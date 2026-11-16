@@ -3,523 +3,523 @@
   "id": 0,
   "off": "3CBD8",
   "ja": "　すで",
-  "en": ""
+  "en": "Bare Hands"
  },
  {
   "id": 1,
   "off": "3CBDC",
   "ja": "[64]カイザーナックル",
-  "en": ""
+  "en": "[64]Kaiser Knuckles"
  },
  {
   "id": 2,
   "off": "3CBE6",
   "ja": "[64]ねこのつめ",
-  "en": ""
+  "en": "[64]Cat Claw"
  },
  {
   "id": 3,
   "off": "3CBED",
   "ja": "[64]ひりゅうのつめ",
-  "en": ""
+  "en": "[64]Wyvern Claw"
  },
  {
   "id": 4,
   "off": "3CBF6",
   "ja": "[64]ようせいのつめ",
-  "en": ""
+  "en": "[64]Fairy Claw"
  },
  {
   "id": 5,
   "off": "3CBFF",
   "ja": "[64]じごくのつめ",
-  "en": ""
+  "en": "[64]Hell Claw"
  },
  {
   "id": 6,
   "off": "3CC07",
   "ja": "[64]ヌンチャク",
-  "en": ""
+  "en": "[64]Nunchaku"
  },
  {
   "id": 7,
   "off": "3CC0E",
   "ja": "[64]トンファー",
-  "en": ""
+  "en": "[64]Tonfa"
  },
  {
   "id": 8,
   "off": "3CC15",
   "ja": "[64]さんせつこん",
-  "en": ""
+  "en": "[64]Three-Section Staff"
  },
  {
   "id": 9,
   "off": "3CC1D",
   "ja": "[66]ミスリルロッド",
-  "en": ""
+  "en": "[66]Mythril Rod"
  },
  {
   "id": 10,
   "off": "3CC26",
   "ja": "[66]ほのおのぼう",
-  "en": ""
+  "en": "[66]Flame Rod"
  },
  {
   "id": 11,
   "off": "3CC2E",
   "ja": "[66]こおりのぼう",
-  "en": ""
+  "en": "[66]Ice Rod"
  },
  {
   "id": 12,
   "off": "3CC36",
   "ja": "[66]ひかりのぼう",
-  "en": ""
+  "en": "[66]Light Rod"
  },
  {
   "id": 13,
   "off": "3CC3E",
   "ja": "[66]すべてのぼう",
-  "en": ""
+  "en": "[66]Rod of All"
  },
  {
   "id": 14,
   "off": "3CC46",
   "ja": "[66]つえ",
-  "en": ""
+  "en": "[66]Staff"
  },
  {
   "id": 15,
   "off": "3CC4A",
   "ja": "[66]もえるつえ",
-  "en": ""
+  "en": "[66]Burning Staff"
  },
  {
   "id": 16,
   "off": "3CC51",
   "ja": "[66]こおるつえ",
-  "en": ""
+  "en": "[66]Freezing Staff"
  },
  {
   "id": 17,
   "off": "3CC58",
   "ja": "[66]ひかるつえ",
-  "en": ""
+  "en": "[66]Shining Staff"
  },
  {
   "id": 18,
   "off": "3CC5F",
   "ja": "[66]ゴーレムのつえ",
-  "en": ""
+  "en": "[66]Golem Staff"
  },
  {
   "id": 19,
   "off": "3CC68",
   "ja": "[66]ルーンのつえ",
-  "en": ""
+  "en": "[66]Rune Staff"
  },
  {
   "id": 20,
   "off": "3CC70",
   "ja": "[66]ちょうろうのつえ",
-  "en": ""
+  "en": "[66]Elder's Staff"
  },
  {
   "id": 21,
   "off": "3CC7A",
   "ja": "[67]ハンマー",
-  "en": ""
+  "en": "[67]Hammer"
  },
  {
   "id": 22,
   "off": "3CC80",
   "ja": "[67]トールハンマー",
-  "en": ""
+  "en": "[67]Thor Hammer"
  },
  {
   "id": 23,
   "off": "3CC89",
   "ja": "[6A]バトルアクス",
-  "en": ""
+  "en": "[6A]Battle Axe"
  },
  {
   "id": 24,
   "off": "3CC91",
   "ja": "[6A]ダブルハーケン",
-  "en": ""
+  "en": "[6A]Double Haken"
  },
  {
   "id": 25,
   "off": "3CC9A",
   "ja": "[6A]モーニングスター",
-  "en": ""
+  "en": "[6A]Morning Star"
  },
  {
   "id": 26,
   "off": "3CCA4",
   "ja": "[68]サンダースピア",
-  "en": ""
+  "en": "[68]Thunder Spear"
  },
  {
   "id": 27,
   "off": "3CCAD",
   "ja": "[68]ウインドスピア",
-  "en": ""
+  "en": "[68]Wind Spear"
  },
  {
   "id": 28,
   "off": "3CCB6",
   "ja": "[68]ブラッドランス",
-  "en": ""
+  "en": "[68]Blood Lance"
  },
  {
   "id": 29,
   "off": "3CCBF",
   "ja": "[68]ホーリーランス",
-  "en": ""
+  "en": "[68]Holy Lance"
  },
  {
   "id": 30,
   "off": "3CCC8",
   "ja": "[69]ナイフ",
-  "en": ""
+  "en": "[69]Knife"
  },
  {
   "id": 31,
   "off": "3CCCD",
   "ja": "[69]ダガー",
-  "en": ""
+  "en": "[69]Dagger"
  },
  {
   "id": 32,
   "off": "3CCD2",
   "ja": "[69]ミスリルナイフ",
-  "en": ""
+  "en": "[69]Mythril Knife"
  },
  {
   "id": 33,
   "off": "3CCDB",
   "ja": "[69]マインゴーシュ",
-  "en": ""
+  "en": "[69]Main Gauche"
  },
  {
   "id": 34,
   "off": "3CCE4",
   "ja": "[69]オリハルコン",
-  "en": ""
+  "en": "[69]Orichalcum"
  },
  {
   "id": 35,
   "off": "3CCEC",
   "ja": "[69]エアーナイフ",
-  "en": ""
+  "en": "[69]Air Knife"
  },
  {
   "id": 36,
   "off": "3CCF4",
   "ja": "[6B]ロングソード",
-  "en": ""
+  "en": "[6B]Longsword"
  },
  {
   "id": 37,
   "off": "3CCFC",
   "ja": "[6B]ワイトスレイヤー",
-  "en": ""
+  "en": "[6B]Wightslayer"
  },
  {
   "id": 38,
   "off": "3CD06",
   "ja": "[6B]きんきらのつるぎ",
-  "en": ""
+  "en": "[6B]Glittering Sword"
  },
  {
   "id": 39,
   "off": "3CD10",
   "ja": "[6B]ミスリルソード",
-  "en": ""
+  "en": "[6B]Mythril Sword"
  },
  {
   "id": 40,
   "off": "3CD19",
   "ja": "[6B]サーペントソード",
-  "en": ""
+  "en": "[6B]Serpent Sword"
  },
  {
   "id": 41,
   "off": "3CD23",
   "ja": "[6B]フリーズブレイド",
-  "en": ""
+  "en": "[6B]Freeze Blade"
  },
  {
   "id": 42,
   "off": "3CD2D",
   "ja": "[6B]ティルヴィング",
-  "en": ""
+  "en": "[6B]Tyrfing"
  },
  {
   "id": 43,
   "off": "3CD36",
   "ja": "[6B]サラマンドソード",
-  "en": ""
+  "en": "[6B]Salamander Sword"
  },
  {
   "id": 44,
   "off": "3CD40",
   "ja": "[6B]キングスソード",
-  "en": ""
+  "en": "[6B]King's Sword"
  },
  {
   "id": 45,
   "off": "3CD49",
   "ja": "[6A]ダブルトマホーク",
-  "en": ""
+  "en": "[6A]Double Tomahawk"
  },
  {
   "id": 46,
   "off": "3CD53",
   "ja": "[6B]こだいのつるぎ",
-  "en": ""
+  "en": "[6B]Ancient Sword"
  },
  {
   "id": 47,
   "off": "3CD5C",
   "ja": "[6C]あしゅら",
-  "en": ""
+  "en": "[6C]Ashura"
  },
  {
   "id": 48,
   "off": "3CD62",
   "ja": "[6B]ブラッドソード",
-  "en": ""
+  "en": "[6B]Blood Sword"
  },
  {
   "id": 49,
   "off": "3CD6B",
   "ja": "[6B]ディフェンダー",
-  "en": ""
+  "en": "[6B]Defender"
  },
  {
   "id": 50,
   "off": "3CD74",
   "ja": "[67]トリトンハンマー",
-  "en": ""
+  "en": "[67]Triton Hammer"
  },
  {
   "id": 51,
   "off": "3CD7E",
   "ja": "[6C]こてつ",
-  "en": ""
+  "en": "[6C]Kotetsu"
  },
  {
   "id": 52,
   "off": "3CD83",
   "ja": "[6C]きくいちもんじ",
-  "en": ""
+  "en": "[6C]Kiku-ichimonji"
  },
  {
   "id": 53,
   "off": "3CD8C",
   "ja": "[6B]ブレイクブレイド",
-  "en": ""
+  "en": "[6B]Break Blade"
  },
  {
   "id": 54,
   "off": "3CD96",
   "ja": "[6B]エクスカリバー",
-  "en": ""
+  "en": "[6B]Excalibur"
  },
  {
   "id": 55,
   "off": "3CD9F",
   "ja": "[6C]マサムネ",
-  "en": ""
+  "en": "[6C]Masamune"
  },
  {
   "id": 56,
   "off": "3CDA5",
   "ja": "[6B]ラグナロク",
-  "en": ""
+  "en": "[6B]Ragnarok"
  },
  {
   "id": 57,
   "off": "3CDAC",
   "ja": "[6B]オニオンソード",
-  "en": ""
+  "en": "[6B]Onion Sword"
  },
  {
   "id": 58,
   "off": "3CDB5",
   "ja": "[65]ほのおのほん",
-  "en": ""
+  "en": "[65]Book of Flame"
  },
  {
   "id": 59,
   "off": "3CDBD",
   "ja": "[65]こおりのほん",
-  "en": ""
+  "en": "[65]Book of Ice"
  },
  {
   "id": 60,
   "off": "3CDC5",
   "ja": "[65]ほのおのじてん",
-  "en": ""
+  "en": "[65]Lexicon of Flame"
  },
  {
   "id": 61,
   "off": "3CDCE",
   "ja": "[65]ひかりのほん",
-  "en": ""
+  "en": "[65]Book of Light"
  },
  {
   "id": 62,
   "off": "3CDD6",
   "ja": "[65]ひかりのじてん",
-  "en": ""
+  "en": "[65]Lexicon of Light"
  },
  {
   "id": 63,
   "off": "3CDDF",
   "ja": "[70]ブーメラン",
-  "en": ""
+  "en": "[70]Boomerang"
  },
  {
   "id": 64,
   "off": "3CDE6",
   "ja": "[70]えんげつりん",
-  "en": ""
+  "en": "[70]Full Moon Ring"
  },
  {
   "id": 65,
   "off": "3CDEE",
   "ja": "[71]しゅりけん",
-  "en": ""
+  "en": "[71]Shuriken"
  },
  {
   "id": 66,
   "off": "3CDF5",
   "ja": "[65]こおりのじてん",
-  "en": ""
+  "en": "[65]Lexicon of Ice"
  },
  {
   "id": 67,
   "off": "3CDFE",
   "ja": "[6F]ギヤマンのベル",
-  "en": ""
+  "en": "[6F]Cut-Glass Bell"
  },
  {
   "id": 68,
   "off": "3CE07",
   "ja": "[6F]だいちのベル",
-  "en": ""
+  "en": "[6F]Earth Bell"
  },
  {
   "id": 69,
   "off": "3CE0F",
   "ja": "[6F]ルーンのベル",
-  "en": ""
+  "en": "[6F]Rune Bell"
  },
  {
   "id": 70,
   "off": "3CE17",
   "ja": "[6D]マドラのたてごと",
-  "en": ""
+  "en": "[6D]Harp of Madora"
  },
  {
   "id": 71,
   "off": "3CE21",
   "ja": "[6D]ゆめのたてごと",
-  "en": ""
+  "en": "[6D]Harp of Dreams"
  },
  {
   "id": 72,
   "off": "3CE2A",
   "ja": "[6D]ラミアのたてごと",
-  "en": ""
+  "en": "[6D]Lamia's Harp"
  },
  {
   "id": 73,
   "off": "3CE34",
   "ja": "[6D]ロキのたてごと",
-  "en": ""
+  "en": "[6D]Loki's Harp"
  },
  {
   "id": 74,
   "off": "3CE3D",
   "ja": "[6E]ゆみ",
-  "en": ""
+  "en": "[6E]Bow"
  },
  {
   "id": 75,
   "off": "3CE41",
   "ja": "[6E]グレートボウ",
-  "en": ""
+  "en": "[6E]Great Bow"
  },
  {
   "id": 76,
   "off": "3CE49",
   "ja": "[6E]キラーボウ",
-  "en": ""
+  "en": "[6E]Killer Bow"
  },
  {
   "id": 77,
   "off": "3CE50",
   "ja": "[6E]ルーンのゆみ",
-  "en": ""
+  "en": "[6E]Rune Bow"
  },
  {
   "id": 78,
   "off": "3CE58",
   "ja": "[6E]よいちのゆみ",
-  "en": ""
+  "en": "[6E]Yoichi's Bow"
  },
  {
   "id": 79,
   "off": "3CE60",
   "ja": "[6E]きのや",
-  "en": ""
+  "en": "[6E]Wooden Arrows"
  },
  {
   "id": 80,
   "off": "3CE65",
   "ja": "[6E]せいなるや",
-  "en": ""
+  "en": "[6E]Holy Arrows"
  },
  {
   "id": 81,
   "off": "3CE6C",
   "ja": "[6E]てつのや",
-  "en": ""
+  "en": "[6E]Iron Arrows"
  },
  {
   "id": 82,
   "off": "3CE72",
   "ja": "[6E]いかづちのや",
-  "en": ""
+  "en": "[6E]Thunder Arrows"
  },
  {
   "id": 83,
   "off": "3CE7A",
   "ja": "[6E]ほのおのや",
-  "en": ""
+  "en": "[6E]Fire Arrows"
  },
  {
   "id": 84,
   "off": "3CE81",
   "ja": "[6E]こおりのや",
-  "en": ""
+  "en": "[6E]Ice Arrows"
  },
  {
   "id": 85,
   "off": "3CE88",
   "ja": "[6E]メデューサのや",
-  "en": ""
+  "en": "[6E]Medusa Arrows"
  },
  {
   "id": 86,
   "off": "3CE91",
   "ja": "[6E]よいちのや",
-  "en": ""
+  "en": "[6E]Yoichi's Arrows"
  },
  {
   "id": 87,
@@ -531,2731 +531,2731 @@
   "id": 88,
   "off": "3CE99",
   "ja": "[60]かわのたて",
-  "en": ""
+  "en": "[60]Leather Shield"
  },
  {
   "id": 89,
   "off": "3CEA0",
   "ja": "[60]オニオンシールド",
-  "en": ""
+  "en": "[60]Onion Shield"
  },
  {
   "id": 90,
   "off": "3CEAA",
   "ja": "[60]ミスリルのたて",
-  "en": ""
+  "en": "[60]Mythril Shield"
  },
  {
   "id": 91,
   "off": "3CEB3",
   "ja": "[60]アイスシールド",
-  "en": ""
+  "en": "[60]Ice Shield"
  },
  {
   "id": 92,
   "off": "3CEBC",
   "ja": "[60]ゆうしゃのたて",
-  "en": ""
+  "en": "[60]Hero's Shield"
  },
  {
   "id": 93,
   "off": "3CEC5",
   "ja": "[60]デモンズシールド",
-  "en": ""
+  "en": "[60]Demon's Shield"
  },
  {
   "id": 94,
   "off": "3CECF",
   "ja": "[60]ダイヤシールド",
-  "en": ""
+  "en": "[60]Diamond Shield"
  },
  {
   "id": 95,
   "off": "3CED8",
   "ja": "[60]イージスのたて",
-  "en": ""
+  "en": "[60]Aegis Shield"
  },
  {
   "id": 96,
   "off": "3CEE1",
   "ja": "[60]げんじのたて",
-  "en": ""
+  "en": "[60]Genji Shield"
  },
  {
   "id": 97,
   "off": "3CEE9",
   "ja": "[60]クリスタルのたて",
-  "en": ""
+  "en": "[60]Crystal Shield"
  },
  {
   "id": 98,
   "off": "3CEF3",
   "ja": "[62]かわのぼうし",
-  "en": ""
+  "en": "[62]Leather Cap"
  },
  {
   "id": 99,
   "off": "3CEFB",
   "ja": "[62]オニオンへルム",
-  "en": ""
+  "en": "[62]Onion Helm"
  },
  {
   "id": 100,
   "off": "3CF04",
   "ja": "[62]ミスリルかぶと",
-  "en": ""
+  "en": "[62]Mythril Helm"
  },
  {
   "id": 101,
   "off": "3CF0D",
   "ja": "[62]ツノガイのかぶと",
-  "en": ""
+  "en": "[62]Tusk Shell Helm"
  },
  {
   "id": 102,
   "off": "3CF17",
   "ja": "[62]アイスへルム",
-  "en": ""
+  "en": "[62]Ice Helm"
  },
  {
   "id": 103,
   "off": "3CF1F",
   "ja": "[62]はちまき",
-  "en": ""
+  "en": "[62]Headband"
  },
  {
   "id": 104,
   "off": "3CF25",
   "ja": "[62]がくしゃのぼうし",
-  "en": ""
+  "en": "[62]Scholar's Hat"
  },
  {
   "id": 105,
   "off": "3CF2F",
   "ja": "[62]くろずきん",
-  "en": ""
+  "en": "[62]Black Hood"
  },
  {
   "id": 106,
   "off": "3CF36",
   "ja": "[62]チャクラバンド",
-  "en": ""
+  "en": "[62]Chakra Band"
  },
  {
   "id": 107,
   "off": "3CF3F",
   "ja": "[62]バイキングへルム",
-  "en": ""
+  "en": "[62]Viking Helm"
  },
  {
   "id": 108,
   "off": "3CF49",
   "ja": "[62]ドラゴンへルム",
-  "en": ""
+  "en": "[62]Dragon Helm"
  },
  {
   "id": 109,
   "off": "3CF52",
   "ja": "[62]はねつきぼうし",
-  "en": ""
+  "en": "[62]Feathered Hat"
  },
  {
   "id": 110,
   "off": "3CF5B",
   "ja": "[62]ダイヤのかぶと",
-  "en": ""
+  "en": "[62]Diamond Helm"
  },
  {
   "id": 111,
   "off": "3CF64",
   "ja": "[62]げんじのかぶと",
-  "en": ""
+  "en": "[62]Genji Helm"
  },
  {
   "id": 112,
   "off": "3CF6D",
   "ja": "[62]クリスタルへルム",
-  "en": ""
+  "en": "[62]Crystal Helm"
  },
  {
   "id": 113,
   "off": "3CF77",
   "ja": "[62]リボン",
-  "en": ""
+  "en": "[62]Ribbon"
  },
  {
   "id": 114,
   "off": "3CF7C",
   "ja": "[61]ふく",
-  "en": ""
+  "en": "[61]Clothes"
  },
  {
   "id": 115,
   "off": "3CF80",
   "ja": "[61]かわよろい",
-  "en": ""
+  "en": "[61]Leather Armor"
  },
  {
   "id": 116,
   "off": "3CF87",
   "ja": "[61]オニオンアーマー",
-  "en": ""
+  "en": "[61]Onion Armor"
  },
  {
   "id": 117,
   "off": "3CF91",
   "ja": "[61]ミスリルアーマー",
-  "en": ""
+  "en": "[61]Mythril Armor"
  },
  {
   "id": 118,
   "off": "3CF9B",
   "ja": "[61]ツノガイのよろい",
-  "en": ""
+  "en": "[61]Tusk Shell Armor"
  },
  {
   "id": 119,
   "off": "3CFA5",
   "ja": "[61]アイスアーマー",
-  "en": ""
+  "en": "[61]Ice Armor"
  },
  {
   "id": 120,
   "off": "3CFAE",
   "ja": "[61]フレイムメイル",
-  "en": ""
+  "en": "[61]Flame Mail"
  },
  {
   "id": 121,
   "off": "3CFB7",
   "ja": "[61]けんぽうぎ",
-  "en": ""
+  "en": "[61]Kenpo Gi"
  },
  {
   "id": 122,
   "off": "3CFBE",
   "ja": "[61]くろしょうぞく",
-  "en": ""
+  "en": "[61]Black Garb"
  },
  {
   "id": 123,
   "off": "3CFC7",
   "ja": "[61]まどうしのふく",
-  "en": ""
+  "en": "[61]Wizard's Garb"
  },
  {
   "id": 124,
   "off": "3CFD0",
   "ja": "[61]バイキングメイル",
-  "en": ""
+  "en": "[61]Viking Mail"
  },
  {
   "id": 125,
   "off": "3CFDA",
   "ja": "[61]くろおびどうぎ",
-  "en": ""
+  "en": "[61]Black Belt Gi"
  },
  {
   "id": 126,
   "off": "3CFE3",
   "ja": "[61]ナイトのよろい",
-  "en": ""
+  "en": "[61]Knight's Armor"
  },
  {
   "id": 127,
   "off": "3CFEC",
   "ja": "[61]ドラゴンメイル",
-  "en": ""
+  "en": "[61]Dragon Mail"
  },
  {
   "id": 128,
   "off": "3CFF5",
   "ja": "[61]しじんのふく",
-  "en": ""
+  "en": "[61]Bard's Garb"
  },
  {
   "id": 129,
   "off": "3CFFD",
   "ja": "[61]がくしゃのふく",
-  "en": ""
+  "en": "[61]Scholar's Garb"
  },
  {
   "id": 130,
   "off": "3D006",
   "ja": "[61]だいちのころも",
-  "en": ""
+  "en": "[61]Robe of the Earth"
  },
  {
   "id": 131,
   "off": "3D00F",
   "ja": "[61]デモンズメイル",
-  "en": ""
+  "en": "[61]Demon's Mail"
  },
  {
   "id": 132,
   "off": "3D018",
   "ja": "[61]ダイヤメイル",
-  "en": ""
+  "en": "[61]Diamond Mail"
  },
  {
   "id": 133,
   "off": "3D020",
   "ja": "[61]リフレクトメイル",
-  "en": ""
+  "en": "[61]Reflect Mail"
  },
  {
   "id": 134,
   "off": "3D02A",
   "ja": "[61]しろのローブ",
-  "en": ""
+  "en": "[61]White Robe"
  },
  {
   "id": 135,
   "off": "3D032",
   "ja": "[61]くろのローブ",
-  "en": ""
+  "en": "[61]Black Robe"
  },
  {
   "id": 136,
   "off": "3D03A",
   "ja": "[61]げんじのよろい",
-  "en": ""
+  "en": "[61]Genji Armor"
  },
  {
   "id": 137,
   "off": "3D043",
   "ja": "[61]クリスタルメイル",
-  "en": ""
+  "en": "[61]Crystal Mail"
  },
  {
   "id": 138,
   "off": "3D04D",
   "ja": "[61]さびたよろい",
-  "en": ""
+  "en": "[61]Rusty Armor"
  },
  {
   "id": 139,
   "off": "3D055",
   "ja": "[63]どうのうでわ",
-  "en": ""
+  "en": "[63]Copper Bracelet"
  },
  {
   "id": 140,
   "off": "3D05D",
   "ja": "[63]オニオレット",
-  "en": ""
+  "en": "[63]Onionlet"
  },
  {
   "id": 141,
   "off": "3D065",
   "ja": "[63]ミスリルのこて",
-  "en": ""
+  "en": "[63]Mythril Gauntlets"
  },
  {
   "id": 142,
   "off": "3D06E",
   "ja": "[63]ミスリルのうでわ",
-  "en": ""
+  "en": "[63]Mythril Bracelet"
  },
  {
   "id": 143,
   "off": "3D078",
   "ja": "[63]とうぞくのこて",
-  "en": ""
+  "en": "[63]Thief's Gauntlets"
  },
  {
   "id": 144,
   "off": "3D081",
   "ja": "[63]ガントレット",
-  "en": ""
+  "en": "[63]Gauntlet"
  },
  {
   "id": 145,
   "off": "3D089",
   "ja": "[63]パワーリスト",
-  "en": ""
+  "en": "[63]Power Wrist"
  },
  {
   "id": 146,
   "off": "3D091",
   "ja": "[63]ルーンのうでわ",
-  "en": ""
+  "en": "[63]Rune Bracelet"
  },
  {
   "id": 147,
   "off": "3D09A",
   "ja": "[63]ダイヤのうでわ",
-  "en": ""
+  "en": "[63]Diamond Bracelet"
  },
  {
   "id": 148,
   "off": "3D0A3",
   "ja": "[63]ダイヤのこて",
-  "en": ""
+  "en": "[63]Diamond Gauntlets"
  },
  {
   "id": 149,
   "off": "3D0AB",
   "ja": "[63]まもりのゆびわ",
-  "en": ""
+  "en": "[63]Ring of Protection"
  },
  {
   "id": 150,
   "off": "3D0B4",
   "ja": "[63]げんじのこて",
-  "en": ""
+  "en": "[63]Genji Gauntlets"
  },
  {
   "id": 151,
   "off": "3D0BC",
   "ja": "[63]クリスタルのこて",
-  "en": ""
+  "en": "[63]Crystal Gauntlets"
  },
  {
   "id": 152,
   "off": "3D0C6",
   "ja": "　まほうのかぎ",
-  "en": ""
+  "en": "Magic Key"
  },
  {
   "id": 153,
   "off": "3D0CE",
   "ja": "　ギサールのやさい",
-  "en": ""
+  "en": "Gysahl Vegetable"
  },
  {
   "id": 154,
   "off": "3D0D8",
   "ja": "　ドワーフのつの",
-  "en": ""
+  "en": "Dwarf's Horn"
  },
  {
   "id": 155,
   "off": "3D0E1",
   "ja": "　ネプトのめ",
-  "en": ""
+  "en": "Nept's Eye"
  },
  {
   "id": 156,
   "off": "3D0E8",
   "ja": "　ときのはぐるま",
-  "en": ""
+  "en": "Gear of Time"
  },
  {
   "id": 157,
   "off": "3D0F1",
   "ja": "　エウレカのかぎ",
-  "en": ""
+  "en": "Eureka Key"
  },
  {
   "id": 158,
   "off": "3D0FA",
   "ja": "　かぜのきば",
-  "en": ""
+  "en": "Fang of Wind"
  },
  {
   "id": 159,
   "off": "3D101",
   "ja": "　ひのきば",
-  "en": ""
+  "en": "Fang of Fire"
  },
  {
   "id": 160,
   "off": "3D107",
   "ja": "　みずのきば",
-  "en": ""
+  "en": "Fang of Water"
  },
  {
   "id": 161,
   "off": "3D10E",
   "ja": "　つちのきば",
-  "en": ""
+  "en": "Fang of Earth"
  },
  {
   "id": 162,
   "off": "3D115",
   "ja": "　ノアのリュート",
-  "en": ""
+  "en": "Noah's Lute"
  },
  {
   "id": 163,
   "off": "3D11E",
   "ja": "　シルクスのかぎ",
-  "en": ""
+  "en": "Syrcus Key"
  },
  {
   "id": 164,
   "off": "3D127",
   "ja": "　こびとのパン",
-  "en": ""
+  "en": "Little People's Bread"
  },
  {
   "id": 165,
   "off": "3D12F",
   "ja": "?????????",
-  "en": ""
+  "en": "?????????"
  },
  {
   "id": 166,
   "off": "3D139",
   "ja": "　ポーション",
-  "en": ""
+  "en": "Potion"
  },
  {
   "id": 167,
   "off": "3D140",
   "ja": "　ハイポーション",
-  "en": ""
+  "en": "High Potion"
  },
  {
   "id": 168,
   "off": "3D149",
   "ja": "　エリクサー",
-  "en": ""
+  "en": "Elixir"
  },
  {
   "id": 169,
   "off": "3D150",
   "ja": "　フェニックスのお",
-  "en": ""
+  "en": "Phoenix Tail"
  },
  {
   "id": 170,
   "off": "3D15A",
   "ja": "　きんのはり",
-  "en": ""
+  "en": "Golden Needle"
  },
  {
   "id": 171,
   "off": "3D161",
   "ja": "　おとめのキッス",
-  "en": ""
+  "en": "Maiden's Kiss"
  },
  {
   "id": 172,
   "off": "3D16A",
   "ja": "　やまびこそう",
-  "en": ""
+  "en": "Echo Herb"
  },
  {
   "id": 173,
   "off": "3D172",
   "ja": "　うちでのこづち",
-  "en": ""
+  "en": "Lucky Mallet"
  },
  {
   "id": 174,
   "off": "3D17B",
   "ja": "　めぐすり",
-  "en": ""
+  "en": "Eye Drops"
  },
  {
   "id": 175,
   "off": "3D181",
   "ja": "　どくけし",
-  "en": ""
+  "en": "Antidote"
  },
  {
   "id": 176,
   "off": "3D187",
   "ja": "　ラッコのあたま",
-  "en": ""
+  "en": "Sea Otter Head"
  },
  {
   "id": 177,
   "off": "3D190",
   "ja": "　ボムのかけら",
-  "en": ""
+  "en": "Bomb Fragment"
  },
  {
   "id": 178,
   "off": "3D198",
   "ja": "　なんきょくのかぜ",
-  "en": ""
+  "en": "Antarctic Wind"
  },
  {
   "id": 179,
   "off": "3D1A2",
   "ja": "　ゼウスのいかり",
-  "en": ""
+  "en": "Zeus's Wrath"
  },
  {
   "id": 180,
   "off": "3D1AB",
   "ja": "　ボムのみぎうで",
-  "en": ""
+  "en": "Bomb's Right Arm"
  },
  {
   "id": 181,
   "off": "3D1B4",
   "ja": "　ほっきょくのかぜ",
-  "en": ""
+  "en": "Arctic Wind"
  },
  {
   "id": 182,
   "off": "3D1BE",
   "ja": "　かみがみのいかり",
-  "en": ""
+  "en": "Wrath of the Gods"
  },
  {
   "id": 183,
   "off": "3D1C8",
   "ja": "　だいちのドラム",
-  "en": ""
+  "en": "Earth Drum"
  },
  {
   "id": 184,
   "off": "3D1D1",
   "ja": "　ラミアのうろこ",
-  "en": ""
+  "en": "Lamia Scale"
  },
  {
   "id": 185,
   "off": "3D1DA",
   "ja": "　バッカスのさけ",
-  "en": ""
+  "en": "Bacchus's Wine"
  },
  {
   "id": 186,
   "off": "3D1E3",
   "ja": "　かめのこうら",
-  "en": ""
+  "en": "Turtle Shell"
  },
  {
   "id": 187,
   "off": "3D1EB",
   "ja": "　あくまのためいき",
-  "en": ""
+  "en": "Devil's Sigh"
  },
  {
   "id": 188,
   "off": "3D1F5",
   "ja": "　ブラックホール",
-  "en": ""
+  "en": "Black Hole"
  },
  {
   "id": 189,
   "off": "3D1FE",
   "ja": "　くろのかおり",
-  "en": ""
+  "en": "Black Scent"
  },
  {
   "id": 190,
   "off": "3D206",
   "ja": "　リリスのくちづけ",
-  "en": ""
+  "en": "Lilith's Kiss"
  },
  {
   "id": 191,
   "off": "3D210",
   "ja": "　てんぐのあくび",
-  "en": ""
+  "en": "Tengu's Yawn"
  },
  {
   "id": 192,
   "off": "3D219",
   "ja": "　かめのこうらわり",
-  "en": ""
+  "en": "Turtle Shell Cracker"
  },
  {
   "id": 193,
   "off": "3D223",
   "ja": "　ますいばり",
-  "en": ""
+  "en": "Anesthetic Needle"
  },
  {
   "id": 194,
   "off": "3D22A",
   "ja": "　ちんもくのおふだ",
-  "en": ""
+  "en": "Charm of Silence"
  },
  {
   "id": 195,
   "off": "3D234",
   "ja": "　ひつじのまくら",
-  "en": ""
+  "en": "Sheep Pillow"
  },
  {
   "id": 196,
   "off": "3D23D",
   "ja": "　ボムのあたま",
-  "en": ""
+  "en": "Bomb's Head"
  },
  {
   "id": 197,
   "off": "3D245",
   "ja": "　ひかりのカーテン",
-  "en": ""
+  "en": "Curtain of Light"
  },
  {
   "id": 198,
   "off": "3D24F",
   "ja": "　チョコボのいかり",
-  "en": ""
+  "en": "Chocobo's Wrath"
  },
  {
   "id": 199,
   "off": "3D259",
   "ja": "　しろのかおり",
-  "en": ""
+  "en": "White Scent"
  },
  {
   "id": 200,
   "off": "3D261",
   "ja": "[75]フレア",
-  "en": ""
+  "en": "[75]Flare"
  },
  {
   "id": 201,
   "off": "3D266",
   "ja": "[75]デス",
-  "en": ""
+  "en": "[75]Death"
  },
  {
   "id": 202,
   "off": "3D26A",
   "ja": "[75]メテオ",
-  "en": ""
+  "en": "[75]Meteor"
  },
  {
   "id": 203,
   "off": "3D26F",
   "ja": "[74]トルネド",
-  "en": ""
+  "en": "[74]Tornado"
  },
  {
   "id": 204,
   "off": "3D275",
   "ja": "[74]アレイズ",
-  "en": ""
+  "en": "[74]Arise"
  },
  {
   "id": 205,
   "off": "3D27B",
   "ja": "[74]ホーリー",
-  "en": ""
+  "en": "[74]Holy"
  },
  {
   "id": 206,
   "off": "3D281",
   "ja": "[72]バハムル",
-  "en": ""
+  "en": "[72]Bahamut"
  },
  {
   "id": 207,
   "off": "3D287",
   "ja": "[75]クエイク",
-  "en": ""
+  "en": "[75]Quake"
  },
  {
   "id": 208,
   "off": "3D28D",
   "ja": "[75]ブレクガ",
-  "en": ""
+  "en": "[75]Breakga"
  },
  {
   "id": 209,
   "off": "3D293",
   "ja": "[75]ドレイン",
-  "en": ""
+  "en": "[75]Drain"
  },
  {
   "id": 210,
   "off": "3D299",
   "ja": "[74]ケアルガ",
-  "en": ""
+  "en": "[74]Curaga"
  },
  {
   "id": 211,
   "off": "3D29F",
   "ja": "[74]エスナ",
-  "en": ""
+  "en": "[74]Esuna"
  },
  {
   "id": 212,
   "off": "3D2A4",
   "ja": "[74]リフレク",
-  "en": ""
+  "en": "[74]Reflect"
  },
  {
   "id": 213,
   "off": "3D2AA",
   "ja": "[72]リバイア",
-  "en": ""
+  "en": "[72]Leviathan"
  },
  {
   "id": 214,
   "off": "3D2B0",
   "ja": "[75]ファイガ",
-  "en": ""
+  "en": "[75]Firaga"
  },
  {
   "id": 215,
   "off": "3D2B6",
   "ja": "[75]バイオ",
-  "en": ""
+  "en": "[75]Bio"
  },
  {
   "id": 216,
   "off": "3D2BB",
   "ja": "[75]デジョン",
-  "en": ""
+  "en": "[75]Dejon"
  },
  {
   "id": 217,
   "off": "3D2C1",
   "ja": "[74]エアロガ",
-  "en": ""
+  "en": "[74]Aeroga"
  },
  {
   "id": 218,
   "off": "3D2C7",
   "ja": "[74]ストナ",
-  "en": ""
+  "en": "[74]Stona"
  },
  {
   "id": 219,
   "off": "3D2CC",
   "ja": "[74]へイスト",
-  "en": ""
+  "en": "[74]Haste"
  },
  {
   "id": 220,
   "off": "3D2D2",
   "ja": "[72]カタスト",
-  "en": ""
+  "en": "[72]Catastrophe"
  },
  {
   "id": 221,
   "off": "3D2D8",
   "ja": "[75]サンダガ",
-  "en": ""
+  "en": "[75]Thundaga"
  },
  {
   "id": 222,
   "off": "3D2DE",
   "ja": "[75]キル",
-  "en": ""
+  "en": "[75]Kill"
  },
  {
   "id": 223,
   "off": "3D2E2",
   "ja": "[75]イレース",
-  "en": ""
+  "en": "[75]Erase"
  },
  {
   "id": 224,
   "off": "3D2E8",
   "ja": "[74]ケアルダ",
-  "en": ""
+  "en": "[74]Curada"
  },
  {
   "id": 225,
   "off": "3D2EE",
   "ja": "[74]レイズ",
-  "en": ""
+  "en": "[74]Raise"
  },
  {
   "id": 226,
   "off": "3D2F3",
   "ja": "[74]プロテス",
-  "en": ""
+  "en": "[74]Protes"
  },
  {
   "id": 227,
   "off": "3D2F9",
   "ja": "[72]ハイパ",
-  "en": ""
+  "en": "[72]Hyper"
  },
  {
   "id": 228,
   "off": "3D2FE",
   "ja": "[75]ブレイク",
-  "en": ""
+  "en": "[75]Break"
  },
  {
   "id": 229,
   "off": "3D304",
   "ja": "[75]ブリザガ",
-  "en": ""
+  "en": "[75]Blizzaga"
  },
  {
   "id": 230,
   "off": "3D30A",
   "ja": "[75]シェイド",
-  "en": ""
+  "en": "[75]Shade"
  },
  {
   "id": 231,
   "off": "3D310",
   "ja": "[74]ライブラ",
-  "en": ""
+  "en": "[74]Libra"
  },
  {
   "id": 232,
   "off": "3D316",
   "ja": "[74]コンフュ",
-  "en": ""
+  "en": "[74]Confuse"
  },
  {
   "id": 233,
   "off": "3D31C",
   "ja": "[74]サイレス",
-  "en": ""
+  "en": "[74]Silence"
  },
  {
   "id": 234,
   "off": "3D322",
   "ja": "[72]ヒートラ",
-  "en": ""
+  "en": "[72]Heatra"
  },
  {
   "id": 235,
   "off": "3D328",
   "ja": "[75]ファイラ",
-  "en": ""
+  "en": "[75]Fira"
  },
  {
   "id": 236,
   "off": "3D32E",
   "ja": "[75]ブリザラ",
-  "en": ""
+  "en": "[75]Blizzara"
  },
  {
   "id": 237,
   "off": "3D334",
   "ja": "[75]サンダラ",
-  "en": ""
+  "en": "[75]Thundara"
  },
  {
   "id": 238,
   "off": "3D33A",
   "ja": "[74]ケアルラ",
-  "en": ""
+  "en": "[74]Cura"
  },
  {
   "id": 239,
   "off": "3D340",
   "ja": "[74]テレポ",
-  "en": ""
+  "en": "[74]Teleport"
  },
  {
   "id": 240,
   "off": "3D345",
   "ja": "[74]ブライナ",
-  "en": ""
+  "en": "[74]Blindna"
  },
  {
   "id": 241,
   "off": "3D34B",
   "ja": "[72]スパルク",
-  "en": ""
+  "en": "[72]Spark"
  },
  {
   "id": 242,
   "off": "3D351",
   "ja": "[75]サンダー",
-  "en": ""
+  "en": "[75]Thunder"
  },
  {
   "id": 243,
   "off": "3D357",
   "ja": "[75]ポイズン",
-  "en": ""
+  "en": "[75]Poison"
  },
  {
   "id": 244,
   "off": "3D35D",
   "ja": "[75]ブライン",
-  "en": ""
+  "en": "[75]Blind"
  },
  {
   "id": 245,
   "off": "3D363",
   "ja": "[74]エアロ",
-  "en": ""
+  "en": "[74]Aero"
  },
  {
   "id": 246,
   "off": "3D368",
   "ja": "[74]トード",
-  "en": ""
+  "en": "[74]Toad"
  },
  {
   "id": 247,
   "off": "3D36D",
   "ja": "[74]ミニマム",
-  "en": ""
+  "en": "[74]Minimum"
  },
  {
   "id": 248,
   "off": "3D373",
   "ja": "[72]アイスン",
-  "en": ""
+  "en": "[72]Icen"
  },
  {
   "id": 249,
   "off": "3D379",
   "ja": "[75]ファイア",
-  "en": ""
+  "en": "[75]Fire"
  },
  {
   "id": 250,
   "off": "3D37F",
   "ja": "[75]ブリザド",
-  "en": ""
+  "en": "[75]Blizzard"
  },
  {
   "id": 251,
   "off": "3D385",
   "ja": "[75]スリプル",
-  "en": ""
+  "en": "[75]Sleep"
  },
  {
   "id": 252,
   "off": "3D38B",
   "ja": "[74]ケアル",
-  "en": ""
+  "en": "[74]Cure"
  },
  {
   "id": 253,
   "off": "3D390",
   "ja": "[74]ポイゾナ",
-  "en": ""
+  "en": "[74]Poisona"
  },
  {
   "id": 254,
   "off": "3D396",
   "ja": "[74]サイトロ",
-  "en": ""
+  "en": "[74]Sightro"
  },
  {
   "id": 255,
   "off": "3D39C",
   "ja": "[72]エスケプ",
-  "en": ""
+  "en": "[72]Escape"
  },
  {
   "id": 256,
   "off": "3D3A2",
   "ja": "ざんてつけん",
-  "en": ""
+  "en": "Zantetsuken"
  },
  {
   "id": 257,
   "off": "3D3A9",
   "ja": "ほのお",
-  "en": ""
+  "en": "Flame"
  },
  {
   "id": 258,
   "off": "3D3AD",
   "ja": "ふぶき",
-  "en": ""
+  "en": "Snowstorm"
  },
  {
   "id": 259,
   "off": "3D3B1",
   "ja": "かみなり",
-  "en": ""
+  "en": "Thunderbolt"
  },
  {
   "id": 260,
   "off": "3D3B6",
   "ja": "どくぎり",
-  "en": ""
+  "en": "Poison Mist"
  },
  {
   "id": 261,
   "off": "3D3BB",
   "ja": "じしん",
-  "en": ""
+  "en": "Earthquake"
  },
  {
   "id": 262,
   "off": "3D3BF",
   "ja": "にらみ",
-  "en": ""
+  "en": "Glare"
  },
  {
   "id": 263,
   "off": "3D3C3",
   "ja": "かいふく1",
-  "en": ""
+  "en": "Restore 1"
  },
  {
   "id": 264,
   "off": "3D3C9",
   "ja": "エリクサー",
-  "en": ""
+  "en": "Elixir"
  },
  {
   "id": 265,
   "off": "3D3CF",
   "ja": "つなみ",
-  "en": ""
+  "en": "Tidal Wave"
  },
  {
   "id": 266,
   "off": "3D3D3",
   "ja": "はどうほう",
-  "en": ""
+  "en": "Wave Cannon"
  },
  {
   "id": 267,
   "off": "3D3D9",
   "ja": "じばく",
-  "en": ""
+  "en": "Self-Destruct"
  },
  {
   "id": 268,
   "off": "3D3DD",
   "ja": "にらみ",
-  "en": ""
+  "en": "Glare"
  },
  {
   "id": 269,
   "off": "3D3E1",
   "ja": "にらみ",
-  "en": ""
+  "en": "Glare"
  },
  {
   "id": 270,
   "off": "3D3E5",
   "ja": "くさいいき",
-  "en": ""
+  "en": "Stinking Breath"
  },
  {
   "id": 271,
   "off": "3D3EB",
   "ja": "マインドブラスト",
-  "en": ""
+  "en": "Mind Blast"
  },
  {
   "id": 272,
   "off": "3D3F4",
   "ja": "しょうかんまほう",
-  "en": ""
+  "en": "Summoning Magic"
  },
  {
   "id": 273,
   "off": "3D3FD",
   "ja": "ぶんれつ1",
-  "en": ""
+  "en": "Division 1"
  },
  {
   "id": 274,
   "off": "3D403",
   "ja": "メガフレア",
-  "en": ""
+  "en": "Megaflare"
  },
  {
   "id": 275,
   "off": "3D409",
   "ja": "ぼうぎょ",
-  "en": ""
+  "en": "Defend"
  },
  {
   "id": 276,
   "off": "3D40E",
   "ja": "かみつき",
-  "en": ""
+  "en": "Bite"
  },
  {
   "id": 277,
   "off": "3D413",
   "ja": "バリアチェンジ",
-  "en": ""
+  "en": "Barrier Change"
  },
  {
   "id": 278,
   "off": "3D41B",
   "ja": "ぞうしょく",
-  "en": ""
+  "en": "Multiply"
  },
  {
   "id": 279,
   "off": "3D421",
   "ja": "ぶんれつ2",
-  "en": ""
+  "en": "Division 2"
  },
  {
   "id": 280,
   "off": "3D427",
   "ja": "じしん",
-  "en": ""
+  "en": "Earthquake"
  },
  {
   "id": 281,
   "off": "3D42B",
   "ja": "りゅうさ",
-  "en": ""
+  "en": "Quicksand"
  },
  {
   "id": 282,
   "off": "3D430",
   "ja": "かまいたち",
-  "en": ""
+  "en": "Kamaitachi"
  },
  {
   "id": 283,
   "off": "3D436",
   "ja": "そこなしぬま",
-  "en": ""
+  "en": "Bottomless Swamp"
  },
  {
   "id": 284,
   "off": "3D43D",
   "ja": "きゅうりゅう",
-  "en": ""
+  "en": "Rapids"
  },
  {
   "id": 285,
   "off": "3D444",
   "ja": "うずしお",
-  "en": ""
+  "en": "Whirlpool"
  },
  {
   "id": 286,
   "off": "3D449",
   "ja": "たつまき",
-  "en": ""
+  "en": "Tornado"
  },
  {
   "id": 287,
   "off": "3D44E",
   "ja": "なだれ",
-  "en": ""
+  "en": "Avalanche"
  },
  {
   "id": 288,
   "off": "3D458",
   "ja": "ゴブリン",
-  "en": ""
+  "en": "Goblin"
  },
  {
   "id": 289,
   "off": "3D45D",
   "ja": "カーバンクル",
-  "en": ""
+  "en": "Carbuncle"
  },
  {
   "id": 290,
   "off": "3D464",
   "ja": "アイファング",
-  "en": ""
+  "en": "Eye Fang"
  },
  {
   "id": 291,
   "off": "3D46B",
   "ja": "ブルーウィスプ",
-  "en": ""
+  "en": "Blue Wisp"
  },
  {
   "id": 292,
   "off": "3D473",
   "ja": "キラービー",
-  "en": ""
+  "en": "Killer Bee"
  },
  {
   "id": 293,
   "off": "3D479",
   "ja": "ウェアウルフ",
-  "en": ""
+  "en": "Werewolf"
  },
  {
   "id": 294,
   "off": "3D480",
   "ja": "バーサーカー",
-  "en": ""
+  "en": "Berserker"
  },
  {
   "id": 295,
   "off": "3D487",
   "ja": "レッドウィスプ",
-  "en": ""
+  "en": "Red Wisp"
  },
  {
   "id": 296,
   "off": "3D48F",
   "ja": "ダークアイ",
-  "en": ""
+  "en": "Dark Eye"
  },
  {
   "id": 297,
   "off": "3D495",
   "ja": "ゾンビ",
-  "en": ""
+  "en": "Zombie"
  },
  {
   "id": 298,
   "off": "3D499",
   "ja": "マミー",
-  "en": ""
+  "en": "Mummy"
  },
  {
   "id": 299,
   "off": "3D49D",
   "ja": "スケルトン",
-  "en": ""
+  "en": "Skeleton"
  },
  {
   "id": 300,
   "off": "3D4A3",
   "ja": "のろいのどうか",
-  "en": ""
+  "en": "Cursed Copper Coin"
  },
  {
   "id": 301,
   "off": "3D4AB",
   "ja": "ラルウァイ",
-  "en": ""
+  "en": "Larvae"
  },
  {
   "id": 302,
   "off": "3D4B1",
   "ja": "シャドウ",
-  "en": ""
+  "en": "Shadow"
  },
  {
   "id": 303,
   "off": "3D4B6",
   "ja": "レブナント",
-  "en": ""
+  "en": "Revenant"
  },
  {
   "id": 304,
   "off": "3D4BC",
   "ja": "ファイアフライ",
-  "en": ""
+  "en": "Firefly"
  },
  {
   "id": 305,
   "off": "3D4C4",
   "ja": "ダイブイーグル",
-  "en": ""
+  "en": "Dive Eagle"
  },
  {
   "id": 306,
   "off": "3D4CC",
   "ja": "ラストバード",
-  "en": ""
+  "en": "Last Bird"
  },
  {
   "id": 307,
   "off": "3D4D3",
   "ja": "ルフ",
-  "en": ""
+  "en": "Rukh"
  },
  {
   "id": 308,
   "off": "3D4D6",
   "ja": "バシリスク",
-  "en": ""
+  "en": "Basilisk"
  },
  {
   "id": 309,
   "off": "3D4DC",
   "ja": "バグベアー",
-  "en": ""
+  "en": "Bugbear"
  },
  {
   "id": 310,
   "off": "3D4E2",
   "ja": "マンドレイク",
-  "en": ""
+  "en": "Mandrake"
  },
  {
   "id": 311,
   "off": "3D4E9",
   "ja": "ウネクローン",
-  "en": ""
+  "en": "Unne Clone"
  },
  {
   "id": 312,
   "off": "3D4F0",
   "ja": "レプラホーン",
-  "en": ""
+  "en": "Leprechaun"
  },
  {
   "id": 313,
   "off": "3D4F7",
   "ja": "ダークフェイス",
-  "en": ""
+  "en": "Dark Face"
  },
  {
   "id": 314,
   "off": "3D4FF",
   "ja": "プティ",
-  "en": ""
+  "en": "Petit"
  },
  {
   "id": 315,
   "off": "3D503",
   "ja": "ポイズンバット",
-  "en": ""
+  "en": "Poison Bat"
  },
  {
   "id": 316,
   "off": "3D50B",
   "ja": "リリパット",
-  "en": ""
+  "en": "Lilliput"
  },
  {
   "id": 317,
   "off": "3D511",
   "ja": "ウェアラット",
-  "en": ""
+  "en": "Wererat"
  },
  {
   "id": 318,
   "off": "3D518",
   "ja": "ブラッドウォーム",
-  "en": ""
+  "en": "Blood Worm"
  },
  {
   "id": 319,
   "off": "3D521",
   "ja": "キラーフィッシュ",
-  "en": ""
+  "en": "Killer Fish"
  },
  {
   "id": 320,
   "off": "3D52A",
   "ja": "ハーミット",
-  "en": ""
+  "en": "Hermit"
  },
  {
   "id": 321,
   "off": "3D530",
   "ja": "シーエレメンタル",
-  "en": ""
+  "en": "Sea Elemental"
  },
  {
   "id": 322,
   "off": "3D539",
   "ja": "タンギー",
-  "en": ""
+  "en": "Tangy"
  },
  {
   "id": 323,
   "off": "3D53E",
   "ja": "サハギン",
-  "en": ""
+  "en": "Sahagin"
  },
  {
   "id": 324,
   "off": "3D543",
   "ja": "パラライマ",
-  "en": ""
+  "en": "Paralima"
  },
  {
   "id": 325,
   "off": "3D549",
   "ja": "グリフォン",
-  "en": ""
+  "en": "Griffon"
  },
  {
   "id": 326,
   "off": "3D54F",
   "ja": "リンクス",
-  "en": ""
+  "en": "Lynx"
  },
  {
   "id": 327,
   "off": "3D554",
   "ja": "ホーネット",
-  "en": ""
+  "en": "Hornet"
  },
  {
   "id": 328,
   "off": "3D55A",
   "ja": "ノッカー",
-  "en": ""
+  "en": "Knocker"
  },
  {
   "id": 329,
   "off": "3D55F",
   "ja": "フライヤー",
-  "en": ""
+  "en": "Flyer"
  },
  {
   "id": 330,
   "off": "3D565",
   "ja": "リザードマン",
-  "en": ""
+  "en": "Lizardman"
  },
  {
   "id": 331,
   "off": "3D56C",
   "ja": "ゴルゴーン",
-  "en": ""
+  "en": "Gorgon"
  },
  {
   "id": 332,
   "off": "3D572",
   "ja": "レッドキャップ",
-  "en": ""
+  "en": "Red Cap"
  },
  {
   "id": 333,
   "off": "3D57A",
   "ja": "バロメッツ",
-  "en": ""
+  "en": "Barometz"
  },
  {
   "id": 334,
   "off": "3D580",
   "ja": "スライム",
-  "en": ""
+  "en": "Slime"
  },
  {
   "id": 335,
   "off": "3D585",
   "ja": "タランチュラ",
-  "en": ""
+  "en": "Tarantula"
  },
  {
   "id": 336,
   "off": "3D58C",
   "ja": "カフジェル",
-  "en": ""
+  "en": "Kafjel"
  },
  {
   "id": 337,
   "off": "3D592",
   "ja": "ピュグマン",
-  "en": ""
+  "en": "Pygman"
  },
  {
   "id": 338,
   "off": "3D598",
   "ja": "ファージャルグ",
-  "en": ""
+  "en": "Farjarg"
  },
  {
   "id": 339,
   "off": "3D5A0",
   "ja": "ブラッドバット",
-  "en": ""
+  "en": "Blood Bat"
  },
  {
   "id": 340,
   "off": "3D5A8",
   "ja": "プティメイジ",
-  "en": ""
+  "en": "Petit Mage"
  },
  {
   "id": 341,
   "off": "3D5AF",
   "ja": "フリアイ",
-  "en": ""
+  "en": "Furiae"
  },
  {
   "id": 342,
   "off": "3D5B4",
   "ja": "オヒシュキ",
-  "en": ""
+  "en": "Ohishuki"
  },
  {
   "id": 343,
   "off": "3D5BA",
   "ja": "ボム",
-  "en": ""
+  "en": "Bomb"
  },
  {
   "id": 344,
   "off": "3D5BD",
   "ja": "マンティコラ",
-  "en": ""
+  "en": "Manticora"
  },
  {
   "id": 345,
   "off": "3D5C4",
   "ja": "しょうにゅうせき",
-  "en": ""
+  "en": "Stalactite"
  },
  {
   "id": 346,
   "off": "3D5CD",
   "ja": "シーデビル",
-  "en": ""
+  "en": "Sea Devil"
  },
  {
   "id": 347,
   "off": "3D5D3",
   "ja": "マーマン",
-  "en": ""
+  "en": "Merman"
  },
  {
   "id": 348,
   "off": "3D5D8",
   "ja": "ルイナスウエーブ",
-  "en": ""
+  "en": "Ruinous Wave"
  },
  {
   "id": 349,
   "off": "3D5E1",
   "ja": "バルーン",
-  "en": ""
+  "en": "Balloon"
  },
  {
   "id": 350,
   "off": "3D5E6",
   "ja": "ミルメコレオ",
-  "en": ""
+  "en": "Myrmecoleo"
  },
  {
   "id": 351,
   "off": "3D5ED",
   "ja": "クロコッタ",
-  "en": ""
+  "en": "Crocotta"
  },
  {
   "id": 352,
   "off": "3D5F3",
   "ja": "アダマンタイマイ",
-  "en": ""
+  "en": "Adamantaimai"
  },
  {
   "id": 353,
   "off": "3D5FC",
   "ja": "レッドマシュマロ",
-  "en": ""
+  "en": "Red Marshmallow"
  },
  {
   "id": 354,
   "off": "3D605",
   "ja": "ファラオ",
-  "en": ""
+  "en": "Pharaoh"
  },
  {
   "id": 355,
   "off": "3D60A",
   "ja": "レムレース",
-  "en": ""
+  "en": "Lemures"
  },
  {
   "id": 356,
   "off": "3D610",
   "ja": "ラミア",
-  "en": ""
+  "en": "Lamia"
  },
  {
   "id": 357,
   "off": "3D614",
   "ja": "デーモン",
-  "en": ""
+  "en": "Demon"
  },
  {
   "id": 358,
   "off": "3D619",
   "ja": "デュラハン",
-  "en": ""
+  "en": "Dullahan"
  },
  {
   "id": 359,
   "off": "3D61F",
   "ja": "アネット",
-  "en": ""
+  "en": "Anet"
  },
  {
   "id": 360,
   "off": "3D624",
   "ja": "マーメイド",
-  "en": ""
+  "en": "Mermaid"
  },
  {
   "id": 361,
   "off": "3D62A",
   "ja": "シーホース",
-  "en": ""
+  "en": "Sea Horse"
  },
  {
   "id": 362,
   "off": "3D630",
   "ja": "シーサーペント",
-  "en": ""
+  "en": "Sea Serpent"
  },
  {
   "id": 363,
   "off": "3D638",
   "ja": "コッカトリス",
-  "en": ""
+  "en": "Cockatrice"
  },
  {
   "id": 364,
   "off": "3D63F",
   "ja": "ポイズントード",
-  "en": ""
+  "en": "Poison Toad"
  },
  {
   "id": 365,
   "off": "3D647",
   "ja": "ツインへッド",
-  "en": ""
+  "en": "Twin Head"
  },
  {
   "id": 366,
   "off": "3D64E",
   "ja": "ローパー",
-  "en": ""
+  "en": "Roper"
  },
  {
   "id": 367,
   "off": "3D653",
   "ja": "アガリアレプト",
-  "en": ""
+  "en": "Agaliarept"
  },
  {
   "id": 368,
   "off": "3D65B",
   "ja": "ダークフット",
-  "en": ""
+  "en": "Dark Foot"
  },
  {
   "id": 369,
   "off": "3D662",
   "ja": "ギガントード",
-  "en": ""
+  "en": "Gigantoad"
  },
  {
   "id": 370,
   "off": "3D669",
   "ja": "ツインライガー",
-  "en": ""
+  "en": "Twin Liger"
  },
  {
   "id": 371,
   "off": "3D671",
   "ja": "ストローパー",
-  "en": ""
+  "en": "Stroper"
  },
  {
   "id": 372,
   "off": "3D678",
   "ja": "ブラックプリン",
-  "en": ""
+  "en": "Black Pudding"
  },
  {
   "id": 373,
   "off": "3D680",
   "ja": "へルカン",
-  "en": ""
+  "en": "Hellcan"
  },
  {
   "id": 374,
   "off": "3D685",
   "ja": "バルカン",
-  "en": ""
+  "en": "Vulcan"
  },
  {
   "id": 375,
   "off": "3D68A",
   "ja": "リュークロコッタ",
-  "en": ""
+  "en": "Leucrocotta"
  },
  {
   "id": 376,
   "off": "3D693",
   "ja": "マジシャン",
-  "en": ""
+  "en": "Magician"
  },
  {
   "id": 377,
   "off": "3D699",
   "ja": "さまようきんか",
-  "en": ""
+  "en": "Wandering Gold Coin"
  },
  {
   "id": 378,
   "off": "3D6A1",
   "ja": "ゴールドイーグル",
-  "en": ""
+  "en": "Gold Eagle"
  },
  {
   "id": 379,
   "off": "3D6AA",
   "ja": "ゴールドウォリア",
-  "en": ""
+  "en": "Gold Warrior"
  },
  {
   "id": 380,
   "off": "3D6B3",
   "ja": "ゴールドベアー",
-  "en": ""
+  "en": "Gold Bear"
  },
  {
   "id": 381,
   "off": "3D6BB",
   "ja": "ゴールドナイト",
-  "en": ""
+  "en": "Gold Knight"
  },
  {
   "id": 382,
   "off": "3D6C3",
   "ja": "ナイトメアー",
-  "en": ""
+  "en": "Nightmare"
  },
  {
   "id": 383,
   "off": "3D6CA",
   "ja": "へルカンメイジ",
-  "en": ""
+  "en": "Hellcan Mage"
  },
  {
   "id": 384,
   "off": "3D6D2",
   "ja": "ニードルモンキー",
-  "en": ""
+  "en": "Needle Monkey"
  },
  {
   "id": 385,
   "off": "3D6DB",
   "ja": "カトブレパス",
-  "en": ""
+  "en": "Catoblepas"
  },
  {
   "id": 386,
   "off": "3D6E2",
   "ja": "ソーサラー",
-  "en": ""
+  "en": "Sorcerer"
  },
  {
   "id": 387,
   "off": "3D6E8",
   "ja": "キャプテン",
-  "en": ""
+  "en": "Captain"
  },
  {
   "id": 388,
   "off": "3D6EE",
   "ja": "サンドウォーム",
-  "en": ""
+  "en": "Sandworm"
  },
  {
   "id": 389,
   "off": "3D6F6",
   "ja": "アイスフライ",
-  "en": ""
+  "en": "Ice Fly"
  },
  {
   "id": 390,
   "off": "3D6FD",
   "ja": "フェニックス",
-  "en": ""
+  "en": "Phoenix"
  },
  {
   "id": 391,
   "off": "3D704",
   "ja": "シムルグ",
-  "en": ""
+  "en": "Simurgh"
  },
  {
   "id": 392,
   "off": "3D709",
   "ja": "ハルピュイア",
-  "en": ""
+  "en": "Harpuia"
  },
  {
   "id": 393,
   "off": "3D710",
   "ja": "ガーゴイル",
-  "en": ""
+  "en": "Gargoyle"
  },
  {
   "id": 394,
   "off": "3D716",
   "ja": "キマイラ",
-  "en": ""
+  "en": "Chimera"
  },
  {
   "id": 395,
   "off": "3D71B",
   "ja": "あくまのうま",
-  "en": ""
+  "en": "Devil's Horse"
  },
  {
   "id": 396,
   "off": "3D722",
   "ja": "ロックガーゴイル",
-  "en": ""
+  "en": "Rock Gargoyle"
  },
  {
   "id": 397,
   "off": "3D72B",
   "ja": "うしにんげん",
-  "en": ""
+  "en": "Bullman"
  },
  {
   "id": 398,
   "off": "3D732",
   "ja": "くろきし",
-  "en": ""
+  "en": "Black Knight"
  },
  {
   "id": 399,
   "off": "3D737",
   "ja": "メイジフライヤー",
-  "en": ""
+  "en": "Mage Flyer"
  },
  {
   "id": 400,
   "off": "3D740",
   "ja": "ニーグル",
-  "en": ""
+  "en": "Nigul"
  },
  {
   "id": 401,
   "off": "3D745",
   "ja": "アブトー",
-  "en": ""
+  "en": "Abtoh"
  },
  {
   "id": 402,
   "off": "3D74A",
   "ja": "ネプトりゅう",
-  "en": ""
+  "en": "Nept Dragon"
  },
  {
   "id": 403,
   "off": "3D751",
   "ja": "カーグラ",
-  "en": ""
+  "en": "Kargra"
  },
  {
   "id": 404,
   "off": "3D756",
   "ja": "カリュブディス",
-  "en": ""
+  "en": "Charybdis"
  },
  {
   "id": 405,
   "off": "3D75E",
   "ja": "ディーライ",
-  "en": ""
+  "en": "Deelai"
  },
  {
   "id": 406,
   "off": "3D764",
   "ja": "メイジキマイラ",
-  "en": ""
+  "en": "Mage Chimera"
  },
  {
   "id": 407,
   "off": "3D76C",
   "ja": "キングリザード",
-  "en": ""
+  "en": "King Lizard"
  },
  {
   "id": 408,
   "off": "3D774",
   "ja": "プテラノゴン",
-  "en": ""
+  "en": "Pteranogon"
  },
  {
   "id": 409,
   "off": "3D77B",
   "ja": "ワイバーン",
-  "en": ""
+  "en": "Wyvern"
  },
  {
   "id": 410,
   "off": "3D781",
   "ja": "ベヒーモス",
-  "en": ""
+  "en": "Behemoth"
  },
  {
   "id": 411,
   "off": "3D787",
   "ja": "キングシーホース",
-  "en": ""
+  "en": "King Sea Horse"
  },
  {
   "id": 412,
   "off": "3D790",
   "ja": "ドラゴン",
-  "en": ""
+  "en": "Dragon"
  },
  {
   "id": 413,
   "off": "3D795",
   "ja": "キュクロプス",
-  "en": ""
+  "en": "Kyklops"
  },
  {
   "id": 414,
   "off": "3D79C",
   "ja": "ボストロル",
-  "en": ""
+  "en": "Boss Troll"
  },
  {
   "id": 415,
   "off": "3D7A2",
   "ja": "ファハン",
-  "en": ""
+  "en": "Fachan"
  },
  {
   "id": 416,
   "off": "3D7A7",
   "ja": "ケンコス",
-  "en": ""
+  "en": "Kenkos"
  },
  {
   "id": 417,
   "off": "3D7AC",
   "ja": "バラー",
-  "en": ""
+  "en": "Balor"
  },
  {
   "id": 418,
   "off": "3D7B0",
   "ja": "ドズメア",
-  "en": ""
+  "en": "Dosmare"
  },
  {
   "id": 419,
   "off": "3D7B5",
   "ja": "うみのまじょ",
-  "en": ""
+  "en": "Sea Witch"
  },
  {
   "id": 420,
   "off": "3D7BC",
   "ja": "さつじんやどかり",
-  "en": ""
+  "en": "Murder Hermit Crab"
  },
  {
   "id": 421,
   "off": "3D7C5",
   "ja": "オログハイ",
-  "en": ""
+  "en": "Olog-hai"
  },
  {
   "id": 422,
   "off": "3D7CB",
   "ja": "ケルピー",
-  "en": ""
+  "en": "Kelpie"
  },
  {
   "id": 423,
   "off": "3D7D0",
   "ja": "エーギル",
-  "en": ""
+  "en": "Aegir"
  },
  {
   "id": 424,
   "off": "3D7D5",
   "ja": "ピュラリス",
-  "en": ""
+  "en": "Pyralis"
  },
  {
   "id": 425,
   "off": "3D7DB",
   "ja": "シレノス",
-  "en": ""
+  "en": "Silenus"
  },
  {
   "id": 426,
   "off": "3D7E0",
   "ja": "ガーブ",
-  "en": ""
+  "en": "Garb"
  },
  {
   "id": 427,
   "off": "3D7E4",
   "ja": "アズリエル",
-  "en": ""
+  "en": "Azriel"
  },
  {
   "id": 428,
   "off": "3D7EA",
   "ja": "イーター",
-  "en": ""
+  "en": "Eater"
  },
  {
   "id": 429,
   "off": "3D7EF",
   "ja": "ホブゴブリン",
-  "en": ""
+  "en": "Hobgoblin"
  },
  {
   "id": 430,
   "off": "3D7F6",
   "ja": "ドラゴンゾンビ",
-  "en": ""
+  "en": "Dragon Zombie"
  },
  {
   "id": 431,
   "off": "3D7FE",
   "ja": "デスクロー",
-  "en": ""
+  "en": "Death Claw"
  },
  {
   "id": 432,
   "off": "3D804",
   "ja": "じごくのうま",
-  "en": ""
+  "en": "Horse of Hell"
  },
  {
   "id": 433,
   "off": "3D80B",
   "ja": "クロノス",
-  "en": ""
+  "en": "Chronos"
  },
  {
   "id": 434,
   "off": "3D810",
   "ja": "バルフレー",
-  "en": ""
+  "en": "Balfrey"
  },
  {
   "id": 435,
   "off": "3D816",
   "ja": "ハニエル",
-  "en": ""
+  "en": "Haniel"
  },
  {
   "id": 436,
   "off": "3D81B",
   "ja": "バッサゴ",
-  "en": ""
+  "en": "Bassago"
  },
  {
   "id": 437,
   "off": "3D820",
   "ja": "ペリュトン",
-  "en": ""
+  "en": "Peryton"
  },
  {
   "id": 438,
   "off": "3D826",
   "ja": "オーガ",
-  "en": ""
+  "en": "Ogre"
  },
  {
   "id": 439,
   "off": "3D82A",
   "ja": "サイクロプス",
-  "en": ""
+  "en": "Cyclops"
  },
  {
   "id": 440,
   "off": "3D831",
   "ja": "ネメシス",
-  "en": ""
+  "en": "Nemesis"
  },
  {
   "id": 441,
   "off": "3D836",
   "ja": "フンババ",
-  "en": ""
+  "en": "Humbaba"
  },
  {
   "id": 442,
   "off": "3D83B",
   "ja": "デスニードル",
-  "en": ""
+  "en": "Death Needle"
  },
  {
   "id": 443,
   "off": "3D842",
   "ja": "ライガー",
-  "en": ""
+  "en": "Liger"
  },
  {
   "id": 444,
   "off": "3D847",
   "ja": "ザンデクローン",
-  "en": ""
+  "en": "Xande Clone"
  },
  {
   "id": 445,
   "off": "3D84F",
   "ja": "アイオン",
-  "en": ""
+  "en": "Aion"
  },
  {
   "id": 446,
   "off": "3D854",
   "ja": "ミノタウロス",
-  "en": ""
+  "en": "Minotaur"
  },
  {
   "id": 447,
   "off": "3D85B",
   "ja": "ウロボロス",
-  "en": ""
+  "en": "Ouroboros"
  },
  {
   "id": 448,
   "off": "3D861",
   "ja": "プランクタイ",
-  "en": ""
+  "en": "Planktai"
  },
  {
   "id": 449,
   "off": "3D868",
   "ja": "シーライオン",
-  "en": ""
+  "en": "Sea Lion"
  },
  {
   "id": 450,
   "off": "3D86F",
   "ja": "レモラ",
-  "en": ""
+  "en": "Remora"
  },
  {
   "id": 451,
   "off": "3D873",
   "ja": "グラネイド",
-  "en": ""
+  "en": "Grenade"
  },
  {
   "id": 452,
   "off": "3D879",
   "ja": "よくりゅう",
-  "en": ""
+  "en": "Winged Dragon"
  },
  {
   "id": 453,
   "off": "3D87F",
   "ja": "グレートボロス",
-  "en": ""
+  "en": "Great Boros"
  },
  {
   "id": 454,
   "off": "3D887",
   "ja": "ライガーサーベル",
-  "en": ""
+  "en": "Liger Saber"
  },
  {
   "id": 455,
   "off": "3D890",
   "ja": "ラミアクイーン",
-  "en": ""
+  "en": "Lamia Queen"
  },
  {
   "id": 456,
   "off": "3D898",
   "ja": "アイアンクロー",
-  "en": ""
+  "en": "Iron Claw"
  },
  {
   "id": 457,
   "off": "3D8A0",
   "ja": "グレートデーモン",
-  "en": ""
+  "en": "Great Demon"
  },
  {
   "id": 458,
   "off": "3D8A9",
   "ja": "タナトス",
-  "en": ""
+  "en": "Thanatos"
  },
  {
   "id": 459,
   "off": "3D8AE",
   "ja": "ボーンドラゴン",
-  "en": ""
+  "en": "Bone Dragon"
  },
  {
   "id": 460,
   "off": "3D8B6",
   "ja": "キングベヒーモス",
-  "en": ""
+  "en": "King Behemoth"
  },
  {
   "id": 461,
   "off": "3D8BF",
   "ja": "ドーガクローン",
-  "en": ""
+  "en": "Doga Clone"
  },
  {
   "id": 462,
   "off": "3D8C7",
   "ja": "グリーンドラゴン",
-  "en": ""
+  "en": "Green Dragon"
  },
  {
   "id": 463,
   "off": "3D8D0",
   "ja": "アバイ",
-  "en": ""
+  "en": "Abai"
  },
  {
   "id": 464,
   "off": "3D8D4",
   "ja": "スレイプニル",
-  "en": ""
+  "en": "Sleipnir"
  },
  {
   "id": 465,
   "off": "3D8DB",
   "ja": "ハオカー",
-  "en": ""
+  "en": "Haokah"
  },
  {
   "id": 466,
   "off": "3D8E0",
   "ja": "アケローン",
-  "en": ""
+  "en": "Acheron"
  },
  {
   "id": 467,
   "off": "3D8E6",
   "ja": "オケアノス",
-  "en": ""
+  "en": "Oceanus"
  },
  {
   "id": 468,
   "off": "3D8EC",
   "ja": "アモン",
-  "en": ""
+  "en": "Amon"
  },
  {
   "id": 469,
   "off": "3D8F0",
   "ja": "ゴモリー",
-  "en": ""
+  "en": "Gomory"
  },
  {
   "id": 470,
   "off": "3D8F5",
   "ja": "ブラク",
-  "en": ""
+  "en": "Burak"
  },
  {
   "id": 471,
   "off": "3D8F9",
   "ja": "ほのおのまじん",
-  "en": ""
+  "en": "Flame Demon"
  },
  {
   "id": 472,
   "off": "3D901",
   "ja": "プラティナル",
-  "en": ""
+  "en": "Platinal"
  },
  {
   "id": 473,
   "off": "3D908",
   "ja": "クムクム",
-  "en": ""
+  "en": "Kumkum"
  },
  {
   "id": 474,
   "off": "3D90D",
   "ja": "しのび",
-  "en": ""
+  "en": "Shinobi"
  },
  {
   "id": 475,
   "off": "3D911",
   "ja": "おかしら",
-  "en": ""
+  "en": "Chief"
  },
  {
   "id": 476,
   "off": "3D916",
   "ja": "かげ",
-  "en": ""
+  "en": "Shade"
  },
  {
   "id": 477,
   "off": "3D919",
   "ja": "ダークジェネラル",
-  "en": ""
+  "en": "Dark General"
  },
  {
   "id": 478,
   "off": "3D922",
   "ja": "スプリガン",
-  "en": ""
+  "en": "Spriggan"
  },
  {
   "id": 479,
   "off": "3D928",
   "ja": "テリブルドラゴン",
-  "en": ""
+  "en": "Terrible Dragon"
  },
  {
   "id": 480,
   "off": "3D931",
   "ja": "グラシャラボラス",
-  "en": ""
+  "en": "Glasya-Labolas"
  },
  {
   "id": 481,
   "off": "3D93A",
   "ja": "ヨルムンガンド",
-  "en": ""
+  "en": "Jormungand"
  },
  {
   "id": 482,
   "off": "3D942",
   "ja": "トール",
-  "en": ""
+  "en": "Thor"
  },
  {
   "id": 483,
   "off": "3D946",
   "ja": "へカトンケイル",
-  "en": ""
+  "en": "Hecatoncheir"
  },
  {
   "id": 484,
   "off": "3D94E",
   "ja": "ヒュドラ",
-  "en": ""
+  "en": "Hydra"
  },
  {
   "id": 485,
   "off": "3D953",
   "ja": "クィーンスキュラ",
-  "en": ""
+  "en": "Queen Scylla"
  },
  {
   "id": 486,
   "off": "3D95C",
   "ja": "ガルム",
-  "en": ""
+  "en": "Garm"
  },
  {
   "id": 487,
   "off": "3D960",
   "ja": "ダブルドラゴン",
-  "en": ""
+  "en": "Double Dragon"
  },
  {
   "id": 488,
   "off": "3D968",
   "ja": "イエロードラゴン",
-  "en": ""
+  "en": "Yellow Dragon"
  },
  {
   "id": 489,
   "off": "3D971",
   "ja": "バハムート",
-  "en": ""
+  "en": "Bahamut"
  },
  {
   "id": 490,
   "off": "3D977",
   "ja": "オーディン",
-  "en": ""
+  "en": "Odin"
  },
  {
   "id": 491,
   "off": "3D97D",
   "ja": "リバイアサン",
-  "en": ""
+  "en": "Leviathan"
  },
  {
   "id": 492,
   "off": "3D984",
   "ja": "ランドタートル",
-  "en": ""
+  "en": "Land Turtle"
  },
  {
   "id": 493,
   "off": "3D98C",
   "ja": "ジン",
-  "en": ""
+  "en": "Djinn"
  },
  {
   "id": 494,
   "off": "3D98F",
   "ja": "おおネズミ",
-  "en": ""
+  "en": "Giant Rat"
  },
  {
   "id": 495,
   "off": "3D995",
   "ja": "メデューサ",
-  "en": ""
+  "en": "Medusa"
  },
  {
   "id": 496,
   "off": "3D99B",
   "ja": "とうぞくグツコー",
-  "en": ""
+  "en": "Gutsco the Thief"
  },
  {
   "id": 497,
   "off": "3D9A4",
   "ja": "サラマンダー",
-  "en": ""
+  "en": "Salamander"
  },
  {
   "id": 498,
   "off": "3D9AB",
   "ja": "まどうしハイン",
-  "en": ""
+  "en": "Hein the Wizard"
  },
  {
   "id": 499,
   "off": "3D9B3",
   "ja": "クラーケン",
-  "en": ""
+  "en": "Kraken"
  },
  {
   "id": 500,
   "off": "3D9B9",
   "ja": "ゴールドル",
-  "en": ""
+  "en": "Goldor"
  },
  {
   "id": 501,
   "off": "3D9BF",
   "ja": "ガルーダ",
-  "en": ""
+  "en": "Garuda"
  },
  {
   "id": 502,
   "off": "3D9C4",
   "ja": "バハムート",
-  "en": ""
+  "en": "Bahamut"
  },
  {
   "id": 503,
   "off": "3D9CA",
   "ja": "ドーガ",
-  "en": ""
+  "en": "Doga"
  },
  {
   "id": 504,
   "off": "3D9CE",
   "ja": "ウネ",
-  "en": ""
+  "en": "Unne"
  },
  {
   "id": 505,
   "off": "3D9D1",
   "ja": "ティターン",
-  "en": ""
+  "en": "Titan"
  },
  {
   "id": 506,
   "off": "3D9D7",
   "ja": "ニンジャ",
-  "en": ""
+  "en": "Ninja"
  },
  {
   "id": 507,
   "off": "3D9DC",
   "ja": "くのいち",
-  "en": ""
+  "en": "Kunoichi"
  },
  {
   "id": 508,
   "off": "3D9E1",
   "ja": "ジェネラル",
-  "en": ""
+  "en": "General"
  },
  {
   "id": 509,
   "off": "3D9E7",
   "ja": "スキュラ",
-  "en": ""
+  "en": "Scylla"
  },
  {
   "id": 510,
   "off": "3D9EC",
   "ja": "ガーディアン",
-  "en": ""
+  "en": "Guardian"
  },
  {
   "id": 511,
   "off": "3D9F3",
   "ja": "レッドドラゴン",
-  "en": ""
+  "en": "Red Dragon"
  },
  {
   "id": 512,
   "off": "3D9FB",
   "ja": "まおうザンデ",
-  "en": ""
+  "en": "Demon King Xande"
  },
  {
   "id": 513,
   "off": "3DA02",
   "ja": "ケルベロス",
-  "en": ""
+  "en": "Cerberus"
  },
  {
   "id": 514,
   "off": "3DA08",
   "ja": "2へッドドラゴン",
-  "en": ""
+  "en": "Two-Headed Dragon"
  },
  {
   "id": 515,
   "off": "3DA11",
   "ja": "エキドナ",
-  "en": ""
+  "en": "Echidna"
  },
  {
   "id": 516,
   "off": "3DA16",
   "ja": "アーリマン",
-  "en": ""
+  "en": "Ahriman"
  },
  {
   "id": 517,
   "off": "3DA1C",
   "ja": "くらやみのくも",
-  "en": ""
+  "en": "Cloud of Darkness"
  },
  {
   "id": 518,
   "off": "3DA24",
   "ja": "くらやみのくも",
-  "en": ""
+  "en": "Cloud of Darkness"
  },
  {
   "id": 519,
   "off": "3DA2C",
   "ja": "[74]チョコボ",
-  "en": ""
+  "en": "[74]Chocobo"
  },
  {
   "id": 520,
   "off": "3DA32",
   "ja": "[75]チョコボ",
-  "en": ""
+  "en": "[75]Chocobo"
  },
  {
   "id": 521,
   "off": "3DA38",
   "ja": "チョコボ",
-  "en": ""
+  "en": "Chocobo"
  },
  {
   "id": 522,
   "off": "3DA3D",
   "ja": "[74]シヴァ",
-  "en": ""
+  "en": "[74]Shiva"
  },
  {
   "id": 523,
   "off": "3DA42",
   "ja": "[75]シヴァ",
-  "en": ""
+  "en": "[75]Shiva"
  },
  {
   "id": 524,
   "off": "3DA47",
   "ja": "シヴァ",
-  "en": ""
+  "en": "Shiva"
  },
  {
   "id": 525,
   "off": "3DA4B",
   "ja": "[74]ラムウ",
-  "en": ""
+  "en": "[74]Ramuh"
  },
  {
   "id": 526,
   "off": "3DA50",
   "ja": "[75]ラムウ",
-  "en": ""
+  "en": "[75]Ramuh"
  },
  {
   "id": 527,
   "off": "3DA55",
   "ja": "ラムウ",
-  "en": ""
+  "en": "Ramuh"
  },
  {
   "id": 528,
   "off": "3DA59",
   "ja": "[74]イフリート",
-  "en": ""
+  "en": "[74]Ifrit"
  },
  {
   "id": 529,
   "off": "3DA60",
   "ja": "[75]イフリート",
-  "en": ""
+  "en": "[75]Ifrit"
  },
  {
   "id": 530,
   "off": "3DA67",
   "ja": "イフリート",
-  "en": ""
+  "en": "Ifrit"
  },
  {
   "id": 531,
   "off": "3DA6D",
   "ja": "[74]タイタン",
-  "en": ""
+  "en": "[74]Titan"
  },
  {
   "id": 532,
   "off": "3DA73",
   "ja": "[75]タイタン",
-  "en": ""
+  "en": "[75]Titan"
  },
  {
   "id": 533,
   "off": "3DA79",
   "ja": "タイタン",
-  "en": ""
+  "en": "Titan"
  },
  {
   "id": 534,
   "off": "3DA7E",
   "ja": "[74]オーディン",
-  "en": ""
+  "en": "[74]Odin"
  },
  {
   "id": 535,
   "off": "3DA85",
   "ja": "[75]オーディン",
-  "en": ""
+  "en": "[75]Odin"
  },
  {
   "id": 536,
   "off": "3DA8C",
   "ja": "オーディン",
-  "en": ""
+  "en": "Odin"
  },
  {
   "id": 537,
   "off": "3DA92",
   "ja": "[74]リバイアサン",
-  "en": ""
+  "en": "[74]Leviathan"
  },
  {
   "id": 538,
   "off": "3DA9A",
   "ja": "[75]リバイアサン",
-  "en": ""
+  "en": "[75]Leviathan"
  },
  {
   "id": 539,
   "off": "3DAA2",
   "ja": "リバイアサン",
-  "en": ""
+  "en": "Leviathan"
  },
  {
   "id": 540,
   "off": "3DAA9",
   "ja": "[74]バハムート",
-  "en": ""
+  "en": "[74]Bahamut"
  },
  {
   "id": 541,
   "off": "3DAB0",
   "ja": "[75]バハムート",
-  "en": ""
+  "en": "[75]Bahamut"
  },
  {
   "id": 542,
   "off": "3DAB7",
   "ja": "バハムート",
-  "en": ""
+  "en": "Bahamut"
  },
  {
   "id": 543,
@@ -3273,373 +3273,373 @@
   "id": 545,
   "off": "3DAC9",
   "ja": "まほうをきゅうしゅうした!",
-  "en": ""
+  "en": "Absorbed the magic!"
  },
  {
   "id": 546,
   "off": "3DAD7",
   "ja": "ぜんしん",
-  "en": ""
+  "en": "Forward"
  },
  {
   "id": 547,
   "off": "3DADC",
   "ja": "こうたい",
-  "en": ""
+  "en": "Back"
  },
  {
   "id": 548,
   "off": "3DAE1",
   "ja": "たたかう",
-  "en": ""
+  "en": "Fight"
  },
  {
   "id": 549,
   "off": "3DAE6",
   "ja": "ぼうぎょ",
-  "en": ""
+  "en": "Defend"
  },
  {
   "id": 550,
   "off": "3DAEB",
   "ja": "にげる",
-  "en": ""
+  "en": "Run"
  },
  {
   "id": 551,
   "off": "3DAEF",
   "ja": "とんずら",
-  "en": ""
+  "en": "Bolt"
  },
  {
   "id": 552,
   "off": "3DAF4",
   "ja": "ジャンプ",
-  "en": ""
+  "en": "Jump"
  },
  {
   "id": 553,
   "off": "3DAF9",
   "ja": "ミス!",
-  "en": ""
+  "en": "Miss!"
  },
  {
   "id": 554,
   "off": "3DAFD",
   "ja": "ひっさつ",
-  "en": ""
+  "en": "Sure Kill"
  },
  {
   "id": 555,
   "off": "3DB02",
   "ja": "ちけい",
-  "en": ""
+  "en": "Terrain"
  },
  {
   "id": 556,
   "off": "3DB06",
   "ja": "しらべる",
-  "en": ""
+  "en": "Examine"
  },
  {
   "id": 557,
   "off": "3DB0B",
   "ja": "みやぶる",
-  "en": ""
+  "en": "See Through"
  },
  {
   "id": 558,
   "off": "3DB10",
   "ja": "ぬすむ",
-  "en": ""
+  "en": "Steal"
  },
  {
   "id": 559,
   "off": "3DB14",
   "ja": "ためる",
-  "en": ""
+  "en": "Build Up"
  },
  {
   "id": 560,
   "off": "3DB18",
   "ja": "うたう",
-  "en": ""
+  "en": "Sing"
  },
  {
   "id": 561,
   "off": "3DB1C",
   "ja": "おどかす",
-  "en": ""
+  "en": "Scare"
  },
  {
   "id": 562,
   "off": "3DB21",
   "ja": "おうえん",
-  "en": ""
+  "en": "Cheer"
  },
  {
   "id": 563,
   "off": "3DB26",
   "ja": "かいヒット",
-  "en": ""
+  "en": "Hits"
  },
  {
   "id": 564,
   "off": "3DB2C",
   "ja": "アイテム",
-  "en": ""
+  "en": "Item"
  },
  {
   "id": 565,
   "off": "3DB31",
   "ja": "まほう",
-  "en": ""
+  "en": "Magic"
  },
  {
   "id": 566,
   "off": "3DB35",
   "ja": "ぜんたい",
-  "en": ""
+  "en": "All"
  },
  {
   "id": 567,
   "off": "3DB3A",
   "ja": "せんせいこうげき!",
-  "en": ""
+  "en": "First strike!"
  },
  {
   "id": 568,
   "off": "3DB44",
   "ja": "モンスターのせんせいこうげき!",
-  "en": ""
+  "en": "The monsters strike first!"
  },
  {
   "id": 569,
   "off": "3DB54",
   "ja": "バックアタックだ!",
-  "en": ""
+  "en": "Back attack!"
  },
  {
   "id": 570,
   "off": "3DB5E",
   "ja": "しんでしまった!",
-  "en": ""
+  "en": "has died!"
  },
  {
   "id": 571,
   "off": "3DB67",
   "ja": "てきをたおした!",
-  "en": ""
+  "en": "Defeated the enemy!"
  },
  {
   "id": 572,
   "off": "3DB70",
   "ja": "ぜんめつした‥‥",
-  "en": ""
+  "en": "Wiped out..."
  },
  {
   "id": 573,
   "off": "3DB79",
   "ja": "てきは　ぜんめつした!",
-  "en": ""
+  "en": "The enemies were wiped out!"
  },
  {
   "id": 574,
   "off": "3DB85",
   "ja": "にげだした‥‥",
-  "en": ""
+  "en": "Ran away..."
  },
  {
   "id": 575,
   "off": "3DB8D",
   "ja": "にげられない!",
-  "en": ""
+  "en": "Can't escape!"
  },
  {
   "id": 576,
   "off": "3DB95",
   "ja": "レベルアップ!",
-  "en": ""
+  "en": "Level up!"
  },
  {
   "id": 577,
   "off": "3DB9D",
   "ja": "いきのねをとめた!",
-  "en": ""
+  "en": "Stopped its breath for good!"
  },
  {
   "id": 578,
   "off": "3DBA7",
   "ja": "じゅくれんどアップ!",
-  "en": ""
+  "en": "Proficiency up!"
  },
  {
   "id": 579,
   "off": "3DBB2",
   "ja": "ひんしのじょうたい",
-  "en": ""
+  "en": "Near death"
  },
  {
   "id": 580,
   "off": "3DBBC",
   "ja": "かんぜんふっかつ!!",
-  "en": ""
+  "en": "Fully revived!!"
  },
  {
   "id": 581,
   "off": "3DBC7",
   "ja": "[77][79]をきゅうしゅうした!",
-  "en": ""
+  "en": "Absorbed [77][79]!"
  },
  {
   "id": 582,
   "off": "3DBD4",
   "ja": "[77][79]をすいとられた!",
-  "en": ""
+  "en": "[77][79] was drained!"
  },
  {
   "id": 583,
   "off": "3DBDF",
   "ja": "[77][79]をぎゃくにすいとられた!!",
-  "en": ""
+  "en": "[77][79] was drained back instead!!"
  },
  {
   "id": 584,
   "off": "3DBEF",
   "ja": "いしになりくだけちった!",
-  "en": ""
+  "en": "Turned to stone and crumbled away!"
  },
  {
   "id": 585,
   "off": "3DBFC",
   "ja": "おたから:",
-  "en": ""
+  "en": "Treasure:"
  },
  {
   "id": 586,
   "off": "3DC02",
   "ja": "[77][79]かいふく!",
-  "en": ""
+  "en": "[77][79] restored!"
  },
  {
   "id": 587,
   "off": "3DC0A",
   "ja": "ステータスかいふく",
-  "en": ""
+  "en": "Status restored"
  },
  {
   "id": 588,
   "off": "3DC14",
   "ja": "バリアをはった",
-  "en": ""
+  "en": "Put up a barrier"
  },
  {
   "id": 589,
   "off": "3DC1C",
   "ja": "ギルてにいれた!",
-  "en": ""
+  "en": "Gil obtained!"
  },
  {
   "id": 590,
   "off": "3DC25",
   "ja": "キャパシティかくとく!",
-  "en": ""
+  "en": "Capacity gained!"
  },
  {
   "id": 591,
   "off": "3DC31",
   "ja": "ためすぎてじばくした!",
-  "en": ""
+  "en": "Built up too much and self-destructed!"
  },
  {
   "id": 592,
   "off": "3DC3D",
   "ja": "じげんのひずみにおくりこんだ!",
-  "en": ""
+  "en": "Sent into the rift between dimensions!"
  },
  {
   "id": 593,
   "off": "3DC4D",
   "ja": "みんな　きあいがはいった!",
-  "en": ""
+  "en": "Everyone is fired up!"
  },
  {
   "id": 594,
   "off": "3DC5B",
   "ja": "モンスターをびびらせた",
-  "en": ""
+  "en": "Frightened the monsters"
  },
  {
   "id": 595,
   "off": "3DC67",
   "ja": "こうげきりょくアップ!",
-  "en": ""
+  "en": "Attack power up!"
  },
  {
   "id": 596,
   "off": "3DC73",
   "ja": "クリティカルヒット!",
-  "en": ""
+  "en": "Critical hit!"
  },
  {
   "id": 597,
   "off": "3DC7E",
   "ja": "ぬすみそこなった",
-  "en": ""
+  "en": "Failed to steal"
  },
  {
   "id": 598,
   "off": "3DC87",
   "ja": "ザコはぜんめつした!",
-  "en": ""
+  "en": "The small fry were wiped out!"
  },
  {
   "id": 599,
   "off": "3DC92",
   "ja": "バリアしょうきょ!",
-  "en": ""
+  "en": "Barrier removed!"
  },
  {
   "id": 600,
   "off": "3DC9C",
   "ja": "[77][79]かいふく!",
-  "en": ""
+  "en": "[77][79] restored!"
  },
  {
   "id": 601,
   "off": "3DCA4",
   "ja": "いきかえった!",
-  "en": ""
+  "en": "Came back to life!"
  },
  {
   "id": 602,
   "off": "3DCAC",
   "ja": "ぼうぎょりょくアップ!",
-  "en": ""
+  "en": "Defense up!"
  },
  {
   "id": 603,
   "off": "3DCB8",
   "ja": "こうかがなかった",
-  "en": ""
+  "en": "It had no effect"
  },
  {
   "id": 604,
   "off": "3DCC1",
   "ja": "からだがじょじょにせきかする",
-  "en": ""
+  "en": "The body is slowly turning to stone"
  },
  {
   "id": 605,
   "off": "3DCD0",
   "ja": "たいほうの　えんごしゃげき!",
-  "en": ""
+  "en": "Covering fire from the cannon!"
  },
  {
   "id": 606,
   "off": "3DCDF",
   "ja": "てきのかげをしばった",
-  "en": ""
+  "en": "Bound the enemy's shadow"
  },
  {
   "id": 607,
@@ -3651,139 +3651,139 @@
   "id": 608,
   "off": "3DCEB",
   "ja": "ポイントの[76][7A][79]かくとく",
-  "en": ""
+  "en": "points of [76][7A][79] gained"
  },
  {
   "id": 609,
   "off": "3DCF8",
   "ja": "どくのダメージ!",
-  "en": ""
+  "en": "Poison damage!"
  },
  {
   "id": 610,
   "off": "3DD01",
   "ja": "たてごとがないのでうたえない!",
-  "en": ""
+  "en": "Can't sing without a harp!"
  },
  {
   "id": 611,
   "off": "3DD11",
   "ja": "じゃくてんは　とくにない",
-  "en": ""
+  "en": "No particular weakness"
  },
  {
   "id": 612,
   "off": "3DD1E",
   "ja": "ようすをみている",
-  "en": ""
+  "en": "Is watching and waiting"
  },
  {
   "id": 613,
   "off": "3DD27",
   "ja": "アンデッドにダメージ!",
-  "en": ""
+  "en": "Damage to the undead!"
  },
  {
   "id": 614,
   "off": "3DD33",
   "ja": "[77][79]かいふく!",
-  "en": ""
+  "en": "[77][79] restored!"
  },
  {
   "id": 615,
   "off": "3DD3B",
   "ja": "じげんのひずみにおくりこんだ!",
-  "en": ""
+  "en": "Sent into the rift between dimensions!"
  },
  {
   "id": 616,
   "off": "3DD4B",
   "ja": "せいなるちからによわい!",
-  "en": ""
+  "en": "Weak against holy power!"
  },
  {
   "id": 617,
   "off": "3DD58",
   "ja": "じしんによわい!",
-  "en": ""
+  "en": "Weak against earthquakes!"
  },
  {
   "id": 618,
   "off": "3DD61",
   "ja": "かぜのちからによわい!",
-  "en": ""
+  "en": "Weak against the power of wind!"
  },
  {
   "id": 619,
   "off": "3DD6D",
   "ja": "ほのおによわい!",
-  "en": ""
+  "en": "Weak against fire!"
  },
  {
   "id": 620,
   "off": "3DD76",
   "ja": "れいきによわい!",
-  "en": ""
+  "en": "Weak against cold!"
  },
  {
   "id": 621,
   "off": "3DD7F",
   "ja": "かみなりによわい!",
-  "en": ""
+  "en": "Weak against lightning!"
  },
  {
   "id": 622,
   "off": "3DD89",
   "ja": "あんこくけんによわい!",
-  "en": ""
+  "en": "Weak against the Dark Sword!"
  },
  {
   "id": 623,
   "off": "3DD95",
   "ja": "しっぱい!ダメージがもどってきた!",
-  "en": ""
+  "en": "Failed! The damage came back!"
  },
  {
   "id": 624,
   "off": "3DDA7",
   "ja": "ちんもくしていて　こうかがでない!",
-  "en": ""
+  "en": "Silenced, so it has no effect!"
  },
  {
   "id": 625,
   "off": "3DDB9",
   "ja": "なにも　おこらなかった",
-  "en": ""
+  "en": "Nothing happened"
  },
  {
   "id": 626,
   "off": "3DDC5",
   "ja": "ナイトが　みをていして　かばった!",
-  "en": ""
+  "en": "The Knight threw their body in the way and covered!"
  },
  {
   "id": 627,
   "off": "3DDD7",
   "ja": "かえるは　まほうがつかえない!",
-  "en": ""
+  "en": "Frogs can't use magic!"
  },
  {
   "id": 628,
   "off": "3DDE7",
   "ja": "[77][79]かいふく!",
-  "en": ""
+  "en": "[77][79] restored!"
  },
  {
   "id": 629,
   "off": "3DDEF",
   "ja": "にげごしで　ぼうぎょできなかった",
-  "en": ""
+  "en": "Was ready to run and couldn't defend"
  },
  {
   "id": 630,
   "off": "3DE00",
   "ja": "せんとうちゅうは　いみがなかった!",
-  "en": ""
+  "en": "It meant nothing during battle!"
  },
  {
   "id": 631,
@@ -3837,13 +3837,13 @@
   "id": 639,
   "off": "3DE1A",
   "ja": "[77][79]かいふく!",
-  "en": ""
+  "en": "[77][79] restored!"
  },
  {
   "id": 640,
   "off": "3DE22",
   "ja": "[77][79]/[78][79]かんぜんかいふく!",
-  "en": ""
+  "en": "[77][79]/[78][79] fully restored!"
  },
  {
   "id": 641,
@@ -3861,7 +3861,7 @@
   "id": 643,
   "off": "3DE33",
   "ja": "ダメージをあたえて　じばくした!",
-  "en": ""
+  "en": "Dealt damage and self-destructed!"
  },
  {
   "id": 644,
@@ -3891,13 +3891,13 @@
   "id": 648,
   "off": "3DE48",
   "ja": "モンスターをしょうかんした!",
-  "en": ""
+  "en": "Summoned a monster!"
  },
  {
   "id": 649,
   "off": "3DE57",
   "ja": "ぶんれつした!",
-  "en": ""
+  "en": "Split apart!"
  },
  {
   "id": 650,
@@ -3909,222 +3909,222 @@
   "id": 651,
   "off": "3DE60",
   "ja": "くびをひっこめて　みをまもっている",
-  "en": ""
+  "en": "Pulled its head in and is protecting itself"
  },
  {
   "id": 652,
   "off": "3DE72",
   "ja": "くびをだして　こうげきしてきた",
-  "en": ""
+  "en": "Stuck its head out and attacked"
  },
  {
   "id": 653,
   "off": "3DE82",
   "ja": "じゃくてんがへんかした!",
-  "en": ""
+  "en": "Its weakness changed!"
  },
  {
   "id": 654,
   "off": "3DE8F",
   "ja": "なかまをよんでふえた!",
-  "en": ""
+  "en": "Called its friends and multiplied!"
  },
  {
   "id": 655,
   "off": "3DE9B",
   "ja": "ぶんれつした!",
-  "en": ""
+  "en": "Split apart!"
  },
  {
   "id": 656,
   "off": "3DEA3",
   "ja": "じしんを　おこした!",
-  "en": ""
+  "en": "Caused an earthquake!"
  },
  {
   "id": 657,
   "off": "3DEAE",
   "ja": "りゅうさにあしをふみいれた",
-  "en": ""
+  "en": "Stepped into quicksand"
  },
  {
   "id": 658,
   "off": "3DEBC",
   "ja": "しんくうかまいたち!",
-  "en": ""
+  "en": "Vacuum Kamaitachi!"
  },
  {
   "id": 659,
   "off": "3DEC7",
   "ja": "そこなしぬまにしずんだ",
-  "en": ""
+  "en": "Sank into a bottomless swamp"
  },
  {
   "id": 660,
   "off": "3DED3",
   "ja": "きゅうりゅうにのみこまれた",
-  "en": ""
+  "en": "Swallowed by the rapids"
  },
  {
   "id": 661,
   "off": "3DEE1",
   "ja": "うずしおがてきをまきこむ!",
-  "en": ""
+  "en": "A whirlpool engulfs the enemy!"
  },
  {
   "id": 662,
   "off": "3DEEF",
   "ja": "たつまきをよんだ!",
-  "en": ""
+  "en": "Called a tornado!"
  },
  {
   "id": 663,
   "off": "3DEF9",
   "ja": "らくせきがてきをちょくげき!",
-  "en": ""
+  "en": "Falling rocks hit the enemy head-on!"
  },
  {
   "id": 664,
   "off": "3DF08",
   "ja": "スタコラにげた",
-  "en": ""
+  "en": "Scampered off"
  },
  {
   "id": 665,
   "off": "3DF10",
   "ja": "なぐられた!",
-  "en": ""
+  "en": "Got punched!"
  },
  {
   "id": 666,
   "off": "3DF17",
   "ja": "キック",
-  "en": ""
+  "en": "Kick"
  },
  {
   "id": 667,
   "off": "3DF1B",
   "ja": "さいみんこうせん!",
-  "en": ""
+  "en": "Hypnotic beam!"
  },
  {
   "id": 668,
   "off": "3DF25",
   "ja": "つめたいしせんでこおりついた",
-  "en": ""
+  "en": "Frozen solid by an icy stare"
  },
  {
   "id": 669,
   "off": "3DF34",
   "ja": "ダイヤモンドダスト!",
-  "en": ""
+  "en": "Diamond Dust!"
  },
  {
   "id": 670,
   "off": "3DF3F",
   "ja": "マインドブラスト!",
-  "en": ""
+  "en": "Mind Blast!"
  },
  {
   "id": 671,
   "off": "3DF49",
   "ja": "かみのいかづち",
-  "en": ""
+  "en": "Lightning of the Gods"
  },
  {
   "id": 672,
   "off": "3DF51",
   "ja": "てんのいかり",
-  "en": ""
+  "en": "Wrath of Heaven"
  },
  {
   "id": 673,
   "off": "3DF58",
   "ja": "かいふくまほう",
-  "en": ""
+  "en": "Healing magic"
  },
  {
   "id": 674,
   "off": "3DF60",
   "ja": "いかりのほのお",
-  "en": ""
+  "en": "Flames of Wrath"
  },
  {
   "id": 675,
   "off": "3DF68",
   "ja": "じごくのかえん",
-  "en": ""
+  "en": "Flames of Hell"
  },
  {
   "id": 676,
   "off": "3DF70",
   "ja": "ボコボコになぐった",
-  "en": ""
+  "en": "Beat it to a pulp"
  },
  {
   "id": 677,
   "off": "3DF7A",
   "ja": "ガンガンにけりをいれた",
-  "en": ""
+  "en": "Laid in kick after kick"
  },
  {
   "id": 678,
   "off": "3DF86",
   "ja": "だいちをゆるがす!",
-  "en": ""
+  "en": "Shakes the earth!"
  },
  {
   "id": 679,
   "off": "3DF90",
   "ja": "ぜんいんにバリア!",
-  "en": ""
+  "en": "Barrier on everyone!"
  },
  {
   "id": 680,
   "off": "3DF9A",
   "ja": "つるぎが　てきをきりさいた!",
-  "en": ""
+  "en": "The sword cut the enemy apart!"
  },
  {
   "id": 681,
   "off": "3DFA9",
   "ja": "ざんてつけん!てきはぜんめつした!",
-  "en": ""
+  "en": "Zantetsuken! The enemies were wiped out!"
  },
  {
   "id": 682,
   "off": "3DFBB",
   "ja": "せきかにらみ!",
-  "en": ""
+  "en": "Petrifying glare!"
  },
  {
   "id": 683,
   "off": "3DFC3",
   "ja": "きょだいなたつまきをおこした",
-  "en": ""
+  "en": "Raised a giant tornado"
  },
  {
   "id": 684,
   "off": "3DFD2",
   "ja": "つなみをおこした",
-  "en": ""
+  "en": "Raised a tsunami"
  },
  {
   "id": 685,
   "off": "3DFDB",
   "ja": "オーラ!こうげきりょくがアップ",
-  "en": ""
+  "en": "Aura! Attack power up"
  },
  {
   "id": 686,
   "off": "3DFEB",
   "ja": "まっぷたつにきりさいた!",
-  "en": ""
+  "en": "Cut it clean in two!"
  },
  {
   "id": 687,
   "off": "3DFF8",
   "ja": "メガフレア!",
-  "en": ""
+  "en": "Megaflare!"
  }
 ]
