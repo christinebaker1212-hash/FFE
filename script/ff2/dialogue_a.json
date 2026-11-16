@@ -273,331 +273,331 @@
   "id": 45,
   "off": "68E0D",
   "ja": "バフスクには　{18:EE}のかわりに　ボーゲンって\nひとが　いるみたいよ",
-  "en": ""
+  "en": "Seems there's someone called Bogen in Bafsk\ninstead of the {18:EE}"
  },
  {
   "id": 46,
   "off": "68E2E",
   "ja": "ぼくも　はんらんぐんにはいって　ていこくと\nたたかうんだ!",
-  "en": ""
+  "en": "I'm gonna join the rebel army too and\nfight the Empire!"
  },
  {
   "id": 47,
   "off": "68E4C",
   "ja": "おねがいじゃ。　バフスクの{18:F3}を\nかんせいするまえに　はかいしておくれ",
-  "en": ""
+  "en": "I beg you. Destroy the {18:F3} in Bafsk\nbefore it is completed"
  },
  {
   "id": 48,
   "off": "68E70",
   "ja": "アルテアで　{18:2F}の{18:ED}が　はんらんぐんを\nつくったときいて　{18:EC}は　ここにきました。\n{18:EC}も　ていこくと　たたかいます!",
-  "en": ""
+  "en": "I heard that the {18:ED} of {18:2F} had formed a rebel army\nin Altea, so {18:EC} came here.\n{18:EC} will fight the Empire too!"
  },
  {
   "id": 49,
   "off": "68EAD",
   "ja": "{18:F3}は　バフスクでつくってるんだ",
-  "en": ""
+  "en": "They're building the {18:F3} in Bafsk"
  },
  {
   "id": 50,
   "off": "68EBE",
   "ja": "アルテアももうすぐ　ていこくにせんりょうされて\nしまうの?",
-  "en": ""
+  "en": "Is Altea going to be occupied by the Empire\nsoon, too?"
  },
  {
   "id": 51,
   "off": "68EDC",
   "ja": "トブールがあなたたちのもちかえった{18:F2}で\nぶきやぼうぐを　どんどんつくっている\nあなたたちのおかげだ",
-  "en": ""
+  "en": "Tobul is making weapon after weapon and armor\nwith the {18:F2} you brought back\nIt's all thanks to you"
  },
  {
   "id": 52,
   "off": "68F0F",
   "ja": "たいへんだ!　おうさまのぐあいが　きゅうに\nわるくなった",
-  "en": ""
+  "en": "This is terrible! The king's condition has\nsuddenly worsened"
  },
  {
   "id": 53,
   "off": "68F2C",
   "ja": "おお　おぬしら　ついに　{18:F3}を　ばくは\nしたか!　やはり　わしの　みこんだとおりじゃ!",
-  "en": ""
+  "en": "Ohh, so you lot finally blew up\nthe {18:F3}! Just as I thought of you!"
  },
  {
   "id": 54,
   "off": "68F58",
   "ja": "{18:ED}さまを　たすけだしてくれたのに\nおうさまが‥‥",
-  "en": ""
+  "en": "You rescued the {18:ED} for us,\nand yet the king..."
  },
  {
   "id": 55,
   "off": "68F72",
   "ja": "ようやった!　{18:F3}を　やっつけたか!",
-  "en": ""
+  "en": "Well done! So you've taken care of the {18:F3}!"
  },
  {
   "id": 56,
   "off": "68F85",
   "ja": "やった!　これでもう　あんしんだ!",
-  "en": ""
+  "en": "Yes! Now we can rest easy!"
  },
  {
   "id": 57,
   "off": "68F97",
   "ja": "{18:F3}を　やっつけたんですって?\nステキ!",
-  "en": ""
+  "en": "You took care of the {18:F3}, I hear?\nHow wonderful!"
  },
  {
   "id": 58,
   "off": "68FAC",
   "ja": "なんということだ\nおうさまが　なくなられるとは‥‥",
-  "en": ""
+  "en": "How terrible\nThat the king should pass away..."
  },
  {
   "id": 59,
   "off": "68FC6",
   "ja": "ディストか。　とおい　しまぐにじゃ。\nせつげんの　ひがしの　うみにあるのじゃが‥‥\nパルムで　ふねを　みつけたら　みなみへと\nかじをとれ",
-  "en": ""
+  "en": "Deist, is it. A far-off island country.\nIt lies in the sea east of the snowfield...\nWhen you find a ship in Palm,\nsteer to the south"
  },
  {
   "id": 60,
   "off": "6900B",
   "ja": "おうさまが　なくなってしまった‥‥",
-  "en": ""
+  "en": "The king has passed away..."
  },
  {
   "id": 61,
   "off": "6901D",
   "ja": "ぼくも　{18:0E}にのって　そらを　とんでみたいな",
-  "en": ""
+  "en": "I wish I could ride a {18:0E} and\nfly through the sky too"
  },
  {
   "id": 62,
   "off": "69034",
   "ja": "ディストは　{18:0E}と　{18:FA}のしま。\nパルムで　ふねを　みつけなされ",
-  "en": ""
+  "en": "Deist is the island of the {18:0E} and the {18:FA}.\nFind a ship in Palm"
  },
  {
   "id": 63,
   "off": "69055",
   "ja": "なに　ディスト!?　だめだめ\nほかを　あたってくんな!",
-  "en": ""
+  "en": "What, Deist!? No, no\nGo ask someone else!"
  },
  {
   "id": 64,
   "off": "69071",
   "ja": "ディストに　いきたいんですって?\nだったら　こっちにきちゃだめよ。\nパルムのまちに　もどって　ふねをさがさなくちゃ",
-  "en": ""
+  "en": "You want to go to Deist?\nThen you shouldn't be coming this way.\nYou need to go back to the town of Palm and look for a ship"
  },
  {
   "id": 65,
   "off": "690AB",
   "ja": "ヨーゼフは　しんでしまったのね‥‥",
-  "en": ""
+  "en": "So Josef is dead..."
  },
  {
   "id": 66,
   "off": "690BD",
   "ja": "おうさまの　ようたいが　あまりよくないのだ‥‥",
-  "en": ""
+  "en": "The king's condition is not good at all..."
  },
  {
   "id": 67,
   "off": "690D5",
   "ja": "われわれは　どうやって　あの　{18:F3}に\nたちむかったらいいんだ‥‥",
-  "en": ""
+  "en": "How on earth are we supposed to stand up\nto that {18:F3}..."
  },
  {
   "id": 68,
   "off": "690F6",
   "ja": "とうとう　{18:F3}が　かんせいしてしまった",
-  "en": ""
+  "en": "The {18:F3} has finally been completed"
  },
  {
   "id": 69,
   "off": "6910A",
   "ja": "ほれみたことか!　わしのいったとおりになったわい\nおまえらには　にが　おもすぎたんじゃ",
-  "en": ""
+  "en": "See, what did I tell you! It turned out just as I said\nIt was too heavy a burden for you lot"
  },
  {
   "id": 70,
   "off": "69136",
   "ja": "とうとう　このアルテアにも　{18:F3}が\nせめてきたが　さいわい　このアジトは　ぶじだったよ。\nまちのひとも　ここにひなんしてきたんだ",
-  "en": ""
+  "en": "The {18:F3} finally attacked Altea too,\nbut luckily this hideout came through safe.\nThe townspeople have taken refuge here as well"
  },
  {
   "id": 71,
   "off": "69177",
   "ja": "{18:F3}を　はかいしなければ　ひがいは\nどんどんひろがるぞ",
-  "en": ""
+  "en": "If the {18:F3} isn't destroyed, the damage\nwill keep on spreading"
  },
  {
   "id": 72,
   "off": "69193",
   "ja": "ポフトのまちにいる　シドなら　{18:F3}の\nじゃくてんを　しってるかも!\nだって　{18:F5}を　つくったぐらいですもの。\nきかいのことには　くわしいんじゃないかしら?",
-  "en": ""
+  "en": "Cid in the town of Poft might know\nthe {18:F3}'s weak point!\nAfter all, he built the {18:F5}.\nI'd bet he knows all about machines, don't you think?"
  },
  {
   "id": 73,
   "off": "691E1",
   "ja": "うえーん　こわかったよー",
-  "en": ""
+  "en": "Waaah, I was so scared"
  },
  {
   "id": 74,
   "off": "691EE",
   "ja": "ああ　かみよ　こくおうのいのちを　すくいたまえ",
-  "en": ""
+  "en": "O gods, I pray you, save the life of our king"
  },
  {
   "id": 75,
   "off": "69206",
   "ja": "あなたたちがもどるまで　なんとかここで\nもちこたえます",
-  "en": ""
+  "en": "We'll hold out here somehow\nuntil you come back"
  },
  {
   "id": 76,
   "off": "69222",
   "ja": "{18:EB}おうじが　いない!\nどこに　いってしまったんだ?",
-  "en": ""
+  "en": "Prince {18:EB} is gone!\nWhere has he gone?"
  },
  {
   "id": 77,
   "off": "6923D",
   "ja": "{18:F3}が　おそってきたんです\nでも　このアジトは　ぶじだったんです",
-  "en": ""
+  "en": "The {18:F3} attacked us\nBut this hideout came through safe"
  },
  {
   "id": 78,
   "off": "6925E",
   "ja": "まちの　そとにいたひとたちは　みんな\nしんじゃったよー",
-  "en": ""
+  "en": "Everyone who was outside the town\nis dead!"
  },
  {
   "id": 79,
   "off": "6927A",
   "ja": "おお　みんな　{18:F3}に　やられてしまった‥‥",
-  "en": ""
+  "en": "Ohh, everyone was killed by the {18:F3}..."
  },
  {
   "id": 80,
   "off": "69290",
   "ja": "いててっ!　もう　おれは　だめだ",
-  "en": ""
+  "en": "Ow ow! I'm done for"
  },
  {
   "id": 81,
   "off": "692A1",
   "ja": "{18:F3}が　おそってきたんだ",
-  "en": ""
+  "en": "The {18:F3} attacked us"
  },
  {
   "id": 82,
   "off": "692AE",
   "ja": "むすめが‥‥　むすめが　しんじまった‥‥",
-  "en": ""
+  "en": "My daughter... my daughter is dead..."
  },
  {
   "id": 83,
   "off": "692C3",
   "ja": "{18:F3}が　おそってきたんです\nみんな　しんでしまったー!",
-  "en": ""
+  "en": "The {18:F3} attacked us\nEveryone's dead!"
  },
  {
   "id": 84,
   "off": "692DF",
   "ja": "{18:ED}を　たすけだしてください",
-  "en": ""
+  "en": "Please rescue the {18:ED}"
  },
  {
   "id": 85,
   "off": "692EE",
   "ja": "{18:ED}が　{18:F3}に　とらえられて\nしまいました!",
-  "en": ""
+  "en": "The {18:ED} has been captured\nby the {18:F3}!"
  },
  {
   "id": 86,
   "off": "69305",
   "ja": "{18:F3}は　{18:2F}のきたに　むかったという\nじょうほうが　はいった",
-  "en": ""
+  "en": "Word has come that the {18:F3} headed\nnorth of {18:2F}"
  },
  {
   "id": 87,
   "off": "69324",
   "ja": "{18:EF}{18:ED}が　つかまっちまったわい\nおぬしらに　はたして　たすけられるかの!",
-  "en": ""
+  "en": "So {18:ED} {18:EF} has gone and got herself caught\nCan you lot really rescue her, I wonder!"
  },
  {
   "id": 88,
   "off": "6934A",
   "ja": "{18:ED}は　{18:F3}のなかに　とらえられて\nいるらしいのだ\nたのむ!　たすけだしてくれ!",
-  "en": ""
+  "en": "It seems the {18:ED} is being held captive\ninside the {18:F3}\nPlease! Rescue her!"
  },
  {
   "id": 89,
   "off": "69373",
   "ja": "{18:EC}が　とめるのを　ふりきって　{18:ED}は\n{18:F5}に　のったのです。\nまさか　ていこくに　つかまるとは!",
-  "en": ""
+  "en": "The {18:ED} brushed off {18:EC} when {18:EC} tried to stop her,\nand boarded the {18:F5}.\nWho would have thought she'd be captured by the Empire!"
  },
  {
   "id": 90,
   "off": "693A5",
   "ja": "こんど　{18:F3}が　おそってきたら\nもう　おしまいです",
-  "en": ""
+  "en": "If the {18:F3} attacks again,\nthat'll be the end of us"
  },
  {
   "id": 91,
   "off": "693BF",
   "ja": "うえーん　おーじょさまー",
-  "en": ""
+  "en": "Waaah, Princeeess"
  },
  {
   "id": 92,
   "off": "693CC",
   "ja": "{18:2F}のはるか　きたのほうに　ていこくの\nほきゅうきちがあるらしいぞ。　{18:F3}は\nいまごろ　そこに　おるじゃろう",
-  "en": ""
+  "en": "It seems the Empire has a supply base\nfar to the north of {18:2F}. The {18:F3}\nmust be there by now"
  },
  {
   "id": 93,
   "off": "69403",
   "ja": "{18:ED}は　シドの　{18:F5}で\nカシュオーンじょうに\nあなたがたを　むかえにいったのです",
-  "en": ""
+  "en": "The {18:ED} went in Cid's {18:F5}\nto Castle Kashuon\nto pick you up"
  },
  {
   "id": 94,
   "off": "6942C",
   "ja": "あっ!　それは　カシュオーンの{18:F7}!",
-  "en": ""
+  "en": "Ah! That's Kashuon's {18:F7}!"
  },
  {
   "id": 95,
   "off": "6943F",
   "ja": "その　{18:F7}で　{18:F3}を\nばくはしてくださいっ!",
-  "en": ""
+  "en": "Please use that {18:F7} to\nblow up the {18:F3}!"
  },
  {
   "id": 96,
   "off": "69456",
   "ja": "{18:EF}さまを　たすけだして!",
-  "en": ""
+  "en": "Rescue Lady {18:EF}!"
  },
  {
   "id": 97,
   "off": "69464",
   "ja": "{18:F3}は　{18:2F}よりも　さらに　きたに\nいったところで　ほきゅうをうけている。\nいまなら　なかにもぐりこむことができるかもしれん\nいそぐのじゃ!",
-  "en": ""
+  "en": "The {18:F3} is being resupplied\nfurther north still of {18:2F}.\nNow you might be able to sneak inside\nHurry!"
  },
  {
   "id": 98,
   "off": "694AB",
   "ja": "{18:EF}{18:ED}が　ていこくにつかまったって\nいうじゃねえか",
-  "en": ""
+  "en": "I hear {18:ED} {18:EF} has been\ncaught by the Empire"
  },
  {
   "id": 99,
   "off": "694C6",
   "ja": "シドの{18:F5}ともども　{18:EF}{18:ED}が\nていこくにつかまったらしいぜ",
-  "en": ""
+  "en": "Seems {18:ED} {18:EF} got caught by the Empire,\nCid's {18:F5} and all"
  },
  {
   "id": 100,
