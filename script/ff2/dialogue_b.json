@@ -363,181 +363,181 @@
   "id": 60,
   "off": "59521",
   "ja": "{18:EC}のなは　{18:EB}。　かつては　カシュオーンの\nおうじだった。　いまはただの　ひきょうものだ。\nあにのスコットが　うちじにしたとき　{18:EC}は\nにげだして　しまったのだ!!",
-  "en": ""
+  "en": "My name is {18:EB}. Once {18:EC} was the prince of\nKashuon. Now I'm nothing but a coward.\nWhen my older brother Scott died in battle, {18:EC}\nran away!!"
  },
  {
   "id": 61,
   "off": "59575",
   "ja": "そうか　きみは　たたかいにしがんしたのか。\n{18:EC}は　{18:EF}に　きょぜつされるのが　こわくて\nしがんもできずに　こんなところで\nうじうじしているんだ。　わらってやってくれ",
-  "en": ""
+  "en": "I see, so you volunteered to fight.\n{18:EC} was so afraid of being rejected by {18:EF}\nthat I couldn't even volunteer, and here I am,\nmoping about in a place like this. Go ahead and laugh at me"
  },
  {
   "id": 62,
   "off": "595C9",
   "ja": "カシュオーンに　だいだいつたわる　{18:04}のつるぎを\nスコットが　もっていた。\nあれは　すばらしい　きれあじだった。",
-  "en": ""
+  "en": "Scott had the sword of {18:04}\nhanded down for generations in Kashuon.\nIt had a marvelous edge."
  },
  {
   "id": 63,
   "off": "59602",
   "ja": "うわさは　きいている。　もし　かんせいしたら\nすべてのまちが　はかいされてしまうだろう。\nだが　{18:EC}に　なにができるだろう?",
-  "en": ""
+  "en": "I've heard the rumors. If it's completed,\nevery town will surely be destroyed.\nBut what can {18:EC} do?"
  },
  {
   "id": 64,
   "off": "59641",
   "ja": "きみたちが　{18:04}を　もちかえったのか!\nなんて　ゆうかんなひとたちなんだ!!\nかよわい　じょせいさえ　まじっているというのに。\nそれにひきかえ{18:EC}は‥‥なさけない。",
-  "en": ""
+  "en": "You brought back the {18:04}!\nWhat brave people you are!!\nAnd with a frail young woman among you, too.\nAnd compared to you, {18:EC}... how pathetic."
  },
  {
   "id": 65,
   "off": "59694",
   "ja": "こんどは　だいせんかんを　はかいしにいくのか!\nああ　{18:EC}にも　なにかできないだろうか。\nきみたちのはんぶんのちからでもあれば‥‥",
-  "en": ""
+  "en": "Now you're going to destroy the great battleship!\nAhh, isn't there something {18:EC} could do too?\nIf I had even half your strength..."
  },
  {
   "id": 66,
   "off": "596D6",
   "ja": "{18:EB}「{18:08}を　とってこれるのは\n{18:EC}だけだとおもい　ここへかえってきたんだ。\n{18:07}を　さがしにいこうと　したんだが\nなぜか　なかには　モンスターがすみついていて\nひとりでは　すすめず　かといって　てぶらでも\nもどれず　ここで　とほうにくれていたんだ。\n{11:02}「しろのことには　くわしいんでしょう?\n\n{18:EB}「このしろは　なぞだらけで　{18:EC}にも\nよくわからないんだ。\nあんないは　できないが　{18:EC}を　なかまに\nくわえてくれないか?\n　　　　{18:EB}　が　くわわった!\n",
-  "en": ""
+  "en": "{18:EB}: \"I thought that {18:EC} was the only one who could\nget the {18:08}, so I came back here.\nI tried to go looking for the {18:07},\nbut for some reason monsters have made their home inside,\nand I couldn't go on alone, but I couldn't go back\nempty-handed either, so I was at a loss here.\"\n{11:02}: \"You know all about the castle, don't you?\"\n\n{18:EB}: \"This castle is full of mysteries; even {18:EC}\ndon't really understand it.\nI can't guide you, but would you let {18:EC}\njoin your party?\"\n    {18:EB} joined!\n"
  },
  {
   "id": 67,
   "off": "597BC",
   "ja": "{18:EB}「{18:F0}が　ディストにせめこんだとき\nだれもが　よくあるこぜりあいだとおもった。\nだが　{18:F0}は　さいしょから　[{16:11}{18:FA}]を\nみなごろしにするつもりだったんだ。",
-  "en": ""
+  "en": "{18:EB}: \"When the {18:F0} invaded Deist,\neveryone thought it was just another skirmish.\nBut from the very start the {18:F0} meant\nto wipe out the [{16:11}{18:FA}] to the last man.\""
  },
  {
   "id": 68,
   "off": "5980E",
   "ja": "{18:FA}は　[{16:08}{18:FB}]の　ことばがわかるというが\nにんげんに　りゅうのことばが　りかいできるだろうか?",
-  "en": ""
+  "en": "They say the {18:FA} understand the language of\nthe [{16:08}{18:FB}], but can a human really\nunderstand the language of dragons?"
  },
  {
   "id": 69,
   "off": "59841",
   "ja": "ディストにいけば　{18:0E}は　まだいるかもしれない\n{18:0E}がいれば　おおきなちからに　なるだろう。\nパルムで　ディストまで　いってくれる\nふねを　さがしてみるといい。",
-  "en": ""
+  "en": "If you go to Deist, there may still be a {18:0E}\nWith a {18:0E}, you'd have a great power on your side.\nTry looking in Palm for a ship\nthat will take you to Deist."
  },
  {
   "id": 70,
   "off": "59892",
   "ja": "{18:EB}「そうか　りゅうきしはいなかったか。\nそれより　なにを　やってるんだ!\nはやく　そのたまごを　いずみに　しずめないと\nしんでしまうぞ!",
-  "en": ""
+  "en": "{18:EB}: \"I see, so there were no Dragon Knights left.\nMore importantly, what are you doing!\nIf you don't sink that egg in the spring quickly,\nit'll die!\""
  },
  {
   "id": 71,
   "off": "598D8",
   "ja": "{18:EB}「{18:EF}が　すっかり　へんになってしまった。\nいちどあって　はなしを　してくれないか。\n{18:EC}には　どうしたらいいか　わからない‥‥",
-  "en": ""
+  "en": "{18:EB}: \"{18:EF} has become completely strange.\nWould you go and talk to her once?\n{18:EC} don't know what to do...\""
  },
  {
   "id": 72,
   "off": "5991B",
   "ja": "{18:0A}が　はやくかえるといいな。",
-  "en": ""
+  "en": "I hope the {18:0A} hatches soon."
  },
  {
   "id": 73,
   "off": "5992B",
   "ja": "{18:EB}「われわれが　てきのしゅりょくと\nたたかっているあいだに　しろにもぐりこんで\n{18:2F}じょうの　しれいかんを　たおしてくれ。\nきみらには　たんどくこうどうのほうが　むいている。",
-  "en": ""
+  "en": "{18:EB}: \"While we fight the enemy's main force,\nslip into the castle and defeat the commander\nof Castle {18:2F}.\nActing on your own suits you better.\""
  },
  {
   "id": 74,
   "off": "59984",
   "ja": "{18:2F}じょうは　とりかえせた　\nきみたちの　おかげだ!!\nところで{10:02}。　ミンウがまだ　かえらないんだ\n[{16:01}{18:F8}]へいって　さがしてみてくれないか。",
-  "en": ""
+  "en": "We were able to take back Castle {18:2F}.\nIt's all thanks to you!!\nBy the way, {10:02}. Minwu still hasn't come back.\nWould you go to [{16:01}{18:F8}] and look for him?"
  },
  {
   "id": 75,
   "off": "599CF",
   "ja": "{18:F8}のとうには　きゅうきょくのまほうをしるした\n[{16:01}{18:F9}]が　あるといわれている。",
-  "en": ""
+  "en": "It is said that in the tower of {18:F8} there is\nthe [{16:01}{18:F9}], which records the ultimate magic."
  },
  {
   "id": 76,
   "off": "599FA",
   "ja": "{18:F0}をたおすたすけになるのは\nまちがいないだろう。",
-  "en": ""
+  "en": "There's no doubt it would help\nus defeat the {18:F0}."
  },
  {
   "id": 77,
   "off": "59A14",
   "ja": "このしろのことは　{18:EF}が1ばん　しっているはず。\nかのじょがしらないのでは‥‥‥\nそうだ!　ポールなら　そういうことにくわしいだろう!\nあいつは　せかい1の　どろぼうらしいからな。",
-  "en": ""
+  "en": "{18:EF} should know this castle best of all.\nIf even she doesn't know...\nI've got it! Paul would know all about that sort of thing!\nThey say he's the greatest thief in the world."
  },
  {
   "id": 78,
   "off": "59A6F",
   "ja": "{18:EB}「{18:F0}は　さいきんなりをひそめているが\nきっと　あらたなこうげきを　じゅんびしているに\nちがいない。　いっこくもはやく　{18:BF}を\nてにいれてくれ!",
-  "en": ""
+  "en": "{18:EB}: \"The {18:F0} has been lying low lately,\nbut he must surely be preparing a new attack.\nGet the {18:BF} without a moment's\ndelay!\""
  },
  {
   "id": 79,
   "off": "59ABA",
   "ja": "{18:EB}「りゅうきしがくわわったのか!\n{18:F0}を　たおすひもちかいだろう!!",
-  "en": ""
+  "en": "{18:EB}: \"A Dragon Knight has joined us!\nThe day we defeat the {18:F0} must be near!!\""
  },
  {
   "id": 80,
   "off": "59ADE",
   "ja": "{18:EB}「せっかく　{18:E7}のまほうをもちかえって\nもらったのに　このままでは　つかうまもなく\n[{16:01}{18:FC}]に　のみこまれてしまう。",
-  "en": ""
+  "en": "{18:EB}: \"You went to the trouble of bringing back the magic of {18:E7},\nbut at this rate, before we even get to use it,\nwe'll be swallowed up by the [{16:01}{18:FC}].\""
  },
  {
   "id": 81,
   "off": "59B1D",
   "ja": "そらでもとばないかぎり　あのなかにはいることは\nできないだろう。",
-  "en": ""
+  "en": "Unless you fly through the sky, there's no way\nto get inside that."
  },
  {
   "id": 82,
   "off": "59B3E",
   "ja": "あの　たつまきの　ちゅうしんは　ふしぎと\nかぜがよわいらしい。",
-  "en": ""
+  "en": "It seems that, strangely, at the center of that tornado\nthe wind is weak."
  },
  {
   "id": 83,
   "off": "59B5E",
   "ja": "{18:EB}「{07}は　{11:02}の\nおにいさんだろ。　たたかうわけには　いかないだろう。\n{10:02}「いや　おれたちがじぶんで　けっちゃくを\nつけるよ。\n{18:EB}「‥‥きみならそういうと　おもったよ。\nかならず　いきてかえってきてくれ!\n",
-  "en": ""
+  "en": "{18:EB}: \"{07} is {11:02}'s\nolder brother, isn't he. You can't fight him.\"\n{10:02}: \"No, we'll settle this\nourselves.\"\n{18:EB}: \"...I thought you'd say that.\nBe sure to come back alive!\"\n"
  },
  {
   "id": 84,
   "off": "59BC9",
   "ja": "なんこうふらくの　ようさいだ。\nポールが　しのびこんだと　じまんしていたが\nほんとうか　どうか?",
-  "en": ""
+  "en": "An impregnable fortress.\nPaul boasted that he'd snuck inside,\nbut whether that's true or not...?"
  },
  {
   "id": 85,
   "off": "59BFA",
   "ja": "{18:EB}「{18:F0}のふっかつとともに　あらわれた\nしろは　じごくのまおうのしろ　パンデモニウムに\nちがいない!\nせかいのめつぼうのききだ!!",
-  "en": ""
+  "en": "{18:EB}: \"The castle that appeared with the {18:F0}'s\nrevival must be Pandaemonium, the castle\nof the demon king of hell!\nThe world is in danger of destruction!!\""
  },
  {
   "id": 86,
   "off": "59C3D",
   "ja": "ミシディアにちいさなみずうみが　あった。\nカシュオーンのむかしばなしにでてくるんだ。\nはいったものは　じごくへいくと‥‥",
-  "en": ""
+  "en": "There was a small lake in Mysidia.\nIt comes up in the old tales of Kashuon.\nThey say those who enter it go to hell..."
  },
  {
   "id": 87,
   "off": "59C7A",
   "ja": "おれさまは　せかい1のとうぞく　ポールさまだ!!\nおれに　ぬすめないものはないぜ。\nさいきんは　ていこくぐんのきんこから　がっぽり\nかせいでるんだ!",
-  "en": ""
+  "en": "I'm the greatest thief in the world, the great Paul!!\nThere ain't nothin' I can't steal.\nLately I've been makin' a killing\nfrom the Imperial army's treasury!"
  },
  {
   "id": 88,
   "off": "59CC5",
   "ja": "おれは　はんらんぐんからは　ぬすまないよ!\nおいらのいえも　{18:2F}に　あったんだ。\nていこくのやつらに　せんりょうされて　いえに\nかえれねえんだ。",
-  "en": ""
+  "en": "I don't steal from the rebel army!\nMy house was in {18:2F} too.\nThe Empire's lot occupied it, and I can't\ngo home."
  },
  {
   "id": 89,
   "off": "59D0E",
   "ja": "ポール「{10:02}じゃねえか!!\nいやー　たすかったぜ。　このこは　ヨーゼフのむすめさ\nボーゲンが　このこをひとじちにとって　ヨーゼフを\nおどしていたんだ。\nおれは　{18:04}のありかをききだして\nここにとりにきたわけさ。　ところが　おれとしたことが\nどじふんじまって　このざまよ。\nおれは　ネリーや　みんなをつれて　さきににげるよ。\nそれじゃーな　ありがとよ!\n",
-  "en": ""
+  "en": "Paul: \"Well if it ain't {10:02}!!\nMan, you saved my hide. This girl's Josef's daughter\nBogen took her hostage and was\nthreatening Josef.\nI got out of him where the {18:04} was\nand came here to get it. But then, of all people, me,\nI messed up, and look at me now.\nI'll take Nelly and everyone and get out ahead of you.\nSee ya, and thanks!\"\n"
  },
  {
   "id": 90,
