@@ -123,181 +123,181 @@
   "id": 20,
   "off": "74D31",
   "ja": "へいし「へいかー!",
-  "en": ""
+  "en": "Soldier: \"Your Majesty!\""
  },
  {
   "id": 21,
   "off": "74D3B",
   "ja": "{18:EB}「こうして　かなしんでいてもしかたがない\nいこう!　それぞれの　しめいをはたすのだ!!",
-  "en": ""
+  "en": "{18:EB}: \"Grieving like this will do no good\nLet's go! Each of us must fulfill our mission!!\""
  },
  {
   "id": 22,
   "off": "74D69",
   "ja": "{18:F0}「さあ　たたかうのだ!\nしょうしゃには　{18:2F}{18:ED}　{18:EF}を\nあたえよう!!",
-  "en": ""
+  "en": "{18:F0}: \"Now, fight!\nTo the victor I shall give {18:ED}\n{18:EF} of {18:2F}!!\""
  },
  {
   "id": 23,
   "off": "74D90",
   "ja": "{18:F0}「みごとだ!ほうびをつかわそう!!\n\n‥{18:F0}を　たおす　チャンスだ!",
-  "en": ""
+  "en": "{18:F0}: \"Splendid! I shall grant you a reward!!\n\n...A chance to defeat the {18:F0}!\""
  },
  {
   "id": 24,
   "off": "74DB5",
   "ja": "{18:F0}「いい　みせものだったぞ　{10:02}\nおまえたちのしょうたいなど　すでに\nみきっておったわ!",
-  "en": ""
+  "en": "{18:F0}: \"That was a fine show, {10:02}\nI had already seen through who you really are!\""
  },
  {
   "id": 25,
   "off": "74DE3",
   "ja": "{18:EE}「フッ　ろうやにぶちこんでおけ!",
-  "en": ""
+  "en": "{18:EE}: \"Heh. Throw them in the dungeon!\""
  },
  {
   "id": 26,
   "off": "74DF6",
   "ja": "{18:F0}「むしけらなど　{18:EC}があいてを\nするにおよばん　　ものども　かかれ!",
-  "en": ""
+  "en": "{18:F0}: \"Vermin like you are not worth {18:EC}'s\ntime. Minions, attack!\""
  },
  {
   "id": 27,
   "off": "74E1B",
   "ja": "{18:F0}「すこしはやるようだな\nだが　つぎはどうだ?",
-  "en": ""
+  "en": "{18:F0}: \"You seem to have some skill\nBut how about this?\""
  },
  {
   "id": 28,
   "off": "74E34",
   "ja": "{18:F0}「なかなかやるではないか\n{18:EC}があいてをしてやろう　かかってこい!!",
-  "en": ""
+  "en": "{18:F0}: \"Not bad at all\n{18:EC} shall deal with you myself. Come at me!!\""
  },
  {
   "id": 29,
   "off": "74E59",
   "ja": "さあ{18:2F}にかえろう!",
-  "en": ""
+  "en": "Now, let's go back to {18:2F}!"
  },
  {
   "id": 30,
   "off": "74E64",
   "ja": "{18:EF}「ありがとう　　あなたがたの　おかげで\nへいわが　もどりました。\nたたかいは　おわりました‥‥\nさあ　おいわいの　パーティーを　ひらきましょう!",
-  "en": ""
+  "en": "{18:EF}: \"Thank you. Thanks to you,\npeace has returned.\nThe fighting is over...\nNow, let us hold a celebration party!\""
  },
  {
   "id": 31,
   "off": "74EAF",
   "ja": "へいし「た　たいへんです!\n{18:EE}の{07}が　{18:F0}に‥‥\nぐふっ!",
-  "en": ""
+  "en": "Soldier: \"Th- this is terrible!\nThe {18:EE}, {07}, has become the {18:F0}...\nGUH!\""
  },
  {
   "id": 32,
   "off": "74ECE",
   "ja": "‥‥なんてことでしょう!‥‥また　たたかいか‥‥\n‥どうしたら　いいんだ‥\n{07}?　いったい　なにものだ‥‥",
-  "en": ""
+  "en": "...How terrible!... War again...\n...What should we do...\n{07}? Who on earth is he..."
  },
  {
   "id": 33,
   "off": "74F04",
   "ja": "ボーゲン「ざまあみろ!",
-  "en": ""
+  "en": "Bogen: \"Serves you right!\""
  },
  {
   "id": 34,
   "off": "74F10",
   "ja": "{18:EE}「これでかったと　おもうなよ!\n\n{11:02}「エッ!そのこえは　にいさ‥ん?!\n{10:02}「なにをいってるんだ!　さあいくぞ\nもうすぐ　ばくはつする!!\nシドの　{18:F5}まで　はしるんだ!\n",
-  "en": ""
+  "en": "{18:EE}: \"Don't think you've won!\"\n\n{11:02}: \"Huh! That voice... brother...?!\"\n{10:02}: \"What are you saying! Come on, let's go\nIt's about to blow!!\nRun for Cid's {18:F5}!\"\n"
  },
  {
   "id": 35,
   "off": "74F6A",
   "ja": "シド「おれは　こんなざまだが　{18:F5}はむきずだ!\nおれが　うごけるようになるまで　おまえたちに\nかしてやる。　いいか　かすだけだぞ!!\nだいじにつかえ‥‥\n‥‥ウッ‥グフッ‥ゲボッ\n{10:02}「シ　シド!　しっかりしろー!!\n",
-  "en": ""
+  "en": "Cid: \"I may be in this state, but the {18:F5}'s unscratched!\nUntil I can move again, I'll lend it\nto you. Got it? I'm only lending it!!\nTake good care of her...\n...ugh... guh... (cough)\"\n{10:02}: \"C- Cid! Hang in there!!\"\n"
  },
  {
   "id": 36,
   "off": "74FD8",
   "ja": "{11:02}「{18:EC}たち　そとにでてるわ",
-  "en": ""
+  "en": "{11:02}: \"{18:EC}'ll be waiting outside with the others\""
  },
  {
   "id": 37,
   "off": "74FE8",
   "ja": "{18:EF}「どうしたの?　そばにきて‥‥\n{10:02}「お　{18:ED}　そ　そんな\n{18:EF}「はやくきて　じらさないで‥\n{10:02}「‥‥ゴクッ‥‥",
-  "en": ""
+  "en": "{18:EF}: \"What's the matter? Come here, close to me...\"\n{10:02}: \"Pr- {18:ED}, b- but...\"\n{18:EF}: \"Come quickly, don't keep me waiting...\"\n{10:02}: \"...(gulp)...\""
  },
  {
   "id": 38,
   "off": "75024",
   "ja": "た　たいへんです!!\n{18:F4}で　とうぎかいが　ひらかれ\nその　しょうひんが　なんと　{18:EF}さま　だそうです",
-  "en": ""
+  "en": "Th- this is terrible!!\nA tournament is being held in {18:F4},\nand they say the prize is none other than Lady {18:EF}"
  },
  {
   "id": 39,
   "off": "75058",
   "ja": "{18:EB}「{18:EC}も　いっしょにいかせてくれ\n　{18:EF}を　たすけださなければ\n{13:02}「{18:EB}　あんたのきもち　わかるよ\nここは　あたいらで　なんとかするよ!いってきな!!",
-  "en": ""
+  "en": "{18:EB}: \"Let {18:EC} go with you too\nI have to rescue {18:EF}\"\n{13:02}: \"{18:EB}, I know how you feel\nWe'll handle things here! Go on!!\""
  },
  {
   "id": 40,
   "off": "750A7",
   "ja": "ボカッ!　スカッ!\nバタン!!",
-  "en": ""
+  "en": "WHAM! WHOOSH!\nTHUD!!"
  },
  {
   "id": 41,
   "off": "750B7",
   "ja": "ポール「こうざんで　たすけてもらった　おかえしだ!\nおれは　かりをつくるのが　きらいでね!\nさっさと　にげるんだぜ!!",
-  "en": ""
+  "en": "Paul: \"This is for savin' me at the mine!\nI hate owin' people!\nHurry up and get outta here!!\""
  },
  {
   "id": 42,
   "off": "750F3",
   "ja": "{13:02}「{18:EF}!　だいじょうぶか!!\n{18:EF}「ゴ　{18:EB}?!あなたが‥‥",
-  "en": ""
+  "en": "{13:02}: \"{18:EF}! Are you all right!!\"\n{18:EF}: \"G- {18:EB}?! You...\""
  },
  {
   "id": 43,
   "off": "75114",
   "ja": "{10:02}「{18:EB}　{18:ED}をつれて\nさきににげろ!!\nおれたちが　てきを　ひきつける!!\n{18:EB}「わかった。　きをつけろよ",
-  "en": ""
+  "en": "{10:02}: \"{18:EB}, take the {18:ED}\nand escape ahead of us!!\nWe'll draw the enemy away!!\"\n{18:EB}: \"Got it. Be careful\""
  },
  {
   "id": 44,
   "off": "7514C",
   "ja": "かがみに　{18:FB}のすがたがうつる\nあの　{18:0A}から　うまれた　{18:FB}だ!\n{18:FB}は　みるみる　{18:2F}にちかづいてくる",
-  "en": ""
+  "en": "The form of a {18:FB} appears in the mirror\nIt's the {18:FB} that hatched from that {18:0A}!\nThe {18:FB} is rapidly approaching {18:2F}"
  },
  {
   "id": 45,
   "off": "75182",
   "ja": "{11:02}「やめて　ふたりとも!!\nにいさん　なぜ　たたかわなければ　ならないの?\n{07}「このよを　しはいするものは　なにか?\nそれは　ちからだ!!\nおれは　{18:F0}に　なったのだ!\nそのちから　てばなしはしない!!\nさあ　{11:02}　そこを　どけ!\n",
-  "en": ""
+  "en": "{11:02}: \"Stop it, both of you!!\nBrother, why do you have to fight?\"\n{07}: \"What is it that rules this world?\nIt is power!!\nI have become the {18:F0}!\nI will never let go of that power!!\nNow, {11:02}, get out of the way!\"\n"
  },
  {
   "id": 46,
   "off": "751F8",
   "ja": "{07}　ひさしぶりだな\n{18:EC}は　じごくで　きゅうきょくのパワーを\nみにつけて　よみがえったぞ!\nおまえが　{18:F0}とは　かたはらいたいわ\nせかいに　{18:F0}は　{18:EC}　ひとりだ!\n",
-  "en": ""
+  "en": "{07}, it's been a while\n{18:EC} have gained ultimate power in hell\nand returned to life!\nYou, the {18:F0}? Don't make me laugh\nThere is only one {18:F0} in this world: {18:EC}!\n"
  },
  {
   "id": 47,
   "off": "7524C",
   "ja": "{07}「このばけものめ!ていこくは\nおれのものだ!おまえなどに　わたさんぞ",
-  "en": ""
+  "en": "{07}: \"You monster! The Empire\nis mine! I won't hand it over to the likes of you\""
  },
  {
   "id": 48,
   "off": "75270",
   "ja": "{18:F0}「ていこく?　フッ　そんなものに　もう\nようはない。　いのちあるものを　みなごろしにし\nせかいを　はかいしつくしてくれる!\nまずは　おまえたちを　ちまつりにあげてやる",
-  "en": ""
+  "en": "{18:F0}: \"The Empire? Heh, I have no more\nuse for such a thing. I will slaughter every living thing\nand destroy the world utterly!\nFirst, I'll make blood offerings of you\""
  },
  {
   "id": 49,
   "off": "752C6",
   "ja": "{13:02}「ここは　ひとまず　たいきゃくだ\nさあ　{18:FB}にのれ!\n{10:02}「{13:02}!どこへいくんだ!!",
-  "en": ""
+  "en": "{13:02}: \"Let's retreat for now\nCome on, get on the {18:FB}!\"\n{10:02}: \"{13:02}! Where are you going!!\""
  },
  {
   "id": 50,
