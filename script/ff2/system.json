@@ -3,505 +3,505 @@
   "id": 0,
   "off": "6B040",
   "ja": "　そのほうこうには　なにもない",
-  "en": ""
+  "en": " There is nothing in that direction"
  },
  {
   "id": 1,
   "off": "6B050",
   "ja": "　たからばこのなかから\n　{02}をてにいれた",
-  "en": ""
+  "en": " From inside the treasure chest\n {02} was obtained"
  },
  {
   "id": 2,
   "off": "6B065",
   "ja": "　たからばこのなかから\n　{03}ぎる　てにいれた",
-  "en": ""
+  "en": " From inside the treasure chest\n {03} Gil was obtained"
  },
  {
   "id": 3,
   "off": "6B07C",
   "ja": "　もちものが　いっぱいで\n　これいじょう　とることができない!",
-  "en": ""
+  "en": " Your belongings are full\n You cannot take any more!"
  },
  {
   "id": 4,
   "off": "6B09C",
   "ja": "　かぎは　すでに　あいている",
-  "en": ""
+  "en": " The lock is already open"
  },
  {
   "id": 5,
   "off": "6B0AB",
   "ja": "　いらっしゃいませ\n　なにか　ごようですか?",
-  "en": ""
+  "en": " Welcome\n How may I help you?"
  },
  {
   "id": 6,
   "off": "6B0C2",
   "ja": "　なにを\n　さしあげましょう",
-  "en": ""
+  "en": " What may I\n get for you?"
  },
  {
   "id": 7,
   "off": "6B0D1",
   "ja": "　おかねが　たりないようですね\n　ほかに　なにか?",
-  "en": ""
+  "en": " You don't seem to have enough money\n Anything else?"
  },
  {
   "id": 8,
   "off": "6B0EB",
   "ja": "　たくさん　もちすぎていて　これいじょうは\n　もちきれないようです\n　もしなにか　うりたいものが　あれば\n　ひきとりますよ",
-  "en": ""
+  "en": " You seem to be carrying too much\n to hold any more\n If there's something you'd like to sell,\n I'll take it off your hands"
  },
  {
   "id": 9,
   "off": "6B129",
   "ja": "　ありがとうございます\n　ほかに　なにか?",
-  "en": ""
+  "en": " Thank you very much\n Anything else?"
  },
  {
   "id": 10,
   "off": "6B13F",
   "ja": "　なにを　うってくれますか?",
-  "en": ""
+  "en": " What will you sell me?"
  },
  {
   "id": 11,
   "off": "6B14E",
   "ja": "　それは　ひきとれません\n　ほかに　なにか?",
-  "en": ""
+  "en": " I can't take that\n Anything else?"
  },
  {
   "id": 12,
   "off": "6B165",
   "ja": "　{04}ぎるで　かいとりましょう\n　よろしいですか?\n{16:08}はい{16:16}いいえ",
-  "en": ""
+  "en": " I will buy it for {04} Gil\n Is that all right?\n{16:08}Yes{16:16}No"
  },
  {
   "id": 13,
   "off": "6B188",
   "ja": "　いらっしゃいませ　おつかれさまでした\n　あなたがたの　HP/MPが　かいふくするには\n　{04}ぎる　かかります\n　おとまりに　なりますか?",
-  "en": ""
+  "en": " Welcome, you must be weary\n To restore your HP/MP\n it will cost {04} Gil\n Will you stay the night?"
  },
  {
   "id": 14,
   "off": "6B1CD",
   "ja": "　おかねが　たりないようですね\n　ざんねんですが　おとめできません‥‥",
-  "en": ""
+  "en": " You don't seem to have enough money\n I'm sorry, but I can't let you stay..."
  },
  {
   "id": 15,
   "off": "6B1F1",
   "ja": "　おやすみなさい　いいゆめを‥‥",
-  "en": ""
+  "en": " Good night, sweet dreams..."
  },
  {
   "id": 16,
   "off": "6B202",
   "ja": "　また　きてくださいね!",
-  "en": ""
+  "en": " Please come again!"
  },
  {
   "id": 17,
   "off": "6B20F",
   "ja": "　よお　あんたら　ふねにのらないかい?\n　ポフトまで　32ぎるで\n　つれていってやるよ!",
-  "en": ""
+  "en": " Hey, you lot, want to ride a ship?\n I'll take you to Poft\n for 32 Gil!"
  },
  {
   "id": 18,
   "off": "6B23C",
   "ja": "　よお　あんたら　ふねにのらないかい?\n　パルムまで　32ぎるで\n　つれていってやるよ!",
-  "en": ""
+  "en": " Hey, you lot, want to ride a ship?\n I'll take you to Palm\n for 32 Gil!"
  },
  {
   "id": 19,
   "off": "6B269",
   "ja": "　よし　じゃあ　まちのおもてに　ふねが\n　まってるから　のってくれ",
-  "en": ""
+  "en": " All right then, the ship's waiting\n out front of town, so climb aboard"
  },
  {
   "id": 20,
   "off": "6B28B",
   "ja": "シドのこぶん「せかいに　ただひとつ　シドのあにきの\nひくうせんに　のりたいのかい?\nとおいところへでも　あっというまにつれてってやるよ!\nもっとも　かねをもっていればのはなしだがね‥‥",
-  "en": ""
+  "en": "Cid's Henchman: \"So you want to ride Big Bro Cid's airship,\nthe only one in the whole world?\nI'll take you anywhere, however far, in no time flat!\nThat is, provided you've got the money...\""
  },
  {
   "id": 21,
   "off": "6B2E8",
   "ja": "　どこまで{16:0D}バフスク　　　　100\n　いくかね?{16:0D}サラマンド　　　200\n{16:0D}セミテのたき　　300\n{16:0D}カシュオーン　　400",
-  "en": ""
+  "en": " Where are{16:0D}Bafsk        100\n you headed?{16:0D}Salamand     200\n{16:0D}Semite Falls 300\n{16:0D}Kashuon      400"
  },
  {
   "id": 22,
   "off": "6B32B",
   "ja": "へっへっ　まいどあり!\nそとの　ひこうじょうに　ひくうせんが\nよういしてあるから　それにのってくれ",
-  "en": ""
+  "en": "Heh heh, thank ya kindly!\nThe airship's all ready on the airfield\noutside, so climb aboard"
  },
  {
   "id": 23,
   "off": "6B35D",
   "ja": "{15:01}かう\n{15:01}うる\n{15:01}ことわる",
-  "en": ""
+  "en": "{15:01}Buy\n{15:01}Sell\n{15:01}Decline"
  },
  {
   "id": 24,
   "off": "6B36E",
   "ja": "{15:01}はい\n{15:01}いいえ",
-  "en": ""
+  "en": "{15:01}Yes\n{15:01}No"
  },
  {
   "id": 25,
   "off": "6B379",
   "ja": "　おっと　おかねがたりないようだ\n　わるいが　それでは　のせるわけには　いかん\n　また　でなおしてくるんだな",
-  "en": ""
+  "en": " Whoa, looks like you're short on money\n Sorry, but I can't take you like that\n Come back another time"
  },
  {
   "id": 26,
   "off": "6B3B0",
   "ja": "{15:01}たずねる\n{15:01}おぼえる\n{15:01}アイテム",
-  "en": ""
+  "en": "{15:01}Ask\n{15:01}Learn\n{15:01}Items"
  },
  {
   "id": 27,
   "off": "6B3C5",
   "ja": "{15:01}アイテム{15:07}まほう{15:0C}そうび{15:11}ステータス{15:18}セーブ",
-  "en": ""
+  "en": "{15:01}Items{15:07}Magic{15:0C}Equip{15:11}Status{15:18}Save"
  },
  {
   "id": 28,
   "off": "6B3E2",
   "ja": "　{05}ぎる",
-  "en": ""
+  "en": " {05} Gil"
  },
  {
   "id": 29,
   "off": "6B3E7",
   "ja": "[3B][3B][3B][3B]\n[3B][3B][3B][3B]",
-  "en": ""
+  "en": "[3B][3B][3B][3B]\n[3B][3B][3B][3B]"
  },
  {
   "id": 30,
   "off": "6B3F1",
   "ja": "[3B][3B][3B][3B]　　{10:02}\n[3B][3B][3B][3B]　　　{10:01}\nHP　{10:20}/{10:21}\nMP　　{10:22}/　{10:23}",
-  "en": ""
+  "en": "[3B][3B][3B][3B]  {10:02}\n[3B][3B][3B][3B]   {10:01}\nHP {10:20}/{10:21}\nMP  {10:22}/ {10:23}"
  },
  {
   "id": 31,
   "off": "6B418",
   "ja": "　アイテム",
-  "en": ""
+  "en": " Items"
  },
  {
   "id": 32,
   "off": "6B41E",
   "ja": "　まほう\n　　{10:02}",
-  "en": ""
+  "en": " Magic\n  {10:02}"
  },
  {
   "id": 33,
   "off": "6B428",
   "ja": "　HP　{10:20}/{10:21}\n　MP　　{10:22}/　{10:23}",
-  "en": ""
+  "en": " HP {10:20}/{10:21}\n MP  {10:22}/ {10:23}"
  },
  {
   "id": 34,
   "off": "6B43E",
   "ja": "　そうび\n　　{10:02}",
-  "en": ""
+  "en": " Equip\n  {10:02}"
  },
  {
   "id": 35,
   "off": "6B448",
   "ja": "　こうげき　‥　{10:24}\n　ぼうぎょ　‥　{10:25}",
-  "en": ""
+  "en": " Attack .. {10:24}\n Defense .. {10:25}"
  },
  {
   "id": 36,
   "off": "6B45E",
   "ja": "　みぎて{14:0A}あたま{14:13}うで\n{16:02}{10:06}{16:0B}{10:03}{16:14}{10:05}\n　ひだりて{14:0A}からだ{14:13}アイテム\n{16:02}{10:07}{16:0B}{10:04}{16:14}{10:08}\n{16:14}{10:09}",
-  "en": ""
+  "en": " Right Hand{14:0A}Head{14:13}Arms\n{16:02}{10:06}{16:0B}{10:03}{16:14}{10:05}\n Left Hand{14:0A}Body{14:13}Item\n{16:02}{10:07}{16:0B}{10:04}{16:14}{10:08}\n{16:14}{10:09}"
  },
  {
   "id": 37,
   "off": "6B49C",
   "ja": "{17:01}{1A:00}{17:0A}{1A:01}{17:13}{1A:02}\n{17:01}{1A:03}{17:0A}{1A:04}{17:13}{1A:05}\n{17:01}{1A:06}{17:0A}{1A:07}{17:13}{1A:08}\n{17:01}{1A:09}{17:0A}{1A:0A}{17:13}{1A:0B}\n{17:01}{1A:0C}{17:0A}{1A:0D}{17:13}{1A:0E}\n{17:01}{1A:0F}{17:0A}{1A:10}{17:13}{1A:11}\n{17:01}{1A:12}{17:0A}{1A:13}{17:13}{1A:14}\n{17:01}{1A:15}{17:0A}{1A:16}{17:13}{1A:17}\n{17:01}{1A:18}{17:0A}{1A:19}{17:13}{1A:1A}\n{17:01}{1A:1B}{17:0A}{1A:1C}{17:13}{1A:1D}\n{17:01}{1A:1E}{17:0A}{1A:1F}{17:13}{0F}",
-  "en": ""
+  "en": "{17:01}{1A:00}{17:0A}{1A:01}{17:13}{1A:02}\n{17:01}{1A:03}{17:0A}{1A:04}{17:13}{1A:05}\n{17:01}{1A:06}{17:0A}{1A:07}{17:13}{1A:08}\n{17:01}{1A:09}{17:0A}{1A:0A}{17:13}{1A:0B}\n{17:01}{1A:0C}{17:0A}{1A:0D}{17:13}{1A:0E}\n{17:01}{1A:0F}{17:0A}{1A:10}{17:13}{1A:11}\n{17:01}{1A:12}{17:0A}{1A:13}{17:13}{1A:14}\n{17:01}{1A:15}{17:0A}{1A:16}{17:13}{1A:17}\n{17:01}{1A:18}{17:0A}{1A:19}{17:13}{1A:1A}\n{17:01}{1A:1B}{17:0A}{1A:1C}{17:13}{1A:1D}\n{17:01}{1A:1E}{17:0A}{1A:1F}{17:13}{0F}"
  },
  {
   "id": 38,
   "off": "6B52A",
   "ja": "{17:02}{10:0A}{14:07}{10:38}{17:0F}{10:0B}{14:14}{10:39}\n{17:02}{10:0C}{14:07}{10:3A}{17:0F}{10:0D}{14:14}{10:3B}\n{17:02}{10:0E}{14:07}{10:3C}{17:0F}{10:0F}{14:14}{10:3D}\n{17:02}{10:10}{14:07}{10:3E}{17:0F}{10:11}{14:14}{10:3F}\n{17:02}{10:12}{14:07}{10:40}{17:0F}{10:13}{14:14}{10:41}\n{17:02}{10:14}{14:07}{10:42}{17:0F}{10:15}{14:14}{10:43}\n{17:02}{10:16}{14:07}{10:44}{17:0F}{10:17}{14:14}{10:45}\n{17:02}{10:18}{14:07}{10:46}{17:0F}{10:19}{14:14}{10:47}\n{17:0F}{0F}",
-  "en": ""
+  "en": "{17:02}{10:0A}{14:07}{10:38}{17:0F}{10:0B}{14:14}{10:39}\n{17:02}{10:0C}{14:07}{10:3A}{17:0F}{10:0D}{14:14}{10:3B}\n{17:02}{10:0E}{14:07}{10:3C}{17:0F}{10:0F}{14:14}{10:3D}\n{17:02}{10:10}{14:07}{10:3E}{17:0F}{10:11}{14:14}{10:3F}\n{17:02}{10:12}{14:07}{10:40}{17:0F}{10:13}{14:14}{10:41}\n{17:02}{10:14}{14:07}{10:42}{17:0F}{10:15}{14:14}{10:43}\n{17:02}{10:16}{14:07}{10:44}{17:0F}{10:17}{14:14}{10:45}\n{17:02}{10:18}{14:07}{10:46}{17:0F}{10:19}{14:14}{10:47}\n{17:0F}{0F}"
  },
  {
   "id": 39,
   "off": "6B5B6",
   "ja": "{14:05}{10:02}{14:0E}HP　{10:20}/{10:21}\n{14:0E}MP　　{10:22}/　{10:23}\n　ちから　　‥　{10:26}　　{10:00}\n　すばやさ　‥　{10:27}　　こうげき　　　‥　{10:24}\n　たいりょく‥　{10:28}　　めいちゅうりつ‥　{10:2D}%\n　ちせい　　‥　{10:29}　　ぼうぎょ　　　‥　{10:25}\n　せいしん　‥　{10:2A}　　かいひりつ　　‥　{10:2E}%\n　まりょく　‥　{10:2B}　　まほうぼうぎょ‥　{10:2F}%\n‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥‥\n　じゅくれんど　　　[70]　{10:32}　　[73]　{10:35}\n　[6E]　{10:30}　　[71]　{10:33}　　[74]　{10:36}\n　[6F]　{10:31}　　[72]　{10:34}　　[75]　{10:37}",
-  "en": ""
+  "en": "{14:05}{10:02}{14:0E}HP {10:20}/{10:21}\n{14:0E}MP  {10:22}/ {10:23}\n Strength     .. {10:26}  {10:00}\n Agility      .. {10:27}  Attack        .. {10:24}\n Stamina      .. {10:28}  Hit Rate      .. {10:2D}%\n Intelligence .. {10:29}  Defense       .. {10:25}\n Spirit       .. {10:2A}  Evasion       .. {10:2E}%\n Magic Power  .. {10:2B}  Magic Defense .. {10:2F}%\n......................................................\n Skill Level   [70] {10:32}  [73] {10:35}\n [6E] {10:30}  [71] {10:33}  [74] {10:36}\n [6F] {10:31}  [72] {10:34}  [75] {10:37}"
  },
  {
   "id": 40,
   "off": "6B6B1",
   "ja": "　この　ファイルに　データーを　かきこみます\n　いぜんの　データー　は　うしなわれます\n　よろしいですか{16:09}はい{16:0D}いいえ",
-  "en": ""
+  "en": " Data will be written to this file\n The previous data will be lost\n Is that all right?{16:09}Yes{16:0D}No"
  },
  {
   "id": 41,
   "off": "6B6EF",
   "ja": "　なんばんに　セーブしますか?\n{16:03}1{16:06}2{16:09}3{16:0C}4",
-  "en": ""
+  "en": " Save to which number?\n{16:03}1{16:06}2{16:09}3{16:0C}4"
  },
  {
   "id": 42,
   "off": "6B70C",
   "ja": "　セーブ　　しゅうりょう!　やめるときは\n　かならず　リセットボタンをおしながら\n　スイッチをきってください!!",
-  "en": ""
+  "en": " Save complete! When you stop playing,\n be sure to hold down the RESET button\n while you turn the power off!!"
  },
  {
   "id": 43,
   "off": "6B745",
   "ja": "　HPを　かいふくする　くすり\n　だれに　つかいますか?",
-  "en": ""
+  "en": " Medicine that restores HP\n On whom will you use it?"
  },
  {
   "id": 44,
   "off": "6B762",
   "ja": "　たいないの　どくそを　ちゅうわする　げどくざい\n　だれに　つかいますか?",
-  "en": ""
+  "en": " An antidote that neutralizes poison in the body\n On whom will you use it?"
  },
  {
   "id": 45,
   "off": "6B788",
   "ja": "　いしの　じょうたいを　なおします\n　だれに　つかいますか?",
-  "en": ""
+  "en": " Cures the state of stone\n On whom will you use it?"
  },
  {
   "id": 46,
   "off": "6B7A7",
   "ja": "　のろいを　とく　せいなる　じゅうじか\n　だれに　つかいますか?",
-  "en": ""
+  "en": " A holy cross that lifts curses\n On whom will you use it?"
  },
  {
   "id": 47,
   "off": "6B7C8",
   "ja": "　かえるに　なってしまった　ひとを　なおします\n　だれに　つかいますか?",
-  "en": ""
+  "en": " Cures someone who has been turned into a frog\n On whom will you use it?"
  },
  {
   "id": 48,
   "off": "6B7ED",
   "ja": "　まほうを　わすれてしまったとき　あたまに\n　このとんかちで　ショックをあたえれば\n　かいふくします　だれに　つかいますか?",
-  "en": ""
+  "en": " When someone has forgotten their magic, give their\n head a jolt with this mallet and it\n comes back. On whom will you use it?"
  },
  {
   "id": 49,
   "off": "6B82C",
   "ja": "　めぐすりで　しりょくを　かいふくします\n　だれに　つかいますか?",
-  "en": ""
+  "en": " Eye drops that restore eyesight\n On whom will you use it?"
  },
  {
   "id": 50,
   "off": "6B84E",
   "ja": "　しんだひとを　よみがえらせる\n　ふしちょうフェニックスのお\n　だれを　いきかえらせますか?",
-  "en": ""
+  "en": " The tail of the immortal bird Phoenix,\n which brings the dead back to life\n Whom will you revive?"
  },
  {
   "id": 51,
   "off": "6B87D",
   "ja": "　HP/MPが　かんぜんにかいふくします\n　だれに　つかいますか?",
-  "en": ""
+  "en": " Fully restores HP/MP\n On whom will you use it?"
  },
  {
   "id": 52,
   "off": "6B89F",
   "ja": "　だれの　MPをかいふくしますか?",
-  "en": ""
+  "en": " Whose MP will you restore?"
  },
  {
   "id": 53,
   "off": "6B8B1",
   "ja": "　HPを　おおはばに　かいふくします\n　だれに　つかいますか?",
-  "en": ""
+  "en": " Greatly restores HP\n On whom will you use it?"
  },
  {
   "id": 54,
   "off": "6B8D1",
   "ja": "　このけいたいようコテージで　よくあさには\n　ぜんいんの　HP/MPが　すっかりかいふくします",
-  "en": ""
+  "en": " With this portable cottage, by the next morning\n everyone's HP/MP will be fully restored"
  },
  {
   "id": 55,
   "off": "6B901",
   "ja": "　いまきたみちを　マジックレベルのかずだけ\n　もどります",
-  "en": ""
+  "en": " Goes back along the way you just came,\n as many steps as the magic level"
  },
  {
   "id": 56,
   "off": "6B91E",
   "ja": "　HPを　かいふくします\n　だれに　かけますか?",
-  "en": ""
+  "en": " Restores HP\n On whom will you cast it?"
  },
  {
   "id": 57,
   "off": "6B937",
   "ja": "　しんだひとを　ふっかつさせます\n　だれを　いきかえらせますか?",
-  "en": ""
+  "en": " Brings the dead back to life\n Whom will you revive?"
  },
  {
   "id": 58,
   "off": "6B958",
   "ja": "　いろいろな　じょうたいを　かいふくする\n　まほうです\n　だれに　かけますか?",
-  "en": ""
+  "en": " Magic that cures\n various ailments\n On whom will you cast it?"
  },
  {
   "id": 59,
   "off": "6B980",
   "ja": "　ちじょうまで　いっきにワープする　まほうです\n　なれないうちは　HPを　いちじるしく\n　しょうもうします",
-  "en": ""
+  "en": " Magic that warps you straight to the surface\n Until you're used to it, it consumes\n a great deal of HP"
  },
  {
   "id": 60,
   "off": "6B9B6",
   "ja": "　だれが　じゅもんを　おぼえますか?",
-  "en": ""
+  "en": " Who will learn the spell?"
  },
  {
   "id": 61,
   "off": "6B9C9",
   "ja": "　すでに　このじゅもんを　おぼえています",
-  "en": ""
+  "en": " You already know this spell"
  },
  {
   "id": 62,
   "off": "6B9DE",
   "ja": "　じゅもんのかずが　おおすぎて　いまは\n　これいじょう　おぼえられません\n　さきに　いらないまほうを　すててください",
-  "en": ""
+  "en": " You have too many spells to learn\n any more right now\n First discard a magic you don't need"
  },
  {
   "id": 63,
   "off": "6BA19",
   "ja": "\n　おぼえられる　たんごは　もっていない",
-  "en": ""
+  "en": "\n You have no words you can learn"
  },
  {
   "id": 64,
   "off": "6BA2E",
   "ja": "　ここでは　セーブできません!\n　ワールドマップじょうで\n　セーブしてください",
-  "en": ""
+  "en": " You can't save here!\n Please save on\n the world map"
  },
  {
   "id": 65,
   "off": "6BA56",
   "ja": "{17:01}{1B:00}{17:0A}{1B:01}\n{17:01}{1B:02}{17:0A}{1B:03}\n{17:01}{1B:04}{17:0A}{1B:05}\n{17:01}{1B:06}{17:0A}{1B:07}\n{17:01}{1B:08}{17:0A}{1B:09}\n{17:01}{1B:0A}{17:0A}{1B:0B}\n{17:01}{1B:0C}{17:0A}{1B:0D}\n{17:01}{1B:0E}{17:0A}{1B:0F}",
-  "en": ""
+  "en": "{17:01}{1B:00}{17:0A}{1B:01}\n{17:01}{1B:02}{17:0A}{1B:03}\n{17:01}{1B:04}{17:0A}{1B:05}\n{17:01}{1B:06}{17:0A}{1B:07}\n{17:01}{1B:08}{17:0A}{1B:09}\n{17:01}{1B:0A}{17:0A}{1B:0B}\n{17:01}{1B:0C}{17:0A}{1B:0D}\n{17:01}{1B:0E}{17:0A}{1B:0F}"
  },
  {
   "id": 66,
   "off": "6BA9E",
   "ja": "{17:01}{1A:00}{17:0A}{1A:01}\n{17:01}{1A:02}{17:0A}{1A:03}\n{17:01}{1A:04}{17:0A}{1A:05}\n{17:01}{1A:06}{17:0A}{1A:07}\n{17:01}{1A:08}{17:0A}{1A:09}\n{17:01}{1A:0A}{17:0A}{1A:0B}\n{17:01}{1A:0C}{17:0A}{1A:0D}\n{17:01}{1A:0E}{17:0A}{1A:0F}\n{17:01}{1A:10}{17:0A}{1A:11}\n{17:01}{1A:12}{17:0A}{1A:13}\n{17:01}{1A:14}{17:0A}{1A:15}\n{17:01}{1A:16}{17:0A}{1A:17}\n{17:01}{1A:18}{17:0A}{1A:19}\n{17:01}{1A:1A}{17:0A}{1A:1B}\n{17:01}{1A:1C}{17:0A}{1A:1D}\n{17:01}{1A:1E}{17:0A}{1A:1F}",
-  "en": ""
+  "en": "{17:01}{1A:00}{17:0A}{1A:01}\n{17:01}{1A:02}{17:0A}{1A:03}\n{17:01}{1A:04}{17:0A}{1A:05}\n{17:01}{1A:06}{17:0A}{1A:07}\n{17:01}{1A:08}{17:0A}{1A:09}\n{17:01}{1A:0A}{17:0A}{1A:0B}\n{17:01}{1A:0C}{17:0A}{1A:0D}\n{17:01}{1A:0E}{17:0A}{1A:0F}\n{17:01}{1A:10}{17:0A}{1A:11}\n{17:01}{1A:12}{17:0A}{1A:13}\n{17:01}{1A:14}{17:0A}{1A:15}\n{17:01}{1A:16}{17:0A}{1A:17}\n{17:01}{1A:18}{17:0A}{1A:19}\n{17:01}{1A:1A}{17:0A}{1A:1B}\n{17:01}{1A:1C}{17:0A}{1A:1D}\n{17:01}{1A:1E}{17:0A}{1A:1F}"
  },
  {
   "id": 67,
   "off": "6BB2E",
   "ja": "\n{14:0B}?",
-  "en": ""
+  "en": "\n{14:0B}?"
  },
  {
   "id": 68,
   "off": "6BB33",
   "ja": "　なにも　おこらなかった",
-  "en": ""
+  "en": " Nothing happened"
  },
  {
   "id": 69,
   "off": "6BB40",
   "ja": "[3B][3B][3B][3B]{14:07}{10:02}\n[3B][3B][3B][3B]",
-  "en": ""
+  "en": "[3B][3B][3B][3B]{14:07}{10:02}\n[3B][3B][3B][3B]"
  },
  {
   "id": 70,
   "off": "6BB4E",
   "ja": "{17:01}あ{17:03}い{17:05}う{17:07}え{17:09}お{17:0C}か{17:0E}き{17:10}く{17:12}け{17:14}こ\n{17:01}さ{17:03}し{17:05}す{17:07}せ{17:09}そ{17:0C}た{17:0E}ち{17:10}つ{17:12}て{17:14}と\n{17:01}な{17:03}に{17:05}ぬ{17:07}ね{17:09}の{17:0C}は{17:0E}ひ{17:10}ふ{17:12}へ{17:14}ほ\n{17:01}ま{17:03}み{17:05}む{17:07}め{17:09}も{17:0C}ら{17:0E}り{17:10}る{17:12}れ{17:14}ろ\n{17:01}や{17:03}ゆ{17:05}よ{17:07}わ{17:09}ん{17:0C}が{17:0E}ぎ{17:10}ぐ{17:12}げ{17:14}ご\n{17:01}ざ{17:03}じ{17:05}ず{17:07}ぜ{17:09}ぞ{17:0C}だ{17:0E}ぢ{17:10}づ{17:12}で{17:14}ど\n{17:01}ぱ{17:03}ぴ{17:05}ぷ{17:07}ぺ{17:09}ぽ{17:0C}ば{17:0E}び{17:10}ぶ{17:12}べ{17:14}ぼ\n{17:01}ゃ{17:03}ゅ{17:05}ょ{17:07}っ{17:09}　{17:0C}0{17:0E}1{17:10}2{17:12}3{17:14}4\n{17:01}ア{17:03}イ{17:05}ウ{17:07}エ{17:09}オ{17:0C}カ{17:0E}キ{17:10}ク{17:12}ケ{17:14}コ\n{17:01}サ{17:03}シ{17:05}ス{17:07}セ{17:09}ソ{17:0C}タ{17:0E}チ{17:10}ツ{17:12}テ{17:14}ト\n{17:01}ナ{17:03}ニ{17:05}ヌ{17:07}ネ{17:09}ノ{17:0C}ハ{17:0E}ヒ{17:10}フ{17:12}ヘ{17:14}ホ\n{17:01}マ{17:03}ミ{17:05}ム{17:07}メ{17:09}モ{17:0C}ラ{17:0E}リ{17:10}ル{17:12}レ{17:14}ロ\n{17:01}ヤ{17:03}ユ{17:05}ヨ{17:07}ワ{17:09}ン{17:0C}ガ{17:0E}ギ{17:10}グ{17:12}ゲ{17:14}ゴ\n{17:01}ザ{17:03}ジ{17:05}ズ{17:07}ゼ{17:09}ゾ{17:0C}ダ{17:0E}ヂ{17:10}ヅ{17:12}デ{17:14}ド\n{17:01}パ{17:03}ピ{17:05}プ{17:07}ペ{17:09}ポ{17:0C}バ{17:0E}ビ{17:10}ブ{17:12}ベ{17:14}ボ\n{17:01}ャ{17:03}ュ{17:05}ョ{17:07}ッ{17:09}ー{17:0C}5{17:0E}6{17:10}7{17:12}8{17:14}9",
-  "en": ""
+  "en": "{17:01}A{17:03}B{17:05}C{17:07}D{17:09}E{17:0C}F{17:0E}G{17:10}H{17:12}I{17:14}J\n{17:01}K{17:03}L{17:05}M{17:07}N{17:09}O{17:0C}P{17:0E}Q{17:10}R{17:12}S{17:14}T\n{17:01}U{17:03}V{17:05}W{17:07}X{17:09}Y{17:0C}Z{17:0E}a{17:10}b{17:12}c{17:14}d\n{17:01}e{17:03}f{17:05}g{17:07}h{17:09}i{17:0C}j{17:0E}k{17:10}l{17:12}m{17:14}n\n{17:01}o{17:03}p{17:05}q{17:07}r{17:09}s{17:0C}t{17:0E}u{17:10}v{17:12}w{17:14}x\n{17:01}y{17:03}z{17:05}0{17:07}1{17:09}2{17:0C}3{17:0E}4{17:10}5{17:12}6{17:14}7\n{17:01}8{17:03}9{17:05}.{17:07},{17:09}'{17:0C}-{17:0E}!{17:10}?{17:12}&{17:14}/\n{17:01}:{17:03}({17:05}){17:07} {17:09} {17:0C} {17:0E} {17:10} {17:12} {17:14} \n{17:01} {17:03} {17:05} {17:07} {17:09} {17:0C} {17:0E} {17:10} {17:12} {17:14} \n{17:01} {17:03} {17:05} {17:07} {17:09} {17:0C} {17:0E} {17:10} {17:12} {17:14} \n{17:01} {17:03} {17:05} {17:07} {17:09} {17:0C} {17:0E} {17:10} {17:12} {17:14} \n{17:01} {17:03} {17:05} {17:07} {17:09} {17:0C} {17:0E} {17:10} {17:12} {17:14} \n{17:01} {17:03} {17:05} {17:07} {17:09} {17:0C} {17:0E} {17:10} {17:12} {17:14} \n{17:01} {17:03} {17:05} {17:07} {17:09} {17:0C} {17:0E} {17:10} {17:12} {17:14} \n{17:01} {17:03} {17:05} {17:07} {17:09} {17:0C} {17:0E} {17:10} {17:12} {17:14} \n{17:01} {17:03} {17:05} {17:07} {17:09} {17:0C} {17:0E} {17:10} {17:12} {17:14} "
  },
  {
   "id": 71,
   "off": "6BD3E",
   "ja": "　このばしょには　めにみえない\n　エネルギーフィールドがあり\n　ワープすることが　できない!",
-  "en": ""
+  "en": " There is an invisible\n energy field here, and you\n cannot warp!"
  },
  {
   "id": 72,
   "off": "6BD6D",
   "ja": "　いのりを　ささげると\n　とつぜん　あたたかいひかりが　あたりをつつみ\n　どこからともなく　やさしさにみちあふれた\n　こえが　ひびいた‥‥\n　「まよえる　ししゃの　たましいよ‥\n　かなしみとくらやみのしはいする　とおいくにより\n　いま　よみがえれ!!\n",
-  "en": ""
+  "en": " When you offer a prayer,\n a warm light suddenly envelops everything around,\n and from nowhere a voice brimming\n with kindness rings out...\n \"O lost soul of the dead...\n from the distant land ruled by sorrow and darkness,\n now return to life!!\"\n"
  },
  {
   "id": 73,
   "off": "6BDEC",
   "ja": "　　　　　はるかかなたの　せかいに　おいて‥‥\n　　ながくつづいていた　へいわが　いま　おわりをつげた\n　パラメキアていこくの　こうていは　まかいから　まものを\n　　　よびだし　せかいせいふくに　のりだしたのである\n\n　　　これにたいし　はんらんぐんは　フィンおうこくで\n　　　たちあがったが　ていこくの　そうこうげきにあい\n　　しろを　うばわれ　へんきょうのまち　アルテアへと\n　　　　　てったいしなければ　ならなかった\n\n　　ここ　フィンおうこくにすむ　4にんのわかものたちも\n　　　てきのこうげきによって　りょうしんを　うしない\n　　しつようなてきの　おってから　にげつづけていた‥‥",
-  "en": ""
+  "en": "In a world far, far away...\nthe peace that had long endured has now come to an end\nThe Emperor of Palamecia summoned monsters from\nthe Demon World and set out to conquer the world\n\nAgainst this, the rebel army rose up in the Kingdom of Finn\nbut, met with the Empire's all-out attack,\nit lost its castle and was forced to retreat\nto the remote town of Altea\n\nFour young people living here in the Kingdom of Finn\nalso lost their parents to the enemy's attack\nand kept fleeing from their relentless pursuers..."
  },
  {
   "id": 74,
   "off": "6BF14",
   "ja": "　　{10:02}{14:09}HP　{10:20}/{10:21}\n　スピード　{06}　　MP　　{10:22}/　{10:23}",
-  "en": ""
+  "en": "  {10:02}{14:09}HP {10:20}/{10:21}\n Speed {06}  MP  {10:22}/ {10:23}"
  },
  {
   "id": 75,
   "off": "6BF37",
   "ja": "　ニューゲーム　　スピード　{06}",
-  "en": ""
+  "en": " New Game  Speed {06}"
  },
  {
   "id": 76,
   "off": "6BF47",
   "ja": "　たからばこのなかから\n　{02}をてにいれた\n　とつぜん　モンスターが　あらわれた!",
-  "en": ""
+  "en": " From inside the treasure chest\n {02} was obtained\n Suddenly, monsters appeared!"
  },
  {
   "id": 77,
   "off": "6BF70",
   "ja": "　いまの　じょうたいでは\n　まほうを　おぼえられません",
-  "en": ""
+  "en": " In your current condition\n you cannot learn magic"
  },
  {
   "id": 240,
   "off": "6BF8C",
   "ja": "　　どく",
-  "en": ""
+  "en": "Poison"
  },
  {
   "id": 241,
   "off": "6BF91",
   "ja": "　ねむり",
-  "en": ""
+  "en": "Sleep"
  },
  {
   "id": 242,
   "off": "6BF96",
   "ja": "ちんもく",
-  "en": ""
+  "en": "Silence"
  },
  {
   "id": 243,
   "off": "6BF9B",
   "ja": "　こびと",
-  "en": ""
+  "en": "Tiny"
  },
  {
   "id": 244,
   "off": "6BFA0",
   "ja": "　　まひ",
-  "en": ""
+  "en": "Paralysis"
  },
  {
   "id": 245,
   "off": "6BFA5",
   "ja": "こんらん",
-  "en": ""
+  "en": "Confusion"
  },
  {
   "id": 246,
@@ -513,54 +513,54 @@
   "id": 247,
   "off": "6BFAB",
   "ja": "もうもく",
-  "en": ""
+  "en": "Blindness"
  },
  {
   "id": 248,
   "off": "6BFB0",
   "ja": "もうどく",
-  "en": ""
+  "en": "Deadly Poison"
  },
  {
   "id": 249,
   "off": "6BFB5",
   "ja": "　のろい",
-  "en": ""
+  "en": "Curse"
  },
  {
   "id": 250,
   "off": "6BFBA",
   "ja": "わすれた",
-  "en": ""
+  "en": "Forgetful"
  },
  {
   "id": 251,
   "off": "6BFBF",
   "ja": "　かえる",
-  "en": ""
+  "en": "Frog"
  },
  {
   "id": 252,
   "off": "6BFC4",
   "ja": "　　いし",
-  "en": ""
+  "en": "Stone"
  },
  {
   "id": 253,
   "off": "6BFC9",
   "ja": "　しぼう",
-  "en": ""
+  "en": "Dead"
  },
  {
   "id": 254,
   "off": "6BFCE",
   "ja": "みぎきき",
-  "en": ""
+  "en": "Right-handed"
  },
  {
   "id": 255,
   "off": "6BFD3",
   "ja": "ひだりきき",
-  "en": ""
+  "en": "Left-handed"
  }
 ]
