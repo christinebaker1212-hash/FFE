@@ -9,265 +9,265 @@
   "id": 1,
   "off": "68601",
   "ja": "ここは　おうさまの　しんしつです。\nおうさまは　{18:2F}から　ここアルテアに\nにげてきたときに　きずをおわれたのです",
-  "en": ""
+  "en": "This is the king's bedchamber.\nThe king was wounded when he fled\nfrom {18:2F} here to Altea"
  },
  {
   "id": 2,
   "off": "6863A",
   "ja": "ここは　はんらんぐんの　さくせんかいぎしつです",
-  "en": ""
+  "en": "This is the rebel army's war room"
  },
  {
   "id": 3,
   "off": "68652",
   "ja": "ひがしにいくと　みなとまちパルムだ。\nあいだに　おおきな　みずうみが　あって\n{18:02}がないと　いけないぞ",
-  "en": ""
+  "en": "Go east and you'll reach the port town of Palm.\nThere's a big lake in between,\nso you can't get there without a {18:02}"
  },
  {
   "id": 4,
   "off": "68686",
   "ja": "{18:2F}にいかれるのか?　やめなされ。\nあそこは　ていこくのモンスターが　うろついておる。\nきたにいったところに　ガテアという　ちいさなむらが\nある。　おぬしらでは　そこにいくのがやっとじゃ",
-  "en": ""
+  "en": "You mean to go to {18:2F}? Don't.\nThe Empire's monsters prowl about there.\nGo north and you'll find a small village called Gatea.\nThe likes of you will do well just to get that far"
  },
  {
   "id": 5,
   "off": "686E4",
   "ja": "ここは　アルテアのまちの　はんらんぐんのアジトだ",
-  "en": ""
+  "en": "This is the rebel army's hideout in the town of Altea"
  },
  {
   "id": 6,
   "off": "686FD",
   "ja": "カシュオーンおうこくの　{18:EB}おうじが\nこのアルテアにいる。\nおうじは　じしんをうしなっておられるようだが‥‥",
-  "en": ""
+  "en": "Prince {18:EB} of the Kingdom of Kashuon\nis here in Altea.\nThough the prince seems to have lost his confidence..."
  },
  {
   "id": 7,
   "off": "68734",
   "ja": "{18:EF}{18:ED}は　{18:2F}がほろぼされたときに\nこのアルテアに　にげてきたの。\nきずついた　おうさまのかわりに　はんらんぐんの\nしきを　りっぱに　つとめていらっしゃいますわ",
-  "en": ""
+  "en": "{18:ED} {18:EF} fled here to Altea\nwhen {18:2F} was destroyed.\nIn place of the wounded king, she commands\nthe rebel army splendidly, she does"
  },
  {
   "id": 8,
   "off": "68786",
   "ja": "ここはアルテアのまち\nていこくも　まだ　ここまでは　おそってきません。\nでも　それも　いつまでもつか‥‥",
-  "en": ""
+  "en": "This is the town of Altea\nThe Empire hasn't attacked this far yet.\nBut how long will that last..."
  },
  {
   "id": 9,
   "off": "687BB",
   "ja": "そこの　ぶきやにいる　トブールは\nうでのいい　かじやさ\nでも　さいきん　げんきがないんだ",
-  "en": ""
+  "en": "Tobul at the weapon shop over there\nis a skilled blacksmith\nBut lately he's been in low spirits"
  },
  {
   "id": 10,
   "off": "687E8",
   "ja": "ポールはわるいやつじゃないよ。\nとうぞくだけど　ていこくのやつらからしか\nぬすまないんだ",
-  "en": ""
+  "en": "Paul's not a bad guy.\nHe's a thief, but he only steals\nfrom the Empire's lot"
  },
  {
   "id": 11,
   "off": "68815",
   "ja": "{18:2F}のしろは　ていこくに　せんりょうされ　とびらを\nかたくとざされてしまい　なかに　はいれん。\nまちも　ていこくのへいしや　モンスターが\nうろついていて　きけんじゃ",
-  "en": ""
+  "en": "The castle of {18:2F} is occupied by the Empire, its gates\nshut tight; no one can get in.\nThe town is dangerous too, with the Empire's soldiers\nand monsters prowling about"
  },
  {
   "id": 12,
   "off": "68868",
   "ja": "ここガテアや　アルテアまでは　ていこくも　まだ\nおそってきません。\nでも　ていこくの　{18:F3}が　かんせいして\nしまったら　ここも‥‥",
-  "en": ""
+  "en": "The Empire hasn't attacked us here in Gatea\nor in Altea yet.\nBut once the Empire's {18:F3}\nis completed, here too..."
  },
  {
   "id": 13,
   "off": "688AA",
   "ja": "{18:2F}のまちのはずれに　さかばがある。\nそこのマスターは　ていこくにせんりょうされたとき\nひとり　にげおくれて　いまでも　ていこくのへいし\nあいてに　しょうばいを　つづけているようだ",
-  "en": ""
+  "en": "There's a tavern on the edge of the town of {18:2F}.\nWhen the Empire occupied it, the master there\nfailed to get away, and it seems he still does\nbusiness with the Empire's soldiers"
  },
  {
   "id": 14,
   "off": "68905",
   "ja": "ここは　ガテアのむら\nみずうみのむこうにみえるのが　{18:2F}だよ",
-  "en": ""
+  "en": "This is the village of Gatea\nWhat you see across the lake is {18:2F}"
  },
  {
   "id": 15,
   "off": "68924",
   "ja": "おうさまも　きみたちの　かつやくをしり\nよろこんでおられるぞ。　これからも　がんばれ",
-  "en": ""
+  "en": "The king has heard of your deeds\nand is delighted. Keep up the good work"
  },
  {
   "id": 16,
   "off": "6894F",
   "ja": "いまのわれわれのぶきでは　ていこくにかなわない。\n{18:F2}があれば　なんとかなるのだが‥‥",
-  "en": ""
+  "en": "With the weapons we have now, we're no match for the Empire.\nIf only we had {18:F2}, we could manage somehow..."
  },
  {
   "id": 17,
   "off": "6897B",
   "ja": "{18:F2}をアルテアに　もちかえってくれ!",
-  "en": ""
+  "en": "Bring the {18:F2} back to Altea!"
  },
  {
   "id": 18,
   "off": "6898E",
   "ja": "サラマンドに　いくのか!\nまず　ひがしのみなとまちパルムにいって\nふねにのりなされ。　おぬしらのような　ひよっこでは\nとても　あるいていける　ばしょじゃないわ!",
-  "en": ""
+  "en": "You're going to Salamand!\nFirst go to Palm, the port town to the east,\nand take a ship. Fledglings like you\ncould never make it there on foot!"
  },
  {
   "id": 19,
   "off": "689DF",
   "ja": "バフスクではていこくの　{18:F3}が\nつくられている。　まちのひとは　どれいとなり\nはたらかされているのだ",
-  "en": ""
+  "en": "In Bafsk, the Empire's {18:F3}\nis being built. The townspeople have been made slaves\nand are being worked to the bone"
  },
  {
   "id": 20,
   "off": "68A12",
   "ja": "その{18:02}があれば　ひがしにあるみずうみをわたって\nパルムにいけるよ",
-  "en": ""
+  "en": "With that {18:02} you can cross the lake to the east\nand get to Palm"
  },
  {
   "id": 21,
   "off": "68A34",
   "ja": "{18:F2}を　ぶきやのトブールに　わたせば\nいいぶきやよろいを　つくってくれるわ",
-  "en": ""
+  "en": "Give the {18:F2} to Tobul at the weapon shop\nand he'll make you good weapons and armor"
  },
  {
   "id": 22,
   "off": "68A5A",
   "ja": "はやく　せんそうがおわって　へいわなよのなかに\nならないだろうか",
-  "en": ""
+  "en": "I wish the war would end soon\nand the world would be at peace"
  },
  {
   "id": 23,
   "off": "68A7B",
   "ja": "{18:F2}って　なんだい。\nくいもんだったら　おいらにも　おくれ",
-  "en": ""
+  "en": "What's {18:F2}?\nIf it's something to eat, give me some too"
  },
  {
   "id": 24,
   "off": "68A99",
   "ja": "みなとまちパルムから　ふねにのって　ポフトにいける\nそこからきたにいけば　サラマンドにつくよ",
-  "en": ""
+  "en": "From the port town of Palm you can take a ship to Poft\nGo north from there and you'll reach Salamand"
  },
  {
   "id": 25,
   "off": "68AC8",
   "ja": "ときどき　このあたりをとんでいる　{18:F5}は\nシドというおとこのものじゃ",
-  "en": ""
+  "en": "The {18:F5} that sometimes flies around here\nbelongs to a man called Cid"
  },
  {
   "id": 26,
   "off": "68AEB",
   "ja": "あなたがたですね　{18:EF}{18:ED}に　みとめられた\nあたらしい　せんしは!",
-  "en": ""
+  "en": "So it's you, the new warriors\nwhom {18:ED} {18:EF} has recognized!"
  },
  {
   "id": 27,
   "off": "68B0D",
   "ja": "おねがいだ　ていこくの　{18:F0}をたおして\nへいわをふたたび　とりもどしてくれ",
-  "en": ""
+  "en": "Please, defeat the Empire's {18:F0}\nand bring back peace once more"
  },
  {
   "id": 28,
   "off": "68B33",
   "ja": "あー　その{18:01}　しってるー\nずっとまえ　スコットとかいうおじさんが　はめてたよー\nそのおじさん　{18:01}をつかって　せかいちずみたいなの\nみせてくれたんだよ\nなんかへんな　じゅもんをとなえてたなあ\n「とくれせんたぼーび　とか‥‥\n",
-  "en": ""
+  "en": "Ah, I know that {18:01}!\nA long time ago some old guy called Scott was wearing it!\nThat old guy used the {18:01} to show me\nsomething like a map of the world\nHe chanted some weird spell, too\n\"tceles dna nottub B or something...\"\n"
  },
  {
   "id": 29,
   "off": "68BA5",
   "ja": "ここから　ふねにのると　ポフトというまちだ",
-  "en": ""
+  "en": "Take a ship from here and you'll get to a town called Poft"
  },
  {
   "id": 30,
   "off": "68BBB",
   "ja": "ここはパルム。　ちいさな　みなとまちさ",
-  "en": ""
+  "en": "This is Palm. A little port town"
  },
  {
   "id": 31,
   "off": "68BCF",
   "ja": "ポフトのさき　バフスクや　サラマンドは\nていこくに　せんりょうされているっていうぜ",
-  "en": ""
+  "en": "They say that beyond Poft, Bafsk and Salamand\nhave been occupied by the Empire"
  },
  {
   "id": 32,
   "off": "68BF9",
   "ja": "ここパルムや　ポフトは　まだていこくのこうげきを\nうけてないんだ",
-  "en": ""
+  "en": "Palm here and Poft haven't\nbeen attacked by the Empire yet"
  },
  {
   "id": 33,
   "off": "68C1A",
   "ja": "パルムは　じゆうなまちよ\nあたいと　いっしょに　ここでくらさない?",
-  "en": ""
+  "en": "Palm's a free town, hon\nWhy don't you stay here and live with me?"
  },
  {
   "id": 34,
   "off": "68C3C",
   "ja": "かいぞく「よお　ねえちゃん　いっしょに　のもーぜっ!\n{11:02}「やだーっ!もう!",
-  "en": ""
+  "en": "Pirate: \"Hey, sweetheart, let's have a drink together!\"\n{11:02}: \"Ew, no! Ugh, honestly!\""
  },
  {
   "id": 35,
   "off": "68C63",
   "ja": "ここは　みなとまちポフト\nここから　きたにいくとサラマンド\nひがしにいくとバフスクです",
-  "en": ""
+  "en": "This is Poft, the port town\nGo north from here for Salamand,\neast for Bafsk"
  },
  {
   "id": 36,
   "off": "68C8F",
   "ja": "あんた　{18:F5}を　みたことあるか?\nあれはこのまちにすむ　シドっていうおとこのものだ。\nあれを　そうじゅうできるのはシドだけさ",
-  "en": ""
+  "en": "Have you ever seen the {18:F5}?\nIt belongs to a man called Cid who lives in this town.\nCid's the only one who can fly it"
  },
  {
   "id": 37,
   "off": "68CCE",
   "ja": "シドなら　このまちのパブにいるだろう\nかねさえだせば　{18:F5}にのせてくれるぜ",
-  "en": ""
+  "en": "If it's Cid you want, he'll be in this town's pub\nPay up and he'll let you ride the {18:F5}"
  },
  {
   "id": 38,
   "off": "68CF4",
   "ja": "ひがしに　バフスクのまちがあるが　あそこは\nていこくにせんりょうされちまってるんだ。\nなにか　おそろしいもんを　つくってるぜ",
-  "en": ""
+  "en": "There's the town of Bafsk to the east, but it's\nbeen occupied by the Empire.\nThey're building something terrible there"
  },
  {
   "id": 39,
   "off": "68D33",
   "ja": "おうは　あなたたちの　かつやくをきき\nあんしんしておられます",
-  "en": ""
+  "en": "The king has heard of your deeds\nand is relieved"
  },
  {
   "id": 40,
   "off": "68D52",
   "ja": "{18:F3}を　はかいしてください!",
-  "en": ""
+  "en": "Please destroy the {18:F3}!"
  },
  {
   "id": 41,
   "off": "68D61",
   "ja": "ていこくの　{18:F3}が　かんせいしたら\nこのアルテアやポフトも　ていこくに\nせんりょうされてしまうだろう",
-  "en": ""
+  "en": "If the Empire's {18:F3} is completed,\nAltea and Poft too will surely be\noccupied by the Empire"
  },
  {
   "id": 42,
   "off": "68D94",
   "ja": "おお　わしにはみえるぞ　なにやら　きょだいで\nじゃあくなものが　そらをとんでいく‥‥\nくわばら　くわばら",
-  "en": ""
+  "en": "Ohh, I can see it... something huge\nand evil flying across the sky...\nHeaven preserve us, heaven preserve us"
  },
  {
   "id": 43,
   "off": "68DC9",
   "ja": "バフスクは　ていこくの{18:EE}に\nしはいされている。\nまちのにんげんはみな　さいみんじゅつに\nかかっているのだ",
-  "en": ""
+  "en": "Bafsk is ruled by the Empire's {18:EE}.\nAll the people of the town are\nunder hypnosis"
  },
  {
   "id": 44,
   "off": "68DFF",
   "ja": "{18:F3}を　ぶっこわすんだっ!",
-  "en": ""
+  "en": "Smash the {18:F3}!"
  },
  {
   "id": 45,
