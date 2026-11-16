@@ -3,121 +3,121 @@
   "id": 0,
   "off": "747EC",
   "ja": "　",
-  "en": ""
+  "en": " "
  },
  {
   "id": 1,
   "off": "747EE",
   "ja": "みぐるみおいてきな　いのちだけは　たすけてやるよ\n\nなに　やるきかい!　バカな　れんちゅうだね\nやろうども　やっちまいな!",
-  "en": ""
+  "en": "Leave everything you've got and we'll let you off with your lives\n\nWhat, you wanna fight! What a bunch of idiots\nBoys, let 'em have it!"
  },
  {
   "id": 2,
   "off": "7482C",
   "ja": "あたいらのまけよ。　さあ　すきにしな!\n\n‥なんで　ころさないんだい?\n\n‥いっしょに　ていこくと　たたかおうだって!\nあたいらみたいな　はぐれものとかい‥\n",
-  "en": ""
+  "en": "We lose. Go on, do what you want with us!\n\n...Why ain't you killin' us?\n\n...You want us to fight the Empire with you!\nWith a bunch of outcasts like us...\n"
  },
  {
   "id": 3,
   "off": "7487C",
   "ja": "やろうども　もちばにつきな!\nさあ　ディストでも　せかいのはてでも\nあたいは　あんたについてくよ!\n　　　　レイラが　なかまになった!!",
-  "en": ""
+  "en": "Boys, to your posts!\nCome on, to Deist or to the ends of the earth,\nI'm followin' you!\n    Leila joined the party!!"
  },
  {
   "id": 4,
   "off": "748C1",
   "ja": "{18:EF}「ミンウ　たすかりますか?\n\nミンウ「はい　じきに　いしきを　とりもどします\nちからづよい　せいめいりょくを　かんじます\n{18:EF}「{18:2F}から　ひなんしてくるとき　このこが\nちみどろになって　たおれているのを　みつけたのです\nあなたなら　たすけられると　おもったのです\n",
-  "en": ""
+  "en": "{18:EF}: \"Minwu, can he be saved?\"\n\nMinwu: \"Yes, he will soon regain consciousness\nI sense a strong life force\"\n{18:EF}: \"When we were fleeing from {18:2F}, I found this boy\nlying covered in blood\nI thought that you would be able to save him\"\n"
  },
  {
   "id": 5,
   "off": "74948",
   "ja": "ミンウ「この　まほうじんが　せいめいりょくを\nぞうふくさせます。　そっとしておきましょう\n{18:EF}「あんしんしました。　それでは　かいぎに\nいきましょう。　みなあつまっているころです\nていこくが　バフスクで　けんぞうちゅうの\n{18:F3}!　あれが　かんせいしたら\nてきの　そうこうげきが　はじまるでしょう\nなにか　てをうたないと!",
-  "en": ""
+  "en": "Minwu: \"This magic circle amplifies\nthe life force. Let us leave him in peace\"\n{18:EF}: \"I'm relieved. Now then, let us go\nto the council. Everyone should be gathered by now\nThe {18:F3} the Empire is building\nin Bafsk! Once it is completed,\nthe enemy's all-out attack will begin\nWe must do something!\""
  },
  {
   "id": 6,
   "off": "749E9",
   "ja": "{10:02}「こ　ここは　どこだ?\n\nハッ!みんなは　ぶじなのか?!",
-  "en": ""
+  "en": "{10:02}: \"Wh- where am I?\n\nAh! Is everyone safe?!\""
  },
  {
   "id": 7,
   "off": "74A08",
   "ja": "{07}!",
-  "en": ""
+  "en": "{07}!"
  },
  {
   "id": 8,
   "off": "74A0B",
   "ja": "{11:02}!",
-  "en": ""
+  "en": "{11:02}!"
  },
  {
   "id": 9,
   "off": "74A0F",
   "ja": "{12:02}!",
-  "en": ""
+  "en": "{12:02}!"
  },
  {
   "id": 10,
   "off": "74A13",
   "ja": "{11:02}「{10:02}　いきていたのね!\n‥よかった‥{18:EC}‥グスン",
-  "en": ""
+  "en": "{11:02}: \"{10:02}, you're alive!\n...Thank goodness... {18:EC}... (sniff)\""
  },
  {
   "id": 11,
   "off": "74A2F",
   "ja": "{10:02}「{11:02}　{12:02}\n{07}は　どこだ?\n{12:02}「{18:2F}の{18:ED}　たすけた　おれたち\n{07}　いなかった\n{10:02}「そうか‥‥だいじょうぶ\nいきているさ　きっと。\n",
-  "en": ""
+  "en": "{10:02}: \"{11:02}, {12:02}\nWhere's {07}?\"\n{12:02}: \"{18:ED} of {18:2F} saved us\n{07} not there\"\n{10:02}: \"I see... It's all right,\nhe's alive, I'm sure of it.\"\n"
  },
  {
   "id": 12,
   "off": "74A77",
   "ja": "{18:EF}「げんきになったのですね。よかった\n{10:02}「{18:ED}　{18:EC}たちを　はんらんぐんに\nくわえてください!\n{18:EF}「だめ　だめ!　あなたがたの　ちからでは\nむだに　いのちをおとすだけです。\nおうちへ　おかえりなさい。\n{11:02}「{18:EC}たちの　いえは　もうないんです。\nりょうしんも‥‥\n{18:EF}「ごめんなさい‥‥そうだわ!\nよかったら　アルテアでくらしなさい。　あいことばさえ\nおぼえておけば　じゆうにくらせます。\nあいことばは　{18:F1}です。　わすれないように。",
-  "en": ""
+  "en": "{18:EF}: \"So you've recovered. I'm glad\"\n{10:02}: \"{18:ED}, let {18:EC} and my friends join\nthe rebel army!\"\n{18:EF}: \"No, no! With your strength\nyou would only throw your lives away.\nGo home.\"\n{11:02}: \"{18:EC} and the others have no home anymore.\nOur parents too...\"\n{18:EF}: \"I'm sorry... I know!\nIf you like, live here in Altea. As long as you\nremember the password, you can live freely.\nThe password is {18:F1}. Don't forget it.\""
  },
  {
   "id": 13,
   "off": "74B54",
   "ja": "{07}「わかったよ　{11:02}",
-  "en": ""
+  "en": "{07}: \"All right, {11:02}\""
  },
  {
   "id": 14,
   "off": "74B5F",
   "ja": "もう　だめだー!",
-  "en": ""
+  "en": "It's no use!"
  },
  {
   "id": 15,
   "off": "74B68",
   "ja": "{13:02}「さあ　いまのうちに　にげろ!\n{12:02}「おまえ　おいて　いけない\n{13:02}「いそげ‥‥これいじょう　もたな‥い",
-  "en": ""
+  "en": "{13:02}: \"Now, run while you can!\"\n{12:02}: \"Can't leave you behind\"\n{13:02}: \"Hurry... I can't... hold it any... longer\""
  },
  {
   "id": 16,
   "off": "74B9F",
   "ja": "{13:02}「あとを‥‥たのむ‥‥ネリー!\n\nついに　{13:02}は　ちからつきて　いわのしたじきに‥‥\n{10:02}「{13:02}!!!",
-  "en": ""
+  "en": "{13:02}: \"Take care... of... Nelly!\"\n\nAt last {13:02}'s strength gave out, and he was crushed beneath the rocks...\n{10:02}: \"{13:02}!!!\""
  },
  {
   "id": 17,
   "off": "74BD5",
   "ja": "{18:2F}おう「{18:EB}　ミンウ　{10:02}\nおまえたちに　たのみがある",
-  "en": ""
+  "en": "King of {18:2F}: \"{18:EB}, Minwu, {10:02}\nI have a request of you\""
  },
  {
   "id": 18,
   "off": "74BF2",
   "ja": "{18:2F}おう「{18:EB}　たくましくなったな\nおまえには　わがぐんの　しきをとってもらいたい\nそして　{18:EF}を　たすけてやってくれ\n{13:02}「はっ　いのちをかけて!\n{18:2F}おう「ミンウ‥せかいの　ききがおとずれたとき\n{18:F9}の　ふういんが　とけるという\nいまが　そのときだとおもうが　どうだ?\nミンウ「はい　ふういんをときに　いってまいります\n{18:2F}おう「{10:02}　ディストへいってくれ\nディストの{18:FA}だんは　みなごろしにあったが\nかならず　いきのこりがいるにちがいない\n{18:FB}と　{18:FA}のちからは　ぜひともひつようだ\n{18:2F}おう「みながちからをあわせれば　かならずや\nしょうりのひが　おとずれよう\n3にんとも　たのんだぞ\n",
-  "en": ""
+  "en": "King of {18:2F}: \"{18:EB}, you have grown strong\nI want you to take command of our army\nAnd help {18:EF}\"\n{13:02}: \"Yes, sire, with my life!\"\nKing of {18:2F}: \"Minwu... it is said that when crisis comes\nto the world, the seal of the {18:F9} will be broken\nI believe that time is now. What say you?\"\nMinwu: \"Yes, I shall go and break the seal\"\nKing of {18:2F}: \"{10:02}, go to Deist\nThe {18:FA} of Deist were slaughtered,\nbut there must surely be survivors\nThe power of the {18:FB} and the {18:FA} is something we need\"\nKing of {18:2F}: \"If all join their strength, surely\nthe day of victory will come\nI am counting on all three of you\"\n"
  },
  {
   "id": 19,
   "off": "74D1B",
   "ja": "{18:2F}おう「むすめを　{18:EF}をたのむ‥うっ‥‥",
-  "en": ""
+  "en": "King of {18:2F}: \"My daughter... take care of {18:EF}... ugh...\""
  },
  {
   "id": 20,
