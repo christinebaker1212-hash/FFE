@@ -21,7 +21,7 @@
   "id": 3,
   "off": "582F6",
   "ja": "{18:EF}「その{18:01}は　スコットのものですね!\nかれは　いきているんですか?!\n{10:02}「おうじは　{18:2F}のまちに　いました。\n{18:EC}たちに　この{18:01}をたくすと　ちからつきて‥‥\n{18:EF}「‥‥それでは　その{18:01}は　かたみのしな‥‥\nかれは　なにかいっていませんでしたか?\n{10:02}「‥‥いえ　なにも‥‥\nこの{18:01}を　うけとってください。\n{18:EF}「それは　あなたが　もっていてください。\nゆうきあるものに　ふさわしい　{18:01}です。\n{18:2F}にせんにゅうして　かえってくるとは\nあなたのちからを　みくびっていました。\nはんらんぐんに　ちからをかしてください。\nまほうのきんぞく[{16:09}{18:F2}]を　てにいれるために\nつよいせんしを　ひつようとしているのです。\n",
-  "en": "{18:EF}: \"That {18:01} is Scott's!\nIs he alive?!\"\n{10:02}: \"The prince was in the town of {18:2F}.\nHe entrusted this {18:01} to us, and then his strength gave out...\"\n{18:EF}: \"...Then that {18:01} is all he left behind...\nDid he say anything?\"\n{10:02}: \"...No, nothing...\nPlease take this {18:01}.\"\n{18:EF}: \"Please keep it yourself.\nIt is a {18:01} fit for one with courage.\nTo think you slipped into {18:2F} and came back...\nI underestimated your strength.\nPlease lend your strength to the rebel army.\nWe need strong warriors to obtain\nthe magic metal [{16:09}{18:F2}].\"\n"
+  "en": "{18:EF}: \"That {18:01} is Scott's!\nIs he alive?!\"\n{10:02}: \"The prince was in the town of {18:2F}.\n{18:EC} and my companions were entrusted with this {18:01}, and then his strength gave out...\"\n{18:EF}: \"...Then that {18:01} is all he left behind...\nDid he say anything?\"\n{10:02}: \"...No, nothing...\nPlease take this {18:01}.\"\n{18:EF}: \"Please keep it yourself.\nIt is a {18:01} fit for one with courage.\nTo think you slipped into {18:2F} and came back...\nI underestimated your strength.\nPlease lend your strength to the rebel army.\nWe need strong warriors to obtain\nthe magic metal [{16:09}{18:F2}].\"\n"
  },
  {
   "id": 4,
