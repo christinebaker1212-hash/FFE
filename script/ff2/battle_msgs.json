@@ -3,696 +3,696 @@
   "id": 0,
   "off": "5737D",
   "ja": "たたかう",
-  "en": ""
+  "en": "Fight"
  },
  {
   "id": 1,
   "off": "57382",
   "ja": "にげる",
-  "en": ""
+  "en": "Run"
  },
  {
   "id": 2,
   "off": "57386",
   "ja": "まほう",
-  "en": ""
+  "en": "Magic"
  },
  {
   "id": 3,
   "off": "5738A",
   "ja": "もちもの",
-  "en": ""
+  "en": "Belongings"
  },
  {
   "id": 4,
   "off": "5738F",
   "ja": "みぎて",
-  "en": ""
+  "en": "Right Hand"
  },
  {
   "id": 5,
   "off": "57393",
   "ja": "ひだりて",
-  "en": ""
+  "en": "Left Hand"
  },
  {
   "id": 6,
   "off": "57398",
   "ja": "アイテム",
-  "en": ""
+  "en": "Items"
  },
  {
   "id": 7,
   "off": "5739D",
   "ja": "しょうひMP",
-  "en": ""
+  "en": "MP Cost"
  },
  {
   "id": 8,
   "off": "573A4",
   "ja": "まほうは　つかえません",
-  "en": ""
+  "en": "Magic can't be used"
  },
  {
   "id": 9,
   "off": "573B0",
   "ja": "せんせいこうげきの　チャンス!!",
-  "en": ""
+  "en": "A chance to strike first!!"
  },
  {
   "id": 10,
   "off": "573C1",
   "ja": "モンスターの　せんせいこうげき!",
-  "en": ""
+  "en": "The monsters strike first!"
  },
  {
   "id": 11,
   "off": "573D2",
   "ja": "かいヒット",
-  "en": ""
+  "en": " hits"
  },
  {
   "id": 12,
   "off": "573D8",
   "ja": "ダメージ",
-  "en": ""
+  "en": " damage"
  },
  {
   "id": 13,
   "off": "573DD",
   "ja": "クリティカルヒット!!",
-  "en": ""
+  "en": "Critical hit!!"
  },
  {
   "id": 14,
   "off": "573E9",
   "ja": "ミス",
-  "en": ""
+  "en": "Miss"
  },
  {
   "id": 15,
   "off": "573EC",
   "ja": "にげだした",
-  "en": ""
+  "en": "Ran away"
  },
  {
   "id": 16,
   "off": "573F2",
   "ja": "にげられない!",
-  "en": ""
+  "en": "Can't escape!"
  },
  {
   "id": 17,
   "off": "573FA",
   "ja": "ねている",
-  "en": ""
+  "en": "Is asleep"
  },
  {
   "id": 18,
   "off": "573FF",
   "ja": "マヒしている",
-  "en": ""
+  "en": "Is paralyzed"
  },
  {
   "id": 19,
   "off": "57406",
   "ja": "なにもしなかった",
-  "en": ""
+  "en": "Did nothing"
  },
  {
   "id": 20,
   "off": "5740F",
   "ja": "こうかがなかった",
-  "en": ""
+  "en": "Had no effect"
  },
  {
   "id": 21,
   "off": "57418",
   "ja": "を　たおした!",
-  "en": ""
+  "en": " was defeated!"
  },
  {
   "id": 22,
   "off": "57420",
   "ja": "が　やられた!",
-  "en": ""
+  "en": " was slain!"
  },
  {
   "id": 23,
   "off": "57428",
   "ja": "たちは　ぜんめつした",
-  "en": ""
+  "en": "'s party was wiped out"
  },
  {
   "id": 24,
   "off": "57433",
   "ja": "たたかいに　かった!!",
-  "en": ""
+  "en": "Won the battle!!"
  },
  {
   "id": 25,
   "off": "5743F",
   "ja": "いのちを　うばわれた　　　",
-  "en": ""
+  "en": "Life was taken   "
  },
  {
   "id": 26,
   "off": "5744D",
   "ja": "いしに　なった",
-  "en": ""
+  "en": "Turned to stone"
  },
  {
   "id": 27,
   "off": "57455",
   "ja": "かえるに　なった?!",
-  "en": ""
+  "en": "Turned into a frog?!"
  },
  {
   "id": 28,
   "off": "57460",
   "ja": "まほうを　わすれた??",
-  "en": ""
+  "en": "Forgot magic??"
  },
  {
   "id": 29,
   "off": "5746C",
   "ja": "のろいに　かかった",
-  "en": ""
+  "en": "Was cursed"
  },
  {
   "id": 30,
   "off": "57476",
   "ja": "もうどくに　おかされた",
-  "en": ""
+  "en": "Struck by deadly poison"
  },
  {
   "id": 31,
   "off": "57482",
   "ja": "めが　みえなくなった",
-  "en": ""
+  "en": "Can no longer see"
  },
  {
   "id": 32,
   "off": "5748D",
   "ja": "こんらん　した??",
-  "en": ""
+  "en": "Became confused??"
  },
  {
   "id": 33,
   "off": "57497",
   "ja": "マヒ　した",
-  "en": ""
+  "en": "Was paralyzed"
  },
  {
   "id": 34,
   "off": "5749D",
   "ja": "ちいさくなった?!",
-  "en": ""
+  "en": "Became small?!"
  },
  {
   "id": 35,
   "off": "574A7",
   "ja": "ちんもく　した",
-  "en": ""
+  "en": "Was silenced"
  },
  {
   "id": 36,
   "off": "574AF",
   "ja": "ねむり　についた",
-  "en": ""
+  "en": "Fell asleep"
  },
  {
   "id": 37,
   "off": "574B8",
   "ja": "どくを　うけた",
-  "en": ""
+  "en": "Was poisoned"
  },
  {
   "id": 38,
   "off": "574C0",
   "ja": "いきかえった",
-  "en": ""
+  "en": "Came back to life"
  },
  {
   "id": 39,
   "off": "574C7",
   "ja": "なまみの　からだに　もどった",
-  "en": ""
+  "en": "Returned to a body of flesh"
  },
  {
   "id": 40,
   "off": "574D6",
   "ja": "ひとのすがたに　もどった",
-  "en": ""
+  "en": "Returned to human form"
  },
  {
   "id": 41,
   "off": "574E3",
   "ja": "きおくを　とりもどした",
-  "en": ""
+  "en": "Regained memory"
  },
  {
   "id": 42,
   "off": "574EF",
   "ja": "のろいが　とけた",
-  "en": ""
+  "en": "The curse was lifted"
  },
  {
   "id": 43,
   "off": "574F8",
   "ja": "もうどくが　きえた",
-  "en": ""
+  "en": "The deadly poison vanished"
  },
  {
   "id": 44,
   "off": "57502",
   "ja": "めが　みえるように　なった",
-  "en": ""
+  "en": "Can see again"
  },
  {
   "id": 45,
   "off": "57510",
   "ja": "おちついた",
-  "en": ""
+  "en": "Calmed down"
  },
  {
   "id": 46,
   "off": "57516",
   "ja": "マヒが　とけた",
-  "en": ""
+  "en": "The paralysis wore off"
  },
  {
   "id": 47,
   "off": "5751E",
   "ja": "もとの　おおきさに　もどった",
-  "en": ""
+  "en": "Returned to original size"
  },
  {
   "id": 48,
   "off": "5752D",
   "ja": "ちんもくが　とけた",
-  "en": ""
+  "en": "The silence was broken"
  },
  {
   "id": 49,
   "off": "57537",
   "ja": "めを　さました",
-  "en": ""
+  "en": "Woke up"
  },
  {
   "id": 50,
   "off": "5753F",
   "ja": "どくが　きれた",
-  "en": ""
+  "en": "The poison wore off"
  },
  {
   "id": 51,
   "off": "57547",
   "ja": "びびらせた",
-  "en": ""
+  "en": "Scared them stiff"
  },
  {
   "id": 52,
   "off": "5754D",
   "ja": "こうげきを　よけやすくなった",
-  "en": ""
+  "en": "Became better at dodging attacks"
  },
  {
   "id": 53,
   "off": "5755C",
   "ja": "まほうに　つよくなった",
-  "en": ""
+  "en": "Became resistant to magic"
  },
  {
   "id": 54,
   "off": "57568",
   "ja": "が　へった",
-  "en": ""
+  "en": " went down"
  },
  {
   "id": 55,
   "off": "5756E",
   "ja": "HP　MP　をいれかえた",
-  "en": ""
+  "en": "Swapped HP and MP"
  },
  {
   "id": 56,
   "off": "5757B",
   "ja": "くろまほうに　かべをつくった",
-  "en": ""
+  "en": "Built a wall against black magic"
  },
  {
   "id": 57,
   "off": "5758A",
   "ja": "かべが　やぶられた",
-  "en": ""
+  "en": "The wall was broken"
  },
  {
   "id": 58,
   "off": "57594",
   "ja": "まほうを　ふせいだ",
-  "en": ""
+  "en": "Blocked the magic"
  },
  {
   "id": 59,
   "off": "5759E",
   "ja": "ぶんれつした",
-  "en": ""
+  "en": "Split apart"
  },
  {
   "id": 60,
   "off": "575A5",
   "ja": "のレベルがあがった",
-  "en": ""
+  "en": "'s level went up"
  },
  {
   "id": 61,
   "off": "575AF",
   "ja": "こうげきかいすうが",
-  "en": ""
+  "en": "Number of attacks"
  },
  {
   "id": 62,
   "off": "575B9",
   "ja": "　へった!!",
-  "en": ""
+  "en": " went down!!"
  },
  {
   "id": 63,
   "off": "575C0",
   "ja": "　ふえた!!",
-  "en": ""
+  "en": " went up!!"
  },
  {
   "id": 64,
   "off": "575C7",
   "ja": "れいきこうげき",
-  "en": ""
+  "en": "Cold attack"
  },
  {
   "id": 65,
   "off": "575CF",
   "ja": "しんけいこうげき",
-  "en": ""
+  "en": "Nerve attack"
  },
  {
   "id": 66,
   "off": "575D8",
   "ja": "どくこうげき",
-  "en": ""
+  "en": "Poison attack"
  },
  {
   "id": 67,
   "off": "575DF",
   "ja": "し",
-  "en": ""
+  "en": "Death"
  },
  {
   "id": 68,
   "off": "575E1",
   "ja": "いなづまこうげき",
-  "en": ""
+  "en": "Lightning attack"
  },
  {
   "id": 69,
   "off": "575EA",
   "ja": "せいしんこうげき",
-  "en": ""
+  "en": "Spirit attack"
  },
  {
   "id": 70,
   "off": "575F3",
   "ja": "ほのおこうげき",
-  "en": ""
+  "en": "Fire attack"
  },
  {
   "id": 71,
   "off": "575FB",
   "ja": "へんかこうげき",
-  "en": ""
+  "en": "Transformation attack"
  },
  {
   "id": 72,
   "off": "57603",
   "ja": "　をふせぐ!!",
-  "en": ""
+  "en": " is blocked!!"
  },
  {
   "id": 73,
   "off": "5760B",
   "ja": "しろい",
-  "en": ""
+  "en": "White"
  },
  {
   "id": 74,
   "off": "5760F",
   "ja": "きいろの",
-  "en": ""
+  "en": "Yellow"
  },
  {
   "id": 75,
   "off": "57614",
   "ja": "みどりの",
-  "en": ""
+  "en": "Green"
  },
  {
   "id": 76,
   "off": "57619",
   "ja": "くろい",
-  "en": ""
+  "en": "Black"
  },
  {
   "id": 77,
   "off": "5761D",
   "ja": "ブルーの",
-  "en": ""
+  "en": "Blue"
  },
  {
   "id": 78,
   "off": "57622",
   "ja": "オレンジの",
-  "en": ""
+  "en": "Orange"
  },
  {
   "id": 79,
   "off": "57628",
   "ja": "あかい",
-  "en": ""
+  "en": "Red"
  },
  {
   "id": 80,
   "off": "5762C",
   "ja": "むらさきの",
-  "en": ""
+  "en": "Purple"
  },
  {
   "id": 81,
   "off": "57632",
   "ja": "オーラ　につつまれた!",
-  "en": ""
+  "en": " aura envelops them!"
  },
  {
   "id": 82,
   "off": "5763E",
   "ja": "れいき",
-  "en": ""
+  "en": "Cold"
  },
  {
   "id": 83,
   "off": "57642",
   "ja": "しんけい",
-  "en": ""
+  "en": "Nerve"
  },
  {
   "id": 84,
   "off": "57647",
   "ja": "どく",
-  "en": ""
+  "en": "Poison"
  },
  {
   "id": 85,
   "off": "5764A",
   "ja": "しをふせぐ",
-  "en": ""
+  "en": "Death blocked"
  },
  {
   "id": 86,
   "off": "57650",
   "ja": "いなづま",
-  "en": ""
+  "en": "Lightning"
  },
  {
   "id": 87,
   "off": "57655",
   "ja": "せいしん",
-  "en": ""
+  "en": "Spirit"
  },
  {
   "id": 88,
   "off": "5765A",
   "ja": "ほのお",
-  "en": ""
+  "en": "Fire"
  },
  {
   "id": 89,
   "off": "5765E",
   "ja": "へんか",
-  "en": ""
+  "en": "Transformation"
  },
  {
   "id": 90,
   "off": "57662",
   "ja": "バリア　がきえた!!",
-  "en": ""
+  "en": "The barrier vanished!!"
  },
  {
   "id": 91,
   "off": "5766D",
   "ja": "こうげきりょく",
-  "en": ""
+  "en": "Attack Power"
  },
  {
   "id": 92,
   "off": "57675",
   "ja": "ぼうぎょりょく",
-  "en": ""
+  "en": "Defense Power"
  },
  {
   "id": 93,
   "off": "5767D",
   "ja": "HP",
-  "en": ""
+  "en": "HP"
  },
  {
   "id": 94,
   "off": "57680",
   "ja": "MP",
-  "en": ""
+  "en": "MP"
  },
  {
   "id": 95,
   "off": "57683",
   "ja": "ちから",
-  "en": ""
+  "en": "Strength"
  },
  {
   "id": 96,
   "off": "57687",
   "ja": "ちせい",
-  "en": ""
+  "en": "Intelligence"
  },
  {
   "id": 97,
   "off": "5768B",
   "ja": "せいしん",
-  "en": ""
+  "en": "Spirit"
  },
  {
   "id": 98,
   "off": "57690",
   "ja": "すばやさ",
-  "en": ""
+  "en": "Agility"
  },
  {
   "id": 99,
   "off": "57695",
   "ja": "たいりょく",
-  "en": ""
+  "en": "Stamina"
  },
  {
   "id": 100,
   "off": "5769B",
   "ja": "まりょく",
-  "en": ""
+  "en": "Magic Power"
  },
  {
   "id": 101,
   "off": "576A0",
   "ja": "が　たかまった!!",
-  "en": ""
+  "en": " rose!!"
  },
  {
   "id": 102,
   "off": "576AA",
   "ja": "が　あがった!!",
-  "en": ""
+  "en": " went up!!"
  },
  {
   "id": 103,
   "off": "576B3",
   "ja": "が　さがった",
-  "en": ""
+  "en": " went down"
  },
  {
   "id": 104,
   "off": "576BA",
   "ja": "を　すいとられた",
-  "en": ""
+  "en": " was drained"
  },
  {
   "id": 105,
   "off": "576C3",
   "ja": "を　すいとった!!",
-  "en": ""
+  "en": " drained!!"
  },
  {
   "id": 106,
   "off": "576CD",
   "ja": "が　かいふく!!",
-  "en": ""
+  "en": " recovered!!"
  },
  {
   "id": 107,
   "off": "576D6",
   "ja": "ギル　てにいれた",
-  "en": ""
+  "en": " Gil obtained"
  },
  {
   "id": 108,
   "off": "576DF",
   "ja": "[6E]すで",
-  "en": ""
+  "en": "[6E]Bare Hands"
  },
  {
   "id": 109,
   "off": "576E3",
   "ja": "[6F]たて",
-  "en": ""
+  "en": "[6F]Shield"
  },
  {
   "id": 110,
   "off": "576E7",
   "ja": "[70]ナイフ",
-  "en": ""
+  "en": "[70]Knife"
  },
  {
   "id": 111,
   "off": "576EC",
   "ja": "[71]つえ",
-  "en": ""
+  "en": "[71]Staff"
  },
  {
   "id": 112,
   "off": "576F0",
   "ja": "[72]やり",
-  "en": ""
+  "en": "[72]Spear"
  },
  {
   "id": 113,
   "off": "576F4",
   "ja": "[73]けん",
-  "en": ""
+  "en": "[73]Sword"
  },
  {
   "id": 114,
   "off": "576F8",
   "ja": "[74]オノ",
-  "en": ""
+  "en": "[74]Axe"
  },
  {
   "id": 115,
   "off": "576FC",
   "ja": "[75]ゆみ",
-  "en": ""
+  "en": "[75]Bow"
  }
 ]
