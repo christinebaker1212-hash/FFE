@@ -183,181 +183,181 @@
   "id": 30,
   "off": "58E81",
   "ja": "あの　ゆうかんなりゅうきしたちは　もういないのですね\nでも{18:EC}には　あなたがたがいます。",
-  "en": ""
+  "en": "Those brave Dragon Knights are gone now, then\nBut {18:EC} still have you."
  },
  {
   "id": 31,
   "off": "58EAE",
   "ja": "このしろの　かがみのまから　{18:0E}を\nよぶことができます。\nでも　まだ　たまごですね。",
-  "en": ""
+  "en": "From this castle's Hall of Mirrors you can\ncall a {18:0E}.\nBut it is still only an egg."
  },
  {
   "id": 32,
   "off": "58ED9",
   "ja": "このしろのちかに　{18:0B}があるそうです。\nちかへ　はいる　とびらをひらくには\nこのじゅもんが　ひつようです。\n　　　　‥‥[{16:07}{18:FF}]‥‥",
-  "en": ""
+  "en": "It is said there is a {18:0B} beneath this castle.\nTo open the door that leads underground,\nthis incantation is needed.\n    ...[{16:07}{18:FF}]..."
  },
  {
   "id": 33,
   "off": "58F1E",
   "ja": "ごめんなさい。　{18:EC}は　どこに　そのとびらがあるか\nしらないのです。",
-  "en": ""
+  "en": "I'm sorry. {18:EC} don't know where\nthat door is."
  },
  {
   "id": 34,
   "off": "58F41",
   "ja": "{18:EF}「その{18:0B}をもって　ミシディアのまちへ\nいきなさい。\nまどうしたちのほうが　もっと　くわしいことを\nしっているでしょう。",
-  "en": ""
+  "en": "{18:EF}: \"Take that {18:0B} and go\nto the town of Mysidia.\nThe mages will surely know\nmore about it.\""
  },
  {
   "id": 35,
   "off": "58F80",
   "ja": "{18:EF}「その　{18:0D}があれば\nとうにはいれるのですね",
-  "en": ""
+  "en": "{18:EF}: \"With that {18:0D}\nyou can enter the tower, can't you\""
  },
  {
   "id": 36,
   "off": "58F99",
   "ja": "{18:EF}「でんせつの　リバイアサンに\nのみこまれていたなんて‥‥\nそれにしても　ミンウは　いまごろ　どうしているか‥‥",
-  "en": ""
+  "en": "{18:EF}: \"To think you were swallowed\nby the legendary Leviathan...\nBut still, what can Minwu be doing now...\""
  },
  {
   "id": 37,
   "off": "58FD3",
   "ja": "{18:EF}「あなたは‥‥　りゅうきし?!\n{13:02}「おめにかかれてこうえいです。\nわたくしは　りゅうきし　{13:02}　ハイウィンド。\n\nディストがていこくに　こうげきされたとき\n{18:EC}は　ミシディアに　{18:BF}をとりに\nいきました。\nそのとちゅう　{10:02}たちと　であったんです。",
-  "en": ""
+  "en": "{18:EF}: \"You are... a Dragon Knight?!\"\n{13:02}: \"It is an honor to meet you.\nI am the Dragon Knight {13:02} Highwind.\n\nWhen Deist was attacked by the Empire,\n{18:EC} went to Mysidia to fetch\nthe {18:BF}.\nOn the way, I met {10:02} and the others.\""
  },
  {
   "id": 38,
   "off": "59053",
   "ja": "{18:2F}じょうの　かがみのまから　{18:0E}を\nよんでみては?\nでも　まだ　たまごでしょうね。",
-  "en": ""
+  "en": "Why not try calling a {18:0E} from the\nHall of Mirrors in Castle {18:2F}?\nBut it's probably still an egg."
  },
  {
   "id": 39,
   "off": "5907E",
   "ja": "{18:EF}「{18:F0}は　まりょくで　[{16:11}{18:FC}]を\nつくりだし　アルテア　ガテア　パルム　ポフトを\nはかいし　この{18:2F}のそばまできています!",
-  "en": ""
+  "en": "{18:EF}: \"With his magic, the {18:F0} has created\na [{16:11}{18:FC}], destroyed Altea, Gatea,\nPalm and Poft, and it has come right up\nto this {18:2F}!\""
  },
  {
   "id": 40,
   "off": "590C0",
   "ja": "むかし　りゅうきしと{18:0E}を　よびたいときには\n{18:09}のひかりを　しろのかがみに\nはんしゃさせていました。",
-  "en": ""
+  "en": "Long ago, when they wanted to call a Dragon Knight and\na {18:0E}, they would reflect the light of the {18:09}\nin the castle's mirror."
  },
  {
   "id": 41,
   "off": "590F4",
   "ja": "{18:F0}みずから　たつまきをコントロールしているに\nちがいありません。",
-  "en": ""
+  "en": "The {18:F0} himself must surely be controlling\nthe tornado."
  },
  {
   "id": 42,
   "off": "59116",
   "ja": "{18:EF}「まあ　{18:0E}ではありませんか!!\nまだこどものようですが‥‥",
-  "en": ""
+  "en": "{18:EF}: \"My, isn't that a {18:0E}!!\nThough it still seems to be a child...\""
  },
  {
   "id": 43,
   "off": "59137",
   "ja": "{18:0E}にのってそらから　たつまきに　はいれるかも\nしれません。",
-  "en": ""
+  "en": "Riding a {18:0E}, you might be able to enter\nthe tornado from the sky."
  },
  {
   "id": 44,
   "off": "59156",
   "ja": "{18:0E}のつばさが　たつまきのちからに　たえられれば\nいいのですけど‥‥",
-  "en": ""
+  "en": "If only the {18:0E}'s wings can withstand\nthe power of the tornado..."
  },
  {
   "id": 45,
   "off": "59179",
   "ja": "{18:EF}「{18:EE}は　{07}だったのね‥‥\nあなたがたの　なかまだったのに‥‥\n{11:02}「せっとくしてみます。　きっと{18:F0}の\nまほうかなにかで　あやつられているんです。\n{18:EF}「{18:EE}は　{18:F0}のあとをつぎ\n[{16:01}{18:F4}]じょうにいるでしょう。\n",
-  "en": ""
+  "en": "{18:EF}: \"So the {18:EE} was {07}...\nAnd he was your friend...\"\n{11:02}: \"I'll try to persuade him. He must surely be\ncontrolled by the {18:F0}'s magic or something.\"\n{18:EF}: \"The {18:EE} has succeeded the {18:F0}\nand will be in Castle [{16:01}{18:F4}].\"\n"
  },
  {
   "id": 46,
   "off": "591E9",
   "ja": "パラメキアじょうは　やまにかこまれていて\nあるいては　ちかづけません",
-  "en": ""
+  "en": "Castle Palamecia is surrounded by mountains\nand cannot be approached on foot"
  },
  {
   "id": 47,
   "off": "5920C",
   "ja": "{18:EF}「かつて　じごくのまものが　せかいにあふれた\nとき　[{16:04}{18:FD}]とよばれる　つうろをとおって\nまものたちは　やってきたそうです。",
-  "en": ""
+  "en": "{18:EF}: \"They say that when the monsters of hell\nonce overran the world, they came\nthrough a passage called [{16:04}{18:FD}].\""
  },
  {
   "id": 48,
   "off": "5924F",
   "ja": "ミシディアのほうに　そういうちめいが　あります。",
-  "en": ""
+  "en": "There is a place by that name over toward Mysidia."
  },
  {
   "id": 49,
   "off": "59268",
   "ja": "ミンウ「{18:EC}には　きみのうんめいが　みえる。\nそれは　{18:EC}のうんめいとも　かかわっている‥‥\nまず　{18:2F}へいきなさい。\nそれがうんめいをきりひらく　みちになるはずだ。",
-  "en": ""
+  "en": "Minwu: \"{18:EC} can see your fate.\nIt is bound up with {18:EC}'s own fate as well...\nFirst, go to {18:2F}.\nThat should be the road that opens up your fate.\""
  },
  {
   "id": 50,
   "off": "592BC",
   "ja": "ふふっ　さっそく　あいことばをつかっているな。\nそうやって　ひとびとのこえに　みみをかたむけるのだ。",
-  "en": ""
+  "en": "Heh, already using the password, I see.\nThat's it, lend an ear to the voices of the people."
  },
  {
   "id": 51,
   "off": "592EF",
   "ja": "ミンウ「{18:2F}からかえってきたようだな。\nきみたちを　まっていた。　ともにたたかおう。\nきみたちに　{18:EC}の{18:02}を　あげよう。\n\n　　　　　ミンウが　なかまになった!\n　　　　　カヌーを　てにいれた!\n",
-  "en": ""
+  "en": "Minwu: \"So you've come back from {18:2F}.\nI was waiting for you. Let us fight together.\n{18:EC} shall give you my {18:02}.\"\n\n     Minwu joined the party!\n     Obtained the Canoe!\n"
  },
  {
   "id": 52,
   "off": "59353",
   "ja": "ミンウ「おうは　せいしんてきなダメージが\nおおきいのだ。\nこればかりは　ちりょうできない。",
-  "en": ""
+  "en": "Minwu: \"The king's spirit has been dealt a heavy blow.\nThat alone cannot be healed.\""
  },
  {
   "id": 53,
   "off": "59381",
   "ja": "だいせんかんも　ひくうせんも　おなじげんりで\nうごいている。",
-  "en": ""
+  "en": "The great battleship and the airship run\non the same principle."
  },
  {
   "id": 54,
   "off": "593A0",
   "ja": "シドは　ひくうせんのために　すべてを　ぎせいにした。\nちいも　めいよも　かぞくも　すべて‥‥",
-  "en": ""
+  "en": "Cid sacrificed everything for the airship.\nRank, honor, family, everything..."
  },
  {
   "id": 55,
   "off": "593CF",
   "ja": "{18:EB}ならば　ベルのありかを　しっているだろう。\nだが　{18:EB}はゆくえふめいだ。\nスコットや{18:EB}と　したしいものならば\nしっているかもしれない。　たとえば　{18:ED}‥‥",
-  "en": ""
+  "en": "{18:EB} would know where the bell is.\nBut {18:EB} is missing.\nSomeone close to Scott and {18:EB}\nmight know. The {18:ED}, for instance..."
  },
  {
   "id": 56,
   "off": "59420",
   "ja": "3ねんに1ど　ほのおのまつりが　ひらかれる。\n{18:07}に　{18:08}をうつし\nせいかだいを　きよめるのだ。",
-  "en": ""
+  "en": "Once every three years the Festival of Flame is held.\nThe {18:08} is passed to the {18:07}\nand the sacred fire stand is purified."
  },
  {
   "id": 57,
   "off": "59451",
   "ja": "ミンウ「{18:ED}は　いつも　おまえたちばかりを\nつらいにんむに　おくりだしていることを\nすまないとおもい　せめてカシュオーンで\nでむかえようと　シドのひくうせんに　のりこんだのだ。",
-  "en": ""
+  "en": "Minwu: \"The {18:ED} felt sorry for always sending\nyou alone off on hard missions,\nand boarded Cid's airship so that she could\nat least welcome you at Kashuon.\""
  },
  {
   "id": 58,
   "off": "594AA",
   "ja": "だいせんかんといえども　かならず　ちゃくりくして\nほきゅうをうけるはずだ。",
-  "en": ""
+  "en": "Even the great battleship must land\nsomewhere to be resupplied."
  },
  {
   "id": 59,
   "off": "594D0",
   "ja": "ミンウ「おまえたちを　まっていた!\nこれから　{18:EC}のまりょくのすべてを　このとびらに\nぶつける。　うまくいけば　ふういんはとけるだろう。\nさあ　さがっていろ!!",
-  "en": ""
+  "en": "Minwu: \"I was waiting for you!\nNow {18:EC} will hurl all my magic power\nat this door. If it works, the seal will be broken.\nNow, stand back!!\""
  },
  {
   "id": 60,
