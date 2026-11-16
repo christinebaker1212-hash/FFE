@@ -1,0 +1,207 @@
+diff --git a/src/mapper.cpp b/src/mapper.cpp
+index e586cae..ca5b1cc 100644
+--- a/src/mapper.cpp
++++ b/src/mapper.cpp
+@@ -9,6 +9,8 @@
+ #include <memory>
+ #include <random>
+ #include <sstream>
++#include <cstdio>
++#include <cstdlib>
+ 
+ using namespace cynes;
+ 
+@@ -165,6 +167,7 @@ std::unique_ptr<Mapper> Mapper::load_mapper(
+     case   2: return std::make_unique<UxROM>(nes, metadata, mode);
+     case   3: return std::make_unique<CNROM>(nes, metadata, mode);
+     case   4: return std::make_unique<MMC3> (nes, metadata, mode);
++    case   5: return std::make_unique<MMC5> (nes, metadata, mode);
+     case   7: return std::make_unique<AxROM>(nes, metadata);
+     case   9: return std::make_unique<MMC2> (nes, metadata, mode);
+     case  10: return std::make_unique<MMC4> (nes, metadata, mode);
+@@ -422,23 +425,33 @@ void MMC1::update_banks() {
+     case 3: set_mirroring_mode(MirroringMode::HORIZONTAL); break;
+     }
+ 
++    // Patched: mask CHR banks to the CHR size (CHR-RAM carts), and support
++    // SUROM (512KB PRG): CHR register bit 4 selects the 256KB PRG half.
++    const uint16_t chr_mask = static_cast<uint16_t>(_banks_chr - 1);
+     if (_registers[0x0] & 0x10) {
+-        map_bank_chr(0x0, 0x4, (_registers[0x1] & 0x1F) << 2);
+-        map_bank_chr(0x4, 0x4, (_registers[0x2] & 0x1F) << 2);
++        map_bank_chr(0x0, 0x4, ((_registers[0x1] & 0x1F) << 2) & chr_mask);
++        map_bank_chr(0x4, 0x4, ((_registers[0x2] & 0x1F) << 2) & chr_mask);
+     } else {
+-        map_bank_chr(0x0, 0x8, (_registers[0x1] & 0x1E) << 2);
++        map_bank_chr(0x0, 0x8, ((_registers[0x1] & 0x1E) << 2) & chr_mask);
++    }
++
++    uint16_t outer = 0;
++    uint16_t half = _banks_prg;
++    if (_banks_prg == 0x200) {
++        half = 0x100;
++        outer = (_registers[0x1] & 0x10) ? 0x100 : 0x000;
+     }
+ 
+     if (_registers[0x0] & 0x08) {
+         if (_registers[0x0] & 0x04) {
+-            map_bank_prg(0x20, 0x10, (_registers[0x3] & 0x0F) << 4);
+-            map_bank_prg(0x30, 0x10, _banks_prg - 0x10);
++            map_bank_prg(0x20, 0x10, outer | ((_registers[0x3] & 0x0F) << 4));
++            map_bank_prg(0x30, 0x10, outer + half - 0x10);
+         } else {
+-            map_bank_prg(0x20, 0x10, 0x0);
+-            map_bank_prg(0x30, 0x10, (_registers[0x3] & 0xF) << 4);
++            map_bank_prg(0x20, 0x10, outer);
++            map_bank_prg(0x30, 0x10, outer | ((_registers[0x3] & 0xF) << 4));
+         }
+     } else {
+-        map_bank_prg(0x20, 0x20, (_registers[0x3] & 0x0E) << 4);
++        map_bank_prg(0x20, 0x20, outer | ((_registers[0x3] & 0x0E) << 4));
+     }
+ 
+     bool read_only = _registers[0x3] & 0x10;
+@@ -674,3 +687,110 @@ void GxROM::write_cpu(uint16_t address, uint8_t value) {
+         map_bank_chr(0x00, 0x08, (value & 0x03) << 3);
+     }
+ }
++
++
++MMC5::MMC5(NES& nes, const ParsedMemory& metadata, MirroringMode mode)
++    : Mapper(nes, metadata, mode, 0x08, 0x02)
++    , _prg_mode{3}, _chr_mode{0}, _protect1{0}, _protect2{0}, _exram_mode{0}, _nt_map{0x44}
++    , _fill_tile{0}, _fill_attr{0}, _mul_a{0xFF}, _mul_b{0xFF}, _prg{}, _chr{}, _chr_upper{0}
++{
++    memset(_exram, 0, sizeof(_exram));
++    _prg[4] = 0xFF; _prg[3] = 0xFF; _prg[2] = 0xFF; _prg[1] = 0xFF;
++    update_banks();
++}
++
++void MMC5::update_banks() {
++    const uint16_t n8 = _banks_prg >> 3;           // number of 8KB PRG banks
++    auto m8 = [&](uint8_t page, uint8_t v) { map_bank_prg(page, 0x8, ((v & 0x7F) % n8) << 3); };
++    switch (_prg_mode & 3) {
++    case 0: { uint8_t b = _prg[4] & 0x7C; for (int i = 0; i < 4; i++) m8(0x20 + 8*i, b + i); break; }
++    case 1: { uint8_t a = _prg[2] & 0x7E, b = _prg[4] & 0x7E;
++              m8(0x20, a); m8(0x28, a + 1); m8(0x30, b); m8(0x38, b + 1); break; }
++    case 2: { uint8_t a = _prg[2] & 0x7E; m8(0x20, a); m8(0x28, a + 1); m8(0x30, _prg[3]); m8(0x38, _prg[4]); break; }
++    default: m8(0x20, _prg[1]); m8(0x28, _prg[2]); m8(0x30, _prg[3]); m8(0x38, _prg[4]); break;
++    }
++    bool ro = !(_protect1 == 2 && _protect2 == 1);
++    map_bank_cpu_ram(0x18, 0x8, 0x0, ro);
++
++    const uint16_t nchr = _banks_chr;              // 1KB units
++    auto mc = [&](uint8_t page, uint8_t size, uint32_t kb) {
++        for (uint8_t i = 0; i < size; i++) map_bank_chr(page + i, static_cast<uint16_t>((kb + i) % nchr));
++    };
++    switch (_chr_mode & 3) {
++    case 0: mc(0, 8, _chr[7] * 8u); break;
++    case 1: mc(0, 4, _chr[3] * 4u); mc(4, 4, _chr[7] * 4u); break;
++    case 2: for (int i = 0; i < 4; i++) mc(2*i, 2, _chr[2*i+1] * 2u); break;
++    default: for (int i = 0; i < 8; i++) mc(i, 1, _chr[i]); break;
++    }
++    for (int i = 0; i < 4; i++) {
++        uint8_t m = (_nt_map >> (2*i)) & 3;
++        map_bank_ppu_ram(0x8 + i, m == 1 ? 1 : 0, false);
++        map_bank_ppu_ram(0xC + i, m == 1 ? 1 : 0, false);
++    }
++}
++
++void MMC5::write_cpu(uint16_t address, uint8_t value) {
++    if (address >= 0x5C00 && address < 0x6000) { if (_exram_mode != 3) _exram[address - 0x5C00] = value; return; }
++    if (address >= 0x5000 && address < 0x5C00) {
++        switch (address) {
++        case 0x5100: _prg_mode = value & 3; break;
++        case 0x5101: _chr_mode = value & 3; break;
++        case 0x5102: _protect1 = value & 3; break;
++        case 0x5103: _protect2 = value & 3; break;
++        case 0x5104: _exram_mode = value & 3; break;
++        case 0x5105: _nt_map = value; break;
++        case 0x5106: _fill_tile = value; break;
++        case 0x5107: _fill_attr = value & 3; break;
++        case 0x5130: _chr_upper = value & 3; break;
++        case 0x5205: _mul_a = value; break;
++        case 0x5206: _mul_b = value; break;
++        default:
++            if (address >= 0x5113 && address <= 0x5117) _prg[address - 0x5113] = value;
++            else if (address >= 0x5120 && address <= 0x512B) _chr[address - 0x5120] = value | (_chr_upper << 8);
++            break;
++        }
++        update_banks();
++        return;
++    }
++    if (address >= 0x8000) {  // ROM
++        if (std::getenv("MMC5_LOG")) fprintf(stderr, "ROMWRITE %04X=%02X\n", address, value);
++        return;
++    }
++    Mapper::write_cpu(address, value);
++}
++
++uint8_t MMC5::read_cpu(uint16_t address) {
++    if (address >= 0x5C00 && address < 0x6000) return _exram_mode >= 2 ? _exram[address - 0x5C00] : 0;
++    if (address == 0x5204) return 0x40;
++    if (address == 0x5205) return static_cast<uint8_t>((_mul_a * _mul_b) & 0xFF);
++    if (address == 0x5206) return static_cast<uint8_t>((_mul_a * _mul_b) >> 8);
++    if (address >= 0x5000 && address < 0x6000) return 0;
++    return Mapper::read_cpu(address);
++}
++
++void MMC5::write_ppu(uint16_t address, uint8_t value) {
++    if (address >= 0x2000) {
++        uint8_t m = (_nt_map >> (((address >> 10) & 3) * 2)) & 3;
++        if (m == 2) { _exram[address & 0x3FF] = value; return; }
++        if (m == 3) return;
++    }
++    Mapper::write_ppu(address, value);
++}
++
++uint8_t MMC5::read_ppu(uint16_t address) {
++    if (address >= 0x2000) {
++        uint8_t m = (_nt_map >> (((address >> 10) & 3) * 2)) & 3;
++        if (m == 2) return _exram[address & 0x3FF];
++        if (m == 3) return (address & 0x3FF) >= 0x3C0 ? static_cast<uint8_t>(_fill_attr * 0x55) : _fill_tile;
++    }
++    return Mapper::read_ppu(address);
++}
++
++void MMC5::stream_state(SaveState& save_state) {
++    Mapper::stream_state(save_state);
++    save_state.stream(_prg_mode); save_state.stream(_chr_mode); save_state.stream(_protect1);
++    save_state.stream(_protect2); save_state.stream(_exram_mode); save_state.stream(_nt_map);
++    save_state.stream(_fill_tile); save_state.stream(_fill_attr); save_state.stream(_mul_a);
++    save_state.stream(_mul_b); save_state.stream(_prg); save_state.stream(_chr);
++    save_state.stream(_chr_upper); save_state.stream(_exram);
++}
+diff --git a/src/mapper.hpp b/src/mapper.hpp
+index 517eb5a..5269835 100644
+--- a/src/mapper.hpp
++++ b/src/mapper.hpp
+@@ -526,6 +526,28 @@ public:
+     /// @param value Value to write.
+     void write_cpu(uint16_t address, uint8_t value) override;
+ };
++/// MMC5 mapper, minimal subset (PRG modes 0-3, PRG-RAM protect, CHR-RAM/ROM 8KB/4KB
++/// modes, nametable mapping incl. ExRAM/fill, ExRAM as CPU RAM, multiplier).
++/// No scanline IRQ / split screen / extended attributes.
++class MMC5 final : public Mapper {
++public:
++    MMC5(NES& nes, const ParsedMemory& metadata, MirroringMode mode);
++    ~MMC5() = default;
++    void write_cpu(uint16_t address, uint8_t value) override;
++    uint8_t read_cpu(uint16_t address) override;
++    void write_ppu(uint16_t address, uint8_t value) override;
++    uint8_t read_ppu(uint16_t address) override;
++    void stream_state(SaveState& save_state) override;
++private:
++    void update_banks();
++    uint8_t _prg_mode, _chr_mode, _protect1, _protect2, _exram_mode, _nt_map;
++    uint8_t _fill_tile, _fill_attr, _mul_a, _mul_b;
++    uint8_t _prg[5];
++    uint16_t _chr[12];
++    uint8_t _chr_upper;
++    uint8_t _exram[0x400];
++};
++
+ }
+ 
+ #endif
