@@ -158,7 +158,7 @@ D = {
 152:"Your memories have been lost, but\nthe world you came from is the true form\nof this world. But now, in this age,\nit has suddenly been thrown into disorder.",
 153:"The chain of time has become a ring.\nTo sever it, you must defeat\nthe true enemy in the past.",
 154:"Someone leapt 2000 years into the past, and from there\nsent the four Chaoses into this world,\nand is carrying out the destruction of the world\nthat began 400 years ago.",
-155:"I can see time going round in circles... Something\nthat leapt 2000 years into the past destroys the world from there,\nand then, now that 2000 years have passed, it again\nleaps 2000 years into the past... and then again...",
+155:"I can see time going round... Something that\nleapt 2000 years into the past destroys the world from there,\nand now, with 2000 years gone by, that thing again\nleaps 2000 years into the past... and then again...",
 156:"I can see 2000 years of time\nrepeating itself!!\nIt's just like the chicken and the egg!!\nSever the chain of time!!",
 157:"In the Temple of Chaos there should be a warrior\nof the Sky People who once fought the Chaos.\nThough he has been changed into the form of a bat...",
 158:"Power must be turned in the right direction!",
