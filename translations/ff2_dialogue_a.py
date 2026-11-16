@@ -92,7 +92,7 @@ D = {
 86:"Word has come that the {18:F3} headed\nnorth of {18:2F}",
 87:"So {18:ED} {18:EF} has gone and got herself caught\nCan you lot really rescue her, I wonder!",
 88:"It seems the {18:ED} is being held captive\ninside the {18:F3}\nPlease! Rescue her!",
-89:"The {18:ED} brushed off {18:EC} when {18:EC} tried to stop her,\nand boarded the {18:F5}.\nWho would have thought she'd be captured by the Empire!",
+89:"{18:EC} tried to stop her, but the {18:ED} shook free\nand boarded the {18:F5}.\nWho would have thought she'd be captured by the Empire!",
 90:"If the {18:F3} attacks again,\nthat'll be the end of us",
 91:"Waaah, Princeeess",
 92:"It seems the Empire has a supply base\nfar to the north of {18:2F}. The {18:F3}\nmust be there by now",
