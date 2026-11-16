@@ -1,0 +1,796 @@
+@@ 1
+Right after the great earthquake happened,
+the world sank into the sea...
+I happened to be on a boat, so I
+was saved.
+The only ones who survived are me and the girl
+sleeping in the back.
+That girl was clinging to a board,
+drifting on the sea.
+@@ 2
+Old Man: "Young lady... are you all right?"
+Elia: "Thank you, sir!"
+Old Man: "Not at all. More importantly, take care!"
+@@ 3
+Elia: "Mmm... mmm..."
+@@ 5
+"Thank goodness! There is still light left
+ inside this shard."
+Elia gently took the shard of the Crystal
+in her hands!
+"Now, let us go to the cave north of
+ the temple."
+
+@@ 6
+Something is written here.
+"A door sealed by the Syrcus Key."
+@@ 7
+The Crystal is quietly giving off light.
+"Warriors of Light.
+ You who divide light from darkness.
+ Bring hope to this world once more..."
+@@ 9
+"You've done so much for us. Thank you."
+"You're welcome!"
+@@ 10
+Looks like you're all right now.
+Good, good.
+@@ 12
+"Somehow it feels like I've been dreaming all along..."
+"Nobody remembers the earthquake, or being turned
+ to stone and sunk in the sea..."
+@@ 13
+A guy called Goldor came and put a strange
+chain on your ship.
+@@ 14
+Come again!
+@@ 15
+Goldor's Manor is in the mountains, if you leave
+Amur and go aaall the way south.
+But before that there's a bottomless swamp.
+Fall in and you'll die.
+@@ 16
+Whoa!
+Your ship flies through the sky!?
+@@ 17
+Four warriors who came from the World of Darkness
+smashed the light that overflowed from the four
+Crystals...
+There's a legend like that.
+Goldor thought you were the four warriors of legend,
+so to keep you from taking his Crystal,
+he put a chain on your ship.
+
+@@ 18
+It is the old man who saved Elia.
+"What! Elia...
+ I see...
+ ........
+ It is a sad thing... For Elia's sake too,
+ bring the light back to this world.
+ I'm counting on you!"
+
+@@ 19
+There's an incredibly huge town called
+Saronia. I've heard that the airship at the castle
+there is very fast...
+@@ 20
+Are you looking for a Crystal?
+Then Goldor, who lives past the bottomless swamp
+to the south, ought to have one.
+@@ 21
+Try going to Saronia.
+It's a very large castle town.
+@@ 22
+Goldor can't get enough of money.
+They say everything in his manor is made of
+gold! To keep it from being taken, the mansion
+is full of locks!!
+@@ 23
+With the Floating Shoes you can cross the
+bottomless swamp.
+If I remember right, Granny Delila, who lives in
+the sewer, had them?
+@@ 24
+Goldor is terribly strong against magic!
+He has complete magic defense!
+@@ 25
+Have you been to the tavern in Amur?
+All the know-it-alls are there!
+@@ 26
+The sewer has been sealed off since monsters
+started appearing.
+I think old Mr. Jil had the key,
+if I remember right...
+@@ 28
+Jil: "What do you want!
+
+"We'd like to go into the sewer to get
+ the Floating Shoes..."
+Jil: "What! Into the sewer!
+{14:03}It's sealed off because monsters
+{14:03}appear there.
+{14:03}It's dangerous!!"
+"But we have to find the fourth
+ and final Crystal."
+Jil: "What!
+   You're the four warriors of legend!!"
+@@ 29
+Old Man 1: "What? The four warriors of legend?"
+Old Man 2: "Isn't that us?"
+Old Man 3: "Those kids are saying it's them too!"
+Old Man 4: "Looks like they're going into the sewer..."
+Old Man 1: "All right, let's get there first!!"
+The Other Old Men: "All riiight, let's get there first!!!"
+
+@@ 30
+Jil: "Well now, I'll show you the way
+{14:03}to the sewer.
+{14:03}Follow me!"
+@@ 31
+Jil: "Good luck!"
+@@ 33
+It's locked, so you can't go in.
+@@ 34
+This village has a legend that four warriors
+will smash overflowing light and darkness...
+@@ 35
+The Old Men: "Yeahhh!!"
+@@ 36
+"Wh-what? Who are those old men??"
+"Those old men...
+ they think they're the four heroes
+ of legend!"
+@@ 37
+No, no, the truth is, what I used just now
+wasn't Teleport, it was a Sea Otter Head!
+Fwa fwa fwa!
+@@ 38
+We're heroes too, you know!
+@@ 39
+You've got good eyes.
+Hmm, you lot might be able to do it.
+@@ 40
+You might be stronger than us,
+but we're the ones who're popular with the ladies!
+Fwa fwa fwa!
+@@ 41
+Well, sorry, sorry.
+Guess we just can't beat the young folks after all?!
+We'll rest here.
+@@ 42
+So the four of legend are you folks
+after all? We were dead sure it was
+us!?
+@@ 43
+Well, thanks a bunch!
+@@ 44
+We still need a lot more training!
+@@ 45
+Delila: "Are the four old men doing well?"
+@@ 46
+I won't hand over my Crystal!
+Die!
+@@ 50
+It's the key to Goldor's chain.
+When you grabbed it, it vanished with a whoosh.
+
+@@ 51
+Goldor's curse vanished, and the airship
+is free!
+"The chain came off, but the Crystal
+ is in pieces... Now we're in a fix."
+@@ 53
+On the seafloor by a small triangle-shaped
+island there's a cave.
+There's loads of treasure there!
+@@ 54
+Go home, go home!
+This library is closed!
+@@ 55
+They say that long ago, under Saronia Castle, there
+was a cave that connected all the way to the seafloor...
+It's blocked up now, though.
+From the bottom of the sea you might be able to get in.
+@@ 56
+We are excavating and surveying the
+Ancient Ruins!
+@@ 57
+The cave got filled up with Adamantite,
+and we can't go any further.
+@@ 58
+The earthquake made the Adamantite wall collapse.
+Our advance party should be on the
+other side, but...
+@@ 59
+I get the feeling there's something tremendous
+in these Ancient Ruins...
+@@ 60
+The merchant bunch secretly carry swords and
+armor out of the Ancient Ruins and put them
+up for sale.
+@@ 61
+Bahamut, Leviathan, Odin:
+if you have these three on your side,
+I shall give you summon magic.
+@@ 62
+Every picture discovered in the ruins
+shows something like a gigantic
+ship.
+@@ 63
+I came here from Falgabard for training.
+The monsters in this cave can't be defeated
+with an ordinary sword. On the contrary,
+they even split apart.
+@@ 64
+"..."
+"Are you all right?"
+"...It seems my Dark Sword
+ was still unpolished...
+ Our meeting here must be some kind of fate.
+ Take this..."
+
+Received Kotetsu.
+@@ 65
+Can't go any further
+@@ 68
+Zzz...
+@@ 69
+Controlling the terrain is very difficult.
+Sometimes the damage bounces back
+on yourself.
+@@ 70
+A Geomancer uses nature itself as a weapon.
+By making use of the terrain, they can make
+attacks like magic.
+@@ 71
+I've heard that Saronia has an incredibly fast
+airship.
+@@ 72
+Southeast of this island is the Dalg Continent.
+The wind that blows out of its entrance
+is very strong.
+Everyone gets blown away.
+@@ 73
+It seems there is a sword called the Dark Sword,
+born from darkness. I am traveling
+in search of it...
+@@ 74
+The great shadow of the lake... Leviathan
+is waiting for the time when it will be set free
+from the chains of darkness...
+@@ 75
+Bahamut, the Dragon King:
+if ever one appears who defeats it,
+its good heart shall become still greater power
+and grant a great art...
+@@ 76
+Odin feared that his own power
+would be exploited.
+And so he sealed himself away...
+A knight with a gentle heart...
+@@ 77
+Long, long ago...
+people took the power of light in their hands.
+And the overflowing power of light
+tried to bring the world to ruin...
+At that time...
+four warriors appeared from the World of Darkness,
+to put the overflowing light back as it was...
+
+@@ 78
+Thiiis is wheeen you
+geeet an iiitem!
+@@ 79
+Choc-co-bo, Cho-co-bo, Choc-co-bo
+Choc-co-bo, Choc-co-bo
+Choc-co-bo, Choc-co-bo
+Hey!
+@@ 80
+It's hard to call one out... Hyaah!
+@@ 81
+Oops!
+A chocobo came out again.
+No good...
+@@ 82
+The door is sealed.
+@@ 84
+It seems Noah could summon Leviathan
+and Bahamut, the Dragon King...
+@@ 85
+They say Leviathan and Bahamut were sealed
+on the Floating Continent by Noah...
+@@ 86
+The monsters a Demon-World Illusionist calls out
+are stronger than an Illusionist's.
+@@ 87
+Summon magic can deal damage even when the enemy
+uses Barrier Change, regardless of
+that barrier.
+@@ 88
+Long ago there was a Great Wizard called Noah.
+It seems he used incredible magic...
+@@ 89
+I am one of the Gulgan tribe...
+@@ 90
+Just as when light flooded long, long ago,
+now the power of darkness is about
+to flood...
+Someone is calling the darkness here...
+That one does not know... that even if the world of
+darkness spreads for a time, in the end,
+the two worlds of light and darkness, their balance
+broken, will both cease to be...
+@@ 91
+They say the great wizard Noah was on the Dalg
+Continent... but it seems he has already died...
+@@ 92
+I've heard a rumor that one of Noah's disciples
+has gone to sleep somewhere in the southern
+fjords to protect the world of dreams.
+
+@@ 93
+I'm doing research on chocobos.
+I can even call the Fat Chocobo!
+Hoooo...
+Enter the Fat Chocobo!!
+@@ 95
+Listen to my song...
+@@ 97
+The losing side will all be executed.
+@@ 98
+Why do we have to fight our own
+allies!
+@@ 99
+Fiiight!
+@@ 100
+By the king's order, the shops have all
+been closed.
+They say there's just one weapon shop
+defying the order.
+@@ 101
+Thanks to you, peace has come to Saronia
+once again!
+@@ 102
+The king has split Saronia's army in two
+and is making them fight!
+@@ 104
+Saronia is divided into four blocks.
+@@ 105
+Saronia's library has every kind of
+book there is.
+@@ 107
+This is the library of Saronia.
+But right now it is closed.
+@@ 108
+Try going to the library.
+There ought to be knowledge you folks
+need.
+@@ 109
+If the war goes on like this, Saronia will
+end up a burned-out field.
+@@ 111
+The rumor is that Prince Alus was banished
+from the castle...
+@@ 113
+I saw a child who looked like the prince
+going into the tavern.
+@@ 114
+I saw it.
+The minister's shadow was shaped like
+a great bird... That was the legendary
+monster bird Garuda...
+@@ 115
+Thank you, warriors!
+@@ 116
+The king will listen to no one.
+Anyone who tries to advise him of anything
+is cut down on the spot.
+@@ 120
+Yikes, gimme a breeeak!
+@@ 122
+By order of the king, Saronia Castle
+is sealed.
+@@ 123
+Gatekeeper: "The likes of you can't
+{14:05}enter the castle!
+{14:05}Go home, go home!"
+@@ 124
+Gatekeeper: "Oh, it's Prince Alus."
+Alus: "Let us in."
+Gatekeeper: "You are banished. I cannot
+{14:05}let you inside."
+@@ 125
+"What...
+ His Majesty says to let them through?"
+"Yes."
+"Prince Alus, forgive my rudeness.
+ Please, go on through."
+
+@@ 126
+Here, right here!
+He went into this tavern!!
+@@ 127
+Old Retainer: "Oh! Prince Alus!"
+Alus: "Shh! I'm banished now.
+{14:04}Don't raise your voice!"
+Old Retainer: "My apologies."
+@@ 128
+Warriors of Light who saved Saronia!
+Thank you!!
+@@ 134
+Customer: "The beeest!!"
+@@ 135
+"I will carry on my father's will and bring
+ peace to Saronia... no, not just Saronia,
+ to the whole world.
+ I can't stay sad forever...
+"Alus!"
+"In this Saronia there may be something
+ of use to you.
+ Use whatever you need!"
+@@ 136
+They say that when the great wizard Noah died,
+he divided his power among the three: Xande, Doga
+and Unne.
+@@ 137
+The only ones with the power to cause this great
+a calamity are probably the three wizards
+of the Dalg Continent.
+
+With the engine of the Nautilus, you should be able
+to go against the wind blowing out of the
+continent's Cross Cape and get inside!
+
+Warriors of Light, head for the Dalg Continent!
+
+@@ 138
+Noah's Lute...
+Its tone reaches even the world of dreams.
+Now it quietly sleeps in the Temple of Time...
+@@ 139
+A temple that touched off the wrath of the gods and sank
+into the sea... It sleeps south of Saronia,
+beneath the Two Horns...
+@@ 140
+On the first floor of this tower there is a hidden
+passage to the treasure room.
+@@ 141
+You can't go any further from here.
+It seems it used to be an underground passage, though.
+@@ 142
+We are Saronia's engineers!
+Please use the Nautilus, the flying ship
+discovered in the Ancient Ruins.
+Now, let's carry it!
+@@ 143
+We've left it outside the castle.
+Its name is Nautilus!!
+That ought not to lose even to the wind of
+the Dalg Continent. Take care!
+Got the airship Nautilus!
+
+@@ 144
+How's the Nautilus running?
+It's a fine airship, isn't it!
+@@ 146
+There is a hidden room in this Saronia.
+Try examining the second wall from the right
+in the wizard's room.
+@@ 147
+You're going to climb the Dragon Tower?!
+Better not!
+It's crawling with monsters!!
+
+@@ 148
+The tower standing in the middle of this district is
+called the Dragon Tower, and the treasure of the
+Dragon Knight clan is kept there.
+@@ 149
+I've heard that the only ones who could defeat
+the legendary monster bird Garuda were those
+called Dragon Knights.
+@@ 150
+On Duster, the island east of Saronia,
+live unusual people like Geomancers
+and Bards.
+@@ 153
+
+{14:08}Book of Owen 1
+
+
+I succeeded in floating the continent in
+the air... I shall name its power generator
+after myself, the Tower of Owen...
+
+@@ 154
+
+{14:08}Book of Owen 2
+
+
+To think the light would flood...
+I miscalculated. I will put my son Desch
+into frozen sleep. I have set him so that if
+anything happens to the Tower of Owen, he will
+wake automatically and repair it.
+My son... I am counting on you...
+
+@@ 155
+
+{14:08}Ancient Book 1
+
+
+Four giant statues. They burn to ashes any who
+pass between them. They protect the Crystal.
+The key to them is the four fangs.
+Only we can pass freely.
+@@ 156
+
+{14:08}Ancient Book 2
+
+
+The Floating Continent is complete.
+We shall install it straight west from
+the Cross Cape of the Dalg Continent...
+
+@@ 157
+
+{14:08}Ancient Book 3
+
+
+We have used too much of the power of light.
+The power has begun to run wild, and now even we
+cannot stop it.
+Will the world be destroyed like this...
+@@ 158
+
+{14:08}Ancient Book 4
+
+
+Four warriors who came from the World of Darkness
+held back the rampage of light for us.
+Who are they? Where did they come from?
+But thanks to them, it seems the world was saved...
+@@ 159
+
+{14:07}Book of the Dark Sword
+
+
+If you seek to master the Dark Sword,
+first make for Falgabard...
+the village of the Dark Sword hidden in the
+mountains west of Saronia...
+@@ 160
+
+{14:08}A Difficult Book
+
+
+The principle of the Gear of Time...
+A perpetual motion machine is...
+its semiconductor... in a state of equilibrium...
+
+@@ 161
+
+{14:08}The Book of Airships
+
+
+The Best Airship of the Year
+ 1.. The Submarine Nautilus
+ 2.. The Great Ship Invincible
+ 3.. The Airship Enterprise
+@@ 162
+You can call the Fat Chocobo in the little room
+on the right. Use a Gysahl Vegetable on the
+candle whose flame has gone out.
+@@ 164
+To protect the world of dreams, Lady Unne
+has gone to sleep in the shrine
+south of Saronia.
+@@ 165
+Lord Xande was a good person too.
+But he left here saying that the Great Wizard
+Noah had given him nothing but a worthless thing
+called human life.
+@@ 166
+I heard from Lord Doga that it was Lord Xande
+who caused that great earthquake...
+@@ 167
+There is magic water in this pot.
+For you, who received the revelation of the Crystals,
+it should bring you back to life and restore
+your strength.
+@@ 168
+Lord Doga.
+What? Surely you're not going into the
+Cave of the Magic Circle??
+Please don't! It's dangerous there!
+@@ 169
+The Cave of the Magic Circle leads to the World
+of Darkness. It's swarming with monsters
+of darkness.
+Oh, Lord Doga, please be safe!
+@@ 170
+Parrot: "Unne is the guardian of the world of dreams.
+{14:04}She's been sleeping here all along.
+{14:04}She won't wake up! No matter what!!
+{14:04}She won't come out of the world of dreams!!!"
+@@ 171
+Parrot: "That lute, could it
+{14:04}be Noah's Lute?
+{14:04}If it is, maybe it can wake Unne..."
+@@ 172
+I see, so Lord Doga has gone off to
+another dimension to fetch the Eureka Key.
+Oh, please be safe...
+@@ 173
+Servant: "What!! Lady Unne!!?"
+Unne: "How's it going? Everyone well?"
+Servant: "Lord Doga has gone to another dimension..."
+Unne: "I hope he's safe, but..."
+@@ 174
+To think that Lord Doga and Lady Unne have died...
+Sob, sob...
+Please. For their sake too, bring back
+the light of this world!
+@@ 175
+Unne: "I'm Unne!
+{14:03}I've been in the world of dreams all this time.
+{14:03}It's been a while since I was in this world. Ahh!
+{14:03}This side's not half bad either!!
+{14:03}Oh, I've heard about you lot from Doga
+{14:03}in my dreams.
+{14:03}To think Xande would do such a thing...
+{14:03}Anyway,
+{14:03}first, unless we get the great ship,
+{14:03}we can't go anywhere. The great ship
+{14:03}can cross over mountains.
+{14:03}It ought to be in the Ancient Ruins to the north.
+{14:03}Well then, shall we be off?
+{14:03}Now, let's go!"
+"Huh?"
+
+Unne: "What!? Don't tell me you don't want
+{14:03}to go along with an old woman!"
+"N-no, it's not like that!"
+Unne: "Well, as long as that's so!?"
+Unne joined the party.
+
+@@ 176
+"Oops, I'd better give you this
+ before I forget."
+Received the Fang of Fire.
+"What is this...?"
+"The two fangs you folks have,
+ and this fang: these are the only things
+ that can bring down the four statues
+ Xande called up. Don't lose them.
+ There's one more fang. The Fang of Earth.
+ To get it, too, we need
+ the great ship. Now, let's go!"
+Got the Fang of Fire from Unne.
+@@ 177
+Not only Lord Doga, but Lady Unne too
+has gone off to another dimension
+to fetch the Eureka Key.
+@@ 179
+It's Adamantite.
+@@ 180
+"All right, we're off.
+ Now, take the helm,
+ here we gooo!
+ Ho ho!!"
+@@ 185
+Launch!
+@@ 186
+This is Falgabard, a village formed when those who
+seek to master the Dark Sword gathered together.
+@@ 187
+The Dark Sword is a sword only those who have
+overcome the fear that darkness holds can wield.
+Only Magic Swordsmen can use it.
+@@ 188
+They say the phantom demon sword Masamune
+is somewhere...
+I'd love to get my hands on it.
+@@ 189
+They say that long, long ago there was one who
+mastered both the demon sword and the holy sword
+and could wield every weapon...
+If I recall, that title was Ninja...
+@@ 190
+The monsters in this cave can only be defeated
+with the Dark Sword!
+It's impossible for you.
+@@ 191
+I am looking for one worthy of this
+Kiku-ichimonji...
+Can you lot defeat this magic beast?
+@@ 193
+Cast away fear.
+If you do, darkness too will lend you its power.
+@@ 194
+They say only the Dark Sword works on the monsters
+that live in the Cave of Darkness north of Amur.
+Several people went off to train there,
+but none have come back.
+@@ 195
+There are monsters that split apart if you
+fight them with anything but the Dark Sword.
+@@ 196
+"It's the Fang of Earth..."
+"Who is it that breaks a seal
+ of such long years!"
+Something attacked the four!!
+@@ 198
+This is the Village of Doga.
+The magic sold in this village is all magic
+that Lord Doga called back from ancient
+times.
+@@ 200
+A voice from the mirror...
+"This is the door to Eureka, the forbidden land
+ where the forbidden weapons were sealed..."
+An invisible wall blocks the way.
+@@ 201
+The power of darkness, the Full Moon Ring.
+"Try and defeat me!"
+
+@@ 202
+The phantom demon sword, Masamune.
+"If you can defeat me, I shall become
+ yours!"
+@@ 203
+The mightiest holy sword, Excalibur.
+"Can you endure my light!?"
+@@ 204
+Ah, where on earth is Prince Alus...?
+@@ 205
+Old Retainer 1: "Oh, it's Prince Alus!
+{14:04}Here, please take this!"
+
+
+Received the Dragon Mail!
+
+@@ 206
+Old Retainer 2: "Prince Alus! You were alive!!
+{14:04}This old man slipped out of the castle
+{14:04}wanting to give this to you, Prince!"
+
+Received the Wind Spear!
+
+@@ 207
+The king has gone mad.
+Please, Prince. Persuade
+the king!!
+
+@@ 208
+Sara: "Be sure to come back...!"
+@@ 209
+"My, what a lovely tune!
+ Let's dance!!"
+@@ 210
+Desch: "We've both got a heavy destiny
+{14:05}on our hands!
+{14:05}Well, let's give it our best!"
+@@ 211
+Old Man: "I'm with you, fo fo fo!
+{14:05}Good luck!"
+@@ 212
+Alus: "Please be safe!!"
+@@ 213
+Cid: "It's all up to you lot.
+{14:03}I'm counting on you!"
+@@ 223
+Found a chocobo!
+@@ 226
+Revived!
+@@ 227
+[77][79] [78][79] restored!
+@@ 228
+Status restored!
+@@ 231
+Hot hot!
+@@ 233
+How about it?
+@@ 236
+Somehow it smells like chocobo...

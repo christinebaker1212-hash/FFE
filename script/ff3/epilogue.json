@@ -4,55 +4,55 @@
   "off": "3E700",
   "len": 50,
   "ja": "{COL:0A}4にんは　ひかりのなかで\n{COL:07}そのいしを　そのこころを　かんじとり\n{COL:0A}たびだつ　けついをした",
-  "en": ""
+  "en": "{COL:0A}Within the light, the four\n{COL:07}sensed its will and its heart,\n{COL:0A}and resolved to set out."
  },
  {
   "id": 1,
   "off": "3E732",
   "len": 42,
   "ja": "{COL:0A}さあ　やみをふりはらい\n{COL:0D}ふたたび\n{COL:07}このせかいに　ひかりをとりもどすのだ",
-  "en": ""
+  "en": "{COL:0A}Now, sweep away the darkness\n{COL:0D}and once again\n{COL:07}bring light back to this world,"
  },
  {
   "id": 2,
   "off": "3E75C",
   "len": 23,
   "ja": "{COL:06}クリスタルのひかりを　きぼうにかえて‥‥",
-  "en": ""
+  "en": "{COL:06}turning the Crystals' light into hope..."
  },
  {
   "id": 3,
   "off": "3E773",
   "len": 112,
   "ja": "{COL:05}さいしょは　なにもない　むの　せかいだった\n{COL:08}あるとき　ひかりと　やみができた\n{COL:09}すべては　そこから　うまれた\n{COL:05}ほし　つき　みず　ひ‥‥　　そして　いのち\n{COL:03}ときは　それをまた　もとのばしょに　かえそうとする",
-  "en": ""
+  "en": "{COL:05}In the beginning was a world of nothingness, where nothing was.\n{COL:08}At one time, light and darkness came to be.\n{COL:09}From there, all things were born.\n{COL:05}Stars, moon, water, fire... and then, life.\n{COL:03}Time seeks to return them again to where they began."
  },
  {
   "id": 4,
   "off": "3E7E3",
   "len": 84,
   "ja": "{COL:04}だが　いのちは　さらに　べつのものをうみだした\n{COL:0A}ひかりと　やみをわけ\n{COL:04}そのかがやきをもって　せかいを　てらしだすもの\n{COL:08}きぼう　という　エネルギーを‥‥",
-  "en": ""
+  "en": "{COL:04}But life gave birth to yet another thing:\n{COL:0A}that which divides light and darkness,\n{COL:04}and with its radiance lights up the world,\n{COL:08}the energy called hope..."
  },
  {
   "id": 5,
   "off": "3E837",
   "len": 118,
   "ja": "{COL:06}いつかまた　ひかりと　やみが　かさなり\n{COL:07}すべてが　むに　かえろうとするとき\n{COL:06}それを2つに　わけるものが　あらわれる\n{COL:0B}わすれてはならない\n{COL:03}そのものに　ちからをあたえているのは　ひとびとの\n{COL:0A}きぼうだということを‥‥",
-  "en": ""
+  "en": "{COL:06}When someday light and darkness overlap again\n{COL:07}and all things are about to return to nothingness,\n{COL:06}those who divide it in two will appear.\n{COL:0B}Do not forget\n{COL:03}that what gives them their power is the people's\n{COL:0A}hope..."
  },
  {
   "id": 6,
   "off": "3E8AD",
   "len": 84,
   "ja": "{COL:09}ときは　すべてを　おしながす\n{COL:0A}ゆめ　ぜつぼう　あい‥‥\n{COL:08}だが　それを　うけいれてはならない\n{COL:0B}ながされてはいけない\n{COL:08}そこに　みいださなければならない",
-  "en": ""
+  "en": "{COL:09}Time sweeps everything away:\n{COL:0A}dreams, despair, love...\n{COL:08}But you must not accept it.\n{COL:0B}You must not be swept away.\n{COL:08}You must find it there:"
  },
  {
   "id": 7,
   "off": "3E901",
   "len": 49,
   "ja": "\n\n{COL:07}さいごにのこった　1つぶの　かがやき\n{COL:09}すべてをてらしだす　かがやき\n{COL:0D}きぼうを‥‥",
-  "en": ""
+  "en": "\n\n{COL:07}the one last grain of radiance remaining,\n{COL:09}the radiance that lights up all things,\n{COL:0D}hope..."
  }
 ]

@@ -9,19 +9,19 @@
   "id": 1,
   "off": "3A551",
   "ja": "だいじしんが　おこったちょくごに\nせかいは　うみに　しずんでしまった‥‥\nちょうど　ふねにのっていたんで　わしは\nたすかったんじゃ。\nいきのこったのは　わしと　おくにねている\nむすめだけじゃよ。\nあのむすめは　いたきれにしがみついて\nひょうりゅうしていたんじゃ。",
-  "en": ""
+  "en": "Right after the great earthquake happened,\nthe world sank into the sea...\nI happened to be on a boat, so I\nwas saved.\nThe only ones who survived are me and the girl\nsleeping in the back.\nThat girl was clinging to a board,\ndrifting on the sea."
  },
  {
   "id": 2,
   "off": "3A5D5",
   "ja": "じいさん「むすめさん‥‥　だいじょうぶかい?\nエリア　「おじいさんありがとう!\nじいさん「なんの。　それより　きをつけてな!",
-  "en": ""
+  "en": "Old Man: \"Young lady... are you all right?\"\nElia: \"Thank you, sir!\"\nOld Man: \"Not at all. More importantly, take care!\""
  },
  {
   "id": 3,
   "off": "3A614",
   "ja": "エリア「うーん‥‥　うーん‥‥",
-  "en": ""
+  "en": "Elia: \"Mmm... mmm...\""
  },
  {
   "id": 4,
@@ -33,19 +33,19 @@
   "id": 5,
   "off": "3A625",
   "ja": "「よかった!　まだ　このかけらのなかには\n　ひかりが　のこっているわ。\nエリアは　クリスタルのかけらを　そっと\nてにとった!\n「さあ　しんでんの　きたにある　どうくつに\n　いきましょう。\n",
-  "en": ""
+  "en": "\"Thank goodness! There is still light left\n inside this shard.\"\nElia gently took the shard of the Crystal\nin her hands!\n\"Now, let us go to the cave north of\n the temple.\"\n"
  },
  {
   "id": 6,
   "off": "3A684",
   "ja": "なにか　かいてある。\n「シルクスのかぎで　ふういんされし　とびらなり。",
-  "en": ""
+  "en": "Something is written here.\n\"A door sealed by the Syrcus Key.\""
  },
  {
   "id": 7,
   "off": "3A6A8",
   "ja": "クリスタルは　しずかに　ひかりをはなっている。\n「ひかりのせんしたちよ。\n　ひかりとやみを　わかつものたちよ。\n　このせかいに　ふたたび　きぼうを‥‥",
-  "en": ""
+  "en": "The Crystal is quietly giving off light.\n\"Warriors of Light.\n You who divide light from darkness.\n Bring hope to this world once more...\""
  },
  {
   "id": 8,
@@ -57,13 +57,13 @@
   "id": 9,
   "off": "3A6F5",
   "ja": "『すっかり　せわになった。　ありがとう。\n「どういたしまして!",
-  "en": ""
+  "en": "\"You've done so much for us. Thank you.\"\n\"You're welcome!\""
  },
  {
   "id": 10,
   "off": "3A715",
   "ja": "もう　だいじょうぶなようだな。\nよかった　よかった。",
-  "en": ""
+  "en": "Looks like you're all right now.\nGood, good."
  },
  {
   "id": 11,
@@ -75,91 +75,91 @@
   "id": 12,
   "off": "3A731",
   "ja": "「なんだか　ずっと　ゆめをみていたようだ‥‥\n『みんな　じしんのことや　いしに　されて　うみに\n　しずめられたことを　おぼえていないんだ‥‥",
-  "en": ""
+  "en": "\"Somehow it feels like I've been dreaming all along...\"\n\"Nobody remembers the earthquake, or being turned\n to stone and sunk in the sea...\""
  },
  {
   "id": 13,
   "off": "3A778",
   "ja": "ゴールドルってやつが　やってきて　あんたたちの\nふねに　へんな　くさりを　つけていったわよ。",
-  "en": ""
+  "en": "A guy called Goldor came and put a strange\nchain on your ship."
  },
  {
   "id": 14,
   "off": "3A7A7",
   "ja": "またきてね!",
-  "en": ""
+  "en": "Come again!"
  },
  {
   "id": 15,
   "off": "3A7AE",
   "ja": "ゴールドルのやかたは　この　アムルをでて\nずっと　みなみにいった　やまのなかだ。\nでも　そのまえに　そこなしぬまがあるんだ。\nおちたら　しんじまうぜ。",
-  "en": ""
+  "en": "Goldor's Manor is in the mountains, if you leave\nAmur and go aaall the way south.\nBut before that there's a bottomless swamp.\nFall in and you'll die."
  },
  {
   "id": 16,
   "off": "3A7FA",
   "ja": "ほお!\nあんたらのふねは　そらを　とぶのかい!?",
-  "en": ""
+  "en": "Whoa!\nYour ship flies through the sky!?"
  },
  {
   "id": 17,
   "off": "3A813",
   "ja": "やみのせかいからきた　4にんのせんしが\n4つのクリスタルから　あふれた　ひかりを\nうちくだいた‥‥\nそんな　でんせつがあるんじゃ。\nゴールドルは　あんたらを　でんせつの4にんの\nせんしとおもって　じぶんのクリスタルを\nとられまいと　ふねに　くさりをつけたんじゃよ。\n",
-  "en": ""
+  "en": "Four warriors who came from the World of Darkness\nsmashed the light that overflowed from the four\nCrystals...\nThere's a legend like that.\nGoldor thought you were the four warriors of legend,\nso to keep you from taking his Crystal,\nhe put a chain on your ship.\n"
  },
  {
   "id": 18,
   "off": "3A899",
   "ja": "エリアを　たすけたじいさんだ。\n「えっ!　エリアが‥‥\n　そうか‥‥\n　‥‥‥‥\n　かなしいことじゃ‥‥　エリアのためにも\n　このせかいに　ひかりを　とりもどしてくれ。\n　たのむぞ!\n",
-  "en": ""
+  "en": "It is the old man who saved Elia.\n\"What! Elia...\n I see...\n ........\n It is a sad thing... For Elia's sake too,\n bring the light back to this world.\n I'm counting on you!\"\n"
  },
  {
   "id": 19,
   "off": "3A8F6",
   "ja": "サロニアという　ものすごく　おおきな　まちが\nあるんじゃ。　そこのしろにある　ひくうていは\nとても　はやいと　きいたことがある‥‥",
-  "en": ""
+  "en": "There's an incredibly huge town called\nSaronia. I've heard that the airship at the castle\nthere is very fast..."
  },
  {
   "id": 20,
   "off": "3A938",
   "ja": "クリスタルを　さがしているのかね?\nそれなら　みなみの　そこなしぬまにすむ\nゴールドルが　もっておるはずじゃ。",
-  "en": ""
+  "en": "Are you looking for a Crystal?\nThen Goldor, who lives past the bottomless swamp\nto the south, ought to have one."
  },
  {
   "id": 21,
   "off": "3A970",
   "ja": "サロニアにいってみなさい。\nとても　おおきな　じょうかまちじゃ。",
-  "en": ""
+  "en": "Try going to Saronia.\nIt's a very large castle town."
  },
  {
   "id": 22,
   "off": "3A991",
   "ja": "ゴールドルは　かねにはめがない。\nやかたのものは　みんな　きんでできているって\nいうぜ!　それを　とられまいと　やしきは\nかぎだらけさ!!",
-  "en": ""
+  "en": "Goldor can't get enough of money.\nThey say everything in his manor is made of\ngold! To keep it from being taken, the mansion\nis full of locks!!"
  },
  {
   "id": 23,
   "off": "3A9D7",
   "ja": "ふゆうそうのくつが　あれば　そこなしぬまを\nわたることができる。\nたしか　げすいどうにすむ　デリラばあさんが\nもってたかな?",
-  "en": ""
+  "en": "With the Floating Shoes you can cross the\nbottomless swamp.\nIf I remember right, Granny Delila, who lives in\nthe sewer, had them?"
  },
  {
   "id": 24,
   "off": "3AA16",
   "ja": "ゴールドルは　まほうに　めっぽうつよいぞ!\nかんぜんに　まほうぼうぎょしとるんじゃ!",
-  "en": ""
+  "en": "Goldor is terribly strong against magic!\nHe has complete magic defense!"
  },
  {
   "id": 25,
   "off": "3AA41",
   "ja": "アムルのさかばには　いったかい?\nじょうほうつうが　そろってるぜ!",
-  "en": ""
+  "en": "Have you been to the tavern in Amur?\nAll the know-it-alls are there!"
  },
  {
   "id": 26,
   "off": "3AA63",
   "ja": "げすいどうは　かいぶつがでるようになって\nふうさされているわ。\nかぎは　たしか　ジルおじいさんが　もっていたと\nおもうけど‥‥",
-  "en": ""
+  "en": "The sewer has been sealed off since monsters\nstarted appearing.\nI think old Mr. Jil had the key,\nif I remember right..."
  },
  {
   "id": 27,
@@ -171,25 +171,25 @@
   "id": 28,
   "off": "3AAA4",
   "ja": "ジル「なんのようじゃい!\n\n『ふゆうそうのくつを　もらいに　げすいどうに\n　はいりたいのですが‥‥\nジル「なに!　げすいどうにじゃと!\n{14:03}あそこは　かいぶつがでるので　ふうさして\n{14:03}あるんじゃ。\n{14:03}あぶないぞ!!\n『しかし　さいごの4つめのクリスタルを\n　さがしださなければ　なりません。\nジル「なんと!\n　　　おぬしたち　でんせつの4せんしか!!",
-  "en": ""
+  "en": "Jil: \"What do you want!\n\n\"We'd like to go into the sewer to get\n the Floating Shoes...\"\nJil: \"What! Into the sewer!\n{14:03}It's sealed off because monsters\n{14:03}appear there.\n{14:03}It's dangerous!!\"\n\"But we have to find the fourth\n and final Crystal.\"\nJil: \"What!\n   You're the four warriors of legend!!\""
  },
  {
   "id": 29,
   "off": "3AB56",
   "ja": "じいさん1「なに?　でんせつの4にんのせんし?\nじいさん2「それは　わしたちのことではないか!\nじいさん3「あいつらも　そうだといってるぞ!\nじいさん4「げすいどうに　はいるらしい‥‥\nじいさん1　　「よし　さきまわりじゃ!!\nほかのじいさん「よーし　さきまわりじゃ!!!\n",
-  "en": ""
+  "en": "Old Man 1: \"What? The four warriors of legend?\"\nOld Man 2: \"Isn't that us?\"\nOld Man 3: \"Those kids are saying it's them too!\"\nOld Man 4: \"Looks like they're going into the sewer...\"\nOld Man 1: \"All right, let's get there first!!\"\nThe Other Old Men: \"All riiight, let's get there first!!!\"\n"
  },
  {
   "id": 30,
   "off": "3ABE0",
   "ja": "ジル「どーれ　げすいどうに　あんないして\n{14:03}やるわい。\n{14:03}ついてきなさい!",
-  "en": ""
+  "en": "Jil: \"Well now, I'll show you the way\n{14:03}to the sewer.\n{14:03}Follow me!\""
  },
  {
   "id": 31,
   "off": "3AC08",
   "ja": "ジル「がんばれよ!",
-  "en": ""
+  "en": "Jil: \"Good luck!\""
  },
  {
   "id": 32,
@@ -201,85 +201,85 @@
   "id": 33,
   "off": "3AC13",
   "ja": "かぎがかかっていて　はいれない。",
-  "en": ""
+  "en": "It's locked, so you can't go in."
  },
  {
   "id": 34,
   "off": "3AC24",
   "ja": "このむらには　4にんのせんしが　あふれるひかりと\nやみを　うちくだく‥‥という　でんせつがあるの。",
-  "en": ""
+  "en": "This village has a legend that four warriors\nwill smash overflowing light and darkness..."
  },
  {
   "id": 35,
   "off": "3AC56",
   "ja": "じいさんたち「いえーい!!",
-  "en": ""
+  "en": "The Old Men: \"Yeahhh!!\""
  },
  {
   "id": 36,
   "off": "3AC64",
   "ja": "『な　なんだ?　あの　じいさんたちは??\n「あの　おじいさんたち‥‥\n　じぶんたちが　でんせつの　4にんの　ゆうしゃと\n　おもっているのよ!",
-  "en": ""
+  "en": "\"Wh-what? Who are those old men??\"\n\"Those old men...\n they think they're the four heroes\n of legend!\""
  },
  {
   "id": 37,
   "off": "3ACAB",
   "ja": "いやいや　じつは　さっきつかったのは\nテレポではなくて　ラッコのあたま　じゃよ!\nファファファ!",
-  "en": ""
+  "en": "No, no, the truth is, what I used just now\nwasn't Teleport, it was a Sea Otter Head!\nFwa fwa fwa!"
  },
  {
   "id": 38,
   "off": "3ACDC",
   "ja": "わしらだって　ゆうしゃじゃぞい!",
-  "en": ""
+  "en": "We're heroes too, you know!"
  },
  {
   "id": 39,
   "off": "3ACED",
   "ja": "いい　めを　しとる。\nんー　おまえたちならやれるかもしれん。",
-  "en": ""
+  "en": "You've got good eyes.\nHmm, you lot might be able to do it."
  },
  {
   "id": 40,
   "off": "3AD0C",
   "ja": "おまえらのほうが　ちからは　つよいが\nおんなに　もてるのは　わしらのほうじゃな!\nファファファ!",
-  "en": ""
+  "en": "You might be stronger than us,\nbut we're the ones who're popular with the ladies!\nFwa fwa fwa!"
  },
  {
   "id": 41,
   "off": "3AD3D",
   "ja": "いやーすまん　すまん。\nやっぱり　わかいもんには　かなわんのかのう?!\nここで　やすんでるわい。",
-  "en": ""
+  "en": "Well, sorry, sorry.\nGuess we just can't beat the young folks after all?!\nWe'll rest here."
  },
  {
   "id": 42,
   "off": "3AD6E",
   "ja": "やっぱり　でんせつの4にんぐみは　あんたらなの\nかのー?　てっきり　わしらのことだと　おもった\nんじゃが!?",
-  "en": ""
+  "en": "So the four of legend are you folks\nafter all? We were dead sure it was\nus!?"
  },
  {
   "id": 43,
   "off": "3ADA5",
   "ja": "いやー　あんがとさん!",
-  "en": ""
+  "en": "Well, thanks a bunch!"
  },
  {
   "id": 44,
   "off": "3ADB1",
   "ja": "わしらも　まだまだ　しゅぎょうが　たりんな!",
-  "en": ""
+  "en": "We still need a lot more training!"
  },
  {
   "id": 45,
   "off": "3ADC8",
   "ja": "デリラ「4にんのじいさんは　げんきかい?",
-  "en": ""
+  "en": "Delila: \"Are the four old men doing well?\""
  },
  {
   "id": 46,
   "off": "3ADDD",
   "ja": "わしのクリスタルはわたさん!\nしねい!",
-  "en": ""
+  "en": "I won't hand over my Crystal!\nDie!"
  },
  {
   "id": 47,
@@ -303,13 +303,13 @@
   "id": 50,
   "off": "3ADF4",
   "ja": "ゴールドルの　くさりの　かぎだ。\nつかむと　スウっと　きえた。\n",
-  "en": ""
+  "en": "It's the key to Goldor's chain.\nWhen you grabbed it, it vanished with a whoosh.\n"
  },
  {
   "id": 51,
   "off": "3AE15",
   "ja": "ゴールドルの　のろいがきえ　ひくうていは\nじゆうになった!\n『くさりは　とけたけど　クリスタルが\n　こなごなに‥‥　まいったな。",
-  "en": ""
+  "en": "Goldor's curse vanished, and the airship\nis free!\n\"The chain came off, but the Crystal\n is in pieces... Now we're in a fix.\""
  },
  {
   "id": 52,
@@ -321,79 +321,79 @@
   "id": 53,
   "off": "3AE57",
   "ja": "さんかくの　かたちをした　ちいさなしまの\nかいていに　どうくつがあるんじゃ\nそこは　おたからドッサリじゃぞ!",
-  "en": ""
+  "en": "On the seafloor by a small triangle-shaped\nisland there's a cave.\nThere's loads of treasure there!"
  },
  {
   "id": 54,
   "off": "3AE8E",
   "ja": "かえった　かえった!\nこの　としょかんは　ふうさされている!",
-  "en": ""
+  "en": "Go home, go home!\nThis library is closed!"
  },
  {
   "id": 55,
   "off": "3AEAD",
   "ja": "むかし　サロニアじょうの　ちかは　かいていまで\nつながる　どうくつになっていたという‥‥\nいまは　ふさがれてしまっておるがの。\nうみのそこからなら　はいれるかもしれん。",
-  "en": ""
+  "en": "They say that long ago, under Saronia Castle, there\nwas a cave that connected all the way to the seafloor...\nIt's blocked up now, though.\nFrom the bottom of the sea you might be able to get in."
  },
  {
   "id": 56,
   "off": "3AF02",
   "ja": "われわれは　こだいいせきを　はっくつちょうさ\nしている!",
-  "en": ""
+  "en": "We are excavating and surveying the\nAncient Ruins!"
  },
  {
   "id": 57,
   "off": "3AF1F",
   "ja": "どうくつが　アダマンタイトで　うまって\nしまい　さきにすすめなくなってしまったのだ。",
-  "en": ""
+  "en": "The cave got filled up with Adamantite,\nand we can't go any further."
  },
  {
   "id": 58,
   "off": "3AF4A",
   "ja": "じしんで　アダマンタイトのかべがくずれたんだ。\nあのさきには　われわれの　せんぱつたいが\nいるはずなんだが‥‥",
-  "en": ""
+  "en": "The earthquake made the Adamantite wall collapse.\nOur advance party should be on the\nother side, but..."
  },
  {
   "id": 59,
   "off": "3AF82",
   "ja": "この　こだいいせきには　なにか　とほうもない\nものが　あるようなきがする‥‥",
-  "en": ""
+  "en": "I get the feeling there's something tremendous\nin these Ancient Ruins..."
  },
  {
   "id": 60,
   "off": "3AFA9",
   "ja": "しょうにんのれんちゅうは　こだいいせきから\nけんや　よろいを　こっそりもちだしては\nうりにだしている。",
-  "en": ""
+  "en": "The merchant bunch secretly carry swords and\narmor out of the Ancient Ruins and put them\nup for sale."
  },
  {
   "id": 61,
   "off": "3AFDD",
   "ja": "バハムート　リバイアサン　オーディーン\n3びきの　みかたがいるのなら\nしょうかんまほうを　あたえよう。",
-  "en": ""
+  "en": "Bahamut, Leviathan, Odin:\nif you have these three on your side,\nI shall give you summon magic."
  },
  {
   "id": 62,
   "off": "3B011",
   "ja": "いせきで　はっけんされた　えには　どれも\nきょだいな　ふねのようなものが　えがかれて\nいるのだ。",
-  "en": ""
+  "en": "Every picture discovered in the ruins\nshows something like a gigantic\nship."
  },
  {
   "id": 63,
   "off": "3B042",
   "ja": "わたしは　しゅぎょうのため　ファルガバードから\nここへきた。　このどうくつの　かいぶつは\nふつうのけんでは　たおせん。　ぎゃくに\nぶんれつしたりもするのだ。",
-  "en": ""
+  "en": "I came here from Falgabard for training.\nThe monsters in this cave can't be defeated\nwith an ordinary sword. On the contrary,\nthey even split apart."
  },
  {
   "id": 64,
   "off": "3B091",
   "ja": "「‥‥\n『だいじょうぶですか?\n「‥‥わたしの　あんこくけんは　まだまだ\n　みじゅくだったようだ‥‥\n　ここであったのも　なにかのえん。\n　これを　うけとってくれ‥‥\n\nこてつを　うけとった。",
-  "en": ""
+  "en": "\"...\"\n\"Are you all right?\"\n\"...It seems my Dark Sword\n was still unpolished...\n Our meeting here must be some kind of fate.\n Take this...\"\n\nReceived Kotetsu."
  },
  {
   "id": 65,
   "off": "3B0F2",
   "ja": "さきにはすすめない",
-  "en": ""
+  "en": "Can't go any further"
  },
  {
   "id": 66,
@@ -411,91 +411,91 @@
   "id": 68,
   "off": "3B0FE",
   "ja": "ぐうぐう‥‥",
-  "en": ""
+  "en": "Zzz..."
  },
  {
   "id": 69,
   "off": "3B105",
   "ja": "ちけいを　あやつるのは　とても　むずかしい。\nじぶんに　ダメージが　はねかえってくることも\nあるのだ。",
-  "en": ""
+  "en": "Controlling the terrain is very difficult.\nSometimes the damage bounces back\non yourself."
  },
  {
   "id": 70,
   "off": "3B139",
   "ja": "ふうすいしは　しぜんそのものを　ぶきとする。\nちけいを　りようして　まほうのような\nこうげきをすることが　できるのだ。",
-  "en": ""
+  "en": "A Geomancer uses nature itself as a weapon.\nBy making use of the terrain, they can make\nattacks like magic."
  },
  {
   "id": 71,
   "off": "3B175",
   "ja": "サロニアには　ものすごくはやい　ひくうていが\nあると　きいたことがある。",
-  "en": ""
+  "en": "I've heard that Saronia has an incredibly fast\nairship."
  },
  {
   "id": 72,
   "off": "3B19A",
   "ja": "このしまの　なんとうに　ダルグたいりくがある。\nそのいりぐちから　ふきだす　かぜは\nとてもつよいんだ。\nみんな　ふきとばされちまう。",
-  "en": ""
+  "en": "Southeast of this island is the Dalg Continent.\nThe wind that blows out of its entrance\nis very strong.\nEveryone gets blown away."
  },
  {
   "id": 73,
   "off": "3B1DD",
   "ja": "あんこくけん　という　くらやみからうまれた\nけんが　あるらしい。　わしは　それをもとめて\nたびしている‥‥",
-  "en": ""
+  "en": "It seems there is a sword called the Dark Sword,\nborn from darkness. I am traveling\nin search of it..."
  },
  {
   "id": 74,
   "off": "3B213",
   "ja": "みずうみの　おおきなかげ‥‥リバイアサン\nじぶんを　やみの　くさりから　ときはなつ\nそのときを　まっている‥‥",
-  "en": ""
+  "en": "The great shadow of the lake... Leviathan\nis waiting for the time when it will be set free\nfrom the chains of darkness..."
  },
  {
   "id": 75,
   "off": "3B24B",
   "ja": "りゅうおう　バハムート\nもしも　たおすものが　あらわれたなら\nその　よきこころは　さらなる　ちからとなって\nおおいなる　わざを　あたえるだろう‥‥",
-  "en": ""
+  "en": "Bahamut, the Dragon King:\nif ever one appears who defeats it,\nits good heart shall become still greater power\nand grant a great art..."
  },
  {
   "id": 76,
   "off": "3B295",
   "ja": "オーディーンは　じぶんのちからが\nりようされることを　おそれた。\nそして　みずからを　ふうじた‥‥\nやさしき　こころをもつ　きし‥‥",
-  "en": ""
+  "en": "Odin feared that his own power\nwould be exploited.\nAnd so he sealed himself away...\nA knight with a gentle heart..."
  },
  {
   "id": 77,
   "off": "3B2D8",
   "ja": "はるか　むかし‥‥\nひかりのちからを　ひとが　てにした。\nそして　あふれた　ひかりのちからは\nせかいを　はめつさせようとした‥‥\nそのとき‥‥\nやみのせかいから　4にんのせんしがあらわれた。\nあふれた　ひかりを　もとにもどすために‥‥\n",
-  "en": ""
+  "en": "Long, long ago...\npeople took the power of light in their hands.\nAnd the overflowing power of light\ntried to bring the world to ruin...\nAt that time...\nfour warriors appeared from the World of Darkness,\nto put the overflowing light back as it was...\n"
  },
  {
   "id": 78,
   "off": "3B34F",
   "ja": "これはっ　あいてむーをー\nもらったーときー!",
-  "en": ""
+  "en": "Thiiis is wheeen you\ngeeet an iiitem!"
  },
  {
   "id": 79,
   "off": "3B366",
   "ja": "チョッコボー　チョコボ　チョッコッボー\nチョッコボ　チョッコボー\nチョッコボ　チョッコボー\nはい!",
-  "en": ""
+  "en": "Choc-co-bo, Cho-co-bo, Choc-co-bo\nChoc-co-bo, Choc-co-bo\nChoc-co-bo, Choc-co-bo\nHey!"
  },
  {
   "id": 80,
   "off": "3B398",
   "ja": "なかなか　よびだせん‥‥えーい!",
-  "en": ""
+  "en": "It's hard to call one out... Hyaah!"
  },
  {
   "id": 81,
   "off": "3B3A9",
   "ja": "おっと!\nまた　チョコボが　でてしまった。\nだめだ‥‥",
-  "en": ""
+  "en": "Oops!\nA chocobo came out again.\nNo good..."
  },
  {
   "id": 82,
   "off": "3B3C5",
   "ja": "とびらは　ふういんされている。",
-  "en": ""
+  "en": "The door is sealed."
  },
  {
   "id": 83,
@@ -507,61 +507,61 @@
   "id": 84,
   "off": "3B3D6",
   "ja": "ノアは　リバイアサンや　りゅうおうバハムートを\nしょうかんすることが　できたらしい‥‥",
-  "en": ""
+  "en": "It seems Noah could summon Leviathan\nand Bahamut, the Dragon King..."
  },
  {
   "id": 85,
   "off": "3B402",
   "ja": "リバイアサンや　バハムートは　ノアによって\nふゆうたいりくに　ふういんされたという‥‥",
-  "en": ""
+  "en": "They say Leviathan and Bahamut were sealed\non the Floating Continent by Noah..."
  },
  {
   "id": 86,
   "off": "3B42E",
   "ja": "げんじゅつしより　まかいげんしの　よびだした\nモンスターのほうが　つよいのだ。",
-  "en": ""
+  "en": "The monsters a Demon-World Illusionist calls out\nare stronger than an Illusionist's."
  },
  {
   "id": 87,
   "off": "3B456",
   "ja": "しょうかんまほうは　てきが　バリアチェンジして\nきても　そのバリアにかんけいなく\nダメージをあたえることができるのだ。",
-  "en": ""
+  "en": "Summon magic can deal damage even when the enemy\nuses Barrier Change, regardless of\nthat barrier."
  },
  {
   "id": 88,
   "off": "3B492",
   "ja": "むかし　ノアという　だいまどうしがいた。\nものすごい　まほうを　つかったらしいが‥‥",
-  "en": ""
+  "en": "Long ago there was a Great Wizard called Noah.\nIt seems he used incredible magic..."
  },
  {
   "id": 89,
   "off": "3B4BD",
   "ja": "わたしは　グルガンぞくの　ひとり‥‥",
-  "en": ""
+  "en": "I am one of the Gulgan tribe..."
  },
  {
   "id": 90,
   "off": "3B4D0",
   "ja": "はるかむかし　ひかりが　はんらんしたときと\nおなじように　いま　やみのちからが\nはんらんしようとしている‥‥\nなにものかが　やみを　よびよせている‥‥\nそのものはしらない‥‥　いちじは　やみのせかいが\nひろがっても　けっきょく　さいごには\nバランスをくずした　ひかりとやみの　2つの\nせかいは　どちらも　なくなってしまうことを‥‥",
-  "en": ""
+  "en": "Just as when light flooded long, long ago,\nnow the power of darkness is about\nto flood...\nSomeone is calling the darkness here...\nThat one does not know... that even if the world of\ndarkness spreads for a time, in the end,\nthe two worlds of light and darkness, their balance\nbroken, will both cease to be..."
  },
  {
   "id": 91,
   "off": "3B576",
   "ja": "ダルグたいりくには　いだいな　まどうし　ノアが\nいたというが‥‥　もう　しんでしまったらしい‥‥",
-  "en": ""
+  "en": "They say the great wizard Noah was on the Dalg\nContinent... but it seems he has already died..."
  },
  {
   "id": 92,
   "off": "3B5A7",
   "ja": "ノアの　でしのうち　ひとりが　ゆめのせかいを\nまもるため　みなみの　フィヨルドの　どこかで\nねむりについているという　うわさを　きいたことが\nあります。",
-  "en": ""
+  "en": "I've heard a rumor that one of Noah's disciples\nhas gone to sleep somewhere in the southern\nfjords to protect the world of dreams.\n"
  },
  {
   "id": 93,
   "off": "3B5F4",
   "ja": "わしは　チョコボの　けんきゅうをしとるんじゃ。\nでぶチョコボだってよべるぞっ!\nほーれ‥‥\nでぶチョコボとうじょう!!",
-  "en": ""
+  "en": "I'm doing research on chocobos.\nI can even call the Fat Chocobo!\nHoooo...\nEnter the Fat Chocobo!!"
  },
  {
   "id": 94,
@@ -573,7 +573,7 @@
   "id": 95,
   "off": "3B631",
   "ja": "わたしの　うたを　ききなさい‥‥",
-  "en": ""
+  "en": "Listen to my song..."
  },
  {
   "id": 96,
@@ -585,37 +585,37 @@
   "id": 97,
   "off": "3B643",
   "ja": "まけたほうは　ぜんいん　しょけいされるのだ。",
-  "en": ""
+  "en": "The losing side will all be executed."
  },
  {
   "id": 98,
   "off": "3B65A",
   "ja": "なんで　みかたどうしで　たたかわなきゃ\nいかんのだ!",
-  "en": ""
+  "en": "Why do we have to fight our own\nallies!"
  },
  {
   "id": 99,
   "off": "3B675",
   "ja": "たたかえー!",
-  "en": ""
+  "en": "Fiiight!"
  },
  {
   "id": 100,
   "off": "3B67C",
   "ja": "おうさまのめいれいで　みせは　みんな\nふうさされてしまいました。\n1けんだけ　めいれいにさからっている\nぶきやが　あるらしいです。",
-  "en": ""
+  "en": "By the king's order, the shops have all\nbeen closed.\nThey say there's just one weapon shop\ndefying the order."
  },
  {
   "id": 101,
   "off": "3B6BE",
   "ja": "あなたがたの　おかげで　サロニアに　ふたたび\nへいわが　おとずれました!",
-  "en": ""
+  "en": "Thanks to you, peace has come to Saronia\nonce again!"
  },
  {
   "id": 102,
   "off": "3B6E3",
   "ja": "おうさまが　サロニアのぐんたいを　2つに\nわけて　たたかわせているんだ!",
-  "en": ""
+  "en": "The king has split Saronia's army in two\nand is making them fight!"
  },
  {
   "id": 103,
@@ -627,13 +627,13 @@
   "id": 104,
   "off": "3B709",
   "ja": "サロニアは　4つのブロックにわかれている。",
-  "en": ""
+  "en": "Saronia is divided into four blocks."
  },
  {
   "id": 105,
   "off": "3B71F",
   "ja": "サロニアの　としょかんには　ありとあらゆる\nほんが　そろっているのじゃ。",
-  "en": ""
+  "en": "Saronia's library has every kind of\nbook there is."
  },
  {
   "id": 106,
@@ -645,19 +645,19 @@
   "id": 107,
   "off": "3B745",
   "ja": "ここはサロニアの　としょかんじゃ。\nじゃが　いまは　ふうさされておる。",
-  "en": ""
+  "en": "This is the library of Saronia.\nBut right now it is closed."
  },
  {
   "id": 108,
   "off": "3B769",
   "ja": "としょかんに　いってみなさい。\nおまえさんたちに　ひつような　ちしきが\nあるはずじゃ。",
-  "en": ""
+  "en": "Try going to the library.\nThere ought to be knowledge you folks\nneed."
  },
  {
   "id": 109,
   "off": "3B795",
   "ja": "このまま　せんそうが　つづけば　サロニアは\nやけのはらになっちまう。",
-  "en": ""
+  "en": "If the war goes on like this, Saronia will\nend up a burned-out field."
  },
  {
   "id": 110,
@@ -669,7 +669,7 @@
   "id": 111,
   "off": "3B7B9",
   "ja": "アルスおうじが　しろのそとに　ついほうになった\nという　うわさだ‥‥",
-  "en": ""
+  "en": "The rumor is that Prince Alus was banished\nfrom the castle..."
  },
  {
   "id": 112,
@@ -681,25 +681,25 @@
   "id": 113,
   "off": "3B7DD",
   "ja": "さかばに　おうじに　にた　こどもが\nはいっていくのを　みかけたぞよ。",
-  "en": ""
+  "en": "I saw a child who looked like the prince\ngoing into the tavern."
  },
  {
   "id": 114,
   "off": "3B800",
   "ja": "わたしは　みたのです。\nだいじんのかげは　おおきな　とりのような\nかたちをしていた‥‥あれは　でんせつの\nかいちょうガルーダ‥‥",
-  "en": ""
+  "en": "I saw it.\nThe minister's shadow was shaped like\na great bird... That was the legendary\nmonster bird Garuda..."
  },
  {
   "id": 115,
   "off": "3B841",
   "ja": "せんしたちよ　ありがとう!",
-  "en": ""
+  "en": "Thank you, warriors!"
  },
  {
   "id": 116,
   "off": "3B84F",
   "ja": "おうは　だれのいうことも　みみに　はいらぬ。\nなにかを　しんげんしようとすれば　そのばで\nきりころされるのだ。",
-  "en": ""
+  "en": "The king will listen to no one.\nAnyone who tries to advise him of anything\nis cut down on the spot."
  },
  {
   "id": 117,
@@ -723,7 +723,7 @@
   "id": 120,
   "off": "3B88A",
   "ja": "ひえー　かんべんしてちょー!",
-  "en": ""
+  "en": "Yikes, gimme a breeeak!"
  },
  {
   "id": 121,
@@ -735,43 +735,43 @@
   "id": 122,
   "off": "3B89A",
   "ja": "おうさまの　めいれいにより　サロニアじょうは\nふうさされている。",
-  "en": ""
+  "en": "By order of the king, Saronia Castle\nis sealed."
  },
  {
   "id": 123,
   "off": "3B8BB",
   "ja": "もんばん「おまえらのようなものは　しろには\n{14:05}はいることはできん!\n{14:05}かえった　かえった!",
-  "en": ""
+  "en": "Gatekeeper: \"The likes of you can't\n{14:05}enter the castle!\n{14:05}Go home, go home!\""
  },
  {
   "id": 124,
   "off": "3B8EB",
   "ja": "もんばん「おお　これはアルスおうじ。\nアルス　「なかにいれるのだ。\nもんばん「あなたは　ついほうのみです。　なかに\n{14:05}いれるわけにはまいりません。",
-  "en": ""
+  "en": "Gatekeeper: \"Oh, it's Prince Alus.\"\nAlus: \"Let us in.\"\nGatekeeper: \"You are banished. I cannot\n{14:05}let you inside.\""
  },
  {
   "id": 125,
   "off": "3B936",
   "ja": "「なに‥‥\n　おうさまが　とおせと　いっておられるのか?\n「はい。\n「アルスおうじ　しつれいいたしました。\n　どうぞ　おとおりください。\n",
-  "en": ""
+  "en": "\"What...\n His Majesty says to let them through?\"\n\"Yes.\"\n\"Prince Alus, forgive my rudeness.\n Please, go on through.\"\n"
  },
  {
   "id": 126,
   "off": "3B97C",
   "ja": "ここじゃよ　ここ!\nこの　さかばに　はいっていったんじゃ!!",
-  "en": ""
+  "en": "Here, right here!\nHe went into this tavern!!"
  },
  {
   "id": 127,
   "off": "3B99B",
   "ja": "じい　「おお!　アルスおうじ!\nアルス「しー!　いまは　ついほうのみです。\n{14:04}おおごえをださないで!\nじい　「すみませぬ。",
-  "en": ""
+  "en": "Old Retainer: \"Oh! Prince Alus!\"\nAlus: \"Shh! I'm banished now.\n{14:04}Don't raise your voice!\"\nOld Retainer: \"My apologies.\""
  },
  {
   "id": 128,
   "off": "3B9DA",
   "ja": "サロニアをすくった　ひかりのせんしよ!\nありがとう!!",
-  "en": ""
+  "en": "Warriors of Light who saved Saronia!\nThank you!!"
  },
  {
   "id": 129,
@@ -807,67 +807,67 @@
   "id": 134,
   "off": "3B9FB",
   "ja": "きゃく「さいこうー!!",
-  "en": ""
+  "en": "Customer: \"The beeest!!\""
  },
  {
   "id": 135,
   "off": "3BA07",
   "ja": "「ちちうえの　いしをつぎ　サロニアを\n　いや　サロニアだけでなく　せかいじゅうを\n　へいわに　してみせます。\n　いつまでも　かなしんでは　いられない‥‥\n『アルス!\n「この　サロニアには　なにか　あなたがたの\n　やくにたつものが　あるかもしれません。\n　なんでも　つかってください!",
-  "en": ""
+  "en": "\"I will carry on my father's will and bring\n peace to Saronia... no, not just Saronia,\n to the whole world.\n I can't stay sad forever...\n\"Alus!\"\n\"In this Saronia there may be something\n of use to you.\n Use whatever you need!\""
  },
  {
   "id": 136,
   "off": "3BA95",
   "ja": "ちょうまどうしノアは　しぬときに　ザンデ　ドーガ\nウネの　3にんに　そのちからを　わけあたえたと\nいう。",
-  "en": ""
+  "en": "They say that when the great wizard Noah died,\nhe divided his power among the three: Xande, Doga\nand Unne."
  },
  {
   "id": 137,
   "off": "3BACA",
   "ja": "これだけの　わざわいを　ひきおこすちからを\nもっているのは　たぶん　ダルグたいりくの\n3にんの　まどうしだけじゃ。\n\nノーチラスごうの　エンジンならば\nたいりくの　じゅうじみさきから　ふきだす\nかぜに　さからって　なかにはいれるはず!\n\nひかりのせんしたちよ　ダルグたいりくにむかえ!\n",
-  "en": ""
+  "en": "The only ones with the power to cause this great\na calamity are probably the three wizards\nof the Dalg Continent.\n\nWith the engine of the Nautilus, you should be able\nto go against the wind blowing out of the\ncontinent's Cross Cape and get inside!\n\nWarriors of Light, head for the Dalg Continent!\n"
  },
  {
   "id": 138,
   "off": "3BB5A",
   "ja": "ノアのリュート‥‥\nゆめのせかいにも　とどく　そのねいろ\nいまは　しずかに　ときのしんでんにねむる‥‥",
-  "en": ""
+  "en": "Noah's Lute...\nIts tone reaches even the world of dreams.\nNow it quietly sleeps in the Temple of Time..."
  },
  {
   "id": 139,
   "off": "3BB8E",
   "ja": "かみの　いかりにふれ　うみにしずんだしんでん‥‥\nサロニアのみなみ　2ほんづののしたに\nねむる‥‥",
-  "en": ""
+  "en": "A temple that touched off the wrath of the gods and sank\ninto the sea... It sleeps south of Saronia,\nbeneath the Two Horns..."
  },
  {
   "id": 140,
   "off": "3BBC0",
   "ja": "このとうの1かいに　たからべやへの\nかくしつうろが　あります。",
-  "en": ""
+  "en": "On the first floor of this tower there is a hidden\npassage to the treasure room."
  },
  {
   "id": 141,
   "off": "3BBE0",
   "ja": "ここからさきには　すすめません。\nむかしは　ちかどうだったらしいのですが。",
-  "en": ""
+  "en": "You can't go any further from here.\nIt seems it used to be an underground passage, though."
  },
  {
   "id": 142,
   "off": "3BC06",
   "ja": "われわれは　サロニアの　エンジニア!\nこだいいせきで　はっけんされた　そらとぶふね\nノーチラスを　つかってください。\nさあ　はこぶぞ!",
-  "en": ""
+  "en": "We are Saronia's engineers!\nPlease use the Nautilus, the flying ship\ndiscovered in the Ancient Ruins.\nNow, let's carry it!"
  },
  {
   "id": 143,
   "off": "3BC4A",
   "ja": "しろのそとに　おいておきました。\nなまえは　ノーチラス!!\nあれなら　ダルグたいりくの　かぜにだって\nまけないはずです。　おきをつけて!\nひくうてい　ノーチラスを　てにいれた!\n",
-  "en": ""
+  "en": "We've left it outside the castle.\nIts name is Nautilus!!\nThat ought not to lose even to the wind of\nthe Dalg Continent. Take care!\nGot the airship Nautilus!\n"
  },
  {
   "id": 144,
   "off": "3BCA4",
   "ja": "ノーチラスの　ちょうしは　どうですか?\nいい　ひくうていでしょう!",
-  "en": ""
+  "en": "How's the Nautilus running?\nIt's a fine airship, isn't it!"
  },
  {
   "id": 145,
@@ -879,31 +879,31 @@
   "id": 146,
   "off": "3BCC7",
   "ja": "このサロニアには　かくしべやがあります。\nまどうしのへやの　みぎから2つめの　かべを\nしらべてみてください。",
-  "en": ""
+  "en": "There is a hidden room in this Saronia.\nTry examining the second wall from the right\nin the wizard's room."
  },
  {
   "id": 147,
   "off": "3BCFE",
   "ja": "ドラゴンのとうに　のぼるだって?!\nやめときな!\nかいぶつが　ウヨウヨいるぜ!!\n",
-  "en": ""
+  "en": "You're going to climb the Dragon Tower?!\nBetter not!\nIt's crawling with monsters!!\n"
  },
  {
   "id": 148,
   "off": "3BD28",
   "ja": "このちくの　ちゅうおうにたつ　とうは\nドラゴンのとうとよばれ　りゅうきしいちぞくの\nたからがおかれています。",
-  "en": ""
+  "en": "The tower standing in the middle of this district is\ncalled the Dragon Tower, and the treasure of the\nDragon Knight clan is kept there."
  },
  {
   "id": 149,
   "off": "3BD5F",
   "ja": "でんせつの　かいちょうガルーダを　たおすことが\nできたのは　りゅうきしと　よばれるものだけ\nだったと　きいたことがある。",
-  "en": ""
+  "en": "I've heard that the only ones who could defeat\nthe legendary monster bird Garuda were those\ncalled Dragon Knights."
  },
  {
   "id": 150,
   "off": "3BD9C",
   "ja": "サロニアのひがしのしま　ダスターには\nふうすいしや　ぎんゆうしじんといった\nかわったひとびとが　すんでいます。",
-  "en": ""
+  "en": "On Duster, the island east of Saronia,\nlive unusual people like Geomancers\nand Bards."
  },
  {
   "id": 151,
@@ -921,61 +921,61 @@
   "id": 153,
   "off": "3BDD6",
   "ja": "\n{14:08}オーエンのほん1\n\n\nわたしは　たいりくを　くうちゅうに　うかすことに\nせいこうした‥‥　その　どうりょくろを　わたしの\nなまえをとって　オーエンのとうとしよう‥‥\n",
-  "en": ""
+  "en": "\n{14:08}Book of Owen 1\n\n\nI succeeded in floating the continent in\nthe air... I shall name its power generator\nafter myself, the Tower of Owen...\n"
  },
  {
   "id": 154,
   "off": "3BE2D",
   "ja": "\n{14:08}オーエンのほん2\n\n\nまさか　ひかりがはんらんしようとは‥‥\nごさんだった。　むすこのデッシュを　れいとう\nとうみんさせる。　もし　オーエンのとうに\nなにかが　あったときは　じどうてきに　めざめ\nそれを　なおすように　セットした。\nむすこよ‥‥　たのむぞ‥‥\n",
-  "en": ""
+  "en": "\n{14:08}Book of Owen 2\n\n\nTo think the light would flood...\nI miscalculated. I will put my son Desch\ninto frozen sleep. I have set him so that if\nanything happens to the Tower of Owen, he will\nwake automatically and repair it.\nMy son... I am counting on you...\n"
  },
  {
   "id": 155,
   "off": "3BEB3",
   "ja": "\n{14:08}こだいのほん1\n\n\n4つのきょぞう。　そのあいだをとおるものを\nやきつくす。　クリスタルをまもるのだ。\nそのかぎは　4ほんのきば。\nわたしたちだけが　じゆうにとおれる。",
-  "en": ""
+  "en": "\n{14:08}Ancient Book 1\n\n\nFour giant statues. They burn to ashes any who\npass between them. They protect the Crystal.\nThe key to them is the four fangs.\nOnly we can pass freely."
  },
  {
   "id": 156,
   "off": "3BF0B",
   "ja": "\n{14:08}こだいのほん2\n\n\nふゆうたいりくが　かんせいした。\nダルグたいりくの　じゅうじみさきを\nまっすぐ　にしに　いったところに　せっちする‥‥\n",
-  "en": ""
+  "en": "\n{14:08}Ancient Book 2\n\n\nThe Floating Continent is complete.\nWe shall install it straight west from\nthe Cross Cape of the Dalg Continent...\n"
  },
  {
   "id": 157,
   "off": "3BF55",
   "ja": "\n{14:08}こだいのほん3\n\n\nわれわれは　ひかりのちからを　つかいすぎた。\nちからは　ぼうそうしだし　いまや　わたしたちにも\nとめることはできない。\nこのまま　せかいは　めつぼうしてしまうのか‥‥",
-  "en": ""
+  "en": "\n{14:08}Ancient Book 3\n\n\nWe have used too much of the power of light.\nThe power has begun to run wild, and now even we\ncannot stop it.\nWill the world be destroyed like this..."
  },
  {
   "id": 158,
   "off": "3BFB6",
   "ja": "\n{14:08}こだいのほん4\n\n\nやみのせかいからやってきた　4にんのせんしが\nひかりのぼうそうを　くいとめてくれた。\nかれらは　なにもの?　どこからきたのか?\nしかし　おかげで　せかいはすくわれたようだ‥‥",
-  "en": ""
+  "en": "\n{14:08}Ancient Book 4\n\n\nFour warriors who came from the World of Darkness\nheld back the rampage of light for us.\nWho are they? Where did they come from?\nBut thanks to them, it seems the world was saved..."
  },
  {
   "id": 159,
   "off": "3C01B",
   "ja": "\n{14:07}あんこくけんのほん\n\n\nあんこくけんを　きわめようとするなら\nまず　ファルガバードを　めざせ‥‥\nサロニアの　にしのやまに　かくれた\nあんこくけんのむらを‥‥",
-  "en": ""
+  "en": "\n{14:07}Book of the Dark Sword\n\n\nIf you seek to master the Dark Sword,\nfirst make for Falgabard...\nthe village of the Dark Sword hidden in the\nmountains west of Saronia..."
  },
  {
   "id": 160,
   "off": "3C06E",
   "ja": "\n{14:08}むずかしいほん\n\n\nときのはぐるまのげんり‥‥\nえいきゅうきかんとは‥‥\nその　はんぶしつを‥‥　きんこうじょうたいで‥‥\n",
-  "en": ""
+  "en": "\n{14:08}A Difficult Book\n\n\nThe principle of the Gear of Time...\nA perpetual motion machine is...\nits semiconductor... in a state of equilibrium...\n"
  },
  {
   "id": 161,
   "off": "3C0B0",
   "ja": "\n{14:08}ひくうていのほん\n\n\nザ　ベスト　ひくうてい　オブ　ザ　イヤー\n　1‥‥せんすいてい　ノーチラス\n　2‥‥きょだいせん　インビンシブル\n　3‥‥ひくうてい　　エンタープライズ",
-  "en": ""
+  "en": "\n{14:08}The Book of Airships\n\n\nThe Best Airship of the Year\n 1.. The Submarine Nautilus\n 2.. The Great Ship Invincible\n 3.. The Airship Enterprise"
  },
  {
   "id": 162,
   "off": "3C10B",
   "ja": "みぎのこべやで　でぶチョコボを　よべますよ。\nひのきえた　ロウソクに　ギサールのやさいを\nつかってください。",
-  "en": ""
+  "en": "You can call the Fat Chocobo in the little room\non the right. Use a Gysahl Vegetable on the\ncandle whose flame has gone out."
  },
  {
   "id": 163,
@@ -987,85 +987,85 @@
   "id": 164,
   "off": "3C143",
   "ja": "ウネさまは　ゆめのせかいを　まもるため\nサロニアの　みなみにある　ほこらで\nねむりについています。",
-  "en": ""
+  "en": "To protect the world of dreams, Lady Unne\nhas gone to sleep in the shrine\nsouth of Saronia."
  },
  {
   "id": 165,
   "off": "3C175",
   "ja": "ザンデさまも　いいひとだった。\nでも　だいまどうし　ノアが　じぶんには\nにんげんのいのちという　つまらないものしか\nくれなかったといって　ここをでていったのです。",
-  "en": ""
+  "en": "Lord Xande was a good person too.\nBut he left here saying that the Great Wizard\nNoah had given him nothing but a worthless thing\ncalled human life."
  },
  {
   "id": 166,
   "off": "3C1C7",
   "ja": "あのだいじしんは　ザンデさまが　ひきおこした\nものだと　ドーガさまに　ききました‥‥",
-  "en": ""
+  "en": "I heard from Lord Doga that it was Lord Xande\nwho caused that great earthquake..."
  },
  {
   "id": 167,
   "off": "3C1F2",
   "ja": "このつぼには　まほうのみずが　はいっています。\nクリスタルのけいじをうけた　あなたがたなら\nいきかえったり　たいりょくをかいふくしたり\nできるはずです。",
-  "en": ""
+  "en": "There is magic water in this pot.\nFor you, who received the revelation of the Crystals,\nit should bring you back to life and restore\nyour strength."
  },
  {
   "id": 168,
   "off": "3C23F",
   "ja": "ドーガさま。\nえっ?まさか　まほうじんのどうくつに\nはいられるのですか??\nやめてくださいっ!　あそこはきけんです!",
-  "en": ""
+  "en": "Lord Doga.\nWhat? Surely you're not going into the\nCave of the Magic Circle??\nPlease don't! It's dangerous there!"
  },
  {
   "id": 169,
   "off": "3C27A",
   "ja": "まほうじんのどうくつは　やみのせかいに\nつうじます。　やみのかいぶつが　うじゃうじゃ\nいるのです。\nああ　ドーガさま　どうか　ごぶじで!",
-  "en": ""
+  "en": "The Cave of the Magic Circle leads to the World\nof Darkness. It's swarming with monsters\nof darkness.\nOh, Lord Doga, please be safe!"
  },
  {
   "id": 170,
   "off": "3C2BF",
   "ja": "オウム「ウネは　ゆめのせかいの　しゅごしゃ。\n{14:04}ここで　ずっと　ねむっている。\n{14:04}おきないよ!　どうやっても!!\n{14:04}ゆめのせかいから　でてこない!!!",
-  "en": ""
+  "en": "Parrot: \"Unne is the guardian of the world of dreams.\n{14:04}She's been sleeping here all along.\n{14:04}She won't wake up! No matter what!!\n{14:04}She won't come out of the world of dreams!!!\""
  },
  {
   "id": 171,
   "off": "3C30E",
   "ja": "オウム「そのリュートは　もしかして\n{14:04}ノアのリュート?\n{14:04}もし　そうなら　ウネをおこせるかも‥‥",
-  "en": ""
+  "en": "Parrot: \"That lute, could it\n{14:04}be Noah's Lute?\n{14:04}If it is, maybe it can wake Unne...\""
  },
  {
   "id": 172,
   "off": "3C341",
   "ja": "そうですか　ドーガさまは　エウレカのかぎを\nとりに　いじげんへと　いってしまわれたのですね。\nああ　どうかごぶじで‥‥",
-  "en": ""
+  "en": "I see, so Lord Doga has gone off to\nanother dimension to fetch the Eureka Key.\nOh, please be safe..."
  },
  {
   "id": 173,
   "off": "3C37D",
   "ja": "めしつかい「えっ!!　ウネさま!!?\nウネ　　　「どうだい?　みんなげんきかい?\nめしつかい「ドーガさまが　いじげんに‥‥\nウネ　　　「ぶじだといいけど‥‥",
-  "en": ""
+  "en": "Servant: \"What!! Lady Unne!!?\"\nUnne: \"How's it going? Everyone well?\"\nServant: \"Lord Doga has gone to another dimension...\"\nUnne: \"I hope he's safe, but...\""
  },
  {
   "id": 174,
   "off": "3C3CC",
   "ja": "ドーガさまと　ウネさまが　しんでしまうなんて‥‥\nシクシク‥‥\nおねがいです。　ふたりのためにも　このせかいの\nひかりを　とりもどしてください!",
-  "en": ""
+  "en": "To think that Lord Doga and Lady Unne have died...\nSob, sob...\nPlease. For their sake too, bring back\nthe light of this world!"
  },
  {
   "id": 175,
   "off": "3C415",
   "ja": "ウネ「あたしがウネだよ!\n{14:03}いままで　ずっと　ゆめのせかいにいたんだ。\n{14:03}このせかいは　ひさしぶりだよ。　あーあ!\n{14:03}こっちも　なかなか　いいもんだね!!\n{14:03}おっと　あんたたちのことは　ゆめのなかで\n{14:03}ドーガにきいてるよ。\n{14:03}まさか　ザンデがそんなことをするなんて‥‥\n{14:03}とにかく\n{14:03}まず　きょだいせんを　てにいれなきゃ\n{14:03}どこにも　いけない。　きょだいせんは\n{14:03}やまを　こえることができるんだ。\n{14:03}きたにある　こだいいせきに　あるはずだよ。\n{14:03}それじゃでかけるとするかい。\n{14:03}さあ　いくよ!\n『えっ?\n\nウネ「なに!?　まさか　ばあさんといっしょは\n{14:03}いやだとでもいうんじゃないだろうね!\n『い　いいえ　そういうわけじゃ!\nウネ「なら　いいけどね!?\nパーティーにウネが　くわった。\n",
-  "en": ""
+  "en": "Unne: \"I'm Unne!\n{14:03}I've been in the world of dreams all this time.\n{14:03}It's been a while since I was in this world. Ahh!\n{14:03}This side's not half bad either!!\n{14:03}Oh, I've heard about you lot from Doga\n{14:03}in my dreams.\n{14:03}To think Xande would do such a thing...\n{14:03}Anyway,\n{14:03}first, unless we get the great ship,\n{14:03}we can't go anywhere. The great ship\n{14:03}can cross over mountains.\n{14:03}It ought to be in the Ancient Ruins to the north.\n{14:03}Well then, shall we be off?\n{14:03}Now, let's go!\"\n\"Huh?\"\n\nUnne: \"What!? Don't tell me you don't want\n{14:03}to go along with an old woman!\"\n\"N-no, it's not like that!\"\nUnne: \"Well, as long as that's so!?\"\nUnne joined the party.\n"
  },
  {
   "id": 176,
   "off": "3C57B",
   "ja": "「おっと　いけない　わすれないうちに\n　これを　わたしておこう。\nほのおのきば　を　うけとった。\n『これは‥‥?\n「おまえさんたちが　もっている　2ほんのきば\n　そして　このきば　これはみんな　ザンデが\n　よびだした4つのぞうを　ゆいいつ　たおせる\n　ものなんだ。　なくしちゃダメだよ。\n　きばは　もう1ぽんある。　つちのきばだ。\n　それを　てにいれるためにも　きょだいせんが\n　ひつようなのさ。　さあ　いくよ!\nウネに　ほのおのきばを　もらった。",
-  "en": ""
+  "en": "\"Oops, I'd better give you this\n before I forget.\"\nReceived the Fang of Fire.\n\"What is this...?\"\n\"The two fangs you folks have,\n and this fang: these are the only things\n that can bring down the four statues\n Xande called up. Don't lose them.\n There's one more fang. The Fang of Earth.\n To get it, too, we need\n the great ship. Now, let's go!\"\nGot the Fang of Fire from Unne."
  },
  {
   "id": 177,
   "off": "3C65C",
   "ja": "ドーガさまだけでなく　ウネさまも\nエウレカのかぎをとりに　いじげんへと\nいってしまわれました。",
-  "en": ""
+  "en": "Not only Lord Doga, but Lady Unne too\nhas gone off to another dimension\nto fetch the Eureka Key."
  },
  {
   "id": 178,
@@ -1077,13 +1077,13 @@
   "id": 179,
   "off": "3C68D",
   "ja": "アダマンタイトだ。",
-  "en": ""
+  "en": "It's Adamantite."
  },
  {
   "id": 180,
   "off": "3C697",
   "ja": "「よーし　しゅっぱつだ。\n　さあ　かじをとって\n　いくよー!\n　ホーホー!!",
-  "en": ""
+  "en": "\"All right, we're off.\n Now, take the helm,\n here we gooo!\n Ho ho!!\""
  },
  {
   "id": 181,
@@ -1113,43 +1113,43 @@
   "id": 185,
   "off": "3C6C2",
   "ja": "はっしん!",
-  "en": ""
+  "en": "Launch!"
  },
  {
   "id": 186,
   "off": "3C6C8",
   "ja": "ここは　あんこくけんを　きわめようとするものが\nあつまってできたむら　ファルガバード。",
-  "en": ""
+  "en": "This is Falgabard, a village formed when those who\nseek to master the Dark Sword gathered together."
  },
  {
   "id": 187,
   "off": "3C6F4",
   "ja": "あんこくけんは　くらやみのもつ　きょうふを\nこくふくしたものだけが　あつかえる　けんだ。\nまけんしにしか　つかえんよ。",
-  "en": ""
+  "en": "The Dark Sword is a sword only those who have\novercome the fear that darkness holds can wield.\nOnly Magic Swordsmen can use it."
  },
  {
   "id": 188,
   "off": "3C730",
   "ja": "まぼろしの　まけん　マサムネが\nどこかにあるというが‥‥\nぜひ　てにしてみたいものだ。",
-  "en": ""
+  "en": "They say the phantom demon sword Masamune\nis somewhere...\nI'd love to get my hands on it."
  },
  {
   "id": 189,
   "off": "3C75C",
   "ja": "はるかむかし　まけんと　せいけんの　りょうほうを\nきわめ　すべての　ぶきをつかいこなせたものが\nいたという‥‥\nたしか　そのしょうごうは　にんじゃ‥‥",
-  "en": ""
+  "en": "They say that long, long ago there was one who\nmastered both the demon sword and the holy sword\nand could wield every weapon...\nIf I recall, that title was Ninja..."
  },
  {
   "id": 190,
   "off": "3C7A8",
   "ja": "この　どうくつの　かいぶつは　あんこくけんでしか\nたおすことは　できん!\nおまえたちには　むりじゃ。",
-  "en": ""
+  "en": "The monsters in this cave can only be defeated\nwith the Dark Sword!\nIt's impossible for you."
  },
  {
   "id": 191,
   "off": "3C7DB",
   "ja": "この　きくいちもんじ　に　ふさわしいものを\nさがしておるんだが‥‥\nおぬしたちに　この　まじゅうを　たおせるかな?",
-  "en": ""
+  "en": "I am looking for one worthy of this\nKiku-ichimonji...\nCan you lot defeat this magic beast?"
  },
  {
   "id": 192,
@@ -1161,25 +1161,25 @@
   "id": 193,
   "off": "3C816",
   "ja": "きょうふを　すてさるのだ。\nそうすれば　やみもまた　ちからをかしてくれる。",
-  "en": ""
+  "en": "Cast away fear.\nIf you do, darkness too will lend you its power."
  },
  {
   "id": 194,
   "off": "3C83C",
   "ja": "アムルのきたにある　あんこくのどうくつにすむ\nまものには　あんこくけんしか　きかないという。\nなんにんか　しゅぎょうに　でかけたが\nかえってきたものはいない。",
-  "en": ""
+  "en": "They say only the Dark Sword works on the monsters\nthat live in the Cave of Darkness north of Amur.\nSeveral people went off to train there,\nbut none have come back."
  },
  {
   "id": 195,
   "off": "3C88C",
   "ja": "あんこくけんいがいで　たたかえば　ぎゃくに\nぶんれつする　かいぶつが　いるのです。",
-  "en": ""
+  "en": "There are monsters that split apart if you\nfight them with anything but the Dark Sword."
  },
  {
   "id": 196,
   "off": "3C8B6",
   "ja": "『つちのきばだ‥‥\n「ながきにわたる　ふういんを　やぶるものは\n　だれだ!\nなにかが　4にんを　おそった!!",
-  "en": ""
+  "en": "\"It's the Fang of Earth...\"\n\"Who is it that breaks a seal\n of such long years!\"\nSomething attacked the four!!"
  },
  {
   "id": 197,
@@ -1191,7 +1191,7 @@
   "id": 198,
   "off": "3C8EE",
   "ja": "ここは　ドーガのむら。\nこのむらでうっている　まほうは　みな\nドーガさまが　こだいより　よびおこした\nまほうです。",
-  "en": ""
+  "en": "This is the Village of Doga.\nThe magic sold in this village is all magic\nthat Lord Doga called back from ancient\ntimes."
  },
  {
   "id": 199,
@@ -1203,85 +1203,85 @@
   "id": 200,
   "off": "3C929",
   "ja": "かがみから　こえが‥‥\n「きんだんのぶきを　ふういんした\n　きんだんのち　エウレカへのとびらなり‥‥\nみえないかべが　みちをふさいでいる。",
-  "en": ""
+  "en": "A voice from the mirror...\n\"This is the door to Eureka, the forbidden land\n where the forbidden weapons were sealed...\"\nAn invisible wall blocks the way."
  },
  {
   "id": 201,
   "off": "3C96F",
   "ja": "あんこくのちから　えんげつりん。\n「わたしを　たおしてみよ!\n",
-  "en": ""
+  "en": "The power of darkness, the Full Moon Ring.\n\"Try and defeat me!\"\n"
  },
  {
   "id": 202,
   "off": "3C98F",
   "ja": "まぼろしの　まけん　マサムネ。\n「わたしを　たおせたなら　おまえのものに\n　なってやろう!",
-  "en": ""
+  "en": "The phantom demon sword, Masamune.\n\"If you can defeat me, I shall become\n yours!\""
  },
  {
   "id": 203,
   "off": "3C9BD",
   "ja": "さいきょうの　せいけん　エクスカリバー。\n「わたしの　ひかりに　たえきれるか!?",
-  "en": ""
+  "en": "The mightiest holy sword, Excalibur.\n\"Can you endure my light!?\""
  },
  {
   "id": 204,
   "off": "3C9E6",
   "ja": "ああ　アルスおうじは　いったいどこに‥‥?",
-  "en": ""
+  "en": "Ah, where on earth is Prince Alus...?"
  },
  {
   "id": 205,
   "off": "3C9FC",
   "ja": "じい1「おお　これは　アルスおうじ!\n{14:04}さあ　これを　おもちください!\n\n\nドラゴンメイルを　うけとった!\n",
-  "en": ""
+  "en": "Old Retainer 1: \"Oh, it's Prince Alus!\n{14:04}Here, please take this!\"\n\n\nReceived the Dragon Mail!\n"
  },
  {
   "id": 206,
   "off": "3CA34",
   "ja": "じい2「アルスおうじよ!いきておられましたか!!\n{14:04}じじは　これを　おうじにわたしたくて\n{14:04}しろを　ぬけてきました!\n\nウィンドスピアを　うけとった!\n",
-  "en": ""
+  "en": "Old Retainer 2: \"Prince Alus! You were alive!!\n{14:04}This old man slipped out of the castle\n{14:04}wanting to give this to you, Prince!\"\n\nReceived the Wind Spear!\n"
  },
  {
   "id": 207,
   "off": "3CA83",
   "ja": "おうさまは　くるっています。\nどうか　おうじよ。　おうを　せっとくして\nください!!\n",
-  "en": ""
+  "en": "The king has gone mad.\nPlease, Prince. Persuade\nthe king!!\n"
  },
  {
   "id": 208,
   "off": "3CAAF",
   "ja": "サラ「かならず　かえってきてくださいね‥‥!",
-  "en": ""
+  "en": "Sara: \"Be sure to come back...!\""
  },
  {
   "id": 209,
   "off": "3CAC6",
   "ja": "「まあ　なんて　すてきな　きょくかしら!\n　おどりましょう!!",
-  "en": ""
+  "en": "\"My, what a lovely tune!\n Let's dance!!\""
  },
  {
   "id": 210,
   "off": "3CAE6",
   "ja": "デッシュ「おたがい　たいへんな　うんめいを\n{14:05}かかえちまったな!\n{14:05}まっ　がんばっていこうぜっ!",
-  "en": ""
+  "en": "Desch: \"We've both got a heavy destiny\n{14:05}on our hands!\n{14:05}Well, let's give it our best!\""
  },
  {
   "id": 211,
   "off": "3CB19",
   "ja": "じいさん「わしがついとるて　フォフォフォ!\n{14:05}がんばれよ!",
-  "en": ""
+  "en": "Old Man: \"I'm with you, fo fo fo!\n{14:05}Good luck!\""
  },
  {
   "id": 212,
   "off": "3CB38",
   "ja": "アルス「どうか　ごぶじで!!",
-  "en": ""
+  "en": "Alus: \"Please be safe!!\""
  },
  {
   "id": 213,
   "off": "3CB47",
   "ja": "シド「おまえたちに　かかっておる。\n{14:03}たのんだぞ!",
-  "en": ""
+  "en": "Cid: \"It's all up to you lot.\n{14:03}I'm counting on you!\""
  },
  {
   "id": 214,
@@ -1341,7 +1341,7 @@
   "id": 223,
   "off": "3CB6B",
   "ja": "チョコボみーっけっ!",
-  "en": ""
+  "en": "Found a chocobo!"
  },
  {
   "id": 224,
@@ -1359,19 +1359,19 @@
   "id": 226,
   "off": "3CB78",
   "ja": "いきかえり!",
-  "en": ""
+  "en": "Revived!"
  },
  {
   "id": 227,
   "off": "3CB7F",
   "ja": "[77][79]　[78][79]　かいふく!",
-  "en": ""
+  "en": "[77][79] [78][79] restored!"
  },
  {
   "id": 228,
   "off": "3CB8B",
   "ja": "ステータス　かいふく!",
-  "en": ""
+  "en": "Status restored!"
  },
  {
   "id": 229,
@@ -1389,7 +1389,7 @@
   "id": 231,
   "off": "3CB99",
   "ja": "あちちっ!",
-  "en": ""
+  "en": "Hot hot!"
  },
  {
   "id": 232,
@@ -1401,7 +1401,7 @@
   "id": 233,
   "off": "3CBA0",
   "ja": "いかがなもんでしょ?",
-  "en": ""
+  "en": "How about it?"
  },
  {
   "id": 234,
@@ -1419,6 +1419,6 @@
   "id": 236,
   "off": "3CBAD",
   "ja": "なんだか　チョコボくさいぞ‥‥",
-  "en": ""
+  "en": "Somehow it smells like chocobo..."
  }
 ]
