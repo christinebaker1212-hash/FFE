@@ -3,181 +3,181 @@
   "id": 0,
   "off": "58200",
   "ja": "ドアには　かぎが　かかっている",
-  "en": ""
+  "en": "The door is locked"
  },
  {
   "id": 1,
   "off": "58210",
   "ja": "{18:EF}「あいことばは　[{16:0C}{18:F1}]です。\nよく　おぼえておくのよ。",
-  "en": ""
+  "en": "{18:EF}: \"The password is [{16:0C}{18:F1}].\nRemember it well.\""
  },
  {
   "id": 2,
   "off": "58231",
   "ja": "のばらは　{18:2F}のくにの　もんしょうです\n{18:2F}‥‥ああ　{18:2F}は　どうなるのでしょう。\nとらわれたひとびとが　{18:2F}にあつめられているのを\nみたというものがいます‥‥\nそういえば　{11:02}のおにいさんの\n{07}も　ゆくえしれずでしたね。\nもしかすると　{18:2F}のまちにいるかもしれません。\n\nただ　いまでは　{18:2F}は　モンスターが　うろつく\nきけんなまちに　なっています。\nかんたんには　ちかづけないでしょう。\n",
-  "en": ""
+  "en": "The wild rose is the crest of the kingdom of {18:2F}\n{18:2F}... ahh, what will become of {18:2F}?\nSomeone says they saw the captured people\nbeing gathered in {18:2F}...\nNow that I think of it, {11:02}'s older brother\n{07} is missing as well, isn't he.\nPerhaps he is in the town of {18:2F}.\n\nBut {18:2F} has now become a dangerous town\nwhere monsters prowl.\nIt won't be easy to get near it.\n"
  },
  {
   "id": 3,
   "off": "582F6",
   "ja": "{18:EF}「その{18:01}は　スコットのものですね!\nかれは　いきているんですか?!\n{10:02}「おうじは　{18:2F}のまちに　いました。\n{18:EC}たちに　この{18:01}をたくすと　ちからつきて‥‥\n{18:EF}「‥‥それでは　その{18:01}は　かたみのしな‥‥\nかれは　なにかいっていませんでしたか?\n{10:02}「‥‥いえ　なにも‥‥\nこの{18:01}を　うけとってください。\n{18:EF}「それは　あなたが　もっていてください。\nゆうきあるものに　ふさわしい　{18:01}です。\n{18:2F}にせんにゅうして　かえってくるとは\nあなたのちからを　みくびっていました。\nはんらんぐんに　ちからをかしてください。\nまほうのきんぞく[{16:09}{18:F2}]を　てにいれるために\nつよいせんしを　ひつようとしているのです。\n",
-  "en": ""
+  "en": "{18:EF}: \"That {18:01} is Scott's!\nIs he alive?!\"\n{10:02}: \"The prince was in the town of {18:2F}.\nHe entrusted this {18:01} to us, and then his strength gave out...\"\n{18:EF}: \"...Then that {18:01} is all he left behind...\nDid he say anything?\"\n{10:02}: \"...No, nothing...\nPlease take this {18:01}.\"\n{18:EF}: \"Please keep it yourself.\nIt is a {18:01} fit for one with courage.\nTo think you slipped into {18:2F} and came back...\nI underestimated your strength.\nPlease lend your strength to the rebel army.\nWe need strong warriors to obtain\nthe magic metal [{16:09}{18:F2}].\"\n"
  },
  {
   "id": 4,
   "off": "5842E",
   "ja": "{18:2F}のたたかいは　そうびのちがいで　やぶれたのです\nていこくへいは　{18:04}せいの　ぶきやよろいを\nつかっていたのです。\n\nていこくは　どこかで　{18:04}をみつけたのです。\nサラマンドにすむ　ヨーゼフというものに　ちょうさを\nめいじたのですが　まだ　れんらくがありません。\nミンウとともに　サラマンドへ　いってくれませんか?",
-  "en": ""
+  "en": "We lost the battle for {18:2F} because of the difference in equipment\nThe Empire's soldiers were using weapons\nand armor made of {18:04}.\n\nThe Empire has found {18:04} somewhere.\nI ordered a man named Josef, who lives in Salamand,\nto investigate, but there has been no word yet.\nWould you go to Salamand together with Minwu?"
  },
  {
   "id": 5,
   "off": "584CD",
   "ja": "ミンウは　とくのたかい　しろまどうしです。\nきっと　あなたがたの　たすけになります。\nミンウとともに　サラマンドへ　いってください。",
-  "en": ""
+  "en": "Minwu is a white wizard of great virtue.\nHe will surely be a help to you.\nPlease go to Salamand together with Minwu."
  },
  {
   "id": 6,
   "off": "58510",
   "ja": "ていこくも　{18:2F}のたたかいでは　おおきなそんがいを\nうけました。　それを　おぎなうために　バフスクで\n[{16:01}{18:F3}]を　けんぞうしているのです。",
-  "en": ""
+  "en": "The Empire, too, suffered great losses in the battle\nfor {18:2F}. To make up for them, it is building\nthe [{16:01}{18:F3}] in Bafsk."
  },
  {
   "id": 7,
   "off": "58558",
   "ja": "{18:F3}は　[{16:09}{18:F5}]を　おおがたにし\nぶきを　たくさん　つんだものです。\nていこくは　バフスクのひとびとを　つかって\n{18:F3}を　つくらせているのです。",
-  "en": ""
+  "en": "The {18:F3} is an enlarged [{16:09}{18:F5}]\nloaded with a great many weapons.\nThe Empire is making the people of Bafsk\nbuild the {18:F3}."
  },
  {
   "id": 8,
   "off": "585A3",
   "ja": "{18:2F}の　しろきしだんのリーダーだった\nシドというおとこが　ひくうせんを　つくったのですが\nその　みりょくに　みもこころも　うばわれ\n{18:2F}から　さっていってしまいました。\nいまは　ポフトのまちに　すみ　たびびとから\nかねをとって　ひくうせんに　のせています。\nかれは　そのおかねをすべて　ひくうせんの　せいのうを\nアップさせるために　つぎこんでいるそうです。",
-  "en": ""
+  "en": "A man named Cid, who led the White Knights\nof {18:2F}, built an airship, but\nits allure stole his body and soul,\nand he left {18:2F}.\nNow he lives in the town of Poft, taking money\nfrom travelers to give them rides in his airship.\nThey say he pours every bit of that money into\nimproving the airship's performance."
  },
  {
   "id": 9,
   "off": "58656",
   "ja": "それが　{18:04}なのですね?!\nそれを　まちのぶきやにいる　トブールに\n{18:EC}てください。　ああ　これで　ていこくと\nたいとうに　たたかえるわ!!",
-  "en": ""
+  "en": "So that is the {18:04}?!\nPlease take it to Tobul at the town's weapon shop,\n{18:EC} beg you. Ahh, now we can fight the Empire\non equal terms!!"
  },
  {
   "id": 10,
   "off": "5869D",
   "ja": "[{16:01}{18:F3}]のけんぞうをしきする　{18:EE}は\nゆうのうなおとこのようです。　さいわい　かれは\nきゅうにパラメキアへ　よびもどされました。\n{18:04}をうばわれて　あわてているのでしょう。",
-  "en": ""
+  "en": "The {18:EE} who oversees the building of the [{16:01}{18:F3}]\nseems to be a capable man. Fortunately, he has\nsuddenly been called back to Palamecia.\nNo doubt they're in a panic at having the {18:04} taken from them."
  },
  {
   "id": 11,
   "off": "586F6",
   "ja": "バフスクの　なかまが　せんかんにたどりつく\nぬけみちをみつけたそうです。\nせんかんを　はかいしてください。　せめて　かんせいを\nおくらせるだけでも　かまいません。\nあなたがたと　{13:02}のちからなら　できないことは\nないと　しんじています。\n",
-  "en": ""
+  "en": "Our comrades in Bafsk say they have found\na secret passage that leads to the battleship.\nPlease destroy the battleship. Even just delaying\nits completion will do.\nWith your strength and {13:02}'s, I believe\nthere is nothing you cannot do.\n"
  },
  {
   "id": 12,
   "off": "5876E",
   "ja": "{18:EF}「だいせんかんのこうげきで　まちのひとが\nおおぜい　きずつきました。　ちちは　すっかり\nらくたんして　びょうじょうが　あっかしたようです。\nちちじしんは　もう　し　がちかいと‥‥\n{11:02}「{13:02}　なんとか　できないの?\n{13:02}「‥‥いのちあるもの　いつかは　しぬ。\nだが　くるしむものを　すくうのが　{18:EC}の　やくめ。\n\n{18:EC}は　ここにのこって　ひとびとのちりょうを\nしなければならない。　きみらとは　ここでわかれよう。\n{10:02}よ。　いっこくもはやく　だいせんかんを\nはかいしてくれ。\n　　　　{13:02}　と　わかれた\n",
-  "en": ""
+  "en": "{18:EF}: \"The great battleship's attack wounded\nmany people of the town. My father lost all\nheart, and it seems his illness has grown worse.\nFather himself says death is near...\"\n{11:02}: \"{13:02}, isn't there anything you can do?\"\n{13:02}: \"...All that live must die someday.\nBut saving those who suffer is {18:EC}'s duty.\n\n{18:EC} must stay here and treat the people.\nWe shall part ways here.\n{10:02}, destroy the great battleship\nwithout a moment's delay.\"\n    Parted with {13:02}\n"
  },
  {
   "id": 13,
   "off": "5886D",
   "ja": "ミンウのおかげで　ちちも　だいぶらくに\nなったようです",
-  "en": ""
+  "en": "Thanks to Minwu, Father seems to be\nmuch more comfortable"
  },
  {
   "id": 14,
   "off": "58889",
   "ja": "{18:EF}「だいせんかんの　こうげきで　おおくのひとが\nしにました。　どうやって　あんなものと\nたたかえばいいのでしょう。　だれか　じゃくてんを\nしらないかしら‥‥",
-  "en": ""
+  "en": "{18:EF}: \"The great battleship's attack killed\nmany people. How are we to fight\nsomething like that? I wonder if anyone\nknows its weak point...\""
  },
  {
   "id": 15,
   "off": "588D9",
   "ja": "{18:EF}「そのはなしは　スコットや{18:EB}から\nきいたことがあります。\nカシュオーンのとびらは　いちぞくのもののこえか\nベルのすんだねいろでしか　あけられないそうです。\nそしてそのベルは　せつげんのどうくつの　おくふかくに\nかくされていて　もちだせないそうです。\nまさか　あそこへいくつもりなの?!\n\nああ　{18:EB}がいれば　あなたがたが　そんな\nきけんを　おかすひつようもないのに!\nかれは　いったいどこへ　いってしまったのかしら。\n\nしかたありません。\nあなたがたの　せいこうを　いのるしかないようです。\nせつげんは　ヨーゼフの　にわのようなものです。\nかれに　そうだんするとよいでしょう。",
-  "en": ""
+  "en": "{18:EF}: \"I've heard that story from Scott\nand {18:EB}.\nThey say the door of Kashuon can only be opened by\nthe voice of one of the royal line or the clear tone of a bell.\nAnd that bell is hidden deep within\nthe cave of the snowfield and cannot be taken out.\nYou don't mean to go there?!\n\nAhh, if only {18:EB} were here, you would not\nhave to run such a risk!\nWherever could he have gone?\n\nIt can't be helped.\nIt seems all I can do is pray for your success.\nThe snowfield is like Josef's own backyard.\nYou should talk it over with him.\""
  },
  {
   "id": 16,
   "off": "589FD",
   "ja": "{18:EF}「{18:08}は　カシュオーンの\nシンボルで　しろの1かいで　いまでも　もえつづけて\nいます。　スコットと{18:EB}に　ほのおにまつわる\nはなしを　いくつか　きいたことがあります。\nたとえば　その　ほのおは　ふつうのたいまつには\nうつすことができないとか‥‥\n{10:02}「{18:08}をつかえば\nだいせんかんを　はかいできるかもしれません。\n{18:EF}「ほんとうですか!!\nすぐにでも　いってきてください。\nシドがカシュオーンまでつれていってくれるでしょう。\nでも　どうやってほのおを　もちかえればいいのかしら?",
-  "en": ""
+  "en": "{18:EF}: \"The {18:08} is the symbol of\nKashuon, and it still burns on\nthe first floor of the castle. I have heard several\nstories about the flame from Scott and {18:EB}.\nFor instance, that the flame cannot be\ntransferred to an ordinary torch...\"\n{10:02}: \"With the {18:08}, we might\nbe able to destroy the great battleship.\"\n{18:EF}: \"Is that true!!\nPlease go at once.\nCid will surely take you to Kashuon.\nBut how will you bring the flame back, I wonder?\""
  },
  {
   "id": 17,
   "off": "58AEF",
   "ja": "{18:EF}「まあ　{13:02}!　ひさしぶりですね。\nおじょうさんが　ていこくにつかまって　たいへん\nでしたね。\nまた　{10:02}の　てだすけを　してください。",
-  "en": ""
+  "en": "{18:EF}: \"My, {13:02}! It's been a long time.\nIt must have been terrible, your daughter\ncaptured by the Empire.\nPlease help {10:02} once again.\""
  },
  {
   "id": 18,
   "off": "58B36",
   "ja": "いっこくもはやく　{18:04}を\nてにいれてください!",
-  "en": ""
+  "en": "Please obtain the {18:04}\nwithout a moment's delay!"
  },
  {
   "id": 19,
   "off": "58B4E",
   "ja": "そのベルとひきかえに　ヨーゼフは‥‥‥‥\nそれがあればカシュオーンじょうに　はいれますね。\nじたいは　いっこくをあらそいます。\nかえりは　シドのひくうせんで　むかえにいきます。",
-  "en": ""
+  "en": "In exchange for that bell, Josef...........\nWith it, you can enter Castle Kashuon.\nEvery moment counts.\nFor your return, we'll come to pick you up in Cid's airship."
  },
  {
   "id": 20,
   "off": "58BA7",
   "ja": "{18:EF}「{18:EB}!　あなたっていうひとは‥‥\nあなたがいれば　ヨーゼフも　しなずにすんだのに!\n{18:EB}「{18:EF}　きいてくれ!　{18:EC}は‥\n{18:EF}「あなたの　いうことなど　ききたくありません!",
-  "en": ""
+  "en": "{18:EF}: \"{18:EB}! You are such a...\nIf you had been here, Josef would not have had to die!\"\n{18:EB}: \"{18:EF}, listen to me! {18:EC}...\"\n{18:EF}: \"I don't want to hear anything you have to say!\""
  },
  {
   "id": 21,
   "off": "58C00",
   "ja": "さあ　はやく　にげましょう!!",
-  "en": ""
+  "en": "Now, quickly, let's escape!!"
  },
  {
   "id": 22,
   "off": "58C10",
   "ja": "うふふ‥‥",
-  "en": ""
+  "en": "Ufufu..."
  },
  {
   "id": 23,
   "off": "58C16",
   "ja": "{18:EF}「{10:02}　あなたに　はなしが　あるの‥‥",
-  "en": ""
+  "en": "{18:EF}: \"{10:02}, there is something I want to talk to you about...\""
  },
  {
   "id": 24,
   "off": "58C2C",
   "ja": "{18:EF}「{10:02}!{11:02}!{12:02}!\nたすけだしてくれて　ありがとう。\nだいせんかんも　はかいしてくれたそうですね。\nああ　かんしゃのことばも　ありません。",
-  "en": ""
+  "en": "{18:EF}: \"{10:02}! {11:02}! {12:02}!\nThank you for rescuing me.\nI hear you destroyed the great battleship as well.\nAhh, I have no words to thank you enough.\""
  },
  {
   "id": 25,
   "off": "58C75",
   "ja": "だいじょうぶ　{18:EC}は　ほんものよ。",
-  "en": ""
+  "en": "It's all right, {18:EC} am the real one."
  },
  {
   "id": 26,
   "off": "58C87",
   "ja": "まあ　{13:02}!　すがたがみえないと　おもったら!!\n{18:EB}のさくせんどおり　{18:EC}たちが　てきの\nちゅういを　ひきつけますから　そのあいだに\nあなたがたは　{18:2F}じょうにせんにゅうして\nてきの　しれいかんを　うちとってください。\n{18:2F}じょうは　いりぐちから　まっすぐすすめば\nおおひろまにでます。\nてきは　そこにいるはずよ。　きをつけて。",
-  "en": ""
+  "en": "My, {13:02}! And here I thought you'd vanished!!\nAs {18:EB} has planned, {18:EC} and the others will draw\nthe enemy's attention, and meanwhile\nyou will slip into Castle {18:2F}\nand strike down the enemy commander.\nIn Castle {18:2F}, go straight on from the entrance\nand you will come to the great hall.\nThe enemy should be there. Be careful."
  },
  {
   "id": 27,
   "off": "58D2D",
   "ja": "{18:EF}「やっと　ここにもどってくることができました\nこれも　みんながちからを　あわせたけっかです。\nみなさんに　かんしゃします。\n\nひとつ　きがかりなのは　{18:F8}へむかった　ミンウ\nのことです。　あれから　なんのれんらくもありません。\n[{16:01}{18:F8}]へ　いってくれませんか?\n",
-  "en": ""
+  "en": "{18:EF}: \"At last we have been able to come back here\nThis, too, is the result of everyone joining forces.\nI thank you all.\n\nOne thing that weighs on me is Minwu, who headed\nfor {18:F8}. There has been no word from him since.\nWould you go to [{16:01}{18:F8}]?\"\n"
  },
  {
   "id": 28,
   "off": "58DB5",
   "ja": "{18:F8}は　まどうしのくにです。\nかれらの　まほうのちからを　かりなければ\nこうていを　たおすことは　むずかしいでしょう。\n\nきょうりょくなまほうが　{18:F8}のとうに\nふういんされていると　ききます。\nそのためには　[{16:08}{18:FE}]が\nひつようだそうです。",
-  "en": ""
+  "en": "{18:F8} is the land of mages.\nWithout borrowing the power of their magic,\nit will be hard to defeat the Emperor.\n\nI hear a powerful magic is sealed\nin the tower of {18:F8}.\nIt seems that for that, the [{16:08}{18:FE}]\nis needed."
  },
  {
   "id": 29,
   "off": "58E30",
   "ja": "はるかむかし　じごくへのつうろがひらき　おおくの\nまものが　ちじょうにおしよせたといいます。\nそのとき　そのまほうのちからで\nまものは　げきたいされたそうです。",
-  "en": ""
+  "en": "They say that long, long ago a passage to hell opened,\nand many monsters swarmed onto the surface.\nAt that time, by the power of that magic,\nthe monsters were driven back."
  },
  {
   "id": 30,

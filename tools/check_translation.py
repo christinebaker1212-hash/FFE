@@ -3,7 +3,7 @@ number of times; flag empty translations and disallowed characters.
 usage: check_translation.py script/ff3/t8000.json [...]"""
 import sys, json, re, collections
 TOK = re.compile(r'\{[0-9A-F]{2}(?::[0-9A-F]{2})?\}|\{COL:[0-9A-F]{2}\}|\[[0-9A-F]{2}\]')
-ALLOWED = re.compile(r"^[A-Za-z0-9 .,!?'\"\-:;()/%&+…\n]*$")
+ALLOWED = re.compile(r"^[A-Za-z0-9 .,!?'\"\-:;()/%&+…\[\]\n]*$")   # [ ] = FF2 key-word brackets
 
 def check(path):
     rows = json.load(open(path)); bad = 0; done = 0
@@ -16,7 +16,7 @@ def check(path):
         plain = TOK.sub('', en)
         problems = []
         if a != b: problems.append('tokens %s != %s' % (dict(a - b), dict(b - a)))
-        if not ALLOWED.match(plain): problems.append('chars %r' % sorted(set(re.sub(r"[A-Za-z0-9 .,!?'\"\-:;()/%&+…\n]", '', plain))))
+        if not ALLOWED.match(plain): problems.append('chars %r' % sorted(set(re.sub(r"[A-Za-z0-9 .,!?'\"\-:;()/%&+…\[\]\n]", '', plain))))
         if problems:
             bad += 1; print('%s #%s: %s' % (path, e['id'], '; '.join(problems)))
     todo = sum(1 for e in rows if e['ja'].strip('　\n') and not e.get('en'))

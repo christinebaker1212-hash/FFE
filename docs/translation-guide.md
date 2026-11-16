@@ -55,7 +55,8 @@ inserted word reads naturally ("{18:2F} Castle", "Give {02} to me").
 - `‥‥` → `...`; `!!` / `!?` / `??` keep as written; `ー` stretching a word ("すごーい")
   → stretch the English ("Amaaazing!").
 - Use straight ASCII quotes and apostrophes only (`"` `'`). Allowed characters:
-  A–Z a–z 0–9 space and `. , ! ? ' " - : ; ( ) / % & + …` (no other symbols).
+  A–Z a–z 0–9 space and `. , ! ? ' " - : ; ( ) / % & + …` (no other symbols). FF2 also uses `[ ]`
+  around learnable key words (`[{16:0C}{18:F1}]`); keep them.
 
 ## 5. Menus and system words
 Short labels (menus, commands, statuses) get the clearest full English word: たたかう →
