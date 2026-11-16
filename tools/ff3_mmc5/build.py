@@ -29,49 +29,90 @@ B8 = 0x2000
 NOP = 0xEA
 
 # ---- helper routines, assembled for $5C00 (ExRAM) ----
+# Item syntax: int = byte; 'name' = 16-bit address of a label; ('lo'|'hi', name) = one
+# byte of it; ('L', name) defines a label here; ('b', opcode, name) = relative branch.
 _PARTS = [
-    ('curtgt', [0x00]),                       # current IRQ target line
-    ('entab',  [0x00, 0x80]),                 # $5204 values: disable / enable
-    ('irq_entry', [
+    ('curtgt',  [0x00]),                      # line of the next IRQ (MMC3 numbering)
+    ('lastirq', [0x00]),                      # line of the IRQ just delivered
+    ('entab',   [0x00, 0x80]),                # $5204 values: disable / enable
+    ('irq_entry', [                           # hardware IRQ at the start of the line
         0x2C, 0x04, 0x52,                     # BIT $5204   ; acknowledge (clears pending)
         0x48,                                 # PHA
-        0xA9, 10,                             # LDA #10     ; 15 + 7*10 = 85 cycles in total
-        0x38, 0xE9, 0x01, 0xD0, 0xFB,         # loop: SEC / SBC #1 / BNE loop
+        0xAD, 'curtgt', 0x8D, 'lastirq',      # LDA curtgt / STA lastirq
+        0xA9, 8,                              # LDA #8 + 2 NOPs ; delay: the game's handler
+        ('L', 'd1'), 0x38, 0xE9, 0x01, ('b', 0xD0, 'd1'),   # starts on the same dot as with
+        0xEA, 0xEA,                           #   MMC3 (calibrated against its $E000 write)
         0x68,                                 # PLA
         0x4C, 0x30, 0xFB]),                   # JMP $FB30   ; the game's IRQ handler
-    ('nmi_setup', [                           # A = MMC3 latch L, $01 = 0 disable / 1 enable
-        0x38, 0xE9, 0x01,                     # SEC / SBC #1 ; fires on line L-1
-        0x8D, 'curtgt',                       # STA curtgt
-        0x8D, 0x03, 0x52,                     # STA $5203
+    ('nmi_setup', [                           # A = latch L + reload, $01 = 0 disable / 1 enable
+        0x38, 0xE9, 0x01,                     # SEC / SBC #1 ; MMC3 fires on line L-1
+        0x8D, 'curtgt', 0x8D, 0x03, 0x52,     # STA curtgt / STA $5203
+        0x2C, 0x04, 0x52,                     # BIT $5204   ; drop a stale pending flag
         0xA6, 0x01,                           # LDX $01
         0xBD, 'entab',                        # LDA entab,X
         0x8D, 0x04, 0x52,                     # STA $5204
         0x60]),                               # RTS
-    ('chain', [                               # A = latch V written right after an IRQ (kept)
-        0x48,                                 # PHA
-        0x38, 0x6D, 'curtgt',                 # SEC / ADC curtgt ; curtgt + V + 1
-        0x8D, 'curtgt',                       # STA curtgt
-        0x8D, 0x03, 0x52,                     # STA $5203
+    ('chain', [                               # A = latch V written right after an IRQ + enable
+        0x38, 0x6D, 'lastirq',                # SEC / ADC lastirq ; MMC3: line + V + 1
+        0x8D, 'curtgt', 0x8D, 0x03, 0x52,     # STA curtgt / STA $5203
         0xA9, 0x80, 0x8D, 0x04, 0x52,         # LDA #$80 / STA $5204
-        0x68, 0x60]),                         # PLA / RTS
+        0x60]),                               # RTS
+    # Battle raster effect (bank $2F, $B8AC-$B8D9). The MMC3 loop chains an IRQ every 2
+    # lines and writes $2000 twice per pair; its timing is too tight for MMC5's line-start
+    # IRQ, so it is reproduced directly: table value k takes effect on line 41+k (k < 108),
+    # i.e. it is written at the start of line 40+k, found by polling MMC5's pending flag.
+    ('fx_line', [0x00]),
+    ('fx2f', [
+        0xA0, 0x00,                           # LDY #0
+        0xA9, 40, 0x8D, 'fx_line',            # LDA #40 / STA fx_line
+        ('L', 'fxl'),
+        0xAD, 'fx_line', 0x8D, 0x03, 0x52,    # LDA fx_line / STA $5203 (IRQ itself disabled)
+        ('L', 'fxp'),
+        0x2C, 0x04, 0x52, ('b', 0x10, 'fxp'), # BIT $5204 / BPL fxp   ; line start
+        0xB9, 0x00, 0x73,                     # LDA $7300,Y
+        0x8D, 0x00, 0x20, 0x85, 0x08,         # STA $2000 / STA $08
+        0xC8, 0xEE, 'fx_line',                # INY / INC fx_line
+        0xC0, 108, ('b', 0xD0, 'fxl'),        # CPY #108 / BNE fxl
+        # leave the IRQ model as the MMC3 loop leaves it: last IRQ on line 147
+        0xA9, 147, 0x8D, 'lastirq',
+        0x2C, 0x04, 0x52,                     # BIT $5204 (drop pending)
+        0xA2, 0x36,                           # LDX #$36 (as the loop leaves it; Y = 108)
+        0x60]),
     ('mir_h', [0xA9, 0x50, 0x8D, 0x05, 0x51, 0x60]),
     ('mir_v', [0xA9, 0x44, 0x8D, 0x05, 0x51, 0x60]),
 ]
+
+def _size(x):
+    if isinstance(x, tuple):
+        return {'L': 0, 'b': 2, 'lo': 1, 'hi': 1}[x[0]]
+    return 2 if isinstance(x, str) else 1
+
 def _assemble(base=0x5C00):
     labels, pc = {}, base
     for name, code in _PARTS:
         labels[name] = pc
-        pc += sum(2 if isinstance(x, str) else 1 for x in code)
-    out = bytearray()
+        for x in code:
+            if isinstance(x, tuple) and x[0] == 'L': labels[x[1]] = pc
+            pc += _size(x)
+    out = bytearray(); pc = base
     for name, code in _PARTS:
         for x in code:
-            if isinstance(x, str): out += bytes([labels[x] & 0xFF, labels[x] >> 8])
+            if isinstance(x, tuple):
+                if x[0] == 'b':
+                    d = labels[x[2]] - (pc + 2); assert -128 <= d <= 127
+                    out += bytes([x[1], d & 0xFF])
+                elif x[0] == 'lo': out.append(labels[x[1]] & 0xFF)
+                elif x[0] == 'hi': out.append(labels[x[1]] >> 8)
+            elif isinstance(x, str): out += bytes([labels[x] & 0xFF, labels[x] >> 8])
             else: out.append(x)
+            pc += _size(x)
     return bytes(out), labels
+
 EXRAM, LABELS = _assemble()
-IRQ_ENTRY, NMI_SETUP, CHAIN = LABELS['irq_entry'], LABELS['nmi_setup'], LABELS['chain']
-MIR_H, MIR_V = LABELS['mir_h'], LABELS['mir_v']
-assert len(EXRAM) <= 0x80
+IRQ_ENTRY, NMI_SETUP = LABELS['irq_entry'], LABELS['nmi_setup']
+MIR_H, MIR_V, CHAIN = LABELS['mir_h'], LABELS['mir_v'], LABELS['chain']
+FX2F = LABELS['fx2f']
+assert len(EXRAM) <= 0xFF
 
 def jsr(a): return bytes([0x20, a & 0xFF, a >> 8])
 
@@ -108,24 +149,42 @@ def convert(src):
     # IRQ vector trampoline $0103: JMP $FB30 -> JMP irq_entry
     patch(rom, E+0xFAD2, [0xA9,0x30,0x8D,0x04,0x01,0xA9,0xFB,0x8D,0x05,0x01],
                          [0xA9,IRQ_ENTRY & 0xFF,0x8D,0x04,0x01,0xA9,IRQ_ENTRY >> 8,0x8D,0x05,0x01])
-    # chained splits: STA $C000 / STA $E001 -> JSR chain
-    for off in (0x20B43, 0x3F5E1, 0x5F8AE, 0x5F8E0, 0x6408B, 0x64B52):
-        patch(rom, off, [0x8D,0x00,0xC0,0x8D,0x01,0xE0], jsr(CHAIN) + bytes([NOP]*3))
-    # --- reset: MMC3 init ($FF6D-$FFAF) -> MMC5 init + copy helpers to ExRAM ---
-    init = bytes([
+    # battle raster effect loop ($B8AC-$B8D9 in bank $2F) -> JSR fx2f / JMP $B8DA
+    loop = bytes.fromhex('a9018d00c08d01e0b9007385084820' '79fb688d0020c8b9007385' '08a905857ec67ed0fca5088d0020c8e8e036d0d2')
+    patch(rom, 0x5F8AC, loop, jsr(FX2F) + bytes([0x4C, 0xDA, 0xB8]) + bytes([NOP] * (len(loop) - 6)))
+    # chained splits (latch V written right after an IRQ, then enable): JSR chain
+    for off in (0x20B43, 0x3F5E1, 0x5F8E0, 0x6408B, 0x64B52):
+        patch(rom, off, [0x8D,0x00,0xC0,0x8D,0x01,0xE0], jsr(CHAIN) + bytes([NOP] * 3))
+    # --- reset ($FF48-$FFB8) rebuilt ---
+    # MMC5 init and the ExRAM copy (~1900 cycles) run between the two vblank waits,
+    # where the original idles anyway (the PPU can power up inside vblank, so running
+    # them before the first wait would miss that vblank and start a frame late). After the waits, a delay replaces the 404-cycle
+    # MMC3 init so the game starts on exactly the same CPU cycle with the same
+    # registers (A=$80, X=6, Y=0, N=1 Z=0 C=1).
+    mmc5_init = bytes([
         0xA9,0x03,0x8D,0x00,0x51,                  # PRG mode 3 (4x 8KB)
         0xA9,0x02,0x8D,0x02,0x51,0x8D,0x04,0x51,   # PRG-RAM protect 1 / ExRAM = CPU RAM
         0xA9,0x01,0x8D,0x03,0x51,                  # PRG-RAM protect 2
         0xA9,0x44,0x8D,0x05,0x51,                  # vertical mirroring
-        0xA9,0x00,0x8D,0x01,0x51,0x8D,0x13,0x51,0x8D,0x27,0x51,0x8D,0x2B,0x51,0x8D,0x30,0x51,
+        0xA9,0x00,0x8D,0x01,0x51,0x8D,0x13,0x51,0x8D,0x27,0x51,0x8D,0x2B,0x51,  # ($5130 unused with 8KB CHR-RAM)
         0xA9,0xFE,0x8D,0x16,0x51,                  # $C000 = bank 126 (patched copy of $3E)
         0xA9,0xC0,0x8D,0x14,0x51,                  # $8000 = bank 64 (helper source)
-        0xA2,0x7F,0xBD,0x00,0x80,0x9D,0x00,0x5C,0xCA,0x10,0xF7,   # copy 128 bytes
-        0xA2,0x06,0xA9,0x80,                       # leave X/A as the MMC3 code did
+        0xA2,len(EXRAM),0xBD,0xFF,0x7F,0x9D,0xFF,0x5B,0xCA,0xD0,0xF7,   # copy helpers (X=n..1)
     ])
-    n = 0xFFB0 - 0xFF6D
-    assert len(init) <= n
-    rom[E+0xFF6D:E+0xFFB0] = init + bytes([NOP] * (n - len(init)))
+    orig_head = rom[E+0xFF48:E+0xFF55]      # SEI CLD LDA #0 STA $2000 STA $2001 STA $4010
+    orig_wait = rom[E+0xFF55:E+0xFF5F]      # LDX #2 / BIT $2002 / BPL / DEX / BNE
+    orig_stack = rom[E+0xFF5F:E+0xFF6D]     # LDX #$FF TXS LDA #$40 STA $0100 STA $0103 STA $4017
+    assert orig_head.hex() == '78d8a9008d00208d01208d1040' and orig_wait.hex() == 'a2022c022010fbcad0f8'
+    tail = bytes([0xA0,79, 0x88,0xD0,0xFD,       # LDY #79 / DEY / BNE : 2 + 5*79 - 1, Y=0
+                  0xEA, 0xA2,0x06, 0x38, 0xA9,0x80,   # NOP LDX #6 SEC LDA #$80   (total 404)
+                  0x4C,0x00,0xC0])               # JMP $C000
+    wait1 = bytes([0x2C,0x02,0x20,0x10,0xFB])      # BIT $2002 / BPL
+    wait2 = wait1 + bytes([0xEA, 0xEA])            # 4 cycles = the original DEX/BNE exit
+                                                    # (X is reloaded right after)
+    code = orig_head + wait1 + mmc5_init + wait2 + orig_stack + tail
+    n = 0xFFB9 - 0xFF48                           # through the old CHR table at $FFB3-$FFB8
+    assert len(code) <= n, len(code)
+    rom[E+0xFF48:E+0xFFB9] = code + bytes([NOP] * (n - len(code)))
     # --- assemble the 1MB image ---
     out = bytearray(b'\xFF' * (128 * B8))
     out[0:len(rom)] = rom
