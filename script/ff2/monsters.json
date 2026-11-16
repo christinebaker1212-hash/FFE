@@ -3,768 +3,768 @@
   "id": 0,
   "off": "56D44",
   "ja": "レッグイーター",
-  "en": ""
+  "en": "Leg Eater"
  },
  {
   "id": 1,
   "off": "56D4C",
   "ja": "バンパイアソーン",
-  "en": ""
+  "en": "Vampire Thorn"
  },
  {
   "id": 2,
   "off": "56D55",
   "ja": "ホーネット",
-  "en": ""
+  "en": "Hornet"
  },
  {
   "id": 3,
   "off": "56D5B",
   "ja": "クィーンビー",
-  "en": ""
+  "en": "Queen Bee"
  },
  {
   "id": 4,
   "off": "56D62",
   "ja": "スノーマン",
-  "en": ""
+  "en": "Snowman"
  },
  {
   "id": 5,
   "off": "56D68",
   "ja": "サスカッチ",
-  "en": ""
+  "en": "Sasquatch"
  },
  {
   "id": 6,
   "off": "56D6E",
   "ja": "アイシクル",
-  "en": ""
+  "en": "Icicle"
  },
  {
   "id": 7,
   "off": "56D74",
   "ja": "しょうにゅうせき",
-  "en": ""
+  "en": "Stalactite"
  },
  {
   "id": 8,
   "off": "56D7D",
   "ja": "コラム",
-  "en": ""
+  "en": "Column"
  },
  {
   "id": 9,
   "off": "56D81",
   "ja": "スプリンター",
-  "en": ""
+  "en": "Splinter"
  },
  {
   "id": 10,
   "off": "56D88",
   "ja": "ビッグバード",
-  "en": ""
+  "en": "Big Bird"
  },
  {
   "id": 11,
   "off": "56D8F",
   "ja": "アダマンタイマイ",
-  "en": ""
+  "en": "Adamantaimai"
  },
  {
   "id": 12,
   "off": "56D98",
   "ja": "ランドタートル",
-  "en": ""
+  "en": "Land Turtle"
  },
  {
   "id": 13,
   "off": "56DA0",
   "ja": "オーガ",
-  "en": ""
+  "en": "Ogre"
  },
  {
   "id": 14,
   "off": "56DA4",
   "ja": "オーガメイジ",
-  "en": ""
+  "en": "Ogre Mage"
  },
  {
   "id": 15,
   "off": "56DAB",
   "ja": "オーガチーフ",
-  "en": ""
+  "en": "Ogre Chief"
  },
  {
   "id": 16,
   "off": "56DB2",
   "ja": "デュアルヘッド",
-  "en": ""
+  "en": "Dual Head"
  },
  {
   "id": 17,
   "off": "56DBA",
   "ja": "ゾンビ2ヘッド",
-  "en": ""
+  "en": "Zombie Two-Head"
  },
  {
   "id": 18,
   "off": "56DC2",
   "ja": "ウェアラット",
-  "en": ""
+  "en": "Wererat"
  },
  {
   "id": 19,
   "off": "56DC9",
   "ja": "スタナー",
-  "en": ""
+  "en": "Stunner"
  },
  {
   "id": 20,
   "off": "56DCE",
   "ja": "デッドヘッド",
-  "en": ""
+  "en": "Dead Head"
  },
  {
   "id": 21,
   "off": "56DD5",
   "ja": "スカル",
-  "en": ""
+  "en": "Skull"
  },
  {
   "id": 22,
   "off": "56DD9",
   "ja": "ゾンビ",
-  "en": ""
+  "en": "Zombie"
  },
  {
   "id": 23,
   "off": "56DDD",
   "ja": "グール",
-  "en": ""
+  "en": "Ghoul"
  },
  {
   "id": 24,
   "off": "56DE1",
   "ja": "ガスト",
-  "en": ""
+  "en": "Ghast"
  },
  {
   "id": 25,
   "off": "56DE5",
   "ja": "レブナント",
-  "en": ""
+  "en": "Revenant"
  },
  {
   "id": 26,
   "off": "56DEB",
   "ja": "シャドウ",
-  "en": ""
+  "en": "Shadow"
  },
  {
   "id": 27,
   "off": "56DF0",
   "ja": "レイス",
-  "en": ""
+  "en": "Wraith"
  },
  {
   "id": 28,
   "off": "56DF4",
   "ja": "スペクター",
-  "en": ""
+  "en": "Specter"
  },
  {
   "id": 29,
   "off": "56DFA",
   "ja": "ゴースト",
-  "en": ""
+  "en": "Ghost"
  },
  {
   "id": 30,
   "off": "56DFF",
   "ja": "ありじごく",
-  "en": ""
+  "en": "Antlion"
  },
  {
   "id": 31,
   "off": "56E05",
   "ja": "さつじんノコギリ",
-  "en": ""
+  "en": "Murder Saw"
  },
  {
   "id": 32,
   "off": "56E0E",
   "ja": "ゴートス",
-  "en": ""
+  "en": "Goatus"
  },
  {
   "id": 33,
   "off": "56E13",
   "ja": "ビーストデーモン",
-  "en": ""
+  "en": "Beast Demon"
  },
  {
   "id": 34,
   "off": "56E1C",
   "ja": "キマイラ",
-  "en": ""
+  "en": "Chimera"
  },
  {
   "id": 35,
   "off": "56E21",
   "ja": "ゴーギマイラ",
-  "en": ""
+  "en": "Gorgimaira"
  },
  {
   "id": 36,
   "off": "56E28",
   "ja": "スフィンクマイラ",
-  "en": ""
+  "en": "Sphinxmaira"
  },
  {
   "id": 37,
   "off": "56E31",
   "ja": "デスフラワー",
-  "en": ""
+  "en": "Death Flower"
  },
  {
   "id": 38,
   "off": "56E38",
   "ja": "あくまのはな",
-  "en": ""
+  "en": "Devil's Flower"
  },
  {
   "id": 39,
   "off": "56E3F",
   "ja": "キラーフィッシュ",
-  "en": ""
+  "en": "Killer Fish"
  },
  {
   "id": 40,
   "off": "56E48",
   "ja": "エレキフィッシュ",
-  "en": ""
+  "en": "Electric Fish"
  },
  {
   "id": 41,
   "off": "56E51",
   "ja": "ダイブイーグル",
-  "en": ""
+  "en": "Dive Eagle"
  },
  {
   "id": 42,
   "off": "56E59",
   "ja": "コカトリス",
-  "en": ""
+  "en": "Cockatrice"
  },
  {
   "id": 43,
   "off": "56E5F",
   "ja": "かいぞく",
-  "en": ""
+  "en": "Pirate"
  },
  {
   "id": 44,
   "off": "56E64",
   "ja": "バッカニア",
-  "en": ""
+  "en": "Buccaneer"
  },
  {
   "id": 45,
   "off": "56E6A",
   "ja": "ボーゲン",
-  "en": ""
+  "en": "Bogen"
  },
  {
   "id": 46,
   "off": "56E6F",
   "ja": "ゾンビボーゲン",
-  "en": ""
+  "en": "Zombie Bogen"
  },
  {
   "id": 47,
   "off": "56E77",
   "ja": "ビッグホーン",
-  "en": ""
+  "en": "Big Horn"
  },
  {
   "id": 48,
   "off": "56E7E",
   "ja": "タスクライノ",
-  "en": ""
+  "en": "Tusk Rhino"
  },
  {
   "id": 49,
   "off": "56E85",
   "ja": "ポイズントード",
-  "en": ""
+  "en": "Poison Toad"
  },
  {
   "id": 50,
   "off": "56E8D",
   "ja": "ギガントード",
-  "en": ""
+  "en": "Gigantoad"
  },
  {
   "id": 51,
   "off": "56E94",
   "ja": "シースネイク",
-  "en": ""
+  "en": "Sea Snake"
  },
  {
   "id": 52,
   "off": "56E9B",
   "ja": "シードラゴン",
-  "en": ""
+  "en": "Sea Dragon"
  },
  {
   "id": 53,
   "off": "56EA2",
   "ja": "ランドレイ",
-  "en": ""
+  "en": "Land Ray"
  },
  {
   "id": 54,
   "off": "56EA8",
   "ja": "マンタレイ",
-  "en": ""
+  "en": "Manta Ray"
  },
  {
   "id": 55,
   "off": "56EAE",
   "ja": "フライングレイ",
-  "en": ""
+  "en": "Flying Ray"
  },
  {
   "id": 56,
   "off": "56EB6",
   "ja": "チェンジャー",
-  "en": ""
+  "en": "Changer"
  },
  {
   "id": 57,
   "off": "56EBD",
   "ja": "ブレイン",
-  "en": ""
+  "en": "Brain"
  },
  {
   "id": 58,
   "off": "56EC2",
   "ja": "パラサイト",
-  "en": ""
+  "en": "Parasite"
  },
  {
   "id": 59,
   "off": "56EC8",
   "ja": "メガパラサイト",
-  "en": ""
+  "en": "Mega Parasite"
  },
  {
   "id": 60,
   "off": "56ED0",
   "ja": "ウェアウルフ",
-  "en": ""
+  "en": "Werewolf"
  },
  {
   "id": 61,
   "off": "56ED7",
   "ja": "ウルフデビル",
-  "en": ""
+  "en": "Wolf Devil"
  },
  {
   "id": 62,
   "off": "56EDE",
   "ja": "インプ",
-  "en": ""
+  "en": "Imp"
  },
  {
   "id": 63,
   "off": "56EE2",
   "ja": "ピットフィーント",
-  "en": ""
+  "en": "Pit Fiend"
  },
  {
   "id": 64,
   "off": "56EEB",
   "ja": "モルボル",
-  "en": ""
+  "en": "Molbol"
  },
  {
   "id": 65,
   "off": "56EF0",
   "ja": "ランドモルボル",
-  "en": ""
+  "en": "Land Molbol"
  },
  {
   "id": 66,
   "off": "56EF8",
   "ja": "モルボルグレート",
-  "en": ""
+  "en": "Molbol Great"
  },
  {
   "id": 67,
   "off": "56F01",
   "ja": "バシリスク",
-  "en": ""
+  "en": "Basilisk"
  },
  {
   "id": 68,
   "off": "56F07",
   "ja": "サラマンダー",
-  "en": ""
+  "en": "Salamander"
  },
  {
   "id": 69,
   "off": "56F0E",
   "ja": "アイスリザード",
-  "en": ""
+  "en": "Ice Lizard"
  },
  {
   "id": 70,
   "off": "56F16",
   "ja": "アイメーバ",
-  "en": ""
+  "en": "Eyemoeba"
  },
  {
   "id": 71,
   "off": "56F1C",
   "ja": "ヘクトアイズ",
-  "en": ""
+  "en": "Hecteyes"
  },
  {
   "id": 72,
   "off": "56F23",
   "ja": "ラウンドウォーム",
-  "en": ""
+  "en": "Roundworm"
  },
  {
   "id": 73,
   "off": "56F2C",
   "ja": "サンドウォーム",
-  "en": ""
+  "en": "Sandworm"
  },
  {
   "id": 74,
   "off": "56F34",
   "ja": "アビスウォーム",
-  "en": ""
+  "en": "Abyss Worm"
  },
  {
   "id": 75,
   "off": "56F3C",
   "ja": "グリーンスライム",
-  "en": ""
+  "en": "Green Slime"
  },
  {
   "id": 76,
   "off": "56F45",
   "ja": "イエローゼリー",
-  "en": ""
+  "en": "Yellow Jelly"
  },
  {
   "id": 77,
   "off": "56F4D",
   "ja": "レッドマシュマロ",
-  "en": ""
+  "en": "Red Marshmallow"
  },
  {
   "id": 78,
   "off": "56F56",
   "ja": "ブラックプリン",
-  "en": ""
+  "en": "Black Pudding"
  },
  {
   "id": 79,
   "off": "56F5E",
   "ja": "レッドソウル",
-  "en": ""
+  "en": "Red Soul"
  },
  {
   "id": 80,
   "off": "56F65",
   "ja": "グリーンソウル",
-  "en": ""
+  "en": "Green Soul"
  },
  {
   "id": 81,
   "off": "56F6D",
   "ja": "イエローソウル",
-  "en": ""
+  "en": "Yellow Soul"
  },
  {
   "id": 82,
   "off": "56F75",
   "ja": "バンパイアガール",
-  "en": ""
+  "en": "Vampire Girl"
  },
  {
   "id": 83,
   "off": "56F7E",
   "ja": "バンパイアレディ",
-  "en": ""
+  "en": "Vampire Lady"
  },
  {
   "id": 84,
   "off": "56F87",
   "ja": "こうてい",
-  "en": ""
+  "en": "Emperor"
  },
  {
   "id": 85,
   "off": "56F8C",
   "ja": "こうていののろい",
-  "en": ""
+  "en": "Emperor's Curse"
  },
  {
   "id": 86,
   "off": "56F95",
   "ja": "キラーマンティス",
-  "en": ""
+  "en": "Killer Mantis"
  },
  {
   "id": 87,
   "off": "56F9E",
   "ja": "マンティスキング",
-  "en": ""
+  "en": "Mantis King"
  },
  {
   "id": 88,
   "off": "56FA7",
   "ja": "マンティスデビル",
-  "en": ""
+  "en": "Mantis Devil"
  },
  {
   "id": 89,
   "off": "56FB0",
   "ja": "しんえいたい",
-  "en": ""
+  "en": "Imperial Guard"
  },
  {
   "id": 90,
   "off": "56FB7",
   "ja": "くろきし",
-  "en": ""
+  "en": "Black Knight"
  },
  {
   "id": 91,
   "off": "56FBC",
   "ja": "デスライダー",
-  "en": ""
+  "en": "Death Rider"
  },
  {
   "id": 92,
   "off": "56FC3",
   "ja": "ウッドゴーレム",
-  "en": ""
+  "en": "Wood Golem"
  },
  {
   "id": 93,
   "off": "56FCB",
   "ja": "ストーンゴーレム",
-  "en": ""
+  "en": "Stone Golem"
  },
  {
   "id": 94,
   "off": "56FD4",
   "ja": "ミスリルゴーレム",
-  "en": ""
+  "en": "Mythril Golem"
  },
  {
   "id": 95,
   "off": "56FDD",
   "ja": "ゴブリン",
-  "en": ""
+  "en": "Goblin"
  },
  {
   "id": 96,
   "off": "56FE2",
   "ja": "ゴブリンガード",
-  "en": ""
+  "en": "Goblin Guard"
  },
  {
   "id": 97,
   "off": "56FEA",
   "ja": "ゴブリンプリンス",
-  "en": ""
+  "en": "Goblin Prince"
  },
  {
   "id": 98,
   "off": "56FF3",
   "ja": "バルーン",
-  "en": ""
+  "en": "Balloon"
  },
  {
   "id": 99,
   "off": "56FF8",
   "ja": "グレネード",
-  "en": ""
+  "en": "Grenade"
  },
  {
   "id": 100,
   "off": "56FFE",
   "ja": "マイン",
-  "en": ""
+  "en": "Mine"
  },
  {
   "id": 101,
   "off": "57002",
   "ja": "ボム",
-  "en": ""
+  "en": "Bomb"
  },
  {
   "id": 102,
   "off": "57005",
   "ja": "ソルジャー",
-  "en": ""
+  "en": "Soldier"
  },
  {
   "id": 103,
   "off": "5700B",
   "ja": "サージェント",
-  "en": ""
+  "en": "Sergeant"
  },
  {
   "id": 104,
   "off": "57012",
   "ja": "キャプテン",
-  "en": ""
+  "en": "Captain"
  },
  {
   "id": 105,
   "off": "57018",
   "ja": "ジェネラル",
-  "en": ""
+  "en": "General"
  },
  {
   "id": 106,
   "off": "5701E",
   "ja": "マジシャン",
-  "en": ""
+  "en": "Magician"
  },
  {
   "id": 107,
   "off": "57024",
   "ja": "ソーサラー",
-  "en": ""
+  "en": "Sorcerer"
  },
  {
   "id": 108,
   "off": "5702A",
   "ja": "ウィザード",
-  "en": ""
+  "en": "Wizard"
  },
  {
   "id": 109,
   "off": "57030",
   "ja": "ウェアパンサー",
-  "en": ""
+  "en": "Werepanther"
  },
  {
   "id": 110,
   "off": "57038",
   "ja": "クアール",
-  "en": ""
+  "en": "Coeurl"
  },
  {
   "id": 111,
   "off": "5703D",
   "ja": "ラミア",
-  "en": ""
+  "en": "Lamia"
  },
  {
   "id": 112,
   "off": "57041",
   "ja": "ラミアクィーン",
-  "en": ""
+  "en": "Lamia Queen"
  },
  {
   "id": 113,
   "off": "57049",
   "ja": "ヒルギガース",
-  "en": ""
+  "en": "Hill Gigas"
  },
  {
   "id": 114,
   "off": "57050",
   "ja": "ファイアギガース",
-  "en": ""
+  "en": "Fire Gigas"
  },
  {
   "id": 115,
   "off": "57059",
   "ja": "アイスギガース",
-  "en": ""
+  "en": "Ice Gigas"
  },
  {
   "id": 116,
   "off": "57061",
   "ja": "サンダーギガース",
-  "en": ""
+  "en": "Thunder Gigas"
  },
  {
   "id": 117,
   "off": "5706A",
   "ja": "ベヒーモス",
-  "en": ""
+  "en": "Behemoth"
  },
  {
   "id": 118,
   "off": "57070",
   "ja": "キングベヒーモス",
-  "en": ""
+  "en": "King Behemoth"
  },
  {
   "id": 119,
   "off": "57079",
   "ja": "ホワイトドラゴン",
-  "en": ""
+  "en": "White Dragon"
  },
  {
   "id": 120,
   "off": "57082",
   "ja": "グリーンドラゴン",
-  "en": ""
+  "en": "Green Dragon"
  },
  {
   "id": 121,
   "off": "5708B",
   "ja": "ブルードラゴン",
-  "en": ""
+  "en": "Blue Dragon"
  },
  {
   "id": 122,
   "off": "57093",
   "ja": "レッドドラゴン",
-  "en": ""
+  "en": "Red Dragon"
  },
  {
   "id": 123,
   "off": "5709B",
   "ja": "テツキョジン",
-  "en": ""
+  "en": "Iron Giant"
  },
  {
   "id": 124,
   "off": "570A2",
   "ja": "ティアマット",
-  "en": ""
+  "en": "Tiamat"
  },
  {
   "id": 125,
   "off": "570A9",
   "ja": "ベルゼブル",
-  "en": ""
+  "en": "Beelzebul"
  },
  {
   "id": 126,
   "off": "570AF",
   "ja": "アスタロート",
-  "en": ""
+  "en": "Astaroth"
  },
  {
   "id": 127,
   "off": "570B6",
   "ja": "こうてい",
-  "en": ""
+  "en": "Emperor"
  }
 ]

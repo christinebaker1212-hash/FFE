@@ -3,420 +3,420 @@
   "id": 0,
   "off": "57147",
   "ja": "ファイア",
-  "en": ""
+  "en": "Fire"
  },
  {
   "id": 1,
   "off": "5714C",
   "ja": "サンダー",
-  "en": ""
+  "en": "Thunder"
  },
  {
   "id": 2,
   "off": "57151",
   "ja": "ブリザド",
-  "en": ""
+  "en": "Blizzard"
  },
  {
   "id": 3,
   "off": "57156",
   "ja": "クラウダ",
-  "en": ""
+  "en": "Clouda"
  },
  {
   "id": 4,
   "off": "5715B",
   "ja": "ドレイン",
-  "en": ""
+  "en": "Drain"
  },
  {
   "id": 5,
   "off": "57160",
   "ja": "アスピル",
-  "en": ""
+  "en": "Aspir"
  },
  {
   "id": 6,
   "off": "57165",
   "ja": "フレアー",
-  "en": ""
+  "en": "Flare"
  },
  {
   "id": 7,
   "off": "5716A",
   "ja": "スリプル",
-  "en": ""
+  "en": "Sleep"
  },
  {
   "id": 8,
   "off": "5716F",
   "ja": "スタン",
-  "en": ""
+  "en": "Stun"
  },
  {
   "id": 9,
   "off": "57173",
   "ja": "ストップ",
-  "en": ""
+  "en": "Stop"
  },
  {
   "id": 10,
   "off": "57178",
   "ja": "コンフュ",
-  "en": ""
+  "en": "Confuse"
  },
  {
   "id": 11,
   "off": "5717D",
   "ja": "ブライン",
-  "en": ""
+  "en": "Blind"
  },
  {
   "id": 12,
   "off": "57182",
   "ja": "カーズ",
-  "en": ""
+  "en": "Curse"
  },
  {
   "id": 13,
   "off": "57186",
   "ja": "トード",
-  "en": ""
+  "en": "Toad"
  },
  {
   "id": 14,
   "off": "5718A",
   "ja": "ブレイク",
-  "en": ""
+  "en": "Break"
  },
  {
   "id": 15,
   "off": "5718F",
   "ja": "デス",
-  "en": ""
+  "en": "Death"
  },
  {
   "id": 16,
   "off": "57192",
   "ja": "デジョン",
-  "en": ""
+  "en": "Dejon"
  },
  {
   "id": 17,
   "off": "57197",
   "ja": "バーサク",
-  "en": ""
+  "en": "Berserk"
  },
  {
   "id": 18,
   "off": "5719C",
   "ja": "ヘイスト",
-  "en": ""
+  "en": "Haste"
  },
  {
   "id": 19,
   "off": "571A1",
   "ja": "オーラ",
-  "en": ""
+  "en": "Aura"
  },
  {
   "id": 20,
   "off": "571A5",
   "ja": "ケアル",
-  "en": ""
+  "en": "Cure"
  },
  {
   "id": 21,
   "off": "571A9",
   "ja": "レイズ",
-  "en": ""
+  "en": "Raise"
  },
  {
   "id": 22,
   "off": "571AD",
   "ja": "バスナ",
-  "en": ""
+  "en": "Basuna"
  },
  {
   "id": 23,
   "off": "571B1",
   "ja": "エスナ",
-  "en": ""
+  "en": "Esuna"
  },
  {
   "id": 24,
   "off": "571B5",
   "ja": "バリア",
-  "en": ""
+  "en": "Barrier"
  },
  {
   "id": 25,
   "off": "571B9",
   "ja": "ブリンク",
-  "en": ""
+  "en": "Blink"
  },
  {
   "id": 26,
   "off": "571BE",
   "ja": "プロテス",
-  "en": ""
+  "en": "Protes"
  },
  {
   "id": 27,
   "off": "571C3",
   "ja": "シェル",
-  "en": ""
+  "en": "Shell"
  },
  {
   "id": 28,
   "off": "571C7",
   "ja": "ウォール",
-  "en": ""
+  "en": "Wall"
  },
  {
   "id": 29,
   "off": "571CC",
   "ja": "デスペル",
-  "en": ""
+  "en": "Dispel"
  },
  {
   "id": 30,
   "off": "571D1",
   "ja": "ミニマム",
-  "en": ""
+  "en": "Minimum"
  },
  {
   "id": 31,
   "off": "571D6",
   "ja": "サイレス",
-  "en": ""
+  "en": "Silence"
  },
  {
   "id": 32,
   "off": "571DB",
   "ja": "アンチ",
-  "en": ""
+  "en": "Anti"
  },
  {
   "id": 33,
   "off": "571DF",
   "ja": "フォーグ",
-  "en": ""
+  "en": "Fog"
  },
  {
   "id": 34,
   "off": "571E4",
   "ja": "スロウ",
-  "en": ""
+  "en": "Slow"
  },
  {
   "id": 35,
   "off": "571E8",
   "ja": "チェンジ",
-  "en": ""
+  "en": "Change"
  },
  {
   "id": 36,
   "off": "571ED",
   "ja": "フィアー",
-  "en": ""
+  "en": "Fear"
  },
  {
   "id": 37,
   "off": "571F2",
   "ja": "ホーリー",
-  "en": ""
+  "en": "Holy"
  },
  {
   "id": 38,
   "off": "571F7",
   "ja": "テレポ",
-  "en": ""
+  "en": "Teleport"
  },
  {
   "id": 39,
   "off": "571FB",
   "ja": "アルテマ",
-  "en": ""
+  "en": "Ultima"
  },
  {
   "id": 40,
   "off": "57200",
   "ja": "かいふく",
-  "en": ""
+  "en": "Restore"
  },
  {
   "id": 41,
   "off": "57205",
   "ja": "めぐすり",
-  "en": ""
+  "en": "Eye Drops"
  },
  {
   "id": 42,
   "off": "5720A",
   "ja": "どくけし",
-  "en": ""
+  "en": "Antidote"
  },
  {
   "id": 43,
   "off": "5720F",
   "ja": "じゅうじか",
-  "en": ""
+  "en": "Cross"
  },
  {
   "id": 44,
   "off": "57215",
   "ja": "かなづち",
-  "en": ""
+  "en": "Mallet"
  },
  {
   "id": 45,
   "off": "5721A",
   "ja": "キッス",
-  "en": ""
+  "en": "Kiss"
  },
  {
   "id": 46,
   "off": "5721E",
   "ja": "きんのはり",
-  "en": ""
+  "en": "Golden Needle"
  },
  {
   "id": 47,
   "off": "57224",
   "ja": "いきかえり",
-  "en": ""
+  "en": "Revival"
  },
  {
   "id": 48,
   "off": "5722A",
   "ja": "エーテル",
-  "en": ""
+  "en": "Ether"
  },
  {
   "id": 49,
   "off": "5722F",
   "ja": "エリクサー",
-  "en": ""
+  "en": "Elixir"
  },
  {
   "id": 50,
   "off": "57235",
   "ja": "のうりょく",
-  "en": ""
+  "en": "Ability"
  },
  {
   "id": 51,
   "off": "5723B",
   "ja": "のうりょく",
-  "en": ""
+  "en": "Ability"
  },
  {
   "id": 52,
   "off": "57241",
   "ja": "さけ",
-  "en": ""
+  "en": "Liquor"
  },
  {
   "id": 53,
   "off": "57244",
   "ja": "ほのお",
-  "en": ""
+  "en": "Flame"
  },
  {
   "id": 54,
   "off": "57248",
   "ja": "ふぶき",
-  "en": ""
+  "en": "Snowstorm"
  },
  {
   "id": 55,
   "off": "5724C",
   "ja": "いなづま",
-  "en": ""
+  "en": "Lightning"
  },
  {
   "id": 56,
   "off": "57251",
   "ja": "どくぎり",
-  "en": ""
+  "en": "Poison Mist"
  },
  {
   "id": 57,
   "off": "57256",
   "ja": "くさいいき",
-  "en": ""
+  "en": "Stinking Breath"
  },
  {
   "id": 58,
   "off": "5725C",
   "ja": "にらみ",
-  "en": ""
+  "en": "Glare"
  },
  {
   "id": 59,
   "off": "57260",
   "ja": "ゆうわく",
-  "en": ""
+  "en": "Temptation"
  },
  {
   "id": 60,
   "off": "57265",
   "ja": "じばく",
-  "en": ""
+  "en": "Self-Destruct"
  },
  {
   "id": 61,
   "off": "57269",
   "ja": "ぶんれつ",
-  "en": ""
+  "en": "Division"
  },
  {
   "id": 62,
   "off": "5726E",
   "ja": "じしん",
-  "en": ""
+  "en": "Earthquake"
  },
  {
   "id": 63,
   "off": "57272",
   "ja": "たつまき",
-  "en": ""
+  "en": "Tornado"
  },
  {
   "id": 64,
   "off": "57277",
   "ja": "つなみ",
-  "en": ""
+  "en": "Tidal Wave"
  },
  {
   "id": 65,
   "off": "5727B",
   "ja": "にんにく",
-  "en": ""
+  "en": "Garlic"
  },
  {
   "id": 66,
   "off": "57280",
   "ja": "ゆみ",
-  "en": ""
+  "en": "Bow"
  },
  {
   "id": 67,
   "off": "57283",
   "ja": "がんせき",
-  "en": ""
+  "en": "Rocks"
  },
  {
   "id": 68,
   "off": "57288",
   "ja": "ブラスター",
-  "en": ""
+  "en": "Blaster"
  },
  {
   "id": 69,
   "off": "5728E",
   "ja": "いんせき",
-  "en": ""
+  "en": "Meteorite"
  }
 ]
