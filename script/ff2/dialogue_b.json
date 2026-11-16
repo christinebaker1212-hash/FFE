@@ -543,181 +543,181 @@
   "id": 90,
   "off": "59DBF",
   "ja": "ポール「{10:02}じゃねえか!　げんきかいっ?!",
-  "en": ""
+  "en": "Paul: \"Well if it ain't {10:02}! How ya doin'?!\""
  },
  {
   "id": 91,
   "off": "59DD5",
   "ja": "{18:2F}じょうのかくしとびら?　しってるぜ!!\nなかには　なにがあるんだ?　{18:0B}?\nなんだ　そんなもの　おれにようはないな。\nよし　おしえてやろう。\nおおひろまの　みぎうえのすみだ。\nおまえも　つくづく　ものずきなやつだ。\nかめん　なんぞとって　なににつかうつもりやら。\n",
-  "en": ""
+  "en": "A hidden door in Castle {18:2F}? Sure, I know it!!\nWhat's inside? A {18:0B}?\nWhat, that? I got no use for somethin' like that.\nAll right, I'll tell ya.\nIt's in the top right corner of the great hall.\nYou really are an odd one.\nWhat're you plannin' to do, grabbin' a mask?\n"
  },
  {
   "id": 92,
   "off": "59E5C",
   "ja": "ポール「いくら　おまえでも　こんどばかりは\nどうにもならないよ。　あいては　たつまきだぜ。",
-  "en": ""
+  "en": "Paul: \"Even you can't do nothin' about it\nthis time. You're up against a tornado.\""
  },
  {
   "id": 93,
   "off": "59E8A",
   "ja": "おまえら　あのなかに　はいろうって　いうのか?\nまったく　たいしたやつらだ。\nよしっ!　とっておきのおたからを　つかってくれ\nベッドのよこのかべを　さがしてみな!",
-  "en": ""
+  "en": "You lot are gonna go inside that thing?\nYou really are somethin' else.\nAll right! Use my special treasure\nSearch the wall beside the bed!"
  },
  {
   "id": 94,
   "off": "59EDC",
   "ja": "ポール「{18:F0}はしんだっていうのに。\nなんだ　その{18:EE}ってやろーは!",
-  "en": ""
+  "en": "Paul: \"And here the {18:F0} was supposed to be dead.\nWho's this {18:EE} guy, anyway!\""
  },
  {
   "id": 95,
   "off": "59EFE",
   "ja": "ポール「あれは　シドの　ゆいごんだったんだよ!!\nわからないのか?　やつはしんじまったんだ!\nしぬってきまったときから　やつは　ひくうせんを\nおまえたちに　ゆずるつもりだったんだ。\nあいつは　ひくうせんをこころから　あいしていたんだ!\nやつの　きもちをわかってやってくれ!!\n",
-  "en": ""
+  "en": "Paul: \"That was Cid's last will!!\nDon't you get it? He's dead!\nFrom the moment he knew he was gonna die,\nhe meant to leave the airship to you.\nThat guy loved the airship with all his heart!\nTry to understand how he felt!!\"\n"
  },
  {
   "id": 96,
   "off": "59F89",
   "ja": "よくきいてくれた!\nおどろくな　おれは　たこにのって　あのしろの\nおくじょうに　おりたんだ!\nそらから　いくんだ!　そらから!!\nそうか　おまえらなら　ひくうせんで　おくじょうに\nおりられるかもしれねえ!\n",
-  "en": ""
+  "en": "Glad you asked!\nDon't be shocked, but I rode a kite and\nlanded on the roof of that castle!\nYou go from the sky! From the sky!!\nI got it, maybe you lot could land on the\nroof with the airship!\n"
  },
  {
   "id": 97,
   "off": "59FF1",
   "ja": "ポール「{10:02}　しぬなよ‥‥\nいきてかえってこいよ‥‥\nおい!　やくそくだぞ!!",
-  "en": ""
+  "en": "Paul: \"{10:02}, don't you die...\nCome back alive...\nHey! That's a promise!!\""
  },
  {
   "id": 98,
   "off": "5A019",
   "ja": "ヨーゼフ「わしになにかようかね?",
-  "en": ""
+  "en": "Josef: \"Want somethin' with me?\""
  },
  {
   "id": 99,
   "off": "5A02A",
   "ja": "{18:EF}さまに　はけんされてきた?\nおまえみたいな　わかぞうが?\nどうも　あやしい?\nほんとうか?",
-  "en": ""
+  "en": "Sent by Lady {18:EF}?\nA young pup like you?\nSounds mighty fishy.\nIs that true?"
  },
  {
   "id": 100,
   "off": "5A05A",
   "ja": "ミ　{18:04}か‥‥まだ　みつからないんだ。\nてがかりはあるんだが‥‥\nおっと　まず　みのあかしをたててもらおう。\n\nセミテのたきの　どうくつで　まちのにんげんが\nはたらかされている。　それをたすけてくるんだ。\nそうしたら　しんようしてやろう。\n",
-  "en": ""
+  "en": "Mi... {18:04}, is it... I haven't found it yet.\nI've got a lead, though...\nHold on, first you'll have to prove yourselves.\n\nThe townsfolk are being worked in the cave\nat Semite Falls. Go and rescue them.\nThen I'll trust you.\n"
  },
  {
   "id": 101,
   "off": "5A0D3",
   "ja": "ひくうせんの　でかいやつだろう。\nもちろん　しってるぞ。",
-  "en": ""
+  "en": "A big airship, right?\nOf course I know about it."
  },
  {
   "id": 102,
   "off": "5A0F0",
   "ja": "ひくうせんに　くわしいやつをしってるが\nおしえるわけにはいかんな。",
-  "en": ""
+  "en": "I know someone who knows all about airships,\nbut I can't tell you."
  },
  {
   "id": 103,
   "off": "5A112",
   "ja": "ヨーゼフ「ありがとう。　むすめがかえってきた。\nボーゲンに　おどされて　うそをついて　いたんだ。\nむすめのことが　しんぱいで‥‥　すまなかった!\nわしにできることがあったら　なんでもいってくれ。",
-  "en": ""
+  "en": "Josef: \"Thank you. My daughter has come home.\nBogen threatened me, so I was lying.\nI was so worried about my daughter... I'm sorry!\nIf there's anything I can do, just say the word.\""
  },
  {
   "id": 104,
   "off": "5A174",
   "ja": "セミテのたきのどうくつは　むかしのこうざんだ。\nいちばんふかいところでは　まだ{18:04}が\nとれるようだ。",
-  "en": ""
+  "en": "The cave at Semite Falls is an old mine.\nIt seems you can still get {18:04}\nin the deepest part."
  },
  {
   "id": 105,
   "off": "5A1A7",
   "ja": "{18:EE}が　しきかんになってから\nだいせんかんのけんぞうは　きゅうそくに\nすすんでいる。　まもなく　かんせいだろう。",
-  "en": ""
+  "en": "Since the {18:EE} became commander,\nthe building of the great battleship has advanced\nrapidly. It'll be finished before long."
  },
  {
   "id": 106,
   "off": "5A1E0",
   "ja": "シドより　ひくうせんにくわしい\nやつはいないぞ。",
-  "en": ""
+  "en": "There's no one who knows airships\nbetter than Cid."
  },
  {
   "id": 107,
   "off": "5A1F9",
   "ja": "はやくアルテアにもちかえるんだ。\n{18:EF}さまが　まっているぞ!",
-  "en": ""
+  "en": "Hurry and take it back to Altea.\nLady {18:EF} is waiting!"
  },
  {
   "id": 108,
   "off": "5A218",
   "ja": "せつげんのどうくつへは　わしの{18:05}が\nなければ　むりだ。　こうざんに　かくしてあるんだ。\n\n\n1かいに　めじるしの　あおいいわがある。\nそこの　みぎうえのかべに　かくしべやが　あるんだ。\nさあ　いそごう。\n\n　　　　ヨーゼフ　が　くわわった!\n",
-  "en": ""
+  "en": "You can't get to the cave in the snowfield without my\n{18:05}. It's hidden in the mine.\n\n\nOn the first floor there's a blue rock that marks the spot.\nThere's a hidden room in the wall to the upper right of it.\nCome on, let's hurry.\n\n    Josef joined!\n"
  },
  {
   "id": 109,
   "off": "5A293",
   "ja": "レイラ「ディストまでいく　ふねをさがしてるんだろ?\nあんたたち　ラッキーだよ!\nあたいのふねが　ちょうどディストまで　いくところさ。\nのってかない?\n{11:02}「なんか　あやしいなー。　あやしい‥‥\n{10:02}「いいじゃないか!　ただ　だし。\nおねがいしますっ!\nレイラ「よーし。　まちのそとで　まってるよっ!",
-  "en": ""
+  "en": "Leila: \"You're lookin' for a ship to Deist, right?\nYou're in luck!\nMy ship just happens to be headin' to Deist.\nWanna come along?\"\n{11:02}: \"Something's fishy. Fishy...\"\n{10:02}: \"What's wrong with that! It's free.\nYes, please!\"\nLeila: \"All right. I'll be waitin' outside town!\""
  },
  {
   "id": 110,
   "off": "5A329",
   "ja": "レイラ「ここのことは　しんぱいしなくていいよ。\nなんとか　やっていくから。",
-  "en": ""
+  "en": "Leila: \"You don't need to worry about this place.\nWe'll manage somehow.\""
  },
  {
   "id": 111,
   "off": "5A34F",
   "ja": "レイラ「いっしょにたたかうよ!　つれてっておくれ。\n\n　　　　レイラ　が　くわわった!",
-  "en": ""
+  "en": "Leila: \"I'll fight with you! Take me along.\"\n\n    Leila joined!"
  },
  {
   "id": 112,
   "off": "5A37B",
   "ja": "レイラ「あらしになって　ふねがこわれて\nあんたたちと　はぐれて‥‥\nあたい　もう　だめかとおもってた‥‥\nよかった‥　よかった!!",
-  "en": ""
+  "en": "Leila: \"The storm came, the ship broke up,\nand I got separated from you...\nI thought I was done for...\nThank goodness... thank goodness!!\""
  },
  {
   "id": 113,
   "off": "5A3BD",
   "ja": "おい　うろうろするんじゃない!\nフィンの{18:ED}が　にげだしたんだ!",
-  "en": ""
+  "en": "Hey, don't wander about!\nThe {18:ED} of Finn has escaped!"
  },
  {
   "id": 114,
   "off": "5A3DE",
   "ja": "レイラ「{18:EE}が　{18:F0}になるってせんげん\nしたんだって?",
-  "en": ""
+  "en": "Leila: \"I hear the {18:EE} declared he's\nbecoming the {18:F0}?\""
  },
  {
   "id": 115,
   "off": "5A3FA",
   "ja": "あそこに　ぬすみにはいったっていう\nポールのじまんばなしを　あきるほどきかされたよ。\nあんたも　きいたかい?",
-  "en": ""
+  "en": "I've heard Paul's bragging about breaking in there\nto steal until I'm sick of it.\nHave you heard it too?"
  },
  {
   "id": 116,
   "off": "5A431",
   "ja": "レイラ「{18:F0}は　あくまに　たましいを\nうっちまったんだよ",
-  "en": ""
+  "en": "Leila: \"The {18:F0} sold his soul\nto the demons\""
  },
  {
   "id": 117,
   "off": "5A44E",
   "ja": "ミシディアのひがしのほそいかいきょう\nあのあたりが　ジェイドのうみだよ。",
-  "en": ""
+  "en": "The narrow strait east of Mysidia,\nthat area is the Sea of Jade."
  },
  {
   "id": 118,
   "off": "5A473",
   "ja": "だれだ　おまえたちは?",
-  "en": ""
+  "en": "Who are you people?"
  },
  {
   "id": 119,
   "off": "5A47F",
   "ja": "ミシディアへは　いったことがある。",
-  "en": ""
+  "en": "I've been to Mysidia."
  },
  {
   "id": 120,
