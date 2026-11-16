@@ -34,6 +34,18 @@ game starts on exactly the same CPU cycle as the original.
 - `inject_test.py`: forces a routine to run in both ROMs (via the NMI trampoline) and
   compares the frames; used for the bank $2F battle effect (all 130 frames identical).
 
+## Results (random play, original vs converted, every frame compared)
+- 4 runs of ~96k frames: identical pictures, RAM and save RAM throughout (field,
+  battles, menus, the per-frame battle-window split).
+- Battle raster effect (bank $2F), forced via `inject_test.py`: all frames identical.
+- 1 run (seed 21) shifts by one frame at a screen transition (frame ~10k with the
+  current build): a timing difference, not a logic one. To reproduce MMC3's mid-line
+  IRQ, MMC5's line-start IRQ has to wait ~83 CPU cycles before the game's handler
+  runs, cycles the original spends in its main loop. In a frame that was already at
+  the CPU limit, the converted game can finish its work one frame later. Firing late
+  instead (no wait) would move the split's scroll writes ~80 dots and risk a visibly
+  wrong scanline, so the exact picture was preferred.
+
 ## Open points
 - The chained single splits in banks $10, $1F and $32 are not yet verified in game
   (their scenes are not reached by random play), and the helper adds ~24 CPU cycles
