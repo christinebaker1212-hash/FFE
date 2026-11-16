@@ -52,7 +52,9 @@ _PARTS = [
         0xBD, 'entab',                        # LDA entab,X
         0x8D, 0x04, 0x52,                     # STA $5204
         0x60]),                               # RTS
-    ('chain', [                               # A = latch V written right after an IRQ + enable
+    ('latch',   [0x00]),                      # emulated MMC3 latch ($C000)
+    ('enable', [                              # $E001 after a latch write right after an IRQ
+        0xAD, 'latch',                        # LDA latch
         0x38, 0x6D, 'lastirq',                # SEC / ADC lastirq ; MMC3: line + V + 1
         0x8D, 'curtgt', 0x8D, 0x03, 0x52,     # STA curtgt / STA $5203
         0xA9, 0x80, 0x8D, 0x04, 0x52,         # LDA #$80 / STA $5204
@@ -110,7 +112,7 @@ def _assemble(base=0x5C00):
 
 EXRAM, LABELS = _assemble()
 IRQ_ENTRY, NMI_SETUP = LABELS['irq_entry'], LABELS['nmi_setup']
-MIR_H, MIR_V, CHAIN = LABELS['mir_h'], LABELS['mir_v'], LABELS['chain']
+MIR_H, MIR_V, ENABLE, LATCH = LABELS['mir_h'], LABELS['mir_v'], LABELS['enable'], LABELS['latch']
 FX2F = LABELS['fx2f']
 assert len(EXRAM) <= 0xFF
 
@@ -152,9 +154,11 @@ def convert(src):
     # battle raster effect loop ($B8AC-$B8D9 in bank $2F) -> JSR fx2f / JMP $B8DA
     loop = bytes.fromhex('a9018d00c08d01e0b9007385084820' '79fb688d0020c8b9007385' '08a905857ec67ed0fca5088d0020c8e8e036d0d2')
     patch(rom, 0x5F8AC, loop, jsr(FX2F) + bytes([0x4C, 0xDA, 0xB8]) + bytes([NOP] * (len(loop) - 6)))
-    # chained splits (latch V written right after an IRQ, then enable): JSR chain
+    # chained splits: STA $C000 / STA $E001 -> STA latch / JSR enable. Kept as two
+    # 3-byte halves because code also enters at the second one (JSR $808E in bank $33).
     for off in (0x20B43, 0x3F5E1, 0x5F8E0, 0x6408B, 0x64B52):
-        patch(rom, off, [0x8D,0x00,0xC0,0x8D,0x01,0xE0], jsr(CHAIN) + bytes([NOP] * 3))
+        patch(rom, off, [0x8D,0x00,0xC0,0x8D,0x01,0xE0],
+              [0x8D, LATCH & 0xFF, LATCH >> 8] + list(jsr(ENABLE)))
     # --- reset ($FF48-$FFB8) rebuilt ---
     # MMC5 init and the ExRAM copy (~1900 cycles) run between the two vblank waits,
     # where the original idles anyway (the PPU can power up inside vblank, so running
