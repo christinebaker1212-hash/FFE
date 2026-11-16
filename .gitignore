@@ -1,0 +1,7 @@
+# Never commit copyrighted ROM images
+*.nes
+*.zip
+roms/
+build/
+__pycache__/
+*.pyc

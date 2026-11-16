@@ -1,0 +1,46 @@
+diff --git a/src/mapper.cpp b/src/mapper.cpp
+index e586cae..e553017 100644
+--- a/src/mapper.cpp
++++ b/src/mapper.cpp
+@@ -422,23 +422,33 @@ void MMC1::update_banks() {
+     case 3: set_mirroring_mode(MirroringMode::HORIZONTAL); break;
+     }
+ 
++    // Patched: mask CHR banks to the CHR size (CHR-RAM carts), and support
++    // SUROM (512KB PRG): CHR register bit 4 selects the 256KB PRG half.
++    const uint16_t chr_mask = static_cast<uint16_t>(_banks_chr - 1);
+     if (_registers[0x0] & 0x10) {
+-        map_bank_chr(0x0, 0x4, (_registers[0x1] & 0x1F) << 2);
+-        map_bank_chr(0x4, 0x4, (_registers[0x2] & 0x1F) << 2);
++        map_bank_chr(0x0, 0x4, ((_registers[0x1] & 0x1F) << 2) & chr_mask);
++        map_bank_chr(0x4, 0x4, ((_registers[0x2] & 0x1F) << 2) & chr_mask);
+     } else {
+-        map_bank_chr(0x0, 0x8, (_registers[0x1] & 0x1E) << 2);
++        map_bank_chr(0x0, 0x8, ((_registers[0x1] & 0x1E) << 2) & chr_mask);
++    }
++
++    uint16_t outer = 0;
++    uint16_t half = _banks_prg;
++    if (_banks_prg == 0x200) {
++        half = 0x100;
++        outer = (_registers[0x1] & 0x10) ? 0x100 : 0x000;
+     }
+ 
+     if (_registers[0x0] & 0x08) {
+         if (_registers[0x0] & 0x04) {
+-            map_bank_prg(0x20, 0x10, (_registers[0x3] & 0x0F) << 4);
+-            map_bank_prg(0x30, 0x10, _banks_prg - 0x10);
++            map_bank_prg(0x20, 0x10, outer | ((_registers[0x3] & 0x0F) << 4));
++            map_bank_prg(0x30, 0x10, outer + half - 0x10);
+         } else {
+-            map_bank_prg(0x20, 0x10, 0x0);
+-            map_bank_prg(0x30, 0x10, (_registers[0x3] & 0xF) << 4);
++            map_bank_prg(0x20, 0x10, outer);
++            map_bank_prg(0x30, 0x10, outer | ((_registers[0x3] & 0xF) << 4));
+         }
+     } else {
+-        map_bank_prg(0x20, 0x20, (_registers[0x3] & 0x0E) << 4);
++        map_bank_prg(0x20, 0x20, outer | ((_registers[0x3] & 0x0E) << 4));
+     }
+ 
+     bool read_only = _registers[0x3] & 0x10;
