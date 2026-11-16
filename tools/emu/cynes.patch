@@ -150,10 +150,16 @@ index e19ae79..7f7d60c 100644
      void addr_abr();
      void addr_abw();
 diff --git a/src/mapper.cpp b/src/mapper.cpp
-index e586cae..bf32e0a 100644
+index e586cae..0f80503 100644
 --- a/src/mapper.cpp
 +++ b/src/mapper.cpp
-@@ -9,6 +9,8 @@
+@@ -1,4 +1,5 @@
+ #include "mapper.hpp"
++extern int g_dbg_bank;
+ 
+ #include "cpu.hpp"
+ #include "nes.hpp"
+@@ -9,6 +10,8 @@
  #include <memory>
  #include <random>
  #include <sstream>
@@ -162,7 +168,7 @@ index e586cae..bf32e0a 100644
  
  using namespace cynes;
  
-@@ -80,13 +82,13 @@ Mapper::Mapper(
+@@ -80,13 +83,13 @@ Mapper::Mapper(
          std::generate(
              _memory.get() + _size_prg + _size_chr + 0x200,
              _memory.get() + _size_prg + _size_chr + _size_cpu_ram,
@@ -178,7 +184,7 @@ index e586cae..bf32e0a 100644
          );
      }
  
-@@ -94,7 +96,7 @@ Mapper::Mapper(
+@@ -94,7 +97,7 @@ Mapper::Mapper(
          std::generate(
              _memory.get() + _size_prg + _size_chr + _size_cpu_ram,
              _memory.get() + _size_prg + _size_chr + _size_cpu_ram + _size_ppu_ram,
@@ -187,7 +193,7 @@ index e586cae..bf32e0a 100644
          );
      }
  
-@@ -165,6 +167,7 @@ std::unique_ptr<Mapper> Mapper::load_mapper(
+@@ -165,6 +168,7 @@ std::unique_ptr<Mapper> Mapper::load_mapper(
      case   2: return std::make_unique<UxROM>(nes, metadata, mode);
      case   3: return std::make_unique<CNROM>(nes, metadata, mode);
      case   4: return std::make_unique<MMC3> (nes, metadata, mode);
@@ -195,7 +201,7 @@ index e586cae..bf32e0a 100644
      case   7: return std::make_unique<AxROM>(nes, metadata);
      case   9: return std::make_unique<MMC2> (nes, metadata, mode);
      case  10: return std::make_unique<MMC4> (nes, metadata, mode);
-@@ -422,23 +425,33 @@ void MMC1::update_banks() {
+@@ -422,23 +426,33 @@ void MMC1::update_banks() {
      case 3: set_mirroring_mode(MirroringMode::HORIZONTAL); break;
      }
  
@@ -237,7 +243,7 @@ index e586cae..bf32e0a 100644
      }
  
      bool read_only = _registers[0x3] & 0x10;
-@@ -575,6 +588,7 @@ void MMC3::write_cpu(uint16_t address, uint8_t value) {
+@@ -575,6 +589,7 @@ void MMC3::write_cpu(uint16_t address, uint8_t value) {
              set_mirroring_mode(MirroringMode::VERTICAL);
          }
      } else if (address < 0xE000) {
@@ -245,7 +251,7 @@ index e586cae..bf32e0a 100644
          if (address & 0x1) {
              _counter = 0x0000;
              _should_reload_interrupt = true;
-@@ -582,6 +596,7 @@ void MMC3::write_cpu(uint16_t address, uint8_t value) {
+@@ -582,6 +597,7 @@ void MMC3::write_cpu(uint16_t address, uint8_t value) {
              _counter_reset_value = value;
          }
      } else {
@@ -253,7 +259,7 @@ index e586cae..bf32e0a 100644
          if (address & 0x1) {
              _enable_interrupt = true;
          } else {
-@@ -611,6 +626,7 @@ void MMC3::update_state(bool state) {
+@@ -611,6 +627,7 @@ void MMC3::update_state(bool state) {
              }
  
              if (_counter == 0 && _enable_interrupt) {
@@ -261,7 +267,7 @@ index e586cae..bf32e0a 100644
                  _nes.cpu.set_mapper_interrupt(true);
              }
  
-@@ -674,3 +690,147 @@ void GxROM::write_cpu(uint16_t address, uint8_t value) {
+@@ -674,3 +691,147 @@ void GxROM::write_cpu(uint16_t address, uint8_t value) {
          map_bank_chr(0x00, 0x08, (value & 0x03) << 3);
      }
  }
@@ -327,7 +333,7 @@ index e586cae..bf32e0a 100644
 +        case 0x5205: _mul_a = value; break;
 +        case 0x5206: _mul_b = value; break;
 +        default:
-+            if (address >= 0x5113 && address <= 0x5117) _prg[address - 0x5113] = value;
++            if (address >= 0x5113 && address <= 0x5117) { _prg[address - 0x5113] = value; if (address == 0x5115) g_dbg_bank = value; }
 +            else if (address >= 0x5120 && address <= 0x512B) _chr[address - 0x5120] = value | (_chr_upper << 8);
 +            break;
 +        }
@@ -460,6 +466,28 @@ index 8961b80..f8c1bee 100644
  
      uint8_t _controller_status[0x2];
      uint8_t _controller_shifters[0x2];
+diff --git a/src/ppu.cpp b/src/ppu.cpp
+index f623eb1..19d7845 100644
+--- a/src/ppu.cpp
++++ b/src/ppu.cpp
+@@ -5,6 +5,9 @@
+ #include "save_state.hpp"
+ 
+ #include <cstring>
++#include <cstdio>
++#include <cstdlib>
++int g_dbg_bank = 0;
+ #include <memory>
+ 
+ using namespace cynes;
+@@ -477,6 +480,7 @@ void PPU::write(uint8_t address, uint8_t value) {
+     }
+ 
+     case Register::PPU_DATA: {
++        if (std::getenv("PPU_LOG")) fprintf(stderr, "P %04X %02X pc=%04X b=%02X\n", _register_v & 0x3FFF, value, _nes.cpu.dbg_pc(), g_dbg_bank);
+         if ((_register_v & 0x3FFF) >= 0x3F00) {
+             _nes.write_ppu(_register_v, value);
+         } else {
 diff --git a/src/ppu.hpp b/src/ppu.hpp
 index 90cfec5..33c93f7 100644
 --- a/src/ppu.hpp

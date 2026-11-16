@@ -1,5 +1,6 @@
 #!/bin/bash
 # Build a patched cynes (headless NES emulator): 512KB MMC1 (SUROM) + minimal MMC5,
+# env PPU_LOG=1 logs every $2007 write with CPU address and PRG bank ($5115),
 # needed for Final Fantasy I・II and the split MMC5 ROMs. Usage: build_emu.sh OUTDIR   then PYTHONPATH=OUTDIR
 set -e
 OUT=$(realpath -m "${1:-build/emu}")
