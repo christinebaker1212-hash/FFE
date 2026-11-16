@@ -903,211 +903,211 @@
   "id": 150,
   "off": "5AA40",
   "ja": "{10:02}「いっしょに　たたかってくれ!\n{18:0E}「{18:EC}は　もう　ながくありません。\nどくが　ぜんしんに　まわってしまいました。",
-  "en": ""
+  "en": "{10:02}: \"Fight with us!\"\n{18:0E}: \"{18:EC} have not long left.\nThe poison has spread through my whole body.\""
  },
  {
   "id": 151,
   "off": "5AA7C",
   "ja": "ていこくとのたたかいが　はじまるすんぜんに\nリチャードという　りゅうきしが　きゅうきょくの\nまほうを　えるためにたびだちました。",
-  "en": ""
+  "en": "Just before the war with the Empire began,\na Dragon Knight named Richard set out\nto obtain the ultimate magic."
  },
  {
   "id": 152,
   "off": "5AABD",
   "ja": "さいごの　ねがいをきいてください。\nこの　たまごを　きたのどうくつにある\nいのちのいずみに　しずめてきてほしいのです。\nこれは　さいごの　{18:0A}です。\nいのちのいずみにしずめなければ　ひからびて\nしんでしまうのです\n\n　　　　{18:0A}を　てにいれた!",
-  "en": ""
+  "en": "Please hear my last wish.\nI want you to sink this egg in the\nSpring of Life in the cave to the north.\nIt is the last {18:0A}.\nIf it is not sunk in the Spring of Life, it will dry up\nand die\n\n    Obtained the {18:0A}!"
  },
  {
   "id": 153,
   "off": "5AB38",
   "ja": "たのみます‥　そのたまごを‥　はやく‥",
-  "en": ""
+  "en": "I beg you... that egg... quickly..."
  },
  {
   "id": 154,
   "off": "5AB4C",
   "ja": "マスター「おいおい　カウンターのなかに　はいられちゃ\nこまるなー!!　まったく　ていこくのやつは\nがさつでこまる‥‥ブツブツ‥‥",
-  "en": ""
+  "en": "Master: \"Hey, hey, I can't have you comin'\nbehind the counter!! Honestly, the Empire's lot\nare so crude... grumble, grumble...\""
  },
  {
   "id": 155,
   "off": "5AB8D",
   "ja": "この　かべに　かくしとびらがある!\nおくに　きずついたせんしがいる。\nおれはもう　こんなところは　こりごりだ!\nあとは　おまえらにまかせるよ。　それじゃあな!",
-  "en": ""
+  "en": "There's a hidden door in this wall!\nThere's a wounded warrior in the back.\nI've had it with this place!\nI'll leave the rest to you. So long!"
  },
  {
   "id": 156,
   "off": "5ABDD",
   "ja": "せんし「おれを　ていこくにうるきか?\nそれなら　せめて　ころしてからにしてくれ。\nいきたままつかまりたくはない‥‥",
-  "en": ""
+  "en": "Warrior: \"Do you mean to sell me to the Empire?\nIf so, at least kill me first.\nI don't want to be captured alive...\""
  },
  {
   "id": 157,
   "off": "5AC17",
   "ja": "せんし「そうか　きみたちは　はんらんぐんだったのか。\n{18:EC}は　スコット。　カシュオーンのおうじだ。\n{10:02}「えっ　あなたが!　うちじに　なさったと\nきいたのですが　いきていたんですね!\nスコット「ああ　だが　もう　ながくはもたない。\nきみたちに　たのみがある。　{18:EC}のおとうとの\n{18:EB}につたえてほしい。　おまえには　すばらしい\nのうりょくがある。　もっと　じしんを　もてと。\n{18:2F}おうにつたえてくれ。\n{18:2F}がやぶれた　げんいんは　ボーゲンはくしゃくが\nうらぎったためだ。　やつはいま　ていこくの\nしょうぐんになっている。\nそれから‥‥{18:EF}。　あいしていると‥‥\nいや　これは　{18:EF}には　つたえないでくれ。\n{18:EC}は　もうしぬ。　{18:EF}は　べつのひとを\nあいすべきだ。\n{11:02}「あの‥‥{18:EC}のあにの　{07}を\nごぞんじありませんか?\nスコット「あいにくだが‥‥やくにたてなくて　すまん。\nそうだ　この{18:01}をあげよう。　きっと　やくにたつ。\nふーっ　つかれた‥‥そろそろ　ねむらせてくれ‥‥\n　　　　　{18:01}を　てにいれた‥‥\n",
-  "en": ""
+  "en": "Warrior: \"I see, so you're with the rebel army.\n{18:EC} am Scott. The prince of Kashuon.\"\n{10:02}: \"What, you are! We heard you died\nin battle, but you're alive!\"\nScott: \"Yes, but I won't last much longer.\nI have a favor to ask of you. {18:EC} have a younger\nbrother, {18:EB}. Tell him: you have wonderful\nabilities. Have more confidence.\nAnd tell the King of {18:2F}:\nthe reason {18:2F} fell is that Count Bogen\nbetrayed us. He is now a general\nof the Empire.\nAnd... {18:EF}. That I love her...\nNo, don't tell {18:EF} that.\n{18:EC} am going to die. {18:EF} should\nlove someone else.\"\n{11:02}: \"Um... {18:EC} have an older brother, {07}.\nDo you know him?\"\nScott: \"I'm afraid not... sorry I can't be of help.\nAh yes, I'll give you this {18:01}. It will surely help you.\nPhew, I'm tired... let me sleep now...\"\n     Obtained the {18:01}...\n"
  },
  {
   "id": 158,
   "off": "5ADDF",
   "ja": "トブール「わしは　ただの　としよりじゃ‥‥",
-  "en": ""
+  "en": "Tobul: \"I'm just an old man...\""
  },
  {
   "id": 159,
   "off": "5ADF5",
   "ja": "ただの　としよりとは　かりのすがたじゃ。\nじつは　はんらんぐん1の　かじや　トブールじゃ!",
-  "en": ""
+  "en": "Just an old man is only my disguise.\nIn truth I'm Tobul, the rebel army's finest blacksmith!"
  },
  {
   "id": 160,
   "off": "5AE23",
   "ja": "{18:04}があれば　よい　けんや　よろいが\nつくれるのに‥‥",
-  "en": ""
+  "en": "With {18:04} I could make\ngood swords and armor..."
  },
  {
   "id": 161,
   "off": "5AE3F",
   "ja": "ドブール「おおっ!　{18:04}だ!\nよーし　わしがどんどん　けんや　よろいをつくって\nしんぜよう。",
-  "en": ""
+  "en": "Dobul: \"Ohh! It's {18:04}!\nRight, I'll make you swords and armor\none after another.\""
  },
  {
   "id": 162,
   "off": "5AE6E",
   "ja": "ドブール「いそがしいんじゃ。　じゃませんでくれっ!",
-  "en": ""
+  "en": "Dobul: \"I'm busy. Don't get in my way!\""
  },
  {
   "id": 163,
   "off": "5AE88",
   "ja": "こども「かえれ!　くるな!",
-  "en": ""
+  "en": "Child: \"Go away! Don't come here!\""
  },
  {
   "id": 164,
   "off": "5AE96",
   "ja": "こども「おかあちゃんに　いいつけてやるー!",
-  "en": ""
+  "en": "Child: \"I'm gonna tell my mommy on you!\""
  },
  {
   "id": 165,
   "off": "5AEAC",
   "ja": "うつくしいベルのおとが　ひびきわたると\nおともなく　かぎがあいた!",
-  "en": ""
+  "en": "As the beautiful sound of the bell rang out,\nthe lock opened without a sound!"
  },
  {
   "id": 166,
   "off": "5AECE",
   "ja": "こども「なーんだ　おにいちゃんたち　いいひとたち\nだったんだ。　ぼくは　また　ていこくのやつらかと\nおもっちゃったよ。",
-  "en": ""
+  "en": "Child: \"Oh, so you big brothers are good guys.\nI thought you were the Empire's\nguys again.\""
  },
  {
   "id": 167,
   "off": "5AF0A",
   "ja": "ぼくも　おおきくなったら　おとうさんみたいに\nりゅうきしになるんだ!",
-  "en": ""
+  "en": "When I grow up, I'm gonna be a Dragon Knight\njust like my dad!"
  },
  {
   "id": 168,
   "off": "5AF2D",
   "ja": "{18:0E}はこのへやで　ねむっているよ。\nでも　もうすぐしんじゃうって　おかあさんが‥‥\nねえ　そんなことないよねー?",
-  "en": ""
+  "en": "The {18:0E} is sleeping in this room.\nBut Mommy says it's gonna die soon...\nHey, that's not true, right?"
  },
  {
   "id": 169,
   "off": "5AF66",
   "ja": "{18:0E}がしんじゃったよー!",
-  "en": ""
+  "en": "The {18:0E} died!"
  },
  {
   "id": 170,
   "off": "5AF73",
   "ja": "こども「おじさんは　りゅうきし?\n{13:02}「ああ。　きみの　おとうさんのともだちさ\nきっと　{18:F0}をたおして　もどってくるよ。\nそうしたら　きみの　おとうさんに　なっていいかな?\nこども「よく　わかんないけど　いいよ。\nぜったい　{18:F0}のやろうを　やっつけてね!!\n",
-  "en": ""
+  "en": "Child: \"Mister, are you a Dragon Knight?\"\n{13:02}: \"Yes. I'm a friend of your father's\nI'll defeat the {18:F0} and come back, I promise.\nWhen I do, could I be your father?\"\nChild: \"I don't really get it, but okay.\nYou gotta beat that {18:F0} bastard for sure!!\"\n"
  },
  {
   "id": 171,
   "off": "5AFF5",
   "ja": "{18:F0}のたましいを　ほろぼさなくちゃ!\nでも　あの　りゅうきしのおじさんは　どうしたの?",
-  "en": ""
+  "en": "You gotta destroy the {18:F0}'s soul!\nBut what happened to that Dragon Knight mister?"
  },
  {
   "id": 172,
   "off": "5B021",
   "ja": "むすこが　ごめいわくを　おかけしたようで\nもうしわけありません。　このこの　ははおやです。\nしゅじんは　{18:FA}でした。\nでもていこくに　ころされてしまい‥‥\n{18:EC}たちだけが　いきのこったのです。\nこのへやのおくに　さいごの{18:0E}がいます。\nなにか　うったえかけてくるのですが\n{18:EC}には　なにをいってるのかわかりません。\n{18:09}があれば　[{16:0B}{18:FB}]とはなせるのに‥‥\nきたに　{18:0E}の　どうくつがあります。\nあそこの　ちか2かいにいけば\n{18:09}があるかも‥‥?",
-  "en": ""
+  "en": "I'm sorry if my son has caused you trouble.\nI am this child's mother.\nMy husband was one of the {18:FA}.\nBut he was killed by the Empire...\nOnly {18:EC} and my son survived.\nThe last {18:0E} is at the back of this room.\nIt is trying to tell us something,\nbut {18:EC} can't understand what it's saying.\nWith the {18:09} we could talk to the [{16:0B}{18:FB}]...\nThere is a {18:0E} cave to the north.\nIf you go down to its second basement floor,\nthe {18:09} might be there...?"
  },
  {
   "id": 173,
   "off": "5B103",
   "ja": "{18:FA}たちは　ゆうかんに　たたかいました。\nですが　{18:F0}はひれつにも　{18:0E}の　のみみずに\nどくを　いれたのです。\n\n{18:0E}は　かわいそうに　ぜんめつしてしまいました。\n[{16:01}{18:FA}]たちも　{18:0E}のいない　たたかいでは\nかちめがありません‥‥\n",
-  "en": ""
+  "en": "The {18:FA} fought bravely.\nBut the {18:F0}, the coward, put poison\nin the {18:0E}s' drinking water.\n\nThe poor {18:0E}s were wiped out.\nWithout the {18:0E}s, even the [{16:01}{18:FA}]\nhad no chance of winning...\n"
  },
  {
   "id": 174,
   "off": "5B17A",
   "ja": "どうくつの　ちかに　いのちのいずみと　よばれる\n{18:0E}の　さんらんばしょが　あると　きいたことが\nあります。",
-  "en": ""
+  "en": "I've heard that beneath the cave there is\na place where the {18:0E}s lay their eggs,\ncalled the Spring of Life."
  },
  {
   "id": 175,
   "off": "5B1B0",
   "ja": "さいごの　{18:0E}は　‥‥しにました。\nでも　あなたがたが　いずみにもっていってくれた\nたまごがまだ　のこっています。\n\nきっと　いつのひにか　はんらんぐんのために\nたたかってくれるでしょう。\n{18:0E}のかわりに　おれいを　いわせてもらいます。\nありがとうございまし‥‥ウッウッ",
-  "en": ""
+  "en": "The last {18:0E} has... died.\nBut the egg you took to the spring\nstill remains.\n\nSurely someday it will fight\nfor the rebel army.\nLet me thank you in the {18:0E}'s place.\nThank you so very mu... (sob, sob)"
  },
  {
   "id": 176,
   "off": "5B238",
   "ja": "ははおや「{13:02}!!\n{13:02}「エリナ!　ほかのみんなは?\nしんでしまったのか　フィリップも?\nエリナ「そう　あのあと　みなごろしに‥‥\n{13:02}「そうか‥‥きのどくに\nきをしっかりもてよ　エリナ　おれが　ついてるから。\nせかいが　へいわになったら　もどってくる。\nそれまで　むすこさんと　ふたりで　がんばるんだ!",
-  "en": ""
+  "en": "Mother: \"{13:02}!!\"\n{13:02}: \"Elina! What about everyone else?\nAre they dead, Philip too?\"\nElina: \"Yes, after that, everyone was slaughtered...\"\n{13:02}: \"I see... I'm so sorry\nBe strong, Elina, I'm here for you.\nWhen the world is at peace, I'll come back.\nUntil then, you and your son must hang on!\""
  },
  {
   "id": 177,
   "off": "5B2D1",
   "ja": "リチャードも　しんでしまったのですか‥‥\nもどってくると　いったのに‥‥\nでも　かれも　りゅうきし。　なかまのために\nしねて　ほんもうでしょう‥‥うっうっ‥‥",
-  "en": ""
+  "en": "So Richard is dead too...\nAnd he said he'd come back...\nBut he too was a Dragon Knight. To die\nfor his comrades must be what he wished... (sob, sob)..."
  },
  {
   "id": 178,
   "off": "5B321",
   "ja": "わたしたちは　このディストを　はなれ\nどこかべつの　まちに　いこうとおもいます。\nここには　つらいおもいでが　おおすぎるんです。\n\nわすれていましたわ。\nこれは　りゅうきしだんの　さいこうのたからです。\nどうか　うけとってください‥‥\n　　　　{18:5F}をてにいれた!",
-  "en": ""
+  "en": "We are going to leave Deist\nand go to some other town.\nThere are too many painful memories here.\n\nI almost forgot.\nThis is the greatest treasure of the Dragon Knights.\nPlease accept it...\n    Obtained the {18:5F}!"
  },
  {
   "id": 179,
   "off": "5B3A5",
   "ja": "クリスタルが　こたえた。\n「そなたに　ちからをさずけよう‥\n\nちからがあがった!",
-  "en": ""
+  "en": "The Crystal answered.\n\"I shall grant thee strength...\n\nStrength went up!"
  },
  {
   "id": 180,
   "off": "5B3CE",
   "ja": "クリスタルが　こたえた。\n「そなたに　すばやさをさずけよう‥\n\nすばやさがあがった!",
-  "en": ""
+  "en": "The Crystal answered.\n\"I shall grant thee agility...\n\nAgility went up!"
  },
  {
   "id": 181,
   "off": "5B3F9",
   "ja": "クリスタルが　こたえた。\n「そなたに　せいしんをさずけよう‥\n\nせいしんがあがった!",
-  "en": ""
+  "en": "The Crystal answered.\n\"I shall grant thee spirit...\n\nSpirit went up!"
  },
  {
   "id": 182,
   "off": "5B424",
   "ja": "クリスタルが　こたえた。\n「そなたに　ちせいをさずけよう‥\n\nちせいがあがった!",
-  "en": ""
+  "en": "The Crystal answered.\n\"I shall grant thee intelligence...\n\nIntelligence went up!"
  },
  {
   "id": 183,
   "off": "5B44D",
   "ja": "クリスタルが　こたえた。\n「そなたに　ふういんされた　まほうを　さずける。\n\n{18:BF}をてにいれた!",
-  "en": ""
+  "en": "The Crystal answered.\n\"I shall grant thee the sealed magic.\n\nObtained the {18:BF}!"
  },
  {
   "id": 184,
   "off": "5B47E",
   "ja": "ジャイアントビーバー「ガウー!　ワウー!",
-  "en": ""
+  "en": "Giant Beaver: \"GAWU! WAWU!\""
  },
  {
   "id": 185,
