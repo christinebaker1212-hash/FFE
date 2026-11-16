@@ -26,7 +26,7 @@ Every decision comes from the Japanese.
 - Katakana that spells an English (or other foreign) word: write that word
   (ポーション → Potion, ブリザド → Blizzard, ミスリル → Mythril, グラシャラボラス → Glasya-Labolas).
 - Coined game terms: keep the coinage visible (ケアル → Cure, ケアルア → Cura,
-  ケアルダ → Curaja, ケアルガ → Curaga, ファイラ → Fira, ファイガ → Firaga,
+  ケアルダ → Curada, ケアルガ → Curaga, ファイラ → Fira, ファイガ → Firaga,
   サンダラ → Thundara, ブリザラ → Blizzara). The suffixes -ra/-da/-ga are kept as-is.
 - Hiragana or native-word names are translated by meaning (どくけし → Antidote,
   めぐすり → Eye Drops, ねこのつめ → Cat Claw, ひりゅうのつめ → Flying Dragon Claw).

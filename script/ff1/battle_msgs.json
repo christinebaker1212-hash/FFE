@@ -3,468 +3,468 @@
   "id": 0,
   "off": "2CC40",
   "ja": "HP　かいふく!",
-  "en": ""
+  "en": "HP recovered!"
  },
  {
   "id": 1,
   "off": "2CC49",
   "ja": "アーマーが　あがった",
-  "en": ""
+  "en": "Armor went up"
  },
  {
   "id": 2,
   "off": "2CC54",
   "ja": "こうげきを　よけやすくなった",
-  "en": ""
+  "en": "Became better at dodging attacks"
  },
  {
   "id": 3,
   "off": "2CC63",
   "ja": "ねむった",
-  "en": ""
+  "en": "Fell asleep"
  },
  {
   "id": 4,
   "off": "2CC68",
   "ja": "てきのすがたが　うきでる",
-  "en": ""
+  "en": "The enemy's form stands out"
  },
  {
   "id": 5,
   "off": "2CC75",
   "ja": "しりょくが　もどった",
-  "en": ""
+  "en": "Eyesight returned"
  },
  {
   "id": 6,
   "off": "2CC80",
   "ja": "ちんもくした",
-  "en": ""
+  "en": "Was silenced"
  },
  {
   "id": 7,
   "off": "2CC87",
   "ja": "いなずまに　つよくなった",
-  "en": ""
+  "en": "Became resistant to lightning"
  },
  {
   "id": 8,
   "off": "2CC94",
   "ja": "くらやみに　つつまれた",
-  "en": ""
+  "en": "Was wrapped in darkness"
  },
  {
   "id": 9,
   "off": "2CCA0",
   "ja": "ぶきの　いりょくがました",
-  "en": ""
+  "en": "Weapon's power increased"
  },
  {
   "id": 10,
   "off": "2CCAD",
   "ja": "うごきが　にぶった",
-  "en": ""
+  "en": "Movements slowed"
  },
  {
   "id": 11,
   "off": "2CCB7",
   "ja": "ほのおに　つよくなった",
-  "en": ""
+  "en": "Became resistant to fire"
  },
  {
   "id": 12,
   "off": "2CCC3",
   "ja": "うごきを　ふうじた",
-  "en": ""
+  "en": "Movement was sealed"
  },
  {
   "id": 13,
   "off": "2CCCD",
   "ja": "どくが　きえた",
-  "en": ""
+  "en": "The poison vanished"
  },
  {
   "id": 14,
   "off": "2CCD5",
   "ja": "にげごしになった",
-  "en": ""
+  "en": "Got ready to flee"
  },
  {
   "id": 15,
   "off": "2CCDE",
   "ja": "さむさに　つよくなった",
-  "en": ""
+  "en": "Became resistant to cold"
  },
  {
   "id": 16,
   "off": "2CCEA",
   "ja": "ちんもくを　やぶった",
-  "en": ""
+  "en": "Broke the silence"
  },
  {
   "id": 17,
   "off": "2CCF5",
   "ja": "すばやくなった",
-  "en": ""
+  "en": "Became quick"
  },
  {
   "id": 18,
   "off": "2CCFD",
   "ja": "こんらんした",
-  "en": ""
+  "en": "Became confused"
  },
  {
   "id": 19,
   "off": "2CD04",
   "ja": "どくを　うけた",
-  "en": ""
+  "en": "Was poisoned"
  },
  {
   "id": 20,
   "off": "2CD0C",
   "ja": "し　がおとずれた",
-  "en": ""
+  "en": "Death came"
  },
  {
   "id": 21,
   "off": "2CD15",
   "ja": "じわれに　のみこまれた!",
-  "en": ""
+  "en": "Swallowed by a fissure!"
  },
  {
   "id": 22,
   "off": "2CD22",
   "ja": "マヒした",
-  "en": ""
+  "en": "Was paralyzed"
  },
  {
   "id": 23,
   "off": "2CD27",
   "ja": "かんぜんに　かいふくした",
-  "en": ""
+  "en": "Fully recovered"
  },
  {
   "id": 24,
   "off": "2CD34",
   "ja": "すべてのまほうに　つよくなった",
-  "en": ""
+  "en": "Became resistant to all magic"
  },
  {
   "id": 25,
   "off": "2CD44",
   "ja": "いしになり　くだけちった!",
-  "en": ""
+  "en": "Turned to stone and shattered!"
  },
  {
   "id": 26,
   "off": "2CD52",
   "ja": "まほうのつるぎをだした",
-  "en": ""
+  "en": "Drew forth a magic sword"
  },
  {
   "id": 27,
   "off": "2CD5E",
   "ja": "ふしぎなひかりに　つつまれた",
-  "en": ""
+  "en": "Was wrapped in a strange light"
  },
  {
   "id": 28,
   "off": "2CD6D",
   "ja": "ぼうぎょりょくがきえた",
-  "en": ""
+  "en": "Defense vanished"
  },
  {
   "id": 29,
   "off": "2CD79",
   "ja": "じかんがとまった",
-  "en": ""
+  "en": "Time stopped"
  },
  {
   "id": 30,
   "off": "2CD82",
   "ja": "じげんのひずみに　なげこまれた!",
-  "en": ""
+  "en": "Was hurled into a rift in dimensions!"
  },
  {
   "id": 31,
   "off": "2CD93",
   "ja": "いのちをうばわれた‥‥",
-  "en": ""
+  "en": "Life was taken..."
  },
  {
   "id": 32,
   "off": "2CD9F",
   "ja": "こうかが　なかった",
-  "en": ""
+  "en": "Had no effect"
  },
  {
   "id": 33,
   "off": "2CDA9",
   "ja": "せんせいこうげきの　チャンス!",
-  "en": ""
+  "en": "A chance to strike first!"
  },
  {
   "id": 34,
   "off": "2CDB9",
   "ja": "モンスターの　せんせいこうげき!",
-  "en": ""
+  "en": "The monsters strike first!"
  },
  {
   "id": 35,
   "off": "2CDCA",
   "ja": "にげられない!",
-  "en": ""
+  "en": "Can't escape!"
  },
  {
   "id": 36,
   "off": "2CDD2",
   "ja": "にげてしまった",
-  "en": ""
+  "en": "Ran away"
  },
  {
   "id": 37,
   "off": "2CDDA",
   "ja": "なんとか　にげだした‥‥",
-  "en": ""
+  "en": "Somehow got away..."
  },
  {
   "id": 38,
   "off": "2CDE7",
   "ja": "めを　さました!",
-  "en": ""
+  "en": "Woke up!"
  },
  {
   "id": 39,
   "off": "2CDF0",
   "ja": "ねむっている",
-  "en": ""
+  "en": "Is asleep"
  },
  {
   "id": 40,
   "off": "2CDF7",
   "ja": "かいふくした!",
-  "en": ""
+  "en": "Recovered!"
  },
  {
   "id": 41,
   "off": "2CDFF",
   "ja": "マヒしている",
-  "en": ""
+  "en": "Is paralyzed"
  },
  {
   "id": 42,
   "off": "2CE06",
   "ja": "かい　ヒット!",
-  "en": ""
+  "en": " hits!"
  },
  {
   "id": 43,
   "off": "2CE0E",
   "ja": "クリティカル　ヒット!!",
-  "en": ""
+  "en": "Critical hit!!"
  },
  {
   "id": 44,
   "off": "2CE1B",
   "ja": "まほうを　つかえない!",
-  "en": ""
+  "en": "Can't use magic!"
  },
  {
   "id": 45,
   "off": "2CE27",
   "ja": "　ダメージ",
-  "en": ""
+  "en": " damage"
  },
  {
   "id": 46,
   "off": "2CE2D",
   "ja": "いしに　なってしまった",
-  "en": ""
+  "en": "Has turned to stone"
  },
  {
   "id": 47,
   "off": "2CE39",
   "ja": "レベルアップ!",
-  "en": ""
+  "en": "Level up!"
  },
  {
   "id": 48,
   "off": "2CE41",
   "ja": "HPさいだいち",
-  "en": ""
+  "en": "Max HP"
  },
  {
   "id": 49,
   "off": "2CE49",
   "ja": "ポイント",
-  "en": ""
+  "en": "points"
  },
  {
   "id": 50,
   "off": "2CE4E",
   "ja": "ちから",
-  "en": ""
+  "en": "Strength"
  },
  {
   "id": 51,
   "off": "2CE52",
   "ja": "すばやさ",
-  "en": ""
+  "en": "Agility"
  },
  {
   "id": 52,
   "off": "2CE57",
   "ja": "ちせい",
-  "en": ""
+  "en": "Intelligence"
  },
  {
   "id": 53,
   "off": "2CE5B",
   "ja": "たいりょく",
-  "en": ""
+  "en": "Vitality"
  },
  {
   "id": 54,
   "off": "2CE61",
   "ja": "こううん",
-  "en": ""
+  "en": "Luck"
  },
  {
   "id": 55,
   "off": "2CE66",
   "ja": "が　アップした",
-  "en": ""
+  "en": " went up"
  },
  {
   "id": 56,
   "off": "2CE6E",
   "ja": "まりょく",
-  "en": ""
+  "en": "Magic power"
  },
  {
   "id": 57,
   "off": "2CE73",
   "ja": "つぎのレベルの　まりょくを　みにつけた!",
-  "en": ""
+  "en": "Gained the magic power of the next level!"
  },
  {
   "id": 58,
   "off": "2CE88",
   "ja": "が　ダウンした",
-  "en": ""
+  "en": " went down"
  },
  {
   "id": 59,
   "off": "2CE90",
   "ja": "ぜんめつした",
-  "en": ""
+  "en": "Were wiped out"
  },
  {
   "id": 60,
   "off": "2CE97",
   "ja": "モンスターは　",
-  "en": ""
+  "en": "The monsters "
  },
  {
   "id": 61,
   "off": "2CE9F",
   "ja": "たちは　",
-  "en": ""
+  "en": "'s party "
  },
  {
   "id": 62,
   "off": "2CEA4",
   "ja": "とどめをさした!!",
-  "en": ""
+  "en": "Dealt the finishing blow!!"
  },
  {
   "id": 63,
   "off": "2CEAE",
   "ja": "ミス!",
-  "en": ""
+  "en": "Miss!"
  },
  {
   "id": 64,
   "off": "2CEB2",
   "ja": "　　　　",
-  "en": ""
+  "en": "    "
  },
  {
   "id": 65,
   "off": "2CEB7",
   "ja": "いし　　",
-  "en": ""
+  "en": "Stone"
  },
  {
   "id": 66,
   "off": "2CEBC",
   "ja": "どく　　",
-  "en": ""
+  "en": "Poison"
  },
  {
   "id": 67,
   "off": "2CEC1",
   "ja": "くらやみ",
-  "en": ""
+  "en": "Darkness"
  },
  {
   "id": 68,
   "off": "2CEC6",
   "ja": "まひ　　",
-  "en": ""
+  "en": "Paralysis"
  },
  {
   "id": 69,
   "off": "2CECB",
   "ja": "ねむり　",
-  "en": ""
+  "en": "Sleep"
  },
  {
   "id": 70,
   "off": "2CED0",
   "ja": "ちんもく",
-  "en": ""
+  "en": "Silence"
  },
  {
   "id": 71,
   "off": "2CED5",
   "ja": "HP　　",
-  "en": ""
+  "en": "HP"
  },
  {
   "id": 72,
   "off": "2CEDA",
   "ja": "けいけんちアップ",
-  "en": ""
+  "en": "Experience up"
  },
  {
   "id": 73,
   "off": "2CEE3",
   "ja": "いまは　こうかがない",
-  "en": ""
+  "en": "No effect now"
  },
  {
   "id": 74,
   "off": "2CEEE",
   "ja": "ちんもくしている",
-  "en": ""
+  "en": "Is silenced"
  },
  {
   "id": 75,
   "off": "2CEF7",
   "ja": "なかまわれを　はじめた",
-  "en": ""
+  "en": "Began fighting among themselves"
  },
  {
   "id": 76,
   "off": "2CF03",
   "ja": "どくのけむりが　つつむ",
-  "en": ""
+  "en": "Poison smoke envelops all"
  },
  {
   "id": 77,
   "off": "2CF0F",
   "ja": "なにも　おこらなかった",
-  "en": ""
+  "en": "Nothing happened"
  }
 ]

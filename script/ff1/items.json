@@ -9,1513 +9,1513 @@
   "id": 1,
   "off": "2B901",
   "ja": "リュート　　　",
-  "en": ""
+  "en": "Lute"
  },
  {
   "id": 2,
   "off": "2B909",
   "ja": "クラウン　　　",
-  "en": ""
+  "en": "Crown"
  },
  {
   "id": 3,
   "off": "2B911",
   "ja": "すいしょうのめ",
-  "en": ""
+  "en": "Crystal Eye"
  },
  {
   "id": 4,
   "off": "2B919",
   "ja": "めざめのくすり",
-  "en": ""
+  "en": "Waking Medicine"
  },
  {
   "id": 5,
   "off": "2B921",
   "ja": "しんぴのかぎ　",
-  "en": ""
+  "en": "Mystic Key"
  },
  {
   "id": 6,
   "off": "2B929",
   "ja": "ニトロのかやく",
-  "en": ""
+  "en": "Nitro Powder"
  },
  {
   "id": 7,
   "off": "2B931",
   "ja": "アダマンタイト",
-  "en": ""
+  "en": "Adamantite"
  },
  {
   "id": 8,
   "off": "2B939",
   "ja": "ロゼッタいし　",
-  "en": ""
+  "en": "Rosetta Stone"
  },
  {
   "id": 9,
   "off": "2B941",
   "ja": "スタールビー　",
-  "en": ""
+  "en": "Star Ruby"
  },
  {
   "id": 10,
   "off": "2B949",
   "ja": "つちのつえ　　",
-  "en": ""
+  "en": "Staff of Earth"
  },
  {
   "id": 11,
   "off": "2B951",
   "ja": "ふゆうせき　　",
-  "en": ""
+  "en": "Floating Stone"
  },
  {
   "id": 12,
   "off": "2B959",
   "ja": "チャイム　　　",
-  "en": ""
+  "en": "Chime"
  },
  {
   "id": 13,
   "off": "2B961",
   "ja": "ねずみのしっぽ",
-  "en": ""
+  "en": "Rat's Tail"
  },
  {
   "id": 14,
   "off": "2B969",
   "ja": "ワープキューブ",
-  "en": ""
+  "en": "Warp Cube"
  },
  {
   "id": 15,
   "off": "2B971",
   "ja": "ようせいのビン",
-  "en": ""
+  "en": "Fairy Bottle"
  },
  {
   "id": 16,
   "off": "2B979",
   "ja": "くうきのみず　",
-  "en": ""
+  "en": "Water of Air"
  },
  {
   "id": 17,
   "off": "2B981",
   "ja": "カヌー　　　　",
-  "en": ""
+  "en": "Canoe"
  },
  {
   "id": 18,
   "off": "2B989",
   "ja": "く",
-  "en": ""
+  "en": "C"
  },
  {
   "id": 19,
   "off": "2B98B",
   "ja": "り",
-  "en": ""
+  "en": "R"
  },
  {
   "id": 20,
   "off": "2B98D",
   "ja": "す",
-  "en": ""
+  "en": "Y"
  },
  {
   "id": 21,
   "off": "2B98F",
   "ja": "た",
-  "en": ""
+  "en": "S"
  },
  {
   "id": 22,
   "off": "2B991",
   "ja": "ねぶくろ　",
-  "en": ""
+  "en": "Sleeping Bag"
  },
  {
   "id": 23,
   "off": "2B997",
   "ja": "テント　　",
-  "en": ""
+  "en": "Tent"
  },
  {
   "id": 24,
   "off": "2B99D",
   "ja": "コテージ　",
-  "en": ""
+  "en": "Cottage"
  },
  {
   "id": 25,
   "off": "2B9A3",
   "ja": "ポーション",
-  "en": ""
+  "en": "Potion"
  },
  {
   "id": 26,
   "off": "2B9A9",
   "ja": "どくけし　",
-  "en": ""
+  "en": "Antidote"
  },
  {
   "id": 27,
   "off": "2B9AF",
   "ja": "きんのはり",
-  "en": ""
+  "en": "Golden Needle"
  },
  {
   "id": 28,
   "off": "2B9B5",
   "ja": "ヌンチャク　　",
-  "en": ""
+  "en": "Nunchaku"
  },
  {
   "id": 29,
   "off": "2B9BD",
   "ja": "ナイフ　　　　",
-  "en": ""
+  "en": "Knife"
  },
  {
   "id": 30,
   "off": "2B9C5",
   "ja": "つえ　　　　　",
-  "en": ""
+  "en": "Staff"
  },
  {
   "id": 31,
   "off": "2B9CD",
   "ja": "レイピア　　　",
-  "en": ""
+  "en": "Rapier"
  },
  {
   "id": 32,
   "off": "2B9D5",
   "ja": "ハンマー　　　",
-  "en": ""
+  "en": "Hammer"
  },
  {
   "id": 33,
   "off": "2B9DD",
   "ja": "ブロードソード",
-  "en": ""
+  "en": "Broadsword"
  },
  {
   "id": 34,
   "off": "2B9E5",
   "ja": "バトルアクス　",
-  "en": ""
+  "en": "Battle Axe"
  },
  {
   "id": 35,
   "off": "2B9ED",
   "ja": "シミター　　　",
-  "en": ""
+  "en": "Scimitar"
  },
  {
   "id": 36,
   "off": "2B9F5",
   "ja": "テツヌンチャク",
-  "en": ""
+  "en": "Iron Nunchaku"
  },
  {
   "id": 37,
   "off": "2B9FD",
   "ja": "ダガー　　　　",
-  "en": ""
+  "en": "Dagger"
  },
  {
   "id": 38,
   "off": "2BA05",
   "ja": "しゃくじょう　",
-  "en": ""
+  "en": "Ringed Staff"
  },
  {
   "id": 39,
   "off": "2BA0D",
   "ja": "サーベル　　　",
-  "en": ""
+  "en": "Saber"
  },
  {
   "id": 40,
   "off": "2BA15",
   "ja": "ロングソード　",
-  "en": ""
+  "en": "Longsword"
  },
  {
   "id": 41,
   "off": "2BA1D",
   "ja": "グレートアクス",
-  "en": ""
+  "en": "Great Axe"
  },
  {
   "id": 42,
   "off": "2BA25",
   "ja": "フォールチョン",
-  "en": ""
+  "en": "Falchion"
  },
  {
   "id": 43,
   "off": "2BA2D",
   "ja": "ミスリルナイフ",
-  "en": ""
+  "en": "Mythril Knife"
  },
  {
   "id": 44,
   "off": "2BA35",
   "ja": "ミスリルソード",
-  "en": ""
+  "en": "Mythril Sword"
  },
  {
   "id": 45,
   "off": "2BA3D",
   "ja": "ミスリルハンマ",
-  "en": ""
+  "en": "Mythril Hammer"
  },
  {
   "id": 46,
   "off": "2BA45",
   "ja": "ミスリルアクス",
-  "en": ""
+  "en": "Mythril Axe"
  },
  {
   "id": 47,
   "off": "2BA4D",
   "ja": "フレームソード",
-  "en": ""
+  "en": "Flame Sword"
  },
  {
   "id": 48,
   "off": "2BA55",
   "ja": "アイスブランド",
-  "en": ""
+  "en": "Icebrand"
  },
  {
   "id": 49,
   "off": "2BA5D",
   "ja": "ウィルムキラー",
-  "en": ""
+  "en": "Wyrmkiller"
  },
  {
   "id": 50,
   "off": "2BA65",
   "ja": "グレートソード",
-  "en": ""
+  "en": "Great Sword"
  },
  {
   "id": 51,
   "off": "2BA6D",
   "ja": "サンブレード　",
-  "en": ""
+  "en": "Sun Blade"
  },
  {
   "id": 52,
   "off": "2BA75",
   "ja": "さんごのつるぎ",
-  "en": ""
+  "en": "Coral Sword"
  },
  {
   "id": 53,
   "off": "2BA7D",
   "ja": "ウェアバスター",
-  "en": ""
+  "en": "Werebuster"
  },
  {
   "id": 54,
   "off": "2BA85",
   "ja": "ルーンブレード",
-  "en": ""
+  "en": "Rune Blade"
  },
  {
   "id": 55,
   "off": "2BA8D",
   "ja": "ちからのつえ　",
-  "en": ""
+  "en": "Staff of Power"
  },
  {
   "id": 56,
   "off": "2BA95",
   "ja": "ライトアクス　",
-  "en": ""
+  "en": "Light Axe"
  },
  {
   "id": 57,
   "off": "2BA9D",
   "ja": "いやしのつえ　",
-  "en": ""
+  "en": "Staff of Healing"
  },
  {
   "id": 58,
   "off": "2BAA5",
   "ja": "まじゅつのつえ",
-  "en": ""
+  "en": "Staff of Sorcery"
  },
  {
   "id": 59,
   "off": "2BAAD",
   "ja": "ディフェンダー",
-  "en": ""
+  "en": "Defender"
  },
  {
   "id": 60,
   "off": "2BAB5",
   "ja": "まどうしのつえ",
-  "en": ""
+  "en": "Wizard's Staff"
  },
  {
   "id": 61,
   "off": "2BABD",
   "ja": "シャープソード",
-  "en": ""
+  "en": "Sharp Sword"
  },
  {
   "id": 62,
   "off": "2BAC5",
   "ja": "ネコのツメ　　",
-  "en": ""
+  "en": "Cat Claw"
  },
  {
   "id": 63,
   "off": "2BACD",
   "ja": "トールハンマー",
-  "en": ""
+  "en": "Thor Hammer"
  },
  {
   "id": 64,
   "off": "2BAD5",
   "ja": "レイズサーベル",
-  "en": ""
+  "en": "Raise Saber"
  },
  {
   "id": 65,
   "off": "2BADD",
   "ja": "サスケのかたな",
-  "en": ""
+  "en": "Sasuke's Katana"
  },
  {
   "id": 66,
   "off": "2BAE5",
   "ja": "エクスカリバー",
-  "en": ""
+  "en": "Excalibur"
  },
  {
   "id": 67,
   "off": "2BAED",
   "ja": "マサムネ　　　",
-  "en": ""
+  "en": "Masamune"
  },
  {
   "id": 68,
   "off": "2BAF5",
   "ja": "ふく　　　　　",
-  "en": ""
+  "en": "Clothes"
  },
  {
   "id": 69,
   "off": "2BAFD",
   "ja": "かわよろい　　",
-  "en": ""
+  "en": "Leather Armor"
  },
  {
   "id": 70,
   "off": "2BB05",
   "ja": "くさりかたびら",
-  "en": ""
+  "en": "Chain Mail"
  },
  {
   "id": 71,
   "off": "2BB0D",
   "ja": "てつよろい　　",
-  "en": ""
+  "en": "Iron Armor"
  },
  {
   "id": 72,
   "off": "2BB15",
   "ja": "ナイトのよろい",
-  "en": ""
+  "en": "Knight's Armor"
  },
  {
   "id": 73,
   "off": "2BB1D",
   "ja": "ミスリルメイル",
-  "en": ""
+  "en": "Mythril Mail"
  },
  {
   "id": 74,
   "off": "2BB25",
   "ja": "フレイムメイル",
-  "en": ""
+  "en": "Flame Mail"
  },
  {
   "id": 75,
   "off": "2BB2D",
   "ja": "アイスアーマー",
-  "en": ""
+  "en": "Ice Armor"
  },
  {
   "id": 76,
   "off": "2BB35",
   "ja": "ダイヤアーマー",
-  "en": ""
+  "en": "Diamond Armor"
  },
  {
   "id": 77,
   "off": "2BB3D",
   "ja": "ドラゴンメイル",
-  "en": ""
+  "en": "Dragon Mail"
  },
  {
   "id": 78,
   "off": "2BB45",
   "ja": "どうのうでわ　",
-  "en": ""
+  "en": "Copper Bracelet"
  },
  {
   "id": 79,
   "off": "2BB4D",
   "ja": "ぎんのうでわ　",
-  "en": ""
+  "en": "Silver Bracelet"
  },
  {
   "id": 80,
   "off": "2BB55",
   "ja": "ルビーのうでわ",
-  "en": ""
+  "en": "Ruby Bracelet"
  },
  {
   "id": 81,
   "off": "2BB5D",
   "ja": "ダイヤのうでわ",
-  "en": ""
+  "en": "Diamond Bracelet"
  },
  {
   "id": 82,
   "off": "2BB65",
   "ja": "しろのローブ　",
-  "en": ""
+  "en": "White Robe"
  },
  {
   "id": 83,
   "off": "2BB6D",
   "ja": "くろのローブ　",
-  "en": ""
+  "en": "Black Robe"
  },
  {
   "id": 84,
   "off": "2BB75",
   "ja": "かわのたて　　",
-  "en": ""
+  "en": "Leather Shield"
  },
  {
   "id": 85,
   "off": "2BB7D",
   "ja": "てつのたて　　",
-  "en": ""
+  "en": "Iron Shield"
  },
  {
   "id": 86,
   "off": "2BB85",
   "ja": "ミスリルのたて",
-  "en": ""
+  "en": "Mythril Shield"
  },
  {
   "id": 87,
   "off": "2BB8D",
   "ja": "ほのおのたて　",
-  "en": ""
+  "en": "Flame Shield"
  },
  {
   "id": 88,
   "off": "2BB95",
   "ja": "アイスシールド",
-  "en": ""
+  "en": "Ice Shield"
  },
  {
   "id": 89,
   "off": "2BB9D",
   "ja": "ダイヤシールド",
-  "en": ""
+  "en": "Diamond Shield"
  },
  {
   "id": 90,
   "off": "2BBA5",
   "ja": "イージスのたて",
-  "en": ""
+  "en": "Aegis Shield"
  },
  {
   "id": 91,
   "off": "2BBAD",
   "ja": "バックラー　　",
-  "en": ""
+  "en": "Buckler"
  },
  {
   "id": 92,
   "off": "2BBB5",
   "ja": "まもりのマント",
-  "en": ""
+  "en": "Cape of Protection"
  },
  {
   "id": 93,
   "off": "2BBBD",
   "ja": "かわのぼうし　",
-  "en": ""
+  "en": "Leather Cap"
  },
  {
   "id": 94,
   "off": "2BBC5",
   "ja": "かぶと　　　　",
-  "en": ""
+  "en": "Helmet"
  },
  {
   "id": 95,
   "off": "2BBCD",
   "ja": "おおかぶと　　",
-  "en": ""
+  "en": "Great Helm"
  },
  {
   "id": 96,
   "off": "2BBD5",
   "ja": "ミスリルかぶと",
-  "en": ""
+  "en": "Mythril Helm"
  },
  {
   "id": 97,
   "off": "2BBDD",
   "ja": "ダイヤのかぶと",
-  "en": ""
+  "en": "Diamond Helm"
  },
  {
   "id": 98,
   "off": "2BBE5",
   "ja": "いやしのかぶと",
-  "en": ""
+  "en": "Helm of Healing"
  },
  {
   "id": 99,
   "off": "2BBED",
   "ja": "リボン　　　　",
-  "en": ""
+  "en": "Ribbon"
  },
  {
   "id": 100,
   "off": "2BBF5",
   "ja": "かわてぶくろ　",
-  "en": ""
+  "en": "Leather Gloves"
  },
  {
   "id": 101,
   "off": "2BBFD",
   "ja": "せいどうのこて",
-  "en": ""
+  "en": "Bronze Gauntlets"
  },
  {
   "id": 102,
   "off": "2BC05",
   "ja": "はがねのこて　",
-  "en": ""
+  "en": "Steel Gauntlets"
  },
  {
   "id": 103,
   "off": "2BC0D",
   "ja": "ミスリルのこて",
-  "en": ""
+  "en": "Mythril Gauntlets"
  },
  {
   "id": 104,
   "off": "2BC15",
   "ja": "ガントレット　",
-  "en": ""
+  "en": "Gauntlet"
  },
  {
   "id": 105,
   "off": "2BC1D",
   "ja": "きょじんのこて",
-  "en": ""
+  "en": "Giant's Gauntlets"
  },
  {
   "id": 106,
   "off": "2BC25",
   "ja": "ダイヤのこて　",
-  "en": ""
+  "en": "Diamond Gauntlets"
  },
  {
   "id": 107,
   "off": "2BC2D",
   "ja": "まもりのゆびわ",
-  "en": ""
+  "en": "Ring of Protection"
  },
  {
   "id": 108,
   "off": "2BC35",
   "ja": "10ギル",
-  "en": ""
+  "en": "10 Gil"
  },
  {
   "id": 109,
   "off": "2BC3A",
   "ja": "20ギル",
-  "en": ""
+  "en": "20 Gil"
  },
  {
   "id": 110,
   "off": "2BC3F",
   "ja": "25ギル",
-  "en": ""
+  "en": "25 Gil"
  },
  {
   "id": 111,
   "off": "2BC44",
   "ja": "30ギル",
-  "en": ""
+  "en": "30 Gil"
  },
  {
   "id": 112,
   "off": "2BC49",
   "ja": "55ギル",
-  "en": ""
+  "en": "55 Gil"
  },
  {
   "id": 113,
   "off": "2BC4E",
   "ja": "70ギル",
-  "en": ""
+  "en": "70 Gil"
  },
  {
   "id": 114,
   "off": "2BC53",
   "ja": "85ギル",
-  "en": ""
+  "en": "85 Gil"
  },
  {
   "id": 115,
   "off": "2BC58",
   "ja": "110ギル",
-  "en": ""
+  "en": "110 Gil"
  },
  {
   "id": 116,
   "off": "2BC5E",
   "ja": "135ギル",
-  "en": ""
+  "en": "135 Gil"
  },
  {
   "id": 117,
   "off": "2BC64",
   "ja": "155ギル",
-  "en": ""
+  "en": "155 Gil"
  },
  {
   "id": 118,
   "off": "2BC6A",
   "ja": "160ギル",
-  "en": ""
+  "en": "160 Gil"
  },
  {
   "id": 119,
   "off": "2BC70",
   "ja": "180ギル",
-  "en": ""
+  "en": "180 Gil"
  },
  {
   "id": 120,
   "off": "2BC76",
   "ja": "240ギル",
-  "en": ""
+  "en": "240 Gil"
  },
  {
   "id": 121,
   "off": "2BC7C",
   "ja": "255ギル",
-  "en": ""
+  "en": "255 Gil"
  },
  {
   "id": 122,
   "off": "2BC82",
   "ja": "260ギル",
-  "en": ""
+  "en": "260 Gil"
  },
  {
   "id": 123,
   "off": "2BC88",
   "ja": "295ギル",
-  "en": ""
+  "en": "295 Gil"
  },
  {
   "id": 124,
   "off": "2BC8E",
   "ja": "300ギル",
-  "en": ""
+  "en": "300 Gil"
  },
  {
   "id": 125,
   "off": "2BC94",
   "ja": "315ギル",
-  "en": ""
+  "en": "315 Gil"
  },
  {
   "id": 126,
   "off": "2BC9A",
   "ja": "330ギル",
-  "en": ""
+  "en": "330 Gil"
  },
  {
   "id": 127,
   "off": "2BCA0",
   "ja": "350ギル",
-  "en": ""
+  "en": "350 Gil"
  },
  {
   "id": 128,
   "off": "2BCA6",
   "ja": "385ギル",
-  "en": ""
+  "en": "385 Gil"
  },
  {
   "id": 129,
   "off": "2BCAC",
   "ja": "400ギル",
-  "en": ""
+  "en": "400 Gil"
  },
  {
   "id": 130,
   "off": "2BCB2",
   "ja": "450ギル",
-  "en": ""
+  "en": "450 Gil"
  },
  {
   "id": 131,
   "off": "2BCB8",
   "ja": "500ギル",
-  "en": ""
+  "en": "500 Gil"
  },
  {
   "id": 132,
   "off": "2BCBE",
   "ja": "530ギル",
-  "en": ""
+  "en": "530 Gil"
  },
  {
   "id": 133,
   "off": "2BCC4",
   "ja": "575ギル",
-  "en": ""
+  "en": "575 Gil"
  },
  {
   "id": 134,
   "off": "2BCCA",
   "ja": "620ギル",
-  "en": ""
+  "en": "620 Gil"
  },
  {
   "id": 135,
   "off": "2BCD0",
   "ja": "680ギル",
-  "en": ""
+  "en": "680 Gil"
  },
  {
   "id": 136,
   "off": "2BCD6",
   "ja": "750ギル",
-  "en": ""
+  "en": "750 Gil"
  },
  {
   "id": 137,
   "off": "2BCDC",
   "ja": "795ギル",
-  "en": ""
+  "en": "795 Gil"
  },
  {
   "id": 138,
   "off": "2BCE2",
   "ja": "880ギル",
-  "en": ""
+  "en": "880 Gil"
  },
  {
   "id": 139,
   "off": "2BCE8",
   "ja": "1020ギル",
-  "en": ""
+  "en": "1020 Gil"
  },
  {
   "id": 140,
   "off": "2BCEF",
   "ja": "1250ギル",
-  "en": ""
+  "en": "1250 Gil"
  },
  {
   "id": 141,
   "off": "2BCF6",
   "ja": "1455ギル",
-  "en": ""
+  "en": "1455 Gil"
  },
  {
   "id": 142,
   "off": "2BCFD",
   "ja": "1520ギル",
-  "en": ""
+  "en": "1520 Gil"
  },
  {
   "id": 143,
   "off": "2BD04",
   "ja": "1760ギル",
-  "en": ""
+  "en": "1760 Gil"
  },
  {
   "id": 144,
   "off": "2BD0B",
   "ja": "1975ギル",
-  "en": ""
+  "en": "1975 Gil"
  },
  {
   "id": 145,
   "off": "2BD12",
   "ja": "2000ギル",
-  "en": ""
+  "en": "2000 Gil"
  },
  {
   "id": 146,
   "off": "2BD19",
   "ja": "2750ギル",
-  "en": ""
+  "en": "2750 Gil"
  },
  {
   "id": 147,
   "off": "2BD20",
   "ja": "3400ギル",
-  "en": ""
+  "en": "3400 Gil"
  },
  {
   "id": 148,
   "off": "2BD27",
   "ja": "4150ギル",
-  "en": ""
+  "en": "4150 Gil"
  },
  {
   "id": 149,
   "off": "2BD2E",
   "ja": "5000ギル",
-  "en": ""
+  "en": "5000 Gil"
  },
  {
   "id": 150,
   "off": "2BD35",
   "ja": "5450ギル",
-  "en": ""
+  "en": "5450 Gil"
  },
  {
   "id": 151,
   "off": "2BD3C",
   "ja": "6400ギル",
-  "en": ""
+  "en": "6400 Gil"
  },
  {
   "id": 152,
   "off": "2BD43",
   "ja": "6720ギル",
-  "en": ""
+  "en": "6720 Gil"
  },
  {
   "id": 153,
   "off": "2BD4A",
   "ja": "7340ギル",
-  "en": ""
+  "en": "7340 Gil"
  },
  {
   "id": 154,
   "off": "2BD51",
   "ja": "7690ギル",
-  "en": ""
+  "en": "7690 Gil"
  },
  {
   "id": 155,
   "off": "2BD58",
   "ja": "7900ギル",
-  "en": ""
+  "en": "7900 Gil"
  },
  {
   "id": 156,
   "off": "2BD5F",
   "ja": "8135ギル",
-  "en": ""
+  "en": "8135 Gil"
  },
  {
   "id": 157,
   "off": "2BD66",
   "ja": "9000ギル",
-  "en": ""
+  "en": "9000 Gil"
  },
  {
   "id": 158,
   "off": "2BD6D",
   "ja": "9300ギル",
-  "en": ""
+  "en": "9300 Gil"
  },
  {
   "id": 159,
   "off": "2BD74",
   "ja": "9500ギル",
-  "en": ""
+  "en": "9500 Gil"
  },
  {
   "id": 160,
   "off": "2BD7B",
   "ja": "9900ギル",
-  "en": ""
+  "en": "9900 Gil"
  },
  {
   "id": 161,
   "off": "2BD82",
   "ja": "10000ギル",
-  "en": ""
+  "en": "10000 Gil"
  },
  {
   "id": 162,
   "off": "2BD8A",
   "ja": "12350ギル",
-  "en": ""
+  "en": "12350 Gil"
  },
  {
   "id": 163,
   "off": "2BD92",
   "ja": "13000ギル",
-  "en": ""
+  "en": "13000 Gil"
  },
  {
   "id": 164,
   "off": "2BD9A",
   "ja": "13450ギル",
-  "en": ""
+  "en": "13450 Gil"
  },
  {
   "id": 165,
   "off": "2BDA2",
   "ja": "14050ギル",
-  "en": ""
+  "en": "14050 Gil"
  },
  {
   "id": 166,
   "off": "2BDAA",
   "ja": "14720ギル",
-  "en": ""
+  "en": "14720 Gil"
  },
  {
   "id": 167,
   "off": "2BDB2",
   "ja": "15000ギル",
-  "en": ""
+  "en": "15000 Gil"
  },
  {
   "id": 168,
   "off": "2BDBA",
   "ja": "17490ギル",
-  "en": ""
+  "en": "17490 Gil"
  },
  {
   "id": 169,
   "off": "2BDC2",
   "ja": "18010ギル",
-  "en": ""
+  "en": "18010 Gil"
  },
  {
   "id": 170,
   "off": "2BDCA",
   "ja": "19990ギル",
-  "en": ""
+  "en": "19990 Gil"
  },
  {
   "id": 171,
   "off": "2BDD2",
   "ja": "20000ギル",
-  "en": ""
+  "en": "20000 Gil"
  },
  {
   "id": 172,
   "off": "2BDDA",
   "ja": "20010ギル",
-  "en": ""
+  "en": "20010 Gil"
  },
  {
   "id": 173,
   "off": "2BDE2",
   "ja": "26000ギル",
-  "en": ""
+  "en": "26000 Gil"
  },
  {
   "id": 174,
   "off": "2BDEA",
   "ja": "45000ギル",
-  "en": ""
+  "en": "45000 Gil"
  },
  {
   "id": 175,
   "off": "2BDF2",
   "ja": "65000ギル",
-  "en": ""
+  "en": "65000 Gil"
  },
  {
   "id": 176,
   "off": "2BDFA",
   "ja": "ケアル　",
-  "en": ""
+  "en": "Cure"
  },
  {
   "id": 177,
   "off": "2BDFF",
   "ja": "ディア　",
-  "en": ""
+  "en": "Dia"
  },
  {
   "id": 178,
   "off": "2BE04",
   "ja": "プロテス",
-  "en": ""
+  "en": "Protes"
  },
  {
   "id": 179,
   "off": "2BE09",
   "ja": "ブリンク",
-  "en": ""
+  "en": "Blink"
  },
  {
   "id": 180,
   "off": "2BE0E",
   "ja": "ファイア",
-  "en": ""
+  "en": "Fire"
  },
  {
   "id": 181,
   "off": "2BE13",
   "ja": "スリプル",
-  "en": ""
+  "en": "Sleep"
  },
  {
   "id": 182,
   "off": "2BE18",
   "ja": "シェイプ",
-  "en": ""
+  "en": "Shape"
  },
  {
   "id": 183,
   "off": "2BE1D",
   "ja": "サンダー",
-  "en": ""
+  "en": "Thunder"
  },
  {
   "id": 184,
   "off": "2BE22",
   "ja": "ブラナ　",
-  "en": ""
+  "en": "Blindna"
  },
  {
   "id": 185,
   "off": "2BE27",
   "ja": "サイレス",
-  "en": ""
+  "en": "Silence"
  },
  {
   "id": 186,
   "off": "2BE2C",
   "ja": "バサンダ",
-  "en": ""
+  "en": "Barthunder"
  },
  {
   "id": 187,
   "off": "2BE31",
   "ja": "インビジ",
-  "en": ""
+  "en": "Invisible"
  },
  {
   "id": 188,
   "off": "2BE36",
   "ja": "ブリザド",
-  "en": ""
+  "en": "Blizzard"
  },
  {
   "id": 189,
   "off": "2BE3B",
   "ja": "ダクネス",
-  "en": ""
+  "en": "Darkness"
  },
  {
   "id": 190,
   "off": "2BE40",
   "ja": "ストライ",
-  "en": ""
+  "en": "Strike"
  },
  {
   "id": 191,
   "off": "2BE45",
   "ja": "スロウ　",
-  "en": ""
+  "en": "Slow"
  },
  {
   "id": 192,
   "off": "2BE4A",
   "ja": "ケアルア",
-  "en": ""
+  "en": "Cura"
  },
  {
   "id": 193,
   "off": "2BE4F",
   "ja": "アディア",
-  "en": ""
+  "en": "Adia"
  },
  {
   "id": 194,
   "off": "2BE54",
   "ja": "バファイ",
-  "en": ""
+  "en": "Barfire"
  },
  {
   "id": 195,
   "off": "2BE59",
   "ja": "ヒール　",
-  "en": ""
+  "en": "Heal"
  },
  {
   "id": 196,
   "off": "2BE5E",
   "ja": "ファイラ",
-  "en": ""
+  "en": "Fira"
  },
  {
   "id": 197,
   "off": "2BE63",
   "ja": "ホールド",
-  "en": ""
+  "en": "Hold"
  },
  {
   "id": 198,
   "off": "2BE68",
   "ja": "サンダラ",
-  "en": ""
+  "en": "Thundara"
  },
  {
   "id": 199,
   "off": "2BE6D",
   "ja": "シェイラ",
-  "en": ""
+  "en": "Shapera"
  },
  {
   "id": 200,
   "off": "2BE72",
   "ja": "ポイゾナ",
-  "en": ""
+  "en": "Poisona"
  },
  {
   "id": 201,
   "off": "2BE77",
   "ja": "フィアー",
-  "en": ""
+  "en": "Fear"
  },
  {
   "id": 202,
   "off": "2BE7C",
   "ja": "バコルド",
-  "en": ""
+  "en": "Barcold"
  },
  {
   "id": 203,
   "off": "2BE81",
   "ja": "ボキャル",
-  "en": ""
+  "en": "Vocal"
  },
  {
   "id": 204,
   "off": "2BE86",
   "ja": "スリプラ",
-  "en": ""
+  "en": "Sleepra"
  },
  {
   "id": 205,
   "off": "2BE8B",
   "ja": "ヘイスト",
-  "en": ""
+  "en": "Haste"
  },
  {
   "id": 206,
   "off": "2BE90",
   "ja": "コンフュ",
-  "en": ""
+  "en": "Confuse"
  },
  {
   "id": 207,
   "off": "2BE95",
   "ja": "ブリザラ",
-  "en": ""
+  "en": "Blizzara"
  },
  {
   "id": 208,
   "off": "2BE9A",
   "ja": "ケアルダ",
-  "en": ""
+  "en": "Curada"
  },
  {
   "id": 209,
   "off": "2BE9F",
   "ja": "レイズ　",
-  "en": ""
+  "en": "Raise"
  },
  {
   "id": 210,
   "off": "2BEA4",
   "ja": "ダディア",
-  "en": ""
+  "en": "Dadia"
  },
  {
   "id": 211,
   "off": "2BEA9",
   "ja": "ヒーラ　",
-  "en": ""
+  "en": "Heala"
  },
  {
   "id": 212,
   "off": "2BEAE",
   "ja": "ファイガ",
-  "en": ""
+  "en": "Firaga"
  },
  {
   "id": 213,
   "off": "2BEB3",
   "ja": "クラウダ",
-  "en": ""
+  "en": "Clouda"
  },
  {
   "id": 214,
   "off": "2BEB8",
   "ja": "テレポ　",
-  "en": ""
+  "en": "Teleport"
  },
  {
   "id": 215,
   "off": "2BEBD",
   "ja": "ラスロウ",
-  "en": ""
+  "en": "Raslow"
  },
  {
   "id": 216,
   "off": "2BEC2",
   "ja": "ストナ　",
-  "en": ""
+  "en": "Stona"
  },
  {
   "id": 217,
   "off": "2BEC7",
   "ja": "ダテレポ",
-  "en": ""
+  "en": "Dateleport"
  },
  {
   "id": 218,
   "off": "2BECC",
   "ja": "プロテア",
-  "en": ""
+  "en": "Protea"
  },
  {
   "id": 219,
   "off": "2BED1",
   "ja": "インビア",
-  "en": ""
+  "en": "Invisia"
  },
  {
   "id": 220,
   "off": "2BED6",
   "ja": "サンガー",
-  "en": ""
+  "en": "Thundaga"
  },
  {
   "id": 221,
   "off": "2BEDB",
   "ja": "デス　　",
-  "en": ""
+  "en": "Death"
  },
  {
   "id": 222,
   "off": "2BEE0",
   "ja": "クエイク",
-  "en": ""
+  "en": "Quake"
  },
  {
   "id": 223,
   "off": "2BEE5",
   "ja": "スタン　",
-  "en": ""
+  "en": "Stun"
  },
  {
   "id": 224,
   "off": "2BEEA",
   "ja": "ケアルガ",
-  "en": ""
+  "en": "Curaga"
  },
  {
   "id": 225,
   "off": "2BEEF",
   "ja": "ガディア",
-  "en": ""
+  "en": "Gadia"
  },
  {
   "id": 226,
   "off": "2BEF4",
   "ja": "バマジク",
-  "en": ""
+  "en": "Barmagic"
  },
  {
   "id": 227,
   "off": "2BEF9",
   "ja": "ラヒーラ",
-  "en": ""
+  "en": "Raheala"
  },
  {
   "id": 228,
   "off": "2BEFE",
   "ja": "ブリザガ",
-  "en": ""
+  "en": "Blizzaga"
  },
  {
   "id": 229,
   "off": "2BF03",
   "ja": "ブレイク",
-  "en": ""
+  "en": "Break"
  },
  {
   "id": 230,
   "off": "2BF08",
   "ja": "セーバー",
-  "en": ""
+  "en": "Saber"
  },
  {
   "id": 231,
   "off": "2BF0D",
   "ja": "ブライン",
-  "en": ""
+  "en": "Blind"
  },
  {
   "id": 232,
   "off": "2BF12",
   "ja": "アレイズ",
-  "en": ""
+  "en": "Arise"
  },
  {
   "id": 233,
   "off": "2BF17",
   "ja": "ホーリー",
-  "en": ""
+  "en": "Holy"
  },
  {
   "id": 234,
   "off": "2BF1C",
   "ja": "バオル　",
-  "en": ""
+  "en": "Barall"
  },
  {
   "id": 235,
   "off": "2BF21",
   "ja": "デスペル",
-  "en": ""
+  "en": "Dispel"
  },
  {
   "id": 236,
   "off": "2BF26",
   "ja": "フレアー",
-  "en": ""
+  "en": "Flare"
  },
  {
   "id": 237,
   "off": "2BF2B",
   "ja": "ストップ",
-  "en": ""
+  "en": "Stop"
  },
  {
   "id": 238,
   "off": "2BF30",
   "ja": "デジョン",
-  "en": ""
+  "en": "Dejon"
  },
  {
   "id": 239,
   "off": "2BF35",
   "ja": "キル　　",
-  "en": ""
+  "en": "Kill"
  },
  {
   "id": 240,
   "off": "2BF3A",
   "ja": "せんし　　　　",
-  "en": ""
+  "en": "Warrior"
  },
  {
   "id": 241,
   "off": "2BF42",
   "ja": "シーフ　　　　",
-  "en": ""
+  "en": "Thief"
  },
  {
   "id": 242,
   "off": "2BF4A",
   "ja": "モンク　　　　",
-  "en": ""
+  "en": "Monk"
  },
  {
   "id": 243,
   "off": "2BF52",
   "ja": "あかまじゅつし",
-  "en": ""
+  "en": "Red Magician"
  },
  {
   "id": 244,
   "off": "2BF5A",
   "ja": "しろまじゅつし",
-  "en": ""
+  "en": "White Magician"
  },
  {
   "id": 245,
   "off": "2BF62",
   "ja": "くろまじゅつし",
-  "en": ""
+  "en": "Black Magician"
  },
  {
   "id": 246,
   "off": "2BF6A",
   "ja": "ナイト　　　　",
-  "en": ""
+  "en": "Knight"
  },
  {
   "id": 247,
   "off": "2BF72",
   "ja": "ニンジャ　　　",
-  "en": ""
+  "en": "Ninja"
  },
  {
   "id": 248,
   "off": "2BF7A",
   "ja": "スーパーモンク",
-  "en": ""
+  "en": "Super Monk"
  },
  {
   "id": 249,
   "off": "2BF82",
   "ja": "あかまどうし　",
-  "en": ""
+  "en": "Red Wizard"
  },
  {
   "id": 250,
   "off": "2BF8A",
   "ja": "しろまどうし　",
-  "en": ""
+  "en": "White Wizard"
  },
  {
   "id": 251,
   "off": "2BF92",
   "ja": "くろまどうし　",
-  "en": ""
+  "en": "Black Wizard"
  },
  {
   "id": 252,
   "off": "2BF9A",
   "ja": "HP　",
-  "en": ""
+  "en": "HP"
  },
  {
   "id": 253,
@@ -1527,12 +1527,12 @@
   "id": 254,
   "off": "2BFA2",
   "ja": "いし　",
-  "en": ""
+  "en": "Stone"
  },
  {
   "id": 255,
   "off": "2BFA6",
   "ja": "どく　",
-  "en": ""
+  "en": "Poison"
  }
 ]
