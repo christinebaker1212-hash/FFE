@@ -3,228 +3,228 @@
   "id": 0,
   "off": "3804C",
   "ja": "　ぶきや　　",
-  "en": ""
+  "en": " Weapon Shop"
  },
  {
   "id": 1,
   "off": "38053",
   "ja": "　ぼうぐや　",
-  "en": ""
+  "en": " Armor Shop"
  },
  {
   "id": 2,
   "off": "3805A",
   "ja": "しろまほうや",
-  "en": ""
+  "en": "White Magic Shop"
  },
  {
   "id": 3,
   "off": "38061",
   "ja": "くろまほうや",
-  "en": ""
+  "en": "Black Magic Shop"
  },
  {
   "id": 4,
   "off": "38068",
   "ja": "きょうかい　",
-  "en": ""
+  "en": "Church"
  },
  {
   "id": 5,
   "off": "3806F",
   "ja": "　やどや　　",
-  "en": ""
+  "en": " Inn"
  },
  {
   "id": 6,
   "off": "38076",
   "ja": "　どうぐや　",
-  "en": ""
+  "en": " Item Shop"
  },
  {
   "id": 7,
   "off": "3807D",
   "ja": "キャラバン　",
-  "en": ""
+  "en": "Caravan"
  },
  {
   "id": 8,
   "off": "38084",
   "ja": "ギル",
-  "en": ""
+  "en": "Gil"
  },
  {
   "id": 9,
   "off": "38087",
   "ja": "へいっ\nいらっしゃい!",
-  "en": ""
+  "en": "Hey there!\nWelcome!"
  },
  {
   "id": 10,
   "off": "38093",
   "ja": "かっていく\nうりつける\nみせをでる",
-  "en": ""
+  "en": "Buy\nSell\nLeave"
  },
  {
   "id": 11,
   "off": "380A5",
   "ja": "かっていく\nみせをでる",
-  "en": ""
+  "en": "Buy\nLeave"
  },
  {
   "id": 12,
   "off": "380B1",
   "ja": "おもたそーう\nあんた\nそれいじょう\nもてないぜっ!",
-  "en": ""
+  "en": "Looks heeeavy!\nYou can't\ncarry any\nmore, pal!"
  },
  {
   "id": 13,
   "off": "380CB",
   "ja": "えーっと\nなにに\nするんだいっ?",
-  "en": ""
+  "en": "Uh, let's see,\nwhat'll it\nbe, then?"
  },
  {
   "id": 14,
   "off": "380DC",
   "ja": "\nギル　だよ\nいいかな?\nどうかな?",
-  "en": ""
+  "en": "\nGil, see.\nAll right?\nHow about it?"
  },
  {
   "id": 15,
   "off": "380EF",
   "ja": "はい\nいいえ",
-  "en": ""
+  "en": "Yes\nNo"
  },
  {
   "id": 16,
   "off": "380F6",
   "ja": "おかねが\nたりない\nようですね",
-  "en": ""
+  "en": "Looks like\nyou don't have\nenough money"
  },
  {
   "id": 17,
   "off": "38106",
   "ja": "だれが\nもつんだいっ?\nだれだいっ?\nだれだいっ?\nだれだいっ?",
-  "en": ""
+  "en": "Who's gonna\ncarry it?\nWho is it?\nWho is it?\nWho is it?"
  },
  {
   "id": 18,
   "off": "38127",
   "ja": "{10}",
-  "en": ""
+  "en": "{10}"
  },
  {
   "id": 19,
   "off": "38133",
   "ja": "まいどありーっ\nほかにも\nなにか\nどうかな?!",
-  "en": ""
+  "en": "Thank ya kindly!\nAnything\nelse I can\ndo for ya?!"
  },
  {
   "id": 20,
   "off": "3814B",
   "ja": "だれのものを\nうって\nくれるん\nだいっ?",
-  "en": ""
+  "en": "Whose stuff\nare ya gonna\nsell me,\nthen?"
  },
  {
   "id": 21,
   "off": "38160",
   "ja": "どれだいっ\nどれだいっ\nどれだいっ?",
-  "en": ""
+  "en": "Which one?\nWhich one?\nWhich one?"
  },
  {
   "id": 22,
   "off": "38173",
   "ja": "まいどありーっ",
-  "en": ""
+  "en": "Thank ya kindly!"
  },
  {
   "id": 23,
   "off": "3817B",
   "ja": "だれが\nまほうを\nおぼえて\nいくのかね?",
-  "en": ""
+  "en": "Who will\nbe learning\nthe magic,\nthen?"
  },
  {
   "id": 24,
   "off": "38190",
   "ja": "どのまほうを\nおぼえて\nいくのかね?",
-  "en": ""
+  "en": "Which magic\nwill you\nbe learning?"
  },
  {
   "id": 25,
   "off": "381A3",
   "ja": "ざんねん‥‥\nそのまほうは\nおぼえられ\nないようだ\nほかにだれか?",
-  "en": ""
+  "en": "Too bad...\nIt seems that\nmagic can't\nbe learned\nAnyone else?"
  },
  {
   "id": 26,
   "off": "381C5",
   "ja": "あんた\nそのまほうは\nもうつかえるよ\nほかには?\nだれか?",
-  "en": ""
+  "en": "You can\nalready use\nthat magic!\nAnything else?\nAnyone?"
  },
  {
   "id": 27,
   "off": "381E3",
   "ja": "いらっしゃい!\nここにとまると\nセーブしまーす\nいいかしら?",
-  "en": ""
+  "en": "Welcome!\nStay here and\nI'll saaave!\nIs that all right?"
  },
  {
   "id": 28,
   "off": "38202",
   "ja": "おやすみー!\n‥‥‥‥‥\n‥‥‥‥‥\n‥‥‥‥!",
-  "en": ""
+  "en": "Good niiight!\n..........\n..........\n........!"
  },
  {
   "id": 29,
   "off": "3821B",
   "ja": "また　きて\nくださいね!",
-  "en": ""
+  "en": "Please come\nagain!"
  },
  {
   "id": 30,
   "off": "38228",
   "ja": "なにも\nもってない\nじゃないか!\nほかに\nなにか??",
-  "en": ""
+  "en": "You don't\nhave anything,\ndo you!\nAnything\nelse??"
  },
  {
   "id": 31,
   "off": "38243",
   "ja": "くじけずに\nがんばるの\nじゃぞ‥‥",
-  "en": ""
+  "en": "Don't lose\nheart, now,\nkeep at it..."
  },
  {
   "id": 32,
   "off": "38255",
   "ja": "だれを\nいきかえらせる\nのかね?",
-  "en": ""
+  "en": "Whom shall\nI bring back\nto life?"
  },
  {
   "id": 33,
   "off": "38266",
   "ja": "たましいよ\nよみがえれーっ",
-  "en": ""
+  "en": "O soul,\nreturn to liiife!"
  },
  {
   "id": 34,
   "off": "38274",
   "ja": "もう\nそのレベルは\nおぼえられ\nないようだ\nだれかほかに?",
-  "en": ""
+  "en": "It seems that\nlevel can no\nlonger be\nlearned\nAnyone else?"
  },
  {
   "id": 35,
   "off": "38292",
   "ja": "だれもたすけは\nいらない\nようです‥‥\nくじけずに\nがんばりなさい",
-  "en": ""
+  "en": "It seems no one\nneeds\nhelp...\nDon't lose heart,\nkeep at it"
  },
  {
   "id": 36,
   "off": "382B4",
   "ja": "おぼえてく\nみせをでる",
-  "en": ""
+  "en": "Learn\nLeave"
  },
  {
   "id": 37,
   "off": "382C0",
   "ja": "それは\nざんねん‥‥\nほかには??\nなにか??",
-  "en": ""
+  "en": "That's\ntoo bad...\nAnything else??\nAnything??"
  }
 ]
