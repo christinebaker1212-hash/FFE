@@ -9,7 +9,7 @@
   "id": 1,
   "off": "37189",
   "ja": "4にんは　いずみのみずを　のんだ‥‥",
-  "en": ""
+  "en": "The four drank the water of the spring..."
  },
  {
   "id": 2,
@@ -27,25 +27,25 @@
   "id": 4,
   "off": "3719E",
   "ja": "ときのはぐるまさえ　あれば‥‥",
-  "en": ""
+  "en": "If only I had the Gear of Time..."
  },
  {
   "id": 5,
   "off": "371AE",
   "ja": "『チョコボくさいぞ‥‥",
-  "en": ""
+  "en": "\"Smells like chocobo...\""
  },
  {
   "id": 6,
   "off": "371BA",
   "ja": "なにか　アイテムをつかうときは　ビーじゃ。\nためしに　わしに　ポーションをつかってみなさい!",
-  "en": ""
+  "en": "When you want to use an item, it's B.\nTry using a Potion on me!"
  },
  {
   "id": 7,
   "off": "371E9",
   "ja": "おやおや　わるガキ　4にんしゅうが\nそろって　どこへおでかけだい?\nなんだって　いまからせかいをすくいにいくだって?\nあたまでも　うったんじゃないのかい?!",
-  "en": ""
+  "en": "My, my, the four little brats all\ntogether, where are you off to?\nWhat's that? You're going off now to save the world?\nDid you hit your heads or something?!"
  },
  {
   "id": 8,
@@ -57,115 +57,115 @@
   "id": 9,
   "off": "37239",
   "ja": "おくで　ちょうろうが　まっています。\nれいかんのつよい　ダーンが　あなたたちに\nおこったことを　かんじとったのです。",
-  "en": ""
+  "en": "The elder is waiting in the back.\nDahn, whose spiritual sense is strong,\nsensed what happened to you."
  },
  {
   "id": 10,
   "off": "37274",
   "ja": "おやまあ　よくここまでこれたもんだ!\nいどのなかに　ポーションがあるよ!!",
-  "en": ""
+  "en": "My, my, how did you manage to get here!\nThere's a Potion in the well!!"
  },
  {
   "id": 11,
   "off": "3729A",
   "ja": "ケアルをもっていくといい。\nこのさきの　そうこに　あるはずじゃ。\nとちゅうのみちには　モンスターがでる。\nきをつけてな!",
-  "en": ""
+  "en": "You'd best take Cure with you.\nIt should be in the storehouse up ahead.\nMonsters appear on the way there.\nTake care!"
  },
  {
   "id": 12,
   "off": "372D7",
   "ja": "はなつみよ!",
-  "en": ""
+  "en": "I'm picking flowers!"
  },
  {
   "id": 13,
   "off": "372DE",
   "ja": "いちばんみぎの　ろうそくが　かくしとびらの\nスイッチになっておる。\nかえりは　かならず　うえのほうに　スイッチが\nあるぞい!",
-  "en": ""
+  "en": "The candle furthest to the right is the switch\nfor the hidden door.\nOn the way back, there's always a switch\nup above, mind!"
  },
  {
   "id": 14,
   "off": "3731D",
   "ja": "クリスタルの　ひかりを　うけたものは\nしんでんの　せいすいで　いきかえったり\nたいりょくを　かいふくしたり　できるそうだ。",
-  "en": ""
+  "en": "They say those who have received the light of the\nCrystal can be revived or have their strength\nrestored by the holy water of the temple."
  },
  {
   "id": 15,
   "off": "3735B",
   "ja": "みなみに　ちょっといくと　カズスのまちだ。\nでも　あの　だいじしんいらい　かいぶつが\nでるようになって　だれも　このむらのそとには\nでたりしないよ。",
-  "en": ""
+  "en": "Go a little to the south and there's the town of Kazus.\nBut ever since that great earthquake, monsters\nhave started appearing, so nobody goes outside\nthis village."
  },
  {
   "id": 16,
   "off": "373A6",
   "ja": "パルメニさんみゃくに　かこまれた　このあたり\nいったいを　おさめているのは\nにしのしろの　サスーンおうです。",
-  "en": ""
+  "en": "The one who rules this whole area,\nsurrounded by the Palmeni Mountains,\nis King Sasune of the castle to the west."
  },
  {
   "id": 17,
   "off": "373DD",
   "ja": "あの　だいじしんで　クリスタルのさいだんが\nちちゅうふかく　しずんでしまった。\nあー　もう　このよは　おしまいだ‥‥",
-  "en": ""
+  "en": "That great earthquake sank the Crystal's altar\ndeep into the earth.\nAhh, this world is finished..."
  },
  {
   "id": 18,
   "off": "37418",
   "ja": "ダーン「わたしのつよい　れいかんが　おまえたちに\n{14:04}なにがおこったのかを　さっちしたのだ。\n{14:04}さあ　ちょうろうのことばを　ききなさい。",
-  "en": ""
+  "en": "Dahn: \"My strong spiritual sense perceived\n{14:04}what happened to you.\n{14:04}Now, listen to the elder's words.\""
  },
  {
   "id": 19,
   "off": "3745E",
   "ja": "4にんの　ははおやがわりだった　ニーナ‥‥\n「とてもしんぱい‥‥\n　きをつけていくのですよ。",
-  "en": ""
+  "en": "Nina, who was like a mother to the four...\n\"I'm so worried...\n Take care as you go.\""
  },
  {
   "id": 20,
   "off": "3748D",
   "ja": "ちょうろうのひとりホマクだ。\n「クリスタルから　うけとった　しょうごうを\n　つかいこなすには　こころのちからがいる。\n　こころの　キャパシティーが　ひつようじゃ!",
-  "en": ""
+  "en": "It is Homac, one of the elders.\n\"To make full use of the titles received from\n the Crystal, you need the strength of the heart.\n You need the Capacity of the heart!\""
  },
  {
   "id": 21,
   "off": "374DF",
   "ja": "みなしごの4にんを　そだててくれた\nちょうろうトパパだ。\n『じっちゃん!　おれたち‥‥\n",
-  "en": ""
+  "en": "It is Elder Topapa, who raised\nthe four orphans.\n\"Gramps! We...\"\n"
  },
  {
   "id": 22,
   "off": "3750C",
   "ja": "「わかっておる。　まさか　おまえたちが\n　えらばれるとは　かんがえもしなかった。\n　{10:02}　{11:02}\n　{12:02}　{13:02}‥‥\n　これは　ぐうぜんの　せんたくではないことを\n　まず　しらなければならない。\n　クリスタルは　そのいしで　おまえたちを\n　えらんだのだ。\n　さあ　そのちからを‥‥　おまえたちの\n　ひかりのこころを　むだにしてはならない。\n　たびだつのじゃ!\n　そして　やみのちからを　ふうじるのだ。",
-  "en": ""
+  "en": "\"I know. I never imagined that you\n would be the ones chosen.\n {10:02} {11:02}\n {12:02} {13:02}...\n First you must know that this\n was no chance choice.\n The Crystal chose you\n by its own will.\n Now, that power... you must not waste\n your hearts of light.\n Set out on your journey!\n And seal away the power of darkness.\""
  },
  {
   "id": 23,
   "off": "375D3",
   "ja": "トパパ「さあ　たびだつのじゃ!",
-  "en": ""
+  "en": "Topapa: \"Now, set out on your journey!\""
  },
  {
   "id": 24,
   "off": "375E3",
   "ja": "あんたたち　たびにでるのかい?\nかねはいらないよ。\nゆっくり　やすんでおいき。",
-  "en": ""
+  "en": "You kids are setting out on a journey?\nI don't need any money.\nGet a good rest before you go."
  },
  {
   "id": 25,
   "off": "3760B",
   "ja": "いかがなもんでしょ。",
-  "en": ""
+  "en": "How about it?"
  },
  {
   "id": 26,
   "off": "37616",
   "ja": "わしが　おまえたちの　ちからを　あててみせよう!\nんー\n‥‥\n‥‥\n{10:01}\n{11:01}\n{12:01}\n{13:01}じゃな。　あたっているじゃろう!",
-  "en": ""
+  "en": "I shall tell you what your powers are!\nHmm...\n...\n...\n{10:01},\n{11:01},\n{12:01},\n{13:01}, is it. I'm right, aren't I!"
  },
  {
   "id": 27,
   "off": "37654",
   "ja": "ぐうぐう",
-  "en": ""
+  "en": "Zzz zzz"
  },
  {
   "id": 28,
@@ -177,13 +177,13 @@
   "id": 29,
   "off": "3765A",
   "ja": "サラひめ　ごぶじでしたか!",
-  "en": ""
+  "en": "Princess Sara, you are safe!"
  },
  {
   "id": 30,
   "off": "37668",
   "ja": "たびにでるなら　どくけしや　めぐすりは\nぜったいに　ひつようですよ。",
-  "en": ""
+  "en": "If you're setting out on a journey, Antidotes and\nEye Drops are absolutely necessary."
  },
  {
   "id": 31,
@@ -195,403 +195,403 @@
   "id": 32,
   "off": "3768C",
   "ja": "たにが　いわでふさがれちまって　カナーンに\nかえれなくなっちまった。\nさけでも　のむしか　ないよ‥‥　ヒック!",
-  "en": ""
+  "en": "The valley's blocked by a rock, so I can't\nget back to Canaan.\nNothing to do but drink... Hic!"
  },
  {
   "id": 33,
   "off": "376C4",
   "ja": "ねえ　おねがい　ピアノひいてよ!",
-  "en": ""
+  "en": "Hey, please, play the piano!"
  },
  {
   "id": 34,
   "off": "376D5",
   "ja": "ギャ!!",
-  "en": ""
+  "en": "Gyah!!"
  },
  {
   "id": 35,
   "off": "376DA",
   "ja": "すまん。　てっきりあんたたちも　ゆうれいかと\nおもって‥‥。　わたしは　にしから　たびしてきた\nものだ。　このまちは　のろわれている。\nやどやに　ゆうれいが　でるんだ!",
-  "en": ""
+  "en": "Sorry. I was sure you folks were ghosts\ntoo... I'm a traveler from the\nwest. This town is cursed.\nGhosts appear at the inn!"
  },
  {
   "id": 36,
   "off": "3772F",
   "ja": "おう「おお　サラひめ!　ぶじだったか!\nサラ「まっていてね。　わたしのこのゆびわで\n　　　ジンを　ふういんします!\nおう「しんぱいじゃ‥‥\nサラ「だいじょうぶよ!\n　　　{0C}たちが　ついてるもの。　ねっ!\n",
-  "en": ""
+  "en": "King: \"Oh, Princess Sara! You're safe!\"\nSara: \"Wait for me. With this ring of mine,\n   I will seal the Djinn!\"\nKing: \"I am worried...\"\nSara: \"It's all right!\n   I have {0C} and the others with me. Right!\"\n"
  },
  {
   "id": 37,
   "off": "37796",
   "ja": "ひくうていがあれば　みずうみをこえて\nジンのいる　ふういんのどうくつまで　いける\nはずじゃ。　たのむ　ジンをたおしてくれ!",
-  "en": ""
+  "en": "With an airship you should be able to cross\nthe lake and reach the Sealed Cave where the\nDjinn is. Please, defeat the Djinn!"
  },
  {
   "id": 38,
   "off": "377D4",
   "ja": "ありがとう。　おまえさんたちのおかげで\nもとのすがたに　もどれたよ!",
-  "en": ""
+  "en": "Thank you. Thanks to you folks\nI've gone back to my original form!"
  },
  {
   "id": 39,
   "off": "377F7",
   "ja": "パルメニさんみゃくの　そととうちを　つなぐ\nネルブのたにが　じしんのあと\nおおきないわで　ふさがれてしまった。",
-  "en": ""
+  "en": "After the earthquake, the Valley of Nelb,\nwhich connects the inside and outside of the\nPalmeni Mountains, was blocked by a huge rock."
  },
  {
   "id": 40,
   "off": "3782F",
   "ja": "カズスは　ミスリルこうざんで　おおきくなった\nまちです。　ミスリルせいの　ぶきや　ぼうぐは\nみんな　ここで　つくられるの。",
-  "en": ""
+  "en": "Kazus is a town that grew big from the Mythril Mine.\nMythril weapons and armor\nare all made here."
  },
  {
   "id": 41,
   "off": "3786D",
   "ja": "このどうくつは　ミスリルのこうざんです。",
-  "en": ""
+  "en": "This cave is the Mythril Mine."
  },
  {
   "id": 42,
   "off": "37882",
   "ja": "タカじいさんは　このむら1ばんの　うでの\nかじやだ。\nこのいえに　ひとりで　すんでるよ。",
-  "en": ""
+  "en": "Old Man Taka is the most skilled\nblacksmith in this village.\nHe lives in this house alone."
  },
  {
   "id": 43,
   "off": "378AF",
   "ja": "ジンののろいで　こんなすがたにされてしまった‥‥",
-  "en": ""
+  "en": "The Djinn's curse turned me into this..."
  },
  {
   "id": 44,
   "off": "378C8",
   "ja": "ありがとう。\nおかげで　もとのすがたに　もどれました。",
-  "en": ""
+  "en": "Thank you.\nThanks to you, I have gone back to my original form."
  },
  {
   "id": 45,
   "off": "378E4",
   "ja": "だいじしんで　ふういんのどうくつに　ふうじこめ\nられていた　ジンがよみがえったのです。",
-  "en": ""
+  "en": "The great earthquake revived the Djinn,\nwho had been sealed inside the Sealed Cave."
  },
  {
   "id": 46,
   "off": "37910",
   "ja": "こら!　はいってきてはいかんよ。",
-  "en": ""
+  "en": "Hey! You mustn't come in here."
  },
  {
   "id": 47,
   "off": "37921",
   "ja": "むかし　サスーンじょうの　サラひめに\nミスリルのゆびわを　つくってさしあげたことが\nある。　あの　ゆびわさえあれば‥‥",
-  "en": ""
+  "en": "Long ago I made a mythril ring and\npresented it to Princess Sara of Sasune Castle.\nIf only we had that ring..."
  },
  {
   "id": 48,
   "off": "3795D",
   "ja": "このまちの　こうざんには　おくへとつづく\nひみつの　いりぐちがあるんだ。\nつきあたりの　ひだりから3つめの　かべを\nしらべてごらん。",
-  "en": ""
+  "en": "The mine in this town has a secret entrance\nleading further in.\nTry examining the third wall from the left\nat the dead end."
  },
  {
   "id": 49,
   "off": "379A0",
   "ja": "ジンを　ふたたび　ふうじこめるためには\nこのむらでしか　つくることのできない　ミスリルの\nゆびわが　ひつようです。　それを　おそれた\nジンは　このむらに　のろいをかけたのです。",
-  "en": ""
+  "en": "To seal the Djinn away again,\na mythril ring that can only be made\nin this village is needed. Fearing that,\nthe Djinn put a curse on this village."
  },
  {
   "id": 50,
   "off": "379F9",
   "ja": "わしはシド。　カナーンからきたんじゃ。\nネルブのたにが　おおいわでふさがれてしまい\nカナーンに　かえるにかえれなくなってしまった。\nそこでこのまちに　ひとばんの　やどを\nもとめたのじゃが　このざまじゃ。　フォフォフォ!\nどうだわかいの　わしの　ひくうていを　かして\nやるから　なんとかしてくれんかのう?\nにしのさばくにかくしてあるんじゃ。\nシドから　ひくうていを　かくしたばしょを\nきいた!\nにしの　さばくだ!!\n",
-  "en": ""
+  "en": "I'm Cid. I came from Canaan.\nThe Valley of Nelb got blocked by a huge rock,\nand now I can't get back to Canaan even if I want to.\nSo I came to this town looking for a night's\nlodging, and look at me now. Fo fo fo!\nHow about it, young ones? I'll lend you my airship,\nso won't you do something about this?\nI've hidden it in the desert to the west.\nHeard from Cid where the airship\nis hidden!\nThe desert to the west!!\n"
  },
  {
   "id": 51,
   "off": "37AC9",
   "ja": "もとの　びぼうを　とりもどしたい‥‥",
-  "en": ""
+  "en": "I want to get my former beauty back..."
  },
  {
   "id": 52,
   "off": "37ADC",
   "ja": "「おかげで　もとの　びぼうを　とりもどせたわ!\n　ホホホ!\n『?!",
-  "en": ""
+  "en": "\"Thanks to you, I got my former beauty back!\n Ho ho ho!\"\n\"?!\""
  },
  {
   "id": 53,
   "off": "37AFE",
   "ja": "シド「カナーンへいくために　ネルブのおおいわを\n　　　くだこうとおもうのだが‥‥\n　　　ひくうていにミスリルせいの　せんしゅを\n　　　つければなんとかなるかもしれん。\nタカ「よーしまっておれ!　いま　つくってやる!!\n",
-  "en": ""
+  "en": "Cid: \"To get to Canaan, I'm thinking of smashing\n   the huge rock of Nelb...\n   If we put a mythril prow on the airship,\n   we might be able to manage it.\"\nTaka: \"All right, wait there! I'll make it right now!!\"\n"
  },
  {
   "id": 54,
   "off": "37B6C",
   "ja": "そーれ　おわったぞい!\nなーに　れいはいらんよ。　むらを　すくって\nくれたんじゃからの。　あたりまえじゃ。\nそれでは　きをつけていきなされ!\nタカじいさんが　ひくうていに\nミスリルのせんしゅを　つけてくれた!\nシド「よーし　ひくうていで　おおいわに\n　　　たいあたりじゃ!!",
-  "en": ""
+  "en": "There, all done!\nNah, I don't need thanks. You saved the\nvillage. It's only natural.\nWell then, take care as you go!\nOld Man Taka put a mythril prow\non the airship!\nCid: \"All right, ram the huge rock\n   with the airship!!\""
  },
  {
   "id": 55,
   "off": "37BF6",
   "ja": "タカ「がんばっての!",
-  "en": ""
+  "en": "Taka: \"Do your best!\""
  },
  {
   "id": 56,
   "off": "37C01",
   "ja": "しろのひとは　みんなジンの　のろいによって\nゆうれいのようなすがたに　されてしまいました。\nわたしは　つかいで　でていたので\nたすかったのです‥‥\nミスリルのゆびわがあれば　ジンをふたたび　\nふういんできるのですが　ゆいいつ　ゆびわを\nつくれる　カズスのむらも　おなじような\nありさまで‥‥\nいったい　わたしはどうしたらいいのか‥‥\n",
-  "en": ""
+  "en": "Everyone in the castle was turned into ghost-like\nforms by the Djinn's curse.\nI was out on an errand,\nso I was spared...\nWith a mythril ring the Djinn could be sealed\nonce more, but the village of Kazus, the only\nplace that can make the ring, is in the same\nstate...\nWhat on earth should I do...\n"
  },
  {
   "id": 57,
   "off": "37CA9",
   "ja": "おかげで　ジンの　のろいはとけました!\nおうさまに　おあいください。\nちいさくおりたためる　まほうのカヌーを\nわたしたいと　おっしゃっています!",
-  "en": ""
+  "en": "Thanks to you, the Djinn's curse is broken!\nPlease see His Majesty.\nHe says he wishes to give you a magic canoe\nthat folds up small!"
  },
  {
   "id": 58,
   "off": "37CF2",
   "ja": "サスーンじょうの　ひだりのとうには\nワイトスレイヤーがある。　アンデッドに\nちからをはっきする　せいなる　つるぎだ。\nだが　あかまどうしにしか　つかうことはできない。",
-  "en": ""
+  "en": "In the left tower of Sasune Castle there is\nthe Wightslayer. It is a holy sword that shows\nits power against the undead.\nBut only Red Wizards can use it."
  },
  {
   "id": 59,
   "off": "37D46",
   "ja": "ふういんのどうくつにいる　モンスターは\nアンデッドばかりです。\nケアルを　かければ　たおすことができるかも\nしれない‥‥",
-  "en": ""
+  "en": "The monsters in the Sealed Cave are\nall undead.\nIf you cast Cure on them, you might be able\nto defeat them..."
  },
  {
   "id": 60,
   "off": "37D83",
   "ja": "このしろには　たからべやへの　ぬけみちが\nあります。",
-  "en": ""
+  "en": "This castle has a secret path to the\ntreasure room."
  },
  {
   "id": 61,
   "off": "37D9E",
   "ja": "ジンの　のろいで　こんなすがたにされてしまった。\nああ　どうしたらいいのか‥‥",
-  "en": ""
+  "en": "The Djinn's curse turned me into this.\nAhh, what should I do..."
  },
  {
   "id": 62,
   "off": "37DC6",
   "ja": "せんしたちよ　ありがとう!",
-  "en": ""
+  "en": "Thank you, warriors!"
  },
  {
   "id": 63,
   "off": "37DD4",
   "ja": "「わたしはサスーンのおう。　ジンの　のろいに\n　よって　みな　ゆうれいのようなすがたに\n　かえられてしまった。　ジンを　たおさぬかぎり\n　もとの　すがたには　もどれぬ。\n『ジンはどこに?\n「しろのきたにある　ふういんのどうくつにいる。\n　だが　ミスリルのゆびわが　なければ\n　ジンを　ふたたび　ふういんすることはできぬ。\n『サラひめが　もっていると‥‥\n「おお　そうだ!　むかし　カズスより　サラひめに\n　ミスリルのゆびわが　おくられた。　だが\n　かんじんの　サラが　どこにもみあたらん。\n　もしや　ジンにさらわれたのでは?!\n　おお　サラひめ‥‥\n『ふういんのどうくつに　いってみましょう。\n「おお　せんしたちよ　よくぞいってくれた。\n　たしか　ふういんのどうくつには　1かしょ\n　かくしとびらが　ある。　がいこつが　かぎに\n　なっていたはずだ‥‥\n\n　たのむ!\n　ジンをたおし　ひとびとをすくってくれ!!\n",
-  "en": ""
+  "en": "\"I am the King of Sasune. By the Djinn's curse\n everyone has been changed into\n ghost-like forms. Unless the Djinn is defeated,\n we cannot go back to our original forms.\"\n\"Where is the Djinn?\"\n\"In the Sealed Cave north of the castle.\n But without a mythril ring,\n the Djinn cannot be sealed away again.\"\n\"We heard Princess Sara has it...\"\n\"Oh, that's right! Long ago, a mythril ring was\n sent from Kazus to Princess Sara. But\n Sara herself is nowhere to be seen.\n Could the Djinn have carried her off?!\n Oh, Princess Sara...\"\n\"Let's try going to the Sealed Cave.\"\n\"Oh, warriors, well spoken.\n If I recall, in the Sealed Cave there is one\n hidden door. A skeleton should serve\n as the key...\n\n I beg you!\n Defeat the Djinn and save the people!!\"\n"
  },
  {
   "id": 64,
   "off": "37F6A",
   "ja": "ありがとう　せんしたちよ。\nふたたび　ジンをふういんし\nサラひめを　たすけだしてくれたこと\nれいをいう。\nこれを　もっていくといい。\nなにかのやくにたつかもしれん。\n\nおうさまから　カヌーをもらった!",
-  "en": ""
+  "en": "Thank you, warriors.\nFor sealing away the Djinn once more and\nrescuing Princess Sara,\nI thank you.\nYou'd best take this with you.\nIt may be of some use.\n\nReceived the canoe from the king!"
  },
  {
   "id": 65,
   "off": "37FCF",
   "ja": "サラ「わたしは　おとうさまの　そばについて\n{14:03}いなくてはなりません。\n{14:03}ほんとうは　あなたについていきたい‥‥\n{14:03}でも　あしでまといになってしまいますね‥‥\n『サラひめ‥‥\n「たびが　おわったら　かならず　かえってきて\n　くださいね。\n　わたし　まっています。",
-  "en": ""
+  "en": "Sara: \"I must stay at my father's\n{14:03}side.\n{14:03}The truth is, I want to go with you...\n{14:03}But I would only be a burden...\"\n\"Princess Sara...\"\n\"When your journey is over, be sure to come back,\n please.\n I will be waiting.\""
  },
  {
   "id": 66,
   "off": "38055",
   "ja": "サラひめは　まいにち　あなたがたのことばかり　\nいっておられますじゃ　はい。",
-  "en": ""
+  "en": "Princess Sara speaks of nothing but you\nevery day, yes indeed."
  },
  {
   "id": 67,
   "off": "3807C",
   "ja": "サラひめが　あなたがたに　あいたがっていました!\nみぎのとうの　いちばんうえが　ひめのへやです。",
-  "en": ""
+  "en": "Princess Sara wanted to see you!\nThe top of the right tower is the princess's room."
  },
  {
   "id": 68,
   "off": "380AD",
   "ja": "せんしたちよ　ありがとう。\nあなたたちは　しんの　ゆうしゃだ!",
-  "en": ""
+  "en": "Warriors, thank you.\nYou are true heroes!"
  },
  {
   "id": 69,
   "off": "380CD",
   "ja": "「わたしはサラ‥‥　サスーンおうのむすめです。\n『サラひめ。　どうしてこんなところに?\n「わたしは　ミスリルのゆびわを　つけていたので\n　ジンの　のろいに　かからなかったのです。\n　しろの　みんなを　たすけたくて　ここまで\n　きたのだけれど　まものがいて　さきには\n　すすめません‥‥\n\n『ここは　きけんだ。\n　サラひめは　しろでまっていてください。\n「いいえ!いきます。\n　ひとりでもいくわ!!",
-  "en": ""
+  "en": "\"I am Sara... daughter of the King of Sasune.\"\n\"Princess Sara. Why are you in a place like this?\"\n\"Because I was wearing the mythril ring,\n the Djinn's curse didn't affect me.\n I wanted to save everyone in the castle,\n so I came this far, but there are monsters\n and I can't go any further...\n\n\"It's dangerous here.\n Princess Sara, please wait at the castle.\"\n\"No! I'm going.\n I'll go even if I'm alone!!\""
  },
  {
   "id": 70,
   "off": "38194",
   "ja": "『こまった　おひめさまだ‥‥\n「おねがい　いっしょにつれていって!\n　この　ミスリルのゆびわがなければ　ジンを\n　ふういんすることはできません!\n『しかたがないな‥‥\nサラひめが　パーティーにくわわった!\n",
-  "en": ""
+  "en": "\"What a troublesome princess...\"\n\"Please, take me with you!\n Without this mythril ring, the Djinn\n cannot be sealed away!\"\n\"Can't be helped...\"\nPrincess Sara joined the party!\n"
  },
  {
   "id": 71,
   "off": "381FC",
   "ja": "シド「わしがいないまに　ばあさんが　からだを\n{14:03}わるくしてな‥‥　ばあさん　しっかりせえ!\n{14:03}まほうのくすり　エリクサーさえあれば‥‥",
-  "en": ""
+  "en": "Cid: \"While I was away, my old woman\n{14:03}took ill... Old woman, hang in there!\n{14:03}If only I had the magic medicine, Elixir...\""
  },
  {
   "id": 72,
   "off": "38242",
   "ja": "ありがとう!\nおまえさんたちには　2どもたすけられた。\n‥‥\nおお　そうだ!\nそこの　かべのロウソクを　おしてごらん。　むかし\nひくうていの　そうこにしていた　どうくつに\nいける。　もしかしたら　なにか　やくにたつものが\nあるかもしれん。",
-  "en": ""
+  "en": "Thank you!\nYou've saved me twice now.\n...\nOh, that's right!\nTry pushing the candle on that wall there. You can get\nto the cave I used as the airship's storehouse\nlong ago. Maybe there's something useful\nthere."
  },
  {
   "id": 73,
   "off": "382BA",
   "ja": "クリスタルは　しずかに　ひかりをはなっている\n「ひかりのせんしたちよ\n　ひかりとやみを　わかつものたちよ\n　このせかいに　ふたたび　きぼうを‥‥",
-  "en": ""
+  "en": "The Crystal is quietly giving off light.\n\"Warriors of Light,\n you who divide light from darkness,\n bring hope to this world once more...\""
  },
  {
   "id": 74,
   "off": "38303",
   "ja": "ゲホッゲホッ!",
-  "en": ""
+  "en": "Cough cough!"
  },
  {
   "id": 75,
   "off": "3830B",
   "ja": "チョコボで　たいりくを　1しゅうしてきたら\nいいもの　あげるよ!",
-  "en": ""
+  "en": "If you go once around the continent on a chocobo,\nI'll give you something good!"
  },
  {
   "id": 76,
   "off": "3832C",
   "ja": "じいさんも　あたしも　あんたたちには　ずいぶん\nせわになったねえ。　ほんとにありがとう。",
-  "en": ""
+  "en": "My old man and I have both been\ngreatly in your debt. Thank you, truly."
  },
  {
   "id": 77,
   "off": "38359",
   "ja": "『ここに　ドワーフのつのを　おけばいいのかな?\n\nドワーフ「はい　おねがいします!",
-  "en": ""
+  "en": "\"I wonder if we should put the Dwarf's Horn here?\"\n\nDwarf: \"Yes, please!\""
  },
  {
   "id": 78,
   "off": "38383",
   "ja": "むかし　たびをしていた　まどうしが\nこのまちの　どこかに　まほうのやくそうを\nかくしたらしい‥‥",
-  "en": ""
+  "en": "It seems a wizard who traveled long ago\nhid a magic herb somewhere\nin this town..."
  },
  {
   "id": 79,
   "off": "383B4",
   "ja": "みなみの　もりのなかに　こびとのまちが\nあるという。",
-  "en": ""
+  "en": "They say there's a town of little people\nin the forest to the south."
  },
  {
   "id": 80,
   "off": "383CF",
   "ja": "ミニマムのまほうを　つかえば　じゆうに　こびとに\nなれるんじゃが‥‥\nデッシュとかいう　たびのわかいもんに　さいごの\n1つをうっちまったよ。",
-  "en": ""
+  "en": "If you use the Minimum magic, you can become tiny\nwhenever you like...\nBut I sold my last one to some young traveler\ncalled Desch."
  },
  {
   "id": 81,
   "off": "38416",
   "ja": "デッシュとかいったかね‥‥\nあのろくでなしに　むすめの　サリーナは\nぞっこんなんだよ。\nまいったね‥‥\nあのおとこ　どうしても　さがさなければならない\nものが　あるといって　たびにでちまった。\nおかげで　むすめは　ないてばかりさ。\n",
-  "en": ""
+  "en": "Desch, I think he called himself...\nMy daughter Salina is crazy about\nthat good-for-nothing.\nWhat a pain...\nThat man said there was something he just had\nto search for, and went off on a journey.\nThanks to him, my daughter does nothing but cry.\n"
  },
  {
   "id": 82,
   "off": "3848B",
   "ja": "サリーナ「ああ‥‥デッシュさま。\n{14:05}こんなに　おしたいしておりますのに‥‥\n{14:05}シクシク‥‥\n\n{14:05}りゅうが　すむという　みなみのやまに\n{14:05}いってしまわれました‥‥\n",
-  "en": ""
+  "en": "Salina: \"Ahh... Master Desch.\n{14:05}When I adore you so much...\n{14:05}Sob, sob...\n\n{14:05}He went off to the southern mountain,\n{14:05}where they say a dragon lives...\"\n"
  },
  {
   "id": 83,
   "off": "384E1",
   "ja": "エアロという　しろまほうは　かぜをあやつり\nあいてをきずつけるのじゃ。\nそらをとぶ　かいぶつに　よくきくぞえ!",
-  "en": ""
+  "en": "The white magic called Aero controls the wind\nand harms the foe.\nIt works well on monsters that fly in the sky!"
  },
  {
   "id": 84,
   "off": "38519",
   "ja": "デッシュという　たびのおとこが　フラっと\nこのまちにやってきたの。\nでも　すぐにまた　どこかに　いってしまったわ。",
-  "en": ""
+  "en": "A traveler named Desch drifted into\nthis town.\nBut he went off somewhere again right away."
  },
  {
   "id": 85,
   "off": "38553",
   "ja": "なんだ?",
-  "en": ""
+  "en": "What?"
  },
  {
   "id": 86,
   "off": "38558",
   "ja": "ホンギャー!",
-  "en": ""
+  "en": "Waaah!"
  },
  {
   "id": 87,
   "off": "3855F",
   "ja": "ゴソゴソ‥‥",
-  "en": ""
+  "en": "Rustle rustle..."
  },
  {
   "id": 88,
   "off": "38566",
   "ja": "「おやまあ　こんなところで　ひとにあうなんて!\n　おまえさんたちも　あの　ドラゴンに\n　つかまったのかい?　ドジだねー!!\n『そういう　あんただって‥‥\n「えっ?\n　そうか　そうか　ハッハッハ!\n　おれは　デッシュ。\n『おれは　{0C}\nデッシュ「じつは　おれ　きおくそうしつでね。\n　　なまえいがいのことは　おもいだせないんだ。\n　　だけど　なにかをしなくちゃいけないんだ‥‥\n　　それがなんだか　わからない‥‥",
-  "en": ""
+  "en": "\"Well I'll be, meeting people in a place like this!\n You folks got caught by that dragon\n too? Clumsy, huh!!\"\n\"Look who's talking...\"\n\"Huh?\n Oh, right, right, ha ha ha!\n I'm Desch.\"\n\"I'm {0C}.\"\nDesch: \"Truth is, I've lost my memory.\n  I can't remember anything but my name.\n  But there's something I've got to do...\n  I just don't know what it is...\""
  },
  {
   "id": 89,
   "off": "38633",
   "ja": "デッシュ「ゲゲッ!!\n{14:05}ドラゴンの　おかえりだー!\n{14:05}かくれろ!!",
-  "en": ""
+  "en": "Desch: \"Yikes!!\n{14:05}The dragon's back!\n{14:05}Hide!!\""
  },
  {
   "id": 90,
   "off": "38657",
   "ja": "そらから　ドラゴンが　おそいかかってきた!\n\nデッシュ「まともに　たたかっても　かちめはねえ!\n{14:05}ぜったい　にげるんだ!\n{14:05}にげるんだ!　にげるんだ!!\n",
-  "en": ""
+  "en": "The dragon swooped down from the sky!\n\nDesch: \"Fighting it straight up, we don't stand a chance!\n{14:05}We've gotta run, no matter what!\n{14:05}Run! Run!!\"\n"
  },
  {
   "id": 91,
   "off": "386A7",
   "ja": "「おや!?\n　あんた　デッシュじゃ!!\n\nデッシュ「いや　ひとちがいですよ‥‥",
-  "en": ""
+  "en": "\"Oh!?\n You're Desch!!\"\n\nDesch: \"No, you've got the wrong guy...\""
  },
  {
   "id": 92,
   "off": "386CF",
   "ja": "サリーナ「デッシュさま!!!\nデッシュ「すまない。　どうしても　やらなければ\n{14:05}ならないことが　あるんだ。\nサリーナ「わたし　ずーっと　まってます‥‥",
-  "en": ""
+  "en": "Salina: \"Master Desch!!!\"\nDesch: \"Sorry. There's something I've just\n{14:05}got to do.\"\nSalina: \"I'll wait for you forever and ever...\""
  },
  {
   "id": 93,
   "off": "3871C",
   "ja": "みかけねー　かおだなあ。",
-  "en": ""
+  "en": "Haven't seen your faces around here."
  },
  {
   "id": 94,
   "off": "38729",
   "ja": "ミラノスさんみゃくを　つらぬく　どうくつが\nあるんだ。　それをとおれば　バイキングのすむ\nミラルカだにへ　でることができるぜ。",
-  "en": ""
+  "en": "There's a cave that cuts through the Miranos\nMountains. Go through it and you can come out\nin Miralka Valley, where the Vikings live."
  },
  {
   "id": 95,
   "off": "38769",
   "ja": "ありがとう　せんしたちよ。\nしばらくゆっくりしていくといい。\nサラも　あいたがっていたぞ。",
-  "en": ""
+  "en": "Thank you, warriors.\nStay and take it easy for a while.\nSara wanted to see you too."
  },
  {
   "id": 96,
   "off": "38797",
   "ja": "おいらは　こびとぞく。\nきらくな　しょうぶん!",
-  "en": ""
+  "en": "I'm of the little people.\nHappy-go-lucky by nature!"
  },
  {
   "id": 97,
   "off": "387AF",
   "ja": "どこかに　いきているもりが　あるんだって。\nそこの　ようせいは　かわいいらしいよ!?",
-  "en": ""
+  "en": "They say there's a living forest somewhere.\nThe fairies there are supposed to be cute!?"
  },
  {
   "id": 98,
   "off": "387DA",
   "ja": "おいしゃさんの　シェルコせんせいが\nたいへんだー!　おなかが　いたいって!!\nでも　だれもたすけられないんだ。　このむらの\nたったひとりの　おいしゃさんだから‥‥",
-  "en": ""
+  "en": "Doctor Shelco, the doctor, is in big\ntrouble! He says his stomach hurts!!\nBut nobody can help him. He's the only\ndoctor in this village..."
  },
  {
   "id": 99,
@@ -603,19 +603,19 @@
   "id": 100,
   "off": "3882D",
   "ja": "へんなにおい‥‥　クンクン!",
-  "en": ""
+  "en": "Smells funny... Sniff sniff!"
  },
  {
   "id": 101,
   "off": "3883C",
   "ja": "ウーン　ウーン‥‥\nどく‥‥けし‥‥\nたのむ‥‥",
-  "en": ""
+  "en": "Ugh... ugh...\nAnti...dote...\nPlease..."
  },
  {
   "id": 102,
   "off": "38855",
   "ja": "『なんだか　ちからがわいてきたぞ!\n\n[77][79]　[78][79]が　かいふくした!",
-  "en": ""
+  "en": "\"Somehow I feel my strength welling up!\"\n\n[77][79] and [78][79] were restored!"
  },
  {
   "id": 103,
@@ -627,43 +627,43 @@
   "id": 104,
   "off": "38878",
   "ja": "おかげで　たすかったよ。\nおれいに　わたしがみつけた　ミラルカさんみゃくを\nとおりぬけられる　どうくつを　おしえてあげよう。\nきをつけて　いきなさい。",
-  "en": ""
+  "en": "Thanks to you, I'm saved.\nAs thanks, I'll tell you about the cave I found\nthat lets you pass through the Miralka Mountains.\nTake care as you go."
  },
  {
   "id": 105,
   "off": "388C4",
   "ja": "シェルコせんせいが　ミラルカだにへの\nぬけみちを　しってるよ。",
-  "en": ""
+  "en": "Doctor Shelco knows a secret path\nto Miralka Valley."
  },
  {
   "id": 106,
   "off": "388E4",
   "ja": "こびとのパンは　まほうのちからを　もってるんだ。\nサイトロっていう　まほうと　おなじちからだよ!",
-  "en": ""
+  "en": "Little People's Bread has magic power.\nThe same power as the magic called Sightro!"
  },
  {
   "id": 107,
   "off": "38915",
   "ja": "こびとのパンを　つかえば　せかいがみえる!",
-  "en": ""
+  "en": "If you use Little People's Bread, you can see the world!"
  },
  {
   "id": 108,
   "off": "3892B",
   "ja": "ほのおのかべが　ゆくてをさえぎっている。",
-  "en": ""
+  "en": "A wall of fire blocks the way ahead."
  },
  {
   "id": 109,
   "off": "38940",
   "ja": "「チョコボで　たいりく1しゅう　おめでとう。\n　はいっ　しょうひんです!\n\nこびとのパンを　もらった!",
-  "en": ""
+  "en": "\"Congratulations on going once around the continent\n on a chocobo. Here, your prize!\"\n\nReceived Little People's Bread!"
  },
  {
   "id": 110,
   "off": "38974",
   "ja": "おれたちゃ　バイキング!\nうみの　きぞくさ!\n‥‥\nでもな‥‥　じつは　こまってるんだ。\nあの　だいじしんのあと　かいりゅうが　あらわれ\nおれたちのふねは　こわされちまったんだ。\nエンタープライズだけは　たすかったけど\nこわがって　だれものりたがらねえ。",
-  "en": ""
+  "en": "We're Vikings!\nNobles of the sea!\n...\nBut y'know... truth is, we're in a fix.\nAfter that great earthquake a sea dragon appeared\nand smashed up our ships.\nOnly the Enterprise came through all right,\nbut everybody's too scared to sail her."
  },
  {
   "id": 111,
@@ -675,19 +675,19 @@
   "id": 112,
   "off": "389F5",
   "ja": "ボスもあたまをかかえちまってるよ。\nかいりゅうには　かなわねえ‥‥",
-  "en": ""
+  "en": "The boss is at his wits' end too.\nWe're no match for the sea dragon..."
  },
  {
   "id": 113,
   "off": "38A17",
   "ja": "ガッツあるじゃねえか!　ありがとよ!!",
-  "en": ""
+  "en": "You've got guts! Thanks!!"
  },
  {
   "id": 114,
   "off": "38A2B",
   "ja": "さけでも　のんでなきゃ　やってられねえぜ!\nふねに　のれないバイキングか‥‥!!",
-  "en": ""
+  "en": "Can't get through this without a drink!\nVikings who can't sail a ship...!!"
  },
  {
   "id": 115,
@@ -699,19 +699,19 @@
   "id": 116,
   "off": "38A55",
   "ja": "ふてねさ‥‥",
-  "en": ""
+  "en": "I'm sulking in bed..."
  },
  {
   "id": 117,
   "off": "38A5C",
   "ja": "これで　ゆっくり　ねれるぜ‥‥",
-  "en": ""
+  "en": "Now I can get some good sleep..."
  },
  {
   "id": 118,
   "off": "38A6C",
   "ja": "みさきにある　たてものは　ネプトのしんでんだ。\nじっちゃんが　くわしいことをしってるはずだぜ!",
-  "en": ""
+  "en": "The building on the cape is the Temple of Nept.\nGramps ought to know all the details!"
  },
  {
   "id": 119,
@@ -723,7 +723,7 @@
   "id": 120,
   "off": "38A9D",
   "ja": "エンタープライズは　むきずだ。\nでも　だれも　のったりはしないよ!\nかいりゅうに　おそわれて　いのちを\nおとすだけさ。",
-  "en": ""
+  "en": "The Enterprise is without a scratch.\nBut nobody's going to sail her!\nYou'd just get attacked by the sea dragon\nand lose your life."
  },
  {
   "id": 121,
@@ -735,7 +735,7 @@
   "id": 122,
   "off": "38ADA",
   "ja": "べ　べつに　かくれてるわけじゃないぞ‥‥!\nじっちゃんが　あがってくるのを　まってるんだ。",
-  "en": ""
+  "en": "I-I'm not hiding or anything...!\nI'm waiting for Gramps to come up."
  },
  {
   "id": 123,
@@ -747,19 +747,19 @@
   "id": 124,
   "off": "38B09",
   "ja": "ふねには　のらないほうが　いいわよ!\nみさきまでいくと　かいりゅうが　おそってくるの。\nきっとあれは　ネプトのしんでんに　まつられた\nネプトりゅうだわ‥‥",
-  "en": ""
+  "en": "You'd better not get on the ship!\nWhen you go out to the cape, the sea dragon attacks.\nI'm sure it's the Nept Dragon worshipped\nat the Temple of Nept..."
  },
  {
   "id": 125,
   "off": "38B57",
   "ja": "きゃー!\nあなたたちって　す　て　き!",
-  "en": ""
+  "en": "Kyaaa!\nYou guys are so... coo... ool!"
  },
  {
   "id": 126,
   "off": "38B6B",
   "ja": "そこにいるのが　ボスよ。\nもう!だらしないったらありゃしない!!",
-  "en": ""
+  "en": "That one there is the boss.\nHonestly! He's so pathetic, it's unbelievable!!"
  },
  {
   "id": 127,
@@ -771,31 +771,31 @@
   "id": 128,
   "off": "38B8D",
   "ja": "ボス「だめだ‥‥かいりゅうには　かてっこねえ‥‥\n{14:03}もし　おまえさんたちが　かいりゅうを\n{14:03}たいじしてくれたら　エンタープライズを\n{14:03}やるぜ!　どうだい?",
-  "en": ""
+  "en": "Boss: \"It's no good... No way we can beat the sea dragon...\n{14:03}If you folks get rid of\n{14:03}the sea dragon for us, I'll give you\n{14:03}the Enterprise! How about it?\""
  },
  {
   "id": 129,
   "off": "38BDE",
   "ja": "ボス「すげー　おまえさんたちは　ほんとうの\n{14:03}ゆうしゃだ。　つよい!　やくそくどおり\n{14:03}エンタープライズは　おまえさんたちの\n{14:03}ものだ!",
-  "en": ""
+  "en": "Boss: \"Amazing, you folks are real\n{14:03}heroes. Strong! Like I promised,\n{14:03}the Enterprise is\n{14:03}yours!\""
  },
  {
   "id": 130,
   "off": "38C26",
   "ja": "わしはバイキングのなかでも　1ばんのとしよりの\nじっちゃん　じゃ。\nネプトのしんでんは　ネプトりゅうが　ねむりに\nついていた　ばしょなのじゃ。\nだが　あのだいじしんで　なにかがおこり\nネプトりゅうが　くるったように\nあばれだしたのじゃ‥‥\n",
-  "en": ""
+  "en": "I'm the oldest of all the Vikings,\nGramps.\nThe Temple of Nept is the place where the Nept\nDragon had gone to sleep.\nBut in that great earthquake something happened,\nand the Nept Dragon began to rampage\nas if it had gone mad...\n"
  },
  {
   "id": 131,
   "off": "38C9F",
   "ja": "ありがとう　わかいの!\nおかげで　ネプトりゅうは　しずまった。",
-  "en": ""
+  "en": "Thank you, young ones!\nThanks to you, the Nept Dragon has calmed down."
  },
  {
   "id": 132,
   "off": "38CBF",
   "ja": "ドワーフのたから　やくにたててくださいラリ!",
-  "en": ""
+  "en": "Please put the dwarves' treasure to use, lali!"
  },
  {
   "id": 133,
@@ -807,61 +807,61 @@
   "id": 134,
   "off": "38CD7",
   "ja": "ネプトりゅうのぞうだ。　かたほうの　めが\nなくなっている。　めの　なくなったところには\nおくへとつづく　ちいさなあなが‥‥\n『こびとになれば　はいれるかな?",
-  "en": ""
+  "en": "It's a statue of the Nept Dragon. One of its eyes\nis missing. Where the eye is missing there's\na small hole that leads further in...\n\"I wonder if we could get in if we turned tiny?\""
  },
  {
   "id": 135,
   "off": "38D26",
   "ja": "ドワーフのつの　ぬすまれたあー!\nラリラリホー!",
-  "en": ""
+  "en": "The Dwarf's Horn was stolen!\nLali-lali-ho!"
  },
  {
   "id": 136,
   "off": "38D3F",
   "ja": "2ほんとも　ぬすまれたあー!\nラリラリホラリー!",
-  "en": ""
+  "en": "Both of them were stolen!\nLali-lali-ho-lalee!"
  },
  {
   "id": 137,
   "off": "38D58",
   "ja": "ドワーフのたから　おれいにあげる!\nムーンウォークで　あんないするラリラリ!!",
-  "en": ""
+  "en": "We'll give you the dwarves' treasure as thanks!\nWe'll show you the way with the moonwalk, lali-lali!!"
  },
  {
   "id": 138,
   "off": "38D80",
   "ja": "ネプトりゅうは　ふかいねむりについている。",
-  "en": ""
+  "en": "The Nept Dragon has fallen into a deep sleep."
  },
  {
   "id": 139,
   "off": "38D96",
   "ja": "おおネズミだ!\n「チュウ!　このほうせきは　だれにもわたさない\n　チュウ!　おまえらなんか　こうしてやる!",
-  "en": ""
+  "en": "It's a giant rat!\n\"Squeak! I won't hand this jewel over to anybody,\n squeak! I'll fix you lot like this!\""
  },
  {
   "id": 140,
   "off": "38DCC",
   "ja": "ネプトりゅうのめを　てにいれた。",
-  "en": ""
+  "en": "Got the Nept Dragon's eye."
  },
  {
   "id": 141,
   "off": "38DDD",
   "ja": "ギョエー!\nもう　もっていくものは　なにもないぞい!!",
-  "en": ""
+  "en": "Gyaaah!\nThere's nothing left to take!!"
  },
  {
   "id": 142,
   "off": "38DF9",
   "ja": "おかげで　たすかった。\nありがとう!",
-  "en": ""
+  "en": "Thanks to you, we're saved.\nThank you!"
  },
  {
   "id": 143,
   "off": "38E0C",
   "ja": "ころさんでくれー!",
-  "en": ""
+  "en": "Don't kill meee!"
  },
  {
   "id": 144,
@@ -873,31 +873,31 @@
   "id": 145,
   "off": "38E17",
   "ja": "にしの　さばくには　あくまがすんどる‥‥\nでっかい　きが　うごきまわっとるんじゃ!",
-  "en": ""
+  "en": "A devil lives in the desert to the west...\nA huge tree moves around!"
  },
  {
   "id": 146,
   "off": "38E41",
   "ja": "ハインにつかまっていた　わかいもんたちも\nもどってきた。　ほんとうに　ありがとう。",
-  "en": ""
+  "en": "The young folks Hein had captured\nhave come back too. Thank you, truly."
  },
  {
   "id": 147,
   "off": "38E6B",
   "ja": "おかげで　たすかりました。\nほんとうに　ありがとうございます。",
-  "en": ""
+  "en": "Thanks to you, we are saved.\nThank you so very much."
  },
  {
   "id": 148,
   "off": "38E8B",
   "ja": "あっ　ハインをたおした　おにいちゃんたちだ!\nかっこいい!",
-  "en": ""
+  "en": "Ah, it's the big brothers who beat Hein!\nSo cool!"
  },
  {
   "id": 149,
   "off": "38EA9",
   "ja": "「これは　このむらを　おそった　へいしが\n　おとしていった　もんしょうじゃ。\n　アーガス‥‥\n『まさか　アーガスおうが!?",
-  "en": ""
+  "en": "\"This is a crest dropped by the soldiers\n who attacked this village.\n Argus...\"\n\"Don't tell me the King of Argus...!?\""
  },
  {
   "id": 150,
@@ -909,7 +909,7 @@
   "id": 151,
   "off": "38EE8",
   "ja": "さばくをこえて　にしへずっといったところに\nじぶんたちを　こだいびとのまつえいとか\nよんでいる　ふうがわりな　れんちゅうが\nすんでおるぞ。",
-  "en": ""
+  "en": "Far to the west, across the desert,\nlives an odd bunch who call themselves\nthe descendants of the Ancients\nor some such."
  },
  {
   "id": 152,
@@ -921,49 +921,49 @@
   "id": 153,
   "off": "38F2F",
   "ja": "どうか　このこだけは　たすけて!",
-  "en": ""
+  "en": "Please, spare at least this child!"
  },
  {
   "id": 154,
   "off": "38F40",
   "ja": "えっ?　ちがうんですか。\nごめんなさい。\nてっきり　むらを　おそったへいしが　また\nやってきたのかとおもって‥‥\nシクシク‥‥しゅじんは　つかまって‥‥\nにしのさばくに　つれていかれたのです。\nアーガスのもんしょうをつけた　へいしたちが\nやってきて‥‥",
-  "en": ""
+  "en": "What? You're not?\nI'm sorry.\nI was sure the soldiers who attacked the village\nhad come again...\nSob... sob... my husband was captured...\nand taken off to the western desert.\nSoldiers wearing the crest of Argus\ncame and..."
  },
  {
   "id": 155,
   "off": "38FBF",
   "ja": "あのひとは　ぶじかしら‥‥\nああ　いきていてください!",
-  "en": ""
+  "en": "I wonder if he is safe...\nOh, please be alive!"
  },
  {
   "id": 156,
   "off": "38FDB",
   "ja": "しゅじん　いきていたんです!\nほんとうに　ありがとうございました!!",
-  "en": ""
+  "en": "My husband was alive!\nThank you so very much!!"
  },
  {
   "id": 157,
   "off": "38FFE",
   "ja": "「えっ!?　デッシュが　オーエンのとうの\n　ほのおのなかに!!\n『きっと　いきてるさ。\n「ああ　デッシュさま　どうか　ごぶじで!",
-  "en": ""
+  "en": "\"What!? Desch is in the flames\n of the Tower of Owen!!\"\n\"I'm sure he's alive.\"\n\"Oh, Master Desch, please be safe!\""
  },
  {
   "id": 158,
   "off": "3903F",
   "ja": "おにいちゃん　ありがとう!",
-  "en": ""
+  "en": "Thank you, big brothers!"
  },
  {
   "id": 159,
   "off": "3904D",
   "ja": "ありがとうございました。\nおかげで　ハインのしろから　ぶじ　むらに\nもどってこれました。",
-  "en": ""
+  "en": "Thank you very much.\nThanks to you, I got back safely to the village\nfrom Hein's castle."
  },
  {
   "id": 160,
   "off": "3907A",
   "ja": "ここは　トックルむらの　そんちょうのいえです。\nどうか　そんちょうの　はなしを　きいてください。",
-  "en": ""
+  "en": "This is the house of the chief of Tokkul village.\nPlease, listen to what the chief has to say."
  },
  {
   "id": 161,
@@ -975,7 +975,7 @@
   "id": 162,
   "off": "390AC",
   "ja": "わしが　そんちょうじゃ。\nじつは　あの　だいじしんいらい　にしのさばくから\nへいしが　やってきて　むらのわかいもんや\nしょくりょうを　りゃくだつしていくのじゃ‥‥\nおかげで　むらは　このありさまじゃ。\nああ‥‥　こまった　こまった。\n",
-  "en": ""
+  "en": "I am the chief.\nThe truth is, ever since that great earthquake, soldiers\nhave been coming from the western desert, carrying off\nthe village's young people and food...\nThanks to that, the village is in this state.\nAhh... what to do, what to do.\n"
  },
  {
   "id": 163,
@@ -987,7 +987,7 @@
   "id": 164,
   "off": "39123",
   "ja": "だんろに　かくしかいだんがあります。\nぶきを　かくしてあるのですが　わたしたち\nにはつかえません。　おねがいです。\nそれをつかい　むらを　すくってください。",
-  "en": ""
+  "en": "There's a hidden staircase in the fireplace.\nWe've hidden weapons there, but we can't\nuse them. Please.\nUse them and save the village."
  },
  {
   "id": 165,
@@ -999,307 +999,307 @@
   "id": 166,
   "off": "39173",
   "ja": "わたしたちは　このもりのようせい。",
-  "en": ""
+  "en": "We are the fairies of this forest."
  },
  {
   "id": 167,
   "off": "39185",
   "ja": "ちょうろうをつれさった　まどうしは\nじぶんの　じゃくてんを　かえることができます。\nそれを　みやぶる　ちからがなくては\nたおすことはできないかもしれません‥‥",
-  "en": ""
+  "en": "The wizard who carried off the elder\ncan change his own weakness.\nWithout the power to see through it,\nyou may not be able to defeat him..."
  },
  {
   "id": 168,
   "off": "391D5",
   "ja": "このもりは　いきています。",
-  "en": ""
+  "en": "This forest is alive."
  },
  {
   "id": 169,
   "off": "391E3",
   "ja": "もりは　ないています‥‥　このもりには\n10000ねんをいきる　ちょうろうのきが\nありました。　それを　まどうしが　のろいをかけ\nどこかに　つれさってしまったのです。",
-  "en": ""
+  "en": "The forest is crying... In this forest there was\nthe elder tree, which lives 10000 years.\nA wizard put a curse on it\nand carried it off somewhere."
  },
  {
   "id": 170,
   "off": "39237",
   "ja": "ちょうろうのきが　もどらなければ　もうじき\nこのもりは　しんでしまいます。\nみんな　かれてしまうの‥‥",
-  "en": ""
+  "en": "If the elder tree doesn't come back, soon\nthis forest will die.\nEverything will wither..."
  },
  {
   "id": 171,
   "off": "3926B",
   "ja": "ちょうろうのきは　しろのかたちに\nきざまれて　さばくを　さまよっています。\nたすけて!",
-  "en": ""
+  "en": "The elder tree has been carved into the shape\nof a castle and is wandering the desert.\nHelp it!"
  },
  {
   "id": 172,
   "off": "39297",
   "ja": "アーガスじょうの　しんかんハインが\nちょうろうに　のろいを　かけたの。",
-  "en": ""
+  "en": "Hein, the priest of Argus Castle,\nput a curse on the elder."
  },
  {
   "id": 173,
   "off": "392BB",
   "ja": "ハインは　バリアチェンジします。\nじぶんのじゃくてんを　かえることができるの。",
-  "en": ""
+  "en": "Hein uses Barrier Change.\nHe can change his own weakness."
  },
  {
   "id": 174,
   "off": "392E3",
   "ja": "ここは　グルガンぞくのたに。　グルガンぞくは\nうまれたときから　めがみえない。　そのかわりに\nだい6かんてきなものが　はったつし　なかには\nみらいを　のぞくことができるものもいる。",
-  "en": ""
+  "en": "This is the Valley of the Gulgan Tribe. The Gulgan tribe\ncannot see from the time they are born. Instead,\na kind of sixth sense has developed, and some among them\ncan peer into the future."
  },
  {
   "id": 175,
   "off": "3933E",
   "ja": "おまえたちが　ひかりをうけついだ　クリスタルは\nかぜをつかさどっている。\nほのお　みず　つちのクリスタルのもとへいけ。\nさらに　おおいなるちからを　てにするだろう‥‥",
-  "en": ""
+  "en": "The Crystal whose light you inherited\ngoverns the wind.\nGo to the Crystals of fire, water and earth.\nYou will gain still greater power..."
  },
  {
   "id": 176,
   "off": "39392",
   "ja": "つちのちからが　ほかの3つのひかりをふうじた‥‥\nそして　みずからのちからも‥‥?",
-  "en": ""
+  "en": "The power of earth sealed the other three lights...\nAnd its own power as well...?"
  },
  {
   "id": 177,
   "off": "393BC",
   "ja": "あの　だいじしんでさえも　たんなる　よちょうに\nすぎぬ。　このせかいの　ひかりのみなもとである\nクリスタルを　ちちゅうふかくひきずりこみ\nまものをうみだした　おおきな　ふるえさえも\nこれから　おとずれるものに　くらべれば\nちっぽけなものだ‥‥\n",
-  "en": ""
+  "en": "Even that great earthquake is no more than an\nomen. Even the great tremor that dragged the\nCrystals, the source of this world's light, deep into\nthe earth and gave birth to monsters,\nset beside what is to come,\nis a trifling thing...\n"
  },
  {
   "id": 178,
   "off": "39437",
   "ja": "ドワーフのすむ　しまに　ほのおのちからが‥‥",
-  "en": ""
+  "en": "On the island where the dwarves live, the power of flame..."
  },
  {
   "id": 179,
   "off": "3944E",
   "ja": "このまほうをつかい　きたにある　オーエンのとうに\nはいりなさい。\nデッシュ‥‥そなたの　うんめいが　まっておる。\n\nトードのまほうを　うけとった!\n",
-  "en": ""
+  "en": "Use this magic and enter the Tower of Owen\nto the north.\nDesch... your destiny is waiting.\n\nReceived the magic Toad!\n"
  },
  {
   "id": 180,
   "off": "39499",
   "ja": "オーエンのとうは　きかいじかけのとう‥‥\nデッシュの　うんめいが　まっている。",
-  "en": ""
+  "en": "The Tower of Owen is a tower of machinery...\nDesch's destiny is waiting."
  },
  {
   "id": 181,
   "off": "394C1",
   "ja": "とうが　あかいほのおをだして　くずれさろうと\nするとき‥‥\nうんめいをかえるおとこは　めざめる。",
-  "en": ""
+  "en": "When the tower gives off red flames and is about\nto crumble away...\nthe man who will change destiny shall awaken."
  },
  {
   "id": 182,
   "off": "394F2",
   "ja": "わたしたちは　このたにに　ひっそりとすんでいる。\nひとが　みらいをしると　たいていふこうを\nまねくからだ。",
-  "en": ""
+  "en": "We live quietly in this valley.\nWhen people know the future, it usually\nbrings them misfortune."
  },
  {
   "id": 183,
   "off": "39528",
   "ja": "みらいは　ひかりにも　やみにもみえる‥‥\nさだかではない‥‥",
-  "en": ""
+  "en": "The future looks like light, and like darkness...\nIt is not certain..."
  },
  {
   "id": 184,
   "off": "39547",
   "ja": "いきているもり　いのちあるもりが　\nおまえたちを　よんでいる‥‥",
-  "en": ""
+  "en": "The living forest, the forest with life,\nis calling you..."
  },
  {
   "id": 185,
   "off": "39568",
   "ja": "わたしたちは　ちょうぶんめいを　きずきあげた\nこだいびとの　まつえい。\nおきてにしたがい　しぜんとともに　くらしている。",
-  "en": ""
+  "en": "We are descendants of the Ancients, who\nbuilt a super civilization.\nWe follow the law and live together with nature."
  },
  {
   "id": 186,
   "off": "395A5",
   "ja": "ひかりのはんらん‥‥それは　こだいびとたちが\nひきおこした　おそろしい　わざわいじゃ。\nこだいびとたちは　クリスタルをつかい　ひかりの\nちからを　じゆうに　あやつったのじゃ。\nだがあるとき　ひかりは　ぼうそうしだした。\nせかいを　はかいしだしたのだ‥‥\nにんげんには　おおきすぎる　ちからだったのじゃ。\n\nやみのせかいから　4にんのせんしが　あらわれ\nひかりのぼうそうを　くいとめたという。　だが\nこだいびとは　ほとんどほろびさった。　わずかに\nいきのこったものが　このちにうつりすんだのじゃ。",
-  "en": ""
+  "en": "The flood of light... that was a terrible calamity\nbrought about by the Ancients.\nThe Ancients used the Crystals to control the power\nof light freely.\nBut one day the light began to run wild.\nIt began to destroy the world...\nIt was a power too great for humans.\n\nIt is said that four warriors appeared from the World\nof Darkness and held back the rampage of light. But\nthe Ancients were almost wiped out. The few who\nsurvived moved to this land and settled here."
  },
  {
   "id": 187,
   "off": "3969D",
   "ja": "このたいりくは　くうちゅうにういとるんじゃ。\nしんじられんかね?\nこだいびとのぶんめいが　きづいたものじゃよ。\nいまだに　うごいとるんじゃ‥‥\nオーエンのとうが　そのちからを　うみだして\nおるんじゃ。\n",
-  "en": ""
+  "en": "This continent is floating in the air.\nCan you believe it?\nIt was built by the civilization of the Ancients.\nIt's still running even now...\nThe Tower of Owen produces that\npower.\n"
  },
  {
   "id": 188,
   "off": "39703",
   "ja": "わしらの　おきてとは‥‥\nおおいなるいしに　みをゆだねて　いきる\nということじゃ。　きかいにたよってはならぬ。",
-  "en": ""
+  "en": "Our law is...\nto live by entrusting ourselves to the great will.\nWe must not rely on machines."
  },
  {
   "id": 189,
   "off": "3973B",
   "ja": "ひかりとやみは　こころをもつ‥‥\nそして　なにかがおこるとき　そのこころは\n4にんのものを　えらびだし　みずからの\nちからをたくすという‥‥\nひかりのはんらんから　せかいをすくった\nやみの4せんしも　そうじゃった。\nそしていま　おまえたちが　ひかりに\nえらばれたのじゃ‥‥\nそのちから　あやまった　つかいかたをしては\nならんぞ!\n",
-  "en": ""
+  "en": "Light and darkness have hearts...\nAnd it is said that when something happens, those\nhearts choose four people and entrust them\nwith their own power...\nSo it was with the Four Warriors of Darkness,\nwho saved the world from the flood of light.\nAnd now you have been chosen\nby the light...\nYou must not use that power\nthe wrong way!\n"
  },
  {
   "id": 190,
   "off": "397E1",
   "ja": "ひがしへいったところに　チョコボという\nどうぶつがすむ　もりがあります。",
-  "en": ""
+  "en": "To the east there is a forest where the animals\ncalled chocobos live."
  },
  {
   "id": 191,
   "off": "39806",
   "ja": "ザンデさまの　めいれいにより　このメデューサが\nとうを　はかいし　ちゅうにういた　このたいりくを\nおとすのだ。\nヒッヒッヒッ‥‥\nじゃまはさせん!　しねい!!\n",
-  "en": ""
+  "en": "By order of Lord Xande, I, Medusa, shall destroy\nthe tower and drop this continent floating\nin the air.\nHee hee hee...\nI'll let no one interfere! Die!!\n"
  },
  {
   "id": 192,
   "off": "39857",
   "ja": "ほのおが　ふきあれている。\nいまにも　ばくはつしそうだ‥‥",
-  "en": ""
+  "en": "Flames are raging.\nIt looks like it could explode at any moment..."
  },
  {
   "id": 193,
   "off": "39875",
   "ja": "だめだ!　ちかよったら　あぶない。\nやっと　きおくがよみがえったぜ!\nおれは　このとうの　かんしにん　こだいびとの\nいきのこりさ。\nながいねむりに　ついていたんだ。\nもし　とうに　なにか　いへんがおきたとき\nめざめるようになっていたんだ。\nねむりすぎて　ちょっとボケていたみたいだな‥‥",
-  "en": ""
+  "en": "No! It's dangerous to get close.\nI've finally got my memory back!\nI'm the overseer of this tower, a survivor\nof the Ancients.\nI was asleep for a long time.\nI was set to wake up if anything\nwent wrong with the tower.\nSeems I slept so long I got a little scatterbrained..."
  },
  {
   "id": 194,
   "off": "39905",
   "ja": "ずいぶんひどいな‥‥\nまだなんとかなるかもしれん。\nおれは　このなかにはいって　どうりょくろを\nなおさなくてはならん。\nこのままじゃ　ふゆうたいりくは　どうりょくを\nうしなって　おちてしまう。\nここで　おわかれだな‥‥\nずいぶん　せわになっちまったな。　ありがとよ。",
-  "en": ""
+  "en": "It's pretty bad...\nMaybe I can still do something.\nI've got to go in here and fix the\npower conduit.\nAt this rate the Floating Continent will lose\nits power and fall.\nThis is where we part ways...\nYou've done a lot for me. Thanks."
  },
  {
   "id": 195,
   "off": "3998B",
   "ja": "『デッシュっ!!やめろ　しんじまうぞ!",
-  "en": ""
+  "en": "\"Desch!! Stop it, you'll get yourself killed!\""
  },
  {
   "id": 196,
   "off": "3999F",
   "ja": "これが　おれのしめいだ‥‥\nおれが　したのそうちで　うずまきをけすから\nおまえたちは　ドワーフのすむ　しまへ　いけ。\nそこに　ほのおのちからがあるはずだ。\nしたにいったら　おまえたちを　そとへ\nワープさせてやるよ。\nそんじゃなっ　あばよ!\nそれっと!",
-  "en": ""
+  "en": "This is my mission...\nI'll stop the whirlpool with the device down below,\nso you guys go to the island where the dwarves live.\nThe power of flame should be there.\nOnce I'm down there, I'll warp you\noutside.\nWell then, so long!\nHere goes!"
  },
  {
   "id": 197,
   "off": "39A1D",
   "ja": "『デッシューっ!!‥‥",
-  "en": ""
+  "en": "\"Deeesch!!...\""
  },
  {
   "id": 198,
   "off": "39A29",
   "ja": "ほのおが　ふきあれている。\n『デッシュー!\nへんじはない。\n『しんじまったのかよ‥‥",
-  "en": ""
+  "en": "Flames are raging.\n\"Deeesch!\"\nThere is no answer.\n\"Did he really die...?\""
  },
  {
   "id": 199,
   "off": "39A54",
   "ja": "ラリホー!",
-  "en": ""
+  "en": "Lali-ho!"
  },
  {
   "id": 200,
   "off": "39A5A",
   "ja": "2ほんの　こおりでできたつの。\nドワーフのたからー!\nでもわるいやつ　ぬすんでったー!\nゆるせなーい!",
-  "en": ""
+  "en": "Two horns made of ice.\nThe dwarves' treasure!\nBut a bad guy stole them!\nUnforgivable!"
  },
  {
   "id": 201,
   "off": "39A8E",
   "ja": "「ありがとー!\n　おれいに　これを　あげるー!!\n　ギサールにいけば　もっとあるよ!\nまほうのかぎをもらった。",
-  "en": ""
+  "en": "\"Thank youuu!\n As thanks, we'll give you thiiis!!\n If you go to Gysahl there's more!\"\nReceived the Magic Key."
  },
  {
   "id": 202,
   "off": "39AC6",
   "ja": "おねがい　つのをとりかえしてー!\nぬすんだやつ　ちかの　みずうみに　にげこんだー!",
-  "en": ""
+  "en": "Please, get the horn back!\nThe guy who stole it ran into the underground lake!"
  },
  {
   "id": 203,
   "off": "39AF0",
   "ja": "しんじられなーい!\nグツコーのやつ　2ほんとも　つの　てにいれた\nたいへん　たいへん!",
-  "en": ""
+  "en": "Unbelievable!\nThat Gutsco got both of the horns!\nTerrible, terrible!"
  },
  {
   "id": 204,
   "off": "39B1C",
   "ja": "ありがとー!!\nおかげで　ドワーフのたから　2ほんのつのが\nかえってきた!",
-  "en": ""
+  "en": "Thank youuu!!\nThanks to you, the dwarves' treasure, the two horns,\ncame back!"
  },
  {
   "id": 205,
   "off": "39B42",
   "ja": "ラリホー!\n2ほんのつの　もどった。\nばんざーい!　ラリホー!!",
-  "en": ""
+  "en": "Lali-ho!\nThe two horns are back.\nHooray! Lali-ho!!"
  },
  {
   "id": 206,
   "off": "39B63",
   "ja": "のこった1ぽんのまわりに　だれも　ちかづけない\nおまじないかけたー!\nこの1ぽんは　ぜったいまもるー!!",
-  "en": ""
+  "en": "We put a charm on the one left so nobody\ncan get near it!\nWe'll protect this one no matter what!!"
  },
  {
   "id": 207,
   "off": "39B98",
   "ja": "どーもありがとー!\nつのとりかえしてくれた!\nもとのばしょに　もどしてください!!",
-  "en": ""
+  "en": "Thank you sooo much!\nYou got the horn back for us!\nPlease put it back where it was!!"
  },
  {
   "id": 208,
   "off": "39BC2",
   "ja": "きっとあいつ　きたのやまに　むかったー!\nおねがい!　2ほんのつの　とりかえしてー!",
-  "en": ""
+  "en": "That guy must have headed for the mountain to the north!\nPlease! Get the two horns back!"
  },
  {
   "id": 209,
   "off": "39BED",
   "ja": "きたのやまに　きれいなガラスみたいな　とうが\nたってた。　でも　じしんのあと　きえたー。\nそこに　どうくつができたー。",
-  "en": ""
+  "en": "On the north mountain there stood a tower like\npretty glass. But after the earthquake it vanished.\nA cave opened up there."
  },
  {
   "id": 210,
   "off": "39C29",
   "ja": "はっしん!!",
-  "en": ""
+  "en": "Launch!!"
  },
  {
   "id": 211,
   "off": "39C30",
   "ja": "あちちっ!",
-  "en": ""
+  "en": "Hot hot!"
  },
  {
   "id": 212,
   "off": "39C36",
   "ja": "えーい　よるな　よるなー!\nおまえらに　このつのは　わたさん。\nしねい!",
-  "en": ""
+  "en": "Bah, stay back, stay back!\nI won't hand this horn over to you.\nDie!"
  },
  {
   "id": 213,
   "off": "39C5B",
   "ja": "ドワーフのつのを　てにいれた。",
-  "en": ""
+  "en": "Got the Dwarf's Horn."
  },
  {
   "id": 214,
   "off": "39C6B",
   "ja": "　おいらは　このもりの　ふしぎなみずを　くみに\n　みなみの　こびとのもりから　きたんだ。\n　こびとしか　はいることのできない　こびとの\n　まちさ!\n　あんたたちも　ミニマムをもっているなら\n　こびとになって　こびとのもりトーザスに\n　いってごらんよ!\n",
-  "en": ""
+  "en": " I came from the Forest of the Little People to the south\n to draw the mysterious water of this forest.\n It's a town of little people that only little people\n can get into!\n If you folks have Minimum too,\n turn tiny and try going to Tozus,\n the Forest of the Little People!\n"
  },
  {
   "id": 215,
   "off": "39CEA",
   "ja": "そとうみを　ずーっと　ひがしにいったところー\nギサールっていう　へんきょうのむらが　あるー!",
-  "en": ""
+  "en": "Go aaall the way east across the open sea,\nand there's a frontier village called Gysahl!"
  },
  {
   "id": 216,
   "off": "39D19",
   "ja": "おやまあ　こんな　へんきょうのまちに　ひとが\nやってくるなんて　なんねんぶりだろ!?",
-  "en": ""
+  "en": "My, my, how many years has it been since anyone\ncame to a frontier town like this!?"
  },
  {
   "id": 217,
@@ -1311,25 +1311,25 @@
   "id": 218,
   "off": "39D45",
   "ja": "あたし　ひつじかいやってるの‥‥",
-  "en": ""
+  "en": "I'm a shepherd..."
  },
  {
   "id": 219,
   "off": "39D56",
   "ja": "こらこら!そっちにいっちゃ　ダメ!!",
-  "en": ""
+  "en": "Hey, hey! Don't go over there!!"
  },
  {
   "id": 220,
   "off": "39D69",
   "ja": "ギサールのやさいは　チョコボのだいこうぶつじゃ。\nおまえさんだけに　こっそりおしえてやるがの\nチョコボのもりには　ふしぎなちからをもった\nチョコボのおやぶんが　いるんじゃ。\nギサールのやさいを　まんなかにはえた　きに\nつかってみなさい。\nもしかしたら　チョコボのおやぶん　でぶチョコボに\nあえるかもしれんて。",
-  "en": ""
+  "en": "Gysahl Vegetables are a chocobo's favorite food.\nI'll let you alone in on a secret:\nin the Chocobo Forest there's a chocobo boss\nwith mysterious powers.\nTry using a Gysahl Vegetable on the tree\ngrowing in the middle.\nYou might just get to meet the chocobo boss,\nthe Fat Chocobo."
  },
  {
   "id": 221,
   "off": "39E04",
   "ja": "つるぎざき「あたし　つるぎざき。\n{14:06}おてがみ　いっぱいかくの!\n\n\n\n{14:04}みなさんも　おてがみくださいね!\n{14:07}スクウェアかいはつぶ\n",
-  "en": ""
+  "en": "Tsurugizaki: \"I'm Tsurugizaki.\n{14:06}I write lots of letters!\n\n\n\n{14:04}Please write me letters too, everyone!\n{14:07}Square Development Division\"\n"
  },
  {
   "id": 222,
@@ -1341,198 +1341,198 @@
   "id": 223,
   "off": "39E4A",
   "ja": "でぶチョコボは　ものを　おなかに\nためておくことができるの!\nおかしいでしょ!!",
-  "en": ""
+  "en": "The Fat Chocobo can store things\nin its belly!\nFunny, isn't it!!"
  },
  {
   "id": 224,
   "off": "39E73",
   "ja": "エリクサーは　やくにたちましたか?",
-  "en": ""
+  "en": "Was the Elixir of use?"
  },
  {
   "id": 225,
   "off": "39E85",
   "ja": "「わたしは　アーガス。　さばくのきたにある\n　しろの　おうだ。といっても　いまはだれもいない\n　だろうが‥‥\n\n　へいしたちは　ハインに　のろいをかけられ\n　あやつられているのだ。　ハインのやつめ　もとは\n　わたしの　そっきんだったのだが‥‥\n　ゴホッゴホッ‥‥\n『だいじょうぶですか　おうさま?\n「だいじょうぶだ。　それより　たのむ\n　ハインをたおしてくれ!\n",
-  "en": ""
+  "en": "\"I am Argus. King of the castle north of\n the desert. Though I suppose there is no one\n there now...\n\n The soldiers have had a curse put on them by Hein\n and are being controlled. That Hein, he was\n once my close aide...\n Cough cough...\"\n\"Are you all right, Your Majesty?\"\n\"I am all right. More importantly, I beg you,\n defeat Hein!\"\n"
  },
  {
   "id": 226,
   "off": "39F3B",
   "ja": "ハインはアーガスのしんかん。\nだが　あのだいじしんのあと　あくのちからに\nとりつかれた。",
-  "en": ""
+  "en": "Hein is the priest of Argus.\nBut after that great earthquake, he was possessed\nby the power of evil."
  },
  {
   "id": 227,
   "off": "39F68",
   "ja": "このしろは　いきているもりの　ちょうろうのきを\nくりぬいて　つくったものだ。\nちょうろうのきは　まどうしハインに\nあやつられている‥‥",
-  "en": ""
+  "en": "This castle was made by hollowing out\nthe elder tree of the living forest.\nThe elder tree is being controlled\nby Hein the Wizard..."
  },
  {
   "id": 228,
   "off": "39FAC",
   "ja": "「これをつかえば　こびとになれる‥‥\n　わたしは　もうだめだ‥‥\n　ひだりすみの　かべにあいたあなからでるのだ‥‥\n　‥‥\nうちでのこづちを　うけとった。\n",
-  "en": ""
+  "en": "\"If you use this, you can become tiny...\n I'm done for...\n Get out through the hole in the wall in the left corner...\n ...\"\nReceived the Lucky Mallet.\n"
  },
  {
   "id": 229,
   "off": "39FFB",
   "ja": "ハインは　なにかきょうりょくなちからを　えたのだ\nそして　そのちからのうみだす　よくぼうに\nまけてしまった‥‥",
-  "en": ""
+  "en": "Hein gained some powerful force,\nand then gave in to the greed\nthat power produces..."
  },
  {
   "id": 230,
   "off": "3A033",
   "ja": "アーガスおうの　けん　キングスソードを　ハインは\nどこかへ　かくしている。",
-  "en": ""
+  "en": "Hein has hidden the King of Argus's sword,\nthe King's Sword, somewhere."
  },
  {
   "id": 231,
   "off": "3A059",
   "ja": "なに?\nハインさまをたおすだと??\nおれは　ハインさまのしもべ!\nしねい!!!",
-  "en": ""
+  "en": "What?\nYou're going to defeat Lord Hein??\nI am Lord Hein's servant!\nDie!!!"
  },
  {
   "id": 232,
   "off": "3A081",
   "ja": "まどうしハインだ!\n「すばらしい‥‥\n　このあんこくの　うみだすちからは\n　うつくしい‥‥\n　わからぬのか　このちからのすばらしさが!\n　わしは　このちからをつかい　いきた　きを\n　うごかし　へいしをあやつり　そして\n　このせかいの　しはいしゃとなるのだ!!\n　じゃまはさせん　しねい!\n",
-  "en": ""
+  "en": "It's Hein the Wizard!\n\"Magnificent...\n The power that this darkness produces\n is beautiful...\n Do you not understand how magnificent this power is!\n Using this power I shall move the living\n tree, control the soldiers, and then\n become the ruler of this world!!\n I'll let no one interfere. Die!\"\n"
  },
  {
   "id": 233,
   "off": "3A112",
   "ja": "さあ　こっちにいらっしゃい!\nまったくもう!　しかたがないんだから!!",
-  "en": ""
+  "en": "Now, come over here!\nHonestly! You're hopeless!!"
  },
  {
   "id": 234,
   "off": "3A136",
   "ja": "ギサールは　ひがしのはじにある　へんきょうの\nむら!　ひつじがいる!\nかぎをつくる　かじやさんが　いるー!\n",
-  "en": ""
+  "en": "Gysahl is a frontier village at the eastern\nedge! There are sheep!\nThere's a blacksmith who makes keys!\n"
  },
  {
   "id": 235,
   "off": "3A16D",
   "ja": "グツコーっていう　わるものが　ドワーフのたから\n2ほんのつのを　ぬすんだー!\nちていこに　もぐって　にげたー!\nドワーフおよげない!　つの　とりもどせない!",
-  "en": ""
+  "en": "A bad guy named Gutsco stole the dwarves' treasure,\nthe two horns!\nHe dove into the underground lake and got away!\nDwarves can't swim! We can't get the horns back!"
  },
  {
   "id": 236,
   "off": "3A1BC",
   "ja": "げげーっ!\nきたにある　どうくつに　グツコーにげたー!\n2ほんとも　つの　とられたー!\nたいへーん　たいへーん!",
-  "en": ""
+  "en": "Yikes!\nGutsco ran off to the cave to the north!\nHe took both of the horns!\nTerrible, terrible!"
  },
  {
   "id": 237,
   "off": "3A1F5",
   "ja": "ステータス　かいふく!",
-  "en": ""
+  "en": "Status restored!"
  },
  {
   "id": 238,
   "off": "3A201",
   "ja": "いきかえり!",
-  "en": ""
+  "en": "Revived!"
  },
  {
   "id": 239,
   "off": "3A208",
   "ja": "[77][79]　[78][79]　かいふく!",
-  "en": ""
+  "en": "[77][79] [78][79] restored!"
  },
  {
   "id": 240,
   "off": "3A214",
   "ja": "ゆうしゃたちよ　そなたたちのおかげで　ふたたび\nへいわがおとずれた。\nこころから　れいをいう。　ほんとうにありがとう。\nこれをもっていくのだ。\nこれは　わが　おうけに　だいだいつたわる\nときのはぐるま　と　よばれるはこ。\nこだいのたみが　つくったものだという。\nこれをカナーンにすむ　シドにわたすのだ。\nおお　シドをしっているのか?\nそれならはなしは　はやい。\nさあいけ　せんしたちよ。\n\nアーガスおうに　ときのはぐるまを　もらった!\n",
-  "en": ""
+  "en": "Heroes, thanks to you, peace has come\nonce again.\nI thank you from my heart. Thank you, truly.\nTake this with you.\nThis is a box handed down for generations\nin my royal family, called the Gear of Time.\nThey say the Ancient People made it.\nGive this to Cid, who lives in Canaan.\nOh, you know Cid?\nThen that makes things quick.\nNow go, warriors.\n\nReceived the Gear of Time from the King of Argus!\n"
  },
  {
   "id": 241,
   "off": "3A2EF",
   "ja": "さあカナーンへ!\nシドに　ときのはぐるまを　わたすのだ!",
-  "en": ""
+  "en": "Now, to Canaan!\nGive the Gear of Time to Cid!"
  },
  {
   "id": 242,
   "off": "3A30C",
   "ja": "「おお　シドのやつめ。　ひくうていをつくったか!\n　さあ　とびたつのだ!　せかいは　はてしない。\n　この　ふゆうたいりくを　とびたつのだ!",
-  "en": ""
+  "en": "\"Oh, that Cid. He built an airship!\n Now, take flight! The world is endless.\n Fly off from this Floating Continent!\""
  },
  {
   "id": 243,
   "off": "3A352",
   "ja": "この　たいりくは　ういています。\nふゆうたいりくなのです。",
-  "en": ""
+  "en": "This continent is floating.\nIt is the Floating Continent."
  },
  {
   "id": 244,
   "off": "3A370",
   "ja": "ときのはぐるま　‥‥\nえいきゅうきかん　とも　よばれていたらしい‥‥",
-  "en": ""
+  "en": "The Gear of Time...\nIt seems it was also called the perpetual motion machine..."
  },
  {
   "id": 245,
   "off": "3A393",
   "ja": "とうぞく　シーフともよばれていた　かれらは\nかぎのかかったドアを　すでで　あけてしまうんだ。",
-  "en": ""
+  "en": "Those called thieves, or Thieves,\ncan open locked doors with their bare hands."
  },
  {
   "id": 246,
   "off": "3A3C2",
   "ja": "4つの　ほのおの　いちばんみぎが\nかくしとびらの　スイッチだ。",
-  "en": ""
+  "en": "The rightmost of the four flames is\nthe switch for the hidden door."
  },
  {
   "id": 247,
   "off": "3A3E2",
   "ja": "ひかりのせんしたちよ　アーガスをすくってくれて\nありがとう!!",
-  "en": ""
+  "en": "Warriors of Light, thank you for saving\nArgus!!"
  },
  {
   "id": 248,
   "off": "3A402",
   "ja": "わたしは　まぼろしの　ひやく　エリクサーを\nつくりだす　けんきゅうをしています。\nぐうぜんできた　この2つの　エリクサーを\nもっていってください!\nエリクサーを　2つもらった!\n",
-  "en": ""
+  "en": "I'm doing research on creating the phantom\nsecret medicine, Elixir.\nPlease take these two Elixirs\nI happened to make!\nReceived two Elixirs!\n"
  },
  {
   "id": 249,
   "off": "3A45C",
   "ja": "たきびだ。",
-  "en": ""
+  "en": "It's a campfire."
  },
  {
   "id": 250,
   "off": "3A462",
   "ja": "ドワーフのつのだ。",
-  "en": ""
+  "en": "It's the Dwarf's Horn."
  },
  {
   "id": 251,
   "off": "3A46C",
   "ja": "いわが　みちをふさいでる。",
-  "en": ""
+  "en": "A rock blocks the path."
  },
  {
   "id": 252,
   "off": "3A47A",
   "ja": "チョコボだよーん!",
-  "en": ""
+  "en": "It's a chocoboooo!"
  },
  {
   "id": 253,
   "off": "3A484",
   "ja": "わしはむかし　アーガスおうのもとで　はたらいて\nいたんじゃ。　ときのはぐるまで　ひくうていを\nつくったりしたんじゃ!\nゆうめいじゃぞ!　ハッハッハ!!",
-  "en": ""
+  "en": "Long ago I worked under the King\nof Argus. I built airships with the\nGear of Time and such!\nI'm famous, you know! Ha ha ha!!"
  },
  {
   "id": 254,
   "off": "3A4D0",
   "ja": "ナイトは　[77][79]のひくいものを　かばって\nくれる。",
-  "en": ""
+  "en": "A Knight protects those with\nlow [77][79]."
  },
  {
   "id": 255,
   "off": "3A4E9",
   "ja": "チョコボみーっけっ!",
-  "en": ""
+  "en": "Found a chocobo!"
  }
 ]

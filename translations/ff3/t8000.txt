@@ -859,11 +859,11 @@ Your inventory is full.
 @@ 145
 Odin: "Warriors of Light...
 {14:07}Use my power!"
-Got the summon magic Catast!
+Got the summon magic Catastrophe!
 @@ 146
 Leviathan: "I shall become the power of those who possess light!"
 
-Got the summon magic Levia!
+Got the summon magic Leviathan!
 @@ 147
 Got Noah's Lute.
 @@ 148
@@ -1001,7 +1001,7 @@ Clank!
  Now, let's get away while we can!"
 "Let's!!"
 @@ 167
-"Take this! It's a spell called Mini,
+"Take this! It's a spell called Minimum,
  but I can't use it anyway.
  Not that it's much in exchange, but let me
  travel together with you folks!"
@@ -1009,7 +1009,7 @@ Clank!
 "Yeah? Then it's settled. We're
  partners! Glad to have ya!!"
 
-Got Mini from Desch.
+Got Minimum from Desch.
 Desch joined the party.
 
 @@ 168
@@ -1075,7 +1075,7 @@ Desch: "If I'm with you folks,
 @@ 181
 Desch: "The Forest of the Little People I heard about
 {14:05}in Canaan ought to be around here somewhere...
-{14:05}Unless everyone turns tiny with Mini,
+{14:05}Unless everyone turns tiny with Minimum,
 {14:05}we can't get in!"
 @@ 182
 Desch: "Aw man,

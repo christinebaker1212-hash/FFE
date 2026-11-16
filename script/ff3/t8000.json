@@ -873,13 +873,13 @@
   "id": 145,
   "off": "339D3",
   "ja": "オーディーン「ひかりのせんしたちよ‥‥\n{14:07}わたしのちからを　つかうがよい!\nしょうかんまほう　カタスト　をてにいれた!",
-  "en": "Odin: \"Warriors of Light...\n{14:07}Use my power!\"\nGot the summon magic Catast!"
+  "en": "Odin: \"Warriors of Light...\n{14:07}Use my power!\"\nGot the summon magic Catastrophe!"
  },
  {
   "id": 146,
   "off": "33A10",
   "ja": "リバイアサン「ひかりあるものの　ちからとなろう!\n\nしょうかんまほう　リバイア　をてにいれた!",
-  "en": "Leviathan: \"I shall become the power of those who possess light!\"\n\nGot the summon magic Levia!"
+  "en": "Leviathan: \"I shall become the power of those who possess light!\"\n\nGot the summon magic Leviathan!"
  },
  {
   "id": 147,
@@ -1005,7 +1005,7 @@
   "id": 167,
   "off": "34162",
   "ja": "「これ　やるよ!　ミニマムっていうまほうなんだが\n　どーせ　おれにはつかいこなせない。\n　そのかわりといっちゃなんだが　おまえさんたちと\n　いっしょに　たびをさせてくれ!\n『ああ　おれたちは　かまわないけど‥‥\n「そうか　ならきまりだ。　おれたちゃ\n　パートナーだぜ!　よろしくなっ!!\n\nデッシュから　ミニマムをもらった。\nデッシュが　パーティーにくわわった。\n",
-  "en": "\"Take this! It's a spell called Mini,\n but I can't use it anyway.\n Not that it's much in exchange, but let me\n travel together with you folks!\"\n\"Sure, we don't mind, but...\"\n\"Yeah? Then it's settled. We're\n partners! Glad to have ya!!\"\n\nGot Mini from Desch.\nDesch joined the party.\n"
+  "en": "\"Take this! It's a spell called Minimum,\n but I can't use it anyway.\n Not that it's much in exchange, but let me\n travel together with you folks!\"\n\"Sure, we don't mind, but...\"\n\"Yeah? Then it's settled. We're\n partners! Glad to have ya!!\"\n\nGot Minimum from Desch.\nDesch joined the party.\n"
  },
  {
   "id": 168,
@@ -1089,7 +1089,7 @@
   "id": 181,
   "off": "34499",
   "ja": "デッシュ「カナーンできいた　こびとのもりが\n{14:05}どこか　ここらへんに　あるはずだが‥‥\n{14:05}ミニマムで　ぜんいん　こびとに\n{14:05}ならなきゃ　はいれないぜ!",
-  "en": "Desch: \"The Forest of the Little People I heard about\n{14:05}in Canaan ought to be around here somewhere...\n{14:05}Unless everyone turns tiny with Mini,\n{14:05}we can't get in!\""
+  "en": "Desch: \"The Forest of the Little People I heard about\n{14:05}in Canaan ought to be around here somewhere...\n{14:05}Unless everyone turns tiny with Minimum,\n{14:05}we can't get in!\""
  },
  {
   "id": 182,

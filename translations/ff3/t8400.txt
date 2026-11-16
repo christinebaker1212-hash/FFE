@@ -1,0 +1,1033 @@
+@@ 1
+The four drank the water of the spring...
+@@ 4
+If only I had the Gear of Time...
+@@ 5
+"Smells like chocobo..."
+@@ 6
+When you want to use an item, it's B.
+Try using a Potion on me!
+@@ 7
+My, my, the four little brats all
+together, where are you off to?
+What's that? You're going off now to save the world?
+Did you hit your heads or something?!
+@@ 9
+The elder is waiting in the back.
+Dahn, whose spiritual sense is strong,
+sensed what happened to you.
+@@ 10
+My, my, how did you manage to get here!
+There's a Potion in the well!!
+@@ 11
+You'd best take Cure with you.
+It should be in the storehouse up ahead.
+Monsters appear on the way there.
+Take care!
+@@ 12
+I'm picking flowers!
+@@ 13
+The candle furthest to the right is the switch
+for the hidden door.
+On the way back, there's always a switch
+up above, mind!
+@@ 14
+They say those who have received the light of the
+Crystal can be revived or have their strength
+restored by the holy water of the temple.
+@@ 15
+Go a little to the south and there's the town of Kazus.
+But ever since that great earthquake, monsters
+have started appearing, so nobody goes outside
+this village.
+@@ 16
+The one who rules this whole area,
+surrounded by the Palmeni Mountains,
+is King Sasune of the castle to the west.
+@@ 17
+That great earthquake sank the Crystal's altar
+deep into the earth.
+Ahh, this world is finished...
+@@ 18
+Dahn: "My strong spiritual sense perceived
+{14:04}what happened to you.
+{14:04}Now, listen to the elder's words."
+@@ 19
+Nina, who was like a mother to the four...
+"I'm so worried...
+ Take care as you go."
+@@ 20
+It is Homac, one of the elders.
+"To make full use of the titles received from
+ the Crystal, you need the strength of the heart.
+ You need the Capacity of the heart!"
+@@ 21
+It is Elder Topapa, who raised
+the four orphans.
+"Gramps! We..."
+
+@@ 22
+"I know. I never imagined that you
+ would be the ones chosen.
+ {10:02} {11:02}
+ {12:02} {13:02}...
+ First you must know that this
+ was no chance choice.
+ The Crystal chose you
+ by its own will.
+ Now, that power... you must not waste
+ your hearts of light.
+ Set out on your journey!
+ And seal away the power of darkness."
+@@ 23
+Topapa: "Now, set out on your journey!"
+@@ 24
+You kids are setting out on a journey?
+I don't need any money.
+Get a good rest before you go.
+@@ 25
+How about it?
+@@ 26
+I shall tell you what your powers are!
+Hmm...
+...
+...
+{10:01},
+{11:01},
+{12:01},
+{13:01}, is it. I'm right, aren't I!
+@@ 27
+Zzz zzz
+@@ 29
+Princess Sara, you are safe!
+@@ 30
+If you're setting out on a journey, Antidotes and
+Eye Drops are absolutely necessary.
+@@ 32
+The valley's blocked by a rock, so I can't
+get back to Canaan.
+Nothing to do but drink... Hic!
+@@ 33
+Hey, please, play the piano!
+@@ 34
+Gyah!!
+@@ 35
+Sorry. I was sure you folks were ghosts
+too... I'm a traveler from the
+west. This town is cursed.
+Ghosts appear at the inn!
+@@ 36
+King: "Oh, Princess Sara! You're safe!"
+Sara: "Wait for me. With this ring of mine,
+   I will seal the Djinn!"
+King: "I am worried..."
+Sara: "It's all right!
+   I have {0C} and the others with me. Right!"
+
+@@ 37
+With an airship you should be able to cross
+the lake and reach the Sealed Cave where the
+Djinn is. Please, defeat the Djinn!
+@@ 38
+Thank you. Thanks to you folks
+I've gone back to my original form!
+@@ 39
+After the earthquake, the Valley of Nelb,
+which connects the inside and outside of the
+Palmeni Mountains, was blocked by a huge rock.
+@@ 40
+Kazus is a town that grew big from the Mythril Mine.
+Mythril weapons and armor
+are all made here.
+@@ 41
+This cave is the Mythril Mine.
+@@ 42
+Old Man Taka is the most skilled
+blacksmith in this village.
+He lives in this house alone.
+@@ 43
+The Djinn's curse turned me into this...
+@@ 44
+Thank you.
+Thanks to you, I have gone back to my original form.
+@@ 45
+The great earthquake revived the Djinn,
+who had been sealed inside the Sealed Cave.
+@@ 46
+Hey! You mustn't come in here.
+@@ 47
+Long ago I made a mythril ring and
+presented it to Princess Sara of Sasune Castle.
+If only we had that ring...
+@@ 48
+The mine in this town has a secret entrance
+leading further in.
+Try examining the third wall from the left
+at the dead end.
+@@ 49
+To seal the Djinn away again,
+a mythril ring that can only be made
+in this village is needed. Fearing that,
+the Djinn put a curse on this village.
+@@ 50
+I'm Cid. I came from Canaan.
+The Valley of Nelb got blocked by a huge rock,
+and now I can't get back to Canaan even if I want to.
+So I came to this town looking for a night's
+lodging, and look at me now. Fo fo fo!
+How about it, young ones? I'll lend you my airship,
+so won't you do something about this?
+I've hidden it in the desert to the west.
+Heard from Cid where the airship
+is hidden!
+The desert to the west!!
+
+@@ 51
+I want to get my former beauty back...
+@@ 52
+"Thanks to you, I got my former beauty back!
+ Ho ho ho!"
+"?!"
+@@ 53
+Cid: "To get to Canaan, I'm thinking of smashing
+   the huge rock of Nelb...
+   If we put a mythril prow on the airship,
+   we might be able to manage it."
+Taka: "All right, wait there! I'll make it right now!!"
+
+@@ 54
+There, all done!
+Nah, I don't need thanks. You saved the
+village. It's only natural.
+Well then, take care as you go!
+Old Man Taka put a mythril prow
+on the airship!
+Cid: "All right, ram the huge rock
+   with the airship!!"
+@@ 55
+Taka: "Do your best!"
+@@ 56
+Everyone in the castle was turned into ghost-like
+forms by the Djinn's curse.
+I was out on an errand,
+so I was spared...
+With a mythril ring the Djinn could be sealed
+once more, but the village of Kazus, the only
+place that can make the ring, is in the same
+state...
+What on earth should I do...
+
+@@ 57
+Thanks to you, the Djinn's curse is broken!
+Please see His Majesty.
+He says he wishes to give you a magic canoe
+that folds up small!
+@@ 58
+In the left tower of Sasune Castle there is
+the Wightslayer. It is a holy sword that shows
+its power against the undead.
+But only Red Wizards can use it.
+@@ 59
+The monsters in the Sealed Cave are
+all undead.
+If you cast Cure on them, you might be able
+to defeat them...
+@@ 60
+This castle has a secret path to the
+treasure room.
+@@ 61
+The Djinn's curse turned me into this.
+Ahh, what should I do...
+@@ 62
+Thank you, warriors!
+@@ 63
+"I am the King of Sasune. By the Djinn's curse
+ everyone has been changed into
+ ghost-like forms. Unless the Djinn is defeated,
+ we cannot go back to our original forms."
+"Where is the Djinn?"
+"In the Sealed Cave north of the castle.
+ But without a mythril ring,
+ the Djinn cannot be sealed away again."
+"We heard Princess Sara has it..."
+"Oh, that's right! Long ago, a mythril ring was
+ sent from Kazus to Princess Sara. But
+ Sara herself is nowhere to be seen.
+ Could the Djinn have carried her off?!
+ Oh, Princess Sara..."
+"Let's try going to the Sealed Cave."
+"Oh, warriors, well spoken.
+ If I recall, in the Sealed Cave there is one
+ hidden door. A skeleton should serve
+ as the key...
+
+ I beg you!
+ Defeat the Djinn and save the people!!"
+
+@@ 64
+Thank you, warriors.
+For sealing away the Djinn once more and
+rescuing Princess Sara,
+I thank you.
+You'd best take this with you.
+It may be of some use.
+
+Received the canoe from the king!
+@@ 65
+Sara: "I must stay at my father's
+{14:03}side.
+{14:03}The truth is, I want to go with you...
+{14:03}But I would only be a burden..."
+"Princess Sara..."
+"When your journey is over, be sure to come back,
+ please.
+ I will be waiting."
+@@ 66
+Princess Sara speaks of nothing but you
+every day, yes indeed.
+@@ 67
+Princess Sara wanted to see you!
+The top of the right tower is the princess's room.
+@@ 68
+Warriors, thank you.
+You are true heroes!
+@@ 69
+"I am Sara... daughter of the King of Sasune."
+"Princess Sara. Why are you in a place like this?"
+"Because I was wearing the mythril ring,
+ the Djinn's curse didn't affect me.
+ I wanted to save everyone in the castle,
+ so I came this far, but there are monsters
+ and I can't go any further...
+
+"It's dangerous here.
+ Princess Sara, please wait at the castle."
+"No! I'm going.
+ I'll go even if I'm alone!!"
+@@ 70
+"What a troublesome princess..."
+"Please, take me with you!
+ Without this mythril ring, the Djinn
+ cannot be sealed away!"
+"Can't be helped..."
+Princess Sara joined the party!
+
+@@ 71
+Cid: "While I was away, my old woman
+{14:03}took ill... Old woman, hang in there!
+{14:03}If only I had the magic medicine, Elixir..."
+@@ 72
+Thank you!
+You've saved me twice now.
+...
+Oh, that's right!
+Try pushing the candle on that wall there. You can get
+to the cave I used as the airship's storehouse
+long ago. Maybe there's something useful
+there.
+@@ 73
+The Crystal is quietly giving off light.
+"Warriors of Light,
+ you who divide light from darkness,
+ bring hope to this world once more..."
+@@ 74
+Cough cough!
+@@ 75
+If you go once around the continent on a chocobo,
+I'll give you something good!
+@@ 76
+My old man and I have both been
+greatly in your debt. Thank you, truly.
+@@ 77
+"I wonder if we should put the Dwarf's Horn here?"
+
+Dwarf: "Yes, please!"
+@@ 78
+It seems a wizard who traveled long ago
+hid a magic herb somewhere
+in this town...
+@@ 79
+They say there's a town of little people
+in the forest to the south.
+@@ 80
+If you use the Minimum magic, you can become tiny
+whenever you like...
+But I sold my last one to some young traveler
+called Desch.
+@@ 81
+Desch, I think he called himself...
+My daughter Salina is crazy about
+that good-for-nothing.
+What a pain...
+That man said there was something he just had
+to search for, and went off on a journey.
+Thanks to him, my daughter does nothing but cry.
+
+@@ 82
+Salina: "Ahh... Master Desch.
+{14:05}When I adore you so much...
+{14:05}Sob, sob...
+
+{14:05}He went off to the southern mountain,
+{14:05}where they say a dragon lives..."
+
+@@ 83
+The white magic called Aero controls the wind
+and harms the foe.
+It works well on monsters that fly in the sky!
+@@ 84
+A traveler named Desch drifted into
+this town.
+But he went off somewhere again right away.
+@@ 85
+What?
+@@ 86
+Waaah!
+@@ 87
+Rustle rustle...
+@@ 88
+"Well I'll be, meeting people in a place like this!
+ You folks got caught by that dragon
+ too? Clumsy, huh!!"
+"Look who's talking..."
+"Huh?
+ Oh, right, right, ha ha ha!
+ I'm Desch."
+"I'm {0C}."
+Desch: "Truth is, I've lost my memory.
+  I can't remember anything but my name.
+  But there's something I've got to do...
+  I just don't know what it is..."
+@@ 89
+Desch: "Yikes!!
+{14:05}The dragon's back!
+{14:05}Hide!!"
+@@ 90
+The dragon swooped down from the sky!
+
+Desch: "Fighting it straight up, we don't stand a chance!
+{14:05}We've gotta run, no matter what!
+{14:05}Run! Run!!"
+
+@@ 91
+"Oh!?
+ You're Desch!!"
+
+Desch: "No, you've got the wrong guy..."
+@@ 92
+Salina: "Master Desch!!!"
+Desch: "Sorry. There's something I've just
+{14:05}got to do."
+Salina: "I'll wait for you forever and ever..."
+@@ 93
+Haven't seen your faces around here.
+@@ 94
+There's a cave that cuts through the Miranos
+Mountains. Go through it and you can come out
+in Miralka Valley, where the Vikings live.
+@@ 95
+Thank you, warriors.
+Stay and take it easy for a while.
+Sara wanted to see you too.
+@@ 96
+I'm of the little people.
+Happy-go-lucky by nature!
+@@ 97
+They say there's a living forest somewhere.
+The fairies there are supposed to be cute!?
+@@ 98
+Doctor Shelco, the doctor, is in big
+trouble! He says his stomach hurts!!
+But nobody can help him. He's the only
+doctor in this village...
+@@ 100
+Smells funny... Sniff sniff!
+@@ 101
+Ugh... ugh...
+Anti...dote...
+Please...
+@@ 102
+"Somehow I feel my strength welling up!"
+
+[77][79] and [78][79] were restored!
+@@ 104
+Thanks to you, I'm saved.
+As thanks, I'll tell you about the cave I found
+that lets you pass through the Miralka Mountains.
+Take care as you go.
+@@ 105
+Doctor Shelco knows a secret path
+to Miralka Valley.
+@@ 106
+Little People's Bread has magic power.
+The same power as the magic called Sightro!
+@@ 107
+If you use Little People's Bread, you can see the world!
+@@ 108
+A wall of fire blocks the way ahead.
+@@ 109
+"Congratulations on going once around the continent
+ on a chocobo. Here, your prize!"
+
+Received Little People's Bread!
+@@ 110
+We're Vikings!
+Nobles of the sea!
+...
+But y'know... truth is, we're in a fix.
+After that great earthquake a sea dragon appeared
+and smashed up our ships.
+Only the Enterprise came through all right,
+but everybody's too scared to sail her.
+@@ 112
+The boss is at his wits' end too.
+We're no match for the sea dragon...
+@@ 113
+You've got guts! Thanks!!
+@@ 114
+Can't get through this without a drink!
+Vikings who can't sail a ship...!!
+@@ 116
+I'm sulking in bed...
+@@ 117
+Now I can get some good sleep...
+@@ 118
+The building on the cape is the Temple of Nept.
+Gramps ought to know all the details!
+@@ 120
+The Enterprise is without a scratch.
+But nobody's going to sail her!
+You'd just get attacked by the sea dragon
+and lose your life.
+@@ 122
+I-I'm not hiding or anything...!
+I'm waiting for Gramps to come up.
+@@ 124
+You'd better not get on the ship!
+When you go out to the cape, the sea dragon attacks.
+I'm sure it's the Nept Dragon worshipped
+at the Temple of Nept...
+@@ 125
+Kyaaa!
+You guys are so... coo... ool!
+@@ 126
+That one there is the boss.
+Honestly! He's so pathetic, it's unbelievable!!
+@@ 128
+Boss: "It's no good... No way we can beat the sea dragon...
+{14:03}If you folks get rid of
+{14:03}the sea dragon for us, I'll give you
+{14:03}the Enterprise! How about it?"
+@@ 129
+Boss: "Amazing, you folks are real
+{14:03}heroes. Strong! Like I promised,
+{14:03}the Enterprise is
+{14:03}yours!"
+@@ 130
+I'm the oldest of all the Vikings,
+Gramps.
+The Temple of Nept is the place where the Nept
+Dragon had gone to sleep.
+But in that great earthquake something happened,
+and the Nept Dragon began to rampage
+as if it had gone mad...
+
+@@ 131
+Thank you, young ones!
+Thanks to you, the Nept Dragon has calmed down.
+@@ 132
+Please put the dwarves' treasure to use, lali!
+@@ 134
+It's a statue of the Nept Dragon. One of its eyes
+is missing. Where the eye is missing there's
+a small hole that leads further in...
+"I wonder if we could get in if we turned tiny?"
+@@ 135
+The Dwarf's Horn was stolen!
+Lali-lali-ho!
+@@ 136
+Both of them were stolen!
+Lali-lali-ho-lalee!
+@@ 137
+We'll give you the dwarves' treasure as thanks!
+We'll show you the way with the moonwalk, lali-lali!!
+@@ 138
+The Nept Dragon has fallen into a deep sleep.
+@@ 139
+It's a giant rat!
+"Squeak! I won't hand this jewel over to anybody,
+ squeak! I'll fix you lot like this!"
+@@ 140
+Got the Nept Dragon's eye.
+@@ 141
+Gyaaah!
+There's nothing left to take!!
+@@ 142
+Thanks to you, we're saved.
+Thank you!
+@@ 143
+Don't kill meee!
+@@ 145
+A devil lives in the desert to the west...
+A huge tree moves around!
+@@ 146
+The young folks Hein had captured
+have come back too. Thank you, truly.
+@@ 147
+Thanks to you, we are saved.
+Thank you so very much.
+@@ 148
+Ah, it's the big brothers who beat Hein!
+So cool!
+@@ 149
+"This is a crest dropped by the soldiers
+ who attacked this village.
+ Argus..."
+"Don't tell me the King of Argus...!?"
+@@ 151
+Far to the west, across the desert,
+lives an odd bunch who call themselves
+the descendants of the Ancients
+or some such.
+@@ 153
+Please, spare at least this child!
+@@ 154
+What? You're not?
+I'm sorry.
+I was sure the soldiers who attacked the village
+had come again...
+Sob... sob... my husband was captured...
+and taken off to the western desert.
+Soldiers wearing the crest of Argus
+came and...
+@@ 155
+I wonder if he is safe...
+Oh, please be alive!
+@@ 156
+My husband was alive!
+Thank you so very much!!
+@@ 157
+"What!? Desch is in the flames
+ of the Tower of Owen!!"
+"I'm sure he's alive."
+"Oh, Master Desch, please be safe!"
+@@ 158
+Thank you, big brothers!
+@@ 159
+Thank you very much.
+Thanks to you, I got back safely to the village
+from Hein's castle.
+@@ 160
+This is the house of the chief of Tokkul village.
+Please, listen to what the chief has to say.
+@@ 162
+I am the chief.
+The truth is, ever since that great earthquake, soldiers
+have been coming from the western desert, carrying off
+the village's young people and food...
+Thanks to that, the village is in this state.
+Ahh... what to do, what to do.
+
+@@ 164
+There's a hidden staircase in the fireplace.
+We've hidden weapons there, but we can't
+use them. Please.
+Use them and save the village.
+@@ 166
+We are the fairies of this forest.
+@@ 167
+The wizard who carried off the elder
+can change his own weakness.
+Without the power to see through it,
+you may not be able to defeat him...
+@@ 168
+This forest is alive.
+@@ 169
+The forest is crying... In this forest there was
+the elder tree, which lives 10000 years.
+A wizard put a curse on it
+and carried it off somewhere.
+@@ 170
+If the elder tree doesn't come back, soon
+this forest will die.
+Everything will wither...
+@@ 171
+The elder tree has been carved into the shape
+of a castle and is wandering the desert.
+Help it!
+@@ 172
+Hein, the priest of Argus Castle,
+put a curse on the elder.
+@@ 173
+Hein uses Barrier Change.
+He can change his own weakness.
+@@ 174
+This is the Valley of the Gulgan Tribe. The Gulgan tribe
+cannot see from the time they are born. Instead,
+a kind of sixth sense has developed, and some among them
+can peer into the future.
+@@ 175
+The Crystal whose light you inherited
+governs the wind.
+Go to the Crystals of fire, water and earth.
+You will gain still greater power...
+@@ 176
+The power of earth sealed the other three lights...
+And its own power as well...?
+@@ 177
+Even that great earthquake is no more than an
+omen. Even the great tremor that dragged the
+Crystals, the source of this world's light, deep into
+the earth and gave birth to monsters,
+set beside what is to come,
+is a trifling thing...
+
+@@ 178
+On the island where the dwarves live, the power of flame...
+@@ 179
+Use this magic and enter the Tower of Owen
+to the north.
+Desch... your destiny is waiting.
+
+Received the magic Toad!
+
+@@ 180
+The Tower of Owen is a tower of machinery...
+Desch's destiny is waiting.
+@@ 181
+When the tower gives off red flames and is about
+to crumble away...
+the man who will change destiny shall awaken.
+@@ 182
+We live quietly in this valley.
+When people know the future, it usually
+brings them misfortune.
+@@ 183
+The future looks like light, and like darkness...
+It is not certain...
+@@ 184
+The living forest, the forest with life,
+is calling you...
+@@ 185
+We are descendants of the Ancients, who
+built a super civilization.
+We follow the law and live together with nature.
+@@ 186
+The flood of light... that was a terrible calamity
+brought about by the Ancients.
+The Ancients used the Crystals to control the power
+of light freely.
+But one day the light began to run wild.
+It began to destroy the world...
+It was a power too great for humans.
+
+It is said that four warriors appeared from the World
+of Darkness and held back the rampage of light. But
+the Ancients were almost wiped out. The few who
+survived moved to this land and settled here.
+@@ 187
+This continent is floating in the air.
+Can you believe it?
+It was built by the civilization of the Ancients.
+It's still running even now...
+The Tower of Owen produces that
+power.
+
+@@ 188
+Our law is...
+to live by entrusting ourselves to the great will.
+We must not rely on machines.
+@@ 189
+Light and darkness have hearts...
+And it is said that when something happens, those
+hearts choose four people and entrust them
+with their own power...
+So it was with the Four Warriors of Darkness,
+who saved the world from the flood of light.
+And now you have been chosen
+by the light...
+You must not use that power
+the wrong way!
+
+@@ 190
+To the east there is a forest where the animals
+called chocobos live.
+@@ 191
+By order of Lord Xande, I, Medusa, shall destroy
+the tower and drop this continent floating
+in the air.
+Hee hee hee...
+I'll let no one interfere! Die!!
+
+@@ 192
+Flames are raging.
+It looks like it could explode at any moment...
+@@ 193
+No! It's dangerous to get close.
+I've finally got my memory back!
+I'm the overseer of this tower, a survivor
+of the Ancients.
+I was asleep for a long time.
+I was set to wake up if anything
+went wrong with the tower.
+Seems I slept so long I got a little scatterbrained...
+@@ 194
+It's pretty bad...
+Maybe I can still do something.
+I've got to go in here and fix the
+power conduit.
+At this rate the Floating Continent will lose
+its power and fall.
+This is where we part ways...
+You've done a lot for me. Thanks.
+@@ 195
+"Desch!! Stop it, you'll get yourself killed!"
+@@ 196
+This is my mission...
+I'll stop the whirlpool with the device down below,
+so you guys go to the island where the dwarves live.
+The power of flame should be there.
+Once I'm down there, I'll warp you
+outside.
+Well then, so long!
+Here goes!
+@@ 197
+"Deeesch!!..."
+@@ 198
+Flames are raging.
+"Deeesch!"
+There is no answer.
+"Did he really die...?"
+@@ 199
+Lali-ho!
+@@ 200
+Two horns made of ice.
+The dwarves' treasure!
+But a bad guy stole them!
+Unforgivable!
+@@ 201
+"Thank youuu!
+ As thanks, we'll give you thiiis!!
+ If you go to Gysahl there's more!"
+Received the Magic Key.
+@@ 202
+Please, get the horn back!
+The guy who stole it ran into the underground lake!
+@@ 203
+Unbelievable!
+That Gutsco got both of the horns!
+Terrible, terrible!
+@@ 204
+Thank youuu!!
+Thanks to you, the dwarves' treasure, the two horns,
+came back!
+@@ 205
+Lali-ho!
+The two horns are back.
+Hooray! Lali-ho!!
+@@ 206
+We put a charm on the one left so nobody
+can get near it!
+We'll protect this one no matter what!!
+@@ 207
+Thank you sooo much!
+You got the horn back for us!
+Please put it back where it was!!
+@@ 208
+That guy must have headed for the mountain to the north!
+Please! Get the two horns back!
+@@ 209
+On the north mountain there stood a tower like
+pretty glass. But after the earthquake it vanished.
+A cave opened up there.
+@@ 210
+Launch!!
+@@ 211
+Hot hot!
+@@ 212
+Bah, stay back, stay back!
+I won't hand this horn over to you.
+Die!
+@@ 213
+Got the Dwarf's Horn.
+@@ 214
+ I came from the Forest of the Little People to the south
+ to draw the mysterious water of this forest.
+ It's a town of little people that only little people
+ can get into!
+ If you folks have Minimum too,
+ turn tiny and try going to Tozus,
+ the Forest of the Little People!
+
+@@ 215
+Go aaall the way east across the open sea,
+and there's a frontier village called Gysahl!
+@@ 216
+My, my, how many years has it been since anyone
+came to a frontier town like this!?
+@@ 218
+I'm a shepherd...
+@@ 219
+Hey, hey! Don't go over there!!
+@@ 220
+Gysahl Vegetables are a chocobo's favorite food.
+I'll let you alone in on a secret:
+in the Chocobo Forest there's a chocobo boss
+with mysterious powers.
+Try using a Gysahl Vegetable on the tree
+growing in the middle.
+You might just get to meet the chocobo boss,
+the Fat Chocobo.
+@@ 221
+Tsurugizaki: "I'm Tsurugizaki.
+{14:06}I write lots of letters!
+
+
+
+{14:04}Please write me letters too, everyone!
+{14:07}Square Development Division"
+
+@@ 223
+The Fat Chocobo can store things
+in its belly!
+Funny, isn't it!!
+@@ 224
+Was the Elixir of use?
+@@ 225
+"I am Argus. King of the castle north of
+ the desert. Though I suppose there is no one
+ there now...
+
+ The soldiers have had a curse put on them by Hein
+ and are being controlled. That Hein, he was
+ once my close aide...
+ Cough cough..."
+"Are you all right, Your Majesty?"
+"I am all right. More importantly, I beg you,
+ defeat Hein!"
+
+@@ 226
+Hein is the priest of Argus.
+But after that great earthquake, he was possessed
+by the power of evil.
+@@ 227
+This castle was made by hollowing out
+the elder tree of the living forest.
+The elder tree is being controlled
+by Hein the Wizard...
+@@ 228
+"If you use this, you can become tiny...
+ I'm done for...
+ Get out through the hole in the wall in the left corner...
+ ..."
+Received the Lucky Mallet.
+
+@@ 229
+Hein gained some powerful force,
+and then gave in to the greed
+that power produces...
+@@ 230
+Hein has hidden the King of Argus's sword,
+the King's Sword, somewhere.
+@@ 231
+What?
+You're going to defeat Lord Hein??
+I am Lord Hein's servant!
+Die!!!
+@@ 232
+It's Hein the Wizard!
+"Magnificent...
+ The power that this darkness produces
+ is beautiful...
+ Do you not understand how magnificent this power is!
+ Using this power I shall move the living
+ tree, control the soldiers, and then
+ become the ruler of this world!!
+ I'll let no one interfere. Die!"
+
+@@ 233
+Now, come over here!
+Honestly! You're hopeless!!
+@@ 234
+Gysahl is a frontier village at the eastern
+edge! There are sheep!
+There's a blacksmith who makes keys!
+
+@@ 235
+A bad guy named Gutsco stole the dwarves' treasure,
+the two horns!
+He dove into the underground lake and got away!
+Dwarves can't swim! We can't get the horns back!
+@@ 236
+Yikes!
+Gutsco ran off to the cave to the north!
+He took both of the horns!
+Terrible, terrible!
+@@ 237
+Status restored!
+@@ 238
+Revived!
+@@ 239
+[77][79] [78][79] restored!
+@@ 240
+Heroes, thanks to you, peace has come
+once again.
+I thank you from my heart. Thank you, truly.
+Take this with you.
+This is a box handed down for generations
+in my royal family, called the Gear of Time.
+They say the Ancient People made it.
+Give this to Cid, who lives in Canaan.
+Oh, you know Cid?
+Then that makes things quick.
+Now go, warriors.
+
+Received the Gear of Time from the King of Argus!
+
+@@ 241
+Now, to Canaan!
+Give the Gear of Time to Cid!
+@@ 242
+"Oh, that Cid. He built an airship!
+ Now, take flight! The world is endless.
+ Fly off from this Floating Continent!"
+@@ 243
+This continent is floating.
+It is the Floating Continent.
+@@ 244
+The Gear of Time...
+It seems it was also called the perpetual motion machine...
+@@ 245
+Those called thieves, or Thieves,
+can open locked doors with their bare hands.
+@@ 246
+The rightmost of the four flames is
+the switch for the hidden door.
+@@ 247
+Warriors of Light, thank you for saving
+Argus!!
+@@ 248
+I'm doing research on creating the phantom
+secret medicine, Elixir.
+Please take these two Elixirs
+I happened to make!
+Received two Elixirs!
+
+@@ 249
+It's a campfire.
+@@ 250
+It's the Dwarf's Horn.
+@@ 251
+A rock blocks the path.
+@@ 252
+It's a chocoboooo!
+@@ 253
+Long ago I worked under the King
+of Argus. I built airships with the
+Gear of Time and such!
+I'm famous, you know! Ha ha ha!!
+@@ 254
+A Knight protects those with
+low [77][79].
+@@ 255
+Found a chocobo!
