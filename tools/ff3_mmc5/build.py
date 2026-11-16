@@ -32,32 +32,36 @@ NOP = 0xEA
 # Item syntax: int = byte; 'name' = 16-bit address of a label; ('lo'|'hi', name) = one
 # byte of it; ('L', name) defines a label here; ('b', opcode, name) = relative branch.
 _PARTS = [
-    ('curtgt',  [0x00]),                      # line of the next IRQ (MMC3 numbering)
+    ('curtgt',  [0x00]),                      # line of a chained IRQ in flight (MMC3 numbering)
+    ('chained', [0x00]),                      # 1 while a chained IRQ is in flight
     ('lastirq', [0x00]),                      # line of the IRQ just delivered
-    ('entab',   [0x00, 0x80]),                # $5204 values: disable / enable
     ('irq_entry', [                           # hardware IRQ at the start of the line
-        0x2C, 0x04, 0x52,                     # BIT $5204   ; acknowledge (clears pending)
+        0x2C, 0x04, 0x52,                     # BIT $5204   ; acknowledge; V = "in frame"
+        ('b', 0x50, 'stale'),                 # BVC stale   ; pending left over from a frame
+                                              #   with the IRQ disabled
         0x48,                                 # PHA
-        0xAD, 'curtgt', 0x8D, 'lastirq',      # LDA curtgt / STA lastirq
-        0xA9, 8,                              # LDA #8 + 2 NOPs ; delay: the game's handler
-        ('L', 'd1'), 0x38, 0xE9, 0x01, ('b', 0xD0, 'd1'),   # starts on the same dot as with
-        0xEA, 0xEA,                           #   MMC3 (calibrated against its $E000 write)
-        0x68,                                 # PLA
-        0x4C, 0x30, 0xFB]),                   # JMP $FB30   ; the game's IRQ handler
-    ('nmi_setup', [                           # A = latch L + reload, $01 = 0 disable / 1 enable
-        0x38, 0xE9, 0x01,                     # SEC / SBC #1 ; MMC3 fires on line L-1
-        0x8D, 'curtgt', 0x8D, 0x03, 0x52,     # STA curtgt / STA $5203
-        0x2C, 0x04, 0x52,                     # BIT $5204   ; drop a stale pending flag
-        0xA6, 0x01,                           # LDX $01
-        0xBD, 'entab',                        # LDA entab,X
-        0x8D, 0x04, 0x52,                     # STA $5204
-        0x60]),                               # RTS
+        0xAD, 'chained', ('b', 0xF0, 'fromnmi'),
+        0xAD, 'curtgt', 0x18, ('b', 0x90, 'have'),   # chained: line = curtgt
+        ('L', 'fromnmi'),
+        0xA5, 0x02, 0x38, 0xE9, 0x01,         # NMI-armed: line = latch ($02) - 1
+        ('L', 'have'),
+        0x8D, 'lastirq',
+        0xA9, 0x00, 0x8D, 'chained',
+        0xA9, 6,                              # delay: the game's handler starts on the same
+        ('L', 'd1'), 0x38, 0xE9, 0x01, ('b', 0xD0, 'd1'),   # dot as with MMC3 (83 cycles
+        0x68,                                 #   from the line start on the NMI path)
+        0x4C, 0x30, 0xFB,                     # JMP $FB30   ; the game's IRQ handler
+        ('L', 'stale'),
+        0x40]),                               # RTI
     ('latch',   [0x00]),                      # emulated MMC3 latch ($C000)
     ('enable', [                              # $E001 after a latch write right after an IRQ
         0xAD, 'latch',                        # LDA latch
         0x38, 0x6D, 'lastirq',                # SEC / ADC lastirq ; MMC3: line + V + 1
+        0xC9, 240, ('b', 0xB0, 'en_x'),       # CMP #240 / BCS (never reached on MMC5 either)
         0x8D, 'curtgt', 0x8D, 0x03, 0x52,     # STA curtgt / STA $5203
+        0xA9, 0x01, 0x8D, 'chained',
         0xA9, 0x80, 0x8D, 0x04, 0x52,         # LDA #$80 / STA $5204
+        ('L', 'en_x'),
         0x60]),                               # RTS
     # Battle raster effect (bank $2F, $B8AC-$B8D9). The MMC3 loop chains an IRQ every 2
     # lines and writes $2000 twice per pair; its timing is too tight for MMC5's line-start
@@ -76,7 +80,7 @@ _PARTS = [
         0xC8, 0xEE, 'fx_line',                # INY / INC fx_line
         0xC0, 108, ('b', 0xD0, 'fxl'),        # CPY #108 / BNE fxl
         # leave the IRQ model as the MMC3 loop leaves it: last IRQ on line 147
-        0xA9, 147, 0x8D, 'lastirq',
+        0xA9, 147, 0x8D, 'lastirq', 0xA9, 0x00, 0x8D, 'chained',
         0x2C, 0x04, 0x52,                     # BIT $5204 (drop pending)
         0xA2, 0x36,                           # LDX #$36 (as the loop leaves it; Y = 108)
         0x60]),
@@ -111,7 +115,7 @@ def _assemble(base=0x5C00):
     return bytes(out), labels
 
 EXRAM, LABELS = _assemble()
-IRQ_ENTRY, NMI_SETUP = LABELS['irq_entry'], LABELS['nmi_setup']
+IRQ_ENTRY = LABELS['irq_entry']
 MIR_H, MIR_V, ENABLE, LATCH = LABELS['mir_h'], LABELS['mir_v'], LABELS['enable'], LABELS['latch']
 FX2F = LABELS['fx2f']
 assert len(EXRAM) <= 0xFF
@@ -143,9 +147,12 @@ def convert(src):
     patch(rom, 0x3F15C, [0xA9,0x01,0x8D,0x00,0xA0], jsr(MIR_H) + bytes([0xA9,0x01]))
     patch(rom, 0x3F1D0, [0xA9,0x00,0x8D,0x00,0xA0], jsr(MIR_V) + bytes([0xA9,0x00]))
     # --- IRQ ---
-    # NMI handler: latch + reload + enable/disable
-    patch(rom, E+0xFB66, [0x8D,0x00,0xC0,0x8D,0x01,0xC0,0xA6,0x01,0x9D,0x00,0xE0],
-                         jsr(NMI_SETUP) + bytes([NOP]*8))
+    # NMI handler ($FB62-$FB70): LDA $03 / STA $02 / STA $C000 / STA $C001 / LDX $01 /
+    # STA $E000,X  (latch + reload + enable/disable, 22 cycles) ->
+    # LDX $03 / STX $02 / DEX / STX $5203 / LDA $01 / LSR / ROR / STA $5204 (23 cycles;
+    # A and X are reloaded right after, at $FB71/$FB75)
+    patch(rom, E+0xFB62, [0xA5,0x03,0x85,0x02,0x8D,0x00,0xC0,0x8D,0x01,0xC0,0xA6,0x01,0x9D,0x00,0xE0],
+                         [0xA6,0x03,0x86,0x02,0xCA,0x8E,0x03,0x52,0xA5,0x01,0x4A,0x6A,0x8D,0x04,0x52])
     # IRQ handler ack ($E000 = disable + ack) -> disable MMC5 IRQ (ack happens at entry)
     patch(rom, E+0xFB45, [0x8D,0x00,0xE0,0xA9,0x00,0x85,0x00], [0xA9,0x00,0x8D,0x04,0x52,0x85,0x00])
     # IRQ vector trampoline $0103: JMP $FB30 -> JMP irq_entry
