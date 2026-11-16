@@ -303,186 +303,186 @@
   "id": 50,
   "off": "752F3",
   "ja": "{13:02}「こい　ばけものめ　{18:EC}があいてだ!\n{18:F0}「みのほどしらずの　うじむしめが!しね!!\n{13:02}「ウォーー!!!\n{11:02}「{13:02}!!",
-  "en": ""
+  "en": "{13:02}: \"Come on, you monster, {18:EC} am your opponent!\"\n{18:F0}: \"Insolent maggot! Die!!\"\n{13:02}: \"RAAAAH!!!\"\n{11:02}: \"{13:02}!!\""
  },
  {
   "id": 51,
   "off": "75333",
   "ja": "{18:EF}「{10:02}!　どうしたのです?\nおまえは　{18:EE}!!\nいったい　なにがあったのです?!\n{10:02}「{18:F0}が‥‥よみがえって‥‥\n{11:02}「{18:FA}が‥‥\n{18:EC}たちを　にがすために‥‥\nヨーゼフ　ミンウ　シド　{13:02}‥‥\nみんなしんでしまった‥‥もうたくさんよ!!",
-  "en": ""
+  "en": "{18:EF}: \"{10:02}! What happened?\nAnd you, the {18:EE}!!\nWhat on earth happened?!\"\n{10:02}: \"The {18:F0}... came back to life...\"\n{11:02}: \"The {18:FA}...\nto let {18:EC} and the others escape...\nJosef, Minwu, Cid, {13:02}...\nThey're all dead... I've had enough!!\""
  },
  {
   "id": 52,
   "off": "753AE",
   "ja": "ついに　{18:FA}と　{18:FB}がそろった!!",
-  "en": ""
+  "en": "At last the {18:FA} and the {18:FB} are together!!"
  },
  {
   "id": 53,
   "off": "753C0",
   "ja": "{11:02}「ミンウ!しっかり!!\nミンウ「{18:EC}は　ちからをつかいすぎた\nきゅうそくがひつようだ‥‥\nさあ　あのとびらの　むこうへ‥‥\nガクッ‥!\n{10:02}「ミンウ!!\n\n",
-  "en": ""
+  "en": "{11:02}: \"Minwu! Hold on!!\"\nMinwu: \"{18:EC} have used too much of my power\nI need rest...\nNow, go beyond that door...\nUgh...!\"\n{10:02}: \"Minwu!!\"\n\n"
  },
  {
   "id": 54,
   "off": "75411",
   "ja": "やった!パンデモニウムに　はいった!!",
-  "en": ""
+  "en": "We did it! We're inside Pandaemonium!!"
  },
  {
   "id": 55,
   "off": "75425",
   "ja": "ついに　ここまでやってきたな!だが　{18:EC}をたおす\nことはできん!しね!",
-  "en": ""
+  "en": "So you have finally come this far! But you cannot\ndefeat {18:EC}! Die!"
  },
  {
   "id": 56,
   "off": "75449",
   "ja": "{18:F0}「この　{18:EC}が　やられるとは‥‥\nしんじられ‥‥ん‥‥2どまでも‥おまえに‥‥\n‥おまえは　いった‥い　な‥にもの‥‥\nウボァー",
-  "en": ""
+  "en": "{18:F0}: \"That {18:EC} could be beaten...\nI can't... believe... it... twice... by you...\n...who... on earth... are you...\nUBOAAAH\""
  },
  {
   "id": 57,
   "off": "7548C",
   "ja": "さあ　だっしゅつだ!!",
-  "en": ""
+  "en": "Now, let's escape!!"
  },
  {
   "id": 58,
   "off": "75498",
   "ja": "{18:EF}「よく　ぶじにかえってきましたね\n{18:EB}「ついにやったな!おめでとう!!",
-  "en": ""
+  "en": "{18:EF}: \"Welcome back safe and sound\"\n{18:EB}: \"You finally did it! Congratulations!!\""
  },
  {
   "id": 59,
   "off": "754BE",
   "ja": "ポール「よく　かえってきたな　ほんとうに‥‥\nむちゃなやつだよ　まったく!!\n\nあばよ　げんきにやれよ!!",
-  "en": ""
+  "en": "Paul: \"You made it back, you really did...\nYou're a reckless one, you are!!\n\nSee ya, take care of yourself!!\""
  },
  {
   "id": 60,
   "off": "754F4",
   "ja": "レイラ「あたいの　みこんだとおりの　おとこだったね!\nかいぞくは　たのしいよ　きがむいたら　きておくれ!\nあたいは　いつまでも　まってるよ!!",
-  "en": ""
+  "en": "Leila: \"You turned out to be just the man I took you for!\nPiratin's fun, come join us if you feel like it!\nI'll be waitin' for you, always!!\""
  },
  {
   "id": 61,
   "off": "7553C",
   "ja": "ネリー「おめでとう!!おとうさんも　きっと\nよろこんでるわ!　{18:EC}　{18:ED}さまのところで\nみんなの　おてつだいをして　はたらくわ!\n{18:EC}でも　きっと　できることがあるとおもうの!!",
-  "en": ""
+  "en": "Nelly: \"Congratulations!! I'm sure Daddy\nis happy too! {18:EC}'m going to work for the {18:ED},\nhelping everyone out!\nEven {18:EC} must be able to do something!!\""
  },
  {
   "id": 62,
   "off": "75596",
   "ja": "ヨ　ヨーゼフ!!",
-  "en": ""
+  "en": "J- Josef!!"
  },
  {
   "id": 63,
   "off": "7559F",
   "ja": "\n　　　　　　　　　　　　?",
-  "en": ""
+  "en": "\n            ?"
  },
  {
   "id": 64,
   "off": "755AE",
   "ja": "{18:EF}「{18:EC}たちは　せかいの　ふっこうのために\nがんばります。　あなたたちも　がんばって!!",
-  "en": ""
+  "en": "{18:EF}: \"{18:EC} and everyone will work hard to rebuild\nthe world. You do your best too!!\""
  },
  {
   "id": 65,
   "off": "755DC",
   "ja": "{12:02}「おわった　やっと‥‥\n{10:02}「ああ!!",
-  "en": ""
+  "en": "{12:02}: \"It over, finally...\"\n{10:02}: \"Yeah!!\""
  },
  {
   "id": 66,
   "off": "755F2",
   "ja": "{11:02}「また　4にんで　くらしましょう!\n{10:02}「‥‥",
-  "en": ""
+  "en": "{11:02}: \"Let's all four live together again!\"\n{10:02}: \"...\""
  },
  {
   "id": 67,
   "off": "7560C",
   "ja": "{11:02}「ね　にいさん!",
-  "en": ""
+  "en": "{11:02}: \"Right, brother!\""
  },
  {
   "id": 68,
   "off": "75617",
   "ja": "{07}「おれたちは　いろんなことをしりすぎた‥\nもう　むかしには　かえれない‥‥",
-  "en": ""
+  "en": "{07}: \"We've learned too many things...\nWe can't go back to the way things were...\""
  },
  {
   "id": 69,
   "off": "7563E",
   "ja": "{11:02}「にいさん‥なぜ?　まって!!\n　{10:02}　にいさんをとめて!!\n{10:02}「{11:02}　おれにはとめられない‥‥\n　{07}　のいったとおりだ‥‥",
-  "en": ""
+  "en": "{11:02}: \"Brother... why? Wait!!\n {10:02}, stop him!!\"\n{10:02}: \"{11:02}, I can't stop him...\n It's just as {07} said...\""
  },
  {
   "id": 70,
   "off": "75680",
   "ja": "{10:02}「{07}　いつのひか　きっと!!",
-  "en": ""
+  "en": "{10:02}: \"{07}, someday, I'm sure of it!!\""
  },
  {
   "id": 71,
   "off": "75691",
   "ja": "{10:02}「さあ　おれたちもいこう!!\nこれからが　ほんとうの　はじまりだ!!",
-  "en": ""
+  "en": "{10:02}: \"Now, let's go too!!\nThis is where it truly begins!!\""
  },
  {
   "id": 72,
   "off": "756B6",
   "ja": "{18:F0}「{18:EC}は　し‥な‥‥ん‥‥!!",
-  "en": ""
+  "en": "{18:F0}: \"{18:EC}... shall... not... die...!!\""
  },
  {
   "id": 73,
   "off": "756C8",
   "ja": "1かいまで　おちてしまった!!",
-  "en": ""
+  "en": "Fell all the way to the first floor!!"
  },
  {
   "id": 74,
   "off": "756D8",
   "ja": "{18:EF}「かかったな　{10:02}　しね!!\n{10:02}「くそっ!{18:ED}に　ばけていたな!\n\n{13:02}「ばけもの!　そうはさせないよ!!",
-  "en": ""
+  "en": "{18:EF}: \"Gotcha, {10:02}. Die!!\"\n{10:02}: \"Damn! You were disguised as the {18:ED}!\"\n\n{13:02}: \"Monster! I won't let you!!\""
  },
  {
   "id": 75,
   "off": "75711",
   "ja": "{10:02}「ありがとう　{13:02}\n{13:02}「ゆだんしちゃ　だめ!\nおんなは　こわいんだよ!!\n{12:02}「{18:ED}　ほんもの　どこ??",
-  "en": ""
+  "en": "{10:02}: \"Thanks, {13:02}\"\n{13:02}: \"Don't let your guard down!\nWomen are scary!!\"\n{12:02}: \"{18:ED}, real one, where??\""
  },
  {
   "id": 76,
   "off": "75749",
   "ja": "{07}「{18:F0}を　たおさないかぎり\nもっと　おおくのものがしぬ!\n{10:02}「{07}!いっしょにたたかおう\n{18:ED}!かれを　なかまにさせてください\n{18:EF}「‥‥{18:EE}のことは\nあなたにまかせましょう!\n{11:02}「にいさん!たたかいましょう!!\n",
-  "en": ""
+  "en": "{07}: \"Unless we defeat the {18:F0},\nmany more will die!\"\n{10:02}: \"{07}! Let's fight together\n{18:ED}! Please let him join us\"\n{18:EF}: \"...I shall leave the matter of the {18:EE}\nto you!\"\n{11:02}: \"Brother! Let's fight!!\"\n"
  },
  {
   "id": 77,
   "off": "757B7",
   "ja": "てきのしれいかんを　たおした!!",
-  "en": ""
+  "en": "Defeated the enemy commander!!"
  },
  {
   "id": 78,
   "off": "757C8",
   "ja": "{10:02}「ここは　どこだ?\nあっ　{13:02}がいない!!",
-  "en": ""
+  "en": "{10:02}: \"Where am I?\nAh, {13:02} is gone!!\""
  },
  {
   "id": 79,
   "off": "757E0",
   "ja": "ドッペルゲンガー「そこを　どけ!",
-  "en": ""
+  "en": "Doppelganger: \"Out of the way!\""
  },
  {
   "id": 80,
   "off": "757F1",
   "ja": "{12:02}「だいじょうぶ　シド?",
-  "en": ""
+  "en": "{12:02}: \"You okay, Cid?\""
  }
 ]
