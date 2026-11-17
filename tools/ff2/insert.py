@@ -180,6 +180,19 @@ EQUIP_LABELS = ['Right Hand', 'Head', 'Arms', 'Left Hand', 'Body', 'Item']
 SYS_LAYOUT[36] = '\n'.join(['{08}{16:02}' + EQUIP_LABELS[k] + '\n{08}{14:03}{10:%02X}' % c
                             for k, c in enumerate((6, 3, 5, 7, 4, 8))] + ['{08}{16:02}{10:09}'])
 SYS_LAYOUT[35] = 'Attack  ..{10:24}\nDefense ..{10:25}'
+# status (window 15, 27 x 24 inside): one column, one row per line (two columns of
+# English labels and values do not fit 27)
+STAT = [('Strength', 0x26, ''), ('Agility', 0x27, ''), ('Stamina', 0x28, ''), ('Intelligence', 0x29, ''),
+        ('Spirit', 0x2A, ''), ('Magic Power', 0x2B, '')]
+COMBAT = [('Attack', 0x24, ''), ('Hit Rate', 0x2D, '%'), ('Defense', 0x25, ''), ('Evasion', 0x2E, '%'),
+          ('Magic Defense', 0x2F, '%')]
+def stat_line(l, c, pct, w=3):    # numbers right-aligned (attributes print 2 wide)
+    return ' %s{14:0F}..%s{10:%02X}%s' % (l, ' ' * (3 - w), c, pct)
+SYS_LAYOUT[39] = '\n'.join(
+    ['{08}{14:05}{10:02}{14:0E}HP {10:20}/{10:21}', '{14:0E}MP  {10:22}/ {10:23}', '', '']
+    + [stat_line(*x, w=2) for x in STAT] + ['', ' {10:00}'] + [stat_line(*x) for x in COMBAT]
+    + ['\u2026' * 27, ' Skill Level', ' [6E] {10:30}{14:0A}[71] {10:33}{14:13}[74] {10:36}',
+       ' [6F] {10:31}{14:0A}[72] {10:34}{14:13}[75] {10:37}', ' [70] {10:32}{14:0A}[73] {10:35}'])
 # magic (window 11, 18 rows inside): one column of the 16 spells with their levels, then
 # the bin (two columns cannot hold an English name, its level and the hand's cells)
 SYS_LAYOUT[38] = '\n'.join(['{08}{17:02}{10:%02X}{14:0B}{10:%02X}' % (0x0A + i, 0x38 + i)
@@ -433,6 +446,51 @@ repin:          ; first cursor on SLOT1's entry if it is in view, else hidden
     lda #0
     sta $A2
     rts
+copystr:        ; $DAF1: system string A to $7B00 for drawing (code 10 becomes the current
+    pha         ;   character's code $9E), as the Japanese, with 16-bit pointers (English
+    lda #$0A    ;   menu strings exceed 256 bytes; $7C00-$7DFF is used only in battle)
+    jsr $FE03
+    pla
+    asl a
+    tay
+    lda $8400,y
+    sta $80
+    lda $8401,y
+    sta $81
+    lda #0
+    sta $82
+    lda #$7B
+    sta $83
+    ldy #0
+.l:
+    lda ($80),y
+    cmp #$30
+    bcs .one
+    cmp #$10
+    bcc .one
+    bne .two
+    lda $9E
+.two:
+    sta ($82),y
+    jsr .inc
+    lda ($80),y
+    sta ($82),y
+    jsr .inc
+    jmp .l
+.one:
+    sta ($82),y
+    jsr .inc
+    cmp #0
+    bne .l
+    lda #$0E
+    jmp $FE03
+.inc:
+    iny
+    bne .r
+    inc $81
+    inc $83
+.r:
+    rts
 onerow:         ; C = 1 in one-row mode
     lda ONE
     cmp #1
@@ -542,6 +600,8 @@ def engine(rom, report, sysbits):
     bank_put(rom, 14, 0xAEC5, jmp(L['itemmenu']))
     assert bank_get(rom, 14, 0xB082, 2) == b'\xa9\x0c'
     bank_put(rom, 14, 0xB082, b'\xa9\x04')
+    assert bank_get(rom, 31, 0xDAF1, 3) == b'\x48\xa9\x0a'
+    bank_put(rom, 31, 0xDAF1, jmp(L['copystr']))
     # magic menu cursors: one column (step 4 bytes = 1 entry)
     for a in (0xAFA7, 0xAFC7):
         assert bank_get(rom, 14, a, 2) == b'\xa9\x08', hex(a)
