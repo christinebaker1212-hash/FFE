@@ -86,10 +86,22 @@ Milestones per game (from `docs/gb-port.md`):
   helper code in MMC5 ExRAM `$5C00-5FFF` (image in bank 18, copied at reset), which the
   recompiler must compile from that image.
 
+- Emulator coverage log extended to 3 planes (code / memory regions per instruction /
+  stack tricks via a shadow JSR stack), and it follows MMC5 `$5116` (8KB at `$C000`).
+- `tools/gb/covrun.py` (new game + random play under COV_LOG) and `tools/gb/nescode.py`
+  (code map: coverage seeds + static flow, code spaces bNN/c62/far/fix/ex, report of
+  unresolved targets, stack tricks, indirect accesses).
+- FF1 engine facts for the port: the game is synchronous. `JSR $FE00` enables NMI and spins;
+  the NMI handler `$FECF` drops the interrupt frame (PLA×3) and RTSes to the caller,
+  so on GB this becomes "halt until vblank, return". The English patch uses MMC5 PRG
+  mode 2: `$C000-DFFF` is 8KB bank 62 normally, far-code bank 40 during `farjsr` (RTS
+  dispatch from ExRAM `$5D0B`). Other stack tricks: `b14:A330` PLA PLA RTS (return to
+  caller's caller), TXS resets at `$C024`/`$C0D3`/`$FE6F`. Jump tables: `JMP ($0010)`
+  at `c62:CA99` and `b14:B187`. Fixed code JSRs into `$8000-BFFF` (bank from `$5115`).
+
 ## In progress / next
-- Milestone 2: more emulator instrumentation (memory regions touched per instruction,
-  for indirect addressing; JSR/RTS stack-trick detection), a long random-play coverage
-  run, then the recompiler (`tools/gb/recomp.py`).
+- Long coverage runs (4 seeds × 80k frames, `build/cov2/`), then the recompiler
+  (`tools/gb/recomp.py`).
 - Recompiler design decisions so far (to go into `docs/gb-port.md`): X in E (D=0), Y in C
   (B=0) so `abs,X`/`abs,Y` = `ld hl,base / add hl,de`; flag liveness decides where Z/N/C/V
   are materialised; 6502 carry polarity (SBC/CMP) tracked at compile time; NES banked

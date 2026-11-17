@@ -75,23 +75,37 @@ index 0bf2d82..77e22e0 100644
  private:
      /// APU memory-mapped register addresses.
 diff --git a/src/cpu.cpp b/src/cpu.cpp
-index 9ecd5c2..c642721 100644
+index 9ecd5c2..fbd4c1d 100644
 --- a/src/cpu.cpp
 +++ b/src/cpu.cpp
-@@ -128,12 +128,45 @@ void CPU::reset() {
+@@ -128,12 +128,73 @@ void CPU::reset() {
      _program_counter |= _nes.read_cpu(0xFFFD) << 8;
  }
  
-+// ---- coverage log (env COV_LOG=file): one byte per ROM file offset (no header) + RAM code
-+// bit0 opcode executed, bit1 reached by RTS, bit2 by JMP (ind), bit3 by RTI, bit4 interrupt entry
++// ---- coverage log (env COV_LOG=file). Three planes of COV_SIZE bytes, indexed by ROM
++// file offset (no header; $C000-$DFFF per MMC5 $5116, $E000-$FFFF = second half of bank 31) or COV_RAM + address for code in RAM:
++//  plane 0 (code): bit0 opcode executed, bit1 reached by RTS, bit2 by JMP (ind), bit3 by RTI,
++//                  bit4 interrupt entry
++//  plane 1 (data regions touched by the instruction, fetches excluded): bit0 RAM $0000-07FF,
++//                  bit1 PPU $2000-3FFF, bit2 APU/IO $4000-401F, bit3 MMC5 regs $5000-5BFF,
++//                  bit4 ExRAM $5C00-5FFF, bit5 SRAM $6000-7FFF, bit6 ROM $8000-BFFF, bit7 ROM $C000-FFFF
++//  plane 2 (stack): bit0 RTS whose return address/S differs from its JSR (stack trick),
++//                  bit1 PLA/PLP popping a JSR/interrupt return address, bit2 TXS,
++//                  bit3 RTI not matching an interrupt, bit4 JSR (site), bit5 RTS matching its JSR
 +#include <cstdio>
 +#include <cstdlib>
 +#include <vector>
 +extern int g_dbg_bank;
-+static const size_t COV_RAM = 0x200000;          // RAM/SRAM code ($0000-$7FFF) after 2MB of ROM
++extern int g_dbg_bank_c;
++static const size_t COV_RAM = 0x200000;
++static const size_t COV_SIZE = COV_RAM + 0x8000;
 +static std::vector<uint8_t> g_cov;
 +static int g_cov_on = -1;
 +static unsigned g_cov_prev = 0;                   // previous opcode, 0x100 = interrupt taken
++static size_t g_cov_cur = 0;                      // index of the instruction being executed
++bool g_cov_fetch = false;
++struct ShadowFrame { uint16_t ret; uint8_t s; bool irq; };
++static std::vector<ShadowFrame> g_shadow;
 +struct CovSaver { ~CovSaver() {
 +    const char* f = std::getenv("COV_LOG");
 +    if (!f || g_cov.empty()) return;
@@ -100,17 +114,31 @@ index 9ecd5c2..c642721 100644
 +    for (size_t i = 0; i < g_cov.size(); i++) old[i] |= g_cov[i];
 +    if (FILE* w = std::fopen(f, "wb")) { std::fwrite(old.data(), 1, old.size(), w); std::fclose(w); }
 +} } g_cov_saver;
++static inline size_t cov_index(uint16_t pc) {
++    if (pc >= 0xE000) return 31 * 0x4000 + 0x2000 + (pc - 0xE000);
++    if (pc >= 0xC000) return (g_dbg_bank_c & 0x7F) * 0x2000 + (pc - 0xC000);   // $5116 (8KB units)
++    if (pc >= 0x8000) return ((g_dbg_bank & 0x7F) >> 1) * 0x4000 + (pc - 0x8000);
++    return COV_RAM + pc;
++}
 +static inline void cov_mark(uint16_t pc) {
-+    if (g_cov_on < 0) { g_cov_on = std::getenv("COV_LOG") ? 1 : 0; if (g_cov_on) g_cov.assign(COV_RAM + 0x8000, 0); }
++    if (g_cov_on < 0) { g_cov_on = std::getenv("COV_LOG") ? 1 : 0; if (g_cov_on) g_cov.assign(3 * COV_SIZE, 0); }
 +    if (!g_cov_on) return;
-+    size_t i;
-+    if (pc >= 0xC000) i = 31 * 0x4000 + (pc - 0xC000);
-+    else if (pc >= 0x8000) i = ((g_dbg_bank & 0x7F) >> 1) * 0x4000 + (pc - 0x8000);
-+    else i = COV_RAM + pc;
++    size_t i = cov_index(pc);
++    g_cov_cur = i;
 +    uint8_t f = 1;
 +    if (g_cov_prev == 0x60) f |= 2; else if (g_cov_prev == 0x6C) f |= 4;
 +    else if (g_cov_prev == 0x40) f |= 8; else if (g_cov_prev == 0x100) f |= 16;
 +    g_cov[i] |= f;
++}
++void cov_data(uint16_t a) {                       // called from NES::read/write
++    if (g_cov_on <= 0 || g_cov_fetch) return;
++    uint8_t r = a < 0x2000 ? 1 : a < 0x4000 ? 2 : a < 0x4020 ? 4 : a < 0x5C00 ? 8 : a < 0x6000 ? 16 :
++                a < 0x8000 ? 32 : a < 0xC000 ? 64 : 128;
++    g_cov[COV_SIZE + g_cov_cur] |= r;
++}
++static inline void cov_stk(uint8_t f) { if (g_cov_on > 0) g_cov[2 * COV_SIZE + g_cov_cur] |= f; }
++static inline void shadow_pop_to(uint8_t s) {    // drop frames whose return address lies below S
++    while (!g_shadow.empty() && g_shadow.back().s < s) g_shadow.pop_back();
 +}
 +
  void CPU::tick() {
@@ -124,14 +152,84 @@ index 9ecd5c2..c642721 100644
  
      (this->*ADDRESSING_MODES[instruction])();
      (this->*INSTRUCTIONS[instruction])();
-@@ -146,6 +179,7 @@ void CPU::tick() {
+@@ -146,6 +207,8 @@ void CPU::tick() {
          _nes.write(0x100 | _stack_pointer--, _program_counter & 0x00FF);
  
          uint16_t address = _should_issue_non_maskable_interrupt ? 0xFFFA : 0xFFFE;
 +        g_cov_prev = 0x100;
++        if (g_cov_on > 0) g_shadow.push_back({_program_counter, (uint8_t)(_stack_pointer - 1), true});
  
          _should_issue_non_maskable_interrupt = false;
  
+@@ -214,7 +277,10 @@ void CPU::stream_state(SaveState& save_state) {
+ }
+ 
+ uint8_t CPU::fetch_next() {
+-    return _nes.read(_program_counter++);
++    g_cov_fetch = true;
++    uint8_t v = _nes.read(_program_counter++);
++    g_cov_fetch = false;
++    return v;
+ }
+ 
+ void CPU::set_status(uint8_t flag, bool value) {
+@@ -815,6 +881,7 @@ void CPU::op_jsr() {
+     _nes.read(_program_counter);
+ 
+     _program_counter--;
++    if (g_cov_on > 0) { cov_stk(16); g_shadow.push_back({(uint16_t)(_program_counter + 1), (uint8_t)(_stack_pointer - 2), false}); }
+ 
+     _nes.write(0x100 | _stack_pointer--, _program_counter >> 8);
+     _nes.write(0x100 | _stack_pointer--, _program_counter & 0x00FF);
+@@ -907,6 +974,7 @@ void CPU::op_php() {
+ }
+ 
+ void CPU::op_pla() {
++    if (g_cov_on > 0 && !g_shadow.empty() && (uint8_t)(_stack_pointer + 1) > g_shadow.back().s) cov_stk(2);
+     _stack_pointer++;
+     _nes.read(_program_counter);
+     _register_a = _nes.read(0x100 | _stack_pointer);
+@@ -916,6 +984,7 @@ void CPU::op_pla() {
+ }
+ 
+ void CPU::op_plp() {
++    if (g_cov_on > 0 && !g_shadow.empty() && (uint8_t)(_stack_pointer + 1) > g_shadow.back().s) cov_stk(2);
+     _stack_pointer++;
+     _nes.read(_program_counter);
+     _status = _nes.read(0x100 | _stack_pointer) & 0xCF;
+@@ -1005,6 +1074,11 @@ void CPU::op_rra() {
+ }
+ 
+ void CPU::op_rti() {
++    if (g_cov_on > 0) {
++        uint8_t s0 = _stack_pointer;
++        if (g_shadow.empty() || !g_shadow.back().irq || g_shadow.back().s != s0) cov_stk(8);
++        shadow_pop_to(s0 + 1); if (!g_shadow.empty() && g_shadow.back().s == s0) g_shadow.pop_back();
++    }
+     _stack_pointer++;
+     _nes.read(_program_counter);
+     _status = _nes.read(0x100 | _stack_pointer) & 0xCF;
+@@ -1021,6 +1095,12 @@ void CPU::op_rts() {
+     _program_counter = _nes.read(0x100 | _stack_pointer);
+     _program_counter |= _nes.read(0x100 | ++_stack_pointer) << 8;
+     _program_counter++;
++    if (g_cov_on > 0) {
++        uint8_t s0 = (uint8_t)(_stack_pointer - 2);
++        bool ok = !g_shadow.empty() && !g_shadow.back().irq && g_shadow.back().s == s0 && g_shadow.back().ret == _program_counter;
++        cov_stk(ok ? 32 : 1);
++        shadow_pop_to(s0 + 1); if (!g_shadow.empty() && g_shadow.back().s == s0) g_shadow.pop_back();
++    }
+ }
+ 
+ void CPU::op_sax() {
+@@ -1156,6 +1236,7 @@ void CPU::op_txa() {
+ 
+ void CPU::op_txs() {
+     _stack_pointer = _register_x;
++    if (g_cov_on > 0) { cov_stk(4); shadow_pop_to(_stack_pointer); }
+ }
+ 
+ void CPU::op_tya() {
 diff --git a/src/cpu.hpp b/src/cpu.hpp
 index e19ae79..7f7d60c 100644
 --- a/src/cpu.hpp
@@ -208,16 +306,17 @@ index e19ae79..7f7d60c 100644
      void addr_abr();
      void addr_abw();
 diff --git a/src/mapper.cpp b/src/mapper.cpp
-index e586cae..0f80503 100644
+index e586cae..e770d45 100644
 --- a/src/mapper.cpp
 +++ b/src/mapper.cpp
-@@ -1,4 +1,5 @@
+@@ -1,4 +1,6 @@
  #include "mapper.hpp"
 +extern int g_dbg_bank;
++int g_dbg_bank_c = 0x80 + 62;   // MMC5 $5116 (8KB at $C000 in PRG mode 2), for the coverage log
  
  #include "cpu.hpp"
  #include "nes.hpp"
-@@ -9,6 +10,8 @@
+@@ -9,6 +11,8 @@
  #include <memory>
  #include <random>
  #include <sstream>
@@ -226,7 +325,7 @@ index e586cae..0f80503 100644
  
  using namespace cynes;
  
-@@ -80,13 +83,13 @@ Mapper::Mapper(
+@@ -80,13 +84,13 @@ Mapper::Mapper(
          std::generate(
              _memory.get() + _size_prg + _size_chr + 0x200,
              _memory.get() + _size_prg + _size_chr + _size_cpu_ram,
@@ -242,7 +341,7 @@ index e586cae..0f80503 100644
          );
      }
  
-@@ -94,7 +97,7 @@ Mapper::Mapper(
+@@ -94,7 +98,7 @@ Mapper::Mapper(
          std::generate(
              _memory.get() + _size_prg + _size_chr + _size_cpu_ram,
              _memory.get() + _size_prg + _size_chr + _size_cpu_ram + _size_ppu_ram,
@@ -251,7 +350,7 @@ index e586cae..0f80503 100644
          );
      }
  
-@@ -165,6 +168,7 @@ std::unique_ptr<Mapper> Mapper::load_mapper(
+@@ -165,6 +169,7 @@ std::unique_ptr<Mapper> Mapper::load_mapper(
      case   2: return std::make_unique<UxROM>(nes, metadata, mode);
      case   3: return std::make_unique<CNROM>(nes, metadata, mode);
      case   4: return std::make_unique<MMC3> (nes, metadata, mode);
@@ -259,7 +358,7 @@ index e586cae..0f80503 100644
      case   7: return std::make_unique<AxROM>(nes, metadata);
      case   9: return std::make_unique<MMC2> (nes, metadata, mode);
      case  10: return std::make_unique<MMC4> (nes, metadata, mode);
-@@ -422,23 +426,33 @@ void MMC1::update_banks() {
+@@ -422,23 +427,33 @@ void MMC1::update_banks() {
      case 3: set_mirroring_mode(MirroringMode::HORIZONTAL); break;
      }
  
@@ -301,7 +400,7 @@ index e586cae..0f80503 100644
      }
  
      bool read_only = _registers[0x3] & 0x10;
-@@ -575,6 +589,7 @@ void MMC3::write_cpu(uint16_t address, uint8_t value) {
+@@ -575,6 +590,7 @@ void MMC3::write_cpu(uint16_t address, uint8_t value) {
              set_mirroring_mode(MirroringMode::VERTICAL);
          }
      } else if (address < 0xE000) {
@@ -309,7 +408,7 @@ index e586cae..0f80503 100644
          if (address & 0x1) {
              _counter = 0x0000;
              _should_reload_interrupt = true;
-@@ -582,6 +597,7 @@ void MMC3::write_cpu(uint16_t address, uint8_t value) {
+@@ -582,6 +598,7 @@ void MMC3::write_cpu(uint16_t address, uint8_t value) {
              _counter_reset_value = value;
          }
      } else {
@@ -317,7 +416,7 @@ index e586cae..0f80503 100644
          if (address & 0x1) {
              _enable_interrupt = true;
          } else {
-@@ -611,6 +627,7 @@ void MMC3::update_state(bool state) {
+@@ -611,6 +628,7 @@ void MMC3::update_state(bool state) {
              }
  
              if (_counter == 0 && _enable_interrupt) {
@@ -325,7 +424,7 @@ index e586cae..0f80503 100644
                  _nes.cpu.set_mapper_interrupt(true);
              }
  
-@@ -674,3 +691,147 @@ void GxROM::write_cpu(uint16_t address, uint8_t value) {
+@@ -674,3 +692,147 @@ void GxROM::write_cpu(uint16_t address, uint8_t value) {
          map_bank_chr(0x00, 0x08, (value & 0x03) << 3);
      }
  }
@@ -391,7 +490,7 @@ index e586cae..0f80503 100644
 +        case 0x5205: _mul_a = value; break;
 +        case 0x5206: _mul_b = value; break;
 +        default:
-+            if (address >= 0x5113 && address <= 0x5117) { _prg[address - 0x5113] = value; if (address == 0x5115) g_dbg_bank = value; }
++            if (address >= 0x5113 && address <= 0x5117) { _prg[address - 0x5113] = value; if (address == 0x5115) g_dbg_bank = value; if (address == 0x5116) g_dbg_bank_c = value; }
 +            else if (address >= 0x5120 && address <= 0x512B) _chr[address - 0x5120] = value | (_chr_upper << 8);
 +            break;
 +        }
@@ -511,6 +610,28 @@ index 517eb5a..01976dd 100644
  }
  
  #endif
+diff --git a/src/nes.cpp b/src/nes.cpp
+index 39fdf33..c4ba320 100644
+--- a/src/nes.cpp
++++ b/src/nes.cpp
+@@ -58,7 +58,9 @@ void NES::dummy_read() {
+     cpu.poll();
+ }
+ 
++void cov_data(uint16_t a);
+ void NES::write(uint16_t address, uint8_t value) {
++    cov_data(address);
+     apu.tick(false);
+     ppu.tick();
+     ppu.tick();
+@@ -112,6 +114,7 @@ void NES::write_oam(uint8_t address, uint8_t value) {
+ }
+ 
+ uint8_t NES::read(uint16_t address) {
++    cov_data(address);
+     apu.tick(true);
+     ppu.tick();
+     ppu.tick();
 diff --git a/src/nes.hpp b/src/nes.hpp
 index 8961b80..f8c1bee 100644
 --- a/src/nes.hpp
