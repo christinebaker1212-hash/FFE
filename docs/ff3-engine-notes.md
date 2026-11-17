@@ -36,3 +36,17 @@ copy of $3E, 127 = $E000 copy of $3F). The engine is the same family as FF2's
 - Status window lines: bank 52 $9BC1-$9CCE, line 18 wide: name, current HP, '/' at
   X $0C, then the max HP or a 5-cell slot (X $0D-$11) with the chosen command ($8C40),
   spell ($8990, with its icon at $0C overwritten by '/') or ailment (t8200 $822C).
+- Enemy list: bank 52 $9D9E (entries $24 0-3, monster $7D6B,x, table $8A40 = names $120+,
+  converted 8 wide, window x 1-10). English: bconvb per entry; compact tiles for words over
+  8 from a 20-tile pool ($E8-$F6, $7B-$7F), bank 87 (enfix), uploaded 4 tiles a vblank.
+- Status slot compact words: bank 86 (slotfix), tiles $D0-$E7 (6 per line), $1000 table.
+- Code in a bank mapped at $A000 must hold the IRQ's sound driver off (INC $A9 ... DEC $A9:
+  the IRQ calls $FAF2 only while $A9 = 0) and must not call routines that map banks
+  ($8185 -> $FA0E maps 16KB $17). $FB80 waits for the NMI; $8D03 restores PPU registers.
+- Battle windows use the $1000 pattern table below the split (zp $08 = $98).
+- Item window: bank 53 $B419 (hands: equipped ids from ($59)+3.., hard-coded kana labels
+  written into the buffer at $7201-$7244), $B48B (inventory page: 8 bytes from $60C0+$3D,
+  interleaved id/count), entries built by $B1D8 (13 wide: mark, icon+name from X 1, ':' at
+  $0A, count at $0B-$0C). Cursor table bank 52 $8B28/$8B30 (y, x): x $08/$80, y $A8-$D8.
+- Magic window: bank 53 $B6E0.. (per level row: level, MP, three spells of 6 cells, table
+  $8990), converted 28 wide.
