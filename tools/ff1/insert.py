@@ -799,6 +799,8 @@ def shops(rom, labels):
         bank_put(rom, 14, 0xAC53 + 5 * k, bytes(w[k] for w in win))
     bank_put(rom, 14, 0xA86A, jmp(labels['shoplist']))
     bank_put(rom, 14, 0xA99C, jsr(labels['magpre']) + b'\xEA\xEA\xEA')
+    o = HDR + 14 * BANK + 0xAA84 - 0x8000            # price redraw reads entry i of the list
+    assert rom[o] == 0x15; rom[o] = 0x17             # string, now 2 bytes further on
     bank_put(rom, 14, 0xA992, bytes([160, 24, 160, 56, 160, 88, 160, 120, 160, 152]))
 
 SHOP_FREE = []
