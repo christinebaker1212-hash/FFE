@@ -4,7 +4,7 @@
 ; NES pulse 1 -> CH1, pulse 2 -> CH2, triangle -> CH3 (triangle wave), noise -> CH4.
 
 APU_SH     = $D840          ; shadow of $4000-$4017
-APU_VOL    = $D858          ; last GB volume byte written per channel (0..3), $FF = unknown
+APU_VOL    = $D85C          ; last GB volume byte written per channel (0..3), $FF = unknown (after $D858-9: pending NR14/NR24 bits)
 
 apu_init:   ld a, $80
             ldh [$FF26], a                  ; sound on

@@ -28,7 +28,15 @@ def main():
     held = 0; total = 0; rows = []; c = Counter()
     rd = lambda a: pb.memory[a] | pb.memory[a + 1] << 8
     last = (0, 0)
-    for k, it in enumerate(new_game_script()):
+    script = new_game_script()
+    if '--random' in sys.argv:
+        import random
+        from compare import UP, DOWN, LEFT, RIGHT, A, B, START
+        r = random.Random(int(sys.argv[sys.argv.index('--random') + 1]))
+        btns = [UP, DOWN, LEFT, RIGHT, A, A, B, START, UP, DOWN, LEFT, RIGHT]
+        for _ in range(int(sys.argv[sys.argv.index('--random') + 2])):
+            script.append((r.choice(btns), r.randint(2, 40), r.randint(1, 20)))
+    for k, it in enumerate(script):
         if it[0] == 'shot': continue
         m, hold, after = it
         for phase, n in ((m, hold), (0, after)):
@@ -47,8 +55,11 @@ def main():
         cur = (rd(0xD830), rd(0xD832))
         dn, dv = cur[0] - last[0], cur[1] - last[1]
         rows.append((k, total, dn, dv)); last = cur
-    for k, t, dn, dv in rows:
-        print('step %3d frame %5d: NES frames %4d in %4d GB frames (%.2fx)' % (k, t, dn, dv, dv / dn if dn else 0))
+    if '--quiet' not in sys.argv:
+        for k, t, dn, dv in rows:
+            print('step %3d frame %5d: NES frames %4d in %4d GB frames (%.2fx)' % (k, t, dn, dv, dv / dn if dn else 0))
+    tn = sum(r[2] for r in rows); tv = sum(r[3] for r in rows)
+    print('total: %d NES frames in %d GB frames (%.2fx)' % (tn, tv, tv / tn))
     print('PC samples in frames without a NES frame end:', sum(v for k, v in c.items() if not k.startswith('space')))
     for k, v in c.most_common(30): print('  %5d  %s' % (v, k))
 
