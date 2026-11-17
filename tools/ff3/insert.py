@@ -74,7 +74,7 @@ def vlen(s):
         n += 1; i += 1
     return n
 
-SPEAKER = re.compile(r'^(\{1[0-3]:..\}|\{18:..\}|\{07\}|[A-Z][\w\'.-]*(?: [A-Z][\w\'.-]*)*): "')
+SPEAKER = re.compile(r'^(\{1[0-3]:..\}|\{18:..\}|\{07\}|[A-Z][\w\'.-]*(?: (?:of|the|[A-Z0-9][\w\'.-]*))*): "')
 COLTOK = re.compile(r'^\{14:..\}')
 
 def paragraphs(text):
