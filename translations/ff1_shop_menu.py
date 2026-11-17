@@ -86,7 +86,7 @@ M = {
  50:" You can't use magic of that level anymore.",
  51:" Are you really going to use it in a place like this?\n Let's not.",
  52:' Weapons',
- 53:'   Equip   Trade   Drop',
+ 53:'   Equip   Swap   Drop',
  54:' {10}', 56:' {11}', 58:' {12}', 60:' {13}',
  62:' Armor',
  63:' Now saving. Here goes!!',

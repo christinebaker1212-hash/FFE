@@ -291,6 +291,30 @@ h_name:         ; $E0A3: draw item name at ($3E) (bank 10), wrapping onto two ro
     sta $3F
 .plain:
     jmp $DECE
+barhl:          ; bank 14 $BF0A: highlight the chosen Equip/Swap/Drop
+    lda $64
+    asl a
+    asl a
+    clc
+    adc $64
+    tax
+    lda #$C3
+    jsr $BF41
+    ldy #5
+.l:
+    lda .t,x
+    sta $2007
+    inx
+    dey
+    bne .l
+    lda #0
+    sta $2006
+    sta $2006
+    rts
+.t:
+    .db $AF, $EF, $FF, $FF, $FF     ; cols 12-17
+    .db $FF, $FF, $AF, $FF, $FF     ; cols 20-23
+    .db $FF, $FF, $FF, $BF, $EF     ; cols 26-29
 magcur:         ; bank 14 $B829: magic list cursor. Level L uses two rows: spell 1 on the
     lda $62     ;   first (beside L/MP), spells 2 and 3 on the second
     sta $10
@@ -418,6 +442,10 @@ def insert_menu_strings(rom, report):
     for e in menu:
         o = HDR + 14 * BANK + 0x0500 + 2 * e['id']
         txt = MENU_OVERRIDE.get(e['id'], e['en'])
+        if e['id'] in DESC_IDS:
+            lines = desc_flow(txt)
+            assert len(lines) <= 4 and max(map(len, lines)) <= 29, (e['id'], lines)
+            txt = '{09}' + '{08}'.join(' ' + l for l in lines)
         # codes 10-13 take a parameter; in ' {10}' the extractor read the parameter 00
         # (= character name) as the end of the string, so it is restored here
         if re.search(r'\{1[0-3]\}$', txt): txt += '{00}'
@@ -436,7 +464,25 @@ def magic_list():
     assert len(enc(out)) <= 192, len(enc(out))
     return out
 
+# item/magic descriptions and prompts: window 8 (full width, bottom); 4 one-row lines of
+# up to 29 letters, reflowed (the Japanese breaks are layout breaks); a final
+# 'A button...Yes  B button...No' prompt keeps its own line
+DESC_IDS = set(range(4, 35)) | set(range(43, 52)) | {63}
+def desc_flow(t, W=29):
+    parts = t.split('\n')
+    if 'A button' in parts[-1]: body, tail = ' '.join(parts[:-1]), [parts[-1].strip()]
+    else: body, tail = ' '.join(parts), []
+    out = []; line = ''
+    for w in body.split(' '):
+        if not w: continue
+        if not line: line = w
+        elif len(line) + 1 + len(w) <= W: line += ' ' + w
+        else: out.append(line); line = w
+    out.append(line)
+    return out + tail
+
 MENU_OVERRIDE = {
+    3: 'Items', 52: 'Weapons', 62: 'Armor',
     42: magic_list(),
     # status screen (windows in status_screen()); values at fixed columns ({0D}{col})
     1: '{04}Gil',
@@ -451,7 +497,7 @@ MENU_OVERRIDE = {
         '{0D}{01}Luck{0D}{0E}{10}{0B}',
     40: '{0D}{12}Weapon{0D}{1B}{10}{3C}\n{0D}{12}Hit Rate{0D}{1B}{10}{3D}\n'
         '{0D}{12}Armor{0D}{1B}{10}{3E}\n{0D}{12}Evasion{0D}{1B}{10}{3F}',
-    53: '{0C}Equip  Trade  Drop',    # one column right of the cursor positions ($BF07)
+    53: '  Equip   Swap  Drop',     # Equip 12-16, Swap 20-23, Drop 26-29 (highlight blocks)
 }
 
 ITEM_SRC = '''
@@ -596,8 +642,15 @@ def equip_screens(rom, labels):
     for a, old, new in ((0xBD96, 1, 4), (0xBDA0, 2, 1), (0xBDAA, 2, 1)):   # cursor: up/down 1 row,
         o = HDR + 14 * BANK + a - 0x8000                                    # left/right other character
         assert rom[o] == old, hex(a); rom[o] = new
-    # windows (x, y, w, h): title box wide enough for "Weapons", command bar moved right
-    bank_put(rom, 14, 0xBE8F, bytes([1, 1, 9, 4, 10, 1, 21, 4]))
+    # windows (x, y, w, h): title box wide enough for 'Weapons', command bar beside it,
+    # name boxes aligned with the title box (they share column 8 with the slot windows)
+    bank_put(rom, 14, 0xBE8F, bytes([0, 1, 9, 4, 9, 1, 22, 4]))
+    for c in range(4):
+        bank_put(rom, 14, 0xBE8F + 4 * (2 + 2 * c), bytes([0, 5 + 6 * c, 9, 4]))
+    # command bar: cursor columns 10/18/24 and the red highlight of the chosen command
+    # over its whole word (5 attribute bytes $23C3-$23C7 instead of 4)
+    bank_put(rom, 14, 0xBF07, bytes([80, 144, 192]))
+    bank_put(rom, 14, 0xBF0A, jmp(labels['barhl']))
 
 def main_menu(rom, labels):
     """Main menu windows (table bank 14 $BAB5, x y w h): Gil window and command window
@@ -608,6 +661,7 @@ def main_menu(rom, labels):
     o = HDR + 14 * BANK + 0xB7D5 - 0x8000
     assert rom[o] == 0x10; rom[o] = 0x08
     bank_put(rom, 14, 0xBAB5 + 4 * 0, bytes([1, 2, 10, 8]))   # orb window, right edge aligned
+    bank_put(rom, 14, 0xBAB5 + 4 * 8, bytes([0, 22, 32, 7]))  # description window, full width
     # character windows: the mages' 'まほう' label was built from immediates at $B9EF
     m = labels['bcmd1']
     code = asm('''
