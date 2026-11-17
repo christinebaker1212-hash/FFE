@@ -39,3 +39,5 @@ All renderings are from the Japanese. `{18:xx}` inserts entry xx of `script/ff2/
 - Learnable key words appear in brackets: `[{16:xx}{18:yy}]` → "[Wild Rose]".
 - The Emperor's death scream ウボァー is kept as "UBOAAAH".
 - Name-entry grid (`system.json` #70) is replaced by a Latin letter grid with the same layout codes.
+- Shop command ことわる (decline the shopkeeper's offer) is "Pass": the shop's command window shows five letters while the sell list overlaps it.
+- りゅうさんのビン is "Sulfuric Acid Bottle" (20 letters, the widest list width).

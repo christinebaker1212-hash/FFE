@@ -327,6 +327,12 @@ h_ypos:         ; $EC55: row of a recorded position ($98 + $1F assumes the dakut
     sbc #1
 .r:
     rts
+shoptpl:        ; bank 14 $90FD builds the buy list from this ($FF: next shop byte): one row
+    .db $08     ;   per item, name from column 2, price at column 21 (the Japanese: 14
+    .db $16,$02,$18,$FF,$14,$15,$19,$FF,$01     ; columns beside the prompt)
+    .db $16,$02,$18,$FF,$14,$15,$19,$FF,$01
+    .db $16,$02,$18,$FF,$14,$15,$19,$FF,$01
+    .db $16,$02,$18,$FF,$14,$15,$19,$FF,$00
 itemmenu:       ; bank 14 $AEC5 (from the main menu): the item list (system string 37) as
     jsr $905E   ;   one column of full names that scrolls in window 7 (as the equipment
 .full:          ;   screen's list does); the slots come from the cursor entries
@@ -612,6 +618,16 @@ def engine(rom, report, sysbits):
         bank_put(rom, 14, a, b'\xa9\x04')
     assert bank_get(rom, 31, 0xE9B2 + 2) == bytes([22])
     bank_put(rom, 31, 0xE9B2 + 2, bytes([23]))         # field window 2: 21 columns inside
+    # shop buy list: below the prompt across the message window (was 12 columns right)
+    assert bank_get(rom, 14, 0x9101, 3) == b'\xb9\x15\x91' and bank_get(rom, 14, 0x9110, 2) == b'\xc0\x24'
+    t = L['shoptpl']
+    bank_put(rom, 14, 0x9102, bytes([t & 0xFF, t >> 8])); bank_put(rom, 14, 0x9111, bytes([37]))
+    assert bank_get(rom, 14, 0x90DB, 23).hex() == 'a538186 90c293f8538a5971869 0c8597a53c38e90c853c'.replace(' ', '')
+    bank_put(rom, 14, 0x90DB, bytes.fromhex('a539186902853 9eaeaa59818690285 98a53d38e902853d'.replace(' ', '')))
+    # field window 3 (money) one column wider
+    for k, base, old, new in ((3, 0xE9B2, 12, 13),):
+        assert bank_get(rom, 31, base + k) == bytes([old]), (k, hex(base))
+        bank_put(rom, 31, base + k, bytes([new]))
     # magic menu cursors: one column (step 4 bytes = 1 entry)
     for a in (0xAFA7, 0xAFC7):
         assert bank_get(rom, 14, a, 2) == b'\xa9\x08', hex(a)

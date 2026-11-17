@@ -75,7 +75,7 @@
   "id": 12,
   "off": "6B165",
   "ja": "　{04}ぎるで　かいとりましょう\n　よろしいですか?\n{16:08}はい{16:16}いいえ",
-  "en": " I will buy it for {04} Gil\n Is that all right?\n{16:08}Yes{16:16}No"
+  "en": "I'll buy it for {04} Gil.\n Is that all right?\n{16:08}Yes{16:16}No"
  },
  {
   "id": 13,
@@ -141,7 +141,7 @@
   "id": 23,
   "off": "6B35D",
   "ja": "{15:01}かう\n{15:01}うる\n{15:01}ことわる",
-  "en": "{15:01}Buy\n{15:01}Sell\n{15:01}Decline"
+  "en": "{15:01}Buy\n{15:01}Sell\n{15:01}Pass"
  },
  {
   "id": 24,
