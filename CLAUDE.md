@@ -47,3 +47,36 @@ FF1 comes first, then FF2, then FF3.
 - Verification: run the NES (`tools/emu`) and GB builds side by side with the same input
   and compare emulated RAM frame by frame (as in `tools/split/equiv.py`), plus
   screenshots of every re-laid-out screen.
+
+## Keeping this file current
+Update the status below as work goes on (about every 5 minutes of work): work done,
+work remaining, scope and plan. Commit and push it with the work.
+
+# GB port status (last updated 2026-11-17)
+
+## Scope and plan
+FF1 first (DMG+SGB), then FF2 (same engine family, DMG+SGB), then FF3 (GBC).
+Milestones per game (from `docs/gb-port.md`):
+1. SM83 assembler + minimal runtime that boots in PyBoy (test pattern, SGB detect).
+2. Recompiler on the fixed bank only; title screen shown through the camera (pan mode).
+   Measure CPU time per frame on DMG speed.
+3. Whole game recompiled; emulated RAM matches the NES across random play.
+4. Sound (APU → GB).
+5. Screen re-layouts for 160×144: dialogue, then menus/shops, then battle, title, ending.
+6. SGB palettes + border, save RAM, timing, accuracy pass.
+
+## Done
+- Design notes: `docs/gb-port.md` (targets, memory map, PPU/APU layers, verification).
+- ROMs checked (SHA-1 OK) and kept in `roms/` (ignored). The English FF1 NES build
+  (`build_mmc5.py` + `tools/ff1/insert.py`) reproduces the patch's result SHA-1
+  `76aa4d30…`; this is the GB build's input (`build/ff1_en.nes`).
+- PyBoy 2.9 installed for headless GB testing (reinstall each session: `pip install pyboy`).
+- `tools/gb/asm_sm83.py`: SM83 assembler (multi-bank, `.sym` output, header/checksum
+  writer `make_rom`) — written, being tested.
+
+## In progress / next
+- Test the assembler against an independent opcode table (every opcode).
+- Boot ROM test: DMG header with SGB flag, MBC5, shows a tile pattern in PyBoy.
+
+## Remaining (FF1)
+- Milestones 2–6 above. FF2 and FF3 not started.
