@@ -144,6 +144,7 @@ boot:       di
             ldh [$FF48], a
             ldh [obp1_v], a
             ldh [$FF49], a
+            call apu_init
             ld a, -68                       ; timer: 4096 Hz / 68 = 60.2 Hz frame tick while the LCD is off
             ldh [$FF06], a
             ldh [$FF05], a
@@ -868,7 +869,6 @@ rt_io_r4017:
 rt_io_rnone:
             ld l, 0
             ret
-rt_apu_w:   ret                             ; sound: milestone 4
 
 rt_mmc_w5115:
             push af

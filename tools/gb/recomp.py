@@ -16,7 +16,8 @@ from nescode import CodeMap, SPACES, index_of
 from asm_sm83 import encode
 
 DATA = 1                    # GB bank of NES 16KB bank 0's data image (NES bank n -> DATA + n)
-CODE0 = DATA + 32           # first GB bank holding recompiled code
+RT_TABLES = DATA + 32       # runtime tables (sound)
+CODE0 = DATA + 33           # first GB bank holding recompiled code
 BANK_LIMIT = 0x4000 - 8     # bytes per code bank (room for a closing jump)
 ALL = frozenset('NZCV')
 

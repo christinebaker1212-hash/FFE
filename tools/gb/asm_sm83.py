@@ -76,6 +76,20 @@ def _split_args(s):
 
 
 def asm(src, syms=None):
+    """Assemble; a `jr` that does not reach is relaxed to `jp` and the source re-assembled."""
+    promote = set()
+    while True:
+        try:
+            return _asm_once(src, syms, promote)
+        except _JrRange as e:
+            promote.add(e.lineno)
+
+
+class _JrRange(Exception):
+    def __init__(self, lineno): self.lineno = lineno
+
+
+def _asm_once(src, syms, promote):
     base_syms = dict(syms or {})
     lines = []
     for n, raw in enumerate(src.split('\n'), 1):
@@ -192,7 +206,14 @@ def asm(src, syms=None):
                     continue
                 if mn == 'incbin_bytes':      # used by build scripts: incbin_bytes <sym of bytes>
                     emit(list(base_syms[args[0]])); continue
-                emit(encode(mn, args, ev, pc, pass_no))
+                if mn == 'jr' and lineno in promote: mn = 'jp'
+                try:
+                    emit(encode(mn, args, ev, pc, pass_no))
+                except AsmError as e:
+                    if mn == 'jr' and 'jr out of range' in str(e): raise _JrRange(lineno)
+                    raise
+            except _JrRange:
+                raise
             except AsmError as e:
                 raise AsmError('line %d: %s\n  %s' % (lineno, e, line.strip()))
             except (KeyError, IndexError, ValueError, SyntaxError) as e:

@@ -14,7 +14,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
 from nescode import CodeMap
-from recomp import Recompiler, emit_program, DATA
+from recomp import Recompiler, emit_program, DATA, RT_TABLES
 from asm_sm83 import asm, make_rom
 
 SHA1_FF12 = '4b22c2c88fc71eacf270ea51ef218944bb4c536a'
@@ -26,6 +26,32 @@ def shade(c):
     if lo >= 0x0D: return 3
     if lo == 0: return [2, 1, 0, 0][hi]
     return [3, 2, 1, 0][hi]
+
+
+def apu_tables():
+    """NES APU -> GB: frequency value for each 11-bit pulse/triangle timer (both:
+    2048 - x = 131072 * 16 * (t + 1) / 1789773), and NR43 for each NES noise period."""
+    import math
+    freq = []
+    for t in range(2048):
+        x = round(2048 - 131072 * 16 * (t + 1) / 1789773)
+        freq.append(max(0, min(2047, x)))
+    periods = [4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068]
+    noise = []
+    for p in periods:
+        f = 1789773 / p
+        best = None
+        for sh in range(14):
+            for r in range(8):
+                g = 262144 / ((r or 0.5) * (1 << sh))
+                e = abs(math.log(g / f))
+                if best is None or e < best[0]: best = (e, sh << 4 | r)
+        noise.append(best[1])
+    src = 'section bank %d, $4000\napu_freq:\n' % RT_TABLES
+    for k in range(0, 2048, 16):
+        src += '    dw %s\n' % ', '.join(str(v) for v in freq[k:k + 16])
+    src += 'apu_noise:\n    db %s\n' % ', '.join(str(v) for v in noise)
+    return src
 
 
 def nes_english(src, out_dir):
@@ -57,14 +83,15 @@ def main():
     cm = CodeMap(nes, covs).build()
     rc = Recompiler(cm)
     prog, bank_of, banks = emit_program(rc)
-    rt = open(os.path.join(HERE, 'rt', 'runtime.s')).read() + '\n' + open(os.path.join(HERE, 'rt', 'ff1_hle.s')).read()
+    rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s'))
+    rt += '\n' + apu_tables()
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(
         '    db %s\n' % ', '.join(str(shade(c)) for c in range(r, r + 16)) for r in range(0, 64, 16))
     src_all = rt + '\n' + shade_src + '\n' + prog
     open(os.path.join(out_dir, 'ff1_en.gb.s'), 'w').write(src_all)
     print('recompiled: %d instructions, %d code banks (%.1fs)' % (len(rc.insns), len(banks), time.time() - t))
     t = time.time()
-    r = asm(src_all, syms={'DATA': DATA})
+    r = asm(src_all, syms={'DATA': DATA, 'RT_TABLES': RT_TABLES})
     print('assembled (%.1fs)' % (time.time() - t))
     rom_nes = open(nes, 'rb').read()[16:]
     for n in range(32):
