@@ -22,6 +22,8 @@ FONT = 0x24320                          # tile N = code N (PRG offset)
 DLG_W = 26                              # dialogue window: 26 columns, 8 rows
 ONE_ROW = (16, 21)                      # banks drawn one row per line
 DB_BANK, DA_BANK, EV_BANK, CODE_BANK = 16, 18, 20, 22
+BT_BANK = 21                            # battle text (bank 5's three tables)
+BUF, SAVE = 0x5E40, 0x5E80              # ExRAM: battle text buffer (64), box save stack
 
 ENC = {chr(0x30 + i): 0x80 + i for i in range(10)}
 for i in range(26):
@@ -291,7 +293,10 @@ EXRAM_SRC = '''
 TMP:    .ds 1
 ONE:    .ds 1
 SLOT1:  .ds 1
-    .ds 13
+BLEN:   .ds 1   ; battle text: length, split index, split cost
+BSPL:   .ds 1
+BCOST:  .ds 1
+    .ds 10
 SYSONE: .ds 32  ; one-row system strings (bit k of byte n: id 8n+k)
 dlgbank:        ; bank 14 $962F: dialogue bank from the map ($A0) and the id ($92)
     lda $A0
@@ -514,6 +519,158 @@ repin:          ; first cursor on SLOT1's entry if it is in view, else hidden
     lda #0
     sta $A2
     rts
+onerow:         ; C = 1 in one-row mode
+    lda ONE
+    cmp #1
+    rts
+h_nl:           ; $EB2E newline: one row (or two, Japanese layout)
+    inc $1F
+    jsr onerow
+    bcs .r
+    inc $1F
+.r:
+    rts
+h_sub:          ; $EA78/$EA82 (paged text): rows scrolled per line
+    sta TMP
+    jsr onerow
+    lda TMP
+    bcc .two
+    sec
+    sbc #1
+    rts
+.two:
+    sec
+    sbc #2
+    rts
+'''
+
+FIXA_SRC = '''
+    org $F750       ; (fixed bank: unused bytes)
+fdbank:         ; $FD8C (battle string fetch, table in bank X): bank 5's three battle text
+    txa         ;   tables are read from the English bank BT
+    cmp #5
+    bne .k
+    lda #BT
+.k:
+    jmp $FE1A
+btidy:          ; battle text in BUF for a box $45 wide: no leading, trailing or double
+    ldx #0      ;   spaces; BLEN its length; BSPL the space where it splits into the most
+    ldy #0      ;   even two rows that fit ($FF: one row)
+    lda #$FF
+    sta TMP
+.n:
+    lda BUF,x
+    beq .e
+    inx
+    cmp #$FF
+    bne .c
+    cmp TMP
+    beq .n
+.c:
+    sta TMP
+    sta BUF,y
+    iny
+    bne .n
+.e:
+    lda TMP
+    cmp #$FF
+    bne .t
+    cpy #0
+    beq .t
+    dey
+.t:
+    lda #0
+    sta BUF,y
+    sty BLEN
+    lda #$FF
+    sta BCOST
+    sta BSPL
+    cpy $45
+    beq .r
+    bcc .r
+    ldx #0
+.s:
+    lda BUF,x
+    beq .r
+    cmp #$FF
+    bne .sn
+    cpx $45
+    beq .k1
+    bcs .r
+.k1:
+    stx TMP
+    lda BLEN
+    clc
+    sbc TMP
+    cmp $45
+    beq .k2
+    bcs .sn
+.k2:
+    cmp TMP
+    bcs .m
+    lda TMP
+.m:
+    cmp BCOST
+    bcs .sn
+    sta BCOST
+    stx BSPL
+.sn:
+    inx
+    bne .s
+.r:
+    rts
+'''
+
+B12_SRC = '''
+    org $95E7       ; bank 12: the Japanese converter (dakuten, handakuten), replaced
+bconv:          ; battle text (BUF, 0-terminated) into the tile buffer at $A8/$A9 +
+    clc         ;   $6F:$44, rows $45 wide. In a box ($44 = $45: the main row of a 2-row
+    lda $A8     ;   interior whose upper row is the Japanese dakuten row) the text is
+    adc $44     ;   tidied and, when wider than the box, split in two rows (btidy). Lists
+    sta $6C     ;   ($44 <> $45) are copied as they are.
+    lda $A9
+    adc $6F
+    sta $6D
+    ldx #0
+    lda $44
+    cmp $45
+    bne .w
+    jsr btidy
+    ldx BSPL
+    inx
+    beq .w
+    sec
+    lda $6C
+    sbc $45
+    sta $6A
+    lda $6D
+    sbc #0
+    sta $6B
+    ldy #0
+.u:
+    cpy BSPL
+    beq .w
+    lda BUF,y
+    sta ($6A),y
+    iny
+    bne .u
+.w:
+    ldy #0
+.l:
+    cpy $45
+    beq .x
+    lda BUF,x
+    beq .x
+    sta ($6C),y
+    inx
+    iny
+    bne .l
+.x:
+    rts
+'''
+
+FIXB_SRC = '''
+    org $F850       ; (fixed bank: unused bytes)
 copystr:        ; $DAF1: system string A to $7B00 for drawing (code 10 becomes the current
     sta $92     ;   character's code $9E), as the Japanese, with 16-bit pointers (English
     pha         ;   ($92: the id, for the one-row bitmap)
@@ -559,29 +716,6 @@ copystr:        ; $DAF1: system string A to $7B00 for drawing (code 10 becomes t
     inc $81
     inc $83
 .r:
-    rts
-onerow:         ; C = 1 in one-row mode
-    lda ONE
-    cmp #1
-    rts
-h_nl:           ; $EB2E newline: one row (or two, Japanese layout)
-    inc $1F
-    jsr onerow
-    bcs .r
-    inc $1F
-.r:
-    rts
-h_sub:          ; $EA78/$EA82 (paged text): rows scrolled per line
-    sta TMP
-    jsr onerow
-    lda TMP
-    bcc .two
-    sec
-    sbc #1
-    rts
-.two:
-    sec
-    sbc #2
     rts
 h_flush:        ; $F069 line flush: lower-row buffer only, on row $3B
     lda $38
@@ -637,6 +771,56 @@ INIT_SRC = '''
     jmp $FE79
 '''
 
+# battle boxes (bank 5 $AC02: width, height, top-left and bottom-left name table address):
+# attacker, target, action, result, message. The Japanese 10/10/9/9/18 columns hold 8/8/7/7/16
+# characters on the main row; English uses both interior rows (bconv) and wider boxes:
+# names up to 12 letters a row ("Adamantaimai"), actions 13 ("Self-Destruct"), messages 26,
+# laid out like the Japanese (the action boxes right of the name boxes sharing a border,
+# the message box under both, as wide as the two).
+BOXES = [(14, 0, 19), (14, 0, 22), (15, 13, 19), (15, 13, 22), (28, 0, 25)]
+# text width per box ($44 = $45 before the conversion), at each place it is set
+BOX_W = [(8, 12, [(12, 0xA9AC), (12, 0xA9C1), (12, 0xAC8A), (5, 0xA73B)]),
+         (7, 13, [(12, 0xA9F7), (12, 0xAA1A), (12, 0xAA44), (12, 0xAA79)]),
+         (16, 26, [(12, 0xA329), (12, 0xBED2), (5, 0xA520), (5, 0xA7AE)])]
+
+def battle(rom, report, L):
+    # text: bank 5 copied to bank BT_BANK, the three tables pointing to English strings
+    rom[HDR + BT_BANK * BANK:HDR + (BT_BANK + 1) * BANK] = rom[HDR + 5 * BANK:HDR + 6 * BANK]
+    b = Bank(rom, BT_BANK, [(0x8000, 0xAC44)])
+    for name, table, n in (('monsters', 0xAC44, 128), ('battle_magic', 0xB0BB, 70), ('battle_msgs', 0xB295, 116)):
+        rows = json.load(open('script/ff2/%s.json' % name))
+        assert len(rows) == n
+        for e in rows:
+            b.put_ptr(table + 2 * e['id'], b.alloc(enc(e['en']) + b'\0'))
+    report.append('battle text bank %d free: %d' % (BT_BANK, sum(y - x for x, y in b.free)))
+    assert bank_get(rom, 31, 0xFD8C, 4) == b'\x8a\x20\x1a\xfe'
+    bank_put(rom, 31, 0xFD8C, jsr(L['fdbank']) + b'\xEA')
+    assert bank_get(rom, 31, 0xFDBD, 2) == b'\xe0\x11'
+    bank_put(rom, 31, 0xFDBE, b'\x3F')                   # up to 63 bytes
+    # the text buffer $7D47 (17 bytes) moves to ExRAM BUF
+    refs = {5: [0xA4EE, 0xA4F4, 0xA4FA, 0xA500, 0xA506, 0xA72D, 0xA738],
+            12: [0x9523, 0x9530, 0xAA11, 0xAA17, 0xAA64, 0xAA6A, 0xAA70, 0xAA76, 0xAA88,
+                 0xAC6B, 0xAC76, 0xAD07, 0xAD1D, 0xAD23, 0xAD29, 0xBF30],
+            31: [0xFDB6]}
+    for bank, addrs in refs.items():
+        for a in addrs:
+            assert bank_get(rom, bank, a + 1, 2) == b'\x47\x7d', (bank, hex(a))
+            bank_put(rom, bank, a + 1, bytes([BUF & 0xFF, BUF >> 8]))
+    # box save stack: $7800 (224 bytes, sprite data from $78E0) to ExRAM SAVE
+    assert bank_get(rom, 12, 0x90FA, 10).hex() == 'a9008d7c00a9788d7d00'
+    bank_put(rom, 12, 0x90FB, bytes([SAVE & 0xFF])); bank_put(rom, 12, 0x9100, bytes([SAVE >> 8]))
+    need = sum(w * 4 for w, _, _ in BOXES) + sum(w * 4 for w, _, _ in BOXES[:4])
+    assert SAVE + sum(w * 4 for w, _, _ in BOXES) <= 0x6000
+    for k, (w, x, y) in enumerate(BOXES):
+        a = 0x2000 + y * 32 + x
+        rec = bytes([w, 4, a & 0xFF, a >> 8, (a + 96) & 0xFF, (a + 96) >> 8])
+        assert bank_get(rom, 5, 0xAC02 + 6 * k, 2) == bytes([[10, 10, 9, 9, 18][k], 4])
+        bank_put(rom, 5, 0xAC02 + 6 * k, rec)
+    for old, new, sites in BOX_W:
+        for bank, a in sites:
+            assert bank_get(rom, bank, a, 2) == bytes([0xA9, old]), (bank, hex(a))
+            bank_put(rom, bank, a + 1, bytes([new]))
+
 def jsr(a): return bytes([0x20, a & 0xFF, a >> 8])
 def jmp(a): return bytes([0x4C, a & 0xFF, a >> 8])
 
@@ -648,7 +832,19 @@ def engine(rom, report, sysbits):
     k = ex.labels['SYSONE'] - ex.org; img[k:k + 32] = sysbits
     rom[HDR + CODE_BANK * BANK:HDR + CODE_BANK * BANK + len(img)] = img
     report.append('ExRAM code: %d bytes' % len(ex.bytes))
-    L = ex.labels
+    L = dict(ex.labels)
+    assert ex.org + len(ex.bytes) <= BUF, hex(ex.org + len(ex.bytes))
+    for src, end in ((FIXA_SRC, 0xF800), (FIXB_SRC, 0xF900)):
+        f = asm(src, syms=dict(L, BUF=BUF, BT=BT_BANK))
+        assert f.org + len(f.bytes) <= end, (hex(f.org + len(f.bytes)))
+        assert set(bank_get(rom, 31, f.org, len(f.bytes))) == {0}
+        bank_put(rom, 31, f.org, f.bytes)
+        report.append('fixed-bank code at %04X: %d bytes' % (f.org, len(f.bytes)))
+        L.update(f.labels)
+    f = asm(B12_SRC, syms=dict(L, BUF=BUF))
+    assert f.org + len(f.bytes) <= 0x9683
+    bank_put(rom, 12, f.org, f.bytes + b'\xEA' * (0x9683 - f.org - len(f.bytes)))
+    report.append('bank 12 converter: %d bytes' % len(f.bytes))
     init = asm(INIT_SRC, syms={'CODE2': CODE_BANK * 2})
     assert init.org + len(init.bytes) <= 0xFFB0
     bank_put(rom, 31, init.org, init.bytes)
@@ -687,6 +883,7 @@ def engine(rom, report, sysbits):
     for k, base, old, new in ((3, 0xE9B2, 12, 13),):
         assert bank_get(rom, 31, base + k) == bytes([old]), (k, hex(base))
         bank_put(rom, 31, base + k, bytes([new]))
+    # battle text into its boxes (two rows for a long English text)
     # magic menu cursors: one column (step 4 bytes = 1 entry)
     for a in (0xAFA7, 0xAFC7):
         assert bank_get(rom, 14, a, 2) == b'\xa9\x08', hex(a)
@@ -712,6 +909,7 @@ def engine(rom, report, sysbits):
         bank_put(rom, 31, a, jsr(L[h]) + b'\xEA\xEA')
     assert bank_get(rom, 31, 0xF069, 4) == b'\xa5\x38\x85\x3a'
     bank_put(rom, 31, 0xF069, jmp(L['h_flush']) + b'\xEA')
+    battle(rom, report, L)
 
 if __name__ == '__main__':
     rom = bytearray(open(sys.argv[1], 'rb').read())
