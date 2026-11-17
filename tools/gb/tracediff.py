@@ -8,7 +8,10 @@ from compare import GB, new_game_script
 from nescode import space_of_index
 from cynes import NES
 
+import random
+from compare import UP, DOWN, LEFT, RIGHT, A, B, START
 nes = NES(sys.argv[1]); gb = GB(sys.argv[2]); K = int(sys.argv[3])
+RND = int(sys.argv[sys.argv.index('--random') + 1]) if '--random' in sys.argv else None
 sym = {}
 for l in open(sys.argv[2][:-3] + '.sym'):
     b, rest = l.split(':'); a, n = rest.split(); sym[n] = (int(b, 16), int(a, 16))
@@ -25,6 +28,11 @@ for it in new_game_script():
     if it[0] == 'shot': continue
     m, h, a = it
     steps += [m] * h + [0] * a
+if RND is not None:
+    r = random.Random(RND)
+    btns = [UP, DOWN, LEFT, RIGHT, A, A, B, START, UP, DOWN, LEFT, RIGHT]
+    while len(steps) < 60000:
+        steps += [r.choice(btns)] * r.randint(2, 40) + [0] * r.randint(1, 20)
 gbtrace = []
 hooked = False
 for m in steps:
@@ -33,8 +41,10 @@ for m in steps:
     nes.step(1)
     if nes.nmi_count == k0: continue
     k = nes.nmi_count
-    gb.set(nes.nmi_pad)
-    while waits[0] < k: gb.pb.tick()
+    hist = nes.pad_history
+    for j in range(k0 + 1, k + 1):
+        gb.set(hist[j & 0xFF])
+        while waits[0] < j: gb.pb.tick()
     if K - 3 <= k < K and not hooked:
         print('tracing from wait', k, file=sys.stderr)
         # hook every instruction label for the next frame

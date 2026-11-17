@@ -108,6 +108,18 @@ class CodeMap:
         if 0x5C00 <= addr < 0x6000: return 'ex'
         return None
 
+    def static_bank(self, space, addr):
+        """Bank of a JSR/JMP into $8000-$BFFF at `addr` when it directly follows
+        LDA #n / JSR $FE03 (or $FE1A), the game's bank switch: 'bNN' or None."""
+        try:
+            sw = self.decode(space, addr - 3); ld = self.decode(space, addr - 5)
+        except IndexError:
+            return None
+        if (sw is not None and sw.mn == 'JSR' and sw.arg in (0xFE03, 0xFE1A) and
+                ld is not None and ld.mn == 'LDA' and ld.mode == 'imm' and ld.arg < 31):
+            return 'b%02d' % ld.arg
+        return None
+
     def build(self):
         work = []
         for ci in range(COV_SIZE):
@@ -138,6 +150,8 @@ class CodeMap:
                 if i.mn == 'JSR': nxt.append(i.arg)
             for t in nxt:
                 ts = self.target_space(sp, t)
+                if ts is None and t == i.arg and i.mn in ('JSR', 'JMP'):
+                    ts = self.static_bank(sp, a)
                 if ts is None:
                     self.unresolved.append((i, 'banked target $%04X' % t)); continue
                 if ts != sp and t != i.arg and not (sp == 'c62' and ts == 'fix'):   # c62 runs on into fix

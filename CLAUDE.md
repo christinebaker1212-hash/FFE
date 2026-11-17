@@ -130,13 +130,19 @@ Milestones per game (from `docs/gb-port.md`):
 - Sprite tile cache (DMG has 384 tiles vs NES 512): 128 GB sprite slots, all 256 NES
   sprite tiles shadowed in cart RAM bank 1, allocated on use by the OAM conversion.
 
+- Recompiler additions: exact PHP/PLP (`rt_get_p`/`rt_set_p`; PHP/PLA and PHA/PLP pairs
+  move P to/from A), idiom table (`b14:B0F1` TSX…TXS = drop 3 frames → `rt_unwind3`,
+  farcall-aware), static bank resolution for `LDA #n / JSR $FE03 / JSR $8xxx` (17 of 25
+  banked calls; reaches b01, b09 and more of b13 statically), `JMP (ind)` through
+  non-RAM pointers. Build: 18.5k instructions, 5 code banks.
+
 ## In progress / next
-- Long random-play equivalence runs (field, battles, menus) and fixing what they find.
+- Random-play equivalence (`build/eq2/`, 3 seeds × 40k frames). Earlier runs on the
+  previous build diverged right after the script (buffer `$0780-07CF`, OAM page).
 - Remaining lag: `$2007` shim cost, CPU delay loop `$D77C` (DEY/BNE timing loop).
-- Known gaps: TSX/TXS stack save-restore in b14 (`B0F1`/`B0FB`), PHP/PLP sites where
-  N/V may be live, banked JSR targets never seen in coverage (`$BC00`, `$AE10` from c62),
-  palette (DMG shades from BG palette 0 only), sound not started, camera fixed at the
-  NES screen centre (screens not re-laid out yet).
+- Known gaps: palette (DMG shades from BG palette 0 only), sound not started, camera
+  fixed at the NES screen centre (screens not re-laid out yet), `rt_unwind3` untested
+  (camp items), 8 banked calls still resolved only at run time.
 - Recompiler and PPU-layer design written up in `docs/gb-port.md` §1-2 (registers X→E,
   Y→C; NES stack on the GB stack; flag liveness; ROM data through a bank-0 helper;
   queued VRAM writes; tile/nametable/scroll mapping).

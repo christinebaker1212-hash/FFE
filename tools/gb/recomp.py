@@ -42,6 +42,11 @@ class FF1:
     #   $FEDB ($FE00 jumps here): enable NMI and spin; the NMI handler returns to the caller.
     #   $E9F6: CHR upload loop (X pages from ($10)+Y to $2007).
     ext = {('fix', 0xFEDB): ('rt_wait_nmi', 'NZ'), ('fix', 0xE9F6): ('hle_chr_pages', 'NZ')}
+    # Idioms replaced by a runtime call, then a jump to `resume`:
+    #   b14:B0F1 TSX/TXA/CMP #$EF/BCS/CLC/ADC #6/TAX/TXS: drop 3 return frames (camp items
+    #   returning from the item menu straight to the field). The S >= $EF guard is not
+    #   reproduced (it only matters for a near-empty stack).
+    idioms = {('b14', 0xB0F1): ('rt_unwind3', 0xB0FC, 'C')}
     skip = [('fix', 0xFECF, 0xFEDB), ('fix', 0xFEDC, 0xFEF1)]   # NMI handler + wait loop
 
 
@@ -60,6 +65,7 @@ class Recompiler:
         out = []
         k = (i.space, i.addr)
         if k in self.g.ext: return []
+        if k in self.g.idioms: return [(i.space, self.g.idioms[k][1])]
         if i.mn in ('RTS', 'RTI', 'BRK'): return []
         if i.mn == 'JMP':
             if i.mode == 'ind': return [None]
@@ -71,6 +77,8 @@ class Recompiler:
 
     def target(self, i, addr):
         ts = self.cm.target_space(i.space, addr)
+        if ts is None and i.mn in ('JSR', 'JMP') and addr == i.arg:
+            ts = self.cm.static_bank(i.space, i.addr)     # LDA #n / JSR $FE03 / JSR $8xxx
         return (ts, addr) if ts else None
 
     def dyn_candidates(self, addr):
@@ -167,6 +175,8 @@ class Recompiler:
                 lo |= ALL if (s is None or s not in ins) else live_in[s]
             if k in self.g.ext:
                 li = lo - frozenset(self.g.ext[k][1])
+            elif k in self.g.idioms:
+                li = lo - frozenset(self.g.idioms[k][2])
             elif i.mn == 'JSR':
                 li = lo                                     # = live_in(callee), set via outs
             else:
@@ -340,6 +350,8 @@ class Emitter:
         k = self.k
         if k in rc.g.ext:
             self.o('jp ' + rc.g.ext[k][0]); return
+        if k in rc.g.idioms:
+            self.o('call ' + rc.g.idioms[k][0]); self.jump(None, (i.space, rc.g.idioms[k][1])); return
         h = getattr(self, 'x_' + mn, None)
         if h is None:
             rc.warn.append('no translation for %r' % i); self.o('call rt_fatal')
@@ -371,8 +383,10 @@ class Emitter:
     def x_TYA(self): self.o('ld a, c'); self.set_nz_reg('a')
 
     def x_TXS(self):
-        p = self.rc.insns.get((self.i.space, self.i.addr - 1))
-        if not (p is not None and ((p.mn == 'LDX' and p.mode == 'imm' and p.arg == 0xFF) or p.mn == 'DEX')):
+        p = self.rc.insns.get((self.i.space, self.i.addr - 2))
+        p1 = self.rc.insns.get((self.i.space, self.i.addr - 1))
+        if not ((p is not None and p.mn == 'LDX' and p.mode == 'imm' and p.arg == 0xFF) or
+                (p1 is not None and p1.mn == 'DEX')):
             self.rc.warn.append('TXS with unknown X at %r' % self.i)
         self.o('ld sp, STACK_TOP')
 
@@ -496,24 +510,40 @@ class Emitter:
     def x_NOP(self): pass
 
     # stack
-    def x_PHA(self): self.o('push af')
+    def x_PHA(self):
+        n = self.nxt()
+        if n is not None and n.mn == 'PLP': return  # PHA / PLP pair
+        self.o('push af')
 
     def x_PLA(self):
         k = self.k
         if k in self.rc.pla_drop:
             if self.rc.pla_drop[k] == 'pop': self.o('pop hl')
             return
+        p = self.prv()
+        if p is not None and p.mn == 'PHP':          # PHP / PLA pair: A already = P
+            self.set_nz_reg('a'); return
         self.o('pop hl', 'ld a, h'); self.set_nz_reg('a')
 
+    def nxt(self):
+        i = self.i
+        return self.rc.insns.get((i.space, i.addr + i.size))
+
+    def prv(self):
+        i = self.i
+        return self.rc.insns.get((i.space, i.addr - 1))
+
     def x_PHP(self):
-        if self.rc.live_in.get(self.k, ALL) & {'N', 'V'}:
-            self.rc.warn.append('PHP with N/V live at %r (only Z/C saved)' % self.i)
-        self.o('push af')
+        n = self.nxt()
+        if n is not None and n.mn == 'PLA':          # PHP / PLA: A = P
+            self.o('call rt_get_p'); return
+        self.o('ldh [sv_a], a', 'call rt_get_p', 'push af', 'ldh a, [sv_a]')
 
     def x_PLP(self):
-        if self.lo & {'N', 'V'}:
-            self.rc.warn.append('PLP with N/V live after at %r' % self.i)
-        self.o('pop hl', 'ld h, a', 'push hl', 'pop af')
+        p = self.prv()
+        if p is not None and p.mn == 'PHA':          # PHA / PLP: P = A
+            self.o('call rt_set_p'); return
+        self.o('ldh [sv_a], a', 'pop hl', 'ld a, h', 'call rt_set_p', 'ldh a, [sv_a]')
 
     # control flow
     def branch(self, cond_true, flag_test=None):
@@ -550,7 +580,9 @@ class Emitter:
     def x_JMP(self):
         i = self.i
         if i.mode == 'ind':
-            if i.arg >= 0x800: self.rc.warn.append('JMP (ind) through non-RAM at %r' % i)
+            if gb_ram(i.arg) is None:
+                self.rc.warn.append('JMP (ind) through non-RAM at %r' % i)
+                self.o('ld hl, $%04X' % i.arg, 'jp rt_jmp_ind_nes'); return
             self.o('ld hl, $%04X' % gb_ram(i.arg), 'jp rt_jmp_ind'); return
         tk = self.rc.target(i, i.arg)
         if tk is None:
@@ -649,7 +681,7 @@ def emit_program(rc):
             # instruction falling through to a key that is not next in this bank
             i = rc.insns[k]
             nxt_keys = [s for s in rc.succ(i) if s is not None and s[1] == i.addr + i.size]
-            if i.mn not in ('JMP', 'RTS', 'RTI', 'BRK') and not (k in rc.g.ext):
+            if i.mn not in ("JMP", "RTS", "RTI", "BRK") and k not in rc.g.ext and k not in rc.g.idioms:
                 ft = (i.space, i.addr + i.size) if not (i.space == 'c62' and i.addr + i.size == 0xE000) else None
                 if ft is not None and (n + 1 >= len(keys) or keys[n + 1] != ft):
                     if ft in rc.insns:

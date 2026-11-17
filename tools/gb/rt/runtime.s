@@ -60,6 +60,9 @@ o_y:        ds 1
 o_t:        ds 1
 o_a:        ds 1
 spr_next:   ds 1
+uw_bank:    ds 1
+uw_ret:     ds 2
+uw_y:       ds 1
 oam_frame:  ds 1
 frames:     ds 1
 hram_end:   ds 1
@@ -1042,6 +1045,40 @@ rt_sbc_v:   ld h, a                         ; 6502 SBC = A + ~M + C (carry in 65
             ld a, h
             jr rt_adc_v
 
+; ------------------------------------------------------------------ 6502 status byte
+rt_get_p:   ; A = P (N from nzv, V from vfl, Z/C from F, bits 4-5 set). F kept, HL used.
+            push af
+            ld h, $30
+            jr nc, .c0
+            set 0, h
+.c0:        jr nz, .z0
+            set 1, h
+.z0:        ldh a, [nzv]
+            and $80
+            or h
+            ld h, a
+            ldh a, [vfl]
+            and $40
+            or h
+            ld h, a
+            pop af
+            ld a, h
+            ret
+rt_set_p:   ; flags from P in A (A kept): nzv, vfl, GB Z and C
+            ldh [nzv], a
+            ldh [vfl], a
+            ld h, a
+            ld l, 0
+            bit 1, h
+            jr z, .z
+            set 7, l
+.z:         bit 0, h
+            jr z, .c
+            set 4, l
+.c:         push hl
+            pop af
+            ret
+
 ; ------------------------------------------------------------------ banking / dispatch
 rt_farcall: ; HL = target, fc_bank = its bank; A, F, BC, DE pass both ways
             ldh [sv_a], a
@@ -1052,6 +1089,7 @@ rt_farcall: ; HL = target, fc_bank = its bank; A, F, BC, DE pass both ways
             ld [$2000], a
             ldh a, [sv_a]
             call rt_jp_hl
+rt_farcall_ret:
             ldh [sv_a], a
             pop hl
             ld a, h
@@ -1141,6 +1179,21 @@ rt_jmp_ind:                                 ; JMP (ind): HL = GB address of the 
             pop af
             jp rt_dyn_jump
 
+rt_jmp_ind_nes:                             ; JMP (ind) with the pointer at NES address HL
+            push af
+            push hl
+            call nes_rd
+            ld a, l
+            ldh [tmp_lo], a
+            pop hl
+            inc hl
+            call nes_rd
+            ld h, l
+            ldh a, [tmp_lo]
+            ld l, a
+            pop af
+            jp rt_dyn_jump
+
 rt_rts_dispatch:                            ; PHA hi / PHA lo / RTS -> jump to (hi:lo) + 1
             ldh [sv_a], a
             pop hl
@@ -1152,6 +1205,61 @@ rt_rts_dispatch:                            ; PHA hi / PHA lo / RTS -> jump to (
             inc hl
             ldh a, [sv_a]
             jp rt_dyn_jump
+
+; Drop N NES return frames from the GB stack (TSX/ADC/TXS idioms), then return to the
+; caller. Farcall frames (rt_farcall_ret + saved bank) and bank-0 stub frames are not NES
+; frames; if a farcall frame is dropped, a synthetic one is pushed back so that the
+; next RTS still restores the bank the remaining frames run in. Carry = 0, A kept.
+rt_unwind3: ldh [sv_a], a
+            ld a, 3
+            jr rt_unwind_a
+rt_unwind:  ldh [sv_a], a                   ; A = number of frames
+rt_unwind_a:
+            ld b, a
+            ld a, c
+            ldh [uw_y], a
+            pop hl
+            ld a, l
+            ldh [uw_ret], a
+            ld a, h
+            ldh [uw_ret + 1], a
+            xor a
+            ldh [uw_bank], a
+.lp:        pop hl
+            ld a, h
+            cp high(rt_farcall_ret)
+            jr nz, .nfc
+            ld a, l
+            cp low(rt_farcall_ret)
+            jr nz, .nfc
+            pop hl                          ; saved bank (H)
+            ld a, h
+            ldh [uw_bank], a
+            jr .lp
+.nfc:       ld a, h
+            cp $40
+            jr c, .lp                       ; bank-0 stub return: not an NES frame
+            dec b
+            jr nz, .lp
+            ldh a, [uw_bank]
+            and a
+            jr z, .res
+            ld h, a
+            ld l, 0
+            push hl
+            ld hl, rt_farcall_ret
+            push hl
+.res:       ldh a, [uw_y]
+            ld c, a
+            ld b, 0
+            ldh a, [uw_ret]
+            ld l, a
+            ldh a, [uw_ret + 1]
+            ld h, a
+            ldh a, [sv_a]
+            scf
+            ccf
+            jp hl
 
 ; ------------------------------------------------------------------ faults
 ; code 1 = no dynamic target (HL = NES address), 2 = uncompiled code reached
