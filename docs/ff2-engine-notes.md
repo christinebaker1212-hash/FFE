@@ -44,3 +44,15 @@ $E9AA/$E9AE/$E9B2/$E9B6)
   $8200); status words bank 12 $9AB6 (bank 10 $8400, ids 240-255, 4-cell slot).
 - boxes are drawn from the tile buffer $7600 (bank 5 $AB25: width $52, rows $53).
 - free RAM after $7D47: up to $7D5D.
+
+## English battle additions (insert.py)
+- Battle text tables (bank 5 $AC44 monsters, $B0BB magic, $B295 messages) are read from bank 21
+  (ExRAM fdbank in $FD8C); text buffer BUF $5E40 (ExRAM, 63 bytes); box save stack $5E80.
+- Boxes (bank 5 $AC02): attacker/target 14 wide, action/result 15, message 28; text widths set
+  at the conversion calls (BOX_W). The converter (bank 12 $95E7) splits a box text over the
+  box's two rows at the most even space (btidy).
+- Enemy list (bank 12 $9683, 8 columns): names with a word wider than 8 have compact tiles
+  (bank 21 CNTAB); enname (fixed $F750) streams them into battle-only free tile slots (SLOTS:
+  $4C-$4F never loaded in battle, unused kana) one per vertical blank, as the game streams
+  monster tiles (bank 11 $9DA2).
+- Free fixed-bank space used: $F750-$F7FF, $F850-$F8FF, $FF30-$FFAF.

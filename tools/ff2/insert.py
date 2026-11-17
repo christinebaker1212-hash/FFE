@@ -14,7 +14,7 @@ Text in banks 16-20 is drawn one tile row per line (the Japanese spends a row on
 dakuten); see EXRAM_SRC."""
 import sys, os, json, re
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from latin_font import tile, proportional, right_label
+from latin_font import tile, proportional, right_label, left_label
 from asm6502 import asm
 
 HDR = 16; BANK = 0x4000
@@ -24,6 +24,7 @@ ONE_ROW = (16, 21)                      # banks drawn one row per line
 DB_BANK, DA_BANK, EV_BANK, CODE_BANK = 16, 18, 20, 22
 BT_BANK = 21                            # battle text (bank 5's three tables)
 BUF, SAVE = 0x5E40, 0x5E80              # ExRAM: battle text buffer (64), box save stack
+CNTAB = 0xBE00                          # bank 21: enemy-list compact names, by monster
 
 ENC = {chr(0x30 + i): 0x80 + i for i in range(10)}
 for i in range(26):
@@ -318,7 +319,11 @@ SLOT1:  .ds 1
 BLEN:   .ds 1   ; battle text: length, split index, split cost
 BSPL:   .ds 1
 BCOST:  .ds 1
-    .ds 10
+BOXF:   .ds 1   ; 1: next battle text is a box entry (enemy list)
+CNEXT:  .ds 1   ; enemy list: next free tile slot, tiles of this name, data index
+CN_N:   .ds 1
+CN_P:   .ds 1
+    .ds 6
 SYSONE: .ds 32  ; one-row system strings (bit k of byte n: id 8n+k)
 dlgbank:        ; bank 14 $962F: dialogue bank from the map ($A0) and the id ($92)
     lda $A0
@@ -541,6 +546,15 @@ repin:          ; first cursor on SLOT1's entry if it is in view, else hidden
     lda #0
     sta $A2
     rts
+fdbank:         ; $FD8C (battle string fetch, table in bank X): bank 5's three battle text
+    txa         ;   tables are read from the English bank BT
+    cmp #5
+    bne .k
+    lda #BT
+.k:
+    jmp $FE1A
+SLOTS:          ; tile codes free in battle (never loaded; unused kana) for compact names
+    .db $4C, $4D, $4E, $4F, $EF, $F0, $F1, $F2, $F3, $F4, $F5, $F6, $7B, $7C, $7D, $7E, $7F
 onerow:         ; C = 1 in one-row mode
     lda ONE
     cmp #1
@@ -567,14 +581,7 @@ h_sub:          ; $EA78/$EA82 (paged text): rows scrolled per line
 '''
 
 FIXA_SRC = '''
-    org $F750       ; (fixed bank: unused bytes)
-fdbank:         ; $FD8C (battle string fetch, table in bank X): bank 5's three battle text
-    txa         ;   tables are read from the English bank BT
-    cmp #5
-    bne .k
-    lda #BT
-.k:
-    jmp $FE1A
+    org $FF30       ; (fixed bank: unused bytes)
 btidy:          ; battle text in BUF for a box $45 wide: no leading, trailing or double
     ldx #0      ;   spaces; BLEN its length; BSPL the space where it splits into the most
     ldy #0      ;   even two rows that fit ($FF: one row)
@@ -654,9 +661,13 @@ bconv:          ; battle text (BUF, 0-terminated) into the tile buffer at $A8/$A
     adc $6F
     sta $6D
     ldx #0
+    lda BOXF
+    stx BOXF
+    bne .b
     lda $44
     cmp $45
     bne .w
+.b:
     jsr btidy
     ldx BSPL
     inx
@@ -689,6 +700,101 @@ bconv:          ; battle text (BUF, 0-terminated) into the tile buffer at $A8/$A
     bne .l
 .x:
     rts
+'''
+
+FIXC_SRC = '''
+    org $F750       ; (fixed bank: unused bytes)
+enname:         ; bank 12 $969E (enemy list, entry $4B): the name (as the Japanese); a
+    jsr $9AAB   ;   name too wide for the list's 8 columns has compact tiles of its own
+    lda #1      ;   (bank BT, table CNTAB by monster): they are written to free tile
+    sta BOXF    ;   slots in a vertical blank and the name is made of their codes
+    lda $4B
+    bne .a
+    sta CNEXT
+.a:
+    ldx $4B
+    lda $7B4E,x
+    asl a
+    tay
+    lda #BT
+    jsr $FE1A
+    lda CNTAB,y
+    sta $6A
+    lda CNTAB+1,y
+    sta $6B
+    ora $6A
+    beq .x
+    ldy #0
+    lda ($6A),y
+    sta CN_N
+    clc
+    adc CNEXT
+    cmp #NSLOT+1
+    bcs .x
+    lda #1
+    sta CN_P
+    ldx #0
+.t:
+    cpx CN_N
+    beq .s0
+    jsr $FA2A   ; one tile per vertical blank (as the game streams monster tiles)
+    txa
+    clc
+    adc CNEXT
+    tay
+    lda SLOTS,y
+    pha
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    sta $2006
+    pla
+    asl a
+    asl a
+    asl a
+    asl a
+    sta $2006
+    ldy CN_P
+.b:
+    lda ($6A),y
+    sta $2007
+    iny
+    tya
+    and #$0F
+    cmp #1
+    bne .b
+    sty CN_P
+    jsr $FD46
+    inx
+    bne .t
+.s0:
+    ldy CN_P
+    ldx #0
+.s:
+    lda ($6A),y
+    beq .e
+    cmp #9
+    bcs .c
+    clc
+    adc CNEXT
+    sty CN_P
+    tay
+    lda SLOTS-1,y
+    ldy CN_P
+.c:
+    sta BUF,x
+    iny
+    inx
+    bne .s
+.e:
+    sta BUF,x
+    lda CNEXT
+    clc
+    adc CN_N
+    sta CNEXT
+.x:
+    jmp $FA84
 '''
 
 FIXB_SRC = '''
@@ -814,6 +920,26 @@ def battle(rom, report, L):
         assert len(rows) == n
         for e in rows:
             b.put_ptr(table + 2 * e['id'], b.alloc(enc(e['en']) + b'\0'))
+    # enemy list (8 columns, two rows a name): a word wider than 8 is drawn on compact tiles
+    # (condensed letters); record: tile count, the tiles, the name with codes 1..n for them
+    assert set(bank_get(rom, 5, CNTAB, 256)) != None
+    for e in json.load(open('script/ff2/monsters.json')):
+        n = e['en']; words = n.split(' ')
+        rows = balanced(n, 8) if len(n) > 8 else [n]
+        if len(rows) <= 2 and all(len(r) <= 8 for r in rows):
+            bank_put(rom, BT_BANK, CNTAB + 2 * e['id'], b'\0\0'); continue
+        rows = [n] if len(words) == 1 else [words[0], ' '.join(words[1:])]
+        assert len(rows) == 2 or len(words) == 1
+        tiles = []; text = bytearray()
+        for r in rows:
+            if text: text.append(0xFF)
+            if len(r) <= 8: text += enc(r); continue
+            t = left_label(r, True, fg=3, bg=2); assert len(t) <= 8, r
+            text += bytes(range(len(tiles) + 1, len(tiles) + 1 + len(t))); tiles += t
+        a = b.alloc(bytes([len(tiles)]) + b''.join(tiles) + bytes(text) + b'\0')
+        bank_put(rom, BT_BANK, CNTAB + 2 * e['id'], bytes([a & 0xFF, a >> 8]))
+    assert bank_get(rom, 12, 0x969E, 3) == b'\x20\xab\x9a'
+    bank_put(rom, 12, 0x969E, jsr(L['enname']))
     report.append('battle text bank %d free: %d' % (BT_BANK, sum(y - x for x, y in b.free)))
     assert bank_get(rom, 31, 0xFD8C, 4) == b'\x8a\x20\x1a\xfe'
     bank_put(rom, 31, 0xFD8C, jsr(L['fdbank']) + b'\xEA')
@@ -847,7 +973,7 @@ def jsr(a): return bytes([0x20, a & 0xFF, a >> 8])
 def jmp(a): return bytes([0x4C, a & 0xFF, a >> 8])
 
 def engine(rom, report, sysbits):
-    ex = asm(EXRAM_SRC, syms={'DB': DB_BANK, 'DA': DA_BANK, 'SB': SPLIT['dialogue_b'], 'SA': SPLIT['dialogue_a'], 'R0': ONE_ROW[0], 'R1': ONE_ROW[1]})
+    ex = asm(EXRAM_SRC, syms={'DB': DB_BANK, 'DA': DA_BANK, 'SB': SPLIT['dialogue_b'], 'SA': SPLIT['dialogue_a'], 'R0': ONE_ROW[0], 'R1': ONE_ROW[1], 'BT': BT_BANK})
     assert ex.org + len(ex.bytes) <= 0x6000
     rom[HDR + CODE_BANK * BANK:HDR + (CODE_BANK + 1) * BANK] = b'\xFF' * BANK
     img = bytearray(ex.bytes)
@@ -856,8 +982,8 @@ def engine(rom, report, sysbits):
     report.append('ExRAM code: %d bytes' % len(ex.bytes))
     L = dict(ex.labels)
     assert ex.org + len(ex.bytes) <= BUF, hex(ex.org + len(ex.bytes))
-    for src, end in ((FIXA_SRC, 0xF800), (FIXB_SRC, 0xF900)):
-        f = asm(src, syms=dict(L, BUF=BUF, BT=BT_BANK))
+    for src, end in ((FIXA_SRC, 0xFFB0), (FIXB_SRC, 0xF900), (FIXC_SRC, 0xF800)):
+        f = asm(src, syms=dict(L, BUF=BUF, BT=BT_BANK, CNTAB=CNTAB, NSLOT=17))
         assert f.org + len(f.bytes) <= end, (hex(f.org + len(f.bytes)))
         assert set(bank_get(rom, 31, f.org, len(f.bytes))) == {0}
         bank_put(rom, 31, f.org, f.bytes)
