@@ -1496,6 +1496,104 @@ scene:          ; bank 13 $B899 (rendering off): as the Japanese, plus the box p
         assert rom[k:k + 8] == bytes([0x55, 0, 0, 0, 0, 0x44, 0x55, 0x55])
         rom[k] = 0x11; rom[k + 5] = 0x00
 
+def prologue(rom):
+    """Opening text (bank 13 $BF20, drawn by bank 14 $A142 from column 1 row 9; seven
+    lines of two tile rows (dakuten + kana) in rows 9-22, faded in top to bottom by
+    attribute bands of two rows from row 8). Each Japanese line becomes one or two centred
+    English lines of 30 followed by a blank row (rows 4+3k..6+3k), so the block keeps the
+    Japanese spacing; the fade starts at row 4 and also fades rows 22-23 (the Japanese
+    showed its last band at once). String in BATTLE_BANK."""
+    e = json.load(open('script/ff1/prologue.json'))[0]
+    out = []
+    for line in e['en'].split('\n'):
+        if len(line) <= 30: ls = [line, '']
+        else:                                    # two balanced halves
+            w = line.split(' ')
+            ls = min(([' '.join(w[:k]), ' '.join(w[k:])] for k in range(1, len(w))),
+                     key=lambda p: max(len(p[0]), len(p[1])))
+            assert max(len(l) for l in ls) <= 30, ls
+        out += [' ' * ((30 - len(l)) // 2) + l if l else '' for l in ls] + ['']
+    assert len(out) == 21
+    bank = Bank(rom, BATTLE_BANK, keep=True); bank.free = BATTLE_FREE[:]
+    a = bank.alloc(enc('{09}' + '{08}'.join(out)) + b'\0')
+    BATTLE_FREE[:] = bank.free
+    o = HDR + 14 * BANK - 0x8000
+    assert rom[o + 0xA142:o + 0xA150] == bytes.fromhex('a920853ea9bf853fa9008537a90d')
+    rom[o + 0xA143] = a & 0xFF; rom[o + 0xA147] = a >> 8; rom[o + 0xA14F] = BATTLE_BANK
+    assert rom[o + 0xA157] == 9; rom[o + 0xA157] = 4              # first text row 4
+    assert rom[o + 0xA288] == 0xD0; rom[o + 0xA288] = 0xC8        # fade from row 4
+    assert rom[o + 0xA2A9] == 0xE8; rom[o + 0xA2A9] = 0xF8        # fade the last band too
+
+NAME_GRID = ['ABCDEFGHIJ', 'KLMNOPQRST', "UVWXYZ'.,-", 'abcdefghij', 'klmnopqrst',
+             'uvwxyz!?&\u2026', '0123456789', '():;/+%"[]', '          ']
+def name_grid(rom):
+    """Name entry grid (bank 14 $A013: 9 rows of 10 cells, 'char sep' pairs, sep FF or
+    01 at a row end; the chosen character is read back from the same string). Latin
+    letters, digits and punctuation in the same layout; the last row is spaces (the
+    Japanese grid ends with one space cell)."""
+    data = bytearray()
+    for r, row in enumerate(NAME_GRID):
+        assert len(row) == 10
+        for c, ch in enumerate(row):
+            data += enc(ch) + (b'\x01' if c == 9 and r < 8 else b'\x00' if c == 9 else b'\xFF')
+    o = HDR + 14 * BANK + 0xA013 - 0x8000
+    assert len(data) == 180 and rom[o] == 0x8A and rom[o + 179] == 0
+    rom[o:o + 180] = data
+
+def class_select(rom):
+    """New-game class boxes (bank 14 $9ECB: the class name is drawn from a string built at
+    $5E = 02 F0+class, in an 8-wide box). 'Red Magician' etc. need the two-row form of the
+    name ({0A}: pre-wrapped name table), so the string comes from a table of six in
+    BATTLE_BANK instead."""
+    bank = Bank(rom, BATTLE_BANK, keep=True); bank.free = BATTLE_FREE[:]
+    # clear both rows of the 8 cells first (the Japanese names were padded to clear the
+    # previous one): 05 07 = save the column, both rows; 06 = back, lower row
+    base = bank.alloc(b''.join(bytes([0x05, 0x07] + [0xFF] * 8 + [0x06, 0x0A, WRAP_WIDTH, 0x02, 0xF0 + c, 0])
+                               for c in range(6)))
+    BATTLE_FREE[:] = bank.free
+    code = asm('''
+    org $9ED6
+    lda $0300,x
+    asl a
+    asl a
+    asl a
+    asl a
+    clc
+    adc #<BASE
+    sta $3E
+    lda #>BASE
+    adc #0
+    sta $3F
+    lda #BB
+    sta $57
+    lda #$0E
+    sta $58
+''', syms={'BASE': base, 'BB': BATTLE_BANK})
+    o = HDR + 14 * BANK - 0x8000
+    assert rom[o + 0x9ED6:o + 0x9EDC] == bytes.fromhex('bd0003186 9f0'.replace(' ', '')) and rom[o + 0x9EF0] == 0x8A
+    n = len(code.bytes); assert n <= 0x9EF0 - 0x9ED6, n
+    rom[o + 0x9ED6:o + 0x9EF0] = code.bytes + b'\xEA' * (0x9EF0 - 0x9ED6 - n)
+
+TITLE_MENU = [' Continue', 'Start Over', ' Message Speed']
+def title_menu(rom):
+    """Title menu (bank 14 $A16F): three boxes, (11,10) and (11,15) 10 wide, (8,20) 16 wide
+    with the speed digit at $22D5; cursor at x=$48 left of the boxes, on the first two
+    only. English: boxes 1-2 at x=10 width 12 ('Start Over'), box 3 at x=6 width 20
+    ('Message Speed', a space, the digit at column 23), all on the original centre; the
+    cursor 8 pixels further left. The strings (25 bytes in the Japanese, followed by the
+    cursor table) go to free fixed-bank space, readable whatever bank is mapped."""
+    data = [enc(t) + b'\0' for t in TITLE_MENU]
+    at = 0xF8B0
+    o = HDR + 14 * BANK - 0x8000
+    for k, (lo, hi) in enumerate(((0xA18C, 0xA190), (0xA1A2, 0xA1A6), (0xA1BC, 0xA1C0))):
+        assert rom[o + lo - 1] == 0xA9 and rom[o + hi - 1] == 0xA9 and rom[o + hi] == 0xA2
+        rom[o + lo] = at & 0xFF; rom[o + hi] = at >> 8
+        put(rom, at, data[k]); at += len(data[k])
+    assert at <= 0xF919
+    for a, old, new in ((0xA179, 0x0B, 10), (0xA185, 0x0A, 12), (0xA1B1, 0x08, 6), (0xA1B5, 0x10, 20),
+                        (0xA1D4, 0x48, 0x40), (0xA257, 0xD5, 0xD7)):
+        assert rom[o + a] == old, hex(a); rom[o + a] = new
+
 def battle(rom, labels, report):
     """Battle text. Messages (table $8F4E+2) and monster names (table $94E0) move to
     BATTLE_BANK at the same addresses; names may be longer than 8 letters; enemy attack
@@ -1634,6 +1732,10 @@ if __name__ == '__main__':
     shops(rom, labels)
     battle(rom, labels, report)
     story(rom, report)
+    prologue(rom)
+    name_grid(rom)
+    class_select(rom)
+    title_menu(rom)
     bad = insert_dialogue(rom, report)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report)); print('strings not fitting:', bad)
