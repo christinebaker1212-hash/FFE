@@ -99,7 +99,7 @@ MSG = {
  540:'[74]Bahamut', 541:'[75]Bahamut', 542:'Bahamut',
  545:'Absorbed the magic!', 546:'Forward', 547:'Back', 548:'Fight', 549:'Defend', 550:'Run',
  551:'Bolt', 552:'Jump', 553:'Miss!', 554:'Sure Kill', 555:'Terrain', 556:'Examine', 557:'See Through',
- 558:'Steal', 559:'Build Up', 560:'Sing', 561:'Scare', 562:'Cheer', 563:'Hits', 564:'Item', 565:'Magic',
+ 558:'Steal', 559:'Build Up', 560:'Sing', 561:'Scare', 562:'Cheer', 563:' hits', 564:'Item', 565:'Magic',
  566:'All', 567:'First strike!', 568:'The monsters strike first!', 569:'Back attack!', 570:'has died!',
  571:'Defeated the enemy!', 572:'Wiped out...', 573:'The enemies were wiped out!', 574:'Ran away...',
  575:"Can't escape!", 576:'Level up!', 577:'Stopped its breath for good!', 578:'Proficiency up!',

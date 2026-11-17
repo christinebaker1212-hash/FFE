@@ -171,7 +171,12 @@ TMP:    .ds 1
 ONE:    .ds 1
 ONEP:   .ds 1   ; ONE of the last drawing (the page scroll runs after it)
 TB16:   .ds 1   ; battle string copy: the table's base in 16KB banks
-    .ds 12
+BLEN:   .ds 1   ; battle box text: length, split index, first part's length, cost
+BSPL:   .ds 1
+BL1:    .ds 1
+BCOST:  .ds 1
+BX:     .ds 1
+    .ds 7
 tbase:          ; $EEBB: bank of a text pointer = (hi >> 5) + the table's base bank
     sta TMP     ;   (table by $95: $80 story, $82 system, $84/$86 dialogue, $88+ names)
     lda $95
@@ -208,6 +213,90 @@ tsel:           ; bank 53 $A616 (battle string copy, $1A/$1B = address of the po
     sta $1A
     lda #$40
     sta $1B
+    rts
+btidy:          ; bank 52 converter: tidy BUF ($7AD7) and choose the split (BSPL, BL1)
+    ldx #0          ; tidy: no trailing or double spaces; leading spaces dropped in the
+    ldy #0          ;   boxes (12 or more wide), one kept in a list entry (the cursor column)
+    lda #0
+    sta TMP
+    lda $18
+    cmp #12
+    bcc .n
+    dec TMP
+.n:
+    lda $7AD7,x
+    beq .e
+    inx
+    cmp #$FF
+    bne .c
+    cmp TMP
+    beq .n
+.c:
+    sta TMP
+    sta $7AD7,y
+    iny
+    bne .n
+.e:
+    lda TMP
+    cmp #$FF
+    bne .t
+    cpy #0
+    beq .t
+    dey
+.t:
+    lda #0
+    sta $7AD7,y
+    sty BLEN
+    lda #$FF
+    sta BCOST
+    sta BSPL
+    cpy $18
+    beq .r
+    bcc .r
+    ldx #0          ; split candidates: a space (first part x long) or a hyphen (x+1)
+.p:
+    lda $7AD7,x
+    beq .r
+    cmp #$FF
+    beq .sp
+    cmp #$C2
+    bne .nx
+    txa
+    clc
+    adc #1
+    bne .k
+.sp:
+    txa
+.k:
+    sta TMP
+    cmp $18
+    beq .k1
+    bcs .r
+.k1:
+    stx BX          ; (rest = BLEN - x - 1)
+    lda BLEN
+    clc
+    sbc BX
+    cmp $18
+    beq .k2
+    bcs .nx
+.k2:
+    cmp TMP
+    bcs .m
+    lda TMP
+.m:
+    cmp BCOST
+    bcs .nx
+    sta BCOST
+    stx BSPL
+    lda TMP
+    sta BL1
+    jmp .nx2
+.nx:
+.nx2:
+    inx
+    bne .p
+.r:
     rts
 onerow:         ; C = 1 in one-row mode
     lda ONE
@@ -340,6 +429,99 @@ BCOPY_SRC = '''
     jmp $FD4A
 '''
 
+# battle boxes (bank 52 $8E83, 9 bytes each: top-left name table address, interior
+# width, save buffer; bottom-left address, save pointer of the bottom row): attacker,
+# action, target, result, message. The Japanese 8/8/8/8/17 columns hold English as two
+# rows (the dakuten row and the main row): names 12, actions 15, messages 28 (the action
+# boxes right of the name boxes sharing a border; the message box under both, as wide).
+BOXES = [(1, 19, 12), (14, 19, 15), (1, 22, 12), (14, 22, 15), (1, 25, 28)]
+BOX_SAVE = 0x5E90                      # ExRAM: 4 rows x (width + 2) per box, 368 bytes
+BOX_CALLS = [(0x9091, 0), (0x90C1, 1), (0x9168, 1), (0x91BF, 2), (0x91EF, 3), (0x9253, 4), (0x9313, 4)]
+
+BCONV_SRC = '''
+    org $966A       ; bank 52: battle text ($7AD7, 0-terminated) into the box buffer ($4E),
+bconv:              ;   rows $18 wide; the Japanese converter (dakuten on the row above) is
+    lda $18         ;   replaced. Text with layout codes (01 newline, 02 xx skip) is copied
+    jsr $A558       ;   as the Japanese lays it out; plain text is tidied and, wider than
+    ldx #0          ;   the box, split over the box's two rows at the most even space (or
+.s:                 ;   after a hyphen)
+    lda $7AD7,x
+    beq .box
+    cmp #3
+    bcc .raw
+    inx
+    bne .s
+.raw:
+    ldx #0
+    ldy #0
+.r:
+    lda $7AD7,x
+    beq .x
+    cmp #1
+    bne .r2
+    lda $18
+    asl a
+    jsr $A558
+    inx
+    ldy #0
+    beq .r
+.r2:
+    cmp #2
+    bne .r3
+    inx
+    tya
+    clc
+    adc $7AD7,x
+    tay
+    inx
+    bne .r
+.r3:
+    sta ($4E),y
+    inx
+    iny
+    bne .r
+.x:
+    rts
+.box:
+    jsr btidy
+.w:
+    ldx #0
+    lda BSPL
+    cmp #$FF
+    beq .o
+    sec             ; first part on the row above
+    lda $4E
+    sbc $18
+    sta $1E
+    lda $4F
+    sbc #0
+    sta $1F
+    ldy #0
+.u:
+    cpy BL1
+    beq .ud
+    lda $7AD7,y
+    sta ($1E),y
+    iny
+    bne .u
+.ud:
+    ldx BSPL
+    inx
+.o:
+    ldy #0
+.l:
+    cpy $18
+    beq .x2
+    lda $7AD7,x
+    beq .x2
+    sta ($4E),y
+    inx
+    iny
+    bne .l
+.x2:
+    rts
+'''
+
 COPIER = 0x9F00                         # bank 64: copies the 1KB ExRAM image at reset
 COPIER_SRC = '''
     org $9F00
@@ -385,6 +567,34 @@ def engine(rom, report):
     bc = asm(BCOPY_SRC, syms=L)
     assert bc.org + len(bc.bytes) <= 0xA66C
     put(rom, 53, bc.org, bc.bytes + b'\xEA' * (0xA66C - bc.org - len(bc.bytes)))
+    # battle boxes
+    bc = asm(BCONV_SRC, syms=L)
+    assert bc.org + len(bc.bytes) <= 0x9754, hex(bc.org + len(bc.bytes))
+    put(rom, 52, bc.org, bc.bytes + b'\xEA' * (0x9754 - bc.org - len(bc.bytes)))
+    report.append('battle converter: %d bytes' % len(bc.bytes))
+    save = BOX_SAVE
+    assert get(rom, 52, 0x8E83, 5).hex() == '612208f57a'
+    for k, (x, y, w) in enumerate(BOXES):
+        top = 0x2000 + 32 * y + x; bot = top + 96; end = save + 3 * (w + 2)
+        put(rom, 52, 0x8E83 + 9 * k, bytes([top & 0xFF, top >> 8, w, save & 0xFF, save >> 8,
+                                             bot & 0xFF, bot >> 8, end & 0xFF, end >> 8]))
+        save += 4 * (w + 2)
+    assert save <= 0x6000, hex(save)
+    # battle string copy ($FD4A): the terminating 0 is copied too (an English name longer
+    # than the Japanese field ran into the field's old contents)
+    assert get(rom, FIX, 0xFD4F, 11).hex() == 'b118f0079dd77ae8c8d0f5'
+    put(rom, FIX, 0xFD4F, bytes.fromhex('b1189dd77af004e8c8d0f5'))
+    # command window (bank 52 $9A98: four commands, each converted 5 wide, window x 4-10):
+    # from x 1, 8 wide inside
+    for a, old, new in ((0x9AC4, 5, 8), (0x9ACB, 5, 8), (0x9AD8, 4, 1)):
+        assert get(rom, 52, a, 2) == bytes([0xA9, old]), hex(a)
+        put(rom, 52, a + 1, bytes([new]))
+    assert get(rom, 52, 0x8B00, 8).hex() == 'a828b828c828d828'          # its cursor x: 3 columns left
+    for k in range(4): put(rom, 52, 0x8B01 + 2 * k, b'\x10')
+    for a, k in BOX_CALLS:
+        assert get(rom, 52, a, 7)[0] == 0xA9 and get(rom, 52, a + 2, 5).hex() == '85186a96'[:0] + get(rom, 52, a + 2, 5).hex()
+        assert get(rom, 52, a + 2, 5) == b'\x85\x18\x20\x6a\x96', hex(a)
+        put(rom, 52, a + 1, bytes([BOXES[k][2]]))
     # one row per line
     assert get(rom, FIX, 0xEEC0, 5) == b'\xa5\x93\x20\x03\xff'
     put(rom, FIX, 0xEEC0, jsr(L['txton']) + b'\xEA\xEA')
