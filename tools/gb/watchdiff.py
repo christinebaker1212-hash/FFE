@@ -53,6 +53,15 @@ for m in steps:
         for (b, a), names in at.items():
             gb.pb.hook_register(b, a, on_label, min(names))
         nes.watch = (ADDR, ADDR)
+        if '--probe' in sys.argv:
+            lab = sys.argv[sys.argv.index('--probe') + 1]
+            def probe(ctx):
+                m = gb.pb.memory; rf = gb.pb.register_file
+                print('  probe %s: $10/$11=%02X%02X Y=%02X X=%02X A=%02X nes_bank8=%d data_bank8=%d nes_bankC=%d code_bank=%d' % (
+                    lab, m[0xC011], m[0xC010], rf.C, rf.E, rf.A, m[0xFF80 + 13], m[0xFF80 + 14], m[0xFF80 + 15], m[0xFF80 + 12]))
+            b, a = sym['L_' + lab]
+            gb.pb.hook_deregister(b, a)
+            gb.pb.hook_register(b, a, probe, None)
         print('watching from wait', k, 'value', hex(last[0]))
         hooked = True
     if k >= K: break

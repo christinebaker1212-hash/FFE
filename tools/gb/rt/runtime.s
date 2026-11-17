@@ -569,6 +569,7 @@ rt_ppu_w7:  push af
             ret
 
 rt_ppu_r7:  push af                         ; buffered read (nametables from the shadow)
+            push bc
             ldh a, [ppu_rbuf]
             ld l, a
             push hl
@@ -595,6 +596,7 @@ rt_ppu_r7:  push af                         ; buffered read (nametables from the
 .set:       ldh [ppu_rbuf], a
             call ppu_inc
             pop hl
+            pop bc
             pop af
             ret
 
