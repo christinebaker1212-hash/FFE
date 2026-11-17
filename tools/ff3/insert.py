@@ -226,21 +226,9 @@ sbase:          ; $D1DA (system string copied to RAM)
     clc
     adc #B1
     rts
-tsel:           ; bank 53 $A616 (battle string copy, $1A/$1B = address of the pointer
-    lda $1B     ;   entry): the table's 16KB base bank; then $1A/$1B = $4000 as the
-    and #$FE    ;   Japanese
-    sec
-    sbc #$80
-    lsr a
-    tax
-    lda TBASE,x
-    lsr a
-    sta TB16
-    lda #0
-    sta $1A
-    lda #$40
-    sta $1B
-    rts
+tsel:           ; bank 53 $A616 (battle string copy): bank EB
+    ldx #$12
+    bne far87
 btidyf:         ; bank 52 converter: btidy (bank EB)
     ldx #6
     bne far87
@@ -323,20 +311,40 @@ jobload:        ; $DD0C (menu graphics loaded, rendering off): the job names' ti
     lda #$80+60
     sta $5114
     rts
+copy16:         ; $D1E0 (system string copied to $7B01 for the selected character: code 10
+    ldy #0      ;   becomes $9E): 16-bit (the English status screen is longer than 255);
+    sty $7B00   ;   the loop is in place of the Japanese one (CPYL)
+    lda #$01
+    sta $82
+    lda #$7B
+    sta $83
+    jmp $D1E3
+cpyw:
+    sta ($82),y
+    iny
+    bne .x
+    inc $81
+    inc $83
+.x:
+    rts
 onerow:         ; C = 1 in one-row mode
     lda ONE
     cmp #1
     rts
 txton:          ; $EEC0 (text drawing starts): one row per line for the English
-    lda $93     ;   dialogue banks
-    jsr $FF03
-    lda #0
-    sta ONE
+    lda $93     ;   dialogue banks, and for a text starting with code 0E (ignored by
+    jsr $FF03   ;   the game: the windows laid out anew, as the status screen)
+    ldy #0
+    sty ONE
+    lda ($3E),y
+    cmp #$0E
+    beq .o
     lda $93
     cmp #R0
     bcc .x
     cmp #R1
     bcs .x
+.o:
     inc ONE
 .x:
     rts
@@ -664,6 +672,22 @@ ENFIX_SRC = '''
     jmp mconv
     jmp magcp
     jmp itemcp
+    jmp tselb
+tselb:          ; (tsel; $1A/$1B = address of the pointer entry): the table's 16KB base
+    lda $1B     ;   bank; then $1A/$1B = $4000 as the Japanese
+    and #$FE
+    sec
+    sbc #$80
+    lsr a
+    tax
+    lda TBASE,x
+    lsr a
+    sta TB16
+    lda #0
+    sta $1A
+    lda #$40
+    sta $1B
+    rts
 itemcp:         ; (itemcopy) the whole name at ITMN
     ldx #0
 .l:
@@ -1455,6 +1479,27 @@ PPL:
     .db $10, $80, $F0, $60
 '''
 
+CPYL_SRC = '''
+    org $D1E3
+.l:
+    lda ($80),y
+    cmp #$28
+    bcs .s
+    cmp #$10
+    bcc .s
+    bne .c
+    lda $9E
+.c:
+    jsr cpyw
+    lda ($80),y
+    jsr cpyw
+    jmp .l
+.s:
+    jsr cpyw
+    cmp #0
+    bne .l
+'''
+
 def field_names(rom, L):
     from latin_font import packed_label
     jobs = {e['id']: e['en'] for e in json.load(open('script/ff3/t8200.json'))}
@@ -1606,6 +1651,10 @@ def engine(rom, report):
     assert get(rom, FIX, 0xF6AE, 4) == b'\xa5\x38\x85\x3a'
     put(rom, FIX, 0xF6AE, jmp(L['h_flush']) + b'\xEA')
     field_names(rom, L)
+    assert get(rom, 126, 0xD1E0, 3) == b'\xa0\x00\x8c' and get(rom, 126, 0xD208, 5) == b'\xa9\x3c\x4c\x03\xff'
+    cl = asm(CPYL_SRC, syms=L); assert cl.org + len(cl.bytes) <= 0xD208
+    put(rom, 126, 0xD1E0, jmp(L['copy16']))
+    put(rom, 126, cl.org, cl.bytes + b'\xEA' * (0xD208 - cl.org - len(cl.bytes)))
 
 if __name__ == '__main__':
     rom = bytearray(open(sys.argv[1], 'rb').read())

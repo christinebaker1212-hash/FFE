@@ -144,6 +144,25 @@ T[33] = '\n'.join(''.join('{17:%s}%s' % (c, chars[r*10 + k]) for k, c in enumera
 # column of 32 full-length names, the count at the right column's place (insert.py: cursor
 # step 4); the last line is the bin
 T[61] = '\n'.join('{17:01}{1A:%02X}{14:19}{1C:%02X}' % (k, k) for k in range(32)) + '\n{17:05}{0F}'
+# status screen (#71): one row per line (code 0E, insert.py), the Japanese two columns of
+# abilities and combat figures one under the other; copied to RAM whole (16-bit, insert.py)
+T[71] = ('{0E}\n{14:0C}{10:02}{14:14}{10:01}\n\n'        # header lines on the Japanese rows
+         '{14:0E}Proficiency {10:3D}\n\n'                 #   (the lower of each pair)
+         '  [5E][76][5F][76][5E] {10:3E}{14:0E}[76][7A][79] {10:32}\n\n'
+         '{14:08}To next level {10:FF}\n\n'
+         ' [77][79] {10:30}/{10:31}\n\n'
+         ' [78][79] {10:80}/{10:81}/{10:82}/{10:83}/{10:84}/{10:85}/{10:86}/{10:87}\n\n'
+         '  Strength{14:14}‥ {10:38}\n'
+         '  Agility{14:14}‥ {10:39}\n'
+         '  Stamina{14:14}‥ {10:3A}\n'
+         '  Intelligence{14:14}‥ {10:3B}\n'
+         '  Spirit{14:14}‥ {10:3C}\n\n'
+         '  Attack {10:46}x{14:14}‥{10:33}\n'
+         '  Hit rate{14:14}‥ {10:42}\n'
+         '  Defense {10:47}x{14:14}‥{10:34}\n'
+         '  Evasion rate{14:14}‥ {10:41}\n'
+         '  Magic defense{14:14}‥{10:36}\n'
+         '  Magic evasion rate‥ {10:40}')
 for i in (32, 37, 47, 48, 50, 51, 52, 57, 59, 60, 72, 73, 74, 109):
     T[i] = codes_only(i)
 apply(P, T)
