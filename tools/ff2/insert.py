@@ -171,6 +171,15 @@ ONE_ROW_LAYOUT = {27}               # menu layouts drawn one row per line
 # inventory (32 slots and the bin): one column of full names, one row each ({08} at each
 # line start: one-row mode also when the list is redrawn from a later line)
 SYS_LAYOUT = {37: '\n'.join(['{08}{17:01}{1A:%02X}' % i for i in range(32)] + ['{08}{17:01}{0F}'])}
+# equipment (window 12, made 14 rows inside): each slot's label, then its name in full;
+# the cursor entries ({16}) keep the Japanese order (right hand, head, arms, left hand,
+# body, item, item)
+EQUIP_LABELS = ['Right Hand', 'Head', 'Arms', 'Left Hand', 'Body', 'Item']
+# (the cursor is on the label: the hand reaches one row down, onto the indented name's
+# empty columns)
+SYS_LAYOUT[36] = '\n'.join(['{08}{16:02}' + EQUIP_LABELS[k] + '\n{08}{14:03}{10:%02X}' % c
+                            for k, c in enumerate((6, 3, 5, 7, 4, 8))] + ['{08}{16:02}{10:09}'])
+SYS_LAYOUT[35] = 'Attack  ..{10:24}\nDefense ..{10:25}'
 
 def system_strings(rom, report, bank):
     """System strings (table bank 10 $8400) after the names. Messages (SYS_W) are drawn
@@ -529,6 +538,11 @@ def engine(rom, report, sysbits):
     bank_put(rom, 14, 0xAEC5, jmp(L['itemmenu']))
     assert bank_get(rom, 14, 0xB082, 2) == b'\xa9\x0c'
     bank_put(rom, 14, 0xB082, b'\xa9\x04')
+    # equipment screen: list window 12 (y 7) 16 rows high, picker window 13 below it
+    WIN = {'y': 0xB4A5, 'h': 0xB4D7}
+    for win, key, old, new in ((12, 'h', 12, 16), (13, 'y', 19, 23), (13, 'h', 10, 6)):
+        assert bank_get(rom, 14, WIN[key] + win) == bytes([old]), (win, key)
+        bank_put(rom, 14, WIN[key] + win, bytes([new]))
     # positions recorded by {15}-{17} (cursor spots, key words): one row up in one-row mode
     assert bank_get(rom, 31, 0xEC55, 5) == b'\xa5\x98\x18\x65\x1f'
     bank_put(rom, 31, 0xEC55, jsr(L['h_ypos']) + b'\xEA\xEA')
