@@ -19,7 +19,7 @@ All renderings are from the Japanese. `{18:xx}` inserts entry xx of `script/ff2/
 | ボーゲン | Bogen | count, traitor |
 | こうてい | Emperor (`{18:F0}`) | |
 | ダークナイト | Dark Knight (`{18:EE}`) | |
-| わたし | I (`{18:EC}`) | inserted pronoun; sentences are built so "I" reads as a subject. Twice the Japanese uses it as the first syllables of わたして/わたしたい ("hand over"); English keeps the insert as "I" |
+| わたし | I (`{18:EC}`) | inserted pronoun; sentences are built so "I" reads as a subject. Where English needs the object or possessive form, the word is written out ("me", "my") instead of the insert, which can only print "I". Twice the Japanese uses it as the first syllables of わたして/わたしたい ("hand over"); English keeps the insert as "I" |
 
 ## Places
 フィン Finn · アルテア Altea · ガテア Gatea · パルム Palm · ポフト Poft · バフスク Bafsk ·

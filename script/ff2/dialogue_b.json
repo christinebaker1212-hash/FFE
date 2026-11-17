@@ -3,7 +3,7 @@
   "id": 0,
   "off": "58200",
   "ja": "ドアには　かぎが　かかっている",
-  "en": "The door is locked"
+  "en": "The door is locked."
  },
  {
   "id": 1,
@@ -15,19 +15,19 @@
   "id": 2,
   "off": "58231",
   "ja": "のばらは　{18:2F}のくにの　もんしょうです\n{18:2F}‥‥ああ　{18:2F}は　どうなるのでしょう。\nとらわれたひとびとが　{18:2F}にあつめられているのを\nみたというものがいます‥‥\nそういえば　{11:02}のおにいさんの\n{07}も　ゆくえしれずでしたね。\nもしかすると　{18:2F}のまちにいるかもしれません。\n\nただ　いまでは　{18:2F}は　モンスターが　うろつく\nきけんなまちに　なっています。\nかんたんには　ちかづけないでしょう。\n",
-  "en": "The wild rose is the crest of the kingdom of {18:2F}\n{18:2F}... ahh, what will become of {18:2F}?\nSomeone says they saw the captured people\nbeing gathered in {18:2F}...\nNow that I think of it, {11:02}'s older brother\n{07} is missing as well, isn't he.\nPerhaps he is in the town of {18:2F}.\n\nBut {18:2F} has now become a dangerous town\nwhere monsters prowl.\nIt won't be easy to get near it.\n"
+  "en": "The wild rose is the crest of the kingdom of {18:2F}.\n{18:2F}... ahh, what will become of {18:2F}?\nSomeone says they saw the captured people\nbeing gathered in {18:2F}...\nNow that I think of it, {11:02}'s older brother\n{07} is missing as well, isn't he.\nPerhaps he is in the town of {18:2F}.\n\nBut {18:2F} has now become a dangerous town\nwhere monsters prowl.\nIt won't be easy to get near it.\n."
  },
  {
   "id": 3,
   "off": "582F6",
   "ja": "{18:EF}「その{18:01}は　スコットのものですね!\nかれは　いきているんですか?!\n{10:02}「おうじは　{18:2F}のまちに　いました。\n{18:EC}たちに　この{18:01}をたくすと　ちからつきて‥‥\n{18:EF}「‥‥それでは　その{18:01}は　かたみのしな‥‥\nかれは　なにかいっていませんでしたか?\n{10:02}「‥‥いえ　なにも‥‥\nこの{18:01}を　うけとってください。\n{18:EF}「それは　あなたが　もっていてください。\nゆうきあるものに　ふさわしい　{18:01}です。\n{18:2F}にせんにゅうして　かえってくるとは\nあなたのちからを　みくびっていました。\nはんらんぐんに　ちからをかしてください。\nまほうのきんぞく[{16:09}{18:F2}]を　てにいれるために\nつよいせんしを　ひつようとしているのです。\n",
-  "en": "{18:EF}: \"That {18:01} is Scott's!\nIs he alive?!\"\n{10:02}: \"The prince was in the town of {18:2F}.\n{18:EC} and my companions were entrusted with this {18:01}, and then his strength gave out...\"\n{18:EF}: \"...Then that {18:01} is all he left behind...\nDid he say anything?\"\n{10:02}: \"...No, nothing...\nPlease take this {18:01}.\"\n{18:EF}: \"Please keep it yourself.\nIt is a {18:01} fit for one with courage.\nTo think you slipped into {18:2F} and came back...\nI underestimated your strength.\nPlease lend your strength to the rebel army.\nWe need strong warriors to obtain\nthe magic metal [{16:09}{18:F2}].\"\n"
+  "en": "{18:EF}: \"That {18:01} is Scott's!\nIs he alive?!\"\n{10:02}: \"The prince was in the town of {18:2F}.\n{18:EC} and my companions were entrusted with this {18:01}, and then his strength gave out...\"\n{18:EF}: \"...Then that {18:01} is all he left behind...\nDid he say anything?\"\n{10:02}: \"...No, nothing...\nPlease take this {18:01}.\"\n{18:EF}: \"Please keep it yourself.\nIt is a {18:01} fit for one with courage.\nTo think you slipped into {18:2F} and came back...\nI underestimated your strength.\nPlease lend your strength to the rebel army.\nWe need strong warriors to obtain\nthe magic metal [{16:09}{18:F2}].\"\n."
  },
  {
   "id": 4,
   "off": "5842E",
   "ja": "{18:2F}のたたかいは　そうびのちがいで　やぶれたのです\nていこくへいは　{18:04}せいの　ぶきやよろいを\nつかっていたのです。\n\nていこくは　どこかで　{18:04}をみつけたのです。\nサラマンドにすむ　ヨーゼフというものに　ちょうさを\nめいじたのですが　まだ　れんらくがありません。\nミンウとともに　サラマンドへ　いってくれませんか?",
-  "en": "We lost the battle for {18:2F} because of the difference in equipment\nThe Empire's soldiers were using weapons\nand armor made of {18:04}.\n\nThe Empire has found {18:04} somewhere.\nI ordered a man named Josef, who lives in Salamand,\nto investigate, but there has been no word yet.\nWould you go to Salamand together with Minwu?"
+  "en": "We lost the battle for {18:2F} because of the difference in equipment.\nThe Empire's soldiers were using weapons\nand armor made of {18:04}.\n\nThe Empire has found {18:04} somewhere.\nI ordered a man named Josef, who lives in Salamand,\nto investigate, but there has been no word yet.\nWould you go to Salamand together with Minwu?"
  },
  {
   "id": 5,
@@ -69,19 +69,19 @@
   "id": 11,
   "off": "586F6",
   "ja": "バフスクの　なかまが　せんかんにたどりつく\nぬけみちをみつけたそうです。\nせんかんを　はかいしてください。　せめて　かんせいを\nおくらせるだけでも　かまいません。\nあなたがたと　{13:02}のちからなら　できないことは\nないと　しんじています。\n",
-  "en": "Our comrades in Bafsk say they have found\na secret passage that leads to the battleship.\nPlease destroy the battleship. Even just delaying\nits completion will do.\nWith your strength and {13:02}'s, I believe\nthere is nothing you cannot do.\n"
+  "en": "Our comrades in Bafsk say they have found\na secret passage that leads to the battleship.\nPlease destroy the battleship. Even just delaying\nits completion will do.\nWith your strength and {13:02}'s, I believe\nthere is nothing you cannot do.\n."
  },
  {
   "id": 12,
   "off": "5876E",
   "ja": "{18:EF}「だいせんかんのこうげきで　まちのひとが\nおおぜい　きずつきました。　ちちは　すっかり\nらくたんして　びょうじょうが　あっかしたようです。\nちちじしんは　もう　し　がちかいと‥‥\n{11:02}「{13:02}　なんとか　できないの?\n{13:02}「‥‥いのちあるもの　いつかは　しぬ。\nだが　くるしむものを　すくうのが　{18:EC}の　やくめ。\n\n{18:EC}は　ここにのこって　ひとびとのちりょうを\nしなければならない。　きみらとは　ここでわかれよう。\n{10:02}よ。　いっこくもはやく　だいせんかんを\nはかいしてくれ。\n　　　　{13:02}　と　わかれた\n",
-  "en": "{18:EF}: \"The great battleship's attack wounded\nmany people of the town. My father lost all\nheart, and it seems his illness has grown worse.\nFather himself says death is near...\"\n{11:02}: \"{13:02}, isn't there anything you can do?\"\n{13:02}: \"...All that live must die someday.\nBut saving those who suffer is {18:EC}'s duty.\n\n{18:EC} must stay here and treat the people.\nWe shall part ways here.\n{10:02}, destroy the great battleship\nwithout a moment's delay.\"\n    Parted with {13:02}\n"
+  "en": "{18:EF}: \"The great battleship's attack wounded\nmany people of the town. My father lost all\nheart, and it seems his illness has grown worse.\nFather himself says death is near...\"\n{11:02}: \"{13:02}, isn't there anything you can do?\"\n{13:02}: \"...All that live must die someday.\nBut saving those who suffer is my duty.\n\n{18:EC} must stay here and treat the people.\nWe shall part ways here.\n{10:02}, destroy the great battleship\nwithout a moment's delay.\"\n    Parted with {13:02}.\n"
  },
  {
   "id": 13,
   "off": "5886D",
   "ja": "ミンウのおかげで　ちちも　だいぶらくに\nなったようです",
-  "en": "Thanks to Minwu, Father seems to be\nmuch more comfortable"
+  "en": "Thanks to Minwu, Father seems to be\nmuch more comfortable."
  },
  {
   "id": 14,
@@ -165,7 +165,7 @@
   "id": 27,
   "off": "58D2D",
   "ja": "{18:EF}「やっと　ここにもどってくることができました\nこれも　みんながちからを　あわせたけっかです。\nみなさんに　かんしゃします。\n\nひとつ　きがかりなのは　{18:F8}へむかった　ミンウ\nのことです。　あれから　なんのれんらくもありません。\n[{16:01}{18:F8}]へ　いってくれませんか?\n",
-  "en": "{18:EF}: \"At last we have been able to come back here\nThis, too, is the result of everyone joining forces.\nI thank you all.\n\nOne thing that weighs on me is Minwu, who headed\nfor {18:F8}. There has been no word from him since.\nWould you go to [{16:01}{18:F8}]?\"\n"
+  "en": "{18:EF}: \"At last we have been able to come back here.\nThis, too, is the result of everyone joining forces.\nI thank you all.\n\nOne thing that weighs on me is Minwu, who headed\nfor {18:F8}. There has been no word from him since.\nWould you go to [{16:01}{18:F8}]?\"\n."
  },
  {
   "id": 28,
@@ -183,7 +183,7 @@
   "id": 30,
   "off": "58E81",
   "ja": "あの　ゆうかんなりゅうきしたちは　もういないのですね\nでも{18:EC}には　あなたがたがいます。",
-  "en": "Those brave Dragon Knights are gone now, then\nBut {18:EC} still have you."
+  "en": "Those brave Dragon Knights are gone now, then.\nBut {18:EC} still have you."
  },
  {
   "id": 31,
@@ -213,7 +213,7 @@
   "id": 35,
   "off": "58F80",
   "ja": "{18:EF}「その　{18:0D}があれば\nとうにはいれるのですね",
-  "en": "{18:EF}: \"With that {18:0D}\nyou can enter the tower, can't you\""
+  "en": "{18:EF}: \"With that {18:0D}\nyou can enter the tower, can't you.\""
  },
  {
   "id": 36,
@@ -273,13 +273,13 @@
   "id": 45,
   "off": "59179",
   "ja": "{18:EF}「{18:EE}は　{07}だったのね‥‥\nあなたがたの　なかまだったのに‥‥\n{11:02}「せっとくしてみます。　きっと{18:F0}の\nまほうかなにかで　あやつられているんです。\n{18:EF}「{18:EE}は　{18:F0}のあとをつぎ\n[{16:01}{18:F4}]じょうにいるでしょう。\n",
-  "en": "{18:EF}: \"So the {18:EE} was {07}...\nAnd he was your friend...\"\n{11:02}: \"I'll try to persuade him. He must surely be\ncontrolled by the {18:F0}'s magic or something.\"\n{18:EF}: \"The {18:EE} has succeeded the {18:F0}\nand will be in Castle [{16:01}{18:F4}].\"\n"
+  "en": "{18:EF}: \"So the {18:EE} was {07}...\nAnd he was your friend...\"\n{11:02}: \"I'll try to persuade him. He must surely be\ncontrolled by the {18:F0}'s magic or something.\"\n{18:EF}: \"The {18:EE} has succeeded the {18:F0}\nand will be in Castle [{16:01}{18:F4}].\"\n."
  },
  {
   "id": 46,
   "off": "591E9",
   "ja": "パラメキアじょうは　やまにかこまれていて\nあるいては　ちかづけません",
-  "en": "Castle Palamecia is surrounded by mountains\nand cannot be approached on foot"
+  "en": "Castle Palamecia is surrounded by mountains\nand cannot be approached on foot."
  },
  {
   "id": 47,
@@ -297,7 +297,7 @@
   "id": 49,
   "off": "59268",
   "ja": "ミンウ「{18:EC}には　きみのうんめいが　みえる。\nそれは　{18:EC}のうんめいとも　かかわっている‥‥\nまず　{18:2F}へいきなさい。\nそれがうんめいをきりひらく　みちになるはずだ。",
-  "en": "Minwu: \"{18:EC} can see your fate.\nIt is bound up with {18:EC}'s own fate as well...\nFirst, go to {18:2F}.\nThat should be the road that opens up your fate.\""
+  "en": "Minwu: \"{18:EC} can see your fate.\nIt is bound up with my own fate as well...\nFirst, go to {18:2F}.\nThat should be the road that opens up your fate.\""
  },
  {
   "id": 50,
@@ -309,7 +309,7 @@
   "id": 51,
   "off": "592EF",
   "ja": "ミンウ「{18:2F}からかえってきたようだな。\nきみたちを　まっていた。　ともにたたかおう。\nきみたちに　{18:EC}の{18:02}を　あげよう。\n\n　　　　　ミンウが　なかまになった!\n　　　　　カヌーを　てにいれた!\n",
-  "en": "Minwu: \"So you've come back from {18:2F}.\nI was waiting for you. Let us fight together.\n{18:EC} shall give you my {18:02}.\"\n\n     Minwu joined the party!\n     Obtained the Canoe!\n"
+  "en": "Minwu: \"So you've come back from {18:2F}.\nI was waiting for you. Let us fight together.\n{18:EC} shall give you my {18:02}.\"\n\n     Minwu joined the party!\n     Obtained the Canoe!\n."
  },
  {
   "id": 52,
@@ -369,7 +369,7 @@
   "id": 61,
   "off": "59575",
   "ja": "そうか　きみは　たたかいにしがんしたのか。\n{18:EC}は　{18:EF}に　きょぜつされるのが　こわくて\nしがんもできずに　こんなところで\nうじうじしているんだ。　わらってやってくれ",
-  "en": "I see, so you volunteered to fight.\n{18:EC} was so afraid of being rejected by {18:EF}\nthat I couldn't even volunteer, and here I am,\nmoping about in a place like this. Go ahead and laugh at me"
+  "en": "I see, so you volunteered to fight.\n{18:EC} was so afraid of being rejected by {18:EF}\nthat I couldn't even volunteer, and here I am,\nmoping about in a place like this. Go ahead and laugh at me."
  },
  {
   "id": 62,
@@ -399,7 +399,7 @@
   "id": 66,
   "off": "596D6",
   "ja": "{18:EB}「{18:08}を　とってこれるのは\n{18:EC}だけだとおもい　ここへかえってきたんだ。\n{18:07}を　さがしにいこうと　したんだが\nなぜか　なかには　モンスターがすみついていて\nひとりでは　すすめず　かといって　てぶらでも\nもどれず　ここで　とほうにくれていたんだ。\n{11:02}「しろのことには　くわしいんでしょう?\n\n{18:EB}「このしろは　なぞだらけで　{18:EC}にも\nよくわからないんだ。\nあんないは　できないが　{18:EC}を　なかまに\nくわえてくれないか?\n　　　　{18:EB}　が　くわわった!\n",
-  "en": "{18:EB}: \"I thought that {18:EC} was the only one who could\nget the {18:08}, so I came back here.\nI tried to go looking for the {18:07},\nbut for some reason monsters have made their home inside,\nand I couldn't go on alone, but I couldn't go back\nempty-handed either, so I was at a loss here.\"\n{11:02}: \"You know all about the castle, don't you?\"\n\n{18:EB}: \"This castle is full of mysteries; even {18:EC}\ndon't really understand it.\nI can't guide you, but would you let {18:EC}\njoin your party?\"\n    {18:EB} joined!\n"
+  "en": "{18:EB}: \"I thought that {18:EC} was the only one who could\nget the {18:08}, so I came back here.\nI tried to go looking for the {18:07},\nbut for some reason monsters have made their home inside,\nand I couldn't go on alone, but I couldn't go back\nempty-handed either, so I was at a loss here.\"\n{11:02}: \"You know all about the castle, don't you?\"\n\n{18:EB}: \"This castle is full of mysteries; even {18:EC}\ndon't really understand it.\nI can't guide you, but would you let me\njoin your party?\"\n    {18:EB} joined!\n."
  },
  {
   "id": 67,
@@ -417,7 +417,7 @@
   "id": 69,
   "off": "59841",
   "ja": "ディストにいけば　{18:0E}は　まだいるかもしれない\n{18:0E}がいれば　おおきなちからに　なるだろう。\nパルムで　ディストまで　いってくれる\nふねを　さがしてみるといい。",
-  "en": "If you go to Deist, there may still be a {18:0E}\nWith a {18:0E}, you'd have a great power on your side.\nTry looking in Palm for a ship\nthat will take you to Deist."
+  "en": "If you go to Deist, there may still be a {18:0E}.\nWith a {18:0E}, you'd have a great power on your side.\nTry looking in Palm for a ship\nthat will take you to Deist."
  },
  {
   "id": 70,
@@ -501,7 +501,7 @@
   "id": 83,
   "off": "59B5E",
   "ja": "{18:EB}「{07}は　{11:02}の\nおにいさんだろ。　たたかうわけには　いかないだろう。\n{10:02}「いや　おれたちがじぶんで　けっちゃくを\nつけるよ。\n{18:EB}「‥‥きみならそういうと　おもったよ。\nかならず　いきてかえってきてくれ!\n",
-  "en": "{18:EB}: \"{07} is {11:02}'s\nolder brother, isn't he. You can't fight him.\"\n{10:02}: \"No, we'll settle this\nourselves.\"\n{18:EB}: \"...I thought you'd say that.\nBe sure to come back alive!\"\n"
+  "en": "{18:EB}: \"{07} is {11:02}'s\nolder brother, isn't he. You can't fight him.\"\n{10:02}: \"No, we'll settle this\nourselves.\"\n{18:EB}: \"...I thought you'd say that.\nBe sure to come back alive!\"\n."
  },
  {
   "id": 84,
@@ -537,7 +537,7 @@
   "id": 89,
   "off": "59D0E",
   "ja": "ポール「{10:02}じゃねえか!!\nいやー　たすかったぜ。　このこは　ヨーゼフのむすめさ\nボーゲンが　このこをひとじちにとって　ヨーゼフを\nおどしていたんだ。\nおれは　{18:04}のありかをききだして\nここにとりにきたわけさ。　ところが　おれとしたことが\nどじふんじまって　このざまよ。\nおれは　ネリーや　みんなをつれて　さきににげるよ。\nそれじゃーな　ありがとよ!\n",
-  "en": "Paul: \"Well if it ain't {10:02}!!\nMan, you saved my hide. This girl's Josef's daughter\nBogen took her hostage and was\nthreatening Josef.\nI got out of him where the {18:04} was\nand came here to get it. But then, of all people, me,\nI messed up, and look at me now.\nI'll take Nelly and everyone and get out ahead of you.\nSee ya, and thanks!\"\n"
+  "en": "Paul: \"Well if it ain't {10:02}!!\nMan, you saved my hide. This girl's Josef's daughter.\nBogen took her hostage and was\nthreatening Josef.\nI got out of him where the {18:04} was\nand came here to get it. But then, of all people, me,\nI messed up, and look at me now.\nI'll take Nelly and everyone and get out ahead of you.\nSee ya, and thanks!\"\n."
  },
  {
   "id": 90,
@@ -549,7 +549,7 @@
   "id": 91,
   "off": "59DD5",
   "ja": "{18:2F}じょうのかくしとびら?　しってるぜ!!\nなかには　なにがあるんだ?　{18:0B}?\nなんだ　そんなもの　おれにようはないな。\nよし　おしえてやろう。\nおおひろまの　みぎうえのすみだ。\nおまえも　つくづく　ものずきなやつだ。\nかめん　なんぞとって　なににつかうつもりやら。\n",
-  "en": "A hidden door in Castle {18:2F}? Sure, I know it!!\nWhat's inside? A {18:0B}?\nWhat, that? I got no use for somethin' like that.\nAll right, I'll tell ya.\nIt's in the top right corner of the great hall.\nYou really are an odd one.\nWhat're you plannin' to do, grabbin' a mask?\n"
+  "en": "A hidden door in Castle {18:2F}? Sure, I know it!!\nWhat's inside? A {18:0B}?\nWhat, that? I got no use for somethin' like that.\nAll right, I'll tell ya.\nIt's in the top right corner of the great hall.\nYou really are an odd one.\nWhat're you plannin' to do, grabbin' a mask?\n."
  },
  {
   "id": 92,
@@ -561,7 +561,7 @@
   "id": 93,
   "off": "59E8A",
   "ja": "おまえら　あのなかに　はいろうって　いうのか?\nまったく　たいしたやつらだ。\nよしっ!　とっておきのおたからを　つかってくれ\nベッドのよこのかべを　さがしてみな!",
-  "en": "You lot are gonna go inside that thing?\nYou really are somethin' else.\nAll right! Use my special treasure\nSearch the wall beside the bed!"
+  "en": "You lot are gonna go inside that thing?\nYou really are somethin' else.\nAll right! Use my special treasure.\nSearch the wall beside the bed!"
  },
  {
   "id": 94,
@@ -573,13 +573,13 @@
   "id": 95,
   "off": "59EFE",
   "ja": "ポール「あれは　シドの　ゆいごんだったんだよ!!\nわからないのか?　やつはしんじまったんだ!\nしぬってきまったときから　やつは　ひくうせんを\nおまえたちに　ゆずるつもりだったんだ。\nあいつは　ひくうせんをこころから　あいしていたんだ!\nやつの　きもちをわかってやってくれ!!\n",
-  "en": "Paul: \"That was Cid's last will!!\nDon't you get it? He's dead!\nFrom the moment he knew he was gonna die,\nhe meant to leave the airship to you.\nThat guy loved the airship with all his heart!\nTry to understand how he felt!!\"\n"
+  "en": "Paul: \"That was Cid's last will!!\nDon't you get it? He's dead!\nFrom the moment he knew he was gonna die,\nhe meant to leave the airship to you.\nThat guy loved the airship with all his heart!\nTry to understand how he felt!!\"\n."
  },
  {
   "id": 96,
   "off": "59F89",
   "ja": "よくきいてくれた!\nおどろくな　おれは　たこにのって　あのしろの\nおくじょうに　おりたんだ!\nそらから　いくんだ!　そらから!!\nそうか　おまえらなら　ひくうせんで　おくじょうに\nおりられるかもしれねえ!\n",
-  "en": "Glad you asked!\nDon't be shocked, but I rode a kite and\nlanded on the roof of that castle!\nYou go from the sky! From the sky!!\nI got it, maybe you lot could land on the\nroof with the airship!\n"
+  "en": "Glad you asked!\nDon't be shocked, but I rode a kite and\nlanded on the roof of that castle!\nYou go from the sky! From the sky!!\nI got it, maybe you lot could land on the\nroof with the airship!\n."
  },
  {
   "id": 97,
@@ -603,7 +603,7 @@
   "id": 100,
   "off": "5A05A",
   "ja": "ミ　{18:04}か‥‥まだ　みつからないんだ。\nてがかりはあるんだが‥‥\nおっと　まず　みのあかしをたててもらおう。\n\nセミテのたきの　どうくつで　まちのにんげんが\nはたらかされている。　それをたすけてくるんだ。\nそうしたら　しんようしてやろう。\n",
-  "en": "Mi... {18:04}, is it... I haven't found it yet.\nI've got a lead, though...\nHold on, first you'll have to prove yourselves.\n\nThe townsfolk are being worked in the cave\nat Semite Falls. Go and rescue them.\nThen I'll trust you.\n"
+  "en": "Mi... {18:04}, is it... I haven't found it yet.\nI've got a lead, though...\nHold on, first you'll have to prove yourselves.\n\nThe townsfolk are being worked in the cave\nat Semite Falls. Go and rescue them.\nThen I'll trust you.\n."
  },
  {
   "id": 101,
@@ -651,7 +651,7 @@
   "id": 108,
   "off": "5A218",
   "ja": "せつげんのどうくつへは　わしの{18:05}が\nなければ　むりだ。　こうざんに　かくしてあるんだ。\n\n\n1かいに　めじるしの　あおいいわがある。\nそこの　みぎうえのかべに　かくしべやが　あるんだ。\nさあ　いそごう。\n\n　　　　ヨーゼフ　が　くわわった!\n",
-  "en": "You can't get to the cave in the snowfield without my\n{18:05}. It's hidden in the mine.\n\n\nOn the first floor there's a blue rock that marks the spot.\nThere's a hidden room in the wall to the upper right of it.\nCome on, let's hurry.\n\n    Josef joined!\n"
+  "en": "You can't get to the cave in the snowfield without my\n{18:05}. It's hidden in the mine.\n\n\nOn the first floor there's a blue rock that marks the spot.\nThere's a hidden room in the wall to the upper right of it.\nCome on, let's hurry.\n\n    Josef joined!\n."
  },
  {
   "id": 109,
@@ -699,7 +699,7 @@
   "id": 116,
   "off": "5A431",
   "ja": "レイラ「{18:F0}は　あくまに　たましいを\nうっちまったんだよ",
-  "en": "Leila: \"The {18:F0} sold his soul\nto the demons\""
+  "en": "Leila: \"The {18:F0} sold his soul\nto the demons.\""
  },
  {
   "id": 117,
@@ -741,7 +741,7 @@
   "id": 123,
   "off": "5A4D7",
   "ja": "おまえたちも　{18:BF}を　とりにきたのか。\nよし　ここから　だっしゅつして　いっしょにいこう。\nこのさきに　ふねがあるのだが\nそのとちゅうに　てごわいモンスターがいるのだ。\nちからをあわせば　たおせるかもしれない。\n\n　　　りゅうきし　リチャード　が　くわわった!\n",
-  "en": "So you've come for the {18:BF} too.\nRight, let's escape from here and go together.\nThere's a ship up ahead,\nbut there's a tough monster on the way.\nIf we join forces, we might be able to defeat it.\n\n   The Dragon Knight Richard joined!\n"
+  "en": "So you've come for the {18:BF} too.\nRight, let's escape from here and go together.\nThere's a ship up ahead,\nbut there's a tough monster on the way.\nIf we join forces, we might be able to defeat it.\n\n   The Dragon Knight Richard joined!\n."
  },
  {
   "id": 124,
@@ -753,7 +753,7 @@
   "id": 125,
   "off": "5A59C",
   "ja": "{18:2F}おう「そうか　スコットもしんだか。\nスコットは　{18:EF}に　プロポーズしておったが\nその　へんじも　きかずに　いってしまったか‥‥\n\nかれならば　{18:EF}の　むことして　ふさわしいと\nおもったのだが。\n",
-  "en": "King of {18:2F}: \"I see, so Scott is dead too.\nScott had proposed to {18:EF},\nand so he went without ever hearing her answer...\n\nI thought he would have been a fitting husband\nfor {18:EF}.\"\n"
+  "en": "King of {18:2F}: \"I see, so Scott is dead too.\nScott had proposed to {18:EF},\nand so he went without ever hearing her answer...\n\nI thought he would have been a fitting husband\nfor {18:EF}.\"\n."
  },
  {
   "id": 126,
@@ -765,7 +765,7 @@
   "id": 127,
   "off": "5A65F",
   "ja": "はるかむかしには　おおくの{18:04}がつかわれていた。\nきたにある　セミテのたきでも　{18:04}が\nさいくつされていた　というきろくがある",
-  "en": "In ancient times much {18:04} was used.\nThere are records that {18:04} was mined\nat Semite Falls to the north too"
+  "en": "In ancient times much {18:04} was used.\nThere are records that {18:04} was mined\nat Semite Falls to the north too."
  },
  {
   "id": 128,
@@ -861,13 +861,13 @@
   "id": 143,
   "off": "5A94D",
   "ja": "ネリー「えーん　えーん",
-  "en": "Nelly: \"Waaah, waaah\""
+  "en": "Nelly: \"Waaah, waaah.\""
  },
  {
   "id": 144,
   "off": "5A959",
   "ja": "ネリー「たすけてくれて　ありがとう",
-  "en": "Nelly: \"Thank you for saving me\""
+  "en": "Nelly: \"Thank you for saving me.\""
  },
  {
   "id": 145,
@@ -897,7 +897,7 @@
   "id": 149,
   "off": "5AA30",
   "ja": "{18:0E}「グァー　グルルー　ガウー",
-  "en": "{18:0E}: \"GRAAH... GRRRR... GAWW\""
+  "en": "{18:0E}: \"GRAAH... GRRRR... GAWW.\""
  },
  {
   "id": 150,
@@ -945,7 +945,7 @@
   "id": 157,
   "off": "5AC17",
   "ja": "せんし「そうか　きみたちは　はんらんぐんだったのか。\n{18:EC}は　スコット。　カシュオーンのおうじだ。\n{10:02}「えっ　あなたが!　うちじに　なさったと\nきいたのですが　いきていたんですね!\nスコット「ああ　だが　もう　ながくはもたない。\nきみたちに　たのみがある。　{18:EC}のおとうとの\n{18:EB}につたえてほしい。　おまえには　すばらしい\nのうりょくがある。　もっと　じしんを　もてと。\n{18:2F}おうにつたえてくれ。\n{18:2F}がやぶれた　げんいんは　ボーゲンはくしゃくが\nうらぎったためだ。　やつはいま　ていこくの\nしょうぐんになっている。\nそれから‥‥{18:EF}。　あいしていると‥‥\nいや　これは　{18:EF}には　つたえないでくれ。\n{18:EC}は　もうしぬ。　{18:EF}は　べつのひとを\nあいすべきだ。\n{11:02}「あの‥‥{18:EC}のあにの　{07}を\nごぞんじありませんか?\nスコット「あいにくだが‥‥やくにたてなくて　すまん。\nそうだ　この{18:01}をあげよう。　きっと　やくにたつ。\nふーっ　つかれた‥‥そろそろ　ねむらせてくれ‥‥\n　　　　　{18:01}を　てにいれた‥‥\n",
-  "en": "Warrior: \"I see, so you're with the rebel army.\n{18:EC} am Scott. The prince of Kashuon.\"\n{10:02}: \"What, you are! We heard you died\nin battle, but you're alive!\"\nScott: \"Yes, but I won't last much longer.\nI have a favor to ask of you. {18:EC} have a younger\nbrother, {18:EB}. Tell him: you have wonderful\nabilities. Have more confidence.\nAnd tell the King of {18:2F}:\nthe reason {18:2F} fell is that Count Bogen\nbetrayed us. He is now a general\nof the Empire.\nAnd... {18:EF}. That I love her...\nNo, don't tell {18:EF} that.\n{18:EC} am going to die. {18:EF} should\nlove someone else.\"\n{11:02}: \"Um... {18:EC} have an older brother, {07}.\nDo you know him?\"\nScott: \"I'm afraid not... sorry I can't be of help.\nAh yes, I'll give you this {18:01}. It will surely help you.\nPhew, I'm tired... let me sleep now...\"\n     Obtained the {18:01}...\n"
+  "en": "Warrior: \"I see, so you're with the rebel army.\n{18:EC} am Scott. The prince of Kashuon.\"\n{10:02}: \"What, you are! We heard you died\nin battle, but you're alive!\"\nScott: \"Yes, but I won't last much longer.\nI have a favor to ask of you. {18:EC} have a younger\nbrother, {18:EB}. Tell him: you have wonderful\nabilities. Have more confidence.\nAnd tell the King of {18:2F}:\nthe reason {18:2F} fell is that Count Bogen\nbetrayed us. He is now a general\nof the Empire.\nAnd... {18:EF}. That I love her...\nNo, don't tell {18:EF} that.\n{18:EC} am going to die. {18:EF} should\nlove someone else.\"\n{11:02}: \"Um... {18:EC} have an older brother, {07}.\nDo you know him?\"\nScott: \"I'm afraid not... sorry I can't be of help.\nAh yes, I'll give you this {18:01}. It will surely help you.\nPhew, I'm tired... let me sleep now...\"\n     Obtained the {18:01}...\n."
  },
  {
   "id": 158,
@@ -1023,7 +1023,7 @@
   "id": 170,
   "off": "5AF73",
   "ja": "こども「おじさんは　りゅうきし?\n{13:02}「ああ。　きみの　おとうさんのともだちさ\nきっと　{18:F0}をたおして　もどってくるよ。\nそうしたら　きみの　おとうさんに　なっていいかな?\nこども「よく　わかんないけど　いいよ。\nぜったい　{18:F0}のやろうを　やっつけてね!!\n",
-  "en": "Child: \"Mister, are you a Dragon Knight?\"\n{13:02}: \"Yes. I'm a friend of your father's\nI'll defeat the {18:F0} and come back, I promise.\nWhen I do, could I be your father?\"\nChild: \"I don't really get it, but okay.\nYou gotta beat that {18:F0} bastard for sure!!\"\n"
+  "en": "Child: \"Mister, are you a Dragon Knight?\"\n{13:02}: \"Yes. I'm a friend of your father's.\nI'll defeat the {18:F0} and come back, I promise.\nWhen I do, could I be your father?\"\nChild: \"I don't really get it, but okay.\nYou gotta beat that {18:F0} bastard for sure!!\"\n."
  },
  {
   "id": 171,
@@ -1041,7 +1041,7 @@
   "id": 173,
   "off": "5B103",
   "ja": "{18:FA}たちは　ゆうかんに　たたかいました。\nですが　{18:F0}はひれつにも　{18:0E}の　のみみずに\nどくを　いれたのです。\n\n{18:0E}は　かわいそうに　ぜんめつしてしまいました。\n[{16:01}{18:FA}]たちも　{18:0E}のいない　たたかいでは\nかちめがありません‥‥\n",
-  "en": "The {18:FA} fought bravely.\nBut the {18:F0}, the coward, put poison\nin the {18:0E}s' drinking water.\n\nThe poor {18:0E}s were wiped out.\nWithout the {18:0E}s, even the [{16:01}{18:FA}]\nhad no chance of winning...\n"
+  "en": "The {18:FA} fought bravely.\nBut the {18:F0}, the coward, put poison\nin the {18:0E}s' drinking water.\n\nThe poor {18:0E}s were wiped out.\nWithout the {18:0E}s, even the [{16:01}{18:FA}]\nhad no chance of winning...\n."
  },
  {
   "id": 174,
@@ -1059,7 +1059,7 @@
   "id": 176,
   "off": "5B238",
   "ja": "ははおや「{13:02}!!\n{13:02}「エリナ!　ほかのみんなは?\nしんでしまったのか　フィリップも?\nエリナ「そう　あのあと　みなごろしに‥‥\n{13:02}「そうか‥‥きのどくに\nきをしっかりもてよ　エリナ　おれが　ついてるから。\nせかいが　へいわになったら　もどってくる。\nそれまで　むすこさんと　ふたりで　がんばるんだ!",
-  "en": "Mother: \"{13:02}!!\"\n{13:02}: \"Elina! What about everyone else?\nAre they dead, Philip too?\"\nElina: \"Yes, after that, everyone was slaughtered...\"\n{13:02}: \"I see... I'm so sorry\nBe strong, Elina, I'm here for you.\nWhen the world is at peace, I'll come back.\nUntil then, you and your son must hang on!\""
+  "en": "Mother: \"{13:02}!!\"\n{13:02}: \"Elina! What about everyone else?\nAre they dead, Philip too?\"\nElina: \"Yes, after that, everyone was slaughtered...\"\n{13:02}: \"I see... I'm so sorry.\nBe strong, Elina, I'm here for you.\nWhen the world is at peace, I'll come back.\nUntil then, you and your son must hang on!\""
  },
  {
   "id": 177,
@@ -1077,31 +1077,31 @@
   "id": 179,
   "off": "5B3A5",
   "ja": "クリスタルが　こたえた。\n「そなたに　ちからをさずけよう‥\n\nちからがあがった!",
-  "en": "The Crystal answered.\n\"I shall grant thee strength...\n\nStrength went up!"
+  "en": "The Crystal answered.\n.\"I shall grant thee strength...\n\nStrength went up!"
  },
  {
   "id": 180,
   "off": "5B3CE",
   "ja": "クリスタルが　こたえた。\n「そなたに　すばやさをさずけよう‥\n\nすばやさがあがった!",
-  "en": "The Crystal answered.\n\"I shall grant thee agility...\n\nAgility went up!"
+  "en": "The Crystal answered.\n.\"I shall grant thee agility...\n\nAgility went up!"
  },
  {
   "id": 181,
   "off": "5B3F9",
   "ja": "クリスタルが　こたえた。\n「そなたに　せいしんをさずけよう‥\n\nせいしんがあがった!",
-  "en": "The Crystal answered.\n\"I shall grant thee spirit...\n\nSpirit went up!"
+  "en": "The Crystal answered.\n.\"I shall grant thee spirit...\n\nSpirit went up!"
  },
  {
   "id": 182,
   "off": "5B424",
   "ja": "クリスタルが　こたえた。\n「そなたに　ちせいをさずけよう‥\n\nちせいがあがった!",
-  "en": "The Crystal answered.\n\"I shall grant thee intelligence...\n\nIntelligence went up!"
+  "en": "The Crystal answered.\n.\"I shall grant thee intelligence...\n\nIntelligence went up!"
  },
  {
   "id": 183,
   "off": "5B44D",
   "ja": "クリスタルが　こたえた。\n「そなたに　ふういんされた　まほうを　さずける。\n\n{18:BF}をてにいれた!",
-  "en": "The Crystal answered.\n\"I shall grant thee the sealed magic.\n\nObtained the {18:BF}!"
+  "en": "The Crystal answered.\n.\"I shall grant thee the sealed magic.\n\nObtained the {18:BF}!"
  },
  {
   "id": 184,
@@ -1113,7 +1113,7 @@
   "id": 185,
   "off": "5B493",
   "ja": "ジャイアントビーバー「ガウワウワウ。　ガウ?\n{12:02}「おれ　どうぶつのことば　わかる",
-  "en": "Giant Beaver: \"GAWU WAWU WAWU. GAWU?\"\n{12:02}: \"Me understand animal talk\""
+  "en": "Giant Beaver: \"GAWU WAWU WAWU. GAWU?\"\n{12:02}: \"Me understand animal talk.\""
  },
  {
   "id": 186,
@@ -1137,7 +1137,7 @@
   "id": 189,
   "off": "5B538",
   "ja": "パラメキアのおうは　ほこらしげにいった\n「このしろに　はいれたら　むすめをほうびにやろう　\nがけをよじのぼるもの　トンネルをほるもの‥‥\nみな　しっぱいした。\nあるおとこが　おおきなふくろに　あついくうきを\nつめると　ふわりとうきあがり　おくじょうから\nしんにゅうした\n\nおうは　おこって　とらえようとしたが\nかれは　{18:ED}とともに　ゆうゆうと　そらを\nとんで　にげていったとさ!\n",
-  "en": "The king of Palamecia proudly said,\n\"To whoever can get into this castle I'll give my daughter as a reward\"\nThose who climbed the cliffs, those who dug tunnels...\nall of them failed.\nOne man filled a great bag with hot air,\nfloated gently up, and got in\nfrom the roof\n\nThe king was furious and tried to catch him,\nbut he flew calmly away through the sky\ntogether with the {18:ED}, so they say!\n"
+  "en": "The king of Palamecia proudly said,\n.\"To whoever can get into this castle I'll give my daughter as a reward.\"\nThose who climbed the cliffs, those who dug tunnels...\nall of them failed.\nOne man filled a great bag with hot air,\nfloated gently up, and got in\nfrom the roof\n\nThe king was furious and tried to catch him,\nbut he flew calmly away through the sky\ntogether with the {18:ED}, so they say!\n."
  },
  {
   "id": 190,
@@ -1149,13 +1149,13 @@
   "id": 191,
   "off": "5B635",
   "ja": "むかし　たからを　よくぬすまれていた　おうは\nぜったいに　やぶられないかぎを　つくらせた。\nさいしょのかぎは　ひとばんでやぶられた。\nつぎの　かぎは　ふたばんでやぶられた。\nそして　みっつめのかぎは　やぶられなかった。\nおうは　まんぞくして　そのかぎ‥{18:06}‥を\nせつげんのどうくつに　かくした。\n",
-  "en": "Long ago, a king whose treasure was often stolen\nhad an unbreakable lock made.\nThe first lock was broken in one night.\nThe next lock was broken in two nights.\nAnd the third lock was never broken.\nThe king was satisfied, and hid that lock... the {18:06}...\nin the cave of the snowfield.\n"
+  "en": "Long ago, a king whose treasure was often stolen\nhad an unbreakable lock made.\nThe first lock was broken in one night.\nThe next lock was broken in two nights.\nAnd the third lock was never broken.\nThe king was satisfied, and hid that lock... the {18:06}...\nin the cave of the snowfield.\n."
  },
  {
   "id": 192,
   "off": "5B6CA",
   "ja": "まだ　せかいに　くにもしろも　なかったころ\nいまのカシュオーンのあたりに　そらから　ほしがおちた\nひとりのおとこが　そのもえたぎるほしから　ほのおを\nとり　さいだんをつくって　まつった。",
-  "en": "Back when there were still no countries or castles in the world,\na star fell from the sky near what is now Kashuon\nOne man took fire from that blazing star,\nbuilt an altar, and enshrined it."
+  "en": "Back when there were still no countries or castles in the world,\na star fell from the sky near what is now Kashuon.\nOne man took fire from that blazing star,\nbuilt an altar, and enshrined it."
  },
  {
   "id": 193,
@@ -1167,7 +1167,7 @@
   "id": 194,
   "off": "5B77C",
   "ja": "むかし　じごくのまおうのきゅうでん　パンデモニウムが\nあらわれたとき　まどうしたちは　きょうりょくな\nまほうをつくり　ききをのがれた。\n\nそのご　せかいの　こんらんをおそれた　まどうしたちは\nきょだいなとうを　つくり　そこに　まほうのひみつを\nしるしたほんを　ふういんした。\n",
-  "en": "Long ago, when Pandaemonium, the palace of the demon king of hell,\nappeared, the mages created a powerful\nmagic and escaped the crisis.\n\nAfterward, fearing chaos in the world, the mages\nbuilt a giant tower and sealed within it a book\nrecording the secrets of magic.\n"
+  "en": "Long ago, when Pandaemonium, the palace of the demon king of hell,\nappeared, the mages created a powerful\nmagic and escaped the crisis.\n\nAfterward, fearing chaos in the world, the mages\nbuilt a giant tower and sealed within it a book\nrecording the secrets of magic.\n."
  },
  {
   "id": 195,
@@ -1185,7 +1185,7 @@
   "id": 197,
   "off": "5B8A0",
   "ja": "{18:0B}を　ちかのめがみに　ささげよ。\nよきこころあらば　ドッペルゲンガーは　うごきをとめる\n{18:0C}を　ドッペルゲンガーにかぶせよ。\nかれは　なんじのあしきこころとともに　さる。",
-  "en": "Offer the {18:0B} to the goddess below.\nIf thy heart be good, the Doppelganger shall stop moving\nPlace the {18:0C} upon the Doppelganger.\nIt shall depart together with thy evil heart."
+  "en": "Offer the {18:0B} to the goddess below.\nIf thy heart be good, the Doppelganger shall stop moving.\nPlace the {18:0C} upon the Doppelganger.\nIt shall depart together with thy evil heart."
  },
  {
   "id": 198,
@@ -1209,7 +1209,7 @@
   "id": 201,
   "off": "5B994",
   "ja": "おお　あんたは　なかまか!\n{18:EE}がいるあいだは　かんしがきびしくて\nこうどうできなかったんだ。\nボーゲンは　いばりくさっているだけの　まぬけだよ。",
-  "en": "Ohh, you're one of us!\nWhile the {18:EE} was here the watch was so strict\nI couldn't make a move.\nBogen's just an idiot who does nothing but swagger."
+  "en": "Ohh, you're one of us!\nWhile the {18:EE} was here the watch was so strict.\nI couldn't make a move.\nBogen's just an idiot who does nothing but swagger."
  },
  {
   "id": 202,
@@ -1227,7 +1227,7 @@
   "id": 204,
   "off": "5BA45",
   "ja": "しつれいいたしました\nどうぞ　おとおりくださいっ!",
-  "en": "Begging your pardon\nPlease go right through!"
+  "en": "Begging your pardon.\nPlease go right through!"
  },
  {
   "id": 205,
@@ -1239,13 +1239,13 @@
   "id": 206,
   "off": "5BA6E",
   "ja": "みがきぬかれた　かがみだ",
-  "en": "A highly polished mirror"
+  "en": "A highly polished mirror."
  },
  {
   "id": 207,
   "off": "5BA7B",
   "ja": "かがみに　たまごが　うつった",
-  "en": "The egg was reflected in the mirror"
+  "en": "The egg was reflected in the mirror."
  },
  {
   "id": 208,
@@ -1257,7 +1257,7 @@
   "id": 209,
   "off": "5BAA8",
   "ja": "{18:08}が　もえさかっている",
-  "en": "The {18:08} is blazing"
+  "en": "The {18:08} is blazing."
  },
  {
   "id": 210,
@@ -1275,7 +1275,7 @@
   "id": 212,
   "off": "5BAF8",
   "ja": "だいせんかんのエンジンだ",
-  "en": "It's the great battleship's engine"
+  "en": "It's the great battleship's engine."
  },
  {
   "id": 213,
@@ -1287,31 +1287,31 @@
   "id": 214,
   "off": "5BB20",
   "ja": "いのちのいずみ",
-  "en": "The Spring of Life"
+  "en": "The Spring of Life."
  },
  {
   "id": 215,
   "off": "5BB28",
   "ja": "いのちのいずみに　{18:0A}を\nそっとしずめた",
-  "en": "Gently sank the {18:0A}\nin the Spring of Life"
+  "en": "Gently sank the {18:0A}\nin the Spring of Life."
  },
  {
   "id": 216,
   "off": "5BB3D",
   "ja": "いのちのいずみ。\nたまごがしずんでいる",
-  "en": "The Spring of Life.\nAn egg is sunk in it"
+  "en": "The Spring of Life.\nAn egg is sunk in it."
  },
  {
   "id": 217,
   "off": "5BB51",
   "ja": "めがみぞうだ",
-  "en": "It's a statue of the goddess"
+  "en": "It's a statue of the goddess."
  },
  {
   "id": 218,
   "off": "5BB58",
   "ja": "めがみぞうに　{18:0B}をかぶせた",
-  "en": "Placed the {18:0B} on the statue of the goddess"
+  "en": "Placed the {18:0B} on the statue of the goddess."
  },
  {
   "id": 219,
@@ -1329,7 +1329,7 @@
   "id": 221,
   "off": "5BBA4",
   "ja": "ドッペルゲンガーに　{18:0C}を　かぶせた。\n{18:0C}とともに　すがたが　きえて　なくなった",
-  "en": "Placed the {18:0C} on the Doppelganger.\nIts form vanished along with the {18:0C}"
+  "en": "Placed the {18:0C} on the Doppelganger.\nIts form vanished along with the {18:0C}."
  },
  {
   "id": 222,
@@ -1347,7 +1347,7 @@
   "id": 224,
   "off": "5BC3F",
   "ja": "なにかのちからが　ゆくてを　さえぎっている",
-  "en": "Some force is blocking the way ahead"
+  "en": "Some force is blocking the way ahead."
  },
  {
   "id": 225,
@@ -1371,7 +1371,7 @@
   "id": 228,
   "off": "5BCED",
   "ja": "かべに　なにかが　うめこまれている\n{18:06}だ!",
-  "en": "Something is embedded in the wall\nIt's the {18:06}!"
+  "en": "Something is embedded in the wall.\nIt's the {18:06}!"
  },
  {
   "id": 229,
@@ -1383,7 +1383,7 @@
   "id": 230,
   "off": "5BD18",
   "ja": "　　　いつのひか　ここをとおるもののために\n\n　　　このさきに　じごくへつづく　みちがある",
-  "en": "   For the one who shall someday pass this way\n\n   Beyond here lies the road that leads to hell"
+  "en": "   For the one who shall someday pass this way\n\n   Beyond here lies the road that leads to hell."
  },
  {
   "id": 231,
@@ -1413,13 +1413,13 @@
   "id": 235,
   "off": "5BDB3",
   "ja": "りゅうきしのしがいだ‥‥\nかたわらになにかおちている。\nりゅうきしの　{18:09}だ!\n　　　　{18:09}　をてにいれた",
-  "en": "The body of a Dragon Knight...\nSomething has fallen beside it.\nIt's the Dragon Knight's {18:09}!\n    Obtained the {18:09}"
+  "en": "The body of a Dragon Knight...\nSomething has fallen beside it.\nIt's the Dragon Knight's {18:09}!\n    Obtained the {18:09}."
  },
  {
   "id": 236,
   "off": "5BDE9",
   "ja": "じょうぶな　てつごうしだ",
-  "en": "Sturdy iron bars"
+  "en": "Sturdy iron bars."
  },
  {
   "id": 237,
@@ -1443,7 +1443,7 @@
   "id": 240,
   "off": "5BE1F",
   "ja": "のうふをやっとります",
-  "en": "I'm a farmer, I am"
+  "en": "I'm a farmer, I am."
  },
  {
   "id": 241,
@@ -1503,7 +1503,7 @@
   "id": 250,
   "off": "5BEF9",
   "ja": "まどうし「よく　ここまできた!　だが　{18:EC}を\nたおさねば　このさきへは　すすめんぞ!\n\nまどうしが　きょだいか　した!!",
-  "en": "Mage: \"You've done well to come this far! But unless\nyou defeat {18:EC}, you shall not go any further!\"\n\nThe mage grew gigantic!!"
+  "en": "Mage: \"You've done well to come this far! But unless\nyou defeat me, you shall not go any further!\"\n\nThe mage grew gigantic!!"
  },
  {
   "id": 251,
@@ -1521,18 +1521,18 @@
   "id": 253,
   "off": "5BFA3",
   "ja": "{10:02}　{11:02}　{12:02}\nのだれかがいきていなければ　いけません",
-  "en": "One of {10:02}, {11:02}, {12:02}\nmust be alive"
+  "en": "One of {10:02}, {11:02}, {12:02}\nmust be alive."
  },
  {
   "id": 254,
   "off": "5BFC0",
   "ja": "そこには　なにもありません",
-  "en": "There is nothing there"
+  "en": "There is nothing there."
  },
  {
   "id": 255,
   "off": "5BFCE",
   "ja": "もう　これいじょう　もつことができません",
-  "en": "You cannot carry any more than this"
+  "en": "You cannot carry any more than this."
  }
 ]

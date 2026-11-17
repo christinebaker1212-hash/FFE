@@ -9,13 +9,13 @@
   "id": 1,
   "off": "747EE",
   "ja": "みぐるみおいてきな　いのちだけは　たすけてやるよ\n\nなに　やるきかい!　バカな　れんちゅうだね\nやろうども　やっちまいな!",
-  "en": "Leave everything you've got and we'll let you off with your lives\n\nWhat, you wanna fight! What a bunch of idiots\nBoys, let 'em have it!"
+  "en": "Leave everything you've got and we'll let you off with your lives\n\nWhat, you wanna fight! What a bunch of idiots.\nBoys, let 'em have it!"
  },
  {
   "id": 2,
   "off": "7482C",
   "ja": "あたいらのまけよ。　さあ　すきにしな!\n\n‥なんで　ころさないんだい?\n\n‥いっしょに　ていこくと　たたかおうだって!\nあたいらみたいな　はぐれものとかい‥\n",
-  "en": "We lose. Go on, do what you want with us!\n\n...Why ain't you killin' us?\n\n...You want us to fight the Empire with you!\nWith a bunch of outcasts like us...\n"
+  "en": "We lose. Go on, do what you want with us!\n\n...Why ain't you killin' us?\n\n...You want us to fight the Empire with you!\nWith a bunch of outcasts like us...\n."
  },
  {
   "id": 3,
@@ -27,13 +27,13 @@
   "id": 4,
   "off": "748C1",
   "ja": "{18:EF}「ミンウ　たすかりますか?\n\nミンウ「はい　じきに　いしきを　とりもどします\nちからづよい　せいめいりょくを　かんじます\n{18:EF}「{18:2F}から　ひなんしてくるとき　このこが\nちみどろになって　たおれているのを　みつけたのです\nあなたなら　たすけられると　おもったのです\n",
-  "en": "{18:EF}: \"Minwu, can he be saved?\"\n\nMinwu: \"Yes, he will soon regain consciousness\nI sense a strong life force\"\n{18:EF}: \"When we were fleeing from {18:2F}, I found this boy\nlying covered in blood\nI thought that you would be able to save him\"\n"
+  "en": "{18:EF}: \"Minwu, can he be saved?\"\n\nMinwu: \"Yes, he will soon regain consciousness.\nI sense a strong life force.\"\n{18:EF}: \"When we were fleeing from {18:2F}, I found this boy\nlying covered in blood.\nI thought that you would be able to save him.\"\n."
  },
  {
   "id": 5,
   "off": "74948",
   "ja": "ミンウ「この　まほうじんが　せいめいりょくを\nぞうふくさせます。　そっとしておきましょう\n{18:EF}「あんしんしました。　それでは　かいぎに\nいきましょう。　みなあつまっているころです\nていこくが　バフスクで　けんぞうちゅうの\n{18:F3}!　あれが　かんせいしたら\nてきの　そうこうげきが　はじまるでしょう\nなにか　てをうたないと!",
-  "en": "Minwu: \"This magic circle amplifies\nthe life force. Let us leave him in peace\"\n{18:EF}: \"I'm relieved. Now then, let us go\nto the council. Everyone should be gathered by now\nThe {18:F3} the Empire is building\nin Bafsk! Once it is completed,\nthe enemy's all-out attack will begin\nWe must do something!\""
+  "en": "Minwu: \"This magic circle amplifies\nthe life force. Let us leave him in peace.\"\n{18:EF}: \"I'm relieved. Now then, let us go\nto the council. Everyone should be gathered by now.\nThe {18:F3} the Empire is building\nin Bafsk! Once it is completed,\nthe enemy's all-out attack will begin.\nWe must do something!\""
  },
  {
   "id": 6,
@@ -69,19 +69,19 @@
   "id": 11,
   "off": "74A2F",
   "ja": "{10:02}「{11:02}　{12:02}\n{07}は　どこだ?\n{12:02}「{18:2F}の{18:ED}　たすけた　おれたち\n{07}　いなかった\n{10:02}「そうか‥‥だいじょうぶ\nいきているさ　きっと。\n",
-  "en": "{10:02}: \"{11:02}, {12:02}\nWhere's {07}?\"\n{12:02}: \"{18:ED} of {18:2F} saved us\n{07} not there\"\n{10:02}: \"I see... It's all right,\nhe's alive, I'm sure of it.\"\n"
+  "en": "{10:02}: \"{11:02}, {12:02}!\nWhere's {07}?\"\n{12:02}: \"{18:ED} of {18:2F} saved us.\n{07} not there.\"\n{10:02}: \"I see... It's all right,\nhe's alive, I'm sure of it.\"\n."
  },
  {
   "id": 12,
   "off": "74A77",
   "ja": "{18:EF}「げんきになったのですね。よかった\n{10:02}「{18:ED}　{18:EC}たちを　はんらんぐんに\nくわえてください!\n{18:EF}「だめ　だめ!　あなたがたの　ちからでは\nむだに　いのちをおとすだけです。\nおうちへ　おかえりなさい。\n{11:02}「{18:EC}たちの　いえは　もうないんです。\nりょうしんも‥‥\n{18:EF}「ごめんなさい‥‥そうだわ!\nよかったら　アルテアでくらしなさい。　あいことばさえ\nおぼえておけば　じゆうにくらせます。\nあいことばは　{18:F1}です。　わすれないように。",
-  "en": "{18:EF}: \"So you've recovered. I'm glad\"\n{10:02}: \"{18:ED}, let {18:EC} and my friends join\nthe rebel army!\"\n{18:EF}: \"No, no! With your strength\nyou would only throw your lives away.\nGo home.\"\n{11:02}: \"{18:EC} and the others have no home anymore.\nOur parents too...\"\n{18:EF}: \"I'm sorry... I know!\nIf you like, live here in Altea. As long as you\nremember the password, you can live freely.\nThe password is {18:F1}. Don't forget it.\""
+  "en": "{18:EF}: \"So you've recovered. I'm glad.\"\n{10:02}: \"{18:ED}, let me and my friends join\nthe rebel army!\"\n{18:EF}: \"No, no! With your strength\nyou would only throw your lives away.\nGo home.\"\n{11:02}: \"{18:EC} and the others have no home anymore.\nOur parents too...\"\n{18:EF}: \"I'm sorry... I know!\nIf you like, live here in Altea. As long as you\nremember the password, you can live freely.\nThe password is {18:F1}. Don't forget it.\""
  },
  {
   "id": 13,
   "off": "74B54",
   "ja": "{07}「わかったよ　{11:02}",
-  "en": "{07}: \"All right, {11:02}\""
+  "en": "{07}: \"All right, {11:02}.\""
  },
  {
   "id": 14,
@@ -93,7 +93,7 @@
   "id": 15,
   "off": "74B68",
   "ja": "{13:02}「さあ　いまのうちに　にげろ!\n{12:02}「おまえ　おいて　いけない\n{13:02}「いそげ‥‥これいじょう　もたな‥い",
-  "en": "{13:02}: \"Now, run while you can!\"\n{12:02}: \"Can't leave you behind\"\n{13:02}: \"Hurry... I can't... hold it any... longer\""
+  "en": "{13:02}: \"Now, run while you can!\"\n{12:02}: \"Can't leave you behind.\"\n{13:02}: \"Hurry... I can't... hold it any... longer.\""
  },
  {
   "id": 16,
@@ -105,13 +105,13 @@
   "id": 17,
   "off": "74BD5",
   "ja": "{18:2F}おう「{18:EB}　ミンウ　{10:02}\nおまえたちに　たのみがある",
-  "en": "King of {18:2F}: \"{18:EB}, Minwu, {10:02}\nI have a request of you\""
+  "en": "King of {18:2F}: \"{18:EB}, Minwu, {10:02}.\nI have a request of you.\""
  },
  {
   "id": 18,
   "off": "74BF2",
   "ja": "{18:2F}おう「{18:EB}　たくましくなったな\nおまえには　わがぐんの　しきをとってもらいたい\nそして　{18:EF}を　たすけてやってくれ\n{13:02}「はっ　いのちをかけて!\n{18:2F}おう「ミンウ‥せかいの　ききがおとずれたとき\n{18:F9}の　ふういんが　とけるという\nいまが　そのときだとおもうが　どうだ?\nミンウ「はい　ふういんをときに　いってまいります\n{18:2F}おう「{10:02}　ディストへいってくれ\nディストの{18:FA}だんは　みなごろしにあったが\nかならず　いきのこりがいるにちがいない\n{18:FB}と　{18:FA}のちからは　ぜひともひつようだ\n{18:2F}おう「みながちからをあわせれば　かならずや\nしょうりのひが　おとずれよう\n3にんとも　たのんだぞ\n",
-  "en": "King of {18:2F}: \"{18:EB}, you have grown strong\nI want you to take command of our army\nAnd help {18:EF}\"\n{13:02}: \"Yes, sire, with my life!\"\nKing of {18:2F}: \"Minwu... it is said that when crisis comes\nto the world, the seal of the {18:F9} will be broken\nI believe that time is now. What say you?\"\nMinwu: \"Yes, I shall go and break the seal\"\nKing of {18:2F}: \"{10:02}, go to Deist\nThe {18:FA} of Deist were slaughtered,\nbut there must surely be survivors\nThe power of the {18:FB} and the {18:FA} is something we need\"\nKing of {18:2F}: \"If all join their strength, surely\nthe day of victory will come\nI am counting on all three of you\"\n"
+  "en": "King of {18:2F}: \"{18:EB}, you have grown strong.\nI want you to take command of our army.\nAnd help {18:EF}.\"\n{13:02}: \"Yes, sire, with my life!\"\nKing of {18:2F}: \"Minwu... it is said that when crisis comes\nto the world, the seal of the {18:F9} will be broken.\nI believe that time is now. What say you?\"\nMinwu: \"Yes, I shall go and break the seal.\"\nKing of {18:2F}: \"{10:02}, go to Deist.\nThe {18:FA} of Deist were slaughtered,\nbut there must surely be survivors.\nThe power of the {18:FB} and the {18:FA} is something we need.\"\nKing of {18:2F}: \"If all join their strength, surely\nthe day of victory will come.\nI am counting on all three of you.\"\n."
  },
  {
   "id": 19,
@@ -129,7 +129,7 @@
   "id": 21,
   "off": "74D3B",
   "ja": "{18:EB}「こうして　かなしんでいてもしかたがない\nいこう!　それぞれの　しめいをはたすのだ!!",
-  "en": "{18:EB}: \"Grieving like this will do no good\nLet's go! Each of us must fulfill our mission!!\""
+  "en": "{18:EB}: \"Grieving like this will do no good.\nLet's go! Each of us must fulfill our mission!!\""
  },
  {
   "id": 22,
@@ -147,7 +147,7 @@
   "id": 24,
   "off": "74DB5",
   "ja": "{18:F0}「いい　みせものだったぞ　{10:02}\nおまえたちのしょうたいなど　すでに\nみきっておったわ!",
-  "en": "{18:F0}: \"That was a fine show, {10:02}\nI had already seen through who you really are!\""
+  "en": "{18:F0}: \"That was a fine show, {10:02}.\nI had already seen through who you really are!\""
  },
  {
   "id": 25,
@@ -159,19 +159,19 @@
   "id": 26,
   "off": "74DF6",
   "ja": "{18:F0}「むしけらなど　{18:EC}があいてを\nするにおよばん　　ものども　かかれ!",
-  "en": "{18:F0}: \"Vermin like you are not worth {18:EC}'s\ntime. Minions, attack!\""
+  "en": "{18:F0}: \"Vermin like you are not worth my\ntime. Minions, attack!\""
  },
  {
   "id": 27,
   "off": "74E1B",
   "ja": "{18:F0}「すこしはやるようだな\nだが　つぎはどうだ?",
-  "en": "{18:F0}: \"You seem to have some skill\nBut how about this?\""
+  "en": "{18:F0}: \"You seem to have some skill.\nBut how about this?\""
  },
  {
   "id": 28,
   "off": "74E34",
   "ja": "{18:F0}「なかなかやるではないか\n{18:EC}があいてをしてやろう　かかってこい!!",
-  "en": "{18:F0}: \"Not bad at all\n{18:EC} shall deal with you myself. Come at me!!\""
+  "en": "{18:F0}: \"Not bad at all.\n{18:EC} shall deal with you myself. Come at me!!\""
  },
  {
   "id": 29,
@@ -207,19 +207,19 @@
   "id": 34,
   "off": "74F10",
   "ja": "{18:EE}「これでかったと　おもうなよ!\n\n{11:02}「エッ!そのこえは　にいさ‥ん?!\n{10:02}「なにをいってるんだ!　さあいくぞ\nもうすぐ　ばくはつする!!\nシドの　{18:F5}まで　はしるんだ!\n",
-  "en": "{18:EE}: \"Don't think you've won!\"\n\n{11:02}: \"Huh! That voice... brother...?!\"\n{10:02}: \"What are you saying! Come on, let's go\nIt's about to blow!!\nRun for Cid's {18:F5}!\"\n"
+  "en": "{18:EE}: \"Don't think you've won!\"\n\n{11:02}: \"Huh! That voice... brother...?!\"\n{10:02}: \"What are you saying! Come on, let's go.\nIt's about to blow!!\nRun for Cid's {18:F5}!\"\n."
  },
  {
   "id": 35,
   "off": "74F6A",
   "ja": "シド「おれは　こんなざまだが　{18:F5}はむきずだ!\nおれが　うごけるようになるまで　おまえたちに\nかしてやる。　いいか　かすだけだぞ!!\nだいじにつかえ‥‥\n‥‥ウッ‥グフッ‥ゲボッ\n{10:02}「シ　シド!　しっかりしろー!!\n",
-  "en": "Cid: \"I may be in this state, but the {18:F5}'s unscratched!\nUntil I can move again, I'll lend it\nto you. Got it? I'm only lending it!!\nTake good care of her...\n...ugh... guh... (cough)\"\n{10:02}: \"C- Cid! Hang in there!!\"\n"
+  "en": "Cid: \"I may be in this state, but the {18:F5}'s unscratched!\nUntil I can move again, I'll lend it\nto you. Got it? I'm only lending it!!\nTake good care of her...\n...ugh... guh... (cough)\"\n{10:02}: \"C- Cid! Hang in there!!\"\n."
  },
  {
   "id": 36,
   "off": "74FD8",
   "ja": "{11:02}「{18:EC}たち　そとにでてるわ",
-  "en": "{11:02}: \"{18:EC}'ll be waiting outside with the others\""
+  "en": "{11:02}: \"{18:EC}'ll be waiting outside with the others.\""
  },
  {
   "id": 37,
@@ -231,13 +231,13 @@
   "id": 38,
   "off": "75024",
   "ja": "た　たいへんです!!\n{18:F4}で　とうぎかいが　ひらかれ\nその　しょうひんが　なんと　{18:EF}さま　だそうです",
-  "en": "Th- this is terrible!!\nA tournament is being held in {18:F4},\nand they say the prize is none other than Lady {18:EF}"
+  "en": "Th- this is terrible!!\nA tournament is being held in {18:F4},\nand they say the prize is none other than Lady {18:EF}."
  },
  {
   "id": 39,
   "off": "75058",
   "ja": "{18:EB}「{18:EC}も　いっしょにいかせてくれ\n　{18:EF}を　たすけださなければ\n{13:02}「{18:EB}　あんたのきもち　わかるよ\nここは　あたいらで　なんとかするよ!いってきな!!",
-  "en": "{18:EB}: \"Let {18:EC} go with you too\nI have to rescue {18:EF}\"\n{13:02}: \"{18:EB}, I know how you feel\nWe'll handle things here! Go on!!\""
+  "en": "{18:EB}: \"Let {18:EC} go with you too.\nI have to rescue {18:EF}.\"\n{13:02}: \"{18:EB}, I know how you feel.\nWe'll handle things here! Go on!!\""
  },
  {
   "id": 40,
@@ -261,43 +261,43 @@
   "id": 43,
   "off": "75114",
   "ja": "{10:02}「{18:EB}　{18:ED}をつれて\nさきににげろ!!\nおれたちが　てきを　ひきつける!!\n{18:EB}「わかった。　きをつけろよ",
-  "en": "{10:02}: \"{18:EB}, take the {18:ED}\nand escape ahead of us!!\nWe'll draw the enemy away!!\"\n{18:EB}: \"Got it. Be careful\""
+  "en": "{10:02}: \"{18:EB}, take the {18:ED}\nand escape ahead of us!!\nWe'll draw the enemy away!!\"\n{18:EB}: \"Got it. Be careful.\""
  },
  {
   "id": 44,
   "off": "7514C",
   "ja": "かがみに　{18:FB}のすがたがうつる\nあの　{18:0A}から　うまれた　{18:FB}だ!\n{18:FB}は　みるみる　{18:2F}にちかづいてくる",
-  "en": "The form of a {18:FB} appears in the mirror\nIt's the {18:FB} that hatched from that {18:0A}!\nThe {18:FB} is rapidly approaching {18:2F}"
+  "en": "The form of a {18:FB} appears in the mirror.\nIt's the {18:FB} that hatched from that {18:0A}!\nThe {18:FB} is rapidly approaching {18:2F}."
  },
  {
   "id": 45,
   "off": "75182",
   "ja": "{11:02}「やめて　ふたりとも!!\nにいさん　なぜ　たたかわなければ　ならないの?\n{07}「このよを　しはいするものは　なにか?\nそれは　ちからだ!!\nおれは　{18:F0}に　なったのだ!\nそのちから　てばなしはしない!!\nさあ　{11:02}　そこを　どけ!\n",
-  "en": "{11:02}: \"Stop it, both of you!!\nBrother, why do you have to fight?\"\n{07}: \"What is it that rules this world?\nIt is power!!\nI have become the {18:F0}!\nI will never let go of that power!!\nNow, {11:02}, get out of the way!\"\n"
+  "en": "{11:02}: \"Stop it, both of you!!\nBrother, why do you have to fight?\"\n{07}: \"What is it that rules this world?\nIt is power!!\nI have become the {18:F0}!\nI will never let go of that power!!\nNow, {11:02}, get out of the way!\"\n."
  },
  {
   "id": 46,
   "off": "751F8",
   "ja": "{07}　ひさしぶりだな\n{18:EC}は　じごくで　きゅうきょくのパワーを\nみにつけて　よみがえったぞ!\nおまえが　{18:F0}とは　かたはらいたいわ\nせかいに　{18:F0}は　{18:EC}　ひとりだ!\n",
-  "en": "{07}, it's been a while\n{18:EC} have gained ultimate power in hell\nand returned to life!\nYou, the {18:F0}? Don't make me laugh\nThere is only one {18:F0} in this world: {18:EC}!\n"
+  "en": "{07}, it's been a while.\n{18:EC} have gained ultimate power in hell\nand returned to life!\nYou, the {18:F0}? Don't make me laugh.\nThere is only one {18:F0} in this world: {18:EC}!\n."
  },
  {
   "id": 47,
   "off": "7524C",
   "ja": "{07}「このばけものめ!ていこくは\nおれのものだ!おまえなどに　わたさんぞ",
-  "en": "{07}: \"You monster! The Empire\nis mine! I won't hand it over to the likes of you\""
+  "en": "{07}: \"You monster! The Empire\nis mine! I won't hand it over to the likes of you.\""
  },
  {
   "id": 48,
   "off": "75270",
   "ja": "{18:F0}「ていこく?　フッ　そんなものに　もう\nようはない。　いのちあるものを　みなごろしにし\nせかいを　はかいしつくしてくれる!\nまずは　おまえたちを　ちまつりにあげてやる",
-  "en": "{18:F0}: \"The Empire? Heh, I have no more\nuse for such a thing. I will slaughter every living thing\nand destroy the world utterly!\nFirst, I'll make blood offerings of you\""
+  "en": "{18:F0}: \"The Empire? Heh, I have no more\nuse for such a thing. I will slaughter every living thing\nand destroy the world utterly!\nFirst, I'll make blood offerings of you.\""
  },
  {
   "id": 49,
   "off": "752C6",
   "ja": "{13:02}「ここは　ひとまず　たいきゃくだ\nさあ　{18:FB}にのれ!\n{10:02}「{13:02}!どこへいくんだ!!",
-  "en": "{13:02}: \"Let's retreat for now\nCome on, get on the {18:FB}!\"\n{10:02}: \"{13:02}! Where are you going!!\""
+  "en": "{13:02}: \"Let's retreat for now.\nCome on, get on the {18:FB}!\"\n{10:02}: \"{13:02}! Where are you going!!\""
  },
  {
   "id": 50,
@@ -309,7 +309,7 @@
   "id": 51,
   "off": "75333",
   "ja": "{18:EF}「{10:02}!　どうしたのです?\nおまえは　{18:EE}!!\nいったい　なにがあったのです?!\n{10:02}「{18:F0}が‥‥よみがえって‥‥\n{11:02}「{18:FA}が‥‥\n{18:EC}たちを　にがすために‥‥\nヨーゼフ　ミンウ　シド　{13:02}‥‥\nみんなしんでしまった‥‥もうたくさんよ!!",
-  "en": "{18:EF}: \"{10:02}! What happened?\nAnd you, the {18:EE}!!\nWhat on earth happened?!\"\n{10:02}: \"The {18:F0}... came back to life...\"\n{11:02}: \"The {18:FA}...\nto let {18:EC} and the others escape...\nJosef, Minwu, Cid, {13:02}...\nThey're all dead... I've had enough!!\""
+  "en": "{18:EF}: \"{10:02}! What happened?\nAnd you, the {18:EE}!!\nWhat on earth happened?!\"\n{10:02}: \"The {18:F0}... came back to life...\"\n{11:02}: \"The {18:FA}...\nto let me and the others escape...\nJosef, Minwu, Cid, {13:02}...\nThey're all dead... I've had enough!!\""
  },
  {
   "id": 52,
@@ -321,7 +321,7 @@
   "id": 53,
   "off": "753C0",
   "ja": "{11:02}「ミンウ!しっかり!!\nミンウ「{18:EC}は　ちからをつかいすぎた\nきゅうそくがひつようだ‥‥\nさあ　あのとびらの　むこうへ‥‥\nガクッ‥!\n{10:02}「ミンウ!!\n\n",
-  "en": "{11:02}: \"Minwu! Hold on!!\"\nMinwu: \"{18:EC} have used too much of my power\nI need rest...\nNow, go beyond that door...\nUgh...!\"\n{10:02}: \"Minwu!!\"\n\n"
+  "en": "{11:02}: \"Minwu! Hold on!!\"\nMinwu: \"{18:EC} have used too much of my power.\nI need rest...\nNow, go beyond that door...\nUgh...!\"\n{10:02}: \"Minwu!!\"\n.\n"
  },
  {
   "id": 54,
@@ -339,7 +339,7 @@
   "id": 56,
   "off": "75449",
   "ja": "{18:F0}「この　{18:EC}が　やられるとは‥‥\nしんじられ‥‥ん‥‥2どまでも‥おまえに‥‥\n‥おまえは　いった‥い　な‥にもの‥‥\nウボァー",
-  "en": "{18:F0}: \"That {18:EC} could be beaten...\nI can't... believe... it... twice... by you...\n...who... on earth... are you...\nUBOAAAH\""
+  "en": "{18:F0}: \"That {18:EC} could be beaten...\nI can't... believe... it... twice... by you...\n...who... on earth... are you...\nUBOAAAH.\""
  },
  {
   "id": 57,
@@ -351,7 +351,7 @@
   "id": 58,
   "off": "75498",
   "ja": "{18:EF}「よく　ぶじにかえってきましたね\n{18:EB}「ついにやったな!おめでとう!!",
-  "en": "{18:EF}: \"Welcome back safe and sound\"\n{18:EB}: \"You finally did it! Congratulations!!\""
+  "en": "{18:EF}: \"Welcome back safe and sound.\"\n{18:EB}: \"You finally did it! Congratulations!!\""
  },
  {
   "id": 59,
@@ -369,7 +369,7 @@
   "id": 61,
   "off": "7553C",
   "ja": "ネリー「おめでとう!!おとうさんも　きっと\nよろこんでるわ!　{18:EC}　{18:ED}さまのところで\nみんなの　おてつだいをして　はたらくわ!\n{18:EC}でも　きっと　できることがあるとおもうの!!",
-  "en": "Nelly: \"Congratulations!! I'm sure Daddy\nis happy too! {18:EC}'m going to work for the {18:ED},\nhelping everyone out!\nEven {18:EC} must be able to do something!!\""
+  "en": "Nelly: \"Congratulations!! I'm sure Daddy\nis happy too! I'm going to work for the {18:ED},\nhelping everyone out!\nEven {18:EC} must be able to do something!!\""
  },
  {
   "id": 62,
@@ -453,13 +453,13 @@
   "id": 75,
   "off": "75711",
   "ja": "{10:02}「ありがとう　{13:02}\n{13:02}「ゆだんしちゃ　だめ!\nおんなは　こわいんだよ!!\n{12:02}「{18:ED}　ほんもの　どこ??",
-  "en": "{10:02}: \"Thanks, {13:02}\"\n{13:02}: \"Don't let your guard down!\nWomen are scary!!\"\n{12:02}: \"{18:ED}, real one, where??\""
+  "en": "{10:02}: \"Thanks, {13:02}.\"\n{13:02}: \"Don't let your guard down!\nWomen are scary!!\"\n{12:02}: \"{18:ED}, real one, where??\""
  },
  {
   "id": 76,
   "off": "75749",
   "ja": "{07}「{18:F0}を　たおさないかぎり\nもっと　おおくのものがしぬ!\n{10:02}「{07}!いっしょにたたかおう\n{18:ED}!かれを　なかまにさせてください\n{18:EF}「‥‥{18:EE}のことは\nあなたにまかせましょう!\n{11:02}「にいさん!たたかいましょう!!\n",
-  "en": "{07}: \"Unless we defeat the {18:F0},\nmany more will die!\"\n{10:02}: \"{07}! Let's fight together\n{18:ED}! Please let him join us\"\n{18:EF}: \"...I shall leave the matter of the {18:EE}\nto you!\"\n{11:02}: \"Brother! Let's fight!!\"\n"
+  "en": "{07}: \"Unless we defeat the {18:F0},\nmany more will die!\"\n{10:02}: \"{07}! Let's fight together!\n{18:ED}! Please let him join us.\"\n{18:EF}: \"...I shall leave the matter of the {18:EE}\nto you!\"\n{11:02}: \"Brother! Let's fight!!\"\n."
  },
  {
   "id": 77,
