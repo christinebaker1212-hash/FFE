@@ -14,7 +14,7 @@ Text in banks 16-20 is drawn one tile row per line (the Japanese spends a row on
 dakuten); see EXRAM_SRC."""
 import sys, os, json, re
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from latin_font import tile
+from latin_font import tile, proportional
 from asm6502 import asm
 
 HDR = 16; BANK = 0x4000
@@ -192,6 +192,24 @@ def ending(rom, report):
     report.append('ending in bank %d at %04X' % (EV_BANK, a))
 
 EV_FREE = [None]
+
+WIDE_NAMES = {'Richard': 0xE0}     # 7 letters in the 6-letter name field: own tiles
+
+def guest_names(rom):
+    """Guest characters' names (6 bytes in their templates, bank 0 $9102 + $80 n). A name
+    longer than 6 letters is drawn proportionally on 6 tiles of its own."""
+    for e in json.load(open('script/ff2/guest_names.json')):
+        n = e['en']
+        if n in WIDE_NAMES:
+            base = WIDE_NAMES[n]
+            for t, data in enumerate(proportional(n, 6, fg=3, bg=2)):
+                o = HDR + FONT + (base + t) * 16; rom[o:o + 16] = data
+            data = bytes(range(base, base + 6))
+        else:
+            data = enc(n); assert len(data) <= 6, n
+            data += b'\xFF' * (6 - len(data))
+        o = HDR + int(e['off'], 16) - 0x40000
+        rom[o:o + 6] = data
 
 def insert_names(rom, report):
     """Names (items, spells, key words; {18:xx}) stay in bank 10 at tables $8200/$8300,
@@ -700,6 +718,7 @@ if __name__ == '__main__':
     report = []
     for e in json.load(open('script/ff2/names.json')): NAMES[e['id']] = e['en']
     font(rom)
+    guest_names(rom)
     b10 = insert_names(rom, report)
     sysbits = system_strings(rom, report, b10)
     put_table(rom, 'dialogue_b', [DB_BANK, DB_BANK + 1], 0x8000, report)

@@ -130,6 +130,30 @@ NARROW = {
  'u': ["...", "...", "#.#", "#.#", "#.#", "#.#", ".##"],
 }
 
+def proportional(word, ntiles, fg=3, bg=0):
+    """`word` in the regular letters, each glyph's blank columns trimmed and 1-pixel gaps,
+    left-aligned in ntiles*8 pixels; returns the list of 16-byte tiles."""
+    cols = []
+    for k, ch in enumerate(word):
+        rows = ["......."] + list(G[ch]) if ch in DESC else list(G[ch]) + ["......."]
+        used = [x for x in range(7) if any(r[x] == '#' for r in rows)] or [0]
+        if k: cols.append([0] * 8)
+        for x in range(min(used), max(used) + 1):
+            cols.append([1 if rows[y][x] == '#' else 0 for y in range(8)])
+    W = ntiles * 8
+    assert len(cols) <= W, (word, len(cols))
+    cols += [[0] * 8] * (W - len(cols))
+    tiles = []
+    for t in range(ntiles):
+        lo = bytearray(8); hi = bytearray(8)
+        for y in range(8):
+            for x in range(8):
+                c = fg if cols[t * 8 + x][y] else bg
+                if c & 1: lo[y] |= 0x80 >> x
+                if c & 2: hi[y] |= 0x80 >> x
+        tiles.append(bytes(lo + hi))
+    return tiles
+
 def narrow_label(word, ntiles, fg=3, bg=0):
     """Render `word` centred in ntiles*8 x 8 pixels with the narrow letters (1 px gaps);
     returns the list of 16-byte tiles."""
