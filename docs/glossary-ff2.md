@@ -41,3 +41,12 @@ All renderings are from the Japanese. `{18:xx}` inserts entry xx of `script/ff2/
 - Name-entry grid (`system.json` #70) is replaced by a Latin letter grid with the same layout codes.
 - Shop command ことわる (decline the shopkeeper's offer) is "Pass": the shop's command window shows five letters while the sell list overlaps it.
 - りゅうさんのビン is "Sulfuric Acid Bottle" (20 letters, the widest list width).
+- Battle command もちもの (what a character holds: the two hands' weapons and the items) is "Gear": the
+  command window shows five letters (the screen scrolls just far enough for it).
+- たずねる / おぼえる / アイテム (key-word menu) start one column further left (the hand on the border), so
+  "Learn" and "Items" fit beside the key-word window.
+- Status words (battle status window: the maximum-HP slot plus the blank cell after it, 5 cells):
+  どく Poison · ねむり Sleep · ちんもく Silence · こびと Tiny · まひ Paralysis · こんらん Confusion ·
+  もうもく Blind · もうどく Venom (the virulent poison) · のろい Curse · わすれた Forgot · かえる Frog ·
+  いし Stone · しぼう Dead. Poison, Silence, Forgot, Paralysis and Confusion are drawn on five tiles
+  of their own (the last two in condensed letters).

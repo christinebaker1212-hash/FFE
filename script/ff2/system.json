@@ -159,7 +159,7 @@
   "id": 26,
   "off": "6B3B0",
   "ja": "{15:01}たずねる\n{15:01}おぼえる\n{15:01}アイテム",
-  "en": "{15:01}Ask\n{15:01}Learn\n{15:01}Items"
+  "en": "{15:00}Ask\n{15:00}Learn\n{15:00}Items"
  },
  {
   "id": 27,
@@ -513,13 +513,13 @@
   "id": 247,
   "off": "6BFAB",
   "ja": "もうもく",
-  "en": "Blindness"
+  "en": "Blind"
  },
  {
   "id": 248,
   "off": "6BFB0",
   "ja": "もうどく",
-  "en": "Deadly Poison"
+  "en": "Venom"
  },
  {
   "id": 249,
@@ -531,7 +531,7 @@
   "id": 250,
   "off": "6BFBA",
   "ja": "わすれた",
-  "en": "Forgetful"
+  "en": "Forgot"
  },
  {
   "id": 251,

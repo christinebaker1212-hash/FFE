@@ -28,7 +28,7 @@ S = {
 23:'{15:01}Buy\n{15:01}Sell\n{15:01}Pass',
 24:'{15:01}Yes\n{15:01}No',
 25:" Whoa, looks like you're short on money.\n Sorry, but I can't take you like that.\n Come back another time.",
-26:'{15:01}Ask\n{15:01}Learn\n{15:01}Items',
+26:'{15:00}Ask\n{15:00}Learn\n{15:00}Items',
 27:'{15:02}Items{15:0A}Magic{15:12}Equip\n{15:02}Status{15:0A}Save',
 28:'{05} Gil',
 31:' Items',
@@ -79,8 +79,8 @@ S2 = {
 75:' New Game  Speed {06}',
 76:' From inside the treasure chest\n {02} was obtained.\n Suddenly, monsters appeared!',
 77:' In your current condition\n you cannot learn magic.',
-240:'Poison', 241:'Sleep', 242:'Silence', 243:'Tiny', 244:'Paralysis', 245:'Confusion', 247:'Blindness',
-248:'Deadly Poison', 249:'Curse', 250:'Forgetful', 251:'Frog', 252:'Stone', 253:'Dead',
+240:'Poison', 241:'Sleep', 242:'Silence', 243:'Tiny', 244:'Paralysis', 245:'Confusion', 247:'Blind',
+248:'Venom', 249:'Curse', 250:'Forgot', 251:'Frog', 252:'Stone', 253:'Dead',
 254:'Right-handed', 255:'Left-handed',
 }
 for k in (65, 66, 67, 69):

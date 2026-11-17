@@ -14,7 +14,7 @@ Text in banks 16-20 is drawn one tile row per line (the Japanese spends a row on
 dakuten); see EXRAM_SRC."""
 import sys, os, json, re
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from latin_font import tile, proportional
+from latin_font import tile, proportional, right_label
 from asm6502 import asm
 
 HDR = 16; BANK = 0x4000
@@ -262,14 +262,36 @@ SYS_LAYOUT[39] = '\n'.join(
 SYS_LAYOUT[38] = '\n'.join(['{08}{17:02}{10:%02X}{14:0B}{10:%02X}' % (0x0A + i, 0x38 + i)
                             for i in range(16)] + ['{08}{17:02}{0F}'])
 
+# status words (ids 240-253): the battle status window gives them the maximum-HP slot,
+# 4 cells in the Japanese (right-aligned kana); English takes the slot and the blank cell
+# after it. Words up to 5 letters are right-aligned in the regular letters; longer ones are
+# drawn on 5 tiles of their own, right-aligned (regular letters if they fit, else
+# condensed ones).
+STATUS_SLOT = 5
+STATUS_DRAWN = {240: False, 242: 'thin', 244: True, 245: True, 250: False}
+STATUS_TILES = list(range(0xD0, 0xE0)) + list(range(0xE6, 0xF0))     # unused katakana
+
+def status_word(rom, i, word, tiles):
+    if i not in STATUS_DRAWN:
+        assert len(word) <= STATUS_SLOT, word
+        return enc(' ' * (STATUS_SLOT - len(word)) + word)
+    codes = [tiles.pop(0) for _ in range(STATUS_SLOT)]
+    for c, data in zip(codes, right_label(word, STATUS_SLOT, STATUS_DRAWN[i], fg=3, bg=2)):
+        o = HDR + FONT + c * 16; rom[o:o + 16] = data
+    return bytes(codes)
+
 def system_strings(rom, report, bank):
     """System strings (table bank 10 $8400) after the names. Messages (SYS_W) are drawn
     one row per line, reflowed to their window like the dialogue (the Japanese indents
     each line by a space); menu layouts
     keep the Japanese structure; the prologue is reflowed by paragraph and centred."""
     one = set(SYS_W) | {PROLOGUE} | ONE_ROW_LAYOUT
+    tiles = list(STATUS_TILES)
     for e in json.load(open('script/ff2/system.json')):
         t = e['en']
+        if 240 <= e['id'] <= 253 and t:
+            bank.put_ptr(0x8400 + 2 * e['id'], bank.alloc(status_word(rom, e['id'], t, tiles) + b'\0'))
+            continue
         if e['id'] in SYS_W:
             t = layout('\n'.join(l.strip() for l in t.split('\n')), SYS_W[e['id']])
         elif e['id'] in SYS_LAYOUT:
@@ -872,15 +894,17 @@ def engine(rom, report, sysbits):
         assert bank_get(rom, 14, a, 2) == b'\xa9\x08', hex(a)
         bank_put(rom, 14, a, b'\xa9\x04')
     assert bank_get(rom, 31, 0xE9B2 + 2) == bytes([22])
-    bank_put(rom, 31, 0xE9B2 + 2, bytes([23]))         # field window 2: 21 columns inside
+    bank_put(rom, 31, 0xE9B2 + 2, bytes([24]))         # field window 2: 22 inside (to the screen edge: an
+    # attribute block of its own; 23 would leave the border in the map palette)
     # shop buy list: below the prompt across the message window (was 12 columns right)
     assert bank_get(rom, 14, 0x9101, 3) == b'\xb9\x15\x91' and bank_get(rom, 14, 0x9110, 2) == b'\xc0\x24'
     t = L['shoptpl']
     bank_put(rom, 14, 0x9102, bytes([t & 0xFF, t >> 8])); bank_put(rom, 14, 0x9111, bytes([37]))
     assert bank_get(rom, 14, 0x90DB, 23).hex() == 'a538186 90c293f8538a5971869 0c8597a53c38e90c853c'.replace(' ', '')
     bank_put(rom, 14, 0x90DB, bytes.fromhex('a539186902853 9eaeaa59818690285 98a53d38e902853d'.replace(' ', '')))
-    # field window 3 (money) one column wider
-    for k, base, old, new in ((3, 0xE9B2, 12, 13),):
+    # field window 3 (money) two columns wider, to the screen edge (its border then has an
+    # attribute block of its own, as window 2)
+    for k, base, old, new in ((3, 0xE9B2, 12, 14),):
         assert bank_get(rom, 31, base + k) == bytes([old]), (k, hex(base))
         bank_put(rom, 31, base + k, bytes([new]))
     # battle text into its boxes (two rows for a long English text)

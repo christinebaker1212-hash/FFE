@@ -177,3 +177,63 @@ def narrow_label(word, ntiles, fg=3, bg=0):
                 if c & 2: hi[y] |= 0x80 >> x
         tiles.append(bytes(lo + hi))
     return tiles
+
+# Condensed letters (the regular style, 4 columns for the round letters) for status labels
+# that must fit a 5-cell slot; same rows and baseline as G (descenders as DESC).
+COND = {
+ 'P': ["###.", "#..#", "#..#", "###.", "#...", "#...", "#..."],
+ 'S': [".###", "#...", "#...", ".##.", "...#", "...#", "###."],
+ 'C': [".##", "#..", "#..", "#..", "#..", "#..", ".##"],
+ 'a': ["....", "....", ".##.", "...#", ".###", "#..#", ".###"],
+ 'o': ["....", "....", ".##.", "#..#", "#..#", "#..#", ".##."],
+ 'n': ["....", "....", "###.", "#..#", "#..#", "#..#", "#..#"],
+ 's': ["....", "....", ".###", "#...", ".##.", "...#", "###."],
+ 'i': ["#", ".", "#", "#", "#", "#", "#"],
+ 'l': ["#", "#", "#", "#", "#", "#", "#"],
+ 'c': ["...", "...", ".##", "#..", "#..", "#..", ".##"],
+ 'e': ["....", "....", ".##.", "#..#", "####", "#...", ".##."],
+ 'r': ["...", "...", "#.#", "##.", "#..", "#..", "#.."],
+ 'u': ["....", "....", "#..#", "#..#", "#..#", "#..#", ".###"],
+ 'f': [".##", "#..", "#..", "###", "#..", "#..", "#.."],
+ 'y': ["....", "#..#", "#..#", "#..#", ".###", "...#", ".##."],
+}
+
+def _glyph_cols(ch, table):
+    """Pixel columns of a glyph (8 rows; descenders one row lower). Regular glyphs are
+    trimmed to their inked columns; condensed ones are used as drawn."""
+    g = table[ch]; w = len(g[0])
+    rows = ["." * w] + list(g) if ch in DESC else list(g) + ["." * w]
+    xs = range(w)
+    if table is not COND:
+        used = [x for x in xs if any(r[x] == '#' for r in rows)] or [0]
+        xs = range(min(used), max(used) + 1)
+    return [[1 if rows[y][x] == '#' else 0 for y in range(8)] for x in xs]
+
+THIN = dict(G, i=COND['i'], l=COND['l'])     # the regular letters, i and l without serifs
+
+def label_width(word, condensed=False):
+    t = {False: G, True: COND, 'thin': THIN}[condensed]
+    return sum(len(_glyph_cols(c, t)) for c in word) + len(word) - 1
+
+def right_label(word, ntiles, condensed=False, fg=3, bg=0):
+    """`word` (regular or condensed letters, 1-pixel gaps) right-aligned in ntiles*8
+    pixels with one blank column at the right; returns the list of 16-byte tiles.
+    condensed: False (regular), True (COND) or 'thin' (regular, plain i and l)."""
+    t = {False: G, True: COND, 'thin': THIN}[condensed]
+    cols = []
+    for k, ch in enumerate(word):
+        if k: cols.append([0] * 8)
+        cols += _glyph_cols(ch, t)
+    W = ntiles * 8
+    assert len(cols) + 1 <= W, (word, len(cols))
+    cols = [[0] * 8] * (W - 1 - len(cols)) + cols + [[0] * 8]
+    tiles = []
+    for k in range(ntiles):
+        lo = bytearray(8); hi = bytearray(8)
+        for y in range(8):
+            for x in range(8):
+                c = fg if cols[k * 8 + x][y] else bg
+                if c & 1: lo[y] |= 0x80 >> x
+                if c & 2: hi[y] |= 0x80 >> x
+        tiles.append(bytes(lo + hi))
+    return tiles

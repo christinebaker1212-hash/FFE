@@ -1,7 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 from apply import apply
-B = ['Fight','Run','Magic','Belongings','Right Hand','Left Hand','Items','MP Cost',"Magic can't be used",
+B = ['Fight','Run','Magic','Gear','Right Hand','Left Hand','Items','MP Cost',"Magic can't be used",
  'A chance to strike first!!','The monsters strike first!',' hits',' damage','Critical hit!!','Miss',
  'Ran away',"Can't escape!",'Is asleep','Is paralyzed','Did nothing','Had no effect',
  ' was defeated!',' was slain!',"'s party was wiped out",'Won the battle!!','Life was taken   ',
