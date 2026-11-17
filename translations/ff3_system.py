@@ -144,6 +144,26 @@ T[33] = '\n'.join(''.join('{17:%s}%s' % (c, chars[r*10 + k]) for k, c in enumera
 # column of 32 full-length names, the count at the right column's place (insert.py: cursor
 # step 4); the last line is the bin
 T[61] = '\n'.join('{17:01}{1A:%02X}{14:19}{1C:%02X}' % (k, k) for k in range(32)) + '\n{17:05}{0F}'
+# shops (windows $14-$19, insert.py): the sign as two one-row lines in its 6 cells; the
+# shopkeeper's lines one-row, two of 19 cells; Buy/Sell/Exit with the cursor's room (the
+# window widened); "How many?" above its choices; the buy list one-row, each price under its
+# item's full name
+T.update({7: '{0E}Weapon\n Shop', 8: '{0E}Armor\n Shop', 9: '{0E} Item\n Shop', 10: '{0E}Magic\n Shop',
+          11: '{15:01}Buy{15:06}Sell{15:0B}Exit',
+          38: '{0E}Welcome! What is\nyour business?',
+          39: '{0E}What shall it be?',
+          40: '{0E}Thank you so much!\nAnything else?',
+          41: '{0E}Thank you for your\npatronage.',
+          42: '{0E}What will you sell?',
+          43: '{0E}That will come to\n{04} Gil.',
+          44: "{0E}You're carrying too\nmuch to buy more.",
+          45: '{0E}{14:02}How many?\n{15:02}1{15:06}4{15:0A}10',
+          46: '{0E}{14:02}How many?\n{15:02}1{15:06}All',
+          80: '{0E}Your inventory is\nfull.',
+          108: "{0E}You don't have\nenough money.",
+          115: '{0E}Who will hold this\nmagic?', 116: "{0E}Can't hold any\nmore.",
+          117: '{0E}Already holds this\nmagic.'})
+T[32] = '{0E}' + '\n'.join('{16:01}{19:%02X}\n{14:0C}{21:%02X} Gil' % (k, k) for k in range(8))
 # equipment messages (window $1E, widened to 28 cells by insert.py): one row per line (code
 # 0E), wrapped in two lines where the English is longer than a line
 def msg2(text, width=28):
@@ -188,6 +208,6 @@ T[71] = ('{0E}\n{14:0C}{10:02}{14:14}{10:01}\n\n'        # header lines on the J
          '  Evasion rate{14:14}‥ {10:41}\n'
          '  Magic defense{14:14}‥{10:36}\n'
          '  Magic evasion rate‥ {10:40}')
-for i in (32, 37, 48, 50, 51, 52, 57, 59, 72, 73, 74, 109):
+for i in (37, 48, 50, 51, 52, 57, 59, 72, 73, 74, 109):
     T[i] = codes_only(i)
 apply(P, T)

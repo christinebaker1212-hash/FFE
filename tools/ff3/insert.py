@@ -1659,6 +1659,16 @@ def menus(rom):
     # the equipment message window ($1E, 17 x 1 inside): the screen's width, two one-row lines
     assert get(rom, 61, 0xAB43 + 0x1E) == b'\x13'
     put(rom, 61, 0xAB43 + 0x1E, b'\x1e')
+    # shops: the command window widened (Buy/Sell/Exit with the cursor's room), the money
+    # window narrowed to its right; the buy list widened to the party at its right; the sell
+    # list (#61 in window $19) one column, cursor step 4
+    X, W = 0xAAF7, 0xAB43
+    assert get(rom, 61, W + 0x16) == b'\x0e' and get(rom, 61, X + 0x17) == b'\x10' and get(rom, 61, W + 0x18) == b'\x16'
+    put(rom, 61, W + 0x16, b'\x11'); put(rom, 61, X + 0x17, b'\x13'); put(rom, 61, W + 0x17, b'\x0d')
+    put(rom, 61, W + 0x18, b'\x18')
+    for a in (0xB140, 0xB3F8):
+        assert get(rom, 61, a, 4) == b'\xa9\x08\x20\x0d', hex(a)
+        put(rom, 61, a + 1, b'\x04')
 
 def engine(rom, report):
     bases = {n: b for n, _, b in TABLES}

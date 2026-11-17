@@ -45,31 +45,31 @@
   "id": 7,
   "off": "35D51",
   "ja": "　ぶきや",
-  "en": " Weapon Shop"
+  "en": "{0E}Weapon\n Shop"
  },
  {
   "id": 8,
   "off": "35D56",
   "ja": "　ぼうぐや",
-  "en": " Armor Shop"
+  "en": "{0E}Armor\n Shop"
  },
  {
   "id": 9,
   "off": "35D5C",
   "ja": "　どうぐや",
-  "en": " Item Shop"
+  "en": "{0E} Item\n Shop"
  },
  {
   "id": 10,
   "off": "35D62",
   "ja": "　まほうや",
-  "en": " Magic Shop"
+  "en": "{0E}Magic\n Shop"
  },
  {
   "id": 11,
   "off": "35D68",
   "ja": "{15:01}かう{15:05}うる{15:09}でる",
-  "en": "{15:01}Buy{15:05}Sell{15:09}Exit"
+  "en": "{15:01}Buy{15:06}Sell{15:0B}Exit"
  },
  {
   "id": 12,
@@ -195,7 +195,7 @@
   "id": 32,
   "off": "35DF3",
   "ja": "{16:01}{19:00}{14:0E}{21:00}\n{16:01}{19:01}{14:0E}{21:01}\n{16:01}{19:02}{14:0E}{21:02}\n{16:01}{19:03}{14:0E}{21:03}\n{16:01}{19:04}{14:0E}{21:04}\n{16:01}{19:05}{14:0E}{21:05}\n{16:01}{19:06}{14:0E}{21:06}\n{16:01}{19:07}{14:0E}{21:07}",
-  "en": "{16:01}{19:00}{14:0E}{21:00}\n{16:01}{19:01}{14:0E}{21:01}\n{16:01}{19:02}{14:0E}{21:02}\n{16:01}{19:03}{14:0E}{21:03}\n{16:01}{19:04}{14:0E}{21:04}\n{16:01}{19:05}{14:0E}{21:05}\n{16:01}{19:06}{14:0E}{21:06}\n{16:01}{19:07}{14:0E}{21:07}"
+  "en": "{0E}{16:01}{19:00}\n{14:0C}{21:00} Gil\n{16:01}{19:01}\n{14:0C}{21:01} Gil\n{16:01}{19:02}\n{14:0C}{21:02} Gil\n{16:01}{19:03}\n{14:0C}{21:03} Gil\n{16:01}{19:04}\n{14:0C}{21:04} Gil\n{16:01}{19:05}\n{14:0C}{21:05} Gil\n{16:01}{19:06}\n{14:0C}{21:06} Gil\n{16:01}{19:07}\n{14:0C}{21:07} Gil"
  },
  {
   "id": 33,
@@ -231,55 +231,55 @@
   "id": 38,
   "off": "360C6",
   "ja": "いらっしゃい　どのようなごようけんで?",
-  "en": "Welcome. What business brings you here?"
+  "en": "{0E}Welcome! What is\nyour business?"
  },
  {
   "id": 39,
   "off": "360DA",
   "ja": "なににいたしましょうか?",
-  "en": "What would you like?"
+  "en": "{0E}What shall it be?"
  },
  {
   "id": 40,
   "off": "360E7",
   "ja": "ありがとうございます　ほかには?",
-  "en": "Thank you very much. Anything else?"
+  "en": "{0E}Thank you so much!\nAnything else?"
  },
  {
   "id": 41,
   "off": "360F8",
   "ja": "まいど　ありがとうございます",
-  "en": "Thank you for your patronage."
+  "en": "{0E}Thank you for your\npatronage."
  },
  {
   "id": 42,
   "off": "36107",
   "ja": "なにを　うりますか?",
-  "en": "What will you sell?"
+  "en": "{0E}What will you sell?"
  },
  {
   "id": 43,
   "off": "36112",
   "ja": "それなら　{04}ギルになります",
-  "en": "Then that comes to {04} Gil."
+  "en": "{0E}That will come to\n{04} Gil."
  },
  {
   "id": 44,
   "off": "36120",
   "ja": "これいじょうはもちすぎでかえません",
-  "en": "You're carrying too much to buy any more."
+  "en": "{0E}You're carrying too\nmuch to buy more."
  },
  {
   "id": 45,
   "off": "36132",
   "ja": "　いくつ?{15:06}1{15:08}4{15:0A}10",
-  "en": " How many?{15:06}1{15:08}4{15:0A}10"
+  "en": "{0E}{14:02}How many?\n{15:02}1{15:06}4{15:0A}10"
  },
  {
   "id": 46,
   "off": "36142",
   "ja": "　いくつ?{15:06}1{15:08}ぜんぶ",
-  "en": " How many?{15:06}1{15:08}All"
+  "en": "{0E}{14:02}How many?\n{15:02}1{15:06}All"
  },
  {
   "id": 47,
@@ -483,7 +483,7 @@
   "id": 80,
   "off": "369E0",
   "ja": "もちものがいっぱいです",
-  "en": "Your inventory is full."
+  "en": "{0E}Your inventory is\nfull."
  },
  {
   "id": 81,
@@ -651,7 +651,7 @@
   "id": 108,
   "off": "36BBE",
   "ja": "おかねがたりません",
-  "en": "You don't have enough money."
+  "en": "{0E}You don't have\nenough money."
  },
  {
   "id": 109,
@@ -693,19 +693,19 @@
   "id": 115,
   "off": "36C37",
   "ja": "だれがこのまほうを　もちますか?",
-  "en": "Who will hold this magic?"
+  "en": "{0E}Who will hold this\nmagic?"
  },
  {
   "id": 116,
   "off": "36C48",
   "ja": "これいじょうはもてません",
-  "en": "Can't hold any more."
+  "en": "{0E}Can't hold any\nmore."
  },
  {
   "id": 117,
   "off": "36C55",
   "ja": "すでに　このまほうは　もっています",
-  "en": "Already holds this magic."
+  "en": "{0E}Already holds this\nmagic."
  },
  {
   "id": 118,
