@@ -845,6 +845,18 @@ copystr:        ; $DAF1: system string A to $7B00 for drawing (code 10 becomes t
     inc $83
 .r:
     rts
+gridx:          ; bank 12 $9C43 (grid cursor: entry = row * $5C + column): the battle magic
+    ldx $5C     ;   list, made 2 columns x 8 rows, numbers its entries row * 2 + column
+    cpx #8
+    bne .r
+    lda $5D
+    cmp #2
+    bne .r
+    ldx #2
+.r:
+    lda #0
+    cpx #0
+    rts
 h_flush:        ; $F069 line flush: lower-row buffer only, on row $3B
     lda $38
     sta $3A
@@ -978,6 +990,22 @@ def battle(rom, report, L):
         bank_put(rom, 12, a + 1, bytes([new]))
     assert bank_get(rom, 12, 0xBFCD, 8).hex() == '48b848d8a0b8a0c8'
     bank_put(rom, 12, 0xBFCD, bytes([0x48, 0xB0, 0x48, 0xC0, 0x48, 0xD0, 0x48, 0xD8]))
+    # battle magic list (window 21 x 8): the Japanese 4 x 4 grid of 5-column names becomes
+    # 2 columns x 8 rows of 10 (spell k at row k / 2); entry number row * 2 + column
+    for a, old, new in ((0x9E0B, 4, 8), (0x9E0F, 4, 2)):          # $5C rows, $5D columns
+        assert bank_get(rom, 12, a, 1) == bytes([old]), hex(a)
+        bank_put(rom, 12, a, bytes([new]))
+    for a, old, new in ((0x9EA2, b'\xa9\x04', 8), (0x9EA6, b'\xa9\x16', 1), (0x9EAE, b'\xa9\x04', 2),
+                        (0x9ECD, b'\x69\x05', 10), (0x9ED8, b'\x69\x16', 1)):
+        assert bank_get(rom, 12, a, 2) == old, hex(a)
+        bank_put(rom, 12, a + 1, bytes([new]))
+    for a in (0x9E50, 0x9F26, 0x9F0C):                                     # row * 4 -> row * 2
+        assert bank_get(rom, 12, a - 2, 3) == b'\xa5\x54\x0a' and bank_get(rom, 12, a, 1) == b'\x0a', hex(a)
+        bank_put(rom, 12, a, b'\xEA')
+    assert bank_get(rom, 12, 0x9C43, 4) == b'\xa9\x00\xa6\x5c'
+    bank_put(rom, 12, 0x9C43, jsr(L['gridx']) + b'\xEA')
+    assert bank_get(rom, 12, 0xBFD5, 4).hex() == '08a808b8'
+    bank_put(rom, 12, 0xBFD5, bytes(v for c in (0x08, 0x58) for r in range(8) for v in (c, 0xA0 + 8 * r)))
     for old, new, sites in BOX_W:
         for bank, a in sites:
             assert bank_get(rom, bank, a, 2) == bytes([0xA9, old]), (bank, hex(a))
