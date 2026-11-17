@@ -1375,6 +1375,14 @@ def drink_window(rom):
     assert code.org + len(code.bytes) <= 0xF994, hex(code.org + len(code.bytes))
     put(rom, code.org, code.bytes)
 
+# victory / level-up strings of the bank 11 table: number codes 0C lo hi kept
+DIRECT_STRINGS = {
+    bytes([0x0C, 0x78, 0x68, 0xC9]): bytes([0x0C, 0x78, 0x68]) + enc('P'),          # 7P
+    bytes([0x60, 0xC2, 0xF2, 0x6A]): enc('Gold'),                                  # ゴールド
+    bytes([0x0C, 0x76, 0x68, 0x5D, 0xF2]): bytes([0x0C, 0x76, 0x68]) + enc(' Gil'),  # 30ギル
+    bytes([0x02, 0xFF, 0xC6, 0x0C, 0x7A, 0x68]): bytes([0x02, 0xFF]) + enc('L') + bytes([0x0C, 0x7A, 0x68]),
+}
+
 BATTLE_BANK = 19
 NARROW_NAMES = {'Tyrannosaurus': (7, 0xEB)}   # tiles $EB-$F1
 STATUS_LABELS = [(65, 'Stone'), (66, 'Poison'), (67, 'Darkness'), (68, 'Paralysis'), (69, 'Sleep'),
@@ -1419,6 +1427,38 @@ def battle(rom, labels, report):
     put(rom, 0xF9DC, bytes([0, 1, 0, 12, 10]))
     put(rom, 0xFA13, bytes([0, 13, 0, 12, 10]))
     drink_window(rom)
+    # strings the battle code passes by pointer into ROM (bank 11 table $A00E, bank 12
+    # $A048): the decoder could read them with any bank mapped (the Japanese kept them in
+    # the message bank). Copies go to BATTLE_BANK, and a stub before the decoder maps
+    # BATTLE_BANK whenever a line's pointer is in $8000-$BFFF.
+    b11 = HDR + 11 * BANK - 0x8000
+    for k in range(10):
+        t = 0xA00E + 2 * k
+        a = rom[b11 + t] | rom[b11 + t + 1] << 8
+        e = rom.index(0, b11 + a)
+        data = bytes(rom[b11 + a:e])
+        data = DIRECT_STRINGS.get(data, data)
+        n = bank.alloc(data + b'\0')
+        rom[b11 + t] = n & 0xFF; rom[b11 + t + 1] = n >> 8
+    n = bank.alloc(enc('Cannot be used!') + b'\0')         # つかえません !
+    o = HDR + 12 * BANK + 0x96FE - 0x8000
+    assert rom[o:o + 6] == bytes([0xA9, 4, 0xA2, 0x48, 0xA0, 0xA0])
+    rom[o + 3] = n & 0xFF; rom[o + 5] = n >> 8
+    stub = asm('''
+    org $F8A0       ; (free: the item list builder moved to far code)
+    cpy #$80
+    bcc .go
+    cpy #$C0
+    bcs .go
+    lda #%d
+    jsr $FE03
+.go:
+    jmp $FA4F
+''' % BATTLE_BANK)
+    put(rom, stub.org, stub.bytes)
+    o = HDR + 15 * BANK + 0xF9B6 - 0xC000
+    assert rom[o:o + 3] == b'\x20\x4f\xfa'
+    put(rom, 0xF9B6, jsr(stub.org))
     b10 = Bank(rom, 10, keep=True); b10.free = NAMES_FREE[:]
     for e in json.load(open('script/ff1/enemy_attacks.json')):
         b10.put_ptr(0xB600 + 2 * e['id'], b10.alloc(enc(e['en']) + b'\0'))

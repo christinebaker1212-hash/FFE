@@ -14,7 +14,7 @@ B = {
  32:'Had no effect', 33:'A chance to strike first!', 34:'The monsters strike first!', 35:"Can't escape!",
  36:'Ran away', 37:'Somehow got away...', 38:'Woke up!', 39:'Is asleep', 40:'Recovered!', 41:'Is paralyzed',
  42:' hits!', 43:'Critical hit!!', 44:"Can't use magic!", 45:' damage', 46:'Has turned to stone',
- 47:'Level up!', 48:'Max HP', 49:'points', 50:'Strength', 51:'Agility', 52:'Intelligence', 53:'Vitality',
+ 47:'Level up!', 48:'Max HP', 49:' points', 50:'Strength', 51:'Agility', 52:'Intelligence', 53:'Vitality',
  54:'Luck', 55:' went up', 56:'Magic power', 57:"Gained next level's magic power!", 58:' went down',
  59:'Were wiped out', 60:'The monsters ', 61:"'s party ", 62:'Dealt the finishing blow!!', 63:'Miss!',
  64:'    ', 65:'Stone', 66:'Poison', 67:'Darkness', 68:'Paralysis', 69:'Sleep', 70:'Silence', 71:'HP',
