@@ -56,35 +56,97 @@ double speed to be playable. FF1 is turn-based and spends most of each frame wai
 NMI, so this should be enough.
 
 ## 1. Recompiler (`tools/gb/recomp.py`)
-- **Code discovery:** trace from the reset, NMI and IRQ vectors and every `JSR`/`JMP`/branch
-  target, bank by bank (FF1 calls across banks through its fixed-bank swap routine at
-  `$FE1A`). Jump tables (`JMP (ind)`, push-address + `RTS`) are found by
-  recording targets in the emulator (`tools/emu`) during play, plus tables listed by hand.
-  Anything left unresolved goes through a runtime NES-address → GB-address lookup.
-- **Registers:** A→A, X→B, Y→C, NES SP→a byte in HRAM (the 6502 stack page is emulated
-  in WRAM so `TSX`/stack tricks keep working), C flag→carry (inverted for subtraction,
-  as 6502 SBC/CMP borrow is the opposite of SM83). N, Z and V are computed only where
-  liveness analysis shows a later branch reads them.
-- **Memory map:** NES `$0000-07FF` → WRAM; `$6000-7FFF` (save RAM) → cart SRAM; zero
-  page → a fixed WRAM page so `(zp),Y` becomes `ld hl` + `add`. ROM data reads in
-  `$8000-BFFF` become reads from the matching MBC5 bank at `$4000-7FFF`. MMC5 bank
-  writes become MBC5 writes.
-- **Output:** SM83 assembly, assembled by a small Python assembler (`tools/gb/asm_sm83.py`),
-  in the same spirit as `tools/asm6502.py`. No outside toolchain is needed.
+Input: `build/ff1_en.nes` plus coverage logs from `tools/gb/covrun.py`; code map from
+`tools/gb/nescode.py` (code spaces `bNN` / `c62` / `far` / `fix` / `ex`).
+
+**What the analysis showed (FF1 English build)**
+- The game is synchronous: `JSR $FE00` enables NMI and spins at `JMP $FEEE`; the NMI
+  handler `$FECF` pops the interrupt frame (`PLA ×3`) and `RTS`es to the caller of
+  `$FE00`. All PPU work happens in the main thread right after that call returns.
+  On GB, `JSR $FE00` → `call wait_frame` (halt until the vblank ISR has run). The NMI
+  handler itself is not compiled.
+- Bank switching: `$FE1A` writes `$5115` (16KB at `$8000`), `$FE06` writes `$5105`.
+  The English patch uses PRG mode 2: `$C000-DFFF` is 8KB bank 62 except during
+  `farjsr`, which maps bank 40 there and dispatches by push-address + `RTS`.
+- Stack tricks found by the shadow-stack log: NMI return (above), `b14:A330` `PLA PLA RTS`
+  (return to the caller's caller), the `farjsr` RTS dispatch (`ex:5D0B`), `TXS`
+  resets (`$C024`, `$C0D3`, reset). Jump tables: `JMP ($0010)` at `c62:CA99`, `b14:B187`.
+
+**Registers.** A → A. X → E with D = 0, Y → C with B = 0, so `abs,X` is
+`ld hl,base / add hl,de` and `abs,Y` is `ld hl,base / add hl,bc`. HL is the only
+scratch pair; HRAM holds the other temporaries.
+
+**Stack.** NES pushes go on the GB stack: `PHA` = `push af`, `PLA` = `pop hl / ld a,h`,
+`JSR` = `call`, `RTS` = `ret`. Each NES 2-byte return address is one 2-byte GB frame, so
+balanced code behaves the same. Known tricks get their own translation: `PLA PLA` that
+drops a return address → `pop hl` (one GB frame); push-address + `RTS` and `JMP (ind)`
+→ `jp dispatch` (sorted table of NES address → GB bank:address, filled from the
+coverage log and the tables that feed them); `TXS` → `ld sp, STACK_TOP`. NES `$0100-01FF`
+stays plain RAM (FF1 keeps variables there).
+
+**Flags.** Backward liveness over the whole program (call/return edges included) says
+which of N, Z, C and V each instruction must produce.
+- C is the GB carry. Its polarity is tracked inside a basic block (`CMP`/`SBC` leave it
+  inverted) and normalised with `ccf` only where C is live at a block exit.
+- Z is the GB Z flag. After loads (`LDA`/`TAX`/`PLA`, which don't set GB flags)
+  `inc r / dec r` sets Z without touching C.
+- N: `bit 7,r` at the branch when the value is still in a register. Otherwise the
+  producer stores the value to HRAM `nzv` and the branch tests it.
+- V (`ADC`/`SBC`/`BIT` → `BVC`/`BVS`) is only computed where it is live (HRAM `vfl`).
+- Runtime helpers that clobber GB flags are wrapped in `push af`/`pop af` where a
+  flag is live across them.
+
+**Memory.** Static addresses are classified at compile time:
+
+| NES | GB |
+|---|---|
+| `$0000-07FF` RAM (and mirrors) | WRAM `$C000-C7FF` (direct `ld`) |
+| `$2000-3FFF` PPU, `$4000-4017` APU/IO | calls into the PPU/APU layer |
+| `$5100-5BFF` MMC5 registers | bank bookkeeping (`$5115`/`$5116`), mirroring; others ignored |
+| `$5C00-5FFF` ExRAM | WRAM `$C800-CBFF` (direct) |
+| `$6000-7FFF` save RAM | cart SRAM `$A000-BFFF`, enabled at boot (direct) |
+| `$8000-FFFF` ROM | data read helper in bank 0 (see below) |
+
+Indirect `(zp),Y` / `(zp,X)` accesses translate the pointer at run time by region. Where the
+coverage log shows a single region for an instruction, a fast path for that region is
+compiled, with a fallback to the general helper.
+
+**ROM data vs code.** The GB has one switchable 16KB window, and it holds the
+recompiled code. NES ROM data is copied verbatim into its own GB banks (`DATA + n` for
+NES 16KB bank n), and reads go through a bank-0 helper: map the data bank, read, map
+the code bank back (~30 cycles). If profiling shows hot tables, those tables get
+copied into the code bank that reads them.
+
+**Code layout.** Each NES space is compiled into GB banks. Bank 0 holds the runtime and
+the most-called fixed-bank routines (frame wait, bank switch, sound, PPU helpers).
+Calls between GB banks go through bank-0 stubs (`farcall`: save A in HRAM, switch,
+`call`, switch back; flags preserved). Banked NES code at `$8000` called from fixed
+code dispatches on the current `$5115` value.
+
+**Output.** SM83 assembly for `tools/gb/asm_sm83.py`, with labels `L_<space>_<addr>`
+so the `.sym` file maps every GB address back to the NES instruction.
 
 ## 2. PPU layer (`tools/gb/rt/ppu.s`)
-- `$2006/$2007` writes go to a WRAM shadow of the nametables, attribute tables and
-  CHR-RAM. At GB vblank the changed parts are sent with GDMA. Tiles change
-  format on the way: the NES stores 8 bytes of plane 0 then 8 of plane 1, the GB
-  interleaves them row by row (a 256-byte lookup table).
-- The NES nametable is 32 tiles wide and the GB BG map is 32×32, so the BG maps
-  one-to-one. Attributes (2 bits per 16×16) are expanded into the CGB attribute map
-  (VRAM bank 1).
-- Palette writes (`$3F00-3F1F`) go through a 64-entry NES-colour → RGB555 table to the
-  CGB palette RAM.
-- OAM DMA (`$4014`) converts NES OAM (Y, tile, attr, X) to GB OAM (Y+16, X+8, tile,
-  attr). The GB shows 40 sprites (10 per line); the NES shows 64 (8 per line).
-- Scroll (`$2005`/`$2000`) sets SCX/SCY through a *camera* (see 3).
+DMG has no VRAM DMA, and VRAM is only writable in vblank/hblank, so:
+- **Rendering off** (`$2001` = 0, used for full-screen loads): wait for vblank, LCD off,
+  and `$2006/$2007` write straight to VRAM (SGB: `MASK_EN` freezes the picture meanwhile).
+- **Rendering on**: `$2007` writes go to a queue, flushed by the vblank ISR. A frame's
+  writes show one frame later.
+- CHR (`$0000-1FFF`): NES byte k of a tile (plane 0 rows 0-7, then plane 1) goes to GB
+  tile byte 2k / 2(k-8)+1. NES has 512 tiles and DMG VRAM has 384 (sprites $8000-8FFF,
+  BG $8800-97FF, 128 shared). Tile usage gets measured with `PPU_LOG` before the
+  allocator is designed (fixed mapping if FF1's real usage fits, else a remapping cache).
+- Nametables: NES tile (x, y) → GB BG map ($9800) column x mod 32, row y. The field
+  writes at most 32 consecutive columns per row update, so mod 32 never puts two
+  NES columns in view at once. NES vertical wrap is 30 rows and the GB map has 32,
+  so an LYC interrupt changes SCY where the view crosses NES row 30.
+- Scroll: camera = NES scroll + (48, 48) (centre of 256×240), per-screen overrides
+  later (milestone 5).
+- OAM (`$4014`): 64 NES sprites → up to 40 GB sprites, culled to the camera view,
+  converted during the frame, DMA'd in vblank.
+- Palettes: DMG uses one BGP (NES index → shade). SGB maps NES palettes 0-3 to SGB
+  palettes 0-3 (`PAL01`/`PAL23`). Attributes become `ATTR_CHR` packets, sent only when a
+  static screen's layout changes (the field keeps one palette set).
 
 ## 3. The screen: 256×240 → 160×144 (the real work)
 A camera alone handles the field: the party stays centred and the view shows

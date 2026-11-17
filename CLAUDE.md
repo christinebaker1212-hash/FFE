@@ -102,14 +102,9 @@ Milestones per game (from `docs/gb-port.md`):
 ## In progress / next
 - Long coverage runs (4 seeds × 80k frames, `build/cov2/`), then the recompiler
   (`tools/gb/recomp.py`).
-- Recompiler design decisions so far (to go into `docs/gb-port.md`): X in E (D=0), Y in C
-  (B=0) so `abs,X`/`abs,Y` = `ld hl,base / add hl,de`; flag liveness decides where Z/N/C/V
-  are materialised; 6502 carry polarity (SBC/CMP) tracked at compile time; NES banked
-  ROM data is read through a bank-0 helper (code and data cannot share the one GB
-  window); indirect pointers translated by region, specialised by the coverage log;
-  NES stack page emulated in WRAM, JSR/RTS native call/ret except where tricks are found;
-  GB vblank flushes queued VRAM writes, then runs the recompiled NMI (1 frame latency);
-  bulk loads with NES rendering off use GB LCD off (SGB: MASK_EN hides it).
+- Recompiler and PPU-layer design written up in `docs/gb-port.md` §1-2 (registers X→E,
+  Y→C; NES stack on the GB stack; flag liveness; ROM data through a bank-0 helper;
+  queued VRAM writes; tile/nametable/scroll mapping).
 - SGB packet sender + detection (MLT_REQ): PyBoy has no SGB, so it gets written with
   the SGB palette work (milestone 6) and is checked in an SGB-capable emulator then.
 
