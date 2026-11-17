@@ -116,7 +116,8 @@ def insert_dialogue(rom, report):
 # first 1KB of CODE_BANK.
 CODE_BANK = 18                        # 16KB bank: ExRAM image + menu strings
 EX = dict(MODE=0x5C00, PREV=0x5C01, SAVEX=0x5C02, WRAPW=0x5C03, TMP=0x5C04, BUF=0x5C10,
-          SLOT=0x5C40, SV54=0x5C05, SV55=0x5C06, SAVEX2=0x5C07, OVF=0x5C0F, MENUBANK=CODE_BANK)
+          SLOT=0x5C40, SV54=0x5C05, SV55=0x5C06, SAVEX2=0x5C07, MI=0x5C08, ML=0x5C09, MS=0x5C0A, MT=0x5C0B,
+          MU=0x5C0C, MR=0x5C0D, FLIP=0x5C0E, OVF=0x5C0F, MENUBANK=CODE_BANK)
 EXRAM_SRC = '''
     org $5C60
 BCMDS
@@ -349,7 +350,118 @@ shoplist:       ; bank 14 $A86A: shop item list string at $0310
     lda #0
     sta $0310,y
     jmp $A8A9
-boxline:        ; $F9B9: decoded battle line ($6CD4 pairs) into the box image at ($8A).
+farjsr:         ; X = far routine number: map FAR8 at $C000, call it, restore the previous
+    lda farcur  ;   mapping (calls may nest)
+    pha
+    lda #$80+FAR8
+    sta farcur
+    sta $5116
+    jsr .go
+    pla
+    sta farcur
+    sta $5116
+    rts
+.go:
+    lda FARHI,x
+    pha
+    lda FARLO,x
+    pha
+    rts
+farcur:
+    .db $80+62
+magflip:        ; after magdown/magup: redraw the magic window if the page changed
+    lda FLIP
+    beq .r
+    lda #0
+    sta FLIP
+    lda #1
+    jsr $F20F
+    jsr $F21B
+.r:
+    rts
+magcur:         ; bank 14 $B829: magic list cursor, level L spell c on row 4+3L+c
+    lda $62
+    and #3
+    asl a
+    asl a
+    asl a
+    sta TMP
+    lda $62
+    lsr a
+    lsr a
+    tax
+    lda .my,x
+    clc
+    adc TMP
+    sta $41
+    lda #80
+    sta $40
+    jmp $ED24
+.my:
+    .db 32, 56, 80, 104, 128, 152, 176, 200
+m_setbank:      ; bank 14 $B957: menu strings are read from MENUBANK
+    lda #$0E
+    sta $58
+    lda #MENUBANK
+    sta $57
+    rts
+m_copy:         ; bank 14 $B96E: copy Y+1 bytes of menu string A to $6C00 (code 10 -> 10|$66)
+    asl a
+    tax
+    lda $8500,x
+    sta $10
+    lda $8501,x
+    sta $11
+    lda #MENUBANK
+    sta $57
+    jsr $FE03
+.l:
+    lda ($10),y
+    cmp #$10
+    bne .s
+    ora $66
+.s:
+    sta $6C00,y
+    dey
+    cpy #$FF
+    bne .l
+    lda #$0E
+    sta $57
+    jsr $FE03
+    lda #0
+    sta $3E
+    lda #$6C
+    sta $3F
+    jmp $B957
+'''
+INIT_SRC = '''
+    org $DD47
+init:           ; called once from reset ($FDF0 has set PRG mode 2 and $5116 first)
+    lda #1
+    sta $5103
+    asl a
+    sta $5102
+    sta $5104               ; ExRAM mode 2: plain RAM
+    lda #$80+CODE2
+    sta $5115
+    ldx #0
+.l:
+    lda $8000,x
+    sta $5C00,x
+    lda $8100,x
+    sta $5D00,x
+    lda $8200,x
+    sta $5E00,x
+    lda $8300,x
+    sta $5F00,x
+    inx
+    bne .l
+    rts
+'''
+
+FAR_SRC = '''
+    org $C000
+boxline:        ; $F9B9 (far): decoded battle line ($6CD4 pairs) into the box image at ($8A).
     ldx #0      ;   Width = cells up to the box frame; a longer line is split at a
     ldy #0      ;   space onto the two rows (upper row first) of the Japanese line.
 .cnt:
@@ -378,6 +490,20 @@ boxline:        ; $F9B9: decoded battle line ($6CD4 pairs) into the box image at
     clc
     adc #$20
     sta SAVEX2
+    ldx #1      ; a marker $FE in the line: split there (upper row / lower row)
+    ldy #0
+.fe:
+    lda $6CD4,x
+    beq .nofe
+    cmp #$FE
+    beq .gotfe
+    inx
+    inx
+    iny
+    bne .fe
+.gotfe:
+    jmp .sp
+.nofe:
     lda TMP
     cmp SAVEX
     bcc .one
@@ -450,86 +576,196 @@ boxline:        ; $F9B9: decoded battle line ($6CD4 pairs) into the box image at
     inx
     inx
     bne .o3
-magcur:         ; bank 14 $B829: magic list cursor, level L spell c on row 4+3L+c
-    lda $62
-    and #3
-    asl a
-    asl a
-    asl a
-    sta TMP
-    lda $62
-    lsr a
-    lsr a
-    tax
-    lda .my,x
-    clc
-    adc TMP
-    sta $41
-    lda #80
-    sta $40
-    jmp $ED24
-.my:
-    .db 32, 56, 80, 104, 128, 152, 176, 200
-m_setbank:      ; bank 14 $B957: menu strings are read from MENUBANK
-    lda #$0E
-    sta $58
-    lda #MENUBANK
-    sta $57
-    rts
-m_copy:         ; bank 14 $B96E: copy Y+1 bytes of menu string A to $6C00 (code 10 -> 10|$66)
-    asl a
-    tax
-    lda $8500,x
-    sta $10
-    lda $8501,x
-    sta $11
-    lda #MENUBANK
-    sta $57
-    jsr $FE03
-.l:
-    lda ($10),y
-    cmp #$10
-    bne .s
-    ora $66
-.s:
-    sta $6C00,y
+magpage:        ; $F75C (far): battle magic list, two levels per page ($6AF8 = 0-3). Per level
+    ldy #5      ;   two queued lines (marker $FE = start of the line's lower row):
+.c:             ;   'L1  <spell 1>' / ' 2  <spell 2>', then '    <spell 3>' / blank
+    lda $FA08,y
+    sta $6A9D,y
     dey
-    cpy #$FF
-    bne .l
-    lda #$0E
-    sta $57
-    jsr $FE03
+    bne .c
+    jsr $F688
+    jsr $F74F
+    lda $6B7A
+    jsr $F88F
+    clc
+    adc #0
+    sta $88
     lda #0
-    sta $3E
-    lda #$6C
-    sta $3F
-    jmp $B957
-'''
-INIT_SRC = '''
-    org $DD47
-init:           ; replaces the MMC5 init chunk at $FDF0 (called once from reset)
-    lda #1
-    sta $5100
-    sta $5103
+    adc #$63
+    sta $89
+    lda #0
+    sta MI
+    sta MU          ; output offset in $6AFA
+.lv:
+    lda $6AF8
     asl a
-    sta $5102
-    sta $5104               ; ExRAM mode 2: plain RAM
-    lda #$80+CODE2
-    sta $5115
-    ldx #0
-.l:
-    lda $8000,x
-    sta $5C00,x
-    lda $8100,x
-    sta $5D00,x
-    lda $8200,x
-    sta $5E00,x
-    lda $8300,x
-    sta $5F00,x
+    clc
+    adc MI
+    sta ML
+    ; ---- line 1
+    lda MU
+    sta MT          ; start of this string
+    ldx MU
+    lda #$C6
+    sta $6AFA,x
     inx
-    bne .l
+    lda ML
+    clc
+    adc #$81
+    sta $6AFA,x
+    inx
+    lda #$FF
+    sta $6AFA,x
+    inx
+    sta $6AFA,x
+    inx
+    lda #0
+    jsr .spell
+    lda #$FE
+    sta $6AFA,x
+    inx
+    lda #$FF
+    sta $6AFA,x
+    inx
+    lda ML
+    clc
+    adc #$20
+    tay
+    lda ($88),y
+    clc
+    adc #$80
+    sta $6AFA,x
+    inx
+    lda #$FF
+    sta $6AFA,x
+    inx
+    sta $6AFA,x
+    inx
+    lda #1
+    jsr .spell
+    lda #0
+    sta $6AFA,x
+    inx
+    stx MU
+    lda MI
+    asl a
+    asl a
+    clc
+    adc #2
+    jsr .queue
+    ; ---- line 2
+    lda MU
+    sta MT
+    ldx MU
+    lda #$FF
+    sta $6AFA,x
+    inx
+    sta $6AFA,x
+    inx
+    sta $6AFA,x
+    inx
+    sta $6AFA,x
+    inx
+    lda #2
+    jsr .spell
+    lda #0
+    sta $6AFA,x
+    inx
+    stx MU
+    lda MI
+    asl a
+    asl a
+    clc
+    adc #4
+    jsr .queue
+    inc MI
+    lda MI
+    cmp #2
+    beq .done
+    jmp .lv
+.done:
+    rts
+.spell:         ; A = slot: append 0E <name index> if the slot holds a spell
+    sta MS
+    stx MR
+    lda ML
+    asl a
+    asl a
+    clc
+    adc MS
+    tay
+    lda ($88),y
+    ldx MR
+    cmp #0
+    beq .sx
+    clc         ; battle spell bytes are spell numbers: name index = byte + $AF
+    adc #$AF
+    pha
+    lda #$0E
+    sta $6AFA,x
+    inx
+    pla
+    sta $6AFA,x
+    inx
+.sx:
+    rts
+.queue:         ; A = y: queue text record 01 3 y ptr(MT)
+    sta $6AA0
+    lda #1
+    sta $6A9E
+    lda #3
+    sta $6A9F
+    lda MT
+    clc
+    adc #$FA
+    sta $6AA1
+    lda #0
+    adc #$6A
+    sta $6AA2
+    jmp $F688
+magdown:        ; bank 12 $9CB4 (far): down = next spell, then next level / page
+    lda $6AAA
+    cmp #2
+    bcs .lv
+    inc $6AAA
+    rts
+.lv:
+    lda $6AAB
+    and #1
+    beq .inc
+    lda $6AF8
+    cmp #3
+    beq .ret
+    inc $6AF8
+    inc FLIP    ; page redraw happens in magflip (needs the fixed bank at $C000)
+.inc:
+    lda #0
+    sta $6AAA
+    inc $6AAB
+.ret:
+    rts
+magup:          ; bank 12 $9CD2 (far)
+    lda $6AAA
+    beq .lv
+    dec $6AAA
+    rts
+.lv:
+    lda $6AAB
+    and #1
+    bne .dec
+    lda $6AF8
+    beq .ret
+    dec $6AF8
+    inc FLIP
+.dec:
+    lda #2
+    sta $6AAA
+    dec $6AAB
+.ret:
     rts
 '''
+FAR_ROUTINES = ['boxline', 'magpage', 'magdown', 'magup']
+FAR8 = 40                              # 8KB bank (first half of 16KB bank 20)
 
 def jmp(a): return bytes([0x4C, a & 0xFF, a >> 8])
 def jsr(a): return bytes([0x20, a & 0xFF, a >> 8])
@@ -541,16 +777,28 @@ def bank_put(rom, bank, cpu, data):
 def menu_engine(rom, report):
     cmds = json.load(open('script/ff1/battle_cmds.json'))
     bc = ''.join('bcmd%d:\n    .db %s, 0\n' % (e['id'], ', '.join(str(b) for b in enc(e['en']))) for e in cmds)
-    ex = asm(EXRAM_SRC.replace('BCMDS', bc), syms=EX)
+    far = asm(FAR_SRC, syms=EX)
+    assert far.org + len(far.bytes) <= 0xE000
+    o = HDR + FAR8 * 0x2000
+    rom[o:o + 0x2000] = far.bytes + b'\xFF' * (0x2000 - len(far.bytes))
+    tabs = '\nFARLO:\n    .db ' + ', '.join('<(%d-1)' % far.labels[r] for r in FAR_ROUTINES) + \
+           '\nFARHI:\n    .db ' + ', '.join('>(%d-1)' % far.labels[r] for r in FAR_ROUTINES) + '\n'
+    ex = asm(EXRAM_SRC.replace('BCMDS', bc) + tabs, syms=dict(EX, FAR8=FAR8))
+    FAR_LABELS.update(far.labels)
     img = bytearray(0x400); img[0x60:0x60 + len(ex.bytes)] = ex.bytes
     assert 0x60 + len(ex.bytes) <= 0x400
     bank_put(rom, CODE_BANK, 0x8000, bytes(img))
     L = ex.labels
+    LABELS_EX.update(L)
     DLG_LABEL[0] = L['dlgbank']
     init = asm(INIT_SRC, syms={'CODE2': CODE_BANK * 2})
     assert init.org + len(init.bytes) <= 0xDDAB      # dakuten tables $DD47-$DDAA (unused in English)
     put(rom, init.org, init.bytes)
-    put(rom, 0xFDF0, jmp(init.labels['init']))
+    # PRG mode 2: $8000 16KB ($5115, as the game uses it), $C000 8KB ($5116, normally
+    # the first half of the fixed bank; the far-code bank is mapped there by farjsr),
+    # $E000 8KB ($5117, power-on last bank). Set from $FDF0, which lies in $E000-$FFFF.
+    put(rom, 0xFDF0, bytes([0xA9, 0x80 + 62, 0x8D, 0x16, 0x51, 0xA9, 0x02, 0x8D, 0x00, 0x51])
+        + jmp(init.labels['init']))
     put(rom, 0xDEB6, jmp(L['h_entry']) + b'\xEA\xEA')
     put(rom, 0xDEB1, jmp(L['h_end']) + b'\xEA\xEA')
     put(rom, 0xDEDE, jmp(L['h_char']) + jmp(L['h_code']))   # $DEE1: JMP h_code
@@ -965,12 +1213,33 @@ def battle(rom, labels, report):
         for bk in (15, 31):
             o = HDR + bk * BANK + a - 0xC000
             assert rom[o] == old, (hex(a), rom[o]); rom[o] = new
-    put(rom, 0xF9B9, jmp(labels['boxline']))
-    assert labels['boxline'] < 0x5F80
+    put(rom, 0xF9B9, farhook('boxline'))
+    assert max(labels.values()) < 0x5F80, hex(max(labels.values()))
+    # battle magic list: 2 levels per page, 4 pages
+    put(rom, 0xF75C, bytes([0xA2, FAR_ROUTINES.index('magpage')]) + jsr(labels['farjsr']) + jmp(0xF640))
+    for a, r in ((0x9CB4, 'magdown'), (0x9CD2, 'magup')):
+        bank_put(rom, 12, a, bytes([0xA2, FAR_ROUTINES.index(r)]) + jsr(labels['farjsr'])
+                 + jmp(labels['magflip']))
+    bank_put(rom, 12, 0x9CF0, b'\x60')                 # left/right: no move
+    bank_put(rom, 12, 0x9CFE, b'\x60')
+    for a, old, new in ((0x9C36, 3, 1), (0x9C81, 3, 1), (0x951C, 1, 3), (0x951E, 0x0A, 0xEA)):
+        o = HDR + 12 * BANK + a - 0x8000
+        assert rom[o] == old, hex(a); rom[o] = new
+    cur = bytearray(32)
+    for c in range(3):
+        for r in range(2):
+            k = r + 4 * c
+            cur[2 * k] = 40; cur[2 * k + 1] = (158 if r == 0 else 190) + 8 * c
+    bank_put(rom, 12, 0x9FBF, bytes(cur[:24]))
     report.append('battle bank free: %d' % sum(b - a for a, b in bank.free))
 
 NAMES_FREE = []
 DLG_LABEL = [0]
+FAR_LABELS = {}
+
+def farhook(name):
+    return bytes([0xA2, FAR_ROUTINES.index(name)]) + jmp(LABELS_EX['farjsr'])
+LABELS_EX = {}
 
 def status_screen(rom):
     """Status windows (x, y, w, h), table at bank 14 $B53A, drawn in this order with
