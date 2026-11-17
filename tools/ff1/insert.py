@@ -1388,6 +1388,114 @@ NARROW_NAMES = {'Tyrannosaurus': (7, 0xEB)}   # tiles $EB-$F1
 STATUS_LABELS = [(65, 'Stone'), (66, 'Poison'), (67, 'Darkness'), (68, 'Paralysis'), (69, 'Sleep'),
                  (70, 'Silence')]
 
+STORY_W, STORY_ROWS = 20, 9     # box x=2 w=22 (was x=4 w=18); text rows y+2..y+10
+def story(rom, report):
+    """Bridge / ending story pages (25, table bank 13 $A800, drawn by the menu text drawer
+    in an 18x12 box at (4,4) over the title picture). English needs more room: the box is
+    22 wide at (2,4) (same centre, so the staff credit pages that share it stay centred;
+    the sky left of it and the birds right of it stay as they are) and lines are one tile
+    row each (the Japanese spends a row on dakuten). Pages are centred vertically, as the
+    Japanese does with leading blank lines. The box palette (attributes) is extended to the
+    new columns when the scene is set up. Strings and table go to BATTLE_BANK."""
+    bank = Bank(rom, BATTLE_BANK, keep=True); bank.free = BATTLE_FREE[:]
+    ptrs = []
+    for e in json.load(open('script/ff1/story.json')):
+        body = ' '.join(e['en'].strip('\n').split('\n'))
+        lines = flow(body, STORY_W)
+        assert len(lines) <= STORY_ROWS and max(len(l) for l in lines) <= STORY_W, lines
+        pad = (STORY_ROWS - len(lines)) // 2
+        txt = '{09}' + '{08}' * pad + '{08}'.join(lines)
+        ptrs.append(bank.alloc(enc(txt) + b'\0'))
+    tab = bank.alloc(b''.join(bytes([a & 0xFF, a >> 8]) for a in ptrs))
+    BATTLE_FREE[:] = bank.free
+    code = asm('''
+    org $F770       ; (free: the Japanese battle magic list builder, now far code)
+geom:           ; bank 13 $B8E3: page box
+    lda #1
+    sta $FF
+    sta $2000
+    sta $37
+    lda #$0D
+    sta $57
+    sta $58
+setbox:         ; bank 13 $B827 too (the box after the ending pages)
+    lda #2
+    sta $38
+    lda #4
+    sta $39
+    lda #22
+    sta $3C
+    lda #12
+    sta $3D
+    rts
+storyptr:       ; bank 13 $BA5F: page $66 from the table in the text bank
+    lda $66
+    asl a
+    tax
+    lda #BB
+    sta $57
+    jsr $FE03
+    lda TAB,x
+    sta $3E
+    lda TAB+1,x
+    sta $3F
+    lda #$0D
+    jsr $FE03
+    jmp $C003
+scene:          ; bank 13 $B899 (rendering off): as the Japanese, plus the box palette on
+    lda #0      ;   columns 2-3 and 20-23 of rows 4-15 in nametable 0
+    sta $2001
+    sta $66
+    ldx #0
+    lda $2002
+    lda #$27
+    sta $2006
+    lda #$C0
+    sta $2006
+.c:
+    lda $BA7F,x
+    sta $2007
+    inx
+    cpx #$20
+    bcc .c
+    ldx #0
+.a:
+    lda #$23
+    sta $2006
+    lda .al,x
+    sta $2006
+    lda .av,x
+    sta $2007
+    inx
+    cpx #6
+    bne .a
+    lda #0
+    sta $FF
+    sta $2000
+    rts
+.al:
+    .db $C8, $CD, $D0, $D5, $D8, $DD
+.av:
+    .db $DD, $FF, $DD, $FF, $DD, $FF
+''', syms={'TAB': tab, 'BB': BATTLE_BANK})
+    assert code.org + len(code.bytes) <= 0xF88F, hex(code.org + len(code.bytes))
+    put(rom, code.org, code.bytes)
+    L = code.labels
+    o = HDR + 13 * BANK - 0x8000
+    assert rom[o + 0xB8E3:o + 0xB8E5] == b'\xa9\x01' and rom[o + 0xB900:o + 0xB903] == b'\x20\x06\xc0'
+    rom[o + 0xB8E3:o + 0xB900] = jsr(L['geom']) + jmp(0xB900) + b'\xEA' * 23
+    assert rom[o + 0xBA5F:o + 0xBA61] == b'\xa5\x66'
+    rom[o + 0xBA5F:o + 0xBA62] = jmp(L['storyptr'])
+    assert rom[o + 0xB827:o + 0xB829] == b'\xa9\x04'
+    rom[o + 0xB827:o + 0xB835] = jsr(L['setbox']) + b'\xEA' * 11
+    assert rom[o + 0xB899:o + 0xB89B] == b'\xa9\x00'
+    rom[o + 0xB899:o + 0xB89C] = jmp(L['scene'])
+    # nametable 1 attributes (written by scene from $BA7F): the same box columns
+    for g in range(1, 4):
+        k = o + 0xBA7F + 8 * g
+        assert rom[k:k + 8] == bytes([0x55, 0, 0, 0, 0, 0x44, 0x55, 0x55])
+        rom[k] = 0x11; rom[k + 5] = 0x00
+
 def battle(rom, labels, report):
     """Battle text. Messages (table $8F4E+2) and monster names (table $94E0) move to
     BATTLE_BANK at the same addresses; names may be longer than 8 letters; enemy attack
@@ -1492,9 +1600,11 @@ def battle(rom, labels, report):
     o = HDR + 12 * BANK + 0x9FD7 - 0x8000
     assert rom[o:o + 2] == b'\x10\xa6'
     rom[o:o + 16] = bytes(v for r in range(8) for v in (0x10, 0x9E + 8 * r))
+    BATTLE_FREE[:] = bank.free
     report.append('battle bank free: %d' % sum(b - a for a, b in bank.free))
 
 NAMES_FREE = []
+BATTLE_FREE = []
 DLG_LABEL = [0]
 FAR_LABELS = {}
 
@@ -1523,6 +1633,7 @@ if __name__ == '__main__':
     status_screen(rom)
     shops(rom, labels)
     battle(rom, labels, report)
+    story(rom, report)
     bad = insert_dialogue(rom, report)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report)); print('strings not fitting:', bad)
