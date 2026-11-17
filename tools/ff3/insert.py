@@ -441,17 +441,8 @@ BOX_CALLS = [(0x9091, 0), (0x90C1, 1), (0x9168, 1), (0x91BF, 2), (0x91EF, 3), (0
 BCONV_SRC = '''
     org $966A       ; bank 52: battle text ($7AD7, 0-terminated) into the box buffer ($4E),
 bconv:              ;   rows $18 wide; the Japanese converter (dakuten on the row above) is
-    lda $18         ;   replaced. Text with layout codes (01 newline, 02 xx skip) is copied
-    jsr $A558       ;   as the Japanese lays it out; plain text is tidied and, wider than
-    ldx #0          ;   the box, split over the box's two rows at the most even space (or
-.s:                 ;   after a hyphen)
-    lda $7AD7,x
-    beq .box
-    cmp #3
-    bcc .raw
-    inx
-    bne .s
-.raw:
+    lda $18         ;   replaced. Lists and layouts are copied as the Japanese lays them
+    jsr $A558       ;   out (01 newline: two rows, 02 xx: skip xx columns)
     ldx #0
     ldy #0
 .r:
@@ -482,7 +473,9 @@ bconv:              ;   rows $18 wide; the Japanese converter (dakuten on the ro
     bne .r
 .x:
     rts
-.box:
+bconvb:             ; box texts and command entries (call sites patched): the text is
+    lda $18         ;   tidied and, wider than the box, split over the box's two rows at
+    jsr $A558       ;   the most even space (or after a hyphen)
     jsr btidy
 .w:
     ldx #0
@@ -568,7 +561,7 @@ def engine(rom, report):
     assert bc.org + len(bc.bytes) <= 0xA66C
     put(rom, 53, bc.org, bc.bytes + b'\xEA' * (0xA66C - bc.org - len(bc.bytes)))
     # battle boxes
-    bc = asm(BCONV_SRC, syms=L)
+    bc = asm(BCONV_SRC, syms=L); BL = bc.labels
     assert bc.org + len(bc.bytes) <= 0x9754, hex(bc.org + len(bc.bytes))
     put(rom, 52, bc.org, bc.bytes + b'\xEA' * (0x9754 - bc.org - len(bc.bytes)))
     report.append('battle converter: %d bytes' % len(bc.bytes))
@@ -592,9 +585,11 @@ def engine(rom, report):
     assert get(rom, 52, 0x8B00, 8).hex() == 'a828b828c828d828'          # its cursor x: 3 columns left
     for k in range(4): put(rom, 52, 0x8B01 + 2 * k, b'\x10')
     for a, k in BOX_CALLS:
-        assert get(rom, 52, a, 7)[0] == 0xA9 and get(rom, 52, a + 2, 5).hex() == '85186a96'[:0] + get(rom, 52, a + 2, 5).hex()
         assert get(rom, 52, a + 2, 5) == b'\x85\x18\x20\x6a\x96', hex(a)
         put(rom, 52, a + 1, bytes([BOXES[k][2]]))
+        put(rom, 52, a + 4, jsr(BL['bconvb']))
+    assert get(rom, 52, 0x9AC8, 3) == b'\x20\x6a\x96'
+    put(rom, 52, 0x9AC8, jsr(BL['bconvb']))
     # one row per line
     assert get(rom, FIX, 0xEEC0, 5) == b'\xa5\x93\x20\x03\xff'
     put(rom, FIX, 0xEEC0, jsr(L['txton']) + b'\xEA\xEA')
