@@ -344,25 +344,26 @@ shoplist:       ; bank 14 $A86A: shop item list string at $0310
     lda #0
     sta $0310,y
     jmp $A8A9
-magcur:         ; bank 14 $B829: magic list cursor. Level L uses two rows: spell 1 on the
-    lda $62     ;   first (beside L/MP), spells 2 and 3 on the second
-    sta $10
+magcur:         ; bank 14 $B829: magic list cursor, level L spell c on row 4+3L+c
+    lda $62
     and #3
+    asl a
+    asl a
+    asl a
+    sta TMP
+    lda $62
+    lsr a
+    lsr a
     tax
-    lda .mx,x
-    sta $40
-    lda $10
-    asl a
-    asl a
-    and #$F0
+    lda .my,x
     clc
-    adc .my,x
+    adc TMP
     sta $41
+    lda #80
+    sta $40
     jmp $ED24
-.mx:
-    .db 80, 16, 120, 80
 .my:
-    .db $28, $30, $30, $28
+    .db 32, 56, 80, 104, 128, 152, 176, 200
 m_setbank:      ; bank 14 $B957: menu strings are read from MENUBANK
     lda #$0E
     sta $58
@@ -462,9 +463,12 @@ def insert_names(rom, report):
     bank.free = [(0x8000, 0xB600)]
     for e in items:
         bank.put_ptr(0xB700 + 2 * e['id'], bank.alloc(enc(e['en']) + b'\0'))
+    sold = shop_items(rom)
     for e in items:
         lines = wrap_name(e['en'], WRAP_WIDTH)
-        assert len(lines) <= 3 and max(len(l) for l in lines) <= WRAP_WIDTH, (e['en'], lines)
+        fits = len(lines) <= 3 and max(len(l) for l in lines) <= WRAP_WIDTH
+        assert fits or e['id'] not in sold, ('shop name does not fit', e['en'], lines)
+        if not fits: lines = [e['en']]          # never shown in a shop list
         if len(lines) == 1: data = enc(lines[0])
         else:
             data = b'\x05' + enc(lines[0]) + b'\x06' + enc(lines[1])
@@ -473,23 +477,25 @@ def insert_names(rom, report):
     report.append('bank 10 names free: %d' % sum(b - a for a, b in bank.free))
 
 WRAP_WIDTH = 9                  # shop list column width
-HYPHEN = {'Broadsword': 'Broad-sword', 'Barthunder': 'Bar-thunder', 'Dateleport': 'Da-teleport',
-          'Adamantite': 'Adaman-tite', 'Protection': 'Protec-tion', 'Wyrmkiller': 'Wyrm-killer',
-          'Werebuster': 'Were-buster'}   # break points, used only where a word is wider than the column
+def shop_items(rom):
+    """Item ids sold in shops (inventory table bank 14 $8300, 5 per shop, shops 0-70)."""
+    sold = set()
+    for s in range(71):
+        o = HDR + 14 * BANK + 0x0300 + 2 * s
+        p = rom[o] | rom[o + 1] << 8
+        if not 0x8000 <= p < 0xC000: continue
+        q = HDR + 14 * BANK + p - 0x8000
+        for v in rom[q:q + 5]:
+            if v == 0: break
+            sold.add(v)
+    return sold
 
 def wrap_name(name, W):
-    """Greedy wrap at spaces; a word longer than W is broken at its marked point."""
-    words = []
-    for w in name.split(' '):
-        if len(w) > W and w in HYPHEN:
-            a, b = HYPHEN[w].split('-'); words += [a + '-', '\x00' + b]
-        else: words.append(w)
+    """Greedy wrap at spaces (never inside a word); at most 3 rows."""
     lines = []; line = ''
-    for w in words:
-        glue = w.startswith('\x00'); w = w.lstrip('\x00')
+    for w in name.split(' '):
         if not line: line = w
-        elif not glue and len(line) + 1 + len(w) <= W: line += ' ' + w
-        elif glue and len(line) - 1 + len(w) <= W: line = line[:-1] + w
+        elif len(line) + 1 + len(w) <= W: line += ' ' + w
         else: lines.append(line); line = w
     lines.append(line)
     return lines
@@ -513,13 +519,15 @@ def insert_menu_strings(rom, report):
     SHOP_FREE[:] = bank.free
 
 def magic_list():
-    # 8 levels x 2 tile rows (lower row only): 'L1 c/m' + spell 1 at column 12, then
-    # spells 2 and 3 at columns 4 and 17. Copied by $B96E with Y=$C0: at most 193 bytes.
+    # 8 levels x 3 tile rows (lower row only), one spell per row at column 12; the level
+    # and MP ('L1 c/m') beside the second spell (the first row of L1 lies under the
+    # title box). Copied by $B96E with Y=$C0: at most 193 bytes.
     out = '{09}'
     for L in range(8):
         cur, mx, s0 = 0x2C + L, 0x34 + L, 0x14 + 3 * L
-        out += '{0D}{03}L%d {10}{%02X}/{10}{%02X}{0D}{0C}{10}{%02X}{08}' % (L + 1, cur, mx, s0)
-        out += '{0D}{04}{10}{%02X}{0D}{11}{10}{%02X}' % (s0 + 1, s0 + 2)
+        out += '{0D}{0C}{10}{%02X}{08}' % s0
+        out += ' L%d {10}{%02X}/{10}{%02X}{0D}{0C}{10}{%02X}{08}' % (L + 1, cur, mx, s0 + 1)
+        out += '{0D}{0C}{10}{%02X}' % (s0 + 2)
         if L < 7: out += '{08}'
     assert len(enc(out)) <= 192, len(enc(out))
     return out
@@ -722,6 +730,7 @@ def main_menu(rom, labels):
     assert rom[o] == 0x10; rom[o] = 0x08
     bank_put(rom, 14, 0xBAB5 + 4 * 0, bytes([1, 2, 10, 8]))   # orb window, right edge aligned
     bank_put(rom, 14, 0xBAB5 + 4 * 8, bytes([0, 22, 32, 7]))  # description window, full width
+    bank_put(rom, 14, 0xBAB5 + 4 * 9, bytes([1, 2, 30, 27]))  # magic list window, full height
     # character windows: the mages' 'まほう' label was built from immediates at $B9EF
     m = labels['bcmd1']
     code = asm('''

@@ -201,7 +201,7 @@
   "id": 33,
   "off": "2B9DD",
   "ja": "ブロードソード",
-  "en": "Broadsword"
+  "en": "Broad Sword"
  },
  {
   "id": 34,
@@ -555,7 +555,7 @@
   "id": 92,
   "off": "2BBB5",
   "ja": "まもりのマント",
-  "en": "Cape of Protection"
+  "en": "Protect Cape"
  },
  {
   "id": 93,
@@ -645,7 +645,7 @@
   "id": 107,
   "off": "2BC2D",
   "ja": "まもりのゆびわ",
-  "en": "Ring of Protection"
+  "en": "Protect Ring"
  },
  {
   "id": 108,
@@ -1119,7 +1119,7 @@
   "id": 186,
   "off": "2BE2C",
   "ja": "バサンダ",
-  "en": "Barthunder"
+  "en": "Thunder Barrier"
  },
  {
   "id": 187,
@@ -1167,7 +1167,7 @@
   "id": 194,
   "off": "2BE54",
   "ja": "バファイ",
-  "en": "Barfire"
+  "en": "Fire Barrier"
  },
  {
   "id": 195,
@@ -1215,7 +1215,7 @@
   "id": 202,
   "off": "2BE7C",
   "ja": "バコルド",
-  "en": "Barcold"
+  "en": "Cold Barrier"
  },
  {
   "id": 203,
@@ -1305,7 +1305,7 @@
   "id": 217,
   "off": "2BEC7",
   "ja": "ダテレポ",
-  "en": "Dateleport"
+  "en": "Escape Teleport"
  },
  {
   "id": 218,
@@ -1359,7 +1359,7 @@
   "id": 226,
   "off": "2BEF4",
   "ja": "バマジク",
-  "en": "Barmagic"
+  "en": "Magic Barrier"
  },
  {
   "id": 227,
@@ -1407,7 +1407,7 @@
   "id": 234,
   "off": "2BF1C",
   "ja": "バオル　",
-  "en": "Barall"
+  "en": "All Barrier"
  },
  {
   "id": 235,

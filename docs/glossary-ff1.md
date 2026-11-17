@@ -64,10 +64,10 @@ The original menu only had room for 4 kana, so several names were clipped; they 
 | コンフュ | Confuse | clipped |
 | ボキャル | Vocal | restores voice |
 | ブラナ | Blindna | cures blindness |
-| バサンダ / バファイ / バコルド / バマジク / バオル | Barthunder / Barfire / Barcold / Barmagic / Barall | バ = barrier |
+| バサンダ / バファイ / バコルド / バマジク / バオル | Thunder Barrier / Fire Barrier / Cold Barrier / Magic Barrier / All Barrier | バ = バリア (barrier) + element; clipped coinages spelled out (owner's decision) |
 | サンガー | Thundaga | clipping of サンダガ |
 | ラスロウ / ラヒーラ | Raslow / Raheala | ラ- prefix kept |
-| ダテレポ | Dateleport | ダ- prefix kept |
+| ダテレポ | Escape Teleport | ダ = 脱 (escape) + テレポ: warps the party out of the dungeon |
 | デジョン | Dejon | coined name, kept |
 | プロテス / プロテア | Protes / Protea | coined names, kept as coined |
 | シェイプ / シェイラ | Shape / Shapera | |
@@ -81,7 +81,8 @@ The original menu only had room for 4 kana, so several names were clipped; they 
 | くうきのみず | Water of Air | 空気の水 |
 | つちのつえ | Staff of Earth | |
 | しゃくじょう | Ringed Staff | 錫杖, a monk's ringed staff |
-| まもりのマント | Cape of Protection | |
+| まもりのマント / まもりのゆびわ | Protect Cape / Protect Ring | 守り (protection); short form so the whole word fits the 9-column shop list |
+| ブロードソード | Broad Sword | written as the katakana splits it |
 | items 18–21 く/り/す/た | C / R / Y / S (provisional) | single kana spelling クリスタ…; their in-game display still has to be checked |
 
 ## Monsters
