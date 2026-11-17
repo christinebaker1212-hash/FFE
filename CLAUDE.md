@@ -71,12 +71,19 @@ Milestones per game (from `docs/gb-port.md`):
   (`build_mmc5.py` + `tools/ff1/insert.py`) reproduces the patch's result SHA-1
   `76aa4d30…`; this is the GB build's input (`build/ff1_en.nes`).
 - PyBoy 2.9 installed for headless GB testing (reinstall each session: `pip install pyboy`).
-- `tools/gb/asm_sm83.py`: SM83 assembler (multi-bank, `.sym` output, header/checksum
-  writer `make_rom`) — written, being tested.
+- `tools/gb/asm_sm83.py`: SM83 assembler (multi-bank, `bank()`/`low()`/`high()`, `.sym`
+  output, header/checksum writer `make_rom`). `tools/gb/test_asm.py` checks all 500
+  opcodes (encoding + length) against PyBoy's opcode table: 0 bad.
+- Milestone 1 (except SGB detection): `tools/gb/boot_test.py` builds
+  `tools/gb/rt/boot_test.s` (DMG header + SGB flag, MBC5+RAM+battery) into
+  `build/boot_test.gb` and checks it in PyBoy: one vblank IRQ per frame, save RAM write,
+  3-shade tile pattern on screen. `tools/gb/rt/hw.s` = hardware register names.
 
 ## In progress / next
-- Test the assembler against an independent opcode table (every opcode).
-- Boot ROM test: DMG header with SGB flag, MBC5, shows a tile pattern in PyBoy.
+- Milestone 2: study FF1's fixed bank (reset, NMI, bank switch `$FE1A`, PPU/APU writes)
+  in `build/ff1_en.nes`, then write the recompiler (`tools/gb/recomp.py`).
+- SGB packet sender + detection (MLT_REQ): PyBoy has no SGB, so it gets written with
+  the SGB palette work (milestone 6) and is checked in an SGB-capable emulator then.
 
 ## Remaining (FF1)
 - Milestones 2–6 above. FF2 and FF3 not started.

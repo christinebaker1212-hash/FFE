@@ -1,0 +1,23 @@
+; Game Boy hardware registers
+rP1   = $FF00
+rSB   = $FF01
+rDIV  = $FF04
+rIF   = $FF0F
+rLCDC = $FF40
+rSTAT = $FF41
+rSCY  = $FF42
+rSCX  = $FF43
+rLY   = $FF44
+rLYC  = $FF45
+rDMA  = $FF46
+rBGP  = $FF47
+rOBP0 = $FF48
+rOBP1 = $FF49
+rWY   = $FF4A
+rWX   = $FF4B
+rIE   = $FFFF
+rNR52 = $FF26
+MBC5_RAMG  = $0000      ; $0A enables cart RAM
+MBC5_BANKL = $2000      ; ROM bank bits 0-7
+MBC5_BANKH = $3000      ; ROM bank bit 8
+MBC5_RAMB  = $4000      ; RAM bank 0-15

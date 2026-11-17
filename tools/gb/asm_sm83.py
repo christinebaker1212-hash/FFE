@@ -81,7 +81,7 @@ def asm(src, syms=None):
     for n, raw in enumerate(src.split('\n'), 1):
         line = re.sub(r";(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$).*", '', raw).rstrip()
         if line.strip(): lines.append((n, line))
-    labels = {}
+    labels = {}; bank_of = {}
     for pass_no in (1, 2):
         syms = dict(base_syms); syms.update(labels)
         banks = {}; label_bank = {}
@@ -155,7 +155,7 @@ def asm(src, syms=None):
                     name = m.group(1)
                     if not name.startswith('.'): scope = name
                     else: name = scope + name
-                    if pass_no == 1 and name in labels and name not in syms_dup_ok:
+                    if pass_no == 1 and name in labels:
                         raise AsmError('duplicate label ' + name)
                     labels[name] = pc; syms[name] = pc
                     if bank is not None: label_bank[name] = bank
@@ -199,9 +199,6 @@ def asm(src, syms=None):
                 raise AsmError('line %d: cannot assemble (%s)\n  %s' % (lineno, e, line.strip()))
         bank_of = dict(label_bank)
     return Result(banks, labels, label_bank)
-
-syms_dup_ok = set()
-bank_of = {}
 
 
 def _mem(a):
