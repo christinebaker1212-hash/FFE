@@ -34,9 +34,22 @@ ENC.update({'.': 0xBE, ',': 0xBF, "'": 0xC0, '"': 0xC1, '-': 0xC2, '…': 0xC3, 
             ' ': 0xFF})
 NEW_GLYPHS = [c for c in ENC if c != ' ']
 
+# "'s" as one tile (code $C9, unused): only in "Little People's Bread", whose second word
+# pair needs 13 cells in the 13-wide battle item entry
+LIG_S = 0xC9
+LIG_NAMES = {164}
+LIG_ROWS = ["##......", ".#......", "#..#####", "..#.....", "...####.", ".......#", "..#####.", "........"]
+
 def font(rom):
     for ch in NEW_GLYPHS:
         o = HDR + FONT + ENC[ch] * 16; rom[o:o + 16] = tile(ch, fg=3, bg=2)
+    lo = bytearray(8); hi = bytearray(8)
+    for y, r in enumerate(LIG_ROWS):
+        for x in range(8):
+            c = 3 if r[x] == '#' else 2
+            if c & 1: lo[y] |= 0x80 >> x
+            if c & 2: hi[y] |= 0x80 >> x
+    o = HDR + FONT + LIG_S * 16; rom[o:o + 16] = bytes(lo + hi)
 
 TOKEN = re.compile(r'\{([0-9A-F]{2})(?::([0-9A-F]{2}))?\}|\[([0-9A-F]{2})\]')
 
@@ -160,6 +173,8 @@ def put_tables(rom, report):
             if (name, e['id']) in NARRATION: t = centred(t, NARRATION[name, e['id']])
             elif name in DIALOGUE and t: t = layout(t)
             data = enc(t) + b'\0'
+            if name == 'names8800' and e['id'] in LIG_NAMES:
+                data = data.replace(enc("'s"), bytes([LIG_S]))
             b, a = lin >> 13, 0x8000 + (lin & 0x1FFF)
             assert b < 8
             put(rom, 0x18, table + 2 * e['id'], bytes([a & 0xFF, (b << 5) | ((a >> 8) & 0x1F)]))
@@ -331,6 +346,26 @@ encopy:         ; bank 52 enemy list ($9DBE: JSR $A609, monster A): the name; co
     lda #$80+EB
     sta $5115
     jsr $A000
+    lda #$80+53
+    sta $5115
+    dec $A9
+    rts
+itemcopy:       ; bank 53 $B20C (battle item entry: JSR $A609, name from X 1): the name
+    jsr $A609   ;   also kept whole at $73E0 (the ':' and count overwrite its tail)
+    ldx #0
+.l:
+    lda $7AD8,x
+    sta $73E0,x
+    beq .r
+    inx
+    bne .l
+.r:
+    rts
+itemconv:       ; bank 53 $B22F (JSR $966A, 13 wide): the entry over its two rows
+    inc $A9
+    lda #$80+EB
+    sta $5115
+    jsr $A003
     lda #$80+53
     sta $5115
     dec $A9
@@ -641,6 +676,8 @@ slotfix:
 EN_POOL = list(range(0xE8, 0xF7)) + list(range(0x7B, 0x80))
 ENFIX_SRC = '''
     org $A000
+    jmp enfix
+    jmp iconv
 enfix:
     lda $24
     bne .a
@@ -738,6 +775,170 @@ enfix:
     adc $1C
     sta ENEXT
 .r:
+    rts
+iconv:              ; battle item entry ($7AD7: mark, ':' at $0A, count at $0B/$0C; the
+    clc             ;   name with its icon at $73E0), rows 13 wide at ($4E): one row as the
+    lda $4E         ;   Japanese when the name fits 9; else over the entry's two rows:
+    adc #13         ;   (A) part 1 above, part 2 and ':' count on the main row, or (B) part
+    sta $4E         ;   1 and ':' count above, part 2 (up to 13) on the main row
+    bcc .a0
+    inc $4F
+.a0:
+    sec
+    lda $4E
+    sbc #13
+    sta $1E
+    lda $4F
+    sbc #0
+    sta $1F
+    ldx #0
+.n:
+    lda $73E0,x
+    beq .n2
+    inx
+    bne .n
+.n2:
+    stx $1C         ; name length
+    lda $7AD7       ; mark
+    ldy #0
+    cpx #10
+    bcs .sp
+    sta ($4E),y     ; one row: mark, name, ':' count
+    jsr .name1
+    jmp .cnt
+.sp:
+    ldx #0          ; split: a space (part 1 = x) or a hyphen (x + 1)
+.s:
+    lda $73E0,x
+    beq .raw
+    cmp #$FF
+    beq .s1
+    cmp #$C2
+    bne .s9
+    inx
+    stx $1A
+    dex
+    jmp .s2
+.s1:
+    stx $1A
+.s2:
+    lda $1C         ; part 2 length = L - x - 1
+    clc
+    sbc $1A
+    adc #0
+    stx $1D
+    sec
+    lda $1C
+    sbc $1D
+    sec
+    sbc #1
+    sta $1B         ; part 2 length
+    lda $1A
+    cmp #13
+    bcs .s9
+    lda $1B
+    cmp #10
+    bcs .tb
+    jmp .la         ; (A)
+.tb:
+    lda $1A
+    cmp #10
+    bcs .s9
+    lda $1B
+    cmp #14
+    bcs .s9
+    jmp .lb         ; (B)
+.s9:
+    inx
+    bne .s
+.raw:
+    lda $7AD7
+    ldy #0
+    sta ($4E),y
+    jsr .name1
+    jmp .cnt
+.la:                ; (A) upper: mark, part 1; main: part 2 from 1, ':' count
+    lda $7AD7
+    ldy #0
+    sta ($1E),y
+    jsr .up1
+    ldx $1D
+    inx
+    ldy #1
+.la2:
+    lda $73E0,x
+    beq .cnt
+    sta ($4E),y
+    inx
+    iny
+    bne .la2
+.lb:                ; (B) upper: mark, part 1, ':' count; main: part 2 (from 0 if 13)
+    lda $7AD7
+    ldy #0
+    sta ($1E),y
+    jsr .up1
+    ldy #10
+    lda #$C8
+    sta ($1E),y
+    iny
+    lda $7AE2
+    sta ($1E),y
+    iny
+    lda $7AE3
+    sta ($1E),y
+    ldx $1D
+    inx
+    ldy #1
+    lda $1B
+    cmp #13
+    bne .lb2
+    dey
+.lb2:
+    lda $73E0,x
+    beq .x
+    sta ($4E),y
+    inx
+    iny
+    bne .lb2
+.x:
+    rts
+.cnt:
+    ldy #10
+    lda #$C8
+    sta ($4E),y
+    iny
+    lda $7AE2
+    sta ($4E),y
+    iny
+    lda $7AE3
+    sta ($4E),y
+    rts
+.name1:             ; the whole name on the main row from column 1 (up to 9)
+    ldx #0
+    ldy #1
+.nm:
+    lda $73E0,x
+    beq .nr
+    cpy #10
+    beq .nr
+    sta ($4E),y
+    inx
+    iny
+    bne .nm
+.nr:
+    rts
+.up1:               ; part 1 (length $1A) on the upper row from column 1
+    ldx #0
+    ldy #1
+.u:
+    cpx $1A
+    beq .ur
+    lda $73E0,x
+    sta ($1E),y
+    inx
+    iny
+    bne .u
+.ur:
     rts
 POOL:
 '''
@@ -895,6 +1096,9 @@ def engine(rom, report):
         put(rom, 52, a + 4, jsr(BL['bconvb']))
     assert get(rom, 52, 0x9AC8, 3) == b'\x20\x6a\x96'
     put(rom, 52, 0x9AC8, jsr(BL['bconvb']))
+    # battle item window entries (bank 53 $B1D8)
+    assert get(rom, 53, 0xB20C, 3) == b'\x20\x09\xa6' and get(rom, 53, 0xB22F, 3) == b'\x20\x6a\x96'
+    put(rom, 53, 0xB20C, jsr(L['itemcopy'])); put(rom, 53, 0xB22F, jsr(L['itemconv']))
     # enemy list: names over the entry's two rows, compact tiles for a too-wide word
     assert get(rom, 52, 0x9DBE, 10).hex() == '2009a6a9088518206a96'
     put(rom, 52, 0x9DBE, jsr(L['encopy'])); put(rom, 52, 0x9DC5, jsr(BL['bconvb']))
