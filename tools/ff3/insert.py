@@ -144,9 +144,16 @@ TABLES = [('t8000', 0x8000, 66), ('t8400', 0x8400, 72), ('t8600', 0x8600, 76),
 DIALOGUE = ('t8000', 't8400', 't8600')
 ONE_BANKS = (66, 80)                    # banks drawn one row per line (dialogue tables)
 
+def load_rows(name):
+    rows = json.load(open('script/ff3/%s.json' % name))
+    if name == 'names8800' and os.environ.get('FF3_TEST_GOBLIN'):     # test builds only
+        for e in rows:
+            if e['id'] == 0x120: e['en'] = os.environ['FF3_TEST_GOBLIN']
+    return rows
+
 def put_tables(rom, report):
     for name, table, base in TABLES:
-        rows = json.load(open('script/ff3/%s.json' % name))
+        rows = load_rows(name)
         lin = 0; blob = bytearray()
         for e in rows:
             t = e['en'] or ''
@@ -179,7 +186,8 @@ BX:     .ds 1
 ISAV:   .ds 1   ; status slot: index and table of the copied word, its first tile
 TSAV:   .ds 1
 TCODE:  .ds 1
-    .ds 4
+ENEXT:  .ds 1   ; enemy list: next free tile of the pool
+    .ds 3
 tbase:          ; $EEBB: bank of a text pointer = (hi >> 5) + the table's base bank
     sta TMP     ;   (table by $95: $80 story, $82 system, $84/$86 dialogue, $88+ names)
     lda $95
@@ -310,6 +318,17 @@ slotcopy:       ; bank 52 status line ($9C2E spell, $9C47 command, $9C79 ailment
     jsr $A609
     inc $A9         ; (the IRQ runs the sound driver, which maps its own banks, only
     lda #$80+SB     ;   while $A9 = 0, as during the game's bank switches)
+    sta $5115
+    jsr $A000
+    lda #$80+53
+    sta $5115
+    dec $A9
+    rts
+encopy:         ; bank 52 enemy list ($9DBE: JSR $A609, monster A): the name; compact
+    sta ISAV    ;   tiles for a word too wide for the list (enfix, bank SB)
+    jsr $A609
+    inc $A9
+    lda #$80+EB
     sta $5115
     jsr $A000
     lda #$80+53
@@ -537,6 +556,7 @@ bconvb:             ; box texts and command entries (call sites patched): the te
 # is drawn on 6 tiles of its own in condensed letters (tight ones if needed), uploaded to
 # the line's tile slots (6 per line from SLOT0) when the line is built
 SLOT_BANK, SLOT0 = 86, 0xD0
+ENEMY_BANK = 87
 SLOT_SRC = '''
     org $A000
 slotfix:
@@ -615,8 +635,147 @@ slotfix:
     rts
 '''
 
+# enemy list (bank 52 $9D9E, 8 columns, two rows a name): a word wider than 8 is drawn
+# on compact tiles from a pool (codes not used by the English font), uploaded when the
+# list is built; record: tile count, tiles, the name with codes 1..n for them
+EN_POOL = list(range(0xE8, 0xF7)) + list(range(0x7B, 0x80))
+ENFIX_SRC = '''
+    org $A000
+enfix:
+    lda $24
+    bne .a
+    sta ENEXT
+.a:
+    ldx ISAV
+    lda ENL,x
+    sta $1E
+    lda ENH,x
+    sta $1F
+    ora $1E
+    bne .h
+    rts
+.h:
+    ldy #0
+    lda ($1E),y
+    sta $1C
+    clc
+    adc ENEXT
+    cmp #NPOOL+1
+    bcc .ok
+    rts
+.ok:
+    lda #1
+    sta $1B
+    lda #0
+    sta $1A
+.t:
+    lda $1A
+    cmp $1C
+    beq .s0
+    and #3
+    bne .w
+    jsr $FB80       ; four tiles a vertical blank
+.w:
+    lda $1A
+    clc
+    adc ENEXT
+    tax
+    lda POOL,x
+    pha
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    ora #$10
+    sta $1D
+    pla
+    asl a
+    asl a
+    asl a
+    asl a
+    tax
+    lda $1D
+    jsr $F8E0
+    ldy $1B
+    ldx #16
+.b:
+    lda ($1E),y
+    sta $2007
+    iny
+    dex
+    bne .b
+    sty $1B
+    inc $1A
+    lda $1A
+    and #3
+    bne .t
+    jsr $8D03
+    jmp .t
+.s0:
+    jsr $8D03
+    ldy $1B
+    ldx #0
+.c:
+    lda ($1E),y
+    beq .e
+    cmp #16         ; codes 1..15: the record's tiles
+    bcs .d
+    clc
+    adc ENEXT
+    sty $1B
+    tay
+    lda POOL-1,y
+    ldy $1B
+.d:
+    sta $7AD7,x
+    iny
+    inx
+    bne .c
+.e:
+    sta $7AD7,x
+    lda ENEXT
+    clc
+    adc $1C
+    sta ENEXT
+.r:
+    rts
+POOL:
+'''
+
+def enemy_records(names):
+    out = {}
+    for i in range(0xF0):
+        n = re.sub(r'\[..\]', '', names.get(0x120 + i) or '')
+        if not n: continue
+        def fits(n, w=8):
+            if len(n) <= w: return True
+            return any((c == ' ' and k <= w and len(n) - k - 1 <= w) or (c == '-' and k + 1 <= w and len(n) - k - 1 <= w)
+                       for k, c in enumerate(n))
+        if fits(n): continue
+        words = n.split(' ')
+        best = min(((' '.join(words[:k]), ' '.join(words[k:])) for k in range(1, len(words))),
+                   key=lambda p: max(len(p[0]), len(p[1])), default=None) if len(words) > 1 else None
+        rows = list(best) if best else [n]
+        tiles = []; text = bytearray()
+        for r in rows:
+            if text: text.append(0xFF)
+            if len(r) <= 8: text += enc(r); continue
+            t = None
+            for k in range(1, 9):
+                t = packed_label(r, k, COND, fg=3, bg=2)
+                if t: break
+            if not t:
+                for k in range(1, 9):
+                    t = packed_label(r, k, TIGHT, fg=3, bg=2)
+                    if t: break
+            assert t, r
+            text += bytes(range(len(tiles) + 1, len(tiles) + 1 + len(t))); tiles += t
+        assert len(tiles) <= 12, (n, len(tiles))
+        out[i] = bytes([len(tiles)]) + b''.join(tiles) + bytes(text) + b'\0'
+    return out
+
 def slot_words(rom, L):
-    names = {e['id']: e['en'] for e in json.load(open('script/ff3/names8800.json'))}
+    names = {e['id']: e['en'] for e in load_rows('names8800')}
     sysx = {e['id']: e['en'] for e in json.load(open('script/ff3/t8200.json'))}
     clean = lambda t: re.sub(r'\[..\]|\{..(:..)?\}', '', t or '').strip()
     groups = [('SP', [names.get(0xC8 + i) for i in range(56)]),
@@ -642,6 +801,15 @@ def slot_words(rom, L):
             a = ptrs.get((g, i), 0); img[lo + i] = a & 0xFF; img[hi + i] = a >> 8
     assert base + len(data) <= 0xC000
     put(rom, SLOT_BANK, code.org, bytes(img) + bytes(data))
+    # enemy list, bank ENEMY_BANK
+    en = asm(ENFIX_SRC + ''.join('    .db $%02X\n' % c for c in EN_POOL) + 'ENL: .ds 240\nENH: .ds 240\n',
+             syms=dict(L, NPOOL=len(EN_POOL)))
+    img = bytearray(en.bytes); base = en.org + len(img); data = bytearray()
+    for i, rec in enemy_records(names).items():
+        a = base + len(data); data += rec
+        img[en.labels['ENL'] - en.org + i] = a & 0xFF; img[en.labels['ENH'] - en.org + i] = a >> 8
+    assert base + len(data) <= 0xC000
+    put(rom, ENEMY_BANK, en.org, bytes(img) + bytes(data))
     return len(ptrs)
 
 COPIER = 0x9F00                         # bank 64: copies the 1KB ExRAM image at reset
@@ -666,7 +834,7 @@ def engine(rom, report):
     bases = {n: b for n, _, b in TABLES}
     ex = asm(EXRAM_SRC, syms={'B0': bases['t8000'], 'B1': bases['t8200'], 'B2': bases['t8400'],
                               'B3': bases['t8600'], 'B4': bases['names8800'],
-                              'R0': ONE_BANKS[0], 'R1': ONE_BANKS[1], 'SB': SLOT_BANK})
+                              'R0': ONE_BANKS[0], 'R1': ONE_BANKS[1], 'SB': SLOT_BANK, 'EB': ENEMY_BANK})
     assert ex.org + len(ex.bytes) <= 0x6000
     assert set(get(rom, 64, 0x8090, 0x370)) == {0xFF}
     put(rom, 64, ex.org - 0x5C00 + 0x8000, ex.bytes)
@@ -727,6 +895,9 @@ def engine(rom, report):
         put(rom, 52, a + 4, jsr(BL['bconvb']))
     assert get(rom, 52, 0x9AC8, 3) == b'\x20\x6a\x96'
     put(rom, 52, 0x9AC8, jsr(BL['bconvb']))
+    # enemy list: names over the entry's two rows, compact tiles for a too-wide word
+    assert get(rom, 52, 0x9DBE, 10).hex() == '2009a6a9088518206a96'
+    put(rom, 52, 0x9DBE, jsr(L['encopy'])); put(rom, 52, 0x9DC5, jsr(BL['bconvb']))
     # one row per line
     assert get(rom, FIX, 0xEEC0, 5) == b'\xa5\x93\x20\x03\xff'
     put(rom, FIX, 0xEEC0, jsr(L['txton']) + b'\xEA\xEA')
