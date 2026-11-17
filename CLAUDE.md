@@ -106,10 +106,18 @@ Milestones per game (from `docs/gb-port.md`):
   BVC/BVS 5, `LDA $2007` 6 sites. Sprites: up to 28 visible, tiles mostly < 128
   (240-243 too). Both 4KB pattern tables are loaded in full.
 
+- **First recompiled build runs.** `tools/gb/build.py` (NES ROM → English NES → recompile →
+  assemble → `build/ff1_en.gb`, 1 MB MBC5, ~1.5 s): 16.6k instructions in 4 code banks,
+  runtime in bank 0 (`tools/gb/rt/runtime.s`), NES data banks copied to GB banks 1-32.
+  In PyBoy (`tools/gb/run_gb.py ROM FRAMES`) the opening prologue text shows in
+  English (centre 160 px of the NES screen, palette untuned).
+
 ## In progress / next
-- Writing `tools/gb/recomp.py` (6502 → SM83 per `docs/gb-port.md` §1) and the runtime
-  `tools/gb/rt/` (vblank ISR, wait_frame, PPU/APU/joypad/MMC5 shims, ROM data read
-  helpers, farcall, dispatch), and `tools/gb/build.py` (NES ROM → GB ROM).
+- Check the title screen / new game / field / battle in PyBoy; fix faults as they show.
+- Known gaps: TSX/TXS stack save-restore in b14 (`B0F1`/`B0FB`), PHP/PLP sites where
+  N/V may be live, banked JSR targets never seen in coverage (`$BC00`, `$AE10` from c62),
+  sprite tiles ≥128 folded onto 0-127, palette (DMG shades from BG palette 0 only),
+  sound not started, camera fixed at the NES screen centre.
 - Recompiler and PPU-layer design written up in `docs/gb-port.md` §1-2 (registers X→E,
   Y→C; NES stack on the GB stack; flag liveness; ROM data through a bank-0 helper;
   queued VRAM writes; tile/nametable/scroll mapping).
