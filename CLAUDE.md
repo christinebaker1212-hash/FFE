@@ -120,8 +120,18 @@ Milestones per game (from `docs/gb-port.md`):
   upload loop `$E9F6` replaced by a native routine (`rt/ff1_hle.s`, recompiler `ext` table).
   `tools/gb/profile_gb.py` reports GB frames per NES frame and PC samples in long loads.
 
+- **Exact equivalence check:** `tools/gb/firstdiff.py NES GB [FRAMES] [--random SEED]`
+  runs both builds frame-locked (cynes exposes `nmi_count`, `nmi_ram` = RAM at each NMI,
+  `pad_history` = pad latched per NMI, `trace`) and compares NES RAM at NMI k with GB
+  RAM on entering frame wait k (PyBoy hook). The new-game script (3662 frames) is
+  **byte-identical** on GB. `tools/gb/tracediff.py NES GB K` compares the instruction
+  sequence of frame K (NES trace vs GB label hooks) to find the first divergent
+  instruction.
+- Sprite tile cache (DMG has 384 tiles vs NES 512): 128 GB sprite slots, all 256 NES
+  sprite tiles shadowed in cart RAM bank 1, allocated on use by the OAM conversion.
+
 ## In progress / next
-- Sprites ≥128 (class screen shows garbled sprites), field walking/scrolling, battles.
+- Long random-play equivalence runs (field, battles, menus) and fixing what they find.
 - Remaining lag: `$2007` shim cost, CPU delay loop `$D77C` (DEY/BNE timing loop).
 - Known gaps: TSX/TXS stack save-restore in b14 (`B0F1`/`B0FB`), PHP/PLP sites where
   N/V may be live, banked JSR targets never seen in coverage (`$BC00`, `$AE10` from c62),

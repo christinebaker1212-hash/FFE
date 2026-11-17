@@ -75,10 +75,10 @@ index 0bf2d82..77e22e0 100644
  private:
      /// APU memory-mapped register addresses.
 diff --git a/src/cpu.cpp b/src/cpu.cpp
-index 9ecd5c2..f56014b 100644
+index 9ecd5c2..8ebcaad 100644
 --- a/src/cpu.cpp
 +++ b/src/cpu.cpp
-@@ -128,12 +128,74 @@ void CPU::reset() {
+@@ -128,12 +128,81 @@ void CPU::reset() {
      _program_counter |= _nes.read_cpu(0xFFFD) << 8;
  }
  
@@ -104,7 +104,11 @@ index 9ecd5c2..f56014b 100644
 +static unsigned g_cov_prev = 0;                   // previous opcode, 0x100 = interrupt taken
 +static size_t g_cov_cur = 0;                      // index of the instruction being executed
 +bool g_cov_fetch = false;
-+unsigned long g_nmi_count = 0;               // NMIs taken (exposed to Python as nmi_count)
++unsigned long g_nmi_count = 0;
++uint8_t g_nmi_ram[0x800];
++extern uint8_t g_last_pad;                    // nes.cpp
++uint8_t g_nmi_pad = 0;
++uint8_t g_pad_hist[256];                     // pad latched before NMI n, at index n & 255                       // controller value the game latched before the last NMI                    // RAM at the last NMI (exposed as nmi_ram)               // NMIs taken (exposed to Python as nmi_count)
 +struct ShadowFrame { uint16_t ret; uint8_t s; bool irq; };
 +static std::vector<ShadowFrame> g_shadow;
 +struct CovSaver { ~CovSaver() {
@@ -121,7 +125,10 @@ index 9ecd5c2..f56014b 100644
 +    if (pc >= 0x8000) return ((g_dbg_bank & 0x7F) >> 1) * 0x4000 + (pc - 0x8000);
 +    return COV_RAM + pc;
 +}
++bool g_trace_on = false;                         // instruction trace for Python (property trace)
++std::vector<uint32_t> g_trace;                   // (space index << 16) | pc
 +static inline void cov_mark(uint16_t pc) {
++    if (g_trace_on && g_trace.size() < 4000000) g_trace.push_back((uint32_t)(cov_index(pc) & 0xFFFFFF) << 8 | 0);
 +    if (g_cov_on < 0) { g_cov_on = std::getenv("COV_LOG") ? 1 : 0; if (g_cov_on) g_cov.assign(3 * COV_SIZE, 0); }
 +    if (!g_cov_on) return;
 +    size_t i = cov_index(pc);
@@ -153,17 +160,22 @@ index 9ecd5c2..f56014b 100644
  
      (this->*ADDRESSING_MODES[instruction])();
      (this->*INSTRUCTIONS[instruction])();
-@@ -146,6 +208,9 @@ void CPU::tick() {
+@@ -146,6 +215,14 @@ void CPU::tick() {
          _nes.write(0x100 | _stack_pointer--, _program_counter & 0x00FF);
  
          uint16_t address = _should_issue_non_maskable_interrupt ? 0xFFFA : 0xFFFE;
-+        if (_should_issue_non_maskable_interrupt) g_nmi_count++;
++        if (_should_issue_non_maskable_interrupt) {
++            g_nmi_count++;
++            g_nmi_pad = g_last_pad;
++            g_pad_hist[g_nmi_count & 0xFF] = g_last_pad;
++            for (int k = 0; k < 0x800; k++) g_nmi_ram[k] = _nes.read_cpu(k);
++        }
 +        g_cov_prev = 0x100;
 +        if (g_cov_on > 0) g_shadow.push_back({_program_counter, (uint8_t)(_stack_pointer - 1), true});
  
          _should_issue_non_maskable_interrupt = false;
  
-@@ -214,7 +279,10 @@ void CPU::stream_state(SaveState& save_state) {
+@@ -214,7 +291,10 @@ void CPU::stream_state(SaveState& save_state) {
  }
  
  uint8_t CPU::fetch_next() {
@@ -175,7 +187,7 @@ index 9ecd5c2..f56014b 100644
  }
  
  void CPU::set_status(uint8_t flag, bool value) {
-@@ -815,6 +883,7 @@ void CPU::op_jsr() {
+@@ -815,6 +895,7 @@ void CPU::op_jsr() {
      _nes.read(_program_counter);
  
      _program_counter--;
@@ -183,7 +195,7 @@ index 9ecd5c2..f56014b 100644
  
      _nes.write(0x100 | _stack_pointer--, _program_counter >> 8);
      _nes.write(0x100 | _stack_pointer--, _program_counter & 0x00FF);
-@@ -907,6 +976,7 @@ void CPU::op_php() {
+@@ -907,6 +988,7 @@ void CPU::op_php() {
  }
  
  void CPU::op_pla() {
@@ -191,7 +203,7 @@ index 9ecd5c2..f56014b 100644
      _stack_pointer++;
      _nes.read(_program_counter);
      _register_a = _nes.read(0x100 | _stack_pointer);
-@@ -916,6 +986,7 @@ void CPU::op_pla() {
+@@ -916,6 +998,7 @@ void CPU::op_pla() {
  }
  
  void CPU::op_plp() {
@@ -199,7 +211,7 @@ index 9ecd5c2..f56014b 100644
      _stack_pointer++;
      _nes.read(_program_counter);
      _status = _nes.read(0x100 | _stack_pointer) & 0xCF;
-@@ -1005,6 +1076,11 @@ void CPU::op_rra() {
+@@ -1005,6 +1088,11 @@ void CPU::op_rra() {
  }
  
  void CPU::op_rti() {
@@ -211,7 +223,7 @@ index 9ecd5c2..f56014b 100644
      _stack_pointer++;
      _nes.read(_program_counter);
      _status = _nes.read(0x100 | _stack_pointer) & 0xCF;
-@@ -1021,6 +1097,12 @@ void CPU::op_rts() {
+@@ -1021,6 +1109,12 @@ void CPU::op_rts() {
      _program_counter = _nes.read(0x100 | _stack_pointer);
      _program_counter |= _nes.read(0x100 | ++_stack_pointer) << 8;
      _program_counter++;
@@ -224,7 +236,7 @@ index 9ecd5c2..f56014b 100644
  }
  
  void CPU::op_sax() {
-@@ -1156,6 +1238,7 @@ void CPU::op_txa() {
+@@ -1156,6 +1250,7 @@ void CPU::op_txa() {
  
  void CPU::op_txs() {
      _stack_pointer = _register_x;
@@ -613,7 +625,7 @@ index 517eb5a..01976dd 100644
  
  #endif
 diff --git a/src/nes.cpp b/src/nes.cpp
-index 39fdf33..c4ba320 100644
+index 39fdf33..5b4c0bf 100644
 --- a/src/nes.cpp
 +++ b/src/nes.cpp
 @@ -58,7 +58,9 @@ void NES::dummy_read() {
@@ -634,6 +646,17 @@ index 39fdf33..c4ba320 100644
      apu.tick(true);
      ppu.tick();
      ppu.tick();
+@@ -210,8 +213,10 @@ Mapper& NES::get_mapper() {
+     return static_cast<Mapper&>(*_mapper.get());
+ }
+ 
++uint8_t g_last_pad = 0;                         // controller 1 value latched by the last strobe
+ void NES::load_controller_shifter(bool polling) {
+     if (polling) {
++        g_last_pad = _controller_status[0];
+         memcpy(_controller_shifters, _controller_status, 0x2);
+     }
+ }
 diff --git a/src/nes.hpp b/src/nes.hpp
 index 8961b80..f8c1bee 100644
 --- a/src/nes.hpp
@@ -695,10 +718,18 @@ index 90cfec5..33c93f7 100644
      bool _rendering_enabled;
      bool _rendering_enabled_delayed;
 diff --git a/src/wrapper.cpp b/src/wrapper.cpp
-index 92db33e..8aa9df0 100644
+index 92db33e..dc460d7 100644
 --- a/src/wrapper.cpp
 +++ b/src/wrapper.cpp
-@@ -111,6 +111,11 @@ PYBIND11_MODULE(emulator, mod) {
+@@ -7,6 +7,7 @@
+ #include <pybind11/cast.h>
+ #include <pybind11/detail/common.h>
+ #include <pybind11/pybind11.h>
++#include <pybind11/stl.h>
+ #include <pybind11/stl/filesystem.h>
+ 
+ using namespace cynes;
+@@ -111,6 +112,32 @@ PYBIND11_MODULE(emulator, mod) {
              &wrapper::NesWrapper::controller,
              "Emulator controller state."
          )
@@ -706,6 +737,27 @@ index 92db33e..8aa9df0 100644
 +            "nmi_count",
 +            [](const wrapper::NesWrapper&) { extern unsigned long g_nmi_count; return g_nmi_count; },
 +            "Number of NMIs taken since start (all emulator instances in the process)."
++        )
++        .def_property(
++            "trace",
++            [](const wrapper::NesWrapper&) { extern std::vector<uint32_t> g_trace; std::vector<uint32_t> t; t.swap(g_trace); return t; },
++            [](wrapper::NesWrapper&, bool on) { extern bool g_trace_on; g_trace_on = on; },
++            "Set True to record executed instructions (coverage index << 8); reading returns and clears them."
++        )
++        .def_property_readonly(
++            "nmi_pad",
++            [](const wrapper::NesWrapper&) { extern uint8_t g_nmi_pad; return (int)g_nmi_pad; },
++            "Controller 1 value latched by the game's last strobe before the last NMI."
++        )
++        .def_property_readonly(
++            "pad_history",
++            [](const wrapper::NesWrapper&) { extern uint8_t g_pad_hist[256]; return pybind11::bytes((const char*)g_pad_hist, 256); },
++            "Controller value latched before NMI n, at index n & 255."
++        )
++        .def_property_readonly(
++            "nmi_ram",
++            [](const wrapper::NesWrapper&) { extern uint8_t g_nmi_ram[0x800]; return pybind11::bytes((const char*)g_nmi_ram, 0x800); },
++            "Copy of CPU RAM $0000-$07FF taken when the last NMI was taken."
 +        )
          .def_property_readonly(
              "has_crashed",

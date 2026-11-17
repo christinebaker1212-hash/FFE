@@ -59,7 +59,7 @@ def main():
             script.append((rng.choice(btns), h, g)); done += h + g
             if len(script) % 40 == 0: script.append(('shot',))
         script.append(('shot',))
-    off = int(sys.argv[sys.argv.index('--off') + 1]) if '--off' in sys.argv else 1
+    off = int(sys.argv[sys.argv.index('--off') + 1]) if '--off' in sys.argv else 0
     nes = NES(nes_path); gb = GB(gb_path)
     shots = []; gb_ticks = 0; first_bad = None
 

@@ -1,0 +1,72 @@
+"""Find where the GB build first runs a different NES instruction than the NES build:
+lockstep to frame wait K-1 (as firstdiff.py), then trace NES instructions and GB labels
+(L_space_addr hooks) for frame K and compare the two sequences.
+usage: PYTHONPATH=build/emu tracediff.py NES GB K"""
+import sys
+sys.path.insert(0, __file__.rsplit('/', 1)[0])
+from compare import GB, new_game_script
+from nescode import space_of_index
+from cynes import NES
+
+nes = NES(sys.argv[1]); gb = GB(sys.argv[2]); K = int(sys.argv[3])
+sym = {}
+for l in open(sys.argv[2][:-3] + '.sym'):
+    b, rest = l.split(':'); a, n = rest.split(); sym[n] = (int(b, 16), int(a, 16))
+waits = [0]
+
+
+def on_wait(ctx):
+    waits[0] += 1
+
+
+gb.pb.hook_register(*sym['rt_wait_nmi'], on_wait, None)
+steps = []
+for it in new_game_script():
+    if it[0] == 'shot': continue
+    m, h, a = it
+    steps += [m] * h + [0] * a
+gbtrace = []
+hooked = False
+for m in steps:
+    nes.controller = m
+    k0 = nes.nmi_count
+    nes.step(1)
+    if nes.nmi_count == k0: continue
+    k = nes.nmi_count
+    gb.set(nes.nmi_pad)
+    while waits[0] < k: gb.pb.tick()
+    if K - 3 <= k < K and not hooked:
+        print('tracing from wait', k, file=sys.stderr)
+        # hook every instruction label for the next frame
+        at = {}
+        for n, (b, a) in sym.items():
+            if n.startswith('L_') and n.count('_') == 2:
+                at.setdefault((b, a), []).append(n[2:])
+        for (b, a), names in at.items():       # empty translations share an address
+            gb.pb.hook_register(b, a, lambda ctx: gbtrace.extend(ctx), sorted(names))
+        hooked = True
+        nes.trace = True
+        continue
+    if k >= K:
+        while waits[0] < k: gb.pb.tick()
+        break
+nt = list(nes.trace)
+print('trace len', len(nt), 'k', k, file=sys.stderr)
+nseq = []
+for v in nt:
+    sp, a = space_of_index(v >> 8)
+    if sp == 'fix' and (0xFECF <= a < 0xFEDB or 0xFEDC <= a < 0xFEF1): continue   # NMI handler / wait loop
+    nseq.append('%s_%04X' % (sp, a))
+print('NES %d instructions, GB %d labels' % (len(nseq), len(gbtrace)))
+# GB labels only exist for compiled instructions; compare in order
+i = nseq.index(gbtrace[0]) if gbtrace and gbtrace[0] in nseq[:50] else 0
+j = 0
+while i < len(nseq) and j < len(gbtrace):
+    if nseq[i] == gbtrace[j]: i += 1; j += 1; continue
+    if j > 0 and gbtrace[j] == gbtrace[j - 1] and (i == 0 or nseq[i - 1] == gbtrace[j]): j += 1; continue
+    print('first difference at NES #%d / GB #%d' % (i, j))
+    print('  NES:', ' '.join(nseq[max(0, i - 12):i + 8]))
+    print('  GB :', ' '.join(gbtrace[max(0, j - 12):j + 8]))
+    break
+else:
+    print('sequences agree up to the shorter one')

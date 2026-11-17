@@ -1,0 +1,61 @@
+"""Lockstep NES/GB (new-game script, then optional random play) and report the first frame
+where NES RAM at NMI k differs from GB RAM on entering frame wait k (page 1 excluded).
+The GB gets the controller value the NES game latched in each frame (cynes nmi_pad).
+usage: PYTHONPATH=build/emu firstdiff.py NES GB [MAXFRAMES] [--random SEED]"""
+import sys, random
+sys.path.insert(0, __file__.rsplit('/', 1)[0])
+from compare import GB, new_game_script, UP, DOWN, LEFT, RIGHT, A, B, START
+from cynes import NES
+
+args = sys.argv[1:]
+rnd = None
+if '--random' in args:
+    k = args.index('--random'); rnd = int(args[k + 1]); del args[k:k + 2]
+nes = NES(args[0]); gb = GB(args[1])
+limit = int(args[2]) if len(args) > 2 else 100000
+sym = {}
+for l in open(args[1][:-3] + '.sym'):
+    b, rest = l.split(':'); a, n = rest.split(); sym[n] = (int(b, 16), int(a, 16))
+snaps = {}
+
+
+def on_wait(ctx):
+    m = gb.pb.memory
+    k = (m[0xD830] | m[0xD831] << 8) + 1                # entering wait number k
+    snaps[k] = bytes(m[0xC000 + i] for i in range(0x800))
+
+
+gb.pb.hook_register(*sym['rt_wait_nmi'], on_wait, None)
+steps = []
+for it in new_game_script():
+    if it[0] == 'shot': continue
+    m, h, a = it
+    steps += [m] * h + [0] * a
+if rnd is not None:
+    r = random.Random(rnd)
+    btns = [UP, DOWN, LEFT, RIGHT, A, A, B, START, UP, DOWN, LEFT, RIGHT]
+    while len(steps) < limit:
+        steps += [r.choice(btns)] * r.randint(2, 40) + [0] * r.randint(1, 20)
+f = 0
+for m in steps[:limit]:
+    nes.controller = m
+    k0 = nes.nmi_count
+    nes.step(1); f += 1
+    if nes.nmi_count == k0: continue
+    k = nes.nmi_count
+    hist = nes.pad_history
+    for j in range(k0 + 1, k + 1):          # one GB frame per NES NMI, with that frame's pad
+        gb.set(hist[j & 0xFF])
+        guard = 0
+        while j not in snaps:
+            gb.pb.tick(); guard += 1
+            if guard > 2000: raise SystemExit('GB stuck before wait %d' % j)
+        if j < k: snaps.pop(j)
+    if k < 8: continue
+    a = nes.nmi_ram; b = snaps.pop(k)
+    d = [i for i in range(0x800) if a[i] != b[i] and not 0x100 <= i < 0x200]
+    if d:
+        print('frame %d nmi %d: %s' % (f, k, ' '.join('%03X:%02X/%02X' % (i, a[i], b[i]) for i in d[:16])))
+        break
+else:
+    print('no difference in %d frames (%d NMIs)' % (f, nes.nmi_count))

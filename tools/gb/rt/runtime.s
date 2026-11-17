@@ -13,6 +13,10 @@ QV         = $CF00
 NT_SH      = $D000          ; NES nametable shadow (2 × 1KB, vertical mirroring)
 PAL_SH     = $D800          ; NES palette RAM shadow (32)
 DBG        = $D820          ; fault info: code, HL, SP, stack top
+SPR_SLOT   = $D900          ; NES sprite tile (0-255) -> GB slot 0-127, $FF = not resident
+SLOT_TILE  = $DA00          ; GB slot -> NES sprite tile ($FF = free)
+SLOT_STAMP = $DA80          ; GB slot -> frame number of its last use in OAM
+SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
 LCDC_ON    = %11000011      ; LCD on, window map $9C00 (off), BG tiles $8800 (signed), BG map $9800, OBJ on, BG on
@@ -55,6 +59,8 @@ obp1_v:     ds 1
 o_y:        ds 1
 o_t:        ds 1
 o_a:        ds 1
+spr_next:   ds 1
+oam_frame:  ds 1
 frames:     ds 1
 hram_end:   ds 1
 
@@ -105,6 +111,23 @@ boot:       di
             xor a
             ld [$4000], a
             ld [$3000], a
+            ld hl, SPR_SLOT                 ; sprite tiles 0-127 resident in slots 0-127
+            xor a
+.sm:        ld [hl+], a
+            inc a
+            cp 128
+            jr nz, .sm
+            ld a, $FF
+.sm2:       ld [hl+], a
+            inc l
+            dec l
+            jr nz, .sm2
+            ld hl, SLOT_TILE
+            xor a
+.st:        ld [hl+], a
+            inc a
+            cp 128
+            jr nz, .st
             ld a, DATA
             ldh [data_bank8], a
             ld a, 62
@@ -436,7 +459,39 @@ rt_ppu_w7:  push af
             add a, c
             ld h, a
             jr .vram
-.spr:       and $07                         ; sprite tiles (n & 127) at $8000
+.spr:       ; sprite table: write the shadow (RAM bank 1); the slot too if the tile is resident
+            and $0F
+            ld b, a                         ; tile high nibble
+            add a, high(SPR_SHADOW)
+            ld h, a
+            ld a, 1
+            ld [$4000], a
+            ld [hl], d
+            xor a
+            ld [$4000], a
+            ld a, b                         ; tile = (v >> 4) & $FF
+            swap a
+            ld b, a
+            ld a, l
+            swap a
+            and $0F
+            or b
+            ld c, l                         ; keep the byte offset
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld a, [hl]
+            cp $FF
+            jr z, .done
+            swap a                          ; GB address = $8000 + slot * 16 + offset
+            ld b, a
+            and $F0
+            ld l, a
+            ld a, c
+            and $0F
+            or l
+            ld l, a
+            ld a, b
+            and $0F
             add a, $80
             ld h, a
             jr .vram
@@ -546,6 +601,11 @@ rt_io_w4014:
             push bc
             push de
             push hl
+            push af
+            ldh a, [oam_frame]
+            inc a
+            ldh [oam_frame], a
+            pop af
             and $07
             add a, high(NES_RAM)
             ld h, a
@@ -577,8 +637,21 @@ rt_io_w4014:
             pop af
             ld [de], a
             inc e
+            push hl
             ldh a, [o_t]
-            and $7F
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld a, [hl]
+            cp $FF
+            call z, spr_alloc
+            ld l, a
+            ld h, high(SLOT_STAMP)
+            set 7, l
+            ldh a, [oam_frame]
+            ld [hl], a
+            res 7, l
+            ld a, l
+            pop hl
             ld [de], a
             inc e
             ldh a, [o_a]                    ; NES: v h p - - - pp  -> GB: p v h pal - - - -
@@ -624,6 +697,110 @@ rt_io_w4014:
             pop de
             pop bc
             pop af
+            ret
+
+; NES sprite tile o_t is not resident: take the next slot not used by this frame's
+; sprites, load the tile from the shadow, return A = slot. Keeps BC, DE, HL.
+spr_alloc:  push bc
+            push de
+            push hl
+            ld b, 128
+.find:      ldh a, [spr_next]
+            inc a
+            and $7F
+            ldh [spr_next], a
+            ld l, a
+            ld h, high(SLOT_STAMP)
+            set 7, l
+            ldh a, [oam_frame]
+            cp [hl]
+            jr nz, .got
+            dec b
+            jr nz, .find
+            ldh a, [spr_next]               ; all slots busy this frame: reuse anyway
+            ld l, a
+.got:       res 7, l                        ; L = slot
+            ld h, high(SLOT_TILE)
+            ld a, [hl]                      ; evict the old tile
+            cp $FF
+            jr z, .free
+            push hl
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld [hl], $FF
+            pop hl
+.free:      ldh a, [o_t]
+            ld [hl], a                      ; SLOT_TILE[slot] = tile
+            ld c, l
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld [hl], c                      ; SPR_SLOT[tile] = slot
+            ; copy 16 bytes: shadow $A000 + tile*16 (RAM bank 1) -> VRAM $8000 + slot*16
+            ld a, l
+            swap a
+            ld b, a
+            and $F0
+            ld e, a
+            ld a, b
+            and $0F
+            add a, high(SPR_SHADOW)
+            ld d, a                         ; DE = shadow
+            ld a, c
+            swap a
+            ld b, a
+            and $F0
+            ld l, a
+            ld a, b
+            and $0F
+            add a, $80
+            ld h, a                         ; HL = VRAM
+            ld a, 1
+            ld [$4000], a
+            ld b, 16
+.cp:        ld a, [de]
+            inc de
+            push bc
+            ld c, a
+            ldh a, [lcd_on]
+            and a
+            jr nz, .q
+            ld [hl], c
+            jr .nx
+.q:         push de                         ; LCD on: through the VRAM queue
+            ld d, c
+            ldh a, [q_tail]
+            ld e, a
+            inc a
+            ld b, a
+.qf:        ldh a, [q_head]
+            cp b
+            jr nz, .qr
+            halt
+            jr .qf
+.qr:        push hl
+            ld a, l
+            ld c, h
+            ld h, high(QH)
+            ld l, e
+            ld [hl], c
+            inc h
+            ld [hl], a
+            inc h
+            ld [hl], d
+            pop hl
+            ld a, b
+            ldh [q_tail], a
+            pop de
+.nx:        inc hl
+            pop bc
+            dec b
+            jr nz, .cp
+            xor a
+            ld [$4000], a
+            ld a, c
+            pop hl
+            pop de
+            pop bc
             ret
 
 ; ------------------------------------------------------------------ joypad / APU / MMC5

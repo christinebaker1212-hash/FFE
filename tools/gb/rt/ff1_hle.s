@@ -57,9 +57,11 @@ hle_chr_pages:
             add a, d
             ld d, a
             jr .copy
-.spr:       and $07
-            add a, $80
+.spr:       and $0F                         ; sprite table -> shadow (RAM bank 1)
+            add a, high(SPR_SHADOW)
             ld d, a
+            ld a, 1
+            ld [$4000], a
 .copy:      ld b, 8
 .p0:        ld a, [hl+]
             ld [de], a
@@ -78,6 +80,9 @@ hle_chr_pages:
             dec b
             jr nz, .p1
             ldh [tmp_lo], a                 ; last byte
+            ld a, d
+            cp high(SPR_SHADOW) + $10
+            call c, hle_spr_tile            ; sprite tile: to its slot if resident
             ldh a, [ppu_vl]                 ; v += 16
             add a, 16
             ldh [ppu_vl], a
@@ -118,4 +123,45 @@ hle_chr_pages:
             ld l, 0
             inc l
             dec l                           ; Z = 1 (DEX reached 0)
+            ret
+
+; after a tile went to the sprite shadow (DE = shadow + 16, RAM bank 1 on):
+; copy it to the tile's GB slot if resident; RAM bank 0 back. Keeps BC, HL.
+hle_spr_tile:
+            push bc
+            push hl
+            ld a, e
+            sub 16
+            ld e, a                         ; DE = shadow tile start
+            ld a, d                         ; tile = ((D - $A0) << 4) | (E >> 4)
+            sub high(SPR_SHADOW)
+            swap a
+            ld b, a
+            ld a, e
+            swap a
+            and $0F
+            or b
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld a, [hl]
+            cp $FF
+            jr z, .x
+            swap a
+            ld b, a
+            and $F0
+            ld l, a
+            ld a, b
+            and $0F
+            add a, $80
+            ld h, a
+            ld b, 16
+.c:         ld a, [de]
+            inc de
+            ld [hl+], a
+            dec b
+            jr nz, .c
+.x:         xor a
+            ld [$4000], a
+            pop hl
+            pop bc
             ret
