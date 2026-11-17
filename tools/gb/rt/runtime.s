@@ -1073,6 +1073,39 @@ rt_sbc_v:   ld h, a                         ; 6502 SBC = A + ~M + C (carry in 65
             ld a, h
             jr rt_adc_v
 
+; ------------------------------------------------------------------ timing loops
+; DEY / BNE (or DEX / BNE) to itself: n iterations take 5n NES cycles = 2.93n GB
+; M-cycles; this waits about that long (loop of 4 M-cycles, 0.75n times) and leaves
+; the register at 0 with Z = 1, carry kept.
+rt_delay_c: push af
+            ld a, c
+            call delay_n
+            pop af
+            ld c, 0
+            inc c
+            dec c
+            ret
+rt_delay_e: push af
+            ld a, e
+            call delay_n
+            pop af
+            ld e, 0
+            inc e
+            dec e
+            ret
+delay_n:    and a
+            jr nz, .n
+            ld a, 192
+            jr .lp
+.n:         ld l, a
+            srl l
+            srl l
+            sub l
+            ret z
+.lp:        dec a
+            jr nz, .lp
+            ret
+
 ; ------------------------------------------------------------------ 6502 status byte
 rt_get_p:   ; A = P (N from nzv, V from vfl, Z/C from F, bits 4-5 set). F kept, HL used.
             push af

@@ -145,11 +145,18 @@ Milestones per game (from `docs/gb-port.md`):
   the prologue music matches the NES pulse pitches.
 - Assembler relaxes out-of-range `jr` to `jp` automatically.
 
+- Vertical wrap: NES nametables wrap at 240 rows, the GB map at 256 → SCY mod 240 plus
+  an LYC split (`stat_isr`); towns/field now show the right rows.
+- CPU timing loops (DEY/BNE or DEX/BNE to itself, 5 sites) → `rt_delay_c/e`, calibrated
+  to NES time.
+- Debug tools: `crashfind.py GB SEED STEPS` (GB alone with the profiler's input; traps
+  rst $38 / re-boot and prints the stack), `profile_gb.py --random SEED STEPS`.
+
 ## In progress / next
-- `$82/$83` divergence (all seeds), then longer random runs; scripted runs that reach
-  battles, shops, camp items (`rt_unwind3`).
+- A crash in random play (seed 2, ~frame 7850, GB re-boots); the `$82/$83` divergence in
+  battle (firstdiff seeds 1-3) is probably the same bug. Being traced with crashfind.
 - Screen layout for 160×144 (milestone 5) — biggest remaining piece; SGB palettes/border.
-- Remaining lag: `$2007` shim cost, CPU delay loop `$D77C` (DEY/BNE timing loop).
+- Battles run ~1.1-1.3× NES frame time on DMG (needs profiling once the crash is fixed).
 - Recompiler and PPU-layer design written up in `docs/gb-port.md` §1-2 (registers X→E,
   Y→C; NES stack on the GB stack; flag liveness; ROM data through a bank-0 helper;
   queued VRAM writes; tile/nametable/scroll mapping).

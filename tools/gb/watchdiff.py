@@ -44,7 +44,10 @@ for m in steps:
     hist = nes.pad_history
     for j in range(k0 + 1, k + 1):
         gb.set(hist[j & 0xFF])
-        while waits[0] < j: gb.pb.tick()
+        guard = 0
+        while waits[0] < j:
+            gb.pb.tick(); guard += 1
+            if guard > 3000: raise SystemExit('GB stuck before frame wait %d (PC=%04X)' % (j, gb.pb.register_file.PC))
     if K - 3 <= k < K and not hooked:
         last[0] = gb.pb.memory[gaddr]
         at = {}

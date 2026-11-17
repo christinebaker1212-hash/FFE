@@ -491,6 +491,13 @@ class Emitter:
     def x_DEC(self): self.incdec('dec')
 
     def regstep(self, op, reg):
+        i = self.i
+        n = self.nxt()
+        if (op == 'dec' and n is not None and n.mn == 'BNE' and n.arg == i.addr):
+            # timing loop DEY/BNE or DEX/BNE to itself: NES-equivalent delay
+            self.o('call rt_delay_%s' % reg)
+            if 'N' in self.need: self.o('ld hl, nzv', 'ld [hl], 0')
+            return
         self.o('%s %s' % (op, reg))
         if 'N' in self.need:
             self.o('ld hl, nzv', 'ld [hl], %s' % reg)
