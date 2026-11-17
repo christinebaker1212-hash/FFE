@@ -1339,9 +1339,9 @@ COPIER_SRC = '''
     rts
 '''
 
-# field menus: a job name longer than its 7 cells is drawn in condensed letters on 7 tiles of
-# its own, character c's at tiles 7c+1.. (map tiles $01-$3F, unused in the menus, which
-# reload them on leaving), uploaded with the menu graphics ($DD06, rendering off); the
+# field menus: a job name longer than its 7 cells is drawn in condensed letters on tiles of
+# its own, all of them at tiles $01.. (map tiles, unused in the menus, which reload them on
+# leaving), uploaded with the menu graphics ($DD06, rendering off); the
 # ailments shown in place of LV, and "Status" in the 5-cell command window, have condensed
 # glyphs of their own in the font's unused codes from $D0
 JOB_BANK = 88
@@ -1390,59 +1390,48 @@ spl:                ; spell $84 (mark if $B9): Leviathan, Catastrophe condensed
     lda SPC,x
     ldy #SPN
     jmp put
-jload:              ; each character's job: its tiles (when condensed) to tiles 7c+1..
+jload:              ; the condensed job names' tiles to tiles $01..
     lda $84
     pha
     lda $85
     pha
-    ldx #0
-.c:
-    lda $6100,x
-    cmp #22
-    bcs .n
-    tay
-    lda JLONG,y
-    beq .n
-    lda JSL,y
+    lda #<JDATA
     sta $84
-    lda JSH,y
+    lda #>JDATA
     sta $85
-    txa
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    tay
     lda $2002
-    lda PPH,y
+    lda #$00
     sta $2006
-    lda PPL,y
+    lda #$10
     sta $2006
+    ldx #JTILES
+.t:
     ldy #0
 .l:
     lda ($84),y
     sta $2007
     iny
-    cpy #112
+    cpy #16
     bne .l
-.n:
-    txa
+    lda $84
     clc
-    adc #$40
-    tax
-    bne .c
+    adc #16
+    sta $84
+    bcc .n
+    inc $85
+.n:
+    dex
+    bne .t
     pla
     sta $85
     pla
     sta $84
     rts
-jobn:               ; A = job + $E2, X = the character's offset
-    sec
+jobn:               ; A = job + $E2: a condensed name (codes JC, JN of them) or the system
+    sec             ;   string as the Japanese; either 7 cells
     sbc #$E2
     tay
-    lda JLONG,y
+    lda JN,y
     bne .k
     tya
     clc
@@ -1452,17 +1441,37 @@ jobn:               ; A = job + $E2, X = the character's offset
     jsr $F3E4
     jmp $F2DC
 .k:
-    txa
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    tay
-    lda C7,y
-    ldy #7
-    bne put
+    tax
+    lda JC,y
+    ldy $90
+.w:
+    sta $07A0,y
+    pha
+    lda #$FF
+    sta $0780,y
+    pla
+    clc
+    adc #1
+    iny
+    dex
+    bne .w
+    lda #$FF
+.f:
+    cpy $90         ; (pad to 7)
+    beq .x
+    tya
+    sec
+    sbc $90
+    cmp #7
+    bcs .x
+    lda #$FF
+    sta $07A0,y
+    sta $0780,y
+    iny
+    bne .f
+.x:
+    sty $90
+    jmp $F291
 ails:               ; A = ailments ($6102 & $FE): the first set, as the Japanese
     ldy #22
     asl a
@@ -1510,12 +1519,6 @@ put:                ; Y codes from A into the line at $90 (the row above blank)
     bne .w
     stx $90
     jmp $F291
-C7:                 ; tile $00 is the menus' background
-    .db 1, 8, 15, 22
-PPH:
-    .db $00, $00, $00, $01
-PPL:
-    .db $10, $80, $F0, $60
 '''
 
 CPYL_SRC = '''
@@ -1557,31 +1560,41 @@ def field_names(rom, L):
     for i, w in FIELD_AIL.items():
         assert jobs[i] == w, (i, jobs[i])
         an[i - 22] = dict(STATIC_WORDS)[w]; ac[i - 22] = codes[w]
-    # jobs: 7 condensed tiles each for the long ones
-    data = bytearray(); jl = []; jsl = []; jsh = []
-    base = 0x8200
+    # jobs longer than 7 letters: condensed (COND, else TIGHT) on as few tiles as hold them,
+    # all of them at tiles $01.. in the menus (63 free)
+    data = bytearray(); jn = []; jc = []; tile_no = 1
     for j in range(22):
-        name = jobs[226 + j]
+        name = jobs[226 + j].rstrip(' ')
         if len(name) <= 7:
-            jl.append(0); jsl.append(0); jsh.append(0); continue
-        t = packed_label(name, 7, COND, fg=3, bg=2) or packed_label(name, 7, TIGHT, fg=3, bg=2)
+            jn.append(0); jc.append(0); continue
+        for n in range(4, 8):
+            t = packed_label(name, n, COND, fg=3, bg=2)
+            if t: break
+        else:
+            for n in range(4, 8):
+                t = packed_label(name, n, TIGHT, fg=3, bg=2)
+                if t: break
         assert t, name
-        a = base + len(data); data += b''.join(t)
-        jl.append(1); jsl.append(a & 0xFF); jsh.append(a >> 8)
+        jn.append(n); jc.append(tile_no); tile_no += n; data += b''.join(t)
+    assert tile_no <= 0x40, tile_no
+    jdata = 0x8200
     names = {e['id']: e['en'] for e in json.load(open('script/ff3/names8800.json'))}
     for i in range(200, 256):
         nm = re.sub(r'\[..\]', '', names[i])
         assert len(nm) <= 8 or LONG_SPELLS.get(i) == nm, (i, nm)
     spn = dict(STATIC_WORDS)['Leviathan']; assert dict(STATIC_WORDS)['Catastrophe'] == spn
     L = dict(L, LEVI=213, CATA=220, SPN=spn)
-    tables = ('SPC:\n    .db $%02X, 0, 0, 0, 0, 0, $%02X\n' % (codes['Leviathan'], codes['Catastrophe']) if spn == 6 else None) + ('JLONG:\n    .db %s\nJSL:\n    .db %s\nJSH:\n    .db %s\nAN:\n    .db %s\nAC:\n    .db %s\n' %
-              tuple(', '.join('$%02X' % v for v in tb) for tb in (jl, jsl, jsh, an, ac)))
+    L = dict(L, JDATA=jdata, JTILES=len(data) // 16)
+    tables = ('SPC:\n    .db $%02X, 0, 0, 0, 0, 0, $%02X\n' % (codes['Leviathan'], codes['Catastrophe']) if spn == 6 else None) + ('JN:\n    .db %s\nJC:\n    .db %s\nAN:\n    .db %s\nAC:\n    .db %s\n' %
+              tuple(', '.join('$%02X' % v for v in tb) for tb in (jn, jc, an, ac)))
     jb = asm(JOBF_SRC + tables, syms=L)
-    assert jb.org + len(jb.bytes) <= base
-    put(rom, JOB_BANK, jb.org, jb.bytes); put(rom, JOB_BANK, base, bytes(data))
+    assert jb.org + len(jb.bytes) <= jdata
+    put(rom, JOB_BANK, jb.org, jb.bytes); put(rom, JOB_BANK, jdata, bytes(data))
     assert get(rom, FIX, 0xF2BB, 2) == b'\xa0\x16' and get(rom, FIX, 0xF30D, 3) == b'\x4c\xd8\xf2'
     put(rom, FIX, 0xF2BB, jmp(L['ailsel']))
     put(rom, FIX, 0xF30D, jmp(L['jobname']))
+    assert get(rom, FIX, 0xF197, 3) == b'\x4c\xd8\xf2'      # code 1E: a job in the job list
+    put(rom, FIX, 0xF197, jmp(L['jobname']))
     assert get(rom, FIX, 0xF384, 3) == b'\x4c\x9d\xf0'
     put(rom, FIX, 0xF384, jmp(L['spellh']))
     assert get(rom, 126, 0xDD0C, 3) == b'\x4c\xf8\xdf'

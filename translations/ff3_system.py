@@ -129,7 +129,7 @@ T.update({221:' Head', 222:' Body', 223:' Arms', 224:' Right Hand', 225:' Left H
 JOBS = ['Onion Knight','Warrior','Monk','White Wizard','Black Wizard','Red Wizard','Hunter',
  'Knight','Thief','Scholar','Geomancer','Dragon Knight','Viking','Karateka','Magic Knight',
  'Illusionist','Bard','Warlock','Guru','Summoner','Sage','Ninja']
-for i, j in enumerate(JOBS): T[226 + i] = j
+for i, j in enumerate(JOBS): T[226 + i] = j.ljust(7)     # 7 cells, as the Japanese
 T.update({248:'Princess Sara', 249:'Old Man Cid', 250:'Desch', 252:'Elia', 253:'Prince Alus',
           254:'Doga', 255:'Unne'})
 
