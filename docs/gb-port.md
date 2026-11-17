@@ -1,4 +1,4 @@
-# FF1 English → Game Boy Color: port design
+# FF1/FF2 English → Game Boy (SGB), FF3 English → Game Boy Color: port design
 
 Status: design only. Nothing is built yet.
 
@@ -18,7 +18,28 @@ Status: design only. Nothing is built yet.
 - Graphics, palettes and sound go through a hardware layer that turns the NES PPU and APU
   register writes into GBC equivalents.
 
-## Why Game Boy Color (CGB-only), not the original DMG
+## Targets (decided by the project owner)
+- **FF1 and FF2: Game Boy (DMG) with Super Game Boy support**, on the largest mapper needed
+  (MBC5, sized to the game, with battery SRAM). Colour comes from SGB palettes (4 palettes
+  assigned per screen area or 8×8 cell through `ATTR_*` packets) plus an SGB border.
+  On a plain DMG the game shows 4 greys.
+- **FF3: Game Boy Color.**
+
+DMG-specific constraints for FF1/FF2 (compared with the table below):
+- **No double speed.** The recompiled code runs on a 4.2 MHz SM83, so the flag-liveness
+  optimisation and a hand-tuned runtime are required, not optional. Measure early
+  (milestone 2) how much of each frame the field and battle loops use.
+- **384 tiles** in VRAM (BG 256 + sprites 256, with 128 shared), against 512 on the NES. CHR
+  uploads go through a tile cache that remaps NES tile numbers to free GB tiles.
+- **8 KB WRAM.** NES RAM (2 KB) and the VRAM write queues go to WRAM. NES save/work RAM
+  `$6000-7FFF` maps directly to an 8 KB cart SRAM bank at `$A000-BFFF`.
+- NES palettes → SGB: each NES palette becomes an SGB palette (`PAL01`/`PAL23`), and
+  attribute changes are batched into `ATTR_CHR`/`ATTR_BLK` packets. Packets are slow
+  (~64 ms each), so they are sent only when a screen's palette layout changes.
+
+The rest of this document was written for a GBC target and still applies to FF3.
+
+## Hardware comparison
 | | NES | GBC | DMG |
 |---|---|---|---|
 | CPU | 6502 1.79 MHz | SM83 8.4 MHz (double speed) | SM83 4.2 MHz |
@@ -90,7 +111,7 @@ in wave RAM), noise → CH4 (NES noise periods → nearest NR43 values). FF1 doe
 the DMC.
 
 ## 5. Cartridge
-MBC5 + 32 KB battery SRAM, CGB-only header flag. Banks: 0 = runtime + fixed-bank code,
+MBC5 + battery SRAM. FF1/FF2: DMG header with the SGB flag (`$0146 = $03`, old licensee `$33`). FF3: CGB-only flag. Banks: 0 = runtime + fixed-bank code,
 1-n = recompiled bank code, followed by ROM data banks copied from `ff1_en.nes`.
 Expected size: 1-2 MB.
 
