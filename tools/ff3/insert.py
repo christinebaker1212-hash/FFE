@@ -1359,7 +1359,7 @@ COPIER_SRC = '''
 # glyphs of their own in the font's unused codes from $D0
 JOB_BANK = 88
 STATIC_WORDS = [('Death', 3), ('Stone', 3), ('Silence', 4), ('Blind', 3), ('Poison', 4), ('Status', 4),
-                ('Leviathan', 6), ('Catastrophe', 6)]
+                ('Leviathan', 6), ('Catastrophe', 6), ('Text Speed', 6)]   # (title: the digit is drawn at cell 10)
 LONG_SPELLS = {213: 'Leviathan', 220: 'Catastrophe'}     # names table ids; the others fit 8
 FIELD_AIL = {22: 'Death', 23: 'Stone', 28: 'Silence', 30: 'Blind', 31: 'Poison'}
 JOBF_SRC = '''
@@ -1601,6 +1601,8 @@ def field_names(rom, L):
         for k, b in enumerate(t): o = HDR + FONT + (code + k) * 16; rom[o:o + 16] = b
         code += n
     assert code <= 0xF7
+    ts = codes['Text Speed']
+    assert ''.join('[%02X]' % (ts + k) for k in range(6)) in jobs[35]
     st = codes['Status']
     assert ''.join('[%02X]' % (st + k) for k in range(4)) in jobs[49]
     an = [0] * 10; ac = [0] * 10

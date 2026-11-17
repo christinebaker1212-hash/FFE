@@ -23,7 +23,7 @@ T = {
  22: 'Death', 23: 'Stone', 24: 'Paralysis', 25: 'Sleep', 26: 'Confusion', 27: 'Frog',
  28: 'Silence', 29: 'Mini', 30: 'Blind', 31: 'Poison',
  34: '{15:01}New Game',
- 35: 'Message Speed {06}',
+ 35: '[F1][F2][F3][F4][F5][F6]{06}',   # "Text Speed" condensed (insert.py): the title draws the digit at cell 10
  36: '{0E}{15:01}Deposit\n{15:01}Withdraw{15:0B}Exit',     # (window $1B, 16 cells: two one-row lines)
  38: 'Welcome. What business brings you here?',
  39: 'What would you like?',
