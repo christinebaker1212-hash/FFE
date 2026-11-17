@@ -12,7 +12,7 @@ English item names, menu strings, item screen.
 """
 import sys, os, json, re
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from latin_font import tile
+from latin_font import tile, narrow_label
 from asm6502 import asm
 
 HDR = 16; BANK = 0x4000
@@ -95,11 +95,8 @@ def insert_dialogue(rom, report):
                 bad += 1; report.append('DOES NOT FIT dialogue %d (%d lines)' % (e['id'], len(lines)))
             bank.put_ptr(0x8000 + 2 * e['id'], bank.alloc(enc('\n'.join(lines)) + b'\0'))
         report.append('bank %d free: %s' % (bank_no, [b - a for a, b in bank.free]))
-    # $DB58: pick bank 16/17 from the id (trampoline in the free bytes at $F41E)
-    put(rom, 0xDB58, bytes([0x4C, 0x1E, 0xF4]))
-    put(rom, 0xF41E, bytes([0xAA, 0x0A, 0xA9, 0x10, 0x69, 0x00,   # TAX / ASL / LDA #16 / ADC #0
-                            0x85, 0x57, 0x20, 0x03, 0xFE,         # STA $57 / JSR $FE03 (switch)
-                            0x4C, 0x60, 0xDB]))                   # JMP $DB60
+    # $DB58: pick bank 16/17 from the id (helper in ExRAM: 'dlgbank')
+    put(rom, 0xDB58, jmp(DLG_LABEL[0]))
     put(rom, 0xDC81, bytes([0x69, 0x01]))     # newline: 1 tile row (was 2)
     put(rom, 0xD52E, bytes([0x69, 0x03]))     # first line one row higher (was row 4)
     return bad
@@ -119,10 +116,18 @@ def insert_dialogue(rom, report):
 # first 1KB of CODE_BANK.
 CODE_BANK = 18                        # 16KB bank: ExRAM image + menu strings
 EX = dict(MODE=0x5C00, PREV=0x5C01, SAVEX=0x5C02, WRAPW=0x5C03, TMP=0x5C04, BUF=0x5C10,
-          SLOT=0x5C40, SV54=0x5C05, SV55=0x5C06, MENUBANK=CODE_BANK)
+          SLOT=0x5C40, SV54=0x5C05, SV55=0x5C06, SAVEX2=0x5C07, OVF=0x5C0F, MENUBANK=CODE_BANK)
 EXRAM_SRC = '''
     org $5C60
 BCMDS
+dlgbank:        ; $DB58 (dialogue A = id): bank 16 for ids 0-127, 17 for 128-255
+    tax
+    asl a
+    lda #16
+    adc #0
+    sta $57
+    jsr $FE03
+    jmp $DB60
 partynames:     ; the four names, one per line (shop 'who?' list, was bank 14 $A90E)
     .db $10, 0, 1, $11, 0, 1, $12, 0, 1, $13, 0, 0
 clr20:          ; 20 blanks, lower row only
@@ -344,6 +349,107 @@ shoplist:       ; bank 14 $A86A: shop item list string at $0310
     lda #0
     sta $0310,y
     jmp $A8A9
+boxline:        ; $F9B9: decoded battle line ($6CD4 pairs) into the box image at ($8A).
+    ldx #0      ;   Width = cells up to the box frame; a longer line is split at a
+    ldy #0      ;   space onto the two rows (upper row first) of the Japanese line.
+.cnt:
+    lda $6CD5,x
+    beq .gotn
+    inx
+    inx
+    iny
+    bne .cnt
+.gotn:
+    sty TMP
+    ldy #0
+.w:
+    lda ($8A),y
+    cmp #$F7
+    bcc .wn
+    cmp #$FF
+    bcc .wend
+.wn:
+    iny
+    cpy #32
+    bne .w
+.wend:
+    sty SAVEX
+    tya
+    clc
+    adc #$20
+    sta SAVEX2
+    lda TMP
+    cmp SAVEX
+    bcc .one
+    beq .one
+    ldy SAVEX
+.f:
+    tya
+    asl a
+    tax
+    lda $6CD5,x
+    cmp #$FF
+    beq .sp
+    dey
+    bne .f
+    lda #1      ; no space to split at: overflow (checked by the test harness)
+    sta OVF
+    jmp .one
+.sp:
+    sty PREV
+    ldy #0
+    ldx #1
+.u:
+    cpy PREV
+    beq .ue
+    lda $6CD4,x
+    sta ($8A),y
+    inx
+    inx
+    iny
+    bne .u
+.ue:
+    inx
+    inx
+    ldy #$20
+.l:
+    lda $6CD4,x
+    beq .done
+    sta ($8A),y
+    inx
+    inx
+    iny
+    cpy SAVEX2
+    bcc .l
+    lda $6CD4,x
+    beq .done
+    lda #1      ; second row longer than the box: overflow
+    sta OVF
+    bne .l
+.done:
+    rts
+.one:
+    ldy #0
+    ldx #0
+.o1:
+    lda $6CD4,x
+    beq .o2
+    sta ($8A),y
+    iny
+    inx
+    inx
+    bne .o1
+.o2:
+    ldy #$20
+    ldx #0
+.o3:
+    lda $6CD5,x
+    beq .done
+    sta ($8A),y
+    iny
+    inx
+    inx
+    bne .o3
 magcur:         ; bank 14 $B829: magic list cursor, level L spell c on row 4+3L+c
     lda $62
     and #3
@@ -440,6 +546,7 @@ def menu_engine(rom, report):
     assert 0x60 + len(ex.bytes) <= 0x400
     bank_put(rom, CODE_BANK, 0x8000, bytes(img))
     L = ex.labels
+    DLG_LABEL[0] = L['dlgbank']
     init = asm(INIT_SRC, syms={'CODE2': CODE_BANK * 2})
     assert init.org + len(init.bytes) <= 0xDDAB      # dakuten tables $DD47-$DDAA (unused in English)
     put(rom, init.org, init.bytes)
@@ -474,6 +581,7 @@ def insert_names(rom, report):
             data = b'\x05' + enc(lines[0]) + b'\x06' + enc(lines[1])
             if len(lines) == 3: data += b'\x0E' + enc(lines[2]) + b'\x0F'
         bank.put_ptr(0xB400 + 2 * e['id'], bank.alloc(data + b'\0'))
+    NAMES_FREE[:] = bank.free
     report.append('bank 10 names free: %d' % sum(b - a for a, b in bank.free))
 
 WRAP_WIDTH = 9                  # shop list column width
@@ -749,7 +857,7 @@ def main_menu(rom, labels):
     cmds = json.load(open('script/ff1/battle_cmds.json'))
     for e in cmds:
         a = labels['bcmd%d' % e['id']]
-        put(rom, 0xFA1B + 5 * e['id'] + 3, bytes([a & 0xFF, a >> 8]))
+        put(rom, 0xFA1B + 5 * e['id'], bytes([a & 0xFF, a >> 8]))   # records: 01 x y ptr
 
 SHOP_TITLES = {0: ['Weapon', 'Shop'], 1: ['Armor', 'Shop'], 2: ['White', 'Magic', 'Shop'],
                3: ['Black', 'Magic', 'Shop'], 4: ['Church'], 5: ['Inn'], 6: ['Item', 'Shop'],
@@ -805,6 +913,65 @@ def shops(rom, labels):
 
 SHOP_FREE = []
 
+BATTLE_BANK = 19
+NARROW_NAMES = {'Tyrannosaurus': (7, 0xEB)}   # tiles $EB-$F1
+STATUS_LABELS = [(65, 'Stone'), (66, 'Poison'), (67, 'Darkness'), (68, 'Paralysis'), (69, 'Sleep'),
+                 (70, 'Silence')]
+
+def battle(rom, labels, report):
+    """Battle text. Messages (table $8F4E+2) and monster names (table $94E0) move to
+    BATTLE_BANK at the same addresses; names may be longer than 8 letters; enemy attack
+    names (bank 10, table $B600) in English; the decoder copies up to 64 bytes (ExRAM
+    $5F80 instead of 32 at $6D54); each line is fitted to its box by boxline."""
+    bank = Bank(rom, BATTLE_BANK)
+    bank.free = [(0x8000, 0x8F4E), (0x8FF0, 0x94E0), (0x95E0, 0xC000)]
+    # status words in the 4-column HP windows: drawn as narrow-letter tiles $D3-$EA
+    labels4 = {}
+    for k, (mid, word) in enumerate(STATUS_LABELS):
+        codes = bytes(range(0xD3 + 4 * k, 0xD7 + 4 * k))
+        for t, data in enumerate(narrow_label(word, 4, fg=3, bg=2)):
+            o = HDR + 0x24000 + codes[t] * 16
+            rom[o:o + 16] = data
+        labels4[mid] = codes
+    for e in json.load(open('script/ff1/battle_msgs.json')):
+        if e['id'] in labels4: data = labels4[e['id']]
+        else:
+            data = enc(e['en'])
+            jlen = len(e['ja'])                    # the Japanese pads with spaces to clear
+            if len(data) < jlen: data += b'\xFF' * (jlen - len(data))
+        bank.put_ptr(0x8F50 + 2 * e['id'], bank.alloc(data + b'\0'))
+    for e in json.load(open('script/ff1/monsters.json')):
+        if e['en'] in NARROW_NAMES:                # one word wider than any name box
+            n, base = NARROW_NAMES[e['en']]
+            for t, data in enumerate(narrow_label(e['en'], n, fg=3, bg=2)):
+                o = HDR + 0x24000 + (base + t) * 16
+                rom[o:o + 16] = data
+            data = bytes(range(base, base + n))
+        else: data = enc(e['en'])
+        bank.put_ptr(0x94E0 + 2 * e['id'], bank.alloc(data + b'\0'))
+    # battle boxes (type x y w h, text 01 x y): attacker/action and target/result pairs
+    # 10 columns each inside (were 8 + 10 / 8 + 9); enemy list 10 (was 9); the command
+    # window starts one column further right (its text keeps column 14)
+    put(rom, 0xF9E1, bytes([0, 1, 1, 12, 4, 1, 2, 2,   0, 13, 1, 12, 4, 1, 14, 2,
+                            0, 1, 4, 12, 4, 1, 2, 5,   0, 13, 4, 12, 4, 1, 14, 5]))
+    put(rom, 0xF9DC, bytes([0, 1, 0, 12, 10]))
+    put(rom, 0xFA13, bytes([0, 13, 0, 12, 10]))
+    b10 = Bank(rom, 10, keep=True); b10.free = NAMES_FREE[:]
+    for e in json.load(open('script/ff1/enemy_attacks.json')):
+        b10.put_ptr(0xB600 + 2 * e['id'], b10.alloc(enc(e['en']) + b'\0'))
+    for a, old, new in ((0xFC1C, 0x0B, BATTLE_BANK), (0xFC71, 0x0B, BATTLE_BANK), (0xFC83, 0x08, 0x20),
+                        (0xFA60, 0x54, 0x80), (0xFA61, 0x6D, 0x5F), (0xFA64, 0x20, 0x40),
+                        (0xFA68, 0x54, 0x80), (0xFA6C, 0x6D, 0x5F)):
+        for bk in (15, 31):
+            o = HDR + bk * BANK + a - 0xC000
+            assert rom[o] == old, (hex(a), rom[o]); rom[o] = new
+    put(rom, 0xF9B9, jmp(labels['boxline']))
+    assert labels['boxline'] < 0x5F80
+    report.append('battle bank free: %d' % sum(b - a for a, b in bank.free))
+
+NAMES_FREE = []
+DLG_LABEL = [0]
+
 def status_screen(rom):
     """Status windows (x, y, w, h), table at bank 14 $B53A, drawn in this order with
     strings 35-40: name; class (wide enough for 'White Magician'); the old level window
@@ -825,6 +992,7 @@ if __name__ == '__main__':
     equip_screens(rom, labels)
     status_screen(rom)
     shops(rom, labels)
+    battle(rom, labels, report)
     bad = insert_dialogue(rom, report)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report)); print('strings not fitting:', bad)

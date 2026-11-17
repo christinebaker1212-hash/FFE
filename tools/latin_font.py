@@ -106,3 +106,50 @@ def tile(ch, fg=3, bg=0):
             if c & 1: lo[y] |= 0x80 >> x
             if c & 2: hi[y] |= 0x80 >> x
     return bytes(lo + hi)
+
+# ---- narrow letters for fixed 4-tile labels (status words in battle) ----
+# Proportional, 7 rows (row 0-6, baseline 6; 'y' uses row 7). Drawn for this project.
+NARROW = {
+ 'S': [".###", "#...", "#...", ".##.", "...#", "...#", "###."],
+ 'P': ["###.", "#..#", "#..#", "###.", "#...", "#...", "#..."],
+ 'D': ["###.", "#..#", "#..#", "#..#", "#..#", "#..#", "###."],
+ 't': [".#.", ".#.", "###", ".#.", ".#.", ".#.", "..#"],
+ 'o': ["...", "...", ".#.", "#.#", "#.#", "#.#", ".#."],
+ 'n': ["...", "...", "##.", "#.#", "#.#", "#.#", "#.#"],
+ 'e': ["...", "...", ".#.", "#.#", "###", "#..", ".##"],
+ 'i': ["#", ".", "#", "#", "#", "#", "#"],
+ 's': ["...", "...", ".##", "#..", ".#.", "..#", "##."],
+ 'a': ["...", "...", "##.", "..#", ".##", "#.#", ".##"],
+ 'r': ["...", "...", "#.#", "##.", "#..", "#..", "#.."],
+ 'k': ["#..", "#..", "#.#", "#.#", "##.", "#.#", "#.#"],
+ 'l': ["#", "#", "#", "#", "#", "#", "#"],
+ 'y': ["...", "...", "#.#", "#.#", "#.#", ".##", "..#", "##."],
+ 'c': ["...", "...", ".##", "#..", "#..", "#..", ".##"],
+ 'p': ["...", "...", "##.", "#.#", "#.#", "##.", "#.."],
+ 'T': ["###", ".#.", ".#.", ".#.", ".#.", ".#.", ".#."],
+ 'u': ["...", "...", "#.#", "#.#", "#.#", "#.#", ".##"],
+}
+
+def narrow_label(word, ntiles, fg=3, bg=0):
+    """Render `word` centred in ntiles*8 x 8 pixels with the narrow letters (1 px gaps);
+    returns the list of 16-byte tiles."""
+    cols = []
+    for k, ch in enumerate(word):
+        g = NARROW[ch]
+        if k: cols.append([0] * 8)
+        for x in range(len(g[0])):
+            cols.append([1 if y < len(g) and g[y][x] == '#' else 0 for y in range(8)])
+    W = ntiles * 8
+    assert len(cols) <= W, (word, len(cols))
+    pad = (W - len(cols)) // 2
+    cols = [[0] * 8] * pad + cols + [[0] * 8] * (W - len(cols) - pad)
+    tiles = []
+    for t in range(ntiles):
+        lo = bytearray(8); hi = bytearray(8)
+        for y in range(8):
+            for x in range(8):
+                c = fg if cols[t * 8 + x][y] else bg
+                if c & 1: lo[y] |= 0x80 >> x
+                if c & 2: hi[y] |= 0x80 >> x
+        tiles.append(bytes(lo + hi))
+    return tiles
