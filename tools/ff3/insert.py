@@ -559,6 +559,32 @@ bconvb:             ; box texts and command entries (call sites patched): the te
     bne .l
 .x2:
     rts
+trsfix:             ; bank 52 $9340 (treasure: "Treasure:" + the item's name): the Japanese
+    ldx #0          ;   blanks the name's icon at a fixed column ($7ADC); here the cell
+.f:                 ;   after the colon, an icon made a space or a space put in before
+    lda $7AD7,x     ;   a name without one
+    beq .d
+    inx
+    cmp #$C8
+    bne .f
+    lda $7AD7,x
+    beq .d
+    cmp #$80
+    bcs .i
+    lda #$FF
+    sta $7AD7,x
+.d:
+    rts
+.i:
+    lda #$FF
+.s:
+    ldy $7AD7,x
+    sta $7AD7,x
+    inx
+    tya
+    bne .s
+    sta $7AD7,x
+    rts
 '''
 
 # status window slot (5 cells after '/'): a word longer than 5 letters ("/" and the word)
@@ -1290,6 +1316,8 @@ def engine(rom, report):
     assert bc.org + len(bc.bytes) <= 0x9754, hex(bc.org + len(bc.bytes))
     put(rom, 52, bc.org, bc.bytes + b'\xEA' * (0x9754 - bc.org - len(bc.bytes)))
     report.append('battle converter: %d bytes' % len(bc.bytes))
+    assert get(rom, 52, 0x9340, 5).hex() == 'a9ff8ddc7a'      # treasure: icon blanked at $7ADC
+    put(rom, 52, 0x9340, jsr(BL['trsfix']) + b'\xEA\xEA')
     save = BOX_SAVE
     assert get(rom, 52, 0x8E83, 5).hex() == '612208f57a'
     for k, (x, y, w) in enumerate(BOXES):

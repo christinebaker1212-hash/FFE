@@ -3489,19 +3489,19 @@
   "id": 581,
   "off": "3DBC7",
   "ja": "[77][79]をきゅうしゅうした!",
-  "en": "Absorbed [77][79]!"
+  "en": " [77][79] absorbed!"
  },
  {
   "id": 582,
   "off": "3DBD4",
   "ja": "[77][79]をすいとられた!",
-  "en": "[77][79] was drained!"
+  "en": " [77][79] was drained!"
  },
  {
   "id": 583,
   "off": "3DBDF",
   "ja": "[77][79]をぎゃくにすいとられた!!",
-  "en": "[77][79] was drained back instead!!"
+  "en": " [77][79] was drained back instead!!"
  },
  {
   "id": 584,
@@ -3519,7 +3519,7 @@
   "id": 586,
   "off": "3DC02",
   "ja": "[77][79]かいふく!",
-  "en": "[77][79] restored!"
+  "en": " [77][79] restored!"
  },
  {
   "id": 587,
@@ -3537,13 +3537,13 @@
   "id": 589,
   "off": "3DC1C",
   "ja": "ギルてにいれた!",
-  "en": "Gil obtained!"
+  "en": " Gil obtained!"
  },
  {
   "id": 590,
   "off": "3DC25",
   "ja": "キャパシティかくとく!",
-  "en": "Capacity gained!"
+  "en": " Capacity gained!"
  },
  {
   "id": 591,
@@ -3603,7 +3603,7 @@
   "id": 600,
   "off": "3DC9C",
   "ja": "[77][79]かいふく!",
-  "en": "[77][79] restored!"
+  "en": " [77][79] restored!"
  },
  {
   "id": 601,
@@ -3651,7 +3651,7 @@
   "id": 608,
   "off": "3DCEB",
   "ja": "ポイントの[76][7A][79]かくとく",
-  "en": "points of [76][7A][79] gained"
+  "en": " points of [76][7A][79] gained"
  },
  {
   "id": 609,
@@ -3687,7 +3687,7 @@
   "id": 614,
   "off": "3DD33",
   "ja": "[77][79]かいふく!",
-  "en": "[77][79] restored!"
+  "en": " [77][79] restored!"
  },
  {
   "id": 615,
@@ -3771,7 +3771,7 @@
   "id": 628,
   "off": "3DDE7",
   "ja": "[77][79]かいふく!",
-  "en": "[77][79] restored!"
+  "en": " [77][79] restored!"
  },
  {
   "id": 629,
@@ -3837,7 +3837,7 @@
   "id": 639,
   "off": "3DE1A",
   "ja": "[77][79]かいふく!",
-  "en": "[77][79] restored!"
+  "en": " [77][79] restored!"
  },
  {
   "id": 640,
