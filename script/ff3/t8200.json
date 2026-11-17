@@ -747,13 +747,13 @@
   "id": 124,
   "off": "36CB9",
   "ja": "{14:0B}ウル",
-  "en": "{14:0B}Ur"
+  "en": "{14:0C}Ur"
  },
  {
   "id": 125,
   "off": "36CBE",
   "ja": "{14:0B}カズス",
-  "en": "{14:0B}Kazus"
+  "en": "{14:0A}Kazus"
  },
  {
   "id": 126,
@@ -777,7 +777,7 @@
   "id": 129,
   "off": "36CD9",
   "ja": "{14:08}こだいびとのむら",
-  "en": "{14:08}Village of the Ancients"
+  "en": "{14:01}Village of the Ancients"
  },
  {
   "id": 130,
@@ -801,151 +801,151 @@
   "id": 133,
   "off": "36CF8",
   "ja": "{14:0A}レプリト",
-  "en": "{14:0A}Replito"
+  "en": "{14:09}Replito"
  },
  {
   "id": 134,
   "off": "36CFF",
   "ja": "{14:08}サロニア　その1",
-  "en": "{14:08}Saronia, Part 1"
+  "en": "{14:05}Saronia, Part 1"
  },
  {
   "id": 135,
   "off": "36D0A",
   "ja": "{14:06}こだいいせき　ちょうさたい",
-  "en": "{14:06}Ancient Ruins Survey Team"
+  "en": "{14:00}Ancient Ruins Survey Team"
  },
  {
   "id": 136,
   "off": "36D1A",
   "ja": "{14:09}ファルガバード",
-  "en": "{14:09}Falgabard"
+  "en": "{14:08}Falgabard"
  },
  {
   "id": 137,
   "off": "36D24",
   "ja": "{14:08}サスーン　じょう",
-  "en": "{14:08}Sasune Castle"
+  "en": "{14:06}Sasune Castle"
  },
  {
   "id": 138,
   "off": "36D2F",
   "ja": "{14:08}アーガス　じょう",
-  "en": "{14:08}Argus Castle"
+  "en": "{14:07}Argus Castle"
  },
  {
   "id": 139,
   "off": "36D3A",
   "ja": "{14:08}サロニア　じょう",
-  "en": "{14:08}Saronia Castle"
+  "en": "{14:06}Saronia Castle"
  },
  {
   "id": 140,
   "off": "36D45",
   "ja": "{14:08}ドワーフのどうくつ",
-  "en": "{14:08}Cave of the Dwarves"
+  "en": "{14:03}Cave of the Dwarves"
  },
  {
   "id": 141,
   "off": "36D51",
   "ja": "{14:08}バイキングのアジト",
-  "en": "{14:08}Vikings' Hideout"
+  "en": "{14:05}Vikings' Hideout"
  },
  {
   "id": 142,
   "off": "36D5D",
   "ja": "{14:08}グルガンぞくのたに",
-  "en": "{14:08}Valley of the Gulgan Tribe"
+  "en": "{14:00}Valley of the Gulgan Tribe"
  },
  {
   "id": 143,
   "off": "36D69",
   "ja": "{14:07}サスーン　ひだりのとう",
-  "en": "{14:07}Sasune Left Tower"
+  "en": "{14:04}Sasune Left Tower"
  },
  {
   "id": 144,
   "off": "36D77",
   "ja": "{14:07}サスーン　みぎのとう",
-  "en": "{14:07}Sasune Right Tower"
+  "en": "{14:04}Sasune Right Tower"
  },
  {
   "id": 145,
   "off": "36D84",
   "ja": "{14:07}アーガス　ひだりのとう",
-  "en": "{14:07}Argus Left Tower"
+  "en": "{14:05}Argus Left Tower"
  },
  {
   "id": 146,
   "off": "36D92",
   "ja": "{14:07}アーガス　みぎのとう",
-  "en": "{14:07}Argus Right Tower"
+  "en": "{14:04}Argus Right Tower"
  },
  {
   "id": 147,
   "off": "36D9F",
   "ja": "{14:08}えんたくのひろま",
-  "en": "{14:08}Hall of the Round Table"
+  "en": "{14:01}Hall of the Round Table"
  },
  {
   "id": 148,
   "off": "36DAA",
   "ja": "{14:08}さんちょうへつづくみち",
-  "en": "{14:08}Path to the Summit"
+  "en": "{14:04}Path to the Summit"
  },
  {
   "id": 149,
   "off": "36DB8",
   "ja": "{14:09}チョコボのもり",
-  "en": "{14:09}Chocobo Forest"
+  "en": "{14:06}Chocobo Forest"
  },
  {
   "id": 150,
   "off": "36DC2",
   "ja": "{14:09}いきてるもり",
-  "en": "{14:09}Living Forest"
+  "en": "{14:06}Living Forest"
  },
  {
   "id": 151,
   "off": "36DCB",
   "ja": "{14:09}バハムートのす",
-  "en": "{14:09}Bahamut's Nest"
+  "en": "{14:06}Bahamut's Nest"
  },
  {
   "id": 152,
   "off": "36DD5",
   "ja": "{14:08}シドのひくうてい",
-  "en": "{14:08}Cid's Airship"
+  "en": "{14:06}Cid's Airship"
  },
  {
   "id": 153,
   "off": "36DE0",
   "ja": "{14:08}ネプトのしんでん",
-  "en": "{14:08}Temple of Nept"
+  "en": "{14:06}Temple of Nept"
  },
  {
   "id": 154,
   "off": "36DEB",
   "ja": "{14:08}ミスリルこうざん",
-  "en": "{14:08}Mythril Mine"
+  "en": "{14:07}Mythril Mine"
  },
  {
   "id": 155,
   "off": "36DF6",
   "ja": "{14:0A}ウルのいど",
-  "en": "{14:0A}Well of Ur"
+  "en": "{14:08}Well of Ur"
  },
  {
   "id": 156,
   "off": "36DFE",
   "ja": "{14:08}ふういんのどうくつ",
-  "en": "{14:08}Sealed Cave"
+  "en": "{14:07}Sealed Cave"
  },
  {
   "id": 157,
   "off": "36E0A",
   "ja": "{14:08}ほのおのどうくつ",
-  "en": "{14:08}Cave of Flame"
+  "en": "{14:06}Cave of Flame"
  },
  {
   "id": 158,
@@ -957,49 +957,49 @@
   "id": 159,
   "off": "36E21",
   "ja": "{14:08}サロニア　その2",
-  "en": "{14:08}Saronia, Part 2"
+  "en": "{14:05}Saronia, Part 2"
  },
  {
   "id": 160,
   "off": "36E2C",
   "ja": "{14:08}サロニア　その3",
-  "en": "{14:08}Saronia, Part 3"
+  "en": "{14:05}Saronia, Part 3"
  },
  {
   "id": 161,
   "off": "36E37",
   "ja": "{14:08}サロニア　その4",
-  "en": "{14:08}Saronia, Part 4"
+  "en": "{14:05}Saronia, Part 4"
  },
  {
   "id": 162,
   "off": "36E42",
   "ja": "{14:07}サロニアのせんじょう",
-  "en": "{14:07}Saronia Battlefield"
+  "en": "{14:03}Saronia Battlefield"
  },
  {
   "id": 163,
   "off": "36E4F",
   "ja": "{14:0A}ちていこ",
-  "en": "{14:0A}Underground Lake"
+  "en": "{14:05}Underground Lake"
  },
  {
   "id": 164,
   "off": "36E56",
   "ja": "{14:07}トーザスのぬけみち",
-  "en": "{14:07}Tozus Back Passage"
+  "en": "{14:04}Tozus Back Passage"
  },
  {
   "id": 165,
   "off": "36E62",
   "ja": "{14:09}オーエンのとう",
-  "en": "{14:09}Tower of Owen"
+  "en": "{14:06}Tower of Owen"
  },
  {
   "id": 166,
   "off": "36E6C",
   "ja": "{14:09}ハインのしろ",
-  "en": "{14:09}Hein's Castle"
+  "en": "{14:06}Hein's Castle"
  },
  {
   "id": 167,
@@ -1011,13 +1011,13 @@
   "id": 168,
   "off": "36E84",
   "ja": "{14:08}かぜのクリスタル",
-  "en": "{14:08}Crystal of Wind"
+  "en": "{14:05}Crystal of Wind"
  },
  {
   "id": 169,
   "off": "36E8F",
   "ja": "{14:09}ひのクリスタル",
-  "en": "{14:09}Crystal of Fire"
+  "en": "{14:05}Crystal of Fire"
  },
  {
   "id": 170,
@@ -1029,37 +1029,37 @@
   "id": 171,
   "off": "36EA4",
   "ja": "{14:07}バハムートのどうくつ",
-  "en": "{14:07}Bahamut's Cave"
+  "en": "{14:06}Bahamut's Cave"
  },
  {
   "id": 172,
   "off": "36EB1",
   "ja": "{14:09}ドーガのやかた",
-  "en": "{14:09}Doga's Manor"
+  "en": "{14:07}Doga's Manor"
  },
  {
   "id": 173,
   "off": "36EBB",
   "ja": "{14:09}ウネのほこら",
-  "en": "{14:09}Unne's Shrine"
+  "en": "{14:06}Unne's Shrine"
  },
  {
   "id": 174,
   "off": "36EC4",
   "ja": "{14:0A}なんぱせん",
-  "en": "{14:0A}Shipwreck"
+  "en": "{14:08}Shipwreck"
  },
  {
   "id": 175,
   "off": "36ECC",
   "ja": "{14:09}みずのしんでん",
-  "en": "{14:09}Temple of Water"
+  "en": "{14:05}Temple of Water"
  },
  {
   "id": 176,
   "off": "36ED6",
   "ja": "{14:09}みずのどうくつ",
-  "en": "{14:09}Cave of Water"
+  "en": "{14:06}Cave of Water"
  },
  {
   "id": 177,
@@ -1071,259 +1071,259 @@
   "id": 178,
   "off": "36EE8",
   "ja": "{14:08}ゴールドルのやかた",
-  "en": "{14:08}Goldor's Manor"
+  "en": "{14:06}Goldor's Manor"
  },
  {
   "id": 179,
   "off": "36EF4",
   "ja": "{14:07}まほうじんのどうくつ",
-  "en": "{14:07}Cave of the Magic Circle"
+  "en": "{14:01}Cave of the Magic Circle"
  },
  {
   "id": 180,
   "off": "36F01",
   "ja": "{14:08}ドーガのどうくつ",
-  "en": "{14:08}Doga's Cave"
+  "en": "{14:07}Doga's Cave"
  },
  {
   "id": 181,
   "off": "36F0C",
   "ja": "{14:09}ときのしんでん",
-  "en": "{14:09}Temple of Time"
+  "en": "{14:06}Temple of Time"
  },
  {
   "id": 182,
   "off": "36F16",
   "ja": "{14:08}かいていどうくつ",
-  "en": "{14:08}Undersea Cave"
+  "en": "{14:06}Undersea Cave"
  },
  {
   "id": 183,
   "off": "36F21",
   "ja": "{14:09}たきのうらがわ",
-  "en": "{14:09}Behind the Waterfall"
+  "en": "{14:03}Behind the Waterfall"
  },
  {
   "id": 184,
   "off": "36F2B",
   "ja": "{14:08}あんこくのどうくつ",
-  "en": "{14:08}Cave of Darkness"
+  "en": "{14:05}Cave of Darkness"
  },
  {
   "id": 185,
   "off": "36F37",
   "ja": "{14:09}こだいいせき",
-  "en": "{14:09}Ancient Ruins"
+  "en": "{14:06}Ancient Ruins"
  },
  {
   "id": 186,
   "off": "36F40",
   "ja": "{14:05}きょだいせん　インビンシブル",
-  "en": "{14:05}Great Ship Invincible"
+  "en": "{14:02}Great Ship Invincible"
  },
  {
   "id": 187,
   "off": "36F51",
   "ja": "{14:06}こだいのたみのめいきゅう",
-  "en": "{14:06}Labyrinth of the Ancient People"
+  "en": "{14:00}Labyrinth of the Ancients"
  },
  {
   "id": 188,
   "off": "36F60",
   "ja": "{14:08}クリスタルタワー",
-  "en": "{14:08}Crystal Tower"
+  "en": "{14:06}Crystal Tower"
  },
  {
   "id": 189,
   "off": "36F6B",
   "ja": "{14:09}ザンデのへや",
-  "en": "{14:09}Xande's Chamber"
+  "en": "{14:05}Xande's Chamber"
  },
  {
   "id": 190,
   "off": "36F74",
   "ja": "{14:09}やみのせかい",
-  "en": "{14:09}World of Darkness"
+  "en": "{14:04}World of Darkness"
  },
  {
   "id": 191,
   "off": "36F7D",
   "ja": "{14:0A}ちか1かい",
-  "en": "{14:0A}Basement Floor 1"
+  "en": "{14:05}Basement Floor 1"
  },
  {
   "id": 192,
   "off": "36F85",
   "ja": "{14:08}みずのクリスタル",
-  "en": "{14:08}Crystal of Water"
+  "en": "{14:05}Crystal of Water"
  },
  {
   "id": 193,
   "off": "36F90",
   "ja": "{14:08}つちのクリスタル",
-  "en": "{14:08}Crystal of Earth"
+  "en": "{14:05}Crystal of Earth"
  },
  {
   "id": 194,
   "off": "36F9B",
   "ja": "{14:07}かぜのダーククリスタル",
-  "en": "{14:07}Dark Crystal of Wind"
+  "en": "{14:03}Dark Crystal of Wind"
  },
  {
   "id": 195,
   "off": "36FA9",
   "ja": "{14:07}ひのダーククリスタル",
-  "en": "{14:07}Dark Crystal of Fire"
+  "en": "{14:03}Dark Crystal of Fire"
  },
  {
   "id": 196,
   "off": "36FB6",
   "ja": "{14:07}みずのダーククリスタル",
-  "en": "{14:07}Dark Crystal of Water"
+  "en": "{14:02}Dark Crystal of Water"
  },
  {
   "id": 197,
   "off": "36FC4",
   "ja": "{14:07}つちのダーククリスタル",
-  "en": "{14:07}Dark Crystal of Earth"
+  "en": "{14:02}Dark Crystal of Earth"
  },
  {
   "id": 198,
   "off": "36FD2",
   "ja": "{14:07}サロニアのちかのめいろ",
-  "en": "{14:07}Saronia Underground Maze"
+  "en": "{14:01}Saronia Underground Maze"
  },
  {
   "id": 199,
   "off": "36FE0",
   "ja": "{14:07}きんだんのち　エウレカ",
-  "en": "{14:07}Forbidden Land Eureka"
+  "en": "{14:02}Forbidden Land Eureka"
  },
  {
   "id": 200,
   "off": "36FEE",
   "ja": "{14:0A}ちか2かい",
-  "en": "{14:0A}Basement Floor 2"
+  "en": "{14:05}Basement Floor 2"
  },
  {
   "id": 201,
   "off": "36FF6",
   "ja": "{14:0A}ちか3かい",
-  "en": "{14:0A}Basement Floor 3"
+  "en": "{14:05}Basement Floor 3"
  },
  {
   "id": 202,
   "off": "36FFE",
   "ja": "{14:0A}ちか4かい",
-  "en": "{14:0A}Basement Floor 4"
+  "en": "{14:05}Basement Floor 4"
  },
  {
   "id": 203,
   "off": "37006",
   "ja": "{14:0A}ちか5かい",
-  "en": "{14:0A}Basement Floor 5"
+  "en": "{14:05}Basement Floor 5"
  },
  {
   "id": 204,
   "off": "3700E",
   "ja": "{14:0A}ちか6かい",
-  "en": "{14:0A}Basement Floor 6"
+  "en": "{14:05}Basement Floor 6"
  },
  {
   "id": 205,
   "off": "37016",
   "ja": "{14:0A}ちか7かい",
-  "en": "{14:0A}Basement Floor 7"
+  "en": "{14:05}Basement Floor 7"
  },
  {
   "id": 206,
   "off": "3701E",
   "ja": "{14:0A}ちか8かい",
-  "en": "{14:0A}Basement Floor 8"
+  "en": "{14:05}Basement Floor 8"
  },
  {
   "id": 207,
   "off": "37026",
   "ja": "{14:0B}2かい",
-  "en": "{14:0B}Floor 2"
+  "en": "{14:09}Floor 2"
  },
  {
   "id": 208,
   "off": "3702C",
   "ja": "{14:0B}3かい",
-  "en": "{14:0B}Floor 3"
+  "en": "{14:09}Floor 3"
  },
  {
   "id": 209,
   "off": "37032",
   "ja": "{14:0B}4かい",
-  "en": "{14:0B}Floor 4"
+  "en": "{14:09}Floor 4"
  },
  {
   "id": 210,
   "off": "37038",
   "ja": "{14:0B}5かい",
-  "en": "{14:0B}Floor 5"
+  "en": "{14:09}Floor 5"
  },
  {
   "id": 211,
   "off": "3703E",
   "ja": "{14:0B}6かい",
-  "en": "{14:0B}Floor 6"
+  "en": "{14:09}Floor 6"
  },
  {
   "id": 212,
   "off": "37044",
   "ja": "{14:0B}7かい",
-  "en": "{14:0B}Floor 7"
+  "en": "{14:09}Floor 7"
  },
  {
   "id": 213,
   "off": "3704A",
   "ja": "{14:0B}8かい",
-  "en": "{14:0B}Floor 8"
+  "en": "{14:09}Floor 8"
  },
  {
   "id": 214,
   "off": "37050",
   "ja": "{14:0B}9かい",
-  "en": "{14:0B}Floor 9"
+  "en": "{14:09}Floor 9"
  },
  {
   "id": 215,
   "off": "37056",
   "ja": "{14:0A}10かい",
-  "en": "{14:0A}Floor 10"
+  "en": "{14:09}Floor 10"
  },
  {
   "id": 216,
   "off": "3705D",
   "ja": "{14:0B}1かい",
-  "en": "{14:0B}Floor 1"
+  "en": "{14:09}Floor 1"
  },
  {
   "id": 217,
   "off": "37063",
   "ja": "{14:07}サロニアのとしょかん",
-  "en": "{14:07}Saronia Library"
+  "en": "{14:05}Saronia Library"
  },
  {
   "id": 218,
   "off": "37070",
   "ja": "{14:09}ドーガのむら",
-  "en": "{14:09}Village of Doga"
+  "en": "{14:05}Village of Doga"
  },
  {
   "id": 219,
   "off": "37079",
   "ja": "{14:09}かいふくのもり",
-  "en": "{14:09}Forest of Healing"
+  "en": "{14:04}Forest of Healing"
  },
  {
   "id": 220,
   "off": "37083",
   "ja": "{14:08}サスーンおうのま",
-  "en": "{14:08}King of Sasune's Chamber"
+  "en": "{14:01}King of Sasune's Chamber"
  },
  {
   "id": 221,

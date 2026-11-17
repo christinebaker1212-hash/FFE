@@ -108,7 +108,7 @@ PLACES = {
  175:'Temple of Water', 176:'Cave of Water', 177:'Sewer', 178:"Goldor's Manor",
  179:'Cave of the Magic Circle', 180:"Doga's Cave", 181:'Temple of Time', 182:'Undersea Cave',
  183:'Behind the Waterfall', 184:'Cave of Darkness', 185:'Ancient Ruins',
- 186:'Great Ship Invincible', 187:'Labyrinth of the Ancient People', 188:'Crystal Tower',
+ 186:'Great Ship Invincible', 187:'Labyrinth of the Ancients', 188:'Crystal Tower',
  189:"Xande's Chamber", 190:'World of Darkness', 191:'Basement Floor 1',
  192:'Crystal of Water', 193:'Crystal of Earth', 194:'Dark Crystal of Wind',
  195:'Dark Crystal of Fire', 196:'Dark Crystal of Water', 197:'Dark Crystal of Earth',
@@ -118,9 +118,9 @@ PLACES = {
 }
 for n in range(2, 9): PLACES[198 + n] = 'Basement Floor %d' % n
 for n in range(2, 11): PLACES[205 + n] = 'Floor %d' % n
-for i, name in PLACES.items():
-    col = re.match(r'\{14:[0-9A-F]{2}\}', rows[i]['ja']).group(0)
-    T[i] = col + name
+for i, name in PLACES.items():         # centred in the place window (26 cells), as the Japanese
+    assert len(name) <= 26, name
+    T[i] = '{14:%02X}' % ((26 - len(name)) // 2) + name
 T.update({221:' Head', 222:' Body', 223:' Arms', 224:' Right Hand', 225:' Left Hand'})
 # job names: the Japanese gives a job 7 cells (menus, status); the English ones longer than 7
 # letters are drawn there in condensed letters (insert.py), which hold up to about 13.
