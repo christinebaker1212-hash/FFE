@@ -240,89 +240,14 @@ tsel:           ; bank 53 $A616 (battle string copy, $1A/$1B = address of the po
     lda #$40
     sta $1B
     rts
-btidy:          ; bank 52 converter: tidy BUF ($7AD7) and choose the split (BSPL, BL1)
-    ldx #0          ; tidy: no trailing or double spaces; leading spaces dropped in the
-    ldy #0          ;   boxes (12 or more wide), one kept in a list entry (the cursor column)
-    lda #0
-    sta TMP
-    lda $18
-    cmp #12
-    bcc .n
-    dec TMP
-.n:
-    lda $7AD7,x
-    beq .e
-    inx
-    cmp #$FF
-    bne .c
-    cmp TMP
-    beq .n
-.c:
-    sta TMP
-    sta $7AD7,y
-    iny
-    bne .n
-.e:
-    lda TMP
-    cmp #$FF
-    bne .t
-    cpy #0
-    beq .t
-    dey
-.t:
-    lda #0
-    sta $7AD7,y
-    sty BLEN
-    lda #$FF
-    sta BCOST
-    sta BSPL
-    cpy $18
-    beq .r
-    bcc .r
-    ldx #0          ; split candidates: a space (first part x long) or a hyphen (x+1)
-.p:
-    lda $7AD7,x
-    beq .r
-    cmp #$FF
-    beq .sp
-    cmp #$C2
-    bne .nx
-    txa
-    clc
-    adc #1
-    bne .k
-.sp:
-    txa
-.k:
-    sta TMP
-    cmp $18
-    beq .k1
-    bcs .r
-.k1:
-    stx BX          ; (rest = BLEN - x - 1)
-    lda BLEN
-    clc
-    sbc BX
-    cmp $18
-    beq .k2
-    bcs .nx
-.k2:
-    cmp TMP
-    bcs .m
-    lda TMP
-.m:
-    cmp BCOST
-    bcs .nx
-    sta BCOST
-    stx BSPL
-    lda TMP
-    sta BL1
-    jmp .nx2
-.nx:
-.nx2:
-    inx
-    bne .p
-.r:
+btidyf:         ; bank 52 converter: btidy (bank EB)
+    inc $A9
+    lda #$80+EB
+    sta $5115
+    jsr $A006
+    lda #$80+53
+    sta $5115
+    dec $A9
     rts
 slotcopy:       ; bank 52 status line ($9C2E spell, $9C47 command, $9C79 ailment: JSR $A609)
     sta ISAV
@@ -548,7 +473,7 @@ bconv:              ;   rows $18 wide; the Japanese converter (dakuten on the ro
 bconvb:             ; box texts and command entries (call sites patched): the text is
     lda $18         ;   tidied and, wider than the box, split over the box's two rows at
     jsr $A558       ;   the most even space (or after a hyphen)
-    jsr btidy
+    jsr btidyf
 .w:
     ldx #0
     lda BSPL
@@ -678,6 +603,7 @@ ENFIX_SRC = '''
     org $A000
     jmp enfix
     jmp iconv
+    jmp btidy
 enfix:
     lda $24
     bne .a
@@ -939,6 +865,90 @@ iconv:              ; battle item entry ($7AD7: mark, ':' at $0A, count at $0B/$
     iny
     bne .u
 .ur:
+    rts
+btidy:          ; bank 52 converter: tidy BUF ($7AD7) and choose the split (BSPL, BL1)
+    ldx #0          ; tidy: no trailing or double spaces; leading spaces dropped in the
+    ldy #0          ;   boxes (12 or more wide), one kept in a list entry (the cursor column)
+    lda #0
+    sta TMP
+    lda $18
+    cmp #12
+    bcc .n
+    dec TMP
+.n:
+    lda $7AD7,x
+    beq .e
+    inx
+    cmp #$FF
+    bne .c
+    cmp TMP
+    beq .n
+.c:
+    sta TMP
+    sta $7AD7,y
+    iny
+    bne .n
+.e:
+    lda TMP
+    cmp #$FF
+    bne .t
+    cpy #0
+    beq .t
+    dey
+.t:
+    lda #0
+    sta $7AD7,y
+    sty BLEN
+    lda #$FF
+    sta BCOST
+    sta BSPL
+    cpy $18
+    beq .r
+    bcc .r
+    ldx #0          ; split candidates: a space (first part x long) or a hyphen (x+1)
+.p:
+    lda $7AD7,x
+    beq .r
+    cmp #$FF
+    beq .sp
+    cmp #$C2
+    bne .nx
+    txa
+    clc
+    adc #1
+    bne .k
+.sp:
+    txa
+.k:
+    sta TMP
+    cmp $18
+    beq .k1
+    bcs .r
+.k1:
+    stx BX          ; (rest = BLEN - x - 1)
+    lda BLEN
+    clc
+    sbc BX
+    cmp $18
+    beq .k2
+    bcs .nx
+.k2:
+    cmp TMP
+    bcs .m
+    lda TMP
+.m:
+    cmp BCOST
+    bcs .nx
+    sta BCOST
+    stx BSPL
+    lda TMP
+    sta BL1
+    jmp .nx2
+.nx:
+.nx2:
+    inx
+    bne .p
+.r:
     rts
 POOL:
 '''
