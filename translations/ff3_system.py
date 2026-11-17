@@ -53,10 +53,10 @@ T = {
      '  Intelligence .. {10:3B}{14:0D}Evasion rate{14:15}.. {10:41}\n'
      '  Spirit       .. {10:3C}{14:0D}Magic defense{14:15}..{10:36}\n'
      '{14:0D}Magic evasion rate.. {10:40}',
- 75: 'Please choose the file to save to.',
- 76: 'This will erase the previous data.{15:0E}Yes{15:12}No',
+ 75: '{0E}Please choose the\nfile to save to.',
+ 76: '{0E}The old data will be\nerased.{15:0E}Yes{15:12}No',
  77: 'Saving is complete.',
- 78: 'Hold in RESET while you turn the power off.',
+ 78: '{0E}Hold RESET while you\nturn the power off.',
  79: 'Thank you very much.\nPlease rest well...',
  80: 'Your inventory is full.',
  81: 'Fat Chocobo: "Yooo,\n need somethiiing?"',

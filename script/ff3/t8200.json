@@ -453,13 +453,13 @@
   "id": 75,
   "off": "3697F",
   "ja": "セーブするファイルをえらんでください",
-  "en": "Please choose the file to save to."
+  "en": "{0E}Please choose the\nfile to save to."
  },
  {
   "id": 76,
   "off": "36992",
   "ja": "まえのデーターをけします{15:0E}はい{15:12}いいえ",
-  "en": "This will erase the previous data.{15:0E}Yes{15:12}No"
+  "en": "{0E}The old data will be\nerased.{15:0E}Yes{15:12}No"
  },
  {
   "id": 77,
@@ -471,7 +471,7 @@
   "id": 78,
   "off": "369B6",
   "ja": "リセットをおしながらスイッチをきりましょう",
-  "en": "Hold in RESET while you turn the power off."
+  "en": "{0E}Hold RESET while you\nturn the power off."
  },
  {
   "id": 79,
