@@ -73,11 +73,11 @@ def vlen(s):
 SPEAKER = re.compile(r'^(\{1[0-3]:..\}|\{18:..\}|\{07\}|[A-Z][\w\'-]*(?: [A-Z][\w\'-]*)?): "')
 
 def paragraphs(text):
-    """Japanese line breaks are layout, except blank lines, speaker turns and indented
-    lines, which start a new paragraph."""
+    """Japanese line breaks are layout, except blank lines, speaker turns, lines opening
+    a quotation and indented lines, which start a new paragraph."""
     paras = []
     for line in text.split('\n'):
-        if paras and line and paras[-1] and not SPEAKER.match(line) and not line.startswith(' ') \
+        if paras and line and paras[-1] and not SPEAKER.match(line) and not line.startswith((' ', '"')) \
                 and not paras[-1].startswith(' '):
             paras[-1] += ' ' + line
         else: paras.append(line)
@@ -159,16 +159,45 @@ def put_table(rom, name, banks, table, report):
 def insert_names(rom, report):
     """Names (items, spells, key words; {18:xx}) stay in bank 10 at tables $8200/$8300,
     strings in the space the dialogue (now banks 18/19) used."""
-    bank = Bank(rom, 10, [(0x8600, 0xA920 + 0x0720)])     # dialogue_a + old names area
+    bank = Bank(rom, 10, [(0x8600, 0xC000)])        # dialogue_a, names, system areas
     for e in json.load(open('script/ff2/names.json')):
         bank.put_ptr(0x8200 + 2 * e['id'], bank.alloc(enc(e['en'] or ' ') + b'\0'))
-    report.append('names bank 10 free: %d' % sum(y - x for x, y in bank.free))
+    return bank
+
+SYS_W = {i: 26 for i in list(range(0, 12)) + list(range(13, 21)) + [22, 25, 63, 64, 68, 71, 72, 76, 77]}
+SYS_W.update({i: 28 for i in range(42, 63)})
+PROLOGUE = 73                       # window 24: 28 columns, 26 rows
+
+def system_strings(rom, report, bank):
+    """System strings (table bank 10 $8400) after the names. Messages (SYS_W) are drawn
+    one row per line, reflowed to their window like the dialogue (the Japanese indents
+    each line by a space); menu layouts
+    keep the Japanese structure; the prologue is reflowed by paragraph and centred."""
+    one = set(SYS_W) | {PROLOGUE}
+    for e in json.load(open('script/ff2/system.json')):
+        t = e['en']
+        if e['id'] in SYS_W:
+            t = layout('\n'.join(l.strip() for l in t.split('\n')), SYS_W[e['id']])
+        elif e['id'] == PROLOGUE:
+            lines = []
+            for para in t.split('\n\n'):
+                if lines: lines.append('')
+                for l in flow(' '.join(para.split('\n')), 28):
+                    lines.append(' ' * ((28 - vlen(l)) // 2) + l)
+            assert len(lines) <= 26, len(lines)
+            t = '\n'.join(lines)
+        bank.put_ptr(0x8400 + 2 * e['id'], bank.alloc(enc(t) + b'\0'))
+    bits = bytearray(32)
+    for i in one: bits[i >> 3] |= 1 << (i & 7)
+    report.append('names+system bank 10 free: %d' % sum(y - x for x, y in bank.free))
+    return bytes(bits)
 
 EXRAM_SRC = '''
     org $5C00
 TMP:    .ds 1
 ONE:    .ds 1
     .ds 14
+SYSONE: .ds 32  ; one-row system strings (bit k of byte n: id 8n+k)
 dlgbank:        ; bank 14 $962F: dialogue bank from the map ($A0) and the id ($92)
     lda $A0
     cmp #$60
@@ -202,6 +231,30 @@ txton:          ; $EAAC (text drawing starts; window frames are drawn elsewhere 
 .n:
     lda #0
     sta ONE
+    lda $93     ; system strings (bank 10, table $8400): per-id bitmap
+    cmp #10
+    bne .r
+    lda $95
+    cmp #$84
+    bne .r
+    lda $92
+    lsr a
+    lsr a
+    lsr a
+    tax
+    lda $92
+    and #7
+    tay
+    lda SYSONE,x
+.s:
+    dey
+    bmi .t
+    lsr a
+    jmp .s
+.t:
+    and #1
+    sta ONE
+.r:
     rts
 txtend:         ; $EAD8 (end of the text): in one-row mode blank the window's rows below
     lda ONE     ;   it (the scroll redraws from a later line; rows past the end would keep
@@ -300,11 +353,13 @@ INIT_SRC = '''
 def jsr(a): return bytes([0x20, a & 0xFF, a >> 8])
 def jmp(a): return bytes([0x4C, a & 0xFF, a >> 8])
 
-def engine(rom, report):
+def engine(rom, report, sysbits):
     ex = asm(EXRAM_SRC, syms={'DB': DB_BANK, 'DA': DA_BANK, 'SB': SPLIT['dialogue_b'], 'SA': SPLIT['dialogue_a'], 'R0': ONE_ROW[0], 'R1': ONE_ROW[1]})
     assert ex.org + len(ex.bytes) <= 0x6000
     rom[HDR + CODE_BANK * BANK:HDR + (CODE_BANK + 1) * BANK] = b'\xFF' * BANK
-    rom[HDR + CODE_BANK * BANK:HDR + CODE_BANK * BANK + len(ex.bytes)] = ex.bytes
+    img = bytearray(ex.bytes)
+    k = ex.labels['SYSONE'] - ex.org; img[k:k + 32] = sysbits
+    rom[HDR + CODE_BANK * BANK:HDR + CODE_BANK * BANK + len(img)] = img
     report.append('ExRAM code: %d bytes' % len(ex.bytes))
     L = ex.labels
     init = asm(INIT_SRC, syms={'CODE2': CODE_BANK * 2})
@@ -337,10 +392,11 @@ if __name__ == '__main__':
     report = []
     for e in json.load(open('script/ff2/names.json')): NAMES[e['id']] = e['en']
     font(rom)
-    insert_names(rom, report)
+    b10 = insert_names(rom, report)
+    sysbits = system_strings(rom, report, b10)
     put_table(rom, 'dialogue_b', [DB_BANK, DB_BANK + 1], 0x8000, report)
     put_table(rom, 'dialogue_a', [DA_BANK, DA_BANK + 1], 0x8000, report)
     put_table(rom, 'events', [EV_BANK], 0x8000, report)
-    engine(rom, report)
+    engine(rom, report, sysbits)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report))

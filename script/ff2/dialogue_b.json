@@ -15,13 +15,13 @@
   "id": 2,
   "off": "58231",
   "ja": "のばらは　{18:2F}のくにの　もんしょうです\n{18:2F}‥‥ああ　{18:2F}は　どうなるのでしょう。\nとらわれたひとびとが　{18:2F}にあつめられているのを\nみたというものがいます‥‥\nそういえば　{11:02}のおにいさんの\n{07}も　ゆくえしれずでしたね。\nもしかすると　{18:2F}のまちにいるかもしれません。\n\nただ　いまでは　{18:2F}は　モンスターが　うろつく\nきけんなまちに　なっています。\nかんたんには　ちかづけないでしょう。\n",
-  "en": "The wild rose is the crest of the kingdom of {18:2F}.\n{18:2F}... ahh, what will become of {18:2F}?\nSomeone says they saw the captured people\nbeing gathered in {18:2F}...\nNow that I think of it, {11:02}'s older brother\n{07} is missing as well, isn't he.\nPerhaps he is in the town of {18:2F}.\n\nBut {18:2F} has now become a dangerous town\nwhere monsters prowl.\nIt won't be easy to get near it.\n."
+  "en": "The wild rose is the crest of the kingdom of {18:2F}.\n{18:2F}... ahh, what will become of {18:2F}?\nSomeone says they saw the captured people\nbeing gathered in {18:2F}...\nNow that I think of it, {11:02}'s older brother\n{07} is missing as well, isn't he.\nPerhaps he is in the town of {18:2F}.\n\nBut {18:2F} has now become a dangerous town\nwhere monsters prowl.\nIt won't be easy to get near it.\n"
  },
  {
   "id": 3,
   "off": "582F6",
   "ja": "{18:EF}「その{18:01}は　スコットのものですね!\nかれは　いきているんですか?!\n{10:02}「おうじは　{18:2F}のまちに　いました。\n{18:EC}たちに　この{18:01}をたくすと　ちからつきて‥‥\n{18:EF}「‥‥それでは　その{18:01}は　かたみのしな‥‥\nかれは　なにかいっていませんでしたか?\n{10:02}「‥‥いえ　なにも‥‥\nこの{18:01}を　うけとってください。\n{18:EF}「それは　あなたが　もっていてください。\nゆうきあるものに　ふさわしい　{18:01}です。\n{18:2F}にせんにゅうして　かえってくるとは\nあなたのちからを　みくびっていました。\nはんらんぐんに　ちからをかしてください。\nまほうのきんぞく[{16:09}{18:F2}]を　てにいれるために\nつよいせんしを　ひつようとしているのです。\n",
-  "en": "{18:EF}: \"That {18:01} is Scott's!\nIs he alive?!\"\n{10:02}: \"The prince was in the town of {18:2F}.\n{18:EC} and my companions were entrusted with this {18:01}, and then his strength gave out...\"\n{18:EF}: \"...Then that {18:01} is all he left behind...\nDid he say anything?\"\n{10:02}: \"...No, nothing...\nPlease take this {18:01}.\"\n{18:EF}: \"Please keep it yourself.\nIt is a {18:01} fit for one with courage.\nTo think you slipped into {18:2F} and came back...\nI underestimated your strength.\nPlease lend your strength to the rebel army.\nWe need strong warriors to obtain\nthe magic metal [{16:09}{18:F2}].\"\n."
+  "en": "{18:EF}: \"That {18:01} is Scott's!\nIs he alive?!\"\n{10:02}: \"The prince was in the town of {18:2F}.\n{18:EC} and my companions were entrusted with this {18:01}, and then his strength gave out...\"\n{18:EF}: \"...Then that {18:01} is all he left behind...\nDid he say anything?\"\n{10:02}: \"...No, nothing...\nPlease take this {18:01}.\"\n{18:EF}: \"Please keep it yourself.\nIt is a {18:01} fit for one with courage.\nTo think you slipped into {18:2F} and came back...\nI underestimated your strength.\nPlease lend your strength to the rebel army.\nWe need strong warriors to obtain\nthe magic metal [{16:09}{18:F2}].\"\n"
  },
  {
   "id": 4,
@@ -69,7 +69,7 @@
   "id": 11,
   "off": "586F6",
   "ja": "バフスクの　なかまが　せんかんにたどりつく\nぬけみちをみつけたそうです。\nせんかんを　はかいしてください。　せめて　かんせいを\nおくらせるだけでも　かまいません。\nあなたがたと　{13:02}のちからなら　できないことは\nないと　しんじています。\n",
-  "en": "Our comrades in Bafsk say they have found\na secret passage that leads to the battleship.\nPlease destroy the battleship. Even just delaying\nits completion will do.\nWith your strength and {13:02}'s, I believe\nthere is nothing you cannot do.\n."
+  "en": "Our comrades in Bafsk say they have found\na secret passage that leads to the battleship.\nPlease destroy the battleship. Even just delaying\nits completion will do.\nWith your strength and {13:02}'s, I believe\nthere is nothing you cannot do.\n"
  },
  {
   "id": 12,
@@ -165,7 +165,7 @@
   "id": 27,
   "off": "58D2D",
   "ja": "{18:EF}「やっと　ここにもどってくることができました\nこれも　みんながちからを　あわせたけっかです。\nみなさんに　かんしゃします。\n\nひとつ　きがかりなのは　{18:F8}へむかった　ミンウ\nのことです。　あれから　なんのれんらくもありません。\n[{16:01}{18:F8}]へ　いってくれませんか?\n",
-  "en": "{18:EF}: \"At last we have been able to come back here.\nThis, too, is the result of everyone joining forces.\nI thank you all.\n\nOne thing that weighs on me is Minwu, who headed\nfor {18:F8}. There has been no word from him since.\nWould you go to [{16:01}{18:F8}]?\"\n."
+  "en": "{18:EF}: \"At last we have been able to come back here.\nThis, too, is the result of everyone joining forces.\nI thank you all.\n\nOne thing that weighs on me is Minwu, who headed\nfor {18:F8}. There has been no word from him since.\nWould you go to [{16:01}{18:F8}]?\"\n"
  },
  {
   "id": 28,
@@ -273,7 +273,7 @@
   "id": 45,
   "off": "59179",
   "ja": "{18:EF}「{18:EE}は　{07}だったのね‥‥\nあなたがたの　なかまだったのに‥‥\n{11:02}「せっとくしてみます。　きっと{18:F0}の\nまほうかなにかで　あやつられているんです。\n{18:EF}「{18:EE}は　{18:F0}のあとをつぎ\n[{16:01}{18:F4}]じょうにいるでしょう。\n",
-  "en": "{18:EF}: \"So the {18:EE} was {07}...\nAnd he was your friend...\"\n{11:02}: \"I'll try to persuade him. He must surely be\ncontrolled by the {18:F0}'s magic or something.\"\n{18:EF}: \"The {18:EE} has succeeded the {18:F0}\nand will be in Castle [{16:01}{18:F4}].\"\n."
+  "en": "{18:EF}: \"So the {18:EE} was {07}...\nAnd he was your friend...\"\n{11:02}: \"I'll try to persuade him. He must surely be\ncontrolled by the {18:F0}'s magic or something.\"\n{18:EF}: \"The {18:EE} has succeeded the {18:F0}\nand will be in Castle [{16:01}{18:F4}].\"\n"
  },
  {
   "id": 46,
@@ -309,7 +309,7 @@
   "id": 51,
   "off": "592EF",
   "ja": "ミンウ「{18:2F}からかえってきたようだな。\nきみたちを　まっていた。　ともにたたかおう。\nきみたちに　{18:EC}の{18:02}を　あげよう。\n\n　　　　　ミンウが　なかまになった!\n　　　　　カヌーを　てにいれた!\n",
-  "en": "Minwu: \"So you've come back from {18:2F}.\nI was waiting for you. Let us fight together.\n{18:EC} shall give you my {18:02}.\"\n\n     Minwu joined the party!\n     Obtained the Canoe!\n."
+  "en": "Minwu: \"So you've come back from {18:2F}.\nI was waiting for you. Let us fight together.\n{18:EC} shall give you my {18:02}.\"\n\n     Minwu joined the party!\n     Obtained the Canoe!\n"
  },
  {
   "id": 52,
@@ -399,7 +399,7 @@
   "id": 66,
   "off": "596D6",
   "ja": "{18:EB}「{18:08}を　とってこれるのは\n{18:EC}だけだとおもい　ここへかえってきたんだ。\n{18:07}を　さがしにいこうと　したんだが\nなぜか　なかには　モンスターがすみついていて\nひとりでは　すすめず　かといって　てぶらでも\nもどれず　ここで　とほうにくれていたんだ。\n{11:02}「しろのことには　くわしいんでしょう?\n\n{18:EB}「このしろは　なぞだらけで　{18:EC}にも\nよくわからないんだ。\nあんないは　できないが　{18:EC}を　なかまに\nくわえてくれないか?\n　　　　{18:EB}　が　くわわった!\n",
-  "en": "{18:EB}: \"I thought that {18:EC} was the only one who could\nget the {18:08}, so I came back here.\nI tried to go looking for the {18:07},\nbut for some reason monsters have made their home inside,\nand I couldn't go on alone, but I couldn't go back\nempty-handed either, so I was at a loss here.\"\n{11:02}: \"You know all about the castle, don't you?\"\n\n{18:EB}: \"This castle is full of mysteries; even {18:EC}\ndon't really understand it.\nI can't guide you, but would you let me\njoin your party?\"\n    {18:EB} joined!\n."
+  "en": "{18:EB}: \"I thought that {18:EC} was the only one who could\nget the {18:08}, so I came back here.\nI tried to go looking for the {18:07},\nbut for some reason monsters have made their home inside,\nand I couldn't go on alone, but I couldn't go back\nempty-handed either, so I was at a loss here.\"\n{11:02}: \"You know all about the castle, don't you?\"\n\n{18:EB}: \"This castle is full of mysteries; even {18:EC}\ndon't really understand it.\nI can't guide you, but would you let me\njoin your party?\"\n    {18:EB} joined!\n"
  },
  {
   "id": 67,
@@ -501,7 +501,7 @@
   "id": 83,
   "off": "59B5E",
   "ja": "{18:EB}「{07}は　{11:02}の\nおにいさんだろ。　たたかうわけには　いかないだろう。\n{10:02}「いや　おれたちがじぶんで　けっちゃくを\nつけるよ。\n{18:EB}「‥‥きみならそういうと　おもったよ。\nかならず　いきてかえってきてくれ!\n",
-  "en": "{18:EB}: \"{07} is {11:02}'s\nolder brother, isn't he. You can't fight him.\"\n{10:02}: \"No, we'll settle this\nourselves.\"\n{18:EB}: \"...I thought you'd say that.\nBe sure to come back alive!\"\n."
+  "en": "{18:EB}: \"{07} is {11:02}'s\nolder brother, isn't he. You can't fight him.\"\n{10:02}: \"No, we'll settle this\nourselves.\"\n{18:EB}: \"...I thought you'd say that.\nBe sure to come back alive!\"\n"
  },
  {
   "id": 84,
@@ -537,7 +537,7 @@
   "id": 89,
   "off": "59D0E",
   "ja": "ポール「{10:02}じゃねえか!!\nいやー　たすかったぜ。　このこは　ヨーゼフのむすめさ\nボーゲンが　このこをひとじちにとって　ヨーゼフを\nおどしていたんだ。\nおれは　{18:04}のありかをききだして\nここにとりにきたわけさ。　ところが　おれとしたことが\nどじふんじまって　このざまよ。\nおれは　ネリーや　みんなをつれて　さきににげるよ。\nそれじゃーな　ありがとよ!\n",
-  "en": "Paul: \"Well if it ain't {10:02}!!\nMan, you saved my hide. This girl's Josef's daughter.\nBogen took her hostage and was\nthreatening Josef.\nI got out of him where the {18:04} was\nand came here to get it. But then, of all people, me,\nI messed up, and look at me now.\nI'll take Nelly and everyone and get out ahead of you.\nSee ya, and thanks!\"\n."
+  "en": "Paul: \"Well if it ain't {10:02}!!\nMan, you saved my hide. This girl's Josef's daughter.\nBogen took her hostage and was\nthreatening Josef.\nI got out of him where the {18:04} was\nand came here to get it. But then, of all people, me,\nI messed up, and look at me now.\nI'll take Nelly and everyone and get out ahead of you.\nSee ya, and thanks!\"\n"
  },
  {
   "id": 90,
@@ -549,7 +549,7 @@
   "id": 91,
   "off": "59DD5",
   "ja": "{18:2F}じょうのかくしとびら?　しってるぜ!!\nなかには　なにがあるんだ?　{18:0B}?\nなんだ　そんなもの　おれにようはないな。\nよし　おしえてやろう。\nおおひろまの　みぎうえのすみだ。\nおまえも　つくづく　ものずきなやつだ。\nかめん　なんぞとって　なににつかうつもりやら。\n",
-  "en": "A hidden door in Castle {18:2F}? Sure, I know it!!\nWhat's inside? A {18:0B}?\nWhat, that? I got no use for somethin' like that.\nAll right, I'll tell ya.\nIt's in the top right corner of the great hall.\nYou really are an odd one.\nWhat're you plannin' to do, grabbin' a mask?\n."
+  "en": "A hidden door in Castle {18:2F}? Sure, I know it!!\nWhat's inside? A {18:0B}?\nWhat, that? I got no use for somethin' like that.\nAll right, I'll tell ya.\nIt's in the top right corner of the great hall.\nYou really are an odd one.\nWhat're you plannin' to do, grabbin' a mask?\n"
  },
  {
   "id": 92,
@@ -573,13 +573,13 @@
   "id": 95,
   "off": "59EFE",
   "ja": "ポール「あれは　シドの　ゆいごんだったんだよ!!\nわからないのか?　やつはしんじまったんだ!\nしぬってきまったときから　やつは　ひくうせんを\nおまえたちに　ゆずるつもりだったんだ。\nあいつは　ひくうせんをこころから　あいしていたんだ!\nやつの　きもちをわかってやってくれ!!\n",
-  "en": "Paul: \"That was Cid's last will!!\nDon't you get it? He's dead!\nFrom the moment he knew he was gonna die,\nhe meant to leave the airship to you.\nThat guy loved the airship with all his heart!\nTry to understand how he felt!!\"\n."
+  "en": "Paul: \"That was Cid's last will!!\nDon't you get it? He's dead!\nFrom the moment he knew he was gonna die,\nhe meant to leave the airship to you.\nThat guy loved the airship with all his heart!\nTry to understand how he felt!!\"\n"
  },
  {
   "id": 96,
   "off": "59F89",
   "ja": "よくきいてくれた!\nおどろくな　おれは　たこにのって　あのしろの\nおくじょうに　おりたんだ!\nそらから　いくんだ!　そらから!!\nそうか　おまえらなら　ひくうせんで　おくじょうに\nおりられるかもしれねえ!\n",
-  "en": "Glad you asked!\nDon't be shocked, but I rode a kite and\nlanded on the roof of that castle!\nYou go from the sky! From the sky!!\nI got it, maybe you lot could land on the\nroof with the airship!\n."
+  "en": "Glad you asked!\nDon't be shocked, but I rode a kite and\nlanded on the roof of that castle!\nYou go from the sky! From the sky!!\nI got it, maybe you lot could land on the\nroof with the airship!\n"
  },
  {
   "id": 97,
@@ -603,7 +603,7 @@
   "id": 100,
   "off": "5A05A",
   "ja": "ミ　{18:04}か‥‥まだ　みつからないんだ。\nてがかりはあるんだが‥‥\nおっと　まず　みのあかしをたててもらおう。\n\nセミテのたきの　どうくつで　まちのにんげんが\nはたらかされている。　それをたすけてくるんだ。\nそうしたら　しんようしてやろう。\n",
-  "en": "Mi... {18:04}, is it... I haven't found it yet.\nI've got a lead, though...\nHold on, first you'll have to prove yourselves.\n\nThe townsfolk are being worked in the cave\nat Semite Falls. Go and rescue them.\nThen I'll trust you.\n."
+  "en": "Mi... {18:04}, is it... I haven't found it yet.\nI've got a lead, though...\nHold on, first you'll have to prove yourselves.\n\nThe townsfolk are being worked in the cave\nat Semite Falls. Go and rescue them.\nThen I'll trust you.\n"
  },
  {
   "id": 101,
@@ -651,7 +651,7 @@
   "id": 108,
   "off": "5A218",
   "ja": "せつげんのどうくつへは　わしの{18:05}が\nなければ　むりだ。　こうざんに　かくしてあるんだ。\n\n\n1かいに　めじるしの　あおいいわがある。\nそこの　みぎうえのかべに　かくしべやが　あるんだ。\nさあ　いそごう。\n\n　　　　ヨーゼフ　が　くわわった!\n",
-  "en": "You can't get to the cave in the snowfield without my\n{18:05}. It's hidden in the mine.\n\n\nOn the first floor there's a blue rock that marks the spot.\nThere's a hidden room in the wall to the upper right of it.\nCome on, let's hurry.\n\n    Josef joined!\n."
+  "en": "You can't get to the cave in the snowfield without my\n{18:05}. It's hidden in the mine.\n\n\nOn the first floor there's a blue rock that marks the spot.\nThere's a hidden room in the wall to the upper right of it.\nCome on, let's hurry.\n\n    Josef joined!\n"
  },
  {
   "id": 109,
@@ -741,7 +741,7 @@
   "id": 123,
   "off": "5A4D7",
   "ja": "おまえたちも　{18:BF}を　とりにきたのか。\nよし　ここから　だっしゅつして　いっしょにいこう。\nこのさきに　ふねがあるのだが\nそのとちゅうに　てごわいモンスターがいるのだ。\nちからをあわせば　たおせるかもしれない。\n\n　　　りゅうきし　リチャード　が　くわわった!\n",
-  "en": "So you've come for the {18:BF} too.\nRight, let's escape from here and go together.\nThere's a ship up ahead,\nbut there's a tough monster on the way.\nIf we join forces, we might be able to defeat it.\n\n   The Dragon Knight Richard joined!\n."
+  "en": "So you've come for the {18:BF} too.\nRight, let's escape from here and go together.\nThere's a ship up ahead,\nbut there's a tough monster on the way.\nIf we join forces, we might be able to defeat it.\n\n   The Dragon Knight Richard joined!\n"
  },
  {
   "id": 124,
@@ -753,7 +753,7 @@
   "id": 125,
   "off": "5A59C",
   "ja": "{18:2F}おう「そうか　スコットもしんだか。\nスコットは　{18:EF}に　プロポーズしておったが\nその　へんじも　きかずに　いってしまったか‥‥\n\nかれならば　{18:EF}の　むことして　ふさわしいと\nおもったのだが。\n",
-  "en": "King of {18:2F}: \"I see, so Scott is dead too.\nScott had proposed to {18:EF},\nand so he went without ever hearing her answer...\n\nI thought he would have been a fitting husband\nfor {18:EF}.\"\n."
+  "en": "King of {18:2F}: \"I see, so Scott is dead too.\nScott had proposed to {18:EF},\nand so he went without ever hearing her answer...\n\nI thought he would have been a fitting husband\nfor {18:EF}.\"\n"
  },
  {
   "id": 126,
@@ -945,7 +945,7 @@
   "id": 157,
   "off": "5AC17",
   "ja": "せんし「そうか　きみたちは　はんらんぐんだったのか。\n{18:EC}は　スコット。　カシュオーンのおうじだ。\n{10:02}「えっ　あなたが!　うちじに　なさったと\nきいたのですが　いきていたんですね!\nスコット「ああ　だが　もう　ながくはもたない。\nきみたちに　たのみがある。　{18:EC}のおとうとの\n{18:EB}につたえてほしい。　おまえには　すばらしい\nのうりょくがある。　もっと　じしんを　もてと。\n{18:2F}おうにつたえてくれ。\n{18:2F}がやぶれた　げんいんは　ボーゲンはくしゃくが\nうらぎったためだ。　やつはいま　ていこくの\nしょうぐんになっている。\nそれから‥‥{18:EF}。　あいしていると‥‥\nいや　これは　{18:EF}には　つたえないでくれ。\n{18:EC}は　もうしぬ。　{18:EF}は　べつのひとを\nあいすべきだ。\n{11:02}「あの‥‥{18:EC}のあにの　{07}を\nごぞんじありませんか?\nスコット「あいにくだが‥‥やくにたてなくて　すまん。\nそうだ　この{18:01}をあげよう。　きっと　やくにたつ。\nふーっ　つかれた‥‥そろそろ　ねむらせてくれ‥‥\n　　　　　{18:01}を　てにいれた‥‥\n",
-  "en": "Warrior: \"I see, so you're with the rebel army.\n{18:EC} am Scott. The prince of Kashuon.\"\n{10:02}: \"What, you are! We heard you died\nin battle, but you're alive!\"\nScott: \"Yes, but I won't last much longer.\nI have a favor to ask of you. {18:EC} have a younger\nbrother, {18:EB}. Tell him: you have wonderful\nabilities. Have more confidence.\nAnd tell the King of {18:2F}:\nthe reason {18:2F} fell is that Count Bogen\nbetrayed us. He is now a general\nof the Empire.\nAnd... {18:EF}. That I love her...\nNo, don't tell {18:EF} that.\n{18:EC} am going to die. {18:EF} should\nlove someone else.\"\n{11:02}: \"Um... {18:EC} have an older brother, {07}.\nDo you know him?\"\nScott: \"I'm afraid not... sorry I can't be of help.\nAh yes, I'll give you this {18:01}. It will surely help you.\nPhew, I'm tired... let me sleep now...\"\n     Obtained the {18:01}...\n."
+  "en": "Warrior: \"I see, so you're with the rebel army.\n{18:EC} am Scott. The prince of Kashuon.\"\n{10:02}: \"What, you are! We heard you died\nin battle, but you're alive!\"\nScott: \"Yes, but I won't last much longer.\nI have a favor to ask of you. {18:EC} have a younger\nbrother, {18:EB}. Tell him: you have wonderful\nabilities. Have more confidence.\nAnd tell the King of {18:2F}:\nthe reason {18:2F} fell is that Count Bogen\nbetrayed us. He is now a general\nof the Empire.\nAnd... {18:EF}. That I love her...\nNo, don't tell {18:EF} that.\n{18:EC} am going to die. {18:EF} should\nlove someone else.\"\n{11:02}: \"Um... {18:EC} have an older brother, {07}.\nDo you know him?\"\nScott: \"I'm afraid not... sorry I can't be of help.\nAh yes, I'll give you this {18:01}. It will surely help you.\nPhew, I'm tired... let me sleep now...\"\n     Obtained the {18:01}...\n"
  },
  {
   "id": 158,
@@ -1023,7 +1023,7 @@
   "id": 170,
   "off": "5AF73",
   "ja": "こども「おじさんは　りゅうきし?\n{13:02}「ああ。　きみの　おとうさんのともだちさ\nきっと　{18:F0}をたおして　もどってくるよ。\nそうしたら　きみの　おとうさんに　なっていいかな?\nこども「よく　わかんないけど　いいよ。\nぜったい　{18:F0}のやろうを　やっつけてね!!\n",
-  "en": "Child: \"Mister, are you a Dragon Knight?\"\n{13:02}: \"Yes. I'm a friend of your father's.\nI'll defeat the {18:F0} and come back, I promise.\nWhen I do, could I be your father?\"\nChild: \"I don't really get it, but okay.\nYou gotta beat that {18:F0} bastard for sure!!\"\n."
+  "en": "Child: \"Mister, are you a Dragon Knight?\"\n{13:02}: \"Yes. I'm a friend of your father's.\nI'll defeat the {18:F0} and come back, I promise.\nWhen I do, could I be your father?\"\nChild: \"I don't really get it, but okay.\nYou gotta beat that {18:F0} bastard for sure!!\"\n"
  },
  {
   "id": 171,
@@ -1041,7 +1041,7 @@
   "id": 173,
   "off": "5B103",
   "ja": "{18:FA}たちは　ゆうかんに　たたかいました。\nですが　{18:F0}はひれつにも　{18:0E}の　のみみずに\nどくを　いれたのです。\n\n{18:0E}は　かわいそうに　ぜんめつしてしまいました。\n[{16:01}{18:FA}]たちも　{18:0E}のいない　たたかいでは\nかちめがありません‥‥\n",
-  "en": "The {18:FA} fought bravely.\nBut the {18:F0}, the coward, put poison\nin the {18:0E}s' drinking water.\n\nThe poor {18:0E}s were wiped out.\nWithout the {18:0E}s, even the [{16:01}{18:FA}]\nhad no chance of winning...\n."
+  "en": "The {18:FA} fought bravely.\nBut the {18:F0}, the coward, put poison\nin the {18:0E}s' drinking water.\n\nThe poor {18:0E}s were wiped out.\nWithout the {18:0E}s, even the [{16:01}{18:FA}]\nhad no chance of winning...\n"
  },
  {
   "id": 174,
@@ -1137,7 +1137,7 @@
   "id": 189,
   "off": "5B538",
   "ja": "パラメキアのおうは　ほこらしげにいった\n「このしろに　はいれたら　むすめをほうびにやろう　\nがけをよじのぼるもの　トンネルをほるもの‥‥\nみな　しっぱいした。\nあるおとこが　おおきなふくろに　あついくうきを\nつめると　ふわりとうきあがり　おくじょうから\nしんにゅうした\n\nおうは　おこって　とらえようとしたが\nかれは　{18:ED}とともに　ゆうゆうと　そらを\nとんで　にげていったとさ!\n",
-  "en": "The king of Palamecia proudly said,\n.\"To whoever can get into this castle I'll give my daughter as a reward.\"\nThose who climbed the cliffs, those who dug tunnels...\nall of them failed.\nOne man filled a great bag with hot air,\nfloated gently up, and got in\nfrom the roof\n\nThe king was furious and tried to catch him,\nbut he flew calmly away through the sky\ntogether with the {18:ED}, so they say!\n."
+  "en": "The king of Palamecia proudly said,\n.\"To whoever can get into this castle I'll give my daughter as a reward.\"\nThose who climbed the cliffs, those who dug tunnels...\nall of them failed.\nOne man filled a great bag with hot air,\nfloated gently up, and got in\nfrom the roof\n\nThe king was furious and tried to catch him,\nbut he flew calmly away through the sky\ntogether with the {18:ED}, so they say!\n"
  },
  {
   "id": 190,
@@ -1149,7 +1149,7 @@
   "id": 191,
   "off": "5B635",
   "ja": "むかし　たからを　よくぬすまれていた　おうは\nぜったいに　やぶられないかぎを　つくらせた。\nさいしょのかぎは　ひとばんでやぶられた。\nつぎの　かぎは　ふたばんでやぶられた。\nそして　みっつめのかぎは　やぶられなかった。\nおうは　まんぞくして　そのかぎ‥{18:06}‥を\nせつげんのどうくつに　かくした。\n",
-  "en": "Long ago, a king whose treasure was often stolen\nhad an unbreakable lock made.\nThe first lock was broken in one night.\nThe next lock was broken in two nights.\nAnd the third lock was never broken.\nThe king was satisfied, and hid that lock... the {18:06}...\nin the cave of the snowfield.\n."
+  "en": "Long ago, a king whose treasure was often stolen\nhad an unbreakable lock made.\nThe first lock was broken in one night.\nThe next lock was broken in two nights.\nAnd the third lock was never broken.\nThe king was satisfied, and hid that lock... the {18:06}...\nin the cave of the snowfield.\n"
  },
  {
   "id": 192,
@@ -1167,7 +1167,7 @@
   "id": 194,
   "off": "5B77C",
   "ja": "むかし　じごくのまおうのきゅうでん　パンデモニウムが\nあらわれたとき　まどうしたちは　きょうりょくな\nまほうをつくり　ききをのがれた。\n\nそのご　せかいの　こんらんをおそれた　まどうしたちは\nきょだいなとうを　つくり　そこに　まほうのひみつを\nしるしたほんを　ふういんした。\n",
-  "en": "Long ago, when Pandaemonium, the palace of the demon king of hell,\nappeared, the mages created a powerful\nmagic and escaped the crisis.\n\nAfterward, fearing chaos in the world, the mages\nbuilt a giant tower and sealed within it a book\nrecording the secrets of magic.\n."
+  "en": "Long ago, when Pandaemonium, the palace of the demon king of hell,\nappeared, the mages created a powerful\nmagic and escaped the crisis.\n\nAfterward, fearing chaos in the world, the mages\nbuilt a giant tower and sealed within it a book\nrecording the secrets of magic.\n"
  },
  {
   "id": 195,

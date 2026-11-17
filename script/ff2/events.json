@@ -15,7 +15,7 @@
   "id": 2,
   "off": "7482C",
   "ja": "あたいらのまけよ。　さあ　すきにしな!\n\n‥なんで　ころさないんだい?\n\n‥いっしょに　ていこくと　たたかおうだって!\nあたいらみたいな　はぐれものとかい‥\n",
-  "en": "We lose. Go on, do what you want with us!\n\n...Why ain't you killin' us?\n\n...You want us to fight the Empire with you!\nWith a bunch of outcasts like us...\n."
+  "en": "We lose. Go on, do what you want with us!\n\n...Why ain't you killin' us?\n\n...You want us to fight the Empire with you!\nWith a bunch of outcasts like us...\n"
  },
  {
   "id": 3,
@@ -27,7 +27,7 @@
   "id": 4,
   "off": "748C1",
   "ja": "{18:EF}「ミンウ　たすかりますか?\n\nミンウ「はい　じきに　いしきを　とりもどします\nちからづよい　せいめいりょくを　かんじます\n{18:EF}「{18:2F}から　ひなんしてくるとき　このこが\nちみどろになって　たおれているのを　みつけたのです\nあなたなら　たすけられると　おもったのです\n",
-  "en": "{18:EF}: \"Minwu, can he be saved?\"\n\nMinwu: \"Yes, he will soon regain consciousness.\nI sense a strong life force.\"\n{18:EF}: \"When we were fleeing from {18:2F}, I found this boy\nlying covered in blood.\nI thought that you would be able to save him.\"\n."
+  "en": "{18:EF}: \"Minwu, can he be saved?\"\n\nMinwu: \"Yes, he will soon regain consciousness.\nI sense a strong life force.\"\n{18:EF}: \"When we were fleeing from {18:2F}, I found this boy\nlying covered in blood.\nI thought that you would be able to save him.\"\n"
  },
  {
   "id": 5,
@@ -69,7 +69,7 @@
   "id": 11,
   "off": "74A2F",
   "ja": "{10:02}「{11:02}　{12:02}\n{07}は　どこだ?\n{12:02}「{18:2F}の{18:ED}　たすけた　おれたち\n{07}　いなかった\n{10:02}「そうか‥‥だいじょうぶ\nいきているさ　きっと。\n",
-  "en": "{10:02}: \"{11:02}, {12:02}!\nWhere's {07}?\"\n{12:02}: \"{18:ED} of {18:2F} saved us.\n{07} not there.\"\n{10:02}: \"I see... It's all right,\nhe's alive, I'm sure of it.\"\n."
+  "en": "{10:02}: \"{11:02}, {12:02}!\nWhere's {07}?\"\n{12:02}: \"{18:ED} of {18:2F} saved us.\n{07} not there.\"\n{10:02}: \"I see... It's all right,\nhe's alive, I'm sure of it.\"\n"
  },
  {
   "id": 12,
@@ -111,7 +111,7 @@
   "id": 18,
   "off": "74BF2",
   "ja": "{18:2F}おう「{18:EB}　たくましくなったな\nおまえには　わがぐんの　しきをとってもらいたい\nそして　{18:EF}を　たすけてやってくれ\n{13:02}「はっ　いのちをかけて!\n{18:2F}おう「ミンウ‥せかいの　ききがおとずれたとき\n{18:F9}の　ふういんが　とけるという\nいまが　そのときだとおもうが　どうだ?\nミンウ「はい　ふういんをときに　いってまいります\n{18:2F}おう「{10:02}　ディストへいってくれ\nディストの{18:FA}だんは　みなごろしにあったが\nかならず　いきのこりがいるにちがいない\n{18:FB}と　{18:FA}のちからは　ぜひともひつようだ\n{18:2F}おう「みながちからをあわせれば　かならずや\nしょうりのひが　おとずれよう\n3にんとも　たのんだぞ\n",
-  "en": "King of {18:2F}: \"{18:EB}, you have grown strong.\nI want you to take command of our army.\nAnd help {18:EF}.\"\n{13:02}: \"Yes, sire, with my life!\"\nKing of {18:2F}: \"Minwu... it is said that when crisis comes\nto the world, the seal of the {18:F9} will be broken.\nI believe that time is now. What say you?\"\nMinwu: \"Yes, I shall go and break the seal.\"\nKing of {18:2F}: \"{10:02}, go to Deist.\nThe {18:FA} of Deist were slaughtered,\nbut there must surely be survivors.\nThe power of the {18:FB} and the {18:FA} is something we need.\"\nKing of {18:2F}: \"If all join their strength, surely\nthe day of victory will come.\nI am counting on all three of you.\"\n."
+  "en": "King of {18:2F}: \"{18:EB}, you have grown strong.\nI want you to take command of our army.\nAnd help {18:EF}.\"\n{13:02}: \"Yes, sire, with my life!\"\nKing of {18:2F}: \"Minwu... it is said that when crisis comes\nto the world, the seal of the {18:F9} will be broken.\nI believe that time is now. What say you?\"\nMinwu: \"Yes, I shall go and break the seal.\"\nKing of {18:2F}: \"{10:02}, go to Deist.\nThe {18:FA} of Deist were slaughtered,\nbut there must surely be survivors.\nThe power of the {18:FB} and the {18:FA} is something we need.\"\nKing of {18:2F}: \"If all join their strength, surely\nthe day of victory will come.\nI am counting on all three of you.\"\n"
  },
  {
   "id": 19,
@@ -207,13 +207,13 @@
   "id": 34,
   "off": "74F10",
   "ja": "{18:EE}「これでかったと　おもうなよ!\n\n{11:02}「エッ!そのこえは　にいさ‥ん?!\n{10:02}「なにをいってるんだ!　さあいくぞ\nもうすぐ　ばくはつする!!\nシドの　{18:F5}まで　はしるんだ!\n",
-  "en": "{18:EE}: \"Don't think you've won!\"\n\n{11:02}: \"Huh! That voice... brother...?!\"\n{10:02}: \"What are you saying! Come on, let's go.\nIt's about to blow!!\nRun for Cid's {18:F5}!\"\n."
+  "en": "{18:EE}: \"Don't think you've won!\"\n\n{11:02}: \"Huh! That voice... brother...?!\"\n{10:02}: \"What are you saying! Come on, let's go.\nIt's about to blow!!\nRun for Cid's {18:F5}!\"\n"
  },
  {
   "id": 35,
   "off": "74F6A",
   "ja": "シド「おれは　こんなざまだが　{18:F5}はむきずだ!\nおれが　うごけるようになるまで　おまえたちに\nかしてやる。　いいか　かすだけだぞ!!\nだいじにつかえ‥‥\n‥‥ウッ‥グフッ‥ゲボッ\n{10:02}「シ　シド!　しっかりしろー!!\n",
-  "en": "Cid: \"I may be in this state, but the {18:F5}'s unscratched!\nUntil I can move again, I'll lend it\nto you. Got it? I'm only lending it!!\nTake good care of her...\n...ugh... guh... (cough)\"\n{10:02}: \"C- Cid! Hang in there!!\"\n."
+  "en": "Cid: \"I may be in this state, but the {18:F5}'s unscratched!\nUntil I can move again, I'll lend it\nto you. Got it? I'm only lending it!!\nTake good care of her...\n...ugh... guh... (cough)\"\n{10:02}: \"C- Cid! Hang in there!!\"\n"
  },
  {
   "id": 36,
@@ -273,13 +273,13 @@
   "id": 45,
   "off": "75182",
   "ja": "{11:02}「やめて　ふたりとも!!\nにいさん　なぜ　たたかわなければ　ならないの?\n{07}「このよを　しはいするものは　なにか?\nそれは　ちからだ!!\nおれは　{18:F0}に　なったのだ!\nそのちから　てばなしはしない!!\nさあ　{11:02}　そこを　どけ!\n",
-  "en": "{11:02}: \"Stop it, both of you!!\nBrother, why do you have to fight?\"\n{07}: \"What is it that rules this world?\nIt is power!!\nI have become the {18:F0}!\nI will never let go of that power!!\nNow, {11:02}, get out of the way!\"\n."
+  "en": "{11:02}: \"Stop it, both of you!!\nBrother, why do you have to fight?\"\n{07}: \"What is it that rules this world?\nIt is power!!\nI have become the {18:F0}!\nI will never let go of that power!!\nNow, {11:02}, get out of the way!\"\n"
  },
  {
   "id": 46,
   "off": "751F8",
   "ja": "{07}　ひさしぶりだな\n{18:EC}は　じごくで　きゅうきょくのパワーを\nみにつけて　よみがえったぞ!\nおまえが　{18:F0}とは　かたはらいたいわ\nせかいに　{18:F0}は　{18:EC}　ひとりだ!\n",
-  "en": "{07}, it's been a while.\n{18:EC} have gained ultimate power in hell\nand returned to life!\nYou, the {18:F0}? Don't make me laugh.\nThere is only one {18:F0} in this world: {18:EC}!\n."
+  "en": "{07}, it's been a while.\n{18:EC} have gained ultimate power in hell\nand returned to life!\nYou, the {18:F0}? Don't make me laugh.\nThere is only one {18:F0} in this world: {18:EC}!\n"
  },
  {
   "id": 47,
@@ -321,7 +321,7 @@
   "id": 53,
   "off": "753C0",
   "ja": "{11:02}「ミンウ!しっかり!!\nミンウ「{18:EC}は　ちからをつかいすぎた\nきゅうそくがひつようだ‥‥\nさあ　あのとびらの　むこうへ‥‥\nガクッ‥!\n{10:02}「ミンウ!!\n\n",
-  "en": "{11:02}: \"Minwu! Hold on!!\"\nMinwu: \"{18:EC} have used too much of my power.\nI need rest...\nNow, go beyond that door...\nUgh...!\"\n{10:02}: \"Minwu!!\"\n.\n"
+  "en": "{11:02}: \"Minwu! Hold on!!\"\nMinwu: \"{18:EC} have used too much of my power.\nI need rest...\nNow, go beyond that door...\nUgh...!\"\n{10:02}: \"Minwu!!\"\n\n"
  },
  {
   "id": 54,
@@ -459,7 +459,7 @@
   "id": 76,
   "off": "75749",
   "ja": "{07}「{18:F0}を　たおさないかぎり\nもっと　おおくのものがしぬ!\n{10:02}「{07}!いっしょにたたかおう\n{18:ED}!かれを　なかまにさせてください\n{18:EF}「‥‥{18:EE}のことは\nあなたにまかせましょう!\n{11:02}「にいさん!たたかいましょう!!\n",
-  "en": "{07}: \"Unless we defeat the {18:F0},\nmany more will die!\"\n{10:02}: \"{07}! Let's fight together!\n{18:ED}! Please let him join us.\"\n{18:EF}: \"...I shall leave the matter of the {18:EE}\nto you!\"\n{11:02}: \"Brother! Let's fight!!\"\n."
+  "en": "{07}: \"Unless we defeat the {18:F0},\nmany more will die!\"\n{10:02}: \"{07}! Let's fight together!\n{18:ED}! Please let him join us.\"\n{18:EF}: \"...I shall leave the matter of the {18:EE}\nto you!\"\n{11:02}: \"Brother! Let's fight!!\"\n"
  },
  {
   "id": 77,
