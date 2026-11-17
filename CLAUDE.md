@@ -99,9 +99,17 @@ Milestones per game (from `docs/gb-port.md`):
   caller's caller), TXS resets at `$C024`/`$C0D3`/`$FE6F`. Jump tables: `JMP ($0010)`
   at `c62:CA99` and `b14:B187`. Fixed code JSRs into `$8000-BFFF` (bank from `$5115`).
 
+- Coverage: 4 × 80k frames of random play (`build/cov2/`, regenerate with covrun.py): ~12k
+  executed + ~6.6k statically reached instructions in b11-b14, c62, far, fix, ex.
+  I/O is only by absolute address (no indirect PPU/APU access). MMC5: only bank, mode,
+  RAM-protect and mirroring registers (no multiplier). PHP 8, PLP 9, TSX 1,
+  BVC/BVS 5, `LDA $2007` 6 sites. Sprites: up to 28 visible, tiles mostly < 128
+  (240-243 too). Both 4KB pattern tables are loaded in full.
+
 ## In progress / next
-- Long coverage runs (4 seeds × 80k frames, `build/cov2/`), then the recompiler
-  (`tools/gb/recomp.py`).
+- Writing `tools/gb/recomp.py` (6502 → SM83 per `docs/gb-port.md` §1) and the runtime
+  `tools/gb/rt/` (vblank ISR, wait_frame, PPU/APU/joypad/MMC5 shims, ROM data read
+  helpers, farcall, dispatch), and `tools/gb/build.py` (NES ROM → GB ROM).
 - Recompiler and PPU-layer design written up in `docs/gb-port.md` §1-2 (registers X→E,
   Y→C; NES stack on the GB stack; flag liveness; ROM data through a bank-0 helper;
   queued VRAM writes; tile/nametable/scroll mapping).
