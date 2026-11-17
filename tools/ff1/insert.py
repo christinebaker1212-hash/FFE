@@ -26,9 +26,14 @@ ENC.update({'.': 0xBE, ',': 0xBF, "'": 0xC0, '"': 0xC1, '-': 0xC2, '…': 0xC3, 
             '[': 0xD1, ']': 0xD2, '/': 0x7A, ' ': 0xFF})
 NEW_GLYPHS = [c for c in ENC if c not in ' /']
 
+SPECIAL = {0xC6: 'L', 0xC7: 'E', 0xC8: 'H', 0xC9: 'P'}   # letter tiles the game uses directly
+
 def font(rom):
     for ch in NEW_GLYPHS:
         o = HDR + 0x24000 + ENC[ch] * 16
+        rom[o:o + 16] = tile(ch, fg=3, bg=2)
+    for code, ch in SPECIAL.items():          # same glyphs, so 'HP' or 'L2' match the text
+        o = HDR + 0x24000 + code * 16
         rom[o:o + 16] = tile(ch, fg=3, bg=2)
 
 ITEM_MAX = 18                     # longest English item name ({02} insert), set in main
@@ -106,16 +111,20 @@ def insert_dialogue(rom, report):
 #   05 upper row only (remembers the column)   06 back to that column, lower row only
 #   07 previous mode    08 newline of ONE tile row    09 lower row only    0B normal
 #   0C skip one column without drawing      0D nn  go to column nn of the row
-#   0A nn  wrap width: an item name inserted afterwards that is longer than nn is split
-#          at a space onto the upper and lower row of its cell (two-line names).
+#   0E/0F third row of a wrapped name (upper row of the next line) / back
+#   0A nn  inserted item names use the pre-wrapped table (bank 10 $B400, built for
+#          WRAP_WIDTH columns): split at spaces or marked hyphen points onto the upper
+#          and lower rows of the line and, if needed, the upper row of the next line.
 # Helper code and variables live in MMC5 ExRAM ($5C00, mode 2), copied at reset from the
 # first 1KB of CODE_BANK.
 CODE_BANK = 18                        # 16KB bank: ExRAM image + menu strings
 EX = dict(MODE=0x5C00, PREV=0x5C01, SAVEX=0x5C02, WRAPW=0x5C03, TMP=0x5C04, BUF=0x5C10,
-          SLOT=0x5C40, MENUBANK=CODE_BANK)
+          SLOT=0x5C40, SV54=0x5C05, SV55=0x5C06, MENUBANK=CODE_BANK)
 EXRAM_SRC = '''
     org $5C60
 BCMDS
+partynames:     ; the four names, one per line (shop 'who?' list, was bank 14 $A90E)
+    .db $10, 0, 1, $11, 0, 1, $12, 0, 1, $13, 0, 0
 clr20:          ; 20 blanks, lower row only
     .db 9, $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF, 0
 h_entry:        ; $DEB6 (menu string drawer entry)
@@ -158,24 +167,39 @@ h_char:         ; $DEDE, A = character
     sta $2007
     jmp $DF04
 h_code:         ; codes 05-0F
-    cmp #5
-    beq .c5
-    cmp #6
-    beq .c6
-    cmp #7
-    beq .c7
-    cmp #8
-    beq .c8
-    cmp #9
-    beq .c9
-    cmp #$0A
-    beq .ca
-    cmp #$0B
-    beq .cb
-    cmp #$0C
-    beq .cc
-    cmp #$0D
-    beq .cd
+    sec
+    sbc #5
+    asl a
+    tax
+    lda .tab+1,x
+    pha
+    lda .tab,x
+    pha
+    rts
+.tab:
+    .dw .c5-1, .c6-1, .c7-1, .c8-1, .c9-1, .ca-1, .cb-1, .cc-1, .cd-1, .ce-1, .cf-1
+.ce:            ; 0E: third row of a name = upper row of the next line, same column
+    lda $54
+    sta SV54
+    lda $55
+    sta SV55
+    lda SAVEX
+    clc
+    adc #$40
+    sta $54
+    bcc .cex
+    inc $55
+.cex:
+    lda #1
+    sta MODE
+    jmp $DEC7
+.cf:            ; 0F: back after the third row, lower row only
+    lda SV54
+    sta $54
+    lda SV55
+    sta $55
+    lda #2
+    sta MODE
     jmp $DEC7
 .cd:
     lda ($3E),y
@@ -235,62 +259,23 @@ h_code:         ; codes 05-0F
 .cax:
     sta WRAPW
     jmp $DEC7
-h_name:         ; $E0A3: draw item name at ($3E) (bank 10), wrapping onto two rows
-    lda WRAPW
-    beq .plain
-    ldy #0
-.len:
-    lda ($3E),y
-    beq .gl
-    iny
-    bne .len
-.gl:
-    cpy WRAPW
-    bcc .plain
-    beq .plain
-    ldy WRAPW
-.find:
-    lda ($3E),y
-    cmp #$FF
-    beq .split
-    dey
-    bne .find
-    beq .plain
-.split:
-    sty TMP
-    ldx #0
-    lda #5
-    sta BUF,x
-    inx
-    ldy #0
-.p1:
-    cpy TMP
-    beq .p1e
-    lda ($3E),y
-    sta BUF,x
-    inx
-    iny
-    bne .p1
-.p1e:
-    lda #6
-    sta BUF,x
-    inx
-    iny
-.p2:
-    lda ($3E),y
-    beq .p2e
-    sta BUF,x
-    inx
-    iny
-    bne .p2
-.p2e:
-    sta BUF,x
-    lda #<BUF
+h_name:         ; $E0A3: item name at ($3E) in bank 10; X = 2*id, C = id bit 7.
+    ldy WRAPW   ; With a wrap width set, use the pre-wrapped copy ($B400 table,
+    beq .plain  ; codes 05/06/0E/0F place up to three rows)
+    bcs .hi
+    lda $B400,x
     sta $3E
-    lda #>BUF
+    lda $B401,x
+    sta $3F
+    jmp $DECE
+.hi:
+    lda $B500,x
+    sta $3E
+    lda $B501,x
     sta $3F
 .plain:
     jmp $DECE
+
 barhl:          ; bank 14 $BF0A: highlight the chosen Equip/Swap/Drop
     lda $64
     asl a
@@ -315,6 +300,50 @@ barhl:          ; bank 14 $BF0A: highlight the chosen Equip/Swap/Drop
     .db $AF, $EF, $FF, $FF, $FF     ; cols 12-17
     .db $FF, $FF, $AF, $FF, $FF     ; cols 20-23
     .db $FF, $FF, $FF, $BF, $EF     ; cols 26-29
+magpre:         ; bank 14 $A99C: magic shop list, same name wrapping as the item list
+    lda #0
+    sta $63
+    lda #$0A
+    sta $0310
+    sta $0311
+    ldy #2
+    rts
+shoplist:       ; bank 14 $A86A: shop item list string at $0310
+    lda #0
+    sta $63
+    lda #$0A            ; wrap width 10: long names on the two rows of the name line
+    sta $0310
+    sta $0311
+    ldy #2
+.sl:
+    ldx $63
+    lda $0300,x
+    beq .se
+    sta $0311,y
+    sta $0316,y
+    lda #2
+    sta $0310,y
+    lda #3
+    sta $0315,y
+    lda #1
+    sta $0312,y
+    sta $0317,y
+    lda #$0D            ; price at column 26 (5 characters, right edge 30)
+    sta $0313,y
+    lda #26
+    sta $0314,y
+    tya
+    clc
+    adc #8
+    tay
+    inc $63
+    lda $63
+    cmp #5
+    bcc .sl
+.se:
+    lda #0
+    sta $0310,y
+    jmp $A8A9
 magcur:         ; bank 14 $B829: magic list cursor. Level L uses two rows: spell 1 on the
     lda $62     ;   first (beside L/MP), spells 2 and 3 on the second
     sta $10
@@ -433,7 +462,37 @@ def insert_names(rom, report):
     bank.free = [(0x8000, 0xB600)]
     for e in items:
         bank.put_ptr(0xB700 + 2 * e['id'], bank.alloc(enc(e['en']) + b'\0'))
+    for e in items:
+        lines = wrap_name(e['en'], WRAP_WIDTH)
+        assert len(lines) <= 3 and max(len(l) for l in lines) <= WRAP_WIDTH, (e['en'], lines)
+        if len(lines) == 1: data = enc(lines[0])
+        else:
+            data = b'\x05' + enc(lines[0]) + b'\x06' + enc(lines[1])
+            if len(lines) == 3: data += b'\x0E' + enc(lines[2]) + b'\x0F'
+        bank.put_ptr(0xB400 + 2 * e['id'], bank.alloc(data + b'\0'))
     report.append('bank 10 names free: %d' % sum(b - a for a, b in bank.free))
+
+WRAP_WIDTH = 9                  # shop list column width
+HYPHEN = {'Broadsword': 'Broad-sword', 'Barthunder': 'Bar-thunder', 'Dateleport': 'Da-teleport',
+          'Adamantite': 'Adaman-tite', 'Protection': 'Protec-tion', 'Wyrmkiller': 'Wyrm-killer',
+          'Werebuster': 'Were-buster'}   # break points, used only where a word is wider than the column
+
+def wrap_name(name, W):
+    """Greedy wrap at spaces; a word longer than W is broken at its marked point."""
+    words = []
+    for w in name.split(' '):
+        if len(w) > W and w in HYPHEN:
+            a, b = HYPHEN[w].split('-'); words += [a + '-', '\x00' + b]
+        else: words.append(w)
+    lines = []; line = ''
+    for w in words:
+        glue = w.startswith('\x00'); w = w.lstrip('\x00')
+        if not line: line = w
+        elif not glue and len(line) + 1 + len(w) <= W: line += ' ' + w
+        elif glue and len(line) - 1 + len(w) <= W: line = line[:-1] + w
+        else: lines.append(line); line = w
+    lines.append(line)
+    return lines
 
 def insert_menu_strings(rom, report):
     menu = json.load(open('script/ff1/menu.json'))
@@ -451,6 +510,7 @@ def insert_menu_strings(rom, report):
         if re.search(r'\{1[0-3]\}$', txt): txt += '{00}'
         a = bank.alloc(enc(txt) + b'\0')
         rom[o] = a & 0xFF; rom[o + 1] = a >> 8
+    SHOP_FREE[:] = bank.free
 
 def magic_list():
     # 8 levels x 2 tile rows (lower row only): 'L1 c/m' + spell 1 at column 12, then
@@ -682,6 +742,58 @@ def main_menu(rom, labels):
         a = labels['bcmd%d' % e['id']]
         put(rom, 0xFA1B + 5 * e['id'] + 3, bytes([a & 0xFF, a >> 8]))
 
+SHOP_TITLES = {0: ['Weapon', 'Shop'], 1: ['Armor', 'Shop'], 2: ['White', 'Magic', 'Shop'],
+               3: ['Black', 'Magic', 'Shop'], 4: ['Church'], 5: ['Inn'], 6: ['Item', 'Shop'],
+               7: ['Caravan']}
+SHOP_SPEECH = set(range(9, 38)) - {10, 11, 15, 18, 36}
+
+
+def flow(text, width):
+    lines = []; line = ''
+    for w in text.replace('\n', ' ').split(' '):
+        if not w: continue
+        if not line: line = w
+        elif len(line) + 1 + len(w) <= width: line += ' ' + w
+        else: lines.append(line); line = w
+    lines.append(line)
+    return lines
+
+def shops(rom, labels):
+    """Shops: strings to MENUBANK (table bank 14 $8000), wider speech window with one-row
+    lines, title box of up to three short lines, item list with two-row names and the
+    price at column 24 in a wider list window, Gil window one column wider."""
+    shop = json.load(open('script/ff1/shop.json'))
+    bank = Bank(rom, CODE_BANK, keep=True)
+    bank.free = SHOP_FREE[:]
+    for e in shop:
+        txt = e['en']
+        if e['id'] in SHOP_TITLES:
+            t = SHOP_TITLES[e['id']]
+            assert ' '.join(t).replace(' ', '') == txt.replace(' ', ''), (t, txt)
+            txt = '{09}' + ('{08}' if len(t) == 1 else '') + '{08}'.join(
+                ' ' * ((7 - len(w)) // 2) + w for w in t)
+        elif e['id'] in SHOP_SPEECH:
+            head = '{08}' if txt.startswith('\n') else ''      # price is printed on line 1
+            lines = flow(txt, 9)
+            assert len(lines) + (1 if head else 0) <= 9, (e['id'], lines)
+            txt = '{09}' + head + '{08}'.join(lines)
+        a = bank.alloc(enc(txt) + b'\0')
+        o = HDR + 14 * BANK + 2 * e['id']
+        rom[o] = a & 0xFF; rom[o + 1] = a >> 8
+    SHOP_FREE[:] = bank.free
+    bank_put(rom, 14, 0xAA45, jsr(labels['m_setbank']) + b'\xEA\xEA\xEA')
+    pn = labels['partynames']
+    bank_put(rom, 14, 0xA8FC, bytes([0xA9, pn & 0xFF, 0x85, 0x3E, 0xA9, pn >> 8, 0x85, 0x3F]))
+    # windows x[5] y[5] w[5] h[5]: speech, title, list, menu, gold
+    win = [(0, 4, 11, 12), (11, 0, 9, 6), (21, 2, 11, 22), (6, 18, 9, 10), (18, 24, 11, 4)]
+    for k in range(4):
+        bank_put(rom, 14, 0xAC53 + 5 * k, bytes(w[k] for w in win))
+    bank_put(rom, 14, 0xA86A, jmp(labels['shoplist']))
+    bank_put(rom, 14, 0xA99C, jsr(labels['magpre']) + b'\xEA\xEA\xEA')
+    bank_put(rom, 14, 0xA992, bytes([160, 24, 160, 56, 160, 88, 160, 120, 160, 152]))
+
+SHOP_FREE = []
+
 def status_screen(rom):
     """Status windows (x, y, w, h), table at bank 14 $B53A, drawn in this order with
     strings 35-40: name; class (wide enough for 'White Magician'); the old level window
@@ -701,6 +813,7 @@ if __name__ == '__main__':
     item_screen(rom)
     equip_screens(rom, labels)
     status_screen(rom)
+    shops(rom, labels)
     bad = insert_dialogue(rom, report)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report)); print('strings not fitting:', bad)
