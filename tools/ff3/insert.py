@@ -139,10 +139,10 @@ def centred(text, width):
     return '\n'.join(lines)
 
 # ---- tables -------------------------------------------------------------------------
-TABLES = [('t8000', 0x8000, 65), ('t8400', 0x8400, 71), ('t8600', 0x8600, 75),
-          ('t8200', 0x8200, 79), ('names8800', 0x8800, 81)]
+TABLES = [('t8000', 0x8000, 66), ('t8400', 0x8400, 72), ('t8600', 0x8600, 76),
+          ('t8200', 0x8200, 80), ('names8800', 0x8800, 82)]  # even: the battle maps 16KB
 DIALOGUE = ('t8000', 't8400', 't8600')
-ONE_BANKS = (65, 79)                    # banks drawn one row per line (dialogue tables)
+ONE_BANKS = (66, 80)                    # banks drawn one row per line (dialogue tables)
 
 def put_tables(rom, report):
     for name, table, base in TABLES:
@@ -170,7 +170,8 @@ EXRAM_SRC = '''
 TMP:    .ds 1
 ONE:    .ds 1
 ONEP:   .ds 1   ; ONE of the last drawing (the page scroll runs after it)
-    .ds 13
+TB16:   .ds 1   ; battle string copy: the table's base in 16KB banks
+    .ds 12
 tbase:          ; $EEBB: bank of a text pointer = (hi >> 5) + the table's base bank
     sta TMP     ;   (table by $95: $80 story, $82 system, $84/$86 dialogue, $88+ names)
     lda $95
@@ -192,6 +193,21 @@ nbase:          ; $F0D2 (code 18: name table)
 sbase:          ; $D1DA (system string copied to RAM)
     clc
     adc #B1
+    rts
+tsel:           ; bank 53 $A616 (battle string copy, $1A/$1B = address of the pointer
+    lda $1B     ;   entry): the table's 16KB base bank; then $1A/$1B = $4000 as the
+    and #$FE    ;   Japanese
+    sec
+    sbc #$80
+    lsr a
+    tax
+    lda TBASE,x
+    lsr a
+    sta TB16
+    lda #0
+    sta $1A
+    lda #$40
+    sta $1B
     rts
 onerow:         ; C = 1 in one-row mode
     lda ONE
@@ -293,6 +309,37 @@ h_flush:        ; $F6AE line flush: lower-row buffer only, on row $3B
     jmp $F715
 '''
 
+BCOPY_SRC = '''
+    org $A621       ; bank 53: the pointer is a linear offset into the table's 64KB from
+    lda $1C         ;   its base: 16KB bank TB16 + (offset >> 14), address $8000 + offset
+    pha             ;   & $3FFF (the Japanese hard-codes base $0C, i.e. bank $18)
+    clc
+    adc TB16
+    tay
+    pla
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    sta $1A
+    pla
+    sta $19
+    pla
+    sta $18
+    lda #$80
+    sec
+    sbc $1A
+    clc
+    adc $19
+    sta $19
+    pla
+    tax
+    tya
+    jmp $FD4A
+'''
+
 COPIER = 0x9F00                         # bank 64: copies the 1KB ExRAM image at reset
 COPIER_SRC = '''
     org $9F00
@@ -331,6 +378,13 @@ def engine(rom, report):
     for bank, a, h in ((FIX, 0xEEBB, 'tbase'), (FIX, 0xF0D2, 'nbase'), (126, 0xD1DA, 'sbase')):
         assert get(rom, bank, a, 3) == b'\x18\x69\x18', hex(a)
         put(rom, bank, a, jsr(L[h]))
+    # battle string copy (bank 53 $A609)
+    assert get(rom, 53, 0xA616, 8).hex() == 'a900851aa940851b'
+    put(rom, 53, 0xA616, jsr(L['tsel']) + b'\xEA' * 5)
+    assert get(rom, 53, 0xA669, 3) == b'\x4c\x4a\xfd'
+    bc = asm(BCOPY_SRC, syms=L)
+    assert bc.org + len(bc.bytes) <= 0xA66C
+    put(rom, 53, bc.org, bc.bytes + b'\xEA' * (0xA66C - bc.org - len(bc.bytes)))
     # one row per line
     assert get(rom, FIX, 0xEEC0, 5) == b'\xa5\x93\x20\x03\xff'
     put(rom, FIX, 0xEEC0, jsr(L['txton']) + b'\xEA\xEA')
