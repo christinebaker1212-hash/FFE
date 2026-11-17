@@ -136,6 +136,10 @@ chars = list('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789') +
 chars += [' '] * (170 - len(chars))
 T[33] = '\n'.join(''.join('{17:%s}%s' % (c, chars[r*10 + k]) for k, c in enumerate(cols)) for r in range(17))
 
-for i in (32, 37, 47, 48, 50, 51, 52, 57, 59, 60, 61, 72, 73, 74, 109):
+# item menu (#61): the Japanese two columns of 13 cells (icon, 7 letters, ':', count) as one
+# column of 32 full-length names, the count at the right column's place (insert.py: cursor
+# step 4); the last line is the bin
+T[61] = '\n'.join('{17:01}{1A:%02X}{14:19}{1C:%02X}' % (k, k) for k in range(32)) + '\n{17:05}{0F}'
+for i in (32, 37, 47, 48, 50, 51, 52, 57, 59, 60, 72, 73, 74, 109):
     T[i] = codes_only(i)
 apply(P, T)

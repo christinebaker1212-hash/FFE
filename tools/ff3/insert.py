@@ -1284,6 +1284,13 @@ COPIER_SRC = '''
     rts
 '''
 
+MENU_BANK = 60                         # field menus: banks 60/61 ($8000-$BFFF)
+def menus(rom):
+    # item menu: one column (t8200 #61), cursor moved 4 bytes (one recorded entry) a line
+    for a in (0x9F01, 0x9F3E):
+        assert get(rom, 60, a, 4) == b'\xa9\x08\x20\x0d', hex(a)
+        put(rom, 60, a + 1, b'\x04')
+
 def engine(rom, report):
     bases = {n: b for n, _, b in TABLES}
     ex = asm(EXRAM_SRC, syms={'B0': bases['t8000'], 'B1': bases['t8200'], 'B2': bases['t8400'],
@@ -1371,6 +1378,12 @@ def engine(rom, report):
         put(rom, FIX, a, jsr(L[h]) + b'\xEA\xEA')
     assert get(rom, FIX, 0xEF4C, 4) == b'\xe6\x1f\xe6\x1f'
     put(rom, FIX, 0xEF4C, jsr(L['h_nl']) + b'\xEA')
+    # code 09 (flush, then one row down: the menus' packed rows) entered the Japanese
+    # newline's second INC $1F ($EFE1 JMP $EF4E); its own entry now sits in the NOPs the
+    # MMC5 build left after the reset copier call ($FF8C-$FF93), skipped at reset
+    assert get(rom, FIX, 0xEFE1, 3) == b'\x4c\x4e\xef' and get(rom, FIX, 0xFF8C, 8) == b'\xEA' * 8
+    put(rom, FIX, 0xFF8C, jmp(0xFF94) + b'\xe6\x1f' + jmp(0xEF50))
+    put(rom, FIX, 0xEFE1, jmp(0xFF8F))
     for a in (0xEE86, 0xEE90):
         assert get(rom, FIX, a, 3) == b'\x38\xe9\x02', hex(a)
         put(rom, FIX, a, jsr(L['h_sub']))
@@ -1386,5 +1399,6 @@ if __name__ == '__main__':
     font(rom)
     put_tables(rom, report)
     engine(rom, report)
+    menus(rom)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report))
