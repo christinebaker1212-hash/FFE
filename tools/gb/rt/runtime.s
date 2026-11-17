@@ -13,6 +13,8 @@ QV         = $CF00
 NT_SH      = $D000          ; NES nametable shadow (2 × 1KB, vertical mirroring)
 PAL_SH     = $D800          ; NES palette RAM shadow (32)
 DBG        = $D820          ; fault info: code, HL, SP, stack top
+NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
+VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
 LCDC_ON    = %11000011      ; LCD on, window map $9C00 (off), BG tiles $8800 (signed), BG map $9800, OBJ on, BG on
 CAM_X      = 48
 CAM_Y      = 48
@@ -181,9 +183,12 @@ vblank_isr: push af
             ldh [frame_flag], a
             ld a, $80
             ldh [vbl_flag], a
-            ld hl, frames
+            ld hl, VBL_CNT
             inc [hl]
-            pop hl
+            jr nz, .vc
+            inc hl
+            inc [hl]
+.vc:        pop hl
             pop de
             pop bc
             pop af
@@ -197,6 +202,13 @@ timer_isr:  push af                         ; frame tick while the LCD is off
             ldh [frame_flag], a
             ld a, $80
             ldh [vbl_flag], a
+            push hl
+            ld hl, VBL_CNT
+            inc [hl]
+            jr nz, .vc
+            inc hl
+            inc [hl]
+.vc:        pop hl
 .x:         pop af
             reti
 
@@ -263,6 +275,13 @@ pal4:       ; HL -> 4 NES colours ($x0 = universal backdrop) -> DMG palette byte
 ; ------------------------------------------------------------------ frame wait (JSR $FE00)
 rt_wait_nmi:
             push af
+            push hl
+            ld hl, NMI_CNT
+            inc [hl]
+            jr nz, .nc
+            inc hl
+            inc [hl]
+.nc:        pop hl
             xor a
             ldh [frame_flag], a
 .w:         halt

@@ -75,10 +75,10 @@ index 0bf2d82..77e22e0 100644
  private:
      /// APU memory-mapped register addresses.
 diff --git a/src/cpu.cpp b/src/cpu.cpp
-index 9ecd5c2..fbd4c1d 100644
+index 9ecd5c2..f56014b 100644
 --- a/src/cpu.cpp
 +++ b/src/cpu.cpp
-@@ -128,12 +128,73 @@ void CPU::reset() {
+@@ -128,12 +128,74 @@ void CPU::reset() {
      _program_counter |= _nes.read_cpu(0xFFFD) << 8;
  }
  
@@ -104,6 +104,7 @@ index 9ecd5c2..fbd4c1d 100644
 +static unsigned g_cov_prev = 0;                   // previous opcode, 0x100 = interrupt taken
 +static size_t g_cov_cur = 0;                      // index of the instruction being executed
 +bool g_cov_fetch = false;
++unsigned long g_nmi_count = 0;               // NMIs taken (exposed to Python as nmi_count)
 +struct ShadowFrame { uint16_t ret; uint8_t s; bool irq; };
 +static std::vector<ShadowFrame> g_shadow;
 +struct CovSaver { ~CovSaver() {
@@ -152,16 +153,17 @@ index 9ecd5c2..fbd4c1d 100644
  
      (this->*ADDRESSING_MODES[instruction])();
      (this->*INSTRUCTIONS[instruction])();
-@@ -146,6 +207,8 @@ void CPU::tick() {
+@@ -146,6 +208,9 @@ void CPU::tick() {
          _nes.write(0x100 | _stack_pointer--, _program_counter & 0x00FF);
  
          uint16_t address = _should_issue_non_maskable_interrupt ? 0xFFFA : 0xFFFE;
++        if (_should_issue_non_maskable_interrupt) g_nmi_count++;
 +        g_cov_prev = 0x100;
 +        if (g_cov_on > 0) g_shadow.push_back({_program_counter, (uint8_t)(_stack_pointer - 1), true});
  
          _should_issue_non_maskable_interrupt = false;
  
-@@ -214,7 +277,10 @@ void CPU::stream_state(SaveState& save_state) {
+@@ -214,7 +279,10 @@ void CPU::stream_state(SaveState& save_state) {
  }
  
  uint8_t CPU::fetch_next() {
@@ -173,7 +175,7 @@ index 9ecd5c2..fbd4c1d 100644
  }
  
  void CPU::set_status(uint8_t flag, bool value) {
-@@ -815,6 +881,7 @@ void CPU::op_jsr() {
+@@ -815,6 +883,7 @@ void CPU::op_jsr() {
      _nes.read(_program_counter);
  
      _program_counter--;
@@ -181,7 +183,7 @@ index 9ecd5c2..fbd4c1d 100644
  
      _nes.write(0x100 | _stack_pointer--, _program_counter >> 8);
      _nes.write(0x100 | _stack_pointer--, _program_counter & 0x00FF);
-@@ -907,6 +974,7 @@ void CPU::op_php() {
+@@ -907,6 +976,7 @@ void CPU::op_php() {
  }
  
  void CPU::op_pla() {
@@ -189,7 +191,7 @@ index 9ecd5c2..fbd4c1d 100644
      _stack_pointer++;
      _nes.read(_program_counter);
      _register_a = _nes.read(0x100 | _stack_pointer);
-@@ -916,6 +984,7 @@ void CPU::op_pla() {
+@@ -916,6 +986,7 @@ void CPU::op_pla() {
  }
  
  void CPU::op_plp() {
@@ -197,7 +199,7 @@ index 9ecd5c2..fbd4c1d 100644
      _stack_pointer++;
      _nes.read(_program_counter);
      _status = _nes.read(0x100 | _stack_pointer) & 0xCF;
-@@ -1005,6 +1074,11 @@ void CPU::op_rra() {
+@@ -1005,6 +1076,11 @@ void CPU::op_rra() {
  }
  
  void CPU::op_rti() {
@@ -209,7 +211,7 @@ index 9ecd5c2..fbd4c1d 100644
      _stack_pointer++;
      _nes.read(_program_counter);
      _status = _nes.read(0x100 | _stack_pointer) & 0xCF;
-@@ -1021,6 +1095,12 @@ void CPU::op_rts() {
+@@ -1021,6 +1097,12 @@ void CPU::op_rts() {
      _program_counter = _nes.read(0x100 | _stack_pointer);
      _program_counter |= _nes.read(0x100 | ++_stack_pointer) << 8;
      _program_counter++;
@@ -222,7 +224,7 @@ index 9ecd5c2..fbd4c1d 100644
  }
  
  void CPU::op_sax() {
-@@ -1156,6 +1236,7 @@ void CPU::op_txa() {
+@@ -1156,6 +1238,7 @@ void CPU::op_txa() {
  
  void CPU::op_txs() {
      _stack_pointer = _register_x;
@@ -692,3 +694,19 @@ index 90cfec5..33c93f7 100644
  
      bool _rendering_enabled;
      bool _rendering_enabled_delayed;
+diff --git a/src/wrapper.cpp b/src/wrapper.cpp
+index 92db33e..8aa9df0 100644
+--- a/src/wrapper.cpp
++++ b/src/wrapper.cpp
+@@ -111,6 +111,11 @@ PYBIND11_MODULE(emulator, mod) {
+             &wrapper::NesWrapper::controller,
+             "Emulator controller state."
+         )
++        .def_property_readonly(
++            "nmi_count",
++            [](const wrapper::NesWrapper&) { extern unsigned long g_nmi_count; return g_nmi_count; },
++            "Number of NMIs taken since start (all emulator instances in the process)."
++        )
+         .def_property_readonly(
+             "has_crashed",
+             &wrapper::NesWrapper::has_crashed,

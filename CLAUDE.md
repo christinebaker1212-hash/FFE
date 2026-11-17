@@ -112,12 +112,21 @@ Milestones per game (from `docs/gb-port.md`):
   In PyBoy (`tools/gb/run_gb.py ROM FRAMES`) the opening prologue text shows in
   English (centre 160 px of the NES screen, palette untuned).
 
+- New game → name entry → class select → field (Coneria) all run on the GB build.
+  `tools/gb/compare.py NES GB OUT` runs both in **lockstep by NES frame** (cynes exposes
+  `nmi_count`; the GB counts frame waits at `$D830`) and diffs RAM/SRAM at checkpoints:
+  0 bytes at several checkpoints, a few bytes in `$B0-$D5` elsewhere (sound state).
+- Speed: steady play runs 1.00× (one GB frame per NES frame). Screen loads lag; CHR
+  upload loop `$E9F6` replaced by a native routine (`rt/ff1_hle.s`, recompiler `ext` table).
+  `tools/gb/profile_gb.py` reports GB frames per NES frame and PC samples in long loads.
+
 ## In progress / next
-- Check the title screen / new game / field / battle in PyBoy; fix faults as they show.
+- Sprites ≥128 (class screen shows garbled sprites), field walking/scrolling, battles.
+- Remaining lag: `$2007` shim cost, CPU delay loop `$D77C` (DEY/BNE timing loop).
 - Known gaps: TSX/TXS stack save-restore in b14 (`B0F1`/`B0FB`), PHP/PLP sites where
   N/V may be live, banked JSR targets never seen in coverage (`$BC00`, `$AE10` from c62),
-  sprite tiles ≥128 folded onto 0-127, palette (DMG shades from BG palette 0 only),
-  sound not started, camera fixed at the NES screen centre.
+  palette (DMG shades from BG palette 0 only), sound not started, camera fixed at the
+  NES screen centre (screens not re-laid out yet).
 - Recompiler and PPU-layer design written up in `docs/gb-port.md` §1-2 (registers X→E,
   Y→C; NES stack on the GB stack; flag liveness; ROM data through a bank-0 helper;
   queued VRAM writes; tile/nametable/scroll mapping).

@@ -57,7 +57,7 @@ def main():
     cm = CodeMap(nes, covs).build()
     rc = Recompiler(cm)
     prog, bank_of, banks = emit_program(rc)
-    rt = open(os.path.join(HERE, 'rt', 'runtime.s')).read()
+    rt = open(os.path.join(HERE, 'rt', 'runtime.s')).read() + '\n' + open(os.path.join(HERE, 'rt', 'ff1_hle.s')).read()
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(
         '    db %s\n' % ', '.join(str(shade(c)) for c in range(r, r + 16)) for r in range(0, 64, 16))
     src_all = rt + '\n' + shade_src + '\n' + prog

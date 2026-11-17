@@ -37,8 +37,11 @@ def label(space, addr):
 class FF1:
     """Game-specific facts (English MMC5 build of FF1)."""
     reset = ('fix', 0xFE2E)
-    # $FE00 -> JMP $FEDB: enable NMI and spin; the NMI handler returns to the caller.
-    wait_nmi = ('fix', 0xFEDB)
+    # Native replacements: NES address -> (routine, flags it defines). Each returns to
+    # the caller of the NES routine like its RTS would.
+    #   $FEDB ($FE00 jumps here): enable NMI and spin; the NMI handler returns to the caller.
+    #   $E9F6: CHR upload loop (X pages from ($10)+Y to $2007).
+    ext = {('fix', 0xFEDB): ('rt_wait_nmi', 'NZ'), ('fix', 0xE9F6): ('hle_chr_pages', 'NZ')}
     skip = [('fix', 0xFECF, 0xFEDB), ('fix', 0xFEDC, 0xFEF1)]   # NMI handler + wait loop
 
 
@@ -56,7 +59,7 @@ class Recompiler:
         """static successors (space, addr) within compiled code; None entries = dynamic"""
         out = []
         k = (i.space, i.addr)
-        if k == self.g.wait_nmi: return []
+        if k in self.g.ext: return []
         if i.mn in ('RTS', 'RTI', 'BRK'): return []
         if i.mn == 'JMP':
             if i.mode == 'ind': return [None]
@@ -131,7 +134,7 @@ class Recompiler:
                 k = work.pop()
                 if k in seen or k not in ins: continue
                 seen.add(k); i = ins[k]
-                if i.mn == 'RTS' or k == self.g.wait_nmi: rts.append(k); continue
+                if i.mn == 'RTS' or k in self.g.ext: rts.append(k); continue
                 for s in self.succ(i):
                     if s is not None: work.append(s)
             for r in rts:
@@ -147,7 +150,7 @@ class Recompiler:
             if i.mn == 'JSR':
                 tk = self.target(i, i.arg)
                 o = [tk] if tk else [None]
-            elif i.mn == 'RTS' or k == self.g.wait_nmi:
+            elif i.mn == 'RTS' or k in self.g.ext:
                 o = list(ret_sites.get(k, ())) or [None]
                 if k in self.rts_dispatch or any((i.space, i.addr - 2) in self.pla_drop for _ in [0]):
                     o = [None]
@@ -162,8 +165,8 @@ class Recompiler:
             lo = frozenset()
             for s in outs[k]:
                 lo |= ALL if (s is None or s not in ins) else live_in[s]
-            if k == self.g.wait_nmi:
-                li = lo - frozenset('NZ')
+            if k in self.g.ext:
+                li = lo - frozenset(self.g.ext[k][1])
             elif i.mn == 'JSR':
                 li = lo                                     # = live_in(callee), set via outs
             else:
@@ -326,7 +329,7 @@ class Emitter:
         """jp to compiled location tk (None = dynamic)"""
         if tk is None:
             self.o('call rt_fatal'); return
-        if tk not in self.rc.insns and tk != self.rc.g.wait_nmi:
+        if tk not in self.rc.insns and tk not in self.rc.g.ext:
             self.rc.warn.append('jump to uncompiled %s:%04X from %r' % (tk[0], tk[1], self.i))
             self.o(('call %s, ' % cond if cond else 'call ') + 'rt_fatal'); return
         self.o(('jp %s, ' % cond if cond else 'jp ') + label(*tk))
@@ -335,8 +338,8 @@ class Emitter:
     def run(self):
         i = self.i; mn = i.mn; rc = self.rc
         k = self.k
-        if k == rc.g.wait_nmi:
-            self.o('jp rt_wait_nmi'); return
+        if k in rc.g.ext:
+            self.o('jp ' + rc.g.ext[k][0]); return
         h = getattr(self, 'x_' + mn, None)
         if h is None:
             rc.warn.append('no translation for %r' % i); self.o('call rt_fatal')
@@ -559,7 +562,7 @@ class Emitter:
         tk = self.rc.target(i, i.arg)
         if tk is None:
             self.o('ld hl, $%04X' % i.arg, 'call rt_dyn_call'); return
-        if tk not in self.rc.insns and tk != self.rc.g.wait_nmi:
+        if tk not in self.rc.insns and tk not in self.rc.g.ext:
             self.rc.warn.append('call to uncompiled %s:%04X from %r' % (tk[0], tk[1], i))
             self.o('call rt_fatal'); return
         self.o('call ' + label(*tk))
@@ -646,7 +649,7 @@ def emit_program(rc):
             # instruction falling through to a key that is not next in this bank
             i = rc.insns[k]
             nxt_keys = [s for s in rc.succ(i) if s is not None and s[1] == i.addr + i.size]
-            if i.mn not in ('JMP', 'RTS', 'RTI', 'BRK') and not (k == rc.g.wait_nmi):
+            if i.mn not in ('JMP', 'RTS', 'RTI', 'BRK') and not (k in rc.g.ext):
                 ft = (i.space, i.addr + i.size) if not (i.space == 'c62' and i.addr + i.size == 0xE000) else None
                 if ft is not None and (n + 1 >= len(keys) or keys[n + 1] != ft):
                     if ft in rc.insns:
