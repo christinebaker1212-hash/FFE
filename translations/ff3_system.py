@@ -24,7 +24,7 @@ T = {
  28: 'Silence', 29: 'Mini', 30: 'Blind', 31: 'Poison',
  34: '{15:01}New Game',
  35: 'Message Speed {06}',
- 36: '{15:01}Deposit{15:07}Withdraw{15:0D}Exit',
+ 36: '{0E}{15:01}Deposit\n{15:01}Withdraw{15:0B}Exit',     # (window $1B, 16 cells: two one-row lines)
  38: 'Welcome. What business brings you here?',
  39: 'What would you like?',
  40: 'Thank you very much. Anything else?',
@@ -59,14 +59,14 @@ T = {
  78: '{0E}Hold RESET while you\nturn the power off.',
  79: 'Thank you very much.\nPlease rest well...',
  80: 'Your inventory is full.',
- 81: 'Fat Chocobo: "Yooo,\n need somethiiing?"',
- 82: '"Whatcha gonna give meee?"',
- 83: '"Whaddaya want, ya saaay?"',
- 84: '"Time to diiig in.\n Munch munch..."',
- 85: '"I can\'t eat no more of\n the same stuff, ya know"',
- 86: '"Your stuff\'s full, so I\n can\'t give it back, huh"',
- 87: '"I can\'t give it all\n back, so I\'ll hang on\n to the rest"',
- 88: '"Hang on a sec, I\'m\n gettin\' it out now..."',
+ 81: '{0E}Fat Chocobo: "Yooo,\nneed somethiiing?"',
+ 82: '{0E}"Whatcha gonna give\nmeee?"',
+ 83: '{0E}"Whaddaya want,\nya saaay?"',
+ 84: '{0E}"Time to diiig in.\nMunch munch..."',
+ 85: '{0E}"I can\'t eat no more\nof the same stuff!"',
+ 86: '{0E}"Your stuff\'s full, so\nI can\'t give it back"',
+ 87: '{0E}"I\'ll hang on to what\nI can\'t give back"',
+ 88: '{0E}"Hang on a sec,\nI\'m gettin\' it out..."',
  89: ' Inside the treasure chest\n there was\n {02}!',
  90: "It can't be used.",
  91: 'Whose [77][79] will you restore?', 92: 'Whose [77][79] will you restore?',
@@ -163,6 +163,8 @@ T.update({7: '{0E}Weapon\n Shop', 8: '{0E}Armor\n Shop', 9: '{0E} Item\n Shop', 
           108: "{0E}You don't have\nenough money.",
           115: '{0E}Who will hold this\nmagic?', 116: "{0E}Can't hold any\nmore.",
           117: '{0E}Already holds this\nmagic.'})
+# items given to someone (#57, field window 2, 26 cells): one column of full names
+T[57] = '\n'.join('{17:01}{22:%02X}{14:17}{1C:%02X}' % (k, k) for k in range(32))
 # item and magic prompts (window $15, 19 cells): one-row, two lines
 T.update({91: '{0E}Whose [77][79] will you\nrestore?', 92: '{0E}Whose [77][79] will you\nrestore?',
           93: '{0E}Whom will you fully\nrestore?', 94: '{0E}Whom will you bring\nback to life?',
@@ -217,6 +219,6 @@ T[71] = ('{0E}\n{14:0C}{10:02}{14:14}{10:01}\n\n'        # header lines on the J
          '  Evasion rate{14:14}‥ {10:41}\n'
          '  Magic defense{14:14}‥{10:36}\n'
          '  Magic evasion rate‥ {10:40}')
-for i in (37, 48, 50, 51, 52, 57, 59, 72, 73, 74, 109):
+for i in (37, 48, 50, 51, 52, 59, 72, 73, 74, 109):
     T[i] = codes_only(i)
 apply(P, T)

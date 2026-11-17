@@ -1666,6 +1666,9 @@ def menus(rom):
     assert get(rom, 61, W + 0x16) == b'\x0e' and get(rom, 61, X + 0x17) == b'\x10' and get(rom, 61, W + 0x18) == b'\x16'
     put(rom, 61, W + 0x16, b'\x11'); put(rom, 61, X + 0x17, b'\x13'); put(rom, 61, W + 0x17, b'\x0d')
     put(rom, 61, W + 0x18, b'\x18')
+    # items given to someone (#57, field window 2) one column
+    assert get(rom, 60, 0x8E03, 4) == b'\xa9\x08\x20\x0d'
+    put(rom, 60, 0x8E04, b'\x04')
     for a in (0xB140, 0xB3F8):
         assert get(rom, 61, a, 4) == b'\xa9\x08\x20\x0d', hex(a)
         put(rom, 61, a + 1, b'\x04')
