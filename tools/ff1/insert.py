@@ -578,11 +578,13 @@ boxline:        ; $F9B9 (far): decoded battle line ($6CD4 pairs) into the box im
     bne .o3
 magpage:        ; $F75C (far): battle magic list, two levels per page ($6AF8 = 0-3). Per level
     ldy #5      ;   two queued lines (marker $FE = start of the line's lower row):
-.c:             ;   'L1  <spell 1>' / ' 2  <spell 2>', then '    <spell 3>' / blank
-    lda $FA08,y
+.c:             ;   'L1  <spell 1>' / '    <spell 2>', then '    <spell 3>' / blank,
+    lda $FA08,y ;   and the level's MP count in its own record at the right edge
     sta $6A9D,y
     dey
     bne .c
+    lda #23     ; one column wider (right frame in line with the command boxes)
+    sta $6AA1
     jsr $F688
     jsr $F74F
     lda $6B7A
@@ -627,16 +629,8 @@ magpage:        ; $F75C (far): battle magic list, two levels per page ($6AF8 = 0
     lda #$FF
     sta $6AFA,x
     inx
-    lda ML
-    clc
-    adc #$20
-    tay
-    lda ($88),y
-    clc
-    adc #$80
     sta $6AFA,x
     inx
-    lda #$FF
     sta $6AFA,x
     inx
     sta $6AFA,x
@@ -653,6 +647,34 @@ magpage:        ; $F75C (far): battle magic list, two levels per page ($6AF8 = 0
     clc
     adc #2
     jsr .queue
+    ; ---- MP count (upper row of line 1, column 23)
+    lda MU
+    sta MT
+    ldx MU
+    lda ML
+    clc
+    adc #$20
+    tay
+    lda ($88),y
+    clc
+    adc #$80
+    sta $6AFA,x
+    inx
+    lda #$FE
+    sta $6AFA,x
+    inx
+    lda #0
+    sta $6AFA,x
+    inx
+    stx MU
+    lda #23
+    sta $6A9F
+    lda MI
+    asl a
+    asl a
+    clc
+    adc #2
+    jsr .queuex
     ; ---- line 2
     lda MU
     sta MT
@@ -668,6 +690,9 @@ magpage:        ; $F75C (far): battle magic list, two levels per page ($6AF8 = 0
     inx
     lda #2
     jsr .spell
+    lda #$FE    ; third spell on the upper row; lower row stays blank
+    sta $6AFA,x
+    inx
     lda #0
     sta $6AFA,x
     inx
@@ -710,11 +735,14 @@ magpage:        ; $F75C (far): battle magic list, two levels per page ($6AF8 = 0
 .sx:
     rts
 .queue:         ; A = y: queue text record 01 3 y ptr(MT)
+    pha
+    lda #3
+    sta $6A9F
+    pla
+.queuex:        ; A = y, x already in $6A9F
     sta $6AA0
     lda #1
     sta $6A9E
-    lda #3
-    sta $6A9F
     lda MT
     clc
     adc #$FA
@@ -763,8 +791,144 @@ magup:          ; bank 12 $9CD2 (far)
     dec $6AAB
 .ret:
     rts
+itemlist:       ; $F896 (far): battle Item list. The Japanese shows weapons and armour in two
+    ldy #5      ;   columns; the English names need the full width, so one column of eight
+.c:             ;   rows (record j: slot 2j on the upper row, 2j+1 on the lower; slots 0-3
+    lda $FA08,y ;   weapons $6118, 4-7 armour $611C)
+    sta $6A9D,y
+    dey
+    bne .c
+    jsr $F688
+    jsr $F74F
+    inc $6A9E
+    inc $6A9F
+    inc $6AA0
+    lda $6B7A
+    jsr $F88F
+    sta MR
+    lda #0
+    sta MI
+    sta MU
+.j:
+    lda MU
+    sta MT
+    tax
+    lda MI
+    asl a
+    sta MS
+    jsr .ent
+    lda #$FE
+    sta $6AFA,x
+    inx
+    inc MS
+    jsr .ent
+    lda #0
+    sta $6AFA,x
+    inx
+    stx MU
+    lda MT
+    clc
+    adc #$FA
+    sta $6AA1
+    lda #0
+    adc #$6A
+    sta $6AA2
+    jsr $F688
+    inc $6AA0
+    inc $6AA0
+    inc MI
+    lda MI
+    cmp #4
+    bne .j
+    rts
+.ent:           ; ' <name of slot MS>' at X
+    lda #$FF
+    sta $6AFA,x
+    inx
+    stx ML
+    lda MR
+    clc
+    adc MS
+    tay
+    lda $6118,y
+    ldx ML
+    cmp #0
+    beq .e
+    and #$7F
+    clc
+    adc #$1B    ; weapon names
+    ldy MS
+    cpy #4
+    bcc .w
+    adc #$43-$1B-1  ; armour names (carry is set here)
+.w:
+    pha
+    lda #$0E
+    sta $6AFA,x
+    inx
+    pla
+    sta $6AFA,x
+    inx
+.e:
+    rts
+itemmove:       ; bank 12 $9D8C (far): cursor moves of the Item / Drink lists
+    lda $68B3   ;   ($6AAA column, $6AAB row; the Item list is told apart by its cursor x)
+    and #$F0
+    tay
+    lda $6AAC
+    cmp #$10
+    beq .item
+    cpy #$80
+    beq .r
+    cpy #$40
+    beq .l
+    cpy #$20
+    beq .d
+    cpy #$10
+    beq .u
+    rts
+.r:
+    inc $6AAA
+    rts
+.l:
+    dec $6AAA
+    rts
+.d:
+    inc $6AAB
+    rts
+.u:
+    dec $6AAB
+    rts
+.item:          ; one list of 8: weapons 0-3 (column 0), then armour 0-3 (column 1)
+    cpy #$20
+    beq .id
+    cpy #$10
+    beq .iu
+    cpy #0
+    beq .ix
+    lda $6AAA   ; left / right: the same row of the other group
+    eor #1
+    sta $6AAA
+.ix:
+    rts
+.id:
+    lda $6AAB
+    cmp #3
+    bne .d
+    lda #0
+    beq .iw
+.iu:
+    lda $6AAB
+    bne .u
+    lda #3
+.iw:            ; past either end of a group: the other group's first / last row
+    sta $6AAB
+    lda $6AAA
+    eor #1
+    sta $6AAA
+    rts
 '''
-FAR_ROUTINES = ['boxline', 'magpage', 'magdown', 'magup']
+FAR_ROUTINES = ['boxline', 'magpage', 'magdown', 'magup', 'itemlist', 'itemmove']
 FAR8 = 40                              # 8KB bank (first half of 16KB bank 20)
 
 def jmp(a): return bytes([0x4C, a & 0xFF, a >> 8])
@@ -1161,6 +1325,56 @@ def shops(rom, labels):
 
 SHOP_FREE = []
 
+def drink_window(rom):
+    """Battle Drink list ($F919): Potion / Antidote with their counts. The Japanese names
+    are padded so the counts share a column; the English names are padded to the longer
+    one and the window is widened to hold it plus a two-digit count."""
+    names = {e['id']: e['en'] for e in json.load(open('script/ff1/items.json'))}
+    ents = [(0x19, 0x6BAF, 0x6AFA), (0x1A, 0x6BB0, 0x6B1A)]     # name, count, string
+    L = max(len(names[n]) for n, _, _ in ents)
+    width = 1 + L + 1 + 2                       # cursor gap, name, space, count (max 99)
+    src = """
+    org $F919
+    ldy #5
+.c: lda $FA0D,y
+    sta $6A9D,y
+    dey
+    bne .c
+    jsr $F688
+    jsr $F74F
+    inc $6A9E
+    inc $6A9F
+    inc $6AA0
+"""
+    put(rom, 0xFA11, bytes([width + 2]))       # window record 00 3 1 w 6 (read only here)
+    for k, (n, cnt, buf) in enumerate(ents):
+        num = buf + 1 + 2 + (L - len(names[n]) + 1)     # position of code 11
+        src += """
+    lda $%04X
+    beq .z%d
+    sta $%04X
+    lda #$11
+    sta $%04X
+    lda #$%02X
+    sta $%04X
+    lda #$0E
+    sta $%04X
+.z%d:
+    lda #0
+    sta $%04X
+    sta $%04X
+    lda #$%02X
+    sta $6AA1
+    lda #$%02X
+    sta $6AA2
+    jsr $F688
+""" % (cnt, k, num + 1, num, n, buf + 2, buf + 1, k, num + 2, num + 3, buf & 0xFF, buf >> 8)
+        if k == 0: src += "    inc $6AA0\n    inc $6AA0\n"
+    src += "    jmp $F640\n"
+    code = asm(src)
+    assert code.org + len(code.bytes) <= 0xF994, hex(code.org + len(code.bytes))
+    put(rom, code.org, code.bytes)
+
 BATTLE_BANK = 19
 NARROW_NAMES = {'Tyrannosaurus': (7, 0xEB)}   # tiles $EB-$F1
 STATUS_LABELS = [(65, 'Stone'), (66, 'Poison'), (67, 'Darkness'), (68, 'Paralysis'), (69, 'Sleep'),
@@ -1204,6 +1418,7 @@ def battle(rom, labels, report):
                             0, 1, 4, 12, 4, 1, 2, 5,   0, 13, 4, 12, 4, 1, 14, 5]))
     put(rom, 0xF9DC, bytes([0, 1, 0, 12, 10]))
     put(rom, 0xFA13, bytes([0, 13, 0, 12, 10]))
+    drink_window(rom)
     b10 = Bank(rom, 10, keep=True); b10.free = NAMES_FREE[:]
     for e in json.load(open('script/ff1/enemy_attacks.json')):
         b10.put_ptr(0xB600 + 2 * e['id'], b10.alloc(enc(e['en']) + b'\0'))
@@ -1231,6 +1446,12 @@ def battle(rom, labels, report):
             k = r + 4 * c
             cur[2 * k] = 40; cur[2 * k + 1] = (158 if r == 0 else 190) + 8 * c
     bank_put(rom, 12, 0x9FBF, bytes(cur[:24]))
+    # battle Item list: one column of 8 rows (cursor table: column*8 + row*2 -> x, y)
+    put(rom, 0xF896, bytes([0xA2, FAR_ROUTINES.index('itemlist')]) + jsr(labels['farjsr']) + jmp(0xF640))
+    bank_put(rom, 12, 0x9D8C, bytes([0xA2, FAR_ROUTINES.index('itemmove')]) + jmp(labels['farjsr']))
+    o = HDR + 12 * BANK + 0x9FD7 - 0x8000
+    assert rom[o:o + 2] == b'\x10\xa6'
+    rom[o:o + 16] = bytes(v for r in range(8) for v in (0x10, 0x9E + 8 * r))
     report.append('battle bank free: %d' % sum(b - a for a, b in bank.free))
 
 NAMES_FREE = []
