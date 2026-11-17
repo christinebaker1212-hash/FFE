@@ -12,7 +12,7 @@ B = ['Fight','Run','Magic','Gear','Right Hand','Left Hand','Items','MP Cost',"Ma
  'The paralysis wore off','Returned to original size','The silence was broken','Woke up',
  'The poison wore off','Scared them stiff','Became better at dodging attacks','Became resistant to magic',
  ' went down','Swapped HP and MP','Built a wall against black magic','The wall was broken',
- 'Blocked the magic','Split apart',"'s level went up",'Number of attacks',' went down!!',' went up!!',
+ 'Blocked the magic','Split apart',' level went up','Number of attacks',' went down!!',' went up!!',
  'Cold attack','Nerve attack','Poison attack','Death','Lightning attack','Spirit attack','Fire attack',
  'Transformation attack',' is blocked!!','White','Yellow','Green','Black','Blue','Orange','Red','Purple',
  ' aura envelops them!','Cold','Nerve','Poison','Death blocked','Lightning','Spirit','Fire','Transformation',

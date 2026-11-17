@@ -50,3 +50,5 @@ All renderings are from the Japanese. `{18:xx}` inserts entry xx of `script/ff2/
   もうもく Blind · もうどく Venom (the virulent poison) · のろい Curse · わすれた Forgot · かえる Frog ·
   いし Stone · しぼう Dead. Poison, Silence, Forgot, Paralysis and Confusion are drawn on five tiles
   of their own (the last two in condensed letters).
+- のレベルがあがった (appended to a spell or weapon type) is " level went up" ("Sword level went up",
+  "Bare Hands level went up").
