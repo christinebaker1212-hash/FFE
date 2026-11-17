@@ -296,6 +296,13 @@ sname:          ; $F2FE (codes 10-13 xx 01: a job, t8200 226 +): the Japanese co
 ailsel:         ; $F2BB (codes 10-13 xx 00, an ailment in place of LV): bank JB
     ldy #6
     bne jbgo
+numsq:          ; $EF76/$EF8F (codes 03/04, an amount in a sentence: JSR $8B78, right-aligned
+    lda $90     ;   in its field): the leading blanks squeezed out (bank JB)
+    pha
+    jsr $8B78
+    pla
+    ldy #12
+    bne jbgo
 spellh:         ; $F384 (codes 10-13 xx 08-1F, a spell in the magic screen): bank JB
     ldy #9
     bne jbgo
@@ -1352,6 +1359,10 @@ FIELD_AIL = {22: 'Death', 23: 'Stone', 28: 'Silence', 30: 'Blind', 31: 'Poison'}
 JOBF_SRC = '''
     org $8000
 disp:
+    cpy #12
+    bne .z
+    jmp sq
+.z:
     cpy #3
     bne .a
     jmp jobn
@@ -1363,6 +1374,36 @@ disp:
     cpy #6
     bne jload
     jmp ails
+sq:                 ; A = the amount's first column, $90 past it: digits moved to A
+    tax
+    tay
+    lda $90
+    sta $80
+.f:
+    cpy $90
+    bcs .r
+    lda $07A0,y
+    cmp #$FF
+    bne .c
+    iny
+    bne .f
+.c:
+    lda $07A0,y
+    sta $07A0,x
+    inx
+    iny
+    cpy $80
+    bcc .c
+    stx $90
+    lda #$FF
+.z:
+    cpx $80
+    bcs .r
+    sta $07A0,x
+    inx
+    bne .z
+.r:
+    rts
 spl:                ; spell $84 (mark if $B9): Leviathan, Catastrophe condensed
     ldx #0
     lda $84
@@ -1593,6 +1634,9 @@ def field_names(rom, L):
     assert get(rom, FIX, 0xF2BB, 2) == b'\xa0\x16' and get(rom, FIX, 0xF30D, 3) == b'\x4c\xd8\xf2'
     put(rom, FIX, 0xF2BB, jmp(L['ailsel']))
     put(rom, FIX, 0xF30D, jmp(L['jobname']))
+    for a in (0xEF76, 0xEF8F):
+        assert get(rom, FIX, a, 3) == b'\x20\x78\x8b', hex(a)
+        put(rom, FIX, a, jsr(L['numsq']))
     assert get(rom, FIX, 0xF197, 3) == b'\x4c\xd8\xf2'      # code 1E: a job in the job list
     put(rom, FIX, 0xF197, jmp(L['jobname']))
     assert get(rom, FIX, 0xF384, 3) == b'\x4c\x9d\xf0'

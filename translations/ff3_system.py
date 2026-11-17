@@ -9,10 +9,10 @@ def codes_only(i):            # entries with no text: copy layout codes, full-wi
     return rows[i]['ja'].replace('　', ' ')
 
 T = {
- 1: ' From inside the treasure chest\n you got {03} Gil!',
- 2: ' Inside the treasure chest\n there was {02}!\n Suddenly, monsters appeared!!',
+ 1: ' From inside the treasure\n chest, you got {03} Gil!',
+ 2: ' Inside the treasure chest\n there was\n {02}!\n Suddenly, monsters\n appeared!!',
  3: ' The door is locked!',
- 4: ' Innkeeper: "Welcome! To restore your party\'s [77][79]\n   it will cost {04} Gil.\n   Will you stay the night?"',
+ 4: ' Innkeeper: "Welcome!\n To restore your party\'s\n [77][79], it will cost\n {04} Gil.\n Will you stay the night?"',
  5: '{05}{14:08}Gil',
  6: '{15:01}Yes\n{15:01}No',
  7: ' Weapon Shop', 8: ' Armor Shop', 9: ' Item Shop', 10: ' Magic Shop',
@@ -67,7 +67,7 @@ T = {
  86: '"Your stuff\'s full, so I can\'t give it back, huh"',
  87: '"I can\'t give it all back, so I\'ll hang on to the rest"',
  88: '"Hang on a sec, I\'m gettin\' it out now..."',
- 89: ' Inside the treasure chest\n there was {02}!',
+ 89: ' Inside the treasure chest\n there was\n {02}!',
  90: "It can't be used.",
  91: 'Whose [77][79] will you restore?', 92: 'Whose [77][79] will you restore?',
  93: 'Whom will you fully restore?', 94: 'Whom will you bring back to life?',
@@ -86,10 +86,10 @@ T = {
  114: '     Not enough Capacity!',
  115: 'Who will hold this magic?', 116: "Can't hold any more.",
  117: 'Already holds this magic.',
- 118: ' {02} in a place like this!',
- 119: " It's too cramped to become big.",
+ 118: ' In a place like this,\n {02}!',
+ 119: " It's too cramped here\n to become big.",
  120: ' Warping impossible', 121: ' Magic cannot be used',
- 122: " With the Thief's special ability\n the lock opened just like that!",
+ 122: " With the Thief's special\n ability, the lock opened\n just like that!",
 }
 PLACES = {
  124:'Ur', 125:'Kazus', 126:'Canaan', 127:'Tozus', 128:'Tokkul', 129:'Village of the Ancients',

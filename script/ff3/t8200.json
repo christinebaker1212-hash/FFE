@@ -9,13 +9,13 @@
   "id": 1,
   "off": "35CB1",
   "ja": "　たからばこのなかから\n　{03}ぎるてにいれた!",
-  "en": " From inside the treasure chest\n you got {03} Gil!"
+  "en": " From inside the treasure\n chest, you got {03} Gil!"
  },
  {
   "id": 2,
   "off": "35CC8",
   "ja": "　たからばこのなかには\n　{02}がはいっていた!\n　とつぜん　モンスターがあらわれた!!",
-  "en": " Inside the treasure chest\n there was {02}!\n Suddenly, monsters appeared!!"
+  "en": " Inside the treasure chest\n there was\n {02}!\n Suddenly, monsters\n appeared!!"
  },
  {
   "id": 3,
@@ -27,7 +27,7 @@
   "id": 4,
   "off": "35D04",
   "ja": "　やどや:「いらっしゃいませ!あなたがたの[77][79]が\n　　かいふくするには　{04}ギルかかります。\n　　おとまりになりますか?",
-  "en": " Innkeeper: \"Welcome! To restore your party's [77][79]\n   it will cost {04} Gil.\n   Will you stay the night?\""
+  "en": " Innkeeper: \"Welcome!\n To restore your party's\n [77][79], it will cost\n {04} Gil.\n Will you stay the night?\""
  },
  {
   "id": 5,
@@ -537,7 +537,7 @@
   "id": 89,
   "off": "36A82",
   "ja": "　たからばこのなかには\n　{02}がはいっていた!",
-  "en": " Inside the treasure chest\n there was {02}!"
+  "en": " Inside the treasure chest\n there was\n {02}!"
  },
  {
   "id": 90,
@@ -711,13 +711,13 @@
   "id": 118,
   "off": "36C67",
   "ja": "　こんなところに　{02}が!",
-  "en": " {02} in a place like this!"
+  "en": " In a place like this,\n {02}!"
  },
  {
   "id": 119,
   "off": "36C74",
   "ja": "　せまくて　おおきくなれません",
-  "en": " It's too cramped to become big."
+  "en": " It's too cramped here\n to become big."
  },
  {
   "id": 120,
@@ -735,7 +735,7 @@
   "id": 122,
   "off": "36C98",
   "ja": "　シーフの　とくしゅのうりょくで\n　あっさり　かぎが　あいた!",
-  "en": " With the Thief's special ability\n the lock opened just like that!"
+  "en": " With the Thief's special\n ability, the lock opened\n just like that!"
  },
  {
   "id": 123,
