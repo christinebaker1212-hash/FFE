@@ -101,11 +101,41 @@ def flow(para, width):
     lines.append(line)
     return lines
 
+def balanced(para, width):
+    """The fewest lines, as even as possible (the longest line shortest)."""
+    words = [w for w in para.split(' ') if w]
+    n = len(flow(para, width))
+    best = None
+    def rec(i, k, acc):
+        nonlocal best
+        if k == 1:
+            l = ' '.join(words[i:])
+            if vlen(l) <= width:
+                cand = acc + [l]
+                if best is None or max(map(vlen, cand)) < max(map(vlen, best)): best = cand
+            return
+        for j in range(i + 1, len(words) - k + 2):
+            l = ' '.join(words[i:j])
+            if vlen(l) > width: break
+            rec(j, k - 1, acc + [l])
+    rec(0, n, [])
+    return best or flow(para, width)
+
 def layout(text, width=DLG_W):
     lines = []
     for p in paragraphs(text):
         lines += flow(p, width) if p.strip() else ['']
     for l in lines: assert vlen(l) <= width, (l, vlen(l))
+    return '\n'.join(lines)
+
+NARRATION = {('t8000', 0): 28, ('t8000', 1): 28}   # opening (window $25: 28 x 26), centred
+
+def centred(text, width):
+    lines = []                          # each Japanese line a unit (the fade-in pacing)
+    for p in text.split('\n'):
+        p = COLTOK.sub('', p).strip(' ')
+        for l in (balanced(p, width) if p else ['']):
+            lines.append(' ' * ((width - vlen(l)) // 2) + l)
     return '\n'.join(lines)
 
 # ---- tables -------------------------------------------------------------------------
@@ -120,7 +150,8 @@ def put_tables(rom, report):
         lin = 0; blob = bytearray()
         for e in rows:
             t = e['en'] or ''
-            if name in DIALOGUE and t: t = layout(t)
+            if (name, e['id']) in NARRATION: t = centred(t, NARRATION[name, e['id']])
+            elif name in DIALOGUE and t: t = layout(t)
             data = enc(t) + b'\0'
             b, a = lin >> 13, 0x8000 + (lin & 0x1FFF)
             assert b < 8
