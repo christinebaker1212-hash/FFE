@@ -137,8 +137,12 @@ Milestones per game (from `docs/gb-port.md`):
   non-RAM pointers. Build: 18.5k instructions, 5 code banks.
 
 ## In progress / next
-- Random-play equivalence (`build/eq2/`, 3 seeds × 40k frames). Earlier runs on the
-  previous build diverged right after the script (buffer `$0780-07CF`, OAM page).
+- Random-play equivalence (`build/eq3/`, 3 seeds × 40k frames). The divergence at the
+  map buffer `$0780-07CF` was not a recompiler bug: FF1 reads not-yet-written save RAM
+  (map ring `$7D00`) and cynes powers on with a pattern there; the tools now copy the
+  NES power-on save RAM into GB cart RAM first (`compare.sync_sram`). Debug tools:
+  `watchdiff.py NES GB K ADDR` (writes to one address: NES write-watch vs GB value at
+  each label), cynes `watch=(lo,hi)` property.
 - Remaining lag: `$2007` shim cost, CPU delay loop `$D77C` (DEY/BNE timing loop).
 - Known gaps: palette (DMG shades from BG palette 0 only), sound not started, camera
   fixed at the NES screen centre (screens not re-laid out yet), `rt_unwind3` untested

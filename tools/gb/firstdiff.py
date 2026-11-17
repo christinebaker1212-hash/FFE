@@ -4,14 +4,14 @@ The GB gets the controller value the NES game latched in each frame (cynes nmi_p
 usage: PYTHONPATH=build/emu firstdiff.py NES GB [MAXFRAMES] [--random SEED]"""
 import sys, random
 sys.path.insert(0, __file__.rsplit('/', 1)[0])
-from compare import GB, new_game_script, UP, DOWN, LEFT, RIGHT, A, B, START
+from compare import sync_sram, GB, new_game_script, UP, DOWN, LEFT, RIGHT, A, B, START
 from cynes import NES
 
 args = sys.argv[1:]
 rnd = None
 if '--random' in args:
     k = args.index('--random'); rnd = int(args[k + 1]); del args[k:k + 2]
-nes = NES(args[0]); gb = GB(args[1])
+nes = NES(args[0]); gb = GB(args[1]); sync_sram(nes, gb)
 limit = int(args[2]) if len(args) > 2 else 100000
 sym = {}
 for l in open(args[1][:-3] + '.sym'):

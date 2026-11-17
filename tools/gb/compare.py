@@ -42,6 +42,13 @@ class GB:
         return self.pb.screen.image.convert('RGB')
 
 
+def sync_sram(nes, gb):
+    """Give the GB cart RAM (bank 0 = NES $6000-$7FFF) the NES emulator's power-on
+    contents, so reads of not-yet-written save RAM agree."""
+    for i in range(0x2000):
+        gb.pb.memory[0, 0xA000 + i] = nes[0x6000 + i]
+
+
 def gb_nmi(gb):
     m = gb.pb.memory
     return m[0xD830] | m[0xD831] << 8
@@ -60,7 +67,7 @@ def main():
             if len(script) % 40 == 0: script.append(('shot',))
         script.append(('shot',))
     off = int(sys.argv[sys.argv.index('--off') + 1]) if '--off' in sys.argv else 0
-    nes = NES(nes_path); gb = GB(gb_path)
+    nes = NES(nes_path); gb = GB(gb_path); sync_sram(nes, gb)
     shots = []; gb_ticks = 0; first_bad = None
 
     def frame(mask):

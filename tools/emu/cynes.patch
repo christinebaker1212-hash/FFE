@@ -75,10 +75,10 @@ index 0bf2d82..77e22e0 100644
  private:
      /// APU memory-mapped register addresses.
 diff --git a/src/cpu.cpp b/src/cpu.cpp
-index 9ecd5c2..8ebcaad 100644
+index 9ecd5c2..84a44cd 100644
 --- a/src/cpu.cpp
 +++ b/src/cpu.cpp
-@@ -128,12 +128,81 @@ void CPU::reset() {
+@@ -128,12 +128,89 @@ void CPU::reset() {
      _program_counter |= _nes.read_cpu(0xFFFD) << 8;
  }
  
@@ -130,13 +130,21 @@ index 9ecd5c2..8ebcaad 100644
 +static inline void cov_mark(uint16_t pc) {
 +    if (g_trace_on && g_trace.size() < 4000000) g_trace.push_back((uint32_t)(cov_index(pc) & 0xFFFFFF) << 8 | 0);
 +    if (g_cov_on < 0) { g_cov_on = std::getenv("COV_LOG") ? 1 : 0; if (g_cov_on) g_cov.assign(3 * COV_SIZE, 0); }
-+    if (!g_cov_on) return;
 +    size_t i = cov_index(pc);
 +    g_cov_cur = i;
++    if (!g_cov_on) return;
 +    uint8_t f = 1;
 +    if (g_cov_prev == 0x60) f |= 2; else if (g_cov_prev == 0x6C) f |= 4;
 +    else if (g_cov_prev == 0x40) f |= 8; else if (g_cov_prev == 0x100) f |= 16;
 +    g_cov[i] |= f;
++}
++int g_watch_lo = -1, g_watch_hi = -1;           // write watch (property watch)
++std::vector<uint32_t> g_watch_log;               // (instruction index << 8 | value), address separately
++std::vector<uint16_t> g_watch_addr;
++void cov_write(uint16_t a, uint8_t v) {          // called from NES::write
++    if (a >= g_watch_lo && a <= g_watch_hi && g_watch_log.size() < 100000) {
++        g_watch_log.push_back((uint32_t)(g_cov_cur & 0xFFFFFF) << 8 | v); g_watch_addr.push_back(a);
++    }
 +}
 +void cov_data(uint16_t a) {                       // called from NES::read/write
 +    if (g_cov_on <= 0 || g_cov_fetch) return;
@@ -160,7 +168,7 @@ index 9ecd5c2..8ebcaad 100644
  
      (this->*ADDRESSING_MODES[instruction])();
      (this->*INSTRUCTIONS[instruction])();
-@@ -146,6 +215,14 @@ void CPU::tick() {
+@@ -146,6 +223,14 @@ void CPU::tick() {
          _nes.write(0x100 | _stack_pointer--, _program_counter & 0x00FF);
  
          uint16_t address = _should_issue_non_maskable_interrupt ? 0xFFFA : 0xFFFE;
@@ -175,7 +183,7 @@ index 9ecd5c2..8ebcaad 100644
  
          _should_issue_non_maskable_interrupt = false;
  
-@@ -214,7 +291,10 @@ void CPU::stream_state(SaveState& save_state) {
+@@ -214,7 +299,10 @@ void CPU::stream_state(SaveState& save_state) {
  }
  
  uint8_t CPU::fetch_next() {
@@ -187,7 +195,7 @@ index 9ecd5c2..8ebcaad 100644
  }
  
  void CPU::set_status(uint8_t flag, bool value) {
-@@ -815,6 +895,7 @@ void CPU::op_jsr() {
+@@ -815,6 +903,7 @@ void CPU::op_jsr() {
      _nes.read(_program_counter);
  
      _program_counter--;
@@ -195,7 +203,7 @@ index 9ecd5c2..8ebcaad 100644
  
      _nes.write(0x100 | _stack_pointer--, _program_counter >> 8);
      _nes.write(0x100 | _stack_pointer--, _program_counter & 0x00FF);
-@@ -907,6 +988,7 @@ void CPU::op_php() {
+@@ -907,6 +996,7 @@ void CPU::op_php() {
  }
  
  void CPU::op_pla() {
@@ -203,7 +211,7 @@ index 9ecd5c2..8ebcaad 100644
      _stack_pointer++;
      _nes.read(_program_counter);
      _register_a = _nes.read(0x100 | _stack_pointer);
-@@ -916,6 +998,7 @@ void CPU::op_pla() {
+@@ -916,6 +1006,7 @@ void CPU::op_pla() {
  }
  
  void CPU::op_plp() {
@@ -211,7 +219,7 @@ index 9ecd5c2..8ebcaad 100644
      _stack_pointer++;
      _nes.read(_program_counter);
      _status = _nes.read(0x100 | _stack_pointer) & 0xCF;
-@@ -1005,6 +1088,11 @@ void CPU::op_rra() {
+@@ -1005,6 +1096,11 @@ void CPU::op_rra() {
  }
  
  void CPU::op_rti() {
@@ -223,7 +231,7 @@ index 9ecd5c2..8ebcaad 100644
      _stack_pointer++;
      _nes.read(_program_counter);
      _status = _nes.read(0x100 | _stack_pointer) & 0xCF;
-@@ -1021,6 +1109,12 @@ void CPU::op_rts() {
+@@ -1021,6 +1117,12 @@ void CPU::op_rts() {
      _program_counter = _nes.read(0x100 | _stack_pointer);
      _program_counter |= _nes.read(0x100 | ++_stack_pointer) << 8;
      _program_counter++;
@@ -236,7 +244,7 @@ index 9ecd5c2..8ebcaad 100644
  }
  
  void CPU::op_sax() {
-@@ -1156,6 +1250,7 @@ void CPU::op_txa() {
+@@ -1156,6 +1258,7 @@ void CPU::op_txa() {
  
  void CPU::op_txs() {
      _stack_pointer = _register_x;
@@ -625,20 +633,22 @@ index 517eb5a..01976dd 100644
  
  #endif
 diff --git a/src/nes.cpp b/src/nes.cpp
-index 39fdf33..5b4c0bf 100644
+index 39fdf33..0049492 100644
 --- a/src/nes.cpp
 +++ b/src/nes.cpp
-@@ -58,7 +58,9 @@ void NES::dummy_read() {
+@@ -58,7 +58,11 @@ void NES::dummy_read() {
      cpu.poll();
  }
  
 +void cov_data(uint16_t a);
++void cov_write(uint16_t a, uint8_t v);
  void NES::write(uint16_t address, uint8_t value) {
 +    cov_data(address);
++    cov_write(address, value);
      apu.tick(false);
      ppu.tick();
      ppu.tick();
-@@ -112,6 +114,7 @@ void NES::write_oam(uint8_t address, uint8_t value) {
+@@ -112,6 +116,7 @@ void NES::write_oam(uint8_t address, uint8_t value) {
  }
  
  uint8_t NES::read(uint16_t address) {
@@ -646,7 +656,7 @@ index 39fdf33..5b4c0bf 100644
      apu.tick(true);
      ppu.tick();
      ppu.tick();
-@@ -210,8 +213,10 @@ Mapper& NES::get_mapper() {
+@@ -210,8 +215,10 @@ Mapper& NES::get_mapper() {
      return static_cast<Mapper&>(*_mapper.get());
  }
  
@@ -718,7 +728,7 @@ index 90cfec5..33c93f7 100644
      bool _rendering_enabled;
      bool _rendering_enabled_delayed;
 diff --git a/src/wrapper.cpp b/src/wrapper.cpp
-index 92db33e..dc460d7 100644
+index 92db33e..7868ac2 100644
 --- a/src/wrapper.cpp
 +++ b/src/wrapper.cpp
 @@ -7,6 +7,7 @@
@@ -729,7 +739,7 @@ index 92db33e..dc460d7 100644
  #include <pybind11/stl/filesystem.h>
  
  using namespace cynes;
-@@ -111,6 +112,32 @@ PYBIND11_MODULE(emulator, mod) {
+@@ -111,6 +112,43 @@ PYBIND11_MODULE(emulator, mod) {
              &wrapper::NesWrapper::controller,
              "Emulator controller state."
          )
@@ -748,6 +758,17 @@ index 92db33e..dc460d7 100644
 +            "nmi_pad",
 +            [](const wrapper::NesWrapper&) { extern uint8_t g_nmi_pad; return (int)g_nmi_pad; },
 +            "Controller 1 value latched by the game's last strobe before the last NMI."
++        )
++        .def_property(
++            "watch",
++            [](const wrapper::NesWrapper&) {
++                extern std::vector<uint32_t> g_watch_log; extern std::vector<uint16_t> g_watch_addr;
++                std::vector<std::tuple<uint32_t, uint16_t, uint8_t>> out;
++                for (size_t k = 0; k < g_watch_log.size(); k++)
++                    out.emplace_back(g_watch_log[k] >> 8, g_watch_addr[k], g_watch_log[k] & 0xFF);
++                g_watch_log.clear(); g_watch_addr.clear(); return out; },
++            [](wrapper::NesWrapper&, std::pair<int, int> r) { extern int g_watch_lo, g_watch_hi; g_watch_lo = r.first; g_watch_hi = r.second; },
++            "Set (lo, hi) to log CPU writes in that range; reading returns [(instruction index, address, value)] and clears."
 +        )
 +        .def_property_readonly(
 +            "pad_history",
