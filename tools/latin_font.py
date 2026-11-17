@@ -216,6 +216,14 @@ COND = {
  'R': ["###.", "#..#", "#..#", "###.", "#.#.", "#..#", "#..#"],
  'S': [".###", "#...", "#...", ".##.", "...#", "...#", "###."],
  'W': ["#...#", "#...#", "#...#", "#.#.#", "#.#.#", "##.##", "#...#"],
+ 'D': ["###.", "#..#", "#..#", "#..#", "#..#", "#..#", "###."],
+ 'F': ["###", "#..", "#..", "##.", "#..", "#..", "#.."],
+ 'H': ["#..#", "#..#", "#..#", "####", "#..#", "#..#", "#..#"],
+ 'K': ["#..#", "#.#.", "##..", "#...", "##..", "#.#.", "#..#"],
+ 'L': ["#..", "#..", "#..", "#..", "#..", "#..", "###"],
+ 'T': ["###", ".#.", ".#.", ".#.", ".#.", ".#.", ".#."],
+ 'U': ["#..#", "#..#", "#..#", "#..#", "#..#", "#..#", ".##."],
+ 'v': ["...", "...", "#.#", "#.#", "#.#", "#.#", ".#."],
 }
 
 def _glyph_cols(ch, table):
@@ -273,6 +281,46 @@ def right_label(word, ntiles, condensed=False, fg=3, bg=0):
         for y in range(8):
             for x in range(8):
                 c = fg if cols[k * 8 + x][y] else bg
+                if c & 1: lo[y] |= 0x80 >> x
+                if c & 2: hi[y] |= 0x80 >> x
+        tiles.append(bytes(lo + hi))
+    return tiles
+
+# Tight letters (3 columns) for the two words that do not fit even condensed (FF3 battle
+# status slot: "See Through", "Catastrophe"); the rest falls back to COND.
+TIGHT = dict(COND)
+TIGHT.update({
+ 'a': ["...", "...", "##.", "..#", ".##", "#.#", ".##"],
+ 'e': ["...", "...", ".#.", "#.#", "###", "#..", ".##"],
+ 'h': ["#..", "#..", "##.", "#.#", "#.#", "#.#", "#.#"],
+ 'o': ["...", "...", ".#.", "#.#", "#.#", "#.#", ".#."],
+ 'p': ["...", "##.", "#.#", "#.#", "##.", "#..", "#.."],
+ 's': ["...", "...", ".##", "#..", ".#.", "..#", "##."],
+ 'u': ["...", "...", "#.#", "#.#", "#.#", "#.#", ".##"],
+ 'g': ["...", ".##", "#.#", "#.#", ".##", "..#", "##."],
+ 'S': [".##", "#..", "#..", ".#.", "..#", "..#", "##."],
+ '/': ["..#", "..#", ".#.", ".#.", ".#.", "#..", "#.."],
+})
+COND['/'] = TIGHT['/']
+
+def packed_label(word, ntiles, table, fg=3, bg=0):
+    """`word` in `table` letters (as drawn, 1-pixel gaps, 3-column space) left-aligned in
+    ntiles*8 pixels; None if it does not fit."""
+    cols = []
+    for k, ch in enumerate(word):
+        if k: cols.append([0] * 8)
+        if ch == ' ': cols += [[0] * 8] * 2; continue
+        g = table[ch]; w = len(g[0])
+        rows = ["." * w] + list(g) if ch in DESC else list(g) + ["." * w]
+        cols += [[1 if rows[y][x] == '#' else 0 for y in range(8)] for x in range(w)]
+    if len(cols) > ntiles * 8: return None
+    cols += [[0] * 8] * (ntiles * 8 - len(cols))
+    tiles = []
+    for t in range(ntiles):
+        lo = bytearray(8); hi = bytearray(8)
+        for y in range(8):
+            for x in range(8):
+                c = fg if cols[t * 8 + x][y] else bg
                 if c & 1: lo[y] |= 0x80 >> x
                 if c & 2: hi[y] |= 0x80 >> x
         tiles.append(bytes(lo + hi))

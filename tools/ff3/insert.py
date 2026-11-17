@@ -12,7 +12,7 @@ English text in the dialogue tables is drawn one tile row per line (the Japanese
 a row on dakuten); see EXRAM_SRC."""
 import sys, os, json, re
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from latin_font import tile
+from latin_font import tile, packed_label, COND, TIGHT
 from asm6502 import asm
 
 HDR = 16; B8 = 0x2000
@@ -176,7 +176,10 @@ BSPL:   .ds 1
 BL1:    .ds 1
 BCOST:  .ds 1
 BX:     .ds 1
-    .ds 7
+ISAV:   .ds 1   ; status slot: index and table of the copied word, its first tile
+TSAV:   .ds 1
+TCODE:  .ds 1
+    .ds 4
 tbase:          ; $EEBB: bank of a text pointer = (hi >> 5) + the table's base bank
     sta TMP     ;   (table by $95: $80 story, $82 system, $84/$86 dialogue, $88+ names)
     lda $95
@@ -297,6 +300,21 @@ btidy:          ; bank 52 converter: tidy BUF ($7AD7) and choose the split (BSPL
     inx
     bne .p
 .r:
+    rts
+slotcopy:       ; bank 52 status line ($9C2E spell, $9C47 command, $9C79 ailment: JSR $A609)
+    sta ISAV
+    pha
+    lda $19
+    sta TSAV
+    pla
+    jsr $A609
+    inc $A9         ; (the IRQ runs the sound driver, which maps its own banks, only
+    lda #$80+SB     ;   while $A9 = 0, as during the game's bank switches)
+    sta $5115
+    jsr $A000
+    lda #$80+53
+    sta $5115
+    dec $A9
     rts
 onerow:         ; C = 1 in one-row mode
     lda ONE
@@ -515,6 +533,117 @@ bconvb:             ; box texts and command entries (call sites patched): the te
     rts
 '''
 
+# status window slot (5 cells after '/'): a word longer than 5 letters ("/" and the word)
+# is drawn on 6 tiles of its own in condensed letters (tight ones if needed), uploaded to
+# the line's tile slots (6 per line from SLOT0) when the line is built
+SLOT_BANK, SLOT0 = 86, 0xD0
+SLOT_SRC = '''
+    org $A000
+slotfix:
+    lda TSAV
+    ldx ISAV
+    cmp #$89
+    bne .c
+    lda SPL,x
+    sta $1E
+    lda SPH,x
+    jmp .g
+.c:
+    cmp #$8C
+    bne .a
+    lda CML,x
+    sta $1E
+    lda CMH,x
+    jmp .g
+.a:
+    lda AIL,x
+    sta $1E
+    lda AIH,x
+.g:
+    sta $1F
+    bne .k
+    lda TSAV        ; as drawn by the game: a spell's icon gives way to '/'
+    cmp #$89
+    bne .r
+    lda #$C7
+    sta $7AE3
+.r:
+    rts
+.k:
+    lda $52
+    asl a
+    adc $52
+    asl a
+    clc
+    adc #SLOT0
+    sta TCODE
+    jsr $FB80       ; next vertical blank
+    lda TCODE       ; (battle windows use the $1000 pattern table, below the split)
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    ora #$10
+    pha
+    lda TCODE
+    asl a
+    asl a
+    asl a
+    asl a
+    tax
+    pla
+    jsr $F8E0
+    ldy #0
+.u:
+    lda ($1E),y
+    sta $2007
+    iny
+    cpy #96
+    bne .u
+    jsr $8D03
+    ldx #0
+    lda TCODE
+.t:
+    sta $7AE3,x
+    clc
+    adc #1
+    inx
+    cpx #6
+    bne .t
+    lda #0
+    sta $7AE9
+    rts
+'''
+
+def slot_words(rom, L):
+    names = {e['id']: e['en'] for e in json.load(open('script/ff3/names8800.json'))}
+    sysx = {e['id']: e['en'] for e in json.load(open('script/ff3/t8200.json'))}
+    clean = lambda t: re.sub(r'\[..\]|\{..(:..)?\}', '', t or '').strip()
+    groups = [('SP', [names.get(0xC8 + i) for i in range(56)]),
+              ('CM', [names.get(0x220 + i) for i in range(32)]),
+              ('AI', [sysx.get(0x16 + i) for i in range(10)])]
+    code = asm(SLOT_SRC + ''.join('%sL: .ds %d\n%sH: .ds %d\n' % (g, len(w), g, len(w)) for g, w in groups),
+               syms=dict(L, SLOT0=SLOT0))
+    base = code.org + len(code.bytes)
+    data = bytearray(); ptrs = {}
+    for g, words in groups:
+        for i, w in enumerate(words):
+            w = clean(w)
+            if len(w) <= 5: continue
+            if g == 'CM' and not 0x222 <= 0x220 + i <= 0x236 or g == 'CM' and 0x220 + i in (0x229, 0x233):
+                continue                    # messages in the same block, never in the slot
+            t = packed_label('/' + w, 6, COND, fg=3, bg=2) or packed_label('/' + w, 6, TIGHT, fg=3, bg=2)
+            assert t, w
+            ptrs[g, i] = base + len(data); data += b''.join(t)
+    img = bytearray(code.bytes)
+    for g, words in groups:
+        lo = code.labels[g + 'L'] - code.org; hi = code.labels[g + 'H'] - code.org
+        for i in range(len(words)):
+            a = ptrs.get((g, i), 0); img[lo + i] = a & 0xFF; img[hi + i] = a >> 8
+    assert base + len(data) <= 0xC000
+    put(rom, SLOT_BANK, code.org, bytes(img) + bytes(data))
+    return len(ptrs)
+
 COPIER = 0x9F00                         # bank 64: copies the 1KB ExRAM image at reset
 COPIER_SRC = '''
     org $9F00
@@ -537,7 +666,7 @@ def engine(rom, report):
     bases = {n: b for n, _, b in TABLES}
     ex = asm(EXRAM_SRC, syms={'B0': bases['t8000'], 'B1': bases['t8200'], 'B2': bases['t8400'],
                               'B3': bases['t8600'], 'B4': bases['names8800'],
-                              'R0': ONE_BANKS[0], 'R1': ONE_BANKS[1]})
+                              'R0': ONE_BANKS[0], 'R1': ONE_BANKS[1], 'SB': SLOT_BANK})
     assert ex.org + len(ex.bytes) <= 0x6000
     assert set(get(rom, 64, 0x8090, 0x370)) == {0xFF}
     put(rom, 64, ex.org - 0x5C00 + 0x8000, ex.bytes)
@@ -573,6 +702,14 @@ def engine(rom, report):
                                              bot & 0xFF, bot >> 8, end & 0xFF, end >> 8]))
         save += 4 * (w + 2)
     assert save <= 0x6000, hex(save)
+    # status window slot
+    n = slot_words(rom, L)
+    report.append('status slot: %d compact words' % n)
+    assert get(rom, 52, 0x9C2E, 8).hex() == '2009a6a9c78de37a'
+    put(rom, 52, 0x9C2E, jsr(L['slotcopy']) + b'\xEA' * 5)
+    for a in (0x9C47, 0x9C79):
+        assert get(rom, 52, a, 3) == b'\x20\x09\xa6', hex(a)
+        put(rom, 52, a, jsr(L['slotcopy']))
     # battle string copy ($FD4A): the terminating 0 is copied too (an English name longer
     # than the Japanese field ran into the field's old contents)
     assert get(rom, FIX, 0xFD4F, 11).hex() == 'b118f0079dd77ae8c8d0f5'
