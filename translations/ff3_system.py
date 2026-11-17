@@ -144,6 +144,27 @@ T[33] = '\n'.join(''.join('{17:%s}%s' % (c, chars[r*10 + k]) for k, c in enumera
 # column of 32 full-length names, the count at the right column's place (insert.py: cursor
 # step 4); the last line is the bin
 T[61] = '\n'.join('{17:01}{1A:%02X}{14:19}{1C:%02X}' % (k, k) for k in range(32)) + '\n{17:05}{0F}'
+# equipment messages (window $1E, widened to 28 cells by insert.py): one row per line (code
+# 0E), wrapped in two lines where the English is longer than a line
+def msg2(text, width=28):
+    lines = ['']
+    for w in text.split(' '):
+        if lines[-1] and len(lines[-1]) + 1 + len(w) > width: lines.append(w)
+        else: lines[-1] = (lines[-1] + ' ' + w) if lines[-1] else w
+    assert len(lines) <= 2, text
+    return '{0E}' + '\n'.join(lines)
+for i in list(range(0x3F, 0x47)) + [0x6B, 0x6E, 0x6F]:
+    T[i] = msg2(T[i].strip(' ').replace('Effect..', 'Effect‥'))
+T[0x42] = '{0E}Effect‥\nIntelligence rose by 5!'      # (not "... rose by" / "5!")
+# equipment window (#62): one row per line (code 0E), each piece on a line of its own in full
+# (insert.py: cursor step 4, "Remove Equipment" the sixth entry, the portrait at the right)
+T[62] = ('{0E} {10:02}\n'
+         ' Attack‥ {10:33}{14:0D}Defense‥ {10:34}\n'
+         '{15:01}{10:06}{10:43}\n{15:01}{10:07}{10:44}\n'
+         '{15:01}{10:03}\n{15:01}{10:04}\n{15:01}{10:05}\n'
+         '{15:01}Remove Equipment')
+# equipment candidates (#47, code 20): one column of full names as the item menu (#61)
+T[47] = '\n'.join('{17:01}{20:%02X}{14:19}{1C:%02X}' % (k, k) for k in range(32))
 # magic screen (#60): one row per line (code 0E), each level's MP on a line of its own above
 # its three spells, which have 9 cells each (icon or mark and 8 letters) in place of 7
 T[60] = '{0E}' + '\n'.join('%d {10:%02X}/{10:%02X}\n{16:01}{10:%02X}{16:0A}{10:%02X}{16:13}{10:%02X}'
@@ -167,6 +188,6 @@ T[71] = ('{0E}\n{14:0C}{10:02}{14:14}{10:01}\n\n'        # header lines on the J
          '  Evasion rate{14:14}‥ {10:41}\n'
          '  Magic defense{14:14}‥{10:36}\n'
          '  Magic evasion rate‥ {10:40}')
-for i in (32, 37, 47, 48, 50, 51, 52, 57, 59, 72, 73, 74, 109):
+for i in (32, 37, 48, 50, 51, 52, 57, 59, 72, 73, 74, 109):
     T[i] = codes_only(i)
 apply(P, T)

@@ -395,10 +395,10 @@ h_ypos:         ; $F086: row of a recorded position ($98 + $1F assumes the dakut
     lda $98
     clc
     adc $1F
-    ldx ONE
-    beq .r
+    ldx ONE         ; (one row: the text is on row $98 + $1F - 1, the cursor's upper half
+    beq .r          ;   on the row above it, as above a Japanese line)
     sec
-    sbc #1
+    sbc #2
 .r:
     rts
 h_flush:        ; $F6AE line flush: lower-row buffer only, on row $3B
@@ -1606,6 +1606,15 @@ def menus(rom):
     for a in (0x9F01, 0x9F3E):
         assert get(rom, 60, a, 4) == b'\xa9\x08\x20\x0d', hex(a)
         put(rom, 60, a + 1, b'\x04')
+    # equipment: one column (#62: cursor step 4; "Remove Equipment", entry 4 in the
+    # Japanese, is entry 5; the portrait at the window's right), candidates one column (#47)
+    assert get(rom, 60, 0x9BEE, 4) == b'\xa9\x08\x20\xa3' and get(rom, 60, 0x9C21, 4) == b'\xa9\x08\x20\x0d'
+    put(rom, 60, 0x9BEF, b'\x04'); put(rom, 60, 0x9C22, b'\x04')
+    assert get(rom, 60, 0x9D9E, 2) == b'\xc9\x10' and get(rom, 60, 0x9D5B, 2) == b'\xa9\x80'
+    put(rom, 60, 0x9D9F, b'\x14'); put(rom, 60, 0x9D5C, b'\xd8')
+    # the equipment message window ($1E, 17 x 1 inside): the screen's width, two one-row lines
+    assert get(rom, 61, 0xAB43 + 0x1E) == b'\x13'
+    put(rom, 61, 0xAB43 + 0x1E, b'\x1e')
 
 def engine(rom, report):
     bases = {n: b for n, _, b in TABLES}

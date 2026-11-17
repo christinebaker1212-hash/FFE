@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, json
 sys.path.insert(0, os.path.dirname(__file__))
 from apply import apply
 T = {}
@@ -135,3 +135,10 @@ MSG = {
  685:'Aura! Attack power up', 686:'Cut it clean in two!', 687:'Megaflare!',
 }
 apply('script/ff3/names8800.json', MSG)
+
+# items without an icon: the Japanese names open with a space in the icon's cell (lists keep
+# their column, and the unusable mark goes there); the English keep it
+rows = json.load(open('script/ff3/names8800.json'))
+SP = {e['id']: ' ' + e['en'] for e in rows if e['id'] < 256 and e['ja'] and e['ja'].startswith('　')
+      and e['en'] and not e['en'].startswith(' ')}
+apply('script/ff3/names8800.json', SP)
