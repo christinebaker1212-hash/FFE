@@ -183,7 +183,7 @@
   "id": 30,
   "off": "35DE9",
   "ja": "くらやみ",
-  "en": "Blindness"
+  "en": "Blind"
  },
  {
   "id": 31,
@@ -297,7 +297,7 @@
   "id": 49,
   "off": "36371",
   "ja": "{15:01}アイテム\n{15:01}まほう\n{15:01}そうび\n{15:01}ステータス\n{15:01}ならびかえ\n{15:01}ジョブ\n{15:01}セーブ",
-  "en": "{15:01}Item\n{15:01}Magic\n{15:01}Equip\n{15:01}Status\n{15:01}Rearrange\n{15:01}Job\n{15:01}Save"
+  "en": "{15:01}Item\n{15:01}Magic\n{15:01}Equip\n{15:01}[E1][E2][E3][E4]\n{15:01}Order\n{15:01}Job\n{15:01}Save"
  },
  {
   "id": 50,
@@ -1359,7 +1359,7 @@
   "id": 226,
   "off": "370A7",
   "ja": "たまねぎけんし",
-  "en": "Onion Swordsman"
+  "en": "Onion Knight"
  },
  {
   "id": 227,
@@ -1443,7 +1443,7 @@
   "id": 240,
   "off": "37117",
   "ja": "まけんし　　　",
-  "en": "Magic Swordsman"
+  "en": "Magic Knight"
  },
  {
   "id": 241,
@@ -1473,7 +1473,7 @@
   "id": 245,
   "off": "3713F",
   "ja": "まかいげんし　",
-  "en": "Demon-World Illusionist"
+  "en": "Summoner"
  },
  {
   "id": 246,

@@ -242,14 +242,8 @@ tsel:           ; bank 53 $A616 (battle string copy, $1A/$1B = address of the po
     sta $1B
     rts
 btidyf:         ; bank 52 converter: btidy (bank EB)
-    inc $A9
-    lda #$80+EB
-    sta $5115
-    jsr $A006
-    lda #$80+53
-    sta $5115
-    dec $A9
-    rts
+    ldx #6
+    bne far87
 slotcopy:       ; bank 52 status line ($9C2E spell, $9C47 command, $9C79 ailment: JSR $A609)
     sta ISAV
     pha
@@ -266,80 +260,68 @@ slotcopy:       ; bank 52 status line ($9C2E spell, $9C47 command, $9C79 ailment
     dec $A9
     rts
 encopy:         ; bank 52 enemy list ($9DBE: JSR $A609, monster A): the name; compact
-    sta ISAV    ;   tiles for a word too wide for the list (enfix, bank SB)
+    sta ISAV    ;   tiles for a word too wide for the list (enfix, bank EB)
     jsr $A609
-    inc $A9
-    lda #$80+EB
-    sta $5115
-    jsr $A000
-    lda #$80+53
-    sta $5115
-    dec $A9
-    rts
+    ldx #0
+    beq far87
 itemcopy:       ; bank 53 $B20C (battle item entry: JSR $A609, name from X 1): the name
-    jsr $A609   ;   also kept whole at ITMN (the ':' and count overwrite its tail)
-    ldx #0
-.l:
-    lda $7AD8,x
-    sta ITMN,x
-    beq .r
-    inx
-    bne .l
-.r:
-    rts
-itemconv:       ; bank 53 $B22F (JSR $966A, 13 wide): the entry over its two rows
-    inc $A9
-    lda #$80+EB
-    sta $5115
-    jsr $A003
-    lda #$80+53
-    sta $5115
-    dec $A9
-    rts
+    jsr $A609   ;   also kept whole at ITMN (the ':' and count overwrite its tail): bank EB
+    ldx #$0F
+    bne far87
+itemconv:       ; bank 53 $B22F (JSR $966A, 13 wide): the entry over its two rows (bank EB)
+    ldx #3
+    bne far87
 magcopy:        ; bank 53 $B76C (magic window: JSR $A609, spell at X 9/16/23): the name
-    stx MX      ;   and mark (X - 1) kept by column (MAGN + 16k, MAGM + k) for mconv
+    stx MX      ;   and mark kept by column (bank EB)
     jsr $A609
-    lda MX
-    sec
-    sbc #9
-    ldx #0
-.d:
-    cmp #7
-    bcc .k
-    sbc #7
-    inx
-    bne .d
-.k:
-    ldy MX
-    lda $7AD6,y     ; (only $73 is a mark: a usable spell leaves the previous name's tail)
-    cmp #$73
-    beq .m
-    lda #$FF
-.m:
-    sta MAGM,x
-    txa
-    asl a
-    asl a
-    asl a
-    asl a
-    tax
-.c:
-    lda $7AD7,y
-    sta MAGN,x
-    beq .r
-    inx
-    iny
-    bne .c
-.r:
-    rts
+    ldx #$0C
+    bne far87
 magconv:        ; bank 53 $B782 (JSR $966A, 28 wide): the level row over its two rows
-    inc $A9
-    lda #$80+EB
+    ldx #9
+far87:          ; call bank EB at $A000 + X (mapped at $A000 in place of bank 53)
+    stx FV
+    inc $A9         ; (the IRQ runs the sound driver, which maps its own banks, only
+    lda #$80+EB     ;   while $A9 = 0, as during the game's bank switches)
     sta $5115
-    jsr $A009
+    jsr .j
     lda #$80+53
     sta $5115
     dec $A9
+    rts
+.j:
+    jmp (FV)
+FV:
+    .db 0, $A0
+sname:          ; $F2FE (codes 10-13 xx 01: a job, t8200 226 +): the Japanese continues
+    pha         ;   in the code 18 name decode ($F0C5), whose base is the name table's;
+    and #$1F    ;   here the system table's
+    ora #$80
+    sta $3F
+    pla
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    jsr sbase
+    jmp $F0D5
+ailsel:         ; $F2BB (codes 10-13 xx 00, an ailment in place of LV): bank JB
+    ldy #6
+    bne jbgo
+jobname:        ; $F30D (codes 10-13 xx 01, the job): bank JB
+    ldy #3
+jbgo:
+    pha
+    lda #$80+JB
+    sta $5114
+    pla
+    jmp $8000
+jobload:        ; $DD0C (menu graphics loaded, rendering off): the job names' tiles
+    jsr $DFF8
+    ldy #0
+    jsr jbgo
+    lda #$80+60
+    sta $5114
     rts
 onerow:         ; C = 1 in one-row mode
     lda ONE
@@ -680,6 +662,52 @@ ENFIX_SRC = '''
     jmp iconv
     jmp btidy
     jmp mconv
+    jmp magcp
+    jmp itemcp
+itemcp:         ; (itemcopy) the whole name at ITMN
+    ldx #0
+.l:
+    lda $7AD8,x
+    sta ITMN,x
+    beq .r
+    inx
+    bne .l
+.r:
+    rts
+magcp:          ; (magcopy) name and mark (X - 1) kept by column (MAGN + 16k, MAGM + k)
+    lda MX
+    sec
+    sbc #9
+    ldx #0
+.d:
+    cmp #7
+    bcc .k
+    sbc #7
+    inx
+    bne .d
+.k:
+    ldy MX
+    lda $7AD6,y     ; (only $73 is a mark: a usable spell leaves the previous name's tail)
+    cmp #$73
+    beq .m
+    lda #$FF
+.m:
+    sta MAGM,x
+    txa
+    asl a
+    asl a
+    asl a
+    asl a
+    tax
+.c:
+    lda $7AD7,y
+    sta MAGN,x
+    beq .r
+    inx
+    iny
+    bne .c
+.r:
+    rts
 enfix:
     lda $24
     bne .a
@@ -1284,6 +1312,189 @@ COPIER_SRC = '''
     rts
 '''
 
+# field menus: a job name longer than its 7 cells is drawn in condensed letters on 7 tiles of
+# its own, character c's at tiles 7c+1.. (map tiles $01-$3F, unused in the menus, which
+# reload them on leaving), uploaded with the menu graphics ($DD06, rendering off); the
+# ailments shown in place of LV, and "Status" in the 5-cell command window, have condensed
+# glyphs of their own in the font's unused codes from $D0
+JOB_BANK = 88
+STATIC_WORDS = [('Death', 3), ('Stone', 3), ('Silence', 4), ('Blind', 3), ('Poison', 4), ('Status', 4)]
+FIELD_AIL = {22: 'Death', 23: 'Stone', 28: 'Silence', 30: 'Blind', 31: 'Poison'}
+JOBF_SRC = '''
+    org $8000
+    cpy #3
+    beq jobn
+    cpy #6
+    bne jload
+    jmp ails
+jload:              ; each character's job: its tiles (when condensed) to tiles 7c+1..
+    lda $84
+    pha
+    lda $85
+    pha
+    ldx #0
+.c:
+    lda $6100,x
+    cmp #22
+    bcs .n
+    tay
+    lda JLONG,y
+    beq .n
+    lda JSL,y
+    sta $84
+    lda JSH,y
+    sta $85
+    txa
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    tay
+    lda $2002
+    lda PPH,y
+    sta $2006
+    lda PPL,y
+    sta $2006
+    ldy #0
+.l:
+    lda ($84),y
+    sta $2007
+    iny
+    cpy #112
+    bne .l
+.n:
+    txa
+    clc
+    adc #$40
+    tax
+    bne .c
+    pla
+    sta $85
+    pla
+    sta $84
+    rts
+jobn:               ; A = job + $E2, X = the character's offset
+    sec
+    sbc #$E2
+    tay
+    lda JLONG,y
+    bne .k
+    tya
+    clc
+    adc #$E2
+.p:
+    tax             ; as the Japanese ($F2D8): the system string
+    jsr $F3E4
+    jmp $F2DC
+.k:
+    txa
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    tay
+    lda C7,y
+    ldy #7
+    bne put
+ails:               ; A = ailments ($6102 & $FE): the first set, as the Japanese
+    ldy #22
+    asl a
+    bcs .f
+    ldy #23
+    asl a
+    bcs .f
+    ldy #27
+    asl a
+    bcs .f
+    iny
+    asl a
+    bcs .f
+    iny
+    asl a
+    bcs .f
+    iny
+    asl a
+    bcs .f
+    iny
+.f:
+    tya
+    sec
+    sbc #22
+    tax
+    lda AN,x
+    bne .k
+    tya
+    jmp jobn.p
+.k:
+    tay
+    lda AC,x
+put:                ; Y codes from A into the line at $90 (the row above blank)
+    ldx $90
+.w:
+    sta $07A0,x
+    pha
+    lda #$FF
+    sta $0780,x
+    pla
+    clc
+    adc #1
+    inx
+    dey
+    bne .w
+    stx $90
+    jmp $F291
+C7:                 ; tile $00 is the menus' background
+    .db 1, 8, 15, 22
+PPH:
+    .db $00, $00, $00, $01
+PPL:
+    .db $10, $80, $F0, $60
+'''
+
+def field_names(rom, L):
+    from latin_font import packed_label
+    jobs = {e['id']: e['en'] for e in json.load(open('script/ff3/t8200.json'))}
+    # static condensed words in the font
+    code = 0xD0; codes = {}
+    for w, n in STATIC_WORDS:
+        t = packed_label(w, n, COND, fg=3, bg=2)
+        assert t, w
+        codes[w] = code
+        for k, b in enumerate(t): o = HDR + FONT + (code + k) * 16; rom[o:o + 16] = b
+        code += n
+    assert code <= 0xF7
+    st = codes['Status']
+    assert ''.join('[%02X]' % (st + k) for k in range(4)) in jobs[49]
+    an = [0] * 10; ac = [0] * 10
+    for i, w in FIELD_AIL.items():
+        assert jobs[i] == w, (i, jobs[i])
+        an[i - 22] = dict(STATIC_WORDS)[w]; ac[i - 22] = codes[w]
+    # jobs: 7 condensed tiles each for the long ones
+    data = bytearray(); jl = []; jsl = []; jsh = []
+    base = 0x8200
+    for j in range(22):
+        name = jobs[226 + j]
+        if len(name) <= 7:
+            jl.append(0); jsl.append(0); jsh.append(0); continue
+        t = packed_label(name, 7, COND, fg=3, bg=2) or packed_label(name, 7, TIGHT, fg=3, bg=2)
+        assert t, name
+        a = base + len(data); data += b''.join(t)
+        jl.append(1); jsl.append(a & 0xFF); jsh.append(a >> 8)
+    tables = ('JLONG:\n    .db %s\nJSL:\n    .db %s\nJSH:\n    .db %s\nAN:\n    .db %s\nAC:\n    .db %s\n' %
+              tuple(', '.join('$%02X' % v for v in tb) for tb in (jl, jsl, jsh, an, ac)))
+    jb = asm(JOBF_SRC + tables, syms=L)
+    assert jb.org + len(jb.bytes) <= base
+    put(rom, JOB_BANK, jb.org, jb.bytes); put(rom, JOB_BANK, base, bytes(data))
+    assert get(rom, FIX, 0xF2BB, 2) == b'\xa0\x16' and get(rom, FIX, 0xF30D, 3) == b'\x4c\xd8\xf2'
+    put(rom, FIX, 0xF2BB, jmp(L['ailsel']))
+    put(rom, FIX, 0xF30D, jmp(L['jobname']))
+    assert get(rom, 126, 0xDD0C, 3) == b'\x4c\xf8\xdf'
+    put(rom, 126, 0xDD0C, jmp(L['jobload']))
+
 MENU_BANK = 60                         # field menus: banks 60/61 ($8000-$BFFF)
 def menus(rom):
     # item menu: one column (t8200 #61), cursor moved 4 bytes (one recorded entry) a line
@@ -1295,7 +1506,8 @@ def engine(rom, report):
     bases = {n: b for n, _, b in TABLES}
     ex = asm(EXRAM_SRC, syms={'B0': bases['t8000'], 'B1': bases['t8200'], 'B2': bases['t8400'],
                               'B3': bases['t8600'], 'B4': bases['names8800'],
-                              'R0': ONE_BANKS[0], 'R1': ONE_BANKS[1], 'SB': SLOT_BANK, 'EB': ENEMY_BANK})
+                              'R0': ONE_BANKS[0], 'R1': ONE_BANKS[1], 'SB': SLOT_BANK, 'EB': ENEMY_BANK,
+                              'JB': JOB_BANK})
     assert ex.org + len(ex.bytes) <= BOX_SAVE, hex(ex.org + len(ex.bytes))
     assert set(get(rom, 64, 0x8090, 0x370)) == {0xFF}
     put(rom, 64, ex.org - 0x5C00 + 0x8000, ex.bytes)
@@ -1378,6 +1590,8 @@ def engine(rom, report):
         put(rom, FIX, a, jsr(L[h]) + b'\xEA\xEA')
     assert get(rom, FIX, 0xEF4C, 4) == b'\xe6\x1f\xe6\x1f'
     put(rom, FIX, 0xEF4C, jsr(L['h_nl']) + b'\xEA')
+    assert get(rom, FIX, 0xF2FE, 3) == b'\x4c\xc5\xf0'
+    put(rom, FIX, 0xF2FE, jmp(L['sname']))
     # code 09 (flush, then one row down: the menus' packed rows) entered the Japanese
     # newline's second INC $1F ($EFE1 JMP $EF4E); its own entry now sits in the NOPs the
     # MMC5 build left after the reset copier call ($FF8C-$FF93), skipped at reset
@@ -1391,6 +1605,7 @@ def engine(rom, report):
     put(rom, FIX, 0xF086, jsr(L['h_ypos']) + b'\xEA\xEA')
     assert get(rom, FIX, 0xF6AE, 4) == b'\xa5\x38\x85\x3a'
     put(rom, FIX, 0xF6AE, jmp(L['h_flush']) + b'\xEA')
+    field_names(rom, L)
 
 if __name__ == '__main__':
     rom = bytearray(open(sys.argv[1], 'rb').read())

@@ -21,7 +21,7 @@ T = {
  16: 'Came back to their senses', 17: 'Back to normal', 18: 'Silence cured', 19: 'Grew big again',
  20: 'Can see again!', 21: 'The poison is gone',
  22: 'Death', 23: 'Stone', 24: 'Paralysis', 25: 'Sleep', 26: 'Confusion', 27: 'Frog',
- 28: 'Silence', 29: 'Mini', 30: 'Blindness', 31: 'Poison',
+ 28: 'Silence', 29: 'Mini', 30: 'Blind', 31: 'Poison',
  34: '{15:01}New Game',
  35: 'Message Speed {06}',
  36: '{15:01}Deposit{15:07}Withdraw{15:0D}Exit',
@@ -34,7 +34,7 @@ T = {
  44: "You're carrying too much to buy any more.",
  45: ' How many?{15:06}1{15:08}4{15:0A}10',
  46: ' How many?{15:06}1{15:08}All',
- 49: '{15:01}Item\n{15:01}Magic\n{15:01}Equip\n{15:01}Status\n{15:01}Rearrange\n{15:01}Job\n{15:01}Save',
+ 49: '{15:01}Item\n{15:01}Magic\n{15:01}Equip\n{15:01}[E1][E2][E3][E4]\n{15:01}Order\n{15:01}Job\n{15:01}Save',
  53: ' Item',
  54: ' {10:02}{15:09}Use{15:0F}Exchange{15:16}Item',
  55: ' Status', 56: ' Save',
@@ -122,9 +122,13 @@ for i, name in PLACES.items():
     col = re.match(r'\{14:[0-9A-F]{2}\}', rows[i]['ja']).group(0)
     T[i] = col + name
 T.update({221:' Head', 222:' Body', 223:' Arms', 224:' Right Hand', 225:' Left Hand'})
-JOBS = ['Onion Swordsman','Warrior','Monk','White Wizard','Black Wizard','Red Wizard','Hunter',
- 'Knight','Thief','Scholar','Geomancer','Dragon Knight','Viking','Karateka','Magic Swordsman',
- 'Illusionist','Bard','Warlock','Guru','Demon-World Illusionist','Sage','Ninja']
+# job names: the Japanese gives a job 7 cells (menus, status); the English ones longer than 7
+# letters are drawn there in condensed letters (insert.py), which hold up to about 13.
+# けんし (swordsman) as Knight in たまねぎけんし/まけんし/りゅうきし; まかいげんし (illusionist of
+# the demon world, who calls its beings) as Summoner
+JOBS = ['Onion Knight','Warrior','Monk','White Wizard','Black Wizard','Red Wizard','Hunter',
+ 'Knight','Thief','Scholar','Geomancer','Dragon Knight','Viking','Karateka','Magic Knight',
+ 'Illusionist','Bard','Warlock','Guru','Summoner','Sage','Ninja']
 for i, j in enumerate(JOBS): T[226 + i] = j
 T.update({248:'Princess Sara', 249:'Old Man Cid', 250:'Desch', 252:'Elia', 253:'Prince Alus',
           254:'Doga', 255:'Unne'})

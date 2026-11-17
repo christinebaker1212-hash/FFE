@@ -55,12 +55,12 @@ All renderings are from the Japanese. `{18:xx}` inserts entry xx of `script/ff3/
 ラリ / ラリホー dwarf speech "lali" / "Lali-ho!" (as in FF1)
 
 ## Jobs (まどうし 魔導師 = Wizard, as in FF1)
-たまねぎけんし Onion Swordsman (剣士 = swordsman) · せんし Warrior · モンク Monk · しろ/くろ/あかまどうし
+たまねぎけんし Onion Knight (剣士 = swordsman; Knight as in まけんし, りゅうきし: a job has 7 cells, condensed letters hold about 13) · せんし Warrior · モンク Monk · しろ/くろ/あかまどうし
 White/Black/Red Wizard · かりゅうど Hunter · ナイト Knight · シーフ Thief · がくしゃ Scholar ·
 ふうすいし Geomancer (風水師) · りゅうきし Dragon Knight · バイキング Viking · からてか Karateka ·
-まけんし Magic Swordsman (魔剣士) · げんじゅつし Illusionist (幻術師, the summoner job) · ぎんゆうしじん Bard ·
+まけんし Magic Knight (魔剣士) · げんじゅつし Illusionist (幻術師, the summoner job) · ぎんゆうしじん Bard ·
 まじん Warlock (魔人: master of black magic; 魔 = both "magic" and "demonic") · どうし Guru (導師: master of
-white magic, literally "guiding teacher") · まかいげんし Demon-World Illusionist (魔界幻士) · けんじゃ Sage ·
+white magic, literally "guiding teacher") · まかいげんし Summoner (魔界幻士: an illusionist who calls beings of the demon world) · けんじゃ Sage ·
 にんじゃ Ninja
 
 ## Battle commands and terms
