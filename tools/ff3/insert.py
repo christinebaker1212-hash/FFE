@@ -296,6 +296,9 @@ sname:          ; $F2FE (codes 10-13 xx 01: a job, t8200 226 +): the Japanese co
 ailsel:         ; $F2BB (codes 10-13 xx 00, an ailment in place of LV): bank JB
     ldy #6
     bne jbgo
+spellh:         ; $F384 (codes 10-13 xx 08-1F, a spell in the magic screen): bank JB
+    ldy #9
+    bne jbgo
 jobname:        ; $F30D (codes 10-13 xx 01, the job): bank JB
     ldy #3
 jbgo:
@@ -1342,15 +1345,51 @@ COPIER_SRC = '''
 # ailments shown in place of LV, and "Status" in the 5-cell command window, have condensed
 # glyphs of their own in the font's unused codes from $D0
 JOB_BANK = 88
-STATIC_WORDS = [('Death', 3), ('Stone', 3), ('Silence', 4), ('Blind', 3), ('Poison', 4), ('Status', 4)]
+STATIC_WORDS = [('Death', 3), ('Stone', 3), ('Silence', 4), ('Blind', 3), ('Poison', 4), ('Status', 4),
+                ('Leviathan', 6), ('Catastrophe', 6)]
+LONG_SPELLS = {213: 'Leviathan', 220: 'Catastrophe'}     # names table ids; the others fit 8
 FIELD_AIL = {22: 'Death', 23: 'Stone', 28: 'Silence', 30: 'Blind', 31: 'Poison'}
 JOBF_SRC = '''
     org $8000
+disp:
     cpy #3
-    beq jobn
+    bne .a
+    jmp jobn
+.a:
+    cpy #9
+    bne .b
+    jmp spl
+.b:
     cpy #6
     bne jload
     jmp ails
+spl:                ; spell $84 (mark if $B9): Leviathan, Catastrophe condensed
+    ldx #0
+    lda $84
+    cmp #LEVI
+    beq .k
+    ldx #SPN
+    cmp #CATA
+    beq .k
+    jmp $F09D
+.k:
+    ldy $90
+    lda #$72
+    sta $07A0,y
+    lda $B9
+    beq .i
+    lda #$73
+    sta $07A0,y
+.i:
+    lda #0
+    sta $B9
+    lda #$FF
+    sta $0780,y
+    iny
+    sty $90
+    lda SPC,x
+    ldy #SPN
+    jmp put
 jload:              ; each character's job: its tiles (when condensed) to tiles 7c+1..
     lda $84
     pha
@@ -1506,7 +1545,7 @@ def field_names(rom, L):
     # static condensed words in the font
     code = 0xD0; codes = {}
     for w, n in STATIC_WORDS:
-        t = packed_label(w, n, COND, fg=3, bg=2)
+        t = packed_label(w, n, COND, fg=3, bg=2) or packed_label(w, n, TIGHT, fg=3, bg=2)
         assert t, w
         codes[w] = code
         for k, b in enumerate(t): o = HDR + FONT + (code + k) * 16; rom[o:o + 16] = b
@@ -1529,7 +1568,13 @@ def field_names(rom, L):
         assert t, name
         a = base + len(data); data += b''.join(t)
         jl.append(1); jsl.append(a & 0xFF); jsh.append(a >> 8)
-    tables = ('JLONG:\n    .db %s\nJSL:\n    .db %s\nJSH:\n    .db %s\nAN:\n    .db %s\nAC:\n    .db %s\n' %
+    names = {e['id']: e['en'] for e in json.load(open('script/ff3/names8800.json'))}
+    for i in range(200, 256):
+        nm = re.sub(r'\[..\]', '', names[i])
+        assert len(nm) <= 8 or LONG_SPELLS.get(i) == nm, (i, nm)
+    spn = dict(STATIC_WORDS)['Leviathan']; assert dict(STATIC_WORDS)['Catastrophe'] == spn
+    L = dict(L, LEVI=213, CATA=220, SPN=spn)
+    tables = ('SPC:\n    .db $%02X, 0, 0, 0, 0, 0, $%02X\n' % (codes['Leviathan'], codes['Catastrophe']) if spn == 6 else None) + ('JLONG:\n    .db %s\nJSL:\n    .db %s\nJSH:\n    .db %s\nAN:\n    .db %s\nAC:\n    .db %s\n' %
               tuple(', '.join('$%02X' % v for v in tb) for tb in (jl, jsl, jsh, an, ac)))
     jb = asm(JOBF_SRC + tables, syms=L)
     assert jb.org + len(jb.bytes) <= base
@@ -1537,6 +1582,8 @@ def field_names(rom, L):
     assert get(rom, FIX, 0xF2BB, 2) == b'\xa0\x16' and get(rom, FIX, 0xF30D, 3) == b'\x4c\xd8\xf2'
     put(rom, FIX, 0xF2BB, jmp(L['ailsel']))
     put(rom, FIX, 0xF30D, jmp(L['jobname']))
+    assert get(rom, FIX, 0xF384, 3) == b'\x4c\x9d\xf0'
+    put(rom, FIX, 0xF384, jmp(L['spellh']))
     assert get(rom, 126, 0xDD0C, 3) == b'\x4c\xf8\xdf'
     put(rom, 126, 0xDD0C, jmp(L['jobload']))
 

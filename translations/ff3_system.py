@@ -36,7 +36,7 @@ T = {
  46: ' How many?{15:06}1{15:08}All',
  49: '{15:01}Item\n{15:01}Magic\n{15:01}Equip\n{15:01}[E1][E2][E3][E4]\n{15:01}Order\n{15:01}Job\n{15:01}Save',
  53: ' Item',
- 54: ' {10:02}{15:09}Use{15:0F}Exchange{15:16}Item',
+ 54: ' {10:02}{15:09}Use{15:0F}Swap{15:16}Item',
  55: ' Status', 56: ' Save',
  58: " To change to this job, it seems you don't\n have enough experience.",
  62: ' {10:02}{14:0A}Attack..{10:33}{14:13}Defense..{10:34}\n{15:01}{10:06}{10:43}{15:12}{10:03}\n{15:01}{10:07}{10:44}{15:12}{10:04}\n{15:01}Remove Equipment{15:12}{10:05}',
@@ -144,6 +144,10 @@ T[33] = '\n'.join(''.join('{17:%s}%s' % (c, chars[r*10 + k]) for k, c in enumera
 # column of 32 full-length names, the count at the right column's place (insert.py: cursor
 # step 4); the last line is the bin
 T[61] = '\n'.join('{17:01}{1A:%02X}{14:19}{1C:%02X}' % (k, k) for k in range(32)) + '\n{17:05}{0F}'
+# magic screen (#60): one row per line (code 0E), each level's MP on a line of its own above
+# its three spells, which have 9 cells each (icon or mark and 8 letters) in place of 7
+T[60] = '{0E}' + '\n'.join('%d {10:%02X}/{10:%02X}\n{16:01}{10:%02X}{16:0A}{10:%02X}{16:13}{10:%02X}'
+                            % (L + 1, 0x80 + L, 0x88 + L, 8 + 3 * L, 9 + 3 * L, 10 + 3 * L) for L in range(8))
 # status screen (#71): one row per line (code 0E, insert.py), the Japanese two columns of
 # abilities and combat figures one under the other; copied to RAM whole (16-bit, insert.py)
 T[71] = ('{0E}\n{14:0C}{10:02}{14:14}{10:01}\n\n'        # header lines on the Japanese rows
@@ -163,6 +167,6 @@ T[71] = ('{0E}\n{14:0C}{10:02}{14:14}{10:01}\n\n'        # header lines on the J
          '  Evasion rate{14:14}‥ {10:41}\n'
          '  Magic defense{14:14}‥{10:36}\n'
          '  Magic evasion rate‥ {10:40}')
-for i in (32, 37, 47, 48, 50, 51, 52, 57, 59, 60, 72, 73, 74, 109):
+for i in (32, 37, 47, 48, 50, 51, 52, 57, 59, 72, 73, 74, 109):
     T[i] = codes_only(i)
 apply(P, T)
