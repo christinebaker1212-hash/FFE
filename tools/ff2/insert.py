@@ -168,6 +168,9 @@ SYS_W = {i: 26 for i in list(range(0, 12)) + list(range(13, 21)) + [22, 25, 63, 
 SYS_W.update({i: 28 for i in range(42, 63)})
 PROLOGUE = 73                       # window 24: 28 columns, 26 rows
 ONE_ROW_LAYOUT = {27}               # menu layouts drawn one row per line
+# inventory (32 slots and the bin): one column of full names, one row each ({08} at each
+# line start: one-row mode also when the list is redrawn from a later line)
+SYS_LAYOUT = {37: '\n'.join(['{08}{17:01}{1A:%02X}' % i for i in range(32)] + ['{08}{17:01}{0F}'])}
 
 def system_strings(rom, report, bank):
     """System strings (table bank 10 $8400) after the names. Messages (SYS_W) are drawn
@@ -179,6 +182,8 @@ def system_strings(rom, report, bank):
         t = e['en']
         if e['id'] in SYS_W:
             t = layout('\n'.join(l.strip() for l in t.split('\n')), SYS_W[e['id']])
+        elif e['id'] in SYS_LAYOUT:
+            t = SYS_LAYOUT[e['id']]
         elif e['id'] == PROLOGUE:
             lines = []
             for para in t.split('\n\n'):
@@ -197,7 +202,8 @@ EXRAM_SRC = '''
     org $5C00
 TMP:    .ds 1
 ONE:    .ds 1
-    .ds 14
+SLOT1:  .ds 1
+    .ds 13
 SYSONE: .ds 32  ; one-row system strings (bit k of byte n: id 8n+k)
 dlgbank:        ; bank 14 $962F: dialogue bank from the map ($A0) and the id ($92)
     lda $A0
@@ -256,6 +262,13 @@ txton:          ; $EAAC (text drawing starts; window frames are drawn elsewhere 
     and #1
     sta ONE
 .r:
+    ldy #0      ; a line starting with code 08 is one-row (lists redrawn from any line)
+    lda ($3E),y
+    cmp #$08
+    bne .x
+    lda #1
+    sta ONE
+.x:
     rts
 txtend:         ; $EAD8 (end of the text): in one-row mode blank the window's rows below
     lda ONE     ;   it (the scroll redraws from a later line; rows past the end would keep
@@ -283,6 +296,129 @@ h_ypos:         ; $EC55: row of a recorded position ($98 + $1F assumes the dakut
     sec
     sbc #1
 .r:
+    rts
+itemmenu:       ; bank 14 $AEC5 (from the main menu): the item list (system string 37) as
+    jsr $905E   ;   one column of full names that scrolls in window 7 (as the equipment
+.full:          ;   screen's list does); the slots come from the cursor entries
+    jsr $B380
+    lda #0
+    sta $A2
+    sta $A3
+    sta $A4
+    sta $7AF0
+    ldx #6
+    jsr $B486
+    lda #$1F
+    jsr $B3DF
+    ldx #7
+    jsr $B486
+    lda #$25
+    jsr $B3F0
+    jsr $94EB
+    lda #1
+    sta $A4
+.l1:
+    jsr $B401
+    lda #4
+    jsr $972D
+    lda $25
+    bne .exit
+    lda $24
+    beq .l1
+    jsr $905E
+    jsr curslot
+    sta SLOT1
+    lda #1
+    sta $A2
+.l2:
+    jsr repin
+    jsr $B401
+    lda #4
+    jsr $972D
+    lda $25
+    beq .a2
+    jsr $905E
+    lda #0
+    sta $A2
+    beq .l1
+.a2:
+    lda $24
+    beq .l2
+    jsr $905E
+    lda #0
+    sta $A2
+    jsr curslot
+    sta $81
+    lda SLOT1
+    sta $80
+    jsr $A871
+    bcc .keep
+    jsr $905E
+    jmp .full
+.keep:          ; redraw the list from its top visible line (the scroll stays)
+    jsr $9523
+    lda $1C
+    sta $3E
+    lda $1D
+    sta $3F
+    jsr $E7AC
+    jmp .l1
+.exit:
+    jsr $905E
+    lda #0
+    sta $78F0
+    sta $A4
+    jmp $B380
+curslot:        ; A = slot of the cursor entry ($20 = the bin)
+    ldx $7AF0
+    lda $7A02,x
+    cmp #$0F
+    bne .s
+    lda #$20
+    rts
+.s:
+    lda $7A03,x
+    rts
+repin:          ; first cursor on SLOT1's entry if it is in view, else hidden
+    ldx #0
+.f:
+    cpx $7AF1
+    bcs .no
+    lda SLOT1
+    cmp #$20
+    bne .i
+    lda $7A02,x
+    cmp #$0F
+    beq .y
+    bne .n
+.i:
+    lda $7A02,x
+    cmp #$1A
+    bne .n
+    lda $7A03,x
+    cmp SLOT1
+    beq .y
+.n:
+    inx
+    inx
+    inx
+    inx
+    bne .f
+.y:
+    lda $7A00,x
+    sta $7800
+    lda $7A01,x
+    sta $7801
+    lda #0
+    sta $78F0
+    lda #4
+    sta $78F1
+    lda #1
+    sta $A2
+    rts
+.no:
+    lda #0
+    sta $A2
     rts
 onerow:         ; C = 1 in one-row mode
     lda ONE
@@ -387,6 +523,12 @@ def engine(rom, report, sysbits):
     # main menu (system string 27): the hand cursor needs two cells before each English
     # command, which one line of 28 cannot give five of; the string has two lines of one
     # row each in the same window
+    # item menu: the scrolling one-column list (EXRAM itemmenu); equipment screen's list
+    # picker: one column (cursor step 4 bytes = 1 entry instead of 3)
+    assert bank_get(rom, 14, 0xAEC5, 3) == b'\x20\x5e\x90'
+    bank_put(rom, 14, 0xAEC5, jmp(L['itemmenu']))
+    assert bank_get(rom, 14, 0xB082, 2) == b'\xa9\x0c'
+    bank_put(rom, 14, 0xB082, b'\xa9\x04')
     # positions recorded by {15}-{17} (cursor spots, key words): one row up in one-row mode
     assert bank_get(rom, 31, 0xEC55, 5) == b'\xa5\x98\x18\x65\x1f'
     bank_put(rom, 31, 0xEC55, jsr(L['h_ypos']) + b'\xEA\xEA')
