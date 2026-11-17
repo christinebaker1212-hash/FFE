@@ -66,6 +66,9 @@ def vlen(s):
             if m.group(3): n += 1
             elif c == '18': n += vlen(NAMES[int(m.group(2), 16)])
             elif c in ('07', '10', '11', '12', '13'): n += 6
+            elif c == '02': n += 20                       # item name (longest)
+            elif c in ('03', '04', '05'): n += 6          # amounts of money
+            elif c == '06': n += 1
             i = m.end(); continue
         n += 1; i += 1
     return n
@@ -184,6 +187,9 @@ SYS_LAYOUT[35] = 'Attack  ..{10:24}\nDefense ..{10:25}'
 # one column, one row per line
 SYS_LAYOUT[65] = '\n'.join('{08}{17:01}{1B:%02X}' % i for i in range(16))
 SYS_LAYOUT[66] = '\n'.join('{08}{17:01}{1A:%02X}' % i for i in range(32))
+# airship destinations (message window): the question, then the four places with fares
+SYS_LAYOUT[21] = '{08}Where are you headed?\n' + '\n'.join(
+    '{16:02}%s{14:14}%d' % (p, 100 * (k + 1)) for k, p in enumerate(('Bafsk', 'Salamand', 'Semite Falls', 'Kashuon')))
 # status (window 15, 27 x 24 inside): one column, one row per line (two columns of
 # English labels and values do not fit 27)
 STAT = [('Strength', 0x26, ''), ('Agility', 0x27, ''), ('Stamina', 0x28, ''), ('Intelligence', 0x29, ''),
