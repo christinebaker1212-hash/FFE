@@ -115,6 +115,7 @@ EX = dict(MODE=0x5C00, PREV=0x5C01, SAVEX=0x5C02, WRAPW=0x5C03, TMP=0x5C04, BUF=
           SLOT=0x5C40, MENUBANK=CODE_BANK)
 EXRAM_SRC = '''
     org $5C60
+BCMDS
 clr20:          ; 20 blanks, lower row only
     .db 9, $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF, 0
 h_entry:        ; $DEB6 (menu string drawer entry)
@@ -378,7 +379,9 @@ def bank_put(rom, bank, cpu, data):
     rom[o:o + len(data)] = data
 
 def menu_engine(rom, report):
-    ex = asm(EXRAM_SRC, syms=EX)
+    cmds = json.load(open('script/ff1/battle_cmds.json'))
+    bc = ''.join('bcmd%d:\n    .db %s, 0\n' % (e['id'], ', '.join(str(b) for b in enc(e['en']))) for e in cmds)
+    ex = asm(EXRAM_SRC.replace('BCMDS', bc), syms=EX)
     img = bytearray(0x400); img[0x60:0x60 + len(ex.bytes)] = ex.bytes
     assert 0x60 + len(ex.bytes) <= 0x400
     bank_put(rom, CODE_BANK, 0x8000, bytes(img))
@@ -435,6 +438,19 @@ def magic_list():
 
 MENU_OVERRIDE = {
     42: magic_list(),
+    # status screen (windows in status_screen()); values at fixed columns ({0D}{col})
+    1: '{04}Gil',
+    2: '  Items\n  Magic\n  Weapons\n  Armor\n  Status',
+    35: '{10}{00}',
+    36: '       {10}{01}',
+    37: '',
+    38: '{09}{0D}{04}Level{0D}{1A}{10}{03}{08}{0D}{04}Experience EP{0D}{16}{10}{04}{08}'
+        '{0D}{04}Until next level{0D}{16}{10}{42}',
+    39: '{0D}{01}Strength{0D}{0E}{10}{07}\n{0D}{01}Agility{0D}{0E}{10}{08}\n'
+        '{0D}{01}Intelligence{0D}{0E}{10}{09}\n{0D}{01}Vitality{0D}{0E}{10}{0A}\n'
+        '{0D}{01}Luck{0D}{0E}{10}{0B}',
+    40: '{0D}{12}Weapon{0D}{1B}{10}{3C}\n{0D}{12}Hit Rate{0D}{1B}{10}{3D}\n'
+        '{0D}{12}Armor{0D}{1B}{10}{3E}\n{0D}{12}Evasion{0D}{1B}{10}{3F}',
     53: '{0C}Equip  Trade  Drop',    # one column right of the cursor positions ($BF07)
 }
 
@@ -583,15 +599,54 @@ def equip_screens(rom, labels):
     # windows (x, y, w, h): title box wide enough for "Weapons", command bar moved right
     bank_put(rom, 14, 0xBE8F, bytes([1, 1, 9, 4, 10, 1, 21, 4]))
 
+def main_menu(rom, labels):
+    """Main menu windows (table bank 14 $BAB5, x y w h): Gil window and command window
+    extended to the left screen edge so 'Gil' and 'Weapons' fit; command cursor one
+    column left. Battle command words (fixed-bank strings, table $FA1B) move to ExRAM."""
+    bank_put(rom, 14, 0xBAB5 + 4 * 5, bytes([0, 10, 11, 5]))
+    bank_put(rom, 14, 0xBAB5 + 4 * 6, bytes([0, 15, 11, 14]))
+    o = HDR + 14 * BANK + 0xB7D5 - 0x8000
+    assert rom[o] == 0x10; rom[o] = 0x08
+    bank_put(rom, 14, 0xBAB5 + 4 * 0, bytes([1, 2, 10, 8]))   # orb window, right edge aligned
+    # character windows: the mages' 'まほう' label was built from immediates at $B9EF
+    m = labels['bcmd1']
+    code = asm('''
+        org $B9EF
+        lda #<M
+        sta $3E
+        lda #>M
+        sta $3F
+        dec $3B
+        jsr $DEB6
+        lda #3
+        sta $3F
+    ''', syms={'M': m}).bytes
+    assert len(code) <= 0xBA0C - 0xB9EF
+    bank_put(rom, 14, 0xB9EF, code + b'\xEA' * (0xBA0C - 0xB9EF - len(code)))
+    cmds = json.load(open('script/ff1/battle_cmds.json'))
+    for e in cmds:
+        a = labels['bcmd%d' % e['id']]
+        put(rom, 0xFA1B + 5 * e['id'] + 3, bytes([a & 0xFF, a >> 8]))
+
+def status_screen(rom):
+    """Status windows (x, y, w, h), table at bank 14 $B53A, drawn in this order with
+    strings 35-40: name; class (wide enough for 'White Magician'); the old level window
+    now coincides with the experience window, which shows Level/Experience/Next in three
+    one-row lines; attribute and battle windows wider for the English labels."""
+    t = [0, 3, 6, 5,   6, 3, 26, 5,   2, 8, 28, 7,   2, 8, 28, 7,   0, 15, 17, 13,   17, 15, 15, 13]
+    bank_put(rom, 14, 0xB53A, bytes(t))
+
 if __name__ == '__main__':
     rom = bytearray(open(sys.argv[1], 'rb').read())
     report = []
     font(rom)
     labels = menu_engine(rom, report)
+    main_menu(rom, labels)
     insert_names(rom, report)
     insert_menu_strings(rom, report)
     item_screen(rom)
     equip_screens(rom, labels)
+    status_screen(rom)
     bad = insert_dialogue(rom, report)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report)); print('strings not fitting:', bad)
