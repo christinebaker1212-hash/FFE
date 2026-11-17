@@ -79,9 +79,25 @@ Milestones per game (from `docs/gb-port.md`):
   `build/boot_test.gb` and checks it in PyBoy: one vblank IRQ per frame, save RAM write,
   3-shade tile pattern on screen. `tools/gb/rt/hw.s` = hardware register names.
 
+- NES emulator (`tools/emu`) now also logs code coverage: env `COV_LOG=FILE` ORs one
+  byte per ROM file offset (bit0 executed, bit1 reached by RTS, bit2 by JMP (ind),
+  bit3 by RTI, bit4 interrupt entry); RAM code at file index $200000+addr.
+  Findings: vectors NMI `$FECF`, RESET `$FE2E`, IRQ `$FEEE`; the English patch runs
+  helper code in MMC5 ExRAM `$5C00-5FFF` (image in bank 18, copied at reset), which the
+  recompiler must compile from that image.
+
 ## In progress / next
-- Milestone 2: study FF1's fixed bank (reset, NMI, bank switch `$FE1A`, PPU/APU writes)
-  in `build/ff1_en.nes`, then write the recompiler (`tools/gb/recomp.py`).
+- Milestone 2: more emulator instrumentation (memory regions touched per instruction,
+  for indirect addressing; JSR/RTS stack-trick detection), a long random-play coverage
+  run, then the recompiler (`tools/gb/recomp.py`).
+- Recompiler design decisions so far (to go into `docs/gb-port.md`): X in E (D=0), Y in C
+  (B=0) so `abs,X`/`abs,Y` = `ld hl,base / add hl,de`; flag liveness decides where Z/N/C/V
+  are materialised; 6502 carry polarity (SBC/CMP) tracked at compile time; NES banked
+  ROM data is read through a bank-0 helper (code and data cannot share the one GB
+  window); indirect pointers translated by region, specialised by the coverage log;
+  NES stack page emulated in WRAM, JSR/RTS native call/ret except where tricks are found;
+  GB vblank flushes queued VRAM writes, then runs the recompiled NMI (1 frame latency);
+  bulk loads with NES rendering off use GB LCD off (SGB: MASK_EN hides it).
 - SGB packet sender + detection (MLT_REQ): PyBoy has no SGB, so it gets written with
   the SGB palette work (milestone 6) and is checked in an SGB-capable emulator then.
 

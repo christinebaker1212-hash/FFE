@@ -74,6 +74,64 @@ index 0bf2d82..77e22e0 100644
  
  private:
      /// APU memory-mapped register addresses.
+diff --git a/src/cpu.cpp b/src/cpu.cpp
+index 9ecd5c2..c642721 100644
+--- a/src/cpu.cpp
++++ b/src/cpu.cpp
+@@ -128,12 +128,45 @@ void CPU::reset() {
+     _program_counter |= _nes.read_cpu(0xFFFD) << 8;
+ }
+ 
++// ---- coverage log (env COV_LOG=file): one byte per ROM file offset (no header) + RAM code
++// bit0 opcode executed, bit1 reached by RTS, bit2 by JMP (ind), bit3 by RTI, bit4 interrupt entry
++#include <cstdio>
++#include <cstdlib>
++#include <vector>
++extern int g_dbg_bank;
++static const size_t COV_RAM = 0x200000;          // RAM/SRAM code ($0000-$7FFF) after 2MB of ROM
++static std::vector<uint8_t> g_cov;
++static int g_cov_on = -1;
++static unsigned g_cov_prev = 0;                   // previous opcode, 0x100 = interrupt taken
++struct CovSaver { ~CovSaver() {
++    const char* f = std::getenv("COV_LOG");
++    if (!f || g_cov.empty()) return;
++    std::vector<uint8_t> old(g_cov.size(), 0);
++    if (FILE* r = std::fopen(f, "rb")) { size_t n = std::fread(old.data(), 1, old.size(), r); (void)n; std::fclose(r); }
++    for (size_t i = 0; i < g_cov.size(); i++) old[i] |= g_cov[i];
++    if (FILE* w = std::fopen(f, "wb")) { std::fwrite(old.data(), 1, old.size(), w); std::fclose(w); }
++} } g_cov_saver;
++static inline void cov_mark(uint16_t pc) {
++    if (g_cov_on < 0) { g_cov_on = std::getenv("COV_LOG") ? 1 : 0; if (g_cov_on) g_cov.assign(COV_RAM + 0x8000, 0); }
++    if (!g_cov_on) return;
++    size_t i;
++    if (pc >= 0xC000) i = 31 * 0x4000 + (pc - 0xC000);
++    else if (pc >= 0x8000) i = ((g_dbg_bank & 0x7F) >> 1) * 0x4000 + (pc - 0x8000);
++    else i = COV_RAM + pc;
++    uint8_t f = 1;
++    if (g_cov_prev == 0x60) f |= 2; else if (g_cov_prev == 0x6C) f |= 4;
++    else if (g_cov_prev == 0x40) f |= 8; else if (g_cov_prev == 0x100) f |= 16;
++    g_cov[i] |= f;
++}
++
+ void CPU::tick() {
+     if (_frozen) {
+         return;
+     }
+ 
++    cov_mark(_program_counter);
+     uint8_t instruction = fetch_next();
++    g_cov_prev = instruction;
+ 
+     (this->*ADDRESSING_MODES[instruction])();
+     (this->*INSTRUCTIONS[instruction])();
+@@ -146,6 +179,7 @@ void CPU::tick() {
+         _nes.write(0x100 | _stack_pointer--, _program_counter & 0x00FF);
+ 
+         uint16_t address = _should_issue_non_maskable_interrupt ? 0xFFFA : 0xFFFE;
++        g_cov_prev = 0x100;
+ 
+         _should_issue_non_maskable_interrupt = false;
+ 
 diff --git a/src/cpu.hpp b/src/cpu.hpp
 index e19ae79..7f7d60c 100644
 --- a/src/cpu.hpp
