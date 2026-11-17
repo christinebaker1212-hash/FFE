@@ -98,6 +98,17 @@ def flow(para, width):
     lines.append(line)
     return lines
 
+def balanced(line, width):
+    """A line wrapped to the fewest rows, the rows as even as possible."""
+    n = len(flow(line, width))
+    if n == 1: return [line]
+    w = line.split(' ')
+    if n == 2:
+        best = min(([' '.join(w[:k]), ' '.join(w[k:])] for k in range(1, len(w))),
+                   key=lambda p: max(vlen(p[0]), vlen(p[1])))
+        if max(vlen(x) for x in best) <= width: return best
+    return flow(line, width)
+
 def fix_keyword_columns(line):
     """{16:xx} sets the drawing column (and records the keyword position): xx is the
     column where the keyword starts in this line."""
@@ -158,6 +169,29 @@ def put_table(rom, name, banks, table, report):
         used[b].put_ptr(table + 2 * e['id'], used[b].alloc(enc(txt) + b'\0'))
     for b in banks:
         report.append('%s bank %d free: %d' % (name, b, sum(y - x for x, y in used[b].free)))
+    if name == 'events': EV_FREE[0] = used[banks[0]].free
+
+def ending(rom, report):
+    """Ending (bank 4 $BC00, drawn by bank 14 $BAAF in 24 columns from (4,4); the four
+    pieces are read one after another): moved to the events bank (one row per line),
+    each line wrapped to 24 and centred as the Japanese centres them."""
+    data = b''
+    for e in json.load(open('script/ff2/ending.json')):
+        if not e['en'].strip():
+            data += enc(e['en']) + b'\0'; continue
+        lines = []
+        for line in e['en'].split('\n'):
+            for l in (balanced(line.strip(), 24) if line.strip() else ['']):
+                lines.append(' ' * ((24 - vlen(l)) // 2) + l if l else '')
+        data += enc('\n'.join(lines)) + b'\0'
+    bank = Bank(rom, EV_BANK, EV_FREE[0])
+    a = bank.alloc(data)
+    assert bank_get(rom, 14, 0xBACD, 2) == b'\xa9\x04' and bank_get(rom, 14, 0xBAD5, 2) == b'\xa9\xbc'
+    bank_put(rom, 14, 0xBACE, bytes([EV_BANK])); bank_put(rom, 14, 0xBAD2, bytes([a & 0xFF]))
+    bank_put(rom, 14, 0xBAD6, bytes([a >> 8]))
+    report.append('ending in bank %d at %04X' % (EV_BANK, a))
+
+EV_FREE = [None]
 
 def insert_names(rom, report):
     """Names (items, spells, key words; {18:xx}) stay in bank 10 at tables $8200/$8300,
@@ -671,6 +705,7 @@ if __name__ == '__main__':
     put_table(rom, 'dialogue_b', [DB_BANK, DB_BANK + 1], 0x8000, report)
     put_table(rom, 'dialogue_a', [DA_BANK, DA_BANK + 1], 0x8000, report)
     put_table(rom, 'events', [EV_BANK], 0x8000, report)
+    ending(rom, report)
     engine(rom, report, sysbits)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report))
