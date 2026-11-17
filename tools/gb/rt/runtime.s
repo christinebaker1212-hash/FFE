@@ -64,6 +64,7 @@ uw_bank:    ds 1
 uw_ret:     ds 2
 uw_y:       ds 1
 oam_frame:  ds 1
+split_scy:  ds 1
 frames:     ds 1
 hram_end:   ds 1
 
@@ -73,7 +74,7 @@ rt_jp_hl:   jp hl
 section bank 0, $0040
             jp vblank_isr
 section bank 0, $0048
-            reti
+            jp stat_isr
 section bank 0, $0050
             jp timer_isr
 section bank 0, $0100
@@ -150,7 +151,7 @@ boot:       di
             ldh [$FF05], a
             ld a, %00000100
             ldh [$FF07], a
-            ld a, %00000101                 ; IE: vblank + timer
+            ld a, %00000111                 ; IE: vblank + LCD STAT (LYC split) + timer
             ldh [$FFFF], a
             xor a
             ldh [$FF0F], a
@@ -194,9 +195,28 @@ vblank_isr: push af
 .no_oam:    ldh a, [scroll_x]
             add a, CAM_X
             ldh [$FF43], a
-            ldh a, [scroll_y]
-            add a, CAM_Y
-            ldh [$FF42], a
+            ldh a, [scroll_y]               ; NES rows wrap at 240, the GB map at 256:
+            add a, CAM_Y                    ; SCY = (scroll_y + CAM_Y) mod 240, and an LYC
+            jr c, .wr                       ; split where the view reaches NES row 240
+            cp 240
+            jr c, .sy
+.wr:        sub 240
+.sy:        ldh [$FF42], a
+            ld b, a
+            ld a, 240
+            sub b
+            cp 144
+            jr nc, .nosplit
+            ldh [$FF45], a
+            ld a, b
+            add a, 16
+            ldh [split_scy], a
+            ld a, %01000000
+            ldh [$FF41], a
+            jr .scy_done
+.nosplit:   xor a
+            ldh [$FF41], a
+.scy_done:
             ldh a, [pal_dirty]
             and a
             call nz, make_palettes
@@ -218,6 +238,12 @@ vblank_isr: push af
 .vc:        pop hl
             pop de
             pop bc
+            pop af
+            reti
+
+stat_isr:   push af                         ; LYC split: skip GB map rows 30-31
+            ldh a, [split_scy]
+            ldh [$FF42], a
             pop af
             reti
 

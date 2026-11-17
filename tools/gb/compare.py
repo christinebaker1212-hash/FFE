@@ -72,13 +72,16 @@ def main():
 
     def frame(mask):
         nonlocal gb_ticks
-        nes.controller = mask; gb.set(mask)
+        nes.controller = mask
+        k0 = nes.nmi_count
         nes.step(1)
-        target = nes.nmi_count + off
-        guard = 0
-        while gb_nmi(gb) < target and guard < 600:
-            gb.pb.tick(); gb_ticks += 1; guard += 1
-        if guard >= 600: raise SystemExit('GB stuck (NES nmi %d, GB %d)' % (nes.nmi_count, gb_nmi(gb)))
+        hist = nes.pad_history
+        for j in range(k0 + 1, nes.nmi_count + 1):      # one GB frame per NES NMI, same pad
+            gb.set(hist[j & 0xFF])
+            guard = 0
+            while gb_nmi(gb) < j + off and guard < 600:
+                gb.pb.tick(); gb_ticks += 1; guard += 1
+            if guard >= 600: raise SystemExit('GB stuck (NES nmi %d, GB %d)' % (nes.nmi_count, gb_nmi(gb)))
 
     for it in script:
         if it[0] == 'shot':
