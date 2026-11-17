@@ -202,7 +202,8 @@ ISAV:   .ds 1   ; status slot: index and table of the copied word, its first til
 TSAV:   .ds 1
 TCODE:  .ds 1
 ENEXT:  .ds 1   ; enemy list: next free tile of the pool
-    .ds 3
+MX:     .ds 1   ; magic window: column of the spell being copied
+    .ds 2
 tbase:          ; $EEBB: bank of a text pointer = (hi >> 5) + the table's base bank
     sta TMP     ;   (table by $95: $80 story, $82 system, $84/$86 dialogue, $88+ names)
     lda $95
@@ -276,11 +277,11 @@ encopy:         ; bank 52 enemy list ($9DBE: JSR $A609, monster A): the name; co
     dec $A9
     rts
 itemcopy:       ; bank 53 $B20C (battle item entry: JSR $A609, name from X 1): the name
-    jsr $A609   ;   also kept whole at $73E0 (the ':' and count overwrite its tail)
+    jsr $A609   ;   also kept whole at ITMN (the ':' and count overwrite its tail)
     ldx #0
 .l:
     lda $7AD8,x
-    sta $73E0,x
+    sta ITMN,x
     beq .r
     inx
     bne .l
@@ -291,6 +292,51 @@ itemconv:       ; bank 53 $B22F (JSR $966A, 13 wide): the entry over its two row
     lda #$80+EB
     sta $5115
     jsr $A003
+    lda #$80+53
+    sta $5115
+    dec $A9
+    rts
+magcopy:        ; bank 53 $B76C (magic window: JSR $A609, spell at X 9/16/23): the name
+    stx MX      ;   and mark (X - 1) kept by column (MAGN + 16k, MAGM + k) for mconv
+    jsr $A609
+    lda MX
+    sec
+    sbc #9
+    ldx #0
+.d:
+    cmp #7
+    bcc .k
+    sbc #7
+    inx
+    bne .d
+.k:
+    ldy MX
+    lda $7AD6,y     ; (only $73 is a mark: a usable spell leaves the previous name's tail)
+    cmp #$73
+    beq .m
+    lda #$FF
+.m:
+    sta MAGM,x
+    txa
+    asl a
+    asl a
+    asl a
+    asl a
+    tax
+.c:
+    lda $7AD7,y
+    sta MAGN,x
+    beq .r
+    inx
+    iny
+    bne .c
+.r:
+    rts
+magconv:        ; bank 53 $B782 (JSR $966A, 28 wide): the level row over its two rows
+    inc $A9
+    lda #$80+EB
+    sta $5115
+    jsr $A009
     lda #$80+53
     sta $5115
     dec $A9
@@ -393,6 +439,9 @@ h_flush:        ; $F6AE line flush: lower-row buffer only, on row $3B
     bcc .b
 .d:
     jmp $F715
+MAGN:   .ds 48  ; magic window: the three names of a level row (16 each)
+MAGM:   .ds 3   ;   and their marks
+ITMN:   .ds 24  ; battle item entry: the whole name
 '''
 
 BCOPY_SRC = '''
@@ -604,6 +653,7 @@ ENFIX_SRC = '''
     jmp enfix
     jmp iconv
     jmp btidy
+    jmp mconv
 enfix:
     lda $24
     bne .a
@@ -703,7 +753,7 @@ enfix:
 .r:
     rts
 iconv:              ; battle item entry ($7AD7: mark, ':' at $0A, count at $0B/$0C; the
-    clc             ;   name with its icon at $73E0), rows 13 wide at ($4E): one row as the
+    clc             ;   name with its icon at ITMN), rows 13 wide at ($4E): one row as the
     lda $4E         ;   Japanese when the name fits 9; else over the entry's two rows:
     adc #13         ;   (A) part 1 above, part 2 and ':' count on the main row, or (B) part
     sta $4E         ;   1 and ':' count above, part 2 (up to 13) on the main row
@@ -719,7 +769,7 @@ iconv:              ; battle item entry ($7AD7: mark, ':' at $0A, count at $0B/$
     sta $1F
     ldx #0
 .n:
-    lda $73E0,x
+    lda ITMN,x
     beq .n2
     inx
     bne .n
@@ -735,7 +785,7 @@ iconv:              ; battle item entry ($7AD7: mark, ':' at $0A, count at $0B/$
 .sp:
     ldx #0          ; split: a space (part 1 = x) or a hyphen (x + 1)
 .s:
-    lda $73E0,x
+    lda ITMN,x
     beq .raw
     cmp #$FF
     beq .s1
@@ -792,7 +842,7 @@ iconv:              ; battle item entry ($7AD7: mark, ':' at $0A, count at $0B/$
     inx
     ldy #1
 .la2:
-    lda $73E0,x
+    lda ITMN,x
     beq .cnt
     sta ($4E),y
     inx
@@ -820,7 +870,7 @@ iconv:              ; battle item entry ($7AD7: mark, ':' at $0A, count at $0B/$
     bne .lb2
     dey
 .lb2:
-    lda $73E0,x
+    lda ITMN,x
     beq .x
     sta ($4E),y
     inx
@@ -843,7 +893,7 @@ iconv:              ; battle item entry ($7AD7: mark, ':' at $0A, count at $0B/$
     ldx #0
     ldy #1
 .nm:
-    lda $73E0,x
+    lda ITMN,x
     beq .nr
     cpy #10
     beq .nr
@@ -859,7 +909,7 @@ iconv:              ; battle item entry ($7AD7: mark, ':' at $0A, count at $0B/$
 .u:
     cpx $1A
     beq .ur
-    lda $73E0,x
+    lda ITMN,x
     sta ($1E),y
     inx
     iny
@@ -950,6 +1000,165 @@ btidy:          ; bank 52 converter: tidy BUF ($7AD7) and choose the split (BSPL
     bne .p
 .r:
     rts
+mconv:              ; magic window level row: upper row: mark 1, the level and MP ($7AD7
+    clc             ;   X 0-6) from X 2, marks 2 and 3 at X 9 and 18; main row: the three
+    lda $4E         ;   spells (icon and name) at X 0, 9, 18 (names over 8 letters on
+    adc #28         ;   compact tiles)
+    sta $4E
+    bcc .a
+    inc $4F
+.a:
+    sec
+    lda $4E
+    sbc #28
+    sta $1E
+    lda $4F
+    sbc #0
+    sta $1F
+    ldy #2
+    ldx #0
+.p:
+    lda $7AD7,x
+    sta ($1E),y
+    inx
+    iny
+    cpx #7
+    bne .p
+    ldx #0          ; column k
+.k:
+    lda MXCOL,x
+    tay
+    lda MAGM,x
+    sta ($1E),y
+    lda #$FF
+    sta MAGM,x
+    stx $1C
+    txa
+    asl a
+    asl a
+    asl a
+    asl a
+    tax             ; name buffer
+    lda MAGN,x
+    bne .h
+    jmp .nx
+.h:
+    lda #0          ; length
+    sta $1D
+.l:
+    lda MAGN,x
+    beq .le
+    inx
+    inc $1D
+    bne .l
+.le:
+    lda $1C
+    asl a
+    asl a
+    asl a
+    asl a
+    tax
+    lda $1D
+    cmp #10
+    bcs .long
+.w:
+    lda MAGN,x
+    beq .wd
+    sta ($4E),y
+    inx
+    iny
+    bne .w
+.wd:
+    jmp .nx0
+.long:              ; icon, then the word's tiles (uploaded now)
+    lda MAGN,x
+    sta ($4E),y
+    iny
+    lda $1D
+    cmp #12
+    beq .cat
+    lda #<LEVT
+    sta $1A
+    lda #>LEVT
+    sta $1B
+    lda #LEV0
+    ldx #LEVN
+    bne .up
+.cat:
+    lda #<CATT
+    sta $1A
+    lda #>CATT
+    sta $1B
+    lda #CAT0
+    ldx #CATN
+.up:
+    sty $1D         ; (column of the word)
+    pha
+    stx $18         ; ($18: tile count; restored below to 28)
+    jsr $FB80
+    pla
+    pha
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    ora #$10
+    tay
+    pla
+    pha
+    asl a
+    asl a
+    asl a
+    asl a
+    tax
+    tya
+    jsr $F8E0
+    lda $18
+    asl a
+    asl a
+    asl a
+    asl a
+    tax
+    ldy #0
+.ub:
+    lda ($1A),y
+    sta $2007
+    iny
+    dex
+    bne .ub
+    jsr $8D03
+    pla             ; first tile code
+    ldy $1D
+    ldx $18
+.uc:
+    sta ($4E),y
+    clc
+    adc #1
+    iny
+    dex
+    bne .uc
+    lda #28
+    sta $18
+.nx0:
+    ldx $1C
+    txa
+    asl a
+    asl a
+    asl a
+    asl a
+    tax
+    lda #0
+    sta MAGN,x
+.nx:
+    ldx $1C
+    inx
+    cpx #3
+    beq .r
+    jmp .k
+.r:
+    rts
+MXCOL:
+    .db 0, 9, 18
 POOL:
 '''
 
@@ -1013,9 +1222,17 @@ def slot_words(rom, L):
     assert base + len(data) <= 0xC000
     put(rom, SLOT_BANK, code.org, bytes(img) + bytes(data))
     # enemy list, bank ENEMY_BANK
-    en = asm(ENFIX_SRC + ''.join('    .db $%02X\n' % c for c in EN_POOL) + 'ENL: .ds 240\nENH: .ds 240\n',
-             syms=dict(L, NPOOL=len(EN_POOL)))
+    lev = packed_label('Leviathan', 5, COND, fg=3, bg=2) or packed_label('Leviathan', 6, COND, fg=3, bg=2)
+    cat = packed_label('Catastrophe', 6, TIGHT, fg=3, bg=2)
+    assert lev and cat and len(lev) + len(cat) <= 24
+    longs = [re.sub(r'\[..\]', '', names[0xC8 + i] or '') for i in range(56)]
+    assert sorted(len(w) for w in longs if len(w) > 8) == [9, 11], longs
+    en = asm(ENFIX_SRC + ''.join('    .db $%02X\n' % c for c in EN_POOL) + 'ENL: .ds 240\nENH: .ds 240\n'
+             + 'LEVT: .ds %d\nCATT: .ds %d\n' % (16 * len(lev), 16 * len(cat)),
+             syms=dict(L, NPOOL=len(EN_POOL), LEV0=0xD0, LEVN=len(lev), CAT0=0xD0 + len(lev), CATN=len(cat)))
     img = bytearray(en.bytes); base = en.org + len(img); data = bytearray()
+    k = en.labels['LEVT'] - en.org; img[k:k + 16 * len(lev)] = b''.join(lev)
+    k = en.labels['CATT'] - en.org; img[k:k + 16 * len(cat)] = b''.join(cat)
     for i, rec in enemy_records(names).items():
         a = base + len(data); data += rec
         img[en.labels['ENL'] - en.org + i] = a & 0xFF; img[en.labels['ENH'] - en.org + i] = a >> 8
@@ -1046,7 +1263,7 @@ def engine(rom, report):
     ex = asm(EXRAM_SRC, syms={'B0': bases['t8000'], 'B1': bases['t8200'], 'B2': bases['t8400'],
                               'B3': bases['t8600'], 'B4': bases['names8800'],
                               'R0': ONE_BANKS[0], 'R1': ONE_BANKS[1], 'SB': SLOT_BANK, 'EB': ENEMY_BANK})
-    assert ex.org + len(ex.bytes) <= 0x6000
+    assert ex.org + len(ex.bytes) <= BOX_SAVE, hex(ex.org + len(ex.bytes))
     assert set(get(rom, 64, 0x8090, 0x370)) == {0xFF}
     put(rom, 64, ex.org - 0x5C00 + 0x8000, ex.bytes)
     report.append('ExRAM code: %d bytes (to $%04X)' % (len(ex.bytes), ex.org + len(ex.bytes)))
@@ -1109,6 +1326,12 @@ def engine(rom, report):
     # battle item window entries (bank 53 $B1D8)
     assert get(rom, 53, 0xB20C, 3) == b'\x20\x09\xa6' and get(rom, 53, 0xB22F, 3) == b'\x20\x6a\x96'
     put(rom, 53, 0xB20C, jsr(L['itemcopy'])); put(rom, 53, 0xB22F, jsr(L['itemconv']))
+    # battle magic window (bank 53 $B6DC: per level row)
+    assert get(rom, 53, 0xB76C, 3) == b'\x20\x09\xa6' and get(rom, 53, 0xB782, 3) == b'\x20\x6a\x96'
+    put(rom, 53, 0xB76C, jsr(L['magcopy'])); put(rom, 53, 0xB782, jsr(L['magconv']))
+    assert get(rom, 52, 0x8B08, 24).hex() == 'a850b850c850d850a888b888c888d888a8c0b8c0c8c0d8c0'
+    for k, x in enumerate((0x08, 0x50, 0x98)):
+        for r in range(4): put(rom, 52, 0x8B09 + 8 * k + 2 * r, bytes([x]))
     # enemy list: names over the entry's two rows, compact tiles for a too-wide word
     assert get(rom, 52, 0x9DBE, 10).hex() == '2009a6a9088518206a96'
     put(rom, 52, 0x9DBE, jsr(L['encopy'])); put(rom, 52, 0x9DC5, jsr(BL['bconvb']))
