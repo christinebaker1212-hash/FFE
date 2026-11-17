@@ -180,6 +180,10 @@ EQUIP_LABELS = ['Right Hand', 'Head', 'Arms', 'Left Hand', 'Body', 'Item']
 SYS_LAYOUT[36] = '\n'.join(['{08}{16:02}' + EQUIP_LABELS[k] + '\n{08}{14:03}{10:%02X}' % c
                             for k, c in enumerate((6, 3, 5, 7, 4, 8))] + ['{08}{16:02}{10:09}'])
 SYS_LAYOUT[35] = 'Attack  ..{10:24}\nDefense ..{10:25}'
+# key-word lists (65: key words, 16; 66: items, 32; field window 2, made 21 inside):
+# one column, one row per line
+SYS_LAYOUT[65] = '\n'.join('{08}{17:01}{1B:%02X}' % i for i in range(16))
+SYS_LAYOUT[66] = '\n'.join('{08}{17:01}{1A:%02X}' % i for i in range(32))
 # status (window 15, 27 x 24 inside): one column, one row per line (two columns of
 # English labels and values do not fit 27)
 STAT = [('Strength', 0x26, ''), ('Agility', 0x27, ''), ('Stamina', 0x28, ''), ('Intelligence', 0x29, ''),
@@ -602,6 +606,12 @@ def engine(rom, report, sysbits):
     bank_put(rom, 14, 0xB082, b'\xa9\x04')
     assert bank_get(rom, 31, 0xDAF1, 3) == b'\x48\xa9\x0a'
     bank_put(rom, 31, 0xDAF1, jmp(L['copystr']))
+    # one-column lists: shop sell, key words (ask), items (show)
+    for a in (0x8FB7, 0x9216, 0x9393):
+        assert bank_get(rom, 14, a, 2) == b'\xa9\x08', hex(a)
+        bank_put(rom, 14, a, b'\xa9\x04')
+    assert bank_get(rom, 31, 0xE9B2 + 2) == bytes([22])
+    bank_put(rom, 31, 0xE9B2 + 2, bytes([23]))         # field window 2: 21 columns inside
     # magic menu cursors: one column (step 4 bytes = 1 entry)
     for a in (0xAFA7, 0xAFC7):
         assert bank_get(rom, 14, a, 2) == b'\xa9\x08', hex(a)

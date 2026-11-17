@@ -12,7 +12,7 @@ T = {
  21:'Mallet', 22:'Eye Drops', 23:'Phoenix Tail', 24:'Elixir', 25:'Ether', 26:'High Potion', 27:'Cottage',
  28:'Wind Flute', 29:'Earth Drum', 30:'Garlic', 31:'Unicorn Horn', 32:'Antarctic Wind', 33:"Sage's Wisdom",
  34:"Saint's Heart", 35:'Hermes Shoes', 36:'Spider Silk', 37:'Bell of Silence', 38:'Hourglass',
- 39:"Reaper's Statue", 40:"Bacchus's Wine", 41:'Bottle of Sulfuric Acid', 42:'Sleep Grass', 43:'Chill Shell',
+ 39:"Reaper's Statue", 40:"Bacchus's Wine", 41:'Sulfuric Acid Bottle', 42:'Sleep Grass', 43:'Chill Shell',
  44:'Fang of Betrayal', 45:'Mythril Mirror', 46:'Hellfire', 47:'Finn',
  48:'[6E]Bare Hands', 49:'[6F]Buckler', 50:'[6F]Bronze Shield', 51:'[6F]Mythril Shield', 52:'[6F]Golden Shield',
  53:'[6F]Ice Shield', 54:'[6F]Flame Shield', 55:'[6F]Diamond Shield', 56:'[6F]Dragon Shield', 57:'[6F]Aegis Shield',
