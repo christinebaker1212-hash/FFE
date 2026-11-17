@@ -1782,6 +1782,39 @@ def engine(rom, report):
     put(rom, 126, 0xD1E0, jmp(L['copy16']))
     put(rom, 126, cl.org, cl.bytes + b'\xEA' * (0xD208 - cl.org - len(cl.bytes)))
 
+# ending narration (bank 31: pages copied whole, 255 bytes, from 16KB bank $0F by $A56B, pointer
+# table $A5DF; 01 newline, 02 xx column, 00 end; two-row lines of 32 cells, six shown): the pages,
+# the staff pages as they are, moved to banks EPI_BANK/+1 (the English is twice as long)
+EPI_BANK = 90
+def epilogue(rom, report):
+    assert get(rom, 31, 0xA56B, 4) == b'\xa9\x0f\x85\x84'
+    ptr = [get(rom, 31, 0xA5DF + 2 * i, 1)[0] | get(rom, 31, 0xA5E0 + 2 * i, 1)[0] << 8 for i in range(17)]
+    assert ptr[9] == 0xA700
+    pages = []
+    for i in range(9):                                   # staff roll and the rest, as they are
+        pages.append(get(rom, 31, ptr[i], ptr[i + 1] - ptr[i]))
+    for e in json.load(open('script/ff3/epilogue.json')):
+        assert e['en'].count('\n') < 6, e['id']               # (six lines of a page are shown)
+        out = bytearray()
+        for k, line in enumerate(e['en'].split('\n')):
+            if k: out.append(0x01)
+            m = re.match(r'\{COL:([0-9A-F]{2})\}', line)
+            if m:
+                out += bytes([0x02, int(m.group(1), 16)]); line = line[m.end():]
+            assert len(line) <= 31, line
+            out += enc(line)
+        out.append(0x00)
+        assert len(out) <= 255
+        pages.append(bytes(out))
+    a = 0x8000; data = bytearray()
+    for i, pg in enumerate(pages):
+        put(rom, 31, 0xA5DF + 2 * i, bytes([a & 0xFF, a >> 8]))
+        data += pg; a += len(pg)
+    assert len(data) + 255 <= 0x4000
+    put(rom, EPI_BANK, 0x8000, bytes(data))
+    put(rom, 31, 0xA56C, bytes([EPI_BANK // 2]))
+    report.append('ending: %d bytes in banks %d-%d' % (len(data), EPI_BANK, EPI_BANK + 1))
+
 if __name__ == '__main__':
     rom = bytearray(open(sys.argv[1], 'rb').read())
     report = []
@@ -1790,5 +1823,6 @@ if __name__ == '__main__':
     put_tables(rom, report)
     engine(rom, report)
     menus(rom)
+    epilogue(rom, report)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report))

@@ -1,40 +1,45 @@
 @@ 0
-{COL:0A}Within the light, the four
-{COL:07}sensed its will and its heart,
-{COL:0A}and resolved to set out.
+{COL:03}Within the light, the four
+{COL:01}sensed its will and its heart,
+{COL:04}and resolved to set out.
 @@ 1
-{COL:0A}Now, sweep away the darkness
-{COL:0D}and once again
-{COL:07}bring light back to this world,
+{COL:02}Now, sweep away the darkness
+{COL:09}and once again
+{COL:02}restore light to this world,
 @@ 2
-{COL:06}turning the Crystals' light into hope...
+{COL:02}turning the Crystals' light
+{COL:0A}into hope...
 @@ 3
-{COL:05}In the beginning was a world of nothingness, where nothing was.
-{COL:08}At one time, light and darkness came to be.
-{COL:09}From there, all things were born.
-{COL:05}Stars, moon, water, fire... and then, life.
-{COL:03}Time seeks to return them again to where they began.
+{COL:02}In the beginning was a void,
+{COL:03}a world where nothing was.
+{COL:01}Then light and darkness arose,
+{COL:02}and from them all was born:
+{COL:00}stars, moon, water, fire, life.
+{COL:01}Time seeks to return them all.
 @@ 4
-{COL:04}But life gave birth to yet another thing:
-{COL:0A}that which divides light and darkness,
-{COL:04}and with its radiance lights up the world,
-{COL:08}the energy called hope...
+{COL:05}But life gave birth to
+{COL:07}yet another thing:
+{COL:02}that which divides light and
+{COL:00}darkness, and with its radiance
+{COL:06}lights up the world:
+{COL:04}the power called hope...
 @@ 5
-{COL:06}When someday light and darkness overlap again
-{COL:07}and all things are about to return to nothingness,
-{COL:06}those who divide it in two will appear.
-{COL:0B}Do not forget
-{COL:03}that what gives them their power is the people's
-{COL:0A}hope...
+{COL:00}When light and darkness overlap
+{COL:00}again, and all things are about
+{COL:00}to return to nothingness, those
+{COL:00}who divide it in two will come.
+{COL:01}Do not forget that their power
+{COL:00}comes from the people's hope...
 @@ 6
-{COL:09}Time sweeps everything away:
-{COL:0A}dreams, despair, love...
-{COL:08}But you must not accept it.
-{COL:0B}You must not be swept away.
-{COL:08}You must find it there:
+{COL:02}Time sweeps everything away:
+{COL:04}dreams, despair, love...
+{COL:02}But you must not accept it.
+{COL:02}You must not be swept away.
+{COL:04}You must find it there:
 @@ 7
 
-
-{COL:07}the one last grain of radiance remaining,
-{COL:09}the radiance that lights up all things,
-{COL:0D}hope...
+{COL:05}the one last grain of
+{COL:05}radiance that remains,
+{COL:02}the radiance that lights up
+{COL:0A}all things,
+{COL:0C}hope...
