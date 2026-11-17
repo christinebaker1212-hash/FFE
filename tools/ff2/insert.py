@@ -167,13 +167,14 @@ def insert_names(rom, report):
 SYS_W = {i: 26 for i in list(range(0, 12)) + list(range(13, 21)) + [22, 25, 63, 64, 68, 71, 72, 76, 77]}
 SYS_W.update({i: 28 for i in range(42, 63)})
 PROLOGUE = 73                       # window 24: 28 columns, 26 rows
+ONE_ROW_LAYOUT = {27}               # menu layouts drawn one row per line
 
 def system_strings(rom, report, bank):
     """System strings (table bank 10 $8400) after the names. Messages (SYS_W) are drawn
     one row per line, reflowed to their window like the dialogue (the Japanese indents
     each line by a space); menu layouts
     keep the Japanese structure; the prologue is reflowed by paragraph and centred."""
-    one = set(SYS_W) | {PROLOGUE}
+    one = set(SYS_W) | {PROLOGUE} | ONE_ROW_LAYOUT
     for e in json.load(open('script/ff2/system.json')):
         t = e['en']
         if e['id'] in SYS_W:
@@ -273,6 +274,16 @@ txtoff:         ; $EADF (window full)
     sta ONE
     lda $57
     jmp $FE03
+h_ypos:         ; $EC55: row of a recorded position ($98 + $1F assumes the dakuten row)
+    lda $98
+    clc
+    adc $1F
+    ldx ONE
+    beq .r
+    sec
+    sbc #1
+.r:
+    rts
 onerow:         ; C = 1 in one-row mode
     lda ONE
     cmp #1
@@ -373,6 +384,12 @@ def engine(rom, report, sysbits):
     # events: bank 20, table $8000
     assert bank_get(rom, 31, 0xE8AE, 2) == b'\xa9\x0d' and bank_get(rom, 31, 0xE8B6, 2) == b'\xa9\xbf'
     bank_put(rom, 31, 0xE8AF, bytes([EV_BANK])); bank_put(rom, 31, 0xE8B7, b'\x80')
+    # main menu (system string 27): the hand cursor needs two cells before each English
+    # command, which one line of 28 cannot give five of; the string has two lines of one
+    # row each in the same window
+    # positions recorded by {15}-{17} (cursor spots, key words): one row up in one-row mode
+    assert bank_get(rom, 31, 0xEC55, 5) == b'\xa5\x98\x18\x65\x1f'
+    bank_put(rom, 31, 0xEC55, jsr(L['h_ypos']) + b'\xEA\xEA')
     # one row per line
     assert bank_get(rom, 31, 0xEB2E, 4) == b'\xe6\x1f\xe6\x1f'
     bank_put(rom, 31, 0xEB2E, jsr(L['h_nl']) + b'\xEA')
