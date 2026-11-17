@@ -320,10 +320,11 @@ BLEN:   .ds 1   ; battle text: length, split index, split cost
 BSPL:   .ds 1
 BCOST:  .ds 1
 BOXF:   .ds 1   ; 1: next battle text is a box entry (enemy list)
+ONEP:   .ds 1   ; ONE of the last drawing (the page scroll runs after it)
 CNEXT:  .ds 1   ; enemy list: next free tile slot, tiles of this name, data index
 CN_N:   .ds 1
 CN_P:   .ds 1
-    .ds 6
+    .ds 5
 SYSONE: .ds 32  ; one-row system strings (bit k of byte n: id 8n+k)
 dlgbank:        ; bank 14 $962F: dialogue bank from the map ($A0) and the id ($92)
     lda $A0
@@ -403,6 +404,8 @@ txtend:         ; $EAD8 (end of the text): in one-row mode blank the window's ro
     jsr $F053
     jmp .c
 txtoff:         ; $EADF (window full)
+    lda ONE
+    sta ONEP
     lda #0
     sta ONE
     lda $57
@@ -568,7 +571,8 @@ h_nl:           ; $EB2E newline: one row (or two, Japanese layout)
     rts
 h_sub:          ; $EA78/$EA82 (paged text): rows scrolled per line
     sta TMP
-    jsr onerow
+    lda ONEP
+    cmp #1
     lda TMP
     bcc .two
     sec
