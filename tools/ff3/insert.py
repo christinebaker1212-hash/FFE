@@ -546,6 +546,12 @@ bconvb:             ; box texts and command entries (call sites patched): the te
 .ud:
     ldx BSPL
     inx
+    ldy #0          ; (a list entry's leading space: the second part under the first)
+    lda $7AD7
+    cmp #$FF
+    bne .l
+    iny
+    bne .l
 .o:
     ldy #0
 .l:

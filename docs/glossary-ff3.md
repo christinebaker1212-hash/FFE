@@ -65,7 +65,7 @@ white magic, literally "guiding teacher") · まかいげんし Summoner (魔界
 
 ## Battle commands and terms
 ぜんしん Forward · こうたい Back · とんずら Bolt (slang for running off) · ひっさつ Sure Kill (必殺) ·
-ちけい Terrain · しらべる Examine · みやぶる See Through · ためる Build Up · おどかす Scare · おうえん Cheer ·
+ちけい Terrain · しらべる Examine · みやぶる See Through · ためる Charge (to store up power; 7 cells in the command window) · おどかす Scare · おうえん Cheer ·
 じゅくれんど Proficiency · キャパシティ Capacity · ザコ small fry · しんくうかまいたち Vacuum Kamaitachi
 (the yokai sickle-wind, kept by name) · ざんてつけん Zantetsuken
 
