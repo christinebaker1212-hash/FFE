@@ -351,7 +351,7 @@
   "id": 58,
   "off": "364E4",
   "ja": "　このジョブに　チェンジするには　けいけんが\n　たりないようです。",
-  "en": " To change to this job, it seems you don't\n have enough experience."
+  "en": "{0E}To change to this job, it\nseems you don't have\nenough experience."
  },
  {
   "id": 59,
@@ -477,7 +477,7 @@
   "id": 79,
   "off": "369CC",
   "ja": "ありがとうございます。　ごゆっくり‥‥",
-  "en": "Thank you very much. Please rest well..."
+  "en": "Thank you very much.\nPlease rest well..."
  },
  {
   "id": 80,
@@ -489,7 +489,7 @@
   "id": 81,
   "off": "369EC",
   "ja": "でぶチョコボ:「よーお　なんかようかーい?",
-  "en": "Fat Chocobo: \"Yooo, need somethiiing?\""
+  "en": "Fat Chocobo: \"Yooo,\n need somethiiing?\""
  },
  {
   "id": 82,
@@ -507,31 +507,31 @@
   "id": 84,
   "off": "36A1D",
   "ja": "「いっただっきまーす。　むしゃむしゃ‥",
-  "en": "\"Time to diiig in. Munch munch...\""
+  "en": "\"Time to diiig in.\n Munch munch...\""
  },
  {
   "id": 85,
   "off": "36A31",
   "ja": "「これいじょう　おなじもんはくえねえよ",
-  "en": "\"I can't eat no more of the same stuff, ya know\""
+  "en": "\"I can't eat no more of\n the same stuff, ya know\""
  },
  {
   "id": 86,
   "off": "36A45",
   "ja": "「もちものがいっぱいで　かえせねえなあ",
-  "en": "\"Your stuff's full, so I can't give it back, huh\""
+  "en": "\"Your stuff's full, so I\n can't give it back, huh\""
  },
  {
   "id": 87,
   "off": "36A59",
   "ja": "「かえしきれないので　のこりはあずかっとくよ",
-  "en": "\"I can't give it all back, so I'll hang on to the rest\""
+  "en": "\"I can't give it all\n back, so I'll hang on\n to the rest\""
  },
  {
   "id": 88,
   "off": "36A70",
   "ja": "「ちょっとまってね　いまだすから‥",
-  "en": "\"Hang on a sec, I'm gettin' it out now...\""
+  "en": "\"Hang on a sec, I'm\n gettin' it out now...\""
  },
  {
   "id": 89,
@@ -549,97 +549,97 @@
   "id": 91,
   "off": "36AA5",
   "ja": "だれの[77][79]をかいふくしますか?",
-  "en": "Whose [77][79] will you restore?"
+  "en": "{0E}Whose [77][79] will you\nrestore?"
  },
  {
   "id": 92,
   "off": "36AB5",
   "ja": "だれの[77][79]をかいふくしますか?",
-  "en": "Whose [77][79] will you restore?"
+  "en": "{0E}Whose [77][79] will you\nrestore?"
  },
  {
   "id": 93,
   "off": "36AC5",
   "ja": "だれをかんぜんにかいふくしますか?",
-  "en": "Whom will you fully restore?"
+  "en": "{0E}Whom will you fully\nrestore?"
  },
  {
   "id": 94,
   "off": "36AD7",
   "ja": "だれをいきかえらせますか?",
-  "en": "Whom will you bring back to life?"
+  "en": "{0E}Whom will you bring\nback to life?"
  },
  {
   "id": 95,
   "off": "36AE5",
   "ja": "いしのじょうたいをかいふくします",
-  "en": "Cures the state of stone"
+  "en": "{0E}Cures the state of\nstone."
  },
  {
   "id": 96,
   "off": "36AF6",
   "ja": "かえるになってしまったひとをもどします",
-  "en": "Turns someone who became a frog back to normal"
+  "en": "{0E}Restores one who\nbecame a frog."
  },
  {
   "id": 97,
   "off": "36B0A",
   "ja": "ちんもくをかいふくします",
-  "en": "Cures silence"
+  "en": "{0E}Cures silence."
  },
  {
   "id": 98,
   "off": "36B17",
   "ja": "こびとにしたり　もどしたりします",
-  "en": "Makes small, or returns to normal"
+  "en": "{0E}Makes one small,\nand back again."
  },
  {
   "id": 99,
   "off": "36B28",
   "ja": "しりょくをかいふくします",
-  "en": "Restores eyesight"
+  "en": "{0E}Restores eyesight."
  },
  {
   "id": 100,
   "off": "36B35",
   "ja": "だれのどくをなおしますか?",
-  "en": "Whose poison will you cure?"
+  "en": "{0E}Whose poison will\nyou cure?"
  },
  {
   "id": 101,
   "off": "36B43",
   "ja": "おもてにワープします",
-  "en": "Warps outside"
+  "en": "{0E}Warps outside."
  },
  {
   "id": 102,
   "off": "36B4E",
   "ja": "だれのステータスをなおしますか?",
-  "en": "Whose status will you cure?"
+  "en": "{0E}Whose status will\nyou cure?"
  },
  {
   "id": 103,
   "off": "36B5F",
   "ja": "いくつまえにもどりますか?　",
-  "en": "Go back how many floors? "
+  "en": "{0E}Go back how many\nfloors?"
  },
  {
   "id": 104,
   "off": "36B6E",
   "ja": "おもてにワープします",
-  "en": "Warps outside"
+  "en": "{0E}Warps outside."
  },
  {
   "id": 105,
   "off": "36B79",
   "ja": "かえるにしたり　もどしたりします　ひとり/ぜんいん",
-  "en": "Turns into a frog, or back again One/All"
+  "en": "{0E}Turns into a frog\nand back. One/All"
  },
  {
   "id": 106,
   "off": "36B93",
   "ja": "こびとにしたり　もどしたりします　ひとり/ぜんいん",
-  "en": "Makes small, or returns to normal One/All"
+  "en": "{0E}Makes small and\nback. One/All"
  },
  {
   "id": 107,
@@ -681,7 +681,7 @@
   "id": 113,
   "off": "36C05",
   "ja": "　すべてのそうびをはずさないとジョブチェンジ\n　できません。",
-  "en": " You can't change jobs unless you remove all\n your equipment."
+  "en": "{0E}You can't change jobs\nunless you remove all\nyour equipment."
  },
  {
   "id": 114,

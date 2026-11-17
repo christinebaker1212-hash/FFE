@@ -50,3 +50,23 @@ copy of $3E, 127 = $E000 copy of $3F). The engine is the same family as FF2's
   $0A, count at $0B-$0C). Cursor table bank 52 $8B28/$8B30 (y, x): x $08/$80, y $A8-$D8.
 - Magic window: bank 53 $B6E0.. (per level row: level, MP, three spells of 6 cells, table
   $8990), converted 28 wide.
+
+## Field menus (banks 60/61 at $8000/$A000; English: insert.py menus/field_names)
+- Window table bank 61 $AAF7 x / $AB1D y / $AB43 w / $AB69 h (38 windows, $AAF1 X = window).
+  Field windows (messages, places) fixed $EDB2 x / $EDB7 y / $EDBC w / $EDC1 h.
+- t8200 strings: $A678 draws id A ($EE9A), $A66B paged ($EE65), $A87A via the RAM copy
+  ($D1B1 -> $7B01, code 10 becomes the selected character $9E; English: 16-bit copy).
+- Text codes: 09 flush + one row (entry $EF4E; English: $FF8F), 0E ignored (English: first
+  byte 0E = the window drawn one row per line), 10-13 xx character field (xx 00 LV or the
+  first ailment, $F299/$F2BB; 01 job, $F301 -> t8200 226+; 08-1F spells $F373 ($7C00 list,
+  mark $B9)), 15/16/17 xx column + cursor position ($78/$79/$7A tables, 4 bytes: x, y, next
+  two string bytes), 1A/20/22 xx item in a list, 1C xx count, 19/21 xx shop item/price,
+  1E xx job (list, $F180), 03/04 amounts ($8B78, right-aligned; English squeezed).
+- Cursor movers $91A3 ($78), $91D9 ($79), $920D ($7A, scrolls by redrawing), step in A.
+- Menu graphics: $DD06 (rendering off) loads tiles $40-$7F; map tiles $00-$3F are unused in
+  the menus and reloaded on leaving (English: the condensed job names at $01..).
+- Screens: main menu bank 61 $A525.. (string 48/49), item $9EC2 (61, window 6), magic $AF1F..
+  (54/60), equipment bank 60 $9BB5 (62 window $0A, 47 window $0B, portrait $9D5B), status
+  (71 via $A875), job $9630 (72-74), shop: $50 > 0 -> fixed $E31F -> bank 61 $AF1F (windows
+  $14-$19; buy list 32, sell list 61), NPC types $E0-$E2 (inn etc.) $8FDD, place names $4B ->
+  window 4.
