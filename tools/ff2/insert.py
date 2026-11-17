@@ -463,7 +463,8 @@ repin:          ; first cursor on SLOT1's entry if it is in view, else hidden
     sta $A2
     rts
 copystr:        ; $DAF1: system string A to $7B00 for drawing (code 10 becomes the current
-    pha         ;   character's code $9E), as the Japanese, with 16-bit pointers (English
+    sta $92     ;   character's code $9E), as the Japanese, with 16-bit pointers (English
+    pha         ;   ($92: the id, for the one-row bitmap)
     lda #$0A    ;   menu strings exceed 256 bytes; $7C00-$7DFF is used only in battle)
     jsr $FE03
     pla
