@@ -10,7 +10,7 @@ English item names, menu strings, item screen.
 - Dialogue moves to the free MMC5 banks 16 (ids 0-127) and 17 (ids 128-255); each bank
   also holds the English item-name table at $B700 used by the {02} insert.
 """
-import sys, os, json
+import sys, os, json, re
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from latin_font import tile
 from asm6502 import asm
@@ -105,15 +105,18 @@ def insert_dialogue(rom, report):
 # control codes (05-0B, unused in the original) let a menu use it:
 #   05 upper row only (remembers the column)   06 back to that column, lower row only
 #   07 previous mode    08 newline of ONE tile row    09 lower row only    0B normal
+#   0C skip one column without drawing      0D nn  go to column nn of the row
 #   0A nn  wrap width: an item name inserted afterwards that is longer than nn is split
 #          at a space onto the upper and lower row of its cell (two-line names).
 # Helper code and variables live in MMC5 ExRAM ($5C00, mode 2), copied at reset from the
 # first 1KB of CODE_BANK.
 CODE_BANK = 18                        # 16KB bank: ExRAM image + menu strings
 EX = dict(MODE=0x5C00, PREV=0x5C01, SAVEX=0x5C02, WRAPW=0x5C03, TMP=0x5C04, BUF=0x5C10,
-          MENUBANK=CODE_BANK)
+          SLOT=0x5C40, MENUBANK=CODE_BANK)
 EXRAM_SRC = '''
-    org $5C40
+    org $5C60
+clr20:          ; 20 blanks, lower row only
+    .db 9, $FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF,$FF, 0
 h_entry:        ; $DEB6 (menu string drawer entry)
     lda #0
     sta MODE
@@ -168,6 +171,25 @@ h_code:         ; codes 05-0F
     beq .ca
     cmp #$0B
     beq .cb
+    cmp #$0C
+    beq .cc
+    cmp #$0D
+    beq .cd
+    jmp $DEC7
+.cd:
+    lda ($3E),y
+    inc $3E
+    bne .cdx
+    inc $3F
+.cdx:
+    sta TMP
+    lda $54
+    and #$E0
+    ora TMP
+    sta $54
+    jmp $DEC7
+.cc:
+    inc $54
     jmp $DEC7
 .c5:
     lda MODE
@@ -268,13 +290,32 @@ h_name:         ; $E0A3: draw item name at ($3E) (bank 10), wrapping onto two ro
     sta $3F
 .plain:
     jmp $DECE
+magcur:         ; bank 14 $B829: magic list cursor. Level L uses two rows: spell 1 on the
+    lda $62     ;   first (beside L/MP), spells 2 and 3 on the second
+    sta $10
+    and #3
+    tax
+    lda .mx,x
+    sta $40
+    lda $10
+    asl a
+    asl a
+    and #$F0
+    clc
+    adc .my,x
+    sta $41
+    jmp $ED24
+.mx:
+    .db 80, 16, 120, 80
+.my:
+    .db $28, $30, $30, $28
 m_setbank:      ; bank 14 $B957: menu strings are read from MENUBANK
     lda #$0E
     sta $58
     lda #MENUBANK
     sta $57
     rts
-m_copy:         ; bank 14 $B96C: copy menu string A to $6C00 (code 10 -> 10|$66)
+m_copy:         ; bank 14 $B96E: copy Y+1 bytes of menu string A to $6C00 (code 10 -> 10|$66)
     asl a
     tax
     lda $8500,x
@@ -284,7 +325,6 @@ m_copy:         ; bank 14 $B96C: copy menu string A to $6C00 (code 10 -> 10|$66)
     lda #MENUBANK
     sta $57
     jsr $FE03
-    ldy #$7F
 .l:
     lda ($10),y
     cmp #$10
@@ -293,7 +333,8 @@ m_copy:         ; bank 14 $B96C: copy menu string A to $6C00 (code 10 -> 10|$66)
 .s:
     sta $6C00,y
     dey
-    bpl .l
+    cpy #$FF
+    bne .l
     lda #$0E
     sta $57
     jsr $FE03
@@ -338,8 +379,8 @@ def bank_put(rom, bank, cpu, data):
 
 def menu_engine(rom, report):
     ex = asm(EXRAM_SRC, syms=EX)
-    img = bytearray(0x400); img[0x40:0x40 + len(ex.bytes)] = ex.bytes
-    assert 0x40 + len(ex.bytes) <= 0x400
+    img = bytearray(0x400); img[0x60:0x60 + len(ex.bytes)] = ex.bytes
+    assert 0x60 + len(ex.bytes) <= 0x400
     bank_put(rom, CODE_BANK, 0x8000, bytes(img))
     L = ex.labels
     init = asm(INIT_SRC, syms={'CODE2': CODE_BANK * 2})
@@ -352,8 +393,10 @@ def menu_engine(rom, report):
     put(rom, 0xDF4D, bytes([0x90, (0xDEE1 - 0xDF4F) & 0xFF]))  # BCC $DEE1 (codes 05-0F)
     put(rom, 0xE0A3, jsr(L['h_name']))
     bank_put(rom, 14, 0xB957, jsr(L['m_setbank']) + b'\xEA\xEA\xEA')
-    bank_put(rom, 14, 0xB96C, jmp(L['m_copy']))
+    bank_put(rom, 14, 0xB829, jmp(L['magcur']))
+    bank_put(rom, 14, 0xB96E, jmp(L['m_copy']))      # $B96C LDY #$7F kept; $BA89 enters at $B96E
     report.append('ExRAM code: %d bytes' % len(ex.bytes))
+    return L
 
 def insert_names(rom, report):
     """English item/weapon/armor/magic/class names: bank 10, table $B700 (as before),
@@ -371,10 +414,29 @@ def insert_menu_strings(rom, report):
     bank.free = [(0x8400, 0xC000)]
     for e in menu:
         o = HDR + 14 * BANK + 0x0500 + 2 * e['id']
-        a = bank.alloc(enc(MENU_OVERRIDE.get(e['id'], e['en'])) + b'\0')
+        txt = MENU_OVERRIDE.get(e['id'], e['en'])
+        # codes 10-13 take a parameter; in ' {10}' the extractor read the parameter 00
+        # (= character name) as the end of the string, so it is restored here
+        if re.search(r'\{1[0-3]\}$', txt): txt += '{00}'
+        a = bank.alloc(enc(txt) + b'\0')
         rom[o] = a & 0xFF; rom[o + 1] = a >> 8
 
-MENU_OVERRIDE = {}
+def magic_list():
+    # 8 levels x 2 tile rows (lower row only): 'L1 c/m' + spell 1 at column 12, then
+    # spells 2 and 3 at columns 4 and 17. Copied by $B96E with Y=$C0: at most 193 bytes.
+    out = '{09}'
+    for L in range(8):
+        cur, mx, s0 = 0x2C + L, 0x34 + L, 0x14 + 3 * L
+        out += '{0D}{03}L%d {10}{%02X}/{10}{%02X}{0D}{0C}{10}{%02X}{08}' % (L + 1, cur, mx, s0)
+        out += '{0D}{04}{10}{%02X}{0D}{11}{10}{%02X}' % (s0 + 1, s0 + 2)
+        if L < 7: out += '{08}'
+    assert len(enc(out)) <= 192, len(enc(out))
+    return out
+
+MENU_OVERRIDE = {
+    42: magic_list(),
+    53: '{0C}Equip  Trade  Drop',    # one column right of the cursor positions ($BF07)
+}
 
 ITEM_SRC = '''
     org $EFF2
@@ -440,14 +502,96 @@ def item_screen(rom):
         o = HDR + 14 * BANK + a - 0x8000
         assert rom[o] == 3, hex(a); rom[o] = 1               # cursor moves: one column
 
+SLOT_SRC = '''
+    org $ED84
+loop:
+    pha
+    tax
+    asl a
+    tay
+    lda postab,y
+    sta $3A
+    lda postab+1,y
+    sta $3B
+    lda #<clr20         ; clear the row first
+    sta $3E
+    lda #>clr20
+    sta $3F
+    txa
+    pha
+    jsr $DEB6
+    pla
+    tax
+    lda #$09
+    sta SLOT
+    lda #$FF
+    sta SLOT+1
+    sta SLOT+2
+    lda #0
+    sta SLOT+3
+    lda $0300,x
+    sta $12
+    and #$7F
+    beq .draw
+    clc
+    adc $67
+    sta SLOT+4
+    lda #2
+    sta SLOT+3
+    lda #0
+    sta SLOT+5
+    lda $12
+    bpl .draw
+    lda #$C7            ; E- : equipped
+    sta SLOT+1
+    lda #$C2
+    sta SLOT+2
+.draw:
+    lda #<SLOT
+    sta $3E
+    lda #>SLOT
+    sta $3F
+    jsr $DEB6
+    pla
+    clc
+    adc #1
+    cmp #$10
+    bcc loop
+    lda #$0E
+    sta $57
+    sta $58
+    jmp $FE03
+postab:
+'''
+
+def equip_screens(rom, labels):
+    """Weapon/armor lists: each character's four slots in four rows of one column
+    (were 2 x 2 names of 7 kana), so names up to 18 letters fit beside the E- mark."""
+    pos = []; cur = []
+    for c in range(4):
+        for k in range(4):
+            y = 6 + 6 * c + k
+            pos += [10, y]; cur += [0x40, y * 8]
+    code = asm(SLOT_SRC, syms=dict(EX, clr20=labels['clr20']))
+    data = code.bytes + bytes(pos)
+    assert code.org + len(data) <= 0xEE21, hex(code.org + len(data))
+    put(rom, code.org, data)
+    bank_put(rom, 14, 0xBED9, bytes(cur))
+    for a, old, new in ((0xBD96, 1, 4), (0xBDA0, 2, 1), (0xBDAA, 2, 1)):   # cursor: up/down 1 row,
+        o = HDR + 14 * BANK + a - 0x8000                                    # left/right other character
+        assert rom[o] == old, hex(a); rom[o] = new
+    # windows (x, y, w, h): title box wide enough for "Weapons", command bar moved right
+    bank_put(rom, 14, 0xBE8F, bytes([1, 1, 9, 4, 10, 1, 21, 4]))
+
 if __name__ == '__main__':
     rom = bytearray(open(sys.argv[1], 'rb').read())
     report = []
     font(rom)
-    menu_engine(rom, report)
+    labels = menu_engine(rom, report)
     insert_names(rom, report)
     insert_menu_strings(rom, report)
     item_screen(rom)
+    equip_screens(rom, labels)
     bad = insert_dialogue(rom, report)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report)); print('strings not fitting:', bad)
