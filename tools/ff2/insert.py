@@ -964,6 +964,20 @@ def battle(rom, report, L):
         rec = bytes([w, 4, a & 0xFF, a >> 8, (a + 96) & 0xFF, (a + 96) >> 8])
         assert bank_get(rom, 5, 0xAC02 + 6 * k, 2) == bytes([[10, 10, 9, 9, 18][k], 4])
         bank_put(rom, 5, 0xAC02 + 6 * k, rec)
+    # 'Magic can't be used' (19 letters) in the 21-column magic window: from column 1, not 4
+    assert bank_get(rom, 12, 0x9EEE, 2) == b'\xa9\x58'
+    bank_put(rom, 12, 0x9EEF, bytes([4 * 21 + 1]))
+    # Gear window (bank 12 $A020, 21 columns, 8 rows): the Japanese two columns of 10 (hands
+    # left, items right) cannot hold English names (up to 20 letters); one column, a row each:
+    # Right Hand / its weapon / Left Hand / its weapon / Items / item 1 / item 2. The cursor
+    # grid (2 x 2: hands, items) is kept; its positions (table $BFCD) follow the rows.
+    # (row 0 stays blank, as the Japanese dakuten row above the first line)
+    for a, old, new in ((0xA02B, 0x15, 21), (0xA036, 0x69, 63), (0xA041, 0x20, 105),
+                        (0xA252, 0x40, 43), (0xA26D, 0x94, 85), (0xA298, 0x4B, 127), (0xA2AD, 0x75, 148)):
+        assert bank_get(rom, 12, a, 2) == bytes([0xA9, old]), hex(a)
+        bank_put(rom, 12, a + 1, bytes([new]))
+    assert bank_get(rom, 12, 0xBFCD, 8).hex() == '48b848d8a0b8a0c8'
+    bank_put(rom, 12, 0xBFCD, bytes([0x48, 0xB0, 0x48, 0xC0, 0x48, 0xD0, 0x48, 0xD8]))
     for old, new, sites in BOX_W:
         for bank, a in sites:
             assert bank_get(rom, bank, a, 2) == bytes([0xA9, old]), (bank, hex(a))
