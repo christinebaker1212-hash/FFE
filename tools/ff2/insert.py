@@ -180,6 +180,10 @@ EQUIP_LABELS = ['Right Hand', 'Head', 'Arms', 'Left Hand', 'Body', 'Item']
 SYS_LAYOUT[36] = '\n'.join(['{08}{16:02}' + EQUIP_LABELS[k] + '\n{08}{14:03}{10:%02X}' % c
                             for k, c in enumerate((6, 3, 5, 7, 4, 8))] + ['{08}{16:02}{10:09}'])
 SYS_LAYOUT[35] = 'Attack  ..{10:24}\nDefense ..{10:25}'
+# magic (window 11, 18 rows inside): one column of the 16 spells with their levels, then
+# the bin (two columns cannot hold an English name, its level and the hand's cells)
+SYS_LAYOUT[38] = '\n'.join(['{08}{17:02}{10:%02X}{14:0B}{10:%02X}' % (0x0A + i, 0x38 + i)
+                            for i in range(16)] + ['{08}{17:02}{0F}'])
 
 def system_strings(rom, report, bank):
     """System strings (table bank 10 $8400) after the names. Messages (SYS_W) are drawn
@@ -538,6 +542,10 @@ def engine(rom, report, sysbits):
     bank_put(rom, 14, 0xAEC5, jmp(L['itemmenu']))
     assert bank_get(rom, 14, 0xB082, 2) == b'\xa9\x0c'
     bank_put(rom, 14, 0xB082, b'\xa9\x04')
+    # magic menu cursors: one column (step 4 bytes = 1 entry)
+    for a in (0xAFA7, 0xAFC7):
+        assert bank_get(rom, 14, a, 2) == b'\xa9\x08', hex(a)
+        bank_put(rom, 14, a, b'\xa9\x04')
     # equipment screen: list window 12 (y 7) 16 rows high, picker window 13 below it
     WIN = {'y': 0xB4A5, 'h': 0xB4D7}
     for win, key, old, new in ((12, 'h', 12, 16), (13, 'y', 19, 23), (13, 'h', 10, 6)):
