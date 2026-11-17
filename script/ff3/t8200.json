@@ -459,7 +459,7 @@
   "id": 76,
   "off": "36992",
   "ja": "まえのデーターをけします{15:0E}はい{15:12}いいえ",
-  "en": "{0E}The old data will be\nerased.{15:0E}Yes{15:12}No"
+  "en": "{0E}This erases\nold data.{15:0E}Yes{15:12}No"
  },
  {
   "id": 77,

@@ -54,7 +54,7 @@ T = {
      '  Spirit       .. {10:3C}{14:0D}Magic defense{14:15}..{10:36}\n'
      '{14:0D}Magic evasion rate.. {10:40}',
  75: '{0E}Please choose the\nfile to save to.',
- 76: '{0E}The old data will be\nerased.{15:0E}Yes{15:12}No',
+ 76: '{0E}This erases\nold data.{15:0E}Yes{15:12}No',
  77: 'Saving is complete.',
  78: '{0E}Hold RESET while you\nturn the power off.',
  79: 'Thank you very much.\nPlease rest well...',
