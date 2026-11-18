@@ -1,4 +1,4 @@
-"""Build the Game Boy (DMG + SGB) FF1 English ROM from the user's own NES ROM.
+"""Build the Game Boy (dual-mode DMG / SGB / CGB) FF1 English ROM from the user's own NES ROM.
 
 usage: build.py ["Final Fantasy I, II (Japan).nes"] [--gb] [--cov DIR] [--out ROM]
   --gb: the GB layout (insert.py --gb -> build/ff1_gb.nes; default coverage build/cov3,
@@ -28,6 +28,30 @@ def shade(c):
     if lo >= 0x0D: return 3
     if lo == 0: return [2, 1, 0, 0][hi]
     return [3, 2, 1, 0][hi]
+
+
+# NES 2C02 palette (the common emulator approximation) -> CGB RGB555. Hardware data, not
+# game content: the CGB mode shows the NES palette RAM through it.
+NES_RGB = [
+    0x7C7C7C, 0x0000FC, 0x0000BC, 0x4428BC, 0x940084, 0xA80020, 0xA81000, 0x881400,
+    0x503000, 0x007800, 0x006800, 0x005800, 0x004058, 0x000000, 0x000000, 0x000000,
+    0xBCBCBC, 0x0078F8, 0x0058F8, 0x6844FC, 0xD800CC, 0xE40058, 0xF83800, 0xE45C10,
+    0xAC7C00, 0x00B800, 0x00A800, 0x00A844, 0x008888, 0x000000, 0x000000, 0x000000,
+    0xF8F8F8, 0x3CBCFC, 0x6888FC, 0x9878F8, 0xF878F8, 0xF85898, 0xF87858, 0xFCA044,
+    0xF8B800, 0xB8F818, 0x58D854, 0x58F898, 0x00E8D8, 0x787878, 0x000000, 0x000000,
+    0xFCFCFC, 0xA4E4FC, 0xB8B8F8, 0xD8B8F8, 0xF8B8F8, 0xF8A4C0, 0xF0D0B0, 0xFCE0A8,
+    0xF8D878, 0xD8F878, 0xB8F8B8, 0xB8F8D8, 0x00FCFC, 0xF8D8F8, 0x000000, 0x000000]
+
+
+def nes_rgb_src():
+    out = 'section bank 0, $3E00\nNES_RGB:\n'
+    for k in range(0, 64, 8):
+        vals = []
+        for c in NES_RGB[k:k + 8]:
+            r, g, b = c >> 16, (c >> 8) & 255, c & 255
+            vals.append(str((r >> 3) | (g >> 3) << 5 | (b >> 3) << 10))
+        out += '    dw %s\n' % ', '.join(vals)
+    return out
 
 
 def apu_tables():
@@ -93,7 +117,7 @@ def main():
     rt += '\n' + apu_tables()
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(
         '    db %s\n' % ', '.join(str(shade(c)) for c in range(r, r + 16)) for r in range(0, 64, 16))
-    src_all = rt + '\n' + shade_src + '\n' + prog
+    src_all = rt + '\n' + shade_src + '\n' + nes_rgb_src() + '\n' + prog
     open(opt['--out'] + '.s', 'w').write(src_all)
     print('recompiled: %d instructions, %d code banks (%.1fs)' % (len(rc.insns), len(banks), time.time() - t))
     t = time.time()
@@ -105,7 +129,8 @@ def main():
     top = max(r.banks) + 1
     size = 2
     while size < top: size *= 2
-    rom = make_rom(r.banks, 'FF1 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x03, sgb=True)
+    rom = make_rom(r.banks, 'FF1 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x03, sgb=True,
+                   cgb=0x80)                          # dual-mode: DMG / SGB / CGB
     open(opt['--out'], 'wb').write(rom)
     open(opt['--out'][:-3] + '.sym', 'w').write(r.sym_file())
     used0 = len(r.banks[0])

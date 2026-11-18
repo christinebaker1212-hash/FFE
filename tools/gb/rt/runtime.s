@@ -19,6 +19,7 @@ SLOT_STAMP = $DA80          ; GB slot -> frame number of its last use in OAM
 SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
+ATTR_Q     = $D880          ; CGB: queue of NES attribute byte indices (64 entries)
 LCDC_ON    = %11000011      ; LCD on, window map $9C00 (off), BG tiles $8800 (signed), BG map $9800, OBJ on, BG on
 BATTLE_BGP = $27            ; DMG battle: colour 0 black, 1 light grey, 2 dark grey, 3 white
 CAM_X      = 48
@@ -72,6 +73,9 @@ cam_x:      ds 1                            ; GB view origin in the NES picture 
 cam_y:      ds 1                            ; set by NES writes to $5800/$5801 (tiles)
 frames:     ds 1
 bgp_fix:    ds 1                            ; DMG BG palette set by the GB layout (0 = from the NES palette 0)
+is_cgb:     ds 1                            ; 1 on a Game Boy Color (CGB mode: NES colours)
+aq_head:    ds 1                            ; CGB attribute queue (NES attribute indices, applied in vblank)
+aq_tail:    ds 1
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -91,6 +95,7 @@ section bank 0, $0100
 section bank 0, $0150
 boot:       di
             ld sp, STACK_TOP
+            push af                         ; A = $11 on a Game Boy Color
 .wv:        ldh a, [$FF44]
             cp 144
             jr c, .wv
@@ -108,6 +113,22 @@ boot:       di
             ld hl, $FF80                    ; clear HRAM
             ld bc, $7F
             call memclr
+            pop af
+            cp $11
+            jr nz, .dmg
+            ld a, 1
+            ldh [is_cgb], a
+            ld a, low(ATTR_Q)
+            ldh [aq_head], a
+            ldh [aq_tail], a
+            ld a, 1                         ; VRAM bank 1 (attributes) cleared too
+            ldh [$FF4F], a
+            ld hl, $8000
+            ld bc, $2000
+            call memclr
+            xor a
+            ldh [$FF4F], a
+.dmg:
             ld hl, dma_code                 ; OAM DMA routine to HRAM
             ld de, hram_dma
             ld b, 10
@@ -196,6 +217,9 @@ vblank_isr: push af
             push hl
             ld b, Q_MAX
             call flush_q
+            ldh a, [is_cgb]
+            and a
+            call nz, attr_flush
             ldh a, [oam_pending]
             and a
             jr z, .no_oam
@@ -303,10 +327,13 @@ flush_q:    ldh a, [q_tail]
             ldh [q_head], a
             ret
 
-; NES palette shadow -> DMG palettes
+; NES palette shadow -> DMG palettes (and CGB palette RAM on a Game Boy Color)
 make_palettes:
             xor a
             ldh [pal_dirty], a
+            ldh a, [is_cgb]
+            and a
+            call nz, cgb_palettes
             ld hl, PAL_SH
             call pal4
             ld c, a
@@ -322,6 +349,148 @@ make_palettes:
             call pal4
             ldh [obp1_v], a
             ret
+cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ palettes 0-3
+            ld a, $80                       ;   (RGB555 from NES_RGB, $3E00; colour 0 of each
+            ldh [$FF68], a                  ;   BG palette is the universal backdrop)
+            ld hl, PAL_SH
+            ld c, $69
+            call .pal16
+            ld a, $80
+            ldh [$FF6A], a
+            ld hl, PAL_SH + $10
+            ld c, $6B
+.pal16:     ld b, 16
+.lp:        ld a, l
+            and $03
+            ld a, [hl+]
+            jr nz, .c
+            ld a, [PAL_SH]
+.c:         push hl
+            and $3F
+            add a, a
+            ld l, a
+            ld h, high(NES_RGB)
+            ld a, [hl+]
+            ldh [c], a
+            ld a, [hl]
+            ldh [c], a
+            pop hl
+            dec b
+            jr nz, .lp
+            ret
+
+attr_write:                                 ; CGB: NES attribute byte A of nametable 0 changed
+            push hl
+            ldh a, [lcd_on]
+            and a
+            jr nz, .q
+            ld a, l
+            sub $C0
+            pop hl
+            jp attr_apply
+.q:         ld a, l                         ; LCD on: queue the index for the vblank
+            sub $C0
+            push af
+            ldh a, [aq_tail]
+            ld l, a
+            ld h, high(ATTR_Q)
+            pop af
+            ld [hl], a
+            ld a, l
+            inc a
+            and $3F
+            or low(ATTR_Q)
+            ldh [aq_tail], a
+            pop hl
+            ret
+
+attr_flush:                                 ; vblank: apply up to 6 queued attribute bytes
+            ld b, 6
+.lp:        ldh a, [aq_head]
+            ld c, a
+            ldh a, [aq_tail]
+            cp c
+            ret z
+            ld l, c
+            ld h, high(ATTR_Q)
+            ld a, [hl]
+            call attr_apply
+            ld a, c
+            inc a
+            and $3F
+            or low(ATTR_Q)
+            ldh [aq_head], a
+            dec b
+            jr nz, .lp
+            ret
+
+attr_apply:                                 ; A = attribute index i (0-63): its 4 x 4 cells
+            push bc                         ;   of the GB map ($9800) get the palette numbers
+            push de                         ;   (VRAM bank 1)
+            push hl
+            ld c, a
+            add a, $C0
+            ld l, a
+            ld h, high(NT_SH) + 3
+            ld d, [hl]                      ; the attribute value
+            ld a, c                         ; HL = $9800 + (i >> 3) * 128 + (i & 7) * 4
+            swap a
+            and $03
+            add a, $98
+            ld h, a
+            ld a, c
+            and $08
+            swap a
+            ld e, a
+            ld a, c
+            and $07
+            add a, a
+            add a, a
+            or e
+            ld l, a
+            ld a, 1
+            ldh [$FF4F], a
+            ld a, d
+            and $03
+            ld b, a                         ; top left
+            ld a, d
+            rrca
+            rrca
+            and $03
+            ld c, a                         ; top right
+            call .two
+            ld a, d
+            swap a
+            and $03
+            ld b, a                         ; bottom left
+            ld a, d
+            swap a
+            rrca
+            rrca
+            and $03
+            ld c, a                         ; bottom right
+            call .two
+            xor a
+            ldh [$FF4F], a
+            pop hl
+            pop de
+            pop bc
+            ret
+.two:       call .row
+.row:       ld [hl], b
+            inc l
+            ld [hl], b
+            inc l
+            ld [hl], c
+            inc l
+            ld [hl], c
+            ld a, l
+            add a, 29
+            ld l, a
+            ret nc
+            inc h
+            ret
+
 pal4:       ; HL -> 4 NES colours ($x0 = universal backdrop) -> DMG palette byte
             ld c, 0
             ld b, 4
@@ -562,7 +731,17 @@ rt_ppu_w7:  push af
             jr nz, .map
             ld a, l
             cp $C0
-            jr nc, .done                    ; attribute table: shadow only (SGB later)
+            jr c, .map
+            ld a, c                         ; attribute table: shadow; CGB (nametable 0):
+            and a                           ;   the 16 cells' palette numbers in VRAM bank 1
+            jr nz, .done
+            ldh a, [is_cgb]
+            and a
+            jr z, .done
+            ld a, l
+            sub $C0
+            call attr_write
+            jr .done
 .map:       ld a, b
             add a, $98
             ld h, a
@@ -736,6 +915,10 @@ rt_io_w4014:
             ld a, b
             and $01                         ; palette 1/3 -> OBP1
             swap a
+            or c
+            ld c, a
+            ld a, b
+            and $03                         ; CGB: OBJ palette = NES palette (ignored on DMG)
             or c
             pop bc
             ld [de], a

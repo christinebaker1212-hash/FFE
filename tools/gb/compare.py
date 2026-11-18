@@ -2,7 +2,7 @@
 save side-by-side screenshots; compare NES RAM $0000-$07FF with GB $C000-$C7FF and
 NES save RAM with GB $A000 at each shot.
 usage: PYTHONPATH=build/emu compare.py NES.nes GB.gb OUTPREFIX [--random SEED FRAMES]"""
-import sys, random
+import os, sys, random
 import numpy as np
 from PIL import Image
 from cynes import NES
@@ -22,7 +22,7 @@ def new_game_script():
 
 class GB:
     def __init__(self, path):
-        self.pb = PyBoy(path, window='null', cgb=False, sound_emulated=False)
+        self.pb = PyBoy(path, window='null', cgb=os.environ.get('GB_CGB') == '1', sound_emulated=False)
         self.pb.set_emulation_speed(0)
         self.held = 0
 

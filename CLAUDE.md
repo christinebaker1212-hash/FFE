@@ -335,6 +335,17 @@ Milestones per game (from `docs/gb-port.md`):
   `firstdiff.py ... --battle [--shots F,.. --out PNG]` checks RAM equivalence through the
   battleshot battle and saves GB screens. `docs/gb-handoff.md` has the current battle design,
   how it is built, and the next steps.
+- **CGB mode works (2026-11-18, colour milestone started; owner: "go ahead"):** header CGB
+  flag $80 (dual-mode); boot detects a Color (A = $11) -> `is_cgb`; `cgb_palettes` loads
+  CGB BG/OBJ palettes 0-3 from the NES palette RAM through `NES_RGB` (2C02 approximation,
+  bank 0 $3E00, made by build.py); NES attribute writes (nametable 0) set the palette
+  numbers of their 16 cells in VRAM bank 1 (`attr_apply`, queued while the LCD is on:
+  `ATTR_Q` $D880, 6 per vblank); sprites carry the NES palette in OAM bits 0-2.
+  `GB_CGB=1` makes the test harness (compare.GB) run PyBoy as a Color. Battle in CGB:
+  NES colours, RAM identical (firstdiff --battle 7100 frames). Text tiles now use colour 0
+  as background (FF1's battle blank tile $FF is colour 0: the "black bar" the owner saw
+  under the first message on DMG). Next in colour: check all screens in CGB, double
+  speed, HDMA; then the DMG per-tile shading and SGB.
 - Column-2 lists push a name down below a wrapped one (VNROW; 7 formations have a name
   > 56 px, only formation 69 lists two names).
 - Owner (2026-11-18): show the enemy names while targeting (done: entering the

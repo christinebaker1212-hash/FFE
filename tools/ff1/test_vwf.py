@@ -49,7 +49,7 @@ def show(ppu, first, n):
         line = ''
         for t in range(first, first + n):
             p0 = ppu.chr.get(t * 16 + r, 0); p1 = ppu.chr.get(t * 16 + 8 + r)
-            line += ''.join('#' if p0 >> (7 - b) & 1 else ('.' if p1 == 0xFF else '?') for b in range(8))
+            line += ''.join('#' if p0 >> (7 - b) & 1 else ('.' if p1 is not None and not (p1 >> (7 - b) & 1) else '?') for b in range(8))
         print(line)
 
 

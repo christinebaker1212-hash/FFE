@@ -79,8 +79,8 @@ def music_trampoline(rom):
 #   party window   tiles $80-$A7: member m's line = $80 + 10m (10 tiles, 80 px)
 #   panel text     tiles $A8-$EF: panel row r (1-4), column c (2-19) = $A8 + 18(r-1) + c-2
 # The panel image ($691E, 32 bytes per row, NES rows 18-29) gets these tile numbers; the
-# glyphs are rendered into a 1-bit line buffer and uploaded in vblank (plane 0 = ink,
-# plane 1 = $FF: ink colour 3 on colour 2, as the font).
+# glyphs are rendered into a 1-bit line buffer and uploaded in vblank (both planes = ink:
+# ink colour 3 on colour 0, like the battle's blank tile $FF).
 PANEL = 0x691E
 GLYPH_FIRST = 0x7A                       # glyph table covers codes $7A-$FF
 DIG3 = 0xD3                              # 3-px digits $D3-$DC, small '/' $DD, arrow $DE
@@ -358,10 +358,15 @@ vupload:            ; VN tiles of the buffer -> BG tiles VT.., 4 tiles per vblan
     inx
     dey
     bne .p0
+    txa             ; plane 1 = plane 0: ink colour 3 on colour 0, as FF1's battle blank
+    sec             ;   tile $FF (written at $F36C) - the same black on the NES, and one
+    sbc #8          ;   shade on the GB
+    tax
     ldy #8
-    lda #$FF
 .p1:
+    lda VBUF,x
     sta $2007
+    inx
     dey
     bne .p1
     inc VUP
