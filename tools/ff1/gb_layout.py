@@ -112,9 +112,28 @@ def party_sprites(rom):
     put_bank(rom, 12, 0x997C, bytes([0xA9, 0x80]), bytes([0xA9, 0xB0]))
 
 
+def party_status(rom):
+    """Name / HP-or-status label / HP number beside each sprite: NES cols 18-21 (GB 16-19),
+    rows 6+3i, 7+3i, 8+3i (the sprite's three rows). The NES boxes (cols 26-29, rows 4+6i)
+    had a dakuten row above the name and above the label; those rows are blank in English
+    and are not drawn. Routine b12:AA5B (one member per frame), row writer $AAFC, row
+    addresses $AB21."""
+    nop5 = bytes([0xEA] * 5)
+    put_bank(rom, 12, 0xAAB0, nop5, bytes([0xA0, 0x00, 0x20, 0xFC, 0xAA]))   # dakuten row of the name
+    put_bank(rom, 12, 0xAABA, nop5, bytes([0xA0, 0x08, 0x20, 0xFC, 0xAA]))   # dakuten row of the label
+    rows = b''.join((0x2000 + (6 + 3 * i) * 32 + 18).to_bytes(2, 'little') for i in range(4))
+    # palette 3 (the HP boxes' palette) for cols 18-21, rows 6-17 in the battle
+    # attribute table $F3F8 (copied to $23C0 at battle setup and kept as the base)
+    for i, (old, new) in {0x0C: (0x33, 0xF3), 0x14: (0x33, 0xFF), 0x1C: (0x33, 0xFF), 0x24: (0xF3, 0xFF),
+                          0x0D: (0x00, 0x30), 0x15: (0x00, 0x33), 0x1D: (0x00, 0x33), 0x25: (0xF0, 0xF3)}.items():
+        put(rom, 0xF3F8 + i, bytes([new]), expect=bytes([old]))
+    put_bank(rom, 12, 0xAB21, rows, bytes([0x9A, 0x20, 0x5A, 0x21, 0x1A, 0x22, 0xDA, 0x22]))
+
+
 def apply(rom, report):
     battle_frames(rom)
     boxline_one_row(rom)
     battle_panel(rom)
     party_sprites(rom)
+    party_status(rom)
     report.append('GB layout applied')

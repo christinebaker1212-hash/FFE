@@ -188,8 +188,16 @@ Milestones per game (from `docs/gb-port.md`):
 - Battle step 1 done (2026-11-18): party sprites at NES x = 128 (`b12:9740`; step forward /
   back `$9951`/`$997C` = $78/$80), visible in GB cols 14-15 rows 0-11 beside the enemies.
 
+- Battle step 2 done: name / HP-or-status label / HP number beside each sprite in NES cols
+  18-21 rows 6+3i..8+3i (GB cols 16-19; `b12:AA5B` without the two blank dakuten rows,
+  row table `$AB21`; palette 3 for those cells in the attribute table `$F3F8`).
+- Tools: `tools/gb/ntlog.py` logs nametable/attribute writes in the battleshot battle with
+  the code address that made them (find who draws a screen area).
+
 ## In progress / next
-- Battle: name/HP beside the sprites (bank 12 `$AB0E`),
+- Battle (owner, 2026-11-18): the bottom frame of the message window must be visible too
+  (windows 6 rows high instead of 7; long split result lines need a place).
+- Battle:
   bottom panel to NES rows 18-23 cols 2-21 (names full width, commands over the right
   half, the four messages as lines of one window via dummy boxes in the hidden rows),
   cursors, flashing of the acting member's line and the target.
