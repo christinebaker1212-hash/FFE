@@ -14,6 +14,9 @@
 SGB_NEXT   = $A000          ; cart RAM bank 2: 8 packets
 SGB_SENT   = $A080          ; cart RAM bank 2: 8 packets as last sent
 SGB_GAP    = 4              ; frames between packets
+SGB_GRID   = $A100          ; cart RAM bank 2: palette of each screen cell (20 x 18)
+SGB_COVER  = $A300          ;   cells covered by the rectangles so far (GRID + $200)
+SGB_SETS   = $A280          ;   ATTR_BLK data sets (6 bytes, at most 15)
 
 ; ---- boot (DMG, LCD off, interrupts off): is_sgb = 1 on a Super Game Boy
 sgb_detect: ld b, 6
@@ -273,6 +276,9 @@ sgb_build:  xor a
             call pal_rgb
             ld c, 3
             call pal_rgb
+            ld a, 6                         ; the cells as rectangles (ATTR_BLK) if they
+            ldh [sgb_nattr], a              ;   take at most 15, else ATTR_CHR (6 packets)
+            call sgb_rects
             jr .cmp
 .glob:      ld hl, SGB_NEXT                 ; one palette (SGB 0) for the screen: each value
             ld a, $01                       ;   from the palette with most cells that has it
@@ -307,16 +313,19 @@ sgb_build:  xor a
 .d2:        ldh a, [sgb_glob]
             and a
             jr nz, .dn
-            ld c, 2                         ; ATTR_CHR: all six if any differs
+            ld c, 2                         ; ATTR packets (sgb_nattr): all if any differs
+            ldh a, [sgb_nattr]
+            add a, 2
+            ld e, a
 .d3:        call pk_diff
             jr nz, .chr
             inc c
             ld a, c
-            cp 8
+            cp e
             jr nz, .d3
             jr .dn
-.chr:       ld a, b
-            or $FC
+.chr:       call attr_mask
+            or b
             ld b, a
 .dn:        ldh a, [sgb_force]              ; (everything after detection / a mode change;
             ld c, a                         ;   one palette: PAL01 and ATTR_BLK only)
@@ -325,7 +334,14 @@ sgb_build:  xor a
             ld a, c
             jr z, .fa
             and $03
-.fa:        or b
+            jr .fb
+.fa:        push af
+            call attr_mask
+            or 3
+            ld c, a
+            pop af
+            and c
+.fb:        or b
             ldh [sgb_pend], a
             xor a
             ldh [sgb_force], a
@@ -531,6 +547,10 @@ sgb_counts: ld hl, SGB_CNT
             ld [hl+], a
             ld a, l
             ldh [sgb_ptr], a                ; next data byte
+            ld a, low(SGB_GRID)
+            ld [SGB_GP], a
+            ld a, high(SGB_GRID)
+            ld [SGB_GP + 1], a
             xor a
             ldh [sgb_acc], a
             ld a, 4
@@ -583,6 +603,17 @@ sgb_counts: ld hl, SGB_CNT
 .o0:        ld a, d
             call cell_pal
             ld c, a
+            ld a, [SGB_GP]                  ; GRID
+            ld l, a
+            ld a, [SGB_GP + 1]
+            ld h, a
+            ld [hl], c
+            inc hl
+            ld a, l
+            ld [SGB_GP], a
+            ld a, h
+            ld [SGB_GP + 1], a
+            ld a, c
             add a, low(SGB_CNT)             ; count
             ld l, a
             ld h, high(SGB_CNT)
@@ -749,4 +780,264 @@ sgb_lcd_off:
             ld a, $FF
             ldh [sgb_force], a
             ldh [sgb_dirty], a
+            ret
+
+; A = the pending bits of the ATTR packets (2 .. 1 + sgb_nattr)
+attr_mask:  push bc
+            ldh a, [sgb_nattr]
+            ld b, a
+            xor a
+.l:         scf
+            rla
+            dec b
+            jr nz, .l
+            add a, a
+            add a, a
+            pop bc
+            ret
+
+; per-cell palettes (GRID) -> ATTR_BLK packets 2.. of NEXT: the whole screen in the most
+; common palette, then rectangles of equal palette, greedy (rows first). Carry: more
+; than 15 rectangles (ATTR_CHR stays). RAM bank 2 on.
+sgb_rects:  push bc
+            push de
+            push hl
+            ld hl, SGB_CNT                  ; most common palette -> sgb_rb
+            ld bc, 0
+            ld e, 0
+.bm:        ld a, [hl+]
+            cp b
+            jr c, .bn
+            jr z, .bn
+            ld b, a
+            ld c, e
+.bn:        inc e
+            ld a, e
+            cp 4
+            jr nz, .bm
+            ld a, c
+            ldh [sgb_rb], a
+            ld hl, SGB_GRID                 ; COVER = cells of that palette
+            ld bc, 360
+.cv:        ldh a, [sgb_rb]
+            ld e, a
+            ld a, [hl]
+            cp e
+            ld a, 0
+            jr nz, .c0
+            inc a
+.c0:        inc h
+            inc h
+            ld [hl], a
+            dec h
+            dec h
+            inc hl
+            dec bc
+            ld a, b
+            or c
+            jr nz, .cv
+            ld hl, SGB_SETS                 ; set 0: everything in that palette
+            ld a, 7
+            ld [hl+], a
+            ldh a, [sgb_rb]
+            ld b, a
+            add a, a
+            add a, a
+            or b
+            add a, a
+            add a, a
+            or b
+            ld [hl+], a
+            xor a
+            ld [hl+], a
+            ld [hl+], a
+            ld a, 19
+            ld [hl+], a
+            ld a, 17
+            ld [hl], a
+            ld a, 1
+            ldh [sgb_ns], a
+            ld d, 0                         ; scan for cells not covered
+.y:         ld e, 0
+.x:         call .addr
+            inc h
+            inc h
+            ld a, [hl]
+            and a
+            jr nz, .nx
+            call .rect
+            jr c, .x9
+.nx:        inc e
+            ld a, e
+            cp 20
+            jr nz, .x
+            inc d
+            ld a, d
+            cp 18
+            jr nz, .y
+            ld hl, SGB_NEXT + 32            ; the packets: clear, header, sets
+            ld b, 96
+            xor a
+.cl:        ld [hl+], a
+            dec b
+            jr nz, .cl
+            ldh a, [sgb_ns]
+            ld c, a
+            add a, a
+            add a, c
+            add a, a                        ; 6n
+            ld b, a
+            add a, 2 + 15
+            swap a
+            and $0F                         ; packets
+            ldh [sgb_nattr], a
+            ld hl, SGB_NEXT + 32
+            or $20
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            ld de, SGB_SETS
+.cp:        ld a, [de]
+            inc de
+            ld [hl+], a
+            dec b
+            jr nz, .cp
+            and a
+.x9:        pop hl
+            pop de
+            pop bc
+            ret
+.addr:      push bc                         ; D = row, E = column -> HL = GRID cell
+            ld h, 0
+            ld l, d
+            add hl, hl
+            add hl, hl
+            ld b, h
+            ld c, l
+            add hl, hl
+            add hl, hl
+            add hl, bc
+            ld b, 0
+            ld c, e
+            add hl, bc
+            ld bc, SGB_GRID
+            add hl, bc
+            pop bc
+            ret
+.same:      ld a, [hl]                      ; Z: cell HL has palette sgb_rp, not covered
+            push bc
+            ld b, a
+            ldh a, [sgb_rp]
+            cp b
+            pop bc
+            ret nz
+            inc h
+            inc h
+            ld a, [hl]
+            dec h
+            dec h
+            and a
+            ret
+.rect:      push de                         ; rectangle from row D, column E -> set
+            call .addr
+            ld a, [hl]
+            ldh [sgb_rp], a
+            ld b, e                         ; right
+.ex:        ld a, b
+            cp 19
+            jr z, .exd
+            inc hl
+            call .same
+            jr nz, .exd
+            inc b
+            jr .ex
+.exd:       ld a, b
+            ldh [sgb_rx1], a
+            ld c, d                         ; down
+.ey:        ld a, c
+            cp 17
+            jr z, .eyd
+            push de
+            ld d, c
+            inc d
+            call .addr
+            pop de
+            ld a, b
+            sub e
+            inc a
+            push bc
+            ld b, a
+.er:        call .same
+            jr nz, .erf
+            inc hl
+            dec b
+            jr nz, .er
+            pop bc
+            inc c
+            jr .ey
+.erf:       pop bc
+.eyd:       ld a, c
+            ldh [sgb_ry1], a
+            ld a, d                         ; cover it
+            ldh [sgb_ty], a
+.mk:        push de
+            ldh a, [sgb_ty]
+            ld d, a
+            call .addr
+            pop de
+            ldh a, [sgb_rx1]
+            sub e
+            inc a
+            ld b, a
+.mc:        inc h
+            inc h
+            ld [hl], 1
+            dec h
+            dec h
+            inc hl
+            dec b
+            jr nz, .mc
+            ldh a, [sgb_ty]
+            ld c, a
+            ldh a, [sgb_ry1]
+            cp c
+            jr z, .mkd
+            ld a, c
+            inc a
+            ldh [sgb_ty], a
+            jr .mk
+.mkd:       ldh a, [sgb_ns]                 ; the data set
+            cp 15
+            jr z, .ovf
+            ld c, a
+            inc a
+            ldh [sgb_ns], a
+            ld a, c
+            add a, a
+            add a, c
+            add a, a
+            add a, low(SGB_SETS)
+            ld l, a
+            ld h, high(SGB_SETS)
+            ld a, 3                         ; inside + border
+            ld [hl+], a
+            ldh a, [sgb_rp]
+            ld b, a
+            add a, a
+            add a, a
+            or b
+            ld [hl+], a
+            ld a, e
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            ldh a, [sgb_rx1]
+            ld [hl+], a
+            ldh a, [sgb_ry1]
+            ld [hl], a
+            pop de
+            and a
+            ret
+.ovf:       pop de
+            scf
             ret

@@ -21,6 +21,7 @@ SGB_CNT    = $DCC4          ; SGB: cells on screen per NES BG palette
 SGB_LSX    = $DCC8          ; SGB: last view position (scroll + camera)
 SGB_LSY    = $DCC9
 SGB_TICK   = $DCCA
+SGB_GP     = $DCCB          ; SGB: GRID write pointer (2)
 SPAL_KEY   = $DCC0          ; NES sprite palette -> coding: values of indices 1-3 (2 bits each),
                             ;   bit 6 = OBP1 (DMG); $39 = as is (CGB)
 SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
@@ -97,6 +98,13 @@ sgb_acc:    ds 1
 sgb_nacc:   ds 1
 sgb_c0:     ds 1
 sgb_r0:     ds 1
+sgb_nattr:  ds 1
+sgb_rb:     ds 1
+sgb_ns:     ds 1
+sgb_rp:     ds 1
+sgb_rx1:    ds 1
+sgb_ry1:    ds 1
+sgb_ty:     ds 1
 fade_drop:  ds 1                            ; DMG: shades the palettes are faded by
 spr_next:   ds 1
 uw_bank:    ds 1

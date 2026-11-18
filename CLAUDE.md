@@ -415,8 +415,27 @@ Milestones per game (from `docs/gb-port.md`):
   before the shading 4178/4202 (the extra is the LCD-on scan and per-write bookkeeping).
   Debug aids: `firstdiff.py` env `STUCK_SAVE=K` saves the PyBoy state at frame wait K;
   ROM `rst $38` trap (`rst38_trap`, DBG+8 = SP, DBG+10 = stack).
-- Next (owner to choose): SGB palettes + border (mGBA), CGB speed-ups (double speed,
-  HDMA), or the next screen (main menu).
+- DMG sprites (owner: the cursor's light/dark were swapped): two fixed OBJ palettes
+  (OBP0 black/dark/white, OBP1 dark/light/white); each NES sprite palette picks one and its
+  tiles are loaded into their slots coded for it (`SPAL_KEY`, `SLOT_KEY`).
+- **SGB done (2026-11-18, owner asked)** (`tools/gb/rt/sgb.s`): detection (MLT_REQ) at
+  boot; colours: SGB palette p colour v = NES colour of BG palette p with value v (a hue
+  preferred over a grey within a value); static screens per 8x8 cell from the NES
+  attributes, encoded as ATTR_BLK rectangles (most screens 1 packet; >15 rectangles:
+  ATTR_CHR); scrolling screens (field, towns) one palette for the screen from the
+  palettes most cells use. Packets go out from the frame wait, one per 4 frames, only
+  those that changed (built in cart RAM bank 2). Sprites take their cell's colours (SGB
+  hardware). Border drawn by `tools/gb/sgb_border.py` (window frame, blue band, lattice,
+  four crystals; no game graphics), sent at boot by VRAM transfer with the screen frozen.
+  mGBA tools: `sgbrun` (build: `gcc -O2 tools/gb/mgba/sgbrun.c -lmgba -o build/sgbrun`)
+  `--padfile/--nshot/--sram`, `sgbshots.py` (SGB/DMG screenshots with the NES checks'
+  input), `sgbram.py` (game state vs NES; matched, apart from scratch bytes caught
+  mid-frame). Found with mGBA: a STAT write on the DMG requests a STAT interrupt; it ran
+  the LYC split handler at once and broke the scroll on every screen (fixed).
+  Possible later: a palette of its own for the battle party column (sprites now take the
+  colours of the enemy/window area they stand in).
+- Next (owner, 2026-11-18): CGB speed-ups (double speed, HDMA), then the next screens,
+  without pausing.
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).
