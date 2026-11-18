@@ -3,6 +3,8 @@ review before the NES code is changed. Graphics that would come from the ROM (en
 backdrops) are drawn as grey placeholder blocks.
 usage: mockup.py OUTDIR"""
 import os, sys
+# Party for mock-ups (owner, 2026-11-18): DUNE Warrior, SPUD Monk, JOJO Red Magician,
+# LEO Black Magician.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from latin_font import tile, COND, G, NARROW, _glyph_cols
 from PIL import Image, ImageDraw
@@ -78,12 +80,12 @@ def battle(out):
     for i in range(5): s.block(i * 4, 2, 4, 4)          # 9 small enemies, 5 + 4
     for i in range(4): s.block(2 + i * 4, 6, 4, 4)
     s.window(0, 10, 10, 8)                              # command window, headed by who acts
-    s.text(1, 11, 'AAAA')
+    s.text(1, 11, 'DUNE')
     for i, w in enumerate(['Fight', 'Magic', 'Medicine', 'Items', 'Run']):
         s.text(1, 12 + i, w)
     s.cursor(0, 12)                                     # cursor sprite over the frame, as on the NES
     s.window(10, 10, 10, 8)                             # party list: name + HP
-    for i, (n, hp) in enumerate([('AAAA', 35), ('BBBB', 30), ('CCCC', 33), ('DDDD', 30)]):
+    for i, (n, hp) in enumerate([('DUNE', 35), ('SPUD', 30), ('JOJO', 33), ('LEO', 30)]):
         s.text(11, 11 + i, '%s%4d' % (n, hp))
     s.save(os.path.join(out, 'mock_battle_command.png'))
 
@@ -94,10 +96,10 @@ def battle(out):
     s.window(0, 10, 10, 8)                              # enemy names (as the NES box)
     for i, w in enumerate(['Goblin', 'Wolf']): s.text(1, 11 + i, w)
     s.window(10, 10, 10, 8)
-    for i, (n, hp) in enumerate([('AAAA', 35), ('BBBB', 30), ('CCCC', 33), ('DDDD', 30)]):
+    for i, (n, hp) in enumerate([('DUNE', 35), ('SPUD', 30), ('JOJO', 33), ('LEO', 30)]):
         s.text(11, 11 + i, '%s%4d' % (n, hp))
     s.window(0, 12, 20, 6)                              # battle message, full width over both
-    s.text(1, 13, 'AAAA')
+    s.text(1, 13, 'DUNE')
     s.text(1, 14, 'Goblin')
     s.text(1, 15, '6 hit(s)!  23 DMG')
     s.save(os.path.join(out, 'mock_battle_message.png'))
@@ -105,7 +107,7 @@ def battle(out):
 
 def battle2(out):
     """Draft 2: party sprites visible (owner's decision)."""
-    party = [('AAAA', 35), ('BBBB', 30), ('CCCC', 33), ('DDDD', 30)]
+    party = [('DUNE', 35), ('SPUD', 30), ('JOJO', 33), ('LEO', 30)]
 
     def top(s):
         for r in range(3):                              # 9 small enemies, NES 3x3 grid
@@ -128,7 +130,7 @@ def battle2(out):
     s.save(os.path.join(out, 'mock2_battle_command.png'))
     s = Screen(bg=3); top(s)
     s.window(0, 12, 20, 6)
-    s.text(1, 13, 'AAAA'); s.text(1, 14, 'Minotaur Zombie'); s.text(1, 15, '6 hit(s)!  23 DMG')
+    s.text(1, 13, 'DUNE'); s.text(1, 14, 'Minotaur Zombie'); s.text(1, 15, '6 hit(s)!  23 DMG')
     s.save(os.path.join(out, 'mock2_battle_message.png'))
 
 
@@ -137,7 +139,7 @@ def battle3(out):
     Left of each pair: the current GB layout (8x8 font, 18 cells per row, 4 rows);
     right: the same windows with the condensed proportional letters (about 5 px per
     letter, 28-30 letters per row), drawn on the tile rows."""
-    party = [('AAAA', 35), ('BBBB', 30), ('CCCC', 33), ('DDDD', 30)]
+    party = [('DUNE', 35), ('SPUD', 30), ('JOJO', 33), ('LEO', 30)]
 
     def top(s):
         for r in range(3):
@@ -146,10 +148,10 @@ def battle3(out):
             s.block(14, i * 3, 2, 3)
             s.text(16, i * 3, n); s.text(16, i * 3 + 1, 'HP'); s.text(16, i * 3 + 2, '%4d' % hp)
 
-    pages = [('turn', ['AAAA', '', 'Goblin', '4 damage']),
+    pages = [('turn', ['DUNE', '', 'Goblin', '4 damage']),
              ('long', ['Was hurled into a', 'rift in', 'dimensions!']),
              ('long2', ['Became better at', 'dodging attacks'])]
-    small = {'turn': ['AAAA', '', 'Goblin', '4 damage'],
+    small = {'turn': ['DUNE', '', 'Goblin', '4 damage'],
              'long': ['Was hurled into a rift in dimensions!'],
              'long2': ['Became better at dodging attacks']}
     for name, rows in pages:
@@ -182,7 +184,7 @@ def battle4(out):
     status word (blank when none). Right: B = the NES order (name / HP or status /
     number). Status words that are wider than 32 px in the condensed letters (Darkness,
     Paralysis) use the narrow letters the English build already has for them."""
-    party = [('AAAA', 35, ''), ('WWWW', 30, 'Poison'), ('Mm', 0, 'Paralysis'), ('DDDD', 125, 'Darkness')]
+    party = [('DUNE', 35, ''), ('LEO', 30, 'Poison'), ('JOJO', 0, 'Paralysis'), ('LEO', 125, 'Darkness')]
 
     def status(s, row, word):
         if word: s.ptext(16, row, word, table=NARROW if s.pwidth(word) > 32 else None)
@@ -203,7 +205,7 @@ def battle4(out):
                 else: s.ptext(16, y + 1, 'HP')
                 s.ptext(16, y + 2, str(hp), right=160)
         s.window(0, 12, 20, 6)
-        for i, r in enumerate(['WWWW', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
+        for i, r in enumerate(['LEO', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
         return s
     both = Image.new('RGB', (160 * 2 + 8, 144), (255, 255, 255))
     both.paste(screen('A').im, (0, 0)); both.paste(screen('B').im, (168, 0))
@@ -217,7 +219,7 @@ def battle5(out):
     at the top screen edge, its sides running into the bottom window. Right: D = frame
     around sprites and text (left side under the sprites' right edge in col 15, text 27 px).
     Lines per member: name / number / status (blank when none)."""
-    party = [('AAAA', 35, ''), ('Bob', 30, 'Poison'), ('Mm', 0, 'Sleep'), ('DDDD', 125, 'Stone')]
+    party = [('DUNE', 35, ''), ('SPUD', 30, 'Poison'), ('JOJO', 0, 'Sleep'), ('LEO', 125, 'Stone')]
 
     def frame_px(s, x0, y0, x1, y1, top=True):
         d = s.d
@@ -232,7 +234,7 @@ def battle5(out):
         for r in range(3):
             for c in range(3): s.block(1 + c * 4, r * 4, 4, 4)
         s.window(0, 12, 20, 6)
-        for i, r in enumerate(['Bob', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
+        for i, r in enumerate(['SPUD', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
         if v == 'C': frame_px(s, 16 * 8, 0, 160 - 1, 12 * 8 + 3, top=False)
         else: frame_px(s, 15 * 8 + 3, 0, 160 - 1, 12 * 8 + 3, top=False)
         left = 16 * 8 + 5 if v == 'C' else 16 * 8
@@ -270,8 +272,8 @@ def battle6(out):
     beside the enemies, so the party window runs the full screen height (GB cols 14-19,
     rows 0-17) and the bottom window spans the enemy area only (cols 0-13). Per member:
     name and status beside the sprite, HP current/max under it."""
-    party = [('AAAA', '192/899', ''), ('Bob', '30/30', 'Poison'), ('Mm', '0/33', 'Sleep'),
-             ('DDDD', '125/999', 'Stone')]
+    party = [('DUNE', '192/899', ''), ('SPUD', '30/30', 'Poison'), ('JOJO', '0/33', 'Sleep'),
+             ('LEO', '125/999', 'Stone')]
 
     def screen(page):
         s = Screen(bg=3)
@@ -287,7 +289,7 @@ def battle6(out):
             _pt(s, 160 - 6 - s.pwidth(hp, SMALLDIG), y + 25, hp, SMALLDIG)
         s.window(0, 12, 14, 6)
         if page == 'msg':
-            for i, r in enumerate(['Bob', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
+            for i, r in enumerate(['SPUD', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
         elif page == 'long':
             s.ptext(1, 13, 'Was hurled into a rift in'); s.ptext(1, 14, 'dimensions!')
         else:
@@ -308,8 +310,8 @@ def battle7(out):
     HP current/max / status word (all fit in 34 px). Enemy area 12 columns (cols 0-11),
     bottom window under it. Mixed formations (14 columns on the NES) would need their
     enemy positions changed in the NES code."""
-    party = [('WWWW', '192/899', ''), ('Bob', '30/30', 'Poison'), ('Mm', '0/33', 'Paralysis'),
-             ('DDDD', '125/999', 'Darkness')]
+    party = [('LEO', '192/899', ''), ('SPUD', '30/30', 'Poison'), ('JOJO', '0/33', 'Paralysis'),
+             ('LEO', '125/999', 'Darkness')]
 
     def screen(page):
         s = Screen(bg=3)
@@ -325,7 +327,7 @@ def battle7(out):
             if st: _pt(s, X0, y + 16, st, NARROW)
         s.window(0, 12, 12, 6)
         if page == 'msg':
-            for i, r in enumerate(['Bob', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
+            for i, r in enumerate(['SPUD', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
         elif page == 'long':
             s.ptext(1, 13, 'Was hurled into a rift'); s.ptext(1, 14, 'in dimensions!')
         else:
@@ -345,8 +347,8 @@ def battle8(out):
     now), a full-height window at cols 16-19 with each member's name / status / HP
     current / max, bottom windows (enemy names, commands) in cols 0-15. Text area of
     the right window: x 133-154 (22 px), 33 px per member = 4 lines."""
-    party = [('AAAA', 192, 899, ''), ('Bob', 30, 30, 'Poison'), ('Mm', 0, 33, 'Sleep'),
-             ('WWWW', 125, 999, 'Paralysis')]
+    party = [('DUNE', 192, 899, ''), ('SPUD', 30, 30, 'Poison'), ('JOJO', 0, 33, 'Sleep'),
+             ('LEO', 125, 999, 'Paralysis')]
     X0, X1 = 133, 154
 
     def screen(page):
@@ -364,7 +366,7 @@ def battle8(out):
             _pt(s, X1 + 1 - s.pwidth('/%d' % mx, SMALLDIG), y + 23, '/%d' % mx, SMALLDIG)
         s.window(0, 12, 16, 6)
         if page == 'msg':
-            for i, r in enumerate(['Bob', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
+            for i, r in enumerate(['SPUD', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
         elif page == 'long':
             s.ptext(1, 13, 'Was hurled into a rift in'); s.ptext(1, 14, 'dimensions!')
         else:
@@ -404,8 +406,8 @@ def battle9(out):
     flush to the screen edge). Enemy area keeps 14 columns; the bottom window is under
     it (cols 0-13). Messages: A = the same words, arranged (actor > target, then action,
     then result); B = sentences (adds English words not in the Japanese)."""
-    party = [('AAAA', 192, 899, ''), ('Bob', 30, 30, 'Poison'), ('Mm', 0, 33, 'Sleep'),
-             ('WWWW', 125, 999, 'Stone')]
+    party = [('DUNE', 192, 899, ''), ('SPUD', 30, 30, 'Poison'), ('JOJO', 0, 33, 'Sleep'),
+             ('LEO', 125, 999, 'Stone')]
     X0, X1 = 132, 155
 
     def screen(page):
@@ -427,10 +429,10 @@ def battle9(out):
             _pt(s, X1 - s.pwidth('/%d' % mx, SMALLDIG), y + 23, '/%d' % mx, SMALLDIG)
         s.window(0, 12, 14, 6)
         lines = {'cmd': ['Goblin', 'Minotaur', 'Zombie'],
-                 'A': ['Bob > Goblin', '  Fire', '  23 damage'],
-                 'B': ['Bob casts Fire', 'on Goblin!', 'Goblin takes 23', 'damage.'],
-                 'B2': ['Goblin attacks Bob!', '2 hits for 9 damage.'],
-                 'B3': ['Mm fell asleep.']}[page]
+                 'A': ['LEO > Goblin', '  Fire', '  23 damage'],
+                 'B': ['LEO casts Fire', 'on Goblin!', 'Goblin takes 23', 'damage.'],
+                 'B2': ['Goblin attacks SPUD!', '2 hits for 9 damage.'],
+                 'B3': ['JOJO fell asleep.']}[page]
         for i, r in enumerate(lines): s.ptext(1, 13 + i, r, table=ARROW)
         if page == 'cmd':
             s.window(7, 12, 7, 6)
@@ -451,8 +453,8 @@ def battle10(out):
     status words allowed. Right window 5 columns (GB cols 15-19, text 31 px), one block
     per member: name / HP cur/max (3-px digits) / status. Sprites at GB cols 13-14
     (NES x = 120), rows 0-11; the bottom window spans cols 0-14."""
-    party = [('AAAA', 192, 899, ''), ('Bob', 30, 30, 'Poison'), ('Mm', 0, 33, 'Numb'),
-             ('WWWW', 999, 999, 'Blind')]
+    party = [('DUNE', 192, 899, ''), ('SPUD', 30, 30, 'Poison'), ('JOJO', 0, 33, 'Numb'),
+             ('LEO', 999, 999, 'Blind')]
     X0, X1 = 125, 155
 
     def screen(page):
@@ -474,8 +476,8 @@ def battle10(out):
             if st: _pt(s, c - s.pwidth(st) // 2, y + 18, st)
         s.window(0, 12, 15, 6)
         lines = {'cmd': ['Goblin', 'Minotaur Zombie'],
-                 'A': ['Bob > Goblin', '  Fire', '  23 damage'],
-                 'A2': ['Goblin > Bob', '  2 hits!', '  9 damage']}[page]
+                 'A': ['LEO > Goblin', '  Fire', '  23 damage'],
+                 'A2': ['Goblin > SPUD', '  2 hits!', '  9 damage']}[page]
         for i, r in enumerate(lines): s.ptext(1, 13 + i, r, table=ARROW)
         if page == 'cmd':
             s.window(8, 12, 7, 6)
@@ -496,8 +498,8 @@ def battle11(out):
     stepping forward into 14). Party info moves to a bottom-right window, one line per
     member: name, HP current/max, status. Bottom-left window: enemy names / messages
     (style A); the command window opens over it."""
-    party = [('AAAA', 192, 899, ''), ('Bob', 30, 30, 'Poison'), ('Mm', 0, 33, 'Numb'),
-             ('WWWW', 999, 999, 'Silence')]
+    party = [('DUNE', 192, 899, ''), ('SPUD', 30, 30, 'Poison'), ('JOJO', 0, 33, 'Numb'),
+             ('LEO', 999, 999, 'Silence')]
 
     def screen(page):
         s = Screen(bg=3)
@@ -515,7 +517,7 @@ def battle11(out):
             _pt(s, 126 - s.pwidth(h, DIG3), y * 8, h, DIG3)         # HP: right edge 125
             if st: _pt(s, 128, y * 8, st)                           # status: x 128-154
         s.window(0, 12, 8, 6)
-        lines = {'cmd': [], 'A': ['Bob > Goblin', ' Fire', ' 23 damage'],
+        lines = {'cmd': [], 'A': ['LEO > Goblin', ' Fire', ' 23 damage'],
                  'idle': ['Goblin', 'Minotaur', 'Zombie']}[page]
         for i, r in enumerate(lines):
             ind = 4 if r.startswith(' ') else 0
@@ -540,8 +542,8 @@ def battle12(out):
     stepping forward into 14). Party info moves to a bottom-right window, one line per
     member: name, HP current/max, status. Bottom-left window: enemy names / messages
     (style A); the command window opens over it."""
-    party = [('AAAA', 192, 899, ''), ('Bob', 30, 30, 'Poison'), ('Mm', 0, 33, 'Numb'),
-             ('WWWW', 999, 999, 'Silence')]
+    party = [('DUNE', 192, 899, ''), ('SPUD', 30, 30, 'Poison'), ('JOJO', 0, 33, 'Numb'),
+             ('LEO', 999, 999, 'Silence')]
 
     def screen(page):
         s = Screen(bg=3)
@@ -559,7 +561,7 @@ def battle12(out):
             _pt(s, 126 - s.pwidth(h, DIG3), y * 8, h, DIG3)         # HP: right edge 125
             if st: _pt(s, 128, y * 8, st)                           # status: x 128-154
         s.window(0, 12, 8, 6)
-        lines = {'cmd': [], 'A': ['Bob > Goblin', ' Fire', ' 23 damage'],
+        lines = {'cmd': [], 'A': ['LEO > Goblin', ' Fire', ' 23 damage'],
                  'idle': ['Goblin', 'Minotaur', 'Zombie']}[page]
         for i, r in enumerate(lines):
             ind = 4 if r.startswith(' ') else 0
@@ -582,8 +584,8 @@ def battle13(out):
     Top row: A = narrow log, a name that does not fit wraps onto an indented second line,
     the log scrolls up when full. Bottom row: B = full-width message window over the party
     window while a message shows (144 px of text, every name on one line)."""
-    party = [('AAAA', 192, 899, ''), ('Bob', 30, 30, 'Poison'), ('Mm', 0, 33, 'Numb'),
-             ('WWWW', 999, 999, 'Silence')]
+    party = [('DUNE', 192, 899, ''), ('SPUD', 30, 30, 'Poison'), ('JOJO', 0, 33, 'Numb'),
+             ('LEO', 999, 999, 'Silence')]
     W = 54
 
     def base():
@@ -629,10 +631,10 @@ def battle13(out):
         for i, (ind, r) in enumerate(rows): _pt(s, 9 + ind, (13 + i) * 8, r, ARROW)
         return s
 
-    cases = [[('actor', 'Bob'), ('target', 'Goblin'), ('act', 'Fire'), ('res', '23 damage')],
-             [('actor', 'Minotaur Zombie'), ('target', 'Bob'), ('act', '2 hits!'), ('res', '9 damage')],
-             [('actor', 'Death Machine'), ('target', 'WWWW'), ('act', 'Nuclear Attack'), ('res', '187 damage')],
-             [('actor', 'Mm'), ('target', 'Mm'), ('act', 'Diamond Gauntlets'), ('res', 'Became resistant to all magic')]]
+    cases = [[('actor', 'SPUD'), ('target', 'Goblin'), ('act', 'Fire'), ('res', '23 damage')],
+             [('actor', 'Minotaur Zombie'), ('target', 'SPUD'), ('act', '2 hits!'), ('res', '9 damage')],
+             [('actor', 'Death Machine'), ('target', 'LEO'), ('act', 'Nuclear Attack'), ('res', '187 damage')],
+             [('actor', 'JOJO'), ('target', 'JOJO'), ('act', 'Diamond Gauntlets'), ('res', 'Became resistant to all magic')]]
     for name, fn in (('mock13_msgs_narrow', narrow), ('mock13_msgs_wide', wide)):
         ims = [fn(c).im for c in cases]
         out_im = Image.new('RGB', (168 * len(ims) - 8, 144), (255, 255, 255))
@@ -656,8 +658,8 @@ def _pt(s, X, Y, txt, table=None):
 def main_menu(out):
     s = Screen(bg=3)
     s.window(0, 0, 20, 10)                              # party list, one line per member
-    for i, (n, c, hp, mhp) in enumerate([('AAAA', 'Warrior', 35, 35), ('BBBB', 'Thief', 30, 30),
-                                         ('CCCC', 'Monk', 33, 33), ('DDDD', 'Red Magician', 30, 30)]):
+    for i, (n, c, hp, mhp) in enumerate([('DUNE', 'Warrior', 35, 35), ('SPUD', 'Thief', 30, 30),
+                                         ('JOJO', 'Monk', 33, 33), ('LEO', 'Red Magician', 30, 30)]):
         s.text(1, 1 + 2 * i, n)
         s.text(6, 1 + 2 * i, 'L 1')
         s.text(11, 1 + 2 * i, '%3d/%3d' % (hp, mhp))

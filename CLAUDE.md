@@ -213,6 +213,9 @@ Milestones per game (from `docs/gb-port.md`):
   decision** before any font change.
 
 ## In progress / next
+- Mock-up party (owner): DUNE Warrior, SPUD Monk, JOJO Red Magician, LEO Black Magician
+  (`tools/gb/mockup.py`). `tools/gb/battleseq.py`: GB-view sheet of a whole battle on the
+  NES (optional forced formation, fight/run input).
 - **Dual-mode decided (2026-11-18):** after the battle layout, the colour milestone does
   the CGB mode first, then SGB (see Targets).
 - (Done, see above) smaller (condensed proportional) font in the battle message
