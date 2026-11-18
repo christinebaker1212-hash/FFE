@@ -539,7 +539,9 @@ Milestones per game (from `docs/gb-port.md`):
   row would cut the frame on line 1; this also fixes the NES-English bug where the price
   overwrote the line). Party names one per row (string in the menu bank, `SHOP['names']`).
   Checked on the NES: weapons (buy, sell), armour, white / black magic, church, inn, items,
-  caravan. Shop facts: EnterShop b14 $A343 ($50 = enter flag, $51 = shop index = type*10 +
+  caravan. GB: covall.SHOPS scripts (buy, sell, magic, inn, items, church) identical to
+  the NES on DMG and CGB, with all other checks (random 30000, battle, dialogue, menu and
+  sub-screens); coverage 19.96k instructions. Shop facts: EnterShop b14 $A343 ($50 = enter flag, $51 = shop index = type*10 +
   town; open one with `--poke 0050=01,0051=01`), windows $AC53, attributes $AC6F, menu
   cursor $A98A, list cursor $A992. Pokes below $0800 work (battleseq.poke_state).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
