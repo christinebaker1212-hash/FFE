@@ -347,7 +347,7 @@ Milestones per game (from `docs/gb-port.md`):
   under the first message on DMG). New-game script in CGB (`compare.py`, GB_CGB=1): name
   entry, class select and the Coneria field in NES colours, RAM diff 0 at all shots; DMG
   battle check still identical (black windows now). Next in colour: check all screens in CGB, double
-  speed, HDMA; then the DMG per-tile shading and SGB.
+  speed, HDMA; SGB (the DMG per-tile shading is done, see below).
 - Fixed (owner: "player sprites totally messed up", 2026-11-18): the native CHR upload
   (`rt/ff1_hle.s`) copied a sprite tile to its slot from one byte too late (planes
   swapped, rows shifted) and treated BG tiles as sprite tiles (`cp $B0 / call c`), which
@@ -384,8 +384,39 @@ Milestones per game (from `docs/gb-port.md`):
   (`battleseq.py --input fire1 --poke` weapons + spells) and on the GB build in CGB mode
   (`firstdiff.py --input fire1 --poke ... --shots`): identical RAM over 7700 frames.
   `battleseq.pad_for(mode, f)` is shared by both tools.
-- Battle layout done. Next (owner chose: plain Game Boy shading): plain-Game-Boy shading per tile, SGB
-  palettes/border, CGB speed-ups (double speed, HDMA), or the next screen (main menu).
+- Battle layout done.
+- **Plain Game Boy (DMG/SGB) shading done (2026-11-18, owner chose it next)**
+  (`tools/gb/rt/dmg_shade.s`): every NES BG tile is kept in a shadow (cart RAM bank 1
+  $B000) and re-coded for the palette it is drawn with. A colour's 2-bit value depends only
+  on its brightness level (2C02 row, `LUM_TAB`), the same in every palette: 0 = the
+  backdrop's level, the other levels in the four BG palettes grouped into 1/2/3 (darkest
+  first; more than three levels split at the two largest gaps). So shared tiles (the font
+  in the red name box and the blue letter grid) code alike. BGP over a black backdrop:
+  dark grey / light grey / white; fades darken it (one shade per two levels below
+  `REF_LMAX`). Maps are recomputed when the palettes have been stable 8 frames (same-colour
+  rewrites ignored) or when the LCD goes on. With the LCD off nothing is shaded until it
+  goes on: then the maps, one scan of the map (`dmg_scan_all`: palette of each cell's tile,
+  tiles used), re-coding of the used tiles; unused marked tiles are parked (`DEFER_BM`)
+  until a cell uses them. Tiles are re-coded only if they use a colour index whose value
+  changed (`TILE_USE`). With the LCD on, 3 tiles per frame through the VRAM queue.
+  Limit: a tile drawn with two palettes whose colours differ in level at the same index
+  gets the last writer's coding (not seen yet on the checked screens).
+- **Both modes, fixed with it:** attributes of nametable 1 were ignored (the field scrolls
+  over both nametables; the CGB field showed grass where the NES has sea). Each GB map
+  cell now records which nametable drew it (`OWN`, `own_set`), and an attribute byte only
+  colours its own cells (only its changed quadrants); an owner change updates that cell.
+  CGB attribute writes go through the VRAM queue (address high + $40 = VRAM bank 1).
+  vblank order: OAM DMA, CGB palettes, scroll, then queued VRAM writes while LY is in
+  144-152 (`flush_vbl`; the fixed 40 per frame ran past vblank once bank-1 entries were
+  added, losing writes). Crash fixed: `rt_mmc_w5800` popped twice (battle start).
+- Checks: firstdiff --battle 7100 frames and --random 1 30000 frames identical on DMG and
+  CGB; shots `dmg_vs_cgb7.png` (class select, field, battle), name entry clean.
+  Speed of the new-game script (compare.py GB frames at the last shot): DMG 4512, CGB 4426,
+  before the shading 4178/4202 (the extra is the LCD-on scan and per-write bookkeeping).
+  Debug aids: `firstdiff.py` env `STUCK_SAVE=K` saves the PyBoy state at frame wait K;
+  ROM `rst $38` trap (`rst38_trap`, DBG+8 = SP, DBG+10 = stack).
+- Next (owner to choose): SGB palettes + border (mGBA), CGB speed-ups (double speed,
+  HDMA), or the next screen (main menu).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).

@@ -80,6 +80,16 @@ approved layout = `mock12_battle.png` + full-width messages `mock13_msgs_wide.pn
    (fiends, Chaos); messages that need three rows.
 4. Then the colour milestone (CGB mode first), then the other screens.
 
+## Plain Game Boy shading (done 2026-11-18)
+`tools/gb/rt/dmg_shade.s` (DMG/SGB only; CGB uses NES colours). BG tiles live in a shadow
+(cart RAM bank 1 $B000) and are re-coded per palette: value = brightness group of the
+colour, the same in all BG palettes (`dmg_maps`), BGP from the groups (`dmg_bgp`, darkened
+during fades). Work happens when the LCD goes on (scan, re-code used tiles) or, with it on,
+3 tiles per frame. RAM: TILE_PAL $DB00, DIRTY_BM $DC00, PAL_MAP $DC20, RT_BUF $DC30,
+REF_LMAX/NGRP $DC40, LVF/LSL/LVMAP/GLUM $DC50-$DC7F, REF_BM $DC80, DEFER_BM $DCA0,
+OWN $DD00 (both modes), TILE_USE $DD80. Both modes track which nametable drew each GB map
+cell (`own_set`) so nametable-1 attributes colour only their cells.
+
 ## After the battle
 Main menu (party list, commands, Gil/orbs), dialogue (wrap 18 columns: `W` in insert.py,
 window via the map-row box builder `$D54B`, text origin `$D520-$D536`), item/magic/equip/
