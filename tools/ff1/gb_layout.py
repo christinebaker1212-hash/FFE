@@ -1915,6 +1915,8 @@ def apply(rom, report):
     main_menu(rom)
     item_menu(rom)
     magic_menu(rom)
+    equip_menu(rom)
+    status_menu(rom)
     report.append('GB layout applied')
 
 
@@ -1925,6 +1927,7 @@ def apply(rom, report):
 # row 16; orbs window (12, 10, 8, 8) with the orbs 2 x 2 centred (columns 14-17, rows
 # 12-15: whole attribute quadrants, two attribute bytes). No class sprites; the cursor
 # points at the member lines / commands. Mock-up: tools/gb/mockup.py main_menu.
+CAM = {}            # camera stubs in bank 14 (main_menu)
 MENU_GB = {}        # menu string overrides for insert.py --gb (id -> text), set by menu_strings()
 
 
@@ -1932,6 +1935,24 @@ def menu_strings(enc_txt):
     """Command list one per row (upper row only, one-row newlines); Gil on the window's
     fifth text row (below the orbs). Magic list: one page of three levels (magic_tpl)."""
     MENU_GB[42] = magic_tpl()
+    MENU_GB[53] = '{09} Equip  Swap  Drop'  # GB equip screen: Equip / Swap / Drop at GB columns 2 / 9 / 15
+    # the equip screen's title and names in lower-row mode (one row: titlexy / memwins put
+    # them on the window's first text row)
+    MENU_GB[52] = '{09}Weapons'
+    MENU_GB[62] = '{09}Armor'
+    MENU_GB[3] = '{09}Items'                # title windows 7 (titlexy / mtitle)
+    # status screen (status_menu): the top window's text in string 38, stats 39, battle 40
+    # (upper-row mode: from the window's first text row; values right-aligned by column)
+    MENU_GB[35] = MENU_GB[36] = MENU_GB[37] = ''
+    MENU_GB[38] = ('{05}{10}{00}{0D}{07}Level{0D}{0D}{10}{03}{08}{10}{01}{08}Experience EP{08}'
+                   '{0D}{0D}{10}{04}{08}Until next level{08}{0D}{0E}{10}{42}')
+    MENU_GB[39] = '{05}' + '{08}'.join('{0D}{01}%s{0D}{11}{10}{%02X}' % (w, 7 + i) for i, w in
+                                     enumerate(('Strength', 'Agility', 'Intelligence', 'Vitality', 'Luck')))
+    MENU_GB[40] = '{05}' + '{08}'.join('{0D}{01}%s{0D}{10}{10}{%02X}' % (w, 0x3C + i) for i, w in
+                                     enumerate(('Weapon', 'Hit Rate', 'Armor', 'Evasion')))
+    MENU_GB[41] = '{09} {10}'
+    for i in range(4):
+        MENU_GB[54 + 2 * i] = '{09} {%02X}' % (0x10 + i)
     MENU_GB[2] = ('{05}' + '{08}'.join('  ' + w for w in ('Items', 'Magic', 'Weapons', 'Armor', 'Status'))
                   + '{08}{04}Gil')      # Gil below the commands (amount 6 wide + 'Gil': 9 of 10 columns)
 
@@ -2064,6 +2085,7 @@ camexit:
     r = asm(src, org=0xB82C)
     assert r.org + len(r.bytes) <= 0xB84D, hex(r.org + len(r.bytes))
     put_bank(rom, B, 0xB82C, r.bytes, bytes(rom[bank_off(B, 0xB82C):bank_off(B, 0xB82C) + 2]))
+    CAM['menu'] = r.labels['cammenu']
     put_bank(rom, B, 0x9C02, bytes([0x20]) + r.labels['camfield'].to_bytes(2, 'little'), bytes([0xAD, 0x02, 0x20]))
     put_bank(rom, B, 0xB84D, bytes([0x20]) + r.labels['cammenu'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
     put_bank(rom, B, 0xAE15, bytes([0x20]) + r.labels['camexit'].to_bytes(2, 'little') + bytes([0xEA, 0xEA]),
@@ -2404,3 +2426,257 @@ def magic_menu(rom):
     put_bank(rom, B, 0xB829, bytes([0x4C]) + ex['gbmagcur'].to_bytes(2, 'little'), bytes([0x4C]))
     put_bank(rom, B, 0xB957, bytes([0x20]) + ex['gbm957'].to_bytes(2, 'little') + bytes([0x20, 0xC3, 0x5E]),
              bytes([0x20, 0xC3, 0x5E, 0xEA, 0xEA, 0xEA]))
+
+
+# Weapons / Armor screens (camera X = 1, Y = 0: GB column = NES column - 1; the hands at
+# NES x 0 show cut off at the left screen edge). Top window 0 = NES (1,0,20,4): title
+# (row 1) and "Equip  Swap  Drop" (row 2; the chosen command's attribute highlight, barhl,
+# moved there). Two members per page: windows (1,4,20,7) / (1,11,20,7), name on the first
+# row, the four slots below ("E" mark + up to 17 letters from GB column 1). The slot
+# cursor on a member of the other page turns the page (members, names, slots redrawn).
+# Swap shows both hands without blinking (the held slot's hand 4 px right).
+EPAGE, EROW = 0x034E, 0x034F
+EQ_ROWS = [6, 7, 8, 9, 13, 14, 15, 16]     # slot rows of the page's 8 slots
+EQ_FIX = """
+    org $ED84
+eloop:              ; A = slot: draws slots A..15 that are on page EPAGE
+    pha
+    lsr a
+    lsr a
+    lsr a
+    cmp EPAGE
+    bne enext
+    pla
+    pha
+    and #7
+    tax
+    lda erows,x
+    sta $3B
+    lda #2
+    sta $3A
+    lda #<eclr      ; clear the row first
+    sta $3E
+    lda #>eclr
+    sta $3F
+    jsr $DEB6
+    pla
+    pha
+    tax
+    lda #$09
+    sta SLOT
+    lda #$FF
+    sta SLOT+1
+    lda #0
+    sta SLOT+2
+    lda $0300,x
+    sta $12
+    and #$7F
+    beq edraw
+    clc
+    adc $67
+    sta SLOT+3
+    lda #2
+    sta SLOT+2
+    lda #0
+    sta SLOT+4
+    lda $12
+    bpl edraw
+    lda #$C7        ; E : equipped
+    sta SLOT+1
+edraw:
+    lda #<SLOT
+    sta $3E
+    lda #>SLOT
+    sta $3F
+    jsr $DEB6
+enext:
+    pla
+    clc
+    adc #1
+    cmp #$10
+    bcc eloop
+    lda #$0E
+    sta $57
+    sta $58
+    jmp $FE03
+erows:
+    .db %s
+eclr:               ; 18 blanks, lower row only
+    .db 9, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, 0
+""" % ', '.join(map(str, EQ_ROWS))
+EQ_WIN = """
+    org $BE25
+    jsr memwins
+    jmp $BE61
+memwins:            ; the page's two members: windows 1 / 2 ((1, 4 / 11, 20, 7)), the name on
+    ldx #0          ;   the first text row (the window drawer leaves $3B = y + 2)
+mw1:
+    stx EROW
+    inx
+    txa
+    jsr $BE71
+    lda EPAGE
+    asl a
+    ora EROW
+    asl a
+    adc #$36        ; string 54 + 2 * member
+    dec $3B
+    jsr $B94B
+    ldx EROW
+    inx
+    cpx #2
+    bcc mw1
+    rts
+slotpos:            ; A = slot -> $41 = 8 * row - 1
+    and #7
+    tax
+    lda erows,x
+    asl a
+    asl a
+    asl a
+    sbc #0
+    sta $41
+    rts
+titlexy:            ; $BE18: the title on the top window's first text row
+    dec $3B
+    jmp $B94B
+"""
+EQ_CUR_A = """
+heldhand:           ; A = held slot: its hand 4 px right, if on this page
+    tay
+    lsr a
+    lsr a
+    lsr a
+    cmp EPAGE
+    bne hh1
+    tya
+    jsr slotpos
+    lda #4
+    sta $40
+    jmp $ED24
+hh1:
+    rts
+"""
+EQ_CUR_B = """
+    org $BEB7
+    lda $63         ; swap (second choice): the held slot's hand, then the cursor
+    jsr heldhand
+    jmp $BEC8
+cmdxy:              ; $BE1B: the command string at (2, 2) inside the top window
+    lda #2
+    sta $3A
+    sta $3B
+    rts
+"""
+EQ_CUR_C = """
+slotcur:            ; $BEC8: hand at the slot cursor $62 (turns the page first)
+    lda $62
+    lsr a
+    lsr a
+    lsr a
+    cmp EPAGE
+    beq sc1
+    sta EPAGE
+    jsr memwins
+    jsr $ED69
+sc1:
+    lda $62
+    jsr slotpos
+    lda #0
+    sta $40
+    jmp $ED24
+camequip:           ; $BE06: camera X = 1, Y = 0, page 1
+    jsr $9C02
+    lda #1
+    sta $5800
+    lda #0
+    sta $5801
+    sta EPAGE
+    rts
+"""
+
+
+def equip_menu(rom):
+    B = 14
+    main = sys.modules['__main__']
+    syms = {'EPAGE': EPAGE, 'EROW': EROW, 'SLOT': main.EX['SLOT']}
+    f = asm(EQ_FIX, syms=syms)
+    assert f.org + len(f.bytes) <= 0xEE21, hex(f.org + len(f.bytes))
+    put(rom, 0xED84, f.bytes, bytes([0x48, 0xAA, 0x0A]))
+    syms.update(erows=f.labels['erows'])
+    w = asm(EQ_WIN, syms=syms)
+    assert w.org + len(w.bytes) <= 0xBE61, hex(w.org + len(w.bytes))
+    put_bank(rom, B, 0xBE25, w.bytes, bytes([0xA9, 0x03, 0x20, 0x71, 0xBE]))
+    syms.update(memwins=w.labels['memwins'], slotpos=w.labels['slotpos'])
+    ca = asm(EQ_CUR_A, syms=syms, org=0xBE9B)         # window table entries 3-9 (not used)
+    assert ca.org + len(ca.bytes) <= 0xBEB7, hex(ca.org + len(ca.bytes))
+    syms.update(ca.labels)
+    cb = asm(EQ_CUR_B, syms=syms)
+    assert cb.org + len(cb.bytes) <= 0xBEC8, hex(cb.org + len(cb.bytes))
+    cc = asm(EQ_CUR_C, syms=syms, org=0xBEC8)         # + the old slot cursor table
+    assert cc.org + len(cc.bytes) <= 0xBEF9, hex(cc.org + len(cc.bytes))
+    old = bytes(rom[bank_off(B, 0xBE93):bank_off(B, 0xBEF9)])
+    assert old[0x24:0x26] == bytes([0xA5, 0xF0]), old[0x24:0x26].hex()     # $BEB7: LDA $F0
+    new = bytearray(old)
+    new[0:8] = bytes([1, 4, 20, 7, 1, 11, 20, 7])     # windows 1 / 2: the page's members
+    new[8:8 + len(ca.bytes)] = ca.bytes
+    new[0x24:0x24 + len(cb.bytes)] = cb.bytes
+    new[0x35:0x35 + len(cc.bytes)] = cc.bytes
+    put_bank(rom, B, 0xBE93, bytes(new), old)
+    # window 0: the top window (1,0,20,4); the command string's position instead of window 1
+    put_bank(rom, B, 0xBE8F, bytes([1, 0, 20, 4]), bytes([0, 1, 9, 4]))
+    put_bank(rom, B, 0xBE1B, bytes([0x20]) + cb.labels['cmdxy'].to_bytes(2, 'little') + bytes([0xEA, 0xEA]),
+             bytes([0xA9, 0x01, 0x20, 0x71, 0xBE]))
+    put_bank(rom, B, 0xBE18, bytes([0x20]) + w.labels['titlexy'].to_bytes(2, 'little'), bytes([0x20, 0x4B, 0xB9]))
+    # title window 7 (Items, magic: member name): on its text row, not on the bottom frame
+    put_bank(rom, B, 0xB937, bytes([0x4C]) + w.labels['titlexy'].to_bytes(2, 'little'), bytes([0x4C, 0x4B, 0xB9]))
+    m = asm('''
+mtitle:             ; $AEC1: the magic screen's title (member name) one row up
+    dec $3B
+    jmp $B96C
+''', org=0xBA73)
+    assert m.org + len(m.bytes) <= 0xBA80
+    put_bank(rom, B, 0xBA73, m.bytes, bytes(rom[bank_off(B, 0xBA73):bank_off(B, 0xBA73) + len(m.bytes)]))
+    put_bank(rom, B, 0xAEC1, bytes([0x20]) + m.labels['mtitle'].to_bytes(2, 'little'), bytes([0x20, 0x6C, 0xB9]))
+    put_bank(rom, B, 0xBE06, bytes([0x20]) + cc.labels['camequip'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
+    # command hands (GB x 0 / 56 / 104 -> NES x 8 / 64 / 112) on row 2
+    put_bank(rom, B, 0xBF07, bytes([8, 64, 112]), bytes([80, 144, 192]))
+    put_bank(rom, B, 0xBF00, bytes([0xA9, 15]), bytes([0xA9, 0x14]))
+    # top window attributes: all palette 3 ($BE61 wrote the old title box's $7F $DF)
+    put_bank(rom, B, 0xBE66, bytes([0xA9, 0xFF, 0x8D, 0x07, 0x20, 0xA9, 0xFF]), bytes([0xA9, 0x7F, 0x8D, 0x07, 0x20, 0xA9, 0xDF]))
+
+
+# barhl (ExRAM, bank 14 $BF0A) for the GB top window: attribute bytes $23C0-$23C4,
+# command row 2 = bottom quadrants (Equip NES cols 3-7, Swap 10-13, Drop 16-19)
+BARHL_PATCH = [("""    lda #$C3
+    jsr $BF41
+    ldy #5""", """    lda #$C0
+    jsr $BF41
+    ldy #5"""), ("""    .db $AF, $EF, $FF, $FF, $FF     ; cols 12-17
+    .db $FF, $FF, $AF, $FF, $FF     ; cols 20-23
+    .db $FF, $FF, $FF, $BF, $EF     ; cols 26-29""", """    .db $BF, $AF, $FF, $FF, $FF     ; GB: cols 3-7
+    .db $FF, $FF, $BF, $EF, $FF     ; cols 10-13
+    .db $FF, $FF, $FF, $FF, $AF     ; cols 16-19""")]
+
+
+# Status screen (camera 0, 0; table bank 14 $B53A, windows drawn with strings 35-40):
+# windows 0-3 = the top window (0,0,20,8) (strings 35-37 empty, 38: name + Level, class,
+# Experience EP / value, Until next level / value), windows 4 = (0,7,20,11) with the
+# stats (39, rows 8-12) and the battle values (40, rows 13-16: window 5 is not drawn, the
+# string's row is set by statrow). Class sprite at the right of rows 1-3.
+def status_menu(rom):
+    B = 14
+    top, bot = [0, 0, 20, 8], [0, 7, 20, 11]
+    put_bank(rom, B, 0xB53A, bytes(top * 4 + bot * 2), bytes(rom[bank_off(B, 0xB53A):bank_off(B, 0xB53A) + 24]))
+    r = asm("""
+statrow:            ; $B4FE (instead of window 5): string 40 from row 13
+    lda #14
+    sta $3B
+    rts
+""", org=0xBA78)
+    assert r.org + len(r.bytes) <= 0xBA80
+    put_bank(rom, B, r.org, r.bytes, bytes(rom[bank_off(B, r.org):bank_off(B, r.org) + len(r.bytes)]))
+    put_bank(rom, B, 0xB4FE, bytes([0x20]) + r.labels['statrow'].to_bytes(2, 'little') + bytes([0xEA, 0xEA]),
+             bytes([0xA2, 0x14, 0x20, 0x23, 0xB5]))
+    put_bank(rom, B, 0xB4C9, bytes([0x20]) + CAM['menu'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
+    put_bank(rom, B, 0xB50B, bytes([0xA9, 128, 0x85, 0x40, 0xA9, 7]), bytes([0xA9, 0x58, 0x85, 0x40, 0xA9, 0x20]))

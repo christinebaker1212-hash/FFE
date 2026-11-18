@@ -975,6 +975,8 @@ def menu_engine(rom, report):
            '\nFARHI:\n    .db ' + ', '.join('>(%d-1)' % far.labels[r] for r in FAR_ROUTINES) + '\n'
     exsrc = EXRAM_SRC.replace('BCMDS', bc)
     if '--gb' in sys.argv:                     # GB layout: menu code in ExRAM
+        for o, n in gb_layout.BARHL_PATCH:
+            assert o in exsrc; exsrc = exsrc.replace(o, n)
         exsrc += gb_layout.exram_source(FAR_ROUTINES)
     ex = asm(exsrc + tabs, syms=dict(EX, FAR8=FAR8))
     FAR_LABELS.update(far.labels)

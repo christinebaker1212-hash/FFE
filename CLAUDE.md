@@ -500,9 +500,22 @@ Milestones per game (from `docs/gb-port.md`):
   field scripts dialogue / menu / items / magic, with pokes) in parallel; build.py warns
   when `rom.sha1` does not match the NES ROM. Tools: fieldseq.py / firstdiff.py / covfield.py
   `--poke ADDR=VAL,..` (at frame 3700 on the field).
-- Next: Weapons/Armor (plan: camera X = 1 so the hand is cut off at the left edge; top
-  window title + "Equip Swap Drop"; two members per page, name + four slots "E" + 17-letter
-  names), Status, then shops.
+- **Weapons / Armor screens (2026-11-18)** (`gb_layout.equip_menu`): camera X = 1 (hands at
+  NES x 0 cut off at the left edge). Top window (NES 1,0,20,4): title row 1 (titlexy),
+  "Equip  Swap  Drop" row 2 (cmdxy; the chosen command red via barhl, moved to $23C0-$23C4:
+  its frame segment below turns red too, reads as an underline). Two members per page:
+  windows 1/2 = (1,4,20,7)/(1,11,20,7), name on the first text row, four slots below
+  ("E" mark + names up to 17 letters; slot drawer $ED84 rewritten, page-filtered). The
+  slot cursor on the other page turns the page (slotcur $BEC8). Swap shows both hands at
+  once (no blinking). FF1's window drawer leaves $3A = x + 1, $3B = y + 2; lower-row mode
+  ({09}) writes at row $3B, default and upper ({05}) modes at $3B / $3B - 1.
+- **Status screen (2026-11-18)** (`gb_layout.status_menu`, camera 0/0): top window (0,0,20,8):
+  name + Level, class, Experience EP / value, Until next level / value (string 38), class
+  sprite right of rows 1-3; window (0,7,20,11): 5 stats (39) and 4 battle values (40), one
+  per row, values ending at column 18. Items / magic titles (window 7) fixed: they were
+  drawn on the bottom frame (now lower-row mode one row up).
+- Next: GB checks of the sub-screens (firstdiff with covall.SCREENS scripts, DMG + CGB),
+  then shops.
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).

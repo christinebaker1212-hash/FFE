@@ -14,6 +14,15 @@ FIELD = [   # (name, script, frames, pokes)
               + ',D5,_10' * 14 + ',_80' + ',D5,_10' * 11 + ',_80,B5,_60,B5,_60', 4700, ITEMS),
     ('magic', '_30,S5,_80,D5,_40,A5,_100,A5,_150,R5,_30,D5,_30,D5,_30,D5,_150,D5,_30,D5,_30,D5,_150,D5,_150,U5,_150,L5,_60,B5,_60,B5,_60', 4700, 'MAGIC'),
 ]
+WEAPONS = '_30,S5,_80,D5,_40,D5,_40,A5,_150'
+SCREENS = {     # menu sub-screen scripts (with magic_pokes), also used by the GB checks
+    'equip': WEAPONS + ',A5,_40' + ',D5,_20' * 8 + ',_120,A5,_100,B5,_60,B5,_150',
+    'swap': WEAPONS + ',R5,_40,A5,_60,A5,_40,D5,_40,A5,_120,B5,_60,B5,_150',
+    'drop': WEAPONS + ',R5,_40,R5,_40,A5,_60,D5,_40,A5,_60,A5,_120,B5,_60,B5,_150',
+    'armor': '_30,S5,_80,D5,_40,D5,_40,D5,_40,A5,_150,A5,_40' + ',D5,_20' * 8 + ',_120,A5,_100,B5,_60,B5,_150',
+    'status': '_30,S5,_80,D5,_40,D5,_40,D5,_40,D5,_40,A5,_100,A5,_150,B5,_100,B5,_100',
+}
+FIELD += [(k, v, 4700, 'MAGIC') for k, v in SCREENS.items()]
 
 
 def magic_pokes():

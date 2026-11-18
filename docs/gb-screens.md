@@ -43,7 +43,7 @@ shrinking the NES layout: no two-character-panel splits, no panning. Common elem
 | Field | 16×15 metatiles | centred camera (10×9 metatiles) | done |
 | Dialogue | 25 cols × 9 lines | 18 cols × 7 lines per page, same text, more pages | todo |
 | Main menu | orb, Gil, commands, 4 character boxes | command window + Gil/orbs, party list window (one line per member); details on the Status screen | todo |
-| Item / Magic / Equip / Status | full-width lists | one column, names in full (two-row form) | todo |
+| Item / Magic / Equip / Status | full-width lists | one column, pages (items 13, magic 3 levels, equip 2 members), status in two windows | done (NES side) |
 | Shops, inn, clinic, church | speech + list + Gil windows | stacked vertically, list one column | todo |
 | Battle | enemies 3×3 grid left, party right, command + message boxes bottom | SaGa-style: enemy graphics on top (up to 5 small per row), party list window at the bottom, commands/messages over it | todo |
 | Battle magic/item lists | full-width | one column | todo |
