@@ -36,6 +36,14 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   (`tools/gb/`) → GB ROM in `build/` (git-ignored).
 
 ## Approach
+- **Owner's decision (2026-11-18): 0% slowdown on Color and DMG is non-negotiable.** Method
+  (owner: "make this work in a way that lets us complete the work and keep 0% slowdowns"):
+  keep recompiling the user's ROM (game bytes still come only from the ROM at build time);
+  use the community disassemblies as references for annotation data in the builder (routine
+  boundaries, code/data, what routines do) and write native GB versions of hot routines,
+  above all the graphics paths. FF1: github.com/Entroper/FF1Disassembly (US release: match
+  to the Japanese ROM); FF2 / FF3: github.com/everything8215/ff2, /ff3. Never copy game code
+  into the repo. Measure with tools/gb/lagcheck.py (Gambatte, hardware-like timing).
 - **Static recompilation** of each game's own 6502 code to SM83, not a hand-written
   re-implementation. Game logic, formulas, RNG and events stay exactly as on the
   Famicom, and the English patch carries over without changes.
