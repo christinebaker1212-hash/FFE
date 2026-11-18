@@ -20,6 +20,7 @@ SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB fo
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
 LCDC_ON    = %11000011      ; LCD on, window map $9C00 (off), BG tiles $8800 (signed), BG map $9800, OBJ on, BG on
+BATTLE_BGP = $27            ; DMG battle: colour 0 black, 1 light grey, 2 dark grey, 3 white
 CAM_X      = 48
 CAM_Y      = 48
 Q_MAX      = 40             ; queue entries flushed per vblank
@@ -70,6 +71,7 @@ split_scy:  ds 1
 cam_x:      ds 1                            ; GB view origin in the NES picture (pixels),
 cam_y:      ds 1                            ; set by NES writes to $5800/$5801 (tiles)
 frames:     ds 1
+bgp_fix:    ds 1                            ; DMG BG palette set by the GB layout (0 = from the NES palette 0)
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -307,7 +309,12 @@ make_palettes:
             ldh [pal_dirty], a
             ld hl, PAL_SH
             call pal4
-            ldh [bgp_v], a
+            ld c, a
+            ldh a, [bgp_fix]
+            and a
+            jr nz, .fix
+            ld a, c
+.fix:       ldh [bgp_v], a
             ld hl, PAL_SH + $10
             call pal4
             ldh [obp0_v], a
@@ -933,12 +940,21 @@ rt_mmc_w5115:
             ldh [data_bank8], a
             pop af
             ret
-rt_mmc_w5800:                               ; camera X in tiles (GB layout code)
+rt_mmc_w5800:                               ; camera X in tiles (GB layout code); bit 7:
+            push af                         ;   the fixed battle BG palette on DMG
             push af
+            and $1F
             add a, a
             add a, a
             add a, a
             ldh [cam_x], a
+            pop af
+            and $80
+            jr z, .auto
+            ld a, BATTLE_BGP
+.auto:      ldh [bgp_fix], a
+            ld a, 1
+            ldh [pal_dirty], a
             pop af
             ret
 rt_mmc_w5801:                               ; camera Y in tiles

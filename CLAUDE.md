@@ -323,8 +323,12 @@ Milestones per game (from `docs/gb-port.md`):
   (18.7k instructions, 5 code banks); `firstdiff.py build/ff1_gb.nes build/ff1_gb.gb 7100
   --battle`: **no RAM difference in 7100 frames** (new game, walk, battle with messages,
   commands, party window); `--random 1`: no difference in 30000 frames. On DMG all BG uses one palette (BGP from NES
-  palette 0), so window interiors are grey: colour
-  milestone (CGB/SGB attributes). Details of the earlier plan: `build.py --gb` (builds
+  palette 0), so window interiors were grey (owner: "the palettes look terrible").
+  Interim: bit 7 of the $5800 camera write selects a fixed DMG battle BGP ($27: colour 0
+  black, 1 light grey, 2 dark grey, 3 white; runtime `bgp_fix`). Windows read well, but
+  enemies whose colour 3 is dark (red, purple) come out white. Proper fixes: CGB mode
+  (NES colours) and, for DMG, shading each BG tile by the brightness of the NES palette it
+  is drawn with (runtime CHR shadow + per-tile palette) - to be planned with the owner. Details of the earlier plan: `build.py --gb` (builds
   `build/ff1_gb.nes` with `insert.py --gb`, coverage `build/cov3` from `covrun.py` on that
   ROM, output `build/ff1_gb.gb`), then `firstdiff.py`, PyBoy and mGBA checks. Coverage
   must be regenerated after every change to the NES code (far-code addresses move).

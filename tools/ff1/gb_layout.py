@@ -6,7 +6,8 @@ decisions in CLAUDE.md (SaGa 3 / GB RPG style).
 
 Camera: the NES code selects the GB view per screen by writing tile coordinates to
 $5800 (X) / $5801 (Y) (unmapped on the MMC5; the GB runtime moves its view). Default
-(field, until a screen sets its own): X = 6, Y = 6.
+(field, until a screen sets its own): X = 6, Y = 6. Bit 7 of the $5800 value selects the
+runtime's fixed battle palette on DMG (one BG palette for the whole screen there).
 
 Battle (mock-up 12/13, approved): camera (1, 6), so GB = NES - (1, 6):
   enemy area     GB cols 1-14, rows 0-11 (NES enemy box interior, unchanged)
@@ -45,7 +46,8 @@ def battle_frames(rom):
     camera (X = 1: NES cols 1-20) and a wrapper for the two battle calls from the field
     (overworld $C1D6, dungeons $C935) that sets the field camera (X = 6) again after the
     battle, keeping A and the flags (the dungeon caller branches on carry)."""
-    put(rom, 0xF2DC, bytes([0xA9, 0x01, 0x8D, 0x00, 0x58,      # LDA #1 / STA $5800
+    put(rom, 0xF2DC, bytes([0xA9, 0x81, 0x8D, 0x00, 0x58,      # LDA #$81 / STA $5800 (bit 7:
+                                                                #   the runtime's battle DMG palette)
                             0x4C, 0x0C, 0xF3]),                 # JMP $F30C
         expect=bytes([0xA9, 0x01, 0x8D, 0x38, 0x00]))
     wrap = 0xF2E4
