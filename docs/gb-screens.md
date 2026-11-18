@@ -24,10 +24,12 @@ shrinking the NES layout: no two-character-panel splits, no panning. Common elem
 - **Party list window**: one line per member (name, HP current/max, status), full width.
   Used in the main menu, shops, inn, item/magic targets and battle.
 - **Full-width windows** stacked vertically; command windows open over the party list.
-- **Battle**: enemy graphics in the upper part of the screen, a party list window at the
-  bottom, the command window and battle messages opening over it. Party battle sprites
-  are not shown permanently (as in the GB SaGa games); how to show who acts (and the
-  NES attack animations) is to be designed.
+- **Battle**: enemy graphics in the upper part of the screen with the **party sprites
+  visible** beside them (owner's decision), each member's name/HP next to their sprite or
+  in a party list; the command window and battle messages open over the lower part. The
+  acting member's line and the target flash.
+- Implementation: FF1's own drawing code is changed (NES side). A runtime compositor that
+  rearranges the finished NES picture was considered and rejected.
 - Exact layouts get drafted as mock-ups (rendered with the real font) before the NES
   code is changed.
 

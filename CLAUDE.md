@@ -49,6 +49,10 @@ FF1 comes first, then FF2, then FF3.
   panning across the NES layout. Party shown as compact one-line-per-member lists
   (name, HP, status), full-width windows, command windows opening over the party
   window, enemy graphics in the upper part of the battle screen.
+  - **Battle (owner's decisions):** the party member sprites stay visible in battle; the
+    acting member's line and the target flash. Re-layout is done properly in the NES code
+    (reverse-engineer FF1's battle/menu drawing and change it), not by a runtime screen
+    compositor that rearranges the NES picture.
 - **SGB testing uses mGBA** (owner's decision): `tools/gb/mgba/sgbrun.c`, built against
   `libmgba-dev` (`gcc -O2 tools/gb/mgba/sgbrun.c -lmgba -o build/sgbrun`), runs a ROM
   as SGB with borders, scripted presses, PPM screenshots. PyBoy stays for DMG logic
