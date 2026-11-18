@@ -219,7 +219,12 @@ Milestones per game (from `docs/gb-port.md`):
   beside the sprite, too narrow) and `mock7_party_window_wide.png` (cols 12-19: name /
   HP cur/max / status beside each sprite all fit; enemy area 12 columns, so mixed
   formations, 14 columns on the NES, need new enemy positions; bottom window under the
-  enemies only). Proposed: mock7, after checking formation widths and free BG tiles; needs a tile renderer in the NES code (CHR RAM) and
+  enemies only). Owner rejected mock6/mock7, chose "smaller copy of the NES layout on
+  one screen", then sent a sketch: enemies top-left, sprites in GB cols 14-15 as now, a
+  full-height framed window at cols 16-19 with name / status / HP current / max per
+  member, bottom windows in cols 0-15. Drawn as `mock8_owner_sketch.png`: text area is
+  only 22 px wide (Silence/Darkness/Paralysis overflow, HP split over two lines);
+  waiting for the owner's answer; needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
 - Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target
   cursor, flashing of the acting member's line and the target, magic/item lists in the

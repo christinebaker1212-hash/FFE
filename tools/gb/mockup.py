@@ -340,6 +340,45 @@ def battle7(out):
     out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock7_party_window_wide.png'))
 
 
+def battle8(out):
+    """Owner's sketch (2026-11-18): enemies top-left, party sprites in GB cols 14-15 (as
+    now), a full-height window at cols 16-19 with each member's name / status / HP
+    current / max, bottom windows (enemy names, commands) in cols 0-15. Text area of
+    the right window: x 133-154 (22 px), 33 px per member = 4 lines."""
+    party = [('AAAA', 192, 899, ''), ('Bob', 30, 30, 'Poison'), ('Mm', 0, 33, 'Sleep'),
+             ('WWWW', 125, 999, 'Paralysis')]
+    X0, X1 = 133, 154
+
+    def screen(page):
+        s = Screen(bg=3)
+        for r in range(3):
+            for c in range(3): s.block(1 + c * 4, r * 4, 4, 4)
+        for i in range(4): s.block(14, i * 3, 2, 3)
+        s.window(16, 0, 4, 18)
+        for i, (n, hp, mx, st) in enumerate(party):
+            y = 7 + i * 33
+            tb = NARROW if st and s.pwidth(st) > X1 - X0 + 1 else None
+            _pt(s, (X0 + X1 + 1 - s.pwidth(n)) // 2, y, n)
+            if st: _pt(s, (X0 + X1 + 1 - s.pwidth(st, tb)) // 2, y + 8, st, tb)
+            _pt(s, X1 + 1 - s.pwidth(str(hp), SMALLDIG), y + 16, str(hp), SMALLDIG)
+            _pt(s, X1 + 1 - s.pwidth('/%d' % mx, SMALLDIG), y + 23, '/%d' % mx, SMALLDIG)
+        s.window(0, 12, 16, 6)
+        if page == 'msg':
+            for i, r in enumerate(['Bob', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
+        elif page == 'long':
+            s.ptext(1, 13, 'Was hurled into a rift in'); s.ptext(1, 14, 'dimensions!')
+        else:
+            for i, w in enumerate(['Goblin', 'Minotaur', 'Zombie']): s.ptext(1, 13 + i, w)
+            s.window(8, 12, 8, 6)
+            for i, w in enumerate(['Fight   Run', 'Magic', 'Medicine', 'Items']): s.ptext(9, 13 + i, w)
+            s.cursor(8, 13)
+        return s
+    ims = [screen(p).im for p in ('cmd', 'msg', 'long')]
+    out_im = Image.new('RGB', (160 * 3 + 16, 144), (255, 255, 255))
+    for k, im in enumerate(ims): out_im.paste(im, (k * 168, 0))
+    out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock8_owner_sketch.png'))
+
+
 def _pt(s, X, Y, txt, table=None):
     """proportional text at pixel (X, Y)"""
     for k, ch in enumerate(txt):
@@ -376,5 +415,5 @@ def main_menu(out):
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else 'build'
     os.makedirs(out, exist_ok=True)
-    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); main_menu(out)
+    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); battle8(out); main_menu(out)
     print('written to', out)
