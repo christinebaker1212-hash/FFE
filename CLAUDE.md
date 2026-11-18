@@ -334,10 +334,13 @@ Milestones per game (from `docs/gb-port.md`):
   how it is built, and the next steps.
 - Column-2 lists push a name down below a wrapped one (VNROW; 7 formations have a name
   > 56 px, only formation 69 lists two names).
-- **Open design question (ask the owner):** the enemy-names window is never visible on
-  the GB: the command window opens over it at once (same position). Options: show the
-  names while choosing an enemy target (in place of the command window), or elsewhere.
-- Battle still to do: enemy-target flash (ask the owner), end-of-battle messages,
+- Owner (2026-11-18): show the enemy names while targeting, and blink the enemy too.
+  Done: entering the enemy-target loop (b12:$9B55 -> stub $AB07) saves the box count and
+  redraws only box 0 (names); leaving it ($9B9C -> stub $9D94) shows the target again
+  (far `eblink_off`) and redraws all saved boxes. The target ($6AAA in the table at $6AAC)
+  blinks: its 4x4 / 6x6 cells are read from the nametable once, then blank / restored
+  every 16 frames (far `eblink`, called by `blink`). RAM $0344-$0373.
+- Battle still to do: end-of-battle messages,
   Medicine list, all formations (fiends, Chaos).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the

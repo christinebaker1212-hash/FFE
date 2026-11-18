@@ -84,7 +84,7 @@ GLYPH_FIRST = 0x7A                       # glyph table covers codes $7A-$FF
 DIG3 = 0xD3                              # 3-px digits $D3-$DC, small '/' $DD, arrow $DE
 SLASH3, ARROW = 0xDD, 0xDE
 STATUS_WORDS = ['Stone', 'Poison', 'Blind', 'Numb', 'Sleep', 'Mute']   # status bits 1-6
-FAR_GB = ['party_line', 'party_stamp', 'blink']   # far routines added for the GB layout (after boxline etc.)
+FAR_GB = ['party_line', 'party_stamp', 'blink', 'eblink_off']   # far routines added for the GB layout (after boxline etc.)
 
 VWF_SRC = """
 VBUF = $6E00        ; line buffer: 18 tiles x 8 rows, 1 bit per pixel, tile-major
@@ -586,6 +586,7 @@ VBM = $0340         ; member whose line blinks ($FF none)
 VBS = $0341         ; 1 = the line is blank now
 VBC = $0342         ; frame counter
 blink:              ; each frame of a pad wait in battle (b12:$97C7), right after vblank
+    jsr eblink
     lda $691E+9     ;   starts: member $6B7A's line (NES row 19+m, cols 10-19), or the
     cmp #$F8        ;   targeted member's while the party-target cursor is up, is blank for
                     ;   16 frames, shown for 16, while the party window is visible
@@ -670,6 +671,164 @@ blink:              ; each frame of a pad wait in battle (b12:$97C7), right afte
     sta $2005
     sta $2005
     rts
+
+; ---- blinking of the targeted enemy ------------------------------------------------------
+VBOX = $0344        ; box count saved while the names show during enemy targeting
+EBI = $0345         ; enemy target index that blinks ($FF none)
+EBS = $0346         ; 1 = its cells are blank now
+EBX = $0347         ; its rectangle: column, row, size (4 or 6)
+EBY = $0348
+EBW = $0349
+EBR = $034A         ; row counter
+EBUF = $0350        ; its cells (up to 6 x 6)
+eblink:             ; called first by blink: while the enemy-target cursor is up (table at
+    lda $6AAC       ;   $6AAC from $9F95 / $9FA7 / $9FAF: first entry x 0, y $30), the target
+    bne .no         ;   ($6AAA) blinks: x = cursor x + 16, y = cursor y; 4 x 4 (9-small
+    lda $6AAD       ;   table), 6 x 6 (4-large table; mixed: entries 0-1)
+    cmp #$30
+    beq .yes
+.no:
+    jmp eoff
+.yes:
+    lda $6AAA
+    cmp EBI
+    beq .same
+    jsr eoff
+    lda $6AAA
+    sta EBI
+    asl a
+    tax
+    lda $6AAC,x
+    clc
+    adc #16
+    lsr a
+    lsr a
+    lsr a
+    sta EBX
+    lda $6AAD,x
+    lsr a
+    lsr a
+    lsr a
+    sta EBY
+    lda #4
+    sta EBW
+    lda $6AAF       ; 9-small table: entry 1 is (0, $50)
+    cmp #$50
+    beq .sz
+    lda #6
+    sta EBW
+    lda $6AB0       ; 4-large table: entry 2 x $40; mixed: $30 (large only for 0-1)
+    cmp #$40
+    beq .sz
+    lda $6AAA
+    cmp #2
+    bcc .sz
+    lda #4
+    sta EBW
+.sz:
+    jsr .read
+    lda #0
+    sta EBS
+.same:
+    lda VBC
+    and #$10
+    beq .w0
+    lda #1
+.w0:
+    cmp EBS
+    beq .r
+    sta EBS
+    jmp eput
+.r:
+    rts
+.read:              ; EBUF = the rectangle's cells (row by row, EBW x EBW)
+    ldy #0
+    lda #0
+    sta EBR
+.rr:
+    jsr eaddr
+    lda $2007       ; (buffered: first read is stale)
+    ldx EBW
+.rc:
+    lda $2007
+    sta EBUF,y
+    iny
+    dex
+    bne .rc
+    inc EBR
+    lda EBR
+    cmp EBW
+    bne .rr
+    jmp escroll
+eoff:               ; no enemy target: show its cells again if they are blank
+    lda EBS
+    beq .n
+    lda #0
+    sta EBS
+    jsr eput
+.n:
+    lda #$FF
+    sta EBI
+    rts
+eput:               ; EBS = 1: blank cells, 0: EBUF
+    ldy #0
+    lda #0
+    sta EBR
+.pr:
+    jsr eaddr
+    ldx EBW
+.pc:
+    lda #$FF
+    pha
+    lda EBS
+    bne .b
+    pla
+    lda EBUF,y
+    pha
+.b:
+    pla
+    sta $2007
+    iny
+    dex
+    bne .pc
+    inc EBR
+    lda EBR
+    cmp EBW
+    bne .pr
+escroll:
+    lda #0
+    sta $2005
+    sta $2005
+    rts
+eaddr:              ; PPU address of row EBY + EBR, column EBX
+    lda $2002
+    lda EBY
+    clc
+    adc EBR
+    sta VLO
+    lda #0
+    sta VHI
+    lda VLO
+    asl a
+    rol VHI
+    asl a
+    rol VHI
+    asl a
+    rol VHI
+    asl a
+    rol VHI
+    asl a
+    rol VHI
+    clc
+    adc EBX
+    tax
+    lda VHI
+    adc #$20
+    sta $2006
+    stx $2006
+    rts
+eblink_off:         ; the enemy-target loop ends ($9B9C hook): show the target again
+    jmp eoff
 
 ; ---- panel text (replaces the English patch's boxline) ---------------------------------
 ; Input: decoded line at $6CD4 (pairs: dakuten, code; 0 ends), ($8A) = panel image cell of
@@ -1562,6 +1721,31 @@ def blink_hook(rom):
              bytes([0xA5, 0x89, 0x8D, 0x06, 0x20]))
 
 
+def enemy_target(rom):
+    """While an enemy target is chosen (loop b12:$9B55-$9BA6) the enemy-names window shows
+    instead of the command window (owner): on entry ($9B55 JSR $9BCB -> stub $AB07) the box
+    count is saved and only box 0 (the names) is drawn again ($F652 draws all boxes but the
+    last); on exit ($9B9C JSR $97B2 -> stub $9D94, in the dead bytes of the old itemmove)
+    the target is shown again (far eblink_off) and all saved boxes are redrawn."""
+    main = sys.modules['__main__']
+    farjsr = main.LABELS_EX['farjsr']
+    vbox = 0x0344
+    put_bank(rom, 12, 0x9B55, bytes([0x20, 0x07, 0xAB]), bytes([0x20, 0xCB, 0x9B]))
+    put_bank(rom, 12, 0xAB07, bytes([0xAD, 0xA3, 0x6A, 0x8D, vbox & 0xFF, vbox >> 8,   # LDA $6AA3 / STA VBOX
+                                     0xA9, 0x02, 0x8D, 0xA3, 0x6A,                     # LDA #2 / STA $6AA3
+                                     0x20, 0x52, 0xF6,                                 # JSR $F652
+                                     0x4C, 0xCB, 0x9B]),                               # JMP $9BCB
+             bytes(rom[bank_off(12, 0xAB07):bank_off(12, 0xAB07) + 17]))
+    put_bank(rom, 12, 0x9B9C, bytes([0x20, 0x94, 0x9D]), bytes([0x20, 0xB2, 0x97]))
+    put_bank(rom, 12, 0x9D94, bytes([0x20, 0xB2, 0x97,                                 # JSR $97B2
+                                     0xA2, main.FAR_ROUTINES.index('eblink_off'),
+                                     0x20, farjsr & 0xFF, farjsr >> 8,                 # farjsr eblink_off
+                                     0xAD, vbox & 0xFF, vbox >> 8, 0x18, 0x69, 0x01,   # LDA VBOX / CLC / ADC #1
+                                     0x8D, 0xA3, 0x6A,                                 # STA $6AA3
+                                     0x4C, 0x52, 0xF6]),                               # JMP $F652
+             bytes(rom[bank_off(12, 0x9D94):bank_off(12, 0x9D94) + 20]))
+
+
 def hooks(rom):
     """Calls into the far-code routines: the party window is stamped into the panel image
     whenever the panel is cleared ($F618, freed bytes $F625-$F63F; X, Y = 0 and A = 0 as
@@ -1601,6 +1785,7 @@ def apply(rom, report):
     magic_cursor(rom)
     item_list(rom)
     blink_hook(rom)
+    enemy_target(rom)
     hooks(rom)
     music_trampoline(rom)
     report.append('GB layout applied')
