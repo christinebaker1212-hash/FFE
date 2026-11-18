@@ -51,7 +51,19 @@ apu_write:  ld a, l
             ld b, 0
             ld hl, APU_SH
             add hl, bc
-            ld [hl], e
+            ld a, [hl]                      ; the same value again (the music driver rewrites
+            cp e                            ;   its registers every frame): nothing to do,
+            jr nz, .chg                     ;   unless it restarts a note ($4003 / $4007 /
+            ld a, c                         ;   $400B / $400F) or is $4015
+            cp $15
+            jr z, .chg
+            and 3
+            cp 3
+            ret nz
+            ld a, c
+            cp $10
+            ret nc
+.chg:       ld [hl], e
             ld a, c
             cp $15
             jp z, w_status
@@ -515,7 +527,14 @@ len_p:      ld hl, APU_ON
 ; B = pulse: one sweep clock. Divider 0 and enabled with a shift: period += / -= period >>
 ; shift (pulse 1 negates as one's complement: one more); target > $7FF (adding) or a period
 ; < 8 mutes. The divider reloads with P (bits 4-6) at 0 or after a $4001 write.
-sw_clk:     ld hl, APU_ON
+sw_clk:     ld a, b                         ; sweep off (bit 7 of $4001 / $4005): nothing
+            and a                           ;   (the divider only matters while it runs)
+            ld a, [APU_SH + 1]
+            jr z, .s0
+            ld a, [APU_SH + 5]
+.s0:        bit 7, a
+            ret z
+            ld hl, APU_ON
             call hl_b
             ld a, [hl]
             and a

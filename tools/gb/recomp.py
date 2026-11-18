@@ -260,6 +260,8 @@ class Emitter:
         """HL = gbaddr (+ index). add hl,rr clobbers GB carry: protect it if C is live."""
         if idx is None:
             self.o('ld hl, $%04X' % gbaddr); return
+        if gbaddr & 0xFF == 0 and self.i.mode in ('abx', 'aby'):   # page-aligned base: no carry
+            self.o('ld h, $%02X' % (gbaddr >> 8), 'ld l, %s' % idx[1]); return
         protect = 'C' in self.keep or 'C' in USE.get(self.i.mn, '')
         if protect: self.o('push af')
         self.o('ld hl, $%04X' % gbaddr, 'add hl, %s' % idx)

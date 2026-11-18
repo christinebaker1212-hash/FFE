@@ -6,7 +6,6 @@ import os, sys, random
 import numpy as np
 from PIL import Image
 from cynes import NES
-from pyboy import PyBoy
 
 RIGHT, LEFT, DOWN, UP, START, SEL, B, A = 1, 2, 4, 8, 16, 32, 64, 128
 GBNAME = {RIGHT: 'right', LEFT: 'left', DOWN: 'down', UP: 'up', START: 'start', SEL: 'select', B: 'b', A: 'a'}
@@ -22,6 +21,7 @@ def new_game_script():
 
 class GB:
     def __init__(self, path):
+        from pyboy import PyBoy                  # (only for the GB checks, not the builder)
         self.pb = PyBoy(path, window='null', cgb=os.environ.get('GB_CGB') == '1', sound_emulated=False)
         self.pb.set_emulation_speed(0)
         self.held = 0

@@ -1,0 +1,45 @@
+# Builds FFE-Builder.exe (tools only: no ROMs, no game data) on a Windows runner.
+# The executable makes the Game Boy versions from the user's own NES ROM files.
+name: FFE Builder (Windows)
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/**'
+      - 'script/**'
+      - '.github/workflows/ffe-builder.yml'
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Patched NES emulator (cynes) for the code map
+        shell: bash
+        run: |
+          git clone -q https://github.com/Youlixx/cynes.git cynes-src
+          cd cynes-src
+          git checkout -q "$(cat ../tools/emu/CYNES_COMMIT)"
+          git apply ../tools/emu/cynes.patch
+          python -m pip install --upgrade pip
+          python -m pip install .
+      - name: Python packages
+        run: python -m pip install numpy pillow pyinstaller
+      - name: Freeze the builder
+        shell: bash
+        run: |
+          pyinstaller --noconfirm --onefile --console --name FFE-Builder \
+            --add-data "tools;tools" --add-data "script;script" \
+            --collect-all cynes --hidden-import numpy --hidden-import PIL.Image \
+            tools/builder/ffe_builder.py
+      - name: Smoke test (no ROM needed)
+        shell: bash
+        run: |
+          ./dist/FFE-Builder.exe --run tools/gb/asm_sm83.py 2>&1 | tail -2 || true
+          ./dist/FFE-Builder.exe --cli nonexistent.nes "$RUNNER_TEMP" 2>&1 | tail -2 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FFE-Builder
+          path: dist/FFE-Builder.exe

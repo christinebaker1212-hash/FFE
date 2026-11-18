@@ -1365,13 +1365,10 @@ rt_ppu_w1:  push af
 .off:       ldh a, [lcd_on]
             and a
             jr z, .ret
-            ldh a, [is_cgb]                 ; CGB: the LCD stays on, masked (VLCD); writes
-            and a                           ;   go the LCD-on ways (queue, tile copy + DMA)
-            jr z, .dmgoff
-            ld a, 1
-            ld [VLCD], a
-            jr .ret
-.dmgoff:    ldh a, [is_sgb]
+            ; (CGB "VLCD", the LCD kept on and masked while the NES renders nothing, avoids
+            ;   the white of a real GBC's LCD-off, but every map write then waits for a
+            ;   vblank: loads became many times slower. Not used: the LCD goes off.)
+            ldh a, [is_sgb]
             and a
             call nz, sgb_lcd_off
 .wv:        ldh a, [$FF44]
@@ -1741,8 +1738,16 @@ rt_io_w4014:
             ld de, OAM_SH
             ld b, 64
             ld c, 40
-.lp:        ld a, [hl+]                     ; NES y (top - 1)
-            ldh [o_y], a
+.lp:        ld a, [hl+]                     ; NES y (top - 1); $EF and below the screen:
+            cp $EF                          ;   hidden (most of the 64), skipped at once
+            jr c, .vis
+            inc l
+            inc l
+            inc l
+            dec b
+            jr nz, .lp
+            jp .full
+.vis:       ldh [o_y], a
             ld a, [hl+]
             ldh [o_t], a
             ld a, [hl+]

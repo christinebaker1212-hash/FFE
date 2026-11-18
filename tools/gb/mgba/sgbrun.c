@@ -14,6 +14,7 @@
  */
 #include <mgba/core/core.h>
 #include <mgba/core/config.h>
+#include <mgba/internal/gb/gb.h>
 #include <mgba-util/vfs.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -50,7 +51,7 @@ int main(int argc, char** argv) {
 	int frames = atoi(argv[2]); const char* out = argv[3];
 	int dmg = 0; struct press presses[256]; int np = 0; int shots[1024]; int ns = 0;
 	int poke_at = 0; const char* poke_list = 0;
-	int prof = getenv("SGBRUN_PROF") != 0; static uint32_t profs[200000]; static uint32_t proff[200000]; int nprof = 0;
+	int prof = getenv("SGBRUN_PROF") != 0; static uint32_t profs[2000000]; static uint32_t proff[2000000]; int prof2 = getenv("SGBRUN_PROF2") ? atoi(getenv("SGBRUN_PROF2")) : 0; unsigned p2tick = 0; int nprof = 0;
 	const char* sram_path = NULL;
 	unsigned char* pads = NULL; long npads = 0; int nshots[1024]; int nns = 0; int nshot_done[1024] = {0};
 	for (int i = 4; i < argc; i++) {
@@ -127,10 +128,23 @@ int main(int argc, char** argv) {
 		}
 		core->setKeys(core, keys);
 		unsigned n_before = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
+		if (prof2) {                                    /* SGBRUN_PROF2=K: PC + mapped bank every K instructions */
+			uint32_t fc = core->frameCounter(core);
+			while (core->frameCounter(core) == fc) {
+				core->step(core);
+				if (++p2tick >= prof2) {
+					p2tick = 0;
+					uint32_t pc = 0; core->readRegister(core, "pc", &pc); pc &= 0xFFFF;
+					unsigned bank = pc < 0x4000 ? 0 : ((struct GB*) core->board)->memory.currentBank;
+					unsigned nn = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
+					if (nprof < 2000000) { profs[nprof] = bank << 16 | pc; proff[nprof++] = nn; }
+				}
+			}
+		} else
 		core->runFrame(core);
 		if (prof) {                                     /* SGBRUN_PROF: PC of frames without a NES frame end */
 			unsigned n_after = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
-			if (n_after == n_before && nprof < 200000) {
+			if (n_after == n_before && nprof < 2000000) {
 				uint32_t pc = 0; core->readRegister(core, "pc", &pc); pc &= 0xFFFF;
 				unsigned bank = pc < 0x4000 ? 0 : core->busRead8(core, 0xFF8C);
 				profs[nprof] = bank << 16 | pc; proff[nprof++] = n_after;
@@ -199,7 +213,7 @@ int main(int argc, char** argv) {
 	/* frame-wait counter of the runtime ($D830), to confirm the game ran */
 	unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 	printf("frames %d, video %ux%u, NES frame waits %u, KEY1 %02X\n", frames, w, h, n, core->busRead8(core, 0xFF4D));
-	if (prof) for (int k = 0; k < nprof; k++) printf("P %02X:%04X %u\n", profs[k] >> 16, profs[k] & 0xFFFF, proff[k]);
+	if (prof || prof2) for (int k = 0; k < nprof; k++) printf("P %02X:%04X %u\n", profs[k] >> 16, profs[k] & 0xFFFF, proff[k]);
 	core->deinit(core);
 	return 0;
 }

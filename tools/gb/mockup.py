@@ -737,3 +737,74 @@ if __name__ == '__main__':
     os.makedirs(out, exist_ok=True)
     battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); battle8(out); battle9(out); battle10(out); battle11(out); battle12(out); battle13(out); battle14(out); main_menu(out)
     print('written to', out)
+
+
+NAME_CHARS = list("ABCDEFGHIJKLMNOPQRSTUVWXYZ'.,-abcdefghijklmnopqrstuvwxyz!?&…0123456789():;/+%\"[]")
+
+
+def name_entry(out):
+    """Owner (2026-11-18): the naming screen looked bad. A: name window (class sprite, the
+    name with blanks), letters 9 per row at a 2-column pitch inside a framed window, the
+    small 8-px hand in the gap before the letter. B: 10 per row as FF1 (no side frames)."""
+    ims = []
+    for per_row in (9, 10):
+        s = Screen(bg=3)
+        s.window(0, 0, 20, 4)
+        s.block(1, 0, 2, 3)                             # class sprite (16 x 24)
+        for i, ch in enumerate('DUN'):
+            s.glyph(6 + 2 * i, 1, ch)
+        for i in range(4):                              # blanks under the four letters
+            s.d.line([(6 + 2 * i) * 8, 2 * 8 + 3, (6 + 2 * i) * 8 + 7, 2 * 8 + 3], fill=SHADES[0 if i < 3 else 1])
+        _pt(s, 14 * 8, 1 * 8 + 4, 'Warrior')
+        if per_row == 9:
+            s.window(0, 4, 20, 14)
+            x0 = 2
+        else:
+            s.d.rectangle([0, 4 * 8, 159, 143], fill=SHADES[3])
+            s.d.line([0, 4 * 8 + 2, 159, 4 * 8 + 2], fill=SHADES[0]); s.d.line([0, 4 * 8 + 3, 159, 4 * 8 + 3], fill=SHADES[1])
+            s.d.line([0, 141, 159, 141], fill=SHADES[0]); s.d.line([0, 140, 159, 140], fill=SHADES[1])
+            x0 = 1
+        rows = (len(NAME_CHARS) + per_row - 1) // per_row
+        y0 = 5 + (12 - rows) // 2
+        for k, ch in enumerate(NAME_CHARS):
+            s.glyph(x0 + 2 * (k % per_row), y0 + k // per_row, ch)
+        cur = 21                                        # cursor on 'V'
+        _hand(s, (x0 + 2 * (cur % per_row)) * 8 - 8, (y0 + cur // per_row) * 8, HAND8)
+        ims.append(s.im)
+    out_im = Image.new('RGB', (168 * 2 - 8, 144), (255, 255, 255))
+    for k, im in enumerate(ims): out_im.paste(im, (k * 168, 0))
+    out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock15_name_entry.png'))
+
+
+def name_entry2(out):
+    """C: name window (0,0,20,3) with the name and its blanks; grid 10 x 8 at 2-column /
+    2-row pitch (rows 3-17), the 8-px hand in the gap before the letter. E: compact 10 x 8
+    block (letters side by side, rows touching) in a window, the cursor a highlighted cell."""
+    ims = []
+    s = Screen(bg=3)
+    s.window(0, 0, 20, 3)
+    for i, ch in enumerate('DUN'): s.glyph(2 + i, 1, ch)
+    s.d.line([5 * 8, 1 * 8 + 7, 5 * 8 + 6, 1 * 8 + 7], fill=SHADES[1])
+    _pt(s, 9 * 8, 1 * 8, 'Warrior')
+    for k, ch in enumerate(NAME_CHARS):
+        s.glyph(1 + 2 * (k % 10), 3 + 2 * (k // 10), ch)
+    _hand(s, (1 + 2 * 1) * 8 - 8, (3 + 2 * 2) * 8, HAND8)
+    ims.append(s.im)
+    s = Screen(bg=3)
+    s.window(0, 0, 20, 4)
+    s.block(1, 0, 2, 3)
+    for i, ch in enumerate('DUN'): s.glyph(5 + i, 1, ch)
+    s.d.line([8 * 8, 1 * 8 + 7, 8 * 8 + 6, 1 * 8 + 7], fill=SHADES[1])
+    _pt(s, 5 * 8, 2 * 8 + 1, 'Warrior')
+    s.window(3, 5, 14, 12)
+    for k, ch in enumerate(NAME_CHARS):
+        x, y = 5 + (k % 10), 7 + (k // 10)
+        if k == 21:
+            s.d.rectangle([x * 8, y * 8, x * 8 + 7, y * 8 + 7], fill=SHADES[1])
+            s.glyph(x, y, ch, fg=3, bg=1)
+        else:
+            s.glyph(x, y, ch)
+    ims.append(s.im)
+    out_im = Image.new('RGB', (168 * 2 - 8, 144), (255, 255, 255))
+    for k, im in enumerate(ims): out_im.paste(im, (k * 168, 0))
+    out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock16_name_entry.png'))

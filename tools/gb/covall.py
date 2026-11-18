@@ -1,7 +1,8 @@
 """Regenerate the recompiler's coverage logs for a NES ROM (needed after every change to
 the NES code): new game + random play (covrun.py, seeds 1-4) and the field scripts below
 (covfield.py) and battle input modes (covbattle.py), all in parallel, then one battle per
-formation (128, 4 at a time); writes OUTDIR/rom.sha1 (build.py warns on a mismatch).
+formation (128); as many runs at once as there are CPUs (env COV_JOBS); writes
+OUTDIR/rom.sha1 (build.py warns on a mismatch).
 usage: PYTHONPATH=build/emu covall.py ROM OUTDIR [FRAMES (random play, default 80000)]"""
 import hashlib, os, subprocess, sys
 
@@ -62,42 +63,36 @@ def magic_pokes():
 def main():
     rom, out = sys.argv[1], sys.argv[2]
     frames = sys.argv[3] if len(sys.argv) > 3 else '80000'
+    sys.path.insert(0, os.path.join(HERE, '..'))
+    from pyrun import script_cmd
     os.makedirs(out, exist_ok=True)
     env = dict(os.environ)
-    procs = []
-    for seed in (1, 2, 3, 4):
-        env1 = dict(env, COV_LOG=os.path.join(out, 's%d.bin' % seed))
-        if os.path.exists(env1['COV_LOG']): os.remove(env1['COV_LOG'])
-        procs.append(subprocess.Popen([sys.executable, os.path.join(HERE, 'covrun.py'), rom, str(seed), frames],
-                                      env=env1, stdout=open(os.path.join(out, 's%d.log' % seed), 'w'),
-                                      stderr=subprocess.STDOUT))
+    jobs = []                                 # (command, COV_LOG, log file)
+    for seed in (1, 2, 3, 4):                 # new game + random play
+        jobs.append((script_cmd(os.path.join(HERE, 'covrun.py'), rom, seed, frames), 's%d' % seed))
     for i, (name, script, n, pokes) in enumerate(FIELD):
-        env1 = dict(env, COV_LOG=os.path.join(out, 's%d.bin' % (5 + i)))
-        if os.path.exists(env1['COV_LOG']): os.remove(env1['COV_LOG'])
-        cmd = [sys.executable, os.path.join(HERE, 'covfield.py'), rom, script, str(n)]
+        cmd = script_cmd(os.path.join(HERE, 'covfield.py'), rom, script, n)
         if pokes: cmd += ['--poke', pokes_of(pokes)]
-        procs.append(subprocess.Popen(cmd, env=env1, stdout=open(os.path.join(out, 's%d.log' % (5 + i)), 'w'),
-                                      stderr=subprocess.STDOUT))
+        jobs.append((cmd, 's%d' % (5 + i)))
     for i, mode in enumerate(BATTLE):
-        env1 = dict(env, COV_LOG=os.path.join(out, 'b%d.bin' % i))
-        if os.path.exists(env1['COV_LOG']): os.remove(env1['COV_LOG'])
-        procs.append(subprocess.Popen([sys.executable, os.path.join(HERE, 'covbattle.py'), rom, mode, '7700',
-                                       '--poke', magic_pokes()], env=env1,
-                                      stdout=open(os.path.join(out, 'b%d.log' % i), 'w'), stderr=subprocess.STDOUT))
-    jobs = []                                 # every battle formation once (fight)
-    for f in range(128):
-        env1 = dict(env, COV_LOG=os.path.join(out, 'f%03d.bin' % f))
-        jobs.append(([sys.executable, os.path.join(HERE, 'covbattle.py'), rom, 'fight', '7000',
-                      '--poke', magic_pokes(), '--form', str(f)], env1, os.path.join(out, 'f%03d.log' % f)))
-    bad = [p.args for p in procs if p.wait() != 0]
-    running = []
-    while jobs or running:                    # (4 at a time)
-        while jobs and len(running) < 4:
-            cmd, env1, log = jobs.pop(0)
-            if os.path.exists(env1['COV_LOG']): os.remove(env1['COV_LOG'])
-            running.append(subprocess.Popen(cmd, env=env1, stdout=open(log, 'w'), stderr=subprocess.STDOUT))
+        jobs.append((script_cmd(os.path.join(HERE, 'covbattle.py'), rom, mode, 7700, '--poke', magic_pokes()), 'b%d' % i))
+    for f in range(128):                      # every battle formation once (fight)
+        jobs.append((script_cmd(os.path.join(HERE, 'covbattle.py'), rom, 'fight', 7000, '--poke', magic_pokes(),
+                                '--form', f), 'f%03d' % f))
+    workers = max(2, int(os.environ.get('COV_JOBS', '0')) or (os.cpu_count() or 4))
+    bad, running, done = [], [], 0
+    while jobs or running:
+        while jobs and len(running) < workers:
+            cmd, name = jobs.pop(0)
+            log = os.path.join(out, name + '.bin')
+            if os.path.exists(log): os.remove(log)
+            running.append(subprocess.Popen(cmd, env=dict(env, COV_LOG=log),
+                                            stdout=open(os.path.join(out, name + '.log'), 'w'),
+                                            stderr=subprocess.STDOUT))
         p = running.pop(0)
         if p.wait() != 0: bad.append(p.args)
+        done += 1
+        print('coverage: %d of %d runs' % (done, done + len(jobs) + len(running)), flush=True)
     sha = hashlib.sha1(open(rom, 'rb').read()).hexdigest()
     with open(os.path.join(out, 'rom.sha1'), 'w') as fh: fh.write('%s  %s\n' % (sha, rom))
     print('coverage written to', out, 'failed:', bad)

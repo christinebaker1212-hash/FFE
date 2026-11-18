@@ -106,9 +106,11 @@ def nes_english(src, out_dir, gb=False):
     if os.path.exists(out) and not gb: return out
     if hashlib.sha1(open(src, 'rb').read()).hexdigest() != SHA1_FF12:
         raise SystemExit('not the expected Final Fantasy I・II (Japan) ROM: ' + src)
-    subprocess.check_call([sys.executable, os.path.join(ROOT, 'tools', 'split', 'build_mmc5.py'), src, out_dir])
-    subprocess.check_call([sys.executable, os.path.join(ROOT, 'tools', 'ff1', 'insert.py'),
-                           os.path.join(out_dir, 'ff1_mmc5.nes'), out] + (['--gb'] if gb else []))
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    from pyrun import script_cmd
+    subprocess.check_call(script_cmd(os.path.join(ROOT, 'tools', 'split', 'build_mmc5.py'), src, out_dir), cwd=ROOT)
+    subprocess.check_call(script_cmd(os.path.join(ROOT, 'tools', 'ff1', 'insert.py'),
+                                     os.path.join(out_dir, 'ff1_mmc5.nes'), out, *(['--gb'] if gb else [])), cwd=ROOT)
     return out
 
 

@@ -11,6 +11,7 @@
  *     run ends after the last one
  *   --wav FILE: the sound output (stereo 16-bit) from NES frame --wav-from on
  *   --poke: as sgbrun (NES $0000-$07FF = WRAM $C000.., $6000-$7FFF = cart RAM)
+ *   --lagfile F: the NES frame count (16 bits) after every GB frame
  *   prints "frames N, NES frame waits M" at the end */
 #include <dlfcn.h>
 #include <stdint.h>
@@ -90,7 +91,7 @@ int main(int argc, char** argv) {
 	int frames = atoi(argv[2]); const char* out = argv[3];
 	const char* padfile = NULL; const char* sram_path = NULL; const char* wav_path = NULL;
 	int nshots[1024]; int nns = 0; int done[1024] = { 0 }; int wav_from = 0;
-	int poke_at = 0; const char* poke_list = NULL;
+	int poke_at = 0; const char* poke_list = NULL; FILE* lagf = NULL; int until = 0;
 	for (int i = 4; i < argc; i++) {
 		if (!strcmp(argv[i], "--dmg")) dmg = 1;
 		else if (!strcmp(argv[i], "--padfile") && i + 1 < argc) padfile = argv[++i];
@@ -99,6 +100,8 @@ int main(int argc, char** argv) {
 		else if (!strcmp(argv[i], "--wav") && i + 1 < argc) wav_path = argv[++i];
 		else if (!strcmp(argv[i], "--wav-from") && i + 1 < argc) wav_from = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--poke") && i + 2 < argc) { poke_at = atoi(argv[++i]); poke_list = argv[++i]; }
+		else if (!strcmp(argv[i], "--lagfile") && i + 1 < argc) lagf = fopen(argv[++i], "wb");
+		else if (!strcmp(argv[i], "--until") && i + 1 < argc) until = atoi(argv[++i]);
 	}
 	unsigned char* pads = NULL; long npads = 0;
 	if (padfile) {
@@ -162,6 +165,8 @@ int main(int argc, char** argv) {
 		wav_on = (int) n >= wav_from;
 		p_retro_run();
 		n = NESF();
+		if (lagf) { uint16_t v = f > 30 ? n : 0; fwrite(&v, 2, 1, lagf); }
+		if (until && f > 30 && n >= (unsigned) until) break;
 		int all = nns > 0;
 		for (int k = 0; k < nns; k++) {
 			if (!done[k] && f > 30 && n >= (unsigned) nshots[k]) {  /* (DMG WRAM is random before boot clears it) */
@@ -174,6 +179,7 @@ int main(int argc, char** argv) {
 		if (all) break;
 	}
 	if (wav) { wav_header(wav, wav_bytes, rate); fclose(wav); }
+	if (lagf) fclose(lagf);
 	printf("frames %d, NES frame waits %u, rate %d\n", f, NESF(), rate);
 	p_retro_deinit();
 	return 0;
