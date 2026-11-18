@@ -44,7 +44,9 @@ class FF1:
     #   $E9F6: CHR upload loop (X pages from ($10)+Y to $2007).
     #   c62:C43C: the per-frame OAM-buffer clear (memset).
     ext = {('fix', 0xFEDB): ('rt_wait_nmi', 'NZ'), ('fix', 0xE9F6): ('hle_chr_pages', 'NZ'),
-           ('c62', 0xC43C): ('hle_oam_clear', 'NZ')}
+           ('c62', 0xC43C): ('hle_oam_clear', 'NZ'),
+           ('c62', 0xD2EB): ('hle_mapdraw', 'NZC'),     # DrawMapRowCol (rt/ff1_native.s)
+           ('c62', 0xD471): ('hle_mapattr', 'NZC')}     # DrawMapAttributes
     # Idioms replaced by a runtime call, then a jump to `resume`:
     #   b14:B0F1 TSX/TXA/CMP #$EF/BCS/CLC/ADC #6/TAX/TXS: drop 3 return frames (camp items
     #   returning from the item menu straight to the field). The S >= $EF guard is not

@@ -145,6 +145,7 @@ def main():
     prog, bank_of, banks = emit_program(rc)
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s', 'sgb.s'))
     rt += '\n' + apu_tables() + '\n' + open(os.path.join(HERE, 'rt', 'apu_core.s')).read()
+    rt += '\n' + open(os.path.join(HERE, 'rt', 'ff1_native.s')).read()
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(
         '    db %s\n' % ', '.join(str(shade(c)) for c in range(r, r + 16)) for r in range(0, 64, 16))
     src_all = rt + '\n' + shade_src + '\n' + nes_rgb_src() + '\n' + border_src() + '\n' + prog

@@ -19,6 +19,7 @@ SLOT_TILE  = $DA00          ; GB slot -> NES sprite tile ($FF = free)
 SLOT_STAMP = $DA80          ; GB slot -> frame number of its last use in OAM
 SLOT_KEY   = $D880          ; GB slot -> coding of its tile (SPAL_KEY value; $FF = to load)
 SGB_BANK   = 63             ; ROM bank of the SGB packet builder (sgb.s)
+HLE_BANK   = 62             ; ROM bank of the native FF1 routines (ff1_native.s)
 SGB_CNT    = $DCC4          ; SGB: cells on screen per NES BG palette
 SGB_LSX    = $DCC8          ; SGB: last view position (scroll + camera)
 SGB_LSY    = $DCC9

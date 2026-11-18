@@ -300,3 +300,24 @@ hle_oam_clear:
             inc a
             dec a                           ; Z = 1, carry kept
             ret
+
+; ---- trampolines into the native FF1 routines (rt/ff1_native.s, bank HLE_BANK)
+hle_mapdraw:
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            call mapdraw_b
+            jr hle_back
+hle_mapattr:
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            call mapattr_b
+hle_back:   push af
+            ldh a, [code_bank]
+            ld [$2000], a
+            pop af
+            ret
+
