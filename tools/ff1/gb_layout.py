@@ -1930,7 +1930,7 @@ def menu_strings(enc_txt):
     """Command list one per row (upper row only, one-row newlines); Gil on the window's
     fifth text row (below the orbs)."""
     MENU_GB[2] = ('{05}' + '{08}'.join('  ' + w for w in ('Items', 'Magic', 'Weapons', 'Armor', 'Status'))
-                  + '{08}{04}G')        # Gil below the commands (the amount is 6 wide: 'Gil' would not fit)
+                  + '{08}{04}Gil')      # Gil below the commands (amount 6 wide + 'Gil': 9 of 10 columns)
 
 
 def main_menu(rom):

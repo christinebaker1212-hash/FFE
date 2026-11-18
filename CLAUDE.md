@@ -467,8 +467,7 @@ Milestones per game (from `docs/gb-port.md`):
   member two lines: name, L + level, HP current/max; class, or Stone/Poison while
   afflicted (b14 $B995 rewritten: template string with menu codes $10+m, nn). Commands +
   Gil (0,9,12,9): commands one per row (upper-row mode, one-row newlines; menu string 2
-  for --gb in `MENU_GB`), Gil below ("{04}G": the amount is 6 wide, 'Gil' does not fit -
-  wording change to confirm with the owner). Orbs window (12,10,8,8), orbs centred
+  for --gb in `MENU_GB`), Gil below ("{04}Gil", owner: keep "Gil"; 9 of the 10 columns). Orbs window (12,10,8,8), orbs centred
   (owner) at columns 14-17 rows 12-15 (whole attribute quadrants, two bytes: `orbattr`).
   No class sprites ($B648 -> RTS). Cursor tables: commands $B7F4 (x 0), members $B7EC.
   Owner feedback fixed: text out of the window (command window was 10 wide), orbs centred.
