@@ -90,7 +90,7 @@ GLYPH_FIRST = 0x7A                       # glyph table covers codes $7A-$FF
 DIG3 = 0xD3                              # 3-px digits $D3-$DC, small '/' $DD, arrow $DE
 SLASH3, ARROW = 0xDD, 0xDE
 STATUS_WORDS = ['Stone', 'Poison', 'Blind', 'Numb', 'Sleep', 'Mute']   # status bits 1-6
-FAR_GB = ['party_line', 'party_stamp', 'dlgpage', 'dlghide', 'magpatch']   # far routines added for the GB layout (after boxline etc.)
+FAR_GB = ['party_line', 'party_stamp', 'dlgpage', 'dlghide', 'magpatch', 'pcopy', 'prow']   # far routines added for the GB layout (after boxline etc.)
 
 VWF_SRC = """
 VBUF = $6E00        ; line buffer: 18 tiles x 8 rows, 1 bit per pixel, tile-major
@@ -1488,7 +1488,7 @@ def enc_word(enc, w):
 
 
 def far_source(enc):
-    return 'MUSIC = $%04X\n' % MUSIC + VWF_SRC + DLG_SRC + glyph_tables(enc) + magpatch_source(enc)
+    return 'MUSIC = $%04X\n' % MUSIC + VWF_SRC + DLG_SRC + glyph_tables(enc) + magpatch_source(enc) + prolog_far_source()
 
 
 # ---- field dialogue ----------------------------------------------------------------
@@ -2918,37 +2918,32 @@ pinit:              ; $A107 (prologue start): page 1, camera 6 / 6
     sta $5800
     sta $5801
     jmp $A232
-prolog:             ; $A142 (after the clear): the page PG, faded in, until a button
-    ldx PG
+prolog:             ; $A142 (after the clear, screen off): the page PG, faded in band by band
+    ldx PG          ;   (pband), until a button
     lda plo,x
     sta $3E
     lda phi,x
     sta $3F
     lda prow,x
-    sta $3B
-    lda #0
-    sta $37
+    sta PR
     lda #BANK
     sta $57
-    lda #$0E
-    sta $58
-    lda #7
-    sta $3A
-    jsr $DEB6
+    ldx #PCOPY      ; the copied font, the page's row pointers
+    jsr FARJSR
     jsr $B793
-    lda PG
-    bne plast
-    lda #$C8        ; page 1: FF1's band fade ($A287 without its endless wait) ...
+    lda #$C8
     sta $62
 pf1:
-    jsr $A29F
+    jsr pband
     lda $62
     clc
     adc #8
     sta $62
     cmp #$F0
     bcc pf1
-    jsr phold       ; ... then a hold; a button skips the whole prologue (as on the NES)
+    lda PG
+    bne plast
+    jsr phold       ; page 1: a hold; a button skips the whole prologue (as on the NES)
     lda PCNT
     bne pdone
     inc PG
@@ -2956,18 +2951,36 @@ pf1:
     sta $2001
     jmp $A10A
 plast:
-    jsr $A287       ; page 2: fade, then FF1's wait for a button
+    jsr pwait       ; page 2: wait for a button
 pdone:
     lda #0
     sta PG
     jmp $A167
+pwait:
+    jsr pfr
+    jmp pwait
 phold:              ; up to HOLD frames; a button returns through $A305's PLA PLA RTS
     lda #HOLD       ;   with PCNT still set
     sta PCNT
 ph1:
-    jsr $A305
+    jsr pfr
     dec PCNT
     bne ph1
+    rts
+pfr:                ; FF1's prologue frame ($A305) with one queued row drawn in the vblank
+    jsr $FE00
+    ldx #PROW
+    jsr FARJSR
+    jmp $A308
+ph:                 ; fade palette 2 in on the half band (attributes A), then its rows
+    sta $63         ;   PT, PT+1 back to the font itself (palette 3 from now on)
+    jsr $A2BA
+    ldx #$01
+pq2:                ; queue rows PT, PT+1 (X = $01 font, $81 copied font)
+    ldy PT
+    txa
+    sta PROWQ,y
+    sta PROWQ+1,y
     rts
 plo:
     .db <P1, <P2
@@ -2976,20 +2989,157 @@ phi:
 prow:
     .db R1, R2
 """
+# FF1's band fade ($A29F, replaced by pband at $A287): attribute band $62 (tile rows T..T+3),
+# top half faded in with palette 2 (bottom half palette 1, the text's colour = the
+# background), then the bottom half. On the Game Boy (DMG / SGB) a tile has one coding
+# for all the cells it is in, so the fading rows must not share tiles with the shown or
+# the waiting rows: a row is drawn only when its fade starts, with a copy of the font
+# (tiles $00-$7F, unused on these screens), and with the font itself once it is shown.
+PBAND_SRC = """
+pband:              ; $A287: band $62 = tile rows T..T+3, T = ($62 & $3F) / 2
+    lda $62
+    and #$3F
+    lsr a
+    sta PT
+    ldx #$81
+    jsr pq2         ; rows T, T+1 fading: copied font
+    lda #$5A
+    jsr ph
+    inc PT
+    inc PT
+    ldx #$81
+    jsr pq2         ; rows T+2, T+3 fading
+    lda #$AF
+    jsr ph
+    lda #$FF
+    sta $63
+    jmp pfr
+"""
+PROLOG_RAM = {'PROWQ': 0x0360, 'PR': 0x0378, 'PNR': 0x0379, 'POFF': 0x037A, 'PT': 0x037B,
+              'PBANK': 0x037C, 'PRLO': 0x0380, 'PRHI': 0x0390}     # (FF1 never uses $0340-$03BF)
 PG, PCNT = 0x034B, 0x0348        # ($0348: the dialogue's DGT, not used meanwhile)
 PROLOG_HOLD = 240                       # frames page 1 stays before page 2 (4 s)
 
 
+def prolog_far_source():
+    """far routines of the prologue: pcopy (screen off: font copy, row pointers) and prow
+    (in the vblank: one queued row)"""
+    return ''.join('%s = $%04X\n' % kv for kv in PROLOG_RAM.items()) + """
+pcopy:              ; (screen off) the font (bank 9 $8800) also to tiles $00-$7F; PRLO / PRHI
+    lda #9          ;   = the page string's row starts (its $09 / $08 bytes), PNR rows;
+    jsr $FE03       ;   no row queued
+    lda #0
+    sta $10
+    lda #$88
+    sta $11
+    ldx #8
+    lda #0
+    jsr $E9E9
+    lda $57
+    sta PBANK
+    jsr $FE03
+    ldx #0
+    ldy #0
+pc1:
+    lda ($3E),y
+    beq pc4
+    cmp #$10
+    bcs pc2
+    lda $3E
+    sta PRLO,x
+    lda $3F
+    sta PRHI,x
+    inx
+pc2:
+    inc $3E
+    bne pc1
+    inc $3F
+    bne pc1
+pc4:
+    stx PNR
+    ldx #23
+    lda #0
+pc5:
+    sta PROWQ,x
+    dex
+    bpl pc5
+    lda #$0E
+    jmp $FE03
+prow:               ; (vblank) the first queued row from 6: PROWQ = $01 font, $81 copy
+    ldx #5
+pr0:
+    inx
+    cpx #24
+    bcs pr2
+    lda PROWQ,x
+    beq pr0
+    and #$80
+    sta POFF
+    lda #0
+    sta PROWQ,x
+    txa
+    sec
+    sbc PR
+    cmp PNR
+    bcs pr2
+    tay
+    lda PRLO,y
+    sta $10
+    lda PRHI,y
+    sta $11
+    bit $2002
+    txa
+    lsr a
+    lsr a
+    lsr a
+    ora #$20
+    sta $2006
+    txa
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    ora #7
+    sta $2006
+    lda PBANK
+    jsr $FE03
+    ldy #1
+pr1:
+    lda ($10),y
+    cmp #$10
+    bcc pr3
+    eor POFF
+    sta $2007
+    iny
+    bne pr1
+pr3:
+    lda #$0E
+    jmp $FE03
+pr2:
+    rts
+"""
+
+
 def prologue(rom):
     B = 14
+    main = sys.modules['__main__']
     p1, p2 = PROLOG['pages']
-    r = asm(PROLOG_SRC, syms={'PG': PG, 'PCNT': PCNT, 'HOLD': PROLOG_HOLD, 'BANK': PROLOG['bank'], 'P1': p1,
-                              'P2': p2, 'R1': PROLOG_ROWS[0], 'R2': PROLOG_ROWS[1]}, org=0xAC6F)
+    syms = dict(PROLOG_RAM, PG=PG, PCNT=PCNT, HOLD=PROLOG_HOLD, BANK=PROLOG['bank'], P1=p1, P2=p2,
+                R1=PROLOG_ROWS[0], R2=PROLOG_ROWS[1], PCOPY=main.FAR_ROUTINES.index('pcopy'),
+                PROW=main.FAR_ROUTINES.index('prow'), FARJSR=main.LABELS_EX['farjsr'], pband=0xA287)
+    r = asm(PROLOG_SRC, syms=syms, org=0xAC6F)
     assert r.org + len(r.bytes) <= 0xAD13, hex(r.org + len(r.bytes))
-    # FF1's band fade from attribute row 1 (rows 4-7) and the last band like the others
-    put_bank(rom, B, 0xA288, bytes([0xC8]), bytes([0xD0]))
-    put_bank(rom, B, 0xA2A9, bytes([0xF8]), bytes([0xE8]))
+    b = asm(PBAND_SRC, syms=dict(syms, ph=r.labels['ph'], pq2=r.labels['pq2'], pfr=r.labels['pfr']), org=0xA287)
+    assert b.org + len(b.bytes) <= 0xA2BA, hex(b.org + len(b.bytes))      # (FF1's fade $A2BA stays)
+    for page in (p1, p2):               # rows: $09 / $08 + direct tile codes (>= $7A), 0-terminated
+        o = bank_off(PROLOG['bank'], page)
+        s = rom[o:rom.index(0, o)]
+        assert s[0] == 0x09 and all(c == 8 or c >= 0x7A for c in s[1:]), s.hex()
+        assert s.count(8) + 1 <= 16
     put_bank(rom, B, r.org, r.bytes, bytes(rom[bank_off(B, r.org):bank_off(B, r.org) + len(r.bytes)]))
+    put_bank(rom, B, b.org, b.bytes, bytes(rom[bank_off(B, b.org):bank_off(B, b.org) + len(b.bytes)]))
+    put_bank(rom, B, 0xA2C3, bytes([0x20]) + r.labels['pfr'].to_bytes(2, 'little'), bytes([0x20, 0x05, 0xA3]))
     put_bank(rom, B, 0xA107, bytes([0x20]) + r.labels['pinit'].to_bytes(2, 'little'), bytes([0x20, 0x32, 0xA2]))
     put_bank(rom, B, 0xA142, bytes([0x4C]) + r.labels['prolog'].to_bytes(2, 'little'), bytes([0xA9, 0x20, 0x85]))
 

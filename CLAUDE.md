@@ -627,6 +627,16 @@ Milestones per game (from `docs/gb-port.md`):
   in theirs (`build/shots/sgb_forms.png`).
 - Tools: `firstdiff.py --wram F` / env `WATCH=lo-hi` (print work RAM of both),
   `tracediff.py --battle`.
+- Prologue fade on DMG / SGB (found with mGBA): FF1's band fade shows waiting lines in
+  palette 1 (text = background colour), the fading half band in palette 2 and shown lines
+  in palette 3, all with the same font tiles; a DMG/SGB tile has one coding, so letters
+  vanished from shown lines and waiting lines showed. Now (`PBAND_SRC` at b14 $A287,
+  far `pcopy` / `prow`): the page text is not drawn up front; a half band's rows are
+  drawn when its fade starts, with a copy of the font in tiles $00-$7F (unused there),
+  and with the font itself once shown (one row per frame in the vblank, from the page
+  string's row pointers). NES output unchanged (screens after the prologue identical).
+  SGB now clean; DMG: a new line's letters can flash white for a few frames (tile
+  re-coding lags the palette while the fade dithers).
 - Next: FF1's accuracy / timing pass (lag in screen transitions, SGB check of the new
   screens in mGBA).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
