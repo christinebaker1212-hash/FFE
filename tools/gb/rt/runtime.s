@@ -1793,14 +1793,13 @@ rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (s
             ld a, [hl]
             cp $FF
             call z, spr_alloc
-            ld l, a
+            ldh [o_cx], a                   ; (slot)
             add a, low(SLOT_KEY)            ; resident with another coding: load it again
             ld l, a
             ld h, high(SLOT_KEY)
             ldh a, [o_key]
             cp [hl]
-            ld a, l
-            sub low(SLOT_KEY)
+            ldh a, [o_cx]
             jr z, .kok
             push bc
             ld c, a
