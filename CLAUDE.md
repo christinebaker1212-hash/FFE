@@ -376,7 +376,11 @@ Milestones per game (from `docs/gb-port.md`):
   fine; Chaos clears the party sprites. (The first shots were mangled because the test
   tool only patched one read of the formation number; `formations.patched` now patches
   every read of $6A, so the battle graphics match the forced formation.)
-- Next: GB build with fresh coverage, firstdiff (DMG + CGB), CGB screenshots.
+- GB build of the finished battle layout (fresh coverage, 18.7k instructions): firstdiff
+  --battle 7100 frames identical on DMG and on CGB; CGB shots show the battle in NES
+  colours with the fixed sprites (`gbc_battle3.png`).
+- Battle layout done. Next (owner to choose): plain-Game-Boy shading per tile, SGB
+  palettes/border, CGB speed-ups (double speed, HDMA), or the next screen (main menu).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).
