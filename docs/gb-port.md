@@ -1,4 +1,4 @@
-# FF1/FF2 English → Game Boy (SGB), FF3 English → Game Boy Color: port design
+# FF1/FF2 English → Game Boy dual-mode (DMG/SGB/CGB), FF3 English → Game Boy Color: port design
 
 Status: design only. Nothing is built yet.
 
@@ -19,13 +19,20 @@ Status: design only. Nothing is built yet.
   register writes into GBC equivalents.
 
 ## Targets (decided by the project owner)
-- **FF1 and FF2: Game Boy (DMG) with Super Game Boy support**, on the largest mapper needed
-  (MBC5, sized to the game, with battery SRAM). Colour comes from SGB palettes (4 palettes
-  assigned per screen area or 8×8 cell through `ATTR_*` packets) plus an SGB border.
-  On a plain DMG the game shows 4 greys.
-- **FF3: Game Boy Color.**
+- **FF1 and FF2: dual-mode cartridge** (owner's decision 2026-11-18; CGB flag `$80`, like
+  Pokémon Gold/Silver), on the largest mapper needed (MBC5, sized to the game, with
+  battery SRAM). One ROM:
+  - on a **Game Boy Color**: CGB palettes matching the NES (NES palette RAM → RGB555,
+    NES 16×16 attributes → per-tile attributes in VRAM bank 1), double speed, HDMA for
+    tile uploads, VRAM bank 1 for extra tiles where useful;
+  - on a **Super Game Boy**: SGB palettes (4 palettes assigned per screen area or 8×8 cell
+    through `ATTR_*` packets) plus an SGB border;
+  - on a plain **DMG**: 4 greys.
+  Screen layouts are identical in all modes; only the runtime's colour/VRAM path differs.
+- **FF3: Game Boy Color only** (the only Color-only cartridge).
 
-DMG-specific constraints for FF1/FF2 (compared with the table below):
+DMG/SGB-mode constraints for FF1/FF2 (compared with the table below; the CGB mode of the
+same ROM has the GBC column's resources):
 - **No double speed.** The recompiled code runs on a 4.2 MHz SM83, so the flag-liveness
   optimisation and a hand-tuned runtime are required, not optional. Measure early
   (milestone 2) how much of each frame the field and battle loops use.

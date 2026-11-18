@@ -14,11 +14,16 @@ The English translations are being adapted to the Game Boy. Design: `docs/gb-por
 ## Targets
 | Game | Target | Cartridge |
 |---|---|---|
-| Final Fantasy I | Game Boy (DMG) with Super Game Boy support (SGB palettes/border) | Largest mapper needed (MBC5, sized to the game) + battery SRAM |
-| Final Fantasy II | Game Boy (DMG) with Super Game Boy support | same as FF1 |
-| Final Fantasy III | Game Boy Color | MBC5 + battery SRAM |
+| Final Fantasy I | **Dual-mode ("black cartridge")**: runs on Game Boy (DMG), Super Game Boy (SGB palettes/border) and Game Boy Color (CGB colours matching the NES palettes) | Largest mapper needed (MBC5, sized to the game) + battery SRAM; header CGB flag $80 |
+| Final Fantasy II | Dual-mode, as FF1 | same as FF1 |
+| Final Fantasy III | Game Boy Color only (the only Color-only cartridge) | MBC5 + battery SRAM; header CGB flag $C0 |
 
 FF1 comes first, then FF2, then FF3.
+Dual-mode (owner's decision, 2026-11-18, replaces "DMG + SGB" for FF1/FF2): one ROM; on
+a CGB the runtime uses CGB palettes (NES palette RAM -> RGB555, NES attributes -> per-tile
+attributes in VRAM bank 1), double speed, HDMA for tile uploads and VRAM bank 1 tiles
+where useful; on DMG/SGB it keeps the 4-shade path plus SGB palettes and border. Screen
+layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in mGBA.
 
 ## What the repo may and may not contain
 - **Tools only.** Do not pack FF's characters, art, music, maps, story or code into the
@@ -36,7 +41,7 @@ FF1 comes first, then FF2, then FF3.
   Famicom, and the English patch carries over without changes.
 - A runtime layer converts NES PPU/APU/mapper writes to Game Boy hardware: tiles
   (NES planar → GB interleaved), nametables → BG map, attributes/palettes → SGB
-  palettes (DMG) or CGB palettes (GBC), OAM, scroll through a camera, APU → GB sound
+  palettes (DMG/SGB mode) or CGB palettes (CGB mode; FF3 always), OAM, scroll through a camera, APU → GB sound
   (triangle → wave channel).
 - The screen is 160×144 instead of 256×240. The field uses a camera centred on the
   party. Dialogue, menus, shops, battle, title and ending get re-laid out for 20×18
@@ -70,7 +75,8 @@ work remaining, scope and plan. Commit and push it with the work.
 **Handoff: `docs/gb-handoff.md`** (session setup, current battle-layout work, exact next steps).
 
 ## Scope and plan
-FF1 first (DMG+SGB), then FF2 (same engine family, DMG+SGB), then FF3 (GBC).
+FF1 first (dual-mode DMG/SGB/CGB), then FF2 (same engine family, dual-mode), then FF3
+(GBC only).
 Milestones per game (from `docs/gb-port.md`):
 1. SM83 assembler + minimal runtime that boots in PyBoy (test pattern, SGB detect).
 2. Recompiler on the fixed bank only; title screen shown through the camera (pan mode).
@@ -78,7 +84,8 @@ Milestones per game (from `docs/gb-port.md`):
 3. Whole game recompiled; emulated RAM matches the NES across random play.
 4. Sound (APU → GB).
 5. Screen re-layouts for 160×144: dialogue, then menus/shops, then battle, title, ending.
-6. SGB palettes + border, save RAM, timing, accuracy pass.
+6. Colour: CGB mode first (NES palettes -> RGB555, attributes -> CGB attribute map, double
+   speed, HDMA), then SGB palettes + border; save RAM, timing, accuracy pass.
 
 ## Done
 - Design notes: `docs/gb-port.md` (targets, memory map, PPU/APU layers, verification).
@@ -206,7 +213,9 @@ Milestones per game (from `docs/gb-port.md`):
   decision** before any font change.
 
 ## In progress / next
-- Owner's decision pending: smaller (condensed proportional) font in the battle message
+- **Dual-mode decided (2026-11-18):** after the battle layout, the colour milestone does
+  the CGB mode first, then SGB (see Targets).
+- (Done, see above) smaller (condensed proportional) font in the battle message
   window (mock-ups `mock3_font_*`, owner: "looks good") and in the name/HP column beside
   the sprites (`mock4_party_small.png`: A = name / HP+number / status word, B = NES order
   name / HP-or-status / number); owner also asked for a window frame around that column,
