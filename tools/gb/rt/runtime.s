@@ -19,12 +19,18 @@ SLOT_STAMP = $DA80          ; GB slot -> frame number of its last use in OAM
 SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
-ATTR_Q     = $D880          ; CGB: queue of NES attribute byte indices (64 entries)
+OWN        = $DD00          ; GB map cell -> nametable that drew it (bit set: nametable 1), 128 bytes
+BG_SHADOW  = $B000          ; DMG shading (rt/dmg_shade.s): NES BG tiles, cart RAM bank 1
+TILE_PAL   = $DB00          ;   palette each BG tile is coded for
+DIRTY_BM   = $DC00          ;   tiles queued for re-coding (bitmap)
+PAL_MAP    = $DC20          ;   value of each NES colour index, per palette
+RT_BUF     = $DC30          ;   one tile being re-coded
+REF_LMAX   = $DC40          ;   brightest BG colour level when the maps were last computed
+PAL_STABLE = 8              ;   frames without palette writes before the maps are recomputed
+RETILE_PER_FRAME = 3
 LCDC_ON    = %11000011      ; LCD on, window map $9C00 (off), BG tiles $8800 (signed), BG map $9800, OBJ on, BG on
-BATTLE_BGP = $27            ; DMG battle: colour 0 black, 1 light grey, 2 dark grey, 3 white
 CAM_X      = 48
 CAM_Y      = 48
-Q_MAX      = 40             ; queue entries flushed per vblank
 
 section hram, $FF80
 hram_dma:   ds 10
@@ -72,15 +78,29 @@ split_scy:  ds 1
 cam_x:      ds 1                            ; GB view origin in the NES picture (pixels),
 cam_y:      ds 1                            ; set by NES writes to $5800/$5801 (tiles)
 frames:     ds 1
-bgp_fix:    ds 1                            ; DMG BG palette set by the GB layout (0 = from the NES palette 0)
 is_cgb:     ds 1                            ; 1 on a Game Boy Color (CGB mode: NES colours)
-aq_head:    ds 1                            ; CGB attribute queue (NES attribute indices, applied in vblank)
-aq_tail:    ds 1
+rq_any:     ds 1                            ; DMG shading (rt/dmg_shade.s): a tile is marked
+rq_pos:     ds 1                            ;   scan position in the dirty bitmap
+pal_age:    ds 1                            ;   frames since the last palette write
+sh_s0:      ds 1
+sh_s1:      ds 1
+sh_p0:      ds 1
+sh_p1:      ds 1
+sh_bk:      ds 1
+sh_l1:      ds 1
+sh_l2:      ds 1
+sh_l3:      ds 1
+sh_chg:     ds 1
+sh_nt:      ds 1                            ;   nametable being shaded: 0 or 4 (high-byte offset)
+ap_own:     ds 1                            ; attr_apply: owner bits wanted (0 or $FF)
+ap_pal:     ds 4                            ; attr_apply: palette of each quadrant
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
 section bank 0, $0000
 rt_jp_hl:   jp hl
+section bank 0, $0038
+            jp rst38_trap                   ; execution ran into $FF bytes: record and stop
 section bank 0, $0040
             jp vblank_isr
 section bank 0, $0048
@@ -118,9 +138,6 @@ boot:       di
             jr nz, .dmg
             ld a, 1
             ldh [is_cgb], a
-            ld a, low(ATTR_Q)
-            ldh [aq_head], a
-            ldh [aq_tail], a
             ld a, 1                         ; VRAM bank 1 (attributes) cleared too
             ldh [$FF4F], a
             ld hl, $8000
@@ -128,7 +145,9 @@ boot:       di
             call memclr
             xor a
             ldh [$FF4F], a
-.dmg:
+            jr .booted
+.dmg:       call dmg_init
+.booted:
             ld hl, dma_code                 ; OAM DMA routine to HRAM
             ld de, hram_dma
             ld b, 10
@@ -211,22 +230,29 @@ dma_code:   ld a, high(OAM_SH)              ; copied to hram_dma (10 bytes)
             ret
 
 ; ------------------------------------------------------------------ interrupts
-vblank_isr: push af
-            push bc
+vblank_isr: push af                         ; order: OAM, palettes, scroll, then queued VRAM
+            push bc                         ;   writes until the last vblank line
             push de
             push hl
-            ld b, Q_MAX
-            call flush_q
-            ldh a, [is_cgb]
-            and a
-            call nz, attr_flush
             ldh a, [oam_pending]
             and a
             jr z, .no_oam
             xor a
             ldh [oam_pending], a
             call hram_dma
-.no_oam:    ldh a, [cam_x]
+.no_oam:    ldh a, [is_cgb]                 ; CGB palette RAM: only in vblank
+            and a
+            jr z, .pal_ok
+            ldh a, [pal_dirty]
+            and a
+            call nz, make_palettes
+.pal_ok:    ldh a, [bgp_v]
+            ldh [$FF47], a
+            ldh a, [obp0_v]
+            ldh [$FF48], a
+            ldh a, [obp1_v]
+            ldh [$FF49], a
+            ldh a, [cam_x]
             ld b, a
             ldh a, [scroll_x]
             add a, b
@@ -254,16 +280,10 @@ vblank_isr: push af
             jr .scy_done
 .nosplit:   xor a
             ldh [$FF41], a
-.scy_done:
-            ldh a, [pal_dirty]
-            and a
+.scy_done:  call flush_vbl
+            ldh a, [pal_dirty]              ; DMG: the shades for the next frame (the
+            and a                           ;   registers are written next vblank)
             call nz, make_palettes
-            ldh a, [bgp_v]
-            ldh [$FF47], a
-            ldh a, [obp0_v]
-            ldh [$FF48], a
-            ldh a, [obp1_v]
-            ldh [$FF49], a
             ld a, 1
             ldh [frame_flag], a
             ld a, $80
@@ -319,10 +339,56 @@ flush_q:    ldh a, [q_tail]
             dec h
             ld h, [hl]
             ld l, a
+            bit 6, h                        ; $D8-$DB: VRAM bank 1 (CGB attributes)
+            jr nz, .b1
             ld [hl], c
-            inc e
+.nx:        inc e
             dec b
             jr nz, .lp
+.done:      ld a, e
+            ldh [q_head], a
+            ret
+.b1:        res 6, h
+            ld a, 1
+            ldh [$FF4F], a
+            ld [hl], c
+            xor a
+            ldh [$FF4F], a
+            jr .nx
+
+; vblank: queued VRAM writes while the vblank lasts (LY 144-152)
+flush_vbl:  ldh a, [q_tail]
+            ld d, a
+            ldh a, [q_head]
+            ld e, a
+.lp:        ld a, e
+            cp d
+            jr z, .done
+            ldh a, [$FF44]
+            sub 144
+            cp 9
+            jr nc, .done
+            ld h, high(QV)
+            ld l, e
+            ld c, [hl]
+            dec h
+            ld a, [hl]
+            dec h
+            ld h, [hl]
+            ld l, a
+            bit 6, h
+            jr nz, .b1
+            ld [hl], c
+            inc e
+            jr .lp
+.b1:        res 6, h
+            ld a, 1
+            ldh [$FF4F], a
+            ld [hl], c
+            xor a
+            ldh [$FF4F], a
+            inc e
+            jr .lp
 .done:      ld a, e
             ldh [q_head], a
             ret
@@ -337,11 +403,12 @@ make_palettes:
             ld hl, PAL_SH
             call pal4
             ld c, a
-            ldh a, [bgp_fix]
+            ldh a, [is_cgb]
             and a
-            jr nz, .fix
             ld a, c
-.fix:       ldh [bgp_v], a
+            jr nz, .cg
+            call dmg_bgp                    ; DMG: shades of the re-coded tile values
+.cg:        ldh [bgp_v], a
             ld hl, PAL_SH + $10
             call pal4
             ldh [obp0_v], a
@@ -379,116 +446,234 @@ cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ pa
             jr nz, .lp
             ret
 
-attr_write:                                 ; CGB: NES attribute byte A of nametable 0 changed
-            push hl
-            ldh a, [lcd_on]
-            and a
-            jr nz, .q
-            ld a, l
-            sub $C0
-            pop hl
-            jp attr_apply
-.q:         ld a, l                         ; LCD on: queue the index for the vblank
-            sub $C0
-            push af
-            ldh a, [aq_tail]
-            ld l, a
-            ld h, high(ATTR_Q)
-            pop af
-            ld [hl], a
-            ld a, l
-            inc a
-            and $3F
-            or low(ATTR_Q)
-            ldh [aq_tail], a
-            pop hl
-            ret
-
-attr_flush:                                 ; vblank: apply up to 6 queued attribute bytes
-            ld b, 6
-.lp:        ldh a, [aq_head]
+attr_apply:                                 ; A = attribute index i (0-63, + $40: nametable 1):
+            push bc                         ;   those of its 4 x 4 cells of the GB map ($9800)
+            push de                         ;   that this nametable owns (OWN) get the palette
+            push hl                         ;   numbers (VRAM bank 1)
             ld c, a
-            ldh a, [aq_tail]
-            cp c
-            ret z
-            ld l, c
-            ld h, high(ATTR_Q)
-            ld a, [hl]
-            call attr_apply
+            and $40
+            jr z, .o0
+            ld a, $FF
+.o0:        ldh [ap_own], a
             ld a, c
-            inc a
+            and $40
+            rrca
+            rrca
+            rrca
+            rrca
+            add a, high(NT_SH) + 3
+            ld h, a
+            ld a, c
             and $3F
-            or low(ATTR_Q)
-            ldh [aq_head], a
-            dec b
-            jr nz, .lp
-            ret
-
-attr_apply:                                 ; A = attribute index i (0-63): its 4 x 4 cells
-            push bc                         ;   of the GB map ($9800) get the palette numbers
-            push de                         ;   (VRAM bank 1)
-            push hl
             ld c, a
             add a, $C0
             ld l, a
-            ld h, high(NT_SH) + 3
-            ld d, [hl]                      ; the attribute value
-            ld a, c                         ; HL = $9800 + (i >> 3) * 128 + (i & 7) * 4
+            ld a, [hl]                      ; the attribute value -> ap_pal[0..3]
+            ld hl, ap_pal
+            ld b, 4
+.qp:        ld d, a
+            and 3
+            ld [hl+], a
+            ld a, d
+            rrca
+            rrca
+            dec b
+            jr nz, .qp
+            ld a, c                         ; DE = OWN byte of (row0, col0): row0 * 4 + col0 / 8
+            and $38                         ;   (row0 = (i >> 3) * 4, col0 = (i & 7) * 4)
+            rrca
+            ld d, a                         ; row0
+            add a, a
+            add a, a
+            ld e, a
+            ld a, c
+            and 7
+            srl a
+            or e
+            ld e, a
+            ld a, c                         ; bit shift of col0 in the byte: 0 or 4
+            and 1
+            ld a, 0
+            jr z, .sb
+            ld a, 4
+.sb:        ld b, a
+            ld a, d                         ; HL = $9800 + row0 * 32 + col0
+            and 7
             swap a
-            and $03
+            add a, a
+            ld l, a
+            ld a, d
+            srl a
+            srl a
+            srl a
             add a, $98
             ld h, a
             ld a, c
-            and $08
-            swap a
-            ld e, a
-            ld a, c
-            and $07
+            and 7
             add a, a
             add a, a
-            or e
+            or l
             ld l, a
-            ld a, 1
-            ldh [$FF4F], a
-            ld a, d
-            and $03
-            ld b, a                         ; top left
-            ld a, d
-            rrca
-            rrca
-            and $03
-            ld c, a                         ; top right
-            call .two
-            ld a, d
+            ld d, high(OWN)
+            ld c, 0                         ; row in the block (0-3)
+.r:         push de
+            ld a, [de]                      ; owner bits of the 4 cells -> low nibble
+            bit 2, b
+            jr z, .sd
             swap a
-            and $03
-            ld b, a                         ; bottom left
-            ld a, d
-            swap a
-            rrca
-            rrca
-            and $03
-            ld c, a                         ; bottom right
-            call .two
-            xor a
-            ldh [$FF4F], a
+.sd:        ld e, a
+            ldh a, [ap_own]
+            xor e
+            cpl                             ; bit set: owned by this nametable
+            ld e, a
+            ld a, c                         ; quadrant row: (row & 2)
+            and 2
+            push bc
+            ld b, a                         ; 0 or 2: index of the left quadrant
+            ld c, 4                         ; 4 cells
+.c:         push bc
+            ld a, c                         ; column in block = 4 - C; right half when C <= 2
+            cp 3
+            ld a, b
+            jr nc, .lft
+            inc a
+.lft:       push hl
+            ld hl, ap_pal
+            add a, l
+            ld l, a
+            ld a, [hl]
+            pop hl
+            bit 0, e
+            call nz, vram_put1
+            inc hl
+            srl e
+            pop bc
+            dec c
+            jr nz, .c
+            pop bc
+            ld a, l                         ; next row: +32 - 4
+            add a, 28
+            ld l, a
+            jr nc, .nh
+            inc h
+.nh:        pop de
+            ld a, e
+            add a, 4
+            ld e, a
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .r
             pop hl
             pop de
             pop bc
             ret
-.two:       call .row
-.row:       ld [hl], b
-            inc l
-            ld [hl], b
-            inc l
-            ld [hl], c
-            inc l
-            ld [hl], c
-            ld a, l
-            add a, 29
+
+; HL = GB map address, A = value for VRAM bank 1: written now (LCD off) or queued
+; (address high + $40 marks bank 1 for flush_q). Keeps all registers but F.
+vram_put1:  push af
+            ldh a, [lcd_on]
+            and a
+            jr nz, .q
+            ld a, 1
+            ldh [$FF4F], a
+            pop af
+            ld [hl], a
+            push af
+            xor a
+            ldh [$FF4F], a
+            pop af
+            ret
+.q:         pop af
+            push hl
+            set 6, h
+            call vram_put
+            pop hl
+            ret
+
+; rt_ppu_w7 nametable cell write: B:L = offset (B 0-3), C = 4 for nametable 1. Marks the
+; owner of the GB map cell; on a Game Boy Color a change of owner re-applies the cell's
+; attribute byte (of its new nametable). Keeps all registers.
+own_set:    push af
+            push bc
+            push de
+            push hl
+            ld a, l                         ; mask of bit (col & 7)
+            and 7
+            ld e, 1
+            inc a
+.m:         dec a
+            jr z, .md
+            sla e
+            jr .m
+.md:        ld a, l                         ; byte = B * 32 + L / 8
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld d, a
+            ld a, b
+            swap a
+            add a, a
+            or d
+            push hl
             ld l, a
-            ret nc
-            inc h
+            ld h, high(OWN)
+            ld a, [hl]
+            and e
+            ld d, a                         ; old bit
+            ld a, c
+            and a
+            jr z, .z
+            ld a, [hl]
+            or e
+            ld [hl], a
+            ld a, d
+            and a
+            pop hl
+            jr z, .chg                      ; 0 -> 1
+            jr .x
+.z:         ld a, e
+            cpl
+            and [hl]
+            ld [hl], a
+            ld a, d
+            and a
+            pop hl
+            jr z, .x                        ; 0 -> 0
+.chg:       ldh a, [is_cgb]
+            and a
+            jr z, .x
+            ld a, l                         ; index = (row / 4) * 8 + col / 4; row = B * 8 + L / 32
+            and 31
+            srl a
+            srl a
+            ld d, a
+            ld a, l
+            swap a
+            rrca
+            and 7
+            ld e, a
+            ld a, b
+            add a, a
+            add a, a
+            add a, a
+            or e                            ; row
+            and $1C
+            add a, a                        ; (row / 4) * 8
+            or d
+            ld d, a
+            ld a, c                         ; + $40 for nametable 1
+            swap a
+            or d
+            push hl
+            ld l, $C0                       ; (attr_apply keeps HL; it takes A)
+            call attr_apply
+            pop hl
+.x:         pop hl
+            pop de
+            pop bc
+            pop af
             ret
 
 pal4:       ; HL -> 4 NES colours ($x0 = universal backdrop) -> DMG palette byte
@@ -523,6 +708,9 @@ rt_wait_nmi:
             inc hl
             inc [hl]
 .nc:        pop hl
+            ldh a, [is_cgb]
+            and a
+            call z, dmg_frame
             xor a
             ldh [frame_flag], a
 .w:         halt
@@ -537,6 +725,27 @@ rt_wait_nmi:
             ldh [nzv], a
             inc a
             dec a
+            ret
+
+dmg_frame:                                  ; DMG shading, once per NES frame: palette maps
+            push bc                         ;   once the palettes are stable, then re-code
+            ldh a, [pal_age]                ;   a few queued tiles (all if the LCD is off)
+            cp 255
+            jr z, .a
+            inc a
+            ldh [pal_age], a
+            cp PAL_STABLE
+            jr nz, .a
+            call dmg_maps
+            ld a, 1                         ; BGP again with the new maps
+            ldh [pal_dirty], a
+.a:         ld b, RETILE_PER_FRAME
+            ldh a, [lcd_on]
+            and a
+            jr nz, .r
+            ld b, 0
+.r:         call dmg_retile_some
+            pop bc
             ret
 
 ; ------------------------------------------------------------------ PPU registers
@@ -554,7 +763,12 @@ rt_ppu_w1:  push af
             jr nz, .ret
             ld b, 0                         ; flush everything (LCD still off)
             call flush_q
-            ld a, LCDC_ON
+            ldh a, [is_cgb]
+            and a
+            jr nz, .lon
+            ld b, 0                         ; DMG: re-code all queued tiles while the LCD is off
+            call dmg_retile_some
+.lon:       ld a, LCDC_ON
             ldh [$FF40], a
             ld a, 1
             ldh [lcd_on], a
@@ -669,6 +883,28 @@ rt_ppu_w7:  push af
             ld a, h
             cp $10
             jr nc, .spr
+            ldh a, [is_cgb]
+            and a
+            jr nz, .bgv
+            ld a, h                         ; DMG: the BG tile goes to the shadow; the tile is
+            add a, high(BG_SHADOW)          ;   re-coded for its palette later
+            ld h, a
+            ld a, 1
+            ld [$4000], a
+            ld [hl], d
+            xor a
+            ld [$4000], a
+            ld a, h
+            sub high(BG_SHADOW)
+            swap a
+            ld b, a
+            ld a, l
+            swap a
+            and $0F
+            or b
+            call dmg_mark
+            jp .done
+.bgv:       ld a, h
             cp $08                          ; BG tiles 0-127 at $9000, 128-255 at $8800
             ld c, $90
             jr c, .bg0
@@ -732,17 +968,33 @@ rt_ppu_w7:  push af
             ld a, l
             cp $C0
             jr c, .map
-            ld a, c                         ; attribute table: shadow; CGB (nametable 0):
-            and a                           ;   the 16 cells' palette numbers in VRAM bank 1
-            jr nz, .done
+            ld a, c                         ; attribute table: shadow; CGB: the 16 cells'
+            swap a                          ;   palette numbers in VRAM bank 1; DMG: their
+            ld b, a                         ;   tiles' shading. A = index (0-63) + $40 for
+            ld a, l                         ;   nametable 1
+            sub $C0
+            or b
+            ld b, a
             ldh a, [is_cgb]
             and a
-            jr z, .done
-            ld a, l
-            sub $C0
-            call attr_write
+            ld a, b
+            jr z, .dat
+            call attr_apply
             jr .done
-.map:       ld a, b
+.dat:       call dmg_attr
+            jr .done
+.map:       call own_set                    ; this nametable now owns the GB map cell
+            ldh a, [is_cgb]
+            and a
+            jr nz, .map2
+            push bc                         ; DMG: the cell's tile shaded for its palette
+            ld a, b                         ;   (B = offset high + 4 for nametable 1)
+            or c
+            ld b, a
+            ld a, d
+            call dmg_cell
+            pop bc
+.map2:      ld a, b
             add a, $98
             ld h, a
 .vram:      ldh a, [lcd_on]
@@ -786,6 +1038,8 @@ rt_ppu_w7:  push af
             ld [hl], a
             ld a, 1
             ldh [pal_dirty], a
+            xor a
+            ldh [pal_age], a
 .done:      call ppu_inc
             pop hl
             pop de
@@ -1123,21 +1377,13 @@ rt_mmc_w5115:
             ldh [data_bank8], a
             pop af
             ret
-rt_mmc_w5800:                               ; camera X in tiles (GB layout code); bit 7:
-            push af                         ;   the fixed battle BG palette on DMG
-            push af
+rt_mmc_w5800:                               ; camera X in tiles (GB layout code; bit 7 is
+            push af                         ;   no longer used)
             and $1F
             add a, a
             add a, a
             add a, a
             ldh [cam_x], a
-            pop af
-            and $80
-            jr z, .auto
-            ld a, BATTLE_BGP
-.auto:      ldh [bgp_fix], a
-            ld a, 1
-            ldh [pal_dirty], a
             pop af
             ret
 rt_mmc_w5801:                               ; camera Y in tiles
@@ -1595,3 +1841,19 @@ rt_fault:   di
             ldh a, [code_bank]
             ld [DBG + 7], a
 rt_halted:  jr rt_halted
+
+; rst $38 (opcode $FF) reached: DBG+8 = SP, DBG+10.. = 8 stack words; then stop
+rst38_trap: di
+            ld [DBG + 8], sp
+            ld hl, sp + 0
+            ld de, DBG + 10
+            ld b, 16
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            ld a, $38
+            ld [DBG], a
+.s:         halt
+            jr .s

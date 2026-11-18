@@ -5,8 +5,10 @@ usage: PYTHONPATH=build/emu firstdiff.py NES GB [MAXFRAMES] [--random SEED] [--b
        [--input MODE (battleseq.py modes, implies --battle)] [--poke ADDR=VAL,...]
        [--shots F1,F2,... --out SHEET.png]
 --battle: the battleshot.py input (new-game script, walk into a battle, A once a second);
---shots: GB screens after those NES frames, saved as one sheet (--out)."""
-import sys, random
+--shots: GB screens after those NES frames, saved as one sheet (--out).
+env STUCK_SAVE=K: save the PyBoy state on entering frame wait K to build/stuck.state and stop
+(for debugging the GB alone from there)."""
+import sys, random, os
 sys.path.insert(0, __file__.rsplit('/', 1)[0])
 from compare import sync_sram, GB, new_game_script, UP, DOWN, LEFT, RIGHT, A, B, START
 from cynes import NES
@@ -78,6 +80,9 @@ for m in steps[:limit]:
         while j not in snaps:
             gb.pb.tick(); guard += 1
             if guard > 2000: raise SystemExit('GB stuck before wait %d' % j)
+            if os.environ.get('STUCK_SAVE') and j == int(os.environ['STUCK_SAVE']):
+                with open('build/stuck.state', 'wb') as fh: gb.pb.save_state(fh)
+                raise SystemExit('saved before wait %d' % j)
         if j < k: snaps.pop(j)
     if f in shots_at:
         shots.append(gb.image())

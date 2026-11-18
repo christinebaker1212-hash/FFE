@@ -114,7 +114,7 @@ def main():
     cm = CodeMap(nes, covs).build()
     rc = Recompiler(cm)
     prog, bank_of, banks = emit_program(rc)
-    rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s'))
+    rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s'))
     rt += '\n' + apu_tables()
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(
         '    db %s\n' % ', '.join(str(shade(c)) for c in range(r, r + 16)) for r in range(0, 64, 16))

@@ -49,7 +49,18 @@ hle_chr_pages:
             ldh a, [ppu_vh]
             cp $10
             jr nc, .spr
-            cp $08
+            ld d, a
+            ldh a, [is_cgb]
+            and a
+            ld a, d
+            jr nz, .bgv
+            and $0F                         ; DMG: BG tiles to the shadow (RAM bank 1), re-coded
+            add a, high(BG_SHADOW)          ;   for their palette later
+            ld d, a
+            ld a, 1
+            ld [$4000], a
+            jr .copy
+.bgv:       cp $08
             ld d, $90
             jr c, .bg0
             ld d, $80
@@ -81,8 +92,13 @@ hle_chr_pages:
             jr nz, .p1
             ldh [tmp_lo], a                 ; last byte
             ld a, d
-            cp high(SPR_SHADOW)             ; (BG tiles are at $80-$97: not sprites)
+            cp high(BG_SHADOW)
+            jr c, .nbg
+            call hle_bg_tile                ; DMG BG tile in the shadow: queue its re-coding
+            jr .nx
+.nbg:       cp high(SPR_SHADOW)             ; (BG tiles in VRAM are at $80-$97: not sprites)
             call nc, hle_spr_tile           ; sprite tile: to its slot if resident
+.nx:
             ldh a, [ppu_vl]                 ; v += 16
             add a, 16
             ldh [ppu_vl], a
@@ -124,6 +140,22 @@ hle_chr_pages:
             inc l
             dec l                           ; Z = 1 (DEX reached 0)
             ret
+
+; after a BG tile went to the DMG shadow (DE = shadow tile start + 17, RAM bank 1 on):
+; queue the tile for re-coding; RAM bank 0 back. Keeps BC, HL.
+hle_bg_tile:
+            xor a
+            ld [$4000], a
+            ld a, e
+            sub 17
+            swap a
+            and $0F
+            ld e, a
+            ld a, d
+            sub high(BG_SHADOW)
+            swap a
+            or e
+            jp dmg_mark
 
 ; after a tile went to the sprite shadow (DE = shadow tile start + 17: the odd-byte loop
 ; ends one past the tile; RAM bank 1 on): copy it to the tile's GB slot if resident;
