@@ -322,8 +322,8 @@ Milestones per game (from `docs/gb-port.md`):
 - **GB build of the battle layout works (2026-11-18):** `build.py --gb` -> `build/ff1_gb.gb`
   (18.7k instructions, 5 code banks); `firstdiff.py build/ff1_gb.nes build/ff1_gb.gb 7100
   --battle`: **no RAM difference in 7100 frames** (new game, walk, battle with messages,
-  commands, party window, blinking); `--random 1`: no difference in 30000 frames. On DMG all BG uses one palette (BGP from NES
-  palette 0), so window interiors are grey and the blink's $FF cells darker: colour
+  commands, party window); `--random 1`: no difference in 30000 frames. On DMG all BG uses one palette (BGP from NES
+  palette 0), so window interiors are grey: colour
   milestone (CGB/SGB attributes). Details of the earlier plan: `build.py --gb` (builds
   `build/ff1_gb.nes` with `insert.py --gb`, coverage `build/cov3` from `covrun.py` on that
   ROM, output `build/ff1_gb.gb`), then `firstdiff.py`, PyBoy and mGBA checks. Coverage

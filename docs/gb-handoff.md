@@ -45,7 +45,7 @@ approved layout = `mock12_battle.png` + full-width messages `mock13_msgs_wide.pn
 - all window text in a small proportional font (rendered into tiles by NES code),
 - messages "style A": `attacker → target`, then action / result lines indented,
 - FF1's large hand cursor, never over text, may be cut off at the left screen edge,
-- the commanding member's party line blinks; status words "Blind" (Darkness), "Numb"
+- no blinking (owner: the cursor is enough); enemy names show while targeting; status words "Blind" (Darkness), "Numb"
   (Paralysis), "Mute" (Silence) where needed (translation change approved),
 - dual-mode target for colour (CGB first), see CLAUDE.md.
 
@@ -56,14 +56,15 @@ approved layout = `mock12_battle.png` + full-width messages `mock13_msgs_wide.pn
   image on every panel clear, hook `$F625`), `party_line` (hook b12:`$AA5B`), `boxline`
   replacement (panel text into tiles `$A8 + 18(row-1) + col-2`, word wrap; marker
   columns 21 = target after the attacker, 22 = next message line, 23 = Run), `MAGPAGE`,
-  `ITEMLIST` (+ `ITEMMOVE_PATCH`), `blink`.
+  `ITEMLIST` (+ `ITEMMOVE_PATCH`); enemy targeting shows the names window (stubs
+  b12:`$AB07` / `$9D94` around the target loop `$9B55`).
 - Far code must not reach bank-62 code at `$C000-$DFFF` (`$F47D` ends in `JMP $C009`,
   the music driver): use the fixed trampoline `MUSIC` (`$F2F1`).
 - Text code `$FD $80+n` moves the pen to tile n of the row (the decoder treats bytes
   < `$48` as control codes and converts `$48-$79`).
 - Tiles: party lines `$80-$A7`, panel text `$A8-$EF` (font tiles, free in battle: the
   field reloads the BG pattern table after a battle). RAM: `$6E00-$6EFF` (renderer),
-  `$0340-$0342` (blink); both never touched by the game in 320k frames of coverage.
+  `$0343-$0344` (list row, saved box count); both never touched by the game in 320k frames of coverage.
 - Tools: `battleshot.py --cam 1`, `battleseq.py` (sheet of a battle; `--form F` forces a
   formation, `--input fight|run|magic4|items4`, `--poke ADDR=VAL` patches work RAM, e.g.
   spells `$6300+64m`, equipment `$6118+64m`), `formations.py` (survey), `ntlog.py`,
@@ -74,7 +75,6 @@ approved layout = `mock12_battle.png` + full-width messages `mock13_msgs_wide.pn
    `firstdiff.py build/ff1_gb.nes build/ff1_gb.gb`, look at it in PyBoy and mGBA (SGB).
    The VRAM queue (40 bytes per GB frame) makes text slower on GB: measure, and later use
    HDMA in CGB mode.
-2. Blink the target (party targets; decide with the owner for enemies).
 3. Enemy names window: long names wrap into the next name's row (rare: names > 56 px);
    end-of-battle messages (gold, experience, level up); "Medicine" list; all formations
    (fiends, Chaos); messages that need three rows.
