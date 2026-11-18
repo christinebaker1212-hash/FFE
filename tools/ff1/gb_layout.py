@@ -6,7 +6,7 @@ decisions in CLAUDE.md (SaGa 3 / GB RPG style).
 
 Camera: the NES code selects the GB view per screen by writing tile coordinates to
 $5800 (X) / $5801 (Y) (unmapped on the MMC5; the GB runtime moves its view). Default
-(field, until a screen sets its own): X = 6, Y = 6. Bit 7 of the $5800 value selects the
+(field, until a screen sets its own): X = FIELD_CAM_X (5), Y = 6. Bit 7 of the $5800 value selects the
 runtime's fixed battle palette on DMG (one BG palette for the whole screen there).
 
 Battle (mock-up 12/13, approved): camera (1, 6), so GB = NES - (1, 6):
@@ -42,6 +42,9 @@ def bank_off(bank, cpu):
     return HDR + bank * BANK + cpu - 0x8000
 
 
+FIELD_CAM_X = 5     # field camera X (tiles): the party (NES x 112-127) centred in the 160-px view
+
+
 def battle_frames(rom):
     """$F2DC-$F30B draws the enemy box (1,1,16,18), the party box (17,1,8,18) and the four
     6x7 HP boxes; the GB layout has no frames there. The freed bytes hold the battle
@@ -55,7 +58,7 @@ def battle_frames(rom):
     wrap = 0xF2E4
     put(rom, wrap, bytes([0x20, 0x00, 0xF2,                    # JSR $F200 (battle)
                           0x08, 0x48,                          # PHP / PHA
-                          0xA9, 0x06, 0x8D, 0x00, 0x58,        # LDA #6 / STA $5800
+                          0xA9, FIELD_CAM_X, 0x8D, 0x00, 0x58, # LDA #FCX / STA $5800
                           0x68, 0x28, 0x60]))                  # PLA / PLP / RTS
     for site in (0xC1D6, 0xC935):
         put(rom, site, bytes([0x20, wrap & 0xFF, wrap >> 8]), expect=bytes([0x20, 0x00, 0xF2]))
@@ -1669,15 +1672,15 @@ dblo:
 dbret:
     rts
 dfill:              ; A = 1 top, 2 middle, 3 bottom; X = 0 upper / $20 lower tile row:
-    tay             ;   left edge in metatile 3, fill to metatile 12, right edge in 12
-    lda dkl-1,y
-    sta $0783,x
+    tay             ;   tile columns 5-24 (the field view, camera X = 5): left edge in the
+    lda dkl-1,y     ;   right half of metatile 2, fill metatiles 3-11, right edge in the left
+    sta $0792,x     ;   half of metatile 12 ($0780 + m: left halves, $0790 + m: right halves)
     lda dkr-1,y
-    sta $079C,x
+    sta $078C,x
     lda dkf-1,y
     ldy #9
 df1:
-    sta $0784,x
+    sta $0783,x
     sta $0793,x
     inx
     dey
@@ -1724,7 +1727,7 @@ dbend:
     r = asm(src, syms={'PAGE': page, 'HIDE': main.FAR_ROUTINES.index('dlghide'), 'FARJSR': farjsr}, org=0xD54B)
     assert r.org == 0xD54B and r.org + len(r.bytes) <= 0xD5E4, hex(r.org + len(r.bytes))
     put(rom, 0xD54B, r.bytes, expect=bytes([0xC6, 0x1C, 0xF0, 0x4C]))
-    put(rom, 0xD520, bytes([0xA5, 0x29, 0x18, 0x69, 0x13, 0x29, 0x1F, 0x38, 0x2A, 0x85, 0x38,   # col ((x+19)&31)*2+1
+    put(rom, 0xD520, bytes([0xA5, 0x29, 0x18, 0x69, 0x13, 0x29, 0x1F, 0x0A, 0xEA, 0x85, 0x38,   # col ((x+19)&31)*2
                             0xA5, 0x2F, 0x0A, 0x69, 0x07, 0xC9, 0x1E, 0x90, 0x02, 0xE9, 0x1E,   # row y*2+7 mod 30
                             0x85, 0x39, 0xA9, 0x80, 0x85, 0x37, 0x68, 0x4C]) + r.labels['dstart'].to_bytes(2, 'little'),
         expect=bytes([0xA5, 0x29, 0x18, 0x69, 0x12, 0x29, 0x1F, 0x0A, 0x85, 0x38]))
@@ -2072,8 +2075,9 @@ mtpl:
     # back to the field camera when the menu closes ($AE15)
     src = """
 camfield:
-    lda #6
+    lda #FCX
     sta $5800
+    lda #6
     sta $5801
     lda $2002
     rts
@@ -2083,19 +2087,28 @@ cammenu:
     sta $5800
     sta $5801
     rts
-camexit:
-    jsr camfield
-    lda #0
-    sta $2001
-    rts
 """
-    r = asm(src, org=0xB82C)
+    r = asm(src, syms={'FCX': FIELD_CAM_X}, org=0xB82C)
     assert r.org + len(r.bytes) <= 0xB84D, hex(r.org + len(r.bytes))
     put_bank(rom, B, 0xB82C, r.bytes, bytes(rom[bank_off(B, 0xB82C):bank_off(B, 0xB82C) + 2]))
     CAM['menu'] = r.labels['cammenu']
     put_bank(rom, B, 0x9C02, bytes([0x20]) + r.labels['camfield'].to_bytes(2, 'little'), bytes([0xAD, 0x02, 0x20]))
     put_bank(rom, B, 0xB84D, bytes([0x20]) + r.labels['cammenu'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
-    put_bank(rom, B, 0xAE15, bytes([0x20]) + r.labels['camexit'].to_bytes(2, 'little') + bytes([0xEA, 0xEA]),
+    x = asm("""
+camexit:            ; $AE15 (menu closed: LDA #0 / STA $2001): the field camera; A = 0 after
+    lda #0          ;   (the caller stores it on); fixed bank's free bytes after pzw ($F7FA-$F81F)
+    sta $2001
+    lda #FCX
+    sta $5800
+    lda #6
+    sta $5801
+    lda $2002
+    lda #0
+    rts
+""", syms={'FCX': FIELD_CAM_X}, org=0xF820)
+    assert x.org + len(x.bytes) <= 0xF88F
+    put(rom, x.org, x.bytes)
+    put_bank(rom, B, 0xAE15, bytes([0x20]) + x.labels['camexit'].to_bytes(2, 'little') + bytes([0xEA, 0xEA]),
              bytes([0xA9, 0x00, 0x8D, 0x01, 0x20]))
 
 
@@ -3170,9 +3183,10 @@ camname:            ; $9D65 (name entry screen): camera 5, 2
     rts
 """
 NG_B14B = """
-camend:             ; $9CBF (party made): the field camera 6 / 6, screen off as before
-    lda #6
+camend:             ; $9CBF (party made): the field camera, screen off as before
+    lda #FCX
     sta $5800
+    lda #6
     sta $5801
     lda #0
     sta $2001
@@ -3201,7 +3215,7 @@ def new_game(rom):
     a = asm(NG_B14, org=0xA145)                     # dead old prologue code (A142 jumps away)
     assert a.org + len(a.bytes) <= 0xA167, hex(a.org + len(a.bytes))
     put_bank(rom, B, a.org, a.bytes, bytes(rom[bank_off(B, a.org):bank_off(B, a.org) + len(a.bytes)]))
-    b = asm(NG_B14B, org=EQ_CAM_END)               # after camequip ($BF0D, equip_menu)
+    b = asm(NG_B14B, syms={"FCX": FIELD_CAM_X}, org=EQ_CAM_END)   # after camequip ($BF0D, equip_menu)
     assert b.org + len(b.bytes) <= 0xBF41, hex(b.org + len(b.bytes))
     put_bank(rom, B, b.org, b.bytes, bytes(rom[bank_off(B, b.org):bank_off(B, b.org) + len(b.bytes)]))
     put_bank(rom, B, 0x9D09, bytes([0x20]) + a.labels['camclass'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
@@ -3248,11 +3262,12 @@ cam35:
     w = asm("""
 brw:                ; $C154: the bridge story, then the field camera again
     jsr $B800
-    lda #6
+    lda #FCX
     sta $5800
+    lda #6
     sta $5801
     rts
-""", org=0xEE12)
+""", syms={'FCX': FIELD_CAM_X}, org=0xEE12)
     assert w.org + len(w.bytes) <= 0xEE21
     put(rom, 0xEE12, w.bytes)
     put(rom, 0xC154, bytes([0x20]) + w.labels['brw'].to_bytes(2, 'little'), expect=bytes([0x20, 0x00, 0xB8]))
@@ -3289,12 +3304,13 @@ pzw:                ; $C28A
     sta $5801
     jsr $AE10
     php             ; (the caller tests the carry)
-    lda #6
+    lda #FCX
     sta $5800
+    lda #6
     sta $5801
     plp
     rts
-""", org=0xF7FA)
-    assert w.org + len(w.bytes) <= 0xF88F
+""", syms={'FCX': FIELD_CAM_X}, org=0xF7FA)
+    assert w.org + len(w.bytes) <= 0xF820          # (camexit, main_menu, from $F820)
     put(rom, w.org, w.bytes)
     put(rom, 0xC28A, bytes([0x20]) + w.labels['pzw'].to_bytes(2, 'little'), expect=bytes([0x20, 0x10, 0xAE]))

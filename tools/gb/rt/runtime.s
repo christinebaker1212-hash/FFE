@@ -64,7 +64,7 @@ MAPS_WAIT  = 16             ;   frames the maps may be due before they are recom
 PAL_STABLE = 8              ;   frames without palette writes before the maps are recomputed
 RETILE_PER_FRAME = 3
 LCDC_ON    = %11000011      ; LCD on, window map $9C00 (off), BG tiles $8800 (signed), BG map $9800, OBJ on, BG on
-CAM_X      = 48
+CAM_X      = 40          ; field camera X (pixels): FIELD_CAM_X in tools/ff1/gb_layout.py
 CAM_Y      = 48
 
 section hram, $FF80
