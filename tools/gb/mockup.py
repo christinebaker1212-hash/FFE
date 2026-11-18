@@ -379,6 +379,57 @@ def battle8(out):
     out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock8_owner_sketch.png'))
 
 
+ARROW = {'>': ["......", "...#..", "....#.", "######", "....#.", "...#..", "......"]}
+
+
+def battle9(out):
+    """Owner (2026-11-18): better fit/readability on the right, livelier messages.
+    Party column spans the full height: sprite i at GB y = 6 + 33 i (cols 14-15), and its
+    4 lines (name / status / HP / max) beside it in the right window (cols 16-19, frame
+    flush to the screen edge). Enemy area keeps 14 columns; the bottom window is under
+    it (cols 0-13). Messages: A = the same words, arranged (actor > target, then action,
+    then result); B = sentences (adds English words not in the Japanese)."""
+    party = [('AAAA', 192, 899, ''), ('Bob', 30, 30, 'Poison'), ('Mm', 0, 33, 'Sleep'),
+             ('WWWW', 125, 999, 'Stone')]
+    X0, X1 = 132, 155
+
+    def screen(page):
+        s = Screen(bg=3)
+        for r in range(3):
+            for c in range(3): s.block(1 + c * 4, r * 4, 4, 4)
+        # right window, frame flush to the screen edge
+        s.d.rectangle([128, 0, 159, 143], fill=SHADES[3])
+        for off, shade in ((1, 1), (2, 0), (3, 1)):
+            s.d.rectangle([128 + off, off, 159 - off + 1, 143 - off], outline=SHADES[shade])
+        for i, (n, hp, mx, st) in enumerate(party):
+            y = 6 + i * 33
+            s.d.rectangle([14 * 8, y, 14 * 8 + 15, y + 23], fill=SHADES[2], outline=SHADES[1])
+            _pt(s, (X0 + X1 + 1 - s.pwidth(n)) // 2, y, n)
+            if st:
+                tb = NARROW if s.pwidth(st) > X1 - X0 + 1 else None
+                _pt(s, (X0 + X1 + 1 - s.pwidth(st, tb)) // 2, y + 8, st, tb)
+            _pt(s, X1 - s.pwidth(str(hp), SMALLDIG), y + 16, str(hp), SMALLDIG)
+            _pt(s, X1 - s.pwidth('/%d' % mx, SMALLDIG), y + 23, '/%d' % mx, SMALLDIG)
+        s.window(0, 12, 14, 6)
+        lines = {'cmd': ['Goblin', 'Minotaur', 'Zombie'],
+                 'A': ['Bob > Goblin', '  Fire', '  23 damage'],
+                 'B': ['Bob casts Fire', 'on Goblin!', 'Goblin takes 23', 'damage.'],
+                 'B2': ['Goblin attacks Bob!', '2 hits for 9 damage.'],
+                 'B3': ['Mm fell asleep.']}[page]
+        for i, r in enumerate(lines): s.ptext(1, 13 + i, r, table=ARROW)
+        if page == 'cmd':
+            s.window(7, 12, 7, 6)
+            for i, w in enumerate(['Fight', 'Magic', 'Medicine', 'Items']): s.ptext(8, 13 + i, w)
+            s.ptext(0, 13, 'Run', px=8 * 8 + 30)
+            s.cursor(7, 13)
+        return s
+    for name, pages in (('mock9_layout', ('cmd', 'A')), ('mock9_messages', ('B', 'B2', 'B3'))):
+        ims = [screen(p).im for p in pages]
+        out_im = Image.new('RGB', (168 * len(ims) - 8, 144), (255, 255, 255))
+        for k, im in enumerate(ims): out_im.paste(im, (k * 168, 0))
+        out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, name + '.png'))
+
+
 def _pt(s, X, Y, txt, table=None):
     """proportional text at pixel (X, Y)"""
     for k, ch in enumerate(txt):
@@ -415,5 +466,5 @@ def main_menu(out):
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else 'build'
     os.makedirs(out, exist_ok=True)
-    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); battle8(out); main_menu(out)
+    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); battle8(out); battle9(out); main_menu(out)
     print('written to', out)

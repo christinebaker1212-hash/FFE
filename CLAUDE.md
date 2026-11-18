@@ -224,7 +224,14 @@ Milestones per game (from `docs/gb-port.md`):
   full-height framed window at cols 16-19 with name / status / HP current / max per
   member, bottom windows in cols 0-15. Drawn as `mock8_owner_sketch.png`: text area is
   only 22 px wide (Silence/Darkness/Paralysis overflow, HP split over two lines);
-  waiting for the owner's answer; needs a tile renderer in the NES code (CHR RAM) and
+  owner: better fit and readability, and livelier messages than "Bob / Fire / Goblin /
+  23 damage". `mock9_layout.png`: sprites spread over the full height (y = 6 + 33i),
+  each member's name / status / HP / max beside its sprite, right window flush to the
+  screen edge (23 px text), bottom window under the enemies (cols 0-13), enemy area
+  keeps 14 columns; message style A (same words, actor > target / action / result).
+  `mock9_messages.png`: style B, sentences (adds English words not in the Japanese:
+  needs the owner to relax translation rule 1 for battle messages). Open: status words
+  wider than 23 px (Silence, Darkness, Paralysis). Waiting for the owner; needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
 - Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target
   cursor, flashing of the acting member's line and the target, magic/item lists in the
