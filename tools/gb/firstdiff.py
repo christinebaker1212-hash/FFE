@@ -2,7 +2,7 @@
 where NES RAM at NMI k differs from GB RAM on entering frame wait k (page 1 excluded).
 The GB gets the controller value the NES game latched in each frame (cynes nmi_pad).
 usage: PYTHONPATH=build/emu firstdiff.py NES GB [MAXFRAMES] [--random SEED] [--battle]
-       [--input MODE (battleseq.py modes, implies --battle)] [--poke ADDR=VAL,...]
+       [--input MODE (battleseq.py modes, implies --battle)] [--poke ADDR=VAL,... [--poke-at F]]
        [--field SCRIPT (fieldseq.py: new game, then the moves)]
        [--shots F1,F2,... --out SHEET.png]
 --battle: the battleshot.py input (new-game script, walk into a battle, A once a second);
@@ -29,6 +29,9 @@ if '--input' in args:
 if '--poke' in args:
     k = args.index('--poke')
     pokes = [tuple(int(x, 16) for x in kv.split('=')) for kv in args[k + 1].split(',') if kv]; del args[k:k + 2]
+poke_at = 6100 if not field else 3700
+if '--poke-at' in args:
+    k = args.index('--poke-at'); poke_at = int(args[k + 1]); del args[k:k + 2]
 shots_at, out = set(), None
 if '--shots' in args:
     k = args.index('--shots'); shots_at = {int(x) for x in args[k + 1].split(',')}; del args[k:k + 2]
@@ -68,7 +71,7 @@ if rnd is not None:
         steps += [r.choice(btns)] * r.randint(2, 40) + [0] * r.randint(1, 20)
 f = 0
 for m in steps[:limit]:
-    if f == 6100 and pokes:                  # work RAM patches (NES state + GB cart RAM)
+    if f == poke_at and pokes:                  # work RAM patches (NES state + GB cart RAM)
         import battleseq
         st = nes.save()
         for a, v in pokes:

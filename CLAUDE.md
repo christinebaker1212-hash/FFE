@@ -481,8 +481,28 @@ Milestones per game (from `docs/gb-port.md`):
   now un-parks them; the name-entry letters B, L, ... were missing).
 - Sprite conversion fixed for camera X / Y = 0 (the main menu): sprites at the left /
   top edge were dropped (the menu hand cursor was invisible).
-- Next: sub-screens (Items, Magic, Weapons/Armor, Status: they use the centred camera
-  for now), then shops.
+- **Items screen (2026-11-18)** (`gb_layout.item_menu`, camera 0/0): title window (0,0,8,3),
+  list window (0,3,20,15) with 13 items per page from column 3 (hand at the screen edge);
+  the list turns the page when the cursor passes its end (at most 23 items = 2 pages,
+  `pagechk` at b14 $B621) and is redrawn when the cursor moves after a description
+  covered it (every description window $B93E sets IDESC). Descriptions / prompts: window
+  8 = (0,9,20,9), up to 7 lines of 18 (insert.py --gb rewraps DESC_IDS; "A button...Yes" /
+  "B button...No" on two lines). A page turn takes ~35 frames (frame rows 1/frame, text
+  rows 2/frame, as FF1's own menu drawing).
+- **Magic screen (2026-11-18)** (`gb_layout.magic_menu`): list window 9 = (0,3,20,15), three
+  levels per page (a level line "L1  MP 9/9", the three spells below from column 3);
+  up/down change the level as on the NES, a level on another page turns the page
+  (`gbmagcur` in ExRAM, called each frame from $B829). String 42 is the page of levels
+  1-3 (`magic_tpl`); far `magpatch` (run for every menu string from $B957, recognises the
+  copy at $6C00 by its first bytes) adds 3*page / 9*page to the level and spell
+  parameters. ExRAM is full up to $5F80 (GB menu code there: `exram_source`).
+- Coverage: `tools/gb/covall.py ROM build/cov3` regenerates all logs (4 random seeds +
+  field scripts dialogue / menu / items / magic, with pokes) in parallel; build.py warns
+  when `rom.sha1` does not match the NES ROM. Tools: fieldseq.py / firstdiff.py / covfield.py
+  `--poke ADDR=VAL,..` (at frame 3700 on the field).
+- Next: Weapons/Armor (plan: camera X = 1 so the hand is cut off at the left edge; top
+  window title + "Equip Swap Drop"; two members per page, name + four slots "E" + 17-letter
+  names), Status, then shops.
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).

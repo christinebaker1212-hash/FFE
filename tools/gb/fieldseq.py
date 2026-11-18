@@ -1,7 +1,8 @@
 """Field input scripts (after the new-game script) for screens reached by walking: talk to
 people, open the menu, shops. NES screenshots (full frame, GB view outlined) of a script.
 usage: PYTHONPATH=build/emu fieldseq.py NES OUT.png SCRIPT [--shots F1,F2,...] [--cam X,Y]
-SCRIPT: a name from SCRIPTS or moves 'U40,A3,_20,...' (button letter + frames; _ = none)"""
+SCRIPT: a name from SCRIPTS or moves 'U40,A3,_20,...' (button letter + frames; _ = none)
+--poke ADDR=VAL,... [--poke-at F]: work RAM patches at NES frame F (default 3700, on the field)"""
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from compare import new_game_script, UP, DOWN, LEFT, RIGHT, A, B, START
@@ -40,10 +41,17 @@ if __name__ == '__main__':
     args = sys.argv[4:]
     shots = [int(x) for x in args[args.index('--shots') + 1].split(',')] if '--shots' in args else []
     cx, cy = (int(v) for v in args[args.index('--cam') + 1].split(',')) if '--cam' in args else (6, 6)
+    pokes = [tuple(int(x, 16) for x in kv.split('=')) for kv in args[args.index('--poke') + 1].split(',') if kv] if '--poke' in args else []
+    poke_at = int(args[args.index('--poke-at') + 1]) if '--poke-at' in args else 3700
     fr = frames_for(script)
     if not shots: shots = list(range(len(fr) - 2000 - 600, len(fr) - 1800, 100))
     n = NES(nes_path); ims = []
     for f in range(max(shots) + 1):
+        if f == poke_at and pokes:
+            import battleseq
+            st = n.save()
+            for a, v in pokes: st[battleseq.SRAM_STATE + a - 0x6000] = v
+            n.load(st)
         n.controller = fr[f] if f < len(fr) else 0
         img = np.array(n.step(1))
         if f in shots:

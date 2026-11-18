@@ -120,7 +120,11 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     nes = opt['--nes'] or nes_english(src, out_dir, gb)     # --nes: an English NES ROM already built
     covs = sorted(glob.glob(os.path.join(opt['--cov'], '*.bin')))
-    if not covs: raise SystemExit('no coverage logs in %s (run tools/gb/covrun.py)' % opt['--cov'])
+    if not covs: raise SystemExit('no coverage logs in %s (run tools/gb/covall.py)' % opt['--cov'])
+    shf = os.path.join(opt['--cov'], 'rom.sha1')
+    if os.path.exists(shf) and open(shf).read().split()[0] != hashlib.sha1(open(nes, 'rb').read()).hexdigest():
+        print('WARNING: coverage in %s is from another NES ROM: run tools/gb/covall.py %s %s'
+              % (opt['--cov'], nes, opt['--cov']))
     t = time.time()
     entries = []                                      # far routines (dispatched by farjsr)
     if os.path.exists(nes + '.far'):

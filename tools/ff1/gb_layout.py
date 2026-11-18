@@ -90,7 +90,7 @@ GLYPH_FIRST = 0x7A                       # glyph table covers codes $7A-$FF
 DIG3 = 0xD3                              # 3-px digits $D3-$DC, small '/' $DD, arrow $DE
 SLASH3, ARROW = 0xDD, 0xDE
 STATUS_WORDS = ['Stone', 'Poison', 'Blind', 'Numb', 'Sleep', 'Mute']   # status bits 1-6
-FAR_GB = ['party_line', 'party_stamp', 'dlgpage', 'dlghide']   # far routines added for the GB layout (after boxline etc.)
+FAR_GB = ['party_line', 'party_stamp', 'dlgpage', 'dlghide', 'magpatch']   # far routines added for the GB layout (after boxline etc.)
 
 VWF_SRC = """
 VBUF = $6E00        ; line buffer: 18 tiles x 8 rows, 1 bit per pixel, tile-major
@@ -1488,7 +1488,7 @@ def enc_word(enc, w):
 
 
 def far_source(enc):
-    return 'MUSIC = $%04X\n' % MUSIC + VWF_SRC + DLG_SRC + glyph_tables(enc)
+    return 'MUSIC = $%04X\n' % MUSIC + VWF_SRC + DLG_SRC + glyph_tables(enc) + magpatch_source(enc)
 
 
 # ---- field dialogue ----------------------------------------------------------------
@@ -1913,6 +1913,8 @@ def apply(rom, report):
     music_trampoline(rom)
     dialogue(rom)
     main_menu(rom)
+    item_menu(rom)
+    magic_menu(rom)
     report.append('GB layout applied')
 
 
@@ -1928,7 +1930,8 @@ MENU_GB = {}        # menu string overrides for insert.py --gb (id -> text), set
 
 def menu_strings(enc_txt):
     """Command list one per row (upper row only, one-row newlines); Gil on the window's
-    fifth text row (below the orbs)."""
+    fifth text row (below the orbs). Magic list: one page of three levels (magic_tpl)."""
+    MENU_GB[42] = magic_tpl()
     MENU_GB[2] = ('{05}' + '{08}'.join('  ' + w for w in ('Items', 'Magic', 'Weapons', 'Armor', 'Status'))
                   + '{08}{04}Gil')      # Gil below the commands (amount 6 wide + 'Gil': 9 of 10 columns)
 
@@ -2065,3 +2068,339 @@ camexit:
     put_bank(rom, B, 0xB84D, bytes([0x20]) + r.labels['cammenu'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
     put_bank(rom, B, 0xAE15, bytes([0x20]) + r.labels['camexit'].to_bytes(2, 'little') + bytes([0xEA, 0xEA]),
              bytes([0xA9, 0x00, 0x8D, 0x01, 0x20]))
+
+
+# Items screen (camera 0, 0): title window 7 (0,0,8,3); list window (0,3,20,15) with 13
+# items per page (rows 4-16, names from column 3, the hand at the screen edge); the list
+# turns to the next / previous page when the cursor passes its end (at most 23 items:
+# 17 key items + 6 others = 2 pages) and is redrawn when the cursor moves after a
+# description (window 8, (0,9,20,9): up to 7 lines of 18 letters) covered it.
+ITEM_PAGE = 13
+IPAGE, IROW, IDESC = 0x0340, 0x0341, 0x0342        # page start, row counter, description shown
+ITEM_FIX = """
+itemscr:            ; $EFA7 (bank 14 $B13C, LCD off): window, item list, first page
+    lda #0
+    sta IPAGE
+    sta IDESC
+    sta $5800       ; GB camera (0, 0)
+    sta $5801
+    jsr listwin
+    ldx #0          ; list of item numbers held: $0300 (key items 1-17, then $16-$1B)
+    ldy #1
+ib1:
+    lda $6020,y
+    beq ib2
+    tya
+    sta $0300,x
+    inx
+ib2:
+    iny
+    cpy #$12
+    bcc ib1
+    cpy #$16
+    bcc ib2
+    cpy #$1C
+    bcc ib1
+    cpx #0
+    bne ib3
+    sec
+    rts
+ib3:
+    stx $63
+    lda #0
+    sta $0300,x
+    jsr drawpage
+    clc
+    rts
+drawpage:           ; items IPAGE .. IPAGE+12 at rows 4-16, column 3
+    lda #0
+    sta IROW
+dp1:
+    lda IPAGE
+    clc
+    adc IROW
+    tax
+    lda $0300,x
+    beq dp3
+    sta $0322
+    ldy #$09        ; lower row only
+    sty $0320
+    ldy #$02        ; item name
+    sty $0321
+    ldy #3
+    cmp #$16
+    bcc dp2
+    tax             ; count after the name
+    lda $6020,x
+    sta $10
+    lda #$0E
+    sta $58
+    jsr $FE03
+    jsr $8E66
+    lda #$FF
+    sta $0323
+    lda $5E
+    sta $0324
+    lda $5F
+    sta $0325
+    ldy #6
+dp2:
+    lda #0
+    sta $0320,y
+    lda #$20
+    sta $3E
+    lda #$03
+    sta $3F
+    lda #3
+    sta $3A
+    lda IROW
+    clc
+    adc #4
+    sta $3B
+    jsr $DEB6
+    inc IROW
+    lda IROW
+    cmp #PAGE
+    bcc dp1
+dp3:
+    rts
+"""
+ITEM_B14 = """
+pagechk:            ; $B621 (cursor moved, $62 set): turn the page / remove a description
+    ldy #0
+    lda $62
+    cmp #PAGE
+    bcc pc1
+    ldy #PAGE
+pc1:
+    lda IDESC
+    bne pc2
+    cpy IPAGE
+    beq pc3
+pc2:
+    sty IPAGE
+    lda #0
+    sta IDESC
+    lda #1
+    sta $37
+    jsr listwin
+    jsr drawpage
+pc3:
+    jmp $B784
+deschk:             ; $B93E: every description window marks the list as covered
+    pha
+    lda #1
+    sta $37
+    sta IDESC
+    jmp $B943
+listwin:            ; list window (0, 3, 20, 15): frame, interior cleared
+    lda #0
+    sta $38
+    lda #3
+    sta $39
+    lda #20
+    sta $3C
+    lda #15
+    sta $3D
+    lda #$0E
+    sta $57
+    jmp $E0F2
+curpos:             ; bank 14 $B7DB: hand at x 0, row 4 + cursor - page
+    lda $62
+    sec
+    sbc IPAGE
+    asl a
+    asl a
+    asl a
+    adc #31
+    sta $41
+    lda #0
+    sta $40
+    jmp $ED24
+"""
+
+
+def item_menu(rom):
+    B = 14
+    def wput(i, geom):
+        put_bank(rom, B, 0xBAB5 + 4 * i, bytes(geom), bytes(rom[bank_off(B, 0xBAB5 + 4 * i):bank_off(B, 0xBAB5 + 4 * i) + 4]))
+    wput(7, (0, 0, 8, 3))                   # title
+    wput(8, (0, 9, 20, 9))                  # descriptions / prompts
+    syms = {'IPAGE': IPAGE, 'IROW': IROW, 'IDESC': IDESC, 'PAGE': ITEM_PAGE}
+    q0 = asm(ITEM_B14, syms=dict(syms, drawpage=0), org=0xBA14)       # member-window code)
+    r = asm(ITEM_FIX, syms=dict(syms, listwin=q0.labels['listwin']), org=0xEFA7)
+    assert r.org + len(r.bytes) <= 0xF05B, hex(r.org + len(r.bytes))
+    put(rom, 0xEFA7, r.bytes, bytes([0xA9, 0x00, 0x85, 0x38]))
+    q = asm(ITEM_B14, syms=dict(syms, drawpage=r.labels['drawpage']), org=0xBA14)   # after mbuild (old
+    assert q.org + len(q.bytes) <= 0xBA80, hex(q.org + len(q.bytes))
+    put_bank(rom, B, q.org, q.bytes, bytes(rom[bank_off(B, q.org):bank_off(B, q.org) + len(q.bytes)]))
+    put_bank(rom, B, 0xB7DB, bytes([0x4C]) + q.labels['curpos'].to_bytes(2, 'little'), bytes([0xA5, 0x62, 0x0A]))
+    put_bank(rom, B, 0xB623, bytes([0x4C]) + q.labels['pagechk'].to_bytes(2, 'little'), bytes([0x4C, 0x84, 0xB7]))
+    put_bank(rom, B, 0xB93E, bytes([0x4C]) + q.labels['deschk'].to_bytes(2, 'little'), bytes([0x48, 0xA9, 0x01]))
+
+
+# Magic screen (camera 0, 0): title window 7 (member name), list window 9 (0,3,20,15)
+# with three levels per page: a level line ("L1" and "MP cur/max") and the three spells
+# below it from column 3 (rows 5-16). The cursor moves as on the NES (up/down: levels,
+# left/right: spells of the level); a level on another page turns the page. String 42 is
+# the page of levels 1-3; for the other pages magpatch (far code) adds 3 * page to the
+# level digits / MP parameters and 9 * page to the spell parameters in the copy at $6C00
+# (and cuts the third level on page 3).
+MPAGE, MLAST, MD1, MD3 = 0x0349, 0x034A, 0x034C, 0x034D
+
+
+def magic_tpl():
+    out = '{09}'
+    for k in range(3):
+        out += '{0D}{01}L%d{0D}{0B}MP {10}{%02X}/{10}{%02X}{08}' % (k + 1, 0x2C + k, 0x34 + k)
+        for c in range(3):
+            out += '{0D}{03}{10}{%02X}{08}' % (0x14 + 3 * k + c)
+    return out
+
+
+def enc_str(enc, s):
+    out = bytearray(); i = 0
+    while i < len(s):
+        if s[i] == '{':
+            j = s.index('}', i); out.append(int(s[i + 1:j], 16)); i = j + 1
+        else: out.append(enc[s[i]]); i += 1
+    return bytes(out)
+
+
+def magpatch_source(enc):
+    t = magic_tpl()
+    b = enc_str(enc, t)
+    offs, muls = [], []
+    for k in range(3):                      # find each level's patchable bytes
+        i = b.index(bytes([enc['L'], enc[str(k + 1)]])) + 1
+        offs.append(i); muls.append(0)
+        for v, m in ((0x2C + k, 0), (0x34 + k, 0)) + tuple((0x14 + 3 * k + c, 1) for c in range(3)):
+            j = b.index(bytes([0x10, v])) + 1
+            offs.append(j); muls.append(m)
+    blk3 = enc_str(enc, t[:t.index('{0D}{01}L3')]).__len__()
+    assert len(b) + 1 <= 0xC1
+    return """
+magpatch:           ; (far, every menu string) the magic list page MPAGE in the copy of
+    lda $6C00       ;   string 42 at $6C00 (recognised by its start: 09 0D 01 'L')
+    cmp #$09
+    bne mp4
+    lda $6C01
+    cmp #$0D
+    bne mp4
+    lda $6C02
+    cmp #$01
+    bne mp4
+    lda $6C03
+    cmp #%d
+    bne mp4
+    lda MPAGE
+    asl a
+    adc MPAGE
+    sta MD1         ; 3 * page
+    asl a
+    adc MD1
+    sta MD3         ; 9 * page
+    ldx #%d
+mp1:
+    ldy MPOFS,x
+    lda MPMUL,x
+    bne mp2
+    lda $6C00,y
+    clc
+    adc MD1
+    jmp mp3
+mp2:
+    lda $6C00,y
+    clc
+    adc MD3
+mp3:
+    sta $6C00,y
+    dex
+    bpl mp1
+    lda MPAGE
+    cmp #2
+    bne mp4
+    lda #0
+    sta $6C00 + %d
+mp4:
+    rts
+MPOFS:
+    .db %s
+MPMUL:
+    .db %s
+""".replace('MPAGE', '$%04X' % MPAGE).replace('MD1', '$%04X' % MD1).replace('MD3', '$%04X' % MD3) % (
+        enc['L'], len(offs) - 1, blk3, ', '.join(map(str, offs)), ', '.join(map(str, muls)))
+
+
+def exram_source(far_routines):
+    """GB menu code in ExRAM (reachable from every bank)."""
+    return """
+gbmagcur:           ; bank 14 $B829 (each frame of the magic list): page, then the hand
+    lda $62
+    lsr a
+    lsr a
+    tax
+    lda gbmpg,x
+    cmp MPAGE
+    bne gbm1
+    ldy IDESC
+    beq gbm2
+    ldy $62
+    cpy MLAST
+    beq gbm2
+gbm1:
+    sta MPAGE
+    lda #0
+    sta IDESC
+    lda #1
+    sta $37
+    lda #9
+    jsr $B902
+    ldy #$C0
+    lda #$2A
+    jsr $B96E
+gbm2:
+    lda $62
+    sta MLAST
+    lsr a
+    lsr a
+    tax
+    lda gbmky,x
+    sta $41
+    lda $62
+    and #3
+    asl a
+    asl a
+    asl a
+    adc $41
+    sta $41
+    lda #0
+    sta $40
+    jmp $ED24
+gbmpg:
+    .db 0, 0, 0, 1, 1, 1, 2, 2
+gbmky:              ; y of spell 1 of level L: row 6 + 4 * (L - 3 * page) -> 8 * row - 1
+    .db 47, 79, 111, 47, 79, 111, 47, 79
+gbmagini:           ; bank 14 $BA80 (magic list, LCD off): page 1
+    lda #0
+    sta MPAGE
+    sta IDESC
+    lda #9
+    jmp $B902
+gbm957:             ; bank 14 $B957 (each menu string): the magic list page
+    ldx #MAGPATCH
+    jmp farjsr
+""".replace('MPAGE', '$%04X' % MPAGE).replace('MLAST', '$%04X' % MLAST)\
+        .replace('IDESC', '$%04X' % IDESC).replace('MAGPATCH', str(far_routines.index('magpatch')))
+
+
+def magic_menu(rom):
+    B = 14
+    main = sys.modules['__main__']
+    ex = main.LABELS_EX
+    put_bank(rom, B, 0xBAB5 + 4 * 9, bytes((0, 3, 20, 15)), bytes(rom[bank_off(B, 0xBAB5 + 36):bank_off(B, 0xBAB5 + 40)]))
+    put_bank(rom, B, 0xBA80, bytes([0x20]) + ex['gbmagini'].to_bytes(2, 'little') + bytes([0xEA, 0xEA]),
+             bytes([0xA9, 0x09, 0x20, 0x02, 0xB9]))
+    put_bank(rom, B, 0xB829, bytes([0x4C]) + ex['gbmagcur'].to_bytes(2, 'little'), bytes([0x4C]))
+    put_bank(rom, B, 0xB957, bytes([0x20]) + ex['gbm957'].to_bytes(2, 'little') + bytes([0x20, 0xC3, 0x5E]),
+             bytes([0x20, 0xC3, 0x5E, 0xEA, 0xEA, 0xEA]))

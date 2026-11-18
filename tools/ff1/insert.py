@@ -973,7 +973,10 @@ def menu_engine(rom, report):
     rom[o:o + 0x2000] = far.bytes + b'\xFF' * (0x2000 - len(far.bytes))
     tabs = '\nFARLO:\n    .db ' + ', '.join('<(%d-1)' % far.labels[r] for r in FAR_ROUTINES) + \
            '\nFARHI:\n    .db ' + ', '.join('>(%d-1)' % far.labels[r] for r in FAR_ROUTINES) + '\n'
-    ex = asm(EXRAM_SRC.replace('BCMDS', bc) + tabs, syms=dict(EX, FAR8=FAR8))
+    exsrc = EXRAM_SRC.replace('BCMDS', bc)
+    if '--gb' in sys.argv:                     # GB layout: menu code in ExRAM
+        exsrc += gb_layout.exram_source(FAR_ROUTINES)
+    ex = asm(exsrc + tabs, syms=dict(EX, FAR8=FAR8))
     FAR_LABELS.update(far.labels)
     img = bytearray(0x400); img[0x60:0x60 + len(ex.bytes)] = ex.bytes
     assert 0x60 + len(ex.bytes) <= 0x400
@@ -1058,7 +1061,12 @@ def insert_menu_strings(rom, report):
             import gb_layout
             if not gb_layout.MENU_GB: gb_layout.menu_strings(None)
             txt = gb_layout.MENU_GB.get(e['id'], txt)
-        if e['id'] in DESC_IDS:
+        if e['id'] in DESC_IDS and '--gb' in sys.argv:    # GB window 8: 7 lines of 18
+            lines = desc_flow(txt, 18)
+            if lines[-1].startswith('A button'): lines[-1:] = lines[-1].split('  ')
+            assert len(lines) <= 7 and max(map(len, lines)) <= 18, (e['id'], lines)
+            txt = '{09}' + '{08}'.join(lines)
+        elif e['id'] in DESC_IDS:
             lines = desc_flow(txt)
             assert len(lines) <= 4 and max(map(len, lines)) <= 29, (e['id'], lines)
             txt = '{09}' + '{08}'.join(' ' + l for l in lines)

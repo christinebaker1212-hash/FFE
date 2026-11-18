@@ -1,0 +1,58 @@
+"""Regenerate the recompiler's coverage logs for a NES ROM (needed after every change to
+the NES code): new game + random play (covrun.py, seeds 1-4) and the field scripts below
+(covfield.py), all in parallel; writes OUTDIR/rom.sha1 (build.py warns on a mismatch).
+usage: PYTHONPATH=build/emu covall.py ROM OUTDIR [FRAMES (random play, default 80000)]"""
+import hashlib, os, subprocess, sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ITEMS = ('6021=1,6022=1,6023=1,6024=1,6025=1,6026=1,6027=1,6028=1,6029=1,602A=1,602B=1,'
+         '602C=1,602D=1,602E=1,602F=1,6030=1,6031=1,6036=4,6037=2,6038=1,6039=63,603A=3,603B=7')
+FIELD = [   # (name, script, frames, pokes)
+    ('dialogue', 'U120,_30,U60,_60,U64,_10,R16,_10,U16,_10,R4,_10,A3,_200,A3,_120,A3,_120,A3,_100', 4700, ''),
+    ('menu', '_30,S5,_80,D5,_30,A5,_80,B5,_40,D5,_20,D5,_20,A5,_120,B5,_60,B5,_60', 4300, ''),
+    ('items', '_30,S5,_80,A5,_100,D5,_10,D5,_40,A5,_60,U5,_10,U5,_10,U5,_60,A5,_80'
+              + ',D5,_10' * 14 + ',_80' + ',D5,_10' * 11 + ',_80,B5,_60,B5,_60', 4700, ITEMS),
+    ('magic', '_30,S5,_80,D5,_40,A5,_100,A5,_150,R5,_30,D5,_30,D5,_30,D5,_150,D5,_30,D5,_30,D5,_150,D5,_150,U5,_150,L5,_60,B5,_60,B5,_60', 4700, 'MAGIC'),
+]
+
+
+def magic_pokes():
+    """spells and MP for all four members, weapons and armour in every slot"""
+    p = []
+    for m in range(4):
+        for L in range(8):
+            for s in range(3): p.append('%04X=%02X' % (0x6300 + 0x40 * m + 4 * L + s, s + 1 + L % 3))
+            p.append('%04X=09' % (0x6320 + 0x40 * m + L)); p.append('%04X=09' % (0x6328 + 0x40 * m + L))
+        for k in range(4):
+            p.append('%04X=%02X' % (0x6118 + 0x40 * m + k, (0x80 if k == 0 else 0) | (1 + 5 * k + m)))
+            p.append('%04X=%02X' % (0x611C + 0x40 * m + k, (0x80 if k == 0 else 0) | (1 + 7 * k + m)))
+    return ','.join(p)
+
+
+def main():
+    rom, out = sys.argv[1], sys.argv[2]
+    frames = sys.argv[3] if len(sys.argv) > 3 else '80000'
+    os.makedirs(out, exist_ok=True)
+    env = dict(os.environ)
+    procs = []
+    for seed in (1, 2, 3, 4):
+        env1 = dict(env, COV_LOG=os.path.join(out, 's%d.bin' % seed))
+        if os.path.exists(env1['COV_LOG']): os.remove(env1['COV_LOG'])
+        procs.append(subprocess.Popen([sys.executable, os.path.join(HERE, 'covrun.py'), rom, str(seed), frames],
+                                      env=env1, stdout=open(os.path.join(out, 's%d.log' % seed), 'w'),
+                                      stderr=subprocess.STDOUT))
+    for i, (name, script, n, pokes) in enumerate(FIELD):
+        env1 = dict(env, COV_LOG=os.path.join(out, 's%d.bin' % (5 + i)))
+        if os.path.exists(env1['COV_LOG']): os.remove(env1['COV_LOG'])
+        cmd = [sys.executable, os.path.join(HERE, 'covfield.py'), rom, script, str(n)]
+        if pokes: cmd += ['--poke', magic_pokes() if pokes == 'MAGIC' else pokes]
+        procs.append(subprocess.Popen(cmd, env=env1, stdout=open(os.path.join(out, 's%d.log' % (5 + i)), 'w'),
+                                      stderr=subprocess.STDOUT))
+    bad = [p.args for p in procs if p.wait() != 0]
+    sha = hashlib.sha1(open(rom, 'rb').read()).hexdigest()
+    with open(os.path.join(out, 'rom.sha1'), 'w') as fh: fh.write('%s  %s\n' % (sha, rom))
+    print('coverage written to', out, 'failed:', bad)
+
+
+if __name__ == '__main__':
+    main()
