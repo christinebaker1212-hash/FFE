@@ -26,8 +26,8 @@ shrinking the NES layout: no two-character-panel splits, no panning. Common elem
 - **Full-width windows** stacked vertically; command windows open over the party list.
 - **Battle**: enemy graphics in the upper part of the screen with the **party sprites
   visible** beside them (owner's decision), each member's name/HP next to their sprite or
-  in a party list; the command window and battle messages open over the lower part. The
-  acting member's line and the target flash.
+  in a party list; the command window and battle messages open over the lower part. No
+  blinking (owner, 2026-11-18: the cursor is enough).
 - Implementation: FF1's own drawing code is changed (NES side). A runtime compositor that
   rearranges the finished NES picture was considered and rejected.
 - Exact layouts get drafted as mock-ups (rendered with the real font) before the NES

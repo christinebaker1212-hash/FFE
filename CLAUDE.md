@@ -54,8 +54,10 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   panning across the NES layout. Party shown as compact one-line-per-member lists
   (name, HP, status), full-width windows, command windows opening over the party
   window, enemy graphics in the upper part of the battle screen.
-  - **Battle (owner's decisions):** the party member sprites stay visible in battle; the
-    acting member's line and the target flash. Re-layout is done properly in the NES code
+  - **Battle (owner's decisions):** the party member sprites stay visible in battle; no
+    blinking of the acting member, the targets or the enemies (owner, 2026-11-18: the
+    cursor is enough; this replaces the earlier "acting member's line and target flash").
+    While an enemy target is chosen, the enemy-names window shows. Re-layout is done properly in the NES code
     (reverse-engineer FF1's battle/menu drawing and change it), not by a runtime screen
     compositor that rearranges the NES picture.
 - **SGB testing uses mGBA** (owner's decision): `tools/gb/mgba/sgbrun.c`, built against
@@ -315,10 +317,7 @@ Milestones per game (from `docs/gb-port.md`):
   fixed-bank ITEMFLIP $F633 -> $F300 redraws after farjsr returns); cursor table $9FD7
   x = 1 (itemmove recognises the Item list by x = 1). Page flips show FF1's stepwise
   panel redraw for a few frames (as the magic pages do).
-  Blinking: the commanding member's line ($6B7A) blinks (16 frames blank / 16 shown, 10
-  nametable writes) in every pad wait (b12:$97C7 -> hook $AAFC -> far `blink`) while the
-  party window is visible. While the party-target cursor is up ($6AAC = 124, table from
-  $9F85) the targeted member's line ($6AAB) blinks instead. Enemy targets: not yet.
+  Blinking was built and then removed (owner: no blinking at all).
   Message tear-down: an empty target shows the attacker alone (no arrow).
 - **GB build of the battle layout works (2026-11-18):** `build.py --gb` -> `build/ff1_gb.gb`
   (18.7k instructions, 5 code banks); `firstdiff.py build/ff1_gb.nes build/ff1_gb.gb 7100
@@ -334,12 +333,9 @@ Milestones per game (from `docs/gb-port.md`):
   how it is built, and the next steps.
 - Column-2 lists push a name down below a wrapped one (VNROW; 7 formations have a name
   > 56 px, only formation 69 lists two names).
-- Owner (2026-11-18): show the enemy names while targeting, and blink the enemy too.
-  Done: entering the enemy-target loop (b12:$9B55 -> stub $AB07) saves the box count and
-  redraws only box 0 (names); leaving it ($9B9C -> stub $9D94) shows the target again
-  (far `eblink_off`) and redraws all saved boxes. The target ($6AAA in the table at $6AAC)
-  blinks: its 4x4 / 6x6 cells are read from the nametable once, then blank / restored
-  every 16 frames (far `eblink`, called by `blink`). RAM $0344-$0373.
+- Owner (2026-11-18): show the enemy names while targeting (done: entering the
+  enemy-target loop, b12:$9B55 -> stub $AB07, saves the box count and redraws only box 0,
+  the names; leaving it, $9B9C -> stub $9D94, redraws all saved boxes). No blinking.
 - Battle still to do: end-of-battle messages,
   Medicine list, all formations (fiends, Chaos).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
