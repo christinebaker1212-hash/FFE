@@ -304,9 +304,12 @@ Milestones per game (from `docs/gb-port.md`):
   `$FD $80+n` = pen to tile n (bytes < $48 are decoder control codes, $48-$79 get dakuten
   conversion; >= $7A pass). Text records are clamped to their row's 18 tiles.
   `battleseq.py --poke` patches work RAM in the state (e.g. spells at $63C0 + 64m).
-  Open (owner, 2026-11-18): the 16-px hand cursor must not overlap text but must stay
-  partly visible: "Fight" + hand + "Run" do not fit the 8-column command window, nor two
-  spells + hands + "L1" per magic row -> proposal pending (small 8-px hand).
+  Cursor (owner, 2026-11-18): FF1's large 16-px hand, never over text, may be cut off at
+  the left screen edge. Command and names windows are 9 columns (they cover the party
+  window's left frame while open); Run = marker column 23 (column 6 + 3-px indent, x 51),
+  its hand at x 35; Fight/Magic/Medicine/Items hands at x 0. Magic list: spells at
+  columns 2 / 12 (hands x 0 / 80), row 2 = spell 3 + "L<n>  MP <count>"; checked with
+  spells poked into all members (`battleseq.py --poke`).
   Next: enemy names window, target/actor flashing, magic/item
   lists, end-of-battle messages, all formations, then the GB build. Implementation needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).

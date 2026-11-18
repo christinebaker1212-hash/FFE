@@ -622,6 +622,15 @@ boxline:
     lda VCOL
     cmp #21
     beq .target
+    cmp #23
+    bne .n22
+    lda #6          ; column 23 = column 6 with a 3-px indent ("Run": the hand fits between
+    sta VCOL        ;   "Fight" and "Run" without touching either)
+    lda #3
+    sta VIND
+    jsr vtext
+    jmp vrest
+.n22:
     cmp #22
     bne .plain
     jmp .next
@@ -969,10 +978,14 @@ MWROW:
 
 # Battle magic list for the GB layout (replaces the English magpage in the far code): the
 # full-width window, two levels per page, each on two rows:
-#   row 1: "L<n>"  spell 1 (column 4)  spell 2 (column 12)
-#   row 2:         spell 3 (column 4)  MP count (column 18)
+#   row 1: spell 1 (column 2)  spell 2 (column 12)
+#   row 2: spell 3 (column 2)  "L<n>  MP <count>" (column 13)
+# (spells up to 64 px; FF1's 16-px hand sits left of each spell, cut off at the screen
+# edge for the left column)
 # Positions use the $FD $80+n pen code of the small-font text (n = tiles from the record).
-MAGPAGE = """magpage:
+MAGPAGE = """LETM = $96
+LETP = $99
+magpage:
     ldy #5
 .c:
     lda $FA08,y
@@ -1006,23 +1019,9 @@ MAGPAGE = """magpage:
     clc
     adc MI
     sta ML
-    lda MU          ; ---- row 1
+    lda MU          ; ---- row 1: spell 1, spell 2
     sta MT
     ldx MU
-    lda #$C6
-    sta $6AFA,x
-    inx
-    lda ML
-    clc
-    adc #$81
-    sta $6AFA,x
-    inx
-    lda #$FD
-    sta $6AFA,x
-    inx
-    lda #$82
-    sta $6AFA,x
-    inx
     lda #0
     jsr .spell
     lda #$FD
@@ -1042,21 +1041,37 @@ MAGPAGE = """magpage:
     clc
     adc #1
     jsr .queue
-    lda MU          ; ---- row 2
+    lda MU          ; ---- row 2: spell 3, "L<n>  MP <count>"
     sta MT
     ldx MU
-    lda #$FD
-    sta $6AFA,x
-    inx
-    lda #$82
-    sta $6AFA,x
-    inx
     lda #2
     jsr .spell
     lda #$FD
     sta $6AFA,x
     inx
-    lda #$90
+    lda #$8B
+    sta $6AFA,x
+    inx
+    lda #$C6
+    sta $6AFA,x
+    inx
+    lda ML
+    clc
+    adc #$81
+    sta $6AFA,x
+    inx
+    lda #$FF
+    sta $6AFA,x
+    inx
+    sta $6AFA,x
+    inx
+    lda #LETM
+    sta $6AFA,x
+    inx
+    lda #LETP
+    sta $6AFA,x
+    inx
+    lda #$FF
     sta $6AFA,x
     inx
     lda ML
@@ -1190,16 +1205,17 @@ def battle_panel(rom):
     cols 1-20). Box records: type 0 = frame (x y w h), type 1 = text (x y, pointer).
     Windows are 6 rows high (panel rows 0-5 = GB rows 12-17), 4 text rows (rows 1-4)."""
     put(rom, 0xF625, bytes([0x60]), expect=bytes([0xA9, 0xFD]))      # (replaced by the hook)
-    # enemy names: left window (cols 1-8), names at column 2, rows 1-4
-    put(rom, 0xF9DC, bytes([0, 1, 0, 8, 6]), expect=bytes([0, 1, 0, 12, 10]))
+    # enemy names: left window (cols 1-9; it covers the party window's left frame while
+    # open), names at column 2, rows 1-4
+    put(rom, 0xF9DC, bytes([0, 1, 0, 9, 6]), expect=bytes([0, 1, 0, 12, 10]))
     put(rom, 0xF6CC, bytes([0xEA] * 3), expect=bytes([0xEE, 0x9F, 0x6A]))      # text x = box x + 1
     put(rom, 0xF6D2, bytes([0xEA] * 3), expect=bytes([0xCE, 0xA0, 0x6A]))      # no DEC $6AA0
     put(rom, 0xF6D7, bytes([0xEA] * 3), expect=bytes([0xEE, 0xA0, 0x6A]))      # one INC $6AA0
     # command window over the names: Fight Run / Magic / Medicine / Items
     cmd = fixed(rom, 0xFA13)[0]
     ptr = [bytes(rom[cmd + 5 * k + 3:cmd + 5 * k + 5]) for k in range(1, 6)]   # Fight Magic Medicine Items Run
-    rec = bytes([0, 1, 0, 8, 6])
-    for k, (x, y) in enumerate(((2, 1), (2, 2), (2, 3), (2, 4), (6, 1))):
+    rec = bytes([0, 1, 0, 9, 6])
+    for k, (x, y) in enumerate(((2, 1), (2, 2), (2, 3), (2, 4), (23, 1))):     # 23: Run, see boxline
         rec += bytes([1, x, y]) + ptr[k]
     put(rom, 0xFA13, rec)
     # battle messages (style A): attacker = full-width window, text at (2, 1); action,
@@ -1220,10 +1236,11 @@ def battle_panel(rom):
 def cursors(rom):
     """Cursor positions (sprite x, y), bank 12: command window $9F75 (Fight / Magic /
     Medicine / Items, then Run for each row), party targets $9F85 (16 px left of the
-    sprites). Command text is at panel col 2 / 6, rows 1-4 (NES rows 19-22); the 16-px
-    hand ends where the text starts (owner: no overlap with the text; it may be cut off
-    at the left screen edge), 2 px above the text row."""
-    cmd = bytes([0, 150, 0, 158, 0, 166, 0, 174] + [32, 150] * 4)
+    sprites). Command text is at panel col 2, rows 1-4 (NES rows 19-22), "Run" at x 51;
+    the 16-px hand (owner: FF1's large hand, never over text, may be cut off at the left
+    screen edge) ends where the text starts, 2 px above the text row: x 0 (half off the
+    GB screen) and x 35 (its left column clears the tail of the "t" of "Fight")."""
+    cmd = bytes([0, 150, 0, 158, 0, 166, 0, 174] + [35, 150] * 4)
     put_bank(rom, 12, 0x9F75, cmd, bytes.fromhex('609e60ae60be60ce909e909e909e909e'))
     party = bytes(sum(([140 - 16, y] for y in (0x34, 0x4C, 0x64, 0x7C)), []) * 2)
     put_bank(rom, 12, 0x9F85, party, bytes.fromhex('a034a04ca064a07c' * 2))
@@ -1231,12 +1248,12 @@ def cursors(rom):
 
 def magic_cursor(rom):
     """Magic list cursor (bank 12 $9FBF, entry slot*4 + level-on-page: x, y), for
-    MAGPAGE's rows: slots 0 / 1 on row 1 + 2r (columns 4 / 12), slot 2 on row 2 + 2r."""
+    MAGPAGE's rows: slots 0 / 1 on row 1 + 2r (columns 2 / 12), slot 2 on row 2 + 2r."""
     cur = bytearray(24)
     for slot in range(3):
         for r in range(2):
             k = r + 4 * slot
-            cur[2 * k] = (16, 80, 16)[slot]
+            cur[2 * k] = (0, 80, 0)[slot]
             cur[2 * k + 1] = 150 + 16 * r + (8 if slot == 2 else 0)
     o = bank_off(12, 0x9FBF); rom[o:o + 24] = cur
 
