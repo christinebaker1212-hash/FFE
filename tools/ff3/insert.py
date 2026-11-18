@@ -402,10 +402,10 @@ h_ypos:         ; $F086: row of a recorded position ($98 + $1F assumes the dakut
     lda $98
     clc
     adc $1F
-    ldx ONE         ; (one row: the text is on row $98 + $1F - 1, the cursor's upper half
-    beq .r          ;   on the row above it, as above a Japanese line)
+    ldx ONE         ; (one row: the text is on row $98 + $1F - 1; the cursor's top goes on
+    beq .r          ;   the text row, as on a Japanese line's lower row)
     sec
-    sbc #2
+    sbc #1
 .r:
     rts
 h_flush:        ; $F6AE line flush: lower-row buffer only, on row $3B
