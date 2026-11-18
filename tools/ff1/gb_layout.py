@@ -53,6 +53,51 @@ def battle_frames(rom):
         put(rom, site, bytes([0x20, wrap & 0xFF, wrap >> 8]), expect=bytes([0x20, 0x00, 0xF2]))
 
 
+def boxline_one_row(rom):
+    """English patch's boxline (far code): a line that fits is written on the text
+    record's own row (the Japanese dakuten row is not drawn), so lines can be single
+    spaced; a line that has to be split still takes that row and the next."""
+    main = sys.modules['__main__']
+    L = main.FAR_LABELS
+    o1, done = L['boxline.o1'], L['boxline.done']
+    off = HDR + main.FAR8 * 0x2000 - 0xC000
+    assert bytes(rom[off + o1:off + o1 + 5]) == bytes([0xBD, 0xD4, 0x6C, 0xF0, rom[off + o1 + 4]])
+    rom[off + o1 + 1] = 0xD5                          # LDA $6CD5,X: the character row
+    rom[off + o1 + 4] = (done - (o1 + 5)) & 0xFF      # BEQ .done (no second row)
+
+
+def battle_panel(rom):
+    """Bottom panel (25x12 image at $691E, NES rows 18-29; the GB shows panel rows 0-5,
+    cols 2-21). Box records: type 0 = frame (x y w h), type 1 = text (x y, pointer).
+    Windows are 7 rows high: their bottom frame falls on panel row 6, which the GB does
+    not show, so 5 text rows are visible (rows 1-5)."""
+    # panel clear: no row of box bottoms for the (removed) enemy/party boxes
+    put(rom, 0xF625, bytes([0x60]), expect=bytes([0xA9, 0xFD]))
+    # enemy names: full-width window, names on rows 1-4 (single spacing)
+    put(rom, 0xF9DC, bytes([0, 2, 0, 20, 7]), expect=bytes([0, 1, 0, 12, 10]))
+    put(rom, 0xF6D2, bytes([0xEA] * 3), expect=bytes([0xCE, 0xA0, 0x6A]))      # no DEC $6AA0
+    put(rom, 0xF6D7, bytes([0xEA] * 3), expect=bytes([0xEE, 0xA0, 0x6A]))      # one INC $6AA0
+    # command window over the right half: Fight Run / Magic / Medicine / Items
+    cmd = fixed(rom, 0xFA13)[0]
+    ptr = [bytes(rom[cmd + 5 * k + 3:cmd + 5 * k + 5]) for k in range(1, 6)]   # Fight Magic Medicine Items Run
+    rec = bytes([0, 11, 0, 11, 7])
+    for k, (x, y) in enumerate(((12, 1), (12, 2), (12, 3), (12, 4), (18, 1))):
+        rec += bytes([1, x, y]) + ptr[k]
+    put(rom, 0xFA13, rec)
+    # battle messages: attacker / action / target / result on rows 1 / 2 / 3 / 4(-5) of
+    # one window; boxes 2-4 are drawn in panel rows 8-9, which the GB does not show
+    msg = bytes([0, 2, 0, 20, 7, 1, 3, 1,
+                 0, 2, 8, 20, 2, 1, 3, 2,
+                 0, 2, 8, 20, 2, 1, 3, 3,
+                 0, 2, 8, 20, 2, 1, 3, 4,
+                 0, 2, 0, 20, 7, 1, 3, 1])           # long single message (record 4)
+    put(rom, 0xF9E1, msg)
+    # item / medicine list window: into the visible rows
+    put(rom, 0xFA0E, bytes([0, 2, 0, 20, 7]))
+
+
 def apply(rom, report):
     battle_frames(rom)
+    boxline_one_row(rom)
+    battle_panel(rom)
     report.append('GB layout applied')
