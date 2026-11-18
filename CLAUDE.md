@@ -584,7 +584,18 @@ Milestones per game (from `docs/gb-port.md`):
   while it fades (palette 1's grey $00 joins the darkest group).
 - All 36 checks identical after fresh coverage (new game, shops, sub-screens, menu,
   dialogue, battle, random 30000; DMG + CGB).
-- Next: the ending.
+- **Bridge / ending story (2026-11-18)** (`gb_layout.story_gb`): box (3,5,20,11) with 9 rows of
+  18 columns (insert.py --gb: upper-row mode), camera (3,5) set on every page (b13 $B8E3
+  area), field camera back after the bridge story (fixed $C154 -> `brw` at $EE12). The
+  FINAL FANTASY picture shows below the box. Checked on the NES: bridge pages, all ending
+  pages, "The End" (test copy with $C154 -> $B803). Bridge story via `--poke 6016=01`
+  and a few steps (covall FIELD 'bridge').
+- Checks (fresh coverage, 20.0k instructions): 37 of 38 identical; the bridge script on
+  CGB differs only in the pad bytes $20/$21 at a page's A press (one frame early / late
+  depending on the press timing; DMG identical) - the harness's per-NMI input feed meeting
+  the story pages' button poll in double speed, not a layout difference.
+- Next: remaining screens from `docs/gb-screens.md` (world map minimap, 15-puzzle, inn /
+  save prompt checks), then FF1's accuracy / timing pass.
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).

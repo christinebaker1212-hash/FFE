@@ -1921,6 +1921,7 @@ def apply(rom, report):
     shop_menu(rom)
     prologue(rom)
     new_game(rom)
+    story_gb(rom)
     report.append('GB layout applied')
 
 
@@ -3063,3 +3064,40 @@ def new_game(rom):
     put_bank(rom, B, 0x9FFD, bytes([0xA9, 3]), bytes([0xA9, 0x0A]))
     put_bank(rom, B, 0x9F47, bytes([0x69, 24]), bytes([0x69, 0x50]))
     put_bank(rom, B, 0x9FBD, bytes([0xA9, 0xFF]), bytes([0xA9, 0x00]))           # attributes: window palette
+
+
+# Bridge / ending story pages (scene over the title picture, bank 13): box (3,5,20,11)
+# with 9 rows of 18 columns (insert.py --gb: upper-row mode), camera (3, 5): the box and
+# the FINAL FANTASY picture below it. The camera is set on every page (bank 13 $B8E3, in
+# the bytes the English page-box code left free) and set back to the field's 6 / 6 after
+# the bridge story (fixed $C154 -> brw). The ending ends in the staff credits (same box).
+def story_gb(rom):
+    B = 13
+    pat = bytes([0xA9, 0x02, 0x85, 0x38, 0xA9, 0x04, 0x85, 0x39, 0xA9, 0x16, 0x85, 0x3C, 0xA9, 0x0C, 0x85, 0x3D])
+    o = fixed(rom, 0xF77F)[0]
+    assert bytes(rom[o:o + 16]) == pat, bytes(rom[o:o + 16]).hex()
+    put(rom, 0xF77F, bytes([0xA9, 3, 0x85, 0x38, 0xA9, 5, 0x85, 0x39, 0xA9, 20, 0x85, 0x3C, 0xA9, 11, 0x85, 0x3D]), pat)
+    c = asm("""
+    jsr $F770       ; $B8E3: page box (English geom), then the story camera
+    jsr cam35
+    jmp $B900
+cam35:
+    lda #3
+    sta $5800
+    lda #5
+    sta $5801
+    rts
+""", org=0xB8E3)
+    assert c.org + len(c.bytes) <= 0xB900
+    put_bank(rom, B, 0xB8E3, c.bytes, bytes([0x20, 0x70, 0xF7, 0x4C, 0x00, 0xB9]) + b'\xEA' * (len(c.bytes) - 6))
+    w = asm("""
+brw:                ; $C154: the bridge story, then the field camera again
+    jsr $B800
+    lda #6
+    sta $5800
+    sta $5801
+    rts
+""", org=0xEE12)
+    assert w.org + len(w.bytes) <= 0xEE21
+    put(rom, 0xEE12, w.bytes)
+    put(rom, 0xC154, bytes([0x20]) + w.labels['brw'].to_bytes(2, 'little'), expect=bytes([0x20, 0x00, 0xB8]))

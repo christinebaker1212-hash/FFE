@@ -1456,12 +1456,14 @@ def story(rom, report):
     new columns when the scene is set up. Strings and table go to BATTLE_BANK."""
     bank = Bank(rom, BATTLE_BANK, keep=True); bank.free = BATTLE_FREE[:]
     ptrs = []
+    gb = '--gb' in sys.argv                    # GB: 18 columns, upper-row mode (gb_layout.story_gb)
+    width, mode = (18, '{05}') if gb else (STORY_W, '{09}')
     for e in json.load(open('script/ff1/story.json')):
         body = ' '.join(e['en'].strip('\n').split('\n'))
-        lines = flow(body, STORY_W)
-        assert len(lines) <= STORY_ROWS and max(len(l) for l in lines) <= STORY_W, lines
+        lines = flow(body, width)
+        assert len(lines) <= STORY_ROWS and max(len(l) for l in lines) <= width, lines
         pad = (STORY_ROWS - len(lines)) // 2
-        txt = '{09}' + '{08}' * pad + '{08}'.join(lines)
+        txt = mode + '{08}' * pad + '{08}'.join(lines)
         ptrs.append(bank.alloc(enc(txt) + b'\0'))
     tab = bank.alloc(b''.join(bytes([a & 0xFF, a >> 8]) for a in ptrs))
     BATTLE_FREE[:] = bank.free

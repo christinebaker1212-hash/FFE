@@ -32,6 +32,7 @@ SHOPS = {       # shop scripts: (shop index $51, input); the shop opens from the
     'shop_church': (0x29, '_120,A5,_150,A5,_100'),
 }
 FIELD += [(k, v, 4700, 'MAGIC,0050=01,0051=%02X' % i) for k, (i, v) in SHOPS.items()]
+FIELD += [('bridge', '_30,D16,_60,D16,_200,_200,A5,_200,A5,_200,A5,_200', 5200, '6016=01')]   # story pages
 BATTLE = ['fight', 'run', 'fire1', 'cure4', 'magic4', 'items4', 'med1']     # battleseq.py modes
 
 
