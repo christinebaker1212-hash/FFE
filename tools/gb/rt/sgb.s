@@ -418,6 +418,16 @@ sgb_scroll: push bc
             ld [SGB_TICK], a
             and 31
             jr nz, .x
+            ld a, [SGB_TX]                  ; (only if the view moved since the last one)
+            cp b
+            jr nz, .tk
+            ld a, [SGB_TY]
+            cp c
+            jr z, .x
+.tk:        ld a, b
+            ld [SGB_TX], a
+            ld a, c
+            ld [SGB_TY], a
             ld a, 1
             ldh [sgb_dirty], a
 .x:         pop bc
@@ -453,6 +463,24 @@ sgb_build:  xor a
             ldh [sgb_dirty], a
             ld a, 2
             ld [$4000], a
+            ldh a, [sgb_glob]               ; static screen, only the palettes changed: the
+            ld b, a                         ;   cells, the party slot and the ATTR packets
+            ldh a, [sgb_force]              ;   stay (the cell count is the costly part)
+            or b
+            ld b, a
+            ldh a, [sgb_adirty]
+            or b
+            jr nz, .full
+            ld hl, SGB_NEXT
+            ld b, 32
+.cp:        ld [hl+], a
+            dec b
+            jr nz, .cp
+            ldh a, [sgb_pslot]
+            push af
+            jr .np
+.full:      xor a
+            ldh [sgb_adirty], a
             ld hl, SGB_NEXT                 ; clear NEXT
             ld b, 128
             xor a
@@ -461,7 +489,25 @@ sgb_build:  xor a
             jr nz, .cl
             ldh a, [sgb_pslot]              ; (the party slot is chosen again)
             push af
-            xor a
+            ldh a, [sgb_glob]               ; battle: the last party slot if it is still free
+            and a                           ;   (only the party column's 48 cells use it):
+            jr nz, .z0                      ;   one cell count instead of two
+            ldh a, [in_battle]
+            and a
+            jr z, .z0
+            ldh a, [sgb_pslot]
+            and a
+            jr z, .z0
+            call sgb_counts
+            ldh a, [sgb_pslot]
+            dec a
+            add a, low(SGB_CNT)
+            ld l, a
+            ld h, high(SGB_CNT)
+            ld a, [hl]
+            cp 48
+            jr z, .np
+.z0:        xor a
             ldh [sgb_pslot], a
             call sgb_counts                 ; cells per palette on screen; per-cell palettes
             ldh a, [sgb_glob]               ;   -> the ATTR packets
@@ -905,20 +951,58 @@ sgb_counts: ld hl, SGB_CNT
             ld b, 20
 .c:         push bc
             push de
-            xor a                           ; owner of the cell
-            ldh [sh_nt], a
+            ld a, d                         ; the cell's palette (inline cell_pal / own_chk):
+            and $1C                         ;   attribute byte NT_SH + $3C0 + (row >> 2) * 8
+            add a, a                        ;   + (col >> 2) of the nametable that drew it
+            ld c, a
+            ld a, e
+            rrca
+            rrca
+            and 7
+            add a, c
+            add a, $C0
+            ld l, a
+            ld h, high(NT_SH) + 3
             ldh a, [own1_lo]
             ld b, a
             ldh a, [own1_hi]
             or b
             jr z, .o0
-            call own_chk
-            and a
+            push hl
+            ld a, d                         ; OWN + row * 4 + (col >> 3), bit col & 7
+            add a, a
+            add a, a
+            ld l, a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            or l
+            ld l, a
+            ld h, high(OWN)
+            ld b, [hl]
+            ld a, e
+            and 7
+            jr z, .ob
+.os:        rrc b
+            dec a
+            jr nz, .os
+.ob:        pop hl
+            bit 0, b
             jr z, .o0
-            ld a, 4
-            ldh [sh_nt], a
-.o0:        ld a, d
-            call cell_pal
+            ld a, h
+            add a, 4
+            ld h, a
+.o0:        ld a, [hl]                      ; bottom half (row & 2): high nibble, right half
+            bit 1, d                        ;   (col & 2): next two bits
+            jr z, .t
+            swap a
+.t:         bit 1, e
+            jr z, .l
+            rrca
+            rrca
+.l:         and 3
             ld c, a
             ldh a, [sgb_pslot]              ; battle party column (GB cols 15-18, rows 0-11):
             and a                           ;   the party slot

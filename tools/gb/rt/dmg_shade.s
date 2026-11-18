@@ -423,9 +423,13 @@ dmg_attr:   push bc
             push de
             push hl
             ld c, a
-            ld a, 1                         ; (SGB: the screen's palettes again)
+            ldh a, [sgb_glob]               ; (SGB: the screen's palettes again; while it
+            and a                           ;   scrolls, on the next 32-frame rebuild)
+            jr nz, .ng
+            ld a, 1
             ldh [sgb_dirty], a
-            ld a, c
+            ldh [sgb_adirty], a
+.ng:        ld a, c
             and $40
             rrca
             rrca
@@ -1001,6 +1005,7 @@ dmg_scan_all:       ; (every cell, then those in the GB view again so that a til
             push hl
             ld a, 1
             ldh [sgb_dirty], a
+            ldh [sgb_adirty], a
             xor a
             ldh [dmg_scan], a
             ld hl, REF_BM                   ; REF_BM: tiles the map uses
@@ -1069,19 +1074,35 @@ dmg_scan_all:       ; (every cell, then those in the GB view again so that a til
 ; re-coding if that changed), the tile counts as used, the palette into PAL_USED.
 ; Keeps B, D, E.
 scan_cell:  push bc
-            xor a
-            ldh [sh_nt], a
-            ldh a, [own1_lo]
-            ld b, a
+            ld b, 0                         ; B = owner offset: 4 pages for nametable 1
+            ldh a, [own1_lo]                ;   (OWN + row * 4 + col / 8, bit col & 7)
+            ld c, a
             ldh a, [own1_hi]
-            or b
+            or c
             jr z, .n0
-            call own_chk                    ;   (compares with sh_nt = 0: A = 1 for nametable 1)
-            and a
+            ld a, d
+            add a, a
+            add a, a
+            ld l, a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            or l
+            ld l, a
+            ld h, high(OWN)
+            ld c, [hl]
+            ld a, e
+            and 7
+            jr z, .ob
+.os:        rrc c
+            dec a
+            jr nz, .os
+.ob:        bit 0, c
             jr z, .n0
-            ld a, 4
-.n0:        ld b, a
-            ld a, d                         ; tile C: NT_SH + owner * $400 + row * 32 + col
+            ld b, 4
+.n0:        ld a, d                         ; tile C: NT_SH + owner * $400 + row * 32 + col
             srl a
             srl a
             srl a
@@ -1118,8 +1139,7 @@ scan_cell:  push bc
             rrca
 .l:         and 3
             ld b, a
-            push hl
-            ld hl, BIT_MASK
+            ld hl, BIT_MASK                 ; PAL_USED |= 1 << B
             add a, l
             ld l, a
             jr nc, .um
@@ -1127,34 +1147,48 @@ scan_cell:  push bc
 .um:        ld a, [PAL_USED]
             or [hl]
             ld [PAL_USED], a
-            pop hl
-            push bc                         ; tile C referenced
-            call bm_addr
-            ld a, l
-            add a, low(REF_BM) - low(DIRTY_BM)
+            ld a, c                         ; tile C referenced: REF_BM byte C / 8, bit C & 7
+            and 7
+            ld hl, BIT_MASK
+            add a, l
             ld l, a
-            ld a, [hl]
-            or b
+            jr nc, .u2
+            inc h
+.u2:        ld a, [hl]
+            push af
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(REF_BM)
+            ld l, a
+            ld h, high(REF_BM)
+            pop af
+            push af
+            or [hl]
             ld [hl], a
-            pop bc
             ld l, c                         ; coded for palette B?
             ld h, high(TILE_PAL)
             ld a, [hl]
             cp b
             jr z, .pk
             ld [hl], b
+            pop af
 .mk:        ld a, c
             call dmg_mark
 .s:         pop bc
             ret
-.pk:        push bc                         ; same palette: a parked tile is marked again
-            call bm_addr                    ;   (the cell uses it now)
-            ld a, l
-            add a, low(DEFER_BM) - low(DIRTY_BM)
+.pk:        ld a, c                         ; same palette: a parked tile is marked again
+            rrca                            ;   (the cell uses it now)
+            rrca
+            rrca
+            and $1F
+            add a, low(DEFER_BM)
             ld l, a
-            ld a, [hl]
-            and b
-            pop bc
+            ld h, high(DEFER_BM)
+            pop af
+            and [hl]
             jr nz, .mk
             jr .s
 

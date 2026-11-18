@@ -10,31 +10,47 @@ mkdir -p roms   # put the user's ROMs here (never commit): "Final Fantasy I, II 
 pip install pyboy
 DEBIAN_FRONTEND=noninteractive apt-get install -y libmgba-dev
 bash tools/emu/build_emu.sh build/emu                     # patched cynes (NES reference emulator)
-gcc -O2 tools/gb/mgba/sgbrun.c -lmgba -o build/sgbrun     # mGBA SGB runner
+gcc -O2 tools/gb/mgba/sgbrun.c -lmgba -o build/sgbrun     # mGBA runner (SGB / DMG / CGB)
 python3 tools/split/build_mmc5.py "roms/Final Fantasy I, II (Japan).nes" build
-python3 tools/ff1/insert.py build/ff1_mmc5.nes build/ff1_en.nes          # English NES (reference)
-python3 tools/ff1/insert.py build/ff1_mmc5.nes build/ff1_gb.nes --gb     # English NES + GB layout
-for s in 1 2 3 4; do COV_LOG=build/cov2/s$s.bin PYTHONPATH=build/emu python3 tools/gb/covrun.py build/ff1_en.nes $s 80000; done
-python3 tools/gb/build.py                                   # -> build/ff1_en.gb (+ .sym, .gb.s, .warn)
+python3 tools/ff1/insert.py build/ff1_mmc5.nes build/ff1_gb.nes --gb     # English NES + GB layout (+ .far)
+PYTHONPATH=build/emu python3 tools/gb/covall.py build/ff1_gb.nes build/cov3   # coverage, ~40 min (4 cores)
+PYTHONPATH=build/emu python3 tools/gb/build.py --gb --nes build/ff1_gb.nes   # -> build/ff1_gb.gb (+ .sym)
 ```
-The coverage runs take ~10-15 minutes (run them in the background, one file per seed).
-If the user uploads the ROMs as zips, unzip into `roms/` and check the SHA-1s in README.
+`build.py --gb` without `--nes` runs the whole pipeline from `roms/` (split, English,
+GB layout) but needs coverage logs made for that exact NES ROM (`build/cov3/rom.sha1`;
+build.py warns on a mismatch). Coverage must be regenerated after every change to the
+NES-side code (`gb_layout.py`, `insert.py`); runtime-only changes (`tools/gb/rt/`) need
+only `build.py`. If the user uploads the ROMs as zips, unzip into `roms/` and check the
+SHA-1s in README.
+
+## Checks
+- RAM equivalence (NES RAM at NMI k = GB RAM entering frame wait k), DMG and CGB
+  (`GB_CGB=1`): `firstdiff.py build/ff1_gb.nes build/ff1_gb.gb 3700` (new game),
+  `... 30000 --random 1`, `... 7100 --battle`, and every `covall.FIELD` script with its
+  pokes (`... N --field SCRIPT --poke P`; N = len(fieldseq.frames_for(SCRIPT)) - 1900).
+- SGB (mGBA): `sgbshots.py NES GB OUT.png K1,K2,.. [--newgame | --field S | --input MODE]
+  [--poke P [--poke-at F]] [--dmg | --cgb]` (screens at NES frames K), `sgbram.py`
+  (game state; a few scratch bytes differ when caught mid-frame, in DMG mode too).
+- Speed (mGBA): `sgbshots.py ... 7000` prints GB frames for 7000 NES frames of the battle
+  script; env `SGBRUN_PROF=1` prints the PC of every frame without a NES frame end
+  (SGB builder code in bank 63 is reported under the caller's bank: resolve PCs against
+  the `3f:` symbols), `SGBRUN_PEEK=ADDR` prints 16 bytes of WRAM per shot.
 
 ## What exists (all FF1)
 - **Toolchain** (`tools/gb/`): SM83 assembler (`asm_sm83.py`, jr→jp relaxation, `.sym`),
   code map from coverage (`nescode.py`), 6502→SM83 recompiler (`recomp.py`), runtime
   (`rt/runtime.s` PPU/joypad/MMC5/banking/dispatch, `rt/apu.s` sound, `rt/ff1_hle.s` native
-  CHR upload), build (`build.py`). Design: `docs/gb-port.md`.
-- **Equivalence**: the GB build of `ff1_en.nes` is byte-identical in RAM to the NES at
-  every frame wait over the new-game script and 3 × 40k frames of random play
-  (`firstdiff.py`). Debug tools: `tracediff.py`, `watchdiff.py`, `crashfind.py`,
-  `profile_gb.py`, `compare.py` (side-by-side shots), `run_gb.py`.
-- **Sound** works (APU → DMG channels). **Speed**: 1.00× in play, ~1.16× overall
-  (screen transitions).
-- **mGBA SGB runner** (`build/sgbrun ROM FRAMES OUT [--press KEYS@F+H] [--shot F]`):
-  the ROM runs as SGB; no SGB packets/palettes/border are sent yet.
+  CHR upload, `rt/dmg_shade.s` plain-GB shading, `rt/sgb.s` SGB palettes/attributes/
+  border/screen mask), build (`build.py`). Design: `docs/gb-port.md`.
+- **Equivalence**: the GB build of `ff1_gb.nes` is byte-identical in RAM to the NES at
+  every frame wait in all checks (see Checks). Debug tools: `tracediff.py`, `watchdiff.py`,
+  `crashfind.py`, `profile_gb.py`, `compare.py` (side-by-side shots), `run_gb.py`.
+- **Sound** works (APU → DMG channels).
+- **mGBA runner** (`build/sgbrun ROM FRAMES OUT [--press KEYS@F+H] [--shot F] [--padfile
+  F --nshot K] [--sram F] [--poke K ADDR=VAL,..] [--dmg | --cgb]`), driven by
+  `sgbshots.py` / `sgbram.py`.
 
-## Layout work in progress: the battle screen
+## The battle screen (done)
 Owner's design (decided step by step on 2026-11-18, mock-ups `tools/gb/mockup.py`,
 approved layout = `mock12_battle.png` + full-width messages `mock13_msgs_wide.png`):
 - camera (1, 6): enemy area GB cols 1-14 rows 0-11 (NES enemy box interior, unchanged,
@@ -80,16 +96,6 @@ approved layout = `mock12_battle.png` + full-width messages `mock13_msgs_wide.pn
   spells `$6300+64m`, equipment `$6118+64m`), `formations.py` (survey), `ntlog.py`,
   `test_vwf.py` (renderer in py65), `mockup.py`.
 
-### Next steps (battle)
-1. GB build: `build.py --gb` (coverage `build/cov3` from `covrun.py build/ff1_gb.nes`),
-   `firstdiff.py build/ff1_gb.nes build/ff1_gb.gb`, look at it in PyBoy and mGBA (SGB).
-   The VRAM queue (40 bytes per GB frame) makes text slower on GB: measure, and later use
-   HDMA in CGB mode.
-3. Enemy names window: long names wrap into the next name's row (rare: names > 56 px);
-   end-of-battle messages (gold, experience, level up); "Medicine" list; all formations
-   (fiends, Chaos); messages that need three rows.
-4. Then the colour milestone (CGB mode first), then the other screens.
-
 ## Plain Game Boy shading (done 2026-11-18)
 `tools/gb/rt/dmg_shade.s` (DMG/SGB only; CGB uses NES colours). BG tiles live in a shadow
 (cart RAM bank 1 $B000) and are re-coded per palette: value = brightness group of the
@@ -100,11 +106,25 @@ REF_LMAX/NGRP $DC40, LVF/LSL/LVMAP/GLUM $DC50-$DC7F, REF_BM $DC80, DEFER_BM $DCA
 OWN $DD00 (both modes), TILE_USE $DD80. Both modes track which nametable drew each GB map
 cell (`own_set`) so nametable-1 attributes colour only their cells.
 
-## After the battle
-Main menu (party list, commands, Gil/orbs), dialogue (wrap 18 columns: `W` in insert.py,
-window via the map-row box builder `$D54B`, text origin `$D520-$D536`), item/magic/equip/
-status, shops, title/prologue/class select/name entry, ending. Then SGB palettes + border
-(test in mGBA), speed of screen transitions (`$2007` shim), then FF2, then FF3 (GBC).
+## State at the FF1 release (2026-11-18, local build only: nothing published)
+All FF1 screens are re-laid out for 160x144 (battle, field dialogue, main menu, items,
+magic, weapons/armour, status, shops, prologue, title, class select, name entry, bridge /
+ending story, world map, 15-puzzle); colour in CGB mode (NES colours), plain Game Boy
+shading and SGB palettes + border. RAM-identical to the NES in all checks (DMG and CGB);
+the only reported difference is the CGB bridge script's pad bytes one frame off (harness
+input feed). Speed for the 7000-frame battle script in mGBA: CGB ~7.5k GB frames, DMG
+9279, SGB 9864 (1.00x in steady play; the extra is screen transitions).
+
+Known limits:
+- Scrolling screens on the SGB use one palette for the whole screen (e.g. water near a
+  bridge can turn grey for a few seconds).
+- DMG prologue: a newly fading line's letters can flash white for a few frames.
+- A BG tile drawn with two palettes whose colours differ in brightness at the same index
+  is coded for one of them on DMG/SGB (only the prologue fade did this; worked around).
+
+Possible next work: speed of screen transitions on DMG/SGB (nametable-write bookkeeping
+`rt_ppu_w7` / `own_set` / `dmg_mark`, the LCD-on scan), then FF2 (dual-mode), then FF3
+(GBC only).
 
 ## Gotchas learned
 - B and D must stay 0 at all times (BC = Y, DE = X for indexed addressing).

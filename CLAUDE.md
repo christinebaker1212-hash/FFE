@@ -72,7 +72,7 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-18)
+# GB port status (last updated 2026-11-18: FF1 released as a local build)
 
 **Handoff: `docs/gb-handoff.md`** (session setup, current battle-layout work, exact next steps).
 
@@ -647,16 +647,25 @@ Milestones per game (from `docs/gb-port.md`):
 - Checks after fresh coverage (20.0k instructions): 39 of 40 identical (new game, random
   30000, battle, all field scripts; DMG + CGB); CGB bridge: pad bytes one frame off at a
   D press (harness input feed, as before; identical without the bridge-flag poke).
-- Next: FF1's accuracy / timing pass (lag in screen transitions, SGB check of the new
-  screens in mGBA).
-- Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
-- `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
-  battle layout is usable (coverage logs must then be regenerated for that ROM).
+- **Speed pass (2026-11-18)**, measured in mGBA on the 7000-NES-frame battle script (GB
+  frames): SGB 10596 -> 9864, DMG 9336 -> 9279, CGB ~7.5k. SGB builder: palette-only
+  changes skip the cell count (`sgb_adirty`: attributes / LCD-on scan / camera), the cell
+  count's inner loop inlined, the battle party slot reused while still free (one count
+  instead of two), attribute writes while scrolling wait for the 32-frame rebuild, which
+  runs only if the view moved. DMG: the LCD-on scan cell inlined. Tools: `sgbrun` env
+  `SGBRUN_PROF=1` (PC of each lagging frame), `SGBRUN_PEEK=ADDR`.
+- SGB check of all new screens in mGBA (menu, sub-screens, shops, dialogue, bridge story,
+  world map, puzzle, new game, battle): fine after the prologue and screen-mask fixes.
 - Recompiler and PPU-layer design written up in `docs/gb-port.md` §1-2 (registers X→E,
   Y→C; NES stack on the GB stack; flag liveness; ROM data through a bank-0 helper;
   queued VRAM writes; tile/nametable/scroll mapping).
-- SGB packet sender + detection (MLT_REQ): PyBoy has no SGB, so it gets written with
-  the SGB palette work (milestone 6) and is checked in an SGB-capable emulator then.
 
-## Remaining (FF1)
-- Milestones 2–6 above. FF2 and FF3 not started.
+## FF1 release (2026-11-18, owner: "local build only", FF1 only)
+FF1 is complete for this release: all screens re-laid out, dual-mode colour (CGB / DMG /
+SGB with border), RAM-identical to the NES in every check. The ROM is built locally
+(`build/ff1_gb.gb`, git-ignored, never published). Build steps, checks and known limits:
+`docs/gb-handoff.md`.
+
+## Remaining
+- FF1: optional speed work on DMG/SGB screen transitions (see the handoff).
+- FF2 (dual-mode) and FF3 (GBC only): not started.

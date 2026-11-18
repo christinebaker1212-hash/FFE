@@ -24,6 +24,8 @@ SGB_LSX    = $DCC8          ; SGB: last view position (scroll + camera)
 SGB_LSY    = $DCC9
 SGB_TICK   = $DCCA
 SGB_GP     = $DCCB          ; SGB: GRID write pointer (2)
+SGB_TX     = $DCCD          ; SGB: view position at the last scrolling rebuild
+SGB_TY     = $DCCE
 SPAL_KEY   = $DCC0          ; NES sprite palette -> coding: values of indices 1-3 (2 bits each),
                             ;   bit 6 = OBP1 (DMG); $39 = as is (CGB)
 SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
@@ -158,6 +160,7 @@ ap_pal:     ds 4                            ; attr_apply: palette of each quadra
 maps_wait:  ds 1                            ; DMG: frames the maps have been due (fades)
 in_battle:  ds 1                            ; bit 7 of the last $5800 write (the battle camera)
 sgb_pslot:  ds 1                            ; SGB: 1 + the palette slot given to the battle party (0: none)
+sgb_adirty: ds 1                            ; SGB: attributes / cells / camera changed (else palettes only)
 sgb_mask:   ds 1                            ; SGB screen mask: 1 = to blank (LCD went off), 2 = blanked, 3 = blanked until the packets built with the LCD on are out
 hram_end:   ds 1
 
@@ -1742,6 +1745,11 @@ rt_mmc_w5115:
 rt_mmc_w5800:                               ; camera X in tiles (GB layout code; bit 7:
             push af                         ;   the battle, for the SGB sprite colours)
             push bc
+            ld b, 1                         ; (SGB: the cells on screen change)
+            ld c, a
+            ld a, b
+            ldh [sgb_adirty], a
+            ld a, c
             and $80
             ld b, a
             ldh a, [in_battle]
@@ -1762,6 +1770,10 @@ rt_mmc_w5800:                               ; camera X in tiles (GB layout code;
             pop af
             ret
 rt_mmc_w5801:                               ; camera Y in tiles
+            push af
+            ld a, 1
+            ldh [sgb_adirty], a
+            pop af
             push af
             add a, a
             add a, a
