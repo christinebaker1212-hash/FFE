@@ -323,7 +323,9 @@ Milestones per game (from `docs/gb-port.md`):
 - **Work now (2026-11-18):** GB build of the battle layout: `build.py --gb` (builds
   `build/ff1_gb.nes` with `insert.py --gb`, coverage `build/cov3` from `covrun.py` on that
   ROM, output `build/ff1_gb.gb`), then `firstdiff.py`, PyBoy and mGBA checks. Coverage
-  must be regenerated after every change to the NES code (far-code addresses move). `docs/gb-handoff.md` has the current battle design,
+  must be regenerated after every change to the NES code (far-code addresses move).
+  `firstdiff.py ... --battle [--shots F,.. --out PNG]` checks RAM equivalence through the
+  battleshot battle and saves GB screens. `docs/gb-handoff.md` has the current battle design,
   how it is built, and the next steps.
 - Column-2 lists push a name down below a wrapped one (VNROW; 7 formations have a name
   > 56 px, only formation 69 lists two names).

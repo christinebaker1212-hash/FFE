@@ -1,7 +1,10 @@
 """Lockstep NES/GB (new-game script, then optional random play) and report the first frame
 where NES RAM at NMI k differs from GB RAM on entering frame wait k (page 1 excluded).
 The GB gets the controller value the NES game latched in each frame (cynes nmi_pad).
-usage: PYTHONPATH=build/emu firstdiff.py NES GB [MAXFRAMES] [--random SEED]"""
+usage: PYTHONPATH=build/emu firstdiff.py NES GB [MAXFRAMES] [--random SEED] [--battle]
+       [--shots F1,F2,... --out SHEET.png]
+--battle: the battleshot.py input (new-game script, walk into a battle, A once a second);
+--shots: GB screens after those NES frames, saved as one sheet (--out)."""
 import sys, random
 sys.path.insert(0, __file__.rsplit('/', 1)[0])
 from compare import sync_sram, GB, new_game_script, UP, DOWN, LEFT, RIGHT, A, B, START
@@ -11,6 +14,14 @@ args = sys.argv[1:]
 rnd = None
 if '--random' in args:
     k = args.index('--random'); rnd = int(args[k + 1]); del args[k:k + 2]
+battle = '--battle' in args
+if battle: args.remove('--battle')
+shots_at, out = set(), None
+if '--shots' in args:
+    k = args.index('--shots'); shots_at = {int(x) for x in args[k + 1].split(',')}; del args[k:k + 2]
+if '--out' in args:
+    k = args.index('--out'); out = args[k + 1]; del args[k:k + 2]
+shots = []
 nes = NES(args[0]); gb = GB(args[1]); sync_sram(nes, gb)
 limit = int(args[2]) if len(args) > 2 else 100000
 sym = {}
@@ -31,6 +42,10 @@ for it in new_game_script():
     if it[0] == 'shot': continue
     m, h, a = it
     steps += [m] * h + [0] * a
+if battle:
+    from battleshot import battle_input, pad
+    bi = battle_input()
+    steps = [pad(bi, f) for f in range(limit)]
 if rnd is not None:
     r = random.Random(rnd)
     btns = [UP, DOWN, LEFT, RIGHT, A, A, B, START, UP, DOWN, LEFT, RIGHT]
@@ -51,6 +66,8 @@ for m in steps[:limit]:
             gb.pb.tick(); guard += 1
             if guard > 2000: raise SystemExit('GB stuck before wait %d' % j)
         if j < k: snaps.pop(j)
+    if f in shots_at:
+        shots.append(gb.image())
     if k < 8: continue
     a = nes.nmi_ram; b = snaps.pop(k)
     d = [i for i in range(0x800) if a[i] != b[i] and not 0x100 <= i < 0x200]
@@ -59,3 +76,10 @@ for m in steps[:limit]:
         break
 else:
     print('no difference in %d frames (%d NMIs)' % (f, nes.nmi_count))
+if shots and out:
+    from PIL import Image
+    sheet = Image.new('RGB', (164 * min(len(shots), 6), 148 * ((len(shots) + 5) // 6)), 'white')
+    for i, g in enumerate(shots):
+        sheet.paste(g, ((i % 6) * 164, (i // 6) * 148))
+    sheet.save(out)
+    print('saved', out)
