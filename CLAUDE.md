@@ -65,7 +65,9 @@ FF1 comes first, then FF2, then FF3.
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-17)
+# GB port status (last updated 2026-11-18)
+
+**Handoff: `docs/gb-handoff.md`** (session setup, current battle-layout work, exact next steps).
 
 ## Scope and plan
 FF1 first (DMG+SGB), then FF2 (same engine family, DMG+SGB), then FF3 (GBC).
