@@ -977,6 +977,8 @@ def menu_engine(rom, report):
     if '--gb' in sys.argv:                     # GB layout: menu code in ExRAM (the command
         a, b = exsrc.index('barhl:'), exsrc.index('magpre:')    # highlight is not used there)
         exsrc = exsrc[:a] + 'barhl:\n    rts\n' + exsrc[b:]
+        for o, n in gb_layout.SHOPLIST_PATCH:
+            assert o in exsrc, o; exsrc = exsrc.replace(o, n, 1)
         exsrc += gb_layout.exram_source(FAR_ROUTINES)
     ex = asm(exsrc + tabs, syms=dict(EX, FAR8=FAR8))
     # $5F80-$5FFF is the battle text buffer: code and the far-call tables must end before it
@@ -1349,9 +1351,15 @@ def shops(rom, labels):
             lines = flow(txt, 9)
             assert len(lines) + (1 if head else 0) <= 9, (e['id'], lines)
             txt = '{09}' + head + '{08}'.join(lines)
+        if '--gb' in sys.argv:                 # GB layout: its own shop strings
+            sys.path.insert(0, os.path.dirname(__file__))
+            import gb_layout
+            txt = gb_layout.shop_text(e['id'], e['en'], txt)
         a = bank.alloc(enc(txt) + b'\0')
         o = HDR + 14 * BANK + 2 * e['id']
         rom[o] = a & 0xFF; rom[o + 1] = a >> 8
+    if '--gb' in sys.argv:                     # party names one row each (shop window 3)
+        gb_layout.SHOP['names'] = bank.alloc(enc('{05} {10}{00}{08} {11}{00}{08} {12}{00}{08} {13}{00}') + b'\0')
     SHOP_FREE[:] = bank.free
     bank_put(rom, 14, 0xAA45, jsr(labels['m_setbank']) + b'\xEA\xEA\xEA')
     pn = labels['partynames']

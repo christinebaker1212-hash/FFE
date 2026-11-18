@@ -23,7 +23,21 @@ SCREENS = {     # menu sub-screen scripts (with magic_pokes), also used by the G
     'status': '_30,S5,_80,D5,_40,D5,_40,D5,_40,D5,_40,A5,_100,A5,_150,B5,_100,B5,_100',
 }
 FIELD += [(k, v, 4700, 'MAGIC') for k, v in SCREENS.items()]
+SHOPS = {       # shop scripts: (shop index $51, input); the shop opens from the field pokes
+    'shop_buy': (0x01, '_120,A5,_100,D5,_30,A5,_100,A5,_100,A5,_120,B5,_80'),
+    'shop_sell': (0x01, '_120,D5,_30,A5,_100,A5,_100,D5,_30,A5,_100,A5,_120,B5,_80'),
+    'shop_magic': (0x15, '_120,A5,_120,A5,_100,B5,_60,B5,_60'),
+    'shop_inn': (0x33, '_120,A5,_200,A5,_250'),
+    'shop_item': (0x3D, '_120,A5,_100,A5,_100,A5,_100,A5,_120,B5,_80'),
+    'shop_church': (0x29, '_120,A5,_150,A5,_100'),
+}
+FIELD += [(k, v, 4700, 'MAGIC,0050=01,0051=%02X' % i) for k, (i, v) in SHOPS.items()]
 BATTLE = ['fight', 'run', 'fire1', 'cure4', 'magic4', 'items4', 'med1']     # battleseq.py modes
+
+
+def pokes_of(p):
+    """a FIELD entry's pokes: 'MAGIC' stands for magic_pokes()"""
+    return magic_pokes() + p[5:] if p.startswith('MAGIC') else p
 
 
 def magic_pokes():
@@ -55,7 +69,7 @@ def main():
         env1 = dict(env, COV_LOG=os.path.join(out, 's%d.bin' % (5 + i)))
         if os.path.exists(env1['COV_LOG']): os.remove(env1['COV_LOG'])
         cmd = [sys.executable, os.path.join(HERE, 'covfield.py'), rom, script, str(n)]
-        if pokes: cmd += ['--poke', magic_pokes() if pokes == 'MAGIC' else pokes]
+        if pokes: cmd += ['--poke', pokes_of(pokes)]
         procs.append(subprocess.Popen(cmd, env=env1, stdout=open(os.path.join(out, 's%d.log' % (5 + i)), 'w'),
                                       stderr=subprocess.STDOUT))
     for i, mode in enumerate(BATTLE):

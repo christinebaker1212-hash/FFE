@@ -1917,6 +1917,7 @@ def apply(rom, report):
     magic_menu(rom)
     equip_menu(rom)
     status_menu(rom)
+    shop_menu(rom)
     report.append('GB layout applied')
 
 
@@ -2681,3 +2682,112 @@ statrow:            ; $B4FE (instead of window 5): string 40 from row 13
              bytes([0xA2, 0x14, 0x20, 0x23, 0xB5]))
     put_bank(rom, B, 0xB4C9, bytes([0x20]) + CAM['menu'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
     put_bank(rom, B, 0xB50B, bytes([0xA9, 128, 0x85, 0x40, 0xA9, 7]), bytes([0xA9, 0x58, 0x85, 0x40, 0xA9, 0x20]))
+
+
+# Shops (owner, 2026-11-18: SaGa style, no shop scene, Gil always shown). Camera X = 1
+# (GB column = NES column - 1; the list hand at NES x 0 is cut off at the screen edge),
+# positions below in GB columns.
+#   window 0 speech (0,0,20,6): up to 4 lines of 18 (upper-row mode from row 1)
+#   window 2 list   (0,5,20,12): shares the speech window's bottom border; 5 items x 2
+#                   rows: name from column 1, price below right-aligned to column 18
+#                   (magic shops: "L3" and the price); the price question: line 1
+#                   empty, the price before "Gil, see." on line 2
+#   window 4 Gil    (0,15,11,3): over the list's bottom-left corner (the last price
+#                   row is empty there), drawn again after every list draw
+#   window 1 title  (0,6,10,5), window 3 menu / Yes-No / names (10,6,10,6)
+# All in the window palette (no scene: the 10x10 picture, the party sprites, the title
+# and Gil palettes are dropped).
+SHOP = {}
+SHOP_WIN = [(1, 0, 20, 6), (1, 6, 10, 5), (1, 5, 20, 12), (11, 6, 10, 6), (1, 15, 11, 3)]   # NES x (camera X 1)
+
+
+def shop_text(i, en, txt):
+    """GB form of shop string i (en: the script text; txt: the NES layout's form)"""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    main = sys.modules['__main__']
+    if i in main.SHOP_TITLES:                 # title: up to 3 words centred in 8 columns
+        t = main.SHOP_TITLES[i]
+        return '{05}' + ('{08}' if len(t) == 1 else '') + '{08}'.join(' ' * ((8 - len(w)) // 2) + w for w in t)
+    if i in main.SHOP_SPEECH:
+        if en.startswith('\n'):                # the price (5 wide) is drawn at the start of
+            words = en.split()                  #   line 2 (row 2; one row higher its blank upper
+                                                #   row would cut the frame): text from GB col 7
+            first = ''
+            while words and len((first + ' ' + words[0]).strip()) <= 12:
+                first = (first + ' ' + words.pop(0)).strip()
+            lines = ['', '{0D}{08}' + first] + (main.flow(' '.join(words), 18) if words else [])
+        else:
+            lines = main.flow(en, 18)
+        assert len(lines) <= 4, (i, lines)
+        return '{05}' + '{08}'.join(lines)
+    if i in (10, 11, 15, 36):                 # menus: one word per row
+        return '{05}' + '{08}'.join(' ' + w for w in en.split('\n'))
+    return txt
+
+
+SHOPLIST_PATCH = [
+    ("""    lda #$0A            ; wrap width 10: long names on the two rows of the name line
+    sta $0310""", """    lda #$05            ; GB: upper-row mode, one-row lines
+    sta $0310"""),
+    ("""    lda #1
+    sta $0312,y
+    sta $0317,y
+    lda #$0D            ; price at column 26 (5 characters, right edge 30)
+    sta $0313,y
+    lda #26""", """    lda #8
+    sta $0312,y
+    sta $0317,y
+    lda #$0D            ; GB: price at NES column 15 (GB 14-18)
+    sta $0313,y
+    lda #15"""),
+    ("""magpre:         ; bank 14 $A99C: magic shop list, same name wrapping as the item list
+    lda #0
+    sta $63
+    lda #$0A""", """magpre:         ; bank 14 $A99C: magic shop list, same name wrapping as the item list
+    lda #0
+    sta $63
+    lda #$05"""),
+]
+
+SHOP_B14 = """
+goldwin:            ; $A804: the Gil window, amount and 'Gil' on its text row
+    jsr $AA4E
+    dec $3B
+    rts
+lgold:              ; after the list ($A8C1 / $A9FF): the Gil window over it again
+    jsr $A802
+    jmp $A925
+camshop:            ; $A78E: camera X = 1, Y = 0
+    jsr $9C02
+    lda #1
+    sta $5800
+    lda #0
+    sta $5801
+    rts
+"""
+
+
+def shop_menu(rom):
+    B = 14
+    main = sys.modules['__main__']
+    old = bytes(rom[bank_off(B, 0xAC53):bank_off(B, 0xAC53) + 20])
+    new = bytes(w[k] for k in range(4) for w in SHOP_WIN)
+    put_bank(rom, B, 0xAC53, new, old)
+    put_bank(rom, B, 0xAC6F, b'\xFF' * 64, bytes(rom[bank_off(B, 0xAC6F):bank_off(B, 0xAC6F) + 64]))
+    put_bank(rom, B, 0xA7C8, b'\xEA\xEA\xEA', bytes([0x20, 0xCF, 0xDC]))       # no scene
+    put_bank(rom, B, 0xAA0D, b'\x60', bytes([0xA9]))                              # no party sprites
+    for a in (0xA8BE, 0xA9FC):                      # window 3 is not erased under the list
+        put_bank(rom, B, a, b'\xEA\xEA\xEA', bytes([0x20, 0xD5, 0xE1]))
+    put_bank(rom, B, 0xA9B9, bytes([0xA9, 0x08]), bytes([0xA9, 0x01]))            # magic list: one-row lines
+    r = asm(SHOP_B14, org=0xA86D)                   # old list builder (A86A jumps to ExRAM)
+    assert r.org + len(r.bytes) <= 0xA8A9
+    put_bank(rom, B, r.org, r.bytes, bytes(rom[bank_off(B, r.org):bank_off(B, r.org) + len(r.bytes)]))
+    put_bank(rom, B, 0xA78E, bytes([0x20]) + r.labels['camshop'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
+    put_bank(rom, B, 0xA804, bytes([0x20]) + r.labels['goldwin'].to_bytes(2, 'little'), bytes([0x20, 0x4E, 0xAA]))
+    for a in (0xA8C1, 0xA9FF):
+        put_bank(rom, B, a, bytes([0x4C]) + r.labels['lgold'].to_bytes(2, 'little'), bytes([0x4C, 0x25, 0xA9]))
+    # cursors (NES x): menu window (GB x 80, rows 7-10), list (cut off, name rows 6, 8, .. 14)
+    put_bank(rom, B, 0xA98A, bytes([88, 55, 88, 63, 88, 71, 88, 79]), bytes(rom[bank_off(B, 0xA98A):bank_off(B, 0xA98A) + 8]))
+    put_bank(rom, B, 0xA992, bytes([0, 47, 0, 63, 0, 79, 0, 95, 0, 111]), bytes(rom[bank_off(B, 0xA992):bank_off(B, 0xA992) + 10]))
+    a = SHOP['names']                               # party names, one row each
+    put_bank(rom, B, 0xA8FC, bytes([0xA9, a & 0xFF, 0x85, 0x3E, 0xA9, a >> 8]), bytes(rom[bank_off(B, 0xA8FC):bank_off(B, 0xA8FC) + 6]))

@@ -527,18 +527,21 @@ Milestones per game (from `docs/gb-port.md`):
   (761 bytes, ends $5F59). ExRAM is nearly full: new GB code goes elsewhere.
 - Coverage now also runs the battle input modes (`covbattle.py`, covall.BATTLE) with
   magic_pokes: the random seeds alone reached ~10% less code after the menu changes.
-- **Shops: waiting for the owner** (mock-ups `build/shots/mock_shop_A.png` / `_B.png`):
-  a full-width buy list (17-letter names + prices, 5 items x 2 rows) must cover the lower
-  area. A = keep the shop scene (shopkeeper, counter, party sprites; NES palettes 0 /
-  1 / 2 there): the list hides it while open (sprites hidden, attributes switched, scene
-  redrawn afterwards). B = SaGa-style without the scene (all windows one palette).
-  Shop facts: EnterShop b14 $A343 ($50 = enter flag, $51 = shop index = type*10 + town,
-  e.g. 1 = Coneria weapons, 70 caravan; open one with `--poke 0050=01,0051=01`), windows
-  $AC53 (x[5] y[5] w[5] h[5]: speech, title, list, menu, gold), attributes $AC6F (64 bytes),
-  scene 10x10 tiles at NES (11,6) from $ACAF, list strings built in ExRAM (shoplist,
-  magpre), menu cursor table $A98A, list cursor $A992. NES English bug seen: the price is
-  missing from the "... Gil, see" line. Tools: pokes below $0800 work now
-  (battleseq.poke_state: RAM_STATE offset; firstdiff writes GB $C000 + a).
+- **Shops (2026-11-18; owner: "SaGa style is fine, but show the Gil")** (`gb_layout.shop_menu`,
+  strings `shop_text`, ExRAM list patch `SHOPLIST_PATCH`): camera X = 1. Speech (NES
+  1,0,20,6): up to 4 lines of 18 (upper-row mode); list (1,5,20,12) sharing the speech
+  window's bottom border: 5 items x 2 rows (name; price below, right edge GB column 18;
+  magic shops "L3 price"); Gil (1,15,11,3) over the list's empty bottom-left corner,
+  drawn again after every list draw (`lgold`), text row via `goldwin`; title (1,6,10,5),
+  menu / Yes-No / names (11,6,10,6). No scene (10x10 picture `$DCCF` and party sprites
+  `$AA0D` off), all attributes window palette, window 3 not erased under the list. The
+  price question: line 1 empty, "<price> Gil, see." on line 2 (the price's blank upper
+  row would cut the frame on line 1; this also fixes the NES-English bug where the price
+  overwrote the line). Party names one per row (string in the menu bank, `SHOP['names']`).
+  Checked on the NES: weapons (buy, sell), armour, white / black magic, church, inn, items,
+  caravan. Shop facts: EnterShop b14 $A343 ($50 = enter flag, $51 = shop index = type*10 +
+  town; open one with `--poke 0050=01,0051=01`), windows $AC53, attributes $AC6F, menu
+  cursor $A98A, list cursor $A992. Pokes below $0800 work (battleseq.poke_state).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).
