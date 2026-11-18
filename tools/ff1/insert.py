@@ -947,6 +947,8 @@ def menu_engine(rom, report):
         import gb_layout
         a, b = src.index('boxline:'), src.index('magpage:')
         src = src[:a] + src[b:] + gb_layout.far_source(ENC)    # small-font battle text
+        a, b = src.index('magpage:'), src.index('magdown:')
+        src = src[:a] + gb_layout.MAGPAGE + src[b:]             # magic list rows
         for r in gb_layout.FAR_GB:
             if r not in FAR_ROUTINES: FAR_ROUTINES.append(r)
     far = asm(src, syms=EX)

@@ -151,6 +151,10 @@ vclear:             ; clear VN tiles of the buffer, VX = 0
     rts
 
 vchar:              ; A = code: draw at VX, advance (glyph width + 1; space 3)
+    cmp #$FD        ; $FD x: pen to pixel x (handled by vstr)
+    bne .nfd
+    rts
+.nfd:
     cmp #$FF
     bne .g
     lda VX
@@ -247,15 +251,28 @@ vchar:              ; A = code: draw at VX, advance (glyph width + 1; space 3)
 .r:
     rts
 
-vstr:               ; draw VSTR from index A up to (not including) index VEND or a 0
-    sta VC
+vstr:               ; draw VSTR from index A up to (not including) index VEND or a 0;
+    sta VC          ;   $FD x moves the pen to pixel x
 .l:
     ldx VC
     cpx VEND
     bcs .r
     lda VSTR,x
     beq .r
+    cmp #$FD
+    bne .c
+    lda VSTR+1,x    ; $FD $80+n: pen to tile n of the row (codes >= $7A pass the decoder)
+    sec
+    sbc #$80
+    asl a
+    asl a
+    asl a
+    sta VX
+    inc VC
+    bne .n
+.c:
     jsr vchar
+.n:
     inc VC
     bne .l
 .r:
@@ -627,12 +644,19 @@ boxline:
 .sv:
     lda VSTR,x
     sta VATK,x
-    beq .pl
+    beq .sve
     inx
     cpx #15
     bne .sv
     lda #0
     sta VATK,x
+.sve:
+    jsr vtext       ; the attacker: following lines start below it
+    lda VROW
+    clc
+    adc #1
+    sta VLINE
+    jmp vrest
 .pl:
     jsr vtext
 .out:
@@ -682,11 +706,18 @@ boxline:
     jsr vtext
     jmp vrest
 .next:
-    lda VLINE
-    bne .nw
+    lda $691E+1     ; a full-width window has its top edge at column 9
+    cmp #$F7
+    bne .open
+    lda $691E+9
+    cmp #$F8
+    beq .have
+.open:
     jsr msgwin
     lda #1
     sta VLINE
+.have:
+    lda VLINE
 .nw:
     cmp #2
     bcc .ni
@@ -709,6 +740,10 @@ boxline:
     lda #2
     sta VCOL
     jsr vtext
+    lda VROW
+    clc
+    adc #1
+    sta VLINE
     jmp vrest
 
 vaddr:              ; ($8A) = panel cell (VROW, VCOL)
@@ -749,6 +784,13 @@ vtext:              ; VSTR at panel (VROW, VCOL), word-wrapped to the frame (row
     bne .w
 .we:
     sty VW
+    lda #20         ; never past column 19: the row's 18 tiles end there
+    sec
+    sbc VCOL
+    cmp VW
+    bcs .wk
+    sta VW
+.wk:
     lda #0
     sta VC0
 .row:
@@ -784,13 +826,6 @@ vtext:              ; VSTR at panel (VROW, VCOL), word-wrapped to the frame (row
     iny
     cpy VN
     bne .c
-    lda VROW
-    clc
-    adc #1
-    cmp VLINE
-    bcc .nl
-    sta VLINE
-.nl:
     ldx VNEXT
     stx VC0
     lda VSTR,x
@@ -827,6 +862,18 @@ vbreak:             ; row from VC0 in VW tiles less VIND: VEND = end, VNEXT = ne
     beq .all
     cmp #$FE
     beq .fe
+    cmp #$FD
+    bne .nf
+    inx
+    lda VSTR,x
+    sec
+    sbc #$80
+    asl a
+    asl a
+    asl a
+    sta VLO
+    jmp .ok
+.nf:
     cmp #$FF
     bne .ch
     stx VBRK
@@ -917,6 +964,164 @@ MWROW:
     .db $F7, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F9
     .db $FA, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FB
     .db $FC, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FE
+"""
+
+
+# Battle magic list for the GB layout (replaces the English magpage in the far code): the
+# full-width window, two levels per page, each on two rows:
+#   row 1: "L<n>"  spell 1 (column 4)  spell 2 (column 12)
+#   row 2:         spell 3 (column 4)  MP count (column 18)
+# Positions use the $FD $80+n pen code of the small-font text (n = tiles from the record).
+MAGPAGE = """magpage:
+    ldy #5
+.c:
+    lda $FA08,y
+    sta $6A9D,y
+    dey
+    bne .c
+    lda #1
+    sta $6A9F
+    lda #0
+    sta $6AA0
+    lda #20
+    sta $6AA1
+    lda #6
+    sta $6AA2
+    jsr $F688
+    jsr $F74F
+    lda $6B7A
+    jsr $F88F
+    clc
+    adc #0
+    sta $88
+    lda #0
+    adc #$63
+    sta $89
+    lda #0
+    sta MI
+    sta MU
+.lv:
+    lda $6AF8
+    asl a
+    clc
+    adc MI
+    sta ML
+    lda MU          ; ---- row 1
+    sta MT
+    ldx MU
+    lda #$C6
+    sta $6AFA,x
+    inx
+    lda ML
+    clc
+    adc #$81
+    sta $6AFA,x
+    inx
+    lda #$FD
+    sta $6AFA,x
+    inx
+    lda #$82
+    sta $6AFA,x
+    inx
+    lda #0
+    jsr .spell
+    lda #$FD
+    sta $6AFA,x
+    inx
+    lda #$8A
+    sta $6AFA,x
+    inx
+    lda #1
+    jsr .spell
+    lda #0
+    sta $6AFA,x
+    inx
+    stx MU
+    lda MI
+    asl a
+    clc
+    adc #1
+    jsr .queue
+    lda MU          ; ---- row 2
+    sta MT
+    ldx MU
+    lda #$FD
+    sta $6AFA,x
+    inx
+    lda #$82
+    sta $6AFA,x
+    inx
+    lda #2
+    jsr .spell
+    lda #$FD
+    sta $6AFA,x
+    inx
+    lda #$90
+    sta $6AFA,x
+    inx
+    lda ML
+    clc
+    adc #$20
+    tay
+    lda ($88),y
+    clc
+    adc #$80
+    sta $6AFA,x
+    inx
+    lda #0
+    sta $6AFA,x
+    inx
+    stx MU
+    lda MI
+    asl a
+    clc
+    adc #2
+    jsr .queue
+    inc MI
+    lda MI
+    cmp #2
+    beq .done
+    jmp .lv
+.done:
+    rts
+.spell:             ; A = slot: append 0E <name index> if the slot holds a spell
+    sta MS
+    stx MR
+    lda ML
+    asl a
+    asl a
+    clc
+    adc MS
+    tay
+    lda ($88),y
+    ldx MR
+    cmp #0
+    beq .sx
+    clc
+    adc #$AF
+    pha
+    lda #$0E
+    sta $6AFA,x
+    inx
+    pla
+    sta $6AFA,x
+    inx
+.sx:
+    rts
+.queue:             ; A = row: queue text record 01 2 row ptr(MT)
+    sta $6AA0
+    lda #2
+    sta $6A9F
+    lda #1
+    sta $6A9E
+    lda MT
+    clc
+    adc #$FA
+    sta $6AA1
+    lda #0
+    adc #$6A
+    sta $6AA2
+    jmp $F688
 """
 
 
@@ -1015,12 +1220,25 @@ def battle_panel(rom):
 def cursors(rom):
     """Cursor positions (sprite x, y), bank 12: command window $9F75 (Fight / Magic /
     Medicine / Items, then Run for each row), party targets $9F85 (16 px left of the
-    sprites). Command text is at panel col 2 / 6, rows 1-4 (NES rows 19-22); the hand
-    sits on the frame left of the text, 2 px above the text row, as on the NES."""
-    cmd = bytes([8, 150, 8, 158, 8, 166, 8, 174] + [40, 150] * 4)
+    sprites). Command text is at panel col 2 / 6, rows 1-4 (NES rows 19-22); the 16-px
+    hand ends where the text starts (owner: no overlap with the text; it may be cut off
+    at the left screen edge), 2 px above the text row."""
+    cmd = bytes([0, 150, 0, 158, 0, 166, 0, 174] + [32, 150] * 4)
     put_bank(rom, 12, 0x9F75, cmd, bytes.fromhex('609e60ae60be60ce909e909e909e909e'))
     party = bytes(sum(([140 - 16, y] for y in (0x34, 0x4C, 0x64, 0x7C)), []) * 2)
     put_bank(rom, 12, 0x9F85, party, bytes.fromhex('a034a04ca064a07c' * 2))
+
+
+def magic_cursor(rom):
+    """Magic list cursor (bank 12 $9FBF, entry slot*4 + level-on-page: x, y), for
+    MAGPAGE's rows: slots 0 / 1 on row 1 + 2r (columns 4 / 12), slot 2 on row 2 + 2r."""
+    cur = bytearray(24)
+    for slot in range(3):
+        for r in range(2):
+            k = r + 4 * slot
+            cur[2 * k] = (16, 80, 16)[slot]
+            cur[2 * k + 1] = 150 + 16 * r + (8 if slot == 2 else 0)
+    o = bank_off(12, 0x9FBF); rom[o:o + 24] = cur
 
 
 def hooks(rom):
@@ -1059,6 +1277,7 @@ def apply(rom, report):
     battle_panel(rom)
     party_sprites(rom)
     cursors(rom)
+    magic_cursor(rom)
     hooks(rom)
     music_trampoline(rom)
     report.append('GB layout applied')

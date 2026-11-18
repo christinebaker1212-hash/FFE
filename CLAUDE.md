@@ -299,7 +299,14 @@ Milestones per game (from `docs/gb-port.md`):
   Gotchas: farjsr clobbers A (pass arguments in RAM); far code must not call routines
   that reach bank-62 code at $C000-$DFFF (e.g. $F47D -> JMP $C009 music): use the fixed
   trampoline MUSIC ($F2F1). `tools/ff1/test_vwf.py` runs the renderer in py65.
-  Command cursor ($9F75) and party-target cursor ($9F85) moved (`cursors()`).
+  Command cursor ($9F75) and party-target cursor ($9F85) moved (`cursors()`). Magic list
+  (`gb_layout.MAGPAGE`, cursor $9FBF): two levels per page, two rows each. Text code
+  `$FD $80+n` = pen to tile n (bytes < $48 are decoder control codes, $48-$79 get dakuten
+  conversion; >= $7A pass). Text records are clamped to their row's 18 tiles.
+  `battleseq.py --poke` patches work RAM in the state (e.g. spells at $63C0 + 64m).
+  Open (owner, 2026-11-18): the 16-px hand cursor must not overlap text but must stay
+  partly visible: "Fight" + hand + "Run" do not fit the 8-column command window, nor two
+  spells + hands + "L1" per magic row -> proposal pending (small 8-px hand).
   Next: enemy names window, target/actor flashing, magic/item
   lists, end-of-battle messages, all formations, then the GB build. Implementation needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
