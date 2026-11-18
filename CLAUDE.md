@@ -276,7 +276,19 @@ Milestones per game (from `docs/gb-port.md`):
   finished tiles in vblank; fixed tile pools: party window 40 tiles, left window +
   full-width message window 72 tiles (font range $80-$F6). Party window stamped into the
   panel image on panel clear ($F618) so the message window (a full-width box) covers it.
-  Implementation needs a tile renderer in the NES code (CHR RAM) and
+  **Implemented (2026-11-18, NES side, checked with battleshot --cam 1):** camera X = 1,
+  sprites NES x = 140 (step 132), small-font renderer (`gb_layout.VWF_SRC`, far bank 40:
+  `vchar`/`vstr`/`vupload`, glyph table from latin_font + 3-px digits + arrow), party
+  window stamped on panel clear (`party_stamp`, hook `$F625`), party lines on HP update
+  (`party_line`, hook b12:`AA5B`), `boxline` replaced by VWF text into tiles
+  $A8 + 18(row-1) + col-2 with word wrap, message records with marker columns 21
+  (target after the attacker) / 22 (next line). Command window and party window, the
+  message window and style A messages show correctly on the NES.
+  Gotchas: farjsr clobbers A (pass arguments in RAM); far code must not call routines
+  that reach bank-62 code at $C000-$DFFF (e.g. $F47D -> JMP $C009 music): use the fixed
+  trampoline MUSIC ($F2F1). `tools/ff1/test_vwf.py` runs the renderer in py65.
+  Next: command cursor positions, enemy names window, target/actor flashing, magic/item
+  lists, end-of-battle messages, all formations, then the GB build. Implementation needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
 - Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target
   cursor, flashing of the acting member's line and the target, magic/item lists in the

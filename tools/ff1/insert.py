@@ -946,7 +946,9 @@ def menu_engine(rom, report):
         sys.path.insert(0, os.path.dirname(__file__))
         import gb_layout
         a, b = src.index('boxline:'), src.index('magpage:')
-        src = src[:a] + gb_layout.BOXLINE + src[b:]
+        src = src[:a] + src[b:] + gb_layout.far_source(ENC)    # small-font battle text
+        for r in gb_layout.FAR_GB:
+            if r not in FAR_ROUTINES: FAR_ROUTINES.append(r)
     far = asm(src, syms=EX)
     assert far.org + len(far.bytes) <= 0xE000
     o = HDR + FAR8 * 0x2000
