@@ -257,7 +257,26 @@ Milestones per game (from `docs/gb-port.md`):
   attacks 59, items 75; the bottom-left window has ~54 px. `mock13_msgs_narrow.png`
   (wrapping log: lines scroll off, still overflows) vs `mock13_msgs_wide.png` (full-width
   message window over the party window while a message shows: all on one line).
-  Proposed: wide. Waiting for the owner. Implementation needs a tile renderer in the NES code (CHR RAM) and
+  **Owner chose the full-width message window** ("let's get cracking").
+  Facts for the implementation (2026-11-18):
+  - `tools/gb/formations.py` (forces each formation via `$F292`, survey of all 128):
+    enemies use NES cols 2-13 (9-small), 2-15 (4-large, mixed, Chaos), 4-11 (fiends),
+    rows 6-17. Battle BG tiles: $00/$FF blank, $01-$10 backdrop, $12-$79 enemies,
+    $80-$F6 font, $F7-$FE frame; $7A-$7F never shown.
+  - Battle start uploads both pattern tables ($000-$1FF); leaving battle (escape tested)
+    reloads the whole BG table, so the battle may overwrite the font tiles.
+  - Font tiles are ink colour 3 on colour 2 (plane 0 = ink, plane 1 = $FF).
+  - GB runtime: CHR writes with the LCD on go through the VRAM queue (40 bytes per GB
+    frame), so text redraws must touch few tiles.
+  - Free space: far-code bank 40 has ~7 KB free, banks 41-61 empty. RAM never written
+    and never addressed by executed code (4 x 80k coverage + battle runs): $0340-$03BF,
+    $6DB2-$6EFF ($6F00-$6F0F is used).
+  Plan: small-font (VWF) renderer in the far bank: glyph table (codes $7A-$FF: width +
+  8 rows, from latin_font COND/G + 3-px digits + arrow), line buffer at $6E00, upload of
+  finished tiles in vblank; fixed tile pools: party window 40 tiles, left window +
+  full-width message window 72 tiles (font range $80-$F6). Party window stamped into the
+  panel image on panel clear ($F618) so the message window (a full-width box) covers it.
+  Implementation needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
 - Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target
   cursor, flashing of the acting member's line and the target, magic/item lists in the
