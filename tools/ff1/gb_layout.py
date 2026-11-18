@@ -1730,6 +1730,7 @@ dbend:
         expect=bytes([0xA5, 0x29, 0x18, 0x69, 0x12, 0x29, 0x1F, 0x0A, 0x85, 0x38]))
     put(rom, 0xDBE8, bytes([0x4C]) + r.labels['dchk'].to_bytes(2, 'little'),
         expect=bytes([0xC9, 0x01, 0xD0, 0x06]))
+    put(rom, 0xCA1B, bytes([0x20]) + main.LABELS_EX['dlgrest'].to_bytes(2, 'little'), expect=bytes([0x20, 0x04, 0xD6]))
 
 def battle_panel(rom):
     """Bottom panel (25x12 image at $691E, NES rows 18-29; the GB shows panel rows 0-5,
@@ -2363,7 +2364,7 @@ gbmagcur:           ; bank 14 $B829 (each frame of the magic list): page, then t
     lsr a
     lsr a
     tax
-    lda gbmpg,x
+    lda GBMPG,x
     cmp MPAGE
     bne gbm1
     ldy IDESC
@@ -2388,7 +2389,7 @@ gbm2:
     lsr a
     lsr a
     tax
-    lda gbmky,x
+    lda GBMKY,x
     sta $41
     lda $62
     and #3
@@ -2400,21 +2401,83 @@ gbm2:
     lda #0
     sta $40
     jmp $ED24
+dlgrest:            ; $CA1B: the dialogue ($D604), then the map rows under the box drawn
+    jsr $D604       ;   again into the visible nametable. FF1 shows the box from the other
+    lda $2A         ;   nametable by a raster split; the GB keeps one map for both, so the
+    clc             ;   box's cells stay until redrawn (as the opening loop $D4B3 does,
+    adc #7          ;   without the box overlay and in the visible nametable)
+    and #$3F
+    sta $2C
+    lda $2F
+    clc
+    adc #7
+    cmp #15
+    bcc dr0
+    sbc #15
+dr0:
+    sta $30
+    lda #1
+    sta $2D
+dr1:
+    lda $2C
+    sec
+    sbc #1
+    and #$3F
+    sta $2C
+    lda $30
+    sec
+    sbc #1
+    bcs dr2
+    adc #15
+dr2:
+    sta $30
+    lda $29
+    sta $2B
+    and #$1F
+    sta $31
+    jsr $D25A
+    jsr $FE00
+    jsr $D2EB
+    jsr $CCA3
+    jsr $C683
+    jsr $D403
+    jsr $FE00
+    jsr $D471
+    jsr $CCA3
+    jsr $C683
+    lda $30
+    cmp $2F
+    bne dr1
+    rts
+""".replace('MPAGE', '$%04X' % MPAGE).replace('MLAST', '$%04X' % MLAST) \
+        .replace('GBMPG', '$%04X' % MAG_B14_LABELS['gbmpg']).replace('GBMKY', '$%04X' % MAG_B14_LABELS['gbmky'])\
+        .replace('IDESC', '$%04X' % IDESC).replace('MAGPATCH', str(far_routines.index('magpatch')))
+
+
+MAG_B14 = """
 gbmpg:
     .db 0, 0, 0, 1, 1, 1, 2, 2
 gbmky:              ; y of spell 1 of level L: row 6 + 4 * (L - 3 * page) -> 8 * row - 1
     .db 47, 79, 111, 47, 79, 111, 47, 79
-gbmagini:           ; bank 14 $BA80 (magic list, LCD off): page 1
+gbmagini:           ; $BA80 (magic list, LCD off): page 1
     lda #0
     sta MPAGE
     sta IDESC
     lda #9
     jmp $B902
-gbm957:             ; bank 14 $B957 (each menu string): the magic list page
+gbm957:             ; $B957 (each menu string): the magic list page
     ldx #MAGPATCH
-    jmp farjsr
-""".replace('MPAGE', '$%04X' % MPAGE).replace('MLAST', '$%04X' % MLAST)\
-        .replace('IDESC', '$%04X' % IDESC).replace('MAGPATCH', str(far_routines.index('magpatch')))
+    jmp FARJSR
+"""
+MAG_B14_ORG = 0xB7F9        # the old item cursor table (23 x 2 bytes), up to $B829
+
+
+def mag_b14(far_routines, farjsr):
+    return asm(MAG_B14, syms={'MPAGE': MPAGE, 'IDESC': IDESC, 'MAGPATCH': far_routines.index('magpatch'),
+                              'FARJSR': farjsr}, org=MAG_B14_ORG)
+
+
+MAG_B14_LABELS = asm(MAG_B14, syms={'MPAGE': 0, 'IDESC': 0, 'MAGPATCH': 0, 'FARJSR': 0}, org=MAG_B14_ORG).labels
 
 
 def magic_menu(rom):
@@ -2422,6 +2485,10 @@ def magic_menu(rom):
     main = sys.modules['__main__']
     ex = main.LABELS_EX
     put_bank(rom, B, 0xBAB5 + 4 * 9, bytes((0, 3, 20, 15)), bytes(rom[bank_off(B, 0xBAB5 + 36):bank_off(B, 0xBAB5 + 40)]))
+    m = mag_b14(main.FAR_ROUTINES, ex['farjsr'])
+    assert m.org + len(m.bytes) <= 0xB829, hex(m.org + len(m.bytes))
+    put_bank(rom, B, m.org, m.bytes, bytes(rom[bank_off(B, m.org):bank_off(B, m.org) + len(m.bytes)]))
+    ex = dict(ex, gbmagini=m.labels['gbmagini'], gbm957=m.labels['gbm957'])
     put_bank(rom, B, 0xBA80, bytes([0x20]) + ex['gbmagini'].to_bytes(2, 'little') + bytes([0xEA, 0xEA]),
              bytes([0xA9, 0x09, 0x20, 0x02, 0xB9]))
     put_bank(rom, B, 0xAEB3, bytes([0x20]) + CAM['menu'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
@@ -2720,6 +2787,8 @@ def shop_text(i, en, txt):
             lines = main.flow(en, 18)
         assert len(lines) <= 4, (i, lines)
         return '{05}' + '{08}'.join(lines)
+    if i == 8:                                # 'Gil' after the amount, lower-row mode too
+        return '{09}' + en
     if i in (10, 11, 15, 36):                 # menus: one word per row
         return '{05}' + '{08}'.join(' ' + w for w in en.split('\n'))
     return txt
@@ -2757,6 +2826,22 @@ goldwin:            ; $A804: the Gil window, amount and 'Gil' on its text row
 lgold:              ; after the list ($A8C1 / $A9FF): the Gil window over it again
     jsr $A802
     jmp $A925
+goldlow:            ; $A80A: the amount ($5A-$5F) in lower-row mode (the default mode's
+    ldx #5          ;   blank upper row would cut the window's top frame)
+gl1:
+    lda $5A,x
+    sta $0351,x
+    dex
+    bpl gl1
+    lda #$09
+    sta $0350
+    lda #0
+    sta $0357
+    lda #$50
+    sta $3E
+    lda #$03
+    sta $3F
+    jmp $AA45
 camshop:            ; $A78E: camera X = 1, Y = 0
     jsr $9C02
     lda #1
@@ -2783,6 +2868,7 @@ def shop_menu(rom):
     assert r.org + len(r.bytes) <= 0xA8A9
     put_bank(rom, B, r.org, r.bytes, bytes(rom[bank_off(B, r.org):bank_off(B, r.org) + len(r.bytes)]))
     put_bank(rom, B, 0xA78E, bytes([0x20]) + r.labels['camshop'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
+    put_bank(rom, B, 0xA80A, bytes([0x20]) + r.labels['goldlow'].to_bytes(2, 'little'), bytes([0x20, 0x45, 0xAA]))
     put_bank(rom, B, 0xA804, bytes([0x20]) + r.labels['goldwin'].to_bytes(2, 'little'), bytes([0x20, 0x4E, 0xAA]))
     for a in (0xA8C1, 0xA9FF):
         put_bank(rom, B, a, bytes([0x4C]) + r.labels['lgold'].to_bytes(2, 'little'), bytes([0x4C, 0x25, 0xA9]))

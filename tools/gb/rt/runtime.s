@@ -362,6 +362,7 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             sub b
             cp 144
             jr nc, .nosplit
+            dec a                           ; (the line before: SCY is written in its hblank)
             ldh [$FF45], a
             ld a, b
             add a, 16
@@ -402,6 +403,9 @@ stat_isr:   push af                         ; LYC split: skip GB map rows 30-31
             ldh a, [$FF41]                  ; (only on a real LY = LYC match: on the DMG a
             bit 2, a                        ;   STAT write requests a STAT interrupt)
             jr z, .x
+.hb:        ldh a, [$FF41]                  ; wait for this line's hblank, so the next line
+            and 3                           ;   (the first one of NES row 240 -> 0) is drawn
+            jr nz, .hb                      ;   wholly with the new SCY
             ldh a, [split_scy]
             ldh [$FF42], a
 .x:         pop af

@@ -544,6 +544,22 @@ Milestones per game (from `docs/gb-port.md`):
   sub-screens); coverage 19.96k instructions. Shop facts: EnterShop b14 $A343 ($50 = enter flag, $51 = shop index = type*10 +
   town; open one with `--poke 0050=01,0051=01`), windows $AC53, attributes $AC6F, menu
   cursor $A98A, list cursor $A992. Pokes below $0800 work (battleseq.poke_state).
+- Owner feedback fixed (2026-11-18):
+  - Gil window's top border was cut: the amount (default mode) wrote a blank upper row over
+    it; the amount is now copied into a lower-row string (`goldlow`, $0350) and "Gil"
+    (shop string 8) is lower-row too.
+  - Dialogue: people / the party appeared over the box after it closed. FF1 shows the box
+    from the other nametable by a raster split ($D604/$D6A3) and never touches the map;
+    the GB keeps one map for both nametables, so the box cells stayed. `dlgrest` (ExRAM,
+    called at $CA1B instead of $D604) redraws the map rows under the box into the visible
+    nametable after it closes (FF1's own row routines, as the opening loop $D4B3). ExRAM
+    room: the unused English `partynames` / `clr20` dropped for --gb, the magic routines
+    `gbmagini` / `gbm957` and tables moved to bank 14 $B7F9.
+  - Seam in the dialogue box's left border: the box crosses NES row 240 -> 0, where the GB
+    view skips map rows 30-31 with an LYC split; the SCY write landed mid-line. LYC is
+    now one line earlier and the write waits for that line's hblank.
+  - Test hook: env `GB_DLG_TEST=text` (insert.py) replaces dialogue 0 ("There's nothing
+    there.") with a long text (test builds only; blanks dialogues 100-109 for room).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).

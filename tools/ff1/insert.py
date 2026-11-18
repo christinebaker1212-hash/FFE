@@ -83,6 +83,9 @@ def put(rom, cpu, data):                  # fixed bank lives in banks 15 and 31
 def insert_dialogue(rom, report):
     if '--gb' in sys.argv: sys.path.insert(0, os.path.dirname(__file__))
     dia = json.load(open('script/ff1/dialogue.json'))
+    if os.environ.get('GB_DLG_TEST'):          # test builds only: dialogue 0 ("There's nothing
+        dia[0] = dict(dia[0], en=os.environ['GB_DLG_TEST'])     # there.") replaced by a long text
+        for i in range(100, 110): dia[i] = dict(dia[i], en='.')  # (room for it in bank 16)
     items = json.load(open('script/ff1/items.json'))
     global ITEM_MAX; ITEM_MAX = max(len(e['en']) for e in items)
     bad = 0
@@ -977,6 +980,9 @@ def menu_engine(rom, report):
     if '--gb' in sys.argv:                     # GB layout: menu code in ExRAM (the command
         a, b = exsrc.index('barhl:'), exsrc.index('magpre:')    # highlight is not used there)
         exsrc = exsrc[:a] + 'barhl:\n    rts\n' + exsrc[b:]
+        for lab in ('partynames:', 'clr20:'):  # (GB: own party-name string, own row clear)
+            a = exsrc.index(lab); b = exsrc.index('\n', exsrc.index('.db', a)) + 1
+            exsrc = exsrc[:a] + lab + '\n' + exsrc[b:]
         for o, n in gb_layout.SHOPLIST_PATCH:
             assert o in exsrc, o; exsrc = exsrc.replace(o, n, 1)
         exsrc += gb_layout.exram_source(FAR_ROUTINES)
