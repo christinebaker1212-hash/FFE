@@ -58,6 +58,7 @@ MLT_REQ2:   db $89, $01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 MLT_REQ1:   db $89, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 MASK_FRZ:   db $B9, $01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 MASK_OFF:   db $B9, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+MASK_BLK:   db $B9, $03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 CHR_TRN0:   db $99, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 PCT_TRN:    db $A1, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
@@ -194,7 +195,28 @@ sgb_frame:  call sgb_scroll
 .go:        push bc
             push de
             push hl
-            ldh a, [sgb_pend]
+            ldh a, [sgb_mask]               ; screen going off: blank the SGB screen (black)
+            cp 1                            ;   until the new screen's palettes and
+            jr nz, .nm                      ;   attributes are out (no frames in the old
+            inc a                           ;   screen's colours)
+            ldh [sgb_mask], a
+            ld hl, MASK_BLK
+            jr .one
+.nm:        ldh a, [sgb_mask]
+            cp 2
+            jr c, .nrm
+            jr nz, .m3
+            ldh a, [lcd_on]                 ; blanked: nothing while the LCD is off (the
+            and a                           ;   screen is being drawn); once it is on, one
+            jr z, .x                        ;   fresh build (it replaces anything pending)
+            ld a, 3
+            ldh [sgb_mask], a
+            call sgb_build_far
+.m3:        ldh a, [sgb_pend]               ; its packets out: show the screen (the game's
+            and a                           ;   fade-in, if any, follows unblanked)
+            jr nz, .send
+            jr .um
+.nrm:       ldh a, [sgb_pend]
             and a
             jr nz, .send
             ldh a, [sgb_dirty]
@@ -247,6 +269,15 @@ sgb_frame:  call sgb_scroll
             jr nz, .cp
             xor a
             ld [$4000], a
+            ld a, SGB_GAP
+            ldh [sgb_wait], a
+            jr .x
+.um:        xor a
+            ldh [sgb_mask], a
+            ld hl, MASK_OFF
+.one:       di
+            call sgb_send
+            ei
             ld a, SGB_GAP
             ldh [sgb_wait], a
 .x:         pop hl
@@ -394,7 +425,16 @@ sgb_scroll: push bc
 
 ; LCD going off: static screens again (per-cell palettes)
 sgb_lcd_off:
-            ldh a, [sgb_glob]
+            ldh a, [sgb_mask]               ; blank (1), or wait for a new build (3 -> 2)
+            and a
+            jr z, .m1
+            cp 3
+            jr nz, .k
+            dec a
+            dec a
+.m1:        inc a
+            ldh [sgb_mask], a
+.k:         ldh a, [sgb_glob]
             and a
             ret z
             xor a

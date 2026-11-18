@@ -158,6 +158,7 @@ ap_pal:     ds 4                            ; attr_apply: palette of each quadra
 maps_wait:  ds 1                            ; DMG: frames the maps have been due (fades)
 in_battle:  ds 1                            ; bit 7 of the last $5800 write (the battle camera)
 sgb_pslot:  ds 1                            ; SGB: 1 + the palette slot given to the battle party (0: none)
+sgb_mask:   ds 1                            ; SGB screen mask: 1 = to blank (LCD went off), 2 = blanked, 3 = blanked until the packets built with the LCD on are out
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors

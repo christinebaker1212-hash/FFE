@@ -637,6 +637,16 @@ Milestones per game (from `docs/gb-port.md`):
   string's row pointers). NES output unchanged (screens after the prologue identical).
   SGB now clean; DMG: a new line's letters can flash white for a few frames (tile
   re-coding lags the palette while the fade dithers).
+- SGB screen changes (found with the new mGBA pokes, `sgbrun --poke`, `sgbshots.py --poke`):
+  a new screen (shop, story) showed ~12 frames in the old screen's colours (packets go
+  out one per 4 frames). Now the LCD going off blanks the SGB screen (MASK_EN black,
+  `sgb_mask`); nothing is built while the LCD is off; once it is on, one fresh build is
+  sent and the screen is shown (the game's own fade-in follows). Shop, new game, menu,
+  battle start, bridge story checked: clean, and the screens appear as early as before.
+  (FF1 itself cycles the field colours when leaving the menu: the SGB follows.)
+- Checks after fresh coverage (20.0k instructions): 39 of 40 identical (new game, random
+  30000, battle, all field scripts; DMG + CGB); CGB bridge: pad bytes one frame off at a
+  D press (harness input feed, as before; identical without the bridge-flag poke).
 - Next: FF1's accuracy / timing pass (lag in screen transitions, SGB check of the new
   screens in mGBA).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
