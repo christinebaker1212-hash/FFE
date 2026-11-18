@@ -161,7 +161,8 @@ Milestones per game (from `docs/gb-port.md`):
   (`$07C0`, routine `$D54B`), text origin column `(($29+$12)&$1F)*2`, row `$2F*2+3`.
 
 ## In progress / next
-- Random-play equivalence after the crash fix (`build/eq5/`), fix what it finds.
+- Random-play equivalence after the crash fix: 3 seeds × 40k frames (~39.6k NMIs each)
+  **byte-identical** RAM at every frame wait. Next: longer/scripted runs (shops, camp items).
 - Screen layout (milestone 5), starting with the dialogue box; per-screen camera register.
 - Speed: faster `$2007` nametable path; SGB palettes/border (needs an SGB-capable test
   emulator; PyBoy has none).
