@@ -96,8 +96,25 @@ def battle_panel(rom):
     put(rom, 0xFA0E, bytes([0, 2, 0, 20, 7]))
 
 
+def put_bank(rom, bank, cpu, data, expect):
+    o = bank_off(bank, cpu)
+    if bytes(rom[o:o + len(expect)]) != expect:
+        raise SystemExit('gb_layout: unexpected bytes at b%02d:%04X' % (bank, cpu))
+    rom[o:o + len(data)] = data
+
+
+def party_sprites(rom):
+    """Party sprites at NES x = 128 (cols 16-17 = GB cols 14-15) instead of 176, so they
+    stay visible beside the enemies; y stays 48/72/96/120 (GB rows 0-11). The acting
+    member steps 8 px forward ($9951) and back ($997C); all other code reads $6AD3."""
+    put_bank(rom, 12, 0x9740, bytes([0xA9, 0x80]), bytes([0xA9, 0xB0]))
+    put_bank(rom, 12, 0x9951, bytes([0xA9, 0x78]), bytes([0xA9, 0xA8]))
+    put_bank(rom, 12, 0x997C, bytes([0xA9, 0x80]), bytes([0xA9, 0xB0]))
+
+
 def apply(rom, report):
     battle_frames(rom)
     boxline_one_row(rom)
     battle_panel(rom)
+    party_sprites(rom)
     report.append('GB layout applied')

@@ -185,8 +185,11 @@ Milestones per game (from `docs/gb-port.md`):
   18-29 by `$F4A2`; box list = 5-byte box records + text records, redrawn by `$F652`;
   message boxes table `$F9E1`, enemy list `$F9DC`, command box `$FA13`.
 
+- Battle step 1 done (2026-11-18): party sprites at NES x = 128 (`b12:9740`; step forward /
+  back `$9951`/`$997C` = $78/$80), visible in GB cols 14-15 rows 0-11 beside the enemies.
+
 ## In progress / next
-- Battle: party sprites to NES x = 128 (cols 16-17), name/HP beside them (bank 12 `$AB0E`),
+- Battle: name/HP beside the sprites (bank 12 `$AB0E`),
   bottom panel to NES rows 18-23 cols 2-21 (names full width, commands over the right
   half, the four messages as lines of one window via dummy boxes in the hidden rows),
   cursors, flashing of the acting member's line and the target.
