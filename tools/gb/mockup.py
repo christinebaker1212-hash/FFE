@@ -210,6 +210,44 @@ def battle4(out):
     both.resize((both.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock4_party_small.png'))
 
 
+def battle5(out):
+    """Owner (2026-11-18): a window frame around the small-font name/HP column, as thick as
+    the NES frames (line in px 1-4 of a frame tile), drawn into the same rendered tiles as
+    the text. Left: C = frame around the text only (GB cols 16-19; text 22 px wide), open
+    at the top screen edge, its sides running into the bottom window. Right: D = frame
+    around sprites and text (left side under the sprites' right edge in col 15, text 27 px).
+    Lines per member: name / number / status (blank when none)."""
+    party = [('AAAA', 35, ''), ('Bob', 30, 'Poison'), ('Mm', 0, 'Sleep'), ('DDDD', 125, 'Stone')]
+
+    def frame_px(s, x0, y0, x1, y1, top=True):
+        d = s.d
+        d.rectangle([x0, y0, x1, y1], outline=None)
+        for off, shade in ((1, 1), (2, 0), (3, 1)):
+            if top: d.line([x0 + off, y0 + off, x1 - off, y0 + off], fill=SHADES[shade])
+            d.line([x0 + off, y0 + (off if top else 0), x0 + off, y1], fill=SHADES[shade])
+            d.line([x1 - off, y0 + (off if top else 0), x1 - off, y1], fill=SHADES[shade])
+
+    def screen(v):
+        s = Screen(bg=3)
+        for r in range(3):
+            for c in range(3): s.block(1 + c * 4, r * 4, 4, 4)
+        s.window(0, 12, 20, 6)
+        for i, r in enumerate(['Bob', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
+        if v == 'C': frame_px(s, 16 * 8, 0, 160 - 1, 12 * 8 + 3, top=False)
+        else: frame_px(s, 15 * 8 + 3, 0, 160 - 1, 12 * 8 + 3, top=False)
+        left = 16 * 8 + 5 if v == 'C' else 16 * 8
+        for i, (n, hp, st) in enumerate(party):
+            y = i * 3
+            s.block(14, y, 2, 3)
+            s.ptext(0, y, n, px=left)
+            s.ptext(0, y + 1, str(hp), right=160 - 5)
+            if st: s.ptext(0, y + 2, st, px=left, table=NARROW)
+        return s
+    both = Image.new('RGB', (160 * 2 + 8, 144), (255, 255, 255))
+    both.paste(screen('C').im, (0, 0)); both.paste(screen('D').im, (168, 0))
+    both.resize((both.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock5_party_frame.png'))
+
+
 def main_menu(out):
     s = Screen(bg=3)
     s.window(0, 0, 20, 10)                              # party list, one line per member
@@ -233,5 +271,5 @@ def main_menu(out):
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else 'build'
     os.makedirs(out, exist_ok=True)
-    battle(out); battle2(out); battle3(out); battle4(out); main_menu(out)
+    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); main_menu(out)
     print('written to', out)

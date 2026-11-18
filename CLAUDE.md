@@ -209,7 +209,10 @@ Milestones per game (from `docs/gb-port.md`):
 - Owner's decision pending: smaller (condensed proportional) font in the battle message
   window (mock-ups `mock3_font_*`, owner: "looks good") and in the name/HP column beside
   the sprites (`mock4_party_small.png`: A = name / HP+number / status word, B = NES order
-  name / HP-or-status / number); needs a tile renderer in the NES code (CHR RAM) and
+  name / HP-or-status / number); owner also asked for a window frame around that column,
+  as thick as the NES frames (`mock5_party_frame.png`: C = around the text only, 22 px of
+  text; D = left side under the sprites' right edge, 27 px; Silence/Darkness/Paralysis
+  do not fit C, Darkness/Paralysis do not fit D even in the narrow letters); needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
 - Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target
   cursor, flashing of the acting member's line and the target, magic/item lists in the
