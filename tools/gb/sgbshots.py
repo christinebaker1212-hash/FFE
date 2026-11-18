@@ -2,7 +2,7 @@
 input of the NES checks: the NES build is run with battleseq's input (or the new-game script)
 and the pad it latched per NMI is fed to the GB by NES frame number.
 usage: PYTHONPATH=build/emu sgbshots.py NES GB OUT.png NMI1,NMI2,... [--input MODE|--newgame]
-       [--dmg]   (MODE: battleseq.py input modes, default fight)"""
+       [--dmg | --cgb]   (MODE: battleseq.py input modes, default fight)"""
 import os, sys, subprocess, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cynes import NES
@@ -16,6 +16,8 @@ newgame = '--newgame' in args
 if newgame: args.remove('--newgame')
 dmg = '--dmg' in args
 if dmg: args.remove('--dmg')
+cgb = '--cgb' in args
+if cgb: args.remove('--cgb')
 nes_path, gb_path, out, shots = args[0], args[1], args[2], [int(x) for x in args[3].split(',')]
 last = max(shots) + 2
 nes = NES(nes_path)
@@ -48,6 +50,7 @@ here = os.path.dirname(os.path.abspath(__file__))
 exe = os.path.join(here, '..', '..', 'build', 'sgbrun')
 cmd = [exe, gb_path, str(last * 4), os.path.join(tmp, 's'), '--padfile', pf, '--sram', sf] + sum([['--nshot', str(s)] for s in shots], [])
 if dmg: cmd.append('--dmg')
+if cgb: cmd.append('--cgb')
 # stop early: run in chunks is not supported; FRAMES is an upper bound (GB frames)
 print(subprocess.run(cmd, capture_output=True, text=True).stdout.strip())  # (env SGBRUN_REGS=1: registers per shot)
 ims = []

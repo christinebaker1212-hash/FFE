@@ -3,7 +3,8 @@
 ; Helpers preserve A, F, BC, DE unless noted; reads return the byte in L.
 ; Symbols from build.py: DATA (GB bank of NES bank 0 data), SHADE_TABLE contents.
 
-STACK_TOP  = $E000
+STACK_TOP  = $C200          ; GB stack in NES page 1 (the NES stack runs on the GB stack; deepest
+                            ;   seen ~100 bytes), outside the switchable CGB WRAM bank $D000-$DFFF
 NES_RAM    = $C000          ; $0000-$07FF
 EX_RAM     = $C800          ; $5C00-$5FFF
 OAM_SH     = $CC00          ; GB shadow OAM (160 bytes)
@@ -27,6 +28,9 @@ SPAL_KEY   = $DCC0          ; NES sprite palette -> coding: values of indices 1-
 SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
+BG_DIRTY   = $CCA0          ; CGB: BG tiles to copy by HDMA (bitmap, 32)
+SPR_DIRTY  = $CCC0          ; CGB: sprite slots to copy by HDMA (bitmap, 16)
+STAGE      = $D000          ; CGB WRAM bank 2: BG tiles (4KB), bank 3: sprite slots (2KB)
 OWN        = $DD00          ; GB map cell -> nametable that drew it (bit set: nametable 1), 128 bytes
 BG_SHADOW  = $B000          ; DMG shading (rt/dmg_shade.s): NES BG tiles, cart RAM bank 1
 TILE_PAL   = $DB00          ;   palette each BG tile is coded for
@@ -105,6 +109,8 @@ sgb_rp:     ds 1
 sgb_rx1:    ds 1
 sgb_ry1:    ds 1
 sgb_ty:     ds 1
+stg_on:     ds 1                            ; spr_load: the slot went to the copy
+hd_any:     ds 1                            ; CGB: a tile is marked for HDMA
 fade_drop:  ds 1                            ; DMG: shades the palettes are faded by
 spr_next:   ds 1
 uw_bank:    ds 1
@@ -176,7 +182,10 @@ boot:       di
             ld hl, $8000                    ; clear VRAM
             ld bc, $2000
             call memclr
-            ld hl, $C000                    ; clear WRAM (below the stack)
+            ld hl, $C000                    ; clear WRAM (not the stack page $C100-$C1FF)
+            ld bc, $100
+            call memclr
+            ld hl, $C200
             ld bc, $1E00
             call memclr
             ld hl, $FE00                    ; clear OAM
@@ -197,6 +206,13 @@ boot:       di
             call memclr
             xor a
             ldh [$FF4F], a
+            ld a, 1                         ; double speed (KEY1 + STOP, interrupts off)
+            ldh [$FF4D], a
+            xor a
+            ldh [$FFFF], a
+            ld a, $30
+            ldh [$FF00], a
+            stop
             jr .booted
 .dmg:       call dmg_init
             call sgb_detect
@@ -261,7 +277,13 @@ boot:       di
             ldh [cam_y], a
             call apu_init
             ld a, -68                       ; timer: 4096 Hz / 68 = 60.2 Hz frame tick while the LCD is off
-            ldh [$FF06], a
+            ld b, a
+            ldh a, [is_cgb]                 ;   (CGB double speed: the timer runs at 8192 Hz)
+            and a
+            ld a, b
+            jr z, .tm
+            ld a, -136
+.tm:        ldh [$FF06], a
             ldh [$FF05], a
             ld a, %00000100
             ldh [$FF07], a
@@ -298,6 +320,10 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             push bc                         ;   writes until the last vblank line
             push de
             push hl
+            ldh a, [$FF70]                  ; CGB: WRAM bank 1 for the runtime's data (the
+            push af                         ;   main thread may be in a tile copy bank)
+            ld a, 1
+            ldh [$FF70], a
             ldh a, [oam_pending]
             and a
             jr z, .no_oam
@@ -344,7 +370,10 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             jr .scy_done
 .nosplit:   xor a
             ldh [$FF41], a
-.scy_done:  ldh a, [$FF0F]                  ; DMG: the STAT write requested a STAT
+.scy_done:  ldh a, [hd_any]                 ; CGB: tiles by HDMA first
+            and a
+            call nz, hdma_flush
+            ldh a, [$FF0F]                  ; DMG: the STAT write requested a STAT
             res 1, a                        ;   interrupt; drop it
             ldh [$FF0F], a
             call flush_vbl
@@ -360,7 +389,9 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             jr nz, .vc
             inc hl
             inc [hl]
-.vc:        pop hl
+.vc:        pop af
+            ldh [$FF70], a
+            pop hl
             pop de
             pop bc
             pop af
@@ -384,12 +415,18 @@ timer_isr:  push af                         ; frame tick while the LCD is off
             ld a, $80
             ldh [vbl_flag], a
             push hl
+            ldh a, [$FF70]                  ; (CGB: WRAM bank 1)
+            push af
+            ld a, 1
+            ldh [$FF70], a
             ld hl, VBL_CNT
             inc [hl]
             jr nz, .vc
             inc hl
             inc [hl]
-.vc:        pop hl
+.vc:        pop af
+            ldh [$FF70], a
+            pop hl
 .x:         pop af
             reti
 
@@ -928,7 +965,10 @@ rt_ppu_w1:  push af
             jr .lon
 .nsc:       ld b, 0
             call dmg_retile_some
-.lon:       ld a, LCDC_ON
+.lon:       ldh a, [is_cgb]                 ; CGB: the tile copy for HDMA from VRAM
+            and a
+            call nz, stage_sync
+            ld a, LCDC_ON
             ldh [$FF40], a
             ld a, 1
             ldh [lcd_on], a
@@ -1067,7 +1107,29 @@ rt_ppu_w7:  push af
             or b
             call dmg_mark
             jp .done
-.bgv:       ld a, h
+.bgv:       ldh a, [lcd_on]                 ; CGB, LCD on: into the tile copy (WRAM bank 2),
+            and a                           ;   the tile goes over by HDMA in the vblank
+            jr z, .bgd
+            ld a, h
+            add a, $D0
+            ld h, a
+            ld a, 2
+            ldh [$FF70], a
+            ld [hl], d
+            ld a, 1
+            ldh [$FF70], a
+            ld a, h                         ; tile = ((H - $D0) << 4) | (L >> 4)
+            sub $D0
+            swap a
+            ld b, a
+            ld a, l
+            swap a
+            and $0F
+            or b
+            ld hl, BG_DIRTY
+            call hd_mark
+            jp .done
+.bgd:       ld a, h
             cp $08                          ; BG tiles 0-127 at $9000, 128-255 at $8800
             ld c, $90
             jr c, .bg0
@@ -1524,19 +1586,54 @@ spr_load:   push af
             call row_masks
             ldh a, [sp_s0]
             call mask_comb
-            call vram_put
+            call .put
             inc hl
             ldh a, [sp_s1]
             call mask_comb
-            call vram_put
+            call .put
             inc hl
             dec b
             jr nz, .row
-            pop hl
+            ldh a, [stg_on]                 ; CGB, LCD on: mark the slot for HDMA
+            and a
+            jr z, .x
+            ld a, c
+            ld hl, SPR_DIRTY
+            call hd_mark
+.x:         pop hl
             pop de
             pop bc
             pop af
             ret
+.put:       push af                         ; A -> VRAM (HL), or on a CGB with the LCD on
+            ldh a, [is_cgb]                 ;   the slot copy (WRAM bank 3, $D000 + ...)
+            and a
+            jr z, .vp
+            ldh a, [lcd_on]
+            and a
+            jr z, .vp
+            ld a, 1
+            ldh [stg_on], a
+            pop af
+            push hl
+            push de
+            ld d, a
+            ld a, h
+            add a, $D0 - $80
+            ld h, a
+            ld a, 3
+            ldh [$FF70], a
+            ld [hl], d
+            ld a, 1
+            ldh [$FF70], a
+            ld a, d
+            pop de
+            pop hl
+            ret
+.vp:        xor a
+            ldh [stg_on], a
+            pop af
+            jp vram_put
 
 ; ------------------------------------------------------------------ joypad / APU / MMC5
 rt_io_w4016:
@@ -1813,17 +1910,24 @@ rt_delay_e: push af
             inc e
             dec e
             ret
-delay_n:    and a
+delay_n:    and a                           ; (twice on a CGB: double speed)
             jr nz, .n
             ld a, 192
-            jr .lp
+            jr .go
 .n:         ld l, a
             srl l
             srl l
             sub l
             ret z
+.go:        ld l, a
 .lp:        dec a
             jr nz, .lp
+            ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, l
+.lp2:       dec a
+            jr nz, .lp2
             ret
 
 ; ------------------------------------------------------------------ 6502 status byte
@@ -2090,3 +2194,210 @@ rst38_trap: di
             ld [DBG], a
 .s:         halt
             jr .s
+
+; ---- CGB tile uploads by HDMA. With the LCD on, BG tile bytes go into a copy of the BG
+; tiles (WRAM bank 2) and sprite slot loads into a copy of the slots (bank 3); the tiles
+; are marked and the vblank copies each marked tile (16 bytes) by general-purpose DMA.
+
+; A = tile / slot, HL = BG_DIRTY or SPR_DIRTY: mark it. Keeps BC, DE.
+hd_mark:    push bc
+            ld b, a
+            srl a
+            srl a
+            srl a
+            add a, l
+            ld l, a
+            ld a, b
+            and 7
+            push hl
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .nc
+            inc h
+.nc:        ld b, [hl]
+            pop hl
+            ld a, [hl]
+            or b
+            ld [hl], a
+            ld a, 1
+            ldh [hd_any], a
+            pop bc
+            ret
+
+; LCD going on: the BG tile copy from VRAM (tiles 0-127 at $9000, 128-255 at $8800)
+stage_sync: push bc
+            push de
+            push hl
+            di
+            ld a, 2
+            ldh [$FF70], a
+            ld hl, $9000
+            ld de, STAGE
+            ld bc, $800
+            call .cp
+            ld hl, $8800
+            ld bc, $800
+            call .cp
+            ld a, 1
+            ldh [$FF70], a
+            ei
+            ld hl, BG_DIRTY                 ; nothing pending
+            ld b, 32
+            xor a
+.z:         ld [hl+], a
+            dec b
+            jr nz, .z
+            pop hl
+            pop de
+            pop bc
+            ret
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec bc
+            ld a, b
+            or c
+            jr nz, .cp
+            ret
+
+; vblank (CGB): marked tiles by HDMA while the vblank lasts
+hdma_flush: ldh a, [$FF70]
+            push af
+            xor a
+            ldh [hd_any], a
+            ld hl, BG_DIRTY
+            ld e, 0                         ; byte index
+.bb:        ld a, [hl]
+            and a
+            jr z, .bn
+            ld d, a
+            ld c, 0
+.bk:        srl d
+            jr nc, .bkn
+            ldh a, [$FF44]                  ; out of vblank time: the rest next frame
+            sub 144
+            cp 8
+            jr nc, .late
+            ld a, 2
+            ldh [$FF70], a
+            ld a, e                         ; tile = e * 8 + c
+            add a, a
+            add a, a
+            add a, a
+            or c
+            push hl
+            push af
+            swap a                          ; source $D000 + tile * 16
+            ld b, a
+            and $F0
+            ldh [$FF52], a
+            ldh [$FF54], a                  ; (destination low byte the same)
+            ld a, b
+            and $0F
+            add a, $D0
+            ldh [$FF51], a
+            pop af
+            cp 128                          ; destination $9000 + tile * 16 or $8800 + ...
+            ld a, b
+            jr nc, .hi
+            and $0F
+            add a, $90
+            jr .dst
+.hi:        and $0F
+            add a, $80
+.dst:       ldh [$FF53], a
+            xor a
+            ldh [$FF55], a                  ; 16 bytes, general purpose
+.w1:        ldh a, [$FF55]                  ; (done: $FF)
+            inc a
+            jr nz, .w1
+            pop hl
+            ld a, c                         ; clear its bit
+            push hl
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .nc
+            inc h
+.nc:        ld a, [hl]
+            pop hl
+            cpl
+            and [hl]
+            ld [hl], a
+.bkn:       inc c
+            ld a, d
+            and a
+            jr nz, .bk
+.bn:        inc l
+            inc e
+            ld a, e
+            cp 32
+            jr nz, .bb
+            ld hl, SPR_DIRTY                ; sprite slots
+            ld e, 0
+.sb:        ld a, [hl]
+            and a
+            jr z, .sn
+            ld d, a
+            ld c, 0
+.sk:        srl d
+            jr nc, .skn
+            ldh a, [$FF44]
+            sub 144
+            cp 8
+            jr nc, .late
+            ld a, 3
+            ldh [$FF70], a
+            ld a, e                         ; slot = e * 8 + c
+            add a, a
+            add a, a
+            add a, a
+            or c
+            swap a                          ; $D000 + slot * 16 -> $8000 + slot * 16
+            ld b, a
+            and $F0
+            ldh [$FF52], a
+            ldh [$FF54], a
+            ld a, b
+            and $0F
+            push af
+            add a, $D0
+            ldh [$FF51], a
+            pop af
+            add a, $80
+            ldh [$FF53], a
+            xor a
+            ldh [$FF55], a
+.w2:        ldh a, [$FF55]
+            inc a
+            jr nz, .w2
+            ld a, c
+            push hl
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .nc2
+            inc h
+.nc2:       ld a, [hl]
+            pop hl
+            cpl
+            and [hl]
+            ld [hl], a
+.skn:       inc c
+            ld a, d
+            and a
+            jr nz, .sk
+.sn:        inc l
+            inc e
+            ld a, e
+            cp 16
+            jr nz, .sb
+            pop af
+            ldh [$FF70], a
+            ret
+.late:      ld a, 1
+            ldh [hd_any], a
+            pop af
+            ldh [$FF70], a
+            ret

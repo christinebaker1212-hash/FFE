@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
 	unsigned char* pads = NULL; long npads = 0; int nshots[1024]; int nns = 0; int nshot_done[1024] = {0};
 	for (int i = 4; i < argc; i++) {
 		if (!strcmp(argv[i], "--dmg")) dmg = 1;
+		else if (!strcmp(argv[i], "--cgb")) dmg = 2;
 		else if (!strcmp(argv[i], "--press") && i + 1 < argc && np < 256) {
 			const char* s = argv[++i]; const char* at = strchr(s, '@');
 			presses[np].keys = parse_keys(s);
@@ -71,13 +72,13 @@ int main(int argc, char** argv) {
 	if (!core || !core->init(core)) { fprintf(stderr, "no core for %s\n", argv[1]); return 1; }
 	mCoreInitConfig(core, NULL);
 	/* the model for every kind of cart header (a dual-mode cart would otherwise run as CGB) */
-	const char* model = dmg ? "DMG" : "SGB";
+	const char* model = dmg == 2 ? "CGB" : dmg ? "DMG" : "SGB";
 	mCoreConfigSetValue(&core->config, "gb.model", model);
 	mCoreConfigSetValue(&core->config, "sgb.model", model);
 	mCoreConfigSetValue(&core->config, "cgb.model", model);
 	mCoreConfigSetValue(&core->config, "cgb.hybridModel", model);
 	mCoreConfigSetValue(&core->config, "cgb.sgbModel", model);
-	mCoreConfigSetIntValue(&core->config, "sgb.borders", dmg ? 0 : 1);
+	mCoreConfigSetIntValue(&core->config, "sgb.borders", dmg ? 0 : 1);   /* --cgb: Game Boy Color */
 	mCoreConfigSetIntValue(&core->config, "useBios", 0);
 	mCoreLoadConfig(core);
 	unsigned w, h;
@@ -100,7 +101,7 @@ int main(int argc, char** argv) {
 		for (int k = 0; k < np; k++)
 			if (f >= presses[k].frame && f < presses[k].frame + presses[k].hold) keys |= presses[k].keys;
 		if (pads) {
-			unsigned n = core->busRead8(core, 0xD830) | core->busRead8(core, 0xD831) << 8;
+			unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 			unsigned char m = n + 1 < npads ? pads[n + 1] : 0;   /* the pad of the frame being played */
 			static const unsigned map[8] = { 1 << 4, 1 << 5, 1 << 7, 1 << 6, 1 << 3, 1 << 2, 1 << 1, 1 << 0 };
 			for (int b = 0; b < 8; b++) if (m & (1 << b)) keys |= map[b];
@@ -110,7 +111,7 @@ int main(int argc, char** argv) {
 		int shot = (f == frames);
 		for (int k = 0; k < ns; k++) if (shots[k] == f) shot = 1;
 		if (nns) {
-			unsigned n = core->busRead8(core, 0xD830) | core->busRead8(core, 0xD831) << 8;
+			unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 			for (int k = 0; k < nns; k++) if (!nshot_done[k] && n >= (unsigned) nshots[k]) {
 				nshot_done[k] = 1;
 				core->desiredVideoDimensions(core, &w, &h);
@@ -127,6 +128,22 @@ int main(int argc, char** argv) {
 					printf("\nRAM2:");
 					for (unsigned a = 0; a < 0x100; a++) printf("%s%02X", a % 16 ? " " : "\n ", core->rawRead8(core, 0xA000 + a, 2));
 					printf("\n");
+				}
+				if (getenv("SGBRUN_HD")) {                  /* CGB tile copy (WRAM 2) vs VRAM */
+					int bad = 0;
+					for (int t = 0; t < 256; t++) {
+						unsigned v = t < 128 ? 0x9000 + t * 16 : 0x8800 + (t - 128) * 16;
+						for (int i = 0; i < 16; i++)
+							if (core->rawRead8(core, 0xD000 + t * 16 + i, 2) != core->rawRead8(core, v + i, 0)) {
+								if (bad < 6) { printf("tile %02X stage", t); for (int j = 0; j < 16; j++) printf(" %02X", core->rawRead8(core, 0xD000 + t * 16 + j, 2));
+									printf(" vram"); for (int j = 0; j < 16; j++) printf(" %02X", core->rawRead8(core, v + j, 0)); printf("\n"); }
+								bad++; break; }
+					}
+					printf("nshot %d: tiles differing %d, dirty", nshots[k], bad);
+					for (int i = 0; i < 32; i++) printf(" %02X", core->busRead8(core, 0xCCA0 + i));
+					printf("\nring:"); for (int i = 0; i < 256; i++) printf(" %02X", core->rawRead8(core, 0xDE00 + i, 1));
+					printf(" SVBK %02X VBK %02X dbg %02X %02X %02X\n", core->busRead8(core, 0xFF70), core->busRead8(core, 0xFF4F),
+						core->busRead8(core, 0xCCD0), core->busRead8(core, 0xCCD1), core->busRead8(core, 0xCCD2));
 				}
 				if (getenv("SGBRUN_REGS"))
 					printf("nshot %d: LCDC %02X STAT %02X SCY %02X SCX %02X LY %02X LYC %02X BGP %02X\n", nshots[k],
@@ -146,8 +163,8 @@ int main(int argc, char** argv) {
 		}
 	}
 	/* frame-wait counter of the runtime ($D830), to confirm the game ran */
-	unsigned n = core->busRead8(core, 0xD830) | core->busRead8(core, 0xD831) << 8;
-	printf("frames %d, video %ux%u, NES frame waits %u\n", frames, w, h, n);
+	unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
+	printf("frames %d, video %ux%u, NES frame waits %u, KEY1 %02X\n", frames, w, h, n, core->busRead8(core, 0xFF4D));
 	core->deinit(core);
 	return 0;
 }

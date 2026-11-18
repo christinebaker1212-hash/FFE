@@ -2,7 +2,7 @@
 K1, K2, ... (sgbrun --nshot with SGBRUN_RAM) against the NES build at those NMIs, with the
 battleseq input. Prints the differing bytes (page 1 and the sound bytes $B4-$D5 vary with
 the moment of the snapshot).
-usage: PYTHONPATH=build/emu sgbram.py NES GB K1,K2,... [--input MODE] [--dmg]"""
+usage: PYTHONPATH=build/emu sgbram.py NES GB K1,K2,... [--input MODE] [--dmg | --cgb]"""
 import os, sys, subprocess, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cynes import NES
@@ -14,6 +14,8 @@ if '--input' in args:
     k = args.index('--input'); mode = args[k + 1]; del args[k:k + 2]
 dmg = '--dmg' in args
 if dmg: args.remove('--dmg')
+cgb = '--cgb' in args
+if cgb: args.remove('--cgb')
 checks = [int(x) for x in args[2].split(',')]
 last = max(checks) + 2
 nes = NES(args[0])
@@ -30,7 +32,7 @@ while nes.nmi_count < last:
 open(os.path.join(tmp, 'pads.bin'), 'wb').write(pads)
 exe = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'build', 'sgbrun')
 cmd = [exe, args[1], str(last * 4), os.path.join(tmp, 'r'), '--padfile', os.path.join(tmp, 'pads.bin'),
-       '--sram', os.path.join(tmp, 'sram.bin')] + sum([['--nshot', str(c)] for c in checks], []) + (['--dmg'] if dmg else [])
+       '--sram', os.path.join(tmp, 'sram.bin')] + sum([['--nshot', str(c)] for c in checks], []) + (['--dmg'] if dmg else []) + (['--cgb'] if cgb else [])
 print(subprocess.run(cmd, capture_output=True, text=True, env=dict(os.environ, SGBRUN_RAM='1')).stdout.strip().splitlines()[-1])
 bad = 0
 for c in checks:
