@@ -44,6 +44,15 @@ FF1 comes first, then FF2, then FF3.
   screen is re-laid out, the camera pans over it.
 - Tools are Python 3, with no outside toolchain (own SM83 assembler, like
   `tools/asm6502.py`). PyBoy (`pip install pyboy`) is used for headless GB testing.
+- **Screen layout direction (owner's decision):** take inspiration from SaGa 3 (Final
+  Fantasy Legend III) and other Game Boy RPGs. No two-character-panel splits and no
+  panning across the NES layout. Party shown as compact one-line-per-member lists
+  (name, HP, status), full-width windows, command windows opening over the party
+  window, enemy graphics in the upper part of the battle screen.
+- **SGB testing uses mGBA** (owner's decision): `tools/gb/mgba/sgbrun.c`, built against
+  `libmgba-dev` (`gcc -O2 tools/gb/mgba/sgbrun.c -lmgba -o build/sgbrun`), runs a ROM
+  as SGB with borders, scripted presses, PPM screenshots. PyBoy stays for DMG logic
+  checks (it has no SGB).
 - Verification: run the NES (`tools/emu`) and GB builds side by side with the same input
   and compare emulated RAM frame by frame (as in `tools/split/equiv.py`), plus
   screenshots of every re-laid-out screen.

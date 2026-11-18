@@ -1,7 +1,7 @@
 # FF1 on the Game Boy: screen-by-screen layout plan (milestone 5)
 
 The GB shows 20×18 tiles. Until a screen is re-laid out, the runtime shows the NES
-screen's centre (NES tile columns 6-25, rows 6-23; `CAM_X/CAM_Y` in `rt/runtime.s`).
+screen's centre (a stopgap only) (NES tile columns 6-25, rows 6-23; `CAM_X/CAM_Y` in `rt/runtime.s`).
 
 ## Approach
 - **Layout stays on the NES side.** A GB variant of the English inserter
@@ -9,13 +9,26 @@ screen's centre (NES tile columns 6-25, rows 6-23; `CAM_X/CAM_Y` in `rt/runtime.
   the English text for the GB view. The recompiler then carries the result over like any
   other code, so the frame-exact NES/GB checks (`firstdiff.py`) keep working against
   that NES variant.
-- **Camera per screen.** The NES code tells the runtime which part of the 256×240 screen to
+- **Camera per screen** (fixed per screen, never panning). The NES code tells the runtime which part of the 256×240 screen to
   show by writing a reserved register (planned: MMC5 `$5130-$5131`, unused by FF1; the runtime
   treats the writes as camera X/Y in tiles). The field keeps the centred camera, and
   a re-laid-out screen can sit anywhere on the NES nametable.
 - **The translation text does not change.** Only line breaks (wrap width) and window geometry
   change. Names stay in full (README rule 3): where a name no longer fits on one row,
   it uses the two-row form the English patch already has for long names.
+
+## Style (owner's decision)
+Take inspiration from SaGa 3 (Final Fantasy Legend III) and other Game Boy RPGs instead of
+shrinking the NES layout: no two-character-panel splits, no panning. Common elements:
+- **Party list window**: one line per member (name, HP current/max, status), full width.
+  Used in the main menu, shops, inn, item/magic targets and battle.
+- **Full-width windows** stacked vertically; command windows open over the party list.
+- **Battle**: enemy graphics in the upper part of the screen, a party list window at the
+  bottom, the command window and battle messages opening over it. Party battle sprites
+  are not shown permanently (as in the GB SaGa games); how to show who acts (and the
+  NES attack animations) is to be designed.
+- Exact layouts get drafted as mock-ups (rendered with the real font) before the NES
+  code is changed.
 
 ## Screens
 | Screen | NES layout (English build) | GB plan | Status |
@@ -26,10 +39,10 @@ screen's centre (NES tile columns 6-25, rows 6-23; `CAM_X/CAM_Y` in `rt/runtime.
 | Name entry | 10-col letter grid + name box | fits (grid is 20 cols incl. frame) | check |
 | Field | 16×15 metatiles | centred camera (10×9 metatiles) | done |
 | Dialogue | 25 cols × 9 lines | 18 cols × 7 lines per page, same text, more pages | todo |
-| Main menu | orb, Gil, commands, 4 character boxes | commands + Gil on top; character boxes 2 per screen with the cursor deciding which pair | todo |
+| Main menu | orb, Gil, commands, 4 character boxes | command window + Gil/orbs, party list window (one line per member); details on the Status screen | todo |
 | Item / Magic / Equip / Status | full-width lists | one column, names in full (two-row form) | todo |
 | Shops, inn, clinic, church | speech + list + Gil windows | stacked vertically, list one column | todo |
-| Battle | enemies 3×3 grid left, party right, command + message boxes bottom | enemy area 12 cols + party 6 cols, 5-row command/message area; messages re-wrapped | todo |
+| Battle | enemies 3×3 grid left, party right, command + message boxes bottom | SaGa-style: enemy graphics on top (up to 5 small per row), party list window at the bottom, commands/messages over it | todo |
 | Battle magic/item lists | full-width | one column | todo |
 | World map (minimap) | 64×64 px map in a box | fits | check |
 | 15-puzzle | 4×4 grid | fits | check |
