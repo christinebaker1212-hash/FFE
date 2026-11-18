@@ -606,9 +606,18 @@ Milestones per game (from `docs/gb-port.md`):
   takes the colours of its cell's SGB palette, and both OBPs gave it colour 1 = the
   darkest colour there (the window blue, the field's dark ground). Both OBPs now map the
   sprite values 1/2/3 to colours 0/2/3 (backdrop black outline, mid, bright): class select
-  black/grey/white, the field party light with a dark outline. Possible next step: a
-  palette of its own for the battle party column (its cells are backdrop black, so an
-  ATTR rectangle there would not tint any background).
+  black/grey/white, the field party light with a dark outline. Owner: better in menus,
+  worse in battle (the black outline vanished on the black backdrop). Battle now: the party
+  column (GB cols 15-18, rows 0-11, backdrop only) gets an SGB palette of its own with the
+  party's colours (`spr_col`: per DMG value the best colour of NES sprite palettes 0-1), in a
+  slot no BG cell on screen uses, else slot 0 (NES palette 0 is the battle scenery strip,
+  above the GB view; in view only empty cells use it); both OBPs then 1/2/3. The runtime
+  knows the battle from bit 7 of the $5800 camera write (`in_battle`). The packet builder
+  moved to ROM bank 63 (`SGB_BANK`, called through `sgb_build_far`): bank 0 was full.
+- Coverage gap found with forced formations: formation 62 hung the GB at the battle start
+  (fault 1: no compiled code for a jump-table target $A4E4). covall now also runs one
+  battle per formation (128, `covbattle.py --form F`; the patched ROM keeps every code
+  offset, so the logs fit the normal ROM).
 - Next: FF1's accuracy / timing pass (lag in screen transitions, SGB check of the new
   screens in mGBA).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).

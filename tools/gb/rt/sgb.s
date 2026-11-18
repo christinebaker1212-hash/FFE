@@ -3,7 +3,7 @@
 ; its brightness group (0 = backdrop, 1-3 darkest .. brightest), and on the SGB the BGP
 ; passes the value through as the colour number (minus the fade), so SGB palette p colour v
 ; is the NES colour of BG palette p that has value v. Sprites use the colours of the cell
-; they are in (SGB hardware); both OBPs give colours 0 / 2 / 3 (not 1, see sgb_obp).
+; they are in (SGB hardware); outside battle both OBPs give colours 0 / 2 / 3 (see sgb_obp).
 ; Static screens: each 8x8 screen cell gets the SGB palette of its NES attribute (ATTR_CHR).
 ; Screens that scroll (field, towns, dungeons) get one palette for the whole screen
 ; (ATTR_BLK), its colours taken from the palette most cells on screen use.
@@ -174,6 +174,15 @@ sgb_send:   push bc
             pop bc
             ret
 
+; sgb_build in its bank (SGB_BANK at $4000), then the code bank again
+sgb_build_far:
+            ld a, SGB_BANK
+            ld [$2000], a
+            call sgb_build
+            ldh a, [code_bank]
+            ld [$2000], a
+            ret
+
 ; ---- once per NES frame (rt_wait_nmi): build the state when wanted, send one packet
 sgb_frame:  call sgb_scroll
             ldh a, [sgb_wait]
@@ -191,7 +200,7 @@ sgb_frame:  call sgb_scroll
             ldh a, [sgb_dirty]
             and a
             jr z, .x
-            call sgb_build
+            call sgb_build_far
             ldh a, [sgb_pend]
             and a
             jr z, .x
@@ -245,6 +254,160 @@ sgb_frame:  call sgb_scroll
             pop bc
             ret
 
+; BGP / OBP on the SGB: colour number = value, darkened by fade_drop (to the backdrop)
+sgb_bgp:    push bc
+            push de
+            ldh a, [fade_drop]
+            ld c, a
+            ld b, 3                         ; value 3 .. 1
+            ld a, 0
+.v:         push af
+            ld a, b
+            sub c
+            jr nc, .ok
+            xor a
+.ok:        ld e, a
+            pop af
+            or e
+            rlca
+            rlca
+            dec b
+            jr nz, .v
+            pop de                          ; (value 0 -> 0 in bits 0-1)
+            pop bc
+            ret
+
+sgb_obp:    push bc
+            push de
+            ldh a, [fade_drop]
+            ld c, a
+            ldh a, [in_battle]              ; battle (the party over the black backdrop, where
+            and a                           ;   a black outline would vanish): OBP0 0 / 1 / 3,
+            jr z, .menu                     ;   OBP1 1 / 2 / 3; with a party slot both 1 / 2 / 3
+            ldh a, [sgb_pslot]              ;   (value v = the party palette's colour v)
+            and a
+            jr z, .old
+            ld b, 1
+            ld e, 2
+            ld d, 3
+            call .mk
+            ldh [obp0_v], a
+            ld b, 1
+            ld e, 2
+            ld d, 3
+            jr .o1
+.old:
+            ld b, 0
+            ld e, 1
+            ld d, 3
+            call .mk
+            ldh [obp0_v], a
+            ld b, 1
+            ld e, 2
+            ld d, 3
+            jr .o1
+.menu:      ld b, 0                         ; OBP0 and OBP1: values 1 / 2 / 3 -> colours 0 /
+            ld e, 2                         ;   2 / 3: never colour 1, the darkest colour of the
+            ld d, 3                         ;   cell's palette, which is the window blue / the
+            call .mk                        ;   field's dark ground (sprites blended in); the
+            ldh [obp0_v], a                 ;   backdrop black outlines them instead
+            ld b, 0
+            ld e, 2
+            ld d, 3
+.o1:
+            call .mk
+            ldh [obp1_v], a
+            pop de
+            pop bc
+            ret
+.mk:        ld a, d                         ; (B, E, D = colours of values 1, 2, 3)
+            call .sub
+            ld d, a
+            ld a, e
+            call .sub
+            ld e, a
+            ld a, b
+            call .sub
+            add a, a
+            add a, a                        ; value 1 -> bits 2-3
+            ld b, a
+            ld a, e
+            swap a                          ; value 2 -> bits 4-5
+            or b
+            ld b, a
+            ld a, d
+            rrca
+            rrca                            ; value 3 -> bits 6-7
+            or b
+            ret
+.sub:       sub c
+            ret nc
+            xor a
+            ret
+
+; scrolling seen with the LCD on: one palette for the screen until the LCD goes off; in
+; that mode the state is rebuilt every 32 frames (the cells on screen change)
+sgb_scroll: push bc
+            ldh a, [scroll_x]
+            ld b, a
+            ldh a, [cam_x]
+            add a, b
+            ld b, a
+            ldh a, [scroll_y]
+            ld c, a
+            ldh a, [cam_y]
+            add a, c
+            ld c, a
+            ldh a, [lcd_on]
+            and a
+            jr z, .save
+            ld a, [SGB_LSX]
+            cp b
+            jr nz, .mv
+            ld a, [SGB_LSY]
+            cp c
+            jr z, .save
+.mv:        ldh a, [sgb_glob]
+            and a
+            jr nz, .save
+            ld a, 1
+            ldh [sgb_glob], a
+            ld a, $FF
+            ldh [sgb_force], a
+            ldh [sgb_dirty], a
+.save:      ld a, b
+            ld [SGB_LSX], a
+            ld a, c
+            ld [SGB_LSY], a
+            ldh a, [sgb_glob]
+            and a
+            jr z, .x
+            ld a, [SGB_TICK]
+            inc a
+            ld [SGB_TICK], a
+            and 31
+            jr nz, .x
+            ld a, 1
+            ldh [sgb_dirty], a
+.x:         pop bc
+            ret
+
+; LCD going off: static screens again (per-cell palettes)
+sgb_lcd_off:
+            ldh a, [sgb_glob]
+            and a
+            ret z
+            xor a
+            ldh [sgb_glob], a
+            ld a, $FF
+            ldh [sgb_force], a
+            ldh [sgb_dirty], a
+            ret
+
+
+; ---- the SGB packet builder and its helpers (called only from sgb_frame through
+; sgb_build_far): in a bank of their own, the runtime bank 0 being full
+section bank SGB_BANK, $4000
 ; ---- NEXT from the current palettes and map; sgb_pend = the packets that differ from SENT
 sgb_build:  xor a
             ldh [sgb_dirty], a
@@ -256,30 +419,67 @@ sgb_build:  xor a
 .cl:        ld [hl+], a
             dec b
             jr nz, .cl
+            ldh a, [sgb_pslot]              ; (the party slot is chosen again)
+            push af
+            xor a
+            ldh [sgb_pslot], a
             call sgb_counts                 ; cells per palette on screen; per-cell palettes
             ldh a, [sgb_glob]               ;   -> the ATTR packets
             and a
-            jr nz, .glob
-            ld hl, SGB_NEXT                 ; PAL01, PAL23 from the four NES BG palettes
-            ld a, $01
+            jr nz, .glob0
+            ldh a, [in_battle]              ; battle: a slot no BG cell uses -> the party
+            and a                           ;   column's cells (backdrop only) with the party
+            jr z, .np                       ;   sprites' colours
+            ld c, 3
+.fs:        ld a, c
+            add a, low(SGB_CNT)
+            ld l, a
+            ld h, high(SGB_CNT)
+            ld a, [hl]
+            and a
+            jr z, .got
+            dec c
+            bit 7, c
+            jr z, .fs
+            ld c, 0                         ; none free: slot 0 (NES palette 0 is the battle
+.got:       ld a, c                         ;   scenery strip, above the GB view; in view only
+                                            ;   empty backdrop cells use it)
+            inc a
+            ldh [sgb_pslot], a
+            call sgb_counts
+.np:        pop af                          ; slot changed: the OBPs again
+            ld c, a
+            ldh a, [sgb_pslot]
+            cp c
+            jr z, .st
+            ld a, 1
+            ldh [pal_dirty], a
+.st:        ld hl, SGB_NEXT                 ; PAL01, PAL23 from the four NES BG palettes
+            ld a, $01                       ;   (or the party's colours in its slot)
             ld [hl+], a
             call bk_rgb
             ld c, 0
-            call pal_rgb
+            call pal_or_spr
             ld c, 1
-            call pal_rgb
+            call pal_or_spr
             ld hl, SGB_NEXT + 16
             ld a, $09
             ld [hl+], a
             call bk_rgb
             ld c, 2
-            call pal_rgb
+            call pal_or_spr
             ld c, 3
-            call pal_rgb
+            call pal_or_spr
             ld a, 6                         ; the cells as rectangles (ATTR_BLK) if they
             ldh [sgb_nattr], a              ;   take at most 15, else ATTR_CHR (6 packets)
             call sgb_rects
             jr .cmp
+.glob0:     pop af
+            ld c, a                         ; (scrolling: no party slot)
+            and a
+            jr z, .glob
+            ld a, 1
+            ldh [pal_dirty], a
 .glob:      ld hl, SGB_NEXT                 ; one palette (SGB 0) for the screen: each value
             ld a, $01                       ;   from the palette with most cells that has it
             ld [hl+], a
@@ -398,6 +598,83 @@ pal_rgb:    ld b, 1
             ld a, b
             cp 4
             jr nz, .v
+            ret
+
+; C = slot: the party's colours in the battle party slot, else NES BG palette C's
+pal_or_spr: ldh a, [sgb_pslot]
+            dec a
+            cp c
+            jp nz, pal_rgb
+            ld b, 1                         ; values 1-3 from the party's sprite palettes
+.v:         call spr_col
+            call rgb_put
+            inc b
+            ld a, b
+            cp 4
+            jr nz, .v
+            ret
+
+; B = value -> A = NES colour: among NES sprite palettes 0-1 (the party), the index with
+; that value (SPAL_KEY) that has the best col_score; none: the next lower value
+spr_col:    push bc
+            push de
+            push hl
+.again:     ld a, b
+            and a
+            jr z, .bk
+            ld d, $FF
+            ld e, 0
+            ld c, 0
+.p:         ld a, c
+            add a, low(SPAL_KEY)
+            ld l, a
+            ld h, high(SPAL_KEY)
+            ld a, [hl]                      ; key: v1 | v2 << 2 | v3 << 4
+            and $3F
+            ld h, a
+            ld l, 1
+.i:         ld a, h
+            and 3
+            cp b
+            jr nz, .n
+            push hl
+            ld a, c
+            add a, a
+            add a, a
+            add a, l
+            add a, low(PAL_SH) + $10
+            ld l, a
+            ld h, high(PAL_SH)
+            ld a, [hl]
+            pop hl
+            push af
+            call col_score
+            cp e
+            jr c, .lo
+            ld e, a
+            pop af
+            ld d, a
+            jr .n
+.lo:        pop af
+.n:         srl h
+            srl h
+            inc l
+            ld a, l
+            cp 4
+            jr nz, .i
+            inc c
+            ld a, c
+            cp 2
+            jr nz, .p
+            ld a, d
+            cp $FF
+            jr nz, .x
+            dec b
+            jr .again
+.bk:        ld a, [PAL_SH]
+.x:         pop hl
+            pop de
+            pop bc
             ret
 
 ; A = NES colour -> its score for being the SGB colour of its value: a hue (columns 1-12)
@@ -603,7 +880,29 @@ sgb_counts: ld hl, SGB_CNT
 .o0:        ld a, d
             call cell_pal
             ld c, a
-            ld a, [SGB_GP]                  ; GRID
+            ldh a, [sgb_pslot]              ; battle party column (GB cols 15-18, rows 0-11):
+            and a                           ;   the party slot
+            jr z, .po
+            ldh a, [sgb_c0]
+            ld l, a
+            ld a, e
+            sub l
+            and 31
+            sub 15
+            cp 4
+            jr nc, .po
+            ldh a, [sgb_r0]
+            ld l, a
+            ld a, d
+            sub l
+            jr nc, .pr
+            add a, 30
+.pr:        cp 12
+            jr nc, .po
+            ldh a, [sgb_pslot]
+            dec a
+            ld c, a
+.po:        ld a, [SGB_GP]                  ; GRID
             ld l, a
             ld a, [SGB_GP + 1]
             ld h, a
@@ -656,130 +955,6 @@ sgb_counts: ld hl, SGB_CNT
             pop bc
             dec b
             jr nz, .r
-            ret
-
-; BGP / OBP on the SGB: colour number = value, darkened by fade_drop (to the backdrop)
-sgb_bgp:    push bc
-            push de
-            ldh a, [fade_drop]
-            ld c, a
-            ld b, 3                         ; value 3 .. 1
-            ld a, 0
-.v:         push af
-            ld a, b
-            sub c
-            jr nc, .ok
-            xor a
-.ok:        ld e, a
-            pop af
-            or e
-            rlca
-            rlca
-            dec b
-            jr nz, .v
-            pop de                          ; (value 0 -> 0 in bits 0-1)
-            pop bc
-            ret
-
-sgb_obp:    push bc
-            push de
-            ldh a, [fade_drop]
-            ld c, a
-            ld b, 0                         ; OBP0 and OBP1: values 1 / 2 / 3 -> colours 0 /
-            ld e, 2                         ;   2 / 3: never colour 1, the darkest colour of the
-            ld d, 3                         ;   cell's palette, which is the window blue / the
-            call .mk                        ;   field's dark ground (sprites blended in); the
-            ldh [obp0_v], a                 ;   backdrop black outlines them instead
-            ld b, 0
-            ld e, 2
-            ld d, 3
-            call .mk
-            ldh [obp1_v], a
-            pop de
-            pop bc
-            ret
-.mk:        ld a, d                         ; (B, E, D = colours of values 1, 2, 3)
-            call .sub
-            ld d, a
-            ld a, e
-            call .sub
-            ld e, a
-            ld a, b
-            call .sub
-            add a, a
-            add a, a                        ; value 1 -> bits 2-3
-            ld b, a
-            ld a, e
-            swap a                          ; value 2 -> bits 4-5
-            or b
-            ld b, a
-            ld a, d
-            rrca
-            rrca                            ; value 3 -> bits 6-7
-            or b
-            ret
-.sub:       sub c
-            ret nc
-            xor a
-            ret
-
-; scrolling seen with the LCD on: one palette for the screen until the LCD goes off; in
-; that mode the state is rebuilt every 32 frames (the cells on screen change)
-sgb_scroll: push bc
-            ldh a, [scroll_x]
-            ld b, a
-            ldh a, [cam_x]
-            add a, b
-            ld b, a
-            ldh a, [scroll_y]
-            ld c, a
-            ldh a, [cam_y]
-            add a, c
-            ld c, a
-            ldh a, [lcd_on]
-            and a
-            jr z, .save
-            ld a, [SGB_LSX]
-            cp b
-            jr nz, .mv
-            ld a, [SGB_LSY]
-            cp c
-            jr z, .save
-.mv:        ldh a, [sgb_glob]
-            and a
-            jr nz, .save
-            ld a, 1
-            ldh [sgb_glob], a
-            ld a, $FF
-            ldh [sgb_force], a
-            ldh [sgb_dirty], a
-.save:      ld a, b
-            ld [SGB_LSX], a
-            ld a, c
-            ld [SGB_LSY], a
-            ldh a, [sgb_glob]
-            and a
-            jr z, .x
-            ld a, [SGB_TICK]
-            inc a
-            ld [SGB_TICK], a
-            and 31
-            jr nz, .x
-            ld a, 1
-            ldh [sgb_dirty], a
-.x:         pop bc
-            ret
-
-; LCD going off: static screens again (per-cell palettes)
-sgb_lcd_off:
-            ldh a, [sgb_glob]
-            and a
-            ret z
-            xor a
-            ldh [sgb_glob], a
-            ld a, $FF
-            ldh [sgb_force], a
-            ldh [sgb_dirty], a
             ret
 
 ; A = the pending bits of the ATTR packets (2 .. 1 + sgb_nattr)
@@ -1041,3 +1216,4 @@ sgb_rects:  push bc
 .ovf:       pop de
             scf
             ret
+

@@ -18,6 +18,7 @@ SPR_SLOT   = $D900          ; NES sprite tile (0-255) -> GB slot 0-127, $FF = no
 SLOT_TILE  = $DA00          ; GB slot -> NES sprite tile ($FF = free)
 SLOT_STAMP = $DA80          ; GB slot -> frame number of its last use in OAM
 SLOT_KEY   = $D880          ; GB slot -> coding of its tile (SPAL_KEY value; $FF = to load)
+SGB_BANK   = 63             ; ROM bank of the SGB packet builder (sgb.s)
 SGB_CNT    = $DCC4          ; SGB: cells on screen per NES BG palette
 SGB_LSX    = $DCC8          ; SGB: last view position (scroll + camera)
 SGB_LSY    = $DCC9
@@ -155,6 +156,8 @@ ap_chg:     ds 1                            ; attribute write: changed quadrants
 ap_own:     ds 1                            ; attr_apply: owner bits wanted (0 or $FF)
 ap_pal:     ds 4                            ; attr_apply: palette of each quadrant
 maps_wait:  ds 1                            ; DMG: frames the maps have been due (fades)
+in_battle:  ds 1                            ; bit 7 of the last $5800 write (the battle camera)
+sgb_pslot:  ds 1                            ; SGB: 1 + the palette slot given to the battle party (0: none)
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -1735,8 +1738,21 @@ rt_mmc_w5115:
             ldh [data_bank8], a
             pop af
             ret
-rt_mmc_w5800:                               ; camera X in tiles (GB layout code; bit 7 is
-            push af                         ;   no longer used)
+rt_mmc_w5800:                               ; camera X in tiles (GB layout code; bit 7:
+            push af                         ;   the battle, for the SGB sprite colours)
+            push bc
+            and $80
+            ld b, a
+            ldh a, [in_battle]
+            cp b
+            jr z, .same
+            ld a, b
+            ldh [in_battle], a
+            ld a, 1                         ; (OBP again)
+            ldh [pal_dirty], a
+.same:      pop bc
+            pop af
+            push af
             and $1F
             add a, a
             add a, a

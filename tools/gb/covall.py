@@ -1,6 +1,7 @@
 """Regenerate the recompiler's coverage logs for a NES ROM (needed after every change to
 the NES code): new game + random play (covrun.py, seeds 1-4) and the field scripts below
-(covfield.py) and battle input modes (covbattle.py), all in parallel; writes OUTDIR/rom.sha1 (build.py warns on a mismatch).
+(covfield.py) and battle input modes (covbattle.py), all in parallel, then one battle per
+formation (128, 4 at a time); writes OUTDIR/rom.sha1 (build.py warns on a mismatch).
 usage: PYTHONPATH=build/emu covall.py ROM OUTDIR [FRAMES (random play, default 80000)]"""
 import hashlib, os, subprocess, sys
 
@@ -81,7 +82,20 @@ def main():
         procs.append(subprocess.Popen([sys.executable, os.path.join(HERE, 'covbattle.py'), rom, mode, '7700',
                                        '--poke', magic_pokes()], env=env1,
                                       stdout=open(os.path.join(out, 'b%d.log' % i), 'w'), stderr=subprocess.STDOUT))
+    jobs = []                                 # every battle formation once (fight)
+    for f in range(128):
+        env1 = dict(env, COV_LOG=os.path.join(out, 'f%03d.bin' % f))
+        jobs.append(([sys.executable, os.path.join(HERE, 'covbattle.py'), rom, 'fight', '7000',
+                      '--poke', magic_pokes(), '--form', str(f)], env1, os.path.join(out, 'f%03d.log' % f)))
     bad = [p.args for p in procs if p.wait() != 0]
+    running = []
+    while jobs or running:                    # (4 at a time)
+        while jobs and len(running) < 4:
+            cmd, env1, log = jobs.pop(0)
+            if os.path.exists(env1['COV_LOG']): os.remove(env1['COV_LOG'])
+            running.append(subprocess.Popen(cmd, env=env1, stdout=open(log, 'w'), stderr=subprocess.STDOUT))
+        p = running.pop(0)
+        if p.wait() != 0: bad.append(p.args)
     sha = hashlib.sha1(open(rom, 'rb').read()).hexdigest()
     with open(os.path.join(out, 'rom.sha1'), 'w') as fh: fh.write('%s  %s\n' % (sha, rom))
     print('coverage written to', out, 'failed:', bad)
