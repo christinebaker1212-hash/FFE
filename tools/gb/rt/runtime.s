@@ -42,6 +42,8 @@ BAND_B     = $CCE9          ;   for BAND_LIFE more frames
 BAND_LIFE  = $CCEA
 BGP_NORM   = $CCEB          ; DMG / SGB: BGP of the frame; BGP_MASK: every value as the backdrop
 BGP_MASK   = $CCEC
+VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
+                            ;   a real GBC shows white with the LCD off, the NES black)
 EMPH_RGB   = $3A00          ; CGB: NES colours with emphasis e (1-7) at EMPH_RGB + e * $80
 STAGE      = $D000          ; CGB WRAM bank 2: BG tiles (4KB), bank 3: sprite slots (2KB)
 OWN        = $DD00          ; GB map cell -> nametable that drew it (bit set: nametable 1), 128 bytes
@@ -465,7 +467,12 @@ vbl_regs:   xor a
             ld [EV_N], a
             ld [EV_I], a
             ld c, 0                         ; C = masked at the top
-            ld a, [BAND_LIFE]
+            ld a, [VLCD]                    ; CGB, NES rendering off: all masked (and no
+            and a                           ;   sprites, below)
+            jr z, .vl
+            inc c
+            jr .bd
+.vl:        ld a, [BAND_LIFE]
             and a
             jr z, .nob
             dec a
@@ -521,6 +528,9 @@ vbl_regs:   xor a
             ldh a, [obp1_v]
             ldh [$FF49], a
             ld b, LCDC_ON & %11111101       ; LCDC: sprites as the NES ($2001 bit 4)
+            ld a, [VLCD]
+            and a
+            jr nz, .ns
             ldh a, [ppu_mask]
             bit 4, a
             jr z, .ns
@@ -1317,6 +1327,8 @@ rt_ppu_w1:  push af
             ldh [ppu_mask], a
             and $18
             jr z, .off
+            xor a
+            ld [VLCD], a                    ; (CGB: shown again)
             ldh a, [lcd_on]
             and a
             jr nz, .ret
@@ -1353,7 +1365,13 @@ rt_ppu_w1:  push af
 .off:       ldh a, [lcd_on]
             and a
             jr z, .ret
-            ldh a, [is_sgb]
+            ldh a, [is_cgb]                 ; CGB: the LCD stays on, masked (VLCD); writes
+            and a                           ;   go the LCD-on ways (queue, tile copy + DMA)
+            jr z, .dmgoff
+            ld a, 1
+            ld [VLCD], a
+            jr .ret
+.dmgoff:    ldh a, [is_sgb]
             and a
             call nz, sgb_lcd_off
 .wv:        ldh a, [$FF44]

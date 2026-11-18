@@ -10,9 +10,13 @@ hle_chr_pages:
 .page:      ld a, e
             and a
             jp z, .done
-            ldh a, [lcd_on]
+            ldh a, [lcd_on]                 ; LCD on: CGB only (BG tiles to the tile copy +
+            and a                           ;   DMA marks)
+            jr z, .lok
+            ldh a, [is_cgb]
             and a
-            jp nz, .slow
+            jp z, .slow
+.lok:
             ldh a, [ppu_ctrl]
             and 4
             jp nz, .slow
@@ -60,7 +64,12 @@ hle_chr_pages:
             ld a, 1
             ld [$4000], a
             jr .copy
-.bgv:       cp $08
+.bgv:       ld d, a
+            ldh a, [lcd_on]
+            and a
+            ld a, d
+            jr nz, .bgs
+            cp $08
             ld d, $90
             jr c, .bg0
             ld d, $80
@@ -68,6 +77,11 @@ hle_chr_pages:
             add a, d
             ld d, a
             jr .copy
+.bgs:       and $0F                         ; CGB, LCD on: the tile copy (WRAM bank 2, $D000 +
+            add a, $D0                      ;   tile * 16), the tile marked for the vblank DMA
+            ld d, a
+            ld a, 2
+            ldh [$FF70], a
 .spr:       and $0F                         ; sprite table -> shadow (RAM bank 1)
             add a, high(SPR_SHADOW)
             ld d, a
@@ -92,6 +106,25 @@ hle_chr_pages:
             jr nz, .p1
             ldh [tmp_lo], a                 ; last byte
             ld a, d
+            cp $D0
+            jr c, .nst
+            ld a, 1                         ; (tile copy: WRAM bank 1 again, mark the tile)
+            ldh [$FF70], a
+            push hl
+            ld a, e
+            sub 17
+            swap a
+            and $0F
+            ld e, a
+            ld a, d
+            sub $D0
+            swap a
+            or e
+            ld hl, BG_DIRTY
+            call hd_mark
+            pop hl
+            jr .nx
+.nst:       ld a, d
             cp high(BG_SHADOW)
             jr c, .nbg
             call hle_bg_tile                ; DMG BG tile in the shadow: queue its re-coding
@@ -201,4 +234,41 @@ hle_chr_page1:
             ld hl, NES_RAM + $11
             dec [hl]
             pop af
+            ret
+
+; ---- c62:D1A8: map decompression run (STA ($12),Y / INY / BEQ $D1B8 / DEX / BNE $D1A8).
+;   The run is stored here; it returns to $D1AB (the BEQ) either with Y = 0 and Z = 1 (as
+;   the NES leaves it when Y wraps: X not counted for that store) or with X = 1 and Z = 0
+;   (the NES's last DEX / BNE then ends the run). A kept. Work RAM ($6000-$7FFF) directly,
+;   anything else through rt_izy_wr.
+hle_rlefill:
+            push af
+            ld a, [NES_RAM + $13]
+            cp $60
+            jr c, .slow
+            cp $80
+            jr nc, .slow
+            add a, $40                      ; NES $6000-$7FFF -> cart RAM $A000-$BFFF
+            ld h, a
+            ld a, [NES_RAM + $12]
+            ld l, a
+            add hl, bc                      ; + Y (B = 0)
+            pop af
+.lp:        ld [hl+], a
+            inc c
+            ret z                           ; Y wrapped (Z = 1)
+            dec e
+            jr nz, .lp
+            inc e                           ; X = 1, Z = 0
+            ret
+.slow:      pop af
+.sl:        push af
+            ld l, $12
+            call rt_izy_wr
+            pop af
+            inc c
+            ret z
+            dec e
+            jr nz, .sl
+            inc e
             ret
