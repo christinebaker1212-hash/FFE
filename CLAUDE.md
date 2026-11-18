@@ -195,8 +195,19 @@ Milestones per game (from `docs/gb-port.md`):
   the code address that made them (find who draws a screen area).
 
 ## In progress / next
-- Battle (owner, 2026-11-18): the bottom frame of the message window must be visible too
-  (windows 6 rows high instead of 7; long split result lines need a place).
+- Battle bottom windows now 6 rows (owner, 2026-11-18: the bottom frame must show): frame
+  on GB row 17, 4 text rows. Long messages use record 4 (whole window), so they have
+  rows 1-4. GB battle line writer `gb_layout.BOXLINE` (replaces the English boxline in
+  the far code with `--gb`): greedy word wrap over up to 4 rows, character row only,
+  `$FE` forces a break; `tools/ff1/test_boxline.py` runs it in py65 on all 82 battle
+  messages (2 need 3 rows; 0 bad).
+- Fixed a crash in the earlier GB panel: the hidden dummy message boxes were 2 rows high,
+  and the frame drawer `$F593` draws h-2 middle rows (0 → 255 rows over RAM). Now 3 rows.
+- Mock-ups `mockup.py` draft 3 (`mock3_font_*`): the message window in the condensed
+  proportional letters (owner asked about a smaller font). **Waiting for the owner's
+  decision** before any font change.
+
+## In progress / next
 - Battle:
   bottom panel to NES rows 18-23 cols 2-21 (names full width, commands over the right
   half, the four messages as lines of one window via dummy boxes in the hidden rows),

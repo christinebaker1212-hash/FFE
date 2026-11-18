@@ -941,7 +941,13 @@ def bank_put(rom, bank, cpu, data):
 def menu_engine(rom, report):
     cmds = json.load(open('script/ff1/battle_cmds.json'))
     bc = ''.join('bcmd%d:\n    .db %s, 0\n' % (e['id'], ', '.join(str(b) for b in enc(e['en']))) for e in cmds)
-    far = asm(FAR_SRC, syms=EX)
+    src = FAR_SRC
+    if '--gb' in sys.argv:                     # GB layout: its own battle line writer
+        sys.path.insert(0, os.path.dirname(__file__))
+        import gb_layout
+        a, b = src.index('boxline:'), src.index('magpage:')
+        src = src[:a] + gb_layout.BOXLINE + src[b:]
+    far = asm(src, syms=EX)
     assert far.org + len(far.bytes) <= 0xE000
     o = HDR + FAR8 * 0x2000
     rom[o:o + 0x2000] = far.bytes + b'\xFF' * (0x2000 - len(far.bytes))

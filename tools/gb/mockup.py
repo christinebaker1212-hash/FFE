@@ -4,7 +4,7 @@ backdrops) are drawn as grey placeholder blocks.
 usage: mockup.py OUTDIR"""
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from latin_font import tile
+from latin_font import tile, COND, G, _glyph_cols
 from PIL import Image, ImageDraw
 
 SHADES = [(224, 248, 208), (136, 192, 112), (52, 104, 86), (8, 24, 32)]   # DMG-like
@@ -27,6 +27,21 @@ class Screen:
         for i, ch in enumerate(s):
             if ch != ' ': self.glyph(x + i, y, ch, fg, bg)
             else: self.d.rectangle([(x + i) * 8, y * 8, (x + i) * 8 + 7, y * 8 + 7], fill=SHADES[bg])
+
+    def ptext(self, x, y, s, fg=0, px=0):
+        """proportional text in the condensed letters (1-px gaps, 3-px space), from tile
+        (x, y) plus px pixels; characters without a condensed form use the regular glyph
+        trimmed to its ink. Returns the width in pixels."""
+        X = x * 8 + px
+        for k, ch in enumerate(s):
+            if k: X += 1
+            if ch == ' ': X += 2; continue
+            cols = _glyph_cols(ch, COND if ch in COND else G)
+            for cx, col in enumerate(cols):
+                for cy in range(8):
+                    if col[cy]: self.im.putpixel((X + cx, y * 8 + cy), SHADES[fg])
+            X += len(cols)
+        return X - x * 8 - px
 
     def window(self, x, y, w, h, bg=3):
         x0, y0, x1, y1 = x * 8, y * 8, (x + w) * 8 - 1, (y + h) * 8 - 1
@@ -104,6 +119,50 @@ def battle2(out):
     s.save(os.path.join(out, 'mock2_battle_message.png'))
 
 
+def battle3(out):
+    """Owner's question (2026-11-18): the bottom message window with a smaller font.
+    Left of each pair: the current GB layout (8x8 font, 18 cells per row, 4 rows);
+    right: the same windows with the condensed proportional letters (about 5 px per
+    letter, 28-30 letters per row), drawn on the tile rows."""
+    party = [('AAAA', 35), ('BBBB', 30), ('CCCC', 33), ('DDDD', 30)]
+
+    def top(s):
+        for r in range(3):
+            for c in range(3): s.block(1 + c * 4, r * 4, 4, 4)
+        for i, (n, hp) in enumerate(party):
+            s.block(14, i * 3, 2, 3)
+            s.text(16, i * 3, n); s.text(16, i * 3 + 1, 'HP'); s.text(16, i * 3 + 2, '%4d' % hp)
+
+    pages = [('turn', ['AAAA', '', 'Goblin', '4 damage']),
+             ('long', ['Was hurled into a', 'rift in', 'dimensions!']),
+             ('long2', ['Became better at', 'dodging attacks'])]
+    small = {'turn': ['AAAA', '', 'Goblin', '4 damage'],
+             'long': ['Was hurled into a rift in dimensions!'],
+             'long2': ['Became better at dodging attacks']}
+    for name, rows in pages:
+        a = Screen(bg=3); top(a); a.window(0, 12, 20, 6)
+        for i, r in enumerate(rows): a.text(1, 13 + i, r)
+        b = Screen(bg=3); top(b); b.window(0, 12, 20, 6)
+        for i, r in enumerate(small[name]): b.ptext(1, 13 + i, r)
+        both = Image.new('RGB', (160 * 2 + 8, 144), (255, 255, 255))
+        both.paste(a.im, (0, 0)); both.paste(b.im, (168, 0))
+        both.resize((both.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock3_font_%s.png' % name))
+    # command window + enemy names, small letters: two columns of names
+    a = Screen(bg=3); top(a); a.window(0, 12, 20, 6)
+    for i, w in enumerate(['Goblin', 'Minotaur Zombie']): a.text(1, 13 + i, w)
+    a.window(9, 12, 11, 6)
+    for i, w in enumerate(['Fight Run', 'Magic', 'Medicine', 'Items']): a.text(10, 13 + i, w)
+    a.cursor(9, 13)
+    b = Screen(bg=3); top(b); b.window(0, 12, 20, 6)
+    for i, w in enumerate(['Goblin', 'Minotaur Zombie']): b.ptext(1, 13 + i, w)
+    b.window(12, 12, 8, 6)
+    for i, w in enumerate(['Fight   Run', 'Magic', 'Medicine', 'Items']): b.ptext(13, 13 + i, w)
+    b.cursor(12, 13)
+    both = Image.new('RGB', (160 * 2 + 8, 144), (255, 255, 255))
+    both.paste(a.im, (0, 0)); both.paste(b.im, (168, 0))
+    both.resize((both.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock3_font_command.png'))
+
+
 def main_menu(out):
     s = Screen(bg=3)
     s.window(0, 0, 20, 10)                              # party list, one line per member
@@ -127,5 +186,5 @@ def main_menu(out):
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else 'build'
     os.makedirs(out, exist_ok=True)
-    battle(out); battle2(out); main_menu(out)
+    battle(out); battle2(out); battle3(out); main_menu(out)
     print('written to', out)

@@ -24,31 +24,36 @@ def rng(name, default):
     return default
 
 
-nes_path, f0, f1 = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-rows, cols, raw = rng('--rows', (0, 29)), rng('--cols', (0, 31)), '--raw' in sys.argv
-frames = battle_input(); n = NES(nes_path)
-latch, addr, ctrl = 0, 0, 0
-hits = defaultdict(lambda: [set(), set(), []])
-for f in range(f1 + 1):
-    if f == f0: n.watch = (0x2000, 0x2007)
-    n.controller = pad(frames, f); n.step(1)
-    if f < f0: continue
-    for idx, a, v in n.watch:
-        if a == 0x2000: ctrl = v
-        elif a == 0x2006:
-            addr = ((v & 0x3F) << 8) | (addr & 0xFF) if latch == 0 else (addr & 0x3F00) | v
-            latch ^= 1
-        elif a == 0x2005: latch ^= 1
-        elif a == 0x2007:
-            if '--attr' in sys.argv and 0x23C0 <= addr < 0x2400:
-                print(f, where(idx), 'attr %02X = %02X' % (addr - 0x23C0, v))
-            if 0x2000 <= addr < 0x2400 and (addr & 0x3FF) < 0x3C0:
-                c, r = addr & 31, (addr >> 5) & 31
-                if rows[0] <= r <= rows[1] and cols[0] <= c <= cols[1]:
-                    h = hits[where(idx)]; h[0].add(f); h[1].add((c, r))
-                    if raw: print(f, where(idx), 'col %d row %d = %02X' % (c, r, v))
-            addr = (addr + (32 if ctrl & 4 else 1)) & 0x3FFF
-for w, (fs, cells, _) in sorted(hits.items()):
-    cs = sorted(cells, key=lambda t: (t[1], t[0]))
-    print(w, 'frames %d-%d (%d)' % (min(fs), max(fs), len(fs)), 'rows', sorted({r for _, r in cs}),
-          'cols', sorted({c for c, _ in cs}))
+def main():
+    nes_path, f0, f1 = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+    rows, cols, raw = rng('--rows', (0, 29)), rng('--cols', (0, 31)), '--raw' in sys.argv
+    frames = battle_input(); n = NES(nes_path)
+    latch, addr, ctrl = 0, 0, 0
+    hits = defaultdict(lambda: [set(), set(), []])
+    for f in range(f1 + 1):
+        if f == f0: n.watch = (0x2000, 0x2007)
+        n.controller = pad(frames, f); n.step(1)
+        if f < f0: continue
+        for idx, a, v in n.watch:
+            if a == 0x2000: ctrl = v
+            elif a == 0x2006:
+                addr = ((v & 0x3F) << 8) | (addr & 0xFF) if latch == 0 else (addr & 0x3F00) | v
+                latch ^= 1
+            elif a == 0x2005: latch ^= 1
+            elif a == 0x2007:
+                if '--attr' in sys.argv and 0x23C0 <= addr < 0x2400:
+                    print(f, where(idx), 'attr %02X = %02X' % (addr - 0x23C0, v))
+                if 0x2000 <= addr < 0x2400 and (addr & 0x3FF) < 0x3C0:
+                    c, r = addr & 31, (addr >> 5) & 31
+                    if rows[0] <= r <= rows[1] and cols[0] <= c <= cols[1]:
+                        h = hits[where(idx)]; h[0].add(f); h[1].add((c, r))
+                        if raw: print(f, where(idx), 'col %d row %d = %02X' % (c, r, v))
+                addr = (addr + (32 if ctrl & 4 else 1)) & 0x3FFF
+    for w, (fs, cells, _) in sorted(hits.items()):
+        cs = sorted(cells, key=lambda t: (t[1], t[0]))
+        print(w, 'frames %d-%d (%d)' % (min(fs), max(fs), len(fs)), 'rows', sorted({r for _, r in cs}),
+              'cols', sorted({c for c, _ in cs}))
+
+
+if __name__ == '__main__':
+    main()
