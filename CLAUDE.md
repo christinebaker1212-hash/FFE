@@ -319,13 +319,13 @@ Milestones per game (from `docs/gb-port.md`):
   nametable writes) in every pad wait (b12:$97C7 -> hook $AAFC -> far `blink`) while the
   party window is visible. Still to do: blink the target (party targets; enemies?).
   Message tear-down: an empty target shows the attacker alone (no arrow).
-  Next: enemy names window, target/actor flashing, magic/item
-  lists, end-of-battle messages, all formations, then the GB build. Implementation needs a tile renderer in the NES code (CHR RAM) and
-  free BG tiles in battle (to be counted).
-- Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target
-  cursor, flashing of the acting member's line and the target, magic/item lists in the
-  window, all formations (large enemies, fiends, Chaos), then build the GB ROM from
-  `ff1_gb.nes` (coverage for that ROM) and check it in PyBoy/mGBA with `firstdiff.py`.
+- **Work now (2026-11-18):** GB build of the battle layout: `build.py --gb` (builds
+  `build/ff1_gb.nes` with `insert.py --gb`, coverage `build/cov3` from `covrun.py` on that
+  ROM, output `build/ff1_gb.gb`), then `firstdiff.py`, PyBoy and mGBA checks. Coverage
+  runs for `ff1_gb.nes` started. `docs/gb-handoff.md` has the current battle design,
+  how it is built, and the next steps.
+- Battle still to do: blink the target, enemy names that wrap, end-of-battle messages,
+  Medicine list, all formations (fiends, Chaos).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).
