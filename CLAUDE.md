@@ -152,11 +152,19 @@ Milestones per game (from `docs/gb-port.md`):
 - Debug tools: `crashfind.py GB SEED STEPS` (GB alone with the profiler's input; traps
   rst $38 / re-boot and prints the stack), `profile_gb.py --random SEED STEPS`.
 
+- Crash fixed: `PLA PLA` (drop a return address) in battle code popped a farcall frame
+  when the routine had been entered from another GB bank; drops now go through the
+  farcall-aware unwinder (`rt_unwind1`). Seed-2 random replay: no crash in 16k frames.
+- Speed over 13.7k NES frames of random play: 1.16× (GB frames per NES frame); the lag
+  is in screen transitions (`$2007` shim ~32%, LCD on/off waits, CHR uploads).
+- Layout plan: `docs/gb-screens.md`. Dialogue box: built through the map-row buffers
+  (`$07C0`, routine `$D54B`), text origin column `(($29+$12)&$1F)*2`, row `$2F*2+3`.
+
 ## In progress / next
-- A crash in random play (seed 2, ~frame 7850, GB re-boots); the `$82/$83` divergence in
-  battle (firstdiff seeds 1-3) is probably the same bug. Being traced with crashfind.
-- Screen layout for 160×144 (milestone 5) — biggest remaining piece; SGB palettes/border.
-- Battles run ~1.1-1.3× NES frame time on DMG (needs profiling once the crash is fixed).
+- Random-play equivalence after the crash fix (`build/eq5/`), fix what it finds.
+- Screen layout (milestone 5), starting with the dialogue box; per-screen camera register.
+- Speed: faster `$2007` nametable path; SGB palettes/border (needs an SGB-capable test
+  emulator; PyBoy has none).
 - Recompiler and PPU-layer design written up in `docs/gb-port.md` §1-2 (registers X→E,
   Y→C; NES stack on the GB stack; flag liveness; ROM data through a bank-0 helper;
   queued VRAM writes; tile/nametable/scroll mapping).
