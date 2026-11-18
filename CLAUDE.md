@@ -569,8 +569,22 @@ Milestones per game (from `docs/gb-port.md`):
   $A10A); a button skips the rest as on the NES, so the new-game input script keeps its
   timing. Code in b14 $AC6F-$AD12 (the shop's attribute table / picture data, unused by the
   GB shop). The title menu (Continue / Start Over / Message Speed) fits the default view.
-- Next: class select (4 boxes, 24x22 on the NES) and name entry (letter grid 10x9 at
-  2-row spacing, 24x26), then the ending.
+- **New-game screens (2026-11-18)** (`gb_layout.new_game`): class select at camera 4/4 with
+  four 10x9 boxes (4,4) (14,4) (4,13) (14,13) (member records b14 $A0C7 rewritten; box
+  height via `boxh`); name entry at camera 5/2: one window (4,1,23,20) larger than the
+  view, the name on the top row (no name box), FF1's letter grid unchanged (two columns /
+  two rows apart, GB rows 1-17), all in the window palette; the field camera 6/6 again
+  when the party is made (`camend`). The name sits right above the first letter row (the
+  grid needs 17 of the 18 rows).
+- DMG fix found with the prologue: a palette fade that changes a colour every frame never
+  let the maps be recomputed (they wait for 8 stable frames), so the faded-in text kept
+  the codings of the dark start (invisible). The maps are now recomputed at the latest
+  16 frames after they became due (`maps_wait`), and palettes reached by attribute changes
+  count as used (`pal_mark` in dmg_attr). On DMG the prologue background is dark grey
+  while it fades (palette 1's grey $00 joins the darkest group).
+- All 36 checks identical after fresh coverage (new game, shops, sub-screens, menu,
+  dialogue, battle, random 30000; DMG + CGB).
+- Next: the ending.
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).

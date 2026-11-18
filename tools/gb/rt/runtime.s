@@ -47,6 +47,7 @@ LSL        = $DC60          ;   levels present, ascending (9)
 LVMAP      = $DC70          ;   level -> value (9)
 TILE_USE   = $DD80          ;   colour indices each BG tile uses (bit i, a nibble per tile), 128 bytes
 GLUM       = $DC7C          ;   value (1-3) -> its brightest level ($DC7D-$DC7F)
+MAPS_WAIT  = 16             ;   frames the maps may be due before they are recomputed anyway
 PAL_STABLE = 8              ;   frames without palette writes before the maps are recomputed
 RETILE_PER_FRAME = 3
 LCDC_ON    = %11000011      ; LCD on, window map $9C00 (off), BG tiles $8800 (signed), BG map $9800, OBJ on, BG on
@@ -153,6 +154,7 @@ sh_nt:      ds 1                            ;   nametable being shaded: 0 or 4 (
 ap_chg:     ds 1                            ; attribute write: changed quadrants (bit q)
 ap_own:     ds 1                            ; attr_apply: owner bits wanted (0 or $FF)
 ap_pal:     ds 4                            ; attr_apply: palette of each quadrant
+maps_wait:  ds 1                            ; DMG: frames the maps have been due (fades)
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -916,7 +918,15 @@ dmg_frame:                                  ; DMG shading, once per NES frame wi
             and a                           ;   palette maps once the palettes have been
             ret z                           ;   stable for PAL_STABLE frames, then re-code a
             push bc                         ;   few marked tiles
-            ldh a, [pal_age]
+            ldh a, [maps_due]               ; palettes changing on every frame (a fade
+            and a                           ;   of one palette, as in the prologue): the
+            jr z, .w                        ;   maps anyway after MAPS_WAIT frames
+            ldh a, [maps_wait]
+            inc a
+            ldh [maps_wait], a
+            cp MAPS_WAIT
+            jr nc, .now
+.w:         ldh a, [pal_age]
             cp 255
             jr z, .a
             inc a
@@ -926,7 +936,7 @@ dmg_frame:                                  ; DMG shading, once per NES frame wi
             ldh a, [maps_due]
             and a
             jr z, .a
-            call dmg_maps_now
+.now:       call dmg_maps_now
 .a:         ld b, RETILE_PER_FRAME
             call dmg_retile_some
             pop bc
@@ -934,6 +944,7 @@ dmg_frame:                                  ; DMG shading, once per NES frame wi
 dmg_maps_now:
             xor a
             ldh [maps_due], a
+            ldh [maps_wait], a
             ld a, 1
             ldh [sgb_dirty], a
             call dmg_maps

@@ -476,7 +476,8 @@ dmg_attr:   push bc
             ld a, d
             call cell_pal
             ld b, a
-            pop af
+            call pal_mark                   ; (a palette reached by an attribute change, e.g.
+            pop af                          ;   the prologue's fade, counts as used too)
             ld l, a
             ld h, high(TILE_PAL)
             ld c, a

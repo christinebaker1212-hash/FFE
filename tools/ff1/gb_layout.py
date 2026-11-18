@@ -1920,6 +1920,7 @@ def apply(rom, report):
     status_menu(rom)
     shop_menu(rom)
     prologue(rom)
+    new_game(rom)
     report.append('GB layout applied')
 
 
@@ -2986,3 +2987,79 @@ def prologue(rom):
     put_bank(rom, B, r.org, r.bytes, bytes(rom[bank_off(B, r.org):bank_off(B, r.org) + len(r.bytes)]))
     put_bank(rom, B, 0xA107, bytes([0x20]) + r.labels['pinit'].to_bytes(2, 'little'), bytes([0x20, 0x32, 0xA2]))
     put_bank(rom, B, 0xA142, bytes([0x4C]) + r.labels['prolog'].to_bytes(2, 'little'), bytes([0xA9, 0x20, 0x85]))
+
+
+# New game screens.
+# Class select (camera 4, 4): four 10x9 boxes (4,4) (14,4) (4,13) (14,13) = NES cols 4-23,
+# rows 4-21: class name rows +1 / +2 (two-row form), sprite rows +3..+5, name row +7. The
+# member records (b14 $A0C7, 16 bytes each, copied to $0300) hold every position.
+# Name entry (camera 5, 2): one window (4,1,23,20) larger than the view (frames just
+# outside it), the name on the top row, FF1's 10 x 9 letter grid as on the NES (two
+# columns / two rows apart: GB cols 1-19, rows 1-17). The game starts with the field
+# camera 6 / 6 again.
+NG_BOXES = [(4, 4), (14, 4), (4, 13), (14, 13)]
+NG_B14 = """
+camclass:           ; $9D09 (class select screen): camera 4, 4
+    jsr $9C02
+    lda #4
+    sta $5800
+    sta $5801
+    rts
+camname:            ; $9D65 (name entry screen): camera 5, 2
+    jsr $9C02
+    lda #5
+    sta $5800
+    lda #2
+    sta $5801
+    rts
+"""
+NG_B14B = """
+camend:             ; $9CBF (party made): the field camera 6 / 6, screen off as before
+    lda #6
+    sta $5800
+    sta $5801
+    lda #0
+    sta $2001
+    rts
+boxh:               ; $9EB3: class boxes 9 rows high
+    lda #9
+    sta $3D
+    lda #0
+    sta $37
+    jmp $E0F2
+"""
+
+
+def new_game(rom):
+    B = 14
+    main = sys.modules['__main__']
+    ex = main.LABELS_EX
+    rec = bytearray()
+    for m, (bx, by) in enumerate(NG_BOXES):
+        sy = (by + 3) * 8
+        rec += bytes([m, 0, 0xFF, 0xFF, 0xFF, 0xFF, bx + 3, by + 7, bx + 1, by + 2, (bx + 4) * 8, sy,
+                      bx, by, bx * 8 + 16, sy])
+    old = bytes(rom[bank_off(B, 0xA0C7):bank_off(B, 0xA0C7) + 64])
+    assert old[0:2] == bytes([0, 0]) and old[12:14] == bytes([4, 4]), old.hex()
+    put_bank(rom, B, 0xA0C7, bytes(rec), old)
+    a = asm(NG_B14, org=0xA145)                     # dead old prologue code (A142 jumps away)
+    assert a.org + len(a.bytes) <= 0xA167, hex(a.org + len(a.bytes))
+    put_bank(rom, B, a.org, a.bytes, bytes(rom[bank_off(B, a.org):bank_off(B, a.org) + len(a.bytes)]))
+    b = asm(NG_B14B, org=0xBF1C)
+    assert b.org + len(b.bytes) <= 0xBF41, hex(b.org + len(b.bytes))
+    put_bank(rom, B, b.org, b.bytes, bytes(rom[bank_off(B, b.org):bank_off(B, b.org) + len(b.bytes)]))
+    put_bank(rom, B, 0x9D09, bytes([0x20]) + a.labels['camclass'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
+    put_bank(rom, B, 0x9D65, bytes([0x20]) + a.labels['camname'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
+    put_bank(rom, B, 0x9CBF, bytes([0x20]) + b.labels['camend'].to_bytes(2, 'little') + bytes([0xEA, 0xEA]),
+             bytes([0xA9, 0x00, 0x8D, 0x01, 0x20]))
+    put_bank(rom, B, 0x9EB3, bytes([0x4C]) + b.labels['boxh'].to_bytes(2, 'little'), bytes([0x85, 0x3D, 0xA9]))
+    # name entry: one window larger than the view (4,1,23,20: its frames just outside), the
+    # name on the view's top row (13,2; no name box), the letters at (6,3) as in FF1 (two
+    # columns / two rows apart: rows 3-19), all in the window palette; cursor y = row*16+24
+    put_bank(rom, B, 0x9FEE, b'\xEA\xEA\xEA', bytes([0x20, 0xF2, 0xE0]))            # no name box
+    put_bank(rom, B, 0x9FCF, bytes([0xA9, 1]), bytes([0xA9, 8]))
+    put_bank(rom, B, 0x9FA1, bytes([0xA9, 13]), bytes([0xA9, 0x0E]))
+    put_bank(rom, B, 0x9FA5, bytes([0xA9, 2]), bytes([0xA9, 4]))
+    put_bank(rom, B, 0x9FFD, bytes([0xA9, 3]), bytes([0xA9, 0x0A]))
+    put_bank(rom, B, 0x9F47, bytes([0x69, 24]), bytes([0x69, 0x50]))
+    put_bank(rom, B, 0x9FBD, bytes([0xA9, 0xFF]), bytes([0xA9, 0x00]))           # attributes: window palette
