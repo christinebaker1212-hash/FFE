@@ -348,6 +348,11 @@ Milestones per game (from `docs/gb-port.md`):
   entry, class select and the Coneria field in NES colours, RAM diff 0 at all shots; DMG
   battle check still identical (black windows now). Next in colour: check all screens in CGB, double
   speed, HDMA; then the DMG per-tile shading and SGB.
+- Fixed (owner: "player sprites totally messed up", 2026-11-18): the native CHR upload
+  (`rt/ff1_hle.s`) copied a sprite tile to its slot from one byte too late (planes
+  swapped, rows shifted) and treated BG tiles as sprite tiles (`cp $B0 / call c`), which
+  overwrote resident sprite slots with BG tile data. Both DMG and CGB affected. CGB colours
+  now use the cynes 2C02 palette values (our NES reference), so they match the NES shots.
 - Column-2 lists push a name down below a wrapped one (VNROW; 7 formations have a name
   > 56 px, only formation 69 lists two names).
 - Owner (2026-11-18): show the enemy names while targeting (done: entering the
