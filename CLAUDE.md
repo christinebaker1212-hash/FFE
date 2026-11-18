@@ -245,7 +245,12 @@ Milestones per game (from `docs/gb-port.md`):
   enemies GB cols 0-13, sprites cols 15-16 stepping into 14 (no overlap), party info in a
   bottom-right window (cols 8-19), one line per member (name, HP cur/max, status),
   bottom-left window (cols 0-7) for enemy names / messages / commands (narrow: ~11
-  letters per line). Waiting for the owner's OK on mock11; implementation needs a tile renderer in the NES code (CHR RAM) and
+  letters per line). **Owner approved** ("probably the best we'll get"), centred as
+  `mock12_battle.png`: camera X = 1 (enemy area GB cols 1-14), sprites at NES x = 140
+  (GB x = 132, step forward to 124), margins 8 px left / 12 px right. Implementation
+  order: (1) measure all formation types (incl. fiends, Chaos) and count free BG tiles in
+  battle; (2) small-font tile renderer in the NES code; (3) party window, sprites,
+  message style A, status words; (4) GB build + firstdiff + PyBoy/mGBA. Implementation needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
 - Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target
   cursor, flashing of the acting member's line and the target, magic/item lists in the
