@@ -489,12 +489,54 @@ def battle10(out):
     out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock10_battle.png'))
 
 
+def battle11(out):
+    """Owner (2026-11-18): the sprites must not overlap the formation. The mixed formations
+    fill the whole 14 x 12 enemy area (2 large + 6 small = 168 tiles), so the enemies
+    keep GB cols 0-13 and the sprites get cols 14-16 to themselves (standing at 15-16,
+    stepping forward into 14). Party info moves to a bottom-right window, one line per
+    member: name, HP current/max, status. Bottom-left window: enemy names / messages
+    (style A); the command window opens over it."""
+    party = [('AAAA', 192, 899, ''), ('Bob', 30, 30, 'Poison'), ('Mm', 0, 33, 'Numb'),
+             ('WWWW', 999, 999, 'Silence')]
+
+    def screen(page):
+        s = Screen(bg=3)
+        s.block(0, 0, 6, 6); s.block(0, 6, 6, 6)                  # mixed formation: 2 large
+        for r in range(3):
+            for c in range(2): s.block(6 + c * 4, r * 4, 4, 4)     # + 6 small (cols 0-13)
+        for i in range(4):
+            dx = -8 if (page == 'cmd' and i == 0) else 0
+            s.d.rectangle([15 * 8 + dx, i * 24, 15 * 8 + 15 + dx, i * 24 + 23], fill=SHADES[2], outline=SHADES[1])
+        s.window(8, 12, 12, 6)
+        for i, (n, hp, mx, st) in enumerate(party):
+            y = 13 + i
+            _pt(s, 9 * 8 + 1, y * 8, n)                            # name: x 73-95
+            h = '%d/%d' % (hp, mx)
+            _pt(s, 126 - s.pwidth(h, DIG3), y * 8, h, DIG3)         # HP: right edge 125
+            if st: _pt(s, 128, y * 8, st)                           # status: x 128-154
+        s.window(0, 12, 8, 6)
+        lines = {'cmd': [], 'A': ['Bob > Goblin', ' Fire', ' 23 damage'],
+                 'idle': ['Goblin', 'Minotaur', 'Zombie']}[page]
+        for i, r in enumerate(lines):
+            ind = 4 if r.startswith(' ') else 0
+            _pt(s, 9 + ind, (13 + i) * 8, r.strip(), ARROW)
+        if page == 'cmd':
+            for i, w in enumerate(['Fight', 'Magic', 'Medicine', 'Items']): s.ptext(1, 13 + i, w)
+            s.ptext(0, 13, 'Run', px=8 + 30)
+            s.cursor(0, 13)
+        return s
+    ims = [screen(p).im for p in ('idle', 'cmd', 'A')]
+    out_im = Image.new('RGB', (168 * 3 - 8, 144), (255, 255, 255))
+    for k, im in enumerate(ims): out_im.paste(im, (k * 168, 0))
+    out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock11_battle.png'))
+
+
 def _pt(s, X, Y, txt, table=None):
     """proportional text at pixel (X, Y)"""
     for k, ch in enumerate(txt):
         if k: X += 1
         if ch == ' ': X += 2; continue
-        t = table if table is not None and ch in table else (COND if ch in COND else G)
+        t = table if table is not None and ch in table else (COND if ch in COND else (ARROW if ch in ARROW else G))
         cols = _glyph_cols(ch, t)
         for cx, col in enumerate(cols):
             for cy in range(8):
@@ -525,5 +567,5 @@ def main_menu(out):
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else 'build'
     os.makedirs(out, exist_ok=True)
-    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); battle8(out); battle9(out); battle10(out); main_menu(out)
+    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); battle8(out); battle9(out); battle10(out); battle11(out); main_menu(out)
     print('written to', out)

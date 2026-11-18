@@ -239,8 +239,13 @@ Milestones per game (from `docs/gb-port.md`):
   15-19, full height, full-thickness frame), one block per member (name / "192/899" in
   3-px digits / status), sprites at GB cols 13-14 (NES x = 120), bottom window cols 0-14;
   status words "Blind" (Darkness) and "Numb" (Paralysis). Mixed formations (14 enemy
-  columns) need their right-hand enemies moved one column. Waiting for the owner's OK
-  on mock10; implementation needs a tile renderer in the NES code (CHR RAM) and
+  columns) need their right-hand enemies moved one column. Owner: no overlap of sprites
+  and formation. The mixed formations fill the whole 14 x 12 enemy area (2 large + 6
+  small = 168 tiles), so they cannot be re-laid into fewer columns; `mock11_battle.png`:
+  enemies GB cols 0-13, sprites cols 15-16 stepping into 14 (no overlap), party info in a
+  bottom-right window (cols 8-19), one line per member (name, HP cur/max, status),
+  bottom-left window (cols 0-7) for enemy names / messages / commands (narrow: ~11
+  letters per line). Waiting for the owner's OK on mock11; implementation needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
 - Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target
   cursor, flashing of the acting member's line and the target, magic/item lists in the
