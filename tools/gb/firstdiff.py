@@ -108,6 +108,9 @@ for m in steps[:limit]:
         lo, hi = (int(x, 16) for x in os.environ['WATCH'].split('-'))
         print(f, k, 'NES', bytes(nes[x] for x in range(lo, hi)).hex(' '))
         print(f, k, 'GB ', bytes(gb.pb.memory[0, 0xA000 + x - 0x6000] for x in range(lo, hi)).hex(' '))
+    if os.environ.get('GBWATCH') and f >= int(os.environ.get('WATCH_FROM', '0')):   # GBWATCH=D840-D872: GB WRAM
+        lo, hi = (int(x, 16) for x in os.environ['GBWATCH'].split('-'))
+        print(f, k, 'GB ', bytes(gb.pb.memory[x] for x in range(lo, hi)).hex(' '))
     if wram_from is not None and f >= wram_from and not d:     # (NES now, GB now: both at the wait)
         w = [0x6000 + i for i in range(0x2000) if nes[0x6000 + i] != gb.pb.memory[0, 0xA000 + i]]
         if w:

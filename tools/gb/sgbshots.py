@@ -2,7 +2,7 @@
 input of the NES checks: the NES build is run with battleseq's input (or the new-game script)
 and the pad it latched per NMI is fed to the GB by NES frame number.
 usage: PYTHONPATH=build/emu sgbshots.py NES GB OUT.png NMI1,NMI2,... [--input MODE|--newgame|--field SCRIPT]
-       [--dmg | --cgb] [--poke ADDR=VAL,.. [--poke-at F]]
+       [--dmg | --cgb] [--gambatte [--wav F --wav-from K]] [--poke ADDR=VAL,.. [--poke-at F]]
        (MODE: battleseq.py input modes, default fight; pokes as fieldseq.py: NES step F,
        default 3700; the GB gets them at the same NES frame)"""
 import os, sys, subprocess, tempfile
@@ -24,6 +24,14 @@ if '--poke' in args:
     k = args.index('--poke'); pokes = args[k + 1]; del args[k:k + 2]
 if '--poke-at' in args:
     k = args.index('--poke-at'); poke_at = int(args[k + 1]); del args[k:k + 2]
+gamb = '--gambatte' in args             # Gambatte (build/gbrun, tools/gb/gambatte/gbrun.c): GBC
+if gamb: args.remove('--gambatte')        #   (or DMG with --dmg), cycle-accurate VRAM access
+wav = None
+if '--wav' in args:                       # (Gambatte) sound from NES frame WAV_FROM to a WAV file
+    k = args.index('--wav'); wav = args[k + 1]; del args[k:k + 2]
+wav_from = 0
+if '--wav-from' in args:
+    k = args.index('--wav-from'); wav_from = int(args[k + 1]); del args[k:k + 2]
 dmg = '--dmg' in args
 if dmg: args.remove('--dmg')
 cgb = '--cgb' in args
@@ -69,11 +77,12 @@ n0 = NES(nes_path)
 for i in range(0x2000): sram[i] = n0[0x6000 + i]
 sf = os.path.join(tmp, 'sram.bin'); open(sf, 'wb').write(sram)
 here = os.path.dirname(os.path.abspath(__file__))
-exe = os.path.join(here, '..', '..', 'build', 'sgbrun')
+exe = os.path.join(here, '..', '..', 'build', 'gbrun' if gamb else 'sgbrun')
 cmd = [exe, gb_path, str(last * 4), os.path.join(tmp, 's'), '--padfile', pf, '--sram', sf] + sum([['--nshot', str(s)] for s in shots], [])
 if poke_nmi is not None: cmd += ['--poke', str(poke_nmi), pokes]
 if dmg: cmd.append('--dmg')
-if cgb: cmd.append('--cgb')
+if cgb and not gamb: cmd.append('--cgb')
+if wav: cmd += ['--wav', wav, '--wav-from', str(wav_from)]
 # stop early: run in chunks is not supported; FRAMES is an upper bound (GB frames)
 print(subprocess.run(cmd, capture_output=True, text=True).stdout.strip())  # (env SGBRUN_REGS=1: registers per shot)
 ims = []

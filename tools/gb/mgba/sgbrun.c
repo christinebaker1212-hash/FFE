@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
 	int frames = atoi(argv[2]); const char* out = argv[3];
 	int dmg = 0; struct press presses[256]; int np = 0; int shots[1024]; int ns = 0;
 	int poke_at = 0; const char* poke_list = 0;
-	int prof = getenv("SGBRUN_PROF") != 0; static uint32_t profs[200000]; int nprof = 0;
+	int prof = getenv("SGBRUN_PROF") != 0; static uint32_t profs[200000]; static uint32_t proff[200000]; int nprof = 0;
 	const char* sram_path = NULL;
 	unsigned char* pads = NULL; long npads = 0; int nshots[1024]; int nns = 0; int nshot_done[1024] = {0};
 	for (int i = 4; i < argc; i++) {
@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
 			if (n_after == n_before && nprof < 200000) {
 				uint32_t pc = 0; core->readRegister(core, "pc", &pc); pc &= 0xFFFF;
 				unsigned bank = pc < 0x4000 ? 0 : core->busRead8(core, 0xFF8C);
-				profs[nprof++] = bank << 16 | pc;
+				profs[nprof] = bank << 16 | pc; proff[nprof++] = n_after;
 			}
 		}
 		int shot = (f == frames);
@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
 	/* frame-wait counter of the runtime ($D830), to confirm the game ran */
 	unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 	printf("frames %d, video %ux%u, NES frame waits %u, KEY1 %02X\n", frames, w, h, n, core->busRead8(core, 0xFF4D));
-	if (prof) for (int k = 0; k < nprof; k++) printf("P %02X:%04X\n", profs[k] >> 16, profs[k] & 0xFFFF);
+	if (prof) for (int k = 0; k < nprof; k++) printf("P %02X:%04X %u\n", profs[k] >> 16, profs[k] & 0xFFFF, proff[k]);
 	core->deinit(core);
 	return 0;
 }
