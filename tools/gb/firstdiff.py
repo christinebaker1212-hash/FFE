@@ -2,6 +2,7 @@
 where NES RAM at NMI k differs from GB RAM on entering frame wait k (page 1 excluded).
 The GB gets the controller value the NES game latched in each frame (cynes nmi_pad).
 usage: PYTHONPATH=build/emu firstdiff.py NES GB [MAXFRAMES] [--random SEED] [--battle]
+       [--input MODE (battleseq.py modes, implies --battle)] [--poke ADDR=VAL,...]
        [--shots F1,F2,... --out SHEET.png]
 --battle: the battleshot.py input (new-game script, walk into a battle, A once a second);
 --shots: GB screens after those NES frames, saved as one sheet (--out)."""
@@ -16,6 +17,12 @@ if '--random' in args:
     k = args.index('--random'); rnd = int(args[k + 1]); del args[k:k + 2]
 battle = '--battle' in args
 if battle: args.remove('--battle')
+mode, pokes = 'fight', []
+if '--input' in args:
+    k = args.index('--input'); mode = args[k + 1]; del args[k:k + 2]; battle = True
+if '--poke' in args:
+    k = args.index('--poke')
+    pokes = [tuple(int(x, 16) for x in kv.split('=')) for kv in args[k + 1].split(',') if kv]; del args[k:k + 2]
 shots_at, out = set(), None
 if '--shots' in args:
     k = args.index('--shots'); shots_at = {int(x) for x in args[k + 1].split(',')}; del args[k:k + 2]
@@ -43,9 +50,8 @@ for it in new_game_script():
     m, h, a = it
     steps += [m] * h + [0] * a
 if battle:
-    from battleshot import battle_input, pad
-    bi = battle_input()
-    steps = [pad(bi, f) for f in range(limit)]
+    import battleseq
+    steps = [battleseq.pad_for(mode, f) for f in range(limit)]
 if rnd is not None:
     r = random.Random(rnd)
     btns = [UP, DOWN, LEFT, RIGHT, A, A, B, START, UP, DOWN, LEFT, RIGHT]
@@ -53,6 +59,13 @@ if rnd is not None:
         steps += [r.choice(btns)] * r.randint(2, 40) + [0] * r.randint(1, 20)
 f = 0
 for m in steps[:limit]:
+    if f == 6100 and pokes:                  # work RAM patches (NES state + GB cart RAM)
+        import battleseq
+        st = nes.save()
+        for a, v in pokes:
+            st[battleseq.SRAM_STATE + a - 0x6000] = v
+            gb.pb.memory[0, 0xA000 + a - 0x6000] = v
+        nes.load(st)
     nes.controller = m
     k0 = nes.nmi_count
     nes.step(1); f += 1

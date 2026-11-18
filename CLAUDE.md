@@ -379,7 +379,12 @@ Milestones per game (from `docs/gb-port.md`):
 - GB build of the finished battle layout (fresh coverage, 18.7k instructions): firstdiff
   --battle 7100 frames identical on DMG and on CGB; CGB shots show the battle in NES
   colours with the fixed sprites (`gbc_battle3.png`).
-- Battle layout done. Next (owner to choose): plain-Game-Boy shading per tile, SGB
+- Battle animations (owner asked): weapon swings, hit sparkles and a spell cast (Cure:
+  caster steps forward, screen flash, sparkles, "HP recovered!") checked on the NES build
+  (`battleseq.py --input fire1 --poke` weapons + spells) and on the GB build in CGB mode
+  (`firstdiff.py --input fire1 --poke ... --shots`): identical RAM over 7700 frames.
+  `battleseq.pad_for(mode, f)` is shared by both tools.
+- Battle layout done. Next (owner chose: plain Game Boy shading): plain-Game-Boy shading per tile, SGB
   palettes/border, CGB speed-ups (double speed, HDMA), or the next screen (main menu).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
