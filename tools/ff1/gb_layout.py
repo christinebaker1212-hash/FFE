@@ -1912,4 +1912,156 @@ def apply(rom, report):
     hooks(rom)
     music_trampoline(rom)
     dialogue(rom)
+    main_menu(rom)
     report.append('GB layout applied')
+
+
+# ---- main menu ----------------------------------------------------------------------
+# GB (camera 0, 0 = NES columns 0-19, rows 0-17): party window (0, 0, 20, 10) with two
+# lines per member (name, level, HP current/max; class or status), commands + Gil
+# (0, 9, 12, 9; its top line on the party window's bottom line): commands rows 11-15, Gil
+# row 16; orbs window (12, 10, 8, 8) with the orbs 2 x 2 centred (columns 14-17, rows
+# 12-15: whole attribute quadrants, two attribute bytes). No class sprites; the cursor
+# points at the member lines / commands. Mock-up: tools/gb/mockup.py main_menu.
+MENU_GB = {}        # menu string overrides for insert.py --gb (id -> text), set by menu_strings()
+
+
+def menu_strings(enc_txt):
+    """Command list one per row (upper row only, one-row newlines); Gil on the window's
+    fifth text row (below the orbs)."""
+    MENU_GB[2] = ('{05}' + '{08}'.join('  ' + w for w in ('Items', 'Magic', 'Weapons', 'Armor', 'Status'))
+                  + '{08}{04}G')        # Gil below the commands (the amount is 6 wide: 'Gil' would not fit)
+
+
+def main_menu(rom):
+    B = 14
+    def wput(i, geom):
+        put_bank(rom, B, 0xBAB5 + 4 * i, bytes(geom), bytes(rom[bank_off(B, 0xBAB5 + 4 * i):bank_off(B, 0xBAB5 + 4 * i) + 4]))
+    wput(1, (0, 0, 20, 10))                 # party
+    wput(6, (0, 9, 12, 9))                  # commands + Gil
+    wput(0, (12, 10, 8, 8))                 # orbs
+    # $B84D: orbs, commands (the Gil window 5 is not drawn: Gil is in the command string);
+    # member windows 2-4 not drawn (the party window holds all)
+    put_bank(rom, B, 0xB853, bytes([0xEA, 0xEA, 0xEA]), bytes([0x20, 0x81, 0xB8]))
+    for a in (0xB865, 0xB86F, 0xB879):
+        put_bank(rom, B, a, bytes([0xEA, 0xEA, 0xEA]), bytes([0x20, 0x02, 0xB9]))
+    # orbs: rows 12-15, columns 14-17 ($218E, $2190, $21CE, $21D0); attributes: orbattr
+    for a, v in ((0xB891, 0x8E), (0xB89B, 0x90), (0xB8A5, 0xCE), (0xB8AF, 0xD0)):
+        put_bank(rom, B, a, bytes([v]), bytes(rom[bank_off(B, a):bank_off(B, a) + 1]))
+    put_bank(rom, B, 0xB8DF, bytes([0x21]), bytes([0x20]))
+    put_bank(rom, B, 0xB8EF, bytes([0x21]), bytes([0x20]))
+
+    # no class sprites ($B648: four sprites via $EC8C)
+    put_bank(rom, B, 0xB648, bytes([0x60]), bytes([0xA9]))
+    # cursors: commands (x 0, rows 11-15 -> y 87 + 8i), members (x 0, rows 1+2m -> y 7 + 16m)
+    put_bank(rom, B, 0xB7D5, bytes([0x00]), bytes([0x08]))
+    put_bank(rom, B, 0xB7F4, bytes([87, 95, 103, 111, 119]), bytes([0x90, 0xA0, 0xB0, 0xC0, 0xD0]))
+    put_bank(rom, B, 0xB7EC, bytes([0, 7, 0, 23, 0, 39, 0, 55]), bytes([0x48, 0x10, 0x98, 0x10]))
+    # member lines: $B995 rewritten (A = member * $40)
+    import json
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__))))
+    main = sys.modules['__main__']
+    ENC = main.ENC
+    # line 1: name (col 2), L + level (cols 7-9), HP current/max (cols 11-17);
+    # line 2: the class, or the status word (Stone / Poison) instead while afflicted
+    tpl = bytes([0x05, 0x10, 0x00, 0x0D, 7, ENC['L'], 0x10, 0x03, 0x0D, 11, 0x10, 0x05, ENC['/'], 0x10, 0x06,
+                 0x08, 0x0D, 3, 0x10, 0x01, 0x00])
+    st = len(tpl) - 2                       # offset of the parameter of the second line's code
+    src = """
+mbuild:             ; A = member * $40: two lines at rows 1 + 2m / 2 + 2m of the party window
+    rol a
+    rol a
+    rol a
+    and #3
+    tax
+    asl a           ; (upper-row mode writes at row $3B - 1)
+    clc
+    adc #2
+    sta $3B
+    lda #2
+    sta $3A
+    txa
+    ora #$10
+    sta $10
+    ldy #0
+mb1:
+    lda mtpl,y
+    cmp #$10        ; member code (parameters here are never $10)
+    bne mb2
+    lda $10
+mb2:
+    sta $0300,y
+    iny
+    cpy #TL
+    bne mb1
+    txa             ; status 2 / 3 (Stone, Poison): the status word instead of the class
+    ror a
+    ror a
+    ror a
+    and #$C0
+    tay
+    lda $6101,y
+    cmp #2
+    bcc mb3
+    lda #2
+    sta $0300 + ST
+mb3:
+    lda #0
+    sta $3E
+    lda #3
+    sta $3F
+    jmp $B957
+orbattr:            ; $B8B8: orb palettes ($17: orb n in bits 2n) into the right quadrants of
+    lda $2002       ;   $23DB (orbs 0 / 2) and the left ones of $23DC (orbs 1 / 3)
+    lda #$23
+    sta $2006
+    lda #$DB
+    sta $2006
+    lda $17         ;   (the other quadrants: window palette 3)
+    and #$33
+    asl a
+    asl a
+    ora #$33
+    sta $2007
+    lda $17
+    and #$CC
+    lsr a
+    lsr a
+    ora #$CC
+    sta $2007
+    rts
+mtpl:
+    .db %s
+""" % ', '.join('$%02X' % b for b in tpl)
+    r = asm(src, syms={'TL': len(tpl), 'ST': st}, org=0xB995)
+    assert r.org + len(r.bytes) <= 0xBA80, hex(r.org + len(r.bytes))
+    put_bank(rom, B, 0xB995, r.bytes, bytes([0x48, 0xAA, 0xA9, 0x03]))
+    put_bank(rom, B, 0xB8B8, bytes([0x4C]) + r.labels['orbattr'].to_bytes(2, 'little'), bytes([0xAD, 0x02, 0x20]))
+    # camera: menu screens (clear $9C02) at the field camera, the main menu at 0, 0, and
+    # back to the field camera when the menu closes ($AE15)
+    src = """
+camfield:
+    lda #6
+    sta $5800
+    sta $5801
+    lda $2002
+    rts
+cammenu:
+    jsr $9C02
+    lda #0
+    sta $5800
+    sta $5801
+    rts
+camexit:
+    jsr camfield
+    lda #0
+    sta $2001
+    rts
+"""
+    r = asm(src, org=0xB82C)
+    assert r.org + len(r.bytes) <= 0xB84D, hex(r.org + len(r.bytes))
+    put_bank(rom, B, 0xB82C, r.bytes, bytes(rom[bank_off(B, 0xB82C):bank_off(B, 0xB82C) + 2]))
+    put_bank(rom, B, 0x9C02, bytes([0x20]) + r.labels['camfield'].to_bytes(2, 'little'), bytes([0xAD, 0x02, 0x20]))
+    put_bank(rom, B, 0xB84D, bytes([0x20]) + r.labels['cammenu'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
+    put_bank(rom, B, 0xAE15, bytes([0x20]) + r.labels['camexit'].to_bytes(2, 'little') + bytes([0xEA, 0xEA]),
+             bytes([0xA9, 0x00, 0x8D, 0x01, 0x20]))

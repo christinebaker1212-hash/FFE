@@ -1053,6 +1053,11 @@ def insert_menu_strings(rom, report):
     for e in menu:
         o = HDR + 14 * BANK + 0x0500 + 2 * e['id']
         txt = MENU_OVERRIDE.get(e['id'], e['en'])
+        if '--gb' in sys.argv:                 # GB layout: its own menu strings
+            sys.path.insert(0, os.path.dirname(__file__))
+            import gb_layout
+            if not gb_layout.MENU_GB: gb_layout.menu_strings(None)
+            txt = gb_layout.MENU_GB.get(e['id'], txt)
         if e['id'] in DESC_IDS:
             lines = desc_flow(txt)
             assert len(lines) <= 4 and max(map(len, lines)) <= 29, (e['id'], lines)

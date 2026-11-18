@@ -360,6 +360,7 @@ dmg_cell:   push bc
             or c                            ; row
             call cell_pal                   ; A = palette of (row A, col E)
             ld e, a
+            call pal_mark
             ld l, d
             ld h, high(TILE_PAL)
             ld a, [hl]
@@ -543,6 +544,19 @@ dmg_maps:   push bc
 .lv:        ld a, c
             and 3
             jr z, .mn
+            ld a, [PAL_USED]                ; palettes no cell uses: their colours left out
+            and a
+            jr z, .lu
+            ld b, a
+            ld a, c
+            srl a
+            srl a
+            inc a
+.lb:        rr b
+            dec a
+            jr nz, .lb
+            jr nc, .mn
+.lu:
             ld l, c
             ld h, high(PAL_SH)
             ld a, [hl]
@@ -834,14 +848,38 @@ dmg_bgp:    push bc
             ld h, high(GLUM)
             ld a, [hl]
             jp lum_shade
-.n3:        ld a, 3
-            sub b
+.n3:        call .v1blk                     ; value 1 / 2 / 3: dark grey / light grey / white,
+            jr z, .n3b                      ;   or black / light grey / white when value 1
+            ld a, 3                         ;   holds only the darkest colours ($0x: menu
+            sub b                           ;   windows, as the battle's black windows)
             ret
-.n2:        ld a, b
+.n3b:       ld a, b
             dec a
+            ld a, 3
+            ret z
+            ld a, b
+            sub 2
+            xor 1
+            ret
+.n2:        call .v1blk
+            ld a, b
+            jr nz, .n2g
+            dec a
+            ld a, 3
+            ret z
+            xor a
+            ret
+.n2g:       dec a
             ld a, 2
             ret z
             xor a
+            ret
+.v1blk:     ld a, [GLUM + 1]                ; Z: value 1's brightest level is 1 or less
+            cp 2
+            jr nc, .v1n
+            xor a
+            ret
+.v1n:       or 1
             ret
 
 ; brightness A (0-8) -> DMG shade (0 white .. 3 black)
@@ -956,9 +994,9 @@ quad_chk:   push bc
 ; LCD going on after drawing with it off: every GB map cell (rows 0-29) gives its tile
 ; the palette it is drawn with (from the nametable that owns the cell); tiles coded for
 ; another palette are marked
-dmg_scan_all:
-            push bc
-            push de
+dmg_scan_all:       ; (every cell, then those in the GB view again so that a tile drawn there
+            push bc         ;   with another palette than off the view is coded for the view;
+            push de         ;   PAL_USED = the palettes of the view)
             push hl
             ld a, 1
             ldh [sgb_dirty], a
@@ -971,7 +1009,66 @@ dmg_scan_all:
             jr nz, .z
             ld d, 0                         ; row
 .r:         ld e, 0                         ; col
-.c:         xor a                           ; owner nametable -> B (0 / 4)
+.c:         call scan_cell
+            inc e
+            ld a, e
+            cp 32
+            jr nz, .c
+            inc d
+            ld a, d
+            cp 30
+            jr nz, .r
+            xor a
+            ld [PAL_USED], a
+            ldh a, [cam_y]                  ; the view: map row (scroll_y + cam_y) mod 240 / 8,
+            ld b, a                         ;   column (scroll_x + cam_x) / 8
+            ldh a, [scroll_y]
+            add a, b
+            jr c, .w
+            cp 240
+            jr c, .y
+.w:         sub 240
+.y:         srl a
+            srl a
+            srl a
+            ld d, a
+            ld b, 18
+.vr:        push bc
+            ldh a, [cam_x]
+            ld c, a
+            ldh a, [scroll_x]
+            add a, c
+            srl a
+            srl a
+            srl a
+            ld e, a
+            ld b, 20
+.vc:        call scan_cell
+            ld a, e
+            inc a
+            and 31
+            ld e, a
+            dec b
+            jr nz, .vc
+            ld a, d
+            inc a
+            cp 30
+            jr c, .vn
+            xor a
+.vn:        ld d, a
+            pop bc
+            dec b
+            jr nz, .vr
+            pop hl
+            pop de
+            pop bc
+            ret
+
+; D = map row, E = column: the tile there gets the palette it is drawn with (marked for
+; re-coding if that changed), the tile counts as used, the palette into PAL_USED.
+; Keeps B, D, E.
+scan_cell:  push bc
+            xor a
             ldh [sh_nt], a
             ldh a, [own1_lo]
             ld b, a
@@ -1020,6 +1117,16 @@ dmg_scan_all:
             rrca
 .l:         and 3
             ld b, a
+            push hl
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .um
+            inc h
+.um:        ld a, [PAL_USED]
+            or [hl]
+            ld [PAL_USED], a
+            pop hl
             push bc                         ; tile C referenced
             call bm_addr
             ld a, l
@@ -1033,22 +1140,22 @@ dmg_scan_all:
             ld h, high(TILE_PAL)
             ld a, [hl]
             cp b
-            jr z, .s
+            jr z, .pk
             ld [hl], b
-            ld a, c
+.mk:        ld a, c
             call dmg_mark
-.s:         inc e
-            ld a, e
-            cp 32
-            jr nz, .c
-            inc d
-            ld a, d
-            cp 30
-            jr nz, .r
-            pop hl
-            pop de
-            pop bc
+.s:         pop bc
             ret
+.pk:        push bc                         ; same palette: a parked tile is marked again
+            call bm_addr                    ;   (the cell uses it now)
+            ld a, l
+            add a, low(DEFER_BM) - low(DIRTY_BM)
+            ld l, a
+            ld a, [hl]
+            and b
+            pop bc
+            jr nz, .mk
+            jr .s
 
 ; LCD going on after a scan: re-code the marked tiles the map uses; the others are
 ; parked in DEFER_BM (dmg_cell marks them again when a cell uses them)
@@ -1224,4 +1331,28 @@ dmg_obp:    push bc
 .cl:        cp 4
             ret c
             ld a, 3
+            ret
+
+; A = BG palette a cell uses: into PAL_USED; a palette new there makes the maps be
+; recomputed (next frame). Keeps BC, DE, HL.
+pal_mark:   push hl
+            push bc
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .nc
+            inc h
+.nc:        ld b, [hl]
+            ld a, [PAL_USED]
+            ld c, a
+            or b
+            cp c
+            jr z, .x
+            ld [PAL_USED], a
+            ld a, 1
+            ldh [maps_due], a
+            ld a, PAL_STABLE - 1
+            ldh [pal_age], a
+.x:         pop bc
+            pop hl
             ret

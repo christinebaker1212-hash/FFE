@@ -714,24 +714,23 @@ def _pt(s, X, Y, txt, table=None):
 
 
 def main_menu(out):
+    """as implemented (gb_layout.main_menu)"""
     s = Screen(bg=3)
-    s.window(0, 0, 20, 10)                              # party list, one line per member
-    for i, (n, c, hp, mhp) in enumerate([('DUNE', 'Warrior', 35, 35), ('SPUD', 'Thief', 30, 30),
-                                         ('JOJO', 'Monk', 33, 33), ('LEO', 'Red Magician', 30, 30)]):
-        s.text(1, 1 + 2 * i, n)
-        s.text(6, 1 + 2 * i, 'L 1')
+    s.window(0, 0, 20, 10)                              # party list, two lines per member
+    for i, (n, c, hp, mhp) in enumerate([('DUNE', 'Warrior', 35, 35), ('SPUD', 'Monk', 33, 33),
+                                         ('JOJO', 'Red Magician', 30, 30), ('LEO', 'Black Magician', 28, 28)]):
+        s.text(2, 1 + 2 * i, n)
+        s.text(7, 1 + 2 * i, 'L 1')
         s.text(11, 1 + 2 * i, '%3d/%3d' % (hp, mhp))
-        s.text(2, 2 + 2 * i, c)
-    s.window(0, 10, 10, 4)                              # orbs
-    for i in range(4): s.block(1 + i * 2, 11, 2, 2)
-    s.window(0, 14, 10, 4)                              # Gil
-    s.text(1, 15, '400 Gil')
-    s.window(10, 10, 10, 8)                             # commands
+        s.text(3, 2 + 2 * i, c)
+    s.window(0, 9, 12, 9)                               # commands + Gil
     for i, w in enumerate(['Items', 'Magic', 'Weapons', 'Armor', 'Status']):
-        s.text(12, 11 + i, w)
-    s.cursor(11, 11)
+        s.text(3, 11 + i, w)
+    s.text(1, 16, '   400G')
+    s.window(12, 10, 8, 8)                              # orbs, centred
+    for i in range(4): s.block(14 + (i % 2) * 2, 12 + (i // 2) * 2, 2, 2)
+    s.cursor(0, 11)
     s.save(os.path.join(out, 'mock_main_menu.png'))
-
 
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else 'build'

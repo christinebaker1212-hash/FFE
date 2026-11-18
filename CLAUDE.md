@@ -461,9 +461,29 @@ Milestones per game (from `docs/gb-port.md`):
 - Recompiler: far routines are entry points even without coverage (`insert.py --gb`
   writes `<rom>.far`; build.py marks them as executed / RTS targets). Coverage
   (`build/cov3`) must still be regenerated after NES code changes (4 seeds x 80k).
-- Next: main menu (window table b14 $BAB5; drawn by b14:$B84D: orbs window 0 with orbs at
-  fixed nametable addresses $B88B, Gil 5, commands 6, member windows 1-4 via $B995;
-  class sprites $B82C), then item/magic/equip/status, shops.
+- **Main menu re-laid out (2026-11-18)** (`gb_layout.main_menu`): camera (0, 0) for the
+  main menu (b14 $B84D -> `cammenu`; menu screens cleared by $9C02 get the field camera
+  6/6 via `camfield`, and the menu exit $AE15 restores it). Party window (0,0,20,10): per
+  member two lines: name, L + level, HP current/max; class, or Stone/Poison while
+  afflicted (b14 $B995 rewritten: template string with menu codes $10+m, nn). Commands +
+  Gil (0,9,12,9): commands one per row (upper-row mode, one-row newlines; menu string 2
+  for --gb in `MENU_GB`), Gil below ("{04}G": the amount is 6 wide, 'Gil' does not fit -
+  wording change to confirm with the owner). Orbs window (12,10,8,8), orbs centred
+  (owner) at columns 14-17 rows 12-15 (whole attribute quadrants, two bytes: `orbattr`).
+  No class sprites ($B648 -> RTS). Cursor tables: commands $B7F4 (x 0), members $B7EC.
+  Owner feedback fixed: text out of the window (command window was 10 wide), orbs centred.
+- Plain Game Boy (owner, 2026-11-18): menus black like the battle: when the darkest
+  brightness group holds only the darkest NES colours ($0x, e.g. the window blue $01) it
+  is black, the middle group light grey (the grey unlit orbs show). Brightness groups
+  are now formed from the palettes the GB view uses (`PAL_USED`: the visible area at
+  each LCD-on scan, plus palettes of cells drawn later; maps recomputed when one is
+  new). LCD-on order fixed: scan, then maps, then re-coding. Fixed: tiles parked while
+  unused stayed stale when a later screen drawn with the LCD off used them (the scan
+  now un-parks them; the name-entry letters B, L, ... were missing).
+- Sprite conversion fixed for camera X / Y = 0 (the main menu): sprites at the left /
+  top edge were dropped (the menu hand cursor was invisible).
+- Next: sub-screens (Items, Magic, Weapons/Armor, Status: they use the centred camera
+  for now), then shops.
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).

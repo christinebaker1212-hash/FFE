@@ -38,6 +38,7 @@ DIRTY_BM   = $DC00          ;   tiles queued for re-coding (bitmap)
 PAL_MAP    = $DC20          ;   value of each NES colour index, per palette
 RT_BUF     = $DC30          ;   one tile being re-coded
 DEFER_BM   = $DCA0          ;   marked tiles parked while no cell uses them (bitmap)
+PAL_USED   = $DC42          ;   BG palettes the map uses (bit p; 0 = not known: all)
 REF_BM     = $DC80          ;   tiles the map uses (bitmap, from dmg_scan_all)
 REF_LMAX   = $DC40          ;   brightest BG colour level when the maps were last computed
 NGRP       = $DC41          ;   number of values (1-3) the brightness levels were grouped into
@@ -954,16 +955,22 @@ rt_ppu_w1:  push af
             ldh a, [is_cgb]
             and a
             jr nz, .lon
-            ldh a, [maps_due]               ; DMG: palette maps now if the palettes changed
-            and a                           ;   since they were last computed
+            ldh a, [dmg_scan]               ; DMG: tiles' palettes (and the palettes in use)
+            push af                         ;   from the whole map if it was drawn with the
+            and a                           ;   LCD off; then the palette maps if the palettes
+            jr z, .nsc                      ;   or those in use changed; then re-code the
+            call dmg_scan_all               ;   marked tiles the map uses (else all marked
+            ld a, 1                         ;   tiles) while the LCD is still off
+            ldh [maps_due], a
+.nsc:       ldh a, [maps_due]
+            and a
             call nz, dmg_maps_now
-            ldh a, [dmg_scan]               ; DMG: tiles' palettes from the whole map if it
-            and a                           ;   was drawn with the LCD off, then re-code the
-            jr z, .nsc                      ;   marked tiles it uses (else all marked tiles)
-            call dmg_scan_all               ;   while the LCD is still off
+            pop af
+            and a
+            jr z, .nsr
             call dmg_retile_ref
             jr .lon
-.nsc:       ld b, 0
+.nsr:       ld b, 0
             call dmg_retile_some
 .lon:       ldh a, [is_cgb]                 ; CGB: the tile copy for HDMA from VRAM
             and a
@@ -1355,32 +1362,40 @@ rt_io_w4014:
             ldh a, [cam_x]
             sub 8
             ldh [o_cx], a
-            ld a, [hl+]                     ; NES x
-            push bc
+            ld a, [hl+]                     ; NES x -> GB x = x - cam_x + 8 (0-167 shown;
+            push bc                         ;   x - cam_x from -8: cut off at the left edge)
             ld b, a
-            ldh a, [o_cx]
+            ldh a, [cam_x]
             ld c, a
             ld a, b
             sub c
             pop bc
+            jr nc, .xpos
+            cp $F8
             jr c, .skip
-            cp 168
+            jr .xok
+.xpos:      cp 160
             jr nc, .skip
+.xok:       add a, 8
             push af
             ldh a, [o_y]
             cp $EF
             jr nc, .skip_p
-            push bc
-            ld b, a
+            push bc                         ; GB y = NES y + 1 - cam_y + 16 (0-159 shown;
+            ld b, a                         ;   from -16 above the view: cut off at the top)
             ldh a, [cam_y]
-            sub 17
             ld c, a
             ld a, b
-            sub c                           ; GB y = NES y + 1 - cam_y + 16
+            inc a
+            sub c
             pop bc
+            jr nc, .ypos
+            cp $F0
             jr c, .skip_p
-            cp 160
+            jr .yok
+.ypos:      cp 144
             jr nc, .skip_p
+.yok:       add a, 16
             ld [de], a
             inc e
             pop af
