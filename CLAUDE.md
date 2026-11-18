@@ -250,7 +250,14 @@ Milestones per game (from `docs/gb-port.md`):
   (GB x = 132, step forward to 124), margins 8 px left / 12 px right. Implementation
   order: (1) measure all formation types (incl. fiends, Chaos) and count free BG tiles in
   battle; (2) small-font tile renderer in the NES code; (3) party window, sprites,
-  message style A, status words; (4) GB build + firstdiff + PyBoy/mGBA. Implementation needs a tile renderer in the NES code (CHR RAM) and
+  message style A, status words; (4) GB build + firstdiff + PyBoy/mGBA.
+  Formation types (bank 11 `$8400`, 16 bytes each, byte 0 high nibble): 43 × 9-small,
+  47 × 4-large, 29 × mixed, 8 fiends (115-122), Chaos (123).
+  Owner: long enemy names must fit well in the messages. Widest: monsters 65 px, enemy
+  attacks 59, items 75; the bottom-left window has ~54 px. `mock13_msgs_narrow.png`
+  (wrapping log: lines scroll off, still overflows) vs `mock13_msgs_wide.png` (full-width
+  message window over the party window while a message shows: all on one line).
+  Proposed: wide. Waiting for the owner. Implementation needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
 - Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target
   cursor, flashing of the acting member's line and the target, magic/item lists in the

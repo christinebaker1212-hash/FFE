@@ -575,6 +575,71 @@ def battle12(out):
     out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock12_battle.png'))
 
 
+def battle13(out):
+    """Owner (2026-11-18): long enemy names must fit well in the battle messages (style A).
+    Widest names: monsters 65 px (Minotaur Zombie), enemy attacks 59 (Nuclear Attack),
+    items 75 (Diamond Gauntlets); the bottom-left window has ~54 px of text.
+    Top row: A = narrow log, a name that does not fit wraps onto an indented second line,
+    the log scrolls up when full. Bottom row: B = full-width message window over the party
+    window while a message shows (144 px of text, every name on one line)."""
+    party = [('AAAA', 192, 899, ''), ('Bob', 30, 30, 'Poison'), ('Mm', 0, 33, 'Numb'),
+             ('WWWW', 999, 999, 'Silence')]
+    W = 54
+
+    def base():
+        s = Screen(bg=3)
+        s.block(1, 0, 6, 6); s.block(1, 6, 6, 6)
+        for r in range(3):
+            for c in range(2): s.block(7 + c * 4, r * 4, 4, 4)
+        for i in range(4):
+            s.d.rectangle([132, i * 24, 147, i * 24 + 23], fill=SHADES[2], outline=SHADES[1])
+        return s
+
+    def party_win(s):
+        s.window(8, 12, 12, 6)
+        for i, (n, hp, mx, st) in enumerate(party):
+            y = 13 + i
+            _pt(s, 9 * 8 + 1, y * 8, n)
+            h = '%d/%d' % (hp, mx)
+            _pt(s, 126 - s.pwidth(h, DIG3), y * 8, h, DIG3)
+            if st: _pt(s, 128, y * 8, st)
+
+    def wrap(s, items, width):
+        rows = []                                   # (indent px, text)
+        for kind, t in items:
+            pre = '> ' if kind == 'target' else ''
+            words, line, ind = (pre + t).split(' '), '', 0
+            for w in words:
+                cand = (line + ' ' + w) if line else w
+                if s.pwidth(cand, ARROW) + ind <= width or not line: line = cand
+                else: rows.append((ind, line)); line, ind = w, 6
+            rows.append((ind, line))
+        return rows
+
+    def narrow(items):
+        s = base(); party_win(s); s.window(0, 12, 8, 6)
+        rows = wrap(s, items, W)[-4:]               # the log shows its last 4 rows
+        for i, (ind, r) in enumerate(rows): _pt(s, 9 + ind, (13 + i) * 8, r, ARROW)
+        return s
+
+    def wide(items):
+        s = base(); s.window(0, 12, 20, 6)
+        actor, target = items[0][1], items[1][1]
+        rows = [(0, actor + ' > ' + target)] + [(6, t) for _, t in items[2:]]
+        for i, (ind, r) in enumerate(rows): _pt(s, 9 + ind, (13 + i) * 8, r, ARROW)
+        return s
+
+    cases = [[('actor', 'Bob'), ('target', 'Goblin'), ('act', 'Fire'), ('res', '23 damage')],
+             [('actor', 'Minotaur Zombie'), ('target', 'Bob'), ('act', '2 hits!'), ('res', '9 damage')],
+             [('actor', 'Death Machine'), ('target', 'WWWW'), ('act', 'Nuclear Attack'), ('res', '187 damage')],
+             [('actor', 'Mm'), ('target', 'Mm'), ('act', 'Diamond Gauntlets'), ('res', 'Became resistant to all magic')]]
+    for name, fn in (('mock13_msgs_narrow', narrow), ('mock13_msgs_wide', wide)):
+        ims = [fn(c).im for c in cases]
+        out_im = Image.new('RGB', (168 * len(ims) - 8, 144), (255, 255, 255))
+        for k, im in enumerate(ims): out_im.paste(im, (k * 168, 0))
+        out_im.resize((out_im.width * 2, 144 * 2), Image.NEAREST).save(os.path.join(out, name + '.png'))
+
+
 def _pt(s, X, Y, txt, table=None):
     """proportional text at pixel (X, Y)"""
     for k, ch in enumerate(txt):
@@ -611,5 +676,5 @@ def main_menu(out):
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else 'build'
     os.makedirs(out, exist_ok=True)
-    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); battle8(out); battle9(out); battle10(out); battle11(out); battle12(out); main_menu(out)
+    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); battle8(out); battle9(out); battle10(out); battle11(out); battle12(out); battle13(out); main_menu(out)
     print('written to', out)
