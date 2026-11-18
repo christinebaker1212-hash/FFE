@@ -17,6 +17,10 @@ SPR_SLOT   = $D900          ; NES sprite tile (0-255) -> GB slot 0-127, $FF = no
 SLOT_TILE  = $DA00          ; GB slot -> NES sprite tile ($FF = free)
 SLOT_STAMP = $DA80          ; GB slot -> frame number of its last use in OAM
 SLOT_KEY   = $D880          ; GB slot -> coding of its tile (SPAL_KEY value; $FF = to load)
+SGB_CNT    = $DCC4          ; SGB: cells on screen per NES BG palette
+SGB_LSX    = $DCC8          ; SGB: last view position (scroll + camera)
+SGB_LSY    = $DCC9
+SGB_TICK   = $DCCA
 SPAL_KEY   = $DCC0          ; NES sprite palette -> coding: values of indices 1-3 (2 bits each),
                             ;   bit 6 = OBP1 (DMG); $39 = as is (CGB)
 SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
@@ -82,6 +86,17 @@ o_cx:       ds 1
 o_key:      ds 1                            ; coding wanted for this sprite's tile
 sp_s0:      ds 1
 sp_s1:      ds 1
+is_sgb:     ds 1                            ; Super Game Boy detected
+sgb_wait:   ds 1
+sgb_pend:   ds 1
+sgb_dirty:  ds 1
+sgb_force:  ds 1
+sgb_glob:   ds 1
+sgb_ptr:    ds 1
+sgb_acc:    ds 1
+sgb_nacc:   ds 1
+sgb_c0:     ds 1
+sgb_r0:     ds 1
 fade_drop:  ds 1                            ; DMG: shades the palettes are faded by
 spr_next:   ds 1
 uw_bank:    ds 1
@@ -176,6 +191,7 @@ boot:       di
             ldh [$FF4F], a
             jr .booted
 .dmg:       call dmg_init
+            call sgb_detect
 .booted:
             ld hl, dma_code                 ; OAM DMA routine to HRAM
             ld de, hram_dma
@@ -320,7 +336,10 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             jr .scy_done
 .nosplit:   xor a
             ldh [$FF41], a
-.scy_done:  call flush_vbl
+.scy_done:  ldh a, [$FF0F]                  ; DMG: the STAT write requested a STAT
+            res 1, a                        ;   interrupt; drop it
+            ldh [$FF0F], a
+            call flush_vbl
             ldh a, [pal_dirty]              ; DMG: the shades for the next frame (the
             and a                           ;   registers are written next vblank)
             call nz, make_palettes
@@ -340,9 +359,12 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             reti
 
 stat_isr:   push af                         ; LYC split: skip GB map rows 30-31
+            ldh a, [$FF41]                  ; (only on a real LY = LYC match: on the DMG a
+            bit 2, a                        ;   STAT write requests a STAT interrupt)
+            jr z, .x
             ldh a, [split_scy]
             ldh [$FF42], a
-            pop af
+.x:         pop af
             reti
 
 timer_isr:  push af                         ; frame tick while the LCD is off
@@ -448,6 +470,11 @@ make_palettes:
             ld a, c
             jr nz, .cg
             call dmg_bgp                    ; DMG: shades of the re-coded tile values
+            ld c, a
+            ldh a, [is_sgb]                 ; SGB: colour numbers
+            and a
+            ld a, c
+            call nz, sgb_bgp
 .cg:        ldh [bgp_v], a
             ldh a, [is_cgb]
             and a
@@ -459,7 +486,10 @@ make_palettes:
             call pal4
             ldh [obp1_v], a
             ret
-.dobp:      jp dmg_obp
+.dobp:      ldh a, [is_sgb]
+            and a
+            jp nz, sgb_obp
+            jp dmg_obp
 cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ palettes 0-3
             ld a, $80                       ;   (RGB555 from NES_RGB, $3E00; colour 0 of each
             ldh [$FF68], a                  ;   BG palette is the universal backdrop)
@@ -812,6 +842,9 @@ rt_wait_nmi:
             ldh a, [is_cgb]
             and a
             call z, dmg_frame
+            ldh a, [is_sgb]
+            and a
+            call nz, sgb_frame
             xor a
             ldh [frame_flag], a
 .w:         halt
@@ -851,6 +884,8 @@ dmg_frame:                                  ; DMG shading, once per NES frame wi
 dmg_maps_now:
             xor a
             ldh [maps_due], a
+            ld a, 1
+            ldh [sgb_dirty], a
             call dmg_maps
             ld a, 1                         ; BGP again with the new maps
             ldh [pal_dirty], a
@@ -893,6 +928,9 @@ rt_ppu_w1:  push af
 .off:       ldh a, [lcd_on]
             and a
             jr z, .ret
+            ldh a, [is_sgb]
+            and a
+            call nz, sgb_lcd_off
 .wv:        ldh a, [$FF44]
             cp 144
             jr c, .wv

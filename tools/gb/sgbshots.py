@@ -1,0 +1,60 @@
+"""SGB screenshots of the GB build in mGBA (build/sgbrun, from tools/gb/mgba/sgbrun.c) with the
+input of the NES checks: the NES build is run with battleseq's input (or the new-game script)
+and the pad it latched per NMI is fed to the GB by NES frame number.
+usage: PYTHONPATH=build/emu sgbshots.py NES GB OUT.png NMI1,NMI2,... [--input MODE|--newgame]
+       [--dmg]   (MODE: battleseq.py input modes, default fight)"""
+import os, sys, subprocess, tempfile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from cynes import NES
+from PIL import Image
+
+args = sys.argv[1:]
+mode = 'fight'
+if '--input' in args:
+    k = args.index('--input'); mode = args[k + 1]; del args[k:k + 2]
+newgame = '--newgame' in args
+if newgame: args.remove('--newgame')
+dmg = '--dmg' in args
+if dmg: args.remove('--dmg')
+nes_path, gb_path, out, shots = args[0], args[1], args[2], [int(x) for x in args[3].split(',')]
+last = max(shots) + 2
+nes = NES(nes_path)
+if newgame:
+    from compare import new_game_script
+    steps = []
+    for it in new_game_script():
+        if it[0] == 'shot': continue
+        m, h, a = it
+        steps += [m] * h + [0] * a
+    pad = lambda f: steps[f] if f < len(steps) else 0
+else:
+    import battleseq
+    pad = lambda f: battleseq.pad_for(mode, f)
+pads = bytearray(last + 2)
+f = 0
+while nes.nmi_count < last and f < last * 3:
+    nes.controller = pad(f)
+    k0 = nes.nmi_count
+    nes.step(1); f += 1
+    for j in range(k0 + 1, min(nes.nmi_count, last) + 1):
+        pads[j] = nes.pad_history[j & 0xFF]
+tmp = tempfile.mkdtemp()
+pf = os.path.join(tmp, 'pads.bin'); open(pf, 'wb').write(pads)
+sram = bytearray(0x8000)                 # cart RAM: bank 0 = the NES power-on save RAM
+n0 = NES(nes_path)
+for i in range(0x2000): sram[i] = n0[0x6000 + i]
+sf = os.path.join(tmp, 'sram.bin'); open(sf, 'wb').write(sram)
+here = os.path.dirname(os.path.abspath(__file__))
+exe = os.path.join(here, '..', '..', 'build', 'sgbrun')
+cmd = [exe, gb_path, str(last * 4), os.path.join(tmp, 's'), '--padfile', pf, '--sram', sf] + sum([['--nshot', str(s)] for s in shots], [])
+if dmg: cmd.append('--dmg')
+# stop early: run in chunks is not supported; FRAMES is an upper bound (GB frames)
+print(subprocess.run(cmd, capture_output=True, text=True).stdout.strip())  # (env SGBRUN_REGS=1: registers per shot)
+ims = []
+for s in shots:
+    p = os.path.join(tmp, 's_n%05d.ppm' % s)
+    if os.path.exists(p): ims.append(Image.open(p).convert('RGB'))
+W = sum(i.size[0] + 4 for i in ims); H = max(i.size[1] for i in ims)
+sheet = Image.new('RGB', (W, H), (255, 0, 255)); x = 0
+for i in ims: sheet.paste(i, (x, 0)); x += i.size[0] + 4
+sheet.save(out); print('saved', out, len(ims), 'shots')

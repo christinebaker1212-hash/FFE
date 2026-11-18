@@ -422,6 +422,9 @@ dmg_attr:   push bc
             push de
             push hl
             ld c, a
+            ld a, 1                         ; (SGB: the screen's palettes again)
+            ldh [sgb_dirty], a
+            ld a, c
             and $40
             rrca
             rrca
@@ -957,6 +960,8 @@ dmg_scan_all:
             push bc
             push de
             push hl
+            ld a, 1
+            ldh [sgb_dirty], a
             xor a
             ldh [dmg_scan], a
             ld hl, REF_BM                   ; REF_BM: tiles the map uses

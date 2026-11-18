@@ -44,6 +44,17 @@ NES_RGB = [
     0xCCD278, 0xB4DE78, 0xA8E290, 0x98E2B4, 0xA0D6E4, 0xA0A2A0, 0x000000, 0x000000]
 
 
+def border_src():
+    """SGB border (tools/gb/sgb_border.py, drawn by code) in bank RT_TABLES at $6000"""
+    import sgb_border
+    chr_, pct, n = sgb_border.make()
+    out = 'section bank %d, $6000\nsgb_bdr_chr:\n' % RT_TABLES
+    out += ''.join('    db %s\n' % ', '.join('$%02X' % b for b in chr_[i:i + 16]) for i in range(0, len(chr_), 16))
+    out += 'sgb_bdr_chr_end:\nsgb_bdr_pct:\n'
+    out += ''.join('    db %s\n' % ', '.join('$%02X' % b for b in pct[i:i + 16]) for i in range(0, len(pct), 16))
+    return out
+
+
 def nes_rgb_src():
     out = 'section bank 0, $3E00\nNES_RGB:\n'
     for k in range(0, 64, 8):
@@ -114,11 +125,11 @@ def main():
     cm = CodeMap(nes, covs).build()
     rc = Recompiler(cm)
     prog, bank_of, banks = emit_program(rc)
-    rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s'))
+    rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s', 'sgb.s'))
     rt += '\n' + apu_tables()
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(
         '    db %s\n' % ', '.join(str(shade(c)) for c in range(r, r + 16)) for r in range(0, 64, 16))
-    src_all = rt + '\n' + shade_src + '\n' + nes_rgb_src() + '\n' + prog
+    src_all = rt + '\n' + shade_src + '\n' + nes_rgb_src() + '\n' + border_src() + '\n' + prog
     open(opt['--out'] + '.s', 'w').write(src_all)
     print('recompiled: %d instructions, %d code banks (%.1fs)' % (len(rc.insns), len(banks), time.time() - t))
     t = time.time()
