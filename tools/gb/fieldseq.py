@@ -9,7 +9,8 @@ from compare import new_game_script, UP, DOWN, LEFT, RIGHT, A, B, START
 from PIL import Image, ImageDraw
 import numpy as np
 
-KEYS = {'U': UP, 'D': DOWN, 'L': LEFT, 'R': RIGHT, 'A': A, 'B': B, 'S': START, '_': 0}
+KEYS = {'U': UP, 'D': DOWN, 'L': LEFT, 'R': RIGHT, 'A': A, 'B': B, 'S': START, '_': 0,
+        'T': 0x20, 'X': 0x60, 'Y': 0xC0}       # T = Select, X = B + Select, Y = A + B
 SCRIPTS = {}
 
 

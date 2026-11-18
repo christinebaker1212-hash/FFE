@@ -1922,6 +1922,8 @@ def apply(rom, report):
     prologue(rom)
     new_game(rom)
     story_gb(rom)
+    minimap(rom)
+    puzzle(rom)
     report.append('GB layout applied')
 
 
@@ -3101,3 +3103,45 @@ brw:                ; $C154: the bridge story, then the field camera again
     assert w.org + len(w.bytes) <= 0xEE21
     put(rom, 0xEE12, w.bytes)
     put(rom, 0xC154, bytes([0x20]) + w.labels['brw'].to_bytes(2, 'little'), expect=bytes([0x20, 0x00, 0xB8]))
+
+
+# World map (B + Select on the field; nametable copied from bank 9 $B000): the 16 x 16-tile
+# map fills the default view (camera 6 / 6) with a margin; the four corner dragons
+# (cols 2-7 / 24-29, rows 2-9 / 18-25) would only show as slivers at the view's edges, so
+# the GB build leaves them out, and the title above the map (its bottom row would show as
+# a sliver at the view's top edge).
+def minimap(rom):
+    o = bank_off(9, 0xB000)
+    for r0 in (2, 18):
+        for c0 in (2, 24):
+            for r in range(r0, r0 + 8):
+                for c in range(c0, c0 + 6):
+                    assert rom[o + 32 * r + c] != 0 or (r, c) in ((r0, c0), (r0, c0 + 6)), (r, c)
+                    rom[o + 32 * r + c] = 0
+    for r in range(2, 7):                   # title above the map: its bottom row would show
+        for c in range(8, 24):              #   as a sliver at the view's top edge
+            rom[o + 32 * r + c] = 0
+
+
+# 15-puzzle (on the ship: B pressed 55 times, then A + B; bank 13 $AE10): the same title
+# picture scene, the puzzle window (8,5,10,10) inside the picture's box (2..23, rows 4-15):
+# camera (3, 4) while it runs (box and FINAL FANTASY picture), the field camera after.
+# Wrapper in the fixed bank's dead old battle-magic code after the story code ($F7FA..).
+def puzzle(rom):
+    w = asm("""
+pzw:                ; $C28A
+    lda #3
+    sta $5800
+    lda #4
+    sta $5801
+    jsr $AE10
+    php             ; (the caller tests the carry)
+    lda #6
+    sta $5800
+    sta $5801
+    plp
+    rts
+""", org=0xF7FA)
+    assert w.org + len(w.bytes) <= 0xF88F
+    put(rom, w.org, w.bytes)
+    put(rom, 0xC28A, bytes([0x20]) + w.labels['pzw'].to_bytes(2, 'little'), expect=bytes([0x20, 0x10, 0xAE]))

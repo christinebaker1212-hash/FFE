@@ -1,7 +1,7 @@
 """SGB screenshots of the GB build in mGBA (build/sgbrun, from tools/gb/mgba/sgbrun.c) with the
 input of the NES checks: the NES build is run with battleseq's input (or the new-game script)
 and the pad it latched per NMI is fed to the GB by NES frame number.
-usage: PYTHONPATH=build/emu sgbshots.py NES GB OUT.png NMI1,NMI2,... [--input MODE|--newgame]
+usage: PYTHONPATH=build/emu sgbshots.py NES GB OUT.png NMI1,NMI2,... [--input MODE|--newgame|--field SCRIPT]
        [--dmg | --cgb]   (MODE: battleseq.py input modes, default fight)"""
 import os, sys, subprocess, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -14,6 +14,9 @@ if '--input' in args:
     k = args.index('--input'); mode = args[k + 1]; del args[k:k + 2]
 newgame = '--newgame' in args
 if newgame: args.remove('--newgame')
+field = None
+if '--field' in args:
+    k = args.index('--field'); field = args[k + 1]; del args[k:k + 2]
 dmg = '--dmg' in args
 if dmg: args.remove('--dmg')
 cgb = '--cgb' in args
@@ -21,7 +24,11 @@ if cgb: args.remove('--cgb')
 nes_path, gb_path, out, shots = args[0], args[1], args[2], [int(x) for x in args[3].split(',')]
 last = max(shots) + 2
 nes = NES(nes_path)
-if newgame:
+if field is not None:                    # fieldseq.py script after the new game (no pokes)
+    import fieldseq
+    steps = fieldseq.frames_for(field)
+    pad = lambda f: steps[f] if f < len(steps) else 0
+elif newgame:
     from compare import new_game_script
     steps = []
     for it in new_game_script():

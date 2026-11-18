@@ -594,8 +594,16 @@ Milestones per game (from `docs/gb-port.md`):
   CGB differs only in the pad bytes $20/$21 at a page's A press (one frame early / late
   depending on the press timing; DMG identical) - the harness's per-NMI input feed meeting
   the story pages' button poll in double speed, not a layout difference.
-- Next: remaining screens from `docs/gb-screens.md` (world map minimap, 15-puzzle, inn /
-  save prompt checks), then FF1's accuracy / timing pass.
+- **World map (minimap, 2026-11-18)** (`gb_layout.minimap`): B + Select on the field; its
+  nametable is copied from bank 9 $B000. The 16x16-tile map fits the default view (6/6)
+  with a margin; the four corner dragons and the title above the map are blanked in that
+  data for the GB build (they would only show as slivers at the view's edges).
+- **15-puzzle (2026-11-18)** (`gb_layout.puzzle`): on the ship B x55 then A + B ($C26D:
+  $25 = 55, $42 = $46 = 4); test with `--poke 0025=36,0042=04,0046=04` and A + B (fieldseq
+  key Y; X = B + Select, T = Select). Camera (3,4) while it runs (wrapper `pzw` at $F7FA in
+  the dead old battle-magic code; $F7FA-$F88E is free fixed-bank space), field camera after.
+- Next: FF1's accuracy / timing pass (lag in screen transitions, SGB check of the new
+  screens in mGBA).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).
