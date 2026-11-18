@@ -35,62 +35,50 @@ If the user uploads the ROMs as zips, unzip into `roms/` and check the SHA-1s in
   the ROM runs as SGB; no SGB packets/palettes/border are sent yet.
 
 ## Layout work in progress: the battle screen
-Owner's design (CLAUDE.md, `docs/gb-screens.md`, mock-up renderer `tools/gb/mockup.py`,
-draft 2 = `mock2_*`): enemies top-left, party sprites visible in a column on the right
-with each member's name/HP beside the sprite, a full-width window at the bottom (enemy
-names; command window over its right half; battle messages as lines of one window), the
-acting member's line and the target flash. Re-layout is done in FF1's NES code
-(`tools/ff1/gb_layout.py`, applied by `insert.py --gb`), not by a runtime compositor.
+Owner's design (decided step by step on 2026-11-18, mock-ups `tools/gb/mockup.py`,
+approved layout = `mock12_battle.png` + full-width messages `mock13_msgs_wide.png`):
+- camera (1, 6): enemy area GB cols 1-14 rows 0-11 (NES enemy box interior, unchanged,
+  all formations fit), party sprites in their own column (NES x 140, step to 132),
+- bottom (GB rows 12-17): left window (enemy names / commands, 9 columns), party window
+  (cols 8-19, one line per member: name, HP current/max in 3-px digits, status word),
+  full-width message window over both while a message shows,
+- all window text in a small proportional font (rendered into tiles by NES code),
+- messages "style A": `attacker → target`, then action / result lines indented,
+- FF1's large hand cursor, never over text, may be cut off at the left screen edge,
+- the commanding member's party line blinks; status words "Blind" (Darkness), "Numb"
+  (Paralysis), "Mute" (Silence) where needed (translation change approved),
+- dual-mode target for colour (CGB first), see CLAUDE.md.
 
-### Mechanism
-- GB camera per screen: NES writes to `$5800` (X tiles) / `$5801` (Y tiles) → runtime
-  `cam_x`/`cam_y` (pixels). Default 6/6 (NES cols 6-25, rows 6-23). Battle sets X = 2
-  at `$F2DC`; a wrapper at `$F2E4` around the battle calls (`$C1D6` overworld, `$C935`
-  dungeon) restores X = 6 afterwards. **Other screens must set their own camera** when
-  they are re-laid out (menus currently show with whatever camera is active).
-- Check on the NES: `PYTHONPATH=build/emu python3 tools/gb/battleshot.py build/ff1_gb.nes OUT.png --cam 2 [frames]`
-  (seed-10 walk into a Goblin battle; full frame with the GB view outlined + the GB view).
-
-### Done (in `gb_layout.py`)
-- Battle setup `$F2DC-$F30B`: enemy/party/HP box frames skipped (freed bytes hold the
-  camera code + wrapper).
-- Bottom panel (25×12 image at `$691E`, stride 32, copied to NES rows 18-29 by `$F4A2`;
-  box list of 5-byte box records + text records, redrawn by `$F652`): windows are 7 rows
-  tall so their bottom frame falls on hidden panel row 6 → 5 visible text rows.
-  Names box `$F9DC` (2,0,20,7), names single-spaced (`$F6D2`, `$F6D7` NOPed); command box
-  records `$FA13` (11,0,11,7) Fight/Magic/Medicine/Items at x=12 rows 1-4, Run at (18,1);
-  message records `$F9E1` (5 × 8 bytes): attacker box = whole window, action/target/result
-  are dummy boxes in hidden rows 8-9 with text at rows 2/3/4; long message record 4 =
-  whole window; item window `$FA0E` (2,0,20,7); panel-clear edge row (`$F625`) removed.
-- English patch's `boxline` (far code, label `boxline.o1`): one-row lines are written on
-  the text record's own row (dakuten row skipped), so lines can be single-spaced; split
-  lines still use two rows.
+### How it is built (`tools/ff1/gb_layout.py`, applied by `insert.py --gb`)
+- Far-code bank 40 (via ExRAM `farjsr`; farjsr clobbers A, so routines read their
+  arguments from RAM): small-font renderer `VWF_SRC` (`vchar`, `vstr`, `vupload`; glyph
+  table generated from `tools/latin_font.py`), `party_stamp` (party window into the panel
+  image on every panel clear, hook `$F625`), `party_line` (hook b12:`$AA5B`), `boxline`
+  replacement (panel text into tiles `$A8 + 18(row-1) + col-2`, word wrap; marker
+  columns 21 = target after the attacker, 22 = next message line, 23 = Run), `MAGPAGE`,
+  `ITEMLIST` (+ `ITEMMOVE_PATCH`), `blink`.
+- Far code must not reach bank-62 code at `$C000-$DFFF` (`$F47D` ends in `JMP $C009`,
+  the music driver): use the fixed trampoline `MUSIC` (`$F2F1`).
+- Text code `$FD $80+n` moves the pen to tile n of the row (the decoder treats bytes
+  < `$48` as control codes and converts `$48-$79`).
+- Tiles: party lines `$80-$A7`, panel text `$A8-$EF` (font tiles, free in battle: the
+  field reloads the BG pattern table after a battle). RAM: `$6E00-$6EFF` (renderer),
+  `$0340-$0342` (blink); both never touched by the game in 320k frames of coverage.
+- Tools: `battleshot.py --cam 1`, `battleseq.py` (sheet of a battle; `--form F` forces a
+  formation, `--input fight|run|magic4|items4`, `--poke ADDR=VAL` patches work RAM, e.g.
+  spells `$6300+64m`, equipment `$6118+64m`), `formations.py` (survey), `ntlog.py`,
+  `test_vwf.py` (renderer in py65), `mockup.py`.
 
 ### Next steps (battle)
-1. **Party sprites → NES x = 128** (`$80`): `b12:9740 LDA #$B0` (records `$6AD3/$6AD7/$6ADB/$6ADF`;
-   y already 48/72/96/120 = GB rows 0-11, 3 rows each). Party-relative effect constants
-   `b12:9951 LDA #$A8` → `$78`, `b12:997C LDA #$B0` → `$80`. (`b12:A68F LDA #$A8` is a
-   temp, not a coordinate — leave it.) Everything else reads `$6AD3` (relative).
-2. **Name/HP beside each sprite**: drawn by bank 12 around `$AB0E` into the old HP boxes
-   (NES cols 26-29, rows 4-26). Move to NES cols 18-21: name on row 6+3i, HP number on
-   row 7+3i (4 columns; status words already exist as 4-tile narrow labels `$D3-$EA`).
-3. **Command cursor**: NES positions x = 96 (left column) / 144 (Run), y = 158/174/190/206
-   (double spacing). New text rows are NES rows 19-22 (y 152-176): cursor x = 80 / 128,
-   y = 147/155/163/171. The cursor is drawn by `b12:97E9` from `$68AF`(x)/`$68B1`(y), copied
-   from `$6AE3/$6AE4`, which come from RAM table `$6AAC` (filled at `b12:9AF4`, `9B1E`, `A109`).
-   `$9F95`/`$9FA7` are the enemy-target grids (no change needed); `$9FBF` is the
-   magic/item list cursor (x = 40, y = $9E..: will need the new list window rows).
-4. Party-target cursor (cures, items on allies): follows `$6AD3` (check it lands left of
-   the sprite in GB col 13).
-5. **Flashing** of the acting member's line (name/HP beside the sprite) and the target:
-   new code (find "whose turn" / "target" in battle RAM; blink by redrawing the line blank
-   / restoring every few frames, or via sprite/palette).
-6. Magic/item lists in battle (`magpage`, `itemlist` far code in insert.py) into the 20×5 window.
-7. Check formations: 9 small, 4 large, mixed, the fiends/Chaos (big graphics), and
-   messages longer than 18 chars (23 of them split onto two rows: result line uses rows 4-5).
-8. Switch `build.py` to `build/ff1_gb.nes` (regenerate coverage for that ROM: covrun on
-   ff1_gb.nes), then run `firstdiff.py build/ff1_gb.nes build/ff1_en.gb` (equivalence
-   against the GB-layout NES ROM), look at the GB result in PyBoy and mGBA.
+1. GB build: `build.py --gb` (coverage `build/cov3` from `covrun.py build/ff1_gb.nes`),
+   `firstdiff.py build/ff1_gb.nes build/ff1_gb.gb`, look at it in PyBoy and mGBA (SGB).
+   The VRAM queue (40 bytes per GB frame) makes text slower on GB: measure, and later use
+   HDMA in CGB mode.
+2. Blink the target (party targets; decide with the owner for enemies).
+3. Enemy names window: long names wrap into the next name's row (rare: names > 56 px);
+   end-of-battle messages (gold, experience, level up); "Medicine" list; all formations
+   (fiends, Chaos); messages that need three rows.
+4. Then the colour milestone (CGB mode first), then the other screens.
 
 ## After the battle
 Main menu (party list, commands, Gil/orbs), dialogue (wrap 18 columns: `W` in insert.py,

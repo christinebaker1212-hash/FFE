@@ -1,6 +1,8 @@
 """Build the Game Boy (DMG + SGB) FF1 English ROM from the user's own NES ROM.
 
-usage: build.py ["Final Fantasy I, II (Japan).nes"] [--cov DIR] [--out build/ff1_en.gb]
+usage: build.py ["Final Fantasy I, II (Japan).nes"] [--gb] [--cov DIR] [--out ROM]
+  --gb: the GB layout (insert.py --gb -> build/ff1_gb.nes; default coverage build/cov3,
+        output build/ff1_gb.gb); without it: build/ff1_en.nes, build/cov2, build/ff1_en.gb
 
 1. NES ROM -> MMC5 split (tools/split/build_mmc5.py) -> English (tools/ff1/insert.py)
    = build/ff1_en.nes
@@ -54,20 +56,24 @@ def apu_tables():
     return src
 
 
-def nes_english(src, out_dir):
-    out = os.path.join(out_dir, 'ff1_en.nes')
-    if os.path.exists(out): return out
+def nes_english(src, out_dir, gb=False):
+    out = os.path.join(out_dir, 'ff1_gb.nes' if gb else 'ff1_en.nes')
+    if os.path.exists(out) and not gb: return out
     if hashlib.sha1(open(src, 'rb').read()).hexdigest() != SHA1_FF12:
         raise SystemExit('not the expected Final Fantasy I・II (Japan) ROM: ' + src)
     subprocess.check_call([sys.executable, os.path.join(ROOT, 'tools', 'split', 'build_mmc5.py'), src, out_dir])
     subprocess.check_call([sys.executable, os.path.join(ROOT, 'tools', 'ff1', 'insert.py'),
-                           os.path.join(out_dir, 'ff1_mmc5.nes'), out])
+                           os.path.join(out_dir, 'ff1_mmc5.nes'), out] + (['--gb'] if gb else []))
     return out
 
 
 def main():
     args = sys.argv[1:]
-    opt = {'--cov': os.path.join(ROOT, 'build', 'cov2'), '--out': os.path.join(ROOT, 'build', 'ff1_en.gb')}
+    gb = '--gb' in args
+    if gb: args.remove('--gb')
+    name = 'ff1_gb' if gb else 'ff1_en'
+    opt = {'--cov': os.path.join(ROOT, 'build', 'cov3' if gb else 'cov2'),
+           '--out': os.path.join(ROOT, 'build', name + '.gb')}
     pos = []
     while args:
         a = args.pop(0)
@@ -76,7 +82,7 @@ def main():
     src = pos[0] if pos else os.path.join(ROOT, 'roms', 'Final Fantasy I, II (Japan).nes')
     out_dir = os.path.dirname(os.path.abspath(opt['--out']))
     os.makedirs(out_dir, exist_ok=True)
-    nes = nes_english(src, out_dir)
+    nes = nes_english(src, out_dir, gb)
     covs = sorted(glob.glob(os.path.join(opt['--cov'], '*.bin')))
     if not covs: raise SystemExit('no coverage logs in %s (run tools/gb/covrun.py)' % opt['--cov'])
     t = time.time()
@@ -88,7 +94,7 @@ def main():
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(
         '    db %s\n' % ', '.join(str(shade(c)) for c in range(r, r + 16)) for r in range(0, 64, 16))
     src_all = rt + '\n' + shade_src + '\n' + prog
-    open(os.path.join(out_dir, 'ff1_en.gb.s'), 'w').write(src_all)
+    open(opt['--out'] + '.s', 'w').write(src_all)
     print('recompiled: %d instructions, %d code banks (%.1fs)' % (len(rc.insns), len(banks), time.time() - t))
     t = time.time()
     r = asm(src_all, syms={'DATA': DATA, 'RT_TABLES': RT_TABLES})
@@ -106,7 +112,7 @@ def main():
     print('wrote %s: %d KB, bank 0 used %d bytes' % (opt['--out'], len(rom) // 1024, used0))
     w = {}
     for x in rc.warn: w.setdefault(x.split(' at ')[0].split(' from ')[0][:40], []).append(x)
-    open(os.path.join(out_dir, 'ff1_en.gb.warn'), 'w').write('\n'.join(rc.warn) + '\n')
+    open(opt['--out'] + '.warn', 'w').write('\n'.join(rc.warn) + '\n')
     for k, v in sorted(w.items(), key=lambda kv: -len(kv[1])):
         print('  warn %-42s x%d  e.g. %s' % (k, len(v), v[0][-40:]))
 
