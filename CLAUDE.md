@@ -344,7 +344,9 @@ Milestones per game (from `docs/gb-port.md`):
   `GB_CGB=1` makes the test harness (compare.GB) run PyBoy as a Color. Battle in CGB:
   NES colours, RAM identical (firstdiff --battle 7100 frames). Text tiles now use colour 0
   as background (FF1's battle blank tile $FF is colour 0: the "black bar" the owner saw
-  under the first message on DMG). Next in colour: check all screens in CGB, double
+  under the first message on DMG). New-game script in CGB (`compare.py`, GB_CGB=1): name
+  entry, class select and the Coneria field in NES colours, RAM diff 0 at all shots; DMG
+  battle check still identical (black windows now). Next in colour: check all screens in CGB, double
   speed, HDMA; then the DMG per-tile shading and SGB.
 - Column-2 lists push a name down below a wrapped one (VNROW; 7 formations have a name
   > 56 px, only formation 69 lists two names).
