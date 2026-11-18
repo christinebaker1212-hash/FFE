@@ -42,7 +42,9 @@ class FF1:
     # the caller of the NES routine like its RTS would.
     #   $FEDB ($FE00 jumps here): enable NMI and spin; the NMI handler returns to the caller.
     #   $E9F6: CHR upload loop (X pages from ($10)+Y to $2007).
-    ext = {('fix', 0xFEDB): ('rt_wait_nmi', 'NZ'), ('fix', 0xE9F6): ('hle_chr_pages', 'NZ')}
+    #   c62:C43C: the per-frame OAM-buffer clear (memset).
+    ext = {('fix', 0xFEDB): ('rt_wait_nmi', 'NZ'), ('fix', 0xE9F6): ('hle_chr_pages', 'NZ'),
+           ('c62', 0xC43C): ('hle_oam_clear', 'NZ')}
     # Idioms replaced by a runtime call, then a jump to `resume`:
     #   b14:B0F1 TSX/TXA/CMP #$EF/BCS/CLC/ADC #6/TAX/TXS: drop 3 return frames (camp items
     #   returning from the item menu straight to the field). The S >= $EF guard is not

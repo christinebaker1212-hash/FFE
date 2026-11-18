@@ -272,3 +272,31 @@ hle_rlefill:
             jr nz, .sl
             inc e
             ret
+
+; ---- c62:C43C: clear the NES OAM buffer ($0200-$02FF = $F8), $26 = 0 (FF1's per-frame
+;   sprite clear: LDX #$3F / LDA #$F8 / 4 x STA $0200..$02C0,X / DEX / BPL; LDA #0 /
+;   STA $26 / RTS). Returns as its RTS: X = $FF, A = 0, Z = 1, N = 0; carry unchanged.
+hle_oam_clear:
+            push af                         ; (carry)
+            ld hl, NES_RAM + $0200
+            ld a, $F8
+            ld e, 32
+.lp:        ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec e
+            jr nz, .lp
+            xor a
+            ld [NES_RAM + $26], a
+            ldh [nzv], a
+            ld e, $FF
+            pop af
+            ld a, 0
+            inc a
+            dec a                           ; Z = 1, carry kept
+            ret

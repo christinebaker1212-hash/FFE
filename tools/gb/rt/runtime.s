@@ -42,6 +42,7 @@ BAND_B     = $CCE9          ;   for BAND_LIFE more frames
 BAND_LIFE  = $CCEA
 BGP_NORM   = $CCEB          ; DMG / SGB: BGP of the frame; BGP_MASK: every value as the backdrop
 BGP_MASK   = $CCEC
+OAM_USED   = $CCEE          ; GB sprites the last OAM conversion used
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
 EMPH_RGB   = $3A00          ; CGB: NES colours with emphasis e (1-7) at EMPH_RGB + e * $80
@@ -1721,80 +1722,64 @@ rt_ppu_r7:  push af                         ; buffered read (nametables from the
             ret
 
 ; ------------------------------------------------------------------ OAM DMA ($4014)
-rt_io_w4014:
+rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (sent next vblank)
             push af
             push bc
             push de
             push hl
-            push af
-            ldh a, [oam_frame]
-            inc a
-            ldh [oam_frame], a
-            pop af
             and $07
             add a, high(NES_RAM)
             ld h, a
             ld l, 0
+            ldh a, [oam_frame]
+            inc a
+            ldh [oam_frame], a
             ld de, OAM_SH
-            ld b, 64
-            ld c, 40
+            ld bc, $4028                    ; B = NES sprites left, C = GB sprites left
 .lp:        ld a, [hl+]                     ; NES y (top - 1); $EF and below the screen:
-            cp $EF                          ;   hidden (most of the 64), skipped at once
-            jr c, .vis
-            inc l
-            inc l
-            inc l
-            dec b
-            jr nz, .lp
-            jp .full
-.vis:       ldh [o_y], a
+            cp $EF                          ;   hidden (most of the 64)
+            jr nc, .hid
+            inc a                           ; GB y = y + 1 - cam_y + 16 (shown from -16:
+            push hl                         ;   cut off at the top)
+            ld h, a
+            ldh a, [cam_y]
+            ld l, a
+            ld a, h
+            sub l
+            jr nc, .yp
+            cp $F0
+            jr c, .nov
+            jr .yk
+.yp:        cp 144
+            jr nc, .nov
+.yk:        add a, 16
+            ldh [o_y], a
+            pop hl
             ld a, [hl+]
             ldh [o_t], a
             ld a, [hl+]
             ldh [o_a], a
-            ldh a, [cam_x]
-            sub 8
-            ldh [o_cx], a
-            ld a, [hl+]                     ; NES x -> GB x = x - cam_x + 8 (0-167 shown;
-            push bc                         ;   x - cam_x from -8: cut off at the left edge)
-            ld b, a
-            ldh a, [cam_x]
-            ld c, a
-            ld a, b
-            sub c
-            pop bc
-            jr nc, .xpos
-            cp $F8
-            jr c, .skip
-            jr .xok
-.xpos:      cp 160
-            jr nc, .skip
-.xok:       add a, 8
-            push af
-            ldh a, [o_y]
-            cp $EF
-            jr nc, .skip_p
-            push bc                         ; GB y = NES y + 1 - cam_y + 16 (0-159 shown;
-            ld b, a                         ;   from -16 above the view: cut off at the top)
-            ldh a, [cam_y]
-            ld c, a
-            ld a, b
-            inc a
-            sub c
-            pop bc
-            jr nc, .ypos
-            cp $F0
-            jr c, .skip_p
-            jr .yok
-.ypos:      cp 144
-            jr nc, .skip_p
-.yok:       add a, 16
-            ld [de], a
-            inc e
-            pop af
-            ld [de], a
-            inc e
+            ld a, [hl+]                     ; GB x = x - cam_x + 8 (shown from -8)
             push hl
+            ld h, a
+            ldh a, [cam_x]
+            ld l, a
+            ld a, h
+            sub l
+            jr nc, .xp
+            cp $F8
+            jr c, .nox
+            jr .xk
+.xp:        cp 160
+            jr nc, .nox
+.xk:        add a, 8
+            ld h, a
+            ldh a, [o_y]
+            ld [de], a
+            inc e
+            ld a, h
+            ld [de], a
+            inc e
             ldh a, [o_a]                    ; coding of the sprite's palette
             and 3
             add a, low(SPAL_KEY)
@@ -1802,77 +1787,93 @@ rt_io_w4014:
             ld h, high(SPAL_KEY)
             ld a, [hl]
             ldh [o_key], a
-            ldh a, [o_t]
+            ldh a, [o_t]                    ; its GB slot (loaded on first use)
             ld l, a
             ld h, high(SPR_SLOT)
             ld a, [hl]
             cp $FF
             call z, spr_alloc
-            push af                         ; resident with another coding: load it again
-            add a, low(SLOT_KEY)
+            ld l, a
+            add a, low(SLOT_KEY)            ; resident with another coding: load it again
             ld l, a
             ld h, high(SLOT_KEY)
             ldh a, [o_key]
             cp [hl]
+            ld a, l
+            sub low(SLOT_KEY)
             jr z, .kok
-            pop af
-            push af
             push bc
             ld c, a
             call spr_load
             pop bc
-.kok:       pop af
-            ld l, a
+.kok:       ld l, a                         ; stamp (in use this frame)
             ld h, high(SLOT_STAMP)
             set 7, l
             ldh a, [oam_frame]
             ld [hl], a
             res 7, l
             ld a, l
-            pop hl
-            ld [de], a
+            ld [de], a                      ; tile = slot
             inc e
-            ldh a, [o_a]                    ; NES: v h p - - - pp  -> GB: p v h pal - - - -
-            push bc
-            ld b, a
-            and $C0                         ; v h
+            ldh a, [o_a]                    ; NES v h p - - - pp -> GB p v h obp1 - pal(3)
+            ld l, a
+            and $C0
             rrca
-            ld c, a                         ; -> bits 6,5
-            ld a, b
-            and $20                         ; priority -> bit 7
+            ld h, a
+            ld a, l
+            and $20
             rlca
             rlca
-            or c
-            ld c, a
-            ldh a, [o_key]                  ; DMG: OBP1 if the coding says so
+            or h
+            ld h, a
+            ld a, l
+            and $03
+            or h
+            ld h, a
+            ldh a, [o_key]                  ; (DMG: OBP1 if the coding says so)
             and $40
             rrca
             rrca
-            or c
-            ld c, a
-            ld a, b
-            and $03                         ; CGB: OBJ palette = NES palette (ignored on DMG)
-            or c
-            pop bc
+            or h
             ld [de], a
             inc e
+            pop hl
             dec c
             jr z, .full
-            jr .skip
-.skip_p:    pop af
-.skip:      dec b
+.nx:        dec b
             jr nz, .lp
-.full:      ld a, c                         ; hide the unused GB sprites
-            and a
+            jr .full
+.hid:       inc l
+            inc l
+            inc l
+            dec b
+            jr nz, .lp
+            jr .full
+.nov:       pop hl                          ; off the view vertically
+            inc l
+            inc l
+            inc l
+            jr .nx
+.nox:       pop hl                          ; off the view horizontally
+            jr .nx
+.full:      ld a, [OAM_USED]                ; hide the GB sprites used last frame only
+            ld b, a
+            ld a, 40
+            sub c
+            ld [OAM_USED], a
+            ld c, a
+            ld a, b
+            sub c
+            jr c, .end
             jr z, .end
+            ld b, a
             xor a
 .clr:       ld [de], a
             inc e
-            ld [de], a
             inc e
             inc e
             inc e
-            dec c
+            dec b
             jr nz, .clr
 .end:       ld a, 1
             ldh [oam_pending], a
