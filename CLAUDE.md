@@ -231,7 +231,16 @@ Milestones per game (from `docs/gb-port.md`):
   keeps 14 columns; message style A (same words, actor > target / action / result).
   `mock9_messages.png`: style B, sentences (adds English words not in the Japanese:
   needs the owner to relax translation rule 1 for battle messages). Open: status words
-  wider than 23 px (Silence, Darkness, Paralysis). Waiting for the owner; needs a tile renderer in the NES code (CHR RAM) and
+  wider than 23 px (Silence, Darkness, Paralysis).
+  **Owner's decisions (2026-11-18):** message style A (same words: "Bob → Goblin" /
+  action / result); HP current/max on one line; members' lines NOT beside their sprites
+  (sprites keep the NES column and step forward/back); a translation change for the
+  status words is fine. Drawn as `mock10_battle.png`: right window 5 columns (GB cols
+  15-19, full height, full-thickness frame), one block per member (name / "192/899" in
+  3-px digits / status), sprites at GB cols 13-14 (NES x = 120), bottom window cols 0-14;
+  status words "Blind" (Darkness) and "Numb" (Paralysis). Mixed formations (14 enemy
+  columns) need their right-hand enemies moved one column. Waiting for the owner's OK
+  on mock10; implementation needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
 - Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target
   cursor, flashing of the acting member's line and the target, magic/item lists in the

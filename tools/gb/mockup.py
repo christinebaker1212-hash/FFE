@@ -379,6 +379,21 @@ def battle8(out):
     out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock8_owner_sketch.png'))
 
 
+# 3-px digits for HP current/max on one line ("999/999" = 27 px)
+DIG3 = {
+ '0': ["###", "#.#", "#.#", "#.#", "#.#", "#.#", "###"],
+ '1': [".#.", "##.", ".#.", ".#.", ".#.", ".#.", "###"],
+ '2': ["###", "..#", "..#", "###", "#..", "#..", "###"],
+ '3': ["###", "..#", "..#", ".##", "..#", "..#", "###"],
+ '4': ["#.#", "#.#", "#.#", "###", "..#", "..#", "..#"],
+ '5': ["###", "#..", "#..", "###", "..#", "..#", "###"],
+ '6': ["###", "#..", "#..", "###", "#.#", "#.#", "###"],
+ '7': ["###", "..#", "..#", ".#.", ".#.", ".#.", ".#."],
+ '8': ["###", "#.#", "#.#", "###", "#.#", "#.#", "###"],
+ '9': ["###", "#.#", "#.#", "###", "..#", "..#", "###"],
+ '/': ["..#", "..#", ".#.", ".#.", ".#.", "#..", "#.."],
+}
+
 ARROW = {'>': ["......", "...#..", "....#.", "######", "....#.", "...#..", "......"]}
 
 
@@ -430,6 +445,50 @@ def battle9(out):
         out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, name + '.png'))
 
 
+def battle10(out):
+    """Owner (2026-11-18): message style A; HP current/max on one line; members' lines not
+    beside their sprites (sprites keep the NES column and step forward/back); shorter
+    status words allowed. Right window 5 columns (GB cols 15-19, text 31 px), one block
+    per member: name / HP cur/max (3-px digits) / status. Sprites at GB cols 13-14
+    (NES x = 120), rows 0-11; the bottom window spans cols 0-14."""
+    party = [('AAAA', 192, 899, ''), ('Bob', 30, 30, 'Poison'), ('Mm', 0, 33, 'Numb'),
+             ('WWWW', 999, 999, 'Blind')]
+    X0, X1 = 125, 155
+
+    def screen(page):
+        s = Screen(bg=3)
+        for r in range(3):
+            for c in range(3): s.block(1 + c * 4, r * 4, 4, 4)
+        for i in range(4):
+            dx = -8 if (page == 'cmd' and i == 0) else 0           # acting member stepped forward
+            s.d.rectangle([13 * 8 + dx, i * 24, 13 * 8 + 15 + dx, i * 24 + 23], fill=SHADES[2], outline=SHADES[1])
+        s.d.rectangle([120, 0, 159, 143], fill=SHADES[3])
+        for off, shade in ((1, 1), (2, 0), (3, 1)):
+            s.d.rectangle([120 + off, off, 159 - off + 1, 143 - off], outline=SHADES[shade])
+        for i, (n, hp, mx, st) in enumerate(party):
+            y = 8 + i * 34
+            c = (X0 + X1 + 1) // 2
+            _pt(s, c - s.pwidth(n) // 2, y, n)
+            h = '%d/%d' % (hp, mx)
+            _pt(s, c - s.pwidth(h, DIG3) // 2, y + 9, h, DIG3)
+            if st: _pt(s, c - s.pwidth(st) // 2, y + 18, st)
+        s.window(0, 12, 15, 6)
+        lines = {'cmd': ['Goblin', 'Minotaur Zombie'],
+                 'A': ['Bob > Goblin', '  Fire', '  23 damage'],
+                 'A2': ['Goblin > Bob', '  2 hits!', '  9 damage']}[page]
+        for i, r in enumerate(lines): s.ptext(1, 13 + i, r, table=ARROW)
+        if page == 'cmd':
+            s.window(8, 12, 7, 6)
+            for i, w in enumerate(['Fight', 'Magic', 'Medicine', 'Items']): s.ptext(9, 13 + i, w)
+            s.ptext(0, 13, 'Run', px=9 * 8 + 28)
+            s.cursor(8, 13)
+        return s
+    ims = [screen(p).im for p in ('cmd', 'A', 'A2')]
+    out_im = Image.new('RGB', (168 * 3 - 8, 144), (255, 255, 255))
+    for k, im in enumerate(ims): out_im.paste(im, (k * 168, 0))
+    out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock10_battle.png'))
+
+
 def _pt(s, X, Y, txt, table=None):
     """proportional text at pixel (X, Y)"""
     for k, ch in enumerate(txt):
@@ -466,5 +525,5 @@ def main_menu(out):
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else 'build'
     os.makedirs(out, exist_ok=True)
-    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); battle8(out); battle9(out); main_menu(out)
+    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); battle8(out); battle9(out); battle10(out); main_menu(out)
     print('written to', out)
