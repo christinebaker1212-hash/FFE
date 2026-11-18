@@ -642,6 +642,64 @@ def battle13(out):
         out_im.resize((out_im.width * 2, 144 * 2), Image.NEAREST).save(os.path.join(out, name + '.png'))
 
 
+HAND16 = ["..........++####", ".........++##+++", ".........+##++++", ".........+#+++..", ".........+#++...",
+          ".....+++++#++...", "...++####+#++...", "..+####++++++++.", ".++############+", "+#+############+",
+          "+##########+++++", "+#+#######+++++.", "+#+#######+++...", "+#+######++++...", "+#++#####++++...",
+          "+++++###+++++...", ".+++++++++#++..."]
+HAND8 = ["........", "..##....", ".#++####", "#++++++#", "#+++####", "#++++#..", ".####..."]
+
+
+def _hand(s, X, Y, art):
+    for y, row in enumerate(art):
+        for x, c in enumerate(row):
+            if c != '.' and 0 <= X + x < 160: s.im.putpixel((X + x, Y + y), SHADES[0 if c == '#' else 1])
+
+
+def battle14(out):
+    """Owner (2026-11-18): the hand cursor must stay partly visible and must not overlap
+    text. Left: a small 8-px hand (fits beside "Run" and between two spells per magic
+    row). Right: FF1's 16-px hand at the screen edge (only its fingertip shows), for
+    comparison. Commands: Fight at column 2 (hand over the frame), Run at x 44."""
+    party = [('DUNE', 35, 35, ''), ('SPUD', 30, 30, 'Poison'), ('JOJO', 33, 33, ''), ('LEO', 30, 30, '')]
+
+    def base():
+        s = Screen(bg=3)
+        s.block(1, 0, 6, 6); s.block(1, 6, 6, 6)
+        for r in range(3):
+            for c in range(2): s.block(7 + c * 4, r * 4, 4, 4)
+        for i in range(4):
+            s.d.rectangle([132, i * 24, 147, i * 24 + 23], fill=SHADES[2], outline=SHADES[1])
+        return s
+
+    def cmd(s, hand, on_run):
+        s.window(0, 12, 8, 6)
+        for i, w in enumerate(['Fight', 'Magic', 'Medicine', 'Items']): _pt(s, 8, (13 + i) * 8, w)
+        _pt(s, 44, 13 * 8, 'Run')
+        if hand == 8: _hand(s, (36 if on_run else 0), 13 * 8, HAND8)
+        else: _hand(s, -8, 13 * 8 - 2, HAND16)
+        s.window(8, 12, 12, 6)
+        for i, (n, hp, mx, st) in enumerate(party):
+            _pt(s, 9 * 8 + 1, (13 + i) * 8, n)
+            h = '%d/%d' % (hp, mx)
+            _pt(s, 126 - s.pwidth(h, DIG3), (13 + i) * 8, h, DIG3)
+            if st: _pt(s, 128, (13 + i) * 8, st)
+
+    def magic(s):
+        s.window(0, 12, 20, 6)
+        rows = [(('Cure', 8), ('Fire', 88)), (('Sleep', 8), ('L1  MP 2', 96)),
+                (('Thunder Barrier', 8), ('Escape Teleport', 88)), (('Blizzard', 8), ('L2  MP 1', 96))]
+        for i, row in enumerate(rows):
+            for txt, x in row: _pt(s, x, (13 + i) * 8, txt)
+        _hand(s, 80, 13 * 8, HAND8)
+
+    a = base(); cmd(a, 8, True)
+    b = base(); magic(b)
+    c = base(); cmd(c, 16, False)
+    out_im = Image.new('RGB', (168 * 3 - 8, 144), (255, 255, 255))
+    for k, im in enumerate((a.im, b.im, c.im)): out_im.paste(im, (k * 168, 0))
+    out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock14_cursor.png'))
+
+
 def _pt(s, X, Y, txt, table=None):
     """proportional text at pixel (X, Y)"""
     for k, ch in enumerate(txt):
@@ -678,5 +736,5 @@ def main_menu(out):
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else 'build'
     os.makedirs(out, exist_ok=True)
-    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); battle8(out); battle9(out); battle10(out); battle11(out); battle12(out); battle13(out); main_menu(out)
+    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); battle8(out); battle9(out); battle10(out); battle11(out); battle12(out); battle13(out); battle14(out); main_menu(out)
     print('written to', out)
