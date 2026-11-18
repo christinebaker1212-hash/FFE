@@ -22,7 +22,7 @@ def main():
         lst = by_bank.get(0 if pc < 0x4000 else bank, [])
         i = bisect.bisect_right([a for a, _ in lst], pc) - 1
         return lst[i][1].split('.')[0] if i >= 0 else '?'
-    pb = PyBoy(rom, window='null', cgb=False, sound_emulated=False)
+    pb = PyBoy(rom, window='null', cgb=__import__('os').environ.get('GB_CGB') == '1', sound_emulated=False)
     pb.set_emulation_speed(0)
     wait_lo = [a for b, a, n in sy if n == 'rt_wait_nmi'][0]
     held = 0; total = 0; rows = []; c = Counter()

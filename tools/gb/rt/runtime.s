@@ -25,7 +25,15 @@ TILE_PAL   = $DB00          ;   palette each BG tile is coded for
 DIRTY_BM   = $DC00          ;   tiles queued for re-coding (bitmap)
 PAL_MAP    = $DC20          ;   value of each NES colour index, per palette
 RT_BUF     = $DC30          ;   one tile being re-coded
+DEFER_BM   = $DCA0          ;   marked tiles parked while no cell uses them (bitmap)
+REF_BM     = $DC80          ;   tiles the map uses (bitmap, from dmg_scan_all)
 REF_LMAX   = $DC40          ;   brightest BG colour level when the maps were last computed
+NGRP       = $DC41          ;   number of values (1-3) the brightness levels were grouped into
+LVF        = $DC50          ;   levels present (9)
+LSL        = $DC60          ;   levels present, ascending (9)
+LVMAP      = $DC70          ;   level -> value (9)
+TILE_USE   = $DD80          ;   colour indices each BG tile uses (bit i, a nibble per tile), 128 bytes
+GLUM       = $DC7C          ;   value (1-3) -> its brightest level ($DC7D-$DC7F)
 PAL_STABLE = 8              ;   frames without palette writes before the maps are recomputed
 RETILE_PER_FRAME = 3
 LCDC_ON    = %11000011      ; LCD on, window map $9C00 (off), BG tiles $8800 (signed), BG map $9800, OBJ on, BG on
@@ -91,7 +99,21 @@ sh_l1:      ds 1
 sh_l2:      ds 1
 sh_l3:      ds 1
 sh_chg:     ds 1
+sh_tile:    ds 1
+sh_u1:      ds 1
+sh_u2:      ds 1
+sh_u3:      ds 1
+sh_m0:      ds 1
+sh_m1:      ds 1
+sh_m2:      ds 1
+sh_m3:      ds 1
+own1_lo:    ds 1                            ; number of GB map cells drawn by nametable 1
+own1_hi:    ds 1
+maps_due:   ds 1                            ; DMG: palettes changed since the maps were computed
+dmg_scan:   ds 1                            ; DMG: map changed while the LCD was off
+sh_same:    ds 1                            ; rt_ppu_w7: cell unchanged (tile and owner)
 sh_nt:      ds 1                            ;   nametable being shaded: 0 or 4 (high-byte offset)
+ap_chg:     ds 1                            ; attribute write: changed quadrants (bit q)
 ap_own:     ds 1                            ; attr_apply: owner bits wanted (0 or $FF)
 ap_pal:     ds 4                            ; attr_apply: palette of each quadrant
 hram_end:   ds 1
@@ -468,15 +490,22 @@ attr_apply:                                 ; A = attribute index i (0-63, + $40
             ld c, a
             add a, $C0
             ld l, a
-            ld a, [hl]                      ; the attribute value -> ap_pal[0..3]
-            ld hl, ap_pal
+            ld a, [hl]                      ; the attribute value -> ap_pal[0..3] ($FF: a
+            ld hl, ap_pal                   ;   quadrant not in ap_chg, left alone)
             ld b, 4
-.qp:        ld d, a
+            ld e, a
+            ldh a, [ap_chg]
+            ld d, a
+.qp:        ld a, e
             and 3
-            ld [hl+], a
-            ld a, d
+            srl d
+            jr c, .qc
+            ld a, $FF
+.qc:        ld [hl+], a
+            ld a, e
             rrca
             rrca
+            ld e, a
             dec b
             jr nz, .qp
             ld a, c                         ; DE = OWN byte of (row0, col0): row0 * 4 + col0 / 8
@@ -544,8 +573,10 @@ attr_apply:                                 ; A = attribute index i (0-63, + $40
             ld a, [hl]
             pop hl
             bit 0, e
+            jr z, .sk
+            cp $FF
             call nz, vram_put1
-            inc hl
+.sk:        inc hl
             srl e
             pop bc
             dec c
@@ -566,6 +597,29 @@ attr_apply:                                 ; A = attribute index i (0-63, + $40
             jr nz, .r
             pop hl
             pop de
+            pop bc
+            ret
+
+; A = old XOR new attribute byte -> A = bit q set for each quadrant q that changed
+quad_mask:  push bc
+            ld c, a
+            ld b, 0
+            and $03
+            jr z, .q1
+            set 0, b
+.q1:        ld a, c
+            and $0C
+            jr z, .q2
+            set 1, b
+.q2:        ld a, c
+            and $30
+            jr z, .q3
+            set 2, b
+.q3:        ld a, c
+            and $C0
+            jr z, .q4
+            set 3, b
+.q4:        ld a, b
             pop bc
             ret
 
@@ -595,18 +649,31 @@ vram_put1:  push af
 ; owner of the GB map cell; on a Game Boy Color a change of owner re-applies the cell's
 ; attribute byte (of its new nametable). Keeps all registers.
 own_set:    push af
-            push bc
+            ld a, c                         ; nametable 0 and no cell drawn by nametable 1:
+            and a                           ;   nothing to do
+            jr nz, .full
+            ldh a, [own1_lo]
+            and a
+            jr nz, .full
+            ldh a, [own1_hi]
+            and a
+            jr nz, .full
+            pop af
+            ret
+.full:      push bc
             push de
             push hl
-            ld a, l                         ; mask of bit (col & 7)
+            push hl                         ; mask of bit (col & 7)
+            ld a, l
             and 7
-            ld e, 1
-            inc a
-.m:         dec a
-            jr z, .md
-            sla e
-            jr .m
-.md:        ld a, l                         ; byte = B * 32 + L / 8
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .nc
+            inc h
+.nc:        ld e, [hl]
+            pop hl
+            ld a, l                         ; byte = B * 32 + L / 8
             rrca
             rrca
             rrca
@@ -631,8 +698,14 @@ own_set:    push af
             ld a, d
             and a
             pop hl
-            jr z, .chg                      ; 0 -> 1
-            jr .x
+            jr nz, .x                       ; 1 -> 1
+            ldh a, [own1_lo]                ; 0 -> 1
+            add a, 1
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            adc a, 0
+            ldh [own1_hi], a
+            jr .chg
 .z:         ld a, e
             cpl
             and [hl]
@@ -641,34 +714,40 @@ own_set:    push af
             and a
             pop hl
             jr z, .x                        ; 0 -> 0
-.chg:       ldh a, [is_cgb]
+            ldh a, [own1_lo]                ; 1 -> 0
+            sub 1
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            sbc a, 0
+            ldh [own1_hi], a
+.chg:       xor a                           ; owner changed: the cell is not unchanged
+            ldh [sh_same], a
+            ldh a, [is_cgb]
             and a
             jr z, .x
-            ld a, l                         ; index = (row / 4) * 8 + col / 4; row = B * 8 + L / 32
+            ld a, c                         ; CGB: this cell's palette from its new nametable
+            ldh [sh_nt], a
+            ld a, l
             and 31
-            srl a
-            srl a
-            ld d, a
+            ld e, a                         ; col
             ld a, l
             swap a
             rrca
             and 7
-            ld e, a
+            ld d, a
             ld a, b
             add a, a
             add a, a
             add a, a
-            or e                            ; row
-            and $1C
-            add a, a                        ; (row / 4) * 8
-            or d
-            ld d, a
-            ld a, c                         ; + $40 for nametable 1
-            swap a
-            or d
+            or d                            ; row
+            call cell_pal
             push hl
-            ld l, $C0                       ; (attr_apply keeps HL; it takes A)
-            call attr_apply
+            ld e, a
+            ld a, b
+            add a, $98
+            ld h, a                         ; HL = $9800 + offset
+            ld a, e
+            call vram_put1
             pop hl
 .x:         pop hl
             pop de
@@ -727,25 +806,32 @@ rt_wait_nmi:
             dec a
             ret
 
-dmg_frame:                                  ; DMG shading, once per NES frame: palette maps
-            push bc                         ;   once the palettes are stable, then re-code
-            ldh a, [pal_age]                ;   a few queued tiles (all if the LCD is off)
+dmg_frame:                                  ; DMG shading, once per NES frame with the LCD
+            ldh a, [lcd_on]                 ;   on (with it off, all of it when it goes on):
+            and a                           ;   palette maps once the palettes have been
+            ret z                           ;   stable for PAL_STABLE frames, then re-code a
+            push bc                         ;   few marked tiles
+            ldh a, [pal_age]
             cp 255
             jr z, .a
             inc a
             ldh [pal_age], a
             cp PAL_STABLE
             jr nz, .a
+            ldh a, [maps_due]
+            and a
+            jr z, .a
+            call dmg_maps_now
+.a:         ld b, RETILE_PER_FRAME
+            call dmg_retile_some
+            pop bc
+            ret
+dmg_maps_now:
+            xor a
+            ldh [maps_due], a
             call dmg_maps
             ld a, 1                         ; BGP again with the new maps
             ldh [pal_dirty], a
-.a:         ld b, RETILE_PER_FRAME
-            ldh a, [lcd_on]
-            and a
-            jr nz, .r
-            ld b, 0
-.r:         call dmg_retile_some
-            pop bc
             ret
 
 ; ------------------------------------------------------------------ PPU registers
@@ -766,7 +852,16 @@ rt_ppu_w1:  push af
             ldh a, [is_cgb]
             and a
             jr nz, .lon
-            ld b, 0                         ; DMG: re-code all queued tiles while the LCD is off
+            ldh a, [maps_due]               ; DMG: palette maps now if the palettes changed
+            and a                           ;   since they were last computed
+            call nz, dmg_maps_now
+            ldh a, [dmg_scan]               ; DMG: tiles' palettes from the whole map if it
+            and a                           ;   was drawn with the LCD off, then re-code the
+            jr z, .nsc                      ;   marked tiles it uses (else all marked tiles)
+            call dmg_scan_all               ;   while the LCD is still off
+            call dmg_retile_ref
+            jr .lon
+.nsc:       ld b, 0
             call dmg_retile_some
 .lon:       ld a, LCDC_ON
             ldh [$FF40], a
@@ -961,13 +1056,18 @@ rt_ppu_w7:  push af
             or c
             add a, high(NT_SH)
             ld h, a
-            ld [hl], d                      ; shadow copy
             ld a, b
             cp $03
-            jr nz, .map
+            jr nz, .map0
             ld a, l
             cp $C0
-            jr c, .map
+            jr c, .map0
+            ld a, [hl]                      ; attribute byte: nothing to do if unchanged;
+            xor d                           ;   ap_chg = quadrants whose palette changed
+            jr z, .done
+            call quad_mask
+            ldh [ap_chg], a
+            ld [hl], d
             ld a, c                         ; attribute table: shadow; CGB: the 16 cells'
             swap a                          ;   palette numbers in VRAM bank 1; DMG: their
             ld b, a                         ;   tiles' shading. A = index (0-63) + $40 for
@@ -981,14 +1081,38 @@ rt_ppu_w7:  push af
             jr z, .dat
             call attr_apply
             jr .done
-.dat:       call dmg_attr
+.dat:       ldh a, [lcd_on]                 ; (LCD off: the scan when it goes on)
+            and a
+            ld a, b
+            jr nz, .dat2
+            ld a, 1
+            ldh [dmg_scan], a
             jr .done
+.dat2:      call dmg_attr
+            jr .done
+.map0:      ld a, [hl]                      ; shadow copy; sh_same = 1 if the cell had this tile
+            sub d
+            ld a, 0
+            jr nz, .df
+            inc a
+.df:        ldh [sh_same], a
+            ld [hl], d
 .map:       call own_set                    ; this nametable now owns the GB map cell
             ldh a, [is_cgb]
             and a
             jr nz, .map2
-            push bc                         ; DMG: the cell's tile shaded for its palette
-            ld a, b                         ;   (B = offset high + 4 for nametable 1)
+            ldh a, [sh_same]                ; DMG: the cell's tile shaded for its palette
+            and a                           ;   (unless tile and owner are unchanged; with
+            jr nz, .map2                    ;   the LCD off, once for the whole map when it
+            ldh a, [lcd_on]                 ;   goes on)
+            and a
+            jr nz, .mcell
+            inc a
+            ldh [dmg_scan], a
+            jr .map2
+.mcell:
+            push bc                         ;   (B = offset high + 4 for nametable 1)
+            ld a, b
             or c
             ld b, a
             ld a, d
@@ -1035,9 +1159,12 @@ rt_ppu_w7:  push af
             ld h, high(PAL_SH)
             ld a, d
             and $3F
+            cp [hl]                         ; same colour again: nothing changes
+            jr z, .done
             ld [hl], a
             ld a, 1
             ldh [pal_dirty], a
+            ldh [maps_due], a
             xor a
             ldh [pal_age], a
 .done:      call ppu_inc
@@ -1843,6 +1970,8 @@ rt_fault:   di
 rt_halted:  jr rt_halted
 
 ; rst $38 (opcode $FF) reached: DBG+8 = SP, DBG+10.. = 8 stack words; then stop
+BIT_MASK:   db 1, 2, 4, 8, 16, 32, 64, 128
+
 rst38_trap: di
             ld [DBG + 8], sp
             ld hl, sp + 0
