@@ -4,7 +4,7 @@ backdrops) are drawn as grey placeholder blocks.
 usage: mockup.py OUTDIR"""
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from latin_font import tile, COND, G, _glyph_cols
+from latin_font import tile, COND, G, NARROW, _glyph_cols
 from PIL import Image, ImageDraw
 
 SHADES = [(224, 248, 208), (136, 192, 112), (52, 104, 86), (8, 24, 32)]   # DMG-like
@@ -28,15 +28,28 @@ class Screen:
             if ch != ' ': self.glyph(x + i, y, ch, fg, bg)
             else: self.d.rectangle([(x + i) * 8, y * 8, (x + i) * 8 + 7, y * 8 + 7], fill=SHADES[bg])
 
-    def ptext(self, x, y, s, fg=0, px=0):
+    def pwidth(self, s, table=None):
+        w = 0
+        for k, ch in enumerate(s):
+            if k: w += 1
+            w += 2 if ch == ' ' else len(_glyph_cols(ch, self._table(ch, table)))
+        return w
+
+    @staticmethod
+    def _table(ch, table):
+        if table is not None and ch in table: return table
+        return COND if ch in COND else G
+
+    def ptext(self, x, y, s, fg=0, px=0, table=None, right=None):
         """proportional text in the condensed letters (1-px gaps, 3-px space), from tile
         (x, y) plus px pixels; characters without a condensed form use the regular glyph
         trimmed to its ink. Returns the width in pixels."""
+        if right is not None: px = right - x * 8 - self.pwidth(s, table)
         X = x * 8 + px
         for k, ch in enumerate(s):
             if k: X += 1
             if ch == ' ': X += 2; continue
-            cols = _glyph_cols(ch, COND if ch in COND else G)
+            cols = _glyph_cols(ch, self._table(ch, table))
             for cx, col in enumerate(cols):
                 for cy in range(8):
                     if col[cy]: self.im.putpixel((X + cx, y * 8 + cy), SHADES[fg])
@@ -163,6 +176,40 @@ def battle3(out):
     both.resize((both.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock3_font_command.png'))
 
 
+def battle4(out):
+    """Owner (2026-11-18): the small font also for the name/HP beside each sprite.
+    Column = GB cols 16-19 (32 px), the sprite's 3 rows. Left: A = name / HP + number /
+    status word (blank when none). Right: B = the NES order (name / HP or status /
+    number). Status words that are wider than 32 px in the condensed letters (Darkness,
+    Paralysis) use the narrow letters the English build already has for them."""
+    party = [('AAAA', 35, ''), ('WWWW', 30, 'Poison'), ('Mm', 0, 'Paralysis'), ('DDDD', 125, 'Darkness')]
+
+    def status(s, row, word):
+        if word: s.ptext(16, row, word, table=NARROW if s.pwidth(word) > 32 else None)
+
+    def screen(variant):
+        s = Screen(bg=3)
+        for r in range(3):
+            for c in range(3): s.block(1 + c * 4, r * 4, 4, 4)
+        for i, (n, hp, st) in enumerate(party):
+            y = i * 3
+            s.block(14, y, 2, 3)
+            s.ptext(16, y, n)
+            if variant == 'A':
+                s.ptext(16, y + 1, 'HP'); s.ptext(16, y + 1, str(hp), right=160)
+                status(s, y + 2, st)
+            else:
+                if st: status(s, y + 1, st)
+                else: s.ptext(16, y + 1, 'HP')
+                s.ptext(16, y + 2, str(hp), right=160)
+        s.window(0, 12, 20, 6)
+        for i, r in enumerate(['WWWW', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
+        return s
+    both = Image.new('RGB', (160 * 2 + 8, 144), (255, 255, 255))
+    both.paste(screen('A').im, (0, 0)); both.paste(screen('B').im, (168, 0))
+    both.resize((both.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock4_party_small.png'))
+
+
 def main_menu(out):
     s = Screen(bg=3)
     s.window(0, 0, 20, 10)                              # party list, one line per member
@@ -186,5 +233,5 @@ def main_menu(out):
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else 'build'
     os.makedirs(out, exist_ok=True)
-    battle(out); battle2(out); battle3(out); main_menu(out)
+    battle(out); battle2(out); battle3(out); battle4(out); main_menu(out)
     print('written to', out)
