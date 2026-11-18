@@ -618,6 +618,15 @@ Milestones per game (from `docs/gb-port.md`):
   (fault 1: no compiled code for a jump-table target $A4E4). covall now also runs one
   battle per formation (128, `covbattle.py --form F`; the patched ROM keeps every code
   offset, so the logs fit the normal ROM).
+  Cause found later: the test tool's formation patcher (`formations.patched`) also patched
+  bytes inside the operands of STA/DEC $6AA5 ($F6B0/$F6B6); it now patches an explicit
+  list of `LDA $6A` sites. With it, f62 and f69 run identical to the NES (firstdiff 7100).
+- Fixed: the new-game camera code (`NG_B14B`) was assembled over the end of `camequip`
+  (equip screen camera; invisible to RAM checks). It now starts at `EQ_CAM_END`.
+- SGB battle party palette checked on f62 / f69 (mGBA): party in its own colours, enemies
+  in theirs (`build/shots/sgb_forms.png`).
+- Tools: `firstdiff.py --wram F` / env `WATCH=lo-hi` (print work RAM of both),
+  `tracediff.py --battle`.
 - Next: FF1's accuracy / timing pass (lag in screen transitions, SGB check of the new
   screens in mGBA).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).

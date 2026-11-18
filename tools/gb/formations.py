@@ -16,17 +16,18 @@ HDR, START, SHOT = 16, 6100, 6300
 
 def patched(rom, f):
     """Every read of the formation number $6A becomes LDA #f (battle graphics $EAD5/$EADD,
-    battle entry $C1D4/$C933, setup $F292, names $F6B0/$F6B6, bank 11 $9AD3/$A141)."""
+    battle entry $C1D4/$C933, setup $F292, bank 11 $9AD3/$A141). (The bytes A5 6A at $F6B0 /
+    $F6B6 are the operands of STA / DEC $6AA5, not reads of $6A: left alone.)"""
     r = bytearray(rom)
-    n = 0
-    for bank, base in ((15, 0xC000), (31, 0xC000), (11, 0x8000)):
-        o0 = HDR + bank * 0x4000
-        for a in range(o0, o0 + 0x4000 - 2):
-            if r[a] == 0xA5 and r[a + 1] == 0x6A:
-                r[a:a + 2] = bytes([0xA9, f]); n += 1
-            elif r[a] == 0xAD and r[a + 1] == 0x6A and r[a + 2] == 0x00:
-                r[a:a + 3] = bytes([0xA9, f, 0xEA]); n += 1
-    assert n >= 9, n
+    sites = [(b, a) for b in (15, 31) for a in (0xC1D4, 0xC933, 0xEAD5, 0xEADD, 0xF292)] + \
+            [(11, 0x9AD3), (11, 0xA141)]
+    for bank, cpu in sites:
+        a = HDR + bank * 0x4000 + (cpu - (0x8000 if bank == 11 else 0xC000))
+        if r[a] == 0xA5 and r[a + 1] == 0x6A:
+            r[a:a + 2] = bytes([0xA9, f])
+        else:
+            assert r[a:a + 3] == bytes([0xAD, 0x6A, 0x00]), (bank, hex(cpu), r[a:a + 3].hex())
+            r[a:a + 3] = bytes([0xA9, f, 0xEA])
     return bytes(r)
 
 

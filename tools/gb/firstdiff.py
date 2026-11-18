@@ -7,6 +7,7 @@ usage: PYTHONPATH=build/emu firstdiff.py NES GB [MAXFRAMES] [--random SEED] [--b
        [--shots F1,F2,... --out SHEET.png]
 --battle: the battleshot.py input (new-game script, walk into a battle, A once a second);
 --shots: GB screens after those NES frames, saved as one sheet (--out).
+--wram F: from NES frame F on, also compare work RAM $6000-$7FFF at each NMI (slow).
 env STUCK_SAVE=K: save the PyBoy state on entering frame wait K to build/stuck.state and stop
 (for debugging the GB alone from there)."""
 import sys, random, os
@@ -32,6 +33,9 @@ if '--poke' in args:
 poke_at = 6100 if not field else 3700
 if '--poke-at' in args:
     k = args.index('--poke-at'); poke_at = int(args[k + 1]); del args[k:k + 2]
+wram_from = None
+if '--wram' in args:
+    k = args.index('--wram'); wram_from = int(args[k + 1]); del args[k:k + 2]
 shots_at, out = set(), None
 if '--shots' in args:
     k = args.index('--shots'); shots_at = {int(x) for x in args[k + 1].split(',')}; del args[k:k + 2]
@@ -100,6 +104,15 @@ for m in steps[:limit]:
     if k < 8: continue
     a = nes.nmi_ram; b = snaps.pop(k)
     d = [i for i in range(0x800) if a[i] != b[i] and not 0x100 <= i < 0x200]
+    if os.environ.get('WATCH') and f >= int(os.environ.get('WATCH_FROM', '0')):   # WATCH=6E90-6EB0: print both
+        lo, hi = (int(x, 16) for x in os.environ['WATCH'].split('-'))
+        print(f, k, 'NES', bytes(nes[x] for x in range(lo, hi)).hex(' '))
+        print(f, k, 'GB ', bytes(gb.pb.memory[0, 0xA000 + x - 0x6000] for x in range(lo, hi)).hex(' '))
+    if wram_from is not None and f >= wram_from and not d:     # (NES now, GB now: both at the wait)
+        w = [0x6000 + i for i in range(0x2000) if nes[0x6000 + i] != gb.pb.memory[0, 0xA000 + i]]
+        if w:
+            print('frame %d nmi %d work RAM: %s' % (f, k, ' '.join('%04X:%02X/%02X' % (x, nes[x], gb.pb.memory[0, 0xA000 + x - 0x6000]) for x in w[:16])))
+            break
     if d:
         print('frame %d nmi %d: %s' % (f, k, ' '.join('%03X:%02X/%02X' % (i, a[i], b[i]) for i in d[:16])))
         break

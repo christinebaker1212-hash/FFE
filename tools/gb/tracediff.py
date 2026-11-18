@@ -1,7 +1,7 @@
 """Find where the GB build first runs a different NES instruction than the NES build:
 lockstep to frame wait K-1 (as firstdiff.py), then trace NES instructions and GB labels
 (L_space_addr hooks) for frame K and compare the two sequences.
-usage: PYTHONPATH=build/emu tracediff.py NES GB K"""
+usage: PYTHONPATH=build/emu tracediff.py NES GB K [--random SEED | --battle]"""
 import sys
 sys.path.insert(0, __file__.rsplit('/', 1)[0])
 from compare import sync_sram, GB, new_game_script
@@ -28,6 +28,9 @@ for it in new_game_script():
     if it[0] == 'shot': continue
     m, h, a = it
     steps += [m] * h + [0] * a
+if '--battle' in sys.argv:                 # battleshot / firstdiff --battle input
+    import battleseq
+    steps = [battleseq.pad_for('fight', f) for f in range(60000)]
 if RND is not None:
     r = random.Random(RND)
     btns = [UP, DOWN, LEFT, RIGHT, A, A, B, START, UP, DOWN, LEFT, RIGHT]
@@ -82,4 +85,6 @@ while i < len(nseq) and j < len(gbtrace):
     print('  GB :', ' '.join(gbtrace[max(0, j - 12):j + 8]))
     break
 else:
-    print('sequences agree up to the shorter one')
+    print('sequences agree up to the shorter one (NES %d / GB %d); where the shorter ends:' % (i, j))
+    print('  NES:', ' '.join(nseq[max(0, i - 12):i + 12]))
+    print('  GB :', ' '.join(gbtrace[max(0, j - 12):j + 12]))

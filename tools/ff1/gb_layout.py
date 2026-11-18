@@ -2717,6 +2717,8 @@ mtitle:             ; $AEC1: the magic screen's title (member name) one row up
     put_bank(rom, B, 0xAEC1, bytes([0x20]) + m.labels['mtitle'].to_bytes(2, 'little'), bytes([0x20, 0x6C, 0xB9]))
     ce = asm(EQ_CAM, syms=syms, org=0xBF0D)          # old highlight code (dead: $BF0A jumped to ExRAM)
     assert ce.org + len(ce.bytes) <= 0xBF41
+    global EQ_CAM_END
+    EQ_CAM_END = ce.org + len(ce.bytes)
     put_bank(rom, B, ce.org, ce.bytes, bytes(rom[bank_off(B, ce.org):bank_off(B, ce.org) + len(ce.bytes)]))
     put_bank(rom, B, 0xBE06, bytes([0x20]) + ce.labels['camequip'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
     # command hands (GB x 0 / 56 / 104 -> NES x 8 / 64 / 112) on row 2
@@ -3001,6 +3003,7 @@ def prologue(rom):
 # columns / two rows apart: GB cols 1-19, rows 1-17). The game starts with the field
 # camera 6 / 6 again.
 NG_BOXES = [(4, 4), (14, 4), (4, 13), (14, 13)]
+EQ_CAM_END = None       # end of camequip in bank 14 (set by equip_menu, which runs first)
 NG_B14 = """
 camclass:           ; $9D09 (class select screen): camera 4, 4
     jsr $9C02
@@ -3048,7 +3051,7 @@ def new_game(rom):
     a = asm(NG_B14, org=0xA145)                     # dead old prologue code (A142 jumps away)
     assert a.org + len(a.bytes) <= 0xA167, hex(a.org + len(a.bytes))
     put_bank(rom, B, a.org, a.bytes, bytes(rom[bank_off(B, a.org):bank_off(B, a.org) + len(a.bytes)]))
-    b = asm(NG_B14B, org=0xBF1C)
+    b = asm(NG_B14B, org=EQ_CAM_END)               # after camequip ($BF0D, equip_menu)
     assert b.org + len(b.bytes) <= 0xBF41, hex(b.org + len(b.bytes))
     put_bank(rom, B, b.org, b.bytes, bytes(rom[bank_off(B, b.org):bank_off(B, b.org) + len(b.bytes)]))
     put_bank(rom, B, 0x9D09, bytes([0x20]) + a.labels['camclass'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
