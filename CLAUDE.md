@@ -558,6 +558,9 @@ Milestones per game (from `docs/gb-port.md`):
   - Seam in the dialogue box's left border: the box crosses NES row 240 -> 0, where the GB
     view skips map rows 30-31 with an LYC split; the SCY write landed mid-line. LYC is
     now one line earlier and the write waits for that line's hblank.
+  - Checked: the 2-page test dialogue on DMG and CGB (border whole, map and people back
+    after closing; firstdiff identical), and all 34 checks (shops, sub-screens, menu,
+    dialogue, battle, random 30000; DMG + CGB) identical after fresh coverage (20.0k).
   - Test hook: env `GB_DLG_TEST=text` (insert.py) replaces dialogue 0 ("There's nothing
     there.") with a long text (test builds only; blanks dialogues 100-109 for room).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
