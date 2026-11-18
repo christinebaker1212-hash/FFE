@@ -44,6 +44,10 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   above all the graphics paths. FF1: github.com/Entroper/FF1Disassembly (US release: match
   to the Japanese ROM); FF2 / FF3: github.com/everything8215/ff2, /ff3. Never copy game code
   into the repo. Measure with tools/gb/lagcheck.py (Gambatte, hardware-like timing).
+- **Owner's decision (2026-11-18): FF1 stays on the current approach (static recompilation of
+  the user's ROM + native routines). FF2 and FF3 switch to their disassembly sources
+  (everything8215/ff2, /ff3) as the base**, packed into the builder (fetched when the builder
+  is made, never committed to this repo); the English patches get ported onto those sources.
 - **Static recompilation** of each game's own 6502 code to SM83, not a hand-written
   re-implementation. Game logic, formulas, RNG and events stay exactly as on the
   Famicom, and the English patch carries over without changes.
