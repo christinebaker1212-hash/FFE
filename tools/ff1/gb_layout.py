@@ -1919,6 +1919,7 @@ def apply(rom, report):
     equip_menu(rom)
     status_menu(rom)
     shop_menu(rom)
+    prologue(rom)
     report.append('GB layout applied')
 
 
@@ -2858,7 +2859,7 @@ def shop_menu(rom):
     old = bytes(rom[bank_off(B, 0xAC53):bank_off(B, 0xAC53) + 20])
     new = bytes(w[k] for k in range(4) for w in SHOP_WIN)
     put_bank(rom, B, 0xAC53, new, old)
-    put_bank(rom, B, 0xAC6F, b'\xFF' * 64, bytes(rom[bank_off(B, 0xAC6F):bank_off(B, 0xAC6F) + 64]))
+    put_bank(rom, B, 0xA7A0, bytes([0xA9, 0xFF, 0xEA]), bytes([0xBD, 0x6F, 0xAC]))   # attributes: all $FF
     put_bank(rom, B, 0xA7C8, b'\xEA\xEA\xEA', bytes([0x20, 0xCF, 0xDC]))       # no scene
     put_bank(rom, B, 0xAA0D, b'\x60', bytes([0xA9]))                              # no party sprites
     for a in (0xA8BE, 0xA9FC):                      # window 3 is not erased under the list
@@ -2877,3 +2878,111 @@ def shop_menu(rom):
     put_bank(rom, B, 0xA992, bytes([0, 47, 0, 63, 0, 79, 0, 95, 0, 111]), bytes(rom[bank_off(B, 0xA992):bank_off(B, 0xA992) + 10]))
     a = SHOP['names']                               # party names, one row each
     put_bank(rom, B, 0xA8FC, bytes([0xA9, a & 0xFF, 0x85, 0x3E, 0xA9, a >> 8]), bytes(rom[bank_off(B, 0xA8FC):bank_off(B, 0xA8FC) + 6]))
+
+
+# Prologue (camera 6, 6: NES cols 6-25, rows 6-23): two pages (sentences 1-3, 4-7) of
+# lines of up to 18 letters, centred, a blank row between sentences; each page drawn and
+# faded in by FF1's own band fade ($A287, a button skips / goes on), page 2 after FF1's
+# own clear ($A10A: nametable blank, attributes dark). Page 1 holds PROLOG_HOLD frames,
+# then page 2 follows by itself; a button skips the rest of the prologue as on the NES
+# (so input scripts keep their timing). Code in the GB shop's unused attribute table and
+# picture data (b14 $AC6F-$AD12; the shop no longer reads them).
+PROLOG = {}
+PROLOG_ROWS = (8, 7)                    # first text row of each page
+
+
+def prologue_pages(en, flow):
+    sents = en.split('\n')
+    pages = []
+    for part in (sents[:3], sents[3:]):
+        rows = []
+        for k, sen in enumerate(part):
+            if k: rows.append('')
+            rows += [' ' * ((18 - len(l)) // 2) + l for l in flow(sen, 18)]
+        assert len(rows) <= 15, rows
+        pages.append('{09}' + '{08}'.join(rows))
+    return pages
+
+
+PROLOG_SRC = """
+pinit:              ; $A107 (prologue start): page 1, camera 6 / 6
+    lda #0
+    sta PG
+    lda #6
+    sta $5800
+    sta $5801
+    jmp $A232
+prolog:             ; $A142 (after the clear): the page PG, faded in, until a button
+    ldx PG
+    lda plo,x
+    sta $3E
+    lda phi,x
+    sta $3F
+    lda prow,x
+    sta $3B
+    lda #0
+    sta $37
+    lda #BANK
+    sta $57
+    lda #$0E
+    sta $58
+    lda #7
+    sta $3A
+    jsr $DEB6
+    jsr $B793
+    lda PG
+    bne plast
+    lda #$C8        ; page 1: FF1's band fade ($A287 without its endless wait) ...
+    sta $62
+pf1:
+    jsr $A29F
+    lda $62
+    clc
+    adc #8
+    sta $62
+    cmp #$F0
+    bcc pf1
+    jsr phold       ; ... then a hold; a button skips the whole prologue (as on the NES)
+    lda PCNT
+    bne pdone
+    inc PG
+    lda #0          ; page 2: screen off, FF1's clear, then here again
+    sta $2001
+    jmp $A10A
+plast:
+    jsr $A287       ; page 2: fade, then FF1's wait for a button
+pdone:
+    lda #0
+    sta PG
+    jmp $A167
+phold:              ; up to HOLD frames; a button returns through $A305's PLA PLA RTS
+    lda #HOLD       ;   with PCNT still set
+    sta PCNT
+ph1:
+    jsr $A305
+    dec PCNT
+    bne ph1
+    rts
+plo:
+    .db <P1, <P2
+phi:
+    .db >P1, >P2
+prow:
+    .db R1, R2
+"""
+PG, PCNT = 0x034B, 0x0348        # ($0348: the dialogue's DGT, not used meanwhile)
+PROLOG_HOLD = 240                       # frames page 1 stays before page 2 (4 s)
+
+
+def prologue(rom):
+    B = 14
+    p1, p2 = PROLOG['pages']
+    r = asm(PROLOG_SRC, syms={'PG': PG, 'PCNT': PCNT, 'HOLD': PROLOG_HOLD, 'BANK': PROLOG['bank'], 'P1': p1,
+                              'P2': p2, 'R1': PROLOG_ROWS[0], 'R2': PROLOG_ROWS[1]}, org=0xAC6F)
+    assert r.org + len(r.bytes) <= 0xAD13, hex(r.org + len(r.bytes))
+    # FF1's band fade from attribute row 1 (rows 4-7) and the last band like the others
+    put_bank(rom, B, 0xA288, bytes([0xC8]), bytes([0xD0]))
+    put_bank(rom, B, 0xA2A9, bytes([0xF8]), bytes([0xE8]))
+    put_bank(rom, B, r.org, r.bytes, bytes(rom[bank_off(B, r.org):bank_off(B, r.org) + len(r.bytes)]))
+    put_bank(rom, B, 0xA107, bytes([0x20]) + r.labels['pinit'].to_bytes(2, 'little'), bytes([0x20, 0x32, 0xA2]))
+    put_bank(rom, B, 0xA142, bytes([0x4C]) + r.labels['prolog'].to_bytes(2, 'little'), bytes([0xA9, 0x20, 0x85]))

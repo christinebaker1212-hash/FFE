@@ -563,6 +563,14 @@ Milestones per game (from `docs/gb-port.md`):
     dialogue, battle, random 30000; DMG + CGB) identical after fresh coverage (20.0k).
   - Test hook: env `GB_DLG_TEST=text` (insert.py) replaces dialogue 0 ("There's nothing
     there.") with a long text (test builds only; blanks dialogues 100-109 for room).
+- **Prologue (2026-11-18)** (`gb_layout.prologue`, strings `prologue_pages`): two pages of
+  18-column centred lines (sentences 1-3 from row 8, 4-7 from row 7; camera 6/6), each
+  faded in by FF1's band fade; page 1 holds 240 frames, then page 2 (after FF1's own clear
+  $A10A); a button skips the rest as on the NES, so the new-game input script keeps its
+  timing. Code in b14 $AC6F-$AD12 (the shop's attribute table / picture data, unused by the
+  GB shop). The title menu (Continue / Start Over / Message Speed) fits the default view.
+- Next: class select (4 boxes, 24x22 on the NES) and name entry (letter grid 10x9 at
+  2-row spacing, 24x26), then the ending.
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).

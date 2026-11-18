@@ -1561,6 +1561,14 @@ def prologue(rom):
     Japanese spacing; the fade starts at row 4 and also fades rows 22-23 (the Japanese
     showed its last band at once). String in BATTLE_BANK."""
     e = json.load(open('script/ff1/prologue.json'))[0]
+    if '--gb' in sys.argv:                     # GB layout: two pages of 18 columns
+        sys.path.insert(0, os.path.dirname(__file__))
+        import gb_layout
+        bank = Bank(rom, BATTLE_BANK, keep=True); bank.free = BATTLE_FREE[:]
+        gb_layout.PROLOG['pages'] = [bank.alloc(enc(t) + b'\0') for t in gb_layout.prologue_pages(e['en'], flow)]
+        BATTLE_FREE[:] = bank.free
+        gb_layout.PROLOG['bank'] = BATTLE_BANK
+        return
     out = []
     for line in e['en'].split('\n'):
         if len(line) <= 30: ls = [line, '']
