@@ -33,6 +33,16 @@ NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), fo
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
 BG_DIRTY   = $CCA0          ; CGB: BG tiles to copy by HDMA (bitmap, 32)
 SPR_DIRTY  = $CCC0          ; CGB: sprite slots to copy by HDMA (bitmap, 16)
+EV_L       = $CCE0          ; raster events of this frame (vbl_regs / stat_isr): first line (3),
+EV_K       = $CCE3          ;   kind (3: 0 = SCY split, 1 = mask off, 2 = mask on),
+EV_I       = $CCE6          ;   next one,
+EV_N       = $CCE7          ;   count
+BAND_T     = $CCE8          ; NES band effect (rt_band): GB lines shown from T to B-1,
+BAND_B     = $CCE9          ;   for BAND_LIFE more frames
+BAND_LIFE  = $CCEA
+BGP_NORM   = $CCEB          ; DMG / SGB: BGP of the frame; BGP_MASK: every value as the backdrop
+BGP_MASK   = $CCEC
+EMPH_RGB   = $3A00          ; CGB: NES colours with emphasis e (1-7) at EMPH_RGB + e * $80
 STAGE      = $D000          ; CGB WRAM bank 2: BG tiles (4KB), bank 3: sprite slots (2KB)
 OWN        = $DD00          ; GB map cell -> nametable that drew it (bit set: nametable 1), 128 bytes
 BG_SHADOW  = $B000          ; DMG shading (rt/dmg_shade.s): NES BG tiles, cart RAM bank 1
@@ -214,6 +224,14 @@ boot:       di
             ld hl, $8000
             ld bc, $2000
             call memclr
+            ld hl, $9C00                    ; window map (the mask): tile 0 of VRAM bank 1
+            ld bc, $400                     ;   (cleared above), palette 0: the backdrop
+.wm:        ld a, $08
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .wm
             xor a
             ldh [$FF4F], a
             ld a, 1                         ; double speed (KEY1 + STOP, interrupts off)
@@ -235,6 +253,10 @@ boot:       di
             inc de
             dec b
             jr nz, .cd
+            xor a                           ; window (the mask) at the top left
+            ldh [$FF4A], a
+            ld a, 7
+            ldh [$FF4B], a
             ld a, $0A                       ; cart RAM on, RAM bank 0 (NES $6000-$7FFF)
             ld [$0000], a
             xor a
@@ -346,41 +368,7 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             ldh a, [pal_dirty]
             and a
             call nz, make_palettes
-.pal_ok:    ldh a, [bgp_v]
-            ldh [$FF47], a
-            ldh a, [obp0_v]
-            ldh [$FF48], a
-            ldh a, [obp1_v]
-            ldh [$FF49], a
-            ldh a, [cam_x]
-            ld b, a
-            ldh a, [scroll_x]
-            add a, b
-            ldh [$FF43], a
-            ldh a, [cam_y]                  ; NES rows wrap at 240, the GB map at 256:
-            ld b, a
-            ldh a, [scroll_y]               ; SCY = (scroll_y + cam_y) mod 240, and an LYC
-            add a, b
-            jr c, .wr                       ; split where the view reaches NES row 240
-            cp 240
-            jr c, .sy
-.wr:        sub 240
-.sy:        ldh [$FF42], a
-            ld b, a
-            ld a, 240
-            sub b
-            cp 144
-            jr nc, .nosplit
-            dec a                           ; (the line before: SCY is written in its hblank)
-            ldh [$FF45], a
-            ld a, b
-            add a, 16
-            ldh [split_scy], a
-            ld a, %01000000
-            ldh [$FF41], a
-            jr .scy_done
-.nosplit:   xor a
-            ldh [$FF41], a
+.pal_ok:    call vbl_regs                   ; BGP / OBP, LCDC, scroll, raster events
 .scy_done:  ldh a, [hd_any]                 ; CGB: tiles by HDMA first
             and a
             call nz, hdma_flush
@@ -408,17 +396,349 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             pop af
             reti
 
-stat_isr:   push af                         ; LYC split: skip GB map rows 30-31
-            ldh a, [$FF41]                  ; (only on a real LY = LYC match: on the DMG a
-            bit 2, a                        ;   STAT write requests a STAT interrupt)
-            jr z, .x
-.hb:        ldh a, [$FF41]                  ; wait for this line's hblank, so the next line
-            and 3                           ;   (the first one of NES row 240 -> 0) is drawn
-            jr nz, .hb                      ;   wholly with the new SCY
+stat_isr:   push af                         ; raster events (vbl_regs), each in the hblank
+            push hl                         ;   of the line before its first line: SCY split
+            ldh a, [$FF41]                  ;   (NES row 240 -> 0), mask off / on (NES band
+            bit 2, a                        ;   effect, BG off). (Only on a real LY = LYC:
+            jr z, .x                        ;   on the DMG a STAT write requests one.)
+.hb:        ldh a, [$FF41]
+            and 3
+            jr nz, .hb
+.ev:        ld a, [EV_I]
+            add a, low(EV_K)
+            ld l, a
+            ld h, high(EV_K)
+            ld a, [hl]
+            and a
+            jr nz, .mk
             ldh a, [split_scy]
             ldh [$FF42], a
-.x:         pop af
+            jr .nx
+.mk:        dec a
+            jr nz, .on
+            ldh a, [is_cgb]                 ; mask off
+            and a
+            jr z, .offd
+            ldh a, [$FF40]
+            res 5, a
+            ldh [$FF40], a
+            jr .nx
+.offd:      ld a, [BGP_NORM]
+            ldh [$FF47], a
+            jr .nx
+.on:        ldh a, [is_cgb]                 ; mask on
+            and a
+            jr z, .ond
+            ldh a, [$FF40]
+            set 5, a
+            ldh [$FF40], a
+            jr .nx
+.ond:       ld a, [BGP_MASK]
+            ldh [$FF47], a
+.nx:        ld a, [EV_I]
+            inc a
+            ld [EV_I], a
+            ld l, a
+            ld a, [EV_N]
+            cp l
+            jr z, .x
+            ld a, l
+            add a, low(EV_L)
+            ld l, a
+            ld h, high(EV_L)
+            ld a, [hl]
+            dec a
+            ld l, a
+            ldh a, [$FF44]
+            cp l
+            jr nc, .ev                      ; (its line already reached)
+            ld a, l
+            ldh [$FF45], a
+.x:         pop hl
+            pop af
             reti
+
+; vblank: the frame's BGP / OBP (DMG / SGB: emphasis darkens them), LCDC (sprites on or off,
+; CGB: the window as the mask), scroll, and the raster events (sorted by line) with the mask
+; at the top: a NES band effect (rt_band) or the NES BG switched off ($2001) masks
+vbl_regs:   xor a
+            ld [EV_N], a
+            ld [EV_I], a
+            ld c, 0                         ; C = masked at the top
+            ld a, [BAND_LIFE]
+            and a
+            jr z, .nob
+            dec a
+            ld [BAND_LIFE], a
+            ld a, [BAND_T]
+            cp 144
+            jr nc, .all
+            ld b, a
+            ld a, [BAND_B]
+            cp b
+            jr z, .all
+            jr c, .all
+            ld a, b
+            and a
+            jr z, .t0
+            ld c, 1
+            ld a, 1                         ; mask off at T
+            call ev_add
+.t0:        ld a, [BAND_B]
+            cp 144
+            jr nc, .bd
+            ld b, a
+            ld a, 2                         ; mask on at B
+            call ev_add
+            jr .bd
+.all:       ld c, 1
+            jr .bd
+.nob:       ldh a, [ppu_mask]
+            bit 3, a
+            jr nz, .bd
+            ld c, 1                         ; NES BG off: the backdrop (sprites stay)
+.bd:        ldh a, [bgp_v]
+            call emph_bgp
+            ld [BGP_NORM], a
+            and 3                           ; mask: every value as value 0 (the backdrop)
+            ld b, a
+            add a, a
+            add a, a
+            or b
+            ld b, a
+            swap a
+            or b
+            ld [BGP_MASK], a
+            ld b, a
+            ld a, c
+            and a
+            ld a, b
+            jr nz, .bg
+            ld a, [BGP_NORM]
+.bg:        ldh [$FF47], a
+            ldh a, [obp0_v]
+            ldh [$FF48], a
+            ldh a, [obp1_v]
+            ldh [$FF49], a
+            ld b, LCDC_ON & %11111101       ; LCDC: sprites as the NES ($2001 bit 4)
+            ldh a, [ppu_mask]
+            bit 4, a
+            jr z, .ns
+            set 1, b
+.ns:        ldh a, [is_cgb]
+            and a
+            jr z, .lc
+            ld a, c
+            and a
+            jr z, .lc
+            set 5, b                        ; CGB: the mask is the window (blank)
+.lc:        ld a, b
+            ldh [$FF40], a
+            ldh a, [cam_x]
+            ld b, a
+            ldh a, [scroll_x]
+            add a, b
+            ldh [$FF43], a
+            ldh a, [cam_y]                  ; NES rows wrap at 240, the GB map at 256:
+            ld b, a
+            ldh a, [scroll_y]               ; SCY = (scroll_y + cam_y) mod 240, and a split
+            add a, b                        ;   event where the view reaches NES row 240
+            jr c, .wr
+            cp 240
+            jr c, .sy
+.wr:        sub 240
+.sy:        ldh [$FF42], a
+            ld b, a
+            ld a, 240
+            sub b
+            cp 144
+            jr nc, .nosplit
+            ld c, a
+            ld a, b
+            add a, 16
+            ldh [split_scy], a
+            ld b, c
+            xor a
+            call ev_add
+.nosplit:   ld a, [EV_N]
+            and a
+            jr z, .noev
+            ld a, [EV_L]
+            dec a
+            ldh [$FF45], a
+            ld a, %01000000
+            ldh [$FF41], a
+            ret
+.noev:      xor a
+            ldh [$FF41], a
+            ret
+
+; A = kind, B = first line (1-143): into the event list, kept sorted by line
+ev_add:     push de
+            push hl
+            ld e, a
+            ld a, [EV_N]
+            ld d, a                         ; D = index to fill (moves down past later lines)
+.lp:        ld a, d
+            and a
+            jr z, .put
+            dec a
+            add a, low(EV_L)
+            ld l, a
+            ld h, high(EV_L)
+            ld a, [hl]                      ; line of the event before
+            cp b
+            jr c, .put
+            jr z, .put
+            inc l                           ; shift it up one
+            ld [hl], a
+            ld a, l
+            add a, EV_K - EV_L - 1
+            ld l, a
+            ld a, [hl]
+            inc l
+            ld [hl], a
+            dec d
+            jr .lp
+.put:       ld a, d
+            add a, low(EV_L)
+            ld l, a
+            ld h, high(EV_L)
+            ld [hl], b
+            ld a, l
+            add a, EV_K - EV_L
+            ld l, a
+            ld [hl], e
+            ld a, [EV_N]
+            inc a
+            ld [EV_N], a
+            pop hl
+            pop de
+            ret
+
+; A = BGP: darkened while the NES emphasis bits ($2001 bits 5-7) are set (the battle-start
+; flashes): DMG one shade darker (two with all three bits), SGB one colour number lower
+emph_bgp:   push bc
+            ld b, a
+            ldh a, [ppu_mask]
+            and $E0
+            jr z, .x
+            ld c, 1
+            cp $E0
+            jr nz, .one
+            inc c
+.one:       ldh a, [is_sgb]
+            and a
+            jr nz, .s
+.d:         ld a, b                         ; DMG: each 2-bit field + 1 (at most 3)
+            call .fd
+            ld b, a
+            dec c
+            jr nz, .d
+            jr .x
+.s:         ld a, b                         ; SGB: each field - 1 (at least 0)
+            call .fs
+            ld b, a
+            dec c
+            jr nz, .s
+.x:         ld a, b
+            pop bc
+            ret
+.fd:        push bc                         ; A: each 2-bit field + 1 (at most 3)
+            push de
+            ld e, a
+            ld b, 0
+            ld d, 4
+.fdl:       ld a, e
+            and 3
+            cp 3
+            jr z, .fd3
+            inc a
+.fd3:       call .acc
+            dec d
+            jr nz, .fdl
+            ld a, b
+            pop de
+            pop bc
+            ret
+.fs:        push bc                         ; A: each 2-bit field - 1 (at least 0)
+            push de
+            ld e, a
+            ld b, 0
+            ld d, 4
+.fsl:       ld a, e
+            and 3
+            jr z, .fs0
+            dec a
+.fs0:       call .acc
+            dec d
+            jr nz, .fsl
+            ld a, b
+            pop de
+            pop bc
+            ret
+.acc:       rrca                            ; B = B >> 2 | field << 6; E >>= 2
+            rrca
+            ld c, a
+            ld a, b
+            srl a
+            srl a
+            or c
+            ld b, a
+            srl e
+            srl e
+            ret
+
+; NES $D741-$D75F (FF1 map transitions: town / dungeon entry and exit, stairs): BG off,
+; ($14) lines, BG on, ($15) lines, BG off, timed by delay calls ($D77C). Here: the band as
+; the GB mask from the next frame (NES top line = $14 - 11, height $15; GB lines minus the
+; camera); the delay calls' side effects: $12 counted 3, 2, 1, 3, .. ($14 + $15 times),
+; X = Y = 0, A = $10
+rt_band:    push hl
+            ld a, $10                       ; the NES's last $2001 write of the frame (sprites
+            call rt_ppu_w1                  ;   on, BG off): turns the LCD on after a load
+            ld a, [NES_RAM + $14]
+            sub 11
+            jr nc, .a
+            xor a
+.a:         ld l, a                         ; L = top (NES line)
+            ld a, [NES_RAM + $15]
+            add a, l
+            jr nc, .b
+            ld a, $FF
+.b:         ld h, a                         ; H = bottom
+            ldh a, [cam_y]
+            ld e, a
+            ld a, l
+            sub e
+            jr nc, .c
+            xor a
+.c:         ld [BAND_T], a
+            ld a, h
+            sub e
+            jr nc, .d
+            xor a
+.d:         ld [BAND_B], a
+            ld a, 2
+            ld [BAND_LIFE], a
+            ld a, [NES_RAM + $14]
+            call .dn
+            ld a, [NES_RAM + $15]
+            call .dn
+            pop hl
+            ld e, 0
+            ld c, 0
+            ld a, $10
+            ret
+.dn:        ld l, a                         ; L calls (0 = 256)
+            ld a, [NES_RAM + $12]
+.lp:        dec a
+            jr nz, .k
+            ld a, 3
+.k:         dec l
+            jr nz, .lp
+            ld [NES_RAM + $12], a
+            ret
 
 timer_isr:  push af                         ; frame tick while the LCD is off
             ldh a, [lcd_on]
@@ -550,8 +870,23 @@ make_palettes:
             jp nz, sgb_obp
             jp dmg_obp
 cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ palettes 0-3
-            ld a, $80                       ;   (RGB555 from NES_RGB, $3E00; colour 0 of each
-            ldh [$FF68], a                  ;   BG palette is the universal backdrop)
+            push de                         ;   (RGB555 from NES_RGB, $3E00, or EMPH_RGB with
+            ldh a, [ppu_mask]               ;   the NES emphasis bits; colour 0 of each BG
+            and $E0                         ;   palette is the universal backdrop)
+            jr nz, .em
+            ld de, NES_RGB
+            jr .go
+.em:        ld e, a                         ; DE = EMPH_RGB + e * $80 (A = e << 5)
+            ld d, 0
+            sla e
+            rl d
+            sla e
+            rl d
+            ld a, d
+            add a, high(EMPH_RGB)
+            ld d, a
+.go:        ld a, $80
+            ldh [$FF68], a
             ld hl, PAL_SH
             ld c, $69
             call .pal16
@@ -559,6 +894,9 @@ cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ pa
             ldh [$FF6A], a
             ld hl, PAL_SH + $10
             ld c, $6B
+            call .pal16
+            pop de
+            ret
 .pal16:     ld b, 16
 .lp:        ld a, l
             and $03
@@ -568,8 +906,9 @@ cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ pa
 .c:         push hl
             and $3F
             add a, a
+            add a, e
             ld l, a
-            ld h, high(NES_RGB)
+            ld h, d
             ld a, [hl+]
             ldh [c], a
             ld a, [hl]
@@ -967,6 +1306,14 @@ rt_ppu_w1:  push af
             push bc
             push de
             push hl
+            ld b, a
+            ldh a, [ppu_mask]               ; emphasis bits changed: CGB palettes again (the
+            xor b                           ;   DMG / SGB BGP is redone every vblank)
+            and $E0
+            jr z, .ne
+            ld a, 1
+            ldh [pal_dirty], a
+.ne:        ld a, b
             ldh [ppu_mask], a
             and $18
             jr z, .off

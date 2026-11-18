@@ -47,7 +47,11 @@ class FF1:
     #   b14:B0F1 TSX/TXA/CMP #$EF/BCS/CLC/ADC #6/TAX/TXS: drop 3 return frames (camp items
     #   returning from the item menu straight to the field). The S >= $EF guard is not
     #   reproduced (it only matters for a near-empty stack).
-    idioms = {('b14', 0xB0F1): ('rt_unwind3', 0xB0FC, 'C')}
+    #   c62:D741-D75F: map-transition band (BG off / on / off timed by delay calls): the GB
+    #   mask from rt_band (rt/runtime.s), with the delay calls' RAM side effects.
+    #   fix:EA7F-EA86: one CHR page to $2007 (map loader): hle_chr_page1 (rt/ff1_hle.s).
+    idioms = {('b14', 0xB0F1): ('rt_unwind3', 0xB0FC, 'C'), ('c62', 0xD741): ('rt_band', 0xD760, 'NZC'),
+              ('fix', 0xEA7F): ('hle_chr_page1', 0xEA87, 'NZ')}
     skip = [('fix', 0xFECF, 0xFEDB), ('fix', 0xFEDC, 0xFEF1)]   # NMI handler + wait loop
 
 

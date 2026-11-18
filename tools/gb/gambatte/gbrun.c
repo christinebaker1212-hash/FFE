@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
 	int f;
 	for (f = 1; f <= frames; f++) {
 		unsigned n = NESF();
-		if (poke_list && n >= (unsigned) poke_at) {
+		if (poke_list && f > 30 && n >= (unsigned) poke_at) {
 			uint8_t* sram = p_retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
 			for (const char* p = poke_list; *p;) {
 				unsigned a, v; int used;
@@ -156,7 +156,7 @@ int main(int argc, char** argv) {
 		}
 		keys = 0;
 		if (pads) {
-			unsigned char m = n + 1 < (unsigned) npads ? pads[n + 1] : 0;
+			unsigned char m = (f > 30 && n + 1 < (unsigned) npads) ? pads[n + 1] : 0;
 			for (int b = 0; b < 8; b++) if (m & (1 << b)) keys |= 1u << map[b];
 		}
 		wav_on = (int) n >= wav_from;
@@ -164,7 +164,7 @@ int main(int argc, char** argv) {
 		n = NESF();
 		int all = nns > 0;
 		for (int k = 0; k < nns; k++) {
-			if (!done[k] && n >= (unsigned) nshots[k]) {
+			if (!done[k] && f > 30 && n >= (unsigned) nshots[k]) {  /* (DMG WRAM is random before boot clears it) */
 				done[k] = 1; printf("shot %d at GB frame %d\n", nshots[k], f);
 				char path[1100]; snprintf(path, sizeof path, "%s_n%05d.ppm", out, nshots[k]);
 				FILE* o = fopen(path, "wb"); fprintf(o, "P6 160 144 255\n"); fwrite(frame, 1, sizeof frame, o); fclose(o);

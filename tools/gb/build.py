@@ -56,13 +56,22 @@ def border_src():
 
 
 def nes_rgb_src():
-    out = 'section bank 0, $3E00\nNES_RGB:\n'
-    for k in range(0, 64, 8):
+    """NES_RGB ($3E00) and, at EMPH_RGB + e * $80 ($3A80-$3DFF), the colours with the NES
+    emphasis bits e = 1-7 ($2001 bits 5-7: red, green, blue): the other components dimmed
+    to 3/4, as the 2C02 roughly does (FF1's battle-start flashes cycle through them)"""
+    def table(e):
         vals = []
-        for c in NES_RGB[k:k + 8]:
+        for c in NES_RGB:
             r, g, b = c >> 16, (c >> 8) & 255, c & 255
+            if e:
+                if e & 6: r = r * 3 // 4
+                if e & 5: g = g * 3 // 4
+                if e & 3: b = b * 3 // 4
             vals.append(str((r >> 3) | (g >> 3) << 5 | (b >> 3) << 10))
-        out += '    dw %s\n' % ', '.join(vals)
+        return ''.join('    dw %s\n' % ', '.join(vals[k:k + 8]) for k in range(0, 64, 8))
+    out = 'section bank 0, $3E00\nNES_RGB:\n' + table(0)
+    for e in range(1, 8):
+        out += 'section bank 0, $%04X\n' % (0x3A00 + e * 0x80) + table(e)
     return out
 
 

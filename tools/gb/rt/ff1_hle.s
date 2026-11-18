@@ -188,3 +188,17 @@ hle_spr_tile:
             pop hl
             pop bc
             ret
+
+; ---- $EA7F: one page from ($10)+Y (Y = 0) to $2007 (map CHR loader $EA60; the
+;   tile fast path of hle_chr_pages). LDA ($10),Y / STA $2007 / INY / BNE: X and $11 kept,
+;   A = last byte, Y = 0, Z = 1, N = 0, carry unchanged.
+hle_chr_page1:
+            push de                         ; X
+            ld e, 1
+            call hle_chr_pages              ; (one page; it counts $11 up and X down)
+            pop de
+            push af
+            ld hl, NES_RAM + $11
+            dec [hl]
+            pop af
+            ret
