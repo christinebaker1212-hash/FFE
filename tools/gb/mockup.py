@@ -248,6 +248,111 @@ def battle5(out):
     both.resize((both.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock5_party_frame.png'))
 
 
+# small digits for HP "192/899" (mock-up only): 4 x 7, '1' 3 wide, '/' 3 wide
+SMALLDIG = {
+ '0': [".##.", "#..#", "#..#", "#..#", "#..#", "#..#", ".##."],
+ '1': [".#.", "##.", ".#.", ".#.", ".#.", ".#.", "###"],
+ '2': [".##.", "#..#", "...#", "..#.", ".#..", "#...", "####"],
+ '3': ["###.", "...#", "...#", ".##.", "...#", "...#", "###."],
+ '4': ["..#.", ".##.", "#.#.", "#.#.", "####", "..#.", "..#."],
+ '5': ["####", "#...", "###.", "...#", "...#", "#..#", ".##."],
+ '6': [".##.", "#...", "###.", "#..#", "#..#", "#..#", ".##."],
+ '7': ["####", "...#", "..#.", "..#.", ".#..", ".#..", ".#.."],
+ '8': [".##.", "#..#", "#..#", ".##.", "#..#", "#..#", ".##."],
+ '9': [".##.", "#..#", "#..#", ".###", "...#", "...#", ".##."],
+ '/': ["..#", "..#", ".#.", ".#.", ".#.", "#..", "#.."],
+}
+
+
+def battle6(out):
+    """Owner (2026-11-18): closed frame (top and bottom lines too) around the party, at the
+    NES frame thickness, and HP as current/max in small digits. The sprites fill 4 x 24 px
+    beside the enemies, so the party window runs the full screen height (GB cols 14-19,
+    rows 0-17) and the bottom window spans the enemy area only (cols 0-13). Per member:
+    name and status beside the sprite, HP current/max under it."""
+    party = [('AAAA', '192/899', ''), ('Bob', '30/30', 'Poison'), ('Mm', '0/33', 'Sleep'),
+             ('DDDD', '125/999', 'Stone')]
+
+    def screen(page):
+        s = Screen(bg=3)
+        for r in range(3):
+            for c in range(3): s.block(1 + c * 4, r * 4, 4, 4)
+        s.window(14, 0, 6, 18)
+        for i, (n, hp, st) in enumerate(party):
+            y = 6 + i * 33                                   # pixel row of the sprite top
+            s.d.rectangle([14 * 8 + 6, y, 14 * 8 + 21, y + 23], fill=SHADES[2], outline=SHADES[1])
+            X0 = 14 * 8 + 24
+            for line, (txt, tb) in enumerate(((n, None), (st, NARROW))):
+                if txt: s.ptext(0, 0, txt, px=X0, table=tb) if False else _pt(s, X0, y + 2 + line * 9, txt, tb)
+            _pt(s, 160 - 6 - s.pwidth(hp, SMALLDIG), y + 25, hp, SMALLDIG)
+        s.window(0, 12, 14, 6)
+        if page == 'msg':
+            for i, r in enumerate(['Bob', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
+        elif page == 'long':
+            s.ptext(1, 13, 'Was hurled into a rift in'); s.ptext(1, 14, 'dimensions!')
+        else:
+            for i, w in enumerate(['Goblin', 'Minotaur Zombie']): s.ptext(1, 13 + i, w)
+            s.window(7, 12, 7, 6)
+            for i, w in enumerate(['Fight  Run', 'Magic', 'Medicine', 'Items']): s.ptext(8, 13 + i, w)
+            s.cursor(7, 13)
+        return s
+    ims = [screen(p).im for p in ('cmd', 'msg', 'long')]
+    out_im = Image.new('RGB', (160 * 3 + 16, 144), (255, 255, 255))
+    for k, im in enumerate(ims): out_im.paste(im, (k * 168, 0))
+    out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock6_party_window.png'))
+
+
+def battle7(out):
+    """Owner (2026-11-18): closed full-thickness frame + HP current/max. Party window 8
+    columns wide (GB cols 12-19), full height; per member, beside the sprite: name /
+    HP current/max / status word (all fit in 34 px). Enemy area 12 columns (cols 0-11),
+    bottom window under it. Mixed formations (14 columns on the NES) would need their
+    enemy positions changed in the NES code."""
+    party = [('WWWW', '192/899', ''), ('Bob', '30/30', 'Poison'), ('Mm', '0/33', 'Paralysis'),
+             ('DDDD', '125/999', 'Darkness')]
+
+    def screen(page):
+        s = Screen(bg=3)
+        for r in range(3):
+            for c in range(3): s.block(c * 4, r * 4, 4, 4)
+        s.window(12, 0, 8, 18)
+        for i, (n, hp, st) in enumerate(party):
+            y = 8 + i * 33
+            s.d.rectangle([12 * 8 + 6, y, 12 * 8 + 21, y + 23], fill=SHADES[2], outline=SHADES[1])
+            X0 = 12 * 8 + 24
+            _pt(s, X0, y, n)
+            _pt(s, X0, y + 8, hp, SMALLDIG)
+            if st: _pt(s, X0, y + 16, st, NARROW)
+        s.window(0, 12, 12, 6)
+        if page == 'msg':
+            for i, r in enumerate(['Bob', 'Fire', 'Goblin', '23 damage']): s.ptext(1, 13 + i, r)
+        elif page == 'long':
+            s.ptext(1, 13, 'Was hurled into a rift'); s.ptext(1, 14, 'in dimensions!')
+        else:
+            for i, w in enumerate(['Goblin', 'Minotaur', 'Zombie']): s.ptext(1, 13 + i, w)
+            s.window(6, 12, 6, 6)
+            for i, w in enumerate(['Fight', 'Magic', 'Medicine', 'Items']): s.ptext(7, 13 + i, w)
+            s.cursor(6, 13)
+        return s
+    ims = [screen(p).im for p in ('cmd', 'msg', 'long')]
+    out_im = Image.new('RGB', (160 * 3 + 16, 144), (255, 255, 255))
+    for k, im in enumerate(ims): out_im.paste(im, (k * 168, 0))
+    out_im.resize((out_im.width * 3, 144 * 3), Image.NEAREST).save(os.path.join(out, 'mock7_party_window_wide.png'))
+
+
+def _pt(s, X, Y, txt, table=None):
+    """proportional text at pixel (X, Y)"""
+    for k, ch in enumerate(txt):
+        if k: X += 1
+        if ch == ' ': X += 2; continue
+        t = table if table is not None and ch in table else (COND if ch in COND else G)
+        cols = _glyph_cols(ch, t)
+        for cx, col in enumerate(cols):
+            for cy in range(8):
+                if col[cy]: s.im.putpixel((X + cx, Y + cy), SHADES[0])
+        X += len(cols)
+
+
 def main_menu(out):
     s = Screen(bg=3)
     s.window(0, 0, 20, 10)                              # party list, one line per member
@@ -271,5 +376,5 @@ def main_menu(out):
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else 'build'
     os.makedirs(out, exist_ok=True)
-    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); main_menu(out)
+    battle(out); battle2(out); battle3(out); battle4(out); battle5(out); battle6(out); battle7(out); main_menu(out)
     print('written to', out)

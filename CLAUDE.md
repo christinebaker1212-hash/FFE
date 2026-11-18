@@ -212,7 +212,14 @@ Milestones per game (from `docs/gb-port.md`):
   name / HP-or-status / number); owner also asked for a window frame around that column,
   as thick as the NES frames (`mock5_party_frame.png`: C = around the text only, 22 px of
   text; D = left side under the sprites' right edge, 27 px; Silence/Darkness/Paralysis
-  do not fit C, Darkness/Paralysis do not fit D even in the narrow letters); needs a tile renderer in the NES code (CHR RAM) and
+  do not fit C, Darkness/Paralysis do not fit D even in the narrow letters). Owner then:
+  closed frame (top and bottom lines too) and HP as current/max ("192/899") in small
+  digits. The sprites fill 4 x 24 px beside the enemies, so a closed party window must
+  run the full screen height: `mock6_party_window.png` (cols 14-19: only ~20 px of text
+  beside the sprite, too narrow) and `mock7_party_window_wide.png` (cols 12-19: name /
+  HP cur/max / status beside each sprite all fit; enemy area 12 columns, so mixed
+  formations, 14 columns on the NES, need new enemy positions; bottom window under the
+  enemies only). Proposed: mock7, after checking formation widths and free BG tiles; needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
 - Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target
   cursor, flashing of the acting member's line and the target, magic/item lists in the
