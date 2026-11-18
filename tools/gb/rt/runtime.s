@@ -16,6 +16,9 @@ DBG        = $D820          ; fault info: code, HL, SP, stack top
 SPR_SLOT   = $D900          ; NES sprite tile (0-255) -> GB slot 0-127, $FF = not resident
 SLOT_TILE  = $DA00          ; GB slot -> NES sprite tile ($FF = free)
 SLOT_STAMP = $DA80          ; GB slot -> frame number of its last use in OAM
+SLOT_KEY   = $D880          ; GB slot -> coding of its tile (SPAL_KEY value; $FF = to load)
+SPAL_KEY   = $DCC0          ; NES sprite palette -> coding: values of indices 1-3 (2 bits each),
+                            ;   bit 6 = OBP1 (DMG); $39 = as is (CGB)
 SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
@@ -76,6 +79,10 @@ o_y:        ds 1
 o_t:        ds 1
 o_a:        ds 1
 o_cx:       ds 1
+o_key:      ds 1                            ; coding wanted for this sprite's tile
+sp_s0:      ds 1
+sp_s1:      ds 1
+fade_drop:  ds 1                            ; DMG: shades the palettes are faded by
 spr_next:   ds 1
 uw_bank:    ds 1
 uw_ret:     ds 2
@@ -194,6 +201,17 @@ boot:       di
             inc l
             dec l
             jr nz, .sm2
+            ld hl, SLOT_KEY                 ; slots: identity coding of the tile loaded
+            ld b, 128
+            ld a, $39
+.sk:        ld [hl+], a
+            dec b
+            jr nz, .sk
+            ld hl, SPAL_KEY
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
             ld hl, SLOT_TILE
             xor a
 .st:        ld [hl+], a
@@ -431,6 +449,9 @@ make_palettes:
             jr nz, .cg
             call dmg_bgp                    ; DMG: shades of the re-coded tile values
 .cg:        ldh [bgp_v], a
+            ldh a, [is_cgb]
+            and a
+            jr z, .dobp
             ld hl, PAL_SH + $10
             call pal4
             ldh [obp0_v], a
@@ -438,6 +459,7 @@ make_palettes:
             call pal4
             ldh [obp1_v], a
             ret
+.dobp:      jp dmg_obp
 cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ palettes 0-3
             ld a, $80                       ;   (RGB555 from NES_RGB, $3E00; colour 0 of each
             ldh [$FF68], a                  ;   BG palette is the universal backdrop)
@@ -1031,19 +1053,11 @@ rt_ppu_w7:  push af
             ld a, [hl]
             cp $FF
             jr z, .done
-            swap a                          ; GB address = $8000 + slot * 16 + offset
-            ld b, a
-            and $F0
-            ld l, a
-            ld a, c
-            and $0F
-            or l
-            ld l, a
-            ld a, b
-            and $0F
-            add a, $80
-            ld h, a
-            jr .vram
+            add a, low(SLOT_KEY)            ; resident: loaded again (coded) by the next
+            ld l, a                         ;   OAM conversion
+            ld h, high(SLOT_KEY)
+            ld [hl], $FF
+            jr .done
 .nt:        cp $3F
             jr z, .pal
             and $07                         ; $2000-$2FFF (+ mirror $3000): vertical mirroring
@@ -1265,12 +1279,33 @@ rt_io_w4014:
             ld [de], a
             inc e
             push hl
+            ldh a, [o_a]                    ; coding of the sprite's palette
+            and 3
+            add a, low(SPAL_KEY)
+            ld l, a
+            ld h, high(SPAL_KEY)
+            ld a, [hl]
+            ldh [o_key], a
             ldh a, [o_t]
             ld l, a
             ld h, high(SPR_SLOT)
             ld a, [hl]
             cp $FF
             call z, spr_alloc
+            push af                         ; resident with another coding: load it again
+            add a, low(SLOT_KEY)
+            ld l, a
+            ld h, high(SLOT_KEY)
+            ldh a, [o_key]
+            cp [hl]
+            jr z, .kok
+            pop af
+            push af
+            push bc
+            ld c, a
+            call spr_load
+            pop bc
+.kok:       pop af
             ld l, a
             ld h, high(SLOT_STAMP)
             set 7, l
@@ -1293,9 +1328,10 @@ rt_io_w4014:
             rlca
             or c
             ld c, a
-            ld a, b
-            and $01                         ; palette 1/3 -> OBP1
-            swap a
+            ldh a, [o_key]                  ; DMG: OBP1 if the coding says so
+            and $40
+            rrca
+            rrca
             or c
             ld c, a
             ld a, b
@@ -1366,8 +1402,51 @@ spr_alloc:  push bc
             ld l, a
             ld h, high(SPR_SLOT)
             ld [hl], c                      ; SPR_SLOT[tile] = slot
-            ; copy 16 bytes: shadow $A000 + tile*16 (RAM bank 1) -> VRAM $8000 + slot*16
-            ld a, l
+            call spr_load
+            ld a, c
+            pop hl
+            pop de
+            pop bc
+            ret
+
+; C = slot: load NES sprite tile o_t into it from the shadow, coded with o_key (the value
+; of each colour index); SLOT_KEY[slot] = o_key. Keeps all registers.
+spr_load:   push af
+            push bc
+            push de
+            push hl
+            ld a, c
+            add a, low(SLOT_KEY)
+            ld l, a
+            ld h, high(SLOT_KEY)
+            ldh a, [o_key]
+            ld [hl], a
+            ld b, a                         ; plane sets: sp_s0 = indices whose value has
+            ld d, 0                         ;   bit 0, sp_s1 = bit 1 (index 0 -> 0)
+            ld e, 0
+            bit 0, b
+            jr z, .k1
+            set 1, d
+.k1:        bit 1, b
+            jr z, .k2
+            set 1, e
+.k2:        bit 2, b
+            jr z, .k3
+            set 2, d
+.k3:        bit 3, b
+            jr z, .k4
+            set 2, e
+.k4:        bit 4, b
+            jr z, .k5
+            set 3, d
+.k5:        bit 5, b
+            jr z, .k6
+            set 3, e
+.k6:        ld a, d
+            ldh [sp_s0], a
+            ld a, e
+            ldh [sp_s1], a
+            ldh a, [o_t]                    ; DE = shadow $A000 + tile * 16 (RAM bank 1)
             swap a
             ld b, a
             and $F0
@@ -1375,8 +1454,8 @@ spr_alloc:  push bc
             ld a, b
             and $0F
             add a, high(SPR_SHADOW)
-            ld d, a                         ; DE = shadow
-            ld a, c
+            ld d, a
+            ld a, c                         ; HL = VRAM $8000 + slot * 16
             swap a
             ld b, a
             and $F0
@@ -1384,54 +1463,33 @@ spr_alloc:  push bc
             ld a, b
             and $0F
             add a, $80
-            ld h, a                         ; HL = VRAM
-            ld a, 1
+            ld h, a
+            ld b, 8
+.row:       ld a, 1
             ld [$4000], a
-            ld b, 16
-.cp:        ld a, [de]
+            ld a, [de]
             inc de
-            push bc
-            ld c, a
-            ldh a, [lcd_on]
-            and a
-            jr nz, .q
-            ld [hl], c
-            jr .nx
-.q:         push de                         ; LCD on: through the VRAM queue
-            ld d, c
-            ldh a, [q_tail]
-            ld e, a
-            inc a
-            ld b, a
-.qf:        ldh a, [q_head]
-            cp b
-            jr nz, .qr
-            halt
-            jr .qf
-.qr:        push hl
-            ld a, l
-            ld c, h
-            ld h, high(QH)
-            ld l, e
-            ld [hl], c
-            inc h
-            ld [hl], a
-            inc h
-            ld [hl], d
-            pop hl
-            ld a, b
-            ldh [q_tail], a
-            pop de
-.nx:        inc hl
-            pop bc
-            dec b
-            jr nz, .cp
+            ldh [sh_p0], a
+            ld a, [de]
+            inc de
+            ldh [sh_p1], a
             xor a
             ld [$4000], a
-            ld a, c
+            call row_masks
+            ldh a, [sp_s0]
+            call mask_comb
+            call vram_put
+            inc hl
+            ldh a, [sp_s1]
+            call mask_comb
+            call vram_put
+            inc hl
+            dec b
+            jr nz, .row
             pop hl
             pop de
             pop bc
+            pop af
             ret
 
 ; ------------------------------------------------------------------ joypad / APU / MMC5

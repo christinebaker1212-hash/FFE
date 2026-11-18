@@ -179,20 +179,10 @@ hle_spr_tile:
             ld a, [hl]
             cp $FF
             jr z, .x
-            swap a
-            ld b, a
-            and $F0
-            ld l, a
-            ld a, b
-            and $0F
-            add a, $80
-            ld h, a
-            ld b, 16
-.c:         ld a, [de]
-            inc de
-            ld [hl+], a
-            dec b
-            jr nz, .c
+            add a, low(SLOT_KEY)            ; resident: loaded again (coded) by the next
+            ld l, a                         ;   OAM conversion
+            ld h, high(SLOT_KEY)
+            ld [hl], $FF
 .x:         xor a
             ld [$4000], a
             pop hl

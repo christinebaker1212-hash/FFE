@@ -175,50 +175,35 @@ retile:     push bc
             ld de, RT_BUF
             ld b, 8
 .row:       ld a, [de]                      ; p0, p1 -> masks of the pixels of index 0-3
-            inc de                          ;   (sh_m0..3); indices used -> sh_u1..3
+            inc de
             ldh [sh_p0], a
-            ld c, a
             ld a, [de]
             inc de
             ldh [sh_p1], a
-            and c                           ; m3 = p0 & p1
-            ldh [sh_m3], a
-            ld c, a
-            ldh a, [sh_u3]
-            or c
-            ldh [sh_u3], a
-            ldh a, [sh_p1]
-            cpl
-            ld c, a
-            ldh a, [sh_p0]
-            and c                           ; m1 = p0 & ~p1
-            ldh [sh_m1], a
+            call row_masks
+            push bc                         ; indices used -> sh_u1..3
+            ldh a, [sh_m1]
             ld c, a
             ldh a, [sh_u1]
             or c
             ldh [sh_u1], a
-            ldh a, [sh_p0]
-            cpl
-            ld c, a
-            ldh a, [sh_p1]
-            and c                           ; m2 = ~p0 & p1
-            ldh [sh_m2], a
+            ldh a, [sh_m2]
             ld c, a
             ldh a, [sh_u2]
             or c
             ldh [sh_u2], a
-            ldh a, [sh_p0]
+            ldh a, [sh_m3]
             ld c, a
-            ldh a, [sh_p1]
+            ldh a, [sh_u3]
             or c
-            cpl                             ; m0
-            ldh [sh_m0], a
+            ldh [sh_u3], a
+            pop bc
             ldh a, [sh_s0]
-            call .comb
+            call mask_comb
             call vram_put
             inc hl
             ldh a, [sh_s1]
-            call .comb
+            call mask_comb
             call vram_put
             inc hl
             dec b
@@ -262,7 +247,31 @@ retile:     push bc
             pop de
             pop bc
             ret
-.comb:      ; A = set of values (bit v) -> A = OR of the pixel masks sh_m<v>
+; sh_p0 / sh_p1 (a tile row's planes) -> sh_m0..3 = masks of the pixels of index 0..3
+row_masks:  push bc
+            ldh a, [sh_p0]
+            ld b, a
+            ldh a, [sh_p1]
+            ld c, a
+            and b
+            ldh [sh_m3], a
+            ld a, c
+            cpl
+            and b
+            ldh [sh_m1], a
+            ld a, b
+            cpl
+            and c
+            ldh [sh_m2], a
+            ld a, b
+            or c
+            cpl
+            ldh [sh_m0], a
+            pop bc
+            ret
+
+; A = set of indices (bit i) -> A = OR of the pixel masks sh_m<i>
+mask_comb:
             push bc
             ld b, a
             ld c, 0
@@ -695,6 +704,7 @@ dmg_maps:   push bc
             ld a, c
             cp 4
             jp nz, .p
+            call spr_maps
 .x:         pop hl
             pop de
             pop bc
@@ -778,6 +788,7 @@ dmg_bgp:    push bc
             xor a
 .dp:        srl a
             ld c, a                         ; fade drop (shades)
+            ldh [fade_drop], a
             ld a, [PAL_SH]
             call lum
             call lum_shade
@@ -1087,4 +1098,125 @@ dmg_retile_ref:
             pop hl
             pop de
             pop bc
+            ret
+
+; DMG sprites: two fixed OBJ palettes, OBP0 = black / dark grey / white and OBP1 = dark
+; grey / light grey / white (values 1 / 2 / 3). Each NES sprite palette takes OBP0 if one
+; of its colours is black, else OBP1, and codes its indices by their shades (SPAL_KEY);
+; the sprite slots are loaded again with that coding when the OAM is converted.
+spr_maps:   push bc
+            push de
+            push hl
+            ld c, 0
+.p:         ld a, c
+            add a, a
+            add a, a
+            add a, low(PAL_SH) + $11
+            ld l, a
+            ld h, high(PAL_SH)
+            ld de, RT_BUF + 8               ; shades of indices 1-3; D... flags black
+            ld b, 3
+.i:         ld a, [hl+]
+            call lum
+            call lum_shade
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .i
+            ld hl, RT_BUF + 8               ; any black (3)? -> OBP0 table, else OBP1
+            ld de, SPR_VAL_B
+            ld b, 3
+.bk:        ld a, [hl+]
+            cp 3
+            jr nz, .bn
+            ld de, SPR_VAL_A
+.bn:        dec b
+            jr nz, .bk
+            ld hl, RT_BUF + 10              ; key = v1 | v2 << 2 | v3 << 4 (+ $40: OBP1)
+            ld b, 0
+            ld a, 3
+.kv:        push af
+            ld a, [hl-]
+            push de
+            add a, e
+            ld e, a
+            jr nc, .kc
+            inc d
+.kc:        ld a, [de]
+            pop de
+            sla b
+            sla b
+            or b
+            ld b, a
+            pop af
+            dec a
+            jr nz, .kv
+            ld a, e                         ; OBP1 table: bit 6
+            cp low(SPR_VAL_B)
+            jr nz, .ka
+            ld a, d
+            cp high(SPR_VAL_B)
+            jr nz, .ka
+            set 6, b
+.ka:        ld a, c
+            add a, low(SPAL_KEY)
+            ld l, a
+            ld h, high(SPAL_KEY)
+            ld [hl], b
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .p
+            pop hl
+            pop de
+            pop bc
+            ret
+SPR_VAL_A:  db 3, 2, 2, 1                   ; shade (white .. black) -> value, OBP0
+SPR_VAL_B:  db 3, 2, 1, 1                   ;   OBP1
+
+; obp0_v / obp1_v from the fixed shades, darkened by fade_drop
+dmg_obp:    push bc
+            ldh a, [fade_drop]
+            ld c, a
+            ld a, 3                         ; OBP0: values 1-3 = black, dark grey, white
+            add a, c
+            call .cl
+            add a, a
+            add a, a
+            ld d, a                         ; value 1 << 2
+            ld a, 2
+            add a, c
+            call .cl
+            swap a
+            or d
+            ld d, a
+            ld a, c
+            call .cl
+            rrca
+            rrca
+            or d
+            ldh [obp0_v], a
+            ld a, 2                         ; OBP1: dark grey, light grey, white
+            add a, c
+            call .cl
+            add a, a
+            add a, a
+            ld d, a
+            ld a, 1
+            add a, c
+            call .cl
+            swap a
+            or d
+            ld d, a
+            ld a, c
+            call .cl
+            rrca
+            rrca
+            or d
+            ldh [obp1_v], a
+            pop bc
+            ret
+.cl:        cp 4
+            ret c
+            ld a, 3
             ret
