@@ -1737,5 +1737,9 @@ if __name__ == '__main__':
     class_select(rom)
     title_menu(rom)
     bad = insert_dialogue(rom, report)
+    if '--gb' in sys.argv:                     # Game Boy layout variant (tools/ff1/gb_layout.py)
+        sys.path.insert(0, os.path.dirname(__file__))
+        import gb_layout
+        gb_layout.apply(rom, report)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report)); print('strings not fitting:', bad)

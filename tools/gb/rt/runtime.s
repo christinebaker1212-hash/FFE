@@ -59,6 +59,7 @@ obp1_v:     ds 1
 o_y:        ds 1
 o_t:        ds 1
 o_a:        ds 1
+o_cx:       ds 1
 spr_next:   ds 1
 uw_bank:    ds 1
 uw_ret:     ds 2
@@ -66,6 +67,8 @@ uw_y:       ds 1
 uw_f:       ds 1
 oam_frame:  ds 1
 split_scy:  ds 1
+cam_x:      ds 1                            ; GB view origin in the NES picture (pixels),
+cam_y:      ds 1                            ; set by NES writes to $5800/$5801 (tiles)
 frames:     ds 1
 hram_end:   ds 1
 
@@ -146,6 +149,10 @@ boot:       di
             ldh [$FF48], a
             ldh [obp1_v], a
             ldh [$FF49], a
+            ld a, CAM_X
+            ldh [cam_x], a
+            ld a, CAM_Y
+            ldh [cam_y], a
             call apu_init
             ld a, -68                       ; timer: 4096 Hz / 68 = 60.2 Hz frame tick while the LCD is off
             ldh [$FF06], a
@@ -193,11 +200,15 @@ vblank_isr: push af
             xor a
             ldh [oam_pending], a
             call hram_dma
-.no_oam:    ldh a, [scroll_x]
-            add a, CAM_X
+.no_oam:    ldh a, [cam_x]
+            ld b, a
+            ldh a, [scroll_x]
+            add a, b
             ldh [$FF43], a
-            ldh a, [scroll_y]               ; NES rows wrap at 240, the GB map at 256:
-            add a, CAM_Y                    ; SCY = (scroll_y + CAM_Y) mod 240, and an LYC
+            ldh a, [cam_y]                  ; NES rows wrap at 240, the GB map at 256:
+            ld b, a
+            ldh a, [scroll_y]               ; SCY = (scroll_y + cam_y) mod 240, and an LYC
+            add a, b
             jr c, .wr                       ; split where the view reaches NES row 240
             cp 240
             jr c, .sy
@@ -652,8 +663,17 @@ rt_io_w4014:
             ldh [o_t], a
             ld a, [hl+]
             ldh [o_a], a
+            ldh a, [cam_x]
+            sub 8
+            ldh [o_cx], a
             ld a, [hl+]                     ; NES x
-            sub CAM_X - 8
+            push bc
+            ld b, a
+            ldh a, [o_cx]
+            ld c, a
+            ld a, b
+            sub c
+            pop bc
             jr c, .skip
             cp 168
             jr nc, .skip
@@ -661,7 +681,14 @@ rt_io_w4014:
             ldh a, [o_y]
             cp $EF
             jr nc, .skip_p
-            sub CAM_Y - 17                  ; GB y = NES y + 1 - CAM_Y + 16
+            push bc
+            ld b, a
+            ldh a, [cam_y]
+            sub 17
+            ld c, a
+            ld a, b
+            sub c                           ; GB y = NES y + 1 - cam_y + 16
+            pop bc
             jr c, .skip_p
             cp 160
             jr nc, .skip_p
@@ -904,6 +931,22 @@ rt_mmc_w5115:
             ldh [nes_bank8], a
             add a, DATA
             ldh [data_bank8], a
+            pop af
+            ret
+rt_mmc_w5800:                               ; camera X in tiles (GB layout code)
+            push af
+            add a, a
+            add a, a
+            add a, a
+            ldh [cam_x], a
+            pop af
+            ret
+rt_mmc_w5801:                               ; camera Y in tiles
+            push af
+            add a, a
+            add a, a
+            add a, a
+            ldh [cam_y], a
             pop af
             ret
 rt_mmc_w5116:

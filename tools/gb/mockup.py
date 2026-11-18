@@ -75,6 +75,35 @@ def battle(out):
     s.save(os.path.join(out, 'mock_battle_message.png'))
 
 
+def battle2(out):
+    """Draft 2: party sprites visible (owner's decision)."""
+    party = [('AAAA', 35), ('BBBB', 30), ('CCCC', 33), ('DDDD', 30)]
+
+    def top(s):
+        for r in range(3):                              # 9 small enemies, NES 3x3 grid
+            for c in range(3): s.block(1 + c * 4, r * 4, 4, 4)
+        for i, (n, hp) in enumerate(party):             # sprite + name/HP per member
+            s.block(14, i * 3, 2, 3)
+            s.text(16, i * 3, n)
+            s.text(16, i * 3 + 1, '%4d' % hp)
+    s = Screen(bg=3); top(s)
+    s.window(0, 12, 20, 6)
+    for i, w in enumerate(['Goblin', 'Minotaur Zombie']): s.text(1, 13 + i, w)
+    s.save(os.path.join(out, 'mock2_battle_idle.png'))
+    s = Screen(bg=3); top(s)
+    s.window(0, 12, 20, 6)
+    for i, w in enumerate(['Goblin', 'Minotaur Zombie']): s.text(1, 13 + i, w)
+    s.window(9, 12, 11, 6)
+    s.text(10, 13, 'Fight Run'); s.text(10, 14, 'Magic'); s.text(10, 15, 'Medicine'); s.text(10, 16, 'Items')
+    s.cursor(9, 13)
+    s.d.rectangle([14 * 8, 0, 20 * 8 - 1, 3 * 8 - 1], outline=SHADES[0])   # acting member's line flashes
+    s.save(os.path.join(out, 'mock2_battle_command.png'))
+    s = Screen(bg=3); top(s)
+    s.window(0, 12, 20, 6)
+    s.text(1, 13, 'AAAA'); s.text(1, 14, 'Minotaur Zombie'); s.text(1, 15, '6 hit(s)!  23 DMG')
+    s.save(os.path.join(out, 'mock2_battle_message.png'))
+
+
 def main_menu(out):
     s = Screen(bg=3)
     s.window(0, 0, 20, 10)                              # party list, one line per member
@@ -98,5 +127,5 @@ def main_menu(out):
 if __name__ == '__main__':
     out = sys.argv[1] if len(sys.argv) > 1 else 'build'
     os.makedirs(out, exist_ok=True)
-    battle(out); main_menu(out)
+    battle(out); battle2(out); main_menu(out)
     print('written to', out)

@@ -302,7 +302,7 @@ class Emitter:
         name = None
         if r == 'ppu': name = 'rt_ppu_w%d' % (a & 7)
         elif r == 'io': name = 'rt_io_w%04X' % a if a in (0x4014, 0x4016) else 'rt_apu_w'
-        elif r == 'mmc': name = 'rt_mmc_w%04X' % a if a in (0x5115, 0x5116) else None
+        elif r == 'mmc': name = 'rt_mmc_w%04X' % a if a in (0x5115, 0x5116, 0x5800, 0x5801) else None
         else:
             self.rc.warn.append('store to ROM %04X at %r' % (a, i)); return
         if name is None: return

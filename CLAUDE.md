@@ -173,12 +173,24 @@ Milestones per game (from `docs/gb-port.md`):
 - Layout plan: `docs/gb-screens.md`. Dialogue box: built through the map-row buffers
   (`$07C0`, routine `$D54B`), text origin column `(($29+$12)&$1F)*2`, row `$2F*2+3`.
 
+- **Battle re-layout started** (`tools/ff1/gb_layout.py`, applied by
+  `insert.py build/ff1_mmc5.nes build/ff1_gb.nes --gb`): per-screen GB camera set by NES
+  writes to `$5800`/`$5801` (tiles; runtime `cam_x`/`cam_y`, default 6/6); battle uses
+  camera X = 2 so the NES enemy box interior lands in GB cols 0-13 unchanged; enemy/party/HP
+  box frames removed; field camera restored by a wrapper around the battle calls
+  (`$C1D6`, `$C935`). `tools/gb/battleshot.py NES OUT --cam 2` shows a battle with the GB
+  view outlined. Battle panel facts: 25x12 image at `$691E` (stride 32) copied to NES rows
+  18-29 by `$F4A2`; box list = 5-byte box records + text records, redrawn by `$F652`;
+  message boxes table `$F9E1`, enemy list `$F9DC`, command box `$FA13`.
+
 ## In progress / next
-- Random-play equivalence after the crash fix: 3 seeds × 40k frames (~39.6k NMIs each)
-  **byte-identical** RAM at every frame wait. Next: longer/scripted runs (shops, camp items).
-- Screen layout (milestone 5), starting with the dialogue box; per-screen camera register.
-- Speed: faster `$2007` nametable path; SGB palettes/border (needs an SGB-capable test
-  emulator; PyBoy has none).
+- Battle: party sprites to NES x = 128 (cols 16-17), name/HP beside them (bank 12 `$AB0E`),
+  bottom panel to NES rows 18-23 cols 2-21 (names full width, commands over the right
+  half, the four messages as lines of one window via dummy boxes in the hidden rows),
+  cursors, flashing of the acting member's line and the target.
+- Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
+- `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
+  battle layout is usable (coverage logs must then be regenerated for that ROM).
 - Recompiler and PPU-layer design written up in `docs/gb-port.md` §1-2 (registers X→E,
   Y→C; NES stack on the GB stack; flag liveness; ROM data through a bank-0 helper;
   queued VRAM writes; tile/nametable/scroll mapping).
