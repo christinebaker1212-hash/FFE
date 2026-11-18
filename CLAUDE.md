@@ -310,6 +310,11 @@ Milestones per game (from `docs/gb-port.md`):
   its hand at x 35; Fight/Magic/Medicine/Items hands at x 0. Magic list: spells at
   columns 2 / 12 (hands x 0 / 80), row 2 = spell 3 + "L<n>  MP <count>"; checked with
   spells poked into all members (`battleseq.py --poke`).
+  Item list (`gb_layout.ITEMLIST`): one group per page (weapons / armour, names up to
+  75 px), group name at column 15; left/right flips the page (itemmove sets FLIP,
+  fixed-bank ITEMFLIP $F633 -> $F300 redraws after farjsr returns); cursor table $9FD7
+  x = 1 (itemmove recognises the Item list by x = 1). Page flips show FF1's stepwise
+  panel redraw for a few frames (as the magic pages do).
   Next: enemy names window, target/actor flashing, magic/item
   lists, end-of-battle messages, all formations, then the GB build. Implementation needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).

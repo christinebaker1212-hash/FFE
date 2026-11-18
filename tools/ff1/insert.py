@@ -949,6 +949,11 @@ def menu_engine(rom, report):
         src = src[:a] + src[b:] + gb_layout.far_source(ENC)    # small-font battle text
         a, b = src.index('magpage:'), src.index('magdown:')
         src = src[:a] + gb_layout.MAGPAGE + src[b:]             # magic list rows
+        a, b = src.index('itemlist:'), src.index('itemmove:')
+        src = src[:a] + gb_layout.ITEMLIST + src[b:]            # item list pages
+        for old, new in gb_layout.ITEMMOVE_PATCH:
+            assert old in src
+            src = src.replace(old, new)
         for r in gb_layout.FAR_GB:
             if r not in FAR_ROUTINES: FAR_ROUTINES.append(r)
     far = asm(src, syms=EX)

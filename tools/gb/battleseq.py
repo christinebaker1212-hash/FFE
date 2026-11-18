@@ -39,7 +39,7 @@ def main():
             k = f % 90
             return DOWN if k < 3 else (A if 30 <= k < 33 else 0)
         if mode in ('magic4', 'items4'):          # Fight x3, then Magic / Items for member 4
-            seq = [A, A, A, A, A, A, DOWN, A] if mode == 'magic4' else [A, A, A, A, A, A, DOWN, DOWN, DOWN, A]
+            seq = [A, A, A, A, A, A, DOWN, A] if mode == 'magic4' else [A, A, A, A, A, A, DOWN, DOWN, DOWN, A, 0, 0, 0, RIGHT]
             k, r = divmod(f - 6400, 30)
             return seq[k] if 0 <= k < len(seq) and r < 3 else 0
         if mode == 'items':

@@ -1140,6 +1140,117 @@ magpage:
 """
 
 
+# Battle Item list for the GB layout (replaces the English itemlist): one group per page,
+# weapons (slots 0-3, $6118) or armour (4-7, $611C) as chosen by the cursor column $6AAA,
+# one name per row at column 2 (names up to 75 px), the group's name at column 15 of row 1.
+# Left / right (itemmove) switches the group and sets FLIP; the page is redrawn by
+# ITEMFLIP in the fixed bank after farjsr returns (the redraw reaches the music driver).
+ITEMLIST = """LETW = $A0
+itemlist:
+    ldy #5
+.c:
+    lda $FA08,y
+    sta $6A9D,y
+    dey
+    bne .c
+    lda #1
+    sta $6A9F
+    lda #0
+    sta $6AA0
+    lda #20
+    sta $6AA1
+    lda #6
+    sta $6AA2
+    jsr $F688
+    jsr $F74F
+    lda $6B7A
+    jsr $F88F
+    sta MR
+    lda $6AAA       ; group: 0 weapons, 1 armour
+    asl a
+    asl a
+    sta MS          ; first slot
+    lda #0
+    sta MI
+    sta MU
+.j:
+    lda MU
+    sta MT
+    tax
+    jsr .ent
+    lda #0
+    sta $6AFA,x
+    inx
+    stx MU
+    lda #2
+    ldy MI
+    iny
+    jsr .queue
+    inc MS
+    inc MI
+    lda MI
+    cmp #4
+    bne .j
+    lda MU          ; group name at column 15, row 1
+    sta MT
+    tax
+    ldy #0
+    lda $6AAA
+    beq .wn
+    ldy #GRP_ARMOR-GRP_WEAPONS
+.wn:
+    lda GRP_WEAPONS,y
+    sta $6AFA,x
+    beq .wd
+    inx
+    iny
+    bne .wn
+.wd:
+    lda #15
+    ldy #1
+.queue:             ; A = column, Y = row: queue text record 01 A Y ptr(MT)
+    sta $6A9F
+    sty $6AA0
+    lda #1
+    sta $6A9E
+    lda MT
+    clc
+    adc #$FA
+    sta $6AA1
+    lda #0
+    adc #$6A
+    sta $6AA2
+    jmp $F688
+.ent:               ; name of slot MS at X (none: empty row)
+    stx ML
+    lda MR
+    clc
+    adc MS
+    tay
+    lda $6118,y
+    ldx ML
+    cmp #0
+    beq .e
+    and #$7F
+    clc
+    adc #$1B
+    ldy MS
+    cpy #4
+    bcc .w
+    adc #$43-$1B-1
+.w:
+    pha
+    lda #$0E
+    sta $6AFA,x
+    inx
+    pla
+    sta $6AFA,x
+    inx
+.e:
+    rts
+"""
+
+
 def glyph_tables(enc):
     """GW (width) and GR (8 row bytes) for codes $7A-$FF, as assembler source."""
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -1190,6 +1301,8 @@ def glyph_tables(enc):
     for w in STATUS_WORDS:
         offs.append(k); k += len(w) + 1
     out += 'STW:\n    .db ' + ', '.join(map(str, offs)) + '\nSTWORDS:\n    .db ' + ', '.join(map(str, data)) + '\n'
+    for lab, w in (('GRP_WEAPONS', 'Weapons'), ('GRP_ARMOR', 'Armor')):
+        out += '%s:\n    .db %s, 0\n' % (lab, ', '.join(str(b) for b in enc_word(enc, w)))
     return out
 
 
@@ -1258,6 +1371,57 @@ def magic_cursor(rom):
     o = bank_off(12, 0x9FBF); rom[o:o + 24] = cur
 
 
+# itemmove (English far code): switching the group also asks for a page redraw
+ITEMMOVE_PATCH = [
+    ("""    lda $6AAC
+    cmp #$10
+    beq .item""", """    lda $6AAC
+    cmp #1      ; GB: the Item list's cursor x is 1 (hand cut off at the screen edge)
+    beq .item"""),
+    ("""    lda $6AAA   ; left / right: the same row of the other group
+    eor #1
+    sta $6AAA
+.ix:""", """    lda $6AAA   ; left / right: the same row of the other group
+    eor #1
+    sta $6AAA
+    inc FLIP    ; GB: one group per page
+.ix:"""),
+    ("""    sta $6AAB
+    lda $6AAA
+    eor #1
+    sta $6AAA
+    rts""", """    sta $6AAB
+    lda $6AAA
+    eor #1
+    sta $6AAA
+    inc FLIP
+    rts"""),
+]
+ITEMFLIP = 0xF633   # fixed bank, after the panel-clear hook ($F625-$F632)
+
+
+def item_list(rom):
+    """Item list paging: cursor table $9FD7 (column*8 + row*2 -> x, y): both groups at
+    x 1 (hand cut off at the screen edge; itemmove tells the Item list apart by x = 1),
+    rows 1-4. b12:$9D8C (itemmove via farjsr) gets
+    JSR + JMP ITEMFLIP (the old routine's dead bytes $9D91-$9D93 are overwritten).
+    ITEMFLIP: if FLIP, clear it, drop the item window and draw the other group's page."""
+    main = sys.modules['__main__']
+    farjsr, flip = main.LABELS_EX['farjsr'], main.EX['FLIP']
+    o = bank_off(12, 0x9FD7)
+    rom[o:o + 16] = bytes(v for c in range(2) for r in range(4) for v in (1, 150 + 8 * r))
+    put_bank(rom, 12, 0x9D8C, bytes([0xA2, main.FAR_ROUTINES.index('itemmove'), 0x20, farjsr & 0xFF, farjsr >> 8,
+                                     0x4C, ITEMFLIP & 0xFF, ITEMFLIP >> 8]),
+             bytes([0xA2, main.FAR_ROUTINES.index('itemmove'), 0x4C, farjsr & 0xFF, farjsr >> 8, 0xC9, 0x80, 0xF0]))
+    rts = ITEMFLIP - 1                         # the panel-clear hook's RTS
+    put(rom, ITEMFLIP, bytes([0xAD, flip & 0xFF, flip >> 8,                    # LDA FLIP
+                              0xF0, (rts - (ITEMFLIP + 5)) & 0xFF,             # BEQ (RTS)
+                              0xA9, 0x00, 0x8D, flip & 0xFF, flip >> 8,        # LDA #0 / STA FLIP
+                              0x4C, 0x00, 0xF3]))                              # JMP $F300
+    put(rom, 0xF300, bytes([0xA9, 0x01, 0x20, 0x0F, 0xF2,                     # LDA #1 / JSR $F20F
+                            0x4C, 0x21, 0xF2]))                                 # JMP $F221 (itemlist)
+
+
 def hooks(rom):
     """Calls into the far-code routines: the party window is stamped into the panel image
     whenever the panel is cleared ($F618, freed bytes $F625-$F63F; X, Y = 0 and A = 0 as
@@ -1295,6 +1459,7 @@ def apply(rom, report):
     party_sprites(rom)
     cursors(rom)
     magic_cursor(rom)
+    item_list(rom)
     hooks(rom)
     music_trampoline(rom)
     report.append('GB layout applied')
