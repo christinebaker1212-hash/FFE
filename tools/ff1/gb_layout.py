@@ -585,14 +585,22 @@ VBM = $0340         ; member whose line blinks ($FF none)
 VBS = $0341         ; 1 = the line is blank now
 VBC = $0342         ; frame counter
 blink:              ; each frame of a pad wait in battle (b12:$97C7), right after vblank
-    lda $691E+9     ;   starts: member $6B7A's line (NES row 19+m, cols 10-19) is blank
-    cmp #$F8        ;   for 16 frames, shown for 16, while the party window is visible
+    lda $691E+9     ;   starts: member $6B7A's line (NES row 19+m, cols 10-19), or the
+    cmp #$F8        ;   targeted member's while the party-target cursor is up, is blank for
+                    ;   16 frames, shown for 16, while the party window is visible
     bne .vis
     lda #$FF
     sta VBM
     rts
 .vis:
+    lda $6AAC       ; cursor table in use ($6AAC, copied from $9F85 for party targets:
+    cmp #140-16     ;   x 124 first): the targeted member ($6AAB, row) blinks instead
+    bne .cmd
+    lda $6AAB
+    jmp .mem
+.cmd:
     lda $6B7A
+.mem:
     and #3
     cmp VBM
     beq .same

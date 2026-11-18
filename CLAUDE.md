@@ -317,14 +317,15 @@ Milestones per game (from `docs/gb-port.md`):
   panel redraw for a few frames (as the magic pages do).
   Blinking: the commanding member's line ($6B7A) blinks (16 frames blank / 16 shown, 10
   nametable writes) in every pad wait (b12:$97C7 -> hook $AAFC -> far `blink`) while the
-  party window is visible. Still to do: blink the target (party targets; enemies?).
+  party window is visible. While the party-target cursor is up ($6AAC = 124, table from
+  $9F85) the targeted member's line ($6AAB) blinks instead. Enemy targets: not yet.
   Message tear-down: an empty target shows the attacker alone (no arrow).
 - **Work now (2026-11-18):** GB build of the battle layout: `build.py --gb` (builds
   `build/ff1_gb.nes` with `insert.py --gb`, coverage `build/cov3` from `covrun.py` on that
   ROM, output `build/ff1_gb.gb`), then `firstdiff.py`, PyBoy and mGBA checks. Coverage
-  runs for `ff1_gb.nes` started. `docs/gb-handoff.md` has the current battle design,
+  must be regenerated after every change to the NES code (far-code addresses move). `docs/gb-handoff.md` has the current battle design,
   how it is built, and the next steps.
-- Battle still to do: blink the target, enemy names that wrap, end-of-battle messages,
+- Battle still to do: enemy-target flash (ask the owner), enemy names that wrap, end-of-battle messages,
   Medicine list, all formations (fiends, Chaos).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the

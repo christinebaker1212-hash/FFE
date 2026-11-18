@@ -1,7 +1,7 @@
 """GB-view screenshots of a whole battle on the NES: optionally force a formation (as
 formations.py), replay the battleshot.py walk, then a battle input pattern, and save the
 GB view (camera X/Y in tiles) every STEP frames into one sheet.
-usage: PYTHONPATH=build/emu battleseq.py NES OUT [--form F] [--cam X] [--input fight|run|magic|items]
+usage: PYTHONPATH=build/emu battleseq.py NES OUT [--form F] [--cam X] [--input fight|run|magic4|items4|cure4]
        [--from N] [--to N] [--step N]
        [--poke 63C0=01,63E0=02,...]  (work RAM, hex, patched into the state at frame 6100)"""
 import os, sys
@@ -38,6 +38,10 @@ def main():
         if mode == 'magic':
             k = f % 90
             return DOWN if k < 3 else (A if 30 <= k < 33 else 0)
+        if mode == 'cure4':                       # Fight x3, then Magic > Cure > party target
+            seq = [A, A, A, A, A, A, DOWN, A, 0, A]
+            k, r = divmod(f - 6400, 30)
+            return seq[k] if 0 <= k < len(seq) and r < 3 else 0
         if mode in ('magic4', 'items4'):          # Fight x3, then Magic / Items for member 4
             seq = [A, A, A, A, A, A, DOWN, A] if mode == 'magic4' else [A, A, A, A, A, A, DOWN, DOWN, DOWN, A, 0, 0, 0, RIGHT]
             k, r = divmod(f - 6400, 30)
