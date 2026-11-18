@@ -325,7 +325,12 @@ Milestones per game (from `docs/gb-port.md`):
   ROM, output `build/ff1_gb.gb`), then `firstdiff.py`, PyBoy and mGBA checks. Coverage
   must be regenerated after every change to the NES code (far-code addresses move). `docs/gb-handoff.md` has the current battle design,
   how it is built, and the next steps.
-- Battle still to do: enemy-target flash (ask the owner), enemy names that wrap, end-of-battle messages,
+- Column-2 lists push a name down below a wrapped one (VNROW; 7 formations have a name
+  > 56 px, only formation 69 lists two names).
+- **Open design question (ask the owner):** the enemy-names window is never visible on
+  the GB: the command window opens over it at once (same position). Options: show the
+  names while choosing an enemy target (in place of the command window), or elsewhere.
+- Battle still to do: enemy-target flash (ask the owner), end-of-battle messages,
   Medicine list, all formations (fiends, Chaos).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the

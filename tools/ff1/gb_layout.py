@@ -114,6 +114,7 @@ VC0 = $6EA8         ; string index where the current row starts
 VLIM = $6EA9        ; pixels available in the row
 VBRK = $6EAA        ; last space that fits
 VRC = $6EAB         ; row count
+VNROW = $0343       ; next free row of a column-2 list (enemy names)
 VSTR = $6EB0        ; text being drawn (codes, 0-terminated, up to 47)
 VTGT = $6EE0        ; target name (15 codes + 0)
 VATK = $6EF0        ; attacker's name (row 1 of the message window), 15 codes + 0
@@ -712,7 +713,9 @@ boxline:
     sta VIND
     lda VCOL
     cmp #21
-    beq .target
+    bne .n21
+    jmp .target
+.n21:
     cmp #23
     bne .n22
     lda #6          ; column 23 = column 6 with a 3-px indent ("Run": the hand fits between
@@ -756,8 +759,25 @@ boxline:
     clc
     adc #1
     sta VLINE
+    sta VNROW
     jmp vrest
 .pl:
+    lda VCOL        ; column 2 lists (enemy names): a name that wrapped pushes the next
+    cmp #2          ;   one down (row 1 starts a list)
+    bne .pl2
+    lda VROW
+    cmp VNROW
+    bcs .pl1
+    lda VNROW
+    sta VROW
+.pl1:
+    jsr vtext
+    lda VROW
+    clc
+    adc #1
+    sta VNROW
+    jmp vrest
+.pl2:
     jsr vtext
 .out:
     jmp vrest
