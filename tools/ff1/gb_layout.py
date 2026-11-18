@@ -117,6 +117,8 @@ VLIM = $6EA9        ; pixels available in the row
 VBRK = $6EAA        ; last space that fits
 VRC = $6EAB         ; row count
 VNROW = $0343       ; next free row of a column-2 list (enemy names)
+VTV = $0345         ; 1: the next message line is not indented (end-of-battle "target")
+VSQ = $0346         ; letter gaps still to drop in a squeezed word
 VSTR = $6EB0        ; text being drawn (codes, 0-terminated, up to 47)
 VTGT = $6EE0        ; target name (15 codes + 0)
 VATK = $6EF0        ; attacker's name (row 1 of the message window), 15 codes + 0
@@ -247,6 +249,15 @@ vchar:              ; A = code: draw at VX, advance (glyph width + 1; space 3)
     cpy #8
     bne .row
 .adv:
+    lda VSQ         ; squeezed word: no gap after this letter
+    beq .gap
+    dec VSQ
+    lda VX
+    clc
+    adc VCNT
+    sta VX
+    rts
+.gap:
     lda VX
     sec
     adc VCNT
@@ -701,6 +712,13 @@ boxline:
 .out:
     jmp vrest
 .target:            ; row 1 = attacker + " -> " + target
+    lda $57         ; end of battle (bank 11 code: experience / gold): the "target" is a
+    cmp #11         ;   line of its own, not indented
+    bne .tg0
+    lda #1
+    sta VTV
+    jmp .next
+.tg0:
     ldx #0
 .tg:
     lda VSTR,x
@@ -777,9 +795,13 @@ boxline:
 .nw:
     cmp #2
     bcc .ni
+    ldx VTV
+    bne .ni
     lda #8
     sta VIND
 .ni:
+    lda #0
+    sta VTV
     jsr vrows       ; rows the text needs
     clc
     adc VLINE
@@ -911,6 +933,7 @@ vbreak:             ; row from VC0 in VW tiles less VIND: VEND = end, VNEXT = ne
     ldx VC0
     lda #0
     sta VLO
+    sta VSQ
     lda #$FF
     sta VBRK
 .l:
@@ -965,7 +988,58 @@ vbreak:             ; row from VC0 in VW tiles less VIND: VEND = end, VNEXT = ne
     inx
     stx VNEXT
     rts
-.cut:               ; one word wider than the row: cut it
+.cut:               ; one word wider than the row: if dropping some of its 1-px letter
+    stx VSQ         ;   gaps makes it fit, squeeze it (VSQ = gaps to drop), else cut it
+    ldx VC0
+    lda #0
+    sta VLO         ; width of the whole word
+    sta VCNT        ; letters
+.sw:
+    lda VSTR,x
+    beq .swe
+    cmp #$FF
+    beq .swe
+    cmp #$FE
+    beq .swe
+    jsr vcw
+    clc
+    adc VLO
+    sta VLO
+    inc VCNT
+    inx
+    bne .sw
+.swe:
+    lda VLO         ; overflow = width - 1 - limit
+    sec
+    sbc #1
+    sec
+    sbc VLIM
+    bcc .sq         ; (fits after all)
+    sta VLO
+    lda VCNT
+    sec
+    sbc #1          ; gaps
+    cmp VLO
+    bcc .nosq
+.sq:
+    lda VLO
+    bcs .sq2
+    lda #0
+.sq2:
+    sta VLO
+    stx VEND        ; the whole word on this row, VLO gaps dropped
+    lda VSTR,x
+    beq .sq3
+    inx             ; skip the space after it
+.sq3:
+    stx VNEXT
+    lda VLO
+    sta VSQ
+    rts
+.nosq:
+    ldx VSQ         ; cut at the overflowing letter
+    lda #0
+    sta VSQ
     cpx VC0
     bne .c2
     inx

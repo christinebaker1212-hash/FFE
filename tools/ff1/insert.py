@@ -1632,7 +1632,7 @@ def battle(rom, labels, report):
             if len(data) < jlen: data += b'\xFF' * (jlen - len(data))
         bank.put_ptr(0x8F50 + 2 * e['id'], bank.alloc(data + b'\0'))
     for e in json.load(open('script/ff1/monsters.json')):
-        if e['en'] in NARROW_NAMES:                # one word wider than any name box
+        if e['en'] in NARROW_NAMES and '--gb' not in sys.argv:   # one word wider than any name box (GB: small font)
             n, base = NARROW_NAMES[e['en']]
             for t, data in enumerate(narrow_label(e['en'], n, fg=3, bg=2)):
                 o = HDR + 0x24000 + (base + t) * 16

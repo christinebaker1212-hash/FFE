@@ -358,8 +358,15 @@ Milestones per game (from `docs/gb-port.md`):
 - Owner (2026-11-18): show the enemy names while targeting (done: entering the
   enemy-target loop, b12:$9B55 -> stub $AB07, saves the box count and redraws only box 0,
   the names; leaving it, $9B9C -> stub $9D94, redraws all saved boxes). No blinking.
-- Battle still to do: end-of-battle messages,
-  Medicine list, all formations (fiends, Chaos).
+- End of battle (checked with formation 62 and party damage poked to 255, `--poke
+  6120=FF,..`): "The monsters were wiped out", "Experience up / 1800P", "Gold / 600 Gil",
+  "Level up! / AAAA L2", "Max HP / 60 points", "Strength went up" all fit. The end-of-
+  battle code (bank 11, $57 = 11) reuses the attacker/target records: there the target
+  marker adds an unindented line instead of the arrow (VTV). Narrow-tile names
+  (Tyrannosaurus) are plain text in the GB build. A single word a few pixels too wide
+  for its row drops some letter gaps (vbreak squeeze, VSQ) instead of being cut.
+- Battle still to do: Medicine list, fiends and Chaos formations, then the GB build
+  (coverage, firstdiff, CGB/DMG shots).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).
