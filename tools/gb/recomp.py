@@ -526,7 +526,7 @@ class Emitter:
     def x_PLA(self):
         k = self.k
         if k in self.rc.pla_drop:
-            if self.rc.pla_drop[k] == 'pop': self.o('pop hl')
+            if self.rc.pla_drop[k] == 'pop': self.o('call rt_unwind1')   # farcall-aware
             return
         p = self.prv()
         if p is not None and p.mn == 'PHP':          # PHP / PLA pair: A already = P

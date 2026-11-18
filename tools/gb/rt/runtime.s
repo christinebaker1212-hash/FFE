@@ -63,6 +63,7 @@ spr_next:   ds 1
 uw_bank:    ds 1
 uw_ret:     ds 2
 uw_y:       ds 1
+uw_f:       ds 1
 oam_frame:  ds 1
 split_scy:  ds 1
 frames:     ds 1
@@ -1267,14 +1268,21 @@ rt_rts_dispatch:                            ; PHA hi / PHA lo / RTS -> jump to (
             ldh a, [sv_a]
             jp rt_dyn_jump
 
-; Drop N NES return frames from the GB stack (TSX/ADC/TXS idioms), then return to the
-; caller. Farcall frames (rt_farcall_ret + saved bank) and bank-0 stub frames are not NES
-; frames; if a farcall frame is dropped, a synthetic one is pushed back so that the
-; next RTS still restores the bank the remaining frames run in. Carry = 0, A kept.
-rt_unwind3: ldh [sv_a], a
-            ld a, 3
+; Drop N NES return frames from the GB stack, then return to the caller. Farcall frames
+; (rt_farcall_ret + saved bank) and bank-0 stub frames are not NES frames; if a farcall
+; frame is dropped, a synthetic one is pushed back so that the next RTS still restores
+; the bank the remaining frames run in.
+rt_unwind1: ldh [sv_a], a                   ; PLA PLA dropping one return address: A, F kept
+            push af
+            pop hl
+            ld a, l
+            ldh [uw_f], a
+            ld a, 1
             jr rt_unwind_a
-rt_unwind:  ldh [sv_a], a                   ; A = number of frames
+rt_unwind3: ldh [sv_a], a                   ; TSX ... TXS idiom: 3 frames, then CLC
+            xor a
+            ldh [uw_f], a
+            ld a, 3
 rt_unwind_a:
             ld b, a
             ld a, c
@@ -1317,10 +1325,14 @@ rt_unwind_a:
             ld l, a
             ldh a, [uw_ret + 1]
             ld h, a
+            push hl                         ; resume address for the final ret
+            ldh a, [uw_f]
+            ld l, a
             ldh a, [sv_a]
-            scf
-            ccf
-            jp hl
+            ld h, a
+            push hl
+            pop af
+            ret
 
 ; ------------------------------------------------------------------ faults
 ; code 1 = no dynamic target (HL = NES address), 2 = uncompiled code reached
