@@ -1,7 +1,8 @@
 # FF1 on the Game Boy: screen-by-screen layout plan (milestone 5)
 
-The GB shows 20×18 tiles. Until a screen is re-laid out, the runtime shows the NES
-screen's centre (a stopgap only) (NES tile columns 6-25, rows 6-23; `CAM_X/CAM_Y` in `rt/runtime.s`).
+The GB shows 20×18 tiles. Until a screen is re-laid out, the runtime shows the centre of
+the NES screen (NES tile columns 6-25, rows 6-23; `CAM_X/CAM_Y` in `rt/runtime.s`). This
+is a stopgap only.
 
 ## Approach
 - **Layout stays on the NES side.** A GB variant of the English inserter
