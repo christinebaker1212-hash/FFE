@@ -365,8 +365,15 @@ Milestones per game (from `docs/gb-port.md`):
   marker adds an unindented line instead of the arrow (VTV). Narrow-tile names
   (Tyrannosaurus) are plain text in the GB build. A single word a few pixels too wide
   for its row drops some letter gaps (vbreak squeeze, VSQ) instead of being cut.
-- Battle still to do: Medicine list, fiends and Chaos formations, then the GB build
-  (coverage, firstdiff, CGB/DMG shots).
+- Medicine list ($F919): Potion / Antidote on rows 1-2 (second INC $6AA0 at $F962 dropped),
+  cursor table b12:$9FE7 x 0 (hand at the screen edge), y 150/158. Checked with item
+  counts poked ($6020-$603F).
+- Transition glitch fixed: messages / lists drawn over the left window showed in its
+  cells for a few frames (shared tiles) while the panel was copied. The 9-column left
+  window now has its own 28 tiles (LPOOL: $F0-$F6, hidden backdrop $01-$11, $7A-$7D);
+  vupload takes a tile number per cell (VTID).
+- Battle still to do: fiends and Chaos formations, then the GB build (coverage,
+  firstdiff, CGB/DMG shots).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).

@@ -77,7 +77,9 @@ def music_trampoline(rom):
 # drawn into fixed BG tiles (the font tiles $80-$EF are free in battle: the field reloads
 # the whole BG pattern table after a battle):
 #   party window   tiles $80-$A7: member m's line = $80 + 10m (10 tiles, 80 px)
-#   panel text     tiles $A8-$EF: panel row r (1-4), column c (2-19) = $A8 + 18(r-1) + c-2
+#   panel text     tiles $A8-$EF: panel row r (1-4), column c (2-19) = $A8 + 18(r-1) + c-2,
+#                  except the 9-column left window (names / commands): its own 28 tiles
+#                  (LPOOL: $F0-$F6, hidden backdrop $01-$11, $7A-$7D)
 # The panel image ($691E, 32 bytes per row, NES rows 18-29) gets these tile numbers; the
 # glyphs are rendered into a 1-bit line buffer and uploaded in vblank (both planes = ink:
 # ink colour 3 on colour 0, like the battle's blank tile $FF).
@@ -119,6 +121,7 @@ VRC = $6EAB         ; row count
 VNROW = $0343       ; next free row of a column-2 list (enemy names)
 VTV = $0345         ; 1: the next message line is not indented (end-of-battle "target")
 VSQ = $0346         ; letter gaps still to drop in a squeezed word
+VTID = $0350        ; BG tile number of each tile of the line being uploaded (up to 18)
 VSTR = $6EB0        ; text being drawn (codes, 0-terminated, up to 47)
 VTGT = $6EE0        ; target name (15 codes + 0)
 VATK = $6EF0        ; attacker's name (row 1 of the message window), 15 codes + 0
@@ -329,15 +332,17 @@ vcw:                ; A = code -> advance in pixels (glyph width + 1, space 3); 
     lda #0
     rts
 
-vupload:            ; VN tiles of the buffer -> BG tiles VT.., 4 tiles per vblank
+vupload:            ; VN tiles of the buffer -> BG tiles VTID[0..VN-1], 4 tiles per vblank
     lda #0
     sta VUP
 .chunk:
     jsr $F499
+    lda #4
+    sta VCNT
+.tile:
     lda $2002
-    lda VT
-    clc
-    adc VUP
+    ldx VUP
+    lda VTID,x
     sta VLO
     lda #0
     sta VHI
@@ -354,9 +359,6 @@ vupload:            ; VN tiles of the buffer -> BG tiles VT.., 4 tiles per vblan
     lda VHI
     sta $2006
     stx $2006
-    lda #4
-    sta VCNT
-.tile:
     lda VUP
     asl a
     asl a
@@ -455,6 +457,14 @@ party_line:         ; member $685E: name, HP current/max, status word -> tiles $
     adc VT
     adc #$80
     sta VT
+    ldx #0
+.id:
+    sta VTID,x
+    clc
+    adc #1
+    inx
+    cpx #10
+    bne .id
     jsr vclear
     jsr pmx         ; X = member * 64 (character data $6100 + X)
     ldy #0
@@ -875,19 +885,7 @@ vtext:              ; VSTR at panel (VROW, VCOL), word-wrapped to the frame (row
     lda VW
     beq .done
     sta VN
-    lda VROW        ; tiles $A8 + 18(row-1) + col-2
-    sec
-    sbc #1
-    asl a
-    sta VT
-    asl a
-    asl a
-    asl a
-    clc
-    adc VT
-    adc VCOL
-    adc #$A8-2
-    sta VT
+    jsr vtids       ; tile numbers of the row's cells
     jsr vbreak
     jsr vclear
     lda VIND
@@ -896,11 +894,9 @@ vtext:              ; VSTR at panel (VROW, VCOL), word-wrapped to the frame (row
     jsr vstr
     jsr vupload
     ldy #0          ; the row's cells show the tiles
-    lda VT
 .c:
+    lda VTID,y
     sta ($8A),y
-    clc
-    adc #1
     iny
     cpy VN
     bne .c
@@ -921,6 +917,64 @@ vtext:              ; VSTR at panel (VROW, VCOL), word-wrapped to the frame (row
     bne .row
 .done:
     rts
+
+vtids:              ; VTID[k] for the VN cells from (VROW, VCOL): in the 9-column left window
+    lda $691E+9     ;   (top-right corner $F9 at column 9: names / commands) its own 28
+    cmp #$F9        ;   tiles (LPOOL), so a message or list drawn over it never shows in it
+    bne .full       ;   while the panel is copied; elsewhere $A8 + 18(row-1) + col-2
+    lda VCOL
+    cmp #9
+    bcs .full
+    lda VROW        ; LPOOL index = 7(row-1) + col-2
+    sec
+    sbc #1
+    sta VLO
+    asl a
+    asl a
+    asl a
+    sec
+    sbc VLO
+    clc
+    adc VCOL
+    sec
+    sbc #2
+    tax
+    ldy #0
+.l:
+    lda LPOOL,x
+    sta VTID,y
+    inx
+    iny
+    cpy VN
+    bne .l
+    rts
+.full:
+    lda VROW
+    sec
+    sbc #1
+    asl a
+    sta VLO
+    asl a
+    asl a
+    asl a
+    clc
+    adc VLO
+    adc VCOL
+    adc #$A8-2
+    ldy #0
+.f:
+    sta VTID,y
+    clc
+    adc #1
+    iny
+    cpy VN
+    bne .f
+    rts
+LPOOL:              ; tiles never shown in battle: font $F0-$F6, backdrop $01-$11 (NES rows
+    .db $F0, $F1, $F2, $F3, $F4, $F5, $F6   ;   2-5, outside the GB view), $7A-$7D
+    .db $01, $02, $03, $04, $05, $06, $07
+    .db $08, $09, $0A, $0B, $0C, $0D, $0E
+    .db $0F, $10, $11, $7A, $7B, $7C, $7D
 
 vbreak:             ; row from VC0 in VW tiles less VIND: VEND = end, VNEXT = next start
     lda VW
@@ -1564,6 +1618,14 @@ def enemy_target(rom):
              bytes(rom[bank_off(12, 0x9D94):bank_off(12, 0x9D94) + 15]))
 
 
+def medicine_list(rom):
+    """Medicine list ($F919): Potion on row 1, Antidote on row 2 (single spacing: the second
+    INC $6AA0 at $F962 is dropped); cursor table b12:$9FE7 (copied by $9C06): hand at x 0
+    (cut off at the screen edge), rows 1 / 2 (y 150 / 158)."""
+    put(rom, 0xF962, bytes([0xEA] * 3), expect=bytes([0xEE, 0xA0, 0x6A]))
+    put_bank(rom, 12, 0x9FE7, bytes([0, 150, 0, 158] * 4), bytes.fromhex('18a618b6' * 4))
+
+
 def hooks(rom):
     """Calls into the far-code routines: the party window is stamped into the panel image
     whenever the panel is cleared ($F618, freed bytes $F625-$F63F; X, Y = 0 and A = 0 as
@@ -1602,6 +1664,7 @@ def apply(rom, report):
     cursors(rom)
     magic_cursor(rom)
     item_list(rom)
+    medicine_list(rom)
     enemy_target(rom)
     hooks(rom)
     music_trampoline(rom)
