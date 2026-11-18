@@ -602,6 +602,13 @@ Milestones per game (from `docs/gb-port.md`):
   $25 = 55, $42 = $46 = 4); test with `--poke 0025=36,0042=04,0046=04` and A + B (fieldseq
   key Y; X = B + Select, T = Select). Camera (3,4) while it runs (wrapper `pzw` at $F7FA in
   the dead old battle-magic code; $F7FA-$F88E is free fixed-bank space), field camera after.
+- SGB sprites (owner: "player sprites blend in with the background", 2026-11-18): a sprite
+  takes the colours of its cell's SGB palette, and both OBPs gave it colour 1 = the
+  darkest colour there (the window blue, the field's dark ground). Both OBPs now map the
+  sprite values 1/2/3 to colours 0/2/3 (backdrop black outline, mid, bright): class select
+  black/grey/white, the field party light with a dark outline. Possible next step: a
+  palette of its own for the battle party column (its cells are backdrop black, so an
+  ATTR rectangle there would not tint any background).
 - Next: FF1's accuracy / timing pass (lag in screen transitions, SGB check of the new
   screens in mGBA).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).

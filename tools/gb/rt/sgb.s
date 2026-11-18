@@ -3,7 +3,7 @@
 ; its brightness group (0 = backdrop, 1-3 darkest .. brightest), and on the SGB the BGP
 ; passes the value through as the colour number (minus the fade), so SGB palette p colour v
 ; is the NES colour of BG palette p that has value v. Sprites use the colours of the cell
-; they are in (SGB hardware): OBP0 = 0 / 1 / 3, OBP1 = 1 / 2 / 3.
+; they are in (SGB hardware); both OBPs give colours 0 / 2 / 3 (not 1, see sgb_obp).
 ; Static screens: each 8x8 screen cell gets the SGB palette of its NES attribute (ATTR_CHR).
 ; Screens that scroll (field, towns, dungeons) get one palette for the whole screen
 ; (ATTR_BLK), its colours taken from the palette most cells on screen use.
@@ -685,12 +685,12 @@ sgb_obp:    push bc
             push de
             ldh a, [fade_drop]
             ld c, a
-            ld b, 0                         ; OBP0: values 1 / 2 / 3 -> colours 0 / 1 / 3
-            ld e, 1
-            ld d, 3
-            call .mk
-            ldh [obp0_v], a
-            ld b, 1                         ; OBP1: 1 / 2 / 3
+            ld b, 0                         ; OBP0 and OBP1: values 1 / 2 / 3 -> colours 0 /
+            ld e, 2                         ;   2 / 3: never colour 1, the darkest colour of the
+            ld d, 3                         ;   cell's palette, which is the window blue / the
+            call .mk                        ;   field's dark ground (sprites blended in); the
+            ldh [obp0_v], a                 ;   backdrop black outlines them instead
+            ld b, 0
             ld e, 2
             ld d, 3
             call .mk
