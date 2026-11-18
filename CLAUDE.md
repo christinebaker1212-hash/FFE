@@ -193,8 +193,6 @@ Milestones per game (from `docs/gb-port.md`):
   row table `$AB21`; palette 3 for those cells in the attribute table `$F3F8`).
 - Tools: `tools/gb/ntlog.py` logs nametable/attribute writes in the battleshot battle with
   the code address that made them (find who draws a screen area).
-
-## In progress / next
 - Battle bottom windows now 6 rows (owner, 2026-11-18: the bottom frame must show): frame
   on GB row 17, 4 text rows. Long messages use record 4 (whole window), so they have
   rows 1-4. GB battle line writer `gb_layout.BOXLINE` (replaces the English boxline in
@@ -208,10 +206,13 @@ Milestones per game (from `docs/gb-port.md`):
   decision** before any font change.
 
 ## In progress / next
-- Battle:
-  bottom panel to NES rows 18-23 cols 2-21 (names full width, commands over the right
-  half, the four messages as lines of one window via dummy boxes in the hidden rows),
-  cursors, flashing of the acting member's line and the target.
+- Owner's decision pending: smaller (condensed proportional) font in the battle message
+  window (mock-ups `mock3_font_*`); needs a tile renderer in the NES code (CHR RAM) and
+  free BG tiles in battle (to be counted).
+- Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target
+  cursor, flashing of the acting member's line and the target, magic/item lists in the
+  window, all formations (large enemies, fiends, Chaos), then build the GB ROM from
+  `ff1_gb.nes` (coverage for that ROM) and check it in PyBoy/mGBA with `firstdiff.py`.
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).
