@@ -2423,9 +2423,10 @@ def magic_menu(rom):
     put_bank(rom, B, 0xBAB5 + 4 * 9, bytes((0, 3, 20, 15)), bytes(rom[bank_off(B, 0xBAB5 + 36):bank_off(B, 0xBAB5 + 40)]))
     put_bank(rom, B, 0xBA80, bytes([0x20]) + ex['gbmagini'].to_bytes(2, 'little') + bytes([0xEA, 0xEA]),
              bytes([0xA9, 0x09, 0x20, 0x02, 0xB9]))
+    put_bank(rom, B, 0xAEB3, bytes([0x20]) + CAM['menu'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
     put_bank(rom, B, 0xB829, bytes([0x4C]) + ex['gbmagcur'].to_bytes(2, 'little'), bytes([0x4C]))
-    put_bank(rom, B, 0xB957, bytes([0x20]) + ex['gbm957'].to_bytes(2, 'little') + bytes([0x20, 0xC3, 0x5E]),
-             bytes([0x20, 0xC3, 0x5E, 0xEA, 0xEA, 0xEA]))
+    ms = bytes([0x20]) + ex['m_setbank'].to_bytes(2, 'little')
+    put_bank(rom, B, 0xB957, bytes([0x20]) + ex['gbm957'].to_bytes(2, 'little') + ms, ms + bytes([0xEA, 0xEA, 0xEA]))
 
 
 # Weapons / Armor screens (camera X = 1, Y = 0: GB column = NES column - 1; the hands at
@@ -2568,6 +2569,16 @@ cmdxy:              ; $BE1B: the command string at (2, 2) inside the top window
     sta $3B
     rts
 """
+EQ_CAM = """
+camequip:           ; $BE06: camera X = 1, Y = 0, page 1
+    jsr $9C02
+    lda #1
+    sta $5800
+    lda #0
+    sta $5801
+    sta EPAGE
+    rts
+"""
 EQ_CUR_C = """
 slotcur:            ; $BEC8: hand at the slot cursor $62 (turns the page first)
     lda $62
@@ -2584,15 +2595,8 @@ sc1:
     jsr slotpos
     lda #0
     sta $40
-    jmp $ED24
-camequip:           ; $BE06: camera X = 1, Y = 0, page 1
-    jsr $9C02
-    lda #1
-    sta $5800
-    lda #0
-    sta $5801
-    sta EPAGE
-    rts
+    jsr $ED24
+    jmp $BEF9       ; and the hand at the chosen command (no colour highlight)
 """
 
 
@@ -2638,25 +2642,22 @@ mtitle:             ; $AEC1: the magic screen's title (member name) one row up
     assert m.org + len(m.bytes) <= 0xBA80
     put_bank(rom, B, 0xBA73, m.bytes, bytes(rom[bank_off(B, 0xBA73):bank_off(B, 0xBA73) + len(m.bytes)]))
     put_bank(rom, B, 0xAEC1, bytes([0x20]) + m.labels['mtitle'].to_bytes(2, 'little'), bytes([0x20, 0x6C, 0xB9]))
-    put_bank(rom, B, 0xBE06, bytes([0x20]) + cc.labels['camequip'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
+    ce = asm(EQ_CAM, syms=syms, org=0xBF0D)          # old highlight code (dead: $BF0A jumped to ExRAM)
+    assert ce.org + len(ce.bytes) <= 0xBF41
+    put_bank(rom, B, ce.org, ce.bytes, bytes(rom[bank_off(B, ce.org):bank_off(B, ce.org) + len(ce.bytes)]))
+    put_bank(rom, B, 0xBE06, bytes([0x20]) + ce.labels['camequip'].to_bytes(2, 'little'), bytes([0x20, 0x02, 0x9C]))
     # command hands (GB x 0 / 56 / 104 -> NES x 8 / 64 / 112) on row 2
     put_bank(rom, B, 0xBF07, bytes([8, 64, 112]), bytes([80, 144, 192]))
     put_bank(rom, B, 0xBF00, bytes([0xA9, 15]), bytes([0xA9, 0x14]))
+    # no colour highlight of the chosen command (on the plain Game Boy the shading codes a
+    # tile for one palette only, so letters shared with the red word vanished elsewhere):
+    # its hand stays instead (slotcur)
+    put_bank(rom, B, 0xBF0A, bytes([0x60]), bytes([0x4C]))
     # top window attributes: all palette 3 ($BE61 wrote the old title box's $7F $DF)
     put_bank(rom, B, 0xBE66, bytes([0xA9, 0xFF, 0x8D, 0x07, 0x20, 0xA9, 0xFF]), bytes([0xA9, 0x7F, 0x8D, 0x07, 0x20, 0xA9, 0xDF]))
 
 
-# barhl (ExRAM, bank 14 $BF0A) for the GB top window: attribute bytes $23C0-$23C4,
-# command row 2 = bottom quadrants (Equip NES cols 3-7, Swap 10-13, Drop 16-19)
-BARHL_PATCH = [("""    lda #$C3
-    jsr $BF41
-    ldy #5""", """    lda #$C0
-    jsr $BF41
-    ldy #5"""), ("""    .db $AF, $EF, $FF, $FF, $FF     ; cols 12-17
-    .db $FF, $FF, $AF, $FF, $FF     ; cols 20-23
-    .db $FF, $FF, $FF, $BF, $EF     ; cols 26-29""", """    .db $BF, $AF, $FF, $FF, $FF     ; GB: cols 3-7
-    .db $FF, $FF, $BF, $EF, $FF     ; cols 10-13
-    .db $FF, $FF, $FF, $FF, $AF     ; cols 16-19""")]
+
 
 
 # Status screen (camera 0, 0; table bank 14 $B53A, windows drawn with strings 35-40):

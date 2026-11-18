@@ -50,7 +50,7 @@ if __name__ == '__main__':
         if f == poke_at and pokes:
             import battleseq
             st = n.save()
-            for a, v in pokes: st[battleseq.SRAM_STATE + a - 0x6000] = v
+            for a, v in pokes: battleseq.poke_state(st, a, v)
             n.load(st)
         n.controller = fr[f] if f < len(fr) else 0
         img = np.array(n.step(1))

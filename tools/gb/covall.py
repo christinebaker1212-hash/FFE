@@ -1,6 +1,6 @@
 """Regenerate the recompiler's coverage logs for a NES ROM (needed after every change to
 the NES code): new game + random play (covrun.py, seeds 1-4) and the field scripts below
-(covfield.py), all in parallel; writes OUTDIR/rom.sha1 (build.py warns on a mismatch).
+(covfield.py) and battle input modes (covbattle.py), all in parallel; writes OUTDIR/rom.sha1 (build.py warns on a mismatch).
 usage: PYTHONPATH=build/emu covall.py ROM OUTDIR [FRAMES (random play, default 80000)]"""
 import hashlib, os, subprocess, sys
 
@@ -23,6 +23,7 @@ SCREENS = {     # menu sub-screen scripts (with magic_pokes), also used by the G
     'status': '_30,S5,_80,D5,_40,D5,_40,D5,_40,D5,_40,A5,_100,A5,_150,B5,_100,B5,_100',
 }
 FIELD += [(k, v, 4700, 'MAGIC') for k, v in SCREENS.items()]
+BATTLE = ['fight', 'run', 'fire1', 'cure4', 'magic4', 'items4', 'med1']     # battleseq.py modes
 
 
 def magic_pokes():
@@ -57,6 +58,12 @@ def main():
         if pokes: cmd += ['--poke', magic_pokes() if pokes == 'MAGIC' else pokes]
         procs.append(subprocess.Popen(cmd, env=env1, stdout=open(os.path.join(out, 's%d.log' % (5 + i)), 'w'),
                                       stderr=subprocess.STDOUT))
+    for i, mode in enumerate(BATTLE):
+        env1 = dict(env, COV_LOG=os.path.join(out, 'b%d.bin' % i))
+        if os.path.exists(env1['COV_LOG']): os.remove(env1['COV_LOG'])
+        procs.append(subprocess.Popen([sys.executable, os.path.join(HERE, 'covbattle.py'), rom, mode, '7700',
+                                       '--poke', magic_pokes()], env=env1,
+                                      stdout=open(os.path.join(out, 'b%d.log' % i), 'w'), stderr=subprocess.STDOUT))
     bad = [p.args for p in procs if p.wait() != 0]
     sha = hashlib.sha1(open(rom, 'rb').read()).hexdigest()
     with open(os.path.join(out, 'rom.sha1'), 'w') as fh: fh.write('%s  %s\n' % (sha, rom))

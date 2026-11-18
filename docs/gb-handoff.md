@@ -50,6 +50,16 @@ approved layout = `mock12_battle.png` + full-width messages `mock13_msgs_wide.pn
 - dual-mode target for colour (CGB first), see CLAUDE.md.
 
 ### How it is built (`tools/ff1/gb_layout.py`, applied by `insert.py --gb`)
+- Space: ExRAM ($5C60-$5F7F; $5F80-$5FFF is the battle text buffer, insert.py asserts the
+  image ends before it) is nearly full. Bank 14 free bytes used by the menu screens: the
+  old member-window code $BA14-$BA7F, old item cursor table / equip cursor table, the old
+  window-table entries 3-9 of the equip screen, the dead highlight code $BF0D-$BF40; fixed
+  bank $EFA7-$F05A (items) and $ED84-$EE20 (equip slots). Far bank 40 has KBs free but
+  cannot call $C000-$DFFF code (text drawer $DEB6 lives there).
+- Menu RAM ($0340-$034F, never used by the NES game): IPAGE/IROW/IDESC $0340-$0342 (items),
+  MPAGE/MLAST/MD1/MD3 $0349/$034A/$034C/$034D (magic), EPAGE/EROW $034E/$034F (equip);
+  battle: VNROW $0343, VBOX $0344, VTV $0345, VSQ $0346, VTID $0350+; dialogue DGN/DGT
+  $0347/$0348.
 - Far-code bank 40 (via ExRAM `farjsr`; farjsr clobbers A, so routines read their
   arguments from RAM): small-font renderer `VWF_SRC` (`vchar`, `vstr`, `vupload`; glyph
   table generated from `tools/latin_font.py`), `party_stamp` (party window into the panel

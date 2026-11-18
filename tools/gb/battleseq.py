@@ -15,6 +15,12 @@ import numpy as np
 
 
 SRAM_STATE = 0x23E2           # offset of NES $6000 in a cynes save state (this ROM/mapper)
+RAM_STATE = 0x500A            # offset of NES $0000 (internal RAM)
+
+
+def poke_state(st, a, v):
+    """patch NES address a (internal RAM $0000-$07FF or work RAM $6000-$7FFF) in a state"""
+    st[(RAM_STATE + a) if a < 0x800 else (SRAM_STATE + a - 0x6000)] = v
 
 
 def pad_for(mode, f):
@@ -75,7 +81,7 @@ def main():
     for f in range(f1 + 1):
         if f == 6100 and pokes:                 # work RAM $6000-$7FFF in the cynes state
             st = n.save()
-            for a, v in pokes: st[SRAM_STATE + a - 0x6000] = v
+            for a, v in pokes: poke_state(st, a, v)
             n.load(st)
         n.controller = pad_for(mode, f); img = n.step(1)
         if f >= f0 and (f - f0) % step == 0:

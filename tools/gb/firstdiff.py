@@ -75,8 +75,9 @@ for m in steps[:limit]:
         import battleseq
         st = nes.save()
         for a, v in pokes:
-            st[battleseq.SRAM_STATE + a - 0x6000] = v
-            gb.pb.memory[0, 0xA000 + a - 0x6000] = v
+            battleseq.poke_state(st, a, v)
+            if a < 0x800: gb.pb.memory[0xC000 + a] = v          # NES RAM at GB $C000
+            else: gb.pb.memory[0, 0xA000 + a - 0x6000] = v
         nes.load(st)
     nes.controller = m
     k0 = nes.nmi_count

@@ -974,11 +974,13 @@ def menu_engine(rom, report):
     tabs = '\nFARLO:\n    .db ' + ', '.join('<(%d-1)' % far.labels[r] for r in FAR_ROUTINES) + \
            '\nFARHI:\n    .db ' + ', '.join('>(%d-1)' % far.labels[r] for r in FAR_ROUTINES) + '\n'
     exsrc = EXRAM_SRC.replace('BCMDS', bc)
-    if '--gb' in sys.argv:                     # GB layout: menu code in ExRAM
-        for o, n in gb_layout.BARHL_PATCH:
-            assert o in exsrc; exsrc = exsrc.replace(o, n)
+    if '--gb' in sys.argv:                     # GB layout: menu code in ExRAM (the command
+        a, b = exsrc.index('barhl:'), exsrc.index('magpre:')    # highlight is not used there)
+        exsrc = exsrc[:a] + 'barhl:\n    rts\n' + exsrc[b:]
         exsrc += gb_layout.exram_source(FAR_ROUTINES)
     ex = asm(exsrc + tabs, syms=dict(EX, FAR8=FAR8))
+    # $5F80-$5FFF is the battle text buffer: code and the far-call tables must end before it
+    assert ex.org + len(ex.bytes) <= 0x5F80, 'ExRAM image ends at $%04X' % (ex.org + len(ex.bytes))
     FAR_LABELS.update(far.labels)
     img = bytearray(0x400); img[0x60:0x60 + len(ex.bytes)] = ex.bytes
     assert 0x60 + len(ex.bytes) <= 0x400

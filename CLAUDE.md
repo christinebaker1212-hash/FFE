@@ -514,8 +514,31 @@ Milestones per game (from `docs/gb-port.md`):
   sprite right of rows 1-3; window (0,7,20,11): 5 stats (39) and 4 battle values (40), one
   per row, values ending at column 18. Items / magic titles (window 7) fixed: they were
   drawn on the bottom frame (now lower-row mode one row up).
-- Next: GB checks of the sub-screens (firstdiff with covall.SCREENS scripts, DMG + CGB),
-  then shops.
+- GB checks of the sub-screens (firstdiff, covall.SCREENS / items / magic scripts with
+  pokes, DMG + CGB): all identical to the NES. Found and fixed with them: the magic list
+  kept the field camera ($AEB3 -> cammenu); on DMG the red command highlight made letters
+  vanish elsewhere (a tile is shaded for one palette only), so the GB build has no colour
+  highlight (barhl off) and the chosen command keeps its hand while a slot is picked.
+- Bug found by the coverage drop (2026-11-18): the GB menu code appended to ExRAM pushed
+  the far-call tables (FARLO/FARHI) past $5F80, the battle text buffer; long battle
+  messages overwrote them and the next farjsr jumped into zero page (random play hung in
+  its first battle, so coverage lost ~10%). insert.py now asserts the ExRAM image ends
+  before $5F80; the GB build drops the unused command-highlight routine (barhl) there
+  (761 bytes, ends $5F59). ExRAM is nearly full: new GB code goes elsewhere.
+- Coverage now also runs the battle input modes (`covbattle.py`, covall.BATTLE) with
+  magic_pokes: the random seeds alone reached ~10% less code after the menu changes.
+- **Shops: waiting for the owner** (mock-ups `build/shots/mock_shop_A.png` / `_B.png`):
+  a full-width buy list (17-letter names + prices, 5 items x 2 rows) must cover the lower
+  area. A = keep the shop scene (shopkeeper, counter, party sprites; NES palettes 0 /
+  1 / 2 there): the list hides it while open (sprites hidden, attributes switched, scene
+  redrawn afterwards). B = SaGa-style without the scene (all windows one palette).
+  Shop facts: EnterShop b14 $A343 ($50 = enter flag, $51 = shop index = type*10 + town,
+  e.g. 1 = Coneria weapons, 70 caravan; open one with `--poke 0050=01,0051=01`), windows
+  $AC53 (x[5] y[5] w[5] h[5]: speech, title, list, menu, gold), attributes $AC6F (64 bytes),
+  scene 10x10 tiles at NES (11,6) from $ACAF, list strings built in ExRAM (shoplist,
+  magpre), menu cursor table $A98A, list cursor $A992. NES English bug seen: the price is
+  missing from the "... Gil, see" line. Tools: pokes below $0800 work now
+  (battleseq.poke_state: RAM_STATE offset; firstdiff writes GB $C000 + a).
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).
