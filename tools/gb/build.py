@@ -109,7 +109,7 @@ def main():
     if gb: args.remove('--gb')
     name = 'ff1_gb' if gb else 'ff1_en'
     opt = {'--cov': os.path.join(ROOT, 'build', 'cov3' if gb else 'cov2'),
-           '--out': os.path.join(ROOT, 'build', name + '.gb')}
+           '--out': os.path.join(ROOT, 'build', name + '.gb'), '--nes': None}
     pos = []
     while args:
         a = args.pop(0)
@@ -118,11 +118,14 @@ def main():
     src = pos[0] if pos else os.path.join(ROOT, 'roms', 'Final Fantasy I, II (Japan).nes')
     out_dir = os.path.dirname(os.path.abspath(opt['--out']))
     os.makedirs(out_dir, exist_ok=True)
-    nes = nes_english(src, out_dir, gb)
+    nes = opt['--nes'] or nes_english(src, out_dir, gb)     # --nes: an English NES ROM already built
     covs = sorted(glob.glob(os.path.join(opt['--cov'], '*.bin')))
     if not covs: raise SystemExit('no coverage logs in %s (run tools/gb/covrun.py)' % opt['--cov'])
     t = time.time()
-    cm = CodeMap(nes, covs).build()
+    entries = []                                      # far routines (dispatched by farjsr)
+    if os.path.exists(nes + '.far'):
+        entries = [('far', int(l.split()[0], 16)) for l in open(nes + '.far') if l.strip()]
+    cm = CodeMap(nes, covs, entries).build()
     rc = Recompiler(cm)
     prog, bank_of, banks = emit_program(rc)
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s', 'sgb.s'))

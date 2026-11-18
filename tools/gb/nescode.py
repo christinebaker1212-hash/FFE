@@ -62,9 +62,11 @@ def fmt_arg(i):
 
 
 class CodeMap:
-    def __init__(self, rom_path, cov_paths):
+    def __init__(self, rom_path, cov_paths, entries=()):
         self.rom = open(rom_path, 'rb').read()[HDR:]
         self.cov = bytearray(3 * COV_SIZE)
+        for sp, a in entries:                             # entry points known without coverage
+            self.cov[index_of(sp, a)] |= 3                #   (executed, reached by RTS)
         for p in cov_paths:
             d = open(p, 'rb').read()
             for k in range(0, len(d), 1 << 20):            # OR in chunks (fast enough)

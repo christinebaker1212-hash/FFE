@@ -20,6 +20,8 @@ Battle (mock-up 12/13, approved): camera (1, 6), so GB = NES - (1, 6):
   All window text is drawn in the small proportional font (VWF below).
 """
 import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from asm6502 import asm
 HDR = 16
 BANK = 0x4000
 
@@ -88,7 +90,7 @@ GLYPH_FIRST = 0x7A                       # glyph table covers codes $7A-$FF
 DIG3 = 0xD3                              # 3-px digits $D3-$DC, small '/' $DD, arrow $DE
 SLASH3, ARROW = 0xDD, 0xDE
 STATUS_WORDS = ['Stone', 'Poison', 'Blind', 'Numb', 'Sleep', 'Mute']   # status bits 1-6
-FAR_GB = ['party_line', 'party_stamp']   # far routines added for the GB layout (after boxline etc.)
+FAR_GB = ['party_line', 'party_stamp', 'dlgpage', 'dlghide']   # far routines added for the GB layout (after boxline etc.)
 
 VWF_SRC = """
 VBUF = $6E00        ; line buffer: 18 tiles x 8 rows, 1 bit per pixel, tile-major
@@ -1486,7 +1488,248 @@ def enc_word(enc, w):
 
 
 def far_source(enc):
-    return 'MUSIC = $%04X\n' % MUSIC + VWF_SRC + glyph_tables(enc)
+    return 'MUSIC = $%04X\n' % MUSIC + VWF_SRC + DLG_SRC + glyph_tables(enc)
+
+
+# ---- field dialogue ----------------------------------------------------------------
+# NES: box metatile columns 1-14 (tile columns 2-29), tile rows 2-12, text 25 columns x 9
+# lines from (4, 3). GB: the top of the GB view, columns 6-25 and tile rows 6-13 (frame,
+# 6 text lines, frame), text 18 columns from (7, 7); the party (screen rows 14-15) stays
+# visible below. Text is wrapped at 18 columns by insert.py --gb and split into pages of
+# 6 lines by code $05: wait for A, clear the text, go on at the first line.
+DLG_W, DLG_H = 18, 6
+DLG_PAGE = 0x05
+
+DLG_SRC = """
+DGN = $0347         ; rows left to clear
+DGT = $0348
+dlgpage:            ; page break in a dialogue (printer at $DB8E; $38/$39 = text origin)
+dgw0:
+    jsr dgframe
+    bmi dgw0        ; A still held: wait for its release
+dgw1:
+    jsr dgframe
+    bpl dgw1        ; wait for A
+dgw2:
+    jsr dgframe
+    bmi dgw2
+    lda $39         ; clear the 6 text rows (one per frame)
+    sta $3B
+    lda #6
+    sta DGN
+dgr:
+    jsr $FE00
+    lda $38
+    sta $3A
+    jsr dgaddr
+    ldx #18
+dgc:
+    lda #$FF
+    sta $2007
+    lda $3A         ; next column; the other nametable at 32 / 0 (as the printer)
+    clc
+    adc #1
+    and #$3F
+    sta $3A
+    and #$1F
+    bne dgc1
+    jsr dgaddr
+dgc1:
+    dex
+    bne dgc
+    jsr MUSIC
+    jsr dgscroll
+    lda $3B
+    clc
+    adc #1
+    cmp #30
+    bcc dgr1
+    sbc #30
+dgr1:
+    sta $3B
+    dec DGN
+    bne dgr
+    jmp dlghide     ; (people over the box hidden again)
+dlghide:            ; dialogue box opening: sprites over the box rows (NES y 48-111) hidden
+    ldx #0          ;   (the field rebuilds the sprites when the box closes)
+dh1:
+    lda $0200,x
+    clc
+    adc #16
+    cmp #48         ; top (y + 1) >= 33 and < 112
+    bcc dh2
+    cmp #127
+    bcs dh2
+    lda #$F0
+    sta $0200,x
+dh2:
+    inx
+    inx
+    inx
+    inx
+    bne dh1
+    lda #2          ; to the screen now (the next OAM upload is after the dialogue)
+    sta $4014
+    rts
+dgframe:            ; next frame (music, scroll), then the pad: A = buttons, N = A button
+    jsr $FE00
+    jsr MUSIC
+    jsr dgscroll
+    lda #1
+    sta $4016
+    lda #0
+    sta $4016
+    ldx #8
+dgp:
+    lda $4016
+    and #3
+    cmp #1
+    rol $20
+    dex
+    bne dgp
+    lda $20
+    rts
+dgscroll:           ; as $CCA3 (field scroll)
+    lda $FD
+    sta $FF
+    sta $2000
+    lda $29
+    asl a
+    asl a
+    asl a
+    asl a
+    ora $35
+    sta $2005
+    lda $2F
+    asl a
+    asl a
+    asl a
+    asl a
+    ora $36
+    sta $2005
+    rts
+dgaddr:             ; PPU address of column $3A (0-63), row $3B (as $DC8E); keeps X
+    lda $2002
+    lda $3B
+    lsr a
+    lsr a
+    lsr a
+    ora #$20
+    pha
+    lda $3A
+    cmp #$20
+    pla
+    bcc dga1
+    ora #$04
+dga1:
+    sta $2006
+    lda $3B
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    sta DGT
+    lda $3A
+    and #$1F
+    ora DGT
+    sta $2006
+    rts
+"""
+
+
+def dialogue(rom):
+    """Field dialogue box for the GB view (see DLG_SRC): the box builder $D54B rewritten
+    (table-driven: upper / lower tile row of each box metatile row), the text origin
+    ($D520) and the page-break code in the printer's dispatch ($DBE8)."""
+    main = sys.modules['__main__']
+    farjsr = main.LABELS_EX['farjsr']
+    page = main.FAR_ROUTINES.index('dlgpage')
+    src = """
+dbuild:             ; box metatile row $1C (6 = lowest .. 1): upper / lower tile row kinds
+    dec $1C
+    beq dbret
+    lda $1C
+    cmp #6
+    bne db0
+    ldx #HIDE       ; first row: people over the box hidden
+    jsr FARJSR
+db0:
+    ldx $1C
+    lda dupk,x
+    beq dblo
+    ldx #0
+    jsr dfill
+dblo:
+    ldx $1C
+    lda dlok,x
+    beq dbret
+    ldx #$20
+    jmp dfill
+dbret:
+    rts
+dfill:              ; A = 1 top, 2 middle, 3 bottom; X = 0 upper / $20 lower tile row:
+    tay             ;   left edge in metatile 3, fill to metatile 12, right edge in 12
+    lda dkl-1,y
+    sta $0783,x
+    lda dkr-1,y
+    sta $079C,x
+    lda dkf-1,y
+    ldy #9
+df1:
+    sta $0784,x
+    sta $0793,x
+    inx
+    dey
+    bne df1
+    rts
+dkl:
+    .db $F7, $FA, $FC
+dkf:
+    .db $F8, $FF, $FD
+dkr:
+    .db $F9, $FB, $FE
+dupk:
+    .db 0, 0, 0, 1, 2, 2, 2
+dlok:
+    .db 0, 0, 0, 2, 2, 2, 3
+dchk:               ; printer dispatch ($DBE8): 01 newline, 05 page break, else as before
+    cmp #$01
+    bne dchk5
+    jsr $DC6D
+    jmp $DB8E
+dchk5:
+    cmp #$05
+    bne dchk9
+    ldx #PAGE
+    jsr FARJSR
+    lda $38
+    sta $3A
+    lda $39
+    sta $3B
+    lda #5
+    sta $17
+    jsr $DC8E
+    jmp $DB8E
+dchk9:
+    jmp $DBF2
+dstart:             ; text about to be printed (A = dialogue id): people over the box hidden
+    pha
+    ldx #HIDE
+    jsr FARJSR
+    pla
+    jmp $DB58
+dbend:
+"""
+    r = asm(src, syms={'PAGE': page, 'HIDE': main.FAR_ROUTINES.index('dlghide'), 'FARJSR': farjsr}, org=0xD54B)
+    assert r.org == 0xD54B and r.org + len(r.bytes) <= 0xD5E4, hex(r.org + len(r.bytes))
+    put(rom, 0xD54B, r.bytes, expect=bytes([0xC6, 0x1C, 0xF0, 0x4C]))
+    put(rom, 0xD520, bytes([0xA5, 0x29, 0x18, 0x69, 0x13, 0x29, 0x1F, 0x38, 0x2A, 0x85, 0x38,   # col ((x+19)&31)*2+1
+                            0xA5, 0x2F, 0x0A, 0x69, 0x07, 0xC9, 0x1E, 0x90, 0x02, 0xE9, 0x1E,   # row y*2+7 mod 30
+                            0x85, 0x39, 0xA9, 0x80, 0x85, 0x37, 0x68, 0x4C]) + r.labels['dstart'].to_bytes(2, 'little'),
+        expect=bytes([0xA5, 0x29, 0x18, 0x69, 0x12, 0x29, 0x1F, 0x0A, 0x85, 0x38]))
+    put(rom, 0xDBE8, bytes([0x4C]) + r.labels['dchk'].to_bytes(2, 'little'),
+        expect=bytes([0xC9, 0x01, 0xD0, 0x06]))
 
 def battle_panel(rom):
     """Bottom panel (25x12 image at $691E, NES rows 18-29; the GB shows panel rows 0-5,
@@ -1668,4 +1911,5 @@ def apply(rom, report):
     enemy_target(rom)
     hooks(rom)
     music_trampoline(rom)
+    dialogue(rom)
     report.append('GB layout applied')

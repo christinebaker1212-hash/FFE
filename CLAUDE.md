@@ -434,8 +434,36 @@ Milestones per game (from `docs/gb-port.md`):
   the LYC split handler at once and broke the scroll on every screen (fixed).
   Possible later: a palette of its own for the battle party column (sprites now take the
   colours of the enemy/window area they stand in).
-- Next (owner, 2026-11-18): CGB speed-ups (double speed, HDMA), then the next screens,
-  without pausing.
+- **CGB speed-ups done (2026-11-18):** double speed (KEY1 + STOP at boot; LCD-off timer
+  and the NES-time delay loops scaled); tile uploads with the LCD on by general-purpose
+  HDMA: BG tile bytes into a copy of the BG tiles (CGB WRAM bank 2), sprite slot loads
+  into a copy of the slots (bank 3), marked tiles copied in the vblank (copy refreshed
+  from VRAM when the LCD goes on). The GB stack moved to NES page 1 ($C100-$C1FF; the
+  NES stack runs on the GB stack, deepest seen ~100 bytes) so it is outside the
+  switchable WRAM bank; interrupt handlers select WRAM bank 1 and restore it. PyBoy
+  does not emulate double speed (KEY1 reads 0); measure speed in mGBA (`sgbrun --cgb`):
+  battle script to NES frame 7000 = 7549 GB frames (8485 at normal speed; DMG 9076,
+  SGB 10083). Checks: firstdiff --battle and --random 1 (30000) identical on DMG and
+  CGB; mGBA CGB/SGB game state = NES at checkpoints (`sgbram.py`).
+- **Field dialogue re-laid out (2026-11-18)** (`gb_layout.dialogue`, DLG_SRC): box at the
+  top of the GB view (NES cols 6-25, tile rows 6-13: frame, 6 text lines, frame; the
+  party at rows 14-15 stays visible), text 18 columns from (7, 7). The box builder $D54B
+  is rewritten table-driven (upper/lower tile row of each box metatile row); text
+  origin $D520; dialogue text wrapped at 18 by `insert.py --gb` with code $05 between
+  pages of 6 lines (up to 13 lines = 3 pages); $05 in the printer dispatch ($DBE8)
+  runs far `dlgpage` (wait for A, clear the 6 rows one per frame across both
+  nametables, scroll + music each frame). People standing over the box are hidden
+  (`dlghide`, OAM upload) when it opens and after each page. Known: on the last page
+  the field's own frame loop can show them again. Checked with a test ROM (a 2-page
+  string in place of "There's nothing there."): firstdiff identical on DMG and CGB.
+  Tools: `fieldseq.py` (field input scripts, NES shots), `firstdiff.py --field`,
+  `build.py --nes FILE` (recompile a given English NES ROM).
+- Recompiler: far routines are entry points even without coverage (`insert.py --gb`
+  writes `<rom>.far`; build.py marks them as executed / RTS targets). Coverage
+  (`build/cov3`) must still be regenerated after NES code changes (4 seeds x 80k).
+- Next: main menu (window table b14 $BAB5; drawn by b14:$B84D: orbs window 0 with orbs at
+  fixed nametable addresses $B88B, Gil 5, commands 6, member windows 1-4 via $B995;
+  class sprites $B82C), then item/magic/equip/status, shops.
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).

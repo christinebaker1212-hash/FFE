@@ -81,6 +81,7 @@ def put(rom, cpu, data):                  # fixed bank lives in banks 15 and 31
         rom[o:o + len(data)] = data
 
 def insert_dialogue(rom, report):
+    if '--gb' in sys.argv: sys.path.insert(0, os.path.dirname(__file__))
     dia = json.load(open('script/ff1/dialogue.json'))
     items = json.load(open('script/ff1/items.json'))
     global ITEM_MAX; ITEM_MAX = max(len(e['en']) for e in items)
@@ -90,6 +91,16 @@ def insert_dialogue(rom, report):
         for e in items:                   # {02} item-name table at $B700 (same layout as original)
             bank.put_ptr(0xB700 + 2 * e['id'], bank.alloc(enc(e['en'] or ' ') + b'\0'))
         for e in dia[half * 128:(half + 1) * 128]:
+            if '--gb' in sys.argv:            # GB: 18 columns, pages of 6 lines (code 05)
+                import gb_layout
+                lines = wrap(e['en'], gb_layout.DLG_W)
+                pages = ['\n'.join(lines[k:k + gb_layout.DLG_H]) for k in range(0, len(lines), gb_layout.DLG_H)]
+                if max(vlen(l) for l in lines) > gb_layout.DLG_W:
+                    bad += 1; report.append('DOES NOT FIT dialogue %d (GB)' % e['id'])
+                data = b''.join(enc(p) + (bytes([gb_layout.DLG_PAGE]) if k < len(pages) - 1 else b'')
+                                for k, p in enumerate(pages))
+                bank.put_ptr(0x8000 + 2 * e['id'], bank.alloc(data + b'\0'))
+                continue
             lines = wrap(e['en'])
             if len(lines) > H or max(vlen(l) for l in lines) > W:
                 bad += 1; report.append('DOES NOT FIT dialogue %d (%d lines)' % (e['id'], len(lines)))
@@ -1757,4 +1768,7 @@ if __name__ == '__main__':
         import gb_layout
         gb_layout.apply(rom, report)
     open(sys.argv[2], 'wb').write(rom)
+    if '--gb' in sys.argv:                     # far-code entry points (farjsr's RTS dispatch) for
+        with open(sys.argv[2] + '.far', 'w') as fh:     # the recompiler (tools/gb/build.py)
+            fh.write(''.join('%04X %s\n' % (FAR_LABELS[r], r) for r in FAR_ROUTINES))
     print('\n'.join(report)); print('strings not fitting:', bad)

@@ -3,6 +3,7 @@ where NES RAM at NMI k differs from GB RAM on entering frame wait k (page 1 excl
 The GB gets the controller value the NES game latched in each frame (cynes nmi_pad).
 usage: PYTHONPATH=build/emu firstdiff.py NES GB [MAXFRAMES] [--random SEED] [--battle]
        [--input MODE (battleseq.py modes, implies --battle)] [--poke ADDR=VAL,...]
+       [--field SCRIPT (fieldseq.py: new game, then the moves)]
        [--shots F1,F2,... --out SHEET.png]
 --battle: the battleshot.py input (new-game script, walk into a battle, A once a second);
 --shots: GB screens after those NES frames, saved as one sheet (--out).
@@ -20,6 +21,9 @@ if '--random' in args:
 battle = '--battle' in args
 if battle: args.remove('--battle')
 mode, pokes = 'fight', []
+field = None
+if '--field' in args:
+    k = args.index('--field'); field = args[k + 1]; del args[k:k + 2]
 if '--input' in args:
     k = args.index('--input'); mode = args[k + 1]; del args[k:k + 2]; battle = True
 if '--poke' in args:
@@ -54,6 +58,9 @@ for it in new_game_script():
 if battle:
     import battleseq
     steps = [battleseq.pad_for(mode, f) for f in range(limit)]
+if field:
+    import fieldseq
+    steps = [fieldseq.pad_for(field, f) for f in range(limit)]
 if rnd is not None:
     r = random.Random(rnd)
     btns = [UP, DOWN, LEFT, RIGHT, A, A, B, START, UP, DOWN, LEFT, RIGHT]
