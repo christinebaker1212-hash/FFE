@@ -287,7 +287,8 @@ Milestones per game (from `docs/gb-port.md`):
   Gotchas: farjsr clobbers A (pass arguments in RAM); far code must not call routines
   that reach bank-62 code at $C000-$DFFF (e.g. $F47D -> JMP $C009 music): use the fixed
   trampoline MUSIC ($F2F1). `tools/ff1/test_vwf.py` runs the renderer in py65.
-  Next: command cursor positions, enemy names window, target/actor flashing, magic/item
+  Command cursor ($9F75) and party-target cursor ($9F85) moved (`cursors()`).
+  Next: enemy names window, target/actor flashing, magic/item
   lists, end-of-battle messages, all formations, then the GB build. Implementation needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
 - Battle next (`docs/gb-handoff.md` steps 3-8): command cursor positions, party-target

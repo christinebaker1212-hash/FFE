@@ -1012,6 +1012,17 @@ def battle_panel(rom):
     put(rom, 0xFA0E, bytes([0, 1, 0, 20, 6]))
 
 
+def cursors(rom):
+    """Cursor positions (sprite x, y), bank 12: command window $9F75 (Fight / Magic /
+    Medicine / Items, then Run for each row), party targets $9F85 (16 px left of the
+    sprites). Command text is at panel col 2 / 6, rows 1-4 (NES rows 19-22); the hand
+    sits on the frame left of the text, 2 px above the text row, as on the NES."""
+    cmd = bytes([8, 150, 8, 158, 8, 166, 8, 174] + [40, 150] * 4)
+    put_bank(rom, 12, 0x9F75, cmd, bytes.fromhex('609e60ae60be60ce909e909e909e909e'))
+    party = bytes(sum(([140 - 16, y] for y in (0x34, 0x4C, 0x64, 0x7C)), []) * 2)
+    put_bank(rom, 12, 0x9F85, party, bytes.fromhex('a034a04ca064a07c' * 2))
+
+
 def hooks(rom):
     """Calls into the far-code routines: the party window is stamped into the panel image
     whenever the panel is cleared ($F618, freed bytes $F625-$F63F; X, Y = 0 and A = 0 as
@@ -1047,6 +1058,7 @@ def apply(rom, report):
     battle_frames(rom)
     battle_panel(rom)
     party_sprites(rom)
+    cursors(rom)
     hooks(rom)
     music_trampoline(rom)
     report.append('GB layout applied')
