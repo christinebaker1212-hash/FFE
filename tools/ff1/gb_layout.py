@@ -84,7 +84,7 @@ GLYPH_FIRST = 0x7A                       # glyph table covers codes $7A-$FF
 DIG3 = 0xD3                              # 3-px digits $D3-$DC, small '/' $DD, arrow $DE
 SLASH3, ARROW = 0xDD, 0xDE
 STATUS_WORDS = ['Stone', 'Poison', 'Blind', 'Numb', 'Sleep', 'Mute']   # status bits 1-6
-FAR_GB = ['party_line', 'party_stamp']   # far routines added for the GB layout (after boxline etc.)
+FAR_GB = ['party_line', 'party_stamp', 'blink']   # far routines added for the GB layout (after boxline etc.)
 
 VWF_SRC = """
 VBUF = $6E00        ; line buffer: 18 tiles x 8 rows, 1 bit per pixel, tile-major
@@ -579,6 +579,89 @@ dec3:               ; VLO/VHI (< 1000) -> 3-px digit codes at VSTR,Y (no leading
 .s:
     rts
 
+
+; ---- blinking of the commanding member's party line ------------------------------------
+VBM = $0340         ; member whose line blinks ($FF none)
+VBS = $0341         ; 1 = the line is blank now
+VBC = $0342         ; frame counter
+blink:              ; each frame of a pad wait in battle (b12:$97C7), right after vblank
+    lda $691E+9     ;   starts: member $6B7A's line (NES row 19+m, cols 10-19) is blank
+    cmp #$F8        ;   for 16 frames, shown for 16, while the party window is visible
+    bne .vis
+    lda #$FF
+    sta VBM
+    rts
+.vis:
+    lda $6B7A
+    and #3
+    cmp VBM
+    beq .same
+    pha
+    lda VBM
+    cmp #4
+    bcs .new
+    lda VBS
+    beq .new
+    lda #0          ; show the previous member's line again
+    jsr .write
+.new:
+    pla
+    sta VBM
+    lda #0
+    sta VBS
+.same:
+    inc VBC
+    lda VBC
+    and #$10
+    beq .w0
+    lda #1
+.w0:
+    cmp VBS
+    beq .r
+    sta VBS
+    jsr .write
+.r:
+    rts
+.write:             ; A = 1: blank cells, 0: the line's tiles (member VBM)
+    sta VLO
+    lda $2002
+    lda #$22
+    sta $2006
+    lda VBM
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    clc
+    adc #$6A
+    sta $2006
+    lda VBM
+    asl a
+    sta VHI
+    asl a
+    asl a
+    adc VHI
+    adc #$80        ; first tile of the line
+    ldx #10
+.c:
+    ldy VLO
+    beq .t
+    ldy #$FF
+    sty $2007
+    bne .n
+.t:
+    sta $2007
+.n:
+    clc
+    adc #1
+    dex
+    bne .c
+    lda #0
+    sta $2005
+    sta $2005
+    rts
+
 ; ---- panel text (replaces the English patch's boxline) ---------------------------------
 ; Input: decoded line at $6CD4 (pairs: dakuten, code; 0 ends), ($8A) = panel image cell of
 ; the text record. Column 21 = "-> target" after the attacker on row 1 of the message
@@ -682,6 +765,23 @@ boxline:
     lda #0
     sta VTGT,x
 .tgd:
+    ldx #0          ; an empty target (spaces only): the attacker alone
+.te:
+    lda VTGT,x
+    beq .ca0
+    cmp #$FF
+    bne .ca1
+    inx
+    bne .te
+.ca0:
+    ldx #0
+.cz:
+    lda VATK,x
+    sta VSTR,x
+    beq .ctd
+    inx
+    bne .cz
+.ca1:
     ldx #0
 .ca:
     lda VATK,x
@@ -1422,6 +1522,18 @@ def item_list(rom):
                             0x4C, 0x21, 0xF2]))                                 # JMP $F221 (itemlist)
 
 
+def blink_hook(rom):
+    """The pad routine b12:$97C7 ends with JSR $AB29 (wait for vblank, music). It calls
+    $AAFC instead (the old HP-box row writer and its table, $AAFC-$AB28, are unused now):
+    JSR $FE00 / farjsr blink / JMP $A07C."""
+    main = sys.modules['__main__']
+    farjsr = main.LABELS_EX['farjsr']
+    put_bank(rom, 12, 0x97E2, bytes([0x20, 0xFC, 0xAA]), bytes([0x20, 0x29, 0xAB]))
+    put_bank(rom, 12, 0xAAFC, bytes([0x20, 0x00, 0xFE, 0xA2, main.FAR_ROUTINES.index('blink'),
+                                     0x20, farjsr & 0xFF, farjsr >> 8, 0x4C, 0x7C, 0xA0]),
+             bytes([0xA5, 0x89, 0x8D, 0x06, 0x20]))
+
+
 def hooks(rom):
     """Calls into the far-code routines: the party window is stamped into the panel image
     whenever the panel is cleared ($F618, freed bytes $F625-$F63F; X, Y = 0 and A = 0 as
@@ -1460,6 +1572,7 @@ def apply(rom, report):
     cursors(rom)
     magic_cursor(rom)
     item_list(rom)
+    blink_hook(rom)
     hooks(rom)
     music_trampoline(rom)
     report.append('GB layout applied')

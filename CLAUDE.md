@@ -315,6 +315,10 @@ Milestones per game (from `docs/gb-port.md`):
   fixed-bank ITEMFLIP $F633 -> $F300 redraws after farjsr returns); cursor table $9FD7
   x = 1 (itemmove recognises the Item list by x = 1). Page flips show FF1's stepwise
   panel redraw for a few frames (as the magic pages do).
+  Blinking: the commanding member's line ($6B7A) blinks (16 frames blank / 16 shown, 10
+  nametable writes) in every pad wait (b12:$97C7 -> hook $AAFC -> far `blink`) while the
+  party window is visible. Still to do: blink the target (party targets; enemies?).
+  Message tear-down: an empty target shows the attacker alone (no arrow).
   Next: enemy names window, target/actor flashing, magic/item
   lists, end-of-battle messages, all formations, then the GB build. Implementation needs a tile renderer in the NES code (CHR RAM) and
   free BG tiles in battle (to be counted).
