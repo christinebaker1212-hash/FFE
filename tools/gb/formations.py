@@ -1,5 +1,5 @@
-"""Battle formation survey on the NES: force each formation (the battle entry's
-`LDA $006A` at $F292 becomes `LDA #f`), replay the battleshot.py walk from a state saved
+"""Battle formation survey on the NES: force each formation (every read of the formation
+number $6A becomes `LDA #f`), replay the battleshot.py walk from a state saved
 just before the encounter, rebuild the nametable from the PPU writes, and report per
 formation the NES columns/rows the enemy graphics use and the BG tile numbers shown.
 usage: PYTHONPATH=build/emu formations.py NES OUTDIR [f ...]  (default: all 128)
@@ -15,11 +15,18 @@ HDR, START, SHOT = 16, 6100, 6300
 
 
 def patched(rom, f):
+    """Every read of the formation number $6A becomes LDA #f (battle graphics $EAD5/$EADD,
+    battle entry $C1D4/$C933, setup $F292, names $F6B0/$F6B6, bank 11 $9AD3/$A141)."""
     r = bytearray(rom)
-    for bank in (15, 31):
-        o = HDR + bank * 0x4000 + 0xF292 - 0xC000
-        assert r[o:o + 3] == bytes([0xAD, 0x6A, 0x00])
-        r[o:o + 3] = bytes([0xA9, f, 0xEA])
+    n = 0
+    for bank, base in ((15, 0xC000), (31, 0xC000), (11, 0x8000)):
+        o0 = HDR + bank * 0x4000
+        for a in range(o0, o0 + 0x4000 - 2):
+            if r[a] == 0xA5 and r[a + 1] == 0x6A:
+                r[a:a + 2] = bytes([0xA9, f]); n += 1
+            elif r[a] == 0xAD and r[a + 1] == 0x6A and r[a + 2] == 0x00:
+                r[a:a + 3] = bytes([0xA9, f, 0xEA]); n += 1
+    assert n >= 9, n
     return bytes(r)
 
 

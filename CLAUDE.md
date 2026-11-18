@@ -372,8 +372,11 @@ Milestones per game (from `docs/gb-port.md`):
   cells for a few frames (shared tiles) while the panel was copied. The 9-column left
   window now has its own 28 tiles (LPOOL: $F0-$F6, hidden backdrop $01-$11, $7A-$7D);
   vupload takes a tile number per cell (VTID).
-- Battle still to do: fiends and Chaos formations, then the GB build (coverage,
-  firstdiff, CGB/DMG shots).
+- Fiends / Chaos checked (Lich f115, Chaos f123): graphics, names, targeting, messages
+  fine; Chaos clears the party sprites. (The first shots were mangled because the test
+  tool only patched one read of the formation number; `formations.patched` now patches
+  every read of $6A, so the battle graphics match the forced formation.)
+- Next: GB build with fresh coverage, firstdiff (DMG + CGB), CGB screenshots.
 - Then main menu, dialogue (18-column wrap), shops, status, etc. (`docs/gb-screens.md`).
 - `build.py` still builds from `build/ff1_en.nes`; switch it to `ff1_gb.nes` once the
   battle layout is usable (coverage logs must then be regenerated for that ROM).
