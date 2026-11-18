@@ -2,7 +2,9 @@
 input of the NES checks: the NES build is run with battleseq's input (or the new-game script)
 and the pad it latched per NMI is fed to the GB by NES frame number.
 usage: PYTHONPATH=build/emu sgbshots.py NES GB OUT.png NMI1,NMI2,... [--input MODE|--newgame|--field SCRIPT]
-       [--dmg | --cgb]   (MODE: battleseq.py input modes, default fight)"""
+       [--dmg | --cgb] [--poke ADDR=VAL,.. [--poke-at F]]
+       (MODE: battleseq.py input modes, default fight; pokes as fieldseq.py: NES step F,
+       default 3700; the GB gets them at the same NES frame)"""
 import os, sys, subprocess, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cynes import NES
@@ -17,6 +19,11 @@ if newgame: args.remove('--newgame')
 field = None
 if '--field' in args:
     k = args.index('--field'); field = args[k + 1]; del args[k:k + 2]
+pokes, poke_at = '', 3700
+if '--poke' in args:
+    k = args.index('--poke'); pokes = args[k + 1]; del args[k:k + 2]
+if '--poke-at' in args:
+    k = args.index('--poke-at'); poke_at = int(args[k + 1]); del args[k:k + 2]
 dmg = '--dmg' in args
 if dmg: args.remove('--dmg')
 cgb = '--cgb' in args
@@ -41,7 +48,15 @@ else:
     pad = lambda f: battleseq.pad_for(mode, f)
 pads = bytearray(last + 2)
 f = 0
+poke_nmi = None
 while nes.nmi_count < last and f < last * 3:
+    if pokes and f == poke_at:
+        import battleseq
+        st = nes.save()
+        for kv in pokes.split(','):
+            a, v = (int(x, 16) for x in kv.split('='))
+            battleseq.poke_state(st, a, v)
+        nes.load(st); poke_nmi = nes.nmi_count + 1
     nes.controller = pad(f)
     k0 = nes.nmi_count
     nes.step(1); f += 1
@@ -56,6 +71,7 @@ sf = os.path.join(tmp, 'sram.bin'); open(sf, 'wb').write(sram)
 here = os.path.dirname(os.path.abspath(__file__))
 exe = os.path.join(here, '..', '..', 'build', 'sgbrun')
 cmd = [exe, gb_path, str(last * 4), os.path.join(tmp, 's'), '--padfile', pf, '--sram', sf] + sum([['--nshot', str(s)] for s in shots], [])
+if poke_nmi is not None: cmd += ['--poke', str(poke_nmi), pokes]
 if dmg: cmd.append('--dmg')
 if cgb: cmd.append('--cgb')
 # stop early: run in chunks is not supported; FRAMES is an upper bound (GB frames)

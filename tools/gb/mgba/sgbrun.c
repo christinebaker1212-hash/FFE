@@ -6,6 +6,8 @@
  *     applied while the runtime's NES frame count ($D830) is that frame (as firstdiff.py);
  *   --nshot K: screenshot when the NES frame count first reaches K;
  *   --sram FILE: initial cart RAM (e.g. the NES power-on save RAM in bank 0, as compare.sync_sram).
+ *   --poke K ADDR=VAL,...: when the NES frame count first reaches K, write NES addresses (hex;
+ *     $0000-$07FF = work RAM $C000.., $6000-$7FFF = cart RAM bank 0).
  *   KEYS: letters a b s(elect) t(start) u d l r, e.g. --press t@700+5
  *   Screenshots: OUTPREFIX_fNNNNN.ppm (256x224 with the SGB border, 160x144 with --dmg).
  * Build: gcc -O2 sgbrun.c -lmgba -o sgbrun   (Ubuntu: apt install libmgba-dev)
@@ -46,6 +48,7 @@ int main(int argc, char** argv) {
 	if (argc < 4) { fprintf(stderr, "usage: sgbrun ROM FRAMES OUTPREFIX [--dmg] [--press K@F+H] [--shot F]\n"); return 2; }
 	int frames = atoi(argv[2]); const char* out = argv[3];
 	int dmg = 0; struct press presses[256]; int np = 0; int shots[1024]; int ns = 0;
+	int poke_at = 0; const char* poke_list = 0;
 	const char* sram_path = NULL;
 	unsigned char* pads = NULL; long npads = 0; int nshots[1024]; int nns = 0; int nshot_done[1024] = {0};
 	for (int i = 4; i < argc; i++) {
@@ -61,6 +64,7 @@ int main(int argc, char** argv) {
 		} else if (!strcmp(argv[i], "--shot") && i + 1 < argc && ns < 1024) shots[ns++] = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--nshot") && i + 1 < argc && nns < 1024) nshots[nns++] = atoi(argv[++i]);
 		else if (!strcmp(argv[i], "--sram") && i + 1 < argc) sram_path = argv[++i];
+		else if (!strcmp(argv[i], "--poke") && i + 2 < argc) { poke_at = atoi(argv[++i]); poke_list = argv[++i]; }
 		else if (!strcmp(argv[i], "--padfile") && i + 1 < argc) {
 			FILE* pf = fopen(argv[++i], "rb");
 			if (!pf) { fprintf(stderr, "no padfile\n"); return 1; }
@@ -97,6 +101,19 @@ int main(int argc, char** argv) {
 	}
 	char path[1024];
 	for (int f = 1; f <= frames; f++) {
+		if (poke_list) {
+			unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
+			if (n >= (unsigned) poke_at) {
+				for (const char* p = poke_list; *p; ) {
+					unsigned a, v; int used;
+					if (sscanf(p, "%x=%x%n", &a, &v, &used) != 2) break;
+					if (a < 0x800) core->rawWrite8(core, 0xC000 + a, -1, v);
+					else if (a >= 0x6000 && a < 0x8000) core->rawWrite8(core, 0xA000 + a - 0x6000, 0, v);
+					p += used; if (*p == ',') p++;
+				}
+				poke_list = 0;
+			}
+		}
 		unsigned keys = 0;
 		for (int k = 0; k < np; k++)
 			if (f >= presses[k].frame && f < presses[k].frame + presses[k].hold) keys |= presses[k].keys;
