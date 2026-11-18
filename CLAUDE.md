@@ -320,7 +320,12 @@ Milestones per game (from `docs/gb-port.md`):
   party window is visible. While the party-target cursor is up ($6AAC = 124, table from
   $9F85) the targeted member's line ($6AAB) blinks instead. Enemy targets: not yet.
   Message tear-down: an empty target shows the attacker alone (no arrow).
-- **Work now (2026-11-18):** GB build of the battle layout: `build.py --gb` (builds
+- **GB build of the battle layout works (2026-11-18):** `build.py --gb` -> `build/ff1_gb.gb`
+  (18.7k instructions, 5 code banks); `firstdiff.py build/ff1_gb.nes build/ff1_gb.gb 7100
+  --battle`: **no RAM difference in 7100 frames** (new game, walk, battle with messages,
+  commands, party window, blinking). On DMG all BG uses one palette (BGP from NES
+  palette 0), so window interiors are grey and the blink's $FF cells darker: colour
+  milestone (CGB/SGB attributes). Details of the earlier plan: `build.py --gb` (builds
   `build/ff1_gb.nes` with `insert.py --gb`, coverage `build/cov3` from `covrun.py` on that
   ROM, output `build/ff1_gb.gb`), then `firstdiff.py`, PyBoy and mGBA checks. Coverage
   must be regenerated after every change to the NES code (far-code addresses move).
