@@ -35,6 +35,8 @@ SHOPS = {       # shop scripts: (shop index $51, input); the shop opens from the
 FIELD += [(k, v, 4700, 'MAGIC,0050=01,0051=%02X' % i) for k, (i, v) in SHOPS.items()]
 FIELD += [('minimap', '_30,X8,_100,_100,A5,_60,B5,_100', 4300, ''),
           ('puzzle', '_6,Y20,_100,_100,R5,_40,D5,_40,L5,_40,U5,_40,B5,_100,_100', 4500, '0025=36,0042=04,0046=04')]
+FIELD += [('lineup', '_30,T5,_100,A5,_40,D5,_30,A5,_100,B5,_100,_100,U30,_100,T5,_100,D5,_30,A5,_40,D5,_30,D5,_30,A5,_100,B5,_100,_300',
+           4900, '')]   # Select: party order (its exit needs RTS-dispatch targets only this reaches)
 FIELD += [('bridge', '_30,D16,_60,D16,_200,_200,A5,_200,A5,_200,A5,_200', 5200, '6016=01')]   # story pages
 BATTLE = ['fight', 'run', 'fire1', 'cure4', 'magic4', 'items4', 'med1']     # battleseq.py modes
 
