@@ -309,6 +309,8 @@ class Emitter:
             self.o('call rt_ppu_r%d' % (a & 7)); return 'l'
         if r == 'io':
             self.o('call rt_io_r%04X' % a if a in (0x4015, 0x4016, 0x4017) else 'call rt_io_rnone'); return 'l'
+        if r == 'mmc' and a in (0x5802, 0x5803, 0x5804):            # GB runtime registers
+            self.o('call rt_mmc_r%04X' % a); return 'l'
         self.o('ld l, 0'); self.rc.warn.append('read of %04X at %r' % (a, i)); return 'l'
 
     def store(self, reg):
@@ -329,7 +331,7 @@ class Emitter:
         name = None
         if r == 'ppu': name = 'rt_ppu_w%d' % (a & 7)
         elif r == 'io': name = 'rt_io_w%04X' % a if a in (0x4014, 0x4016) else 'rt_apu_w'
-        elif r == 'mmc': name = 'rt_mmc_w%04X' % a if a in (0x5115, 0x5116, 0x5800, 0x5801) else None
+        elif r == 'mmc': name = 'rt_mmc_w%04X' % a if a in (0x5115, 0x5116, 0x5800, 0x5801, 0x5802, 0x5803, 0x5804) else None
         else:
             self.rc.warn.append('store to ROM %04X at %r' % (a, i)); return
         if name is None: return

@@ -39,6 +39,8 @@ BG_DIRTY   = $CCA0          ; CGB: BG tiles to copy by HDMA (bitmap, 32)
 SPR_DIRTY  = $CCC0          ; CGB: sprite slots to copy by HDMA (bitmap, 16)
 LK_C       = $CCD0          ; lookup: the last two results (6 bytes each), which to replace
 LK_RR      = $CCDC
+VOL_BGM    = $CCDD          ; music / sound effect volume 0-8 (OPTIONS, $5803 / $5804)
+VOL_SFX    = $CCDE
 EV_L       = $CCE0          ; raster events of this frame (vbl_regs / stat_isr): first line (3),
 EV_K       = $CCE3          ;   kind (3: 0 = SCY split, 1 = mask off, 2 = mask on),
 EV_I       = $CCE6          ;   next one,
@@ -335,6 +337,7 @@ boot:       di
             ld a, CAM_Y
             ldh [cam_y], a
             call apu_init
+            call opt_load
             ld a, -68                       ; timer: 4096 Hz / 68 = 60.2 Hz frame tick while the LCD is off
             ld b, a
             ldh a, [is_cgb]                 ;   (CGB double speed: the timer runs at 8192 Hz)
@@ -2408,6 +2411,82 @@ rt_mmc_w5800:                               ; camera X in tiles (GB layout code;
             ldh [cam_x], a
             pop af
             ret
+; ---- GB runtime registers for the FF1 Select menu (GB layout code; the NES has nothing
+; there). $5802 write: $A5 = make a suspend point (NES RAM, ExRAM -> cart RAM bank 4, NES
+; save RAM -> bank 5; the LCD must be off), $5A = restore it and erase it, $E0 = erase it;
+; read: 1 if one exists. $5803 / $5804: BGM / SFX volume 0-8 (kept in cart RAM bank 3).
+SUSP_MAGIC = $AC00          ; (cart RAM bank 4) "SUSP" when a suspend point is there
+OPT_SAVE   = $BF00          ; (cart RAM bank 3) BGM, SFX volume, $5A when valid
+rt_mmc_r5802:                               ; (bank HLE_BANK: susp_r)
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            call susp_r
+            ldh a, [code_bank]
+            ld [$2000], a
+            pop af
+            ret
+rt_mmc_w5802:                               ; (bank HLE_BANK: susp_w)
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            call susp_w
+            jp hle_back
+rt_mmc_w5803:
+            push hl
+            ld hl, VOL_BGM
+            jr opt_put
+rt_mmc_w5804:
+            push hl
+            ld hl, VOL_SFX
+opt_put:    cp 9                            ; (0-8)
+            jr c, .ok
+            ld a, 8
+.ok:        ld [hl], a
+            push af
+            ld a, 3
+            ld [$4000], a
+            ld a, [VOL_BGM]
+            ld [OPT_SAVE], a
+            ld a, [VOL_SFX]
+            ld [OPT_SAVE + 1], a
+            ld a, $5A
+            ld [OPT_SAVE + 2], a
+            xor a
+            ld [$4000], a
+            pop af
+            pop hl
+            ret
+rt_mmc_r5803:
+            ld hl, VOL_BGM
+            ld l, [hl]
+            ret
+rt_mmc_r5804:
+            ld hl, VOL_SFX
+            ld l, [hl]
+            ret
+; boot: the volumes kept in cart RAM bank 3 (else 8, 8)
+opt_load:   ld a, 3
+            ld [$4000], a
+            ld a, 8
+            ld [VOL_BGM], a
+            ld [VOL_SFX], a
+            ld a, [OPT_SAVE + 2]
+            cp $5A
+            jr nz, .x
+            ld a, [OPT_SAVE]
+            cp 9
+            jr nc, .x
+            ld [VOL_BGM], a
+            ld a, [OPT_SAVE + 1]
+            cp 9
+            jr nc, .x
+            ld [VOL_SFX], a
+.x:         xor a
+            ld [$4000], a
+            ret
+
 rt_mmc_w5801:                               ; camera Y in tiles
             push af
             ld a, 1

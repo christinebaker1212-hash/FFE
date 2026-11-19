@@ -174,7 +174,7 @@ def main():
     top = max(r.banks) + 1
     size = 2
     while size < top: size *= 2
-    rom = make_rom(r.banks, 'FF1 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x03, sgb=True,
+    rom = make_rom(r.banks, 'FF1 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x04, sgb=True,
                    cgb=0x80)                          # dual-mode: DMG / SGB / CGB
     open(opt['--out'], 'wb').write(rom)
     open(opt['--out'][:-3] + '.sym', 'w').write(r.sym_file())

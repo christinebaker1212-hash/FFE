@@ -125,6 +125,7 @@ psh:        ld a, b
 vol_byte:   bit 4, a
             jr z, .env
             and $0F
+            call vscale
             ld [hl], a
             swap a
             or $08                          ; add mode, period 0: no envelope steps; $08 writes
@@ -139,7 +140,50 @@ vol_byte:   bit 4, a
 .nc:        ld a, [hl]
             pop hl
             ld [hl], $FF
-            or $F0
+            push bc
+            ld b, a
+            ld a, 15                        ; (start volume scaled by the OPTIONS volume)
+            call vscale
+            swap a
+            or b
+            pop bc
+            ret
+
+; A = NES volume 0-15, L = the channel's APU_CV entry -> A = volume x (BGM or SFX volume) / 8.
+; Square 2 counts as sound effect while FF1 plays one on it ($7E or the battle sound
+; counter $94), noise always. Keeps BC, DE, HL.
+vscale:     push bc
+            push hl
+            ld b, a
+            ld a, l
+            sub low(APU_CV)
+            ld hl, VOL_BGM
+            and a
+            jr z, .lv                       ; square 1: music
+            cp 3
+            jr z, .sfx                      ; noise: sound effects
+            ld a, [NES_RAM + $7E]
+            ld c, a
+            ld a, [NES_RAM + $94]
+            or c
+            jr z, .lv
+.sfx:       ld hl, VOL_SFX
+.lv:        ld c, [hl]                      ; C = 0-8
+            ld a, c
+            cp 8
+            ld a, b
+            jr nc, .x                       ; (8: as is)
+            xor a
+            inc c
+.m:         dec c
+            jr z, .d
+            add a, b
+            jr .m
+.d:         srl a
+            srl a
+            srl a
+.x:         pop hl
+            pop bc
             ret
 
 ; B = pulse, E = new $4000 / $4004 value
@@ -163,12 +207,14 @@ vol_change: bit 4, e
             ld d, a
             ld a, e
             and $0F
+            call vscale
             sub d
             and $0F
             ret z                           ; same volume
             ld d, a
             ld a, e
             and $0F
+            call vscale
             ld [hl], a
             inc c                           ; NRx2: $08 x (new - old) mod 16 ("zombie mode")
 .zm:        ld a, $08
@@ -331,8 +377,18 @@ w_tri:      ld a, c
             ld [APU_ON + 2], a
             ld a, $80
             ldh [$FF1A], a                  ; DAC on
+            ld a, [VOL_BGM]                 ; level: BGM volume 0 / 1-2 / 3-5 / 6-8 ->
+            and a                           ;   0 / 25 / 50 / 100 %
+            jr z, .t0
+            cp 3
+            ld a, $60
+            jr c, .t0
+            ld a, [VOL_BGM]
+            cp 6
+            ld a, $40
+            jr c, .t0
             ld a, $20
-            ldh [$FF1C], a                  ; 100 %
+.t0:        ldh [$FF1C], a
             call t_freq
             or $80
             ldh [$FF1E], a                  ; restart

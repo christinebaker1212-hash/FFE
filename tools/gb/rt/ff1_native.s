@@ -2372,3 +2372,131 @@ palup2_b:   ld c, e                         ; c62:D874: from X on, $03C0 + X
             pop af
             ret
 
+; ---- suspend points ($5802, rt_mmc_r5802 / rt_mmc_w5802 in runtime.s)
+susp_r:
+            push af
+            ld a, 4
+            ld [$4000], a
+            ld hl, SUSP_MAGIC
+            ld a, [hl+]
+            cp 'S'
+            jr nz, .no
+            ld a, [hl+]
+            cp 'U'
+            jr nz, .no
+            ld a, [hl+]
+            cp 'S'
+            jr nz, .no
+            ld a, [hl]
+            cp 'P'
+            jr nz, .no
+            ld l, 1
+            jr .x
+.no:        ld l, 0
+.x:         xor a
+            ld [$4000], a
+            pop af
+            ret
+susp_w:
+            push af
+            push bc
+            push de
+            push hl
+            cp $A5
+            jr z, .save
+            cp $5A
+            jr z, .load
+            cp $E0
+            jr z, .erase
+            jr .x
+.save:      ld a, 4                         ; NES RAM and ExRAM -> bank 4
+            ld [$4000], a
+            ld hl, NES_RAM
+            ld de, $A000
+            ld bc, $0C00
+            call .cp
+            ld a, 5                         ; save RAM (bank 0) -> bank 5 through QV (the
+            ld b, 32                        ;   VRAM queue is empty while the LCD is off)
+            ld hl, $A000
+.sv:        push bc
+            xor a
+            ld [$4000], a
+            push hl
+            ld de, QV
+            ld bc, 256
+            call .cp
+            pop hl
+            ld a, 5
+            ld [$4000], a
+            ld d, h
+            ld e, l
+            ld hl, QV
+            ld bc, 256
+            call .cp
+            ld h, d
+            ld l, e
+            pop bc
+            dec b
+            jr nz, .sv
+            ld a, 4
+            ld [$4000], a
+            ld hl, SUSP_MAGIC
+            ld a, 'S'
+            ld [hl+], a
+            ld a, 'U'
+            ld [hl+], a
+            ld a, 'S'
+            ld [hl+], a
+            ld [hl], 'P'
+            jr .x
+.load:      ld a, 4                         ; bank 4 -> NES RAM (not page 1: the GB stack)
+            ld [$4000], a
+            ld hl, $A000
+            ld de, NES_RAM
+            ld bc, $0100
+            call .cp
+            ld hl, $A200
+            ld de, NES_RAM + $0200
+            ld bc, $0A00
+            call .cp
+            ld b, 32                        ; bank 5 -> save RAM
+            ld hl, $A000
+.ld:        push bc
+            ld a, 5
+            ld [$4000], a
+            push hl
+            ld de, QV
+            ld bc, 256
+            call .cp
+            pop hl
+            xor a
+            ld [$4000], a
+            ld d, h
+            ld e, l
+            ld hl, QV
+            ld bc, 256
+            call .cp
+            ld h, d
+            ld l, e
+            pop bc
+            dec b
+            jr nz, .ld
+.erase:     ld a, 4
+            ld [$4000], a
+            xor a
+            ld [SUSP_MAGIC], a
+.x:         xor a
+            ld [$4000], a
+            pop hl
+            pop de
+            pop bc
+            pop af
+            ret
+.cp:        ld a, [hl+]                     ; HL -> DE, BC bytes
+            ld [de], a
+            inc de
+            dec bc
+            ld a, b
+            or c
+            jr nz, .cp
+            ret

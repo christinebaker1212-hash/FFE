@@ -1931,6 +1931,7 @@ def apply(rom, report):
     story_gb(rom)
     minimap(rom)
     puzzle(rom)
+    select_menu(rom)
     report.append('GB layout applied')
 
 
@@ -2112,6 +2113,7 @@ camexit:            ; $AE15 (menu closed: LDA #0 / STA $2001): the field camera;
 """, syms={'FCX': FIELD_CAM_X}, org=0xF820)
     assert x.org + len(x.bytes) <= 0xF88F
     put(rom, x.org, x.bytes)
+    FIX_FREE[:] = [x.org + len(x.bytes), 0xF88F]          # (select_menu's stubs)
     put_bank(rom, B, 0xAE15, bytes([0x20]) + x.labels['camexit'].to_bytes(2, 'little') + bytes([0xEA, 0xEA]),
              bytes([0xA9, 0x00, 0x8D, 0x01, 0x20]))
 
@@ -3318,3 +3320,603 @@ pzw:                ; $C28A
     assert w.org + len(w.bytes) <= 0xF820          # (camexit, main_menu, from $F820)
     put(rom, w.org, w.bytes)
     put(rom, 0xC28A, bytes([0x20]) + w.labels['pzw'].to_bytes(2, 'little'), expect=bytes([0x20, 0x10, 0xAE]))
+
+
+# ---- Select menu (owner, 2026-11-19): Select on a map opens a small window OPTIONS /
+# FORMATION / SUSPEND (instead of FF1's lineup screen, now under FORMATION). OPTIONS edits
+# battle speed (FF1's message speed $FA, 1-8), BGM volume and SFX volume (0-8, GB runtime
+# registers $5803 / $5804, kept in cart RAM). SUSPEND asks, then makes a suspend point (GB
+# runtime $5802: NES RAM, ExRAM and save RAM into cart RAM banks 4-5) and returns to the
+# title. CONTINUE on the title: "Continue from Suspend point?" Yes = restore it (and erase
+# it) and re-enter the map; No = with a save: "Continue from last save? The suspend point
+# will be lost!" (Yes: erase it, continue the save; No: back to the title), without one:
+# a new game. Code in the empty 16KB bank 21 (camera 0, 0); fixed-bank stubs switch to it.
+SEL_BANK = 21
+FIX_FREE = [0, 0]               # fixed-bank bytes after camexit (set by main_menu)
+SUSP_KIND = 0x6DF0              # 0 = overworld, 1 = standard map (saved with the snapshot)
+
+
+def wrap18(text, width=18):
+    out, line = [], ''
+    for w in text.split():
+        if not line: line = w
+        elif len(line) + 1 + len(w) <= width: line += ' ' + w
+        else: out.append(line); line = w
+    out.append(line)
+    return out
+
+
+def screen_rows(enc, x, y, w, h, lines):
+    """rows (NES row, col, bytes) of a window at (x, y, w, h) with text lines [(row, col,
+    text)] (row/col relative to the window); FF1's frame tiles $F7-$FE, blank $FF"""
+    rows = []
+    for r in range(h):
+        if r == 0: b = bytes([0xF7]) + b'\xF8' * (w - 2) + bytes([0xF9])
+        elif r == h - 1: b = bytes([0xFC]) + b'\xFD' * (w - 2) + bytes([0xFE])
+        else: b = bytes([0xFA]) + b'\xFF' * (w - 2) + bytes([0xFB])
+        b = bytearray(b)
+        for (tr, tc, t) in lines:
+            if tr == r:
+                e = enc_str(enc, t)
+                b[tc:tc + len(e)] = e
+        rows.append((y + r, x, bytes(b)))
+    return rows
+
+
+def rows_db(rows):
+    out = []
+    for (r, c, b) in rows:
+        a = 0x2000 + r * 32 + c
+        out.append('    .db $%02X, $%02X, %d, %s' % (a >> 8, a & 0xFF, len(b), ', '.join('$%02X' % x for x in b)))
+    out.append('    .db 0')
+    return '\n'.join(out)
+
+
+def select_menu(rom):
+    main = sys.modules['__main__']
+    enc = main.ENC
+    # screens (GB view = NES cols 0-19, rows 0-17)
+    sel = screen_rows(enc, 3, 4, 14, 9, [(2, 4, 'Options'), (4, 4, 'Formation'), (6, 4, 'Suspend')])
+    opt = screen_rows(enc, 0, 3, 20, 11, [(1, 2, 'OPTIONS'), (3, 4, 'Battle speed'), (5, 4, 'BGM volume'),
+                                          (7, 4, 'SFX volume')])
+    hand = lambda row: row * 8 - 4                       # hand y (16 px) beside text row `row`
+    sel_y = [hand(4 + r) for r in (2, 4, 6)]
+    opt_y = [hand(3 + r) for r in (3, 5, 7)]
+    sus_txt = wrap18('Create a Suspend Point and return to the Title? Suspend points are retained '
+                     'when turning off the Power.')
+    def ask(txt):                                        # question + Yes / No, centred
+        h = len(txt) + 7
+        top = (18 - h) // 2
+        rows = screen_rows(enc, 0, top, 20, h, [(1 + i, 1, t) for i, t in enumerate(txt)] +
+                           [(len(txt) + 2, 5, 'Yes'), (len(txt) + 4, 5, 'No')])
+        return rows, [hand(top + len(txt) + 2), hand(top + len(txt) + 4)]
+    sus, sy = ask(sus_txt)
+    c1, c1y = ask(wrap18('Continue from Suspend point?'))
+    c2, c2y = ask(wrap18('Continue from last save? The suspend point will be lost!'))
+
+    fx = asm("""
+selc:               ; c62:C1B7 / CA59 (Select on the overworld / a standard map: LDA #0 / #1,
+    sta SUSPK       ;   JSR selc in place of LDA #14 / JSR $FE03 / JSR $9915 lineup)
+    lda #BANK
+    jsr $FE03
+    jsr $8000
+    lda #14
+    jmp $FE03
+tr_lineup:          ; (from bank 21) FF1's lineup menu, bank 21 back
+    lda #14
+    jsr $FE03
+    jsr $9915
+    lda #BANK
+    jmp $FE03
+tr_chr:             ; (from bank 21) FF1's menu CHR / palettes ($E995 ends in bank 14)
+    jsr $E995
+    lda #BANK
+    jmp $FE03
+tr_clr:             ; (from bank 21, PPU address $2000 set) FF1's menu screen clear ($9C0F:
+    lda #14         ;   960 x 0, 64 x $FF)
+    jsr $FE03
+    jsr $9C0F
+    lda #BANK
+    jmp $FE03
+conthook:           ; c62:C079 (title, Continue: LDA $64FE): the suspend point first
+    lda #BANK
+    jsr $FE03
+    jsr $8003
+    pha
+    lda #14
+    jsr $FE03
+    pla
+    rts
+res_ow:             ; (from bank 21, after the restore) re-enter the map, bank 14 as after
+    lda #14         ;   the lineup menu
+    jsr $FE03
+    jmp $C764
+res_sm:
+    lda #14
+    jsr $FE03
+    jmp $CF3C
+""", syms={'BANK': SEL_BANK, 'SUSPK': SUSP_KIND}, org=FIX_FREE[0])
+    assert fx.org + len(fx.bytes) <= FIX_FREE[1], hex(fx.org + len(fx.bytes))
+    put(rom, fx.org, fx.bytes)
+    L = fx.labels
+    b21 = asm("""
+    jmp selmenu
+    jmp contentry
+
+; ---- screen helpers ----
+scron:              ; LCD on (copy of b14:$B793 with this bank for the music call)
+    jsr $C43C
+    jsr $FE00
+    lda #2
+    sta $4014
+    jsr $D844
+    lda #$08
+    sta $FF
+    sta $2000
+    lda #$1E
+    sta $2001
+    lda #0
+    sta $2005
+    sta $2005
+    lda #BANK
+    sta $57
+    jmp $C68B
+frame:              ; one menu frame (copy of b14:$B670): sprites, scroll, music, joypad
+    jsr $FE00
+    lda #2
+    sta $4014
+    lda $FF
+    sta $2000
+    lda #0
+    sta $2005
+    sta $2005
+    lda #BANK
+    sta $57
+    jsr $C68B
+    inc $F0
+    lda #0
+    sta $24
+    sta $25
+    jmp $D7B6
+beep:               ; cursor sound (b14:$ADB0)
+    lda #$7A
+    sta $4004
+    lda #$9B
+    sta $4005
+    lda #$20
+    sta $4006
+    lsr a
+    sta $4007
+    sta $7E
+    rts
+newscr:             ; LCD off, menu CHR / palettes, camera (0, 0), screen cleared, then the
+    lda #0          ;   rows at ($10)
+    sta $2001
+    lda $10         ; ($E995 uses $10 / $11)
+    sta SUSPK+1
+    lda $11
+    sta SUSPK+2
+    jsr TRCHR
+    ldx #11         ; palettes 0-2 as the main menu's (b14:$AD8B; $E995 leaves them)
+.pl:
+    lda MENUPAL,x
+    sta $03C0,x
+    dex
+    bpl .pl
+    lda #0
+    sta $5800
+    sta $5801
+    lda $2002
+    lda #$20
+    sta $2006
+    lda #0
+    sta $2006
+    jsr TRCLR
+    lda SUSPK+1
+    sta $10
+    lda SUSPK+2
+    sta $11
+drawrows:           ; rows at ($10): PPU address hi, lo, length, bytes; 0 ends
+    lda $2002
+    ldy #0
+    lda ($10),y
+    beq .x
+    sta $2006
+    iny
+    lda ($10),y
+    sta $2006
+    iny
+    lda ($10),y
+    tax
+    iny
+.c:
+    lda ($10),y
+    sta $2007
+    iny
+    dex
+    bne .c
+    tya
+    clc
+    adc $10
+    sta $10
+    bcc drawrows
+    inc $11
+    jmp drawrows
+.x:
+    rts
+dirs:               ; A = new direction press (bits R 1, L 2, D 4, U 8), 0 = none
+    lda $20
+    and #$0F
+    cmp $61
+    beq .n
+    sta $61
+    rts
+.n:
+    lda #0
+    rts
+; cursor loop: $62 = cursor, $63 = entries, ($12) = hand y table, $40 = hand x;
+; returns A = 1 (A button) / 0 (B button), $62 = the choice
+choose:
+    ldy #2          ; (the hand rows to RAM: FF1's routines use $12 / $13)
+.cy:
+    lda ($12),y
+    sta SUSPK+3,y
+    dey
+    bpl .cy
+    lda #0
+    sta $24
+    sta $25
+.l:
+    jsr $C43C
+    ldy $62
+    lda SUSPK+3,y
+    sta $41
+    jsr $ED24
+    jsr frame
+    lda $24
+    bne .a
+    lda $25
+    bne .b
+    jsr dirs
+    and #$0C
+    beq .l
+    cmp #4
+    bne .up
+    inc $62
+    lda $62
+    cmp $63
+    bcc .bp
+    lda #0
+    sta $62
+    beq .bp
+.up:
+    dec $62
+    bpl .bp
+    lda $63
+    sec
+    sbc #1
+    sta $62
+.bp:
+    jsr beep
+    jmp .l
+.a:
+    lda #1
+    rts
+.b:
+    lda #0
+    rts
+
+; ---- Select menu ----
+selmenu:
+    lda #$51        ; menu music, as the main menu
+    sta $4B
+    lda #0
+    sta $62
+.again:
+    lda #<SELROWS
+    sta $10
+    lda #>SELROWS
+    sta $11
+    jsr newscr
+    jsr scron
+    lda #3
+    sta $63
+    lda #<SELY
+    sta $12
+    lda #>SELY
+    sta $13
+    lda #40
+    sta $40
+    jsr choose
+    beq .exit
+    lda $62
+    beq .opt
+    cmp #1
+    beq .form
+    jmp suspend
+.form:
+    jsr TRLINEUP    ; FF1's lineup screen; then back to the map
+.exit:
+    jsr $F820       ; (camexit: the field camera)
+    rts
+.opt:
+    jsr options
+    lda #0
+    sta $62
+    jmp .again
+
+; ---- OPTIONS: up / down choose, left / right change; B back ----
+options:
+    lda #<OPTROWS
+    sta $10
+    lda #>OPTROWS
+    sta $11
+    jsr newscr
+    jsr optvals
+    jsr scron
+    lda #0
+    sta $62
+    sta $24
+    sta $25
+.l:
+    jsr $C43C
+    ldy $62
+    lda OPTY,y
+    sta $41
+    lda #16
+    sta $40
+    jsr $ED24
+    jsr frame
+    jsr optdraw     ; (values: 3 bytes in the vblank)
+    lda $25
+    bne .x
+    jsr dirs
+    beq .l
+    cmp #4
+    beq .dn
+    cmp #8
+    beq .up
+    cmp #1
+    beq .rt
+    cmp #2
+    beq .lt
+    jmp .l
+.dn:
+    lda $62
+    cmp #2
+    bcs .l
+    inc $62
+    jsr beep
+    jmp .l
+.up:
+    lda $62
+    beq .l
+    dec $62
+    jsr beep
+    jmp .l
+.rt:
+    lda #1
+    bne .ch
+.lt:
+    lda #$FF
+.ch:
+    sta $14
+    jsr beep
+    lda $62
+    bne .vol
+    lda $FA         ; battle speed: 1-8 (FF1 message speed 0-7)
+    clc
+    adc $14
+    and #7
+    sta $FA
+    jmp .l
+.vol:
+    cmp #1
+    bne .sfx
+    lda $5803
+    clc
+    adc $14
+    jsr clamp8
+    sta $5803
+    jmp .l
+.sfx:
+    lda $5804
+    clc
+    adc $14
+    jsr clamp8
+    sta $5804
+    jmp .l
+.x:
+    rts
+clamp8:
+    cmp #$FF
+    bne .h
+    lda #0
+.h:
+    cmp #9
+    bcc .o
+    lda #8
+.o:
+    rts
+optvals:            ; (LCD off) the three values
+    jsr optdraw
+    rts
+optdraw:            ; values at column 16 of rows 7-9 (battle speed 1-8, volumes 0-8)
+    lda $2002
+    lda #>ROWV
+    sta $2006
+    lda #<ROWV
+    sta $2006
+    lda $FA
+    clc
+    adc #$81
+    sta $2007
+    lda $2002
+    lda #>(ROWV+64)
+    sta $2006
+    lda #<(ROWV+64)
+    sta $2006
+    lda $5803
+    clc
+    adc #$80
+    sta $2007
+    lda $2002
+    lda #>(ROWV+128)
+    sta $2006
+    lda #<(ROWV+128)
+    sta $2006
+    lda $5804
+    clc
+    adc #$80
+    sta $2007
+    lda #0
+    sta $2005
+    sta $2005
+    rts
+
+; ---- SUSPEND ----
+suspend:
+    lda #<SUSROWS
+    sta $10
+    lda #>SUSROWS
+    sta $11
+    jsr newscr
+    jsr scron
+    lda #1          ; (No first)
+    sta $62
+    lda #2
+    sta $63
+    lda #<SUSY
+    sta $12
+    lda #>SUSY
+    sta $13
+    lda #24
+    sta $40
+    jsr choose
+    beq .no
+    lda $62
+    bne .no
+    lda #0          ; Yes: the suspend point, then the title
+    sta $2001
+    sta $4015
+    lda #$A5
+    sta $5802
+    jmp $C012
+.no:
+    lda #0
+    sta $62
+    jmp selmenu
+
+; ---- title, Continue (conthook): A = $64FE for FF1's checks after ----
+contentry:
+    lda $5802
+    bne .s
+    lda $64FE
+    rts
+.s:
+    lda #<C1ROWS
+    sta $10
+    lda #>C1ROWS
+    sta $11
+    jsr newscr
+    jsr scron
+    lda #0
+    sta $62
+    lda #2
+    sta $63
+    lda #<C1Y
+    sta $12
+    lda #>C1Y
+    sta $13
+    lda #24
+    sta $40
+    jsr choose
+    beq .nos
+    lda $62
+    bne .nos
+    lda #0          ; Yes: restore (the point is erased) and re-enter the map
+    sta $2001
+    sta $4015
+    lda #$5A
+    sta $5802
+    jsr $F820       ; (camexit: the field camera)
+    lda SUSPK
+    bne .sm
+    jmp RESOW
+.sm:
+    jmp RESSM
+.nos:
+    lda $64FE       ; No: a save there?
+    cmp #$55
+    bne .new
+    lda $64FF
+    cmp #$AA
+    bne .new
+    lda #<C2ROWS
+    sta $10
+    lda #>C2ROWS
+    sta $11
+    jsr newscr
+    jsr scron
+    lda #1
+    sta $62
+    lda #2
+    sta $63
+    lda #<C2Y
+    sta $12
+    lda #>C2Y
+    sta $13
+    lda #24
+    sta $40
+    jsr choose
+    beq .title
+    lda $62
+    bne .title
+    lda #$E0        ; Yes: the suspend point is lost; FF1 continues the save
+    sta $5802
+    lda $64FE
+    rts
+.title:
+    lda #0
+    sta $2001
+    jmp $C06F       ; No: the title again
+.new:
+    lda #0          ; no save: a new game (FF1's check fails)
+    rts
+
+MENUPAL:
+    .db %(menupal)s
+OPTY:
+    .db %(opty)s
+SELY:
+    .db %(sely)s
+SUSY:
+    .db %(sy)s
+C1Y:
+    .db %(c1y)s
+C2Y:
+    .db %(c2y)s
+SELROWS:
+%(sel)s
+OPTROWS:
+%(opt)s
+SUSROWS:
+%(sus)s
+C1ROWS:
+%(c1)s
+C2ROWS:
+%(c2)s
+""" % dict(opty=', '.join(map(str, opt_y)), sely=', '.join(map(str, sel_y)),
+           menupal=', '.join('$%02X' % b for b in rom[bank_off(14, 0xAD8B):bank_off(14, 0xAD8B) + 12]),
+           sy=', '.join(map(str, sy)), c1y=', '.join(map(str, c1y)), c2y=', '.join(map(str, c2y)),
+           sel=rows_db(sel), opt=rows_db(opt), sus=rows_db(sus), c1=rows_db(c1), c2=rows_db(c2)),
+        syms={'BANK': SEL_BANK, 'SUSPK': SUSP_KIND, 'TRCLR': L['tr_clr'], 'TRCHR': L['tr_chr'], 'TRLINEUP': L['tr_lineup'],
+              'RESOW': L['res_ow'], 'RESSM': L['res_sm'], 'ROWV': 0x2000 + (3 + 3) * 32 + 17}, org=0x8000)
+    o = bank_off(SEL_BANK, 0x8000)
+    assert len(b21.bytes) < 0x4000
+    rom[o:o + len(b21.bytes)] = b21.bytes
+    put(rom, 0xC1B7, bytes([0xA9, 0, 0x20]) + L['selc'].to_bytes(2, 'little') + b'\xEA' * 3,
+        expect=bytes.fromhex('a90e2003fe201599'))
+    put(rom, 0xCA59, bytes([0xA9, 1, 0x20]) + L['selc'].to_bytes(2, 'little') + b'\xEA' * 3,
+        expect=bytes.fromhex('a90e2003fe201599'))
+    put(rom, 0xC079, bytes([0x20]) + L['conthook'].to_bytes(2, 'little'), expect=bytes.fromhex('adfe64'))
