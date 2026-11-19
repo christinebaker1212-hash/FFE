@@ -1519,7 +1519,7 @@ mapattr_b:  xor a
             jr nz, .gen
             ldh a, [lcd_on]
             and a
-            jr z, .gen
+            jr z, .off
             ld a, b
             ldh [ppu_vh], a
             ld a, c
@@ -1528,6 +1528,34 @@ mapattr_b:  xor a
             push af
             call attr_fast
             call ppu_inc
+            pop af
+            ld d, a
+            jr .nx
+.off:       ld a, b                         ; DMG, LCD off: the attribute shadow (the map
+            ldh [ppu_vh], a                 ;   is scanned when the LCD goes on)
+            ld a, c
+            ldh [ppu_vl], a
+            ld a, b
+            and $07
+            ld h, a
+            and $04
+            push de
+            ld d, a
+            ld a, h
+            and $03
+            or d
+            pop de
+            add a, high(NT_SH)
+            ld h, a
+            ld l, c
+            pop af
+            push af
+            cp [hl]
+            jr z, .os
+            ld [hl], a
+            ld a, 1
+            ldh [dmg_scan], a
+.os:        call ppu_inc
             pop af
             ld d, a
             jr .nx
@@ -4885,7 +4913,9 @@ hle_mapdec: ld a, e
             jr nz, .run
             ld [de], a
             inc de
-            call .inc
+            inc l
+            jr nz, .lp
+            call .ih
             jr .lp
 .run:       cp $FF
             jp z, mdc_end
@@ -4901,11 +4931,13 @@ hle_mapdec: ld a, e
             jr nz, .f
             xor a
             ld [MDC_X], a
-            call .inc
+            inc l
+            jr nz, .lp
+            call .ih
             jr .lp
 .inc:       inc l
             ret nz
-            inc h
+.ih:        inc h
             bit 7, h                        ; (NES $C000: the next bank at $8000)
             ret z
             ld h, $40
@@ -6969,7 +7001,12 @@ dmg_maps_b: push bc
             ld [hl], d
             inc c
             jr .as
-.pm:        ld c, 0                         ; palette
+.pm:        xor a                           ; (sh_m0..3: indices changed per palette)
+            ldh [sh_m0], a
+            ldh [sh_m1], a
+            ldh [sh_m2], a
+            ldh [sh_m3], a
+            ld c, 0                         ; palette
 .p:         ld a, c
             add a, a
             add a, a
@@ -7040,11 +7077,30 @@ dmg_maps_b: push bc
             jr nz, .cmp
             ldh a, [sh_chg]
             and a
-            call nz, .markp
+            jr z, .nx
+            push bc
+            ld b, a
+            ld a, c
+            add a, low(sh_m0)
+            ld c, a
+            ld a, b
+            ldh [c], a
+            pop bc
 .nx:        inc c
             ld a, c
             cp 4
             jp nz, .p
+            ldh a, [sh_m0]
+            ld b, a
+            ldh a, [sh_m1]
+            or b
+            ld b, a
+            ldh a, [sh_m2]
+            or b
+            ld b, a
+            ldh a, [sh_m3]
+            or b
+            call nz, .markp
             call spr_maps
 .x:         pop hl
             pop de
@@ -7083,34 +7139,40 @@ dmg_maps_b: push bc
             jr .mg
 .mgx:       ldh a, [sh_l3]
             ret
-.markp:     ; queue every tile coded for palette C that uses an index in sh_chg
-            push bc
-            ld hl, TILE_PAL
-.tk:        ld a, [hl]
-            cp c
-            jr nz, .tn
-            push hl
-            ld a, l                         ; its TILE_USE nibble
-            ld d, a
-            srl a
-            add a, low(TILE_USE)
-            ld l, a
-            ld h, high(TILE_USE)
-            ld a, [hl]
-            bit 0, d
-            jr z, .te
-            swap a
-.te:        and $0F
+.markp:     ; one pass: queue every tile whose palette's changed indices (sh_m0..3) meet
+            ld hl, TILE_PAL                 ;   the indices it uses (TILE_USE)
+            ld de, TILE_USE
+.tk:        ld a, [hl]                      ; even tile: low nibble
+            cp 4
+            jr nc, .t1
+            add a, low(sh_m0)
+            ld c, a
+            ldh a, [c]
             ld b, a
-            ldh a, [sh_chg]
+            ld a, [de]
+            and $0F
             and b
-            pop hl
+            jr z, .t1
+            ld a, l
+            call dmg_mark
+.t1:        inc l                           ; odd tile: high nibble
+            ld a, [hl]
+            cp 4
+            jr nc, .tn
+            add a, low(sh_m0)
+            ld c, a
+            ldh a, [c]
+            swap a
+            ld b, a
+            ld a, [de]
+            and $F0
+            and b
             jr z, .tn
             ld a, l
             call dmg_mark
-.tn:        inc l
+.tn:        inc e
+            inc l
             jr nz, .tk
-            pop bc
             ret
 
 ; BGP: value 0 = the backdrop's shade. Over a black backdrop, values 1-3 get dark grey /
