@@ -13,7 +13,8 @@ MD_IDX     = $CCF6          ;   source index,
 MD_ADD     = $CCF7          ;   column: +1 for the right-hand column
 MD_FAST    = $CCF8          ;   DMG with the LCD on: the batched writer (mdf_row / mdf_col),
 MD_MK      = MD_SRC         ;   (batched) a tile is marked or parked somewhere,
-MD_PB      = $DCE0          ;   CGB: palettes of a GB map row (32)
+MD_PB      = $DCE0          ;   CGB: palettes of a GB map row (32),
+TMK        = MD_PB          ;   DMG: tiles marked or parked (32: DIRTY_BM | DEFER_BM)
 
 section bank HLE_BANK, $4000
 NBIT:       db 1, 2, 4, 8, 16, 32, 64, 128   ; (at $4000: low byte = bit number)
@@ -52,19 +53,28 @@ mapdraw_b:  xor a                           ; (LDA $2002)
             ld [MD_MK], a
             inc a
             jr .sf
-.dm:        ld hl, DIRTY_BM                 ; any tile marked / parked? (else no cell needs
-            ld b, 32                        ;   its palette checked)
-            xor a
-.mk1:       or [hl]
+.dm:        ld hl, DIRTY_BM                 ; TMK = tiles marked or parked (DIRTY_BM | DEFER_BM),
+            ld de, TMK                      ;   MD_MK = any (else no cell needs its palette
+            ld b, 32                        ;   checked)
+            ld c, 0
+.mk1:       ld a, l
+            add a, low(DEFER_BM) - low(DIRTY_BM)
+            ld l, a
+            ld a, [hl]
+            push af
+            ld a, l
+            sub low(DEFER_BM) - low(DIRTY_BM)
+            ld l, a
+            pop af
+            or [hl]
+            ld [de], a
+            or c
+            ld c, a
             inc l
+            inc e
             dec b
             jr nz, .mk1
-            ld l, low(DEFER_BM)
-            ld b, 32
-.mk2:       or [hl]
-            inc l
-            dec b
-            jr nz, .mk2
+            ld a, c
             ld [MD_MK], a
             ld a, 1
             jr .sf
@@ -751,30 +761,19 @@ mdf_ownrow: ld h, high(OWN)
 mdf_mk:     ld a, b
             and a
             ret z
-.l:         ld a, [hl]
-            ld d, a
-            push hl
-            and 7
-            ld l, a
-            ld h, high(NBIT)
-            ld e, [hl]
-            ld a, d
-            rrca
-            rrca
-            rrca
-            and $1F
-            ld l, a
-            ld h, high(DIRTY_BM)
-            ld a, [hl]
-            and e
+.l:         push bc
+.l2:        ld e, [hl]                      ; (TMK built at the draw's start)
+            ld d, high(TK_BIT)
+            ld a, [de]
+            ld c, a
+            inc d
+            ld a, [de]
+            ld e, a
+            ld d, high(TMK)
+            ld a, [de]
+            and c
             jr nz, .m
-            ld a, l
-            add a, low(DEFER_BM) - low(DIRTY_BM)
-            ld l, a
-            ld a, [hl]
-            and e
-            jr nz, .m
-.n:         pop hl
+.n:         pop bc
             ld a, l
             add a, c
             ld l, a
@@ -783,7 +782,7 @@ mdf_mk:     ld a, b
 .nc:        dec b
             jr nz, .l
             ret
-.m:         pop hl
+.m:         ld d, [hl]
             push hl
             push bc
             ld a, h
@@ -801,6 +800,7 @@ mdf_mk:     ld a, b
             jr .mx
 .now:       call cell_fast
 .mx:        pop bc
+            pop hl
             jr .n
 
 ; column (DrawMapRowCol with $2D bit 1): E = pair column in its nametable, $12 = pairs
@@ -3833,6 +3833,389 @@ vclear_b:   xor a
             pop af
             ret
 
+; ---- NES OAM page A -> GB OAM shadow (rt_io_w4014 runs it with code_bank = HLE_BANK).
+; The 64 entries are tested unrolled (most are hidden: y >= $EF): .vis converts one in
+; view: GB y = NES y + 17 - cam_y * 8 (shown from -16), x = NES x + 8 - cam_x * 8 (from
+; -8), its tile in a GB sprite slot (loaded on first use, coded for its palette), the
+; attributes; a full GB table (40) ends the scan.
+oamconv_b:  and $07
+            add a, high(NES_RAM)
+            ld h, a
+            ldh a, [oam_frame]
+            inc a
+            ldh [oam_frame], a
+            ldh a, [cam_y]
+            cpl
+            add a, 18
+            ld b, a
+            ldh a, [cam_x]
+            cpl
+            add a, 9
+            ld c, a
+            ld de, OAM_SH
+            ld l, $00
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $04
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $08
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $0C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $10
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $14
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $18
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $1C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $20
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $24
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $28
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $2C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $30
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $34
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $38
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $3C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $40
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $44
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $48
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $4C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $50
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $54
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $58
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $5C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $60
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $64
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $68
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $6C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $70
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $74
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $78
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $7C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $80
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $84
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $88
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $8C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $90
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $94
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $98
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $9C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $A0
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $A4
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $A8
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $AC
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $B0
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $B4
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $B8
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $BC
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $C0
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $C4
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $C8
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $CC
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $D0
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $D4
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $D8
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $DC
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $E0
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $E4
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $E8
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $EC
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $F0
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $F4
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $F8
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $FC
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            jp .full
+.vis:       add a, b                        ; HL -> entry, A = NES y
+            cp 160
+            ret nc
+            ld [de], a                      ; (GB y; kept only if x is in view too)
+            inc l
+            ld a, [hl+]
+            ldh [o_t], a
+            ld a, [hl+]
+            ldh [o_a], a
+            ld a, [hl]
+            add a, c
+            cp 168
+            jr nc, .xr
+            inc e
+            ld [de], a                      ; GB x
+            inc e
+            push hl
+            push bc
+            ldh a, [o_a]                    ; B = coding of the sprite's palette
+            and 3
+            add a, low(SPAL_KEY)
+            ld l, a
+            ld h, high(SPAL_KEY)
+            ld b, [hl]
+            ldh a, [o_t]                    ; C = its GB slot (loaded on first use)
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld a, [hl]
+            cp $FF
+            jr z, .alloc
+            ld c, a
+            add a, low(SLOT_KEY)            ; resident with another coding: load it again
+            ld l, a
+            ld h, high(SLOT_KEY)
+            ld a, b
+            cp [hl]
+            jr nz, .load
+.ok:        ld a, c                         ; stamp (in use this frame)
+            or $80
+            ld l, a
+            ld h, high(SLOT_STAMP)
+            ldh a, [oam_frame]
+            ld [hl], a
+            ld a, c
+            ld [de], a                      ; tile = slot
+            inc e
+            ldh a, [o_a]                    ; NES v h p - - - pp -> GB p v h obp1 - pal(3)
+            ld l, a
+            and $C0
+            rrca
+            bit 5, l
+            jr z, .np
+            or $80
+.np:        ld h, a
+            ld a, l
+            and 3
+            or h
+            bit 6, b                        ; (DMG: OBP1 if the coding says so)
+            jr z, .o0
+            or $10
+.o0:        ld [de], a
+            inc e
+            pop bc
+            pop hl
+            ld a, e
+            cp 160
+            ret nz
+            pop af                          ; GB table full: the scan ends
+            jr .full
+.xr:        xor a                           ; out of view sideways: this entry's y hidden
+            ld [de], a                      ;   again (else last frame's x and tile showed)
+            ret
+.alloc:     ld a, b
+            ldh [o_key], a
+            call spr_alloc
+            ld c, a
+            jr .ok
+.load:      ld a, b
+            ldh [o_key], a
+            call spr_load
+            jr .ok
+.full:      ld a, e                         ; hide the GB sprites used last frame only
+            rrca
+            rrca
+            ld c, a
+            ld a, [OAM_USED]
+            ld b, a
+            ld a, c
+            ld [OAM_USED], a
+            ld a, b
+            sub c
+            jr c, .end
+            jr z, .end
+            ld b, a
+            xor a
+.clr:       ld [de], a
+            inc e
+            inc e
+            inc e
+            inc e
+            dec b
+            jr nz, .clr
+.end:       ld a, 1
+            ldh [oam_pending], a
+            ret
+
 ; set bits of each byte (mdf_ownrow)
 section bank HLE_BANK, $5F00
 POPC:
@@ -3852,3 +4235,40 @@ POPC:
             db 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7
             db 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7
             db 4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8
+
+; tile -> its bit in a tile bitmap, the bitmap byte in TMK (mdf_mk)
+section bank HLE_BANK, $5D00
+TK_BIT:
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
+TK_IDX:
+            db $E0, $E0, $E0, $E0, $E0, $E0, $E0, $E0, $E1, $E1, $E1, $E1, $E1, $E1, $E1, $E1
+            db $E2, $E2, $E2, $E2, $E2, $E2, $E2, $E2, $E3, $E3, $E3, $E3, $E3, $E3, $E3, $E3
+            db $E4, $E4, $E4, $E4, $E4, $E4, $E4, $E4, $E5, $E5, $E5, $E5, $E5, $E5, $E5, $E5
+            db $E6, $E6, $E6, $E6, $E6, $E6, $E6, $E6, $E7, $E7, $E7, $E7, $E7, $E7, $E7, $E7
+            db $E8, $E8, $E8, $E8, $E8, $E8, $E8, $E8, $E9, $E9, $E9, $E9, $E9, $E9, $E9, $E9
+            db $EA, $EA, $EA, $EA, $EA, $EA, $EA, $EA, $EB, $EB, $EB, $EB, $EB, $EB, $EB, $EB
+            db $EC, $EC, $EC, $EC, $EC, $EC, $EC, $EC, $ED, $ED, $ED, $ED, $ED, $ED, $ED, $ED
+            db $EE, $EE, $EE, $EE, $EE, $EE, $EE, $EE, $EF, $EF, $EF, $EF, $EF, $EF, $EF, $EF
+            db $F0, $F0, $F0, $F0, $F0, $F0, $F0, $F0, $F1, $F1, $F1, $F1, $F1, $F1, $F1, $F1
+            db $F2, $F2, $F2, $F2, $F2, $F2, $F2, $F2, $F3, $F3, $F3, $F3, $F3, $F3, $F3, $F3
+            db $F4, $F4, $F4, $F4, $F4, $F4, $F4, $F4, $F5, $F5, $F5, $F5, $F5, $F5, $F5, $F5
+            db $F6, $F6, $F6, $F6, $F6, $F6, $F6, $F6, $F7, $F7, $F7, $F7, $F7, $F7, $F7, $F7
+            db $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F9, $F9, $F9, $F9, $F9, $F9, $F9, $F9
+            db $FA, $FA, $FA, $FA, $FA, $FA, $FA, $FA, $FB, $FB, $FB, $FB, $FB, $FB, $FB, $FB
+            db $FC, $FC, $FC, $FC, $FC, $FC, $FC, $FC, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD
+            db $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF

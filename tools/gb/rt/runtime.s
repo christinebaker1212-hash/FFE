@@ -2283,140 +2283,22 @@ rt_ppu_r7:  push af                         ; buffered read (nametables from the
             ret
 
 ; ------------------------------------------------------------------ OAM DMA ($4014)
-rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (sent next vblank)
+rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (sent next vblank):
+            push af                         ;   oamconv_b (bank HLE_BANK, run with code_bank
+            push bc                         ;   = HLE_BANK so the sprite slot loads and the
+            push de                         ;   interrupt handlers come back to it)
+            push hl
+            ld b, a
+            ldh a, [code_bank]
             push af
-            push bc
-            push de
-            push hl
-            and $07
-            add a, high(NES_RAM)
-            ld h, a
-            ld l, 0
-            ldh a, [oam_frame]
-            inc a
-            ldh [oam_frame], a
-            ldh a, [cam_y]                  ; B = 17 - cam_y: GB y = NES y + B (shown from
-            cpl                             ;   -16: cut off at the top), C = 8 - cam_x: GB
-            add a, 18                       ;   x = NES x + C (shown from -8). (The cameras
-            ld b, a                         ;   stay below 80 px, so far-off sprites never
-            ldh a, [cam_x]                  ;   wrap into the view.)
-            cpl
-            add a, 9
-            ld c, a
-            ld de, OAM_SH                   ; E = next GB sprite * 4, L = next NES sprite * 4
-.lp:        ld a, [hl+]                     ; NES y (top - 1); $EF and below: hidden (most
-            cp $EF                          ;   of the 64)
-            jr nc, .s3
-            add a, b
-            cp 160
-            jr nc, .s3
-            ld [de], a                      ; (GB y; kept only if x is in view too)
-            ld a, [hl+]
-            ldh [o_t], a
-            ld a, [hl+]
-            ldh [o_a], a
-            ld a, [hl+]
-            add a, c
-            cp 168
-            jr nc, .xr
-            inc e
-            ld [de], a                      ; GB x
-            inc e
-            push hl
-            push bc
-            ldh a, [o_a]                    ; B = coding of the sprite's palette
-            and 3
-            add a, low(SPAL_KEY)
-            ld l, a
-            ld h, high(SPAL_KEY)
-            ld b, [hl]
-            ldh a, [o_t]                    ; C = its GB slot (loaded on first use)
-            ld l, a
-            ld h, high(SPR_SLOT)
-            ld a, [hl]
-            cp $FF
-            jr z, .alloc
-            ld c, a
-            add a, low(SLOT_KEY)            ; resident with another coding: load it again
-            ld l, a
-            ld h, high(SLOT_KEY)
+            ld a, HLE_BANK
+            ldh [code_bank], a
+            ld [$2000], a
             ld a, b
-            cp [hl]
-            jr nz, .load
-.ok:        ld a, c                         ; stamp (in use this frame)
-            or $80
-            ld l, a
-            ld h, high(SLOT_STAMP)
-            ldh a, [oam_frame]
-            ld [hl], a
-            ld a, c
-            ld [de], a                      ; tile = slot
-            inc e
-            ldh a, [o_a]                    ; NES v h p - - - pp -> GB p v h obp1 - pal(3)
-            ld l, a
-            and $C0
-            rrca
-            bit 5, l
-            jr z, .np
-            or $80
-.np:        ld h, a
-            ld a, l
-            and 3
-            or h
-            bit 6, b                        ; (DMG: OBP1 if the coding says so)
-            jr z, .o0
-            or $10
-.o0:        ld [de], a
-            inc e
-            pop bc
-            pop hl
-            ld a, e
-            cp 160
-            jr z, .full
-.nx:        ld a, l
-            and a
-            jr nz, .lp
-            jr .full
-.xr:        xor a                           ; out of view sideways: the entry whose y was
-            ld [de], a                      ;   just written is hidden again (else it kept
-            jr .nx                          ;   last frame's x and tile: a stray 8 px piece)
-.s3:        inc l
-            inc l
-            inc l
-            jr nz, .lp
-            jr .full
-.alloc:     ld a, b
-            ldh [o_key], a
-            call spr_alloc
-            ld c, a
-            jr .ok
-.load:      ld a, b
-            ldh [o_key], a
-            call spr_load
-            jr .ok
-.full:      ld a, e                         ; hide the GB sprites used last frame only
-            rrca
-            rrca
-            ld c, a
-            ld a, [OAM_USED]
-            ld b, a
-            ld a, c
-            ld [OAM_USED], a
-            ld a, b
-            sub c
-            jr c, .end
-            jr z, .end
-            ld b, a
-            xor a
-.clr:       ld [de], a
-            inc e
-            inc e
-            inc e
-            inc e
-            dec b
-            jr nz, .clr
-.end:       ld a, 1
-            ldh [oam_pending], a
+            call oamconv_b
+.end:       pop af
+            ldh [code_bank], a
+            ld [$2000], a
             pop hl
             pop de
             pop bc
@@ -2934,7 +2816,35 @@ rt_izy_rd:  push af                         ; L = zp pointer; byte at ptr+Y -> L
             ld h, [hl]
             ld l, a
             add hl, bc
-            call nes_rd
+            ld a, h                         ; (inline: RAM, $8000 and $E000 banks)
+            cp $20
+            jr nc, .n1
+            and $07
+            or high(NES_RAM)
+            ld h, a
+            ld l, [hl]
+            pop af
+            ret
+.n1:        cp $E0
+            jr nc, .e
+            cp $80
+            jr c, .o
+            cp $C0
+            jr nc, .o
+            sub $40
+            ld h, a
+            ldh a, [data_bank8]
+.rd:        ld [$2000], a
+            ld l, [hl]
+            ldh a, [code_bank]
+            ld [$2000], a
+            pop af
+            ret
+.e:         sub $80
+            ld h, a
+            ld a, DATA + 31
+            jr .rd
+.o:         call nes_rd
             pop af
             ret
 rt_izx_rd:  push af                         ; L = zp; pointer at (zp + X)

@@ -13,6 +13,7 @@
  * Build: gcc -O2 sgbrun.c -lmgba -o sgbrun   (Ubuntu: apt install libmgba-dev)
  */
 #include <mgba/core/core.h>
+#include <mgba/core/timing.h>
 #include <mgba/core/config.h>
 #include <mgba/internal/gb/gb.h>
 #include <mgba-util/vfs.h>
@@ -143,12 +144,23 @@ int main(int argc, char** argv) {
 			uint32_t fc = core->frameCounter(core);
 			while (core->frameCounter(core) == fc) {
 				core->step(core);
-				if (++p2tick >= prof2) {
+				int take;
+				if (getenv("SGBRUN_PROFC")) {           /* (with SGBRUN_PROFC: every PROF2 cycles, halts included) */
+					static uint64_t nextc = 0;
+					uint64_t t = mTimingGlobalTime(&((struct GB*) core->board)->timing);
+					take = t >= nextc; if (take) nextc = t + prof2;
+				} else take = ++p2tick >= prof2;
+				if (take) {
 					p2tick = 0;
 					uint32_t pc = 0; core->readRegister(core, "pc", &pc); pc &= 0xFFFF;
 					unsigned bank = pc < 0x4000 ? 0 : ((struct GB*) core->board)->memory.currentBank;
 					unsigned nn = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 					if (nprof < 2000000) { profs[nprof] = bank << 16 | pc; proff[nprof++] = nn; }
+					if (getenv("SGBRUN_PROF_SP") && nprof < 2000000) {   /* + the word at SP (a caller), for profiling helpers */
+						uint32_t sp = 0; core->readRegister(core, "sp", &sp); sp &= 0xFFFF;
+						unsigned ra = core->rawRead8(core, sp, -1) | core->rawRead8(core, sp + 1, -1) << 8;
+						profs[nprof] = 0x1000000u | (unsigned) ((struct GB*) core->board)->memory.currentBank << 16 | ra; proff[nprof++] = nn;
+					}
 				}
 			}
 		} else
@@ -230,7 +242,7 @@ int main(int argc, char** argv) {
 	/* frame-wait counter of the runtime ($D830), to confirm the game ran */
 	unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 	printf("frames %d, video %ux%u, NES frame waits %u, KEY1 %02X\n", frames, w, h, n, core->busRead8(core, 0xFF4D));
-	if (prof || prof2) for (int k = 0; k < nprof; k++) printf("P %02X:%04X %u\n", profs[k] >> 16, profs[k] & 0xFFFF, proff[k]);
+	if (prof || prof2) for (int k = 0; k < nprof; k++) printf("%s %02X:%04X %u\n", (profs[k] >> 24) ? "S" : "P", (profs[k] >> 16) & 0xFF, profs[k] & 0xFFFF, proff[k]);
 	core->deinit(core);
 	return 0;
 }
