@@ -20,10 +20,10 @@ from nescode import Insn, fmt_arg, SIZE, COV_RAM, COV_SIZE
 
 HDR = 16
 SPACES = {}
-for b in range(15): SPACES['b%02d' % b] = (0x8000, b * 0x4000, 0x4000)
+for b in list(range(15)) + list(range(23, 31)): SPACES['b%02d' % b] = (0x8000, b * 0x4000, 0x4000)   # 23-30: GB layout code
 SPACES['fix'] = (0xC000, 31 * 0x4000, 0x4000)
 SPACES['ex'] = (0x5C00, 22 * 0x4000, 0x400)
-MAPKEY = {**{str(b): 'b%02d' % b for b in range(15)}, '15': 'fix', '16': 'ex'}
+MAPKEY = {**{str(b): 'b%02d' % b for b in list(range(15)) + list(range(23, 31))}, '15': 'fix', '16': 'ex'}
 
 
 def index_of(space, addr):
@@ -86,10 +86,10 @@ class CodeMap:
 
     def static_bank(self, space, addr):
         """bank of a JSR/JMP into $8000-$BFFF at addr right after LDA #n / JSR $FE03 (or
-        $FE1A), the game's bank switch: 'bNN' or None"""
+        $FE1A, or $FA7F which also records it in $3E), the game's bank switch: 'bNN' or None"""
         sw = self.insns.get((space, addr - 3)); ld = self.insns.get((space, addr - 5))
-        if (sw is not None and sw.mn == 'JSR' and sw.arg in (0xFE03, 0xFE1A) and
-                ld is not None and ld.mn == 'LDA' and ld.mode == 'imm' and ld.arg < 15):
+        if (sw is not None and sw.mn == 'JSR' and sw.arg in (0xFE03, 0xFE1A, 0xFA7F) and
+                ld is not None and ld.mn == 'LDA' and ld.mode == 'imm' and 'b%02d' % ld.arg in SPACES):
             return 'b%02d' % ld.arg
         return None
 
@@ -107,7 +107,7 @@ class CodeMap:
                     k = ('ex', a)
                 else:
                     b, o = divmod(ci, 0x4000)
-                    k = ('fix', 0xC000 + o) if b == 31 else ('b%02d' % b, 0x8000 + o) if b < 15 else None
+                    k = ('fix', 0xC000 + o) if b == 31 else ('b%02d' % b, 0x8000 + o) if 'b%02d' % b in SPACES else None
                 if k is None or k not in self.insns:
                     self.unresolved.append((None, 'executed outside the map: %r' % (k,)))
         for k, i in list(self.insns.items()):

@@ -1682,9 +1682,16 @@ rt_ppu_w7:  push af
             and $F0
             or c
             ld l, a
-            ld a, h
-            cp $10
-            jr nc, .spr
+            ld a, h                         ; FF2: BG = the table $2000 bit 4 selects (the
+            and $10                         ;   battle uses $1000 for BG, $0000 for sprites;
+            ld b, a                         ;   the field the other way round), the other
+            ldh a, [ppu_ctrl]               ;   table = sprites
+            and $10
+            xor b
+            ld a, h                         ; (A = address high for .spr; flags kept)
+            jr nz, .spr
+            and $0F
+            ld h, a
             ldh a, [is_cgb]
             and a
             jr nz, .bgv

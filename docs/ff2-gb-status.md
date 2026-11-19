@@ -130,8 +130,24 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   BG pattern table at the split (battlefield table 1, menu table 0): a DMG cannot hold both
   plus sprites, so the GB windows will draw with free table-1 tiles (small-font renderer,
   as FF1). Tile survey `tools/gb2/ff2tiles.py` (cynes PPU_LOG per forced formation).
-- Next: tile pools from the survey; windows in GB rows 12-17 (NES rows 18-23, no menu
-  scroll, command window over the names window); small-font renderer (free bank 23).
+- Step 2 (done): bank-23 window system in layout.py: per-battle tile pool (free table-1
+  tiles from the monster slots `$7B62/$7B72/$7B82/$7B8A` + first tiles `b11:9FA5`, bosses
+  from a build-time bitmap of their tilemaps), frame tiles from the ROM font (`$F7-$FE`),
+  blank fill of NES rows 18-23, small-font renderer (latin_font condensed letters, 3-px
+  digits at codes $10-$1A), CHR upload after the game's waits (6 tiles per frame, then the
+  battle scroll), entries through the fixed-bank dispatcher `gbf` (`$F800`, index + return
+  bank, `$FA7F`). Party window (replaces `b12:912A`): name, HP cur/max (battle stats +$0A /
+  +$0E), MP (+$0C), redrawn on HP changes. Old NES window / message-box nametable output
+  off (`b12:930C` RTS, bank-5 box STA $2007 -> BIT, `b12:9B3E` menu clear), menu area on
+  table 1 and nametable 0 (`fix:FD63`, `b12:904A`), no menu scroll (`b12:9AC6`).
+- Source base / translator know the layout banks 23-30; `$FA7F` bank switches resolve
+  statically. Runtime: CHR writes go to BG or sprites by `$2000` bit 4 (battle: BG table 1).
+- Checked: NES variant (cynes shots) and GB (Gambatte CGB / DMG shots) through the opening
+  battle: enemies, party sprites, party window correct; firstdiff on the GB-layout pair
+  (seed 1, 11000 frames): no difference in 10520 waits.
+- Next: enemy names window, command window (over it) + cursor positions, messages (style A,
+  full width), magic / Gear / item lists, victory windows; status words in the party window;
+  hit knock-back runs past the right edge.
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 
