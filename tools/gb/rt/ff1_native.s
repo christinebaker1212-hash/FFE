@@ -39,9 +39,9 @@ mapdraw_b:  xor a                           ; (LDA $2002)
             jr z, .de
             call q_drain1
             jr .dr
-.de:        ld a, [VLCD]                    ; CGB masked load: no VRAM writes, the GB map and
-            and a                           ;   the cell palettes are rebuilt from the shadows
-            jr z, .nv                       ;   when it is shown (MD_FAST = 2)
+.de:        ld a, [VLCD]                    ; CGB masked load (not yet being shown): no VRAM
+            cp 1                            ;   writes, the GB map and the cell palettes are
+            jr nz, .nv                      ;   rebuilt from the shadows when shown (MD_FAST 2)
             ld a, 1
             ld [MAP_RB], a
             ld [CGB_RP], a
@@ -4801,3 +4801,59 @@ pg_copy0:   and a
             ld [$2000], a
             pop af
             ret
+
+; (bank 0 space after the colour tables)
+section bank 0, $3F40
+; ---- fix:F56A-F591 (battle box row): LDY #0 / LDA $68B3 / STA ($88),Y / LDX $6AA1 / DEX /
+; DEX / INY / LDA $68B4 / (STA ($88),Y / INY / DEX / BNE) / LDA $68B5 / STA ($88),Y /
+; $88-$89 += $20 (CLC / ADC). Out: X = 0, Y = width - 1, A = $89; N, Z, C of the last ADC.
+hle_boxrow: ld a, [$AAA1]                   ; ($6AA1: the box width)
+            sub 2
+            ld e, a                         ; E = middle cells (0: 256, as DEX / BNE)
+            ld a, [NES_RAM + $89]
+            sub $60
+            cp $1F
+            jr nc, .slow                    ; (not in save RAM $6000-$7EFF)
+            add a, $A0
+            ld h, a
+            ld a, [NES_RAM + $88]
+            ld l, a
+            ld a, [$A8B3]
+            ld [hl+], a
+            ld a, [$A8B4]
+            ld b, e
+.m:         ld [hl+], a
+            dec b
+            jr nz, .m
+            ld a, [$A8B5]
+            ld [hl], a
+            jr .done
+.slow:      ld bc, 0
+            ld a, [$A8B3]
+            ld l, $88
+            call rt_izy_wr
+            inc c
+.sm:        ld a, [$A8B4]
+            ld l, $88
+            call rt_izy_wr
+            inc c
+            dec e
+            jr nz, .sm
+            ld a, [$A8B5]
+            ld l, $88
+            call rt_izy_wr
+.done:      ld a, [$AAA1]
+            dec a
+            ld c, a                         ; Y
+            ld b, 0
+            ld d, 0
+            ld e, 0                         ; X
+            ld a, [NES_RAM + $88]
+            add a, $20
+            ld [NES_RAM + $88], a
+            ld a, [NES_RAM + $89]
+            adc a, 0
+            ld [NES_RAM + $89], a
+            ldh [nzv], a
+            ret
+

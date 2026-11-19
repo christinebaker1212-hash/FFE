@@ -2191,7 +2191,13 @@ rt_ppu_w7g: push af
             ld a, d
             call dmg_cell
             pop bc
-.map2:      ld a, b
+.map2:      ld a, [VLCD]                    ; (CGB masked load, not yet being shown: the GB
+            cp 1                            ;   map is rebuilt from the shadows when it is)
+            jr nz, .m3
+            ld a, 1
+            ld [MAP_RB], a
+            jr .done
+.m3:        ld a, b
             add a, $98
             ld h, a
 .vram:      ldh a, [lcd_on]

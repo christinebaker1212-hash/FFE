@@ -117,7 +117,7 @@ if gbj:
         if k in gb_at and k + 1 in gb_at and k in nes_at and k + 1 in nes_at:
             g, n = gb_at[k + 1] - gb_at[k], nes_at[k + 1] - nes_at[k]
             if g != n: diff.append('%d:%d/%d' % (k, g, n))
-    print('waits where GB frames != NES frames (GB/NES): %d' % len(diff), ' '.join(diff[:80]))
+    print('waits where GB frames != NES frames (GB/NES): %d' % len(diff), ' '.join(diff[:int(os.environ.get('LAG_N', '80'))]))
     if os.environ.get('LAG_TIMELINE'):           # wait count at each GB frame around a wait
         c = int(os.environ['LAG_TIMELINE'])
         g0 = gb_at.get(c, 0)

@@ -46,20 +46,33 @@ hle_chr_pages:
             ldh a, [data_bank8]
             ld [$2000], a
             push de
-            ldh a, [is_cgb]                 ; DMG, LCD off, a whole BG page (16 tiles from
-            ld d, a                         ;   tile 0 of a page): straight copies, the marks
-            ldh a, [lcd_on]                 ;   for the 16 tiles at once
-            or d
-            jr nz, .tile
-            ld a, c
-            and a
-            jr nz, .tile
-            ldh a, [ppu_vl]
+            ld a, c                         ; a whole BG page (16 tiles from tile 0 of a
+            and a                           ;   page), DMG with the LCD off (to the shadow)
+            jr nz, .tile                    ;   or CGB with it on (to the tile copy): straight
+            ldh a, [ppu_vl]                 ;   copies, the marks for the 16 tiles at once
             and a
             jr nz, .tile
             ldh a, [ppu_vh]
             cp $10
             jr nc, .tile
+            ld d, a
+            ldh a, [is_cgb]
+            and a
+            jr z, .fd
+            ldh a, [lcd_on]
+            and a
+            jr z, .tile
+            ld a, d
+            add a, $D0                      ; CGB: WRAM bank 2, $D000 + tile * 16
+            ld d, a
+            ld e, 0
+            ld a, 2
+            ldh [$FF70], a
+            jr .ft
+.fd:        ldh a, [lcd_on]
+            and a
+            jr nz, .tile
+            ld a, d
             add a, high(BG_SHADOW)
             ld d, a
             ld e, 0
@@ -136,7 +149,23 @@ hle_chr_pages:
             dec e
             jr nz, .ft
             ldh [tmp_lo], a                 ; (last byte)
-            xor a
+            ldh a, [is_cgb]
+            and a
+            jr z, .fm
+            ld a, 1                         ; CGB: WRAM bank 1, the page's 16 tiles marked
+            ldh [$FF70], a                  ;   for the vblank DMA
+            ldh a, [ppu_vh]
+            add a, a
+            add a, low(BG_DIRTY)
+            ld l, a
+            ld h, high(BG_DIRTY)
+            ld a, $FF
+            ld [hl+], a
+            ld [hl], a
+            ld a, 1
+            ldh [hd_any], a
+            jr .fv
+.fm:        xor a
             ld [$4000], a
             ldh a, [ppu_vh]                 ; tiles t0 = page * 16 .. + 15: CODED unknown,
             swap a                          ;   marked (DIRTY_BM), not parked (DEFER_BM)
@@ -162,7 +191,7 @@ hle_chr_pages:
             ld [hl], a
             inc a
             ldh [rq_any], a
-            ldh a, [ppu_vh]                 ; v += 256
+.fv:        ldh a, [ppu_vh]                 ; v += 256
             inc a
             and $3F
             ldh [ppu_vh], a
@@ -581,59 +610,6 @@ hle_pgcopy:                                 ; c62:C324 page copy (pgcopy_b, bank
             ld [$2000], a
             ld a, b
             ld b, 0
-            ret
-
-; ---- fix:F56A-F591 (battle box row): LDY #0 / LDA $68B3 / STA ($88),Y / LDX $6AA1 / DEX /
-; DEX / INY / LDA $68B4 / (STA ($88),Y / INY / DEX / BNE) / LDA $68B5 / STA ($88),Y /
-; $88-$89 += $20 (CLC / ADC). Out: X = 0, Y = width - 1, A = $89; N, Z, C of the last ADC.
-hle_boxrow: ld a, [$AAA1]                   ; ($6AA1: the box width)
-            sub 2
-            ld e, a                         ; E = middle cells (0: 256, as DEX / BNE)
-            ld a, [NES_RAM + $89]
-            sub $60
-            cp $1F
-            jr nc, .slow                    ; (not in save RAM $6000-$7EFF)
-            add a, $A0
-            ld h, a
-            ld a, [NES_RAM + $88]
-            ld l, a
-            ld a, [$A8B3]
-            ld [hl+], a
-            ld a, [$A8B4]
-            ld b, e
-.m:         ld [hl+], a
-            dec b
-            jr nz, .m
-            ld a, [$A8B5]
-            ld [hl], a
-            jr .done
-.slow:      ld bc, 0
-            ld a, [$A8B3]
-            ld l, $88
-            call rt_izy_wr
-            inc c
-.sm:        ld a, [$A8B4]
-            ld l, $88
-            call rt_izy_wr
-            inc c
-            dec e
-            jr nz, .sm
-            ld a, [$A8B5]
-            ld l, $88
-            call rt_izy_wr
-.done:      ld a, [$AAA1]
-            dec a
-            ld c, a                         ; Y
-            ld b, 0
-            ld d, 0
-            ld e, 0                         ; X
-            ld a, [NES_RAM + $88]
-            add a, $20
-            ld [NES_RAM + $88], a
-            ld a, [NES_RAM + $89]
-            adc a, 0
-            ld [NES_RAM + $89], a
-            ldh [nzv], a
             ret
 
 ; ---- fix:F618-F624 (battle panel cleared): LDY #0 / LDA #0 / 256 x (STA $691E,Y / STA
