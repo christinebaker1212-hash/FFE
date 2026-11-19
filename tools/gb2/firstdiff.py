@@ -19,6 +19,10 @@ sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from compare import GB, sync_sram, UP, DOWN, LEFT, RIGHT, A, B, START
 from cynes import NES
 
+# zero-page bytes where FF2 saves S (TSX / STX, later LDX / TXS: b14:919A -> 91FD): the GB
+# runtime's S is its own stack depth (rt_tsx), exact only as a round trip, so a stack-like
+# value (>= $C0 on both) there is not a difference
+TSX_SAVES = {0x04}
 WRAM_EVERY = int(os.environ.get('WRAM_EVERY', '50'))
 # Sound-driver state (ram-map.txt): music runs in real time, and in the battle phases with
 # an asynchronous NMI the GB ticks it at its own vblanks, so these may differ (not game
@@ -171,7 +175,8 @@ def main():
                 else: m[0, 0xA000 + a - 0x6000] = v
         if state['diff'] is not None or k not in nes_ram: return
         a = nes_ram[k]; b = bytes(m[0xC000 + i] for i in range(0x800))
-        d = [i for i in range(0x800) if a[i] != b[i] and not 0x100 <= i < 0x200 and i not in mask]
+        d = [i for i in range(0x800) if a[i] != b[i] and not 0x100 <= i < 0x200 and i not in mask
+             and not (i in TSX_SAVES and a[i] >= 0xC0 and b[i] >= 0xC0)]
         if d:
             state['diff'] = 'NES frame %d, wait %d: %s' % (frame_of[k], k, ' '.join(
                 '%03X:%02X/%02X' % (i, a[i], b[i]) for i in d[:16]))

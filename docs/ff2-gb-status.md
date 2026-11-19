@@ -289,8 +289,22 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   garbage ("??", "vern Egg") in the English build. Both now go through `dlgbank` (ExRAM
   stubs `npcdlg` / `npctxt`, as `b14:962F`). Checked on the NES English build (proper
   lines); English pair 29415 waits and GB-layout pair 29534 waits identical (seed 1).
-- Open: windows 1-3 (keyword Ask / Learn, item choice, yes / no: NES rows 14-27, partly
-  below the GB view) need a mock-up; shop messages wait for the shop layout.
+- **Keyword menus (owner approved `ff2_mock8`, 2026-11-19)** (`layout.keyword_menus`):
+  windows 1 (Ask / Learn / Items) and 2 (keyword / item list) at NES screen (6, 16) =
+  GB rows 10-17 (window 1 8 x 6, one row per line: SYSONE bit for system 26; window 2
+  20 x 8, 6 rows, scrolling), sprite regions moved; lists 65 / 66 from column 0 (18
+  columns); the list covers window 1, so window 1's hand is hidden while a list is open
+  (`b14:955B/9567` -> `kwopen`) and the list is closed (`fix:D16F`) before the menu opens
+  again (`b14:91A5/91AF/91B5` -> `kwback`; code in bank 14's unused `$87C0`). Long item
+  names (owner: condensed letters): Diamond Breast|plate, Sulfuric Acid |Bottle, (icon)
+  Sword of the |Earth get their last word in condensed letters on font tiles $7B-$7F /
+  $F0-$F6 (unused kana) so they fit 18 columns (names table bank 10; the battle / treasure
+  screens keep their own copies). Checked on the NES variant and Gambatte CGB (item list
+  with the three names, keyword list, back to the menu); firstdiff with keywords and items
+  poked: 14563 waits identical; random seed 1, 30000 frames: 29534 waits identical.
+  firstdiff tolerates stack-like values in `$04` (FF2 saves S there, `b14:919A`; the GB's
+  S is exact only as a round trip).
+- Open: window 3 (money) and the shop windows wait for the shop layout.
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).

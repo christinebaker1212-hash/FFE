@@ -2387,6 +2387,79 @@ def gb_wrap(ins, text, width=DLG_GB_W):
     return '\n'.join(lines)
 
 
+# keyword menus (owner approved ff2_mock8): window 1 (Ask / Learn / Items) and window 2
+# (keyword / item list) in GB rows 10-17 under the dialogue box
+KW_WIN = {1: dict(left=6, top=16, width=8, height=6), 2: dict(left=6, top=16, width=20, height=8)}
+# item names wider than the 18 columns (owner: condensed letters on tiles of their own):
+# the last word in the condensed letters on fewer tiles (1-px gaps), in
+# font tiles unused by the English field text (kana $7B-$7F, $F0-$F6)
+LONG_NAMES = {137: 'plate', 41: 'Bottle', 90: 'Earth'}     # Diamond Breastplate, Sulfuric
+LONG_TILES = [0x7B, 0x7C, 0x7D, 0x7E, 0x7F, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6]   #   Acid Bottle, Sword of the Earth
+
+
+def keyword_menus(rom, ins, bank):
+    """windows 1 / 2 moved (table fix:E9AA, sprite regions fix:E892), the Ask / Learn /
+    Items menu (system 26) one row per line (ExRAM SYSONE bit), the keyword / item lists
+    (65 / 66) from column 0, the long item names"""
+    import json
+    from latin_font import left_label
+    for wnd, w in KW_WIN.items():
+        for k, key in enumerate(('left', 'top', 'width', 'height')):
+            put(rom, 31, 0xE9AA + 4 * k + wnd, bytes([w[key]]))
+        x0, y0 = 8 * w['left'], 8 * w['top']
+        x1, y1 = x0 + 8 * w['width'], y0 + 8 * w['height']
+        for k, v in enumerate((x0 - 6, x1 - 1, y0 - 6, y1 - 9)):
+            put(rom, 31, 0xE892 + 6 * k + wnd, bytes([v]))
+    import importlib.util                       # (the real assembler: a recording run of
+    spec = importlib.util.spec_from_file_location(  #   ff2en must not see this module)
+        'asm6502_plain', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'asm6502.py'))
+    a6 = importlib.util.module_from_spec(spec); spec.loader.exec_module(a6)
+    ex = a6.asm(ins.EXRAM_SRC, syms={k: 0 for k in ('DB', 'DA', 'SB', 'SA', 'R0', 'R1', 'BT')})
+    o = HDR + ins.CODE_BANK * BANK + ex.labels['SYSONE'] - ex.org
+    assert rom[o + 27 // 8] & (1 << (27 % 8)), 'SYSONE not where expected'
+    rom[o + 26 // 8] |= 1 << (26 % 8)
+    for sid, n in ((65, 16), (66, 32)):
+        t = '\n'.join('{08}{17:00}{%s:%02X}' % ('1B' if sid == 65 else '1A', i) for i in range(n))
+        bank.put_ptr(0x8400 + 2 * sid, bank.alloc(ins.enc(t) + b'\0'))
+    # the list window covers the Ask / Learn / Items window: its hand hidden while a list is
+    # open (b14:955B / 9567 open window 2), and the list closed (fix:D16F, as the game
+    # closes it when the conversation ends) before the menu opens again (the three
+    # JMP $9174 after a list). Code in bank 14's unused $87BB-$87FF.
+    k = asm('''
+    org $87C0
+kwopen:
+    lda #0
+    sta $A2
+    lda #2
+    sta $96
+    rts
+kwback:
+    jsr $D16F
+    jmp $9174
+''')
+    assert set(rom[HDR + 14 * BANK + 0x07C0:HDR + 14 * BANK + 0x07C0 + len(k.bytes)]) <= {0, 0xFF}
+    put(rom, 14, k.org, k.bytes)
+    for a in (0x955B, 0x9567):
+        put(rom, 14, a, bytes([0x20]) + k.labels['kwopen'].to_bytes(2, 'little') + b'\xEA', old=bytes.fromhex('a9028596'))
+    for a in (0x91A5, 0x91AF, 0x91B5):
+        put(rom, 14, a, bytes([0x4C]) + k.labels['kwback'].to_bytes(2, 'little'), old=bytes.fromhex('4c7491'))
+    tiles = list(LONG_TILES)
+    for e in json.load(open('script/ff2/names.json')):
+        if e['id'] not in LONG_NAMES: continue
+        name, tail = e['en'], LONG_NAMES[e['id']]
+        assert name.endswith(tail)
+        head = ins.enc(name[:-len(tail)])
+        n = DLG_GB_W - len(head)
+        assert 0 < n < len(tail), name
+        codes = [tiles.pop(0) for _ in range(n)]
+        t = left_label(tail, True, fg=3, bg=2)
+        assert len(t) <= n, (name, len(t), n)
+        t += [bytes(8) + b'\xFF' * 8] * (n - len(t))
+        for c, data in zip(codes, t):
+            q = HDR + ins.FONT + c * 16; rom[q:q + 16] = data
+        bank.put_ptr(0x8200 + 2 * e['id'], bank.alloc(head + bytes(codes) + b'\0'))
+
+
 def dialogue(rom):
     """Field text window 0 (dialogue, events) at DLG_WIN; dialogue and event text wrapped at
     18 columns (insert.py's paragraphs / flow, the same banks and bank split as insert.py),
@@ -2443,6 +2516,7 @@ def dialogue(rom):
         b10 = ins.insert_names(scratch, [])
         ins.system_strings(scratch, [], b10)
         bank = ins.Bank(rom, 10, b10.free)
+        keyword_menus(rom, ins, bank)
         for e in json.load(open('script/ff2/system.json')):
             if e['id'] in SYS_FIELD and e['en']:
                 t = '\n'.join(l.strip() for l in e['en'].split('\n'))
