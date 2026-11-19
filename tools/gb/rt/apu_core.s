@@ -9,8 +9,8 @@ apu_init_b: ld a, $80
             ldh [$FF26], a                  ; sound on
             ld a, $77
             ldh [$FF24], a                  ; full master volume
-            ld a, $FF
-            ldh [$FF25], a                  ; every channel to both outputs
+            ld a, SND_MASK
+            ldh [$FF25], a                  ; every channel to both outputs (test builds: env GB_SND_MASK)
             xor a
             ldh [$FF10], a                  ; CH1: no GB sweep
             ldh [$FF1A], a                  ; CH3 DAC off while loading wave RAM
@@ -157,6 +157,7 @@ vscale:     push bc
             ld b, a
             ld a, l
             sub low(APU_CV)
+            push af                         ; (channel)
             ld hl, VOL_BGM
             and a
             jr z, .lv                       ; square 1: music
@@ -169,7 +170,19 @@ vscale:     push bc
             jr z, .lv
 .sfx:       ld hl, VOL_SFX
 .lv:        ld c, [hl]                      ; C = 0-8
-            ld a, c
+            pop af
+            cp 2                            ; the pulses at 5/8: the NES mixes its triangle
+            jr nc, .np                      ;   ~1.7x a full pulse, the GB wave channel can
+            ld a, c                         ;   only match a full pulse (the bass balance)
+            add a, a
+            add a, a
+            add a, c
+            add a, 4
+            srl a
+            srl a
+            srl a
+            ld c, a
+.np:        ld a, c
             cp 8
             ld a, b
             jr nc, .x                       ; (8: as is)

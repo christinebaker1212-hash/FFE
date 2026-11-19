@@ -786,10 +786,26 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   - SameBoy libretro core (owner allowed) for hardware-like checks: `GBRUN_CORE=build/
     sameboy_libretro.so build/gbrun ...` (build notes in `docs/gb-lessons.md`).
   - Lag (Gambatte, battle script 7000 waits): CGB +1.3%, DMG ~+4.5% (screen loads).
+  - Owner (2026-11-19, later): message box instant (cursor sound on open and each page, none
+    on close); black-and-white patches after a message (box attributes outside the box
+    coloured edge cells: other-view cells now stay out of the GB map); cursor sound buzz
+    (the sound queue re-sent the swept period every frame). Then: battle speed-ups and
+    slow-downs, sound channels, DMG fades / battle palette, names of 6 letters.
+  - **Pacing as the NES (owner: no speed-ups):** frame waits end at the next vblank, no
+    catch-up (the catch-up bursts were the battle speed-ups). Sound writes go straight to
+    the GB again (the per-frame queue is gone). Honest lag now (lagcheck, battle 6000-7650,
+    per 500 waits): CGB about +2-3%, DMG about +19% in battle. Speed work done: native
+    small-font renderer (vstr/vchar with shift tables, vclear), panel-row skip of unchanged
+    cells, native panel clear / battle-text copy / $90 swap (idioms), CGB emphasis colours
+    computed (bank 0 space). Remaining: DMG battle frames (panel cells, text tiles, sprites).
+  - Sound checked per voice (single-channel test builds, env GB_SND_MASK; NES reference
+    rendered from the register writes): pitch and timing of both pulses and the triangle
+    match the NES; the triangle was half as loud relative to the pulses: pulses now at 5/8.
+  - Color tile DMA: the mark scan was slow enough that the DMA ran during drawing (garbled
+    letters): byte-wise scan, DMA only at LY 144-151 (12 tiles a line).
 
 ## Remaining
-- FF1: names up to 6 letters (owner asked; save-RAM bytes and every name drawer); DMG
-  transitions black (DMG LCD-off is white: needs the masked load on DMG too); DMG
-  screen-load times and the DMG prologue fade; owner to confirm the new menu movement and
-  centring, the dialogue box and the hardware fixes.
+- FF1 (owner's list, 2026-11-19): DMG battle pacing (+19% in battle: must match the NES);
+  DMG fades: a simple fade (owner) instead of the NES palette steps; DMG battle palette wrong
+  on entry; names up to 6 letters; DMG transitions black; then the owner's play-test.
 - FF2: separate session (`docs/ff2-gb-brief.md`). FF3 (GBC only): not started.
