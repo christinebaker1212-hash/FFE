@@ -561,17 +561,9 @@ maprb_tramp:                                ; CGB masked load shown: maprb_b (ba
             ret
 
 vshow_tramp:                                ; CGB masked load shown: vshow_b (bank PF_BANK)
-            ld a, PF_BANK                   ;   for nametable 0 only, else maprb_b / repal_b
+            ld a, PF_BANK
             ld [$2000], a
             call vshow_b
-            ld a, HLE_BANK
-            ld [$2000], a
-            ld a, [MAP_RB]
-            and a
-            call nz, maprb_b
-            ld a, [CGB_RP]
-            and a
-            call nz, repal_b
             ldh a, [code_bank]
             ld [$2000], a
             ret

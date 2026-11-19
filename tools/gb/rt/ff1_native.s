@@ -7885,7 +7885,7 @@ rtb_b:      ldh [sh_u3], a
 ; With every cell drawn by nametable 0 (own1 = 0): the map is its shadow (NT_SH, WRAM bank 1)
 ; and the palettes are expanded from its attribute bytes into WRAM bank 4 $D000; both go to
 ; VRAM by general-purpose DMA in a vblank (interrupts off; a second vblank if the first has
-; no room left). Otherwise maprb_b / repal_b (four cells per moment VRAM is free).
+; no room left). Cells of both nametables: vshow_own.
 vshow_b:    ld a, [MAP_RB]
             ld b, a
             ld a, [CGB_RP]
@@ -7895,8 +7895,8 @@ vshow_b:    ld a, [MAP_RB]
             ld b, a
             ldh a, [own1_hi]
             or b
-            ret nz                          ; (both nametables: vshow_tramp runs maprb_b /
-.g:         ldh a, [q_head]                 ;   repal_b; vshow_own below is WIP, unused)                 ; queued writes first (no queued cell after these)
+            jp nz, vshow_own                ; (cells of both nametables: by owner)
+.g:         ldh a, [q_head]                 ; queued writes first (no queued cell after these)
             ld b, a
             ldh a, [q_tail]
             cp b
@@ -8116,7 +8116,8 @@ vshow_own:  ldh a, [q_head]                 ; queued writes first
             ld a, [hl]
             ld d, a
             ld a, b                         ; HL = NT_SH + row * 32 + group * 8
-            swap a
+            and 7                           ; (rows 16-29: swap would carry row bit 4 into
+            swap a                          ;   the low byte)
             add a, a
             ld l, a                         ; (row & 7) * 32 in the low byte
             ld a, b
