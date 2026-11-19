@@ -47,6 +47,16 @@ block per member: portrait (32 x 32), name, HP current/max, MP current/max (3-px
 status word. Commands (Items, Magic, Equip, Status, Save; cols 13-19 rows 0-6) and Gil
 (rows 7-9) beside it.
 
+## New-game screens (approved 2026-11-19: `ff2_mock13_newgame.png`)
+- Credits (splash): the ROM's credit lines (fix:F692) centred in 18 columns; a line over 18
+  is split after "BY".
+- Prologue: the same text at 18 columns, one paragraph a page (12 / 11 / 9 lines), each page
+  revealed band by band as on the NES; A or B ends it as on the NES.
+- Load menu: four slot windows sharing their frames (GB rows 1-13): slot number, leader name,
+  Speed; HP and MP current/max in 3-px digits; New Game window (rows 14-17).
+- Name entry: portrait + name window (0,0,20,6); letter grid (0,6,20,12) with 9 letters a row
+  two columns apart, 5 of the 9 rows shown, scrolling as on the NES; hand over the left frame.
+
 ## To draft
 Items, magic, equipment, status, shops, keyword dialogue (Ask / Learn), save menu, name
 entry, prologue, title, ending, world map (B + Select), Select menu (options / formation /

@@ -556,3 +556,110 @@ if __name__ == '__main__':
     print(sub_screens(sys.argv[1], sys.argv[2]))
     print(target_select(sys.argv[1], sys.argv[2]))
     print(shop(sys.argv[1], sys.argv[2]))
+
+
+def credits_lines(nes_path):
+    """the splash screen's credit lines from the ROM (fix:F692: tile codes, $FE = next line
+    two rows down, $FF = end; first line at NES row 8): [(nes_row, nes_col0, codes)]"""
+    import layout
+    r = open(nes_path, 'rb').read()
+    o = layout.HDR + 15 * layout.BANK + 0xF692 - 0xC000
+    lines, row, cur = [], 8, []
+    while r[o] != 0xFF:
+        if r[o] == 0xFE:
+            lines.append((row, 2, cur)); cur = []; row += 2
+        else: cur.append(r[o])
+        o += 1
+    lines.append((row, 2, cur))
+    return [l for l in lines if any(l[2])]
+
+
+def gb_credit_lines(codes):
+    """one NES credit line -> GB lines of at most 18 tiles: leading / trailing blanks dropped;
+    a longer line is split after the word BY (codes $02 $19)"""
+    c = list(codes)
+    while c and c[0] == 0: c.pop(0)
+    while c and c[-1] == 0: c.pop()
+    if len(c) <= 18: return [c]
+    for k in range(len(c) - 2):
+        if c[k:k + 3] == [0x02, 0x19, 0x00]: return [c[:k + 2], c[k + 3:]]
+    return [c[:18], c[18:]]
+
+
+def new_game(nes_path, out):
+    """Splash / prologue / load menu / name entry (camera at the window, no panning).
+    Splash: the ROM's credit lines centred in 18 columns (a line over 18 split after BY).
+    Prologue: the same text at 18 columns, one paragraph a page (12 / 11 / 9 lines), shown
+    band by band as on the NES; A or B ends it as on the NES. Load menu: four slot windows
+    sharing their frames (0,1,20,4) .. (0,10,20,4) with leader name, Speed and HP / MP in
+    3-px digits; New Game window (0,14,20,4). Name entry: portrait + name window (0,0,20,6);
+    letter grid (0,6,20,12): 9 letters a row (the NES has 10 in two groups of 5, 22 columns),
+    two rows apart, 5 of the 9 rows shown, scrolling as on the NES."""
+    import json, textwrap
+    from cynes import NES
+    import numpy as np
+    shots = []
+    # splash, from a frame of the NES splash screen (glyphs cropped from the NES picture)
+    n = NES(nes_path)
+    for f in range(1201): n.controller = 0; fr = n.step(1)
+    nes = Image.fromarray(np.array(fr))
+    s = Screen(bg=3)
+    lines = credits_lines(nes_path)
+    gb = []
+    for row, col0, codes in lines:
+        lead = next(i for i, c in enumerate(codes) if c)
+        segs = gb_credit_lines(codes)
+        pos = col0 + lead
+        for sg in segs:
+            gb.append((sg, row, pos)); pos += len(sg) + 1
+    rows = {0: 3, 1: 6, 2: 9, 3: 11, 4: 12, 5: 14, 6: 15}
+    for i, (sg, row, pos) in enumerate(gb):
+        x = (20 - len(sg)) // 2
+        for k, c in enumerate(sg):
+            if c:
+                t = nes.crop(((pos + k) * 8, row * 8, (pos + k) * 8 + 8, row * 8 + 8))
+                t = t.convert('L').point(lambda v: 255 if v > 128 else 0).convert('1')
+                s.im.paste(SHADES[0], ((x + k) * 8, rows.get(i, 16) * 8), t)
+    shots.append(s)
+    # prologue pages
+    t = [e for e in json.load(open(os.path.join(HERE, '..', '..', 'script', 'ff2', 'system.json'))) if e['id'] == 73][0]['en']
+    paras = [textwrap.wrap(' '.join(p.split('\n')), 18, break_on_hyphens=False) for p in t.split('\n\n')]
+    for k, p in enumerate(paras[:3:2]):
+        s = Screen(bg=3)
+        y0 = (18 - len(p)) // 2
+        shown = len(p) if k else 8
+        for i, l in enumerate(p[:shown]): s.text((20 - len(l)) // 2, y0 + i, l, fg=0, bg=3)
+        shots.append(s)
+    # load menu
+    s = Screen(bg=3)
+    slots = [('AAAAAA', 6, 30, 30, 5, 5), None, ('Firion', 3, 1250, 1490, 88, 120), None]
+    for k, sl in enumerate(slots):
+        s.window(0, 1 + 3 * k, 20, 4)
+    for k, sl in enumerate(slots):
+        y = 2 + 3 * k
+        s.text(1, y, str(k + 1))
+        if sl:
+            nm, sp, hp, mh, mp, mm = sl
+            s.text(3, y, nm); s.text(11, y, 'Speed %d' % sp)
+            _pt(s, 24, (y + 1) * 8, 'HP'); h = '%d/%d' % (hp, mh); _pt(s, 80 - s.pwidth(h, DIG3), (y + 1) * 8, h, DIG3)
+            _pt(s, 96, (y + 1) * 8, 'MP'); m = '%d/%d' % (mp, mm); _pt(s, 140 - s.pwidth(m, DIG3), (y + 1) * 8, m, DIG3)
+    s.window(0, 14, 20, 4); s.text(2, 15, 'New Game  Speed 6')
+    _hand(s, -9, 2 * 8 - 4, HAND16)
+    shots.append(s)
+    # name entry
+    grid = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,\'-!?&/:()";+% '
+    pt = portraits(nes_path)[0]
+    for top in (0, 4):
+        s = Screen(bg=3)
+        s.window(0, 0, 20, 6); s.im.paste(pt.crop((4, 0, 28, 32)), (12, 8))
+        s.text(6, 2, 'Fir'); s.block(9, 2, 1, 1)
+        s.window(0, 6, 20, 12)
+        for r in range(5):
+            row = grid[(top + r) * 9:(top + r) * 9 + 9]
+            for c, ch in enumerate(row): s.text(2 + 2 * c, 8 + 2 * r, ch)
+        _hand(s, 0, (8 + 2 * (2 if top else 0)) * 8 - 4, HAND16)
+        shots.append(s)
+    sheet = Image.new('RGB', (168 * 3 - 8, 152 * 2 - 8), (255, 255, 255))
+    for k, s in enumerate(shots): sheet.paste(s.im, ((k % 3) * 168, (k // 3) * 152))
+    sheet = sheet.resize((sheet.width * 2, sheet.height * 2), Image.NEAREST)
+    p = os.path.join(out, 'ff2_mock13_newgame.png'); sheet.save(p); return p
