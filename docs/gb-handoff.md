@@ -148,7 +148,7 @@ Input files for the script are kept by `LAG_KEEP=1 lagcheck.py ...` (it prints t
 | | 2026-11-19 start | 2026-11-19 late | 2026-11-19 night |
 |---|---|---|---|
 | Color (CGB) | 126 frames lag (+1.6%) | ~33 (+0.4%) | 23 (+0.3%) |
-| Plain GB (DMG) | 263 (+3.4%) | ~200 (+2.6%) | 173 (+2.3%) |
+| Plain GB (DMG) | 263 (+3.4%) | ~200 (+2.6%) | 172 (+2.2%) |
 
 Night session (checkall 62/62 after each step; SameBoy VRAM identical to the build before at
 150-170 points, DMG and CGB, with the scratch `vramcmp.py` approach in gb-lessons):
@@ -172,7 +172,9 @@ was ~65 through scn_c); two-palette tiles get bit 7 and `scn_view` walks the vie
 deciding each such tile at its last view cell (bit 6) and stopping when all are decided (the
 field's ground tile $20 is one: the old forward pass ran scn_tab + scn_rowv over 18 rows);
 SC_NP / REF_BM clears unrolled; `palup2_b` (palette upload, every frame of the prologue and
-fades) fast path for v = $3F00 + index / increment 1: unchanged colours cost no ppu_inc call.
+fades) fast path for v = $3F00 + index / increment 1: unchanged colours cost no ppu_inc call;
+`oamconv_b` attribute by table (OATTR, bank 62 $7900) and SLOT_KEY / SLOT_STAMP sharing L.
+checkall 62/62 on the last build (adcab9e + OATTR).
 Still to do in the scan: `scn_pu` (~37 M-cycles per view
 cell), `scn_tab` (~350 per row), the settle loop. Tools added: `LAG_DUMP=FILE
 lagcheck.py ...` (GB / NES frames per wait), `SGBRUN_CALLS=ADDR` (return address at every
@@ -217,7 +219,11 @@ Remaining lag, by where it is (DMG / CGB frames on the script):
   the DMG LCD-off wait for vblank in rt_ppu_w1 (~0.5 frame per load, needed on hardware).
 - Field entry (2857, 3061-3062): DMG ~27, CGB ~6 (map decompression, DrawMapAttributes,
   scan + re-coding ~1300 samples; CGB: maprb_b / repal_b -> fix vshow_own).
-- Battle start (6126-6137): DMG ~26, CGB ~6 (same parts).
+- Battle start (6125-6162): DMG ~25 (night session: 6126 9/5 GB/NES frames = BG table copy
+  of new data + ntclr; 6134 5/1 = b12 battle setup: OAM clear loop b12:97A7 (256 x STA
+  $0200,X, no idiom yet) and a permuted 12-byte copy b12:AFAF-AFC3 through (zp),Y called many
+  times; 6137 7/2 = LCD-on scan + re-coding; 6150 4/1 = party sprite slots: anf_rows ~600
+  M-cycles a tile (per-function plane routines as pf_tab would be ~3x faster)), CGB ~3.
 - In battle: DMG ~50 (about 44 heavy waits of ~1.6 frames: panel redraws: VWF text,
   hle_cp64 / hle_sw16, farcalls, rt_mmc_w5808, hle_pclr, boxline far code); CGB ~3.
 - Measured costs (night session, DMG): `rt_ppu_w7` short path ~130 M-cycles per NES $2007

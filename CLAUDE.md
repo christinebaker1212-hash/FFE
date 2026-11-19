@@ -833,9 +833,11 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   the frame waits' spare time (boot wait 12 -> 3 frames); DrawMapAttributes DMG LCD-off loop;
   battle nametable clear unrolled; LCD-on scan: mixed-owner groups inline, two-palette tiles
   marked and decided by a backward walk of the view that stops when all are decided
-  (`scn_view`, replaces scn_rowv), clears unrolled; palette upload fast path. All checked SameBoy-VRAM-identical to the build before (DMG
+  (`scn_view`, replaces scn_rowv), clears unrolled; palette upload fast path; sprite
+  attribute conversion by table (`OATTR`, bank 62 $7900). All checked SameBoy-VRAM-identical to the build before (DMG
   and CGB, 150-180 points; only frame-alignment shifts while a Color load is masked or a
-  queued write is pending). Lag: CGB 31 -> 23, DMG 199 -> 173 frames. Tools: lagcheck LAG_DUMP, sgbrun SGBRUN_CALLS / SGBRUN_PROF_SPOFF,
+  queued write is pending; OAM_SH identical too). checkall 62/62 on the last build. Lag: CGB
+  31 -> 23, DMG 199 -> 172 frames. Tools: lagcheck LAG_DUMP, sgbrun SGBRUN_CALLS / SGBRUN_PROF_SPOFF,
   gbrun cart-RAM dump.
 
 ## Remaining

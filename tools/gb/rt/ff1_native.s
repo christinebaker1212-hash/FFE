@@ -4748,32 +4748,22 @@ oamconv_b:  and $07
             cp $FF
             jr z, .alloc
             ld c, a
-            add a, low(SLOT_KEY)            ; resident with another coding: load it again
-            ld l, a
-            ld h, high(SLOT_KEY)
+            or $80                          ; (SLOT_KEY and SLOT_STAMP: $80 | slot in their
+            ld l, a                         ;   pages)
+            ld h, high(SLOT_KEY)            ; resident with another coding: load it again
             ld a, b
             cp [hl]
             jr nz, .load
-.ok:        ld a, c                         ; stamp (in use this frame)
-            or $80
-            ld l, a
-            ld h, high(SLOT_STAMP)
+.ok2:       ld h, high(SLOT_STAMP)          ; stamp (in use this frame)
             ldh a, [oam_frame]
             ld [hl], a
             ld a, c
             ld [de], a                      ; tile = slot
             inc e
             ldh a, [o_a]                    ; NES v h p - - - pp -> GB p v h obp1 - pal(3)
-            ld l, a
-            and $C0
-            rrca
-            bit 5, l
-            jr z, .np
-            or $80
-.np:        ld h, a
-            ld a, l
-            and 3
-            or h
+            ld l, a                         ;   (OATTR), OBP1 below
+            ld h, high(OATTR)
+            ld a, [hl]
             bit 6, b                        ; (DMG: OBP1 if the coding says so)
             jr z, .o0
             or $10
@@ -4797,7 +4787,10 @@ oamconv_b:  and $07
 .load:      ld a, b
             ldh [o_key], a
             call spr_load
-            jr .ok
+.ok:        ld a, c
+            or $80
+            ld l, a
+            jr .ok2
 .full:      ld a, e                         ; hide the GB sprites used last frame only
             rrca
             rrca
@@ -4920,6 +4913,27 @@ pgcopy_b:   push af                         ; (carry)
             dec l                           ; Z = 1, carry kept
             ret
 
+
+; oamconv_b: NES sprite attribute (v h p - - - p p) -> GB OAM attribute (p v h - - p p p:
+; priority, flips, CGB palette); OBP1 (DMG) added from the coding
+section bank HLE_BANK, $7900
+OATTR:
+            db $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03
+            db $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03, $00, $01, $02, $03
+            db $80, $81, $82, $83, $80, $81, $82, $83, $80, $81, $82, $83, $80, $81, $82, $83
+            db $80, $81, $82, $83, $80, $81, $82, $83, $80, $81, $82, $83, $80, $81, $82, $83
+            db $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23
+            db $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23, $20, $21, $22, $23
+            db $A0, $A1, $A2, $A3, $A0, $A1, $A2, $A3, $A0, $A1, $A2, $A3, $A0, $A1, $A2, $A3
+            db $A0, $A1, $A2, $A3, $A0, $A1, $A2, $A3, $A0, $A1, $A2, $A3, $A0, $A1, $A2, $A3
+            db $40, $41, $42, $43, $40, $41, $42, $43, $40, $41, $42, $43, $40, $41, $42, $43
+            db $40, $41, $42, $43, $40, $41, $42, $43, $40, $41, $42, $43, $40, $41, $42, $43
+            db $C0, $C1, $C2, $C3, $C0, $C1, $C2, $C3, $C0, $C1, $C2, $C3, $C0, $C1, $C2, $C3
+            db $C0, $C1, $C2, $C3, $C0, $C1, $C2, $C3, $C0, $C1, $C2, $C3, $C0, $C1, $C2, $C3
+            db $60, $61, $62, $63, $60, $61, $62, $63, $60, $61, $62, $63, $60, $61, $62, $63
+            db $60, $61, $62, $63, $60, $61, $62, $63, $60, $61, $62, $63, $60, $61, $62, $63
+            db $E0, $E1, $E2, $E3, $E0, $E1, $E2, $E3, $E0, $E1, $E2, $E3, $E0, $E1, $E2, $E3
+            db $E0, $E1, $E2, $E3, $E0, $E1, $E2, $E3, $E0, $E1, $E2, $E3, $E0, $E1, $E2, $E3
 
 ; set bits of each byte (mdf_ownrow)
 section bank HLE_BANK, $5F00
