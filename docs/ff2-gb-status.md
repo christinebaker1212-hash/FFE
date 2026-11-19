@@ -247,9 +247,12 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   the same steps in registers / NES RAM (results, side effects on $00-$07, A and flags as
   the NES leaves them), in bank HLE_BANK (`rt/ff2_banked.s`) behind bank-0 stubs; the
   native-routine table takes the flags a routine reads (these read the incoming carry).
-  Cross-bank stubs now start at `$2500` (bank 0 runtime grew). Battle entry: CGB +52,
-  DMG +81 frames; totals CGB +0.3%, DMG +4.2%; random seed 1, 30000 frames: 29534 waits
-  identical on DMG and CGB.
+  Cross-bank stubs now start at `$2500` (bank 0 runtime grew). Multiply-16 runs FF2's
+  steps in registers; divide-16 is a register restoring division with the NES's final
+  state ($00 = 0, $01 = $80 if the entry carry was set, A = $07, C = 0; checked against a
+  model of the 6502 routine on 200000 random cases). Battle entry: CGB +46, DMG +70
+  frames; totals CGB +0.2%, DMG +4.1%; random seed 1, 30000 frames: 29534 waits identical
+  on DMG and CGB.
 - Next: the remaining battle-entry time (attribute writes `attr_apply`, tile marks, the
   battle's own setup code), GB tile upload latency.
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs

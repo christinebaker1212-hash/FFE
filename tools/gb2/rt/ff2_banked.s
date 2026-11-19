@@ -32,45 +32,67 @@ hle_mul8_b:   ld [NES_RAM + $00], a
             pop af                          ; A, Z = 1, C from the last ROR
             ret
 
-; fix:FC98 multiply (16-bit): +++$04 <- +$00 * +$02 (step for step, in NES RAM)
-hle_mul16_b:  ld hl, NES_RAM + $04
+; fix:FC98 multiply (16-bit): +++$04 <- +$00 * +$02, FF2's steps in registers ($07 B, $06 C,
+; $05 D, $04 E, $03 H, $02 L; RORs through the carry as on the NES; A = the last $07 sum)
+hle_mul16_b:
+            push bc
+            push de
+            ld a, [NES_RAM + $02]
+            ld l, a
+            ld a, [NES_RAM + $03]
+            ld h, a
+            ld bc, 0
+            ld de, 0
             ld a, 0
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl], a
-            ld e, 16
-.lp:        ld hl, NES_RAM + $03
-            rr [hl]                         ; ROR $03
-            dec l
-            rr [hl]                         ; ROR $02
+            ldh [tmp_lo], a                 ; (A at exit)
+            ld a, 16
+            ldh [uw_y], a
+.lp:        rr h                            ; ROR $03 / $02
+            rr l
             jr nc, .n
             ld a, [NES_RAM + $00]           ; CLC / $06 += $00 / $07 += $01 + carry
-            ld hl, NES_RAM + $06
-            add a, [hl]
-            ld [hl+], a
+            add a, c
+            ld c, a
             ld a, [NES_RAM + $01]
-            adc a, [hl]
-            ld [hl], a
-.n:         ld hl, NES_RAM + $07
-            rr [hl]                         ; ROR $07 / $06 / $05 / $04
-            dec l
-            rr [hl]
-            dec l
-            rr [hl]
-            dec l
-            rr [hl]
-            dec e
+            adc a, b
+            ld b, a
+            ldh [tmp_lo], a
+.n:         rr b                            ; ROR $07 / $06 / $05 / $04
+            rr c
+            rr d
+            rr e
+            ldh a, [uw_y]                   ; DEX (carry kept)
+            dec a
+            ldh [uw_y], a
             jr nz, .lp
-            push af
-            xor a
+            ld a, l
+            ld [NES_RAM + $02], a
+            ld a, h
+            ld [NES_RAM + $03], a
+            ld a, e
+            ld [NES_RAM + $04], a
+            ld a, d
+            ld [NES_RAM + $05], a
+            ld a, c
+            ld [NES_RAM + $06], a
+            ld a, b
+            ld [NES_RAM + $07], a
+            ld a, 0
             ldh [nzv], a
-            pop af                          ; A, Z = 1, C from the last ROR
+            pop de
+            pop bc
+            ld e, 0                         ; X = 0
+            ldh a, [tmp_lo]                 ; A; Z = 1 and C from the last ROR still set
             ret
 
-; fix:FCC3 divide (16-bit): +$04 = +$00 / +$02, +$06 = remainder (step for step; a zero
-; +$00 or +$02 returns at once with A = 0, Z = 1, X and C unchanged)
-hle_div16_b:  push af                         ; caller's carry
+; fix:FCC3 divide (16-bit): +$04 = +$00 / +$02, +$06 = remainder. FF2's restoring division
+; (16-bit remainder register: an overflowing shift loses its top bit) in registers: divisor
+; BC, dividend / quotient DE, remainder HL; as the NES leaves them: $00 = 0, $01 = $80 if the
+; carry was set on entry (it is rotated in first, then only zeros), A = $07, C = 0. A zero
+; +$00 or +$02: A = 0, Z = 1, X and C unchanged. (Checked against a model of the 6502
+; routine on 200000 random cases.)
+hle_div16_b:
+            push af                         ; caller's carry
             ld hl, NES_RAM + $04
             ld a, 0
             ld [hl+], a
@@ -86,43 +108,63 @@ hle_div16_b:  push af                         ; caller's carry
             inc l                           ; $03
             or [hl]
             jr z, .zero
-            pop af                          ; the carry into the first ROL $00
-            ld e, 16
-.lp:        ld hl, NES_RAM + $00
-            rl [hl]                         ; ROL $00 / $01 / $06 / $07
-            inc l
-            rl [hl]
-            ld hl, NES_RAM + $06
-            rl [hl]
-            inc l
-            rl [hl]
-            ld a, [NES_RAM + $06]           ; SEC / $06 -= $02 / $07 -= $03
-            ld hl, NES_RAM + $02
-            sub [hl]
+            pop af
+            ld a, 0                         ; the final $01: $80 if the entry carry was set
+            jr nc, .c0
+            ld a, $80
+.c0:        ldh [tmp_lo], a
+            push bc
+            push de
+            ld a, [NES_RAM + $02]
+            ld c, a
+            ld a, [NES_RAM + $03]
+            ld b, a
+            ld a, [NES_RAM + $00]
+            ld e, a
+            ld a, [NES_RAM + $01]
             ld d, a
-            ld a, [NES_RAM + $07]
-            inc l
-            sbc a, [hl]
-            jr c, .neg                      ; borrow: the NES adds it back (no change), CLC
-            ld [NES_RAM + $07], a           ; no borrow: stored, NES carry set
-            ld hl, NES_RAM + $06
-            ld [hl], d
-            scf
-            jr .rol
-.neg:       ld a, [NES_RAM + $07]           ; (A = $07 as the NES leaves it)
-            scf
-            ccf
-.rol:       ld hl, NES_RAM + $04
-            rl [hl]                         ; ROL $04 / $05
-            inc l
-            rl [hl]
-            dec e
+            ld hl, 0
+            ld a, 16
+            ldh [uw_y], a
+.lp:        sla e                           ; dividend bit out, quotient bit 0 in
+            rl d
+            rl l                            ; into the remainder (its top bit lost)
+            rl h
+            ld a, l                         ; remainder - divisor
+            sub c
+            ldh [wtmp], a
+            ld a, h
+            sbc a, b
+            jr c, .no
+            ld h, a                         ; fits: subtracted, quotient bit 1
+            ldh a, [wtmp]
+            ld l, a
+            inc e
+.no:        ldh a, [uw_y]
+            dec a
+            ldh [uw_y], a
             jr nz, .lp
-            push af
+            ld a, e
+            ld [NES_RAM + $04], a
+            ld a, d
+            ld [NES_RAM + $05], a
+            ld a, l
+            ld [NES_RAM + $06], a
+            ld a, h
+            ld [NES_RAM + $07], a
             xor a
+            ld [NES_RAM + $00], a
             ldh [nzv], a
-            ld d, 0
-            pop af                          ; A = $07, Z = 1, C from ROL $05
+            ldh a, [tmp_lo]
+            ld [NES_RAM + $01], a
+            pop de
+            pop bc
+            ld e, 0                         ; X = 0
+            ld a, 1
+            dec a                           ; Z = 1
+            scf
+            ccf                             ; C = 0
+            ld a, h                         ; A = $07 (flags kept)
             ret
 .zero:      xor a
             ldh [nzv], a
@@ -130,4 +172,3 @@ hle_div16_b:  push af                         ; caller's carry
             ld a, 1
             dec a                           ; A = 0, Z = 1 (carry kept)
             ret
-
