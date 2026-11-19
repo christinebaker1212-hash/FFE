@@ -2830,6 +2830,49 @@ anf_rows:   ld a, 8
             jr nz, .row
             ret
 
+; NES sprite tile o_t is not resident: take the next slot not used by this frame's
+; sprites, load the tile from the shadow, return A = slot. Keeps BC, DE, HL.
+spr_alloc:  push bc
+            push de
+            push hl
+            ld b, 128
+.find:      ldh a, [spr_next]
+            inc a
+            and $7F
+            ldh [spr_next], a
+            ld l, a
+            ld h, high(SLOT_STAMP)
+            set 7, l
+            ldh a, [oam_frame]
+            cp [hl]
+            jr nz, .got
+            dec b
+            jr nz, .find
+            ldh a, [spr_next]               ; all slots busy this frame: reuse anyway
+            ld l, a
+.got:       res 7, l                        ; L = slot
+            ld h, high(SLOT_TILE)
+            ld a, [hl]                      ; evict the old tile
+            cp $FF
+            jr z, .free
+            push hl
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld [hl], $FF
+            pop hl
+.free:      ldh a, [o_t]
+            ld [hl], a                      ; SLOT_TILE[slot] = tile
+            ld c, l
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld [hl], c                      ; SPR_SLOT[tile] = slot
+            call spr_load
+            ld a, c
+            pop hl
+            pop de
+            pop bc
+            ret
+
 ; DMG spr_load: C = GB sprite slot: NES sprite tile o_t from the shadow, coded with o_key
 ; (values of colour indices 1-3, 2 bits each; index 0 stays 0), as one block to VRAM
 ; $8000 + slot * 16; SLOT_KEY[slot] = o_key. Keeps all registers.
@@ -3276,161 +3319,6 @@ nf_whole:   ld a, c
             ld [hl+], a
             dec c
             jr nz, .f
-            ret
-
-; CGB masked load shown (rt_ppu_w1): the GB map and the cell palettes deferred while masked.
-; With every cell drawn by nametable 0 (own1 = 0): the map is its shadow (NT_SH, WRAM bank 1)
-; and the palettes are expanded from its attribute bytes into WRAM bank 4 $D000; both go to
-; VRAM by general-purpose DMA in a vblank (interrupts off; a second vblank if the first has
-; no room left). Otherwise maprb_b / repal_b (four cells per moment VRAM is free).
-vshow_b:    ld a, [MAP_RB]
-            ld b, a
-            ld a, [CGB_RP]
-            or b
-            ret z
-            ldh a, [own1_lo]
-            ld b, a
-            ldh a, [own1_hi]
-            or b
-            jr z, .g
-            ld a, [MAP_RB]
-            and a
-            call nz, maprb_b
-            ld a, [CGB_RP]
-            and a
-            call nz, repal_b
-            ret
-.g:         ldh a, [q_head]                 ; queued writes first (no queued cell after these)
-            ld b, a
-            ldh a, [q_tail]
-            cp b
-            jr z, .qe
-            call q_drain1
-            jr .g
-.qe:        ld a, [CGB_RP]
-            and a
-            call nz, .pal
-            di
-            ld a, [MAP_RB]
-            and a
-            jr z, .np
-            call .vb                        ; map: NT_SH $D000 (bank 1) -> $9800, 60 x 16
-            ld a, $D0
-            ldh [$FF51], a
-            xor a
-            ldh [$FF52], a
-            ld a, $18
-            ldh [$FF53], a
-            xor a
-            ldh [$FF54], a
-            ld a, 59
-            ldh [$FF55], a
-            xor a
-            ld [MAP_RB], a
-.np:        ld a, [CGB_RP]
-            and a
-            jr z, .x
-            ldh a, [$FF44]                  ; (in a vblank with room left, else the next)
-            cp 144
-            jr c, .wt
-            cp 149
-            jr c, .go
-.wt:        call .vb
-.go:        ld a, 4                         ; palettes: bank 4 $D000 -> VRAM bank 1 $9800
-            ldh [$FF70], a
-            ld a, 1
-            ldh [$FF4F], a
-            ld a, $D0
-            ldh [$FF51], a
-            xor a
-            ldh [$FF52], a
-            ld a, $18
-            ldh [$FF53], a
-            xor a
-            ldh [$FF54], a
-            ld a, 59
-            ldh [$FF55], a
-            xor a
-            ldh [$FF4F], a
-            ld [CGB_RP], a
-            inc a
-            ldh [$FF70], a
-.x:         ei
-            ret
-.vb:        ldh a, [$FF44]                  ; wait for the start of a vblank (LY 144)
-            cp 144
-            jr z, .vb
-.v1:        ldh a, [$FF44]
-            cp 144
-            jr nz, .v1
-            ret
-.pal:       ld de, 0                        ; D = attribute index (0-63), E = (scratch)
-.pa:        ld a, d                         ; value (NT_SH $3C0 + i, bank 1)
-            add a, $C0
-            ld l, a
-            ld h, high(NT_SH) + 3
-            ld c, [hl]
-            ld a, d                         ; HL = $D000 + row0 * 32 + col0 (bank 4)
-            and $38                         ;   row0 = (i >> 3) * 4, col0 = (i & 7) * 4
-            ld l, a
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl                      ; (i & $38) * 16 = row0 * 32
-            ld a, d
-            and 7
-            add a, a
-            add a, a
-            add a, l
-            ld l, a
-            ld a, h
-            add a, $D0
-            ld h, a
-            ld a, 4
-            ldh [$FF70], a
-            ld b, 2                         ; top half (quadrants 0 / 1), then bottom (2 / 3)
-.hf:        ld a, c
-            and 3
-            ld e, a                         ; left
-            ld a, c
-            rrca
-            rrca
-            and 3                           ; right
-            push bc
-            ld b, a
-            ld c, 2                         ; two rows
-.rw:        ld a, h                         ; (rows 30-31: none)
-            cp $D3
-            jr nz, .w
-            ld a, l
-            cp $C0
-            jr nc, .sk
-.w:         ld a, e
-            ld [hl+], a
-            ld [hl+], a
-            ld a, b
-            ld [hl+], a
-            ld [hl+], a
-            ld a, l
-            add a, 28
-            ld l, a
-            jr nc, .nc
-            inc h
-.nc:        dec c
-            jr nz, .rw
-.sk:        pop bc
-            ld a, c
-            swap a
-            ld c, a
-            dec b
-            jr nz, .hf
-            ld a, 1
-            ldh [$FF70], a
-            inc d
-            ld a, d
-            cp 64
-            jr nz, .pa
             ret
 
 ; CGB masked load shown: the GB map (rows 0-29) from the nametable shadows by owner (OWN),
@@ -7991,6 +7879,457 @@ rtb_b:      ldh [sh_u3], a
             call pf2_b.pf
 .done:      xor a
             ld [$4000], a
+            ret
+
+; CGB masked load shown (rt_ppu_w1): the GB map and the cell palettes deferred while masked.
+; With every cell drawn by nametable 0 (own1 = 0): the map is its shadow (NT_SH, WRAM bank 1)
+; and the palettes are expanded from its attribute bytes into WRAM bank 4 $D000; both go to
+; VRAM by general-purpose DMA in a vblank (interrupts off; a second vblank if the first has
+; no room left). Otherwise maprb_b / repal_b (four cells per moment VRAM is free).
+vshow_b:    ld a, [MAP_RB]
+            ld b, a
+            ld a, [CGB_RP]
+            or b
+            ret z
+            ldh a, [own1_lo]
+            ld b, a
+            ldh a, [own1_hi]
+            or b
+            ret nz                          ; (both nametables: vshow_tramp runs maprb_b /
+.g:         ldh a, [q_head]                 ;   repal_b; vshow_own below is WIP, unused)                 ; queued writes first (no queued cell after these)
+            ld b, a
+            ldh a, [q_tail]
+            cp b
+            jr z, .qe
+            call q_drain1
+            jr .g
+.qe:        ld a, [CGB_RP]
+            and a
+            call nz, .pal
+            di
+            ld a, [MAP_RB]
+            and a
+            jr z, .np
+            call .vb                        ; map: NT_SH $D000 (bank 1) -> $9800, 60 x 16
+            ld a, $D0
+            ldh [$FF51], a
+            xor a
+            ldh [$FF52], a
+            ld a, $18
+            ldh [$FF53], a
+            xor a
+            ldh [$FF54], a
+            ld a, 59
+            ldh [$FF55], a
+            xor a
+            ld [MAP_RB], a
+.np:        ld a, [CGB_RP]
+            and a
+            jr z, .x
+            ldh a, [$FF44]                  ; (in a vblank with room left, else the next)
+            cp 144
+            jr c, .wt
+            cp 149
+            jr c, .go
+.wt:        call .vb
+.go:        ld a, 4                         ; palettes: bank 4 $D000 -> VRAM bank 1 $9800
+            ldh [$FF70], a
+            ld a, 1
+            ldh [$FF4F], a
+            ld a, $D0
+            ldh [$FF51], a
+            xor a
+            ldh [$FF52], a
+            ld a, $18
+            ldh [$FF53], a
+            xor a
+            ldh [$FF54], a
+            ld a, 59
+            ldh [$FF55], a
+            xor a
+            ldh [$FF4F], a
+            ld [CGB_RP], a
+            inc a
+            ldh [$FF70], a
+.x:         ei
+            ret
+.vb:        ldh a, [$FF44]                  ; in a vblank with room (LY 144-146): now;
+            cp 144                          ;   else wait for the next one
+            jr c, .v1
+            cp 147
+            ret c
+.v0:        ldh a, [$FF44]
+            cp 144
+            jr nc, .v0
+.v1:        ldh a, [$FF44]
+            cp 144
+            jr nz, .v1
+            ret
+.pal:       ld de, 0                        ; D = attribute index (0-63), E = (scratch)
+.pa:        ld a, d                         ; value (NT_SH $3C0 + i, bank 1)
+            add a, $C0
+            ld l, a
+            ld h, high(NT_SH) + 3
+            ld c, [hl]
+            ld a, d                         ; HL = $D000 + row0 * 32 + col0 (bank 4)
+            and $38                         ;   row0 = (i >> 3) * 4, col0 = (i & 7) * 4
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl                      ; (i & $38) * 16 = row0 * 32
+            ld a, d
+            and 7
+            add a, a
+            add a, a
+            add a, l
+            ld l, a
+            ld a, h
+            add a, $D0
+            ld h, a
+            ld a, 4
+            ldh [$FF70], a
+            ld b, 2                         ; top half (quadrants 0 / 1), then bottom (2 / 3)
+.hf:        ld a, c
+            and 3
+            ld e, a                         ; left
+            ld a, c
+            rrca
+            rrca
+            and 3                           ; right
+            push bc
+            ld b, a
+            ld c, 2                         ; two rows
+.rw:        ld a, h                         ; (rows 30-31: none)
+            cp $D3
+            jr nz, .w
+            ld a, l
+            cp $C0
+            jr nc, .sk
+.w:         ld a, e
+            ld [hl+], a
+            ld [hl+], a
+            ld a, b
+            ld [hl+], a
+            ld [hl+], a
+            ld a, l
+            add a, 28
+            ld l, a
+            jr nc, .nc
+            inc h
+.nc:        dec c
+            jr nz, .rw
+.sk:        pop bc
+            ld a, c
+            swap a
+            ld c, a
+            dec b
+            jr nz, .hf
+            ld a, 1
+            ldh [$FF70], a
+            inc d
+            ld a, d
+            cp 64
+            jr nz, .pa
+            ret
+
+; vshow_b with cells of both nametables: GB map (by owner) to WRAM bank 4 $D000, cell
+; palettes to $D400, eight cells at a time (read in bank 1, kept on the stack, written in
+; bank 4); then both by general-purpose DMA in a vblank
+vshow_own:  ldh a, [q_head]                 ; queued writes first
+            ld b, a
+            ldh a, [q_tail]
+            cp b
+            jr z, .qe
+            call q_drain1
+            jr vshow_own
+.qe:        ld b, 0                         ; B = row (0-29)
+.row:       ld c, 0                         ; group (0-3)
+.grp:       push bc
+            ld a, b                         ; palettes of the group's four pairs, both
+            and $1C                         ;   nametables: attribute bytes $3C0 + (row / 4)
+            add a, a                        ;   * 8 + group * 2, + 1
+            add a, $C0
+            ld l, a
+            ld a, c
+            add a, a
+            add a, l
+            ld l, a
+            ld h, high(NT_SH) + 3
+            ld e, b                         ; (E: row)
+            ld a, [hl+]                     ; NT0, columns 0-3
+            bit 1, e
+            jr z, .a0
+            swap a
+.a0:        ld d, a
+            and 3
+            ldh [sh_m0], a
+            ld a, d
+            rrca
+            rrca
+            and 3
+            ldh [sh_m1], a
+            ld a, [hl]                      ; NT0, columns 4-7
+            bit 1, e
+            jr z, .a1
+            swap a
+.a1:        ld d, a
+            and 3
+            ldh [sh_m2], a
+            ld a, d
+            rrca
+            rrca
+            and 3
+            ldh [sh_m3], a
+            set 2, h                        ; NT1
+            ld a, [hl-]
+            bit 1, e
+            jr z, .a2
+            swap a
+.a2:        ld d, a
+            and 3
+            ldh [sh_u1], a
+            ld a, d
+            rrca
+            rrca
+            and 3
+            ldh [sh_u2], a
+            ld a, [hl]
+            bit 1, e
+            jr z, .a3
+            swap a
+.a3:        ld d, a
+            and 3
+            ldh [sh_p0], a
+            ld a, d
+            rrca
+            rrca
+            and 3
+            ldh [sh_p1], a
+            ld a, b                         ; owner bits: OWN[row * 4 + group]
+            add a, a
+            add a, a
+            add a, c
+            ld l, a
+            ld h, high(OWN)
+            ld a, [hl]
+            ld d, a
+            ld a, b                         ; HL = NT_SH + row * 32 + group * 8
+            swap a
+            add a, a
+            ld l, a                         ; (row & 7) * 32 in the low byte
+            ld a, b
+            srl a
+            srl a
+            srl a
+            add a, high(NT_SH)
+            ld h, a
+            ld a, c
+            add a, a
+            add a, a
+            add a, a
+            add a, l
+            ld l, a
+            ld c, d                         ; C = owner bits
+            srl c
+            jr c, .n0
+            ld d, [hl]
+            ldh a, [sh_m0]
+            jr .w0
+.n0:      set 2, h
+            ld d, [hl]
+            res 2, h
+            ldh a, [sh_p0]
+.w0:      ld e, a
+            push de
+            inc l
+            srl c
+            jr c, .n1
+            ld d, [hl]
+            ldh a, [sh_m0]
+            jr .w1
+.n1:      set 2, h
+            ld d, [hl]
+            res 2, h
+            ldh a, [sh_p0]
+.w1:      ld e, a
+            push de
+            inc l
+            srl c
+            jr c, .n2
+            ld d, [hl]
+            ldh a, [sh_m1]
+            jr .w2
+.n2:      set 2, h
+            ld d, [hl]
+            res 2, h
+            ldh a, [sh_p1]
+.w2:      ld e, a
+            push de
+            inc l
+            srl c
+            jr c, .n3
+            ld d, [hl]
+            ldh a, [sh_m1]
+            jr .w3
+.n3:      set 2, h
+            ld d, [hl]
+            res 2, h
+            ldh a, [sh_p1]
+.w3:      ld e, a
+            push de
+            inc l
+            srl c
+            jr c, .n4
+            ld d, [hl]
+            ldh a, [sh_m2]
+            jr .w4
+.n4:      set 2, h
+            ld d, [hl]
+            res 2, h
+            ldh a, [sh_u1]
+.w4:      ld e, a
+            push de
+            inc l
+            srl c
+            jr c, .n5
+            ld d, [hl]
+            ldh a, [sh_m2]
+            jr .w5
+.n5:      set 2, h
+            ld d, [hl]
+            res 2, h
+            ldh a, [sh_u1]
+.w5:      ld e, a
+            push de
+            inc l
+            srl c
+            jr c, .n6
+            ld d, [hl]
+            ldh a, [sh_m3]
+            jr .w6
+.n6:      set 2, h
+            ld d, [hl]
+            res 2, h
+            ldh a, [sh_u2]
+.w6:      ld e, a
+            push de
+            inc l
+            srl c
+            jr c, .n7
+            ld d, [hl]
+            ldh a, [sh_m3]
+            jr .w7
+.n7:      set 2, h
+            ld d, [hl]
+            res 2, h
+            ldh a, [sh_u2]
+.w7:      ld e, a
+            push de
+            inc l
+            dec l                           ; HL = the group's last cell, bank 4
+            ld a, 4
+            ldh [$FF70], a
+            pop de
+            ld [hl], d
+            set 2, h
+            ld [hl], e
+            res 2, h
+            dec l
+            pop de
+            ld [hl], d
+            set 2, h
+            ld [hl], e
+            res 2, h
+            dec l
+            pop de
+            ld [hl], d
+            set 2, h
+            ld [hl], e
+            res 2, h
+            dec l
+            pop de
+            ld [hl], d
+            set 2, h
+            ld [hl], e
+            res 2, h
+            dec l
+            pop de
+            ld [hl], d
+            set 2, h
+            ld [hl], e
+            res 2, h
+            dec l
+            pop de
+            ld [hl], d
+            set 2, h
+            ld [hl], e
+            res 2, h
+            dec l
+            pop de
+            ld [hl], d
+            set 2, h
+            ld [hl], e
+            res 2, h
+            dec l
+            pop de
+            ld [hl], d
+            set 2, h
+            ld [hl], e
+            res 2, h
+            dec l
+            ld a, 1
+            ldh [$FF70], a
+            pop bc
+            inc c
+            ld a, c
+            cp 4
+            jp nz, .grp
+            inc b
+            ld a, b
+            cp 30
+            jp nz, .row
+            xor a
+            ld [MAP_RB], a
+            ld [CGB_RP], a
+            di
+            call vshow_b.vb
+            ld a, 4
+            ldh [$FF70], a
+            ld a, $D0                       ; map: bank 4 $D000 -> $9800
+            ldh [$FF51], a
+            xor a
+            ldh [$FF52], a
+            ld a, $18
+            ldh [$FF53], a
+            xor a
+            ldh [$FF54], a
+            ld a, 59
+            ldh [$FF55], a
+            ldh a, [$FF44]                  ; (in a vblank with room left, else the next)
+            cp 144
+            jr c, .wt
+            cp 149
+            jr c, .go
+.wt:        call vshow_b.vb
+.go:        ld a, 1                         ; palettes: bank 4 $D400 -> VRAM bank 1 $9800
+            ldh [$FF4F], a
+            ld a, $D4
+            ldh [$FF51], a
+            xor a
+            ldh [$FF52], a
+            ld a, $18
+            ldh [$FF53], a
+            xor a
+            ldh [$FF54], a
+            ld a, 59
+            ldh [$FF55], a
+            xor a
+            ldh [$FF4F], a
+            inc a
+            ldh [$FF70], a
+            ei
             ret
 
 section bank PF_BANK, $7F00

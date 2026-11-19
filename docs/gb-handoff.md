@@ -1,4 +1,4 @@
-# Game Boy port — handoff (2026-11-18)
+# Game Boy port — handoff (2026-11-19)
 
 Read `CLAUDE.md` first: it holds the owner's binding decisions, the targets, the rules on
 what the repo may contain, and a running status. This file is the detailed state of the
@@ -133,6 +133,69 @@ Known limits:
 Possible next work: speed of screen transitions on DMG/SGB (nametable-write bookkeeping
 `rt_ppu_w7` / `own_set` / `dmg_mark`, the LCD-on scan), then FF2 (dual-mode), then FF3
 (GBC only).
+
+## Speed work, state 2026-11-19 (owner: "keep going until DMG and Color are both 0%")
+
+Measure on the 7650-wait new-game + battle script (Gambatte, hardware-like timing):
+`PYTHONPATH=build/emu python3 tools/gb/lagcheck.py build/ff1_gb.nes build/ff1_gb.gb 7650 --win 500 [--dmg]`.
+`--gbjitter A-B` with `LAG_N=5000` lists every wait whose GB frames differ from the NES's.
+To group lag into screen loads, see `docs/gb-lessons.md` (Speed). Profile in mGBA with
+`SGBRUN_PROFC=1 SGBRUN_PROF2=800 build/sgbrun ROM 8200 out --dmg|--cgb --padfile P --sram S > prof.txt`.
+The output has one sample per 800 timing units: about 175 samples per DMG frame, or per
+double-speed CGB frame at PROF2=400. Group the samples per wait by symbol.
+Input files for the script are kept by `LAG_KEEP=1 lagcheck.py ...` (it prints the temp dir).
+
+| | session start | now |
+|---|---|---|
+| Color (CGB) | 126 frames lag (+1.6%) | ~33 (+0.4%) |
+| Plain GB (DMG) | 263 (+3.4%) | ~200 (+2.6%) |
+
+Done this session (all checked VRAM-identical in SameBoy against the build before, or
+self-consistent with `mapself`; RAM 62/62 at commit 92a3c5f+, later changes are RAM-neutral
+runtime work but **checkall has not been re-run since the coverage refresh**: run it first):
+- Title-screen corruption on CGB (repal_b left VRAM bank 1 selected) and stale queued map
+  cells after a masked load (maprb_b drains the VRAM queue first). Battle message teardown
+  in one frame ($5808, NES side; coverage refreshed for it).
+- CGB: attribute palettes written straight to VRAM bank 1 (attr_apply, vram_put1); whole
+  sprite pages left in ROM (lazy: LZ_BM / LZ_SRC in cart RAM bank 3, `spr_mat` copies a tile
+  to the shadow on demand; DMG and CGB); identity-coded CGB slot loads as a plain copy;
+  masked load shown with nametable 0 only: map + palettes by general-purpose DMA (vshow_b,
+  bank 60); rt_ppu_w7 short path also for CGB masked loads (MAP_RB).
+- DMG: battle panel rows with cells owned by nametable 1 on the fast path (nrf NR_O1);
+  native `(zp),Y -> $2007` runs (izyrun0: b21:80C5, fix:F24D); ntfill bulk paths for
+  attribute bytes and increment-32 columns, 8-byte fills; DrawMapAttributes with the LCD off
+  to the shadow only; map decompression literal loop inline + `fillde`; one-pass re-coding
+  at LCD on (`rtb_b`, bank 60, replaces dmg_retile_ref / some(0)); colour-use scan by POP
+  (`pf2_b`); LCD-on scan with palette bit sets (SC_NP bits; the view pass `scn_rowv` only
+  when a tile is drawn with two palettes; PAL_USED from `scn_pu` in the full pass);
+  dmg_maps / dmg_target / spr_maps / spr_alloc moved out of bank 0.
+- Tried and reverted: deferring the DMG LCD switch-off to the vblank interrupt (slower: the
+  bulk LCD-off paths are lost for the rest of that frame).
+
+**Work in progress (not active):** `vshow_own` (bank 60): for masked loads whose cells belong
+to both nametables (field, battle), build map + palettes by owner into WRAM bank 4 and DMA
+them. It has a bug: the bank-4 buffer itself is wrong for rows 16-29, columns 0/1/4/5 (seen at
+wait 3064 on the CGB; the DMA copies the buffer correctly). vshow_b returns before it
+(`ret nz` on own1), and vshow_tramp runs maprb_b / repal_b for those loads as before (about 3
+frames per field / battle load on CGB). Fix the builder (check the per-cell push / pop
+pairing and the HL arithmetic for rows >= 16), then re-enable it with `jp nz, vshow_own`.
+
+Remaining lag, by where it is (DMG / CGB frames on the script):
+- Boot wait 1: DMG 11 (all 256 BG tiles coded at LCD on in prologue mode: ~550 M-cycles a
+  tile). Defer to the prologue's idle frames only if the intro text never shows uncoded.
+- Prologue bands: DMG ~22 in total, 2-4 per band (attribute writes each frame, b14:A2ED).
+- New-game screens (waits 719-1610): DMG ~55, CGB ~15. Costs: CHR upload to the shadow
+  (hle_chr_pages, ~4 frames per full upload on DMG: BG pages could be left in ROM like the
+  sprite pages), menu text printer c62:DED0..DF01 ($2006 / $2007 per letter), window rows,
+  the DMG LCD-off wait for vblank in rt_ppu_w1 (~0.5 frame per load, needed on hardware).
+- Field entry (2857, 3061-3062): DMG ~27, CGB ~6 (map decompression, DrawMapAttributes,
+  scan + re-coding ~1300 samples; CGB: maprb_b / repal_b -> fix vshow_own).
+- Battle start (6126-6137): DMG ~26, CGB ~6 (same parts).
+- In battle: DMG ~50 (about 44 heavy waits of ~1.6 frames: panel redraws: VWF text,
+  hle_cp64 / hle_sw16, farcalls, rt_mmc_w5808, hle_pclr, boxline far code); CGB ~3.
+- Bank 0 is full (~70 bytes free): move code to bank 60 (PF_BANK, room up to $7D00) or
+  HLE_BANK (full at $5F00) behind a trampoline; equates used before their definition must
+  be defined earlier (one-pass labels).
 
 ## Gotchas learned
 - B and D must stay 0 at all times (BC = Y, DE = X for indexed addressing).

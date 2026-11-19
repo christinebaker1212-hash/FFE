@@ -1919,12 +1919,18 @@ ppu_inc:    ldh a, [ppu_ctrl]
             ldh [ppu_vh], a
             ret
 
-rt_ppu_w7:  ldh [w7v], a                    ; LCD off, a nametable cell (not attributes, not
-            push af                         ;   palettes): the short path
-            ldh a, [lcd_on]
+rt_ppu_w7:  ldh [w7v], a                    ; LCD off (or a CGB masked load), a nametable
+            push af                         ;   cell (not attributes, not palettes): the short
+            ldh a, [lcd_on]                 ;   path
+            and a
+            jr z, .s0
+            ld a, [VLCD]
+            cp 1
+            jr nz, .gen0
+            ldh a, [dlg_on]
             and a
             jr nz, .gen0
-            ldh a, [ppu_vh]
+.s0:        ldh a, [ppu_vh]
             cp $20
             jr c, .gen0
             cp $3F
@@ -1966,12 +1972,17 @@ rt_ppu_w7:  ldh [w7v], a                    ; LCD off, a nametable cell (not att
             jr nz, .fc
             ld a, 1                         ; DMG: the map is scanned when the LCD goes on
             ldh [dmg_scan], a
-.fc:        ld a, b
+.fc:        ld a, [VLCD]                    ; GB map (LCD off; masked: rebuilt when shown)
+            cp 1
+            jr z, .fm
+            ld a, b
             add a, $98
             ld h, a
             ldh a, [w7v]
-            ld [hl], a                      ; GB map (LCD off)
-            ldh a, [ppu_ctrl]               ; v += 1 or 32
+            ld [hl], a
+            jr .fp
+.fm:        ld [MAP_RB], a
+.fp:        ldh a, [ppu_ctrl]               ; v += 1 or 32
             and 4
             ld a, 1
             jr z, .fi
@@ -2353,49 +2364,6 @@ rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (s
             pop de
             pop bc
             pop af
-            ret
-
-; NES sprite tile o_t is not resident: take the next slot not used by this frame's
-; sprites, load the tile from the shadow, return A = slot. Keeps BC, DE, HL.
-spr_alloc:  push bc
-            push de
-            push hl
-            ld b, 128
-.find:      ldh a, [spr_next]
-            inc a
-            and $7F
-            ldh [spr_next], a
-            ld l, a
-            ld h, high(SLOT_STAMP)
-            set 7, l
-            ldh a, [oam_frame]
-            cp [hl]
-            jr nz, .got
-            dec b
-            jr nz, .find
-            ldh a, [spr_next]               ; all slots busy this frame: reuse anyway
-            ld l, a
-.got:       res 7, l                        ; L = slot
-            ld h, high(SLOT_TILE)
-            ld a, [hl]                      ; evict the old tile
-            cp $FF
-            jr z, .free
-            push hl
-            ld l, a
-            ld h, high(SPR_SLOT)
-            ld [hl], $FF
-            pop hl
-.free:      ldh a, [o_t]
-            ld [hl], a                      ; SLOT_TILE[slot] = tile
-            ld c, l
-            ld l, a
-            ld h, high(SPR_SLOT)
-            ld [hl], c                      ; SPR_SLOT[tile] = slot
-            call spr_load
-            ld a, c
-            pop hl
-            pop de
-            pop bc
             ret
 
 ; C = slot: load NES sprite tile o_t into it from the shadow, coded with o_key (the value

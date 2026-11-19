@@ -84,7 +84,7 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-19: DMG/CGB speed work)
+# GB port status (last updated 2026-11-19 late: DMG/CGB speed work, see gb-handoff.md)
 
 **Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
 **Handoff: `docs/gb-handoff.md`** (session setup, current battle-layout work, exact next steps).
@@ -819,6 +819,10 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   the NES's own 2/0-frame jitter). Still slow on DMG: screen loads (battle start ~50 frames,
   field entry ~66, intro/new-game screens 15-45: the LCD-on map scan and tile re-coding).
   Tools: sgbrun SGBRUN_PROFC (cycle sampling), SGBRUN_PROF_SP; lagcheck LAG_KEEP.
+
+- **Speed, 2026-11-19 (late):** lag on the 7650-wait script: CGB 126 -> ~33 frames, DMG 263 -> ~200.
+  Details, the WIP (`vshow_own`, disabled, buggy) and the remaining lag by screen:
+  `docs/gb-handoff.md` "Speed work". checkall not re-run since the last coverage refresh.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
