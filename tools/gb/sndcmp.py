@@ -44,7 +44,7 @@ def gb_record(gb, track, secs, out):
     sc = '_%d' % (secs * 60 + 200)
     cmd = [sys.executable, os.path.join(HERE, 'sgbshots.py'), NES_ROM, gb, out + '.png', str(START + secs * 60 + 60),
            '--field', sc, '--poke', '004B=%02X' % (0x40 | track), '--poke-at', str(START), '--gambatte',
-           '--wav', out, '--wav-from', str(START - 60)]
+           '--wav', out, '--wav-from', str(START - 60)] + (['--dmg'] if os.environ.get('SND_DMG') else [])
     subprocess.run(cmd, capture_output=True, env=dict(os.environ))
 
 

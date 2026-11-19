@@ -389,8 +389,16 @@ w_tri:      ld a, c
             srl a
             inc a
             ld [APU_TLIN], a
-            ld a, 1
+            ld a, [APU_SH + $0B]            ; (a period below 2: silent, as on the NES)
+            and 7
+            jr nz, .pk
+            ld a, [APU_SH + $0A]
+            cp 2
+            jp c, t_mute
+.pk:        ld a, 1
             ld [APU_ON + 2], a
+            xor a                           ; DAC off, then on: retriggering the wave channel
+            ldh [$FF1A], a                  ;   while it plays corrupts wave RAM on the DMG
             ld a, $80
             ldh [$FF1A], a                  ; DAC on
             ld a, [VOL_BGM]                 ; level: BGM volume 0 / 1-2 / 3-5 / 6-8 ->
