@@ -66,6 +66,7 @@ TB_H       = $D873
 SGB_BGAP   = $D83F          ; SGB: frames before the next packet build may run (sgb_frame)
 SGB_MIN    = 12
 NT_NOW     = $D87D          ; nt_tile: check the cell's palette at once (not in spare time)
+CGB_RP     = $CCEF          ; CGB: cell palettes stale (owners changed with the LCD off; repal_b at LCD on)
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
 EMPH_RGB   = $3A00          ; CGB: NES colours with emphasis e (1-7) at EMPH_RGB + e * $80
@@ -1087,6 +1088,15 @@ cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ pa
             ret
 
 attr_apply:                                 ; A = attribute index i (0-63, + $40: nametable 1):
+            push af                         ; (LCD off: all cells' palettes when it goes on,
+            ldh a, [lcd_on]                 ;   repal_b; the shadow is already updated)
+            and a
+            jr nz, .on
+            inc a
+            ld [CGB_RP], a
+            pop af
+            ret
+.on:        pop af
             push bc                         ;   those of its 4 x 4 cells of the GB map ($9800)
             push de                         ;   that this nametable owns (OWN) get the palette
             push hl                         ;   numbers (VRAM bank 1)
@@ -1343,7 +1353,13 @@ own_set:    push af
             ldh a, [is_cgb]
             and a
             jr z, .x
-            ld a, c                         ; CGB: this cell's palette from its new nametable
+            ldh a, [lcd_on]                 ; (LCD off: all cells' palettes when it goes on)
+            and a
+            jr nz, .lc
+            inc a
+            ld [CGB_RP], a
+            jr .x
+.lc:        ld a, c                         ; CGB: this cell's palette from its new nametable
             ldh [sh_nt], a
             ld a, l
             and 31
@@ -1552,9 +1568,14 @@ rt_ppu_w1:  push af
             jr .lon
 .nsr:       ld b, 0
             call dmg_retile_some
-.lon:       ldh a, [is_cgb]                 ; CGB: the tile copy for HDMA from VRAM
+.lon:       ldh a, [is_cgb]                 ; CGB: cell palettes if owners changed, the tile
+            and a                           ;   copy for HDMA from VRAM
+            jr z, .lo2
+            ld a, [CGB_RP]
             and a
-            call nz, stage_sync
+            call nz, repal_tramp
+            call stage_sync
+.lo2:
             ld a, LCDC_ON
             ldh [$FF40], a
             ld a, 1

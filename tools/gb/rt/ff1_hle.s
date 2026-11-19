@@ -321,6 +321,14 @@ hle_back:   push af
             pop af
             ret
 
+repal_tramp:                                ; LCD on, CGB: repal_b (bank HLE_BANK)
+            ld a, HLE_BANK
+            ld [$2000], a
+            call repal_b
+            ldh a, [code_bank]
+            ld [$2000], a
+            ret
+
 fresh_tramp:                                ; frame wait, DMG: fresh_scan (bank HLE_BANK)
             ld a, HLE_BANK
             ld [$2000], a

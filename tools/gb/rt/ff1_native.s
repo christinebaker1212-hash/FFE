@@ -1268,15 +1268,12 @@ rt_anf:     push de
             ret
 
 ; ---- fix:F2CF (battle setup, gb_layout): LDY #8 / LDX #0 / STA $2007 / DEX / BNE / DEY /
-; BNE: A to 2048 PPU bytes (both nametables from $2000). DMG with the LCD off, from $2000
+; BNE: A to 2048 PPU bytes (both nametables from $2000). With the LCD off, from $2000
 ; with increment 1: the nametables' tiles, the GB map rows 0-29 and their owner (nametable
 ; 1 drew every cell last) at once, the 128 attribute bytes through rt_ppu_w7; otherwise
 ; 2048 rt_ppu_w7 calls. Out: X = Y = 0, A kept; N = 0, Z = 1, carry kept.
 ntclr_b:    push af
             ld d, a
-            ldh a, [is_cgb]
-            and a
-            jr nz, .gen
             ldh a, [lcd_on]
             and a
             jr nz, .gen
@@ -1305,9 +1302,25 @@ ntclr_b:    push af
             ldh [own1_lo], a
             ld a, high(960)
             ldh [own1_hi], a
+            ldh a, [is_cgb]
+            and a
+            jr nz, .cg
             ld a, 1
             ldh [dmg_scan], a
-            ld a, $23                       ; attribute bytes
+            jr .at
+.cg:        ld a, d                         ; CGB: attribute shadows unlike D, so the attribute
+            cpl                             ;   bytes below colour every cell again
+            ld hl, NT_SH + $3C0
+            ld c, 64
+.c1:        ld [hl+], a
+            dec c
+            jr nz, .c1
+            ld hl, NT_SH + $7C0
+            ld c, 64
+.c2:        ld [hl+], a
+            dec c
+            jr nz, .c2
+.at:        ld a, $23                       ; attribute bytes
             call .attr
             ld a, $27
             call .attr
@@ -1938,7 +1951,19 @@ ntfill:     ld a, b
             ldh a, [ppu_ctrl]
             and 4
             jr nz, .one
-            ldh a, [own1_lo]                ; (cells owned by nametable 1: on a CGB their
+            ld a, b                         ; a whole nametable from offset 0: in bulk
+            cp 4
+            jr c, .nw
+            ldh a, [ppu_vl]
+            and a
+            jr nz, .nw
+            ldh a, [ppu_vh]
+            and $F3
+            cp $20
+            jr nz, .nw
+            call nf_whole
+            jr ntfill
+.nw:        ldh a, [own1_lo]                ; (cells owned by nametable 1: on a CGB their
             ld h, a                         ;   attributes would change too: byte by byte)
             ldh a, [own1_hi]
             or h
@@ -2045,6 +2070,136 @@ ntfill:     ld a, b
             dec b
             jr nz, .sl
 .x:         ret
+
+; ntfill with the LCD off, increment 1, at offset 0 of a nametable and >= $400 bytes: its
+; 960 cells in bulk (shadow, GB map, every GB map cell now owned by this nametable: the last
+; writer, as byte by byte); its attribute shadow is invalidated so the 64 attribute bytes
+; that follow in the same fill colour every cell again (CGB palettes; DMG: the map is
+; scanned when the LCD goes on). D = value; BC -= $3C0; the address moves to the attributes.
+nf_whole:   ld a, c
+            sub $C0
+            ld c, a
+            ld a, b
+            sbc a, 3
+            ld b, a
+            push bc
+            ldh a, [ppu_vh]
+            and 4
+            ld e, a                         ; E = 4: nametable 1
+            add a, high(NT_SH)
+            ld h, a
+            ld l, 0
+            call .fill                      ; shadow
+            ld a, d                         ; (attribute shadow: every byte differs from D)
+            cpl
+            ld b, 64
+.at:        ld [hl+], a
+            dec b
+            jr nz, .at
+            ld hl, $9800
+            call .fill                      ; GB map (LCD off)
+            ld a, e                         ; owners: all nametable 0 / all nametable 1
+            and a
+            jr z, .o
+            ld a, $FF
+.o:         ld hl, OWN
+            ld b, 120
+.ol:        ld [hl+], a
+            dec b
+            jr nz, .ol
+            ld a, e
+            and a
+            jr z, .c0
+            ld a, $C0
+            ldh [own1_lo], a
+            ld a, 3
+            ldh [own1_hi], a
+            jr .c1
+.c0:        xor a
+            ldh [own1_lo], a
+            ldh [own1_hi], a
+.c1:        ld a, $C0                       ; v = attributes of this nametable
+            ldh [ppu_vl], a
+            ldh a, [ppu_vh]
+            or 3
+            ldh [ppu_vh], a
+            ldh a, [is_cgb]
+            and a
+            jr nz, .x
+            ld a, 1
+            ldh [dmg_scan], a
+.x:         pop bc
+            ret
+.fill:      ld bc, $04C0                    ; HL: 960 bytes of D (HL ends at +$3C0)
+.f:         ld a, d
+            ld [hl+], a
+            dec c
+            jr nz, .f
+            dec b
+            jr nz, .f
+            ret
+
+; CGB, LCD off: every GB map cell's palette (VRAM bank 1, rows 0-29) from the attribute
+; shadow of the nametable that drew it (OWN). Run when the LCD goes on after owners changed
+; with it off (own_set leaves those cells to this).
+repal_b:    xor a
+            ld [CGB_RP], a
+            inc a
+            ldh [$FF4F], a
+            ld hl, $9800
+            ld b, 0                         ; B = row
+.row:       ld a, b                         ; DE = OWN + row * 4
+            add a, a
+            add a, a
+            ld e, a
+            ld d, high(OWN)
+            ld c, 0                         ; C = col
+.byte:      ld a, [de]
+            inc de
+            push de
+            ld d, a                         ; D = owner bits of 8 cells (bit 0 first)
+            ld e, 8
+.cell:      push hl
+            ld a, b                         ; L = $C0 + (row / 4) * 8 + col / 4
+            and $1C
+            add a, a
+            add a, $C0
+            ld l, a
+            ld a, c
+            srl a
+            srl a
+            add a, l
+            ld l, a
+            srl d
+            ld a, high(NT_SH) + 3
+            jr nc, .n0
+            ld a, high(NT_SH) + 7
+.n0:        ld h, a
+            ld a, [hl]                      ; quadrant: bottom (row & 2), right (col & 2)
+            bit 1, b
+            jr z, .t
+            swap a
+.t:         bit 1, c
+            jr z, .lf
+            rrca
+            rrca
+.lf:        and 3
+            pop hl
+            ld [hl+], a
+            inc c
+            dec e
+            jr nz, .cell
+            pop de
+            ld a, c
+            cp 32
+            jr nz, .byte
+            inc b
+            ld a, b
+            cp 30
+            jr nz, .row
+            xor a
+            ldh [$FF4F], a
+            ret
 
 ; ntfill, DMG: HL = first cell offset, NF_N cells: their OWN bits cleared (own1 counts
 ; down). Keeps HL, D.
