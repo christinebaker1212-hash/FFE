@@ -3057,7 +3057,7 @@ ntfill:     ld a, b
             jr z, .bk
             ld a, [VLCD]
             and a
-            jr z, .one
+            jr z, .lon
 .bk:        ldh a, [ppu_ctrl]
             and 4
             jp nz, .col
@@ -3268,6 +3268,13 @@ ntfill:     ld a, b
             call rt_ppu_w7
             dec bc
             jr ntfill
+.lon:       ld a, d                         ; LCD on, not masked: every byte through
+            call rt_ppu_w7                  ;   rt_ppu_w7 (the state cannot become a bulk
+            dec bc                          ;   case during these writes)
+            ld a, b
+            or c
+            jr nz, .lon
+            ret
 .setm:      ld a, [VLCD]
             and a
             jr z, .set
@@ -9467,6 +9474,187 @@ prow_b:     ldh a, [code_bank]
             ret
 .gen:       ldh a, [w7v]
             jp rt_ppu_w7
+
+; ---- fix window-row routines, from the LDA $2002 after their JSR $E1BD to their RTS (build.py:
+; WRF = L, M, R, add per variant; A = variant): $2002, $2006 x 2 with $55 / $54, X = $1A, STA
+; $2007 of L, X x M (X = 0: 256), R; the add variants then $54 += $20 with the carry into $55.
+; LCD off or a CGB masked load, increment 1, nametable 0, no cell drawn by nametable 1, map
+; cells: shadow and map at once (as wrow3_b); else rt_ppu_w7 / hle_wrow. Out: X = 0; with the
+; add A = $55 and N, Z, C, V as its ADC #$00; else A = R, N and Z from it, C and V kept.
+wrf_b:      push af                         ; (entry flags)
+            push bc                         ; (Y)
+            add a, a
+            add a, a
+            add a, low(WRF)
+            ld l, a
+            ld h, high(WRF)
+            ld a, [hl+]
+            ldh [sh_l1], a                  ; L
+            ld a, [hl+]
+            ldh [sh_u2], a                  ; M
+            ld a, [hl+]
+            ldh [sh_u3], a                  ; R
+            ld a, [hl]
+            ldh [sh_l2], a                  ; add
+            xor a
+            ldh [vbl_flag], a
+            ldh [ppu_latch], a
+            ld a, [NES_RAM + $55]
+            and $3F
+            ldh [ppu_vh], a
+            ld a, [NES_RAM + $54]
+            ldh [ppu_vl], a
+            ld a, [NES_RAM + $1A]
+            ld e, a                         ; X
+            ldh a, [lcd_on]
+            and a
+            jr z, .lk
+            ld a, [VLCD]
+            cp 1
+            jp nz, .gen
+            ldh a, [dlg_on]
+            and a
+            jp nz, .gen
+.lk:        ldh a, [ppu_ctrl]
+            and 4
+            jp nz, .gen
+            ldh a, [own1_lo]
+            ld h, a
+            ldh a, [own1_hi]
+            or h
+            jp nz, .gen
+            ldh a, [ppu_vh]
+            cp $20
+            jp c, .gen
+            cp $3F
+            jp z, .gen
+            bit 2, a
+            jp nz, .gen
+            and 3
+            ld h, a
+            ldh a, [ppu_vl]
+            ld l, a                         ; HL = the first cell's offset
+            push hl
+            ld b, 0
+            ld a, e                         ; n = X + 2 (X = 0: 258)
+            add a, 2
+            ld c, a
+            ld a, 0
+            adc a, b
+            ld b, a
+            ld a, e
+            and a
+            jr nz, .n1
+            inc b
+.n1:        add hl, bc                      ; (BC = n)
+            ld a, h
+            cp 3
+            jr c, .ok
+            jr nz, .g1
+            ld a, l
+            cp $C1
+            jr nc, .g1
+.ok:        ld a, l                         ; v = the end
+            ldh [ppu_vl], a
+            ldh a, [ppu_vh]
+            and $FC
+            or h
+            ldh [ppu_vh], a
+            pop hl
+            push de
+            push hl
+            ld a, h
+            add a, high(NT_SH)
+            ld h, a
+            call .row                       ; shadow
+            pop hl
+            pop de
+            ld a, [VLCD]
+            cp 1
+            jr nz, .mp
+            ld [MAP_RB], a                  ; (masked: the GB map rebuilt when shown)
+            jr .md
+.mp:        ld a, h
+            add a, $98
+            ld h, a
+            call .row                       ; GB map
+.md:        ld a, 1
+            ldh [dmg_scan], a
+            jr .fin
+.g1:        pop hl
+.gen:       ldh a, [code_bank]              ; (the PPU routines come back to code_bank)
+            push af
+            ld a, PF_BANK
+            ldh [code_bank], a
+            ld b, 0
+            ld d, 0
+            ldh a, [sh_l1]
+            call rt_ppu_w7
+            ldh a, [sh_u2]
+            push de
+            call hle_wrow                   ; X x M (keeps the registers but X)
+            pop de
+            ldh a, [sh_u3]
+            call rt_ppu_w7
+            pop af
+            ldh [code_bank], a
+.fin:       pop bc                          ; (Y)
+            ld e, 0                         ; X = 0
+            ld d, 0
+            ldh a, [sh_l2]
+            and a
+            jr nz, .add
+            pop hl                          ; A = R; N, Z from it; C kept
+            ld a, l
+            and $10
+            ld l, a
+            ldh a, [sh_u3]
+            ldh [nzv], a
+            and a
+            jr nz, .nz
+            set 7, l
+.nz:        ld h, a
+            push hl
+            pop af
+            ret
+.add:       pop hl                          ; (entry flags dropped)
+            ld hl, NES_RAM + $54            ; $54 += $20, $55 += carry (ADC #$00)
+            ld a, [hl]
+            add a, $20
+            ld [hl+], a
+            ld a, [hl]
+            ld d, a                         ; (D = the old $55)
+            adc a, 0
+            ld [hl], a
+            ld e, a                         ; (E = the new $55)
+            ld l, 0                         ; flags: C, Z
+            jr nc, .a1
+            ld l, $10
+.a1:        and a
+            jr nz, .a2
+            set 7, l
+.a2:        ld a, e
+            ldh [nzv], a                    ; N
+            ld a, d                         ; V: (old ^ new) & new & $80
+            xor e
+            and e
+            and $80
+            rrca
+            ldh [vfl], a
+            ld h, e
+            ld de, 0
+            push hl
+            pop af
+            ret
+.row:       ldh a, [sh_l1]                  ; HL: L, E x M, R (E = X)
+            ld [hl+], a
+            ldh a, [sh_u2]
+.rm:        ld [hl+], a
+            dec e
+            jr nz, .rm
+            ldh a, [sh_u3]
+            ld [hl], a
+            ret
 
 section bank PF_BANK, $7F00
 NBIT60:     db 1, 2, 4, 8, 16, 32, 64, 128

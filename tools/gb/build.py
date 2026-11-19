@@ -226,6 +226,33 @@ def main():
         wrow3[lt] = (mt, rt_)
         a = 0xE000 + m.start()
         rc.g.idioms[('fix', a)] = ('hle_wrow3', a + 16, 'NZ')   # (at the left tile's STA: A = L)
+    for sp, base, off, size in ([('fix', 0xE000, fixo, 0x2000), ('c62', 0xC000, 62 * 0x2000, 0x2000)] +
+                                [('b%02d' % b, 0x8000, b * 0x4000, 0x4000) for b in range(31)]):
+        blk = prg[off:off + size]                    # every STA $2007 / DEX / BNE (to the STA):
+        for m in re.finditer(re.escape(bytes.fromhex('8d0720cad0fa')), blk):   # X x A (hle_wrow)
+            k = (sp, base + m.start())
+            if k not in rc.g.idioms and k in rc.insns:
+                rc.g.idioms[k] = ('hle_wrow', base + m.start() + 6, 'NZ')
+    wrf = []                                         # whole window-row routines after their
+    pat = re.compile(re.escape(bytes.fromhex('20bde1ad0220a5558d0620a5548d0620a61aa9')) + b'(.)' +
+                     re.escape(bytes.fromhex('8d0720a9')) + b'(.)' + re.escape(bytes.fromhex('8d0720cad0faa9')) +
+                     b'(.)' + re.escape(bytes.fromhex('8d0720')), re.S)    # JSR $E1BD ... (fixed bank)
+    for m in pat.finditer(prg[fixo:]):
+        a = 0xE000 + m.start() + 3                   # (the LDA $2002)
+        tail = prg[fixo + m.end():fixo + m.end() + 14]
+        if tail[:13] == bytes.fromhex('a5541869208554a55569008555') and tail[13] == 0x60:
+            add, end = 1, 0xE000 + m.end() + 13
+        elif tail[0] == 0x60:
+            add, end = 0, 0xE000 + m.end()
+        else:
+            continue
+        if len(wrf) >= 3: break
+        n = len(wrf)
+        wrf.append((m.group(1)[0], m.group(2)[0], m.group(3)[0], add))
+        rc.g.idioms[('fix', a)] = ('hle_wrf%d' % n, end, 'NZC')
+    wrf_src = 'WRF:\n' + ''.join('    db $%02X, $%02X, $%02X, %d\n' % w for w in wrf)
+    for n in range(3):
+        wrf_src += 'wrf_v%d:     ld a, %d\n            jp wrf_b\n' % (n, n) if n < len(wrf) else 'wrf_v%d:     ret\n' % n
     wrow3_src = 'WROW3:\n' + ''.join('    db $%02X, $%02X, $%02X\n' % (l, m_, r_) for l, (m_, r_) in sorted(wrow3.items())) + '    db 0, 0, 0\n'
     far_sym = {}
     if os.path.exists(nes + '.farsym'):              # far routines run natively (rt/ff1_native.s)
@@ -247,6 +274,7 @@ def main():
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s', 'sgb.s'))
     rt += '\nPROW_OFF = NES_RAM + $%04X\n' % prow_off
     rt += '\nsection bank HLE_BANK, $7800\n' + wrow3_src     # (build-time table from the ROM)
+    rt += '\nsection bank PF_BANK, $7C00\n' + wrf_src
     rt += '\n' + apu_tables() + '\nSND_MASK = $%02X\n' % int(os.environ.get('GB_SND_MASK', 'FF'), 16) + 'MDF_ON = %d\n' % int(os.environ.get('GB_MDF', '1'))
     rt += open(os.path.join(HERE, 'rt', 'apu_core.s')).read()
     rt += '\n' + vwf_tables(prg, far_sym)            # (before ff1_native.s: VW_GR_NES)
