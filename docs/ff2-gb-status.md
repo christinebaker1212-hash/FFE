@@ -167,6 +167,12 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   battle): CGB keeps pace in battle (the async NMI phases even take fewer frames than the
   NES), battle entry +149 frames; **DMG battle entry +349 frames** (the battle graphics
   through the DMG shading path): to fix (speed pass).
+- Speed work: translator no longer computes V for ADC/SBC (FF2's BVC/BVS all follow a BIT,
+  no V test after a PLP: V not assumed live at unknown successors nor by PHP); native
+  `fix:FD6F` copy-to-PPU (`hle_ppucopy`, rt/ff2.s; whole tiles into the shadows / CGB tile
+  copy); stubs from `$2400`. DMG battle entry +328 -> +22 frames; DMG total over the seed-1
+  run to the end of the opening battle +6.3% (boot +45, menu load +26, prologue small
+  ones). Checks: GB-layout pair 10592 waits and English pair 29406 waits RAM-identical.
 - Next: victory / loot windows (bank 5; a forced formation 0 did not end: monster HP poke at
   battle stats +$0A had no effect, to look into), status words in the party window ("Dead"
   etc.), clear the bottom rows at battle start, hit knock-back past the right edge, item use
