@@ -84,7 +84,7 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-19 late: DMG/CGB speed work, see gb-handoff.md)
+# GB port status (last updated 2026-11-19 night: DMG/CGB speed work, see gb-handoff.md)
 
 **Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
 **Handoff: `docs/gb-handoff.md`** (session setup, current battle-layout work, exact next steps).
@@ -821,8 +821,20 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   Tools: sgbrun SGBRUN_PROFC (cycle sampling), SGBRUN_PROF_SP; lagcheck LAG_KEEP.
 
 - **Speed, 2026-11-19 (late):** lag on the 7650-wait script: CGB 126 -> ~33 frames, DMG 263 -> ~200.
-  Details, the WIP (`vshow_own`, disabled, buggy) and the remaining lag by screen:
-  `docs/gb-handoff.md` "Speed work". checkall not re-run since the last coverage refresh.
+  Details and the remaining lag by screen: `docs/gb-handoff.md` "Speed work".
+- **Speed, 2026-11-19 (night session):** coverage refreshed, checkall 62/62 on every step.
+  `vshow_own` fixed (rows 16-29: `and 7` before the swap) and enabled (CGB masked loads with
+  cells of both nametables by DMA); `rt_ppu_w7` short path tightened; window middle rows
+  fix:E1A4 -> `hle_wrow`; dmg_maps_b `.markp` marks eight tiles per bitmap byte; menu text
+  printer c62:DEF1 (one letter, two cells) -> `hle_tpair` / `tpair_b` (bank 60); DMG whole BG
+  page copies skipped when the same ROM page is copied again onto an unwritten shadow page
+  (`bgsrc`, BG_SRC in cart RAM bank 3); hle_chr_pages' DMG BG page no longer falls into the
+  sprite-page slot reload; prologue: only the map's tiles re-coded at LCD on, the others in
+  the frame waits' spare time (boot wait 12 -> 3 frames); DrawMapAttributes DMG LCD-off loop;
+  battle nametable clear unrolled. All checked SameBoy-VRAM-identical to the build before (DMG
+  and CGB, 150-180 points; only frame-alignment shifts while a Color load is masked or a
+  queued write is pending). Lag: CGB 31 -> 23, DMG 199 -> 179 frames. Tools: lagcheck LAG_DUMP, sgbrun SGBRUN_CALLS / SGBRUN_PROF_SPOFF,
+  gbrun cart-RAM dump.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

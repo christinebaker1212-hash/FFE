@@ -111,6 +111,8 @@ hle_chr_pages:
 .fd:        ldh a, [lcd_on]
             and a
             jr nz, .tile
+            call bgsrc                      ; the same ROM page as last time, the shadow page
+            jr z, .fsk                      ;   not written since: it holds these bytes already
             ld a, d
             add a, high(BG_SHADOW)
             ld d, a
@@ -233,6 +235,8 @@ hle_chr_pages:
             ld [hl], a
             inc a
             ldh [rq_any], a
+            jr .fv                          ; (a BG page: no sprite slot to reload; this fell
+                                            ;   into .fsm and made sprite tiles 16-31 reload)
 .fsm:       and $0F                         ; sprite page: SLOT_KEY of its resident tiles
             swap a                          ;   unknown
             ld l, a
@@ -251,6 +255,11 @@ hle_chr_pages:
             jr nz, .fsl
             xor a
             ld [$4000], a
+.fsk:       ld bc, 255                      ; (A = the page's last byte; Y = 0)
+            add hl, bc
+            ld a, [hl]
+            ld bc, 0
+            ldh [tmp_lo], a
 .fv:        ldh a, [ppu_vh]                 ; v += 256
             inc a
             and $3F
@@ -655,6 +664,14 @@ hle_wrow:                                  ; (bank HLE_BANK: wrow_b)
             ld [$2000], a
             pop af
             call wrow_b
+            jp hle_back
+
+hle_tpair:                                  ; c62:DEF1 one letter (bank PF_BANK: tpair_b)
+            push af
+            ld a, PF_BANK
+            ld [$2000], a
+            pop af
+            call tpair_b
             jp hle_back
 
 hle_palup:                                  ; c62:D865 palette upload (bank HLE_BANK: palup_b)

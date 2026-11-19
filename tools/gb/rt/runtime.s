@@ -15,6 +15,8 @@ NT_SH      = $D000          ; NES nametable shadow (2 × 1KB, vertical mirroring
 PAL_SH     = $D800          ; NES palette RAM shadow (32)
 LZ_BM      = $A600          ; (cart RAM bank 3) DMG sprite tiles still in ROM (32), spr_mat
 LZ_SRC     = $A620          ;   16 x (bank, address lo, hi, -)
+BG_SRC     = $A680          ; (cart RAM bank 3) DMG: ROM source of each BG page's last whole-page copy,
+                            ;   16 x (bank, address lo, hi, -); bank $FF: written since (bgsrc)
 DBG        = $D820          ; fault info: code, HL, SP, stack top
 SPR_SLOT   = $D900          ; NES sprite tile (0-255) -> GB slot 0-127, $FF = not resident
 SLOT_TILE  = $DA00          ; GB slot -> NES sprite tile ($FF = free)
@@ -1806,11 +1808,12 @@ rt_ppu_w1:  push af
             pop af
             and a
             jr z, .nsr
-            ldh a, [pro_mode]               ; (the prologue: every marked tile now, its rows
-            and a                           ;   appear one by one later)
-            jr nz, .nsr
-            ld a, 1
-            call dmg_retile_lcd
+            ldh a, [pro_mode]               ; (the prologue: the map's tiles now, the other
+            and a                           ;   marked ones in the spare time of the frames
+            ld a, 1                         ;   before its rows appear)
+            jr z, .nsp
+            inc a
+.nsp:       call dmg_retile_lcd
             jr .lon
 .nsr:       xor a
             call dmg_retile_lcd
@@ -1935,47 +1938,47 @@ rt_ppu_w7:  ldh [w7v], a                    ; LCD off (or a CGB masked load), a 
             jr c, .gen0
             cp $3F
             jr z, .gen0
-            push bc
             push hl
             and 7
-            ld b, a                         ; B: bit 2 = nametable, bits 0-1 = offset high
+            ld h, a                         ; H: bit 2 = nametable, bits 0-1 = offset high
+            ldh a, [ppu_vl]
+            ld l, a
+            ld a, h
             and 3
             cp 3
             jr nz, .f1
-            ldh a, [ppu_vl]
+            ld a, l
             cp $C0
             jr nc, .gen1
-.f1:        ld a, b
+.f1:        ld a, h
             add a, high(NT_SH)
             ld h, a
-            ldh a, [ppu_vl]
-            ld l, a
             ldh a, [w7v]
             ld [hl], a                      ; shadow
-            ld a, b
-            and 4
-            ld c, a
-            ld a, b
-            and 3
-            ld b, a                         ; B = offset high, C = 4 for nametable 1
-            ld a, c
-            and a
+            bit 2, h                        ; nametable 1, or cells drawn by it: the owner
             jr nz, .fo
             ldh a, [own1_lo]
-            ld h, a
-            ldh a, [own1_hi]
-            or h
-            jr z, .fv
-.fo:        call own_set                    ; this nametable owns the GB map cell
-.fv:        ldh a, [is_cgb]
             and a
-            jr nz, .fc
-            ld a, 1                         ; DMG: the map is scanned when the LCD goes on
-            ldh [dmg_scan], a
-.fc:        ld a, [VLCD]                    ; GB map (LCD off; masked: rebuilt when shown)
+            jr nz, .fo
+            ldh a, [own1_hi]
+            and a
+            jr z, .fv
+.fo:        push bc
+            ld a, h
+            and 4
+            ld c, a                         ; C = 4 for nametable 1
+            ld a, h
+            and 3
+            ld b, a                         ; B = offset high
+            call own_set                    ; this nametable owns the GB map cell
+            pop bc
+.fv:        ld a, 1                         ; DMG: the map is scanned when the LCD goes on
+            ldh [dmg_scan], a               ;   (read only on a DMG)
+            ld a, [VLCD]                    ; GB map (LCD off; masked: rebuilt when shown)
             cp 1
             jr z, .fm
-            ld a, b
+            ld a, h
+            and 3
             add a, $98
             ld h, a
             ldh a, [w7v]
@@ -1985,22 +1988,19 @@ rt_ppu_w7:  ldh [w7v], a                    ; LCD off (or a CGB masked load), a 
 .fp:        ldh a, [ppu_ctrl]               ; v += 1 or 32
             and 4
             ld a, 1
-            jr z, .fi
+            jr z, .fs
             ld a, 32
-.fi:        ld h, a
-            ldh a, [ppu_vl]
-            add a, h
+.fs:        add a, l
             ldh [ppu_vl], a
+            jr nc, .fx
             ldh a, [ppu_vh]
-            adc a, 0
+            inc a
             and $3F
             ldh [ppu_vh], a
-            pop hl
-            pop bc
+.fx:        pop hl
             pop af
             ret
 .gen1:      pop hl
-            pop bc
 .gen0:      pop af
 rt_ppu_w7g: push af
             push bc

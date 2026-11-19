@@ -137,7 +137,8 @@ tkey_bc:    push hl
             ret
 
 ; A = tile whose pixels were written: mark it, its coding unknown. Keeps all registers.
-dmg_markw:  push hl
+dmg_markw:  call bgsrc_inv                  ; (its page no longer as copied from ROM)
+            push hl
             ld l, a
             ld h, high(CODED)
             ld [hl], $FF
@@ -1004,14 +1005,16 @@ bg_lmax_hl: push bc                         ; HL = 16 BG colours (page offset a 
             ret
 
 ; boot (DMG): PAL_MAP identity, full brightness reference
-lz_init:    ld a, 3                         ; boot: no sprite page left in ROM (LZ_BM)
-            ld [$4000], a
+lz_init:    ld a, 3                         ; boot: no sprite page left in ROM (LZ_BM), no
+            ld [$4000], a                   ;   BG page known as copied from ROM (BG_SRC)
             ld hl, LZ_BM
             xor a
             ld b, 32
 .lz:        ld [hl+], a
             dec b
             jr nz, .lz
+            call bgsrc_init
+            xor a
             ld [$4000], a
             ret
 dmg_init:   ld hl, CODED                    ; no tile coded yet

@@ -66,6 +66,8 @@ class FF1:
               ('b14', 0x9C0F): ('hle_mclr', 0x9C2D, 'NZC'),    # menu screen cleared
               ('fix', 0xE14D): ('hle_wrow', 0xE153, 'NZ'),     # window rows (frame middles)
               ('fix', 0xE17F): ('hle_wrow', 0xE185, 'NZ'),
+              ('fix', 0xE1A4): ('hle_wrow', 0xE1AA, 'NZ'),
+              ('c62', 0xDEF1): ('hle_tpair', 0xDF04, 'NZ'),  # menu text printer: one letter
               ('c62', 0xD865): ('hle_palup', 0xD87F, 'NZC'),    # palette upload, every frame
               ('c62', 0xD874): ('hle_palup2', 0xD87F, 'NZC'),   #   (entered at its second loop)
               ('c62', 0xD6B8): ('rt_dlgdelay', 0xD6C3, 'NZ'),   # dialogue box split: timing loop
@@ -83,6 +85,8 @@ class FF1:
                   ('b14', 0x9C0F): bytes.fromhex('a00098a2038d0720c8d0facad0f78d0720c8c0c090f8a9ff8d0720c8d0fa'),
                   ('fix', 0xE14D): bytes.fromhex('8d0720cad0fa'),
                   ('fix', 0xE17F): bytes.fromhex('8d0720cad0fa'),
+                  ('fix', 0xE1A4): bytes.fromhex('8d0720cad0fa'),
+                  ('c62', 0xDEF1): bytes.fromhex('ae0220a6558e0620a6548e06208c07208d0720'),
                   ('c62', 0xD865): bytes.fromhex('a50df00bbde0038d0720e8e01090f5bdc0038d0720e8e02090f5'),
                   ('c62', 0xD874): bytes.fromhex('bdc0038d0720e8e02090f5'),
                   ('c62', 0xD6B8): bytes.fromhex('a006a61bca207cd7cad0fa'),

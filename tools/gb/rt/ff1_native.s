@@ -1470,6 +1470,12 @@ mapattr_b:  xor a
             dec a
 .n:         ld [NES_RAM + $11], a
             ld e, 0
+            ldh a, [is_cgb]                 ; DMG with the LCD off: the attribute shadow
+            and a                           ;   only, in one loop (the map is scanned when
+            jr nz, .lp                      ;   the LCD goes on)
+            ldh a, [lcd_on]
+            and a
+            jr z, .fo
 .lp:        ld hl, NES_RAM + $07D0          ; address
             ld a, l
             add a, e
@@ -1581,7 +1587,7 @@ mapattr_b:  xor a
             ld a, [NES_RAM + $11]
             cp e
             jr nz, .lp
-            ld b, 0                         ; Y = last at_lo, A = last new byte; Z = 1, C = 1
+.ex:        ld b, 0                         ; Y = last at_lo, A = last new byte; Z = 1, C = 1
             ld a, e
             dec a
             add a, low(NES_RAM + $07E0)
@@ -1598,6 +1604,58 @@ mapattr_b:  xor a
             push hl
             pop af
             ret
+.fo:        ld a, [NES_RAM + $11]
+            ld e, a                         ; E = entries left; L walks the
+            ld hl, NES_RAM + $07D0          ;   tables by bits 4-5: $C0 attr, $D0 hi, $E0 lo,
+.fl:        ld a, [hl]                      ;   $F0 mask
+            and 7
+            add a, high(NT_SH)
+            ld b, a
+            res 4, l
+            set 5, l
+            ld c, [hl]                      ; BC = the byte in the shadow
+            ld a, [bc]
+            ld d, a                         ; D = old
+            res 5, l
+            xor [hl]
+            set 4, l
+            set 5, l
+            and [hl]                        ; (old ^ attr) & mask: the bits that change
+            jr z, .fs
+            xor d
+            ld [bc], a
+            ld a, 1
+            ldh [dmg_scan], a
+.fs:        res 5, l
+            inc l
+            dec e
+            jr nz, .fl
+            ld a, d                         ; the last entry: $10 = its old byte, the read
+            ld [NES_RAM + $10], a           ;   buffer = the byte after it, v = its address
+            inc c                           ;   + 1 or 32
+            ld a, [bc]
+            dec c
+            ldh [ppu_rbuf], a
+            ld a, [bc]
+            ld d, a                         ; D = its new byte
+            ld a, [NES_RAM + $11]
+            ld e, a                         ; (X = the count)
+            add a, low(NES_RAM + $07CF)
+            ld l, a
+            ld h, high(NES_RAM + $07CF)
+            ld b, [hl]                      ; its address high
+            ldh a, [ppu_ctrl]
+            and 4
+            ld a, 1
+            jr z, .fi
+            ld a, 32
+.fi:        add a, c
+            ldh [ppu_vl], a
+            ld a, b
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            jr .ex
 
 ; ---- far vtile (tools/ff1/gb_layout.py vupload): tile VUP of the small-font line buffer
 ; VBUF (8 rows, 1 bit per pixel) -> BG tile VTID[VUP] by 16 $2007 writes (plane 1 = plane
@@ -1670,6 +1728,7 @@ vtile_b:    xor a
             pop de
             push de
             ld a, d
+            call bgsrc_inv                  ; (the page no longer as copied from ROM)
             call vt_code
             jr .out
 .cgb:       pop de                          ; CGB: D = tile
@@ -2142,14 +2201,26 @@ ntclr_b:    push af
             ld bc, 0
             ld de, 0
             ret
-.fill:      ld c, $3C                       ; HL: $3C0 bytes of D
-.f:         ld a, d
-            ld b, 16
+.fill:      ld c, $3C                       ; HL: $3C0 bytes of D (16 per pass)
+            ld a, d
 .f1:        ld [hl+], a
-            dec b
-            jr nz, .f1
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
             dec c
-            jr nz, .f
+            jr nz, .f1
             ret
 .attr:      ldh [ppu_vh], a                 ; A = $23 / $27: its 64 attribute bytes
             ld a, $C0
@@ -3582,7 +3653,7 @@ mclr_b:     ld d, 0
             scf                             ; (Z from the xor)
             ret
 
-; fix:E14D / E17F (window rows): X times STA $2007 of A. Out: X = 0; N = 0, Z = 1, carry,
+; fix:E14D / E17F / E1A4 (window rows): X times STA $2007 of A. Out: X = 0; N = 0, Z = 1, carry,
 ; A and Y kept.
 wrow_b:     push bc
             push af
@@ -4836,6 +4907,75 @@ POPC:
 
 ; ---- bank 0: one page HL -> DE (E = 0), with ROM bank A at $4000 for it (0: none); bank
 ; HLE_BANK again after. Out: A = the last byte. (For pgcopy_b, which runs in HLE_BANK.)
+; DMG whole BG page copies (hle_chr_pages): BG_SRC[page] = the ROM bank and address it was
+; last copied from; any other write to the page's shadow (dmg_markw, vtile_b) clears it.
+; bgsrc: D = page, HL = the source (data_bank8 mapped) -> Z: the same as last time (the shadow
+; holds these bytes; nothing to do), NZ: recorded now (copy it). Keeps BC, DE, HL.
+section bank 0, $3FD0
+bgsrc:      push bc
+            push de
+            ld a, 3
+            ld [$4000], a
+            ld a, d
+            add a, a
+            add a, a
+            add a, low(BG_SRC)
+            ld c, a
+            ld b, high(BG_SRC)
+            ldh a, [data_bank8]
+            ld d, a
+            ld a, [bc]
+            xor d
+            ld e, a
+            ld a, d
+            ld [bc], a
+            inc c
+            ld a, [bc]
+            xor l
+            or e
+            ld e, a
+            ld a, l
+            ld [bc], a
+            inc c
+            ld a, [bc]
+            xor h
+            or e
+            ld e, a
+            ld a, h
+            ld [bc], a
+            xor a
+            ld [$4000], a
+            or e
+            pop de
+            pop bc
+            ret
+
+; A = BG tile whose shadow bytes were written: its page's BG_SRC cleared. Keeps all registers.
+section bank 0, $3DD8
+bgsrc_inv:  push af
+            push hl
+            and $F0
+            rrca
+            rrca
+            add a, low(BG_SRC)
+            ld l, a
+            ld h, high(BG_SRC)
+            ld a, 3
+            ld [$4000], a
+            ld [hl], $FF
+            xor a
+            ld [$4000], a
+            pop hl
+            pop af
+            ret
+bgsrc_init: ld hl, BG_SRC                   ; (cart RAM bank 3 on) every page unknown
+            ld a, $FF
+            ld b, 64
+.l:         ld [hl+], a
+            dec b
+            jr nz, .l
+            ret
+
 section bank 0, $3DA0
 pg_copy0:   and a
             jr z, .c
@@ -7281,39 +7421,149 @@ dmg_maps_b: push bc
 .mgx:       ldh a, [sh_l3]
             ret
 .markp:     ; one pass: queue every tile whose palette's changed indices (sh_m0..3) meet
-            ld hl, TILE_PAL                 ;   the indices it uses (TILE_USE)
-            ld de, TILE_USE
-.tk:        ld a, [hl]                      ; even tile: low nibble
+            ld hl, TILE_PAL                 ;   the indices it uses (TILE_USE); eight tiles'
+            ld de, TILE_USE                 ;   bits gathered in B, then marked at once (as
+.mb:                                        ;   dmg_mark: DIRTY_BM set, DEFER_BM cleared)
+            ld a, [hl]                      ; even tile: low nibble
             cp 4
-            jr nc, .t1
+            jr nc, .r00                   ;   (no palette: carry clear)
             add a, low(sh_m0)
             ld c, a
             ldh a, [c]
-            ld b, a
+            ld c, a
             ld a, [de]
+            and c
             and $0F
-            and b
-            jr z, .t1
-            ld a, l
-            call dmg_mark
-.t1:        inc l                           ; odd tile: high nibble
-            ld a, [hl]
+            add a, $FF                      ; carry: a changed index it uses
+.r00:     rr b
+            inc l
+            ld a, [hl]                      ; odd tile: high nibble
             cp 4
-            jr nc, .tn
+            jr nc, .r10
             add a, low(sh_m0)
             ld c, a
             ldh a, [c]
             swap a
-            ld b, a
+            ld c, a
             ld a, [de]
+            and c
             and $F0
-            and b
-            jr z, .tn
-            ld a, l
-            call dmg_mark
-.tn:        inc e
+            add a, $FF
+.r10:     rr b
             inc l
-            jr nz, .tk
+            inc e
+            ld a, [hl]                      ; even tile: low nibble
+            cp 4
+            jr nc, .r01                   ;   (no palette: carry clear)
+            add a, low(sh_m0)
+            ld c, a
+            ldh a, [c]
+            ld c, a
+            ld a, [de]
+            and c
+            and $0F
+            add a, $FF                      ; carry: a changed index it uses
+.r01:     rr b
+            inc l
+            ld a, [hl]                      ; odd tile: high nibble
+            cp 4
+            jr nc, .r11
+            add a, low(sh_m0)
+            ld c, a
+            ldh a, [c]
+            swap a
+            ld c, a
+            ld a, [de]
+            and c
+            and $F0
+            add a, $FF
+.r11:     rr b
+            inc l
+            inc e
+            ld a, [hl]                      ; even tile: low nibble
+            cp 4
+            jr nc, .r02                   ;   (no palette: carry clear)
+            add a, low(sh_m0)
+            ld c, a
+            ldh a, [c]
+            ld c, a
+            ld a, [de]
+            and c
+            and $0F
+            add a, $FF                      ; carry: a changed index it uses
+.r02:     rr b
+            inc l
+            ld a, [hl]                      ; odd tile: high nibble
+            cp 4
+            jr nc, .r12
+            add a, low(sh_m0)
+            ld c, a
+            ldh a, [c]
+            swap a
+            ld c, a
+            ld a, [de]
+            and c
+            and $F0
+            add a, $FF
+.r12:     rr b
+            inc l
+            inc e
+            ld a, [hl]                      ; even tile: low nibble
+            cp 4
+            jr nc, .r03                   ;   (no palette: carry clear)
+            add a, low(sh_m0)
+            ld c, a
+            ldh a, [c]
+            ld c, a
+            ld a, [de]
+            and c
+            and $0F
+            add a, $FF                      ; carry: a changed index it uses
+.r03:     rr b
+            inc l
+            ld a, [hl]                      ; odd tile: high nibble
+            cp 4
+            jr nc, .r13
+            add a, low(sh_m0)
+            ld c, a
+            ldh a, [c]
+            swap a
+            ld c, a
+            ld a, [de]
+            and c
+            and $F0
+            add a, $FF
+.r13:     rr b
+            inc l
+            inc e
+            ld a, b
+            and a
+            jr z, .mq
+            push hl
+            dec l                           ; HL = the DIRTY_BM byte of these eight
+            ld a, l
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld l, a
+            ld h, high(DIRTY_BM)
+            ld a, [hl]
+            or b
+            ld [hl], a
+            ld a, l
+            add a, low(DEFER_BM) - low(DIRTY_BM)
+            ld l, a
+            ld a, b
+            cpl
+            and [hl]
+            ld [hl], a
+            ld a, 1
+            ldh [rq_any], a
+            pop hl
+.mq:        ld a, l
+            and a
+            jp nz, .mb
             ret
 
 ; BGP: value 0 = the backdrop's shade. Over a black backdrop, values 1-3 get dark grey /
@@ -7700,7 +7950,8 @@ SPR_VAL_B:  db 3, 2, 1, 1                   ;   OBP1
 
 ; ---- DMG, LCD off (rt_ppu_w1 turning it on): the marked tiles re-coded straight into VRAM
 ; in one pass. A = 0: every marked tile (dmg_retile_some 0); A = 1: those the map uses
-; (REF_BM), the others parked in DEFER_BM (dmg_retile_ref). The same codings, keys
+; (REF_BM), the others parked in DEFER_BM (dmg_retile_ref); A = 2: those the map uses, the
+; others left marked (re-coded in the frame waits' spare time: the prologue). The same codings, keys
 ; (CODED) and TILE_USE as retile_b.
 RB_S       = $DC30          ; (RT_BUF) per palette: S0 = indices whose value has bit 0 (4), S1 (4)
 rtb_b:      ldh [sh_u3], a
@@ -7750,9 +8001,9 @@ rtb_b:      ldh [sh_u3], a
             ldh a, [sh_u3]
             and a
             jr z, .all
-            ld a, e                         ; (the map's tiles; the others parked)
-            add a, low(REF_BM)
-            ld l, a
+            ld a, e                         ; (the map's tiles; the others parked, or with
+            add a, low(REF_BM)              ;   A = 2 left marked for the frame waits' spare
+            ld l, a                         ;   time)
             ld h, high(REF_BM)
             ld b, [hl]
             ld a, b
@@ -7760,6 +8011,9 @@ rtb_b:      ldh [sh_u3], a
             and d
             jr z, .np
             ld c, a
+            ldh a, [sh_u3]
+            cp 2
+            jr z, .kp
             ld a, e
             add a, low(DEFER_BM)
             ld l, a
@@ -7767,6 +8021,10 @@ rtb_b:      ldh [sh_u3], a
             ld a, c
             or [hl]
             ld [hl], a
+            jr .np
+.kp:        ld l, e
+            ld h, high(DIRTY_BM)
+            ld [hl], c
 .np:        ld a, d
             and b
             ld d, a
@@ -7791,8 +8049,12 @@ rtb_b:      ldh [sh_u3], a
             ld a, e
             cp 32
             jr nz, .byte
+            ldh a, [sh_u3]                  ; (A = 2: tiles may be left marked)
+            cp 2
+            ld a, 1
+            jr z, .rq
             xor a
-            ldh [rq_any], a
+.rq:        ldh [rq_any], a
             ret
 .one:       ldh [sh_tile], a                ; tile A
             swap a                          ; HL = shadow tile (RAM bank 1)
@@ -8331,6 +8593,143 @@ vshow_own:  ldh a, [q_head]                 ; queued writes first
             inc a
             ldh [$FF70], a
             ei
+            ret
+
+; ---- c62:DEF1-DF03 (menu text printer, one letter): LDX $2002 / LDX $55 / STX $2006 / LDX $54 /
+; STX $2006 / STY $2007 / STA $2007: the dakuten byte Y and the letter A at $55:$54 and the
+; next cell (+1 or +32). LCD off, no cell drawn by nametable 1, both cells map cells of
+; nametable 0: straight to the shadow and the GB map (as rt_ppu_w7's short path); anything
+; else through the PPU routines. Out: X = $54; N, Z from it; A, Y and carry kept.
+tpair_b:    push af                         ; (the letter, carry)
+            ld a, c
+            ldh [w7v], a                    ; (Y)
+            ldh a, [lcd_on]                 ; LCD off, or a CGB masked load (map rebuilt
+            and a                           ;   from the shadow when shown)
+            jr z, .lof
+            ld a, [VLCD]
+            cp 1
+            jr nz, .slow
+            ldh a, [dlg_on]
+            and a
+            jr nz, .slow
+.lof:       ldh a, [own1_lo]
+            ld h, a
+            ldh a, [own1_hi]
+            or h
+            jr nz, .slow
+            ld a, [NES_RAM + $55]
+            and $3F
+            cp $20
+            jr c, .slow
+            cp $3F
+            jr z, .slow
+            bit 2, a
+            jr nz, .slow                    ; (nametable 1)
+            and 3
+            ld h, a
+            ld a, [NES_RAM + $54]
+            ld l, a                         ; HL = the first cell's offset
+            ldh a, [ppu_ctrl]
+            and 4
+            ld a, 1
+            jr z, .i1
+            ld a, 32
+.i1:        ld e, a                         ; DE = the increment
+            push hl
+            add hl, de                      ; HL = the second cell's offset: below $3C0
+            ld a, h
+            cp 3
+            jr c, .ok
+            jr nz, .sl1
+            ld a, l
+            cp $C0
+            jr nc, .sl1
+.ok:        pop de                          ; DE = the first cell's offset
+            ld a, h
+            add a, high(NT_SH)
+            ld h, a
+            pop af
+            push af
+            ld [hl], a                      ; the letter: shadow
+            ld a, d
+            add a, high(NT_SH)
+            ld b, h
+            ld h, a
+            ld c, l
+            ld l, e
+            ldh a, [w7v]
+            ld [hl], a                      ; Y: shadow
+            ld a, [VLCD]
+            cp 1
+            jr nz, .map
+            ld [MAP_RB], a                  ; (masked: the GB map rebuilt when shown)
+            jr .mx
+.map:       ld a, h                         ; GB map: Y, then the letter
+            add a, $98 - high(NT_SH)
+            ld h, a
+            ldh a, [w7v]
+            ld [hl], a
+            ld a, b
+            add a, $98 - high(NT_SH)
+            ld h, a
+            ld l, c
+            pop af
+            push af
+            ld [hl], a
+.mx:        ldh a, [w7v]                    ; (C = Y again, B = 0)
+            ld c, a
+            ld b, 0
+            ld a, 1                         ; DMG: the map is scanned when the LCD goes on
+            ldh [dmg_scan], a
+            ldh a, [ppu_ctrl]               ; v = $55:$54 + 2 increments
+            and 4
+            ld a, 2
+            jr z, .i2
+            ld a, 64
+.i2:        ld e, a
+            ld a, [NES_RAM + $54]
+            add a, e
+            ldh [ppu_vl], a
+            ld a, [NES_RAM + $55]
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            xor a                           ; ($2002 read: vblank flag and latch cleared;
+            ldh [vbl_flag], a               ;   the two $2006 writes leave the latch at 0)
+            ldh [ppu_latch], a
+            jr .out
+.sl1:       pop hl
+.slow:      ldh a, [code_bank]              ; (the PPU routines come back to code_bank)
+            ld b, a
+            ld a, PF_BANK
+            ldh [code_bank], a
+            call rt_ppu_r2
+            ld a, [NES_RAM + $55]
+            call rt_ppu_w6
+            ld a, [NES_RAM + $54]
+            call rt_ppu_w6
+            ld a, c
+            call rt_ppu_w7
+            pop af
+            push af
+            call rt_ppu_w7
+            ld a, b
+            ldh [code_bank], a
+            ld b, 0
+.out:       ld a, [NES_RAM + $54]           ; X = $54, N and Z from it
+            ld e, a
+            ld d, 0
+            ldh [nzv], a
+            pop hl                          ; H = the letter, L = its flags: carry kept
+            ld a, l
+            and $10
+            ld l, a
+            ld a, e
+            and a
+            jr nz, .nz
+            set 7, l
+.nz:        push hl
+            pop af
             ret
 
 section bank PF_BANK, $7F00
