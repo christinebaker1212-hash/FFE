@@ -107,22 +107,39 @@ python3 tools/gb3/ff3src.py "roms/Final Fantasy III (Japan).nes" build/ff3/src_e
 - **Results:**
   - Screens (Gambatte vs NES, inside the camera): opening narration, the second page,
     New Game menu, name entry, the first field scene with its dialogue: as the NES.
-  - RAM (`firstdiff.py ... --input newgame`): **identical for 2,593 frames** (power-on,
-    narration, menu, name entry, the opening field scene and dialogue) with nothing masked;
-    with the sound driver's bytes and the joypad repeat counter masked (`--ignore
-    00C9-00CA,00D0-00DF,0014-0014`: they depend on how often the IRQ / the poll loop runs)
-    **identical through frame 3,725** of the opening battle (commands, attacks, messages).
-    Then a button read inside a busy poll loop lands in another frame (PyBoy has no double
-    speed: the harness resyncs the input clock at each wait, but polls inside the loops
-    still see other frames) and the runs part.
-  - Speed (Gambatte / mGBA, CGB double speed): narration 1.00x after an 85-frame lag at
-    power-on (initial loads). Battle: the main thread is too slow: per 200 NES frames the
-    NES waits ~197 times, the GB ~154 (was ~145 before the indirect-read fast path and the
-    OAM rewrite). Profile now: indirect ROM reads 19% (battle sprite data copied through
-    `(zp),Y`, e.g. `p32:9130`), OAM conversion 10%, PPU writes ~8%.
+  - RAM (`firstdiff.py ... --input newgame --ignore 00C9-00CA,00D0-00DF,0014-0014`: the
+    sound driver's bytes and the joypad repeat counter, which depend on how often the IRQ /
+    the poll loop runs): **identical through waited-for frame 4,661** (power-on, narration,
+    menu, name entry, the opening field scene and dialogue, the whole opening battle and
+    the scene after it). The battle rng table matches too (`--sram 7BE3-7CE2`).
 - Facts: the battle input loop polls the joypad ~130 times a frame (the repeat counter
   `$14` steps per poll, so it depends on CPU speed even on the NES); a cynes step can hold
   two NMIs; `$05` is also used as scratch outside the wait.
+
+## Speed pass (2026-11-19)
+Measured in mGBA (CGB double speed) with the `newgame` input: real frames between waited-for
+frames (GB `VBL_CNT`, NES emulator frames). Tools (scratch scripts, to be moved into
+`tools/gb3/`): elapsed frames since waited-for 2400 per 100 input frames; per-waited-frame
+lead; mGBA cycle profiles (`SGBRUN_PROF2=300 SGBRUN_PROFC=1`, `profnes.py` groups samples by
+NES routine; ~470 samples = one frame of CPU).
+- **Result: the opening battle keeps pace overall**: from waited-for 2400 (field) to 4332 (end
+  of the battle) the GB takes 2002 frames, the NES 2001. Battle start: the GB builds the rng
+  table at once (the NES spends 25 frames) but loads the battle graphics in ~30 frames (NES
+  11); the fade-in keeps pace. In the battle, the first round's animations still lose ~9
+  frames over ~190 waited frames (frames that need ~1.1 frames of CPU: HP window redraw +
+  sprite animation), and the GB gains them back later where the NES has lag frames.
+- Done: bulk `$2007` paths (map-row runs with step 1 and 32, `rt_ppu_copy` pieces, CHR runs
+  inside a tile, `(zp),Y` upload idiom `rt_ppu_izy`, whole attribute tables `attr_put64`);
+  attribute writes ~10x faster (one address computation per quadrant pair); fill idiom 24
+  cycles per byte; 64-entry dynamic-target cache; natives: hex-to-decimal `p34:95E1`,
+  divide rewritten, `F8EA` / `F8E0` / `F8C5`, `nat_9111` in three passes; JSR / JMP to a
+  native calls bank 0 directly (no cross-bank call).
+- Fixed on the way: the vblank handler incremented `VBL_CNT` (`$D832`) in whatever WRAM bank
+  was selected, corrupting byte 2 of tile `$83` in the CHR staging copy; the test tools
+  write the runtime's counters in WRAM bank 1 explicitly (PyBoy writes the selected bank).
+- Remaining hot spots in battle frames: indirect reads `(zp),Y` of ROM data (~100 cycles
+  each), OAM conversion (~5k cycles a frame), banked ROM reads, cross-bank calls (~400
+  cycles each), the HP window redraw (text buffer through `STA (zp),Y`).
 
 ## Known open items
 - Battle screen: the windows below the split (BG table 1 vs the battlefield's table, the
@@ -135,9 +152,7 @@ python3 tools/gb3/ff3src.py "roms/Final Fantasy III (Japan).nes" build/ff3/src_e
   raster split); belongs in the window layer (FF1 lesson).
 
 ## Next
-1. Speed pass (battle first): native versions of the hot battle loops (sprite data copies
-   through `(zp),Y`, `p32:9130` / `915C`), OAM conversion only of changed sprites, PPU copy
-   routines, initial loads; measure waited-for frames per NES frame (mGBA `SGBRUN_PEEK=D830`:
-   input clock / GB frames / waited-for frames).
+1. Speed: the first battle round (above); then other battles (bosses, magic animations), the
+   field, menus; move the measuring scripts into `tools/gb3/`.
 2. Raster split in the runtime (LYC, window layer), sound (APU -> GB, FF1/FF2 model).
 3. Mock-ups for the owner (battle, dialogue, main menu), then the re-layouts.
