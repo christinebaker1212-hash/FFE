@@ -486,6 +486,397 @@ hle_ppucopy:
             dec l                           ; Z = 1
             ret
 
+; b11:9D68 "fill ppu" (STA $2007 / DEX / BNE: A = value, X = count, 0 = 256): whole tiles of a
+; pattern table go in at once (both planes the constant: every GB byte = the value), marked
+; as hle_ppucopy marks them; anything else byte by byte through rt_ppu_w7. Returns X = 0,
+; Z = 1, N = 0, A and C kept, Y kept.
+hle_fill:   ldh [tmp_lo], a
+            push af                         ; caller's carry
+            ld a, e
+            and $0F
+            jp nz, .slow
+            ldh a, [ppu_ctrl]
+            and 4
+            jp nz, .slow
+            ldh a, [ppu_vh]
+            cp $20
+            jp nc, .slow
+            ldh a, [ppu_vl]
+            and $0F
+            jp nz, .slow
+            ldh a, [lcd_on]                 ; LCD on: CGB only (tile copy + DMA marks)
+            and a
+            jr z, .lok
+            ldh a, [is_cgb]
+            and a
+            jp z, .slow
+.lok:       ld a, e                         ; tiles: X / 16 (X = 0: 16)
+            swap a
+            and $0F
+            jr nz, .tn
+            ld a, 16
+.tn:        ldh [uw_y], a
+.tile:      ldh a, [ppu_vl]
+            and $F0
+            ld e, a
+            ldh a, [ppu_vh]
+            ld d, a
+            and $10
+            ld b, a
+            ldh a, [ppu_ctrl]
+            and $10
+            xor b
+            ld a, d                         ; (flags kept)
+            jr nz, .spr
+            and $0F
+            ld d, a
+            ldh a, [is_cgb]
+            and a
+            ld a, d
+            jr nz, .bgv
+            add a, high(BG_SHADOW)          ; DMG: BG tile to the shadow, re-coded later
+            ld d, a
+            ld a, 1
+            ld [$4000], a
+            jr .fill
+.bgv:       ld d, a
+            ldh a, [lcd_on]
+            and a
+            ld a, d
+            jr nz, .bgs
+            cp $08                          ; CGB, LCD off: VRAM (tiles 0-127 $9000, 128-255 $8800)
+            ld d, $90
+            jr c, .bg0
+            ld d, $80
+.bg0:       and $0F
+            add a, d
+            ld d, a
+            jr .fill
+.bgs:       add a, $D0                      ; CGB, LCD on: the tile copy (WRAM bank 2), marked
+            ld d, a
+            ld a, 2
+            ldh [$FF70], a
+            jr .fill
+.spr:       and $0F                         ; sprite table: the shadow (cart RAM bank 1)
+            add a, high(SPR_SHADOW)
+            ld d, a
+            ld a, 1
+            ld [$4000], a
+.fill:      ldh a, [tmp_lo]
+            ld b, 16
+.f:         ld [de], a
+            inc e
+            dec b
+            jr nz, .f
+            inc e                           ; DE = start + 17 (as hle_ppucopy's marks)
+            ld a, d
+            cp $D0
+            jr c, .nst
+            ld a, 1                         ; tile copy: WRAM bank 1 again, mark the tile
+            ldh [$FF70], a
+            ld a, e
+            sub 17
+            swap a
+            and $0F
+            ld e, a
+            ld a, d
+            sub $D0
+            swap a
+            or e
+            ld hl, BG_DIRTY
+            call hd_mark
+            jr .nx
+.nst:       cp $80
+            jr c, .nvr
+            cp $A0                          ; (VRAM $80-$97: nothing to mark)
+            jr c, .nx
+.nvr:       cp high(BG_SHADOW)
+            jr c, .spm
+            call ff2_bg_tile
+            jr .nx
+.spm:       call ff2_spr_tile
+.nx:        ldh a, [ppu_vl]                 ; v += 16
+            add a, 16
+            ldh [ppu_vl], a
+            ldh a, [ppu_vh]
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            ldh a, [uw_y]
+            dec a
+            ldh [uw_y], a
+            jr nz, .tile
+            ld e, 0                         ; X = 0
+            jr .done
+.slow:      ldh a, [lcd_on]                 ; nametable cells (no attribute byte) with the LCD
+            and a                           ;   off: in bulk (hle_fill_nt), else byte by byte
+            jr nz, .gen
+            ldh a, [ppu_ctrl]
+            and 4
+            jr nz, .gen
+            ldh a, [ppu_vh]
+            cp $20
+            jr c, .gen
+            cp $30
+            jr nc, .gen
+            and 3
+            ld d, a                         ; last offset = (vh & 3) * 256 + vl + count - 1
+            ldh a, [ppu_vl]
+            ld l, a
+            ld a, e
+            dec a
+            add a, l
+            ld h, a                         ; (low byte of the last offset)
+            ld a, d
+            adc a, 0
+            cp 3
+            jr c, .ntok
+            jr nz, .gen
+            ld a, h
+            cp $C0
+            jr nc, .gen
+.ntok:      call hle_fill_nt
+            jr .done
+.gen:       ldh a, [tmp_lo]
+            call rt_ppu_w7
+            dec e
+            jr nz, .gen
+.done:      ld b, 0
+            ld d, 0
+            xor a
+            ldh [nzv], a
+            pop af                          ; carry back
+            ldh a, [tmp_lo]
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1
+            ret
+
+; hle_fill's nametable run (LCD off; E = count, 0 = 256; D = offset high, L = offset low;
+; value in tmp_lo): NES shadow, GB map, owner bits (own1 count kept) per cell; CGB: the
+; run's cells take their palette from their (new) nametable's attributes if an owner
+; changed; DMG: the map scan when the LCD goes on. PPU address advanced. Keeps C (Y).
+F_ADD      = $D839          ; high(NT_SH) - $98 + nametable * 4 (shadow page from map page)
+F_CHG      = $D83A          ; an owner changed
+F_D0       = $D83B          ; start: map page, offset low, count
+F_L0       = $D83C
+F_CNT      = $D83D
+hle_fill_nt:
+            push bc
+            ldh a, [ppu_vh]
+            and 4
+            ldh [sh_nt], a
+            add a, high(NT_SH) - $98
+            ld [F_ADD], a
+            xor a
+            ld [F_CHG], a
+            ld a, d
+            add a, $98
+            ld d, a                         ; D:L = GB map cell
+            ld [F_D0], a
+            ld a, l
+            ld [F_L0], a
+            ld a, e
+            ld [F_CNT], a
+            ldh a, [tmp_lo]                 ; GB map (LCD off), then the NES shadow
+            ld h, d
+            ld b, e
+.fm:        ld [hl+], a
+            dec b
+            jr nz, .fm
+            ld a, [F_ADD]
+            add a, d
+            ld h, a
+            ld a, [F_L0]
+            ld l, a
+            ldh a, [tmp_lo]
+            ld b, e
+.fs:        ld [hl+], a
+            dec b
+            jr nz, .fs
+            ld a, d                         ; owner bits: cell n = (page - $98) * 256 + low;
+            sub $98                         ;   byte n / 8, bit n & 7; C = cells left
+            ld b, a
+            ld a, [F_L0]
+            ld l, a
+            ld c, e
+.ob:        ld a, l                         ; byte index B * 32 + L / 8
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld h, a
+            ld a, b
+            swap a
+            add a, a
+            or h
+            ld e, a                         ; E = owner byte index
+            ld a, l
+            and 7
+            jr nz, .obit                    ; not at a byte start: one cell
+            ld a, c
+            cp 8
+            jr c, .obit                     ; fewer than 8 left: one cell
+            ld h, high(OWN)                 ; 8 cells: the whole byte
+            push hl
+            ld l, e
+            ldh a, [sh_nt]
+            and a
+            ld a, $FF
+            jr nz, .o8
+            xor a
+.o8:        ld d, [hl]
+            ld [hl], a
+            xor d                           ; changed bits -> own1 count
+            jr z, .o8x
+            ld e, a                         ; (E: changed bits; D: old byte)
+            ld a, 1
+            ld [F_CHG], a
+.pop:       srl e
+            jr nc, .pz
+            ldh a, [sh_nt]
+            and a
+            jr z, .pdec
+            ldh a, [own1_lo]
+            add a, 1
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            adc a, 0
+            ldh [own1_hi], a
+            jr .pz
+.pdec:      ldh a, [own1_lo]
+            sub 1
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            sbc a, 0
+            ldh [own1_hi], a
+.pz:        ld a, e
+            and a
+            jr nz, .pop
+.o8x:       pop hl
+            ld a, l
+            add a, 8
+            ld l, a
+            jr nc, .o8n
+            inc b
+.o8n:       ld a, c
+            sub 8
+            ld c, a
+            jr nz, .ob
+            jr .odone
+.obit:      ld a, l                         ; one cell: mask 1 << (low & 7)
+            and 7
+            ld d, a
+            ld a, 1
+            jr z, .m0
+.ms:        add a, a
+            dec d
+            jr nz, .ms
+.m0:        ld d, a
+            push hl
+            ld h, high(OWN)
+            ld l, e
+            ld a, [hl]
+            and d
+            ld e, a                         ; old bit
+            ldh a, [sh_nt]
+            and a
+            jr z, .clr
+            ld a, [hl]
+            or d
+            ld [hl], a
+            ld a, e
+            and a
+            jr nz, .same                    ; 1 -> 1
+            ldh a, [own1_lo]
+            add a, 1
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            adc a, 0
+            ldh [own1_hi], a
+            jr .chg
+.clr:       ld a, d
+            cpl
+            and [hl]
+            ld [hl], a
+            ld a, e
+            and a
+            jr z, .same                     ; 0 -> 0
+            ldh a, [own1_lo]
+            sub 1
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            sbc a, 0
+            ldh [own1_hi], a
+.chg:       ld a, 1
+            ld [F_CHG], a
+.same:      pop hl
+            inc l
+            jr nz, .on
+            inc b
+.on:        dec c
+            jr nz, .ob
+.odone:
+            ldh a, [is_cgb]
+            and a
+            jr nz, .cgb
+            ld a, 1                         ; DMG: shaded when the LCD goes on
+            ldh [dmg_scan], a
+            jr .adv
+.cgb:       ld a, [F_CHG]
+            and a
+            jr z, .adv
+            ld a, [F_D0]                    ; CGB: palettes of the run's cells (VRAM bank 1)
+            ld d, a
+            ld a, [F_L0]
+            ld l, a
+            ld a, [F_CNT]
+            ld c, a
+            ld a, 1
+            ldh [$FF4F], a
+.pc:        ld a, l
+            and 31
+            ld e, a                         ; col
+            ld a, d
+            sub $98
+            add a, a
+            add a, a
+            add a, a
+            ld b, a
+            ld a, l
+            swap a
+            rrca
+            and 7
+            or b                            ; row
+            call cell_pal
+            ld h, d
+            ld [hl], a
+            inc l
+            jr nz, .pn
+            inc d
+.pn:        dec c
+            jr nz, .pc
+            xor a
+            ldh [$FF4F], a
+.adv:       ld a, [F_CNT]                   ; v += count (0 = 256)
+            ld e, a
+            ldh a, [ppu_vl]
+            add a, e
+            ldh [ppu_vl], a
+            ldh a, [ppu_vh]
+            adc a, 0
+            ld b, a
+            ld a, e
+            and a
+            jr nz, .a1
+            inc b
+.a1:        ld a, b
+            and $3F
+            ldh [ppu_vh], a
+            ld e, 0                         ; X = 0
+            pop bc
+            ret
+
 ff2_bg_tile:                                ; DMG BG tile in the shadow (DE = start + 17, cart
             xor a                           ;   RAM bank 1 on): queue its re-coding; RAM bank 0
             ld [$4000], a

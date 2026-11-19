@@ -57,7 +57,8 @@ class FF2:
     #   JMP $FA3C / JMP $FEA1 there and spins; that stub writes RTI back, reads $2002 and
     #   drops the interrupt frame (PLA x3, A = $FA / $FE), returning to the waiter.
     ext = {('fix', 0xFA2A): ('rt_wait_fa2a', 'NZ'), ('fix', 0xFEAD): ('rt_wait_fead', 'NZ'),
-           ('fix', 0xFD6F): ('hle_ppucopy', 'NZ')}       # copy data to ppu (rt/ff2.s, native)
+           ('fix', 0xFD6F): ('hle_ppucopy', 'NZ'),       # copy data to ppu (rt/ff2.s, native)
+           ('b11', 0x9D68): ('hle_fill', 'NZ')}          # fill ppu (rt/ff2.s, native)
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   fix:FA91-FA99: PHA $FA / PHA $99 / JMP ($0040): "jump (long)" calls through ($40)
     #   with a pushed return address: on the GB a call through the pointer, then $FA9A.

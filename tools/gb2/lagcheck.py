@@ -36,9 +36,11 @@ def main():
     out = subprocess.run(cmd, capture_output=True, text=True).stdout
     lag = open(lf, 'rb').read()
     waits = [lag[i] | lag[i + 1] << 8 for i in range(0, len(lag), 2)]   # wait count after each GB frame
-    gb_at = {}
-    for g, k in enumerate(waits):
-        if k not in gb_at: gb_at[k] = g + 1                           # GB frame when wait k was reached
+    gb_at = {}                                                        # GB frame when wait k was
+    top = 0                                                           #   reached (several waits
+    for g, k in enumerate(waits):                                     #   can pass in one GB frame)
+        while top < k:
+            top += 1; gb_at[top] = g + 1
     print(out.strip())
     tot_n = tot_g = 0; worst = []
     for a in range(1, last - win, win):

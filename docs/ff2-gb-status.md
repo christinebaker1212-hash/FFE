@@ -230,7 +230,18 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   (reached in 4-px steps from both base x; at most 4 px past the edge for a few frames).
   The small shake (`b11:B131`, +4) puts the back row 4 px past the edge briefly (kept).
   Random seed 1, 30000 frames: 29534 waits identical.
-- Next: CGB battle-entry speed, GB tile upload latency.
+- Battle-entry speed (2026-11-19): native `hle_fill` for `b11:9D68` (fill ppu: whole
+  pattern-table tiles in one go, marked as `hle_ppucopy` marks them; nametable runs with
+  the LCD off in bulk: map, shadow, owner bits a byte at a time, CGB palettes of the run
+  if an owner changed; else the generic path). **lagcheck fixed**: it stopped its windows
+  at the first wait the GB passed inside one frame, so earlier DMG totals were partial
+  (the "+22 DMG battle entry" above was wrong). Now, seed 1 to wait 9800, Gambatte:
+  CGB total +0.9%, battle entry (wait 9506) +110 -> +58 frames; DMG total +5.8%, battle
+  entry +219 -> +93, plus +94 at wait 3356 and +90 at wait 1531 (screen loads before the
+  battle). RAM identical (DMG and CGB, 10592 waits).
+- Next: the remaining battle-entry time (attribute writes `attr_apply`, FF2's multiply /
+  divide `fix:FC79-FD00`, tile marks), DMG screen loads (waits 1531, 3356), GB tile upload
+  latency.
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 
