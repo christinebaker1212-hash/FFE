@@ -1,0 +1,52 @@
+# FF2 Game Boy adaptation: status
+
+Brief: `docs/ff2-gb-brief.md`. Plan for the owner: `docs/ff2-gb-plan.md`.
+Branch: `claude/zealous-hypatia-3sn3fr` (started from the FF1 GB branch
+`claude/tender-meitner-j5gu01`, fast-forward; FF1 files untouched).
+
+## Session setup (cloud container: nothing persists outside git)
+```bash
+mkdir -p roms   # the owner's ROMs (never commit); check SHA-1s against README.md
+bash tools/emu/build_emu.sh build/emu                          # cynes (NES reference)
+git clone --depth 1 https://github.com/everything8215/ff2 build/src/ff2   # listing (never commit)
+python3 tools/split/build_mmc5.py "roms/Final Fantasy I, II (Japan).nes" build
+python3 tools/ff2/insert.py build/ff2_mmc5.nes build/ff2_en.nes             # sha1 0e76a60d...
+python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src_ja
+python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src_en --english
+```
+
+## Done
+- 2026-11-19: ROMs checked (both SHA-1s match README). English FF2 NES build with the
+  existing tools reproduces the patch result SHA-1 `0e76a60d…`.
+- everything8215/ff2 fetched (commit `8d26190`, 2022-12-05). It is **an annotated listing,
+  not an assemblable source**: `ff2j.asm` (33.9k lines, `BB/AAAA: bytes MNEMONIC ; comment`)
+  of the standalone FF2 (J) ROM, covering the code (~61.5 KB) and a few tables, plus
+  `rom-map.txt`, `ram-map.txt`, event/NPC notes. Graphics, maps, text and music are only
+  described in the ROM map.
+- Listing vs the owner's ROM (FF2 = second half of FF I・II): every listed byte matches
+  except the compilation's own boot glue (reset `$FE48-$FE78` enters through the cart menu
+  stub at `$FF00`; title string at `$FFE0`) and 4 stale code fragments the listing marks
+  with `--` (missing leading byte).
+- `tools/gb2/ff2src.py`: listing + ROM → assemblable 6502 source in `build/` (one file per
+  bank, labels for every branch/jump/call target, the listing's titles and comments,
+  data from the ROM). **Japanese FF2: all 16 banks reassemble byte-identical**
+  (`tools/asm6502.py`). `--english` builds the English MMC5 ROM in a temp dir (build_mmc5 +
+  insert.py), records insert.py's code modules (`tools/gb2/ff2en.py`: org, labels,
+  instruction starts) and re-decodes the 169 listing instructions the patch/split changed;
+  **English FF2 (sha1 `0e76a60d…`): banks 00-0F + ExRAM code reassemble byte-identical.**
+- NES coverage driver `tools/gb2/covrun.py` and `tools/gb2/covcheck.py` (executed
+  instruction starts vs the source code map).
+
+## In progress
+- Coverage check of the code map (4 seeds × 60k frames of random play on the English
+  NES build).
+- Plan for the owner (`docs/ff2-gb-plan.md`) with questions: Select-menu opening, re-layout
+  side, reuse of the FF1 recompiler.
+
+## Remaining (brief's milestones)
+1. ~~Setup~~ (done, see above).
+2. English patch → source mapping: written up in the plan (owner to confirm).
+3. 6502 → SM83 path: plan written; owner's OK needed before large builds.
+4. Boot to title (PyBoy, Gambatte), new game, field, battle; equivalence vs NES;
+   re-layouts with mock-ups; colour (CGB, DMG shading, SGB); Select menu + suspend
+   points; builder.

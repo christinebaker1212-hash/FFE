@@ -9,6 +9,8 @@
 
 # Game Boy ports (set by the project owner — binding)
 
+- **FF2 Game Boy port: status and plan in `docs/ff2-gb-status.md` (FF2 session, branch `claude/zealous-hypatia-3sn3fr`).**
+
 The English translations are being adapted to the Game Boy. Design: `docs/gb-port.md`.
 
 ## Targets
