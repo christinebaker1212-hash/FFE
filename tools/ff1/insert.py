@@ -965,6 +965,8 @@ def menu_engine(rom, report):
         src = src[:a] + gb_layout.MAGPAGE + src[b:]             # magic list rows
         a, b = src.index('itemlist:'), src.index('itemmove:')
         src = src[:a] + gb_layout.ITEMLIST + src[b:]            # item list pages
+        a, b = src.index('magdown:'), src.index('itemlist:')
+        src = src[:a] + gb_layout.MAGMOVE + src[b:]             # magic list moves by position
         for old, new in gb_layout.ITEMMOVE_PATCH:
             assert old in src
             src = src.replace(old, new)

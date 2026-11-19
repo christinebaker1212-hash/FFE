@@ -62,7 +62,7 @@ def fmt_arg(i):
 
 
 class CodeMap:
-    def __init__(self, rom_path, cov_paths, entries=()):
+    def __init__(self, rom_path, cov_paths, entries=(), old_rom=None):
         self.rom = open(rom_path, 'rb').read()[HDR:]
         self.cov = bytearray(3 * COV_SIZE)
         for sp, a in entries:                             # entry points known without coverage
@@ -73,8 +73,26 @@ class CodeMap:
                 a = int.from_bytes(self.cov[k:k + (1 << 20)], 'little') | int.from_bytes(d[k:k + (1 << 20)], 'little')
                 n = min(1 << 20, len(d) - k)
                 self.cov[k:k + n] = a.to_bytes(n, 'little')
+        self.stale = 0
+        if old_rom is not None: self.drop_stale(old_rom[HDR:])
         self.insns = {}                                   # (space, addr) -> Insn
         self.unresolved = []                              # (from insn, reason)
+
+    def drop_stale(self, old):
+        """Coverage made on an older build of the NES ROM (old): forget what the logs say
+        about bytes that changed (and 2 bytes either side, so no logged instruction start
+        lands inside a new instruction); static flow from the unchanged code reaches the
+        new code. ExRAM code (bank 18 image) is logged at its RAM address."""
+        n = min(len(old), len(self.rom))
+        diff = [i for i in range(n) if old[i] != self.rom[i]]
+        ex0 = SPACES['ex'][1]
+        for i in diff:
+            idx = [i]
+            if ex0 <= i < ex0 + 0x400: idx.append(COV_RAM + 0x5C00 + i - ex0)
+            for j in idx:
+                for k in range(j - 2, j + 3):
+                    for pl in range(3): self.cov[pl * COV_SIZE + k] = 0
+        self.stale = len(diff)
 
     def byte(self, space, addr):
         base, off, size = SPACES[space]

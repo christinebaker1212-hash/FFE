@@ -4,7 +4,7 @@ the NES code): new game + random play (covrun.py, seeds 1-4) and the field scrip
 formation (128); as many runs at once as there are CPUs (env COV_JOBS); writes
 OUTDIR/rom.sha1 (build.py warns on a mismatch).
 usage: PYTHONPATH=build/emu covall.py ROM OUTDIR [FRAMES (random play, default 80000)]"""
-import hashlib, os, subprocess, sys
+import hashlib, os, shutil, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ITEMS = ('6021=1,6022=1,6023=1,6024=1,6025=1,6026=1,6027=1,6028=1,6029=1,602A=1,602B=1,'
@@ -96,6 +96,7 @@ def main():
         print('coverage: %d of %d runs' % (done, done + len(jobs) + len(running)), flush=True)
     sha = hashlib.sha1(open(rom, 'rb').read()).hexdigest()
     with open(os.path.join(out, 'rom.sha1'), 'w') as fh: fh.write('%s  %s\n' % (sha, rom))
+    shutil.copyfile(rom, os.path.join(out, 'rom.nes'))   # (build.py: drop coverage of changed bytes)
     print('coverage written to', out, 'failed:', bad)
 
 

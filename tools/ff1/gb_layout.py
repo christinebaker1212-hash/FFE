@@ -93,7 +93,7 @@ GLYPH_FIRST = 0x7A                       # glyph table covers codes $7A-$FF
 DIG3 = 0xD3                              # 3-px digits $D3-$DC, small '/' $DD, arrow $DE
 SLASH3, ARROW = 0xDD, 0xDE
 STATUS_WORDS = ['Stone', 'Poison', 'Blind', 'Numb', 'Sleep', 'Mute']   # status bits 1-6
-FAR_GB = ['party_line', 'party_stamp', 'dlgpage', 'dlghide', 'magpatch', 'pcopy', 'prow', 'wpnfix']   # far routines added for the GB layout (after boxline etc.)
+FAR_GB = ['party_line', 'party_stamp', 'dlgpage', 'dlghide', 'magpatch', 'pcopy', 'prow', 'wpnfix', 'etarget']   # far routines added for the GB layout (after boxline etc.)
 
 VWF_SRC = """
 VBUF = $6E00        ; line buffer: 18 tiles x 8 rows, 1 bit per pixel, tile-major
@@ -1495,7 +1495,7 @@ def enc_word(enc, w):
 
 
 def far_source(enc):
-    return 'MUSIC = $%04X\n' % MUSIC + VWF_SRC + DLG_SRC + glyph_tables(enc) + magpatch_source(enc) + prolog_far_source() + WPNFIX_SRC
+    return 'MUSIC = $%04X\n' % MUSIC + VWF_SRC + DLG_SRC + glyph_tables(enc) + magpatch_source(enc) + prolog_far_source() + WPNFIX_SRC + ETARGET_SRC
 
 
 # ---- field dialogue ----------------------------------------------------------------
@@ -1795,6 +1795,73 @@ def magic_cursor(rom):
             cur[2 * k] = (0, 80, 0)[slot]
             cur[2 * k + 1] = 150 + 16 * r + (8 if slot == 2 else 0)
     o = bank_off(12, 0x9FBF); rom[o:o + 24] = cur
+    main = sys.modules['__main__']
+    farjsr = main.LABELS_EX['farjsr']
+    put_bank(rom, 12, 0x9BAD, bytes([0xA2, main.FAR_ROUTINES.index('etarget'), 0x20, farjsr & 0xFF,
+                                     farjsr >> 8, 0x60]), bytes.fromhex('adb368'))  # enemy target moves
+    put_bank(rom, 12, 0x9CF0, MAGLR, bytes([0x60, 0xAA, 0x6A]))           # left
+    put_bank(rom, 12, 0x9CFE, bytes([0x4C, 0xF0, 0x9C]), bytes([0x60]))   # right
+
+
+# Battle magic list movement by position (owner: free selection). Each level is two rows:
+# slot 0 | slot 1 on the first, slot 2 | "L<n> MP" on the second. Down: slot 0 -> slot 2,
+# slot 2 -> next level's slot 0, slot 1 -> next level's slot 1; up the reverse; pages turn
+# on their own (FLIP, as the English magdown). Left / right (b12 $9CF0 / $9CFE, RTS in the
+# English patch) switch slot 0 <-> 1 (MAGLR).
+MAGMOVE = """magdown:        ; bank 12 $9CB4 (far)
+    lda $6AAA
+    bne .nx
+    lda #2
+    sta $6AAA
+    rts
+.nx:
+    lda $6AAB
+    and #1
+    beq .inc
+    lda $6AF8
+    cmp #3
+    beq .ret
+    inc $6AF8
+    inc FLIP
+.inc:
+    inc $6AAB
+    lda $6AAA
+    cmp #2
+    bne .ret
+    lda #0
+    sta $6AAA
+.ret:
+    rts
+magup:          ; bank 12 $9CD2 (far)
+    lda $6AAA
+    cmp #2
+    bne .pv
+    lda #0
+    sta $6AAA
+    rts
+.pv:
+    lda $6AAB
+    and #1
+    bne .dec
+    lda $6AF8
+    beq .ret
+    dec $6AF8
+    inc FLIP
+.dec:
+    dec $6AAB
+    lda $6AAA
+    bne .ret
+    lda #2
+    sta $6AAA
+.ret:
+    rts
+"""
+MAGLR = bytes([0xAD, 0xAA, 0x6A,       # $9CF0: LDA $6AAA
+               0xC9, 0x02,             # CMP #2
+               0xB0, 0x05,             # BCS (RTS)
+               0x49, 0x01,             # EOR #1
+               0x8D, 0xAA, 0x6A,       # STA $6AAA
+               0x60])                  # RTS
 
 
 # itemmove (English far code): switching the group also asks for a page redraw
@@ -1822,6 +1889,71 @@ ITEMMOVE_PATCH = [
     sta $6AAA
     inc FLIP
     rts"""),
+]
+# GB: the command window (Fight / Run on the first row, Magic / Medicine / Items below;
+# told apart by Run's hand x 35 at column 1 row 0) moves by position: right only from the
+# first row (to Run), left back to column 0, down from Run to Magic. Menus whose two
+# columns share their x (the party targets) ignore left / right.
+ITEMMOVE_PATCH += [
+    ("""    cpy #$80
+    beq .r
+    cpy #$40
+    beq .l
+    cpy #$20""", """    lda $6AB4
+    cmp #35
+    beq .cmd
+    cmp $6AAC
+    bne .gen
+    cpy #$80
+    beq .cret
+    cpy #$40
+    beq .cret
+.gen:
+    cpy #$80
+    beq .r
+    cpy #$40
+    beq .l
+    cpy #$20"""),
+    (""".u:
+    dec $6AAB
+    rts
+""", """.u:
+    dec $6AAB
+    rts
+.cmd:
+    cpy #$80
+    beq .cr
+    cpy #$40
+    beq .cl
+    cpy #$20
+    beq .cd
+    cpy #$10
+    beq .cu
+.cret:
+    rts
+.cr:
+    lda $6AAB
+    bne .cret
+    lda #1
+    sta $6AAA
+    rts
+.cl:
+    lda #0
+    sta $6AAA
+    rts
+.cd:
+    lda $6AAA
+    beq .d
+    lda #0
+    sta $6AAA
+    lda #1
+    sta $6AAB
+    rts
+.cu:
+    lda $6AAA
+    bne .cret
+    beq .u
+"""),
 ]
 ITEMFLIP = 0xF633   # fixed bank, after the panel-clear hook ($F625-$F632)
 
@@ -1934,6 +2066,160 @@ wpnfix:             ; b12:ADAB, armed member: $88 = weapon data, $80 = battle st
     lda ($88),y
     ldy #$04
     sta ($80),y     ; element
+    rts
+"""
+
+
+# Enemy target cursor (owner: free selection). FF1 only cycles through the enemy list
+# with up / down (b12 $9BAD); here each direction picks the nearest living enemy that way
+# by the cursor positions ($6AAC: x, y per slot; score = half the distance along the
+# direction + the distance across it). Up / down with nothing that way cycle the list as
+# FF1 did, left / right then stay.
+ETARGET_SRC = """
+ET_CX = $6DC0
+ET_CY = $6DC1
+ET_BS = $6DC2
+ET_BI = $6DC3
+ET_D = $6DC4
+ET_AX = $6DC5
+etarget:
+    lda $68B3
+    ldx #$80
+    asl a
+    bcs .dir
+    ldx #$40
+    asl a
+    bcs .dir
+    ldx #$20
+    asl a
+    bcs .dir
+    ldx #$10
+    asl a
+    bcs .dir
+    rts
+.dir:
+    stx ET_D
+    lda $6AAA
+    asl a
+    tay
+    lda $6AAC,y
+    sta ET_CX
+    lda $6AAD,y
+    sta ET_CY
+    lda #$FF
+    sta ET_BS
+    sta ET_BI
+    ldx #0
+.lp:
+    cpx $6AAA
+    beq .nx
+    lda $6AEF,x
+    cmp #$FF
+    beq .nx
+    txa
+    asl a
+    tay
+    lda ET_D
+    and #$C0
+    beq .vert
+    lda $6AAD,y         ; left / right: across = |dy|, along = dx
+    sec
+    sbc ET_CY
+    jsr .abs
+    sta ET_AX
+    lda $6AAC,y
+    sec
+    sbc ET_CX
+    bit ET_D
+    bmi .pos
+    jmp .neg
+.vert:
+    lda $6AAC,y         ; up / down: across = |dx|, along = dy
+    sec
+    sbc ET_CX
+    jsr .abs
+    sta ET_AX
+    lda $6AAD,y
+    sec
+    sbc ET_CY
+    pha
+    lda ET_D
+    cmp #$20
+    beq .dn
+    pla
+    jmp .neg
+.dn:
+    pla
+.pos:
+    cmp #0
+    beq .nx
+    bmi .nx
+    jmp .sc
+.neg:
+    cmp #0
+    bpl .nx
+    eor #$FF
+    clc
+    adc #1
+.sc:
+    lsr a
+    clc
+    adc ET_AX
+    cmp ET_BS
+    bcs .nx
+    sta ET_BS
+    stx ET_BI
+.nx:
+    inx
+    cpx #9
+    bne .lp
+    ldx ET_BI
+    cpx #$FF
+    beq .none
+.set:
+    stx $6AAA
+    lda $6AEF,x
+    sta $6B7B
+    rts
+.none:
+    lda ET_D
+    cmp #$20
+    beq .next
+    cmp #$10
+    beq .prev
+    rts
+.next:              ; FF1's down: next living enemy in the list
+    lda $6AAA
+    cmp $6AAB
+    bne .n1
+    lda #$FF
+    sta $6AAA
+.n1:
+    inc $6AAA
+    ldx $6AAA
+    lda $6AEF,x
+    cmp #$FF
+    beq .next
+    bne .set
+.prev:              ; FF1's up: previous one
+    lda $6AAA
+    bne .p1
+    lda $6AAB
+    sta $6AAA
+    inc $6AAA
+.p1:
+    dec $6AAA
+    ldx $6AAA
+    lda $6AEF,x
+    cmp #$FF
+    beq .prev
+    bne .set
+.abs:
+    bpl .ab
+    eor #$FF
+    clc
+    adc #1
+.ab:
     rts
 """
 

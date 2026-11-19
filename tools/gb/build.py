@@ -136,14 +136,20 @@ def main():
     covs = sorted(glob.glob(os.path.join(opt['--cov'], '*.bin')))
     if not covs: raise SystemExit('no coverage logs in %s (run tools/gb/covall.py)' % opt['--cov'])
     shf = os.path.join(opt['--cov'], 'rom.sha1')
+    old_rom = None
     if os.path.exists(shf) and open(shf).read().split()[0] != hashlib.sha1(open(nes, 'rb').read()).hexdigest():
         print('WARNING: coverage in %s is from another NES ROM: run tools/gb/covall.py %s %s'
               % (opt['--cov'], nes, opt['--cov']))
+        if os.path.exists(os.path.join(opt['--cov'], 'rom.nes')):     # (covall keeps a copy)
+            old_rom = open(os.path.join(opt['--cov'], 'rom.nes'), 'rb').read()
     t = time.time()
     entries = []                                      # far routines (dispatched by farjsr)
     if os.path.exists(nes + '.far'):
         entries = [('far', int(l.split()[0], 16)) for l in open(nes + '.far') if l.strip()]
-    cm = CodeMap(nes, covs, entries).build()
+    cm = CodeMap(nes, covs, entries, old_rom)
+    if old_rom is not None:
+        print('  coverage of %d changed bytes dropped (static flow only there; check, then regenerate)' % cm.stale)
+    cm = cm.build()
     rc = Recompiler(cm)
     prg = open(nes, 'rb').read()[16:]
     for k, code in getattr(rc.g, 'idiom_code', {}).items():   # (fixed bank: the last 8KB)
