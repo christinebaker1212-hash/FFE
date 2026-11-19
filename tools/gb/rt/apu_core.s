@@ -532,97 +532,75 @@ apq_apply_b:
             ld l, a
             ld h, high(APQ_S0)
             push hl
-            ld c, 0
+            ld a, l
+            add a, 13
+            ld l, a
+            ld b, [hl]                      ; B = restart bits (shifted out as each channel's
+            pop hl                          ;   restart register passes: bit 0 = this channel)
+            ld c, 0                         ; C = register, HL = its value in the slot
 .lp:        ld a, c
             cp 9
             jr z, .nx
             cp 13
             jr z, .nx
-            pop hl
-            push hl
-            add a, l
-            ld l, a
             ld e, [hl]                      ; E = value
-            ld a, c
             and 3
             cp 3
             jr nz, .cv
-            pop hl                          ; restart register: if its note restarted
-            push hl
-            ld a, l
-            add a, 13
-            ld l, a
-            ld b, [hl]
-            ld a, c
-            rrca
-            rrca
-            and 3
-            inc a
-.rb:        srl b
-            dec a
-            jr nz, .rb
+            srl b                           ; restart register: sent if its note restarted
             jr nc, .nx
             jr .wr
-.cv:        ld a, c                         ; other registers: if the value changed
-            and $0B                         ; ($4002 / $4006, the pulse periods: against the
-            cp 2                            ;   value last applied, not the shadow: the sweep
-            jr nz, .sh                      ;   changes the shadow, and the old value sent
-            ld a, c                         ;   again each frame restarted the sweep)
-            rrca
-            rrca
+.cv:        ld a, c
+            and $0B
+            cp 2
+            jr nz, .sh
+            push hl                         ; $4002 / $4006 (pulse periods): against the value
+            ld a, c                         ;   last applied, not the shadow (the sweep changes
+            rrca                            ;   that); the same value is sent again only with
+            rrca                            ;   a note restart (the sweep may have moved it)
             and 1
-            ld d, a                         ; D = pulse
             add a, low(APQ_LO)
             ld l, a
             ld h, high(APQ_LO)
             ld a, [hl]
             ld [hl], e
+            pop hl
             cp e
             jr nz, .wr
-            pop hl                          ; same value: sent only if its note restarts
-            push hl                         ;   (the sweep may have moved the period)
-            ld a, l
-            add a, 13
-            ld l, a
-            ld a, [hl]
-            bit 0, d
-            jr z, .r0
-            rrca
-.r0:        rrca
-            jr c, .wr
+            bit 0, b
+            jr nz, .wr
             jr .nx
-.sh:        ld a, c
+.sh:        push hl                         ; other registers: if the value changed
+            ld a, c
             add a, low(APU_SH)
             ld l, a
             ld h, high(APU_SH)
             ld a, [hl]
+            pop hl
             cp e
             jr z, .nx
 .wr:        push bc
+            push hl
             ld l, c
             call apu_write
+            pop hl
             pop bc
-.nx:        inc c
+.nx:        inc hl
+            inc c
             ld a, c
             cp 16
             jr nz, .lp
-            pop hl                          ; $4015
-            push hl
-            ld a, l
-            add a, 13
-            ld l, a
-            bit 4, [hl]
+            bit 0, b                        ; $4015 written (byte 13 bit 4, now bit 0)
             jr z, .ns
-            pop hl
-            push hl
-            ld a, l
-            add a, 9
+            ld a, l                         ; its value: byte 9 (HL = slot + 16)
+            sub 7
             ld l, a
-            ld e, [hl]
+            jr nc, .b9
+            dec h
+.b9:        ld e, [hl]
             ld l, $15
             call apu_write
-.ns:        pop hl
-            call apu_frame
+.ns:        call apu_frame
             ldh a, [apq_n]                  ; dequeued: head ^= 1, count - 1
             xor $80
             dec a

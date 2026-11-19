@@ -742,7 +742,7 @@ def emit_program(rc):
                     elif i.mn != 'JSR' or True:
                         out.append('    call rt_fatal')
     # stubs (bank 0)
-    stubs = ['section bank 0, $22A0']
+    stubs = ['section bank 0, $2400']
     for lab in sorted(xrefs):
         stubs += ['xs_%s:' % lab, '    ldh [sv_a], a', '    ld a, bank(%s)' % lab, '    ldh [fc_bank], a',
                   '    ldh a, [sv_a]', '    ld hl, %s' % lab, '    jp rt_farcall',

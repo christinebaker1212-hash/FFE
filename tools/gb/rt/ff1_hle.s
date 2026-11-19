@@ -352,6 +352,13 @@ hle_vtile:                                  ; far vtile (bank HLE_BANK: vtile_b)
             ld [$2000], a
             call vtile_b
             jp hle_back
+hle_vstr:                                   ; far vstr (bank HLE_BANK: vstr_b)
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            call vstr_b
+            jp hle_back
 
 ; b12:BF8F (battle, every frame): swap $0090-$009F with $6D97-$6DA6 (LDA/PHA/LDA/STA/PLA/
 ; STA, X 0-15). Out: X = 16, Y = 0, A = the old $009F; N = 0, Z = 1, C kept.

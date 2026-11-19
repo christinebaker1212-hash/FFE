@@ -268,7 +268,43 @@ nt_tile:    ld a, h
             jr z, .nd
             call dlg_cell
             ret nz
-.nd:        ldh a, [is_cgb]
+.nd:        ldh a, [sh_same]                ; the same tile again, from the nametable that
+            and a                           ;   owns the cell: nothing changes (FF1 rewrites
+            jr z, .nd2                      ;   whole panels and rows)
+            push de
+            push hl
+            ld a, l
+            and 7
+            add a, low(NBIT)
+            ld e, a
+            ld d, high(NBIT)
+            ld a, [de]
+            ld e, a                         ; E = the cell's bit
+            ld a, l
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld d, a
+            ld a, b
+            swap a
+            add a, a
+            or d
+            ld l, a
+            ld h, high(OWN)
+            ld a, [hl]
+            and e                           ; NZ: nametable 1 owns it
+            pop hl
+            pop de
+            jr z, .o0
+            ld a, c
+            and a
+            ret nz
+            jr .nd2
+.o0:        ld a, c
+            and a
+            ret z
+.nd2:       ldh a, [is_cgb]
             and a
             jr z, .dmg
             call own_set                    ; this nametable owns the GB cell
@@ -2821,4 +2857,177 @@ dlg_w:      push af
 .x:         pop hl
             pop bc
             pop af
+            ret
+
+; ---- far vstr / vchar (tools/ff1/gb_layout.py VWF_SRC), natively: A = index into VSTR; draws
+; VSTR from there up to index VEND or a 0 into the line buffer VBUF (1 bit per pixel, 8 rows
+; per tile, tile-major), $FD $80+n moving the pen to tile n. RAM as the NES routines leave it
+; (VC, VX, VSQ, VCNT, VSH, VT2, VOFF, VLO, $88/$89 = the last glyph's rows, VBUF); the
+; callers use no register after it. Glyph tables vw_gw / vw_gr: copies of the far bank's GW /
+; GR made by build.py (codes $7A-$FF).
+VW_BUF     = $AE00          ; (cart RAM bank 0 = NES $6000-$7FFF)
+VW_VX      = $AE90
+VW_VN      = $AE91
+VW_VCNT    = $AE93
+VW_VSH     = $AE94
+VW_VOFF    = $AE95
+VW_VLO     = $AE96
+VW_VT2     = $AE97
+VW_VC      = $AE99
+VW_VEND    = $AEA6
+VW_VSTR    = $AEB0
+VW_VSQ     = $C346          ; (NES $0346)
+VW_FIRST   = $7A
+vstr_b:     call vstr_n                     ; (out: B = D = 0, as the recompiled code keeps
+            ld b, 0                         ;   them: BC = Y, DE = X)
+            ld d, 0
+            ret
+vstr_n:     ld [VW_VC], a
+.l:         ld a, [VW_VEND]
+            ld c, a
+            ld a, [VW_VC]
+            cp c
+            ret nc                          ; index >= VEND
+            add a, low(VW_VSTR)
+            ld l, a
+            ld h, high(VW_VSTR)
+            ld a, [hl]
+            and a
+            ret z
+            cp $FD
+            jr nz, .c
+            inc l                           ; $FD $80+n: pen to tile n
+            ld a, [hl]
+            sub $80
+            add a, a
+            add a, a
+            add a, a
+            ld [VW_VX], a
+            ld hl, VW_VC
+            inc [hl]
+            jr .n
+.c:         call vchar_n
+.n:         ld hl, VW_VC
+            inc [hl]
+            jr nz, .l
+            ret
+
+vchar_n:    cp $FD
+            ret z
+            cp $FF
+            jr nz, .g
+            ld a, [VW_VX]                   ; space: 3 pixels
+            add a, 3
+            ld [VW_VX], a
+            ret
+.g:         sub VW_FIRST
+            ret c
+            ld e, a                         ; E = glyph
+            ld hl, vw_gw
+            add a, l
+            ld l, a
+            jr nc, .w
+            inc h
+.w:         ld a, [hl]
+            and a
+            ret z
+            ld [VW_VCNT], a
+            ld l, e                         ; HL = glyph * 8
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            push hl
+            ld bc, VW_GR_NES                ; $88/$89 = GR + glyph * 8 (NES address)
+            add hl, bc
+            ld a, l
+            ld [NES_RAM + $88], a
+            ld a, h
+            ld [NES_RAM + $89], a
+            pop hl
+            ld bc, vw_gr
+            add hl, bc                      ; HL = the glyph's rows
+            ld a, [VW_VX]
+            and 7
+            ld [VW_VSH], a
+            ld d, a                         ; D = shift
+            ld a, [VW_VX]
+            srl a
+            srl a
+            srl a
+            ld b, a                         ; B = tile
+            ld a, [VW_VN]
+            ld c, a                         ; C = tiles in the line
+            ld a, b
+            cp c
+            jr nc, .adv
+            ld [VW_VT2], a
+            add a, a
+            add a, a
+            add a, a
+            ld [VW_VOFF], a
+            ld e, a                         ; E = buffer offset of the row
+            inc b                           ; B = 1 if the next tile is in the line
+            ld a, b
+            cp c
+            ld b, 0
+            jr nc, .nb
+            inc b
+.nb:        ld c, 8                         ; C = rows left
+.row:       ld a, [hl+]
+            push hl
+            and a
+            jr nz, .px
+            ld [VW_VLO], a                  ; (VLO = 0 for an empty row)
+            jr .nx
+.px:        push bc
+            ld c, 0                         ; A:C = row shifted right by the pen's pixel
+            inc d
+            dec d
+            jr z, .ns
+            push de
+.sh:        srl a
+            rr c
+            dec d
+            jr nz, .sh
+            pop de
+.ns:        ld h, high(VW_BUF)
+            ld l, e
+            or [hl]
+            ld [hl], a
+            ld a, c
+            ld [VW_VLO], a
+            pop bc
+            and a
+            jr z, .nx
+            dec b
+            inc b
+            jr z, .nx
+            ld a, l
+            add a, 8
+            ld l, a
+            ld a, [VW_VLO]
+            or [hl]
+            ld [hl], a
+.nx:        pop hl
+            inc e
+            dec c
+            jr nz, .row
+.adv:       ld hl, VW_VSQ                   ; a squeezed word: no gap after the letter
+            ld a, [hl]
+            and a
+            jr z, .gap
+            dec [hl]
+            ld a, [VW_VCNT]
+            ld b, a
+            ld a, [VW_VX]
+            add a, b
+            ld [VW_VX], a
+            ret
+.gap:       ld a, [VW_VCNT]
+            ld b, a
+            ld a, [VW_VX]
+            scf
+            adc a, b
+            ld [VW_VX], a
             ret

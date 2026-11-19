@@ -71,7 +71,7 @@ MAP_RB     = $CCFF          ; CGB masked load: GB map to rebuild from the shadow
 CGB_RP     = $CCEF          ; CGB: cell palettes stale (owners changed with the LCD off; repal_b at LCD on)
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
-EMPH_RGB   = $3A00          ; CGB: NES colours with emphasis e (1-7) at EMPH_RGB + e * $80
+EMPH_E     = $DC46          ; CGB: NES emphasis bits (red 1, green 2, blue 4) of the palettes being made
 STAGE      = $D000          ; CGB WRAM bank 2: BG tiles (4KB), bank 3: sprite slots (2KB)
 OWN        = $DD00          ; GB map cell -> nametable that drew it (bit set: nametable 1), 128 bytes
 BG_SHADOW  = $B000          ; DMG shading (rt/dmg_shade.s): NES BG tiles, cart RAM bank 1
@@ -1156,19 +1156,11 @@ make_palettes:
 cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ palettes 0-3
             push de                         ;   (RGB555 from NES_RGB, $3E00, or EMPH_RGB with
             ldh a, [ppu_mask]               ;   the NES emphasis bits; colour 0 of each BG
-            and $E0                         ;   palette is the universal backdrop)
-            jr nz, .em
+            and $E0                         ;   palette is the universal backdrop; with the
+            swap a                          ;   emphasis bits e, the other components dimmed
+            rrca                            ;   to 3/4 as the 2C02 roughly does: the battle-
+            ld [EMPH_E], a                  ;   start flashes)
             ld de, NES_RGB
-            jr .go
-.em:        ld e, a                         ; DE = EMPH_RGB + e * $80 (A = e << 5)
-            ld d, 0
-            sla e
-            rl d
-            sla e
-            rl d
-            ld a, d
-            add a, high(EMPH_RGB)
-            ld d, a
 .go:        ld a, $80
             ldh [$FF68], a
             ld hl, PAL_SH
@@ -1193,13 +1185,90 @@ cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ pa
             add a, e
             ld l, a
             ld h, d
+            ld a, [EMPH_E]
+            and a
+            jr nz, .dim
             ld a, [hl+]
             ldh [c], a
             ld a, [hl]
             ldh [c], a
-            pop hl
+.nx:        pop hl
             dec b
             jr nz, .lp
+            ret
+.dim:       push bc                         ; RGB555 with emphasis: r, g, b - x / 4 per the bits
+            ld a, [hl+]
+            ld c, a
+            ld b, [hl]
+            ld a, c                         ; H = red
+            and 31
+            ld h, a
+            ld a, [EMPH_E]
+            and 6
+            jr z, .r
+            ld a, h
+            call .q
+            ld h, a
+.r:         ld a, b                         ; L = green
+            and 3
+            add a, a
+            add a, a
+            add a, a
+            ld l, a
+            ld a, c
+            swap a
+            rrca
+            and 7
+            or l
+            ld l, a
+            ld a, [EMPH_E]
+            and 5
+            jr z, .g
+            ld a, l
+            call .q
+            ld l, a
+.g:         ld a, b                         ; B = blue
+            rrca
+            rrca
+            and 31
+            ld b, a
+            ld a, [EMPH_E]
+            and 3
+            jr z, .b
+            ld a, b
+            call .q
+            ld b, a
+.b:         ld a, l                         ; C = low byte: red | green << 5
+            and 7
+            swap a
+            add a, a
+            or h
+            ld c, a
+            ld a, b                         ; B = high byte: green >> 3 | blue << 2
+            add a, a
+            add a, a
+            ld b, a
+            ld a, l
+            srl a
+            srl a
+            srl a
+            or b
+            ld h, a
+            ld l, c
+            pop bc
+            ld a, l
+            ldh [c], a
+            ld a, h
+            ldh [c], a
+            jr .nx
+.q:         push bc                         ; A = A - A / 4
+            ld b, a
+            srl a
+            srl a
+            cpl
+            inc a
+            add a, b
+            pop bc
             ret
 
 attr_apply:                                 ; A = attribute index i (0-63, + $40: nametable 1):
@@ -1549,22 +1618,10 @@ rt_wait_nmi:
             ldh a, [is_sgb]
             and a
             call nz, sgb_frame
-            push hl                         ; pacing: each NES frame takes one GB frame.
-            ld a, [VBL_SEEN]                ;   A frame that ran long leaves frames not
-            ld l, a                         ;   taken yet: the next waits return at once
-            ld a, [VBL_CNT]                 ;   until the game is back in step (its speed
-            sub l                           ;   and the music keep time; the picture
-            jr z, .w                        ;   drops a frame instead). At most CATCH_UP.
-            cp CATCH_UP + 1
-            jr c, .tk
-            ld a, [VBL_CNT]
-            sub CATCH_UP
-            ld l, a
-.tk:        inc l
-            ld a, l
-            ld [VBL_SEEN], a
-            jr .go
-.w:         halt
+            push hl                         ; pacing as the NES (owner: no speed-ups): the
+            ld a, [VBL_CNT]                 ;   wait ends at the next vblank; a frame that
+            ld l, a                         ;   ran long is simply late, as on the NES (FF1
+.w:         halt                            ;   misses an NMI the same way), no catch-up
             ld a, [VBL_CNT]
             cp l
             jr z, .w
@@ -2041,9 +2098,48 @@ rt_ppu_w7g: push af
             ld [hl], d
             ldh a, [dlg_on]                 ; a dialogue box's cell: to the window
             and a
-            jr z, .map
+            jr z, .same
             call dlg_cell
             jp nz, .done
+.same:      ldh a, [sh_same]                ; the same tile again, from the nametable that
+            and a                           ;   owns the cell: nothing changes
+            jr z, .map
+            push de
+            push hl
+            ld a, l
+            and 7
+            ld e, a
+            ld a, 1
+            inc e
+.sb:        dec e
+            jr z, .sd
+            add a, a
+            jr .sb
+.sd:        ld e, a                         ; E = the cell's bit
+            ld a, l
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld d, a
+            ld a, b
+            swap a
+            add a, a
+            or d
+            ld l, a
+            ld h, high(OWN)
+            ld a, [hl]
+            and e                           ; NZ: nametable 1 owns it
+            pop hl
+            pop de
+            jr z, .s0
+            ld a, c
+            and a
+            jp nz, .done
+            jr .map
+.s0:        ld a, c
+            and a
+            jp z, .done
 .map:       call own_set                    ; this nametable now owns the GB map cell
             ldh a, [is_cgb]
             and a

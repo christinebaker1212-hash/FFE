@@ -98,10 +98,7 @@ def nes_rgb_src():
                 if e & 3: b = b * 3 // 4
             vals.append(str((r >> 3) | (g >> 3) << 5 | (b >> 3) << 10))
         return ''.join('    dw %s\n' % ', '.join(vals[k:k + 8]) for k in range(0, 64, 8))
-    out = 'section bank 0, $3E00\nNES_RGB:\n' + table(0)
-    for e in range(1, 8):
-        out += 'section bank 0, $%04X\n' % (0x3A00 + e * 0x80) + table(e)
-    return out
+    return 'section bank 0, $3E00\nNES_RGB:\n' + table(0)     # (emphasis: computed, runtime.s)
 
 
 def apu_tables():
@@ -143,7 +140,22 @@ def nes_english(src, out_dir, gb=False):
     return out
 
 
-FAR_EXT = {'vtile': ('hle_vtile', 'NZC')}         # gb_layout.py's small-font tile upload
+FAR_EXT = {'vtile': ('hle_vtile', 'NZC'),        # gb_layout.py's small-font tile upload
+           'vstr': ('hle_vstr', 'NZC')}          #   and text renderer (rt/ff1_native.s)
+FAR_BANK = 40                                     # (8 KB bank of the far code)
+
+
+def vwf_tables(prg, far_sym):
+    """The small-font glyph tables (widths GW, rows GR, codes $7A-$FF) copied from the far bank
+    of the English NES ROM into the native bank for vstr_b (rt/ff1_native.s)."""
+    n = 256 - 0x7A
+    if 'GW' not in far_sym or 'GR' not in far_sym:
+        return 'VW_GR_NES = 0\nsection bank HLE_BANK, $7A00\nvw_gw:\nvw_gr:\n'
+    off = lambda a: FAR_BANK * 0x2000 + a - 0xC000
+    gw = prg[off(far_sym['GW']):off(far_sym['GW']) + n]
+    gr = prg[off(far_sym['GR']):off(far_sym['GR']) + 8 * n]
+    rows = lambda b: '\n'.join('            db ' + ', '.join('$%02X' % x for x in b[i:i + 16]) for i in range(0, len(b), 16))
+    return ('VW_GR_NES = $%04X\nsection bank HLE_BANK, $7A00\nvw_gw:\n%s\nvw_gr:\n%s\n' % (far_sym['GR'], rows(gw), rows(gr)))
 
 
 def main():
@@ -191,13 +203,16 @@ def main():
                62 * 0x2000 + k[1] - 0xC000 if k[0] == 'c62' else None)
         if off is None or prg[off:off + len(code)] != code:
             print('  idiom %s:%04X: code not found, not used' % k); rc.g.idioms.pop(k, None)
+    far_sym = {}
     if os.path.exists(nes + '.farsym'):              # far routines run natively (rt/ff1_native.s)
         for l in open(nes + '.farsym'):
             a, n = l.split()
+            far_sym[n] = int(a, 16)
             if n in FAR_EXT: rc.g.ext[('far', int(a, 16))] = FAR_EXT[n]
     prog, bank_of, banks = emit_program(rc)
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s', 'sgb.s'))
     rt += '\n' + apu_tables() + '\n' + open(os.path.join(HERE, 'rt', 'apu_core.s')).read()
+    rt += '\n' + vwf_tables(prg, far_sym)            # (before ff1_native.s: VW_GR_NES)
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ff1_native.s')).read()
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ramchk.s')).read() + '\n' + ramchk_src()
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(
