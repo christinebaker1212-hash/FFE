@@ -458,7 +458,56 @@ hle_pclr:   push af
 
 ; ---- fix:FA5B-FA66: LDY #0 / 64 x (LDA ($90),Y / STA $5F80,Y): 64 bytes to ExRAM $5F80.
 ; Out: A = the last byte, Y = $40, X kept; N = 0, Z = 1, C = 1.
-hle_cp64:   ld c, 0
+hle_cp64:   ld a, [NES_RAM + $90]           ; source in one 8 KB area of ROM or save RAM:
+            ld l, a                         ;   one bank switch, then a plain copy
+            ld a, [NES_RAM + $91]
+            ld h, a
+            ld a, l
+            add a, $3F
+            ld a, h
+            adc a, 0
+            xor h
+            and $E0
+            jr nz, .slow                    ; (crosses an 8 KB boundary: byte by byte)
+            ld a, h
+            cp $60
+            jr c, .slow
+            cp $80
+            jr nc, .rom
+            add a, $40                      ; save RAM $6000 -> $A000
+            ld h, a
+            jr .cp
+.rom:       cp $C0
+            jr nc, .rc
+            sub $40                         ; $8000-$BFFF: data_bank8 at $4000
+            ld h, a
+            ldh a, [data_bank8]
+            jr .bk
+.rc:        cp $E0
+            jr nc, .re
+            sub $80                         ; $C000-$DFFF: data_bankC at $4000
+            ld h, a
+            ldh a, [data_bankC]
+            jr .bk
+.re:        sub $80                         ; $E000-$FFFF: the fixed bank's data at $6000
+            ld h, a
+            ld a, DATA + 31
+.bk:        ld [$2000], a
+.cp:        push de                         ; (E = X: kept)
+            ld de, EX_RAM + $380
+            ld c, $40
+.cl:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec c
+            jr nz, .cl
+            pop de
+            ld b, a
+            ldh a, [code_bank]
+            ld [$2000], a
+            ld c, $40
+            jr .out
+.slow:      ld c, 0
 .l:         ld a, [NES_RAM + $90]
             ld l, a
             ld a, [NES_RAM + $91]
@@ -476,7 +525,7 @@ hle_cp64:   ld c, 0
             ld a, c
             cp $40
             jr nz, .l
-            xor a
+.out:       xor a
             ldh [nzv], a
             ld a, b                         ; A = the last byte; Z = 1, C = 1 (CPY #$40)
             ld b, 0
