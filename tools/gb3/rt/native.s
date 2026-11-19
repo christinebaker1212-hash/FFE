@@ -64,14 +64,12 @@ nat_9111:   ld a, e
             ld [NES_RAM + $83], a
             ld bc, 0
             ld a, [NES_RAM + $90]           ; A = frame, X = 6, C = 1 (from CPY #$18):
-            ld e, 6                         ;   the NES multiply ($F8EA: A = lo, X = hi)
-            scf
-            push af
-            ld a, bank(L_fix_F8EA)
-            ldh [fc_bank], a
-            pop af
-            ld hl, L_fix_F8EA
-            call rt_farcall
+            ld e, 6                         ;   the NES multiply ($F8EA = JSR $FCD6 / LDA $1A
+            scf                             ;   / LDX $1B)
+            call nat_fcd6
+            ld a, [NES_RAM + $1B]
+            ld e, a
+            ld a, [NES_RAM + $1A]
             add a, $2E                      ; $7E / $7F = $972E + 6 * frame
             ld [NES_RAM + $7E], a
             ld l, a
@@ -1172,4 +1170,75 @@ nat_bd2a:   ld hl, NES_RAM + $264
             ld hl, sp + 0
             set 7, [hl]
             pop af
+            ret
+
+; ------------------------------------------------------------------ p34:95E1
+; convert hex to decimal: $18/$19 -> $1A-$1D (ten-thousands .. tens, + $80; leading zeros $FF)
+; and $1E (units + $80), by repeated subtraction as the NES does. Left as the NES leaves it:
+; $18 = units, $19 = 0, $1F = $FF, $20 / $21 = 10 / 0, X = 3, Y kept; A and flags from the
+; leading-zero scan: the first nonzero digit (Z = 0, N = 0, C = 1) or, all zero, $FF (N = 1,
+; Z = 0, C = 1).
+nat_95e1:
+            ld a, [NES_RAM + $18]
+            ld l, a
+            ld a, [NES_RAM + $19]
+            ld h, a
+            ld de, -10000
+            call .dg
+            ld [NES_RAM + $1A], a
+            ld de, -1000
+            call .dg
+            ld [NES_RAM + $1B], a
+            ld de, -100
+            call .dg
+            ld [NES_RAM + $1C], a
+            ld de, -10
+            call .dg
+            ld [NES_RAM + $1D], a
+            ld a, l
+            ld [NES_RAM + $18], a
+            add a, $80
+            ld [NES_RAM + $1E], a
+            xor a
+            ld [NES_RAM + $19], a
+            ld [NES_RAM + $21], a
+            ld d, a
+            ld b, a
+            ld a, $0A
+            ld [NES_RAM + $20], a
+            ld a, $FF
+            ld [NES_RAM + $1F], a
+            ld e, 3                         ; X
+            ld hl, NES_RAM + $1A
+.z:         ld a, [hl]                      ; leading zeros -> $FF
+            cp $80
+            jr nz, .nz
+            ld a, $FF
+            ld [hl+], a
+            inc b
+            bit 2, b
+            jr z, .z
+            ld b, 0
+            ldh [nzv], a                    ; all zero: A = $FF, N = 1, Z = 0, C = 1
+            or a
+            scf
+            ret
+.nz:        ld b, 0                         ; A = the digit ($80 + d): Z = 0, N = 0, C = 1
+            push af
+            xor a
+            ldh [nzv], a
+            pop af
+            scf
+            ret
+.dg:        ld b, $7F                       ; A = $80 + HL / K, HL = HL mod K (DE = -K)
+.dl:        inc b
+            add hl, de
+            jr c, .dl
+            ld a, l                         ; (one subtraction too many: add K back)
+            sub e
+            ld l, a
+            ld a, h
+            sbc a, d
+            ld h, a
+            ld a, b
             ret
