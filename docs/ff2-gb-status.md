@@ -239,8 +239,12 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   CGB total +0.9%, battle entry (wait 9506) +110 -> +58 frames; DMG total +5.8%, battle
   entry +219 -> +93, plus +94 at wait 3356 and +90 at wait 1531 (screen loads before the
   battle). RAM identical (DMG and CGB, 10592 waits).
-- Next: the remaining battle-entry time (attribute writes `attr_apply`, FF2's multiply /
-  divide `fix:FC79-FD00`, tile marks), DMG screen loads (waits 1531, 3356), GB tile upload
+- Native CHR copies `fix:E50E` (pages from ($80)) and `fix:E51E` (bytes from ($80),Y),
+  through `copy_core` (whole tiles from ROM in one go, else byte by byte): screen loads at
+  waits 1531 / 3356: CGB +40 / +39 -> +11 / +11, DMG +94 / +90 -> +24 / +20. Totals (seed 1
+  to wait 9800): CGB +0.3%, DMG +4.4%. RAM identical (DMG and CGB).
+- Next: the remaining battle-entry time (wait 9506: CGB +58, DMG +93; attribute writes
+  `attr_apply`, FF2's multiply / divide `fix:FC79-FD00`, tile marks), GB tile upload
   latency.
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).

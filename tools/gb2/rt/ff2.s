@@ -877,6 +877,222 @@ hle_fill_nt:
             pop bc
             ret
 
+; fix:E50E "copy large data to ppu" (Y = 0; X pages of 256 bytes from ($80), INC $81 per
+; page) and fix:E51E "copy data to ppu" (X bytes from ($80),Y): through copy_core. Exits as
+; the NES loops leave things: A = last byte, X = 0, Z = 1, N = 0, C kept; E50E: Y = 0 and
+; $81 advanced; E51E: Y advanced (8 bits).
+hle_copy_e50e:
+            push af                         ; caller's carry
+.pg:        ld a, [NES_RAM + $81]
+            ld h, a
+            ld a, [NES_RAM + $80]
+            ld l, a
+            push de
+            ld e, 0                         ; 256 bytes
+            call copy_core
+            pop de
+            ld hl, NES_RAM + $81
+            inc [hl]
+            dec e
+            jr nz, .pg
+            ld c, 0                         ; Y = 0
+            jr hle_copy_x
+hle_copy_e51e:
+            push af
+            ld a, c                         ; byte by byte if Y would wrap
+            add a, e
+            jr c, .w
+            jr z, .w2
+            jr .nw
+.w2:        ld a, e                         ; (Y + X = 256: no wrap unless X = 0)
+            and a
+            jr z, .w
+.nw:        ld a, [NES_RAM + $81]
+            ld h, a
+            ld a, [NES_RAM + $80]
+            ld l, a
+            ld b, 0
+            add hl, bc                      ; source = ($80) + Y
+            ld a, c
+            add a, e
+            ld c, a                         ; Y += X
+            call copy_core
+            ld b, 0
+            jr hle_copy_x
+.w:         ld l, $80                       ; generic: LDA ($80),Y / STA $2007 / INY / DEX
+            call rt_izy_rd
+            ld a, l
+            ldh [tmp_lo], a
+            call rt_ppu_w7
+            inc c
+            dec e
+            jr nz, .w
+hle_copy_x: ld b, 0
+            ld d, 0
+            ld e, 0                         ; X = 0
+            xor a
+            ldh [nzv], a
+            pop af                          ; carry back
+            ldh a, [tmp_lo]                 ; A = last byte
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1
+            ret
+
+; HL = NES source, E = count (0 = 256) -> the PPU at its address (tmp_lo = last byte).
+; Whole tiles of a pattern table from ROM $8000-$BEFF in one go each (as hle_ppucopy),
+; else byte by byte. Keeps C; B, D, E, HL clobbered.
+copy_core:  ld a, e
+            and $0F
+            jp nz, .slow
+            ldh a, [ppu_ctrl]
+            and 4
+            jp nz, .slow
+            ldh a, [ppu_vh]
+            cp $20
+            jp nc, .slow
+            ldh a, [ppu_vl]
+            and $0F
+            jp nz, .slow
+            ld a, h
+            cp $80
+            jp c, .slow
+            cp $BF
+            jp nc, .slow
+            ldh a, [lcd_on]                 ; LCD on: CGB only (tile copy + DMA marks)
+            and a
+            jr z, .lok
+            ldh a, [is_cgb]
+            and a
+            jp z, .slow
+.lok:       ld a, e
+            swap a
+            and $0F
+            jr nz, .tn
+            ld a, 16
+.tn:        ldh [uw_y], a
+            ld a, h                         ; GB $4000 + source - $8000 (data bank)
+            sub $40
+            ld h, a
+            ldh a, [data_bank8]
+            ld [$2000], a
+.tile:      ldh a, [ppu_vl]
+            and $F0
+            ld e, a
+            ldh a, [ppu_vh]
+            ld d, a
+            and $10
+            ld b, a
+            ldh a, [ppu_ctrl]
+            and $10
+            xor b
+            ld a, d                         ; (flags kept)
+            jr nz, .spr
+            and $0F
+            ld d, a
+            ldh a, [is_cgb]
+            and a
+            ld a, d
+            jr nz, .bgv
+            add a, high(BG_SHADOW)          ; DMG: BG tile to the shadow, re-coded later
+            ld d, a
+            ld a, 1
+            ld [$4000], a
+            jr .copy
+.bgv:       ld d, a
+            ldh a, [lcd_on]
+            and a
+            ld a, d
+            jr nz, .bgs
+            cp $08                          ; CGB, LCD off: VRAM (tiles 0-127 $9000, 128-255 $8800)
+            ld d, $90
+            jr c, .bg0
+            ld d, $80
+.bg0:       and $0F
+            add a, d
+            ld d, a
+            jr .copy
+.bgs:       add a, $D0                      ; CGB, LCD on: the tile copy (WRAM bank 2), marked
+            ld d, a
+            ld a, 2
+            ldh [$FF70], a
+            jr .copy
+.spr:       and $0F                         ; sprite table: the shadow (cart RAM bank 1)
+            add a, high(SPR_SHADOW)
+            ld d, a
+            ld a, 1
+            ld [$4000], a
+.copy:      ld b, 8
+.p0:        ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            dec b
+            jr nz, .p0
+            ld a, e
+            sub 15
+            ld e, a
+            ld b, 8
+.p1:        ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            dec b
+            jr nz, .p1
+            ldh [tmp_lo], a                 ; last byte
+            ld a, d
+            cp $D0
+            jr c, .nst
+            ld a, 1                         ; tile copy: WRAM bank 1 again, mark the tile
+            ldh [$FF70], a
+            push hl
+            ld a, e
+            sub 17
+            swap a
+            and $0F
+            ld e, a
+            ld a, d
+            sub $D0
+            swap a
+            or e
+            ld hl, BG_DIRTY
+            call hd_mark
+            pop hl
+            jr .nx
+.nst:       cp $80
+            jr c, .nvr
+            cp $A0                          ; (VRAM $80-$97: nothing to mark)
+            jr c, .nx
+.nvr:       cp high(BG_SHADOW)
+            jr c, .spm
+            call ff2_bg_tile
+            jr .nx
+.spm:       call ff2_spr_tile
+.nx:        ldh a, [ppu_vl]                 ; v += 16
+            add a, 16
+            ldh [ppu_vl], a
+            ldh a, [ppu_vh]
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            ldh a, [uw_y]
+            dec a
+            ldh [uw_y], a
+            jr nz, .tile
+            ldh a, [code_bank]
+            ld [$2000], a
+            ret
+.slow:      push hl
+            call nes_rd
+            ld a, l
+            ldh [tmp_lo], a
+            call rt_ppu_w7
+            pop hl
+            inc hl
+            dec e
+            jr nz, .slow
+            ret
+
 ff2_bg_tile:                                ; DMG BG tile in the shadow (DE = start + 17, cart
             xor a                           ;   RAM bank 1 on): queue its re-coding; RAM bank 0
             ld [$4000], a
