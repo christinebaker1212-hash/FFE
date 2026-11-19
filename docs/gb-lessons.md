@@ -65,6 +65,30 @@ it in FF1 (file / routine names in this repo).
   about towns.
 - The dynamic-target lookup must not be a linear search in bank 0 (it overflowed and was
   slow): buckets by low byte in its own bank (`dyn_buckets`, DYN_BANK 61).
+- **Frame wait: take the vblank count on entry**, before any spare-time work the wait does
+  (DMG shading checks, tile re-coding). Taken after it, work that ran past line 144 made the
+  wait sleep to the *following* vblank and lost a whole frame (the NES NMI comes during its
+  wait loop). This alone halved the town-walk lag on DMG.
+- **Flag liveness across unknown edges**: treating every flag as live at returns to unknown
+  callers made every ADC/SBC compute V (265 + 102 helper calls). FF1 reads V in a handful of
+  places; with PHP..PLP pairs (and PHP/PLA/AND/PHA/PLP masks) modelled and static-flow
+  "readers" inside executed instructions ignored, V is provably dead at unknown edges and all
+  of them compile to plain arithmetic (recomp.py `liveness`, prints its verdict).
+- **Batch, don't go per cell**: DrawMapRowCol (64 tiles), the battle panel rows (25 cells)
+  and the sprite conversion (64 entries) were 150-250 cycles per item through the generic
+  nametable path. Batched writers (`mdf_row/col`, `nrf`, `oamconv_b`) do the shadow in runs,
+  owner bits 8 at a time, VRAM two cells per STAT poll. Check preconditions exactly (an
+  "own1 == 0" shortcut never held in battle: test the run's own owner bits).
+- **The GB has ~59% of the NES's cycles per frame on DMG** (17,556 M-cycles vs 29,780):
+  native routines must be well under the 6502 cost, and runtime overhead per frame (sprite
+  conversion, OAM clear, indirect reads) is the budget everything else shares.
+- Profile by cycles, not instructions (`sgbrun` SGBRUN_PROFC=1 SGBRUN_PROF2=N); profile only
+  the waits that lag (SGBRUN_LAG + a list of waits); and remember a helper's [SP] is not the
+  caller when it pushes first (use a PyBoy hook at its entry instead).
+- **Prove every speed change on the picture**: build the old path behind a switch
+  (`GB_MDF=0`) and compare SameBoy VRAM, shadows and owner bits at many points
+  (scratch `vramcmp.py` approach). It caught a fast path that wrote the STAT value instead of
+  the tile (the poll reuses A) - RAM checks cannot see that.
 
 ## Testing
 

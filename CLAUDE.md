@@ -84,7 +84,7 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-19: hardware-test fixes, dialogue box)
+# GB port status (last updated 2026-11-19: DMG/CGB speed work)
 
 **Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
 **Handoff: `docs/gb-handoff.md`** (session setup, current battle-layout work, exact next steps).
@@ -804,8 +804,25 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   - Color tile DMA: the mark scan was slow enough that the DMA ran during drawing (garbled
     letters): byte-wise scan, DMA only at LY 144-151 (12 tiles a line).
 
+- **Speed, 2026-11-19 (later)** (lagcheck, Gambatte; details in `docs/gb-lessons.md` Speed):
+  frame wait takes the vblank count on entry (`VBL_ENT`); V flag dead at unknown edges (no
+  `rt_adc_v`/`rt_sbc_v` calls left); batched DrawMapRowCol writer `mdf_row`/`mdf_col` (DMG +
+  CGB bank-1 palettes; DMG cells marked in FRESH in bulk, as the per-tile path does); battle
+  panel rows `nrf`; sprite conversion `oamconv_b` (bank 62, unrolled scan); box row idiom
+  `hle_boxrow` (fix:F56A); small-font glyph rows unrolled, text tile coding in two passes;
+  (zp),Y reads/writes inline; DMG BG pattern pages with the LCD off copied whole.
+  `GB_MDF=0` builds the old per-tile paths: SameBoy VRAM identical to them on DMG and CGB
+  (town walk, battle). A skip added early this session (unmarked tiles not checked) was
+  reverted: every changed cell is checked again, as before.
+  Results: town walk (420 waits) DMG lag 111 -> 34 frames, CGB 38 -> ~0; battle (1450 waits)
+  DMG ~19% -> 3.4%, CGB ~0.1%; overworld walking keeps pace on both (remaining "lag" there is
+  the NES's own 2/0-frame jitter). Still slow on DMG: screen loads (battle start ~50 frames,
+  field entry ~66, intro/new-game screens 15-45: the LCD-on map scan and tile re-coding).
+  Tools: sgbrun SGBRUN_PROFC (cycle sampling), SGBRUN_PROF_SP; lagcheck LAG_KEEP.
+
 ## Remaining
-- FF1 (owner's list, 2026-11-19): DMG battle pacing (+19% in battle: must match the NES);
-  DMG fades: a simple fade (owner) instead of the NES palette steps; DMG battle palette wrong
-  on entry; names up to 6 letters; DMG transitions black; then the owner's play-test.
+- FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
+  (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette
+  steps; names up to 6 letters; music voices vs the NSF (sndcmp.py); then the owner's
+  play-test.
 - FF2: separate session (`docs/ff2-gb-brief.md`). FF3 (GBC only): not started.
