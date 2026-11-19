@@ -37,11 +37,14 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
 - NES coverage driver `tools/gb2/covrun.py` and `tools/gb2/covcheck.py` (executed
   instruction starts vs the source code map).
 
+- Coverage check (cynes, `covrun.py` seeds 1-4 × 60k frames from power-on, random input,
+  no crash): 14,464 executed instruction starts, all in the source code map except RAM
+  `$0100` (the NMI jump stub).
+- Plan for the owner: `docs/ff2-gb-plan.md`.
+
 ## In progress
-- Coverage check of the code map (4 seeds × 60k frames of random play on the English
-  NES build).
-- Plan for the owner (`docs/ff2-gb-plan.md`) with questions: Select-menu opening, re-layout
-  side, reuse of the FF1 recompiler.
+- Waiting for the owner: Select-menu opening (proposal: Select = new menu, FORMATION = the
+  row screen Select opens now, B+Select keeps the minimap) and OK for the approach.
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
