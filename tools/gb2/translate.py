@@ -25,6 +25,11 @@ RT_TABLES = DATA + 32       # runtime tables (sound)
 CODE0 = DATA + 33           # first GB bank holding recompiled code
 BANK_LIMIT = 0x4000 - 8     # bytes per code bank (room for a closing jump)
 ALL = frozenset('NZCV')
+# FF2: flags assumed live where control goes somewhere unknown (dynamic jumps / calls, returns to
+# them): not V. Every BVC / BVS in FF2 tests V from a BIT just before it (b11:9C32, A076, B102,
+# B186, B1D8, fix:C504, EDF3, FD49, FD5E), PHP / PLP keep their own liveness, so V from ADC / SBC
+# never reaches an unknown successor (350 ADC and 149 SBC sites stopped computing it).
+UNK = frozenset('NZC')
 
 DEF = {'ADC': 'NZCV', 'SBC': 'NZCV', 'AND': 'NZ', 'ORA': 'NZ', 'EOR': 'NZ', 'ASL': 'NZC', 'LSR': 'NZC',
        'ROL': 'NZC', 'ROR': 'NZC', 'BIT': 'NZV', 'CMP': 'NZC', 'CPX': 'NZC', 'CPY': 'NZC', 'DEC': 'NZ',
@@ -32,7 +37,9 @@ DEF = {'ADC': 'NZCV', 'SBC': 'NZCV', 'AND': 'NZ', 'ORA': 'NZ', 'EOR': 'NZ', 'ASL
        'TAX': 'NZ', 'TAY': 'NZ', 'TXA': 'NZ', 'TYA': 'NZ', 'TSX': 'NZ', 'PLA': 'NZ', 'CLC': 'C', 'SEC': 'C',
        'CLV': 'V', 'PLP': 'NZCV', 'RTI': 'NZCV', 'EXT': 'NZ'}
 USE = {'ADC': 'C', 'SBC': 'C', 'ROL': 'C', 'ROR': 'C', 'BCC': 'C', 'BCS': 'C', 'BEQ': 'Z', 'BNE': 'Z',
-       'BMI': 'N', 'BPL': 'N', 'BVC': 'V', 'BVS': 'V', 'PHP': 'NZCV'}
+       'BMI': 'N', 'BPL': 'N', 'BVC': 'V', 'BVS': 'V', 'PHP': 'NZC'}
+# (FF2: after each PLP the code tests C or Z only (b03:AD45, b11:9BA3, B98D, fix:C084, CB46,
+# EA9D; the battle NMI handlers' PLP / RTI restore their own context): PHP does not need V)
 BRANCH = {'BCC', 'BCS', 'BEQ', 'BNE', 'BMI', 'BPL', 'BVC', 'BVS'}
 
 
@@ -232,7 +239,7 @@ class Recompiler:
             k = work.pop(); i = ins[k]
             lo = frozenset()
             for s in outs[k]:
-                lo |= ALL if (s is None or s not in ins) else live_in[s]
+                lo |= UNK if (s is None or s not in ins) else live_in[s]
             if k in self.g.ext:
                 li = lo - frozenset(self.g.ext[k][1])
             elif k in self.g.idioms:
@@ -241,8 +248,8 @@ class Recompiler:
                 li = lo                                     # = live_in(callee), set via outs
             else:
                 li = frozenset(USE.get(i.mn, '')) | (lo - frozenset(DEF.get(i.mn, '')))
-                if i.mn == 'JMP' and i.mode == 'ind': li = ALL
-                if k in self.rts_dispatch: li = ALL
+                if i.mn == 'JMP' and i.mode == 'ind': li = UNK
+                if k in self.rts_dispatch: li = UNK
             if lo != live_out[k] or li != live_in[k]:
                 live_out[k], live_in[k] = lo, li
                 work.extend(preds[k])
