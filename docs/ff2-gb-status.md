@@ -217,8 +217,16 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   fewer gaps). Checked with statuses poked into the battle stats (+$08/+$09): "Stone",
   "Venom", "Dead"; firstdiff 12763 waits identical. (The NES slot is the maximum HP only;
   the GB line has no room for a word there, so MP is hidden while a status shows.)
-- Next: clear the bottom rows at battle start, hit knock-back past the right edge, item use in battle (Gear -> item), CGB
-  battle-entry speed, GB tile upload latency.
+- Item use in battle (2026-11-19): FF2's Gear cursor is a 2 x 2 grid (hands / items; left /
+  right switch the column); on the GB list of four lines up / down now step through all
+  four (`gear_updown`: b12:9BA8's down / up handlers, only for a 2 x 2 grid, code in the
+  dead parts of `b12:9147` / `b12:930C`); the slot chosen means the same as on the NES.
+  Checked: Potion / Antidote poked into the item slots, Down x2 + A + A uses the Potion;
+  firstdiff 12388 waits identical; random seed 1 30000 frames: 29494 waits identical.
+- DMG: at a battle start the bottom rows and the enemies are mis-shaded for ~55 frames
+  (the shading re-codes the battle tiles 3 per frame after the fade-in palettes; NES and
+  CGB show black there): for the DMG speed work.
+- Next: hit knock-back past the right edge, CGB battle-entry speed, GB tile upload latency.
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 

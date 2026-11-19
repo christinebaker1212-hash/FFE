@@ -2236,6 +2236,80 @@ def battle(rom):
     put(rom, 12, 0x9F3E, bytes([0x20]) + ent['gb_magcost'].to_bytes(2, 'little') + bytes([0x4C, 0x5A, 0x9F]),
         old=bytes.fromhex('a9238d0620'))
     loot(rom, ent)
+    gear_updown(rom)
+
+
+def gear_updown(rom):
+    """Gear window: FF2's cursor grid is 2 x 2 (hands, items: b12:9BA8 with $5D = 2 columns,
+    $5C = 2 rows; left / right switch the column); the GB window lists the four lines one
+    under the other, so up / down step through all four (column * 2 + row, wrapping) when
+    the grid is 2 x 2 (only the Gear window calls b12:9BA8 so). The slot chosen ($53 / $54)
+    means the same as on the NES. Code in the dead parts of b12:9147 (command pane) and
+    b12:930C (window copy), both turned into RTS above."""
+    a = asm('''
+    org $9148
+g22:                    ; C = 1 and A = column * 2 + row in a 2 x 2 grid, else C = 0
+    lda $5D
+    cmp #2
+    bne no
+    lda $5C
+    cmp #2
+    bne no
+    lda $53
+    asl a
+    ora $54
+    sec
+    rts
+no:
+    clc
+    rts
+gvdown:
+    jsr g22
+    bcc dn
+    adc #0
+gset:
+    and #3
+    lsr a
+    sta $53
+    lda #0
+    rol a
+    sta $54
+    rts
+dn:
+    inc $54
+    lda $54
+    cmp $5C
+    bne dx
+    lda #0
+    sta $54
+dx:
+    rts
+''')
+    assert a.org + len(a.bytes) <= 0x9187, hex(a.org + len(a.bytes))
+    put(rom, 12, a.org, a.bytes)
+    b = asm('''
+    org $930D
+gvup:
+    jsr G22
+    bcc un
+    sbc #1
+    jmp GSET
+un:
+    dec $54
+    bpl ux
+    ldx $5C
+    dex
+    stx $54
+ux:
+    rts
+''', syms=dict(G22=a.labels['g22'], GSET=a.labels['gset']))
+    assert b.org + len(b.bytes) <= 0x934A
+    put(rom, 12, b.org, b.bytes)
+    # down (b12:9C20-9C2E) / up (9C33-9C3E) handlers -> the wrappers, then JMP $9C6C
+    put(rom, 12, 0x9C20, bytes([0x20]) + a.labels['gvdown'].to_bytes(2, 'little') + bytes([0x4C, 0x6C, 0x9C]) + b'\xEA' * 9,
+        old=bytes.fromhex('e654a554c55cd004a90085544c6c9c'))
+    put(rom, 12, 0x9C33, bytes([0x20]) + b.labels['gvup'].to_bytes(2, 'little') + bytes([0x4C, 0x6C, 0x9C]) + b'\xEA' * 6,
+        old=bytes.fromhex('c6541005a65cca86544c6c9c'))
 
 
 def loot(rom, ent):
