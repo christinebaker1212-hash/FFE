@@ -12,9 +12,8 @@ MD_SRC     = $CCF4          ;   buffer offset of the first / second tile of a pa
 MD_IDX     = $CCF6          ;   source index,
 MD_ADD     = $CCF7          ;   column: +1 for the right-hand column
 MD_FAST    = $CCF8          ;   DMG with the LCD on: the batched writer (mdf_row / mdf_col),
-MD_MK      = MD_SRC         ;   (batched) a tile is marked or parked somewhere,
-MD_PB      = $DCE0          ;   CGB: palettes of a GB map row (32),
-TMK        = MD_PB          ;   DMG: tiles marked or parked (32: DIRTY_BM | DEFER_BM)
+MD_MK      = MD_SRC         ;   (batched) DMG: mark the drawn cells in FRESH,
+MD_PB      = $DCE0          ;   CGB: palettes of a GB map row (32)
 
 section bank HLE_BANK, $4000
 NBIT:       db 1, 2, 4, 8, 16, 32, 64, 128   ; (at $4000: low byte = bit number)
@@ -53,29 +52,8 @@ mapdraw_b:  xor a                           ; (LDA $2002)
             ld [MD_MK], a
             inc a
             jr .sf
-.dm:        ld hl, DIRTY_BM                 ; TMK = tiles marked or parked (DIRTY_BM | DEFER_BM),
-            ld de, TMK                      ;   MD_MK = any (else no cell needs its palette
-            ld b, 32                        ;   checked)
-            ld c, 0
-.mk1:       ld a, l
-            add a, low(DEFER_BM) - low(DIRTY_BM)
-            ld l, a
-            ld a, [hl]
-            push af
-            ld a, l
-            sub low(DEFER_BM) - low(DIRTY_BM)
-            ld l, a
-            pop af
-            or [hl]
-            ld [de], a
-            or c
-            ld c, a
-            inc l
-            inc e
-            dec b
-            jr nz, .mk1
-            ld a, c
-            ld [MD_MK], a
+.dm:        ld a, 1                         ; DMG: the drawn cells are marked for the
+            ld [MD_MK], a                   ;   palette check (FRESH, as nt_tile does)
             ld a, 1
             jr .sf
 .sl:        xor a
@@ -382,22 +360,7 @@ nt_tile:    ld a, h
             inc a
             ldh [dmg_scan], a
             jr .map
-.cell:      push bc                         ; a tile shaded since its graphics were loaded
-            push hl                         ;   (not marked / parked) keeps its palette: FF1's
-            ld c, d                         ;   map tiles belong to metatiles of one palette
-            call bm_addr                    ;   (attribute writes still re-check the cells
-            ld a, [hl]                      ;   they change): no per-cell check while the map
-            ld c, a                         ;   scrolls
-            ld a, l
-            add a, low(DEFER_BM) - low(DIRTY_BM)
-            ld l, a
-            ld a, [hl]
-            or c
-            and b
-            pop hl
-            pop bc
-            jr z, .map
-            ld a, [NT_NOW]                  ; (ntrun_b: the palette check at once)
+.cell:      ld a, [NT_NOW]                  ; (ntrun_b: the palette check at once)
             and a
             jr nz, .now
             call fresh_set
@@ -574,33 +537,29 @@ mdf_rgb:    ld a, [NES_RAM + $11]
             ld a, $FF
 .e0:        ld e, a
             call mdf_ownrow
-            ld a, [MD_MK]
-            and a
+            ld a, [MD_MK]                   ; DMG: the row's 32 cells marked in FRESH (byte
+            and a                           ;   row * 4 + col / 8), checked in spare time
             ret z
-            ld a, [NES_RAM + $11]
-            and 7
-            add a, high(NT_SH)
-            ld h, a
-            ld a, [MD_LO]
-            ld l, a
-            ld a, [MD_ADD]
-            cpl
-            add a, 33
+            ld a, [MD_IDX]
+            add a, a
+            add a, a
+            add a, a
             ld b, a
-            ld c, 1
-            call mdf_mk
-            ld a, [NES_RAM + $11]
-            and 7
-            xor 4
-            add a, high(NT_SH)
-            ld h, a
             ld a, [MD_LO]
-            and $E0
+            swap a
+            rrca
+            and 7
+            or b                            ; row
+            add a, a
+            add a, a
             ld l, a
-            ld a, [MD_ADD]
-            ld b, a
-            ld c, 1
-            jp mdf_mk
+            ld h, high(FRESH)
+            ld a, $FF
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            jp mdf_fra
 
 ; CGB: the palettes of the GB map row at MD_LO (offset high MD_IDX) from the attribute
 ; shadow of the nametable that drew each cell (A from column MD_ADD, B below), to VRAM
@@ -756,52 +715,13 @@ mdf_ownrow: ld h, high(OWN)
             jr nz, .j
             ret
 
-; HL = shadow cell, B = cells, C = step (1 / 32): cells whose tile is marked (DIRTY_BM) or
-; parked (DEFER_BM) get their palette checked as in nt_tile (FRESH, or at once with NT_NOW)
-mdf_mk:     ld a, b
-            and a
-            ret z
-.l:         push bc
-.l2:        ld e, [hl]                      ; (TMK built at the draw's start)
-            ld d, high(TK_BIT)
-            ld a, [de]
-            ld c, a
-            inc d
-            ld a, [de]
-            ld e, a
-            ld d, high(TMK)
-            ld a, [de]
-            and c
-            jr nz, .m
-.n:         pop bc
-            ld a, l
-            add a, c
-            ld l, a
-            jr nc, .nc
-            inc h
-.nc:        dec b
-            jr nz, .l
+; cells were marked in FRESH: the bookkeeping fresh_set does
+mdf_fra:    xor a
+            ld [FR_AGE], a
+            ld [FR_EMPTY], a
+            inc a
+            ld [FR_ANY], a
             ret
-.m:         ld d, [hl]
-            push hl
-            push bc
-            ld a, h
-            sub high(NT_SH)
-            ld b, a
-            and 4
-            ld c, a                         ; C = 4 for nametable 1
-            ld a, b
-            and 3
-            ld b, a                         ; B = offset high, L = offset low, D = tile
-            ld a, [NT_NOW]
-            and a
-            jr nz, .now
-            call fresh_set
-            jr .mx
-.now:       call cell_fast
-.mx:        pop bc
-            pop hl
-            jr .n
 
 ; column (DrawMapRowCol with $2D bit 1): E = pair column in its nametable, $12 = pairs
 ; before the wrap to row 0, ppu_ctrl set
@@ -1050,12 +970,34 @@ mdf_cone:   ld [MD_ADD], a
             adc a, d
             ldh [own1_hi], a
             pop hl
-            ld a, [MD_MK]
+            ld a, [MD_MK]                   ; DMG: the column's 30 cells marked in FRESH
             and a
             ret z
+            ld a, l
+            and 31
+            ld b, a
+            and 7
+            ld e, a
+            ld d, high(NBIT)
+            ld a, [de]
+            ld c, a                         ; C = the column's bit
+            ld a, b
+            rrca
+            rrca
+            rrca
+            and 3
+            ld l, a
+            ld h, high(FRESH)
             ld b, 30
-            ld c, 32
-            jp mdf_mk
+.fr:        ld a, [hl]
+            or c
+            ld [hl], a
+            ld a, l
+            add a, 4
+            ld l, a
+            dec b
+            jr nz, .fr
+            jp mdf_fra
 
 ; DMG own_set: B = offset high (0-3), C = 4 for nametable 1, L = offset low. The GB map
 ; cell's owner bit (OWN) and the count of cells nametable 1 owns; sh_same = 0 on a change.
@@ -2130,7 +2072,10 @@ ntclr_b:    push af
 ; once, as rt_ppu_w7 does), anything else through rt_ppu_w7. Out: Y = $19, A = the last
 ; byte, X kept; N = 0, Z = 1, C = 1.
 NR_SRC     = $D87E          ; ntrun_b: source address (lo, hi)
+NR_END     = $DCCF          ;   fast path: source low byte after the last cell
 ntrun_b:    push de
+            call nrf_ok                     ; nametable 0, none of its cells owned by
+            jp z, nrf                       ;   nametable 1, LCD on: the run path
             ld a, 1
             ld [NT_NOW], a
             ld a, [NES_RAM + $88]
@@ -2254,6 +2199,138 @@ ntrun_b:    push de
             push hl
             pop af
             ret
+
+; Z: the panel row can take the fast path: LCD on (CGB: not masked), no dialogue box, PPU
+; +1, no GB map cell owned by nametable 1, PPU address in nametable 0's cells with the 25
+; cells before the attributes, the source in NES $6000-$7FFF. Then BC = source (cart RAM),
+; HL = shadow, DE = GB map, NR_END set.
+nrf_ok:     ld a, MDF_ON
+            and a
+            jr z, .no
+            ldh a, [lcd_on]
+            and a
+            jr z, .no
+            ldh a, [dlg_on]
+            ld b, a
+            ld a, [VLCD]
+            or b
+            jr nz, .no
+            ldh a, [ppu_ctrl]
+            and 4
+            jr nz, .no
+            ldh a, [own1_lo]
+            ld b, a
+            ldh a, [own1_hi]
+            or b
+            jr nz, .no
+            ldh a, [ppu_vh]
+            cp $20
+            jr c, .no
+            cp $3F
+            jr nc, .no
+            and 7
+            cp 3
+            jr z, .a3
+            jr nc, .no                      ; (nametable 1)
+            jr .ok
+.a3:        ldh a, [ppu_vl]                 ; row 24-29 area: the run ends before $3C0
+            cp $C0 - $19 + 1
+            jr nc, .no
+.ok:        ld a, [NES_RAM + $89]
+            sub $60
+            cp $1F
+            jr nc, .no                      ; ($6000-$7EFF: no carry past $7FFF)
+            add a, $A0
+            ld b, a
+            ld a, [NES_RAM + $88]
+            ld c, a
+            add a, $19
+            ld [NR_END], a
+            ldh a, [ppu_vh]
+            and 3
+            ld d, a
+            add a, high(NT_SH)
+            ld h, a
+            ld a, d
+            add a, $98
+            ld d, a
+            ldh a, [ppu_vl]
+            ld l, a
+            ld e, a
+            xor a                           ; (Z)
+            ret
+.no:        or 1
+            ret
+
+; the fast panel row: the VRAM queue emptied first (no queued cell written after these);
+; unchanged cells (shadow has the tile; nametable 0 owns every cell) only move on; a
+; changed cell: shadow, DMG palette check at once (cell_fast), GB map at the next free
+; VRAM moment
+nrf:        push bc
+            push de
+.dr:        ldh a, [q_head]
+            ld b, a
+            ldh a, [q_tail]
+            cp b
+            jr z, .de
+            call q_drain1
+            jr .dr
+.de:        pop de
+            pop bc
+.f:         ld a, [bc]
+            inc bc
+            cp [hl]
+            jr nz, .c
+.n:         inc hl
+            inc de
+            ld a, [NR_END]
+            cp c
+            jr nz, .f
+            dec bc                          ; out: PPU address + $19, A = the last byte,
+            ld a, [bc]                      ;   Y = $19, X kept; N = 0, Z = 1, C = 1
+            ld d, a
+            ldh a, [ppu_vl]
+            add a, $19
+            ldh [ppu_vl], a
+            ldh a, [ppu_vh]
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            xor a
+            ldh [nzv], a
+            ld a, d
+            pop de
+            ld bc, $19
+            push af
+            pop hl
+            ld l, $90
+            push hl
+            pop af
+            ret
+.c:         ld [hl], a                      ; changed cell
+            push bc
+            push de
+            ld d, a
+            ldh a, [is_cgb]
+            and a
+            jr nz, .cg
+            ld a, h
+            sub high(NT_SH)
+            ld b, a                         ; B = offset high, C = nametable 0, L = low
+            ld c, 0
+            call cell_fast
+.cg:        ld a, d
+            pop de
+.w:         di
+            ldh a, [$FF41]
+            bit 1, a
+            jr z, .wr
+            ei
+            jr .w
+.wr:        ld [de], a
+            ei
+            pop bc
+            jr .n
 
 ; DMG, vtile_b: tile A was written with plane 1 = plane 0 (rows in RT_BUF): only colour
 ; indices 0 and 3. Coded at once for its palette (value of index 3 where a pixel is set,
@@ -4236,39 +4313,3 @@ POPC:
             db 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7
             db 4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8
 
-; tile -> its bit in a tile bitmap, the bitmap byte in TMK (mdf_mk)
-section bank HLE_BANK, $5D00
-TK_BIT:
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-            db 1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128
-TK_IDX:
-            db $E0, $E0, $E0, $E0, $E0, $E0, $E0, $E0, $E1, $E1, $E1, $E1, $E1, $E1, $E1, $E1
-            db $E2, $E2, $E2, $E2, $E2, $E2, $E2, $E2, $E3, $E3, $E3, $E3, $E3, $E3, $E3, $E3
-            db $E4, $E4, $E4, $E4, $E4, $E4, $E4, $E4, $E5, $E5, $E5, $E5, $E5, $E5, $E5, $E5
-            db $E6, $E6, $E6, $E6, $E6, $E6, $E6, $E6, $E7, $E7, $E7, $E7, $E7, $E7, $E7, $E7
-            db $E8, $E8, $E8, $E8, $E8, $E8, $E8, $E8, $E9, $E9, $E9, $E9, $E9, $E9, $E9, $E9
-            db $EA, $EA, $EA, $EA, $EA, $EA, $EA, $EA, $EB, $EB, $EB, $EB, $EB, $EB, $EB, $EB
-            db $EC, $EC, $EC, $EC, $EC, $EC, $EC, $EC, $ED, $ED, $ED, $ED, $ED, $ED, $ED, $ED
-            db $EE, $EE, $EE, $EE, $EE, $EE, $EE, $EE, $EF, $EF, $EF, $EF, $EF, $EF, $EF, $EF
-            db $F0, $F0, $F0, $F0, $F0, $F0, $F0, $F0, $F1, $F1, $F1, $F1, $F1, $F1, $F1, $F1
-            db $F2, $F2, $F2, $F2, $F2, $F2, $F2, $F2, $F3, $F3, $F3, $F3, $F3, $F3, $F3, $F3
-            db $F4, $F4, $F4, $F4, $F4, $F4, $F4, $F4, $F5, $F5, $F5, $F5, $F5, $F5, $F5, $F5
-            db $F6, $F6, $F6, $F6, $F6, $F6, $F6, $F6, $F7, $F7, $F7, $F7, $F7, $F7, $F7, $F7
-            db $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F9, $F9, $F9, $F9, $F9, $F9, $F9, $F9
-            db $FA, $FA, $FA, $FA, $FA, $FA, $FA, $FA, $FB, $FB, $FB, $FB, $FB, $FB, $FB, $FB
-            db $FC, $FC, $FC, $FC, $FC, $FC, $FC, $FC, $FD, $FD, $FD, $FD, $FD, $FD, $FD, $FD
-            db $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FE, $FF, $FF, $FF, $FF, $FF, $FF, $FF, $FF
