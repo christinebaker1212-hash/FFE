@@ -2242,8 +2242,50 @@ def bank24(rom):
         B23_SRC[B23_SRC.index('tileaddr:'):B23_SRC.index('; ---- party window')]
     tabs = B23_SRC[B23_SRC.index('BIT:    .db'):]
     mdata, msyms = menu_data(rom)
-    src = '    org $8000\n    jmp gb_menu\n' + core + MENU_SRC + tabs + mdata + glyph_src(rom)
-    return asm(src, syms=dict(RAM, **msyms))
+    src = '    org $8000\n    jmp gb_menu\n' + core + MENU_SRC + tabs + mdata + glyph_src(rom) + prophecy_data(rom)
+    return asm(src, syms=dict(RAM, **msyms, **PROPH_RAM))
+
+
+PROPH_RAM = dict(PPG=0xD2, PRP=0xD4, PP=0x7600, PN=0x7601, PI=0x7602, PJ=0x7603, PH=0x7604, PK=0x7605,
+                 PCNT=0x7606, PEXIT=0x7607, PAR=0x7608, PATT=0x7609, PRM=0x760A, PRLEN=0x760B,
+                 PRA=0x760C, P64=0x760E)     # (prophecy; $7600 page: the menus' save area)
+
+
+def prophecy_pages():
+    """the prophecy (system string 73) at 18 columns, one paragraph a page, lines centred
+    in the GB view (camera 6 / 6): [[(nes_row, nes_col, text)]]"""
+    import json, textwrap
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
+    t = [e for e in json.load(open(os.path.join(root, 'script', 'ff2', 'system.json'))) if e['id'] == 73][0]['en']
+    pages = []
+    for para in t.split('\n\n'):
+        lines = textwrap.wrap(' '.join(para.split()), 18, break_on_hyphens=False)
+        assert len(lines) <= 18
+        r0 = 6 + (18 - len(lines)) // 2
+        pages.append([(r0 + i, 6 + (20 - len(l)) // 2, l) for i, l in enumerate(lines)])
+    assert len(pages) == 3
+    return pages
+
+
+def prophecy_data(rom):
+    """bank 24 data for gm_prophecy: the letter tiles $80-$CF (bank 9 $8320 + 16 n, the menu
+    font), PGTAB -> per page: line count, per line half row (row / 2), name table address,
+    length, codes"""
+    ins = _insert_module()
+    b9 = rom[HDR + 9 * BANK:HDR + 10 * BANK]
+    font = b9[0x320 + 16 * 0x80:0x320 + 16 * 0xD0]
+    out = 'PFONT:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in font[i:i + 16]) for i in range(0, len(font), 16))
+    out += 'PGTAB: .dw PG0, PG1, PG2\n'
+    for k, page in enumerate(prophecy_pages()):
+        out += 'PG%d: .db %d\n' % (k, len(page))
+        for i, (r, c, l) in enumerate(page):
+            a = 0x2000 + 32 * r + c
+            codes = ins.enc(l)
+            assert all(0x80 <= b < 0xD0 or b == 0xFF for b in codes), l
+            out += '    .db %d, $%02X, $%02X, %d\n    .dw PL%d_%d\n' % (r // 2, a & 0xFF, a >> 8, len(codes), k, i)
+        for i, (r, c, l) in enumerate(page):
+            out += 'PL%d_%d: .db %s\n' % (k, i, ', '.join('$%02X' % b for b in ins.enc(l)))
+    return out
 
 
 GBM = [None]            # the main menu's entry (set by battle(), used by main_menu())
@@ -2284,7 +2326,7 @@ gb_menu:
     rts
 .go:
     jmp ($0000)
-MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit, gm_tparty, gm_shoptext, gm_slot, gm_ngcam
+MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit, gm_tparty, gm_shoptext, gm_slot, gm_ngcam, gm_prophecy
 
 gm_exit:
     lda #6
@@ -3075,6 +3117,298 @@ gm_slot:                ; b14:B7EC (load menu slot $9E & 3, owner approved ff2_m
     sta $7800,x
     inx
     bne .rs
+    rts
+gm_prophecy:            ; b14:B8DD (prophecy, owner approved ff2_mock13; rendering off,
+    lda #<PFONT         ;   attributes $55, names $FF): a copy of the letter tiles $80-$CF in
+    sta $00             ;   tiles $01-$50 (a band being faded in is drawn with them: one GB
+    lda #>PFONT         ;   tile coding per palette on the plain Game Boy), then the pages
+    sta $01
+    lda #$00
+    sta $2006
+    lda #$10
+    sta $2006
+    ldx #5
+    ldy #0
+.up:
+    lda ($00),y
+    sta $2007
+    iny
+    bne .up
+    inc $01
+    dex
+    bne .up
+    jsr $FE00           ; (as b14:B8DD-B8EF)
+    jsr $DC30
+    lda #0
+    sta $2005
+    sta $2005
+    lda #$0A
+    sta $2001
+    lda #0
+    sta PP
+    sta PEXIT
+    sta PRLEN
+    lda #$FF
+    sta PAR
+.page:
+    lda PP
+    asl a
+    tax
+    lda PGTAB,x
+    sta PPG
+    lda PGTAB+1,x
+    sta PPG+1
+    ldy #0
+    lda (PPG),y
+    sta PN
+    lda #0
+    sta PI
+.half:                  ; lines PI .. PJ - 1 share a half attribute row (two NES rows)
+    lda PI
+    sta PJ
+    jsr pline
+    tay
+    iny
+    lda (PPG),y
+    sta PH
+.hj:
+    inc PJ
+    lda PJ
+    cmp PN
+    beq .hd
+    jsr plinej
+    tay
+    iny
+    lda (PPG),y
+    cmp PH
+    beq .hj
+.hd:
+    lda #0              ; draw them with the copy tiles
+    sta PRM
+    jsr pdraw
+    lda PEXIT
+    beq .k1
+    rts
+.k1:
+    lda PH              ; fade the half in: attribute row PH / 2, top half $5A (the
+    lsr a               ;   bottom hidden), bottom half $AF (the top shown)
+    sta PAR
+    lda #$5A
+    bcc .a0
+    lda #$AF
+.a0:
+    sta PATT
+    jsr pfade
+    lda PEXIT
+    beq .k2
+    rts
+.k2:
+    lda PH              ; shown: $5F / $FF, drawn with the font itself
+    lsr a
+    lda #$5F
+    bcc .a1
+    lda #$FF
+.a1:
+    sta PATT
+    lda #1
+    sta PRM
+    jsr pdraw
+    lda PEXIT
+    beq .k3
+    rts
+.k3:
+    lda PJ
+    sta PI
+    cmp PN
+    bne .half
+    lda PP              ; hold: 240 frames, the last page until A / B (as the NES)
+    cmp #2
+    beq .last
+    lda #240
+    sta PCNT
+.hold:
+    jsr pframe
+    lda PEXIT
+    beq .k4
+    rts
+.k4:
+    dec PCNT
+    bne .hold
+    lda #2              ; clear: the lines blanked, attributes back to $55
+    sta PRM
+    lda #0
+    sta PI
+    lda PN
+    sta PJ
+    jsr pdraw
+    lda PEXIT
+    beq .k5
+    rts
+.k5:
+    lda #$55
+    sta PATT
+    lda #1
+    sta PAR
+.ca:
+    jsr pframe
+    lda PEXIT
+    beq .k6
+    rts
+.k6:
+    inc PAR
+    lda PAR
+    cmp #6
+    bne .ca
+    lda #$FF
+    sta PAR
+    inc PP
+    jmp .page
+.last:
+    jsr pframe
+    lda PEXIT
+    beq .last
+.out:
+    rts
+pline:                  ; Y = 6 PI + 1 (the line's record), PPG + Y
+    lda PI
+    jmp pliney
+plinej:
+    lda PJ
+pliney:
+    sta PCNT
+    asl a
+    adc PCNT
+    asl a
+    rts                 ; (A = 6 n; callers add the field offset)
+pdraw:                  ; draw lines PI .. PJ - 1 in mode PRM (0 copy tiles, 1 font, 2 blank),
+    lda PI              ;   one a frame
+    sta PK
+.l:
+    lda PK
+    cmp PJ
+    beq .e
+    asl a
+    adc PK
+    asl a
+    tay
+    iny
+    iny
+    lda (PPG),y         ; +2 address low, +3 high, +4 length, +5/+6 codes
+    sta PRA
+    iny
+    lda (PPG),y
+    sta PRA+1
+    iny
+    lda (PPG),y
+    sta PRLEN
+    iny
+    lda (PPG),y
+    sta PRP
+    iny
+    lda (PPG),y
+    sta PRP+1
+    jsr pframe
+    lda PEXIT
+    bne .e
+    inc PK
+    jmp .l
+.e:
+    rts
+pfade:                  ; b14:B965: palette 2 colour 3 up in four steps of 16 frames,
+    lda #0              ;   alternating with the step below on odd frames
+    sta P64
+.lp:
+    lda P64
+    sta $03CB
+.fr:
+    jsr pframe
+    lda PEXIT
+    bne .e
+    inc $F0
+    lda $F0
+    and #$0F
+    bne .odd
+    lda P64
+    clc
+    adc #$10
+    sta P64
+    cmp #$40
+    bcc .lp
+.e:
+    rts
+.odd:
+    lsr a
+    bcc .lp
+    lda $03CB
+    sec
+    sbc #$10
+    bpl .s
+    lda #$01
+.s:
+    sta $03CB
+    jmp .fr
+pframe:                 ; one frame (b14:B9B0): a line (PRLEN), the attribute row (PAR),
+    jsr $FE00           ;   palettes, scroll, music, joypad (A / B -> PEXIT)
+    lda PRLEN
+    beq .na
+    lda PRA+1
+    sta $2006
+    lda PRA
+    sta $2006
+    ldy #0
+.c:
+    lda PRM
+    cmp #2
+    beq .bl
+    lda (PRP),y
+    ldx PRM
+    bne .w
+    cmp #$80
+    bcc .w
+    cmp #$D0
+    bcs .w
+    sbc #$7E            ; (carry clear: - $7F)
+    jmp .w
+.bl:
+    lda #$FF
+.w:
+    sta $2007
+    iny
+    cpy PRLEN
+    bne .c
+    lda #0
+    sta PRLEN
+.na:
+    lda PAR
+    bmi .nb
+    asl a
+    asl a
+    asl a
+    ora #$C0
+    tax
+    lda #$23
+    sta $2006
+    stx $2006
+    lda PATT
+    ldx #8
+.at:
+    sta $2007
+    dex
+    bne .at
+.nb:
+    jsr $DC30
+    lda $FF
+    sta $2000
+    lda #0
+    sta $2005
+    sta $2005
+    sta $24
+    sta $25
+    jsr $C74F
+    jsr $DBA2
+    lda $24
+    ora $25
+    sta PEXIT
     rts
 gm_shoptext:            ; b14:90FD (shop list text, owner approved ff2_mock12): per item the
     ldx #0              ;   name (column 1, cursor spot) and the price under it at column
@@ -3982,6 +4316,14 @@ ngcam:
     put(rom, 14, 0xB7CE, cur, old=bytes.fromhex('02040000020900000 20e000002130000 02190000'.replace(' ', '')))
 
     credits(rom)
+    # prophecy: b14:B8DD-B8FC (frame, window 24 + string 73, the reveal b14:B932) -> bank 24
+    p = asm('''
+    org $B8DD
+    lda #9
+    jsr GBM
+    jmp $B8FD
+''', syms=dict(GBM=g))
+    put(rom, 14, p.org, p.bytes, old=bytes.fromhex('2000fe2030dca900'))
 
 
 def gb_credit_lines(codes):

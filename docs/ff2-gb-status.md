@@ -383,8 +383,31 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   it shows; the field draws them again on closing. Checked (NES variant, Gambatte):
   buy, sell, confirmation, Gil update; firstdiff shop scenario 23190 waits identical;
   random seed 1, 30000 frames: 29470 waits identical.
-- Next: the remaining field screens (name entry, title, prologue, ending, world map,
-  Select menu).
+- **New-game screens** (owner approved `ff2_mock13_newgame`, `layout.new_game`; camera 6 / 6
+  = the boot camera, screens laid out in NES cols 6-25, rows 6-23; the load menu resets the
+  camera at `b14:B656`, as a reset can come from a battle):
+  - Credits (`layout.credits`): the ROM's credit lines (fix:F692) centred in 18 columns, a
+    longer line split after BY; the typewriter's new line goes one row down from NES column 6
+    (fix:F593/F595/F504: every typed character, spaces too, takes its own tile $01-$7F, so the
+    centring cannot use leading spaces from column 2: 146 > 127 tiles).
+  - Prologue (bank 24 `gm_prophecy`, sub-command 9, in place of `b14:B8DD-B8FC`): one
+    paragraph a page (12 / 11 / 9 lines at 18 columns), each half attribute row faded in as
+    `b14:B965` does (palette 2 colour 3 in four steps, attribute $5A / $AF), the band's lines
+    drawn when its fade starts with a copy of the letter tiles in tiles $01-$50 (uploaded
+    while the screen is off) and redrawn with the font once shown, so the plain Game Boy's
+    one coding per tile never mixes a fading and a shown line. Pages 1-2 hold 240 frames,
+    page 3 waits; A / B ends it at any point (as the NES).
+  - Load menu: slot windows drawn by bank 24 `gm_slot` (sub-command 7, `b14:B7EC`): window
+    NES (6, 7 + 3k, 20, 4) sharing frames, number, leader name, Speed n (8-px letters), HP /
+    MP cur/max in 3-px digits (tiles $31 + 12k); New Game window 21 (6,20,20,4), one row;
+    cursor spots `b14:B7CE` (hand at NES column 5).
+  - Name entry: windows 22 (6,6,20,6) and 23 (6,12,20,12); name at column 12 (string 69
+    `{14:05}`), portrait x/y `b14:8848/884C`, name cursor `b14:B628/B63D`; string 70 with 9
+    letters a row (all 80 entries in order), cursor step 36 (`b14:B566`); the window scrolls
+    as on the NES (5 of 9 rows).
+  Checked: NES variant shots of all four (with save slots poked into SRAM), Gambatte CGB and
+  DMG shots.
+- Next: the remaining field screens (ending, world map, Select menu).
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
