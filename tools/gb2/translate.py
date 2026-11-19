@@ -807,7 +807,7 @@ def emit_program(rc):
                     elif i.mn != 'JSR' or True:
                         out.append('    call rt_fatal')
     # stubs (bank 0): call rt_fcs reads the target's bank and address after the call
-    stubs = ['section bank 0, $2560']                   # (runtime below, colour tables from $3A00)
+    stubs = ['section bank 0, $25C0']                   # (runtime below, colour tables from $3A00)
     for lab in sorted(xrefs):
         stubs += ['xs_%s:' % lab, '    call rt_fcs', '    db bank(%s)' % lab, '    dw %s' % lab,
                   'xj_%s:' % lab, '    call xs_%s' % lab, '    ret']

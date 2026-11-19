@@ -407,7 +407,17 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
     as on the NES (5 of 9 rows).
   Checked: NES variant shots of all four (with save slots poked into SRAM), Gambatte CGB and
   DMG shots.
-- Next: the remaining field screens (ending, world map, Select menu).
+- **Fixed: world-map water** (found by loading a save; it was there before): the water
+  animation `fix:C2F3` reads its tiles back through `$2007` and rotates them, and the
+  runtime's `$2007` read returned 0 for the pattern tables, so the water went flat. `rt_ppu_r7`
+  now reads pattern data back (BG tiles from the DMG shadow / the CGB tile copy with the LCD
+  on / VRAM with it off; sprite tiles from their shadow). Bank 0 grew: stubs from `$25C0`.
+  Checked: load a saved game (SRAM slots poked at frame 100; the new-game script's A presses
+  load slot 1), CGB / DMG shots; firstdiff load scenario 7982 waits, random 30000 (29142
+  waits) and the shop scenario (22862 waits) identical. Tools: firstdiff env `GB_SAVE=K`
+  (PyBoy state at wait K to build/gb2.state).
+- Next: the remaining field screens (row menu, world-map overview, ending; Select menu with
+  suspend: design with the owner).
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).

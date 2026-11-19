@@ -195,8 +195,12 @@ def main():
         gb.pb.hook_register(*sym[hn], hk, hn)
     gb.feed_pads(sym, lambda n: pads.get(n + 1, 0))
     shots = []; guard = 0; prev = 0
+    save_at = int(os.environ.get('GB_SAVE', '0'))   # debug: PyBoy state at that wait -> build/gb2.state
     while state['k'] < last and state['diff'] is None:
         gb.pb.tick(); guard += 1
+        if save_at and state['k'] >= save_at:
+            with open('build/gb2.state', 'wb') as fh: gb.pb.save_state(fh)
+            print('saved build/gb2.state at wait', state['k']); return
         if state['k'] != prev: prev, guard = state['k'], 0
         if guard > 2000:
             m = gb.pb.memory; pc = gb.pb.register_file.PC; cb = m[0xFF8C]

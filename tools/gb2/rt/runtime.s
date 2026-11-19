@@ -1921,7 +1921,7 @@ rt_ppu_r7:  push af                         ; buffered read (nametables from the
             push hl
             ldh a, [ppu_vh]
             cp $20
-            jr c, .zero
+            jr c, .chr
             cp $3F
             jr z, .zero
             and $07
@@ -1945,6 +1945,73 @@ rt_ppu_r7:  push af                         ; buffered read (nametables from the
             pop bc
             pop af
             ret
+.chr:       ; FF2: pattern tables read back (the world map's water animation fix:C2F3 reads
+            ; and rotates its tiles): BG tiles from the DMG shadow / the CGB tile copy (LCD
+            ; on) / VRAM (LCD off), sprite tiles from their shadow; GB byte order as rt_ppu_w7
+            ld h, a
+            ldh a, [ppu_vl]
+            ld l, a
+            and $0F
+            cp 8
+            jr c, .r0
+            sub 8
+            add a, a
+            inc a
+            jr .rk
+.r0:        add a, a
+.rk:        ld c, a
+            ld a, l
+            and $F0
+            or c
+            ld l, a
+            ld a, h
+            and $10
+            ld b, a
+            ldh a, [ppu_ctrl]
+            and $10
+            xor b
+            ld a, h
+            jr nz, .rspr
+            and $0F
+            ld h, a
+            ldh a, [is_cgb]
+            and a
+            jr nz, .rcgb
+            ld a, h
+            add a, high(BG_SHADOW)
+.rcart:     ld h, a
+            ld a, 1
+            ld [$4000], a
+            ld b, [hl]
+            xor a
+            ld [$4000], a
+            ld a, b
+            jr .set
+.rspr:      and $0F
+            add a, high(SPR_SHADOW)
+            jr .rcart
+.rcgb:      ldh a, [lcd_on]
+            and a
+            jr z, .rvram
+            ld a, h
+            add a, $D0
+            ld h, a
+            ld a, 2
+            ldh [$FF70], a
+            ld b, [hl]
+            ld a, 1
+            ldh [$FF70], a
+            ld a, b
+            jr .set
+.rvram:     ld a, h
+            cp $08
+            ld c, $90
+            jr c, .rv0
+            ld c, $80
+.rv0:       add a, c
+            ld h, a
+            ld a, [hl]
+            jr .set
 
 ; ------------------------------------------------------------------ OAM DMA ($4014)
 rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (sent next vblank)
