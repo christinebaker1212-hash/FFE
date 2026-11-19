@@ -97,17 +97,16 @@ def nes_pass(nes, steps, limit, shots_at=(), pokes=(), poke_frame=9700):
     return nes_ram, pads, frame_of, wram, shot_w
 
 
-def main():
-    args = sys.argv[1:]
+def scenario(args):
+    """the input scenario from the options (removed from args): NES GB [FRAMES] with
+    --random SEED, --form F (forced formation: data patch in copies of both ROMs), --press
+    'frame:key,..' (from the first press on only these), --poke ADDR=VAL,.. at --pokeat F.
+    Returns (nes_path, gb_path, steps, pokes, poke_at, limit)."""
     def opt(name, default=None, conv=str):
         if name in args:
             k = args.index(name); v = conv(args[k + 1]); del args[k:k + 2]; return v
         return default
     rnd = opt('--random', None, int)
-    mask = set() if '--strict' in args else SOUND
-    if '--strict' in args: args.remove('--strict')
-    shots_at = {int(x) for x in opt('--shots', '').split(',') if x}
-    out = opt('--out')
     form = opt('--form', None, int)
     presses = opt('--press', '')
     pokes = [tuple(int(x, 16) for x in kv.split('=')) for kv in opt('--poke', '').split(',') if kv]
@@ -125,7 +124,6 @@ def main():
         g[0x14E] = g[0x14F] = 0                     # (global checksum not used)
         shutil.copy(gb_path[:-3] + '.sym', os.path.join(tmp, 'f.sym'))
         gb_path = os.path.join(tmp, 'f.gb'); open(gb_path, 'wb').write(g)
-    nes = NES(nes_path); gb = GB(gb_path); sync_sram(nes, gb)
     limit = int(args[2]) if len(args) > 2 else 6000
     steps = script_newgame(limit)
     if rnd is not None: add_random(steps, rnd)
@@ -136,6 +134,22 @@ def main():
         for item in presses.split(','):
             t, k = item.split(':')
             for j in range(int(t), min(int(t) + 4, limit)): steps[j] = K[k]
+    return nes_path, gb_path, steps, pokes, poke_at, limit
+
+
+def main():
+    args = sys.argv[1:]
+    def opt(name, default=None, conv=str):
+        if name in args:
+            k = args.index(name); v = conv(args[k + 1]); del args[k:k + 2]; return v
+        return default
+    mask = set() if '--strict' in args else SOUND
+    if '--strict' in args: args.remove('--strict')
+    shots_at = {int(x) for x in opt('--shots', '').split(',') if x}
+    out = opt('--out')
+    sc = scenario(args)
+    nes_path, gb_path, steps, pokes, poke_at, limit = sc
+    nes = NES(nes_path); gb = GB(gb_path); sync_sram(nes, gb)
     poke_w = None
     sym = {}
     for l in open(gb_path[:-3] + '.sym'):

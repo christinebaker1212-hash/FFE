@@ -184,7 +184,9 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   (`b5:9FCF`), camera (1, 0): treasure window (GB 0,0,20,7: ".. Treasure ..", Drop, Done;
   8 slots in two columns), inventory window (GB 0,6,20,12: two columns, 10 of 16 rows,
   scroll `$73` 0-6). A cell is redrawn when its item id changes (`LSHOW`), so swaps / drops
-  / scrolling redraw only what changed. Names wider than the 64-px cell: narrow letters
+  redraw only what changed; a one-row scroll re-points the nametable rows (ring of 10
+  row blocks of tiles, `LRING`, widths `LWID`; 2 rows a frame, the NES vblank) and draws
+  only the new row. Names wider than the 64-px cell: narrow letters
   (latin_font NARROW, glyph codes `$20+`), then letter gaps dropped from the end, then 1-px
   spaces (build-time per item, `loot_data`). Item type icons (`$6E-$75`) come from the ROM
   font (glyph table; the battle Gear window shows them too). Navigation (`b5:A1DE-A285`
@@ -205,10 +207,13 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
 - firstdiff: `--pokeat F` (frame of the pokes), env `WRAM_EVERY`, `HOOKS=label,..`
   (print at GB labels), `SHOT_INFO`. Note: battle scripts need `--random 1` (the plain
   new-game script stays in name entry).
-- Checks: GB-layout pair seed 1, 30000 frames: no difference in 29494 waits.
+- Checks: GB-layout pair seed 1, 30000 frames: no difference in 29494 waits; treasure run
+  with scrolling down / up, swap and drop: 14226 waits; English pair 29406 waits.
+  `gbshots.py` takes the same scenario options as firstdiff (`scenario()`; pokes go to
+  Gambatte at the matching wait): CGB shots of the treasure screen fine.
 - Next: status words in the party window ("Dead" etc.), clear the bottom rows at battle
   start, hit knock-back past the right edge, item use in battle (Gear -> item), CGB
-  battle-entry speed, GB tile upload latency (a full inventory scroll redraws 20 cells).
+  battle-entry speed, GB tile upload latency.
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 

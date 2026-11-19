@@ -77,7 +77,8 @@ RAM = dict(GBIDX=0x7FDF, GBRB=0x7FE0, GBPOOL=0x7FE1, VX=0x7FE2, VN=0x7FE3, VT=0x
            NL=0x7FF7, NS=0x7FF8, VSQZ=0x7FF9, VI0=0x7FFA, VI1=0x7FFB, VCX=0x7FFC, VFILL=0x7FFD, VLN=0x7FFE,
            USED=0x75C0, VBUF=0x7800, BLANKT=0x7888, FTILE=0x7889, PTILE=0x7891, LTILE=0x78B9, XTILE=0x78D1,
            NTBUF=0x78D5, ATKBUF=0x75E0, MOPEN=0x75F0, MLINE=0x75F1, MPAGE=0x75F2,
-           LSHOW=0x75C0, LNAV=0x75DC, LBASE=0x75DD, LDGAP=0x75DE, LCOV=0x7FFF)    # (L*: treasure screen, after the battle)
+           LSHOW=0x75C0, LNAV=0x75DC, LBASE=0x75DD, LDGAP=0x75DE, LCOV=0x7FFF,
+           LWID=0x75E0, LRING=0x75F4, LSCR=0x75F5)    # (L*: treasure screen, after the battle)
 # fixed-bank entries (5 bytes each, at $FFD0 and $FEEC): routine, bank to return to (bank 23 RETB), the NES routine replaced
 ENTRIES = [('gb_party', 0x0C, 0x912A), ('gb_names', 0x0C, 0x910D), ('gb_names', 0x0C, 0x981D),
            ('gb_cmds', 0x0C, 0x982C), ('gb_msgopen', 0x05, 0xAA57), ('gb_msgclose', 0x05, 0xAB4F),
@@ -1432,6 +1433,10 @@ gb_lootscr:             ; b5:9FDA (after the fade out, before the fade in)
     sta LSHOW,x
     dex
     bpl .c
+    lda #0              ; (b5:A011 sets the scroll to 0 before the menu as well)
+    sta $73
+    sta LSCR
+    sta LRING
     jsr lsync
     lda #0
     sta $00
@@ -1492,9 +1497,69 @@ lsync:
     inx
     cpx #8
     bne .t
+    lda $73             ; scrolled by one row: the rows' tiles stay, the nametable rows are
+    sec                 ;   pointed one row on (ring of 10 row blocks) and only the new row
+    sbc LSCR            ;   is drawn
+    beq .same
+    cmp #1
+    beq .down
+    cmp #$FF
+    bne .same
+    lda LRING           ; up: content moves down
+    clc
+    adc #9
+    cmp #10
+    bcc .u1
+    sbc #10
+.u1:
+    sta LRING
+    ldy #19
+.us:
+    lda LSHOW+6,y
+    sta LSHOW+8,y
+    lda LWID-2,y
+    sta LWID,y
+    dey
+    cpy #2
+    bcs .us
+    lda #$FE
+    sta LSHOW+8
+    sta LSHOW+9
+    lda #0
+    sta LWID
+    sta LWID+1
+    jmp .rows
+.down:
+    ldy LRING           ; down: content moves up
+    iny
+    cpy #10
+    bcc .d1
+    ldy #0
+.d1:
+    sty LRING
+    ldy #0
+.ds:
+    lda LSHOW+10,y
+    sta LSHOW+8,y
+    lda LWID+2,y
+    sta LWID,y
+    iny
+    cpy #18
+    bne .ds
+    lda #$FE
+    sta LSHOW+26
+    sta LSHOW+27
+    lda #0
+    sta LWID+18
+    sta LWID+19
+.rows:
+    jsr lrows
+.same:
     lda $73
+    sta LSCR
     asl a
     sta LBASE
+    ldx #8
 .i:
     stx VI
     txa
@@ -1574,7 +1639,17 @@ lcell:                  ; cell VI shows the name of item A (narrow letters / dro
 .w:
     sta VW
     ldx VI
+    cpx #8
+    bcc .fx
+    cpx #28
+    bcs .fx
+    sta LWID-8,x
+    txa
+    jsr ringbase
+    jmp .bs
+.fx:
     lda LCT,x
+.bs:
     sta VSV
     ldy #0              ; tile numbers of the cell -> NTBUF
 .tl:
@@ -1626,6 +1701,98 @@ lcell:                  ; cell VI shows the name of item A (narrow letters / dro
     cpy VN
     bne .c
     jmp scroll
+
+ringbase:               ; A = inventory cell (8-27) -> its first tile: $40 + 16 * ((row +
+    sec                 ;   LRING) mod 10) + 8 * column
+    sbc #8
+    pha
+    lsr a
+    clc
+    adc LRING
+    cmp #10
+    bcc .m
+    sbc #10
+.m:
+    asl a
+    asl a
+    asl a
+    asl a
+    sta VT
+    pla
+    and #1
+    asl a
+    asl a
+    asl a
+    ora VT
+    clc
+    adc #$40
+    rts
+lrows:                  ; the 10 inventory rows' nametable entries (2 rows a frame: the
+    lda #0              ;   NES vblank)
+    sta VLINE
+.f:
+    jsr $FA2A
+    lda #2
+    sta VCNT
+.r:
+    lda VLINE
+    clc
+    adc #7
+    sta VSH
+    lda #0
+    sta VT
+    ldy #5
+.sh:
+    asl VSH
+    rol VT
+    dey
+    bne .sh
+    lda VT
+    ora #$20
+    sta $2006
+    lda VSH
+    ora #2
+    sta $2006
+    lda VLINE
+    asl a
+    sta VI0
+    jsr lrowcell
+    lda #$FF
+    sta $2007
+    sta $2007
+    inc VI0
+    jsr lrowcell
+    inc VLINE
+    dec VCNT
+    bne .r
+    jsr scroll
+    lda VLINE
+    cmp #10
+    bne .f
+    rts
+lrowcell:               ; cell 8 + VI0: its tiles (LWID of them), then blank
+    lda VI0
+    clc
+    adc #8
+    jsr ringbase
+    sta VSV
+    ldx VI0
+    lda LWID,x
+    sta VW
+    ldy #0
+.l:
+    lda #$FF
+    cpy VW
+    bcs .b
+    tya
+    clc
+    adc VSV
+.b:
+    sta $2007
+    iny
+    cpy #8
+    bne .l
+    rts
 
 gb_lootnav:             ; b5 loot menu: right / left / down / up (replaces b5:A1DE-A285).
     lda #0              ;   GB grid: Drop Done / 4 treasure rows / inventory rows; LNAV = 1
