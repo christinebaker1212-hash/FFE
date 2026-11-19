@@ -1015,84 +1015,79 @@ rebank_attrs:
 
 ; ------------------------------------------------------------------ OAM, joypad, APU
 rt_io_w4014:                                ; OAM DMA from NES page A -> GB shadow OAM
-            push af
+            push af                         ;   (64 NES sprites -> up to 40 GB sprites in view)
             push bc
             push de
-            ld d, a
-            ld e, 0
-            ld a, d
             add a, high(NES_RAM)
-            ld d, a                         ; DE = NES OAM page (GB address)
+            ld d, a
+            ld e, 0                         ; DE = NES OAM page (GB address)
+            ldh a, [cam_y]                  ; C = 17 - cam_y: GB Y = NES Y + C (visible 9..159)
+            cpl
+            add a, 18
+            ld c, a
+            ldh a, [cam_x]                  ; o_cx = 8 - cam_x: GB X = NES X + o_cx (1..167)
+            cpl
+            add a, 9
+            ldh [o_cx], a
+            ldh a, [ppu_ctrl]               ; sprite pattern table -> bank bit
+            and 8
+            ldh [wtmp], a
             ld hl, OAM_SH
             ld b, 64
-            ld c, 40
-.lp:        ld a, [de]                      ; NES Y (top - 1)
-            inc de
+.lp:        ld a, [de]                      ; NES Y
             cp $EF
-            jr nc, .skip3
-            inc a
+            jr nc, .skip
+            add a, c
+            ldh [tmp_lo], a                 ; GB Y
+            sub 9
+            cp 151
+            jr nc, .skip
+            inc e
+            inc e
+            inc e
+            ld a, [de]                      ; NES X
             push hl
-            ld hl, cam_y
-            sub [hl]
+            ld hl, o_cx
+            add a, [hl]
             pop hl
-            cp 144
-            jr c, .yin
-            cp 256 - 7
-            jr c, .skip3
-.yin:       add a, 16
-            ldh [o_cx], a                   ; (GB Y)
-            ld a, [de]                      ; tile
-            inc de
-            ldh [o_cnt], a
-            ld a, [de]                      ; attributes
-            inc de
-            ldh [wtmp], a
-            ld a, [de]                      ; X
-            inc de
-            push hl
-            ld hl, cam_x
-            sub [hl]
-            pop hl
-            cp 160
-            jr c, .xin
-            cp 256 - 7
-            jr c, .skip0
-.xin:       add a, 8
-            push af
-            ldh a, [o_cx]
+            ldh [o_cnt], a                  ; GB X
+            dec a
+            cp 167
+            jr nc, .skipx
+            ldh a, [tmp_lo]
             ld [hl+], a                     ; Y
-            pop af
-            ld [hl+], a                     ; X
             ldh a, [o_cnt]
-            ld [hl+], a                     ; tile
-            ldh a, [wtmp]                   ; attributes: palette, flips, priority, table
-            push bc
-            ld b, a
-            and 3
-            ld c, a
-            ld a, b
-            and $C0
-            rrca
-            or c
-            ld c, a
-            ld a, b
-            and $20
-            rlca
-            rlca
-            or c
-            ld c, a
-            ldh a, [ppu_ctrl]
-            and 8                           ; sprite pattern table -> bank bit
-            or c
-            pop bc
+            ld [hl+], a                     ; X
+            dec e
+            dec e
+            ld a, [de]                      ; tile
+            inc e
             ld [hl+], a
-            dec c
-            jr z, .full
-            jr .skip0
-.skip3:     inc de
-            inc de
-            inc de
-.skip0:     dec b
+            ld a, [de]                      ; attributes through the table
+            inc e
+            inc e
+            push hl
+            ld l, a
+            ld h, high(OAM_ATTR)
+            ld a, [hl]
+            ld hl, wtmp
+            or [hl]
+            pop hl
+            ld [hl+], a
+            ld a, l
+            cp low(OAM_SH) + 160
+            jr z, .end
+            dec b
+            jr nz, .lp
+            jr .full
+.skipx:     inc e
+            dec b
+            jr nz, .lp
+            jr .full
+.skip:      ld a, e
+            add a, 4
+            ld e, a
+            dec b
             jr nz, .lp
 .full:      ld a, l                         ; rest off screen
             cp low(OAM_SH) + 160
@@ -1327,7 +1322,47 @@ rt_izy_rd:  push af                         ; L = zp pointer; byte at ptr+Y -> L
             ld h, [hl]
             ld l, a
             add hl, bc
-            call nes_rd
+izrd:       ld a, h                         ; HL = NES address (ROM windows first: the battle
+            cp $80                          ;   sprite / animation data)
+            jr c, .low
+            cp $A0
+            jr nc, .hi
+            and $1F                         ; $8000-$9FFF: the $5114 bank
+            or $40
+            ld h, a
+            ldh a, [odd8]
+            or h
+            ld h, a
+            ldh a, [data_bank8]
+.rd:        ld [MBC5_BANKL], a
+            ld l, [hl]
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            pop af
+            ret
+.hi:        cp $C0
+            jr nc, .f
+            and $1F                         ; $A000-$BFFF: the $5115 bank
+            or $40
+            ld h, a
+            ldh a, [oddA]
+            or h
+            ld h, a
+            ldh a, [data_bankA]
+            jr .rd
+.f:         sub $80                         ; $C000-$FFFF: banks 126 / 127
+            ld h, a
+            ld a, DATA + 63
+            jr .rd
+.low:       cp $20
+            jr nc, .other
+            and $07                         ; RAM
+            or high(NES_RAM)
+            ld h, a
+            ld l, [hl]
+            pop af
+            ret
+.other:     call nes_rd                     ; PRG-RAM, ExRAM, I/O
             pop af
             ret
 rt_izx_rd:  push af                         ; L = zp; pointer at (zp + X)
@@ -1338,9 +1373,7 @@ rt_izx_rd:  push af                         ; L = zp; pointer at (zp + X)
             ld a, [hl+]
             ld h, [hl]
             ld l, a
-            call nes_rd
-            pop af
-            ret
+            jr izrd
 rt_izy_wr:  push af                         ; L = zp pointer; A -> ptr+Y
             ldh [wtmp], a
             ld h, high(NES_RAM)
@@ -1348,7 +1381,25 @@ rt_izy_wr:  push af                         ; L = zp pointer; A -> ptr+Y
             ld h, [hl]
             ld l, a
             add hl, bc
-            call nes_wr
+            ld a, h                         ; (RAM and PRG-RAM first)
+            cp $20
+            jr nc, .n1
+            and $07
+            or high(NES_RAM)
+            ld h, a
+            pop af
+            ld [hl], a
+            ret
+.n1:        cp $60
+            jr c, .other
+            cp $80
+            jr nc, .other
+            add a, $40                      ; PRG-RAM $6000 -> $A000
+            ld h, a
+            pop af
+            ld [hl], a
+            ret
+.other:     call nes_wr
             pop af
             ret
 rt_izx_wr:  push af

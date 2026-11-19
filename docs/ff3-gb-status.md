@@ -108,14 +108,18 @@ python3 tools/gb3/ff3src.py "roms/Final Fantasy III (Japan).nes" build/ff3/src_e
   - Screens (Gambatte vs NES, inside the camera): opening narration, the second page,
     New Game menu, name entry, the first field scene with its dialogue: as the NES.
   - RAM (`firstdiff.py ... --input newgame`): **identical for 2,593 frames** (power-on,
-    narration, menu, name entry, the opening field scene and dialogue); through the
-    opening battle identical to frame 2,723 with the sound driver's zero page and the
-    joypad repeat counter masked (`--ignore 00D0-00DF,0014-0014`). After that, input
-    read in busy loops differs (PyBoy has no double speed: the harness resyncs the input
-    clock at each wait, but polls inside the loops still see other frames).
-  - Speed (Gambatte): narration 1.00x after an 85-frame lag at power-on (initial loads);
-    battle ~15% slower (profile: OAM conversion 12%, indirect reads through the general
-    address decoder ~25%, PPU writes).
+    narration, menu, name entry, the opening field scene and dialogue) with nothing masked;
+    with the sound driver's bytes and the joypad repeat counter masked (`--ignore
+    00C9-00CA,00D0-00DF,0014-0014`: they depend on how often the IRQ / the poll loop runs)
+    **identical through frame 3,725** of the opening battle (commands, attacks, messages).
+    Then a button read inside a busy poll loop lands in another frame (PyBoy has no double
+    speed: the harness resyncs the input clock at each wait, but polls inside the loops
+    still see other frames) and the runs part.
+  - Speed (Gambatte / mGBA, CGB double speed): narration 1.00x after an 85-frame lag at
+    power-on (initial loads). Battle: the main thread is too slow: per 200 NES frames the
+    NES waits ~197 times, the GB ~154 (was ~145 before the indirect-read fast path and the
+    OAM rewrite). Profile now: indirect ROM reads 19% (battle sprite data copied through
+    `(zp),Y`, e.g. `p32:9130`), OAM conversion 10%, PPU writes ~8%.
 - Facts: the battle input loop polls the joypad ~130 times a frame (the repeat counter
   `$14` steps per poll, so it depends on CPU speed even on the NES); a cynes step can hold
   two NMIs; `$05` is also used as scratch outside the wait.
@@ -131,7 +135,9 @@ python3 tools/gb3/ff3src.py "roms/Final Fantasy III (Japan).nes" build/ff3/src_e
   raster split); belongs in the window layer (FF1 lesson).
 
 ## Next
-1. Speed pass: region fast paths for indirect reads / writes (coverage memory flags),
-   native OAM conversion and PPU copy routines, initial loads; Gambatte lag per window.
+1. Speed pass (battle first): native versions of the hot battle loops (sprite data copies
+   through `(zp),Y`, `p32:9130` / `915C`), OAM conversion only of changed sprites, PPU copy
+   routines, initial loads; measure waited-for frames per NES frame (mGBA `SGBRUN_PEEK=D830`:
+   input clock / GB frames / waited-for frames).
 2. Raster split in the runtime (LYC, window layer), sound (APU -> GB, FF1/FF2 model).
 3. Mock-ups for the owner (battle, dialogue, main menu), then the re-layouts.

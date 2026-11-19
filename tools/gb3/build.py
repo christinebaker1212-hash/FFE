@@ -52,6 +52,17 @@ def source_base(src, nes, srcdir):
     subprocess.check_call(script_cmd(os.path.join(HERE, 'ff3src.py'), src, srcdir, '--english', '--listing', listing), cwd=ROOT)
 
 
+def oam_attr_src():
+    """OAM_ATTR ($3D00, bank 0): NES sprite attribute byte -> CGB OAM attributes (palette
+    bits 0-1, priority bit 5 -> bit 7, horizontal / vertical flip bits 6 / 7 -> bits 5 / 6);
+    the runtime ORs in the VRAM bank of the sprite pattern table"""
+    t = []
+    for a in range(256):
+        t.append((a & 3) | ((a & 0x20) << 2) | ((a & 0x40) >> 1) | ((a & 0x80) >> 1))
+    return 'section bank 0, $3D00\nOAM_ATTR:\n' + ''.join(
+        '    db %s\n' % ', '.join(str(v) for v in t[k:k + 16]) for k in range(0, 256, 16))
+
+
 def main():
     args = sys.argv[1:]
     opt = {'--cov': os.path.join(ROOT, 'build', 'ff3', 'cov'),
@@ -80,7 +91,7 @@ def main():
             print('  idiom %s:%04X: code not found, not used' % k); rc.g.idioms.pop(k, None)
     prog, bank_of, banks = emit_program(rc)
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in RT_FILES)
-    src_all = rt + '\n' + gb1.nes_rgb_src() + '\n' + prog
+    src_all = rt + '\n' + gb1.nes_rgb_src() + '\n' + oam_attr_src() + '\n' + prog
     open(opt['--out'] + '.s', 'w').write(src_all)
     print('translated: %d instructions, %d code banks (%.1fs), %d dynamic targets'
           % (len(rc.insns), len(banks), time.time() - t, rc.n_dyn))
