@@ -437,6 +437,59 @@ hle_palup2:                                 ; c62:D874 palette upload from X (pa
             jp hle_back
 
 
+; ---- fix:F56A-F591 (battle box row): LDY #0 / LDA $68B3 / STA ($88),Y / LDX $6AA1 / DEX /
+; DEX / INY / LDA $68B4 / (STA ($88),Y / INY / DEX / BNE) / LDA $68B5 / STA ($88),Y /
+; $88-$89 += $20 (CLC / ADC). Out: X = 0, Y = width - 1, A = $89; N, Z, C of the last ADC.
+hle_boxrow: ld a, [$AAA1]                   ; ($6AA1: the box width)
+            sub 2
+            ld e, a                         ; E = middle cells (0: 256, as DEX / BNE)
+            ld a, [NES_RAM + $89]
+            sub $60
+            cp $1F
+            jr nc, .slow                    ; (not in save RAM $6000-$7EFF)
+            add a, $A0
+            ld h, a
+            ld a, [NES_RAM + $88]
+            ld l, a
+            ld a, [$A8B3]
+            ld [hl+], a
+            ld a, [$A8B4]
+            ld b, e
+.m:         ld [hl+], a
+            dec b
+            jr nz, .m
+            ld a, [$A8B5]
+            ld [hl], a
+            jr .done
+.slow:      ld bc, 0
+            ld a, [$A8B3]
+            ld l, $88
+            call rt_izy_wr
+            inc c
+.sm:        ld a, [$A8B4]
+            ld l, $88
+            call rt_izy_wr
+            inc c
+            dec e
+            jr nz, .sm
+            ld a, [$A8B5]
+            ld l, $88
+            call rt_izy_wr
+.done:      ld a, [$AAA1]
+            dec a
+            ld c, a                         ; Y
+            ld b, 0
+            ld d, 0
+            ld e, 0                         ; X
+            ld a, [NES_RAM + $88]
+            add a, $20
+            ld [NES_RAM + $88], a
+            ld a, [NES_RAM + $89]
+            adc a, 0
+            ld [NES_RAM + $89], a
+            ldh [nzv], a
+            ret
+
 ; ---- fix:F618-F624 (battle panel cleared): LDY #0 / LDA #0 / 256 x (STA $691E,Y / STA
 ; $699E,Y): $691E-$6A9D zeroed. Out: A = Y = 0, X kept; N = 0, Z = 1, C kept.
 hle_pclr:   push af
@@ -471,7 +524,13 @@ hle_cp64:   ld a, [NES_RAM + $90]           ; source in one 8 KB area of ROM or 
             jr nz, .slow                    ; (crosses an 8 KB boundary: byte by byte)
             ld a, h
             cp $60
+            jr nc, .hi
+            cp $5C
             jr c, .slow
+            add a, $6C                      ; ExRAM $5C00 -> $C800
+            ld h, a
+            jr .cp
+.hi:
             cp $80
             jr nc, .rom
             add a, $40                      ; save RAM $6000 -> $A000
