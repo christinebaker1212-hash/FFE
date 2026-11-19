@@ -306,3 +306,224 @@ spr_cam2:   push bc
             pop de
             pop bc
             ret
+
+; ------------------------------------------------------------------ native CHR copy
+; fix:FD6F "copy data to ppu": LDA $2002 / ($01,$00) -> $2006 / LDY #0 / loop LDA ($02),Y /
+; STA $2007 / INY / DEX / BNE. Exit: A = last byte, X = 0, Y = count (mod 256), Z = 1, N = 0,
+; carry kept. Fast path (battle / map graphics): whole tiles from $8000-$BFFF into a pattern
+; table, +1 increment; BG or sprite table by $2000 bit 4 (as rt_ppu_w7); else per byte.
+hle_ppucopy:
+            push af                         ; caller's carry
+            call rt_ppu_r2
+            ld a, [NES_RAM + $01]
+            call rt_ppu_w6
+            ld a, [NES_RAM + $00]
+            call rt_ppu_w6
+            ld c, 0                         ; Y = 0
+            ld a, e
+            and $0F
+            jp nz, .slow
+            ldh a, [ppu_ctrl]
+            and 4
+            jp nz, .slow
+            ldh a, [ppu_vh]
+            cp $20
+            jp nc, .slow
+            ldh a, [ppu_vl]
+            and $0F
+            jp nz, .slow
+            ld a, [NES_RAM + $03]
+            cp $80
+            jp c, .slow
+            cp $C0
+            jp nc, .slow
+            ldh a, [lcd_on]                 ; LCD on: CGB only (tile copy + DMA marks)
+            and a
+            jr z, .lok
+            ldh a, [is_cgb]
+            and a
+            jp z, .slow
+.lok:       ld a, e                         ; tiles: X / 16 (X = 0: 256 bytes)
+            swap a
+            and $0F
+            jr nz, .tn
+            ld a, 16
+.tn:        ldh [uw_y], a
+            ld a, [NES_RAM + $03]           ; source HL = GB $4000 + ptr - $8000 (data bank)
+            sub $40
+            ld h, a
+            ld a, [NES_RAM + $02]
+            ld l, a
+            ldh a, [data_bank8]
+            ld [$2000], a
+            push de
+.tile:      ldh a, [ppu_vl]
+            and $F0
+            ld e, a
+            ldh a, [ppu_vh]
+            ld d, a
+            and $10
+            ld b, a
+            ldh a, [ppu_ctrl]
+            and $10
+            xor b
+            ld a, d                         ; (flags kept)
+            jr nz, .spr
+            and $0F
+            ld d, a
+            ldh a, [is_cgb]
+            and a
+            ld a, d
+            jr nz, .bgv
+            add a, high(BG_SHADOW)          ; DMG: BG tile to the shadow, re-coded later
+            ld d, a
+            ld a, 1
+            ld [$4000], a
+            jr .copy
+.bgv:       ld d, a
+            ldh a, [lcd_on]
+            and a
+            ld a, d
+            jr nz, .bgs
+            cp $08                          ; CGB, LCD off: VRAM (tiles 0-127 $9000, 128-255 $8800)
+            ld d, $90
+            jr c, .bg0
+            ld d, $80
+.bg0:       and $0F
+            add a, d
+            ld d, a
+            jr .copy
+.bgs:       add a, $D0                      ; CGB, LCD on: the tile copy (WRAM bank 2), marked
+            ld d, a
+            ld a, 2
+            ldh [$FF70], a
+            jr .copy
+.spr:       and $0F                         ; sprite table: the shadow (cart RAM bank 1)
+            add a, high(SPR_SHADOW)
+            ld d, a
+            ld a, 1
+            ld [$4000], a
+.copy:      ld b, 8
+.p0:        ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            dec b
+            jr nz, .p0
+            ld a, e
+            sub 15
+            ld e, a
+            ld b, 8
+.p1:        ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            dec b
+            jr nz, .p1
+            ldh [tmp_lo], a                 ; last byte
+            ld a, d
+            cp $D0
+            jr c, .nst
+            ld a, 1                         ; tile copy: WRAM bank 1 again, mark the tile
+            ldh [$FF70], a
+            push hl
+            ld a, e
+            sub 17
+            swap a
+            and $0F
+            ld e, a
+            ld a, d
+            sub $D0
+            swap a
+            or e
+            ld hl, BG_DIRTY
+            call hd_mark
+            pop hl
+            jr .nx
+.nst:       cp $80
+            jr c, .nvr
+            cp $A0                          ; (VRAM $80-$97: nothing to mark)
+            jr c, .nx
+.nvr:       cp high(BG_SHADOW)
+            jr c, .spm
+            call ff2_bg_tile
+            jr .nx
+.spm:       call ff2_spr_tile
+.nx:        ldh a, [ppu_vl]                 ; v += 16, Y += 16
+            add a, 16
+            ldh [ppu_vl], a
+            ldh a, [ppu_vh]
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            ld a, c
+            add a, 16
+            ld c, a
+            ldh a, [uw_y]
+            dec a
+            ldh [uw_y], a
+            jr nz, .tile
+            pop de
+            ldh a, [code_bank]
+            ld [$2000], a
+            ld b, 0
+            ld e, 0                         ; X = 0
+            jr .done
+.slow:      ld l, $02                       ; generic: LDA ($02),Y / STA $2007 / INY / DEX
+            call rt_izy_rd
+            ld a, l
+            ldh [tmp_lo], a
+            call rt_ppu_w7
+            inc c
+            dec e
+            jr nz, .slow
+.done:      xor a
+            ldh [nzv], a
+            pop af                          ; carry back
+            ldh a, [tmp_lo]
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1
+            ret
+
+ff2_bg_tile:                                ; DMG BG tile in the shadow (DE = start + 17, cart
+            xor a                           ;   RAM bank 1 on): queue its re-coding; RAM bank 0
+            ld [$4000], a
+            ld a, e
+            sub 17
+            swap a
+            and $0F
+            ld e, a
+            ld a, d
+            sub high(BG_SHADOW)
+            swap a
+            or e
+            jp dmg_markw
+ff2_spr_tile:                               ; sprite tile in the shadow: its slot reloaded if
+            push bc                         ;   resident; RAM bank 0. Keeps BC, HL.
+            push hl
+            ld a, e
+            sub 17
+            ld e, a
+            ld a, d
+            sub high(SPR_SHADOW)
+            swap a
+            ld b, a
+            ld a, e
+            swap a
+            and $0F
+            or b
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld a, [hl]
+            cp $FF
+            jr z, .x
+            add a, low(SLOT_KEY)
+            ld l, a
+            ld h, high(SLOT_KEY)
+            ld [hl], $FF
+.x:         xor a
+            ld [$4000], a
+            pop hl
+            pop bc
+            ret

@@ -56,7 +56,8 @@ class FF2:
     #   $FA2A / $FEAD: wait for vblank. FF2's NMI vector is $0100 in RAM; the wait writes
     #   JMP $FA3C / JMP $FEA1 there and spins; that stub writes RTI back, reads $2002 and
     #   drops the interrupt frame (PLA x3, A = $FA / $FE), returning to the waiter.
-    ext = {('fix', 0xFA2A): ('rt_wait_fa2a', 'NZ'), ('fix', 0xFEAD): ('rt_wait_fead', 'NZ')}
+    ext = {('fix', 0xFA2A): ('rt_wait_fa2a', 'NZ'), ('fix', 0xFEAD): ('rt_wait_fead', 'NZ'),
+           ('fix', 0xFD6F): ('hle_ppucopy', 'NZ')}       # copy data to ppu (rt/ff2.s, native)
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   fix:FA91-FA99: PHA $FA / PHA $99 / JMP ($0040): "jump (long)" calls through ($40)
     #   with a pushed return address: on the GB a call through the pointer, then $FA9A.
@@ -770,7 +771,7 @@ def emit_program(rc):
                     elif i.mn != 'JSR' or True:
                         out.append('    call rt_fatal')
     # stubs (bank 0): call rt_fcs reads the target's bank and address after the call
-    stubs = ['section bank 0, $2000']
+    stubs = ['section bank 0, $2400']                   # (runtime below, colour tables from $3A00)
     for lab in sorted(xrefs):
         stubs += ['xs_%s:' % lab, '    call rt_fcs', '    db bank(%s)' % lab, '    dw %s' % lab,
                   'xj_%s:' % lab, '    call xs_%s' % lab, '    ret']
