@@ -1100,9 +1100,9 @@ quad_chk:   push bc
 ; LCD going on after drawing with it off: every GB map cell (rows 0-29) gives its tile
 ; the palette it is drawn with (from the nametable that owns the cell); tiles coded for
 ; another palette are marked
-dmg_scan_all:                               ; (native: scan_b, bank HLE_BANK)
+dmg_scan_all:                               ; (native: scan_b, bank PF_BANK)
             push af
-            ld a, HLE_BANK
+            ld a, PF_BANK
             ld [$2000], a
             pop af
             call scan_b

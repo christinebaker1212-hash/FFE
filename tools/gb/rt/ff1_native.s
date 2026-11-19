@@ -14,6 +14,9 @@ MD_ADD     = $CCF7          ;   column: +1 for the right-hand column
 MD_FAST    = $CCF8          ;   DMG with the LCD on: the batched writer (mdf_row / mdf_col),
 MD_MK      = MD_SRC         ;   (batched) DMG: mark the drawn cells in FRESH,
 MD_PB      = $DCE0          ;   CGB: palettes of a GB map row (32)
+SP_T       = $DCE0          ; scan_b (DMG): palettes of a map row by pair (32; MD_PB is the CGB's)
+SC_VR      = $D837          ;   the view's first map row, first column
+SC_VC      = $D838
 
 section bank HLE_BANK, $4000
 NBIT:       db 1, 2, 4, 8, 16, 32, 64, 128   ; (at $4000: low byte = bit number)
@@ -2843,326 +2846,6 @@ SC_PU      = $D83B          ;   PAL_USED wanted, cells left, tile / palette of t
 SC_N       = $D83C
 SC_LT      = $D83D
 SC_LP      = $D82E          ;   (in the fault-dump area DBG + 14: written only on a fault)
-SC_NP      = $DE00          ; scan_b: palette each tile is drawn with ($FF: not used; the FRESH /
-                            ;   TBLK area, free here: queue flushed, FRESH superseded)
-scan_b:     push bc
-            push de
-            push hl
-            ld a, 1
-            ldh [sgb_dirty], a
-            ldh [sgb_adirty], a
-            xor a
-            ldh [dmg_scan], a
-            ld hl, REF_BM
-            ld b, 32
-.z:         ld [hl+], a
-            dec b
-            jr nz, .z
-            ld hl, SC_NP
-            ld a, $FF
-.f:         ld [hl+], a
-            dec b
-            jr nz, .f
-            ldh a, [own1_lo]                ; one palette for the whole screen (no cell drawn
-            ld b, a                         ;   by nametable 1, nametable 0's 64 attribute
-            ldh a, [own1_hi]                ;   bytes all one value with four equal
-            or b                            ;   quadrants: menus, new-game screens): every
-            jr nz, .full                    ;   tile of the map gets that palette
-            ld hl, NT_SH + $3C0
-            ld a, [hl+]
-            ld c, a
-            ld b, 63
-.ua:        ld a, [hl+]
-            cp c
-            jr nz, .full
-            dec b
-            jr nz, .ua
-            ld a, c
-            rrca
-            rrca
-            xor c
-            and $3F
-            jr nz, .full                    ; (quadrants differ)
-            ld a, c
-            and 3
-            ld b, a                         ; B = the palette
-            ld l, b
-            ld h, high(NBIT)
-            ld a, [hl]
-            ld [PAL_USED], a
-            ld hl, NT_SH
-            ld d, high(SC_NP)
-            ld c, 240                       ; 960 cells, 4 per pass
-.uc:        ld a, [hl+]
-            ld e, a
-            ld a, b
-            ld [de], a
-            ld a, [hl+]
-            ld e, a
-            ld a, b
-            ld [de], a
-            ld a, [hl+]
-            ld e, a
-            ld a, b
-            ld [de], a
-            ld a, [hl+]
-            ld e, a
-            ld a, b
-            ld [de], a
-            dec c
-            jr nz, .uc
-            jp .settle
-.full:      ld d, 0                         ; every cell, rows 0-29
-.r:         call scn_row
-            inc d
-            ld a, d
-            cp 30
-            jr nz, .r
-            xor a
-            ld [PAL_USED], a
-            ldh a, [cam_y]                  ; then the view (its cells win for a tile drawn
-            ld b, a                         ;   with two palettes): map row (scroll_y +
-            ldh a, [scroll_y]               ;   cam_y) mod 240 / 8, column (scroll_x +
-            add a, b                        ;   cam_x) / 8; PAL_USED = its palettes
-            jr c, .w
-            cp 240
-            jr c, .y
-.w:         sub 240
-.y:         srl a
-            srl a
-            srl a
-            ld d, a
-            ld b, 18
-.vr:        push bc
-            ldh a, [cam_x]
-            ld c, a
-            ldh a, [scroll_x]
-            add a, c
-            srl a
-            srl a
-            srl a
-            ld e, a
-            ld b, 20
-.vc:        push bc
-            call scn_cell                   ; B = tile, A = palette
-            ld l, b
-            ld h, high(SC_NP)
-            ld [hl], a
-            ld l, a
-            ld h, high(NBIT)
-            ld a, [hl]
-            ld hl, PAL_USED
-            or [hl]
-            ld [hl], a
-            ld a, e
-            inc a
-            and 31
-            ld e, a
-            pop bc
-            dec b
-            jr nz, .vc
-            ld a, d
-            inc a
-            cp 30
-            jr c, .vn
-            xor a
-.vn:        ld d, a
-            pop bc
-            dec b
-            jr nz, .vr
-.settle:    ld e, 0                         ; each tile used: REF_BM; drawn with another palette
-.t:         ld l, e                         ;   than it is coded for: TILE_PAL, marked; the
-            ld h, high(SC_NP)               ;   same palette but parked: marked again
-            ld a, [hl]
-            cp $FF
-            jr z, .tn
-            ld b, a
-            ld a, e
-            and 7
-            ld l, a
-            ld h, high(NBIT)
-            ld c, [hl]                      ; C = the tile's bit
-            ld a, e
-            rrca
-            rrca
-            rrca
-            and $1F
-            ld d, a                         ; D = its byte
-            add a, low(REF_BM)
-            ld l, a
-            ld h, high(REF_BM)
-            ld a, [hl]
-            or c
-            ld [hl], a
-            ld l, e
-            ld h, high(TILE_PAL)
-            ld a, [hl]
-            cp b
-            jr z, .sm
-            ld [hl], b
-            jr .mk
-.sm:        ld a, d
-            add a, low(DEFER_BM)
-            ld l, a
-            ld h, high(DEFER_BM)
-            ld a, [hl]
-            and c
-            jr z, .tn
-.mk:        ld a, e
-            call dmg_mark
-.tn:        inc e
-            jr nz, .t
-            ld hl, SC_NP                    ; FRESH (and TBLK) cleared, nothing pending
-            xor a
-            ld b, a
-.c:         ld [hl+], a
-            dec b
-            jr nz, .c
-            ld [FR_ANY], a
-            ld [FR_PEND], a
-            ld [FR_AGE], a
-            ld [FR_EMPTY], a
-            ld [FR_POS], a
-            pop hl
-            pop de
-            pop bc
-            ret
-
-; scan_b: the 32 cells of map row D -> SC_NP[tile] = palette (owner bits 8 at a time)
-scn_row:    ld a, d
-            and 7
-            swap a
-            add a, a
-            ld [SC_TL], a                   ; tile row offset
-            ld a, d
-            srl a
-            srl a
-            srl a
-            add a, high(NT_SH)
-            ld [SC_TH], a                   ; tile row page (nametable 0)
-            ld a, d
-            and $1C
-            add a, a
-            add a, $C0
-            ld [SC_AL], a                   ; attribute row offset
-            ld e, 0
-.g:         ld a, d                         ; C = owner bits of columns E..E+7
-            add a, a
-            add a, a
-            ld l, a
-            ld a, e
-            rrca
-            rrca
-            rrca
-            and 3
-            or l
-            ld l, a
-            ld h, high(OWN)
-            ld c, [hl]
-.cell:      ld a, [SC_TH]
-            srl c
-            jr nc, .n0
-            add a, 4
-.n0:        ld h, a
-            ld a, [SC_TL]
-            or e
-            ld l, a
-            ld b, [hl]                      ; B = tile
-            ld a, h
-            or 3
-            ld h, a                         ; attribute page of that nametable
-            ld a, e
-            rrca
-            rrca
-            and 7
-            ld l, a
-            ld a, [SC_AL]
-            add a, l
-            ld l, a
-            ld a, [hl]
-            bit 1, d
-            jr z, .t
-            swap a
-.t:         bit 1, e
-            jr z, .l
-            rrca
-            rrca
-.l:         and 3
-            ld l, b
-            ld h, high(SC_NP)
-            ld [hl], a
-            inc e
-            ld a, e
-            and 7
-            jr nz, .cell
-            ld a, e
-            cp 32
-            jr nz, .g
-            ret
-
-; D = map row, E = column: B = the cell's tile, A = its palette (from the nametable that
-; drew it). Keeps C, DE.
-scn_cell:   push bc
-            ld a, d
-            add a, a
-            add a, a
-            ld l, a
-            ld a, e
-            rrca
-            rrca
-            rrca
-            and 3
-            or l
-            ld l, a
-            ld h, high(OWN)
-            ld b, [hl]
-            ld a, e
-            and 7
-            ld l, a
-            ld h, high(NBIT)
-            ld a, [hl]
-            and b
-            ld a, d
-            jr z, .o0
-            add a, 32                       ; (nametable 1: + 4 pages = row + 32)
-.o0:        srl a
-            srl a
-            srl a
-            add a, high(NT_SH)
-            ld h, a
-            ld a, d
-            and 7
-            swap a
-            add a, a
-            or e
-            ld l, a
-            ld a, [hl]
-            pop bc
-            ld b, a                         ; B = tile
-            ld a, h
-            or 3
-            ld h, a
-            ld a, d
-            and $1C
-            add a, a
-            add a, $C0
-            ld l, a
-            ld a, e
-            rrca
-            rrca
-            and 7
-            add a, l
-            ld l, a
-            ld a, [hl]
-            bit 1, d
-            jr z, .t
-            swap a
-.t:         bit 1, e
-            jr z, .l
-            rrca
-            rrca
-.l:         and 3
-            ret
 
 ; ---- D = value, BC = count: count $2007 writes of D (rt_ppu_w7 semantics). In bulk while
 ; the LCD is off, the increment is 1 and the address is in nametable 0's cells with no cell
@@ -5048,7 +4731,7 @@ mdc_end:       ld a, l
 ; ---- DMG tile coding, one output plane per call: plane = f(NES plane 0, plane 1), f one of the
 ; 16 boolean functions (bit i of T: the value for colour index i = p0 + 2 * p1). HL = the tile
 ; in the shadow (interleaved rows), DE = the plane's first byte (+2 a row). Clobbers A, BC.
-PF_BANK    = 60
+; (PF_BANK = 60: runtime.s)
 section bank PF_BANK, $4000
 pf_tab:
             dw pf_0, pf_1, pf_2, pf_3, pf_4, pf_5, pf_6, pf_7, pf_8, pf_9, pf_10, pf_11, pf_12, pf_13, pf_14, pf_15
@@ -6148,3 +5831,797 @@ rt_mmc_w5808:
             pop bc
             pop af
             ret
+
+; ---- the DMG LCD-on map scan (dmg_scan_all), in PF_BANK
+section bank PF_BANK, $4800
+SC_NP      = $DE00          ; scan_b: palette each tile is drawn with ($FF: not used; the FRESH /
+                            ;   TBLK area, free here: queue flushed, FRESH superseded)
+scan_b:     push bc
+            push de
+            push hl
+            ld a, 1
+            ldh [sgb_dirty], a
+            ldh [sgb_adirty], a
+            xor a
+            ldh [dmg_scan], a
+            ld hl, REF_BM
+            ld b, 32
+.z:         ld [hl+], a
+            dec b
+            jr nz, .z
+            ld hl, SC_NP
+            ld a, $FF
+.f:         ld [hl+], a
+            dec b
+            jr nz, .f
+            ldh a, [own1_lo]                ; one palette for the whole screen (no cell drawn
+            ld b, a                         ;   by nametable 1, nametable 0's 64 attribute
+            ldh a, [own1_hi]                ;   bytes all one value with four equal
+            or b                            ;   quadrants: menus, new-game screens): every
+            jr nz, .full                    ;   tile of the map gets that palette
+            ld hl, NT_SH + $3C0
+            ld a, [hl+]
+            ld c, a
+            ld b, 63
+.ua:        ld a, [hl+]
+            cp c
+            jr nz, .full
+            dec b
+            jr nz, .ua
+            ld a, c
+            rrca
+            rrca
+            xor c
+            and $3F
+            jr nz, .full                    ; (quadrants differ)
+            ld a, c
+            and 3
+            ld b, a                         ; B = the palette
+            ld l, b
+            ld h, high(NBIT60)
+            ld a, [hl]
+            ld [PAL_USED], a
+            ld hl, NT_SH
+            ld d, high(SC_NP)
+            ld c, 240                       ; 960 cells, 4 per pass
+.uc:        ld a, [hl+]
+            ld e, a
+            ld a, b
+            ld [de], a
+            ld a, [hl+]
+            ld e, a
+            ld a, b
+            ld [de], a
+            ld a, [hl+]
+            ld e, a
+            ld a, b
+            ld [de], a
+            ld a, [hl+]
+            ld e, a
+            ld a, b
+            ld [de], a
+            dec c
+            jr nz, .uc
+            jp .settle
+.full:      ldh a, [cam_y]                  ; the view: map row (scroll_y + cam_y) mod 240 / 8,
+            ld b, a                         ;   column (scroll_x + cam_x) / 8
+            ldh a, [scroll_y]
+            add a, b
+            jr c, .w
+            cp 240
+            jr c, .y
+.w:         sub 240
+.y:         srl a
+            srl a
+            srl a
+            ld [SC_VR], a
+            ldh a, [cam_x]
+            ld b, a
+            ldh a, [scroll_x]
+            add a, b
+            srl a
+            srl a
+            srl a
+            ld [SC_VC], a
+            ld d, 0                         ; every cell, rows 0-29
+.r:         call scn_tab                    ;   (then the view's cells again: they win for a
+            call scn_rowf                   ;   tile drawn with two palettes)
+            inc d
+            ld a, d
+            cp 30
+            jr nz, .r
+            xor a
+            ld [PAL_USED], a
+            ld a, [SC_VR]
+            ld d, a
+            ld b, 18
+.vr:        push bc
+            call scn_tab
+            call scn_rowv
+            ld a, d
+            inc a
+            cp 30
+            jr c, .vn
+            xor a
+.vn:        ld d, a
+            pop bc
+            dec b
+            jr nz, .vr
+.settle:    ld e, 0                         ; each tile used: REF_BM; drawn with another palette
+.t:         ld l, e                         ;   than it is coded for: TILE_PAL, marked; the
+            ld h, high(SC_NP)               ;   same palette but parked: marked again
+            ld a, [hl]
+            cp $FF
+            jr z, .tn
+            ld b, a
+            ld a, e
+            and 7
+            ld l, a
+            ld h, high(NBIT60)
+            ld c, [hl]                      ; C = the tile's bit
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld d, a                         ; D = its byte
+            add a, low(REF_BM)
+            ld l, a
+            ld h, high(REF_BM)
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ld l, e
+            ld h, high(TILE_PAL)
+            ld a, [hl]
+            cp b
+            jr z, .sm
+            ld [hl], b
+            jr .mk
+.sm:        ld a, d
+            add a, low(DEFER_BM)
+            ld l, a
+            ld h, high(DEFER_BM)
+            ld a, [hl]
+            and c
+            jr z, .tn
+.mk:        ld a, d                         ; marked (DIRTY_BM), no longer parked (as dmg_mark)
+            ld l, a
+            ld h, high(DIRTY_BM)
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ld a, l
+            add a, low(DEFER_BM)
+            ld l, a
+            ld a, c
+            cpl
+            and [hl]
+            ld [hl], a
+            ld a, 1
+            ldh [rq_any], a
+.tn:        inc e
+            jr nz, .t
+            ld hl, SC_NP                    ; FRESH (and TBLK) cleared, nothing pending
+            xor a
+            ld b, a
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            ld [FR_ANY], a
+            ld [FR_PEND], a
+            ld [FR_AGE], a
+            ld [FR_EMPTY], a
+            ld [FR_POS], a
+            pop hl
+            pop de
+            pop bc
+            ret
+
+; scan_b, map row D: SC_TL / SC_TH (tile row offset, page of nametable 0) and SP_T[nt * 16
+; + pair] = the palette of columns 2 * pair, + 1 in nametable nt. Keeps DE.
+scn_tab:    push de
+            ld a, d
+            and 7
+            swap a
+            add a, a
+            ld [SC_TL], a
+            ld a, d
+            srl a
+            srl a
+            srl a
+            add a, high(NT_SH)
+            ld [SC_TH], a
+            ld a, d
+            and $1C
+            add a, a
+            add a, $C0
+            ld l, a
+            ld bc, SP_T
+            bit 1, d
+            jr nz, .s
+            ld h, high(NT_SH) + 3
+            push hl
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            pop hl
+            ld h, high(NT_SH) + 7
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            pop de
+            ret
+.s:         ld h, high(NT_SH) + 3           ; (bottom half of the attribute bytes)
+            push hl
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            pop hl
+            ld h, high(NT_SH) + 7
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            ld a, [hl+]
+            swap a
+            ld e, a
+            and 3
+            ld [bc], a
+            inc c
+            ld a, e
+            rrca
+            rrca
+            and 3
+            ld [bc], a
+            inc c
+            pop de
+            ret
+
+; scan_b: row D (scn_tab done), every column: SC_NP[tile] = palette; an 8-column group drawn
+; by one nametable two cells per palette fetch
+scn_rowf:   ld e, 0
+.g:         ld a, d                         ; OWN byte of columns E..E+7
+            add a, a
+            add a, a
+            ld l, a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            or l
+            ld l, a
+            ld h, high(OWN)
+            ld a, [hl]
+            and a
+            jr z, .u0
+            inc a
+            jr z, .u1
+            ld b, 8                         ; both nametables: cell by cell
+.m:         push bc
+            call scn_c
+            inc e
+            pop bc
+            dec b
+            jr nz, .m
+            jr .ng
+.u0:        ld c, 0
+            jr .uf
+.u1:        ld c, 16
+.uf:        push de
+            ld a, [SC_TH]
+            bit 4, c
+            jr z, .p0
+            add a, 4
+.p0:        ld h, a
+            ld a, [SC_TL]
+            or e
+            ld l, a
+            ld a, e
+            srl a
+            add a, c
+            add a, low(SP_T)
+            ld c, a
+            ld b, high(SP_T)
+            ld d, high(SC_NP)
+            ld a, [bc]
+            inc c
+            ld e, [hl]
+            inc l
+            ld [de], a
+            ld e, [hl]
+            inc l
+            ld [de], a
+            ld a, [bc]
+            inc c
+            ld e, [hl]
+            inc l
+            ld [de], a
+            ld e, [hl]
+            inc l
+            ld [de], a
+            ld a, [bc]
+            inc c
+            ld e, [hl]
+            inc l
+            ld [de], a
+            ld e, [hl]
+            inc l
+            ld [de], a
+            ld a, [bc]
+            inc c
+            ld e, [hl]
+            inc l
+            ld [de], a
+            ld e, [hl]
+            inc l
+            ld [de], a
+            pop de
+            ld a, e
+            add a, 8
+            ld e, a
+.ng:        ld a, e
+            cp 32
+            jr nz, .g
+            ret
+
+; scan_b: view row D (scn_tab done), its 20 columns from SC_VC: SC_NP[tile] = palette,
+; PAL_USED gets each palette; owner bits fetched again at each 8-column boundary
+scn_rowv:   ld a, [SC_VC]
+            ld e, a
+            call .ob
+            ld b, 20
+.c:         push bc
+            srl c                           ; owner: carry
+            ld a, [SC_TH]
+            ld b, 0
+            jr nc, .o0
+            add a, 4
+            ld b, 16
+.o0:        ld h, a
+            ld a, [SC_TL]
+            or e
+            ld l, a
+            ld a, [hl]                      ; tile
+            push af
+            ld a, e
+            srl a
+            add a, b
+            add a, low(SP_T)
+            ld l, a
+            ld h, high(SP_T)
+            ld b, [hl]                      ; palette
+            pop af
+            ld l, a
+            ld h, high(SC_NP)
+            ld [hl], b
+            ld l, b
+            ld h, high(NBIT60)
+            ld a, [hl]
+            ld hl, PAL_USED
+            or [hl]
+            ld [hl], a
+            ld a, c
+            pop bc
+            ld c, a
+            ld a, e
+            inc a
+            and 31
+            ld e, a
+            and 7
+            call z, .ob
+            dec b
+            jr nz, .c
+            ret
+.ob:        ld a, d                         ; C = owner bits from column E on
+            add a, a
+            add a, a
+            ld l, a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            or l
+            ld l, a
+            ld h, high(OWN)
+            ld c, [hl]
+            ld a, e
+            and 7
+            ret z
+.sh:        srl c
+            dec a
+            jr nz, .sh
+            ret
+
+; scan_b: map row D (scn_tab done), column E: SC_NP[tile] = A = its palette (the cell's
+; nametable from OWN). Keeps DE.
+scn_c:      push de
+            ld a, d
+            add a, a
+            add a, a
+            ld l, a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            or l
+            ld l, a
+            ld h, high(OWN)
+            ld b, [hl]
+            ld a, e
+            and 7
+            ld l, a
+            ld h, high(NBIT60)
+            ld a, [hl]
+            and b
+            ld c, 0
+            ld a, [SC_TH]
+            jr z, .o
+            ld c, 16
+            add a, 4
+.o:         ld h, a
+            ld a, [SC_TL]
+            or e
+            ld l, a
+            ld b, [hl]                      ; B = tile
+            ld a, e
+            srl a
+            add a, c
+            add a, low(SP_T)
+            ld l, a
+            ld h, high(SP_T)
+            ld a, [hl]
+            ld l, b
+            ld h, high(SC_NP)
+            ld [hl], a
+            pop de
+            ret
+
+section bank PF_BANK, $7F00
+NBIT60:     db 1, 2, 4, 8, 16, 32, 64, 128
