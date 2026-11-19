@@ -3040,29 +3040,31 @@ vchar_n:    cp $FD
             inc b
 .nb:        ld c, 8                         ; C = rows left
 .row:       ld a, [hl+]
-            push hl
             and a
             jr nz, .px
             ld [VW_VLO], a                  ; (VLO = 0 for an empty row)
-            jr .nx
-.px:        push bc
-            ld c, 0                         ; A:C = row shifted right by the pen's pixel
-            inc d
-            dec d
-            jr z, .ns
-            push de
-.sh:        srl a
-            rr c
-            dec d
-            jr nz, .sh
-            pop de
-.ns:        ld h, high(VW_BUF)
+            jr .nx2
+.px:        push hl                         ; row >> shift and row << (8 - shift) from the
+            ld l, a                         ;   tables VW_SHR (build.py)
+            ld a, d
+            and a
+            jr z, .s0
+            add a, a
+            add a, high(VW_SHR) - 1
+            ld h, a
+            ld a, [hl]
+            ld [VW_VLO], a
+            dec h
+            ld a, [hl]
+            jr .s1
+.s0:        xor a
+            ld [VW_VLO], a
+            ld a, l
+.s1:        ld h, high(VW_BUF)
             ld l, e
             or [hl]
             ld [hl], a
-            ld a, c
-            ld [VW_VLO], a
-            pop bc
+            ld a, [VW_VLO]
             and a
             jr z, .nx
             dec b
@@ -3075,7 +3077,7 @@ vchar_n:    cp $FD
             or [hl]
             ld [hl], a
 .nx:        pop hl
-            inc e
+.nx2:       inc e
             dec c
             jr nz, .row
 .adv:       ld hl, VW_VSQ                   ; a squeezed word: no gap after the letter
@@ -3095,4 +3097,27 @@ vchar_n:    cp $FD
             scf
             adc a, b
             ld [VW_VX], a
+            ret
+
+; ---- far vclear (gb_layout.py VWF_SRC): VN * 8 bytes of VBUF cleared (256 when that is 0),
+; VX = 0. Out: A = X = 0, Y kept; N = 0, Z = 1, C = 1.
+vclear_b:   xor a
+            ld [VW_VX], a
+            ldh [nzv], a
+            ld a, [VW_VN]
+            add a, a
+            add a, a
+            add a, a
+            ld e, a
+            ld hl, VW_BUF
+            xor a
+.l:         ld [hl+], a
+            dec e
+            jr nz, .l
+            ld de, 0
+            push af
+            pop hl
+            ld l, $90                       ; (Z, C)
+            push hl
+            pop af
             ret

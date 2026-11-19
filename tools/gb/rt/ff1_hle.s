@@ -436,3 +436,84 @@ hle_palup2:                                 ; c62:D874 palette upload from X (pa
             call palup2_b
             jp hle_back
 
+
+; ---- fix:F618-F624 (battle panel cleared): LDY #0 / LDA #0 / 256 x (STA $691E,Y / STA
+; $699E,Y): $691E-$6A9D zeroed. Out: A = Y = 0, X kept; N = 0, Z = 1, C kept.
+hle_pclr:   push af
+            push hl
+            ld hl, $A91E                    ; ($691E, cart RAM bank 0)
+            xor a
+            ld b, 192                       ; 384 bytes
+.l:         ld [hl+], a
+            ld [hl+], a
+            dec b
+            jr nz, .l
+            ldh [nzv], a
+            pop hl
+            pop af
+            ld c, 0
+            ld a, 1
+            dec a                           ; (Z = 1, carry kept)
+            ret
+
+; ---- fix:FA5B-FA66: LDY #0 / 64 x (LDA ($90),Y / STA $5F80,Y): 64 bytes to ExRAM $5F80.
+; Out: A = the last byte, Y = $40, X kept; N = 0, Z = 1, C = 1.
+hle_cp64:   ld c, 0
+.l:         ld a, [NES_RAM + $90]
+            ld l, a
+            ld a, [NES_RAM + $91]
+            ld h, a
+            ld b, 0
+            add hl, bc
+            call nes_rd
+            ld a, c
+            add a, low(EX_RAM + $380)
+            ld h, high(EX_RAM + $380)
+            ld b, l
+            ld l, a
+            ld [hl], b
+            inc c
+            ld a, c
+            cp $40
+            jr nz, .l
+            xor a
+            ldh [nzv], a
+            ld a, b                         ; A = the last byte; Z = 1, C = 1 (CPY #$40)
+            ld b, 0
+            push af
+            pop hl
+            ld l, $90
+            push hl
+            pop af
+            ret
+
+; ---- fix:FCC7-FCD7: LDX #$0F / 16 x swap $90,X with $6D74,X (through the stack). Out:
+; X = $FF, A = the old $90, Y kept; N = 1, Z = 0, C kept.
+hle_sw16:   push af
+            push bc
+            ld hl, NES_RAM + $90
+            ld de, $AD74                    ; ($6D74)
+            ld b, 16
+.l:         ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .l
+            ld a, $80
+            ldh [nzv], a
+            pop bc
+            pop af
+            ld de, $00FF                    ; X = $FF
+            ld a, 2
+            dec a                           ; (Z = 0, carry kept)
+            ld a, [$AD74]
+            ret
+
+hle_vclear:                                 ; far vclear (bank HLE_BANK: vclear_b)
+            ld a, HLE_BANK
+            ld [$2000], a
+            call vclear_b
+            jp hle_back

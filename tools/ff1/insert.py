@@ -1819,5 +1819,5 @@ if __name__ == '__main__':
             fh.write(''.join('ex:%04X h_code.%s\n' % (LABELS_EX['h_code.' + c], c)
                              for c in ('c5', 'c6', 'c7', 'c8', 'c9', 'ca', 'cb', 'cc', 'cd', 'ce', 'cf')))
         with open(sys.argv[2] + '.farsym', 'w') as fh:  # far routines the GB build replaces
-            fh.write(''.join('%04X %s\n' % (FAR_LABELS[r], r) for r in ('vtile', 'vstr', 'GW', 'GR') if r in FAR_LABELS))
+            fh.write(''.join('%04X %s\n' % (FAR_LABELS[r], r) for r in ('vtile', 'vstr', 'vclear', 'GW', 'GR') if r in FAR_LABELS))
     print('\n'.join(report)); print('strings not fitting:', bad)

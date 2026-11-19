@@ -141,7 +141,8 @@ def nes_english(src, out_dir, gb=False):
 
 
 FAR_EXT = {'vtile': ('hle_vtile', 'NZC'),        # gb_layout.py's small-font tile upload
-           'vstr': ('hle_vstr', 'NZC')}          #   and text renderer (rt/ff1_native.s)
+           'vstr': ('hle_vstr', 'NZC'),          #   and text renderer (rt/ff1_native.s)
+           'vclear': ('hle_vclear', 'NZC')}
 FAR_BANK = 40                                     # (8 KB bank of the far code)
 
 
@@ -150,12 +151,16 @@ def vwf_tables(prg, far_sym):
     of the English NES ROM into the native bank for vstr_b (rt/ff1_native.s)."""
     n = 256 - 0x7A
     if 'GW' not in far_sym or 'GR' not in far_sym:
-        return 'VW_GR_NES = 0\nsection bank HLE_BANK, $7A00\nvw_gw:\nvw_gr:\n'
+        return 'VW_GR_NES = 0\nsection bank HLE_BANK, $7A00\nvw_gw:\nvw_gr:\nsection bank HLE_BANK, $6000\nVW_SHR:\n'
     off = lambda a: FAR_BANK * 0x2000 + a - 0xC000
     gw = prg[off(far_sym['GW']):off(far_sym['GW']) + n]
     gr = prg[off(far_sym['GR']):off(far_sym['GR']) + 8 * n]
     rows = lambda b: '\n'.join('            db ' + ', '.join('$%02X' % x for x in b[i:i + 16]) for i in range(0, len(b), 16))
-    return ('VW_GR_NES = $%04X\nsection bank HLE_BANK, $7A00\nvw_gw:\n%s\nvw_gr:\n%s\n' % (far_sym['GR'], rows(gw), rows(gr)))
+    shr = bytearray()                                # shift s (1-7): page of b >> s, page of b << (8 - s)
+    for sh in range(1, 8):
+        shr += bytes(b >> sh for b in range(256)) + bytes((b << (8 - sh)) & 255 for b in range(256))
+    return ('VW_GR_NES = $%04X\nsection bank HLE_BANK, $7A00\nvw_gw:\n%s\nvw_gr:\n%s\n' % (far_sym['GR'], rows(gw), rows(gr))
+            + 'section bank HLE_BANK, $6000\nVW_SHR:\n%s\n' % rows(shr))
 
 
 def main():

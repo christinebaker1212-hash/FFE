@@ -68,7 +68,10 @@ class FF1:
               ('fix', 0xE17F): ('hle_wrow', 0xE185, 'NZ'),
               ('c62', 0xD865): ('hle_palup', 0xD87F, 'NZC'),    # palette upload, every frame
               ('c62', 0xD874): ('hle_palup2', 0xD87F, 'NZC'),   #   (entered at its second loop)
-              ('c62', 0xD6B8): ('rt_dlgdelay', 0xD6C3, 'NZ')}   # dialogue box split: timing loop
+              ('c62', 0xD6B8): ('rt_dlgdelay', 0xD6C3, 'NZ'),   # dialogue box split: timing loop
+              ('fix', 0xF618): ('hle_pclr', 0xF625, 'NZ'),     # battle panel image cleared
+              ('fix', 0xFA5B): ('hle_cp64', 0xFA67, 'NZC'),    # battle text: 64 bytes to ExRAM
+              ('fix', 0xFCC7): ('hle_sw16', 0xFCD8, 'NZ')}     # swap $90-$9F with $6D74
     # bytes each idiom replaces (build.py drops an idiom whose code is not there)
     idiom_code = {('fix', 0xF2CF): bytes.fromhex('a008a2008d0720cad0fa88d0f5'),
                   ('fix', 0xF4EA): bytes.fromhex('a000b1888d0720c8c019d0f6'),
@@ -77,7 +80,10 @@ class FF1:
                   ('fix', 0xE17F): bytes.fromhex('8d0720cad0fa'),
                   ('c62', 0xD865): bytes.fromhex('a50df00bbde0038d0720e8e01090f5bdc0038d0720e8e02090f5'),
                   ('c62', 0xD874): bytes.fromhex('bdc0038d0720e8e02090f5'),
-                  ('c62', 0xD6B8): bytes.fromhex('a006a61bca207cd7cad0fa')}
+                  ('c62', 0xD6B8): bytes.fromhex('a006a61bca207cd7cad0fa'),
+                  ('fix', 0xF618): bytes.fromhex('a000a900991e69999e69c8d0f7'),
+                  ('fix', 0xFA5B): bytes.fromhex('a000b19099805fc8c040d0f6'),
+                  ('fix', 0xFCC7): bytes.fromhex('a20fb59048bd746d9590689d746dca10f1')}
     skip = [('fix', 0xFECF, 0xFEDB), ('fix', 0xFEDC, 0xFEF1)]   # NMI handler + wait loop
     # Jump tables of the JMP (ind) dispatches (space, table, entries): every entry is compiled
     # and a dynamic target, not only those the coverage runs reached (a person whose talk
