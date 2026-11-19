@@ -302,7 +302,7 @@ dmg_cell:   push bc
             add a, a
             or c                            ; row
             call cell_pal                   ; A = palette of (row A, col E)
-            ld e, a
+dmg_cell_e: ld e, a
             call pal_mark
             ld l, d
             ld h, high(TILE_PAL)
@@ -331,6 +331,14 @@ dmg_cell:   push bc
             pop de
             pop bc
             ret
+
+; A = tile drawn with NES palette 3 (a dialogue box cell in the window): coded for it
+dmg_tile3:  push bc
+            push de
+            push hl
+            ld d, a
+            ld a, 3
+            jr dmg_cell_e
 
 ; A = row, E = col -> A = palette (0-3) from the attribute shadow of nametable sh_nt
 cell_pal:   push bc

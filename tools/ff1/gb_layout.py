@@ -1558,7 +1558,9 @@ dgr1:
     bne dgr
     jmp dlghide     ; (people over the box hidden again)
 dlghide:            ; dialogue box opening: sprites over the box rows (NES y 48-111) hidden
-    ldx #0          ;   (the field rebuilds the sprites when the box closes)
+    lda #1          ;   (the field rebuilds the sprites when the box closes); GB: the box
+    sta $5805       ;   is being built (its cells go to the GB window; ignored once open)
+    ldx #0
 dh1:
     lda $0200,x
     clc
@@ -2938,53 +2940,10 @@ gbm2:
     lda #0
     sta $40
     jmp $ED24
-dlgrest:            ; $CA1B: the dialogue ($D604), then the map rows under the box drawn
-    jsr $D604       ;   again into the visible nametable. FF1 shows the box from the other
-    lda $2A         ;   nametable by a raster split; the GB keeps one map for both, so the
-    clc             ;   box's cells stay until redrawn (as the opening loop $D4B3 does,
-    adc #7          ;   without the box overlay and in the visible nametable)
-    and #$3F
-    sta $2C
-    lda $2F
-    clc
-    adc #7
-    cmp #15
-    bcc dr0
-    sbc #15
-dr0:
-    sta $30
-    lda #1
-    sta $2D
-dr1:
-    lda $2C
-    sec
-    sbc #1
-    and #$3F
-    sta $2C
-    lda $30
-    sec
-    sbc #1
-    bcs dr2
-    adc #15
-dr2:
-    sta $30
-    lda $29
-    sta $2B
-    and #$1F
-    sta $31
-    jsr $D25A
-    jsr $FE00
-    jsr $D2EB
-    jsr $CCA3
-    jsr $C683
-    jsr $D403
-    jsr $FE00
-    jsr $D471
-    jsr $CCA3
-    jsr $C683
-    lda $30
-    cmp $2F
-    bne dr1
+dlgrest:            ; $CA1B: the dialogue ($D604), then (GB) the box closed: the GB shows
+    jsr $D604       ;   it in its window (FF1 builds it in the other nametable and shows it
+    lda #0          ;   by a raster split), so the map under it was never touched
+    sta $5805
     rts
 """.replace('MPAGE', '$%04X' % MPAGE).replace('MLAST', '$%04X' % MLAST) \
         .replace('GBMPG', '$%04X' % MAG_B14_LABELS['gbmpg']).replace('GBMKY', '$%04X' % MAG_B14_LABELS['gbmky'])\

@@ -70,7 +70,8 @@ while nes.nmi_count < last and f < last * 3:
     nes.step(1); f += 1
     for j in range(k0 + 1, min(nes.nmi_count, last) + 1):
         pads[j] = nes.pad_history[j & 0xFF]
-tmp = tempfile.mkdtemp()
+tmp = os.environ.get('SHOTS_KEEP') or tempfile.mkdtemp()   # (env SHOTS_KEEP=DIR: keep the runner's files there)
+os.makedirs(tmp, exist_ok=True)
 pf = os.path.join(tmp, 'pads.bin'); open(pf, 'wb').write(pads)
 sram = bytearray(0x8000)                 # cart RAM: bank 0 = the NES power-on save RAM
 n0 = NES(nes_path)

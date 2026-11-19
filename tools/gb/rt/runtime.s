@@ -67,7 +67,6 @@ TB_H       = $D873
 SGB_BGAP   = $D83F          ; SGB: frames before the next packet build may run (sgb_frame)
 SGB_MIN    = 12
 NT_NOW     = $D87D          ; nt_tile: check the cell's palette at once (not in spare time)
-ISR_PC     = $D876          ; (debug) the address the last vblank interrupted (2)
 MAP_RB     = $CCFF          ; CGB masked load: GB map to rebuild from the shadows when shown
 CGB_RP     = $CCEF          ; CGB: cell palettes stale (owners changed with the LCD off; repal_b at LCD on)
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
@@ -205,6 +204,10 @@ maps_wait:  ds 1                            ; DMG: frames the maps have been due
 in_battle:  ds 1                            ; bit 7 of the last $5800 write (the battle camera)
 sgb_pslot:  ds 1                            ; SGB: 1 + the palette slot given to the battle party (0: none)
 sgb_adirty: ds 1                            ; SGB: attributes / cells / camera changed (else palettes only)
+dlg_on:     ds 1                            ; field dialogue box open ($5805): its cells go to the window
+dlg_c0:     ds 1                            ;   box rectangle in the other view: NES column (0-63),
+dlg_r0:     ds 1                            ;   NES tile row (0-29) of its top left (20 x 8 cells)
+dlg_l:      ds 1                            ;   lines of it shown (window from the top, off at this line)
 sgb_mask:   ds 1                            ; SGB screen mask: 1 = to blank (LCD went off), 2 = blanked, 3 = blanked until the packets built with the LCD on are out
 hram_end:   ds 1
 w7v:        ds 1                            ; rt_ppu_w7: the value written
@@ -402,11 +405,6 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             push af                         ;   main thread may be in a tile copy bank)
             ld a, 1
             ldh [$FF70], a
-            ld hl, sp+10                    ; (debug: the interrupted address -> ISR_PC)
-            ld a, [hl+]
-            ld [ISR_PC], a
-            ld a, [hl]
-            ld [ISR_PC + 1], a
 
             ldh a, [oam_pending]
             and a
@@ -467,8 +465,14 @@ stat_isr:   push af                         ; raster events (vbl_regs), each in 
             ldh [$FF42], a
             jr .nx
 .mk:        dec a
-            jr nz, .on
-            ldh a, [is_cgb]                 ; mask off
+            jr z, .off
+            dec a
+            jr z, .on
+            ldh a, [$FF40]                  ; 3: window off (bottom of a dialogue box)
+            res 5, a
+            ldh [$FF40], a
+            jr .nx
+.off:       ldh a, [is_cgb]                 ; mask off
             and a
             jr z, .offd
             ldh a, [$FF40]
@@ -478,7 +482,7 @@ stat_isr:   push af                         ; raster events (vbl_regs), each in 
 .offd:      ld a, [BGP_NORM]
             ldh [$FF47], a
             jr .nx
-.on:        ldh a, [is_cgb]                 ; mask on
+.on:        ldh a, [is_cgb]                 ; mask on (kind 2)
             and a
             jr z, .ond
             ldh a, [$FF40]
@@ -598,7 +602,16 @@ vbl_regs:   ld a, [VLCD]                    ; CGB: a masked load's writes done: 
             bit 4, a
             jr z, .ns
             set 1, b
-.ns:        ldh a, [is_cgb]
+.ns:        ldh a, [dlg_l]                  ; dialogue box: the window from the top, off
+            and a                           ;   at line dlg_l
+            jr z, .nw
+            set 5, b
+            push bc
+            ld b, a
+            ld a, 3
+            call ev_add
+            pop bc
+.nw:        ldh a, [is_cgb]
             and a
             jr z, .lc
             ld a, c
@@ -819,7 +832,24 @@ rt_band:    push hl
 ; (A and N/Z are overwritten after; carry kept).
 rt_dlgdelay: push af
             push hl
+            ldh a, [dlg_on]                 ; lines of the box shown: ($1B - 8) * 3 / 4, at
+            and a                           ;   most 64 (the NES box's 88 lines, opened 2 and
+            jr z, .nd                       ;   closed 3 per frame, scaled to the GB's 64)
             ld a, [NES_RAM + $1B]
+            sub 8
+            jr nc, .p
+            xor a
+.p:         ld l, a
+            srl a
+            srl a
+            ld h, a
+            ld a, l
+            sub h
+            cp 64
+            jr c, .s
+            ld a, 64
+.s:         ldh [dlg_l], a
+.nd:        ld a, [NES_RAM + $1B]
             dec a
             ld l, a
             ld a, [NES_RAM + $12]
@@ -2000,6 +2030,11 @@ rt_ppu_w7g: push af
             inc a
 .df:        ldh [sh_same], a
             ld [hl], d
+            ldh a, [dlg_on]                 ; a dialogue box's cell: to the window
+            and a
+            jr z, .map
+            call dlg_cell
+            jp nz, .done
 .map:       call own_set                    ; this nametable now owns the GB map cell
             ldh a, [is_cgb]
             and a
@@ -2554,6 +2589,79 @@ rt_mmc_w5802:                               ; (bank HLE_BANK: susp_w)
             pop af
             call susp_w
             jp hle_back
+rt_mmc_w5805:                               ; dialogue box on / off (bank HLE_BANK: dlg_w)
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            call dlg_w
+            jp hle_back
+; nametable cell written while a dialogue box is open: B = offset high (0-3), C = 4 for
+; nametable 1, L = offset low, D = tile. A cell of the box rectangle (the other view, where
+; FF1 builds the box) goes to the window map (CGB: palette 3; DMG: the tile coded for NES
+; palette 3, the box's): NZ. Otherwise Z (the GB map as usual). Keeps BC, DE, HL.
+dlg_cell:   push hl
+            push de
+            ld a, l                         ; NES column 0-63
+            and 31
+            bit 2, c
+            jr z, .n0
+            or 32
+.n0:        ld e, a
+            ldh a, [dlg_c0]
+            ld d, a
+            ld a, e
+            sub d
+            and 63
+            cp 20
+            jr nc, .no
+            ld e, a                         ; E = box column
+            ld a, l                         ; NES tile row = B * 8 + L / 32
+            rlca
+            rlca
+            rlca
+            and 7
+            ld d, a
+            ld a, b
+            add a, a
+            add a, a
+            add a, a
+            or d
+            ld d, a
+            ldh a, [dlg_r0]
+            ld h, a
+            ld a, d
+            sub h
+            jr nc, .p
+            add a, 30
+.p:         cp 8
+            jr nc, .no
+            swap a                          ; window map $9C00 + row * 32 + column
+            add a, a
+            or e
+            ld l, a
+            ld h, $9C
+            pop de
+            push de
+            ld a, d
+            call vram_put
+            ldh a, [is_cgb]
+            and a
+            jr z, .dmg
+            ld h, $DC                       ; (VRAM bank 1)
+            ld a, 3
+            call vram_put
+            jr .yes
+.dmg:       ld a, d
+            call dmg_tile3
+.yes:       pop de
+            pop hl
+            or 1
+            ret
+.no:        pop de
+            pop hl
+            xor a
+            ret
 rt_mmc_w5803:
             push hl
             ld hl, VOL_BGM
@@ -3235,132 +3343,167 @@ stage_sync: push bc
             ret
 
 ; vblank (CGB): the marked BG tiles from the tile copy (WRAM bank 2), each run of consecutive
-; marked tiles (within tiles 0-127 / 128-255) by one general-purpose DMA, as long as the
-; vblank lasts (about 24 tiles per line left at double speed). Carry set: out of time.
-hdma_bg:    ld b, 0                         ; B = tile
-.nx:        ld a, b                         ; (a byte of 8 unmarked tiles skipped at once)
-            and 7
-            jr nz, .nb
-            ld a, b
-            rrca
-            rrca
-            rrca
-            and 31
-            add a, low(BG_DIRTY)
-            ld l, a
-            ld h, high(BG_DIRTY)
-            ld a, [hl]
+; marked tiles (within tiles 0-127 / 128-255) by one general-purpose DMA while LY is 144-151
+; (12 tiles a line; a DMA moves 16 bytes per 32 dots, and past the vblank its writes are
+; lost). The marks are scanned a byte (8 tiles) at a time. Carry set: out of time (the
+; tiles not copied stay marked).
+hdma_bg:    ld hl, BG_DIRTY
+            ld b, 0                         ; B = tile of the mark looked at
+            ld e, 0                         ; E = length of the open run, C = its first tile
+.byte:      ld a, [hl]
             and a
-            jr nz, .nb
+            jr z, .zero
+            cp $FF
+            jr nz, .bits
+            ld a, e                         ; 8 marked: the run grows by 8
+            and a
+            jr nz, .x8
+            ld c, b
+.x8:        add a, 8
+            ld e, a
             ld a, b
             add a, 8
             ld b, a
-            jr nz, .nx
+            jr .bend
+.bits:      ld d, a
+.bit:       srl d
+            jr nc, .b0
+            ld a, e
             and a
-            ret
-.nb:        call .isd
-            jr nz, .run
-            inc b
-            jr nz, .nx
+            jr nz, .b1
+            ld c, b
+.b1:        inc e
+            jr .bn
+.b0:        ld a, e
             and a
-            ret
-.run:       ld c, b                         ; C = first of the run
-.ext:       inc b
-            jr z, .end
+            call nz, .flush
+            ret c
+.bn:        inc b
             ld a, b
-            cp 128
-            jr z, .end
-            call .isd
-            jr nz, .ext
-.end:       ldh a, [$FF44]                  ; time left: (152 - LY) lines x 24 tiles
-            cp 152
-            jr nc, .late
+            and 7
+            jr nz, .bit
+            jr .bend
+.zero:      ld a, e
+            and a
+            call nz, .flush
+            ret c
+            ld a, b
+            add a, 8
+            ld b, a
+.bend:      inc l
+            ld a, b
+            and $7F                         ; tiles 128 and 256: the run ends
+            jr nz, .byte
+            ld a, e
+            and a
+            call nz, .flush
+            ret c
+            ld a, b
+            and a
+            jr nz, .byte
+            ret
+            ; the run C, E: copied (cut to the time left: carry), its marks cleared, E = 0
+.flush:     push bc
+            push de
+            push hl
+            ldh a, [$FF44]
+            sub 144
+            cp 8
+            jr nc, .late                    ; (a late vblank handler: LY past 151)
             ld d, a
-            ld a, 152
+            ld a, 8
             sub d
-            ld d, a
-            ld a, b                         ; length = B - C (B = 0: 256)
-            sub c
-            ld e, a                         ; E = length (1-128)
-            ld a, d                         ; D lines: max = 24 D (D <= 8: <= 192)
+            ld d, a                         ; D = lines left (1-8)
             add a, a
             add a, d
             add a, a
-            add a, a
-            add a, a
+            add a, a                        ; 12 tiles a line
+            ld d, 0
             cp e
-            jr nc, .ok
-            ld e, a                         ; cut to the time left
-            ld a, c
-            add a, e
-            ld b, a
-.ok:        ld a, 2
+            jr nc, .fw
+            ld e, a
+            inc d                           ; D = 1: cut
+.fw:        push de
+            ld a, 2
             ldh [$FF70], a
             ld a, c                         ; source $D000 + C * 16
             swap a
-            ld d, a
+            ld h, a
             and $F0
             ldh [$FF52], a
             ldh [$FF54], a
-            ld a, d
+            ld a, h
             and $0F
             add a, $D0
             ldh [$FF51], a
-            ld a, c                         ; destination $9000 + C * 16 (C < 128) or $8800 + ..
-            cp 128
-            ld a, d
-            jr nc, .hi
+            bit 7, c                        ; destination $9000 + C * 16 (C < 128) or $8800 + ..
+            ld a, h
+            jr nz, .fhi
             and $0F
             add a, $90
-            jr .dst
-.hi:        and $0F
+            jr .fdst
+.fhi:       and $0F
             add a, $80
-.dst:       ldh [$FF53], a
+.fdst:      ldh [$FF53], a
             ld a, e
             dec a
             ldh [$FF55], a                  ; E blocks of 16 bytes, general purpose
-.w:         ldh a, [$FF55]
+.fwt:       ldh a, [$FF55]
             inc a
-            jr nz, .w
+            jr nz, .fwt
             ld a, 1
             ldh [$FF70], a
-.cl:        ld a, c                         ; marks of C .. C + E - 1 cleared
-            call .bit
-            cpl
-            and [hl]
-            ld [hl], a
-            inc c
-            dec e
-            jr nz, .cl
-            ld a, b
-            and a
-            jr nz, .nx
-            and a                           ; (all 256 done)
-            ret
-.late:      scf
-            ret
-.isd:       ld a, b                         ; NZ if tile B is marked
-            call .bit
-            and [hl]
-            ret
-.bit:       push af                         ; A = tile: HL = its BG_DIRTY byte, A = its bit
-            rrca
+.cm:        ld a, c                         ; marks of C .. C + E - 1 cleared (whole bytes
+            rrca                            ;   at once)
             rrca
             rrca
             and 31
             add a, low(BG_DIRTY)
             ld l, a
             ld h, high(BG_DIRTY)
-            pop af
+            ld a, c
+            and 7
+            jr nz, .c1
+            ld a, e
+            cp 8
+            jr c, .c1
+            ld [hl], 0
+            sub 8
+            ld e, a
+            ld a, c
+            add a, 8
+            ld c, a
+            jr .cn
+.c1:        ld a, c
             and 7
             push hl
             ld hl, BIT_MASK
             add a, l
             ld l, a
-            jr nc, .bn
+            jr nc, .c2
             inc h
-.bn:        ld a, [hl]
+.c2:        ld a, [hl]
             pop hl
+            cpl
+            and [hl]
+            ld [hl], a
+            inc c
+            dec e
+.cn:        ld a, e
+            and a
+            jr nz, .cm
+            pop de
+            ld a, d
+            pop hl
+            pop de
+            pop bc
+            ld e, 0
+            rrca                            ; (cut: carry)
+            ret
+.late:      pop hl
+            pop de
+            pop bc
+            scf
             ret
 
 ; vblank (CGB): marked tiles by HDMA while the vblank lasts

@@ -263,7 +263,12 @@ nt_tile:    ld a, h
             inc a
 .df:        ldh [sh_same], a
             ld [hl], d
-            ldh a, [is_cgb]
+            ldh a, [dlg_on]                 ; a dialogue box's cell: to the window
+            and a
+            jr z, .nd
+            call dlg_cell
+            ret nz
+.nd:        ldh a, [is_cgb]
             and a
             jr z, .dmg
             call own_set                    ; this nametable owns the GB cell
@@ -2728,4 +2733,91 @@ susp_w:
             ld a, b
             or c
             jr nz, .cp
+            ret
+
+; ---- $5805 write (GB layout code, rt_mmc_w5805): A = 1 when FF1 starts building a field
+; dialogue box ($D4B3), 0 when the box has closed ($D604 returned). FF1 builds the box in
+; the other nametable at the view's position and shows it with a raster split growing to
+; scanline $1B; the GB keeps one map for both nametables, so the box's cells go to the
+; window map instead (dlg_cell) and the window shows its first dlg_l lines (rt_dlgdelay).
+; The rectangle: NES column = view column (scroll + camera) + 32, the view's top tile row.
+dlg_w:      push af
+            push bc
+            push hl
+            and a
+            jr z, .off
+            ldh a, [dlg_on]
+            and a
+            jr nz, .x
+            ldh a, [cam_x]                  ; column = ((scroll_x + cam_x) >> 3, with the carry
+            ld b, a                         ;   as +32) + 32 * nametable + 32, mod 64
+            ldh a, [scroll_x]
+            add a, b
+            rra
+            srl a
+            srl a
+            ld b, a
+            ldh a, [ppu_ctrl]
+            and 1
+            swap a
+            add a, a
+            add a, b
+            add a, 32
+            and 63
+            ldh [dlg_c0], a
+            ldh a, [cam_y]                  ; row = ((scroll_y + cam_y) mod 240) >> 3
+            ld b, a
+            ldh a, [scroll_y]
+            add a, b
+            jr c, .w
+            cp 240
+            jr c, .s
+.w:         sub 240
+.s:         srl a
+            srl a
+            srl a
+            ldh [dlg_r0], a
+            xor a
+            ldh [dlg_l], a
+            inc a
+            ldh [dlg_on], a
+            jr .x
+.off:       ldh a, [dlg_on]
+            and a
+            jr z, .x
+            xor a
+            ldh [dlg_on], a
+            ldh [dlg_l], a
+            ldh a, [is_cgb]                 ; CGB: the window rows back to the mask's
+            and a                           ;   attributes (palette 7, black)
+            jr z, .x
+            ldh a, [lcd_on]
+            and a
+            jr nz, .on
+            ld a, 1                         ; (LCD off: straight into VRAM bank 1)
+            ldh [$FF4F], a
+            ld hl, $9C00
+.d:         ld a, $0F
+            ld [hl+], a
+            ld a, l
+            and a
+            jr nz, .d
+            xor a
+            ldh [$FF4F], a
+            jr .x
+.on:        ld hl, $DC00
+.r:         ld a, $0F
+            call vram_put
+            inc l
+            ld a, l
+            and 31
+            cp 20
+            jr c, .r
+            ld a, l
+            add a, 12
+            ld l, a
+            jr nz, .r
+.x:         pop hl
+            pop bc
+            pop af
             ret

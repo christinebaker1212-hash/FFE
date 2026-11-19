@@ -190,6 +190,14 @@ int main(int argc, char** argv) {
 				FILE* o = fopen(path, "wb"); fprintf(o, "P6 160 144 255\n"); fwrite(frame, 1, sizeof frame, o); fclose(o);
 				snprintf(path, sizeof path, "%s_n%05d.ram", out, nshots[k]);   /* NES RAM $0000-$07FF */
 				o = fopen(path, "wb"); fwrite(wram, 1, 0x800, o); fclose(o);
+				if (getenv("GBRUN_VRAM")) {   /* VRAM (both CGB banks if the core gives them) + WRAM */
+					uint8_t* vr = p_retro_get_memory_data(RETRO_MEMORY_VIDEO_RAM);
+					size_t vn = p_retro_get_memory_size(RETRO_MEMORY_VIDEO_RAM);
+					snprintf(path, sizeof path, "%s_n%05d.vram", out, nshots[k]);
+					o = fopen(path, "wb"); if (vr) fwrite(vr, 1, vn, o); fclose(o);
+					snprintf(path, sizeof path, "%s_n%05d.wram", out, nshots[k]);
+					o = fopen(path, "wb"); fwrite(wram, 1, wsize, o); fclose(o);
+				}
 				if (getenv("GBRUN_DBG")) {   /* (debug ring $DE00-$DEFF) */
 					snprintf(path, sizeof path, "%s_n%05d.dbg", out, nshots[k]);
 					o = fopen(path, "wb"); fwrite(wram + 0x1E00, 1, 0x100, o); fclose(o);
@@ -204,7 +212,6 @@ int main(int argc, char** argv) {
 	printf("frames %d, NES frame waits %u, rate %d\n", f, NESF(), rate);
 	if (getenv("GBRUN_DBG")) {   /* the runtime's fault record DBG ($D820) and a few flags */
 		printf("DBG"); for (int i = 0; i < 16; i++) printf(" %02X", wram[0x1820 + i]); printf("\n");
-		printf("ISR_PC %02X%02X\n", wram[0x1877], wram[0x1876]);
 		printf("DDFF %02X\n", wram[0x1DFF]);
 	}
 	p_retro_deinit();
