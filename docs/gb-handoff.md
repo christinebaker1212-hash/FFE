@@ -148,7 +148,7 @@ Input files for the script are kept by `LAG_KEEP=1 lagcheck.py ...` (it prints t
 | | 2026-11-19 start | 2026-11-19 late | 2026-11-19 night |
 |---|---|---|---|
 | Color (CGB) | 126 frames lag (+1.6%) | ~33 (+0.4%) | 23 (+0.3%) |
-| Plain GB (DMG) | 263 (+3.4%) | ~200 (+2.6%) | 179 (+2.3%) |
+| Plain GB (DMG) | 263 (+3.4%) | ~200 (+2.6%) | 173 (+2.3%) |
 
 Night session (checkall 62/62 after each step; SameBoy VRAM identical to the build before at
 150-170 points, DMG and CGB, with the scratch `vramcmp.py` approach in gb-lessons):
@@ -166,7 +166,13 @@ hle_chr_pages' DMG BG page path fell into the sprite-page code (`.fsm`) and made
 16-31 reload after every BG page: now `jr .fv`; prologue (`pro_mode`): `rtb_b` mode 2 re-codes
 only the map's tiles at LCD on and leaves the others marked for the frame waits (3+ a frame:
 all done by wait ~85, the text appears from ~150; boot wait 12 -> 3 frames); `mapattr_b` DMG
-LCD-off loop (~40 M-cycles an entry, was ~128); `ntclr_b` fill unrolled. Tools added: `LAG_DUMP=FILE
+LCD-off loop (~40 M-cycles an entry, was ~128); `ntclr_b` fill unrolled; LCD-on scan
+(`scan_b` full pass): mixed-owner groups inline in `scn_rowf` (`.mc`, ~33 M-cycles a cell,
+was ~65 through scn_c); two-palette tiles get bit 7 and `scn_view` walks the view backwards,
+deciding each such tile at its last view cell (bit 6) and stopping when all are decided (the
+field's ground tile $20 is one: the old forward pass ran scn_tab + scn_rowv over 18 rows);
+SC_NP / REF_BM clears unrolled. Still to do in the scan: `scn_pu` (~37 M-cycles per view
+cell), `scn_tab` (~350 per row), the settle loop. Tools added: `LAG_DUMP=FILE
 lagcheck.py ...` (GB / NES frames per wait), `SGBRUN_CALLS=ADDR` (return address at every
 entry of a routine: exact callers and call counts), `SGBRUN_PROF_SPOFF`, gbrun writes cart
 RAM (`.cram`) with GBRUN_VRAM (Gambatte gives no VRAM: use SameBoy for VRAM).

@@ -6274,12 +6274,29 @@ scan_b:     push bc
             xor a
             ldh [dmg_scan], a
             ld hl, REF_BM
-            ld b, 32
-.z:         ld [hl+], a
+            ld b, 4
+.z:
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
             dec b
             jr nz, .z
             ld hl, SC_NP                    ; (SC_NP: the palettes each tile is drawn with,
-.f:         ld [hl+], a                     ;   bit p; bit 7: the view's palette)
+            ld b, 32                        ;   bit p; bit 7: the view's palette)
+.f:
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
             dec b
             jr nz, .f
             ldh a, [own1_lo]                ; one palette for the whole screen (no cell drawn
@@ -6369,30 +6386,20 @@ scan_b:     push bc
             ld a, d
             cp 30
             jr nz, .r
-            ld hl, SC_NP                    ; a tile drawn with two palettes: the view's
-.cf:        ld a, [hl]                      ;   cells decide (the last one), as before
+            ld hl, SC_NP                    ; a tile drawn with two palettes: bit 7, and the
+            ld c, 0                         ;   view's cells decide (the last one; out of the
+.cf:        ld a, [hl]                      ;   view: the lowest); C = how many
             ld b, a
             dec a
             and b
-            jr nz, .cv
-            inc l
+            jr z, .cn
+            set 7, [hl]
+            inc c
+.cn:        inc l
             jr nz, .cf
-            jr .settle
-.cv:        ld a, [SC_VR]
-            ld d, a
-            ld b, 18
-.vr:        push bc
-            call scn_tab
-            call scn_rowv
-            ld a, d
-            inc a
-            cp 30
-            jr c, .vn
-            xor a
-.vn:        ld d, a
-            pop bc
-            dec b
-            jr nz, .vr
+            ld a, c
+            and a
+            call nz, scn_view
 .settle:    ld e, 0                         ; each tile used: REF_BM; drawn with another palette
 .t:         ld l, e                         ;   than it is coded for: TILE_PAL, marked; the
             ld h, high(SC_NP)               ;   same palette but parked: marked again
@@ -6453,8 +6460,16 @@ scan_b:     push bc
             jr nz, .t
             ld hl, SC_NP                    ; FRESH (and TBLK) cleared, nothing pending
             xor a
-            ld b, a
-.c:         ld [hl+], a
+            ld b, 32
+.c:
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
             dec b
             jr nz, .c
             ld [FR_ANY], a
@@ -6892,13 +6907,37 @@ scn_rowf:   ld e, 0
             jr z, .u0
             inc a
             jr z, .u1
-            ld b, 8                         ; both nametables: cell by cell
-.m:         push bc
-            call scn_c
-            inc e
-            pop bc
+            dec a                           ; both nametables: cell by cell (C = owner bits;
+            ld c, a                         ;   each pair's two palette bits fetched once)
+            push de
+            ld a, e
+            srl a
+            add a, low(SP_T)
+            ldh [sh_l1], a                  ; (SP_T index of the group's first pair)
+            ld a, [SC_TL]
+            or e
+            ld e, a                         ; E = the tiles' offset
+            ld a, [SC_TH]
+            ld d, a                         ; D = nametable 0's page (+ 4: nametable 1)
+            ld b, 4
+.mp:        ldh a, [sh_l1]
+            ld l, a
+            inc a
+            ldh [sh_l1], a
+            ld h, high(SP_T)
+            ld a, [hl]
+            ldh [sh_u2], a
+            set 4, l
+            ld a, [hl]
+            ldh [sh_u3], a
+            call .mc
+            call .mc
             dec b
-            jr nz, .m
+            jr nz, .mp
+            pop de
+            ld a, e
+            add a, 8
+            ld e, a
             jr .ng
 .u0:        ld c, 0
             jr .uf
@@ -6992,6 +7031,172 @@ scn_rowf:   ld e, 0
 .ng:        ld a, e
             cp 32
             jr nz, .g
+            ret
+.mc:        srl c                           ; one cell: SC_NP[tile] |= its palette bit
+            ld a, d
+            jr c, .m1
+            ld h, a
+            ld l, e
+            ld l, [hl]
+            ld h, high(SC_NP)
+            ldh a, [sh_u2]
+            or [hl]
+            ld [hl], a
+            inc e
+            ret
+.m1:        add a, 4
+            ld h, a
+            ld l, e
+            ld l, [hl]
+            ld h, high(SC_NP)
+            ldh a, [sh_u3]
+            or [hl]
+            ld [hl], a
+            inc e
+            ret
+
+; scan_b: the view's cells (18 rows from SC_VR, 20 columns from SC_VC): a tile marked with
+; bit 7 (drawn with two palettes) gets $C0 | the palette bit of its last view cell (as
+; scn_rowv did, where the last view cell won). Walked backwards: the first cell found decides
+; (bit 6), and the walk ends once all C marked tiles are decided.
+scn_view:   ld a, c
+            ldh [sh_u2], a                  ; (tiles left to decide)
+            ld a, [SC_VR]                   ; D = the view's last row, (VR + 17) mod 30
+            add a, 17
+            cp 30
+            jr c, .r0
+            sub 30
+.r0:        ld d, a
+            ld b, 18
+.vr:        push bc
+            ld a, d                         ; the row's tiles: offset (row & 7) * 32, page
+            and 7
+            swap a
+            add a, a
+            ldh [sh_l1], a
+            ld a, d
+            srl a
+            srl a
+            srl a
+            add a, high(NT_SH)
+            ldh [sh_l2], a
+            ld a, [SC_VC]                   ; E = the view's last column, (VC + 19) mod 32
+            add a, 19
+            and 31
+            ld e, a
+            call .ob                        ; C: bit 7 = column E's owner
+            ld b, 20
+.vc:        sla c
+            ldh a, [sh_l2]
+            jr nc, .o0
+            add a, 4
+.o0:        ld h, a
+            ldh a, [sh_l1]
+            or e
+            ld l, a
+            ld l, [hl]                      ; the tile
+            ld h, high(SC_NP)
+            ld a, [hl]
+            and $C0
+            cp $80                          ; marked, not decided yet
+            jr nz, .nd
+            call .set
+            ldh a, [sh_u2]
+            dec a
+            ldh [sh_u2], a
+            jr z, .dn
+.nd:        ld a, e
+            dec a
+            and 31
+            ld e, a
+            and 7
+            cp 7
+            call z, .ob
+            dec b
+            jr nz, .vc
+            ld a, d
+            sub 1
+            jr nc, .vn
+            ld a, 29
+.vn:        ld d, a
+            pop bc
+            dec b
+            jr nz, .vr
+            ret
+.dn:        pop bc
+            ret
+.ob:        ld a, d                         ; C = OWN[D * 4 + E / 8] << (7 - E & 7): bit 7 =
+            add a, a                        ;   column E
+            add a, a
+            ld l, a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            or l
+            ld l, a
+            ld h, high(OWN)
+            ld c, [hl]
+            ld a, e
+            and 7
+            xor 7
+            ret z
+.sh:        sla c
+            dec a
+            jr nz, .sh
+            ret
+.set:       push hl                         ; HL = the tile's SC_NP: $C0 | the palette bit of
+            push bc                         ;   cell (D, E) in the nametable that drew it
+            ld a, d
+            add a, a
+            add a, a
+            ld l, a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            or l
+            ld l, a
+            ld h, high(OWN)
+            ld b, [hl]
+            ld a, e
+            and 7
+            ld l, a
+            ld h, high(NBIT60)
+            ld a, [hl]
+            and b                           ; NZ: nametable 1
+            ld a, high(NT_SH) + 3
+            jr z, .s0
+            add a, 4
+.s0:        ld h, a
+            ld a, d                         ; attribute byte $3C0 + (D / 4) * 8 + E / 4
+            and $1C
+            add a, a
+            add a, $C0
+            ld l, a
+            ld a, e
+            srl a
+            srl a
+            add a, l
+            ld l, a
+            ld a, [hl]
+            bit 1, d                        ; quadrant: bit 1 of D -> 4 bits, of E -> 2
+            jr z, .s1
+            swap a
+.s1:        bit 1, e
+            jr z, .s2
+            rrca
+            rrca
+.s2:        and 3
+            ld l, a
+            ld h, high(NBIT60)
+            ld a, [hl]
+            or $C0
+            pop bc
+            pop hl
+            ld [hl], a
             ret
 
 ; scan_b: view row D (scn_tab done), only when a tile is drawn with two palettes: its 20
