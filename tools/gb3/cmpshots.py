@@ -32,17 +32,20 @@ def newgame_pad(w):
 INPUTS['newgame'] = newgame_pad
 
 class Waits:
-    """NES frames as the GB runtime counts them (NMI_CNT): NMIs taken while the RAM NMI
-    vector $0100 holds a JMP (a synchronous wait's JMP $FF2A, or the battle / cutscene
-    handler JMP $FB57); RTI there means nobody waits for that frame"""
+    """NES frames as the GB runtime counts them (NMI_CNT): NMIs that end a synchronous wait
+    (RAM vector $0100 = JMP $FF2A) or run the battle / cutscene handler (JMP $FB57); an
+    NMI through RTI is nobody's frame. Counted inside the emulator (build/emu3: nmi_count,
+    nmi_ram, pad_history count only those NMIs). latch[k]: the pad the NES latched between
+    frames k and k + 1 (pad_history[k + 1]), which the GB reads from slot k."""
     def __init__(self, n):
-        self.n = n; self.count = 0; self.last = n.nmi_count
-    def update(self):
+        self.n = n; self.latch = {}; self.count = n.nmi_count
+    def update(self, controller=None):
         k = self.n.nmi_count
-        if k != self.last:
-            if self.n.nmi_ram[0x100] == 0x4C: self.count += k - self.last
-            self.last = k
-        return self.count
+        if k != self.count:
+            ph = self.n.pad_history
+            for j in range(self.count + 1, k + 1): self.latch[j - 1] = ph[j & 0xFF]
+            self.count = k
+        return k
 
 def nes_frames(path, ks, pad):
     n = NES(path); W = Waits(n)
@@ -58,7 +61,8 @@ def nes_frames(path, ks, pad):
 def gb_frames(gb, ks, pad):
     d = tempfile.mkdtemp(prefix='ff3cmp_')
     pf = os.path.join(d, 'pads.bin')
-    open(pf, 'wb').write(bytes(pad(w) for w in range(max(ks) + 64)))
+    # (gbrun puts pads[k + 1] in slot k; the GB reads slot k after frame k: pad(k), as cynes)
+    open(pf, 'wb').write(bytes(pad(w - 1) if w else 0 for w in range(max(ks) + 64)))
     cmd = [os.path.join(os.path.dirname(gb), 'gbrun'), gb, str(max(ks) * 3 + 600), os.path.join(d, 's'), '--padfile', pf]
     for k in ks: cmd += ['--nshot', str(k)]
     subprocess.run(cmd, capture_output=True)

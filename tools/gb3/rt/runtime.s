@@ -13,8 +13,9 @@
 ; mirroring the second nametable continues at row 30, mod 32). NES palette RAM -> CGB
 ; palettes 0-3 (BG) and 0-3 (OBJ) through NES_RGB.
 
-STACK_TOP  = $C200          ; GB stack in NES page 1 ($C100-$C1FF; FF3's NMI / IRQ jump stubs
-                            ;   at $0100-$0105 stay below the deepest use seen)
+STACK_TOP  = $D000          ; GB stack $CD00-$CFFF (the NES stack runs on it; FF3 keeps data in
+                            ;   page 1 at $0100-$0161, so the stack stays out of NES RAM), outside
+                            ;   the switchable WRAM bank $D000-$DFFF
 NES_RAM    = $C000          ; $0000-$07FF
 EX_RAM     = $C800          ; $5C00-$5FFF
 OAM_SH     = $CC00          ; GB shadow OAM (160 bytes)
@@ -137,11 +138,8 @@ boot:       di
             ld hl, $8000
             ld bc, $2000
             call memclr
-            ld hl, $C000                    ; clear WRAM (not the stack page)
-            ld bc, $100
-            call memclr
-            ld hl, $C200
-            ld bc, $0E00
+            ld hl, $C000                    ; clear WRAM (not the stack $CF00-$CFFF in use)
+            ld bc, $0F00
             call memclr
             ld a, 1
             ldh [rSVBK], a
@@ -445,13 +443,13 @@ rt_async:   push af
             push af
             ldh a, [tmp_lo]
             push af
-            ld a, 1
+.again:     ld a, 1
             ldh [in_async], a
             ld de, 0
             ld bc, 0
             ldh a, [async_req]
-            bit 0, a
-            jr z, .irq
+            bit 1, a                        ; (an IRQ still due from the last frame first)
+            jr nz, .irq
             and $FE
             ldh [async_req], a
             ld hl, NMI_CNT                  ; (an NES frame: the test runners' clock)
@@ -474,7 +472,13 @@ rt_async:   push af
 .irq:       and $FD
             ldh [async_req], a
             call run_irq
-.done:      xor a
+.done:      ldh a, [async_req]              ; (an NMI due as well: run it now)
+            bit 0, a
+            jr z, .end
+            xor a
+            ldh [in_async], a
+            jr .again
+.end:       xor a
             ldh [in_async], a
             pop af
             ldh [tmp_lo], a
