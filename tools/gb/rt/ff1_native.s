@@ -1428,15 +1428,25 @@ ntrun_b:    push de
             ld [NR_SRC + 1], a
             ld c, $19
 .lp:        push bc
-            ld a, [NR_SRC]                  ; D = next byte
-            ld l, a
+            ld a, [NR_SRC]                  ; D = next byte (NES $6000-$7FFF: cart RAM
+            ld l, a                         ;   directly)
             ld a, [NR_SRC + 1]
             ld h, a
-            push hl
+            sub $60
+            cp $20
+            jr nc, .rd
+            add a, $A0
+            ld h, a
+            ld d, [hl]
+            ld a, h
+            sub $40
+            ld h, a
+            jr .rdd
+.rd:        push hl
             call nes_rd
             ld d, l
             pop hl
-            inc hl
+.rdd:       inc hl
             ld a, l
             ld [NR_SRC], a
             ld a, h
@@ -1452,10 +1462,65 @@ ntrun_b:    push de
             ld a, h                         ; (attribute bytes: rt_ppu_w7)
             and 3
             cp 3
-            jr nz, .cell
+            jr nz, .same
             ld a, l
             cp $C0
             jr nc, .gen
+.same:      ldh a, [dlg_on]                 ; unchanged cell (shadow has the tile, the
+            and a                           ;   writing nametable owns it): only the
+            jr nz, .cell                    ;   address moves (FF1 rewrites whole panels)
+            ldh a, [ppu_ctrl]
+            and 4
+            jr nz, .cell
+            ld a, h
+            and 7
+            add a, high(NT_SH)
+            push hl
+            ld h, a
+            ld a, [hl]
+            pop hl
+            cp d
+            jr nz, .cell
+            ld a, h                         ; owner bit: OWN[(vh & 3) * 32 + vl / 8], bit vl & 7
+            and 3
+            swap a
+            add a, a
+            ld b, a
+            ld a, l
+            rrca
+            rrca
+            rrca
+            and $1F
+            or b
+            ld c, a
+            ld b, high(OWN)
+            ld a, [bc]
+            ld b, a                         ; B = the OWN byte
+            push hl
+            ld a, l
+            and 7
+            add a, low(NBIT)
+            ld l, a
+            ld h, high(NBIT)
+            ld a, [hl]
+            pop hl
+            and b                           ; NZ: nametable 1 owns it
+            jr z, .o0
+            ld a, h
+            and 4
+            jr nz, .skip
+            jr .cell
+.o0:        ld a, h
+            and 4
+            jr nz, .cell
+.skip:      ld a, l                         ; PPU address + 1
+            add a, 1
+            ldh [ppu_vl], a
+            ld a, h
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            jr .nx
 .cell:      push de
             call nt_tile
             pop de

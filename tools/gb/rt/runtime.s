@@ -1603,7 +1603,7 @@ pal4:       ; HL -> 4 NES colours ($x0 = universal backdrop) -> DMG palette byte
 
 ; ------------------------------------------------------------------ frame wait (JSR $FE00)
 rt_wait_nmi:
-            call apq_commit                 ; (the frame's sound: queued, applied per vblank)
+            call apu_tick                   ; (NES frame counter: length counters, sweeps)
             push af
             push hl
             ld hl, NMI_CNT
