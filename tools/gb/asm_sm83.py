@@ -159,11 +159,16 @@ def _asm_once(src, syms, promote):
             pc += len(bs)
 
         claimed = {}
+        consts = {}
         for lineno, line in lines:
             try:
                 m = re.match(r'^\s*([A-Za-z_][A-Za-z_0-9]*)\s*(?:=|\s[eE][qQ][uU]\s)\s*(.+)$', line)
                 if m:
-                    syms[m.group(1)] = ev(m.group(2)); continue
+                    v = ev(m.group(2))
+                    if pass_no == 2 and m.group(1) in consts and consts[m.group(1)] != (lineno, m.group(2)):
+                        raise AsmError('%s defined twice' % m.group(1))
+                    consts[m.group(1)] = (lineno, m.group(2))
+                    syms[m.group(1)] = v; continue
                 m = re.match(r'^\s*([A-Za-z_.][A-Za-z_0-9.]*):(.*)$', line)
                 if m:
                     name = m.group(1)

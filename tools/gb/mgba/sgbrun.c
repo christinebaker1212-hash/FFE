@@ -153,6 +153,12 @@ int main(int argc, char** argv) {
 			}
 		} else
 		core->runFrame(core);
+		if (getenv("SGBRUN_LAG")) {                     /* SGBRUN_LAG=FILE: NES frame count per GB frame */
+			static FILE* lf = NULL;
+			if (!lf) lf = fopen(getenv("SGBRUN_LAG"), "wb");
+			uint16_t v = f > 30 ? (core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8) : 0;
+			fwrite(&v, 2, 1, lf); fflush(lf);
+		}
 		if (prof) {                                     /* SGBRUN_PROF: PC of frames without a NES frame end */
 			unsigned n_after = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 			if (n_after == n_before && nprof < 2000000) {

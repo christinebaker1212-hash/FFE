@@ -5,7 +5,7 @@ k+1 are compared with the GB's video frames between the same waits. A GB that ke
 takes exactly as many frames; extra GB frames are lag (the game runs slower, the music
 stretches).
 usage: PYTHONPATH=build/emu lagcheck.py NES GB UNTIL [--field SCRIPT | --newgame | --input MODE]
-       [--dmg] [--poke P [--poke-at F]] [--win 60]
+       [--dmg | --sgb (mGBA)] [--poke P [--poke-at F]] [--win 60]
   prints lag per window of NES frame waits, the worst single waits, and the total."""
 import os, sys, subprocess, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -22,7 +22,7 @@ def opt(name, default=None, flag=False):
 
 
 field = opt('--field'); newgame = opt('--newgame', flag=True); mode = opt('--input', 'fight')
-dmg = opt('--dmg', flag=True); pokes = opt('--poke', ''); poke_at = int(opt('--poke-at', '3700'))
+dmg = opt('--dmg', flag=True); sgb = opt('--sgb', flag=True); pokes = opt('--poke', ''); poke_at = int(opt('--poke-at', '3700'))
 win = int(opt('--win', '60'))
 nes_path, gb_path, until = args[0], args[1], int(args[2])
 
@@ -68,7 +68,12 @@ cmd = [exe, gb_path, str(until * 4), os.path.join(tmp, 's'), '--padfile', pf, '-
        '--lagfile', lf, '--until', str(until)]
 if poke_nmi is not None: cmd += ['--poke', str(poke_nmi), pokes]
 if dmg: cmd.append('--dmg')
-subprocess.run(cmd, capture_output=True)
+if sgb:                                       # Super Game Boy: mGBA (sgbrun, SGBRUN_LAG)
+    exe2 = os.path.join(os.path.dirname(exe), 'sgbrun')
+    cmd = [exe2, gb_path, str(until * 4), os.path.join(tmp, 's'), '--padfile', pf, '--sram', sf]
+    subprocess.run(cmd, capture_output=True, env=dict(os.environ, SGBRUN_LAG=lf))
+else:
+    subprocess.run(cmd, capture_output=True)
 d = open(lf, 'rb').read()
 cnt = [d[i] | d[i + 1] << 8 for i in range(0, len(d), 2)]
 gb_at = {}

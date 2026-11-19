@@ -222,6 +222,14 @@ sgb_frame:  call sgb_scroll
             ldh a, [sgb_dirty]
             and a
             jr z, .x
+            ld a, [SGB_BGAP]                ; at most one build per SGB_MIN frames (the band
+            and a                           ;   fade changes attributes every frame; the
+            jr z, .bd                       ;   packets go out one per 4 frames anyway)
+            dec a
+            ld [SGB_BGAP], a
+            jr .x
+.bd:        ld a, SGB_MIN - 1
+            ld [SGB_BGAP], a
             call sgb_build_far
             ldh a, [sgb_pend]
             and a

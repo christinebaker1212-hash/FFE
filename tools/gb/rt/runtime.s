@@ -59,6 +59,8 @@ FRESH      = $DE00          ; DMG: one bit per GB map cell (byte row * 4 + col /
 TBLK       = $DE80          ; DMG: 8 re-coded tiles (16 bytes) waiting in the VRAM queue,
 TB_T       = $D872          ;   blocks taken / freed (a ring)
 TB_H       = $D873
+SGB_BGAP   = $D83F          ; SGB: frames before the next packet build may run (sgb_frame)
+SGB_MIN    = 6
 NT_NOW     = $D87D          ; nt_tile: check the cell's palette at once (not in spare time)
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
