@@ -211,8 +211,13 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   with scrolling down / up, swap and drop: 14226 waits; English pair 29406 waits.
   `gbshots.py` takes the same scenario options as firstdiff (`scenario()`; pokes go to
   Gambatte at the matching wait): CGB shots of the treasure screen fine.
-- Next: status words in the party window ("Dead" etc.), clear the bottom rows at battle
-  start, hit knock-back past the right edge, item use in battle (Gear -> item), CGB
+- Status words in the battle party window (2026-11-19): `$7BA6 + member` (text id, `$F6`
+  none, as `b12:956D`): the English word (script/ff2/system.json 240-253) after the current
+  HP in place of the maximum HP and MP (30 px; Paralysis / Confusion in narrow letters with
+  fewer gaps). Checked with statuses poked into the battle stats (+$08/+$09): "Stone",
+  "Venom", "Dead"; firstdiff 12763 waits identical. (The NES slot is the maximum HP only;
+  the GB line has no room for a word there, so MP is hidden while a status shows.)
+- Next: clear the bottom rows at battle start, hit knock-back past the right edge, item use in battle (Gear -> item), CGB
   battle-entry speed, GB tile upload latency.
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).

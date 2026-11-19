@@ -77,7 +77,7 @@ RAM = dict(GBIDX=0x7FDF, GBRB=0x7FE0, GBPOOL=0x7FE1, VX=0x7FE2, VN=0x7FE3, VT=0x
            NL=0x7FF7, NS=0x7FF8, VSQZ=0x7FF9, VI0=0x7FFA, VI1=0x7FFB, VCX=0x7FFC, VFILL=0x7FFD, VLN=0x7FFE,
            USED=0x75C0, VBUF=0x7800, BLANKT=0x7888, FTILE=0x7889, PTILE=0x7891, LTILE=0x78B9, XTILE=0x78D1,
            NTBUF=0x78D5, ATKBUF=0x75E0, MOPEN=0x75F0, MLINE=0x75F1, MPAGE=0x75F2,
-           LSHOW=0x75C0, LNAV=0x75DC, LBASE=0x75DD, LDGAP=0x75DE, LCOV=0x7FFF,
+           LSHOW=0x75C0, LNAV=0x75DC, LBASE=0x75DD, LDGAP=0x7FE8, LCOV=0x7FFF,
            LWID=0x75E0, LRING=0x75F4, LSCR=0x75F5)    # (L*: treasure screen, after the battle)
 # fixed-bank entries (5 bytes each, at $FFD0 and $FEEC): routine, bank to return to (bank 23 RETB), the NES routine replaced
 ENTRIES = [('gb_party', 0x0C, 0x912A), ('gb_names', 0x0C, 0x910D), ('gb_names', 0x0C, 0x981D),
@@ -713,6 +713,24 @@ gb_party:
     sta VNUM+1
     lda #48
     jsr vnum
+    ldx VLINE           ; status ($7BA6 + member: text id, $F6 none, as b12:956D): the word
+    lda $7BA6,x         ;   in place of the maximum HP and MP (30 px)
+    cmp #$F6
+    beq .nost
+    sec
+    sbc #$F0
+    tax
+    lda STLO,x
+    sta VS
+    lda STHI,x
+    sta VS+1
+    lda STGAP,x
+    sta LDGAP
+    lda #50
+    sta VX
+    jsr vfit
+    jmp .up
+.nost:
     lda #$1A            ; small '/'
     jsr vchar
     ldy #$0E            ; max HP
@@ -1592,7 +1610,11 @@ lcell:                  ; cell VI shows the name of item A (narrow letters / dro
     lda LCN,x
     sta VN
     jsr vclear
-    ldy #0
+    jsr vfit
+    lda VX              ; tiles used: (VX + 6) / 8 (VX includes the last letter's gap)
+    jmp lcell2
+vfit:                   ; draw (VS) at VX, no letter gap after the characters from length -
+    ldy #0              ;   LDGAP to length - 2
 .n:
     lda (VS),y
     beq .nd
@@ -1627,7 +1649,8 @@ lcell:                  ; cell VI shows the name of item A (narrow letters / dro
 .e:
     lda #0
     sta VSQZ
-    lda VX              ; tiles used: (VX + 6) / 8 (VX includes the last letter's gap)
+    rts
+lcell2:
     clc
     adc #6
     lsr a
@@ -2069,7 +2092,7 @@ def loot_data(rom, gw):
     cells = [(8 * k, 2 + k // 2, 2 + 10 * (k % 2), 8) for k in range(8)]
     cells += [(0x40 + 8 * j, 7 + j // 2, 2 + 10 * (j % 2), 8) for j in range(20)]
     cells += [(0xE0, 1, 2, 8), (0xE8, 1, 12, 5), (0xEC, 1, 17, 3)]      # .. Treasure .., Drop, Done
-    def ink(cs, gap):                       # pixel columns used (as lcell draws it)
+    def ink(cs, gap):                       # pixel columns used (as vfit draws it)
         x, last, n = 0, 0, len(cs)
         for i, c in enumerate(cs):
             if gw[c] == 0: x += 2; continue
@@ -2097,6 +2120,24 @@ def loot_data(rom, gw):
         fits += 'FIT%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
     for nm, v in (('LFLO', lo), ('LFHI', hi), ('LGAP', [str(x) for x in gaps])):
         out += nm + ':\n' + ''.join('    .db %s\n' % ', '.join(v[i:i + 16]) for i in range(0, 256, 16))
+    # battle status words (text ids $F0-$FD, script/ff2/system.json 240-253, the English the
+    # NES build draws): 30 px in the party line
+    import json, importlib.util
+    spec = importlib.util.spec_from_file_location('ff2insert', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2', 'insert.py'))
+    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
+    words = {e['id']: e['en'] for e in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'script', 'ff2', 'system.json'))) if 240 <= e['id'] <= 253}
+    sl, sh, sg = [], [], []
+    for k in range(14):
+        cs = bytes(ins.ENC[ch] for ch in words.get(240 + k, ''))
+        g = 0
+        if ink(cs, 0) > 30:
+            cs = bytes(nar.get(c, c) for c in cs)
+            while ink(cs, g) > 30:
+                g += 1
+                assert g <= len(cs), words[240 + k]
+        fits += 'ST%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
+        sl.append('<ST%d' % k); sh.append('>ST%d' % k); sg.append(str(g))
+    out += 'STLO: .db %s\nSTHI: .db %s\nSTGAP: .db %s\n' % (', '.join(sl), ', '.join(sh), ', '.join(sg))
     return out + fits
 
 
