@@ -258,6 +258,7 @@ boot:       di
             ld hl, $FF80                    ; clear HRAM
             ld bc, $7F
             call memclr
+            call lz_init
             pop af
             cp $11
             jr nz, .dmg
@@ -2469,7 +2470,32 @@ spr_load:   push af
             and $0F
             add a, $80
             ld h, a
-            ld b, 8
+            ldh a, [o_key]                  ; CGB, identity coding, LCD on: the 16 bytes as
+            cp $39                          ;   they are into the slot copy (WRAM bank 3)
+            jr nz, .row0
+            ldh a, [lcd_on]
+            and a
+            jr z, .row0
+            ld a, h
+            add a, $D0 - $80
+            ld h, a
+            ld a, 1
+            ld [$4000], a
+            ld a, 3
+            ldh [$FF70], a
+            ld b, 16
+.fc:        ld a, [de]
+            inc de
+            ld [hl+], a
+            dec b
+            jr nz, .fc
+            ld a, 1
+            ldh [$FF70], a
+            ldh [stg_on], a
+            xor a
+            ld [$4000], a
+            jr .mk
+.row0:      ld b, 8
 .row:       ld a, 1
             ld [$4000], a
             ld a, [de]
@@ -2491,7 +2517,7 @@ spr_load:   push af
             inc hl
             dec b
             jr nz, .row
-            ldh a, [stg_on]                 ; CGB, LCD on: mark the slot for HDMA
+.mk:        ldh a, [stg_on]                 ; CGB, LCD on: mark the slot for HDMA
             and a
             jr z, .x
             ld a, c

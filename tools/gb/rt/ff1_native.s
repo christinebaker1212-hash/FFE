@@ -4927,10 +4927,7 @@ hle_mapdec: ld a, e
             call .inc
             ld c, [hl]                      ; count (0: 256)
             ld a, b
-.f:         ld [de], a
-            inc de
-            dec c
-            jr nz, .f
+            call fillde
             xor a
             ld [MDC_X], a
             inc l

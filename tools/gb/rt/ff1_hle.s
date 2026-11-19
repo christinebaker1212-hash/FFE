@@ -69,12 +69,11 @@ hle_chr_pages:
             ld a, 2
             ldh [$FF70], a
             jr .ft
-.fs:        ld b, a                         ; a whole sprite page: DMG: left in ROM (bank,
-            ldh a, [is_cgb]                 ;   address in LZ_SRC, its tiles marked in LZ_BM:
-            and a                           ;   spr_mat copies a tile to the shadow when a slot
-            ld a, b                         ;   load or a write needs it); CGB: to the sprite
-            jr nz, .fsc                     ;   shadow (RAM bank 1). Its resident slots
-            and $0F                         ;   reloaded by the next OAM conversion
+.fs:        and $0F                         ; a whole sprite page: left in ROM (bank, address
+                                            ;   in LZ_SRC, its tiles marked in LZ_BM: spr_mat
+                                            ;   copies a tile to the shadow when a slot load or
+                                            ;   a write needs it); its resident slots reloaded
+                                            ;   by the next OAM conversion
             ld e, a
             ld a, 3
             ld [$4000], a
@@ -109,11 +108,6 @@ hle_chr_pages:
             ldh [tmp_lo], a
             ldh a, [ppu_vh]
             jr .fsm
-.fsc:       and $0F
-            add a, high(SPR_SHADOW)
-            ld d, a
-            ld e, 0
-            jr .fb
 .fd:        ldh a, [lcd_on]
             and a
             jr nz, .tile

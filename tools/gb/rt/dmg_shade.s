@@ -729,9 +729,6 @@ spr_mat:    push af
             push de
             push hl
             ld e, a
-            ldh a, [is_cgb]
-            and a
-            jr nz, .x
             ld a, 3
             ld [$4000], a
             ld a, e
@@ -813,6 +810,46 @@ spr_mat:    push af
             pop de
             pop bc
             pop af
+            ret
+
+; A = value, DE = destination, C = count (0: 256): filled 8 bytes at a time; DE += count.
+; Keeps HL, C.
+fillde:     push hl
+            ld h, d
+            ld l, e
+            ld e, a
+            ld a, c
+            and 7
+            jr z, .g
+            ld d, a
+            ld a, e
+.r:         ld [hl+], a
+            dec d
+            jr nz, .r
+.g:         ld a, c
+            srl a
+            srl a
+            srl a
+            jr nz, .gn
+            ld a, c
+            and a
+            jr nz, .x
+            ld a, 32
+.gn:        ld d, a
+            ld a, e
+.gl:        ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec d
+            jr nz, .gl
+.x:         ld d, h
+            ld e, l
+            pop hl
             ret
 
 ; dmg_maps: native in bank PF_BANK (dmg_maps_b)
@@ -967,7 +1004,7 @@ bg_lmax_hl: push bc                         ; HL = 16 BG colours (page offset a 
             ret
 
 ; boot (DMG): PAL_MAP identity, full brightness reference
-dmg_init:   ld a, 3                         ; no sprite page left in ROM (LZ_BM)
+lz_init:    ld a, 3                         ; boot: no sprite page left in ROM (LZ_BM)
             ld [$4000], a
             ld hl, LZ_BM
             xor a
@@ -976,7 +1013,8 @@ dmg_init:   ld a, 3                         ; no sprite page left in ROM (LZ_BM)
             dec b
             jr nz, .lz
             ld [$4000], a
-            ld hl, CODED                    ; no tile coded yet
+            ret
+dmg_init:   ld hl, CODED                    ; no tile coded yet
             ld a, $FF
 .cd:        ld [hl+], a
             inc l
