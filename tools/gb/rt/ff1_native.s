@@ -1817,23 +1817,12 @@ retile_b:   push bc
             ld l, c
             ld a, 1
             ld [$4000], a
-            push hl
-            ldh a, [sh_s0]                  ; plane 0: the function whose bit i is bit 0 of
-            call pf_call                    ;   index i's value; plane 1: bit 1
-            pop hl
-            pop de
-            push de
-            inc e
-            push hl
-            ldh a, [sh_s1]
-            call pf_call
-            pop hl
-            ldh a, [sh_tile]                ; pixels written since its last coding (CODED
-            ld e, a                         ;   $FF): the colour indices it uses (TILE_USE)
-            ld d, high(CODED)
-            ld a, [de]
-            inc a
-            call z, tile_use
+            ldh a, [sh_tile]                ; both planes (pf2_b: plane 0 the function whose
+            ld c, a                         ;   bit i is bit 0 of index i's value, plane 1
+            ld b, high(CODED)               ;   bit 1); pixels written since its last
+            ld a, [bc]                      ;   coding (CODED $FF, A = 0): also the colour
+            inc a                           ;   indices it uses (TILE_USE)
+            call pf2_call
             xor a
             ld [$4000], a
             ldh a, [sh_s0]                  ; the coding it has now
@@ -2915,7 +2904,7 @@ SC_LP      = $D82E          ;   (in the fault-dump area DBG + 14: written only o
 ; the LCD is off, the increment is 1 and the address is in nametable 0's cells with no cell
 ; owned by nametable 1: shadow and GB map filled at once (DMG: the map is scanned when the
 ; LCD goes on). Anything else byte by byte through rt_ppu_w7. Keeps D.
-NF_N       = $D82C          ; ntfill: bytes of this run (2; fault-dump area, DBG + 12)
+
 ntfill:     ld a, b
             or c
             ret z
@@ -6716,6 +6705,473 @@ scn_c:      push de
             ld h, high(SC_NP)
             ld [hl], a
             pop de
+            ret
+
+; recompute PAL_MAP from the NES BG palettes. A colour's value depends only on its
+; brightness level, the same in every palette (a tile drawn with several palettes, such
+; as the font, is then coded alike): 0 = the backdrop's level; the other levels present
+; in the four BG palettes, darkest first, get 1 / 2 / 3, more than three levels being
+; split into three groups at the two largest gaps between them. Tiles of palettes whose
+; map changed are queued for re-coding. All colours black (faded out): nothing changes.
+dmg_maps_b: push bc
+            push de
+            push hl
+            ld hl, MPB                      ; (the palette to shade by: dmg_target)
+            call bg_lmax_hl
+            and a
+            jp z, .x
+            ld [REF_LMAX], a                ; brightness the BGP fade level is measured from
+            ld a, [MPB]
+            call lum
+            ldh [sh_bk], a                  ; backdrop brightness
+            ld hl, LVF                      ; levels present (other than the backdrop's)
+            ld b, 9
+            xor a
+.cl:        ld [hl+], a
+            dec b
+            jr nz, .cl
+            ld c, 0
+.lv:        ld a, c
+            and 3
+            jr z, .mn
+            ld a, [PAL_USED]                ; palettes no cell uses: their colours left out
+            and a
+            jr z, .lu
+            ld b, a
+            ld a, c
+            srl a
+            srl a
+            inc a
+.lb:        rr b
+            dec a
+            jr nz, .lb
+            jr nc, .mn
+.lu:
+            ld a, c
+            add a, low(MPB)
+            ld l, a
+            ld h, high(MPB)
+            ld a, [hl]
+            call lum
+            ld b, a
+            ldh a, [sh_bk]
+            cp b
+            jr z, .mn
+            ld a, b
+            add a, low(LVF)
+            ld l, a
+            ld h, high(LVF)
+            ld [hl], 1
+.mn:        inc c
+            ld a, c
+            cp 16
+            jr nz, .lv
+            ld e, 0                         ; LSL = the levels present, ascending; E = count
+            ld c, 0
+.ls:        ld a, c
+            add a, low(LVF)
+            ld l, a
+            ld h, high(LVF)
+            ld a, [hl]
+            and a
+            jr z, .ln
+            ld a, e
+            add a, low(LSL)
+            ld l, a
+            ld h, high(LSL)
+            ld [hl], c
+            inc e
+.ln:        inc c
+            ld a, c
+            cp 9
+            jr nz, .ls
+            xor a                           ; cuts (group ends): sh_s0 < sh_s1
+            ldh [sh_s0], a
+            inc a
+            ldh [sh_s1], a
+            ld a, e
+            cp 4
+            jr c, .asg
+            ld a, $FF
+            call .maxgap
+            ld d, a
+            call .maxgap
+            cp d
+            jr nc, .ord
+            ld b, a
+            ld a, d
+            ld d, b
+.ord:       ldh [sh_s1], a
+            ld a, d
+            ldh [sh_s0], a
+.asg:       ld a, e                         ; number of values in use
+            cp 4
+            jr c, .ng
+            ld a, 3
+.ng:        ld [NGRP], a
+            ld c, 0
+.as:        ld a, c
+            cp e
+            jr z, .pm
+            ld b, 1                         ; value = 1 + (i > cut 0) + (i > cut 1)
+            ldh a, [sh_s0]
+            cp c
+            jr nc, .a1
+            inc b
+.a1:        ldh a, [sh_s1]
+            cp c
+            jr nc, .a2
+            inc b
+.a2:        ld a, c
+            add a, low(LSL)
+            ld l, a
+            ld h, high(LSL)
+            ld a, [hl]                      ; level
+            ld d, a
+            add a, low(LVMAP)
+            ld l, a
+            ld h, high(LVMAP)
+            ld [hl], b
+            ld a, b                         ; GLUM[value] = its brightest level
+            add a, low(GLUM)
+            ld l, a
+            ld [hl], d
+            inc c
+            jr .as
+.pm:        ld c, 0                         ; palette
+.p:         ld a, c
+            add a, a
+            add a, a
+            add a, low(MPB)
+            ld l, a
+            ld h, high(MPB)
+            ld de, RT_BUF
+            xor a
+            ld [de], a                      ; colour 0 -> 0
+            inc de
+            ld b, 3
+            ldh [sh_chg], a                 ; (0: all three like the backdrop so far)
+.pc:        inc l
+            ld a, [hl]
+            push hl
+            call lum
+            ld h, a
+            ldh a, [sh_bk]
+            cp h
+            ld a, 0
+            jr z, .pz
+            ld a, h
+            add a, low(LVMAP)
+            ld l, a
+            ld h, high(LVMAP)
+            ld a, [hl]
+            ld h, a
+            ld a, 1
+            ldh [sh_chg], a
+            ld a, h
+.pz:        pop hl
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .pc
+            ldh a, [sh_chg]                 ; a palette that is all backdrop keeps its map
+            and a
+            jr z, .nx
+            ld a, c                         ; compare with PAL_MAP[c]; copy; mark if changed
+            add a, a
+            add a, a
+            add a, low(PAL_MAP)
+            ld l, a
+            ld h, high(PAL_MAP)
+            ld de, RT_BUF
+            ld b, 4
+            xor a
+            ldh [sh_chg], a                 ; sh_chg: indices whose value changed (bit i)
+            inc a
+            ldh [sh_l1], a                  ; (bit of the index being compared)
+.cmp:       ld a, [de]
+            cp [hl]
+            jr z, .same
+            ld [hl], a
+            push bc
+            ldh a, [sh_l1]
+            ld b, a
+            ldh a, [sh_chg]
+            or b
+            ldh [sh_chg], a
+            pop bc
+.same:      ldh a, [sh_l1]
+            add a, a
+            ldh [sh_l1], a
+            inc de
+            inc hl
+            dec b
+            jr nz, .cmp
+            ldh a, [sh_chg]
+            and a
+            call nz, .markp
+.nx:        inc c
+            ld a, c
+            cp 4
+            jp nz, .p
+            call spr_maps
+.x:         pop hl
+            pop de
+            pop bc
+            ret
+.maxgap:    ; A = gap index to skip -> A = index i of the largest LSL[i+1] - LSL[i]
+            ldh [sh_l1], a                  ;   (the first one of equal gaps); keeps D, E
+            xor a
+            ldh [sh_l2], a
+            ldh [sh_l3], a
+            ld c, 0
+.mg:        ld a, c
+            inc a
+            cp e
+            jr nc, .mgx
+            ldh a, [sh_l1]
+            cp c
+            jr z, .mgn
+            ld a, c
+            add a, low(LSL)
+            ld l, a
+            ld h, high(LSL)
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl]
+            sub b
+            ld b, a
+            ldh a, [sh_l2]
+            cp b
+            jr nc, .mgn
+            ld a, b
+            ldh [sh_l2], a
+            ld a, c
+            ldh [sh_l3], a
+.mgn:       inc c
+            jr .mg
+.mgx:       ldh a, [sh_l3]
+            ret
+.markp:     ; queue every tile coded for palette C that uses an index in sh_chg
+            push bc
+            ld hl, TILE_PAL
+.tk:        ld a, [hl]
+            cp c
+            jr nz, .tn
+            push hl
+            ld a, l                         ; its TILE_USE nibble
+            ld d, a
+            srl a
+            add a, low(TILE_USE)
+            ld l, a
+            ld h, high(TILE_USE)
+            ld a, [hl]
+            bit 0, d
+            jr z, .te
+            swap a
+.te:        and $0F
+            ld b, a
+            ldh a, [sh_chg]
+            and b
+            pop hl
+            jr z, .tn
+            ld a, l
+            call dmg_mark
+.tn:        inc l
+            jr nz, .tk
+            pop bc
+            ret
+
+; BGP: value 0 = the backdrop's shade. Over a black backdrop, values 1-3 get dark grey /
+; light grey / white (two values: dark grey / white); otherwise each value the shade of its
+; brightest level. Darkened while the palettes are faded: one shade per two brightness
+; levels the brightest BG colour is below REF_LMAX (its level when the maps were last
+; computed). Returns A = BGP.
+
+; ---- retile_b: tile HL (shadow, RAM bank 1 on) coded into DE (plane 0 by sh_s0, plane 1 by
+; sh_s1); A = 0: its TILE_USE nibble too (colour indices 1-3 used). Keeps nothing.
+TU_SP      = $DCDA          ; (2) pf2_b: SP saved while the tile is read with POP
+pf2_b:      push af
+            push hl
+            push de
+            ldh a, [sh_s0]
+            call .pf
+            pop de
+            pop hl
+            push hl
+            inc e
+            ldh a, [sh_s1]
+            call .pf
+            pop hl
+            pop af
+            and a
+            ret nz
+            ld [TU_SP], sp                  ; rows by POP (p0 in E, p1 in D), interrupts off:
+            di                              ;   B |= p0 & ~p1, C |= p1 & ~p0, H |= p0 & p1
+            ld sp, hl
+            ld bc, 0
+            ld h, b
+            pop de
+            ld a, e
+            and d
+            ld l, a
+            or h
+            ld h, a
+            ld a, l
+            xor e
+            or b
+            ld b, a
+            ld a, l
+            xor d
+            or c
+            ld c, a
+            pop de
+            ld a, e
+            and d
+            ld l, a
+            or h
+            ld h, a
+            ld a, l
+            xor e
+            or b
+            ld b, a
+            ld a, l
+            xor d
+            or c
+            ld c, a
+            pop de
+            ld a, e
+            and d
+            ld l, a
+            or h
+            ld h, a
+            ld a, l
+            xor e
+            or b
+            ld b, a
+            ld a, l
+            xor d
+            or c
+            ld c, a
+            pop de
+            ld a, e
+            and d
+            ld l, a
+            or h
+            ld h, a
+            ld a, l
+            xor e
+            or b
+            ld b, a
+            ld a, l
+            xor d
+            or c
+            ld c, a
+            pop de
+            ld a, e
+            and d
+            ld l, a
+            or h
+            ld h, a
+            ld a, l
+            xor e
+            or b
+            ld b, a
+            ld a, l
+            xor d
+            or c
+            ld c, a
+            pop de
+            ld a, e
+            and d
+            ld l, a
+            or h
+            ld h, a
+            ld a, l
+            xor e
+            or b
+            ld b, a
+            ld a, l
+            xor d
+            or c
+            ld c, a
+            pop de
+            ld a, e
+            and d
+            ld l, a
+            or h
+            ld h, a
+            ld a, l
+            xor e
+            or b
+            ld b, a
+            ld a, l
+            xor d
+            or c
+            ld c, a
+            pop de
+            ld a, e
+            and d
+            ld l, a
+            or h
+            ld h, a
+            ld a, l
+            xor e
+            or b
+            ld b, a
+            ld a, l
+            xor d
+            or c
+            ld c, a
+            ld a, [TU_SP]
+            ld l, a
+            ld a, [TU_SP + 1]
+            ld d, h
+            ld h, a
+            ld sp, hl
+            ei
+            xor a
+            inc b
+            dec b
+            jr z, .u2
+            set 1, a
+.u2:        inc c
+            dec c
+            jr z, .u3
+            set 2, a
+.u3:        inc d
+            dec d
+            jr z, .u4
+            set 3, a
+.u4:        ld c, a
+            ldh a, [sh_tile]
+            ld b, a
+            srl a
+            add a, low(TILE_USE)
+            ld l, a
+            ld h, high(TILE_USE)
+            bit 0, b
+            jr z, .lo
+            ld a, c
+            swap a
+            ld c, a
+            ld a, [hl]
+            and $0F
+            jr .st
+.lo:        ld a, [hl]
+            and $F0
+.st:        or c
+            ld [hl], a
+            ret
+.pf:        push hl                         ; plane function A (pf_tab), HL / DE kept for it
+            add a, a
+            ld l, a
+            ld h, high(pf_tab)
+            ld a, [hl+]
+            ld b, [hl]
+            ld c, a
+            pop hl
+            push bc
             ret
 
 section bank PF_BANK, $7F00

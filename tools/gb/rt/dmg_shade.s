@@ -597,286 +597,245 @@ LUM_TAB:
             db 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0, 0, 0
             db 8, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0
 
-; recompute PAL_MAP from the NES BG palettes. A colour's value depends only on its
-; brightness level, the same in every palette (a tile drawn with several palettes, such
-; as the font, is then coded alike): 0 = the backdrop's level; the other levels present
-; in the four BG palettes, darkest first, get 1 / 2 / 3, more than three levels being
-; split into three groups at the two largest gaps between them. Tiles of palettes whose
-; map changed are queued for re-coding. All colours black (faded out): nothing changes.
-dmg_maps:   push bc
-            push de
-            push hl
-            ld hl, MPB                      ; (the palette to shade by: dmg_target)
-            call bg_lmax_hl
-            and a
-            jp z, .x
-            ld [REF_LMAX], a                ; brightness the BGP fade level is measured from
-            ld a, [MPB]
-            call lum
-            ldh [sh_bk], a                  ; backdrop brightness
-            ld hl, LVF                      ; levels present (other than the backdrop's)
-            ld b, 9
-            xor a
-.cl:        ld [hl+], a
-            dec b
-            jr nz, .cl
-            ld c, 0
-.lv:        ld a, c
-            and 3
-            jr z, .mn
-            ld a, [PAL_USED]                ; palettes no cell uses: their colours left out
-            and a
-            jr z, .lu
-            ld b, a
-            ld a, c
-            srl a
-            srl a
-            inc a
-.lb:        rr b
-            dec a
-            jr nz, .lb
-            jr nc, .mn
-.lu:
-            ld a, c
-            add a, low(MPB)
-            ld l, a
-            ld h, high(MPB)
-            ld a, [hl]
-            call lum
-            ld b, a
-            ldh a, [sh_bk]
-            cp b
-            jr z, .mn
-            ld a, b
-            add a, low(LVF)
-            ld l, a
-            ld h, high(LVF)
-            ld [hl], 1
-.mn:        inc c
-            ld a, c
-            cp 16
-            jr nz, .lv
-            ld e, 0                         ; LSL = the levels present, ascending; E = count
-            ld c, 0
-.ls:        ld a, c
-            add a, low(LVF)
-            ld l, a
-            ld h, high(LVF)
-            ld a, [hl]
-            and a
-            jr z, .ln
-            ld a, e
-            add a, low(LSL)
-            ld l, a
-            ld h, high(LSL)
-            ld [hl], c
-            inc e
-.ln:        inc c
-            ld a, c
-            cp 9
-            jr nz, .ls
-            xor a                           ; cuts (group ends): sh_s0 < sh_s1
-            ldh [sh_s0], a
-            inc a
-            ldh [sh_s1], a
-            ld a, e
-            cp 4
-            jr c, .asg
-            ld a, $FF
-            call .maxgap
-            ld d, a
-            call .maxgap
-            cp d
-            jr nc, .ord
-            ld b, a
-            ld a, d
-            ld d, b
-.ord:       ldh [sh_s1], a
-            ld a, d
-            ldh [sh_s0], a
-.asg:       ld a, e                         ; number of values in use
-            cp 4
-            jr c, .ng
-            ld a, 3
-.ng:        ld [NGRP], a
-            ld c, 0
-.as:        ld a, c
-            cp e
-            jr z, .pm
-            ld b, 1                         ; value = 1 + (i > cut 0) + (i > cut 1)
-            ldh a, [sh_s0]
-            cp c
-            jr nc, .a1
-            inc b
-.a1:        ldh a, [sh_s1]
-            cp c
-            jr nc, .a2
-            inc b
-.a2:        ld a, c
-            add a, low(LSL)
-            ld l, a
-            ld h, high(LSL)
-            ld a, [hl]                      ; level
-            ld d, a
-            add a, low(LVMAP)
-            ld l, a
-            ld h, high(LVMAP)
-            ld [hl], b
-            ld a, b                         ; GLUM[value] = its brightest level
-            add a, low(GLUM)
-            ld l, a
-            ld [hl], d
-            inc c
-            jr .as
-.pm:        ld c, 0                         ; palette
-.p:         ld a, c
-            add a, a
-            add a, a
-            add a, low(MPB)
-            ld l, a
-            ld h, high(MPB)
-            ld de, RT_BUF
-            xor a
-            ld [de], a                      ; colour 0 -> 0
-            inc de
-            ld b, 3
-            ldh [sh_chg], a                 ; (0: all three like the backdrop so far)
-.pc:        inc l
-            ld a, [hl]
-            push hl
-            call lum
-            ld h, a
-            ldh a, [sh_bk]
-            cp h
-            ld a, 0
-            jr z, .pz
-            ld a, h
-            add a, low(LVMAP)
-            ld l, a
-            ld h, high(LVMAP)
-            ld a, [hl]
-            ld h, a
-            ld a, 1
-            ldh [sh_chg], a
-            ld a, h
-.pz:        pop hl
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .pc
-            ldh a, [sh_chg]                 ; a palette that is all backdrop keeps its map
-            and a
-            jr z, .nx
-            ld a, c                         ; compare with PAL_MAP[c]; copy; mark if changed
-            add a, a
-            add a, a
-            add a, low(PAL_MAP)
-            ld l, a
-            ld h, high(PAL_MAP)
-            ld de, RT_BUF
-            ld b, 4
-            xor a
-            ldh [sh_chg], a                 ; sh_chg: indices whose value changed (bit i)
-            inc a
-            ldh [sh_l1], a                  ; (bit of the index being compared)
-.cmp:       ld a, [de]
-            cp [hl]
-            jr z, .same
-            ld [hl], a
-            push bc
-            ldh a, [sh_l1]
-            ld b, a
-            ldh a, [sh_chg]
-            or b
-            ldh [sh_chg], a
-            pop bc
-.same:      ldh a, [sh_l1]
-            add a, a
-            ldh [sh_l1], a
-            inc de
-            inc hl
-            dec b
-            jr nz, .cmp
-            ldh a, [sh_chg]
-            and a
-            call nz, .markp
-.nx:        inc c
-            ld a, c
-            cp 4
-            jp nz, .p
-            call spr_maps
-.x:         pop hl
-            pop de
-            pop bc
-            ret
-.maxgap:    ; A = gap index to skip -> A = index i of the largest LSL[i+1] - LSL[i]
-            ldh [sh_l1], a                  ;   (the first one of equal gaps); keeps D, E
-            xor a
-            ldh [sh_l2], a
-            ldh [sh_l3], a
-            ld c, 0
-.mg:        ld a, c
-            inc a
-            cp e
-            jr nc, .mgx
-            ldh a, [sh_l1]
-            cp c
-            jr z, .mgn
-            ld a, c
-            add a, low(LSL)
-            ld l, a
-            ld h, high(LSL)
-            ld a, [hl+]
-            ld b, a
-            ld a, [hl]
-            sub b
-            ld b, a
-            ldh a, [sh_l2]
-            cp b
-            jr nc, .mgn
-            ld a, b
-            ldh [sh_l2], a
-            ld a, c
-            ldh [sh_l3], a
-.mgn:       inc c
-            jr .mg
-.mgx:       ldh a, [sh_l3]
-            ret
-.markp:     ; queue every tile coded for palette C that uses an index in sh_chg
-            push bc
-            ld hl, TILE_PAL
-.tk:        ld a, [hl]
-            cp c
-            jr nz, .tn
-            push hl
-            ld a, l                         ; its TILE_USE nibble
-            ld d, a
-            srl a
-            add a, low(TILE_USE)
-            ld l, a
-            ld h, high(TILE_USE)
-            ld a, [hl]
-            bit 0, d
-            jr z, .te
-            swap a
-.te:        and $0F
-            ld b, a
-            ldh a, [sh_chg]
-            and b
-            pop hl
-            jr z, .tn
-            ld a, l
-            call dmg_mark
-.tn:        inc l
-            jr nz, .tk
-            pop bc
+; retile_b (bank HLE_BANK): both planes of a tile (and TILE_USE) by pf2_b in bank PF_BANK
+pf2_call:   push af
+            ld a, PF_BANK
+            ld [$2000], a
+            pop af
+            call pf2_b
+            ld a, HLE_BANK
+            ld [$2000], a
             ret
 
-; BGP: value 0 = the backdrop's shade. Over a black backdrop, values 1-3 get dark grey /
-; light grey / white (two values: dark grey / white); otherwise each value the shade of its
-; brightest level. Darkened while the palettes are faded: one shade per two brightness
-; levels the brightest BG colour is below REF_LMAX (its level when the maps were last
-; computed). Returns A = BGP.
+; ---- LDA (zp),Y / STA $2007 / INY / DEX / BNE (b21:80C5, fix:F24D): X bytes (0: 256) to
+; the PPU. In bulk while the LCD is off (or a CGB masked load), the increment is 1, the run
+; stays in nametable 0's cells and its source in one 8 KB area: shadow and GB map copied
+; (owners as ntfill); anything else byte by byte. Out: A = the last byte, X = 0, Y += n,
+; N = 0, Z = 1, carry kept.
+NF_N       = $D82C          ; ntfill / izyrun0: bytes of this run (2; fault-dump area, DBG + 12)
+IZ_OFF     = $DCDC          ; izyrun0: nametable offset (2), last byte
+IZ_LAST    = $DCDE
+hle_izr10:  ld a, $10
+            jr izyrun0
+hle_izr94:  ld a, $94
+izyrun0:    ldh [tmp_lo], a                 ; (zp)
+            push af                         ; (carry)
+            ldh a, [lcd_on]
+            and a
+            jr z, .bk
+            ld a, [VLCD]
+            and a
+            jp z, .slow
+.bk:        ldh a, [ppu_ctrl]
+            and 4
+            jp nz, .slow
+            ldh a, [ppu_vh]
+            cp $20
+            jp c, .slow
+            cp $3F
+            jp z, .slow
+            and 7
+            cp 4
+            jp nc, .slow                    ; (nametable 1)
+            ld h, a
+            ldh a, [own1_lo]                ; (cells of nametable 1 on a CGB: byte by byte)
+            ld l, a
+            ldh a, [own1_hi]
+            or l
+            jr z, .o0
+            ldh a, [is_cgb]
+            and a
+            jp nz, .slow
+.o0:        ldh a, [ppu_vl]                 ; offset + n <= $3C0
+            ld l, a                         ; (HL = offset)
+            ld a, e
+            dec a                           ; n - 1 (0-255)
+            add a, l
+            ld a, h
+            adc a, 0
+            cp 3
+            jr c, .ok
+            jp nz, .slow
+            ld a, e
+            dec a
+            add a, l
+            cp $C0
+            jp nc, .slow
+.ok:        ld a, l                         ; offset and n kept
+            ld [IZ_OFF], a
+            ld a, h
+            ld [IZ_OFF + 1], a
+            ld a, e
+            ld [NF_N], a
+            and a
+            ld a, 0
+            jr nz, .n1
+            inc a
+.n1:        ld [NF_N + 1], a
+            ldh a, [tmp_lo]                 ; source: NES (zp) + Y
+            ld l, a
+            ld h, high(NES_RAM)
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            add hl, bc
+            ld a, e                         ; last byte in the same 8 KB area
+            dec a
+            add a, l
+            ld a, h
+            adc a, 0
+            xor h
+            and $E0
+            jp nz, .slow
+            ld a, h
+            cp $20
+            jr c, .ram
+            cp $60
+            jp c, .slow
+            cp $80
+            jr nc, .rom
+            add a, $40                      ; save RAM
+            ld h, a
+            jr .src
+.ram:       ld a, e                         ; (within the 2 KB: no mirror crossing)
+            dec a
+            add a, l
+            ld a, h
+            adc a, 0
+            xor h
+            and $F8
+            jp nz, .slow
+            ld a, h
+            and 7
+            or high(NES_RAM)
+            ld h, a
+            jr .src
+.rom:       cp $C0
+            jr nc, .rc
+            sub $40
+            ld h, a
+            ldh a, [data_bank8]
+            jr .bnk
+.rc:        cp $E0
+            jr nc, .re
+            sub $80
+            ld h, a
+            ldh a, [data_bankC]
+            jr .bnk
+.re:        sub $80
+            ld h, a
+            ld a, DATA + 31
+.bnk:       ld [$2000], a
+.src:       ld a, [IZ_OFF + 1]              ; shadow
+            add a, high(NT_SH)
+            ld d, a
+            ld a, [IZ_OFF]
+            ld e, a
+            push hl
+            ld b, c                         ; (Y)
+            ld a, [NF_N]
+            ld c, a
+.cs:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec c
+            jr nz, .cs
+            ld [IZ_LAST], a
+            pop hl
+            ld a, [VLCD]                    ; GB map (LCD off; masked: rebuilt when shown)
+            and a
+            jr z, .mp
+            ld a, 1
+            ld [MAP_RB], a
+            jr .md
+.mp:        ld a, [IZ_OFF + 1]
+            add a, $98
+            ld d, a
+            ld a, [IZ_OFF]
+            ld e, a
+            ld a, [NF_N]
+            ld c, a
+.m0:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec c
+            jr nz, .m0
+.md:        ld c, b                         ; C = Y
+            ld b, 0
+            ldh a, [code_bank]
+            ld [$2000], a
+            ld a, [IZ_OFF]
+            ld l, a
+            ld a, [IZ_OFF + 1]
+            ld h, a
+            ldh a, [own1_lo]                ; nametable 0 owns these cells now
+            ld d, a
+            ldh a, [own1_hi]
+            or d
+            jr z, .nown
+            push bc
+            push hl
+            ld a, HLE_BANK
+            ld [$2000], a
+            call nf_own
+            ldh a, [code_bank]
+            ld [$2000], a
+            pop hl
+            pop bc
+.nown:      ldh a, [is_cgb]
+            and a
+            jr nz, .cg
+            ld a, 1
+            ldh [dmg_scan], a
+.cg:        ld a, [NF_N]                    ; v += n (within nametable 0), Y += n
+            ld d, a
+            add a, l
+            ldh [ppu_vl], a
+            ld a, [NF_N + 1]
+            adc a, h
+            ld h, a
+            ldh a, [ppu_vh]
+            and $FC
+            or h
+            ldh [ppu_vh], a
+            ld a, c
+            add a, d
+            ld c, a
+            ld a, [IZ_LAST]
+            ldh [tmp_lo], a
+            jr .out
+.slow:      ldh a, [tmp_lo]                 ; byte by byte
+            ld d, a
+.sl:        ld l, d
+            push de
+            call rt_izy_rd
+            ld a, l
+            ldh [tmp_lo], a
+            call rt_ppu_w7
+            pop de
+            inc c
+            dec e
+            jr nz, .sl
+.out:       ld b, 0
+            ld d, b
+            ld e, b
+            xor a
+            ldh [nzv], a
+            pop af                          ; carry back
+            ldh a, [tmp_lo]
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1
+            ret
+
+; dmg_maps: native in bank PF_BANK (dmg_maps_b)
+dmg_maps:   push af
+            ld a, PF_BANK
+            ld [$2000], a
+            pop af
+            call dmg_maps_b
+            jp hle_back
+
 dmg_bgp:    push bc
             push de
             push hl
