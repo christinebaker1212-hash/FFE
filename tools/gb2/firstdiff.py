@@ -8,6 +8,7 @@ gets the pad the NES latched before each wait NMI, at its joypad read (feed_pads
 usage: PYTHONPATH=build/emu firstdiff.py NES GB [FRAMES] [--random SEED] [--script S]
   --script: newgame (default: power-on, Start through the prologue, New Game, names)
   --shots F1,F2.. --out SHEET.png: GB screens after those NES frames
+  --strict: also compare the sound driver's RAM (SOUND)
 Work RAM $6000-$7FFF (cart RAM bank 0 on the GB) is compared every WRAM_EVERY waits."""
 import sys, os, random
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -16,6 +17,10 @@ from compare import GB, sync_sram, UP, DOWN, LEFT, RIGHT, A, B, START
 from cynes import NES
 
 WRAM_EVERY = 50
+# Sound-driver state (ram-map.txt): music runs in real time, and in the battle phases with
+# an asynchronous NMI the GB ticks it at its own vblanks, so these may differ (not game
+# logic; the song id $6F25 stays compared). --strict compares them too.
+SOUND = set(range(0xB0, 0xF0)) | set(range(0x6F00, 0x6F25))
 WAIT_STUBS = {(0x4C, 0x3C, 0xFA), (0x4C, 0xA1, 0xFE)}
 
 
@@ -55,19 +60,26 @@ def nes_pass(nes, steps, limit, shots_at=()):
     wram = {}                                      # work RAM $6000-$7FFF every WRAM_EVERY waits
     # The pad: what the game read (the 8th ROL $20 of its joypad loop at fix:DBBC), fed
     # to the GB at its read after the same wait.
+    # The other joypad routine (fix:FC3E, menus) shifts the pad into $35 bit-reversed by
+    # ROR $35 at fix:FC4B.
     ROL20 = 31 * 0x4000 + 0xDBBC - 0xC000          # coverage index of that instruction
-    w = 0; nrol = 0
+    ROR35 = 31 * 0x4000 + 0xFC4B - 0xC000
+    rev = [int('{:08b}'.format(i)[::-1], 2) for i in range(256)]
+    w = 0; nrol = 0; nror = 0
     for f in range(limit):
         nes.controller = steps[f]
         nes.step(1)
         for ix, a, v in nes.watch:
             if a == 0x100 and v == 0x40 and (shadow[0x100], shadow[0x101], shadow[0x102]) in WAIT_STUBS:
-                w += 1; nrol = 0
+                w += 1; nrol = nror = 0
                 nes_ram[w] = bytes(shadow[:0x800]); frame_of[w] = f
                 if w % WRAM_EVERY == 0: wram[w] = bytes(shadow[0x6000:0x8000])
             if a == 0x20:
                 nrol = nrol + 1 if ix == ROL20 else 0
                 if nrol == 8: pads[w + 1] = v; nrol = 0
+            elif a == 0x35:
+                nror = nror + 1 if ix == ROR35 else 0
+                if nror == 8: pads[w + 1] = rev[v]; nror = 0
             if a < 0x2000: shadow[a & 0x7FF] = v
             elif a >= 0x6000: shadow[a] = v
         if f in shots_at: shot_w.append(w)
@@ -81,6 +93,8 @@ def main():
             k = args.index(name); v = conv(args[k + 1]); del args[k:k + 2]; return v
         return default
     rnd = opt('--random', None, int)
+    mask = set() if '--strict' in args else SOUND
+    if '--strict' in args: args.remove('--strict')
     shots_at = {int(x) for x in opt('--shots', '').split(',') if x}
     out = opt('--out')
     nes = NES(args[0]); gb = GB(args[1]); sync_sram(nes, gb)
@@ -102,13 +116,13 @@ def main():
         state['k'] = k
         if state['diff'] is not None or k not in nes_ram: return
         a = nes_ram[k]; b = bytes(m[0xC000 + i] for i in range(0x800))
-        d = [i for i in range(0x800) if a[i] != b[i] and not 0x100 <= i < 0x200]
+        d = [i for i in range(0x800) if a[i] != b[i] and not 0x100 <= i < 0x200 and i not in mask]
         if d:
             state['diff'] = 'NES frame %d, wait %d: %s' % (frame_of[k], k, ' '.join(
                 '%03X:%02X/%02X' % (i, a[i], b[i]) for i in d[:16]))
         elif k in wram:
             x = wram[k]; y = bytes(m[0, 0xA000 + i] for i in range(0x2000))
-            d = [i for i in range(0x2000) if x[i] != y[i]]
+            d = [i for i in range(0x2000) if x[i] != y[i] and 0x6000 + i not in mask]
             if d:
                 state['diff'] = 'NES frame %d, wait %d, work RAM: %s' % (frame_of[k], k, ' '.join(
                     '%04X:%02X/%02X' % (0x6000 + i, x[i], y[i]) for i in d[:16]))
