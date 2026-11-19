@@ -385,10 +385,11 @@ w_tri:      ld a, c
             ld a, [APU_SH + $08]            ; linear counter reload
             and $7F
             jr z, t_mute
-            srl a                           ; (240 Hz -> frames: / 4)
-            srl a
+            srl a                           ; (240 Hz -> frames: / 4, at least 1; the NES
+            srl a                           ;   counts R quarter frames, R / 4 frames)
+            jr nz, .l1
             inc a
-            ld [APU_TLIN], a
+.l1:        ld [APU_TLIN], a
             ld a, [APU_SH + $0B]            ; (a period below 2: silent, as on the NES)
             and 7
             jr nz, .pk
