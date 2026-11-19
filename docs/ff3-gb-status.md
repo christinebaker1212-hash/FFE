@@ -64,8 +64,14 @@ python3 tools/gb3/ff3src.py "roms/Final Fantasy III (Japan).nes" build/ff3/src_e
   samples (only `$4011` level writes); Select on the field only changes the walking party
   member (`$F72C`); the minimap comes from Sight / Dwarven Bread; the main menu's Order
   (ならびかえ) is the formation screen.
-- Plan for the owner: `docs/ff3-gb-plan.md` (**waiting for the owner**: Select-menu
-  question; approach).
+- Plan: `docs/ff3-gb-plan.md`, **approved by the owner (2026-11-19)**.
+
+## Owner's decisions (2026-11-19)
+- **Select menu:** Select on the field opens OPTIONS / SUSPEND (no FORMATION: the main
+  menu has Order). **B + Select** changes the walking party member (Famicom: Select).
+- **Approach:** as in the plan (§3): mechanical translation of the generated source,
+  native routines for graphics, raster splits, sound and hot paths, re-layouts on the NES
+  side.
 
 ## Next
 1. `tools/gb3/translate.py` (copy of FF2's `tools/gb2/translate.py`, adapted: 8 KB banks

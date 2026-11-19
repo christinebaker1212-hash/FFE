@@ -1,4 +1,4 @@
-# FF3 on the Game Boy Color: plan (draft for the owner, 2026-11-19)
+# FF3 on the Game Boy Color: plan (approved by the owner 2026-11-19)
 
 Status and setup: `docs/ff3-gb-status.md`. Targets and rules: `CLAUDE.md` (FF3: Game Boy
 Color only, CGB flag `$C0`, MBC5 + battery SRAM, 0% slowdown, disassembly base, nothing
@@ -114,14 +114,8 @@ NES "GB-layout" ROM. Mock-ups (PNG, real font and graphics from the user's ROM, 
 6. Select menu and suspend points.
 7. The builder (`tools/builder/ffe_builder.py`: enable FF3).
 
-## 6. Questions for the owner
-1. **Select menu.** On FF3's field, Select only changes which party member is shown walking
-   (`$F72C`, with a sound). The minimap comes from the Sight spell and Dwarven Bread, not
-   a button. FORMATION would be the main menu's own **Order** screen (ならびかえ).
-   Proposal:
-   - Select opens the new menu: OPTIONS / FORMATION / SUSPEND;
-   - the walking-member change moves to **B + Select**.
-   Other options: a fourth entry in the Select menu for it, or drop it.
-2. **Approach.** OK to go ahead as in §3? Mechanical translation of the generated
-   source, native routines for graphics, raster splits, sound and hot paths, and
-   re-layouts on the NES side so equivalence stays checkable.
+## 6. Owner's decisions (2026-11-19)
+1. **Select menu:** Select on the field opens the new menu with **OPTIONS** and **SUSPEND**
+   (no FORMATION entry: FF3's main menu already has Order). **B + Select** changes the
+   walking party member (the Famicom's Select action, `$F72C`).
+2. **Approach:** approved as in §3 ("go ahead with the plan").
