@@ -564,6 +564,34 @@ apq_apply_b:
             jr nc, .nx
             jr .wr
 .cv:        ld a, c                         ; other registers: if the value changed
+            and $0B                         ; ($4002 / $4006, the pulse periods: against the
+            cp 2                            ;   value last applied, not the shadow: the sweep
+            jr nz, .sh                      ;   changes the shadow, and the old value sent
+            ld a, c                         ;   again each frame restarted the sweep)
+            rrca
+            rrca
+            and 1
+            ld d, a                         ; D = pulse
+            add a, low(APQ_LO)
+            ld l, a
+            ld h, high(APQ_LO)
+            ld a, [hl]
+            ld [hl], e
+            cp e
+            jr nz, .wr
+            pop hl                          ; same value: sent only if its note restarts
+            push hl                         ;   (the sweep may have moved the period)
+            ld a, l
+            add a, 13
+            ld l, a
+            ld a, [hl]
+            bit 0, d
+            jr z, .r0
+            rrca
+.r0:        rrca
+            jr c, .wr
+            jr .nx
+.sh:        ld a, c
             add a, low(APU_SH)
             ld l, a
             ld h, high(APU_SH)

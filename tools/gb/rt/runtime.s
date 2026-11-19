@@ -2623,7 +2623,7 @@ dlg_cell:   push hl
             sub d
             and 63
             cp 20
-            jr nc, .no
+            jr nc, .oth
             ld e, a                         ; E = box column
             ld a, l                         ; NES tile row = B * 8 + L / 32
             rlca
@@ -2644,7 +2644,7 @@ dlg_cell:   push hl
             jr nc, .p
             add a, 30
 .p:         cp 8
-            jr nc, .no
+            jr nc, .drop
             swap a                          ; window map $9C00 + row * 32 + column
             add a, a
             or e
@@ -2664,6 +2664,20 @@ dlg_cell:   push hl
 .dmg:       ld a, d
             call dmg_tile3
 .yes:       pop de
+            pop hl
+            or 1
+            ret
+.oth:       ld e, a                         ; not in the box: a cell of the other view (the
+            ldh a, [cam_x]                  ;   32 columns from c0 - camera) is left out of the
+            rrca                            ;   GB map (its shadow only): FF1 draws map rows
+            rrca                            ;   there with the box, and their attributes
+            rrca                            ;   would colour cells at the view's edges
+            and $1F
+            add a, e
+            and 63
+            cp 32
+            jr nc, .no
+.drop:      pop de
             pop hl
             or 1
             ret

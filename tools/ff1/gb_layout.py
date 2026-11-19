@@ -1512,22 +1512,13 @@ DGN = $0347         ; rows left to clear
 DGT = $0348
 DGR = $0349         ; 1: the box was opened at a page break (GB), 0 after it closes
 dlgpage:            ; page break in a dialogue (printer at $DB8E; $38/$39 = text origin)
-    lda DGR         ; FF1 prints the first page before it reveals the box ($D604): at the
-    bne dgw0        ;   first page break the GB box opens here (lines 2, 4 .. 64 shown,
-    lda #1          ;   $5806), and the runtime keeps it open through FF1's own opening
-    sta DGR
-    lda #2
-dgo:
-    pha
-    jsr $FE00
-    jsr MUSIC
-    jsr dgscroll
-    pla
+    lda DGR         ; FF1 prints the first page before it shows the box ($D604): at the
+    bne dgw0        ;   first page break the GB box is shown here at once ($5806 = all 64
+    lda #1          ;   lines; the runtime keeps it through FF1's own opening), with the
+    sta DGR         ;   cursor sound (owner: no animation, a cursor sound on opening and
+    lda #64         ;   on each next page, none on closing)
     sta $5806
-    clc
-    adc #2
-    cmp #66
-    bcc dgo
+    jsr dgsnd
 dgw0:
     jsr dgframe
     bmi dgw0        ; A still held: wait for its release
@@ -1573,7 +1564,19 @@ dgr1:
     sta $3B
     dec DGN
     bne dgr
+    jsr dgsnd       ; the next page: cursor sound
     jmp dlghide     ; (people over the box hidden again)
+dgsnd:              ; FF1's menu cursor sound (b14 $ADB0)
+    lda #$7A
+    sta $4004
+    lda #$9B
+    sta $4005
+    lda #$20
+    sta $4006
+    lsr a
+    sta $4007
+    sta $7E
+    rts
 dlghide:            ; dialogue box opening: sprites over the box rows (NES y 48-111) hidden
     lda #1          ;   (the field rebuilds the sprites when the box closes); GB: the box
     sta $5805       ;   is being built (its cells go to the GB window; ignored once open)
@@ -1757,6 +1760,23 @@ dbend:
     put(rom, 0xDBE8, bytes([0x4C]) + r.labels['dchk'].to_bytes(2, 'little'),
         expect=bytes([0xC9, 0x01, 0xD0, 0x06]))
     put(rom, 0xCA1B, bytes([0x20]) + main.LABELS_EX['dlgrest'].to_bytes(2, 'little'), expect=bytes([0x20, 0x04, 0xD6]))
+    # owner (2026-11-19): the box shown and removed at once, the cursor sound when it opens
+    # (dlgrest; not when a page break has opened it already), none when it closes. $D604:
+    # $12 = 3, $1A = the other nametable, $1B = $60 (all shown), on to its wait loop $D629;
+    # $D68B (close sound + shrinking split) -> RTS.
+    op = asm('''
+    lda #3
+    sta $12
+    lda $FF
+    eor #1
+    sta $1A
+    lda #$60
+    sta $1B
+    jmp $D629
+''', org=0xD604)
+    assert len(op.bytes) <= 0xD629 - 0xD604, len(op.bytes)
+    put(rom, 0xD604, op.bytes, expect=bytes([0xA9, 0x03, 0x85, 0x12, 0xA9, 0x35]))
+    put(rom, 0xD68B, bytes([0x60]), expect=bytes([0xA9]))
 
 def battle_panel(rom):
     """Bottom panel (25x12 image at $691E, NES rows 18-29; the GB shows panel rows 0-5,
@@ -2958,6 +2978,18 @@ gbm2:
     sta $40
     jmp $ED24
 dlgrest:            ; $CA1B: the dialogue ($D604), then (GB) the box closed: the GB shows
+    lda $0349       ;   (the cursor sound as the box opens, unless a page break opened it)
+    bne drs
+    lda #$7A
+    sta $4004
+    lda #$9B
+    sta $4005
+    lda #$20
+    sta $4006
+    lsr a
+    sta $4007
+    sta $7E
+drs:
     jsr $D604       ;   it in its window (FF1 builds it in the other nametable and shows it
     lda #0          ;   by a raster split), so the map under it was never touched
     sta $5805

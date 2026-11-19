@@ -32,6 +32,7 @@ apu_init:   ld a, RT_TABLES
 ; two frames behind. ($4015 is never read back by the game: reads return 0.)
 APQ_P      = $DCD0          ; snapshot being written (16)
 APQ_S0     = $DCE0          ; queued frames: 2 slots of 16 ($DCE0, $DCF0)
+APQ_LO     = $DC44          ; $4002 / $4006 last applied from the queue (2)
 
 rt_apu_w:   push af
             push bc
