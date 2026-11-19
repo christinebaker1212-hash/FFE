@@ -30,30 +30,21 @@ def script_newgame(n):
     return pads
 
 
-def main():
-    args = sys.argv[1:]
-    def opt(name, default=None, conv=str):
-        if name in args:
-            k = args.index(name); v = conv(args[k + 1]); del args[k:k + 2]; return v
-        return default
-    rnd = opt('--random', None, int)
-    shots_at = {int(x) for x in opt('--shots', '').split(',') if x}
-    out = opt('--out')
-    nes = NES(args[0]); gb = GB(args[1]); sync_sram(nes, gb)
-    limit = int(args[2]) if len(args) > 2 else 6000
-    steps = script_newgame(limit)
-    if rnd is not None:
-        r = random.Random(rnd); start = 4000
-        btns = [UP, DOWN, LEFT, RIGHT, A, A, B, START, UP, DOWN, LEFT, RIGHT]
-        k = start
-        while k < limit:
-            m = r.choice(btns); h = r.randint(2, 40); g = r.randint(1, 20)
-            for j in range(k, min(k + h, limit)): steps[j] = m
-            for j in range(k + h, min(k + h + g, limit)): steps[j] = 0
-            k += h + g
-    sym = {}
-    for l in open(args[1][:-3] + '.sym'):
-        b, rest = l.split(':'); a, n = rest.split(); sym[n] = (int(b, 16), int(a, 16))
+def add_random(steps, seed, start=4000):
+    """random play from NES frame `start` on (held 2-40 frames, released 1-20)"""
+    r = random.Random(seed); k = start; n = len(steps)
+    btns = [UP, DOWN, LEFT, RIGHT, A, A, B, START, UP, DOWN, LEFT, RIGHT]
+    while k < n:
+        m = r.choice(btns); h = r.randint(2, 40); g = r.randint(1, 20)
+        for j in range(k, min(k + h, n)): steps[j] = m
+        for j in range(k + h, min(k + h + g, n)): steps[j] = 0
+        k += h + g
+
+
+def nes_pass(nes, steps, limit, shots_at=()):
+    """Run the NES build for `limit` frames with pad steps[f]; returns per wait NMI w:
+    RAM, the pad the game read after it (w + 1), the NES frame, work RAM every
+    WRAM_EVERY waits, and the wait reached at each frame in shots_at."""
     # 1. NES alone: RAM and latched pad at each wait NMI. One cynes step can take two
     # NMIs and nmi_ram keeps only the last, so NES RAM is rebuilt from the logged writes
     # (watch $0000-$07FF) and taken at the stub's write of RTI to $0100 after a wait's
@@ -80,6 +71,27 @@ def main():
             if a < 0x2000: shadow[a & 0x7FF] = v
             elif a >= 0x6000: shadow[a] = v
         if f in shots_at: shot_w.append(w)
+    return nes_ram, pads, frame_of, wram, shot_w
+
+
+def main():
+    args = sys.argv[1:]
+    def opt(name, default=None, conv=str):
+        if name in args:
+            k = args.index(name); v = conv(args[k + 1]); del args[k:k + 2]; return v
+        return default
+    rnd = opt('--random', None, int)
+    shots_at = {int(x) for x in opt('--shots', '').split(',') if x}
+    out = opt('--out')
+    nes = NES(args[0]); gb = GB(args[1]); sync_sram(nes, gb)
+    limit = int(args[2]) if len(args) > 2 else 6000
+    steps = script_newgame(limit)
+    if rnd is not None: add_random(steps, rnd)
+    sym = {}
+    for l in open(args[1][:-3] + '.sym'):
+        b, rest = l.split(':'); a, n = rest.split(); sym[n] = (int(b, 16), int(a, 16))
+    nes_ram, pads, frame_of, wram, shot_w = nes_pass(nes, steps, limit, shots_at)
+    w = max(nes_ram) if nes_ram else 0
     last = w
     print('NES: %d frames, %d NMIs, %d wait NMIs' % (limit, nes.nmi_count, last))
     # 2. GB with those pads
