@@ -30,12 +30,7 @@ NMI_CNT    = $D830          ; 16-bit count of NES frame waits             test r
 VBL_CNT    = $D832          ; 16-bit count of GB frames                   tools/gb/gambatte/
 WAIT_CNT   = $D834          ; 16-bit count of NES frames the main thread waited for (tools/gb3/firstdiff.py)
 TEST_PAD   = $D83E          ; $A5: test runner input mode (later)         gbrun.c)
-LK_LO      = $D840          ; dynamic-target lookup cache: NES address, key, GB bank and address
-LK_HI      = $D841
-LK_KEY     = $D842
-LK_BANK    = $D843
-LK_GLO     = $D844
-LK_GHI     = $D845
+LK_TAB     = $DA00          ; dynamic-target lookup cache (512 bytes, WRAM bank 1; lookup)
 PC_BUF     = $CD00          ; rt_ppu_copy: one piece (<= 32 bytes; the stack's far end, never reached)
 NC_BUF     = $CD40          ; nat_chr64: 64 bytes for a nametable destination
 MAP_SH     = $D000          ; GB map (VRAM bank 0 $9800-$9BFF) and its attributes (VRAM bank 1),
@@ -2636,52 +2631,16 @@ rt_farcall_ret:
 
 ; HL = NES address -> HL = GB address, fc_bank = GB bank (A, F, BC, DE kept). Hashed table
 ; in bank DYN_BANK (translate.py): bucket (lo + hi + key) & $FF, key = the NES 8KB bank of
-; the address's window ($8000: $5114, $A000: $5115), else $FF.
+; the address's window ($8000: $5114, $A000: $5115), else $FF. In front of it a direct-mapped
+; cache LK_TAB (WRAM bank 1, 64 entries of 8 bytes: lo, hi, key, GB bank, GB address), index
+; (lo + hi + key) & 63. (An empty entry, all 0, never matches: key 0 only goes with $8000-$BFFF.)
 lookup:
            push af
             push bc
             push de
-            ld a, h                         ; one-entry cache: same NES address and window bank
-            ld d, a
-            ld a, l
-            ld e, a
-            ld a, d
-            cp $80
-            jr c, .cany
-            cp $A0
-            jr c, .c8
-            cp $C0
-            jr nc, .cany
-            ldh a, [nes_bankA]
-            jr .ck
-.c8:        ldh a, [nes_bank8]
-            jr .ck
-.cany:      ld a, $FF
-.ck:        ld c, a
-            ld a, [LK_KEY]
-            cp c
-            jr nz, .full
-            ld a, [LK_LO]
-            cp e
-            jr nz, .full
-            ld a, [LK_HI]
-            cp d
-            jr nz, .full
-            ld a, [LK_BANK]
-            ldh [fc_bank], a
-            ld a, [LK_GLO]
-            ld l, a
-            ld a, [LK_GHI]
-            ld h, a
-            pop de
-            pop bc
-            pop af
-            ret
-.full:      ld h, d
-            ld l, e
             ld d, h
             ld e, l
-            ld a, d
+            ld a, d                         ; C = key
             cp $80
             jr c, .any
             cp $A0
@@ -2694,12 +2653,41 @@ lookup:
             jr .key
 .any:       ld a, $FF
 .key:       ld c, a
-            ld a, DYN_BANK
-            ld [MBC5_BANKL], a
             ld a, e
             add a, d
             add a, c
+            ld b, a                         ; B = hash
+            and 63
+            add a, a
+            add a, a
             ld l, a
+            ld h, high(LK_TAB) / 2          ; (LK_TAB 512-aligned)
+            add hl, hl                      ; HL = LK_TAB + 8 * index
+            ld a, [hl+]
+            cp e
+            jr nz, .full
+            ld a, [hl+]
+            cp d
+            jr nz, .full
+            ld a, [hl+]
+            cp c
+            jr nz, .full
+            ld a, [hl+]
+            ldh [fc_bank], a
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            pop de
+            pop bc
+            pop af
+            ret
+.full:      ld a, l                         ; (entry start: L & $F8)
+            and $F8
+            ld l, a
+            push hl
+            ld a, DYN_BANK
+            ld [MBC5_BANKL], a
+            ld l, b
             ld h, high(dyn_index) / 2
             add hl, hl                      ; dyn_index + 2 * bucket ($4000-$41FF)
             ld a, [hl+]
@@ -2719,23 +2707,32 @@ lookup:
             ld a, [hl+]
             cp c
             jr nz, .n3
-            ld a, [hl+]
+            ld a, [hl+]                     ; found: bank, address -> the cache entry
             ldh [fc_bank], a
-            ld [LK_BANK], a
+            ld b, a
             ld a, [hl+]
             ld h, [hl]
             ld l, a
-            ld [LK_GLO], a
-            ld a, h
-            ld [LK_GHI], a
-            ld a, e                         ; (the cache entry)
-            ld [LK_LO], a
-            ld a, d
-            ld [LK_HI], a
-            ld a, c
-            ld [LK_KEY], a
             ldh a, [code_bank]
             ld [MBC5_BANKL], a
+            ld a, l
+            ldh [tmp_lo], a
+            ld a, h
+            pop hl                          ; HL = entry
+            ld [hl], e
+            inc l
+            ld [hl], d
+            inc l
+            ld [hl], c
+            inc l
+            ld [hl], b
+            inc l
+            ld d, a
+            ldh a, [tmp_lo]
+            ld [hl+], a
+            ld [hl], d
+            ld h, d
+            ld l, a
             pop de
             pop bc
             pop af
@@ -2746,7 +2743,8 @@ lookup:
             inc hl
             inc hl
             jr .lp
-.miss:      ldh a, [code_bank]
+.miss:      pop hl
+            ldh a, [code_bank]
             ld [MBC5_BANKL], a
             ld h, d
             ld l, e

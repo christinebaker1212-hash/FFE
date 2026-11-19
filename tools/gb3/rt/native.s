@@ -227,7 +227,16 @@ nat_chr64:
             ld a, c
             cp $40
             jr nz, .gb
-            ld a, $40
+            ldh a, [ppu_vl]                 ; a whole attribute table ($23C0 / $27C0 / ..):
+            cp $C0                          ;   only the bytes that changed
+            jr nz, .ncp
+            ldh a, [ppu_vh]
+            and 3
+            cp 3
+            jr nz, .ncp
+            call attr_put64
+            jr .end
+.ncp:       ld a, $40
             ldh [cp_n], a
             ld hl, NC_BUF
             xor a
@@ -256,6 +265,64 @@ nat_chr64:
             xor a
             ldh [nt_x], a
             ldh a, [nt_a]
+            ret
+
+; NC_BUF (64 bytes) -> the attribute table at the PPU address ($2xC0, increment 1): the
+; nametable shadow, and attr_apply for each byte that changed; PPU address + 64. C kept.
+attr_put64:
+            push bc
+            ldh a, [ppu_vh]                 ; B = nametable 0 / 1 after mirroring (as rt_ppu_w7)
+            and $0F
+            rrca
+            rrca
+            and 3
+            ld b, a
+            ldh a, [mirror]
+            and a
+            ld a, b
+            jr z, .vm
+            srl a
+            jr .nt
+.vm:        and 1
+.nt:        ld b, a
+            ld c, 0                         ; C = index 0-63
+.lp:        ld a, b                         ; HL = NT_SH + n * $400 + $3C0 + index
+            add a, a
+            add a, a
+            add a, high(NT_SH) + 3
+            ld h, a
+            ld a, c
+            add a, $C0
+            ld l, a
+            ld a, [hl]
+            ld d, a                         ; D = old
+            push hl
+            ld hl, NC_BUF
+            ld a, l
+            add a, c
+            ld l, a
+            ld a, [hl]                      ; A = new
+            pop hl
+            cp d
+            jr z, .same
+            ld [hl], a
+            ld e, a
+            ld a, d
+            ldh [c_q], a
+            ld a, e
+            ld l, c
+            call attr_apply                 ; (keeps B, C)
+.same:      inc c
+            ld a, c
+            cp $40
+            jr nz, .lp
+            ldh a, [ppu_vh]                 ; PPU address + 64 ($xxC0 -> next page)
+            inc a
+            and $3F
+            ldh [ppu_vh], a
+            xor a
+            ldh [ppu_vl], a
+            pop bc
             ret
 
 ; fast path of nat_chr64: PPU address tile-aligned, source ($7E) + 63 in one ROM window.
