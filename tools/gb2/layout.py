@@ -2619,6 +2619,37 @@ gm_party:               ; b14:AD0A (replaces the four member windows b14:B396)
     lda #$77
     sta VP+1
     jsr ntwin
+    lda #9              ; the gap between the commands and Gil windows (NES cols 13-20,
+    sta VLINE           ;   rows 9-14) black: other screens (save, target) drew there
+.gap:
+    jsr $FA2A
+    lda VLINE
+    sta VSH
+    lda #0
+    sta VT
+    ldx #5
+.sh:
+    asl VSH
+    rol VT
+    dex
+    bne .sh
+    lda VT
+    ora #$20
+    sta $2006
+    lda VSH
+    ora #13
+    sta $2006
+    lda #0
+    ldx #8
+.z:
+    sta $2007
+    dex
+    bne .z
+    jsr scroll
+    inc VLINE
+    lda VLINE
+    cmp #15
+    bne .gap
     jsr gm_attr2
     ldx #0
 .rs:
@@ -3432,9 +3463,11 @@ mm_exit:                ; b14:AD8C (menu closed): field camera, then close menu
     lda #4
     jsr GBM
     jmp $B380
-mm_save:                ; b14:B1D7 (save menu, no close menu): window palette
-    jsr $DA8F
+mm_save:                ; b14:B1D7 (save menu, no close menu): window palette, the party
+    jsr $DA8F           ;   lines (as the target screen) under the message
     lda #3
+    jsr GBM
+    lda #5
     jmp GBM
 ''', syms=dict(GBM=GBM[0]))
     assert m.org + len(m.bytes) <= 0x8800
@@ -3484,6 +3517,10 @@ st_keys:                ; b14:B1CB (status loop): Left / Right turn the page; A 
     lda $24
     ora $25
     rts
+sv_back:                ; b14:AD82 (save menu closed): party window, then commands / Gil
+    lda #1
+    jsr GBM
+    jmp $ADA2
 tg_party:               ; b14:A909 / A8E5 / AC60 (instead of the member windows b14:B396)
     lda #0              ; (the list's hand, cursor 3, hidden: the description covers the
     sta $A4             ;   list; the item / magic menus set it again when they redraw)
@@ -3513,8 +3550,11 @@ MMTAB:
     assert eb.org + len(eb.bytes) <= 0x8833, hex(eb.org + len(eb.bytes))
     put(rom, 14, eb.org, eb.bytes)
     t.labels.update(ea.labels); t.labels.update(eb.labels)
-    for a in (0xA909, 0xA8E5, 0xAC60):
+    for a in (0xA909, 0xA8E5, 0xAC60, 0xB226, 0xB25E):      # (+ the save menu's previews)
         put(rom, 14, a, bytes([0x20]) + t.labels['tg_party'].to_bytes(2, 'little'), old=bytes.fromhex('2096b3'))
+    put(rom, 14, 0xB2C0, bytes([0x4C]) + t.labels['tg_party'].to_bytes(2, 'little'), old=bytes.fromhex('4c96b3'))
+    # back from the save menu (b14:AD82 JSR ADA2): the party window again first
+    put(rom, 14, 0xAD82, bytes([0x20]) + t.labels['sv_back'].to_bytes(2, 'little'), old=bytes.fromhex('20a2ad'))
     for a in (0xAD3C, 0xAD4B, 0xAD5A):
         put(rom, 14, a, bytes([0x20]) + t.labels['mm_sel'].to_bytes(2, 'little'), old=bytes.fromhex('2059ae'))
     put(rom, 14, 0xAEAA, bytes(v for k in range(4) for v in (TG_SEL_X, TG_SEL_Y + k, 0, 0)))
@@ -3531,6 +3571,8 @@ MMTAB:
     put(rom, 14, 0xB1D1 - 2, bytes([0xF0, (0xB1C0 - 0xB1D1) & 0xFF]))  # (BEQ $B1C0 after the JSR)
     put(rom, 14, 0x8834, bytes([0x0F]), old=bytes([0x0F]))
     put(rom, 14, 0x8838, bytes([0x14]), old=bytes([0x64]))    # magic / equip portrait: centred in its box
+    for sid in (40, 41, 42):
+        rom[sysone + sid // 8] |= 1 << (sid % 8)
     for sid in (32, 33, 34, 35, 39, ST_P1, ST_P1 + 1):
         rom[sysone + sid // 8] |= 1 << (sid % 8)
     for sid, txt in sub_strings(ins).items():
@@ -3607,10 +3649,24 @@ def sub_strings(ins):
     # magic defense print " hits-percent" + % (6): cols 12-17)
     sk = ['{14:00}[%02X] {10:%02X}{14:09}[%02X] {10:%02X}' % (0x6E + 2 * r, 0x30 + 2 * r, 0x6F + 2 * r, 0x31 + 2 * r)
           for r in range(4)]
-    return {32: '{14:04}Magic\n{14:04}{10:02}', 34: '{14:04}Equip\n{14:04}{10:02}',
+    import json, re
+    sv = {e['id']: e['en'] for e in json.load(open('script/ff2/system.json')) if e['id'] in (40, 41, 42)}
+    def lines(t):                       # each original line wrapped at 18 (no reflow: the
+        out = []                        #   Japanese line breaks separate sentences here)
+        for l in t.split('\n'):
+            m = re.search(r'\{16:', l)
+            text, spots = (l[:m.start()], l[m.start():]) if m else (l, '')
+            if text.strip(): out += ins.flow(text.strip(), 18)
+            if spots: out.append(spots)
+        return '\n'.join(out)
+    save = {40: lines(sv[40].replace('{16:09}Yes{16:0D}No', '\n{16:03}Yes{16:08}No')), 41: lines(sv[41]),
+            42: '\n'.join(ins.flow(' '.join(l.strip() for l in sv[42].split('\n')), 18))}   # (sentences: flowed)
+    out = {32: '{14:04}Magic\n{14:04}{10:02}', 34: '{14:04}Equip\n{14:04}{10:02}',
             33: 'HP {10:20}/{10:21}\nMP  {10:22}/ {10:23}',
             39: '{14:04}{10:02}\n{14:04}HP {10:20}/{10:21}\n{14:04}MP  {10:22}/ {10:23}\n{14:04}{10:00}',
             ST_P1: '\n'.join(p1), ST_P1 + 1: '\n'.join(md + ['', 'Skill Level'] + sk)}
+    out.update(save)
+    return out
 
 
 MM_SEL_X, MM_SEL_Y = 0, 3

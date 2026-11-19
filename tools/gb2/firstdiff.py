@@ -132,7 +132,7 @@ def scenario(args):
     steps = script_newgame(limit)
     if rnd is not None: add_random(steps, rnd)
     if presses:                                # NES frame:key after which the input is only these
-        K = dict(A=A, B=B, U=UP, D=DOWN, L=LEFT, R=RIGHT, S=START)
+        K = dict(A=A, B=B, U=UP, D=DOWN, L=LEFT, R=RIGHT, S=START, N=0)   # (N: no button)
         first = min(int(x.split(':')[0]) for x in presses.split(','))
         for f in range(first, limit): steps[f] = 0
         for item in presses.split(','):

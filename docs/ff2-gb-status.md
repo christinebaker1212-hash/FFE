@@ -362,8 +362,17 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   `b14:B396` (old member windows) and `b14:8801` (old main-menu portrait body).
   Checked (NES variant, Gambatte): firstdiff equip / status / magic scenarios 16706 /
   16699 / 16699 waits identical; random seed 1, 30000 frames: 29461 waits identical.
-- Next: save menu, then the remaining field screens (shops, name entry, title, prologue,
-  ending, world map, Select menu).
+- **Save menu** (same layout as the target screen): message window 16 on top (strings
+  40-42: 40 / 41 each line wrapped at 18 with the cursor spots kept, 42 flowed), party lines
+  below (`gm_tparty` at the start `mm_save` and for the slot previews `b14:B226/B25E/B2C0`,
+  which still called the old member windows at `B396`, now reused); back in the main menu
+  the party window is drawn again (`sv_back` at `b14:AD82`), and `gm_party` blacks the gap
+  between the commands and Gil windows. Checked (NES variant): save to an empty slot,
+  overwrite confirmation; firstdiff save scenario (SRAM written) 16706 waits identical;
+  random seed 1, 30000 frames: 29470 waits identical.
+- firstdiff `--press`: key `N` (no button) to end the random input at a given frame.
+- Next: the remaining field screens (shops, name entry, title, prologue, ending, world map,
+  Select menu).
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
