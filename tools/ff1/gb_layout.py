@@ -1510,7 +1510,24 @@ DLG_PAGE = 0x05
 DLG_SRC = """
 DGN = $0347         ; rows left to clear
 DGT = $0348
+DGR = $0349         ; 1: the box was opened at a page break (GB), 0 after it closes
 dlgpage:            ; page break in a dialogue (printer at $DB8E; $38/$39 = text origin)
+    lda DGR         ; FF1 prints the first page before it reveals the box ($D604): at the
+    bne dgw0        ;   first page break the GB box opens here (lines 2, 4 .. 64 shown,
+    lda #1          ;   $5806), and the runtime keeps it open through FF1's own opening
+    sta DGR
+    lda #2
+dgo:
+    pha
+    jsr $FE00
+    jsr MUSIC
+    jsr dgscroll
+    pla
+    sta $5806
+    clc
+    adc #2
+    cmp #66
+    bcc dgo
 dgw0:
     jsr dgframe
     bmi dgw0        ; A still held: wait for its release
@@ -2944,6 +2961,7 @@ dlgrest:            ; $CA1B: the dialogue ($D604), then (GB) the box closed: the
     jsr $D604       ;   it in its window (FF1 builds it in the other nametable and shows it
     lda #0          ;   by a raster split), so the map under it was never touched
     sta $5805
+    sta $0349       ;   (DGR: no page break opened the next box)
     rts
 """.replace('MPAGE', '$%04X' % MPAGE).replace('MLAST', '$%04X' % MLAST) \
         .replace('GBMPG', '$%04X' % MAG_B14_LABELS['gbmpg']).replace('GBMKY', '$%04X' % MAG_B14_LABELS['gbmky'])\

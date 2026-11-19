@@ -208,6 +208,7 @@ dlg_on:     ds 1                            ; field dialogue box open ($5805): i
 dlg_c0:     ds 1                            ;   box rectangle in the other view: NES column (0-63),
 dlg_r0:     ds 1                            ;   NES tile row (0-29) of its top left (20 x 8 cells)
 dlg_l:      ds 1                            ;   lines of it shown (window from the top, off at this line)
+dlg_st:     ds 1                            ;   1: opened at a page break ($5806): kept open until $1B reaches $60
 sgb_mask:   ds 1                            ; SGB screen mask: 1 = to blank (LCD went off), 2 = blanked, 3 = blanked until the packets built with the LCD on are out
 hram_end:   ds 1
 w7v:        ds 1                            ; rt_ppu_w7: the value written
@@ -835,7 +836,15 @@ rt_dlgdelay: push af
             ldh a, [dlg_on]                 ; lines of the box shown: ($1B - 8) * 3 / 4, at
             and a                           ;   most 64 (the NES box's 88 lines, opened 2 and
             jr z, .nd                       ;   closed 3 per frame, scaled to the GB's 64)
+            ldh a, [dlg_st]                 ; (already opened at a page break: FF1's own
+            and a                           ;   opening is not shown again)
+            jr z, .op
             ld a, [NES_RAM + $1B]
+            cp $60
+            jr c, .nd
+            xor a
+            ldh [dlg_st], a
+.op:        ld a, [NES_RAM + $1B]
             sub 8
             jr nc, .p
             xor a
@@ -2661,6 +2670,13 @@ dlg_cell:   push hl
 .no:        pop de
             pop hl
             xor a
+            ret
+rt_mmc_w5806:                               ; dialogue box lines shown (opened at a page break)
+            ldh [dlg_l], a
+            push af
+            ld a, 1
+            ldh [dlg_st], a
+            pop af
             ret
 rt_mmc_w5803:
             push hl

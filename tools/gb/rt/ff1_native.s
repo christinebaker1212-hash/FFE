@@ -2779,6 +2779,7 @@ dlg_w:      push af
             ldh [dlg_r0], a
             xor a
             ldh [dlg_l], a
+            ldh [dlg_st], a
             inc a
             ldh [dlg_on], a
             jr .x
