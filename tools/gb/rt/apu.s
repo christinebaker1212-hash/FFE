@@ -14,6 +14,7 @@ APU_SWD    = $D86C          ; sweep dividers (2)
 APU_SWR    = $D86E          ; sweep reload flags (2)
 APU_TLIN   = $D870          ; triangle linear counter (frames left; control flag clear)
 APU_SWT    = $D871          ; sweep register being clocked (scratch)
+APU_TRF    = $D85A          ; triangle: $400B written this frame (reload pending)
 ; Volume changes don't restart the note: NRx2 "zombie mode" (each $08 written while the
 ; channel plays in add mode with envelope period 0 raises its volume by one, mod 16).
 

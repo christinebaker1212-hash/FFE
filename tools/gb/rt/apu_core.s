@@ -192,7 +192,8 @@ vscale:     push bc
             jr z, .d
             add a, b
             jr .m
-.d:         srl a
+.d:         add a, 7                        ; (rounded up: a quiet NES note stays audible)
+            srl a
             srl a
             srl a
 .x:         pop hl
@@ -364,7 +365,7 @@ w_tri:      ld a, c
             jr z, .lo
             cp $0B
             ret nz
-            ld a, [APU_SH + $15]
+.st:        ld a, [APU_SH + $15]
             bit 2, a
             ret z
             ld a, e
@@ -379,6 +380,8 @@ w_tri:      ld a, c
             inc h
 .nc:        ld a, [hl]
             ld [APU_LEN + 2], a
+            ld a, 1                         ; (reload pending this frame, as the NES's flag:
+            ld [APU_TRF], a                 ;   a $4008 written after it still starts the note)
             ld a, [APU_SH + $08]            ; linear counter reload
             and $7F
             jr z, t_mute
@@ -414,7 +417,17 @@ w_tri:      ld a, c
             ret
 .lin:       ld a, [APU_ON + 2]              ; reload 0 silences it (FF1's note-off)
             and a
+            jr nz, .lon
+            ld a, [APU_TRF]                 ; silent, but $400B was written this frame: the
+            and a                           ;   note starts now (the NES reloads the linear
+            ret z                           ;   counter at the next quarter frame)
+            ld a, e
+            and $7F
             ret z
+            ld a, [APU_SH + $0B]
+            ld e, a
+            jr w_tri.st
+.lon:
             ld a, e
             and $7F
             jr z, t_mute
@@ -530,7 +543,9 @@ w_status:   ld a, e
 
 ; ---- once per NES frame: two half-frame clocks (length counters, sweep), four quarter-
 ; frame clocks (the triangle's linear counter, counted here in frames)
-apu_frame:  ld b, 0
+apu_frame:  xor a                           ; (the triangle's reload flag lasts the frame)
+            ld [APU_TRF], a
+            ld b, 0
             call len_p
             ld b, 1
             call len_p
