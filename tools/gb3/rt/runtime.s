@@ -69,6 +69,11 @@ joy_shift:  ds 1
 joy_state:  ds 1
 irq_line:   ds 1                            ; MMC5 $5203 / $5204 (scanline IRQ)
 irq_en:     ds 1
+async_req:  ds 1                            ; asynchronous NES interrupts due: bit 0 NMI (set by
+                                            ;   the vblank while $0100 holds a JMP and NMIs are
+                                            ;   on), bit 1 IRQ (armed by the NMI handler); run
+                                            ;   at the next safe point (rt_async)
+in_async:   ds 1                            ; rt_async is running a handler
 in_irq:     ds 1                            ; running the NES IRQ handler: $2000 / $2005 are
 spl_ctrl:   ds 1                            ;   the split's values (below irq_line)
 spl_x:      ds 1
@@ -286,7 +291,16 @@ vblank_isr: push af
             ldh [rHDMA5], a
             xor a
             ldh [rVBK], a
-.nrb:       ld a, 1
+.nrb:       ldh a, [ppu_ctrl]               ; asynchronous NMI (battle / cutscenes): $0100 = JMP
+            bit 7, a                        ;   and NMIs on: run the handler at the next safe
+            jr z, .nn                       ;   point
+            ld a, [NES_RAM + $100]
+            cp $4C
+            jr nz, .nn
+            ldh a, [async_req]
+            or 1
+            ldh [async_req], a
+.nn:        ld a, 1
             ldh [frame_tick], a
             ld a, $80
             ldh [ppu_stat], a
@@ -410,25 +424,72 @@ run_irq:    ldh a, [irq_en]
             pop af
             ret
 
-; the NES NMI through the RAM vector $0100 if it holds a JMP (battle / cutscene handler)
-; and NMIs are on; A, F, BC, DE kept
-run_nmi:    ldh a, [ppu_ctrl]
-            bit 7, a
-            ret z
-            ld a, [NES_RAM + $100]
-            cp $4C
-            ret nz
-            push af
+; Asynchronous NES interrupts at a safe point of the translated code (ROM data reads,
+; joypad reads, cross-bank returns, the wait idioms): the NMI handler through $0100, then
+; on a later call the IRQ it armed (through $0103). Everything is preserved (registers,
+; the 6502 flag bytes and the helpers' scratch bytes in HRAM).
+rt_async:   push af
+            ldh a, [in_async]
+            and a
+            jr nz, .busy
             push bc
             push de
-            ld a, [NES_RAM + $101]
+            push hl
+            ldh a, [nzv]
+            push af
+            ldh a, [vfl]
+            push af
+            ldh a, [sv_a]
+            push af
+            ldh a, [wtmp]
+            push af
+            ldh a, [tmp_lo]
+            push af
+            ld a, 1
+            ldh [in_async], a
+            ld de, 0
+            ld bc, 0
+            ldh a, [async_req]
+            bit 0, a
+            jr z, .irq
+            and $FE
+            ldh [async_req], a
+            ld hl, NMI_CNT                  ; (an NES frame: the test runners' clock)
+            inc [hl]
+            jr nz, .c
+            inc hl
+            inc [hl]
+.c:         ld a, [NES_RAM + $101]
             ld l, a
             ld a, [NES_RAM + $102]
             ld h, a
-            call rt_dyn_call
+            call rt_dyn_call                ; (RTI = ret)
+            ldh a, [irq_en]                 ; the IRQ it armed: at the next safe point
+            and a
+            jr z, .done
+            ldh a, [async_req]
+            or 2
+            ldh [async_req], a
+            jr .done
+.irq:       and $FD
+            ldh [async_req], a
+            call run_irq
+.done:      xor a
+            ldh [in_async], a
+            pop af
+            ldh [tmp_lo], a
+            pop af
+            ldh [wtmp], a
+            pop af
+            ldh [sv_a], a
+            pop af
+            ldh [vfl], a
+            pop af
+            ldh [nzv], a
+            pop hl
             pop de
             pop bc
-            pop af
+.busy:      pop af
             ret
 
 ; $FF36 (wait for vblank): returns like the NES stub $FF2A (RTI back in $0100, $2002 read,
@@ -447,19 +508,21 @@ rt_wait_ff36:
             dec a
             ret
 
-; $FB80 idiom (INC $05 / wait until the NMI handler clears it): one vblank, the handler,
-; and the IRQ it arms; then LDA $05 (N, Z). C kept.
+; $FB80 idiom (INC $05 / wait until the NMI handler clears it): the handler runs from the
+; vblank's request; then LDA $05 (N, Z). C kept.
 rt_wait_nmi:
             push af
             ld hl, NES_RAM + $05
             inc [hl]
-.lp:        call wait_vbl
-            call run_nmi
-            call run_irq
+.lp:        ldh a, [async_req]
+            and a
+            call nz, rt_async
             ld a, [NES_RAM + $05]
             and a
-            jr nz, .lp
-            pop af
+            jr z, .done
+            halt
+            jr .lp
+.done:      pop af
             ld a, [NES_RAM + $05]
             ldh [nzv], a
             inc a
@@ -471,13 +534,13 @@ rt_wait_irq:
             push af
             ld hl, NES_RAM + $00
             inc [hl]
-            call run_irq
-.lp:        ld a, [NES_RAM + $00]
+.lp:        ldh a, [async_req]
+            and a
+            call nz, rt_async
+            ld a, [NES_RAM + $00]
             and a
             jr z, .done
-            call wait_vbl
-            call run_nmi
-            call run_irq
+            halt
             jr .lp
 .done:      pop af
             ld a, [NES_RAM + $00]
@@ -1020,6 +1083,9 @@ rt_io_w4016:                                ; strobe: latch the buttons
             ret
 rt_io_r4016:                                ; next button in NES order (A B Sel Start U D L R)
             push af
+            ldh a, [async_req]              ; (safe point: battle input loops poll here)
+            and a
+            call nz, rt_async
             ldh a, [joy_shift]
             ld l, a
             scf
@@ -1032,7 +1098,23 @@ rt_io_r4016:                                ; next button in NES order (A B Sel 
             ret
 read_buttons:                               ; -> A: bit 0 A, 1 B, 2 Select, 3 Start, 4 Up,
             push bc                         ;   5 Down, 6 Left, 7 Right (1 = pressed)
-            ld a, $20
+            ld a, [TEST_PAD]                ; test runner mode (gbrun / sgbrun): the pad of
+            cp $A5                          ;   NES frame wait k from cart RAM bank 3
+            jr nz, .real                    ;   $A000 + (k & $FF), in this bit order
+            push hl
+            ld a, 3
+            ld [MBC5_RAMB], a
+            ld a, [NMI_CNT]
+            ld l, a
+            ld h, $A0
+            ld b, [hl]
+            xor a
+            ld [MBC5_RAMB], a
+            ld a, b
+            pop hl
+            pop bc
+            ret
+.real:      ld a, $20
             ldh [rP1], a
             ldh a, [rP1]
             ldh a, [rP1]
@@ -1173,6 +1255,9 @@ rt_rd_8:    push af
             ld l, [hl]
             ldh a, [code_bank]
             ld [MBC5_BANKL], a
+            ldh a, [async_req]              ; (safe point)
+            and a
+            call nz, rt_async
             pop af
             ret
 rt_rd_a:    push af
@@ -1184,6 +1269,9 @@ rt_rd_a:    push af
             ld l, [hl]
             ldh a, [code_bank]
             ld [MBC5_BANKL], a
+            ldh a, [async_req]              ; (safe point)
+            and a
+            call nz, rt_async
             pop af
             ret
 rt_rd_f:    push af                         ; $C000-$FFFF: banks 126 / 127 = GB bank DATA + 63
@@ -1192,6 +1280,9 @@ rt_rd_f:    push af                         ; $C000-$FFFF: banks 126 / 127 = GB 
             ld l, [hl]
             ldh a, [code_bank]
             ld [MBC5_BANKL], a
+            ldh a, [async_req]              ; (safe point)
+            and a
+            call nz, rt_async
             pop af
             ret
 
@@ -1494,7 +1585,14 @@ rt_farcall_ret:
             ldh [code_bank], a
             ld [MBC5_BANKL], a
             ldh a, [sv_a]
+            push af                         ; (the callee's A and flags pass back)
+            ldh a, [async_req]              ; (safe point)
+            and a
+            jr nz, .async
+            pop af
             ret
+.async:     pop af
+            jp rt_async
 
 ; HL = NES address -> HL = GB address, fc_bank = GB bank (A, F, BC, DE kept). Hashed table
 ; in bank DYN_BANK (translate.py): bucket (lo + hi + key) & $FF, key = the NES 8KB bank of

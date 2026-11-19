@@ -1,26 +1,65 @@
 """Side-by-side screens: the English NES build (cynes) and the GB build (Gambatte, build/gbrun)
-at the same NES frame waits (synchronous waits: writes of JMP to $0100).
+at the same NES frame waits (counted as the GB runtime does: class Waits).
 
-usage: PYTHONPATH=build/emu3 cmpshots.py NES GB OUT.png K1,K2,.. [--press KEY@WAIT,..]
-  (no input yet: the same frames with no buttons)
+usage: PYTHONPATH=build/emu3 cmpshots.py NES GB OUT.png K1,K2,.. [--input NAME]
+  --input: a pad script (pads(): one NES pad byte per frame wait; bit 0 Right .. 7 A), fed
+  to the NES by its wait count and to the GB through gbrun --padfile (test mode)
 The NES picture is drawn with the GB view (camera 48, 48) outlined."""
 import sys, os, subprocess, tempfile
 from PIL import Image, ImageDraw
 from cynes import NES
 
-def nes_frames(path, ks):
-    n = NES(path); n.watch = (0x100, 0x100)
+A, START = 128, 16
+INPUTS = {
+    'none': lambda w: 0,
+    'newgame': None,                     # (newgame_pad below)
+}
+RIGHT = 1
+
+def newgame_pad(w):
+    """A every 16 waits from 1000 (second narration page, New Game) until name entry
+    (~1342); from 1360 four names (FF3 rejects a name equal to an earlier one): A x 7
+    (6 letters + confirm), then Right (next letter of the grid) before the next name; then
+    A every 16 waits (the opening scene)"""
+    if w <= 1000: return 0
+    if w < 1360: return A if w % 16 < 4 else 0
+    k = (w - 1360) // 16; ph = (w - 1360) % 16
+    if ph >= 4: return 0
+    per = 8                               # A x 7, then Right
+    if k < 4 * per:
+        return RIGHT if k % per == per - 1 else A
+    return A
+INPUTS['newgame'] = newgame_pad
+
+class Waits:
+    """NES frames as the GB runtime counts them (NMI_CNT): NMIs taken while the RAM NMI
+    vector $0100 holds a JMP (a synchronous wait's JMP $FF2A, or the battle / cutscene
+    handler JMP $FB57); RTI there means nobody waits for that frame"""
+    def __init__(self, n):
+        self.n = n; self.count = 0; self.last = n.nmi_count
+    def update(self):
+        k = self.n.nmi_count
+        if k != self.last:
+            if self.n.nmi_ram[0x100] == 0x4C: self.count += k - self.last
+            self.last = k
+        return self.count
+
+def nes_frames(path, ks, pad):
+    n = NES(path); W = Waits(n)
     waits = 0; out = {}; f = 0
     while len(out) < len(ks) and f < 100000:
+        n.controller = pad(waits + 1)
         fr = n.step(1); f += 1
-        waits += sum(1 for i, a, v in n.watch if v == 0x4C)
+        waits = W.update()
         for k in ks:
             if k not in out and waits >= k: out[k] = Image.fromarray(fr.copy())
     return out
 
-def gb_frames(gb, ks):
+def gb_frames(gb, ks, pad):
     d = tempfile.mkdtemp(prefix='ff3cmp_')
-    cmd = [os.path.join(os.path.dirname(gb), 'gbrun'), gb, str(max(ks) * 3 + 600), os.path.join(d, 's')]
+    pf = os.path.join(d, 'pads.bin')
+    open(pf, 'wb').write(bytes(pad(w) for w in range(max(ks) + 64)))
+    cmd = [os.path.join(os.path.dirname(gb), 'gbrun'), gb, str(max(ks) * 3 + 600), os.path.join(d, 's'), '--padfile', pf]
     for k in ks: cmd += ['--nshot', str(k)]
     subprocess.run(cmd, capture_output=True)
     out = {}
@@ -31,7 +70,8 @@ def gb_frames(gb, ks):
 
 def main():
     nes, gb, outp, ks = sys.argv[1], sys.argv[2], sys.argv[3], [int(x) for x in sys.argv[4].split(',')]
-    a = nes_frames(nes, ks); b = gb_frames(gb, ks)
+    pad = INPUTS[sys.argv[sys.argv.index('--input') + 1] if '--input' in sys.argv else 'none']
+    a = nes_frames(nes, ks, pad); b = gb_frames(gb, ks, pad)
     W = 256 + 8 + 320; H = 240
     sheet = Image.new('RGB', (W, (H + 14) * len(ks)), (40, 40, 40))
     dr = ImageDraw.Draw(sheet)
