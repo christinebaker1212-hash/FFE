@@ -626,6 +626,16 @@ VBOX = $0344        ; box count saved while the names show during enemy targetin
 ; window; column 22 = next line of the message window (indented 8 px from row 2 on).
 boxline:
     jsr vsave
+    lda $6AA5       ; tearing boxes down ($F6AB: $6AA5 undraws left, $F652 redraws boxes
+    beq .td         ;   0..$6AA4-1, $6AA3 = the one drawn): the text of every box this
+    clc             ;   teardown removes is not drawn again, so a message goes at once
+    adc $6AA3       ;   instead of line by line (index + undraws left > boxes kept)
+    cmp $6AA4
+    bcc .td
+    beq .td
+    sta $5808       ; (GB: the message window's text cells blank at once)
+    jmp vrest
+.td:
     lda $8A
     sec
     sbc #<$691E

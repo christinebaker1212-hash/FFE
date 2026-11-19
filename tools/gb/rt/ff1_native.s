@@ -4889,7 +4889,7 @@ POPC:
 
 ; ---- bank 0: one page HL -> DE (E = 0), with ROM bank A at $4000 for it (0: none); bank
 ; HLE_BANK again after. Out: A = the last byte. (For pgcopy_b, which runs in HLE_BANK.)
-section bank 0, $3D80
+section bank 0, $3DA0
 pg_copy0:   and a
             jr z, .c
             ld [$2000], a
@@ -6087,4 +6087,64 @@ pf_call:    push hl
             ld [$2000], a
             ret
 .go:        push bc
+            ret
+
+; $5808 (GB layout, battle message teardown): the message window's text cells (NES rows
+; 19-22, columns 2-19) blank at once, in the shadow and the GB map (once per frame), so
+; the whole message goes together; FF1's row-by-row panel copy that follows then finds
+; them blank already (and draws back whatever stays)
+BLK_F      = $DCD6
+rt_mmc_w5808:
+            push af
+            push bc
+            push de
+            push hl
+            ld hl, BLK_F                    ; (16-bit frame count of the last blank)
+            ld a, [NMI_CNT]
+            cp [hl]
+            jr nz, .n
+            inc l
+            ld a, [NMI_CNT + 1]
+            cp [hl]
+            jr z, .x
+.n:         ld a, [NMI_CNT]
+            ld [BLK_F], a
+            ld a, [NMI_CNT + 1]
+            ld [BLK_F + 1], a
+            ld hl, NT_SH + 19 * 32 + 2
+            ld de, $9800 + 19 * 32 + 2
+            ld c, 4
+.r:         ld b, 18
+.c:         ld a, [hl]                      ; (only the message window's own small-font tiles,
+            sub $A8                         ;   $A8-$EF: the party and command windows keep
+            cp $48                          ;   theirs)
+            jr c, .bl
+            inc hl
+            jr .nx
+.bl:        xor a
+            ld [hl+], a
+.w:         di
+            ldh a, [$FF41]
+            bit 1, a
+            jr z, .g
+            ei
+            jr .w
+.g:         xor a
+            ld [de], a
+            ei
+.nx:        inc de
+            dec b
+            jr nz, .c
+            ld a, 14
+            add a, l
+            ld l, a
+            ld a, 14
+            add a, e
+            ld e, a
+            dec c
+            jr nz, .r
+.x:         pop hl
+            pop de
+            pop bc
+            pop af
             ret
