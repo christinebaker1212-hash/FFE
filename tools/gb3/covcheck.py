@@ -15,7 +15,9 @@ for f in sys.argv[2:]:
         if v & 1: ex[i] = 1
 hit = [i for i in range(COV_SIZE) if ex[i]]
 def name(i):
-    if i >= COV_RAM: return ('X' if i >= COV_RAM + 0x5C00 else 'RAM') + ':%04X' % (i - COV_RAM)
+    if i >= COV_RAM:
+        a = i - COV_RAM
+        return ('X' if 0x5C00 <= a < 0x6000 else 'PRG-RAM' if a >= 0x6000 else 'RAM') + ':%04X' % a
     b, o = divmod(i, B8)
     return '%02X/%04X' % (b, o + base.get(b, 0x8000 if b % 2 == 0 else 0xA000))
 ram = [i for i in hit if COV_RAM <= i < COV_RAM + 0x5C00 or i >= COV_RAM + 0x6000]

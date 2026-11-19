@@ -46,10 +46,29 @@ python3 tools/gb3/ff3src.py "roms/Final Fantasy III (Japan).nes" build/ff3/src_e
     other bank window (bank known only at run time: resolved by the bank-switch analysis
     in the translator).
 
+- Coverage check (`tools/gb3/build_emu.sh` → `build/emu3`: cynes with the shared patch
+  plus an FF3 coverage index by 8 KB bank, MMC5 PRG mode 3, `$E000` = bank 127;
+  `tools/gb3/covrun.py` seeds 1-4 × 60k frames from power-on, random input, no crash;
+  `tools/gb3/covcheck.py`): **21,367 executed instruction starts, all in the source map**
+  except the two known bank-straddling instructions (`30/9FFE`, `32/9FFF`, pairs above)
+  and code run from RAM: the NMI / IRQ jump stubs `$0100` / `$0103` (replaced by the
+  runtime) and the sine helper copied from `2E/9F6C` to PRG-RAM `$7EE3-$7EF4` (the
+  listing documents it, as it does the final boss code copied to `$7EF5`).
+  ```bash
+  bash tools/gb3/build_emu.sh build/emu3
+  mkdir -p build/ff3/cov && cd build/ff3/cov
+  COV_LOG=c1.bin PYTHONPATH=../../emu3 python3 ../../../tools/gb3/covrun.py ../../ff3_en.nes 1 60000
+  python3 ../../../tools/gb3/covcheck.py ../src_en c1.bin
+  ```
+- Engine facts for the plan: 8×8 sprites (`$2000` values `$80/$88/$98/$00/$04`); no DPCM
+  samples (only `$4011` level writes); Select on the field only changes the walking party
+  member (`$F72C`); the minimap comes from Sight / Dwarven Bread; the main menu's Order
+  (ならびかえ) is the formation screen.
+- Plan for the owner: `docs/ff3-gb-plan.md` (**waiting for the owner**: Select-menu
+  question; approach).
+
 ## Next
-1. NES coverage run (cynes, random play) to check every executed instruction start is
-   in the source map, including code run from RAM (NMI/IRQ stubs at `$0100`/`$0103`, the
-   final boss animation copied to `$7EF5`).
-2. Plan for the owner (`docs/ff3-gb-plan.md`): GBC-only runtime, translation of the
-   source, raster splits → LYC, MMC5 helpers replaced natively, screen re-layouts with
-   mock-ups, Select-menu question (how FF3 opens it).
+1. `tools/gb3/translate.py` (copy of FF2's `tools/gb2/translate.py`, adapted: 8 KB banks
+   and MMC5 mode 3, bank pairs, RAM code), CGB-only runtime (`tools/gb3/rt/`, copied from
+   FF2/FF1, DMG/SGB paths dropped), `tools/gb3/build.py` → boot to the title in Gambatte CGB.
+2. RAM equivalence against the English NES build (cynes), then field / battle / speed.

@@ -16,7 +16,7 @@ the user's ROM (`tools/gb3/ff3src.py`); nothing from either is committed.
 |---|---|
 | Japanese FF3: generated source → reassembled (`tools/asm6502.py`) | **byte-identical, all 17 code banks** |
 | English FF3 (MMC5 build, sha1 `4a7f1ae4…`): generated source → reassembled | **byte-identical**: 21 banks + the ExRAM code |
-| Coverage, random play on the English NES build (cynes) | see `docs/ff3-gb-status.md` (all executed code inside the source map so far) |
+| Coverage: 4 × 60k frames of random play on the English NES build (cynes) | 21,367 executed instruction starts; all in the source map except 2 instructions that straddle a bank pair (known) and RAM code: the NMI/IRQ stubs at `$0100`/`$0103` (replaced by the runtime) and a sine helper copied to `$7EE3` (documented in the listing) |
 
 The English patch needs no hand-porting: `tools/gb3/ff3en.py` runs `tools/ff3/insert.py`
 unchanged and records its 8 code modules (ExRAM text engine, battle text converter, field
