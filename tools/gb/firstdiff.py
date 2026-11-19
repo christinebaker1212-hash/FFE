@@ -90,15 +90,21 @@ last = nes.nmi_count
 state = {'diff': None, 'k': 0}
 
 
+def do_poke(m):
+    if state.pop('poke', None):
+        for a, v in pokes:
+            if a < 0x800: m[0xC000 + a] = v              # NES RAM at GB $C000
+            else: m[0, 0xA000 + a - 0x6000] = v
+
+
 def on_wait(ctx):
     m = gb.pb.memory
     k = (m[0xD830] | m[0xD831] << 8) + 1                # entering wait number k
     state['k'] = k
-    if k == poke_k:
-        for a, v in pokes:
-            if a < 0x800: m[0xC000 + a] = v              # NES RAM at GB $C000
-            else: m[0, 0xA000 + a - 0x6000] = v
-    if state['diff'] is not None or k not in nes_ram: return
+    if k == poke_k:                                     # (after this wait's comparison: the
+        state['poke'] = True                            #   NES snapshot at NMI k precedes its poke)
+    if state['diff'] is not None or k not in nes_ram:
+        do_poke(m); return
     a = nes_ram[k]; b = bytes(m[0xC000 + i] for i in range(0x800))
     d = [i for i in range(0x800) if a[i] != b[i] and not 0x100 <= i < 0x200]
     if d:
@@ -108,6 +114,7 @@ def on_wait(ctx):
         if w:
             state['diff'] = 'frame %d nmi %d work RAM: %s' % (frame_of.get(k, -1), k, ' '.join(
                 '%04X:%02X/%02X' % (x, wram_at[k][x - 0x6000], m[0, 0xA000 + x - 0x6000]) for x in w[:16]))
+    do_poke(m)
     if os.environ.get('GBWATCH') and frame_of.get(k, 0) >= int(os.environ.get('WATCH_FROM', '0')):
         lo, hi = (int(x, 16) for x in os.environ['GBWATCH'].split('-'))
         print(frame_of.get(k), k, 'GB ', bytes(m[x] for x in range(lo, hi)).hex(' '))
