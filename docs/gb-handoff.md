@@ -171,7 +171,9 @@ LCD-off loop (~40 M-cycles an entry, was ~128); `ntclr_b` fill unrolled; LCD-on 
 was ~65 through scn_c); two-palette tiles get bit 7 and `scn_view` walks the view backwards,
 deciding each such tile at its last view cell (bit 6) and stopping when all are decided (the
 field's ground tile $20 is one: the old forward pass ran scn_tab + scn_rowv over 18 rows);
-SC_NP / REF_BM clears unrolled. Still to do in the scan: `scn_pu` (~37 M-cycles per view
+SC_NP / REF_BM clears unrolled; `palup2_b` (palette upload, every frame of the prologue and
+fades) fast path for v = $3F00 + index / increment 1: unchanged colours cost no ppu_inc call.
+Still to do in the scan: `scn_pu` (~37 M-cycles per view
 cell), `scn_tab` (~350 per row), the settle loop. Tools added: `LAG_DUMP=FILE
 lagcheck.py ...` (GB / NES frames per wait), `SGBRUN_CALLS=ADDR` (return address at every
 entry of a routine: exact callers and call counts), `SGBRUN_PROF_SPOFF`, gbrun writes cart
@@ -203,7 +205,12 @@ runtime work but **checkall has not been re-run since the coverage refresh**: ru
 
 Remaining lag, by where it is (DMG / CGB frames on the script):
 - Boot wait 1: done (DMG 12 -> 3: prologue tiles coded in the spare time before the text).
-- Prologue bands: DMG ~22 in total, 2-4 per band (attribute writes each frame, b14:A2ED).
+- Prologue bands: DMG ~21 in total, 2-4 per band. Measured (night session): the cost is the
+  English text writer far:D20A-D217 (LDA ($10),Y / CMP #$10 / EOR $037A / STA $2007 / INY /
+  BNE, ~16 letters a frame with the LCD on: rt_ppu_w7g + own_set + dmg_cell + vram_put, ~400
+  M-cycles a letter, the VRAM queue fills and q_drain1 waits); the attribute row b14:A2FE is
+  cheap (unchanged bytes skipped, no re-shading in pro_mode). Idea: a native LCD-on row writer
+  for that loop (shadow + owners at once, the map cells through one queue block).
 - New-game screens (waits 719-1610): DMG ~55, CGB ~15. Costs: CHR upload to the shadow
   (hle_chr_pages, ~4 frames per full upload on DMG: BG pages could be left in ROM like the
   sprite pages), menu text printer c62:DED0..DF01 ($2006 / $2007 per letter), window rows,

@@ -3702,7 +3702,43 @@ palup2_b:   ld c, e                         ; c62:D874: from X on, $03C0 + X
             ld a, c
             cp 32
             jr nc, .x
-.lp:        ld a, c
+.lp:        ldh a, [ppu_vh]                 ; v = $3F00 + index, increment 1 (as the game
+            cp $3F                          ;   sets it): unchanged colours only counted, v
+            jr nz, .sl                      ;   set before a changed one and at the end
+            ldh a, [ppu_ctrl]
+            and 4
+            jr nz, .sl
+            ldh a, [ppu_vl]
+            cp c
+            jr nz, .sl
+.fl:        ld a, c
+            cp 16
+            jr nz, .fn
+            ld hl, NES_RAM + $03D0
+.fn:        ld a, [hl+]
+            ld b, a                         ; B = the colour
+            ld a, c                         ; PAL_SH index: $10/$14/$18/$1C -> $00/$04/...
+            ld e, a
+            and $13
+            cp $10
+            jr nz, .fm
+            res 4, e
+.fm:        ld d, high(PAL_SH)
+            ld a, [de]
+            xor b
+            and $3F
+            jr z, .fs
+            ld a, c
+            ldh [ppu_vl], a
+            ld a, b
+            call rt_ppu_w7                  ; (keeps all registers)
+.fs:        inc c
+            ld a, c
+            cp 32
+            jr c, .fl
+            ldh [ppu_vl], a                 ; v = $3F20
+            jr .x
+.sl:        ld a, c
             cp 16
             jr nz, .n
             ld hl, NES_RAM + $03D0
@@ -3734,7 +3770,7 @@ palup2_b:   ld c, e                         ; c62:D874: from X on, $03C0 + X
             inc c
             ld a, c
             cp 32
-            jr c, .lp
+            jr c, .sl
 .x:         xor a
             ldh [nzv], a
             ld e, c
