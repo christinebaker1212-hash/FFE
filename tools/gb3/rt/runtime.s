@@ -75,6 +75,14 @@ bg_bank:    ds 1                            ; BG pattern table the attributes ca
 map_dirty:  ds 4                            ; GB map rows written (bit per row) /
 attr_dirty: ds 4                            ;   attribute rows written
 map_any:    ds 1                            ; a bit is set in map_dirty / attr_dirty
+wc_n:       ds 1                            ; $2007 write cache: cells left in the current map row
+wc_nl:      ds 1                            ;   (increment 1), the next cell's NT_SH and MAP_SH
+wc_nh:      ds 1                            ;   addresses (0 = slow path)
+wc_ml:      ds 1
+wc_mh:      ds 1
+wv:         ds 1
+mr_lo:      ds 1                            ; GB map row marked last ($2007 writes: L & $E0, H)
+mr_hi:      ds 1
 frame_tick: ds 1
 oam_pending: ds 1
 oam_end:    ds 1                            ; OAM_SH slots in use after the last conversion (low byte)
@@ -315,6 +323,8 @@ vblank_isr: push af
             ldh [rSVBK], a
             xor a
             ldh [map_any], a
+            ldh [mr_hi], a                  ; (row marks gone: forget the last marked row and
+            ldh [wc_n], a                   ;   the cached run)
             ld hl, map_dirty
             ld d, high(MAP_SH)
             ld e, 0
@@ -646,6 +656,8 @@ rt_ppu_w0:  push af                         ; $2000
             ldh a, [in_irq]
             and a
             jr nz, .split
+            xor a
+            ldh [wc_n], a                   ; (increment may change: no cached run)
             pop af
             ldh [ppu_ctrl], a
             push af
@@ -708,6 +720,8 @@ rt_ppu_w6:  push af                         ; $2006
 .lo:        pop af
             ldh [ppu_vl], a
             push af
+            xor a
+            ldh [wc_n], a                   ; (new address: no cached run)
             ldh a, [ppu_th]
             and $3F
             ldh [ppu_vh], a
@@ -766,9 +780,51 @@ vput_go:
             ret
 
 rt_ppu_w7:
-           push af                         ; $2007 write
+            ldh [wv], a                     ; $2007 write
+            push af
+            di                              ; (fast path: a run of cells in one map row, after
+            ldh a, [wc_n]                   ;   a slow write set it up; the vblank flush
+            and a                           ;   clears it)
+            jr z, .slow0
+            dec a
+            ldh [wc_n], a
+            push hl
+            ldh a, [wc_nl]                  ; nametable shadow (WRAM bank 1)
+            ld l, a
+            inc a
+            ldh [wc_nl], a
+            ldh a, [wc_nh]
+            ld h, a
+            ldh a, [wv]
+            ld [hl], a
+            ldh a, [wc_ml]                  ; map shadow (WRAM bank MAP_BANK)
+            ld l, a
+            inc a
+            ldh [wc_ml], a
+            ldh a, [wc_mh]
+            ld h, a
+            ld a, MAP_BANK
+            ldh [rSVBK], a
+            ldh a, [wv]
+            ld [hl], a
+            ld a, 1
+            ldh [rSVBK], a
+            ei
+            ldh a, [ppu_vl]                 ; PPU address + 1
+            inc a
+            ldh [ppu_vl], a
+            jr nz, .fv
+            ldh a, [ppu_vh]
+            inc a
+            and $3F
+            ldh [ppu_vh], a
+.fv:        pop hl
+            pop af
+            ret
+.slow0:     ei
             push bc
             push de
+            ldh a, [wv]
             ld c, a
             ldh a, [ppu_vl]                 ; HL = NES VRAM address, then advance it (1 / 32)
             ld l, a
@@ -822,6 +878,11 @@ rt_ppu_w7:
             ld a, [hl]                      ; (old value: attribute writes compare)
             ldh [c_q], a
             ld [hl], c                      ; shadow
+            inc hl                          ; (next cell's shadow address, for the cache)
+            ld a, l
+            ldh [wc_nl], a
+            ld a, h
+            ldh [wc_nh], a
             pop hl
             ld a, h
             cp 3
@@ -830,15 +891,44 @@ rt_ppu_w7:
             cp $C0
             jr nc, .attr
 .cell:      call cell_map                   ; HL = GB map address of the cell
-            call map_mark
-            ld a, h                         ; -> MAP_SH (WRAM bank MAP_BANK)
-            sub $98 - high(MAP_SH)
-            ld h, a
+            ld a, h                         ; -> MAP_SH (WRAM bank MAP_BANK) first, then the row
+            sub $98 - high(MAP_SH)          ;   mark (a vblank flush in between then copies the
+            ld d, a                         ;   value or forgets the mark: never a lost write)
+            ld e, l
             ld a, MAP_BANK
             ldh [rSVBK], a
-            ld [hl], c
+            ld a, c
+            ld [de], a
             ld a, 1
             ldh [rSVBK], a
+            ld a, l                         ; row already marked last time: skip
+            and $E0
+            ld e, a
+            ldh a, [mr_lo]
+            cp e
+            jr nz, .mk
+            ldh a, [mr_hi]
+            cp h
+            jr z, .cache
+.mk:        ld a, e
+            ldh [mr_lo], a
+            ld a, h
+            ldh [mr_hi], a
+            call map_mark
+.cache:     ldh a, [ppu_ctrl]               ; increment 1: the rest of this map row goes the
+            and 4                           ;   fast way
+            jr nz, .done
+            ld a, l
+            and 31
+            xor 31
+            jr z, .done
+            ldh [wc_n], a
+            ld a, l
+            inc a
+            ldh [wc_ml], a
+            ld a, h
+            sub $98 - high(MAP_SH)
+            ldh [wc_mh], a
             jr .done
 .attr:      ld a, l
             sub $C0
@@ -1045,6 +1135,8 @@ cell_map:   ldh a, [mirror]
             ret
 
 rt_ppu_r7:  push af                         ; $2007 read (buffered; nametables from the shadow)
+            xor a
+            ldh [wc_n], a
             push bc
             push de
             call ppu_addr_inc
@@ -1777,6 +1869,46 @@ rt_copy_n:  push bc
             push hl
             ld hl, sp + 2
             set 7, [hl]                     ; Z = 1
+            pop hl
+            pop af
+            ret
+
+; PPU upload loop idiom (translate.py ppu_idiom): LDA src,X|Y / STA $2007 / INX|INY /
+; CPX|CPY #n / BNE: cp_n bytes (0 = 256) from GB address HL (ROM bank A, 0 = RAM) through
+; $2007. Returns A = the last byte, Z = 1, C = 1, nzv = 0. B, C, D, E kept.
+rt_ppu_copy:
+            push bc
+            push de
+            ld d, a                         ; D = data bank (0: RAM)
+            ldh a, [cp_n]
+            ld b, a
+.lp:        ld a, d
+            and a
+            jr z, .r
+            ld [MBC5_BANKL], a
+            ld a, [hl+]
+            ld e, a
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            ld a, e
+            jr .w
+.r:         ld a, [hl+]
+.w:         push hl
+            call rt_ppu_w7
+            pop hl
+            dec b
+            jr nz, .lp
+            ld b, a
+            xor a
+            ldh [nzv], a
+            ld a, b
+            pop de
+            pop bc
+            scf
+            push af
+            push hl
+            ld hl, sp + 2
+            set 7, [hl]
             pop hl
             pop af
             ret

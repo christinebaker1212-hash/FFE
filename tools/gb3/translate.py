@@ -478,8 +478,38 @@ class Emitter:
             h()
 
     # loads / stores
+    def ppu_idiom(self):
+        """LDA src,X|Y / STA $2007 / INX|INY / CPX|CPY #n / BNE back, src in RAM or ROM (within
+        its 8KB window): rt_ppu_copy (index = n, A = the last byte, Z = 1, C = 1, N = 0)"""
+        i = self.i
+        if i.mode not in ('abx', 'aby'): return False
+        r = 'X' if i.mode == 'abx' else 'Y'
+        st = self.rc.insns.get((i.space, i.addr + 3)); j = self.rc.insns.get((i.space, i.addr + 6))
+        k = self.rc.insns.get((i.space, i.addr + 7)); l = self.rc.insns.get((i.space, i.addr + 9))
+        if not (st and j and k and l and st.mn == 'STA' and st.mode == 'abs' and st.arg == 0x2007
+                and j.mn == 'IN' + r and k.mn == 'CP' + r and k.mode == 'imm' and l.mn == 'BNE' and l.arg == i.addr):
+            return False
+        reg = 'e' if r == 'X' else 'c'; pair = 'de' if r == 'X' else 'bc'
+        src = i.arg; reg_src = nes_region(src); n = k.arg or 256
+        if reg_src in ('ram', 'ex', 'sram'): sh = gb_ram(src); bank = None
+        elif reg_src in ('rom8', 'roma'):
+            if (src & 0x1FFF) + n > 0x2000: return False
+            sh = 0x4000 + (src & 0x1FFF); bank = reg_src
+        elif reg_src == 'romf':
+            if src + n > 0x10000: return False
+            sh = 0x4000 + (src - 0xC000); bank = 'romf'
+        else: return False
+        self.o('ld a, $%02X' % k.arg, 'sub %s' % reg, 'ldh [cp_n], a', 'ld hl, $%04X' % sh, 'add hl, %s' % pair)
+        if bank == 'rom8': self.o('ldh a, [odd8]', 'add a, h', 'ld h, a', 'ldh a, [data_bank8]')
+        elif bank == 'roma': self.o('ldh a, [oddA]', 'add a, h', 'ld h, a', 'ldh a, [data_bankA]')
+        elif bank == 'romf': self.o('ld a, DATA + 63')
+        else: self.o('xor a')
+        self.o('call rt_ppu_copy', 'ld %s, $%02X' % (reg, k.arg))
+        self.jump(None, (i.space, i.addr + 11))
+        return True
+
     def x_LDA(self):
-        if self.copy_idiom(): return
+        if self.copy_idiom() or self.ppu_idiom(): return
         op = self.operand()
         if op != 'a': self.o('ld a, %s' % op)
         self.set_nz_reg('a')

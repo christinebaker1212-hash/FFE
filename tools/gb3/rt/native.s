@@ -167,7 +167,12 @@ nat_9111:   ld a, e
 ; STA $2007 / INY / CPY #$40 / BNE): 64 bytes straight into the CHR staging copy when the PPU
 ; address is in the pattern tables with increment 1 (else through $2007). Out as the loop:
 ; Y = $40, A = the last byte written, X = $92 (0) or the last source byte, Z = 1, C = 1, N = 0.
-nat_chr64:  ld c, 0                         ; Y
+nat_chr64:
+            push af
+            xor a
+            ldh [wc_n], a                   ; (the PPU address moves: no cached run)
+            pop af
+             ld c, 0                         ; Y
             ldh a, [ppu_ctrl]
             and 4
             jr nz, .slow
@@ -406,7 +411,12 @@ chr64_fast: ldh a, [ppu_vl]
 ; the palette shadow (writes to $3F10/14/18/1C land on $3F00/04/08/0C, as on the NES), the
 ; CGB palettes reloaded only if a colour changed. PPU state as after the NES loop: latch
 ; reset, address $3F20. Out: X = $20, A = the last colour, Z = 1, C = 1, N = 0.
-nat_f897:   ld a, c                         ; (Y is kept)
+nat_f897:
+            push af
+            xor a
+            ldh [wc_n], a                   ; (the PPU address moves: no cached run)
+            pop af
+              ld a, c                         ; (Y is kept)
             ldh [nt_x], a
             ld hl, $BCF7                    ; PRG-RAM $7CF7
             ld de, PAL_SH
@@ -460,15 +470,35 @@ nat_f897:   ld a, c                         ; (Y is kept)
 ; tile marked, the GB map cleared and the attributes reset (palette 0, the BG table's bank)
 ; by DMA in the next vblank (map_flush). Out: A = X = Y = 0, Z = 1, N = 0, C kept;
 ; PPU address $3000, latch reset.
-nat_9f98:   push af
+nat_9f98:
+            push af
+            xor a
+            ldh [wc_n], a                   ; (the PPU address moves: no cached run)
+            pop af
+              push af
             ld a, 2                         ; staging tables (WRAM banks 2, 3)
 .sb:        ldh [rSVBK], a
             ld hl, STAGE
-.c1:        xor a
+            xor a
+            ld b, 0                         ; 256 x 16 bytes
+.c1:        ld [hl+], a
             ld [hl+], a
-            ld a, h
-            cp high(STAGE) + $10
-            jr c, .c1
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec b
+            jr nz, .c1
             ldh a, [rSVBK]
             inc a
             cp 4
@@ -513,6 +543,8 @@ nat_9f98:   push af
             ld a, 1
             ldh [chr_dirty], a
             ldh [map_any], a
+            xor a
+            ldh [mr_hi], a
             xor a
             ldh [ppu_latch], a
             ldh [ppu_stat], a
