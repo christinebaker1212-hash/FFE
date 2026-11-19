@@ -203,7 +203,37 @@ vram_put:   push bc
             jr nz, .q
             ld [hl], d
             jr .x
-.q:         ldh a, [q_tail]
+.q:         ld a, [VLCD]                    ; CGB masked load, queue empty: written now, in
+            and a                           ;   STAT mode 0 / 1 (mode 2 follows: VRAM stays
+            jr z, .qq                       ;   free long enough), interrupts off for it
+            ldh a, [q_head]
+            ld b, a
+            ldh a, [q_tail]
+            cp b
+            jr nz, .qq
+            bit 6, h                        ; (address high + $40: VRAM bank 1)
+            jr z, .m0
+            res 6, h
+            di
+            ld a, 1
+            ldh [$FF4F], a
+.w1:        ldh a, [$FF41]
+            bit 1, a
+            jr nz, .w1
+            ld [hl], d
+            xor a
+            ldh [$FF4F], a
+            ei
+            set 6, h
+            jr .x
+.m0:        di
+.w0:        ldh a, [$FF41]
+            bit 1, a
+            jr nz, .w0
+            ld [hl], d
+            ei
+            jr .x
+.qq:        ldh a, [q_tail]
             ld e, a
             inc a
             ld b, a

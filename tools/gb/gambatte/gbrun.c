@@ -198,6 +198,10 @@ int main(int argc, char** argv) {
 	if (wav) { wav_header(wav, wav_bytes, rate); fclose(wav); }
 	if (lagf) fclose(lagf);
 	printf("frames %d, NES frame waits %u, rate %d\n", f, NESF(), rate);
+	if (getenv("GBRUN_DBG")) {   /* the runtime's fault record DBG ($D820) and a few flags */
+		printf("DBG"); for (int i = 0; i < 16; i++) printf(" %02X", wram[0x1820 + i]); printf("\n");
+		printf("ISR_PC %02X%02X\n", wram[0x1877], wram[0x1876]);
+	}
 	p_retro_deinit();
 	return 0;
 }

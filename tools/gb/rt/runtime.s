@@ -67,6 +67,8 @@ TB_H       = $D873
 SGB_BGAP   = $D83F          ; SGB: frames before the next packet build may run (sgb_frame)
 SGB_MIN    = 12
 NT_NOW     = $D87D          ; nt_tile: check the cell's palette at once (not in spare time)
+ISR_PC     = $D876          ; (debug) the address the last vblank interrupted (2)
+MAP_RB     = $CCFF          ; CGB masked load: GB map to rebuild from the shadows when shown
 CGB_RP     = $CCEF          ; CGB: cell palettes stale (owners changed with the LCD off; repal_b at LCD on)
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
@@ -256,8 +258,8 @@ boot:       di
             ld bc, $2000
             call memclr
             ld hl, $9C00                    ; window map (the mask): tile 0 of VRAM bank 1
-            ld bc, $400                     ;   (cleared above), palette 0: the backdrop
-.wm:        ld a, $08
+            ld bc, $400                     ;   (cleared above), palette 7: black
+.wm:        ld a, $0F
             ld [hl+], a
             dec bc
             ld a, b
@@ -265,6 +267,13 @@ boot:       di
             jr nz, .wm
             xor a
             ldh [$FF4F], a
+            ld a, $B8                       ; BG palette 7 (the mask): black
+            ldh [$FF68], a
+            xor a
+            ld b, 8
+.p7:        ldh [$FF69], a
+            dec b
+            jr nz, .p7
             ld a, 1                         ; double speed (KEY1 + STOP, interrupts off)
             ldh [$FF4D], a
             xor a
@@ -391,6 +400,11 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             push af                         ;   main thread may be in a tile copy bank)
             ld a, 1
             ldh [$FF70], a
+            ld hl, sp+10                    ; (debug: the interrupted address -> ISR_PC)
+            ld a, [hl+]
+            ld [ISR_PC], a
+            ld a, [hl]
+            ld [ISR_PC + 1], a
             ldh a, [oam_pending]
             and a
             jr z, .no_oam
@@ -496,7 +510,20 @@ stat_isr:   push af                         ; raster events (vbl_regs), each in 
 ; vblank: the frame's BGP / OBP (DMG / SGB: emphasis darkens them), LCDC (sprites on or off,
 ; CGB: the window as the mask), scroll, and the raster events (sorted by line) with the mask
 ; at the top: a NES band effect (rt_band) or the NES BG switched off ($2001) masks
-vbl_regs:   xor a
+vbl_regs:   ld a, [VLCD]                    ; CGB: a masked load's writes done: shown
+            cp 2
+            jr nz, .vk
+            ldh a, [hd_any]
+            and a
+            jr nz, .vk
+            ldh a, [q_head]
+            ld b, a
+            ldh a, [q_tail]
+            cp b
+            jr nz, .vk
+            xor a
+            ld [VLCD], a
+.vk:        xor a
             ld [EV_N], a
             ld [EV_I], a
             ld c, 0                         ; C = masked at the top
@@ -1114,11 +1141,14 @@ cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ pa
             ret
 
 attr_apply:                                 ; A = attribute index i (0-63, + $40: nametable 1):
-            push af                         ; (LCD off: all cells' palettes when it goes on,
-            ldh a, [lcd_on]                 ;   repal_b; the shadow is already updated)
+            push af                         ; (LCD off or a masked load: all cells' palettes
+            ldh a, [lcd_on]                 ;   when the screen is shown, repal_b; the shadow
+            and a                           ;   is already updated)
+            jr z, .df
+            ld a, [VLCD]
             and a
-            jr nz, .on
-            inc a
+            jr z, .on
+.df:        ld a, 1
             ld [CGB_RP], a
             pop af
             ret
@@ -1379,10 +1409,13 @@ own_set:    push af
             ldh a, [is_cgb]
             and a
             jr z, .x
-            ldh a, [lcd_on]                 ; (LCD off: all cells' palettes when it goes on)
+            ldh a, [lcd_on]                 ; (LCD off or a masked load: all cells' palettes
+            and a                           ;   when the screen is shown)
+            jr z, .df
+            ld a, [VLCD]
             and a
-            jr nz, .lc
-            inc a
+            jr z, .lc
+.df:        ld a, 1
             ld [CGB_RP], a
             jr .x
 .lc:        ld a, c                         ; CGB: this cell's palette from its new nametable
@@ -1567,9 +1600,20 @@ rt_ppu_w1:  push af
             ldh [ppu_mask], a
             and $18
             jr z, .off
-            xor a
-            ld [VLCD], a                    ; (CGB: shown again)
-            ldh a, [lcd_on]
+            ld a, [VLCD]                    ; CGB masked load: shown once the queued writes
+            and a                           ;   and tile copies are done (vblank: VLCD 2 -> 0);
+            jr z, .nv                       ;   the masked frames are not caught up
+            ld a, [MAP_RB]                  ; (map cells and cell palettes deferred while
+            and a                           ;   masked)
+            call nz, maprb_tramp
+            ld a, [CGB_RP]
+            and a
+            call nz, repal_tramp
+            ld a, 2
+            ld [VLCD], a
+            ld a, [VBL_CNT]
+            ld [VBL_SEEN], a
+.nv:        ldh a, [lcd_on]
             and a
             jr nz, .ret
             ld b, 0                         ; flush everything (LCD still off)
@@ -1612,10 +1656,13 @@ rt_ppu_w1:  push af
 .off:       ldh a, [lcd_on]
             and a
             jr z, .ret
-            ; (CGB "VLCD", the LCD kept on and masked while the NES renders nothing, avoids
-            ;   the white of a real GBC's LCD-off, but every map write then waits for a
-            ;   vblank: loads became many times slower. Not used: the LCD goes off.)
-            ldh a, [is_sgb]
+            ldh a, [is_cgb]                 ; CGB: the LCD stays on, the screen masked black
+            and a                           ;   (a real GBC shows white with the LCD off);
+            jr z, .nc                       ;   writes take the LCD-on paths
+            ld a, 1
+            ld [VLCD], a
+            jr .ret
+.nc:        ldh a, [is_sgb]
             and a
             call nz, sgb_lcd_off
 .wv:        ldh a, [$FF44]
@@ -1959,7 +2006,13 @@ rt_ppu_w7g: push af
             jr nz, .queue
             ld [hl], d
             jr .done
-.queue:     ldh a, [q_tail]
+.queue:     ld a, [VLCD]                    ; (masked load: vram_put writes it now)
+            and a
+            jr z, .qn
+            ld a, d
+            call vram_put
+            jr .done
+.qn:        ldh a, [q_tail]
             ld e, a
             inc a
             ld b, a

@@ -82,6 +82,8 @@ hle_chr_pages:
             ld d, a
             ld a, 2
             ldh [$FF70], a
+            jr .copy                        ; (this jump was missing: the tile went over the
+                                            ;   sprite shadow and WRAM bank 2 stayed selected)
 .spr:       and $0F                         ; sprite table -> shadow (RAM bank 1)
             add a, high(SPR_SHADOW)
             ld d, a
@@ -319,6 +321,14 @@ hle_back:   push af
             ldh a, [code_bank]
             ld [$2000], a
             pop af
+            ret
+
+maprb_tramp:                                ; CGB masked load shown: maprb_b (bank HLE_BANK)
+            ld a, HLE_BANK
+            ld [$2000], a
+            call maprb_b
+            ldh a, [code_bank]
+            ld [$2000], a
             ret
 
 repal_tramp:                                ; LCD on, CGB: repal_b (bank HLE_BANK)

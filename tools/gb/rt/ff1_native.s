@@ -1274,10 +1274,13 @@ rt_anf:     push de
 ; 2048 rt_ppu_w7 calls. Out: X = Y = 0, A kept; N = 0, Z = 1, carry kept.
 ntclr_b:    push af
             ld d, a
-            ldh a, [lcd_on]
+            ldh a, [lcd_on]                 ; (LCD off, or a CGB masked load)
             and a
-            jr nz, .gen
-            ldh a, [ppu_ctrl]
+            jr z, .bk
+            ld a, [VLCD]
+            and a
+            jr z, .gen
+.bk:        ldh a, [ppu_ctrl]
             and 4
             jr nz, .gen
             ldh a, [ppu_vh]
@@ -1290,9 +1293,15 @@ ntclr_b:    push af
             call .fill
             ld hl, NT_SH + $400             ; nametable 1 tiles
             call .fill
-            ld hl, $9800                    ; GB map rows 0-29
+            ld a, [VLCD]                    ; (masked: the GB map rebuilt when shown)
+            and a
+            jr z, .gm
+            ld a, 1
+            ld [MAP_RB], a
+            jr .gd
+.gm:        ld hl, $9800                    ; GB map rows 0-29
             call .fill
-            ld hl, OWN                      ; every cell drawn by nametable 1 last
+.gd:        ld hl, OWN                      ; every cell drawn by nametable 1 last
             ld a, $FF
             ld c, 120
 .ow:        ld [hl+], a
@@ -1945,10 +1954,13 @@ NF_N       = $D82C          ; ntfill: bytes of this run (2; fault-dump area, DBG
 ntfill:     ld a, b
             or c
             ret z
-            ldh a, [lcd_on]
+            ldh a, [lcd_on]                 ; (LCD off, or a CGB masked load)
             and a
-            jr nz, .one
-            ldh a, [ppu_ctrl]
+            jr z, .bk
+            ld a, [VLCD]
+            and a
+            jr z, .one
+.bk:        ldh a, [ppu_ctrl]
             and 4
             jr nz, .one
             ld a, b                         ; a whole nametable from offset 0: in bulk
@@ -2024,7 +2036,7 @@ ntfill:     ld a, b
             ld a, h
             add a, $98
             ld h, a
-            call .set                       ; GB map (LCD off)
+            call .setm                      ; GB map (LCD off; masked: rebuilt when shown)
             pop hl
             ldh a, [own1_lo]                ; nametable 0 owns these cells now
             ld b, a
@@ -2053,6 +2065,12 @@ ntfill:     ld a, b
             call rt_ppu_w7
             dec bc
             jr ntfill
+.setm:      ld a, [VLCD]
+            and a
+            jr z, .set
+            ld a, 1
+            ld [MAP_RB], a
+            ret
 .set:       ld a, [NF_N]                    ; HL: NF_N bytes of D
             ld c, a
             ld a, [NF_N + 1]
@@ -2096,9 +2114,15 @@ nf_whole:   ld a, c
 .at:        ld [hl+], a
             dec b
             jr nz, .at
-            ld hl, $9800
-            call .fill                      ; GB map (LCD off)
-            ld a, e                         ; owners: all nametable 0 / all nametable 1
+            ld a, [VLCD]                    ; GB map (LCD off; masked: rebuilt when shown)
+            and a
+            jr z, .gm
+            ld a, 1
+            ld [MAP_RB], a
+            jr .gd
+.gm:        ld hl, $9800
+            call .fill
+.gd:        ld a, e                         ; owners: all nametable 0 / all nametable 1
             and a
             jr z, .o
             ld a, $FF
@@ -2137,6 +2161,43 @@ nf_whole:   ld a, c
             jr nz, .f
             dec b
             jr nz, .f
+            ret
+
+; CGB masked load shown: the GB map (rows 0-29) from the nametable shadows by owner (OWN),
+; each write in STAT mode 0 / 1 (the LCD is on). After bulk fills that skipped the map.
+maprb_b:    xor a
+            ld [MAP_RB], a
+            ld hl, $9800
+            ld de, OWN
+            ld b, 120                       ; 960 cells, 8 per owner byte
+.byte:      ld a, [de]
+            inc de
+            push de
+            ld c, a                         ; C = owner bits (bit 0 first)
+            ld e, 8
+.cell:      push hl
+            ld a, h                         ; shadow = NT_SH (+ $400: nametable 1) + offset
+            sub $98
+            srl c
+            jr nc, .n0
+            add a, 4
+.n0:        add a, high(NT_SH)
+            ld h, a
+            ld a, [hl]
+            pop hl
+            ldh [tmp_lo], a
+            di
+.wt:        ldh a, [$FF41]
+            bit 1, a
+            jr nz, .wt
+            ldh a, [tmp_lo]
+            ld [hl+], a
+            ei
+            dec e
+            jr nz, .cell
+            pop de
+            dec b
+            jr nz, .byte
             ret
 
 ; CGB, LCD off: every GB map cell's palette (VRAM bank 1, rows 0-29) from the attribute
@@ -2185,8 +2246,21 @@ repal_b:    xor a
             rrca
 .lf:        and 3
             pop hl
+            ldh [tmp_lo], a                 ; (LCD on, a masked load: in STAT mode 0 / 1)
+            ldh a, [$FF40]
+            bit 7, a
+            jr z, .wr
+            di
+.wt:        ldh a, [$FF41]
+            bit 1, a
+            jr nz, .wt
+            ldh a, [tmp_lo]
             ld [hl+], a
-            inc c
+            ei
+            jr .nx
+.wr:        ldh a, [tmp_lo]
+            ld [hl+], a
+.nx:        inc c
             dec e
             jr nz, .cell
             pop de
