@@ -2184,6 +2184,9 @@ def battle(rom):
     put(rom, 11, 0x9B6F, bytes([0x69, 48]), old=bytes([0x69, 0x2C]))
     put(rom, 11, 0xA102, bytes([0xA9, 156]), old=bytes([0xA9, 0xD0]))
     put(rom, 11, 0xA109, bytes([0xA9, 160]), old=bytes([0xA9, 0xE0]))
+    # big knock-back (b11:B11B: x to 240 in 4-px steps and back): to x 164, reached from both
+    # base x (156 / 160); x 240 is off the GB view (its right edge is NES x 180)
+    put(rom, 11, 0xB120, bytes([0xA9, 164]), old=bytes([0xA9, 0xF0]))
     # one BG pattern table: the menu area keeps table 1 (no switch at the split, fix:FD60
     # AND #$EF -> AND #$FF), the menu does not scroll (b12:9AC6 scroll menu -> RTS)
     put(rom, 31, 0xFD63, bytes([0xFF]), old=bytes([0xEF]))

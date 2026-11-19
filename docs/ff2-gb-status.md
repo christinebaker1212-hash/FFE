@@ -226,7 +226,11 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
 - DMG: at a battle start the bottom rows and the enemies are mis-shaded for ~55 frames
   (the shading re-codes the battle tiles 3 per frame after the fade-in palettes; NES and
   CGB show black there): for the DMG speed work.
-- Next: hit knock-back past the right edge, CGB battle-entry speed, GB tile upload latency.
+- Big knock-back (`b11:B11B`, x to 240 and back: off the GB view) goes to x 164 instead
+  (reached in 4-px steps from both base x; at most 4 px past the edge for a few frames).
+  The small shake (`b11:B131`, +4) puts the back row 4 px past the edge briefly (kept).
+  Random seed 1, 30000 frames: 29534 waits identical.
+- Next: CGB battle-entry speed, GB tile upload latency.
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 
