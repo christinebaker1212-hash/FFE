@@ -778,7 +778,11 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
     (`GBRUN_VRAM`) match the tile copy at every checkpoint.
   - Intro text flash; name entry window border; dialogue box opened / closed like the NES:
     built in the GB window layer, revealed line by line from FF1's split line `$1B`
-    (`dlg_cell`, `$5805`, `rt_dlgdelay`), map under it untouched (`dlgrest` reduced).
+    (`dlg_cell`, `$5805`, `rt_dlgdelay`), map under it untouched (`dlgrest` reduced). A
+    text of several pages opens the box at its first page break (FF1 prints page 1 before
+    its reveal; `$5806` lines shown, `dlg_st` keeps it open through FF1's opening).
+  - Checks after fresh coverage: 62 of 62 RAM checks identical (DMG + CGB); SameBoy VRAM =
+    tile copy at every checkpoint; 2-page test dialogue (`GB_DLG_TEST`) checked by eye.
   - SameBoy libretro core (owner allowed) for hardware-like checks: `GBRUN_CORE=build/
     sameboy_libretro.so build/gbrun ...` (build notes in `docs/gb-lessons.md`).
   - Lag (Gambatte, battle script 7000 waits): CGB +1.3%, DMG ~+4.5% (screen loads).
