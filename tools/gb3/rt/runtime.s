@@ -19,12 +19,14 @@ NES_RAM    = $C000          ; $0000-$07FF
 EX_RAM     = $C800          ; $5C00-$5FFF
 OAM_SH     = $CC00          ; GB shadow OAM (160 bytes)
 PAL_SH     = $CCA0          ; NES palette RAM (32)
-DBG        = $CCC0          ; fault info: code, HL, SP, stack top (16)
-VBL_CNT    = $CCD0          ; 16-bit count of GB frames (vblank interrupts)
-NMI_CNT    = $CCD2          ; 16-bit count of NES frame waits
-TEST_PAD   = $CCD4          ; $A5: test runner input mode (later)
 NT_SH      = $D000          ; NES nametables (2 x 1KB after mirroring), WRAM bank 1
-ATTR_SH    = $D800          ; GB map attributes (VRAM bank 1 $9800-$9BFF), 1KB, 16-aligned
+DBG        = $D820          ; fault info: code, HL, SP, stack top (16)  (the addresses FF1's
+NMI_CNT    = $D830          ; 16-bit count of NES frame waits             test runners read:
+VBL_CNT    = $D832          ; 16-bit count of GB frames                   tools/gb/gambatte/
+TEST_PAD   = $D83E          ; $A5: test runner input mode (later)         gbrun.c)
+DBG_RING   = $DE00          ; debug ring (256 bytes; gbrun GBRUN_DBG dumps it)
+DBG_RING_P = $D83F
+ATTR_SH    = $DC00          ; GB map attributes (VRAM bank 1 $9800-$9BFF), 1KB, 16-aligned
 DYN_BANK   = 127            ; ROM bank of the dynamic-target table (translate.py)
 LCDC_ON    = %10010011      ; LCD on, window map $9800 (off), BG/window tiles $8000 (unsigned),
                             ;   BG map $9800, 8x8 OBJ on, BG priority on
@@ -362,6 +364,13 @@ black_palettes:                             ; all CGB palettes black
 ; ------------------------------------------------------------------ frame waits
 ; wait for the next vblank (the NES NMI); A, F, BC, DE kept
 wait_vbl:   push af
+            ld hl, DBG_RING_P               ; (debug: LY at each wait entry -> ring $DE00)
+            ld a, [hl]
+            inc [hl]
+            ld l, a
+            ld h, high(DBG_RING)
+            ldh a, [rLY]
+            ld [hl], a
             xor a
             ldh [frame_tick], a
 .w:         halt
@@ -644,6 +653,8 @@ rt_ppu_w7:  push af                         ; $2007 write
             add a, h
             add a, high(NT_SH)
             ld h, a
+            ld a, [hl]                      ; (old value: attribute writes compare)
+            ldh [c_q], a
             ld [hl], c                      ; shadow
             pop hl
             ld a, h
@@ -781,58 +792,82 @@ rt_ppu_r7:  push af                         ; $2007 read (buffered; nametables f
             pop af
             ret
 
-; attribute byte A at index L (0-63) of nametable B: palettes of its 16 cells -> ATTR_SH
-; and VRAM bank 1. Keeps B, C.
+; attribute byte A at index L (0-63) of nametable B, old value in c_q: palettes of the
+; quadrants that changed -> ATTR_SH and VRAM bank 1 (two cells per access window). Keeps B, C.
 attr_apply: ldh [c_val], a
+            ld d, a
+            ldh a, [c_q]
+            xor d
+            ret z                           ; unchanged
+            ld d, a                         ; D = changed bits
             ld a, b
             ldh [c_nt], a
             ld a, l
             and 7
             add a, a
             add a, a
-            ldh [c_x], a                    ; first cell column
+            ldh [c_x], a                    ; first cell column of the block
             ld a, l
             and $38
             rrca
-            ldh [c_y], a                    ; first cell row (4 * (index >> 3))
-            ld d, 0                         ; D = row in the block (0-3)
-.row:       ldh a, [c_y]
-            add a, d
-            cp 30
-            jr nc, .next_row
-            ld e, 0                         ; E = column in the block
-.col:       ld a, d                         ; quadrant shift = (row & 2) * 2 + (col & 2)
-            and 2
-            add a, a
-            ld l, a
-            ld a, e
-            and 2
-            add a, l
-            ld l, a
-            ldh a, [c_val]
-.sh:        dec l
-            inc l
+            ldh [c_y], a                    ; first cell row
+            ld e, 0                         ; E = quadrant 0-3
+.q:         ld a, d
+            and 3
+            jr z, .nextq
+            push de
+            ldh a, [c_val]                  ; palette of quadrant E
+            ld d, e
+.sh:        dec d
+            inc d
             jr z, .got
             rrca
-            dec l
+            rrca
+            dec d
             jr .sh
 .got:       and 3
             ld l, a
             ldh a, [bg_bank]
             or l
-            ldh [c_q], a
-            push de                         ; GB map offset of the cell
-            ldh a, [c_y]
-            add a, d
+            ldh [c_q], a                    ; attribute value of the quadrant's cells
+            ld a, e                         ; cell row = y + 2 * (q >> 1)
+            and 2
             ld l, a
+            ldh a, [c_y]
+            add a, l
+            ld d, a                         ; D = row
+            ld a, e                         ; column = x + 2 * (q & 1)
+            and 1
+            add a, a
+            ld l, a
+            ldh a, [c_x]
+            add a, l
+            ld e, a                         ; E = column
+            call quad_row
+            inc d
+            call quad_row
+            pop de
+.nextq:     srl d
+            srl d
+            inc e
+            ld a, e
+            cp 4
+            jr c, .q
+            ldh a, [c_nt]
+            ld b, a
+            ret
+quad_row:   ld a, d                         ; cells (E, D) and (E + 1, D) of nametable c_nt
+            cp 30
+            ret nc
+            push de
+            ld l, d
             ld h, 0
             add hl, hl
             add hl, hl
             add hl, hl
             add hl, hl
-            add hl, hl                      ; row * 32
-            ldh a, [c_x]
-            add a, e
+            add hl, hl
+            ld a, e
             add a, l
             ld l, a
             ldh a, [c_nt]
@@ -843,20 +878,20 @@ attr_apply: ldh [c_val], a
             ld d, a
             ld e, l
             ldh a, [c_q]
-            ld [de], a                      ; shadow
-            call vput1
-            pop de
+            ld [de], a                      ; shadow (two cells)
             inc e
-            ld a, e
-            cp 4
-            jr c, .col
-.next_row:  inc d
-            ld a, d
-            cp 4
-            jr c, .row
-            ld d, 0
-            ld a, [c_nt]
-            ld b, a
+            ld [de], a
+            di
+            ld a, 1
+            ldh [rVBK], a
+.w:         ldh a, [rSTAT]
+            and 2
+            jr nz, .w
+            ldh a, [c_q]
+            ld [hl+], a
+            ld [hl], a
+            ei
+            pop de
             ret
 
 ; BG pattern table changed: set the bank bit of every attribute in the shadow, then the

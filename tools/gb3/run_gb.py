@@ -37,10 +37,10 @@ def main():
         pb.tick(1, f in shots)
         if f in shots:
             pb.screen.image.save(os.path.join(a.out, 'f%05d.png' % f))
-    dbg = S['DBG'][1] if 'DBG' in S else 0xCCC0
+    dbg = 0xD820
     m = pb.memory
     d = [m[dbg + i] for i in range(16)]
-    nmi = m[0xCCD2] | m[0xCCD3] << 8; vbl = m[0xCCD0] | m[0xCCD1] << 8
+    nmi = m[0xD830] | m[0xD831] << 8; vbl = m[0xD832] | m[0xD833] << 8
     print('frames %d: GB vblanks %d, NES frame waits %d' % (a.frames, vbl, nmi))
     print('DBG: code %02X HL %02X%02X SP %02X%02X ret %02X%02X bank %02X' % (d[0], d[2], d[1], d[4], d[3], d[6], d[5], d[7]))
     pb.stop(save=False)
