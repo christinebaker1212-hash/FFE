@@ -2608,12 +2608,14 @@ rt_farcall_ret:
             ld a, h
             ldh [code_bank], a
             ld [$2000], a
+            ldh a, [sv_a]
+            push af                         ; (A and flags pass back to the caller)
             ldh a, [nmi_req]                ; FF2: a battle NMI handler due: run it here
             and a
             jr nz, .nmi
-            ldh a, [sv_a]
+            pop af
             ret
-.nmi:       ldh a, [sv_a]
+.nmi:       pop af
             jp rt_nmi_run
 
 ; HL = NES address -> HL = GB address, fc_bank = GB bank (A, F, BC, DE kept).
