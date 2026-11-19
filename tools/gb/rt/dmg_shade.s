@@ -340,120 +340,12 @@ dmg_cell_e: ld e, a
 ; screens that do not use those buffers) MPB = the live palette (carry clear).
 ; Out: B = 1 if MPB changed. Keeps DE, HL.
 MPB        = SPR_DIRTY      ; (16; the CGB uses it for the sprite DMA marks only)
-dmg_target: push de
-            push hl
-            ldh a, [pro_mode]               ; the prologue: palettes 1-3 as palette 3 (its
-            and a                           ;   shown lines: the text white on black; lines
-            jr z, .np                       ;   appear as drawn, the page fades by the BGP)
-            ld hl, PAL_SH
-            ld de, MPB
-            ld b, 0
-            ld c, 0
-.pp:        ld a, c
-            cp 4
-            ld a, c
-            jr c, .p0
-            and 3
-            add a, 12
-.p0:        add a, low(PAL_SH)
-            ld l, a
-            ld a, [de]
-            cp [hl]
-            jr z, .ps
-            ld b, 1
-            ld a, [hl]
-            ld [de], a
-.ps:        inc e
-            inc c
-            ld a, c
-            cp 16
-            jr nz, .pp
-            pop hl
-            pop de
-            scf
-            ret
-.np:        ldh a, [in_battle]
-            and a
-            ld hl, NES_RAM + $3C0
-            jr z, .t
-            ld hl, $AD34                    ; ($6D34, cart RAM bank 0)
-.t:         push hl
-            ld de, PAL_SH
-            ld b, 16
-            ld c, 0                         ; C = target colours that are not black
-.ck:        ld a, e
-            and 3
-            jr nz, .c1
-            ld a, e
-            and a
-            jr nz, .nx                      ; (colour 0 of palettes 1-3: the backdrop)
-.c1:        ld a, [hl]
-            and $3F
-            call .blk
-            jr z, .tb
-            inc c
-.tb:        push bc
-            ld a, [hl]
-            and $3F
-            ld c, a                         ; C = target colour
-            ld a, [de]
-            and $3F
-            ld b, a                         ; B = live colour
-            cp c
-            jr z, .ok
-            call .blk
-            jr z, .ok                       ; (black)
-            xor c
-            and $0F
-            jr nz, .bad                     ; another hue
-            ld a, b
-            cp c
-            jr nc, .bad                     ; brighter
-.ok:        pop bc
-.nx:        inc hl
-            inc e
-            dec b
-            jr nz, .ck
-            pop hl                          ; a fade of the target (if it is not all black)
-            ld a, c
-            and a
-            jr z, .live
-            scf
-            jr .cp
-.bad:       pop bc
-            pop hl
-.live:      ld hl, PAL_SH
-            and a                           ; (carry clear)
-.cp:        push af
-            ld de, MPB
-            ld c, 16
-            ld b, 0
-.cl:        ld a, [de]
-            cp [hl]
-            jr z, .cs
-            ld b, 1
-            ld a, [hl]
-            ld [de], a
-.cs:        inc hl
-            inc e
-            dec c
-            jr nz, .cl
+dmg_target: push af                         ; (native in bank PF_BANK: dmg_target_b)
+            ld a, PF_BANK
+            ld [$2000], a
             pop af
-            pop hl
-            pop de
-            ret
-.blk:       cp $0F                          ; Z: an NES black (x0F, or xD-xF)
-            ret z
-            push af
-            and $0F
-            cp $0D
-            jr c, .nb
-            pop af
-            cp a
-            ret
-.nb:        pop af
-            or 1                            ; (NZ)
-            ret
+            call dmg_target_b
+            jp hle_back
 
 ; A = tile drawn with NES palette 3 (a dialogue box cell in the window): coded for it
 dmg_tile3:  push bc
@@ -828,6 +720,101 @@ izyrun0:    ldh [tmp_lo], a                 ; (zp)
             dec l                           ; Z = 1
             ret
 
+; ---- DMG sprite pages left in ROM by hle_chr_pages (whole pages): LZ_BM (cart RAM bank 3)
+; marks the tiles not yet in the shadow, LZ_SRC the ROM bank and address of each page.
+; A = sprite tile: copied into the shadow now if marked (the ROM bank: code_bank after).
+; Keeps all registers.
+spr_mat:    push af
+            push bc
+            push de
+            push hl
+            ld e, a
+            ldh a, [is_cgb]
+            and a
+            jr nz, .x
+            ld a, 3
+            ld [$4000], a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(LZ_BM)
+            ld l, a
+            ld h, high(LZ_BM)
+            ld a, e
+            and 7
+            ld b, 1
+            jr z, .bt
+.sh:        sla b
+            dec a
+            jr nz, .sh
+.bt:        ld a, [hl]
+            and b
+            jr z, .n
+            ld a, b
+            cpl
+            and [hl]
+            ld [hl], a
+            ld a, e                         ; source: the page's + (tile & 15) * 16
+            swap a
+            and $0F
+            add a, a
+            add a, a
+            add a, low(LZ_SRC)
+            ld l, a
+            ld a, [hl+]
+            ld d, a                         ; D = ROM bank
+            ld a, [hl+]
+            ld c, a
+            ld b, [hl]
+            ld a, e
+            and $0F
+            swap a
+            add a, c
+            ld c, a
+            jr nc, .nc
+            inc b
+.nc:        ld a, e                         ; HL = shadow $A000 + tile * 16
+            swap a
+            ld l, a
+            and $0F
+            add a, high(SPR_SHADOW)
+            ld h, a
+            ld a, l
+            and $F0
+            ld l, a
+            ld a, 1
+            ld [$4000], a
+            ld a, d
+            ld [$2000], a
+            ld e, 8                         ; plane 0 -> even bytes, plane 1 -> odd
+.p0:        ld a, [bc]
+            inc bc
+            ld [hl+], a
+            inc l
+            dec e
+            jr nz, .p0
+            ld a, l
+            sub 15
+            ld l, a
+            ld e, 8
+.p1:        ld a, [bc]
+            inc bc
+            ld [hl+], a
+            inc l
+            dec e
+            jr nz, .p1
+            ldh a, [code_bank]
+            ld [$2000], a
+.n:         xor a
+            ld [$4000], a
+.x:         pop hl
+            pop de
+            pop bc
+            pop af
+            ret
+
 ; dmg_maps: native in bank PF_BANK (dmg_maps_b)
 dmg_maps:   push af
             ld a, PF_BANK
@@ -980,7 +967,16 @@ bg_lmax_hl: push bc                         ; HL = 16 BG colours (page offset a 
             ret
 
 ; boot (DMG): PAL_MAP identity, full brightness reference
-dmg_init:   ld hl, CODED                    ; no tile coded yet
+dmg_init:   ld a, 3                         ; no sprite page left in ROM (LZ_BM)
+            ld [$4000], a
+            ld hl, LZ_BM
+            xor a
+            ld b, 32
+.lz:        ld [hl+], a
+            dec b
+            jr nz, .lz
+            ld [$4000], a
+            ld hl, CODED                    ; no tile coded yet
             ld a, $FF
 .cd:        ld [hl+], a
             inc l
@@ -1067,134 +1063,21 @@ dmg_scan_all:                               ; (native: scan_b, bank PF_BANK)
             call scan_b
             jp hle_back
 
-; LCD going on after a scan: re-code the marked tiles the map uses; the others are
-; parked in DEFER_BM (dmg_cell marks them again when a cell uses them)
-dmg_retile_ref:
+; LCD off, going on: re-code marked tiles in one pass (rtb_b, bank PF_BANK): A = 0 all,
+; A = 1 those the map uses (the others parked)
+dmg_retile_lcd:
             push bc
             push de
             push hl
-            ld e, 0                         ; bitmap byte
-.b:         ld l, e
-            ld h, high(DIRTY_BM)
-            ld a, e
-            add a, low(REF_BM)
-            ld c, a
-            ld b, high(REF_BM)
-            ld a, [bc]                      ; marked tiles the map does not use: parked
-            cpl                             ;   (DEFER_BM) until a cell uses them
-            and [hl]
-            push hl
             push af
-            ld a, e
-            add a, low(DEFER_BM)
-            ld l, a
-            ld h, high(DEFER_BM)
+            ld a, PF_BANK
+            ld [$2000], a
             pop af
-            or [hl]
-            ld [hl], a
-            pop hl
-            ld a, [bc]
-            and [hl]
-            ld [hl], 0                      ; no longer marked
-            jr z, .n
-            ld d, a                         ; bits to do
-            ld c, 0
-.k:         srl d
-            jr nc, .kn
-            push de
-            ld a, e
-            add a, a
-            add a, a
-            add a, a
-            or c
-            call retile
-            pop de
-.kn:        inc c
-            ld a, d
-            and a
-            jr nz, .k
-.n:         inc e
-            ld a, e
-            cp 32
-            jr nz, .b
+            call rtb_b
             pop hl
             pop de
             pop bc
-            ret
-
-; DMG sprites: two fixed OBJ palettes, OBP0 = black / dark grey / white and OBP1 = dark
-; grey / light grey / white (values 1 / 2 / 3). Each NES sprite palette takes OBP0 if one
-; of its colours is black, else OBP1, and codes its indices by their shades (SPAL_KEY);
-; the sprite slots are loaded again with that coding when the OAM is converted.
-spr_maps:   push bc
-            push de
-            push hl
-            ld c, 0
-.p:         ld a, c
-            add a, a
-            add a, a
-            add a, low(PAL_SH) + $11
-            ld l, a
-            ld h, high(PAL_SH)
-            ld de, RT_BUF + 8               ; shades of indices 1-3; D... flags black
-            ld b, 3
-.i:         ld a, [hl+]
-            call lum
-            call lum_shade
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .i
-            ld hl, RT_BUF + 8               ; any black (3)? -> OBP0 table, else OBP1
-            ld de, SPR_VAL_B
-            ld b, 3
-.bk:        ld a, [hl+]
-            cp 3
-            jr nz, .bn
-            ld de, SPR_VAL_A
-.bn:        dec b
-            jr nz, .bk
-            ld hl, RT_BUF + 10              ; key = v1 | v2 << 2 | v3 << 4 (+ $40: OBP1)
-            ld b, 0
-            ld a, 3
-.kv:        push af
-            ld a, [hl-]
-            push de
-            add a, e
-            ld e, a
-            jr nc, .kc
-            inc d
-.kc:        ld a, [de]
-            pop de
-            sla b
-            sla b
-            or b
-            ld b, a
-            pop af
-            dec a
-            jr nz, .kv
-            ld a, e                         ; OBP1 table: bit 6
-            cp low(SPR_VAL_B)
-            jr nz, .ka
-            ld a, d
-            cp high(SPR_VAL_B)
-            jr nz, .ka
-            set 6, b
-.ka:        ld a, c
-            add a, low(SPAL_KEY)
-            ld l, a
-            ld h, high(SPAL_KEY)
-            ld [hl], b
-            inc c
-            ld a, c
-            cp 4
-            jr nz, .p
-            pop hl
-            pop de
-            pop bc
-            ret
-SPR_VAL_A:  db 3, 2, 2, 1                   ; shade (white .. black) -> value, OBP0
-SPR_VAL_B:  db 3, 2, 1, 1                   ;   OBP1
+            jp hle_back
 
 ; obp0_v / obp1_v from the fixed shades, darkened by fade_drop
 dmg_obp:    push bc

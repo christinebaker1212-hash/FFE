@@ -13,6 +13,8 @@ QL         = $CE00
 QV         = $CF00
 NT_SH      = $D000          ; NES nametable shadow (2 × 1KB, vertical mirroring)
 PAL_SH     = $D800          ; NES palette RAM shadow (32)
+LZ_BM      = $A600          ; (cart RAM bank 3) DMG sprite tiles still in ROM (32), spr_mat
+LZ_SRC     = $A620          ;   16 x (bank, address lo, hi, -)
 DBG        = $D820          ; fault info: code, HL, SP, stack top
 SPR_SLOT   = $D900          ; NES sprite tile (0-255) -> GB slot 0-127, $FF = not resident
 SLOT_TILE  = $DA00          ; GB slot -> NES sprite tile ($FF = free)
@@ -1811,10 +1813,11 @@ rt_ppu_w1:  push af
             ldh a, [pro_mode]               ; (the prologue: every marked tile now, its rows
             and a                           ;   appear one by one later)
             jr nz, .nsr
-            call dmg_retile_ref
+            ld a, 1
+            call dmg_retile_lcd
             jr .lon
-.nsr:       ld b, 0
-            call dmg_retile_some
+.nsr:       xor a
+            call dmg_retile_lcd
 .lon:       ldh a, [is_cgb]                 ; CGB: cell palettes if owners changed, the tile
             and a                           ;   copy for HDMA from VRAM
             jr z, .lo2
@@ -2075,6 +2078,18 @@ rt_ppu_w7g: push af
             ld h, a
             jr .vram
 .spr:       ; sprite table: write the shadow (RAM bank 1); the slot too if the tile is resident
+            push af                         ; (a tile still in ROM: to the shadow first)
+            push hl
+            and $0F
+            swap a
+            ld b, a
+            ld a, l
+            swap a
+            and $0F
+            or b
+            call spr_mat
+            pop hl
+            pop af
             and $0F
             ld b, a                         ; tile high nibble
             add a, high(SPR_SHADOW)
@@ -2434,6 +2449,8 @@ spr_load:   push af
             ldh [sp_s0], a
             ld a, e
             ldh [sp_s1], a
+            ldh a, [o_t]                    ; (still in ROM: to the shadow first)
+            call spr_mat
             ldh a, [o_t]                    ; DE = shadow $A000 + tile * 16 (RAM bank 1)
             swap a
             ld b, a

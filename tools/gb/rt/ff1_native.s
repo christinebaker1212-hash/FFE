@@ -2870,6 +2870,8 @@ sprload_b:  push af
             call rt_anf
             push bc
             call blk_alloc                  ; DE = block
+            ldh a, [o_t]                    ; (still in ROM: to the shadow first)
+            call spr_mat
             ldh a, [o_t]                    ; HL = shadow $A000 + tile * 16 (RAM bank 1)
             swap a
             ld b, a
@@ -6096,9 +6098,8 @@ scan_b:     push bc
 .z:         ld [hl+], a
             dec b
             jr nz, .z
-            ld hl, SC_NP
-            ld a, $FF
-.f:         ld [hl+], a
+            ld hl, SC_NP                    ; (SC_NP: the palettes each tile is drawn with,
+.f:         ld [hl+], a                     ;   bit p; bit 7: the view's palette)
             dec b
             jr nz, .f
             ldh a, [own1_lo]                ; one palette for the whole screen (no cell drawn
@@ -6128,6 +6129,7 @@ scan_b:     push bc
             ld h, high(NBIT60)
             ld a, [hl]
             ld [PAL_USED], a
+            ld b, a                         ; (as a palette bit)
             ld hl, NT_SH
             ld d, high(SC_NP)
             ld c, 240                       ; 960 cells, 4 per pass
@@ -6170,16 +6172,33 @@ scan_b:     push bc
             srl a
             srl a
             ld [SC_VC], a
-            ld d, 0                         ; every cell, rows 0-29
-.r:         call scn_tab                    ;   (then the view's cells again: they win for a
-            call scn_rowf                   ;   tile drawn with two palettes)
+            xor a
+            ld [PAL_USED], a
+            ld d, 0                         ; every cell, rows 0-29: SC_NP |= its palette;
+.r:         call scn_tab                    ;   the view's rows: PAL_USED
+            call scn_rowf
+            ld a, [SC_VR]                   ; (view row: (D - VR) mod 30 < 18)
+            ld b, a
+            ld a, d
+            sub b
+            jr nc, .vd
+            add a, 30
+.vd:        cp 18
+            call c, scn_pu
             inc d
             ld a, d
             cp 30
             jr nz, .r
-            xor a
-            ld [PAL_USED], a
-            ld a, [SC_VR]
+            ld hl, SC_NP                    ; a tile drawn with two palettes: the view's
+.cf:        ld a, [hl]                      ;   cells decide (the last one), as before
+            ld b, a
+            dec a
+            and b
+            jr nz, .cv
+            inc l
+            jr nz, .cf
+            jr .settle
+.cv:        ld a, [SC_VR]
             ld d, a
             ld b, 18
 .vr:        push bc
@@ -6198,9 +6217,12 @@ scan_b:     push bc
 .t:         ld l, e                         ;   than it is coded for: TILE_PAL, marked; the
             ld h, high(SC_NP)               ;   same palette but parked: marked again
             ld a, [hl]
-            cp $FF
-            jr z, .tn
-            ld b, a
+            and $0F                         ; (palette bits -> palette: the view's, else
+            jr z, .tn                       ;   the lowest)
+            add a, low(SC_LOG)
+            ld l, a
+            ld h, high(SC_LOG)
+            ld b, [hl]
             ld a, e
             and 7
             ld l, a
@@ -6267,8 +6289,8 @@ scan_b:     push bc
 
 ; scan_b, map row D: SC_TL / SC_TH (tile row offset, page of nametable 0) and SP_T[nt * 16
 ; + pair] = the palette of columns 2 * pair, + 1 in nametable nt. Keeps DE.
-scn_tab:    push de
-            ld a, d
+scn_tab:    push de                         ; SP_T entries as palette bits (SC_TBL: nibble ->
+            ld a, d                         ;   bit of its low / high 2-bit field)
             and 7
             swap a
             add a, a
@@ -6286,385 +6308,387 @@ scn_tab:    push de
             ld l, a
             ld bc, SP_T
             bit 1, d
+            ld d, high(SC_TBL)
             jr nz, .s
             ld h, high(NT_SH) + 3
             push hl
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             pop hl
             ld h, high(NT_SH) + 7
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             pop de
             ret
-.s:         ld h, high(NT_SH) + 3           ; (bottom half of the attribute bytes)
+.s:
+            ld h, high(NT_SH) + 3
             push hl
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             pop hl
             ld h, high(NT_SH) + 7
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             ld a, [hl+]
             swap a
+            and $0F
             ld e, a
-            and 3
+            ld a, [de]
             ld [bc], a
             inc c
-            ld a, e
-            rrca
-            rrca
-            and 3
+            inc d
+            ld a, [de]
             ld [bc], a
             inc c
+            dec d
             pop de
             ret
 
@@ -6700,53 +6724,87 @@ scn_rowf:   ld e, 0
             jr .uf
 .u1:        ld c, 16
 .uf:        push de
-            ld a, [SC_TH]
-            bit 4, c
-            jr z, .p0
-            add a, 4
-.p0:        ld h, a
-            ld a, [SC_TL]
-            or e
-            ld l, a
             ld a, e
             srl a
             add a, c
             add a, low(SP_T)
-            ld c, a
-            ld b, high(SP_T)
-            ld d, high(SC_NP)
-            ld a, [bc]
-            inc c
-            ld e, [hl]
-            inc l
-            ld [de], a
-            ld e, [hl]
-            inc l
-            ld [de], a
-            ld a, [bc]
-            inc c
-            ld e, [hl]
-            inc l
-            ld [de], a
-            ld e, [hl]
-            inc l
-            ld [de], a
-            ld a, [bc]
-            inc c
-            ld e, [hl]
-            inc l
-            ld [de], a
-            ld e, [hl]
-            inc l
-            ld [de], a
-            ld a, [bc]
-            inc c
-            ld e, [hl]
-            inc l
-            ld [de], a
-            ld e, [hl]
-            inc l
-            ld [de], a
+            ld b, a                         ; B = SP_T low
+            ld a, [SC_TH]
+            bit 4, c
+            jr z, .p0
+            add a, 4
+.p0:        ld d, a
+            ld a, [SC_TL]
+            or e
+            ld e, a                         ; DE = the tiles
+            ld l, b
+            ld h, high(SP_T)
+            ld c, [hl]
+            inc b
+            ld h, high(SC_NP)
+            ld a, [de]
+            inc e
+            ld l, a
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ld a, [de]
+            inc e
+            ld l, a
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ld l, b
+            ld h, high(SP_T)
+            ld c, [hl]
+            inc b
+            ld h, high(SC_NP)
+            ld a, [de]
+            inc e
+            ld l, a
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ld a, [de]
+            inc e
+            ld l, a
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ld l, b
+            ld h, high(SP_T)
+            ld c, [hl]
+            inc b
+            ld h, high(SC_NP)
+            ld a, [de]
+            inc e
+            ld l, a
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ld a, [de]
+            inc e
+            ld l, a
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ld l, b
+            ld h, high(SP_T)
+            ld c, [hl]
+            inc b
+            ld h, high(SC_NP)
+            ld a, [de]
+            inc e
+            ld l, a
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ld a, [de]
+            inc e
+            ld l, a
+            ld a, [hl]
+            or c
+            ld [hl], a
             pop de
             ld a, e
             add a, 8
@@ -6756,11 +6814,12 @@ scn_rowf:   ld e, 0
             jr nz, .g
             ret
 
-; scan_b: view row D (scn_tab done), its 20 columns from SC_VC: SC_NP[tile] = palette,
-; PAL_USED gets each palette; owner bits fetched again at each 8-column boundary
+; scan_b: view row D (scn_tab done), only when a tile is drawn with two palettes: its 20
+; columns from SC_VC; a tile drawn with two palettes gets the view cell's ($80 | bit; the
+; last view cell wins). Keeps D.
 scn_rowv:   ld a, [SC_VC]
             ld e, a
-            call .ob
+            call scn_ob
             ld b, 20
 .c:         push bc
             srl c                           ; owner: carry
@@ -6781,18 +6840,24 @@ scn_rowv:   ld a, [SC_VC]
             add a, low(SP_T)
             ld l, a
             ld h, high(SP_T)
-            ld b, [hl]                      ; palette
+            ld b, [hl]                      ; palette bit
             pop af
             ld l, a
             ld h, high(SC_NP)
-            ld [hl], b
-            ld l, b
-            ld h, high(NBIT60)
             ld a, [hl]
-            ld hl, PAL_USED
-            or [hl]
+            bit 7, a
+            jr nz, .w
+            and $0F
+            push bc
+            ld b, a
+            dec a
+            and b
+            pop bc
+            jr z, .nw
+.w:         ld a, b
+            or $80
             ld [hl], a
-            ld a, c
+.nw:        ld a, c
             pop bc
             ld c, a
             ld a, e
@@ -6800,11 +6865,46 @@ scn_rowv:   ld a, [SC_VC]
             and 31
             ld e, a
             and 7
-            call z, .ob
+            call z, scn_ob
             dec b
             jr nz, .c
             ret
-.ob:        ld a, d                         ; C = owner bits from column E on
+
+; scan_b: view row D (scn_tab done): PAL_USED gets the palette of each of its 20 view
+; cells (by owner). Keeps D.
+scn_pu:     ld a, [SC_VC]
+            ld e, a
+            call scn_ob
+            xor a
+            ldh [sh_u1], a
+            ld b, 20
+.c:         ld a, e
+            srl a
+            add a, low(SP_T)
+            srl c
+            jr nc, .o
+            add a, 16
+.o:         ld l, a
+            ld h, high(SP_T)
+            ldh a, [sh_u1]
+            or [hl]
+            ldh [sh_u1], a
+            ld a, e
+            inc a
+            and 31
+            ld e, a
+            and 7
+            call z, scn_ob
+            dec b
+            jr nz, .c
+            ld hl, PAL_USED
+            ldh a, [sh_u1]
+            or [hl]
+            ld [hl], a
+            ret
+
+; C = owner bits of map row D from column E on (bit 0: column E)
+scn_ob:     ld a, d
             add a, a
             add a, a
             ld l, a
@@ -6866,6 +6966,7 @@ scn_c:      push de
             ld a, [hl]
             ld l, b
             ld h, high(SC_NP)
+            or [hl]
             ld [hl], a
             pop de
             ret
@@ -7199,7 +7300,7 @@ pf2_b:      push af
             pop af
             and a
             ret nz
-            ld [TU_SP], sp                  ; rows by POP (p0 in E, p1 in D), interrupts off:
+.use:       ld [TU_SP], sp                  ; rows by POP (p0 in E, p1 in D), interrupts off:
             di                              ;   B |= p0 & ~p1, C |= p1 & ~p0, H |= p0 & p1
             ld sp, hl
             ld bc, 0
@@ -7367,5 +7468,387 @@ pf2_b:      push af
             push bc
             ret
 
+dmg_target_b: push de
+            push hl
+            ldh a, [pro_mode]               ; the prologue: palettes 1-3 as palette 3 (its
+            and a                           ;   shown lines: the text white on black; lines
+            jr z, .np                       ;   appear as drawn, the page fades by the BGP)
+            ld hl, PAL_SH
+            ld de, MPB
+            ld b, 0
+            ld c, 0
+.pp:        ld a, c
+            cp 4
+            ld a, c
+            jr c, .p0
+            and 3
+            add a, 12
+.p0:        add a, low(PAL_SH)
+            ld l, a
+            ld a, [de]
+            cp [hl]
+            jr z, .ps
+            ld b, 1
+            ld a, [hl]
+            ld [de], a
+.ps:        inc e
+            inc c
+            ld a, c
+            cp 16
+            jr nz, .pp
+            pop hl
+            pop de
+            scf
+            ret
+.np:        ldh a, [in_battle]
+            and a
+            ld hl, NES_RAM + $3C0
+            jr z, .t
+            ld hl, $AD34                    ; ($6D34, cart RAM bank 0)
+.t:         push hl
+            ld de, PAL_SH
+            ld b, 16
+            ld c, 0                         ; C = target colours that are not black
+.ck:        ld a, e
+            and 3
+            jr nz, .c1
+            ld a, e
+            and a
+            jr nz, .nx                      ; (colour 0 of palettes 1-3: the backdrop)
+.c1:        ld a, [hl]
+            and $3F
+            call .blk
+            jr z, .tb
+            inc c
+.tb:        push bc
+            ld a, [hl]
+            and $3F
+            ld c, a                         ; C = target colour
+            ld a, [de]
+            and $3F
+            ld b, a                         ; B = live colour
+            cp c
+            jr z, .ok
+            call .blk
+            jr z, .ok                       ; (black)
+            xor c
+            and $0F
+            jr nz, .bad                     ; another hue
+            ld a, b
+            cp c
+            jr nc, .bad                     ; brighter
+.ok:        pop bc
+.nx:        inc hl
+            inc e
+            dec b
+            jr nz, .ck
+            pop hl                          ; a fade of the target (if it is not all black)
+            ld a, c
+            and a
+            jr z, .live
+            scf
+            jr .cp
+.bad:       pop bc
+            pop hl
+.live:      ld hl, PAL_SH
+            and a                           ; (carry clear)
+.cp:        push af
+            ld de, MPB
+            ld c, 16
+            ld b, 0
+.cl:        ld a, [de]
+            cp [hl]
+            jr z, .cs
+            ld b, 1
+            ld a, [hl]
+            ld [de], a
+.cs:        inc hl
+            inc e
+            dec c
+            jr nz, .cl
+            pop af
+            pop hl
+            pop de
+            ret
+.blk:       cp $0F                          ; Z: an NES black (x0F, or xD-xF)
+            ret z
+            push af
+            and $0F
+            cp $0D
+            jr c, .nb
+            pop af
+            cp a
+            ret
+.nb:        pop af
+            or 1                            ; (NZ)
+            ret
+
+; DMG sprites: two fixed OBJ palettes, OBP0 = black / dark grey / white and OBP1 = dark
+; grey / light grey / white (values 1 / 2 / 3). Each NES sprite palette takes OBP0 if one
+; of its colours is black, else OBP1, and codes its indices by their shades (SPAL_KEY);
+; the sprite slots are loaded again with that coding when the OAM is converted.
+spr_maps:   push bc
+            push de
+            push hl
+            ld c, 0
+.p:         ld a, c
+            add a, a
+            add a, a
+            add a, low(PAL_SH) + $11
+            ld l, a
+            ld h, high(PAL_SH)
+            ld de, RT_BUF + 8               ; shades of indices 1-3; D... flags black
+            ld b, 3
+.i:         ld a, [hl+]
+            call lum
+            call lum_shade
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .i
+            ld hl, RT_BUF + 8               ; any black (3)? -> OBP0 table, else OBP1
+            ld de, SPR_VAL_B
+            ld b, 3
+.bk:        ld a, [hl+]
+            cp 3
+            jr nz, .bn
+            ld de, SPR_VAL_A
+.bn:        dec b
+            jr nz, .bk
+            ld hl, RT_BUF + 10              ; key = v1 | v2 << 2 | v3 << 4 (+ $40: OBP1)
+            ld b, 0
+            ld a, 3
+.kv:        push af
+            ld a, [hl-]
+            push de
+            add a, e
+            ld e, a
+            jr nc, .kc
+            inc d
+.kc:        ld a, [de]
+            pop de
+            sla b
+            sla b
+            or b
+            ld b, a
+            pop af
+            dec a
+            jr nz, .kv
+            ld a, e                         ; OBP1 table: bit 6
+            cp low(SPR_VAL_B)
+            jr nz, .ka
+            ld a, d
+            cp high(SPR_VAL_B)
+            jr nz, .ka
+            set 6, b
+.ka:        ld a, c
+            add a, low(SPAL_KEY)
+            ld l, a
+            ld h, high(SPAL_KEY)
+            ld [hl], b
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .p
+            pop hl
+            pop de
+            pop bc
+            ret
+SPR_VAL_A:  db 3, 2, 2, 1                   ; shade (white .. black) -> value, OBP0
+SPR_VAL_B:  db 3, 2, 1, 1                   ;   OBP1
+
+
+; ---- DMG, LCD off (rt_ppu_w1 turning it on): the marked tiles re-coded straight into VRAM
+; in one pass. A = 0: every marked tile (dmg_retile_some 0); A = 1: those the map uses
+; (REF_BM), the others parked in DEFER_BM (dmg_retile_ref). The same codings, keys
+; (CODED) and TILE_USE as retile_b.
+RB_S       = $DC30          ; (RT_BUF) per palette: S0 = indices whose value has bit 0 (4), S1 (4)
+rtb_b:      ldh [sh_u3], a
+            ld hl, PAL_MAP                  ; S0 / S1 of the four palettes
+            ld c, 0
+.pp:        ld de, $0001                    ; D = S0, E = bit
+            ld b, 0                         ; B = S1
+.pi:        ld a, [hl+]
+            rrca
+            jr nc, .p0
+            push af
+            ld a, d
+            or e
+            ld d, a
+            pop af
+.p0:        rrca
+            jr nc, .p1
+            ld a, b
+            or e
+            ld b, a
+.p1:        sla e
+            bit 4, e
+            jr z, .pi
+            push hl
+            ld a, c
+            add a, low(RB_S)
+            ld l, a
+            ld h, high(RB_S)
+            ld [hl], d
+            ld a, l
+            add a, 4
+            ld l, a
+            ld [hl], b
+            pop hl
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .pp
+            ld e, 0                         ; bitmap byte
+.byte:      ld l, e
+            ld h, high(DIRTY_BM)
+            ld a, [hl]
+            and a
+            jr z, .nb
+            ld [hl], 0
+            ld d, a
+            ldh a, [sh_u3]
+            and a
+            jr z, .all
+            ld a, e                         ; (the map's tiles; the others parked)
+            add a, low(REF_BM)
+            ld l, a
+            ld h, high(REF_BM)
+            ld b, [hl]
+            ld a, b
+            cpl
+            and d
+            jr z, .np
+            ld c, a
+            ld a, e
+            add a, low(DEFER_BM)
+            ld l, a
+            ld h, high(DEFER_BM)
+            ld a, c
+            or [hl]
+            ld [hl], a
+.np:        ld a, d
+            and b
+            ld d, a
+.all:       ld a, e
+            add a, a
+            add a, a
+            add a, a
+            ld c, a                         ; C = tile of bit 0
+.bit:       srl d
+            jr nc, .bn
+            push bc
+            push de
+            ld a, c
+            call .one
+            pop de
+            pop bc
+.bn:        inc c
+            ld a, d
+            and a
+            jr nz, .bit
+.nb:        inc e
+            ld a, e
+            cp 32
+            jr nz, .byte
+            xor a
+            ldh [rq_any], a
+            ret
+.one:       ldh [sh_tile], a                ; tile A
+            swap a                          ; HL = shadow tile (RAM bank 1)
+            ld l, a
+            and $0F
+            add a, high(BG_SHADOW)
+            ld h, a
+            ld a, l
+            and $F0
+            ld l, a
+            ld a, 1
+            ld [$4000], a
+            ldh a, [sh_tile]
+            ld e, a
+            ld d, high(CODED)
+            ld a, [de]
+            inc a
+            jr nz, .k
+            push hl                         ; written since its last coding: TILE_USE first
+            xor a
+            call pf2_b.use
+            pop hl
+.k:         ldh a, [sh_tile]                ; key = (u & S1) << 4 | (u & S0), u = TILE_USE | 1
+            ld e, a
+            ld d, high(TILE_PAL)
+            ld a, [de]
+            add a, low(RB_S)
+            ld c, a
+            ld b, high(RB_S)
+            ld a, [bc]
+            ldh [sh_s0], a
+            ld a, c
+            add a, 4
+            ld c, a
+            ld a, [bc]
+            ldh [sh_s1], a
+            ld a, e
+            srl a
+            add a, low(TILE_USE)
+            ld c, a
+            ld b, high(TILE_USE)
+            ld a, [bc]
+            bit 0, e
+            jr z, .lo
+            swap a
+.lo:        and $0F
+            or 1
+            ld b, a
+            ldh a, [sh_s1]
+            and b
+            swap a
+            ld c, a
+            ldh a, [sh_s0]
+            and b
+            or c
+            ld d, high(CODED)
+            ld b, a                         ; B = key
+            ld a, [de]
+            cp b
+            jr z, .done
+            ld a, b
+            ld [de], a
+            ld a, e                         ; DE = VRAM tile ($9000 + t * 16 for 0-127,
+            swap a                          ;   $8000 + t * 16 above)
+            ld c, a
+            and $0F
+            bit 7, e
+            jr nz, .hi
+            add a, $90
+            jr .dd
+.hi:        add a, $80
+.dd:        ld d, a
+            ld a, c
+            and $F0
+            ld e, a
+            push hl
+            push de
+            ldh a, [sh_s0]
+            call pf2_b.pf
+            pop de
+            pop hl
+            inc e
+            ldh a, [sh_s1]
+            call pf2_b.pf
+.done:      xor a
+            ld [$4000], a
+            ret
+
 section bank PF_BANK, $7F00
 NBIT60:     db 1, 2, 4, 8, 16, 32, 64, 128
+
+; scan_b tables: SC_TBL[n] = bit of n's low field, SC_TBL + $100: of its high field;
+; SC_LOG[bits] = the palette (the lowest bit)
+section bank PF_BANK, $7D00
+SC_TBL:     db 1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 8, 1, 2, 4, 8
+section bank PF_BANK, $7E00
+            db 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 8, 8, 8, 8
+section bank PF_BANK, $7E40
+SC_LOG:     db 0, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0

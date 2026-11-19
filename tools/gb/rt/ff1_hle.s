@@ -69,9 +69,49 @@ hle_chr_pages:
             ld a, 2
             ldh [$FF70], a
             jr .ft
-.fs:        and $0F                         ; a whole sprite page: to the sprite shadow
-            add a, high(SPR_SHADOW)         ;   (RAM bank 1); its resident slots reloaded
-            ld d, a                         ;   by the next OAM conversion
+.fs:        ld b, a                         ; a whole sprite page: DMG: left in ROM (bank,
+            ldh a, [is_cgb]                 ;   address in LZ_SRC, its tiles marked in LZ_BM:
+            and a                           ;   spr_mat copies a tile to the shadow when a slot
+            ld a, b                         ;   load or a write needs it); CGB: to the sprite
+            jr nz, .fsc                     ;   shadow (RAM bank 1). Its resident slots
+            and $0F                         ;   reloaded by the next OAM conversion
+            ld e, a
+            ld a, 3
+            ld [$4000], a
+            ld a, e
+            add a, a
+            add a, a
+            add a, low(LZ_SRC)
+            ld c, a
+            ld b, high(LZ_SRC)
+            ldh a, [data_bank8]
+            ld [bc], a
+            inc c
+            ld a, l
+            ld [bc], a
+            inc c
+            ld a, h
+            ld [bc], a
+            ld a, e
+            add a, a
+            add a, low(LZ_BM)
+            ld c, a
+            ld a, $FF
+            ld [bc], a
+            inc c
+            ld [bc], a
+            xor a
+            ld [$4000], a
+            ld bc, 255                      ; (A = the page's last byte)
+            add hl, bc
+            ld a, [hl]
+            ld bc, 0                        ; (Y = 0)
+            ldh [tmp_lo], a
+            ldh a, [ppu_vh]
+            jr .fsm
+.fsc:       and $0F
+            add a, high(SPR_SHADOW)
+            ld d, a
             ld e, 0
             jr .fb
 .fd:        ldh a, [lcd_on]
@@ -266,7 +306,20 @@ hle_chr_pages:
             ldh [$FF70], a
             jr .copy                        ; (this jump was missing: the tile went over the
                                             ;   sprite shadow and WRAM bank 2 stayed selected)
-.spr:       and $0F                         ; sprite table -> shadow (RAM bank 1)
+.spr:       push af                         ; (a tile still in ROM: to the shadow first)
+            and $0F
+            swap a
+            push bc
+            ld b, a
+            ld a, e
+            swap a
+            or b                            ; tile = (vh & $0F) << 4 | vl >> 4
+            pop bc
+            call spr_mat
+            ldh a, [data_bank8]
+            ld [$2000], a
+            pop af
+            and $0F                         ; sprite table -> shadow (RAM bank 1)
             add a, high(SPR_SHADOW)
             ld d, a
             ld a, 1
