@@ -42,14 +42,21 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   `$0100` (the NMI jump stub).
 - Plan for the owner: `docs/ff2-gb-plan.md`.
 
+## Owner's decisions (2026-11-19)
+- **Select menu:** Select on the field opens the new menu (OPTIONS / FORMATION / SUSPEND);
+  FORMATION is the row screen Select opens on the Famicom; B+Select keeps the minimap.
+- **Approach approved** as in `docs/ff2-gb-plan.md` §3: mechanical translation of the
+  generated source, native GB routines for graphics / sound / hot paths, re-layouts on
+  the NES side (equivalence stays checkable).
+
 ## In progress
-- Waiting for the owner: Select-menu opening (proposal: Select = new menu, FORMATION = the
-  row screen Select opens now, B+Select keeps the minimap) and OK for the approach.
+- Milestone 4: translator (`tools/gb2/translate.py`) and runtime (`tools/gb2/rt/`), boot
+  to the title in PyBoy and Gambatte.
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
-2. English patch → source mapping: written up in the plan (owner to confirm).
-3. 6502 → SM83 path: plan written; owner's OK needed before large builds.
+2. ~~English patch → source mapping~~ (plan §2, approved).
+3. ~~6502 → SM83 path~~ (plan §3, approved).
 4. Boot to title (PyBoy, Gambatte), new game, field, battle; equivalence vs NES;
    re-layouts with mock-ups; colour (CGB, DMG shading, SGB); Select menu + suspend
    points; builder.

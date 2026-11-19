@@ -1,4 +1,4 @@
-# FF2 on the Game Boy: plan (for the owner's OK)
+# FF2 on the Game Boy: plan (approved by the owner 2026-11-19)
 
 Status and setup: `docs/ff2-gb-status.md`. Targets and rules: `docs/ff2-gb-brief.md`.
 
@@ -104,7 +104,7 @@ shadows, saves, suspend point).
 5. Select menu and suspend points.
 6. The builder.
 
-## 4. Questions for the owner
+## 4. Questions for the owner (answered 2026-11-19: both as proposed)
 1. **Select menu.** On FF2's field, Select alone opens the row (formation) screen, and
    B+Select opens the world minimap once the party has the key item. Proposal:
    - Select opens the new menu: OPTIONS / FORMATION (that same row screen) / SUSPEND;
