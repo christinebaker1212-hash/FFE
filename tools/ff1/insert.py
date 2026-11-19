@@ -1000,7 +1000,7 @@ def menu_engine(rom, report):
     LABELS_EX.update(L)
     DLG_LABEL[0] = L['dlgbank']
     init = asm(INIT_SRC, syms={'CODE2': CODE_BANK * 2})
-    assert init.org + len(init.bytes) <= 0xDD90      # dakuten tables $DD47-$DDAA (unused in English; GB shop stub at $DD90)
+    assert init.org + len(init.bytes) <= 0xDD78      # dakuten tables $DD47-$DDAA (unused in English; GB stubs from $DD78)
     put(rom, init.org, init.bytes)
     # PRG mode 2: $8000 16KB ($5115, as the game uses it), $C000 8KB ($5116, normally
     # the first half of the fixed bank; the far-code bank is mapped there by farjsr),
