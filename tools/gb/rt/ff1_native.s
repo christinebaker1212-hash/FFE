@@ -2808,7 +2808,56 @@ scan_b:     push bc
 .f:         ld [hl+], a
             dec b
             jr nz, .f
-            ld d, 0                         ; every cell, rows 0-29
+            ldh a, [own1_lo]                ; one palette for the whole screen (no cell drawn
+            ld b, a                         ;   by nametable 1, nametable 0's 64 attribute
+            ldh a, [own1_hi]                ;   bytes all one value with four equal
+            or b                            ;   quadrants: menus, new-game screens): every
+            jr nz, .full                    ;   tile of the map gets that palette
+            ld hl, NT_SH + $3C0
+            ld a, [hl+]
+            ld c, a
+            ld b, 63
+.ua:        ld a, [hl+]
+            cp c
+            jr nz, .full
+            dec b
+            jr nz, .ua
+            ld a, c
+            rrca
+            rrca
+            xor c
+            and $3F
+            jr nz, .full                    ; (quadrants differ)
+            ld a, c
+            and 3
+            ld b, a                         ; B = the palette
+            ld l, b
+            ld h, high(NBIT)
+            ld a, [hl]
+            ld [PAL_USED], a
+            ld hl, NT_SH
+            ld d, high(SC_NP)
+            ld c, 240                       ; 960 cells, 4 per pass
+.uc:        ld a, [hl+]
+            ld e, a
+            ld a, b
+            ld [de], a
+            ld a, [hl+]
+            ld e, a
+            ld a, b
+            ld [de], a
+            ld a, [hl+]
+            ld e, a
+            ld a, b
+            ld [de], a
+            ld a, [hl+]
+            ld e, a
+            ld a, b
+            ld [de], a
+            dec c
+            jr nz, .uc
+            jp .settle
+.full:      ld d, 0                         ; every cell, rows 0-29
 .r:         call scn_row
             inc d
             ld a, d
@@ -2866,7 +2915,7 @@ scan_b:     push bc
             pop bc
             dec b
             jr nz, .vr
-            ld e, 0                         ; each tile used: REF_BM; drawn with another palette
+.settle:    ld e, 0                         ; each tile used: REF_BM; drawn with another palette
 .t:         ld l, e                         ;   than it is coded for: TILE_PAL, marked; the
             ld h, high(SC_NP)               ;   same palette but parked: marked again
             ld a, [hl]
@@ -4857,3 +4906,86 @@ hle_boxrow: ld a, [$AAA1]                   ; ($6AA1: the box width)
             ldh [nzv], a
             ret
 
+; ---- c62:D188 .. the $FF that ends it (map decompression into save RAM): bytes < $80 are
+; tiles, $80 + t then n (0: 256) a run of t, $FF the end; the source crossing into $C000
+; goes on at $8000 of the next bank (c62:D1D9: $15 + 1 through $FE03: $5115). In bank 0
+; (the source is read through the data bank). Out as at c62:D158: A = $FF, Y = 0, X as the
+; NES leaves it (0 after a run); $10-$14 as on the NES; Z = 1, C = 1, N = 0.
+MDC_X      = $DCD5
+section bank 0, $3E80
+hle_mapdec: ld a, e
+            ld [MDC_X], a
+            ldh a, [data_bank8]
+            ld [$2000], a
+            ld a, [NES_RAM + $10]
+            ld l, a
+            ld a, [NES_RAM + $11]
+            sub $40
+            ld h, a                         ; HL = source ($8000 -> $4000)
+            ld a, [NES_RAM + $12]
+            ld e, a
+            ld a, [NES_RAM + $13]
+            add a, $40
+            ld d, a                         ; DE = destination ($7000 -> $B000)
+.lp:        ld a, [hl]
+            bit 7, a
+            jr nz, .run
+            ld [de], a
+            inc de
+            call .inc
+            jr .lp
+.run:       cp $FF
+            jp z, mdc_end
+            and $7F
+            ld [NES_RAM + $14], a
+            ld b, a
+            call .inc
+            ld c, [hl]                      ; count (0: 256)
+            ld a, b
+.f:         ld [de], a
+            inc de
+            dec c
+            jr nz, .f
+            xor a
+            ld [MDC_X], a
+            call .inc
+            jr .lp
+.inc:       inc l
+            ret nz
+            inc h
+            bit 7, h                        ; (NES $C000: the next bank at $8000)
+            ret z
+            ld h, $40
+            ld a, [NES_RAM + $15]
+            inc a
+            add a, a
+            or $80
+            call rt_mmc_w5115
+            ldh a, [data_bank8]
+            ld [$2000], a
+            ret
+
+; (hle_mapdec's end, in the bank-0 space after hle_boxrow)
+section bank 0, $3FA6
+mdc_end:       ld a, l
+            ld [NES_RAM + $10], a
+            ld a, h
+            add a, $40
+            ld [NES_RAM + $11], a
+            ld a, e
+            ld [NES_RAM + $12], a
+            ld a, d
+            sub $40
+            ld [NES_RAM + $13], a
+            ldh a, [code_bank]
+            ld [$2000], a
+            xor a
+            ldh [nzv], a
+            ld bc, 0
+            ld d, 0
+            ld a, [MDC_X]
+            ld e, a
+            ld a, $FF
+            cp a
+            scf
+            ret
