@@ -3431,10 +3431,11 @@ res_ow:             ; (from bank 21, after the restore) re-enter the map, bank 1
     lda #14         ;   the lineup menu
     jsr $FE03
     jmp $C764
-res_sm:
+res_sm:             ;   (the standard map: $CF3C returns into its frame loop $C8B8)
     lda #14
     jsr $FE03
-    jmp $CF3C
+    jsr $CF3C
+    jmp $C8B8
 """, syms={'BANK': SEL_BANK, 'SUSPK': SUSP_KIND}, org=FIX_FREE[0])
     assert fx.org + len(fx.bytes) <= FIX_FREE[1], hex(fx.org + len(fx.bytes))
     put(rom, fx.org, fx.bytes)
