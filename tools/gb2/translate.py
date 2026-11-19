@@ -408,7 +408,7 @@ class Emitter:
         name = None
         if r == 'ppu': name = 'rt_ppu_w%d' % (a & 7)
         elif r == 'io': name = 'rt_io_w%04X' % a if a in (0x4014, 0x4016) else 'rt_apu_w'
-        elif r == 'mmc': name = 'rt_mmc_w%04X' % a if a in (0x5115, 0x5116, 0x5800, 0x5801, 0x5802, 0x5803, 0x5804, 0x5805) else None
+        elif r == 'mmc': name = 'rt_mmc_w%04X' % a if a in (0x5115, 0x5116, 0x5800, 0x5801, 0x5802, 0x5803, 0x5804, 0x5805, 0x5806, 0x5807, 0x5808, 0x5809, 0x580A) else None
         else:
             self.rc.warn.append('store to ROM %04X at %r' % (a, i)); return
         if name is None: return
@@ -807,7 +807,7 @@ def emit_program(rc):
                     elif i.mn != 'JSR' or True:
                         out.append('    call rt_fatal')
     # stubs (bank 0): call rt_fcs reads the target's bank and address after the call
-    stubs = ['section bank 0, $2500']                   # (runtime below, colour tables from $3A00)
+    stubs = ['section bank 0, $2560']                   # (runtime below, colour tables from $3A00)
     for lab in sorted(xrefs):
         stubs += ['xs_%s:' % lab, '    call rt_fcs', '    db bank(%s)' % lab, '    dw %s' % lab,
                   'xj_%s:' % lab, '    call xs_%s' % lab, '    ret']

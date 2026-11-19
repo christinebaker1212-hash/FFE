@@ -35,6 +35,14 @@ SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB fo
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
 TEST_PAD   = $D83E
+; FF2 GB-only palette override (rt/ff2.s)
+OVR_ON     = $DCF0          ; bit 7: override on
+OVR_C0     = $DCF1
+OVR_C1     = $DCF2
+OVR_R0     = $DCF3
+OVR_R1     = $DCF4
+OVR_P      = $DCF5
+OVR_I      = $DCF6          ; attr_apply: attribute index of the block being applied
 CAM2_LINE  = $D836          ; FF2: GB line where the second camera starts (0: none; $5803)
 CAM2_X     = $D837          ;   its view origin in the NES picture (pixels; $5804 / $5805 in tiles)
 CAM2_Y     = $D838          ; $A5: test runner input (read_buttons)
@@ -1120,6 +1128,7 @@ attr_apply:                                 ; A = attribute index i (0-63, + $40
             ld a, c
             and $3F
             ld c, a
+            ld [OVR_I], a                   ; (FF2: for the palette override's post-pass)
             add a, $C0
             ld l, a
             ld a, [hl]                      ; the attribute value -> ap_pal[0..3] ($FF: a
@@ -1227,6 +1236,9 @@ attr_apply:                                 ; A = attribute index i (0-63, + $40
             ld a, c
             cp 4
             jr nz, .r
+            ldh a, [ap_own]                 ; FF2: overridden cells of this block (nametable 0)
+            and a
+            call z, ovr_blk
             pop hl
             pop de
             pop bc

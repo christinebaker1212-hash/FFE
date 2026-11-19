@@ -580,6 +580,7 @@ cell_fast:  push bc
             rrca
             rrca
 .l:         and 3
+            call ovr_eb                     ; (FF2: GB-only palette override)
             ld e, a                         ; E = palette
             call pal_used
             ld l, d

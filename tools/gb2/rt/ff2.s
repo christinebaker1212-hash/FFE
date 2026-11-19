@@ -1150,3 +1150,189 @@ ff2_spr_tile:                               ; sprite tile in the shadow: its slo
             pop hl
             pop bc
             ret
+
+
+; ------------------------------------------------------------------ palette override
+; GB-only (tools/gb2/layout.py; nothing on the NES): a rectangle of nametable-0 cells drawn
+; with one palette whatever the NES attributes say (finer than the NES's 16 x 16 blocks).
+; $5806 / $5807 first / last column, $5808 / $5809 first / last row, $580A palette (bits
+; 0-1) + bit 7 on. Every per-cell palette lookup (cell_pal, the DMG scan, cell_fast, the SGB
+; attribute map, CGB attr_apply) goes through ovr_*.
+; (OVR_* addresses: runtime.s)
+rt_mmc_w5806:
+            ld [OVR_C0], a
+            ret
+rt_mmc_w5807:
+            ld [OVR_C1], a
+            ret
+rt_mmc_w5808:
+            ld [OVR_R0], a
+            ret
+rt_mmc_w5809:
+            ld [OVR_R1], a
+            ret
+rt_mmc_w580A:
+            push af
+            push bc
+            push de
+            push hl
+            ld b, a
+            and 3
+            ld [OVR_P], a
+            ld a, b
+            and $80
+            ld [OVR_ON], a
+            ld a, 1                         ; SGB: the attribute map again
+            ldh [sgb_dirty], a
+            ldh [sgb_adirty], a
+            ld a, [OVR_R0]                  ; every cell of the rectangle again
+            ld d, a
+.r:         ld a, [OVR_C0]
+            ld e, a
+.c:         call ovr_cell
+            ld a, [OVR_C1]
+            cp e
+            jr z, .cn
+            inc e
+            jr .c
+.cn:        ld a, [OVR_R1]
+            cp d
+            jr z, .x
+            inc d
+            jr .r
+.x:         pop hl
+            pop de
+            pop bc
+            pop af
+            ret
+ovr_cell:                                   ; D = row, E = col (nametable 0): its palette again
+            push de
+            ldh a, [is_cgb]
+            and a
+            jr z, .dmg
+            xor a                           ; CGB: VRAM bank 1 = cell_pal (override included)
+            ldh [sh_nt], a
+            ld a, d
+            call cell_pal
+            ld b, a
+            call ovr_addr
+            ld a, b
+            call vram_put1
+            pop de
+            ret
+.dmg:       ldh a, [lcd_on]                 ; DMG: with the LCD off the map is scanned when it
+            and a                           ;   goes on; else the cell's tile checked now
+            jr nz, .on
+            inc a
+            ldh [dmg_scan], a
+            pop de
+            ret
+.on:        call ovr_addr                   ; tile from the shadow
+            ld a, h
+            sub $98 - high(NT_SH)
+            ld h, a
+            ld a, [hl]
+            ld d, a
+            ld a, h
+            sub high(NT_SH)
+            ld b, a                         ; offset high
+            ld c, 0
+            ld a, d
+            call dmg_cell
+            pop de
+            ret
+ovr_addr:                                   ; D = row, E = col -> HL = $9800 + row * 32 + col
+            ld a, d
+            and 7
+            swap a
+            add a, a
+            or e
+            ld l, a
+            ld a, d
+            srl a
+            srl a
+            srl a
+            add a, $98
+            ld h, a
+            ret
+ovr_blk:                                    ; attr_apply's block OVR_I: its overridden cells
+            ld a, [OVR_ON]
+            and a
+            ret z
+            ld a, [OVR_R0]
+            ld d, a
+.r:         ld a, [OVR_C0]
+            ld e, a
+.c:         ld a, d                         ; in this block: (row >> 2) * 8 + (col >> 2) = I
+            and $1C
+            add a, a
+            ld b, a
+            ld a, e
+            srl a
+            srl a
+            or b
+            ld b, a
+            ld a, [OVR_I]
+            cp b
+            jr nz, .n
+            call ovr_addr
+            ld a, [OVR_P]
+            call vram_put1
+.n:         ld a, [OVR_C1]
+            cp e
+            jr z, .cn
+            inc e
+            jr .c
+.cn:        ld a, [OVR_R1]
+            cp d
+            ret z
+            inc d
+            jr .r
+ovr_be:     push hl                         ; A = palette of (row B, col E) -> A, overridden
+            ld h, b
+            ld l, e
+            call ovr_hl
+            pop hl
+            ret
+ovr_de:     push hl                         ; (row D, col E)
+            ld h, d
+            ld l, e
+            call ovr_hl
+            pop hl
+            ret
+ovr_eb:     push hl                         ; (row E, col B)
+            ld h, e
+            ld l, b
+            call ovr_hl
+            pop hl
+            ret
+ovr_hl:     push bc                         ; A = palette, H = row, L = col -> A (HL clobbered)
+            push de
+            ld b, a
+            ld a, [OVR_ON]
+            and a
+            jr z, .x
+            ld d, h
+            ld e, l
+            ld hl, OVR_C0
+            ld a, e
+            cp [hl]
+            jr c, .x                        ; col < C0
+            inc hl
+            ld a, [hl]
+            cp e
+            jr c, .x                        ; C1 < col
+            inc hl
+            ld a, d
+            cp [hl]
+            jr c, .x                        ; row < R0
+            inc hl
+            ld a, [hl]
+            cp d
+            jr c, .x                        ; R1 < row
+            ld a, [OVR_P]
+            ld b, a
+.x:         ld a, b
+            pop de
+            pop bc
+            ret

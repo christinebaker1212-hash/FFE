@@ -310,6 +310,7 @@ cell_pal:   push bc
             rrca
             rrca
 .l:         and 3
+            call ovr_be                     ; (FF2: GB-only palette override)
             pop hl
             pop bc
             ret
@@ -1040,6 +1041,7 @@ scan_cell:  push bc
             rrca
             rrca
 .l:         and 3
+            call ovr_de                     ; (FF2: GB-only palette override)
             ld b, a
             ld hl, BIT_MASK                 ; PAL_USED |= 1 << B
             add a, l

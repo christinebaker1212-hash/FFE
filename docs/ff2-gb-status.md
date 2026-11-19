@@ -324,9 +324,17 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   + music update after its waits).
 - Checked: NES variant and Gambatte CGB shots (portraits, text, cursors); random seed 1,
   30000 frames: 29452 waits identical.
-- Open (asked the owner): centring the portraits in their boxes needs 16 tiles each (only
-  109 free) - proposed a GB-only per-tile colour override so the box is the portrait's
-  width. Sub-screens (items, magic, equip, status, save) still to re-lay out.
+- Portrait box = the portrait's width (owner: yes to the proposal): **GB-only palette
+  override** (rt/ff2.s, registers `$5806-$580A`: a rectangle of nametable-0 cells drawn
+  with one palette, finer than the NES's 16 x 16 blocks). Every per-cell palette lookup goes
+  through `ovr_*`: `cell_pal`, the DMG scan (`dmg_shade.s`), `cell_fast` (native.s), the SGB
+  attribute map (sgb.s), CGB `attr_apply` (post-pass `ovr_blk`); a register write redoes
+  the rectangle's cells (CGB VRAM bank 1, DMG tile check / LCD-on scan, SGB rebuild). The
+  menu sets column 5, rows 2-17 to the window palette; sub-menus and the exit clear it.
+  Checked: Gambatte CGB and DMG shots (box 24 px, no black column); random seed 1, 30000
+  frames: 29452 waits identical. (SGB not yet checked in mGBA.) Cross-bank stubs now from
+  `$2560` (bank 0 runtime grew; they end near `$38E0`, colour tables at `$3A00`).
+- Sub-screens (items, magic, equip, status, save) still to re-lay out.
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).

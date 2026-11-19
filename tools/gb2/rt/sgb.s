@@ -1003,6 +1003,7 @@ sgb_counts: ld hl, SGB_CNT
             rrca
             rrca
 .l:         and 3
+            call ovr_de                     ; (FF2: GB-only palette override)
             ld c, a
             ldh a, [sgb_pslot]              ; battle party column (GB cols 15-18, rows 0-11):
             and a                           ;   the party slot

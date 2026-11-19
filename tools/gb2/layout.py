@@ -1972,8 +1972,9 @@ gb_lootnav:             ; b5 loot menu: right / left / down / up (replaces b5:A1
 
 ; ---- field main menu (owner-approved revision of option A, ff2_mock9 + portraits inside
 ; the frame): camera (1, 1): GB (x, y) = NES (x+1, y+1). Party window NES (1,1,12,18), per
-; member k (rows 2+4k..5+4k): portrait box cols 2-5 (background tiles $01+12k.., black
-; column 5; its 2 x 2 attribute quads get a palette of its own), name / HP / MP / status
+; member k (rows 2+4k..5+4k): portrait box cols 2-4 (background tiles $01+12k..; its 2 x 2
+; attribute quads, cols 2-5, get a palette of its own, column 5 the window palette back
+; by the GB-only override $5806-$580A), name / HP / MP / status
 ; word in cols 6-11 (HP and MP small letters: tiles $31+12k..). Commands NES (13,1,8,7),
 ; Gil NES (13,15,8,4) (amount in small digits: tiles $61-$66).
 ; GBARG: 0 init (menu start, LCD off), 1 party window, 2 Gil amount, 3 attributes back to
@@ -2008,6 +2009,8 @@ gm_exit:
     lda #6
     sta $5800
     sta $5801
+    lda #0
+    sta $580A
     rts
 
 gm_init:                ; LCD off (b14:ACE3): camera, portrait tiles, their palettes
@@ -2132,6 +2135,15 @@ gm_init:                ; LCD off (b14:ACE3): camera, portrait tiles, their pale
 gm_party:               ; b14:AD0A (replaces the four member windows b14:B396)
     lda #1
     sta MSCR
+    lda #5              ; GB-only palette override: NES column 5, rows 2-17 in the window
+    sta $5806           ;   palette (the portrait boxes' attribute quads are 32 px wide,
+    sta $5807           ;   the portraits 24: the box is the portrait's width)
+    lda #2
+    sta $5808
+    lda #17
+    sta $5809
+    lda #$83
+    sta $580A
     ldx #0              ; the renderer's RAM ($7800-$78FF, menu cursor data here) saved
 .sv:
     lda $7800,x
@@ -2186,7 +2198,7 @@ gm_party:               ; b14:AD0A (replaces the four member windows b14:B396)
     lda VT
     sta $7702,y
     inc VT
-    lda #0
+    lda #$FF            ; (column 3: window colour, GB-only palette override)
     sta $7703,y
     tya
     clc
@@ -2421,6 +2433,8 @@ ndig:                   ; A = digits of VNUM (1-4)
 gm_attr:                ; window palette everywhere (sub-menus draw anywhere)
     lda #1
     sta MSCR
+    lda #0              ; (palette override off)
+    sta $580A
     ldx #63
     lda #$FF
 .c:
