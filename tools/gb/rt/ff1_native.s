@@ -2201,7 +2201,7 @@ ntrun_b:    push de
             ret
 
 ; Z: the panel row can take the fast path: LCD on (CGB: not masked), no dialogue box, PPU
-; +1, no GB map cell owned by nametable 1, PPU address in nametable 0's cells with the 25
+; +1, none of its 25 GB map cells owned by nametable 1, PPU address in nametable 0's cells with the 25
 ; cells before the attributes, the source in NES $6000-$7FFF. Then BC = source (cart RAM),
 ; HL = shadow, DE = GB map, NR_END set.
 nrf_ok:     ld a, MDF_ON
@@ -2218,11 +2218,6 @@ nrf_ok:     ld a, MDF_ON
             ldh a, [ppu_ctrl]
             and 4
             jr nz, .no
-            ldh a, [own1_lo]
-            ld b, a
-            ldh a, [own1_hi]
-            or b
-            jr nz, .no
             ldh a, [ppu_vh]
             cp $20
             jr c, .no
@@ -2236,7 +2231,44 @@ nrf_ok:     ld a, MDF_ON
 .a3:        ldh a, [ppu_vl]                 ; row 24-29 area: the run ends before $3C0
             cp $C0 - $19 + 1
             jr nc, .no
-.ok:        ld a, [NES_RAM + $89]
+.ok:        ldh a, [ppu_vh]                 ; none of the run's cells owned by nametable 1:
+            and 3                           ;   its 25 OWN bits (from bit k = vl & 7 of byte
+            swap a                          ;   vl / 8: bits k-7, two bytes, bits 0-k) are 0
+            add a, a
+            ld b, a
+            ldh a, [ppu_vl]
+            rrca
+            rrca
+            rrca
+            and $1F
+            or b
+            ld l, a
+            ld h, high(OWN)
+            ldh a, [ppu_vl]
+            and 7
+            inc a
+            ld c, a
+            ld a, $FF
+            jr .s1
+.s0:        add a, a
+.s1:        dec c
+            jr nz, .s0
+            ld b, a                         ; B = $FF << k
+            and [hl]
+            ld e, a
+            inc l
+            ld a, [hl+]
+            or e
+            or [hl]
+            inc l
+            ld e, a
+            ld a, b
+            add a, a
+            cpl                             ; bits 0-k
+            and [hl]
+            or e
+            jr nz, .no
+            ld a, [NES_RAM + $89]
             sub $60
             cp $1F
             jr nc, .no                      ; ($6000-$7EFF: no carry past $7FFF)
@@ -2263,7 +2295,7 @@ nrf_ok:     ld a, MDF_ON
             ret
 
 ; the fast panel row: the VRAM queue emptied first (no queued cell written after these);
-; unchanged cells (shadow has the tile; nametable 0 owns every cell) only move on; a
+; unchanged cells (shadow has the tile; nametable 0 owns the run's cells) only move on; a
 ; changed cell: shadow, DMG palette check at once (cell_fast), GB map at the next free
 ; VRAM moment
 nrf:        push bc
@@ -2321,13 +2353,15 @@ nrf:        push bc
             call cell_fast
 .cg:        ld a, d
             pop de
+            ld c, a                         ; (C = the tile: the poll uses A)
 .w:         di
             ldh a, [$FF41]
             bit 1, a
             jr z, .wr
             ei
             jr .w
-.wr:        ld [de], a
+.wr:        ld a, c
+            ld [de], a
             ei
             pop bc
             jr .n
