@@ -19,7 +19,7 @@ Battle (mock-up 12/13, approved): camera (1, 6), so GB = NES - (1, 6):
                   "attacker -> target", then action / result lines indented)
   All window text is drawn in the small proportional font (VWF below).
 """
-import os, sys
+import os, sys, json
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 from asm6502 import asm
 HDR = 16
@@ -3443,6 +3443,7 @@ res_sm:             ;   (the standard map: $CF3C returns into its frame loop $C8
     b21 = asm("""
     jmp selmenu
     jmp contentry
+    jmp ndisp
 
 ; ---- screen helpers ----
 scron:              ; LCD on (copy of b14:$B793 with this bank for the music call)
@@ -3907,11 +3908,12 @@ C1ROWS:
 %(c1)s
 C2ROWS:
 %(c2)s
-""" % dict(opty=', '.join(map(str, opt_y)), sely=', '.join(map(str, sel_y)),
+%(namesrc)s
+""" % dict(namesrc=name_entry_e(rom, None).replace('DRAWROWS', 'drawrows'), opty=', '.join(map(str, opt_y)), sely=', '.join(map(str, sel_y)),
            menupal=', '.join('$%02X' % b for b in rom[bank_off(14, 0xAD8B):bank_off(14, 0xAD8B) + 12]),
            sy=', '.join(map(str, sy)), c1y=', '.join(map(str, c1y)), c2y=', '.join(map(str, c2y)),
            sel=rows_db(sel), opt=rows_db(opt), sus=rows_db(sus), c1=rows_db(c1), c2=rows_db(c2)),
-        syms={'BANK': SEL_BANK, 'SUSPK': SUSP_KIND, 'TRCLR': L['tr_clr'], 'TRCHR': L['tr_chr'], 'TRLINEUP': L['tr_lineup'],
+        syms={'BANK': SEL_BANK, 'SUSPK': SUSP_KIND, 'SEL': SUSP_KIND + 6, 'TRCLR': L['tr_clr'], 'TRCHR': L['tr_chr'], 'TRLINEUP': L['tr_lineup'],
               'RESOW': L['res_ow'], 'RESSM': L['res_sm'], 'ROWV': 0x2000 + (3 + 3) * 32 + 17}, org=0x8000)
     o = bank_off(SEL_BANK, 0x8000)
     assert len(b21.bytes) < 0x4000
@@ -3921,3 +3923,148 @@ C2ROWS:
     put(rom, 0xCA59, bytes([0xA9, 1, 0x20]) + L['selc'].to_bytes(2, 'little') + b'\xEA' * 3,
         expect=bytes.fromhex('a90e2003fe201599'))
     put(rom, 0xC079, bytes([0x20]) + L['conthook'].to_bytes(2, 'little'), expect=bytes.fromhex('adfe64'))
+
+
+# ---- name entry, design E (owner, 2026-11-19): camera (5, 2) as before. A top window
+# GB (0,0,20,4) with the member's class sprite at the left, the name (GB 5,1) and the
+# class name (GB 5,2); the letters as a compact 10 x 9 block (side by side, rows touching)
+# in a window GB (3,5,14,12); the chosen letter highlighted by an 8 x 8 sprite behind the
+# letter (tile $D0, colour 1) instead of the hand. FF1's grid table ($A013) becomes 90
+# bytes read with stride 1; its freed bytes hold the shims to bank 21.
+def name_entry_e(rom, b21_free):
+    main = sys.modules['__main__']
+    enc = main.ENC
+    B = 14
+    grid = main.NAME_GRID
+    tab = b''.join(enc_str(enc, ch) for row in grid for ch in row)
+    assert len(tab) == 90
+    old = bytes(rom[bank_off(B, 0xA013):bank_off(B, 0xA013) + 180])
+    put_bank(rom, B, 0xA013, tab, old[:90])
+    put_bank(rom, B, 0x9DFC, b'\xEA', b'\x0A')                     # (no ASL: stride 1)
+    shims = asm("""
+nscr14:
+    lda #0
+    jmp TR21X
+ncur14:
+    lda #1
+    jmp TR21X
+""", syms={'TR21X': 0xF900}, org=0xA013 + 90)
+    assert shims.org + len(shims.bytes) <= 0xA0C7
+    put_bank(rom, B, shims.org, shims.bytes, bytes(rom[bank_off(B, shims.org):bank_off(B, shims.org) + len(shims.bytes)]))
+    put_bank(rom, B, 0x9D68, bytes([0x20]) + shims.labels['nscr14'].to_bytes(2, 'little'), bytes([0x20, 0xB0, 0x9F]))
+    put_bank(rom, B, 0x9E51, bytes([0x20]) + shims.labels['ncur14'].to_bytes(2, 'little'), bytes([0x20, 0x35, 0x9F]))
+    put_bank(rom, B, 0x9FA1, bytes([0xA9, 10]), bytes([0xA9, 13]))   # name at NES (10, 3) = GB (5, 1)
+    put_bank(rom, B, 0x9FA5, bytes([0xA9, 3]), bytes([0xA9, 2]))
+    fx = asm("""
+tr21x:              ; A = routine (bank 21 ndisp) from bank-14 code; bank 14 again after
+    sta SEL
+    lda #BANK
+    jsr $FE03
+    jsr $8006
+    lda #14
+    jmp $FE03
+""", syms={'BANK': SEL_BANK, 'SEL': SUSP_KIND + 6}, org=0xF900)
+    assert fx.org + len(fx.bytes) <= 0xF919
+    put(rom, 0xF900, fx.bytes)       # (insert.py title_menu: $F8B0-$F918 is free; its strings end before $F8E0)
+    # screen rows: top window, letter window with the letters; class names (GB 5,2 = NES 10,4)
+    top = screen_rows(enc, 5, 2, 20, 4, [])
+    letters = screen_rows(enc, 8, 7, 14, 12, [(2 + r, 2, row) for r, row in enumerate(grid)])
+    items = json.load(open('script/ff1/items.json'))
+    cls = [e['en'] for e in items if e['id'] in range(240, 246)]
+    assert len(cls) == 6
+    cls_rows = ['CLS%d:\n%s' % (k, rows_db([(4, 10, enc_str(enc, c.ljust(14)))])) for k, c in enumerate(cls)]
+    src = """
+ndisp:
+    lda SEL
+    bne ncur
+nscr:               ; (PPU off; the screen was cleared) attributes: window palette
+    lda $2002
+    lda #$23
+    sta $2006
+    lda #$C0
+    sta $2006
+    lda #$FF
+    ldx #64
+.a:
+    sta $2007
+    dex
+    bne .a
+    lda #<NROWS
+    sta $10
+    lda #>NROWS
+    sta $11
+    jsr DRAWROWS
+    ldx $67         ; the member's class name
+    lda $0300,x
+    tax
+    lda CLSLO,x
+    sta $10
+    lda CLSHI,x
+    sta $11
+    jsr DRAWROWS
+    lda $2002       ; sprite tile $D0: an 8 x 8 outline in colour 1 (the highlight; yellow
+    lda #$1D        ;   in the menu's sprite palette 0)
+    sta $2006
+    lda #$00
+    sta $2006
+    ldx #0
+.p0:
+    lda HLTILE,x
+    sta $2007
+    inx
+    cpx #16
+    bne .p0
+    rts
+HLTILE:
+    .db $FF, $81, $81, $81, $81, $81, $81, $FF, 0, 0, 0, 0, 0, 0, 0, 0
+ncur:               ; each frame (OAM cleared): the highlight behind the chosen letter,
+    lda $65         ;   then the member's class sprite in the top window
+    asl a
+    asl a
+    asl a
+    clc
+    adc #71         ; (letters from NES row 9: y = 72 + 8 row, minus 1)
+    ldx $26
+    sta $0200,x
+    lda #$D0
+    sta $0201,x
+    lda #$00        ; (in front, palette 0)
+    sta $0202,x
+    lda $64
+    asl a
+    asl a
+    asl a
+    clc
+    adc #80         ; (NES column 10)
+    sta $0203,x
+    txa
+    clc
+    adc #4
+    sta $26
+    ldx $67
+    lda $0300,x
+    tax
+    lda $ED33,x
+    sta $11
+    txa
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    sta $10
+    lda #48
+    sta $40
+    lda #18
+    sta $41
+    jmp $ECB3
+CLSLO:
+    .db %(clslo)s
+CLSHI:
+    .db %(clshi)s
+NROWS:
+%(nrows)s
+%(cls)s
+""" % dict(clslo=', '.join('<CLS%d' % k for k in range(6)), clshi=', '.join('>CLS%d' % k for k in range(6)),
+           nrows=rows_db(top + letters), cls='\n'.join(cls_rows))
+    return src
