@@ -65,8 +65,6 @@ class CodeMap:
     def __init__(self, rom_path, cov_paths, entries=(), old_rom=None):
         self.rom = open(rom_path, 'rb').read()[HDR:]
         self.cov = bytearray(3 * COV_SIZE)
-        for sp, a in entries:                             # entry points known without coverage
-            self.cov[index_of(sp, a)] |= 3                #   (executed, reached by RTS)
         for p in cov_paths:
             d = open(p, 'rb').read()
             for k in range(0, len(d), 1 << 20):            # OR in chunks (fast enough)
@@ -75,6 +73,8 @@ class CodeMap:
                 self.cov[k:k + n] = a.to_bytes(n, 'little')
         self.stale = 0
         if old_rom is not None: self.drop_stale(old_rom[HDR:])
+        for sp, a in entries:                             # entry points known without coverage
+            self.cov[index_of(sp, a)] |= 3                #   (executed, reached by RTS)
         self.insns = {}                                   # (space, addr) -> Insn
         self.unresolved = []                              # (from insn, reason)
 
