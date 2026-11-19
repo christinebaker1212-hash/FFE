@@ -173,6 +173,10 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   copy); stubs from `$2400`. DMG battle entry +328 -> +22 frames; DMG total over the seed-1
   run to the end of the opening battle +6.3% (boot +45, menu load +26, prologue small
   ones). Checks: GB-layout pair 10592 waits and English pair 29406 waits RAM-identical.
+- CGB pacing (same run): -0.8% overall, steady screens exact; battle entry +110 frames
+  (profile, mGBA CGB, waits 9505-9512: nametable writes `rt_ppu_w7` / `own_set` /
+  `ppu_inc` / `attr_apply` from b11 "fill ppu" `9D58-9D6C` and the battlefield tilemap
+  setup, FF2's multiply / divide `fix:FC79-FD00`): native versions next.
 - Next: victory / loot windows (bank 5; a forced formation 0 did not end: monster HP poke at
   battle stats +$0A had no effect, to look into), status words in the party window ("Dead"
   etc.), clear the bottom rows at battle start, hit knock-back past the right edge, item use
