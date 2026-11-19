@@ -1782,15 +1782,27 @@ retile_b:   push bc
             pop de
             pop bc
             ret
-.go:        ld hl, RM
+.go:        ldh a, [lcd_on]                 ; LCD off: coded straight into its VRAM tile ($9000
+            and a                           ;   + tile * 16 for 0-127, $8000 + tile * 16
+            jr nz, .bk                      ;   above); on: into a block for the queue
+            ldh a, [sh_tile]
+            ld c, a
+            swap a
+            ld b, a
+            and $F0
+            ld e, a
             ld a, b
-            call rt_anf
-            ld a, c
-            call rt_anf
-            ld a, 8
-            ld [hl], a                      ; (row counter)
-            call blk_alloc                  ; DE = a free block
-            ldh a, [sh_tile]                ; shadow -> block (RAM bank 1)
+            and $0F
+            bit 7, c
+            jr nz, .hi
+            add a, $90
+            jr .dd
+.hi:        add a, $80
+.dd:        ld d, a
+            jr .cd
+.bk:        call blk_alloc                  ; DE = a free block
+.cd:        push de
+            ldh a, [sh_tile]                ; HL = the shadow tile (RAM bank 1)
             swap a
             ld l, a
             and $F0
@@ -1802,50 +1814,25 @@ retile_b:   push bc
             ld l, c
             ld a, 1
             ld [$4000], a
-            ld c, 16
-.cp:        ld a, [hl+]
-            ld [de], a
+            push hl
+            ldh a, [sh_s0]                  ; plane 0: the function whose bit i is bit 0 of
+            call pf_call                    ;   index i's value; plane 1: bit 1
+            pop hl
+            pop de
+            push de
             inc e
-            dec c
-            jr nz, .cp
+            push hl
+            ldh a, [sh_s1]
+            call pf_call
+            pop hl
+            ldh a, [sh_tile]                ; pixels written since its last coding (CODED
+            ld e, a                         ;   $FF): the colour indices it uses (TILE_USE)
+            ld d, high(CODED)
+            ld a, [de]
+            inc a
+            call z, tile_use
             xor a
             ld [$4000], a
-            ld a, e
-            sub 16
-            ld l, a
-            ld h, d                         ; HL = block
-            call anf_rows
-            ld c, 0                         ; colour indices the tile uses -> TILE_USE nibble
-            ldh a, [sh_u1]
-            and a
-            jr z, .u2
-            set 1, c
-.u2:        ldh a, [sh_u2]
-            and a
-            jr z, .u3
-            set 2, c
-.u3:        ldh a, [sh_u3]
-            and a
-            jr z, .u4
-            set 3, c
-.u4:        ldh a, [sh_tile]
-            ld b, a
-            srl a
-            add a, low(TILE_USE)
-            ld l, a
-            ld h, high(TILE_USE)
-            bit 0, b
-            jr z, .ulo
-            ld a, c
-            swap a
-            ld c, a
-            ld a, [hl]
-            and $0F
-            jr .ust
-.ulo:       ld a, [hl]
-            and $F0
-.ust:       or c
-            ld [hl], a
             ldh a, [sh_s0]                  ; the coding it has now
             ld b, a
             ldh a, [sh_s1]
@@ -1856,10 +1843,78 @@ retile_b:   push bc
             ld l, e
             ld h, high(CODED)
             ld [hl], a
+            pop de
+            ldh a, [lcd_on]
+            and a
+            jr z, .x
+            ldh a, [sh_tile]
+            ld e, a
             call blk_send
-            pop hl
+.x:         pop hl
             pop de
             pop bc
+            ret
+
+; HL = a BG tile in the shadow (RAM bank 1 on), sh_tile its number: its TILE_USE nibble
+; (bit i: a pixel of colour index i = 1-3)
+tile_use:   ld bc, 0
+            ld d, 0
+            ld e, 8
+.r:         ld a, [hl+]
+            ldh [tmp_lo], a                 ; p0
+            ld a, [hl+]
+            push hl
+            ld h, a                         ; H = p1, L = p0
+            ldh a, [tmp_lo]
+            ld l, a
+            and h
+            or d
+            ld d, a                         ; index 3
+            ld a, h
+            cpl
+            and l
+            or b
+            ld b, a                         ; index 1
+            ld a, l
+            cpl
+            and h
+            or c
+            ld c, a                         ; index 2
+            pop hl
+            dec e
+            jr nz, .r
+            xor a
+            inc b
+            dec b
+            jr z, .u2
+            set 1, a
+.u2:        inc c
+            dec c
+            jr z, .u3
+            set 2, a
+.u3:        inc d
+            dec d
+            jr z, .u4
+            set 3, a
+.u4:        ld c, a
+            ldh a, [sh_tile]
+            ld b, a
+            srl a
+            add a, low(TILE_USE)
+            ld l, a
+            ld h, high(TILE_USE)
+            bit 0, b
+            jr z, .lo
+            ld a, c
+            swap a
+            ld c, a
+            ld a, [hl]
+            and $0F
+            jr .st
+.lo:        ld a, [hl]
+            and $F0
+.st:        or c
+            ld [hl], a
             ret
 
 ; DE = the next TBLK block (with the LCD on, waits while all 8 are queued). Keeps BC, HL.
@@ -4988,4 +5043,1048 @@ mdc_end:       ld a, l
             ld a, $FF
             cp a
             scf
+            ret
+
+; ---- DMG tile coding, one output plane per call: plane = f(NES plane 0, plane 1), f one of the
+; 16 boolean functions (bit i of T: the value for colour index i = p0 + 2 * p1). HL = the tile
+; in the shadow (interleaved rows), DE = the plane's first byte (+2 a row). Clobbers A, BC.
+PF_BANK    = 60
+section bank PF_BANK, $4000
+pf_tab:
+            dw pf_0, pf_1, pf_2, pf_3, pf_4, pf_5, pf_6, pf_7, pf_8, pf_9, pf_10, pf_11, pf_12, pf_13, pf_14, pf_15
+pf_0:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor a
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor a
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor a
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor a
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor a
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor a
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor a
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor a
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_1:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_2:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_3:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_4:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            and c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            and c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            and c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            and c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            and c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            and c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            and c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            and c
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_5:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_6:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_7:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_8:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_9:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            xor b
+            cpl
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_10:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, b
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_11:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            cpl
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_12:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_13:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            or c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            or c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            or c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            or c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            or c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            or c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            or c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, b
+            cpl
+            or c
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_14:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            or b
+            ld [de], a
+            inc e
+            inc e
+            ret
+pf_15:
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, $FF
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, $FF
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, $FF
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, $FF
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, $FF
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, $FF
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, $FF
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld a, $FF
+            ld [de], a
+            inc e
+            inc e
+            ret
+
+; bank 0: A = function T, HL = shadow tile, DE = output plane: pf_T in PF_BANK, then
+; HLE_BANK again (for retile_b). Clobbers A, BC.
+section bank 0, $3D20
+pf_call:    push hl
+            add a, a
+            ld l, a
+            ld h, high(pf_tab)
+            ld a, PF_BANK
+            ld [$2000], a
+            ld a, [hl+]
+            ld b, [hl]
+            ld c, a
+            pop hl
+            call .go
+            ld a, HLE_BANK
+            ld [$2000], a
+            ret
+.go:        push bc
             ret
