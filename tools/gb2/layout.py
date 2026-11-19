@@ -74,9 +74,10 @@ end:
 RAM = dict(GBIDX=0x7FDF, GBRB=0x7FE0, GBPOOL=0x7FE1, VX=0x7FE2, VN=0x7FE3, VT=0x7FE4, VC=0x7FE5,
            VSH=0x7FE6, VCNT=0x7FE7, VP=0xD2, VQ=0xD4, VS=0xD6, VNUM=0x7FEC, VPAD=0x7FEE, VDIG=0x7FEF,
            VROW=0x7FF0, VCOL=0x7FF1, VW=0x7FF2, VH=0x7FF3, VLINE=0x7FF4, VSV=0x7FF5, VI=0x7FF6,
+           NL=0x7FF7, NS=0x7FF8, VSQZ=0x7FF9, VI0=0x7FFA, VI1=0x7FFB,
            USED=0x75C0, VBUF=0x7800, PTILE=0x7860, LTILE=0x7888, FTILE=0x78A0, NTBUF=0x78AC)
 # fixed-bank entries (7 bytes each, at $FFD0): index, bank to return to, the NES routine replaced
-ENTRIES = [('gb_party', 0x0C, 0x912A)]
+ENTRIES = [('gb_party', 0x0C, 0x912A), ('gb_names', 0x0C, 0x910D)]
 
 ENT_SRC = '''
     org $FFD0
@@ -94,7 +95,7 @@ gbdisp:                 ; dispatch GBIDX (word table: entries of the code map)
     sta $01
     jmp ($0000)
 gbtab:
-    .dw gb_party
+    .dw gb_party, gb_names
 
 ; ---- tile pool: table-1 tiles this battle's battlefield does not use
 poolinit:
@@ -462,7 +463,9 @@ vchar:                  ; A = code: draw its glyph at VX (columns, bit 7 = top r
     iny
     dec VCNT
     bne .col
-    inc VX              ; 1-px gap
+    lda VSQZ            ; 1-px gap (none in a squeezed name)
+    bne .full
+    inc VX
 .full:
     rts
 .sp:
@@ -745,6 +748,160 @@ gb_party:
     sta VP+1
     jmp ntwin
 
+; ---- enemy names window (replaces b12:910D): GB cols 0-7, rows 12-17 = NES rows 18-23;
+; the monster types of $7B4E-$7B51 (bit 7 set: none), one line each; a name wider than the
+; 48-px line wraps at a space onto the next line (NWRAP: byte index of that space), unless
+; that makes more than 4 lines: then such names are drawn squeezed (no letter gaps)
+gb_names:
+    jsr poolinit
+    lda #0
+    sta VSQZ
+    sta NL
+    ldx #3
+.cnt:
+    lda $7B4E,x
+    bmi .cn
+    tay
+    inc NL
+    lda NWRAP,y
+    beq .cn
+    inc NL
+.cn:
+    dex
+    bpl .cnt
+    lda NL
+    cmp #5
+    bcc .nsq
+    lda #1
+    sta NS              ; (squeeze the wrapped names)
+    bne .go
+.nsq:
+    lda #0
+    sta NS
+.go:
+    lda #0
+    sta NL
+    sta VI              ; slot
+.slot:
+    ldx VI
+    lda $7B4E,x
+    bmi .next
+    tay
+    lda NPLO,y
+    sta VP
+    lda NPHI,y
+    sta VP+1
+    lda NSQ,y           ; 1: one wide word, squeezed
+    cmp #1
+    beq .sq
+    lda NWRAP,y
+    beq .whole
+    ldx NS              ; more than 4 lines: the wrapped name on one line, squeezed
+    bne .sq
+    sta VI1             ; first line: bytes 0 .. NWRAP-1
+    lda #0
+    sta VI0
+    jsr nline
+    ldx VI
+    ldy $7B4E,x
+    lda NSQ,y           ; 2: its second line squeezed
+    lsr a
+    sta VSQZ
+    lda NWRAP,y
+    clc
+    adc #1
+    sta VI0
+    lda #$FF
+    sta VI1
+    jsr nline
+    lda #0
+    sta VSQZ
+    jmp .next
+.sq:
+    lda #1
+    sta VSQZ
+.whole:
+    lda #0
+    sta VI0
+    lda #$FF
+    sta VI1
+    jsr nline
+    lda #0
+    sta VSQZ
+.next:
+    inc VI
+    lda VI
+    cmp #4
+    bne .slot
+.rest:                  ; empty lines below
+    lda NL
+    cmp #4
+    bcs .win
+    lda #0
+    sta VI0
+    sta VI1
+    jsr nline
+    jmp .rest
+.win:
+    lda #18
+    sta VROW
+    lda #0
+    sta VCOL
+    lda #8
+    sta VW
+    lda #6
+    sta VH
+    lda #<LTILE
+    sta VP
+    lda #>LTILE
+    sta VP+1
+    jmp ntwin
+nline:                  ; one names line NL from (VP) bytes VI0 .. VI1-1 (or the 0), uploaded
+    lda NL
+    cmp #4
+    bcs .x
+    lda VP
+    pha
+    lda VP+1
+    pha
+    lda #6
+    sta VN
+    jsr vclear
+    lda #1
+    sta VX
+    ldy VI0
+.l:
+    cpy VI1
+    bcs .up
+    lda (VP),y
+    beq .up
+    sty VDIG
+    jsr vchar
+    ldy VDIG
+    iny
+    bne .l
+.up:
+    lda NL              ; upload to LTILE + 6 * NL
+    asl a
+    sta VSH
+    asl a
+    clc
+    adc VSH
+    clc
+    adc #<LTILE
+    sta VP
+    lda #>LTILE
+    adc #0
+    sta VP+1
+    jsr vupload
+    pla
+    sta VP+1
+    pla
+    sta VP
+    inc NL
+.x:
+    rts
+
 BIT:    .db $80, $40, $20, $10, $08, $04, $02, $01
 POW:    .db <1000, <100, <10, <1
 POWH:   .db >1000, >100, >10, >1
@@ -779,6 +936,48 @@ def glyph_tables():
     return glyph
 
 
+def names_data(rom):
+    """monster names for the names window: the English strings (bank 21 table $AC44, as
+    insert.py placed them), and per monster the byte index of the space to wrap at when the
+    name is wider than the 48-px line (0: fits; $FF: one word, drawn squeezed)"""
+    from latin_font import _glyph_cols, COND, G
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('ff2insert', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2', 'insert.py'))
+    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
+    dec = {v: k for k, v in ins.ENC.items()}
+    def width(codes):
+        t = 0
+        for i, c in enumerate(codes):
+            if i: t += 1
+            ch = dec.get(c, ' ')
+            t += 2 if ch == ' ' else len(_glyph_cols(ch, COND if ch in COND else G))
+        return t
+    b21 = rom[HDR + 21 * BANK:HDR + 22 * BANK]
+    strs, wrap, squeeze = [], [], []
+    for m in range(128):
+        p = b21[0x2C44 + 2 * m] | b21[0x2C44 + 2 * m + 1] << 8
+        o = p - 0x8000; e = b21.index(0, o)
+        cs = bytes(b21[o:e]); strs.append(cs)
+        k, q = 0, 0
+        if width(cs) > 48:
+            sq = lambda c: width(c) - max(0, len(c) - 1)       # squeezed: no letter gaps
+            sp = [i for i, c in enumerate(cs) if c == 0xFF and width(cs[:i]) <= 48]
+            if sp:
+                k = sp[-1]
+                if width(cs[k + 1:]) > 48:
+                    q = 2; assert sq(cs[k + 1:]) <= 48, cs      # second line squeezed
+            else:
+                q = 1; assert sq(cs) <= 48, cs                  # one word: squeezed
+        wrap.append(k); squeeze.append(q)
+    out = '\nNWRAP:\n' + ''.join('    .db %s\n' % ', '.join(str(v) for v in wrap[i:i + 16]) for i in range(0, 128, 16))
+    out += 'NSQ:\n' + ''.join('    .db %s\n' % ', '.join(str(v) for v in squeeze[i:i + 16]) for i in range(0, 128, 16))
+    out += 'NPLO:\n' + ''.join('    .db %s\n' % ', '.join('<NAME%d' % k for k in range(i, i + 16)) for i in range(0, 128, 16))
+    out += 'NPHI:\n' + ''.join('    .db %s\n' % ', '.join('>NAME%d' % k for k in range(i, i + 16)) for i in range(0, 128, 16))
+    for m, cs in enumerate(strs):
+        out += 'NAME%d: .db %s\n' % (m, ', '.join('$%02X' % c for c in cs + b'\0'))
+    return out
+
+
 def bank23(rom, L):
     """bank 23 source + data from the user's ROM (first monster tiles, boss tilemaps, frame
     tiles) and the glyph tables"""
@@ -796,7 +995,8 @@ def bank23(rom, L):
     data, offs = bytearray(), []
     for c in range(256):
         offs.append(len(data)); data += bytes(g.get(c, []))
-    src = B23_SRC + '\nFIRST: .db ' + ', '.join('$%02X' % v for v in first)
+    nsrc = names_data(rom)
+    src = B23_SRC + nsrc + '\nFIRST: .db ' + ', '.join('$%02X' % v for v in first)
     src += '\nBOSSUSED:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in b) for b in boss)
     src += 'FRAMEGFX:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in frame[i:i + 16]) for i in range(0, 128, 16))
     src += 'GW:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in gw[i:i + 16]) for i in range(0, 256, 16))
