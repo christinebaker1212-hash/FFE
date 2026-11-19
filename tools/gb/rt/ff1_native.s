@@ -3833,75 +3833,316 @@ vchar_n:    cp $FD
             ld [NES_RAM + $89], a
             pop hl
             ld bc, vw_gr
-            add hl, bc                      ; HL = the glyph's rows
+            add hl, bc
+            ld b, h
+            ld c, l                         ; BC = the glyph's rows
             ld a, [VW_VX]
             and 7
             ld [VW_VSH], a
-            ld d, a                         ; D = shift
+            ld h, a                         ; H = shift
             ld a, [VW_VX]
             srl a
             srl a
             srl a
-            ld b, a                         ; B = tile
+            ld l, a                         ; L = tile
             ld a, [VW_VN]
-            ld c, a                         ; C = tiles in the line
-            ld a, b
-            cp c
-            jr nc, .adv
+            ld d, a                         ; D = tiles in the line
+            ld a, l
+            cp d
+            jp nc, .adv
             ld [VW_VT2], a
             add a, a
             add a, a
             add a, a
             ld [VW_VOFF], a
-            ld e, a                         ; E = buffer offset of the row
-            inc b                           ; B = 1 if the next tile is in the line
-            ld a, b
-            cp c
-            ld b, 0
-            jr nc, .nb
-            inc b
-.nb:        ld c, 8                         ; C = rows left
-.row:       ld a, [hl+]
-            and a
-            jr nz, .px
-            ld [VW_VLO], a                  ; (VLO = 0 for an empty row)
-            jr .nx2
-.px:        push hl                         ; row >> shift and row << (8 - shift) from the
-            ld l, a                         ;   tables VW_SHR (build.py)
-            ld a, d
-            and a
-            jr z, .s0
-            add a, a
-            add a, high(VW_SHR) - 1
+            ld e, a                         ; DE = the tile's first row in VW_BUF
+            ld a, h                         ; rows OR-ed in, unrolled: shift 0; shifted (the
+            and a                           ;   table page of row >> shift: VW_SHR + 2 *
+            jr z, .va                       ;   shift - 2, the next page: what spills into
+            add a, a                        ;   the next tile) within the line's last tile;
+            add a, high(VW_SHR) - 2         ;   shifted into the next tile too
             ld h, a
-            ld a, [hl]
-            ld [VW_VLO], a
-            dec h
-            ld a, [hl]
-            jr .s1
-.s0:        xor a
-            ld [VW_VLO], a
+            inc l
             ld a, l
-.s1:        ld h, high(VW_BUF)
-            ld l, e
-            or [hl]
-            ld [hl], a
-            ld a, [VW_VLO]
+            cp d                            ; (carry: the next tile is in the line)
+            ld d, high(VW_BUF)
+            jr nc, .vb
+            ld a, [bc]
+            inc bc
             and a
-            jr z, .nx
-            dec b
-            inc b
-            jr z, .nx
-            ld a, l
-            add a, 8
+            jr z, .z0
             ld l, a
-            ld a, [VW_VLO]
+            ld a, [de]
             or [hl]
-            ld [hl], a
-.nx:        pop hl
-.nx2:       inc e
-            dec c
-            jr nz, .row
+            ld [de], a
+            ld a, e
+            add a, 8
+            ld e, a
+            inc h
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            dec h
+            ld a, e
+            sub 8
+            ld e, a
+.z0:        inc e
+            ld a, [bc]
+            inc bc
+            and a
+            jr z, .z1
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            ld a, e
+            add a, 8
+            ld e, a
+            inc h
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            dec h
+            ld a, e
+            sub 8
+            ld e, a
+.z1:        inc e
+            ld a, [bc]
+            inc bc
+            and a
+            jr z, .z2
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            ld a, e
+            add a, 8
+            ld e, a
+            inc h
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            dec h
+            ld a, e
+            sub 8
+            ld e, a
+.z2:        inc e
+            ld a, [bc]
+            inc bc
+            and a
+            jr z, .z3
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            ld a, e
+            add a, 8
+            ld e, a
+            inc h
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            dec h
+            ld a, e
+            sub 8
+            ld e, a
+.z3:        inc e
+            ld a, [bc]
+            inc bc
+            and a
+            jr z, .z4
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            ld a, e
+            add a, 8
+            ld e, a
+            inc h
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            dec h
+            ld a, e
+            sub 8
+            ld e, a
+.z4:        inc e
+            ld a, [bc]
+            inc bc
+            and a
+            jr z, .z5
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            ld a, e
+            add a, 8
+            ld e, a
+            inc h
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            dec h
+            ld a, e
+            sub 8
+            ld e, a
+.z5:        inc e
+            ld a, [bc]
+            inc bc
+            and a
+            jr z, .z6
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            ld a, e
+            add a, 8
+            ld e, a
+            inc h
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            dec h
+            ld a, e
+            sub 8
+            ld e, a
+.z6:        inc e
+            ld a, [bc]
+            inc bc
+            and a
+            jr z, .z7
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            ld a, e
+            add a, 8
+            ld e, a
+            inc h
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            dec h
+            ld a, e
+            sub 8
+            ld e, a
+.z7:        inc e
+            jp .adv
+.va:        ld d, high(VW_BUF)
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or l
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or l
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or l
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or l
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or l
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or l
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or l
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or l
+            ld [de], a
+            inc e
+            jp .adv
+.vb:
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            inc e
+            ld a, [bc]
+            inc bc
+            ld l, a
+            ld a, [de]
+            or [hl]
+            ld [de], a
+            inc e
 .adv:       ld hl, VW_VSQ                   ; a squeezed word: no gap after the letter
             ld a, [hl]
             and a

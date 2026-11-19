@@ -2865,7 +2865,23 @@ rt_izy_wr:  push af                         ; L = zp pointer; A -> ptr+Y
             ld h, [hl]
             ld l, a
             add hl, bc
-            call nes_wr
+            ld a, h                         ; (inline: RAM and save RAM)
+            cp $20
+            jr nc, .n1
+            and $07
+            or high(NES_RAM)
+.w:         ld h, a
+            ldh a, [wtmp]
+            ld [hl], a
+            pop af
+            ret
+.n1:        cp $60
+            jr c, .o
+            cp $80
+            jr nc, .o
+            add a, $40
+            jr .w
+.o:         call nes_wr
             pop af
             ret
 rt_izx_wr:  push af
