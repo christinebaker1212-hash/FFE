@@ -703,11 +703,19 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   attributes arrive (no more double re-coding per step; visible cells always right);
   re-coding by ANF masks in a block, one queue entry per tile (`retile_b`, `q_block`).
 - Sprite conversion rewritten (camera offsets precomputed, counters in registers).
-- Measured (lagcheck, Gambatte): walking DMG and CGB keep pace; battle CGB keeps pace;
-  battle DMG still about +24 frames per 60 waits in message phases (before: +33);
-  transitions (screen loads) still lag on both.
-- Next: build with `vtile` + swap (coverage `build/cov4` being made), measure; then the
-  battle panel copy (fix:F4A2/F4F1), generic `$2007` path, transitions.
+- Also native: menu screen clear (b14:9C0F), window rows (fix:E14D/E17F), battle panel row
+  (fix:F4EA), battle nametable clear (fix:F2CF) via a bulk `ntfill`; LCD-on DMG map scan
+  (`scan_b`/`scan_row`); DMG sprite slot loads and tile re-coding as 16-byte queue blocks;
+  small-font tiles coded at once; a full VRAM queue is drained in STAT mode 0/1 instead
+  of halting; LCD-off nametable writes take a short path in `rt_ppu_w7`.
+- Test runners feed input exactly: ROM test mode (`TEST_PAD` $D83E = $A5, pads in cart RAM
+  bank 3 by NMI count; `gbrun`/`sgbrun` set it); `gbrun` dumps NES RAM with each shot.
+  PyBoy's CGB picture is not reliable (no double speed): check CGB visuals in mGBA.
+- Measured (lagcheck, Gambatte, 2026-11-19): walking and battle keep pace on DMG and CGB
+  (catch-up absorbs single heavy frames); new-game + battle script total lag DMG 323
+  frames (+4.6%, was 853), CGB 99 (+1.4%), all of it in screen loads (DMG 25-70 frames
+  per load, CGB 9-28). Remaining transition cost is spread: map loading code, map draw,
+  LCD-on scan, re-coding, CHR uploads.
 
 ## Remaining
 - FF1: the speed work above; Select menu (options / formation / suspend), name entry

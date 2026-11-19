@@ -1727,9 +1727,7 @@ scan_b:     push bc
             or b
             ld [SC_O1], a
             ld d, 0
-.r:         ld e, 0
-            ld a, 32
-            call scan_run
+.r:         call scan_row
             inc d
             ld a, d
             cp 30
@@ -1940,12 +1938,15 @@ ntfill:     ld a, b
             ldh a, [ppu_ctrl]
             and 4
             jr nz, .one
-            ldh a, [own1_lo]
-            ld h, a
+            ldh a, [own1_lo]                ; (cells owned by nametable 1: on a CGB their
+            ld h, a                         ;   attributes would change too: byte by byte)
             ldh a, [own1_hi]
             or h
+            jr z, .o0
+            ldh a, [is_cgb]
+            and a
             jr nz, .one
-            ldh a, [ppu_vh]
+.o0:        ldh a, [ppu_vh]
             cp $20
             jr c, .one
             cp $3F
@@ -2000,6 +2001,11 @@ ntfill:     ld a, b
             ld h, a
             call .set                       ; GB map (LCD off)
             pop hl
+            ldh a, [own1_lo]                ; nametable 0 owns these cells now
+            ld b, a
+            ldh a, [own1_hi]
+            or b
+            call nz, nf_own
             ld a, [NF_N]                    ; v += n
             add a, l
             ldh [ppu_vl], a
@@ -2040,6 +2046,74 @@ ntfill:     ld a, b
             jr nz, .sl
 .x:         ret
 
+; ntfill, DMG: HL = first cell offset, NF_N cells: their OWN bits cleared (own1 counts
+; down). Keeps HL, D.
+nf_own:     push hl
+            push de
+            ld a, [NF_N]
+            ld c, a
+            ld a, [NF_N + 1]
+            ld b, a
+            ld a, l
+            and 7
+            ld e, a
+            push hl
+            ld h, high(NBIT)
+            ld l, e
+            ld e, [hl]                      ; E = bit of the first cell
+            pop hl
+            ld a, l                         ; HL = OWN + offset / 8
+            srl h
+            rra
+            srl h
+            rra
+            srl h
+            rra
+            ld l, a
+            ld h, high(OWN)
+.lp:        ld a, e                         ; a whole empty byte: 8 cells at once
+            cp 1
+            jr nz, .bit
+            ld a, [hl]
+            and a
+            jr nz, .bit
+            ld a, b
+            and a
+            jr nz, .skip
+            ld a, c
+            cp 8
+            jr c, .bit
+.skip:      inc l
+            ld a, c
+            sub 8
+            ld c, a
+            jr nc, .nx
+            dec b
+            jr .nx
+.bit:       ld a, [hl]
+            and e
+            jr z, .nb
+            ld a, e
+            cpl
+            and [hl]
+            ld [hl], a
+            ldh a, [own1_lo]
+            sub 1
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            sbc a, 0
+            ldh [own1_hi], a
+.nb:        rlc e
+            jr nc, .sm
+            inc l
+.sm:        dec bc
+.nx:        ld a, b
+            or c
+            jr nz, .lp
+            pop de
+            pop hl
+            ret
+
 ; b14:9C0F (menu screen clear): 960 zeros and 64 $FF from the current PPU address.
 ; Out: X = 0, Y = 0, A = $FF; N = 0, Z = 1, C = 1.
 mclr_b:     ld d, 0
@@ -2079,5 +2153,158 @@ wrow_b:     push bc
             pop af
             ld de, 0
             pop bc                          ; (Y kept)
+            ret
+
+; scan_b's full pass: row D, columns 0-31 (as scan_run, but the palette fetched once per
+; column pair or owner change, the owner bit from a rotating byte). Keeps D.
+SC_OB      = $D82A          ; owner bits of the next 8 cells, this cell's owner, the owner
+SC_CO      = $D82B          ;   the palette was fetched for (fault-dump area DBG + 8..11:
+SC_LO      = $D829          ;   written only on a fault)
+scan_row:   ld a, $FF
+            ld [SC_LT], a
+            ld [SC_LP], a
+            ld a, d
+            and 7
+            swap a
+            add a, a
+            ld [SC_TL], a
+            ld a, d
+            and $1C
+            add a, a
+            add a, $C0
+            ld [SC_AL], a
+            ld a, d
+            and 2
+            ld [SC_RF], a
+            ld a, d
+            add a, a
+            add a, a
+            ld [SC_OL], a
+            push de
+            ld a, d
+            srl a
+            srl a
+            srl a
+            add a, high(NT_SH)
+            ld d, a                         ; D = tile row page (nametable 0)
+            ld e, 0
+            ld b, $FF                       ; (palette not fetched)
+.cell:      ld a, e                         ; owner bits: a new byte every 8 cells
+            and 7
+            jr nz, .ob
+            ld a, [SC_O1]
+            and a
+            jr z, .oz
+            ld a, e
+            rrca
+            rrca
+            rrca
+            ld l, a
+            ld a, [SC_OL]
+            add a, l
+            ld l, a
+            ld h, high(OWN)
+            ld a, [hl]
+.oz:        ld [SC_OB], a
+.ob:        ld a, [SC_OB]                   ; C = owner (0 / 4) of this cell
+            rrca
+            ld [SC_OB], a
+            ld a, 0
+            jr nc, .o0
+            ld a, 4
+.o0:        ld [SC_CO], a
+            add a, d                        ; tile: page D (+ 4), offset SC_TL + column
+            ld h, a
+            ld a, [SC_TL]
+            or e
+            ld l, a
+            ld c, [hl]                      ; C = tile
+            bit 0, e                        ; palette: even column or owner change
+            jr z, .pal
+            ld a, [SC_LO]
+            ld h, a
+            ld a, [SC_CO]
+            cp h
+            jr z, .samep
+.pal:       ld a, [SC_CO]
+            ld [SC_LO], a
+            add a, high(NT_SH) + 3
+            ld h, a
+            ld a, e
+            srl a
+            srl a
+            ld l, a
+            ld a, [SC_AL]
+            add a, l
+            ld l, a
+            ld a, [SC_RF]
+            and a
+            ld a, [hl]
+            jr z, .t
+            swap a
+.t:         bit 1, e
+            jr z, .l
+            rrca
+            rrca
+.l:         and 3
+            ld b, a                         ; B = palette
+.samep:     ld a, [SC_LT]                   ; same tile and palette as the cell before
+            cp c
+            jr nz, .new
+            ld a, [SC_LP]
+            cp b
+            jr z, .nx
+.new:       ld a, c
+            ld [SC_LT], a
+            ld a, b
+            ld [SC_LP], a
+            ld a, c                         ; REF_BM: the tile is used
+            and 7
+            ld l, a
+            ld h, high(NBIT)
+            ld a, [hl]
+            push af
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(REF_BM)
+            ld l, a
+            ld h, high(REF_BM)
+            pop af
+            or [hl]
+            ld [hl], a
+            ld l, c                         ; coded for palette B?
+            ld h, high(TILE_PAL)
+            ld a, [hl]
+            cp b
+            jr z, .pk
+            ld [hl], b
+.mk:        ld a, c
+            call dmg_mark
+            jr .nx
+.pk:        ld a, c                         ; same palette: a parked tile is marked again
+            and 7
+            ld l, a
+            ld h, high(NBIT)
+            ld a, [hl]
+            push af
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(DEFER_BM)
+            ld l, a
+            ld h, high(DEFER_BM)
+            pop af
+            and [hl]
+            jr nz, .mk
+.nx:        inc e
+            ld a, e
+            cp 32
+            jp nz, .cell
+            pop de
             ret
 
