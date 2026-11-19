@@ -12,6 +12,8 @@ rt_wait_fa2a:
             ld [NES_RAM + $101], a
             ld a, $FA
             ld [NES_RAM + $102], a
+            ld a, $4C                       ; JMP
+            ld [NES_RAM + $100], a
             pop af
             call rt_frame
             push af
@@ -27,6 +29,8 @@ rt_wait_fead:
             ld [NES_RAM + $101], a
             ld a, $FE
             ld [NES_RAM + $102], a
+            ld a, $4C                       ; JMP
+            ld [NES_RAM + $100], a
             pop af
             call rt_frame
             push af
