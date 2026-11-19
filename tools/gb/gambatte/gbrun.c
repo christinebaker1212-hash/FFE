@@ -197,6 +197,10 @@ int main(int argc, char** argv) {
 					o = fopen(path, "wb"); if (vr) fwrite(vr, 1, vn, o); fclose(o);
 					snprintf(path, sizeof path, "%s_n%05d.wram", out, nshots[k]);
 					o = fopen(path, "wb"); fwrite(wram, 1, wsize, o); fclose(o);
+					uint8_t* cr = p_retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);   /* + cart RAM */
+					size_t cn = p_retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
+					snprintf(path, sizeof path, "%s_n%05d.cram", out, nshots[k]);
+					o = fopen(path, "wb"); if (cr) fwrite(cr, 1, cn, o); fclose(o);
 				}
 				if (getenv("GBRUN_DBG")) {   /* (debug ring $DE00-$DEFF) */
 					snprintf(path, sizeof path, "%s_n%05d.dbg", out, nshots[k]);

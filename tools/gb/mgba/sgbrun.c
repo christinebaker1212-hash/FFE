@@ -52,6 +52,7 @@ int main(int argc, char** argv) {
 	int frames = atoi(argv[2]); const char* out = argv[3];
 	int dmg = 0; struct press presses[256]; int np = 0; int shots[1024]; int ns = 0;
 	int poke_at = 0; const char* poke_list = 0;
+	unsigned callt = getenv("SGBRUN_CALLS") ? strtoul(getenv("SGBRUN_CALLS"), 0, 16) : 0; static uint32_t callr[2000000], callw[2000000]; int ncall = 0;
 	int prof = getenv("SGBRUN_PROF") != 0; static uint32_t profs[2000000]; static uint32_t proff[2000000]; int prof2 = getenv("SGBRUN_PROF2") ? atoi(getenv("SGBRUN_PROF2")) : 0; unsigned p2tick = 0; int nprof = 0;
 	const char* sram_path = NULL;
 	unsigned char* pads = NULL; long npads = 0; int nshots[1024]; int nns = 0; int nshot_done[1024] = {0};
@@ -144,6 +145,15 @@ int main(int argc, char** argv) {
 			uint32_t fc = core->frameCounter(core);
 			while (core->frameCounter(core) == fc) {
 				core->step(core);
+				if (callt) {                            /* SGBRUN_CALLS=HEX: return address at each entry */
+					uint32_t pc = 0; core->readRegister(core, "pc", &pc);
+					if ((pc & 0xFFFF) == callt && ncall < 2000000) {
+						uint32_t sp = 0; core->readRegister(core, "sp", &sp); sp &= 0xFFFF;
+						unsigned ra = core->rawRead8(core, sp, -1) | core->rawRead8(core, sp + 1, -1) << 8;
+						unsigned rb = ra < 0x4000 ? 0 : ((struct GB*) core->board)->memory.currentBank;
+						callr[ncall] = rb << 16 | ra; callw[ncall++] = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
+					}
+				}
 				int take;
 				if (getenv("SGBRUN_PROFC")) {           /* (with SGBRUN_PROFC: every PROF2 cycles, halts included) */
 					static uint64_t nextc = 0;
@@ -157,7 +167,8 @@ int main(int argc, char** argv) {
 					unsigned nn = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 					if (nprof < 2000000) { profs[nprof] = bank << 16 | pc; proff[nprof++] = nn; }
 					if (getenv("SGBRUN_PROF_SP") && nprof < 2000000) {   /* + the word at SP (a caller), for profiling helpers */
-						uint32_t sp = 0; core->readRegister(core, "sp", &sp); sp &= 0xFFFF;
+						uint32_t sp = 0; core->readRegister(core, "sp", &sp);   /* (SGBRUN_PROF_SPOFF=N: the word at SP + N) */
+						sp = (sp + (getenv("SGBRUN_PROF_SPOFF") ? atoi(getenv("SGBRUN_PROF_SPOFF")) : 0)) & 0xFFFF;
 						unsigned ra = core->rawRead8(core, sp, -1) | core->rawRead8(core, sp + 1, -1) << 8;
 						profs[nprof] = 0x1000000u | (unsigned) ((struct GB*) core->board)->memory.currentBank << 16 | ra; proff[nprof++] = nn;
 					}
@@ -242,6 +253,7 @@ int main(int argc, char** argv) {
 	/* frame-wait counter of the runtime ($D830), to confirm the game ran */
 	unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 	printf("frames %d, video %ux%u, NES frame waits %u, KEY1 %02X\n", frames, w, h, n, core->busRead8(core, 0xFF4D));
+	for (int k = 0; k < ncall; k++) printf("C %02X:%04X %u\n", (callr[k] >> 16) & 0xFF, callr[k] & 0xFFFF, callw[k]);
 	if (prof || prof2) for (int k = 0; k < nprof; k++) printf("%s %02X:%04X %u\n", (profs[k] >> 24) ? "S" : "P", (profs[k] >> 16) & 0xFF, profs[k] & 0xFFFF, proff[k]);
 	core->deinit(core);
 	return 0;

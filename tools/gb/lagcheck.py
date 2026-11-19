@@ -6,7 +6,8 @@ takes exactly as many frames; extra GB frames are lag (the game runs slower, the
 stretches).
 usage: PYTHONPATH=build/emu lagcheck.py NES GB UNTIL [--field SCRIPT | --newgame | --input MODE]
        [--dmg | --sgb (mGBA)] [--poke P [--poke-at F]] [--win 60]
-  prints lag per window of NES frame waits, the worst single waits, and the total."""
+  prints lag per window of NES frame waits, the worst single waits, and the total.
+  env LAG_DUMP=FILE writes 'wait GB-frames NES-frames' per wait (for grouping profiles)."""
 import os, sys, subprocess, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cynes import NES
@@ -92,6 +93,9 @@ row = []
 for w0 in range(k0, k1 - win + 1, win):
     row.append('%d:%d' % (w0, span(w0, w0 + win)))
 print('lag per %d waits: %s' % (win, ' '.join(row)))
+if os.environ.get('LAG_DUMP'):                 # LAG_DUMP=FILE: "k gb_frames nes_frames" per wait
+    with open(os.environ['LAG_DUMP'], 'w') as o:
+        for k in ks: o.write('%d %d %d\n' % (k, gb_at[k + 1] - gb_at[k], nes_at[k + 1] - nes_at[k]))
 if os.environ.get('LAG_SHOW'):                 # LAG_SHOW=k,..: GB / NES frames of those waits
     print('GB/NES frames:', ' '.join('%d:%d/%d' % (k, gb_at[k + 1] - gb_at[k], nes_at[k + 1] - nes_at[k])
                                       for k in map(int, os.environ['LAG_SHOW'].split(',')) if k in gb_at and k + 1 in gb_at))
