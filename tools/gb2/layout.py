@@ -71,19 +71,20 @@ end:
 
 
 # Battle RAM (free in battle, see the module docstring)
-RAM = dict(GBIDX=0x7FDF, GBRB=0x7FE0, GBPOOL=0x7FE1, VX=0x7FE2, VN=0x7FE3, VT=0x7FE4, VC=0x7FE5,
+RAM = dict(MV=0x75F0, GBIDX=0x7FDF, GBRB=0x7FE0, GBPOOL=0x7FE1, VX=0x7FE2, VN=0x7FE3, VT=0x7FE4, VC=0x7FE5,
            VSH=0x7FE6, VCNT=0x7FE7, VP=0xD2, VQ=0xD4, VS=0xD6, VNUM=0x7FEC, VPAD=0x7FEE, VDIG=0x7FEF,
            VROW=0x7FF0, VCOL=0x7FF1, VW=0x7FF2, VH=0x7FF3, VLINE=0x7FF4, VSV=0x7FF5, VI=0x7FF6,
            NL=0x7FF7, NS=0x7FF8, VSQZ=0x7FF9, VI0=0x7FFA, VI1=0x7FFB, VCX=0x7FFC, VFILL=0x7FFD, VLN=0x7FFE,
            USED=0x75C0, VBUF=0x7800, BLANKT=0x7888, FTILE=0x7889, PTILE=0x7891, LTILE=0x78B9, XTILE=0x78D1,
            NTBUF=0x78D5, ATKBUF=0x75E0, MOPEN=0x75F0, MLINE=0x75F1, MPAGE=0x75F2,
-           LSHOW=0x75C0, LNAV=0x75DC, LBASE=0x75DD, LDGAP=0x7FE8, LCOV=0x7FFF,
+           LSHOW=0x75C0, LNAV=0x75DC, LBASE=0x75DD, LDGAP=0x7FE8, LCOV=0x7FFF, GBARG=0x7FE9, MSCR=0x7FEA, TBLHI=0x7FEB, MSLOT=0x75F8, SLOTP=0x75FC,
            LWID=0x75E0, LRING=0x75F4, LSCR=0x75F5)    # (L*: treasure screen, after the battle)
 # fixed-bank entries (5 bytes each, at $FFD0 and $FEEC): routine, bank to return to (bank 23 RETB), the NES routine replaced
 ENTRIES = [('gb_party', 0x0C, 0x912A), ('gb_names', 0x0C, 0x910D), ('gb_names', 0x0C, 0x981D),
            ('gb_cmds', 0x0C, 0x982C), ('gb_msgopen', 0x05, 0xAA57), ('gb_msgclose', 0x05, 0xAB4F),
            ('gb_magic', 0x0C, None), ('gb_magcost', 0x0C, None), ('gb_gear', 0x0C, None),
-           ('gb_lootscr', 0x05, None), ('gb_lootf', 0x05, None), ('gb_lootnav', 0x05, None)]
+           ('gb_lootscr', 0x05, None), ('gb_lootf', 0x05, None), ('gb_lootnav', 0x05, None),
+           ('gb_menu', 0x0E, None)]            # (index 12: entry gbm at $F8F0, A = sub-command)
 # (None: called from a patched JSR, not replacing a routine)
 
 ENT_SRC = '''
@@ -109,6 +110,8 @@ gbtab:
 
 ; ---- tile pool: table-1 tiles this battle's battlefield does not use
 poolinit:
+    lda #$10            ; (battle windows: pattern table 1)
+    sta TBLHI
     lda GBPOOL
     beq .go
     rts
@@ -265,7 +268,7 @@ vupload:
     lsr a
     lsr a
     lsr a
-    ora #$10
+    ora TBLHI
     sta $2006
     pla
     asl a
@@ -299,6 +302,15 @@ vupload:
 .end:
     jmp scroll
 scroll:
+    lda MSCR            ; field menu (camera 1 / 1): its $2000, no scroll, the music
+    beq .b
+    lda $FF
+    sta $2000
+    lda #0
+    sta $2005
+    sta $2005
+    jmp $C74F
+.b:
     lda $3B
     sta $2000
     lda $39
@@ -402,13 +414,13 @@ blank:                  ; tile BLANKT = window colour 2; NES rows 18-23 cols 0-3
     cmp #24
     bne .r
     rts
-tileaddr:               ; A = table-1 tile: PPU address of its pattern
+tileaddr:               ; A = tile: PPU address of its pattern (table TBLHI)
     pha
     lsr a
     lsr a
     lsr a
     lsr a
-    ora #$10
+    ora TBLHI
     sta $2006
     pla
     asl a
@@ -1396,6 +1408,8 @@ gb_gear:
 ; its own tiles (LCT), position (LCR / LCC) and length (LCN); a cell is drawn again when
 ; the item id it shows (LSHOW) changes.
 gb_lootscr:             ; b5:9FDA (after the fade out, before the fade in)
+    lda #$10
+    sta TBLHI
     lda #0
     sta $2005
     sta $2005
@@ -1956,6 +1970,637 @@ gb_lootnav:             ; b5 loot menu: right / left / down / up (replaces b5:A1
 .x2:
     rts
 
+; ---- field main menu (owner-approved revision of option A, ff2_mock9 + portraits inside
+; the frame): camera (1, 1): GB (x, y) = NES (x+1, y+1). Party window NES (1,1,12,18), per
+; member k (rows 2+4k..5+4k): portrait box cols 2-5 (background tiles $01+12k.., black
+; column 5; its 2 x 2 attribute quads get a palette of its own), name / HP / MP / status
+; word in cols 6-11 (HP and MP small letters: tiles $31+12k..). Commands NES (13,1,8,7),
+; Gil NES (13,15,8,4) (amount in small digits: tiles $61-$66).
+; GBARG: 0 init (menu start, LCD off), 1 party window, 2 Gil amount, 3 attributes back to
+; the window palette (before a sub-menu), 4 field camera (menu closed)
+gb_menu:
+    lda $57
+    pha
+    lda #23             ; (the music update's bank restore comes back here)
+    sta $57
+    lda #0
+    sta TBLHI
+    lda GBARG           ; (a word table: the translator finds its targets)
+    asl a
+    tax
+    lda MJT,x
+    sta $00
+    lda MJT+1,x
+    sta $01
+    jsr .go
+    pla
+    sta $57
+    lda #0
+    sta MSCR
+    lda #$10
+    sta TBLHI
+    rts
+.go:
+    jmp ($0000)
+MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit
+
+gm_exit:
+    lda #6
+    sta $5800
+    sta $5801
+    rts
+
+gm_init:                ; LCD off (b14:ACE3): camera, portrait tiles, their palettes
+    lda #1
+    sta $5800
+    sta $5801
+    lda #0
+    sta $5802
+    sta $5803
+    lda #$FF
+    sta SLOTP
+    sta SLOTP+1
+    sta SLOTP+2
+    lda #0
+    sta VI
+.mem:
+    lda VI
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    tax                 ; X = 64 * k
+    lda #$FF
+    ldy VI
+    sta MSLOT,y
+    lda $6235,x         ; hidden (as b14:8852)
+    bpl .vis
+    jmp .next
+.vis:
+    lda $6101,x         ; palette index / portrait as b14:8852 and fix:E6FA
+    ldy #$0B            ; dead: cross portrait (id 9)
+    sty VT
+    ldy #9
+    asl a
+    bcs .got
+    ldy #$0A            ; stone: own portrait
+    sty VT
+    ldy #0
+    asl a
+    bcs .own
+    ldy #$09            ; toad: toad portrait (id 10)
+    sty VT
+    ldy #10
+    asl a
+    bcs .got
+.own:
+    lda $6100,x
+    and #$0F
+    tay
+    ldx VT
+    cpx #$0A
+    beq .got
+    sty VT              ; (normal: palette by character)
+.got:
+    sty VC              ; portrait id
+    ldx VT
+    lda PALID,x         ; sprite palette 0-3 -> BG slot 0-2
+    sta VSH
+    ldx #0
+.sl:
+    lda SLOTP,x
+    cmp VSH
+    beq .slot
+    cmp #$FF
+    beq .new
+    inx
+    cpx #3
+    bne .sl
+    ldx #0
+    beq .slot
+.new:
+    lda VSH
+    sta SLOTP,x
+.slot:
+    txa
+    ldy VI
+    sta MSLOT,y
+    asl a
+    asl a
+    tay                 ; Y = 4 * slot, X = 4 * palette
+    lda VSH
+    asl a
+    asl a
+    tax
+    lda $03D1,x
+    sta $03C1,y
+    lda $03D2,x
+    sta $03C2,y
+    lda $03D3,x
+    sta $03C3,y
+    ldx VC              ; tiles: PPU (1 + 12k) * 16, 192 bytes from PORTG + 192 * id
+    lda PGLO,x
+    sta VQ
+    lda PGHI,x
+    sta VQ+1
+    lda VI
+    asl a
+    adc VI              ; 3k
+    asl a
+    asl a               ; 12k
+    clc
+    adc #1
+    jsr tileaddr
+    ldy #0
+.cp:
+    lda (VQ),y
+    sta $2007
+    iny
+    cpy #192
+    bne .cp
+.next:
+    inc VI
+    lda VI
+    cmp #4
+    beq .done
+    jmp .mem
+.done:
+    jmp $DC30           ; palettes to the PPU (as b14:ACE3)
+
+gm_party:               ; b14:AD0A (replaces the four member windows b14:B396)
+    lda #1
+    sta MSCR
+    ldx #0              ; the renderer's RAM ($7800-$78FF, menu cursor data here) saved
+.sv:
+    lda $7800,x
+    sta $7600,x
+    inx
+    bne .sv
+    ldx #7
+.ft:
+    txa
+    clc
+    adc #$F7
+    sta FTILE,x
+    dex
+    bpl .ft
+    lda #$FF
+    sta BLANKT
+    ldx #0
+.cl:
+    sta $7700,x
+    inx
+    cpx #160
+    bne .cl
+    lda #0
+    sta VFILL
+    sta NL
+.mem:
+    ldx NL
+    lda MSLOT,x
+    cmp #$FF
+    bne .shown
+    jmp .next
+.shown:
+    lda MBASE,x         ; Y = buffer offset of the block (40k)
+    sta VSV
+    tay
+    lda NL              ; portrait: tiles 1 + 12k + 3r + c, column 3 = tile 0 (black)
+    asl a
+    adc NL
+    asl a
+    asl a
+    clc
+    adc #1
+    sta VT
+    ldx #0
+.pr:
+    lda VT
+    sta $7700,y
+    inc VT
+    lda VT
+    sta $7701,y
+    inc VT
+    lda VT
+    sta $7702,y
+    inc VT
+    lda #0
+    sta $7703,y
+    tya
+    clc
+    adc #10
+    tay
+    inx
+    cpx #4
+    bne .pr
+    lda NL              ; X = 64 k
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    sta VCX
+    tax
+    ldy VSV             ; name (row 0, cols 4-9)
+    lda #6
+    sta VCNT
+.nm:
+    lda $6102,x
+    sta $7704,y
+    inx
+    iny
+    dec VCNT
+    bne .nm
+    lda NL              ; HP / MP tiles $31 + 12k / $37 + 12k (rows 1 / 2)
+    asl a
+    adc NL
+    asl a
+    asl a
+    clc
+    adc #$31
+    sta VT
+    lda VSV
+    clc
+    adc #14
+    tay
+    ldx #0
+.hm:
+    lda VT
+    sta $7700,y
+    clc
+    adc #6
+    sta $770A,y
+    inc VT
+    iny
+    inx
+    cpx #6
+    bne .hm
+    ldx VCX             ; status word (row 3, cols 5-9) as fix:ED04
+    lda $6101,x
+    beq .st
+    ldy #7
+.sb:
+    asl a
+    bcs .st0
+    dey
+    bne .sb
+.st0:
+    tya
+.st:
+    sta VT              ; 5 * index
+    asl a
+    asl a
+    clc
+    adc VT
+    tax
+    lda VSV
+    clc
+    adc #35
+    tay
+    lda #5
+    sta VCNT
+.sw:
+    lda STW,x
+    sta $7700,y
+    inx
+    iny
+    dec VCNT
+    bne .sw
+    ldx VCX             ; HP line
+    lda #CHH
+    sta VC
+    lda $6108,x
+    sta MV
+    lda $6109,x
+    sta MV+1
+    lda $610A,x
+    sta MV+2
+    lda $610B,x
+    sta MV+3
+    jsr gm_line
+    lda NL
+    asl a
+    adc NL
+    asl a
+    asl a
+    clc
+    adc #$31
+    jsr gm_up
+    ldx VCX             ; MP line
+    lda #CHM
+    sta VC
+    lda $610C,x
+    sta MV
+    lda $610D,x
+    sta MV+1
+    lda $610E,x
+    sta MV+2
+    lda $610F,x
+    sta MV+3
+    jsr gm_line
+    lda NL
+    asl a
+    adc NL
+    asl a
+    asl a
+    clc
+    adc #$37
+    jsr gm_up
+.next:
+    inc NL
+    lda NL
+    cmp #4
+    beq .win
+    jmp .mem
+.win:
+    lda #1
+    sta VROW
+    sta VCOL
+    lda #12
+    sta VW
+    lda #18
+    sta VH
+    lda #$00
+    sta VP
+    lda #$77
+    sta VP+1
+    jsr ntwin
+    jsr gm_attr2
+    ldx #0
+.rs:
+    lda $7600,x
+    sta $7800,x
+    inx
+    bne .rs
+    rts
+gm_up:                  ; VBUF's 6 tiles to tiles A .. A+5
+    ldx #0
+.l:
+    sta NTBUF,x
+    clc
+    adc #1
+    inx
+    cpx #6
+    bne .l
+    lda #6
+    sta VN
+    lda #<NTBUF
+    sta VP
+    lda #>NTBUF
+    sta VP+1
+    jmp vupload
+gm_line:                ; VC = label letter ('H' / 'M'); MV = current, MV+2 = maximum:
+    lda #6              ;   "HP" / "MP", "cur/max" ending at the line's right edge
+    sta VN
+    jsr vclear
+    lda VC
+    jsr vchar
+    lda #CHP
+    jsr vchar
+    lda MV+2
+    sta VNUM
+    lda MV+3
+    sta VNUM+1
+    jsr ndig
+    sta NS
+    lda MV
+    sta VNUM
+    lda MV+1
+    sta VNUM+1
+    jsr ndig            ; start = 48 - 4 (dc + dm + 1)
+    sta VCNT
+    clc
+    adc NS
+    adc #1
+    asl a
+    asl a
+    sta VT
+    lda #48
+    sec
+    sbc VT
+    sta VT
+    lda VCNT
+    asl a
+    asl a
+    clc
+    adc VT
+    jsr vnum            ; current (VNUM still the current)
+    lda #$1A
+    jsr vchar
+    lda MV+2
+    sta VNUM
+    lda MV+3
+    sta VNUM+1
+    lda NS
+    asl a
+    asl a
+    clc
+    adc VX
+    jmp vnum
+ndig:                   ; A = digits of VNUM (1-4)
+    ldx #0
+.c:
+    lda VNUM
+    cmp POW,x
+    lda VNUM+1
+    sbc POWH,x
+    bcs .x
+    inx
+    cpx #3
+    bne .c
+.x:
+    txa
+    eor #$FF
+    clc
+    adc #5
+    rts
+
+gm_attr:                ; window palette everywhere (sub-menus draw anywhere)
+    lda #1
+    sta MSCR
+    ldx #63
+    lda #$FF
+.c:
+    sta $77A0,x
+    dex
+    bpl .c
+    bmi gm_aw
+gm_attr2:               ; window palette, portrait quads of shown members their slot
+    ldx #63
+    lda #$FF
+.c:
+    sta $77A0,x
+    dex
+    bpl .c
+    lda #0
+    sta VI
+.m:
+    ldx VI
+    lda MSLOT,x
+    cmp #$FF
+    beq .n
+    sta VC
+    lda VI
+    asl a
+    asl a
+    sta VCNT            ; quad entries 4k .. 4k+3
+    ldy #4
+.q:
+    ldx VCNT
+    lda QSH,x
+    tax
+    lda VC
+.s:
+    dex
+    bmi .sd
+    asl a
+    jmp .s
+.sd:
+    sta VT
+    ldx VCNT
+    lda QIDX,x
+    tax
+    lda $77A0,x
+    pha
+    txa
+    pha
+    ldx VCNT
+    lda QMSK,x
+    sta VSH
+    pla
+    tax
+    pla
+    and VSH
+    ora VT
+    sta $77A0,x
+    inc VCNT
+    dey
+    bne .q
+.n:
+    inc VI
+    lda VI
+    cmp #4
+    bne .m
+gm_aw:                  ; the 64 bytes to $23C0 in one vblank
+    jsr $FA2A
+    lda #$23
+    sta $2006
+    lda #$C0
+    sta $2006
+    ldx #0
+.w:
+    lda $77A0,x
+    sta $2007
+    inx
+    cpx #64
+    bne .w
+    jmp scroll
+
+gm_gil:                 ; Gil amount (24 bits, $601C) in small digits, right edge of the
+    lda #1              ;   Gil window's first line (NES row 16, cols 14-19)
+    sta MSCR
+    ldx #0
+.sv:
+    lda $7800,x
+    sta $7600,x
+    inx
+    bne .sv
+    lda $601C
+    sta MV
+    lda $601D
+    sta MV+1
+    lda $601E
+    sta MV+2
+    ldx #0              ; 7 decimal digits into NTBUF+8..
+.d:
+    lda #0
+    sta VDIG
+.sub:
+    lda MV
+    sec
+    sbc P24L,x
+    sta VT
+    lda MV+1
+    sbc P24M,x
+    sta VC
+    lda MV+2
+    sbc P24H,x
+    bcc .nd
+    sta MV+2
+    lda VC
+    sta MV+1
+    lda VT
+    sta MV
+    inc VDIG
+    jmp .sub
+.nd:
+    lda VDIG
+    sta NTBUF+8,x
+    inx
+    cpx #7
+    bne .d
+    ldx #0
+.z:
+    lda NTBUF+8,x
+    bne .nz
+    inx
+    cpx #6
+    bne .z
+.nz:
+    stx VI              ; first digit shown
+    lda #6
+    sta VN
+    jsr vclear
+    lda #7              ; VX = 48 - 4 * digits
+    sec
+    sbc VI
+    asl a
+    asl a
+    sta VT
+    lda #48
+    sec
+    sbc VT
+    sta VX
+.dr:
+    ldx VI
+    cpx #7
+    beq .up
+    lda NTBUF+8,x
+    clc
+    adc #$10
+    jsr vchar
+    inc VI
+    jmp .dr
+.up:
+    lda #$61
+    jsr gm_up
+    jsr $FA2A           ; the row: tiles $61-$66 at $220E
+    lda #$22
+    sta $2006
+    lda #$0E
+    sta $2006
+    ldx #$61
+.r:
+    stx $2007
+    inx
+    cpx #$67
+    bne .r
+    jsr scroll
+    ldx #0
+.rs:
+    lda $7600,x
+    sta $7800,x
+    inx
+    bne .rs
+    rts
+P24L: .db $40, $A0, $10, $E8, $64, $0A, $01
+P24M: .db $42, $86, $27, $03, $00, $00, $00
+P24H: .db $0F, $01, $00, $00, $00, $00, $00
+MBASE: .db 0, 40, 80, 120
+
 BIT:    .db $80, $40, $20, $10, $08, $04, $02, $01
 POW:    .db <1000, <100, <10, <1
 POWH:   .db >1000, >100, >10, >1
@@ -2141,6 +2786,42 @@ def loot_data(rom, gw):
     return out + fits
 
 
+def menu_data(rom):
+    """main menu tables from the user's ROM: the 12 portraits (bank 9, pointers fix:E76A,
+    192 bytes each), their palette indices (b14:890B), the status words of text ids
+    $F6-$FD (bank 10 table $8400, 5 cells), and the attribute quads of the portrait boxes"""
+    import importlib.util
+    ins = _insert_module()
+    b9 = rom[HDR + 9 * BANK:HDR + 10 * BANK]
+    fix = rom[HDR + 31 * BANK:HDR + 32 * BANK]
+    b10 = rom[HDR + 10 * BANK:HDR + 11 * BANK]
+    b14 = rom[HDR + 14 * BANK:HDR + 15 * BANK]
+    out = 'PORTG:\n'
+    for i in range(12):
+        o = fix[0x276A + i] * 16
+        out += ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in b9[o + j:o + j + 16]) for j in range(0, 192, 16))
+    out += 'PGLO: .db %s\nPGHI: .db %s\n' % (', '.join('<(PORTG+%d)' % (192 * i) for i in range(12)),
+                                              ', '.join('>(PORTG+%d)' % (192 * i) for i in range(12)))
+    out += 'PALID: .db %s\n' % ', '.join('$%02X' % v for v in b14[0x090B:0x0917])
+    stw = []
+    for k in range(8):
+        i = 0xF6 + k
+        p = b10[0x0400 + 2 * i] | b10[0x0400 + 2 * i + 1] << 8
+        o = p - 0x8000; cs = bytes(b10[o:b10.index(0, o)])
+        assert len(cs) <= 5, cs
+        stw += list(cs) + [0xFF] * (5 - len(cs))
+    out += 'STW: .db %s\n' % ', '.join('$%02X' % v for v in stw)
+    qi, qs, qm = [], [], []
+    for k in range(4):
+        for qy in (1 + 2 * k, 2 + 2 * k):
+            for qx in (1, 2):
+                sh = ((qy & 1) * 2 + (qx & 1)) * 2
+                qi.append((qy >> 1) * 8 + (qx >> 1)); qs.append(sh); qm.append(~(3 << sh) & 0xFF)
+    for nm, v in (('QIDX', qi), ('QSH', qs), ('QMSK', qm)):
+        out += '%s: .db %s\n' % (nm, ', '.join(str(x) for x in v))
+    return out, dict(CHH=ins.ENC['H'], CHM=ins.ENC['M'], CHP=ins.ENC['P'])
+
+
 def bank23(rom, L, extra=''):
     """bank 23 source + data from the user's ROM (first monster tiles, boss tilemaps, frame
     tiles) and the glyph tables"""
@@ -2158,7 +2839,8 @@ def bank23(rom, L, extra=''):
     data, offs = bytearray(), []
     for c in range(256):
         offs.append(len(data)); data += bytes(g.get(c, []))
-    nsrc = names_data(rom) + loot_data(rom, gw)
+    mdata, msyms = menu_data(rom)
+    nsrc = names_data(rom) + loot_data(rom, gw) + mdata
     src = B23_SRC.replace('GBTAB', ', '.join(name for name, rb, nes in ENTRIES)) + nsrc + extra + '\nFIRST: .db ' + ', '.join('$%02X' % v for v in first)
     src += '\nBOSSUSED:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in b) for b in boss)
     src += 'FRAMEGFX:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in frame[i:i + 16]) for i in range(0, 128, 16))
@@ -2166,7 +2848,10 @@ def bank23(rom, L, extra=''):
     src += 'GLYPHS:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in data[i:i + 16]) for i in range(0, len(data), 16))
     src += 'GOFF:\n' + ''.join('    .db %s\n' % ', '.join('<(GLYPHS+%d)' % o for o in offs[i:i + 16]) for i in range(0, 256, 16))
     src += 'GHI:\n' + ''.join('    .db %s\n' % ', '.join('>(GLYPHS+%d)' % o for o in offs[i:i + 16]) for i in range(0, 256, 16))
-    return asm(src, syms=dict(RAM, BUF=0x5E40, **L))
+    return asm(src, syms=dict(RAM, BUF=0x5E40, **L, **msyms))
+
+
+GBM = [None]            # the main menu's entry (set by battle(), used by main_menu())
 
 
 def battle(rom):
@@ -2226,11 +2911,22 @@ def battle(rom):
         e = asm(ent, syms=dict(gbf=f.labels['gbf']))
         assert e.org + len(e.bytes) <= end
         put(rom, 31, e.org, e.bytes); labels.update(e.labels)
-    assert len(ENTRIES) <= 12
+    assert len(ENTRIES) == 13
+    g = asm('''
+    org $F8F0
+gbm:                    ; gb_menu (entry 12): A = sub-command
+    sta GBARG
+    ldx #12
+    jmp gbf
+''', syms=dict(RAM, gbf=f.labels['gbf']))
+    assert set(rom[HDR + 31 * BANK + 0x38F0:HDR + 31 * BANK + 0x38F0 + len(g.bytes)]) <= {0}
+    put(rom, 31, g.org, g.bytes)
+    labels['e12'] = g.labels['gbm']
     class E: pass
     e = E(); e.labels = labels
     for k, (name, rb, nes) in enumerate(ENTRIES):
         if nes is not None: put(rom, rb, nes, bytes([0x4C]) + e.labels['e%d' % k].to_bytes(2, 'little'))
+    GBM[0] = labels['e12']
     ent = {name: e.labels['e%d' % k] for k, (name, rb, nes) in enumerate(ENTRIES)}
     put(rom, 12, 0x9DE3, bytes([0x20]) + ent['gb_magic'].to_bytes(2, 'little'), old=bytes([0x20, 0x50, 0x92]))
     put(rom, 12, 0xA058, bytes([0x4C]) + ent['gb_gear'].to_bytes(2, 'little'), old=bytes([0x4C, 0x50, 0x92]))
@@ -2397,6 +3093,64 @@ LONG_NAMES = {137: 'plate', 41: 'Bottle', 90: 'Earth'}     # Diamond Breastplate
 LONG_TILES = [0x7B, 0x7C, 0x7D, 0x7E, 0x7F, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6]   #   Acid Bottle, Sword of the Earth
 
 
+# main menu windows (b14 menu window table $B48C/$B4A5/$B4BE/$B4D7): 4 commands, 5 Gil
+MM_WIN = {4: (13, 1, 8, 8), 5: (13, 15, 8, 4)}      # (heights even: rows drawn in pairs)
+MM_CMDS = ['Items', 'Magic', 'Equip', 'Status', 'Save']
+
+
+def main_menu(rom, ins, bank, sysone):
+    """main menu (gb_menu in bank 23): hooks in bank 14, windows, strings 27 / 28"""
+    m = asm('''
+    org $87D0
+mm_init:                ; b14:ACE3 (LCD off): portraits, palettes (gm_init ends with DC30)
+    lda #0
+    jmp GBM
+mm_party:               ; b14:AD0A: the party window
+    lda #1
+    jmp GBM
+mm_gil:                 ; b14:ADB3: commands text, then the Gil amount
+    jsr $B3DF
+    lda #2
+    jmp GBM
+mm_close:               ; b14:B380 (close menu, before every sub-menu): window palette
+    jsr $C46E
+    lda #3
+    jmp GBM
+mm_exit:                ; b14:AD8C (menu closed): field camera, then close menu
+    lda #4
+    jsr GBM
+    jmp $B380
+mm_save:                ; b14:B1D7 (save menu, no close menu): window palette
+    jsr $DA8F
+    lda #3
+    jmp GBM
+''', syms=dict(GBM=GBM[0]))
+    assert m.org + len(m.bytes) <= 0x8800
+    assert set(rom[HDR + 14 * BANK + 0x07D0:HDR + 14 * BANK + 0x07D0 + len(m.bytes)]) <= {0, 0xFF}
+    put(rom, 14, m.org, m.bytes)
+    L = m.labels
+    put(rom, 14, 0xACE3, bytes([0x20]) + L['mm_init'].to_bytes(2, 'little'), old=bytes.fromhex('2030dc'))
+    put(rom, 14, 0xAD0A, bytes([0x20]) + L['mm_party'].to_bytes(2, 'little'), old=bytes.fromhex('2096b3'))
+    put(rom, 14, 0xADB3, bytes([0x4C]) + L['mm_gil'].to_bytes(2, 'little'), old=bytes.fromhex('4cdfb3'))
+    put(rom, 14, 0xB380, bytes([0x20]) + L['mm_close'].to_bytes(2, 'little'), old=bytes.fromhex('206ec4'))
+    put(rom, 14, 0xAD8C, bytes([0x20]) + L['mm_exit'].to_bytes(2, 'little'), old=bytes.fromhex('2080b3'))
+    put(rom, 14, 0xB1D7, bytes([0x20]) + L['mm_save'].to_bytes(2, 'little'), old=bytes.fromhex('208fda'))
+    put(rom, 14, 0x8800, b'\x60', old=b'\xa2')             # no sprite portraits (main menu)
+    for w, (x, y, wd, h) in MM_WIN.items():
+        for base, v in ((0xB48C, x), (0xB4A5, y), (0xB4BE, wd), (0xB4D7, h)):
+            put(rom, 14, base + w, bytes([v]))
+    # character select (b14:AEAA, x / y tiles per member): the hand at the left screen edge
+    put(rom, 14, 0xAEAA, bytes(v for k in range(4) for v in (MM_SEL_X, MM_SEL_Y + 4 * k, 0, 0)))
+    rom[sysone + 28 // 8] |= 1 << (28 % 8)                  # Gil window one row per line
+    t27 = '\n'.join('{15:00}' + c for c in MM_CMDS)
+    t28 = '\n{14:03}Gil'
+    for sid, t in ((27, t27), (28, t28)):
+        bank.put_ptr(0x8400 + 2 * sid, bank.alloc(ins.enc(t) + b'\0'))
+
+
+MM_SEL_X, MM_SEL_Y = 0, 3
+
+
 def keyword_menus(rom, ins, bank):
     """windows 1 / 2 moved (table fix:E9AA, sprite regions fix:E892), the Ask / Learn /
     Items menu (system 26) one row per line (ExRAM SYSONE bit), the keyword / item lists
@@ -2443,6 +3197,7 @@ kwback:
         put(rom, 14, a, bytes([0x20]) + k.labels['kwopen'].to_bytes(2, 'little') + b'\xEA', old=bytes.fromhex('a9028596'))
     for a in (0x91A5, 0x91AF, 0x91B5):
         put(rom, 14, a, bytes([0x4C]) + k.labels['kwback'].to_bytes(2, 'little'), old=bytes.fromhex('4c7491'))
+    main_menu(rom, ins, bank, o)
     tiles = list(LONG_TILES)
     for e in json.load(open('script/ff2/names.json')):
         if e['id'] not in LONG_NAMES: continue

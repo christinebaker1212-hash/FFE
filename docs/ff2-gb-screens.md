@@ -30,7 +30,18 @@ Re-layouts are done in the NES code (NES side, `tools/gb2/layout.py`, applied af
 Box over the top of the view (GB rows 0-7: frame, 6 lines of 18 columns, frame), the party
 below stays visible; same text re-wrapped at 18 columns, a new page of 6 lines on A.
 
-## Main menu (approved 2026-11-19: option A of `ff2_mock4_menu_portraits.png`)
+## Main menu, as built (owner approved the revision `ff2_mock9_menu_bg.png`, "but still keep
+them inside the border window", 2026-11-19)
+- Four portraits are 48 sprites; a Game Boy shows 40, so the portraits are background tiles
+  (copied from the ROM at menu start into the menu's unused BG tiles $01-$30). NES colours
+  come in 16 x 16 blocks: camera (1, 1), so the party window NES (1,1,12,18) is GB (0,0,12,18)
+  and each portrait box (NES cols 2-5, rows 2+4k..5+4k) covers whole attribute quads, with
+  the member's portrait palette in a BG palette of its own (menu BG palettes 0-2 are free).
+- Per member: name, HP cur/max, MP cur/max (small letters / 3-px digits), status word.
+- Commands GB (12,0,8,8), one per row, hand over the frames between the windows; Gil GB
+  (12,14,8,4): amount in 3-px digits, "Gil" below.
+
+## Main menu (approved 2026-11-19: option A of `ff2_mock4_menu_portraits.png`; superseded above)
 Owner: keep the portraits. Party window over the left 13 columns, full height, one 4-row
 block per member: portrait (32 x 32), name, HP current/max, MP current/max (3-px digits),
 status word. Commands (Items, Magic, Equip, Status, Save; cols 13-19 rows 0-6) and Gil

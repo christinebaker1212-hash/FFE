@@ -306,6 +306,28 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   S is exact only as a round trip).
 - Open: window 3 (money) and the shop windows wait for the shop layout.
 
+## Main menu (2026-11-19, owner approved `ff2_mock9` with the portraits inside the frame)
+- `layout.main_menu` + bank-23 `gb_menu` (one entry, `gbm` at `$F8F0`: A = sub-command
+  0 init / 1 party window / 2 Gil amount / 3 window palette / 4 field camera; hooks in bank
+  14's unused `$87D0`: `ACE3`, `AD0A`, `ADB3`, `B380`, `AD8C`, `B1D7`). Camera (1, 1). Portraits
+  as background tiles (four portraits = 48 sprites, a Game Boy shows 40): copied at menu
+  start from portrait data put into bank 23 at build time, into the menu's unused BG tiles
+  $01-$30; each box (NES cols 2-5, rows 2+4k..) covers whole attribute quads with the
+  member's portrait palette in BG palette 0-2 (`$03C0` shadow; menu windows use palette 3).
+  Party window (NES 1,1,12,18): name (NES letters), HP / MP cur/max (small letters, 3-px
+  digits, tiles $31-$60), status word (fix:ED04's choice, bank-10 words copied at build
+  time). Commands (13,1,8,8) one per row (string 27), Gil (13,15,8,4): amount in small
+  digits (tiles $61-$66), "Gil" below (string 28, one-row). `b14:8800` (sprite portraits)
+  off; character select hand at the left screen edge (`b14:AEAA`). Sub-menus get the
+  window palette back (`B380`, save `B1D7`) and the field camera returns on exit.
+  The bank-23 renderer gained `TBLHI` (pattern table of its tiles) and `MSCR` (menu scroll
+  + music update after its waits).
+- Checked: NES variant and Gambatte CGB shots (portraits, text, cursors); random seed 1,
+  30000 frames: 29452 waits identical.
+- Open (asked the owner): centring the portraits in their boxes needs 16 tiles each (only
+  109 free) - proposed a GB-only per-tile colour override so the box is the portrait's
+  width. Sub-screens (items, magic, equip, status, save) still to re-lay out.
+
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
 2. ~~English patch → source mapping~~ (plan §2, approved).

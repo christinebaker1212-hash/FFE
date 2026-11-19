@@ -391,6 +391,37 @@ def nes_frame_layout(nes_path, frame):
     return dmg(nes_frame(nes_path, frame))
 
 
+def main_menu_bg(nes_path, out):
+    """Main menu, option A as built (portraits as background tiles: a Game Boy shows 40
+    sprites, four portraits need 48; NES colours come in 16 x 16 blocks, so each portrait
+    sits in its own black 32 x 32 box at the left edge, outside the party window).
+    Party window (4,0,8,18): per member name (NES letters), HP and MP in small letters /
+    3-px digits, status word on the 4th row; commands (12,0,8,7), one per row, hand over
+    the frames between the windows; Gil (12,14,8,4): amount in 3-px digits, "Gil" below."""
+    pt = portraits(nes_path)
+    party = [('Firion', 30, 30, 5, 5, ''), ('Maria', 20, 20, 5, 5, 'Poison'), ('Guy', 40, 40, 5, 5, ''),
+             ('Minwu', 9999, 9999, 999, 999, '')]
+    a = Screen(bg=3)
+    for i in range(4):
+        img = pt[i] if i < 3 else None
+        if img: a.im.paste(img.crop((4, 0, 28, 32)), (4, 32 * i))
+        else: a.block(0, 4 * i, 4, 4)
+    a.window(4, 0, 8, 18)
+    for i, (n, hp, mx, mp, mm, st) in enumerate(party):
+        y = 1 + 4 * i
+        a.text(5, y, n, fg=0, bg=3)
+        _pt(a, 40, (y + 1) * 8, 'HP'); h = '%d/%d' % (hp, mx); _pt(a, 87 - a.pwidth(h, DIG3), (y + 1) * 8, h, DIG3)
+        _pt(a, 40, (y + 2) * 8, 'MP'); m = '%d/%d' % (mp, mm); _pt(a, 87 - a.pwidth(m, DIG3), (y + 2) * 8, m, DIG3)
+        if st: _pt(a, 87 - a.pwidth(st), (y + 3) * 8, st)
+    a.window(12, 0, 8, 7)
+    for i, c in enumerate(['Items', 'Magic', 'Equip', 'Status', 'Save']): a.text(13, 1 + i, c, fg=0, bg=3)
+    _hand(a, 13 * 8 - 16, 8 - 4, HAND16)
+    a.window(12, 14, 8, 4)
+    g = '9999999'; _pt(a, 150 - a.pwidth(g, DIG3), 15 * 8, g, DIG3); a.text(15, 16, 'Gil', fg=0, bg=3)
+    im = a.im.resize((320, 288), Image.NEAREST)
+    p = os.path.join(out, 'ff2_mock9_menu_bg.png'); im.save(p); return p
+
+
 if __name__ == '__main__':
     os.makedirs(sys.argv[2], exist_ok=True)
     print(battle(sys.argv[1], sys.argv[2]))
@@ -401,3 +432,4 @@ if __name__ == '__main__':
     print(battle_lists(sys.argv[1], sys.argv[2]))
     print(loot_menu(sys.argv[2]))
     print(keyword_windows(sys.argv[1], sys.argv[2]))
+    print(main_menu_bg(sys.argv[1], sys.argv[2]))
