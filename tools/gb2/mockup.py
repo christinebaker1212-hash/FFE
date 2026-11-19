@@ -422,6 +422,60 @@ def main_menu_bg(nes_path, out):
     p = os.path.join(out, 'ff2_mock9_menu_bg.png'); im.save(p); return p
 
 
+def sub_screens(nes_path, out):
+    """Main-menu sub-screens (camera 1 / 1 as the main menu; the NES letters; portraits stay
+    sprites: one at a time). Items: title (0,0,8,3), list (0,2,20,16), 14 rows, one column,
+    scrolling. Magic / Equip / Status: top window (0,0,20,6) with the portrait and 4 lines,
+    a list window (0,5,20,13) with 11 rows. Equip: the 5 slots as label + item rows and the
+    Item slot (11 rows, as the NES); the replacement list opens over the lower rows
+    (0,12,20,6). Status: page 1 the 6 attributes and 5 battle values, page 2 (Right / Left)
+    the weapon skills in two columns."""
+    pt = portraits(nes_path)[0]
+    def top(s, title, lines):
+        s.window(0, 0, 20, 6); s.im.paste(pt.crop((4, 0, 28, 32)), (8, 8))
+        for i, l in enumerate([title] + lines): s.text(5, 1 + i, l)
+    shots = []
+    s = Screen(bg=3); s.window(0, 2, 20, 16); s.window(0, 0, 8, 3); s.text(1, 1, 'Items')
+    for i, n in enumerate(['Potion', 'Sulfuric Acid Bottle', 'Diamond Breastplate', 'Golden Breastplate',
+                           'Ring of Protection', 'Antidote', 'Cottage', 'Phoenix Tail', "Maiden's Kiss", 'Ether',
+                           'Eye Drops', 'Garlic', 'Elixir', 'Cross']):
+        if len(n) <= 18: s.text(1, 3 + i, n)
+        else: _fit(s, 8, (3 + i) * 8, n, 144)
+    _hand(s, -9, 3 * 8 - 4, HAND16); shots.append(s)
+    s = Screen(bg=3); top(s, 'Magic', ['AAAAAA', 'HP 30/ 30', 'MP  5/  5'])
+    s.window(0, 5, 20, 13)
+    for i, (n, l) in enumerate([('Fire', 3), ('Cure', 2), ('Blizzard', 1), ('Thunder', 1), ('Toad', 1), ('Life', 1)]):
+        s.text(2, 6 + i, n); s.text(14, 6 + i, 'L%2d' % l)
+    _hand(s, -1, 6 * 8 - 4, HAND16); shots.append(s)
+    s = Screen(bg=3); top(s, 'Equip', ['AAAAAA', 'Attack .. 10', 'Defense .. 2'])
+    s.window(0, 5, 20, 13)
+    for i, l in enumerate(['Right Hand', ' Broadsword', 'Head', '', 'Arms', '', 'Left Hand', ' Buckler', 'Body',
+                           ' Leather Armor', 'Item']):
+        s.text(2, 6 + i, l)
+    _hand(s, -1, 6 * 8 - 4, HAND16); shots.append(s)
+    s2 = Screen(bg=3); s2.im.paste(s.im, (0, 0)); s2.window(0, 12, 20, 6)
+    for i, n in enumerate(['Broadsword', 'Mythril Knife', 'Bronze Shield', 'Dagger']): s2.text(2, 13 + i, n)
+    _hand(s2, -1, 13 * 8 - 4, HAND16); shots.append(s2)
+    s = Screen(bg=3); top(s, 'AAAAAA', ['HP 30/ 30', 'MP  5/  5', 'Right-handed'])
+    s.window(0, 5, 20, 13)
+    for i, (l, v) in enumerate([('Strength', '10'), ('Agility', '10'), ('Stamina', '10'), ('Intelligence', '10'),
+                                ('Spirit', '10'), ('Magic Power', '10'), ('Attack', ' 10'), ('Hit Rate', ' 70%'),
+                                ('Defense', '  2'), ('Evasion', ' 14%'), ('Magic Defense', ' 12%')]):
+        s.text(1, 6 + i, l); s.text(14, 6 + i, '..' + v.strip())
+    shots.append(s)
+    s = Screen(bg=3); top(s, 'AAAAAA', ['HP 30/ 30', 'MP  5/  5', 'Right-handed'])
+    s.window(0, 5, 20, 13); s.text(1, 6, 'Skill Level')
+    sk = ['Fist', 'Shield', 'Knife', 'Spear', 'Staff', 'Sword', 'Axe', 'Bow']
+    for i in range(8):
+        r, c = 8 + 2 * (i // 2), 1 + 9 * (i % 2)
+        s.block(c, r, 1, 1); s.text(c + 1, r, '1-00%')
+    shots.append(s)
+    sheet = Image.new('RGB', (168 * 3 - 8, 152 * 2 - 8), (255, 255, 255))
+    for k, s in enumerate(shots): sheet.paste(s.im, ((k % 3) * 168, (k // 3) * 152))
+    sheet = sheet.resize((sheet.width * 2, sheet.height * 2), Image.NEAREST)
+    p = os.path.join(out, 'ff2_mock10_subscreens.png'); sheet.save(p); return p
+
+
 if __name__ == '__main__':
     os.makedirs(sys.argv[2], exist_ok=True)
     print(battle(sys.argv[1], sys.argv[2]))
@@ -433,3 +487,4 @@ if __name__ == '__main__':
     print(loot_menu(sys.argv[2]))
     print(keyword_windows(sys.argv[1], sys.argv[2]))
     print(main_menu_bg(sys.argv[1], sys.argv[2]))
+    print(sub_screens(sys.argv[1], sys.argv[2]))

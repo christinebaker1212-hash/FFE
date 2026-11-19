@@ -94,3 +94,11 @@ suspend).
 - Item names longer than 18 columns (Sulfuric Acid Bottle, Diamond Breastplate, icon +
   Sword of the Earth): owner chose condensed letters on tiles of their own (wording
   unchanged).
+
+## Main-menu sub-screens (owner approved `ff2_mock10_subscreens.png`, 2026-11-19)
+- Camera (1, 1) as the main menu; NES letters; portraits stay sprites (one at a time).
+- Items: title (0,0,8,3), list (0,2,20,16): 14 rows, one column from column 1, scrolling.
+- Magic / Equip / Status: top window (0,0,20,6) with the portrait and 4 lines, list window
+  (0,5,20,13) with 11 rows. Equip: 5 slots as label + item rows and the Item slot; the
+  replacement list over the lower rows (0,12,20,6). Status: page 1 the 6 attributes and 5
+  battle values, page 2 (Left / Right) the weapon skills in two columns.
