@@ -4465,6 +4465,42 @@ ncur14:
 """, syms={'TR21X': 0xF900}, org=0xA013 + 90)
     assert shims.org + len(shims.bytes) <= 0xA0C7
     put_bank(rom, B, shims.org, shims.bytes, bytes(rom[bank_off(B, shims.org):bank_off(B, shims.org) + len(shims.bytes)]))
+    # the name (b14 $9F7D, redrawn after each letter): FF1 drew it in the default text mode,
+    # which also blanks the row above it (the top window's border); now in lower-row mode
+    # ({09}) from a copy at $6DD0: {09}, the four letters, 0
+    nm = asm("""
+nmdraw:
+    ldx $67
+    ldy #0
+nm1:
+    lda $0302,x
+    sta $6DD1,y
+    inx
+    iny
+    cpy #4
+    bne nm1
+    lda #$09
+    sta $6DD0
+    lda #0
+    sta $6DD5
+    lda #$D0
+    sta $3E
+    lda #$6D
+    sta $3F
+    lda #$0E
+    sta $57
+    sta $58
+    lda #$0A
+    sta $3A
+    lda #$03
+    sta $3B
+    lda #$01
+    sta $37
+    jmp $DEB6
+""", org=shims.org + len(shims.bytes))
+    assert nm.org + len(nm.bytes) <= 0xA0C7, hex(nm.org + len(nm.bytes))
+    put_bank(rom, B, nm.org, nm.bytes, bytes(rom[bank_off(B, nm.org):bank_off(B, nm.org) + len(nm.bytes)]))
+    put_bank(rom, B, 0x9F7D, bytes([0x4C]) + nm.org.to_bytes(2, 'little'), bytes([0xA6, 0x67, 0xBD]))
     put_bank(rom, B, 0x9D68, bytes([0x20]) + shims.labels['nscr14'].to_bytes(2, 'little'), bytes([0x20, 0xB0, 0x9F]))
     put_bank(rom, B, 0x9E51, bytes([0x20]) + shims.labels['ncur14'].to_bytes(2, 'little'), bytes([0x20, 0x35, 0x9F]))
     put_bank(rom, B, 0x9FA1, bytes([0xA9, 10]), bytes([0xA9, 13]))   # name at NES (10, 3) = GB (5, 1)

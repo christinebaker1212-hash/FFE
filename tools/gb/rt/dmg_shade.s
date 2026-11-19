@@ -203,7 +203,12 @@ vram_put:   push bc
             jr nz, .q
             ld [hl], d
             jr .x
-.q:         ldh a, [q_head]                 ; queue empty: written now if VRAM is free (STAT
+.q:         ldh a, [q_head]                 ; (entries waiting: as many written as VRAM
+            ld b, a                         ;   allows right now)
+            ldh a, [q_tail]
+            cp b
+            call nz, q_try
+            ldh a, [q_head]                 ; queue empty: written now if VRAM is free (STAT
             ld b, a                         ;   mode 0 / 1; mode 2 follows, so VRAM stays free
             ldh a, [q_tail]                 ;   long enough), interrupts off for it; a CGB
             cp b                            ;   masked load waits for that moment, otherwise

@@ -937,6 +937,12 @@ q_block:    push de
 ; the vblank flush, in the moments the LCD leaves VRAM free (STAT mode 0 / 1; mode 2
 ; follows mode 0, so a write within 20 M-cycles of seeing mode 0 is safe). Interrupts off
 ; for the entry (a tile block: about two lines). Keeps BC, DE, HL.
+q_try:      push bc                         ; queued entries written while VRAM is free now
+            push de                         ;   (up to 15, no waiting)
+            push hl
+            di
+            ld d, 15
+            jr q_drain1.lp
 q_drain1:   push bc
             push de
             push hl
@@ -3228,45 +3234,81 @@ stage_sync: push bc
             jr nz, .cp
             ret
 
-; vblank (CGB): marked tiles by HDMA while the vblank lasts
-hdma_flush: ldh a, [$FF70]
-            push af
-            xor a
-            ldh [hd_any], a
-            ld hl, BG_DIRTY
-            ld e, 0                         ; byte index
-.bb:        ld a, [hl]
+; vblank (CGB): the marked BG tiles from the tile copy (WRAM bank 2), each run of consecutive
+; marked tiles (within tiles 0-127 / 128-255) by one general-purpose DMA, as long as the
+; vblank lasts (about 24 tiles per line left at double speed). Carry set: out of time.
+hdma_bg:    ld b, 0                         ; B = tile
+.nx:        ld a, b                         ; (a byte of 8 unmarked tiles skipped at once)
+            and 7
+            jr nz, .nb
+            ld a, b
+            rrca
+            rrca
+            rrca
+            and 31
+            add a, low(BG_DIRTY)
+            ld l, a
+            ld h, high(BG_DIRTY)
+            ld a, [hl]
             and a
-            jr z, .bn
-            ld d, a
-            ld c, 0
-.bk:        srl d
-            jr nc, .bkn
-            ldh a, [$FF44]                  ; out of vblank time: the rest next frame
-            sub 144
-            cp 8
-            jr nc, .late
-            ld a, 2
-            ldh [$FF70], a
-            ld a, e                         ; tile = e * 8 + c
-            add a, a
-            add a, a
-            add a, a
-            or c
-            push hl
-            push af
-            swap a                          ; source $D000 + tile * 16
+            jr nz, .nb
+            ld a, b
+            add a, 8
             ld b, a
+            jr nz, .nx
+            and a
+            ret
+.nb:        call .isd
+            jr nz, .run
+            inc b
+            jr nz, .nx
+            and a
+            ret
+.run:       ld c, b                         ; C = first of the run
+.ext:       inc b
+            jr z, .end
+            ld a, b
+            cp 128
+            jr z, .end
+            call .isd
+            jr nz, .ext
+.end:       ldh a, [$FF44]                  ; time left: (152 - LY) lines x 24 tiles
+            cp 152
+            jr nc, .late
+            ld d, a
+            ld a, 152
+            sub d
+            ld d, a
+            ld a, b                         ; length = B - C (B = 0: 256)
+            sub c
+            ld e, a                         ; E = length (1-128)
+            ld a, d                         ; D lines: max = 24 D (D <= 8: <= 192)
+            add a, a
+            add a, d
+            add a, a
+            add a, a
+            add a, a
+            cp e
+            jr nc, .ok
+            ld e, a                         ; cut to the time left
+            ld a, c
+            add a, e
+            ld b, a
+.ok:        ld a, 2
+            ldh [$FF70], a
+            ld a, c                         ; source $D000 + C * 16
+            swap a
+            ld d, a
             and $F0
             ldh [$FF52], a
-            ldh [$FF54], a                  ; (destination low byte the same)
-            ld a, b
+            ldh [$FF54], a
+            ld a, d
             and $0F
             add a, $D0
             ldh [$FF51], a
-            pop af
-            cp 128                          ; destination $9000 + tile * 16 or $8800 + ...
-            ld a, b
+            ld a, c                         ; destination $9000 + C * 16 (C < 128) or $8800 + ..
+            cp 128
+            ld a, d
             jr nc, .hi
             and $0F
             add a, $90
@@ -3274,33 +3316,60 @@ hdma_flush: ldh a, [$FF70]
 .hi:        and $0F
             add a, $80
 .dst:       ldh [$FF53], a
-            xor a
-            ldh [$FF55], a                  ; 16 bytes, general purpose
-.w1:        ldh a, [$FF55]                  ; (done: $FF)
+            ld a, e
+            dec a
+            ldh [$FF55], a                  ; E blocks of 16 bytes, general purpose
+.w:         ldh a, [$FF55]
             inc a
-            jr nz, .w1
-            pop hl
-            ld a, c                         ; clear its bit
+            jr nz, .w
+            ld a, 1
+            ldh [$FF70], a
+.cl:        ld a, c                         ; marks of C .. C + E - 1 cleared
+            call .bit
+            cpl
+            and [hl]
+            ld [hl], a
+            inc c
+            dec e
+            jr nz, .cl
+            ld a, b
+            and a
+            jr nz, .nx
+            and a                           ; (all 256 done)
+            ret
+.late:      scf
+            ret
+.isd:       ld a, b                         ; NZ if tile B is marked
+            call .bit
+            and [hl]
+            ret
+.bit:       push af                         ; A = tile: HL = its BG_DIRTY byte, A = its bit
+            rrca
+            rrca
+            rrca
+            and 31
+            add a, low(BG_DIRTY)
+            ld l, a
+            ld h, high(BG_DIRTY)
+            pop af
+            and 7
             push hl
             ld hl, BIT_MASK
             add a, l
             ld l, a
-            jr nc, .nc
+            jr nc, .bn
             inc h
-.nc:        ld a, [hl]
+.bn:        ld a, [hl]
             pop hl
-            cpl
-            and [hl]
-            ld [hl], a
-.bkn:       inc c
-            ld a, d
-            and a
-            jr nz, .bk
-.bn:        inc l
-            inc e
-            ld a, e
-            cp 32
-            jr nz, .bb
+            ret
+
+; vblank (CGB): marked tiles by HDMA while the vblank lasts
+hdma_flush: ldh a, [$FF70]
+            push af
+            xor a
+            ldh [hd_any], a
+            call hdma_bg                    ; BG tiles: runs of marked tiles, one DMA each
+            jr c, .late
             ld hl, SPR_DIRTY                ; sprite slots
             ld e, 0
 .sb:        ld a, [hl]

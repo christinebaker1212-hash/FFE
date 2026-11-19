@@ -16,9 +16,6 @@ it in FF1 (file / routine names in this repo).
   ExRAM RTS-dispatch targets listed by `insert.py` in `<rom>.far` as `ex:` lines).
   **FF2/FF3 with disassembly sources:** make sure every routine a table points to is
   translated and reachable, and never let an unknown target halt silently.
-- **LCD off shows white on a real GBC** (and blank on DMG). Screen loads that switch the LCD
-  off flash white between screens; the NES shows black. (Being fixed: keep the LCD on and
-  black during loads.)
 - **Battle music briefly sped up on damage.** The NES game itself lags (2 NES frames per
   game frame) on heavy battle frames; the GB reproduced that, then its catch-up pacing ran
   the next game frames back to back, and the music driver (called once per game frame)
