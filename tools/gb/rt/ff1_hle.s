@@ -560,6 +560,14 @@ maprb_tramp:                                ; CGB masked load shown: maprb_b (ba
             ld [$2000], a
             ret
 
+vshow_tramp:                                ; CGB masked load shown: vshow_b (bank HLE_BANK)
+            ld a, HLE_BANK
+            ld [$2000], a
+            call vshow_b
+            ldh a, [code_bank]
+            ld [$2000], a
+            ret
+
 repal_tramp:                                ; LCD on, CGB: repal_b (bank HLE_BANK)
             ld a, HLE_BANK
             ld [$2000], a

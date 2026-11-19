@@ -3278,6 +3278,161 @@ nf_whole:   ld a, c
             jr nz, .f
             ret
 
+; CGB masked load shown (rt_ppu_w1): the GB map and the cell palettes deferred while masked.
+; With every cell drawn by nametable 0 (own1 = 0): the map is its shadow (NT_SH, WRAM bank 1)
+; and the palettes are expanded from its attribute bytes into WRAM bank 4 $D000; both go to
+; VRAM by general-purpose DMA in a vblank (interrupts off; a second vblank if the first has
+; no room left). Otherwise maprb_b / repal_b (four cells per moment VRAM is free).
+vshow_b:    ld a, [MAP_RB]
+            ld b, a
+            ld a, [CGB_RP]
+            or b
+            ret z
+            ldh a, [own1_lo]
+            ld b, a
+            ldh a, [own1_hi]
+            or b
+            jr z, .g
+            ld a, [MAP_RB]
+            and a
+            call nz, maprb_b
+            ld a, [CGB_RP]
+            and a
+            call nz, repal_b
+            ret
+.g:         ldh a, [q_head]                 ; queued writes first (no queued cell after these)
+            ld b, a
+            ldh a, [q_tail]
+            cp b
+            jr z, .qe
+            call q_drain1
+            jr .g
+.qe:        ld a, [CGB_RP]
+            and a
+            call nz, .pal
+            di
+            ld a, [MAP_RB]
+            and a
+            jr z, .np
+            call .vb                        ; map: NT_SH $D000 (bank 1) -> $9800, 60 x 16
+            ld a, $D0
+            ldh [$FF51], a
+            xor a
+            ldh [$FF52], a
+            ld a, $18
+            ldh [$FF53], a
+            xor a
+            ldh [$FF54], a
+            ld a, 59
+            ldh [$FF55], a
+            xor a
+            ld [MAP_RB], a
+.np:        ld a, [CGB_RP]
+            and a
+            jr z, .x
+            ldh a, [$FF44]                  ; (in a vblank with room left, else the next)
+            cp 144
+            jr c, .wt
+            cp 149
+            jr c, .go
+.wt:        call .vb
+.go:        ld a, 4                         ; palettes: bank 4 $D000 -> VRAM bank 1 $9800
+            ldh [$FF70], a
+            ld a, 1
+            ldh [$FF4F], a
+            ld a, $D0
+            ldh [$FF51], a
+            xor a
+            ldh [$FF52], a
+            ld a, $18
+            ldh [$FF53], a
+            xor a
+            ldh [$FF54], a
+            ld a, 59
+            ldh [$FF55], a
+            xor a
+            ldh [$FF4F], a
+            ld [CGB_RP], a
+            inc a
+            ldh [$FF70], a
+.x:         ei
+            ret
+.vb:        ldh a, [$FF44]                  ; wait for the start of a vblank (LY 144)
+            cp 144
+            jr z, .vb
+.v1:        ldh a, [$FF44]
+            cp 144
+            jr nz, .v1
+            ret
+.pal:       ld de, 0                        ; D = attribute index (0-63), E = (scratch)
+.pa:        ld a, d                         ; value (NT_SH $3C0 + i, bank 1)
+            add a, $C0
+            ld l, a
+            ld h, high(NT_SH) + 3
+            ld c, [hl]
+            ld a, d                         ; HL = $D000 + row0 * 32 + col0 (bank 4)
+            and $38                         ;   row0 = (i >> 3) * 4, col0 = (i & 7) * 4
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl                      ; (i & $38) * 16 = row0 * 32
+            ld a, d
+            and 7
+            add a, a
+            add a, a
+            add a, l
+            ld l, a
+            ld a, h
+            add a, $D0
+            ld h, a
+            ld a, 4
+            ldh [$FF70], a
+            ld b, 2                         ; top half (quadrants 0 / 1), then bottom (2 / 3)
+.hf:        ld a, c
+            and 3
+            ld e, a                         ; left
+            ld a, c
+            rrca
+            rrca
+            and 3                           ; right
+            push bc
+            ld b, a
+            ld c, 2                         ; two rows
+.rw:        ld a, h                         ; (rows 30-31: none)
+            cp $D3
+            jr nz, .w
+            ld a, l
+            cp $C0
+            jr nc, .sk
+.w:         ld a, e
+            ld [hl+], a
+            ld [hl+], a
+            ld a, b
+            ld [hl+], a
+            ld [hl+], a
+            ld a, l
+            add a, 28
+            ld l, a
+            jr nc, .nc
+            inc h
+.nc:        dec c
+            jr nz, .rw
+.sk:        pop bc
+            ld a, c
+            swap a
+            ld c, a
+            dec b
+            jr nz, .hf
+            ld a, 1
+            ldh [$FF70], a
+            inc d
+            ld a, d
+            cp 64
+            jr nz, .pa
+            ret
+
 ; CGB masked load shown: the GB map (rows 0-29) from the nametable shadows by owner (OWN),
 ; four cells per moment VRAM is free (mr_flush4). After bulk fills that skipped the map.
 MR_OUT     = $DCD0          ; maprb_b / repal_b: four values for VRAM (4), owner bits

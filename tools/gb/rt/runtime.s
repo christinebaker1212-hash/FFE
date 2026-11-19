@@ -1780,13 +1780,8 @@ rt_ppu_w1:  push af
             ld a, [VLCD]                    ; CGB masked load: shown once the queued writes
             and a                           ;   and tile copies are done (vblank: VLCD 2 -> 0);
             jr z, .nv                       ;   the masked frames are not caught up
-            ld a, [MAP_RB]                  ; (map cells and cell palettes deferred while
-            and a                           ;   masked)
-            call nz, maprb_tramp
-            ld a, [CGB_RP]
-            and a
-            call nz, repal_tramp
-            ld a, 2
+            call vshow_tramp                ; (map cells and cell palettes deferred while
+            ld a, 2                         ;   masked)
             ld [VLCD], a
             ld a, [VBL_CNT]
             ld [VBL_SEEN], a
