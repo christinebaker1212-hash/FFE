@@ -175,6 +175,25 @@ SC_NP / REF_BM clears unrolled; `palup2_b` (palette upload, every frame of the p
 fades) fast path for v = $3F00 + index / increment 1: unchanged colours cost no ppu_inc call;
 `oamconv_b` attribute by table (OATTR, bank 62 $7900) and SLOT_KEY / SLOT_STAMP sharing L.
 checkall 62/62 on the last build (adcab9e + OATTR).
+Next session (same day): `prow_b` (bank 60, trampoline `hle_prow1` at bank 0 $3EE3): the
+prologue row writer far pr1..pr3 (insert.py exports pr1 / pr3 in `.farsym`; build.py checks
+the loop's bytes, makes the idiom and `PROW_OFF`): per letter the shadow, `dmg_cell`,
+`vram_put` without the generic $2007 path (DMG, LCD on; anything else rt_ppu_w7). Band waits
+~265 -> ~235 samples (still 2 GB frames each: they need < ~170; the rest is the fade's
+palette / attribute / shading work). Changes the timing of one letter re-coding at wait 199
+by a frame (the known prologue shading lag). `wrow3_b` (bank 62, `hle_wrow3` at $3EF0):
+window rows entered at the left tile's STA (build.py finds every LDA #L / STA $2007 / LDA #M
+/ STA / DEX / BNE / LDA #R / STA in the fixed bank and builds `WROW3`, bank 62 $7800): the
+whole row into the shadow and map at once. The name-entry loads (1035 / 1284 / 1533) lose a
+frame of work, but the LCD-on wait after them (uniform scan ~150 samples + the frame's own
+work ~150) then takes 2 frames: no net gain yet; a faster uniform scan (cells by `ld e,[hl]` /
+`inc l` / `ld [de],a`, settle eight tiles a byte) would save ~60 samples there. Tried the
+cell loop: DMG lag 171 -> 174 (reverted): in each name-entry screen ~99 waits after the load
+(1134 / 1383 / 1632) a wait with only ~0.4 frame of work then takes 2 GB frames, the frame
+ending inside `oamconv_b` (the game's $4014 write). Lag there depends on where in the frame
+the work lands, not only on how much: to investigate (what delays that frame's start: spare-
+time re-coding in the frame wait, a long `di` section, the VRAM queue).
+Bank 0 is now full except ~15 bytes at $255E (main code) and 0 at $3EE3-$3EFF.
 Still to do in the scan: `scn_pu` (~37 M-cycles per view
 cell), `scn_tab` (~350 per row), the settle loop. Tools added: `LAG_DUMP=FILE
 lagcheck.py ...` (GB / NES frames per wait), `SGBRUN_CALLS=ADDR` (return address at every
@@ -237,8 +256,8 @@ Remaining lag, by where it is (DMG / CGB frames on the script):
   inline per-cell loop ~25). `scn_pu` ~37 M-cycles per view cell (pair-level: ~4x less).
   Heavy battle waits (~365 / ~430 samples each turn): hle_cp64, hle_sw16, hle_pclr,
   rt_mmc_w5808, (zp),Y, farcalls, VWF; no single big item.
-- Bank 0 is full: ~15 bytes at the end of the main code ($255E-$256D, before the xref stubs),
-  ~29 at $3EE3; bank 62 has 541 bytes at $5CE3 and 3 KB at $6E00: move code to bank 60 (PF_BANK, room up to $7D00) or
+- Bank 0 is full: ~15 bytes at the end of the main code ($255E-$256D, before the xref stubs);
+  bank 62 has ~200 bytes after its main code and $6E00-$77FF free (WROW3 $7800, OATTR $7900): move code to bank 60 (PF_BANK, room up to $7D00) or
   HLE_BANK (full at $5F00) behind a trampoline; equates used before their definition must
   be defined earlier (one-pass labels).
 

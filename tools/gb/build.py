@@ -11,7 +11,7 @@ usage: build.py ["Final Fantasy I, II (Japan).nes"] [--gb] [--cov DIR] [--out RO
 4. ROM: bank 0 runtime, banks DATA.. = the NES banks' data, then code banks
 Nothing game-specific is stored in the repo; everything comes from the NES ROM.
 """
-import os, sys, glob, hashlib, subprocess, time
+import re, os, sys, glob, hashlib, subprocess, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
@@ -208,14 +208,38 @@ def main():
                62 * 0x2000 + k[1] - 0xC000 if k[0] == 'c62' else None)
         if off is None or prg[off:off + len(code)] != code:
             print('  idiom %s:%04X: code not found, not used' % k); rc.g.idioms.pop(k, None)
+    wrow3 = {}                                       # window rows in the fixed bank: LDA #L /
+    fixo = len(prg) - 0x2000                         #   STA $2007 / LDA #M / STA $2007 / DEX /
+    for m in re.finditer(re.escape(bytes.fromhex('8d0720a9')) + b'(.)' + re.escape(bytes.fromhex(
+            '8d0720cad0faa9')) + b'(.)' + re.escape(bytes.fromhex('8d0720')), prg[fixo:], re.S):   # BNE / LDA #R / STA $2007
+        at = fixo + m.start()
+        if prg[at - 2] != 0xA9: continue
+        lt, mt, rt_ = prg[at - 1], m.group(1)[0], m.group(2)[0]
+        if wrow3.get(lt, (mt, rt_)) != (mt, rt_): print('  window row: tile $%02X twice, not native' % lt); continue
+        wrow3[lt] = (mt, rt_)
+        a = 0xE000 + m.start()
+        rc.g.idioms[('fix', a)] = ('hle_wrow3', a + 16, 'NZ')   # (at the left tile's STA: A = L)
+    wrow3_src = 'WROW3:\n' + ''.join('    db $%02X, $%02X, $%02X\n' % (l, m_, r_) for l, (m_, r_) in sorted(wrow3.items())) + '    db 0, 0, 0\n'
     far_sym = {}
     if os.path.exists(nes + '.farsym'):              # far routines run natively (rt/ff1_native.s)
         for l in open(nes + '.farsym'):
             a, n = l.split()
             far_sym[n] = int(a, 16)
             if n in FAR_EXT: rc.g.ext[('far', int(a, 16))] = FAR_EXT[n]
+    prow_off = 0                                     # gb_layout prow's row loop (pr1..pr3):
+    if 'pr1' in far_sym and 'pr3' in far_sym:        #   native (rt/ff1_native.s prow_b)
+        o = FAR_BANK * 0x2000 + far_sym['pr1'] - 0xC000
+        c = prg[o:o + 15]
+        if (c[:5] == bytes.fromhex('b110c91090') and c[6] == 0x4D and c[9:] == bytes.fromhex('8d0720c8d0f1')
+                and far_sym['pr1'] + 6 + c[5] == far_sym['pr3'] and c[8] < 0x08):
+            prow_off = c[7] | c[8] << 8
+            rc.g.idioms[('far', far_sym['pr1'])] = ('hle_prow1', far_sym['pr3'], 'NZC')
+        else:
+            print('  far pr1: code not as expected, not native')
     prog, bank_of, banks = emit_program(rc)
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s', 'sgb.s'))
+    rt += '\nPROW_OFF = NES_RAM + $%04X\n' % prow_off
+    rt += '\nsection bank HLE_BANK, $7800\n' + wrow3_src     # (build-time table from the ROM)
     rt += '\n' + apu_tables() + '\nSND_MASK = $%02X\n' % int(os.environ.get('GB_SND_MASK', 'FF'), 16) + 'MDF_ON = %d\n' % int(os.environ.get('GB_MDF', '1'))
     rt += open(os.path.join(HERE, 'rt', 'apu_core.s')).read()
     rt += '\n' + vwf_tables(prg, far_sym)            # (before ff1_native.s: VW_GR_NES)

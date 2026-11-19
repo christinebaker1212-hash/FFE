@@ -3678,6 +3678,174 @@ wrow_b:     push bc
             pop bc                          ; (Y kept)
             ret
 
+; fix window rows (build.py: every LDA #L / STA $2007 / LDA #M / STA $2007 / DEX / BNE /
+; LDA #R / STA $2007, entered at the first STA with A = L): L, X times M (X = 0: 256), R.
+; LCD off (or a CGB masked load), increment 1, nametable 0, no cell drawn by nametable 1, all
+; map cells: shadow and GB map at once; otherwise rt_ppu_w7 / ntfill. M and R from WROW3.
+; Out: A = R, X = 0; N, Z from R; carry kept.
+wrow3_b:    push af                         ; (carry)
+            ldh [sh_l1], a                  ; L
+            ld hl, WROW3
+.f:         ld a, [hl+]
+            cp $00
+            jr z, .nf
+            ld b, a
+            ldh a, [sh_l1]
+            cp b
+            jr z, .fd
+            inc hl
+            inc hl
+            jr .f
+.nf:        ld b, 0                         ; (not in the table: cannot happen; plain STA)
+            pop af
+            ldh a, [sh_l1]
+            jp rt_ppu_w7
+.fd:        ld a, [hl+]
+            ldh [sh_u2], a                  ; M
+            ld a, [hl]
+            ldh [sh_u3], a                  ; R
+            ld b, 0
+            ldh a, [lcd_on]                 ; (LCD off, or a CGB masked load)
+            and a
+            jr z, .lk
+            ld a, [VLCD]
+            cp 1
+            jr nz, .gen
+            ldh a, [dlg_on]
+            and a
+            jr nz, .gen
+.lk:        ldh a, [ppu_ctrl]
+            and 4
+            jr nz, .gen
+            ldh a, [own1_lo]
+            ld h, a
+            ldh a, [own1_hi]
+            or h
+            jr nz, .gen
+            ldh a, [ppu_vh]
+            cp $20
+            jr c, .gen
+            cp $3F
+            jr z, .gen
+            bit 2, a
+            jr nz, .gen
+            and 3
+            ld h, a
+            ldh a, [ppu_vl]
+            ld l, a                         ; HL = the first cell's offset
+            push hl
+            ld a, e                         ; n = X + 2 (X = 0: 258)
+            add a, 2
+            ld c, a
+            ld a, 0
+            adc a, b
+            ld b, a
+            ld a, e
+            and a
+            jr nz, .n1
+            inc b
+.n1:        add hl, bc                      ; the end: within the map cells ($3C0)
+            ld a, h
+            cp 3
+            jr c, .ok
+            jr nz, .g1
+            ld a, l
+            cp $C1
+            jr nc, .g1
+.ok:        ld bc, 0
+            pop hl
+            push hl
+            push de
+            ld a, h
+            add a, high(NT_SH)
+            ld h, a
+            call .row                       ; shadow
+            pop de
+            push de
+            ld a, [VLCD]
+            cp 1
+            jr nz, .mp
+            ld [MAP_RB], a                  ; (masked: the GB map rebuilt when shown)
+            jr .md
+.mp:        pop de
+            pop hl
+            push hl
+            push de
+            ld a, h
+            add a, $98
+            ld h, a
+            call .row                       ; GB map
+.md:        ld a, 1                         ; DMG: the map is scanned when the LCD goes on
+            ldh [dmg_scan], a
+            pop de                          ; (E = X)
+            pop hl                          ; v = the end
+            ld a, e
+            add a, 2
+            ld c, a
+            ld a, 0
+            adc a, 0
+            ld b, a
+            ld a, e
+            and a
+            jr nz, .n2
+            inc b
+.n2:        add hl, bc
+            ld a, l
+            ldh [ppu_vl], a
+            ldh a, [ppu_vh]
+            and $FC
+            or h
+            ldh [ppu_vh], a
+            ld bc, 0
+            jr .out
+.g1:        pop hl
+.gen:       ldh a, [code_bank]              ; (the PPU routines come back to code_bank)
+            push af
+            ld a, HLE_BANK
+            ldh [code_bank], a
+            ldh a, [sh_l1]
+            call rt_ppu_w7
+            ldh a, [sh_u2]
+            ld d, a
+            ld b, 0
+            ld c, e
+            ld a, c
+            and a
+            jr nz, .g2
+            inc b
+.g2:        push de
+            call ntfill
+            pop de
+            ld d, 0
+            ld bc, 0
+            ldh a, [sh_u3]
+            call rt_ppu_w7
+            pop af
+            ldh [code_bank], a
+.out:       ld e, 0                         ; X = 0
+            pop hl                          ; (L = the flags on entry: carry kept)
+            ld a, l
+            and $10
+            ld l, a
+            ldh a, [sh_u3]                  ; A = R; N, Z from it
+            ldh [nzv], a
+            and a
+            jr nz, .nz
+            set 7, l
+.nz:        ld h, a
+            push hl
+            pop af
+            ret
+.row:       ldh a, [sh_l1]                  ; HL: L, E x M, R
+            ld [hl+], a
+            ldh a, [sh_u2]
+.rm:        ld [hl+], a
+            dec e
+            jr nz, .rm
+            ldh a, [sh_u3]
+            ld [hl], a
+            ret
+
 ; scan_b's full pass: row D, columns 0-31 (as scan_run, but the palette fetched once per
 ; column pair or owner change, the owner bit from a rotating byte). Keeps D.
 SC_OB      = $D82A          ; owner bits of the next 8 cells, this cell's owner, the owner
@@ -4999,6 +5167,21 @@ bgsrc:      push bc
             pop de
             pop bc
             ret
+
+; far pr1 (prologue row writer): prow_b (bank PF_BANK)
+section bank 0, $3EE3
+hle_prow1:  push af
+            ld a, PF_BANK
+            ld [$2000], a
+            pop af
+            call prow_b
+            jp hle_back
+hle_wrow3:  push af                         ; fix window rows: wrow3_b (bank HLE_BANK)
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            call wrow3_b
+            jp hle_back
 
 ; A = BG tile whose shadow bytes were written: its page's BG_SRC cleared. Keeps all registers.
 section bank 0, $3DD8
@@ -8986,6 +9169,115 @@ tpair_b:    push af                         ; (the letter, carry)
 .nz:        push hl
             pop af
             ret
+
+; ---- far pr1 (gb_layout prow, the prologue's row writer): LDA ($10),Y / CMP #$10 / BCC pr3 /
+; EOR POFF / STA $2007 / INY / BNE pr1. Each letter as rt_ppu_w7 would write it, without its
+; generic path: DMG, LCD on, increment 1, nametable 0, no cell drawn by nametable 1, no
+; dialogue: the shadow, the tile's palette check (dmg_cell) and the GB map (vram_put);
+; otherwise rt_ppu_w7. Runs with code_bank = PF_BANK (the helpers come back to it).
+; Out (at pr3): a code < $10: A = it, N = 1, Z = 0, C = 0; Y wrapped: A = the last letter,
+; N = 0, Z = 1, C = 1. Y as the loop leaves it, X kept.
+prow_b:     ldh a, [code_bank]
+            push af
+            ld a, PF_BANK
+            ldh [code_bank], a
+.lp:        ld l, $10
+            call rt_izy_rd
+            ld a, l
+            cp $10
+            jr c, .code
+            ld hl, PROW_OFF
+            xor [hl]
+            ldh [w7v], a
+            call .put
+            inc c
+            jr nz, .lp
+            pop af                          ; (Y wrapped)
+            ldh [code_bank], a
+            xor a
+            ldh [nzv], a
+            ldh a, [w7v]
+            ld h, a
+            ld l, $90                       ; Z, C
+            push hl
+            pop af
+            ret
+.code:      ld h, a
+            pop af
+            ldh [code_bank], a
+            ld a, $80
+            ldh [nzv], a
+            ld l, 0
+            push hl
+            pop af
+            ret
+.put:       ldh a, [is_cgb]                 ; the letter (w7v) to the PPU
+            and a
+            jr nz, .gen
+            ldh a, [lcd_on]
+            and a
+            jr z, .gen
+            ldh a, [dlg_on]
+            and a
+            jr nz, .gen
+            ldh a, [ppu_ctrl]
+            and 4
+            jr nz, .gen
+            ldh a, [own1_lo]
+            ld h, a
+            ldh a, [own1_hi]
+            or h
+            jr nz, .gen
+            ldh a, [ppu_vh]
+            cp $20
+            jr c, .gen
+            cp $3F
+            jr z, .gen
+            bit 2, a
+            jr nz, .gen
+            and 3
+            ld h, a
+            ldh a, [ppu_vl]
+            ld l, a                         ; HL = the cell's offset
+            ld a, h
+            cp 3
+            jr nz, .ok
+            ld a, l
+            cp $C0
+            jr nc, .gen
+.ok:        push de
+            ld d, h
+            ld e, l
+            ld a, h
+            add a, high(NT_SH)
+            ld h, a
+            ldh a, [w7v]
+            cp [hl]
+            jr z, .inc                      ; the same tile, same owner: nothing changes
+            ld [hl], a                      ; shadow
+            push bc
+            ld b, d                         ; B:L = offset (nametable 0)
+            ld l, e
+            call dmg_cell                   ; the tile's palette (A = tile)
+            pop bc
+            ld a, d                         ; GB map
+            add a, $98
+            ld h, a
+            ld l, e
+            ldh a, [w7v]
+            call vram_put
+.inc:       pop de
+            ldh a, [ppu_vl]                 ; v += 1
+            add a, 1
+            ldh [ppu_vl], a
+            ret nc
+            ldh a, [ppu_vh]
+            inc a
+            and $3F
+            ldh [ppu_vh], a
+            ret
+.gen:       ldh a, [w7v]
+            jp rt_ppu_w7
 
 section bank PF_BANK, $7F00
 NBIT60:     db 1, 2, 4, 8, 16, 32, 64, 128

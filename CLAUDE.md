@@ -837,7 +837,8 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   attribute conversion by table (`OATTR`, bank 62 $7900). All checked SameBoy-VRAM-identical to the build before (DMG
   and CGB, 150-180 points; only frame-alignment shifts while a Color load is masked or a
   queued write is pending; OAM_SH identical too). checkall 62/62 on the last build. Lag: CGB
-  31 -> 23, DMG 199 -> 172 frames. Tools: lagcheck LAG_DUMP, sgbrun SGBRUN_CALLS / SGBRUN_PROF_SPOFF,
+  31 -> 23, DMG 199 -> 172 frames. Then: prologue row writer native (`prow_b`), window rows
+  native (`wrow3_b`, table from the ROM at build time): CGB 21, DMG 171. Tools: lagcheck LAG_DUMP, sgbrun SGBRUN_CALLS / SGBRUN_PROF_SPOFF,
   gbrun cart-RAM dump.
 
 ## Remaining
