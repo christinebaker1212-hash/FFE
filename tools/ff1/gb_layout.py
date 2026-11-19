@@ -2224,6 +2224,48 @@ etarget:
 """
 
 
+def shop_exit(rom):
+    """Leaving a shop (owner: the view was off afterwards): FF1 returns to the field without
+    a screen clear, so the shop's camera (1, 0) stayed. c62 $C170 / $C911 call EnterShop
+    ($A343, bank 14 mapped) through a stub in c62 that sets the field camera after; the stub
+    sits in the Japanese dakuten tables ($DD47-$DDAA, unused in English) after insert.py's
+    reset init ($DD47-$DD75)."""
+    ORG = 0xDD90
+    o = HDR + 62 * 0x2000 + ORG - 0xC000
+    r = asm("""
+shopw:
+    jsr $A343
+    lda #FCX
+    sta $5800
+    lda #6
+    sta $5801
+    rts
+""", syms={'FCX': FIELD_CAM_X}, org=ORG)
+    rom[o:o + len(r.bytes)] = r.bytes
+    # FORMATION (FF1's lineup, b14 $9915, reached from the Select menu): its 14 x 19 box at
+    # (10, 5) did not fit 18 rows and sat off-centre at the field camera. Box 18 rows high
+    # (the bottom frame right under the last member's sprite), camera (7, 5) set just
+    # before the box is drawn ($9972 JSR DrawBox -> camlu; the screen clear before it sets
+    # the field camera, which the field gets back when the lineup closes).
+    lu = asm("""
+camlu:
+    lda #7
+    sta $5800
+    lda #5
+    sta $5801
+    jmp $E0F2
+""", org=r.org + len(r.bytes))
+    assert lu.org + len(lu.bytes) <= 0xDDAB
+    o2 = HDR + 62 * 0x2000 + lu.org - 0xC000
+    rom[o2:o2 + len(lu.bytes)] = lu.bytes
+    put_bank(rom, 14, 0x9972, bytes([0x20]) + lu.org.to_bytes(2, 'little'), bytes([0x20, 0xF2, 0xE0]))
+    put_bank(rom, 14, 0x9934, bytes([0x12]), bytes([0x13]))
+    for a in (0xC170, 0xC911):              # c62 (8KB bank 62): JSR EnterShop -> JSR shopw
+        o = HDR + 62 * 0x2000 + a - 0xC000
+        assert bytes(rom[o:o + 3]) == bytes([0x20, 0x43, 0xA3]), hex(a)
+        rom[o + 1:o + 3] = r.org.to_bytes(2, 'little')
+
+
 def bug_fixes(rom):
     main = sys.modules['__main__']
     farjsr = main.LABELS_EX['farjsr']
@@ -2277,6 +2319,7 @@ def apply(rom, report):
     minimap(rom)
     puzzle(rom)
     select_menu(rom)
+    shop_exit(rom)
     bug_fixes(rom)
     report.append('GB layout applied')
 
@@ -3894,6 +3937,7 @@ res_sm:             ;   (the standard map: $CF3C returns into its frame loop $C8
 """, syms={'BANK': SEL_BANK, 'SUSPK': SUSP_KIND}, org=FIX_FREE[0])
     assert fx.org + len(fx.bytes) <= FIX_FREE[1], hex(fx.org + len(fx.bytes))
     put(rom, fx.org, fx.bytes)
+    FIX_FREE[0] = fx.org + len(fx.bytes)
     L = fx.labels
     b21 = asm("""
     jmp selmenu
