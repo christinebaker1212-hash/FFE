@@ -73,7 +73,10 @@ class FF3:
            ('fix', 0xFCD6): ('nat_fcd6', 'NZC', 'C'),   # multiply (8-bit)
            ('p2e', 0xBD2A): ('nat_bd2a', 'NZC'),     # monster death animation step
            ('p34', 0x9754): ('nat_9754', 'NZ'),      # init text buffer ($7200-$73FF = $FF)
-           ('p34', 0x95E1): ('nat_95e1', 'NZC')}     # convert hex to decimal
+           ('p34', 0x95E1): ('nat_95e1', 'NZC'),     # convert hex to decimal
+           ('fix', 0xF8EA): ('nat_f8ea', 'NZC', 'C'),   # multiply (A = $1A, X = $1B)
+           ('fix', 0xF8E0): ('nat_f8e0', 'NZV'),     # set ppu address
+           ('fix', 0xF8C5): ('nat_f8c5', 'NZ')}      # wait for vblank, oam, ppu registers
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   $FB80 wait for nmi (INC $05 / LDA $05 / BNE): the asynchronous NMI handler
     #   ($0100 = JMP $FB57 in battle / cutscenes) clears $05; on the GB the handler runs
@@ -462,6 +465,8 @@ class Emitter:
         if tk not in self.rc.insns and tk not in self.rc.g.ext:
             self.rc.warn.append('jump to uncompiled %s:%04X from %r' % (tk[0], tk[1], self.i))
             self.o(('call %s, ' % cond if cond else 'call ') + 'rt_fatal'); return
+        if tk in self.rc.g.ext:                      # a native routine: bank 0, directly
+            self.o(('jp %s, ' % cond if cond else 'jp ') + self.rc.g.ext[tk][0]); return
         self.o(('jp %s, ' % cond if cond else 'jp ') + label(*tk))
 
     # -- main ------------------------------------------------------------------------
@@ -840,6 +845,8 @@ class Emitter:
         if tk not in self.rc.insns and tk not in self.rc.g.ext:
             self.rc.warn.append('call to uncompiled %s:%04X from %r' % (tk[0], tk[1], i))
             self.o('call rt_fatal'); return
+        if tk in self.rc.g.ext:                      # a native routine: bank 0, no bank switch
+            self.o('call ' + self.rc.g.ext[tk][0]); return
         self.o('call ' + label(*tk))
 
     def x_RTS(self):

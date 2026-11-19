@@ -778,51 +778,105 @@ nat_fc92:   push af
             jr z, .zero
             ld a, c
             ldh [nt_y], a
-            ld a, 16
-            ldh [nt_x], a
-            ld a, [NES_RAM + $18]
-            ld c, a
+            ld a, [NES_RAM + $18]           ; HL = dividend ($19:$18), shifted out as the
+            ld l, a                         ;   quotient bits come in: HL = quotient ($1D:$1C)
             ld a, [NES_RAM + $19]
-            ld b, a                         ; B:C = $19:$18
-            ld de, 0                        ; D:E = $1F:$1E
-            ld hl, 0                        ; H:L = $1D:$1C
-            pop af                          ; (the incoming carry)
-.lp:        rl c                            ; ROL $18 $19 $1E $1F
-            rl b
+            ld h, a
+            ld a, [NES_RAM + $1A]
+            ld c, a
+            ld a, [NES_RAM + $1B]
+            ld b, a                         ; BC = divisor, DE = remainder ($1F:$1E)
+            ld de, 0
+            pop af                          ; the NES's ROL $18 takes the incoming carry first,
+            ld a, 0                         ;   then the zeros ROL $1D shifts out: $18:$19 end
+            rra                             ;   as 0 : C << 7; the last ROL leaves C = 0
+            ldh [nt_a], a
+            ld a, 4
+            ldh [nt_x], a
+.lp:
+            add hl, hl                      ; (dividend out of H, quotient bit into L)
             rl e
             rl d
-            ld a, [NES_RAM + $1A]           ; SEC / SBC: D:E -= $1B:$1A
-            push hl
-            ld h, a
-            ld a, e
-            sub h
+            ld a, e                         ; SEC / SBC: remainder - divisor
+            sub c
             ld e, a
-            ld a, [NES_RAM + $1B]
-            ld h, a
             ld a, d
-            sbc a, h
+            sbc a, b
             ld d, a
-            pop hl
-            jr c, .back                     ; (GB borrow = 6502 C clear)
-            scf                             ; 6502 C = 1
-            jr .rol
-.back:      ld a, [NES_RAM + $1A]           ; restore (ADC with C = 0), then CLC
-            add a, e
+            jr nc, .q0
+            ld a, e                         ; borrow: restore (ADC), quotient bit 0
+            add a, c
             ld e, a
-            ld a, [NES_RAM + $1B]
-            adc a, d
+            ld a, d
+            adc a, b
             ld d, a
-            and a                           ; C = 0
-.rol:       rl l                            ; ROL $1C $1D
-            rl h
+            jr .n0
+.q0:        inc l                           ; quotient bit 1
+.n0:
+            add hl, hl                      ; (dividend out of H, quotient bit into L)
+            rl e
+            rl d
+            ld a, e                         ; SEC / SBC: remainder - divisor
+            sub c
+            ld e, a
+            ld a, d
+            sbc a, b
+            ld d, a
+            jr nc, .q1
+            ld a, e                         ; borrow: restore (ADC), quotient bit 0
+            add a, c
+            ld e, a
+            ld a, d
+            adc a, b
+            ld d, a
+            jr .n1
+.q1:        inc l                           ; quotient bit 1
+.n1:
+            add hl, hl                      ; (dividend out of H, quotient bit into L)
+            rl e
+            rl d
+            ld a, e                         ; SEC / SBC: remainder - divisor
+            sub c
+            ld e, a
+            ld a, d
+            sbc a, b
+            ld d, a
+            jr nc, .q2
+            ld a, e                         ; borrow: restore (ADC), quotient bit 0
+            add a, c
+            ld e, a
+            ld a, d
+            adc a, b
+            ld d, a
+            jr .n2
+.q2:        inc l                           ; quotient bit 1
+.n2:
+            add hl, hl                      ; (dividend out of H, quotient bit into L)
+            rl e
+            rl d
+            ld a, e                         ; SEC / SBC: remainder - divisor
+            sub c
+            ld e, a
+            ld a, d
+            sbc a, b
+            ld d, a
+            jr nc, .q3
+            ld a, e                         ; borrow: restore (ADC), quotient bit 0
+            add a, c
+            ld e, a
+            ld a, d
+            adc a, b
+            ld d, a
+            jr .n3
+.q3:        inc l                           ; quotient bit 1
+.n3:
             ldh a, [nt_x]
             dec a
             ldh [nt_x], a
-            jr nz, .lp
-            push af
-            ld a, c
+            jp nz, .lp
+            xor a
             ld [NES_RAM + $18], a
-            ld a, b
+            ldh a, [nt_a]
             ld [NES_RAM + $19], a
             ld a, l
             ld [NES_RAM + $1C], a
@@ -836,12 +890,8 @@ nat_fc92:   push af
             ld b, 0
             ldh a, [nt_y]
             ld c, a
-            xor a
+            xor a                           ; X = 0, A = $1F, Z = 1, N = 0, C = 0
             ldh [nzv], a
-            pop af
-            ld a, 0
-            inc a
-            dec a
             ld a, [NES_RAM + $1F]
             ret
 .zero:      xor a                           ; early RTS: A = 0, Z = 1, N = 0, C kept, X kept
@@ -1273,4 +1323,64 @@ nat_95e1:
             sbc a, d
             ld h, a
             ld a, b
+            ret
+
+; ------------------------------------------------------------------ fix:F8EA, F8E0, F8C5
+; multiply wrapper: JSR $FCD6 / LDA $1A / LDX $1B. Out: A = $1A, X = $1B (N, Z of X), C from
+; the multiply, Y kept.
+nat_f8ea:   call nat_fcd6
+            ld a, [NES_RAM + $1B]
+            ld e, a
+            ldh [nzv], a
+            inc e
+            dec e
+            ld a, [NES_RAM + $1A]
+            ret
+
+; set ppu address: BIT $2002 / STA $2006 / STX $2006. Out: N, V, Z of the BIT; A, X, Y, C kept.
+nat_f8e0:   push af
+            ldh [ppu_th], a
+            ld a, e
+            ldh [ppu_vl], a
+            ldh a, [ppu_th]
+            and $3F
+            ldh [ppu_vh], a
+            xor a
+            ldh [wc_n], a                   ; (new address: no cached run)
+            ldh [ppu_latch], a              ; (BIT resets it; the two writes leave it reset)
+            ldh a, [ppu_stat]
+            ld l, a
+            xor a
+            ldh [ppu_stat], a
+            ld a, l
+            ldh [nzv], a
+            ldh [vfl], a
+            pop af
+            ld h, a
+            push af                         ; Z = (A & $2002) = 0, carry kept
+            and l
+            ld l, a
+            pop af
+            ld a, h
+            inc l
+            dec l
+            ret
+
+; wait for vblank (no color update): $FB80 (wait for the NMI handler), $F8AA (OAM DMA from
+; page 2), $F8CB (PPU registers from $06 / $09 / $0C / $0D). Out: A = $0D (N, Z), C kept,
+; X, Y kept.
+nat_f8c5:   call rt_wait_nmi
+            ld a, 2
+            call rt_io_w4014
+            ld a, [NES_RAM + $06]
+            call rt_ppu_w0
+            ld a, [NES_RAM + $09]
+            call rt_ppu_w1
+            ld a, [NES_RAM + $0C]
+            call rt_ppu_w5
+            ld a, [NES_RAM + $0D]
+            call rt_ppu_w5
+            ldh [nzv], a
+            inc a
+            dec a
             ret
