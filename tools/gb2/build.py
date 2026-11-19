@@ -46,7 +46,10 @@ def source_base(src, nes, srcdir, gb=False):
     import json
     mp = os.path.join(srcdir, 'map.json')
     sha = hashlib.sha1(open(nes, 'rb').read()).hexdigest()
-    if os.path.exists(mp) and json.load(open(mp))['rom_sha1'] == sha: return
+    tools = [os.path.join(HERE, f) for f in ('ff2src.py', 'ff2en.py', 'layout.py')] + \
+        [os.path.join(ROOT, 'tools', 'ff2', 'insert.py')]
+    fresh = os.path.exists(mp) and all(os.path.getmtime(t) <= os.path.getmtime(mp) for t in tools)
+    if fresh and json.load(open(mp))['rom_sha1'] == sha: return
     listing = os.path.join(ROOT, 'build', 'src', 'ff2', 'ff2j.asm')
     if not os.path.exists(listing):
         raise SystemExit('everything8215 listing missing: git clone --depth 1 '

@@ -136,13 +136,15 @@ def build(rom_path, outdir, listing, english=False, gb=False):
             if dec and len(dec[2]) == len(want) and dec[2][0] == want[0]:
                 code[b][o] = dict(e, comment=(e['comment'] + ' ' if e['comment'] else '') + '[operand changed]')
                 rep['redecoded'].append('%02X/%04X operand' % (b, e['addr'])); cov = o + len(want); continue
-            p = o; starts = []
+            p = o; starts = []; term = False
             while True:
                 d = decode(bk, p)
                 if d is None or p in span[b] and p != o: break
                 starts.append(p); p += len(d[2])
                 if p in bounds: break
-            if p in bounds and starts:
+                if d[0] in ('JMP', 'RTS', 'RTI'):       # (a patched jump over a cut-up
+                    term = True; break                  #   instruction: the rest is dead)
+            if (p in bounds or term) and starts:
                 for s in starts:
                     code[b][s] = dict(title=e['title'] if s == o else None, notes=e['notes'] if s == o else [],
                                       comment='[changed: was %s]' % e['text'] if s == o else '[changed]')

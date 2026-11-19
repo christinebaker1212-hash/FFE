@@ -145,9 +145,20 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
 - Checked: NES variant (cynes shots) and GB (Gambatte CGB / DMG shots) through the opening
   battle: enemies, party sprites, party window correct; firstdiff on the GB-layout pair
   (seed 1, 11000 frames): no difference in 10520 waits.
-- Next: enemy names window, command window (over it) + cursor positions, messages (style A,
-  full width), magic / Gear / item lists, victory windows; status words in the party window;
-  hit knock-back runs past the right edge.
+- Step 3 (done): enemy names window (`b12:910D`; long names wrap at a space, one-word
+  names or >4 lines squeezed without letter gaps; names from the English bank-21 table),
+  command window over it (`b12:982C`; names back at `b12:981D`; cursor table `b12:BFC5`:
+  hand at the screen edge), message window (bank 5 `AA57`/`AB4F`; style A from the English
+  buffer BUF per box: attacker > target, action / result indented, messages on the next
+  line; names + party redrawn when the last box closes). Checked on the NES variant
+  (formations 0, 46, 55, 90, 126 forced) and on GB (Gambatte CGB); firstdiff GB-layout pair
+  seed 1, 11000 frames: no difference in 10627 waits.
+- Source base: a patched JMP that cuts into the next listed instruction ends the re-decode
+  (the rest is dead code); build.py regenerates the source map when its tools changed.
+- Next: magic / Gear / item lists (windows via `b12:9250` are invisible now), victory /
+  loot windows (bank 5), status words in the party window ("Dead" etc.), clear the bottom
+  rows at battle start, hit knock-back past the right edge, redraw flicker after messages,
+  GB tile upload latency / speed (lagcheck).
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 

@@ -132,7 +132,13 @@ def main():
     while state['k'] < last and state['diff'] is None:
         gb.pb.tick(); guard += 1
         if state['k'] != prev: prev, guard = state['k'], 0
-        if guard > 2000: raise SystemExit('GB stuck before wait %d' % (state['k'] + 1))
+        if guard > 2000:
+            m = gb.pb.memory; pc = gb.pb.register_file.PC; cb = m[0xFF8C]
+            bank = cb if pc >= 0x4000 else 0
+            best = max(((a, n) for n, (b, a) in sym.items() if b == bank and a <= pc), default=(0, '?'))
+            raise SystemExit('GB stuck before wait %d: PC %04X bank %d (%s+%d) SP %04X, fault info $D820: %s' % (
+                state['k'] + 1, pc, cb, best[1], pc - best[0], gb.pb.register_file.SP,
+                bytes(m[0xD820 + i] for i in range(16)).hex(' ')))
         while shot_w and state['k'] >= shot_w[0]:
             shots.append(gb.image()); shot_w.pop(0)
     print(state['diff'] or 'no difference in %d frame waits (NES frames 0-%d)' % (last, limit))
