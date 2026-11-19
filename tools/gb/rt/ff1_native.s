@@ -1691,3 +1691,238 @@ sprload_b:  push af
             pop af
             ret
 
+; ---- DMG: LCD going on after drawing with it off (dmg_scan_all): every GB map cell (rows
+; 0-29) gives its tile the palette it is drawn with (from the nametable that owns the
+; cell; marked for re-coding if that changed, a parked tile marked again), REF_BM = tiles
+; the map uses; then the cells in the GB view again (they win for a tile drawn with two
+; palettes) and PAL_USED = the palettes of the view. Row constants once per row; a cell
+; with the tile and palette of the cell before it is skipped.
+SC_TH      = $D835          ; scan_run: tile row: page (row / 8), offset ((row & 7) * 32),
+SC_TL      = $D836
+SC_AL      = $D837          ;   attribute row offset ($C0 + (row / 4) * 8), row & 2,
+SC_RF      = $D838
+SC_OL      = $D839          ;   OWN row offset (row * 4), nametable 1 owns cells,
+SC_O1      = $D83A
+SC_PU      = $D83B          ;   PAL_USED wanted, cells left, tile / palette of the cell before
+SC_N       = $D83C
+SC_LT      = $D83D
+SC_LP      = $D82E          ;   (in the fault-dump area DBG + 14: written only on a fault)
+scan_b:     push bc
+            push de
+            push hl
+            ld a, 1
+            ldh [sgb_dirty], a
+            ldh [sgb_adirty], a
+            xor a
+            ldh [dmg_scan], a
+            ld [SC_PU], a
+            ld hl, REF_BM
+            ld b, 32
+.z:         ld [hl+], a
+            dec b
+            jr nz, .z
+            ldh a, [own1_lo]
+            ld b, a
+            ldh a, [own1_hi]
+            or b
+            ld [SC_O1], a
+            ld d, 0
+.r:         ld e, 0
+            ld a, 32
+            call scan_run
+            inc d
+            ld a, d
+            cp 30
+            jr nz, .r
+            xor a
+            ld [PAL_USED], a
+            inc a
+            ld [SC_PU], a
+            ldh a, [cam_y]                  ; the view: map row (scroll_y + cam_y) mod 240 / 8,
+            ld b, a                         ;   column (scroll_x + cam_x) / 8
+            ldh a, [scroll_y]
+            add a, b
+            jr c, .w
+            cp 240
+            jr c, .y
+.w:         sub 240
+.y:         srl a
+            srl a
+            srl a
+            ld d, a
+            ld b, 18
+.vr:        push bc
+            ldh a, [cam_x]
+            ld c, a
+            ldh a, [scroll_x]
+            add a, c
+            srl a
+            srl a
+            srl a
+            ld e, a
+            ld a, 20
+            call scan_run
+            ld a, d
+            inc a
+            cp 30
+            jr c, .vn
+            xor a
+.vn:        ld d, a
+            pop bc
+            dec b
+            jr nz, .vr
+            pop hl
+            pop de
+            pop bc
+            ret
+
+; D = row, E = first column, A = cells (columns wrap at 32). Keeps D.
+scan_run:   ld [SC_N], a
+            ld a, $FF
+            ld [SC_LT], a
+            ld [SC_LP], a
+            ld a, d
+            srl a
+            srl a
+            srl a
+            ld [SC_TH], a
+            ld a, d
+            and 7
+            swap a
+            add a, a
+            ld [SC_TL], a
+            ld a, d
+            and $1C
+            add a, a
+            add a, $C0
+            ld [SC_AL], a
+            ld a, d
+            and 2
+            ld [SC_RF], a
+            ld a, d
+            add a, a
+            add a, a
+            ld [SC_OL], a
+.cell:      ld b, 0                         ; B = 4 if nametable 1 owns the cell
+            ld a, [SC_O1]
+            and a
+            jr z, .o0
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            ld c, a
+            ld a, [SC_OL]
+            or c
+            ld l, a
+            ld h, high(OWN)
+            ld c, [hl]
+            ld a, e
+            and 7
+            ld l, a
+            ld h, high(NBIT)
+            ld a, [hl]
+            and c
+            jr z, .o0
+            ld b, 4
+.o0:        ld a, [SC_TH]                   ; C = tile
+            add a, high(NT_SH)
+            add a, b
+            ld h, a
+            ld a, [SC_TL]
+            or e
+            ld l, a
+            ld c, [hl]
+            ld a, b                         ; B = palette
+            add a, high(NT_SH) + 3
+            ld h, a
+            ld a, e
+            srl a
+            srl a
+            ld l, a
+            ld a, [SC_AL]
+            add a, l
+            ld l, a
+            ld a, [SC_RF]
+            and a
+            ld a, [hl]
+            jr z, .t
+            swap a
+.t:         bit 1, e
+            jr z, .l
+            rrca
+            rrca
+.l:         and 3
+            ld b, a
+            ld a, [SC_LT]                   ; same as the cell before: done
+            cp c
+            jr nz, .new
+            ld a, [SC_LP]
+            cp b
+            jr z, .nx
+.new:       ld a, c
+            ld [SC_LT], a
+            ld a, b
+            ld [SC_LP], a
+            ld a, [SC_PU]
+            and a
+            jr z, .np
+            ld l, b                         ; PAL_USED |= 1 << palette
+            ld h, high(NBIT)
+            ld a, [hl]
+            ld hl, PAL_USED
+            or [hl]
+            ld [hl], a
+.np:        ld a, c                         ; REF_BM: the tile is used
+            and 7
+            ld l, a
+            ld h, high(NBIT)
+            ld a, [hl]
+            push af
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(REF_BM)
+            ld l, a
+            ld h, high(REF_BM)
+            pop af
+            or [hl]
+            ld [hl], a
+            ld l, c                         ; coded for palette B?
+            ld h, high(TILE_PAL)
+            ld a, [hl]
+            cp b
+            jr z, .pk
+            ld [hl], b
+.mk:        ld a, c
+            call dmg_mark
+            jr .nx
+.pk:        ld a, c                         ; same palette: a parked tile is marked again
+            and 7
+            ld l, a
+            ld h, high(NBIT)
+            ld a, [hl]
+            push af
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(DEFER_BM)
+            ld l, a
+            ld h, high(DEFER_BM)
+            pop af
+            and [hl]
+            jr nz, .mk
+.nx:        ld a, e
+            inc a
+            and 31
+            ld e, a
+            ld hl, SC_N
+            dec [hl]
+            jp nz, .cell
+            ret
+
