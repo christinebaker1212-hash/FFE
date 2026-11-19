@@ -265,6 +265,20 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 
+## Field dialogue (in progress, owner-approved layout `ff2_mock2`, 2026-11-19)
+- `layout.dialogue()`: text window 0 (`fix:E9AA` table) at NES screen (6, 6), 20 x 8 tiles
+  = GB rows 0-7 with the field camera 6 / 6 (18 columns x 6 lines inside; FF2's engine
+  pages from the window height); dialogue (banks 16-19) and events (bank 20) re-packed
+  wrapped at 18 columns with insert.py's paragraphs / flow and insert.py's bank split
+  (`gb_wrap`: 3 lines with one long name lose their indent / move a trailing "..." to its
+  own line); the ending block placed after the events again (bank 14 `$BAD2/$BAD6`);
+  the sprites-behind-window region of window 0 (`fix:E892`) set to the GB box (NPCs no
+  longer over the text). Checked: Gambatte CGB shots of the scenes after the opening
+  battle; random seed 1, 30000 frames: 29534 waits identical.
+- Open: windows 1-3 (keyword Ask / Learn, item choice, yes / no: NES rows 14-27, partly
+  below the GB view) need a mock-up; system strings shown in window 0 are still wrapped
+  at 26 (`SYS_W`).
+
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
 2. ~~English patch → source mapping~~ (plan §2, approved).

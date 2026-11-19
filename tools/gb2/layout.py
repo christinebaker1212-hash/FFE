@@ -2354,8 +2354,92 @@ ab:
     put(rom, 5, 0xA416, bytes(tab))
 
 
+# ---------------------------------------------------------------- field dialogue
+# Owner's layout (ff2_mock2): the box over the top of the GB view (field camera 6 / 6: NES
+# screen columns 6-25, rows 6-13), 18 columns x 6 lines inside, the party visible below.
+DLG_GB_W = 18
+DLG_WIN = dict(left=6, top=6, width=20, height=8)     # text window 0 (fix:E9AA table)
+
+
+def _insert_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('ff2insert', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2', 'insert.py'))
+    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
+    return ins
+
+
+def gb_wrap(ins, text, width=DLG_GB_W):
+    """insert.py's layout() at the GB width; a line still too wide (one long name with
+    punctuation: 3 lines in the whole script) loses its indent, then its trailing '...'
+    goes to a line of its own"""
+    lines = []
+    for p in ins.paragraphs(text):
+        for l in (ins.flow(p, width) if p.strip() else ['']):
+            if ins.vlen(l) > width: l = l.lstrip(' ')
+            if ins.vlen(l) > width and l.endswith('...'):
+                lines += [l[:-3], '...']; continue
+            lines.append(l)
+    lines = [ins.fix_keyword_columns(l) for l in lines]
+    for l in lines: assert ins.vlen(l) <= width, (l, ins.vlen(l))
+    return '\n'.join(lines)
+
+
+def dialogue(rom):
+    """Field text window 0 (dialogue, events) at DLG_WIN; dialogue and event text wrapped at
+    18 columns (insert.py's paragraphs / flow, the same banks and bank split as insert.py),
+    the ending moved after the events again (bank 14 $BACE pointer)."""
+    import json
+    ins = _insert_module()
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..')
+    cwd = os.getcwd(); os.chdir(root)
+    try:
+        for e in json.load(open('script/ff2/names.json')): ins.NAMES[e['id']] = e['en']
+        w = DLG_WIN
+        for k, (key, v) in enumerate((('left', w['left']), ('top', w['top']), ('width', w['width']), ('height', w['height']))):
+            put(rom, 31, 0xE9AA + 4 * k, bytes([v]), old=bytes([(2, 2, 0x1C, 0x0A)[k]]))
+        # sprites behind window 0 (fix:E843, region table E892: x from / to, y from / to;
+        # NES: x 10-238, y 10-86 for the box at 16-239 x 16-95): the GB box's region
+        x0, y0 = 8 * w['left'], 8 * w['top']
+        x1, y1 = x0 + 8 * w['width'], y0 + 8 * w['height']
+        for k, (v, o) in enumerate(((x0 - 6, 0x0A), (x1 - 1, 0xEF), (y0 - 6, 0x0A), (y1 - 9, 0x57))):
+            put(rom, 31, 0xE892 + 6 * k, bytes([v]), old=bytes([o]))
+        free_ev = None
+        for name, banks in (('dialogue_b', [ins.DB_BANK, ins.DB_BANK + 1]), ('dialogue_a', [ins.DA_BANK, ins.DA_BANK + 1]),
+                            ('events', [ins.EV_BANK])):
+            rows = json.load(open('script/ff2/%s.json' % name))
+            size = {e['id']: len(ins.enc(ins.layout(e['en']))) + 1 for e in rows if e['en']}   # insert.py's split
+            total = sum(size.values()); acc = 0; split = 256
+            if len(banks) > 1:
+                for i in sorted(size):
+                    acc += size[i]
+                    if acc > total / 2: split = i; break
+            used = {}
+            for b in banks:
+                rom[HDR + b * BANK:HDR + (b + 1) * BANK] = b'\xFF' * BANK
+                used[b] = ins.Bank(rom, b, [(0x8200, 0xC000)])
+            for e in rows:
+                b = banks[1 if e['id'] >= split else 0]
+                txt = gb_wrap(ins, e['en']) if e['en'] else ''
+                used[b].put_ptr(0x8000 + 2 * e['id'], used[b].alloc(ins.enc(txt) + b'\0'))
+            if name == 'events': free_ev = used[banks[0]].free
+        data = b''                                          # the ending (as insert.ending)
+        for e in json.load(open('script/ff2/ending.json')):
+            if not e['en'].strip():
+                data += ins.enc(e['en']) + b'\0'; continue
+            lines = []
+            for line in e['en'].split('\n'):
+                for l in (ins.balanced(line.strip(), 24) if line.strip() else ['']):
+                    lines.append(' ' * ((24 - ins.vlen(l)) // 2) + l if l else '')
+            data += ins.enc('\n'.join(lines)) + b'\0'
+        a = ins.Bank(rom, ins.EV_BANK, free_ev).alloc(data)
+        put(rom, 14, 0xBAD2, bytes([a & 0xFF])); put(rom, 14, 0xBAD6, bytes([a >> 8]))
+    finally:
+        os.chdir(cwd)
+
+
 def apply(rom):
     battle(rom)
+    dialogue(rom)
 
 
 if __name__ == '__main__':
