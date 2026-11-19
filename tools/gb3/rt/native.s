@@ -255,7 +255,7 @@ chr64_fast: ldh a, [ppu_vl]
             jr nz, .no
             ld a, h
             cp $80
-            jr c, .no
+            jr c, .lowsrc
             cp $A0
             jr nc, .ha
             and $1F
@@ -279,6 +279,18 @@ chr64_fast: ldh a, [ppu_vl]
 .hf:        sub $80
             ld h, a
             ld a, DATA + 63
+            jr .src
+.lowsrc:    cp $60                          ; PRG-RAM $6000-$7FFF (decompressed graphics) ->
+            jr c, .ramsrc                   ;   GB $A000; RAM $0000-$07FF -> $C000
+            add a, $40
+            ld h, a
+            ldh a, [code_bank]              ; (no ROM bank needed)
+            jr .src
+.ramsrc:    cp $08
+            jr nc, .no
+            add a, high(NES_RAM)
+            ld h, a
+            ldh a, [code_bank]
 .src:       ld [MBC5_BANKL], a
             push hl                         ; mark the 4 tiles dirty
             ldh a, [ppu_vl]
@@ -545,6 +557,8 @@ nat_9f98:
             ldh [map_any], a
             xor a
             ldh [mr_hi], a
+            dec a
+            ldh [tm_hi], a
             xor a
             ldh [ppu_latch], a
             ldh [ppu_stat], a

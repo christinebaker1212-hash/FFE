@@ -81,6 +81,8 @@ wc_nh:      ds 1                            ;   addresses (0 = slow path)
 wc_ml:      ds 1
 wc_mh:      ds 1
 wv:         ds 1
+tm_lo:      ds 1                            ; CHR tile marked last (L & $F0, H; H = $FF: none)
+tm_hi:      ds 1
 mr_lo:      ds 1                            ; GB map row marked last ($2007 writes: L & $E0, H)
 mr_hi:      ds 1
 frame_tick: ds 1
@@ -194,6 +196,8 @@ boot:       di
             ld hl, $FF80                    ; clear HRAM
             ld bc, $7F
             call memclr
+            ld a, $FF                       ; (no CHR tile marked yet)
+            ldh [tm_hi], a
             ld hl, dma_code                 ; OAM DMA routine to HRAM
             ld de, hram_dma
             ld b, 10
@@ -964,8 +968,23 @@ rt_ppu_w7:
 ; NES CHR byte C at NES address HL ($0000-$1FFF) -> staging copy (WRAM bank 2 / 3, GB
 ; row order: byte k of a tile -> 2k, k - 8 -> 2(k - 8) + 1), tile marked for the vblank's
 ; DMA. A, F, B, D, E, HL clobbered (rt_ppu_w7 keeps them); C kept.
-chr_put:    call tile_mark
-            jr chr_store
+chr_put:    push hl                         ; store first, then mark (a vblank flush in
+            call chr_store                  ;   between copies the byte or forgets the mark)
+            pop hl
+            ld a, l                         ; same tile as the last mark: done
+            and $F0
+            ld b, a
+            ldh a, [tm_lo]
+            cp b
+            jr nz, .mk
+            ldh a, [tm_hi]
+            cp h
+            ret z
+.mk:        ld a, b
+            ldh [tm_lo], a
+            ld a, h
+            ldh [tm_hi], a
+            jp tile_mark
 ; mark the tile of NES CHR address HL dirty (A, F, B, D, E clobbered; HL, C kept)
 tile_mark:  ld a, h                         ; dirty byte = tile >> 3 = H * 2 + (L >> 7)
             and $1F
@@ -1030,6 +1049,8 @@ chr_store:  ld a, l                         ; byte k -> GB offset
 ; the rest waits for the next vblank. A, F, BC, DE, HL clobbered.
 hd_flush:   xor a
             ldh [chr_dirty], a
+            ld a, $FF                       ; (marks cleared: forget the last marked tile)
+            ldh [tm_hi], a
             ld hl, TILE_DIRTY
 .byte:      ld a, [hl]
             and a
@@ -1246,7 +1267,33 @@ attr_apply: ldh [c_val], a
             ld a, e
             cp 4
             jr c, .q
+            ld d, 0                         ; the block's rows marked once, after the writes
+.mk:        ldh a, [c_y]
+            add a, d
+            cp 30
+            jr nc, .mkx
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ldh a, [c_x]
+            add a, l
+            ld l, a
             ldh a, [c_nt]
+            ld b, a
+            call cell_map
+            push de
+            ld de, attr_dirty
+            call row_mark
+            pop de
+            inc d
+            ld a, d
+            cp 4
+            jr c, .mk
+.mkx:       ldh a, [c_nt]
             ld b, a
             ret
 quad_row:   ld a, d                         ; cells (E, D) and (E + 1, D) of nametable c_nt
@@ -1266,10 +1313,6 @@ quad_row:   ld a, d                         ; cells (E, D) and (E + 1, D) of nam
             ldh a, [c_nt]
             ld b, a
             call cell_map                   ; -> $98xx
-            push hl
-            ld de, attr_dirty
-            call row_mark
-            pop hl
             ld a, h
             sub $98 - high(ATTR_SH)
             ld h, a
