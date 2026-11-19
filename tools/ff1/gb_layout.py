@@ -1978,6 +1978,7 @@ def apply(rom, report):
     music_trampoline(rom)
     dialogue(rom)
     main_menu(rom)
+    target_menu(rom)
     item_menu(rom)
     magic_menu(rom)
     equip_menu(rom)
@@ -2028,6 +2029,44 @@ def menu_strings(enc_txt):
         MENU_GB[54 + 2 * i] = '{09} {%02X}' % (0x10 + i)
     MENU_GB[2] = ('{05}' + '{08}'.join('  ' + w for w in ('Items', 'Magic', 'Weapons', 'Armor', 'Status'))
                   + '{08}{04}Gil')      # Gil below the commands (amount 6 wide + 'Gil': 9 of 10 columns)
+
+
+def target_menu(rom):
+    """Target screen of field magic and items (b14 $B413, also redrawn after each use): FF1
+    drew four boxes side by side at NES rows 11-18 (outside the GB view, and their English
+    strings at $B46D came out garbled); the GB draws the main menu's party window instead
+    ($B859: window 1 (0, 0, 20, 10) and the four members' lines, HP updated after each use)
+    at camera 0, 0, with the hand beside the member's name (x 0, y 7 + 16m, as the main
+    menu) moved by up / down."""
+    B = 14
+    src = """
+    lda #0          ; $B413
+    sta $2001
+    sta $37
+    jsr CAMMENU     ; clear ($9C02) and camera 0, 0
+    jsr $B859       ; party window and member lines
+    jmp $B793       ; screen on
+"""
+    r = asm(src, syms={'CAMMENU': CAM['menu']}, org=0xB413)
+    assert r.org + len(r.bytes) <= 0xB437
+    put_bank(rom, B, 0xB413, r.bytes, bytes.fromhex('a9008d0120853720029c'))
+    cur = asm("""
+    lda $62         ; $B401: hand at x 0, y 7 + 16 * member
+    asl a
+    asl a
+    asl a
+    asl a
+    adc #7
+    sta $41
+    lda #0
+    sta $40
+    jmp $ED24
+""", org=0xB401)
+    assert len(cur.bytes) <= 18
+    put_bank(rom, B, 0xB401, cur.bytes, bytes.fromhex('a662bd0fb48540a9688541'))
+    # cursor: down (+1) / up (-1) instead of right / left
+    put_bank(rom, B, 0xB3D0, bytes([0x29, 0x0C]), bytes([0x29, 0x03]))
+    put_bank(rom, B, 0xB3DC, bytes([0xC9, 0x04]), bytes([0xC9, 0x01]))
 
 
 def main_menu(rom):
