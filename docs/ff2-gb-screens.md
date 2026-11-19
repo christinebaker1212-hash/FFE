@@ -33,3 +33,29 @@ status word. Commands (Items, Magic, Equip, Status, Save; cols 13-19 rows 0-6) a
 Items, magic, equipment, status, shops, keyword dialogue (Ask / Learn), save menu, name
 entry, prologue, title, ending, world map (B + Select), Select menu (options / formation /
 suspend).
+
+## Battle: how it is built (layout.py, in progress)
+- Cameras: battlefield NES (20, 48) for GB lines 0-95; second camera (0, 48) from line 96,
+  so the windows live in NES rows 18-23, cols 0-19 of nametable 0 (y maps 1:1 for both,
+  only x differs). Party: y = slot * 24 + 48, base x 156 / 160.
+- One BG pattern table: on the NES the menu area switches to table 0 (font) at the sprite-0
+  split; a DMG cannot hold both tables plus the sprite slots, so in the GB layout the menu
+  area stays on table 1 (`fix:FD5B` AND #$EF dropped) and the windows draw with table-1
+  tiles not used by this battle's battlefield. Free tiles per battle: backdrop `$00`,
+  `$10-$1F` always used; monsters use rectangles of consecutive tiles from the first tile
+  of their graphics (`b11:9F14`, table `$9FA5`), bosses a 144-byte tilemap (`b11:9F57`);
+  survey (`tools/gb2/ff2tiles.py`, all 128 formations): at most 133 tiles in rows 2-17
+  (formation 6), so >= 100 tiles are free in every battle.
+- Window code (planned): pool init after the monster tilemaps (free-tile list in RAM);
+  small proportional font renderer (glyphs from tools/latin_font.py, 3-px digits) writing
+  tile bitmaps to the pool tiles in vblank after the game's own waits; panel routines
+  replacing the NES window drawing: names (`b12:910D`), party stats (`b12:912A`), commands
+  (`b12:9147`, over the names window; the menu scroll `b12:981D/982C/9AC6` no longer
+  slides), message boxes (bank 5 `AA57` open / `AB4F` close, English boxes at `5:AC02`),
+  then the magic / Gear / item lists, victory and loot windows. Code in free bank 23,
+  called through fixed-bank stubs that switch with `$FA7F` (bank recorded in `$3E`, so
+  the asynchronous battle NMI's "return (long)" restores it).
+- Free RAM (cynes write logs, random play seed 1, 30000 frames): never written
+  `$75C0-$75FF`, `$7FDF-$7FFF`; in battle also `$7800-$78DF` (the box save stack the
+  English patch moved to ExRAM; no write during the opening battle). `$74C0-$74FF`,
+  `$7BE3-$7BFF`, `$627C-$627F` are written (not free). Banks 23-30 are empty.
