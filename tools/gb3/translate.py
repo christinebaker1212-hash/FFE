@@ -60,7 +60,13 @@ class FF3:
     #   $FF36 wait for vblank: writes JMP $FF2A into the RAM NMI vector $0100 and spins;
     #   $FF2A reads $2002, writes RTI back to $0100 and drops the interrupt frame (PLA x3,
     #   A = $FF), returning to the waiter. On the GB: wait for the vblank, A = $FF.
-    ext = {('fix', 0xFF36): ('rt_wait_ff36', 'NZ')}
+    ext = {('fix', 0xFF36): ('rt_wait_ff36', 'NZ'),
+           # native versions of hot routines (rt/native.s)
+           ('p32', 0x9111): ('nat_9111', 'NZC'),     # battle: draw character sprite
+           ('fix', 0xF897): ('nat_f897', 'NZC'),     # copy color palettes to ppu
+           ('p2e', 0x9F98): ('nat_9f98', 'NZ'),      # clear vram ($0000-$2FFF)
+           ('fix', 0xFCF5): ('nat_fcf5', 'NZC', 'C'),   # multiply (16-bit)
+           ('fix', 0xFC92): ('nat_fc92', 'NZC', 'C')}   # divide (16-bit)
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   $FB80 wait for nmi (INC $05 / LDA $05 / BNE): the asynchronous NMI handler
     #   ($0100 = JMP $FB57 in battle / cutscenes) clears $05; on the GB the handler runs
@@ -69,9 +75,11 @@ class FF3:
     #   ("wait for last battle bg scanline", ~5400 cycles): no wait on the GB, Y = 0.
     idioms = {('fix', 0xFB80): ('rt_wait_nmi', 0xFB86, 'NZ'),
               ('fix', 0xFB79): ('rt_wait_irq', 0xFB7F, 'NZ'),
-              ('fix', 0xF809): ('rt_bgwait', 0xF816, 'NZ')}
+              ('fix', 0xF809): ('rt_bgwait', 0xF816, 'NZ'),
+              ('fix', 0xF98E): ('nat_chr64', 0xF9A2, 'NZC')}   # copy graphics to ppu: 64-byte loop
     idiom_code = {('fix', 0xFB80): bytes.fromhex('e605a505d0fc'), ('fix', 0xFB79): bytes.fromhex('e600a500d0fc'),
-                  ('fix', 0xF809): bytes.fromhex('a000eaeaeaeaeaeaeaea88d0f560')}
+                  ('fix', 0xF809): bytes.fromhex('a000eaeaeaeaeaeaeaea88d0f560'),
+                  ('fix', 0xF98E): bytes.fromhex('a000b17ea692f004aabd00738d0720c8c040d0ee')}
     # asynchronous NMI / IRQ handlers (run by the runtime through the dynamic table; RTI = ret)
     nmi_handlers = [('fix', 0xFB57), ('fix', 0xFB30), ('ex', 0x5C03)]
     skip = [('fix', 0xFF2A, 0xFF36), ('fix', 0xFF38, 0xFF48)]   # NMI return stub, rest of the wait

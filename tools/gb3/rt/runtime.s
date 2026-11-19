@@ -20,6 +20,10 @@ NES_RAM    = $C000          ; $0000-$07FF
 EX_RAM     = $C800          ; $5C00-$5FFF
 OAM_SH     = $CC00          ; GB shadow OAM (160 bytes)
 PAL_SH     = $CCA0          ; NES palette RAM (32)
+TILE_DIRTY = $CCC0          ; NES tiles written since their last copy to VRAM (bit per tile, 64;
+                            ;   must end at $CCFF: hd_flush stops when L wraps)
+STAGE      = $D000          ; NES pattern tables in GB format: table 0 in WRAM bank 2, table 1
+                            ;   in bank 3 (copied to VRAM by DMA in the vblank, hd_flush)
 NT_SH      = $D000          ; NES nametables (2 x 1KB after mirroring), WRAM bank 1
 DBG        = $D820          ; fault info: code, HL, SP, stack top (16)  (the addresses FF1's
 NMI_CNT    = $D830          ; 16-bit count of NES frame waits             test runners read:
@@ -67,6 +71,7 @@ frame_tick: ds 1
 oam_pending: ds 1
 pal_dirty:  ds 1
 shown:      ds 1                            ; palettes shown: 1 normal, 0 black (rendering off)
+chr_dirty:  ds 1                            ; a bit is set in TILE_DIRTY
 joy_shift:  ds 1
 joy_state:  ds 1
 irq_line:   ds 1                            ; MMC5 $5203 / $5204 (scanline IRQ)
@@ -97,6 +102,10 @@ c_y:        ds 1
 c_nt:       ds 1
 c_val:      ds 1
 c_q:        ds 1
+nt_x:       ds 1                            ; native routines (rt/native.s): saved X, A
+nt_a:       ds 1
+nt_y:       ds 1
+map_clr:    ds 1                            ; clear the GB map in the vblank (nat_9f98)
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -144,6 +153,11 @@ boot:       di
             call memclr
             ld hl, $C000                    ; clear WRAM (not the stack $CF00-$CFFF in use)
             ld bc, $0F00
+            call memclr
+            ld a, 4                         ; WRAM bank 4: zeros (DMA source, map clears)
+            ldh [rSVBK], a
+            ld hl, $D000
+            ld bc, $1000
             call memclr
             ld a, 1
             ldh [rSVBK], a
@@ -293,7 +307,41 @@ vblank_isr: push af
             ldh [rHDMA5], a
             xor a
             ldh [rVBK], a
-.nrb:       ldh a, [ppu_ctrl]               ; asynchronous NMI (battle / cutscenes): $0100 = JMP
+.nrb:       ldh a, [map_clr]                ; GB map cleared by DMA from a zero page
+            and a                           ;   (WRAM bank 4, kept zero)
+            jr z, .nmc
+            xor a
+            ldh [map_clr], a
+            ldh [rVBK], a
+            ldh a, [rSVBK]
+            push af
+            ld a, 4
+            ldh [rSVBK], a
+            ld a, $D0
+            ldh [rHDMA1], a
+            xor a
+            ldh [rHDMA2], a
+            ld a, $98
+            ldh [rHDMA3], a
+            xor a
+            ldh [rHDMA4], a
+            ld a, $3F
+            ldh [rHDMA5], a
+            pop af
+            ldh [rSVBK], a
+.nmc:       ldh a, [chr_dirty]              ; staged tiles -> VRAM
+            and a
+            jr z, .nchr
+            push bc
+            push de
+            ldh a, [rSVBK]
+            push af
+            call hd_flush
+            pop af
+            ldh [rSVBK], a
+            pop de
+            pop bc
+.nchr:      ldh a, [ppu_ctrl]               ; asynchronous NMI (battle / cutscenes): $0100 = JMP
             bit 7, a                        ;   and NMIs on: run the handler at the next safe
             jr z, .nn                       ;   point
             ld a, [NES_RAM + $100]
@@ -385,13 +433,6 @@ black_palettes:                             ; all CGB palettes black
 ; ------------------------------------------------------------------ frame waits
 ; wait for the next vblank (the NES NMI); A, F, BC, DE kept
 wait_vbl:   push af
-            ld hl, DBG_RING_P               ; (debug: LY at each wait entry -> ring $DE00)
-            ld a, [hl]
-            inc [hl]
-            ld l, a
-            ld h, high(DBG_RING)
-            ldh a, [rLY]
-            ld [hl], a
             xor a
             ldh [frame_tick], a
 .w:         halt
@@ -550,6 +591,9 @@ rt_wait_nmi:
             call rt_async
             xor a
             ldh [in_wait], a
+            ld a, [NES_RAM + $05]           ; (cleared: done; else run what is still due
+            and a                           ;   before halting: an IRQ ran first, the NMI
+            jr nz, .lp                      ;   is due too)
 .chk:
             ld a, [NES_RAM + $05]
             and a
@@ -570,8 +614,12 @@ rt_wait_irq:
             inc [hl]
 .lp:        ldh a, [async_req]
             and a
-            call nz, rt_async
+            jr z, .chk
+            call rt_async
             ld a, [NES_RAM + $00]
+            and a
+            jr nz, .lp
+.chk:       ld a, [NES_RAM + $00]
             and a
             jr z, .done
             halt
@@ -717,7 +765,15 @@ vput_go:
             ei
             ret
 
-rt_ppu_w7:  push af                         ; $2007 write
+rt_ppu_w7:
+            push hl
+            ld hl, DBG_RING + 4
+            inc [hl]
+            jr nz, .pc2
+            inc hl
+            inc [hl]
+.pc2:         pop hl
+           push af                         ; $2007 write
             push bc
             push de
             ld c, a
@@ -770,33 +826,7 @@ rt_ppu_w7:  push af                         ; $2007 write
             ld a, c
             call attr_apply                 ; L = attribute index, A = value, B = nametable
             jr .done
-.chr:       ld a, h                         ; CHR: tile byte k -> GB row byte
-            and $10
-            ld b, a                         ; bank (table 1 -> VRAM bank 1)
-            ld a, l
-            and $0F
-            cp 8
-            jr c, .lo8
-            sub 8
-            add a, a
-            inc a
-            jr .k
-.lo8:       add a, a
-.k:         ld d, a
-            ld a, l
-            and $F0
-            or d
-            ld l, a
-            ld a, h
-            and $0F
-            or $80
-            ld h, a
-            ld a, c
-            bit 4, b
-            jr nz, .b1
-            call vput0
-            jr .done
-.b1:        call vput1
+.chr:       call chr_put                    ; CHR: into the staging copy
             jr .done
 .pal:       ld a, l                         ; palette RAM ($3F10/14/18/1C = $3F00/04/08/0C)
             and $1F
@@ -819,6 +849,160 @@ rt_ppu_w7:  push af                         ; $2007 write
 .done:      pop de
             pop bc
             pop af
+            ret
+
+; NES CHR byte C at NES address HL ($0000-$1FFF) -> staging copy (WRAM bank 2 / 3, GB
+; row order: byte k of a tile -> 2k, k - 8 -> 2(k - 8) + 1), tile marked for the vblank's
+; DMA. A, F, B, D, E, HL clobbered (rt_ppu_w7 keeps them); C kept.
+chr_put:    call tile_mark
+            jr chr_store
+; mark the tile of NES CHR address HL dirty (A, F, B, D, E clobbered; HL, C kept)
+tile_mark:  ld a, h                         ; dirty byte = tile >> 3 = H * 2 + (L >> 7)
+            and $1F
+            add a, a
+            bit 7, l
+            jr z, .i
+            inc a
+.i:         add a, low(TILE_DIRTY)
+            ld e, a
+            ld d, high(TILE_DIRTY)
+            ld a, l                         ; bit = (L >> 4) & 7
+            swap a
+            and 7
+            ld b, a
+            ld a, 1
+            inc b
+.sh:        dec b
+            jr z, .m
+            add a, a
+            jr .sh
+.m:         push hl
+            ld h, d
+            ld l, e
+            or [hl]
+            ld [hl], a
+            pop hl
+            ld a, 1
+            ldh [chr_dirty], a
+            ret
+chr_store:  ld a, l                         ; byte k -> GB offset
+            and $0F
+            cp 8
+            jr c, .lo8
+            sub 8
+            add a, a
+            inc a
+            jr .k
+.lo8:       add a, a
+.k:         ld d, a
+            ld a, l
+            and $F0
+            or d
+            ld l, a
+            ld a, h
+            and $10                         ; table -> WRAM bank 2 / 3
+            swap a
+            add a, 2
+            ld b, a
+            ld a, h
+            and $0F
+            or high(STAGE)
+            ld h, a
+            ld a, b
+            ldh [rSVBK], a
+            ld [hl], c
+            ld a, 1
+            ldh [rSVBK], a
+            ret
+
+; vblank: dirty tiles -> VRAM by general-purpose DMA (runs of set bits within a byte = up to
+; 8 tiles per DMA), only while LY is still 144-151 (a DMA in drawing time loses its writes);
+; the rest waits for the next vblank. A, F, BC, DE, HL clobbered.
+hd_flush:   xor a
+            ldh [chr_dirty], a
+            ld hl, TILE_DIRTY
+.byte:      ld a, [hl]
+            and a
+            jr z, .next
+            ldh a, [rLY]
+            cp 144
+            jr c, .late
+            cp 151
+            jr nc, .late
+            ld d, [hl]                      ; D = the byte's bits
+            ld [hl], 0
+            push hl
+            ld a, l                         ; tile = (L - low(TILE_DIRTY)) * 8 + bit
+            sub low(TILE_DIRTY)
+            ld e, a                         ; E = byte index 0-63 (bit 5: table 1)
+            ld b, 0                         ; B = bit
+.bit:       bit 0, d
+            jr z, .nb
+            ld c, 0                         ; run length
+.run:       inc c
+            srl d
+            inc b
+            bit 0, d
+            jr z, .go
+            ld a, b
+            cp 8
+            jr c, .run
+.go:        push de
+            push bc
+            ld a, b                         ; first tile of the run: E * 8 + B - C
+            sub c
+            ld b, a
+            ld a, e
+            and $1F
+            ld d, a                         ; tile & 255 = (E & 31) * 8 + first bit
+            add a, a
+            add a, a
+            add a, a
+            add a, b
+            ld l, a                         ; L = tile (0-255)
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl                      ; HL = tile * 16
+            ld a, e                         ; table: WRAM bank 2 / 3, VRAM bank 0 / 1
+            and $20
+            swap a
+            rrca
+            ldh [rVBK], a
+            add a, 2
+            ldh [rSVBK], a
+            ld a, h
+            add a, high(STAGE)
+            ldh [rHDMA1], a
+            ld a, l
+            ldh [rHDMA2], a
+            ld a, h
+            add a, $80 - $00
+            ldh [rHDMA3], a                 ; (VRAM $8000 + tile * 16)
+            ld a, l
+            ldh [rHDMA4], a
+            ld a, c
+            dec a
+            ldh [rHDMA5], a                 ; C blocks, general purpose
+            ld a, 1
+            ldh [rSVBK], a
+            xor a
+            ldh [rVBK], a
+            pop bc
+            pop de
+            jr .bit2
+.nb:        srl d
+            inc b
+.bit2:      ld a, b
+            cp 8
+            jr c, .bit
+            pop hl
+.next:      inc l                           ; (TILE_DIRTY ends at $CCFF: L wraps to 0)
+            jr nz, .byte
+            ret
+.late:      ld a, 1                         ; out of vblank time: the rest next frame
+            ldh [chr_dirty], a
             ret
 
 ; HL = offset in nametable B (cell < $3C0) -> HL = GB map address. Keeps B, C.
@@ -1014,7 +1198,15 @@ rebank_attrs:
             ret
 
 ; ------------------------------------------------------------------ OAM, joypad, APU
-rt_io_w4014:                                ; OAM DMA from NES page A -> GB shadow OAM
+rt_io_w4014:
+            push hl
+            ld hl, DBG_RING + 0
+            inc [hl]
+            jr nz, .pc0
+            inc hl
+            inc [hl]
+.pc0:         pop hl
+           ; OAM DMA from NES page A -> GB shadow OAM
             push af                         ;   (64 NES sprites -> up to 40 GB sprites in view)
             push bc
             push de
@@ -1275,7 +1467,15 @@ rt_mmc_w580F:
 ; ------------------------------------------------------------------ ROM data reads
 ; HL = $4000 + offset in the window's 8KB bank; returns L. The GB bank holds NES banks 2k
 ; (at $4000) and 2k + 1 (at $6000).
-rt_rd_8:    push af
+rt_rd_8:
+            push hl
+            ld hl, DBG_RING + 6
+            inc [hl]
+            jr nz, .pc3
+            inc hl
+            inc [hl]
+.pc3:         pop hl
+           push af
             ldh a, [data_bank8]
             ld [MBC5_BANKL], a
             ldh a, [odd8]
@@ -1289,7 +1489,15 @@ rt_rd_8:    push af
             call nz, rt_async
             pop af
             ret
-rt_rd_a:    push af
+rt_rd_a:
+            push hl
+            ld hl, DBG_RING + 12
+            inc [hl]
+            jr nz, .pc6
+            inc hl
+            inc [hl]
+.pc6:         pop hl
+           push af
             ldh a, [data_bankA]
             ld [MBC5_BANKL], a
             ldh a, [oddA]
@@ -1303,7 +1511,15 @@ rt_rd_a:    push af
             call nz, rt_async
             pop af
             ret
-rt_rd_f:    push af                         ; $C000-$FFFF: banks 126 / 127 = GB bank DATA + 63
+rt_rd_f:
+            push hl
+            ld hl, DBG_RING + 14
+            inc [hl]
+            jr nz, .pc7
+            inc hl
+            inc [hl]
+.pc7:         pop hl
+           push af                         ; $C000-$FFFF: banks 126 / 127 = GB bank DATA + 63
             ld a, DATA + 63
             ld [MBC5_BANKL], a
             ld l, [hl]
@@ -1316,7 +1532,15 @@ rt_rd_f:    push af                         ; $C000-$FFFF: banks 126 / 127 = GB 
             ret
 
 ; ------------------------------------------------------------------ indirect access
-rt_izy_rd:  push af                         ; L = zp pointer; byte at ptr+Y -> L
+rt_izy_rd:
+            push hl
+            ld hl, DBG_RING + 2
+            inc [hl]
+            jr nz, .pc1
+            inc hl
+            inc [hl]
+.pc1:         pop hl
+           push af                         ; L = zp pointer; byte at ptr+Y -> L
             ld h, high(NES_RAM)
             ld a, [hl+]
             ld h, [hl]
@@ -1374,7 +1598,15 @@ rt_izx_rd:  push af                         ; L = zp; pointer at (zp + X)
             ld h, [hl]
             ld l, a
             jr izrd
-rt_izy_wr:  push af                         ; L = zp pointer; A -> ptr+Y
+rt_izy_wr:
+            push hl
+            ld hl, DBG_RING + 10
+            inc [hl]
+            jr nz, .pc5
+            inc hl
+            inc [hl]
+.pc5:         pop hl
+           push af                         ; L = zp pointer; A -> ptr+Y
             ldh [wtmp], a
             ld h, high(NES_RAM)
             ld a, [hl+]
@@ -1654,7 +1886,15 @@ rt_txs:     push af                         ; SP = STACK_TOP - 2 * ($FF - X); A,
             ret
 
 ; ------------------------------------------------------------------ banking / dispatch
-rt_farcall: ; HL = target, fc_bank = its bank; A, F, BC, DE pass both ways
+rt_farcall:
+            push hl
+            ld hl, DBG_RING + 8
+            inc [hl]
+            jr nz, .pc4
+            inc hl
+            inc [hl]
+.pc4:         pop hl
+           ; HL = target, fc_bank = its bank; A, F, BC, DE pass both ways
             ldh [sv_a], a
             ldh a, [code_bank]
             push af
@@ -1682,7 +1922,15 @@ rt_farcall_ret:
 ; HL = NES address -> HL = GB address, fc_bank = GB bank (A, F, BC, DE kept). Hashed table
 ; in bank DYN_BANK (translate.py): bucket (lo + hi + key) & $FF, key = the NES 8KB bank of
 ; the address's window ($8000: $5114, $A000: $5115), else $FF.
-lookup:     push af
+lookup:
+            push hl
+            ld hl, DBG_RING + 16
+            inc [hl]
+            jr nz, .pc8
+            inc hl
+            inc [hl]
+.pc8:         pop hl
+           push af
             push bc
             push de
             ld d, h
