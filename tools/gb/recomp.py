@@ -59,10 +59,16 @@ class FF1:
               ('fix', 0xEA7F): ('hle_chr_page1', 0xEA87, 'NZ'),
               ('c62', 0xD1A8): ('hle_rlefill', 0xD1AB, 'Z'),   # map decompression run (rt/ff1_hle.s)
               ('fix', 0xF2CF): ('hle_ntclr', 0xF2DC, 'NZ'),    # battle setup: nametables cleared
-              ('fix', 0xF4EA): ('hle_ntrun', 0xF4F6, 'NZC')}   # battle panel: a row to the PPU
+              ('fix', 0xF4EA): ('hle_ntrun', 0xF4F6, 'NZC'),   # battle panel: a row to the PPU
+              ('b14', 0x9C0F): ('hle_mclr', 0x9C2D, 'NZC'),    # menu screen cleared
+              ('fix', 0xE14D): ('hle_wrow', 0xE153, 'NZ'),     # window rows (frame middles)
+              ('fix', 0xE17F): ('hle_wrow', 0xE185, 'NZ')}
     # bytes each idiom replaces (build.py drops an idiom whose code is not there)
     idiom_code = {('fix', 0xF2CF): bytes.fromhex('a008a2008d0720cad0fa88d0f5'),
-                  ('fix', 0xF4EA): bytes.fromhex('a000b1888d0720c8c019d0f6')}
+                  ('fix', 0xF4EA): bytes.fromhex('a000b1888d0720c8c019d0f6'),
+                  ('b14', 0x9C0F): bytes.fromhex('a00098a2038d0720c8d0facad0f78d0720c8c0c090f8a9ff8d0720c8d0fa'),
+                  ('fix', 0xE14D): bytes.fromhex('8d0720cad0fa'),
+                  ('fix', 0xE17F): bytes.fromhex('8d0720cad0fa')}
     skip = [('fix', 0xFECF, 0xFEDB), ('fix', 0xFEDC, 0xFEF1)]   # NMI handler + wait loop
 
 

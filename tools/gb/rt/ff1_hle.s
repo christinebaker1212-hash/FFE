@@ -379,3 +379,19 @@ hle_ntrun:                                  ; fix:F4EA panel row copy (bank HLE_
             call ntrun_b
             jp hle_back
 
+hle_mclr:                                  ; (bank HLE_BANK: mclr_b)
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            call mclr_b
+            jp hle_back
+
+hle_wrow:                                  ; (bank HLE_BANK: wrow_b)
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            call wrow_b
+            jp hle_back
+

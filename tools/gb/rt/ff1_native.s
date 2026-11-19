@@ -1926,3 +1926,158 @@ scan_run:   ld [SC_N], a
             jp nz, .cell
             ret
 
+; ---- D = value, BC = count: count $2007 writes of D (rt_ppu_w7 semantics). In bulk while
+; the LCD is off, the increment is 1 and the address is in nametable 0's cells with no cell
+; owned by nametable 1: shadow and GB map filled at once (DMG: the map is scanned when the
+; LCD goes on). Anything else byte by byte through rt_ppu_w7. Keeps D.
+NF_N       = $D82C          ; ntfill: bytes of this run (2; fault-dump area, DBG + 12)
+ntfill:     ld a, b
+            or c
+            ret z
+            ldh a, [lcd_on]
+            and a
+            jr nz, .one
+            ldh a, [ppu_ctrl]
+            and 4
+            jr nz, .one
+            ldh a, [own1_lo]
+            ld h, a
+            ldh a, [own1_hi]
+            or h
+            jr nz, .one
+            ldh a, [ppu_vh]
+            cp $20
+            jr c, .one
+            cp $3F
+            jr z, .one
+            and 7
+            cp 4
+            jr nc, .one                     ; (nametable 1)
+            ld h, a
+            ldh a, [ppu_vl]
+            ld l, a                         ; HL = offset 0-$3FF
+            push de
+            ld a, $C0                       ; DE = room = $3C0 - offset
+            sub l
+            ld e, a
+            ld a, 3
+            sbc a, h
+            ld d, a
+            jr c, .attr                     ; (offset >= $3C0: attributes)
+            or e
+            jr z, .attr
+            ld a, b                         ; n = min(count, room)
+            cp d
+            jr c, .cnt
+            jr nz, .rm
+            ld a, c
+            cp e
+            jr c, .cnt
+.rm:        jr .n
+.cnt:       ld d, b
+            ld e, c
+.n:         ld a, e
+            ld [NF_N], a
+            ld a, d
+            ld [NF_N + 1], a
+            ld a, c                         ; count -= n
+            sub e
+            ld c, a
+            ld a, b
+            sbc a, d
+            ld b, a
+            pop de                          ; D = value
+            push bc
+            push hl
+            ld a, h
+            add a, high(NT_SH)
+            ld h, a
+            call .set                       ; shadow
+            pop hl
+            push hl
+            ld a, h
+            add a, $98
+            ld h, a
+            call .set                       ; GB map (LCD off)
+            pop hl
+            ld a, [NF_N]                    ; v += n
+            add a, l
+            ldh [ppu_vl], a
+            ld a, [NF_N + 1]
+            adc a, h
+            ld h, a
+            ldh a, [ppu_vh]                 ; (mirror bits kept)
+            and $F8
+            or h
+            ldh [ppu_vh], a
+            ldh a, [is_cgb]
+            and a
+            jr nz, .cg
+            ld a, 1
+            ldh [dmg_scan], a
+.cg:        pop bc
+            jr ntfill
+.attr:      pop de
+.one:       ld a, d
+            call rt_ppu_w7
+            dec bc
+            jr ntfill
+.set:       ld a, [NF_N]                    ; HL: NF_N bytes of D
+            ld c, a
+            ld a, [NF_N + 1]
+            ld b, a
+            inc b
+            ld a, c
+            and a
+            jr nz, .s
+            dec b
+            jr z, .x
+.s:         ld a, d
+.sl:        ld [hl+], a
+            dec c
+            jr nz, .sl
+            dec b
+            jr nz, .sl
+.x:         ret
+
+; b14:9C0F (menu screen clear): 960 zeros and 64 $FF from the current PPU address.
+; Out: X = 0, Y = 0, A = $FF; N = 0, Z = 1, C = 1.
+mclr_b:     ld d, 0
+            ld bc, 960
+            call ntfill
+            ld d, $FF
+            ld bc, 64
+            call ntfill
+            xor a
+            ldh [nzv], a
+            ld a, $FF
+            ld bc, 0
+            ld de, 0
+            scf                             ; (Z from the xor)
+            ret
+
+; fix:E14D / E17F (window rows): X times STA $2007 of A. Out: X = 0; N = 0, Z = 1, carry,
+; A and Y kept.
+wrow_b:     push bc
+            push af
+            ld d, a
+            ld b, 0
+            ld c, e
+            ld a, c
+            and a
+            jr nz, .n
+            inc b                           ; (X = 0: 256)
+.n:         call ntfill
+            xor a
+            ldh [nzv], a
+            pop hl
+            ld a, l
+            and $10
+            or $80
+            ld l, a
+            push hl
+            pop af
+            ld de, 0
+            pop bc                          ; (Y kept)
+            ret
+
