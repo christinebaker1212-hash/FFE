@@ -155,10 +155,15 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   seed 1, 11000 frames: no difference in 10627 waits.
 - Source base: a patched JMP that cuts into the next listed instruction ends the re-decode
   (the rest is dead code); build.py regenerates the source map when its tools changed.
-- Next: magic / Gear / item lists (windows via `b12:9250` are invisible now), victory /
-  loot windows (bank 5), status words in the party window ("Dead" etc.), clear the bottom
-  rows at battle start, hit knock-back past the right edge, redraw flicker after messages,
-  GB tile upload latency / speed (lagcheck).
+- Step 4 (done): battle magic list (owner-approved; `b12:9DE3` open, `b12:9EF5` display part
+  `9F3E-9F59` -> page turn + MP line, cursor table `b12:BFD5`; names only, as the NES list)
+  and Gear window (`b12:A058`, cursor table `b12:BFCD`). Entries are 5 bytes (index; return
+  bank from a table in bank 23), at `$FFD0` and `$FEEC`. firstdiff: `--form F` (forced
+  formation, data patch in both ROMs), `--press`, `--poke`; forced formation 0 with spells
+  poked, magic list opened and paged: no difference in 10227 waits (PyBoy DMG).
+- Next: victory / loot windows (bank 5), status words in the party window ("Dead" etc.),
+  clear the bottom rows at battle start, hit knock-back past the right edge, redraw flicker
+  after messages, item use in battle (Gear -> item), GB tile upload latency / speed.
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 

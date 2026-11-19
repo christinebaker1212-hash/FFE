@@ -1,5 +1,5 @@
-"""FF2 battle formations on the NES: force each battle id (a test copy of the user's
-English build: fix:FA9E STA $7B48 -> JSR to LDA #id / STA $7B48 / RTS at free $FEF0),
+"""FF2 battle formations on the NES: force each battle (a test copy of the user's
+English build with that battle's properties in the opening battle's entry, see patched()),
 start from a state saved just before the opening battle (firstdiff's new-game script +
 random seed 1), and measure where enemies and party sprites are drawn (pixel bounds of
 non-backdrop pixels in the battlefield above the windows; sprites from OAM).
@@ -12,18 +12,17 @@ import firstdiff as fd
 from PIL import Image
 import numpy as np
 
-SPOT = 0xFEF0           # (free in the English and the GB-layout ROM: zeros after fix:FEBF reset ppu)
 START = 9500           # NES frame before the opening battle's id is set (9512, seed 1 path)
 SHOT = 120             # frames after START for the measured picture
 
 
 def patched(rom, bid):
-    r = bytearray(rom); base = 16 + 31 * 0x4000 - 0xC000
-    assert r[base + 0xFA9E:base + 0xFAA1] == bytes([0x8D, 0x48, 0x7B])
-    r[base + 0xFA9E:base + 0xFAA1] = bytes([0x20, SPOT & 0xFF, SPOT >> 8])
-    r[base + SPOT:base + SPOT + 6] = bytes([0xA9, bid, 0x8D, 0x48, 0x7B, 0x60])
+    """the opening battle ($7F) shows battle bid: its 8-byte properties (b11:8620) and surprise
+    rate (b11:8A20) copied over battle $7F's (data only; no code space needed)"""
+    r = bytearray(rom); b = 16 + 11 * 0x4000 - 0x8000
+    r[b + 0x8620 + 8 * 0x7F:b + 0x8620 + 8 * 0x80] = r[b + 0x8620 + 8 * bid:b + 0x8620 + 8 * bid + 8]
+    r[b + 0x8A20 + 0x7F] = r[b + 0x8A20 + bid]
     return bytes(r)
-
 
 def main():
     nes_path, out = sys.argv[1], sys.argv[2]

@@ -76,10 +76,10 @@ RAM = dict(GBIDX=0x7FDF, GBRB=0x7FE0, GBPOOL=0x7FE1, VX=0x7FE2, VN=0x7FE3, VT=0x
            NL=0x7FF7, NS=0x7FF8, VSQZ=0x7FF9, VI0=0x7FFA, VI1=0x7FFB, VCX=0x7FFC, VFILL=0x7FFD, VLN=0x7FFE,
            USED=0x75C0, VBUF=0x7800, BLANKT=0x7888, FTILE=0x7889, PTILE=0x7891, LTILE=0x78B9, XTILE=0x78D1,
            NTBUF=0x78D5, ATKBUF=0x75E0, MOPEN=0x75F0, MLINE=0x75F1, MPAGE=0x75F2)
-# fixed-bank entries (5 bytes each, at $FFD0): routine, bank to return to (bank 23 RETB), the NES routine replaced
+# fixed-bank entries (5 bytes each, at $FFD0 and $FEEC): routine, bank to return to (bank 23 RETB), the NES routine replaced
 ENTRIES = [('gb_party', 0x0C, 0x912A), ('gb_names', 0x0C, 0x910D), ('gb_names', 0x0C, 0x981D),
            ('gb_cmds', 0x0C, 0x982C), ('gb_msgopen', 0x05, 0xAA57), ('gb_msgclose', 0x05, 0xAB4F),
-           ('gb_magic', 0x0C, None), ('gb_magcost', 0x0C, None)]
+           ('gb_magic', 0x0C, None), ('gb_magcost', 0x0C, None), ('gb_gear', 0x0C, None)]
 # (None: called from a patched JSR, not replacing a routine)
 
 ENT_SRC = '''
@@ -101,7 +101,7 @@ gbdisp:                 ; dispatch GBIDX (word table: entries of the code map)
     sta $01
     jmp ($0000)
 gbtab:
-    .dw gb_party, gb_names, gb_names, gb_cmds, gb_msgopen, gb_msgclose, gb_magic, gb_magcost
+    .dw gb_party, gb_names, gb_names, gb_cmds, gb_msgopen, gb_msgclose, gb_magic, gb_magcost, gb_gear
 
 ; ---- tile pool: table-1 tiles this battle's battlefield does not use
 poolinit:
@@ -1278,6 +1278,55 @@ magmp:                  ; line 4: "MP" cur/max, "MP Cost" n
 .e:
     jmp lineend
 
+; ---- Gear window (b12:A058, the window open of b12:A020; owner-approved layout): Right
+; Hand + weapon, Left Hand + weapon, Items + item 1, item 2 below it (character properties
+; at ($7A): +$1C right hand, +$1D left hand, +$1E / +$1F items); labels at pen 9, names 58
+gb_gear:
+    jsr poolinit
+    lda #1
+    sta VFILL
+    lda #18
+    sta VROW
+    lda #0
+    sta VCOL
+    lda #20
+    sta VW
+    lda #6
+    sta VH
+    jsr ntwin
+    lda #0
+    sta VFILL
+    sta VLN
+.ln:
+    lda #9
+    sta VCX
+    jsr linestart
+    ldx VLN
+    lda GLABLO,x
+    sta VP
+    lda GLABHI,x
+    sta VP+1
+    jsr vstrp
+    lda #58
+    sta VX
+    lda VLN
+    clc
+    adc #$1C
+    tay
+    lda ($7A),y
+    tax
+    lda NMLO,x
+    sta VP
+    lda NMHI,x
+    sta VP+1
+    jsr vstrp
+    jsr lineend
+    inc VLN
+    lda VLN
+    cmp #4
+    bne .ln
+    rts
+
 BIT:    .db $80, $40, $20, $10, $08, $04, $02, $01
 POW:    .db <1000, <100, <10, <1
 POWH:   .db >1000, >100, >10, >1
@@ -1364,6 +1413,9 @@ def names_data(rom):
         p = b21[0x3295 + 2 * k] | b21[0x3295 + 2 * k + 1] << 8
         o = p - 0x8000; return bytes(b21[o:b21.index(0, o)])
     out += 'COSTLAB: .db %s\n' % ', '.join('$%02X' % c for c in bmsg(7) + b'\0')
+    for k, lab in enumerate((bmsg(4), bmsg(5), bmsg(6), b'')):     # Right Hand, Left Hand, Items
+        out += 'GLAB%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in lab + b'\0'))
+    out += 'GLABLO: .db <GLAB0, <GLAB1, <GLAB2, <GLAB3\nGLABHI: .db >GLAB0, >GLAB1, >GLAB2, >GLAB3\n'
     out += 'NOMAGIC: .db %s\n' % ', '.join('$%02X' % c for c in bmsg(8) + b'\0')
     out += 'MPLAB: .db %s\n' % ', '.join('$%02X' % c for c in bytes([ins.ENC['M'], ins.ENC['P']]) + b'\0')
     cmds = []                                   # battle commands: battle_msgs 0-3 (bank 21 $B295)
@@ -1450,16 +1502,24 @@ def battle(rom):
                  '\nRETB: .db %s\n' % ', '.join('$%02X' % rb for name, rb, nes in ENTRIES))
     assert len(b23.bytes) <= BANK
     put(rom, 23, 0x8000, b23.bytes)
-    ent = 'org $FFD0\n'
-    for k, (name, rb, nes) in enumerate(ENTRIES):
-        ent += 'e%d:\n    ldx #%d\n    jmp gbf\n' % (k, k)
-    e = asm(ent, syms=dict(gbf=f.labels['gbf']))
-    assert e.org + len(e.bytes) <= 0xFFFA
-    put(rom, 31, e.org, e.bytes)
+    labels = {}
+    for org, end, ks in ((0xFFD0, 0xFFFA, range(0, 8)), (0xFEEC, 0xFF00, range(8, 12))):   # (free:
+        ent = 'org $%04X\n' % org                                                          #  rom info,
+        for k in ks:                                                                        #  zeros)
+            if k < len(ENTRIES): ent += 'e%d:\n    ldx #%d\n    jmp gbf\n' % (k, k)
+        e = asm(ent, syms=dict(gbf=f.labels['gbf']))
+        assert e.org + len(e.bytes) <= end
+        put(rom, 31, e.org, e.bytes); labels.update(e.labels)
+    assert len(ENTRIES) <= 12
+    class E: pass
+    e = E(); e.labels = labels
     for k, (name, rb, nes) in enumerate(ENTRIES):
         if nes is not None: put(rom, rb, nes, bytes([0x4C]) + e.labels['e%d' % k].to_bytes(2, 'little'))
     ent = {name: e.labels['e%d' % k] for k, (name, rb, nes) in enumerate(ENTRIES)}
     put(rom, 12, 0x9DE3, bytes([0x20]) + ent['gb_magic'].to_bytes(2, 'little'), old=bytes([0x20, 0x50, 0x92]))
+    put(rom, 12, 0xA058, bytes([0x4C]) + ent['gb_gear'].to_bytes(2, 'little'), old=bytes([0x4C, 0x50, 0x92]))
+    # Gear cursor (b12:BFCD: right hand, left hand, item 1, item 2): hand at the screen edge
+    put(rom, 12, 0xBFCD, bytes(v for k in range(4) for v in (0, 147 + 8 * k)), old=bytes.fromhex('48b048c048d048d8'))
     put(rom, 12, 0x9F3E, bytes([0x20]) + ent['gb_magcost'].to_bytes(2, 'little') + bytes([0x4C, 0x5A, 0x9F]),
         old=bytes.fromhex('a9238d0620'))
 

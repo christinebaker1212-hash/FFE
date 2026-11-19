@@ -9,6 +9,9 @@ usage: PYTHONPATH=build/emu firstdiff.py NES GB [FRAMES] [--random SEED] [--scri
   --script: newgame (default: power-on, Start through the prologue, New Game, names)
   --shots F1,F2.. --out SHEET.png: GB screens after those NES frames
   --strict: also compare the sound driver's RAM (SOUND)
+  --form F: the opening battle shows battle F (ff2form.patched, NES and GB data banks)
+  --press F:K,..: from the first F on, only these presses (K: A B U D L R S, 4 frames)
+  --poke ADDR=VAL,..: RAM pokes at NES frame 9700 (the GB at the matching frame wait)
 Work RAM $6000-$7FFF (cart RAM bank 0 on the GB) is compared every WRAM_EVERY waits."""
 import sys, os, random
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -46,7 +49,7 @@ def add_random(steps, seed, start=4000):
         k += h + g
 
 
-def nes_pass(nes, steps, limit, shots_at=()):
+def nes_pass(nes, steps, limit, shots_at=(), pokes=(), poke_frame=9700):
     """Run the NES build for `limit` frames with pad steps[f]; returns per wait NMI w:
     RAM, the pad the game read after it (w + 1), the NES frame, work RAM every
     WRAM_EVERY waits, and the wait reached at each frame in shots_at."""
@@ -66,7 +69,14 @@ def nes_pass(nes, steps, limit, shots_at=()):
     ROR35 = 31 * 0x4000 + 0xFC4B - 0xC000
     rev = [int('{:08b}'.format(i)[::-1], 2) for i in range(256)]
     w = 0; nrol = 0; nror = 0
+    poke_wait = None
     for f in range(limit):
+        if pokes and f == poke_frame:           # RAM pokes (the GB gets them at the same wait)
+            for a, v in pokes:
+                nes[a] = v
+                if a < 0x800: shadow[a] = v
+                elif a >= 0x6000: shadow[a] = v
+            poke_wait = w
         nes.controller = steps[f]
         nes.step(1)
         for ix, a, v in nes.watch:
@@ -83,6 +93,7 @@ def nes_pass(nes, steps, limit, shots_at=()):
             if a < 0x2000: shadow[a & 0x7FF] = v
             elif a >= 0x6000: shadow[a] = v
         if f in shots_at: shot_w.append(w)
+    nes_pass.poke_wait = poke_wait
     return nes_ram, pads, frame_of, wram, shot_w
 
 
@@ -97,23 +108,52 @@ def main():
     if '--strict' in args: args.remove('--strict')
     shots_at = {int(x) for x in opt('--shots', '').split(',') if x}
     out = opt('--out')
-    nes = NES(args[0]); gb = GB(args[1]); sync_sram(nes, gb)
+    form = opt('--form', None, int)
+    presses = opt('--press', '')
+    pokes = [tuple(int(x, 16) for x in kv.split('=')) for kv in opt('--poke', '').split(',') if kv]
+    nes_path, gb_path = args[0], args[1]
+    if form is not None:                       # the opening battle shows battle `form` (ff2form)
+        import ff2form, tempfile, shutil
+        tmp = tempfile.mkdtemp()
+        nes_rom = open(nes_path, 'rb').read()
+        p = ff2form.patched(nes_rom, form)
+        nes_path = os.path.join(tmp, 'f.nes'); open(nes_path, 'wb').write(p)
+        g = bytearray(open(gb_path, 'rb').read())     # GB data bank 1 + 11 = NES bank 11
+        o_n, o_g = 16 + 11 * 0x4000, (1 + 11) * 0x4000
+        g[o_g:o_g + 0x4000] = p[o_n:o_n + 0x4000]
+        g[0x14E] = g[0x14F] = 0                     # (global checksum not used)
+        shutil.copy(gb_path[:-3] + '.sym', os.path.join(tmp, 'f.sym'))
+        gb_path = os.path.join(tmp, 'f.gb'); open(gb_path, 'wb').write(g)
+    nes = NES(nes_path); gb = GB(gb_path); sync_sram(nes, gb)
     limit = int(args[2]) if len(args) > 2 else 6000
     steps = script_newgame(limit)
     if rnd is not None: add_random(steps, rnd)
+    if presses:                                # NES frame:key after which the input is only these
+        K = dict(A=A, B=B, U=UP, D=DOWN, L=LEFT, R=RIGHT, S=START)
+        first = min(int(x.split(':')[0]) for x in presses.split(','))
+        for f in range(first, limit): steps[f] = 0
+        for item in presses.split(','):
+            t, k = item.split(':')
+            for j in range(int(t), min(int(t) + 4, limit)): steps[j] = K[k]
+    poke_w = None
     sym = {}
-    for l in open(args[1][:-3] + '.sym'):
+    for l in open(gb_path[:-3] + '.sym'):
         b, rest = l.split(':'); a, n = rest.split(); sym[n] = (int(b, 16), int(a, 16))
-    nes_ram, pads, frame_of, wram, shot_w = nes_pass(nes, steps, limit, shots_at)
+    nes_ram, pads, frame_of, wram, shot_w = nes_pass(nes, steps, limit, shots_at, pokes)
     w = max(nes_ram) if nes_ram else 0
     last = w
     print('NES: %d frames, %d NMIs, %d wait NMIs' % (limit, nes.nmi_count, last))
     # 2. GB with those pads
     state = {'diff': None, 'k': 0}
+    pw = getattr(nes_pass, 'poke_wait', None)
     def on_wait(_):
         m = gb.pb.memory
         k = (m[0xD830] | m[0xD831] << 8) + 1
         state['k'] = k
+        if pw is not None and k == pw + 1:      # the NES pokes went in between waits pw and pw+1
+            for a, v in pokes:
+                if a < 0x800: m[0xC000 + a] = v
+                else: m[0, 0xA000 + a - 0x6000] = v
         if state['diff'] is not None or k not in nes_ram: return
         a = nes_ram[k]; b = bytes(m[0xC000 + i] for i in range(0x800))
         d = [i for i in range(0x800) if a[i] != b[i] and not 0x100 <= i < 0x200 and i not in mask]
