@@ -210,7 +210,7 @@ vram_put:   push bc
 .f:         ldh a, [q_head]
             cp b
             jr nz, .r
-            halt
+            call q_drain1
             jr .f
 .r:         push hl
             ld a, l

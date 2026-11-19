@@ -1159,7 +1159,7 @@ blk_alloc:  ldh a, [lcd_on]
             sub d
             cp 8
             jr c, .bk
-            halt                            ; all 8 queued: wait for the vblank flush
+            call q_drain1                   ; all 8 queued: write the oldest entries now
             jr .wb
 .bk:        ld a, [TB_T]
             and 7
@@ -1198,7 +1198,7 @@ blk_send_bc:                                ; (BC = VRAM address)
 .f:         ldh a, [q_head]
             cp l
             jr nz, .r
-            halt
+            call q_drain1
             jr .f
 .r:         ld h, high(QH)
             ld a, l

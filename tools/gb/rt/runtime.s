@@ -868,6 +868,86 @@ q_block:    push de
             pop de
             ret
 
+; VRAM queue full with the LCD on: the oldest entry written now instead of waiting for
+; the vblank flush, in the moments the LCD leaves VRAM free (STAT mode 0 / 1; mode 2
+; follows mode 0, so a write within 20 M-cycles of seeing mode 0 is safe). Interrupts off
+; for the entry (a tile block: about two lines). Keeps BC, DE, HL.
+q_drain1:   push bc
+            push de
+            push hl
+            di
+            ldh a, [q_head]
+            ld e, a
+            ldh a, [q_tail]
+            cp e
+            jr z, .x
+            ld h, high(QV)
+            ld l, e
+            ld c, [hl]
+            dec h
+            ld a, [hl]
+            dec h
+            ld h, [hl]
+            ld l, a
+            inc h
+            dec h
+            jr z, .blk
+            bit 6, h
+            jr nz, .b1
+.w:         ldh a, [$FF41]
+            bit 1, a
+            jr nz, .w
+            ld [hl], c
+            jr .nx
+.b1:        res 6, h                        ; (CGB attributes: VRAM bank 1)
+            ld a, 1
+            ldh [$FF4F], a
+.w1:        ldh a, [$FF41]
+            bit 1, a
+            jr nz, .w1
+            ld [hl], c
+            xor a
+            ldh [$FF4F], a
+            jr .nx
+.blk:       call q_block_h
+.nx:        ld a, e
+            inc a
+            ldh [q_head], a
+.x:         ei
+            pop hl
+            pop de
+            pop bc
+            ret
+q_block_h:  push de                         ; q_block, two bytes per free moment
+            push bc
+            ld d, c
+            ld a, l
+            and $F0
+            ld e, a
+            ld a, l
+            and 7
+            swap a
+            add a, low(TBLK)
+            ld l, a
+            ld h, high(TBLK)
+            ld b, 8
+.c:         ldh a, [$FF41]
+            bit 1, a
+            jr nz, .c
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .c
+            ld hl, TB_H
+            inc [hl]
+            pop bc
+            pop de
+            ret
+
 ; vblank: queued VRAM writes while the vblank lasts (LY 144-152)
 flush_vbl:  ldh a, [q_tail]
             ld d, a
@@ -1759,7 +1839,7 @@ rt_ppu_w7:  push af
 .full:      ldh a, [q_head]
             cp b
             jr nz, .room
-            halt                            ; queue full: wait for the vblank flush
+            call q_drain1                   ; queue full: write the oldest entry now
             jr .full
 .room:      ld a, l
             ld c, h
