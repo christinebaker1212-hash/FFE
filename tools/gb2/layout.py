@@ -1124,6 +1124,19 @@ lineend:                ; upload line VLN (tiles PTILE + 17 * VLN) and write its
 gb_msgclose:
     dec MOPEN
     bne .x
+    lda #1              ; blank the message window first (its tiles are about to become the
+    sta VFILL           ;   names' and the party's again), then those two windows
+    lda #18
+    sta VROW
+    lda #0
+    sta VCOL
+    lda #20
+    sta VW
+    lda #6
+    sta VH
+    jsr ntwin
+    lda #0
+    sta VFILL
     jsr gb_names
     jmp gb_party
 .x:

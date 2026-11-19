@@ -161,9 +161,16 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   bank from a table in bank 23), at `$FFD0` and `$FEEC`. firstdiff: `--form F` (forced
   formation, data patch in both ROMs), `--press`, `--poke`; forced formation 0 with spells
   poked, magic list opened and paged: no difference in 10227 waits (PyBoy DMG).
-- Next: victory / loot windows (bank 5), status words in the party window ("Dead" etc.),
-  clear the bottom rows at battle start, hit knock-back past the right edge, redraw flicker
-  after messages, item use in battle (Gear -> item), GB tile upload latency / speed.
+- Message close blanks the bottom window before the names / party come back (no stale
+  message tiles). firstdiff GB-layout pair seed 1, 11000 frames: no difference in 10592 waits.
+- Speed of the GB-layout battle (lagcheck, Gambatte, seed 1 to the end of the opening
+  battle): CGB keeps pace in battle (the async NMI phases even take fewer frames than the
+  NES), battle entry +149 frames; **DMG battle entry +349 frames** (the battle graphics
+  through the DMG shading path): to fix (speed pass).
+- Next: victory / loot windows (bank 5; a forced formation 0 did not end: monster HP poke at
+  battle stats +$0A had no effect, to look into), status words in the party window ("Dead"
+  etc.), clear the bottom rows at battle start, hit knock-back past the right edge, item use
+  in battle (Gear -> item), DMG battle-entry speed, GB tile upload latency.
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 
