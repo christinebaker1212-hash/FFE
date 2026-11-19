@@ -779,6 +779,28 @@ rt_band:    push hl
             ld [NES_RAM + $12], a
             ret
 
+; c62:D6B8-D6C2 (dialogue box raster split): LDY #6 / LDX $1B / DEX / then JSR $D77C / DEX /
+; BNE: a timing loop of $1B - 1 scanline delays (0: 256). The GB needs no split (the box is
+; in its map): only the delay calls' effects, $12 counted 3, 2, 1 per call, X = Y = 0
+; (A and N/Z are overwritten after; carry kept).
+rt_dlgdelay: push af
+            push hl
+            ld a, [NES_RAM + $1B]
+            dec a
+            ld l, a
+            ld a, [NES_RAM + $12]
+.lp:        dec a
+            jr nz, .k
+            ld a, 3
+.k:         dec l
+            jr nz, .lp
+            ld [NES_RAM + $12], a
+            pop hl
+            pop af
+            ld e, 0
+            ld c, 0
+            ret
+
 timer_isr:  push af                         ; frame tick while the LCD is off
             ldh a, [lcd_on]
             and a

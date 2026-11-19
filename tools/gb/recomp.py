@@ -55,6 +55,9 @@ class FF1:
     #   c62:D741-D75F: map-transition band (BG off / on / off timed by delay calls): the GB
     #   mask from rt_band (rt/runtime.s), with the delay calls' RAM side effects.
     #   fix:EA7F-EA86: one CHR page to $2007 (map loader): hle_chr_page1 (rt/ff1_hle.s).
+    #   c62:D6B8-D6C2: the dialogue box's raster split waits $1B - 1 scanlines through
+    #   $D77C every frame the box shows; the GB draws the box into its map, so only the
+    #   RAM effects remain (rt_dlgdelay).
     idioms = {('b14', 0xB0F1): ('rt_unwind3', 0xB0FC, 'C'), ('c62', 0xD741): ('rt_band', 0xD760, 'NZC'),
               ('fix', 0xEA7F): ('hle_chr_page1', 0xEA87, 'NZ'),
               ('c62', 0xD1A8): ('hle_rlefill', 0xD1AB, 'Z'),   # map decompression run (rt/ff1_hle.s)
@@ -64,7 +67,8 @@ class FF1:
               ('fix', 0xE14D): ('hle_wrow', 0xE153, 'NZ'),     # window rows (frame middles)
               ('fix', 0xE17F): ('hle_wrow', 0xE185, 'NZ'),
               ('c62', 0xD865): ('hle_palup', 0xD87F, 'NZC'),    # palette upload, every frame
-              ('c62', 0xD874): ('hle_palup2', 0xD87F, 'NZC')}   #   (entered at its second loop)
+              ('c62', 0xD874): ('hle_palup2', 0xD87F, 'NZC'),   #   (entered at its second loop)
+              ('c62', 0xD6B8): ('rt_dlgdelay', 0xD6C3, 'NZ')}   # dialogue box split: timing loop
     # bytes each idiom replaces (build.py drops an idiom whose code is not there)
     idiom_code = {('fix', 0xF2CF): bytes.fromhex('a008a2008d0720cad0fa88d0f5'),
                   ('fix', 0xF4EA): bytes.fromhex('a000b1888d0720c8c019d0f6'),
@@ -72,7 +76,8 @@ class FF1:
                   ('fix', 0xE14D): bytes.fromhex('8d0720cad0fa'),
                   ('fix', 0xE17F): bytes.fromhex('8d0720cad0fa'),
                   ('c62', 0xD865): bytes.fromhex('a50df00bbde0038d0720e8e01090f5bdc0038d0720e8e02090f5'),
-                  ('c62', 0xD874): bytes.fromhex('bdc0038d0720e8e02090f5')}
+                  ('c62', 0xD874): bytes.fromhex('bdc0038d0720e8e02090f5'),
+                  ('c62', 0xD6B8): bytes.fromhex('a006a61bca207cd7cad0fa')}
     skip = [('fix', 0xFECF, 0xFEDB), ('fix', 0xFEDC, 0xFEF1)]   # NMI handler + wait loop
 
 
