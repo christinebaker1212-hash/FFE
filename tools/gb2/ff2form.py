@@ -1,5 +1,5 @@
 """FF2 battle formations on the NES: force each battle id (a test copy of the user's
-English build: fix:FA9E STA $7B48 -> JSR to LDA #id / STA $7B48 / RTS at free $FFF0),
+English build: fix:FA9E STA $7B48 -> JSR to LDA #id / STA $7B48 / RTS at free $FEF0),
 start from a state saved just before the opening battle (firstdiff's new-game script +
 random seed 1), and measure where enemies and party sprites are drawn (pixel bounds of
 non-backdrop pixels in the battlefield above the windows; sprites from OAM).
@@ -12,7 +12,7 @@ import firstdiff as fd
 from PIL import Image
 import numpy as np
 
-SPOT = 0xFFF0           # (free in the English and the GB-layout ROM: the old rom-info block)
+SPOT = 0xFEF0           # (free in the English and the GB-layout ROM: zeros after fix:FEBF reset ppu)
 START = 9500           # NES frame before the opening battle's id is set (9512, seed 1 path)
 SHOT = 120             # frames after START for the measured picture
 

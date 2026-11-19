@@ -33,9 +33,8 @@ CAM_BATTLE = dict(x=2, fine=4, y=6, line=96, x2=0, y2=6)
 
 FIX_SRC = '''
     org $F800
-gbf:                    ; X = GB routine index, A = bank to return to (bank 23 code)
+gbf:                    ; X = GB routine index (bank 23 code; its bank to return to: RETB)
     stx GBIDX
-    sta GBRB
     lda #23
     jsr $FA7F           ; (switch with $3E set: the battle NMI's return (long) restores it)
     jsr $8000           ; bank 23 dispatcher
@@ -76,10 +75,12 @@ RAM = dict(GBIDX=0x7FDF, GBRB=0x7FE0, GBPOOL=0x7FE1, VX=0x7FE2, VN=0x7FE3, VT=0x
            VROW=0x7FF0, VCOL=0x7FF1, VW=0x7FF2, VH=0x7FF3, VLINE=0x7FF4, VSV=0x7FF5, VI=0x7FF6,
            NL=0x7FF7, NS=0x7FF8, VSQZ=0x7FF9, VI0=0x7FFA, VI1=0x7FFB, VCX=0x7FFC, VFILL=0x7FFD, VLN=0x7FFE,
            USED=0x75C0, VBUF=0x7800, BLANKT=0x7888, FTILE=0x7889, PTILE=0x7891, LTILE=0x78B9, XTILE=0x78D1,
-           NTBUF=0x78D5, ATKBUF=0x75E0, MOPEN=0x75F0, MLINE=0x75F1)
-# fixed-bank entries (7 bytes each, at $FFD0): index, bank to return to, the NES routine replaced
+           NTBUF=0x78D5, ATKBUF=0x75E0, MOPEN=0x75F0, MLINE=0x75F1, MPAGE=0x75F2)
+# fixed-bank entries (5 bytes each, at $FFD0): routine, bank to return to (bank 23 RETB), the NES routine replaced
 ENTRIES = [('gb_party', 0x0C, 0x912A), ('gb_names', 0x0C, 0x910D), ('gb_names', 0x0C, 0x981D),
-           ('gb_cmds', 0x0C, 0x982C), ('gb_msgopen', 0x05, 0xAA57), ('gb_msgclose', 0x05, 0xAB4F)]
+           ('gb_cmds', 0x0C, 0x982C), ('gb_msgopen', 0x05, 0xAA57), ('gb_msgclose', 0x05, 0xAB4F),
+           ('gb_magic', 0x0C, None), ('gb_magcost', 0x0C, None)]
+# (None: called from a patched JSR, not replacing a routine)
 
 ENT_SRC = '''
     org $FFD0
@@ -88,7 +89,10 @@ ENT_SRC = '''
 B23_SRC = '''
     org $8000
 gbdisp:                 ; dispatch GBIDX (word table: entries of the code map)
-    lda GBIDX
+    ldx GBIDX
+    lda RETB,x          ; (bank of the caller, for gbf's return)
+    sta GBRB
+    txa
     asl a
     tax
     lda gbtab,x
@@ -97,7 +101,7 @@ gbdisp:                 ; dispatch GBIDX (word table: entries of the code map)
     sta $01
     jmp ($0000)
 gbtab:
-    .dw gb_party, gb_names, gb_names, gb_cmds, gb_msgopen, gb_msgclose
+    .dw gb_party, gb_names, gb_names, gb_cmds, gb_msgopen, gb_msgclose, gb_magic, gb_magcost
 
 ; ---- tile pool: table-1 tiles this battle's battlefield does not use
 poolinit:
@@ -1125,6 +1129,155 @@ gb_msgclose:
 .x:
     rts
 
+; ---- battle magic list (b12:9DE3 open + 9EF5 cost; owner-approved layout): full-width
+; window, spell names in two columns (pen 9 / 81), three rows a page (cursor row $54 / 3),
+; line 4 "MP cur/max" and "MP Cost n" (n = $77, set by b12:9EF5 for the spell under the
+; cursor); no spells ($76 = 0): "Magic can't be used" as on the NES
+gb_magic:
+    jsr poolinit
+    lda #1              ; frame with blank lines (as the message window)
+    sta VFILL
+    lda #18
+    sta VROW
+    lda #0
+    sta VCOL
+    lda #20
+    sta VW
+    lda #6
+    sta VH
+    jsr ntwin
+    lda #0
+    sta VFILL
+    lda $76
+    bne .has
+    lda #0
+    sta VLN
+    lda #9
+    sta VCX
+    jsr linestart
+    lda #<NOMAGIC
+    sta VP
+    lda #>NOMAGIC
+    sta VP+1
+    jsr vstrp
+    jmp lineend
+.has:
+    lda #$FF
+    sta MPAGE
+    lda #0
+    sta $77             ; (no cost shown until b12:9EF5 sets it)
+    jsr magpage
+    jmp magmp
+gb_magcost:             ; b12:9EF5's display part: page turn, then the MP line
+    jsr magpage
+    jmp magmp
+magpage:                ; draw the page of cursor row $54 if it is not the one shown
+    lda $54
+    ldx #0
+.d:
+    cmp #3
+    bcc .p
+    sbc #3
+    inx
+    bne .d
+.p:
+    cpx MPAGE
+    bne .new
+    rts
+.new:
+    stx MPAGE
+    txa                 ; first spell index of the page = page * 6
+    asl a
+    sta VI
+    asl a
+    clc
+    adc VI
+    sta VI
+    lda #0
+    sta VLN
+.ln:
+    lda #9
+    sta VCX
+    jsr linestart
+    jsr magname         ; column 1: spell VI
+    inc VI
+    lda #81
+    sta VX
+    jsr magname         ; column 2: spell VI + 1
+    inc VI
+    jsr lineend
+    inc VLN
+    lda VLN
+    cmp #3
+    bne .ln
+    rts
+magname:                ; draw the name of spell slot VI (character $9E: list $7CE3) at VX
+    lda VI
+    cmp #16
+    bcs .x
+    tax
+    lda $7CE3,x
+    beq .x
+    tax
+    lda NMLO,x
+    sta VP
+    lda NMHI,x
+    sta VP+1
+    jmp vstrp
+.x:
+    rts
+magmp:                  ; line 4: "MP" cur/max, "MP Cost" n
+    lda #3
+    sta VLN
+    lda #9
+    sta VCX
+    jsr linestart
+    lda #<MPLAB
+    sta VP
+    lda #>MPLAB
+    sta VP+1
+    jsr vstrp
+    ldy #$0C            ; current MP (battle stats at ($80))
+    lda ($80),y
+    sta VNUM
+    iny
+    lda ($80),y
+    sta VNUM+1
+    lda VX
+    clc
+    adc #18
+    jsr vnum
+    lda #$1A
+    jsr vchar
+    ldy #$10            ; max MP
+    lda ($80),y
+    sta VNUM
+    iny
+    lda ($80),y
+    sta VNUM+1
+    lda VX
+    clc
+    adc #13
+    jsr vnum
+    lda #81
+    sta VX
+    lda #<COSTLAB
+    sta VP
+    lda #>COSTLAB
+    sta VP+1
+    jsr vstrp
+    lda $77
+    beq .e
+    sta VNUM
+    lda #0
+    sta VNUM+1
+    lda VX
+    clc
+    adc #10
+    jsr vnum
+.e:
+    jmp lineend
+
 BIT:    .db $80, $40, $20, $10, $08, $04, $02, $01
 POW:    .db <1000, <100, <10, <1
 POWH:   .db >1000, >100, >10, >1
@@ -1200,6 +1353,19 @@ def names_data(rom):
     out += 'NPHI:\n' + ''.join('    .db %s\n' % ', '.join('>NAME%d' % k for k in range(i, i + 16)) for i in range(0, 128, 16))
     for m, cs in enumerate(strs):
         out += 'NAME%d: .db %s\n' % (m, ', '.join('$%02X' % c for c in cs + b'\0'))
+    b10 = rom[HDR + 10 * BANK:HDR + 11 * BANK]   # names (items, spells; bank 10 table $8200)
+    out += 'NMLO:\n' + ''.join('    .db %s\n' % ', '.join('<NM%d' % k for k in range(i, i + 16)) for i in range(0, 256, 16))
+    out += 'NMHI:\n' + ''.join('    .db %s\n' % ', '.join('>NM%d' % k for k in range(i, i + 16)) for i in range(0, 256, 16))
+    for k in range(256):
+        p = b10[0x0200 + 2 * k] | b10[0x0200 + 2 * k + 1] << 8
+        o = p - 0x8000; cs = bytes(b10[o:b10.index(0, o)])
+        out += 'NM%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
+    def bmsg(k):                                # battle_msgs k (bank 21 $B295)
+        p = b21[0x3295 + 2 * k] | b21[0x3295 + 2 * k + 1] << 8
+        o = p - 0x8000; return bytes(b21[o:b21.index(0, o)])
+    out += 'COSTLAB: .db %s\n' % ', '.join('$%02X' % c for c in bmsg(7) + b'\0')
+    out += 'NOMAGIC: .db %s\n' % ', '.join('$%02X' % c for c in bmsg(8) + b'\0')
+    out += 'MPLAB: .db %s\n' % ', '.join('$%02X' % c for c in bytes([ins.ENC['M'], ins.ENC['P']]) + b'\0')
     cmds = []                                   # battle commands: battle_msgs 0-3 (bank 21 $B295)
     for k in range(4):
         p = b21[0x3295 + 2 * k] | b21[0x3295 + 2 * k + 1] << 8
@@ -1211,7 +1377,7 @@ def names_data(rom):
     return out
 
 
-def bank23(rom, L):
+def bank23(rom, L, extra=''):
     """bank 23 source + data from the user's ROM (first monster tiles, boss tilemaps, frame
     tiles) and the glyph tables"""
     b11 = rom[HDR + 11 * BANK:HDR + 12 * BANK]
@@ -1229,7 +1395,7 @@ def bank23(rom, L):
     for c in range(256):
         offs.append(len(data)); data += bytes(g.get(c, []))
     nsrc = names_data(rom)
-    src = B23_SRC + nsrc + '\nFIRST: .db ' + ', '.join('$%02X' % v for v in first)
+    src = B23_SRC + nsrc + extra + '\nFIRST: .db ' + ', '.join('$%02X' % v for v in first)
     src += '\nBOSSUSED:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in b) for b in boss)
     src += 'FRAMEGFX:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in frame[i:i + 16]) for i in range(0, 128, 16))
     src += 'GW:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in gw[i:i + 16]) for i in range(0, 256, 16))
@@ -1271,19 +1437,31 @@ def battle(rom):
     # command cursor (b12:BFC5, x / y per command): hand at the screen edge, rows 19-22
     put(rom, 12, 0x9147, bytes([0x60]), old=bytes([0x20]))
     put(rom, 12, 0xBFC5, bytes([0x00, 147, 0x00, 155, 0x00, 163, 0x00, 171]), old=bytes.fromhex('c0a8c0b8c0c8c0d8'))
+    # battle magic list: the MP window (b12:9DB5 JSR $9250) not drawn, the list window
+    # (b12:9DE3 JSR $9250) -> GB magic window; b12:9EF5's cost digits (9F3E-9F59, PPU) ->
+    # GB page / MP line; cursor table b12:BFD5 (row r, column c: entry 2r + c): x 0 / 72,
+    # y on line r mod 3
+    put(rom, 12, 0x9DB5, bytes([0x2C, 0x50, 0x92]), old=bytes([0x20, 0x50, 0x92]))
+    cur = bytes(v for r in range(8) for c in range(2) for v in ((0, 72)[c], 147 + 8 * (r % 3)))
+    put(rom, 12, 0xBFD5, cur)
     # bank 23 + entries
     rom[HDR + 23 * BANK:HDR + 24 * BANK] = b'\xFF' * BANK
-    b23 = bank23(rom, dict(gbf=f.labels['gbf']))
+    b23 = bank23(rom, dict(gbf=f.labels['gbf']),
+                 '\nRETB: .db %s\n' % ', '.join('$%02X' % rb for name, rb, nes in ENTRIES))
     assert len(b23.bytes) <= BANK
     put(rom, 23, 0x8000, b23.bytes)
     ent = 'org $FFD0\n'
     for k, (name, rb, nes) in enumerate(ENTRIES):
-        ent += 'e%d:\n    ldx #%d\n    lda #$%02X\n    jmp gbf\n' % (k, k, rb)
+        ent += 'e%d:\n    ldx #%d\n    jmp gbf\n' % (k, k)
     e = asm(ent, syms=dict(gbf=f.labels['gbf']))
     assert e.org + len(e.bytes) <= 0xFFFA
     put(rom, 31, e.org, e.bytes)
     for k, (name, rb, nes) in enumerate(ENTRIES):
-        put(rom, rb, nes, bytes([0x4C]) + e.labels['e%d' % k].to_bytes(2, 'little'))
+        if nes is not None: put(rom, rb, nes, bytes([0x4C]) + e.labels['e%d' % k].to_bytes(2, 'little'))
+    ent = {name: e.labels['e%d' % k] for k, (name, rb, nes) in enumerate(ENTRIES)}
+    put(rom, 12, 0x9DE3, bytes([0x20]) + ent['gb_magic'].to_bytes(2, 'little'), old=bytes([0x20, 0x50, 0x92]))
+    put(rom, 12, 0x9F3E, bytes([0x20]) + ent['gb_magcost'].to_bytes(2, 'little') + bytes([0x4C, 0x5A, 0x9F]),
+        old=bytes.fromhex('a9238d0620'))
 
 
 def apply(rom):

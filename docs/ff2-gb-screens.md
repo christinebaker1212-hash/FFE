@@ -19,6 +19,13 @@ Re-layouts are done in the NES code (NES side, `tools/gb2/layout.py`, applied af
   in place of the maximum as on the NES), MP. Messages: full-width window over both,
   style A (actor > target / action / result lines), small proportional font. No blinking.
 
+## Battle lists (approved 2026-11-19: `ff2_mock6_battle_lists.png`)
+- Magic: full-width bottom window, spells in two columns (pen x 17 / 89, hand at x 0 / 72),
+  three rows a page, line 4 "MP cur/max" and "MP Cost n"; moving past the last row turns
+  the page.
+- Gear: Right Hand + weapon, Left Hand + weapon, Items + item 1, item 2 below it (labels
+  and names as translated; hand at the screen edge on the chosen line).
+
 ## Field dialogue (approved: `ff2_mock2_dialogue.png`)
 Box over the top of the view (GB rows 0-7: frame, 6 lines of 18 columns, frame), the party
 below stays visible; same text re-wrapped at 18 columns, a new page of 6 lines on A.
