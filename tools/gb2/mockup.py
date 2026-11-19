@@ -508,6 +508,40 @@ def target_select(nes_path, out):
     p = os.path.join(out, 'ff2_mock11_target.png'); sheet.save(p); return p
 
 
+def shop(nes_path, out):
+    """Shops (NES: the price list inside the dialogue window, beside the prompt; Buy / Sell /
+    Exit and Gil windows below). GB: dialogue box rows 0-7 as in the field; Buy / Sell / Exit
+    (0,9,8,6) and Gil (8,9,12,4: amount, "Gil" below) under it. Buying: the list in its own
+    window over the dialogue box (0,0,20,10): per item the name, the price below it on the
+    right (names up to 19 letters). Selling: "What will you sell?" in the box, the item list
+    (0,10,20,8) over the menu / Gil windows, as the field's item list."""
+    shots = []
+    def base(msg):
+        s = Screen(bg=3)
+        s.window(0, 0, 20, 8)
+        for i, l in enumerate(msg): s.text(1, 1 + i, l)
+        s.window(0, 9, 8, 6)
+        for i, w in enumerate(['Buy', 'Sell', 'Exit']): s.text(2, 10 + i, w)
+        s.window(8, 9, 12, 4); s.text(11, 10, '    400'); s.text(16, 11, 'Gil')
+        return s
+    s = base(['Welcome.', 'How may I help', 'you?']); _hand(s, -6, 10 * 8 - 4, HAND16); shots.append(s)
+    s = base(['What may I', 'get for you?'])
+    s.window(0, 0, 20, 10)
+    for i, (n, p) in enumerate([('Bronze Gauntlets', 400), ('Mythril Gauntlets', 2500), ("Giant's Gauntlets", 6000),
+                                ('Diamond Gauntlets', 12000)]):
+        s.text(1, 1 + 2 * i, n); t = str(p); s.text(18 - len(t), 2 + 2 * i, t)
+    _hand(s, -9, 1 * 8 - 4, HAND16); shots.append(s)
+    s = base(['What will you', 'sell me?'])
+    s.window(0, 10, 20, 8)
+    for i, n in enumerate(['Potion', 'Antidote', 'Cottage', 'Golden Breastplate', 'Phoenix Tail', 'Pass']):
+        s.text(1, 11 + i, n)
+    _hand(s, -9, 11 * 8 - 4, HAND16); shots.append(s)
+    sheet = Image.new('RGB', (168 * 3 - 8, 144), (255, 255, 255))
+    for k, s in enumerate(shots): sheet.paste(s.im, (k * 168, 0))
+    sheet = sheet.resize((sheet.width * 2, 288), Image.NEAREST)
+    p = os.path.join(out, 'ff2_mock12_shop.png'); sheet.save(p); return p
+
+
 if __name__ == '__main__':
     os.makedirs(sys.argv[2], exist_ok=True)
     print(battle(sys.argv[1], sys.argv[2]))
@@ -521,3 +555,4 @@ if __name__ == '__main__':
     print(main_menu_bg(sys.argv[1], sys.argv[2]))
     print(sub_screens(sys.argv[1], sys.argv[2]))
     print(target_select(sys.argv[1], sys.argv[2]))
+    print(shop(sys.argv[1], sys.argv[2]))

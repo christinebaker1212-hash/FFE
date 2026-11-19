@@ -2282,7 +2282,7 @@ gb_menu:
     rts
 .go:
     jmp ($0000)
-MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit, gm_tparty
+MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit, gm_tparty, gm_shoptext
 
 gm_exit:
     lda #6
@@ -2914,6 +2914,51 @@ gm_upn:                 ; VBUF's VN tiles to tiles A ..
     lda #>NTBUF
     sta VP+1
     jmp vupload
+gm_shoptext:            ; b14:90FD (shop list text, owner approved ff2_mock12): per item the
+    ldx #0              ;   name (column 1, cursor spot) and the price under it at column
+    ldy #0              ;   13, from the shop data at $7B00 (id, price index); into $7B20
+    lda #$08            ;   (one row per line)
+    sta $7B20,y
+    iny
+.it:
+    lda #$16
+    sta $7B20,y
+    iny
+    lda #$01
+    sta $7B20,y
+    iny
+    lda #$18
+    sta $7B20,y
+    iny
+    lda $7B00,x
+    sta $7B20,y
+    inx
+    iny
+    lda #$01
+    sta $7B20,y
+    iny
+    lda #$14
+    sta $7B20,y
+    iny
+    lda #$0D
+    sta $7B20,y
+    iny
+    lda #$19
+    sta $7B20,y
+    iny
+    lda $7B00,x
+    sta $7B20,y
+    inx
+    iny
+    lda #$01
+    sta $7B20,y
+    iny
+    cpx #8
+    bne .it
+    dey
+    lda #0
+    sta $7B20,y
+    rts
 gm_up:                  ; VBUF's 6 tiles to tiles A .. A+5
     ldx #0
 .l:
@@ -3393,7 +3438,8 @@ DLG_GB_W = 18
 DLG_WIN = dict(left=6, top=6, width=20, height=8)     # text window 0 (fix:E9AA table)
 # system strings shown in window 0 on the field (chest, nothing there, lock, ship / airship
 # talk, keywords, save, warp, prayer, magic); the shop ones go with the shop layout
-SYS_FIELD = {0, 1, 2, 3, 4, 17, 18, 19, 20, 22, 25, 63, 64, 68, 71, 72, 76, 77}
+SYS_FIELD = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 22, 25, 63, 64, 68, 71, 72,
+             76, 77}   # (5-16: shops, inn)
 
 
 def _insert_module():
@@ -3571,6 +3617,7 @@ MMTAB:
     put(rom, 14, 0xB1D1 - 2, bytes([0xF0, (0xB1C0 - 0xB1D1) & 0xFF]))  # (BEQ $B1C0 after the JSR)
     put(rom, 14, 0x8834, bytes([0x0F]), old=bytes([0x0F]))
     put(rom, 14, 0x8838, bytes([0x14]), old=bytes([0x64]))    # magic / equip portrait: centred in its box
+    shop_layout(rom, ins, bank, sysone)
     for sid in (40, 41, 42):
         rom[sysone + sid // 8] |= 1 << (sid % 8)
     for sid in (32, 33, 34, 35, 39, ST_P1, ST_P1 + 1):
@@ -3631,6 +3678,90 @@ eq_upd:                 ; b14:B0B0 (equipment changed): slots text, the list's f
     ldx #$0D
     jmp $B486
 '''
+
+SHOP_GIL = 82           # shop Gil window text (system string 28 is the main menu's now)
+SHOP_LIST = dict(left=6, top=6, width=20, height=10)   # NES screen: GB (0,0,20,10)
+SHOP_WIN3 = dict(left=14, top=16, width=12, height=4)  # Gil window: GB (8,10,12,4)
+
+
+def shop_layout(rom, ins, bank, sysone):
+    """shops (owner approved ff2_mock12): the buy list in a window of its own over the
+    dialogue box (b14:90DB, after the prompt), its text built in bank 24 (b14:90FD), the Gil
+    window 3 under the box beside Buy / Sell / Exit (window 1, as the keyword menu)"""
+    L, T, W, H = SHOP_LIST['left'], SHOP_LIST['top'], SHOP_LIST['width'], SHOP_LIST['height']
+    b = asm('''
+    org $90FD
+    lda #6              ; the list text (bank 24)
+    jmp GBM
+shop_l2:
+    lda #TOP+2
+    sta $98
+    lda #WID
+    sta $3C
+    lda #HGT
+    sta $3D
+    ldx #4              ; sprites behind it (region 4; FF2's regions leave out the player:
+    jsr $E843           ;   its sprites 0-3 hidden here, the field draws them again)
+    lda #$F0
+    sta $0200
+    sta $0204
+    sta $0208
+    sta $020C
+    jsr $E923
+    lda #$20
+    sta $3E
+    lda #$7B
+    sta $3F
+    jmp $E7AC
+''', syms=dict(GBM=GBM[0], TOP=T, WID=W, HGT=H))
+    assert b.org + len(b.bytes) <= 0x9139, hex(b.org + len(b.bytes))
+    put(rom, 14, b.org, b.bytes)
+    a = asm('''
+    org $90DB
+shop_list:
+    lda $29
+    asl a
+    clc
+    adc #LFT
+    and #$3F
+    sta $38
+    lda $2F
+    asl a
+    clc
+    adc #TOP
+    cmp #$1E
+    bcc .y
+    sbc #$1E
+.y:
+    sta $39
+    lda #LFT-1
+    sta $97
+    jmp L2
+''', syms=dict(LFT=L, TOP=T, L2=b.labels['shop_l2']))
+    assert a.org + len(a.bytes) <= 0x90FD
+    put(rom, 14, a.org, a.bytes)
+    put(rom, 14, 0x9141, bytes([SHOP_GIL]), old=bytes([0x1C]))
+    w = SHOP_WIN3
+    for k, key in enumerate(('left', 'top', 'width', 'height')):
+        put(rom, 31, 0xE9AA + 4 * k + 3, bytes([w[key]]))
+    for wnd, (x0, y0, ww, hh) in ((3, (8 * w['left'], 8 * w['top'], w['width'], w['height'])),
+                                  (4, (8 * L, 8 * T, W, H))):
+        x1, y1 = x0 + 8 * ww, y0 + 8 * hh
+        for k, v in enumerate((x0 - 6, x1 - 1, y0 - 6, y1 - 9)):
+            put(rom, 31, 0xE892 + 6 * k + wnd, bytes([v]))
+    # dialogue close (fix:D164: metatile rows X-$66 .. X-1 of the screen redrawn): rows 2-7
+    # (tile rows 4-15): the dialogue box and the list window
+    put(rom, 31, 0xD168, bytes([6]), old=bytes([5]))
+    put(rom, 31, 0xD16C, bytes([8]), old=bytes([6]))
+    for sid in (12, 23, 24, SHOP_GIL):
+        rom[sysone + sid // 8] |= 1 << (sid % 8)
+    t12 = "I'll buy it for\n{04} Gil.\nIs that all right?\n{16:03}Yes{16:08}No"
+    t21 = '{08}Where are you\nheaded?\n' + '\n'.join('{16:01}%s{14:0E}%d' % (p, 100 * (k + 1)) for k, p in
+                                                     enumerate(('Bafsk', 'Salamand', 'Semite Falls', 'Kashuon')))
+    for sid, t in ((12, t12), (21, t21)):
+        bank.put_ptr(0x8400 + 2 * sid, bank.alloc(ins.enc(t) + b'\0'))
+    bank.put_ptr(0x8400 + 2 * SHOP_GIL, bank.alloc(ins.enc('{14:03}{05}\n{14:07}Gil') + b'\0'))
+
 
 ST_P1 = 80              # status pages: system strings 80 / 81 (ids unused by the game)
 

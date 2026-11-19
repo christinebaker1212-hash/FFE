@@ -304,7 +304,7 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   poked: 14563 waits identical; random seed 1, 30000 frames: 29534 waits identical.
   firstdiff tolerates stack-like values in `$04` (FF2 saves S there, `b14:919A`; the GB's
   S is exact only as a round trip).
-- Open: window 3 (money) and the shop windows wait for the shop layout.
+- Window 3 (money) and the shop windows: done with the shops (see Main menu section).
 
 ## Main menu (2026-11-19, owner approved `ff2_mock9` with the portraits inside the frame)
 - `layout.main_menu` + bank-23 `gb_menu` (one entry, `gbm` at `$F8F0`: A = sub-command
@@ -371,7 +371,19 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   overwrite confirmation; firstdiff save scenario (SRAM written) 16706 waits identical;
   random seed 1, 30000 frames: 29470 waits identical.
 - firstdiff `--press`: key `N` (no button) to end the random input at a given frame.
-- Next: the remaining field screens (shops, name entry, title, prologue, ending, world map,
+- **Shops** (owner approved `ff2_mock12`, `layout.shop_layout`): the shopkeeper's text in the
+  dialogue box (strings 12, 21, 23, 24 and the inn / airship texts re-wrapped at 18; 12 =
+  "I'll buy it for / <price> Gil. / Is that all right? / Yes  No"; 21 = airship
+  destinations at 18 columns); Buy / Sell / Pass in window 1, Gil in window 3 at NES
+  (14,16,12,4) (string 82: amount on one row, "Gil" below, right-aligned); the buy / sell
+  list over the dialogue box: the item name, its price right-aligned on the row below
+  (`b14:90DB` `shop_list`, `b14:90FD` -> bank 24 `gm_shoptext`, sub-command 6). The close
+  routine `fix:D164` restores 6 metatile rows (X = 8, $66 = 6). The sprites behind the list
+  (region 4 plus the player's sprites 0-3, which FF2's regions leave out) are hidden while
+  it shows; the field draws them again on closing. Checked (NES variant, Gambatte):
+  buy, sell, confirmation, Gil update; firstdiff shop scenario 23190 waits identical;
+  random seed 1, 30000 frames: 29470 waits identical.
+- Next: the remaining field screens (name entry, title, prologue, ending, world map,
   Select menu).
 
 ## Remaining (brief's milestones)
