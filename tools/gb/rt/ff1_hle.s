@@ -188,7 +188,7 @@ hle_bg_tile:
             sub high(BG_SHADOW)
             swap a
             or e
-            jp dmg_mark
+            jp dmg_markw
 
 ; after a tile went to the sprite shadow (DE = shadow tile start + 17: the odd-byte loop
 ; ends one past the tile; RAM bank 1 on): copy it to the tile's GB slot if resident;
@@ -321,3 +321,10 @@ hle_back:   push af
             pop af
             ret
 
+fresh_tramp:                                ; frame wait, DMG: fresh_scan (bank HLE_BANK)
+            ld a, HLE_BANK
+            ld [$2000], a
+            call fresh_scan
+            ldh a, [code_bank]
+            ld [$2000], a
+            ret

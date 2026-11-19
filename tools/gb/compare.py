@@ -32,6 +32,20 @@ class GB:
             if not mask & bit and self.held & bit: self.pb.button_release(name)
         self.held = mask
 
+    def feed_pads(self, sym, pad_of):
+        """Exact input: the pad the NES latched for frame k (pad_of(k), NES bit order, None =
+        the buttons as set) goes to the game when it strobes the controller in frame k, by a
+        hook after read_buttons in rt_io_w4016 (frames that catch up run several game frames
+        in one PyBoy tick, so buttons set between ticks would come a frame late)."""
+        rev = [int('{:08b}'.format(i)[::-1], 2) for i in range(256)]
+
+        def hook(_):
+            m = self.pb.memory
+            v = pad_of(m[0xD830] | m[0xD831] << 8)
+            if v is not None: self.pb.register_file.A = rev[v]
+        b, a = sym['rt_io_w4016']
+        self.pb.hook_register(b, a + 5, hook, None)
+
     def step(self, n):
         for _ in range(n): self.pb.tick()
 

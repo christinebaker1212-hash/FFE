@@ -140,7 +140,16 @@ retile:     push bc
             ldh [sh_s0], a
             ld a, c
             ldh [sh_s1], a
-            ld a, e                         ; shadow -> RT_BUF (RAM bank 1)
+            call tkey_bc                    ; already coded like that: nothing to do (FF1
+            ld l, e                         ;   writes a map row before its attributes, so
+            ld h, high(CODED)               ;   its tiles are marked twice and come back to
+            cp [hl]                         ;   the coding they had)
+            jr nz, .go
+            pop hl
+            pop de
+            pop bc
+            ret
+.go:        ld a, e                         ; shadow -> RT_BUF (RAM bank 1)
             swap a
             ld d, a
             and $F0
@@ -243,10 +252,52 @@ retile:     push bc
             and $F0
 .ust:       or c
             ld [hl], a
+            ldh a, [sh_s0]                  ; the coding it has now
+            ld b, a
+            ldh a, [sh_s1]
+            ld c, a
+            ldh a, [sh_tile]
+            ld e, a
+            call tkey_bc
+            ld l, e
+            ld h, high(CODED)
+            ld [hl], a
             pop hl
             pop de
             pop bc
             ret
+
+; B / C = colour indices whose value has bit 0 / bit 1 set (the tile's palette), E = tile ->
+; A = its coding key: the values of the indices it uses. Keeps BC, DE, HL.
+tkey_bc:    push hl
+            ld a, e
+            srl a
+            add a, low(TILE_USE)
+            ld l, a
+            ld h, high(TILE_USE)
+            ld a, [hl]
+            bit 0, e
+            jr z, .lo
+            swap a
+.lo:        and $0F
+            or 1
+            ld l, a
+            and c
+            swap a
+            ld h, a
+            ld a, l
+            and b
+            or h
+            pop hl
+            ret
+
+; A = tile whose pixels were written: mark it, its coding unknown. Keeps all registers.
+dmg_markw:  push hl
+            ld l, a
+            ld h, high(CODED)
+            ld [hl], $FF
+            pop hl
+            jp dmg_mark
 ; sh_p0 / sh_p1 (a tile row's planes) -> sh_m0..3 = masks of the pixels of index 0..3
 row_masks:  push bc
             ldh a, [sh_p0]
@@ -926,7 +977,13 @@ bg_lmax:    push bc
             ret
 
 ; boot (DMG): PAL_MAP identity, full brightness reference
-dmg_init:   ld a, 8
+dmg_init:   ld hl, CODED                    ; no tile coded yet
+            ld a, $FF
+.cd:        ld [hl+], a
+            inc l
+            dec l
+            jr nz, .cd
+            ld a, 8
             ld [REF_LMAX], a
             ld a, 3
             ld [NGRP], a

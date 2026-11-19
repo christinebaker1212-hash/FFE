@@ -32,6 +32,8 @@ SPAL_KEY   = $DCC0          ; NES sprite palette -> coding: values of indices 1-
 SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
+VBL_SEEN   = $D834          ; VBL_CNT (low) up to which GB frames were taken by NES frames
+CATCH_UP   = 8              ; GB frames an NES frame wait may be behind at most
 BG_DIRTY   = $CCA0          ; CGB: BG tiles to copy by HDMA (bitmap, 32)
 SPR_DIRTY  = $CCC0          ; CGB: sprite slots to copy by HDMA (bitmap, 16)
 EV_L       = $CCE0          ; raster events of this frame (vbl_regs / stat_isr): first line (3),
@@ -44,6 +46,15 @@ BAND_LIFE  = $CCEA
 BGP_NORM   = $CCEB          ; DMG / SGB: BGP of the frame; BGP_MASK: every value as the backdrop
 BGP_MASK   = $CCEC
 OAM_USED   = $CCEE          ; GB sprites the last OAM conversion used
+FR_ANY     = $CCF9          ; DMG: cells marked in FRESH (palette check to do),
+FR_AGE     = $CCFA          ;   frame waits since the last mark, since cells are waiting,
+FR_PEND    = $CCFB
+FR_POS     = $CCFC          ;   fresh_scan: next byte, empty bytes in a row seen,
+FR_EMPTY   = $CCFD
+FR_FRC     = $CCFE          ;   all at once (waited FR_FORCE waits)
+FR_LY      = 136            ;   (checks while LY is below this)
+FR_FORCE   = 24
+FRESH      = $DE00          ; DMG: one bit per GB map cell (byte row * 4 + col / 8), 128 bytes
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
 EMPH_RGB   = $3A00          ; CGB: NES colours with emphasis e (1-7) at EMPH_RGB + e * $80
@@ -63,6 +74,7 @@ LVF        = $DC50          ;   levels present (9)
 LSL        = $DC60          ;   levels present, ascending (9)
 LVMAP      = $DC70          ;   level -> value (9)
 TILE_USE   = $DD80          ;   colour indices each BG tile uses (bit i, a nibble per tile), 128 bytes
+CODED      = $DF00          ; DMG: coding key each BG tile has in VRAM ($FF = unknown)
 GLUM       = $DC7C          ;   value (1-3) -> its brightest level ($DC7D-$DC7F)
 MAPS_WAIT  = 16             ;   frames the maps may be due before they are recomputed anyway
 PAL_STABLE = 8              ;   frames without palette writes before the maps are recomputed
@@ -1256,12 +1268,29 @@ rt_wait_nmi:
             ldh a, [is_sgb]
             and a
             call nz, sgb_frame
+            push hl                         ; pacing: each NES frame takes one GB frame.
+            ld a, [VBL_SEEN]                ;   A frame that ran long leaves frames not
+            ld l, a                         ;   taken yet: the next waits return at once
+            ld a, [VBL_CNT]                 ;   until the game is back in step (its speed
+            sub l                           ;   and the music keep time; the picture
+            jr z, .w                        ;   drops a frame instead). At most CATCH_UP.
+            cp CATCH_UP + 1
+            jr c, .tk
+            ld a, [VBL_CNT]
+            sub CATCH_UP
+            ld l, a
+.tk:        inc l
+            ld a, l
+            ld [VBL_SEEN], a
+            jr .go
+.w:         halt
+            ld a, [VBL_CNT]
+            cp l
+            jr z, .w
+            ld [VBL_SEEN], a
+.go:        pop hl
             xor a
             ldh [frame_flag], a
-.w:         halt
-            ldh a, [frame_flag]
-            and a
-            jr z, .w
             ld a, [NES_RAM + $FF]           ; NMI handler: LDA $FF / STA $2000 / LDA $2002
             call rt_ppu_w0
             call rt_ppu_r2
@@ -1277,6 +1306,9 @@ dmg_frame:                                  ; DMG shading, once per NES frame wi
             and a                           ;   palette maps once the palettes have been
             ret z                           ;   stable for PAL_STABLE frames, then re-code a
             push bc                         ;   few marked tiles
+            ld a, [FR_ANY]                  ; (map cells marked by DrawMapRowCol / Attributes)
+            and a
+            call nz, fresh_tramp
             ldh a, [maps_due]               ; palettes changing on every frame (a fade
             and a                           ;   of one palette, as in the prologue): the
             jr z, .w                        ;   maps anyway after MAPS_WAIT frames
@@ -1363,6 +1395,8 @@ rt_ppu_w1:  push af
             ldh [$FF40], a
             ld a, 1
             ldh [lcd_on], a
+            ld a, [VBL_CNT]                 ; frames lost while the LCD was off are not
+            ld [VBL_SEEN], a                ;   caught up (the screen fades in at its pace)
             jr .ret
 .off:       ldh a, [lcd_on]
             and a
@@ -1499,7 +1533,7 @@ rt_ppu_w7:  push af
             swap a
             and $0F
             or b
-            call dmg_mark
+            call dmg_markw
             jp .done
 .bgv:       ldh a, [lcd_on]                 ; CGB, LCD on: into the tile copy (WRAM bank 2),
             and a                           ;   the tile goes over by HDMA in the vblank

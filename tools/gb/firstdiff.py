@@ -47,16 +47,6 @@ limit = int(args[2]) if len(args) > 2 else 100000
 sym = {}
 for l in open(args[1][:-3] + '.sym'):
     b, rest = l.split(':'); a, n = rest.split(); sym[n] = (int(b, 16), int(a, 16))
-snaps = {}
-
-
-def on_wait(ctx):
-    m = gb.pb.memory
-    k = (m[0xD830] | m[0xD831] << 8) + 1                # entering wait number k
-    snaps[k] = bytes(m[0xC000 + i] for i in range(0x800))
-
-
-gb.pb.hook_register(*sym['rt_wait_nmi'], on_wait, None)
 steps = []
 for it in new_game_script():
     if it[0] == 'shot': continue
@@ -73,54 +63,72 @@ if rnd is not None:
     btns = [UP, DOWN, LEFT, RIGHT, A, A, B, START, UP, DOWN, LEFT, RIGHT]
     while len(steps) < limit:
         steps += [r.choice(btns)] * r.randint(2, 40) + [0] * r.randint(1, 20)
+
+# 1. the NES alone: RAM at each NMI k, the pad it latched, NES frame of each NMI
+nes_ram, pads, frame_of, wram_at = {}, {}, {}, {}
+poke_k, shot_k = None, []
 f = 0
 for m in steps[:limit]:
-    if f == poke_at and pokes:                  # work RAM patches (NES state + GB cart RAM)
+    if f == poke_at and pokes:                  # work RAM patches (NES state; GB below)
         import battleseq
         st = nes.save()
-        for a, v in pokes:
-            battleseq.poke_state(st, a, v)
-            if a < 0x800: gb.pb.memory[0xC000 + a] = v          # NES RAM at GB $C000
-            else: gb.pb.memory[0, 0xA000 + a - 0x6000] = v
-        nes.load(st)
+        for a, v in pokes: battleseq.poke_state(st, a, v)
+        nes.load(st); poke_k = nes.nmi_count
     nes.controller = m
     k0 = nes.nmi_count
     nes.step(1); f += 1
-    if nes.nmi_count == k0: continue
     k = nes.nmi_count
-    hist = nes.pad_history
-    for j in range(k0 + 1, k + 1):          # one GB frame per NES NMI, with that frame's pad
-        gb.set(hist[j & 0xFF])
-        guard = 0
-        while j not in snaps:
-            gb.pb.tick(); guard += 1
-            if guard > 2000: raise SystemExit('GB stuck before wait %d' % j)
-            if os.environ.get('STUCK_SAVE') and j == int(os.environ['STUCK_SAVE']):
-                with open('build/stuck.state', 'wb') as fh: gb.pb.save_state(fh)
-                raise SystemExit('saved before wait %d' % j)
-        if j < k: snaps.pop(j)
-    if f in shots_at:
-        shots.append(gb.image())
-    if k < 8: continue
-    a = nes.nmi_ram; b = snaps.pop(k)
+    for j in range(k0 + 1, k + 1):
+        pads[j] = nes.pad_history[j & 0xFF]; frame_of[j] = f
+    if k != k0 and k >= 8: nes_ram[k] = bytes(nes.nmi_ram)
+    if k != k0 and wram_from is not None and f >= wram_from:
+        wram_at[k] = bytes(nes[0x6000 + i] for i in range(0x2000))
+    if f in shots_at: shot_k.append(k)
+last = nes.nmi_count
+
+# 2. the GB with those pads; RAM on entering each frame wait compared with the NES
+state = {'diff': None, 'k': 0}
+
+
+def on_wait(ctx):
+    m = gb.pb.memory
+    k = (m[0xD830] | m[0xD831] << 8) + 1                # entering wait number k
+    state['k'] = k
+    if k == poke_k:
+        for a, v in pokes:
+            if a < 0x800: m[0xC000 + a] = v              # NES RAM at GB $C000
+            else: m[0, 0xA000 + a - 0x6000] = v
+    if state['diff'] is not None or k not in nes_ram: return
+    a = nes_ram[k]; b = bytes(m[0xC000 + i] for i in range(0x800))
     d = [i for i in range(0x800) if a[i] != b[i] and not 0x100 <= i < 0x200]
-    if os.environ.get('WATCH') and f >= int(os.environ.get('WATCH_FROM', '0')):   # WATCH=6E90-6EB0: print both
-        lo, hi = (int(x, 16) for x in os.environ['WATCH'].split('-'))
-        print(f, k, 'NES', bytes(nes[x] for x in range(lo, hi)).hex(' '))
-        print(f, k, 'GB ', bytes(gb.pb.memory[0, 0xA000 + x - 0x6000] for x in range(lo, hi)).hex(' '))
-    if os.environ.get('GBWATCH') and f >= int(os.environ.get('WATCH_FROM', '0')):   # GBWATCH=D840-D872: GB WRAM
-        lo, hi = (int(x, 16) for x in os.environ['GBWATCH'].split('-'))
-        print(f, k, 'GB ', bytes(gb.pb.memory[x] for x in range(lo, hi)).hex(' '))
-    if wram_from is not None and f >= wram_from and not d:     # (NES now, GB now: both at the wait)
-        w = [0x6000 + i for i in range(0x2000) if nes[0x6000 + i] != gb.pb.memory[0, 0xA000 + i]]
-        if w:
-            print('frame %d nmi %d work RAM: %s' % (f, k, ' '.join('%04X:%02X/%02X' % (x, nes[x], gb.pb.memory[0, 0xA000 + x - 0x6000]) for x in w[:16])))
-            break
     if d:
-        print('frame %d nmi %d: %s' % (f, k, ' '.join('%03X:%02X/%02X' % (i, a[i], b[i]) for i in d[:16])))
-        break
+        state['diff'] = 'frame %d nmi %d: %s' % (frame_of.get(k, -1), k, ' '.join('%03X:%02X/%02X' % (i, a[i], b[i]) for i in d[:16]))
+    elif k in wram_at:
+        w = [0x6000 + i for i in range(0x2000) if wram_at[k][i] != m[0, 0xA000 + i]]
+        if w:
+            state['diff'] = 'frame %d nmi %d work RAM: %s' % (frame_of.get(k, -1), k, ' '.join(
+                '%04X:%02X/%02X' % (x, wram_at[k][x - 0x6000], m[0, 0xA000 + x - 0x6000]) for x in w[:16]))
+    if os.environ.get('GBWATCH') and frame_of.get(k, 0) >= int(os.environ.get('WATCH_FROM', '0')):
+        lo, hi = (int(x, 16) for x in os.environ['GBWATCH'].split('-'))
+        print(frame_of.get(k), k, 'GB ', bytes(m[x] for x in range(lo, hi)).hex(' '))
+
+
+gb.pb.hook_register(*sym['rt_wait_nmi'], on_wait, None)
+gb.feed_pads(sym, lambda n: pads.get(n + 1))      # (frame after wait n: the pad of NMI n + 1)
+guard = 0; prev = 0
+while state['k'] <= last and state['diff'] is None:
+    gb.pb.tick(); guard += 1
+    if state['k'] != prev: prev, guard = state['k'], 0
+    if guard > 2000: raise SystemExit('GB stuck before wait %d' % (state['k'] + 1))
+    if os.environ.get('STUCK_SAVE') and state['k'] + 1 >= int(os.environ['STUCK_SAVE']):
+        with open('build/stuck.state', 'wb') as fh: gb.pb.save_state(fh)
+        raise SystemExit('saved before wait %d' % (state['k'] + 1))
+    while shot_k and state['k'] >= shot_k[0]:
+        shots.append(gb.image()); shot_k.pop(0)
+if state['diff']:
+    print(state['diff'])
 else:
-    print('no difference in %d frames (%d NMIs)' % (f, nes.nmi_count))
+    print('no difference in %d frames (%d NMIs)' % (f, last))
 if shots and out:
     from PIL import Image
     sheet = Image.new('RGB', (164 * min(len(shots), 6), 148 * ((len(shots) + 5) // 6)), 'white')
