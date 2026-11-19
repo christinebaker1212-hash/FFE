@@ -1960,14 +1960,21 @@ izrd:       ld a, h                         ; HL = NES address (ROM windows firs
             ld a, DATA + 63
             jr .rd
 .low:       cp $20
-            jr nc, .other
+            jr nc, .prg
             and $07                         ; RAM
             or high(NES_RAM)
             ld h, a
             ld l, [hl]
             pop af
             ret
-.other:     call nes_rd                     ; PRG-RAM, ExRAM, I/O
+.prg:       cp $60
+            jr c, .other
+            add a, $40                      ; PRG-RAM $6000-$7FFF -> $A000
+            ld h, a
+            ld l, [hl]
+            pop af
+            ret
+.other:     call nes_rd                     ; ExRAM, I/O
             pop af
             ret
 rt_izx_rd:  push af                         ; L = zp; pointer at (zp + X)

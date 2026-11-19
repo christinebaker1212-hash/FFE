@@ -76,7 +76,22 @@ class FF3:
            ('p34', 0x95E1): ('nat_95e1', 'NZC'),     # convert hex to decimal
            ('fix', 0xF8EA): ('nat_f8ea', 'NZC', 'C'),   # multiply (A = $1A, X = $1B)
            ('fix', 0xF8E0): ('nat_f8e0', 'NZV'),     # set ppu address
-           ('fix', 0xF8C5): ('nat_f8c5', 'NZ')}      # wait for vblank, oam, ppu registers
+           ('fix', 0xF8C5): ('nat_f8c5', 'NZ'),      # wait for vblank, oam, ppu registers
+           ('fix', 0xF8CB): ('nat_f8cb', 'NZ'),      # update ppu registers
+           ('fix', 0xF8AA): ('nat_f8aa', 'NZ'),      # oam dma
+           ('fix', 0xFB80): ('rt_wait_nmi', 'NZ'),   # wait for nmi (as the idiom)
+           ('fix', 0xF8F2): ('nat_f8f2', 'NZC'),     # add to +$7E
+           ('fix', 0xF8FE): ('nat_f8fe', 'NZC'),     # add to +$80
+           ('p34', 0xA558): ('nat_a558', 'NZC'),     # add to text buffer offset
+           ('p34', 0xA549): ('nat_a549', 'NZ'),      # write spaces to text buffer
+           ('fix', 0xFBAA): ('nat_fbaa', 'NZC'),     # update joypad input
+           ('fix', 0xFD20): ('nat_fd20', 'NZ'),      # set bit
+           ('fix', 0xFD2C): ('nat_fd2c', 'NZ'),      # clear bit
+           ('fix', 0xFD38): ('nat_fd38', 'NZ')}      # check bit
+    for _a, _n in zip(range(0xFD3C, 0xFD41), ('nat_fd3c', 'nat_fd3d', 'nat_fd3e', 'nat_fd3f', 'nat_fd40')):
+        ext[('fix', _a)] = (_n, 'NZC')               # asl x6 .. x2
+    for _a, _n in zip(range(0xFD43, 0xFD48), ('nat_fd43', 'nat_fd44', 'nat_fd45', 'nat_fd46', 'nat_fd47')):
+        ext[('fix', _a)] = (_n, 'NZC')               # lsr x6 .. x2
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   $FB80 wait for nmi (INC $05 / LDA $05 / BNE): the asynchronous NMI handler
     #   ($0100 = JMP $FB57 in battle / cutscenes) clears $05; on the GB the handler runs

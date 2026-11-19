@@ -698,13 +698,13 @@ nat_9f98:
 ; multiply (16-bit): $1C-$1F = $18:$19 * $1A:$1B, the NES loop step for step in registers
 ; (same final $1A-$1F, A, carry). In: C (6502 carry) as the NES reads it. Out: X = 0, A = the
 ; last $1F computed (0 if none), Z = 1, N = 0, C from the last ROR; Y kept.
-nat_fcf5:   push af
+nat_fcf5:   push af                         ; (unrolled: 16 steps)
             ld a, c
             ldh [nt_y], a
-            xor a
-            ldh [nt_a], a
-            ld a, 16
-            ldh [nt_x], a
+            ld a, [NES_RAM + $18]
+            ldh [n9_y], a
+            ld a, [NES_RAM + $19]
+            ldh [n9_x], a
             ld a, [NES_RAM + $1A]
             ld c, a
             ld a, [NES_RAM + $1B]
@@ -712,24 +712,215 @@ nat_fcf5:   push af
             ld de, 0                        ; D = $1F, E = $1E
             ld hl, 0                        ; H = $1D, L = $1C
             pop af                          ; (the incoming carry)
-.lp:        rr b                            ; ROR $1B / ROR $1A
+            ld a, 0
+            rr b                            ; ROR $1B / ROR $1A
             rr c
-            jr nc, .ns
-            ld a, [NES_RAM + $18]           ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            jr nc, .s0
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
             add a, e
             ld e, a
-            ld a, [NES_RAM + $19]
+            ldh a, [n9_x]
             adc a, d
-            ld d, a
-            ldh [nt_a], a
-.ns:        rr d                            ; ROR $1F $1E $1D $1C
+            ld d, a                         ; (A = the last $1F computed)
+.s0:        rr d                            ; ROR $1F $1E $1D $1C
             rr e
             rr h
             rr l
-            ldh a, [nt_x]
-            dec a
-            ldh [nt_x], a
-            jr nz, .lp
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s1
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s1:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s2
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s2:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s3
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s3:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s4
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s4:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s5
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s5:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s6
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s6:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s7
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s7:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s8
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s8:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s9
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s9:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s10
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s10:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s11
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s11:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s12
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s12:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s13
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s13:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s14
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s14:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s15
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s15:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
             push af
             ld a, c
             ld [NES_RAM + $1A], a
@@ -749,11 +940,10 @@ nat_fcf5:   push af
             ld c, a
             xor a
             ldh [nzv], a
-            pop af                          ; (carry of the last ROR)
-            ld a, 0
-            inc a
-            dec a                           ; Z = 1 (DEX)
-            ldh a, [nt_a]
+            pop af                          ; A = the last $1F computed, carry of the last ROR
+            ld h, 0                         ; Z = 1 (DEX): from a register known to be 0
+            inc h
+            dec h
             ret
 
 ; ------------------------------------------------------------------ fix:FC92
@@ -1367,7 +1557,7 @@ nat_f8e0:   push af
 nat_f8c5:   call rt_wait_nmi
             ld a, 2
             call rt_io_w4014
-            ld a, [NES_RAM + $06]
+nat_f8cb:   ld a, [NES_RAM + $06]           ; update ppu registers ($F8CB)
             call rt_ppu_w0
             ld a, [NES_RAM + $09]
             call rt_ppu_w1
@@ -1378,4 +1568,150 @@ nat_f8c5:   call rt_wait_nmi
             ldh [nzv], a
             inc a
             dec a
+            ret
+
+; ------------------------------------------------------------------ small fixed-bank helpers
+; (each called from every code bank: here they cost no bank switch)
+; $FD3C-$FD40: ASL A x 6 .. x 2; $FD43-$FD47: LSR A x 6 .. x 2. Out: N, Z, C of the last shift.
+nat_fd3c:   add a, a
+nat_fd3d:   add a, a
+nat_fd3e:   add a, a
+nat_fd3f:   add a, a
+nat_fd40:   add a, a
+            add a, a
+            ldh [nzv], a
+            ret
+nat_fd43:   srl a
+nat_fd44:   srl a
+nat_fd45:   srl a
+nat_fd46:   srl a
+nat_fd47:   srl a
+            srl a
+            ldh [nzv], a
+            ret
+; $FD20 set bit (ORA $FD24,X), $FD2C clear bit (AND $FD30,X), $FD38 check bit (AND $FD24,X):
+; the mask read from the fixed bank as the NES does; N, Z of the result, C kept.
+nat_fd20:   push af                         ; (A and the carry)
+            ld hl, $4000 + $FD24 - $C000
+            add hl, de                      ; + X (D = 0)
+            call rt_rd_f                    ; L = mask (A, F kept)
+            pop af
+            push af
+            or l
+            jr bit_out
+nat_fd2c:   push af
+            ld hl, $4000 + $FD30 - $C000
+            add hl, de
+            call rt_rd_f
+            pop af
+            push af
+            and l
+            jr bit_out
+nat_fd38:   push af
+            ld hl, $4000 + $FD24 - $C000
+            add hl, de
+            call rt_rd_f
+            pop af
+            push af
+            and l
+bit_out:    ld l, a                         ; N, Z of the result, the caller's carry
+            ldh [nzv], a
+            pop af
+            ld a, l
+            inc l
+            dec l
+            ret
+
+; $F8F2 / $F8FE / p34:$A558: CLC / ADC zp / STA zp / LDA zp+1 / ADC #0 / STA zp+1 (16-bit add
+; of A to $7E / $80 / $4E). Out: A = the high byte, N, Z, C of its ADC.
+nat_f8f2:   ld hl, NES_RAM + $7E
+            jr add16
+nat_f8fe:   ld hl, NES_RAM + $80
+            jr add16
+nat_a558:   ld hl, NES_RAM + $4E
+add16:      add a, [hl]
+            ld [hl+], a
+            ld a, [hl]
+            adc a, 0
+            ld [hl], a
+            ldh [nzv], a
+            ret
+
+; $F8AA: LDA #2 / STA $4014 (OAM DMA from page 2). Out: A = 2, N = Z = 0, C kept.
+nat_f8aa:   ld a, 2
+            call rt_io_w4014
+            ldh [nzv], a
+            inc a
+            dec a
+            ret
+
+; p34:$A549 write spaces to text buffer: $7AD7 + X = 0, then $FF at X - 1 downwards while X
+; stays positive (DEX / BPL). Out: A = $FF, X as the loop leaves it (N = 1), C kept, Y kept.
+nat_a549:   ld hl, $BAD7                    ; ($7AD7 in PRG-RAM)
+            add hl, de
+            ld [hl], 0
+            dec e
+.lp:        ld hl, $BAD7
+            add hl, de
+            ld [hl], $FF
+            dec e
+            bit 7, e
+            jr z, .lp
+            ld a, e
+            ldh [nzv], a
+            inc e
+            dec e
+            ld a, $FF
+            ret
+
+; $FBAA update joypad input: $12 = previous buttons, $13 = new (8 reads of $4016, as the NES:
+; each read is a safe point), repeat counter $14. Out: X = 0, A / N / Z as the NES path leaves
+; them, C from the last ROR $13.
+nat_fbaa:   ld a, [NES_RAM + $13]
+            ld [NES_RAM + $12], a
+            ld a, 1
+            call rt_io_w4016
+            xor a
+            call rt_io_w4016
+            ld e, 8
+.rd:        call rt_io_r4016                ; L = the button (bit 0)
+            ld a, l
+            rra
+            ld hl, NES_RAM + $13
+            rr [hl]
+            dec e
+            jr nz, .rd
+            push af                         ; (the carry of the last ROR)
+            ld a, [NES_RAM + $12]
+            ld l, a
+            ld a, [NES_RAM + $13]
+            ld h, a
+            or l
+            jr nz, .any
+            ld [NES_RAM + $12], a           ; nothing pressed: $12 = 0, $14 = 8
+            ld a, 8
+            ld [NES_RAM + $14], a
+            jr .out
+.any:       ld a, l
+            and h
+            jr nz, .held
+.new:       ld a, l                         ; newly pressed: $12 = ~old & new
+            cpl
+            and h
+            ld [NES_RAM + $12], a
+            jr .out
+.held:      ld a, [NES_RAM + $14]           ; held: repeat every 4 frames after 8
+            dec a
+            ld [NES_RAM + $14], a
+            jr nz, .new
+            ld a, 4
+            ld [NES_RAM + $14], a
+            ld a, h
+            ld [NES_RAM + $12], a
+.out:       ld l, a
+            ldh [nzv], a
+            pop af
+            ld a, l
+            inc l
+            dec l
             ret
