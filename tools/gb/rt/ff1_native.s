@@ -2387,53 +2387,165 @@ vt_code:    push bc
             inc l
             inc l
             ld c, [hl]                      ; C = v3
+            ld a, b                         ; plane p = (pixels & K) ^ Y: Y = v0 bit p
+            and 1                           ;   spread, K = Y ^ (v3 bit p spread)
+            jr z, .y0
+            ld a, $FF
+.y0:        ld [RM + 1], a                  ; Y0
+            ld d, a
+            ld a, c
+            and 1
+            jr z, .x0
+            ld a, $FF
+.x0:        xor d
+            ld [RM], a                      ; K0
+            ld a, b
+            and 2
+            jr z, .y1
+            ld a, $FF
+.y1:        ld [RM + 3], a                  ; Y1
+            ld d, a
+            ld a, c
+            and 2
+            jr z, .x1
+            ld a, $FF
+.x1:        xor d
+            ld [RM + 2], a                  ; K1
             push de
-            call blk_alloc
-            ld h, d
-            ld l, e                         ; HL = block
-            pop de
-            push de
-            ld de, RT_BUF
-            ld a, 8
-            ld [RM + 8], a
-            xor a
-            ld [RM], a                      ; (any pixel set)
-.row:       ld a, [de]
-            inc e
-            push de
-            ld d, a                         ; D = pixels
+            call blk_alloc                  ; DE = block
+            ld hl, RT_BUF
             ld a, [RM]
-            or d
-            ld [RM], a
-            ld e, 0                         ; plane 0: v3 bit 0 where set, v0 bit 0 elsewhere
-            bit 0, c
-            jr z, .a0
-            ld e, d
-.a0:        bit 0, b
-            jr z, .b0
-            ld a, d
-            cpl
-            or e
-            ld e, a
-.b0:        ld [hl], e
-            inc l
-            ld e, 0                         ; plane 1
-            bit 1, c
-            jr z, .a1
-            ld e, d
-.a1:        bit 1, b
-            jr z, .b1
-            ld a, d
-            cpl
-            or e
-            ld e, a
-.b1:        ld [hl], e
-            inc l
+            ld b, a
+            ld a, [RM + 1]
+            ld c, a
+            push de
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
             pop de
-            ld a, [RM + 8]
-            dec a
-            ld [RM + 8], a
-            jr nz, .row
+            inc e
+            ld l, low(RT_BUF)
+            ld a, [RM + 2]
+            ld b, a
+            ld a, [RM + 3]
+            ld c, a
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            and b
+            xor c
+            ld [de], a
+            inc e
+            inc e
+            ld l, low(RT_BUF)               ; (any pixel set)
+            xor a
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            ld [RM], a
+            dec e                           ; (DE: block, as before for the code below)
+            ld a, e
+            and $F0
+            ld e, a
+            ld h, d
+            ld l, e
             pop de                          ; E = tile
             ld a, e                         ; TILE_USE nibble: index 3 if a pixel is set
             srl a
