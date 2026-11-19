@@ -29,21 +29,10 @@ nat_9111:   ld a, e
             ld c, a
             ld hl, $4000 + $91CB - $8000
             add hl, bc
-            ld a, [hl+]
-            ld [NES_RAM + $7E], a
-            ld e, a
+            ld a, [hl+]                     ; (NES $7E / $7F hold this pointer until the
+            ld [NES_RAM + $7E], a           ;   tile pointer replaces it below)
             ld a, [hl]
             ld [NES_RAM + $7F], a
-            sub $40                         ; NES $8000-$9FFF -> GB $4000-$5FFF
-            ld h, a
-            ld l, e
-            ld de, $B300                    ; PRG-RAM $7300
-            ld c, 24
-.cp:        ld a, [hl+]                     ; copy the 24 bytes
-            ld [de], a
-            inc e
-            dec c
-            jr nz, .cp
             ldh a, [nt_x]                   ; $82 = tile offset ($9295 + X)
             ld l, a
             ld h, 0
@@ -62,6 +51,11 @@ nat_9111:   ld a, e
             inc l
             or [hl]
             ld [NES_RAM + $83], a
+            ldh [n9_at], a
+            ld a, [NES_RAM + $8E]
+            ldh [n9_y], a
+            ld a, [NES_RAM + $8C]
+            ldh [n9_x], a
             ld bc, 0
             ld a, [NES_RAM + $90]           ; A = frame, X = 6, C = 1 (from CPY #$18):
             ld e, 6                         ;   the NES multiply ($F8EA = JSR $FCD6 / LDA $1A
@@ -70,80 +64,118 @@ nat_9111:   ld a, e
             ld a, [NES_RAM + $1B]
             ld e, a
             ld a, [NES_RAM + $1A]
-            add a, $2E                      ; $7E / $7F = $972E + 6 * frame
-            ld [NES_RAM + $7E], a
+            add a, $2E                      ; $7E / $7F = $972E + 6 * frame (tiles)
             ld l, a
             ld a, e
             adc a, $97
-            ld [NES_RAM + $7F], a
             sub $40
             ld h, a
             ld a, NAT_B32
             ld [MBC5_BANKL], a
-            ld de, $B300
-            ld c, 6
-.lp:        push hl                         ; y += $8E
-            ld hl, NES_RAM + $8E
-            ld a, [de]
-            add a, [hl]
-            ld [de], a
-            pop hl
-            inc e
-            ld a, [hl+]                     ; tile: bit 7 set: the value; else + $82
+            ld a, [NES_RAM + $82]           ; the 6 tiles -> $7301 + 4i: bit 7 set: the value,
+            ld c, a                         ;   else + $82
+            ld de, $B301
+.tl:        ld a, [hl+]
             bit 7, a
-            jr z, .add
+            jr z, .ta
             and $7F
-            jr .st
-.add:       push hl
-            ld hl, NES_RAM + $82
-            add a, [hl]
-            pop hl
-.st:        ld [de], a
-            inc e
-            push hl                         ; attributes |= $83
-            ld hl, NES_RAM + $83
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            pop hl
-            inc e
+            jr .ts
+.ta:        add a, c
+.ts:        ld [de], a
+            ld a, e
+            add a, 4
+            ld e, a
+            cp 25
+            jr nz, .tl
+            ld a, l                         ; (NES $7E / $7F: the tile pointer)
+            sub 6
+            ld [NES_RAM + $7E], a
+            ld a, h
+            sbc a, 0
+            add a, $40
+            ld [NES_RAM + $7F], a
+            ld a, [NES_RAM + $90]
+            ld c, a
+            ld b, 0
+            ld a, [NES_RAM + $91]
+            and a
+            ld hl, $4000 + $926B - $8000
+            jr z, .t2
+            ld hl, $4000 + $9280 - $8000
+.t2:        add hl, bc
+            ld a, [hl]
+            add a, a
+            ld c, a
+            ld hl, $4000 + $91CB - $8000
+            add hl, bc
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, h
+            sub $40
+            ld h, a                         ; HL = position / flip data (GB)
+            ld de, $B300
             ld a, [NES_RAM + $98]           ; back attack gets an h-flip ($90D2: $78C3 = $88)
             and a
-            jr z, .nb
+            jr z, .pl
             ld a, [$B8C3]
             cp $88
-            jr nz, .nb
-            push hl                         ; x = 248 - (x + $8C), flip
-            ld hl, NES_RAM + $8C
-            ld a, [de]
+            jr z, .pb
+.pl:        ldh a, [n9_y]                   ; y += $8E
             add a, [hl]
+            inc hl
+            ld [de], a
+            inc e
+            inc hl                          ; (tile: done above)
+            inc e
+            ldh a, [n9_at]                  ; attributes |= $83
+            or [hl]
+            inc hl
+            ld [de], a
+            inc e
+            ldh a, [n9_x]                   ; x += $8C
+            add a, [hl]
+            inc hl
+            ld [de], a
+            inc e
+            ld a, e
+            cp 24
+            jr nz, .pl
+            jr .cp
+.pb:        ldh a, [n9_y]                   ; (back attack: x = 248 - (x + $8C), h-flip)
+            add a, [hl]
+            inc hl
+            ld [de], a
+            inc e
+            inc hl
+            inc e
+            ldh a, [n9_at]
+            or [hl]
+            xor $40
+            inc hl
+            ld [de], a
+            inc e
+            ldh a, [n9_x]
+            add a, [hl]
+            inc hl
             cpl
             add a, $F9
             ld [de], a
-            pop hl
-            dec e
-            ld a, [de]
-            xor $40
-            ld [de], a
             inc e
-            jr .nx
-.nb:        push hl                         ; x += $8C
-            ld hl, NES_RAM + $8C
-            ld a, [de]
-            add a, [hl]
-            ld [de], a
-            pop hl
-.nx:        inc e
-            dec c
-            jr nz, .lp
-            ldh a, [code_bank]
+            ld a, e
+            cp 24
+            jr nz, .pb
+.cp:        ldh a, [code_bank]
             ld [MBC5_BANKL], a
             ld a, [NES_RAM + $C8]           ; buffer -> $0200 + $C8 (X wraps in the page)
             ld e, a
             ld d, high(NES_RAM + $200)
             ld hl, $B300
-            ld c, 24
+            ld c, 12
 .c2:        ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
             ld [de], a
             inc e
             dec c

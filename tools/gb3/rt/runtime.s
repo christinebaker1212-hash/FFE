@@ -123,6 +123,9 @@ nt_y:       ds 1
 cp_dl:      ds 1                            ; rt_copy_n: destination (GB), count
 cp_dh:      ds 1
 cp_n:       ds 1
+n9_y:       ds 1                            ; nat_9111: y offset, attributes, x offset
+n9_at:      ds 1
+n9_x:       ds 1
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors

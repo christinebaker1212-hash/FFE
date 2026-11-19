@@ -548,9 +548,11 @@ class Emitter:
         g = gb_ram(i.arg); reg = 'e' if r == 'X' else 'c'; pair = 'de' if r == 'X' else 'bc'
         lab = 'fl_%s_%04X' % (i.space, i.addr)
         tmp = 'b' if r == 'X' else 'd'               # (B / D: 0 again after)
+        # (count = n - index, 0 = 256 as on the NES; the index register counts down)
         self.o('ld hl, $%04X' % g, 'add hl, %s' % pair, 'ld %s, a' % tmp,
-               '%s:' % lab, 'ld a, %s' % tmp, 'ld [hl+], a', 'inc %s' % reg, 'ld a, %s' % reg,
-               'cp $%02X' % k.arg, 'jr nz, %s' % lab, 'ld a, %s' % tmp, 'ld %s, 0' % tmp,
+               'ld a, $%02X' % k.arg, 'sub %s' % reg, 'ld %s, a' % reg, 'ld a, %s' % tmp,
+               '%s:' % lab, 'ld [hl+], a', 'dec %s' % reg, 'jr nz, %s' % lab,
+               'ld %s, $%02X' % (reg, k.arg), 'ld %s, 0' % tmp,
                'ld hl, nzv', 'ld [hl], 0', 'scf')
         self.jump(None, (i.space, i.addr + 8))
         return True
