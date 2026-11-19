@@ -138,6 +138,48 @@ def battle_fit(nes_path, out):
     p = os.path.join(out, 'ff2_mock5_battle_fit.png'); sheet.save(p); return p
 
 
+def battle_lists(nes_path, out):
+    """Battle magic list and Gear window (the NES: 21 x 8 windows; the GB bottom window has
+    4 lines). Magic: two columns (pen x 17 / 89, hand at x 0 / 72), three rows a page, the
+    MP line ("MP 5/5", "MP Cost 2") on line 4; moving past the last row turns the page.
+    Gear: Right Hand + weapon, Left Hand + weapon, Items + item 1, item 2 below it (the
+    labels and names as translated, only the line breaks change)."""
+    f = nes_battle_frame(nes_path)
+    enemies = dmg(f.crop((20, 48, 160, 144)))
+    def base():
+        s = Screen(bg=3); s.im.paste(enemies, (0, 0))
+        a = f.crop((200, 44, 256, 150))
+        import numpy as np
+        arr = np.array(f).astype(int)
+        for k, y0 in enumerate((45, 72, 99, 126)):
+            band = arr[y0:y0 + 24, 200:256]
+            xs = np.nonzero((band.sum(axis=2) > 40).any(axis=0))[0]
+            if len(xs):
+                x0 = 200 + xs.min(); s.im.paste(dmg(f.crop((x0, y0, x0 + 16, y0 + 24))), (144 if x0 >= 220 else 140, 24 * k))
+        s.window(0, 12, 20, 6)
+        return s
+    shots = []
+    s = base()
+    spells = [('Fire', 3), ('Cure', 2), ('Blizzard', 1), ('Thunder', 1), ('Toad', 1), ('Life', 1)]
+    for i, (n, lv) in enumerate(spells):
+        x = 17 if i % 2 == 0 else 89; y = (13 + i // 2) * 8
+        w = _pt(s, 0, y, n, None) if False else None
+        s.ptext(0, 13 + i // 2, n, px=x)
+        lvx = x + s.pwidth(n) + 4
+        _pt(s, lvx, y, str(lv), DIG3)
+    _pt(s, 17, 16 * 8, 'MP'); _pt(s, 31, 16 * 8, '5/5', DIG3); _pt(s, 89, 16 * 8, 'MP Cost'); _pt(s, 89 + s.pwidth('MP Cost') + 4, 16 * 8, '2', DIG3)
+    _hand(s, -2, 13 * 8 - 4, HAND16); shots.append(s)
+    s = base()
+    for i, (lab, item) in enumerate([('Right Hand', 'Broadsword'), ('Left Hand', 'Buckler'), ('Items', 'Potion'), ('', 'Diamond Gauntlets')]):
+        if lab: s.ptext(0, 13 + i, lab, px=17)
+        s.ptext(0, 13 + i, item, px=62)
+    _hand(s, -2, 13 * 8 - 4, HAND16); shots.append(s)
+    sheet = Image.new('RGB', (168 * len(shots) - 8, 144), (255, 255, 255))
+    for k, s in enumerate(shots): sheet.paste(s.im, (k * 168, 0))
+    sheet = sheet.resize((sheet.width * 2, 288), Image.NEAREST)
+    p = os.path.join(out, 'ff2_mock6_battle_lists.png'); sheet.save(p); return p
+
+
 def nes_frame(nes_path, frame):
     from cynes import NES
     import firstdiff as fd
@@ -264,3 +306,4 @@ if __name__ == '__main__':
     print(main_menu(sys.argv[2]))
     print(main_menu_portraits(sys.argv[1], sys.argv[2]))
     print(battle_fit(sys.argv[1], sys.argv[2]))
+    print(battle_lists(sys.argv[1], sys.argv[2]))
