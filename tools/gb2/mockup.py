@@ -476,6 +476,38 @@ def sub_screens(nes_path, out):
     p = os.path.join(out, 'ff2_mock10_subscreens.png'); sheet.save(p); return p
 
 
+def target_select(nes_path, out):
+    """Item / spell use on the field (NES: the four member windows plus a description window
+    at the bottom, NES rows 21-28). GB: description window (0,0,20,12): up to 8 lines of 18
+    (the longest, the mallet's, has 8); party window (0,12,20,6): one line per member: name,
+    HP current/max and MP current/max in 3-px digits; an afflicted member's status word in
+    place of MP. Hand at the screen edge on the chosen line."""
+    import textwrap
+    shots = []
+    for txt, party in (("Medicine that restores HP. On whom will you use it?",
+                        [('AAAAAA', 30, 30, 5, 5, ''), ('WBBBr-', 12, 20, 5, 5, 'Poison'), ('1jigLK', 40, 40, 5, 5, ''),
+                         ('Minwu', 9999, 9999, 999, 999, '')]),
+                       ("When someone has forgotten their magic, give their head a jolt with this mallet and it comes back. On whom will you use it?",
+                        [('AAAAAA', 30, 30, 5, 5, ''), ('WBBBr-', 20, 20, 5, 5, 'Forgot'), ('1jigLK', 0, 40, 5, 5, 'Dead'),
+                         ('', 0, 0, 0, 0, '')])):
+        s = Screen(bg=3)
+        s.window(0, 0, 20, 12)
+        for i, l in enumerate(textwrap.wrap(txt, 18)): s.text(1, 1 + i, l)
+        s.window(0, 12, 20, 6)
+        for i, (n, hp, mx, mp, mm, st) in enumerate(party):
+            if not n: continue
+            y = 13 + i
+            s.text(1, y, n)
+            h = '%d/%d' % (hp, mx); _pt(s, 96 - s.pwidth(h, DIG3), y * 8, h, DIG3)
+            if st: s.text(13, y, st[:6].rjust(6)[-6:])
+            else: m = '%d/%d' % (mp, mm); _pt(s, 150 - s.pwidth(m, DIG3), y * 8, m, DIG3)
+        _hand(s, -9, 14 * 8 - 4, HAND16); shots.append(s)
+    sheet = Image.new('RGB', (168 * 2 - 8, 144), (255, 255, 255))
+    for k, s in enumerate(shots): sheet.paste(s.im, (k * 168, 0))
+    sheet = sheet.resize((sheet.width * 2, 288), Image.NEAREST)
+    p = os.path.join(out, 'ff2_mock11_target.png'); sheet.save(p); return p
+
+
 if __name__ == '__main__':
     os.makedirs(sys.argv[2], exist_ok=True)
     print(battle(sys.argv[1], sys.argv[2]))
@@ -488,3 +520,4 @@ if __name__ == '__main__':
     print(keyword_windows(sys.argv[1], sys.argv[2]))
     print(main_menu_bg(sys.argv[1], sys.argv[2]))
     print(sub_screens(sys.argv[1], sys.argv[2]))
+    print(target_select(sys.argv[1], sys.argv[2]))

@@ -334,7 +334,21 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   Checked: Gambatte CGB and DMG shots (box 24 px, no black column); random seed 1, 30000
   frames: 29452 waits identical; mGBA SGB shot: box at the portrait's width too. Stubs from
   `$2560` (bank 0 runtime grew; they end near `$38E0`, colour tables at `$3A00`).
-- Sub-screens (items, magic, equip, status, save) still to re-lay out.
+- Main-menu code moved to its own bank 24 (`bank24()`: MENU_SRC + the renderer core of
+  B23_SRC + glyph tables + menu data; bank 23 was full). Entry `gbm` at `$F8F0` switches to
+  bank 24 itself and returns to bank 14.
+- **Items screen** (owner approved `ff2_mock10`): menu windows 6 (title, one row) and 7
+  (list NES (1,3,20,16): 14 rows), the list string 37 from column 0 (18 letters).
+- **Item / spell target** (owner approved `ff2_mock11`): description window 16 at NES
+  (1,1,20,12), system strings 43-62 re-wrapped at 18, one row per line; party lines
+  (`gm_tparty`, NES (1,13,20,6): name, HP cur/max (small digits, tiles $31+9k), MP cur/max
+  ($36+9k) or the status word) instead of the member windows (`b14:A909/A8E5/AC60`); the
+  member cursor table `b14:AEAA` now holds the target lines, the main menu's character
+  select gets its own table (`mm_sel` at `b14:AD3C/AD4B/AD5A`); the list's hand hidden while
+  choosing. Hooks in `b14:AEC8` (the original item menu body, dead since insert.py's).
+  Checked (NES variant, Gambatte): Potion on a member (5/30 -> 30/30); firstdiff with
+  items poked: 16506 waits identical; random seed 1, 30000 frames: 29452 waits identical.
+- Next: Magic, Equip, Status (approved), save menu.
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).

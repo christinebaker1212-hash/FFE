@@ -83,8 +83,7 @@ RAM = dict(MV=0x75F0, GBIDX=0x7FDF, GBRB=0x7FE0, GBPOOL=0x7FE1, VX=0x7FE2, VN=0x
 ENTRIES = [('gb_party', 0x0C, 0x912A), ('gb_names', 0x0C, 0x910D), ('gb_names', 0x0C, 0x981D),
            ('gb_cmds', 0x0C, 0x982C), ('gb_msgopen', 0x05, 0xAA57), ('gb_msgclose', 0x05, 0xAB4F),
            ('gb_magic', 0x0C, None), ('gb_magcost', 0x0C, None), ('gb_gear', 0x0C, None),
-           ('gb_lootscr', 0x05, None), ('gb_lootf', 0x05, None), ('gb_lootnav', 0x05, None),
-           ('gb_menu', 0x0E, None)]            # (index 12: entry gbm at $F8F0, A = sub-command)
+           ('gb_lootscr', 0x05, None), ('gb_lootf', 0x05, None), ('gb_lootnav', 0x05, None)]
 # (None: called from a patched JSR, not replacing a routine)
 
 ENT_SRC = '''
@@ -1970,6 +1969,286 @@ gb_lootnav:             ; b5 loot menu: right / left / down / up (replaces b5:A1
 .x2:
     rts
 
+
+BIT:    .db $80, $40, $20, $10, $08, $04, $02, $01
+POW:    .db <1000, <100, <10, <1
+POWH:   .db >1000, >100, >10, >1
+STATOFS: .db $7A, $AA, $DA, $0A
+STATHI:  .db 0, 0, 0, 1
+'''
+
+
+def glyph_tables(rom=None):
+    """glyph data for the small-font renderer (bank 23): code -> width, columns (bit 7 =
+    top row); letters condensed (tools/latin_font.py COND, else G), 3-px digits at codes
+    $10-$19, small '/' at $1A (FF1's battle digits)"""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2'))
+    from latin_font import _glyph_cols, COND, G
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('ff2insert', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2', 'insert.py'))
+    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
+    DIG3 = {'0': ["###", "#.#", "#.#", "#.#", "#.#", "#.#", "###"], '1': [".#.", "##.", ".#.", ".#.", ".#.", ".#.", "###"],
+            '2': ["###", "..#", "..#", "###", "#..", "#..", "###"], '3': ["###", "..#", "..#", ".##", "..#", "..#", "###"],
+            '4': ["#.#", "#.#", "#.#", "###", "..#", "..#", "..#"], '5': ["###", "#..", "#..", "###", "..#", "..#", "###"],
+            '6': ["###", "#..", "#..", "###", "#.#", "#.#", "###"], '7': ["###", "..#", "..#", ".#.", ".#.", ".#.", ".#."],
+            '8': ["###", "#.#", "#.#", "###", "#.#", "#.#", "###"], '9': ["###", "#.#", "#.#", "###", "..#", "..#", "###"],
+            '/': ["..#", "..#", ".#.", ".#.", ".#.", "#..", "#.."]}
+    glyph = {}
+    for ch, code in ins.ENC.items():
+        if ch == ' ': continue
+        cols = _glyph_cols(ch, COND if ch in COND else G)
+        glyph[code] = [sum(b << (7 - r) for r, b in enumerate(c)) for c in cols]
+    for i, ch in enumerate('0123456789/'):
+        art = DIG3[ch]
+        glyph[0x10 + i] = [sum((1 << (7 - (r + 1))) for r in range(7) if art[r][c] == '#') for c in range(3)]
+    arrow = ["......", "...#..", "....#.", "######", "....#.", "...#..", "......"]   # FF1's battle arrow
+    glyph[0x1B] = [sum((1 << (7 - (r + 1))) for r in range(7) if arrow[r][c] == '#') for c in range(6)]
+    from latin_font import NARROW
+    for i, ch in enumerate(sorted(NARROW)):          # narrow letters (long item names): $20 + i
+        glyph[NARROW_CODE + i] = [sum(b << (7 - r) for r, b in enumerate(c)) for c in _glyph_cols(ch, NARROW)]
+    if rom is not None:                              # item type icons $6E-$75: the ROM font's
+        b9 = rom[HDR + 9 * BANK:HDR + 10 * BANK]     #   tiles (bank 9 $8320, plane 0 = ink),
+        for t in range(0x6E, 0x76):                  #   empty columns trimmed
+            rows = b9[0x0320 + 16 * t:0x0320 + 16 * t + 8]
+            cols = [sum(((rows[r] >> (7 - c)) & 1) << (7 - r) for r in range(8)) for c in range(8)]
+            while cols and not cols[0]: cols.pop(0)
+            while cols and not cols[-1]: cols.pop()
+            glyph[t] = cols
+    glyph[THIN_SPACE] = [0]                          # 1-px space (long names, see loot_data)
+    return glyph
+
+
+NARROW_CODE = 0x20
+THIN_SPACE = 0x3F
+
+
+def narrow_codes():
+    """English code -> its narrow letter's code (glyph_tables)"""
+    from latin_font import NARROW
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('ff2insert', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2', 'insert.py'))
+    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
+    return {ins.ENC[ch]: NARROW_CODE + i for i, ch in enumerate(sorted(NARROW))}
+
+
+def names_data(rom):
+    """monster names for the names window: the English strings (bank 21 table $AC44, as
+    insert.py placed them), and per monster the byte index of the space to wrap at when the
+    name is wider than the 48-px line (0: fits; $FF: one word, drawn squeezed)"""
+    from latin_font import _glyph_cols, COND, G
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('ff2insert', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2', 'insert.py'))
+    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
+    dec = {v: k for k, v in ins.ENC.items()}
+    def width(codes):
+        t = 0
+        for i, c in enumerate(codes):
+            if i: t += 1
+            ch = dec.get(c, ' ')
+            t += 2 if ch == ' ' else len(_glyph_cols(ch, COND if ch in COND else G))
+        return t
+    b21 = rom[HDR + 21 * BANK:HDR + 22 * BANK]
+    strs, wrap, squeeze = [], [], []
+    for m in range(128):
+        p = b21[0x2C44 + 2 * m] | b21[0x2C44 + 2 * m + 1] << 8
+        o = p - 0x8000; e = b21.index(0, o)
+        cs = bytes(b21[o:e]); strs.append(cs)
+        k, q = 0, 0
+        if width(cs) > 48:
+            sq = lambda c: width(c) - max(0, len(c) - 1)       # squeezed: no letter gaps
+            sp = [i for i, c in enumerate(cs) if c == 0xFF and width(cs[:i]) <= 48]
+            if sp:
+                k = sp[-1]
+                if width(cs[k + 1:]) > 48:
+                    q = 2; assert sq(cs[k + 1:]) <= 48, cs      # second line squeezed
+            else:
+                q = 1; assert sq(cs) <= 48, cs                  # one word: squeezed
+        wrap.append(k); squeeze.append(q)
+    out = '\nNWRAP:\n' + ''.join('    .db %s\n' % ', '.join(str(v) for v in wrap[i:i + 16]) for i in range(0, 128, 16))
+    out += 'NSQ:\n' + ''.join('    .db %s\n' % ', '.join(str(v) for v in squeeze[i:i + 16]) for i in range(0, 128, 16))
+    out += 'NPLO:\n' + ''.join('    .db %s\n' % ', '.join('<NAME%d' % k for k in range(i, i + 16)) for i in range(0, 128, 16))
+    out += 'NPHI:\n' + ''.join('    .db %s\n' % ', '.join('>NAME%d' % k for k in range(i, i + 16)) for i in range(0, 128, 16))
+    for m, cs in enumerate(strs):
+        out += 'NAME%d: .db %s\n' % (m, ', '.join('$%02X' % c for c in cs + b'\0'))
+    b10 = rom[HDR + 10 * BANK:HDR + 11 * BANK]   # names (items, spells; bank 10 table $8200)
+    out += 'NMLO:\n' + ''.join('    .db %s\n' % ', '.join('<NM%d' % k for k in range(i, i + 16)) for i in range(0, 256, 16))
+    out += 'NMHI:\n' + ''.join('    .db %s\n' % ', '.join('>NM%d' % k for k in range(i, i + 16)) for i in range(0, 256, 16))
+    for k in range(256):
+        p = b10[0x0200 + 2 * k] | b10[0x0200 + 2 * k + 1] << 8
+        o = p - 0x8000; cs = bytes(b10[o:b10.index(0, o)])
+        out += 'NM%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
+    def bmsg(k):                                # battle_msgs k (bank 21 $B295)
+        p = b21[0x3295 + 2 * k] | b21[0x3295 + 2 * k + 1] << 8
+        o = p - 0x8000; return bytes(b21[o:b21.index(0, o)])
+    out += 'COSTLAB: .db %s\n' % ', '.join('$%02X' % c for c in bmsg(7) + b'\0')
+    for k, lab in enumerate((bmsg(4), bmsg(5), bmsg(6), b'')):     # Right Hand, Left Hand, Items
+        out += 'GLAB%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in lab + b'\0'))
+    out += 'GLABLO: .db <GLAB0, <GLAB1, <GLAB2, <GLAB3\nGLABHI: .db >GLAB0, >GLAB1, >GLAB2, >GLAB3\n'
+    out += 'NOMAGIC: .db %s\n' % ', '.join('$%02X' % c for c in bmsg(8) + b'\0')
+    out += 'MPLAB: .db %s\n' % ', '.join('$%02X' % c for c in bytes([ins.ENC['M'], ins.ENC['P']]) + b'\0')
+    cmds = []                                   # battle commands: battle_msgs 0-3 (bank 21 $B295)
+    for k in range(4):
+        p = b21[0x3295 + 2 * k] | b21[0x3295 + 2 * k + 1] << 8
+        o = p - 0x8000; cmds.append(bytes(b21[o:b21.index(0, o)]))
+        assert width(cmds[-1]) <= 48 - 8, cmds[-1]
+    out += 'CMDLO: .db %s\nCMDHI: .db %s\n' % (', '.join('<CMD%d' % k for k in range(4)), ', '.join('>CMD%d' % k for k in range(4)))
+    for k, cs in enumerate(cmds):
+        out += 'CMD%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
+    return out
+
+
+def loot_data(rom, gw):
+    """treasure screen tables: cells (tiles, NES row / column, length) and, per item, the
+    string to draw in a 64-px cell: the English name, or for a wider one the name in the
+    narrow letters with the letter gaps after its last LGAP-1 characters dropped"""
+    b10 = rom[HDR + 10 * BANK:HDR + 11 * BANK]
+    nar = narrow_codes()
+    cells = [(8 * k, 2 + k // 2, 2 + 10 * (k % 2), 8) for k in range(8)]
+    cells += [(0x40 + 8 * j, 7 + j // 2, 2 + 10 * (j % 2), 8) for j in range(20)]
+    cells += [(0xE0, 1, 2, 8), (0xE8, 1, 12, 5), (0xEC, 1, 17, 3)]      # .. Treasure .., Drop, Done
+    def ink(cs, gap):                       # pixel columns used (as vfit draws it)
+        x, last, n = 0, 0, len(cs)
+        for i, c in enumerate(cs):
+            if gw[c] == 0: x += 2; continue
+            x += gw[c]; last = x
+            if not (n - gap <= i < n - 1): x += 1
+        return last
+    out = ''
+    for nm, k in (('LCT', 0), ('LCR', 1), ('LCC', 2), ('LCN', 3)):
+        out += nm + ': .db ' + ', '.join(str(c[k]) for c in cells) + '\n'
+    out += 'LTITLE: .db $E8, $E9, $EA\n'
+    lo, hi, gaps, fits = [], [], [], ''
+    for k in range(256):
+        p = b10[0x0200 + 2 * k] | b10[0x0200 + 2 * k + 1] << 8
+        o = p - 0x8000; cs = bytes(b10[o:b10.index(0, o)])
+        if ink(cs, 0) <= 64:
+            lo.append('<NM%d' % k); hi.append('>NM%d' % k); gaps.append(0); continue
+        cs = bytes(nar.get(c, c) for c in cs)
+        if ink(cs, len(cs)) > 64:           # still too wide: thin spaces (1 px where squeezed)
+            cs = bytes(THIN_SPACE if c == 0xFF else c for c in cs)
+        g = 0
+        while ink(cs, g) > 64:
+            g += 1
+            assert g <= len(cs), k
+        lo.append('<FIT%d' % k); hi.append('>FIT%d' % k); gaps.append(g)
+        fits += 'FIT%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
+    for nm, v in (('LFLO', lo), ('LFHI', hi), ('LGAP', [str(x) for x in gaps])):
+        out += nm + ':\n' + ''.join('    .db %s\n' % ', '.join(v[i:i + 16]) for i in range(0, 256, 16))
+    # battle status words (text ids $F0-$FD, script/ff2/system.json 240-253, the English the
+    # NES build draws): 30 px in the party line
+    import json, importlib.util
+    spec = importlib.util.spec_from_file_location('ff2insert', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2', 'insert.py'))
+    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
+    words = {e['id']: e['en'] for e in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'script', 'ff2', 'system.json'))) if 240 <= e['id'] <= 253}
+    sl, sh, sg = [], [], []
+    for k in range(14):
+        cs = bytes(ins.ENC[ch] for ch in words.get(240 + k, ''))
+        g = 0
+        if ink(cs, 0) > 30:
+            cs = bytes(nar.get(c, c) for c in cs)
+            while ink(cs, g) > 30:
+                g += 1
+                assert g <= len(cs), words[240 + k]
+        fits += 'ST%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
+        sl.append('<ST%d' % k); sh.append('>ST%d' % k); sg.append(str(g))
+    out += 'STLO: .db %s\nSTHI: .db %s\nSTGAP: .db %s\n' % (', '.join(sl), ', '.join(sh), ', '.join(sg))
+    return out + fits
+
+
+def menu_data(rom):
+    """main menu tables from the user's ROM: the 12 portraits (bank 9, pointers fix:E76A,
+    192 bytes each), their palette indices (b14:890B), the status words of text ids
+    $F6-$FD (bank 10 table $8400, 5 cells), and the attribute quads of the portrait boxes"""
+    import importlib.util
+    ins = _insert_module()
+    b9 = rom[HDR + 9 * BANK:HDR + 10 * BANK]
+    fix = rom[HDR + 31 * BANK:HDR + 32 * BANK]
+    b10 = rom[HDR + 10 * BANK:HDR + 11 * BANK]
+    b14 = rom[HDR + 14 * BANK:HDR + 15 * BANK]
+    out = 'PORTG:\n'
+    for i in range(12):
+        o = fix[0x276A + i] * 16
+        out += ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in b9[o + j:o + j + 16]) for j in range(0, 192, 16))
+    out += 'PGLO: .db %s\nPGHI: .db %s\n' % (', '.join('<(PORTG+%d)' % (192 * i) for i in range(12)),
+                                              ', '.join('>(PORTG+%d)' % (192 * i) for i in range(12)))
+    out += 'PALID: .db %s\n' % ', '.join('$%02X' % v for v in b14[0x090B:0x0917])
+    stw = []
+    for k in range(8):
+        i = 0xF6 + k
+        p = b10[0x0400 + 2 * i] | b10[0x0400 + 2 * i + 1] << 8
+        o = p - 0x8000; cs = bytes(b10[o:b10.index(0, o)])
+        assert len(cs) <= 5, cs
+        stw += list(cs) + [0xFF] * (5 - len(cs))
+    out += 'STW: .db %s\n' % ', '.join('$%02X' % v for v in stw)
+    qi, qs, qm = [], [], []
+    for k in range(4):
+        for qy in (1 + 2 * k, 2 + 2 * k):
+            for qx in (1, 2):
+                sh = ((qy & 1) * 2 + (qx & 1)) * 2
+                qi.append((qy >> 1) * 8 + (qx >> 1)); qs.append(sh); qm.append(~(3 << sh) & 0xFF)
+    for nm, v in (('QIDX', qi), ('QSH', qs), ('QMSK', qm)):
+        out += '%s: .db %s\n' % (nm, ', '.join(str(x) for x in v))
+    return out, dict(CHH=ins.ENC['H'], CHM=ins.ENC['M'], CHP=ins.ENC['P'])
+
+
+def bank23(rom, L, extra=''):
+    """bank 23 source + data from the user's ROM (first monster tiles, boss tilemaps, frame
+    tiles) and the glyph tables"""
+    b11 = rom[HDR + 11 * BANK:HDR + 12 * BANK]
+    first = b11[0x9FA5 - 0x8000:0x9FA5 - 0x8000 + 9]
+    boss = []
+    for k in range(6):                                  # boss tilemaps (b11:8DDE, 144 each)
+        used = bytearray(32)
+        for t in b11[0x8DDE - 0x8000 + 144 * k:0x8DDE - 0x8000 + 144 * (k + 1)]: used[t >> 3] |= 0x80 >> (t & 7)
+        boss.append(bytes(used))
+    b9 = rom[HDR + 9 * BANK:HDR + 10 * BANK]
+    frame = b''.join(b9[0x0320 + 16 * t:0x0320 + 16 * t + 16] for t in range(0xF7, 0xFF))
+    g = glyph_tables(rom)
+    gw = bytes(len(g.get(c, [])) for c in range(256))
+    data, offs = bytearray(), []
+    for c in range(256):
+        offs.append(len(data)); data += bytes(g.get(c, []))
+    nsrc = names_data(rom) + loot_data(rom, gw)
+    src = B23_SRC.replace('GBTAB', ', '.join(name for name, rb, nes in ENTRIES)) + nsrc + extra + '\nFIRST: .db ' + ', '.join('$%02X' % v for v in first)
+    src += '\nBOSSUSED:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in b) for b in boss)
+    src += 'FRAMEGFX:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in frame[i:i + 16]) for i in range(0, 128, 16))
+    src += 'GW:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in gw[i:i + 16]) for i in range(0, 256, 16))
+    src += 'GLYPHS:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in data[i:i + 16]) for i in range(0, len(data), 16))
+    src += 'GOFF:\n' + ''.join('    .db %s\n' % ', '.join('<(GLYPHS+%d)' % o for o in offs[i:i + 16]) for i in range(0, 256, 16))
+    src += 'GHI:\n' + ''.join('    .db %s\n' % ', '.join('>(GLYPHS+%d)' % o for o in offs[i:i + 16]) for i in range(0, 256, 16))
+    return asm(src, syms=dict(RAM, BUF=0x5E40, **L))
+
+
+def glyph_src(rom):
+    """the small-font glyph tables (GW, GLYPHS, GOFF, GHI)"""
+    g = glyph_tables(rom)
+    gw = bytes(len(g.get(c, [])) for c in range(256))
+    data, offs = bytearray(), []
+    for c in range(256):
+        offs.append(len(data)); data += bytes(g.get(c, []))
+    src = 'GW:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in gw[i:i + 16]) for i in range(0, 256, 16))
+    src += 'GLYPHS:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in data[i:i + 16]) for i in range(0, len(data), 16))
+    src += 'GOFF:\n' + ''.join('    .db %s\n' % ', '.join('<(GLYPHS+%d)' % o for o in offs[i:i + 16]) for i in range(0, 256, 16))
+    src += 'GHI:\n' + ''.join('    .db %s\n' % ', '.join('>(GLYPHS+%d)' % o for o in offs[i:i + 16]) for i in range(0, 256, 16))
+    return src
+
+
+def bank24(rom):
+    """bank 24: the main menu (MENU_SRC) with the renderer core of B23_SRC (vupload ..
+    ntwin), its tables and the menu data"""
+    core = B23_SRC[B23_SRC.index('vupload:'):B23_SRC.index('frames:')] + \
+        B23_SRC[B23_SRC.index('tileaddr:'):B23_SRC.index('; ---- party window')]
+    tabs = B23_SRC[B23_SRC.index('BIT:    .db'):]
+    mdata, msyms = menu_data(rom)
+    src = '    org $8000\n    jmp gb_menu\n' + core + MENU_SRC + tabs + mdata + glyph_src(rom)
+    return asm(src, syms=dict(RAM, **msyms))
+
+
+GBM = [None]            # the main menu's entry (set by battle(), used by main_menu())
+
+# main menu code (bank 24, entry gbm at $F8F0: A = sub-command; the renderer core of
+# B23_SRC assembled into this bank as well)
+MENU_SRC = r'''
 ; ---- field main menu (owner-approved revision of option A, ff2_mock9 + portraits inside
 ; the frame): camera (1, 1): GB (x, y) = NES (x+1, y+1). Party window NES (1,1,12,18), per
 ; member k (rows 2+4k..5+4k): portrait box cols 2-4 (background tiles $01+12k..; its 2 x 2
@@ -1982,7 +2261,7 @@ gb_lootnav:             ; b5 loot menu: right / left / down / up (replaces b5:A1
 gb_menu:
     lda $57
     pha
-    lda #23             ; (the music update's bank restore comes back here)
+    lda #24             ; (the music update's bank restore comes back here)
     sta $57
     lda #0
     sta TBLHI
@@ -2003,7 +2282,7 @@ gb_menu:
     rts
 .go:
     jmp ($0000)
-MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit
+MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit, gm_tparty
 
 gm_exit:
     lda #6
@@ -2348,6 +2627,262 @@ gm_party:               ; b14:AD0A (replaces the four member windows b14:B396)
     inx
     bne .rs
     rts
+gm_tparty:              ; item / spell target (b14:A909, A8E5, AC60 instead of b14:B396):
+    lda #1              ;   window NES (1,13,20,6), member k on row 14+k: name cols 2-7,
+    sta MSCR            ;   HP cur/max cols 8-12 (tiles $31+9k..), MP cols 15-18 (tiles
+    ldx #0              ;   $36+9k..) or the status word cols 14-18
+.sv:
+    lda $7800,x
+    sta $7600,x
+    inx
+    bne .sv
+    ldx #7
+.ft:
+    txa
+    clc
+    adc #$F7
+    sta FTILE,x
+    dex
+    bpl .ft
+    lda #$FF
+    sta BLANKT
+    ldx #0
+.cl:
+    sta $7700,x
+    inx
+    cpx #72
+    bne .cl
+    lda #0
+    sta VFILL
+    sta NL
+.mem:
+    lda NL
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    sta VCX
+    tax
+    lda $6235,x
+    bpl .shown
+    jmp .next
+.shown:
+    lda NL              ; buffer row: 18 * k
+    asl a
+    sta VSV
+    asl a
+    asl a
+    asl a
+    clc
+    adc VSV
+    sta VSV
+    tay
+    lda #6
+    sta VCNT
+.nm:
+    lda $6102,x
+    sta $7700,y
+    inx
+    iny
+    dec VCNT
+    bne .nm
+    lda NL              ; tiles: HP $31 + 9k (5), MP $36 + 9k (4)
+    asl a
+    asl a
+    asl a
+    clc
+    adc NL
+    clc
+    adc #$31
+    sta VT
+    lda VSV
+    clc
+    adc #6
+    tay
+    ldx #5
+.ht:
+    lda VT
+    sta $7700,y
+    inc VT
+    iny
+    dex
+    bne .ht
+    ldx VCX
+    lda $6101,x         ; status: the word (cols 12-16 of the buffer row), else MP
+    beq .mp
+    ldy #7
+.sb:
+    asl a
+    bcs .st0
+    dey
+    bne .sb
+.st0:
+    tya
+    beq .mp
+    sta VT
+    asl a
+    asl a
+    clc
+    adc VT
+    tax
+    lda VSV
+    clc
+    adc #12
+    tay
+    lda #5
+    sta VCNT
+.sw:
+    lda STW,x
+    sta $7700,y
+    inx
+    iny
+    dec VCNT
+    bne .sw
+    jmp .hp
+.mp:
+    lda VSV
+    clc
+    adc #13
+    tay
+    lda VT              ; (VT = $36 + 9k)
+    ldx #4
+.mt:
+    sta $7700,y
+    clc
+    adc #1
+    iny
+    dex
+    bne .mt
+    ldx VCX
+    lda $610C,x
+    sta MV
+    lda $610D,x
+    sta MV+1
+    lda $610E,x
+    sta MV+2
+    lda $610F,x
+    sta MV+3
+    lda #4
+    jsr gm_digits
+    lda NL
+    asl a
+    asl a
+    asl a
+    clc
+    adc NL
+    clc
+    adc #$36
+    jsr gm_upn
+.hp:
+    ldx VCX
+    lda $6108,x
+    sta MV
+    lda $6109,x
+    sta MV+1
+    lda $610A,x
+    sta MV+2
+    lda $610B,x
+    sta MV+3
+    lda #5
+    jsr gm_digits
+    lda NL
+    asl a
+    asl a
+    asl a
+    clc
+    adc NL
+    clc
+    adc #$31
+    jsr gm_upn
+.next:
+    inc NL
+    lda NL
+    cmp #4
+    beq .win
+    jmp .mem
+.win:
+    lda #13
+    sta VROW
+    lda #1
+    sta VCOL
+    lda #20
+    sta VW
+    lda #6
+    sta VH
+    lda #$00
+    sta VP
+    lda #$77
+    sta VP+1
+    jsr ntwin
+    ldx #0
+.rs:
+    lda $7600,x
+    sta $7800,x
+    inx
+    bne .rs
+    rts
+gm_digits:              ; A = tiles (VN): "cur/max" (MV, MV+2) right-aligned in them
+    sta VN
+    jsr vclear
+    lda MV+2
+    sta VNUM
+    lda MV+3
+    sta VNUM+1
+    jsr ndig
+    sta NS
+    lda MV
+    sta VNUM
+    lda MV+1
+    sta VNUM+1
+    jsr ndig
+    sta VCNT
+    clc
+    adc NS
+    adc #1
+    asl a
+    asl a
+    sta VT
+    lda VN
+    asl a
+    asl a
+    asl a
+    sec
+    sbc VT
+    sta VT
+    lda VCNT
+    asl a
+    asl a
+    clc
+    adc VT
+    jsr vnum
+    lda #$1A
+    jsr vchar
+    lda MV+2
+    sta VNUM
+    lda MV+3
+    sta VNUM+1
+    lda NS
+    asl a
+    asl a
+    clc
+    adc VX
+    jmp vnum
+gm_upn:                 ; VBUF's VN tiles to tiles A ..
+    ldx #0
+.l:
+    sta NTBUF,x
+    clc
+    adc #1
+    inx
+    cpx VN
+    bne .l
+    lda #<NTBUF
+    sta VP
+    lda #>NTBUF
+    sta VP+1
+    jmp vupload
 gm_up:                  ; VBUF's 6 tiles to tiles A .. A+5
     ldx #0
 .l:
@@ -2614,258 +3149,7 @@ P24L: .db $40, $A0, $10, $E8, $64, $0A, $01
 P24M: .db $42, $86, $27, $03, $00, $00, $00
 P24H: .db $0F, $01, $00, $00, $00, $00, $00
 MBASE: .db 0, 40, 80, 120
-
-BIT:    .db $80, $40, $20, $10, $08, $04, $02, $01
-POW:    .db <1000, <100, <10, <1
-POWH:   .db >1000, >100, >10, >1
-STATOFS: .db $7A, $AA, $DA, $0A
-STATHI:  .db 0, 0, 0, 1
 '''
-
-
-def glyph_tables(rom=None):
-    """glyph data for the small-font renderer (bank 23): code -> width, columns (bit 7 =
-    top row); letters condensed (tools/latin_font.py COND, else G), 3-px digits at codes
-    $10-$19, small '/' at $1A (FF1's battle digits)"""
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2'))
-    from latin_font import _glyph_cols, COND, G
-    import importlib.util
-    spec = importlib.util.spec_from_file_location('ff2insert', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2', 'insert.py'))
-    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
-    DIG3 = {'0': ["###", "#.#", "#.#", "#.#", "#.#", "#.#", "###"], '1': [".#.", "##.", ".#.", ".#.", ".#.", ".#.", "###"],
-            '2': ["###", "..#", "..#", "###", "#..", "#..", "###"], '3': ["###", "..#", "..#", ".##", "..#", "..#", "###"],
-            '4': ["#.#", "#.#", "#.#", "###", "..#", "..#", "..#"], '5': ["###", "#..", "#..", "###", "..#", "..#", "###"],
-            '6': ["###", "#..", "#..", "###", "#.#", "#.#", "###"], '7': ["###", "..#", "..#", ".#.", ".#.", ".#.", ".#."],
-            '8': ["###", "#.#", "#.#", "###", "#.#", "#.#", "###"], '9': ["###", "#.#", "#.#", "###", "..#", "..#", "###"],
-            '/': ["..#", "..#", ".#.", ".#.", ".#.", "#..", "#.."]}
-    glyph = {}
-    for ch, code in ins.ENC.items():
-        if ch == ' ': continue
-        cols = _glyph_cols(ch, COND if ch in COND else G)
-        glyph[code] = [sum(b << (7 - r) for r, b in enumerate(c)) for c in cols]
-    for i, ch in enumerate('0123456789/'):
-        art = DIG3[ch]
-        glyph[0x10 + i] = [sum((1 << (7 - (r + 1))) for r in range(7) if art[r][c] == '#') for c in range(3)]
-    arrow = ["......", "...#..", "....#.", "######", "....#.", "...#..", "......"]   # FF1's battle arrow
-    glyph[0x1B] = [sum((1 << (7 - (r + 1))) for r in range(7) if arrow[r][c] == '#') for c in range(6)]
-    from latin_font import NARROW
-    for i, ch in enumerate(sorted(NARROW)):          # narrow letters (long item names): $20 + i
-        glyph[NARROW_CODE + i] = [sum(b << (7 - r) for r, b in enumerate(c)) for c in _glyph_cols(ch, NARROW)]
-    if rom is not None:                              # item type icons $6E-$75: the ROM font's
-        b9 = rom[HDR + 9 * BANK:HDR + 10 * BANK]     #   tiles (bank 9 $8320, plane 0 = ink),
-        for t in range(0x6E, 0x76):                  #   empty columns trimmed
-            rows = b9[0x0320 + 16 * t:0x0320 + 16 * t + 8]
-            cols = [sum(((rows[r] >> (7 - c)) & 1) << (7 - r) for r in range(8)) for c in range(8)]
-            while cols and not cols[0]: cols.pop(0)
-            while cols and not cols[-1]: cols.pop()
-            glyph[t] = cols
-    glyph[THIN_SPACE] = [0]                          # 1-px space (long names, see loot_data)
-    return glyph
-
-
-NARROW_CODE = 0x20
-THIN_SPACE = 0x3F
-
-
-def narrow_codes():
-    """English code -> its narrow letter's code (glyph_tables)"""
-    from latin_font import NARROW
-    import importlib.util
-    spec = importlib.util.spec_from_file_location('ff2insert', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2', 'insert.py'))
-    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
-    return {ins.ENC[ch]: NARROW_CODE + i for i, ch in enumerate(sorted(NARROW))}
-
-
-def names_data(rom):
-    """monster names for the names window: the English strings (bank 21 table $AC44, as
-    insert.py placed them), and per monster the byte index of the space to wrap at when the
-    name is wider than the 48-px line (0: fits; $FF: one word, drawn squeezed)"""
-    from latin_font import _glyph_cols, COND, G
-    import importlib.util
-    spec = importlib.util.spec_from_file_location('ff2insert', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2', 'insert.py'))
-    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
-    dec = {v: k for k, v in ins.ENC.items()}
-    def width(codes):
-        t = 0
-        for i, c in enumerate(codes):
-            if i: t += 1
-            ch = dec.get(c, ' ')
-            t += 2 if ch == ' ' else len(_glyph_cols(ch, COND if ch in COND else G))
-        return t
-    b21 = rom[HDR + 21 * BANK:HDR + 22 * BANK]
-    strs, wrap, squeeze = [], [], []
-    for m in range(128):
-        p = b21[0x2C44 + 2 * m] | b21[0x2C44 + 2 * m + 1] << 8
-        o = p - 0x8000; e = b21.index(0, o)
-        cs = bytes(b21[o:e]); strs.append(cs)
-        k, q = 0, 0
-        if width(cs) > 48:
-            sq = lambda c: width(c) - max(0, len(c) - 1)       # squeezed: no letter gaps
-            sp = [i for i, c in enumerate(cs) if c == 0xFF and width(cs[:i]) <= 48]
-            if sp:
-                k = sp[-1]
-                if width(cs[k + 1:]) > 48:
-                    q = 2; assert sq(cs[k + 1:]) <= 48, cs      # second line squeezed
-            else:
-                q = 1; assert sq(cs) <= 48, cs                  # one word: squeezed
-        wrap.append(k); squeeze.append(q)
-    out = '\nNWRAP:\n' + ''.join('    .db %s\n' % ', '.join(str(v) for v in wrap[i:i + 16]) for i in range(0, 128, 16))
-    out += 'NSQ:\n' + ''.join('    .db %s\n' % ', '.join(str(v) for v in squeeze[i:i + 16]) for i in range(0, 128, 16))
-    out += 'NPLO:\n' + ''.join('    .db %s\n' % ', '.join('<NAME%d' % k for k in range(i, i + 16)) for i in range(0, 128, 16))
-    out += 'NPHI:\n' + ''.join('    .db %s\n' % ', '.join('>NAME%d' % k for k in range(i, i + 16)) for i in range(0, 128, 16))
-    for m, cs in enumerate(strs):
-        out += 'NAME%d: .db %s\n' % (m, ', '.join('$%02X' % c for c in cs + b'\0'))
-    b10 = rom[HDR + 10 * BANK:HDR + 11 * BANK]   # names (items, spells; bank 10 table $8200)
-    out += 'NMLO:\n' + ''.join('    .db %s\n' % ', '.join('<NM%d' % k for k in range(i, i + 16)) for i in range(0, 256, 16))
-    out += 'NMHI:\n' + ''.join('    .db %s\n' % ', '.join('>NM%d' % k for k in range(i, i + 16)) for i in range(0, 256, 16))
-    for k in range(256):
-        p = b10[0x0200 + 2 * k] | b10[0x0200 + 2 * k + 1] << 8
-        o = p - 0x8000; cs = bytes(b10[o:b10.index(0, o)])
-        out += 'NM%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
-    def bmsg(k):                                # battle_msgs k (bank 21 $B295)
-        p = b21[0x3295 + 2 * k] | b21[0x3295 + 2 * k + 1] << 8
-        o = p - 0x8000; return bytes(b21[o:b21.index(0, o)])
-    out += 'COSTLAB: .db %s\n' % ', '.join('$%02X' % c for c in bmsg(7) + b'\0')
-    for k, lab in enumerate((bmsg(4), bmsg(5), bmsg(6), b'')):     # Right Hand, Left Hand, Items
-        out += 'GLAB%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in lab + b'\0'))
-    out += 'GLABLO: .db <GLAB0, <GLAB1, <GLAB2, <GLAB3\nGLABHI: .db >GLAB0, >GLAB1, >GLAB2, >GLAB3\n'
-    out += 'NOMAGIC: .db %s\n' % ', '.join('$%02X' % c for c in bmsg(8) + b'\0')
-    out += 'MPLAB: .db %s\n' % ', '.join('$%02X' % c for c in bytes([ins.ENC['M'], ins.ENC['P']]) + b'\0')
-    cmds = []                                   # battle commands: battle_msgs 0-3 (bank 21 $B295)
-    for k in range(4):
-        p = b21[0x3295 + 2 * k] | b21[0x3295 + 2 * k + 1] << 8
-        o = p - 0x8000; cmds.append(bytes(b21[o:b21.index(0, o)]))
-        assert width(cmds[-1]) <= 48 - 8, cmds[-1]
-    out += 'CMDLO: .db %s\nCMDHI: .db %s\n' % (', '.join('<CMD%d' % k for k in range(4)), ', '.join('>CMD%d' % k for k in range(4)))
-    for k, cs in enumerate(cmds):
-        out += 'CMD%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
-    return out
-
-
-def loot_data(rom, gw):
-    """treasure screen tables: cells (tiles, NES row / column, length) and, per item, the
-    string to draw in a 64-px cell: the English name, or for a wider one the name in the
-    narrow letters with the letter gaps after its last LGAP-1 characters dropped"""
-    b10 = rom[HDR + 10 * BANK:HDR + 11 * BANK]
-    nar = narrow_codes()
-    cells = [(8 * k, 2 + k // 2, 2 + 10 * (k % 2), 8) for k in range(8)]
-    cells += [(0x40 + 8 * j, 7 + j // 2, 2 + 10 * (j % 2), 8) for j in range(20)]
-    cells += [(0xE0, 1, 2, 8), (0xE8, 1, 12, 5), (0xEC, 1, 17, 3)]      # .. Treasure .., Drop, Done
-    def ink(cs, gap):                       # pixel columns used (as vfit draws it)
-        x, last, n = 0, 0, len(cs)
-        for i, c in enumerate(cs):
-            if gw[c] == 0: x += 2; continue
-            x += gw[c]; last = x
-            if not (n - gap <= i < n - 1): x += 1
-        return last
-    out = ''
-    for nm, k in (('LCT', 0), ('LCR', 1), ('LCC', 2), ('LCN', 3)):
-        out += nm + ': .db ' + ', '.join(str(c[k]) for c in cells) + '\n'
-    out += 'LTITLE: .db $E8, $E9, $EA\n'
-    lo, hi, gaps, fits = [], [], [], ''
-    for k in range(256):
-        p = b10[0x0200 + 2 * k] | b10[0x0200 + 2 * k + 1] << 8
-        o = p - 0x8000; cs = bytes(b10[o:b10.index(0, o)])
-        if ink(cs, 0) <= 64:
-            lo.append('<NM%d' % k); hi.append('>NM%d' % k); gaps.append(0); continue
-        cs = bytes(nar.get(c, c) for c in cs)
-        if ink(cs, len(cs)) > 64:           # still too wide: thin spaces (1 px where squeezed)
-            cs = bytes(THIN_SPACE if c == 0xFF else c for c in cs)
-        g = 0
-        while ink(cs, g) > 64:
-            g += 1
-            assert g <= len(cs), k
-        lo.append('<FIT%d' % k); hi.append('>FIT%d' % k); gaps.append(g)
-        fits += 'FIT%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
-    for nm, v in (('LFLO', lo), ('LFHI', hi), ('LGAP', [str(x) for x in gaps])):
-        out += nm + ':\n' + ''.join('    .db %s\n' % ', '.join(v[i:i + 16]) for i in range(0, 256, 16))
-    # battle status words (text ids $F0-$FD, script/ff2/system.json 240-253, the English the
-    # NES build draws): 30 px in the party line
-    import json, importlib.util
-    spec = importlib.util.spec_from_file_location('ff2insert', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2', 'insert.py'))
-    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
-    words = {e['id']: e['en'] for e in json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'script', 'ff2', 'system.json'))) if 240 <= e['id'] <= 253}
-    sl, sh, sg = [], [], []
-    for k in range(14):
-        cs = bytes(ins.ENC[ch] for ch in words.get(240 + k, ''))
-        g = 0
-        if ink(cs, 0) > 30:
-            cs = bytes(nar.get(c, c) for c in cs)
-            while ink(cs, g) > 30:
-                g += 1
-                assert g <= len(cs), words[240 + k]
-        fits += 'ST%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
-        sl.append('<ST%d' % k); sh.append('>ST%d' % k); sg.append(str(g))
-    out += 'STLO: .db %s\nSTHI: .db %s\nSTGAP: .db %s\n' % (', '.join(sl), ', '.join(sh), ', '.join(sg))
-    return out + fits
-
-
-def menu_data(rom):
-    """main menu tables from the user's ROM: the 12 portraits (bank 9, pointers fix:E76A,
-    192 bytes each), their palette indices (b14:890B), the status words of text ids
-    $F6-$FD (bank 10 table $8400, 5 cells), and the attribute quads of the portrait boxes"""
-    import importlib.util
-    ins = _insert_module()
-    b9 = rom[HDR + 9 * BANK:HDR + 10 * BANK]
-    fix = rom[HDR + 31 * BANK:HDR + 32 * BANK]
-    b10 = rom[HDR + 10 * BANK:HDR + 11 * BANK]
-    b14 = rom[HDR + 14 * BANK:HDR + 15 * BANK]
-    out = 'PORTG:\n'
-    for i in range(12):
-        o = fix[0x276A + i] * 16
-        out += ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in b9[o + j:o + j + 16]) for j in range(0, 192, 16))
-    out += 'PGLO: .db %s\nPGHI: .db %s\n' % (', '.join('<(PORTG+%d)' % (192 * i) for i in range(12)),
-                                              ', '.join('>(PORTG+%d)' % (192 * i) for i in range(12)))
-    out += 'PALID: .db %s\n' % ', '.join('$%02X' % v for v in b14[0x090B:0x0917])
-    stw = []
-    for k in range(8):
-        i = 0xF6 + k
-        p = b10[0x0400 + 2 * i] | b10[0x0400 + 2 * i + 1] << 8
-        o = p - 0x8000; cs = bytes(b10[o:b10.index(0, o)])
-        assert len(cs) <= 5, cs
-        stw += list(cs) + [0xFF] * (5 - len(cs))
-    out += 'STW: .db %s\n' % ', '.join('$%02X' % v for v in stw)
-    qi, qs, qm = [], [], []
-    for k in range(4):
-        for qy in (1 + 2 * k, 2 + 2 * k):
-            for qx in (1, 2):
-                sh = ((qy & 1) * 2 + (qx & 1)) * 2
-                qi.append((qy >> 1) * 8 + (qx >> 1)); qs.append(sh); qm.append(~(3 << sh) & 0xFF)
-    for nm, v in (('QIDX', qi), ('QSH', qs), ('QMSK', qm)):
-        out += '%s: .db %s\n' % (nm, ', '.join(str(x) for x in v))
-    return out, dict(CHH=ins.ENC['H'], CHM=ins.ENC['M'], CHP=ins.ENC['P'])
-
-
-def bank23(rom, L, extra=''):
-    """bank 23 source + data from the user's ROM (first monster tiles, boss tilemaps, frame
-    tiles) and the glyph tables"""
-    b11 = rom[HDR + 11 * BANK:HDR + 12 * BANK]
-    first = b11[0x9FA5 - 0x8000:0x9FA5 - 0x8000 + 9]
-    boss = []
-    for k in range(6):                                  # boss tilemaps (b11:8DDE, 144 each)
-        used = bytearray(32)
-        for t in b11[0x8DDE - 0x8000 + 144 * k:0x8DDE - 0x8000 + 144 * (k + 1)]: used[t >> 3] |= 0x80 >> (t & 7)
-        boss.append(bytes(used))
-    b9 = rom[HDR + 9 * BANK:HDR + 10 * BANK]
-    frame = b''.join(b9[0x0320 + 16 * t:0x0320 + 16 * t + 16] for t in range(0xF7, 0xFF))
-    g = glyph_tables(rom)
-    gw = bytes(len(g.get(c, [])) for c in range(256))
-    data, offs = bytearray(), []
-    for c in range(256):
-        offs.append(len(data)); data += bytes(g.get(c, []))
-    mdata, msyms = menu_data(rom)
-    nsrc = names_data(rom) + loot_data(rom, gw) + mdata
-    src = B23_SRC.replace('GBTAB', ', '.join(name for name, rb, nes in ENTRIES)) + nsrc + extra + '\nFIRST: .db ' + ', '.join('$%02X' % v for v in first)
-    src += '\nBOSSUSED:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in b) for b in boss)
-    src += 'FRAMEGFX:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in frame[i:i + 16]) for i in range(0, 128, 16))
-    src += 'GW:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in gw[i:i + 16]) for i in range(0, 256, 16))
-    src += 'GLYPHS:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in data[i:i + 16]) for i in range(0, len(data), 16))
-    src += 'GOFF:\n' + ''.join('    .db %s\n' % ', '.join('<(GLYPHS+%d)' % o for o in offs[i:i + 16]) for i in range(0, 256, 16))
-    src += 'GHI:\n' + ''.join('    .db %s\n' % ', '.join('>(GLYPHS+%d)' % o for o in offs[i:i + 16]) for i in range(0, 256, 16))
-    return asm(src, syms=dict(RAM, BUF=0x5E40, **L, **msyms))
-
-
-GBM = [None]            # the main menu's entry (set by battle(), used by main_menu())
 
 
 def battle(rom):
@@ -2925,22 +3209,29 @@ def battle(rom):
         e = asm(ent, syms=dict(gbf=f.labels['gbf']))
         assert e.org + len(e.bytes) <= end
         put(rom, 31, e.org, e.bytes); labels.update(e.labels)
-    assert len(ENTRIES) == 13
+    assert len(ENTRIES) <= 12
     g = asm('''
     org $F8F0
-gbm:                    ; gb_menu (entry 12): A = sub-command
+gbm:                    ; main menu (bank 24): A = sub-command; back to bank 14
     sta GBARG
-    ldx #12
-    jmp gbf
-''', syms=dict(RAM, gbf=f.labels['gbf']))
+    lda #24
+    jsr $FA7F
+    jsr $8000
+    lda #$0E
+    jmp $FA7F
+''', syms=dict(RAM))
+    assert g.org + len(g.bytes) <= 0xF900
     assert set(rom[HDR + 31 * BANK + 0x38F0:HDR + 31 * BANK + 0x38F0 + len(g.bytes)]) <= {0}
     put(rom, 31, g.org, g.bytes)
-    labels['e12'] = g.labels['gbm']
+    GBM[0] = g.labels['gbm']
+    b24 = bank24(rom)
+    assert len(b24.bytes) <= BANK, len(b24.bytes)
+    rom[HDR + 24 * BANK:HDR + 25 * BANK] = b'\xFF' * BANK
+    put(rom, 24, 0x8000, b24.bytes)
     class E: pass
     e = E(); e.labels = labels
     for k, (name, rb, nes) in enumerate(ENTRIES):
         if nes is not None: put(rom, rb, nes, bytes([0x4C]) + e.labels['e%d' % k].to_bytes(2, 'little'))
-    GBM[0] = labels['e12']
     ent = {name: e.labels['e%d' % k] for k, (name, rb, nes) in enumerate(ENTRIES)}
     put(rom, 12, 0x9DE3, bytes([0x20]) + ent['gb_magic'].to_bytes(2, 'little'), old=bytes([0x20, 0x50, 0x92]))
     put(rom, 12, 0xA058, bytes([0x4C]) + ent['gb_gear'].to_bytes(2, 'little'), old=bytes([0x4C, 0x50, 0x92]))
@@ -3108,7 +3399,9 @@ LONG_TILES = [0x7B, 0x7C, 0x7D, 0x7E, 0x7F, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 
 
 
 # main menu windows (b14 menu window table $B48C/$B4A5/$B4BE/$B4D7): 4 commands, 5 Gil
-MM_WIN = {4: (13, 1, 8, 8), 5: (13, 15, 8, 4)}      # (heights even: rows drawn in pairs)
+MM_WIN = {4: (13, 1, 8, 8), 5: (13, 15, 8, 4),      # (heights even: rows drawn in pairs)
+          6: (1, 1, 8, 4), 7: (1, 3, 20, 16)}      # items: title, list (14 rows; the list's
+#                                                      top frame covers the title's lower rows)
 MM_CMDS = ['Items', 'Magic', 'Equip', 'Status', 'Save']
 
 
@@ -3153,9 +3446,43 @@ mm_save:                ; b14:B1D7 (save menu, no close menu): window palette
     for w, (x, y, wd, h) in MM_WIN.items():
         for base, v in ((0xB48C, x), (0xB4A5, y), (0xB4BE, wd), (0xB4D7, h)):
             put(rom, 14, base + w, bytes([v]))
-    # character select (b14:AEAA, x / y tiles per member): the hand at the left screen edge
-    put(rom, 14, 0xAEAA, bytes(v for k in range(4) for v in (MM_SEL_X, MM_SEL_Y + 4 * k, 0, 0)))
     rom[sysone + 28 // 8] |= 1 << (28 % 8)                  # Gil window one row per line
+    # item / spell target (owner approved ff2_mock11): b14:AEC8-AF49 (the original item
+    # menu's body, dead since insert.py's item menu) for the hooks
+    t = asm('''
+    org $AEC8
+tg_party:               ; b14:A909 / A8E5 / AC60 (instead of the member windows b14:B396)
+    lda #0              ; (the list's hand, cursor 3, hidden: the description covers the
+    sta $A4             ;   list; the item / magic menus set it again when they redraw)
+    lda #5
+    jmp GBM
+mm_sel:                 ; b14:AD3C / AD4B / AD5A (main menu: character select b14:AE59)
+    lda #0              ;   with the main menu's cursor table (AEAA: the target lines)
+    sta $79F0
+    ldx #$0F
+.l:
+    lda MMTAB,x
+    sta $7900,x
+    dex
+    bpl .l
+    jmp $AE69
+MMTAB:
+    .db MSX, MSY, 0, 0, MSX, MSY+4, 0, 0, MSX, MSY+8, 0, 0, MSX, MSY+12, 0, 0
+''', syms=dict(GBM=GBM[0], MSX=MM_SEL_X, MSY=MM_SEL_Y))
+    assert t.org + len(t.bytes) <= 0xAF4A
+    put(rom, 14, t.org, t.bytes)
+    for a in (0xA909, 0xA8E5, 0xAC60):
+        put(rom, 14, a, bytes([0x20]) + t.labels['tg_party'].to_bytes(2, 'little'), old=bytes.fromhex('2096b3'))
+    for a in (0xAD3C, 0xAD4B, 0xAD5A):
+        put(rom, 14, a, bytes([0x20]) + t.labels['mm_sel'].to_bytes(2, 'little'), old=bytes.fromhex('2059ae'))
+    put(rom, 14, 0xAEAA, bytes(v for k in range(4) for v in (TG_SEL_X, TG_SEL_Y + k, 0, 0)))
+    for base, v in ((0xB48C, 1), (0xB4A5, 1), (0xB4BE, 20), (0xB4D7, 12)):   # window 16: description
+        put(rom, 14, base + 16, bytes([v]))
+    for sid in range(43, 63):
+        rom[sysone + sid // 8] |= 1 << (sid % 8)
+    rom[sysone + 31 // 8] |= 1 << (31 % 8)                  # items title one row per line
+    t37 = '\n'.join(['{08}{17:00}{1A:%02X}' % i for i in range(32)] + ['{08}{17:00}{0F}'])
+    bank.put_ptr(0x8400 + 2 * 37, bank.alloc(ins.enc(t37) + b'\0'))   # items from column 0 (18)
     t27 = '\n'.join('{15:00}' + c for c in MM_CMDS)
     t28 = '\n{14:03}Gil'
     for sid, t in ((27, t27), (28, t28)):
@@ -3163,6 +3490,7 @@ mm_save:                ; b14:B1D7 (save menu, no close menu): window palette
 
 
 MM_SEL_X, MM_SEL_Y = 0, 3
+TG_SEL_X, TG_SEL_Y = 0, 14
 
 
 def keyword_menus(rom, ins, bank):
@@ -3287,7 +3615,7 @@ def dialogue(rom):
         bank = ins.Bank(rom, 10, b10.free)
         keyword_menus(rom, ins, bank)
         for e in json.load(open('script/ff2/system.json')):
-            if e['id'] in SYS_FIELD and e['en']:
+            if (e['id'] in SYS_FIELD or 43 <= e['id'] <= 62) and e['en']:
                 t = '\n'.join(l.strip() for l in e['en'].split('\n'))
                 t = gb_wrap(ins, t.replace('{02}', 'I' * 18)).replace('I' * 18, '{02}')   # item
                 #   name counted as 18 (3 names are longer: 19-20, open point)
