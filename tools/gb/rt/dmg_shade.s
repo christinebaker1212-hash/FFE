@@ -332,6 +332,129 @@ dmg_cell_e: ld e, a
             pop bc
             ret
 
+; ---- DMG / SGB: the palette the maps are made from (MPB). FF1 fades and cycles its colours
+; on the PPU while the palette they lead to stays in RAM ($6D34 in battle, $03C0 elsewhere).
+; When every live BG colour is that target's colour, black, or the same hue darker (a fade),
+; the maps come from the target (carry set): fades then only darken the BGP, and a battle
+; fading in from black is shaded right from its first frame. Otherwise (colour cycles,
+; screens that do not use those buffers) MPB = the live palette (carry clear).
+; Out: B = 1 if MPB changed. Keeps DE, HL.
+MPB        = SPR_DIRTY      ; (16; the CGB uses it for the sprite DMA marks only)
+dmg_target: push de
+            push hl
+            ldh a, [pro_mode]               ; the prologue: palettes 1-3 as palette 3 (its
+            and a                           ;   shown lines: the text white on black; lines
+            jr z, .np                       ;   appear as drawn, the page fades by the BGP)
+            ld hl, PAL_SH
+            ld de, MPB
+            ld b, 0
+            ld c, 0
+.pp:        ld a, c
+            cp 4
+            ld a, c
+            jr c, .p0
+            and 3
+            add a, 12
+.p0:        add a, low(PAL_SH)
+            ld l, a
+            ld a, [de]
+            cp [hl]
+            jr z, .ps
+            ld b, 1
+            ld a, [hl]
+            ld [de], a
+.ps:        inc e
+            inc c
+            ld a, c
+            cp 16
+            jr nz, .pp
+            pop hl
+            pop de
+            scf
+            ret
+.np:        ldh a, [in_battle]
+            and a
+            ld hl, NES_RAM + $3C0
+            jr z, .t
+            ld hl, $AD34                    ; ($6D34, cart RAM bank 0)
+.t:         push hl
+            ld de, PAL_SH
+            ld b, 16
+            ld c, 0                         ; C = target colours that are not black
+.ck:        ld a, e
+            and 3
+            jr nz, .c1
+            ld a, e
+            and a
+            jr nz, .nx                      ; (colour 0 of palettes 1-3: the backdrop)
+.c1:        ld a, [hl]
+            and $3F
+            call .blk
+            jr z, .tb
+            inc c
+.tb:        push bc
+            ld a, [hl]
+            and $3F
+            ld c, a                         ; C = target colour
+            ld a, [de]
+            and $3F
+            ld b, a                         ; B = live colour
+            cp c
+            jr z, .ok
+            call .blk
+            jr z, .ok                       ; (black)
+            xor c
+            and $0F
+            jr nz, .bad                     ; another hue
+            ld a, b
+            cp c
+            jr nc, .bad                     ; brighter
+.ok:        pop bc
+.nx:        inc hl
+            inc e
+            dec b
+            jr nz, .ck
+            pop hl                          ; a fade of the target (if it is not all black)
+            ld a, c
+            and a
+            jr z, .live
+            scf
+            jr .cp
+.bad:       pop bc
+            pop hl
+.live:      ld hl, PAL_SH
+            and a                           ; (carry clear)
+.cp:        push af
+            ld de, MPB
+            ld c, 16
+            ld b, 0
+.cl:        ld a, [de]
+            cp [hl]
+            jr z, .cs
+            ld b, 1
+            ld a, [hl]
+            ld [de], a
+.cs:        inc hl
+            inc e
+            dec c
+            jr nz, .cl
+            pop af
+            pop hl
+            pop de
+            ret
+.blk:       cp $0F                          ; Z: an NES black (x0F, or xD-xF)
+            ret z
+            push af
+            and $0F
+            cp $0D
+            jr c, .nb
+            pop af
+            cp a
+            ret
+.nb:        pop af
+            or 1                            ; (NZ)
+            ret
+
 ; A = tile drawn with NES palette 3 (a dialogue box cell in the window): coded for it
 dmg_tile3:  push bc
             push de
@@ -483,11 +606,12 @@ LUM_TAB:
 dmg_maps:   push bc
             push de
             push hl
-            call bg_lmax
+            ld hl, MPB                      ; (the palette to shade by: dmg_target)
+            call bg_lmax_hl
             and a
             jp z, .x
             ld [REF_LMAX], a                ; brightness the BGP fade level is measured from
-            ld a, [PAL_SH]
+            ld a, [MPB]
             call lum
             ldh [sh_bk], a                  ; backdrop brightness
             ld hl, LVF                      ; levels present (other than the backdrop's)
@@ -513,8 +637,10 @@ dmg_maps:   push bc
             jr nz, .lb
             jr nc, .mn
 .lu:
-            ld l, c
-            ld h, high(PAL_SH)
+            ld a, c
+            add a, low(MPB)
+            ld l, a
+            ld h, high(MPB)
             ld a, [hl]
             call lum
             ld b, a
@@ -606,8 +732,9 @@ dmg_maps:   push bc
 .p:         ld a, c
             add a, a
             add a, a
+            add a, low(MPB)
             ld l, a
-            ld h, high(PAL_SH)
+            ld h, high(MPB)
             ld de, RT_BUF
             xor a
             ld [de], a                      ; colour 0 -> 0
@@ -855,10 +982,15 @@ lum_shade:  and a
             ret
 
 ; A = brightest colour 1-3 of the four NES BG palettes (0-8)
-bg_lmax:    push bc
-            push hl
+bg_lmax:    push hl
             ld hl, PAL_SH
+            call bg_lmax_hl
+            pop hl
+            ret
+bg_lmax_hl: push bc                         ; HL = 16 BG colours (page offset a multiple of 16)
+            push hl
             ld b, 0
+            ld c, 16
 .i:         ld a, l
             and 3
             jr z, .n
@@ -868,8 +1000,7 @@ bg_lmax:    push bc
             jr c, .n
             ld b, a
 .n:         inc l
-            ld a, l
-            cp 16
+            dec c
             jr nz, .i
             ld a, b
             pop hl

@@ -3567,8 +3567,10 @@ def prolog_far_source():
     (in the vblank: one queued row)"""
     return ''.join('%s = $%04X\n' % kv for kv in PROLOG_RAM.items()) + """
 pcopy:              ; (screen off) the font (bank 9 $8800) also to tiles $00-$7F; PRLO / PRHI
-    lda #9          ;   = the page string's row starts (its $09 / $08 bytes), PNR rows;
-    jsr $FE03       ;   no row queued
+    lda #1          ;   = the page string's row starts (its $09 / $08 bytes), PNR rows;
+    sta $5807       ;   no row queued. (GB: prologue page: DMG text shading as shown)
+    lda #9
+    jsr $FE03
     lda #0
     sta $10
     lda #$88

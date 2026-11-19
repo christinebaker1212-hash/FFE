@@ -208,6 +208,7 @@ dlg_on:     ds 1                            ; field dialogue box open ($5805): i
 dlg_c0:     ds 1                            ;   box rectangle in the other view: NES column (0-63),
 dlg_r0:     ds 1                            ;   NES tile row (0-29) of its top left (20 x 8 cells)
 dlg_l:      ds 1                            ;   lines of it shown (window from the top, off at this line)
+pro_mode:   ds 1                            ; DMG: the prologue's pages ($5807): text shaded as shown
 dlg_st:     ds 1                            ;   1: opened at a page break ($5806): kept open until $1B reaches $60
 sgb_mask:   ds 1                            ; SGB screen mask: 1 = to blank (LCD went off), 2 = blanked, 3 = blanked until the packets built with the LCD on are out
 hram_end:   ds 1
@@ -469,10 +470,9 @@ stat_isr:   push af                         ; raster events (vbl_regs), each in 
             jr z, .off
             dec a
             jr z, .on
-            ldh a, [$FF40]                  ; 3: window off (bottom of a dialogue box)
-            res 5, a
-            ldh [$FF40], a
-            jr .nx
+            ld a, 167                       ; 3: bottom of a dialogue box: the window moved
+            ldh [$FF4B], a                  ;   off-screen (switching it off mid-frame shifts
+            jr .nx                          ;   the BG below by a pixel on the hardware)
 .off:       ldh a, [is_cgb]                 ; mask off
             and a
             jr z, .offd
@@ -603,8 +603,10 @@ vbl_regs:   ld a, [VLCD]                    ; CGB: a masked load's writes done: 
             bit 4, a
             jr z, .ns
             set 1, b
-.ns:        ldh a, [dlg_l]                  ; dialogue box: the window from the top, off
-            and a                           ;   at line dlg_l
+.ns:        ld a, 7                         ; (WX in place for the top of the frame: a
+            ldh [$FF4B], a                  ;   dialogue box moves it off at its bottom)
+            ldh a, [dlg_l]                  ; dialogue box: the window from the top, moved
+            and a                           ;   off-screen at line dlg_l
             jr z, .nw
             set 5, b
             push bc
@@ -1647,14 +1649,17 @@ dmg_frame:                                  ; DMG shading, once per NES frame wi
             ld a, [FR_ANY]                  ; (map cells marked by DrawMapRowCol / Attributes)
             and a
             call nz, fresh_tramp
-            ldh a, [maps_due]               ; palettes changing on every frame (a fade
-            and a                           ;   of one palette, as in the prologue): the
-            jr z, .w                        ;   maps anyway after MAPS_WAIT frames
-            ldh a, [maps_wait]
-            inc a
-            ldh [maps_wait], a
-            cp MAPS_WAIT
-            jr nc, .now
+            ldh a, [maps_due]               ; palettes changed: a fade of the target (or the
+            and a                           ;   prologue): the maps from the target at once if
+            jr z, .w                        ;   it changed (fades only darken the BGP); else
+            call dmg_target                 ;   (colour cycles, other screens) when stable
+            jr nc, .w
+            xor a
+            ldh [maps_due], a
+            ld a, b
+            and a
+            jr z, .a
+            jr .now
 .w:         ldh a, [pal_age]
             cp 255
             jr z, .a
@@ -1696,6 +1701,9 @@ dmg_maps_now:
             ldh [maps_wait], a
             ld a, 1
             ldh [sgb_dirty], a
+            push bc
+            call dmg_target
+            pop bc
             call dmg_maps
             ld a, 1                         ; BGP again with the new maps
             ldh [pal_dirty], a
@@ -1753,6 +1761,9 @@ rt_ppu_w1:  push af
             pop af
             and a
             jr z, .nsr
+            ldh a, [pro_mode]               ; (the prologue: every marked tile now, its rows
+            and a                           ;   appear one by one later)
+            jr nz, .nsr
             call dmg_retile_ref
             jr .lon
 .nsr:       ld b, 0
@@ -1790,6 +1801,7 @@ rt_ppu_w1:  push af
             xor a
             ldh [$FF40], a
             ldh [lcd_on], a
+            ldh [pro_mode], a               ; (the prologue sets it again on each page)
             ld b, 0
             call flush_q
 .ret:       pop hl
@@ -2087,7 +2099,11 @@ rt_ppu_w7g: push af
             ld a, 1
             ldh [dmg_scan], a
             jr .done
-.dat2:      call dmg_attr
+.dat2:      ldh a, [pro_mode]               ; (the prologue: every palette shades alike)
+            and a
+            jr nz, .done
+            ld a, b
+            call dmg_attr
             jr .done
 .map0:      ld a, [hl]                      ; shadow copy; sh_same = 1 if the cell had this tile
             sub d
@@ -2783,6 +2799,9 @@ dlg_cell:   push hl
 .no:        pop de
             pop hl
             xor a
+            ret
+rt_mmc_w5807:                               ; the prologue's pages (GB layout code): DMG text shading
+            ldh [pro_mode], a
             ret
 rt_mmc_w5806:                               ; dialogue box lines shown (opened at a page break)
             ldh [dlg_l], a
