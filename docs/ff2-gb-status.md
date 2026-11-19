@@ -49,9 +49,23 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   generated source, native GB routines for graphics / sound / hot paths, re-layouts on
   the NES side (equivalence stays checkable).
 
+- **First GB build boots (2026-11-19).** `tools/gb2/build.py` (NES ROM → English NES →
+  source base → translate → assemble → `build/ff2_en.gb`, 1 MB MBC5, dual-mode header):
+  29.8k instructions in 8 code banks, runtime copied from FF1 into `tools/gb2/rt/` (FF2
+  frame waits / far-jump idiom / TSX-TXS in `rt/ff2.s`, hashed dynamic-target table in
+  bank 61, compact bank-0 stubs). Checked in PyBoy (DMG mode, centre-camera view, no
+  re-layout yet): splash screen → prologue → (Start) save menu → New Game → name entry,
+  matching the NES build's screens at the same input (cynes shots).
+  - `tools/gb2/translate.py` (copy of FF1's recompiler adapted): code map from the source
+    base, FF2 game facts (waits `$FA2A`/`$FEAD` native, NMI return stubs skipped, `$FA91`
+    jump-(long) idiom), dynamic targets from data words / immediate pointer pairs that
+    start a routine (487 entries).
+  - Gotchas: PyBoy runs its own boot ROM for ~70 frames before `$0100` (hooks fire after
+    that); runtime files without a `section` continue the previous file's section.
+
 ## In progress
-- Milestone 4: translator (`tools/gb2/translate.py`) and runtime (`tools/gb2/rt/`), boot
-  to the title in PyBoy and Gambatte.
+- Gambatte check (`build/gbrun`), then RAM equivalence against the NES build (firstdiff
+  style), speed (lagcheck), sprite-0 split emulation (battle), async battle NMI phases.
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
