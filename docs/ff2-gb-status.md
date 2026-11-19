@@ -243,9 +243,15 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   through `copy_core` (whole tiles from ROM in one go, else byte by byte): screen loads at
   waits 1531 / 3356: CGB +40 / +39 -> +11 / +11, DMG +94 / +90 -> +24 / +20. Totals (seed 1
   to wait 9800): CGB +0.3%, DMG +4.4%. RAM identical (DMG and CGB).
-- Next: the remaining battle-entry time (wait 9506: CGB +58, DMG +93; attribute writes
-  `attr_apply`, FF2's multiply / divide `fix:FC79-FD00`, tile marks), GB tile upload
-  latency.
+- Native multiply / multiply (16-bit) / divide (16-bit) (`fix:FC79` / `FC98` / `FCC3`):
+  the same steps in registers / NES RAM (results, side effects on $00-$07, A and flags as
+  the NES leaves them), in bank HLE_BANK (`rt/ff2_banked.s`) behind bank-0 stubs; the
+  native-routine table takes the flags a routine reads (these read the incoming carry).
+  Cross-bank stubs now start at `$2500` (bank 0 runtime grew). Battle entry: CGB +52,
+  DMG +81 frames; totals CGB +0.3%, DMG +4.2%; random seed 1, 30000 frames: 29534 waits
+  identical on DMG and CGB.
+- Next: the remaining battle-entry time (attribute writes `attr_apply`, tile marks, the
+  battle's own setup code), GB tile upload latency.
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 

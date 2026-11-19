@@ -51,8 +51,8 @@ class FF2:
     """Game-specific facts (English MMC5 build of FF2)."""
     reset = ('fix', 0xFE2E)
     reset_txs = ('fix', 0xFE8D)                  # DEX / TXS with X = 0 (vblank wait loop)
-    # Native replacements: NES address -> (routine, flags it defines); each returns to
-    # the caller of the NES routine like its RTS would.
+    # Native replacements: NES address -> (routine, flags it defines[, flags it reads]);
+    # each returns to the caller of the NES routine like its RTS would.
     #   $FA2A / $FEAD: wait for vblank. FF2's NMI vector is $0100 in RAM; the wait writes
     #   JMP $FA3C / JMP $FEA1 there and spins; that stub writes RTI back, reads $2002 and
     #   drops the interrupt frame (PLA x3, A = $FA / $FE), returning to the waiter.
@@ -60,7 +60,11 @@ class FF2:
            ('fix', 0xFD6F): ('hle_ppucopy', 'NZ'),       # copy data to ppu (rt/ff2.s, native)
            ('b11', 0x9D68): ('hle_fill', 'NZ'),          # fill ppu (rt/ff2.s, native)
            ('fix', 0xE50E): ('hle_copy_e50e', 'NZ'),     # copy large data to ppu (native)
-           ('fix', 0xE51E): ('hle_copy_e51e', 'NZ')}     # copy data to ppu (native)
+           ('fix', 0xE51E): ('hle_copy_e51e', 'NZ'),     # copy data to ppu (native)
+           # multiply / multiply (16-bit) / divide (16-bit): the same steps in registers
+           # (results, side effects on $00-$07, A, flags); they read the incoming carry
+           ('fix', 0xFC79): ('hle_mul8', 'NZC', 'C'), ('fix', 0xFC98): ('hle_mul16', 'NZC', 'C'),
+           ('fix', 0xFCC3): ('hle_div16', 'NZC', 'C')}
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   fix:FA91-FA99: PHA $FA / PHA $99 / JMP ($0040): "jump (long)" calls through ($40)
     #   with a pushed return address: on the GB a call through the pointer, then $FA9A.
@@ -272,8 +276,8 @@ class Recompiler:
             lo = frozenset()
             for s in outs[k]:
                 lo |= UNK if (s is None or s not in ins) else live_in[s]
-            if k in self.g.ext:
-                li = lo - frozenset(self.g.ext[k][1])
+            if k in self.g.ext:                             # (an optional third field: flags
+                li = (lo - frozenset(self.g.ext[k][1])) | frozenset(self.g.ext[k][2:3] and self.g.ext[k][2] or '')
             elif k in self.g.idioms:
                 li = lo - frozenset(self.g.idioms[k][2])
             elif i.mn == 'JSR':
@@ -802,7 +806,7 @@ def emit_program(rc):
                     elif i.mn != 'JSR' or True:
                         out.append('    call rt_fatal')
     # stubs (bank 0): call rt_fcs reads the target's bank and address after the call
-    stubs = ['section bank 0, $2400']                   # (runtime below, colour tables from $3A00)
+    stubs = ['section bank 0, $2500']                   # (runtime below, colour tables from $3A00)
     for lab in sorted(xrefs):
         stubs += ['xs_%s:' % lab, '    call rt_fcs', '    db bank(%s)' % lab, '    dw %s' % lab,
                   'xj_%s:' % lab, '    call xs_%s' % lab, '    ret']

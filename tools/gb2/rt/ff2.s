@@ -1093,6 +1093,18 @@ copy_core:  ld a, e
             jr nz, .slow
             ret
 
+; FF2's multiply / divide (rt/ff2_banked.s, bank HLE_BANK): tail calls through rt_fcs
+; (A and flags kept both ways)
+hle_mul8:   call rt_fcs
+            db HLE_BANK
+            dw hle_mul8_b
+hle_mul16:  call rt_fcs
+            db HLE_BANK
+            dw hle_mul16_b
+hle_div16:  call rt_fcs
+            db HLE_BANK
+            dw hle_div16_b
+
 ff2_bg_tile:                                ; DMG BG tile in the shadow (DE = start + 17, cart
             xor a                           ;   RAM bank 1 on): queue its re-coding; RAM bank 0
             ld [$4000], a
