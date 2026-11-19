@@ -332,7 +332,7 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   the rectangle's cells (CGB VRAM bank 1, DMG tile check / LCD-on scan, SGB rebuild). The
   menu sets column 5, rows 2-17 to the window palette; sub-menus and the exit clear it.
   Checked: Gambatte CGB and DMG shots (box 24 px, no black column); random seed 1, 30000
-  frames: 29452 waits identical. (SGB not yet checked in mGBA.) Cross-bank stubs now from
+  frames: 29452 waits identical; mGBA SGB shot: box at the portrait's width too. Stubs from
   `$2560` (bank 0 runtime grew; they end near `$38E0`, colour tables at `$3A00`).
 - Sub-screens (items, magic, equip, status, save) still to re-lay out.
 
