@@ -299,6 +299,60 @@ def main_menu_portraits(nes_path, out):
     p = os.path.join(out, 'ff2_mock4_menu_portraits.png'); sheet.save(p); return p
 
 
+def _fit(s, X, Y, txt, width):
+    """proportional text squeezed into width px: condensed letters, then the narrow
+    forms (tools/latin_font.py NARROW), then letter gaps dropped from the right"""
+    from latin_font import NARROW
+    tab = None if s.pwidth(txt) <= width else NARROW
+    w = s.pwidth(txt, tab)
+    drop = max(0, w - width)
+    for k, ch in enumerate(txt):
+        if k:
+            if drop and k >= len(txt) - drop: pass
+            else: X += 1
+        if ch == ' ': X += 2; continue
+        t = tab if tab is not None and ch in tab else None
+        _pt(s, X, Y, ch, t)
+        X += s.pwidth(ch, t)
+
+
+def loot_menu(out):
+    """Treasure screen after a battle (NES: loot window, Drop / Done window and a 19 x 28
+    inventory window side by side). GB: treasure window (0,0,20,7): "Treasure", Drop and
+    Done on line 1, the 8 treasure slots in two columns below; inventory window (0,6,20,12)
+    sharing its border: two columns, 10 of the 16 rows, scrolling. Columns 64 px (text at
+    x 8 / 88, hands at x -8 / 72); longer names use the narrow letters and drop letter gaps
+    (widest: Diamond Breastplate). Up / down move through all rows of both windows, left /
+    right between the two columns; A on a slot picks it (a second hand stays on it) and A on
+    another slot swaps them, as on the NES."""
+    loot = ['Potion', 'Book of Blizzard', 'Diamond Breastplate', '', '', '', '', '']
+    inv = ['Potion', 'Antarctic Wind', 'Cottage', 'Sulfuric Acid Bottle', 'Book of Fire', 'Ether',
+           'Copper Breastplate', 'Phoenix Tail', 'Leather Cap', 'Mythril Gauntlets', 'Golden Needle',
+           'Sword of the Earth', "Maiden's Kiss", 'Eye Drops', 'Garlic', 'Antidote', 'High Potion',
+           'Mythril Shield', 'Hermes Shoes', 'Unicorn Horn', 'Elixir', 'Cross'] + [''] * 10 
+
+    def screen(hand, hand2=None, scroll=0):
+        s = Screen(bg=3)
+        s.window(0, 6, 20, 12)
+        s.window(0, 0, 20, 7)
+        _pt(s, 8, 8, 'Treasure'); _pt(s, 96, 8, 'Drop'); _pt(s, 132, 8, 'Done')
+        for k, n in enumerate(loot):
+            if n: _fit(s, 8 + 80 * (k % 2), (2 + k // 2) * 8, n, 64)
+        for r in range(10):
+            for c in range(2):
+                n = inv[2 * (r + scroll) + c]
+                if n: _fit(s, 8 + 80 * c, (7 + r) * 8, n, 64)
+        for h in [hand] + ([hand2] if hand2 else []):
+            _hand(s, h[0], h[1] * 8 - 4, HAND16)
+        return s
+
+    shots = [screen((-8, 3)), screen((-8, 11), hand2=(72, 2)), screen((72, 16), scroll=6)]
+    sheet = Image.new('RGB', (168 * len(shots) - 8, 144), (255, 255, 255))
+    for k, s in enumerate(shots): sheet.paste(s.im, (k * 168, 0))
+    sheet = sheet.resize((sheet.width * 2, 288), Image.NEAREST)
+    p = os.path.join(out, 'ff2_mock7_treasure.png'); sheet.save(p); return p
+
+
 if __name__ == '__main__':
     os.makedirs(sys.argv[2], exist_ok=True)
     print(battle(sys.argv[1], sys.argv[2]))
@@ -307,3 +361,4 @@ if __name__ == '__main__':
     print(main_menu_portraits(sys.argv[1], sys.argv[2]))
     print(battle_fit(sys.argv[1], sys.argv[2]))
     print(battle_lists(sys.argv[1], sys.argv[2]))
+    print(loot_menu(sys.argv[2]))
