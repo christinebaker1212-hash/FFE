@@ -84,7 +84,7 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-18: FF1 released as a local build)
+# GB port status (last updated 2026-11-19: hardware-test fixes, dialogue box)
 
 **Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
 **Handoff: `docs/gb-handoff.md`** (session setup, current battle-layout work, exact next steps).
@@ -762,8 +762,30 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   of changed bytes and relies on static flow there. Fine for small NES changes; new code
   entered only dynamically (RTS dispatch) still needs fresh coverage (seen: boot hung with
   the old cov3 after the Select menu).
+- **Owner's hardware test (EverDrive clone on a Game Boy Color, 2026-11-19), fixed:**
+  - Lock-up talking to people: jump-table entries never reached in coverage were not
+    compiled (99 of 128 talk routines, spells, tile effects, ExRAM text codes). Every entry
+    of every static table is now compiled (`recomp.FF1.jump_tables`, `ex:` lines in .far);
+    the dynamic-target table moved to bank 61 (buckets). Cart RAM 32 KB (4 banks) with a
+    boot check (`rt/ramchk.s`: message if the cart does not bank its RAM).
+  - Transitions white on the Color: loads keep the LCD on behind a black mask (VLCD; window
+    with palette 7), VRAM writes in STAT mode 0/1, map / palettes rebuilt when shown.
+  - Battle music rushing after FF1's own slow frames: APU writes queued per game frame,
+    applied once per vblank (`apu.s` APQ).
+  - Garbled tiles (letters, map): the native CHR upload's Color path fell into the sprite
+    branch; and the tile DMA ran into drawing time (slow per-tile mark scan): `hdma_bg`
+    rewritten (byte-wise scan, DMA only at LY 144-151, 12 tiles a line). SameBoy VRAM dumps
+    (`GBRUN_VRAM`) match the tile copy at every checkpoint.
+  - Intro text flash; name entry window border; dialogue box opened / closed like the NES:
+    built in the GB window layer, revealed line by line from FF1's split line `$1B`
+    (`dlg_cell`, `$5805`, `rt_dlgdelay`), map under it untouched (`dlgrest` reduced).
+  - SameBoy libretro core (owner allowed) for hardware-like checks: `GBRUN_CORE=build/
+    sameboy_libretro.so build/gbrun ...` (build notes in `docs/gb-lessons.md`).
+  - Lag (Gambatte, battle script 7000 waits): CGB +1.3%, DMG ~+4.5% (screen loads).
 
 ## Remaining
-- FF1: DMG screen-load times (+4.3% over the battle script) and the DMG prologue fade;
-  owner to confirm the new menu movement and centring; any other screen that shifts.
+- FF1: names up to 6 letters (owner asked; save-RAM bytes and every name drawer); DMG
+  transitions black (DMG LCD-off is white: needs the masked load on DMG too); DMG
+  screen-load times and the DMG prologue fade; owner to confirm the new menu movement and
+  centring, the dialogue box and the hardware fixes.
 - FF2: separate session (`docs/ff2-gb-brief.md`). FF3 (GBC only): not started.

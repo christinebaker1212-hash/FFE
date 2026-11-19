@@ -6,6 +6,24 @@ it in FF1 (file / routine names in this repo).
 
 ## Real-hardware findings (owner, EverDrive, 2026-11-19)
 
+- **Garbled letters / tiles on the Color: tile DMA during drawing.** Marked BG tiles go from a
+  WRAM copy to VRAM by general-purpose DMA in the vblank. The mark scan called a subroutine
+  per tile (~40 cycles), so a 128-tile run spent ~40 scanlines before its DMA started; by
+  then LY had wrapped and the DMA ran during drawing, where VRAM writes are dropped (every
+  second row pair of a letter lost). Fix (`hdma_bg`): scan the marks a byte (8 tiles) at a
+  time, clear marks a byte at a time, start a DMA only while LY is 144-151, and budget 12
+  tiles per remaining line (a DMA moves 16 bytes per 32 dots: 14 a line). Check VRAM against
+  the tile copy in SameBoy (`GBRUN_VRAM=1`, `SHOTS_KEEP=dir`): it must match at every
+  checkpoint. A time check must reject LY < 144 as well as LY > 151.
+- **Raster-split effects belong in the window layer.** FF1 builds the dialogue box in the
+  other nametable and reveals it with a split growing down to scanline `$1B`; the GB keeps
+  one map for both nametables, so the box was drawn over the field row by row and the map
+  redrawn after (stilted, slow). Now the box's cells go to the GB window map (`dlg_cell`,
+  `$5805` on/off) and the window is switched off at the (scaled) split line each frame. The
+  map under the box is never touched. FF2/FF3 use the same kind of box.
+- **Check that runtime work-RAM variables do not overlap.** A debug word (ISR_PC) sat inside
+  the DMG re-coding masks (RM, 9 bytes): a vblank during a re-coding corrupted that tile.
+
 - **Lock-ups from dispatch targets that testing never reached.** FF1 picks talk routines,
   tile effects, shop types, spell effects and text control codes through jump tables
   (`JMP (ind)` and push-push-RTS). The recompiler only compiled table entries that the
