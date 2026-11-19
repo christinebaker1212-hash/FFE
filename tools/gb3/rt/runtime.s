@@ -30,6 +30,12 @@ NMI_CNT    = $D830          ; 16-bit count of NES frame waits             test r
 VBL_CNT    = $D832          ; 16-bit count of GB frames                   tools/gb/gambatte/
 WAIT_CNT   = $D834          ; 16-bit count of NES frames the main thread waited for (tools/gb3/firstdiff.py)
 TEST_PAD   = $D83E          ; $A5: test runner input mode (later)         gbrun.c)
+LK_LO      = $D840          ; dynamic-target lookup cache: NES address, key, GB bank and address
+LK_HI      = $D841
+LK_KEY     = $D842
+LK_BANK    = $D843
+LK_GLO     = $D844
+LK_GHI     = $D845
 MAP_SH     = $D000          ; GB map (VRAM bank 0 $9800-$9BFF) and its attributes (VRAM bank 1),
 ATTR_SH    = $D400          ;   1KB each, in WRAM bank MAP_BANK; dirty rows copied by DMA in the
 MAP_BANK   = 5              ;   vblank (map_flush)
@@ -1300,88 +1306,85 @@ rebank_attrs:
             ret
 
 ; ------------------------------------------------------------------ OAM, joypad, APU
-rt_io_w4014:
-           ; OAM DMA from NES page A -> GB shadow OAM
+rt_io_w4014:                                ; OAM DMA from NES page A -> GB shadow OAM
             push af                         ;   (64 NES sprites -> up to 40 GB sprites in view)
             push bc
             push de
             add a, high(NES_RAM)
-            ld d, a
-            ld e, 0                         ; DE = NES OAM page (GB address)
+            ld h, a
+            ld l, 0                         ; HL = NES OAM page (GB address)
             ldh a, [cam_y]                  ; C = 17 - cam_y: GB Y = NES Y + C (visible 9..159)
             cpl
             add a, 18
             ld c, a
-            ldh a, [cam_x]                  ; o_cx = 8 - cam_x: GB X = NES X + o_cx (1..167)
+            ldh a, [cam_x]                  ; B = 8 - cam_x: GB X = NES X + B (visible 1..167)
             cpl
             add a, 9
-            ldh [o_cx], a
-            ldh a, [ppu_ctrl]               ; sprite pattern table -> bank bit
+            ld b, a
+            ldh a, [ppu_ctrl]               ; attribute table for the sprite pattern table
             and 8
+            rrca
+            rrca
+            rrca
+            add a, high(OAM_ATTR)
             ldh [wtmp], a
-            ld hl, OAM_SH
-            ld b, 64
-.lp:        ld a, [de]                      ; NES Y
+            ld de, OAM_SH
+.lp:        ld a, [hl+]                     ; NES Y (HL -> tile)
             cp $EF
-            jr nc, .skip
+            jr nc, .s3
             add a, c
-            ldh [tmp_lo], a                 ; GB Y
-            sub 9
-            cp 151
-            jr nc, .skip
+            cp 160
+            jr nc, .s3
+            cp 9
+            jr c, .s3
+            ld [de], a                      ; (GB Y, kept if X is in view too)
+            inc l
+            inc l
+            ld a, [hl-]                     ; NES X (HL -> attributes)
+            add a, b
+            jr z, .sx
+            cp 168
+            jr nc, .sx
             inc e
+            ld [de], a                      ; X
+            dec l
+            ld a, [hl+]                     ; tile (HL -> attributes)
             inc e
-            inc e
-            ld a, [de]                      ; NES X
-            push hl
-            ld hl, o_cx
-            add a, [hl]
-            pop hl
-            ldh [o_cnt], a                  ; GB X
-            dec a
-            cp 167
-            jr nc, .skipx
-            ldh a, [tmp_lo]
-            ld [hl+], a                     ; Y
-            ldh a, [o_cnt]
-            ld [hl+], a                     ; X
-            dec e
-            dec e
-            ld a, [de]                      ; tile
-            inc e
-            ld [hl+], a
-            ld a, [de]                      ; attributes through the table
-            inc e
-            inc e
+            ld [de], a
+            ld a, [hl+]                     ; attributes (HL -> X)
             push hl
             ld l, a
-            ld h, high(OAM_ATTR)
+            ldh a, [wtmp]
+            ld h, a
             ld a, [hl]
-            ld hl, wtmp
-            or [hl]
             pop hl
-            ld [hl+], a
-            ld a, l
+            inc e
+            ld [de], a
+            inc e
+            inc l                           ; next sprite
+            ld a, e
             cp low(OAM_SH) + 160
             jr z, .end
-            dec b
+            ld a, l
+            and a
             jr nz, .lp
-            jr .full
-.skipx:     inc e
-            dec b
+            jr .fill
+.s3:        inc l                           ; (HL at the tile: + 3)
+            inc l
+            inc l
             jr nz, .lp
-            jr .full
-.skip:      ld a, e
-            add a, 4
-            ld e, a
-            dec b
+            jr .fill
+.sx:        inc l                           ; (HL at the attributes: + 2)
+            inc l
             jr nz, .lp
-.full:      ld a, l                         ; rest off screen
+.fill:      ld h, d                         ; rest off screen
+            ld l, e
+.fl:        ld a, l
             cp low(OAM_SH) + 160
             jr nc, .end
             xor a
             ld [hl+], a
-            jr .full
+            jr .fl
 .end:       ld a, 1
             ldh [oam_pending], a
             pop de
@@ -2024,6 +2027,44 @@ lookup:
            push af
             push bc
             push de
+            ld a, h                         ; one-entry cache: same NES address and window bank
+            ld d, a
+            ld a, l
+            ld e, a
+            ld a, d
+            cp $80
+            jr c, .cany
+            cp $A0
+            jr c, .c8
+            cp $C0
+            jr nc, .cany
+            ldh a, [nes_bankA]
+            jr .ck
+.c8:        ldh a, [nes_bank8]
+            jr .ck
+.cany:      ld a, $FF
+.ck:        ld c, a
+            ld a, [LK_KEY]
+            cp c
+            jr nz, .full
+            ld a, [LK_LO]
+            cp e
+            jr nz, .full
+            ld a, [LK_HI]
+            cp d
+            jr nz, .full
+            ld a, [LK_BANK]
+            ldh [fc_bank], a
+            ld a, [LK_GLO]
+            ld l, a
+            ld a, [LK_GHI]
+            ld h, a
+            pop de
+            pop bc
+            pop af
+            ret
+.full:      ld h, d
+            ld l, e
             ld d, h
             ld e, l
             ld a, d
@@ -2066,9 +2107,19 @@ lookup:
             jr nz, .n3
             ld a, [hl+]
             ldh [fc_bank], a
+            ld [LK_BANK], a
             ld a, [hl+]
             ld h, [hl]
             ld l, a
+            ld [LK_GLO], a
+            ld a, h
+            ld [LK_GHI], a
+            ld a, e                         ; (the cache entry)
+            ld [LK_LO], a
+            ld a, d
+            ld [LK_HI], a
+            ld a, c
+            ld [LK_KEY], a
             ldh a, [code_bank]
             ld [MBC5_BANKL], a
             pop de

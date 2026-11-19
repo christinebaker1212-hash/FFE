@@ -59,8 +59,10 @@ def oam_attr_src():
     t = []
     for a in range(256):
         t.append((a & 3) | ((a & 0x20) << 2) | ((a & 0x40) >> 1) | ((a & 0x80) >> 1))
-    return 'section bank 0, $3D00\nOAM_ATTR:\n' + ''.join(
-        '    db %s\n' % ', '.join(str(v) for v in t[k:k + 16]) for k in range(0, 256, 16))
+    out = 'section bank 0, $3C00\nOAM_ATTR:\n'        # $3C00: pattern table 0, $3D00: table 1 (VRAM bank 1)
+    for bank in (0, 8):
+        out += ''.join('    db %s\n' % ', '.join(str(v | bank) for v in t[k:k + 16]) for k in range(0, 256, 16))
+    return out
 
 
 def main():

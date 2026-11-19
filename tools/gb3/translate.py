@@ -67,7 +67,10 @@ class FF3:
            ('p2e', 0x9F98): ('nat_9f98', 'NZ'),      # clear vram ($0000-$2FFF)
            ('fix', 0xFCF5): ('nat_fcf5', 'NZC', 'C'),   # multiply (16-bit)
            ('fix', 0xFC92): ('nat_fc92', 'NZC', 'C'),   # divide (16-bit)
-           ('fix', 0xFC27): ('nat_fc27', 'NZC', 'C')}   # init rng (battle / cutscene start)
+           ('fix', 0xFC27): ('nat_fc27', 'NZC', 'C'),   # init rng (battle / cutscene start)
+           ('fix', 0xFB87): ('nat_fb87', 'NZC'),     # switch prg bank 0 and 1 (+ $AB)
+           ('fix', 0xFB89): ('nat_fb89', 'NZC'),     #   (no $AB)
+           ('p34', 0x9754): ('nat_9754', 'NZ')}      # init text buffer ($7200-$73FF = $FF)
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   $FB80 wait for nmi (INC $05 / LDA $05 / BNE): the asynchronous NMI handler
     #   ($0100 = JMP $FB57 in battle / cutscenes) clears $05; on the GB the handler runs

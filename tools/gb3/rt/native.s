@@ -800,3 +800,65 @@ nat_fc27:   ld hl, NES_RAM                  ; seed: A + the zero page with carri
             push hl
             pop af
             ret
+
+; ------------------------------------------------------------------ fix:FB87 / FB89
+; switch prg bank 0 and 1: A = 16KB unit -> $8000 = 2A, $A000 = 2A + 1 ($5114 / $5115 with
+; bit 7), $AB = A (FB87 only); $A9 incremented and decremented around each write (net 0).
+; Out: A = ((2A & $7F) + 1) & $7F, C = 0, N / Z from the last DEC $A9 (= $A9); X, Y kept.
+nat_fb87:   ld [NES_RAM + $AB], a
+nat_fb89:   add a, a                        ; ASL
+            push af
+            or $80
+            call rt_mmc_w5114
+            pop af
+            and $7F
+            inc a                           ; (CLC / ADC #1: no carry out, A <= $80)
+            push af
+            or $80
+            call rt_mmc_w5115
+            pop af
+            and $7F
+            push af
+            ld a, [NES_RAM + $A9]           ; N / Z of $A9 (the last DEC), C = 0
+            ldh [nzv], a
+            and a                           ; Z from $A9, C = 0
+            push af
+            pop hl
+            pop af
+            push hl
+            ld h, a                         ; A back, flags from $A9 test
+            pop af
+            ld a, h
+            ret
+
+; ------------------------------------------------------------------ p34:9754
+; init text buffer: $7200-$73FF = $FF, $7AC0 = $4E = $18 = 0, $7AC1 = $4F = $72, $19 = $73.
+; Out: A = $FF, Y = 0, Z = 1, N = 0, C kept; X kept.
+nat_9754:   push af
+            xor a
+            ld [$BAC0], a                   ; $7AC0
+            ld [NES_RAM + $4E], a
+            ld [NES_RAM + $18], a
+            ld a, $72
+            ld [$BAC1], a                   ; $7AC1
+            ld [NES_RAM + $4F], a
+            inc a
+            ld [NES_RAM + $19], a
+            ld hl, $B200                    ; $7200 (PRG-RAM)
+            ld a, $FF
+.f:         ld [hl+], a
+            ld [hl+], a
+            ld a, h
+            cp $B4
+            ld a, $FF
+            jr nz, .f
+            ld c, 0
+            xor a
+            ldh [nzv], a
+            pop af                          ; (C kept)
+            push af
+            ld hl, sp + 0
+            set 7, [hl]                     ; Z = 1
+            pop af
+            ld a, $FF
+            ret
