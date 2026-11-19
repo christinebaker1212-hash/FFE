@@ -118,10 +118,9 @@ python3 tools/gb3/ff3src.py "roms/Final Fantasy III (Japan).nes" build/ff3/src_e
 
 ## Speed pass (2026-11-19)
 Measured in mGBA (CGB double speed) with the `newgame` input: real frames between waited-for
-frames (GB `VBL_CNT`, NES emulator frames). Tools (scratch scripts, to be moved into
-`tools/gb3/`): elapsed frames since waited-for 2400 per 100 input frames; per-waited-frame
-lead; mGBA cycle profiles (`SGBRUN_PROF2=300 SGBRUN_PROFC=1`, `profnes.py` groups samples by
-NES routine; ~470 samples = one frame of CPU).
+frames (GB `VBL_CNT`, NES emulator frames): `tools/gb3/lagcheck.py NES GB FROM TO [--step
+N]` (per-waited-frame lead and total); mGBA cycle profiles (`SGBRUN_PROF2=300
+SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one frame of CPU).
 - **Result: the opening battle keeps pace overall**: from waited-for 2400 (field) to 4332 (end
   of the battle) the GB takes 2002 frames, the NES 2001. Battle start: the GB builds the rng
   table at once (the NES spends 25 frames) but loads the battle graphics in ~30 frames (NES
@@ -153,6 +152,6 @@ NES routine; ~470 samples = one frame of CPU).
 
 ## Next
 1. Speed: the first battle round (above); then other battles (bosses, magic animations), the
-   field, menus; move the measuring scripts into `tools/gb3/`.
+   field, menus.
 2. Raster split in the runtime (LYC, window layer), sound (APU -> GB, FF1/FF2 model).
 3. Mock-ups for the owner (battle, dialogue, main menu), then the re-layouts.
