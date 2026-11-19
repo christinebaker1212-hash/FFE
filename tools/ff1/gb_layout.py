@@ -2265,6 +2265,7 @@ def apply(rom, report):
     dialogue(rom)
     main_menu(rom)
     target_menu(rom)
+    field_magic_move(rom)
     item_menu(rom)
     magic_menu(rom)
     equip_menu(rom)
@@ -2315,6 +2316,77 @@ def menu_strings(enc_txt):
         MENU_GB[54 + 2 * i] = '{09} {%02X}' % (0x10 + i)
     MENU_GB[2] = ('{05}' + '{08}'.join('  ' + w for w in ('Items', 'Magic', 'Weapons', 'Armor', 'Status'))
                   + '{08}{04}Gil')      # Gil below the commands (amount 6 wide + 'Gil': 9 of 10 columns)
+
+
+def field_magic_move(rom):
+    """Field magic list movement (b14 $B707, $62 = level * 4 + spell, $20 = buttons): the GB
+    list shows each level's spells one per row, so down / up step through the spells in
+    list order (empty slots skipped, across levels, wrapping), right / left jump a level
+    (FF1's up / down). $B77B: Z set if the slot is empty; $B784: done."""
+    src = """
+    cmp #4          ; $B707
+    beq nxt
+    cmp #8
+    beq prv
+    cmp #1
+    bne lft
+rgt:
+    lda $62
+    clc
+    adc #4
+    and #$1F
+    sta $62
+    jsr $B77B
+    beq rgt
+    jmp $B784
+lft:
+    lda $62
+    sec
+    sbc #4
+    and #$1F
+    sta $62
+    jsr $B77B
+    beq lft
+    jmp $B784
+nxt:
+    lda $62
+    and #3
+    cmp #2
+    bcc n1
+    lda $62
+    and #$1C
+    clc
+    adc #4
+    and #$1F
+    sta $62
+    jmp n2
+n1:
+    inc $62
+n2:
+    jsr $B77B
+    beq nxt
+    jmp $B784
+prv:
+    lda $62
+    and #3
+    bne p1
+    lda $62
+    sec
+    sbc #4
+    and #$1C
+    ora #2
+    sta $62
+    jmp p2
+p1:
+    dec $62
+p2:
+    jsr $B77B
+    beq prv
+    jmp $B784
+"""
+    r = asm(src, org=0xB707)
+    assert r.org + len(r.bytes) <= 0xB77B, hex(r.org + len(r.bytes))
+    put_bank(rom, 14, 0xB707, r.bytes, bytes.fromhex('c904b04cc901d023'))
 
 
 def target_menu(rom):
