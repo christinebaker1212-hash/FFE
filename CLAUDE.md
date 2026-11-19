@@ -838,7 +838,9 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   and CGB, 150-180 points; only frame-alignment shifts while a Color load is masked or a
   queued write is pending; OAM_SH identical too). checkall 62/62 on the last build. Lag: CGB
   31 -> 23, DMG 199 -> 172 frames. Then: prologue row writer native (`prow_b`), window rows
-  native (`wrow3_b`, table from the ROM at build time): CGB 21, DMG 171. Tools: lagcheck LAG_DUMP, sgbrun SGBRUN_CALLS / SGBRUN_PROF_SPOFF,
+  native (`wrow3_b`, table from the ROM at build time): CGB 21, DMG 171; frame-wait race fixed
+  (a vblank between the check and the `halt` slept a whole frame): CGB 19, DMG 168; CGB
+  masked-load show done in the frame wait (it busy-waited mid-frame): CGB 9. Tools: lagcheck LAG_DUMP, sgbrun SGBRUN_CALLS / SGBRUN_PROF_SPOFF,
   gbrun cart-RAM dump.
 
 ## Remaining

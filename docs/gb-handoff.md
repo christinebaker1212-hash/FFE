@@ -141,14 +141,15 @@ Measure on the 7650-wait new-game + battle script (Gambatte, hardware-like timin
 `--gbjitter A-B` with `LAG_N=5000` lists every wait whose GB frames differ from the NES's.
 To group lag into screen loads, see `docs/gb-lessons.md` (Speed). Profile in mGBA with
 `SGBRUN_PROFC=1 SGBRUN_PROF2=800 build/sgbrun ROM 8200 out --dmg|--cgb --padfile P --sram S > prof.txt`.
-The output has one sample per 800 timing units: about 175 samples per DMG frame, or per
-double-speed CGB frame at PROF2=400. Group the samples per wait by symbol.
+The output has one sample per 800 timing units: about 175 samples per DMG frame (at PROF2=400
+in double speed: ~350 per CGB frame). `SGBRUN_PROF_LY=1` adds LY to each sample (bits 16-23 of
+the wait column). Group the samples per wait by symbol.
 Input files for the script are kept by `LAG_KEEP=1 lagcheck.py ...` (it prints the temp dir).
 
 | | 2026-11-19 start | 2026-11-19 late | 2026-11-19 night |
 |---|---|---|---|
-| Color (CGB) | 126 frames lag (+1.6%) | ~33 (+0.4%) | 23 (+0.3%) |
-| Plain GB (DMG) | 263 (+3.4%) | ~200 (+2.6%) | 172 (+2.2%) |
+| Color (CGB) | 126 frames lag (+1.6%) | ~33 (+0.4%) | 9 (+0.1%) |
+| Plain GB (DMG) | 263 (+3.4%) | ~200 (+2.6%) | 168 (+2.2%) |
 
 Night session (checkall 62/62 after each step; SameBoy VRAM identical to the build before at
 150-170 points, DMG and CGB, with the scratch `vramcmp.py` approach in gb-lessons):
@@ -190,9 +191,25 @@ work ~150) then takes 2 frames: no net gain yet; a faster uniform scan (cells by
 `inc l` / `ld [de],a`, settle eight tiles a byte) would save ~60 samples there. Tried the
 cell loop: DMG lag 171 -> 174 (reverted): in each name-entry screen ~99 waits after the load
 (1134 / 1383 / 1632) a wait with only ~0.4 frame of work then takes 2 GB frames, the frame
-ending inside `oamconv_b` (the game's $4014 write). Lag there depends on where in the frame
-the work lands, not only on how much: to investigate (what delays that frame's start: spare-
-time re-coding in the frame wait, a long `di` section, the VRAM queue).
+ending inside `oamconv_b` (the game's $4014 write). Cause found: a race in the frame wait
+(the vblank could land between its check and its `halt`, after the frame timer had woken it:
+the halt then slept a whole frame). Fixed with di / check / halt / ei (rt_wait_nmi): CGB 21 ->
+19, DMG 171 -> 168; the faster uniform-scan cell loop then neutral (kept).
+CGB masked-load show moved to the frame wait: the NES's rendering-on write ($2001, rt_ppu_w1)
+used to run vshow_b at once, busy-waiting for LY 144 and DMAing map + cell palettes in the
+middle of the NES frame, so that frame always spilled into a second GB frame. Now it sets
+`VSHOW_P` ($CCDF); `rt_wait_nmi` calls `vshow_tramp` -> `vshow_def` (bank 60; keeps BC/DE/HL;
+skipped if rendering is off again) after taking VBL_ENT, so the DMA happens in the vblank the
+wait would sleep through anyway. `vshow_unm` (end of vshow_b / vshow_own, interrupts still
+off): VLCD 2, and when vbl_regs would unmask (no queued write, no tile copy, no dialogue) the
+window mask is lifted right there and VLCD = 0 (the vblank handler runs ~9 lines late after
+the DMA; deciding the unmask in it showed the top lines masked for a frame, and a later
+re-mask gave a black frame). CGB 19 -> 9 frames lag. CGB screenshots identical to the build
+before at 93 + 152 points except one top line for one frame at the field fade-in (3066: the
+late handler writes that frame's palettes at line 0). To remove that: send the map by HBlank
+DMA while still masked (source NT_SH in WRAM bank 1 only; vshow_own's bank-4 buffer would be
+read with the handlers' bank 1).
+(Profiler scale: SGBRUN_PROF2=400 in double speed gives ~350 samples per CGB frame, not 175.)
 Bank 0 is now full except ~15 bytes at $255E (main code) and 0 at $3EE3-$3EFF.
 Still to do in the scan: `scn_pu` (~37 M-cycles per view
 cell), `scn_tab` (~350 per row), the settle loop. Tools added: `LAG_DUMP=FILE

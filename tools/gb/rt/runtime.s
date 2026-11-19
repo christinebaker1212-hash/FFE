@@ -75,6 +75,7 @@ SGB_MIN    = 12
 NT_NOW     = $D87D          ; nt_tile: check the cell's palette at once (not in spare time)
 MAP_RB     = $CCFF          ; CGB masked load: GB map to rebuild from the shadows when shown
 CGB_RP     = $CCEF          ; CGB: cell palettes stale (owners changed with the LCD off; repal_b at LCD on)
+VSHOW_P    = $CCDF          ; CGB: a masked load to show in the next frame wait (rendering on)
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
 EMPH_E     = $DC46          ; CGB: NES emphasis bits (red 1, green 2, blue 4) of the palettes being made
@@ -1671,15 +1672,21 @@ rt_wait_nmi:
             ldh a, [is_sgb]
             and a
             call nz, sgb_frame
+            ld a, [VSHOW_P]                 ; (CGB: a masked load shown, its DMA in this
+            and a                           ;   wait's vblank)
+            call nz, vshow_tramp
             push hl                         ; pacing as the NES (owner: no speed-ups): the
             ld a, [VBL_ENT]                 ;   wait ends at the next vblank; a frame that
             ld l, a                         ;   ran long is simply late, as on the NES (FF1
-.w:         ld a, [VBL_CNT]                 ;   misses an NMI the same way), no catch-up
-            cp l
-            jr nz, .dn
-            halt
-            jr .w
-.dn:        ld [VBL_SEEN], a
+.w:         di                              ;   misses an NMI the same way), no catch-up
+            ld a, [VBL_CNT]                 ; (check and halt with interrupts off: a vblank
+            cp l                            ;   between them made the halt sleep a whole
+            jr nz, .dn                      ;   frame, when another interrupt such as the
+            halt                            ;   timer had woken the wait just before it;
+            ei                              ;   halt wakes on the pending interrupt, which runs
+            jr .w                           ;   after the ei's next instruction)
+.dn:        ei
+            ld [VBL_SEEN], a
 .go:        pop hl
             xor a
             ldh [frame_flag], a
@@ -1779,14 +1786,11 @@ rt_ppu_w1:  push af
             ldh [ppu_mask], a
             and $18
             jr z, .off
-            ld a, [VLCD]                    ; CGB masked load: shown once the queued writes
-            and a                           ;   and tile copies are done (vblank: VLCD 2 -> 0);
-            jr z, .nv                       ;   the masked frames are not caught up
-            call vshow_tramp                ; (map cells and cell palettes deferred while
-            ld a, 2                         ;   masked)
-            ld [VLCD], a
-            ld a, [VBL_CNT]
-            ld [VBL_SEEN], a
+            ld a, [VLCD]                    ; CGB masked load: shown in the next frame wait
+            and a                           ;   (vshow_def: map and cell palettes by DMA in
+            jr z, .nv                       ;   its vblank, VLCD 2 -> unmasked); the rest of
+            ld a, 1                         ;   this NES frame still writes masked
+            ld [VSHOW_P], a
 .nv:        ldh a, [lcd_on]
             and a
             jr nz, .ret

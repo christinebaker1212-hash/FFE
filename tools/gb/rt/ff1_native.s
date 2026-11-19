@@ -6562,24 +6562,59 @@ scan_b:     push bc
             ld b, a                         ; (as a palette bit)
             ld hl, NT_SH
             ld d, high(SC_NP)
-            ld c, 240                       ; 960 cells, 4 per pass
-.uc:        ld a, [hl+]
-            ld e, a
-            ld a, b
+            ld c, 60                        ; 960 cells, 16 per pass (a page in 16 passes;
+.uc:                                        ;   A = the palette bit)
+            ld e, [hl]
             ld [de], a
-            ld a, [hl+]
-            ld e, a
-            ld a, b
+            inc l
+            ld e, [hl]
             ld [de], a
-            ld a, [hl+]
-            ld e, a
-            ld a, b
+            inc l
+            ld e, [hl]
             ld [de], a
-            ld a, [hl+]
-            ld e, a
-            ld a, b
+            inc l
+            ld e, [hl]
             ld [de], a
-            dec c
+            inc l
+            ld e, [hl]
+            ld [de], a
+            inc l
+            ld e, [hl]
+            ld [de], a
+            inc l
+            ld e, [hl]
+            ld [de], a
+            inc l
+            ld e, [hl]
+            ld [de], a
+            inc l
+            ld e, [hl]
+            ld [de], a
+            inc l
+            ld e, [hl]
+            ld [de], a
+            inc l
+            ld e, [hl]
+            ld [de], a
+            inc l
+            ld e, [hl]
+            ld [de], a
+            inc l
+            ld e, [hl]
+            ld [de], a
+            inc l
+            ld e, [hl]
+            ld [de], a
+            inc l
+            ld e, [hl]
+            ld [de], a
+            inc l
+            ld e, [hl]
+            ld [de], a
+            inc l
+            jr nz, .uh
+            inc h
+.uh:        dec c
             jr nz, .uc
             jp .settle
 .full:      ldh a, [cam_y]                  ; the view: map row (scroll_y + cam_y) mod 240 / 8,
@@ -8586,6 +8621,55 @@ rtb_b:      ldh [sh_u3], a
 ; and the palettes are expanded from its attribute bytes into WRAM bank 4 $D000; both go to
 ; VRAM by general-purpose DMA in a vblank (interrupts off; a second vblank if the first has
 ; no room left). Cells of both nametables: vshow_own.
+; end of a CGB masked load's show (interrupts off, in the vblank, after the DMA): VLCD 2.
+; This vblank's handler runs late (after the DMA), so when it would unmask (no queued write,
+; no tile copy pending, no dialogue window) the window mask is lifted here for the top lines
+; of the next frame, LCDC as vbl_regs sets it.
+vshow_unm:  ld a, 2
+            ld [VLCD], a
+            ldh a, [hd_any]
+            and a
+            ret nz
+            ldh a, [q_head]
+            ld b, a
+            ldh a, [q_tail]
+            cp b
+            ret nz
+            ldh a, [dlg_l]
+            and a
+            ret nz
+            xor a                           ; (shown now: VLCD 0, so writes made before the
+            ld [VLCD], a                    ;   next vblank do not mask it again)
+            ld b, LCDC_ON & %11111101
+            ldh a, [ppu_mask]
+            bit 4, a
+            jr z, .ns
+            set 1, b
+.ns:        ld a, b
+            ldh [$FF40], a
+            ret
+vshow_def:  xor a                           ; (frame wait) VSHOW_P: rendering still on: shown,
+            ld [VSHOW_P], a                 ;   unmasked in the vblank (VLCD 2); else masked.
+            ldh a, [ppu_mask]               ;   Keeps BC, DE, HL (the NES's X / Y)
+            and $18
+            ret z
+            ld a, [MAP_RB]                  ; nothing to rebuild: unmasked by vbl_regs (VLCD 2)
+            and a
+            jr nz, .sh
+            ld a, [CGB_RP]
+            and a
+            jr nz, .sh
+            ld a, 2
+            ld [VLCD], a
+            ret
+.sh:        push bc                         ; else VLCD set at the end of the DMA (vshow_unm:
+            push de                         ;   not before it, so no vblank handler unmasks
+            push hl                         ;   the old map)
+            call vshow_b
+            pop hl
+            pop de
+            pop bc
+            ret
 vshow_b:    ld a, [MAP_RB]
             ld b, a
             ld a, [CGB_RP]
@@ -8651,7 +8735,8 @@ vshow_b:    ld a, [MAP_RB]
             ld [CGB_RP], a
             inc a
             ldh [$FF70], a
-.x:         ei
+.x:         call vshow_unm
+            ei
             ret
 .vb:        ldh a, [$FF44]                  ; in a vblank with room (LY 144-146): now;
             cp 144                          ;   else wait for the next one
@@ -9030,6 +9115,7 @@ vshow_own:  ldh a, [q_head]                 ; queued writes first
             ldh [$FF4F], a
             inc a
             ldh [$FF70], a
+            call vshow_unm
             ei
             ret
 

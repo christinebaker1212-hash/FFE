@@ -165,6 +165,7 @@ int main(int argc, char** argv) {
 					uint32_t pc = 0; core->readRegister(core, "pc", &pc); pc &= 0xFFFF;
 					unsigned bank = pc < 0x4000 ? 0 : ((struct GB*) core->board)->memory.currentBank;
 					unsigned nn = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
+					if (getenv("SGBRUN_PROF_LY")) nn |= (unsigned) core->rawRead8(core, 0xFF44, -1) << 16;   /* (LY in bits 16-23 of the wait column) */
 					if (nprof < 2000000) { profs[nprof] = bank << 16 | pc; proff[nprof++] = nn; }
 					if (getenv("SGBRUN_PROF_SP") && nprof < 2000000) {   /* + the word at SP (a caller), for profiling helpers */
 						uint32_t sp = 0; core->readRegister(core, "sp", &sp);   /* (SGBRUN_PROF_SPOFF=N: the word at SP + N) */

@@ -74,6 +74,12 @@ it in FF1 (file / routine names in this repo).
   places; with PHP..PLP pairs (and PHP/PLA/AND/PHA/PLP masks) modelled and static-flow
   "readers" inside executed instructions ignored, V is provably dead at unknown edges and all
   of them compile to plain arithmetic (recomp.py `liveness`, prints its verdict).
+- **Frame wait: check and halt with interrupts off** (`di` / check / `halt` / `ei`). A plain
+  check-then-`halt` loop loses a whole frame whenever the vblank interrupt lands between the
+  check and the `halt` - which happens when another interrupt (here the LCD-off frame timer,
+  left running with the LCD on) wakes the wait just before the vblank. It looked like random
+  frame-alignment noise ("a faster routine made lag worse"); fixing it gave CGB -2, DMG -3
+  frames on the script. Use `SGBRUN_PROF_LY=1` (LY with each sample) to see such a frame.
 - **Batch, don't go per cell**: DrawMapRowCol (64 tiles), the battle panel rows (25 cells)
   and the sprite conversion (64 entries) were 150-250 cycles per item through the generic
   nametable path. Batched writers (`mdf_row/col`, `nrf`, `oamconv_b`) do the shadow in runs,

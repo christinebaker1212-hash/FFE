@@ -569,10 +569,10 @@ maprb_tramp:                                ; CGB masked load shown: maprb_b (ba
             ld [$2000], a
             ret
 
-vshow_tramp:                                ; CGB masked load shown: vshow_b (bank PF_BANK)
-            ld a, PF_BANK
+vshow_tramp:                                ; frame wait, CGB masked load shown: vshow_def
+            ld a, PF_BANK                   ;   (bank PF_BANK)
             ld [$2000], a
-            call vshow_b
+            call vshow_def
             ldh a, [code_bank]
             ld [$2000], a
             ret
