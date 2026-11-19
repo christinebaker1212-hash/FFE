@@ -42,6 +42,8 @@ def main():
     ap.add_argument('--input', default='none'); ap.add_argument('--from', dest='frm', type=int, default=0)
     ap.add_argument('--max', type=int, default=5); ap.add_argument('--ignore', default='')
     ap.add_argument('--show', default='', help='LO-HI: print these RAM bytes of both every frame')
+    ap.add_argument('--sram', default='', help='LO-HI: compare this PRG-RAM range ($6000-$7FFF) '
+                    'at the end of both runs (for data that stays put, e.g. the battle rng table)')
     a = ap.parse_args()
     a.show = tuple(int(v, 16) for v in a.show.split('-')) if a.show else None
     pad = INPUTS[a.input]
@@ -65,6 +67,7 @@ def main():
             nes_clock[wk] = k
             if wk >= a.frm: nes_ram[wk] = bytes(n.nmi_ram)
     print('NES: %d frames (input clock), %d waited-for frames, in %d NES frames' % (k, wk, f))
+    nes_sram = bytes(n[0x6000 + i] for i in range(0x2000))
     k = wk
     # GB
     S = sym(os.path.splitext(a.gb)[0] + '.sym')
@@ -119,6 +122,11 @@ def main():
     while st['last'] < k and t < a.frames * 6 + 2000:
         pb.tick(1, False); t += 1
         if st['diffs'] >= a.max: break
+    if a.sram:
+        lo, hi = (int(v, 16) for v in a.sram.split('-'))
+        d = [x for x in range(lo, hi + 1) if m[0, 0xA000 + x - 0x6000] != nes_sram[x - 0x6000]]
+        print('PRG-RAM %04X-%04X at the end: %d bytes differ %s' % (lo, hi, len(d),
+              ' '.join('%04X:%02X/%02X' % (x, nes_sram[x - 0x6000], m[0, 0xA000 + x - 0x6000]) for x in d[:16])))
     dbg = [m[0xD820 + i] for i in range(8)]
     print('GB: %d GB frames, reached frame %d, %d frames compared, %d with differences; DBG %s'
           % (t, st['last'], st['checked'], st['diffs'], ' '.join('%02X' % x for x in dbg)))

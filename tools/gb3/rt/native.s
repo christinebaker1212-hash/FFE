@@ -304,8 +304,38 @@ chr64_fast: ldh a, [ppu_vl]
             ldh a, [ppu_vl]
             ld e, a
             pop hl
-            ld a, [NES_RAM + $92]           ; B = flip table on
-            ld b, a
+            ld a, [NES_RAM + $92]           ; flip table on: the slow loop
+            and a
+            jr nz, .flp
+            ld c, 64                        ; 64 bytes, plane 0 -> even, plane 1 -> odd bytes
+.pl:        ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            dec c
+            ld a, c
+            and 7
+            jr nz, .pl
+            ld a, e                         ; after 8 bytes: plane 1 (-15) or next tile (-1)
+            bit 3, c
+            jr z, .np
+            sub 15
+            ld e, a
+            jr .pl
+.np:        dec a
+            ld e, a
+            jr nz, .pl2
+            inc d
+.pl2:       ld a, c
+            and a
+            jr nz, .pl
+            dec hl                          ; A = the last byte (no table: X = $92 = 0)
+            ld a, [hl]
+            ldh [nt_a], a
+            xor a
+            ldh [nt_x], a
+            jr .done
+.flp:       ld b, a
             ld c, 4
 .tile:      push bc
             ld c, 8                         ; plane 0 -> even bytes
@@ -335,6 +365,7 @@ chr64_fast: ldh a, [ppu_vl]
 .t2:        pop bc
             dec c
             jr nz, .tile
+.done:
             ld a, 1
             ldh [rSVBK], a
             ldh a, [code_bank]
@@ -427,7 +458,7 @@ nat_f897:   ld a, c                         ; (Y is kept)
 ; ------------------------------------------------------------------ p2e:9F98
 ; clear vram ($0000-$2FFF through $2007): staging copy and nametable shadow cleared, every
 ; tile marked, the GB map cleared and the attributes reset (palette 0, the BG table's bank)
-; by DMA in the next vblank (map_clr / rebank). Out: A = X = Y = 0, Z = 1, N = 0, C kept;
+; by DMA in the next vblank (map_flush). Out: A = X = Y = 0, Z = 1, N = 0, C kept;
 ; PPU address $3000, latch reset.
 nat_9f98:   push af
             ld a, 2                         ; staging tables (WRAM banks 2, 3)
@@ -450,7 +481,14 @@ nat_9f98:   push af
             ld a, h
             cp high(NT_SH) + 8
             jr c, .c2
-            ld hl, ATTR_SH                  ; attributes: palette 0, the BG table's bank
+            ld a, MAP_BANK                  ; GB map: tile 0; attributes: palette 0, the BG
+            ldh [rSVBK], a                  ;   table's bank
+            ld hl, MAP_SH
+.c5:        xor a
+            ld [hl+], a
+            ld a, h
+            cp high(MAP_SH) + 4
+            jr c, .c5
             ldh a, [bg_bank]
             ld b, a
 .c3:        ld a, b
@@ -458,6 +496,14 @@ nat_9f98:   push af
             ld a, h
             cp high(ATTR_SH) + 4
             jr c, .c3
+            ld a, 1
+            ldh [rSVBK], a
+            ld a, $FF
+            ld hl, map_dirty                ; (map_dirty, attr_dirty: 8 bytes in a row)
+            ld b, 8
+.c6:        ld [hl+], a
+            dec b
+            jr nz, .c6
             ld hl, TILE_DIRTY               ; all 512 tiles
             ld a, $FF
 .c4:        ld [hl+], a
@@ -466,8 +512,7 @@ nat_9f98:   push af
             jr nz, .c4
             ld a, 1
             ldh [chr_dirty], a
-            ldh [rebank], a
-            ldh [map_clr], a
+            ldh [map_any], a
             xor a
             ldh [ppu_latch], a
             ldh [ppu_stat], a
@@ -639,4 +684,119 @@ nat_fc92:   push af
             ld a, 0
             inc a
             dec a
+            ret
+
+; ------------------------------------------------------------------ fix:FC27
+; init rng (battle / cutscene start: a 256-byte table at $7BE3 from 256 rounds of a 16-bit
+; multiply and divide). Closed form for rounds 0-254: v' = r if r <= 512 else 1024 - r, with
+; r = (s * v) mod 1024, s = 3 / 5, table = (v' >> 1) & 255; the last round runs the native
+; multiply / divide step for step, so $18-$1F, A, X, Y and the flags end as on the NES.
+nat_fc27:   ld hl, NES_RAM                  ; seed: A + the zero page with carries (ADC $00,X)
+.sum:       adc a, [hl]
+            inc l
+            jr nz, .sum
+            ld [NES_RAM + $15], a
+            ld [NES_RAM + $16], a
+            ld [NES_RAM + $17], a
+            and 2
+            add a, 3                        ; (AND / CLC / ADC #3)
+            ld [NES_RAM + $22], a
+            ld b, a                         ; B = s
+            ld de, 1                        ; DE = v
+            ld hl, $BBE3                    ; table ($7BE3)
+.rnd:       push hl
+            ld h, d                         ; HL = v * s (s = 3: v + 2v; 5: v + 4v)
+            ld l, e
+            add hl, hl
+            bit 2, b
+            jr z, .s3
+            add hl, hl
+.s3:        add hl, de
+            ld a, h                         ; r = mod 1024
+            and 3
+            ld h, a
+            cp 2                            ; r > 512: 1024 - r
+            jr c, .keep
+            jr nz, .flip
+            ld a, l
+            and a
+            jr z, .keep
+.flip:      xor a
+            sub l
+            ld l, a
+            ld a, 4
+            sbc a, h
+            ld h, a
+.keep:      ld d, h
+            ld e, l
+            pop hl
+            ld a, d                         ; table = (v >> 1) & 255
+            rra
+            ld a, e
+            rra
+            ld [hl+], a
+            ld a, l
+            cp $E2                          ; ($7BE3 + 255 = $7CE2: the last round below)
+            jr nz, .rnd
+            ld a, e                         ; v -> $20 / $21
+            ld [NES_RAM + $20], a
+            ld a, d
+            ld [NES_RAM + $21], a
+            ld a, b                         ; last round exactly: $18 = s, $19 = 0, $1A / $1B = v
+            ld [NES_RAM + $18], a
+            xor a
+            ld [NES_RAM + $19], a
+            ld a, e
+            ld [NES_RAM + $1A], a
+            ld a, d
+            ld [NES_RAM + $1B], a
+            ld a, e                         ; carry = bit 0 of $20 (the last ROR)
+            rra
+            ld c, $FF                       ; (Y = 255)
+            call nat_fcf5
+            ld a, [NES_RAM + $1C]
+            ld [NES_RAM + $18], a
+            ld a, [NES_RAM + $1D]
+            ld [NES_RAM + $19], a
+            ld a, 0
+            ld [NES_RAM + $1A], a
+            ld a, 4
+            ld [NES_RAM + $1B], a           ; (loads keep the multiply's carry)
+            call nat_fc92
+            ld a, [NES_RAM + $1F]           ; SEC / SBC #2 / ORA $1E / BEQ / BCC
+            sub 2
+            jr c, .nf2                      ; ($1F < 2: keep)
+            ld h, a
+            ld a, [NES_RAM + $1E]
+            or h
+            jr z, .nf2
+            ld a, [NES_RAM + $1E]           ; $1E = 0 - $1E, $1F = 4 - $1F - borrow
+            cpl
+            add a, 1
+            ld [NES_RAM + $1E], a
+            ccf
+            ld a, [NES_RAM + $1F]
+            ld h, a
+            ld a, 4
+            sbc a, h
+            ld [NES_RAM + $1F], a
+.nf2:       ld a, [NES_RAM + $1F]
+            ld [NES_RAM + $21], a
+            ld h, a
+            ld a, [NES_RAM + $1E]
+            ld [NES_RAM + $20], a
+            srl h                           ; LSR $1F (C = bit 0) / ROR $1E
+            rra
+            ld [$BCE2], a                   ; table[255]
+            push af                         ; (A and the ROR's carry)
+            xor a                           ; Y = 0 (INY wrapped): Z = 1, N = 0
+            ldh [nzv], a
+            ld bc, 0
+            ld d, 0
+            pop af
+            push af
+            pop hl
+            set 7, l                        ; GB Z flag on, carry kept
+            push hl
+            pop af
             ret

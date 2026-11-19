@@ -66,7 +66,8 @@ class FF3:
            ('fix', 0xF897): ('nat_f897', 'NZC'),     # copy color palettes to ppu
            ('p2e', 0x9F98): ('nat_9f98', 'NZ'),      # clear vram ($0000-$2FFF)
            ('fix', 0xFCF5): ('nat_fcf5', 'NZC', 'C'),   # multiply (16-bit)
-           ('fix', 0xFC92): ('nat_fc92', 'NZC', 'C')}   # divide (16-bit)
+           ('fix', 0xFC92): ('nat_fc92', 'NZC', 'C'),   # divide (16-bit)
+           ('fix', 0xFC27): ('nat_fc27', 'NZC', 'C')}   # init rng (battle / cutscene start)
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   $FB80 wait for nmi (INC $05 / LDA $05 / BNE): the asynchronous NMI handler
     #   ($0100 = JMP $FB57 in battle / cutscenes) clears $05; on the GB the handler runs

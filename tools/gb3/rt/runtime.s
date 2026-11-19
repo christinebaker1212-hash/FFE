@@ -30,9 +30,9 @@ NMI_CNT    = $D830          ; 16-bit count of NES frame waits             test r
 VBL_CNT    = $D832          ; 16-bit count of GB frames                   tools/gb/gambatte/
 WAIT_CNT   = $D834          ; 16-bit count of NES frames the main thread waited for (tools/gb3/firstdiff.py)
 TEST_PAD   = $D83E          ; $A5: test runner input mode (later)         gbrun.c)
-DBG_RING   = $DE00          ; debug ring (256 bytes; gbrun GBRUN_DBG dumps it)
-DBG_RING_P = $D83F
-ATTR_SH    = $DC00          ; GB map attributes (VRAM bank 1 $9800-$9BFF), 1KB, 16-aligned
+MAP_SH     = $D000          ; GB map (VRAM bank 0 $9800-$9BFF) and its attributes (VRAM bank 1),
+ATTR_SH    = $D400          ;   1KB each, in WRAM bank MAP_BANK; dirty rows copied by DMA in the
+MAP_BANK   = 5              ;   vblank (map_flush)
 DYN_BANK   = 127            ; ROM bank of the dynamic-target table (translate.py)
 LCDC_ON    = %10010011      ; LCD on, window map $9800 (off), BG/window tiles $8000 (unsigned),
                             ;   BG map $9800, 8x8 OBJ on, BG priority on
@@ -66,7 +66,9 @@ scroll_x:   ds 1
 scroll_y:   ds 1
 mirror:     ds 1                            ; 0 vertical ($5105 = $44), 1 horizontal ($50)
 bg_bank:    ds 1                            ; BG pattern table the attributes carry (0 / 8)
-rebank:     ds 1                            ; BG table changed: rewrite the attributes
+map_dirty:  ds 4                            ; GB map rows written (bit per row) /
+attr_dirty: ds 4                            ;   attribute rows written
+map_any:    ds 1                            ; a bit is set in map_dirty / attr_dirty
 frame_tick: ds 1
 oam_pending: ds 1
 pal_dirty:  ds 1
@@ -105,7 +107,6 @@ c_q:        ds 1
 nt_x:       ds 1                            ; native routines (rt/native.s): saved X, A
 nt_a:       ds 1
 nt_y:       ds 1
-map_clr:    ds 1                            ; clear the GB map in the vblank (nat_9f98)
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -155,6 +156,11 @@ boot:       di
             ld bc, $0F00
             call memclr
             ld a, 4                         ; WRAM bank 4: zeros (DMA source, map clears)
+            ldh [rSVBK], a
+            ld hl, $D000
+            ld bc, $1000
+            call memclr
+            ld a, MAP_BANK                  ; GB map / attribute shadows
             ldh [rSVBK], a
             ld hl, $D000
             ld bc, $1000
@@ -288,47 +294,31 @@ vblank_isr: push af
             ldh a, [cam_y]
             add a, l
             ldh [rSCY], a
-            ldh a, [rebank]                 ; BG table changed: attributes by DMA
+            ldh a, [map_any]                ; staged map / attribute rows -> VRAM
             and a
-            jr z, .nrb
-            xor a
-            ldh [rebank], a
-            ld a, 1
-            ldh [rVBK], a
-            ld a, high(ATTR_SH)
-            ldh [rHDMA1], a
-            xor a
-            ldh [rHDMA2], a
-            ld a, $98
-            ldh [rHDMA3], a
-            xor a
-            ldh [rHDMA4], a
-            ld a, $3F                       ; 64 blocks of 16 bytes, general purpose
-            ldh [rHDMA5], a
-            xor a
-            ldh [rVBK], a
-.nrb:       ldh a, [map_clr]                ; GB map cleared by DMA from a zero page
-            and a                           ;   (WRAM bank 4, kept zero)
             jr z, .nmc
-            xor a
-            ldh [map_clr], a
-            ldh [rVBK], a
+            push bc
+            push de
             ldh a, [rSVBK]
             push af
-            ld a, 4
+            ld a, MAP_BANK
             ldh [rSVBK], a
-            ld a, $D0
-            ldh [rHDMA1], a
             xor a
-            ldh [rHDMA2], a
-            ld a, $98
-            ldh [rHDMA3], a
+            ldh [map_any], a
+            ld hl, map_dirty
+            ld d, high(MAP_SH)
+            ld e, 0
+            call map_flush
+            ld hl, attr_dirty
+            ld d, high(ATTR_SH)
+            ld e, 1
+            call map_flush
             xor a
-            ldh [rHDMA4], a
-            ld a, $3F
-            ldh [rHDMA5], a
+            ldh [rVBK], a
             pop af
             ldh [rSVBK], a
+            pop de
+            pop bc
 .nmc:       ldh a, [chr_dirty]              ; staged tiles -> VRAM
             and a
             jr z, .nchr
@@ -766,13 +756,6 @@ vput_go:
             ret
 
 rt_ppu_w7:
-            push hl
-            ld hl, DBG_RING + 4
-            inc [hl]
-            jr nz, .pc2
-            inc hl
-            inc [hl]
-.pc2:         pop hl
            push af                         ; $2007 write
             push bc
             push de
@@ -817,8 +800,15 @@ rt_ppu_w7:
             cp $C0
             jr nc, .attr
 .cell:      call cell_map                   ; HL = GB map address of the cell
-            ld a, c
-            call vput0
+            call map_mark
+            ld a, h                         ; -> MAP_SH (WRAM bank MAP_BANK)
+            sub $98 - high(MAP_SH)
+            ld h, a
+            ld a, MAP_BANK
+            ldh [rSVBK], a
+            ld [hl], c
+            ld a, 1
+            ldh [rSVBK], a
             jr .done
 .attr:      ld a, l
             sub $C0
@@ -1154,25 +1144,127 @@ quad_row:   ld a, d                         ; cells (E, D) and (E + 1, D) of nam
             ldh a, [c_nt]
             ld b, a
             call cell_map                   ; -> $98xx
+            push hl
+            ld de, attr_dirty
+            call row_mark
+            pop hl
             ld a, h
             sub $98 - high(ATTR_SH)
-            ld d, a
-            ld e, l
+            ld h, a
+            ld a, MAP_BANK
+            ldh [rSVBK], a
             ldh a, [c_q]
-            ld [de], a                      ; shadow (two cells)
-            inc e
-            ld [de], a
-            di
-            ld a, 1
-            ldh [rVBK], a
-.w:         ldh a, [rSTAT]
-            and 2
-            jr nz, .w
-            ldh a, [c_q]
-            ld [hl+], a
+            ld [hl+], a                     ; shadow (two cells)
             ld [hl], a
-            ei
+            ld a, 1
+            ldh [rSVBK], a
             pop de
+            ret
+
+; HL = GB map address ($9800-$9BFF): mark its row in map_dirty (map_mark) or in the bitmap at
+; DE (row_mark). A, F, D, E clobbered; HL, B, C kept.
+map_mark:   ld de, map_dirty
+row_mark:   ld a, h                         ; row = (H & 3) << 3 | L >> 5: byte H & 3, bit L >> 5
+            and 3
+            add a, e
+            ld e, a
+            ld a, l
+            swap a
+            rrca
+            and 7
+            push hl
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .nc
+            inc h
+.nc:        ld a, [hl]
+            ld h, d
+            ld l, e
+            or [hl]
+            ld [hl], a
+            pop hl
+            ld a, 1
+            ldh [map_any], a
+            ret
+
+; vblank: dirty rows of one shadow -> VRAM by general-purpose DMA (runs within a bitmap byte,
+; 2 blocks per row), while LY is 144-150; the rest stays marked for the next vblank.
+; HL = bitmap (4 bytes, HRAM), D = high(shadow), E = VRAM bank. SVBK = MAP_BANK.
+map_flush:  ld a, e
+            ldh [rVBK], a
+            ld b, 0                         ; B = bitmap byte 0-3
+.byte:      ld a, [hl]
+            and a
+            jr z, .next
+            ldh a, [rLY]
+            cp 151
+            jr nc, .late
+            ld c, [hl]                      ; C = bits; row = B * 8 + bit
+            ld [hl], 0
+            push hl
+            ld e, 0                         ; E = bit
+.bit:       bit 0, c
+            jr z, .nb
+            ld l, 0                         ; L = run length
+.run:       inc l
+            srl c
+            inc e
+            bit 0, c
+            jr z, .go
+            ld a, e
+            cp 8
+            jr c, .run
+.go:        push de
+            push bc
+            ld a, e                         ; first row = B * 8 + E - L
+            sub l
+            ld e, a
+            ld a, b
+            add a, a
+            add a, a
+            add a, a
+            add a, e                        ; A = row (0-31)
+            ld h, 0                         ; offset = row * 32
+            push hl
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            add a, d
+            ldh [rHDMA1], a
+            ld a, l
+            ldh [rHDMA2], a
+            ld a, h
+            add a, $98
+            ldh [rHDMA3], a
+            ld a, l
+            ldh [rHDMA4], a
+            pop hl
+            ld a, l                         ; 2 blocks per row
+            add a, a
+            dec a
+            ldh [rHDMA5], a
+            pop bc
+            pop de
+            jr .b2
+.nb:        srl c
+            inc e
+.b2:        ld a, e
+            cp 8
+            jr c, .bit
+            pop hl
+.next:      inc hl
+            inc b
+            ld a, b
+            cp 4
+            jr c, .byte
+            ret
+.late:      ld a, 1
+            ldh [map_any], a
             ret
 
 ; BG pattern table changed: set the bank bit of every attribute in the shadow, then the
@@ -1182,6 +1274,8 @@ rebank_attrs:
             push bc
             push hl
             ld b, a
+            ld a, MAP_BANK
+            ldh [rSVBK], a
             ld hl, ATTR_SH
 .l:         ld a, [hl]
             and $F7
@@ -1191,7 +1285,15 @@ rebank_attrs:
             cp high(ATTR_SH) + 4
             jr c, .l
             ld a, 1
-            ldh [rebank], a
+            ldh [rSVBK], a
+            ld a, $FF
+            ld hl, attr_dirty
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            ld a, 1
+            ldh [map_any], a
             pop hl
             pop bc
             pop af
@@ -1199,13 +1301,6 @@ rebank_attrs:
 
 ; ------------------------------------------------------------------ OAM, joypad, APU
 rt_io_w4014:
-            push hl
-            ld hl, DBG_RING + 0
-            inc [hl]
-            jr nz, .pc0
-            inc hl
-            inc [hl]
-.pc0:         pop hl
            ; OAM DMA from NES page A -> GB shadow OAM
             push af                         ;   (64 NES sprites -> up to 40 GB sprites in view)
             push bc
@@ -1468,13 +1563,6 @@ rt_mmc_w580F:
 ; HL = $4000 + offset in the window's 8KB bank; returns L. The GB bank holds NES banks 2k
 ; (at $4000) and 2k + 1 (at $6000).
 rt_rd_8:
-            push hl
-            ld hl, DBG_RING + 6
-            inc [hl]
-            jr nz, .pc3
-            inc hl
-            inc [hl]
-.pc3:         pop hl
            push af
             ldh a, [data_bank8]
             ld [MBC5_BANKL], a
@@ -1490,13 +1578,6 @@ rt_rd_8:
             pop af
             ret
 rt_rd_a:
-            push hl
-            ld hl, DBG_RING + 12
-            inc [hl]
-            jr nz, .pc6
-            inc hl
-            inc [hl]
-.pc6:         pop hl
            push af
             ldh a, [data_bankA]
             ld [MBC5_BANKL], a
@@ -1512,13 +1593,6 @@ rt_rd_a:
             pop af
             ret
 rt_rd_f:
-            push hl
-            ld hl, DBG_RING + 14
-            inc [hl]
-            jr nz, .pc7
-            inc hl
-            inc [hl]
-.pc7:         pop hl
            push af                         ; $C000-$FFFF: banks 126 / 127 = GB bank DATA + 63
             ld a, DATA + 63
             ld [MBC5_BANKL], a
@@ -1533,13 +1607,6 @@ rt_rd_f:
 
 ; ------------------------------------------------------------------ indirect access
 rt_izy_rd:
-            push hl
-            ld hl, DBG_RING + 2
-            inc [hl]
-            jr nz, .pc1
-            inc hl
-            inc [hl]
-.pc1:         pop hl
            push af                         ; L = zp pointer; byte at ptr+Y -> L
             ld h, high(NES_RAM)
             ld a, [hl+]
@@ -1599,13 +1666,6 @@ rt_izx_rd:  push af                         ; L = zp; pointer at (zp + X)
             ld l, a
             jr izrd
 rt_izy_wr:
-            push hl
-            ld hl, DBG_RING + 10
-            inc [hl]
-            jr nz, .pc5
-            inc hl
-            inc [hl]
-.pc5:         pop hl
            push af                         ; L = zp pointer; A -> ptr+Y
             ldh [wtmp], a
             ld h, high(NES_RAM)
@@ -1887,13 +1947,6 @@ rt_txs:     push af                         ; SP = STACK_TOP - 2 * ($FF - X); A,
 
 ; ------------------------------------------------------------------ banking / dispatch
 rt_farcall:
-            push hl
-            ld hl, DBG_RING + 8
-            inc [hl]
-            jr nz, .pc4
-            inc hl
-            inc [hl]
-.pc4:         pop hl
            ; HL = target, fc_bank = its bank; A, F, BC, DE pass both ways
             ldh [sv_a], a
             ldh a, [code_bank]
@@ -1923,13 +1976,6 @@ rt_farcall_ret:
 ; in bank DYN_BANK (translate.py): bucket (lo + hi + key) & $FF, key = the NES 8KB bank of
 ; the address's window ($8000: $5114, $A000: $5115), else $FF.
 lookup:
-            push hl
-            ld hl, DBG_RING + 16
-            inc [hl]
-            jr nz, .pc8
-            inc hl
-            inc [hl]
-.pc8:         pop hl
            push af
             push bc
             push de
@@ -2147,6 +2193,8 @@ rt_fault:   di
             ldh a, [code_bank]
             ld [DBG + 7], a
 rt_halted:  jr rt_halted
+
+BIT_MASK:   db 1, 2, 4, 8, 16, 32, 64, 128
 
 rst38_trap: di                              ; rst $38 (opcode $FF) reached: DBG+8 = SP,
             ld [DBG + 8], sp                ;   DBG+10.. = stack words; then stop
