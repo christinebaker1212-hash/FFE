@@ -46,6 +46,133 @@ hle_chr_pages:
             ldh a, [data_bank8]
             ld [$2000], a
             push de
+            ldh a, [is_cgb]                 ; DMG, LCD off, a whole BG page (16 tiles from
+            ld d, a                         ;   tile 0 of a page): straight copies, the marks
+            ldh a, [lcd_on]                 ;   for the 16 tiles at once
+            or d
+            jr nz, .tile
+            ld a, c
+            and a
+            jr nz, .tile
+            ldh a, [ppu_vl]
+            and a
+            jr nz, .tile
+            ldh a, [ppu_vh]
+            cp $10
+            jr nc, .tile
+            add a, high(BG_SHADOW)
+            ld d, a
+            ld e, 0
+            ld a, 1
+            ld [$4000], a
+.ft:
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, e
+            sub 15
+            ld e, a
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            dec e
+            jr nz, .ft
+            ldh [tmp_lo], a                 ; (last byte)
+            xor a
+            ld [$4000], a
+            ldh a, [ppu_vh]                 ; tiles t0 = page * 16 .. + 15: CODED unknown,
+            swap a                          ;   marked (DIRTY_BM), not parked (DEFER_BM)
+            ld l, a
+            ld h, high(CODED)
+            ld b, 16
+            ld a, $FF
+.fc:        ld [hl+], a
+            dec b
+            jr nz, .fc
+            ldh a, [ppu_vh]
+            add a, a
+            ld l, a
+            ld h, high(DIRTY_BM)
+            ld a, $FF
+            ld [hl+], a
+            ld [hl], a
+            ld a, l
+            add a, low(DEFER_BM) - low(DIRTY_BM)
+            ld l, a
+            xor a
+            ld [hl-], a
+            ld [hl], a
+            inc a
+            ldh [rq_any], a
+            ldh a, [ppu_vh]                 ; v += 256
+            inc a
+            and $3F
+            ldh [ppu_vh], a
+            pop de
+            ldh a, [code_bank]
+            ld [$2000], a
+            ld hl, NES_RAM + $11            ; INC $11 / DEX (Y stays 0)
+            inc [hl]
+            dec e
+            jp .page
 .tile:      ; destination DE = GB tile address for v (as in rt_ppu_w7)
             ldh a, [ppu_vl]
             and $F0
