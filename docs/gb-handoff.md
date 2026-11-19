@@ -13,7 +13,7 @@ bash tools/emu/build_emu.sh build/emu                     # patched cynes (NES r
 gcc -O2 tools/gb/mgba/sgbrun.c -lmgba -o build/sgbrun     # mGBA runner (SGB / DMG / CGB)
 python3 tools/split/build_mmc5.py "roms/Final Fantasy I, II (Japan).nes" build
 python3 tools/ff1/insert.py build/ff1_mmc5.nes build/ff1_gb.nes --gb     # English NES + GB layout (+ .far)
-PYTHONPATH=build/emu python3 tools/gb/covall.py build/ff1_gb.nes build/cov3   # coverage, ~40 min (4 cores)
+PYTHONPATH=build/emu python3 tools/gb/covall.py build/ff1_gb.nes build/cov3   # coverage, ~20 min (4 cores)
 PYTHONPATH=build/emu python3 tools/gb/build.py --gb --nes build/ff1_gb.nes   # -> build/ff1_gb.gb (+ .sym)
 ```
 `build.py --gb` without `--nes` runs the whole pipeline from `roms/` (split, English,
@@ -23,7 +23,15 @@ NES-side code (`gb_layout.py`, `insert.py`); runtime-only changes (`tools/gb/rt/
 only `build.py`. If the user uploads the ROMs as zips, unzip into `roms/` and check the
 SHA-1s in README.
 
+Coverage from an older NES ROM still works for small NES-side changes: covall keeps a copy
+(`rom.nes`), and build.py drops the logs of the changed bytes and relies on static flow
+there (prints how many). New code reached only by dynamic dispatch can still be missing
+(the GB then halts with fault code 1 in `DBG` $D820): regenerate before the final checks.
+`covall.py` reads the ROM at the start of each run: give it a copy if you keep rebuilding.
+
 ## Checks
+- All at once: `PYTHONPATH=build/emu python3 tools/gb/checkall.py build/ff1_gb.nes
+  build/ff1_gb.gb [--only NAME,..] [--dmg|--cgb]` (logs in `build/checks/`).
 - RAM equivalence (NES RAM at NMI k = GB RAM entering frame wait k), DMG and CGB
   (`GB_CGB=1`): `firstdiff.py build/ff1_gb.nes build/ff1_gb.gb 3700` (new game),
   `... 30000 --random 1`, `... 7100 --battle`, and every `covall.FIELD` script with its
