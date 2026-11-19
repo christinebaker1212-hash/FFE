@@ -215,25 +215,95 @@ class Recompiler:
             outs[k] = o
             for s in o:
                 if s is not None: preds[s].add(k)
-        work = list(ins)
-        while work:
-            k = work.pop(); i = ins[k]
-            lo = frozenset()
-            for s in outs[k]:
-                lo |= ALL if (s is None or s not in ins) else live_in[s]
-            if k in self.g.ext:
-                li = lo - frozenset(self.g.ext[k][1])
-            elif k in self.g.idioms:
-                li = lo - frozenset(self.g.idioms[k][2])
-            elif i.mn == 'JSR':
-                li = lo                                     # = live_in(callee), set via outs
-            else:
-                li = frozenset(USE.get(i.mn, '')) | (lo - frozenset(DEF.get(i.mn, '')))
-                if i.mn == 'JMP' and i.mode == 'ind': li = ALL
-                if k in self.rts_dispatch: li = ALL
-            if lo != live_out[k] or li != live_in[k]:
-                live_out[k], live_in[k] = lo, li
-                work.extend(preds[k])
+        # PHP ... PLP in straight-line code: the PHP needs only the flags live after the PLP
+        php_plp, plp_php = {}, {}
+        php_mask = {}                  # PHP / PLA / AND #m / PHA / PLP: flags kept by the mask
+        for k, i in ins.items():
+            if i.mn != 'PHP': continue
+            seq = [ins.get((k[0], k[1] + d)) for d in (1, 2, 4, 5)]
+            if all(seq) and [x.mn for x in seq] == ['PLA', 'AND', 'PHA', 'PLP'] and seq[1].mode == 'imm':
+                m = seq[1].arg
+                php_mask[k] = frozenset(f for f, b in (('N', 7), ('V', 6), ('Z', 1), ('C', 0)) if m >> b & 1)
+                php_plp[k] = (k[0], k[1] + 5); plp_php[(k[0], k[1] + 5)] = k
+                continue
+            d, c = 0, k
+            for _ in range(40):
+                o = [(c[0], c[1] + 3)] if ins[c].mn == 'JSR' else outs.get(c, [])   # (calls return)
+                if len(o) != 1 or o[0] is None or o[0] not in ins: break
+                c = o[0]; m = ins[c].mn
+                if ins[c].mode == 'rel' or m in ('JMP', 'RTS', 'RTI') or c in self.g.ext or c in self.g.idioms: break
+                if m in ('PHA', 'PHP'): d += 1
+                elif m in ('PLA', 'PLP'):
+                    if d == 0:
+                        if m == 'PLP': php_plp[k] = c; plp_php[c] = k
+                        break
+                    d -= 1
+        # V at unknown edges: FF1 reads V in a few places only (BVC / BVS, PHP). If no reader
+        # can be reached from a target of an unknown edge (a dynamic target or a JSR's return
+        # site) before V is set again, unknown edges do not keep V live, and ADC / SBC whose
+        # V only reached them compile without computing it (checked after solving with V
+        # dead there; else solved again with all flags live).
+        entry_like = set(self.dyn_targets()) | {(k[0], k[1] + 3) for k, i in ins.items() if i.mn == 'JSR'}
+        def defs(k):
+            if k in self.g.ext: return frozenset(self.g.ext[k][1])
+            if k in self.g.idioms: return frozenset(self.g.idioms[k][2])
+            i = ins[k]
+            return frozenset() if i.mn == 'JSR' else frozenset(DEF.get(i.mn, ''))
+        NZCV = frozenset('NZCV')
+        # V readers that never ran and overlap an instruction that did (static flow into
+        # the operand bytes of real code, e.g. after a branch that is always taken)
+        ran = [k for k, i in ins.items() if i.cov & 1]
+        inside = set()
+        for k in ran:
+            for d in range(1, ins[k].size): inside.add((k[0], k[1] + d))
+        bogus_v = {k for k, i in ins.items() if i.mn in ('BVC', 'BVS', 'PHP') and not i.cov & 1 and k in inside}
+        def solve(U):
+            for k in ins: live_in[k] = live_out[k] = frozenset()
+            work = list(ins)
+            while work:
+                k = work.pop(); i = ins[k]
+                lo = frozenset()
+                for s in outs[k]:
+                    lo |= U if (s is None or s not in ins) else live_in[s]
+                if k in self.g.ext:
+                    li = lo - frozenset(self.g.ext[k][1])
+                elif k in self.g.idioms:
+                    li = lo - frozenset(self.g.idioms[k][2])
+                elif i.mn == 'JSR':
+                    li = lo                                     # = live_in(callee), set via outs
+                elif k in php_plp:
+                    li = lo | (live_out[php_plp[k]] & php_mask.get(k, NZCV))
+                else:
+                    li = frozenset(USE.get(i.mn, '')) | (lo - frozenset(DEF.get(i.mn, '')))
+                    if k in bogus_v: li = li - frozenset('V')
+                    if i.mn == 'JMP' and i.mode == 'ind': li = U
+                    if k in self.rts_dispatch: li = U
+                if lo != live_out[k] or li != live_in[k]:
+                    live_out[k], live_in[k] = lo, li
+                    work.extend(preds[k])
+                    if k in plp_php: work.append(plp_php[k])
+        def v_reaches_unknown():
+            for r, ri in ins.items():
+                if r in self.g.ext or r in self.g.idioms or r in bogus_v: continue
+                if ri.mn in ('BVC', 'BVS') or ri.mn == 'PHP' and (r not in php_plp or 'V' in live_out[php_plp[r]] & php_mask.get(r, NZCV)):
+                    seen = set(); st = [r]
+                    while st:
+                        k = st.pop()
+                        if k in seen: continue
+                        seen.add(k)
+                        if k in entry_like or ins[k].mn == 'JMP' and ins[k].mode == 'ind' or k in self.rts_dispatch:
+                            return (r, k)
+                        for q in preds[k]:
+                            if 'V' not in defs(q): st.append(q)
+            return None
+        U = ALL - frozenset('V')
+        solve(U)
+        self.v_reason = v_reaches_unknown()
+        if self.v_reason:
+            U = ALL
+            solve(U)
+        self.U = U
+        import sys as _s; print('V at unknown edges:', 'live' if U == ALL else 'dead', self.v_reason, 'bogus V readers', len(bogus_v), file=_s.stderr)
         # JSR: flags live after the call that the callee does not define must pass through
         self.live_out, self.live_in = live_out, live_in
 

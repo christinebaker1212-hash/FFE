@@ -11,6 +11,9 @@ MD_A       = $CCF3          ;   the NES's A at the end (last load),
 MD_SRC     = $CCF4          ;   buffer offset of the first / second tile of a pair (2),
 MD_IDX     = $CCF6          ;   source index,
 MD_ADD     = $CCF7          ;   column: +1 for the right-hand column
+MD_FAST    = $CCF8          ;   DMG with the LCD on: the batched writer (mdf_row / mdf_col),
+MD_MK      = MD_SRC         ;   (batched) a tile is marked or parked somewhere,
+MD_PB      = $DCE0          ;   CGB: palettes of a GB map row (32)
 
 section bank HLE_BANK, $4000
 NBIT:       db 1, 2, 4, 8, 16, 32, 64, 128   ; (at $4000: low byte = bit number)
@@ -23,6 +26,50 @@ NBIT:       db 1, 2, 4, 8, 16, 32, 64, 128   ; (at $4000: low byte = bit number)
 mapdraw_b:  xor a                           ; (LDA $2002)
             ldh [vbl_flag], a
             ldh [ppu_latch], a
+            ld a, MDF_ON                    ; (GB_MDF=0 at build time: per tile, for checks)
+            and a
+            jr z, .sl
+            ldh a, [lcd_on]                 ; LCD on (CGB: not a masked load), no dialogue
+            and a                           ;   box: the batched writer (the VRAM queue
+            jr z, .sl                       ;   emptied first, so no queued map cell is
+            ld a, [VLCD]                    ;   written after it)
+            and a
+            jr nz, .sl
+            ldh a, [dlg_on]
+            and a
+            jr nz, .sl
+.dr:        ldh a, [q_head]
+            ld b, a
+            ldh a, [q_tail]
+            cp b
+            jr z, .de
+            call q_drain1
+            jr .dr
+.de:        ldh a, [is_cgb]                 ; (CGB: no shading checks)
+            and a
+            jr z, .dm
+            xor a
+            ld [MD_MK], a
+            inc a
+            jr .sf
+.dm:        ld hl, DIRTY_BM                 ; any tile marked / parked? (else no cell needs
+            ld b, 32                        ;   its palette checked)
+            xor a
+.mk1:       or [hl]
+            inc l
+            dec b
+            jr nz, .mk1
+            ld l, low(DEFER_BM)
+            ld b, 32
+.mk2:       or [hl]
+            inc l
+            dec b
+            jr nz, .mk2
+            ld [MD_MK], a
+            ld a, 1
+            jr .sf
+.sl:        xor a
+.sf:        ld [MD_FAST], a
             ld a, [NES_RAM + $30]           ; tmp = $2000 + nty * 64 (+ 2 * col, NT $2400 for
             ld l, a                         ;   col >= 16)
             rrca
@@ -56,6 +103,9 @@ mapdraw_b:  xor a                           ; (LDA $2002)
             ld a, [NES_RAM + $2D]
             and $02
             jp nz, .col
+            ld a, [MD_FAST]
+            and a
+            jp nz, mdf_row
             ; -- row: two tile rows of 16 pairs, nametable switch after 16 - col pairs
             ld a, e
             xor $0F
@@ -122,6 +172,9 @@ mapdraw_b:  xor a                           ; (LDA $2002)
             ld [NES_RAM + $12], a
             ld a, $04
             ldh [ppu_ctrl], a
+            ld a, [MD_FAST]
+            and a
+            jp nz, mdf_col
             ld a, [NES_RAM + $11]
             ld [MD_HI], a
             ld a, [NES_RAM + $10]
@@ -319,7 +372,22 @@ nt_tile:    ld a, h
             inc a
             ldh [dmg_scan], a
             jr .map
-.cell:      ld a, [NT_NOW]                  ; (ntrun_b: the palette check at once)
+.cell:      push bc                         ; a tile shaded since its graphics were loaded
+            push hl                         ;   (not marked / parked) keeps its palette: FF1's
+            ld c, d                         ;   map tiles belong to metatiles of one palette
+            call bm_addr                    ;   (attribute writes still re-check the cells
+            ld a, [hl]                      ;   they change): no per-cell check while the map
+            ld c, a                         ;   scrolls
+            ld a, l
+            add a, low(DEFER_BM) - low(DIRTY_BM)
+            ld l, a
+            ld a, [hl]
+            or c
+            and b
+            pop hl
+            pop bc
+            jr z, .map
+            ld a, [NT_NOW]                  ; (ntrun_b: the palette check at once)
             and a
             jr nz, .now
             call fresh_set
@@ -345,6 +413,649 @@ nt_tile:    ld a, h
             ret
 .q:         ld a, d
             jp vram_put
+
+; ---- DrawMapRowCol batched (DMG, LCD on, no dialogue box, VRAM queue empty): the tiles
+; go to the nametable shadow in runs, the GB map row / column is copied from the shadow
+; (two cells per moment VRAM is free), the owner bits are set 8 cells at a time, and the
+; cells whose tile is marked or parked get their palette checked (as nt_tile). The NES
+; state at the end (RAM $10-$12, PPU address, A / X / Y / flags) as the per-tile loop.
+mdf_row:    ld a, e                         ; E = pair column in its nametable
+            add a, a
+            ld [MD_ADD], a                  ; s = first column of nametable A (2 * E)
+            ld a, e
+            xor $0F
+            inc a
+            ld [NES_RAM + $12], a           ; pairs before the boundary
+            ld a, [NES_RAM + $10]
+            ld [MD_LO], a
+            xor a
+            call mdf_rsh                    ; tile row 2k: UL / UR
+            call mdf_rgb
+            ld a, [NES_RAM + $10]
+            add a, $20
+            ld [NES_RAM + $10], a
+            ld [MD_LO], a
+            ld a, $20
+            call mdf_rsh                    ; tile row 2k + 1: DL / DR
+            call mdf_rgb
+            ld a, [NES_RAM + $11]           ; the address after the last tile (nametable B)
+            xor $04
+            ld [MD_HI], a
+            ld a, [NES_RAM + $12]
+            cp 16
+            jr nz, .nb
+            ld a, [NES_RAM + $10]           ; boundary at the last pair: A = the low byte
+            and $E0
+            ld [MD_LO], a
+            ld [MD_A], a
+            jr .ex
+.nb:        ld b, a
+            ld a, 16
+            sub b
+            add a, a
+            ld b, a
+            ld a, [NES_RAM + $10]
+            and $E0
+            add a, b
+            ld [MD_LO], a
+            ld a, [NES_RAM + $07BF]         ; A = the last tile (DR, pair 15)
+            ld [MD_A], a
+.ex:        ld a, [NES_RAM + $12]
+            sub 16
+            ld e, a
+            ld c, $10
+            ld a, [MD_A]
+            jp mapdraw_b.exit
+
+; A = buffer offset (0 / $20): 16 pairs (A[i], A[i + $10]) into the shadow row at MD_LO
+; ($11 = address high), the nametable switch after $12 pairs
+mdf_rsh:    add a, low(NES_RAM + $0780)
+            ld c, a
+            ld b, high(NES_RAM + $0780)
+            ld a, [NES_RAM + $11]
+            and 7
+            add a, high(NT_SH)
+            ld h, a
+            ld a, [MD_LO]
+            ld l, a
+            ld a, [NES_RAM + $12]
+            ld d, a
+            ld e, 16
+.p:         ld a, [bc]
+            ld [hl+], a
+            ld a, c
+            add a, $10
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, c
+            sub $0F
+            ld c, a
+            dec e
+            ret z
+            dec d
+            jr nz, .p
+            ld a, [NES_RAM + $11]           ; nametable B from column 0
+            and 7
+            xor 4
+            add a, high(NT_SH)
+            ld h, a
+            ld a, [MD_LO]
+            and $E0
+            ld l, a
+            jr .p
+
+; the shadow row at MD_LO to the GB map (nametable A from column s = MD_ADD, B below s),
+; its owner bits, the palette checks
+mdf_rgb:    ld a, [NES_RAM + $11]
+            and 3
+            ld [MD_IDX], a                  ; offset high
+            ld a, [NES_RAM + $11]
+            and 7
+            add a, high(NT_SH)
+            ld h, a
+            ld a, [MD_LO]
+            ld l, a
+            ld e, a
+            ld a, [MD_IDX]
+            add a, $98
+            ld d, a
+            ld a, [MD_ADD]
+            cpl
+            add a, 33
+            srl a
+            ld b, a                         ; (32 - s) / 2 pairs
+            call mdf_vrun
+            ld a, [NES_RAM + $11]
+            and 7
+            xor 4
+            add a, high(NT_SH)
+            ld h, a
+            ld a, [MD_LO]
+            and $E0
+            ld l, a
+            ld e, a
+            ld a, [MD_IDX]
+            add a, $98
+            ld d, a
+            ld a, [MD_ADD]
+            srl a
+            ld b, a                         ; s / 2 pairs
+            call mdf_vrun
+            ldh a, [is_cgb]                 ; CGB: the row's cell palettes (VRAM bank 1)
+            and a
+            call nz, mdf_pbrow
+            ld a, [MD_LO]                   ; OWN: offset high * 32 + (row & 7) * 4
+            and $E0
+            rrca
+            rrca
+            rrca
+            ld l, a
+            ld a, [MD_IDX]
+            swap a
+            add a, a
+            or l
+            ld l, a
+            ld a, [MD_ADD]
+            ld d, a
+            ld a, [NES_RAM + $11]
+            and 4
+            jr z, .e0
+            ld a, $FF
+.e0:        ld e, a
+            call mdf_ownrow
+            ld a, [MD_MK]
+            and a
+            ret z
+            ld a, [NES_RAM + $11]
+            and 7
+            add a, high(NT_SH)
+            ld h, a
+            ld a, [MD_LO]
+            ld l, a
+            ld a, [MD_ADD]
+            cpl
+            add a, 33
+            ld b, a
+            ld c, 1
+            call mdf_mk
+            ld a, [NES_RAM + $11]
+            and 7
+            xor 4
+            add a, high(NT_SH)
+            ld h, a
+            ld a, [MD_LO]
+            and $E0
+            ld l, a
+            ld a, [MD_ADD]
+            ld b, a
+            ld c, 1
+            jp mdf_mk
+
+; CGB: the palettes of the GB map row at MD_LO (offset high MD_IDX) from the attribute
+; shadow of the nametable that drew each cell (A from column MD_ADD, B below), to VRAM
+; bank 1
+mdf_pbrow:  ld a, [MD_IDX]
+            add a, a
+            add a, a
+            add a, a
+            ld b, a
+            ld a, [MD_LO]
+            swap a
+            rrca
+            and 7
+            or b
+            ld b, a                         ; B = row
+            and $1C
+            add a, a
+            add a, $C0
+            ld c, a                         ; C = attribute row ($C0 + (row / 4) * 8)
+            ld hl, MD_PB
+            ld d, 0                         ; D = pair
+.p:         push hl
+            ld a, [MD_ADD]
+            ld e, a
+            ld a, d
+            add a, a
+            cp e                            ; carry: column below s (nametable B)
+            ld a, [NES_RAM + $11]
+            jr nc, .na
+            xor 4
+.na:        and 4
+            add a, high(NT_SH) + 3
+            ld h, a
+            ld a, d
+            srl a
+            add a, c
+            ld l, a
+            ld a, [hl]
+            bit 1, b
+            jr z, .t
+            swap a
+.t:         bit 0, d
+            jr z, .u
+            rrca
+            rrca
+.u:         and 3
+            pop hl
+            ld [hl+], a
+            ld [hl+], a
+            inc d
+            ld a, d
+            cp 16
+            jr nz, .p
+            ld hl, MD_PB
+            ld a, [MD_LO]
+            and $E0
+            ld e, a
+            ld a, [MD_IDX]
+            add a, $98
+            ld d, a
+            ld b, 16
+.l:         di                              ; (VRAM bank 1 only with interrupts off: the
+            ldh a, [$FF41]                  ;   handlers leave bank 0 selected)
+            bit 1, a
+            jr z, .w
+            ei
+            jr .l
+.w:         ld a, 1
+            ldh [$FF4F], a
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            xor a
+            ldh [$FF4F], a
+            ei
+            dec b
+            jr nz, .l
+            ret
+
+; HL = source, DE = GB map, B = pairs: two cells per moment VRAM is free (STAT mode 0 / 1,
+; mode 2 follows: both writes land within its 20 M-cycles); interrupts between the polls
+mdf_vrun:   ld a, b
+            and a
+            ret z
+.l:         di
+            ldh a, [$FF41]
+            bit 1, a
+            jr z, .w
+            ei
+            jr .l
+.w:         ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            ei
+            inc e
+            dec b
+            jr nz, .l
+            ret
+
+; OWN bytes L..L+3 (a GB map row): columns >= D owned by nametable A (E = $FF: nametable
+; 1, 0: nametable 0), those below by the other one; own1 kept as the count of set bits
+mdf_ownrow: ld h, high(OWN)
+            ld b, 0                         ; B = first column of the byte
+.j:         ld a, d
+            sub b
+            jr c, .ff
+            jr z, .ff
+            cp 8
+            jr nc, .zz
+            ld c, a
+            ld a, $FF
+.sh:        add a, a
+            dec c
+            jr nz, .sh
+            jr .m
+.ff:        ld a, $FF
+            jr .m
+.zz:        xor a
+.m:         xor e                           ; A = columns >= D -> the new byte
+            cpl
+            ld c, a
+            push hl
+            push de
+            ld e, [hl]
+            ld [hl], c
+            ld h, high(POPC)
+            ld l, c
+            ld a, [hl]
+            ld l, e
+            sub [hl]                        ; set bits new - old
+            ld e, a
+            ld d, 0
+            jr nc, .p
+            dec d
+.p:         ldh a, [own1_lo]
+            add a, e
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            adc a, d
+            ldh [own1_hi], a
+            pop de
+            pop hl
+            inc l
+            ld a, b
+            add a, 8
+            ld b, a
+            cp 32
+            jr nz, .j
+            ret
+
+; HL = shadow cell, B = cells, C = step (1 / 32): cells whose tile is marked (DIRTY_BM) or
+; parked (DEFER_BM) get their palette checked as in nt_tile (FRESH, or at once with NT_NOW)
+mdf_mk:     ld a, b
+            and a
+            ret z
+.l:         ld a, [hl]
+            ld d, a
+            push hl
+            and 7
+            ld l, a
+            ld h, high(NBIT)
+            ld e, [hl]
+            ld a, d
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld l, a
+            ld h, high(DIRTY_BM)
+            ld a, [hl]
+            and e
+            jr nz, .m
+            ld a, l
+            add a, low(DEFER_BM) - low(DIRTY_BM)
+            ld l, a
+            ld a, [hl]
+            and e
+            jr nz, .m
+.n:         pop hl
+            ld a, l
+            add a, c
+            ld l, a
+            jr nc, .nc
+            inc h
+.nc:        dec b
+            jr nz, .l
+            ret
+.m:         pop hl
+            push hl
+            push bc
+            ld a, h
+            sub high(NT_SH)
+            ld b, a
+            and 4
+            ld c, a                         ; C = 4 for nametable 1
+            ld a, b
+            and 3
+            ld b, a                         ; B = offset high, L = offset low, D = tile
+            ld a, [NT_NOW]
+            and a
+            jr nz, .now
+            call fresh_set
+            jr .mx
+.now:       call cell_fast
+.mx:        pop bc
+            jr .n
+
+; column (DrawMapRowCol with $2D bit 1): E = pair column in its nametable, $12 = pairs
+; before the wrap to row 0, ppu_ctrl set
+mdf_col:    xor a
+            call mdf_cone                   ; UL / DL
+            ld a, 1
+            call mdf_cone                   ; UR / DR
+            ld a, [NES_RAM + $11]           ; the address after the last tile: from row 0
+            and $24                         ;   of the right-hand column on, 64 per pair
+            ld h, a
+            ld a, [NES_RAM + $10]
+            inc a
+            and $1F
+            ld l, a
+            ld a, [NES_RAM + $12]
+            cp 15
+            jr nz, .nb
+            ld a, l                         ; boundary at the last pair: A = the low byte
+            ld [MD_A], a
+            jr .ad
+.nb:        ld b, a
+            ld a, 15
+            sub b
+            ld b, a
+            ld de, 64
+.a64:       add hl, de
+            dec b
+            jr nz, .a64
+            ld a, [NES_RAM + $07BE]         ; A = the last tile (DR, pair 14)
+            ld [MD_A], a
+.ad:        ld a, h
+            and $3F
+            ld [MD_HI], a
+            ld a, l
+            ld [MD_LO], a
+            ld a, [NES_RAM + $12]
+            sub 15
+            ld e, a
+            ld c, $0F
+            ld a, [MD_A]
+            jp mapdraw_b.exit
+
+; CGB: palettes of the column (shadow cell of row 0 at the stack top + 2) from its
+; nametable's attribute shadow, to VRAM bank 1, two rows (one quadrant row) per write
+mdf_pbcol:  ld hl, sp + 2
+            ld a, [hl+]
+            ld c, a                         ; C = column (shadow low byte, row 0)
+            ld a, [hl]
+            and 4
+            add a, high(NT_SH) + 3
+            ld h, a
+            ld a, c
+            srl a
+            srl a
+            add a, $C0
+            ld l, a                         ; HL = attribute byte of rows 0-3
+            ld e, c
+            ld d, $98                       ; DE = GB map row 0
+            ld b, 0                         ; B = pair (rows 2B, 2B + 1)
+.p:         ld a, [hl]
+            bit 0, b
+            jr z, .t
+            swap a
+.t:         bit 1, c
+            jr z, .u
+            rrca
+            rrca
+.u:         and 3
+            push bc
+            ld c, a
+.l:         di
+            ldh a, [$FF41]
+            bit 1, a
+            jr z, .w
+            ei
+            jr .l
+.w:         ld a, 1
+            ldh [$FF4F], a
+            ld a, c
+            ld [de], a
+            set 5, e
+            ld [de], a
+            xor a
+            ldh [$FF4F], a
+            ei
+            pop bc
+            ld a, e
+            add a, 32
+            ld e, a
+            jr nc, .n
+            inc d
+.n:         bit 0, b
+            jr z, .s
+            ld a, l
+            add a, 8
+            ld l, a
+.s:         inc b
+            ld a, b
+            cp 15
+            jr nz, .p
+            ret
+
+; A = 0 / 1: the left / right column of the pairs (buffers $00 / $20 or $10 / $30)
+mdf_cone:   ld [MD_ADD], a
+            swap a
+            add a, low(NES_RAM + $0780)
+            ld c, a
+            ld b, high(NES_RAM + $0780)
+            ld a, [NES_RAM + $11]
+            and 7
+            add a, high(NT_SH)
+            ld h, a
+            ld a, [MD_ADD]
+            ld d, a
+            ld a, [NES_RAM + $10]
+            add a, d
+            ld l, a                         ; HL = shadow of row 2 * nty
+            ld a, [NES_RAM + $12]
+            ld d, a
+            ld e, 15
+.p:         ld a, [bc]
+            ld [hl], a
+            ld a, l
+            add a, 32
+            ld l, a
+            ld a, c
+            add a, $20
+            ld c, a
+            ld a, [bc]
+            ld [hl], a
+            ld a, c
+            sub $1F
+            ld c, a
+            ld a, l
+            add a, 32
+            ld l, a
+            jr nc, .nc
+            inc h
+.nc:        dec e
+            jr z, .dn
+            dec d
+            jr nz, .p
+            ld a, l                         ; wrap to row 0
+            and $1F
+            ld l, a
+            ld a, h
+            and $FC
+            ld h, a
+            jr .p
+.dn:        ld a, [NES_RAM + $11]           ; HL = the column's row 0 in the shadow
+            and 4
+            add a, high(NT_SH)
+            ld h, a
+            ld a, [NES_RAM + $10]
+            and $1F
+            ld b, a
+            ld a, [MD_ADD]
+            add a, b
+            ld l, a
+            push hl
+            ld e, a
+            ld d, $98                       ; GB map column, 15 pairs of rows
+            ld b, 15
+.v:         ld c, [hl]
+            set 5, l
+.w:         di
+            ldh a, [$FF41]
+            bit 1, a
+            jr z, .go
+            ei
+            jr .w
+.go:        ld a, c
+            ld [de], a
+            ld a, [hl]
+            set 5, e
+            ld [de], a
+            ei
+            ld a, l
+            add a, 32
+            ld l, a
+            jr nc, .n1
+            inc h
+.n1:        ld a, e
+            add a, 32
+            ld e, a
+            jr nc, .n2
+            inc d
+.n2:        dec b
+            jr nz, .v
+            ldh a, [is_cgb]                 ; CGB: the column's cell palettes
+            and a
+            call nz, mdf_pbcol
+            pop hl                          ; owner bits of the column's 30 cells
+            push hl
+            ld a, l
+            and 7
+            ld e, a
+            ld d, high(NBIT)
+            ld a, [de]
+            ld c, a                         ; C = the bit
+            ld a, h
+            and 4
+            ld e, a                         ; E = 4 for nametable 1
+            ld a, l
+            rrca
+            rrca
+            rrca
+            and 3
+            ld l, a
+            ld h, high(OWN)
+            ld b, 30
+            ld d, 0                         ; D = change of the count
+.o:         ld a, [hl]
+            and c
+            jr z, .oz
+            ld a, e
+            and a
+            jr nz, .on
+            ld a, c
+            cpl
+            and [hl]
+            ld [hl], a
+            dec d
+            jr .on
+.oz:        ld a, e
+            and a
+            jr z, .on
+            ld a, [hl]
+            or c
+            ld [hl], a
+            inc d
+.on:        ld a, l
+            add a, 4
+            ld l, a
+            dec b
+            jr nz, .o
+            ld e, d
+            ld d, 0
+            bit 7, e
+            jr z, .ps
+            dec d
+.ps:        ldh a, [own1_lo]
+            add a, e
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            adc a, d
+            ldh [own1_hi], a
+            pop hl
+            ld a, [MD_MK]
+            and a
+            ret z
+            ld b, 30
+            ld c, 32
+            jp mdf_mk
 
 ; DMG own_set: B = offset high (0-3), C = 4 for nametable 1, L = offset low. The GB map
 ; cell's owner bit (OWN) and the count of cells nametable 1 owns; sh_same = 0 on a change.
@@ -3121,3 +3832,23 @@ vclear_b:   xor a
             push hl
             pop af
             ret
+
+; set bits of each byte (mdf_ownrow)
+section bank HLE_BANK, $5F00
+POPC:
+            db 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4
+            db 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5
+            db 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5
+            db 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6
+            db 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5
+            db 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6
+            db 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6
+            db 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7
+            db 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5
+            db 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6
+            db 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6
+            db 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7
+            db 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6
+            db 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7
+            db 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7
+            db 4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8

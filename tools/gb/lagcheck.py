@@ -64,6 +64,7 @@ n0 = NES(nes_path)
 for i in range(0x2000): sram[i] = n0[0x6000 + i]
 sf = os.path.join(tmp, 'sram.bin'); open(sf, 'wb').write(sram)
 lf = os.path.join(tmp, 'lag.bin')
+if os.environ.get('LAG_KEEP'): print('inputs in', tmp)   # padfile / sram for sgbrun profiling
 exe = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'build', 'gbrun')
 cmd = [exe, gb_path, str(until * 4), os.path.join(tmp, 's'), '--padfile', pf, '--sram', sf,
        '--lagfile', lf, '--until', str(until)]

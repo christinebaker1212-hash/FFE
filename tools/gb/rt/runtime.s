@@ -34,6 +34,7 @@ SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB fo
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
 TEST_PAD   = $D83E          ; $A5: test runner input (read_buttons)
+VBL_ENT    = $D85B          ; VBL_CNT at the frame wait's entry (rt_wait_nmi)
 VBL_SEEN   = $D834          ; VBL_CNT (low) up to which GB frames were taken by NES frames
 CATCH_UP   = 8              ; GB frames an NES frame wait may be behind at most
 BG_DIRTY   = $CCA0          ; CGB: BG tiles to copy by HDMA (bitmap, 32)
@@ -1624,20 +1625,23 @@ rt_wait_nmi:
             inc hl
             inc [hl]
 .nc:        pop hl
-            ldh a, [is_cgb]
+            ld a, [VBL_CNT]                 ; (the count at the wait's entry: spare-time work
+            ld [VBL_ENT], a                 ;   below that runs into the vblank costs no frame,
+            ldh a, [is_cgb]                 ;   as the NES NMI comes during its wait loop)
             and a
             call z, dmg_frame
             ldh a, [is_sgb]
             and a
             call nz, sgb_frame
             push hl                         ; pacing as the NES (owner: no speed-ups): the
-            ld a, [VBL_CNT]                 ;   wait ends at the next vblank; a frame that
+            ld a, [VBL_ENT]                 ;   wait ends at the next vblank; a frame that
             ld l, a                         ;   ran long is simply late, as on the NES (FF1
-.w:         halt                            ;   misses an NMI the same way), no catch-up
-            ld a, [VBL_CNT]
+.w:         ld a, [VBL_CNT]                 ;   misses an NMI the same way), no catch-up
             cp l
-            jr z, .w
-            ld [VBL_SEEN], a
+            jr nz, .dn
+            halt
+            jr .w
+.dn:        ld [VBL_SEEN], a
 .go:        pop hl
             xor a
             ldh [frame_flag], a
