@@ -2188,7 +2188,9 @@ def menu_data(rom):
                 qi.append((qy >> 1) * 8 + (qx >> 1)); qs.append(sh); qm.append(~(3 << sh) & 0xFF)
     for nm, v in (('QIDX', qi), ('QSH', qs), ('QMSK', qm)):
         out += '%s: .db %s\n' % (nm, ', '.join(str(x) for x in v))
-    return out, dict(CHH=ins.ENC['H'], CHM=ins.ENC['M'], CHP=ins.ENC['P'])
+    out += 'SPEEDW: .db %s\n' % ', '.join('$%02X' % v for v in ins.enc('Speed '))
+    assert all(ins.ENC[str(d)] == ins.ENC['0'] + d for d in range(10))
+    return out, dict(CHH=ins.ENC['H'], CHM=ins.ENC['M'], CHP=ins.ENC['P'], CH1=ins.ENC['1'])
 
 
 def bank23(rom, L, extra=''):
@@ -2282,7 +2284,7 @@ gb_menu:
     rts
 .go:
     jmp ($0000)
-MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit, gm_tparty, gm_shoptext
+MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit, gm_tparty, gm_shoptext, gm_slot, gm_ngcam
 
 gm_exit:
     lda #6
@@ -2914,6 +2916,166 @@ gm_upn:                 ; VBUF's VN tiles to tiles A ..
     lda #>NTBUF
     sta VP+1
     jmp vupload
+gm_ngcam:               ; b14:B656 (game load menu, before its graphics): camera 6 / 6, no
+    lda #6              ;   split or palette override (a reset can come from a battle)
+    sta $5800
+    sta $5801
+    lda #0
+    sta $5802
+    sta $5803
+    sta $5804
+    sta $5805
+    sta $580A
+    rts
+gm_slot:                ; b14:B7EC (load menu slot $9E & 3, owner approved ff2_mock13):
+    lda #1              ;   window NES (6, 7 + 3k, 20, 4): number, leader name, Speed n;
+    sta MSCR            ;   HP / MP cur/max in 3-px digits (tiles $31 + 12k ..)
+    ldx #0
+.sv:
+    lda $7800,x
+    sta $7600,x
+    inx
+    bne .sv
+    ldx #7
+.ft:
+    txa
+    clc
+    adc #$F7
+    sta FTILE,x
+    dex
+    bpl .ft
+    lda #$FF
+    sta BLANKT
+    ldx #35
+.cl:
+    sta $7700,x
+    dex
+    bpl .cl
+    lda #0
+    sta VFILL
+    lda $9E
+    and #3
+    sta NL
+    clc
+    adc #CH1
+    sta $7700
+    ldx NL
+    lda $88,x
+    beq .full
+    jmp .win
+.full:
+    lda NL
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    sta VCX
+    tax
+    ldy #0
+.nm:
+    lda $6102,x
+    sta $7702,y
+    inx
+    iny
+    cpy #6
+    bne .nm
+    ldx #0
+.sp:
+    lda SPEEDW,x
+    sta $770A,x
+    inx
+    cpx #6
+    bne .sp
+    ldx VCX
+    lda $6110,x
+    clc
+    adc #CH1
+    sta $7710
+    lda NL              ; HP / MP tiles
+    asl a
+    adc NL
+    asl a
+    asl a
+    clc
+    adc #$31
+    sta VT
+    ldx #0
+.ht:
+    lda VT
+    sta $7714,x
+    clc
+    adc #6
+    sta $771D,x
+    inc VT
+    inx
+    cpx #6
+    bne .ht
+    ldx VCX
+    lda #CHH
+    sta VC
+    lda $6108,x
+    sta MV
+    lda $6109,x
+    sta MV+1
+    lda $610A,x
+    sta MV+2
+    lda $610B,x
+    sta MV+3
+    jsr gm_line
+    lda NL
+    asl a
+    adc NL
+    asl a
+    asl a
+    clc
+    adc #$31
+    jsr gm_up
+    ldx VCX
+    lda #CHM
+    sta VC
+    lda $610C,x
+    sta MV
+    lda $610D,x
+    sta MV+1
+    lda $610E,x
+    sta MV+2
+    lda $610F,x
+    sta MV+3
+    jsr gm_line
+    lda NL
+    asl a
+    adc NL
+    asl a
+    asl a
+    clc
+    adc #$37
+    jsr gm_up
+.win:
+    lda NL
+    asl a
+    adc NL
+    adc #7
+    sta VROW
+    lda #6
+    sta VCOL
+    lda #20
+    sta VW
+    lda #4
+    sta VH
+    lda #$00
+    sta VP
+    lda #$77
+    sta VP+1
+    jsr ntwin
+    ldx #0
+.rs:
+    lda $7600,x
+    sta $7800,x
+    inx
+    bne .rs
+    rts
 gm_shoptext:            ; b14:90FD (shop list text, owner approved ff2_mock12): per item the
     ldx #0              ;   name (column 1, cursor spot) and the price under it at column
     ldy #0              ;   13, from the shop data at $7B00 (id, price index); into $7B20
@@ -3766,6 +3928,104 @@ shop_list:
 ST_P1 = 80              # status pages: system strings 80 / 81 (ids unused by the game)
 
 
+# new-game screens (owner approved ff2_mock13): camera 6 / 6 (the boot camera), so the
+# screens are laid out in NES cols 6-25, rows 6-23
+NG_WIN = {22: (6, 6, 20, 6),            # name entry: portrait + name (GB 0,0,20,6)
+          23: (6, 12, 20, 12)}          # letter grid (GB 0,6,20,12): 5 of its 9 rows shown
+NG_LOAD = {21: (6, 20, 20, 4)}        # New Game window (GB 0,14,20,4)
+NG_COLS = 9                             # letters a row (NES 10, in two groups of 5)
+
+
+def new_game(rom, ins, bank, sysone):
+    import json, re
+    sys_en = {e['id']: e['en'] for e in json.load(open('script/ff2/system.json'))}
+    for w, (x, y, wd, h) in NG_WIN.items():
+        for base, v in ((0xB48C, x), (0xB4A5, y), (0xB4BE, wd), (0xB4D7, h)):
+            put(rom, 14, base + w, bytes([v]))
+    # name window (string 69): the portrait's 4 columns, the name from column 5 (GB col 6)
+    t69 = sys_en[69]
+    assert '{14:07}' in t69
+    bank.put_ptr(0x8400 + 2 * 69, bank.alloc(ins.enc(t69.replace('{14:07}', '{14:05}')) + b'\0'))
+    put(rom, 14, 0x8848, bytes([8 * 7]), old=bytes([0x44]))          # portrait x / y (GB 1, 1)
+    put(rom, 14, 0x884C, bytes([8 * 7 - 1]), old=bytes([0x1F]))
+    put(rom, 14, 0xB628, bytes([8 * 8 - 1]), old=bytes([0x27]))      # name cursor: row 8,
+    put(rom, 14, 0xB63D, bytes([8 * 12]), old=bytes([0x78]))         #   from column 12
+    # letter grid (string 70): the same letters in their order, NG_COLS a row two columns
+    # apart from column 1 of the window; the cursor moves NG_COLS entries up / down
+    ents = re.findall(r'\{17:[0-9A-F]{2}\}([^{\n]|\[[0-9A-F]{2}\])', sys_en[70].replace('\n', ''))
+    assert len(ents) == 80, len(ents)
+    rows = [ents[i:i + NG_COLS] for i in range(0, len(ents), NG_COLS)]
+    t70 = '\n'.join(''.join('{17:%02X}%s' % (1 + 2 * c, ch) for c, ch in enumerate(r)) for r in rows)
+    bank.put_ptr(0x8400 + 2 * 70, bank.alloc(ins.enc(t70) + b'\0'))
+    put(rom, 14, 0xB566, bytes([4 * NG_COLS]), old=bytes([0x28]))
+    # load menu: slot windows drawn by bank 24 (gm_slot, sub-command 7) in place of b14:B7EC
+    # (window + string 74); the freed bytes call the camera reset (sub-command 8) at B656
+    g = GBM[0]
+    k = asm('''
+    org $B7EC
+    lda #7
+    jmp GBM
+ngcam:
+    lda #8
+    jsr GBM
+    jmp $E491
+''', syms=dict(GBM=g))
+    assert k.org + len(k.bytes) <= 0xB7FC
+    put(rom, 14, k.org, k.bytes, old=bytes.fromhex('a59e2903186911aa2086b4a94a4c45b8')[:len(k.bytes)])
+    put(rom, 14, 0xB656, bytes([0x20]) + k.labels['ngcam'].to_bytes(2, 'little'), old=bytes.fromhex('2091e4'))
+    rom[sysone + 75 // 8] |= 1 << (75 % 8)             # New Game line: one row (GB row 15)
+    for w, (x, y, wd, h) in NG_LOAD.items():
+        for base, v in ((0xB48C, x), (0xB4A5, y), (0xB4BE, wd), (0xB4D7, h)):
+            put(rom, 14, base + w, bytes([v]))
+    # cursor spots (b14:B7CE: column, character row): hand at NES column 5 (GB x -8)
+    cur = bytes(v for r in [8, 11, 14, 17, 21] for v in (5, r, 0, 0))
+    put(rom, 14, 0xB7CE, cur, old=bytes.fromhex('02040000020900000 20e000002130000 02190000'.replace(' ', '')))
+
+    credits(rom)
+
+
+def gb_credit_lines(codes):
+    """one NES credit line -> GB lines of at most 18 tiles: leading / trailing blanks dropped;
+    a longer line is split after the word BY (codes $02 $19)"""
+    c = list(codes)
+    while c and c[0] == 0: c.pop(0)
+    while c and c[-1] == 0: c.pop()
+    if len(c) <= 18: return [c]
+    for k in range(len(c) - 2):
+        if c[k:k + 3] == [0x02, 0x19, 0x00]: return [c[:k + 2], c[k + 3:]]
+    return [c[:18], c[18:]]
+
+
+NG_CREDIT_ROWS = [3, 6, 9, 11, 12, 14, 15]      # GB rows of the credit lines (ff2_mock13)
+
+
+def credits(rom):
+    """splash screen (fix:F476): the ROM's credit lines (data fix:F692) centred in the GB view
+    (18 columns; a longer line split after BY); a new line starts at NES column 6 (GB 0) one
+    row down (fix:F562 +$40 -> +$20), so blank rows are extra $FE codes. Every character,
+    spaces too, takes a tile ($01-$7F), so the leading spaces now start at column 6."""
+    o = HDR + 31 * BANK + 0xF692 - 0xC000
+    lines, row, cur = [], 8, []
+    while rom[o] != 0xFF:
+        if rom[o] == 0xFE: lines.append(cur); cur = []
+        else: cur.append(rom[o])
+        o += 1
+    lines.append(cur)
+    gb = [sg for l in lines if any(l) for sg in gb_credit_lines(l)]
+    assert len(gb) == len(NG_CREDIT_ROWS), [len(x) for x in gb]
+    data, row = bytearray(), 8
+    for sg, r in zip(gb, NG_CREDIT_ROWS):
+        data += b'\xFE' * (r + 6 - row); row = r + 6
+        data += bytes((20 - len(sg)) // 2) + bytes(sg)
+    data += b'\xFE\xFF'                   # (the last new line clears the typing row)
+    nchar = sum(1 for b in data if b < 0xFE)
+    assert nchar < 0x80 and len(data) <= 0xF74E - 0xF692, (nchar, len(data))
+    put(rom, 31, 0xF692, data)
+    put(rom, 31, 0xF504, bytes([0x06]), old=bytes([0x02]))      # first line: $2106
+    put(rom, 31, 0xF593, bytes([0x20]), old=bytes([0x40]))      # a new line one row down,
+    put(rom, 31, 0xF595, bytes([0x06]), old=bytes([0x02]))      #   from column 6
+
+
 def sub_strings(ins):
     """the sub-screens' strings: titles at column 4 of the top window (beside the portrait
     box), values without leading blanks, status split into the top window and two pages"""
@@ -3851,6 +4111,7 @@ kwback:
     for a in (0x91A5, 0x91AF, 0x91B5):
         put(rom, 14, a, bytes([0x4C]) + k.labels['kwback'].to_bytes(2, 'little'), old=bytes.fromhex('4c7491'))
     main_menu(rom, ins, bank, o)
+    new_game(rom, ins, bank, o)
     tiles = list(LONG_TILES)
     for e in json.load(open('script/ff2/names.json')):
         if e['id'] not in LONG_NAMES: continue

@@ -575,15 +575,8 @@ def credits_lines(nes_path):
 
 
 def gb_credit_lines(codes):
-    """one NES credit line -> GB lines of at most 18 tiles: leading / trailing blanks dropped;
-    a longer line is split after the word BY (codes $02 $19)"""
-    c = list(codes)
-    while c and c[0] == 0: c.pop(0)
-    while c and c[-1] == 0: c.pop()
-    if len(c) <= 18: return [c]
-    for k in range(len(c) - 2):
-        if c[k:k + 3] == [0x02, 0x19, 0x00]: return [c[:k + 2], c[k + 3:]]
-    return [c[:18], c[18:]]
+    import layout
+    return layout.gb_credit_lines(codes)
 
 
 def new_game(nes_path, out):
