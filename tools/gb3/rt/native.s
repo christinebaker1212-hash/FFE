@@ -1022,29 +1022,24 @@ nat_fc27:   ld hl, NES_RAM                  ; seed: A + the zero page with carri
 ; bit 7), $AB = A (FB87 only); $A9 incremented and decremented around each write (net 0).
 ; Out: A = ((2A & $7F) + 1) & $7F, C = 0, N / Z from the last DEC $A9 (= $A9); X, Y kept.
 nat_fb87:   ld [NES_RAM + $AB], a
-nat_fb89:   add a, a                        ; ASL
-            push af
-            or $80
-            call rt_mmc_w5114
-            pop af
-            and $7F
-            inc a                           ; (CLC / ADC #1: no carry out, A <= $80)
-            push af
-            or $80
-            call rt_mmc_w5115
-            pop af
-            and $7F
-            push af
+nat_fb89:   add a, a                        ; $8000: bank 2A & $7F (even), $A000: the next
+            and $7F                         ;   (odd): both in GB bank DATA + (2A & $7F) / 2
+            ldh [nes_bank8], a
+            inc a
+            ldh [nes_bankA], a
+            ld l, a                         ; L = A out
+            srl a
+            add a, DATA
+            ldh [data_bank8], a
+            ldh [data_bankA], a
+            xor a
+            ldh [odd8], a
+            ld a, $20
+            ldh [oddA], a
             ld a, [NES_RAM + $A9]           ; N / Z of $A9 (the last DEC), C = 0
             ldh [nzv], a
-            and a                           ; Z from $A9, C = 0
-            push af
-            pop hl
-            pop af
-            push hl
-            ld h, a                         ; A back, flags from $A9 test
-            pop af
-            ld a, h
+            and a
+            ld a, l
             ret
 
 ; ------------------------------------------------------------------ p34:9754
