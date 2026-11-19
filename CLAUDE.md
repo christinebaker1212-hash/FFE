@@ -735,9 +735,15 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
     (far `etarget`: nearest living enemy in the pressed direction, up/down cycle the list
     when nothing is that way); command window (Run only beside Fight); party targets
     ignore left/right. Checked on the NES build (cursor RAM per press).
-  - Open: "positions shift because the screen isn't always centred" (camera per screen:
-    menu 0/0, equip / shops 1, field 5/6, name entry 5/2, class select 4/4, story 3/5);
-    an audit of every menu action on DMG and CGB.
+  - Field magic list: down/up step through the spells in list order (the GB lists them one
+    per row), right/left jump a level (b14 $B707).
+  - Positions shifting (owner: after a shop): FF1 leaves a shop without a screen clear, so
+    the shop camera (1, 0) stayed; c62 $C170/$C911 now call the shop through `shopw` (c62
+    $DD90, in the unused dakuten tables) which sets the field camera after. FORMATION
+    (lineup b14 $9915): box 18 rows high, camera (7, 5) via `camlu`, centred. Checked
+    walking, towns, castle, dialogue: the party stays centred.
+  - GB checks (Gambatte CGB): Cure from the menu (target window, HP update), shop exit.
+  - `tools/gb/checkall.py`: all RAM equivalence checks on DMG + CGB in parallel.
 - build.py: coverage from an older NES ROM (covall now keeps `rom.nes`) drops the logs
   of changed bytes and relies on static flow there. Fine for small NES changes; new code
   entered only dynamically (RTS dispatch) still needs fresh coverage (seen: boot hung with
