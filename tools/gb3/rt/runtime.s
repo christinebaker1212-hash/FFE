@@ -126,6 +126,7 @@ cp_n:       ds 1
 n9_y:       ds 1                            ; nat_9111: y offset, attributes, x offset
 n9_at:      ds 1
 n9_x:       ds 1
+ch_n:       ds 1                            ; chr64_fast: bytes (16 / 32 / 48 / 64)
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -1927,12 +1928,15 @@ rt_izy_rd:
             ld h, [hl]
             ld l, a
             add hl, bc
-izrd:       ld a, h                         ; HL = NES address (ROM windows first: the battle
-            cp $80                          ;   sprite / animation data)
-            jr c, .low
-            cp $A0
-            jr nc, .hi
-            and $1F                         ; $8000-$9FFF: the $5114 bank
+izrd:       ld a, h                         ; HL = NES address (AF pushed by the caller)
+            add a, a                        ; (H's top bits shifted out: no compares)
+            jr nc, .low
+            add a, a
+            jr c, .f
+            add a, a
+            jr c, .hi
+            ld a, h                         ; $8000-$9FFF: the $5114 bank
+            and $1F
             or $40
             ld h, a
             ldh a, [odd8]
@@ -1945,9 +1949,8 @@ izrd:       ld a, h                         ; HL = NES address (ROM windows firs
             ld [MBC5_BANKL], a
             pop af
             ret
-.hi:        cp $C0
-            jr nc, .f
-            and $1F                         ; $A000-$BFFF: the $5115 bank
+.hi:        ld a, h                         ; $A000-$BFFF: the $5115 bank
+            and $1F
             or $40
             ld h, a
             ldh a, [oddA]
@@ -1955,11 +1958,13 @@ izrd:       ld a, h                         ; HL = NES address (ROM windows firs
             ld h, a
             ldh a, [data_bankA]
             jr .rd
-.f:         sub $80                         ; $C000-$FFFF: banks 126 / 127
+.f:         ld a, h                         ; $C000-$FFFF: banks 126 / 127
+            sub $80
             ld h, a
             ld a, DATA + 63
             jr .rd
-.low:       cp $20
+.low:       ld a, h
+            cp $20
             jr nc, .prg
             and $07                         ; RAM
             or high(NES_RAM)
@@ -2329,6 +2334,106 @@ rt_ppu_izy: push af                         ; (C: kept)
             and $10
             or $80
             ld [hl], a
+            pop af
+            ret
+
+; LDA (zp),Y with the carry dead (translate.py): L = zp -> A = the byte at ptr + Y; F
+; clobbered (the caller sets N / Z); BC, DE kept. RAM and PRG-RAM inline, else izrd.
+rt_izy_lda: ld h, high(NES_RAM)
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            add hl, bc
+            ld a, h
+            add a, a
+            jr c, .rom
+            ld a, h
+            and $E0
+            jr z, .ram
+            cp $60
+            jr nz, .oth
+            ld a, h                         ; PRG-RAM $6000 -> $A000
+            add a, $40
+            ld h, a
+            ld a, [hl]
+            ret
+.ram:       ld a, h
+            and 7
+            or high(NES_RAM)
+            ld h, a
+            ld a, [hl]
+            ret
+.rom:       add a, a
+            jr c, .f
+            add a, a
+            jr c, .hi
+            ld a, h                         ; $8000-$9FFF
+            and $1F
+            or $40
+            ld h, a
+            ldh a, [odd8]
+            or h
+            ld h, a
+            ldh a, [data_bank8]
+.rd:        ld [MBC5_BANKL], a
+            ld a, [hl]
+            ld h, a
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            ld a, h
+            ret
+.hi:        ld a, h                         ; $A000-$BFFF
+            and $1F
+            or $40
+            ld h, a
+            ldh a, [oddA]
+            or h
+            ld h, a
+            ldh a, [data_bankA]
+            jr .rd
+.f:         ld a, h                         ; $C000-$FFFF
+            sub $80
+            ld h, a
+            ld a, DATA + 63
+            jr .rd
+.oth:       call izrd_c                     ; (ExRAM, I/O)
+            ld a, l
+            ret
+izrd_c:     push af
+            jp izrd
+; STA (zp),Y with no flag live after it (translate.py): L = zp, A -> ptr + Y; A, BC, E kept,
+; D used (0 again), F clobbered.
+rt_izy_sta: ld d, a
+            ld h, high(NES_RAM)
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            add hl, bc
+            ld a, h
+            and $E0
+            jr z, .ram
+            cp $60
+            jr nz, .oth
+            ld a, h
+            add a, $40
+            ld h, a
+            ld a, d
+            ld [hl], a
+            ld d, 0
+            ret
+.ram:       ld a, h
+            and 7
+            or high(NES_RAM)
+            ld h, a
+            ld a, d
+            ld [hl], a
+            ld d, 0
+            ret
+.oth:       ld a, d
+            ld d, 0
+            ldh [wtmp], a
+            push af
+            call nes_wr
             pop af
             ret
 

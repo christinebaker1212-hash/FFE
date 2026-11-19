@@ -87,7 +87,9 @@ class FF3:
            ('fix', 0xFBAA): ('nat_fbaa', 'NZC'),     # update joypad input
            ('fix', 0xFD20): ('nat_fd20', 'NZ'),      # set bit
            ('fix', 0xFD2C): ('nat_fd2c', 'NZ'),      # clear bit
-           ('fix', 0xFD38): ('nat_fd38', 'NZ')}      # check bit
+           ('fix', 0xFD38): ('nat_fd38', 'NZ'),      # check bit
+           ('p2e', 0xA697): ('nat_a697', 'NZ'),      # reset attribute tables
+           ('p2e', 0xA78D): ('nat_a78d', 'NZC')}     # set attribute table for monster
     for _a, _n in zip(range(0xFD3C, 0xFD41), ('nat_fd3c', 'nat_fd3d', 'nat_fd3e', 'nat_fd3f', 'nat_fd40')):
         ext[('fix', _a)] = (_n, 'NZC')               # asl x6 .. x2
     for _a, _n in zip(range(0xFD43, 0xFD48), ('nat_fd43', 'nat_fd44', 'nat_fd45', 'nat_fd46', 'nat_fd47')):
@@ -101,10 +103,12 @@ class FF3:
     idioms = {('fix', 0xFB80): ('rt_wait_nmi', 0xFB86, 'NZ'),
               ('fix', 0xFB79): ('rt_wait_irq', 0xFB7F, 'NZ'),
               ('fix', 0xF809): ('rt_bgwait', 0xF816, 'NZ'),
-              ('fix', 0xF98E): ('nat_chr64', 0xF9A2, 'NZC')}   # copy graphics to ppu: 64-byte loop
+              ('fix', 0xF98E): ('nat_chr64', 0xF9A2, 'NZC'),   # copy graphics to ppu: 64-byte loop
+              ('fix', 0xF9DA): ('nat_chrn', 0xF9EE, 'NZC')}    #   the last rows ($82 bytes)
     idiom_code = {('fix', 0xFB80): bytes.fromhex('e605a505d0fc'), ('fix', 0xFB79): bytes.fromhex('e600a500d0fc'),
                   ('fix', 0xF809): bytes.fromhex('a000eaeaeaeaeaeaeaea88d0f560'),
-                  ('fix', 0xF98E): bytes.fromhex('a000b17ea692f004aabd00738d0720c8c040d0ee')}
+                  ('fix', 0xF98E): bytes.fromhex('a000b17ea692f004aabd00738d0720c8c040d0ee'),
+                  ('fix', 0xF9DA): bytes.fromhex('a000b17ea692f004aabd00738d0720c8c482d0ee')}
     # asynchronous NMI / IRQ handlers (run by the runtime through the dynamic table; RTI = ret)
     nmi_handlers = [('fix', 0xFB57), ('fix', 0xFB30), ('ex', 0x5C03)]
     skip = [('fix', 0xFF2A, 0xFF36), ('fix', 0xFF38, 0xFF48)]   # NMI return stub, rest of the wait
@@ -424,6 +428,8 @@ class Emitter:
     def store(self, reg):
         """store register reg ('a', 'e', 'c') to the instruction's address"""
         i = self.i; m = i.mode
+        if m == 'izy' and reg == 'a' and not self.keep:     # no flag live: lean helper
+            self.o('ld l, $%02X' % i.arg, 'call rt_izy_sta'); return
         if m in ('izy', 'izx'):
             if reg == 'a': self.o('ld l, $%02X' % i.arg, 'call rt_%s_wr' % m)
             else: self.o('push af', 'ld a, %s' % reg, 'ld l, $%02X' % i.arg, 'call rt_%s_wr' % m, 'pop af')
@@ -545,6 +551,9 @@ class Emitter:
 
     def x_LDA(self):
         if self.copy_idiom() or self.ppu_idiom() or self.ppu_izy_idiom(): return
+        if self.i.mode == 'izy' and 'C' not in self.keep:   # lean helper: A direct, F free
+            self.o('ld l, $%02X' % self.i.arg, 'call rt_izy_lda')
+            self.set_nz_reg('a'); return
         op = self.operand()
         if op != 'a': self.o('ld a, %s' % op)
         self.set_nz_reg('a')
