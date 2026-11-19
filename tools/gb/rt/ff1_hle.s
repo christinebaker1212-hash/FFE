@@ -328,3 +328,38 @@ fresh_tramp:                                ; frame wait, DMG: fresh_scan (bank 
             ldh a, [code_bank]
             ld [$2000], a
             ret
+
+hle_vtile:                                  ; far vtile (bank HLE_BANK: vtile_b)
+            ld a, HLE_BANK
+            ld [$2000], a
+            call vtile_b
+            jp hle_back
+
+; b12:BF8F (battle, every frame): swap $0090-$009F with $6D97-$6DA6 (LDA/PHA/LDA/STA/PLA/
+; STA, X 0-15). Out: X = 16, Y = 0, A = the old $009F; N = 0, Z = 1, C kept.
+hle_swap90: push af
+            ld hl, NES_RAM + $90
+            ld de, $AD97                    ; $6D97 (cart RAM bank 0)
+            ld c, 16
+.l:         ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc de
+            dec c
+            jr nz, .l
+            xor a
+            ldh [nzv], a
+            pop hl                          ; (L = F before: keep its carry)
+            ld a, l
+            and $10
+            or $80
+            ld l, a
+            ld h, b
+            push hl
+            pop af
+            ld de, 16
+            ld bc, 0
+            ret
+

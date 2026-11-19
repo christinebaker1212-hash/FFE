@@ -678,6 +678,38 @@ SGB with border), RAM-identical to the NES in every check. The ROM is built loca
 (`build/ff1_gb.gb`, git-ignored, never published). Build steps, checks and known limits:
 `docs/gb-handoff.md`.
 
+## After the release: owner feedback (2026-11-18/19)
+Fixed: sound (cursor beep length: NES length counters / sweep / linear counter per frame,
+`rt/apu_core.s`; noise channel), party reorder -> bridge scene bug, overworld camera
+centred (FIELD_CAM_X = 5), transition effects (town / stairs curtain `rt_band`, battle-start
+emphasis flash). New tools: `build/gbrun` (Gambatte, hardware-like timing; build with
+`gcc -O2 -I/usr/include/libretro-common tools/gb/gambatte/gbrun.c -ldl -o build/gbrun` after
+`apt-get install libretro-gambatte retroarch-dev`), `lagcheck.py NES GB UNTIL [--field S]
+[--dmg] [--win N]` (GB frames vs NES frames per window = lag), `sgbrun` env
+`SGBRUN_PROF2=K` (PC + real bank every K instructions). Builder: `tools/builder/
+ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 shown disabled).
+
+**Speed work (owner: 0% slower on Color and DMG, non-negotiable)** - state 2026-11-19:
+- Catch-up pacing (`rt_wait_nmi`, CATCH_UP = 8): a long NES frame leaves GB frames not
+  taken; the next waits return at once, so game speed and music keep time (a frame of
+  picture is dropped). Not after LCD-off loads. Test harnesses must feed input at the
+  joypad read (`compare.GB.feed_pads`): several game frames can run in one PyBoy tick.
+- Native routines (bank 62 `rt/ff1_native.s`, trampolines in `rt/ff1_hle.s`, recompiler
+  `ext` / idioms): DrawMapRowCol, DrawMapAttributes, CHR page copy, map RLE fill, OAM clear,
+  battle swap b12:BF8F, far `vtile` (small-font tile upload; `<rom>.farsym` from insert.py,
+  build.py FAR_EXT).
+- DMG shading: coding key per tile (CODED; re-coding skipped when unchanged); map cells
+  from the map drawer checked in spare time (FRESH bitmap, `fresh_scan`) after their
+  attributes arrive (no more double re-coding per step; visible cells always right);
+  re-coding by ANF masks in a block, one queue entry per tile (`retile_b`, `q_block`).
+- Sprite conversion rewritten (camera offsets precomputed, counters in registers).
+- Measured (lagcheck, Gambatte): walking DMG and CGB keep pace; battle CGB keeps pace;
+  battle DMG still about +24 frames per 60 waits in message phases (before: +33);
+  transitions (screen loads) still lag on both.
+- Next: build with `vtile` + swap (coverage `build/cov4` being made), measure; then the
+  battle panel copy (fix:F4A2/F4F1), generic `$2007` path, transitions.
+
 ## Remaining
-- FF1: optional speed work on DMG/SGB screen transitions (see the handoff).
-- FF2 (dual-mode) and FF3 (GBC only): not started.
+- FF1: the speed work above; Select menu (options / formation / suspend), name entry
+  (design E), Disch disassembly BUGGED fixes, final builder exe.
+- FF2 (dual-mode) and FF3 (GBC only): not started (on the everything8215 sources).

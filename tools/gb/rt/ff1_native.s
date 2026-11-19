@@ -849,3 +849,460 @@ mapattr_b:  xor a
             push hl
             pop af
             ret
+
+; ---- far vtile (tools/ff1/gb_layout.py vupload): tile VUP of the small-font line buffer
+; VBUF (8 rows, 1 bit per pixel) -> BG tile VTID[VUP] by 16 $2007 writes (plane 1 = plane
+; 0). Native: the tile's bytes straight into the DMG shadow (re-coded once) or the CGB tile
+; copy / VRAM. Out as the NES: A = the last byte, X = VUP * 8 + 8, Y = 0, VLO = tile,
+; VHI = tile >> 4, PPU address = tile * 16 + 16, latch and vblank flag clear; N = 0, Z = 1,
+; C = 1.
+VT_BUF     = $AE00          ; VBUF $6E00 (cart RAM bank 0)
+VT_VLO     = $AE96
+VT_VUP     = $AE98
+VT_VHI     = $AEA1
+VT_TID     = $C350          ; VTID $0350
+vtile_b:    xor a
+            ldh [vbl_flag], a
+            ldh [ppu_latch], a
+            ld a, [VT_VUP]
+            ld e, a
+            add a, low(VT_TID)
+            ld l, a
+            ld h, high(VT_TID)
+            ld a, [hl]
+            ld d, a                         ; D = tile
+            ld [VT_VLO], a
+            swap a
+            and $0F
+            ld [VT_VHI], a
+            ld a, e                         ; HL = VBUF + VUP * 8
+            add a, a
+            add a, a
+            add a, a
+            ld l, a
+            add a, 8
+            ld e, a                         ; (X out)
+            ld h, high(VT_BUF)
+            push de
+            ldh a, [is_cgb]
+            and a
+            jr nz, .cgb
+            ld de, RT_BUF                   ; DMG: rows to WRAM, then the shadow (RAM bank 1)
+            ld c, 8
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec c
+            jr nz, .cp
+            pop de
+            push de
+            ld a, d
+            swap a
+            ld l, a
+            and $F0
+            ld c, a                         ; (low byte of tile * 16)
+            ld a, l
+            and $0F
+            add a, high(BG_SHADOW)
+            ld h, a
+            ld l, c
+            ld de, RT_BUF
+            ld a, 1
+            ld [$4000], a
+            ld c, 8
+.sh:        ld a, [de]
+            inc e
+            ld [hl+], a
+            ld [hl+], a
+            dec c
+            jr nz, .sh
+            xor a
+            ld [$4000], a
+            pop de
+            push de
+            ld a, d
+            call dmg_markw
+            jr .out
+.cgb:       pop de                          ; CGB: D = tile
+            push de
+            ld a, d
+            swap a
+            ld b, a
+            and $F0
+            ld c, a
+            ld a, b
+            and $0F
+            ld b, a                         ; BC = tile * 16
+            ldh a, [lcd_on]
+            and a
+            jr z, .vr
+            ld a, b                         ; LCD on: the tile copy (WRAM bank 2 $D000 +),
+            add a, $D0                      ;   sent by HDMA in the vblank
+            ld d, a
+            ld e, c
+            ld a, 2
+            ldh [$FF70], a
+            ld c, 8
+.cg:        ld a, [hl+]
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            dec c
+            jr nz, .cg
+            ld a, 1
+            ldh [$FF70], a
+            pop de
+            push de
+            ld a, d
+            push hl
+            ld hl, BG_DIRTY
+            call hd_mark
+            pop hl
+            jr .out
+.vr:        ld a, d                         ; LCD off: VRAM (tiles 0-127 at $9000, 128-255 at $8800)
+            cp $80
+            ld a, b
+            jr nc, .hi
+            add a, $90
+            jr .va
+.hi:        add a, $80
+.va:        ld d, a
+            ld e, c
+            ld c, 8
+.vv:        ld a, [hl+]
+            ld [de], a
+            inc e
+            ld [de], a
+            inc de
+            dec c
+            jr nz, .vv
+.out:       pop de                          ; D = tile, E = X
+            ld a, d                         ; PPU address = tile * 16 + 16
+            swap a
+            and $0F
+            ld b, a
+            ld a, d
+            swap a
+            and $F0
+            add a, 16
+            ldh [ppu_vl], a
+            ld a, b
+            adc a, 0
+            ldh [ppu_vh], a
+            ld b, 0
+            ld c, 0                         ; Y = 0
+            ld a, [VT_VUP]                  ; A = VBUF[VUP * 8 + 7]
+            add a, a
+            add a, a
+            add a, a
+            add a, 7
+            ld l, a
+            ld h, high(VT_BUF)
+            ld d, 0
+            xor a
+            ldh [nzv], a
+            ld a, [hl]
+            push af
+            pop hl
+            ld l, $90                       ; (Z, C)
+            push hl
+            pop af
+            ret
+
+
+; ---- DMG re-coding of BG tile A (dmg_shade.s retile): its shadow pixels through the
+; values of TILE_PAL[tile]'s colour indices. Each output plane is a function of the two
+; NES planes p0, p1 per pixel, written as W ^ (p0 & X) ^ (p1 & Y) ^ (p0 & p1 & Z) with
+; masks X, Y, Z, W of $00 / $FF (from the plane's truth table over indices 0-3). Done in
+; a TBLK block, then sent as one queue entry (LCD on) or copied (LCD off). TILE_USE and
+; CODED as before; nothing is done if the tile already has that coding. Keeps BC, DE, HL.
+RM         = RT_BUF         ; masks X0 Y0 Z0 W0 X1 Y1 Z1 W1, row counter
+retile_b:   push bc
+            push de
+            push hl
+            ldh [sh_tile], a
+            ld e, a
+            ld l, a
+            ld h, high(TILE_PAL)
+            ld a, [hl]
+            add a, a
+            add a, a
+            add a, low(PAL_MAP)
+            ld l, a
+            ld h, high(PAL_MAP)
+            ld bc, 0                        ; B = indices whose value has bit 0, C = bit 1
+            ld d, 1
+.m:         ld a, [hl+]
+            rrca
+            jr nc, .n0
+            push af
+            ld a, b
+            or d
+            ld b, a
+            pop af
+.n0:        rrca
+            jr nc, .n1
+            ld a, c
+            or d
+            ld c, a
+.n1:        sla d
+            ld a, d
+            cp 16
+            jr nz, .m
+            ld a, b
+            ldh [sh_s0], a
+            ld a, c
+            ldh [sh_s1], a
+            call tkey_bc                    ; already coded like that: nothing to do
+            ld l, e
+            ld h, high(CODED)
+            cp [hl]
+            jr nz, .go
+            pop hl
+            pop de
+            pop bc
+            ret
+.go:        ld hl, RM
+            ld a, b
+            call rt_anf
+            ld a, c
+            call rt_anf
+            ld a, 8
+            ld [hl], a                      ; (row counter)
+            ldh a, [lcd_on]                 ; a block: with the LCD on, one not queued
+            and a
+            jr z, .bk
+.wb:        ld a, [TB_H]
+            ld b, a
+            ld a, [TB_T]
+            sub b
+            cp 8
+            jr c, .bk
+            halt                            ; all 8 queued: wait for the vblank flush
+            jr .wb
+.bk:        ld a, [TB_T]
+            and 7
+            swap a
+            add a, low(TBLK)
+            ld e, a
+            ld d, high(TBLK)                ; DE = block
+            ldh a, [sh_tile]                ; shadow -> block (RAM bank 1)
+            swap a
+            ld l, a
+            and $F0
+            ld c, a
+            ld a, l
+            and $0F
+            add a, high(BG_SHADOW)
+            ld h, a
+            ld l, c
+            ld a, 1
+            ld [$4000], a
+            ld c, 16
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec c
+            jr nz, .cp
+            xor a
+            ld [$4000], a
+            ld a, e
+            sub 16
+            ld l, a
+            ld h, d                         ; HL = block
+            xor a
+            ldh [sh_u1], a
+            ldh [sh_u2], a
+            ldh [sh_u3], a
+.row:       ld b, [hl]                      ; p0
+            inc l
+            ld c, [hl]                      ; p1
+            ld a, b
+            and c
+            ld d, a                         ; p0 & p1 (index 3)
+            xor b                           ; index 1
+            ld e, a
+            ldh a, [sh_u1]
+            or e
+            ldh [sh_u1], a
+            ld a, d                         ; index 2
+            xor c
+            ld e, a
+            ldh a, [sh_u2]
+            or e
+            ldh [sh_u2], a
+            ldh a, [sh_u3]
+            or d
+            ldh [sh_u3], a
+            ld a, [RM + 4]                  ; plane 1
+            and b
+            ld e, a
+            ld a, [RM + 5]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 6]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 7]
+            xor e
+            ld [hl-], a
+            ld a, [RM]                      ; plane 0
+            and b
+            ld e, a
+            ld a, [RM + 1]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 2]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 3]
+            xor e
+            ld [hl+], a
+            inc l
+            ld a, [RM + 8]
+            dec a
+            ld [RM + 8], a
+            jr nz, .row
+            ld c, 0                         ; colour indices the tile uses -> TILE_USE nibble
+            ldh a, [sh_u1]
+            and a
+            jr z, .u2
+            set 1, c
+.u2:        ldh a, [sh_u2]
+            and a
+            jr z, .u3
+            set 2, c
+.u3:        ldh a, [sh_u3]
+            and a
+            jr z, .u4
+            set 3, c
+.u4:        ldh a, [sh_tile]
+            ld b, a
+            srl a
+            add a, low(TILE_USE)
+            ld l, a
+            ld h, high(TILE_USE)
+            bit 0, b
+            jr z, .ulo
+            ld a, c
+            swap a
+            ld c, a
+            ld a, [hl]
+            and $0F
+            jr .ust
+.ulo:       ld a, [hl]
+            and $F0
+.ust:       or c
+            ld [hl], a
+            ldh a, [sh_s0]                  ; the coding it has now
+            ld b, a
+            ldh a, [sh_s1]
+            ld c, a
+            ldh a, [sh_tile]
+            ld e, a
+            call tkey_bc
+            ld l, e
+            ld h, high(CODED)
+            ld [hl], a
+            ld a, e                         ; VRAM address: tiles 0-127 at $9000, 128-255 at $8800
+            swap a
+            ld c, a
+            and $0F
+            bit 7, e
+            jr nz, .hi
+            add a, $90
+            jr .va
+.hi:        add a, $80
+.va:        ld b, a                         ; B = address high, C = tile low nibble << 4
+            ld a, c
+            and $F0
+            ld c, a
+            ld a, [TB_T]
+            and 7
+            ld d, a                         ; D = block
+            ldh a, [lcd_on]
+            and a
+            jr z, .dir
+            ldh a, [q_tail]                 ; queue entry: high 0, low = address low | block,
+            ld e, a                         ;   value = address high
+            inc a
+            ld l, a
+.f:         ldh a, [q_head]
+            cp l
+            jr nz, .r
+            halt
+            jr .f
+.r:         ld h, high(QH)
+            ld a, l
+            ld l, e
+            ld e, a
+            ld [hl], 0
+            inc h
+            ld a, c
+            or d
+            ld [hl], a
+            inc h
+            ld [hl], b
+            ld a, e
+            ldh [q_tail], a
+            ld hl, TB_T
+            inc [hl]
+            jr .x
+.dir:       ld a, d                         ; LCD off: copy now
+            swap a
+            add a, low(TBLK)
+            ld l, a
+            ld h, high(TBLK)
+            ld d, b
+            ld e, c
+            ld c, 16
+.dc:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec c
+            jr nz, .dc
+.x:         pop hl
+            pop de
+            pop bc
+            ret
+
+; A = set S of colour indices (bit i) whose value has the plane's bit -> masks X Y Z W at
+; [HL+]: X = t0 ^ t1, Y = t0 ^ t2, Z = t0 ^ t1 ^ t2 ^ t3, W = t0 (t_i = bit i of S), as
+; $00 / $FF. Keeps BC, DE.
+rt_anf:     push de
+            ld d, a
+            srl a
+            xor d
+            ld e, a                         ; bit 0: t0 ^ t1, bit 2: t2 ^ t3
+            and 1
+            cpl
+            inc a
+            ld [hl+], a                     ; X
+            ld a, d
+            srl a
+            srl a
+            xor d
+            and 1
+            cpl
+            inc a
+            ld [hl+], a                     ; Y
+            ld a, e
+            srl a
+            srl a
+            xor e
+            and 1
+            cpl
+            inc a
+            ld [hl+], a                     ; Z
+            ld a, d
+            and 1
+            cpl
+            inc a
+            ld [hl+], a                     ; W
+            pop de
+            ret

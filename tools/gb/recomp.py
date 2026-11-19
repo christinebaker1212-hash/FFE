@@ -46,7 +46,8 @@ class FF1:
     ext = {('fix', 0xFEDB): ('rt_wait_nmi', 'NZ'), ('fix', 0xE9F6): ('hle_chr_pages', 'NZ'),
            ('c62', 0xC43C): ('hle_oam_clear', 'NZ'),
            ('c62', 0xD2EB): ('hle_mapdraw', 'NZC'),     # DrawMapRowCol (rt/ff1_native.s)
-           ('c62', 0xD471): ('hle_mapattr', 'NZC')}     # DrawMapAttributes
+           ('c62', 0xD471): ('hle_mapattr', 'NZC'),     # DrawMapAttributes
+           ('b12', 0xBF8F): ('hle_swap90', 'NZ')}       # battle: swap $90-$9F / $6D97 (rt/ff1_hle.s)
     # Idioms replaced by a runtime call, then a jump to `resume`:
     #   b14:B0F1 TSX/TXA/CMP #$EF/BCS/CLC/ADC #6/TAX/TXS: drop 3 return frames (camp items
     #   returning from the item menu straight to the field). The S >= $EF guard is not

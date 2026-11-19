@@ -345,7 +345,19 @@ vupload:            ; VN tiles of the buffer -> BG tiles VTID[0..VN-1], 4 tiles 
     lda #4
     sta VCNT
 .tile:
-    lda $2002
+    jsr vtile
+    inc VUP
+    lda VUP
+    cmp VN
+    beq .done
+    dec VCNT
+    bne .tile
+    jsr vpost
+    jmp .chunk
+.done:
+    jmp vpost
+vtile:              ; tile VUP of the buffer -> BG tile VTID[VUP] (the GB build runs a
+    lda $2002       ;   native copy instead: tools/gb/rt/ff1_native.s vtile_b)
     ldx VUP
     lda VTID,x
     sta VLO
@@ -387,15 +399,7 @@ vupload:            ; VN tiles of the buffer -> BG tiles VTID[0..VN-1], 4 tiles 
     inx
     dey
     bne .p1
-    inc VUP
-    lda VUP
-    cmp VN
-    beq .done
-    dec VCNT
-    bne .tile
-    jsr vpost
-    jmp .chunk
-.done:
+    rts
 vpost:              ; after the PPU writes: as $F47D (mask, scroll 0, music), but the music
     lda $68B8       ;   driver $C009 lies in bank 62, which the far bank replaces at $C000:
     sta $2001       ;   it is called through the fixed-bank trampoline MUSIC

@@ -114,6 +114,9 @@ def nes_english(src, out_dir, gb=False):
     return out
 
 
+FAR_EXT = {'vtile': ('hle_vtile', 'NZC')}         # gb_layout.py's small-font tile upload
+
+
 def main():
     args = sys.argv[1:]
     gb = '--gb' in args
@@ -142,6 +145,10 @@ def main():
         entries = [('far', int(l.split()[0], 16)) for l in open(nes + '.far') if l.strip()]
     cm = CodeMap(nes, covs, entries).build()
     rc = Recompiler(cm)
+    if os.path.exists(nes + '.farsym'):              # far routines run natively (rt/ff1_native.s)
+        for l in open(nes + '.farsym'):
+            a, n = l.split()
+            if n in FAR_EXT: rc.g.ext[('far', int(a, 16))] = FAR_EXT[n]
     prog, bank_of, banks = emit_program(rc)
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s', 'sgb.s'))
     rt += '\n' + apu_tables() + '\n' + open(os.path.join(HERE, 'rt', 'apu_core.s')).read()

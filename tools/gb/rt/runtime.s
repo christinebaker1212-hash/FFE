@@ -55,6 +55,9 @@ FR_FRC     = $CCFE          ;   all at once (waited FR_FORCE waits)
 FR_LY      = 136            ;   (checks while LY is below this)
 FR_FORCE   = 24
 FRESH      = $DE00          ; DMG: one bit per GB map cell (byte row * 4 + col / 8), 128 bytes
+TBLK       = $DE80          ; DMG: 8 re-coded tiles (16 bytes) waiting in the VRAM queue,
+TB_T       = $D872          ;   blocks taken / freed (a ring)
+TB_H       = $D873
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
 EMPH_RGB   = $3A00          ; CGB: NES colours with emphasis e (1-7) at EMPH_RGB + e * $80
@@ -79,6 +82,7 @@ GLUM       = $DC7C          ;   value (1-3) -> its brightest level ($DC7D-$DC7F)
 MAPS_WAIT  = 16             ;   frames the maps may be due before they are recomputed anyway
 PAL_STABLE = 8              ;   frames without palette writes before the maps are recomputed
 RETILE_PER_FRAME = 3
+RT_LY      = 128            ;   more re-coding in the frame wait while LY is below this
 LCDC_ON    = %11000011      ; LCD on, window map $9C00 (off), BG tiles $8800 (signed), BG map $9800, OBJ on, BG on
 CAM_X      = 40          ; field camera X (pixels): FIELD_CAM_X in tools/ff1/gb_layout.py
 CAM_Y      = 48
@@ -804,6 +808,9 @@ flush_q:    ldh a, [q_tail]
             dec h
             ld h, [hl]
             ld l, a
+            inc h                           ; address high 0: a tile block (q_block)
+            dec h
+            jr z, .blk
             bit 6, h                        ; $D8-$DB: VRAM bank 1 (CGB attributes)
             jr nz, .b1
             ld [hl], c
@@ -820,6 +827,44 @@ flush_q:    ldh a, [q_tail]
             xor a
             ldh [$FF4F], a
             jr .nx
+.blk:       call q_block
+            jr .nx
+
+; queue entry of a whole tile (DMG re-coding, retile_b): L = VRAM address low | block, C =
+; VRAM address high: the 16 bytes of TBLK block (L & 7) to VRAM; the block is free again.
+; Keeps BC, DE.
+q_block:    push de
+            push bc
+            ld d, c
+            ld a, l
+            and $F0
+            ld e, a
+            ld a, l
+            and 7
+            swap a
+            add a, low(TBLK)
+            ld l, a
+            ld h, high(TBLK)
+            ld b, 4
+.c:         ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .c
+            ld hl, TB_H
+            inc [hl]
+            pop bc
+            pop de
+            ret
 
 ; vblank: queued VRAM writes while the vblank lasts (LY 144-152)
 flush_vbl:  ldh a, [q_tail]
@@ -841,9 +886,15 @@ flush_vbl:  ldh a, [q_tail]
             dec h
             ld h, [hl]
             ld l, a
+            inc h
+            dec h
+            jr z, .blk
             bit 6, h
             jr nz, .b1
             ld [hl], c
+            inc e
+            jr .lp
+.blk:       call q_block
             inc e
             jr .lp
 .b1:        res 6, h
@@ -1330,7 +1381,27 @@ dmg_frame:                                  ; DMG shading, once per NES frame wi
 .now:       call dmg_maps_now
 .a:         ld b, RETILE_PER_FRAME
             call dmg_retile_some
-            pop bc
+.more:      ldh a, [rq_any]                 ; more while the frame has time left (not behind,
+            and a                           ;   LY < RT_LY) and a queue block is free
+            jr z, .x
+            ld a, [VBL_SEEN]
+            ld b, a
+            ld a, [VBL_CNT]
+            cp b
+            jr nz, .x
+            ldh a, [$FF44]
+            cp RT_LY
+            jr nc, .x
+            ld a, [TB_H]
+            ld b, a
+            ld a, [TB_T]
+            sub b
+            cp 8
+            jr nc, .x
+            ld b, 1
+            call dmg_retile_some
+            jr .more
+.x:         pop bc
             ret
 dmg_maps_now:
             xor a
@@ -1769,133 +1840,110 @@ rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (s
             ldh a, [oam_frame]
             inc a
             ldh [oam_frame], a
-            ld de, OAM_SH
-            ld bc, $4028                    ; B = NES sprites left, C = GB sprites left
-.lp:        ld a, [hl+]                     ; NES y (top - 1); $EF and below the screen:
-            cp $EF                          ;   hidden (most of the 64)
-            jr nc, .hid
-            inc a                           ; GB y = y + 1 - cam_y + 16 (shown from -16:
-            push hl                         ;   cut off at the top)
-            ld h, a
-            ldh a, [cam_y]
-            ld l, a
-            ld a, h
-            sub l
-            jr nc, .yp
-            cp $F0
-            jr c, .nov
-            jr .yk
-.yp:        cp 144
-            jr nc, .nov
-.yk:        add a, 16
-            ldh [o_y], a
-            pop hl
+            ldh a, [cam_y]                  ; B = 17 - cam_y: GB y = NES y + B (shown from
+            cpl                             ;   -16: cut off at the top), C = 8 - cam_x: GB
+            add a, 18                       ;   x = NES x + C (shown from -8). (The cameras
+            ld b, a                         ;   stay below 80 px, so far-off sprites never
+            ldh a, [cam_x]                  ;   wrap into the view.)
+            cpl
+            add a, 9
+            ld c, a
+            ld de, OAM_SH                   ; E = next GB sprite * 4, L = next NES sprite * 4
+.lp:        ld a, [hl+]                     ; NES y (top - 1); $EF and below: hidden (most
+            cp $EF                          ;   of the 64)
+            jr nc, .s3
+            add a, b
+            cp 160
+            jr nc, .s3
+            ld [de], a                      ; (GB y; kept only if x is in view too)
             ld a, [hl+]
             ldh [o_t], a
             ld a, [hl+]
             ldh [o_a], a
-            ld a, [hl+]                     ; GB x = x - cam_x + 8 (shown from -8)
+            ld a, [hl+]
+            add a, c
+            cp 168
+            jr nc, .nx
+            inc e
+            ld [de], a                      ; GB x
+            inc e
             push hl
-            ld h, a
-            ldh a, [cam_x]
-            ld l, a
-            ld a, h
-            sub l
-            jr nc, .xp
-            cp $F8
-            jr c, .nox
-            jr .xk
-.xp:        cp 160
-            jr nc, .nox
-.xk:        add a, 8
-            ld h, a
-            ldh a, [o_y]
-            ld [de], a
-            inc e
-            ld a, h
-            ld [de], a
-            inc e
-            ldh a, [o_a]                    ; coding of the sprite's palette
+            push bc
+            ldh a, [o_a]                    ; B = coding of the sprite's palette
             and 3
             add a, low(SPAL_KEY)
             ld l, a
             ld h, high(SPAL_KEY)
-            ld a, [hl]
-            ldh [o_key], a
-            ldh a, [o_t]                    ; its GB slot (loaded on first use)
+            ld b, [hl]
+            ldh a, [o_t]                    ; C = its GB slot (loaded on first use)
             ld l, a
             ld h, high(SPR_SLOT)
             ld a, [hl]
             cp $FF
-            call z, spr_alloc
-            ldh [o_cx], a                   ; (slot)
+            jr z, .alloc
+            ld c, a
             add a, low(SLOT_KEY)            ; resident with another coding: load it again
             ld l, a
             ld h, high(SLOT_KEY)
-            ldh a, [o_key]
+            ld a, b
             cp [hl]
-            ldh a, [o_cx]
-            jr z, .kok
-            push bc
-            ld c, a
-            call spr_load
-            pop bc
-.kok:       ld l, a                         ; stamp (in use this frame)
+            jr nz, .load
+.ok:        ld a, c                         ; stamp (in use this frame)
+            or $80
+            ld l, a
             ld h, high(SLOT_STAMP)
-            set 7, l
             ldh a, [oam_frame]
             ld [hl], a
-            res 7, l
-            ld a, l
+            ld a, c
             ld [de], a                      ; tile = slot
             inc e
             ldh a, [o_a]                    ; NES v h p - - - pp -> GB p v h obp1 - pal(3)
             ld l, a
             and $C0
             rrca
-            ld h, a
+            bit 5, l
+            jr z, .np
+            or $80
+.np:        ld h, a
             ld a, l
-            and $20
-            rlca
-            rlca
+            and 3
             or h
-            ld h, a
-            ld a, l
-            and $03
-            or h
-            ld h, a
-            ldh a, [o_key]                  ; (DMG: OBP1 if the coding says so)
-            and $40
-            rrca
-            rrca
-            or h
-            ld [de], a
+            bit 6, b                        ; (DMG: OBP1 if the coding says so)
+            jr z, .o0
+            or $10
+.o0:        ld [de], a
             inc e
+            pop bc
             pop hl
-            dec c
+            ld a, e
+            cp 160
             jr z, .full
-.nx:        dec b
+.nx:        ld a, l
+            and a
             jr nz, .lp
             jr .full
-.hid:       inc l
+.s3:        inc l
             inc l
             inc l
-            dec b
             jr nz, .lp
             jr .full
-.nov:       pop hl                          ; off the view vertically
-            inc l
-            inc l
-            inc l
-            jr .nx
-.nox:       pop hl                          ; off the view horizontally
-            jr .nx
-.full:      ld a, [OAM_USED]                ; hide the GB sprites used last frame only
-            ld b, a
-            ld a, 40
-            sub c
-            ld [OAM_USED], a
+.alloc:     ld a, b
+            ldh [o_key], a
+            call spr_alloc
             ld c, a
+            jr .ok
+.load:      ld a, b
+            ldh [o_key], a
+            call spr_load
+            jr .ok
+.full:      ld a, e                         ; hide the GB sprites used last frame only
+            rrca
+            rrca
+            ld c, a
+            ld a, [OAM_USED]
+            ld b, a
+            ld a, c
+            ld [OAM_USED], a
             ld a, b
             sub c
             jr c, .end
