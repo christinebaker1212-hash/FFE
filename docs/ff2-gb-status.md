@@ -63,9 +63,33 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   - Gotchas: PyBoy runs its own boot ROM for ~70 frames before `$0100` (hooks fire after
     that); runtime files without a `section` continue the previous file's section.
 
+- Gambatte (`build/gbrun`, CGB and `--dmg`, pad file fed at the joypad read): same screens
+  as PyBoy up to name entry; CGB shows the NES colours. Raw speed over 4000 NES frames
+  (splash, prologue, menus): CGB 4120 GB frames, DMG 4350 (the extra is in screen loads;
+  per-window lag not measured yet).
+- **RAM equivalence** `tools/gb2/firstdiff.py NES GB [FRAMES] [--random SEED]`: FF2's NMI
+  fires every frame, so only *wait NMIs* (taken while `$0100` holds a wait's `JMP` stub)
+  are compared with the GB entering frame wait w. One cynes step can take two NMIs, so NES
+  RAM is rebuilt from the write log (`watch`) and taken at the stub's `RTI` write; the pad
+  is what the game read (8th `ROL $20` at `fix:DBBC`). Work RAM `$6000-$7FFF` every 50
+  waits. Result: **identical for 4992 waits** (power-on to name entry, new-game script);
+  random play (seed 1) found a translation bug at wait ~9550 (zero-page indexed addressing
+  must wrap: `LDA $FF,X`; fixed with `res 0, h`), then stopped at the first battle.
+- Battle support: sprite-0 polling loops (`fix:FD46`, `fix:FD5B`, `b11:A073`) are idioms
+  without waiting (V as the loops leave it); the battle NMI handlers (`b12:9A79`,
+  `b05:A9A2`, installed in `$0100` during monster actions / actions) are requested by the
+  vblank ISR and run at the next safe point (ROM data reads, cross-bank returns, the three
+  `$AC` handshake loops = idiom `rt_ac_wait`), context saved, `RTI` = `ret`.
+
+## Known open items
+- `b14:ABEA` (Warp: drops the menu frames + one 5-byte frame per map level by arithmetic
+  on S): needs a semantic GB version (GB stack pointer per map level); TSX/TXS elsewhere
+  are approximated (`rt_tsx`/`rt_txs`, exact round trip).
+- Battle screen split (battlefield / menu pattern tables, sprite 0) not shown correctly
+  yet: part of the battle re-layout.
+
 ## In progress
-- Gambatte check (`build/gbrun`), then RAM equivalence against the NES build (firstdiff
-  style), speed (lagcheck), sprite-0 split emulation (battle), async battle NMI phases.
+- Random-play equivalence through battles; then speed (lagcheck), screen re-layouts.
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).

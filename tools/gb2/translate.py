@@ -53,8 +53,23 @@ class FF2:
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   fix:FA91-FA99: PHA $FA / PHA $99 / JMP ($0040): "jump (long)" calls through ($40)
     #   with a pushed return address: on the GB a call through the pointer, then $FA9A.
-    idioms = {('fix', 0xFA91): ('rt_call_ind40', 0xFA9A, 'NZ')}
-    idiom_code = {('fix', 0xFA91): bytes.fromhex('a9fa48a999486c4000')}
+    #   Sprite-0 polling (BIT $2002 / BVS or BVC to itself): fix:FD46 (battle: wait for the
+    #   flag to clear, battlefield scroll follows), fix:FD5B (wait for the hit, menu scroll
+    #   follows), b11:A073 (wait for the end of vblank before a timed raster loop). No wait
+    #   on the GB, V as the loop leaves it; the split itself is the battle layout's job.
+    idioms = {('fix', 0xFA91): ('rt_call_ind40', 0xFA9A, 'NZ'),
+              ('fix', 0xFD46): ('rt_s0_clear', 0xFD4B, 'NZV'), ('fix', 0xFD5B): ('rt_s0_hit', 0xFD60, 'NZV'),
+              ('b11', 0xA073): ('rt_s0_clear', 0xA078, 'NZV'),
+              # LDA $AC / BNE (wait until the battle NMI handler has run): rt_ac_wait
+              ('b05', 0xA70A): ('rt_ac_wait', 0xA70E, 'NZ'), ('b12', 0xA630): ('rt_ac_wait', 0xA634, 'NZ'),
+              ('b12', 0xA990): ('rt_ac_wait', 0xA994, 'NZ')}
+    # battle NMI handlers (run by rt_nmi_run through the dynamic table; RTI = ret)
+    nmi_handlers = [('b12', 0x9A79), ('b05', 0xA9A2)]
+    idiom_code = {('fix', 0xFA91): bytes.fromhex('a9fa48a999486c4000'),
+                  ('fix', 0xFD46): bytes.fromhex('2c022070fb'), ('fix', 0xFD5B): bytes.fromhex('2c022050fb'),
+                  ('b11', 0xA073): bytes.fromhex('2c022070fb'),
+                  ('b05', 0xA70A): bytes.fromhex('a5acd0fc'), ('b12', 0xA630): bytes.fromhex('a5acd0fc'),
+                  ('b12', 0xA990): bytes.fromhex('a5acd0fc')}
     skip = [('fix', 0xFA2C, 0xFA48), ('fix', 0xFEA1, 0xFEAD), ('fix', 0xFEAF, 0xFEBF)]   # waits (but their entries) + NMI return stubs
 
 
@@ -130,6 +145,7 @@ class Recompiler:
                 for c in self.dyn_candidates(i.arg): t.add(c)
                 if not self.dyn_candidates(i.arg): self.warn.append('no known code for %r' % i)
         t.add(self.g.reset)
+        t |= set(self.g.nmi_handlers)
         t |= self.static_dyn_targets()
         return sorted(t)
 
@@ -303,6 +319,7 @@ class Emitter:
         protect = 'C' in self.keep or 'C' in USE.get(self.i.mn, '')
         if protect: self.o('push af')
         self.o('ld hl, $%04X' % gbaddr, 'add hl, %s' % idx)
+        if self.i.mode in ('zpx', 'zpy'): self.o('res 0, h')   # zero-page index wraps ($C0xx)
         if protect: self.o('pop af')
 
     def operand(self):
@@ -660,7 +677,8 @@ class Emitter:
         else: self.o('ret')
 
     def x_RTI(self):
-        self.rc.warn.append('RTI at %r' % self.i); self.o('call rt_fatal')
+        # FF2: only the battle NMI handlers end in RTI; rt_nmi_run calls them
+        self.o('ret')
 
     def x_BRK(self):
         self.o('call rt_fatal')

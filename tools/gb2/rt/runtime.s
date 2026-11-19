@@ -196,6 +196,8 @@ in_battle:  ds 1                            ; bit 7 of the last $5800 write (the
 sgb_pslot:  ds 1                            ; SGB: 1 + the palette slot given to the battle party (0: none)
 sgb_adirty: ds 1                            ; SGB: attributes / cells / camera changed (else palettes only)
 sgb_mask:   ds 1                            ; SGB screen mask: 1 = to blank (LCD went off), 2 = blanked, 3 = blanked until the packets built with the LCD on are out
+nmi_req:    ds 1                            ; FF2: an NES NMI to a battle handler is due (vblank_isr)
+in_nmi:     ds 1                            ; FF2: rt_nmi_run is running the handler
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -407,6 +409,7 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             ldh [frame_flag], a
             ld a, $80
             ldh [vbl_flag], a
+            call nmi_check                  ; FF2: battle NMI handler due (rt/ff2.s)
             ld hl, VBL_CNT
             inc [hl]
             jr nz, .vc
@@ -2356,6 +2359,9 @@ rt_rd_8:    push af
             ld l, [hl]
             ldh a, [code_bank]
             ld [$2000], a
+            ldh a, [nmi_req]                ; FF2: a battle NMI handler due: run it here
+            and a
+            call nz, rt_nmi_run
             pop af
             ret
 rt_rd_c:    push af
@@ -2364,6 +2370,9 @@ rt_rd_c:    push af
             ld l, [hl]
             ldh a, [code_bank]
             ld [$2000], a
+            ldh a, [nmi_req]                ; FF2: a battle NMI handler due: run it here
+            and a
+            call nz, rt_nmi_run
             pop af
             ret
 rt_rd_e:    push af
@@ -2372,6 +2381,9 @@ rt_rd_e:    push af
             ld l, [hl]
             ldh a, [code_bank]
             ld [$2000], a
+            ldh a, [nmi_req]                ; FF2: a battle NMI handler due: run it here
+            and a
+            call nz, rt_nmi_run
             pop af
             ret
 
@@ -2596,8 +2608,13 @@ rt_farcall_ret:
             ld a, h
             ldh [code_bank], a
             ld [$2000], a
+            ldh a, [nmi_req]                ; FF2: a battle NMI handler due: run it here
+            and a
+            jr nz, .nmi
             ldh a, [sv_a]
             ret
+.nmi:       ldh a, [sv_a]
+            jp rt_nmi_run
 
 ; HL = NES address -> HL = GB address, fc_bank = GB bank (A, F, BC, DE kept).
 ; FF2: hashed table in bank DYN_BANK (translate.py): bucket (lo + hi + key) & $FF, key =

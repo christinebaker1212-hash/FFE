@@ -73,8 +73,9 @@ def main():
     rc = Recompiler(cm)
     prg = open(nes, 'rb').read()[16:]
     for k, code in getattr(rc.g, 'idiom_code', {}).items():   # fixed bank = bank 31
-        off = 31 * 0x4000 + k[1] - 0xC000 if k[0] == 'fix' else None
-        if off is None or prg[off:off + len(code)] != code:
+        off = 31 * 0x4000 + k[1] - 0xC000 if k[0] == 'fix' else \
+            int(k[0][1:]) * 0x4000 + k[1] - 0x8000 if k[0].startswith('b') else None
+        if off is None or prg[off:off + len(code)] != code or k not in cm.insns:
             print('  idiom %s:%04X: code not found, not used' % k); rc.g.idioms.pop(k, None)
     prog, bank_of, banks = emit_program(rc)
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in RT_FILES)
