@@ -210,12 +210,35 @@ nat_chr64:
             scf
             ldh a, [nt_a]
             ret
-.slow:      call .byte
+.slow:      ldh a, [ppu_ctrl]               ; nametables with step 1: gather the 64 bytes,
+            and 4                           ;   then rt_ppu_copy's runs (whole map-row pieces)
+            jr nz, .slw
+            ldh a, [ppu_vh]
+            cp $20
+            jr c, .slw
+            cp $3F
+            jr nc, .slw
+.gb:        call .byte                      ; (C = Y = 0 .. 63)
+            ld hl, NC_BUF
+            ld b, 0
+            add hl, bc
+            ld [hl], a
+            inc c
+            ld a, c
+            cp $40
+            jr nz, .gb
+            ld a, $40
+            ldh [cp_n], a
+            ld hl, NC_BUF
+            xor a
+            call rt_ppu_copy
+            jr .end
+.slw:       call .byte
             call rt_ppu_w7
             inc c
             ld a, c
             cp $40
-            jr nz, .slow
+            jr nz, .slw
             jr .end
 .byte:      ld l, $7E                       ; A = the byte to write; nt_x = X, nt_a = A
             call rt_izy_rd

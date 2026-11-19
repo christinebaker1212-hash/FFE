@@ -36,6 +36,8 @@ LK_KEY     = $D842
 LK_BANK    = $D843
 LK_GLO     = $D844
 LK_GHI     = $D845
+PC_BUF     = $CD00          ; rt_ppu_copy: one piece (<= 32 bytes; the stack's far end, never reached)
+NC_BUF     = $CD40          ; nat_chr64: 64 bytes for a nametable destination
 MAP_SH     = $D000          ; GB map (VRAM bank 0 $9800-$9BFF) and its attributes (VRAM bank 1),
 ATTR_SH    = $D400          ;   1KB each, in WRAM bank MAP_BANK; dirty rows copied by DMA in the
 MAP_BANK   = 5              ;   vblank (map_flush)
@@ -81,6 +83,7 @@ wc_nh:      ds 1                            ;   addresses (0 = slow path)
 wc_ml:      ds 1
 wc_mh:      ds 1
 wv:         ds 1
+wc_inc:     ds 1                            ; the cached run's step: 1 or 32
 tm_lo:      ds 1                            ; CHR tile marked last (L & $F0, H; H = $FF: none)
 tm_hi:      ds 1
 mr_lo:      ds 1                            ; GB map row marked last ($2007 writes: L & $E0, H)
@@ -793,20 +796,28 @@ rt_ppu_w7:
             dec a
             ldh [wc_n], a
             push hl
+            push de
+            ldh a, [wc_inc]
+            ld e, a
             ldh a, [wc_nl]                  ; nametable shadow (WRAM bank 1)
             ld l, a
-            inc a
+            add a, e
             ldh [wc_nl], a
             ldh a, [wc_nh]
             ld h, a
+            adc a, 0
+            ldh [wc_nh], a
             ldh a, [wv]
             ld [hl], a
-            ldh a, [wc_ml]                  ; map shadow (WRAM bank MAP_BANK)
+            ldh a, [wc_ml]                  ; map shadow (WRAM bank MAP_BANK; wraps in 1KB)
             ld l, a
-            inc a
+            add a, e
             ldh [wc_ml], a
             ldh a, [wc_mh]
             ld h, a
+            adc a, 0
+            res 2, a
+            ldh [wc_mh], a
             ld a, MAP_BANK
             ldh [rSVBK], a
             ldh a, [wv]
@@ -814,15 +825,16 @@ rt_ppu_w7:
             ld a, 1
             ldh [rSVBK], a
             ei
-            ldh a, [ppu_vl]                 ; PPU address + 1
-            inc a
+            ldh a, [ppu_vl]                 ; PPU address + the step
+            add a, e
             ldh [ppu_vl], a
-            jr nz, .fv
+            jr nc, .fv
             ldh a, [ppu_vh]
             inc a
             and $3F
             ldh [ppu_vh], a
-.fv:        pop hl
+.fv:        pop de
+            pop hl
             pop af
             ret
 .slow0:     ei
@@ -920,8 +932,10 @@ rt_ppu_w7:
             ldh [mr_hi], a
             call map_mark
 .cache:     ldh a, [ppu_ctrl]               ; increment 1: the rest of this map row goes the
-            and 4                           ;   fast way
-            jr nz, .done
+            and 4                           ;   fast way; increment 32: the rest of the column
+            jr nz, .c32                     ;   down to NES row 29 (its rows marked now)
+            ld a, 1
+            ldh [wc_inc], a
             ld a, l
             and 31
             xor 31
@@ -933,6 +947,63 @@ rt_ppu_w7:
             ld a, h
             sub $98 - high(MAP_SH)
             ldh [wc_mh], a
+            jr .done
+.c32:       ldh a, [wc_nl]                  ; NES row of this cell = (shadow offset >> 5) & 31
+            sub 1                           ;   (wc_nl / wc_nh hold this cell's + 1)
+            ld e, a
+            ldh a, [wc_nh]
+            sbc a, 0
+            and 3
+            ld d, a
+            ld a, e
+            and $E0
+            or d
+            swap a
+            rrca                            ; A = row (bits: D[1:0] E[7:5])
+            and 31
+            cp 29
+            jr nc, .done
+            ld d, a
+            ld a, 29
+            sub d
+            ldh [wc_n], a                   ; cells left below in this nametable's cell area
+            ld b, a
+            ldh a, [wc_nl]                  ; next NES cell = this + 32
+            add a, 31
+            ldh [wc_nl], a
+            ldh a, [wc_nh]
+            adc a, 0
+            ldh [wc_nh], a
+            ld a, 32
+            ldh [wc_inc], a
+            ld a, l                         ; next map cell = this + 32 (wrapping in the map)
+            add a, 32
+            ld l, a
+            ld a, h
+            adc a, 0
+            and $9B
+            ld h, a
+            ld a, l
+            ldh [wc_ml], a
+            ld a, h
+            sub $98 - high(MAP_SH)
+            ldh [wc_mh], a
+.pm:        push bc                         ; mark the rows of the run
+            push hl
+            call map_mark
+            pop hl
+            pop bc
+            ld a, l
+            add a, 32
+            ld l, a
+            ld a, h
+            adc a, 0
+            and $9B
+            ld h, a
+            dec b
+            jr nz, .pm
+            xor a                           ; (row cache: unknown now)
+            ldh [mr_hi], a
             jr .done
 .attr:      ld a, l
             sub $C0
@@ -1924,8 +1995,106 @@ rt_ppu_copy:
             push de
             ld d, a                         ; D = data bank (0: RAM)
             ldh a, [cp_n]
+            ld b, a                         ; B = bytes left (0 = 256: one byte first)
+.lp:        ld a, b
+            and a
+            jr z, .one
+            ldh a, [wc_n]                   ; a cached run with step 1: whole pieces of it
+            and a
+            jr z, .one
+            ldh a, [wc_inc]
+            dec a
+            jr nz, .one
+            ldh a, [wc_n]                   ; K = min(run, left)
+            cp b
+            jr c, .k
+            ld a, b
+.k:         ld e, a                         ; E = K
+            push bc
+            push de
+            ld bc, PC_BUF                   ; source -> buffer
+            ld a, d
+            and a
+            jr z, .s1
+            ld [MBC5_BANKL], a
+.s1:        ld a, [hl+]
+            ld [bc], a
+            inc c
+            dec e
+            jr nz, .s1
+            ldh [nt_a], a                   ; (the last byte: A at the end)
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            pop de
+            push hl
+            ldh a, [wc_nl]                  ; buffer -> nametable shadow (bank 1)
+            ld l, a
+            ldh a, [wc_nh]
+            ld h, a
+            ld bc, PC_BUF
+            push de
+.s2:        ld a, [bc]
+            ld [hl+], a
+            inc c
+            dec e
+            jr nz, .s2
+            pop de
+            ld a, l
+            ldh [wc_nl], a
+            ld a, h
+            ldh [wc_nh], a
+            di                              ; buffer -> map shadow (bank MAP_BANK), unless a
+            ldh a, [wc_n]                   ;   vblank flush dropped the run meanwhile (then
+            and a                           ;   the rest goes one byte at a time)
+            jr z, .lost
+            ldh a, [wc_ml]
+            ld l, a
+            ldh a, [wc_mh]
+            ld h, a
+            ld a, MAP_BANK
+            ldh [rSVBK], a
+            ld bc, PC_BUF
+            push de
+.s3:        ld a, [bc]
+            ld [hl+], a
+            inc c
+            dec e
+            jr nz, .s3
+            pop de
+            ld a, 1
+            ldh [rSVBK], a
+            ld a, l
+            ldh [wc_ml], a
+            ld a, h
+            ldh [wc_mh], a
+            ldh a, [wc_n]                   ; run -= K, PPU address += K
+            sub e
+            ldh [wc_n], a
+            ei
+            ldh a, [ppu_vl]
+            add a, e
+            ldh [ppu_vl], a
+            jr nc, .v
+            ldh a, [ppu_vh]
+            inc a
+            and $3F
+            ldh [ppu_vh], a
+.v:         pop hl
+            pop bc
+            ld a, b                         ; left -= K
+            sub e
             ld b, a
-.lp:        ld a, d
+            jr nz, .lp
+            jr .end
+.lost:      ei                              ; (nametable shadow already written: redo the
+            pop hl                          ;   piece through $2007 from the source)
+            pop bc
+            ld a, l
+            sub e
+            ld l, a
+            jr nc, .one
+            dec h
+.one:       ld a, d                         ; one byte through $2007
             and a
             jr z, .r
             ld [MBC5_BANKL], a
@@ -1936,15 +2105,15 @@ rt_ppu_copy:
             ld a, e
             jr .w
 .r:         ld a, [hl+]
-.w:         push hl
+.w:         ldh [nt_a], a
+            push hl
             call rt_ppu_w7
             pop hl
             dec b
             jr nz, .lp
-            ld b, a
-            xor a
+.end:       xor a
             ldh [nzv], a
-            ld a, b
+            ldh a, [nt_a]
             pop de
             pop bc
             scf
