@@ -74,10 +74,11 @@ end:
 RAM = dict(GBIDX=0x7FDF, GBRB=0x7FE0, GBPOOL=0x7FE1, VX=0x7FE2, VN=0x7FE3, VT=0x7FE4, VC=0x7FE5,
            VSH=0x7FE6, VCNT=0x7FE7, VP=0xD2, VQ=0xD4, VS=0xD6, VNUM=0x7FEC, VPAD=0x7FEE, VDIG=0x7FEF,
            VROW=0x7FF0, VCOL=0x7FF1, VW=0x7FF2, VH=0x7FF3, VLINE=0x7FF4, VSV=0x7FF5, VI=0x7FF6,
-           NL=0x7FF7, NS=0x7FF8, VSQZ=0x7FF9, VI0=0x7FFA, VI1=0x7FFB,
+           NL=0x7FF7, NS=0x7FF8, VSQZ=0x7FF9, VI0=0x7FFA, VI1=0x7FFB, VCX=0x7FFC,
            USED=0x75C0, VBUF=0x7800, PTILE=0x7860, LTILE=0x7888, FTILE=0x78A0, NTBUF=0x78AC)
 # fixed-bank entries (7 bytes each, at $FFD0): index, bank to return to, the NES routine replaced
-ENTRIES = [('gb_party', 0x0C, 0x912A), ('gb_names', 0x0C, 0x910D)]
+ENTRIES = [('gb_party', 0x0C, 0x912A), ('gb_names', 0x0C, 0x910D), ('gb_names', 0x0C, 0x981D),
+           ('gb_cmds', 0x0C, 0x982C)]
 
 ENT_SRC = '''
     org $FFD0
@@ -95,7 +96,7 @@ gbdisp:                 ; dispatch GBIDX (word table: entries of the code map)
     sta $01
     jmp ($0000)
 gbtab:
-    .dw gb_party, gb_names
+    .dw gb_party, gb_names, gb_names, gb_cmds
 
 ; ---- tile pool: table-1 tiles this battle's battlefield does not use
 poolinit:
@@ -754,6 +755,8 @@ gb_party:
 ; that makes more than 4 lines: then such names are drawn squeezed (no letter gaps)
 gb_names:
     jsr poolinit
+    lda #1
+    sta VCX
     lda #0
     sta VSQZ
     sta NL
@@ -836,13 +839,13 @@ gb_names:
 .rest:                  ; empty lines below
     lda NL
     cmp #4
-    bcs .win
+    bcs gb_names_win
     lda #0
     sta VI0
     sta VI1
     jsr nline
     jmp .rest
-.win:
+gb_names_win:
     lda #18
     sta VROW
     lda #0
@@ -856,6 +859,32 @@ gb_names:
     lda #>LTILE
     sta VP+1
     jmp ntwin
+; ---- command window (replaces b12:982C, the slide to the commands pane): over the names
+; window, Fight / Run / Magic / Gear from x 9 (the hand cursor at the screen edge left of it)
+gb_cmds:
+    jsr poolinit
+    lda #0
+    sta NL
+    sta VSQZ
+.c:
+    ldx NL
+    lda CMDLO,x
+    sta VP
+    lda CMDHI,x
+    sta VP+1
+    lda #0
+    sta VI0
+    lda #$FF
+    sta VI1
+    lda #9
+    sta VCX
+    jsr nline
+    lda NL
+    cmp #4
+    bne .c
+    lda #1
+    sta VCX
+    jmp gb_names_win
 nline:                  ; one names line NL from (VP) bytes VI0 .. VI1-1 (or the 0), uploaded
     lda NL
     cmp #4
@@ -867,7 +896,7 @@ nline:                  ; one names line NL from (VP) bytes VI0 .. VI1-1 (or the
     lda #6
     sta VN
     jsr vclear
-    lda #1
+    lda VCX             ; (pen start: 1, the commands 9)
     sta VX
     ldy VI0
 .l:
@@ -975,6 +1004,14 @@ def names_data(rom):
     out += 'NPHI:\n' + ''.join('    .db %s\n' % ', '.join('>NAME%d' % k for k in range(i, i + 16)) for i in range(0, 128, 16))
     for m, cs in enumerate(strs):
         out += 'NAME%d: .db %s\n' % (m, ', '.join('$%02X' % c for c in cs + b'\0'))
+    cmds = []                                   # battle commands: battle_msgs 0-3 (bank 21 $B295)
+    for k in range(4):
+        p = b21[0x3295 + 2 * k] | b21[0x3295 + 2 * k + 1] << 8
+        o = p - 0x8000; cmds.append(bytes(b21[o:b21.index(0, o)]))
+        assert width(cmds[-1]) <= 48 - 8, cmds[-1]
+    out += 'CMDLO: .db %s\nCMDHI: .db %s\n' % (', '.join('<CMD%d' % k for k in range(4)), ', '.join('>CMD%d' % k for k in range(4)))
+    for k, cs in enumerate(cmds):
+        out += 'CMD%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
     return out
 
 
@@ -1034,6 +1071,10 @@ def battle(rom):
     # restore reads stay); the GB message window replaces them
     for a in (0xAB0D, 0xAB14, 0xAB1C, 0xAB2A, 0xAB34, 0xAB3D, 0xAB91):
         put(rom, 5, a, bytes([0x2C, 0xFF, 0x07]), old=bytes([0x8D, 0x07, 0x20]))
+    # the NES command pane (b12:9147, drawn once into the hidden right half): not needed;
+    # command cursor (b12:BFC5, x / y per command): hand at the screen edge, rows 19-22
+    put(rom, 12, 0x9147, bytes([0x60]), old=bytes([0x20]))
+    put(rom, 12, 0xBFC5, bytes([0x00, 147, 0x00, 155, 0x00, 163, 0x00, 171]), old=bytes.fromhex('c0a8c0b8c0c8c0d8'))
     # bank 23 + entries
     rom[HDR + 23 * BANK:HDR + 24 * BANK] = b'\xFF' * BANK
     b23 = bank23(rom, dict(gbf=f.labels['gbf']))
