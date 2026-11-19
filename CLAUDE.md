@@ -717,7 +717,33 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   per load, CGB 9-28). Remaining transition cost is spread: map loading code, map draw,
   LCD-on scan, re-coding, CHR uploads.
 
+- **FF1's own bugs fixed (2026-11-19, `gb_layout.bug_fixes`, GB build only; Disch's FF1
+  disassembly "BUGGED" notes, matched to the Japanese code):** run chance read the level
+  through the battle-stat pointer (b12 A3EF), LOK2 never did anything (BA4E JMP -> BEQ),
+  HARM used a player's class as enemy category (B618), weapon crit = weapon index (now the
+  weapon's crit byte), weapon element / category never applied (stored in battle-stat bytes
+  $03/$04, an HP copy nothing reads; attack setup A4E7/A4EE reads them), enemy group 3
+  palette bit (b11 A37F). Far routine `wpnfix`. Checked on the NES build (battle stats per
+  weapon). Not fixed (ambiguous or harmless): XFER / enemy weakness ROM vs RAM, CURE on the
+  dead outside battle, BB armour absorb, stat-100 report, TMPR, multi-level-up.
+- **Owner feedback 2026-11-19 (menus):**
+  - Field magic / item target screen (b14 $B413): FF1's four boxes were outside the GB
+    view and garbled in English (also in the plain English NES build); now the main menu's
+    party window ($B859) at camera 0/0, hand beside the member, up/down.
+  - Battle menus move by position: magic list (MAGMOVE / MAGLR: down slot 0 -> 2 -> next
+    level, left/right between the row's two spells, pages turn by themselves); enemy target
+    (far `etarget`: nearest living enemy in the pressed direction, up/down cycle the list
+    when nothing is that way); command window (Run only beside Fight); party targets
+    ignore left/right. Checked on the NES build (cursor RAM per press).
+  - Open: "positions shift because the screen isn't always centred" (camera per screen:
+    menu 0/0, equip / shops 1, field 5/6, name entry 5/2, class select 4/4, story 3/5);
+    an audit of every menu action on DMG and CGB.
+- build.py: coverage from an older NES ROM (covall now keeps `rom.nes`) drops the logs
+  of changed bytes and relies on static flow there. Fine for small NES changes; new code
+  entered only dynamically (RTS dispatch) still needs fresh coverage (seen: boot hung with
+  the old cov3 after the Select menu).
+
 ## Remaining
-- FF1: the speed work above; Select menu (options / formation / suspend), name entry
-  (design E), Disch disassembly BUGGED fixes, final builder exe.
-- FF2 (dual-mode) and FF3 (GBC only): not started (on the everything8215 sources).
+- FF1: fresh coverage + all checks for the Select menu, name entry, bug fixes and the new
+  menu movement (DMG + CGB + SGB); the menu audit; centring; transitions; final builder exe.
+- FF2: separate session (`docs/ff2-gb-brief.md`). FF3 (GBC only): not started.
