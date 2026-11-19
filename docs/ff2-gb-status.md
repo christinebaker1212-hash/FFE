@@ -275,9 +275,15 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   the sprites-behind-window region of window 0 (`fix:E892`) set to the GB box (NPCs no
   longer over the text). Checked: Gambatte CGB shots of the scenes after the opening
   battle; random seed 1, 30000 frames: 29534 waits identical.
+- Field messages of the system table shown in window 0 (`SYS_FIELD`: chest, nothing
+  there, lock, ship / airship talk, keywords, save, warp, prayer, magic) re-wrapped at 18
+  into bank 10's free space (insert.py's allocations replayed on a scratch copy give the
+  free list). Item names ({02}) are counted as 18 columns: **open point for the owner**:
+  three item names are longer than the 18-column box (Sulfuric Acid Bottle 20, Diamond
+  Breastplate 19, icon + Sword of the Earth 19) and would run into the frame when a chest
+  gives one. Random seed 1, 30000 frames: 29534 waits identical.
 - Open: windows 1-3 (keyword Ask / Learn, item choice, yes / no: NES rows 14-27, partly
-  below the GB view) need a mock-up; system strings shown in window 0 are still wrapped
-  at 26 (`SYS_W`).
+  below the GB view) need a mock-up; shop messages wait for the shop layout.
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).

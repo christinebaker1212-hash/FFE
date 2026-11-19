@@ -2359,6 +2359,9 @@ ab:
 # screen columns 6-25, rows 6-13), 18 columns x 6 lines inside, the party visible below.
 DLG_GB_W = 18
 DLG_WIN = dict(left=6, top=6, width=20, height=8)     # text window 0 (fix:E9AA table)
+# system strings shown in window 0 on the field (chest, nothing there, lock, ship / airship
+# talk, keywords, save, warp, prayer, magic); the shop ones go with the shop layout
+SYS_FIELD = {0, 1, 2, 3, 4, 17, 18, 19, 20, 22, 25, 63, 64, 68, 71, 72, 76, 77}
 
 
 def _insert_module():
@@ -2433,6 +2436,19 @@ def dialogue(rom):
             data += ins.enc('\n'.join(lines)) + b'\0'
         a = ins.Bank(rom, ins.EV_BANK, free_ev).alloc(data)
         put(rom, 14, 0xBAD2, bytes([a & 0xFF])); put(rom, 14, 0xBAD6, bytes([a >> 8]))
+        # field messages of the system table (bank 10 $8400) drawn in window 0: wrapped at
+        # 18 too, into bank 10's space left after insert.py's names + system strings (its
+        # allocations replayed on a scratch copy give the free list)
+        scratch = bytearray(rom)
+        b10 = ins.insert_names(scratch, [])
+        ins.system_strings(scratch, [], b10)
+        bank = ins.Bank(rom, 10, b10.free)
+        for e in json.load(open('script/ff2/system.json')):
+            if e['id'] in SYS_FIELD and e['en']:
+                t = '\n'.join(l.strip() for l in e['en'].split('\n'))
+                t = gb_wrap(ins, t.replace('{02}', 'I' * 18)).replace('I' * 18, '{02}')   # item
+                #   name counted as 18 (3 names are longer: 19-20, open point)
+                bank.put_ptr(0x8400 + 2 * e['id'], bank.alloc(ins.enc(t) + b'\0'))
     finally:
         os.chdir(cwd)
 
