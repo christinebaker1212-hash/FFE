@@ -19,11 +19,22 @@ it in FF1 (file / routine names in this repo).
 - **LCD off shows white on a real GBC** (and blank on DMG). Screen loads that switch the LCD
   off flash white between screens; the NES shows black. (Being fixed: keep the LCD on and
   black during loads.)
-- **Battle music briefly speeds up on damage**: frames that overrun the budget are caught up
-  by running several game frames (and music ticks) in one GB frame (`rt_wait_nmi` catch-up).
-  The music driver must not run faster: remove the heavy frames, or tick the music on its
-  own steady timer. (Being fixed.)
-- **Sprite corruption while walking in towns** (being investigated with SameBoy).
+- **Battle music briefly sped up on damage.** The NES game itself lags (2 NES frames per
+  game frame) on heavy battle frames; the GB reproduced that, then its catch-up pacing ran
+  the next game frames back to back, and the music driver (called once per game frame)
+  rushed. Only cycle-accurate emulators (Gambatte, SameBoy) show it; mGBA does not. Fix:
+  the driver's APU writes go into a per-frame snapshot, queued at each frame wait, and at
+  most one queued frame is applied per vblank (`apu.s` APQ, `apq_apply_b`). Sound now runs
+  at a steady 60 Hz whatever the game-frame pacing. Use this from the start.
+- **A missing `jr` in the native CHR upload** (Color, LCD on) wrote BG tiles over the sprite
+  shadow and left WRAM bank 2 selected (hangs, sprite corruption). Check every bank switch
+  (`$FF70`, `$4000`, `$2000`) is undone on every path; test the LCD-on paths explicitly.
+- **Cart RAM**: use at most 32 KB (4 banks, as retail MBC5 games); clones / old flash carts
+  may not bank more. Check at boot that the banks are separate and say so on screen.
+- **LCD off is white on a real GBC.** Keep the LCD on during loads behind a black mask (window
+  layer, a black palette); write VRAM only in STAT mode 0/1; let bulk fills update shadows
+  and rebuild the map / attributes in one pass when the screen is shown (`maprb_b`,
+  `repal_b`). Cost here: CGB loads +0.4% of play time.
 
 ## Speed
 

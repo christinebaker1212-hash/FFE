@@ -517,6 +517,90 @@ w_status:   ld a, e
 
 ; ---- once per NES frame: two half-frame clocks (length counters, sweep), four quarter-
 ; frame clocks (the triangle's linear counter, counted here in frames)
+; the oldest queued frame (apu.s apq_commit): its changed registers and restarted notes to
+; apu_write, then the NES frame counter's clocks (apu_frame); the slot dequeued
+apq_apply_b:
+            ldh a, [apq_n]
+            ld b, a
+            and 3
+            ret z
+            ld a, b                         ; HL = head slot
+            rlca
+            and 1
+            swap a
+            add a, low(APQ_S0)
+            ld l, a
+            ld h, high(APQ_S0)
+            push hl
+            ld c, 0
+.lp:        ld a, c
+            cp 9
+            jr z, .nx
+            cp 13
+            jr z, .nx
+            pop hl
+            push hl
+            add a, l
+            ld l, a
+            ld e, [hl]                      ; E = value
+            ld a, c
+            and 3
+            cp 3
+            jr nz, .cv
+            pop hl                          ; restart register: if its note restarted
+            push hl
+            ld a, l
+            add a, 13
+            ld l, a
+            ld b, [hl]
+            ld a, c
+            rrca
+            rrca
+            and 3
+            inc a
+.rb:        srl b
+            dec a
+            jr nz, .rb
+            jr nc, .nx
+            jr .wr
+.cv:        ld a, c                         ; other registers: if the value changed
+            add a, low(APU_SH)
+            ld l, a
+            ld h, high(APU_SH)
+            ld a, [hl]
+            cp e
+            jr z, .nx
+.wr:        push bc
+            ld l, c
+            call apu_write
+            pop bc
+.nx:        inc c
+            ld a, c
+            cp 16
+            jr nz, .lp
+            pop hl                          ; $4015
+            push hl
+            ld a, l
+            add a, 13
+            ld l, a
+            bit 4, [hl]
+            jr z, .ns
+            pop hl
+            push hl
+            ld a, l
+            add a, 9
+            ld l, a
+            ld e, [hl]
+            ld l, $15
+            call apu_write
+.ns:        pop hl
+            call apu_frame
+            ldh a, [apq_n]                  ; dequeued: head ^= 1, count - 1
+            xor $80
+            dec a
+            ldh [apq_n], a
+            ret
+
 apu_frame:  ld b, 0
             call len_p
             ld b, 1

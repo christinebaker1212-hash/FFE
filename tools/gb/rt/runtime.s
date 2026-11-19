@@ -101,6 +101,8 @@ CAM_Y      = 48
 
 section hram, $FF80
 hram_dma:   ds 10
+apq_n:      ds 1                            ; sound queue (apu.s): count (bits 0-1), head (bit 7)
+apq_vbl:    ds 1                            ;   VBL_CNT at the last frame applied
 sv_a:       ds 1
 fc_bank:    ds 1
 code_bank:  ds 1
@@ -405,6 +407,7 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             ld [ISR_PC], a
             ld a, [hl]
             ld [ISR_PC + 1], a
+
             ldh a, [oam_pending]
             and a
             jr z, .no_oam
@@ -938,7 +941,8 @@ q_drain1:   push bc
             push de
             push hl
             di
-            ldh a, [q_head]
+            ld d, 16                        ; up to 16 entries while VRAM is free (waits
+.lp:        ldh a, [q_head]                 ;   only for the first: then stops instead)
             ld e, a
             ldh a, [q_tail]
             cp e
@@ -958,23 +962,36 @@ q_drain1:   push bc
             jr nz, .b1
 .w:         ldh a, [$FF41]
             bit 1, a
-            jr nz, .w
-            ld [hl], c
+            jr z, .wr
+            ld a, d
+            cp 16
+            jr nz, .x
+            jr .w
+.wr:        ld [hl], c
             jr .nx
 .b1:        res 6, h                        ; (CGB attributes: VRAM bank 1)
             ld a, 1
             ldh [$FF4F], a
 .w1:        ldh a, [$FF41]
             bit 1, a
-            jr nz, .w1
-            ld [hl], c
+            jr z, .wr1
+            ld a, d
+            cp 16
+            jr nz, .x1
+            jr .w1
+.wr1:       ld [hl], c
             xor a
             ldh [$FF4F], a
             jr .nx
+.x1:        xor a
+            ldh [$FF4F], a
+            jr .x
 .blk:       call q_block_h
 .nx:        ld a, e
             inc a
             ldh [q_head], a
+            dec d
+            jr nz, .lp
 .x:         ei
             pop hl
             pop de
@@ -1472,7 +1489,7 @@ pal4:       ; HL -> 4 NES colours ($x0 = universal backdrop) -> DMG palette byte
 
 ; ------------------------------------------------------------------ frame wait (JSR $FE00)
 rt_wait_nmi:
-            call apu_tick                   ; (NES frame counter: length counters, sweeps)
+            call apq_commit                 ; (the frame's sound: queued, applied per vblank)
             push af
             push hl
             ld hl, NMI_CNT
@@ -2006,10 +2023,7 @@ rt_ppu_w7g: push af
             jr nz, .queue
             ld [hl], d
             jr .done
-.queue:     ld a, [VLCD]                    ; (masked load: vram_put writes it now)
-            and a
-            jr z, .qn
-            ld a, d
+.queue:     ld a, d                         ; (vram_put: now if VRAM is free, else queued)
             call vram_put
             jr .done
 .qn:        ldh a, [q_tail]

@@ -203,14 +203,13 @@ vram_put:   push bc
             jr nz, .q
             ld [hl], d
             jr .x
-.q:         ld a, [VLCD]                    ; CGB masked load, queue empty: written now, in
-            and a                           ;   STAT mode 0 / 1 (mode 2 follows: VRAM stays
-            jr z, .qq                       ;   free long enough), interrupts off for it
-            ldh a, [q_head]
-            ld b, a
-            ldh a, [q_tail]
-            cp b
-            jr nz, .qq
+.q:         ldh a, [q_head]                 ; queue empty: written now if VRAM is free (STAT
+            ld b, a                         ;   mode 0 / 1; mode 2 follows, so VRAM stays free
+            ldh a, [q_tail]                 ;   long enough), interrupts off for it; a CGB
+            cp b                            ;   masked load waits for that moment, otherwise
+            jr nz, .qq                      ;   the queue
+            ld a, [VLCD]
+            ld e, a
             bit 6, h                        ; (address high + $40: VRAM bank 1)
             jr z, .m0
             res 6, h
@@ -219,8 +218,16 @@ vram_put:   push bc
             ldh [$FF4F], a
 .w1:        ldh a, [$FF41]
             bit 1, a
+            jr z, .d1
+            ld a, e
+            and a
             jr nz, .w1
-            ld [hl], d
+            xor a                           ; (not free and no masked load: queued)
+            ldh [$FF4F], a
+            ei
+            set 6, h
+            jr .qq
+.d1:        ld [hl], d
             xor a
             ldh [$FF4F], a
             ei
@@ -229,8 +236,13 @@ vram_put:   push bc
 .m0:        di
 .w0:        ldh a, [$FF41]
             bit 1, a
+            jr z, .d0
+            ld a, e
+            and a
             jr nz, .w0
-            ld [hl], d
+            ei
+            jr .qq
+.d0:        ld [hl], d
             ei
             jr .x
 .qq:        ldh a, [q_tail]
