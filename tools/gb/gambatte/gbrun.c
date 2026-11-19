@@ -35,6 +35,7 @@ static bool env_cb(unsigned cmd, void* data) {
 		if (!strcmp(v->key, "gambatte_gb_hwmode")) { v->value = dmg ? "GB" : "GBC"; return true; }
 		if (!strcmp(v->key, "gambatte_gb_colorization")) { v->value = "disabled"; return true; }
 		if (!strcmp(v->key, "gambatte_gb_internal_palette")) { v->value = "GB - DMG"; return true; }
+		if (!strcmp(v->key, "sameboy_model")) { v->value = dmg ? "Game Boy" : "Game Boy Color"; return true; }
 		v->value = NULL; return false;
 	}
 	case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
@@ -109,6 +110,7 @@ int main(int argc, char** argv) {
 		fseek(pf, 0, SEEK_END); npads = ftell(pf); fseek(pf, 0, SEEK_SET);
 		pads = malloc(npads); if (fread(pads, 1, npads, pf) != (size_t) npads) return 1; fclose(pf);
 	}
+	if (getenv("GBRUN_CORE")) CORE = getenv("GBRUN_CORE");   /* e.g. SameBoy's libretro core */
 	void* h = dlopen(CORE, RTLD_NOW); if (!h) { fprintf(stderr, "%s\n", dlerror()); return 1; }
 #define SYM(n) typeof(&n) p_##n = (typeof(&n)) dlsym(h, #n)
 	SYM(retro_set_environment); SYM(retro_set_video_refresh); SYM(retro_set_audio_sample);
@@ -138,6 +140,7 @@ int main(int argc, char** argv) {
 	uint8_t* wram = p_retro_get_memory_data(RETRO_MEMORY_SYSTEM_RAM);
 	size_t wsize = p_retro_get_memory_size(RETRO_MEMORY_SYSTEM_RAM);
 	if (!wram || wsize < 0x2000) { fprintf(stderr, "no system RAM\n"); return 1; }
+	memset(wram, 0, wsize);      /* (cores with a boot ROM, e.g. SameBoy: no random frame counter) */
 	/* $D830 lives in WRAM bank 1 (offset $1830 both on DMG and on CGB) */
 #define NESF() (wram[0x1830] | wram[0x1831] << 8)
 	static const unsigned map[8] = { RETRO_DEVICE_ID_JOYPAD_RIGHT, RETRO_DEVICE_ID_JOYPAD_LEFT,

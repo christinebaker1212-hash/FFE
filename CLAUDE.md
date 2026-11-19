@@ -86,6 +86,7 @@ work remaining, scope and plan. Commit and push it with the work.
 
 # GB port status (last updated 2026-11-18: FF1 released as a local build)
 
+**Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
 **Handoff: `docs/gb-handoff.md`** (session setup, current battle-layout work, exact next steps).
 
 ## Scope and plan

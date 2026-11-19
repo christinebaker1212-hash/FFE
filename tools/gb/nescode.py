@@ -62,7 +62,7 @@ def fmt_arg(i):
 
 
 class CodeMap:
-    def __init__(self, rom_path, cov_paths, entries=(), old_rom=None):
+    def __init__(self, rom_path, cov_paths, entries=(), old_rom=None, tables=()):
         self.rom = open(rom_path, 'rb').read()[HDR:]
         self.cov = bytearray(3 * COV_SIZE)
         for p in cov_paths:
@@ -75,6 +75,13 @@ class CodeMap:
         if old_rom is not None: self.drop_stale(old_rom[HDR:])
         for sp, a in entries:                             # entry points known without coverage
             self.cov[index_of(sp, a)] |= 3                #   (executed, reached by RTS)
+        self.table_targets = []
+        for sp, a, n in tables:                           # jump tables: every entry executed,
+            for k in range(n):                            #   reached by JMP (ind)
+                t = self.byte(sp, a + 2 * k) | self.byte(sp, a + 2 * k + 1) << 8
+                tsp = sp if 0x8000 <= t < 0xC000 else 'c62' if t < 0xE000 else 'fix'
+                self.cov[index_of(tsp, t)] |= 5
+                self.table_targets.append((tsp, t))
         self.insns = {}                                   # (space, addr) -> Insn
         self.unresolved = []                              # (from insn, reason)
 

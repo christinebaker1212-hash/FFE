@@ -20,6 +20,7 @@ SLOT_STAMP = $DA80          ; GB slot -> frame number of its last use in OAM
 SLOT_KEY   = $D880          ; GB slot -> coding of its tile (SPAL_KEY value; $FF = to load)
 SGB_BANK   = 63             ; ROM bank of the SGB packet builder (sgb.s)
 HLE_BANK   = 62             ; ROM bank of the native FF1 routines (ff1_native.s)
+DYN_BANK   = 61             ; ROM bank of the dynamic-target table (recomp.py: buckets by low byte)
 SGB_CNT    = $DCC4          ; SGB: cells on screen per NES BG palette
 SGB_LSX    = $DCC8          ; SGB: last view position (scroll + camera)
 SGB_LSY    = $DCC9
@@ -2841,11 +2842,19 @@ lookup:     push af
             inc hl
             dec b
             jr nz, .cq
-            ld hl, dyn_table
-.lp:        ld a, [hl+]
-            cp e
-            jr nz, .n1
+            ld a, DYN_BANK                  ; the bucket of the low byte (bank DYN_BANK)
+            ld [$2000], a
+            ld l, e
+            ld h, $20
+            add hl, hl                      ; HL = $4000 + 2 * lo
             ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld b, [hl]                      ; B = entries
+            inc hl
+            inc b
+            jr .bn
+.lp:        ld a, [hl+]
             cp d
             jr nz, .n2
             ld a, [hl+]
@@ -2882,22 +2891,21 @@ lookup:     push af
             ld a, [hl+]
             ld h, [hl]
             ld l, a
+            ldh a, [code_bank]              ; (the caller's bank again)
+            ld [$2000], a
             pop de
             pop bc
             pop af
             ret
-.n1:        cp $FF                          ; end marker ($FF $FF)
-            jr nz, .s1
-            ld a, [hl]
-            cp $FF
-            jr z, .miss
-.s1:        inc hl
 .n2:        inc hl
 .n3:        inc hl
             inc hl
             inc hl
-            jr .lp
-.miss:      ld h, d
+.bn:        dec b
+            jr nz, .lp
+.miss:      ldh a, [code_bank]
+            ld [$2000], a
+            ld h, d
             ld l, e
             ld a, 1
             jp rt_fault

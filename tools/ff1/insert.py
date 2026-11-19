@@ -1815,6 +1815,9 @@ if __name__ == '__main__':
     if '--gb' in sys.argv:                     # far-code entry points (farjsr's RTS dispatch) for
         with open(sys.argv[2] + '.far', 'w') as fh:     # the recompiler (tools/gb/build.py)
             fh.write(''.join('%04X %s\n' % (FAR_LABELS[r], r) for r in FAR_ROUTINES))
+            # ExRAM RTS dispatch: the text engine's control codes 05-0F (h_code.tab)
+            fh.write(''.join('ex:%04X h_code.%s\n' % (LABELS_EX['h_code.' + c], c)
+                             for c in ('c5', 'c6', 'c7', 'c8', 'c9', 'ca', 'cb', 'cc', 'cd', 'ce', 'cf')))
         with open(sys.argv[2] + '.farsym', 'w') as fh:  # far routines the GB build replaces
             fh.write(''.join('%04X %s\n' % (FAR_LABELS[r], r) for r in ('vtile',) if r in FAR_LABELS))
     print('\n'.join(report)); print('strings not fitting:', bad)

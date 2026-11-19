@@ -145,8 +145,12 @@ def main():
     t = time.time()
     entries = []                                      # far routines (dispatched by farjsr)
     if os.path.exists(nes + '.far'):
-        entries = [('far', int(l.split()[0], 16)) for l in open(nes + '.far') if l.strip()]
-    cm = CodeMap(nes, covs, entries, old_rom)
+        for l in open(nes + '.far'):           # (lines 'ex:ADDR': ExRAM RTS-dispatch targets)
+            if not l.strip(): continue
+            a = l.split()[0]
+            entries.append(('ex', int(a[3:], 16)) if a.startswith('ex:') else ('far', int(a, 16)))
+    from recomp import FF1
+    cm = CodeMap(nes, covs, entries, old_rom, getattr(FF1, 'jump_tables', ()))
     if old_rom is not None:
         print('  coverage of %d changed bytes dropped (static flow only there; check, then regenerate)' % cm.stale)
     cm = cm.build()

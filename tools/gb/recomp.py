@@ -79,6 +79,17 @@ class FF1:
                   ('c62', 0xD874): bytes.fromhex('bdc0038d0720e8e02090f5'),
                   ('c62', 0xD6B8): bytes.fromhex('a006a61bca207cd7cad0fa')}
     skip = [('fix', 0xFECF, 0xFEDB), ('fix', 0xFEDC, 0xFEF1)]   # NMI handler + wait loop
+    # Jump tables of the JMP (ind) dispatches (space, table, entries): every entry is compiled
+    # and a dynamic target, not only those the coverage runs reached (a person whose talk
+    # routine no run had used locked the game up).
+    jump_tables = [('b14', 0x90D3, 128), ('b14', 0x91D3, 80),     # map objects (talk etc.), b14:9069 / 9076
+                   ('c62', 0xCDA3, 16),                           # tile properties, c62:CA99
+                   ('b14', 0xA333, 8),                            # shop types, b14:A367
+                   ('b14', 0xB18A, 30),                           # b14:B187
+                   ('b12', 0x946F, 4), ('b12', 0x94DE, 4),        # battle, b12:946C / 94DB
+                   ('b12', 0x9AC5, 5),                            # b12:9AC2
+                   ('b12', 0xB807, 19),                           # battle magic effects, b12:B804
+                   ('b11', 0xA7AA, 3)]                            # b11:A449
 
 
 class Recompiler:
@@ -736,15 +747,21 @@ def emit_program(rc):
         stubs += ['xs_%s:' % lab, '    ldh [sv_a], a', '    ld a, bank(%s)' % lab, '    ldh [fc_bank], a',
                   '    ldh a, [sv_a]', '    ld hl, %s' % lab, '    jp rt_farcall',
                   'xj_%s:' % lab, '    call xs_%s' % lab, '    ret']
-    # dynamic target table: nes_lo, nes_hi, key, gb_bank, gb_lo, gb_hi
-    tab = ['dyn_table:']
+    # dynamic target table (bank DYN_BANK): 256 buckets by the NES address's low byte, each a
+    # count and entries nes_hi, key, gb_bank, gb_lo, gb_hi (runtime lookup)
+    buckets = defaultdict(list)
     for sp, a in rc.dyn:
         if (sp, a) not in rc.insns: continue
         key = int(sp[1:]) if sp.startswith('b') else 62 if sp == 'c62' else 40 if sp == 'far' else 0xFF
-        lab = label(sp, a)
-        tab.append('    db $%02X, $%02X, $%02X, bank(%s), low(%s), high(%s)' % (a & 0xFF, a >> 8, key, lab, lab, lab))
-    tab.append('    db $FF, $FF')
-    return '\n'.join(stubs + tab + out) + '\n', bank_of, banks
+        buckets[a & 0xFF].append((a >> 8, key, label(sp, a)))
+    tab = ['section bank DYN_BANK, $4000', 'dyn_buckets:']
+    tab += ['    dw ' + ', '.join('dynb_%02X' % (lo + k) for k in range(8)) for lo in range(0, 256, 8)]
+    for lo in range(256):
+        tab.append('dynb_%02X:' % lo)
+        tab.append('    db %d' % len(buckets[lo]))
+        for hi, key, lab in buckets[lo]:
+            tab.append('    db $%02X, $%02X, bank(%s), low(%s), high(%s)' % (hi, key, lab, lab, lab))
+    return '\n'.join(stubs + out + tab) + '\n', bank_of, banks
 
 
 def retarget(line, bank, bank_of, xrefs):
