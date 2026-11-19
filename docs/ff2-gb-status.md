@@ -177,10 +177,38 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   (profile, mGBA CGB, waits 9505-9512: nametable writes `rt_ppu_w7` / `own_set` /
   `ppu_inc` / `attr_apply` from b11 "fill ppu" `9D58-9D6C` and the battlefield tilemap
   setup, FF2's multiply / divide `fix:FC79-FD00`): native versions next.
-- Next: victory / loot windows (bank 5; a forced formation 0 did not end: monster HP poke at
-  battle stats +$0A had no effect, to look into), status words in the party window ("Dead"
-  etc.), clear the bottom rows at battle start, hit knock-back past the right edge, item use
-  in battle (Gear -> item), DMG battle-entry speed, GB tile upload latency.
+- Step 5 (done, 2026-11-19): end of battle. Victory messages ("Won the battle!!", Gil,
+  stat gains) already go through the GB message window. **Treasure screen** (owner approved
+  mock-up `ff2_mock7`, `mockup.loot_menu`): `layout.loot()` + bank-23 `gb_lootscr` /
+  `gb_lootf` / `gb_lootnav`. Drawn after the fade out into nametable 0 with BG table 1
+  (`b5:9FCF`), camera (1, 0): treasure window (GB 0,0,20,7: ".. Treasure ..", Drop, Done;
+  8 slots in two columns), inventory window (GB 0,6,20,12: two columns, 10 of 16 rows,
+  scroll `$73` 0-6). A cell is redrawn when its item id changes (`LSHOW`), so swaps / drops
+  / scrolling redraw only what changed. Names wider than the 64-px cell: narrow letters
+  (latin_font NARROW, glyph codes `$20+`), then letter gaps dropped from the end, then 1-px
+  spaces (build-time per item, `loot_data`). Item type icons (`$6E-$75`) come from the ROM
+  font (glyph table; the battle Gear window shows them too). Navigation (`b5:A1DE-A285`
+  replaced): up / down through Drop-Done, treasure rows and inventory rows, left / right
+  between columns; while an item waits for its slot the cursor stays in the other window
+  (as on the NES). Cursor table `b5:A416`. Checked: NES variant (swap, scroll, drop) and
+  firstdiff with every monster dropping items (test copy of `b5:B800`), inventory poked,
+  forced formation 0, monster HP 1 / defence 0 poked after the battle start (`--pokeat
+  10300`): no difference in 14227 waits (PyBoy DMG).
+- Fixed with it: (1) jump-table entries (runs of 3+ JMP abs) are dynamic targets (the
+  monster death `b11:961B` was reached through the fixed-bank dispatcher only); (2) PLA
+  pairs that drop return addresses are found without coverage (runs of 2 / 4 PLAs leaving
+  by RTS / JMP: the victory exit `b05:A021` and 7 more); (3) after a battle the field
+  reloads its tiles (`fix:E512`) with the battle's `$2000` (BG table 1), so the GB sent them
+  the wrong way: `fieldcam` writes the field's `$2000` (`$FD`) first (the room after the
+  opening battle was garbage on the GB before; now right); (4) back from the magic list /
+  Gear window the party window is drawn again before the commands (`LCOV`).
+- firstdiff: `--pokeat F` (frame of the pokes), env `WRAM_EVERY`, `HOOKS=label,..`
+  (print at GB labels), `SHOT_INFO`. Note: battle scripts need `--random 1` (the plain
+  new-game script stays in name entry).
+- Checks: GB-layout pair seed 1, 30000 frames: no difference in 29494 waits.
+- Next: status words in the party window ("Dead" etc.), clear the bottom rows at battle
+  start, hit knock-back past the right edge, item use in battle (Gear -> item), CGB
+  battle-entry speed, GB tile upload latency (a full inventory scroll redraws 20 cells).
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 

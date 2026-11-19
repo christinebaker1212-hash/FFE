@@ -125,6 +125,28 @@ class Recompiler:
                 nxt = self.insns.get((i.space, i.addr + 1))
                 if nxt is not None and nxt.mn == 'PLA' and nxt.stk & 2:
                     self.pla_drop[k] = 'pop'; self.pla_drop[(i.space, i.addr + 1)] = 'none'
+        # Without coverage: a run of 2 or 4 PLAs that leaves by RTS / JMP within 8 straight-line
+        # instructions, with no PHA in the 16 bytes before, drops return addresses (b05:A021
+        # battle victory exit, b11:AF16, fix:F194, ...)
+        for (sp, a), i in self.insns.items():
+            if i.mn != 'PLA' or (sp, a) in self.pla_drop: continue
+            p = self.insns.get((sp, a - 1))
+            if p is not None and p.mn == 'PLA': continue            # not the first of the run
+            n = 0
+            while (lambda j: j is not None and j.mn == 'PLA')(self.insns.get((sp, a + n))): n += 1
+            if n not in (2, 4): continue
+            if any((lambda j: j is not None and j.mn in ('PHA', 'PHP'))(self.insns.get((sp, b))) for b in range(a - 16, a)):
+                continue
+            q, ok = a + n, False
+            for _ in range(8):
+                j = self.insns.get((sp, q))
+                if j is None or j.mode == 'rel' or j.mn in ('PHA', 'PHP', 'PLA', 'PLP', 'RTI', 'BRK', 'TXS'): break
+                if j.mn in ('RTS', 'JMP'): ok = True; break
+                q += j.size
+            if not ok: continue
+            for m in range(n):
+                self.pla_drop[(sp, a + m)] = 'pop' if m % 2 == 0 else 'none'
+            self.static_drops = getattr(self, 'static_drops', []) + [(sp, a, n)]
         for k, i in self.insns.items():
             if i.mn == 'PLA' and i.stk & 2 and k not in self.pla_drop:
                 self.warn.append('lone PLA popping a return address at %r' % i)
@@ -180,6 +202,12 @@ class Recompiler:
                 w = self.cm.byte(sp, a) | self.cm.byte(sp, a + 1) << 8
                 ts = owner(sp, w)
                 if ts: t.add((ts, w))
+        for (sp, a), i in self.insns.items():           # jump tables: runs of 3+ JMP abs (entries
+            def jmp(k):                                 #   reached through jump (long) / RTS
+                j = self.insns.get((sp, k))             #   dispatch with a computed low byte)
+                return j is not None and j.mn == 'JMP' and j.mode == 'abs'
+            if jmp(a) and ((jmp(a - 3) and jmp(a - 6)) or (jmp(a - 3) and jmp(a + 3)) or (jmp(a + 3) and jmp(a + 6))):
+                t.add((sp, a))
         for (sp, a), i in self.insns.items():
             if not (i.mn == 'LDA' and i.mode == 'imm'): continue
             st = self.insns.get((sp, a + 2))

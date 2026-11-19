@@ -47,13 +47,12 @@ btlcam:                 ; fix:FAB9 (JMP $9639, init battle): battle cameras firs
     sta $5802
     lda #CY
     sta $5801
-    lda #CX2
-    sta $5804
     lda #CY2
     sta $5805
     lda #CL
     sta $5803
-    lda #0
+    lda #0              ; (second camera X = 0)
+    sta $5804
     sta GBPOOL          ; tile pool: made again for this battle
     jmp $9639
 fieldcam:               ; fix:FA0F (return from battle; LDA #$0E / JSR $FE1A): field camera
@@ -63,6 +62,8 @@ fieldcam:               ; fix:FA0F (return from battle; LDA #$0E / JSR $FE1A): f
     lda #0
     sta $5802
     sta $5803
+    lda $FD             ; the field's $2000 (BG table 0) before the field reloads its tiles
+    sta $2000           ;   (fix:E512; the GB sends a tile to BG or sprites by $2000 bit 4)
     lda #$0E
     jmp $FE1A
 end:
@@ -75,11 +76,13 @@ RAM = dict(GBIDX=0x7FDF, GBRB=0x7FE0, GBPOOL=0x7FE1, VX=0x7FE2, VN=0x7FE3, VT=0x
            VROW=0x7FF0, VCOL=0x7FF1, VW=0x7FF2, VH=0x7FF3, VLINE=0x7FF4, VSV=0x7FF5, VI=0x7FF6,
            NL=0x7FF7, NS=0x7FF8, VSQZ=0x7FF9, VI0=0x7FFA, VI1=0x7FFB, VCX=0x7FFC, VFILL=0x7FFD, VLN=0x7FFE,
            USED=0x75C0, VBUF=0x7800, BLANKT=0x7888, FTILE=0x7889, PTILE=0x7891, LTILE=0x78B9, XTILE=0x78D1,
-           NTBUF=0x78D5, ATKBUF=0x75E0, MOPEN=0x75F0, MLINE=0x75F1, MPAGE=0x75F2)
+           NTBUF=0x78D5, ATKBUF=0x75E0, MOPEN=0x75F0, MLINE=0x75F1, MPAGE=0x75F2,
+           LSHOW=0x75C0, LNAV=0x75DC, LBASE=0x75DD, LDGAP=0x75DE, LCOV=0x7FFF)    # (L*: treasure screen, after the battle)
 # fixed-bank entries (5 bytes each, at $FFD0 and $FEEC): routine, bank to return to (bank 23 RETB), the NES routine replaced
 ENTRIES = [('gb_party', 0x0C, 0x912A), ('gb_names', 0x0C, 0x910D), ('gb_names', 0x0C, 0x981D),
            ('gb_cmds', 0x0C, 0x982C), ('gb_msgopen', 0x05, 0xAA57), ('gb_msgclose', 0x05, 0xAB4F),
-           ('gb_magic', 0x0C, None), ('gb_magcost', 0x0C, None), ('gb_gear', 0x0C, None)]
+           ('gb_magic', 0x0C, None), ('gb_magcost', 0x0C, None), ('gb_gear', 0x0C, None),
+           ('gb_lootscr', 0x05, None), ('gb_lootf', 0x05, None), ('gb_lootnav', 0x05, None)]
 # (None: called from a patched JSR, not replacing a routine)
 
 ENT_SRC = '''
@@ -101,7 +104,7 @@ gbdisp:                 ; dispatch GBIDX (word table: entries of the code map)
     sta $01
     jmp ($0000)
 gbtab:
-    .dw gb_party, gb_names, gb_names, gb_cmds, gb_msgopen, gb_msgclose, gb_magic, gb_magcost, gb_gear
+    .dw GBTAB
 
 ; ---- tile pool: table-1 tiles this battle's battlefield does not use
 poolinit:
@@ -109,8 +112,9 @@ poolinit:
     beq .go
     rts
 .go:
-    ldx #31
     lda #0
+    sta LCOV
+    ldx #31
 .c:
     sta USED,x
     dex
@@ -896,6 +900,27 @@ gb_cmds:
     bne .c
     lda #1
     sta VCX
+    lda LCOV            ; back from the magic list / Gear window (full width): the party
+    beq .w              ;   window again first (the command window covers the names)
+    lda #0
+    sta LCOV
+    lda #1
+    sta VFILL
+    lda #18
+    sta VROW
+    lda #0
+    sta VCOL
+    lda #20
+    sta VW
+    lda #6
+    sta VH
+    jsr ntwin
+    lda #0
+    sta VFILL
+    jsr gb_party
+    lda #1
+    sta VCX
+.w:
     jmp gb_names_win
 nline:                  ; one names line NL from (VP) bytes VI0 .. VI1-1 (or the 0), uploaded
     lda NL
@@ -1148,6 +1173,8 @@ gb_msgclose:
 ; cursor); no spells ($76 = 0): "Magic can't be used" as on the NES
 gb_magic:
     jsr poolinit
+    lda #1
+    sta LCOV
     lda #1              ; frame with blank lines (as the message window)
     sta VFILL
     lda #18
@@ -1297,6 +1324,8 @@ magmp:                  ; line 4: "MP" cur/max, "MP Cost" n
 gb_gear:
     jsr poolinit
     lda #1
+    sta LCOV
+    lda #1
     sta VFILL
     lda #18
     sta VROW
@@ -1340,6 +1369,403 @@ gb_gear:
     bne .ln
     rts
 
+; ---- treasure screen (bank 5 $9F09: after a battle that left items). Owner's layout
+; (mock-up ff2_mock7): treasure window (GB 0,0,20,7): title, Drop, Done on line 1, the 8
+; treasure slots in two columns; inventory window (GB 0,6,20,12): two columns, 10 of the
+; 16 rows (scroll $73, 0-6). NES nametable 0, camera (1, 0): GB column c = NES column c+1.
+; Cells 0-7 treasure, 8-27 inventory (row-major, two per row), 28-30 the titles; each has
+; its own tiles (LCT), position (LCR / LCC) and length (LCN); a cell is drawn again when
+; the item id it shows (LSHOW) changes.
+gb_lootscr:             ; b5:9FDA (after the fade out, before the fade in)
+    lda #0
+    sta $2005
+    sta $2005
+    lda #1
+    sta $5800
+    lda #0
+    sta $5801
+    sta $5802
+    sta $5803
+    lda #$FF
+    sta BLANKT
+    ldx #7
+.ft:
+    txa
+    clc
+    adc #$F7
+    sta FTILE,x
+    dex
+    bpl .ft
+    jsr frames
+    jsr lblank
+    lda #1
+    sta VFILL
+    lda #0
+    sta VROW
+    lda #1
+    sta VCOL
+    lda #20
+    sta VW
+    lda #7
+    sta VH
+    jsr ntwin
+    lda #6
+    sta VROW
+    lda #12
+    sta VH
+    jsr ntwin
+    lda #0
+    sta VFILL
+    jsr lattr
+    ldx #28
+.tt:
+    stx VI
+    lda LTITLE-28,x
+    jsr lcell
+    ldx VI
+    inx
+    cpx #31
+    bne .tt
+    ldx #27
+    lda #$FE
+.c:
+    sta LSHOW,x
+    dex
+    bpl .c
+    jsr lsync
+    lda #0
+    sta $00
+    rts
+lblank:                 ; tile $FF: window colour 2
+    jsr $FA2A
+    lda #$FF
+    jsr tileaddr
+    lda #0
+    ldx #8
+.p0:
+    sta $2007
+    dex
+    bne .p0
+    lda #$FF
+    ldx #8
+.p1:
+    sta $2007
+    dex
+    bne .p1
+    jmp scroll
+lattr:                  ; nametable 0 attributes: palette 0 (two frames)
+    lda #0
+    sta VLINE
+.h:
+    jsr $FA2A
+    lda #$23
+    sta $2006
+    lda VLINE
+    ora #$C0
+    sta $2006
+    lda #0
+    ldx #32
+.a:
+    sta $2007
+    dex
+    bne .a
+    jsr scroll
+    lda VLINE
+    clc
+    adc #32
+    sta VLINE
+    cmp #64
+    bne .h
+    rts
+gb_lootf:               ; b5 loot menu frame loop: cells whose item changed
+lsync:
+    ldx #0
+.t:
+    stx VI
+    lda $7B6A,x
+    cmp LSHOW,x
+    beq .tn
+    sta LSHOW,x
+    jsr lcell
+.tn:
+    ldx VI
+    inx
+    cpx #8
+    bne .t
+    lda $73
+    asl a
+    sta LBASE
+.i:
+    stx VI
+    txa
+    sec
+    sbc #8
+    clc
+    adc LBASE
+    tay
+    lda $6060,y
+    ldx VI
+    cmp LSHOW,x
+    beq .in
+    sta LSHOW,x
+    jsr lcell
+.in:
+    ldx VI
+    inx
+    cpx #28
+    bne .i
+    rts
+lcell:                  ; cell VI shows the name of item A (narrow letters / dropped gaps
+    tax                 ;   for long names: LFLO / LFHI, LGAP, made at build time)
+    lda LFLO,x
+    sta VS
+    lda LFHI,x
+    sta VS+1
+    lda LGAP,x
+    sta LDGAP
+    ldx VI
+    lda LCN,x
+    sta VN
+    jsr vclear
+    ldy #0
+.n:
+    lda (VS),y
+    beq .nd
+    iny
+    bne .n
+.nd:
+    sty VI1             ; length; no letter gap after the characters VI0 .. VI1-2
+    tya
+    sec
+    sbc LDGAP
+    sta VI0
+    ldy #0
+.l:
+    cpy VI1
+    beq .e
+    lda #0
+    cpy VI0
+    bcc .g
+    iny
+    cpy VI1
+    dey
+    bcs .g
+    lda #1
+.g:
+    sta VSQZ
+    lda (VS),y
+    sty VDIG
+    jsr vchar
+    ldy VDIG
+    iny
+    bne .l
+.e:
+    lda #0
+    sta VSQZ
+    lda VX              ; tiles used: (VX + 6) / 8 (VX includes the last letter's gap)
+    clc
+    adc #6
+    lsr a
+    lsr a
+    lsr a
+    cmp VN
+    bcc .w
+    lda VN
+.w:
+    sta VW
+    ldx VI
+    lda LCT,x
+    sta VSV
+    ldy #0              ; tile numbers of the cell -> NTBUF
+.tl:
+    tya
+    clc
+    adc VSV
+    sta NTBUF,y
+    iny
+    cpy #8
+    bne .tl
+    lda VW
+    beq .nt
+    sta VN
+    lda #<NTBUF
+    sta VP
+    lda #>NTBUF
+    sta VP+1
+    jsr vupload
+.nt:
+    jsr $FA2A           ; the cell's row: its tiles, then blank ($FF)
+    ldx VI
+    lda LCR,x
+    sta VSH
+    lda #0
+    sta VT
+    ldy #5
+.sh:
+    asl VSH
+    rol VT
+    dey
+    bne .sh
+    lda VT
+    ora #$20
+    sta $2006
+    lda VSH
+    ora LCC,x
+    sta $2006
+    lda LCN,x
+    sta VN
+    ldy #0
+.c:
+    lda #$FF
+    cpy VW
+    bcs .b
+    lda NTBUF,y
+.b:
+    sta $2007
+    iny
+    cpy VN
+    bne .c
+    jmp scroll
+
+gb_lootnav:             ; b5 loot menu: right / left / down / up (replaces b5:A1DE-A285).
+    lda #0              ;   GB grid: Drop Done / 4 treasure rows / inventory rows; LNAV = 1
+    sta LNAV            ;   when the cursor moved ($72 window column, $74 row, $73 scroll)
+    lda $34
+    cmp #$80
+    beq .right
+    cmp #$40
+    beq .left
+    cmp #$20
+    beq .down
+    cmp #$10
+    bne .x
+    jmp .up
+.x:
+    rts
+.moved:
+    lda #1
+    sta LNAV
+    rts
+.right:
+    lda $72
+    bne .r1
+    lda $74
+    and #1
+    bne .x
+    inc $74
+    jmp .moved
+.r1:
+    cmp #1
+    bne .x
+    inc $72
+    jmp .moved
+.left:
+    lda $72
+    bne .l1
+    lda $74
+    and #1
+    beq .x
+    dec $74
+    jmp .moved
+.l1:
+    cmp #2
+    bne .x
+    dec $72
+    jmp .moved
+.down:
+    lda $72
+    bne .d1
+    lda $74
+    cmp #8
+    bcc .d0
+    sbc #8              ; Drop / Done -> treasure slot 0 / 1
+    sta $74
+    jmp .moved
+.d0:
+    cmp #6
+    bcs .dinv
+    adc #2
+    sta $74
+    jmp .moved
+.dinv:                  ; -> inventory (not while an inventory item waits for its slot)
+    lda $50
+    beq .di
+    lda $54
+    bne .x
+.di:
+    lda $74
+    and #1
+    clc
+    adc #1
+    sta $72
+    lda #0
+    sta $74
+    jmp .moved
+.d1:
+    lda $74
+    cmp #9
+    bcs .dscr
+    inc $74
+    jmp .moved
+.dscr:
+    lda $73
+    cmp #6
+    bcs .x
+    inc $73
+    jmp .scr
+.up:
+    lda $72
+    bne .u1
+    lda $74
+    cmp #8
+    bcs .x2
+    cmp #2
+    bcs .u0
+    adc #8              ; slot 0 / 1 -> Drop / Done
+    sta $74
+    jmp .moved
+.u0:
+    sbc #2
+    sta $74
+    jmp .moved
+.u1:
+    lda $74
+    beq .uscr
+    dec $74
+    jmp .moved
+.uscr:
+    lda $73
+    beq .utr
+    dec $73
+    jmp .scr
+.utr:                   ; -> treasure (not while a treasure item waits for its slot)
+    lda $50
+    beq .ut
+    lda $54
+    beq .x2
+.ut:
+    lda $72
+    clc
+    adc #5
+    sta $74
+    lda #0
+    sta $72
+    jmp .moved
+.scr:                   ; window offset as b5:A3E9 keeps it ($22 per row)
+    lda $73
+    asl a
+    sta VT
+    asl a
+    asl a
+    asl a
+    asl a
+    clc
+    adc VT
+    sta $A7
+    jmp .moved
+.x2:
+    rts
+
 BIT:    .db $80, $40, $20, $10, $08, $04, $02, $01
 POW:    .db <1000, <100, <10, <1
 POWH:   .db >1000, >100, >10, >1
@@ -1348,7 +1774,7 @@ STATHI:  .db 0, 0, 0, 1
 '''
 
 
-def glyph_tables():
+def glyph_tables(rom=None):
     """glyph data for the small-font renderer (bank 23): code -> width, columns (bit 7 =
     top row); letters condensed (tools/latin_font.py COND, else G), 3-px digits at codes
     $10-$19, small '/' at $1A (FF1's battle digits)"""
@@ -1373,7 +1799,32 @@ def glyph_tables():
         glyph[0x10 + i] = [sum((1 << (7 - (r + 1))) for r in range(7) if art[r][c] == '#') for c in range(3)]
     arrow = ["......", "...#..", "....#.", "######", "....#.", "...#..", "......"]   # FF1's battle arrow
     glyph[0x1B] = [sum((1 << (7 - (r + 1))) for r in range(7) if arrow[r][c] == '#') for c in range(6)]
+    from latin_font import NARROW
+    for i, ch in enumerate(sorted(NARROW)):          # narrow letters (long item names): $20 + i
+        glyph[NARROW_CODE + i] = [sum(b << (7 - r) for r, b in enumerate(c)) for c in _glyph_cols(ch, NARROW)]
+    if rom is not None:                              # item type icons $6E-$75: the ROM font's
+        b9 = rom[HDR + 9 * BANK:HDR + 10 * BANK]     #   tiles (bank 9 $8320, plane 0 = ink),
+        for t in range(0x6E, 0x76):                  #   empty columns trimmed
+            rows = b9[0x0320 + 16 * t:0x0320 + 16 * t + 8]
+            cols = [sum(((rows[r] >> (7 - c)) & 1) << (7 - r) for r in range(8)) for c in range(8)]
+            while cols and not cols[0]: cols.pop(0)
+            while cols and not cols[-1]: cols.pop()
+            glyph[t] = cols
+    glyph[THIN_SPACE] = [0]                          # 1-px space (long names, see loot_data)
     return glyph
+
+
+NARROW_CODE = 0x20
+THIN_SPACE = 0x3F
+
+
+def narrow_codes():
+    """English code -> its narrow letter's code (glyph_tables)"""
+    from latin_font import NARROW
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('ff2insert', os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'ff2', 'insert.py'))
+    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
+    return {ins.ENC[ch]: NARROW_CODE + i for i, ch in enumerate(sorted(NARROW))}
 
 
 def names_data(rom):
@@ -1442,6 +1893,46 @@ def names_data(rom):
     return out
 
 
+def loot_data(rom, gw):
+    """treasure screen tables: cells (tiles, NES row / column, length) and, per item, the
+    string to draw in a 64-px cell: the English name, or for a wider one the name in the
+    narrow letters with the letter gaps after its last LGAP-1 characters dropped"""
+    b10 = rom[HDR + 10 * BANK:HDR + 11 * BANK]
+    nar = narrow_codes()
+    cells = [(8 * k, 2 + k // 2, 2 + 10 * (k % 2), 8) for k in range(8)]
+    cells += [(0x40 + 8 * j, 7 + j // 2, 2 + 10 * (j % 2), 8) for j in range(20)]
+    cells += [(0xE0, 1, 2, 8), (0xE8, 1, 12, 5), (0xEC, 1, 17, 3)]      # .. Treasure .., Drop, Done
+    def ink(cs, gap):                       # pixel columns used (as lcell draws it)
+        x, last, n = 0, 0, len(cs)
+        for i, c in enumerate(cs):
+            if gw[c] == 0: x += 2; continue
+            x += gw[c]; last = x
+            if not (n - gap <= i < n - 1): x += 1
+        return last
+    out = ''
+    for nm, k in (('LCT', 0), ('LCR', 1), ('LCC', 2), ('LCN', 3)):
+        out += nm + ': .db ' + ', '.join(str(c[k]) for c in cells) + '\n'
+    out += 'LTITLE: .db $E8, $E9, $EA\n'
+    lo, hi, gaps, fits = [], [], [], ''
+    for k in range(256):
+        p = b10[0x0200 + 2 * k] | b10[0x0200 + 2 * k + 1] << 8
+        o = p - 0x8000; cs = bytes(b10[o:b10.index(0, o)])
+        if ink(cs, 0) <= 64:
+            lo.append('<NM%d' % k); hi.append('>NM%d' % k); gaps.append(0); continue
+        cs = bytes(nar.get(c, c) for c in cs)
+        if ink(cs, len(cs)) > 64:           # still too wide: thin spaces (1 px where squeezed)
+            cs = bytes(THIN_SPACE if c == 0xFF else c for c in cs)
+        g = 0
+        while ink(cs, g) > 64:
+            g += 1
+            assert g <= len(cs), k
+        lo.append('<FIT%d' % k); hi.append('>FIT%d' % k); gaps.append(g)
+        fits += 'FIT%d: .db %s\n' % (k, ', '.join('$%02X' % c for c in cs + b'\0'))
+    for nm, v in (('LFLO', lo), ('LFHI', hi), ('LGAP', [str(x) for x in gaps])):
+        out += nm + ':\n' + ''.join('    .db %s\n' % ', '.join(v[i:i + 16]) for i in range(0, 256, 16))
+    return out + fits
+
+
 def bank23(rom, L, extra=''):
     """bank 23 source + data from the user's ROM (first monster tiles, boss tilemaps, frame
     tiles) and the glyph tables"""
@@ -1454,13 +1945,13 @@ def bank23(rom, L, extra=''):
         boss.append(bytes(used))
     b9 = rom[HDR + 9 * BANK:HDR + 10 * BANK]
     frame = b''.join(b9[0x0320 + 16 * t:0x0320 + 16 * t + 16] for t in range(0xF7, 0xFF))
-    g = glyph_tables()
+    g = glyph_tables(rom)
     gw = bytes(len(g.get(c, [])) for c in range(256))
     data, offs = bytearray(), []
     for c in range(256):
         offs.append(len(data)); data += bytes(g.get(c, []))
-    nsrc = names_data(rom)
-    src = B23_SRC + nsrc + extra + '\nFIRST: .db ' + ', '.join('$%02X' % v for v in first)
+    nsrc = names_data(rom) + loot_data(rom, gw)
+    src = B23_SRC.replace('GBTAB', ', '.join(name for name, rb, nes in ENTRIES)) + nsrc + extra + '\nFIRST: .db ' + ', '.join('$%02X' % v for v in first)
     src += '\nBOSSUSED:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in b) for b in boss)
     src += 'FRAMEGFX:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in frame[i:i + 16]) for i in range(0, 128, 16))
     src += 'GW:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in gw[i:i + 16]) for i in range(0, 256, 16))
@@ -1472,6 +1963,7 @@ def bank23(rom, L, extra=''):
 
 def battle(rom):
     c = CAM_BATTLE
+    assert c['x2'] == 0
     f = asm(FIX_SRC, syms=dict(RAM, CX=c['x'], CF=c['fine'], CY=c['y'], CX2=c['x2'], CY2=c['y2'], CL=c['line']))
     assert f.org + len(f.bytes) <= 0xF850
     put(rom, 31, f.org, f.bytes)
@@ -1535,6 +2027,46 @@ def battle(rom):
     put(rom, 12, 0xBFCD, bytes(v for k in range(4) for v in (0, 147 + 8 * k)), old=bytes.fromhex('48b048c048d048d8'))
     put(rom, 12, 0x9F3E, bytes([0x20]) + ent['gb_magcost'].to_bytes(2, 'little') + bytes([0x4C, 0x5A, 0x9F]),
         old=bytes.fromhex('a9238d0620'))
+    loot(rom, ent)
+
+
+def loot(rom, ent):
+    """treasure screen (bank 5): drawn into nametable 0 with BG pattern table 1 (the GB
+    has one BG table) by bank 23 after the fade out; the GB navigation; cursor positions"""
+    put(rom, 5, 0x9FCF, bytes([0x09, 0x00, 0x29, 0xFF]), old=bytes.fromhex('090129ef'))
+    put(rom, 5, 0x9FDA, bytes([0x20]) + ent['gb_lootscr'].to_bytes(2, 'little') + b'\xEA' * 9,
+        old=bytes.fromhex('a9008d05208d0520a9008500'))
+    # frame loop (A1D0-A1DD: OAM, joypad, wait for a press; A1DE-A285: right / left / down /
+    # up) -> stub at A1DE: GB cells, the same waits, GB navigation, then A / B as before
+    put(rom, 5, 0xA1D0, bytes([0x4C, 0xDE, 0xA1]) + b'\xEA' * 11, old=bytes.fromhex('208aa12046fd2034fcad3400f0f2'))
+    stub = asm('''
+    org $A1DE
+st:
+    jsr LOOTF
+    jsr $A18A
+    jsr $FD46
+    jsr $FC34
+    lda $34
+    beq st
+    jsr LOOTNAV
+    lda LNAV
+    beq ab
+    jmp $A3A6
+ab:
+    lda $34
+    jmp $A286
+''', syms=dict(LOOTF=ent['gb_lootf'], LOOTNAV=ent['gb_lootnav'], LNAV=RAM['LNAV']))
+    assert stub.org + len(stub.bytes) <= 0xA286
+    put(rom, 5, 0xA1DE, stub.bytes + b'\xEA' * (0xA286 - 0xA1DE - len(stub.bytes)))
+    # cursor (b5:A416, 3 columns x 12 rows of x, y; x = the hand's right half): hands at GB
+    # x -8 / 72 (NES 8 / 88 with camera X = 1), Done at GB 112; y = GB text row * 8 - 5;
+    # treasure slots rows 2-5, Drop / Done row 1, inventory rows 7-16
+    col0 = [((8, 88)[k & 1], (2 + k // 2) * 8 - 5) for k in range(8)] + [(88, 3), (128, 3)] * 2
+    tab = bytearray()
+    for c in range(3):
+        rows = col0 if c == 0 else [((8, 88)[c - 1], (7 + min(v, 9)) * 8 - 5) for v in range(12)]
+        for x, y in rows[:12]: tab += bytes([x, y])
+    put(rom, 5, 0xA416, bytes(tab))
 
 
 def apply(rom):

@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from compare import GB, sync_sram, UP, DOWN, LEFT, RIGHT, A, B, START
 from cynes import NES
 
-WRAM_EVERY = 50
+WRAM_EVERY = int(os.environ.get('WRAM_EVERY', '50'))
 # Sound-driver state (ram-map.txt): music runs in real time, and in the battle phases with
 # an asynchronous NMI the GB ticks it at its own vblanks, so these may differ (not game
 # logic; the song id $6F25 stays compared). --strict compares them too.
@@ -111,6 +111,7 @@ def main():
     form = opt('--form', None, int)
     presses = opt('--press', '')
     pokes = [tuple(int(x, 16) for x in kv.split('=')) for kv in opt('--poke', '').split(',') if kv]
+    poke_at = opt('--pokeat', 9700, int)        # NES frame of the pokes
     nes_path, gb_path = args[0], args[1]
     if form is not None:                       # the opening battle shows battle `form` (ff2form)
         import ff2form, tempfile, shutil
@@ -139,7 +140,7 @@ def main():
     sym = {}
     for l in open(gb_path[:-3] + '.sym'):
         b, rest = l.split(':'); a, n = rest.split(); sym[n] = (int(b, 16), int(a, 16))
-    nes_ram, pads, frame_of, wram, shot_w = nes_pass(nes, steps, limit, shots_at, pokes)
+    nes_ram, pads, frame_of, wram, shot_w = nes_pass(nes, steps, limit, shots_at, pokes, poke_at)
     w = max(nes_ram) if nes_ram else 0
     last = w
     print('NES: %d frames, %d NMIs, %d wait NMIs' % (limit, nes.nmi_count, last))
@@ -167,6 +168,12 @@ def main():
                 state['diff'] = 'NES frame %d, wait %d, work RAM: %s' % (frame_of[k], k, ' '.join(
                     '%04X:%02X/%02X' % (0x6000 + i, x[i], y[i]) for i in d[:16]))
     gb.pb.hook_register(*sym['rt_frame'], on_wait, None)
+    for hn in [h for h in os.environ.get('HOOKS', '').split(',') if h]:   # debug: print at labels
+        def hk(name, gb=gb, state=state):
+            m = gb.pb.memory
+            if state['k'] >= int(os.environ.get('HOOK_FROM', '0')):
+                print('hook %s wait %d $40/$41 %02X%02X A %02X' % (name, state['k'], m[0xC041], m[0xC040], gb.pb.register_file.A))
+        gb.pb.hook_register(*sym[hn], hk, hn)
     gb.feed_pads(sym, lambda n: pads.get(n + 1, 0))
     shots = []; guard = 0; prev = 0
     while state['k'] < last and state['diff'] is None:
@@ -181,6 +188,7 @@ def main():
                 bytes(m[0xD820 + i] for i in range(16)).hex(' ')))
         while shot_w and state['k'] >= shot_w[0]:
             shots.append(gb.image()); shot_w.pop(0)
+            if os.environ.get('SHOT_INFO'): print('shot at wait %d: LCDC %02X SCX %d SCY %d' % (state['k'], gb.pb.memory[0xFF40], gb.pb.memory[0xFF43], gb.pb.memory[0xFF42]))
     print(state['diff'] or 'no difference in %d frame waits (NES frames 0-%d)' % (last, limit))
     if shots and out:
         from PIL import Image

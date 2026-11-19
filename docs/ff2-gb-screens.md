@@ -66,3 +66,11 @@ suspend).
   `$75C0-$75FF`, `$7FDF-$7FFF`; in battle also `$7800-$78DF` (the box save stack the
   English patch moved to ExRAM; no write during the opening battle). `$74C0-$74FF`,
   `$7BE3-$7BFF`, `$627C-$627F` are written (not free). Banks 23-30 are empty.
+
+## Treasure screen (owner approved the mock-up `ff2_mock7_treasure.png`, 2026-11-19)
+- Stacked full-width windows: treasure (GB rows 0-6: ".. Treasure ..", Drop, Done on line 1;
+  the 8 treasure slots in two columns on lines 2-5) and inventory (rows 6-17, sharing the
+  border: two columns, 10 of the 16 rows, scrolling).
+- 64-px columns (text at GB x 8 / 88, hands at x -8 / 72); longer names in narrow letters
+  with fewer letter gaps (widest: Diamond Breastplate, ?Sword of the Earth).
+- Up / down move through both windows, left / right between the columns.
