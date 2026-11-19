@@ -353,6 +353,44 @@ def loot_menu(out):
     p = os.path.join(out, 'ff2_mock7_treasure.png'); sheet.save(p); return p
 
 
+def keyword_windows(nes_path, out):
+    """Field keyword menus (NES windows 1-3: Ask / Learn / Items at (2,18), the keyword or item
+    list at (8,18) 24 wide, Yes / No at (18,14); NES rows 14-27, below the GB view). GB: the
+    dialogue box stays on rows 0-7 and the party on rows 8-9; the menus use rows 10-17:
+    Ask / Learn / Items (0,10,8,5), hand at the screen edge; the keyword / item list a
+    full-width window (0,10,20,8) over it, one column from column 1 (18 letters: all
+    keywords, all but 3 item names), hand cut by the screen edge, 6 of the 16 keywords /
+    32 items, scrolling; Yes / No (12,10,8,4). Same NES font as the dialogue."""
+    f = nes_frame_layout(nes_path, 13843)
+    bg = f.crop((48, 48, 208, 192))
+    def base():
+        s = Screen(bg=3); s.im.paste(bg, (0, 0)); return s
+    shots = []
+    s = base(); s.window(0, 10, 8, 5)
+    for i, w in enumerate(['Ask', 'Learn', 'Items']): s.text(2, 11 + i, w)
+    _hand(s, -6, 12 * 8 - 4, HAND16); shots.append(s)
+    s = base(); s.window(0, 10, 20, 8)
+    for i, w in enumerate(['Wild Rose', 'Mythril', 'Goddess\'s Bell', 'Sunfire', 'Great Battleship', 'Airship']):
+        s.text(1, 11 + i, w)
+    _hand(s, -9, 11 * 8 - 4, HAND16); shots.append(s)
+    s = base(); s.window(0, 10, 20, 8)
+    for i, w in enumerate(['Potion', 'Antidote', 'Cottage', 'Golden Breastplate', 'Phoenix Tail', 'Pass']):
+        s.text(1, 11 + i, w)
+    _hand(s, -9, 14 * 8 - 4, HAND16); shots.append(s)
+    s = base(); s.window(12, 10, 8, 4)
+    for i, w in enumerate(['Yes', 'No']): s.text(14, 11 + i, w)
+    _hand(s, 12 * 8 - 6, 11 * 8 - 4, HAND16); shots.append(s)
+    sheet = Image.new('RGB', (168 * len(shots) - 8, 144), (255, 255, 255))
+    for k, s in enumerate(shots): sheet.paste(s.im, (k * 168, 0))
+    sheet = sheet.resize((sheet.width * 2, 288), Image.NEAREST)
+    p = os.path.join(out, 'ff2_mock8_keywords.png'); sheet.save(p); return p
+
+
+def nes_frame_layout(nes_path, frame):
+    """NES frame of the GB-layout build (seed 1 path) in DMG-like shades"""
+    return dmg(nes_frame(nes_path, frame))
+
+
 if __name__ == '__main__':
     os.makedirs(sys.argv[2], exist_ok=True)
     print(battle(sys.argv[1], sys.argv[2]))
@@ -362,3 +400,4 @@ if __name__ == '__main__':
     print(battle_fit(sys.argv[1], sys.argv[2]))
     print(battle_lists(sys.argv[1], sys.argv[2]))
     print(loot_menu(sys.argv[2]))
+    print(keyword_windows(sys.argv[1], sys.argv[2]))

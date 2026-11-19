@@ -74,3 +74,12 @@ suspend).
 - 64-px columns (text at GB x 8 / 88, hands at x -8 / 72); longer names in narrow letters
   with fewer letter gaps (widest: Diamond Breastplate, ?Sword of the Earth).
 - Up / down move through both windows, left / right between the columns.
+
+## Field keyword menus (owner approved `ff2_mock8_keywords.png`, 2026-11-19)
+- Dialogue box stays on GB rows 0-7, the party visible on rows 8-9; menus in rows 10-17:
+  Ask / Learn / Items (0,10,8,5), hand at the screen edge; keyword / item list a
+  full-width window (0,10,20,8) over it, one column from column 1, 6 rows, scrolling;
+  Yes / No (12,10,8,4).
+- Item names longer than 18 columns (Sulfuric Acid Bottle, Diamond Breastplate, icon +
+  Sword of the Earth): owner chose condensed letters on tiles of their own (wording
+  unchanged).
