@@ -91,19 +91,27 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   screens exact; lag in two screen loads: +46, +36 frames), DMG +7.1% (screen loads, and
   +3 frames at several prologue waits).
 - Mock-up tool `tools/gb2/mockup.py` (FF1's renderer + real graphics cropped from an NES
-  frame of the user's build, output in build/ only); first draft `ff2_mock1_battle.png`.
+  frame of the user's build, output in build/ only). Drafts sent to the owner
+  (2026-11-19), **waiting for review**: `ff2_mock1_battle.png` (FF1's approved battle
+  pattern: enemies GB x 0-127 rows 0-11, party column x 128-159, names / commands window
+  cols 0-7 + party window cols 8-19 with name, HP cur/max, MP; full-width style-A
+  messages), `ff2_mock2_dialogue.png` (box GB rows 0-7, 18 columns x 6 lines per page),
+  `ff2_mock3_menu.png` (party one line per member with HP / MP, commands, Gil).
+- `tools/gb2/gbshots.py`: Gambatte screens at given waits next to the NES frames.
 
 ## Known open items
-- Picture: the castle room shows almost black on the GB (DMG, PyBoy) although RAM matches:
-  PPU-layer issue in FF2's map drawing, to check (also in CGB / Gambatte).
+- DMG shading: the castle floor (dark `$0x` colours) turns black on DMG (FF1's rule: the
+  darkest group of only `$0x` colours is black); correct on CGB. For the colour phase.
 - `b14:ABEA` (Warp: drops the menu frames + one 5-byte frame per map level by arithmetic
   on S): needs a semantic GB version (GB stack pointer per map level); TSX/TXS elsewhere
   are approximated (`rt_tsx`/`rt_txs`, exact round trip).
 - Battle screen split (battlefield / menu pattern tables, sprite 0) not shown correctly
   yet: part of the battle re-layout.
 
-## In progress
-- Random-play equivalence through battles; then speed (lagcheck), screen re-layouts.
+## Next
+- Owner's review of the mock-ups, then the re-layouts (NES side, `tools/gb2/layout.py`).
+- Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
+  (other seeds, scripted field / shop / battle input).
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
