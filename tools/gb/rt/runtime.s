@@ -2288,7 +2288,7 @@ rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (s
             ld a, [hl+]
             add a, c
             cp 168
-            jr nc, .nx
+            jr nc, .xr
             inc e
             ld [de], a                      ; GB x
             inc e
@@ -2347,6 +2347,9 @@ rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (s
             and a
             jr nz, .lp
             jr .full
+.xr:        xor a                           ; out of view sideways: the entry whose y was
+            ld [de], a                      ;   just written is hidden again (else it kept
+            jr .nx                          ;   last frame's x and tile: a stray 8 px piece)
 .s3:        inc l
             inc l
             inc l
