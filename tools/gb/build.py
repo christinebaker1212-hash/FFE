@@ -55,6 +55,35 @@ def border_src():
     return out
 
 
+def ramchk_src():
+    """Font and text of the boot RAM-check message (rt/ramchk.s), from the repo's own font
+    (tools/latin_font.py): one 8 x 8 tile per character, ink colour 3."""
+    sys.path.insert(0, os.path.join(HERE, '..'))
+    import latin_font as L
+    chars = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,()-:'
+    out = 'section bank DYN_BANK, $7200\nramchk_font:\n'
+    for ch in chars:
+        cols = L._glyph_cols(ch, L.G) if ch != ' ' else []
+        x0 = max(0, (8 - len(cols)) // 2)
+        rows = []
+        for y in range(8):
+            v = 0
+            for x, col in enumerate(cols[:8]):
+                if col[y]: v |= 0x80 >> (x0 + x)
+            rows += [v, v]
+        out += '    db %s\n' % ', '.join('$%02X' % b for b in rows)
+    out += 'ramchk_font_end:\nramchk_text:\n'
+    lines = ['CARTRIDGE RAM ERROR', '', 'THIS GAME NEEDS', '32 KB OF SAVE RAM', 'IN FOUR BANKS (MBC5)',
+             '', 'THIS CART DOES NOT', 'BANK ITS SAVE RAM.']
+    assert all(len(t) <= 20 for t in lines)
+    for r, t in enumerate(lines):
+        if not t: continue
+        off = 0x9800 + (4 + r) * 32 + (20 - len(t)) // 2
+        out += '    db $%02X, $%02X, %d, %s\n' % (off & 0xFF, off >> 8, len(t), ', '.join(str(chars.index(c)) for c in t))
+    out += '    db 0, 0\n'
+    return out
+
+
 def nes_rgb_src():
     """NES_RGB ($3E00) and, at EMPH_RGB + e * $80 ($3A80-$3DFF), the colours with the NES
     emphasis bits e = 1-7 ($2001 bits 5-7: red, green, blue): the other components dimmed
@@ -170,6 +199,7 @@ def main():
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s', 'sgb.s'))
     rt += '\n' + apu_tables() + '\n' + open(os.path.join(HERE, 'rt', 'apu_core.s')).read()
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ff1_native.s')).read()
+    rt += '\n' + open(os.path.join(HERE, 'rt', 'ramchk.s')).read() + '\n' + ramchk_src()
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(
         '    db %s\n' % ', '.join(str(shade(c)) for c in range(r, r + 16)) for r in range(0, 64, 16))
     src_all = rt + '\n' + shade_src + '\n' + nes_rgb_src() + '\n' + border_src() + '\n' + prog
@@ -184,7 +214,7 @@ def main():
     top = max(r.banks) + 1
     size = 2
     while size < top: size *= 2
-    rom = make_rom(r.banks, 'FF1 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x04, sgb=True,
+    rom = make_rom(r.banks, 'FF1 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x03, sgb=True,
                    cgb=0x80)                          # dual-mode: DMG / SGB / CGB
     open(opt['--out'], 'wb').write(rom)
     open(opt['--out'][:-3] + '.sym', 'w').write(r.sym_file())

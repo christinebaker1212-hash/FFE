@@ -11,12 +11,12 @@
 ; and sent one at a time, SGB_GAP frames apart, from the frame wait.
 ;   packets 0 PAL01, 1 PAL23, 2.. ATTR_BLK (1) or ATTR_CHR (6)
 
-SGB_NEXT   = $A000          ; cart RAM bank 2: 8 packets
-SGB_SENT   = $A080          ; cart RAM bank 2: 8 packets as last sent
+SGB_NEXT   = $A100          ; cart RAM bank 3: 8 packets
+SGB_SENT   = $A180          ; cart RAM bank 3: 8 packets as last sent
 SGB_GAP    = 4              ; frames between packets
-SGB_GRID   = $A100          ; cart RAM bank 2: palette of each screen cell (20 x 18)
-SGB_COVER  = $A300          ;   cells covered by the rectangles so far (GRID + $200)
-SGB_SETS   = $A280          ;   ATTR_BLK data sets (6 bytes, at most 15)
+SGB_GRID   = $A200          ; cart RAM bank 3: palette of each screen cell (20 x 18)
+SGB_COVER  = $A400          ;   cells covered by the rectangles so far (GRID + $200)
+SGB_SETS   = $A380          ;   ATTR_BLK data sets (6 bytes, at most 15)
 
 ; ---- boot (DMG, LCD off, interrupts off): is_sgb = 1 on a Super Game Boy
 sgb_detect: ld b, 6
@@ -257,7 +257,7 @@ sgb_frame:  call sgb_scroll
             swap a
             ld l, a
             ld h, high(SGB_NEXT)
-            ld a, 2
+            ld a, 3
             ld [$4000], a
             di
             call sgb_send
@@ -469,7 +469,7 @@ section bank SGB_BANK, $4000
 ; ---- NEXT from the current palettes and map; sgb_pend = the packets that differ from SENT
 sgb_build:  xor a
             ldh [sgb_dirty], a
-            ld a, 2
+            ld a, 3
             ld [$4000], a
             ldh a, [sgb_glob]               ; static screen, only the palettes changed: the
             ld b, a                         ;   cells, the party slot and the ATTR packets

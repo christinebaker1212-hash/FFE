@@ -2530,7 +2530,7 @@ palup2_b:   ld c, e                         ; c62:D874: from X on, $03C0 + X
 ; ---- suspend points ($5802, rt_mmc_r5802 / rt_mmc_w5802 in runtime.s)
 susp_r:
             push af
-            ld a, 4
+            ld a, 3
             ld [$4000], a
             ld hl, SUSP_MAGIC
             ld a, [hl+]
@@ -2564,13 +2564,13 @@ susp_w:
             cp $E0
             jr z, .erase
             jr .x
-.save:      ld a, 4                         ; NES RAM and ExRAM -> bank 4
+.save:      ld a, 3                         ; NES RAM and ExRAM -> bank 3 SUSP_RAM
             ld [$4000], a
             ld hl, NES_RAM
-            ld de, $A000
+            ld de, SUSP_RAM
             ld bc, $0C00
             call .cp
-            ld a, 5                         ; save RAM (bank 0) -> bank 5 through QV (the
+            ld a, 2                         ; save RAM (bank 0) -> bank 2 through QV (the
             ld b, 32                        ;   VRAM queue is empty while the LCD is off)
             ld hl, $A000
 .sv:        push bc
@@ -2581,7 +2581,7 @@ susp_w:
             ld bc, 256
             call .cp
             pop hl
-            ld a, 5
+            ld a, 2
             ld [$4000], a
             ld d, h
             ld e, l
@@ -2593,7 +2593,7 @@ susp_w:
             pop bc
             dec b
             jr nz, .sv
-            ld a, 4
+            ld a, 3
             ld [$4000], a
             ld hl, SUSP_MAGIC
             ld a, 'S'
@@ -2604,20 +2604,20 @@ susp_w:
             ld [hl+], a
             ld [hl], 'P'
             jr .x
-.load:      ld a, 4                         ; bank 4 -> NES RAM (not page 1: the GB stack)
+.load:      ld a, 3                         ; bank 3 -> NES RAM (not page 1: the GB stack)
             ld [$4000], a
-            ld hl, $A000
+            ld hl, SUSP_RAM
             ld de, NES_RAM
             ld bc, $0100
             call .cp
-            ld hl, $A200
+            ld hl, SUSP_RAM + $0200
             ld de, NES_RAM + $0200
             ld bc, $0A00
             call .cp
-            ld b, 32                        ; bank 5 -> save RAM
+            ld b, 32                        ; bank 2 -> save RAM
             ld hl, $A000
 .ld:        push bc
-            ld a, 5
+            ld a, 2
             ld [$4000], a
             push hl
             ld de, QV
@@ -2636,7 +2636,7 @@ susp_w:
             pop bc
             dec b
             jr nz, .ld
-.erase:     ld a, 4
+.erase:     ld a, 3
             ld [$4000], a
             xor a
             ld [SUSP_MAGIC], a

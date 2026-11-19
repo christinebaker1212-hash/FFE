@@ -293,6 +293,9 @@ boot:       di
             xor a
             ld [$4000], a
             ld [$3000], a
+            ld a, DYN_BANK                  ; cart RAM banks 0-3 separate? (else a message)
+            ld [$2000], a
+            call ramchk
             ld hl, SPR_SLOT                 ; sprite tiles 0-127 resident in slots 0-127
             xor a
 .sm:        ld [hl+], a
@@ -2459,7 +2462,8 @@ rt_mmc_w5800:                               ; camera X in tiles (GB layout code;
 ; there). $5802 write: $A5 = make a suspend point (NES RAM, ExRAM -> cart RAM bank 4, NES
 ; save RAM -> bank 5; the LCD must be off), $5A = restore it and erase it, $E0 = erase it;
 ; read: 1 if one exists. $5803 / $5804: BGM / SFX volume 0-8 (kept in cart RAM bank 3).
-SUSP_MAGIC = $AC00          ; (cart RAM bank 4) "SUSP" when a suspend point is there
+SUSP_MAGIC = $B100          ; (cart RAM bank 3) "SUSP" when a suspend point is there
+SUSP_RAM   = $B200          ; (cart RAM bank 3) suspend: NES RAM + ExRAM ($0C00 bytes); bank 2: save RAM
 OPT_SAVE   = $BF00          ; (cart RAM bank 3) BGM, SFX volume, $5A when valid
 rt_mmc_r5802:                               ; (bank HLE_BANK: susp_r)
             push af
