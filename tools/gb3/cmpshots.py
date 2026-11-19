@@ -33,8 +33,8 @@ INPUTS['newgame'] = newgame_pad
 
 class Waits:
     """NES frames as the GB runtime counts them (NMI_CNT): NMIs that end a synchronous wait
-    (RAM vector $0100 = JMP $FF2A) or run the battle / cutscene handler (JMP $FB57); an
-    NMI through RTI is nobody's frame. Counted inside the emulator (build/emu3: nmi_count,
+    (RAM vector $0100 = JMP $FF2A) or end the battle / cutscene wait $FB80 (JMP $FB57
+    taken in its loop); other NMIs are nobody's frame. Counted inside the emulator (build/emu3: nmi_count,
     nmi_ram, pad_history count only those NMIs). latch[k]: the pad the NES latched between
     frames k and k + 1 (pad_history[k + 1]), which the GB reads from slot k."""
     def __init__(self, n):

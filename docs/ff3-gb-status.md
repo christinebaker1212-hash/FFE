@@ -73,8 +73,65 @@ python3 tools/gb3/ff3src.py "roms/Final Fantasy III (Japan).nes" build/ff3/src_e
   native routines for graphics, raster splits, sound and hot paths, re-layouts on the NES
   side.
 
+## Step 1-2 of the plan (2026-11-19): first GBC build, equivalence
+- **Translator** `tools/gb3/translate.py` (copied from FF2's, adapted): code map
+  `tools/gb3/ff3code.py` (spaces: bank pairs `p2e p30 p32 p34 p3a p3c` as 16 KB, single
+  banks `b10 b1f b36 b40 b56 b57 b58`, `fix` = banks 126/127, `ex` = ExRAM, `ram` = the
+  sine helper copied to `$7EE3`); calls into the other bank window resolved from the game's
+  bank switches before them (`$FF03/$FF06/$FF09/$FB87/$FB89`, `$C98A/$EB28/$F727/$EB23`,
+  `STA $5114/$5115`) plus a few hints: **all resolved** but an unused `JMP $0000`. Flag facts
+  checked for FF3 (V only from BIT; C only after PLP). 46,310 instructions -> 11 code banks
+  (~148 KB SM83), 531 dynamic targets, 508 bank-0 stubs.
+- **Runtime** `tools/gb3/rt/runtime.s` (CGB only, ~1.4k lines; CPU helpers from FF2):
+  double speed; NES pattern table 0/1 = VRAM bank 0/1 `$8000` (unsigned addressing, bank bit
+  per map cell / sprite: no tile cache); nametables -> map `$9800` (horizontal mirroring:
+  second nametable from row 30, mod 32); attributes -> VRAM bank 1 (only changed quadrants,
+  two cells per access window; whole map re-banked by DMA when `$2000` switches the BG
+  table); NES palettes -> CGB palettes 0-3 / 0-3 (NES_RGB), black while NES rendering is
+  off (the LCD stays on); OAM conversion with the camera (48, 48 for now); joypad (+ test
+  mode); MMC5 `$5114/$5115` (8 KB banks: GB bank DATA + n/2, odd banks at `$6000`),
+  `$5105`, `$5203/$5204`; frame waits: `$FF36` native, `$FB80` / `$FB79` idioms,
+  `$F809` delay loop removed; **asynchronous NMI / IRQ** (battle, cutscenes: `$0100 = JMP
+  $FB57`, `$0103 = JMP $5C03`): the vblank counts NMIs due, the handler runs at the next
+  safe point (ROM data reads, joypad reads, cross-bank returns, the wait idioms), the IRQ it
+  armed at the following one (its `$2000/$2005` writes are recorded as the split's values,
+  not applied yet). GB stack at `$CD00-$CFFF` (FF3 keeps data in `$0110-$0161`).
+- **Build** `tools/gb3/build.py` -> `build/ff3_en.gbc` (2 MB MBC5, 32 KB RAM, CGB flag $C0;
+  NES 8 KB banks copied in pairs from the user's ROM; code banks from 66; dynamic table in
+  bank 127). ~4 s.
+- **Checks** (tools): `run_gb.py` (PyBoy), `cmpshots.py` (NES next to Gambatte at the same
+  frames, input scripts `none` / `newgame`), `firstdiff.py` (RAM equivalence, PyBoy hooks),
+  `profsum.py` (mGBA `SGBRUN_PROF2` samples by routine), `build_emu.sh` (cynes for FF3:
+  8 KB coverage index; `nmi_count` / `pad_history` count FF3's frames, `ff3_waits` /
+  `nmi_ram` the frames the game waits for).
+- **Results:**
+  - Screens (Gambatte vs NES, inside the camera): opening narration, the second page,
+    New Game menu, name entry, the first field scene with its dialogue: as the NES.
+  - RAM (`firstdiff.py ... --input newgame`): **identical for 2,593 frames** (power-on,
+    narration, menu, name entry, the opening field scene and dialogue); through the
+    opening battle identical to frame 2,723 with the sound driver's zero page and the
+    joypad repeat counter masked (`--ignore 00D0-00DF,0014-0014`). After that, input
+    read in busy loops differs (PyBoy has no double speed: the harness resyncs the input
+    clock at each wait, but polls inside the loops still see other frames).
+  - Speed (Gambatte): narration 1.00x after an 85-frame lag at power-on (initial loads);
+    battle ~15% slower (profile: OAM conversion 12%, indirect reads through the general
+    address decoder ~25%, PPU writes).
+- Facts: the battle input loop polls the joypad ~130 times a frame (the repeat counter
+  `$14` steps per poll, so it depends on CPU speed even on the NES); a cynes step can hold
+  two NMIs; `$05` is also used as scratch outside the wait.
+
+## Known open items
+- Battle screen: the windows below the split (BG table 1 vs the battlefield's table, the
+  IRQ's `$2000/$2005` values) are not shown yet; the party sprites are outside the centre
+  camera. Both belong to the battle re-layout (step 4) and the split support in the runtime.
+- Warp (`p3c:9B5F` TSX / TXS arithmetic) and the inn's `TXS` from a saved X (`p3c:9039`) use
+  FF2's approximate helpers: need a semantic version (as FF2's open item).
+- Sound: APU writes ignored for now.
+- Field dialogue box: drawn into the map (the NES shows it from the other nametable by a
+  raster split); belongs in the window layer (FF1 lesson).
+
 ## Next
-1. `tools/gb3/translate.py` (copy of FF2's `tools/gb2/translate.py`, adapted: 8 KB banks
-   and MMC5 mode 3, bank pairs, RAM code), CGB-only runtime (`tools/gb3/rt/`, copied from
-   FF2/FF1, DMG/SGB paths dropped), `tools/gb3/build.py` → boot to the title in Gambatte CGB.
-2. RAM equivalence against the English NES build (cynes), then field / battle / speed.
+1. Speed pass: region fast paths for indirect reads / writes (coverage memory flags),
+   native OAM conversion and PPU copy routines, initial loads; Gambatte lag per window.
+2. Raster split in the runtime (LYC, window layer), sound (APU -> GB, FF1/FF2 model).
+3. Mock-ups for the owner (battle, dialogue, main menu), then the re-layouts.

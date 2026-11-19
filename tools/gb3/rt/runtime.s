@@ -24,6 +24,7 @@ NT_SH      = $D000          ; NES nametables (2 x 1KB after mirroring), WRAM ban
 DBG        = $D820          ; fault info: code, HL, SP, stack top (16)  (the addresses FF1's
 NMI_CNT    = $D830          ; 16-bit count of NES frame waits             test runners read:
 VBL_CNT    = $D832          ; 16-bit count of GB frames                   tools/gb/gambatte/
+WAIT_CNT   = $D834          ; 16-bit count of NES frames the main thread waited for (tools/gb3/firstdiff.py)
 TEST_PAD   = $D83E          ; $A5: test runner input mode (later)         gbrun.c)
 DBG_RING   = $DE00          ; debug ring (256 bytes; gbrun GBRUN_DBG dumps it)
 DBG_RING_P = $D83F
@@ -74,7 +75,10 @@ async_req:  ds 1                            ; asynchronous NES interrupts due: b
                                             ;   the vblank while $0100 holds a JMP and NMIs are
                                             ;   on), bit 1 IRQ (armed by the NMI handler); run
                                             ;   at the next safe point (rt_async)
+nmi_pend:   ds 1                            ; NMIs due (vblanks since the handler last ran; the
+                                            ;   handler runs once for each: none is dropped)
 in_async:   ds 1                            ; rt_async is running a handler
+in_wait:    ds 1                            ; rt_wait_nmi is waiting (its NMI counts a frame)
 in_irq:     ds 1                            ; running the NES IRQ handler: $2000 / $2005 are
 spl_ctrl:   ds 1                            ;   the split's values (below irq_line)
 spl_x:      ds 1
@@ -295,6 +299,11 @@ vblank_isr: push af
             ld a, [NES_RAM + $100]
             cp $4C
             jr nz, .nn
+            ldh a, [nmi_pend]
+            cp 8
+            jr nc, .nn
+            inc a
+            ldh [nmi_pend], a
             ldh a, [async_req]
             or 1
             ldh [async_req], a
@@ -394,7 +403,12 @@ wait_vbl:   push af
             jr nz, .c
             inc hl
             inc [hl]
-.c:         pop af
+.c:         ld hl, WAIT_CNT
+            inc [hl]
+            jr nz, .c2
+            inc hl
+            inc [hl]
+.c2:        pop af
             ret
 
 ; run the NES IRQ handler if the scanline IRQ is armed (it would have fired in the frame
@@ -443,20 +457,36 @@ rt_async:   push af
             push af
             ldh a, [tmp_lo]
             push af
-.again:     ld a, 1
+            ld a, 1
             ldh [in_async], a
             ld de, 0
             ld bc, 0
             ldh a, [async_req]
             bit 1, a                        ; (an IRQ still due from the last frame first)
             jr nz, .irq
+            ldh a, [nmi_pend]
+            dec a
+            ldh [nmi_pend], a
+            jr nz, .more
+            ldh a, [async_req]
             and $FE
             ldh [async_req], a
-            ld hl, NMI_CNT                  ; (an NES frame: the test runners' clock)
+.more:
+            ld hl, NMI_CNT                  ; an NES frame (the input clock of the test runners)
             inc [hl]
-            jr nz, .c
+            jr nz, .c0
             inc hl
             inc [hl]
+.c0:        ldh a, [in_wait]                ; a frame the main thread waited for ($FB80): an
+            and a                           ;   equivalence point
+            jr z, .c
+            ld hl, WAIT_CNT
+            inc [hl]
+            jr nz, .cnt
+            inc hl
+            inc [hl]
+.cnt:       xor a
+            ldh [in_wait], a
 .c:         ld a, [NES_RAM + $101]
             ld l, a
             ld a, [NES_RAM + $102]
@@ -472,13 +502,7 @@ rt_async:   push af
 .irq:       and $FD
             ldh [async_req], a
             call run_irq
-.done:      ldh a, [async_req]              ; (an NMI due as well: run it now)
-            bit 0, a
-            jr z, .end
-            xor a
-            ldh [in_async], a
-            jr .again
-.end:       xor a
+.done:      xor a
             ldh [in_async], a
             pop af
             ldh [tmp_lo], a
@@ -520,7 +544,13 @@ rt_wait_nmi:
             inc [hl]
 .lp:        ldh a, [async_req]
             and a
-            call nz, rt_async
+            jr z, .chk
+            ld a, 1
+            ldh [in_wait], a
+            call rt_async
+            xor a
+            ldh [in_wait], a
+.chk:
             ld a, [NES_RAM + $05]
             and a
             jr z, .done

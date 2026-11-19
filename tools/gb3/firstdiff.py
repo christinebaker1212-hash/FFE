@@ -3,13 +3,15 @@
 usage: PYTHONPATH=build/emu3 firstdiff.py NES GB FRAMES [--input NAME] [--from K] [--max N]
               [--ignore LO-HI,..]
 
-The NES (cynes) and the GB (PyBoy, CGB mode) run with the same input (tools/gb3/cmpshots.py
-INPUTS, one pad byte per counted frame). Counted frames are NMIs taken while the RAM NMI
-vector $0100 holds a JMP (cmpshots.Waits); the GB counts the same (NMI_CNT $D830):
-  - synchronous waits ($FF36): NES RAM at the NMI = the state at the wait; GB: entry of
-    wait_vbl (NMI_CNT = k - 1 there);
-  - asynchronous NMIs (battle, cutscenes): NES RAM when the NMI was taken; GB: the safe
-    point where rt_async runs the handler (rt_async.c, NMI_CNT = k).
+The NES (cynes, build/emu3) and the GB (PyBoy, CGB mode) run with the same input
+(tools/gb3/cmpshots.py INPUTS). Two clocks, counted the same way on both:
+  - input frames (NES nmi_count, GB NMI_CNT $D830): NMIs through JMP $FF2A (a wait) or
+    JMP $FB57 (the battle / cutscene handler) in the RAM vector $0100; the GB reads the
+    pad the NES latched in the same frame (pad_history; test-mode slots);
+  - waited-for frames (NES ff3_waits, GB WAIT_CNT $D834): the equivalence points, where
+    the main thread waits ($FF36, or the $FB80 loop for the asynchronous handler). NES
+    RAM at that NMI; GB at wait_vbl entry (WAIT_CNT = k - 1) or where rt_wait_nmi runs the
+    handler (rt_async.cnt, WAIT_CNT = k).
 NES RAM $0000-$07FF is compared with GB $C000-$C7FF (the GB keeps its own stack out of it),
 except $0100-$0102 (the wait's NMI stub) and the NES stack $0162-$01FF.
 Prints the first frames with differences (address, NES, GB)."""
@@ -49,18 +51,21 @@ def main():
     for r in [x for x in a.ignore.split(',') if x]:
         lo, hi = (int(v, 16) for v in r.split('-')); ign |= set(range(lo, hi + 1))
     # NES: RAM at each counted frame
-    n = NES(a.nes); W = Waits(n); nes_ram = {}; k = 0; f = 0; latched = {}
+    n = NES(a.nes); W = Waits(n); nes_ram = {}; k = 0; f = 0; latched = {}; wk = 0; nes_clock = {}
     sram0 = bytes(n[0x6000 + i] for i in range(0x2000))   # power-on save RAM (the game reads
                                                          #   unwritten save RAM: copied to the GB)
     while k < a.frames and f < a.frames * 4 + 1000:
         c = pad(k + 1)
         n.controller = c
         n.step(1); f += 1
-        k2 = W.update(c)
-        if k2 != k:
-            k = k2
-            if k >= a.frm: nes_ram[k] = bytes(n.nmi_ram)
-    print('NES: %d counted frames in %d NES frames' % (k, f))
+        k = W.update(c)
+        w2 = n.ff3_waits
+        if w2 != wk:
+            wk = w2
+            nes_clock[wk] = k
+            if wk >= a.frm: nes_ram[wk] = bytes(n.nmi_ram)
+    print('NES: %d frames (input clock), %d waited-for frames, in %d NES frames' % (k, wk, f))
+    k = wk
     # GB
     S = sym(os.path.splitext(a.gb)[0] + '.sym')
     pb = PyBoy(a.gb, window='null', cgb=True)
@@ -74,27 +79,40 @@ def main():
             if v is None: v = W.latch.get(j - 1, 0)
             m[3, 0xA000 + (j & 0xFF)] = gb_order(v)
 
-    def check(kk):
+    def check(kk, before=0):
         st['last'] = kk
-        feed(kk)
+        # (PyBoy runs the CGB at normal speed, so in the asynchronous phases more vblanks
+        # pass per unit of game progress than on the NES or a real GBC: the GB's input clock
+        # is set to the NES's at each equivalence point, so both read the same pads)
+        c = nes_clock.get(kk)
+        if c is not None:
+            c -= before                          # (at a wait's entry its frame is not counted yet)
+            m[0xD830] = c & 0xFF; m[0xD831] = c >> 8
+            feed(c)
         if kk not in nes_ram: return
         st['checked'] += 1
         g = bytes(m[0xC000 + i] for i in range(0x800))
         d = [i for i in range(0x800) if g[i] != nes_ram[kk][i] and i not in ign]
         if a.show:
             lo, hi = a.show
-            print('frame %d NES %s | GB %s' % (kk, nes_ram[kk][lo:hi + 1].hex(), g[lo:hi + 1].hex()))
+            print('frame %d NES %s | GB %s   (GB input clock %d, NES %s)' % (kk, nes_ram[kk][lo:hi + 1].hex(),
+                  g[lo:hi + 1].hex(), m[0xD830] | m[0xD831] << 8, nes_clock.get(kk)))
         if d and st['diffs'] < a.max:
             st['diffs'] += 1
             print('frame %d: %d bytes differ: %s' % (kk, len(d), ' '.join(
                 '%04X:%02X/%02X' % (i, nes_ram[kk][i], g[i]) for i in d[:24])))
 
+    def nmi(): return m[0xD830] | m[0xD831] << 8
+    def waits(): return m[0xD834] | m[0xD835] << 8
     def on_wait(ctx):
-        check((m[0xD830] | m[0xD831] << 8) + 1)
+        feed(nmi()); check(waits() + 1, 1)
     def on_async(ctx):
-        check(m[0xD830] | m[0xD831] << 8)
+        check(waits())
+    def on_frame(ctx):
+        feed(nmi())
     pb.hook_register(*S['wait_vbl'], on_wait, None)
-    pb.hook_register(*S['rt_async.c'], on_async, None)
+    pb.hook_register(*S['rt_async.cnt'], on_async, None)
+    pb.hook_register(*S['rt_async.c'], on_frame, None)
     for i in range(0x2000): m[0, 0xA000 + i] = sram0[i]
     feed(0)
     t = 0

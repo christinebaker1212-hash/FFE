@@ -40,8 +40,9 @@ except screen size:
 → VRAM bank 1 `$8000-$8FFF` (unsigned tile addressing for BG and sprites). Each BG map cell
 and each sprite picks its table with the CGB bank bit, so FF3's battle split (BG from table
 1 above the split, table 0 for the windows below, `$2000` = `$98` / `$88`) is just per-cell
-attributes, no mid-frame switching. `$9000-$97FF` in both banks (256 tiles) stays free for
-GB-only graphics (small-font text, window frames).
+attributes, no mid-frame switching. (With unsigned addressing the BG and window can only
+use `$8000-$8FFF`, so GB-only text goes into NES tiles from the NES side, as FF1 does; the
+mask while NES rendering is off is black palettes, not a window.)
 
 ## 3. 6502 → SM83
 **Mechanical translation of the generated source** (`tools/gb3/translate.py`, copied from

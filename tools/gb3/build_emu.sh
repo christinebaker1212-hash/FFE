@@ -24,9 +24,10 @@ sub(cpu, "    if (pc >= 0x8000) return ((g_dbg_bank & 0x7F) >> 1) * 0x4000 + (pc
 sub(cpu, "    if (pc >= 0xE000) return 31 * 0x4000 + 0x2000 + (pc - 0xE000);",
          "    if (pc >= 0xE000) return 127 * 0x2000 + (pc - 0xE000);          // FF3: 1MB, bank 127")
 sub(cpu, "extern int g_dbg_bank_c;", "extern int g_dbg_bank_c;\nextern int g_dbg_bank_8;")
-# FF3 frame count: nmi_count / nmi_pad / pad_history / nmi_ram only at NMIs that end a wait
-# ($0100 = JMP $FF2A) or run the battle / cutscene handler (JMP $FB57), as the GB runtime
-# counts frames; an NMI through RTI is nobody's frame
+# FF3 frames, as the GB runtime counts them: nmi_count / nmi_pad / pad_history count NMIs
+# through JMP $FF2A (a wait) or JMP $FB57 (battle / cutscene handler) in the RAM vector
+# $0100 (the input clock); ff3_waits / nmi_ram only those that end a wait ($FF2A, or $FB57
+# taken in the $FB80 loop $FB82-$FB85): the RAM equivalence points
 c2 = [p for p in glob.glob('src/*.cpp') if 'g_nmi_ram[k] = _nes.read_cpu(k);' in open(p).read()][0]
 old = """            g_nmi_count++;
             g_nmi_pad = g_last_pad;
@@ -37,9 +38,20 @@ new = """            uint16_t ff3v = _nes.read_cpu(0x101) | _nes.read_cpu(0x102)
             g_nmi_count++;
             g_nmi_pad = g_last_pad;
             g_pad_hist[g_nmi_count & 0xFF] = g_last_pad;
+            if (ff3v == 0xFF2A || (_program_counter >= 0xFB82 && _program_counter < 0xFB86)) {
+            g_ff3_waits++;
             for (int k = 0; k < 0x800; k++) g_nmi_ram[k] = _nes.read_cpu(k);
+            }
             }"""
 sub(c2, old, new)
+sub(c2, "unsigned long g_nmi_count = 0;", "unsigned long g_nmi_count = 0;\nunsigned long g_ff3_waits = 0;")
+wr = [p for p in glob.glob('src/*.cpp') + glob.glob('src/*.hpp') if '"nmi_count",' in open(p).read()][0]
+sub(wr, '''            "nmi_count",''', '''            "ff3_waits",
+            [](const wrapper::NesWrapper&) { extern unsigned long g_ff3_waits; return g_ff3_waits; },
+            "FF3: NMIs that end a frame wait (the RAM equivalence points; nmi_ram is taken there)."
+        )
+        .def_property_readonly(
+            "nmi_count",''')
 m = [p for p in glob.glob('src/*.cpp') if 'g_dbg_bank_c = 0x80 + 62' in open(p).read()][0]
 sub(m, "int g_dbg_bank_c = 0x80 + 62;", "int g_dbg_bank_8 = 0xFF;\nint g_dbg_bank_c = 0x80 + 62;")
 sub(m, "if (address == 0x5115) g_dbg_bank = value;", "if (address == 0x5115) g_dbg_bank = value; if (address == 0x5114) g_dbg_bank_8 = value;")
