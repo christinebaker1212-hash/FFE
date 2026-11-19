@@ -584,6 +584,16 @@ vbl_regs:   ld a, [VLCD]                    ; CGB: a masked load's writes done: 
             swap a
             or b
             ld [BGP_MASK], a
+            ld a, [BAND_LIFE]               ; plain Game Boy: a band transition masks to
+            and a                           ;   white (the LCD goes off next, and that is
+            jr z, .bm                       ;   white there)
+            ldh a, [is_cgb]
+            ld b, a
+            ldh a, [is_sgb]
+            or b
+            jr nz, .bm
+            ld [BGP_MASK], a
+.bm:        ld a, [BGP_MASK]
             ld b, a
             ld a, c
             and a

@@ -892,14 +892,12 @@ dmg_bgp:    push bc
             ld a, [PAL_SH]
             call lum
             call lum_shade
-            ld d, a                         ; value 0
             ld e, a                         ; (backdrop shade)
+            call .fd                        ; value 0
+            ld d, a
             ld b, 1                         ; value being placed
 .v:         call .base
-            add a, c
-            cp 4
-            jr c, .ok
-            ld a, 3
+            call .fd
 .ok:        push bc
 .sh:        add a, a
             add a, a
@@ -916,6 +914,21 @@ dmg_bgp:    push bc
             pop hl
             pop de
             pop bc
+            ret
+.fd:        push af                         ; A = shade, C = fade drop -> faded shade: on a
+            ldh a, [is_sgb]                 ;   plain Game Boy toward white (owner: simple
+            and a                           ;   fades; the LCD off between screens is white
+            jr nz, .fdk                     ;   there), on the SGB toward black
+            pop af
+            sub c
+            ret nc
+            xor a
+            ret
+.fdk:       pop af
+            add a, c
+            cp 4
+            ret c
+            ld a, 3
             ret
 .base:      ld a, e                         ; B = value -> A = its shade before the fade
             cp 3
