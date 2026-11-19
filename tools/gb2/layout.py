@@ -3400,8 +3400,13 @@ LONG_TILES = [0x7B, 0x7C, 0x7D, 0x7E, 0x7F, 0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 
 
 # main menu windows (b14 menu window table $B48C/$B4A5/$B4BE/$B4D7): 4 commands, 5 Gil
 MM_WIN = {4: (13, 1, 8, 8), 5: (13, 15, 8, 4),      # (heights even: rows drawn in pairs)
-          6: (1, 1, 8, 4), 7: (1, 3, 20, 16)}      # items: title, list (14 rows; the list's
+          6: (1, 1, 8, 4), 7: (1, 3, 20, 16),      # items: title, list (14 rows; the list's
 #                                                      top frame covers the title's lower rows)
+          # magic / equip / status (ff2_mock10): top window 8 / 15 (NES 1,1,20,6) with the
+          # portrait box 9 / 14 and the values 10 drawn inside it without frames (b14:B451),
+          # list windows 11 / 12 (NES 1,6,20,13: 11 rows), equip's replacement list 13
+          8: (1, 1, 20, 6), 9: (1, 1, 6, 6), 10: (5, 3, 15, 4), 11: (1, 6, 20, 13),
+          12: (1, 6, 20, 13), 13: (1, 13, 20, 6), 14: (1, 1, 6, 6), 15: (1, 1, 20, 6)}
 MM_CMDS = ['Items', 'Magic', 'Equip', 'Status', 'Save']
 
 
@@ -3451,6 +3456,34 @@ mm_save:                ; b14:B1D7 (save menu, no close menu): window palette
     # menu's body, dead since insert.py's item menu) for the hooks
     t = asm('''
     org $AEC8
+st_list:                ; b14:B37D (status: after the top window and the portrait box): the
+    jsr $B3DF           ;   page-1 list (window 11)
+    lda #0
+    sta SPAGE
+    sta SPREV
+st_draw:
+    ldx #$0B
+    jsr $B486
+    lda SPAGE
+    clc
+    adc #SP1
+    jmp $B3DF
+st_keys:                ; b14:B1CB (status loop): Left / Right turn the page; A = A or B
+    lda $20             ;   pressed (for the BEQ after it)
+    and #$03
+    cmp SPREV
+    sta SPREV
+    beq .ab
+    cmp #0
+    beq .ab
+    lda SPAGE
+    eor #1
+    sta SPAGE
+    jsr st_draw
+.ab:
+    lda $24
+    ora $25
+    rts
 tg_party:               ; b14:A909 / A8E5 / AC60 (instead of the member windows b14:B396)
     lda #0              ; (the list's hand, cursor 3, hidden: the description covers the
     sta $A4             ;   list; the item / magic menus set it again when they redraw)
@@ -3468,14 +3501,40 @@ mm_sel:                 ; b14:AD3C / AD4B / AD5A (main menu: character select b1
     jmp $AE69
 MMTAB:
     .db MSX, MSY, 0, 0, MSX, MSY+4, 0, 0, MSX, MSY+8, 0, 0, MSX, MSY+12, 0, 0
-''', syms=dict(GBM=GBM[0], MSX=MM_SEL_X, MSY=MM_SEL_Y))
-    assert t.org + len(t.bytes) <= 0xAF4A
+''', syms=dict(GBM=GBM[0], MSX=MM_SEL_X, MSY=MM_SEL_Y, SPAGE=0x75F6, SPREV=0x75F7, SP1=ST_P1))
+    assert t.org + len(t.bytes) <= 0xAF4A, hex(t.org + len(t.bytes))
     put(rom, 14, t.org, t.bytes)
+    # equip hooks: b14:B396-B3C7 (the member windows, all callers replaced) and b14:8801-8832
+    # (the main menu's sprite portraits, 8800 is an RTS now)
+    ea = asm('    org $B396\n' + EQ_A)
+    assert ea.org + len(ea.bytes) <= 0xB3C8, hex(ea.org + len(ea.bytes))
+    put(rom, 14, ea.org, ea.bytes)
+    eb = asm('    org $8801\n' + EQ_B)
+    assert eb.org + len(eb.bytes) <= 0x8833, hex(eb.org + len(eb.bytes))
+    put(rom, 14, eb.org, eb.bytes)
+    t.labels.update(ea.labels); t.labels.update(eb.labels)
     for a in (0xA909, 0xA8E5, 0xAC60):
         put(rom, 14, a, bytes([0x20]) + t.labels['tg_party'].to_bytes(2, 'little'), old=bytes.fromhex('2096b3'))
     for a in (0xAD3C, 0xAD4B, 0xAD5A):
         put(rom, 14, a, bytes([0x20]) + t.labels['mm_sel'].to_bytes(2, 'little'), old=bytes.fromhex('2059ae'))
     put(rom, 14, 0xAEAA, bytes(v for k in range(4) for v in (TG_SEL_X, TG_SEL_Y + k, 0, 0)))
+    put(rom, 14, 0xB04B, bytes([0x4C]) + t.labels['eq_init'].to_bytes(2, 'little'), old=bytes.fromhex('a20c20'))
+    put(rom, 14, 0xB078, bytes([0x20]) + t.labels['eq_open'].to_bytes(2, 'little') + b'\xEA', old=bytes.fromhex('a90185a4'))
+    put(rom, 14, 0xB08E, bytes([0x20]) + t.labels['eq_close'].to_bytes(2, 'little') + b'\xEA', old=bytes.fromhex('a90085a4'))
+    put(rom, 14, 0xB0B0, bytes([0x20]) + t.labels['eq_upd'].to_bytes(2, 'little') + b'\xEA' * 7,
+        old=bytes.fromhex('a20c2051b4a92420cdb3'))
+    for a in (0xAF6B, 0xAF75, 0xB039, 0xB043, 0xB378):     # portrait box / values: no frame
+        put(rom, 14, a, bytes([0x20, 0x51, 0xB4]), old=bytes.fromhex('2086b4'))
+    put(rom, 14, 0xB37D, bytes([0x4C]) + t.labels['st_list'].to_bytes(2, 'little'), old=bytes.fromhex('4cdfb3'))
+    put(rom, 14, 0xB1CB, bytes([0x20]) + t.labels['st_keys'].to_bytes(2, 'little') + b'\xEA\xEA\xEA',
+        old=bytes.fromhex('a5240525f0ef')[:6])
+    put(rom, 14, 0xB1D1 - 2, bytes([0xF0, (0xB1C0 - 0xB1D1) & 0xFF]))  # (BEQ $B1C0 after the JSR)
+    put(rom, 14, 0x8834, bytes([0x0F]), old=bytes([0x0F]))
+    put(rom, 14, 0x8838, bytes([0x14]), old=bytes([0x64]))    # magic / equip portrait: centred in its box
+    for sid in (32, 33, 34, 35, 39, ST_P1, ST_P1 + 1):
+        rom[sysone + sid // 8] |= 1 << (sid % 8)
+    for sid, txt in sub_strings(ins).items():
+        bank.put_ptr(0x8400 + 2 * sid, bank.alloc(ins.enc(txt) + b'\0'))
     for base, v in ((0xB48C, 1), (0xB4A5, 1), (0xB4BE, 20), (0xB4D7, 12)):   # window 16: description
         put(rom, 14, base + 16, bytes([v]))
     for sid in range(43, 63):
@@ -3487,6 +3546,71 @@ MMTAB:
     t28 = '\n{14:03}Gil'
     for sid, t in ((27, t27), (28, t28)):
         bank.put_ptr(0x8400 + 2 * sid, bank.alloc(ins.enc(t) + b'\0'))
+
+
+EQ_A = r'''
+eq_init:                ; b14:B04B (equip): the replacement list (window 13) first, its text
+    ldx #$0D            ;   variables saved (as b14:B05F), then the slots (window 12) over it
+    jsr $B486
+    lda #$25
+    jsr $B3F0
+    jsr $94EB
+    ldx #$0C
+    jsr $B486
+    lda #$24
+    jsr $B3CD
+    jmp $B062
+eq_open:                ; b14:B078 (a slot chosen): the replacement list opens (the slot's
+    lda #1              ;   hand, cursor 2, hidden: the slot may be under the list); its text
+    sta $A4             ;   by b14:B0BA (restore its variables, draw, JMP $B07C: where the
+    lsr a               ;   caller goes next anyway)
+    sta $A3
+    ldx #$0D
+    jsr $B486
+    pla
+    pla
+    jmp $B0BA
+'''
+EQ_B = r'''
+eq_close:               ; b14:B08E (B in the list): the slots again, their hand back
+    lda #0
+    sta $A4
+    lda #1
+    sta $A3
+    ldx #$0C
+    jsr $B486
+    lda #$24
+    jmp $B3CD
+eq_upd:                 ; b14:B0B0 (equipment changed): slots text, the list's frame again
+    ldx #$0C            ;   (b14:B0BA draws its text)
+    jsr $B451
+    lda #$24
+    jsr $B3CD
+    ldx #$0D
+    jmp $B486
+'''
+
+ST_P1 = 80              # status pages: system strings 80 / 81 (ids unused by the game)
+
+
+def sub_strings(ins):
+    """the sub-screens' strings: titles at column 4 of the top window (beside the portrait
+    box), values without leading blanks, status split into the top window and two pages"""
+    st = [('Strength', 0x26), ('Agility', 0x27), ('Stamina', 0x28), ('Intelligence', 0x29),
+          ('Spirit', 0x2A), ('Magic Power', 0x2B)]
+    cb = [('Attack', 0x24, ''), ('Hit Rate', 0x2D, '%'), ('Defense', 0x25, ''), ('Evasion', 0x2E, '%'),
+          ('Magic Defense', 0x2F, '%')]
+    p1 = ['%s{14:0E}..{10:%02X}' % (l, c) for l, c in st] + \
+         [('%s{14:0C}{10:%02X}%s' if pc else '%s{14:0D}..{10:%02X}%s') % (l, c, pc) for l, c, pc in cb[:4]]
+    md = ['%s' % cb[4][0], '{14:0C}{10:%02X}%s' % (cb[4][1], cb[4][2])]   # 19 wide: two rows, page 2
+    # (attributes 2 digits after ".." at 14-15; attack / defense 3 wide; hit rate, evasion,
+    # magic defense print " hits-percent" + % (6): cols 12-17)
+    sk = ['{14:00}[%02X] {10:%02X}{14:09}[%02X] {10:%02X}' % (0x6E + 2 * r, 0x30 + 2 * r, 0x6F + 2 * r, 0x31 + 2 * r)
+          for r in range(4)]
+    return {32: '{14:04}Magic\n{14:04}{10:02}', 34: '{14:04}Equip\n{14:04}{10:02}',
+            33: 'HP {10:20}/{10:21}\nMP  {10:22}/ {10:23}',
+            39: '{14:04}{10:02}\n{14:04}HP {10:20}/{10:21}\n{14:04}MP  {10:22}/ {10:23}\n{14:04}{10:00}',
+            ST_P1: '\n'.join(p1), ST_P1 + 1: '\n'.join(md + ['', 'Skill Level'] + sk)}
 
 
 MM_SEL_X, MM_SEL_Y = 0, 3

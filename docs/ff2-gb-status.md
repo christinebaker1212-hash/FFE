@@ -348,7 +348,22 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   choosing. Hooks in `b14:AEC8` (the original item menu body, dead since insert.py's).
   Checked (NES variant, Gambatte): Potion on a member (5/30 -> 30/30); firstdiff with
   items poked: 16506 waits identical; random seed 1, 30000 frames: 29452 waits identical.
-- Next: Magic, Equip, Status (approved), save menu.
+- **Magic / Equip / Status** (owner approved `ff2_mock10`): top window 8 / 15 at NES
+  (1,1,20,6), the portrait box (9 / 14) and the values (10) drawn inside it without frames
+  (`b14:B451` instead of `B486` at `AF6B/AF75/B039/B043/B378`); titles / values strings
+  32-35 and 39 at column 4 beside the box (one row per line); magic / equip portrait sprite
+  centred in its black box (`b14:8838` x $14). Lists: windows 11 / 12 at NES (1,6,20,13)
+  (11 rows). Equip: the replacement list (window 13, NES (1,13,20,6)) is drawn first and
+  its text state saved, then covered by the slots; it opens when a slot is chosen
+  (`eq_open`, the slot's hand hidden), closes on B (`eq_close`), and is redrawn after a
+  change (`eq_upd`). Status: page 1 (string 80) attributes, Attack, Hit Rate, Defense,
+  Evasion; page 2 (string 81) Magic Defense (19 wide: two rows) and the weapon skills in
+  two columns; Left / Right switch (`st_keys` at `b14:B1CB`). Hooks in `b14:AEC8`,
+  `b14:B396` (old member windows) and `b14:8801` (old main-menu portrait body).
+  Checked (NES variant, Gambatte): firstdiff equip / status / magic scenarios 16706 /
+  16699 / 16699 waits identical; random seed 1, 30000 frames: 29461 waits identical.
+- Next: save menu, then the remaining field screens (shops, name entry, title, prologue,
+  ending, world map, Select menu).
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).

@@ -102,3 +102,5 @@ suspend).
   (0,5,20,13) with 11 rows. Equip: 5 slots as label + item rows and the Item slot; the
   replacement list over the lower rows (0,12,20,6). Status: page 1 the 6 attributes and 5
   battle values, page 2 (Left / Right) the weapon skills in two columns.
+- As built: Status's "Magic Defense" value prints 6 characters (" 1-22%"), one too many for
+  its row, so it moved to page 2 in two rows above the skills.
