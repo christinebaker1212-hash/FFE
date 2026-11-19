@@ -484,7 +484,16 @@ class Emitter:
     def x_LDY(self):
         op = self.operand(); self.o('ld c, %s' % op); self.set_nz_reg('c')
 
-    def x_STA(self): self.store('a')
+    def x_STA(self):
+        i = self.i
+        if i.mode == 'izy':                          # fill idiom: STA (zp),Y / INY / BNE back
+            n1 = self.rc.insns.get((i.space, i.addr + 2)); n2 = self.rc.insns.get((i.space, i.addr + 3))
+            if n1 is not None and n2 is not None and n1.mn == 'INY' and n2.mn == 'BNE' and n2.arg == i.addr:
+                # the rest of the page from Y; then Y = 0, Z = 1, N = 0, C and A kept
+                self.o('ld l, $%02X' % i.arg, 'call rt_izy_fill')
+                self.jump(None, (i.space, i.addr + 5))
+                return
+        self.store('a')
     def x_STX(self): self.store('e')
     def x_STY(self): self.store('c')
 

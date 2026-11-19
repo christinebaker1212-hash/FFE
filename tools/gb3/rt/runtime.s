@@ -1665,6 +1665,51 @@ rt_izx_rd:  push af                         ; L = zp; pointer at (zp + X)
             ld h, [hl]
             ld l, a
             jr izrd
+; STA (zp),Y / INY / BNE (translate.py idiom): A -> ptr + Y .. ptr + 255; then Y = 0, Z = 1,
+; N = 0, A and C kept. L = zp.
+rt_izy_fill:
+            push af
+            ldh [wtmp], a
+            ld h, high(NES_RAM)
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            add hl, bc                      ; HL = first address (NES)
+            ld a, h
+            cp $20
+            jr c, .ram
+            cp $60
+            jr c, .slow
+            cp $80
+            jr nc, .slow
+            add a, $40                      ; PRG-RAM -> $A000
+            ld h, a
+            jr .fill
+.ram:       and $07
+            or high(NES_RAM)
+            ld h, a
+.fill:      ldh a, [wtmp]                   ; (256 - Y bytes from ptr + Y, as on the NES)
+.fl:        ld [hl+], a
+            inc c
+            jr nz, .fl
+            jr .end
+.slow:      push hl                         ; I/O or ROM: one byte at a time
+            call nes_wr
+            pop hl
+            inc hl
+            inc c
+            jr nz, .slow
+.end:       xor a
+            ldh [nzv], a
+            pop af                          ; Z = 1, A and C kept
+            push af
+            push hl
+            ld hl, sp + 2
+            set 7, [hl]
+            pop hl
+            pop af
+            ret
+
 rt_izy_wr:
            push af                         ; L = zp pointer; A -> ptr+Y
             ldh [wtmp], a
