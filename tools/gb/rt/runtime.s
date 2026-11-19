@@ -37,6 +37,8 @@ VBL_SEEN   = $D834          ; VBL_CNT (low) up to which GB frames were taken by 
 CATCH_UP   = 8              ; GB frames an NES frame wait may be behind at most
 BG_DIRTY   = $CCA0          ; CGB: BG tiles to copy by HDMA (bitmap, 32)
 SPR_DIRTY  = $CCC0          ; CGB: sprite slots to copy by HDMA (bitmap, 16)
+LK_C       = $CCD0          ; lookup: the last two results (6 bytes each), which to replace
+LK_RR      = $CCDC
 EV_L       = $CCE0          ; raster events of this frame (vbl_regs / stat_isr): first line (3),
 EV_K       = $CCE3          ;   kind (3: 0 = SCY split, 1 = mask off, 2 = mask on),
 EV_I       = $CCE6          ;   next one,
@@ -60,7 +62,7 @@ TBLK       = $DE80          ; DMG: 8 re-coded tiles (16 bytes) waiting in the VR
 TB_T       = $D872          ;   blocks taken / freed (a ring)
 TB_H       = $D873
 SGB_BGAP   = $D83F          ; SGB: frames before the next packet build may run (sgb_frame)
-SGB_MIN    = 6
+SGB_MIN    = 12
 NT_NOW     = $D87D          ; nt_tile: check the cell's palette at once (not in spare time)
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
@@ -2698,6 +2700,25 @@ lookup:     push af
             jr .key
 .any:       ld a, $FF
 .key:       ld c, a
+            ld hl, LK_C                     ; the last two found (key lo, hi, bank key,
+            ld b, 2                         ;   GB bank, GB address)
+.cq:        ld a, [hl+]
+            cp e
+            jr nz, .c1
+            ld a, [hl+]
+            cp d
+            jr nz, .c2
+            ld a, [hl+]
+            cp c
+            jr nz, .c3
+            jr .hit
+.c1:        inc hl
+.c2:        inc hl
+.c3:        inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .cq
             ld hl, dyn_table
 .lp:        ld a, [hl+]
             cp e
@@ -2708,7 +2729,33 @@ lookup:     push af
             ld a, [hl+]
             cp c
             jr nz, .n3
+            push hl                         ; into the cache (the older entry)
+            ld a, [LK_RR]
+            xor 6
+            ld [LK_RR], a
+            add a, low(LK_C)
+            ld l, a
+            ld h, high(LK_C)
+            ld [hl], e
+            inc l
+            ld [hl], d
+            inc l
+            ld [hl], c
+            inc l
+            ld d, h
+            ld e, l
+            pop hl
             ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl]
+            ld [de], a
+            dec hl
+            dec hl
+.hit:       ld a, [hl+]
             ldh [fc_bank], a
             ld a, [hl+]
             ld h, [hl]

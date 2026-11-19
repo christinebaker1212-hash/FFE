@@ -395,3 +395,19 @@ hle_wrow:                                  ; (bank HLE_BANK: wrow_b)
             call wrow_b
             jp hle_back
 
+hle_palup:                                  ; c62:D865 palette upload (bank HLE_BANK: palup_b)
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            call palup_b
+            jp hle_back
+
+hle_palup2:                                 ; c62:D874 palette upload from X (palup2_b)
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            call palup2_b
+            jp hle_back
+

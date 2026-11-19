@@ -2308,3 +2308,67 @@ scan_row:   ld a, $FF
             pop de
             ret
 
+; ---- c62:D865 (every frame: the 32 palette bytes to $3F00): LDA $0D / BEQ / 16 x $03E0,X /
+; then $03C0,X up to X = $20. A colour equal to the shadow's changes nothing: only changed
+; ones go through rt_ppu_w7. Out: X = $20, A = the last byte; N = 0, Z = 1, C = 1.
+palup_b:    ld a, [NES_RAM + $0D]
+            and a
+            ld hl, NES_RAM + $03C0
+            jr z, .s
+            ld hl, NES_RAM + $03E0
+.s:         ld c, 0                         ; C = index 0-31
+            jp palup2_b.lp
+palup2_b:   ld c, e                         ; c62:D874: from X on, $03C0 + X
+            ld a, e
+            add a, low(NES_RAM + $03C0)
+            ld l, a
+            ld h, high(NES_RAM + $03C0)
+            ld a, c
+            cp 32
+            jr nc, .x
+.lp:        ld a, c
+            cp 16
+            jr nz, .n
+            ld hl, NES_RAM + $03D0
+.n:         ld a, [hl+]
+            ld d, a
+            push hl
+            ldh a, [ppu_vh]                 ; (the game set $3F00; follow the PPU address)
+            cp $3F
+            jr nz, .w
+            ldh a, [ppu_vl]                 ; PAL_SH index: $10/$14/$18/$1C -> $00/$04/...
+            and $1F
+            ld l, a
+            and $13
+            cp $10
+            ld a, l
+            jr nz, .m
+            and $0F
+.m:         ld l, a
+            ld h, high(PAL_SH)
+            ld a, d
+            and $3F
+            cp [hl]
+            jr nz, .w
+            call ppu_inc                    ; unchanged: only the address moves
+            jr .nx
+.w:         ld a, d
+            call rt_ppu_w7
+.nx:        pop hl
+            inc c
+            ld a, c
+            cp 32
+            jr c, .lp
+.x:         xor a
+            ldh [nzv], a
+            ld e, c
+            ld d, 0
+            ld b, 0
+            ld a, [NES_RAM + $03DF]
+            push af
+            pop hl
+            ld l, $90
+            push hl
+            pop af
+            ret
+

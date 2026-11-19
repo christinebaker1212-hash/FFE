@@ -148,7 +148,8 @@ def main():
     prg = open(nes, 'rb').read()[16:]
     for k, code in getattr(rc.g, 'idiom_code', {}).items():   # (fixed bank: the last 8KB)
         off = (len(prg) - 0x2000 + k[1] - 0xE000 if k[0] == 'fix' else
-               int(k[0][1:]) * 0x4000 + k[1] - 0x8000 if k[0][0] == 'b' else None)
+               int(k[0][1:]) * 0x4000 + k[1] - 0x8000 if k[0][0] == 'b' else
+               62 * 0x2000 + k[1] - 0xC000 if k[0] == 'c62' else None)
         if off is None or prg[off:off + len(code)] != code:
             print('  idiom %s:%04X: code not found, not used' % k); rc.g.idioms.pop(k, None)
     if os.path.exists(nes + '.farsym'):              # far routines run natively (rt/ff1_native.s)
