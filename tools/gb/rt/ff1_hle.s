@@ -363,3 +363,11 @@ hle_swap90: push af
             ld bc, 0
             ret
 
+hle_ntclr:                                  ; fix:F2CF nametable clear (bank HLE_BANK: ntclr_b)
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            call ntclr_b
+            jp hle_back
+

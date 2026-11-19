@@ -894,7 +894,10 @@ flush_vbl:  ldh a, [q_tail]
             ld [hl], c
             inc e
             jr .lp
-.blk:       call q_block
+.blk:       ldh a, [$FF44]                  ; (a block takes about a line: not after LY 150)
+            cp 151
+            jr nc, .done
+            call q_block
             inc e
             jr .lp
 .b1:        res 6, h

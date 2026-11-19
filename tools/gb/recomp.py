@@ -57,7 +57,10 @@ class FF1:
     #   fix:EA7F-EA86: one CHR page to $2007 (map loader): hle_chr_page1 (rt/ff1_hle.s).
     idioms = {('b14', 0xB0F1): ('rt_unwind3', 0xB0FC, 'C'), ('c62', 0xD741): ('rt_band', 0xD760, 'NZC'),
               ('fix', 0xEA7F): ('hle_chr_page1', 0xEA87, 'NZ'),
-              ('c62', 0xD1A8): ('hle_rlefill', 0xD1AB, 'Z')}   # map decompression run (rt/ff1_hle.s)
+              ('c62', 0xD1A8): ('hle_rlefill', 0xD1AB, 'Z'),   # map decompression run (rt/ff1_hle.s)
+              ('fix', 0xF2CF): ('hle_ntclr', 0xF2DC, 'NZ')}    # battle setup: nametables cleared
+    # bytes each idiom replaces (build.py drops an idiom whose code is not there)
+    idiom_code = {('fix', 0xF2CF): bytes.fromhex('a008a2008d0720cad0fa88d0f5')}
     skip = [('fix', 0xFECF, 0xFEDB), ('fix', 0xFEDC, 0xFEF1)]   # NMI handler + wait loop
 
 

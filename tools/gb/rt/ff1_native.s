@@ -1017,7 +1017,8 @@ vtile_b:    xor a
 ; masks X, Y, Z, W of $00 / $FF (from the plane's truth table over indices 0-3). Done in
 ; a TBLK block, then sent as one queue entry (LCD on) or copied (LCD off). TILE_USE and
 ; CODED as before; nothing is done if the tile already has that coding. Keeps BC, DE, HL.
-RM         = RT_BUF         ; masks X0 Y0 Z0 W0 X1 Y1 Z1 W1, row counter
+RM         = $D874          ; masks X0 Y0 Z0 W0 X1 Y1 Z1 W1, row counter (not RT_BUF: the
+                            ;   vblank handler's dmg_obp uses RT_BUF + 8)
 retile_b:   push bc
             push de
             push hl
@@ -1306,3 +1307,88 @@ rt_anf:     push de
             ld [hl+], a                     ; W
             pop de
             ret
+
+; ---- fix:F2CF (battle setup, gb_layout): LDY #8 / LDX #0 / STA $2007 / DEX / BNE / DEY /
+; BNE: A to 2048 PPU bytes (both nametables from $2000). DMG with the LCD off, from $2000
+; with increment 1: the nametables' tiles, the GB map rows 0-29 and their owner (nametable
+; 1 drew every cell last) at once, the 128 attribute bytes through rt_ppu_w7; otherwise
+; 2048 rt_ppu_w7 calls. Out: X = Y = 0, A kept; N = 0, Z = 1, carry kept.
+ntclr_b:    push af
+            ld d, a
+            ldh a, [is_cgb]
+            and a
+            jr nz, .gen
+            ldh a, [lcd_on]
+            and a
+            jr nz, .gen
+            ldh a, [ppu_ctrl]
+            and 4
+            jr nz, .gen
+            ldh a, [ppu_vh]
+            cp $20
+            jr nz, .gen
+            ldh a, [ppu_vl]
+            and a
+            jr nz, .gen
+            ld hl, NT_SH                    ; nametable 0 tiles
+            call .fill
+            ld hl, NT_SH + $400             ; nametable 1 tiles
+            call .fill
+            ld hl, $9800                    ; GB map rows 0-29
+            call .fill
+            ld hl, OWN                      ; every cell drawn by nametable 1 last
+            ld a, $FF
+            ld c, 120
+.ow:        ld [hl+], a
+            dec c
+            jr nz, .ow
+            ld a, low(960)
+            ldh [own1_lo], a
+            ld a, high(960)
+            ldh [own1_hi], a
+            ld a, 1
+            ldh [dmg_scan], a
+            ld a, $23                       ; attribute bytes
+            call .attr
+            ld a, $27
+            call .attr
+            jr .out
+.gen:       ld e, 0                         ; 8 x 256 writes
+            ld c, 8
+.g:         ld a, d
+            call rt_ppu_w7
+            dec e
+            jr nz, .g
+            dec c
+            jr nz, .g
+.out:       xor a
+            ldh [nzv], a
+            pop hl                          ; A kept, Z set, carry kept
+            ld a, l
+            and $10
+            or $80
+            ld l, a
+            push hl
+            pop af
+            ld bc, 0
+            ld de, 0
+            ret
+.fill:      ld c, $3C                       ; HL: $3C0 bytes of D
+.f:         ld a, d
+            ld b, 16
+.f1:        ld [hl+], a
+            dec b
+            jr nz, .f1
+            dec c
+            jr nz, .f
+            ret
+.attr:      ldh [ppu_vh], a                 ; A = $23 / $27: its 64 attribute bytes
+            ld a, $C0
+            ldh [ppu_vl], a
+            ld c, 64
+.a:         ld a, d
+            call rt_ppu_w7
+            dec c
+            jr nz, .a
+            ret
+

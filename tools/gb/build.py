@@ -145,6 +145,11 @@ def main():
         entries = [('far', int(l.split()[0], 16)) for l in open(nes + '.far') if l.strip()]
     cm = CodeMap(nes, covs, entries).build()
     rc = Recompiler(cm)
+    prg = open(nes, 'rb').read()[16:]
+    for k, code in getattr(rc.g, 'idiom_code', {}).items():   # (fixed bank: the last 8KB)
+        off = len(prg) - 0x2000 + k[1] - 0xE000 if k[0] == 'fix' else None
+        if off is None or prg[off:off + len(code)] != code:
+            print('  idiom %s:%04X: code not found, not used' % k); rc.g.idioms.pop(k, None)
     if os.path.exists(nes + '.farsym'):              # far routines run natively (rt/ff1_native.s)
         for l in open(nes + '.farsym'):
             a, n = l.split()
