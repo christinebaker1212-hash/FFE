@@ -904,6 +904,9 @@ sgb_counts: ld hl, SGB_CNT
             ld [hl+], a
             ld [hl+], a
             ld [hl], a
+            ldh a, [sgb_glob]               ; scrolling screen: only the counts are used
+            and a
+            jp nz, sgb_counts_g
             ld hl, SGB_NEXT + 32            ; ATTR_CHR header: x 0, y 0, 360 cells, by rows
             ld a, $3E
             ld [hl+], a
@@ -1085,6 +1088,123 @@ sgb_counts: ld hl, SGB_CNT
             xor a
 .rn:        ld d, a
             pop bc
+            dec b
+            jr nz, .r
+            ret
+
+; scrolling screen: SGB_CNT from one cell per attribute quadrant on screen (even map row
+; and column; the four cells of a quadrant share its palette unless two nametables drew
+; them), 4 per quadrant (saturating at 255)
+sgb_counts_g:
+            ldh a, [cam_x]                  ; first map column / row on screen (as above)
+            ld b, a
+            ldh a, [scroll_x]
+            add a, b
+            add a, 4
+            srl a
+            srl a
+            srl a
+            ldh [sgb_c0], a
+            ldh a, [cam_y]
+            ld b, a
+            ldh a, [scroll_y]
+            add a, b
+            jr c, .wr
+            cp 240
+            jr c, .sy
+.wr:        sub 240
+.sy:        add a, 4
+            srl a
+            srl a
+            srl a
+            cp 30
+            jr c, .r0
+            sub 30
+.r0:        ld d, a                         ; D = map row, E = map column
+            ld b, 18
+.r:         bit 0, d
+            jr nz, .rn
+            push bc
+            ldh a, [sgb_c0]
+            ld e, a
+            ld b, 20
+.c:         bit 0, e
+            jr nz, .cn
+            push bc
+            ld a, d                         ; attribute byte of the nametable that drew it
+            and $1C
+            add a, a
+            ld c, a
+            ld a, e
+            rrca
+            rrca
+            and 7
+            add a, c
+            add a, $C0
+            ld l, a
+            ld h, high(NT_SH) + 3
+            ldh a, [own1_lo]
+            ld b, a
+            ldh a, [own1_hi]
+            or b
+            jr z, .o0
+            push hl
+            ld a, d
+            add a, a
+            add a, a
+            ld l, a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            or l
+            ld l, a
+            ld h, high(OWN)
+            ld b, [hl]
+            ld a, e
+            and 7
+            jr z, .ob
+.os:        rrc b
+            dec a
+            jr nz, .os
+.ob:        pop hl
+            bit 0, b
+            jr z, .o0
+            ld a, h
+            add a, 4
+            ld h, a
+.o0:        ld a, [hl]
+            bit 1, d
+            jr z, .t
+            swap a
+.t:         bit 1, e
+            jr z, .l
+            rrca
+            rrca
+.l:         and 3
+            add a, low(SGB_CNT)
+            ld l, a
+            ld h, high(SGB_CNT)
+            ld a, [hl]
+            add a, 4
+            jr nc, .ns
+            ld a, 255
+.ns:        ld [hl], a
+            pop bc
+.cn:        ld a, e
+            inc a
+            and 31
+            ld e, a
+            dec b
+            jr nz, .c
+            pop bc
+.rn:        ld a, d
+            inc a
+            cp 30
+            jr c, .rw
+            xor a
+.rw:        ld d, a
             dec b
             jr nz, .r
             ret
