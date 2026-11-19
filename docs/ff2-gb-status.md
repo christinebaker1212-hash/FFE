@@ -108,8 +108,14 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
 - Battle screen split (battlefield / menu pattern tables, sprite 0) not shown correctly
   yet: part of the battle re-layout.
 
+- Owner's decisions on the mock-ups (2026-11-19): battle, dialogue, main menu approved with
+  changes; details in `docs/ff2-gb-screens.md` (all 4 members and every formation on screen:
+  enemy area NES x 20-159, party column x 140-159, back row 4 px; main menu with portraits).
+  Formation survey tool `tools/gb2/ff2form.py`.
+
 ## Next
-- Owner's review of the mock-ups, then the re-layouts (NES side, `tools/gb2/layout.py`).
+- Re-layouts on the NES side (`tools/gb2/layout.py`), battle first; mock-ups of the other
+  screens (`docs/ff2-gb-screens.md`, "To draft").
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 

@@ -85,6 +85,59 @@ def battle(nes_path, out):
     p = os.path.join(out, 'ff2_mock1_battle.png'); sheet.save(p); return p
 
 
+def forced_battle(nes_path, bids):
+    """NES frames of the given battle ids (tools/gb2/ff2form.py forcing)"""
+    from cynes import NES
+    import firstdiff as fd
+    import ff2form as F
+    import numpy as np
+    rom = open(nes_path, 'rb').read()
+    steps = fd.script_newgame(F.START + F.SHOT + 1); fd.add_random(steps, 1)
+    n = NES(nes_path)
+    for f in range(F.START): n.controller = steps[f]; n.step(1)
+    st = n.save(); out = []
+    tmp = os.path.join(os.path.dirname(nes_path), 'ff2_formtmp.nes')
+    for bid in bids:
+        open(tmp, 'wb').write(F.patched(rom, bid)); m = NES(tmp); m.load(st)
+        for f in range(F.START, F.START + F.SHOT): m.controller = steps[f]; fr = m.step(1)
+        out.append(Image.fromarray(np.array(fr)))
+    return out
+
+
+def battle_fit(nes_path, out):
+    """Owner (2026-11-19): all 4 members and every formation must be on screen. Survey of
+    the 128 formations (tools/gb2/ff2form.py): enemies NES x 16-159, y 48-143 (exactly
+    12 rows high; 126 formations within x 16-143, the Emperor x 25-151, formation 90 (three
+    48-px monsters across) x 17-159). Owner's choice: enemy area = NES x 20-159 at GB x
+    0-139 (formation 90 loses 3 px of an antenna at the left edge), party column GB x
+    140-159: front row x 140, back row x 144 (4 px), every sprite whole; members at y 0 /
+    24 / 48 / 72 (24-px slots; the NES stands them 27 px apart, y 45-149)."""
+    frames = forced_battle(nes_path, [90, 126, 7, 34])
+    shots = []
+    for f in frames:
+        s = Screen(bg=3)
+        s.im.paste(dmg(f.crop((20, 48, 160, 144))), (0, 0))           # enemy area: NES x 20-159
+        import numpy as np
+        a = np.array(f).astype(int)
+        for k, y0 in enumerate((45, 72, 99, 126)):                 # NES member slots (24 px tall)
+            band = a[y0:y0 + 24, 200:256]
+            xs = np.nonzero((band.sum(axis=2) > 40).any(axis=0))[0]
+            if not len(xs): continue
+            x0 = 200 + xs.min()
+            back = x0 >= 220                                       # NES back row: 10-12 px right
+            s.im.paste(dmg(f.crop((x0, y0, x0 + 16, y0 + 24))), (144 if back else 140, 24 * k))
+        s.window(0, 12, 8, 6); s.window(8, 12, 12, 6)
+        for i, (n, hp, mx, mp, st) in enumerate(PARTY):
+            y = (13 + i) * 8
+            _pt(s, 9 * 8 + 1, y, n); h = '%d/%s' % (hp, st or mx)
+            _pt(s, 140 - s.pwidth(h, DIG3), y, h, DIG3); _pt(s, 155 - s.pwidth(str(mp), DIG3), y, str(mp), DIG3)
+        shots.append(s)
+    sheet = Image.new('RGB', (168 * len(shots) - 8, 144), (255, 255, 255))
+    for k, s in enumerate(shots): sheet.paste(s.im, (k * 168, 0))
+    sheet = sheet.resize((sheet.width * 2, 288), Image.NEAREST)
+    p = os.path.join(out, 'ff2_mock5_battle_fit.png'); sheet.save(p); return p
+
+
 def nes_frame(nes_path, frame):
     from cynes import NES
     import firstdiff as fd
@@ -155,8 +208,59 @@ def main_menu(out):
     p = os.path.join(out, 'ff2_mock3_menu.png'); s.save(p, scale=2); return p
 
 
+def portraits(nes_path):
+    """the party portraits (32 x 32) from an NES main-menu frame (seed 1 path, frame 17600)"""
+    f = nes_frame(nes_path, 17600)
+    return [dmg(f.crop((x, y, x + 32, y + 32))) for x, y in ((16, 16), (128, 16), (32, 96))]
+
+
+def main_menu_portraits(nes_path, out):
+    """Owner (2026-11-19): keep the portraits. A: party window over the left 13 columns,
+    full height, one 4-row block per member: portrait (4 x 4 tiles), name, HP cur/max, MP
+    cur/max (3-px digits), status word; commands (cols 13-19, rows 0-6) and Gil (rows 7-9)
+    beside it. B: the approved one-line list, plus a window with the portrait of the member
+    the cursor is on (and when no member is chosen, the leader's)."""
+    pt = portraits(nes_path)
+    party = [('Firion', 30, 30, 5, 5, ''), ('Maria', 20, 20, 5, 5, 'Poison'), ('Guy', 40, 40, 5, 5, ''),
+             ('Minwu', 9999, 9999, 999, 999, '')]
+    a = Screen(bg=3)
+    a.window(0, 0, 13, 18)
+    for i, (n, hp, mx, mp, mm, st) in enumerate(party):
+        y = 1 + 4 * i
+        img = pt[i] if i < 3 else None
+        if img: a.im.paste(img, (8, y * 8))
+        else: a.block(1, y, 4, 4)
+        a.text(5, y, n, fg=0, bg=3)
+        _pt(a, 40, (y + 1) * 8, 'HP'); h = '%d/%d' % (hp, mx); _pt(a, 98 - a.pwidth(h, DIG3), (y + 1) * 8, h, DIG3)
+        _pt(a, 40, (y + 2) * 8, 'MP'); m = '%d/%d' % (mp, mm); _pt(a, 98 - a.pwidth(m, DIG3), (y + 2) * 8, m, DIG3)
+        if st: _pt(a, 40, (y + 3) * 8, st)
+    a.window(13, 0, 7, 7)
+    for i, c in enumerate(['Items', 'Magic', 'Equip', 'Status', 'Save']): _pt(a, 13 * 8 + 12, (1 + i) * 8, c)
+    _hand(a, 13 * 8 - 6, 8 - 4, HAND16)
+    a.window(13, 7, 7, 3); _pt(a, 13 * 8 + 6, 8 * 8, '400 Gil')
+    b = Screen(bg=3)
+    b.window(0, 0, 20, 7)
+    _pt(b, 96, 8, 'HP'); _pt(b, 138, 8, 'MP')
+    for i, (n, hp, mx, mp, mm, st) in enumerate(party):
+        y = (2 + i) * 8
+        b.text(1, 2 + i, n, fg=0, bg=3)
+        h = '%d/%d' % (hp, mx); m = '%d/%d' % (mp, mm)
+        _pt(b, 112 - b.pwidth(h, DIG3), y, h, DIG3); _pt(b, 152 - b.pwidth(m, DIG3), y, m, DIG3)
+    b.window(0, 7, 9, 7)
+    for i, c in enumerate(['Items', 'Magic', 'Equip', 'Status', 'Save']): b.text(2, 8 + i, c, fg=0, bg=3)
+    _hand(b, -6, 8 * 8 - 4, HAND16)
+    b.window(0, 14, 9, 3); b.text(1, 15, '400 Gil', fg=0, bg=3)
+    b.window(11, 8, 6, 6); b.im.paste(pt[0], (11 * 8 + 8, 8 * 8 + 8))
+    sheet = Image.new('RGB', (168 * 2 - 8, 144), (255, 255, 255))
+    sheet.paste(a.im, (0, 0)); sheet.paste(b.im, (168, 0))
+    sheet = sheet.resize((sheet.width * 2, 288), Image.NEAREST)
+    p = os.path.join(out, 'ff2_mock4_menu_portraits.png'); sheet.save(p); return p
+
+
 if __name__ == '__main__':
     os.makedirs(sys.argv[2], exist_ok=True)
     print(battle(sys.argv[1], sys.argv[2]))
     print(dialogue(sys.argv[1], sys.argv[2]))
     print(main_menu(sys.argv[2]))
+    print(main_menu_portraits(sys.argv[1], sys.argv[2]))
+    print(battle_fit(sys.argv[1], sys.argv[2]))
