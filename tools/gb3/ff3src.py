@@ -124,7 +124,7 @@ def build(rom_path, outdir, listing, english=False):
     code = {b: {} for b in banks}               # bank -> {offset: entry}
     names = {b: {} for b in banks}              # bank -> {offset: label from insert.py}
     span = {b: set() for b in banks}
-    rep = dict(kind=R.kind, mismatch=[], redecoded=[], overlap=[], flow=[], realigned=[], unknown_bank=0)
+    rep = dict(kind=R.kind, mismatch=[], redecoded=[], overlap=[], flow=[], realigned=[], cross=[], unknown_bank=0)
     for m in R.mods:
         if not m['where']: continue
         b = m['where'][0]
@@ -161,6 +161,12 @@ def build(rom_path, outdir, listing, english=False):
             if dec and len(dec[2]) == len(want) and dec[2][0] == want[0]:
                 code[b][o] = dict(e, comment=(e['comment'] + ' ' if e['comment'] else '') + '[operand changed]')
                 rep['redecoded'].append('%02X/%04X operand' % (e['bank'], e['addr'])); cov = o + len(want); continue
+            if o + len(want) > len(bk) and b + 1 in banks and base.get(b + 1) == base[b] + B8 \
+                    and (bk[o:] + banks[b + 1][:o + len(want) - len(bk)]) == want:
+                rep['cross'].append([b, o])          # runs on into the next bank of a pair
+                rep['mismatch'].append('%02X/%04X %s (crosses into the next bank: map.json cross)'
+                                       % (e['bank'], e['addr'], e['text']))
+                continue
             p = o; starts = []; term = False
             while True:
                 d = decode(bk, p)
@@ -307,7 +313,7 @@ def build(rom_path, outdir, listing, english=False):
                    fixed=list(R.fixed),
                    code={b: sorted(code[b]) for b in banks if code[b]},
                    labels={b: {str(k): v for k, v in labels[b].items()} for b in banks if code[b]},
-                   report=rep, summary=summary),
+                   cross=rep['cross'], report=rep, summary=summary),
               open(os.path.join(outdir, 'map.json'), 'w'), indent=0)
     return ok, summary, rep, R.rom
 
