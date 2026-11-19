@@ -81,7 +81,21 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   vblank ISR and run at the next safe point (ROM data reads, cross-bank returns, the three
   `$AC` handshake loops = idiom `rt_ac_wait`), context saved, `RTI` = `ret`.
 
+- Random play seed 1, 30000 NES frames (name entry, the scripted opening battle against the
+  Black Knights incl. its asynchronous NMI phases, the castle, field, main menu, equipment):
+  **no RAM / work-RAM difference in 29406 frame waits** (PyBoy DMG; sound-driver RAM
+  masked: `$B0-$EF`, `$6F00-$6F24`, saved song state `$6F26-$6F5D`; `--strict` compares it).
+  Found and fixed on the way: zero-page index wrap, the farcall return clobbering flags
+  around the NMI poll, the harness missing the second joypad routine (`fix:FC3E`).
+- Speed, Gambatte, new-game script 5000 frames (`tools/gb2/lagcheck.py`): CGB +1.9% (steady
+  screens exact; lag in two screen loads: +46, +36 frames), DMG +7.1% (screen loads, and
+  +3 frames at several prologue waits).
+- Mock-up tool `tools/gb2/mockup.py` (FF1's renderer + real graphics cropped from an NES
+  frame of the user's build, output in build/ only); first draft `ff2_mock1_battle.png`.
+
 ## Known open items
+- Picture: the castle room shows almost black on the GB (DMG, PyBoy) although RAM matches:
+  PPU-layer issue in FF2's map drawing, to check (also in CGB / Gambatte).
 - `b14:ABEA` (Warp: drops the menu frames + one 5-byte frame per map level by arithmetic
   on S): needs a semantic GB version (GB stack pointer per map level); TSX/TXS elsewhere
   are approximated (`rt_tsx`/`rt_txs`, exact round trip).

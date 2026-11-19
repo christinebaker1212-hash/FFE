@@ -20,7 +20,7 @@ WRAM_EVERY = 50
 # Sound-driver state (ram-map.txt): music runs in real time, and in the battle phases with
 # an asynchronous NMI the GB ticks it at its own vblanks, so these may differ (not game
 # logic; the song id $6F25 stays compared). --strict compares them too.
-SOUND = set(range(0xB0, 0xF0)) | set(range(0x6F00, 0x6F25))
+SOUND = set(range(0xB0, 0xF0)) | set(range(0x6F00, 0x6F25)) | set(range(0x6F26, 0x6F5E))   # + saved song state (b13:988E)
 WAIT_STUBS = {(0x4C, 0x3C, 0xFA), (0x4C, 0xA1, 0xFE)}
 
 
