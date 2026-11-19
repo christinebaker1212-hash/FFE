@@ -32,6 +32,7 @@ SPAL_KEY   = $DCC0          ; NES sprite palette -> coding: values of indices 1-
 SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
+TEST_PAD   = $D83E          ; $A5: test runner input (read_buttons)
 VBL_SEEN   = $D834          ; VBL_CNT (low) up to which GB frames were taken by NES frames
 CATCH_UP   = 8              ; GB frames an NES frame wait may be behind at most
 BG_DIRTY   = $CCA0          ; CGB: BG tiles to copy by HDMA (bitmap, 32)
@@ -58,6 +59,7 @@ FRESH      = $DE00          ; DMG: one bit per GB map cell (byte row * 4 + col /
 TBLK       = $DE80          ; DMG: 8 re-coded tiles (16 bytes) waiting in the VRAM queue,
 TB_T       = $D872          ;   blocks taken / freed (a ring)
 TB_H       = $D873
+NT_NOW     = $D87D          ; nt_tile: check the cell's palette at once (not in spare time)
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
 EMPH_RGB   = $3A00          ; CGB: NES colours with emphasis e (1-7) at EMPH_RGB + e * $80
@@ -2014,7 +2016,17 @@ spr_alloc:  push bc
 ; C = slot: load NES sprite tile o_t into it from the shadow, coded with o_key (the value
 ; of each colour index); SLOT_KEY[slot] = o_key. Keeps all registers.
 spr_load:   push af
-            push bc
+            ldh a, [is_cgb]                 ; DMG: native (sprload_b, bank HLE_BANK)
+            and a
+            jr nz, .cg
+            ld a, HLE_BANK
+            ld [$2000], a
+            call sprload_b
+            ldh a, [code_bank]
+            ld [$2000], a
+            pop af
+            ret
+.cg:        push bc
             push de
             push hl
             ld a, c
@@ -2152,6 +2164,9 @@ rt_io_r4016:
             pop af
             ret
 read_buttons:                               ; A = A B Sel St U D L R (bit 0..7), 1 = pressed
+            ld a, [TEST_PAD]                ; (test runners: the pad of this NES frame from
+            cp $A5                          ;   cart RAM bank 3 $A000 + NMI_CNT low)
+            jr z, .test
             ld a, $20
             ldh [$FF00], a
             ldh a, [$FF00]
@@ -2183,6 +2198,16 @@ read_buttons:                               ; A = A B Sel St U D L R (bit 0..7),
 .l:         bit 0, h
             ret z
             or $80
+            ret
+.test:      ld a, 3
+            ld [$4000], a
+            ld a, [NMI_CNT]
+            ld l, a
+            ld h, $A0
+            ld l, [hl]
+            xor a
+            ld [$4000], a
+            ld a, l
             ret
 rt_io_r4015:
 rt_io_r4017:

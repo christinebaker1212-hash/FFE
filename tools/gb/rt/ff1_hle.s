@@ -371,3 +371,11 @@ hle_ntclr:                                  ; fix:F2CF nametable clear (bank HLE
             call ntclr_b
             jp hle_back
 
+hle_ntrun:                                  ; fix:F4EA panel row copy (bank HLE_BANK: ntrun_b)
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            call ntrun_b
+            jp hle_back
+

@@ -125,6 +125,17 @@ int main(int argc, char** argv) {
 			unsigned char m = n + 1 < npads ? pads[n + 1] : 0;   /* the pad of the frame being played */
 			static const unsigned map[8] = { 1 << 4, 1 << 5, 1 << 7, 1 << 6, 1 << 3, 1 << 2, 1 << 1, 1 << 0 };
 			for (int b = 0; b < 8; b++) if (m & (1 << b)) keys |= map[b];
+			/* exact input: the ROM's test mode (TEST_PAD $D83E = $A5) reads the pad of the
+			   frame after wait k from cart RAM bank 3 $A000 + (k & $FF) */
+			if (f > 30) {
+				core->rawWrite8(core, 0xD83E, 1, 0xA5);
+				for (unsigned k = n; k < n + 32; k++) {
+					unsigned char v = k + 1 < npads ? pads[k + 1] : 0, r = 0;
+					for (int b = 0; b < 8; b++) if (v & (1 << b)) r |= 0x80 >> b;
+					struct GB* gbm = (struct GB*) core->board;
+					if (gbm->memory.sram && gbm->sramSize >= 0x8000) gbm->memory.sram[0x6000 + (k & 0xFF)] = r;
+				}
+			}
 		}
 		core->setKeys(core, keys);
 		unsigned n_before = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;

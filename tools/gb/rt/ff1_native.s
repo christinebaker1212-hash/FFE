@@ -278,7 +278,12 @@ nt_tile:    ld a, h
             inc a
             ldh [dmg_scan], a
             jr .map
-.cell:      call fresh_set
+.cell:      ld a, [NT_NOW]                  ; (ntrun_b: the palette check at once)
+            and a
+            jr nz, .now
+            call fresh_set
+            jr .map
+.now:       call cell_fast
 .map:       ld a, b                         ; GB map $9800 + offset
             add a, $98
             ld h, a
@@ -921,7 +926,7 @@ vtile_b:    xor a
             pop de
             push de
             ld a, d
-            call dmg_markw
+            call vt_code
             jr .out
 .cgb:       pop de                          ; CGB: D = tile
             push de
@@ -1071,23 +1076,7 @@ retile_b:   push bc
             call rt_anf
             ld a, 8
             ld [hl], a                      ; (row counter)
-            ldh a, [lcd_on]                 ; a block: with the LCD on, one not queued
-            and a
-            jr z, .bk
-.wb:        ld a, [TB_H]
-            ld b, a
-            ld a, [TB_T]
-            sub b
-            cp 8
-            jr c, .bk
-            halt                            ; all 8 queued: wait for the vblank flush
-            jr .wb
-.bk:        ld a, [TB_T]
-            and 7
-            swap a
-            add a, low(TBLK)
-            ld e, a
-            ld d, high(TBLK)                ; DE = block
+            call blk_alloc                  ; DE = a free block
             ldh a, [sh_tile]                ; shadow -> block (RAM bank 1)
             swap a
             ld l, a
@@ -1112,63 +1101,7 @@ retile_b:   push bc
             sub 16
             ld l, a
             ld h, d                         ; HL = block
-            xor a
-            ldh [sh_u1], a
-            ldh [sh_u2], a
-            ldh [sh_u3], a
-.row:       ld b, [hl]                      ; p0
-            inc l
-            ld c, [hl]                      ; p1
-            ld a, b
-            and c
-            ld d, a                         ; p0 & p1 (index 3)
-            xor b                           ; index 1
-            ld e, a
-            ldh a, [sh_u1]
-            or e
-            ldh [sh_u1], a
-            ld a, d                         ; index 2
-            xor c
-            ld e, a
-            ldh a, [sh_u2]
-            or e
-            ldh [sh_u2], a
-            ldh a, [sh_u3]
-            or d
-            ldh [sh_u3], a
-            ld a, [RM + 4]                  ; plane 1
-            and b
-            ld e, a
-            ld a, [RM + 5]
-            and c
-            xor e
-            ld e, a
-            ld a, [RM + 6]
-            and d
-            xor e
-            ld e, a
-            ld a, [RM + 7]
-            xor e
-            ld [hl-], a
-            ld a, [RM]                      ; plane 0
-            and b
-            ld e, a
-            ld a, [RM + 1]
-            and c
-            xor e
-            ld e, a
-            ld a, [RM + 2]
-            and d
-            xor e
-            ld e, a
-            ld a, [RM + 3]
-            xor e
-            ld [hl+], a
-            inc l
-            ld a, [RM + 8]
-            dec a
-            ld [RM + 8], a
-            jr nz, .row
+            call anf_rows
             ld c, 0                         ; colour indices the tile uses -> TILE_USE nibble
             ldh a, [sh_u1]
             and a
@@ -1210,7 +1143,35 @@ retile_b:   push bc
             ld l, e
             ld h, high(CODED)
             ld [hl], a
-            ld a, e                         ; VRAM address: tiles 0-127 at $9000, 128-255 at $8800
+            call blk_send
+            pop hl
+            pop de
+            pop bc
+            ret
+
+; DE = the next TBLK block (with the LCD on, waits while all 8 are queued). Keeps BC, HL.
+blk_alloc:  ldh a, [lcd_on]
+            and a
+            jr z, .bk
+.wb:        ld a, [TB_H]
+            ld d, a
+            ld a, [TB_T]
+            sub d
+            cp 8
+            jr c, .bk
+            halt                            ; all 8 queued: wait for the vblank flush
+            jr .wb
+.bk:        ld a, [TB_T]
+            and 7
+            swap a
+            add a, low(TBLK)
+            ld e, a
+            ld d, high(TBLK)
+            ret
+
+; E = BG tile: block TB_T (from blk_alloc, filled) to its VRAM tile: one queue entry (LCD
+; on: address high 0, low = address low | block, value = address high), or copied now.
+blk_send:   ld a, e                         ; VRAM address: tiles 0-127 at $9000, 128-255 at $8800
             swap a
             ld c, a
             and $0F
@@ -1223,14 +1184,15 @@ retile_b:   push bc
             ld a, c
             and $F0
             ld c, a
+blk_send_bc:                                ; (BC = VRAM address)
             ld a, [TB_T]
             and 7
             ld d, a                         ; D = block
             ldh a, [lcd_on]
             and a
             jr z, .dir
-            ldh a, [q_tail]                 ; queue entry: high 0, low = address low | block,
-            ld e, a                         ;   value = address high
+            ldh a, [q_tail]
+            ld e, a
             inc a
             ld l, a
 .f:         ldh a, [q_head]
@@ -1253,7 +1215,7 @@ retile_b:   push bc
             ldh [q_tail], a
             ld hl, TB_T
             inc [hl]
-            jr .x
+            ret
 .dir:       ld a, d                         ; LCD off: copy now
             swap a
             add a, low(TBLK)
@@ -1267,9 +1229,6 @@ retile_b:   push bc
             inc e
             dec c
             jr nz, .dc
-.x:         pop hl
-            pop de
-            pop bc
             ret
 
 ; A = set S of colour indices (bit i) whose value has the plane's bit -> masks X Y Z W at
@@ -1390,5 +1349,345 @@ ntclr_b:    push af
             call rt_ppu_w7
             dec c
             jr nz, .a
+            ret
+
+; ---- fix:F4EA (battle panel row): LDY #0 / LDA ($88),Y / STA $2007 / INY / CPY #$19 /
+; BNE: 25 bytes from ($88) to the PPU. Nametable cells through nt_tile (palette checked at
+; once, as rt_ppu_w7 does), anything else through rt_ppu_w7. Out: Y = $19, A = the last
+; byte, X kept; N = 0, Z = 1, C = 1.
+NR_SRC     = $D87E          ; ntrun_b: source address (lo, hi)
+ntrun_b:    push de
+            ld a, 1
+            ld [NT_NOW], a
+            ld a, [NES_RAM + $88]
+            ld [NR_SRC], a
+            ld a, [NES_RAM + $89]
+            ld [NR_SRC + 1], a
+            ld c, $19
+.lp:        push bc
+            ld a, [NR_SRC]                  ; D = next byte
+            ld l, a
+            ld a, [NR_SRC + 1]
+            ld h, a
+            push hl
+            call nes_rd
+            ld d, l
+            pop hl
+            inc hl
+            ld a, l
+            ld [NR_SRC], a
+            ld a, h
+            ld [NR_SRC + 1], a
+            ldh a, [ppu_vh]                 ; nametable ($2000-$3EFF): native cell write
+            cp $20
+            jr c, .gen
+            cp $3F
+            jr z, .gen
+            ld h, a
+            ldh a, [ppu_vl]
+            ld l, a
+            ld a, h                         ; (attribute bytes: rt_ppu_w7)
+            and 3
+            cp 3
+            jr nz, .cell
+            ld a, l
+            cp $C0
+            jr nc, .gen
+.cell:      push de
+            call nt_tile
+            pop de
+            call ppu_inc
+            jr .nx
+.gen:       ld a, d
+            call rt_ppu_w7
+.nx:        pop bc
+            dec c
+            jr nz, .lp
+            xor a
+            ld [NT_NOW], a
+            ldh [nzv], a
+            ld a, d
+            pop de
+            ld bc, $19
+            push af
+            pop hl
+            ld l, $90                       ; (Z, C)
+            push hl
+            pop af
+            ret
+
+; DMG, vtile_b: tile A was written with plane 1 = plane 0 (rows in RT_BUF): only colour
+; indices 0 and 3. Coded at once for its palette (value of index 3 where a pixel is set,
+; of index 0 elsewhere) into a block for VRAM; TILE_USE, CODED as retile_b leaves them.
+vt_code:    push bc
+            push de
+            push hl
+            ldh [sh_tile], a
+            ld e, a
+            ld l, a                         ; PAL_MAP row of its palette: v0, v3
+            ld h, high(TILE_PAL)
+            ld a, [hl]
+            add a, a
+            add a, a
+            add a, low(PAL_MAP)
+            ld l, a
+            ld h, high(PAL_MAP)
+            ld a, [hl+]
+            ld b, a                         ; B = v0
+            inc l
+            inc l
+            ld c, [hl]                      ; C = v3
+            push de
+            call blk_alloc
+            ld h, d
+            ld l, e                         ; HL = block
+            pop de
+            push de
+            ld de, RT_BUF
+            ld a, 8
+            ld [RM + 8], a
+            xor a
+            ld [RM], a                      ; (any pixel set)
+.row:       ld a, [de]
+            inc e
+            push de
+            ld d, a                         ; D = pixels
+            ld a, [RM]
+            or d
+            ld [RM], a
+            ld e, 0                         ; plane 0: v3 bit 0 where set, v0 bit 0 elsewhere
+            bit 0, c
+            jr z, .a0
+            ld e, d
+.a0:        bit 0, b
+            jr z, .b0
+            ld a, d
+            cpl
+            or e
+            ld e, a
+.b0:        ld [hl], e
+            inc l
+            ld e, 0                         ; plane 1
+            bit 1, c
+            jr z, .a1
+            ld e, d
+.a1:        bit 1, b
+            jr z, .b1
+            ld a, d
+            cpl
+            or e
+            ld e, a
+.b1:        ld [hl], e
+            inc l
+            pop de
+            ld a, [RM + 8]
+            dec a
+            ld [RM + 8], a
+            jr nz, .row
+            pop de                          ; E = tile
+            ld a, e                         ; TILE_USE nibble: index 3 if a pixel is set
+            srl a
+            add a, low(TILE_USE)
+            ld l, a
+            ld h, high(TILE_USE)
+            ld a, [RM]
+            and a
+            ld a, 0
+            jr z, .nu
+            ld a, 8
+.nu:        bit 0, e
+            jr z, .ulo
+            swap a
+            ld d, a
+            ld a, [hl]
+            and $0F
+            jr .ust
+.ulo:       ld d, a
+            ld a, [hl]
+            and $F0
+.ust:       or d
+            ld [hl], a
+            ld a, e                         ; CODED: its key for this palette
+            push de
+            ld l, a
+            ld h, high(TILE_PAL)
+            ld a, [hl]
+            add a, a
+            add a, a
+            add a, low(PAL_MAP)
+            ld l, a
+            ld h, high(PAL_MAP)
+            ld bc, 0
+            ld d, 1
+.m:         ld a, [hl+]
+            rrca
+            jr nc, .n0
+            push af
+            ld a, b
+            or d
+            ld b, a
+            pop af
+.n0:        rrca
+            jr nc, .n1
+            ld a, c
+            or d
+            ld c, a
+.n1:        sla d
+            ld a, d
+            cp 16
+            jr nz, .m
+            pop de
+            call tkey_bc
+            ld l, e
+            ld h, high(CODED)
+            ld [hl], a
+            call blk_send
+            pop hl
+            pop de
+            pop bc
+            ret
+
+; HL = a TBLK block with a tile in GB byte order: each row through the masks at RM (rt_anf)
+; in place; sh_u1..3 = pixels of colour index 1..3 (any row). Keeps nothing.
+anf_rows:   ld a, 8
+            ld [RM + 8], a
+            xor a
+            ldh [sh_u1], a
+            ldh [sh_u2], a
+            ldh [sh_u3], a
+.row:       ld b, [hl]                      ; p0
+            inc l
+            ld c, [hl]                      ; p1
+            ld a, b
+            and c
+            ld d, a                         ; p0 & p1 (index 3)
+            xor b                           ; index 1
+            ld e, a
+            ldh a, [sh_u1]
+            or e
+            ldh [sh_u1], a
+            ld a, d                         ; index 2
+            xor c
+            ld e, a
+            ldh a, [sh_u2]
+            or e
+            ldh [sh_u2], a
+            ldh a, [sh_u3]
+            or d
+            ldh [sh_u3], a
+            ld a, [RM + 4]                  ; plane 1
+            and b
+            ld e, a
+            ld a, [RM + 5]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 6]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 7]
+            xor e
+            ld [hl-], a
+            ld a, [RM]                      ; plane 0
+            and b
+            ld e, a
+            ld a, [RM + 1]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 2]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 3]
+            xor e
+            ld [hl+], a
+            inc l
+            ld a, [RM + 8]
+            dec a
+            ld [RM + 8], a
+            jr nz, .row
+            ret
+
+; DMG spr_load: C = GB sprite slot: NES sprite tile o_t from the shadow, coded with o_key
+; (values of colour indices 1-3, 2 bits each; index 0 stays 0), as one block to VRAM
+; $8000 + slot * 16; SLOT_KEY[slot] = o_key. Keeps all registers.
+sprload_b:  push af
+            push bc
+            push de
+            push hl
+            ld a, c
+            add a, low(SLOT_KEY)
+            ld l, a
+            ld h, high(SLOT_KEY)
+            ldh a, [o_key]
+            ld [hl], a
+            ld b, a                         ; D = indices whose value has bit 0, E = bit 1
+            ld de, 0
+            bit 0, b
+            jr z, .k1
+            set 1, d
+.k1:        bit 1, b
+            jr z, .k2
+            set 1, e
+.k2:        bit 2, b
+            jr z, .k3
+            set 2, d
+.k3:        bit 3, b
+            jr z, .k4
+            set 2, e
+.k4:        bit 4, b
+            jr z, .k5
+            set 3, d
+.k5:        bit 5, b
+            jr z, .k6
+            set 3, e
+.k6:        ld hl, RM
+            ld a, d
+            call rt_anf
+            ld a, e
+            call rt_anf
+            push bc
+            call blk_alloc                  ; DE = block
+            ldh a, [o_t]                    ; HL = shadow $A000 + tile * 16 (RAM bank 1)
+            swap a
+            ld b, a
+            and $F0
+            ld l, a
+            ld a, b
+            and $0F
+            add a, high(SPR_SHADOW)
+            ld h, a
+            ld a, 1
+            ld [$4000], a
+            ld c, 16
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec c
+            jr nz, .cp
+            xor a
+            ld [$4000], a
+            ld a, e
+            sub 16
+            ld l, a
+            ld h, d
+            call anf_rows
+            pop bc
+            ld a, c                         ; BC = $8000 + slot * 16
+            swap a
+            ld b, a
+            and $F0
+            ld c, a
+            ld a, b
+            and $0F
+            add a, $80
+            ld b, a
+            call blk_send_bc
+            pop hl
+            pop de
+            pop bc
+            pop af
             ret
 

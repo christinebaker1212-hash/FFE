@@ -161,6 +161,18 @@ int main(int argc, char** argv) {
 		if (pads) {
 			unsigned char m = (f > 30 && n + 1 < (unsigned) npads) ? pads[n + 1] : 0;
 			for (int b = 0; b < 8; b++) if (m & (1 << b)) keys |= 1u << map[b];
+			/* exact input: the ROM's test mode (TEST_PAD $D83E = $A5) reads the pad of the
+			   frame after wait k from cart RAM bank 3 $A000 + (k & $FF), in its button order
+			   (A B Sel St U D L R = bit 0..7: the NES order reversed) */
+			uint8_t* sr = p_retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+			if (f > 30 && sr && p_retro_get_memory_size(RETRO_MEMORY_SAVE_RAM) >= 0x8000) {
+				wram[0x183E] = 0xA5;
+				for (unsigned k = n; k < n + 32; k++) {
+					unsigned char v = k + 1 < (unsigned) npads ? pads[k + 1] : 0, r = 0;
+					for (int b = 0; b < 8; b++) if (v & (1 << b)) r |= 0x80 >> b;
+					sr[0x6000 + (k & 0xFF)] = r;
+				}
+			}
 		}
 		wav_on = (int) n >= wav_from;
 		p_retro_run();
@@ -173,6 +185,8 @@ int main(int argc, char** argv) {
 				done[k] = 1; printf("shot %d at GB frame %d\n", nshots[k], f);
 				char path[1100]; snprintf(path, sizeof path, "%s_n%05d.ppm", out, nshots[k]);
 				FILE* o = fopen(path, "wb"); fprintf(o, "P6 160 144 255\n"); fwrite(frame, 1, sizeof frame, o); fclose(o);
+				snprintf(path, sizeof path, "%s_n%05d.ram", out, nshots[k]);   /* NES RAM $0000-$07FF */
+				o = fopen(path, "wb"); fwrite(wram, 1, 0x800, o); fclose(o);
 			}
 			all &= done[k];
 		}
