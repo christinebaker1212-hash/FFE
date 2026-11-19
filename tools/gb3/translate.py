@@ -70,6 +70,7 @@ class FF3:
            ('fix', 0xFC27): ('nat_fc27', 'NZC', 'C'),   # init rng (battle / cutscene start)
            ('fix', 0xFB87): ('nat_fb87', 'NZC'),     # switch prg bank 0 and 1 (+ $AB)
            ('fix', 0xFB89): ('nat_fb89', 'NZC'),     #   (no $AB)
+           ('fix', 0xFCD6): ('nat_fcd6', 'NZC', 'C'),   # multiply (8-bit)
            ('p34', 0x9754): ('nat_9754', 'NZ')}      # init text buffer ($7200-$73FF = $FF)
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   $FB80 wait for nmi (INC $05 / LDA $05 / BNE): the asynchronous NMI handler
@@ -477,6 +478,7 @@ class Emitter:
 
     # loads / stores
     def x_LDA(self):
+        if self.copy_idiom(): return
         op = self.operand()
         if op != 'a': self.o('ld a, %s' % op)
         self.set_nz_reg('a')
@@ -487,8 +489,65 @@ class Emitter:
     def x_LDY(self):
         op = self.operand(); self.o('ld c, %s' % op); self.set_nz_reg('c')
 
+    def fill_idiom(self):
+        """STA abs,X|Y / INX|INY / CPX|CPY #n / BNE back, abs in RAM: a fill of the index range
+        up to n (as the loop ends: index = n, Z = 1, C = 1, N = 0, A kept)"""
+        i = self.i
+        if i.mode not in ('abx', 'aby') or gb_ram(i.arg) is None: return False
+        r = 'X' if i.mode == 'abx' else 'Y'
+        j = self.rc.insns.get((i.space, i.addr + 3)); k = self.rc.insns.get((i.space, i.addr + 4))
+        l = self.rc.insns.get((i.space, i.addr + 6))
+        if not (j and k and l and j.mn == 'IN' + r and k.mn == 'CP' + r and k.mode == 'imm'
+                and l.mn == 'BNE' and l.arg == i.addr): return False
+        g = gb_ram(i.arg); reg = 'e' if r == 'X' else 'c'; pair = 'de' if r == 'X' else 'bc'
+        lab = 'fl_%s_%04X' % (i.space, i.addr)
+        tmp = 'b' if r == 'X' else 'd'               # (B / D: 0 again after)
+        self.o('ld hl, $%04X' % g, 'add hl, %s' % pair, 'ld %s, a' % tmp,
+               '%s:' % lab, 'ld a, %s' % tmp, 'ld [hl+], a', 'inc %s' % reg, 'ld a, %s' % reg,
+               'cp $%02X' % k.arg, 'jr nz, %s' % lab, 'ld a, %s' % tmp, 'ld %s, 0' % tmp,
+               'ld hl, nzv', 'ld [hl], 0', 'scf')
+        self.jump(None, (i.space, i.addr + 8))
+        return True
+
+    def copy_idiom(self):
+        """LDA src,X|Y / STA dst,X|Y / INX|INY / CPX|CPY #n / BNE back; dst in RAM, src in RAM
+        or ROM (within its 8KB window): rt_copy_n (index = n, A = the last byte, Z = 1, C = 1,
+        N = 0 as the loop ends)"""
+        i = self.i
+        if i.mode not in ('abx', 'aby'): return False
+        r = 'X' if i.mode == 'abx' else 'Y'
+        st = self.rc.insns.get((i.space, i.addr + 3)); j = self.rc.insns.get((i.space, i.addr + 6))
+        k = self.rc.insns.get((i.space, i.addr + 7)); l = self.rc.insns.get((i.space, i.addr + 9))
+        if not (st and j and k and l and st.mn == 'STA' and st.mode == i.mode and gb_ram(st.arg) is not None
+                and j.mn == 'IN' + r and k.mn == 'CP' + r and k.mode == 'imm' and l.mn == 'BNE' and l.arg == i.addr):
+            return False
+        reg = 'e' if r == 'X' else 'c'; pair = 'de' if r == 'X' else 'bc'
+        src = i.arg; reg_src = nes_region(src)
+        n = k.arg or 256
+        if reg_src in ('ram', 'ex', 'sram'):
+            sh = gb_ram(src); bank = None
+        elif reg_src in ('rom8', 'roma'):
+            if (src & 0x1FFF) + n > 0x2000: return False
+            sh = 0x4000 + (src & 0x1FFF); bank = reg_src
+        elif reg_src == 'romf':
+            if src + n > 0x10000: return False
+            sh = 0x4000 + (src - 0xC000); bank = 'romf'
+        else:
+            return False
+        self.o('ld hl, $%04X' % gb_ram(st.arg), 'add hl, %s' % pair, 'ld a, l', 'ldh [cp_dl], a',
+               'ld a, h', 'ldh [cp_dh], a', 'ld a, $%02X' % k.arg, 'sub %s' % reg, 'ldh [cp_n], a',
+               'ld hl, $%04X' % sh, 'add hl, %s' % pair)
+        if bank == 'rom8': self.o('ldh a, [odd8]', 'add a, h', 'ld h, a', 'ldh a, [data_bank8]')
+        elif bank == 'roma': self.o('ldh a, [oddA]', 'add a, h', 'ld h, a', 'ldh a, [data_bankA]')
+        elif bank == 'romf': self.o('ld a, DATA + 63')
+        else: self.o('xor a')
+        self.o('call rt_copy_n', 'ld %s, $%02X' % (reg, k.arg))
+        self.jump(None, (i.space, i.addr + 11))
+        return True
+
     def x_STA(self):
         i = self.i
+        if self.fill_idiom(): return
         if i.mode == 'izy':                          # fill idiom: STA (zp),Y / INY / BNE back
             n1 = self.rc.insns.get((i.space, i.addr + 2)); n2 = self.rc.insns.get((i.space, i.addr + 3))
             if n1 is not None and n2 is not None and n1.mn == 'INY' and n2.mn == 'BNE' and n2.arg == i.addr:

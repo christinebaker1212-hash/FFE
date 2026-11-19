@@ -867,3 +867,50 @@ nat_9754:   push af
             pop af
             ld a, $FF
             ret                             ; (B = 0 after the loop)
+
+; ------------------------------------------------------------------ fix:FCD6
+; multiply: $1B:$1A = A * X ($18 = A, $19 = X, rotated as the NES loop leaves it), step for
+; step in registers. In: A, X, C (6502 carry). Out: X = 0, A = the last ADC result ($1B) or
+; 0, Z = 1, N = 0, C from the last ROR $1A; Y kept.
+nat_fcd6:   ld [NES_RAM + $18], a
+            ld h, a                         ; H = $18
+            push af                         ; (incoming carry)
+            ld a, e
+            ld l, a                         ; L = $19
+            ld a, c
+            ldh [nt_y], a
+            xor a
+            ldh [nt_a], a
+            ld d, a                         ; D = $1B, E = $1A
+            ld e, a
+            ld c, 8
+            pop af
+.lp:        rr l                            ; ROR $19
+            jr nc, .ns
+            ld a, h                         ; CLC / ADC $1B
+            add a, d
+            ld d, a
+            ldh [nt_a], a
+.ns:        rr d                            ; ROR $1B / ROR $1A
+            rr e
+            dec c
+            jr nz, .lp
+            push af
+            ld a, l
+            ld [NES_RAM + $19], a
+            ld a, d
+            ld [NES_RAM + $1B], a
+            ld a, e
+            ld [NES_RAM + $1A], a
+            ld de, 0
+            ld b, 0
+            ldh a, [nt_y]
+            ld c, a
+            xor a
+            ldh [nzv], a
+            pop af
+            ld a, 0
+            inc a
+            dec a
+            ldh a, [nt_a]
+            ret

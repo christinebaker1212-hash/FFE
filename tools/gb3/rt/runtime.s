@@ -114,6 +114,9 @@ c_q:        ds 1
 nt_x:       ds 1                            ; native routines (rt/native.s): saved X, A
 nt_a:       ds 1
 nt_y:       ds 1
+cp_dl:      ds 1                            ; rt_copy_n: destination (GB), count
+cp_dh:      ds 1
+cp_n:       ds 1
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -1738,6 +1741,42 @@ rt_izy_fill:
             push hl
             ld hl, sp + 2
             set 7, [hl]
+            pop hl
+            pop af
+            ret
+
+; copy loop idiom (translate.py copy_idiom): cp_n bytes (0 = 256) from GB address HL (ROM
+; bank A, 0 = RAM) to cp_dh:cp_dl. Returns A = the last byte, Z = 1, C = 1 (CPX / CPY equal),
+; nzv = 0. B, C, D, E kept.
+rt_copy_n:  push bc
+            push de
+            and a
+            jr z, .ram
+            ld [MBC5_BANKL], a
+.ram:       ldh a, [cp_dl]
+            ld e, a
+            ldh a, [cp_dh]
+            ld d, a
+            ldh a, [cp_n]
+            ld b, a
+.lp:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .lp
+            ld b, a
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            xor a
+            ldh [nzv], a
+            ld a, b
+            pop de
+            pop bc
+            scf
+            push af
+            push hl
+            ld hl, sp + 2
+            set 7, [hl]                     ; Z = 1
             pop hl
             pop af
             ret
