@@ -345,6 +345,12 @@ dlgbank:        ; bank 14 $962F: dialogue bank from the map ($A0) and the id ($9
 .c:
     stx $93
     rts
+npcdlg:         ; $E8D5 (npc dialogue window, first line) and $CBEE (npcs $60-$BF, text
+    jsr dlgbank ;   only): the dialogue bank as at $962F (the game had set bank 6 / 10, the
+    jmp $EA54   ;   Japanese tables, in "check npc script" b14:9794)
+npctxt:
+    jsr dlgbank
+    jmp $CB64
 txton:          ; $EAAC (text drawing starts; window frames are drawn elsewhere with the
     lda $93     ;   same flush): one row per line while drawing text from banks R0..R1-1
     jsr $FE03
@@ -1047,6 +1053,8 @@ def engine(rom, report, sysbits):
     # dialogue: bank by map and id
     assert bank_get(rom, 14, 0x962F, 12) == bytes.fromhex('a5a0a206c9609002a20a8693')
     bank_put(rom, 14, 0x962F, jsr(L['dlgbank']) + b'\xEA' * 9)
+    assert bank_get(rom, 31, 0xE8D5, 3) == jmp(0xEA54) and bank_get(rom, 31, 0xCBEE, 3) == jmp(0xCB64)
+    bank_put(rom, 31, 0xE8D5, jmp(L['npcdlg'])); bank_put(rom, 31, 0xCBEE, jmp(L['npctxt']))
     # events: bank 20, table $8000
     assert bank_get(rom, 31, 0xE8AE, 2) == b'\xa9\x0d' and bank_get(rom, 31, 0xE8B6, 2) == b'\xa9\xbf'
     bank_put(rom, 31, 0xE8AF, bytes([EV_BANK])); bank_put(rom, 31, 0xE8B7, b'\x80')

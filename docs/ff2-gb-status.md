@@ -282,6 +282,13 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   three item names are longer than the 18-column box (Sulfuric Acid Bottle 20, Diamond
   Breastplate 19, icon + Sword of the Earth 19) and would run into the frame when a chest
   gives one. Random seed 1, 30000 frames: 29534 waits identical.
+- **English patch bug fixed (tools/ff2/insert.py, also the NES English build):** the npc
+  dialogue path (`b14:9145` -> `fix:E8CA`, the first line of a conversation with the Ask /
+  Learn menu) and text-only npcs ($60-$BF, `fix:CBEE`) read the dialogue from the bank
+  "check npc script" (`b14:9794`) set: 6 / 10, the Japanese tables, so those lines showed
+  garbage ("??", "vern Egg") in the English build. Both now go through `dlgbank` (ExRAM
+  stubs `npcdlg` / `npctxt`, as `b14:962F`). Checked on the NES English build (proper
+  lines); English pair 29415 waits and GB-layout pair 29534 waits identical (seed 1).
 - Open: windows 1-3 (keyword Ask / Learn, item choice, yes / no: NES rows 14-27, partly
   below the GB view) need a mock-up; shop messages wait for the shop layout.
 
