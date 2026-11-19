@@ -172,3 +172,93 @@ hle_div16_b:
             ld a, 1
             dec a                           ; A = 0, Z = 1 (carry kept)
             ret
+
+; b11:97D5 init rng: A + carry + the 256 zero-page bytes (ADC chain) -> $42; k = (A & 2) + 3
+; -> $0A; 256 entries of x = k * x mod 1024 folded above 512 (x = 1024 - x), table $7A48 + n
+; = (x >> 1) & $FF. The NES computes it with the 16-bit multiply / divide; the end state is
+; theirs: $00-$02 = 0, $03 = 4, $04 / $05 = the last quotient, $06 / $07 = $08 / $09 = the
+; last x, A = the last entry, X = Y = 0, Z = 1, N = 0, C = x bit 0. (Checked against a
+; model of the 6502 routine on 300 random zero pages.)
+hle_initrng_b:
+            push bc
+            push de
+            ld hl, NES_RAM
+            ld b, 0
+.sum:       adc a, [hl]                     ; (inc l / dec b keep the carry)
+            inc l
+            dec b
+            jr nz, .sum
+            ld [NES_RAM + $42], a
+            and 2
+            add a, 3
+            ld [NES_RAM + $0A], a
+            ldh [wtmp], a                   ; k
+            ld de, 1                        ; x
+            ld hl, $A000 + $7A48 - $6000    ; table (cart RAM bank 0)
+            ld c, 0                         ; 256 entries
+.lp:        push hl
+            ld h, d
+            ld l, e
+            add hl, hl                      ; 2x
+            ldh a, [wtmp]
+            cp 3
+            jr z, .k3
+            add hl, hl                      ; 4x
+.k3:        add hl, de                      ; p = k * x (< 5120)
+            ld a, h
+            srl a
+            srl a
+            ldh [uw_y], a                   ; q = p >> 10
+            ld a, h
+            and 3
+            ld h, a                         ; x = p & 1023
+            cp 2
+            jr c, .ok
+            jr nz, .fold                    ; >= 768
+            ld a, l
+            and a
+            jr z, .ok                       ; = 512: kept
+.fold:      xor a                           ; > 512: 1024 - x
+            sub l
+            ld l, a
+            ld a, 4
+            sbc a, h
+            ld h, a
+.ok:        ld d, h
+            ld e, l
+            ld a, h                         ; entry = (x >> 1) & $FF
+            srl a
+            ld a, l
+            rra
+            pop hl
+            ld [hl+], a
+            dec c
+            jr nz, .lp
+            xor a
+            ld [NES_RAM + $00], a
+            ld [NES_RAM + $01], a
+            ld [NES_RAM + $02], a
+            ld [NES_RAM + $05], a
+            ldh [nzv], a
+            ld a, 4
+            ld [NES_RAM + $03], a
+            ldh a, [uw_y]
+            ld [NES_RAM + $04], a
+            ld a, e
+            ld [NES_RAM + $06], a
+            ld [NES_RAM + $08], a
+            ld a, d
+            ld [NES_RAM + $07], a
+            ld [NES_RAM + $09], a
+            pop de
+            pop bc
+            ld c, 0                         ; Y = 0
+            ld e, 0                         ; X = 0
+            ld a, [NES_RAM + $07]           ; A = the last entry, C = x bit 0
+            srl a
+            ld a, [NES_RAM + $06]
+            rra
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1 (carry kept)
+            ret

@@ -1104,6 +1104,10 @@ hle_mul16:  call rt_fcs
 hle_div16:  call rt_fcs
             db HLE_BANK
             dw hle_div16_b
+hle_initrng:
+            call rt_fcs
+            db HLE_BANK
+            dw hle_initrng_b
 
 ff2_bg_tile:                                ; DMG BG tile in the shadow (DE = start + 17, cart
             xor a                           ;   RAM bank 1 on): queue its re-coding; RAM bank 0

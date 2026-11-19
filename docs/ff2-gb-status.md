@@ -253,8 +253,15 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   model of the 6502 routine on 200000 random cases). Battle entry: CGB +46, DMG +70
   frames; totals CGB +0.2%, DMG +4.1%; random seed 1, 30000 frames: 29534 waits identical
   on DMG and CGB.
+- Native `b11:97D5` (init rng: the battle's 256-entry RNG table through 256 multiply +
+  divide calls): closed form x = k * x mod 1024, folded above 512, with the NES's end state
+  (zero page, A / X / Y, flags; checked against a model of the 6502 routine on 300 random
+  zero pages). The 16-bit multiply's end state also has a closed form (checked on 200000
+  cases: $02 = entry carry, $03 = 0, A = (product >> (bit length of the multiplier + 7)),
+  C = 0), kept for later. Battle entry (wait 9506): CGB +34, DMG +46 frames (from +110 /
+  +219); totals CGB +0.1%, DMG +3.9%.
 - Next: the remaining battle-entry time (attribute writes `attr_apply`, tile marks, the
-  battle's own setup code), GB tile upload latency.
+  battle's own setup code), DMG boot (+45 at wait 2), GB tile upload latency.
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 
