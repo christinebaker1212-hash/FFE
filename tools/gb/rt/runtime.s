@@ -37,6 +37,7 @@ SPAL_KEY   = $DCC0          ; NES sprite palette -> coding: values of indices 1-
                             ;   bit 6 = OBP1 (DMG); $39 = as is (CGB)
 SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
+APU_SH     = $D840          ; shadow of $4000-$4017 (rt_apu_w, rt/apu.s)
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
 TEST_PAD   = $D83E          ; $A5: test runner input (read_buttons)
 VBL_ENT    = $D85B          ; VBL_CNT at the frame wait's entry (rt_wait_nmi)
@@ -75,6 +76,7 @@ SGB_MIN    = 12
 NT_NOW     = $D87D          ; nt_tile: check the cell's palette at once (not in spare time)
 MAP_RB     = $CCFF          ; CGB masked load: GB map to rebuild from the shadows when shown
 CGB_RP     = $CCEF          ; CGB: cell palettes stale (owners changed with the LCD off; repal_b at LCD on)
+PB_ROW     = $D85D          ; CGB: rows of vshow_own's buffer built ahead (vpre)
 VSHOW_P    = $CCDF          ; CGB: a masked load to show in the next frame wait (rendering on)
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
@@ -224,6 +226,47 @@ w7v:        ds 1                            ; rt_ppu_w7: the value written
 ; ------------------------------------------------------------------ vectors
 section bank 0, $0000
 rt_jp_hl:   jp hl
+; NES APU write (L = register, A = value). A register written with the value it holds (the
+; music driver rewrites its registers every frame) changes nothing, as apu_write decides:
+; checked here before the bank switch; note restarts ($4003 / $4007 / $400B / $400F) and
+; $4010-$4017 always go to apu_write (bank RT_TABLES).
+section bank 0, $0001
+rt_apu_w:   push af
+            push hl
+            ld h, a
+            ld a, l
+            cp $10
+            jr nc, .full
+            and 3
+            cp 3
+            jr z, .full
+            ld a, l
+            add a, low(APU_SH)
+            ld l, a
+            ld a, h
+            ld h, high(APU_SH)
+            cp [hl]
+            jr z, .x
+.full:      pop hl
+            pop af
+            push af
+            push bc
+            push de
+            push hl
+            ld e, a
+            ld a, RT_TABLES
+            ld [$2000], a
+            call apu_write
+            ldh a, [code_bank]
+            ld [$2000], a
+            pop hl
+            pop de
+            pop bc
+            pop af
+            ret
+.x:         pop hl
+            pop af
+            ret
 section bank 0, $0038
             jp rst38_trap                   ; execution ran into $FF bytes: record and stop
 section bank 0, $0040
@@ -1672,8 +1715,8 @@ rt_wait_nmi:
             ldh a, [is_sgb]
             and a
             call nz, sgb_frame
-            ld a, [VSHOW_P]                 ; (CGB: a masked load shown, its DMA in this
-            and a                           ;   wait's vblank)
+            ldh a, [is_cgb]                 ; (CGB: a masked load shown, its DMA in this
+            and a                           ;   wait's vblank; or its buffer built ahead)
             call nz, vshow_tramp
             push hl                         ; pacing as the NES (owner: no speed-ups): the
             ld a, [VBL_ENT]                 ;   wait ends at the next vblank; a frame that

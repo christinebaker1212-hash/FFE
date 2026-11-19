@@ -124,6 +124,13 @@ def apu_tables():
     for k in range(0, 2048, 16):
         src += '    dw %s\n' % ', '.join(str(v) for v in freq[k:k + 16])
     src += 'apu_noise:\n    db %s\n' % ', '.join(str(v) for v in noise)
+    # volume scaling (apu_core vscale): VSTAB[level * 16 + v] = v at level 8, else
+    # (v * level + 7) >> 3 (rounded up: a quiet note stays audible); PADJ[level] = the pulses'
+    # level, 5/8 of it ((5 * level + 4) >> 3)
+    src += 'section bank %d, $5100\nVSTAB:\n' % RT_TABLES
+    for lv in range(9):
+        src += '    db %s\n' % ', '.join(str(v if lv >= 8 else (v * lv + 7) >> 3) for v in range(16))
+    src += 'PADJ:\n    db %s\n' % ', '.join(str((5 * lv + 4) >> 3) for lv in range(9))
     return src
 
 

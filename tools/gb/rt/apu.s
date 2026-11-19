@@ -4,7 +4,7 @@
 ; linear counter: the NES frame counter's half-frame clocks), apu_init at boot.
 ; NES pulse 1 -> CH1, pulse 2 -> CH2, triangle -> CH3 (triangle wave), noise -> CH4.
 
-APU_SH     = $D840          ; shadow of $4000-$4017
+; APU_SH ($D840, shadow of $4000-$4017): runtime.s (rt_apu_w reads it first)
 APU_FH     = $D858          ; NRx4 frequency high bits of the two pulses (2)
 APU_LEN    = $D860          ; NES length counters: pulse 1, pulse 2, triangle, noise
 APU_ON     = $D864          ; channel sounding (cleared by the length counter, the sweep's
@@ -28,21 +28,6 @@ apu_init:   ld a, RT_TABLES
 ; Sound writes go to the GB at once (rt_apu_w), as the NES's go to its APU; apu_tick runs at
 ; each frame wait. (A per-frame queue was used while frame waits could catch up after a slow
 ; frame; the waits now always end at a new vblank, so the driver runs at most once a frame.)
-rt_apu_w:   push af
-            push bc
-            push de
-            push hl
-            ld e, a
-            ld a, RT_TABLES
-            ld [$2000], a
-            call apu_write
-            ldh a, [code_bank]
-            ld [$2000], a
-            pop hl
-            pop de
-            pop bc
-            pop af
-            ret
 
 apu_tick:   push af
             push bc

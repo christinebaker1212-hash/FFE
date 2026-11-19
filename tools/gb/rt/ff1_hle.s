@@ -667,12 +667,11 @@ hle_wrow:                                  ; (bank HLE_BANK: wrow_b)
             jp hle_back
 
 hle_tpair:                                  ; c62:DEF1 one letter (bank PF_BANK: tpair_b)
-            push af
-            ld a, PF_BANK
-            ld [$2000], a
-            pop af
-            call tpair_b
-            jp hle_back
+            ld hl, tpair_b
+            jp hle_pfj
+hle_prow1:                                  ; far pr1, the prologue rows (prow_b)
+            ld hl, prow_b
+            jp hle_pfj
 
 hle_palup:                                  ; c62:D865 palette upload (bank HLE_BANK: palup_b)
             push af

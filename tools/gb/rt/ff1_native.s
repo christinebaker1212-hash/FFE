@@ -5168,13 +5168,13 @@ bgsrc:      push bc
             pop bc
             ret
 
-; far pr1 (prologue row writer): prow_b (bank PF_BANK)
+; bank PF_BANK routines through HL (hle_pfj)
 section bank 0, $3EE3
-hle_prow1:  push af
-            ld a, PF_BANK
-            ld [$2000], a
+hle_pfj:    push af                         ; HL = a routine in bank PF_BANK (stubs
+            ld a, PF_BANK                   ;   hle_prow1 / hle_tpair / hle_prt: HL is
+            ld [$2000], a                   ;   free at the recompiled code's calls)
             pop af
-            call prow_b
+            call rt_jp_hl
             jp hle_back
 hle_wrow3:  push af                         ; fix window rows: wrow3_b (bank HLE_BANK)
             ld a, HLE_BANK
@@ -8638,6 +8638,9 @@ vshow_unm:  ld a, 2
             ldh a, [dlg_l]
             and a
             ret nz
+            ld a, [BAND_LIFE]               ; (a band reveal: its raster events from vbl_regs,
+            and a                           ;   the window mask kept meanwhile)
+            ret nz
             xor a                           ; (shown now: VLCD 0, so writes made before the
             ld [VLCD], a                    ;   next vblank do not mask it again)
             ld b, LCDC_ON & %11111101
@@ -8648,7 +8651,14 @@ vshow_unm:  ld a, 2
 .ns:        ld a, b
             ldh [$FF40], a
             ret
-vshow_def:  xor a                           ; (frame wait) VSHOW_P: rendering still on: shown,
+vshow_def:  ld a, [VSHOW_P]                 ; (every CGB frame wait) a show pending: below;
+            and a                           ;   else, masked: vshow_own's buffer built ahead
+            jr nz, .sh0
+            ld a, [VLCD]
+            cp 1
+            ret nz
+            jp vpre
+.sh0:       xor a                           ; VSHOW_P: rendering still on: shown,
             ld [VSHOW_P], a                 ;   unmasked in the vblank (VLCD 2); else masked.
             ldh a, [ppu_mask]               ;   Keeps BC, DE, HL (the NES's X / Y)
             and $18
@@ -8829,8 +8839,74 @@ vshow_own:  ldh a, [q_head]                 ; queued writes first
             jr z, .qe
             call q_drain1
             jr vshow_own
-.qe:        ld b, 0                         ; B = row (0-29)
-.row:       ld c, 0                         ; group (0-3)
+.qe:        call vo_first                   ; B = the first row still to build (a build
+            xor a                           ;   ahead in the masked frame waits: vpre)
+            ldh [sh_l2], a                  ; (no time limit)
+            call vo_rows
+            xor a
+            ld [MAP_RB], a
+            ld [CGB_RP], a
+            di
+            call vshow_b.vb
+            ld a, 4
+            ldh [$FF70], a
+            ld a, $D0                       ; map: bank 4 $D000 -> $9800
+            ldh [$FF51], a
+            xor a
+            ldh [$FF52], a
+            ld a, $18
+            ldh [$FF53], a
+            xor a
+            ldh [$FF54], a
+            ld a, 59
+            ldh [$FF55], a
+            ldh a, [$FF44]                  ; (in a vblank with room left, else the next)
+            cp 144
+            jr c, .wt
+            cp 149
+            jr c, .go
+.wt:        call vshow_b.vb
+.go:        ld a, 1                         ; palettes: bank 4 $D400 -> VRAM bank 1 $9800
+            ldh [$FF4F], a
+            ld a, $D4
+            ldh [$FF51], a
+            xor a
+            ldh [$FF52], a
+            ld a, $18
+            ldh [$FF53], a
+            xor a
+            ldh [$FF54], a
+            ld a, 59
+            ldh [$FF55], a
+            xor a
+            ldh [$FF4F], a
+            inc a
+            ldh [$FF70], a
+            call vshow_unm
+            ei
+            ret
+
+; vshow_own's rows B..29 (map by owner -> WRAM bank 4 $D000, cell palettes -> $D400). sh_l2
+; non-zero: stop before the vblank (a vblank since the frame wait began, or LY 136-143).
+; Out: B = the next row.
+vo_rows:
+.row:       ld a, b
+            cp 30
+            ret z
+            ldh a, [sh_l2]
+            and a
+            jr z, .go
+            ld a, [VBL_CNT]
+            ld c, a
+            ld a, [VBL_ENT]
+            cp c
+            ret nz
+            ldh a, [$FF44]
+            cp 136
+            jr c, .go
+            cp 144
+            ret c
+.go:        ld c, 0                         ; group (0-3)
 .grp:       push bc
             ld a, b                         ; palettes of the group's four pairs, both
             and $1C                         ;   nametables: attribute bytes $3C0 + (row / 4)
@@ -9073,50 +9149,77 @@ vshow_own:  ldh a, [q_head]                 ; queued writes first
             cp 4
             jp nz, .grp
             inc b
+            jp .row
+
+; B = the first row vshow_own must build: MAP_RB = CGB_RP = 2 (built ahead): 30; both 3 (being
+; built, nothing written since): PB_ROW; else 0
+vo_first:   ld a, [CGB_RP]
+            ld b, a
+            ld a, [MAP_RB]
+            cp b
+            jr nz, .z
+            cp 2
+            jr z, .all
+            cp 3
+            jr nz, .z
+            ld a, [PB_ROW]
+            ld b, a
+            ret
+.all:       ld b, 30
+            ret
+.z:         ld b, 0
+            ret
+
+; frame wait, CGB masked load not yet shown, cells of both nametables: vshow_own's buffer
+; built ahead, a few rows per wait in its spare time (MAP_RB = CGB_RP = 3 while building, 2
+; when done; any write sets them back to 1 and the build starts over). Keeps BC, DE, HL.
+vpre:       push bc
+            push de
+            push hl
+            ldh a, [own1_lo]
+            ld b, a
+            ldh a, [own1_hi]
+            or b
+            jr z, .x
+            ld a, [MAP_RB]
+            ld b, a
+            ld a, [CGB_RP]
+            ld c, a
+            or b
+            jr z, .x                        ; (nothing to build)
             ld a, b
-            cp 30
-            jp nz, .row
-            xor a
+            cp 1
+            jr z, .st
+            ld a, c
+            cp 1
+            jr z, .st
+            ld a, b
+            cp c
+            jr nz, .st
+            cp 2
+            jr z, .x                        ; (built)
+            cp 3
+            jr nz, .st
+            ld a, [PB_ROW]
+            ld b, a
+            jr .bd
+.st:        ld b, 0
+            ld a, 3
             ld [MAP_RB], a
             ld [CGB_RP], a
-            di
-            call vshow_b.vb
-            ld a, 4
-            ldh [$FF70], a
-            ld a, $D0                       ; map: bank 4 $D000 -> $9800
-            ldh [$FF51], a
-            xor a
-            ldh [$FF52], a
-            ld a, $18
-            ldh [$FF53], a
-            xor a
-            ldh [$FF54], a
-            ld a, 59
-            ldh [$FF55], a
-            ldh a, [$FF44]                  ; (in a vblank with room left, else the next)
-            cp 144
-            jr c, .wt
-            cp 149
-            jr c, .go
-.wt:        call vshow_b.vb
-.go:        ld a, 1                         ; palettes: bank 4 $D400 -> VRAM bank 1 $9800
-            ldh [$FF4F], a
-            ld a, $D4
-            ldh [$FF51], a
-            xor a
-            ldh [$FF52], a
-            ld a, $18
-            ldh [$FF53], a
-            xor a
-            ldh [$FF54], a
-            ld a, 59
-            ldh [$FF55], a
-            xor a
-            ldh [$FF4F], a
-            inc a
-            ldh [$FF70], a
-            call vshow_unm
-            ei
+.bd:        ld a, 1
+            ldh [sh_l2], a
+            call vo_rows
+            ld a, b
+            ld [PB_ROW], a
+            cp 30
+            jr nz, .x
+            ld a, 2
+            ld [MAP_RB], a
+            ld [CGB_RP], a
+.x:         pop hl
+            pop de
+            pop bc
             ret
 
 ; ---- c62:DEF1-DF03 (menu text printer, one letter): LDX $2002 / LDX $55 / STX $2006 / LDX $54 /

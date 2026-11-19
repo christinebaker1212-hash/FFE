@@ -154,49 +154,35 @@ vol_byte:   bit 4, a
 ; counter $94), noise always. Keeps BC, DE, HL.
 vscale:     push bc
             push hl
-            ld b, a
+            ld b, a                         ; B = volume
             ld a, l
             sub low(APU_CV)
-            push af                         ; (channel)
+            ld c, a                         ; C = channel
             ld hl, VOL_BGM
             and a
             jr z, .lv                       ; square 1: music
             cp 3
             jr z, .sfx                      ; noise: sound effects
             ld a, [NES_RAM + $7E]
-            ld c, a
+            and a
+            jr nz, .sfx
             ld a, [NES_RAM + $94]
-            or c
+            and a
             jr z, .lv
 .sfx:       ld hl, VOL_SFX
-.lv:        ld c, [hl]                      ; C = 0-8
-            pop af
-            cp 2                            ; the pulses at 5/8: the NES mixes its triangle
-            jr nc, .np                      ;   ~1.7x a full pulse, the GB wave channel can
-            ld a, c                         ;   only match a full pulse (the bass balance)
-            add a, a
-            add a, a
-            add a, c
-            add a, 4
-            srl a
-            srl a
-            srl a
-            ld c, a
-.np:        ld a, c
-            cp 8
-            ld a, b
-            jr nc, .x                       ; (8: as is)
-            xor a
-            inc c
-.m:         dec c
-            jr z, .d
-            add a, b
-            jr .m
-.d:         add a, 7                        ; (rounded up: a quiet NES note stays audible)
-            srl a
-            srl a
-            srl a
-.x:         pop hl
+.lv:        ld a, [hl]                      ; level 0-8
+            bit 1, c                        ; the pulses at 5/8 (PADJ): the NES mixes its
+            jr nz, .np                      ;   triangle ~1.7x a full pulse, the GB wave
+            add a, low(PADJ)                ;   channel can only match a full pulse
+            ld l, a
+            ld h, high(PADJ)
+            ld a, [hl]
+.np:        swap a                          ; VSTAB[level * 16 + volume]
+            or b
+            ld l, a
+            ld h, high(VSTAB)
+            ld a, [hl]
+            pop hl
             pop bc
             ret
 
