@@ -29,15 +29,9 @@ mapdraw_b:  xor a                           ; (LDA $2002)
             ld a, MDF_ON                    ; (GB_MDF=0 at build time: per tile, for checks)
             and a
             jr z, .sl
-            ldh a, [lcd_on]                 ; LCD on (CGB: not a masked load), no dialogue
-            and a                           ;   box: the batched writer (the VRAM queue
-            jr z, .sl                       ;   emptied first, so no queued map cell is
-            ld a, [VLCD]                    ;   written after it)
-            and a
-            jr nz, .sl
-            ldh a, [dlg_on]
-            and a
-            jr nz, .sl
+            ldh a, [dlg_on]                 ; no dialogue box: the batched writer (the VRAM
+            and a                           ;   queue emptied first, so no queued map cell
+            jr nz, .sl                      ;   is written after it)
 .dr:        ldh a, [q_head]
             ld b, a
             ldh a, [q_tail]
@@ -45,16 +39,30 @@ mapdraw_b:  xor a                           ; (LDA $2002)
             jr z, .de
             call q_drain1
             jr .dr
-.de:        ldh a, [is_cgb]                 ; (CGB: no shading checks)
+.de:        ld a, [VLCD]                    ; CGB masked load: no VRAM writes, the GB map and
+            and a                           ;   the cell palettes are rebuilt from the shadows
+            jr z, .nv                       ;   when it is shown (MD_FAST = 2)
+            ld a, 1
+            ld [MAP_RB], a
+            ld [CGB_RP], a
+            xor a
+            ld [MD_MK], a
+            ld a, 2
+            jr .sf
+.nv:        ldh a, [is_cgb]                 ; (CGB: no shading checks)
             and a
             jr z, .dm
             xor a
             ld [MD_MK], a
             inc a
             jr .sf
-.dm:        ld a, 1                         ; DMG: the drawn cells are marked for the
-            ld [MD_MK], a                   ;   palette check (FRESH, as nt_tile does)
-            ld a, 1
+.dm:        ldh a, [lcd_on]                 ; DMG: the drawn cells are marked for the palette
+            ld [MD_MK], a                   ;   check (FRESH, as nt_tile does); LCD off: the
+            and a                           ;   map is scanned when it goes on
+            jr nz, .d1
+            inc a
+            ldh [dmg_scan], a
+.d1:        ld a, 1
             jr .sf
 .sl:        xor a
 .sf:        ld [MD_FAST], a
@@ -515,9 +523,13 @@ mdf_rgb:    ld a, [NES_RAM + $11]
             srl a
             ld b, a                         ; s / 2 pairs
             call mdf_vrun
-            ldh a, [is_cgb]                 ; CGB: the row's cell palettes (VRAM bank 1)
+            ld a, [MD_FAST]                 ; CGB (not masked): the row's cell palettes (VRAM
+            cp 2                            ;   bank 1)
+            jr z, .np
+            ldh a, [is_cgb]
             and a
             call nz, mdf_pbrow
+.np:
             ld a, [MD_LO]                   ; OWN: offset high * 32 + (row & 7) * 4
             and $E0
             rrca
@@ -644,7 +656,10 @@ mdf_pbrow:  ld a, [MD_IDX]
 
 ; HL = source, DE = GB map, B = pairs: two cells per moment VRAM is free (STAT mode 0 / 1,
 ; mode 2 follows: both writes land within its 20 M-cycles); interrupts between the polls
-mdf_vrun:   ld a, b
+mdf_vrun:   ld a, [MD_FAST]                 ; (masked load: rebuilt when shown)
+            cp 2
+            ret z
+            ld a, b
             and a
             ret z
 .l:         di
@@ -883,6 +898,9 @@ mdf_cone:   ld [MD_ADD], a
             ld l, a
             push hl
             ld e, a
+            ld a, [MD_FAST]                 ; (masked load: map and palettes rebuilt when
+            cp 2                            ;   shown)
+            jr z, .vx
             ld d, $98                       ; GB map column, 15 pairs of rows
             ld b, 15
 .v:         ld c, [hl]
@@ -914,6 +932,7 @@ mdf_cone:   ld [MD_ADD], a
             ldh a, [is_cgb]                 ; CGB: the column's cell palettes
             and a
             call nz, mdf_pbcol
+.vx:
             pop hl                          ; owner bits of the column's 30 cells
             push hl
             ld a, l
@@ -2769,6 +2788,8 @@ SC_PU      = $D83B          ;   PAL_USED wanted, cells left, tile / palette of t
 SC_N       = $D83C
 SC_LT      = $D83D
 SC_LP      = $D82E          ;   (in the fault-dump area DBG + 14: written only on a fault)
+SC_NP      = $DE00          ; scan_b: palette each tile is drawn with ($FF: not used; the FRESH /
+                            ;   TBLK area, free here: queue flushed, FRESH superseded)
 scan_b:     push bc
             push de
             push hl
@@ -2777,31 +2798,28 @@ scan_b:     push bc
             ldh [sgb_adirty], a
             xor a
             ldh [dmg_scan], a
-            ld [SC_PU], a
             ld hl, REF_BM
             ld b, 32
 .z:         ld [hl+], a
             dec b
             jr nz, .z
-            ldh a, [own1_lo]
-            ld b, a
-            ldh a, [own1_hi]
-            or b
-            ld [SC_O1], a
-            ld d, 0
-.r:         call scan_row
+            ld hl, SC_NP
+            ld a, $FF
+.f:         ld [hl+], a
+            dec b
+            jr nz, .f
+            ld d, 0                         ; every cell, rows 0-29
+.r:         call scn_row
             inc d
             ld a, d
             cp 30
             jr nz, .r
             xor a
             ld [PAL_USED], a
-            inc a
-            ld [SC_PU], a
-            ldh a, [cam_y]                  ; the view: map row (scroll_y + cam_y) mod 240 / 8,
-            ld b, a                         ;   column (scroll_x + cam_x) / 8
-            ldh a, [scroll_y]
-            add a, b
+            ldh a, [cam_y]                  ; then the view (its cells win for a tile drawn
+            ld b, a                         ;   with two palettes): map row (scroll_y +
+            ldh a, [scroll_y]               ;   cam_y) mod 240 / 8, column (scroll_x +
+            add a, b                        ;   cam_x) / 8; PAL_USED = its palettes
             jr c, .w
             cp 240
             jr c, .y
@@ -2820,8 +2838,25 @@ scan_b:     push bc
             srl a
             srl a
             ld e, a
-            ld a, 20
-            call scan_run
+            ld b, 20
+.vc:        push bc
+            call scn_cell                   ; B = tile, A = palette
+            ld l, b
+            ld h, high(SC_NP)
+            ld [hl], a
+            ld l, a
+            ld h, high(NBIT)
+            ld a, [hl]
+            ld hl, PAL_USED
+            or [hl]
+            ld [hl], a
+            ld a, e
+            inc a
+            and 31
+            ld e, a
+            pop bc
+            dec b
+            jr nz, .vc
             ld a, d
             inc a
             cp 30
@@ -2831,82 +2866,117 @@ scan_b:     push bc
             pop bc
             dec b
             jr nz, .vr
+            ld e, 0                         ; each tile used: REF_BM; drawn with another palette
+.t:         ld l, e                         ;   than it is coded for: TILE_PAL, marked; the
+            ld h, high(SC_NP)               ;   same palette but parked: marked again
+            ld a, [hl]
+            cp $FF
+            jr z, .tn
+            ld b, a
+            ld a, e
+            and 7
+            ld l, a
+            ld h, high(NBIT)
+            ld c, [hl]                      ; C = the tile's bit
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld d, a                         ; D = its byte
+            add a, low(REF_BM)
+            ld l, a
+            ld h, high(REF_BM)
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ld l, e
+            ld h, high(TILE_PAL)
+            ld a, [hl]
+            cp b
+            jr z, .sm
+            ld [hl], b
+            jr .mk
+.sm:        ld a, d
+            add a, low(DEFER_BM)
+            ld l, a
+            ld h, high(DEFER_BM)
+            ld a, [hl]
+            and c
+            jr z, .tn
+.mk:        ld a, e
+            call dmg_mark
+.tn:        inc e
+            jr nz, .t
+            ld hl, SC_NP                    ; FRESH (and TBLK) cleared, nothing pending
+            xor a
+            ld b, a
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            ld [FR_ANY], a
+            ld [FR_PEND], a
+            ld [FR_AGE], a
+            ld [FR_EMPTY], a
+            ld [FR_POS], a
             pop hl
             pop de
             pop bc
             ret
 
-; D = row, E = first column, A = cells (columns wrap at 32). Keeps D.
-scan_run:   ld [SC_N], a
-            ld a, $FF
-            ld [SC_LT], a
-            ld [SC_LP], a
-            ld a, d
-            srl a
-            srl a
-            srl a
-            ld [SC_TH], a
-            ld a, d
+; scan_b: the 32 cells of map row D -> SC_NP[tile] = palette (owner bits 8 at a time)
+scn_row:    ld a, d
             and 7
             swap a
             add a, a
-            ld [SC_TL], a
+            ld [SC_TL], a                   ; tile row offset
+            ld a, d
+            srl a
+            srl a
+            srl a
+            add a, high(NT_SH)
+            ld [SC_TH], a                   ; tile row page (nametable 0)
             ld a, d
             and $1C
             add a, a
             add a, $C0
-            ld [SC_AL], a
-            ld a, d
-            and 2
-            ld [SC_RF], a
-            ld a, d
+            ld [SC_AL], a                   ; attribute row offset
+            ld e, 0
+.g:         ld a, d                         ; C = owner bits of columns E..E+7
             add a, a
             add a, a
-            ld [SC_OL], a
-.cell:      ld b, 0                         ; B = 4 if nametable 1 owns the cell
-            ld a, [SC_O1]
-            and a
-            jr z, .o0
+            ld l, a
             ld a, e
             rrca
             rrca
             rrca
             and 3
-            ld c, a
-            ld a, [SC_OL]
-            or c
+            or l
             ld l, a
             ld h, high(OWN)
             ld c, [hl]
-            ld a, e
-            and 7
-            ld l, a
-            ld h, high(NBIT)
-            ld a, [hl]
-            and c
-            jr z, .o0
-            ld b, 4
-.o0:        ld a, [SC_TH]                   ; C = tile
-            add a, high(NT_SH)
-            add a, b
-            ld h, a
+.cell:      ld a, [SC_TH]
+            srl c
+            jr nc, .n0
+            add a, 4
+.n0:        ld h, a
             ld a, [SC_TL]
             or e
             ld l, a
-            ld c, [hl]
-            ld a, b                         ; B = palette
-            add a, high(NT_SH) + 3
-            ld h, a
+            ld b, [hl]                      ; B = tile
+            ld a, h
+            or 3
+            ld h, a                         ; attribute page of that nametable
             ld a, e
-            srl a
-            srl a
+            rrca
+            rrca
+            and 7
             ld l, a
             ld a, [SC_AL]
             add a, l
             ld l, a
-            ld a, [SC_RF]
-            and a
             ld a, [hl]
+            bit 1, d
             jr z, .t
             swap a
 .t:         bit 1, e
@@ -2914,76 +2984,80 @@ scan_run:   ld [SC_N], a
             rrca
             rrca
 .l:         and 3
-            ld b, a
-            ld a, [SC_LT]                   ; same as the cell before: done
-            cp c
-            jr nz, .new
-            ld a, [SC_LP]
-            cp b
-            jr z, .nx
-.new:       ld a, c
-            ld [SC_LT], a
-            ld a, b
-            ld [SC_LP], a
-            ld a, [SC_PU]
-            and a
-            jr z, .np
-            ld l, b                         ; PAL_USED |= 1 << palette
-            ld h, high(NBIT)
-            ld a, [hl]
-            ld hl, PAL_USED
-            or [hl]
+            ld l, b
+            ld h, high(SC_NP)
             ld [hl], a
-.np:        ld a, c                         ; REF_BM: the tile is used
+            inc e
+            ld a, e
+            and 7
+            jr nz, .cell
+            ld a, e
+            cp 32
+            jr nz, .g
+            ret
+
+; D = map row, E = column: B = the cell's tile, A = its palette (from the nametable that
+; drew it). Keeps C, DE.
+scn_cell:   push bc
+            ld a, d
+            add a, a
+            add a, a
+            ld l, a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            or l
+            ld l, a
+            ld h, high(OWN)
+            ld b, [hl]
+            ld a, e
             and 7
             ld l, a
             ld h, high(NBIT)
             ld a, [hl]
-            push af
-            ld a, c
-            rrca
-            rrca
-            rrca
-            and $1F
-            add a, low(REF_BM)
-            ld l, a
-            ld h, high(REF_BM)
-            pop af
-            or [hl]
-            ld [hl], a
-            ld l, c                         ; coded for palette B?
-            ld h, high(TILE_PAL)
-            ld a, [hl]
-            cp b
-            jr z, .pk
-            ld [hl], b
-.mk:        ld a, c
-            call dmg_mark
-            jr .nx
-.pk:        ld a, c                         ; same palette: a parked tile is marked again
+            and b
+            ld a, d
+            jr z, .o0
+            add a, 32                       ; (nametable 1: + 4 pages = row + 32)
+.o0:        srl a
+            srl a
+            srl a
+            add a, high(NT_SH)
+            ld h, a
+            ld a, d
             and 7
+            swap a
+            add a, a
+            or e
             ld l, a
-            ld h, high(NBIT)
             ld a, [hl]
-            push af
-            ld a, c
-            rrca
-            rrca
-            rrca
-            and $1F
-            add a, low(DEFER_BM)
+            pop bc
+            ld b, a                         ; B = tile
+            ld a, h
+            or 3
+            ld h, a
+            ld a, d
+            and $1C
+            add a, a
+            add a, $C0
             ld l, a
-            ld h, high(DEFER_BM)
-            pop af
-            and [hl]
-            jr nz, .mk
-.nx:        ld a, e
-            inc a
-            and 31
-            ld e, a
-            ld hl, SC_N
-            dec [hl]
-            jp nz, .cell
+            ld a, e
+            rrca
+            rrca
+            and 7
+            add a, l
+            ld l, a
+            ld a, [hl]
+            bit 1, d
+            jr z, .t
+            swap a
+.t:         bit 1, e
+            jr z, .l
+            rrca
+            rrca
+.l:         and 3
             ret
 
 ; ---- D = value, BC = count: count $2007 writes of D (rt_ppu_w7 semantics). In bulk while
@@ -3204,65 +3278,106 @@ nf_whole:   ld a, c
             ret
 
 ; CGB masked load shown: the GB map (rows 0-29) from the nametable shadows by owner (OWN),
-; each write in STAT mode 0 / 1 (the LCD is on). After bulk fills that skipped the map.
+; four cells per moment VRAM is free (mr_flush4). After bulk fills that skipped the map.
+MR_OUT     = $DCD0          ; maprb_b / repal_b: four values for VRAM (4), owner bits
+MR_BITS    = $DCD4
 maprb_b:    xor a
             ld [MAP_RB], a
             ld hl, $9800
             ld de, OWN
-            ld b, 120                       ; 960 cells, 8 per owner byte
 .byte:      ld a, [de]
             inc de
             push de
             ld c, a                         ; C = owner bits (bit 0 first)
-            ld e, 8
-.cell:      push hl
-            ld a, h                         ; shadow = NT_SH (+ $400: nametable 1) + offset
-            sub $98
-            srl c
-            jr nc, .n0
-            add a, 4
-.n0:        add a, high(NT_SH)
-            ld h, a
-            ld a, [hl]
-            pop hl
-            ldh [tmp_lo], a
-            di
-.wt:        ldh a, [$FF41]
-            bit 1, a
-            jr nz, .wt
-            ldh a, [tmp_lo]
-            ld [hl+], a
-            ei
-            dec e
-            jr nz, .cell
+            call .four
+            call .four
             pop de
-            dec b
+            ld a, l
+            cp $C0
+            jr nz, .byte
+            ld a, h
+            cp $9B
             jr nz, .byte
             ret
+.four:      push hl
+            ld a, h                         ; shadow = NT_SH (+ $400: nametable 1) + offset
+            add a, high(NT_SH) - $98
+            ld h, a
+            ld de, MR_OUT
+            ld b, 4
+.f:         srl c
+            ld a, h
+            jr nc, .f0
+            add a, 4
+.f0:        push hl
+            ld h, a
+            ld a, [hl]
+            ld [de], a
+            inc de
+            pop hl
+            inc l
+            dec b
+            jr nz, .f
+            pop hl
+            push bc
+            ld c, 0
+            call mr_flush4
+            pop bc
+            ret
 
-; CGB, LCD off: every GB map cell's palette (VRAM bank 1, rows 0-29) from the attribute
-; shadow of the nametable that drew it (OWN). Run when the LCD goes on after owners changed
-; with it off (own_set leaves those cells to this).
+; CGB: MR_OUT[0..3] to VRAM bank C at HL (HL += 4) at the next moment VRAM is free (STAT
+; mode 0 / 1; double speed: mode 2 after it leaves 40 M-cycles); the bank chosen with
+; interrupts off (the handlers leave bank 0 selected)
+mr_flush4:
+.w:         di
+            ldh a, [$FF41]
+            bit 1, a
+            jr z, .go
+            ei
+            jr .w
+.go:        ld a, c
+            ldh [$FF4F], a
+            ld a, [MR_OUT]
+            ld [hl+], a
+            ld a, [MR_OUT + 1]
+            ld [hl+], a
+            ld a, [MR_OUT + 2]
+            ld [hl+], a
+            ld a, [MR_OUT + 3]
+            ld [hl+], a
+            xor a
+            ldh [$FF4F], a
+            ei
+            ret
+
+; CGB: every GB map cell's palette (VRAM bank 1, rows 0-29) from the attribute shadow of the
+; nametable that drew it (OWN), four cells (one attribute byte) per write. Run when the
+; LCD goes on after owners changed with it off (own_set leaves those cells to this).
 repal_b:    xor a
             ld [CGB_RP], a
-            inc a
-            ldh [$FF4F], a
             ld hl, $9800
             ld b, 0                         ; B = row
-.row:       ld a, b                         ; DE = OWN + row * 4
+.row:       ld c, 0                         ; C = column
+.grp:       push hl
+            ld a, b                         ; owner bits of columns C..C+3
             add a, a
             add a, a
-            ld e, a
-            ld d, high(OWN)
-            ld c, 0                         ; C = col
-.byte:      ld a, [de]
-            inc de
-            push de
-            ld d, a                         ; D = owner bits of 8 cells (bit 0 first)
-            ld e, 8
-.cell:      push hl
-            ld a, b                         ; L = $C0 + (row / 4) * 8 + col / 4
-            and $1C
+            ld l, a
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and 3
+            or l
+            ld l, a
+            ld h, high(OWN)
+            ld a, [hl]
+            bit 2, c
+            jr z, .lo
+            swap a
+.lo:        ld [MR_BITS], a
+            ld a, b                         ; attribute byte $C0 + (row / 4) * 8 + col / 4
+            and $1C                         ;   of both nametables, this row's half
             add a, a
             add a, $C0
             ld l, a
@@ -3271,48 +3386,65 @@ repal_b:    xor a
             srl a
             add a, l
             ld l, a
-            srl d
-            ld a, high(NT_SH) + 3
-            jr nc, .n0
-            ld a, high(NT_SH) + 7
-.n0:        ld h, a
-            ld a, [hl]                      ; quadrant: bottom (row & 2), right (col & 2)
+            ld h, high(NT_SH) + 3
+            ld a, [hl]
             bit 1, b
-            jr z, .t
+            jr z, .a0
             swap a
-.t:         bit 1, c
-            jr z, .lf
+.a0:        ld d, a
+            ld h, high(NT_SH) + 7
+            ld a, [hl]
+            bit 1, b
+            jr z, .a1
+            swap a
+.a1:        ld e, a
+            ld hl, MR_OUT
+            push bc
+            ld a, [MR_BITS]
+            ld c, a
+            srl c                           ; columns 0-1: the left quadrant, 2-3: the right
+            ld a, d
+            jr nc, .c0
+            ld a, e
+.c0:        and 3
+            ld [hl+], a
+            srl c
+            ld a, d
+            jr nc, .c1
+            ld a, e
+.c1:        and 3
+            ld [hl+], a
+            srl c
+            ld a, d
+            jr nc, .c2
+            ld a, e
+.c2:        rrca
             rrca
+            and 3
+            ld [hl+], a
+            srl c
+            ld a, d
+            jr nc, .c3
+            ld a, e
+.c3:        rrca
             rrca
-.lf:        and 3
+            and 3
+            ld [hl], a
+            pop bc
             pop hl
-            ldh [tmp_lo], a                 ; (LCD on, a masked load: in STAT mode 0 / 1)
-            ldh a, [$FF40]
-            bit 7, a
-            jr z, .wr
-            di
-.wt:        ldh a, [$FF41]
-            bit 1, a
-            jr nz, .wt
-            ldh a, [tmp_lo]
-            ld [hl+], a
-            ei
-            jr .nx
-.wr:        ldh a, [tmp_lo]
-            ld [hl+], a
-.nx:        inc c
-            dec e
-            jr nz, .cell
-            pop de
+            push bc
+            ld c, 1
+            call mr_flush4
+            pop bc
             ld a, c
+            add a, 4
+            ld c, a
             cp 32
-            jr nz, .byte
+            jr nz, .grp
             inc b
             ld a, b
             cp 30
             jr nz, .row
-            xor a
-            ldh [$FF4F], a
             ret
 
 ; ntfill, DMG: HL = first cell offset, NF_N cells: their OWN bits cleared (own1 counts
@@ -3429,153 +3561,6 @@ wrow_b:     push bc
 SC_OB      = $D82A          ; owner bits of the next 8 cells, this cell's owner, the owner
 SC_CO      = $D82B          ;   the palette was fetched for (fault-dump area DBG + 8..11:
 SC_LO      = $D829          ;   written only on a fault)
-scan_row:   ld a, $FF
-            ld [SC_LT], a
-            ld [SC_LP], a
-            ld a, d
-            and 7
-            swap a
-            add a, a
-            ld [SC_TL], a
-            ld a, d
-            and $1C
-            add a, a
-            add a, $C0
-            ld [SC_AL], a
-            ld a, d
-            and 2
-            ld [SC_RF], a
-            ld a, d
-            add a, a
-            add a, a
-            ld [SC_OL], a
-            push de
-            ld a, d
-            srl a
-            srl a
-            srl a
-            add a, high(NT_SH)
-            ld d, a                         ; D = tile row page (nametable 0)
-            ld e, 0
-            ld b, $FF                       ; (palette not fetched)
-.cell:      ld a, e                         ; owner bits: a new byte every 8 cells
-            and 7
-            jr nz, .ob
-            ld a, [SC_O1]
-            and a
-            jr z, .oz
-            ld a, e
-            rrca
-            rrca
-            rrca
-            ld l, a
-            ld a, [SC_OL]
-            add a, l
-            ld l, a
-            ld h, high(OWN)
-            ld a, [hl]
-.oz:        ld [SC_OB], a
-.ob:        ld a, [SC_OB]                   ; C = owner (0 / 4) of this cell
-            rrca
-            ld [SC_OB], a
-            ld a, 0
-            jr nc, .o0
-            ld a, 4
-.o0:        ld [SC_CO], a
-            add a, d                        ; tile: page D (+ 4), offset SC_TL + column
-            ld h, a
-            ld a, [SC_TL]
-            or e
-            ld l, a
-            ld c, [hl]                      ; C = tile
-            bit 0, e                        ; palette: even column or owner change
-            jr z, .pal
-            ld a, [SC_LO]
-            ld h, a
-            ld a, [SC_CO]
-            cp h
-            jr z, .samep
-.pal:       ld a, [SC_CO]
-            ld [SC_LO], a
-            add a, high(NT_SH) + 3
-            ld h, a
-            ld a, e
-            srl a
-            srl a
-            ld l, a
-            ld a, [SC_AL]
-            add a, l
-            ld l, a
-            ld a, [SC_RF]
-            and a
-            ld a, [hl]
-            jr z, .t
-            swap a
-.t:         bit 1, e
-            jr z, .l
-            rrca
-            rrca
-.l:         and 3
-            ld b, a                         ; B = palette
-.samep:     ld a, [SC_LT]                   ; same tile and palette as the cell before
-            cp c
-            jr nz, .new
-            ld a, [SC_LP]
-            cp b
-            jr z, .nx
-.new:       ld a, c
-            ld [SC_LT], a
-            ld a, b
-            ld [SC_LP], a
-            ld a, c                         ; REF_BM: the tile is used
-            and 7
-            ld l, a
-            ld h, high(NBIT)
-            ld a, [hl]
-            push af
-            ld a, c
-            rrca
-            rrca
-            rrca
-            and $1F
-            add a, low(REF_BM)
-            ld l, a
-            ld h, high(REF_BM)
-            pop af
-            or [hl]
-            ld [hl], a
-            ld l, c                         ; coded for palette B?
-            ld h, high(TILE_PAL)
-            ld a, [hl]
-            cp b
-            jr z, .pk
-            ld [hl], b
-.mk:        ld a, c
-            call dmg_mark
-            jr .nx
-.pk:        ld a, c                         ; same palette: a parked tile is marked again
-            and 7
-            ld l, a
-            ld h, high(NBIT)
-            ld a, [hl]
-            push af
-            ld a, c
-            rrca
-            rrca
-            rrca
-            and $1F
-            add a, low(DEFER_BM)
-            ld l, a
-            ld h, high(DEFER_BM)
-            pop af
-            and [hl]
-            jr nz, .mk
-.nx:        inc e
-            ld a, e
-            cp 32
-            jp nz, .cell
-            pop de
-            ret
 
 ; ---- c62:D865 (every frame: the 32 palette bytes to $3F00): LDA $0D / BEQ / 16 x $03E0,X /
 ; then $03C0,X up to X = $20. A colour equal to the shadow's changes nothing: only changed
@@ -4680,6 +4665,104 @@ oamconv_b:  and $07
             ldh [oam_pending], a
             ret
 
+; ---- c62:C324-C333 (copy X pages): LDY #0 / (LDA ($10),Y / STA ($12),Y / INY / BNE) / INC $11 /
+; INC $13 / DEX / BNE. Page-aligned pointers: one GB page per NES page (ROM through its
+; data bank); anything else byte by byte. Out: A = the last byte, X = Y = 0, $11 / $13 + X;
+; N = 0, Z = 1, carry kept.
+pgcopy_b:   push af                         ; (carry)
+            ld c, 0
+.pg:        ld a, [NES_RAM + $10]
+            ld b, a
+            ld a, [NES_RAM + $12]
+            or b
+            jr nz, .slow
+            ld a, [NES_RAM + $13]           ; destination: RAM, ExRAM, save RAM
+            cp $20
+            jr nc, .d1
+            and 7
+            add a, high(NES_RAM)
+            jr .dk
+.d1:        cp $5C
+            jr c, .slow
+            cp $60
+            jr nc, .d2
+            add a, $6C
+            jr .dk
+.d2:        cp $80
+            jr nc, .slow
+            add a, $40
+.dk:        ld d, a
+            ld a, [NES_RAM + $11]           ; source: as the destination, or ROM
+            cp $20
+            jr nc, .s1
+            and 7
+            add a, high(NES_RAM)
+            jr .sn
+.s1:        cp $5C
+            jr c, .slow
+            cp $60
+            jr nc, .s2
+            add a, $6C
+            jr .sn
+.s2:        cp $80
+            jr nc, .s3
+            add a, $40
+.sn:        ld h, a
+            xor a                           ; (no bank switch)
+            jr .cp
+.s3:        cp $C0
+            jr nc, .s4
+            sub $40
+            ld h, a
+            ldh a, [data_bank8]
+            jr .cp
+.s4:        sub $80
+            ld h, a
+            cp $60
+            ld a, DATA + 31
+            jr nc, .cp
+            ldh a, [data_bankC]
+.cp:        ld l, 0
+            ld b, e                         ; (X)
+            ld e, 0
+            call pg_copy0                   ; (bank 0: the source bank may replace this one)
+            ld e, b
+            ldh [tmp_lo], a
+            ld hl, NES_RAM + $11
+            inc [hl]
+            ld hl, NES_RAM + $13
+            inc [hl]
+            dec e
+            jr nz, .pg
+            jr .done
+.slow:      ld b, 0                         ; byte by byte (C = Y)
+.sb:        ld l, $10
+            call rt_izy_rd
+            ld a, l
+            ldh [tmp_lo], a
+            ld l, $12
+            call rt_izy_wr
+            inc c
+            jr nz, .sb
+            ld hl, NES_RAM + $11
+            inc [hl]
+            ld hl, NES_RAM + $13
+            inc [hl]
+            dec e
+            jr nz, .slow
+.done:      ld bc, 0
+            ld d, 0
+            ld e, 0
+            xor a
+            ldh [nzv], a
+            pop af
+            ldh a, [tmp_lo]
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1, carry kept
+            ret
+
+
 ; set bits of each byte (mdf_ownrow)
 section bank HLE_BANK, $5F00
 POPC:
@@ -4700,3 +4783,21 @@ POPC:
             db 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7
             db 4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8
 
+; ---- bank 0: one page HL -> DE (E = 0), with ROM bank A at $4000 for it (0: none); bank
+; HLE_BANK again after. Out: A = the last byte. (For pgcopy_b, which runs in HLE_BANK.)
+section bank 0, $3D80
+pg_copy0:   and a
+            jr z, .c
+            ld [$2000], a
+.c:         ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            jr nz, .c
+            push af
+            ld a, HLE_BANK
+            ld [$2000], a
+            pop af
+            ret

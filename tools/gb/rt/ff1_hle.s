@@ -564,6 +564,25 @@ hle_palup2:                                 ; c62:D874 palette upload from X (pa
             jp hle_back
 
 
+hle_pgcopy:                                 ; c62:C324 page copy (pgcopy_b, bank HLE_BANK, run
+            ld b, a                         ;   with code_bank = HLE_BANK: its byte path's
+            ldh a, [code_bank]              ;   helpers come back to it); flags kept both ways
+            push af
+            ld a, HLE_BANK
+            ldh [code_bank], a
+            ld [$2000], a
+            ld a, b
+            ld b, 0
+            call pgcopy_b
+            ld b, a
+            pop hl
+            ld a, h
+            ldh [code_bank], a
+            ld [$2000], a
+            ld a, b
+            ld b, 0
+            ret
+
 ; ---- fix:F56A-F591 (battle box row): LDY #0 / LDA $68B3 / STA ($88),Y / LDX $6AA1 / DEX /
 ; DEX / INY / LDA $68B4 / (STA ($88),Y / INY / DEX / BNE) / LDA $68B5 / STA ($88),Y /
 ; $88-$89 += $20 (CLC / ADC). Out: X = 0, Y = width - 1, A = $89; N, Z, C of the last ADC.

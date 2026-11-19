@@ -92,6 +92,9 @@ row = []
 for w0 in range(k0, k1 - win + 1, win):
     row.append('%d:%d' % (w0, span(w0, w0 + win)))
 print('lag per %d waits: %s' % (win, ' '.join(row)))
+if os.environ.get('LAG_SHOW'):                 # LAG_SHOW=k,..: GB / NES frames of those waits
+    print('GB/NES frames:', ' '.join('%d:%d/%d' % (k, gb_at[k + 1] - gb_at[k], nes_at[k + 1] - nes_at[k])
+                                      for k in map(int, os.environ['LAG_SHOW'].split(',')) if k in gb_at and k + 1 in gb_at))
 w10 = sorted(((span(k, k + 10), k) for k in range(k0, k1 - 10)), reverse=True)
 shown, out = set(), []
 for v, k in w10:

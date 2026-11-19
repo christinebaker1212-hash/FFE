@@ -69,6 +69,7 @@ class FF1:
               ('c62', 0xD865): ('hle_palup', 0xD87F, 'NZC'),    # palette upload, every frame
               ('c62', 0xD874): ('hle_palup2', 0xD87F, 'NZC'),   #   (entered at its second loop)
               ('c62', 0xD6B8): ('rt_dlgdelay', 0xD6C3, 'NZ'),   # dialogue box split: timing loop
+              ('c62', 0xC324): ('hle_pgcopy', 0xC334, 'NZ'),   # copy X pages ($10) -> ($12)
               ('fix', 0xF56A): ('hle_boxrow', 0xF592, 'NZC'),  # battle box row into the panel image
               ('fix', 0xF618): ('hle_pclr', 0xF625, 'NZ'),     # battle panel image cleared
               ('fix', 0xFA5B): ('hle_cp64', 0xFA67, 'NZC'),    # battle text: 64 bytes to ExRAM
@@ -82,6 +83,7 @@ class FF1:
                   ('c62', 0xD865): bytes.fromhex('a50df00bbde0038d0720e8e01090f5bdc0038d0720e8e02090f5'),
                   ('c62', 0xD874): bytes.fromhex('bdc0038d0720e8e02090f5'),
                   ('c62', 0xD6B8): bytes.fromhex('a006a61bca207cd7cad0fa'),
+                  ('c62', 0xC324): bytes.fromhex('a000b1109112c8d0f9e611e613cad0f2'),
                   ('fix', 0xF56A): bytes.fromhex('a000adb3689188aea16acacac8adb4689188c8cad0faadb5689188a5881869208588a58969008589'),
                   ('fix', 0xF618): bytes.fromhex('a000a900991e69999e69c8d0f7'),
                   ('fix', 0xFA5B): bytes.fromhex('a000b19099805fc8c040d0f6'),
