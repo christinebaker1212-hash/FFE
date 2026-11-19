@@ -21,7 +21,7 @@ from asm_sm83 import asm, make_rom
 import build as gb1                       # tools/gb/build.py: shared tables (APU, NES colours, border)
 
 SHA1_FF12 = '4b22c2c88fc71eacf270ea51ef218944bb4c536a'
-RT_FILES = ('runtime.s', 'apu.s', 'hle.s', 'dmg_shade.s', 'sgb.s', 'ff2.s')
+RT_FILES = ('runtime.s', 'apu.s', 'hle.s', 'ff2.s', 'dmg_shade.s', 'sgb.s')   # (ff2.s continues bank 0)
 
 
 def nes_english(src, out_dir):
