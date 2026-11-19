@@ -1,6 +1,7 @@
 """Build the Game Boy (dual-mode DMG / SGB / CGB) FF2 English ROM from the user's own NES ROM.
 
-usage: build.py ["Final Fantasy I, II (Japan).nes"] [--cov DIR] [--out ROM]
+usage: build.py ["Final Fantasy I, II (Japan).nes"] [--gb] [--cov DIR] [--out ROM]
+  --gb: with the GB screen layout (tools/gb2/layout.py): build/ff2_gb.nes -> build/ff2_gb.gb
 
 1. NES ROM -> MMC5 split (tools/split/build_mmc5.py) -> English (tools/ff2/insert.py)
    = build/ff2_en.nes
@@ -24,7 +25,7 @@ SHA1_FF12 = '4b22c2c88fc71eacf270ea51ef218944bb4c536a'
 RT_FILES = ('runtime.s', 'apu.s', 'hle.s', 'ff2.s', 'dmg_shade.s', 'sgb.s')   # (ff2.s continues bank 0)
 
 
-def nes_english(src, out_dir):
+def nes_english(src, out_dir, gb=False):
     out = os.path.join(out_dir, 'ff2_en.nes')
     if hashlib.sha1(open(src, 'rb').read()).hexdigest() != SHA1_FF12:
         raise SystemExit('not the expected Final Fantasy I・II (Japan) ROM: ' + src)
@@ -33,10 +34,14 @@ def nes_english(src, out_dir):
     subprocess.check_call(script_cmd(os.path.join(ROOT, 'tools', 'split', 'build_mmc5.py'), src, out_dir), cwd=ROOT)
     subprocess.check_call(script_cmd(os.path.join(ROOT, 'tools', 'ff2', 'insert.py'),
                                      os.path.join(out_dir, 'ff2_mmc5.nes'), out), cwd=ROOT)
+    if gb:
+        gbo = os.path.join(out_dir, 'ff2_gb.nes')
+        subprocess.check_call(script_cmd(os.path.join(HERE, 'layout.py'), out, gbo), cwd=ROOT)
+        return gbo
     return out
 
 
-def source_base(src, nes, srcdir):
+def source_base(src, nes, srcdir, gb=False):
     """build/ff2/src_en from the listing + ROM, unless it is already there for this ROM"""
     import json
     mp = os.path.join(srcdir, 'map.json')
@@ -48,14 +53,16 @@ def source_base(src, nes, srcdir):
                          'https://github.com/everything8215/ff2 build/src/ff2')
     sys.path.insert(0, os.path.join(ROOT, 'tools'))
     from pyrun import script_cmd
-    subprocess.check_call(script_cmd(os.path.join(HERE, 'ff2src.py'), src, srcdir, '--english',
+    subprocess.check_call(script_cmd(os.path.join(HERE, 'ff2src.py'), src, srcdir, '--gb' if gb else '--english',
                                      '--listing', listing), cwd=ROOT)
 
 
 def main():
     args = sys.argv[1:]
+    gb = '--gb' in args
+    if gb: args.remove('--gb')
     opt = {'--cov': os.path.join(ROOT, 'build', 'ff2', 'cov'),
-           '--out': os.path.join(ROOT, 'build', 'ff2_en.gb'), '--nes': None}
+           '--out': os.path.join(ROOT, 'build', 'ff2_gb.gb' if gb else 'ff2_en.gb'), '--nes': None}
     pos = []
     while args:
         a = args.pop(0)
@@ -64,9 +71,9 @@ def main():
     src = pos[0] if pos else os.path.join(ROOT, 'roms', 'Final Fantasy I, II (Japan).nes')
     out_dir = os.path.dirname(os.path.abspath(opt['--out']))
     os.makedirs(out_dir, exist_ok=True)
-    nes = opt['--nes'] or nes_english(src, out_dir)
-    srcdir = os.path.join(ROOT, 'build', 'ff2', 'src_en')
-    source_base(src, nes, srcdir)
+    nes = opt['--nes'] or nes_english(src, out_dir, gb)
+    srcdir = os.path.join(ROOT, 'build', 'ff2', 'src_gb' if gb else 'src_en')
+    source_base(src, nes, srcdir, gb)
     covs = sorted(glob.glob(os.path.join(opt['--cov'], 's*.bin')))   # optional: stack-trick flags
     t = time.time()
     cm = CodeMap(nes, srcdir, covs).build()

@@ -113,9 +113,25 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   enemy area NES x 20-159, party column x 140-159, back row 4 px; main menu with portraits).
   Formation survey tool `tools/gb2/ff2form.py`.
 
-## Next
-- Re-layouts on the NES side (`tools/gb2/layout.py`), battle first; mock-ups of the other
-  screens (`docs/ff2-gb-screens.md`, "To draft").
+## Battle re-layout (in progress, owner: "go ahead", 2026-11-19)
+- Pipeline: `tools/gb2/layout.py` (NES side, after insert.py) -> `build/ff2_gb.nes`;
+  `ff2src.py --gb` / `ff2en.record(gb_out=)` record its modules; `build.py --gb` ->
+  `build/ff2_gb.gb`. Checked: firstdiff on the GB-layout pair, random seed 1, 11000
+  frames: no difference in 10475 waits (through the opening battle).
+- Runtime: FF2 camera registers `$5802` (fine X), `$5803` (split line), `$5804/$5805`
+  (second camera, tiles); raster event kind 3 sets SCX/SCY at the split; sprites below the
+  split take the second camera's offsets (`spr_cam2`).
+- Done in layout.py: battle cameras (battlefield NES x 20 / y 48 above line 96, windows
+  below), field camera back on return (`fix:FA0F`), party y = slot * 24 + 48 (`b11:9B68`),
+  base x 156 / 160 (`b11:A102`).
+- Facts: the battle menu scrolls horizontally over two nametables ($38, $3A bit 0) to slide
+  between the names+stats pane and the stats+commands pane (windows: names (0,19)-(9,30),
+  stats (10,19)-(31,30), commands (32,19)-(39,30), `b12:9126/9143/9183`); FF2 switches the
+  BG pattern table at the split (battlefield table 1, menu table 0): a DMG cannot hold both
+  plus sprites, so the GB windows will draw with free table-1 tiles (small-font renderer,
+  as FF1). Tile survey `tools/gb2/ff2tiles.py` (cynes PPU_LOG per forced formation).
+- Next: tile pools from the survey; windows in GB rows 12-17 (NES rows 18-23, no menu
+  scroll, command window over the names window); small-font renderer (free bank 23).
 - Meanwhile: speed of screen loads (DMG +7%), the Warp idiom, more equivalence runs
   (other seeds, scripted field / shop / battle input).
 

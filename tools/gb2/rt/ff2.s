@@ -230,3 +230,79 @@ rt_ac_wait:
             inc a
             dec a                           ; Z = 1
             ret
+
+; ------------------------------------------------------------------ cameras
+; NES writes (GB layout code, tools/gb2/layout.py; nothing on the NES): $5800 / $5801
+; camera X / Y in tiles (runtime.s), $5802 fine X (pixels 0-7, after $5800), $5803 the GB
+; line where a second camera starts (0: none), $5804 / $5805 its X / Y in tiles (absolute:
+; the NES scroll is not added). A, F kept.
+rt_mmc_w5802:
+            push af
+            push bc
+            and 7
+            ld b, a
+            ldh a, [cam_x]
+            and $F8
+            or b
+            ldh [cam_x], a
+            pop bc
+            pop af
+            ret
+rt_mmc_w5803:
+            ld [CAM2_LINE], a
+            ret
+rt_mmc_w5804:
+            push af
+            add a, a
+            add a, a
+            add a, a
+            ld [CAM2_X], a
+            pop af
+            ret
+rt_mmc_w5805:
+            push af
+            add a, a
+            add a, a
+            add a, a
+            ld [CAM2_Y], a
+            pop af
+            ret
+
+; OAM conversion (A = CAM2_LINE, E = end of the GB sprites): sprites at or below the line
+; are shown with the second camera: GB x += cam_x - CAM2_X, GB y += cam_y - CAM2_Y.
+spr_cam2:   push bc
+            push de
+            push hl
+            add a, 16
+            ld b, a                         ; B = OAM y of the line
+            ldh a, [cam_x]
+            ld hl, CAM2_X
+            sub [hl]
+            ld c, a                         ; C = x delta
+            ldh a, [cam_y]
+            ld hl, CAM2_Y
+            sub [hl]
+            ld d, a                         ; D = y delta
+            ld a, e
+            and a
+            jr z, .done
+            ld hl, OAM_SH
+.lp:        ld a, [hl]
+            cp b
+            jr c, .nx
+            add a, d
+            ld [hl+], a
+            ld a, [hl]
+            add a, c
+            ld [hl-], a
+.nx:        inc l
+            inc l
+            inc l
+            inc l
+            ld a, l
+            cp e
+            jr c, .lp
+.done:      pop hl
+            pop de
+            pop bc
+            ret

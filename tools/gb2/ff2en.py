@@ -29,7 +29,9 @@ def marked(src):
         out.append(raw)
     return '\n'.join(out), n
 
-def record(mmc5_in, en_out, script=None):
+def record(mmc5_in, en_out, script=None, gb_out=None):
+    """gb_out: also apply tools/gb2/layout.py (GB layout) to en_out -> gb_out, recording its
+    modules too; the module placement is then looked up in gb_out"""
     real = asm6502.asm; mods = []
     def rec(src, syms=None, org=0x8000):
         r = real(src, syms=syms, org=org)
@@ -47,10 +49,13 @@ def record(mmc5_in, en_out, script=None):
     try:
         sys.argv = ['insert.py', mmc5_in, en_out]
         runpy.run_path(script or os.path.join(HERE, '..', 'ff2', 'insert.py'), run_name='__main__')
+        if gb_out:
+            sys.argv = ['layout.py', en_out, gb_out]
+            runpy.run_path(os.path.join(HERE, 'layout.py'), run_name='__main__')
     finally:
         sys.argv = argv
         if saved is not None: sys.modules['asm6502'] = saved
-    rom = open(en_out, 'rb').read()[16:]
+    rom = open(gb_out or en_out, 'rb').read()[16:]
     B = 0x4000
     for m in mods:
         o = m['org']; n = len(m['bytes'])

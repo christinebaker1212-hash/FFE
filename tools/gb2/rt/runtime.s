@@ -34,7 +34,10 @@ SPAL_KEY   = $DCC0          ; NES sprite palette -> coding: values of indices 1-
 SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
-TEST_PAD   = $D83E          ; $A5: test runner input (read_buttons)
+TEST_PAD   = $D83E
+CAM2_LINE  = $D836          ; FF2: GB line where the second camera starts (0: none; $5803)
+CAM2_X     = $D837          ;   its view origin in the NES picture (pixels; $5804 / $5805 in tiles)
+CAM2_Y     = $D838          ; $A5: test runner input (read_buttons)
 VBL_SEEN   = $D834          ; VBL_CNT (low) up to which GB frames were taken by NES frames
 CATCH_UP   = 8              ; GB frames an NES frame wait may be behind at most
 BG_DIRTY   = $CCA0          ; CGB: BG tiles to copy by HDMA (bitmap, 32)
@@ -437,7 +440,15 @@ stat_isr:   push af                         ; raster events (vbl_regs), each in 
             ld h, high(EV_K)
             ld a, [hl]
             and a
+            jr z, .scy
+            cp 3
             jr nz, .mk
+            ld a, [CAM2_X]                  ; FF2: the second camera (absolute: no NES scroll)
+            ldh [$FF43], a
+            ld a, [CAM2_Y]
+            ldh [$FF42], a
+            jr .nx
+.scy:
             ldh a, [split_scy]
             ldh [$FF42], a
             jr .nx
@@ -595,7 +606,13 @@ vbl_regs:   xor a
             ld b, c
             xor a
             call ev_add
-.nosplit:   ld a, [EV_N]
+.nosplit:   ld a, [CAM2_LINE]               ; FF2: second camera below a line (battle windows)
+            and a
+            jr z, .nocam2
+            ld b, a
+            ld a, 3
+            call ev_add
+.nocam2:    ld a, [EV_N]
             and a
             jr z, .noev
             ld a, [EV_L]
@@ -2019,7 +2036,10 @@ rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (s
             ldh [o_key], a
             call spr_load
             jr .ok
-.full:      ld a, e                         ; hide the GB sprites used last frame only
+.full:      ld a, [CAM2_LINE]               ; FF2: sprites below the second camera's line
+            and a                           ;   take its x origin
+            call nz, spr_cam2
+            ld a, e                         ; hide the GB sprites used last frame only
             rrca
             rrca
             ld c, a

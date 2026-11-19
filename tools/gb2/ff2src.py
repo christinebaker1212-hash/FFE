@@ -21,7 +21,8 @@ tools/gb2/ff2en.py recording insert.py's code modules). In the English source:
   - insert.py's modules (fixed bank, bank 12, init) are code with their own labels;
   - the ExRAM code (bank 22 image, runs at $5C00) is written as exram.asm.
 
-usage: ff2src.py ROM OUTDIR [--english] [--listing build/src/ff2/ff2j.asm]
+usage: ff2src.py ROM OUTDIR [--english | --gb] [--listing build/src/ff2/ff2j.asm]
+  --gb: the English build plus the GB layout (tools/gb2/layout.py)
 Writes OUTDIR/bankNN.asm (game banks 00-0E, fixed bank 0F), exram.asm (English),
 map.json (code starts and labels per bank) and checks that each file reassembles
 (tools/asm6502.py) to the ROM's bytes."""
@@ -69,7 +70,7 @@ def decode(bk, off):
     if off + n > len(bk): return None
     return mn, md, bk[off:off + n]
 
-def load(rom_path, english):
+def load(rom_path, english, gb=False):
     data = open(rom_path, 'rb').read()
     if hashlib.sha1(data).hexdigest() != SHA1_FF12:
         sys.exit('expected "Final Fantasy I, II (Japan).nes" (sha1 %s)' % SHA1_FF12)
@@ -82,17 +83,18 @@ def load(rom_path, english):
     import ff2en
     tmp = tempfile.mkdtemp(prefix='ff2src_')
     mmc5 = os.path.join(tmp, 'ff2_mmc5.nes'); en = os.path.join(tmp, 'ff2_en.nes')
+    gbn = os.path.join(tmp, 'ff2_gb.nes') if gb else None
     open(mmc5, 'wb').write(bm.build(data[16:], 2))
-    mods = ff2en.record(mmc5, en)
-    rom = open(en, 'rb').read(); prg = rom[16:]
+    mods = ff2en.record(mmc5, en, gb_out=gbn)
+    rom = open(gbn or en, 'rb').read(); prg = rom[16:]
     banks = [prg[i * BANK:(i + 1) * BANK] for i in range(15)] + [prg[31 * BANK:32 * BANK]]
     ex = [m for m in mods if m['where'][0] == 22]
     assert len(ex) == 1
     banks.append(prg[22 * BANK:22 * BANK + len(ex[0]['bytes'])])
-    return banks, mods, rom, 'en'
+    return banks, mods, rom, 'gb' if gb else 'en'
 
-def build(rom_path, outdir, listing, english=False):
-    banks, mods, rom, kind = load(rom_path, english)
+def build(rom_path, outdir, listing, english=False, gb=False):
+    banks, mods, rom, kind = load(rom_path, english or gb, gb)
     NB = len(banks)
     L = parse_listing(listing)
     code = [dict() for _ in range(NB)]          # bank -> {offset: entry}
@@ -239,9 +241,10 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument('rom'); ap.add_argument('outdir')
     ap.add_argument('--english', action='store_true')
+    ap.add_argument('--gb', action='store_true', help='English + GB layout (tools/gb2/layout.py)')
     ap.add_argument('--listing', default='build/src/ff2/ff2j.asm')
     a = ap.parse_args()
-    ok, summary, rep, rom = build(a.rom, a.outdir, a.listing, a.english)
+    ok, summary, rep, rom = build(a.rom, a.outdir, a.listing, a.english, a.gb)
     for n, s in summary.items():
         print('%-7s %5d code bytes, %4d labels, reassembles: %s' % (n, s['code_bytes'], s['labels'], s['reassembles']))
     print('source ROM sha1: %s' % hashlib.sha1(rom).hexdigest())
