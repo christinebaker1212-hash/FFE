@@ -71,6 +71,7 @@ class FF3:
            ('fix', 0xFB87): ('nat_fb87', 'NZC'),     # switch prg bank 0 and 1 (+ $AB)
            ('fix', 0xFB89): ('nat_fb89', 'NZC'),     #   (no $AB)
            ('fix', 0xFCD6): ('nat_fcd6', 'NZC', 'C'),   # multiply (8-bit)
+           ('p2e', 0xBD2A): ('nat_bd2a', 'NZC'),     # monster death animation step
            ('p34', 0x9754): ('nat_9754', 'NZ')}      # init text buffer ($7200-$73FF = $FF)
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   $FB80 wait for nmi (INC $05 / LDA $05 / BNE): the asynchronous NMI handler

@@ -914,3 +914,126 @@ nat_fcd6:   ld [NES_RAM + $18], a
             dec a
             ldh a, [nt_a]
             ret
+
+; ------------------------------------------------------------------ p2e:BD2A
+; monster death animation step (39 entries a step): sprites $0264-$02FF hidden, then for each
+; entry of $7380 (x / y) the cell ($7900 + 32 * y + x) is checked; free cells get a sprite
+; (y, tile $86, attributes $43 / $03 by back attack, x) at $0264 + $84. Multiply by 32 in closed
+; form except for the last entry, which runs the native multiply so $18-$1B end as on the NES.
+; Out: X = $4E, Y as the last entry left it, A as the NES leaves it, Z = 1, C = 1, N = 0.
+nat_bd2a:   ld hl, NES_RAM + $264
+            ld a, $F0
+            ld b, $9C
+.f:         ld [hl+], a
+            dec b
+            jr nz, .f
+            xor a
+            ld [NES_RAM + $84], a
+            ld a, $61
+            ld [NES_RAM + $86], a
+            ld a, $0D
+            ld [NES_RAM + $87], a
+            ld e, 0                         ; X
+.lp:        ld c, 0                         ; Y (LDY #0)
+            ld a, e
+            add a, $80
+            ld l, a
+            ld h, $B3                       ; $7380 + X (PRG-RAM)
+            ld a, [hl+]
+            ld [NES_RAM + $7E], a
+            ld a, [hl]
+            ld [NES_RAM + $7F], a
+            ld a, e
+            cp $4C
+            jr z, .exact
+            ld a, [NES_RAM + $7F]           ; 32 * y: lo = y << 5, hi = y >> 3
+            ld h, a
+            swap a
+            add a, a
+            and $E0
+            ld l, a
+            ld a, h
+            srl a
+            srl a
+            srl a
+            ld h, a
+            jr .mul
+.exact:     push de                         ; the last entry: the NES multiply ($F8EA) step for
+            ld a, [NES_RAM + $7F]           ;   step (C = 0 from the CPX before)
+            ld e, $20
+            and a
+            call nat_fcd6
+            ld a, [NES_RAM + $1A]
+            ld l, a
+            ld a, [NES_RAM + $1B]
+            ld h, a
+            pop de
+            ld c, 0
+.mul:       ld a, h                         ; pointer $7900 + 32y + x -> $82 / $83
+            add a, $79
+            ld h, a
+            ld a, [NES_RAM + $7E]
+            add a, l
+            ld l, a
+            ld [NES_RAM + $82], a
+            ld a, h
+            adc a, 0
+            ld [NES_RAM + $83], a
+            add a, $40                      ; (PRG-RAM -> GB $A000)
+            ld h, a
+            ld a, [hl]
+            ldh [nt_a], a
+            and a
+            jr nz, .skip
+            ld a, [NES_RAM + $84]           ; a sprite at $0264 + $84
+            ld c, a
+            ld hl, NES_RAM + $264
+            add hl, bc
+            ld a, [NES_RAM + $7F]           ; y: ((y + 5) << 3) - 1
+            add a, 5
+            add a, a
+            add a, a
+            add a, a
+            dec a
+            ld [hl+], a
+            ld a, [NES_RAM + $86]           ; tile
+            ld [hl+], a
+            ld a, [$B8C3]                   ; back attack ($78C3 = $88): $43, else $03
+            cp $88
+            ld a, $43
+            jr z, .ba
+            ld a, $03
+.ba:        ld [hl+], a
+            ld a, [NES_RAM + $7E]           ; x << 3
+            add a, a
+            add a, a
+            add a, a
+            ld [hl], a
+            ld a, [NES_RAM + $84]
+            add a, 4
+            ld [NES_RAM + $84], a
+            ldh [nt_a], a
+.skip:      ld hl, NES_RAM + $87            ; DEC $87: at 0, next tile and 13 again
+            dec [hl]
+            jr nz, .nz
+            ld hl, NES_RAM + $86
+            inc [hl]
+            ld a, $0D
+            ld [NES_RAM + $87], a
+            ldh [nt_a], a
+.nz:        inc e
+            inc e
+            ld a, e
+            cp $4E
+            jr nz, .lp
+            xor a                           ; X = $4E, Z = 1, C = 1, N = 0
+            ldh [nzv], a
+            ld b, 0
+            ld d, 0
+            ldh a, [nt_a]
+            scf
+            push af
+            ld hl, sp + 0
+            set 7, [hl]
+            pop af
+            ret
