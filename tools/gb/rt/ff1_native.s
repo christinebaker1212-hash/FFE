@@ -2281,7 +2281,10 @@ ntrun_b:    push de
 ; +1, none of its 25 GB map cells owned by nametable 1, PPU address in nametable 0's cells with the 25
 ; cells before the attributes, the source in NES $6000-$7FFF. Then BC = source (cart RAM),
 ; HL = shadow, DE = GB map, NR_END set.
-nrf_ok:     ld a, MDF_ON
+NR_O1      = $DCD8          ; nrf_ok -> nrf: cells of the run owned by nametable 1 (DMG)
+nrf_ok:     xor a
+            ld [NR_O1], a
+            ld a, MDF_ON
             and a
             jr z, .no
             ldh a, [lcd_on]
@@ -2344,8 +2347,13 @@ nrf_ok:     ld a, MDF_ON
             cpl                             ; bits 0-k
             and [hl]
             or e
+            jr z, .src
+            ldh a, [is_cgb]                 ; (DMG: those cells change owner in nrf)
+            and a
             jr nz, .no
-            ld a, [NES_RAM + $89]
+            inc a
+            ld [NR_O1], a
+.src:       ld a, [NES_RAM + $89]
             sub $60
             cp $1F
             jr nc, .no                      ; ($6000-$7EFF: no carry past $7FFF)
@@ -2385,6 +2393,62 @@ nrf:        push bc
             call q_drain1
             jr .dr
 .de:        pop de
+            pop bc
+            ld a, [NR_O1]                   ; cells owned by nametable 1: owner bit
+            and a                           ;   cleared, the shadow byte made to differ
+            jr z, .f                        ;   from the new tile (so the loop below
+            push bc                         ;   writes and checks the cell)
+            push de
+            push hl
+            ld e, 25
+.pp:        push bc
+            push hl
+            ld a, h
+            sub high(NT_SH)
+            swap a
+            add a, a
+            ld d, a
+            ld a, l
+            rrca
+            rrca
+            rrca
+            and $1F
+            or d
+            ld c, a                         ; C = OWN byte
+            ld a, l
+            and 7
+            ld l, a
+            ld h, high(NBIT)
+            ld d, [hl]                      ; D = bit
+            ld h, high(OWN)
+            ld l, c
+            ld a, [hl]
+            and d
+            jr z, .pn
+            ld a, d
+            cpl
+            and [hl]
+            ld [hl], a
+            ldh a, [own1_lo]
+            sub 1
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            sbc a, 0
+            ldh [own1_hi], a
+            pop hl
+            pop bc
+            ld a, [bc]
+            cpl
+            ld [hl], a
+            jr .pc
+.pn:        pop hl
+            pop bc
+.pc:        inc hl
+            inc bc
+            dec e
+            jr nz, .pp
+            pop hl
+            pop de
             pop bc
 .f:         ld a, [bc]
             inc bc
