@@ -9,7 +9,7 @@ usage: layout.py build/ff2_en.nes build/ff2_gb.nes
 
 Free space used: fixed bank $F800-$F84F (unused code, rom-map.txt) and $FFD0-$FFF9 (the
 rom-info block), bank 23 (empty). RAM in battle: $7800-$78DF (the box save stack the
-English patch moved to ExRAM), $75C0-$75FF, $7FDF-$7FFF (never written by the game), zero
+English patch moved to ExRAM: line buffer 136 bytes, tile pool lists 77), $75C0-$75FF, $7FDF-$7FFF (never written by the game), zero
 page $D2-$D7 (unused per ram-map.txt) for the renderer's pointers."""
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
@@ -74,11 +74,12 @@ end:
 RAM = dict(GBIDX=0x7FDF, GBRB=0x7FE0, GBPOOL=0x7FE1, VX=0x7FE2, VN=0x7FE3, VT=0x7FE4, VC=0x7FE5,
            VSH=0x7FE6, VCNT=0x7FE7, VP=0xD2, VQ=0xD4, VS=0xD6, VNUM=0x7FEC, VPAD=0x7FEE, VDIG=0x7FEF,
            VROW=0x7FF0, VCOL=0x7FF1, VW=0x7FF2, VH=0x7FF3, VLINE=0x7FF4, VSV=0x7FF5, VI=0x7FF6,
-           NL=0x7FF7, NS=0x7FF8, VSQZ=0x7FF9, VI0=0x7FFA, VI1=0x7FFB, VCX=0x7FFC,
-           USED=0x75C0, VBUF=0x7800, PTILE=0x7860, LTILE=0x7888, FTILE=0x78A0, NTBUF=0x78AC)
+           NL=0x7FF7, NS=0x7FF8, VSQZ=0x7FF9, VI0=0x7FFA, VI1=0x7FFB, VCX=0x7FFC, VFILL=0x7FFD, VLN=0x7FFE,
+           USED=0x75C0, VBUF=0x7800, BLANKT=0x7888, FTILE=0x7889, PTILE=0x7891, LTILE=0x78B9, XTILE=0x78D1,
+           NTBUF=0x78D5, ATKBUF=0x75E0, MOPEN=0x75F0, MLINE=0x75F1)
 # fixed-bank entries (7 bytes each, at $FFD0): index, bank to return to, the NES routine replaced
 ENTRIES = [('gb_party', 0x0C, 0x912A), ('gb_names', 0x0C, 0x910D), ('gb_names', 0x0C, 0x981D),
-           ('gb_cmds', 0x0C, 0x982C)]
+           ('gb_cmds', 0x0C, 0x982C), ('gb_msgopen', 0x05, 0xAA57), ('gb_msgclose', 0x05, 0xAB4F)]
 
 ENT_SRC = '''
     org $FFD0
@@ -96,7 +97,7 @@ gbdisp:                 ; dispatch GBIDX (word table: entries of the code map)
     sta $01
     jmp ($0000)
 gbtab:
-    .dw gb_party, gb_names, gb_names, gb_cmds
+    .dw gb_party, gb_names, gb_names, gb_cmds, gb_msgopen, gb_msgclose
 
 ; ---- tile pool: table-1 tiles this battle's battlefield does not use
 poolinit:
@@ -163,7 +164,7 @@ poolinit:
     iny
     cpy #32
     bne .bl
-.alloc:                 ; pool: free tiles from $FF down: blank, party 40, left 24, frame 8
+.alloc:                 ; pool: free tiles from $FF down
     ldx #0
     lda #$FF
     sta VT
@@ -172,9 +173,9 @@ poolinit:
     jsr usetest
     bne .an
     lda VT
-    sta PTILE-1,x       ; (the first, highest free tile: the blank, at PTILE-1)
-    inx
-    cpx #73
+    sta BLANKT,x        ; blank, 8 frame tiles, party 40, left 24, extra 4 (the message
+    inx                 ;   window's 4 x 17 text tiles = party + left + extra)
+    cpx #77
     beq .done
 .an:
     dec VT
@@ -182,10 +183,12 @@ poolinit:
     cmp #$1F
     bne .al
 .done:
+    lda #0
+    sta MOPEN
     lda #1
     sta GBPOOL
     jsr frames          ; frame tiles into the pool
-    jmp blank           ; blank tile (PTILE-1) over the window rows 18-23
+    jmp blank           ; blank tile (BLANKT) over the window rows 18-23
 
 usemark:                ; A = tile: mark used (X, Y kept)
     pha
@@ -340,9 +343,9 @@ frames:                 ; the 8 frame tiles (ROM font $F7-$FE, copied at build t
     bne .f
     rts
 
-blank:                  ; tile PTILE-1 = window colour 2; NES rows 18-23 cols 0-31 filled with it
+blank:                  ; tile BLANKT = window colour 2; NES rows 18-23 cols 0-31 filled with it
     jsr $FA2A
-    lda PTILE-1
+    lda BLANKT
     jsr tileaddr
     lda #0
     ldx #8
@@ -378,7 +381,7 @@ blank:                  ; tile PTILE-1 = window colour 2; NES rows 18-23 cols 0-
     sta $2006
     lda VT
     sta $2006
-    lda PTILE-1
+    lda BLANKT
     ldx #32
 .f:
     sta $2007
@@ -585,19 +588,24 @@ ntwin:
     adc #1
     cmp VH
     beq .bot
-    lda FTILE+3         ; left side, text, right side
+    lda FTILE+3         ; left side, text (or blank: VFILL), right side
     sta $2007
     ldx VW
     dex
     dex
 .t:
+    lda VFILL
+    beq .tt0
+    lda BLANKT
+    bne .t2
+.tt0:
     ldy #0
     lda (VP),y
-    sta $2007
     inc VP
-    bne .t1
+    bne .t2
     inc VP+1
-.t1:
+.t2:
+    sta $2007
     dex
     bne .t
     lda FTILE+4
@@ -931,6 +939,192 @@ nline:                  ; one names line NL from (VP) bytes VI0 .. VI1-1 (or the
 .x:
     rts
 
+; ---- message window (replaces bank 5 AA57 open / AB4F close; box $64: 0 attacker, 1
+; target, 2 action, 3 result, 4 message; the box's text is in the English buffer BUF):
+; full width (GB rows 12-17; 17 text tiles = 136 px a line), style A: line 1 "attacker > target", lines 2-3 action and
+; result indented, a message on the next free line; when the last box closes, the names and
+; party windows come back (their tiles are the message lines' tiles)
+gb_msgopen:
+    jsr poolinit
+    lda MOPEN
+    bne .have
+    lda #0
+    sta MLINE
+    lda #1              ; frame, blank lines
+    sta VFILL
+    lda #18
+    sta VROW
+    lda #0
+    sta VCOL
+    lda #20
+    sta VW
+    lda #6
+    sta VH
+    jsr ntwin
+    lda #0
+    sta VFILL
+.have:
+    inc MOPEN
+    lda $64
+    beq .atk
+    cmp #1
+    beq .tgt
+    cmp #4
+    beq .msg
+    sec                 ; 2 action -> line 1, 3 result -> line 2
+    sbc #1
+    sta VLN
+    lda #7
+    sta VCX
+    jmp .one
+.msg:
+    lda MLINE
+    cmp #4
+    bcc .m1
+    lda #3
+.m1:
+    sta VLN
+    lda #1
+    sta VCX
+    jmp .one
+.atk:
+    ldx #0              ; keep the attacker's name for the target line
+.ak:
+    lda BUF,x
+    sta ATKBUF,x
+    beq .ak1
+    inx
+    cpx #15
+    bne .ak
+    lda #0
+    sta ATKBUF,x
+.ak1:
+    lda #0
+    sta VLN
+    lda #1
+    sta VCX
+.one:
+    jsr linestart
+    lda #<BUF
+    sta VP
+    lda #>BUF
+    sta VP+1
+    jsr vstrp
+    jmp lineend
+.tgt:
+    lda #0
+    sta VLN
+    lda #1
+    sta VCX
+    jsr linestart
+    lda #<ATKBUF
+    sta VP
+    lda #>ATKBUF
+    sta VP+1
+    jsr vstrp
+    lda #$FF            ; " > "
+    jsr vchar
+    lda #$1B
+    jsr vchar
+    lda #$FF
+    jsr vchar
+    lda #<BUF
+    sta VP
+    lda #>BUF
+    sta VP+1
+    jsr vstrp
+    jmp lineend
+linestart:              ; message line VLN: clear its 17 tiles, pen at VCX
+    lda #17
+    sta VN
+    jsr vclear
+    lda VCX
+    sta VX
+    rts
+vstrp:                  ; codes at (VP) up to 0 (control codes < $10 skipped)
+    ldy #0
+.l:
+    lda (VP),y
+    beq .e
+    cmp #$10
+    bcc .n
+    sty VDIG
+    jsr vchar
+    ldy VDIG
+.n:
+    iny
+    cpy #63
+    bne .l
+.e:
+    rts
+lineend:                ; upload line VLN (tiles PTILE + 17 * VLN) and write its row
+    lda VLN
+    asl a
+    asl a
+    asl a
+    asl a
+    clc
+    adc VLN             ; * 17
+    clc
+    adc #<PTILE
+    sta VP
+    lda #>PTILE
+    adc #0
+    sta VP+1
+    lda VP
+    pha
+    lda VP+1
+    pha
+    jsr vupload
+    pla
+    sta VP+1
+    pla
+    sta VP
+    jsr $FA2A           ; the row: NES row 19 + VLN, cols 1-18
+    lda VLN
+    clc
+    adc #19
+    sta VSH
+    lda #0
+    sta VT
+    ldx #5
+.sh:
+    asl VSH
+    rol VT
+    dex
+    bne .sh
+    lda VT
+    ora #$20
+    sta $2006
+    lda VSH
+    ora #1
+    sta $2006
+    ldy #0
+.w:
+    lda (VP),y
+    sta $2007
+    iny
+    cpy #17
+    bne .w
+    lda BLANKT          ; (the 18th cell)
+    sta $2007
+    jsr scroll
+    lda VLN             ; next free line
+    clc
+    adc #1
+    cmp MLINE
+    bcc .x
+    sta MLINE
+.x:
+    rts
+gb_msgclose:
+    dec MOPEN
+    bne .x
+    jsr gb_names
+    jmp gb_party
+.x:
+    rts
+
 BIT:    .db $80, $40, $20, $10, $08, $04, $02, $01
 POW:    .db <1000, <100, <10, <1
 POWH:   .db >1000, >100, >10, >1
@@ -962,6 +1156,8 @@ def glyph_tables():
     for i, ch in enumerate('0123456789/'):
         art = DIG3[ch]
         glyph[0x10 + i] = [sum((1 << (7 - (r + 1))) for r in range(7) if art[r][c] == '#') for c in range(3)]
+    arrow = ["......", "...#..", "....#.", "######", "....#.", "...#..", "......"]   # FF1's battle arrow
+    glyph[0x1B] = [sum((1 << (7 - (r + 1))) for r in range(7) if arrow[r][c] == '#') for c in range(6)]
     return glyph
 
 
@@ -1040,7 +1236,7 @@ def bank23(rom, L):
     src += 'GLYPHS:\n' + ''.join('    .db %s\n' % ', '.join('$%02X' % v for v in data[i:i + 16]) for i in range(0, len(data), 16))
     src += 'GOFF:\n' + ''.join('    .db %s\n' % ', '.join('<(GLYPHS+%d)' % o for o in offs[i:i + 16]) for i in range(0, 256, 16))
     src += 'GHI:\n' + ''.join('    .db %s\n' % ', '.join('>(GLYPHS+%d)' % o for o in offs[i:i + 16]) for i in range(0, 256, 16))
-    return asm(src, syms=dict(RAM, **L))
+    return asm(src, syms=dict(RAM, BUF=0x5E40, **L))
 
 
 def battle(rom):
