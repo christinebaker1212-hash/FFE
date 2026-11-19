@@ -1375,6 +1375,7 @@ attr_apply:                                 ; A = attribute index i (0-63, + $40
             ld d, high(OWN)
             ld c, 0                         ; row in the block (0-3)
 .r:         push de
+            push bc
             ld a, [de]                      ; owner bits of the 4 cells -> low nibble
             bit 2, b
             jr z, .sd
@@ -1383,36 +1384,80 @@ attr_apply:                                 ; A = attribute index i (0-63, + $40
             ldh a, [ap_own]
             xor e
             cpl                             ; bit set: owned by this nametable
+            and $0F
             ld e, a
-            ld a, c                         ; quadrant row: (row & 2)
+            ld a, c                         ; quadrant row: (row & 2) -> left / right palettes
             and 2
-            push bc
-            ld b, a                         ; 0 or 2: index of the left quadrant
-            ld c, 4                         ; 4 cells
-.c:         push bc
-            ld a, c                         ; column in block = 4 - C; right half when C <= 2
-            cp 3
-            ld a, b
-            jr nc, .lft
+            add a, low(ap_pal)
+            ld c, a
+            ldh a, [c]
+            ld d, a                         ; D = left palette ($FF: unchanged)
+            inc c
+            ldh a, [c]
+            ld c, a                         ; C = right palette
+            ld a, d
             inc a
-.lft:       push hl
-            ld hl, ap_pal
-            add a, l
-            ld l, a
-            ld a, [hl]
-            pop hl
+            jr nz, .k1
+            ld a, e
+            and $0C
+            ld e, a
+.k1:        ld a, c
+            inc a
+            jr nz, .k2
+            ld a, e
+            and $03
+            ld e, a
+.k2:        ld a, e                         ; cells written straight into VRAM bank 1, two
+            and $03                         ;   per moment VRAM is free (STAT mode 0 / 1;
+            jr z, .h2                       ;   mode 2 follows), interrupts off meanwhile
+.w1:        di
+            ldh a, [$FF41]
+            bit 1, a
+            jr z, .v1
+            ei
+            jr .w1
+.v1:        ld a, 1
+            ldh [$FF4F], a
             bit 0, e
-            jr z, .sk
-            cp $FF
-            call nz, vram_put1
-.sk:        inc hl
-            srl e
-            pop bc
-            dec c
-            jr nz, .c
-            pop bc
-            ld a, l                         ; next row: +32 - 4
-            add a, 28
+            jr z, .c1
+            ld [hl], d
+.c1:        inc l
+            bit 1, e
+            jr z, .c2
+            ld [hl], d
+.c2:        xor a
+            ldh [$FF4F], a
+            ei
+            dec l
+.h2:        ld a, e
+            and $0C
+            jr z, .nw
+            inc l
+            inc l
+.w2:        di
+            ldh a, [$FF41]
+            bit 1, a
+            jr z, .v2
+            ei
+            jr .w2
+.v2:        ld a, 1
+            ldh [$FF4F], a
+            bit 2, e
+            jr z, .c3
+            ld [hl], c
+.c3:        inc l
+            bit 3, e
+            jr z, .c4
+            ld [hl], c
+.c4:        xor a
+            ldh [$FF4F], a
+            ei
+            dec l
+            dec l
+            dec l
+.nw:        pop bc
+            ld a, l                         ; next row: +32
+            add a, 32
             ld l, a
             jr nc, .nh
             inc h
@@ -1426,29 +1471,6 @@ attr_apply:                                 ; A = attribute index i (0-63, + $40
             jr nz, .r
             pop hl
             pop de
-            pop bc
-            ret
-
-; A = old XOR new attribute byte -> A = bit q set for each quadrant q that changed
-quad_mask:  push bc
-            ld c, a
-            ld b, 0
-            and $03
-            jr z, .q1
-            set 0, b
-.q1:        ld a, c
-            and $0C
-            jr z, .q2
-            set 1, b
-.q2:        ld a, c
-            and $30
-            jr z, .q3
-            set 2, b
-.q3:        ld a, c
-            and $C0
-            jr z, .q4
-            set 3, b
-.q4:        ld a, b
             pop bc
             ret
 
@@ -1467,11 +1489,21 @@ vram_put1:  push af
             ldh [$FF4F], a
             pop af
             ret
-.q:         pop af
-            push hl
-            set 6, h
-            call vram_put
-            pop hl
+.q:         di                              ; LCD on: when VRAM is free (STAT mode 0 / 1)
+            ldh a, [$FF41]
+            bit 1, a
+            jr z, .v
+            ei
+            jr .q
+.v:         ld a, 1
+            ldh [$FF4F], a
+            pop af
+            ld [hl], a
+            push af
+            xor a
+            ldh [$FF4F], a
+            ei
+            pop af
             ret
 
 ; rt_ppu_w7 nametable cell write: B:L = offset (B 0-3), C = 4 for nametable 1. Marks the

@@ -54,7 +54,7 @@ hle_chr_pages:
             jr nz, .tile
             ldh a, [ppu_vh]
             cp $10
-            jr nc, .tile
+            jr nc, .fs
             ld d, a
             ldh a, [is_cgb]
             and a
@@ -69,6 +69,11 @@ hle_chr_pages:
             ld a, 2
             ldh [$FF70], a
             jr .ft
+.fs:        and $0F                         ; a whole sprite page: to the sprite shadow
+            add a, high(SPR_SHADOW)         ;   (RAM bank 1); its resident slots reloaded
+            ld d, a                         ;   by the next OAM conversion
+            ld e, 0
+            jr .fb
 .fd:        ldh a, [lcd_on]
             and a
             jr nz, .tile
@@ -76,7 +81,7 @@ hle_chr_pages:
             add a, high(BG_SHADOW)
             ld d, a
             ld e, 0
-            ld a, 1
+.fb:        ld a, 1
             ld [$4000], a
 .ft:
             ld a, [hl+]
@@ -149,6 +154,9 @@ hle_chr_pages:
             dec e
             jr nz, .ft
             ldh [tmp_lo], a                 ; (last byte)
+            ldh a, [ppu_vh]
+            cp $10
+            jr nc, .fsm
             ldh a, [is_cgb]
             and a
             jr z, .fm
@@ -191,6 +199,24 @@ hle_chr_pages:
             ld [hl], a
             inc a
             ldh [rq_any], a
+.fsm:       and $0F                         ; sprite page: SLOT_KEY of its resident tiles
+            swap a                          ;   unknown
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld b, 16
+.fsl:       ld a, [hl+]
+            cp $FF
+            jr z, .fsn
+            push hl
+            add a, low(SLOT_KEY)
+            ld l, a
+            ld h, high(SLOT_KEY)
+            ld [hl], $FF
+            pop hl
+.fsn:       dec b
+            jr nz, .fsl
+            xor a
+            ld [$4000], a
 .fv:        ldh a, [ppu_vh]                 ; v += 256
             inc a
             and $3F

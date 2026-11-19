@@ -3068,7 +3068,14 @@ nf_whole:   ld a, c
 ; four cells per moment VRAM is free (mr_flush4). After bulk fills that skipped the map.
 MR_OUT     = $DCD0          ; maprb_b / repal_b: four values for VRAM (4), owner bits
 MR_BITS    = $DCD4
-maprb_b:    xor a
+maprb_b:    ldh a, [q_head]                 ; queued writes first (a queued map cell must
+            ld b, a                         ;   not land after the rebuild)
+            ldh a, [q_tail]
+            cp b
+            jr z, .qe
+            call q_drain1
+            jr maprb_b
+.qe:        xor a
             ld [MAP_RB], a
             ld hl, $9800
             ld de, OWN
@@ -4587,6 +4594,30 @@ pg_copy0:   and a
             ld a, HLE_BANK
             ld [$2000], a
             pop af
+            ret
+
+; (moved here from runtime.s: bank 0 space)
+; A = old XOR new attribute byte -> A = bit q set for each quadrant q that changed
+quad_mask:  push bc
+            ld c, a
+            ld b, 0
+            and $03
+            jr z, .q1
+            set 0, b
+.q1:        ld a, c
+            and $0C
+            jr z, .q2
+            set 1, b
+.q2:        ld a, c
+            and $30
+            jr z, .q3
+            set 2, b
+.q3:        ld a, c
+            and $C0
+            jr z, .q4
+            set 3, b
+.q4:        ld a, b
+            pop bc
             ret
 
 ; (bank 0 space after the colour tables)
