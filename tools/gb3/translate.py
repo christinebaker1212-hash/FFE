@@ -508,8 +508,22 @@ class Emitter:
         self.jump(None, (i.space, i.addr + 11))
         return True
 
+    def ppu_izy_idiom(self):
+        """LDA (zp),Y / STA $2007 / INY / DEX / BNE back: rt_ppu_izy (bulk when the source
+        is one memory window; X = 0, Y + count, A = the last byte, Z = 1, N = 0, C kept)"""
+        i = self.i
+        if i.mode != 'izy': return False
+        st = self.rc.insns.get((i.space, i.addr + 2)); j = self.rc.insns.get((i.space, i.addr + 5))
+        k = self.rc.insns.get((i.space, i.addr + 6)); l = self.rc.insns.get((i.space, i.addr + 7))
+        if not (st and j and k and l and st.mn == 'STA' and st.mode == 'abs' and st.arg == 0x2007
+                and j.mn == 'INY' and k.mn == 'DEX' and l.mn == 'BNE' and l.arg == i.addr):
+            return False
+        self.o('ld l, $%02X' % i.arg, 'call rt_ppu_izy')
+        self.jump(None, (i.space, i.addr + 9))
+        return True
+
     def x_LDA(self):
-        if self.copy_idiom() or self.ppu_idiom(): return
+        if self.copy_idiom() or self.ppu_idiom() or self.ppu_izy_idiom(): return
         op = self.operand()
         if op != 'a': self.o('ld a, %s' % op)
         self.set_nz_reg('a')

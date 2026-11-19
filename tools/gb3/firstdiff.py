@@ -76,7 +76,7 @@ def main():
     st = {'diffs': 0, 'checked': 0, 'last': 0}
 
     def feed(kk):
-        m[0xD83E] = 0xA5
+        m[1, 0xD83E] = 0xA5
         for j in range(kk, kk + 40):                 # slot j: the NES's latch after frame j
             v = W.latch.get(j)
             if v is None: v = W.latch.get(j - 1, 0)
@@ -90,7 +90,7 @@ def main():
         c = nes_clock.get(kk)
         if c is not None:
             c -= before                          # (at a wait's entry its frame is not counted yet)
-            m[0xD830] = c & 0xFF; m[0xD831] = c >> 8
+            m[1, 0xD830] = c & 0xFF; m[1, 0xD831] = c >> 8
             feed(c)
         if kk not in nes_ram: return
         st['checked'] += 1
@@ -99,14 +99,14 @@ def main():
         if a.show:
             lo, hi = a.show
             print('frame %d NES %s | GB %s   (GB input clock %d, NES %s)' % (kk, nes_ram[kk][lo:hi + 1].hex(),
-                  g[lo:hi + 1].hex(), m[0xD830] | m[0xD831] << 8, nes_clock.get(kk)))
+                  g[lo:hi + 1].hex(), m[1, 0xD830] | m[1, 0xD831] << 8, nes_clock.get(kk)))
         if d and st['diffs'] < a.max:
             st['diffs'] += 1
             print('frame %d: %d bytes differ: %s' % (kk, len(d), ' '.join(
                 '%04X:%02X/%02X' % (i, nes_ram[kk][i], g[i]) for i in d[:24])))
 
-    def nmi(): return m[0xD830] | m[0xD831] << 8
-    def waits(): return m[0xD834] | m[0xD835] << 8
+    def nmi(): return m[1, 0xD830] | m[1, 0xD831] << 8
+    def waits(): return m[1, 0xD834] | m[1, 0xD835] << 8
     def on_wait(ctx):
         feed(nmi()); check(waits() + 1, 1)
     def on_async(ctx):
@@ -127,7 +127,7 @@ def main():
         d = [x for x in range(lo, hi + 1) if m[0, 0xA000 + x - 0x6000] != nes_sram[x - 0x6000]]
         print('PRG-RAM %04X-%04X at the end: %d bytes differ %s' % (lo, hi, len(d),
               ' '.join('%04X:%02X/%02X' % (x, nes_sram[x - 0x6000], m[0, 0xA000 + x - 0x6000]) for x in d[:16])))
-    dbg = [m[0xD820 + i] for i in range(8)]
+    dbg = [m[1, 0xD820 + i] for i in range(8)]
     print('GB: %d GB frames, reached frame %d, %d frames compared, %d with differences; DBG %s'
           % (t, st['last'], st['checked'], st['diffs'], ' '.join('%02X' % x for x in dbg)))
     pb.stop(save=False)

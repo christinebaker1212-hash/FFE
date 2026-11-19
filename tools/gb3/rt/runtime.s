@@ -120,8 +120,6 @@ uw_f:       ds 1
 o_cnt:      ds 1
 o_cx:       ds 1
 c_x:        ds 1                            ; attribute writes: cell / quadrant work
-c_y:        ds 1
-c_nt:       ds 1
 c_val:      ds 1
 c_q:        ds 1
 nt_x:       ds 1                            ; native routines (rt/native.s): saved X, A
@@ -376,12 +374,18 @@ vblank_isr: push af
             ldh [frame_tick], a
             ld a, $80
             ldh [ppu_stat], a
+            ldh a, [rSVBK]                  ; (VBL_CNT is in WRAM bank 1: the main thread may
+            push af                         ;   have a staging bank selected)
+            ld a, 1
+            ldh [rSVBK], a
             ld hl, VBL_CNT
             inc [hl]
             jr nz, .c
             inc hl
             inc [hl]
-.c:         pop hl
+.c:         pop af
+            ldh [rSVBK], a
+            pop hl
             pop af
             reti
 
@@ -799,6 +803,8 @@ rt_ppu_w7:
             push de
             ldh a, [wc_inc]
             ld e, a
+            cp 2
+            jr z, .fchr
             ldh a, [wc_nl]                  ; nametable shadow (WRAM bank 1)
             ld l, a
             add a, e
@@ -825,7 +831,7 @@ rt_ppu_w7:
             ld a, 1
             ldh [rSVBK], a
             ei
-            ldh a, [ppu_vl]                 ; PPU address + the step
+.adv:       ldh a, [ppu_vl]                 ; PPU address + the step
             add a, e
             ldh [ppu_vl], a
             jr nc, .fv
@@ -837,6 +843,28 @@ rt_ppu_w7:
             pop hl
             pop af
             ret
+.fchr:      ldh a, [wc_ml]                  ; CHR run (step 2 marks it): the next byte of the
+            ld l, a                         ;   tile straight into the staging copy (tile
+            ldh a, [wc_mh]                  ;   marked when the run was set up; the vblank's
+            ld h, a                         ;   hd_flush ends the run)
+            ldh a, [wc_nl]                  ; (WRAM bank 2 / 3)
+            ldh [rSVBK], a
+            ldh a, [wv]
+            ld [hl], a
+            ld a, 1
+            ldh [rSVBK], a
+            ld a, l                         ; staging offset: plane 0 bytes 0, 2 .. 14, then
+            and $0F                         ;   plane 1 bytes 1, 3 .. 15
+            cp 14
+            ld a, l
+            jr z, .fp1
+            add a, 2
+            jr .fst
+.fp1:       sub 13
+.fst:       ldh [wc_ml], a
+            ei
+            ld e, 1
+            jr .adv
 .slow0:     ei
             push bc
             push de
@@ -1011,7 +1039,47 @@ rt_ppu_w7:
             ld a, c
             call attr_apply                 ; L = attribute index, A = value, B = nametable
             jr .done
-.chr:       call chr_put                    ; CHR: into the staging copy
+.chr:       di                              ; CHR: into the staging copy; with step 1 the
+            call chr_put                    ;   rest of the tile goes the fast way (set up
+            ldh a, [ppu_ctrl]               ;   with interrupts off: a vblank flush between
+            and 4                           ;   the mark and the run would lose the run's
+            jr nz, .chx                     ;   writes)
+            ld a, l
+            and $0F
+            cp 15
+            jr z, .chx
+            ld d, a                         ; D = byte k of the tile
+            ld a, 15
+            sub d
+            ld b, a                         ; B = bytes left in the tile
+            ld a, d
+            inc a                           ; staging offset of byte k + 1
+            cp 8
+            jr c, .c0
+            sub 8
+            add a, a
+            inc a
+            jr .c1
+.c0:        add a, a
+.c1:        ld d, a
+            ld a, l
+            and $F0
+            or d
+            ldh [wc_ml], a
+            ld a, h
+            and $10
+            swap a
+            add a, 2
+            ldh [wc_nl], a
+            ld a, h
+            and $0F
+            or high(STAGE)
+            ldh [wc_mh], a
+            ld a, 2
+            ldh [wc_inc], a
+            ld a, b
+            ldh [wc_n], a
+.chx:       ei
             jr .done
 .pal:       ld a, l                         ; palette RAM ($3F10/14/18/1C = $3F00/04/08/0C)
             and $1F
@@ -1120,6 +1188,7 @@ chr_store:  ld a, l                         ; byte k -> GB offset
 ; the rest waits for the next vblank. A, F, BC, DE, HL clobbered.
 hd_flush:   xor a
             ldh [chr_dirty], a
+            ldh [wc_n], a                   ; (a CHR run relies on its tile's mark)
             ld a, $FF                       ; (marks cleared: forget the last marked tile)
             ldh [tm_hi], a
             ld hl, TILE_DIRTY
@@ -1278,123 +1347,129 @@ rt_ppu_r7:  push af                         ; $2007 read (buffered; nametables f
             ret
 
 ; attribute byte A at index L (0-63) of nametable B, old value in c_q: palettes of the
-; quadrants that changed -> ATTR_SH and VRAM bank 1 (two cells per access window). Keeps B, C.
+; quadrants that changed -> ATTR_SH (WRAM bank MAP_BANK), their rows marked in attr_dirty
+; after the writes (a vblank flush in between copies the values or keeps the mark).
+; A block covers cell rows r..r + 3 (r = 4 * block row); in the map a pair of rows (r, r + 1)
+; never straddles the 32-row wrap (r and the horizontal-mirroring offset 30 are even), so
+; each pair is one address computation. Keeps B, C.
 attr_apply: ldh [c_val], a
             ld d, a
             ldh a, [c_q]
             xor d
             ret z                           ; unchanged
+            push bc
             ld d, a                         ; D = changed bits
-            ld a, b
-            ldh [c_nt], a
             ld a, l
+            and $38
+            cp $38
+            jr nz, .rows
+            ld a, d                         ; block row 7: its lower quadrants would be NES
+            and $0F                         ;   rows 30-31 (none)
+            jr z, .ret
+            ld d, a
+            ld a, $38
+.rows:      rrca                            ; A = first cell row r (0, 4, .. 28)
+            ld e, a
+            ldh a, [mirror]
+            and a
+            jr z, .v
+            ld a, b
+            and a
+            jr z, .v
+            ld a, e                         ; horizontal, nametable 1: rows + 30, mod 32
+            add a, 30
+            and 31
+            ld e, a
+.v:         ld a, l
             and 7
             add a, a
             add a, a
-            ldh [c_x], a                    ; first cell column of the block
-            ld a, l
-            and $38
-            rrca
-            ldh [c_y], a                    ; first cell row
-            ld e, 0                         ; E = quadrant 0-3
-.q:         ld a, d
-            and 3
-            jr z, .nextq
-            push de
-            ldh a, [c_val]                  ; palette of quadrant E
-            ld d, e
-.sh:        dec d
-            inc d
-            jr z, .got
-            rrca
-            rrca
-            dec d
-            jr .sh
-.got:       and 3
-            ld l, a
+            ld c, a                         ; C = first cell column
             ldh a, [bg_bank]
-            or l
-            ldh [c_q], a                    ; attribute value of the quadrant's cells
-            ld a, e                         ; cell row = y + 2 * (q >> 1)
-            and 2
-            ld l, a
-            ldh a, [c_y]
-            add a, l
-            ld d, a                         ; D = row
-            ld a, e                         ; column = x + 2 * (q & 1)
-            and 1
-            add a, a
-            ld l, a
-            ldh a, [c_x]
-            add a, l
-            ld e, a                         ; E = column
-            call quad_row
-            inc d
-            call quad_row
-            pop de
-.nextq:     srl d
-            srl d
-            inc e
-            ld a, e
-            cp 4
-            jr c, .q
-            ld d, 0                         ; the block's rows marked once, after the writes
-.mk:        ldh a, [c_y]
-            add a, d
-            cp 30
-            jr nc, .mkx
-            ld l, a
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            ldh a, [c_x]
-            add a, l
-            ld l, a
-            ldh a, [c_nt]
-            ld b, a
-            call cell_map
-            push de
-            ld de, attr_dirty
-            call row_mark
-            pop de
-            inc d
-            ld a, d
-            cp 4
-            jr c, .mk
-.mkx:       ldh a, [c_nt]
-            ld b, a
-            ret
-quad_row:   ld a, d                         ; cells (E, D) and (E + 1, D) of nametable c_nt
-            cp 30
-            ret nc
-            push de
-            ld l, d
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            ld a, e
-            add a, l
-            ld l, a
-            ldh a, [c_nt]
-            ld b, a
-            call cell_map                   ; -> $98xx
-            ld a, h
-            sub $98 - high(ATTR_SH)
-            ld h, a
+            ld b, a                         ; B = the cells' VRAM bank bit
             ld a, MAP_BANK
             ldh [rSVBK], a
-            ldh a, [c_q]
-            ld [hl+], a                     ; shadow (two cells)
-            ld [hl], a
+            ldh a, [c_val]
+            call .pair                      ; quadrants 0, 1: rows E, E + 1
+            swap d
+            ld a, e
+            add a, 2
+            and 31
+            ld e, a
+            ldh a, [c_val]
+            swap a
+            call .pair                      ; quadrants 2, 3
             ld a, 1
             ldh [rSVBK], a
-            pop de
+.ret:       pop bc
+            ret
+; A = palettes (bits 0-1 left quadrant, 2-3 right), D low nibble = their changed bits,
+; E = map row (even), C = column, B = bank bit
+.pair:      ldh [c_x], a
+            ld a, d
+            and $0F
+            ret z
+            ld a, e                         ; HL = ATTR_SH + E * 32 + C (bit 5 of L clear:
+            rrca                            ;   E is even)
+            rrca
+            rrca
+            ld h, a
+            and $E0
+            or c
+            ld l, a
+            ld a, h
+            and 3
+            add a, high(ATTR_SH)
+            ld h, a
+            ld a, d
+            and 3
+            jr z, .p1
+            ldh a, [c_x]
+            and 3
+            or b
+            ld [hl+], a                     ; two cells in each of the two rows
+            ld [hl-], a
+            set 5, l
+            ld [hl+], a
+            ld [hl-], a
+            res 5, l
+.p1:        ld a, d
+            and $0C
+            jr z, .pm
+            inc l
+            inc l
+            ldh a, [c_x]
+            rrca
+            rrca
+            and 3
+            or b
+            ld [hl+], a
+            ld [hl-], a
+            set 5, l
+            ld [hl+], a
+            ld [hl], a
+.pm:        ld a, e                         ; rows E, E + 1: bits E & 7, + 1 of byte E >> 3
+            and 6
+            rrca
+            ld hl, PAIR_MASK
+            add a, l
+            ld l, a
+            jr nc, .pn
+            inc h
+.pn:        ld h, [hl]
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            add a, low(attr_dirty)
+            ld l, a
+            ld a, h
+            ld h, $FF
+            or [hl]
+            ld [hl], a
+            ld a, 1
+            ldh [map_any], a
             ret
 
 ; HL = GB map address ($9800-$9BFF): mark its row in map_dirty (map_mark) or in the bitmap at
@@ -2125,6 +2200,133 @@ rt_ppu_copy:
             pop af
             ret
 
+; LDA (zp),Y / STA $2007 / INY / DEX / BNE (translate.py ppu_izy_idiom): L = zp, C = Y,
+; E = X (0 = 256). The bytes ptr + Y .. go through rt_ppu_copy when they lie in one memory
+; window (RAM, PRG-RAM, a ROM window) and Y does not wrap; else one at a time. Returns
+; A = the last byte, X = 0, Y + count, Z = 1, N = 0 (nzv), C kept. D = 0, B = 0.
+rt_ppu_izy: push af                         ; (C: kept)
+            ld a, e
+            and a
+            jr z, .slow
+            add a, c                        ; Y + X <= 256
+            jr nc, .ok
+            jr nz, .slow
+.ok:        ld d, l                         ; D = zp (for the slow path)
+            ld h, high(NES_RAM)
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            add hl, bc                      ; HL = first NES address
+            ld a, e                         ; (L + X - 1: the carry into H for the end check)
+            dec a
+            add a, l
+            ld a, h
+            jr c, .cy
+            cp $20
+            jr c, .ram
+            cp $60
+            jr c, .slow1
+            cp $80
+            jr c, .prg
+            cp $A0
+            jr c, .w8
+            cp $C0
+            jr c, .wa
+            jr .rf
+.cy:        cp $20                          ; (end in the next page: same windows, end checked)
+            jr c, .ramc
+            cp $60
+            jr c, .slow1
+            cp $80
+            jr c, .prgc
+            cp $A0
+            jr c, .w8c
+            cp $C0
+            jr c, .wac
+            cp $FF
+            jr z, .slow1
+            jr .rf
+.ramc:      and 7
+            cp 7
+            jr z, .slow1                    ; (would run past $07FF)
+            ld a, h
+.ram:       and 7
+            or high(NES_RAM)
+            ld h, a
+            xor a
+            jr .go
+.prgc:      and $1F
+            cp $1F
+            jr z, .slow1
+            ld a, h
+.prg:       add a, $40                      ; PRG-RAM $6000 -> $A000
+            ld h, a
+            xor a
+            jr .go
+.w8c:       and $1F
+            cp $1F
+            jr z, .slow1
+            ld a, h
+.w8:        and $1F
+            or $40
+            ld h, a
+            ldh a, [odd8]
+            or h
+            ld h, a
+            ldh a, [data_bank8]
+            jr .go
+.wac:       and $1F
+            cp $1F
+            jr z, .slow1
+            ld a, h
+.wa:        and $1F
+            or $40
+            ld h, a
+            ldh a, [oddA]
+            or h
+            ld h, a
+            ldh a, [data_bankA]
+            jr .go
+.rf:        sub $80                         ; $C000-$FFFF: banks 126 / 127 at $4000
+            ld h, a
+            ld a, DATA + 63
+.go:        ld d, a
+            ld a, e
+            ldh [cp_n], a
+            ld a, d
+            ld d, 0
+            call rt_ppu_copy
+            jr .end
+.slow1:     ld l, d
+.slow:      ld d, l                         ; one byte at a time (256 when X = 0)
+.sl:        ld l, d
+            call rt_izy_rd
+            ld a, l
+            ldh [nt_a], a
+            call rt_ppu_w7
+            inc c
+            dec e
+            jr nz, .sl
+            ld d, 0
+            ld e, c                         ; (Y: the count added below)
+            ld c, 0
+.end:       ld a, c                         ; Y += X, X = 0
+            add a, e
+            ld c, a
+            ld e, 0
+            xor a
+            ldh [nzv], a
+            pop af                          ; F: C as on entry, Z = 1; A = the last byte
+            ldh a, [nt_a]
+            push af
+            ld hl, sp + 0
+            ld a, [hl]
+            and $10
+            or $80
+            ld [hl], a
+            pop af
+            ret
+
 rt_izy_wr:
            push af                         ; L = zp pointer; A -> ptr+Y
             ldh [wtmp], a
@@ -2703,6 +2905,7 @@ rt_fault:   di
 rt_halted:  jr rt_halted
 
 BIT_MASK:   db 1, 2, 4, 8, 16, 32, 64, 128
+PAIR_MASK:  db 3, 12, 48, 192
 
 rst38_trap: di                              ; rst $38 (opcode $FF) reached: DBG+8 = SP,
             ld [DBG + 8], sp                ;   DBG+10.. = stack words; then stop
