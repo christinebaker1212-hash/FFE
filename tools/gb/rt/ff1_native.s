@@ -2916,7 +2916,7 @@ ntfill:     ld a, b
             jr z, .one
 .bk:        ldh a, [ppu_ctrl]
             and 4
-            jr nz, .one
+            jp nz, .col
             ld a, b                         ; a whole nametable from offset 0: in bulk
             cp 4
             jr c, .nw
@@ -3014,7 +3014,112 @@ ntfill:     ld a, b
             ldh [dmg_scan], a
 .cg:        pop bc
             jr ntfill
-.attr:      pop de
+.attr:      pop de                          ; attribute bytes: the shadow; the cells'
+            ld a, h                         ;   palettes from it when the screen shows
+            add a, high(NT_SH)              ;   (DMG: the LCD-on scan; CGB: repal_b)
+            ld h, a
+            ld e, 0                         ; (E: a byte changed)
+.al:        ld a, [hl]
+            cp d
+            jr z, .as
+            ld [hl], d
+            ld e, 1
+.as:        inc l
+            dec bc
+            ld a, b
+            or c
+            jr z, .ae
+            ld a, l
+            and a
+            jr nz, .al
+.ae:        ld a, l                         ; v: offset L, or the next nametable at 0
+            ldh [ppu_vl], a
+            and a
+            jr nz, .av
+            ldh a, [ppu_vh]
+            inc a
+            and $3F
+            ldh [ppu_vh], a
+.av:        ld a, e
+            and a
+            jp z, ntfill
+            ld a, 1
+            ld [CGB_RP], a                  ; (CGB; on a DMG unused)
+            ldh a, [is_cgb]
+            and a
+            jp nz, ntfill
+            ld a, 1
+            ldh [dmg_scan], a
+            jp ntfill
+.col:       ldh a, [own1_lo]                ; increment 32 (a column) in nametable 0, no
+            ld h, a                         ;   cell owned by nametable 1: shadow and GB map
+            ldh a, [own1_hi]                ;   cell by cell, up to the attributes
+            or h
+            jr nz, .one
+            ldh a, [ppu_vh]
+            cp $20
+            jr c, .one
+            cp $3F
+            jr z, .one
+            and 7
+            cp 4
+            jr nc, .one
+            ld h, a
+            ldh a, [ppu_vl]
+            ld l, a
+            push de
+            ld e, 0                         ; (E: cells written)
+.cl:        ld a, h
+            cp 3
+            jr c, .c1
+            ld a, l
+            cp $C0
+            jr nc, .ce
+.c1:        ld a, h
+            add a, high(NT_SH)
+            ld h, a
+            ld [hl], d
+            ld a, [VLCD]
+            and a
+            jr nz, .cv
+            ld a, h
+            sub high(NT_SH) - $98
+            ld h, a
+            ld [hl], d
+            ld a, h
+            sub $98
+            jr .cn
+.cv:        ld a, 1
+            ld [MAP_RB], a
+            ld a, h
+            sub high(NT_SH)
+.cn:        ld h, a
+            inc e
+            ld a, l
+            add a, 32
+            ld l, a
+            jr nc, .cc
+            inc h
+.cc:        dec bc
+            ld a, b
+            or c
+            jr nz, .cl
+.ce:        ld a, l
+            ldh [ppu_vl], a
+            ldh a, [ppu_vh]
+            and $FC
+            or h
+            ldh [ppu_vh], a
+            ld a, e
+            pop de
+            and a
+            jp z, .one
+            ldh a, [is_cgb]
+            and a
+            jp nz, ntfill
+            ld a, 1
+            ldh [dmg_scan], a
+            jp ntfill
 .one:       ld a, d
             call rt_ppu_w7
             dec bc
@@ -3025,22 +3130,43 @@ ntfill:     ld a, b
             ld a, 1
             ld [MAP_RB], a
             ret
-.set:       ld a, [NF_N]                    ; HL: NF_N bytes of D
-            ld c, a
+.set:       ld a, [NF_N]                    ; HL: NF_N bytes of D (8 at a time, then the
+            ld c, a                         ;   rest)
             ld a, [NF_N + 1]
             ld b, a
+            srl b
+            rr c
+            srl b
+            rr c
+            srl b
+            rr c
             inc b
             ld a, c
             and a
-            jr nz, .s
+            jr nz, .s8
             dec b
-            jr z, .x
-.s:         ld a, d
+            jr z, .r
+.s8:        ld a, d
 .sl:        ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
             dec c
             jr nz, .sl
             dec b
             jr nz, .sl
+.r:         ld a, [NF_N]
+            and 7
+            ret z
+            ld c, a
+            ld a, d
+.sr:        ld [hl+], a
+            dec c
+            jr nz, .sr
 .x:         ret
 
 ; ntfill with the LCD off, increment 1, at offset 0 of a nametable and >= $400 bytes: its
@@ -3108,12 +3234,17 @@ nf_whole:   ld a, c
             ldh [dmg_scan], a
 .x:         pop bc
             ret
-.fill:      ld bc, $04C0                    ; HL: 960 bytes of D (HL ends at +$3C0)
-.f:         ld a, d
+.fill:      ld a, d                         ; HL: 960 bytes of D (HL ends at +$3C0)
+            ld c, 120
+.f:         ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
             ld [hl+], a
             dec c
-            jr nz, .f
-            dec b
             jr nz, .f
             ret
 
