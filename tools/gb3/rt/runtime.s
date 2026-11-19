@@ -77,6 +77,7 @@ attr_dirty: ds 4                            ;   attribute rows written
 map_any:    ds 1                            ; a bit is set in map_dirty / attr_dirty
 frame_tick: ds 1
 oam_pending: ds 1
+oam_end:    ds 1                            ; OAM_SH slots in use after the last conversion (low byte)
 pal_dirty:  ds 1
 shown:      ds 1                            ; palettes shown: 1 normal, 0 black (rendering off)
 chr_dirty:  ds 1                            ; a bit is set in TILE_DIRTY
@@ -766,7 +767,27 @@ rt_ppu_w7:
             push bc
             push de
             ld c, a
-            call ppu_addr_inc               ; HL = NES VRAM address
+            ldh a, [ppu_vl]                 ; HL = NES VRAM address, then advance it (1 / 32)
+            ld l, a
+            ld e, a
+            ldh a, [ppu_vh]
+            ld h, a
+            ld d, a
+            ldh a, [ppu_ctrl]
+            bit 2, a
+            jr nz, .i32
+            inc de
+            jr .ist
+.i32:       ld a, e
+            add a, 32
+            ld e, a
+            jr nc, .ist
+            inc d
+.ist:       ld a, e
+            ldh [ppu_vl], a
+            ld a, d
+            and $3F
+            ldh [ppu_vh], a
             ld a, h
             cp $20
             jr c, .chr
@@ -1364,7 +1385,7 @@ rt_io_w4014:                                ; OAM DMA from NES page A -> GB shad
             inc l                           ; next sprite
             ld a, e
             cp low(OAM_SH) + 160
-            jr z, .end
+            jr z, .full2
             ld a, l
             and a
             jr nz, .lp
@@ -1377,13 +1398,18 @@ rt_io_w4014:                                ; OAM DMA from NES page A -> GB shad
 .sx:        inc l                           ; (HL at the attributes: + 2)
             inc l
             jr nz, .lp
-.fill:      ld h, d                         ; rest off screen
+.fill:      ldh a, [oam_end]                ; rest off screen (Y = 0 hides a GB sprite): only
+            ld b, a                         ;   the slots used by the last conversion
+            ld a, e
+            ldh [oam_end], a
+            ld h, d
             ld l, e
+            ld de, 4
 .fl:        ld a, l
-            cp low(OAM_SH) + 160
+            cp b
             jr nc, .end
-            xor a
-            ld [hl+], a
+            ld [hl], 0
+            add hl, de
             jr .fl
 .end:       ld a, 1
             ldh [oam_pending], a
@@ -1391,6 +1417,9 @@ rt_io_w4014:                                ; OAM DMA from NES page A -> GB shad
             pop bc
             pop af
             ret
+.full2:     ld a, e                         ; (40 sprites: all slots in use)
+            ldh [oam_end], a
+            jr .end
 
 rt_io_w4016:                                ; strobe: latch the buttons
             push af

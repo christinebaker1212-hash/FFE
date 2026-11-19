@@ -846,11 +846,16 @@ nat_9754:   push af
             ld [NES_RAM + $19], a
             ld hl, $B200                    ; $7200 (PRG-RAM)
             ld a, $FF
+            ld b, 64
 .f:         ld [hl+], a
             ld [hl+], a
-            ld a, h
-            cp $B4
-            ld a, $FF
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec b
             jr nz, .f
             ld c, 0
             xor a
@@ -861,4 +866,4 @@ nat_9754:   push af
             set 7, [hl]                     ; Z = 1
             pop af
             ld a, $FF
-            ret
+            ret                             ; (B = 0 after the loop)
