@@ -988,6 +988,7 @@ def menu_engine(rom, report):
         exsrc += gb_layout.exram_source(FAR_ROUTINES)
     ex = asm(exsrc + tabs, syms=dict(EX, FAR8=FAR8))
     # $5F80-$5FFF is the battle text buffer: code and the far-call tables must end before it
+    if os.environ.get('EXEND'): print('ExRAM ends at $%04X' % (ex.org + len(ex.bytes)))
     assert ex.org + len(ex.bytes) <= 0x5F80, 'ExRAM image ends at $%04X' % (ex.org + len(ex.bytes))
     FAR_LABELS.update(far.labels)
     img = bytearray(0x400); img[0x60:0x60 + len(ex.bytes)] = ex.bytes

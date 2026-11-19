@@ -93,7 +93,7 @@ GLYPH_FIRST = 0x7A                       # glyph table covers codes $7A-$FF
 DIG3 = 0xD3                              # 3-px digits $D3-$DC, small '/' $DD, arrow $DE
 SLASH3, ARROW = 0xDD, 0xDE
 STATUS_WORDS = ['Stone', 'Poison', 'Blind', 'Numb', 'Sleep', 'Mute']   # status bits 1-6
-FAR_GB = ['party_line', 'party_stamp', 'dlgpage', 'dlghide', 'magpatch', 'pcopy', 'prow']   # far routines added for the GB layout (after boxline etc.)
+FAR_GB = ['party_line', 'party_stamp', 'dlgpage', 'dlghide', 'magpatch', 'pcopy', 'prow', 'wpnfix']   # far routines added for the GB layout (after boxline etc.)
 
 VWF_SRC = """
 VBUF = $6E00        ; line buffer: 18 tiles x 8 rows, 1 bit per pixel, tile-major
@@ -1495,7 +1495,7 @@ def enc_word(enc, w):
 
 
 def far_source(enc):
-    return 'MUSIC = $%04X\n' % MUSIC + VWF_SRC + DLG_SRC + glyph_tables(enc) + magpatch_source(enc) + prolog_far_source()
+    return 'MUSIC = $%04X\n' % MUSIC + VWF_SRC + DLG_SRC + glyph_tables(enc) + magpatch_source(enc) + prolog_far_source() + WPNFIX_SRC
 
 
 # ---- field dialogue ----------------------------------------------------------------
@@ -1898,6 +1898,63 @@ def put_bank(rom, bank, cpu, data, expect):
     rom[o:o + len(data)] = data
 
 
+# ---- FF1's own bugs (Disch's FF1 disassembly, "BUGGED" notes; owner asked for the fixes) --
+# Japanese ROM addresses (the US disassembly matched by code). Each patch checks the bytes
+# it replaces. Not fixed (no clear single intended behaviour, or harmless): XFER and the
+# enemies' element weakness (ROM vs RAM copy), CURE on a dead member outside battle,
+# Black Belt armour absorb, the stat-100 level-up report, TMPR, multi-level-up stats.
+#  A  running away: the run chance reads the level from the battle stats ($80, $12 bytes
+#     long, so +$26 lands in another member's bytes) instead of the character ($82).
+#  B  LOK2 (lower evasion): CMP #200 is followed by JMP to the RTS, so the spell never
+#     did anything; BEQ (as in the other spell effects: 200 = no effect) restores it.
+#  C  HARM against the party: a player's class was read as its enemy category (undead
+#     etc.); players have none.
+#  D  critical hit rate: the weapon's index was used instead of its crit value (byte 2).
+#  E  weapon element / category (bytes 4 / 5) were never stored, so weapons never got their
+#     bonus against weak / matching enemies. They go into the battle-stat bytes $03 / $04
+#     (an HP copy no code reads; zeroed at setup for the unarmed), read by the attack
+#     setup at b12:A4E7 / A4EE instead of $0D / $0E (those stay zero: the party's own
+#     category / weakness when it is attacked).
+#  G  enemy group 3's palette came from formation bit 6 (group 2's) instead of bit 5.
+WPNFIX_SRC = """
+wpnfix:             ; b12:ADAB, armed member: $88 = weapon data, $80 = battle stats
+    ldy #7
+    lda ($88),y
+    ldy #$11
+    sta ($80),y     ; palette (as before)
+    ldy #2
+    lda ($88),y
+    ldy #$0F
+    sta ($80),y     ; crit rate = the weapon's crit value
+    ldy #5
+    lda ($88),y
+    ldy #$03
+    sta ($80),y     ; category
+    ldy #4
+    lda ($88),y
+    ldy #$04
+    sta ($80),y     ; element
+    rts
+"""
+
+
+def bug_fixes(rom):
+    main = sys.modules['__main__']
+    farjsr = main.LABELS_EX['farjsr']
+    idx = main.FAR_ROUTINES.index
+    put_bank(rom, 12, 0xA3EF, b'\x82', b'\x80')                                   # A
+    put_bank(rom, 12, 0xBA4E, b'\xF0\x17\xEA', b'\x4C\x67\xBA')                    # B
+    put_bank(rom, 12, 0xB618, b'\xA9\x00', b'\xB1\x92')                           # C
+    put_bank(rom, 12, 0xADAB, bytes([0xA2, idx('wpnfix'), 0x20, farjsr & 0xFF, farjsr >> 8,
+                                     0xEA, 0xEA, 0xEA]),
+             bytes.fromhex('a007b188a0119180'))                                     # D, E
+    put_bank(rom, 12, 0xAD28, bytes.fromhex('a900a0039180ea'), bytes.fromhex('a00aa90320e1ac'))
+    put_bank(rom, 12, 0xAD2F, bytes.fromhex('a900a0049180ea'), bytes.fromhex('a00ba90420e1ac'))
+    put_bank(rom, 12, 0xA4E8, b'\x03', b'\x0D')
+    put_bank(rom, 12, 0xA4EF, b'\x04', b'\x0E')
+    put_bank(rom, 11, 0xA37F, b'\xEA', b'\x4A\x4A\x4A\x4A\x4A\x4A\x29\x01')         # G
+
+
 def party_sprites(rom):
     """Party sprites at NES x = 140 (GB x = 132) instead of 176, beside the enemy area
     (NES cols 2-15 end at x = 127, so the step forward to 132 never overlaps an enemy);
@@ -1932,6 +1989,7 @@ def apply(rom, report):
     minimap(rom)
     puzzle(rom)
     select_menu(rom)
+    bug_fixes(rom)
     report.append('GB layout applied')
 
 
