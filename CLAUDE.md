@@ -829,4 +829,5 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette
   steps; names up to 6 letters; music voices vs the NSF (sndcmp.py); then the owner's
   play-test.
-- FF2: separate session (`docs/ff2-gb-brief.md`). FF3 (GBC only): not started.
+- FF2: separate session (`docs/ff2-gb-brief.md`). FF3 (GBC only): separate session, status in
+  `docs/ff3-gb-status.md` (branch `claude/vibrant-davinci-lc8boi`).
