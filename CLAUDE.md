@@ -744,12 +744,25 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
     walking, towns, castle, dialogue: the party stays centred.
   - GB checks (Gambatte CGB): Cure from the menu (target window, HP update), shop exit.
   - `tools/gb/checkall.py`: all RAM equivalence checks on DMG + CGB in parallel.
+  - Centring (FIELD_CAM_X 5 since the release): title menu one column left; world map at
+    camera X 6 while it shows (`mapw`); the c62 stubs (shopw / mapw / camlu) at $DD78.
+- **Speed (2026-11-19):** DMG walking and talking in towns lagged up to 75%: the dialogue
+  box's raster-split timing loop (c62:D6B8, $1B scanline delays every frame the box shows)
+  is now its RAM effects only (`rt_dlgdelay`). CGB loads: the battle nametable clear in
+  bulk on CGB too; with the LCD off, owner changes and attribute writes leave the cell
+  palettes to one pass at LCD-on (`repal_b`, CGB_RP). Lag over the 7000-wait battle
+  script (lagcheck, Gambatte): CGB 97 -> 65 frames (+0.9%, battle start +33 -> +4), DMG
+  ~304 (+4.3%, screen loads: field entry +74, name/class screens +17-31). Known: DMG
+  prologue band fade runs ~2-4 frames behind per 20 (attribute changes at half-band starts).
+- Builder checked end to end on Linux (`ffe_builder.py --cli` with the Japanese ROM):
+  split, English, GB layout, coverage (161 runs), recompile -> `Final Fantasy I (English,
+  GB).gb`; its NES ROM is byte-identical to `build/ff1_gb.nes`.
 - build.py: coverage from an older NES ROM (covall now keeps `rom.nes`) drops the logs
   of changed bytes and relies on static flow there. Fine for small NES changes; new code
   entered only dynamically (RTS dispatch) still needs fresh coverage (seen: boot hung with
   the old cov3 after the Select menu).
 
 ## Remaining
-- FF1: fresh coverage + all checks for the Select menu, name entry, bug fixes and the new
-  menu movement (DMG + CGB + SGB); the menu audit; centring; transitions; final builder exe.
+- FF1: DMG screen-load times (+4.3% over the battle script) and the DMG prologue fade;
+  owner to confirm the new menu movement and centring; any other screen that shifts.
 - FF2: separate session (`docs/ff2-gb-brief.md`). FF3 (GBC only): not started.
