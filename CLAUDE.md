@@ -891,6 +891,12 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   unchanged (DMG 144). Measured and set aside: deferring the DMG LCD switch-off (the
   `rt_ppu_w1` wait for vblank totals ~21 frames of the script, but the map rebuild it needs
   costs most of a load's wait back: ~7 frames for a change touching all 42 VLCD sites).
+- Recompiler: a JSR whose target is a native routine (ext), possibly behind JMPs, calls it
+  directly (no cross-bank stub / farcall: music, frame wait, OAM clear every frame). checkall
+  62/62; CGB 0, DMG 144 -> 143. Tried and reverted (no gain): DMG switch-on deferred until the
+  map's tiles are re-coded in spare time with the LCD off (battle start -1, field +1: the
+  field draws on right after rendering is on); view-only LCD-on scan for every fixed-camera
+  screen (they take the one-palette path already).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

@@ -798,7 +798,18 @@ class Emitter:
         if tk not in self.rc.insns and tk not in self.rc.g.ext:
             self.rc.warn.append('call to uncompiled %s:%04X from %r' % (tk[0], tk[1], i))
             self.o('call rt_fatal'); return
+        e = self.ext_of(tk)                   # a native routine (bank 0), maybe behind JMPs:
+        if e: self.o('call ' + e); return     #   called directly (no farcall to a stub)
         self.o('call ' + label(*tk))
+
+    def ext_of(self, tk):
+        for _ in range(4):
+            if tk in self.rc.g.ext: return self.rc.g.ext[tk][0]
+            j = self.rc.insns.get(tk)
+            if j is None or j.mn != 'JMP' or j.mode != 'abs' or tk in self.rc.g.idioms: return None
+            tk = self.rc.target(j, j.arg)
+            if tk is None: return None
+        return None
 
     def x_RTS(self):
         if self.k in self.rc.rts_dispatch: self.o('jp rt_rts_dispatch')
