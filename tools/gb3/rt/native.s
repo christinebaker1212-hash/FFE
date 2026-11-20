@@ -2359,3 +2359,89 @@ nat_966a:   ld a, [NES_RAM + $18]
             rla
             ldh [n9_y], a
             ret
+
+; ------------------------------------------------------------------ fix:FBEF
+; random (X..A): $20 = X; X = $FF -> A = $FF; A = 0 or A = X -> A; else d = A - X ($18, $19 = 0),
+; t = $7BE3[$15 + $21] (that counter + 1) and the 16-bit multiply of d by t * 256 + $80
+; ($FCF5 with C = 1), in closed form: $1A = 1, $1B = 0, $1C = (d & 1) << 7,
+; $1E:$1D = d * t + d / 2, $1F = 0; X = $1E (+ 1 if $1D bit 7), A = X + $20 (N, Z, C of it).
+nat_fbef:   ld h, a
+            ld a, e
+            ld [NES_RAM + $20], a
+            cp $FF
+            jr nz, .n1
+            ld a, $FF                       ; (TXA: N = 1, Z = 0; C = 1 from CPX)
+            ldh [nzv], a
+            ld a, 1
+            and a
+            scf
+            ld a, $FF
+            ret
+.n1:        ld a, h
+            and a
+            jr z, .eq
+            cp e
+            jr z, .eq
+            sub e                           ; d
+            ld [NES_RAM + $18], a
+            ld b, a
+            xor a
+            ld [NES_RAM + $19], a
+            ld [NES_RAM + $1B], a
+            ld [NES_RAM + $1F], a
+            inc a
+            ld [NES_RAM + $1A], a
+            ld a, b                         ; $1C = (d & 1) << 7
+            rrca
+            and $80
+            ld [NES_RAM + $1C], a
+            ld a, [NES_RAM + $21]           ; t = $7BE3 + ($15 + $21), that counter + 1
+            add a, $15
+            ld l, a
+            ld h, high(NES_RAM)
+            ld a, [hl]
+            inc [hl]
+            ld l, a
+            ld h, 0
+            ld de, $BBE3                    ; ($7BE3 in PRG-RAM)
+            add hl, de
+            ld a, [hl]
+            ld e, a                         ; HL = d * t
+            ld d, 0
+            ld hl, 0
+            push bc
+.ml:        srl b
+            jr nc, .ms
+            add hl, de
+.ms:        sla e
+            rl d
+            ld a, b
+            and a
+            jr nz, .ml
+            pop bc
+            ld a, b                         ; + d / 2
+            srl a
+            add a, l
+            ld l, a
+            jr nc, .mc
+            inc h
+.mc:        ld a, l
+            ld [NES_RAM + $1D], a
+            ld a, h
+            ld [NES_RAM + $1E], a
+            bit 7, l                        ; X = $1E (+ 1 if $1D bit 7)
+            jr z, .x
+            inc a
+.x:         ld e, a
+            ld d, 0
+            ld b, 0
+            ld hl, NES_RAM + $20            ; A = X + $20
+            add a, [hl]
+            ldh [nzv], a
+            ret
+.eq:        ld l, a                         ; A unchanged, Z = 1, C = 1, N = 0
+            xor a
+            ldh [nzv], a
+            scf
+            ld a, l
+            ret

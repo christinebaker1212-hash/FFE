@@ -92,7 +92,8 @@ class FF3:
            ('p2e', 0xA78D): ('nat_a78d', 'NZC'),     # set attribute table for monster
            ('b40', 0x9F00): ('nat_9f00', 'NZ'),      # reload the ExRAM text engine
            ('p32', 0x9FE4): ('nat_9fe4', 'NZC'),     # update status animation sprites
-           ('p34', 0x966A): ('nat_966a', 'NZC')}     # English text line copy (bconv)
+           ('p34', 0x966A): ('nat_966a', 'NZC'),     # English text line copy (bconv)
+           ('fix', 0xFBEF): ('nat_fbef', 'NZC')}     # random (X..A)
     for _a, _n in zip(range(0xFD3C, 0xFD41), ('nat_fd3c', 'nat_fd3d', 'nat_fd3e', 'nat_fd3f', 'nat_fd40')):
         ext[('fix', _a)] = (_n, 'NZC')               # asl x6 .. x2
     for _a, _n in zip(range(0xFD43, 0xFD48), ('nat_fd43', 'nat_fd44', 'nat_fd45', 'nat_fd46', 'nat_fd47')):
