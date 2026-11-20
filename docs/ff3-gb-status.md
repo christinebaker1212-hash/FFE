@@ -180,8 +180,18 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   resync; `--freeze W`, `--dump DIR`): battlefield, party, command window + hand, messages as
   the NES. Lag (`lagcheck.py ... 2000 12000 --input explore --resync --step 10`): +0.1% in
   total; steps of +16 / +22 / +73 frames at screen loads (3854, 8544, 9877).
-- Open in battle: enemy names window while targeting, magic / item lists, back attacks,
-  bosses / large formations; a mock-up check by the owner.
+- Enemy-names window while choosing targets (attack, jump, magic: hook before the battle
+  graphics' "choose targets"), as wide as the longest name shown (8-18 columns; a 19-letter
+  name on two rows; 4 long-named types can push the 4th out).
+- Item / Magic lists: FF3's item list scrolls sideways (2 columns of 4 visible, 9 columns),
+  the magic list has 3 spells per level over 28 columns: neither fits; mock-ups for the owner
+  (`mockup.py NES OUT lists`: tall window GB rows 8-17 vs the 6-row window; items one column
+  per page, magic rows as FF1: spells 1-2 / spell 3 + level and MP).
+- Field camera (owner: centre the player): the default camera is now (40, 45), the party
+  (NES x 112-127, y 109-124) at the GB screen's centre. The minimap still to check (no input
+  script reaches the world map yet).
+- Open in battle: the item / magic lists (owner's choice), back attacks, bosses / large
+  formations.
 
 ## Known open items
 - Warp (`p3c:9B5F` TSX / TXS arithmetic) and the inn's `TXS` from a saved X (`p3c:9039`) use

@@ -39,8 +39,9 @@ MAP_BANK   = 5              ;   vblank (map_flush)
 DYN_BANK   = 127            ; ROM bank of the dynamic-target table (translate.py)
 LCDC_ON    = %10010011      ; LCD on, window map $9800 (off), BG/window tiles $8000 (unsigned),
                             ;   BG map $9800, 8x8 OBJ on, BG priority on
-CAM_X      = 48             ; default camera (pixels): the centre of the NES picture
-CAM_Y      = 48
+CAM_X      = 40             ; default camera (pixels) = the field camera: the party (NES x 112-127,
+CAM_Y      = 45             ;   y 109-124) at the centre of the GB screen (owner); screens re-laid
+                            ;   out later set their own
 BCAM_X     = 20             ; battle (GB layout): battlefield camera NES x 20 / y 48 (the enemy
 BCAM_Y     = 48             ;   area x 20-159 at GB x 0-139, the party column at GB 140-159);
 WCAM_X     = 16             ;   windows (NES rows 19-24 -> GB rows 12-17) at column 2 / row 7,
