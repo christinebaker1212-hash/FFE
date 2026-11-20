@@ -95,7 +95,8 @@ class FF3:
            ('p34', 0x966A): ('nat_966a', 'NZC'),     # English text line copy (bconv)
            ('fix', 0xFBEF): ('nat_fbef', 'NZC'),     # random (X..A)
            ('p34', 0x8F57): ('nat_8f57', 'NZC'),     # sort attack order list
-           ('fix', 0xDEEA): ('nat_deea', 'NZ')}      # copy tiles to vram
+           ('fix', 0xDEEA): ('nat_deea', 'NZ'),      # copy tiles to vram
+           ('fix', 0xC486): ('nat_c486', 'NZ')}      # clear oam data ($0200-$02FF = $F0)
     for _a, _n in zip(range(0xFD3C, 0xFD41), ('nat_fd3c', 'nat_fd3d', 'nat_fd3e', 'nat_fd3f', 'nat_fd40')):
         ext[('fix', _a)] = (_n, 'NZC')               # asl x6 .. x2
     for _a, _n in zip(range(0xFD43, 0xFD48), ('nat_fd43', 'nat_fd44', 'nat_fd45', 'nat_fd46', 'nat_fd47')):

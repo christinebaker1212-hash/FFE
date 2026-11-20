@@ -855,4 +855,6 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   RAM-identical; Status / Equip / Item / Magic / Job / Save re-laid out (owner's mocks); field
   vertical wrap fixed; Color-only screen added; Lot Check items done (work RAM in Color WRAM,
   cart RAM only around save accesses, soft reset, save check screen, `--release` build).
-  Next: condensed font for all names (owner), load menu, prophecy, name entry, shops.
+  Native code in place of the NES layer (owner, 2026-11-20): plan `docs/ff3-native-plan.md`
+  (OAM clear done; next native text / windows with the condensed names, music driver, map,
+  sprites). Then load menu, prophecy, name entry, shops.

@@ -58,6 +58,7 @@ def main():
                                           for w in range(top)))
             env['SGBRUN_CLOCK'] = cf
         out = subprocess.run(cmd, env=env, capture_output=True, text=True).stdout + ''
+        if os.environ.get('LAG_OUT'): open(os.environ['LAG_OUT'], 'w').write(out)   # (profiles: nesmap.py)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     for l in out.splitlines():

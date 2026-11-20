@@ -1086,6 +1086,28 @@ nat_fb89:   add a, a                        ; $8000: bank 2A & $7F (even), $A000
 ; ------------------------------------------------------------------ p34:9754
 ; init text buffer: $7200-$73FF = $FF, $7AC0 = $4E = $18 = 0, $7AC1 = $4F = $72, $19 = $73.
 ; Out: A = $FF, Y = 0, Z = 1, N = 0, C kept; X kept.
+; ------------------------------------------------------------------ fix:C486
+; clear oam data (every frame): $0200-$02FF = $F0, $26 = 0. Out as the NES: X = $FF, A = 0,
+; N = 0, Z = 1, C kept (no flag-changing instruction but dec b; B = 0 after).
+nat_c486:   ld hl, NES_RAM + $200
+            ld a, $F0
+            ld b, 32
+.f:         ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec b
+            jr nz, .f
+            ld e, $FF
+            ld a, 0
+            ld [NES_RAM + $26], a
+            ldh [nzv], a
+            ret
+
 nat_9754:   push af
             xor a
             ld [$DAC0], a                   ; $7AC0

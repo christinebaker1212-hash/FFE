@@ -395,6 +395,11 @@ Results per item: `docs/gb-release-checklist.md` (FF3 column); every item passes
   `SGBRUN_SVBK` / `SGBRUN_WWATCH` / `SGBRUN_SRAMOUT`, `--sram` now also writes the cart RAM
   directly; firstdiff `prg_at` (the new map), `FD_BANKS=ADDR`.
 
+## Native code instead of the NES layer (2026-11-20, owner: use the disassembly to reduce the
+NES running): plan and measurements in `docs/ff3-native-plan.md` (tool `tools/gb3/nesmap.py`).
+- First step: FF3's per-frame OAM clear (fix:C486) native (`nat_c486`): busy GB time -9%, lag
+  explore 2000-12000 +0.6%; firstdiff explore 12000 identical.
+
 ## Known open items
 - **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3: all items pass in
   emulators (2026-11-20; GBA hardware untested); re-run the checks on the final build.
