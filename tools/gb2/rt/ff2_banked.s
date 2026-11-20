@@ -1558,10 +1558,12 @@ chr_w1:     push bc
 SC_RB      = $DCD4          ; (MU_ temps of hle_mapupd) row: nametable byte offset low,
 SC_RH      = $DCD5          ;   page of nametable 0,
 SC_AB      = $DCD6          ;   attribute byte offset low
-SC_OW      = $DCD7          ; cells owned by nametable 1 exist
+SC_OW      = $DCD7          ; cells of this row owned by nametable 1 exist (sc_row)
 SC_P1      = $DCD8          ; off the view (no PAL_USED), else the view
 SC_VR      = $DCD9          ; first view row, first view column
 SC_VC      = $DCDA
+SC_LT      = $DCDC          ; the last cell's tile and palette ($FF: none): a cell like it
+SC_LP      = $DCDD          ;   needs nothing more
 dmg_scan_all_b:
             push bc
             push de
@@ -1602,6 +1604,8 @@ dmg_scan_all_b:
             srl a
             srl a
             ld [SC_VC], a
+            ld a, $FF
+            ld [SC_LT], a
             ld a, 1                         ; off the view: rows outside it whole, rows in it
             ld [SC_P1], a                   ;   from the column after it, 12 columns
             ld d, 0
@@ -1637,6 +1641,8 @@ dmg_scan_all_b:
             jr nz, .r
             xor a                           ; the view
             ld [SC_P1], a
+            dec a
+            ld [SC_LT], a
             ld a, [SC_VR]
             ld d, a
             ld b, 18
@@ -1685,6 +1691,20 @@ sc_row:     ld a, d                         ; D = map row -> SC_RB, SC_RH, SC_AB
             add a, a
             add a, $C0
             ld [SC_AB], a
+            push hl                         ; SC_OW = the row's owner bits (0: every cell
+            ld a, d                         ;   nametable 0's, no lookups)
+            add a, a
+            add a, a
+            ld l, a
+            ld h, high(OWN)
+            ld a, [hl+]
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            ld [SC_OW], a
+            pop hl
             ret
 
 ; D = map row, E = column (sc_row done for D). Keeps D, E.
@@ -1720,29 +1740,22 @@ sc_cell:    ld b, 0                         ; B = 4 for a cell nametable 1 owns
             or e
             ld l, a
             ld c, [hl]
-            ld a, c                         ; REF_BM |= bit C
-            and 7
-            ld l, a
-            ld h, high(BITS8)
-            ld h, [hl]
-            ld a, c
-            rrca
-            rrca
-            rrca
-            and $1F
-            add a, low(REF_BM)
-            ld l, a
-            ld a, h
-            ld h, high(REF_BM)
-            or [hl]
-            ld [hl], a
             ld a, [SC_P1]                   ; off the view, a palette fixed by the tileset:
-            and a                           ;   only the parked check
-            jr z, .pal
+            and a                           ;   REF_BM and the parked check (nothing if the
+            jr z, .pal                      ;   last cell had this tile too)
             ld l, c
             ld h, high(TILE_PAL)
             bit 7, [hl]
-            jr nz, .pk
+            jr z, .pal
+            ld a, [SC_LT]
+            cp c
+            ret z
+            ld a, c
+            ld [SC_LT], a
+            ld a, $FF
+            ld [SC_LP], a
+            call .ref
+            jr .pk
 .pal:       ld a, b                         ; palette: attribute byte, quadrant (row & 2, col & 2)
             add a, high(NT_SH) + 3
             ld h, a
@@ -1770,7 +1783,18 @@ sc_cell:    ld b, 0                         ; B = 4 for a cell nametable 1 owns
             ld a, b
             call ovr_de
             ld b, a
-.nv:        ld a, [SC_P1]
+.nv:        ld a, [SC_LT]                   ; the same tile and palette as the last cell: done
+            cp c
+            jr nz, .nw
+            ld a, [SC_LP]
+            cp b
+            ret z
+.nw:        ld a, c
+            ld [SC_LT], a
+            ld a, b
+            ld [SC_LP], a
+            call .ref
+            ld a, [SC_P1]
             and a
             jr nz, .tp
             ld l, b                         ; the view: PAL_USED |= bit B
@@ -1806,6 +1830,23 @@ sc_cell:    ld b, 0                         ; B = 4 for a cell nametable 1 owns
             ret z
             ld a, c
             jp dmg_mark
+.ref:       ld a, c                         ; REF_BM |= bit C (keeps B, C, D, E)
+            and 7
+            ld l, a
+            ld h, high(BITS8)
+            ld h, [hl]
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(REF_BM)
+            ld l, a
+            ld a, h
+            ld h, high(REF_BM)
+            or [hl]
+            ld [hl], a
+            ret
 
 ; CGB, LCD going on after cells / attributes changed with it off (CGB_SCAN): every GB map
 ; cell (rows 0-29) gets its palette number in VRAM bank 1 from the nametable that owns it
