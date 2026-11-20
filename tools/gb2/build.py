@@ -92,6 +92,7 @@ def main():
     rt += '\n' + gb1.apu_tables() + '\n' + open(os.path.join(HERE, 'rt', 'apu_core.s')).read()
     rt += '\n' + open(os.path.join(HERE, 'rt', 'native.s')).read()
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ff2_banked.s')).read()   # (continues bank HLE_BANK)
+    rt += '\n' + open(os.path.join(HERE, 'rt', 'ff2_pal.s')).read()      # (bank 0 $39E0: CGB palettes)
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(
         '    db %s\n' % ', '.join(str(gb1.shade(c)) for c in range(r, r + 16)) for r in range(0, 64, 16))
     src_all = rt + '\n' + shade_src + '\n' + gb1.nes_rgb_src() + '\n' + gb1.border_src() + '\n' + prog

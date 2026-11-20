@@ -132,7 +132,7 @@ def scenario(args):
     steps = script_newgame(limit)
     if rnd is not None: add_random(steps, rnd)
     if presses:                                # NES frame:key after which the input is only these
-        K = dict(A=A, B=B, U=UP, D=DOWN, L=LEFT, R=RIGHT, S=START, N=0)   # (N: no button)
+        K = dict(A=A, B=B, U=UP, D=DOWN, L=LEFT, R=RIGHT, S=START, N=0, T=32, Y=96)   # (N: no button, T: Select, Y: B + Select)
         first = min(int(x.split(':')[0]) for x in presses.split(','))
         for f in range(first, limit): steps[f] = 0
         for item in presses.split(','):
@@ -169,6 +169,9 @@ def main():
         m = gb.pb.memory
         k = (m[0xD830] | m[0xD831] << 8) + 1
         state['k'] = k
+        if os.environ.get('PEEK') and k >= int(os.environ.get('HOOK_FROM', '0')):   # debug: bytes at
+            a0 = int(os.environ['PEEK'], 16)                                         #   wait k (PEEK=addr)
+            print('peek wait %d %04X: %s' % (k, a0, bytes(m[a0 + i] for i in range(16)).hex()))
         if pw is not None and k == pw + 1:      # the NES pokes went in between waits pw and pw+1
             for a, v in pokes:
                 if a < 0x800: m[0xC000 + a] = v

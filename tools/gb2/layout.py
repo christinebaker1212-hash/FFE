@@ -2246,7 +2246,7 @@ def bank24(rom):
     return asm(src, syms=dict(RAM, **msyms, **PROPH_RAM))
 
 
-PROPH_RAM = dict(PPG=0xD2, PRP=0xD4, PP=0x7600, PN=0x7601, PI=0x7602, PJ=0x7603, PH=0x7604, PK=0x7605,
+PROPH_RAM = dict(ROWX=0x75C0, PPG=0xD2, PRP=0xD4, PP=0x7600, PN=0x7601, PI=0x7602, PJ=0x7603, PH=0x7604, PK=0x7605,
                  PCNT=0x7606, PEXIT=0x7607, PAR=0x7608, PATT=0x7609, PRM=0x760A, PRLEN=0x760B,
                  PRA=0x760C, P64=0x760E)     # (prophecy; $7600 page: the menus' save area)
 
@@ -2326,7 +2326,7 @@ gb_menu:
     rts
 .go:
     jmp ($0000)
-MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit, gm_tparty, gm_shoptext, gm_slot, gm_ngcam, gm_prophecy
+MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit, gm_tparty, gm_shoptext, gm_slot, gm_ngcam, gm_prophecy, gm_rowinit, gm_rowdraw
 
 gm_exit:
     lda #6
@@ -3409,6 +3409,209 @@ pframe:                 ; one frame (b14:B9B0): a line (PRLEN), the attribute ro
     lda $24
     ora $25
     sta PEXIT
+    rts
+gm_rowinit:             ; fix:F110 (row menu, rendering off; owner approved ff2_mock14): the
+    jsr gm_init         ;   portrait tiles / palettes as the main menu, camera 6 / 5; the
+    lda #6              ;   portraits are drawn by gm_rowdraw from the first frame on (the
+    sta $5800           ;   window, drawn after this, covers their cells)
+    lda #5
+    sta $5801
+    ldx #3
+    lda #$FF
+.x:
+    sta ROWX,x
+    dex
+    bpl .x
+    ldx #63
+.c:
+    sta $77A0,x
+    dex
+    bpl .c
+    rts
+gm_rowdraw:             ; fix:F182 (in place of the sprite portraits fix:F212, each frame):
+    lda #0              ;   a member whose x ($61 + k: $80 front, $A0 back) changed is moved
+    sta VI              ;   (old cells blanked, new drawn, quads re-coloured), a row a frame
+.m:
+    ldx VI
+    lda MSLOT,x
+    cmp #$FF
+    beq .n
+    lda $61,x
+    cmp ROWX,x
+    beq .n
+    lda #1              ; (rows written in vblanks: music and scroll as the menus)
+    sta MSCR
+    lda ROWX,x          ; old place (none yet: $FF): blank, window palette
+    cmp #$FF
+    beq .new
+    sta VCX
+    lda #$FF
+    sta VC
+    jsr rowcells
+    lda #3
+    sta VT
+    jsr rowquads
+.new:
+    ldx VI
+    lda $61,x
+    sta ROWX,x
+    jsr rowput2
+    jsr gm_aw
+    lda #0
+    sta MSCR
+.n:
+    inc VI
+    lda VI
+    cmp #4
+    bne .m
+    rts
+rowput2:                ; the same with a vblank wait per row
+    ldx VI
+    lda ROWX,x
+    sta VCX
+    lda #0
+    sta VC
+    jsr rowcells
+rowq:
+    ldx VI
+    lda MSLOT,x
+    sta VT
+    jmp rowquads
+rowcells:               ; member VI's 4 x 4 cells at x VCX: VC = 0 portrait tiles 1 + 12k +
+    lda #0              ;   3r + c (column 3: tile 0, black in any palette), else the window
+    sta VCNT            ;   tile $FF; a vblank per row
+.r:
+    jsr $FA2A
+    lda VI              ; PPU $2000 + 32 (6 + 4k + r) + VCX / 8
+    asl a
+    asl a
+    clc
+    adc #6
+    adc VCNT
+    sta VSH
+    lda #0
+    sta VN
+    ldx #5
+.sh:
+    asl VSH
+    rol VN
+    dex
+    bne .sh
+    lda VCX
+    lsr a
+    lsr a
+    lsr a
+    ora VSH
+    tax
+    lda VN
+    ora #$20
+    sta $2006
+    stx $2006
+    lda VI              ; first tile 1 + 12k + 3r
+    asl a
+    adc VI
+    asl a
+    asl a
+    sta VN
+    lda VCNT
+    asl a
+    adc VCNT
+    adc VN
+    adc #1
+    ldx #0
+.t:
+    ldy VC
+    bne .b
+    cpx #3
+    beq .z
+    sta $2007
+    jmp .tn
+.z:
+    ldy #0
+    sty $2007
+    jmp .tn
+.b:
+    ldy #$FF
+    sty $2007
+.tn:
+    clc
+    adc #1
+    inx
+    cpx #4
+    bne .t
+    jsr scroll
+    inc VCNT
+    lda VCNT
+    cmp #4
+    beq .rd
+    jmp .r
+.rd:
+    rts
+rowquads:               ; member VI's 4 quads at x VCX (cols VCX/8 .. +3, rows 6+4k .. +3)
+    lda #0              ;   get palette VT in the attribute copy $77A0
+    sta VCNT
+.q:
+    lda VI              ; qy = 3 + 2k + (n >> 1), qx = VCX / 16 + (n & 1)
+    asl a
+    clc
+    adc #3
+    sta VSH
+    lda VCNT
+    lsr a
+    clc
+    adc VSH
+    sta VSH             ; qy
+    lda VCX
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    sta VN
+    lda VCNT
+    and #1
+    clc
+    adc VN
+    sta VN              ; qx
+    lda VSH             ; index (qy >> 1) * 8 + (qx >> 1)
+    lsr a
+    asl a
+    asl a
+    asl a
+    sta VC
+    lda VN
+    lsr a
+    clc
+    adc VC
+    tax
+    lda VSH             ; shift ((qy & 1) * 2 + (qx & 1)) * 2
+    and #1
+    asl a
+    sta VC
+    lda VN
+    and #1
+    ora VC
+    asl a
+    tay
+    lda #3              ; mask and value
+    sta VC
+    lda VT
+    sta VN
+.s:
+    dey
+    bmi .sd
+    asl VC
+    asl VN
+    jmp .s
+.sd:
+    lda VC
+    eor #$FF
+    and $77A0,x
+    ora VN
+    sta $77A0,x
+    inc VCNT
+    lda VCNT
+    cmp #4
+    bne .q
     rts
 gm_shoptext:            ; b14:90FD (shop list text, owner approved ff2_mock12): per item the
     ldx #0              ;   name (column 1, cursor spot) and the price under it at column
@@ -4538,9 +4741,64 @@ def dialogue(rom):
         os.chdir(cwd)
 
 
+def world_overview(rom):
+    """world-map overview (B + Select with the ring, bank 9 $BA00; owner approved
+    ff2_mock14): camera 6 / 9 (the globe NES y 80-207 centred, the logo above out of view),
+    field camera 6 / 6 after. Stub in bank 9's stale data ($BE20, rom-map.txt)."""
+    k = asm('''
+    org $BE20
+    lda #6
+    sta $5800
+    lda #9
+    sta $5801
+    jsr $BA00
+    lda #6
+    sta $5801
+    rts
+''')
+    assert k.org + len(k.bytes) <= 0xBE40
+    put(rom, 9, k.org, k.bytes, old=bytes(len(k.bytes)))
+    put(rom, 31, 0xC19F, bytes([0x20, 0x20, 0xBE]), old=bytes([0x20, 0x00, 0xBA]))
+
+    row_menu(rom)
+
+
+def row_menu(rom):
+    """row menu (Select on the field, fix:F0E2; owner approved ff2_mock14): camera 6 / 5,
+    portraits as background tiles (bank 24 gm_rowinit / gm_rowdraw), back row x $A0 (NES
+    $A8: 4 columns right, on the 16 x 16 colour grid). Stubs in bank 14 $B845 (the load
+    menu's old slot drawer, replaced by gm_slot)."""
+    g = GBM[0]
+    k = asm('''
+    org $B845
+rowin:
+    lda #10
+    jsr GBM
+    jmp $DC30
+rowdr:
+    lda #11
+    jmp GBM
+rowex:
+    lda #4
+    jsr GBM
+    lda #0
+    sta $2001
+    rts
+''', syms=dict(GBM=g))
+    assert k.org + len(k.bytes) <= 0xB87A
+    put(rom, 14, k.org, k.bytes)
+    L = k.labels
+    put(rom, 31, 0xF110, bytes([0x20]) + L['rowin'].to_bytes(2, 'little'), old=bytes.fromhex('2030dc'))
+    put(rom, 31, 0xF182, bytes([0x20]) + L['rowdr'].to_bytes(2, 'little'), old=bytes.fromhex('2012f2'))
+    put(rom, 31, 0xF196, bytes([0x20]) + L['rowex'].to_bytes(2, 'little') + b'\xEA\xEA', old=bytes.fromhex('a9008d0120'))
+    put(rom, 31, 0xF2B8, bytes([0x9F]), old=bytes([0xA7]))
+    put(rom, 31, 0xF2BC, bytes([0xA0]), old=bytes([0xA8]))
+
+
 def apply(rom):
     battle(rom)
     dialogue(rom)
+    world_overview(rom)
 
 
 if __name__ == '__main__':

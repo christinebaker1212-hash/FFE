@@ -416,8 +416,29 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   load slot 1), CGB / DMG shots; firstdiff load scenario 7982 waits, random 30000 (29142
   waits) and the shop scenario (22862 waits) identical. Tools: firstdiff env `GB_SAVE=K`
   (PyBoy state at wait K to build/gb2.state).
-- Next: the remaining field screens (row menu, world-map overview, ending; Select menu with
-  suspend: design with the owner).
+- **World-map overview** (B + Select with the ring; owner approved `ff2_mock14`): camera 6 / 9
+  around `09/BA00` (stub in bank 9's stale data `$BE20`, called from `fix:C19F`), the globe
+  centred, the logo above it out of view; field camera 6 / 6 after.
+- **Row menu** (Select; `ff2_mock14`): camera 6 / 5 (window NES (7,5,18,18) whole); portraits as
+  background tiles (bank 24 `gm_rowinit` at `fix:F110`: the main menu's portrait tiles and
+  palettes; `gm_rowdraw` at `fix:F182` in place of the sprite portraits `fix:F212`: a member
+  whose x changed is moved, a row a frame, its quads re-coloured; gap column tile 0); back
+  row x $A0 (`fix:F2B8/F2BC`, NES $A8); camera 6 / 6 again on leaving (`fix:F196` -> gm_exit).
+  Stubs in bank 14 `$B845` (the load menu's old slot drawer). On a CGB the portraits sit in
+  black boxes as in the main menu (the window interior is black here, so they do not show).
+- **Fixed (CGB): sprite tiles and BG tiles not copied on busy screens.** The overview changes
+  one colour a frame; the palette rebuild wrote all 32 CGB colours and two DMG palette bytes
+  each time and used up the vblank, so the HDMA tile copies never ran (the overview's
+  markers showed stale slot graphics, parts of the globe were missing). Now `rt_ppu_w7`
+  marks the changed entries (`PAL_DM`) and `cgb_palettes` (rt/ff2_pal.s, bank 0 `$39E0`)
+  writes only those (all after an emphasis change); on a CGB `make_palettes` stops after
+  them (BGP / OBP have no effect). Also: sprite-slot copies are flushed before BG tiles,
+  and a slot loaded with the LCD off updates the WRAM copy too (a mark still pending would
+  have copied a stale slot back). Found and checked with mGBA (`sgbrun --cgb`,
+  `SGBRUN_PEEK`); PyBoy has no double speed or VRAM locking and did not show it.
+  Checks: random 30000 on DMG and CGB, overview / load scenario on DMG and CGB, shop
+  scenario: identical.
+- Next: the ending; Select menu with suspend (design with the owner).
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).

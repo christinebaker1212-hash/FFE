@@ -14,6 +14,8 @@ QL         = $CE00
 QV         = $CF00
 NT_SH      = $D000          ; NES nametable shadow (2 × 1KB, vertical mirroring)
 PAL_SH     = $D800          ; NES palette RAM shadow (32)
+PAL_DM     = $DCD0          ; CGB: palette entries changed since the last write (bitmap, 4)
+PAL_LEM    = $DCF7          ; CGB: emphasis bits | 1 of the last write
 DBG        = $D820          ; fault info: code, HL, SP, stack top
 SPR_SLOT   = $D900          ; NES sprite tile (0-255) -> GB slot 0-127, $FF = not resident
 SLOT_TILE  = $DA00          ; GB slot -> NES sprite tile ($FF = free)
@@ -1030,7 +1032,7 @@ make_palettes:
             ldh [pal_dirty], a
             ldh a, [is_cgb]
             and a
-            call nz, cgb_palettes
+            jp nz, cgb_palettes             ; (CGB: BGP / OBP have no effect)
             ld hl, PAL_SH
             call pal4
             ld c, a
@@ -1059,55 +1061,6 @@ make_palettes:
             and a
             jp nz, sgb_obp
             jp dmg_obp
-cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ palettes 0-3
-            push de                         ;   (RGB555 from NES_RGB, $3E00, or EMPH_RGB with
-            ldh a, [ppu_mask]               ;   the NES emphasis bits; colour 0 of each BG
-            and $E0                         ;   palette is the universal backdrop)
-            jr nz, .em
-            ld de, NES_RGB
-            jr .go
-.em:        ld e, a                         ; DE = EMPH_RGB + e * $80 (A = e << 5)
-            ld d, 0
-            sla e
-            rl d
-            sla e
-            rl d
-            ld a, d
-            add a, high(EMPH_RGB)
-            ld d, a
-.go:        ld a, $80
-            ldh [$FF68], a
-            ld hl, PAL_SH
-            ld c, $69
-            call .pal16
-            ld a, $80
-            ldh [$FF6A], a
-            ld hl, PAL_SH + $10
-            ld c, $6B
-            call .pal16
-            pop de
-            ret
-.pal16:     ld b, 16
-.lp:        ld a, l
-            and $03
-            ld a, [hl+]
-            jr nz, .c
-            ld a, [PAL_SH]
-.c:         push hl
-            and $3F
-            add a, a
-            add a, e
-            ld l, a
-            ld h, d
-            ld a, [hl+]
-            ldh [c], a
-            ld a, [hl]
-            ldh [c], a
-            pop hl
-            dec b
-            jr nz, .lp
-            ret
-
 attr_apply:                                 ; A = attribute index i (0-63, + $40: nametable 1):
             push bc                         ;   those of its 4 x 4 cells of the GB map ($9800)
             push de                         ;   that this nametable owns (OWN) get the palette
@@ -1902,7 +1855,36 @@ rt_ppu_w7:  push af
             cp [hl]                         ; same colour again: nothing changes
             jr z, .done
             ld [hl], a
-            ld a, 1
+            ld a, l                         ; CGB: the entry to write again (the backdrop:
+            and a                           ;   every palette's colour 0, so all)
+            jr nz, .pm
+            dec a
+            ld hl, PAL_DM
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            jr .pd
+.pm:        ld e, a
+            and 7
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .pc
+            inc h
+.pc:        ld c, [hl]
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            add a, low(PAL_DM)
+            ld l, a
+            ld h, high(PAL_DM)
+            ld a, [hl]
+            or c
+            ld [hl], a
+.pd:        ld a, 1
             ldh [pal_dirty], a
             ldh [maps_due], a
             xor a
@@ -2322,7 +2304,26 @@ spr_load:   push af
             ret
 .vp:        xor a
             ldh [stg_on], a
+            ldh a, [is_cgb]                 ; CGB, LCD off: the slot copy too (a mark still
+            and a                           ;   pending from before the LCD went off would
+            jr z, .vq                       ;   copy a stale slot over this one)
             pop af
+            push hl
+            push de
+            ld d, a
+            ld a, h
+            add a, $D0 - $80
+            ld h, a
+            ld a, 3
+            ldh [$FF70], a
+            ld [hl], d
+            ld a, 1
+            ldh [$FF70], a
+            ld a, d
+            pop de
+            pop hl
+            jp vram_put
+.vq:        pop af
             jp vram_put
 
 ; ------------------------------------------------------------------ joypad / APU / MMC5
@@ -3030,6 +3031,66 @@ hdma_flush: ldh a, [$FF70]
             push af
             xor a
             ldh [hd_any], a
+            ld hl, SPR_DIRTY                ; sprite slots first (few; the BG tiles can
+                                            ;   use up the vblank for frames on end)
+            ld e, 0
+.sb:        ld a, [hl]
+            and a
+            jr z, .sn
+            ld d, a
+            ld c, 0
+.sk:        srl d
+            jr nc, .skn
+            ldh a, [$FF44]
+            sub 144
+            cp 8
+            jr nc, .late
+            ld a, 3
+            ldh [$FF70], a
+            ld a, e                         ; slot = e * 8 + c
+            add a, a
+            add a, a
+            add a, a
+            or c
+            swap a                          ; $D000 + slot * 16 -> $8000 + slot * 16
+            ld b, a
+            and $F0
+            ldh [$FF52], a
+            ldh [$FF54], a
+            ld a, b
+            and $0F
+            push af
+            add a, $D0
+            ldh [$FF51], a
+            pop af
+            add a, $80
+            ldh [$FF53], a
+            xor a
+            ldh [$FF55], a
+.w2:        ldh a, [$FF55]
+            inc a
+            jr nz, .w2
+            ld a, c
+            push hl
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .nc2
+            inc h
+.nc2:       ld a, [hl]
+            pop hl
+            cpl
+            and [hl]
+            ld [hl], a
+.skn:       inc c
+            ld a, d
+            and a
+            jr nz, .sk
+.sn:        inc l
+            inc e
+            ld a, e
+            cp 16
+            jr nz, .sb
             ld hl, BG_DIRTY
             ld e, 0                         ; byte index
 .bb:        ld a, [hl]
@@ -3098,65 +3159,6 @@ hdma_flush: ldh a, [$FF70]
             ld a, e
             cp 32
             jr nz, .bb
-            ld hl, SPR_DIRTY                ; sprite slots
-            ld e, 0
-.sb:        ld a, [hl]
-            and a
-            jr z, .sn
-            ld d, a
-            ld c, 0
-.sk:        srl d
-            jr nc, .skn
-            ldh a, [$FF44]
-            sub 144
-            cp 8
-            jr nc, .late
-            ld a, 3
-            ldh [$FF70], a
-            ld a, e                         ; slot = e * 8 + c
-            add a, a
-            add a, a
-            add a, a
-            or c
-            swap a                          ; $D000 + slot * 16 -> $8000 + slot * 16
-            ld b, a
-            and $F0
-            ldh [$FF52], a
-            ldh [$FF54], a
-            ld a, b
-            and $0F
-            push af
-            add a, $D0
-            ldh [$FF51], a
-            pop af
-            add a, $80
-            ldh [$FF53], a
-            xor a
-            ldh [$FF55], a
-.w2:        ldh a, [$FF55]
-            inc a
-            jr nz, .w2
-            ld a, c
-            push hl
-            ld hl, BIT_MASK
-            add a, l
-            ld l, a
-            jr nc, .nc2
-            inc h
-.nc2:       ld a, [hl]
-            pop hl
-            cpl
-            and [hl]
-            ld [hl], a
-.skn:       inc c
-            ld a, d
-            and a
-            jr nz, .sk
-.sn:        inc l
-            inc e
-            ld a, e
-            cp 16
-            jr nz, .sb
             pop af
             ldh [$FF70], a
             ret
