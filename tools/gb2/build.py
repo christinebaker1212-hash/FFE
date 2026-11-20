@@ -77,6 +77,11 @@ def main():
     nes = opt['--nes'] or nes_english(src, out_dir, gb)
     srcdir = os.path.join(ROOT, 'build', 'ff2', 'src_gb' if gb else 'src_en')
     source_base(src, nes, srcdir, gb)
+    ext_side = nes + '.ext.json'                    # native replacements of our own layout
+    if os.path.exists(ext_side):                    #   routines (layout.NATIVE_EXT)
+        import json, translate
+        for name, (bank, addr, routine, flags) in json.load(open(ext_side)).items():
+            translate.FF2.ext[('b%02d' % bank if bank != 31 else 'fix', addr)] = (routine, flags)
     covs = sorted(glob.glob(os.path.join(opt['--cov'], 's*.bin')))   # optional: stack-trick flags
     t = time.time()
     cm = CodeMap(nes, srcdir, covs).build()

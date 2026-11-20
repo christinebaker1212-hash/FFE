@@ -1016,3 +1016,134 @@ hle_oamclr_b:
             dec e                           ; Z = 1, carry kept
             ld e, $FF
             ret
+
+; layout.py's vtile (banks 23 / 24): A = tile, X (E) = 8 VC: the tile's 16 bytes (plane 0
+; from VBUF = NES $7800 + X, cart RAM bank 0; plane 1 $FF) to the pattern table at
+; (TBLHI = NES $7FEB) * 256 + 16 * tile, then $2006 / $2007 as the NES leaves them. DMG BG
+; tile: the shadow (cart RAM bank 1) and one re-coding mark; CGB BG tile: VRAM (LCD off) or
+; the tile copy + HDMA mark; a sprite-table tile byte by byte through rt_ppu_w7. Exit: A =
+; $FF, X = 8 VC + 8, Y = 0, Z = 1, N = 0, C = 0.
+VT_BUF     = $DCDE          ; plane 0 (8)
+hle_vtile_b:
+            ld d, a                         ; D = tile
+            ld a, [$BFE5]                   ; X = 8 VC (VC = NES $7FE5); VBUF + X -> VT_BUF
+            add a, a                        ;   (cart RAM bank 0 is mapped)
+            add a, a
+            add a, a
+            ld e, a
+            ld l, a
+            ld h, $B8
+            push de
+            ld de, VT_BUF
+            ld b, 8
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .cp
+            pop de
+            ld a, d                         ; PPU address: TBLHI | tile >> 4, tile << 4
+            swap a
+            and $0F
+            ld b, a
+            ld a, [$BFEB]
+            or b
+            ldh [ppu_vh], a
+            ld a, d
+            swap a
+            and $F0
+            ldh [ppu_vl], a
+            ldh a, [ppu_vh]                 ; BG = the table $2000 bit 4 selects (as rt_ppu_w7)
+            and $10
+            ld b, a
+            ldh a, [ppu_ctrl]
+            and $10
+            xor b
+            jr nz, .slow
+            ldh a, [is_cgb]
+            and a
+            jr nz, .cgb
+            ldh a, [ppu_vh]                 ; DMG: shadow $B000 + (vh & $0F) * 256 + vl
+            and $0F
+            add a, high(BG_SHADOW)
+            ld h, a
+            ldh a, [ppu_vl]
+            ld l, a
+            ld a, 1
+            ld [$4000], a
+            call .put
+            xor a
+            ld [$4000], a
+            ld a, d
+            call dmg_markw
+            jr .done
+.cgb:       ldh a, [lcd_on]
+            and a
+            jr z, .vram
+            ldh a, [ppu_vh]                 ; CGB, LCD on: the tile copy (WRAM 2), HDMA mark
+            and $0F
+            add a, $D0
+            ld h, a
+            ldh a, [ppu_vl]
+            ld l, a
+            ld a, 2
+            ldh [$FF70], a
+            call .put
+            ld a, 1
+            ldh [$FF70], a
+            ld a, d
+            ld hl, BG_DIRTY
+            call hd_mark
+            jr .done
+.vram:      ldh a, [ppu_vh]                 ; CGB, LCD off: VRAM (tiles 0-127 $9000, 128-255 $8800)
+            and $0F
+            cp $08
+            ld b, $90
+            jr c, .v0
+            ld b, $80
+.v0:        add a, b
+            ld h, a
+            ldh a, [ppu_vl]
+            ld l, a
+            call .put
+            jr .done
+.slow:      ld hl, VT_BUF                   ; (sprite table: byte by byte)
+            ld b, 8
+.s0:        ld a, [hl+]
+            call rt_ppu_w7
+            dec b
+            jr nz, .s0
+            ld b, 8
+            ld a, $FF
+.s1:        call rt_ppu_w7
+            dec b
+            jr nz, .s1
+            jr .x
+.done:      ldh a, [ppu_vl]                 ; PPU address left 16 on
+            add a, 16
+            ldh [ppu_vl], a
+            ldh a, [ppu_vh]
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+.x:         ld a, e
+            add a, 8
+            ld e, a                         ; X
+            ld bc, 0                        ; Y = 0 (B = 0)
+            ld d, b
+            xor a
+            ldh [nzv], a                    ; N = 0, Z = 1, C = 0
+            ld a, $FF                       ; (ld keeps the flags)
+            ret
+.put:       push de                         ; HL = the tile in GB byte order: plane 0 rows to
+            ld de, VT_BUF                   ;   even bytes, plane 1 ($FF) to odd
+            ld b, 8
+.p:         ld a, [de]
+            inc de
+            ld [hl+], a
+            ld [hl], $FF
+            inc hl
+            dec b
+            jr nz, .p
+            pop de
+            ret

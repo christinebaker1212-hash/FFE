@@ -271,9 +271,18 @@ vupload:
     bcs .end
     tay
     lda (VP),y
-    pha
-    lsr a
-    lsr a
+    jsr vtile
+    inc VC
+    dec VCNT
+    bne .tile
+    jsr scroll
+    jmp .frame
+.end:
+    jmp scroll
+vtile:                  ; A = tile: its 16 bytes (plane 0 VBUF + 8 VC, plane 1 $FF) to the
+    pha                 ;   pattern table. On the GB native (hle_vtile, rt/ff2_banked.s:
+    lsr a               ;   one tile write, one re-coding mark). Exit: A = $FF, X = 8 VC + 8,
+    lsr a               ;   Y = 0, Z = 1, N = 0, C = 0.
     lsr a
     lsr a
     ora TBLHI
@@ -302,13 +311,8 @@ vupload:
     sta $2007
     dey
     bne .p1
-    inc VC
-    dec VCNT
-    bne .tile
-    jsr scroll
-    jmp .frame
-.end:
-    jmp scroll
+    clc
+    rts
 scroll:
     lda MSCR            ; field menu (camera 1 / 1): its $2000, no scroll, the music
     beq .b
@@ -2259,6 +2263,8 @@ EPI = dict(x=6, y=9, w=20, h=16)     # epilogue window (b14:BAAF; NES (4,4,24,24
 EPI_SYMS = dict(EW_X=EPI['x'], EW_Y=EPI['y'], EW_W=EPI['w'], EW_H=EPI['h'], EVB=20, EP2=0xBFF0)   # EP2: page 2's
 #   address (data in bank 24 outside the code module, written by dialogue())
 B24L = [None]           # bank 24 labels (set by battle())
+NATIVE_EXT = {}         # name -> (bank, address, GB routine, flags): native replacements of our
+                        #   own NES routines, for the translator (<rom>.ext.json, build.py)
 
 
 PROPH_RAM = dict(ROWX=0x75C0, PPG=0xD2, PRP=0xD4, PP=0x7600, PN=0x7601, PI=0x7602, PJ=0x7603, PH=0x7604, PK=0x7605,
@@ -4057,6 +4063,7 @@ def battle(rom):
                  '\nRETB: .db %s\n' % ', '.join('$%02X' % rb for name, rb, nes in ENTRIES))
     assert len(b23.bytes) <= BANK
     put(rom, 23, 0x8000, b23.bytes)
+    NATIVE_EXT['b23_vtile'] = (23, b23.labels['vtile'], 'hle_vtile', 'NZC')
     labels = {}
     for org, end, ks in ((0xFFD0, 0xFFFA, range(0, 8)), (0xFEEC, 0xFF00, range(8, 12))):   # (free:
         ent = 'org $%04X\n' % org                                                          #  rom info,
@@ -4085,6 +4092,7 @@ gbm:                    ; main menu (bank 24): A = sub-command; back to bank 14
     rom[HDR + 24 * BANK:HDR + 25 * BANK] = b'\xFF' * BANK
     put(rom, 24, 0x8000, b24.bytes)
     B24L[0] = b24.labels
+    NATIVE_EXT['b24_vtile'] = (24, b24.labels['vtile'], 'hle_vtile', 'NZC')
     class E: pass
     e = E(); e.labels = labels
     for k, (name, rb, nes) in enumerate(ENTRIES):
@@ -4956,4 +4964,6 @@ if __name__ == '__main__':
     rom = bytearray(open(sys.argv[1], 'rb').read())
     apply(rom)
     open(sys.argv[2], 'wb').write(rom)
+    import json
+    with open(sys.argv[2] + '.ext.json', 'w') as fh: json.dump(NATIVE_EXT, fh, indent=1)
     print('wrote', sys.argv[2])

@@ -513,6 +513,16 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   (`wattr` in the GB fixed-bank code), else their last column kept the map's palette.
   Checked: shots of dialogue, walking, throne room, world map, shop (CGB, DMG); RAM identical
   (random 30000 DMG / CGB, shop scenario, load + world map scenario).
+- **Native small-font tile upload (2026-11-20):** the GB renderer's per-tile loop (banks 23 /
+  24) is a subroutine `vtile` (16 bytes: plane 0 from VBUF, plane 1 $FF); the translator
+  replaces it with `hle_vtile` (rt/ff2_banked.s): the tile straight into the DMG shadow with
+  one re-coding mark (CGB: the tile copy + HDMA mark, or VRAM with the LCD off) instead of 16
+  write-handler calls and 16 marks. layout.py records such replacements of its own routines
+  in `<rom>.ext.json` (`NATIVE_EXT`), build.py adds them to the translator's table. Battle
+  on DMG was ~25% tile writes. Result (lagcheck DMG, random 30000): +7.8% -> +5.5%; the
+  opening battle's windows from +10..+32 to -4..+7 per 60 (parity). RAM identical (random
+  30000, DMG and CGB); DMG battle shots correct.
+- Owner (2026-11-20): battles, overworld and dialogue must never slow down; aim for parity.
 - Next (step 1, third part): the remaining field costs (dialogue window: text printer
   fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
   then screen loads, music, sprites. Earlier plan text:

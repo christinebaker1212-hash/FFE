@@ -1104,6 +1104,9 @@ hle_mul16:  call rt_fcs
 hle_div16:  call rt_fcs
             db HLE_BANK
             dw hle_div16_b
+hle_vtile:  call rt_fcs                    ; layout's vtile (banks 23 / 24: small-font tile upload)
+            db HLE_BANK
+            dw hle_vtile_b
 hle_mapupd: call rt_fcs                    ; fix:D21B update map background (native)
             db HLE_BANK
             dw hle_mapupd_b
