@@ -161,7 +161,7 @@ class RomFont:
             out.append(self.enc[s[i]]); i += 1
         return out
 
-    def draw(self, scr, c, r, s, ink):
+    def draw(self, scr, c, r, s, ink, dy=0):
         for k, code in enumerate(self.codes(s)):
             if code == 0xFF: continue
             o = 16 + FONT + code * 16
@@ -169,7 +169,7 @@ class RomFont:
                 p0, p1 = self.d[o + y], self.d[o + 8 + y]
                 for x in range(8):
                     v = ((p0 >> (7 - x)) & 1) | (((p1 >> (7 - x)) & 1) << 1)
-                    if v == 3: scr.im.putpixel(((c + k) * 8 + x, r * 8 + y), ink)
+                    if v == 3 and 0 <= r * 8 + y - dy: scr.im.putpixel(((c + k) * 8 + x, r * 8 + y - dy), ink)
 
 
 def item_rows(name, count):
@@ -293,14 +293,14 @@ def small_text(scr, x, y, s, ink):
     return x
 
 
-def condensed(scr, c, r, word, ink, ntiles=9):
+def condensed(scr, c, r, word, ink, ntiles=9, dy=0):
     from latin_font import packed_label, COND, TIGHT
     t = packed_label(word, ntiles, COND, fg=3, bg=0) or packed_label(word, ntiles, TIGHT, fg=3, bg=0)
     for k, tl in enumerate(t):
         for y in range(8):
             for x in range(8):
                 v = ((tl[y] >> (7 - x)) & 1) | (((tl[8 + y] >> (7 - x)) & 1) << 1)
-                if v: scr.im.putpixel(((c + k) * 8 + x, r * 8 + y), ink)
+                if v: scr.im.putpixel(((c + k) * 8 + x, r * 8 + y - dy), ink)
 
 
 def menu_all_fit(nes, outd, cmd):
@@ -328,6 +328,29 @@ def menu_all_fit(nes, outd, cmd):
     F.draw(s, 13, 14, 'Sara', T.ink)
     s.save(os.path.join(outd, 'N3_all_fit.png'))
     print('wrote', os.path.join(outd, 'N3_all_fit.png'))
+    # owner: our font for HP / MP, and some separation between members: party window cols
+    # 0-12, the member's lines 2-4 drawn 1 / 2 / 3 px higher (shifted copies of the tiles)
+    s = Screen(T)
+    s.window(0, 0, 13, 18)
+    party2 = [('AAAAAA', 'OnionKn', 28, 32, 1, '9997', '0000'), ('AAAAAB', 'BlkMage', 291, 999, 12, '9997', '0000'),
+              ('BBBBBC', 'WhtMage', 1234, 9999, 99, '9997', '0000'), ('CCCCCD', 'MagicKn', 32, 32, 1, '9997', '0000')]
+    jobs = ['Onion Knight', 'Black Mage', 'White Mage', 'Magic Knight']
+    for i, (nm, _, hp, mx, lv, m1, m2) in enumerate(party2):
+        r = 1 + 4 * i
+        F.draw(s, 1, r, nm, T.ink); F.draw(s, 8, r, 'Lv%2d' % lv, T.ink)
+        condensed(s, 1, r + 1, jobs[i], T.ink, 11, dy=1)
+        F.draw(s, 1, r + 2, '[77][79]', green, dy=2); F.draw(s, 3, r + 2, ('%4d/%-4d' % (hp, mx)).replace(' ', ' '), green, dy=2)
+        F.draw(s, 1, r + 3, '[78][79]', T.ink, dy=3); F.draw(s, 3, r + 3, m1 + ' ' + m2, T.ink, dy=3)
+    s.window(13, 0, 7, 9)
+    for i, c in enumerate(['Item', 'Magic', 'Equip', None, 'Order', 'Job', 'Save']):
+        if c: F.draw(s, 14, 1 + i, c, T.ink)
+        else: condensed(s, 14, 1 + i, 'Status', T.ink, 5)
+    s.window(13, 9, 7, 4)
+    small_text(s, 14 * 8 + 2, 10 * 8, '9999999G', T.ink); small_text(s, 14 * 8 + 2, 11 * 8, '    255C', T.ink)
+    s.window(13, 13, 7, 5)
+    F.draw(s, 14, 14, 'Sara', T.ink)
+    s.save(os.path.join(outd, 'N4_our_font.png'))
+    print('wrote', os.path.join(outd, 'N4_our_font.png'))
 
 
 def menu_options(nes, outd, cmd):
