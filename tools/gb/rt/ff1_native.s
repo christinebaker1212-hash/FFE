@@ -4618,74 +4618,81 @@ oamconv_b:  and $07
             ld a, [OAM_USED]                ; (few sprites last time: converting costs less
             cp 6                            ;   than comparing; the copy is left invalid)
             jr c, .pl
-            ld a, [OAM_CLEAN]
+            ld a, [OC_MISS]                 ; (the input changed lately: a few frames without
+            and a                           ;   comparing; the last of them keeps the input
+            jr z, .try                      ;   for the next compare)
+            dec a
+            ld [OC_MISS], a
+            jr nz, .pl
+            jr .sv
+.try:       ld a, [OAM_CLEAN]
             and a
             jr z, .sv
             ld a, [de]
             cp h
-            jr nz, .sv
+            jr nz, .ms
             inc e
             ldh a, [cam_x]
             ld b, a
             ld a, [de]
             cp b
-            jr nz, .sv
+            jr nz, .ms
             inc e
             ldh a, [cam_y]
             ld b, a
             ld a, [de]
             cp b
-            jr nz, .sv
+            jr nz, .ms
             inc e
             ld bc, SPAL_KEY
             ld a, [bc]
             ld l, a
             ld a, [de]
             cp l
-            jr nz, .sv
+            jr nz, .ms
             inc e
             inc c
             ld a, [bc]
             ld l, a
             ld a, [de]
             cp l
-            jr nz, .sv
+            jr nz, .ms
             inc e
             inc c
             ld a, [bc]
             ld l, a
             ld a, [de]
             cp l
-            jr nz, .sv
+            jr nz, .ms
             inc e
             inc c
             ld a, [bc]
             ld l, a
             ld a, [de]
             cp l
-            jr nz, .sv
+            jr nz, .ms
             ld de, OC_COPY                  ; entries: y; the rest while y < $EF
             ld l, e
 .cm:        ld a, [de]
             cp [hl]
-            jr nz, .sv
+            jr nz, .ms
             cp $EF
             jr nc, .ch
             inc l
             inc e
             ld a, [de]
             cp [hl]
-            jr nz, .sv
+            jr nz, .ms
             inc l
             inc e
             ld a, [de]
             cp [hl]
-            jr nz, .sv
+            jr nz, .ms
             inc l
             inc e
             ld a, [de]
             cp [hl]
-            jr nz, .sv
+            jr nz, .ms
             inc l
             inc e
             jr nz, .cm
@@ -4698,6 +4705,9 @@ oamconv_b:  and $07
 .same:      xor a
             ld [$4000], a
             ret
+.ms:        ld a, 4                         ; changed: plain conversions for a while
+            ld [OC_MISS], a
+            jr .pl
 .sv:        ld de, OC_HDR                   ; keep this input
             ld a, h
             ld [de], a

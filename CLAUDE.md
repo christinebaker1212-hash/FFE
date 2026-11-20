@@ -885,6 +885,12 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   show; pictures identical over the whole battle, only off-view tile codings differ).
   checkall 62/62. DMG 145 -> 144. State and next steps: `docs/gb-handoff.md` "Native
   presentation".
+- OAM conversion compare made adaptive (after a change: plain conversions for 4 frames, the
+  last keeps the input, then compare again; `OC_MISS`): VRAM + OAM identical at 366 points on
+  DMG and CGB, checkall 62/62; busy time lower on screens whose sprites change often, lag
+  unchanged (DMG 144). Measured and set aside: deferring the DMG LCD switch-off (the
+  `rt_ppu_w1` wait for vblank totals ~21 frames of the script, but the map rebuild it needs
+  costs most of a load's wait back: ~7 frames for a change touching all 42 VLCD sites).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
