@@ -47,6 +47,25 @@ static void save_ppm(const char* path, const color_t* buf, unsigned w, unsigned 
 	fclose(f);
 }
 
+/* FF3 test mode: when WAIT_CNT ($D834) moves, NMI_CNT ($D830) = the NES input clock at that
+   waited-for frame ($FFFF: none), and the test pad slots refilled from there */
+static void resync(struct mCore* core, uint16_t* clk, long nclk, unsigned* lastw,
+                   unsigned char* pads, long npads) {
+	unsigned w = core->rawRead8(core, 0xD834, 1) | core->rawRead8(core, 0xD835, 1) << 8;
+	if (w == *lastw) return;
+	*lastw = w;
+	if (w >= (unsigned) nclk || clk[w] == 0xFFFF) return;
+	unsigned c = clk[w];
+	core->rawWrite8(core, 0xD830, 1, c & 0xFF);
+	core->rawWrite8(core, 0xD831, 1, c >> 8);
+	struct GB* gbm = (struct GB*) core->board;
+	for (unsigned k = c; k < c + 32; k++) {
+		unsigned char v = k + 1 < npads ? pads[k + 1] : 0, r = 0;
+		for (int b = 0; b < 8; b++) if (v & (1 << b)) r |= 0x80 >> b;
+		if (gbm->memory.sram && gbm->sramSize >= 0x8000) gbm->memory.sram[0x6000 + (k & 0xFF)] = r;
+	}
+}
+
 int main(int argc, char** argv) {
 	if (argc < 4) { fprintf(stderr, "usage: sgbrun ROM FRAMES OUTPREFIX [--dmg] [--press K@F+H] [--shot F]\n"); return 2; }
 	int frames = atoi(argv[2]); const char* out = argv[3];
@@ -152,6 +171,7 @@ int main(int argc, char** argv) {
 			uint32_t fc = core->frameCounter(core);
 			while (core->frameCounter(core) == fc) {
 				core->step(core);
+				if (nclk && f > 30) resync(core, clk, nclk, &lastw, pads, npads);
 				int take;
 				if (getenv("SGBRUN_PROFC")) {           /* (with SGBRUN_PROFC: every PROF2 cycles, halts included) */
 					static uint64_t nextc = 0;
@@ -175,21 +195,7 @@ int main(int argc, char** argv) {
 			uint32_t fc = core->frameCounter(core);
 			while (core->frameCounter(core) == fc) {
 				core->step(core);
-				unsigned w = core->rawRead8(core, 0xD834, 1) | core->rawRead8(core, 0xD835, 1) << 8;
-				if (w != lastw && f > 30) {
-					lastw = w;
-					if (w < (unsigned) nclk) {
-						unsigned c = clk[w];
-						core->rawWrite8(core, 0xD830, 1, c & 0xFF);
-						core->rawWrite8(core, 0xD831, 1, c >> 8);
-						struct GB* gbm = (struct GB*) core->board;
-						for (unsigned k = c; k < c + 32; k++) {
-							unsigned char v = k + 1 < npads ? pads[k + 1] : 0, r = 0;
-							for (int b = 0; b < 8; b++) if (v & (1 << b)) r |= 0x80 >> b;
-							if (gbm->memory.sram && gbm->sramSize >= 0x8000) gbm->memory.sram[0x6000 + (k & 0xFF)] = r;
-						}
-					}
-				}
+				if (f > 30) resync(core, clk, nclk, &lastw, pads, npads);
 			}
 		} else
 		core->runFrame(core);

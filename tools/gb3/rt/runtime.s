@@ -127,6 +127,9 @@ n9_y:       ds 1                            ; nat_9111: y offset, attributes, x 
 n9_at:      ds 1
 n9_x:       ds 1
 ch_n:       ds 1                            ; chr64_fast: bytes (16 / 32 / 48 / 64)
+ch_sl:      ds 1                            ;   source (NES address) and flip table flag
+ch_sh:      ds 1
+ch_fl:      ds 1
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors

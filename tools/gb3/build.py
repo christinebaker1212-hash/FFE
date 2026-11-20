@@ -93,7 +93,10 @@ def main():
             print('  idiom %s:%04X: code not found, not used' % k); rc.g.idioms.pop(k, None)
     prog, bank_of, banks = emit_program(rc)
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in RT_FILES)
-    src_all = rt + '\n' + gb1.nes_rgb_src() + '\n' + oam_attr_src() + '\n' + prog
+    # (the cross-bank stubs continue bank 0 right after the runtime, up to OAM_ATTR at $3C00)
+    head, sep, rest = prog.partition('section bank DYN_BANK')
+    stubs = head.split('\n', 1)[1] if head.startswith('section bank 0') else head
+    src_all = rt + '\n' + stubs + '\n' + gb1.nes_rgb_src() + '\n' + oam_attr_src() + '\n' + sep + rest
     open(opt['--out'] + '.s', 'w').write(src_all)
     print('N-branch peephole: %d' % getattr(rc, 'n_npeep', 0))
     print('translated: %d instructions, %d code banks (%.1fs), %d dynamic targets'

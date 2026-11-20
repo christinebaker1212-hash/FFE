@@ -94,7 +94,8 @@ class FF3:
            ('p32', 0x9FE4): ('nat_9fe4', 'NZC'),     # update status animation sprites
            ('p34', 0x966A): ('nat_966a', 'NZC'),     # English text line copy (bconv)
            ('fix', 0xFBEF): ('nat_fbef', 'NZC'),     # random (X..A)
-           ('p34', 0x8F57): ('nat_8f57', 'NZC')}     # sort attack order list
+           ('p34', 0x8F57): ('nat_8f57', 'NZC'),     # sort attack order list
+           ('fix', 0xDEEA): ('nat_deea', 'NZ')}      # copy tiles to vram
     for _a, _n in zip(range(0xFD3C, 0xFD41), ('nat_fd3c', 'nat_fd3d', 'nat_fd3e', 'nat_fd3f', 'nat_fd40')):
         ext[('fix', _a)] = (_n, 'NZC')               # asl x6 .. x2
     for _a, _n in zip(range(0xFD43, 0xFD48), ('nat_fd43', 'nat_fd44', 'nat_fd45', 'nat_fd46', 'nat_fd47')):
@@ -576,8 +577,24 @@ class Emitter:
         self.jump(None, (i.space, i.addr + 10))
         return True
 
+    def ppu_izy256_idiom(self):
+        """LDA (zp),Y / STA $2007 / INY / BNE back: rt_ppu_izy with X = 256 - Y (X kept),
+        Y = 0, A = the last byte, Z = 1, N = 0, C kept"""
+        i = self.i
+        if i.mode != 'izy': return False
+        st = self.rc.insns.get((i.space, i.addr + 2)); j = self.rc.insns.get((i.space, i.addr + 5))
+        l = self.rc.insns.get((i.space, i.addr + 6))
+        if not (st and j and l and st.mn == 'STA' and st.mode == 'abs' and st.arg == 0x2007
+                and j.mn == 'INY' and l.mn == 'BNE' and l.arg == i.addr):
+            return False
+        self.o('ld d, e', 'push de', 'push af', 'xor a', 'sub c', 'ld e, a', 'pop af',
+               'ld l, $%02X' % i.arg, 'call rt_ppu_izy', 'pop de', 'ld e, d', 'ld d, 0')
+        self.jump(None, (i.space, i.addr + 8))
+        return True
+
     def x_LDA(self):
-        if self.copy_idiom() or self.ppu_idiom() or self.ppu_izy_idiom() or self.copy_izy_idiom(): return
+        if (self.copy_idiom() or self.ppu_idiom() or self.ppu_izy_idiom() or self.copy_izy_idiom()
+                or self.ppu_izy256_idiom()): return
         if self.i.mode == 'izy' and 'C' not in self.keep:   # PRG-RAM inline, else helper
             lb = label(self.i.space, self.i.addr)
             self.o('ld hl, $%04X' % (0xC000 + self.i.arg), 'ld a, [hl+]', 'ld h, [hl]', 'ld l, a',

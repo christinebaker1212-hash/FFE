@@ -53,7 +53,9 @@ def main():
             import struct
             cf = os.path.join(tmp, 'clock.bin')
             top = max(clock) + 1
-            open(cf, 'wb').write(b''.join(struct.pack('<H', clock.get(w, 0) & 0xFFFF) for w in range(top)))
+            # ($FFFF: a waited-for count the NES skipped: no resync there, as firstdiff.py)
+            open(cf, 'wb').write(b''.join(struct.pack('<H', clock[w] & 0xFFFF if w in clock else 0xFFFF)
+                                          for w in range(top)))
             env['SGBRUN_CLOCK'] = cf
         out = subprocess.run(cmd, env=env, capture_output=True, text=True).stdout + ''
     finally:

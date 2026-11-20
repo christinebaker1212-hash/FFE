@@ -219,6 +219,7 @@ nat_chr64:
             ldh a, [ppu_vh]
             cp $20
             jr nc, .slow
+            call chr64_src7e
             call chr64_fast                 ; (whole tiles from one ROM window: NC)
             jr nc, .end
 .lp:        call .byte
@@ -365,6 +366,16 @@ attr_put64:
             pop bc
             ret
 
+; chr64_fast parameters from the F98E / F9DA loops: source ($7E), flip table flag $92
+chr64_src7e:
+            ld a, [NES_RAM + $7E]
+            ldh [ch_sl], a
+            ld a, [NES_RAM + $7F]
+            ldh [ch_sh], a
+            ld a, [NES_RAM + $92]
+            ldh [ch_fl], a
+            ret
+
 ; fast path of nat_chr64: PPU address tile-aligned, source ($7E) + 63 in one ROM window.
 ; 4 tiles: source read in place (one bank switch), flip table applied, written to the staging
 ; copy in GB row order, each tile marked once. Returns NC when done (Y = $40, nt_a / nt_x
@@ -372,9 +383,9 @@ attr_put64:
 chr64_fast: ldh a, [ppu_vl]
             and $0F
             jr nz, .no
-            ld a, [NES_RAM + $7E]           ; source -> GB bank (A) + address (HL)
+            ldh a, [ch_sl]                  ; source -> GB bank (A) + address (HL)
             ld l, a
-            ld a, [NES_RAM + $7F]
+            ldh a, [ch_sh]
             ld h, a
             ldh a, [ch_n]                   ; (no window change within the bytes)
             dec a
@@ -455,7 +466,7 @@ chr64_fast: ldh a, [ppu_vl]
             ldh a, [ppu_vl]
             ld e, a
             pop hl
-            ld a, [NES_RAM + $92]           ; flip table on: the slow loop
+            ldh a, [ch_fl]                  ; flip table on: the slow loop
             and a
             jr nz, .flp
             ldh a, [ch_n]                   ; plane 0 -> even, plane 1 -> odd bytes
@@ -1957,6 +1968,7 @@ nat_chrn:   xor a
             ldh a, [ppu_vh]
             cp $20
             jr nc, .slow
+            call chr64_src7e
             call chr64_fast                 ; (C = the bytes when done)
             jr nc, .end
 .slow:      ld b, 0
@@ -2626,4 +2638,93 @@ nat_8f57:   ld a, [NES_RAM + $1D]           ; GB bases of the two tables
             ret
 .mp:        add a, $40
             ld h, a
+            ret
+
+; ------------------------------------------------------------------ fix:DEEA
+; copy tiles to vram: X tiles (0 = 256) of 16 bytes from ($80) + Y through $2007 (the source
+; runs on linearly: Y wraps into $81). CHR destinations (step 1, tile-aligned) four tiles at a
+; time into the staging copy (chr64_fast), else byte by byte. Out: X = 0, $82 = 0, Y and $81
+; advanced, A = the last byte, Z = 1, N = 0, C kept.
+nat_deea:   push af                         ; (C kept)
+            xor a
+            ldh [wc_n], a
+            ld [NES_RAM + $82], a
+            ldh [ch_fl], a
+.tl:        ld a, e                         ; tiles in this piece: min(4, left) (0 = 256)
+            dec a
+            cp 3
+            jr c, .n
+            ld a, 3
+.n:         inc a
+            ld b, a                         ; B = tiles
+            ldh a, [ppu_ctrl]               ; CHR, step 1, tile-aligned: the fast way
+            and 4
+            jr nz, .slow
+            ldh a, [ppu_vh]
+            cp $20
+            jr nc, .slow
+            ldh a, [ppu_vl]
+            and $0F
+            jr nz, .slow
+            ld a, [NES_RAM + $80]           ; source = ($80) + Y
+            add a, c
+            ldh [ch_sl], a
+            ld a, [NES_RAM + $81]
+            adc a, 0
+            ldh [ch_sh], a
+            ld a, b
+            swap a
+            ldh [ch_n], a
+            push bc
+            push de
+            call chr64_fast
+            pop de
+            pop bc
+            jr c, .slow
+            ld a, b                         ; Y += 16 * tiles (into $81)
+            swap a
+            add a, c
+            ld c, a
+            jr nc, .nc
+            ld hl, NES_RAM + $81
+            inc [hl]
+.nc:        ld a, e
+            sub b
+            ld e, a
+            jr nz, .tl
+            jr .end
+.slow:      ld a, b                         ; this piece byte by byte
+            swap a
+            ld b, a
+.sb:        ld l, $80
+            call rt_izy_rd
+            ld a, l
+            ldh [nt_a], a
+            call rt_ppu_w7
+            inc c
+            jr nz, .sn
+            ld hl, NES_RAM + $81
+            inc [hl]
+.sn:        dec b
+            ld a, b
+            and $0F
+            jr nz, .s2
+            dec e                           ; (a tile done)
+.s2:        ld a, b
+            and a
+            jr nz, .sb
+            ld a, e
+            and a
+            jr nz, .tl
+            jr .end
+.end:       ld e, 0
+            ld b, 0
+            ld d, 0
+            xor a
+            ldh [nzv], a
+            pop af
+            ld a, 0
+            inc a
+            dec a                           ; Z = 1 (DEX), carry kept
+            ldh a, [nt_a]
             ret
