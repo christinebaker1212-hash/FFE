@@ -4820,14 +4820,22 @@ vchar_n:    cp $FD
 vclear_b:   xor a
             ld [VW_VX], a
             ldh [nzv], a
-            ld a, [VW_VN]
-            add a, a
-            add a, a
-            add a, a
-            ld e, a
+            ld a, [VW_VN]                   ; (VN tiles of 8 rows: 8 bytes a pass; the NES
+            and $1F                         ;   loop clears VN * 8 mod 256 bytes, 256 for 0:
+            jr nz, .n0                      ;   32 passes)
+            ld a, 32
+.n0:        ld e, a
             ld hl, VW_BUF
             xor a
-.l:         ld [hl+], a
+.l:
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
             dec e
             jr nz, .l
             ld de, 0
@@ -16287,6 +16295,53 @@ prc_b:      xor a
             ld [hl], a
             pop bc
             ret
+
+; ---- gb_layout vtext's scan (far): Y = the first of the 20 cells at ($8A) that is a frame tile
+; ($F7-$FE), else 20. Out: Y (C), B = 0; A and flags as left (dead there).
+vscan_b:    ld hl, NES_RAM + $8A
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, h
+            and $E0
+            cp $60
+            jr nz, .gen                     ; (not save RAM: through the PPU-free reads)
+            ld a, h
+            add a, $40
+            ld h, a
+            ld c, 0
+.w:         ld a, [hl+]
+            cp $F7
+            jr c, .n
+            cp $FF
+            jr c, .x
+.n:         inc c
+            ld a, c
+            cp 20
+            jr nz, .w
+.x:         ld b, 0
+            ret
+.gen:       ldh a, [code_bank]              ; (the helpers come back to code_bank)
+            push af
+            ld a, PF_BANK
+            ldh [code_bank], a
+            ld bc, 0
+.g:         push bc
+            ld l, $8A
+            call rt_izy_rd
+            ld a, l
+            pop bc
+            cp $F7
+            jr c, .gn
+            cp $FF
+            jr c, .gx
+.gn:        inc c
+            ld a, c
+            cp 20
+            jr nz, .g
+.gx:        pop af
+            ldh [code_bank], a
+            jr .x
 
 ; ---- b12:97A7 (battle: LDX #0 / LDA #$F0 / STA $0200,X / INX / BNE): the OAM page all $F0.
 ; Out: A = $F0, X = 0, Z = 1, N = 0, carry kept.

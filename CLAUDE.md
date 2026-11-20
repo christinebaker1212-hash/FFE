@@ -1058,6 +1058,10 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   allocated (`.stmp`, once per conversion). Visible sprites identical at 263 (DMG) / 168 (CGB)
   points; battle RAM identical. DMG 40 -> 39, CGB 0.
 
+- Battle text: vclear_b clears 8 bytes a pass; gb_layout vtext's scan of a panel row for the
+  frame native (`vscan_b`, a pf idiom found by its bytes in the far bank). checkall 62/62.
+  DMG 39 -> 36, CGB 0 (-8).
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette

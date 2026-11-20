@@ -328,6 +328,14 @@ def main():
         print('  DrawBox: code not found, not native')
     if prg[12 * 0x4000 - 0x8000 + 0x97A7:12 * 0x4000 - 0x8000 + 0x97B2].hex() == 'a200a9f09d0002e8d0fa60':  # b12:97A7
         rc.g.idioms[('b12', 0x97A7)] = ('pf:oclr_b', 0x97B1, 'NZ')            #   cleared ($F0)
+    faro = FAR_BANK * 0x2000 - 0xC000                # gb_layout vtext's scan for the frame: LDY #0 /
+    pat = bytes.fromhex('a000b18ac9f79004c9ff9005c8c014d0f1')   # LDA ($8A),Y / CMP #$F7 / BCC /
+    far = bytes(prg[FAR_BANK * 0x2000:(FAR_BANK + 1) * 0x2000])   # CMP #$FF / BCC / INY / CPY #20
+    hits = [m.start() for m in re.finditer(re.escape(pat), far)]  # / BNE (Y out; A, flags dead)
+    if len(hits) == 1:
+        rc.g.idioms[('far', 0xC000 + hits[0])] = ('pf:vscan_b', 0xC000 + hits[0] + len(pat), 'NZC')
+    else:
+        print('  vtext scan: not found, not native')
     c62o = 62 * 0x2000 - 0xC000                     # c62:D25A PrepRowCol (with D1E6-D259) and
     if (hashlib.sha1(prg[c62o + 0xD1E6:c62o + 0xD2EB]).hexdigest() == '713eeab7a15c90a4e8e489b2ea423246f4319182'   # D403 (attribute positions):
             and os.environ.get('GB_PRC') != '0'):            # prc_b / pap_b (every map row / column)
