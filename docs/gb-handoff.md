@@ -126,6 +126,11 @@ Possible next work: speed of screen transitions on DMG/SGB (nametable-write book
 `rt_ppu_w7` / `own_set` / `dmg_mark`, the LCD-on scan), then FF2 (dual-mode), then FF3
 (GBC only).
 
+## Required before any release
+The Lot Check requirements in `docs/gb-release-requirements.md` apply to FF1, FF2 and FF3
+(owner, 2026-11-20: absolutely required before a release). The FF1 "release" above was a
+local build made before this rule; it has not been checked against them.
+
 ## Gotchas learned
 - B and D must stay 0 at all times (BC = Y, DE = X for indexed addressing).
 - Compare NES/GB at NMI k vs GB entering frame wait k (cynes `nmi_ram`), feeding the GB the

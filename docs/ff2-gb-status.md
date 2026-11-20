@@ -647,6 +647,15 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   4. Then music, sprites (docs/gb-native-presentation.md order). Select menu with suspend
      (design with the owner). Known DMG look issue: the black castle floor ($0x rule).
 
+## Required before any release
+- The Lot Check requirements in `docs/gb-release-requirements.md` (owner, 2026-11-20:
+  absolutely required): header / checksums, LCD off only in V-Blank, VRAM / OAM access
+  windows, SRAM disabled after access + save validation with an on-screen message, soft
+  reset A + B + Start + Select, memory cleared at boot, DMG / Pocket / SGB / CGB / GBA
+  compatibility, Nintendo hardware names in all text, no undisclosed code (remove or
+  document `TEST_PAD`, the `rst $38` trap, test builds). The notes at the end of that file
+  list what is known to need work (cart RAM is enabled all the time; no soft reset yet).
+
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
 2. ~~English patch → source mapping~~ (plan §2, approved).

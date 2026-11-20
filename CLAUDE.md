@@ -82,6 +82,14 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   and compare emulated RAM frame by frame (as in `tools/split/equiv.py`), plus
   screenshots of every re-laid-out screen.
 
+## Release requirements (owner's decision, 2026-11-20 — binding)
+No Game Boy build of FF1, FF2 or FF3 counts as released until it meets the Lot Check
+standards in `docs/gb-release-requirements.md` (header and checksums, LCD off only in
+V-Blank, VRAM / OAM access windows, SRAM disable + save validation with an on-screen
+message, soft reset A + B + Start + Select, memory cleared at boot, DMG / Pocket / SGB /
+CGB / GBA compatibility, the CGB-only error screen for FF3, Nintendo hardware names in
+all text, no undisclosed code). These are absolutely required tasks before a release.
+
 ## Keeping this file current
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
@@ -712,6 +720,8 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   battle panel copy (fix:F4A2/F4F1), generic `$2007` path, transitions.
 
 ## Remaining
+- Before any release (FF1, FF2, FF3): the Lot Check requirements in
+  `docs/gb-release-requirements.md` (absolutely required).
 - FF1: the speed work above; Select menu (options / formation / suspend), name entry
   (design E), Disch disassembly BUGGED fixes, final builder exe.
 - FF2 (dual-mode) and FF3 (GBC only): not started (on the everything8215 sources).
