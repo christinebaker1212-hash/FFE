@@ -73,7 +73,9 @@ def main():
         if poke: cmd += ['--poke', str(poke_k + 1), poke[1]]
         env = dict(os.environ, SGBRUN_CLOCK=cf)
         if a.dump: env['SGBRUN_DUMP'] = '1'
-        subprocess.run(cmd, env=env, capture_output=True)
+        res = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        if os.environ.get('GBSHOTS_LOG'):
+            open(os.environ['GBSHOTS_LOG'], 'w').write(res.stdout + res.stderr)
         s = a.scale
         sheet = Image.new('RGB', ((256 + 8 + 160) * s, 244 * s * len(ws)), (40, 40, 40))
         d = ImageDraw.Draw(sheet)
@@ -91,7 +93,8 @@ def main():
         sheet.save(a.out)
         print('wrote', a.out)
     finally:
-        shutil.rmtree(tmp, ignore_errors=True)
+        if os.environ.get('GBSHOTS_KEEP'): print('kept', tmp)
+        else: shutil.rmtree(tmp, ignore_errors=True)
 
 
 if __name__ == '__main__':

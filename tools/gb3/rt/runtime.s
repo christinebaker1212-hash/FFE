@@ -49,6 +49,9 @@ WCAM_DY    = 8              ;   from GB line 96 (a LYC interrupt sets SCX / SCY 
 SPLIT_LY   = 96             ;   hblank); NES row 18 (the enemy animations') is not shown
 TALL_LY    = 64             ;   (list windows: NES rows 19-28 from GB line 64, rows 14-18 hidden)
 SPL_ROW    = 18             ;   map rows from 18: the BG pattern table of the split's $2000
+MCAM_X     = 24             ; main menu (GB layout, $5808): camera NES x 24 / y 0; the right
+MNU_WX     = 111            ;   windows (NES cols 16-22) on the window layer from GB col 13;
+MNU_LYC0   = 14             ;   SCY steps at fixed lines (MNU_EV: the members' lines pulled up)
 
 section hram, $FF80
 hram_dma:   ds 10
@@ -145,6 +148,9 @@ ch_n:       ds 1                            ; chr64_fast: bytes (16 / 32 / 48 / 
 ch_sl:      ds 1                            ;   source (NES address) and flip table flag
 ch_sh:      ds 1
 ch_fl:      ds 1
+mnu:        ds 1                            ; main menu mode ($5808, tools/gb3/layout.py)
+mnu_i:      ds 1                            ;   next SCY step (MNU_EV index * 2), SCY at line 0
+mnu_b:      ds 1
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -273,6 +279,9 @@ dma_code:   ld a, high(OAM_SH)              ; copied to HRAM: OAM DMA
 
 ; ------------------------------------------------------------------ battle split (LYC)
 stat_isr:   push af                         ; line SPLIT_LY - 1: the window camera from the
+            ldh a, [mnu]                    ;   next line (written in this line's hblank)
+            and a
+            jr nz, mnu_isr
 .w:         ldh a, [rSTAT]                  ;   next line (written in this line's hblank)
             and 3
             jr nz, .w
@@ -288,6 +297,36 @@ stat_isr:   push af                         ; line SPLIT_LY - 1: the window came
             pop hl
             pop af
             reti
+mnu_isr:    push hl                         ; main menu: the next SCY step (in the hblank of
+            ldh a, [mnu_i]                  ;   the line before), then the next step's line
+            ld hl, MNU_EV
+            add a, l
+            ld l, a
+            jr nc, .c
+            inc h
+.c:         ldh a, [mnu_b]
+            add a, [hl]
+            inc hl
+            ld l, [hl]
+            ld h, a
+.w:         ldh a, [rSTAT]
+            and 3
+            jr nz, .w
+            ld a, h
+            ldh [rSCY], a
+            ld a, l
+            ldh [rLYC], a
+            ldh a, [mnu_i]
+            add a, 2
+            ldh [mnu_i], a
+            pop hl
+            pop af
+            reti
+; (SCY offset from this line, next step's line - 1): member i from GB line 8 + 32i at map
+; line 8 + 40i (NES rows: name, job, HP, MP, a blank row); its job / HP lines 1 px higher, MP
+; 2 px, the blank row's first 2 px as the gap; the bottom frame (map row 21) from line 136
+MNU_EV:     db 1, 29, 2, 39, 8, 46, 9, 61, 10, 71, 16, 78, 17, 93, 18, 103, 24, 110
+            db 25, 125, 26, 135, 32, $FF
 
 ; ------------------------------------------------------------------ vblank
 vblank_isr: push af
@@ -330,7 +369,13 @@ vblank_isr: push af
             ld a, LCDC_ON
             jr nz, .obj
             and $FD
-.obj:       ldh [rLCDC], a
+.obj:       ld l, a
+            ldh a, [mnu]                    ; (main menu: the window layer, map $9C00)
+            and a
+            ld a, l
+            jr z, .lc
+            or $60
+.lc:        ldh [rLCDC], a
             ldh a, [ppu_ctrl]               ; scroll: NES scroll + camera
             ld h, a
             ldh a, [scroll_x]
@@ -352,7 +397,17 @@ vblank_isr: push af
             ldh a, [cam_y]
             add a, l
             ldh [rSCY], a
-            ldh a, [map_any]                ; staged map / attribute rows -> VRAM
+            ld l, a
+            ldh a, [mnu]
+            and a
+            jr z, .nm
+            ld a, l
+            ldh [mnu_b], a
+            xor a
+            ldh [mnu_i], a
+            ld a, MNU_LYC0
+            ldh [rLYC], a
+.nm:        ldh a, [map_any]                ; staged map / attribute rows -> VRAM
             and a
             jr z, .nmc
             push bc
@@ -1673,7 +1728,13 @@ map_flush:  ld a, e
 .byte:      ld a, [hl]
             and a
             jr z, .next
+            ldh a, [mnu]                    ; (main menu: a byte's rows also go to the window
+            and a                           ;   map, 3 blocks a row: start earlier)
+            jr z, .t
+            ld a, 4
+.t:         ld e, a
             ldh a, [rLY]
+            add a, e
             cp 151
             jr nc, .late
             ld c, [hl]                      ; C = bits; row = B * 8 + bit
@@ -1724,6 +1785,9 @@ map_flush:  ld a, e
             add a, a
             dec a
             ldh [rHDMA5], a
+            ldh a, [mnu]                    ; (main menu: columns 16-31 also to the window map)
+            and a
+            call nz, win_rows
             pop bc
             pop de
             jr .b2
@@ -1741,6 +1805,42 @@ map_flush:  ld a, e
             ret
 .late:      ld a, 1
             ldh [map_any], a
+            ret
+
+; main menu: rows B * 8 + E .. + L - 1, columns 16-31 of the shadow (high byte D) -> the
+; window map $9C00 (same VRAM bank), one DMA block per row. C, E, H, L, A clobbered.
+win_rows:   ld a, b
+            add a, a
+            add a, a
+            add a, a
+            add a, e
+            ld c, a
+.r:         ld a, c
+            cp 18                           ; (rows 0-17: the window's)
+            ret nc
+            rrca
+            rrca
+            rrca
+            ld e, a
+            and 3
+            add a, d
+            ldh [rHDMA1], a
+            ld a, e
+            and $E0
+            or $10
+            ldh [rHDMA2], a
+            ld a, e
+            and 3
+            add a, $9C
+            ldh [rHDMA3], a
+            ld a, e
+            and $E0
+            ldh [rHDMA4], a
+            xor a
+            ldh [rHDMA5], a
+            inc c
+            dec l
+            jr nz, .r
             ret
 
 ; BG pattern table changed: set the bank bit of every attribute in the shadow, then the
@@ -2148,8 +2248,25 @@ rt_mmc_w5807:                               ; GB layout, battle: list window (A 
             call rt_io_w4014                ;   not send its sprite page every frame)
             pop af
             ret
-rt_mmc_w5808:
-rt_mmc_w5809:
+rt_mmc_w5808:                               ; GB layout: main menu mode (body far_5808)
+            push af
+            push hl
+            ld hl, far_5808
+            jr far_mmc
+rt_mmc_w5809:                               ;   and a member's HP row palette (far_5809)
+            push af
+            push hl
+            ld hl, far_5809
+far_mmc:    push af
+            ld a, RT_TABLES
+            ld [MBC5_BANKL], a
+            pop af
+            call rt_jp_hl
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            pop hl
+            pop af
+            ret
 rt_mmc_w580A:
 rt_mmc_w580B:
 rt_mmc_w580C:

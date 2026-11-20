@@ -1,7 +1,7 @@
 """RAM equivalence of the FF3 GBC build against the English NES build, frame by frame.
 
 usage: PYTHONPATH=build/emu3 firstdiff.py NES GB FRAMES [--input NAME] [--from K] [--max N]
-              [--ignore LO-HI,..]
+              [--ignore LO-HI,..] [--freeze W] [--press W:PAD:N,..]
 
 The NES (cynes, build/emu3) and the GB (PyBoy, CGB mode) run with the same input
 (tools/gb3/cmpshots.py INPUTS). Two clocks, counted the same way on both:
@@ -44,7 +44,12 @@ def main():
     ap.add_argument('--show', default='', help='LO-HI: print these RAM bytes of both every frame')
     ap.add_argument('--sram', default='', help='LO-HI: compare this PRG-RAM range ($6000-$7FFF) '
                     'at the end of both runs (for data that stays put, e.g. the battle rng table)')
+    ap.add_argument('--freeze', type=int, default=0, help='no input from this waited-for frame on')
+    ap.add_argument('--press', default='', help='W:PAD:N,.. : pad PAD for N waited-for frames from W (as gbshots.py)')
+    ap.add_argument('--poke', default='', help='W:ADDR=VAL,.. : write NES RAM / PRG-RAM at waited-for frame W (both)')
     a = ap.parse_args()
+    poke = (int(a.poke.split(':')[0]), [tuple(int(x, 16) for x in av.split('=')) for av in a.poke.split(':', 1)[1].split(',')]) if a.poke else None
+    presses = [tuple(int(v, 0) for v in p.split(':')) for p in a.press.split(',') if p]
     a.show = tuple(int(v, 16) for v in a.show.split('-')) if a.show else None
     pad = INPUTS[a.input]
     # (the synchronous wait's NMI stub at $0100-$0102, replaced natively on the GB, and the
@@ -57,9 +62,17 @@ def main():
     import cmpshots; cmpshots.CUR_NES = n
     sram0 = bytes(n[0x6000 + i] for i in range(0x2000))   # power-on save RAM (the game reads
                                                          #   unwritten save RAM: copied to the GB)
+    st0 = {}
     while k < a.frames and f < a.frames * 4 + 1000:
-        c = pad(k + 1)
+        c = pad(k + 1) if not a.freeze or n.ff3_waits < a.freeze else 0
+        for pw, pv, pn in presses:
+            if pw <= n.ff3_waits < pw + pn: c = pv
         n.controller = c
+        if poke and n.ff3_waits >= poke[0] and not st0.get('poked'):
+            import numpy as np
+            sv = bytearray(n.save())
+            for ad, v in poke[1]: sv[(0x500A + ad) if ad < 0x800 else (0x23E2 + ad - 0x6000)] = v
+            n.load(np.array(sv, dtype=np.uint8)); st0['poked'] = 1
         n.step(1); f += 1
         k = W.update(c)
         w2 = n.ff3_waits
@@ -109,6 +122,11 @@ def main():
     def nmi(): return m[1, 0xD830] | m[1, 0xD831] << 8
     def waits(): return m[1, 0xD834] | m[1, 0xD835] << 8
     def on_wait(ctx):
+        if poke and not st.get('poked') and waits() + 1 >= poke[0]:
+            for ad, v in poke[1]:
+                if ad < 0x800: m[0xC000 + ad] = v
+                else: m[0, 0xA000 + ad - 0x6000] = v
+            st['poked'] = 1
         feed(nmi()); check(waits() + 1, 1)
     def on_async(ctx):
         check(waits())
@@ -128,9 +146,13 @@ def main():
         d = [x for x in range(lo, hi + 1) if m[0, 0xA000 + x - 0x6000] != nes_sram[x - 0x6000]]
         print('PRG-RAM %04X-%04X at the end: %d bytes differ %s' % (lo, hi, len(d),
               ' '.join('%04X:%02X/%02X' % (x, nes_sram[x - 0x6000], m[0, 0xA000 + x - 0x6000]) for x in d[:16])))
-    dbg = [m[1, 0xD820 + i] for i in range(8)]
+    dbg = [m[1, 0xD820 + i] for i in range(16)]
     print('GB: %d GB frames, reached frame %d, %d frames compared, %d with differences; DBG %s'
           % (t, st['last'], st['checked'], st['diffs'], ' '.join('%02X' % x for x in dbg)))
+    if dbg[0] == 0x38:
+        sp = dbg[8] | dbg[9] << 8
+        print('rst38 trap: SP %04X, stack: %s' % (sp, ' '.join('%04X' % (m[sp + 2 * i] | m[sp + 2 * i + 1] << 8) for i in range(12))))
+        print('ROM bank', m[0xFF8C] if False else '?', ' code_bank HRAM:', ' '.join('%02X' % m[0xFF80 + i] for i in range(16)))
     pb.stop(save=False)
 
 if __name__ == '__main__':

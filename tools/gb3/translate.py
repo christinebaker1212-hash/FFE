@@ -970,7 +970,12 @@ def components(rc):
         for s in rc.succ(i):
             # FF3: a JMP into another space is a tail call (bank-0 stub: call + ret), so it
             # does not tie the two together (else one component spans 5 spaces, > 16 KB)
-            if i.mn == 'JMP' and s is not None and s[0] != i.space: continue
+            # (except between the fixed bank and the ExRAM code: the English text code jumps
+            # back and forth between them with bytes pushed across, e.g. the guest name's PHA
+            # at fix:F2FC and its PLA at fix:F0D5 around ex:sname; a call + ret stub between
+            # them would sit in the middle of that stack data)
+            if i.mn == 'JMP' and s is not None and s[0] != i.space and {s[0], i.space} != {'fix', 'ex'}:
+                continue
             if s is not None and s in parent: parent[find(s)] = find(k)
     comp = defaultdict(list)
     for k in rc.insns: comp[find(k)].append(k)

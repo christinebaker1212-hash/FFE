@@ -1083,6 +1083,9 @@ MENU_TEXT = {   # t8200 ids (GB layout; the MP of a level: 2 cells "_n", written
           '{15:00}Job\n{15:00}Save',
     0x32: '{0E}{07}',
     0x33: '{0E}{14:01}[7B][7C][7D][7E]\n{14:03}[7F][CA]',   # (tiles drawn by SMALLNUM)
+    # the guest's name (code 07, only in the main menu's guest window, 5 columns): the given
+    # name alone (owner-approved mock-up: "Sara")
+    0xF8: 'Sara', 0xF9: 'Cid', 0xFD: 'Alus',
 }
 
 MENU_HP_SRC = '''
@@ -1126,16 +1129,10 @@ SMALLNUM_SRC = '''
 SNB = $5EB4         ; ExRAM (battle only: the message window's save area): 6 tiles' plane 0
 DG = $5EE4          ; 12 characters: Gil (7 digits, G), Capacity (3 digits, C)
     org $85E0
-disp2:              ; bank 88 $8000 (JOBF dispatch): Y = 15 -> smallnum
-    cpy #15
-    bne .o
-    jmp smallnum
-.o:
-    cpy #12
-    bne .z
-    jmp $8004
-.z:
-    jmp $8007
+disp2:              ; bank 88 $8004 (JOBF dispatch, Y = 12: was JMP sq): A = $FF -> smallnum
+    cmp #$FF        ;   (numsq passes a text column)
+    beq smallnum
+    jmp SQ
 smallnum:           ; Gil and Capacity in 4-px digits -> tiles $7B-$7F, $CA (main menu)
     lda $601C
     sta $80
@@ -1340,18 +1337,31 @@ def main_menu(r):
     r.mods.append(dict(hp, where=(B3C, 0x95B2 & 0x1FFF)))
     r.log.append((B3C, 0x95B2, 'main menu: HP palettes per member for the GB ($5809), menu mode on'))
     r.patch(B3D, 0xA685, '20 86 C4', '20 ' + j(hp['labels']['mnuoff']), 'close menu: GB menu mode off')
-    sm = r.module(SMALLNUM_SRC + small_glyph_table(), syms={'JBTAIL': JBTAIL})
+    sm = r.module(SMALLNUM_SRC + small_glyph_table(), syms={'JBTAIL': JBTAIL, 'SQ': 0x801C})
     o = r.off(B88, sm['org'])
     assert sm['org'] + len(sm['bytes']) <= 0xA000
     assert set(r.d[o:o + len(sm['bytes'])]) == {0xFF}
     r.d[o:o + len(sm['bytes'])] = sm['bytes']
     r.mods.append(dict(sm, where=(B88, sm['org'] & 0x1FFF)))
-    r.patch(B88, 0x8000, 'C0 0C D0', '4C ' + j(sm['labels']['disp2']), 'job bank dispatch: smallnum (Y = 15)')
+    r.patch(B88, 0x8004, '4C 1C 80', '4C ' + j(sm['labels']['disp2']), 'job bank dispatch: smallnum (Y = 12, A = $FF)')
     r.patch(B3D, 0xA589, 'A2 03 A9 33 20 66 A6 A2 04 A9 34 20 66 A6',
-            'A2 03 A9 33 20 66 A6 A0 0F 20 ' + j(JBGO) + ' EA EA', 'main menu: Gil + Capacity window, 4-px digits')
+            'A2 03 A9 33 20 66 A6 A0 0C A9 FF 20 ' + j(JBGO), 'main menu: Gil + Capacity window, 4-px digits')
+    r.patch(B3D, 0xA705, '01 05 00 00 01 0B 00 00 01 11 00 00 01 17 00 00',
+            '02 01 00 00 02 05 00 00 02 09 00 00 02 0D 00 00', 'character select: hand at each name (GB rows)')
     for a in (0xA5AC, 0xA6D0):
         r.patch(B3D, a, 'A9 00 20 00 80 A9 00 20 CB 80', 'A9 00 EA EA EA A9 00 EA EA EA',
                 'main menu: no class sprites, no guest sprite')
+    # owner: "the HP and MP font is off alignment with the other fonts": FF3's label glyphs
+    # (L V E H M P) use pixel rows 1-7, the English font rows 0-6: moved up one row (the menu
+    # screens draw these tiles from the font block); the level's "LV" in the English letters
+    # "Lv" (as the battle magic list)
+    for c in (0x5E, 0x5F, 0x76, 0x77, 0x78, 0x79):
+        o = 16 + FONT + c * 16
+        g = r.d[o:o + 16]
+        assert g[0] == 0 and g[8:] == b'\xff' * 8, (hex(c), g.hex())
+        r.d[o:o + 8] = g[1:8] + b'\0'
+    r.log.append((0, FONT, 'label glyphs L V E H M P one row up (English font rows)'))
+    r.patch(0x7F, 0xF2AC, 'A9 5E 9D A0 07 A9 5F', 'A9 95 9D A0 07 A9 B9', 'level label: "Lv" in the English font')
 
 
 def apply(data):

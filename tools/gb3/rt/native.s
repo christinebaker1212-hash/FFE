@@ -2293,182 +2293,16 @@ nat_fbef:   ld h, a
 ; sort attack order list (recursive): keys at ($1C) + 1.., indices at ($1E) + 1.. (PRG-RAM or
 ; RAM; set to 0.. first), step for step as the NES code (same final $18-$22, arrays, A, X, Y,
 ; flags); pushes / pops through HL (flags kept). X = E, Y = C.
-nat_8f57:   ld a, [NES_RAM + $1D]           ; GB bases of the two tables
-            ld h, a
-            ld a, [NES_RAM + $1C]
-            ld l, a
-            call .map
-            ld a, l
-            ldh [n9_y], a
-            ld a, h
-            ldh [n9_at], a
-            ld a, [NES_RAM + $1F]
-            ld h, a
-            ld a, [NES_RAM + $1E]
-            ld l, a
-            call .map
-            ld a, l
-            ldh [c_x], a
-            ld a, h
-            ldh [c_val], a
-            ld a, [NES_RAM + $22]           ; LDA $22 / PHA / SEC / SBC $1A / TAX / INX / STX $18
-            ld l, a
-            push hl
-            ld hl, NES_RAM + $1A
-            sub [hl]
-            inc a
-            ld [NES_RAM + $18], a
-            ld c, 1                         ; indices: ($1E) + 1.. = 0..
-            ld e, 0
-.ini:       call .iadr
-            ld [hl], e
-            inc c
-            inc e
-            ld a, [NES_RAM + $18]
-            cp e
-            jr nz, .ini
-            pop hl                          ; PLA
-            ld a, l
-            call .p6f
-            ret
-.p6f:       ld [NES_RAM + $1B], a
-            ld a, [NES_RAM + $18]
-            ld l, a
-            push hl
-            ld a, [NES_RAM + $19]
-            ld l, a
-            push hl
-            ld l, e
-            push hl
-            ld a, [NES_RAM + $1A]
-            ld e, a                         ; X = $1A
-            ld [NES_RAM + $18], a
-            ld a, [NES_RAM + $1B]
-            ld [NES_RAM + $19], a
-            ld a, [NES_RAM + $1A]
-            ld c, a
-            call .kadr
-            ld a, [hl]
-            ld [NES_RAM + $20], a
-.l87:       ld a, [NES_RAM + $1B]           ; Y = $1B; Y < $1A: done
-            ld c, a
-            ld hl, NES_RAM + $1A
-            cp [hl]
-            jr c, .d3
-.l8d:       call .kadr                      ; down while key[Y] < pivot
-            ld a, [hl]
-            ld hl, NES_RAM + $20
-            cp [hl]
-            jr nc, .l96
-            dec c
-            jr .l8d
-.l96:       ld a, c
-            ld [NES_RAM + $1B], a
-            ld a, [NES_RAM + $1A]
-            ld c, a
-.l9a:       call .kadr                      ; up while key[Y] > pivot
-            ld a, [hl]
-            ld hl, NES_RAM + $20
-            cp [hl]
-            jr z, .a5
-            jr c, .a5
-            inc c
-            jr .l9a
-.a5:        ld a, c
-            ld [NES_RAM + $1A], a
-            ld a, [NES_RAM + $1B]
-            ld c, a
-            ld hl, NES_RAM + $1A
-            cp [hl]
-            jr c, .d3
-            call .kadr                      ; swap entries $1B and $1A
-            ld e, [hl]                      ; X = key[$1B]
-            call .iadr
-            ld a, [hl]
-            ld [NES_RAM + $21], a
-            ld a, [NES_RAM + $1A]
-            ld c, a
-            call .kadr
-            ld b, [hl]
-            ld a, [NES_RAM + $1B]
-            ld c, a
-            call .kadr
-            ld [hl], b
-            ld a, [NES_RAM + $1A]
-            ld c, a
-            call .iadr
-            ld b, [hl]
-            ld a, [NES_RAM + $1B]
-            ld c, a
-            call .iadr
-            ld [hl], b
-            ld a, [NES_RAM + $1A]
-            ld c, a
-            call .iadr
-            ld a, [NES_RAM + $21]
-            ld [hl], a
-            call .kadr
-            ld [hl], e
-            ld b, 0
-            ld hl, NES_RAM + $1B
-            dec [hl]
-            ld hl, NES_RAM + $1A
-            inc [hl]
-            jr .l87                         ; (BCS: C = 1 from the CPY above)
-.d3:        ld a, [NES_RAM + $1A]           ; X = $1A
-            ld e, a
-            ld a, [NES_RAM + $18]           ; Y > $18: the left part
-            cp c
-            jr nc, .e3
-            ld [NES_RAM + $1A], a
-            ld a, c
-            call .p6f
-.e3:        ld a, [NES_RAM + $19]           ; X < $19: the right part
-            ld l, a
-            ld a, e
-            cp l
-            ccf                             ; (6502 carry: X >= $19)
-            jr c, .ee
-            ld [NES_RAM + $1A], a
-            ld a, [NES_RAM + $19]
-            call .p6f
-.ee:        pop hl                          ; PLA / TAX / PLA / STA $19 / PLA / STA $18
-            ld e, l
-            pop hl
-            ld a, l
-            ld [NES_RAM + $19], a
-            pop hl
-            ld a, l
-            ld [NES_RAM + $18], a
-            ldh [nzv], a
-            ld b, 0
-            ld d, 0
-            inc a
-            dec a
-            ret
-.kadr:      ldh a, [n9_y]                   ; HL = key table + Y
-            add a, c
-            ld l, a
-            ldh a, [n9_at]
-            adc a, 0
-            ld h, a
-            ret
-.iadr:      ldh a, [c_x]                    ; HL = index table + Y
-            add a, c
-            ld l, a
-            ldh a, [c_val]
-            adc a, 0
-            ld h, a
-            ret
-.map:       ld a, h                         ; NES RAM / PRG-RAM address -> GB
-            cp $20
-            jr nc, .mp
-            and 7
-            or high(NES_RAM)
-            ld h, a
-            ret
-.mp:        add a, $40
-            ld h, a
+nat_8f57:                                   ; (body in the runtime tables bank: far_8f57)
+            push af
+            ld a, RT_TABLES
+            ld [MBC5_BANKL], a
+            pop af
+            call far_8f57
+            push af
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            pop af
             ret
 
 ; ------------------------------------------------------------------ fix:DEEA
@@ -2773,5 +2607,365 @@ far_fc27:   ld hl, NES_RAM                  ; seed: A + the zero page with carri
             pop af
             ret
 
+
+far_8f57:   ld a, [NES_RAM + $1D]           ; GB bases of the two tables
+            ld h, a
+            ld a, [NES_RAM + $1C]
+            ld l, a
+            call .map
+            ld a, l
+            ldh [n9_y], a
+            ld a, h
+            ldh [n9_at], a
+            ld a, [NES_RAM + $1F]
+            ld h, a
+            ld a, [NES_RAM + $1E]
+            ld l, a
+            call .map
+            ld a, l
+            ldh [c_x], a
+            ld a, h
+            ldh [c_val], a
+            ld a, [NES_RAM + $22]           ; LDA $22 / PHA / SEC / SBC $1A / TAX / INX / STX $18
+            ld l, a
+            push hl
+            ld hl, NES_RAM + $1A
+            sub [hl]
+            inc a
+            ld [NES_RAM + $18], a
+            ld c, 1                         ; indices: ($1E) + 1.. = 0..
+            ld e, 0
+.ini:       call .iadr
+            ld [hl], e
+            inc c
+            inc e
+            ld a, [NES_RAM + $18]
+            cp e
+            jr nz, .ini
+            pop hl                          ; PLA
+            ld a, l
+            call .p6f
+            ret
+.p6f:       ld [NES_RAM + $1B], a
+            ld a, [NES_RAM + $18]
+            ld l, a
+            push hl
+            ld a, [NES_RAM + $19]
+            ld l, a
+            push hl
+            ld l, e
+            push hl
+            ld a, [NES_RAM + $1A]
+            ld e, a                         ; X = $1A
+            ld [NES_RAM + $18], a
+            ld a, [NES_RAM + $1B]
+            ld [NES_RAM + $19], a
+            ld a, [NES_RAM + $1A]
+            ld c, a
+            call .kadr
+            ld a, [hl]
+            ld [NES_RAM + $20], a
+.l87:       ld a, [NES_RAM + $1B]           ; Y = $1B; Y < $1A: done
+            ld c, a
+            ld hl, NES_RAM + $1A
+            cp [hl]
+            jr c, .d3
+.l8d:       call .kadr                      ; down while key[Y] < pivot
+            ld a, [hl]
+            ld hl, NES_RAM + $20
+            cp [hl]
+            jr nc, .l96
+            dec c
+            jr .l8d
+.l96:       ld a, c
+            ld [NES_RAM + $1B], a
+            ld a, [NES_RAM + $1A]
+            ld c, a
+.l9a:       call .kadr                      ; up while key[Y] > pivot
+            ld a, [hl]
+            ld hl, NES_RAM + $20
+            cp [hl]
+            jr z, .a5
+            jr c, .a5
+            inc c
+            jr .l9a
+.a5:        ld a, c
+            ld [NES_RAM + $1A], a
+            ld a, [NES_RAM + $1B]
+            ld c, a
+            ld hl, NES_RAM + $1A
+            cp [hl]
+            jr c, .d3
+            call .kadr                      ; swap entries $1B and $1A
+            ld e, [hl]                      ; X = key[$1B]
+            call .iadr
+            ld a, [hl]
+            ld [NES_RAM + $21], a
+            ld a, [NES_RAM + $1A]
+            ld c, a
+            call .kadr
+            ld b, [hl]
+            ld a, [NES_RAM + $1B]
+            ld c, a
+            call .kadr
+            ld [hl], b
+            ld a, [NES_RAM + $1A]
+            ld c, a
+            call .iadr
+            ld b, [hl]
+            ld a, [NES_RAM + $1B]
+            ld c, a
+            call .iadr
+            ld [hl], b
+            ld a, [NES_RAM + $1A]
+            ld c, a
+            call .iadr
+            ld a, [NES_RAM + $21]
+            ld [hl], a
+            call .kadr
+            ld [hl], e
+            ld b, 0
+            ld hl, NES_RAM + $1B
+            dec [hl]
+            ld hl, NES_RAM + $1A
+            inc [hl]
+            jr .l87                         ; (BCS: C = 1 from the CPY above)
+.d3:        ld a, [NES_RAM + $1A]           ; X = $1A
+            ld e, a
+            ld a, [NES_RAM + $18]           ; Y > $18: the left part
+            cp c
+            jr nc, .e3
+            ld [NES_RAM + $1A], a
+            ld a, c
+            call .p6f
+.e3:        ld a, [NES_RAM + $19]           ; X < $19: the right part
+            ld l, a
+            ld a, e
+            cp l
+            ccf                             ; (6502 carry: X >= $19)
+            jr c, .ee
+            ld [NES_RAM + $1A], a
+            ld a, [NES_RAM + $19]
+            call .p6f
+.ee:        pop hl                          ; PLA / TAX / PLA / STA $19 / PLA / STA $18
+            ld e, l
+            pop hl
+            ld a, l
+            ld [NES_RAM + $19], a
+            pop hl
+            ld a, l
+            ld [NES_RAM + $18], a
+            ldh [nzv], a
+            ld b, 0
+            ld d, 0
+            inc a
+            dec a
+            ret
+.kadr:      ldh a, [n9_y]                   ; HL = key table + Y
+            add a, c
+            ld l, a
+            ldh a, [n9_at]
+            adc a, 0
+            ld h, a
+            ret
+.iadr:      ldh a, [c_x]                    ; HL = index table + Y
+            add a, c
+            ld l, a
+            ldh a, [c_val]
+            adc a, 0
+            ld h, a
+            ret
+.map:       ld a, h                         ; NES RAM / PRG-RAM address -> GB
+            cp $20
+            jr nc, .mp
+            and 7
+            or high(NES_RAM)
+            ld h, a
+            ret
+.mp:        add a, $40
+            ld h, a
+            ret
+
+
+; ------------------------------------------------------------------ main menu ($5808 / $5809)
+; GB layout (tools/gb3/layout.py main_menu): A <> 0: menu mode on (camera MCAM_X / 0, the right
+; windows on the window layer, the SCY steps of MNU_EV from the LYC interrupt); A = 0: off
+; (field camera, the HP rows' palettes from the NES attributes again).
+far_5808:   and a
+            jr z, .off
+            ldh a, [mnu]
+            and a
+            ret nz
+            ld a, $FF                       ; (no step this frame: the vblank starts them)
+            ldh [rLYC], a
+            xor a
+            ldh [mnu_i], a
+            ldh [ovr_st], a
+            ldh [cam_y], a
+            ldh [rWY], a
+            ld a, MCAM_X
+            ldh [cam_x], a
+            ld a, MNU_WX
+            ldh [rWX], a
+            ld a, $40                       ; STAT interrupt on LY = LYC
+            ldh [rSTAT], a
+            ldh a, [rIF]
+            and $FD
+            ldh [rIF], a
+            ldh a, [rIE]
+            or 2
+            ldh [rIE], a
+            ld a, 1
+            ldh [mnu], a
+            ld a, $FF                       ; every map row again (the window map's copy)
+            ld hl, map_dirty
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            ld hl, attr_dirty
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            ld a, 1
+            ldh [map_any], a
+            ret
+.off:       ldh a, [mnu]
+            and a
+            ret z
+            xor a
+            ldh [mnu], a
+            ldh [rSTAT], a
+            ldh a, [rIE]
+            and $FD
+            ldh [rIE], a
+            ld a, CAM_X
+            ldh [cam_x], a
+            ld a, CAM_Y
+            ldh [cam_y], a
+            push bc
+            push de
+            ld d, 3                         ; HP rows 3, 8, 13, 18: palettes from NT_SH
+.rr:        ld e, 4
+.c:         ld a, d                         ; attribute byte NT_SH + $3C0 + (row >> 2) * 8
+            and $1C                         ;   + (col >> 2)
+            add a, a
+            ld l, a
+            ld a, e
+            rrca
+            rrca
+            and 7
+            add a, l
+            add a, $C0
+            ld l, a
+            ld h, high(NT_SH) + 3
+            ld a, 1
+            ldh [rSVBK], a
+            ld a, [hl]
+            bit 1, d                        ; quadrant: row bit 1 -> high nibble, col bit 1
+            jr z, .t                        ;   -> bits 2-3
+            swap a
+.t:         bit 1, e
+            jr z, .u
+            rrca
+            rrca
+.u:         and 3
+            ld b, a
+            ldh a, [bg_bank]
+            or b
+            ld b, a
+            call mnu_cell
+            ld a, MAP_BANK
+            ldh [rSVBK], a
+            ld [hl], b
+            inc e
+            ld a, e
+            cp 15
+            jr c, .c
+            ld a, 1
+            ldh [rSVBK], a
+            ld a, d
+            call mnu_mark
+            ld a, d
+            add a, 5
+            ld d, a
+            cp 23
+            jr c, .rr
+            pop de
+            pop bc
+            ret
+
+far_5809:   push bc                         ; A = member * 4 + palette: the member's HP row
+            push de                         ;   (NES row 3 + 5 * member, cols 4-14)
+            ld b, a
+            and 3
+            ld c, a
+            ldh a, [bg_bank]
+            or c
+            ld c, a                         ; C = attribute (palette, BG table bank)
+            ld a, b
+            rrca
+            rrca
+            and 3
+            ld b, a
+            add a, a
+            add a, a
+            add a, b
+            add a, 3
+            ld d, a
+            ld e, 4
+            call mnu_cell
+            ld a, MAP_BANK
+            ldh [rSVBK], a
+            ld b, 11
+.w:         ld a, c
+            ld [hl+], a
+            dec b
+            jr nz, .w
+            ld a, 1
+            ldh [rSVBK], a
+            ld a, d
+            call mnu_mark
+            pop de
+            pop bc
+            ret
+
+mnu_cell:   ld a, d                         ; HL = ATTR_SH + D * 32 + E
+            rrca
+            rrca
+            rrca
+            ld h, a
+            and $E0
+            or e
+            ld l, a
+            ld a, h
+            and 3
+            add a, high(ATTR_SH)
+            ld h, a
+            ret
+
+mnu_mark:   ld b, a                         ; attribute row A marked for the vblank copy
+            and 7
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .n
+            inc h
+.n:         ld c, [hl]
+            ld a, b
+            rrca
+            rrca
+            rrca
+            and 3
+            add a, low(attr_dirty)
+            ld l, a
+            ld h, $FF
+            ld a, c
+            or [hl]
+            ld [hl], a
+            ld a, 1
+            ldh [map_any], a
+            ret
 
 section bank 0, nat_end0

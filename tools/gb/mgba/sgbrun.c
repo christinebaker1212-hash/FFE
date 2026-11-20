@@ -173,6 +173,18 @@ int main(int argc, char** argv) {
 			while (core->frameCounter(core) == fc) {
 				core->step(core);
 				if (nclk && f > 30) resync(core, clk, nclk, &lastw, pads, npads);
+				if (getenv("SGBRUN_TRAP")) {            /* PC = ADDR (bank 0): print the last 64 PCs (bank:pc) */
+					static int ta = -1, ti = 0, done = 0; static uint32_t ring[64];
+					if (ta < 0) ta = strtoul(getenv("SGBRUN_TRAP"), 0, 16);
+					uint32_t pc = 0; core->readRegister(core, "pc", &pc); pc &= 0xFFFF;
+					unsigned bk = ((struct GB*) core->board)->memory.currentBank;
+					ring[ti++ & 63] = (pc < 0x4000 ? 0 : bk) << 16 | pc;
+					if (pc == (unsigned) ta && !done) {
+						done = 1; printf("trap at %04X, last PCs:", ta);
+						for (int i = 0; i < 64; i++) { uint32_t v = ring[(ti + i) & 63]; printf(" %02X:%04X", v >> 16, v & 0xFFFF); }
+						printf("\n");
+					}
+				}
 				if (getenv("SGBRUN_CALLERS")) {         /* PC = ADDR (bank 0): the return address on the stack */
 					static int ca = -1; if (ca < 0) ca = strtoul(getenv("SGBRUN_CALLERS"), 0, 16);
 					uint32_t pc = 0; core->readRegister(core, "pc", &pc);
