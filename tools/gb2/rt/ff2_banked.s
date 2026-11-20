@@ -1704,8 +1704,61 @@ dmg_scan_all_b:
             ld e, a
             ld b, 12
 .c:         push bc
-            call sc_cell
-            pop bc
+            ld b, 0                         ; off the view, a tile the tileset fixed: only its
+            ld a, [SC_OW]                   ;   REF_BM bit (the parked check per tile at the
+            and a                           ;   end); else sc_cell
+            jr z, .o0
+            ld a, d
+            add a, a
+            add a, a
+            ld l, a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            or l
+            ld l, a
+            ld h, high(OWN)
+            ld c, [hl]
+            ld a, e
+            and 7
+            ld l, a
+            ld h, high(BITS8)
+            ld a, [hl]
+            and c
+            jr z, .o0
+            ld b, 4
+.o0:        ld a, [SC_RH]
+            add a, b
+            ld h, a
+            ld a, [SC_RB]
+            or e
+            ld l, a
+            ld c, [hl]
+            ld l, c
+            ld h, high(TILE_PAL)
+            bit 7, [hl]
+            jr z, .sl
+            ld a, c
+            and 7
+            ld l, a
+            ld h, high(BITS8)
+            ld b, [hl]
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and $1F
+            or low(REF_BM)
+            ld l, a
+            ld h, high(REF_BM)
+            ld a, [hl]
+            or b
+            ld [hl], a
+            jr .cn
+.sl:        call sc_cell
+.cn:        pop bc
             ld a, e
             inc a
             and 31
@@ -1746,6 +1799,37 @@ dmg_scan_all_b:
             pop bc
             dec b
             jr nz, .vr
+            ld e, 0                         ; tiles in use and parked: marked again (they are
+.pb:        ld a, e                         ;   needed now)
+            add a, low(REF_BM)
+            ld l, a
+            ld h, high(REF_BM)
+            ld b, [hl]
+            ld a, e
+            add a, low(DEFER_BM)
+            ld l, a
+            ld h, high(DEFER_BM)
+            ld a, [hl]
+            and b
+            jr z, .pn
+            ld c, a                         ; C = those bits of byte E
+            ld b, 0
+.pt:        srl c
+            jr nc, .pz
+            ld a, e
+            add a, a
+            add a, a
+            add a, a
+            or b
+            call dmg_mark
+.pz:        inc b
+            ld a, c
+            and a
+            jr nz, .pt
+.pn:        inc e
+            ld a, e
+            cp 32
+            jr nz, .pb
             pop hl
             pop de
             pop bc
@@ -1889,24 +1973,7 @@ sc_cell:    ld b, 0                         ; B = 4 for a cell nametable 1 owns
             ld [hl], b
             ld a, c
             jp dmg_mark
-.pk:        ld a, c                         ; same palette: a parked tile is marked again
-            and 7                           ;   (the cell uses it now)
-            ld l, a
-            ld h, high(BITS8)
-            ld h, [hl]
-            ld a, c
-            rrca
-            rrca
-            rrca
-            and $1F
-            add a, low(DEFER_BM)
-            ld l, a
-            ld a, h
-            ld h, high(DEFER_BM)
-            and [hl]
-            ret z
-            ld a, c
-            jp dmg_mark
+.pk:        ret                             ; (parked tiles in use: once per tile at the end)
 .ref:       ld a, c                         ; REF_BM |= bit C (keeps B, C, D, E)
             and 7
             ld l, a
@@ -2639,6 +2706,186 @@ hle_bcopy_b:
             ld l, 0
             inc l
             dec l                           ; Z = 1, C = 1
+            ret
+
+; b00:9D97-9DCF (map load): metatiles $7400[$88..255] -> 2 x 2 tiles at ($80) (+0, +1, +$20,
+; +$21 from $7800 / $7880 / $7900 / $7980 + X), ($80) += 2, a row's end + $20. Cart RAM
+; ($80 page $60-$7B) through GB pointers, else byte by byte. Exit as the NES: $88 = 0, Y = $21,
+; X = the last metatile, A and carry from the last pointer step, N = 0, Z = 1.
+hle_mexp_b:
+            ld a, [NES_RAM + $81]
+            cp $60
+            jr c, .gen
+            cp $7C
+            jr nc, .gen
+.lp:        ld a, [NES_RAM + $88]           ; X = $7400[$88] (cart RAM $B400)
+            ld l, a
+            ld h, $B4
+            ld e, [hl]
+            ld a, [NES_RAM + $80]           ; HL = ($80) in cart RAM
+            ld l, a
+            ld a, [NES_RAM + $81]
+            add a, $40
+            ld h, a
+            ld d, $B8                       ; $7800 + X -> +0
+            ld a, [de]
+            ld [hl+], a
+            ld d, $B8                       ; ($7880 + X: $B880; X < $80 not assumed)
+            ld a, e
+            add a, $80
+            ld c, a
+            ld a, d
+            adc a, 0
+            ld b, a
+            ld a, [bc]
+            ld [hl], a
+            ld bc, $1F                      ; +$20
+            add hl, bc
+            ld d, $B9                       ; $7900 + X
+            ld a, [de]
+            ld [hl+], a
+            ld a, e                         ; $7980 + X
+            add a, $80
+            ld c, a
+            ld a, $B9
+            adc a, 0
+            ld b, a
+            ld a, [bc]
+            ld [hl], a
+            call .step
+            ld hl, NES_RAM + $88
+            inc [hl]
+            jr nz, .lp
+            jr .x
+.gen:       ld a, [NES_RAM + $88]           ; (as the NES, through nes_rd / nes_wr)
+            ld l, a
+            ld h, $74
+            call nes_rd
+            ld e, l
+            ld d, $78
+            ld c, 0
+            call .g1
+            ld d, $78
+            ld a, e
+            add a, $80
+            ld e, a                         ; (E = X + $80: X >= $80 reads $7900+; as $7880,X)
+            ld a, d
+            adc a, 0
+            ld d, a
+            ld c, 1
+            call .g1
+            ld a, e
+            sub $80
+            ld e, a
+            ld d, $79
+            ld c, $20
+            call .g1
+            ld a, e
+            add a, $80
+            ld e, a
+            ld a, $79
+            adc a, 0
+            ld d, a
+            ld c, $21
+            call .g1
+            ld a, e
+            sub $80
+            ld e, a
+            call .step
+            ld hl, NES_RAM + $88
+            inc [hl]
+            jr nz, .gen
+.x:         ld a, [MU_T]                    ; (A as left by .step)
+            ld b, a
+            ld c, $21                       ; Y = $21
+            ld d, 0
+            xor a
+            ldh [nzv], a
+            ld a, [MU_N]                    ; carry of the last step
+            rrca
+            ld a, b
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1, carry kept
+            ld b, 0
+            ret
+.g1:        ld h, d                         ; byte at D:E -> ($80) + C
+            ld l, e
+            push de
+            call nes_rd
+            ld a, l
+            ldh [wtmp], a
+            ld a, [NES_RAM + $80]
+            add a, c
+            ld l, a
+            ld a, [NES_RAM + $81]
+            adc a, 0
+            ld h, a
+            call nes_wr
+            pop de
+            ret
+.step:      ld a, [NES_RAM + $80]           ; $80 += 2; at a row's end + $20 (carry: $81 + 1)
+            add a, 2
+            ld [NES_RAM + $80], a
+            ld b, 0
+            jr nc, .s0
+            inc b
+.s0:        and $1F
+            jr nz, .s1
+            ld a, [NES_RAM + $80]
+            add a, $20
+            ld [NES_RAM + $80], a
+            ld b, 0
+            jr nc, .s1
+            inc b
+            ld hl, NES_RAM + $81
+            inc [hl]
+.s1:        ld [MU_T], a                    ; (A, carry for the exit)
+            ld a, b
+            ld [MU_N], a
+            ret
+
+; b00:9DDB-9DDE (map load): LDA ($80),Y / CMP #$39 over $7000-$73FF: the bytes below $39 are
+; skipped here (INY, INC $81 at a page end); returns at the next byte >= $39 (carry 1) or at
+; the last byte of $73xx (carry 0) with A = the byte and the flags of the CMP; the BCC / JSR /
+; INY / loop end that follow run as the NES. ($81 outside $70-$73: one byte, as the NES.)
+hle_mscan_b:
+            ld a, [NES_RAM + $81]
+            cp $70
+            jr c, .one
+            cp $74
+            jr nc, .one
+.lp:        ld a, [NES_RAM + $80]           ; HL = ($80) + Y (cart RAM)
+            add a, c
+            ld l, a
+            ld a, [NES_RAM + $81]
+            adc a, $40
+            ld h, a
+            ld a, [hl]
+            cp $39
+            jr nc, .ret
+            ld b, a
+            inc c                           ; the last byte ($73FF): return it
+            jr nz, .ok
+            dec c
+            ld a, [NES_RAM + $81]
+            cp $73
+            ld a, b
+            jr z, .ret
+            inc c
+            ld hl, NES_RAM + $81
+            inc [hl]
+.ok:        jr .lp
+.one:       ld l, $80
+            call rt_izy_rd
+            ld a, l
+.ret:       ld b, 0                         ; flags of CMP #$39
+            ld l, a
+            sub $39
+            ldh [nzv], a
+            ld a, l
+            cp $39                          ; (Z, carry inverted to the 6502 sense)
+            ccf
             ret
 
 section bank HLE_BANK, $7F00

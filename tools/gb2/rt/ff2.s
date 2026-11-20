@@ -819,6 +819,42 @@ hle_fill4:  push af
             dec l                           ; Z = 1
             ret
 
+; b00:9E44-9E4C (map load): LDA $8B00,X / STA $0400,X / INX / BNE - the rest of the page from
+; the ROM data image to RAM. Exit: A = the last byte, X = 0, N = 0, Z = 1; Y, carry kept.
+hle_rcopy:  push af
+            push bc
+            ldh a, [data_bank8]
+            ld [$2000], a
+            ld h, $4B                       ; ($8B00 in the data image)
+            ld l, e
+            ld b, high(NES_RAM) + 4
+            ld c, e
+.l:         ld a, [hl+]
+            ld [bc], a
+            inc c
+            jr nz, .l
+            ld e, a
+            ldh a, [code_bank]
+            ld [$2000], a
+            ld a, e
+            ldh [tmp_lo], a
+            ld e, 0
+            pop bc
+            xor a
+            ldh [nzv], a
+            pop af
+            ldh a, [tmp_lo]
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1
+            ret
+hle_mexp:   call rt_fcs                     ; b00:9D97 map load metatile expansion (native)
+            db HLE_BANK
+            dw hle_mexp_b
+hle_mscan:  call rt_fcs                     ; b00:9DDB map load scan (native)
+            db HLE_BANK
+            dw hle_mscan_b
+
 ; fix:F496 / F4B1 (boot, screen clears): STA $2007 / INY / BNE / DEX / BNE with Y = 0: X pages
 ; of A through hle_fill (whole tiles / nametable cells in bulk). Exit: X = Y = 0, Z = 1, N = 0,
 ; A and carry kept.
