@@ -916,6 +916,8 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   RAM ($90-$93, $9E) and exit registers. RAM identical (battle 7100 frames, checkall 62/62),
   battle VRAM identical but for tiles arriving a frame apart. DMG 131 -> 121 (battle rounds
   48 -> 38), CGB 0.
+- hle_sw16 / hle_cp64 copies unrolled (FF1 swaps $90-$9F and copies a box's text for every
+  box it redraws). checkall 62/62. DMG 121 -> 118.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

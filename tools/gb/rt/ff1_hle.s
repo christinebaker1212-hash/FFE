@@ -777,8 +777,29 @@ hle_cp64:   ld a, [NES_RAM + $90]           ; source in one 8 KB area of ROM or 
 .bk:        ld [$2000], a
 .cp:        push de                         ; (E = X: kept)
             ld de, EX_RAM + $380
-            ld c, $40
+            ld c, 8                         ; (64 bytes, 8 a pass; $CB80 stays in its page)
 .cl:        ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
             ld [de], a
             inc e
             dec c
@@ -823,16 +844,104 @@ hle_cp64:   ld a, [NES_RAM + $90]           ; source in one 8 KB area of ROM or 
 hle_sw16:   push af
             push bc
             ld hl, NES_RAM + $90
-            ld de, $AD74                    ; ($6D74)
-            ld b, 16
-.l:         ld a, [de]
+            ld de, $AD74                    ; ($6D74; the 16 bytes stay in its page)
+            ld a, [de]
             ld c, [hl]
             ld [hl+], a
             ld a, c
             ld [de], a
-            inc de
-            dec b
-            jr nz, .l
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+
             ld a, $80
             ldh [nzv], a
             pop bc
