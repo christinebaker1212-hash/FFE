@@ -1997,7 +1997,7 @@ rt_ppu_w7:  ldh [w7v], a                    ; LCD off (or a CGB masked load), a 
             jr nz, .f1
             ld a, l
             cp $C0
-            jr nc, .gen1
+            jr nc, .at
 .f1:        ld a, h
             add a, high(NT_SH)
             ld h, a
@@ -2033,6 +2033,27 @@ rt_ppu_w7:  ldh [w7v], a                    ; LCD off (or a CGB masked load), a 
             ld [hl], a
             jr .fp
 .fm:        ld [MAP_RB], a
+            jr .fp
+.at:        bit 2, h                        ; an attribute byte of nametable 0 (CGB: no cell
+            jr nz, .gen1                    ;   drawn by nametable 1, as ntfill): the shadow;
+            ldh a, [own1_lo]                ;   the cells' palettes from it when the screen
+            ld l, a                         ;   shows (DMG: the LCD-on scan; CGB: repal_b)
+            ldh a, [own1_hi]
+            or l
+            jr z, .a0
+            ldh a, [is_cgb]
+            and a
+            jr nz, .gen1
+.a0:        ldh a, [ppu_vl]
+            ld l, a
+            ld h, high(NT_SH) + 3
+            ldh a, [w7v]
+            cp [hl]
+            jr z, .fp
+            ld [hl], a
+            ld a, 1
+            ld [CGB_RP], a
+            ldh [dmg_scan], a
 .fp:        ldh a, [ppu_ctrl]               ; v += 1 or 32
             and 4
             ld a, 1
@@ -3294,7 +3315,24 @@ rt_dyn_jump:                                ; HL = NES address
             pop af
             jp hl
 .far:       pop af                          ; another bank: call it, so that its RTS
-            call rt_farcall                 ; comes back here and the bank is restored
+            push af                         ;   comes back here and the bank is restored;
+            push hl                         ;   but when the frame on top is a farcall
+            ld hl, sp + 4                   ;   frame, its return sets the bank itself: a
+            ld a, [hl+]                     ;   plain jump (a loop of JMP (ind) / PLA PLA
+            cp low(rt_farcall_ret)          ;   across banks, as b12:946C, grew the stack)
+            jr nz, .cl
+            ld a, [hl]
+            cp high(rt_farcall_ret)
+            jr nz, .cl
+            ldh a, [fc_bank]
+            ldh [code_bank], a
+            ld [$2000], a
+            pop hl
+            pop af
+            jp hl
+.cl:        pop hl
+            pop af
+            call rt_farcall
             ret
 
 rt_jmp_ind:                                 ; JMP (ind): HL = GB address of the pointer
@@ -3374,7 +3412,15 @@ rt_unwind_a:
             jr c, .lp                       ; bank-0 stub return: not an NES frame
             dec b
             jr nz, .lp
-            ldh a, [uw_bank]
+            pop hl                          ; the frame below is a farcall frame too: the one
+            push hl                         ;   dropped is not kept (that frame's return sets
+            ld a, h                         ;   the bank itself; kept, a loop that drops its
+            cp high(rt_farcall_ret)         ;   return and jumps back, as b12:946A, grew the
+            jr nz, .kb                      ;   stack 4 bytes a turn when called from another
+            ld a, l                         ;   bank)
+            cp low(rt_farcall_ret)
+            jr z, .res
+.kb:        ldh a, [uw_bank]
             and a
             jr z, .res
             ld h, a

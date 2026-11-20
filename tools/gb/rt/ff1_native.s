@@ -2158,16 +2158,9 @@ ntclr_b:    push af
             ldh [own1_lo], a
             ld a, high(960)
             ldh [own1_hi], a
-            ldh a, [is_cgb]
-            and a
-            jr nz, .cg
-            ld a, 1
-            ldh [dmg_scan], a
-            jr .at
-.cg:        ld a, d                         ; CGB: attribute shadows unlike D, so the attribute
-            cpl                             ;   bytes below colour every cell again
-            ld hl, NT_SH + $3C0
-            ld c, 64
+            ld a, d                         ; attribute bytes: the shadows; the cells'
+            ld hl, NT_SH + $3C0             ;   palettes from them when the screen shows
+            ld c, 64                        ;   (DMG: the LCD-on scan; CGB: repal_b)
 .c1:        ld [hl+], a
             dec c
             jr nz, .c1
@@ -2176,10 +2169,13 @@ ntclr_b:    push af
 .c2:        ld [hl+], a
             dec c
             jr nz, .c2
-.at:        ld a, $23                       ; attribute bytes
-            call .attr
-            ld a, $27
-            call .attr
+            ld a, 1
+            ld [CGB_RP], a
+            ldh [dmg_scan], a
+            ld a, $28                       ; v = $2800 (after 8 x 256 writes)
+            ldh [ppu_vh], a
+            xor a
+            ldh [ppu_vl], a
             jr .out
 .gen:       ld e, 0                         ; 8 x 256 writes
             ld c, 8
@@ -2221,15 +2217,6 @@ ntclr_b:    push af
             ld [hl+], a
             dec c
             jr nz, .f1
-            ret
-.attr:      ldh [ppu_vh], a                 ; A = $23 / $27: its 64 attribute bytes
-            ld a, $C0
-            ldh [ppu_vl], a
-            ld c, 64
-.a:         ld a, d
-            call rt_ppu_w7
-            dec c
-            jr nz, .a
             ret
 
 ; ---- fix:F4EA (battle panel row): LDY #0 / LDA ($88),Y / STA $2007 / INY / CPY #$19 /

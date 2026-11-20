@@ -854,6 +854,19 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   (`OAM_CLEAN`; copy in cart RAM bank 3 `OC_HDR`/`OC_COPY`; only when the last conversion
   used 6+ sprites). checkall 62/62. **Lag on the 7650-wait script: CGB 0** (GB 7675 frames
   for the NES's 7677), DMG ~157.
+- **2026-11-20 (later):** recompiler: `(zp),Y` inline for any read and for STA when the coverage
+  saw the target in one region (RAM / save RAM / ExRAM), the runtime call otherwise; cross-bank
+  `xj_` stubs only where used (none: ~1.4 KB of bank 0 freed). `rt_ppu_w7`: LCD-off attribute
+  bytes of nametable 0 to the shadow only (palettes when shown, as ntfill); battle nametable
+  clear writes its attribute tables in bulk. **Two GB stack leaks fixed** (found because the
+  bigger code needed 7 banks: random play overflowed the GB stack into NES $FE): `rt_unwind`
+  (PLA PLA) no longer keeps the dropped caller's farcall frame when the frame below is a
+  farcall frame, and a cross-bank dynamic jump is a plain jump when the frame on top is one
+  (b12:946A/946C, battle state loop: +4 / +6 bytes a turn when called across banks). Tools:
+  sgbrun SGBRUN_MINSP / SGBRUN_TRACE=A-B / SGBRUN_STK=PC / SGBRUN_CALLSP. checkall 62/62.
+  Lag: CGB 0, DMG 151.
+- **Owner's decision (2026-11-20): native presentation over recompiled logic** for all three
+  ports: `docs/gb-native-presentation.md`. FF1 work follows it from here.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

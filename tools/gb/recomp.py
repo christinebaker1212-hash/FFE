@@ -412,6 +412,8 @@ class Emitter:
         i = self.i; m = i.mode
         if m == 'imm': return '$%02X' % i.arg
         if m in ('izy', 'izx'):
+            if self.izy_inline(None): return 'a'
+            if self.izy_inline('l'): return 'l'
             self.o('ld l, $%02X' % i.arg, 'call rt_%s_rd' % m)
             return 'l'
         a = i.arg; idx = self.index_reg()
@@ -432,10 +434,48 @@ class Emitter:
             self.o('call rt_mmc_r%04X' % a); return 'l'
         self.o('ld l, 0'); self.rc.warn.append('read of %04X at %r' % (a, i)); return 'l'
 
+    # (zp),Y inline for LDA / STA when the coverage saw its target in one region only (RAM,
+    # save RAM or ExRAM; the zero-page pointer read is RAM too): the address checked, the
+    # runtime call kept for anything else; GB flags kept on the stack where live.
+    IZY_CHK = {0x00: ('cp $20', 'jr nc, .izs', 'and $07', 'or $C0'),
+               0x20: ('sub $60', 'cp $20', 'jr nc, .izs', 'add a, $A0'),
+               0x10: ('sub $5C', 'cp $04', 'jr nc, .izs', 'add a, $C8')}
+
+    def izy_inline(self, st):
+        i = self.i
+        if i.mode != 'izy' or i.arg == 0xFF or not i.mem & 1: return False
+        chk = self.IZY_CHK.get(i.mem & 0xFE)
+        if chk is None: return False
+        if st == 'l':                                     # any other read: the byte in L
+            if i.mn in ('LDA', 'STA'): return False
+            if '%s:%04X' % (i.space, i.addr) in os.environ.get('IZY_SKIP', ''): return False
+            self.rc.izy_inl = getattr(self.rc, 'izy_inl', 0) + 1
+            self.o('push af', 'ld hl, $%04X' % (0xC000 + i.arg), 'ld a, [hl+]', 'ld h, [hl]', 'ld l, a',
+                   'add hl, bc', 'ld a, h', *chk, 'ld h, a', 'ld l, [hl]', 'pop af', 'jr .izd', '.izs:',
+                   'pop af', 'ld l, $%02X' % i.arg, 'call rt_izy_rd', '.izd:')
+            return True
+        if i.mn != ('LDA' if st is None else 'STA'): return False
+        pc = st is None and 'C' in self.keep              # (LDA: carry live: kept on the stack)
+        self.rc.izy_inl = getattr(self.rc, 'izy_inl', 0) + 1
+        if st or pc: self.o('push af')
+        self.o('ld hl, $%04X' % (0xC000 + i.arg), 'ld a, [hl+]', 'ld h, [hl]', 'ld l, a', 'add hl, bc',
+               'ld a, h', *chk, 'ld h, a')
+        if st:
+            self.o('pop af', 'ld [hl], a', 'jr .izd', '.izs:', 'pop af', 'ld l, $%02X' % i.arg,
+                   'call rt_izy_wr', '.izd:')
+        elif pc:
+            self.o('ld a, [hl]', 'ld l, a', 'pop af', 'ld a, l', 'jr .izd', '.izs:', 'pop af',
+                   'ld l, $%02X' % i.arg, 'call rt_izy_rd', 'ld a, l', '.izd:')
+        else:
+            self.o('ld a, [hl]', 'jr .izd', '.izs:', 'ld l, $%02X' % i.arg, 'call rt_izy_rd',
+                   'ld a, l', '.izd:')
+        return True
+
     def store(self, reg):
         """store register reg ('a', 'e', 'c') to the instruction's address"""
         i = self.i; m = i.mode
         if m in ('izy', 'izx'):
+            if reg == 'a' and self.izy_inline('a'): return
             if reg == 'a': self.o('ld l, $%02X' % i.arg, 'call rt_%s_wr' % m)
             else: self.o('push af', 'ld a, %s' % reg, 'ld l, $%02X' % i.arg, 'call rt_%s_wr' % m, 'pop af')
             return
@@ -850,11 +890,12 @@ def emit_program(rc):
                     elif i.mn != 'JSR' or True:
                         out.append('    call rt_fatal')
     # stubs (bank 0)
-    stubs = ['section bank 0, $%04X' % (0x3D20 - 18 * len(xrefs))]   # (18 bytes each, ending at pf_call)
+    xj = {l for l in xrefs if l in XJ_USED}               # (jumps: call the stub, then return)
+    stubs = ['section bank 0, $%04X' % (0x3D20 - 14 * len(xrefs) - 4 * len(xj))]   # (ending at pf_call)
     for lab in sorted(xrefs):
         stubs += ['xs_%s:' % lab, '    ldh [sv_a], a', '    ld a, bank(%s)' % lab, '    ldh [fc_bank], a',
-                  '    ldh a, [sv_a]', '    ld hl, %s' % lab, '    jp rt_farcall',
-                  'xj_%s:' % lab, '    call xs_%s' % lab, '    ret']
+                  '    ldh a, [sv_a]', '    ld hl, %s' % lab, '    jp rt_farcall']
+        if lab in xj: stubs += ['xj_%s:' % lab, '    call xs_%s' % lab, '    ret']
     # dynamic target table (bank DYN_BANK): 256 buckets by the NES address's low byte, each a
     # count and entries nes_hi, key, gb_bank, gb_lo, gb_hi (runtime lookup)
     buckets = defaultdict(list)
@@ -872,6 +913,9 @@ def emit_program(rc):
     return '\n'.join(stubs + out + tab) + '\n', bank_of, banks
 
 
+XJ_USED = set()                                           # labels reached by a cross-bank jp
+
+
 def retarget(line, bank, bank_of, xrefs):
     """route jp/call to labels in another bank through a bank-0 stub"""
     s = line.strip()
@@ -884,6 +928,7 @@ def retarget(line, bank, bank_of, xrefs):
                 if tb is not None and tb != bank:
                     xrefs.add(tgt)
                     if op == 'jp ':
+                        XJ_USED.add(tgt)
                         # a jump into another bank: call the stub and return (keeps the
                         # caller's bank correct when the target finally returns)
                         if ',' in s:

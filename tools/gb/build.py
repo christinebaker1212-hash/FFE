@@ -303,6 +303,7 @@ def main():
     src_all = rt + '\n' + shade_src + '\n' + nes_rgb_src() + '\n' + border_src() + '\n' + prog
     open(opt['--out'] + '.s', 'w').write(src_all)
     print('recompiled: %d instructions, %d code banks (%.1fs)' % (len(rc.insns), len(banks), time.time() - t))
+    print('  (zp),Y inline: %d' % getattr(rc, 'izy_inl', 0))
     t = time.time()
     r = asm(src_all, syms={'DATA': DATA, 'RT_TABLES': RT_TABLES})
     print('assembled (%.1fs)' % (time.time() - t))
