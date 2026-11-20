@@ -72,7 +72,7 @@ def parse_listing(path):
 class Rom:
     """banks: {index: bytes}; base: {index: CPU address of byte 0}; lmap: listing bank ->
     index; fixed: (index at $C000, index at $E000)"""
-    def __init__(self, path, english):
+    def __init__(self, path, english, gb=False):
         data = open(path, 'rb').read()
         if hashlib.sha1(data).hexdigest() != SHA1_JA:
             sys.exit('expected "Final Fantasy III (Japan).nes" (sha1 %s)' % SHA1_JA)
@@ -92,6 +92,10 @@ class Rom:
             self.seeds = [(EXRAM, bm.LABELS[k] - 0x5C00, 'tools/ff3_mmc5 ' + k)
                           for k in ('irq_entry', 'enable', 'fx2f', 'mir_h', 'mir_v') if k in bm.LABELS]
             data = open(en, 'rb').read()
+            if gb:                          # the GB-layout ROM (tools/gb3/layout.py)
+                import layout
+                data, lmods, _ = layout.apply(data)
+                self.mods += lmods
         self.rom = data; prg = data[16:]
         n = len(prg) // B8
         self.banks = {i: prg[i * B8:(i + 1) * B8] for i in range(n)}
@@ -118,8 +122,8 @@ def target(mn, md, bs, pc):
     if mn in ('JSR', 'JMP') and md == 'abs': return bs[1] | bs[2] << 8
     return None
 
-def build(rom_path, outdir, listing, english=False):
-    R = Rom(rom_path, english)
+def build(rom_path, outdir, listing, english=False, gb=False):
+    R = Rom(rom_path, english, gb)
     banks, base = R.banks, R.base
     code = {b: {} for b in banks}               # bank -> {offset: entry}
     names = {b: {} for b in banks}              # bank -> {offset: label from insert.py}
@@ -341,9 +345,10 @@ if __name__ == '__main__':
     ap.add_argument('rom'); ap.add_argument('outdir')
     ap.add_argument('--english', action='store_true')
     ap.add_argument('--listing', default='build/src/ff3/ff3j.asm')
+    ap.add_argument('--gb', action='store_true', help='(with --english) the GB-layout ROM (tools/gb3/layout.py)')
     ap.add_argument('-v', action='store_true', help='list every re-decoded / flow item')
     a = ap.parse_args()
-    ok, summary, rep, rom = build(a.rom, a.outdir, a.listing, a.english)
+    ok, summary, rep, rom = build(a.rom, a.outdir, a.listing, a.english, a.gb)
     tot = 0
     for n, s in summary.items():
         print('%-7s %5d code bytes, %4d labels, reassembles: %s' % (n, s['code_bytes'], s['labels'], s['reassembles']))

@@ -17,9 +17,10 @@ Battle (decision 3, with FF1 / FF2's battle rules):
   English text has no dakuten row): 4 text rows; party window cols 2-21 (GB 0-19), command
   and enemy-name windows cols 2-11 (GB 0-9)
 """
-import os, sys
+import os, sys, re
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..'))
+sys.path.insert(0, HERE)
 from asm6502 import asm
 B8 = 0x2000
 FONT = 0x1B000                          # English font: tile N = code N (PRG offset)
@@ -360,7 +361,23 @@ FR: .db $F9, $FB, $FB, $FB, $FB, $FE
 MSGX_END = 0x6000
 
 
+EXRAM = 128                             # ff3src / ff3en index of the ExRAM image
+
+
 class Rom:
+    def module(self, src, syms=None):
+        """assemble a code module, as tools/gb3/ff3en.py records insert.py's: org, bytes,
+        labels, insns (instruction starts)"""
+        import ff3en
+        m = asm(src, syms=syms)
+        msrc, n = ff3en.marked(src)
+        m2 = asm(msrc, syms=syms)
+        assert m2.bytes == m.bytes
+        insns = sorted(v for k, v in m2.labels.items() if re.search(r'\.__i\d+$', k))
+        assert len(insns) == n
+        labels = {k: v for k, v in m.labels.items() if syms is None or k not in syms}
+        return dict(org=m.org, bytes=bytes(m.bytes), labels=labels, insns=insns)
+
     def __init__(self, data):
         self.d = bytearray(data); self.log = []; self.mods = []
 
@@ -378,19 +395,28 @@ class Rom:
         self.log.append((bank, addr, why))
 
 
+TRAMP_SRC = '''
+    org $5E7F
+gbbon:              ; battle start: the GB's battle cameras
+    lda #1
+    bne gbcam
+gbboff:             ; battle end: the field camera
+    lda #0
+gbcam:
+    sta $5806       ; (GB runtime: camera set; open bus on the NES)
+    jmp $FA1D       ; reset ppu control (the call this replaces)
+'''
+
+
 def battle(r):
     B2F, B34, B7F, B40 = 0x2F, 0x34, 0x7F, 0x40
     # cameras: two trampolines in the ExRAM image's free bytes ($5E7F-$5E8F; the English
     # engine's box save buffer starts at $5E90), called instead of "reset ppu control"
     # ($FA1D) at the start and the end of a battle ($FA26)
-    code = bytes([
-        0xA9, 0x01,             # $5E7F gbbon:  LDA #1 (battle cameras)
-        0xD0, 0x02,             #               BNE +2
-        0xA9, 0x00,             # $5E83 gbboff: LDA #0 (field camera)
-        0x8D, 0x06, 0x58,       #               STA $5806 (GB: camera set)
-        0x4C, 0x1D, 0xFA])      #               JMP $FA1D
-    assert len(code) <= 0x5E90 - 0x5E7F
-    r.patch(B40, 0x827F, 'FF' * len(code), code.hex(), 'battle camera trampolines (ExRAM $5E7F)')
+    t = r.module(TRAMP_SRC)
+    assert t['org'] + len(t['bytes']) <= 0x5E90
+    r.patch(B40, 0x827F, 'FF' * len(t['bytes']), t['bytes'].hex(), 'battle camera trampolines (ExRAM $5E7F)')
+    r.mods.append(dict(t, where=(EXRAM, t['org'] - 0x5C00)))
     r.patch(B7F, 0xFA2F, '20 1D FA', '20 7F 5E', 'battle start: battle cameras')
     r.patch(B7F, 0xFA73, '20 1D FA', '20 83 5E', 'battle end: field camera')
     # party column: x by row (front, back) and members 24 px apart
@@ -426,26 +452,27 @@ def battle(r):
 
 def battle_messages(r):
     B34 = 0x34
-    x = asm(MSGX_SRC)
-    assert x.org + len(x.bytes) <= MSGX_END, hex(x.org + len(x.bytes))
-    xo = r.off(0x40, x.org - 0x5C00 + 0x8000)
-    assert set(r.d[xo:xo + len(x.bytes)]) == {0xFF}
-    r.d[xo:xo + len(x.bytes)] = x.bytes
-    r.log.append((0x40, x.org, 'message window helpers in ExRAM (%d bytes)' % len(x.bytes)))
-    r.mods.append(x)
+    x = r.module(MSGX_SRC)
+    assert x['org'] + len(x['bytes']) <= MSGX_END, hex(x['org'] + len(x['bytes']))
+    xo = r.off(0x40, x['org'] - 0x5C00 + 0x8000)
+    assert set(r.d[xo:xo + len(x['bytes'])]) == {0xFF}
+    r.d[xo:xo + len(x['bytes'])] = x['bytes']
+    r.log.append((0x40, x['org'], 'message window helpers in ExRAM (%d bytes)' % len(x['bytes'])))
+    r.mods.append(dict(x, where=(EXRAM, x['org'] - 0x5C00)))
     r.patch(0x40, 0x8290, 'FF', '00', 'MCNT = 0 at reset (ExRAM image)')
-    syms = {k: v for k, v in x.labels.items() if '.' not in k}
+    syms = {k: v for k, v in x['labels'].items() if '.' not in k}
     syms['ARROW'] = ARROW
-    m = asm(MSG_SRC, syms=syms)
-    assert m.org == 0x8D1B and m.org + len(m.bytes) <= MSG_END, hex(m.org + len(m.bytes))
+    m = r.module(MSG_SRC, syms)
+    assert m['org'] == 0x8D1B and m['org'] + len(m['bytes']) <= MSG_END, hex(m['org'] + len(m['bytes']))
+    m['bytes'] += b'\xEA' * (MSG_END - 0x8D1B - len(m['bytes']))       # (the old routines' rest)
     o = r.off(B34, 0x8D1B)
     if r.d[o:o + 5].hex() != '8518203ffd' or r.d[r.off(B34, 0x8E83):r.off(B34, 0x8E85)].hex() != '6122':
         raise SystemExit('layout: open message window / box table not found')
-    r.d[o:r.off(B34, MSG_END)] = m.bytes + b'\xEA' * (MSG_END - 0x8D1B - len(m.bytes))
-    r.log.append((B34, 0x8D1B, 'message window routines (%d bytes)' % len(m.bytes)))
-    r.mods.append(m)
+    r.d[o:r.off(B34, MSG_END)] = m['bytes']
+    r.log.append((B34, 0x8D1B, 'message window routines'))
+    r.mods.append(dict(m, where=(B34, 0x8D1B & 0x1FFF)))
     # the close call ($94DF LDA $4B / JSR $8E14) -> msgclose
-    c = m.labels['msgclose']
+    c = m['labels']['msgclose']
     r.patch(B34, 0x94E0, '4B 20 14 8E', '4B 20 %02X %02X' % (c & 0xFF, c >> 8), 'close message window')
     # box texts: never split (one row of 64 in the buffer; the window wraps them itself)
     for a in (0x9091, 0x90C1, 0x9168, 0x91BF, 0x91EF, 0x9253, 0x9313):
@@ -465,13 +492,19 @@ def battle_messages(r):
     r.log.append((0, 0, 'arrow glyph $%02X' % ARROW))
 
 
-def main():
-    src, out = sys.argv[1], sys.argv[2]
-    r = Rom(open(src, 'rb').read())
+def apply(data):
+    """English NES ROM bytes -> (GB-layout ROM bytes, code modules for tools/gb3/ff3src.py)"""
+    r = Rom(data)
     battle(r)
     battle_messages(r)
-    open(out, 'wb').write(bytes(r.d))
-    print('layout: %d patches -> %s' % (len(r.log), out))
+    return bytes(r.d), r.mods, r.log
+
+
+def main():
+    src, out = sys.argv[1], sys.argv[2]
+    d, mods, log = apply(open(src, 'rb').read())
+    open(out, 'wb').write(d)
+    print('layout: %d patches, %d code modules -> %s' % (len(log), len(mods), out))
 
 
 if __name__ == '__main__':

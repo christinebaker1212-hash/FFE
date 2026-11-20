@@ -2264,6 +2264,7 @@ nat_9fe4:   ldh a, [data_bank8]
 ; the last carry-producing step; X, Y as the loop leaves them.
 nat_966a:   ld a, BCONV_GB                  ; (GB layout, tools/gb3/layout.py: lines start in
             and a                           ;   the first buffer row and a newline is one row)
+            ld a, 0
             jr nz, .g0
             ld a, [NES_RAM + $18]
 .g0:        call nat_a558

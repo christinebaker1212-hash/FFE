@@ -1,6 +1,9 @@
 """Build the Game Boy Color FF3 English ROM from the user's own NES ROM.
 
-usage: build.py ["Final Fantasy III (Japan).nes"] [--nes EN.nes] [--cov DIR] [--out ROM]
+usage: build.py ["Final Fantasy III (Japan).nes"] [--gb] [--nes EN.nes] [--cov DIR] [--out ROM]
+
+--gb: the GB screen layouts (tools/gb3/layout.py on the English NES ROM = build/ff3_gb.nes,
+source base build/ff3/src_gb, output build/ff3_gb.gbc)
 
 1. NES ROM -> MMC5 (tools/ff3_mmc5/build.py) -> English (tools/ff3/insert.py)
    = build/ff3_en.nes
@@ -37,11 +40,11 @@ def nes_english(src, out_dir):
     return out
 
 
-def source_base(src, nes, srcdir):
-    """build/ff3/src_en from the listing + ROM, unless it is already there for this ROM"""
+def source_base(src, nes, srcdir, gb=False):
+    """build/ff3/src_en (src_gb) from the listing + ROM, unless it is already there for this ROM"""
     mp = os.path.join(srcdir, 'map.json')
     sha = hashlib.sha1(open(nes, 'rb').read()).hexdigest()
-    tools = [os.path.join(HERE, f) for f in ('ff3src.py', 'ff3en.py')] + [os.path.join(ROOT, 'tools', 'ff3', 'insert.py')]
+    tools = [os.path.join(HERE, f) for f in ('ff3src.py', 'ff3en.py', 'layout.py')] + [os.path.join(ROOT, 'tools', 'ff3', 'insert.py')]
     fresh = os.path.exists(mp) and all(os.path.getmtime(t) <= os.path.getmtime(mp) for t in tools)
     if fresh and json.load(open(mp))['rom_sha1'] == sha: return
     listing = os.path.join(ROOT, 'build', 'src', 'ff3', 'ff3j.asm')
@@ -49,7 +52,8 @@ def source_base(src, nes, srcdir):
         raise SystemExit('everything8215 listing missing: git clone --depth 1 '
                          'https://github.com/everything8215/ff3 build/src/ff3')
     from pyrun import script_cmd
-    subprocess.check_call(script_cmd(os.path.join(HERE, 'ff3src.py'), src, srcdir, '--english', '--listing', listing), cwd=ROOT)
+    subprocess.check_call(script_cmd(os.path.join(HERE, 'ff3src.py'), src, srcdir, '--english', '--listing', listing,
+                                     *(['--gb'] if gb else [])), cwd=ROOT)
 
 
 def oam_attr_src():
@@ -68,18 +72,26 @@ def oam_attr_src():
 def main():
     args = sys.argv[1:]
     opt = {'--cov': os.path.join(ROOT, 'build', 'ff3', 'cov'),
-           '--out': os.path.join(ROOT, 'build', 'ff3_en.gbc'), '--nes': None}
-    pos = []
+           '--out': None, '--nes': None}
+    pos = []; gb = False
     while args:
         a = args.pop(0)
-        if a in opt: opt[a] = args.pop(0)
+        if a == '--gb': gb = True
+        elif a in opt: opt[a] = args.pop(0)
         else: pos.append(a)
+    opt['--out'] = opt['--out'] or os.path.join(ROOT, 'build', 'ff3_gb.gbc' if gb else 'ff3_en.gbc')
     src = pos[0] if pos else os.path.join(ROOT, 'roms', 'Final Fantasy III (Japan).nes')
     out_dir = os.path.dirname(os.path.abspath(opt['--out']))
     os.makedirs(out_dir, exist_ok=True)
     nes = opt['--nes'] or nes_english(src, out_dir)
-    srcdir = os.path.join(ROOT, 'build', 'ff3', 'src_en')
-    source_base(src, nes, srcdir)
+    if gb and not opt['--nes']:              # the GB-layout NES ROM (tools/gb3/layout.py)
+        import layout
+        d, _, log = layout.apply(open(nes, 'rb').read())
+        nes = os.path.join(out_dir, 'ff3_gb.nes')
+        open(nes, 'wb').write(d)
+        print('layout: %d patches -> %s' % (len(log), nes))
+    srcdir = os.path.join(ROOT, 'build', 'ff3', 'src_gb' if gb else 'src_en')
+    source_base(src, nes, srcdir, gb)
     covs = sorted(glob.glob(os.path.join(opt['--cov'], 'c*.bin')))   # optional: stack-trick flags
     t = time.time()
     cm = CodeMap(nes, srcdir, covs).build()
