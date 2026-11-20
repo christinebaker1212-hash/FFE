@@ -224,8 +224,49 @@ def lists(nes, outd, base, cmd, hand):
     print('wrote', outd, outs)
 
 
+def magic_options(nes, outd, base, cmd):
+    """clearer battle magic list layouts (owner: the two-row mix is confusing): A = a level line
+    then the spells (2 rows), 3 levels in a tall window of 9 rows; B = a level line then one spell
+    per row, 2 levels; D = two rows per level with labelled level / MP on row 2"""
+    F = RomFont(nes); T = Tiles(cmd); outs = []
+    def field(rows):
+        s = Screen(T); battlefield(base, s)
+        s.im.paste((0, 0, 0), (0, rows * 8, 160, 144))
+        return s
+    sp = SPELLS[::-1]                                  # (highest level first, as FF3)
+    s = field(7); s.window(0, 7, 20, 11)
+    for i, (lv, names, mp) in enumerate(sp[:3]):
+        r = 8 + 3 * i
+        F.draw(s, 1, r, 'Lv' + lv, T.ink); F.draw(s, 11, r, 'MP ' + mp, T.ink)
+        F.draw(s, 1, r + 1, names[0], T.ink); F.draw(s, 10, r + 1, names[1], T.ink)
+        F.draw(s, 1, r + 2, names[2], T.ink)
+    s.save(os.path.join(outd, 'MA_level_line.png')); outs.append('MA_level_line.png')
+    s = field(8); s.window(0, 8, 20, 10)
+    for i, (lv, names, mp) in enumerate(sp[:2]):
+        r = 9 + 4 * i
+        F.draw(s, 1, r, 'Lv' + lv, T.ink); F.draw(s, 11, r, 'MP ' + mp, T.ink)
+        for j in range(3): F.draw(s, 1, r + 1 + j, names[j], T.ink)
+    s.save(os.path.join(outd, 'MB_one_per_row.png')); outs.append('MB_one_per_row.png')
+    s = field(8); s.window(0, 8, 20, 10)
+    for i, (lv, names, mp) in enumerate(sp[:4]):
+        r = 9 + 2 * i
+        F.draw(s, 1, r, names[0], T.ink); F.draw(s, 10, r, names[1], T.ink)
+        F.draw(s, 1, r + 1, names[2], T.ink); F.draw(s, 10, r + 1, 'Lv' + lv + ' MP' + mp, T.ink)
+    s.save(os.path.join(outd, 'MD_labelled.png')); outs.append('MD_labelled.png')
+    ims = [Image.open(os.path.join(outd, o)) for o in outs]
+    sheet = Image.new('RGB', (480 * 3 + 32, 432), (40, 40, 40))
+    for i, im in enumerate(ims): sheet.paste(im, (i * 496, 0))
+    sheet.save(os.path.join(outd, 'magic_options.png'))
+    print('wrote', outd, outs)
+
+
 def main():
     nes, outd = sys.argv[1], sys.argv[2]
+    if len(sys.argv) > 3 and sys.argv[3] == 'magic':
+        os.makedirs(outd, exist_ok=True)
+        fr = capture(nes, [8950, 9000])
+        magic_options(nes, outd, fr[8950], fr[9000])
+        return
     if len(sys.argv) > 3 and sys.argv[3] == 'lists':
         os.makedirs(outd, exist_ok=True)
         fr = capture(nes, [8950, 9000])

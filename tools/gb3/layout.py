@@ -700,29 +700,195 @@ def items_pages(r):
           'the hands: English labels R.Hand / L.Hand')
 
 
+# battle magic list (owner, 2026-11-20: "a level line, then one spell per row"): per level a
+# line "Lv<n>  MP cur/max" and its three spells one per row (4 rows of 18), 2 levels per page.
+# The level rows come from MGROW (bank 87, in place of the English row converter mconv, through
+# its far-call entry $A009); the menu's input goes through MAGIN (bank 53, free space after the
+# item pages) instead of the generic list cursor: up / down step through the spells (into the
+# next level after the third), left / right jump a level; the hand from the menu's own state.
+MGROW_SRC = """
+MAGN = $5E34        ; (English: the level row's three names, 16 bytes each, and marks)
+MAGM = $5E64
+    org $B2E0
+mgrow:
+    ldy #0          ; row 0: Lv<n> .. MP cur/max
+    lda #$95
+    sta ($4E),y
+    iny
+    lda #$B9
+    sta ($4E),y
+    iny
+    lda $7AD7
+    sta ($4E),y
+    ldy #10
+    lda #$96
+    sta ($4E),y
+    iny
+    lda #$99
+    sta ($4E),y
+    ldy #13
+    ldx #2
+.m:
+    lda $7AD7,x
+    sta ($4E),y
+    iny
+    inx
+    cpx #7
+    bne .m
+    lda $4E         ; rows 1-3: mark, then the spell (icon and name)
+    sta $1E
+    lda $4F
+    sta $1F
+    lda #0
+    sta $1C
+.k:
+    clc
+    lda $1E
+    adc #18
+    sta $1E
+    bcc .k1
+    inc $1F
+.k1:
+    ldx $1C
+    ldy #0
+    lda MAGM,x
+    sta ($1E),y
+    lda #$FF
+    sta MAGM,x
+    txa
+    asl a
+    asl a
+    asl a
+    asl a
+    tax
+    ldy #1
+.c:
+    lda MAGN,x
+    beq .e
+    sta ($1E),y
+    inx
+    iny
+    cpy #18
+    bne .c
+.e:
+    lda $1C
+    asl a
+    asl a
+    asl a
+    asl a
+    tax
+    lda #0
+    sta MAGN,x
+    inc $1C
+    lda $1C
+    cmp #3
+    bne .k
+    rts
+"""
+MAGIN_SRC = """
+    org $B370
+magin:              ; (magic menu: in place of the generic list input, $899E)
+    lda $25         ; the hand: level row $25 (32 px each), spell $26 (8 px)
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    sta $1C
+    lda $26
+    asl a
+    asl a
+    asl a
+    clc
+    adc $1C
+    adc #$A8
+    sta $1C
+    lda #$18
+    sta $1D
+    lda #0
+    sta $1A
+    jsr $892E
+.w:
+    jsr $8185
+    jsr $FBAA
+    lda $12
+    beq .w
+    pha
+    jsr $9B79
+    pla
+    cmp #$20        ; down: the next spell; after the third, the next level
+    bne .u
+    lda $26
+    cmp #2
+    bcs .dl
+    lda #$80
+    bne .x
+.dl:
+    lda $24
+    cmp #7
+    beq .no
+    cmp $46
+    beq .no
+    lda #0
+    sta $26
+    lda #$20
+    bne .x
+.u:
+    cmp #$10        ; up: the previous spell; before the first, the level above
+    bne .l
+    lda $26
+    beq .ul
+    lda #$40
+    bne .x
+.ul:
+    lda $24
+    beq .no
+    lda #2
+    sta $26
+    lda #$10
+    bne .x
+.l:
+    cmp #$40        ; left / right: a level up / down
+    bne .r
+    lda #$10
+    bne .x
+.r:
+    cmp #$80
+    bne .x
+    lda #$20
+    bne .x
+.no:
+    lda #$04        ; (Select: nothing in the magic menu)
+.x:
+    sta $12
+    rts
+"""
+
+
 def magic_rows(r):
-    """battle magic list (owner, 2026-11-20, as FF1's): two rows per level in an 18-column list
-    window, row 1 = spells 1 and 2, row 2 = spell 3 and the level / MP. Done through the
-    English row converter's constants (bank 87 mconv: names at row offsets 0 / 9 / 18 of an
-    18-wide row = spell 3 at the start of the next row; the level text and the marks row
-    pointer one row below instead of above). Open: the unusable-spell mark ('X') has no cell
-    of its own (it lands in row 2)."""
     B87, B35 = 87, 0x35
-    r.patch(B87, 0xA2C9, '69 1C', '69 00', 'magic row: names on the first row')
-    r.patch(B87, 0xA2D1, '38 A5 4E E9 1C 85 1E A5 4F E9 00 85 1F', '18 A5 4E 69 12 85 1E A5 4F 69 00 85 1F',
-            'magic row: level / marks on the second row')
-    r.patch(B87, 0xA2DE, 'A0 02', 'A0 0A', 'magic row: level and MP from column 10')
-    r.patch(B87, 0xA39B, 'A9 1C 85 18', 'A9 12 85 18', 'magic row: width 18 (after a compact name)')
-    r.patch(B35, 0xB77E, 'A9 1C 85 18', 'A9 12 85 18', 'magic row: width 18')
-    r.patch(B35, 0xB785, 'A9 1C 20 58 A5', 'A9 24 20 58 A5', 'magic list: 2 rows of 18 per level')
-    r.patch(B35, 0xB80B, 'E9 38', 'E9 24', 'magic list scroll up: one level')
-    r.patch(B35, 0xB844, '69 38', '69 24', 'magic list scroll down: one level')
+    g = r.module(MGROW_SRC)
+    o = r.off(B87, g['org'])
+    assert set(r.d[o:o + len(g['bytes'])]) == {0xFF}
+    r.d[o:o + len(g['bytes'])] = g['bytes']
+    r.mods.append(dict(g, where=(B87, g['org'] & 0x1FFF)))
+    j = lambda a: '%02X %02X' % (a & 0xFF, a >> 8)
+    r.patch(B87, 0xA009, '4C C6 A2', '4C ' + j(g['labels']['mgrow']), 'magic level rows: GB layout (mgrow)')
+    m = r.module(MAGIN_SRC)
+    assert m['org'] + len(m['bytes']) <= 0xB419
+    o = r.off(B35, m['org'])
+    assert set(r.d[o:o + len(m['bytes'])]) == {0xEA}
+    r.d[o:o + len(m['bytes'])] = m['bytes']
+    r.mods.append(dict(m, where=(B35, m['org'] & 0x1FFF)))
+    r.patch(B35, 0xB7C3, '20 9E 89', '20 ' + j(m['labels']['magin']), 'magic menu input: spells in list order')
+    r.patch(B35, 0xB785, 'A9 1C 20 58 A5', 'A9 48 20 58 A5', 'magic list: 4 rows of 18 per level')
+    r.patch(B35, 0xB80B, 'E9 38', 'E9 48', 'magic list scroll up: one level')
+    r.patch(B35, 0xB844, '69 38', '69 48', 'magic list scroll down: one level')
+    r.patch(B35, 0xB83B, '04', '02', 'magic list: 2 levels per page')
     for a in (0xB796, 0xB818, 0xB851):
         r.patch(B35, a, 'A9 01 85 18 A9 1E 85 19 A9 03 85 1A', 'A9 02 85 18 A9 15 85 19 A9 83 85 1A',
                 'magic window: cols 2-21, list window')
-    r.patch(0x34, 0x8B08, 'A8 08 B8 08 C8 08 D8 08 A8 50 B8 50 C8 50 D8 50 A8 98 B8 98 C8 98 D8 98',
-            'A0 18 B0 18 C0 18 D0 18 A0 60 B0 60 C0 60 D0 60 A8 18 B8 18 C8 18 D8 18',
-            'magic cursor: spells 1-2 on row 1, spell 3 on row 2')
+    r.patch(0x34, 0x8B08, 'A8 08', 'A8 18', 'magic cursor: first position (hand at the screen edge)')
 
 
 def battle_messages(r):

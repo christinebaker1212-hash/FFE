@@ -201,12 +201,17 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   2-16), the next column at cols 17-31 (its edge shows), left/right turn whole pages (page
   routines in place of FF3's sideways scroll, `ITEMPG_SRC` at bank 53 $B2A7); the hands'
   labels "R.Hand" / "L.Hand" (FF3 wrote Japanese codes the English font shows as "fGS" /
-  "aPnS", also in the plain English NES build). Magic: cols 2-21, per level row 1 = spells 1-2,
-  row 2 = spell 3 + level / MP, through the English row converter's constants (bank 87
-  mconv), cursor table $8B08 by spell position. Open: the unusable-spell mark has no cell of
-  its own.
+  "aPnS", also in the plain English NES build). Magic (owner, after a first two-row version was "too visually confusing"): cols 2-21, per
+  level a line "Lv<n>  MP cur/max" and one spell per row (4 rows, 2 levels per page): rows from
+  `MGROW_SRC` (bank 87, through the English converter's far entry $A009); input through
+  `MAGIN_SRC` (bank 53 $B370, in place of the generic list input $899E): up / down step through
+  the spells in list order (into the next level after the third), left / right jump a level,
+  the hand placed from the menu's own state ($25 level row, $26 spell). The unusable-spell
+  mark ('X') sits in the cell before the spell's icon.
 - Runtime fixes on the way: the LYC handler did not keep HL (hung PyBoy at a battle start);
-  bank 0 was full: the clear-VRAM native moved to the RT_TABLES bank behind a stub.
+  bank 0 was full: the clear-VRAM and rng-init natives moved to the RT_TABLES bank behind
+  stubs; sprite conversion: a rejected last sprite left its Y in the next slot (stale sprite),
+  and in the tall list window the low rows were dropped before the split moved them up.
 - Tools: `gbshots.py --press W:PAD:N` and `--poke W:ADDR=VAL,..` (NES and GB alike), e.g.
   member 1 as a Black Mage with spells: `--poke 2560:6100=04,6130=09,6131=09,6207=07`.
 - Open in battle: back attacks, bosses / large formations.

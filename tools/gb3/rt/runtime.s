@@ -1823,10 +1823,6 @@ rt_io_w4014:                                ; OAM DMA from NES page A -> GB shad
             cp $EF
             jr nc, .s3
             add a, c
-            cp 160
-            jr nc, .s3
-            cp 9
-            jr c, .s3
             ld [de], a                      ; (battle, below the split: the window camera;
             ldh a, [bcam]                   ;   what the split hides is not shown)
             and a
@@ -1845,6 +1841,8 @@ rt_io_w4014:                                ; OAM DMA from NES page A -> GB shad
             cp l
             pop hl
             jr c, .s3
+            cp 160                          ; (in view: checked after the split's move)
+            jr nc, .s3
             ld [de], a
             inc l
             inc l
@@ -1854,6 +1852,10 @@ rt_io_w4014:                                ; OAM DMA from NES page A -> GB shad
             jr .xc
 .tp2:       pop hl
 .tp1:       ld a, [de]
+            cp 160
+            jr nc, .s3
+            cp 9
+            jr c, .s3
 .tp0:       ld [de], a                      ; (GB Y, kept if X is in view too)
             inc l
             inc l
