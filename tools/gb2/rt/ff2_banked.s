@@ -711,6 +711,35 @@ hle_mapupd_b:
             and $E0
             ld [MU_WL], a
             ld b, 0
+            ldh a, [lcd_on]                 ; LCD off: the cells inline (.coff)
+            and a
+            jr nz, .vl
+.vo:        ld a, [MU_N]
+            cp b
+            jr nz, .vo1
+            ld a, [MU_WH]
+            ld d, a
+            ld a, [MU_WL]
+            ld e, a
+.vo1:       ld a, [MU_BA]
+            add a, b
+            ld l, a
+            ld h, high(NES_RAM) + 7
+            ld a, [hl]
+            call .coff
+            inc e
+            ld a, [MU_BB]
+            add a, b
+            ld l, a
+            ld h, high(NES_RAM) + 7
+            ld a, [hl]
+            call .coff
+            inc e
+            inc b
+            ld a, b
+            cp 16
+            jr nz, .vo
+            jp .offx
 .vl:        ld a, [MU_N]
             cp b
             jr nz, .vn
@@ -765,6 +794,104 @@ hle_mapupd_b:
             and $1F
             ld [MU_WL], a
             ld b, 0
+            ldh a, [lcd_on]                 ; LCD off: the cells inline (.coff)
+            and a
+            jr nz, .hl
+.ho:        ld a, [MU_N]
+            cp b
+            jr nz, .ho1
+            ld a, [MU_WH]
+            ld d, a
+            ld a, [MU_WL]
+            ld e, a
+.ho1:       ld a, [MU_BA]
+            add a, b
+            ld l, a
+            ld h, high(NES_RAM) + 7
+            ld a, [hl]
+            call .coff
+            call .d32
+            ld a, [MU_BB]
+            add a, b
+            ld l, a
+            ld h, high(NES_RAM) + 7
+            ld a, [hl]
+            call .coff
+            call .d32
+            inc b
+            ld a, b
+            cp 15
+            jr nz, .ho
+            jp .offx
+; LCD off: tile A to the cell at NES address (D, E): GB map, shadow, owner bit (own1 counted;
+; CGB: CGB_SCAN on a change). Keeps B, D, E.
+.coff:      ld c, a
+            ld a, d
+            and 3
+            add a, $98
+            ld h, a
+            ld l, e
+            ld [hl], c
+            ld a, d
+            and 7
+            add a, high(NT_SH)
+            ld h, a
+            ld [hl], c
+            ld a, e
+            and 7
+            ld l, a
+            ld h, high(BITS8)
+            ld c, [hl]
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld l, a
+            ld a, d
+            and 3
+            swap a
+            add a, a
+            or l
+            ld l, a
+            ld h, high(OWN)
+            bit 2, d
+            jr z, .k0
+            ld a, [hl]
+            and c
+            ret nz
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ldh a, [own1_lo]
+            add a, 1
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            adc a, 0
+            ldh [own1_hi], a
+            jr .kch
+.k0:        ld a, [hl]
+            and c
+            ret z
+            ld a, c
+            cpl
+            and [hl]
+            ld [hl], a
+            ldh a, [own1_lo]
+            sub 1
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            sbc a, 0
+            ldh [own1_hi], a
+.kch:       ld a, 1
+            ld [CGB_SCAN], a                ; (DMG: harmless; the scan flag is set at the end)
+            ret
+.offx:      ldh a, [is_cgb]                 ; DMG / SGB: the scan when the LCD goes on
+            and a
+            ret nz
+            ld a, 1
+            ldh [dmg_scan], a
+            ret
 .hl:        ld a, [MU_N]
             cp b
             jr nz, .hn
