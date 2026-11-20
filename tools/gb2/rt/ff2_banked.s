@@ -305,6 +305,19 @@ tset_fix_b: xor a
             inc c
             bit 7, c
             jr z, .m
+            ld hl, TILE_PAL + $80           ; tiles $80-$FF the tileset does not use: the font
+.f:         ld a, [hl]                      ;   and window frame, always drawn with the window
+            bit 6, a                        ;   palette 3 (fix:E92A fills the window's
+            jr nz, .fn                      ;   attribute buffer with $FF)
+            and 3
+            cp 3
+            jr z, .f3
+            ld a, l
+            call dmg_mark
+.f3:        ld [hl], $83
+.fn:        inc l
+            jr nz, .f
+            set 3, d                        ; (palette 3 in use)
             ld hl, TILE_PAL                 ; (seen marks off)
 .s:         res 6, [hl]
             inc l

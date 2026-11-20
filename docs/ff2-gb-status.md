@@ -523,6 +523,11 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   opening battle's windows from +10..+32 to -4..+7 per 60 (parity). RAM identical (random
   30000, DMG and CGB); DMG battle shots correct.
 - Owner (2026-11-20): battles, overworld and dialogue must never slow down; aim for parity.
+- Font / window tiles fixed to the window palette: `tset_fix_b` gives tiles $80-$FF the field
+  tileset does not use palette 3 (the field always draws its windows with attribute $FF,
+  fix:E92A), so dialogue text and window attribute writes skip the cell lookups. DMG +5.5% ->
+  +5.1%; dialogue windows 17041-17221: +11 / +8 / +13 -> +5 / +0 / +3. RAM identical; DMG
+  dialogue shots correct.
 - Next (step 1, third part): the remaining field costs (dialogue window: text printer
   fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
   then screen loads, music, sprites. Earlier plan text:
