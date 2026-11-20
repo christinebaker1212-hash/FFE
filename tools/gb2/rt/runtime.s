@@ -1790,6 +1790,16 @@ rt_ppu_w7:  push af
             inc a
 .df:        ldh [sh_same], a
             ld [hl], d
+            and a                           ; the same tile, nametable 0, no cell owned by
+            jr z, .map                      ;   nametable 1: the GB map cell has it already
+            ld a, c                         ;   (FF2's text printer rewrites whole rows)
+            and a
+            jr nz, .map
+            ldh a, [own1_lo]
+            ld e, a
+            ldh a, [own1_hi]
+            or e
+            jr z, .done
 .map:       call own_set                    ; this nametable now owns the GB map cell
             ldh a, [is_cgb]
             and a

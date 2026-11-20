@@ -462,8 +462,12 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   Profile (mGBA, PC every 200 instructions, waits 17000-19000): rt_ppu_w7 11%, OAM
   conversion 6%, the OAM clear loop fix:C46E 7% (translated), delay loops 4%, DMG cell /
   attribute bookkeeping ~10% together, music engine (bank 13) a few %.
-  First step: fix:C46E native (`hle_oamclr`, rt/ff2_pal.s): DMG +9.4%. Random 30000 on DMG
-  and CGB identical.
+  First step: fix:C46E native (`hle_oamclr`, rt/ff2_pal.s): DMG +9.4%. Second: a nametable
+  write of the tile the cell already has (nametable 0, no cell owned by nametable 1) stops
+  after the shadow compare (no owner / shading / VRAM queue work; FF2's text printer
+  rewrites whole rows): DMG +9.1%, CGB -0.9%. Random 30000 on DMG and CGB identical.
+  (Screenshots of the dialogue scenes show the NES's own transitional states, e.g. a line
+  twice while the text scrolls, a few frames late on the GB: the lag, not a drawing fault.)
 - Next: DMG field speed (nametable writes, OAM conversion, cell bookkeeping); Select menu
   with suspend (design with the owner).
 
