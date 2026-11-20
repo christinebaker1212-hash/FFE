@@ -10456,6 +10456,65 @@ rlist_b:    push af                         ; [SP + 2]: the flags out (C)
             pop af
             ret
 
+; DMG, LCD off: the GB map rows 0-29 from NT_SH (+ $400 for cells of nametable 1, OWN);
+; MAP_RB = 0. Eight cells per OWN byte (bit 0 first).
+dmg_maprb_b: push bc
+            push de
+            xor a
+            ld [MAP_RB], a
+            ld de, $9800
+            ld hl, OWN
+.by:        ld a, [hl+]
+            push hl
+            ld c, a
+            ld a, d                         ; HL = shadow of these 8 cells
+            add a, high(NT_SH) - $98
+            ld h, a
+            ld l, e
+            ld a, c
+            and a
+            jr z, .z
+            inc a
+            jr z, .f
+            ld b, 8                         ; mixed: cell by cell
+.c:         push hl
+            srl c
+            jr nc, .c0
+            ld a, h
+            add a, 4
+            ld h, a
+.c0:        ld a, [hl]
+            ld [de], a
+            inc e
+            pop hl
+            inc l
+            dec b
+            jr nz, .c
+            jr .nx
+.f:         ld a, h                         ; all of nametable 1
+            add a, 4
+            ld h, a
+.z:         ld b, 8
+.zc:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .zc
+.nx:        pop hl
+            ld a, e
+            and a
+            jr nz, .n1
+            inc d
+.n1:        ld a, d
+            cp $9B
+            jr nz, .by
+            ld a, e
+            cp $C0
+            jr nz, .by
+            pop de
+            pop bc
+            ret
+
 section bank PF_BANK, $7F00
 NBIT60:     db 1, 2, 4, 8, 16, 32, 64, 128
 

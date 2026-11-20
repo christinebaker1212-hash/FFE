@@ -11,9 +11,12 @@ hle_chr_pages:
             and a
             jp z, .done
             ldh a, [lcd_on]                 ; LCD on: CGB only (BG tiles to the tile copy +
-            and a                           ;   DMA marks)
-            jr z, .lok
+            and a                           ;   DMA marks), or DMG with its switch-off pending
+            jr z, .lok                      ;   (VLCD: as with the LCD off)
             ldh a, [is_cgb]
+            and a
+            jr nz, .lok
+            ld a, [VLCD]
             and a
             jp z, .slow
 .lok:
@@ -110,7 +113,11 @@ hle_chr_pages:
             jr .fsm
 .fd:        ldh a, [lcd_on]
             and a
-            jr nz, .tile
+            jr z, .fdo
+            ld a, [VLCD]
+            and a
+            jr z, .tile
+.fdo:
             call bgsrc                      ; the same ROM page as last time, the shadow page
             jr z, .fsk                      ;   not written since: it holds these bytes already
             ld a, d

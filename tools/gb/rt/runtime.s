@@ -481,7 +481,13 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             res 1, a                        ;   interrupt; drop it
             ldh [$FF0F], a
             call flush_vbl
-            ldh a, [pal_dirty]              ; DMG: the shades for the next frame (the
+            ldh a, [is_cgb]                 ; DMG: a switch-off deferred to this vblank
+            and a
+            jr nz, .nd
+            ld a, [VLCD]
+            and a
+            call nz, dmg_loff
+.nd:        ldh a, [pal_dirty]              ; DMG: the shades for the next frame (the
             and a                           ;   registers are written next vblank)
             call nz, make_palettes
             ld a, 1
@@ -1749,6 +1755,9 @@ dmg_frame:                                  ; DMG shading, once per NES frame wi
             ldh a, [lcd_on]                 ;   on (with it off, all of it when it goes on):
             and a                           ;   palette maps once the palettes have been
             ret z                           ;   stable for PAL_STABLE frames, then re-code a
+            ld a, [VLCD]                    ;   (not while a switch-off is pending)
+            and a
+            ret nz
             push bc                         ;   few marked tiles
             ld a, [FR_ANY]                  ; (map cells marked by DrawMapRowCol / Attributes)
             and a
@@ -1831,7 +1840,25 @@ rt_ppu_w1:  push af
             ldh [ppu_mask], a
             and $18
             jr z, .off
-            ld a, [VLCD]                    ; CGB masked load: shown in the next frame wait
+            ldh a, [is_cgb]                 ; DMG: a deferred switch-off (VLCD 1): the map
+            and a                           ;   from the shadows if it was written meanwhile
+            jr nz, .cv
+            ld a, [VLCD]
+            and a
+            jr z, .nv
+            xor a
+            ld [VLCD], a
+            ld a, [MAP_RB]
+            and a
+            jr z, .nv
+            ldh a, [lcd_on]                 ; (still on: the switch-off never came, rare:
+            and a                           ;   the map by the LCD-on path)
+            jr z, .mo
+            call maprb_tramp
+            jr .nv
+.mo:        call dmg_maprb
+            jr .nv
+.cv:        ld a, [VLCD]                    ; CGB masked load: shown in the next frame wait
             and a                           ;   (vshow_def: map and cell palettes by DMA in
             jr z, .nv                       ;   its vblank, VLCD 2 -> unmasked); the rest of
             ld a, 1                         ;   this NES frame still writes masked
@@ -1893,6 +1920,20 @@ rt_ppu_w1:  push af
 .nc:        ldh a, [is_sgb]
             and a
             call nz, sgb_lcd_off
+            ldh a, [is_sgb]                 ; DMG, not in the vblank: blank now (white, no
+            and a                           ;   sprites, as the LCD going off) and switch the
+            jr nz, .wv                      ;   LCD off in the next vblank (dmg_loff); until
+            ldh a, [$FF44]                  ;   then writes go to the shadows (VLCD 1, as a
+            cp 144                          ;   CGB masked load) and the GB map is rebuilt
+            jr nc, .wv                      ;   from them when the LCD goes on
+            ld a, 1
+            ld [VLCD], a
+            xor a
+            ldh [$FF47], a
+            ldh a, [$FF40]
+            res 1, a
+            ldh [$FF40], a
+            jr .ret
 .wv:        ldh a, [$FF44]
             cp 144
             jr c, .wv
@@ -1906,6 +1947,30 @@ rt_ppu_w1:  push af
             pop de
             pop bc
             pop af
+            ret
+
+; DMG, VLCD 1 with the LCD on (rt_ppu_w1 deferred the switch-off): off now, in the vblank
+dmg_loff:   ldh a, [lcd_on]
+            and a
+            ret z
+            ldh a, [$FF44]
+            cp 144
+            ret c
+            xor a
+            ldh [$FF40], a
+            ldh [lcd_on], a
+            ldh [pro_mode], a
+            ldh a, [$FF06]                  ; (the timer's frame from now: this vblank counted)
+            ldh [$FF05], a
+            ld b, 0
+            jp flush_q
+
+; DMG, LCD off: the GB map (rows 0-29) from the shadows, each cell from the nametable that
+; drew it last (OWN); MAP_RB cleared (dmg_maprb_b, bank PF_BANK)
+dmg_maprb:  push hl
+            ld hl, dmg_maprb_b
+            call hle_pfj
+            pop hl
             ret
 
 rt_ppu_r2:  push af
@@ -2667,6 +2732,19 @@ rt_io_rnone:
             ld l, 0
             ret
 
+; fix:FE1A (FF1's bank select, behind JSR $FE03): PHA / ASL / ORA #$80 / STA $5115 / LDA $00 /
+; PLA / LSR x 4 natively. Out: A = A >> 4; C = its bit 3, N = 0, Z from A; V kept.
+hle_bank:   ld h, a
+            add a, a
+            or $80
+            call rt_mmc_w5115
+            ld a, h
+            srl a
+            srl a
+            srl a
+            srl a
+            ldh [nzv], a
+            ret
 rt_mmc_w5115:
             push af
             and $7F
