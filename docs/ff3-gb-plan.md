@@ -137,6 +137,12 @@ NES "GB-layout" ROM. Mock-ups (PNG, real font and graphics from the user's ROM, 
    command hand over the window frame at the screen edge (FF1). Messages: one window, lines
    filled in order (attacker -> target on line 1 when it fits, the action, the result
    word-wrapped at 18; a longer result covers the last lines).
+   **Item / Magic lists (owner, 2026-11-20, mock-ups `mockup.py NES OUT lists`):** a tall
+   list window while choosing (GB rows 8-17, the battlefield's NES rows 6-13 above; back to
+   the normal layout afterwards): items 4 per page in FF3's own 2-row entries, left/right
+   turns whole pages (one column, the next column's edge showing at the right; no scroll
+   animation); magic 4 levels per page, row 1 = spells 1-2, row 2 = spell 3 + level / MP
+   (as FF1's battle magic list), the cursor moving between the spells by position.
 4. **Native presentation (owner, 2026-11-20, all three ports):** game logic recompiled from
    the user's ROM, presentation (picture, sprites, music, screen loads) native GB code;
    measure first (lagcheck, sgbrun profile buckets), reproduce each replaced routine's RAM
