@@ -619,32 +619,6 @@ hle_vstr:                                   ; far vstr (bank HLE_BANK: vstr_b)
 
 ; b12:BF8F (battle, every frame): swap $0090-$009F with $6D97-$6DA6 (LDA/PHA/LDA/STA/PLA/
 ; STA, X 0-15). Out: X = 16, Y = 0, A = the old $009F; N = 0, Z = 1, C kept.
-hle_swap90: push af
-            ld hl, NES_RAM + $90
-            ld de, $AD97                    ; $6D97 (cart RAM bank 0)
-            ld c, 16
-.l:         ld a, [de]
-            ld b, [hl]
-            ld [hl+], a
-            ld a, b
-            ld [de], a
-            inc de
-            dec c
-            jr nz, .l
-            xor a
-            ldh [nzv], a
-            pop hl                          ; (L = F before: keep its carry)
-            ld a, l
-            and $10
-            or $80
-            ld l, a
-            ld h, b
-            push hl
-            pop af
-            ld de, 16
-            ld bc, 0
-            ret
-
 hle_ntclr:                                  ; fix:F2CF nametable clear (bank HLE_BANK: ntclr_b)
             push af
             ld a, HLE_BANK
@@ -719,8 +693,23 @@ hle_pclr:   push af
             push hl
             ld hl, $A91E                    ; ($691E, cart RAM bank 0)
             xor a
-            ld b, 192                       ; 384 bytes
-.l:         ld [hl+], a
+            ld b, 24                        ; 384 bytes
+.l:
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
             ld [hl+], a
             dec b
             jr nz, .l

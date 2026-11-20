@@ -138,6 +138,7 @@ vsave:
     sta VSV,x
     dex
     bpl .l
+vsave_r:
     rts
 vrest:
     ldx #3
@@ -146,6 +147,7 @@ vrest:
     sta $88,x
     dex
     bpl .l
+vrest_r:
     rts
 
 vclear:             ; clear VN tiles of the buffer, VX = 0
@@ -445,6 +447,7 @@ party_stamp:        ; panel cleared ($F618): party window into the panel image, 
     iny
     cpy #4
     bne .rows
+pstamp_r:
     rts
 PSTAMP:
     .db $F7, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F8, $F9
@@ -2385,7 +2388,37 @@ def apply(rom, report):
     shop_exit(rom)
     title_centre(rom)
     bug_fixes(rom)
+    teardown_skip(rom)
     report.append('GB layout applied')
+
+
+def teardown_skip(rom):
+    """Battle box teardown ($F6AB: $6AA5 undraws left; each $F652 pass redraws the boxes
+    kept): a text record whose box this teardown removes is not drawn again (boxline's own
+    test, see VWF_SRC), so its text is not expanded either ($F8A0: the copy, the swaps and
+    the decoding cost most of a pass); the message window is blanked as boxline does."""
+    o = fixed(rom, 0xF9B0)[1]
+    hook = bytes(rom[o + 9:o + 14])                   # $F9B9: insert.py's far hook (LDX #n / JMP farjsr)
+    assert rom[o:o + 9] == bytes.fromhex('aea16aaca26a20a0f8') and hook[0] == 0xA2 and hook[2] == 0x4C
+    t = asm("""
+    lda $6AA5
+    beq .go
+    clc
+    adc $6AA3
+    cmp $6AA4
+    bcc .go
+    beq .go
+    sta $5808       ; (GB: the message window's text cells blank at once)
+    rts
+.go:
+    ldx $6AA1
+    ldy $6AA2
+    jsr $F8A0
+    ldx #HOOKX
+    jmp HOOKJ
+""", syms={'HOOKX': hook[1], 'HOOKJ': hook[3] | hook[4] << 8}, org=0xF9B0)
+    assert len(t.bytes) <= 0xF9DC - 0xF9B0         # (over $F9B0-$F9DB: the English text loops after
+    put(rom, 0xF9B0, t.bytes)                       #   the hook are not used in the GB build)
 
 
 # ---- main menu ----------------------------------------------------------------------

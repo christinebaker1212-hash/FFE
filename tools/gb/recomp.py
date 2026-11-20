@@ -143,11 +143,47 @@ class Recompiler:
         if i.mn in ('RTS', 'RTI', 'BRK'): return []
         if i.mn == 'JMP':
             if i.mode == 'ind': return [None]
-            return [self.target(i, i.arg)]
+            return [self.jmp_final(self.target(i, i.arg))]
         out.append((i.space, i.addr + i.size) if not (i.space == 'c62' and i.addr + i.size == 0xE000)
                    else ('fix', 0xE000))
         if i.mode == 'rel': out.append(self.target(i, i.arg))
         return out
+
+    def table_jump(self, i):
+        """JMP (P) after LDA T,Y / STA P / LDA T+1,Y / STA P+1 with T a known jump table of
+        this space: [(NES address, GB label)] of its entries, else None"""
+        P = i.arg
+        if P >= 0xFF or os.environ.get('GB_TJ') == '0': return None
+        seq = [self.insns.get((i.space, i.addr - d)) for d in (10, 7, 5, 2)]
+        if None in seq: return None
+        l0, s0, l1, s1 = seq
+        if not (l0.mn == 'LDA' and l0.mode == 'aby' and s0.mn == 'STA' and s0.mode == 'zp' and s0.arg == P
+                and l1.mn == 'LDA' and l1.mode == 'aby' and l1.arg == l0.arg + 1
+                and s1.mn == 'STA' and s1.mode == 'zp' and s1.arg == P + 1):
+            return None
+        tab = [(sp, t, n) for sp, t, n in getattr(self.g, 'jump_tables', ()) if sp == i.space and t == l0.arg]
+        if not tab or i.space not in SPACES: return None
+        base, off, size = SPACES[i.space]
+        out = []
+        for j in range(tab[0][2]):
+            o = off + l0.arg - base + 2 * j
+            a = self.cm.rom[o] | self.cm.rom[o + 1] << 8
+            tk = self.target(i, a)
+            if tk is None or tk not in self.insns: return None
+            out.append((a, label(*tk)))
+        return out
+
+    def jmp_final(self, t):
+        """a JMP's target followed through JMP trampolines (to a native routine, or the code
+        the chain ends at): compiled as a jump straight there"""
+        for _ in range(6):
+            if t is None or t in self.g.ext or t in self.g.idioms: return t
+            j = self.insns.get(t)
+            if j is None or j.mn != 'JMP' or j.mode != 'abs': return t
+            t2 = self.target(j, j.arg)
+            if t2 is None: return t
+            t = t2
+        return t
 
     def target(self, i, addr):
         ts = self.cm.target_space(i.space, addr)
@@ -781,6 +817,12 @@ class Emitter:
     def x_JMP(self):
         i = self.i
         if i.mode == 'ind':
+            tj = self.rc.table_jump(i)
+            if tj:                                # a pointer just loaded from a jump table with Y:
+                self.o('ld hl, .tj', 'jp rt_tjump', '.tj:', 'db $%02X, %d' % (i.arg, len(tj)))
+                for a, lab in tj:                 #   dispatched by Y (rt_tjump checks the pointer)
+                    self.o('db $%02X, $%02X, bank(%s), low(%s), high(%s)' % (a & 0xFF, a >> 8, lab, lab, lab))
+                return
             if gb_ram(i.arg) is None:
                 self.rc.warn.append('JMP (ind) through non-RAM at %r' % i)
                 self.o('ld hl, $%04X' % i.arg, 'jp rt_jmp_ind_nes'); return
@@ -788,6 +830,8 @@ class Emitter:
         tk = self.rc.target(i, i.arg)
         if tk is None:
             self.o('ld hl, $%04X' % i.arg, 'jp rt_dyn_jump'); return
+        tk = self.rc.jmp_final(tk)
+        if tk in self.rc.g.ext: self.o('jp ' + self.rc.g.ext[tk][0]); return
         self.jump(None, tk)
 
     def x_JSR(self):
@@ -832,6 +876,7 @@ def line_size(line):
     mn = parts[0].lower()
     from asm_sm83 import _split_args
     args = _split_args(parts[1]) if len(parts) > 1 else []
+    if mn == 'db': return len(args)
     return len(encode(mn, args, lambda e: 0, 0x4000, 1))
 
 
@@ -850,7 +895,7 @@ def components(rc):
             if nx in parent: parent[find(nx)] = find(k)
             continue
         for s in rc.succ(i):
-            if s is not None and s in parent: parent[find(s)] = find(k)
+            if s is not None and s in parent and s not in rc.g.ext: parent[find(s)] = find(k)
     comp = defaultdict(list)
     for k in rc.insns: comp[find(k)].append(k)
     return list(comp.values())
@@ -861,15 +906,42 @@ def layout(rc, blocks):
     code = {k: lines for sp in blocks for k, lines in blocks[sp]}
     sizes = {k: sum(line_size(l) for l in code[k]) for k in code}
     comps = components(rc)
-    comps.sort(key=lambda c: (min(c)[0], min(c)[1]))
+    # each component goes with the space holding most of its bytes; the fixed bank's code and
+    # the ExRAM code start a bank of their own (they call each other most: no farcalls there)
+    def prim(c):
+        n = defaultdict(int)
+        for k in c: n[k[0]] += sizes[k]
+        sp = max(n, key=lambda s: (n[s], s))
+        return (2 if sp in ('fix', 'ex') else 1 if sp in ('far',) else 0, sp, min(k for k in c if k[0] == sp)[1])
+    comps.sort(key=prim)
+    if os.environ.get('LAYOUT_DBG'):                      # LAYOUT_DBG=sp:ADDR,..: those keys' components
+        for t in os.environ['LAYOUT_DBG'].split(','):
+            sp, ad = t.split(':'); ad = int(ad, 16)
+            for c in comps:
+                if (sp, ad) in c:
+                    n = defaultdict(int)
+                    for k in c: n[k[0]] += sizes[k]
+                    print('LAYOUT', t, prim(c), dict(n), '%s:%04X' % min(c), len(c))
+                    cs = set(c)
+                    for k in c:
+                        i = rc.insns[k]
+                        if i.mn == 'JSR': continue
+                        for s2 in rc.succ(i):
+                            if s2 is not None and s2 in cs and s2[0] != k[0]:
+                                print('  XEDGE %s:%04X %s -> %s:%04X' % (k[0], k[1], i.mn, s2[0], s2[1]))
     bank_of = {}
     banks = []                                            # [(bank, [keys], size)]
     cur, used, keys = CODE0, 0, []
+    grp = None
     for c in comps:
         c.sort()
         sz = sum(sizes[k] for k in c) + 3 * len(c) // 8 + 8   # slack for split jumps
         if sz > BANK_LIMIT:
             rc.warn.append('component of %d bytes at %s:%04X is larger than a bank' % (sz, *min(c)))
+        g = prim(c)[0]
+        if g != grp and g == 2 and keys:
+            banks.append((cur, keys)); cur += 1; used, keys = 0, []
+        grp = g
         if used + sz > BANK_LIMIT and keys:
             banks.append((cur, keys)); cur += 1; used, keys = 0, []
         for k in c: bank_of[k] = cur
@@ -878,28 +950,86 @@ def layout(rc, blocks):
     return bank_of, banks, code, sizes
 
 
+LREF = re.compile(r'\bL_([a-z0-9]+)_([0-9A-F]{4})\b')
+CLONE_MAX = int(os.environ.get('GB_CLONE', '160'))      # (bytes) small routines copied into calling banks
+
+
+def plan_clones(rc, banks, bank_of, sizes, code):
+    """small routines called from another bank get a copy in the calling bank (no farcall):
+    a routine = the code reached from its entry by fall-through, branches and jumps (calls
+    not followed), up to CLONE_MAX bytes. Returns {bank: set of keys copied there}."""
+    if CLONE_MAX <= 0: return {}
+    used = {b: sum(sizes[k] for k in keys) + len(keys) * 3 // 8 + 64 for b, keys in banks}
+    cache = {}
+
+    def body(t):
+        if t in cache: return cache[t]
+        seen, st, tot = set(), [t], 0
+        while st:
+            k = st.pop()
+            if k in seen: continue
+            if k not in rc.insns or k not in sizes: cache[t] = None; return None
+            seen.add(k); tot += sizes[k]
+            if tot > CLONE_MAX: cache[t] = None; return None
+            st.extend(x for x in rc.succ(rc.insns[k]) if x is not None)
+        cache[t] = seen
+        return seen
+    clones = {}
+    for bank, keys in banks:
+        cand = set()
+        for k in keys:
+            for line in code[k]:
+                ls = line.strip()
+                if ls.startswith('call ') or ls.startswith('jp '):
+                    m = LREF.search(ls)
+                    if m:
+                        t = (m.group(1), int(m.group(2), 16))
+                        if bank_of.get(t, bank) != bank: cand.add(t)
+        cl = set()
+        for t in sorted(cand, key=lambda t: (len(body(t) or ()) or 99999, t)):
+            bd = body(t)
+            if not bd: continue
+            new = {k for k in bd if bank_of.get(k) != bank and k not in cl}
+            cost = sum(sizes[k] for k in new) + 3 * len(new) // 8 + 8
+            if used[bank] + cost > BANK_LIMIT: continue
+            cl |= new; used[bank] += cost
+        if cl: clones[bank] = cl
+    return clones
+
+
+def emit_keys(rc, out, keys, bank, bank_of, xrefs, code, cl, pre):
+    def fix(line):
+        if cl:
+            line = LREF.sub(lambda m: ('C%d_' % bank + m.group(0)) if (m.group(1), int(m.group(2), 16)) in cl
+                            else m.group(0), line)
+        return retarget(line, bank, bank_of, xrefs)
+    for n, k in enumerate(keys):
+        out.append(pre + label(*k) + ':')
+        for line in code[k]:
+            out.append('    ' + fix(line))
+        # instruction falling through to a key that is not next in this bank
+        i = rc.insns[k]
+        if i.mn not in ("JMP", "RTS", "RTI", "BRK") and k not in rc.g.ext and (k not in rc.g.idioms or rc.cond_idiom(k)):
+            ft = (i.space, i.addr + i.size) if not (i.space == 'c62' and i.addr + i.size == 0xE000) else None
+            if ft is not None and (n + 1 >= len(keys) or keys[n + 1] != ft):
+                if ft in rc.insns:
+                    out.append('    ' + fix('jp ' + label(*ft)))
+                else:
+                    out.append('    call rt_fatal')
+
+
 def emit_program(rc):
     blocks = rc.compile()
     bank_of, banks, code, sizes = layout(rc, blocks)
+    clones = plan_clones(rc, banks, bank_of, sizes, code)
+    rc.clone_bytes = sum(sizes[k] for c in clones.values() for k in c)
     out = []
     xrefs = set()                                         # labels needing a bank-0 stub
     for bank, keys in banks:
         out.append('section bank %d, $4000' % bank)
-        keys = sorted(keys)
-        for n, k in enumerate(keys):
-            out.append(label(*k) + ':')
-            for line in code[k]:
-                out.append('    ' + retarget(line, bank, bank_of, xrefs))
-            # instruction falling through to a key that is not next in this bank
-            i = rc.insns[k]
-            nxt_keys = [s for s in rc.succ(i) if s is not None and s[1] == i.addr + i.size]
-            if i.mn not in ("JMP", "RTS", "RTI", "BRK") and k not in rc.g.ext and (k not in rc.g.idioms or rc.cond_idiom(k)):
-                ft = (i.space, i.addr + i.size) if not (i.space == 'c62' and i.addr + i.size == 0xE000) else None
-                if ft is not None and (n + 1 >= len(keys) or keys[n + 1] != ft):
-                    if ft in rc.insns:
-                        out.append('    ' + retarget('jp ' + label(*ft), bank, bank_of, xrefs))
-                    elif i.mn != 'JSR' or True:
-                        out.append('    call rt_fatal')
+        cl = clones.get(bank, set())
+        emit_keys(rc, out, sorted(keys), bank, bank_of, xrefs, code, cl, '')
+        if cl: emit_keys(rc, out, sorted(cl), bank, bank_of, xrefs, code, cl, 'C%d_' % bank)
     # stubs (bank 0)
     xj = {l for l in xrefs if l in XJ_USED}               # (jumps: call the stub, then return)
     stubs = ['section bank 0, $%04X' % (0x3D20 - 14 * len(xrefs) - 4 * len(xj))]   # (ending at pf_call)

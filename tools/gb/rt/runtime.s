@@ -25,6 +25,7 @@ SLOT_KEY   = $D880          ; GB slot -> coding of its tile (SPAL_KEY value; $FF
 SGB_BANK   = 63             ; ROM bank of the SGB packet builder (sgb.s)
 HLE_BANK   = 62             ; ROM bank of the native FF1 routines (ff1_native.s)
 PF_BANK    = 60             ; ROM bank of the DMG tile-coding plane routines and the LCD-on map scan
+OC_BANK    = 59             ; ROM bank of oamconv_b's unrolled compare (ff1_native.s occmp)
 DYN_BANK   = 61             ; ROM bank of the dynamic-target table (recomp.py: buckets by low byte)
 SGB_CNT    = $DCC4          ; SGB: cells on screen per NES BG palette
 SGB_LSX    = $DCC8          ; SGB: last view position (scroll + camera)
@@ -76,6 +77,7 @@ SGB_MIN    = 12
 NT_NOW     = $D87D          ; nt_tile: check the cell's palette at once (not in spare time)
 MAP_RB     = $CCFF          ; CGB masked load: GB map to rebuild from the shadows when shown
 CGB_RP     = $CCEF          ; CGB: cell palettes stale (owners changed with the LCD off; repal_b at LCD on)
+BLK_REQ    = $D85C          ; the battle message window's blanked cells to the GB map (vblank)
 PB_ROW     = $D85D          ; CGB: rows of vshow_own's buffer built ahead (vpre)
 OAM_CLEAN  = $D85E          ; oamconv_b: no sprite slot invalidated since its last run (1)
 OC_MISS    = $D85F          ; oamconv_b: frames left before the next compare (after a change)
@@ -480,6 +482,9 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             ldh a, [$FF0F]                  ; DMG: the STAT write requested a STAT
             res 1, a                        ;   interrupt; drop it
             ldh [$FF0F], a
+            ld a, [BLK_REQ]                 ; the battle message window blanked (rt_mmc_w5808):
+            and a                           ;   its four rows from the shadow, before the
+            call nz, blk_cp                 ;   queued writes
             call flush_vbl
             ldh a, [is_cgb]                 ; DMG: a switch-off deferred to this vblank
             and a
@@ -506,6 +511,81 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             pop bc
             pop af
             reti
+
+; the battle message window's rows (GB rows 19-22, columns 2-19) from the shadow to the map
+blk_cp:     xor a
+            ld [BLK_REQ], a
+            ld hl, NT_SH + 19 * 32 + 2
+            ld de, $9800 + 19 * 32 + 2
+            ld c, 4
+.r:
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, 14
+            add a, l
+            ld l, a
+            jr nc, .h
+            inc h
+.h:         ld a, 14
+            add a, e
+            ld e, a
+            jr nc, .d
+            inc d
+.d:         dec c
+            jr nz, .r
+            ret
 
 stat_isr:   push af                         ; raster events (vbl_regs), each in the hblank
             push hl                         ;   of the line before its first line: SCY split
@@ -3387,6 +3467,7 @@ rt_dyn_call:
             jp rt_farcall
 rt_dyn_jump:                                ; HL = NES address
             call lookup
+rt_dyn_go:                                  ; (HL = GB address, fc_bank = its bank)
             push af
             push bc
             ldh a, [fc_bank]

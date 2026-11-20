@@ -4602,527 +4602,6 @@ vclear_b:   xor a
             pop af
             ret
 
-; ---- NES OAM page A -> GB OAM shadow (rt_io_w4014 runs it with code_bank = HLE_BANK).
-; The 64 entries are tested unrolled (most are hidden: y >= $EF): .vis converts one in
-; view: GB y = NES y + 17 - cam_y * 8 (shown from -16), x = NES x + 8 - cam_x * 8 (from
-; -8), its tile in a GB sprite slot (loaded on first use, coded for its palette), the
-; attributes; a full GB table (40) ends the scan.
-OC_HDR     = $A6C0          ; (cart RAM bank 3) oamconv_b's last input: page, cam_x, cam_y,
-OC_COPY    = $A700          ;   SPAL_KEY 0-3; the NES OAM page (256)
-oamconv_b:  and $07
-            add a, high(NES_RAM)
-            ld h, a
-            ld a, 3                         ; the same input as last time (page, camera,
-            ld [$4000], a                   ;   codings, the entries in use; no slot changed
-            ld de, OC_HDR                   ;   since, oam_clean): nothing to do
-            ld a, [OAM_USED]                ; (few sprites last time: converting costs less
-            cp 6                            ;   than comparing; the copy is left invalid)
-            jr c, .pl
-            ld a, [OC_MISS]                 ; (the input changed lately: a few frames without
-            and a                           ;   comparing; the last of them keeps the input
-            jr z, .try                      ;   for the next compare)
-            dec a
-            ld [OC_MISS], a
-            jr nz, .pl
-            jr .sv
-.try:       ld a, [OAM_CLEAN]
-            and a
-            jr z, .sv
-            ld a, [de]
-            cp h
-            jr nz, .ms
-            inc e
-            ldh a, [cam_x]
-            ld b, a
-            ld a, [de]
-            cp b
-            jr nz, .ms
-            inc e
-            ldh a, [cam_y]
-            ld b, a
-            ld a, [de]
-            cp b
-            jr nz, .ms
-            inc e
-            ld bc, SPAL_KEY
-            ld a, [bc]
-            ld l, a
-            ld a, [de]
-            cp l
-            jr nz, .ms
-            inc e
-            inc c
-            ld a, [bc]
-            ld l, a
-            ld a, [de]
-            cp l
-            jr nz, .ms
-            inc e
-            inc c
-            ld a, [bc]
-            ld l, a
-            ld a, [de]
-            cp l
-            jr nz, .ms
-            inc e
-            inc c
-            ld a, [bc]
-            ld l, a
-            ld a, [de]
-            cp l
-            jr nz, .ms
-            ld de, OC_COPY                  ; entries: y; the rest while y < $EF
-            ld l, e
-.cm:        ld a, [de]
-            cp [hl]
-            jr nz, .ms
-            cp $EF
-            jr nc, .ch
-            inc l
-            inc e
-            ld a, [de]
-            cp [hl]
-            jr nz, .ms
-            inc l
-            inc e
-            ld a, [de]
-            cp [hl]
-            jr nz, .ms
-            inc l
-            inc e
-            ld a, [de]
-            cp [hl]
-            jr nz, .ms
-            inc l
-            inc e
-            jr nz, .cm
-            jr .same
-.ch:        ld a, l
-            add a, 4
-            ld l, a
-            ld e, a
-            jr nz, .cm
-.same:      xor a
-            ld [$4000], a
-            ret
-.ms:        ld a, 4                         ; changed: plain conversions for a while
-            ld [OC_MISS], a
-            jr .pl
-.sv:        ld de, OC_HDR                   ; keep this input
-            ld a, h
-            ld [de], a
-            inc e
-            ldh a, [cam_x]
-            ld [de], a
-            inc e
-            ldh a, [cam_y]
-            ld [de], a
-            inc e
-            ld bc, SPAL_KEY
-            ld a, [bc]
-            ld [de], a
-            inc e
-            inc c
-            ld a, [bc]
-            ld [de], a
-            inc e
-            inc c
-            ld a, [bc]
-            ld [de], a
-            inc e
-            inc c
-            ld a, [bc]
-            ld [de], a
-            ld de, OC_COPY
-            ld l, e
-.cp:        ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            jr nz, .cp
-            dec h
-            ld a, 1
-            jr .pk
-.pl:        xor a
-.pk:        ld [OAM_CLEAN], a
-            xor a
-            ld [$4000], a
-            ldh a, [oam_frame]
-            inc a
-            ldh [oam_frame], a
-            ldh a, [cam_y]
-            cpl
-            add a, 18
-            ld b, a
-            ldh a, [cam_x]
-            cpl
-            add a, 9
-            ld c, a
-            ld de, OAM_SH
-            ld l, $00
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $04
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $08
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $0C
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $10
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $14
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $18
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $1C
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $20
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $24
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $28
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $2C
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $30
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $34
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $38
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $3C
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $40
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $44
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $48
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $4C
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $50
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $54
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $58
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $5C
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $60
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $64
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $68
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $6C
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $70
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $74
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $78
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $7C
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $80
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $84
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $88
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $8C
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $90
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $94
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $98
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $9C
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $A0
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $A4
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $A8
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $AC
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $B0
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $B4
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $B8
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $BC
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $C0
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $C4
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $C8
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $CC
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $D0
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $D4
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $D8
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $DC
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $E0
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $E4
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $E8
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $EC
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $F0
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $F4
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $F8
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            ld l, $FC
-            ld a, [hl]
-            cp $EF
-            call c, .vis
-            jp .full
-.vis:       add a, b                        ; HL -> entry, A = NES y
-            cp 160
-            ret nc
-            ld [de], a                      ; (GB y; kept only if x is in view too)
-            inc l
-            ld a, [hl+]
-            ldh [o_t], a
-            ld a, [hl+]
-            ldh [o_a], a
-            ld a, [hl]
-            add a, c
-            cp 168
-            jr nc, .xr
-            inc e
-            ld [de], a                      ; GB x
-            inc e
-            push hl
-            push bc
-            ldh a, [o_a]                    ; B = coding of the sprite's palette
-            and 3
-            add a, low(SPAL_KEY)
-            ld l, a
-            ld h, high(SPAL_KEY)
-            ld b, [hl]
-            ldh a, [o_t]                    ; C = its GB slot (loaded on first use)
-            ld l, a
-            ld h, high(SPR_SLOT)
-            ld a, [hl]
-            cp $FF
-            jr z, .alloc
-            ld c, a
-            or $80                          ; (SLOT_KEY and SLOT_STAMP: $80 | slot in their
-            ld l, a                         ;   pages)
-            ld h, high(SLOT_KEY)            ; resident with another coding: load it again
-            ld a, b
-            cp [hl]
-            jr nz, .load
-.ok2:       ld h, high(SLOT_STAMP)          ; stamp (in use this frame)
-            ldh a, [oam_frame]
-            ld [hl], a
-            ld a, c
-            ld [de], a                      ; tile = slot
-            inc e
-            ldh a, [o_a]                    ; NES v h p - - - pp -> GB p v h obp1 - pal(3)
-            ld l, a                         ;   (OATTR), OBP1 below
-            ld h, high(OATTR)
-            ld a, [hl]
-            bit 6, b                        ; (DMG: OBP1 if the coding says so)
-            jr z, .o0
-            or $10
-.o0:        ld [de], a
-            inc e
-            pop bc
-            pop hl
-            ld a, e
-            cp 160
-            ret nz
-            pop af                          ; GB table full: the scan ends
-            jr .full
-.xr:        xor a                           ; out of view sideways: this entry's y hidden
-            ld [de], a                      ;   again (else last frame's x and tile showed)
-            ret
-.alloc:     ld a, b
-            ldh [o_key], a
-            call spr_alloc
-            ld c, a
-            jr .ok
-.load:      ld a, b
-            ldh [o_key], a
-            call spr_load
-.ok:        ld a, c
-            or $80
-            ld l, a
-            jr .ok2
-.full:      ld a, e                         ; hide the GB sprites used last frame only
-            rrca
-            rrca
-            ld c, a
-            ld a, [OAM_USED]
-            ld b, a
-            ld a, c
-            ld [OAM_USED], a
-            ld a, b
-            sub c
-            jr c, .end
-            jr z, .end
-            ld b, a
-            xor a
-.clr:       ld [de], a
-            inc e
-            inc e
-            inc e
-            inc e
-            dec b
-            jr nz, .clr
-.end:       ld a, 1
-            ldh [oam_pending], a
-            ret
-
 ; ---- c62:C324-C333 (copy X pages): LDY #0 / (LDA ($10),Y / STA ($12),Y / INY / BNE) / INC $11 /
 ; INC $13 / DEX / BNE. Page-aligned pointers: one GB page per NES page (ROM through its
 ; data bank); anything else byte by byte. Out: A = the last byte, X = Y = 0, $11 / $13 + X;
@@ -6578,61 +6057,6 @@ pf_call:    push hl
 ; the whole message goes together; FF1's row-by-row panel copy that follows then finds
 ; them blank already (and draws back whatever stays)
 BLK_F      = $DCD6
-rt_mmc_w5808:
-            push af
-            push bc
-            push de
-            push hl
-            ld hl, BLK_F                    ; (16-bit frame count of the last blank)
-            ld a, [NMI_CNT]
-            cp [hl]
-            jr nz, .n
-            inc l
-            ld a, [NMI_CNT + 1]
-            cp [hl]
-            jr z, .x
-.n:         ld a, [NMI_CNT]
-            ld [BLK_F], a
-            ld a, [NMI_CNT + 1]
-            ld [BLK_F + 1], a
-            ld hl, NT_SH + 19 * 32 + 2
-            ld de, $9800 + 19 * 32 + 2
-            ld c, 4
-.r:         ld b, 18
-.c:         ld a, [hl]                      ; (only the message window's own small-font tiles,
-            sub $A8                         ;   $A8-$EF: the party and command windows keep
-            cp $48                          ;   theirs)
-            jr c, .bl
-            inc hl
-            jr .nx
-.bl:        xor a
-            ld [hl+], a
-.w:         di
-            ldh a, [$FF41]
-            bit 1, a
-            jr z, .g
-            ei
-            jr .w
-.g:         xor a
-            ld [de], a
-            ei
-.nx:        inc de
-            dec b
-            jr nz, .c
-            ld a, 14
-            add a, l
-            ld l, a
-            ld a, 14
-            add a, e
-            ld e, a
-            dec c
-            jr nz, .r
-.x:         pop hl
-            pop de
-            pop bc
-            pop af
-            ret
-
 ; ---- the DMG LCD-on map scan (dmg_scan_all), in PF_BANK
 section bank PF_BANK, $4800
 SC_NP      = $DE00          ; scan_b: palette each tile is drawn with ($FF: not used; the FRESH /
@@ -10761,3 +10185,3989 @@ section bank PF_BANK, $7E00
             db 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 8, 8, 8, 8
 section bank PF_BANK, $7E40
 SC_LOG:     db 0, 0, 1, 0, 2, 0, 1, 0, 3, 0, 1, 0, 2, 0, 1, 0
+
+; ---- gb_layout's own far routines, native (build.py FAR_PF: used when their bytes hash as
+; expected). NES $6000-$7FFF = cart RAM bank 0 at $A000.
+section bank PF_BANK, $7000
+VSV_GB     = $A000 + $0EAC  ; vsave / vrest: the caller's $88-$8B
+; vsave: $88-$8B -> VSV; vrest: back. Out as the 6502 loop (X 3..0): A = the byte at index
+; 0, X = $FF, N = 1, Z = 0; C, V kept.
+vsave_b:    ld hl, NES_RAM + $88
+            ld a, [hl+]
+            ld [VSV_GB], a
+            ld a, [hl+]
+            ld [VSV_GB + 1], a
+            ld a, [hl+]
+            ld [VSV_GB + 2], a
+            ld a, [hl]
+            ld [VSV_GB + 3], a
+vs_out:     ld a, $FE
+            inc a                           ; (Z = 0, C kept)
+            ldh [nzv], a
+            ld e, a
+            ld a, [VSV_GB]
+            ret
+vrest_b:    ld hl, VSV_GB
+            ld a, [hl+]
+            ld [NES_RAM + $88], a
+            ld a, [hl+]
+            ld [NES_RAM + $89], a
+            ld a, [hl+]
+            ld [NES_RAM + $8A], a
+            ld a, [hl]
+            ld [NES_RAM + $8B], a
+            jr vs_out
+; party_stamp (battle panel cleared): the party window into the panel image ($691E, 32 a
+; row): top / bottom frame rows at column 9 of rows 0 / 5, rows 1-4 left frame, ten tiles
+; $80 + 10m.., right frame; VLINE = 0. Out: A = $A8, X = $8A, Y = 4, Z = 1, C = 1, N = 0,
+; V = 0 (the last ADC).
+PS_PAN     = $A000 + $091E
+pstamp_b:   xor a
+            ld [$A000 + $0EA0], a           ; (VLINE)
+            ld hl, PS_PAN + 9
+            ld [hl], $F7
+            inc l
+            ld a, $F8
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], $F9
+            ld hl, PS_PAN + 5 * 32 + 9
+            ld [hl], $FC
+            inc hl
+            ld a, $FD
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], $FE
+            ld hl, PS_PAN + 32 + 9
+            ld a, $80
+            ld c, 4
+.r:         ld [hl], $FA
+            inc hl
+            ld [hl+], a
+            inc a
+            ld [hl+], a
+            inc a
+            ld [hl+], a
+            inc a
+            ld [hl+], a
+            inc a
+            ld [hl+], a
+            inc a
+            ld [hl+], a
+            inc a
+            ld [hl+], a
+            inc a
+            ld [hl+], a
+            inc a
+            ld [hl+], a
+            inc a
+            ld [hl+], a
+            inc a
+            ld [hl], $FB
+            ld de, 32 - 11
+            add hl, de
+            dec c
+            jr nz, .r
+            ld e, $8A                       ; (D = 0 from the add)
+            ld c, 4
+            xor a
+            ldh [nzv], a
+            ldh [vfl], a
+            scf
+            ld a, $A8
+            ret
+
+; ---- b12:BF13-BF25 (battle sprite step, every frame: swap $90-$9F with $6D97, LDA $94 / BEQ,
+; the step, swap back): when the swapped-in $94 ($6D9B) is 0 the two swaps cancel, so only the
+; registers as FF1 leaves them: A = $6DA6, X = 16, Y = 0; N = 0, Z = 1; C kept. A conditional
+; idiom (build.py checks the bytes): $6D9B != 0 declines (past the caller's JP, all kept).
+bfsw_b:     push af
+            ld a, [$A000 + $0D9B]
+            and a
+            jr nz, .dcl
+            xor a
+            ldh [nzv], a
+            ld bc, 0
+            ld de, 16
+            pop hl
+            ld a, l
+            and $10
+            or $80
+            ld l, a
+            push hl
+            pop af
+            ld a, [$A000 + $0DA6]
+            ret
+.dcl:       push hl                         ; decline: past the caller's JP (3 bytes)
+            ld hl, sp + 6                   ;   (HL, AF, hle_pfj's return, the caller's)
+            ld a, [hl]
+            add a, 3
+            ld [hl+], a
+            jr nc, .d1
+            inc [hl]
+.d1:        pop hl
+            pop af
+            ret
+
+; ---- fix:FC89-FC98 (battle text: a name of at most $9F letters from ($94), each through
+; FA9C): each letter's pair at ($92) (dakuten byte, tile, as btx_b), $92 += 2, $9E = it;
+; stops at a 0 or after $9F letters. Out (at FC99): Y = the letters done, X kept; A = 0 (the
+; 0) or the last letter; N = 0, Z = 1; C from the last CPY (1 after $9F letters; kept if the
+; first byte is 0); V as the last letter's conversion left it (kept if none).
+bnm_b:      push af                         ; [SP + 4]: the flags out (C)
+            ldh a, [code_bank]              ; (nes_rd / nes_wr come back to code_bank)
+            push af
+            ld a, PF_BANK
+            ldh [code_bank], a
+            push de                         ; (X)
+            ld c, 0
+.lp:        ld hl, NES_RAM + $94
+            ld a, [hl+]
+            ld h, [hl]
+            add a, c
+            ld l, a
+            jr nc, .r1
+            inc h
+.r1:        call btx_b.rd
+            and a
+            jr z, .z
+            ld [NES_RAM + $9E], a
+            ld b, a
+            ld d, $FF                       ; D = dakuten byte, E = tile
+            cp $7A
+            jr nc, .k
+            ld d, $C0
+            ld e, $47
+            cp $57
+            jr c, .ad
+            ld e, $4C
+            cp $5C
+            jr c, .ad
+            ld e, $73
+            cp $6B
+            jr c, .ad
+            ld e, $78
+            cp $70
+            jr c, .ad
+            ld d, $C1
+            ld e, $33
+            cp $75
+            jr c, .ad
+            ld e, $6E
+.ad:        add a, e                        ; (C = 0, V = 1)
+            ld e, a
+            ld a, $40
+            ldh [vfl], a
+            ld hl, sp + 4
+            res 4, [hl]
+            jr .wr
+.k:         ld e, a                         ; (C = 1, V kept)
+            ld hl, sp + 4
+            set 4, [hl]
+.wr:        ld hl, NES_RAM + $92
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, d
+            call btx_b.wb
+            inc hl
+            ld a, e
+            call btx_b.wb
+            ld hl, NES_RAM + $92            ; $92 += 2
+            ld a, [hl]
+            add a, 2
+            ld [hl+], a
+            jr nc, .n2
+            inc [hl]
+.n2:        inc c                           ; INY / CPY $9F
+            ld hl, NES_RAM + $9F
+            ld a, c
+            cp [hl]
+            jr z, .eq
+            ld hl, sp + 4
+            jr c, .lt
+            set 4, [hl]
+            jr .lp
+.lt:        res 4, [hl]
+            jr .lp
+.z:         ld b, 0
+            jr .out
+.eq:        ld hl, sp + 4
+            set 4, [hl]
+.out:       xor a
+            ldh [nzv], a
+            pop de
+            ld d, 0
+            pop af
+            ldh [code_bank], a
+            pop hl                          ; (L = flags: C)
+            ld a, l
+            and $10
+            or $80
+            ld l, a
+            ld h, b
+            ld b, 0
+            push hl
+            pop af
+            ret
+
+; ---- fix:F5F3-F5FE (battle box list: a 5-byte record from ($8C) to $6A9E-$6AA2). Out (at the
+; RTS): A = the fifth byte, Y = 5, X kept; N = 0, Z = 1, C = 1; V kept.
+rec5_b:     push de                         ; (X)
+            ld hl, NES_RAM + $8C
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, h
+            sub $60
+            cp $1B                          ; (save RAM, the five bytes below $7C00)
+            jr nc, .gen
+            add a, $A0
+            ld h, a
+            ld de, $A000 + $0A9E
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl]
+            ld [de], a
+.out:       pop de
+            ld d, 0
+            ld b, a
+            xor a
+            ldh [nzv], a
+            ld c, 5
+            scf                             ; (Z = 1 from the XOR, C = 1)
+            ld a, b
+            ld b, 0
+            ret
+.gen:       ldh a, [code_bank]              ; (anything else: byte by byte, through nes_rd,
+            push af                         ;   which comes back to code_bank)
+            ld a, PF_BANK
+            ldh [code_bank], a
+            ld de, $A000 + $0A9E
+            ld b, 5
+.g:         push hl
+            call btx_b.rd
+            pop hl
+            ld [de], a
+            inc e
+            inc hl
+            dec b
+            jr nz, .g
+            ld b, a
+            pop af
+            ldh [code_bank], a
+            ld a, b
+            jr .out
+
+
+section bank HLE_BANK, $6E00
+; ---- NES OAM page A -> GB OAM shadow (rt_io_w4014 runs it with code_bank = HLE_BANK).
+; GB y = NES y + 17 - cam_y * 8 (shown from -16), x = NES x + 8 - cam_x * 8 (from -8), the
+; tile in a GB sprite slot (loaded on first use, coded for its palette), the attributes.
+; The GB table is filled from its end, the NES entries taken last first: the NES order is
+; kept, and sprites appearing or going at the start of the page (FF1's cursor, entries 0-3)
+; leave the slots of the others where they were. So a page like the last one is converted
+; incrementally (.inc): entries equal to the last page's copy keep their GB entries; only
+; changed ones are converted, and the ones below a change in the number of GB entries. A
+; tile not resident with its coding, a new camera / page / coding or a slot changed since
+; (oam_clean = 0) convert the whole page (.sv, a new frame number for the slot stamps); more
+; than 40 in view: the forward conversion (.fwd), which drops the last ones as before.
+OC_HDR     = $A6C0          ; (cart RAM bank 3) oamconv_b's last input: page, cam_x, cam_y,
+OC_COPY    = $A700          ;   SPAL_KEY 0-3; the NES OAM page (256)
+OC_POS     = $A800          ;   GB slot of each NES entry with a GB entry (index = entry offset)
+OC_LIST    = $A6C8          ;   changed entries (occmp, up to 16)
+oamconv_b:  and $07
+            add a, high(NES_RAM)
+            ld h, a
+            ld a, [OAM_USED]                ; (few sprites last time: converting costs less
+            cp 6                            ;   than comparing; the copy is left invalid)
+            jr c, .pl
+            ld a, 3
+            ld [$4000], a
+            ld de, OC_HDR
+            ld a, [OAM_CLEAN]
+            and a
+            jr z, .sv
+            ld a, [de]
+            cp h
+            jr nz, .sv
+            inc e
+            ldh a, [cam_x]
+            ld b, a
+            ld a, [de]
+            cp b
+            jr nz, .sv
+            inc e
+            ldh a, [cam_y]
+            ld b, a
+            ld a, [de]
+            cp b
+            jr nz, .sv
+            inc e
+            ld bc, SPAL_KEY
+            ld a, [bc]
+            ld l, a
+            ld a, [de]
+            cp l
+            jr nz, .sv
+            inc e
+            inc c
+            ld a, [bc]
+            ld l, a
+            ld a, [de]
+            cp l
+            jr nz, .sv
+            inc e
+            inc c
+            ld a, [bc]
+            ld l, a
+            ld a, [de]
+            cp l
+            jr nz, .sv
+            inc e
+            inc c
+            ld a, [bc]
+            ld l, a
+            ld a, [de]
+            cp l
+            jr nz, .sv
+            jp .inc
+.sv:        ld de, OC_HDR                   ; keep this input
+            ld a, h
+            ld [de], a
+            inc e
+            ldh a, [cam_x]
+            ld [de], a
+            inc e
+            ldh a, [cam_y]
+            ld [de], a
+            inc e
+            ld bc, SPAL_KEY
+            ld a, [bc]
+            ld [de], a
+            inc e
+            inc c
+            ld a, [bc]
+            ld [de], a
+            inc e
+            inc c
+            ld a, [bc]
+            ld [de], a
+            inc e
+            inc c
+            ld a, [bc]
+            ld [de], a
+            ld de, OC_COPY
+            ld l, e
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            jr nz, .cp
+            dec h
+            ld a, 1
+            jr .pk
+.pl:        xor a
+.pk:        ld [OAM_CLEAN], a
+            ld a, 3                         ; (cart RAM bank 3 on: each entry's GB slot to
+            ld [$4000], a                   ;   OC_POS)
+            ldh a, [oam_frame]
+            inc a
+            ldh [oam_frame], a
+            ldh a, [cam_y]
+            cpl
+            add a, 18
+            ld b, a
+            ldh a, [cam_x]
+            cpl
+            add a, 9
+            ld c, a
+            ld de, OAM_SH + 156
+            ld l, $FC
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $F8
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $F4
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $F0
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $EC
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $E8
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $E4
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $E0
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $DC
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $D8
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $D4
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $D0
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $CC
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $C8
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $C4
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $C0
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $BC
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $B8
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $B4
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $B0
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $AC
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $A8
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $A4
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $A0
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $9C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $98
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $94
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $90
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $8C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $88
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $84
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $80
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $7C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $78
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $74
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $70
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $6C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $68
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $64
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $60
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $5C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $58
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $54
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $50
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $4C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $48
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $44
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $40
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $3C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $38
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $34
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $30
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $2C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $28
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $24
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $20
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $1C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $18
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $14
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $10
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $0C
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $08
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $04
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld l, $00
+            ld a, [hl]
+            cp $EF
+            call c, .vis
+            ld a, e
+            add a, 4
+            jp .endr
+.vis:       add a, b                        ; HL -> entry, A = NES y
+            cp 160
+            ret nc
+            ld [de], a                      ; (GB y; kept only if x is in view too)
+            inc l
+            ld a, [hl+]
+            ldh [o_t], a
+            ld a, [hl+]
+            ldh [o_a], a
+            ld a, [hl]
+            add a, c
+            cp 168
+            jr nc, .xr
+            inc e
+            ld [de], a                      ; GB x
+            inc e
+            push hl
+            push bc
+            ldh a, [o_a]                    ; B = coding of the sprite's palette
+            and 3
+            add a, low(SPAL_KEY)
+            ld l, a
+            ld h, high(SPAL_KEY)
+            ld b, [hl]
+            ldh a, [o_t]                    ; C = its GB slot (loaded on first use)
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld a, [hl]
+            cp $FF
+            jr z, .alloc
+            ld c, a
+            or $80                          ; (SLOT_KEY and SLOT_STAMP: $80 | slot in their
+            ld l, a                         ;   pages)
+            ld h, high(SLOT_KEY)            ; resident with another coding: load it again
+            ld a, b
+            cp [hl]
+            jr nz, .load
+.ok2:       ld h, high(SLOT_STAMP)          ; stamp (in use this frame)
+            ldh a, [oam_frame]
+            ld [hl], a
+            ld a, c
+            ld [de], a                      ; tile = slot
+            inc e
+            ldh a, [o_a]                    ; NES v h p - - - pp -> GB p v h obp1 - pal(3)
+            ld l, a                         ;   (OATTR), OBP1 below
+            ld h, high(OATTR)
+            ld a, [hl]
+            bit 6, b                        ; (DMG: OBP1 if the coding says so)
+            jr z, .o0
+            or $10
+.o0:        ld [de], a
+            pop bc
+            pop hl
+            push hl                         ; OC_POS[entry] = its slot
+            ld a, l
+            and $FC
+            ld l, a
+            ld h, high(OC_POS)
+            ld a, e
+            sub 3
+            ld [hl], a
+            pop hl
+            ld a, e                         ; the slot below (filled from the end)
+            sub 7
+            ld e, a
+            ret nc
+            pop af                          ; slot 0 filled: more than 40 in view; the
+            jp oc_fwd                       ;   forward conversion (drops the last ones)
+.xr:        xor a                           ; out of view sideways: this entry's y hidden
+            ld [de], a                      ;   again (else last frame's x and tile showed)
+            ret
+.alloc:     ld a, b
+            ldh [o_key], a
+            call spr_alloc
+            ld c, a
+            jr .ok
+.load:      ld a, b
+            ldh [o_key], a
+            call spr_load
+.ok:        ld a, 3                         ; (the load left cart RAM bank 0 on)
+            ld [$4000], a
+            ld a, c
+            or $80
+            ld l, a
+            jr .ok2
+
+; the incremental conversion (cart RAM bank 3 on; H = the page): occmp (bank OC_BANK) lists
+; the entries that differ from the copy; each one keeps its GB slot (OC_POS) or leaves a
+; hidden hole there; one that comes into view (no slot) or a tile not resident: the whole page
+.inc:       push hl
+            ld a, OC_BANK
+            ldh [fc_bank], a
+            ld a, h
+            ld hl, occmp
+            call rt_farcall
+            pop hl
+            jr c, .ab                       ; (more than 16 changed)
+            ld a, c
+            sub low(OC_LIST)
+            jr z, .same
+            ldh [o_cx], a                   ; entries left
+            ld a, low(OC_LIST)
+            ldh [o_y], a                    ; next one in the list
+            ldh a, [cam_y]
+            cpl
+            add a, 18
+            ld b, a
+            ldh a, [cam_x]
+            cpl
+            add a, 9
+            ld c, a
+.il:        ldh a, [o_y]
+            ld e, a
+            inc a
+            ldh [o_y], a
+            ld d, high(OC_LIST)
+            ld a, [de]
+            ld l, a
+            ld e, a
+            ld d, high(OC_COPY)
+            ld a, [de]                      ; a GB entry last time? (the copy, same camera)
+            cp $EF
+            jr nc, .o0n
+            add a, b
+            cp 160
+            jr nc, .o0n
+            inc e
+            inc e
+            inc e
+            ld a, [de]
+            ld e, l
+            add a, c
+            cp 168
+            jr nc, .o0n
+            ld a, 1
+            jr .o1n
+.o0n:       xor a
+.o1n:       ld [OC_MISS], a
+            ld a, [hl]                      ; one now?
+            cp $EF
+            jr nc, .nn
+            add a, b
+            cp 160
+            jr nc, .nn
+            inc l
+            inc l
+            inc l
+            ld a, [hl]
+            dec l
+            dec l
+            dec l
+            add a, c
+            cp 168
+            jr nc, .nn
+            ld a, [OC_MISS]
+            and a
+            jr z, .ab                       ; (comes into view: no slot for it)
+            inc d                           ; in its slot
+            ld a, [de]
+            dec d
+            call .vput
+            jr .cu
+.nn:        ld a, [OC_MISS]                 ; none now: its slot hidden
+            and a
+            jr z, .cu
+            inc d
+            ld a, [de]
+            dec d
+            push de
+            ld e, a
+            ld d, high(OAM_SH)
+            xor a
+            ld [de], a
+            pop de
+.cu:        ld a, [hl+]                     ; the copy updated
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl]
+            ld [de], a
+            ldh a, [o_cx]
+            dec a
+            ldh [o_cx], a
+            jr nz, .il
+            xor a
+            ld [$4000], a
+            ld a, 1
+            ldh [oam_pending], a
+            ret
+.same:      xor a
+            ld [$4000], a
+            ret
+.ab:        ld a, l                         ; (the whole page again: H = the page)
+            jp .sv
+
+; A = GB slot, HL -> entry (y), B / C = camera: the entry written there; its tile must be
+; resident with its coding (else the whole page again)
+.vput:      push de
+            push hl
+            ld e, a
+            ld d, high(OAM_SH)
+            ld a, [hl+]
+            add a, b
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ldh [o_t], a
+            ld a, [hl+]
+            ldh [o_a], a
+            ld a, [hl]
+            add a, c
+            ld [de], a
+            inc e
+            push bc
+            ldh a, [o_a]
+            and 3
+            add a, low(SPAL_KEY)
+            ld l, a
+            ld h, high(SPAL_KEY)
+            ld b, [hl]
+            ldh a, [o_t]
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld a, [hl]
+            cp $FF
+            jr z, .vab
+            ld c, a
+            or $80
+            ld l, a
+            ld h, high(SLOT_KEY)
+            ld a, b
+            cp [hl]
+            jr nz, .vab
+            ld h, high(SLOT_STAMP)
+            ldh a, [oam_frame]
+            ld [hl], a
+            ld a, c
+            ld [de], a
+            inc e
+            ldh a, [o_a]
+            ld l, a
+            ld h, high(OATTR)
+            ld a, [hl]
+            bit 6, b
+            jr z, .v0
+            or $10
+.v0:        ld [de], a
+            pop bc
+            pop hl
+            pop de
+            ret
+.vab:       pop bc
+            pop hl
+            pop de
+            pop af                          ; (the return address)
+            jr .ab
+
+; A = p (the lowest GB slot in use; 160: none): the slots below that the last conversion
+; used are hidden; OAM_USED = the count
+.endr:      ld e, a
+            ld a, 160
+            sub e
+            rrca
+            rrca
+            ld c, a
+            ld a, [OAM_USED]
+            ld b, a
+            ld a, c
+            ld [OAM_USED], a
+            ld a, b
+            sub c
+            jr c, .rx
+            jr z, .rx
+            ld b, a
+            ld d, high(OAM_SH)
+.rc:        ld a, e
+            sub 4
+            ld e, a
+            xor a
+            ld [de], a
+            dec b
+            jr nz, .rc
+.rx:        xor a
+            ld [$4000], a
+            inc a
+            ldh [oam_pending], a
+            ret
+
+
+; the forward conversion (more than 40 in view): slots 0-39, the last entries dropped
+oc_fwd:     xor a
+            ld [OAM_CLEAN], a
+            ld [$4000], a
+            ldh a, [cam_y]
+            cpl
+            add a, 18
+            ld b, a
+            ldh a, [cam_x]
+            cpl
+            add a, 9
+            ld c, a
+            ld de, OAM_SH
+            ld l, $00
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $04
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $08
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $0C
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $10
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $14
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $18
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $1C
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $20
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $24
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $28
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $2C
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $30
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $34
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $38
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $3C
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $40
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $44
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $48
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $4C
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $50
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $54
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $58
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $5C
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $60
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $64
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $68
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $6C
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $70
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $74
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $78
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $7C
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $80
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $84
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $88
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $8C
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $90
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $94
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $98
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $9C
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $A0
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $A4
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $A8
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $AC
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $B0
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $B4
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $B8
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $BC
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $C0
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $C4
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $C8
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $CC
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $D0
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $D4
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $D8
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $DC
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $E0
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $E4
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $E8
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $EC
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $F0
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $F4
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $F8
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            ld l, $FC
+            ld a, [hl]
+            cp $EF
+            call c, .visF
+            jp .fullF
+.visF:       add a, b                        ; HL -> entry, A = NES y
+            cp 160
+            ret nc
+            ld [de], a                      ; (GB y; kept only if x is in view too)
+            inc l
+            ld a, [hl+]
+            ldh [o_t], a
+            ld a, [hl+]
+            ldh [o_a], a
+            ld a, [hl]
+            add a, c
+            cp 168
+            jr nc, .xrF
+            inc e
+            ld [de], a                      ; GB x
+            inc e
+            push hl
+            push bc
+            ldh a, [o_a]                    ; B = coding of the sprite's palette
+            and 3
+            add a, low(SPAL_KEY)
+            ld l, a
+            ld h, high(SPAL_KEY)
+            ld b, [hl]
+            ldh a, [o_t]                    ; C = its GB slot (loaded on first use)
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld a, [hl]
+            cp $FF
+            jr z, .allocF
+            ld c, a
+            or $80                          ; (SLOT_KEY and SLOT_STAMP: $80 | slot in their
+            ld l, a                         ;   pages)
+            ld h, high(SLOT_KEY)            ; resident with another coding: load it again
+            ld a, b
+            cp [hl]
+            jr nz, .loadF
+.ok2F:       ld h, high(SLOT_STAMP)          ; stamp (in use this frame)
+            ldh a, [oam_frame]
+            ld [hl], a
+            ld a, c
+            ld [de], a                      ; tile = slot
+            inc e
+            ldh a, [o_a]                    ; NES v h p - - - pp -> GB p v h obp1 - pal(3)
+            ld l, a                         ;   (OATTR), OBP1 below
+            ld h, high(OATTR)
+            ld a, [hl]
+            bit 6, b                        ; (DMG: OBP1 if the coding says so)
+            jr z, .o0F
+            or $10
+.o0F:        ld [de], a
+            inc e
+            pop bc
+            pop hl
+            ld a, e
+            cp 160
+            ret nz
+            pop af                          ; GB table full: the scan ends
+            jr .fullF
+.xrF:        xor a                           ; out of view sideways: this entry's y hidden
+            ld [de], a                      ;   again (else last frame's x and tile showed)
+            ret
+.allocF:     ld a, b
+            ldh [o_key], a
+            call spr_alloc
+            ld c, a
+            jr .okF
+.loadF:      ld a, b
+            ldh [o_key], a
+            call spr_load
+.okF:        ld a, c
+            or $80
+            ld l, a
+            jr .ok2F
+.fullF:      ld a, e                         ; hide the GB sprites used last frame only
+            rrca
+            rrca
+            ld c, a
+            ld a, [OAM_USED]
+            ld b, a
+            ld a, c
+            ld [OAM_USED], a
+            ld a, b
+            sub c
+            jr c, .endF
+            jr z, .endF
+            ld b, a
+            xor a
+.clrF:       ld [de], a
+            inc e
+            inc e
+            inc e
+            inc e
+            dec b
+            jr nz, .clrF
+.endF:       ld a, 1
+            ldh [oam_pending], a
+            ret
+
+
+; ---- oamconv_b's compare (ROM bank OC_BANK, through rt_farcall; cart RAM bank 3 on): NES OAM
+; page A against the copy, entries 63..0 unrolled (hidden in both: y only); the offsets of
+; the entries that differ to OC_LIST. Out: C = low(OC_LIST) + their count; carry: more
+; than 15 (the list is full).
+section bank OC_BANK, $4000
+occmp:      ld h, a
+            ld bc, OC_LIST
+            ld d, high(OC_COPY)
+            ld l, $FC
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c63
+            cp $EF
+            jr nc, .n63
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c63
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c63
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n63
+.c63:        ld a, $FC
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n63:
+            ld l, $F8
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c62
+            cp $EF
+            jr nc, .n62
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c62
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c62
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n62
+.c62:        ld a, $F8
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n62:
+            ld l, $F4
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c61
+            cp $EF
+            jr nc, .n61
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c61
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c61
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n61
+.c61:        ld a, $F4
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n61:
+            ld l, $F0
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c60
+            cp $EF
+            jr nc, .n60
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c60
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c60
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n60
+.c60:        ld a, $F0
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n60:
+            ld l, $EC
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c59
+            cp $EF
+            jr nc, .n59
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c59
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c59
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n59
+.c59:        ld a, $EC
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n59:
+            ld l, $E8
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c58
+            cp $EF
+            jr nc, .n58
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c58
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c58
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n58
+.c58:        ld a, $E8
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n58:
+            ld l, $E4
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c57
+            cp $EF
+            jr nc, .n57
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c57
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c57
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n57
+.c57:        ld a, $E4
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n57:
+            ld l, $E0
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c56
+            cp $EF
+            jr nc, .n56
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c56
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c56
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n56
+.c56:        ld a, $E0
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n56:
+            ld l, $DC
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c55
+            cp $EF
+            jr nc, .n55
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c55
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c55
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n55
+.c55:        ld a, $DC
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n55:
+            ld l, $D8
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c54
+            cp $EF
+            jr nc, .n54
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c54
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c54
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n54
+.c54:        ld a, $D8
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n54:
+            ld l, $D4
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c53
+            cp $EF
+            jr nc, .n53
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c53
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c53
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n53
+.c53:        ld a, $D4
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n53:
+            ld l, $D0
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c52
+            cp $EF
+            jr nc, .n52
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c52
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c52
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n52
+.c52:        ld a, $D0
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n52:
+            ld l, $CC
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c51
+            cp $EF
+            jr nc, .n51
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c51
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c51
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n51
+.c51:        ld a, $CC
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n51:
+            ld l, $C8
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c50
+            cp $EF
+            jr nc, .n50
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c50
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c50
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n50
+.c50:        ld a, $C8
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n50:
+            ld l, $C4
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c49
+            cp $EF
+            jr nc, .n49
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c49
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c49
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n49
+.c49:        ld a, $C4
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n49:
+            ld l, $C0
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c48
+            cp $EF
+            jr nc, .n48
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c48
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c48
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n48
+.c48:        ld a, $C0
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n48:
+            ld l, $BC
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c47
+            cp $EF
+            jr nc, .n47
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c47
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c47
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n47
+.c47:        ld a, $BC
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n47:
+            ld l, $B8
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c46
+            cp $EF
+            jr nc, .n46
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c46
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c46
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n46
+.c46:        ld a, $B8
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n46:
+            ld l, $B4
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c45
+            cp $EF
+            jr nc, .n45
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c45
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c45
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n45
+.c45:        ld a, $B4
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n45:
+            ld l, $B0
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c44
+            cp $EF
+            jr nc, .n44
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c44
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c44
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n44
+.c44:        ld a, $B0
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n44:
+            ld l, $AC
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c43
+            cp $EF
+            jr nc, .n43
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c43
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c43
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n43
+.c43:        ld a, $AC
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n43:
+            ld l, $A8
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c42
+            cp $EF
+            jr nc, .n42
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c42
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c42
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n42
+.c42:        ld a, $A8
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n42:
+            ld l, $A4
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c41
+            cp $EF
+            jr nc, .n41
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c41
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c41
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n41
+.c41:        ld a, $A4
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n41:
+            ld l, $A0
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c40
+            cp $EF
+            jr nc, .n40
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c40
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c40
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n40
+.c40:        ld a, $A0
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n40:
+            ld l, $9C
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c39
+            cp $EF
+            jr nc, .n39
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c39
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c39
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n39
+.c39:        ld a, $9C
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n39:
+            ld l, $98
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c38
+            cp $EF
+            jr nc, .n38
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c38
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c38
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n38
+.c38:        ld a, $98
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n38:
+            ld l, $94
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c37
+            cp $EF
+            jr nc, .n37
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c37
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c37
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n37
+.c37:        ld a, $94
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n37:
+            ld l, $90
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c36
+            cp $EF
+            jr nc, .n36
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c36
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c36
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n36
+.c36:        ld a, $90
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n36:
+            ld l, $8C
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c35
+            cp $EF
+            jr nc, .n35
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c35
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c35
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n35
+.c35:        ld a, $8C
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n35:
+            ld l, $88
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c34
+            cp $EF
+            jr nc, .n34
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c34
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c34
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n34
+.c34:        ld a, $88
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n34:
+            ld l, $84
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c33
+            cp $EF
+            jr nc, .n33
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c33
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c33
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n33
+.c33:        ld a, $84
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n33:
+            ld l, $80
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c32
+            cp $EF
+            jr nc, .n32
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c32
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c32
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n32
+.c32:        ld a, $80
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n32:
+            ld l, $7C
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c31
+            cp $EF
+            jr nc, .n31
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c31
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c31
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n31
+.c31:        ld a, $7C
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n31:
+            ld l, $78
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c30
+            cp $EF
+            jr nc, .n30
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c30
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c30
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n30
+.c30:        ld a, $78
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n30:
+            ld l, $74
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c29
+            cp $EF
+            jr nc, .n29
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c29
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c29
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n29
+.c29:        ld a, $74
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n29:
+            ld l, $70
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c28
+            cp $EF
+            jr nc, .n28
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c28
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c28
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n28
+.c28:        ld a, $70
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n28:
+            ld l, $6C
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c27
+            cp $EF
+            jr nc, .n27
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c27
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c27
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n27
+.c27:        ld a, $6C
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n27:
+            ld l, $68
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c26
+            cp $EF
+            jr nc, .n26
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c26
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c26
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n26
+.c26:        ld a, $68
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n26:
+            ld l, $64
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c25
+            cp $EF
+            jr nc, .n25
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c25
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c25
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n25
+.c25:        ld a, $64
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n25:
+            ld l, $60
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c24
+            cp $EF
+            jr nc, .n24
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c24
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c24
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n24
+.c24:        ld a, $60
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n24:
+            ld l, $5C
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c23
+            cp $EF
+            jr nc, .n23
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c23
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c23
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n23
+.c23:        ld a, $5C
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n23:
+            ld l, $58
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c22
+            cp $EF
+            jr nc, .n22
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c22
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c22
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n22
+.c22:        ld a, $58
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n22:
+            ld l, $54
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c21
+            cp $EF
+            jr nc, .n21
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c21
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c21
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n21
+.c21:        ld a, $54
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n21:
+            ld l, $50
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c20
+            cp $EF
+            jr nc, .n20
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c20
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c20
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n20
+.c20:        ld a, $50
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n20:
+            ld l, $4C
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c19
+            cp $EF
+            jr nc, .n19
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c19
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c19
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n19
+.c19:        ld a, $4C
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n19:
+            ld l, $48
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c18
+            cp $EF
+            jr nc, .n18
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c18
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c18
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n18
+.c18:        ld a, $48
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n18:
+            ld l, $44
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c17
+            cp $EF
+            jr nc, .n17
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c17
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c17
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n17
+.c17:        ld a, $44
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n17:
+            ld l, $40
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c16
+            cp $EF
+            jr nc, .n16
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c16
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c16
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n16
+.c16:        ld a, $40
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n16:
+            ld l, $3C
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c15
+            cp $EF
+            jr nc, .n15
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c15
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c15
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n15
+.c15:        ld a, $3C
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n15:
+            ld l, $38
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c14
+            cp $EF
+            jr nc, .n14
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c14
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c14
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n14
+.c14:        ld a, $38
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n14:
+            ld l, $34
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c13
+            cp $EF
+            jr nc, .n13
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c13
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c13
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n13
+.c13:        ld a, $34
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n13:
+            ld l, $30
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c12
+            cp $EF
+            jr nc, .n12
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c12
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c12
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n12
+.c12:        ld a, $30
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n12:
+            ld l, $2C
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c11
+            cp $EF
+            jr nc, .n11
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c11
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c11
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n11
+.c11:        ld a, $2C
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n11:
+            ld l, $28
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c10
+            cp $EF
+            jr nc, .n10
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c10
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c10
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n10
+.c10:        ld a, $28
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n10:
+            ld l, $24
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c9
+            cp $EF
+            jr nc, .n9
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c9
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c9
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n9
+.c9:        ld a, $24
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n9:
+            ld l, $20
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c8
+            cp $EF
+            jr nc, .n8
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c8
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c8
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n8
+.c8:        ld a, $20
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n8:
+            ld l, $1C
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c7
+            cp $EF
+            jr nc, .n7
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c7
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c7
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n7
+.c7:        ld a, $1C
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n7:
+            ld l, $18
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c6
+            cp $EF
+            jr nc, .n6
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c6
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c6
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n6
+.c6:        ld a, $18
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n6:
+            ld l, $14
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c5
+            cp $EF
+            jr nc, .n5
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c5
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c5
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n5
+.c5:        ld a, $14
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n5:
+            ld l, $10
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c4
+            cp $EF
+            jr nc, .n4
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c4
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c4
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n4
+.c4:        ld a, $10
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n4:
+            ld l, $0C
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c3
+            cp $EF
+            jr nc, .n3
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c3
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c3
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n3
+.c3:        ld a, $0C
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n3:
+            ld l, $08
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c2
+            cp $EF
+            jr nc, .n2
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c2
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c2
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n2
+.c2:        ld a, $08
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n2:
+            ld l, $04
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c1
+            cp $EF
+            jr nc, .n1
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c1
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c1
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n1
+.c1:        ld a, $04
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n1:
+            ld l, $00
+            ld e, l
+            ld a, [de]
+            cp [hl]
+            jr nz, .c0
+            cp $EF
+            jr nc, .n0
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c0
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .c0
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr z, .n0
+.c0:        ld a, $00
+            ld [bc], a
+            inc c
+            ld a, c
+            cp low(OC_LIST) + 16
+            jp z, .over
+.n0:
+            and a
+            ret
+.over:      scf
+            ret
+
+; ---- b12:9ADA-9AFB (battle, every frame of a choice): $6AEF + x = (the byte at $6BB7 + T1[x] =
+; $FF) ? $FF : T1[x] for x 0-8; $6AAC-$6ABD = T2. T1 / T2 = the ROM's tables at b12:9FF7 / 9F95,
+; copied by build.py (B9AD_T). Out (at 9AFC): A = T2's last byte, X = 9, Y = $12; N = 0,
+; Z = 1, C = 1; V kept.
+section bank PF_BANK, $7300
+b9ad_b:     ld hl, B9AD_T
+            ld de, $A000 + $0AEF
+            ld c, 9
+.l1:        ld a, [hl+]
+            push hl
+            ld b, a
+            add a, low($A000 + $0BB7)
+            ld l, a
+            ld a, high($A000 + $0BB7)
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            cp $FF
+            jr z, .s
+            ld a, b
+.s:         ld [de], a
+            inc de
+            pop hl
+            dec c
+            jr nz, .l1
+            ld de, $A000 + $0AAC            ; ($6AAC-$6ABD: one page)
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld b, a
+            xor a
+            ldh [nzv], a
+            ld de, 9
+            ld c, $12
+            scf
+            ld a, b
+            ld b, 0
+            ret
+
+; (in bank 0's free space after sgb.s)
+section bank 0, $2800
+rt_mmc_w5808:
+            push af
+            push bc
+            push de
+            push hl
+            ld hl, BLK_F                    ; (16-bit frame count of the last blank)
+            ld a, [NMI_CNT]
+            cp [hl]
+            jr nz, .n
+            inc l
+            ld a, [NMI_CNT + 1]
+            cp [hl]
+            jp z, .x
+.n:         ld a, [NMI_CNT]
+            ld [BLK_F], a
+            ld a, [NMI_CNT + 1]
+            ld [BLK_F + 1], a
+            ld hl, NT_SH + 19 * 32 + 2      ; the shadow now; the GB map in the next vblank
+                                            ;   (blk_cp: the four rows from the shadow,
+                                            ;   before the queued writes) or at once with
+                                            ;   the LCD off. Only the message window's own
+                                            ;   small-font tiles, $A8-$EF: the party and
+                                            ;   command windows keep theirs (rows 19-22,
+                                            ;   columns 2-19: one page)
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k0
+            ld [hl], 0
+.k0:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k1
+            ld [hl], 0
+.k1:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k2
+            ld [hl], 0
+.k2:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k3
+            ld [hl], 0
+.k3:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k4
+            ld [hl], 0
+.k4:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k5
+            ld [hl], 0
+.k5:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k6
+            ld [hl], 0
+.k6:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k7
+            ld [hl], 0
+.k7:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k8
+            ld [hl], 0
+.k8:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k9
+            ld [hl], 0
+.k9:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k10
+            ld [hl], 0
+.k10:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k11
+            ld [hl], 0
+.k11:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k12
+            ld [hl], 0
+.k12:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k13
+            ld [hl], 0
+.k13:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k14
+            ld [hl], 0
+.k14:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k15
+            ld [hl], 0
+.k15:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k16
+            ld [hl], 0
+.k16:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k17
+            ld [hl], 0
+.k17:        inc l
+            ld a, 14
+            add a, l
+            ld l, a
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k18
+            ld [hl], 0
+.k18:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k19
+            ld [hl], 0
+.k19:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k20
+            ld [hl], 0
+.k20:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k21
+            ld [hl], 0
+.k21:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k22
+            ld [hl], 0
+.k22:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k23
+            ld [hl], 0
+.k23:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k24
+            ld [hl], 0
+.k24:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k25
+            ld [hl], 0
+.k25:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k26
+            ld [hl], 0
+.k26:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k27
+            ld [hl], 0
+.k27:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k28
+            ld [hl], 0
+.k28:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k29
+            ld [hl], 0
+.k29:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k30
+            ld [hl], 0
+.k30:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k31
+            ld [hl], 0
+.k31:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k32
+            ld [hl], 0
+.k32:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k33
+            ld [hl], 0
+.k33:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k34
+            ld [hl], 0
+.k34:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k35
+            ld [hl], 0
+.k35:        inc l
+            ld a, 14
+            add a, l
+            ld l, a
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k36
+            ld [hl], 0
+.k36:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k37
+            ld [hl], 0
+.k37:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k38
+            ld [hl], 0
+.k38:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k39
+            ld [hl], 0
+.k39:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k40
+            ld [hl], 0
+.k40:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k41
+            ld [hl], 0
+.k41:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k42
+            ld [hl], 0
+.k42:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k43
+            ld [hl], 0
+.k43:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k44
+            ld [hl], 0
+.k44:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k45
+            ld [hl], 0
+.k45:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k46
+            ld [hl], 0
+.k46:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k47
+            ld [hl], 0
+.k47:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k48
+            ld [hl], 0
+.k48:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k49
+            ld [hl], 0
+.k49:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k50
+            ld [hl], 0
+.k50:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k51
+            ld [hl], 0
+.k51:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k52
+            ld [hl], 0
+.k52:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k53
+            ld [hl], 0
+.k53:        inc l
+            ld a, 14
+            add a, l
+            ld l, a
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k54
+            ld [hl], 0
+.k54:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k55
+            ld [hl], 0
+.k55:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k56
+            ld [hl], 0
+.k56:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k57
+            ld [hl], 0
+.k57:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k58
+            ld [hl], 0
+.k58:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k59
+            ld [hl], 0
+.k59:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k60
+            ld [hl], 0
+.k60:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k61
+            ld [hl], 0
+.k61:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k62
+            ld [hl], 0
+.k62:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k63
+            ld [hl], 0
+.k63:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k64
+            ld [hl], 0
+.k64:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k65
+            ld [hl], 0
+.k65:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k66
+            ld [hl], 0
+.k66:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k67
+            ld [hl], 0
+.k67:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k68
+            ld [hl], 0
+.k68:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k69
+            ld [hl], 0
+.k69:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k70
+            ld [hl], 0
+.k70:        inc l
+            ld a, [hl]
+            sub $A8
+            cp $48
+            jr nc, .k71
+            ld [hl], 0
+.k71:        inc l
+            ldh a, [$FF40]
+            bit 7, a
+            jr z, .off
+            ld a, 1
+            ld [BLK_REQ], a
+.x:         pop hl
+            pop de
+            pop bc
+            pop af
+            ret
+.off:       call blk_cp
+            jr .x
+
+
+; ---- JMP (P) of a pointer just loaded from a jump table with Y (recomp.py table_jump): HL ->
+; P, N, then per entry the NES address and its GB bank / address. The pointer is checked
+; against Y's entry; anything else goes through the dynamic jump. A, F kept.
+rt_tjump:   push af
+            push de
+            ld a, [hl+]
+            ld e, a
+            ld d, high(NES_RAM)             ; DE = the pointer
+            ld a, c
+            rrca
+            jr c, .dyn                      ; (Y odd)
+            cp [hl]
+            jr nc, .dyn                     ; (past the table)
+            inc hl
+            push bc
+            ld c, a
+            add a, a
+            add a, a
+            add a, c
+            ld c, a
+            ld b, 0
+            add hl, bc
+            pop bc
+            ld a, [de]
+            cp [hl]
+            jr nz, .dyn
+            inc e
+            inc hl
+            ld a, [de]
+            cp [hl]
+            jr nz, .dyn1
+            inc hl
+            ld a, [hl+]
+            ldh [fc_bank], a
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            pop de
+            pop af
+            jp rt_dyn_go
+.dyn1:      dec e
+.dyn:       ld h, d
+            ld l, e
+            pop de
+            pop af
+            jp rt_jmp_ind
+
+; ---- farjsr's .go (ExRAM: LDA FARHI,X / PHA / LDA FARLO,X / PHA / RTS, an idiom): far routine
+; X directly (FARX, build.py: count, then per routine its FARLO byte and GB bank / address).
+; A = the FARLO byte, N / Z from it; C, V kept.
+rt_farx:    pop hl                          ; (the idiom's return: this is a jump)
+            push af
+            ld hl, FARX
+            ld a, e
+            cp [hl]
+            jp nc, rt_fatal
+            inc hl
+            add a, a
+            add a, a
+            add a, l
+            ld l, a
+            jr nc, .h
+            inc h
+.h:         ld a, [hl+]
+            ldh [nzv], a
+            ldh [sv_a], a
+            ld a, [hl+]
+            ldh [fc_bank], a
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            pop af
+            ldh a, [sv_a]
+            inc a
+            dec a
+            jp rt_dyn_go
+
+; ---- b12:BF8F: swap $90-$9F with $6D97-$6DA6 (cart RAM bank 0; one page). Out: A = the old
+; $9F, X = 16, Y = 0; N = 0, Z = 1; C kept.
+hle_swap90: push af
+            ld hl, NES_RAM + $90
+            ld de, $AD97
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [de]
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc e
+            xor a
+            ldh [nzv], a
+            pop hl                          ; (L = F before: keep its carry)
+            ld a, l
+            and $10
+            or $80
+            ld l, a
+            ld h, b
+            push hl
+            pop af
+            ld de, 16
+            ld bc, 0
+            ret

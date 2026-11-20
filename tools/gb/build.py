@@ -268,11 +268,54 @@ def main():
         rc.g.idioms[('fix', 0xE0FD)] = ('pf:dbox_b', 0xE118, 'NZCV', 'cond')
     else:
         print('  DrawBox: code not found, not native')
+    if prg[fixo + 0x15F3:fixo + 0x1600].hex() == 'a000b18c999e6ac8c005d0f660':   # fix:F5F3 box record copy
+        rc.g.idioms[('fix', 0xF5F3)] = ('pf:rec5_b', 0xF5FF, 'NZC')
+    farx_src = 'FARX:\n    db 0\n'                   # farjsr's .go (ExRAM RTS dispatch by X) straight
+    nfar = sum(1 for e in entries if e[0] == 'far')   #   to far routine X (rt_farx)
+    exo = 18 * 0x4000                                 # (the ExRAM image, $5C00)
+    exi = bytes(prg[exo:exo + 0x400])
+    m = [k for k in range(0x400 - 9) if exi[k] == 0xBD and exi[k + 3] == 0x48 and exi[k + 4] == 0xBD
+         and exi[k + 7] == 0x48 and exi[k + 8] == 0x60 and exi[k - 4:k] == bytes.fromhex('8d165160')]
+    if len(m) == 1 and nfar and os.environ.get('GB_FARX') != '0':
+        go = 0x5C00 + m[0]
+        fhi = exi[m[0] + 1] | exi[m[0] + 2] << 8
+        flo = exi[m[0] + 5] | exi[m[0] + 6] << 8
+        rows = []
+        for x in range(nfar):
+            lo, hi = exi[flo - 0x5C00 + x], exi[fhi - 0x5C00 + x]
+            tk = ('far', (lo | hi << 8) + 1)
+            if tk not in rc.insns: rows = None; break
+            lab = 'L_far_%04X' % tk[1]
+            rows.append('    db $%02X, bank(%s), low(%s), high(%s)\n' % (lo, lab, lab, lab))
+        if rows:
+            farx_src = 'FARX:\n    db %d\n' % nfar + ''.join(rows)
+            rc.g.idioms[('ex', go)] = ('rt_farx', go + 8, 'NZ')
+        else:
+            print('  farjsr: a far routine not compiled, not direct')
+    else:
+        print('  farjsr: dispatch not found, not direct')
+    b12o = 12 * 0x4000 - 0x8000
+    b9ad_src = 'B9AD_T:\n'                           # b12:9ADA-9AFB (battle: two ROM tables to save
+    if prg[b12o + 0x9ADA:b12o + 0x9AFC].hex() == ('a200bcf79fb9b76bc9fff001989def6ae8e009d0ed'   # RAM each
+                                                   'a000b9959f99ac6ac8c012d0f5'):                 # frame)
+        tb = prg[b12o + 0x9FF7:b12o + 0x9FF7 + 9] + prg[b12o + 0x9F95:b12o + 0x9F95 + 18]  # (from the ROM)
+        b9ad_src += '    db ' + ', '.join('$%02X' % x for x in tb) + '\n'
+        rc.g.idioms[('b12', 0x9ADA)] = ('pf:b9ad_b', 0x9AFC, 'NZC')
+    else:
+        print('  b12:9ADA: code not as expected, not native')
+                                                     # b12:BF13 battle sprite step: the two
+    if (prg[b12o + 0xBF13:b12o + 0xBF26].hex() == '208fbfa594f0082026bf205ebfc694208fbf60'   # swaps of $90-$9F
+            and prg[b12o + 0xBF8F:b12o + 0xBFA4].hex() == 'a200a010b59048bd976d9590689d976de888d0f060'):
+        rc.g.idioms[('b12', 0xBF13)] = ('pf:bfsw_b', 0xBF25, 'NZ', 'cond')   #   cancel when $6D9B = 0
+    else:
+        print('  b12:BF13: code not as expected, not native')
     # battle text expansion loop (fix:FA77, FA9C, FAE7, FCA7, FCB7) native (btx_b): its bytes by hash
     btx = hashlib.sha1(prg[fixo + 0x1A77:fixo + 0x1A90] + prg[fixo + 0x1A9C:fixo + 0x1AF2] +
                        prg[fixo + 0x1CA7:fixo + 0x1CC4]).hexdigest()
     if btx == 'd0a108d91cdbcacd2aa243cc30fcc235cb5a26eb':
         rc.g.idioms[('fix', 0xFA77)] = ('pf:btx_b', 0xFA7B, 'NZCV')
+        if prg[fixo + 0x1C89:fixo + 0x1C99].hex() == 'a000b194f00a209cfac8c49ff002d0f2':   # FC89: a name
+            rc.g.idioms[('fix', 0xFC89)] = ('pf:bnm_b', 0xFC99, 'NZCV')                    #   through FA9C
     else:
         print('  battle text loop: code not as expected, not native', btx)
     wrf_src = 'WRF:\n' + ''.join('    db $%02X, $%02X, $%02X, %d\n' % w for w in wrf)
@@ -295,6 +338,15 @@ def main():
             rc.g.idioms[('far', far_sym['pr1'])] = ('pf:prow_b', far_sym['pr3'], 'NZC')
         else:
             print('  far pr1: code not as expected, not native')
+    FAR_PF = (('vsave', 'vsave_r', 'pf:vsave_b', 'NZ', '1e47f7de43adc89b'),         # gb_layout's own far routines
+              ('vrest', 'vrest_r', 'pf:vrest_b', 'NZ', 'ac1e89bbed7afc8d'),                        #   run natively (bank PF_BANK)
+              ('party_stamp', 'pstamp_r', 'pf:pstamp_b', 'NZCV', '071f266715fd8d17'))              #   when their bytes hash as expected
+    for nm, rn, nat, fl, h in FAR_PF:
+        if nm in far_sym and rn in far_sym:
+            o = FAR_BANK * 0x2000 - 0xC000
+            code = prg[o + far_sym[nm]:o + far_sym[rn] + 1]
+            if hashlib.sha1(code).hexdigest()[:16] == h: rc.g.idioms[('far', far_sym[nm])] = (nat, far_sym[rn], fl)
+            else: print('  far %s: code not as expected (%s), not native' % (nm, hashlib.sha1(code).hexdigest()[:16]))
     MUS_SHA1 = 'bd9d5ae99e4ca63c248c984e9c1b42df1844589f'   # (a hash of the code, not the code)
     # FF1's music engine (b13:B000-B2F2) native (rt/mus.s) when its bytes are the expected ones;
     # the table addresses from the ROM's own operands
@@ -314,10 +366,13 @@ def main():
     mus_src = ''.join('%s = $%04X\n' % (k, mus.get(k, 0x8000)) for k in
                       ('MUS_SCORE_HI', 'MUS_P2C', 'MUS_ENVSPD', 'MUS_LENS', 'MUS_OCT', 'MUS_FREQS', 'MUS_ENVPAT'))
     prog, bank_of, banks = emit_program(rc)
+    print('  routines copied into calling banks: %d bytes' % getattr(rc, 'clone_bytes', 0))
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s', 'sgb.s'))
     rt += '\nPROW_OFF = NES_RAM + $%04X\n' % prow_off
     rt += '\nsection bank HLE_BANK, $7800\n' + wrow3_src     # (build-time table from the ROM)
     rt += '\nsection bank PF_BANK, $7C00\n' + wrf_src
+    rt += '\nsection bank PF_BANK, $7B00\n' + b9ad_src
+    rt += '\nsection bank 0, $2F00\n' + farx_src      # (bank 0, read by rt_farx)
     rt += '\n' + apu_tables() + '\nSND_MASK = $%02X\n' % int(os.environ.get('GB_SND_MASK', 'FF'), 16) + 'MDF_ON = %d\n' % int(os.environ.get('GB_MDF', '1'))
     rt += open(os.path.join(HERE, 'rt', 'apu_core.s')).read()
     rt += mus_src + open(os.path.join(HERE, 'rt', 'mus.s')).read()

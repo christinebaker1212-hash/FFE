@@ -918,6 +918,35 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   48 -> 38), CGB 0.
 - hle_sw16 / hle_cp64 copies unrolled (FF1 swaps $90-$9F and copies a box's text for every
   box it redraws). checkall 62/62. DMG 121 -> 118.
+- **Battle frames, 2026-11-20 (later)** (lagcheck DMG 117 -> 107, CGB 0; checkall 62/62):
+  - Recompiler: each code component goes with the space holding most of its bytes; the fixed
+    bank's and the ExRAM code start a bank of their own; a JMP to a trampoline (a JMP chain)
+    is compiled as a jump to its end (straight to a native routine), so shared tail-jump
+    targets no longer glue unrelated code into one blob; small routines (up to 160 bytes,
+    `GB_CLONE`) called from another bank get a copy there (no farcall; 4.9 KB copied).
+    JMP (ind) right after a pointer load from a known jump table (`LDA T,Y / STA P / LDA T+1,Y
+    / STA P+1`) dispatches by Y through a table next to it (`rt_tjump`, the pointer checked);
+    the English farjsr's RTS dispatch goes straight to far routine X (`rt_farx`, table FARX
+    from the ROM's FARLO/FARHI at build time).
+  - Native: gb_layout's own vsave / vrest / party_stamp (pf idioms, bytes hash-checked); FF1's
+    name copy fix:FC89 (`bnm_b`), box record copy fix:F5F3 (`rec5_b`), b12:9ADA (two ROM tables
+    to save RAM each frame, tables copied from the ROM at build time, `b9ad_b`); b12:BF13's two
+    swaps of $90-$9F cancel when the swapped-in $94 is 0 (`bfsw_b`, conditional idiom).
+  - Battle message window blank ($5808): shadow at once, GB map in the next vblank (`blk_cp`).
+  - gb_layout `teardown_skip` (fix:F9B0): a text record whose box the teardown removes is not
+    expanded (boxline does not draw it anyway); NES and GB run the same code.
+  - OAM conversion: the GB table is filled from its end, NES entries last first (NES order
+    kept; the cursor at entries 0-3 appearing / going leaves the others in place); a page
+    like the last one is converted incrementally: `occmp` (unrolled, ROM bank 59 `OC_BANK`)
+    lists the changed entries, each keeps its GB slot (`OC_POS`, cart RAM bank 3 $A800) or
+    leaves a hidden hole; a sprite coming into view or a tile not resident converts the whole
+    page; more than 40 in view: the old forward conversion. Visible sprites (y, x, attributes,
+    tile pixels) identical to the forward layout at 477 points (DMG + CGB; one transient at a
+    screen change from shot timing).
+  - Tools: `sgbrun` env `SGBRUN_LYAT=PC` (wait, LY, VBL_CNT whenever PC is reached).
+  - Bank 0 has ~3 KB free again ($2800-$33FF; the far-call stubs shrank with the copies).
+  - Still lagging in battle: one frame per round on DMG (box redraw frames ~10 lines over in
+    Gambatte; mGBA and Gambatte differ on which ones).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
