@@ -1560,15 +1560,16 @@ chr_w1:     push bc
 ; LCD going on after drawing with it off (dmg_scan_all, rt/dmg_shade.s): every GB map cell
 ; (rows 0-29) gives its tile the palette it is drawn with (from the nametable that owns the
 ; cell; tiles coded for another palette are marked, parked tiles in use marked again) and
-; the tile counts as used (REF_BM); then the cells in the GB view again, so that a tile drawn
-; there with another palette than off the view is coded for the view, and PAL_USED = the
-; palettes of the view. Per row set-up and bit masks from a table: ~2.5 times faster than
-; the cell-by-cell version.
+; the tile counts as used (REF_BM). The cells in the GB view come last, so that a tile drawn
+; there with another palette than off the view is coded for the view, and give PAL_USED (the
+; palettes of the view). Each cell once, per row set-up, bit masks from a table.
 SC_RB      = $DCD4          ; (MU_ temps of hle_mapupd) row: nametable byte offset low,
 SC_RH      = $DCD5          ;   page of nametable 0,
 SC_AB      = $DCD6          ;   attribute byte offset low
 SC_OW      = $DCD7          ; cells owned by nametable 1 exist
-SC_P1      = $DCD8          ; first pass (REF_BM), else the view (PAL_USED)
+SC_P1      = $DCD8          ; off the view (no PAL_USED), else the view
+SC_VR      = $DCD9          ; first view row, first view column
+SC_VC      = $DCDA
 dmg_scan_all_b:
             push bc
             push de
@@ -1578,6 +1579,7 @@ dmg_scan_all_b:
             ldh [sgb_adirty], a
             xor a
             ldh [dmg_scan], a
+            ld [PAL_USED], a
             ld hl, REF_BM
             ld b, 32
 .z:         ld [hl+], a
@@ -1588,22 +1590,6 @@ dmg_scan_all_b:
             ldh a, [own1_hi]
             or b
             ld [SC_OW], a
-            ld a, 1
-            ld [SC_P1], a
-            ld d, 0
-.r:         call sc_row
-            ld e, 0
-.c:         call sc_cell
-            inc e
-            bit 5, e
-            jr z, .c
-            inc d
-            ld a, d
-            cp 30
-            jr nz, .r
-            xor a
-            ld [PAL_USED], a
-            ld [SC_P1], a
             ldh a, [cam_y]                  ; the view: map row (scroll_y + cam_y) mod 240 / 8,
             ld b, a                         ;   column (scroll_x + cam_x) / 8
             ldh a, [scroll_y]
@@ -1615,10 +1601,7 @@ dmg_scan_all_b:
 .y:         srl a
             srl a
             srl a
-            ld d, a
-            ld b, 18
-.vr:        push bc
-            call sc_row
+            ld [SC_VR], a
             ldh a, [cam_x]
             ld c, a
             ldh a, [scroll_x]
@@ -1626,6 +1609,48 @@ dmg_scan_all_b:
             srl a
             srl a
             srl a
+            ld [SC_VC], a
+            ld a, 1                         ; off the view: rows outside it whole, rows in it
+            ld [SC_P1], a                   ;   from the column after it, 12 columns
+            ld d, 0
+.r:         call sc_row
+            ld a, [SC_VR]                   ; row in the view: (row - first) mod 30 < 18
+            ld b, a
+            ld a, d
+            sub b
+            jr nc, .r1
+            add a, 30
+.r1:        cp 18
+            jr c, .rv
+            ld e, 0
+            ld b, 32
+            jr .c
+.rv:        ld a, [SC_VC]
+            add a, 20
+            and 31
+            ld e, a
+            ld b, 12
+.c:         push bc
+            call sc_cell
+            pop bc
+            ld a, e
+            inc a
+            and 31
+            ld e, a
+            dec b
+            jr nz, .c
+            inc d
+            ld a, d
+            cp 30
+            jr nz, .r
+            xor a                           ; the view
+            ld [SC_P1], a
+            ld a, [SC_VR]
+            ld d, a
+            ld b, 18
+.vr:        push bc
+            call sc_row
+            ld a, [SC_VC]
             ld e, a
             ld b, 20
 .vc:        push bc
@@ -1703,7 +1728,30 @@ sc_cell:    ld b, 0                         ; B = 4 for a cell nametable 1 owns
             or e
             ld l, a
             ld c, [hl]
-            ld a, b                         ; palette: attribute byte, quadrant (row & 2, col & 2)
+            ld a, c                         ; REF_BM |= bit C
+            and 7
+            ld l, a
+            ld h, high(BITS8)
+            ld h, [hl]
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(REF_BM)
+            ld l, a
+            ld a, h
+            ld h, high(REF_BM)
+            or [hl]
+            ld [hl], a
+            ld a, [SC_P1]                   ; off the view, a palette fixed by the tileset:
+            and a                           ;   only the parked check
+            jr z, .pal
+            ld l, c
+            ld h, high(TILE_PAL)
+            bit 7, [hl]
+            jr nz, .pk
+.pal:       ld a, b                         ; palette: attribute byte, quadrant (row & 2, col & 2)
             add a, high(NT_SH) + 3
             ld h, a
             ld a, e
@@ -1732,25 +1780,8 @@ sc_cell:    ld b, 0                         ; B = 4 for a cell nametable 1 owns
             ld b, a
 .nv:        ld a, [SC_P1]
             and a
-            jr z, .pu
-            ld a, c                         ; first pass: REF_BM |= bit C
-            and 7
-            ld l, a
-            ld h, high(BITS8)
-            ld h, [hl]
-            ld a, c
-            rrca
-            rrca
-            rrca
-            and $1F
-            add a, low(REF_BM)
-            ld l, a
-            ld a, h
-            ld h, high(REF_BM)
-            or [hl]
-            ld [hl], a
-            jr .tp
-.pu:        ld l, b                         ; the view: PAL_USED |= bit B
+            jr nz, .tp
+            ld l, b                         ; the view: PAL_USED |= bit B
             ld h, high(BITS8)
             ld a, [PAL_USED]
             or [hl]
