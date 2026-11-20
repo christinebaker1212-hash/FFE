@@ -6769,17 +6769,24 @@ scan_b:     push bc
             xor a
             ld [PAL_USED], a
             ld d, 0                         ; every cell, rows 0-29: SC_NP |= its palette;
-.r:         call scn_tab                    ;   the view's rows: PAL_USED
-            call scn_rowf
-            ld a, [SC_VR]                   ; (view row: (D - VR) mod 30 < 18)
-            ld b, a
-            ld a, d
-            sub b
-            jr nc, .vd
+.r:         ld a, [SC_VR]                   ;   the view's rows: PAL_USED (view row: (D - VR)
+            ld b, a                         ;   mod 30 < 18). In battle only the view's rows:
+            ld a, d                         ;   a fixed camera and no scrolling, so the other
+            sub b                           ;   rows never show (their tiles keep codings
+            jr nc, .vd                      ;   nobody sees)
             add a, 30
 .vd:        cp 18
-            call c, scn_pu
-            inc d
+            jr c, .vr
+            ldh a, [in_battle]
+            bit 7, a
+            jr nz, .rn
+            call scn_tab
+            call scn_rowf
+            jr .rn
+.vr:        call scn_tab
+            call scn_rowf
+            call scn_pu
+.rn:        inc d
             ld a, d
             cp 30
             jr nz, .r

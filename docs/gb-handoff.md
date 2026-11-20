@@ -278,6 +278,34 @@ Remaining lag, by where it is (DMG / CGB frames on the script):
   HLE_BANK (full at $5F00) behind a trampoline; equates used before their definition must
   be defined earlier (one-pass labels).
 
+## Native presentation (owner's decision 2026-11-20; plan: docs/gb-native-presentation.md)
+
+State 2026-11-20 (7650-wait script, Gambatte lagcheck): **CGB 0** (GB 7674 frames for the
+NES's 7677), **DMG ~144**. Done for it: native music engine (`rt/mus.s`), conditional and
+bank-60 idioms, native DrawBox / menu text / PPU record lists, OAM conversion skipped on an
+unchanged input, `(zp),Y` inline from coverage regions, two GB stack leaks fixed, battle LCD-on
+scan of the view's rows only.
+
+Measure: `tools/gb/profbuckets.py PROF SYM [--lagfile LAG_DUMP]` on an sgbrun profile
+(`SGBRUN_PROFC=1 SGBRUN_PROF2=800 build/sgbrun ROM FRAMES OUT --dmg --padfile P --sram S`;
+1 sample = 100 single-speed M-cycles on DMG, a DMG frame = 175 samples). mGBA's game state
+drifts from Gambatte's late in the script (other menu frames), so use it for costs per kind of
+frame, Gambatte (lagcheck, `worktime.sh`-style ring logs in cart RAM bank 3 $A800 for DMG)
+for exact overruns.
+
+DMG lag left, by screen (frames): prologue band fades ~26 (row writer, VRAM queue stalls,
+attribute writes re-checking cells, the palette upload while fading); new-game screens ~43;
+field entry ~18; battle start ~23 (6126 LCD-off CHR + attributes, 6137 LCD-on scan +
+re-coding, 6150 party sprite slot loads); battle rounds ~34 (FF1's panel redraw per box:
+hle_cp64 / hle_sw16 per box, small-font tiles, farcalls). Busy time, whole script: picture
+23%, music 21% (now the GB-side APU layer: volume changes, per-frame length / sweep clock),
+sprites 19% (oamconv, OAM clear), game code 16%, glue 13%.
+
+Next by the plan: build-time DMG shading per screen (tileset + palette) so loads copy
+pre-coded tiles instead of scanning and re-coding; native battle panel; native sprites (draw
+the game's sprite groups into GB OAM); music: skip the per-frame APU clock when no channel
+needs it.
+
 ## Gotchas learned
 - B and D must stay 0 at all times (BC = Y, DE = X for indexed addressing).
 - Compare NES/GB at NMI k vs GB entering frame wait k (cynes `nmi_ram`), feeding the GB the

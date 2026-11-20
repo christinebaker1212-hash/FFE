@@ -881,6 +881,10 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   identical to the previous build at 301 points (DMG), VRAM identical, checkall 62/62.
   Busy time -3.4% (DMG); lag: CGB 0, DMG 151 -> 145. What is left of music: the GB-side APU
   layer (volume changes, the per-frame length / sweep clock).
+- Battle LCD-on scan of the view's rows only (fixed camera, no scrolling: the other rows never
+  show; pictures identical over the whole battle, only off-view tile codings differ).
+  checkall 62/62. DMG 145 -> 144. State and next steps: `docs/gb-handoff.md` "Native
+  presentation".
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
