@@ -70,7 +70,8 @@ class FF2:
            ('fix', 0xD21B): ('hle_mapupd', 'NZC'),      # update map background (rt/ff2_banked.s, native)
            ('b03', 0xA902): ('hle_objspr', 'NZCV'),     # draw object sprite (rt/ff2_banked.s, native)
            ('fix', 0xC2F3): ('hle_water', 'NZCV'),      # world-map water animation (rt/ff2_banked.s, native)
-           ('fix', 0xF321): ('hle_ntclr0', 'NZC')}      # clear nametable 0 (rt/ff2_banked.s, native)
+           ('fix', 0xF321): ('hle_ntclr0', 'NZC'),      # clear nametable 0 (rt/ff2_banked.s, native)
+           ('b11', 0xA43A): ('hle_bspr', 'NZCV')}       # draw battle character sprite (rt/ff2_banked.s, native)
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   fix:FA91-FA99: PHA $FA / PHA $99 / JMP ($0040): "jump (long)" calls through ($40)
     #   with a pushed return address: on the GB a call through the pointer, then $FA9A.

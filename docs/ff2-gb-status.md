@@ -592,6 +592,12 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   palette number in VRAM bank 1 once when the LCD goes on (owner's nametable, quadrant,
   GB-only override). CGB door loads +33 -> +28, battle load +37 -> +28; random 1 CGB -2.0%;
   RAM identical; 10 CGB screens pixel-identical to the build before.
+- Native "draw battle character sprite" (b11:A43A, every battle frame per party member: 6 OAM
+  entries from the pose data at $7900 + 24 * pose): `hle_bspr`, FF2's steps with both
+  multiplies through `hle_mul8_b`, pose / OAM bytes through GB pointers (byte-by-byte
+  fallback for other addresses). It was ~24% of the battle-intro frames (indirect reads /
+  writes through the generic helpers). Battle intro DMG second window +32 -> +24. RAM
+  identical (random 1 DMG / CGB, random 2, forced formation 40).
 - Status of the owner's three (DMG, random 1): overworld walking / sailing at parity (walk
   scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
   remaining: battle entry (load +19 net, intro +39 / +32), door loads (+56 single wait,

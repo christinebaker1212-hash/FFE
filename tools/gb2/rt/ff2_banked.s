@@ -1907,6 +1907,285 @@ cgb_attr_all_b:
             pop bc
             ret
 
+; b11:A43A "draw battle character sprite" (every battle frame, per party member X): 6 OAM
+; entries (24 bytes at ($2C + 2X)) from the member's pose data at $7900 + 24 * pose (cart
+; RAM). FF2's steps: both multiplies through hle_mul8_b (incoming / outgoing carries), $00-$0F
+; as the NES leaves them, the pose bytes and OAM bytes read / written through GB pointers
+; (other addresses byte by byte through nes_rd / nes_wr). Exit as the NES: early ($7BA2,X
+; bit 7 set) A, N = 1, Z = 0, carry and V kept; else Y = $18, Z = 1, C = 1, N = 0, V = bit 6 of
+; $06, fill (no pose) A = $F0, X = $04, else A = the last byte, X = 6.
+BS_F       = $DCDB          ; (MU_GL) 1: pointers usable directly (BS_S source, HL OAM)
+hle_bspr_b:
+            push bc
+            ld a, e
+            ld [NES_RAM + $04], a           ; STX $04
+            ld hl, $BBA2                    ; LDA $7BA2,X / BPL -> RTS
+            add a, l
+            ld l, a
+            jr nc, .h0
+            inc h
+.h0:        ld a, [hl]
+            bit 7, a
+            jr z, .go
+            pop bc                          ; (bit 7 set: RTS with N = 1)
+            ldh [nzv], a
+            inc a
+            dec a
+            ret
+.go:        ld [NES_RAM + $05], a
+            ld hl, $BBC2                    ; $06 = $7BC2,X, $07 = $06 & $7F
+            ld a, e
+            add a, l
+            ld l, a
+            jr nc, .h1
+            inc h
+.h1:        ld a, [hl]
+            ld [NES_RAM + $06], a
+            and $7F
+            ld [NES_RAM + $07], a
+            ld e, 8                         ; X = 8 / 6 (CMP #3), A = $04: multiply
+            cp 3
+            jr c, .e8
+            ld e, 6
+.e8:        ccf
+            ld a, [NES_RAM + $04]
+            call hle_mul8_b
+            ld a, [NES_RAM + $02]
+            ld [NES_RAM + $08], a
+            ld a, [NES_RAM + $07]           ; LDA #0 / LDX $07 / BEQ
+            ld b, a
+            inc a
+            dec a
+            ld a, 0
+            jr z, .m2
+            ld a, b                         ; LDA #6 / CPX #8 / BEQ
+            cp 8
+            jr nz, .n8
+            scf
+            ld a, 6
+            jr .m2
+.n8:        ccf
+            push af
+            dec b                           ; DEX / LDA $A50B,X (bank 11 data image)
+            ld hl, $650B
+            ld a, b
+            add a, l
+            ld l, a
+            jr nc, .h2
+            inc h
+.h2:        ldh a, [data_bank8]
+            call rd8_bank
+            pop af
+            ld a, [VT_BUF]
+            ld b, a
+            ld a, [NES_RAM + $05]           ; LDX $05 / BEQ / CLC / ADC #3
+            inc a
+            dec a
+            ld a, b
+            jr z, .m2
+            add a, 3
+.m2:        ld e, $18                       ; LDX #$18 / multiply
+            call hle_mul8_b
+            ld a, [NES_RAM + $02]           ; $00 / $01 = $7900 + the product (+ carry)
+            adc a, 0
+            ld [NES_RAM + $00], a
+            ld a, [NES_RAM + $03]
+            adc a, $79
+            ld [NES_RAM + $01], a
+            ld a, [NES_RAM + $04]           ; $02 / $03 = ($2C + 2X)
+            add a, a
+            add a, $2C
+            ld l, a
+            ld h, high(NES_RAM)
+            ld a, [hl+]
+            ld [NES_RAM + $02], a
+            ld a, [hl]
+            ld [NES_RAM + $03], a
+            xor a                           ; direct pointers: source in cart RAM ($60-$7E
+            ld [BS_F], a                    ;   page), OAM bytes in RAM below $0700
+            ld a, [NES_RAM + $01]
+            cp $60
+            jr c, .sl
+            cp $7F
+            jr nc, .sl
+            ld a, [NES_RAM + $03]
+            cp $07
+            jr nc, .sl
+            ld a, 1
+            ld [BS_F], a
+.sl:        ld a, [NES_RAM + $08]           ; $0A + k = pose byte 1 + 4k + $08
+            ld b, a
+            ld c, 1
+            ld hl, NES_RAM + $0A
+.l1:        ld a, c
+            call bs_get
+            add a, b
+            ld [hl+], a
+            ld a, c
+            add a, 4
+            ld c, a
+            cp 25
+            jr nz, .l1
+            ld a, [NES_RAM + $06]           ; BIT $06 / BPL: LDA $05 / BNE: swap the pairs
+            bit 7, a
+            jr z, .ns
+            ld a, [NES_RAM + $05]
+            and a
+            jr nz, .ns
+            ld hl, NES_RAM + $0A
+            ld c, 3
+.sw:        ld a, [hl+]
+            ld b, [hl]
+            ld [hl-], a
+            ld [hl], b
+            inc l
+            inc l
+            dec c
+            jr nz, .sw
+.ns:        ld a, [NES_RAM + $04]           ; $08 / $09 = $7BCA,X / $7BCE,X; $05 = $7BB6,X
+            ld c, a                         ;   (| $40 when bit 7 of $06)
+            ld b, 0
+            ld hl, $BBCA
+            add hl, bc
+            ld a, [hl]
+            ld [NES_RAM + $08], a
+            ld hl, $BBCE
+            add hl, bc
+            ld a, [hl]
+            ld [NES_RAM + $09], a
+            ld hl, $BBB6
+            add hl, bc
+            ld a, [NES_RAM + $06]
+            ld b, a
+            ld a, [hl]
+            bit 7, b
+            jr z, .o4
+            or $40
+.o4:        ld [NES_RAM + $05], a
+            ld a, [NES_RAM + $07]
+            and a
+            jr nz, .main
+            ld c, 0                         ; no pose: 24 x $F0
+.fl:        ld a, $F0
+            call bs_put
+            inc c
+            ld a, c
+            cp $18
+            jr nz, .fl
+            ld a, [NES_RAM + $04]
+            ld e, a                         ; X = $04
+            ld h, $F0
+            jr .x
+.main:      ld c, 0                         ; per entry: pose + $09, $0A + k, $05, pose + $08
+            ld e, 0
+.l2:        ld a, c
+            call bs_get
+            ld b, a
+            ld a, [NES_RAM + $09]
+            add a, b
+            call bs_put
+            inc c
+            ld a, e
+            add a, $0A
+            ld l, a
+            ld h, high(NES_RAM)
+            ld a, [hl]
+            inc e
+            call bs_put
+            inc c
+            ld a, [NES_RAM + $05]
+            call bs_put
+            inc c
+            ld a, c
+            call bs_get
+            ld b, a
+            ld a, [NES_RAM + $08]
+            add a, b
+            call bs_put
+            inc c
+            ld h, a                         ; (the last byte)
+            ld a, c
+            cp $18
+            jr nz, .l2
+.x:         pop bc                          ; Y = $18 (B = 0)
+            ld bc, $18
+            ld d, b
+            ld a, [NES_RAM + $06]
+            and $40
+            ldh [vfl], a
+            xor a
+            ldh [nzv], a
+            ld a, h
+            scf
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1, C = 1
+            ret
+
+; A = offset -> A = byte at ($00) + offset (BS_F: GB pointer into cart RAM). Keeps BC, DE, HL.
+bs_get:     push hl
+            ld l, a
+            ld a, [BS_F]
+            and a
+            jr z, .g
+            ld a, [NES_RAM + $00]
+            add a, l
+            ld l, a
+            ld a, [NES_RAM + $01]
+            adc a, $40
+            ld h, a
+            ld a, [hl]
+            pop hl
+            ret
+.g:         push bc
+            push de
+            ld a, [NES_RAM + $00]
+            add a, l
+            ld l, a
+            ld a, [NES_RAM + $01]
+            adc a, 0
+            ld h, a
+            call nes_rd
+            ld a, l
+            pop de
+            pop bc
+            pop hl
+            ret
+
+; A = value -> ($02) + C (BS_F: GB pointer into RAM). Keeps A, BC, DE, HL.
+bs_put:     push hl
+            push af
+            ld a, [BS_F]
+            and a
+            jr z, .g
+            ld a, [NES_RAM + $02]
+            add a, c
+            ld l, a
+            ld a, [NES_RAM + $03]
+            adc a, high(NES_RAM)
+            ld h, a
+            pop af
+            ld [hl], a
+            pop hl
+            ret
+.g:         pop af
+            push af
+            push bc
+            push de
+            ldh [wtmp], a
+            ld a, [NES_RAM + $02]
+            add a, c
+            ld l, a
+            ld a, [NES_RAM + $03]
+            adc a, 0
+            ld h, a
+            call nes_wr
+            pop de
+            pop bc
+            pop af
+            pop hl
+            ret
+
 section bank HLE_BANK, $7F00
 BITS8:      db 1, 2, 4, 8, 16, 32, 64, 128      ; (page start: low byte = bit number)
 

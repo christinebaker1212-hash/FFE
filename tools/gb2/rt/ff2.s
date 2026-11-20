@@ -1256,6 +1256,9 @@ hle_water: call rt_fcs                     ; fix:C2F3 world-map water animation 
 hle_ntclr0: call rt_fcs                    ; fix:F321 clear nametable 0 (native)
             db HLE_BANK
             dw hle_ntclr0_b
+hle_bspr:   call rt_fcs                     ; b11:A43A draw battle character sprite (native)
+            db HLE_BANK
+            dw hle_bspr_b
 hle_vtile:  call rt_fcs                    ; layout's vtile (banks 23 / 24: small-font tile upload)
             db HLE_BANK
             dw hle_vtile_b
