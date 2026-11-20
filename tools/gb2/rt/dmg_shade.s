@@ -744,7 +744,12 @@ dmg_bgp:    push bc
             jr z, .n3
             cp 2
             jr z, .n2
-.lum:       ld a, b
+.lum:       ld a, b                         ; (value 1, the darkest: by its darkest level -
+            dec a                           ;   FF2's credits draw black with indices 2-3
+            jr nz, .lg                      ;   over a blue backdrop, beside a grey)
+            ld a, [LSL]
+            jp lum_shade
+.lg:        ld a, b
             add a, low(GLUM)
             ld l, a
             ld h, high(GLUM)

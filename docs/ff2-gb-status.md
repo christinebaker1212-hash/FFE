@@ -447,8 +447,13 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   place). Credits 3 columns left (`b14:BB2B` $224A -> $2247). Test builds: env
   `GB_END_TEST=1` (layout.py: Select on the field starts the ending, `JMP $F34D` at fix:F0E2).
   Checked: NES variant and Gambatte CGB shots of both pages, credits, THE END.
-- Next: DMG shading of the credits screen (background dark grey, the crystal ball fades into
-  it); Select menu with suspend (design with the owner).
+- **Fixed (DMG): credits background dark grey**, the crystal ball fading into it. The credits
+  draw black with colour indices 2-3 over a blue backdrop ($12); the backdrop takes value 0
+  and black value 1, whose shade came from its group's brightest level (a grey shares the
+  group). With a non-black backdrop, value 1 (the darkest group) is now shaded by its
+  darkest level (`dmg_shade.s` `.lum`, `LSL[0]`). Checked: DMG credits black with the ball
+  visible; 12 DMG shots along the new-game / random path identical before and after.
+- Next: Select menu with suspend (design with the owner); speed check of the new screens.
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
