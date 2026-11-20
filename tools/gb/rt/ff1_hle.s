@@ -336,6 +336,37 @@ hle_chr_pages:
             ld d, a
             ld a, 1
             ld [$4000], a
+            push hl                         ; the same tile again (FF1 uploads its cursor and
+            push de                         ;   other sprites again when they appear): the
+            ld b, 8                         ;   slot stays
+.c0:        ld a, [de]
+            cp [hl]
+            jr nz, .cd
+            inc hl
+            inc e
+            inc e
+            dec b
+            jr nz, .c0
+            ld a, e
+            sub 15
+            ld e, a
+            ld b, 8
+.c1:        ld a, [de]
+            cp [hl]
+            jr nz, .cd
+            inc hl
+            inc e
+            inc e
+            dec b
+            jr nz, .c1
+            dec hl
+            ld a, [hl+]
+            ldh [tmp_lo], a                 ; (last byte)
+            pop de
+            pop af                          ; (HL advanced as by the copy)
+            jr .nx
+.cd:        pop de
+            pop hl
 .copy:      ld b, 8
 .p0:        ld a, [hl+]
             ld [de], a

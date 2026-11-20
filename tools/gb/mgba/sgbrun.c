@@ -147,7 +147,8 @@ int main(int argc, char** argv) {
 				core->step(core);
 				if (callt) {                            /* SGBRUN_CALLS=HEX: return address at each entry */
 					uint32_t pc = 0; core->readRegister(core, "pc", &pc);
-					if ((pc & 0xFFFF) == callt && ncall < 2000000) {
+					static int cbank = -2; if (cbank == -2) cbank = getenv("SGBRUN_BANK") ? (int) strtoul(getenv("SGBRUN_BANK"), 0, 16) : -1;
+					if ((pc & 0xFFFF) == callt && ncall < 2000000 && (cbank < 0 || (pc & 0xFFFF) < 0x4000 || ((struct GB*) core->board)->memory.currentBank == cbank)) {
 						uint32_t sp = 0; core->readRegister(core, "sp", &sp); sp &= 0xFFFF;
 						unsigned ra = core->rawRead8(core, sp, -1) | core->rawRead8(core, sp + 1, -1) << 8;
 						unsigned rb = ra < 0x4000 ? 0 : ((struct GB*) core->board)->memory.currentBank;
@@ -158,8 +159,12 @@ int main(int argc, char** argv) {
 				if (getenv("SGBRUN_LYAT")) {            /* SGBRUN_LYAT=PC: wait, LY, VBL_CNT each time PC is reached */
 					static unsigned lyat = 0; if (!lyat) lyat = strtoul(getenv("SGBRUN_LYAT"), 0, 16);
 					uint32_t pc = 0; core->readRegister(core, "pc", &pc);
-					if ((pc & 0xFFFF) == lyat) fprintf(stderr, "L %u %u %u\n", core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8,
+					static int lbank = -2; if (lbank == -2) lbank = getenv("SGBRUN_BANK") ? (int) strtoul(getenv("SGBRUN_BANK"), 0, 16) : -1;   /* (SGBRUN_BANK=HEX: only in that ROM bank) */
+					if ((pc & 0xFFFF) == lyat && (lbank < 0 || lyat < 0x4000 || ((struct GB*) core->board)->memory.currentBank == lbank)) fprintf(stderr, "L %u %u %u\n", core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8,
 						core->rawRead8(core, 0xFF44, -1), core->rawRead8(core, 0xD832, 1) | core->rawRead8(core, 0xFF05, -1) << 8);
+					if ((pc & 0xFFFF) == lyat && getenv("SGBRUN_LYMEM") && (lbank < 0 || lyat < 0x4000 || ((struct GB*) core->board)->memory.currentBank == lbank)) {   /* (+ 8 bytes there) */
+						unsigned a0 = strtoul(getenv("SGBRUN_LYMEM"), 0, 16); fprintf(stderr, "M");
+						for (unsigned a = a0; a < a0 + 8; a++) fprintf(stderr, " %02X", core->busRead8(core, a)); fprintf(stderr, "\n"); }
 				}
 				if (getenv("SGBRUN_TRACE")) {           /* SGBRUN_TRACE=A-B: bank:PC SP of every instruction in waits A-B */
 					static int ta = -1, tb = -1; if (ta < 0) sscanf(getenv("SGBRUN_TRACE"), "%d-%d", &ta, &tb);

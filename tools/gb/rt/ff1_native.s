@@ -17,6 +17,7 @@ MD_PB      = $DCE0          ;   CGB: palettes of a GB map row (32)
 SP_T       = $DCE0          ; scan_b (DMG): palettes of a map row by pair (32; MD_PB is the CGB's)
 SC_VR      = $D837          ;   the view's first map row, first column
 SC_VC      = $D838
+SC_TC      = $D827          ;   scn_tab: row / 2 its SP_T is for ($FF: none; fault-dump area DBG + 7)
 
 section bank HLE_BANK, $4000
 NBIT:       db 1, 2, 4, 8, 16, 32, 64, 128   ; (at $4000: low byte = bit number)
@@ -6258,7 +6259,9 @@ scan_b:     push bc
             ret
 ; scan_b in pieces (also run in the frame waits' spare time by lon_b): scb_init (carry: a
 ; one-palette screen, done), scb_row for rows D = 0-29, scb_fin
-scb_init:   ld a, 1
+scb_init:   ld a, $FF
+            ld [SC_TC], a
+            ld a, 1
             ldh [sgb_dirty], a
             ldh [sgb_adirty], a
             xor a
@@ -6526,6 +6529,14 @@ scn_tab:    push de                         ; SP_T entries as palette bits (SC_T
             srl a
             add a, high(NT_SH)
             ld [SC_TH], a
+            ld a, d                         ; (rows 2k and 2k + 1 share their attribute
+            srl a                           ;   quadrants: SP_T as for the row before;
+            ld hl, SC_TC                    ;   SC_TC $FF from scb_init)
+            cp [hl]
+            jr nz, .new
+            pop de
+            ret
+.new:       ld [hl], a
             ld a, d
             and $1C
             add a, a
@@ -7287,7 +7298,78 @@ scn_rowv:   ld a, [SC_VC]
 
 ; scan_b: view row D (scn_tab done): PAL_USED gets the palette of each of its 20 view
 ; cells (by owner). Keeps D.
-scn_pu:     ld a, [SC_VC]
+scn_pu:     ld hl, SP_T                     ; (nothing new possible: all 32 pairs' palettes
+            xor a                           ;   already in PAL_USED)
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            ld b, a
+            ld a, [PAL_USED]
+            cpl
+            and b
+            ret z
+            ld a, [SC_VC]
             ld e, a
             call scn_ob
             xor a
@@ -14416,7 +14498,16 @@ hle_swap90: push af
 ; (moved to bank 0's free space)
 hle_mapdec: ld a, e
             ld [MDC_X], a
-            ldh a, [data_bank8]
+            ld a, [NES_RAM + $12]           ; a standard map's whole decompression ($7000):
+            and a                           ;   decompressed at build time (MAPS_BANK0's
+            jr nz, .dec                     ;   table: NES bank, source; build.py), copied
+            ld a, [NES_RAM + $13]
+            and $F0
+            cp $70
+            jr nz, .dec
+            call mpre
+            ret c
+.dec:       ldh a, [data_bank8]
             ld [$2000], a
             ld a, [NES_RAM + $10]
             ld l, a
@@ -14476,6 +14567,232 @@ hle_mapdec: ld a, e
             ldh a, [data_bank8]
             ld [$2000], a
             ret
+
+
+; the table: 10 bytes an entry (NES bank, source low / high, GB bank, page, the source's end
+; low / high, flags (bit 0: a run: X and $14 below), X, $14), $FF at the end. Carry: done, RAM
+; and registers as mdc_end leaves them.
+mpre:       ld a, MAPS_BANK0
+            ld [$2000], a
+            ldh a, [nes_bank8]              ; the overworld's rows (bank 1, row $2C, 256
+            cp 1                            ;   bytes to $7000 + (row & 15) * 256): table at
+            jr z, .ow                       ;   $5000, 16 bytes a row
+            ld a, [NES_RAM + $13]
+            cp $70
+            jr nz, .nf
+            ld hl, $4000
+.f:         ld a, [hl]
+            cp $FF
+            jr z, .nf
+            ld b, a
+            ldh a, [nes_bank8]
+            cp b
+            jr nz, .n0
+            inc hl
+            ld a, [NES_RAM + $10]
+            cp [hl]
+            jr nz, .n1
+            inc hl
+            ld a, [NES_RAM + $11]
+            cp [hl]
+            jr nz, .n2
+            inc hl
+            ld a, [hl+]
+            ld b, a                         ; B = GB bank
+            ld a, [hl+]
+            ld c, a                         ; C = page
+            ld a, [hl+]
+            ld [NES_RAM + $10], a
+            ld a, [hl+]
+            ld [NES_RAM + $11], a
+            ld a, [hl+]
+            rrca
+            jr nc, .nr
+            ld a, [hl+]
+            ld [MDC_X], a
+            ld a, [hl]
+            ld [NES_RAM + $14], a
+.nr:        ld a, b
+            ld [$2000], a
+            ld h, c
+            ld l, 0
+            ld de, $B000
+.cp:
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            jr nz, .cp
+            inc d
+            ld a, d
+            cp $C0
+            jr nz, .cp
+            xor a
+            ld [NES_RAM + $12], a
+            ld a, $80
+            ld [NES_RAM + $13], a
+.end:       ldh a, [code_bank]
+            ld [$2000], a
+            xor a
+            ldh [nzv], a
+            ld bc, 0
+            ld d, 0
+            ld a, [MDC_X]
+            ld e, a
+            ld a, $FF
+            cp a
+            scf
+            ret
+.n0:        inc hl
+.n1:        inc hl
+.n2:        ld de, 8
+            add hl, de
+            jr .f
+.nf:        and a                           ; (not found: carry clear)
+            ret
+.ow:        ld a, [NES_RAM + $2C]
+            ld b, a
+            swap a
+            and $F0
+            ld l, a
+            ld a, b
+            swap a
+            and $0F
+            add a, $50
+            ld h, a
+            ld a, [hl+]
+            cp $FF
+            jr z, .nf                       ; (no entry)
+            ld b, a
+            ld a, [NES_RAM + $10]
+            cp b
+            jr nz, .nf
+            ld a, [NES_RAM + $11]
+            cp [hl]
+            jr nz, .nf
+            inc hl
+            ld a, [hl+]
+            ld b, a                         ; B = GB bank
+            ld a, [hl+]
+            ld c, a                         ; C = page
+            ld a, [hl+]
+            ld [NES_RAM + $10], a
+            ld a, [hl+]
+            ld [NES_RAM + $11], a
+            ld a, [hl+]
+            rrca
+            jr nc, .or
+            ld a, [hl+]
+            ld [MDC_X], a
+            ld a, [hl]
+            ld [NES_RAM + $14], a
+.or:        ld a, b
+            ld [$2000], a
+            ld h, c
+            ld l, 0
+            ld a, [NES_RAM + $13]
+            ld b, a
+            add a, $40
+            ld d, a
+            ld e, 0
+.oc:
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            jr nz, .oc
+            ld a, b
+            inc a
+            ld [NES_RAM + $13], a
+            jr .end
 
 
 ; ---- palup2_b's fast path (v = $3F00 + C, increment 1): C = the first index, HL -> its colour
@@ -15124,4 +15441,755 @@ bdc_b:      ld c, a
             ld a, [hl]
             add a, 8
             ld [hl], a
+            ret
+
+; ---- c62:D25A PrepRowCol natively (FF1 turns 16 map tiles of a row / column into the five
+; draw buffers: $0780 / $0790 / $07A0 / $07B0 / $07C0 + X = $0500 / $0580 / $0600 / $0680 /
+; $0700 + tile). $2D bit 0: a 64x64 map at $7000 (ptr $10 / $11 from $2B / $2C, $12 = row
+; bits; a row wraps within its 64 tiles, a column adds $40 with the page kept in $70-$7F);
+; else the overworld's 16-row ring of 256 tiles ($10 = $2B, $11 = $70 | $2C & 15; a row: INC
+; $10, a column: $11 + 1 in the ring). $2D bit 1: a column. RAM as FF1 leaves it ($10-$12);
+; out (at the RTS): X = 16, Y = the last tile, A = the last value FF1 had (a row of the
+; overworld: the last $0700 byte; a 64x64 row: $10; a column: $11), Z and C set (CPX #$10).
+section bank PF_BANK, $6100
+; the 16 tiles are gathered into $07C0-$07CF first (D = cart RAM page, B = low byte of the
+; pointer, steps by mode), sh_u2 = OR of all tiles (bit 7: the slow per-tile path)
+prc_b:      xor a
+            ldh [sh_u2], a
+            ld hl, NES_RAM + $07C0
+            ld a, [NES_RAM + $2D]
+            rrca
+            jr nc, .ow
+            ld a, [NES_RAM + $2C]           ; 64x64 map
+            ld b, a
+            rrca
+            rrca
+            and $C0
+            ld c, a                         ; C = $12
+            ld [NES_RAM + $12], a
+            ld a, b
+            srl a
+            srl a
+            or $70
+            ld [NES_RAM + $11], a
+            add a, $40                      ; ($7000 -> cart RAM $B000)
+            ld d, a
+            ld a, [NES_RAM + $2B]
+            or c
+            ld e, a                         ; E = $10
+            ld a, [NES_RAM + $2D]
+            and 2
+            jr nz, .sc
+.sr:        ld a, [de]                      ; a row: $10 = ($10 + 1) & $3F | $12
+            ld [hl+], a
+            ld b, a
+            ldh a, [sh_u2]
+            or b
+            ldh [sh_u2], a
+            ld a, e
+            inc a
+            and $3F
+            or c
+            ld e, a
+            ld a, l
+            cp low(NES_RAM + $07D0)
+            jr nz, .sr
+            ld a, e
+            ld [NES_RAM + $10], a
+            ldh [sh_u3], a                  ; (A out)
+            jr .p2
+.sc:        ld a, [de]                      ; a column: $10 + $40, carry into $11 (page
+            ld [hl+], a                     ;   in $70-$7F)
+            ld b, a
+            ldh a, [sh_u2]
+            or b
+            ldh [sh_u2], a
+            ld a, e
+            add a, $40
+            ld e, a
+            ld a, d
+            adc a, 0
+            sub $40
+            and $0F
+            or $70
+            ld c, a                         ; (C = $11)
+            add a, $40
+            ld d, a
+            ld a, l
+            cp low(NES_RAM + $07D0)
+            jr nz, .sc
+            ld a, e
+            ld [NES_RAM + $10], a
+            ld a, c
+            ld [NES_RAM + $11], a
+            ldh [sh_u3], a
+            jr .p2
+.ow:        ld a, [NES_RAM + $2C]           ; overworld
+            and $0F
+            or $70
+            ld c, a                         ; C = $11
+            ld [NES_RAM + $11], a
+            add a, $40
+            ld d, a
+            ld a, [NES_RAM + $2B]
+            ld e, a                         ; E = $10
+            ld a, [NES_RAM + $2D]
+            and 2
+            jr nz, .oc
+.or:        ld a, [de]                      ; a row: INC $10
+            ld [hl+], a
+            ld b, a
+            ldh a, [sh_u2]
+            or b
+            ldh [sh_u2], a
+            inc e
+            ld a, l
+            cp low(NES_RAM + $07D0)
+            jr nz, .or
+            ld a, e
+            ld [NES_RAM + $10], a
+            ld a, $FF                       ; (A out: the last $0700 byte)
+            ldh [sh_u3], a
+            jr .p2
+.oc:        ld a, [de]                      ; a column: $11 = ($11 + 1) & 15 | $70
+            ld [hl+], a
+            ld b, a
+            ldh a, [sh_u2]
+            or b
+            ldh [sh_u2], a
+            ld a, c
+            inc a
+            and $0F
+            or $70
+            ld c, a
+            add a, $40
+            ld d, a
+            ld a, l
+            cp low(NES_RAM + $07D0)
+            jr nz, .oc
+            ld a, e
+            ld [NES_RAM + $10], a
+            ld a, c
+            ld [NES_RAM + $11], a
+            ldh [sh_u3], a
+.p2:        ld a, [NES_RAM + $07CF]
+            ldh [tmp_lo], a                 ; (Y out: the last tile)
+            ldh a, [sh_u2]
+            rla
+            jr c, .slow
+            ld hl, NES_RAM + $0780          ; all tiles below $80: five passes, each over
+            ld de, NES_RAM + $07C0          ;   the 16 tiles (in $07C0-$07CF until the
+            ld b, high(NES_RAM) + 5         ;   last pass replaces them in place)
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld e, low(NES_RAM + $07C0)
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld e, low(NES_RAM + $07C0)
+            inc b
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld e, low(NES_RAM + $07C0)
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            or $80
+            ld c, a
+            ld a, [bc]
+            ld [hl+], a
+            inc b
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+            ld c, [hl]
+            ld a, [bc]
+            ld [hl+], a
+.out:       ld a, [NES_RAM + $07CF]
+            ld b, a                         ; (the last $0700 byte)
+            ld a, [NES_RAM + $2D]           ; A out: an overworld row: that byte; else as
+            and 3                           ;   saved in sh_u3
+            jr z, .o2
+            ldh a, [sh_u3]
+            ld b, a
+.o2:        ldh a, [tmp_lo]
+            ld c, a                         ; Y = the last tile
+            ld e, 16
+            ld d, 0
+            xor a
+            ldh [nzv], a                    ; (Z = 1, N = 0)
+            scf
+            ld a, b
+            ld b, 0
+            ret
+.slow:      ld e, 0                         ; (a tile $80 or above: tile by tile)
+.sl:        ld a, e
+            or $C0
+            ld l, a
+            ld h, high(NES_RAM) + 7
+            ld a, [hl]
+            call .put
+            inc e
+            ld a, e
+            cp 16
+            jr c, .sl
+            jr .out
+; one tile A at X = E: the five buffer bytes; A out = the $0700 byte. Keeps BCDE.
+.put:       push bc
+            ld c, a                         ; C = tile
+            ld h, high(NES_RAM) + 7
+            ld a, e
+            or $80
+            ld l, a                         ; HL = $0780 + X
+            ld b, high(NES_RAM) + 5
+            ld a, [bc]
+            ld [hl], a
+            set 4, l                        ; $0790 + X
+            ld a, c
+            rlca                            ; (carry: tile + $80 crosses a page)
+            ld a, b
+            adc a, 0
+            ld b, a
+            ld a, c
+            xor $80
+            ld c, a
+            ld a, [bc]
+            ld [hl], a
+            ld a, l
+            add a, $10
+            ld l, a                         ; $07A0 + X
+            ld a, c
+            xor $80
+            ld c, a
+            ld b, high(NES_RAM) + 6
+            ld a, [bc]
+            ld [hl], a
+            set 4, l                        ; $07B0 + X
+            ld a, c
+            rlca
+            ld a, b
+            adc a, 0
+            ld b, a
+            ld a, c
+            xor $80
+            ld c, a
+            ld a, [bc]
+            ld [hl], a
+            ld a, l
+            add a, $10
+            ld l, a                         ; $07C0 + X
+            ld a, c
+            xor $80
+            ld c, a
+            ld b, high(NES_RAM) + 7
+            ld a, [bc]
+            ld [hl], a
+            pop bc
+            ret
+
+; ---- c62:D403 natively (FF1: 16 attribute positions of a row / column of the map: $07D0 +
+; Y = $23 / $27, $07E0 + Y = $C0 | ($30 >> 1) << 3 | ($31 & 15) >> 1, $07F0 + Y = the
+; quadrant mask $0F / $F0 & $33 / $CC), $31 + 1 (mod 32) per entry in a row (16), $30 + 1
+; (mod 15) in a column (15). RAM as FF1 leaves it ($10-$12, $30 / $31); out: Y = 16 / 15,
+; X = the last $33 / $CC, A = the last $31 / $30, Z and C set.
+pap_b:      ld a, [NES_RAM + $2D]           ; (state in registers / HRAM, RAM at the end:
+            and 2                           ;   C = Y, H = page 7, L = $07D0 + Y)
+            jr nz, .col
+            ld a, [NES_RAM + $30]           ; a row: $30 fixed, $31 + 1 mod 32 per entry
+            ld d, $0F
+            srl a
+            jr nc, .x0
+            ld d, $F0
+.x0:        add a, a
+            add a, a
+            add a, a
+            ld b, a                         ; B = ($30 >> 1) << 3, D = $0F / $F0
+            ld a, [NES_RAM + $31]
+            ldh [sh_u2], a
+            ld c, 0
+            ld h, high(NES_RAM) + 7
+.r:         ld a, c
+            or $D0
+            ld l, a
+            ldh a, [sh_u2]
+            cp $10
+            ld [hl], $23
+            jr c, .r1
+            ld [hl], $27
+            and $0F
+.r1:        ld e, $33
+            srl a
+            jr nc, .r2
+            ld e, $CC
+.r2:        or b
+            ldh [sh_u3], a                  ; ($10)
+            or $C0
+            set 5, l
+            res 4, l
+            ld [hl], a                      ; $07E0 + Y
+            set 4, l
+            ld a, e
+            and d
+            ld [hl], a                      ; $07F0 + Y
+            ldh a, [sh_u2]
+            inc a
+            and $1F
+            ldh [sh_u2], a
+            inc c
+            ld a, c
+            cp 16
+            jr c, .r
+            ldh a, [sh_u2]
+            ld [NES_RAM + $31], a
+            jr .out
+.col:       ld a, [NES_RAM + $31]           ; a column: $31 fixed, $30 + 1 mod 15 per entry
+            ld h, $23
+            cp $10
+            jr c, .n0
+            and $0F
+            ld h, $27
+.n0:        ld e, $33
+            srl a
+            jr nc, .m0
+            ld e, $CC
+.m0:        ld b, a                         ; B = ($31 & 15) >> 1, E = $33 / $CC
+            ld a, h
+            ldh [wtmp], a                   ; (the page byte)
+            ld a, [NES_RAM + $30]
+            ldh [sh_u2], a
+            ld c, 0
+            ld h, high(NES_RAM) + 7
+.c:         ld a, c
+            or $D0
+            ld l, a
+            ldh a, [wtmp]
+            ld [hl], a                      ; $07D0 + Y
+            ldh a, [sh_u2]
+            ld d, $0F
+            srl a
+            jr nc, .c1
+            ld d, $F0
+.c1:        add a, a
+            add a, a
+            add a, a
+            or b
+            ldh [sh_u3], a                  ; ($10)
+            or $C0
+            set 5, l
+            res 4, l
+            ld [hl], a
+            set 4, l
+            ld a, e
+            and d
+            ld [hl], a
+            ldh a, [sh_u2]
+            inc a
+            cp 15
+            jr c, .c2
+            sub 15
+.c2:        ldh [sh_u2], a
+            inc c
+            ld a, c
+            cp 15
+            jr c, .c
+            ldh a, [sh_u2]
+            ld [NES_RAM + $30], a
+.out:       ld b, a                         ; (A out: the last $31 / $30)
+            ldh a, [sh_u3]
+            ld [NES_RAM + $10], a
+            ld a, l
+            and $0F                         ; (the last entry's mask and page byte)
+            or $F0
+            ld l, a
+            ld a, [hl]
+            ld [NES_RAM + $11], a
+            res 5, l
+            ld a, [hl]
+            ld [NES_RAM + $12], a
+            ld d, 0
+            xor a
+            ldh [nzv], a
+            scf
+            ld a, b
+            ld b, 0
             ret

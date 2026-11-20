@@ -987,6 +987,17 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
     re-coding): small cuts do not move them; they need the build-time DMG shading / native
     loaders of docs/gb-native-presentation.md.
 
+- **Field loads, 2026-11-20 (later):** FF1's map row / column prep c62:D25A and the attribute
+  positions c62:D403 native (`prc_b` / `pap_b`, pf idioms, bytes hash-checked; buffer passes
+  over the 16 tiles); **maps decompressed at build time** (`build.std_maps`: FF1's own RLE
+  decoder mirrored in Python on the user's ROM; 59 standard maps of 4 KB and the overworld's
+  256 rows in ROM banks 64+ (ROM now 2 MB), table in bank 64; `hle_mapdec` copies a match,
+  else decompresses; env GB_MAPPRE=0 off); LCD-on scan: SP_T kept for the second row of an
+  attribute row pair, scn_pu skipped when no new palette is possible. checkall 62/62 (n35).
+  DMG 72 -> 69 (field entry 8 -> 4), CGB 0. Tools: sgbrun env SGBRUN_BANK (hooks in that ROM
+  bank only) and SGBRUN_LYMEM (8 bytes with each SGBRUN_LYAT line). Note: sgbrun profile
+  samples are ~400 GB cycles each (175 a frame).
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette

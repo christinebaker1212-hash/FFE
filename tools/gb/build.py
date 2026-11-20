@@ -22,6 +22,64 @@ from asm_sm83 import asm, make_rom
 SHA1_FF12 = '4b22c2c88fc71eacf270ea51ef218944bb4c536a'
 
 
+MAPS_BANK0 = 64                                  # table of the decompressed standard maps; the
+                                                 # maps from the next bank, four 4 KB maps a bank
+def std_maps(rom):
+    """FF1's standard maps decompressed as c62:D188 does (run byte $80 | tile, count; $FF ends;
+    from the pointer table at bank 4 $8000, map m: low, high = bank bits 6-7 + 4, address
+    | $8000), for hle_mapdec to copy: {GB bank: bytes}. Maps that cross into the next bank
+    or do not make 4096 bytes are left to the decompressor."""
+    if os.environ.get('GB_MAPPRE') == '0': return {MAPS_BANK0: bytearray([0xFF])}
+    def dec(bank, p):
+        out = bytearray(); x = None; t14 = None
+        rd = lambda p: rom[bank * 0x4000 + p - 0x8000]
+        while True:
+            a = rd(p)
+            if a < 0x80:
+                out.append(a); p += 1
+            elif a == 0xFF:
+                return out, p, x, t14
+            else:
+                t14 = a & 0x7F; p += 1
+                if p >= 0xC000: return None
+                x = rd(p); y = 0
+                while True:
+                    out.append(t14); y = (y + 1) & 0xFF
+                    if y == 0: break
+                    x = (x - 1) & 0xFF
+                    if x == 0: break
+                p += 1
+            if p >= 0xC000: return None
+    tab = bytearray(); data = {}; n = 0
+    for m in range(61):
+        lo, hi = rom[4 * 0x4000 + 2 * m], rom[4 * 0x4000 + 2 * m + 1]
+        bank, ptr = (hi >> 6) | 4, lo | ((hi & 0x3F) | 0x80) << 8
+        r = dec(bank, ptr)
+        if r is None or len(r[0]) != 0x1000: continue
+        out, end, x, t14 = r
+        gb = MAPS_BANK0 + 1 + n // 4
+        data.setdefault(gb, bytearray(b'\xff' * 0x4000))[(n % 4) * 0x1000:(n % 4 + 1) * 0x1000] = out
+        tab += bytes([bank, ptr & 0xFF, ptr >> 8, gb, 0x40 + (n % 4) * 0x10, end & 0xFF, end >> 8,
+                      1 if x is not None else 0, x or 0, t14 or 0])
+        n += 1
+    bank0 = bytearray(b'\xff' * 0x2000)
+    bank0[:len(tab) + 1] = tab + b'\xff'
+    nr = 0                                       # the overworld's 256 rows (c62:D159: bank 1,
+    for row in range(256):                       #   pointers at $8000 + 2 row), 256 bytes each:
+        ptr = rom[0x4000 + 2 * row] | rom[0x4000 + 2 * row + 1] << 8    # a table at $5000
+        r = dec(1, ptr) if 0x8000 <= ptr < 0xC000 else None             #   (16 bytes a row)
+        if r is None or len(r[0]) != 0x100: continue
+        out, end, x, t14 = r
+        gb = MAPS_BANK0 + 1 + (n + 3) // 4 + row // 64
+        data.setdefault(gb, bytearray(b'\xff' * 0x4000))[(row % 64) * 0x100:(row % 64 + 1) * 0x100] = out
+        bank0[0x1000 + 16 * row:0x1000 + 16 * row + 10] = bytes([ptr & 0xFF, ptr >> 8, gb, 0x40 + row % 64,
+            end & 0xFF, end >> 8, 1 if x is not None else 0, x or 0, t14 or 0, 0])
+        nr += 1
+    data[MAPS_BANK0] = bank0
+    print('  maps decompressed at build time: %d standard maps, %d overworld rows' % (n, nr))
+    return data
+
+
 def shade(c):
     """NES palette index -> DMG shade (0 white .. 3 black), by brightness row."""
     lo, hi = c & 0x0F, c >> 4
@@ -268,6 +326,17 @@ def main():
         rc.g.idioms[('fix', 0xE0FD)] = ('pf:dbox_b', 0xE118, 'NZCV', 'cond')
     else:
         print('  DrawBox: code not found, not native')
+    c62o = 62 * 0x2000 - 0xC000                     # c62:D25A PrepRowCol (with D1E6-D259) and
+    if (hashlib.sha1(prg[c62o + 0xD1E6:c62o + 0xD2EB]).hexdigest() == '713eeab7a15c90a4e8e489b2ea423246f4319182'   # D403 (attribute positions):
+            and os.environ.get('GB_PRC') != '0'):            # prc_b / pap_b (every map row / column)
+        rc.g.idioms[('c62', 0xD25A)] = ('pf:prc_b', 0xD2B6, 'NZC')
+    else:
+        print('  PrepRowCol: code not found, not native')
+    if (hashlib.sha1(prg[c62o + 0xD403:c62o + 0xD471]).hexdigest() == 'c3f94b79eef661bb123d559bfaf68d66c77454b6'
+            and os.environ.get('GB_PRC') != '0'):
+        rc.g.idioms[('c62', 0xD403)] = ('pf:pap_b', 0xD470, 'NZC')
+    else:
+        print('  attribute positions: code not found, not native')
     if prg[fixo + 0x15F3:fixo + 0x1600].hex() == 'a000b18c999e6ac8c005d0f660':   # fix:F5F3 box record copy
         rc.g.idioms[('fix', 0xF5F3)] = ('pf:rec5_b', 0xF5FF, 'NZC')
     farx_src = 'FARX:\n    db 0\n'                   # farjsr's .go (ExRAM RTS dispatch by X) straight
@@ -396,11 +465,13 @@ def main():
     print('recompiled: %d instructions, %d code banks (%.1fs)' % (len(rc.insns), len(banks), time.time() - t))
     print('  (zp),Y inline: %d' % getattr(rc, 'izy_inl', 0))
     t = time.time()
-    r = asm(src_all, syms={'DATA': DATA, 'RT_TABLES': RT_TABLES})
+    r = asm(src_all, syms={'DATA': DATA, 'RT_TABLES': RT_TABLES, 'MAPS_BANK0': MAPS_BANK0})
     print('assembled (%.1fs)' % (time.time() - t))
     rom_nes = open(nes, 'rb').read()[16:]
     for n in range(32):
         r.banks[DATA + n] = bytearray(rom_nes[n * 0x4000:(n + 1) * 0x4000])
+    for bk, data in std_maps(rom_nes).items():        # standard maps decompressed (hle_mapdec)
+        r.banks[bk] = data
     top = max(r.banks) + 1
     size = 2
     while size < top: size *= 2
