@@ -673,6 +673,11 @@ dmg_scan_all:
             ld [$2000], a
             call dmg_scan_all_b
             jp hle_back
+cgb_attr_all:                               ; CGB, LCD going on: every cell's palette
+            ld a, HLE_BANK                  ;   (cgb_attr_all_b, rt/ff2_banked.s)
+            ld [$2000], a
+            call cgb_attr_all_b
+            jp hle_back
 
 ; LCD going on after a scan: re-code the marked tiles the map uses; the others are
 ; parked in DEFER_BM (dmg_cell marks them again when a cell uses them)

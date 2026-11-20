@@ -1807,13 +1807,113 @@ sc_cell:    ld b, 0                         ; B = 4 for a cell nametable 1 owns
             ld a, c
             jp dmg_mark
 
+; CGB, LCD going on after cells / attributes changed with it off (CGB_SCAN): every GB map
+; cell (rows 0-29) gets its palette number in VRAM bank 1 from the nametable that owns it
+; (and the GB-only override), once, instead of attr_apply / own_set for each write.
+cgb_attr_all_b:
+            push bc
+            push de
+            push hl
+            xor a
+            ld [CGB_SCAN], a
+            inc a
+            ldh [$FF4F], a                  ; VRAM bank 1
+            ldh a, [own1_lo]
+            ld b, a
+            ldh a, [own1_hi]
+            or b
+            ld [SC_OW], a
+            ld d, 0
+.r:         call sc_row
+            ld a, d                         ; HL = $9800 + row * 32
+            and 7
+            swap a
+            add a, a
+            ld l, a
+            ld a, d
+            srl a
+            srl a
+            srl a
+            add a, $98
+            ld h, a
+            ld e, 0
+.c:         push hl
+            ld b, 0                         ; B = 4 for a cell nametable 1 owns
+            ld a, [SC_OW]
+            and a
+            jr z, .o0
+            ld a, d
+            add a, a
+            add a, a
+            ld l, a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and 3
+            or l
+            ld l, a
+            ld h, high(OWN)
+            ld c, [hl]
+            ld a, e
+            and 7
+            ld l, a
+            ld h, high(BITS8)
+            ld a, [hl]
+            and c
+            jr z, .o0
+            ld b, 4
+.o0:        ld a, b                         ; attribute byte, quadrant (row & 2, col & 2)
+            add a, high(NT_SH) + 3
+            ld h, a
+            ld a, e
+            rrca
+            rrca
+            and 7
+            ld l, a
+            ld a, [SC_AB]
+            add a, l
+            ld l, a
+            ld a, [hl]
+            bit 1, d
+            jr z, .t
+            swap a
+.t:         bit 1, e
+            jr z, .q
+            rrca
+            rrca
+.q:         and 3
+            ld b, a
+            ld a, [OVR_ON]                  ; (FF2: GB-only palette override)
+            and a
+            jr z, .nv
+            ld a, b
+            call ovr_de
+            ld b, a
+.nv:        pop hl
+            ld [hl], b
+            inc hl
+            inc e
+            bit 5, e
+            jr z, .c
+            inc d
+            ld a, d
+            cp 30
+            jr nz, .r
+            xor a
+            ldh [$FF4F], a
+            pop hl
+            pop de
+            pop bc
+            ret
+
 section bank HLE_BANK, $7F00
 BITS8:      db 1, 2, 4, 8, 16, 32, 64, 128      ; (page start: low byte = bit number)
 
 ; fix:F321 "clear nametable 0" (menus, screen changes): $2000-$23BF = 0, $23C0-$23FF = $FF.
 ; With the LCD off and +1 increment: the shadow tiles, GB map rows 0-29 and the owners at
 ; once (every cell nametable 0's; DMG: the scan when the LCD goes on; CGB: if nametable 1
-; owned cells, nametable 0's attributes on every cell again); the 64 attribute bytes
+; owned cells, the cells' palettes when the LCD goes on); the 64 attribute bytes
 ; through rt_ppu_w7. Else byte by byte. Exit as the NES: A = $FF, X = Y = 0, N = 0, Z = 1,
 ; C = 1 (CPY #$C0).
 hle_ntclr0_b:
@@ -1851,18 +1951,11 @@ hle_ntclr0_b:
             inc a
             ldh [dmg_scan], a
             jr .at
-.cgb:       ld a, b
-            and a
+.cgb:       ld a, b                         ; (cells nametable 1 owned: their palettes when
+            and a                           ;   the LCD goes on)
             jr z, .at
-            ld a, $0F
-            ldh [ap_chg], a
-            ld c, 0
-.ap:        ld a, c
-            call attr_apply
-            inc c
-            ld a, c
-            cp 64
-            jr nz, .ap
+            ld a, 1
+            ld [CGB_SCAN], a
 .at:        ld a, $23                       ; the attribute bytes
             ldh [ppu_vh], a
             ld a, $C0

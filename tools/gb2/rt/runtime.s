@@ -16,6 +16,7 @@ NT_SH      = $D000          ; NES nametable shadow (2 × 1KB, vertical mirroring
 PAL_SH     = $D800          ; NES palette RAM shadow (32)
 CP_SRAM    = $DCE6          ; cp_core: the source is in cart RAM (NES $6000-$7FFF),
 CP_BUF     = $DCE7          ;   one plane of a tile on its way from cart RAM bank 0 to bank 1 (8)
+CGB_SCAN   = $DCEF          ; CGB: cells / attributes changed with the LCD off (palettes at LCD-on)
 TSET_PEND  = $DCF8          ; DMG: a field tileset was loaded ($580B): fixed palettes at LCD-on
 PAL_DM     = $DCD0          ; CGB: palette entries changed since the last write (bitmap, 4)
 PAL_LEM    = $DCF7          ; CGB: emphasis bits | 1 of the last write
@@ -1354,6 +1355,13 @@ own_set:    push af
             ldh a, [is_cgb]
             and a
             jr z, .x
+            ldh a, [lcd_on]                 ; (LCD off: all cells' palettes when it goes on)
+            and a
+            jr nz, .cg
+            inc a
+            ld [CGB_SCAN], a
+            jr .x
+.cg:
             ld a, c                         ; CGB: this cell's palette from its new nametable
             ldh [sh_nt], a
             ld a, l
@@ -1565,9 +1573,14 @@ rt_ppu_w1:  push af
             jr .lon
 .nsr:       ld b, 0
             call dmg_retile_some
-.lon:       ldh a, [is_cgb]                 ; CGB: the tile copy for HDMA from VRAM
+.lon:       ldh a, [is_cgb]                 ; CGB: the cells' palettes if they changed, the
+            and a                           ;   tile copy for HDMA from VRAM
+            jr z, .lon2
+            ld a, [CGB_SCAN]
             and a
-            call nz, stage_sync
+            call nz, cgb_attr_all
+            call stage_sync
+.lon2:
             ld a, LCDC_ON
             ldh [$FF40], a
             ld a, 1
@@ -1813,7 +1826,14 @@ rt_ppu_w7:  push af
             and a
             ld a, b
             jr z, .dat
-            call attr_apply
+            ldh a, [lcd_on]                 ; CGB, LCD off: all cells' palettes when it goes on
+            and a
+            ld a, b
+            jr nz, .cat
+            ld a, 1
+            ld [CGB_SCAN], a
+            jr .done
+.cat:       call attr_apply
             jr .done
 .dat:       ldh a, [lcd_on]                 ; (LCD off: the scan when it goes on)
             and a

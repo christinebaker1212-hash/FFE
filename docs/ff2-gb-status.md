@@ -587,6 +587,11 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   rt_ppu_w7; the DMG branch minus the shading does the same (shadow, owner + the cell's CGB
   palette, GB map). CGB door loads +37 -> +33; RAM identical; CGB shots equal apart from
   mid-draw moments of the dialogue box (VRAM queue timing).
+- CGB attribute map deferred while the LCD is off: `own_set` (owner change) and attribute
+  writes only set `CGB_SCAN` ($DCEF); `cgb_attr_all_b` (HLE bank) gives every cell its
+  palette number in VRAM bank 1 once when the LCD goes on (owner's nametable, quadrant,
+  GB-only override). CGB door loads +33 -> +28, battle load +37 -> +28; random 1 CGB -2.0%;
+  RAM identical; 10 CGB screens pixel-identical to the build before.
 - Status of the owner's three (DMG, random 1): overworld walking / sailing at parity (walk
   scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
   remaining: battle entry (load +19 net, intro +39 / +32), door loads (+56 single wait,
