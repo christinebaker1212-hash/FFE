@@ -546,6 +546,16 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   (parity, the catch-up evens it out); RAM identical (walk scenario DMG / CGB, random 1 30000
   DMG / CGB); DMG water shots correct. Random path unchanged (+4.3%, it hardly visits the
   world map); its worst single waits are map loads (+85..+102) and the battle entry.
+- **Map transitions (2026-11-20)**: `lagcheck.py --detail W0-W1` prints NES / GB frames per
+  wait. Around every door the DMG took 2-3 GB frames per wait for ~70 waits: FF2's curtain
+  (fix:D8C9 opening / D8EE closing, per frame D935: BG off, ($84) lines, BG on, ($85) lines,
+  BG off, each line a delay call fix:D962) ran its delay loops in NES time. Idiom fix:D93B ->
+  `rt_band` (FF2 version: the band as the GB raster mask, NES rows $84 - 10 to $84 + $85 - 11
+  measured on the NES picture; $82 counted as the delay calls do, X = Y = 0, A = $10, carry
+  kept): 1 GB frame per wait. The load itself: idiom fix:E69E (LDA ($80),Y / STA $2007 / INY /
+  BNE, the map graphics pages) -> `hle_chrpg`, through the tile copier of `hle_ppucopy`
+  (now `cp_core`, pointer address as a parameter). Door load DMG 100 -> 57 GB frames, CGB
+  58 -> 37 (NES 10). Random 1, 30000: DMG +4.3% -> +2.4%, CGB -0.8% -> -1.6%; RAM identical.
 - Next (step 1, third part): the remaining field costs (dialogue window: text printer
   fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
   then screen loads, music, sprites. Earlier plan text:

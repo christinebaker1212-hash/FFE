@@ -752,25 +752,50 @@ emph_bgp:   push bc
             srl e
             ret
 
-; NES $D741-$D75F (FF1 map transitions: town / dungeon entry and exit, stairs): BG off,
-; ($14) lines, BG on, ($15) lines, BG off, timed by delay calls ($D77C). Here: the band as
-; the GB mask from the next frame (NES top line = $14 - 11, height $15; GB lines minus the
-; camera); the delay calls' side effects: $12 counted 3, 2, 1, 3, .. ($14 + $15 times),
-; X = Y = 0, A = $10
-rt_band:    push hl
+; NES fix:D93B-D95E (FF2 map transitions, the curtain fix:D8C9 / D8EE): BG off, ($84)
+; lines, BG on, ($85) lines, BG off, timed by delay calls (fix:D962, one NES line each).
+; Here: the band as the GB mask from the next frame (NES rows $84 - 10 to $84 + $85 - 11,
+; measured on the NES picture; GB lines minus the camera); the delay calls' side effects:
+; $82 counted 3, 2, 1, 3, .. ($84 + $85 times, 0 = 256), X = Y = 0, A = $10
+rt_band:    push af                         ; (carry kept)
+            push hl
             ld a, $10                       ; the NES's last $2001 write of the frame (sprites
             call rt_ppu_w1                  ;   on, BG off): turns the LCD on after a load
-            ld a, [NES_RAM + $14]
-            sub 11
-            jr nc, .a
-            xor a
-.a:         ld l, a                         ; L = top (NES line)
-            ld a, [NES_RAM + $15]
-            add a, l
-            jr nc, .b
-            ld a, $FF
-.b:         ld h, a                         ; H = bottom
-            ldh a, [cam_y]
+            ld a, [NES_RAM + $84]           ; DE = $84 + $85 - 10 (0 = 256 each)
+            ld e, a
+            ld d, 0
+            and a
+            jr nz, .e1
+            inc d
+.e1:        ld a, [NES_RAM + $85]
+            and a
+            jr nz, .e2
+            inc d
+.e2:        add a, e
+            ld e, a
+            jr nc, .e3
+            inc d
+.e3:        ld a, e
+            sub 10
+            ld e, a
+            ld a, d
+            sbc a, 0
+            jr c, .bz
+            and a
+            jr z, .bk
+            ld e, $FF                       ; (bottom clamped to 255)
+            jr .bk
+.bz:        ld e, 0
+.bk:        ld h, e                         ; H = bottom (exclusive)
+            ld a, [NES_RAM + $84]           ; L = top: $84 - 10 ($84 = 0: 246, 1-9: 0)
+            sub 10
+            ld l, a
+            jr nc, .t
+            ld a, [NES_RAM + $84]
+            and a
+            jr z, .t
+            ld l, 0
+.t:         ldh a, [cam_y]
             ld e, a
             ld a, l
             sub e
@@ -784,23 +809,27 @@ rt_band:    push hl
 .d:         ld [BAND_B], a
             ld a, 2
             ld [BAND_LIFE], a
-            ld a, [NES_RAM + $14]
+            ld a, [NES_RAM + $84]
             call .dn
-            ld a, [NES_RAM + $15]
+            ld a, [NES_RAM + $85]
             call .dn
             pop hl
-            ld e, 0
+            ld de, 0
             ld c, 0
-            ld a, $10
+            xor a                           ; N = 0 (LDA #$10)
+            ldh [nzv], a
+            pop af
+            ld a, $0F                       ; A = $10, Z = 0, carry as on entry
+            inc a
             ret
 .dn:        ld l, a                         ; L calls (0 = 256)
-            ld a, [NES_RAM + $12]
+            ld a, [NES_RAM + $82]
 .lp:        dec a
             jr nz, .k
             ld a, 3
 .k:         dec l
             jr nz, .lp
-            ld [NES_RAM + $12], a
+            ld [NES_RAM + $82], a
             ret
 
 timer_isr:  push af                         ; frame tick while the LCD is off

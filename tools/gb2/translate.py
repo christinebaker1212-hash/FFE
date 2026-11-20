@@ -82,14 +82,21 @@ class FF2:
               ('b11', 0xA073): ('rt_s0_clear', 0xA078, 'NZV'),
               # LDA $AC / BNE (wait until the battle NMI handler has run): rt_ac_wait
               ('b05', 0xA70A): ('rt_ac_wait', 0xA70E, 'NZ'), ('b12', 0xA630): ('rt_ac_wait', 0xA634, 'NZ'),
-              ('b12', 0xA990): ('rt_ac_wait', 0xA994, 'NZ')}
+              ('b12', 0xA990): ('rt_ac_wait', 0xA994, 'NZ'),
+              # fix:D93B-D95E map-transition curtain (BG off / on / off timed by delay calls,
+              # fix:D962): the GB mask from rt_band (rt/runtime.s), with the calls' RAM effects
+              ('fix', 0xD93B): ('rt_band', 0xD95F, 'NZ'),
+              # fix:E69E-E6A5 LDA ($80),Y / STA $2007 / INY / BNE: a graphics page (rt/ff2.s)
+              ('fix', 0xE69E): ('hle_chrpg', 0xE6A6, 'NZ')}
     # battle NMI handlers (run by rt_nmi_run through the dynamic table; RTI = ret)
     nmi_handlers = [('b12', 0x9A79), ('b05', 0xA9A2)]
     idiom_code = {('fix', 0xFA91): bytes.fromhex('a9fa48a999486c4000'),
                   ('fix', 0xFD46): bytes.fromhex('2c022070fb'), ('fix', 0xFD5B): bytes.fromhex('2c022050fb'),
                   ('b11', 0xA073): bytes.fromhex('2c022070fb'),
                   ('b05', 0xA70A): bytes.fromhex('a5acd0fc'), ('b12', 0xA630): bytes.fromhex('a5acd0fc'),
-                  ('b12', 0xA990): bytes.fromhex('a5acd0fc')}
+                  ('b12', 0xA990): bytes.fromhex('a5acd0fc'),
+                  ('fix', 0xD93B): bytes.fromhex('a20acad0fda9108d0120'),
+                  ('fix', 0xE69E): bytes.fromhex('b1808d0720c8d0f8')}
     skip = [('fix', 0xFA2C, 0xFA48), ('fix', 0xFEA1, 0xFEAD), ('fix', 0xFEAF, 0xFEBF)]   # waits (but their entries) + NMI return stubs
 
 

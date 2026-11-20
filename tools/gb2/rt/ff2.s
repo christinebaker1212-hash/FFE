@@ -320,6 +320,36 @@ hle_ppucopy:
             ld a, [NES_RAM + $00]
             call rt_ppu_w6
             ld c, 0                         ; Y = 0
+            ld l, $02
+            call cp_core
+cp_tail:    xor a
+            ldh [nzv], a
+            pop af                          ; carry back
+            ldh a, [tmp_lo]
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1
+            ret
+
+; fix:E69E-E6A5 (map / tileset graphics load): LDA ($80),Y / STA $2007 / INY / BNE: the
+; rest of a page. Exit: A = last byte, Y = 0, Z = 1, N = 0, X and carry kept.
+hle_chrpg:  push af
+            push de
+            ld a, c
+            cpl
+            inc a
+            ld e, a                         ; 256 - Y bytes (Y = 0: 256)
+            ld l, $80
+            call cp_core
+            pop de
+            jr cp_tail
+
+; L = zero-page address of the source pointer, E = count (0 = 256), C = Y: LDA (zp),Y /
+; STA $2007 / INY, E times. Out: tmp_lo = last byte, C += count, B = D = E = 0.
+cp_core:    ld d, l                         ; (D = zp for the byte path)
+            ld a, c
+            and a
+            jp nz, .slow
             ld a, e
             and $0F
             jp nz, .slow
@@ -332,7 +362,11 @@ hle_ppucopy:
             ldh a, [ppu_vl]
             and $0F
             jp nz, .slow
-            ld a, [NES_RAM + $03]
+            ld h, high(NES_RAM)             ; HL = the pointer
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, h
             cp $80
             jp c, .slow
             cp $C0
@@ -349,11 +383,9 @@ hle_ppucopy:
             jr nz, .tn
             ld a, 16
 .tn:        ldh [uw_y], a
-            ld a, [NES_RAM + $03]           ; source HL = GB $4000 + ptr - $8000 (data bank)
+            ld a, h                         ; source HL = GB $4000 + ptr - $8000 (data bank)
             sub $40
             ld h, a
-            ld a, [NES_RAM + $02]
-            ld l, a
             ldh a, [data_bank8]
             ld [$2000], a
             push de
@@ -467,9 +499,10 @@ hle_ppucopy:
             ldh a, [code_bank]
             ld [$2000], a
             ld b, 0
-            ld e, 0                         ; X = 0
-            jr .done
-.slow:      ld l, $02                       ; generic: LDA ($02),Y / STA $2007 / INY / DEX
+            ld d, b
+            ld e, b
+            ret
+.slow:      ld l, d                         ; generic: LDA (zp),Y / STA $2007 / INY / DEX
             call rt_izy_rd
             ld a, l
             ldh [tmp_lo], a
@@ -477,14 +510,9 @@ hle_ppucopy:
             inc c
             dec e
             jr nz, .slow
-.done:      xor a
-            ldh [nzv], a
-            pop af                          ; carry back
-            ldh a, [tmp_lo]
-            ld l, 0
-            inc l
-            dec l                           ; Z = 1
+            ld d, 0
             ret
+
 
 ; b11:9D68 "fill ppu" (STA $2007 / DEX / BNE: A = value, X = count, 0 = 256): whole tiles of a
 ; pattern table go in at once (both planes the constant: every GB byte = the value), marked
