@@ -260,8 +260,47 @@ def magic_options(nes, outd, base, cmd):
     print('wrote', outd, outs)
 
 
+def menu_options(nes, outd, cmd):
+    """field main menu mock-ups (160 x 144): per member name + HP / job + level / MP of the 8
+    spell levels on 3 lines; commands opening over the party window (A: right, rows 0-8;
+    B: bottom right); Gil and Capacity below"""
+    F = RomFont(nes); T = Tiles(cmd); outs = []
+    party = [('AAAAAA', 'Onion Knight', 28), ('AAAAAB', 'Black Mage', 29), ('BBBBBC', 'White Mage', 32),
+             ('CCCCCD', 'Red Mage', 32)]
+    cmds = ['Item', 'Magic', 'Equip', 'Status', 'Order', 'Job', 'Save']
+    def base():
+        s = Screen(T)
+        s.window(0, 0, 20, 14)
+        for i, (nm, job, hp) in enumerate(party):
+            r = 1 + 3 * i
+            F.draw(s, 1, r, nm, T.ink); F.draw(s, 11, r, '%3d/%3d' % (hp, 32), T.ink)
+            F.draw(s, 1, r + 1, ' ' + job, T.ink); F.draw(s, 15, r + 1, 'Lv 1', T.ink)
+            F.draw(s, 1, r + 2, 'MP 9/9/9/9/0/0/0/0', T.ink)
+        s.window(0, 14, 20, 4)
+        F.draw(s, 1, 15, 'Gil', T.ink); F.draw(s, 12, 15, '%6dG' % 9, T.ink)
+        F.draw(s, 1, 16, 'Capacity', T.ink); F.draw(s, 12, 16, '%6dC' % 1, T.ink)
+        return s
+    s = base(); s.save(os.path.join(outd, 'N0_party.png')); outs.append('N0_party.png')
+    s = base(); s.window(11, 0, 9, 9)
+    for i, c in enumerate(cmds): F.draw(s, 13, 1 + i, c, T.ink)
+    s.save(os.path.join(outd, 'N1_commands_right.png')); outs.append('N1_commands_right.png')
+    s = base(); s.window(11, 9, 9, 9)
+    for i, c in enumerate(cmds): F.draw(s, 13, 10 + i, c, T.ink)
+    s.save(os.path.join(outd, 'N2_commands_bottom.png')); outs.append('N2_commands_bottom.png')
+    ims = [Image.open(os.path.join(outd, o)) for o in outs]
+    sheet = Image.new('RGB', (480 * 3 + 32, 432), (40, 40, 40))
+    for i, im in enumerate(ims): sheet.paste(im, (i * 496, 0))
+    sheet.save(os.path.join(outd, 'menu_options.png'))
+    print('wrote', outd, outs)
+
+
 def main():
     nes, outd = sys.argv[1], sys.argv[2]
+    if len(sys.argv) > 3 and sys.argv[3] == 'menu':
+        os.makedirs(outd, exist_ok=True)
+        fr = capture(nes, [9000])
+        menu_options(nes, outd, fr[9000])
+        return
     if len(sys.argv) > 3 and sys.argv[3] == 'magic':
         os.makedirs(outd, exist_ok=True)
         fr = capture(nes, [8950, 9000])
