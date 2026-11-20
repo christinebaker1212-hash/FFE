@@ -494,26 +494,36 @@ cp_core:    ld d, l                         ; (D = zp for the byte path)
             dec b
             jr nz, .p1
             jr .cd
-.cs:        ld b, 16                        ; GB byte order: rows of plane 0 to even bytes,
-.s0:        xor a                           ;   plane 1 to odd (E back by 15 after 8)
+.cs:        call .pl                        ; a plane at a time through CP_BUF (bank 0 ->
+            ld a, e                         ;   buffer, bank 1 -> shadow): plane 0 to the
+            sub 15                          ;   even bytes, plane 1 to the odd ones
+            ld e, a
+            call .pl
+            jr .cd
+.pl:        push de
+            xor a
             ld [$4000], a
-            ld a, [hl+]
-            ldh [wtmp], a
-            ld a, 1
+            ld de, CP_BUF
+            ld b, 8
+.pa:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .pa
+            pop de
+            ld a, 1                         ; bank 1 for the shadow
             ld [$4000], a
-            ldh a, [wtmp]
+            push hl
+            ld hl, CP_BUF
+            ld b, 8
+.pb:        ld a, [hl+]
             ld [de], a
             inc e
             inc e
             dec b
-            jr z, .cd
-            ld a, b
-            cp 8
-            jr nz, .s0
-            ld a, e
-            sub 15
-            ld e, a
-            jr .s0
+            jr nz, .pb
+            pop hl
+            ret
 .cd:        ldh [tmp_lo], a                 ; last byte
             ld a, d
             cp $D0
