@@ -214,6 +214,19 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   and in the tall list window the low rows were dropped before the split moved them up.
 - Tools: `gbshots.py --press W:PAD:N` and `--poke W:ADDR=VAL,..` (NES and GB alike), e.g.
   member 1 as a Black Mage with spells: `--poke 2560:6100=04,6130=09,6131=09,6207=07`.
+- **Field dialogue (as FF1's approved layout):** the field text windows (bank 127 $EDB2) placed
+  inside the GB view (screen cols 5-24, rows 6-23 of the field camera): dialogue box cols 5-24,
+  rows 6-11 (4 lines of 18 above the centred party; even rows / heights so the box shares no
+  attribute quadrant with the map), yes/no (17,14,8,8), item select (5,12,20,10), gil
+  (13,18,12,4), map title (5,6,20,4); the English dialogue re-wrapped at 18 columns (insert.py's
+  table builder run again from layout.py; a word longer than 18 breaks after a hyphen); the
+  window attributes one quadrant wider (the windows start at the odd col 5: helper in the
+  unreferenced code at bank 127 $F435); the map redrawn on closing for the new rows ($C9B9 /
+  $C9C4: count, start = bottom metatile row + 1). FF3 scrolls longer texts page-wise. Checked:
+  the opening "Ow ow ow" dialogue on NES and GB (mGBA). Not yet seen: yes/no, item select, gil,
+  map title windows (no input script reaches them).
+- RAM checks: `--ignore 00C9-00CA,00D0-00DF,0013-0014` from now on: $13 (buttons pressed last
+  frame) depends on the battle input loop's polls per frame, as $14 does.
 - Open in battle: back attacks, bosses / large formations.
 
 ## Known open items

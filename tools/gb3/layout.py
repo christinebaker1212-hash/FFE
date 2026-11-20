@@ -984,6 +984,65 @@ def field(r):
         r.patch(0x7F, 0xE36B, '4C 2C F7', '4C 63 C0', 'TEST: Select = minimap')   # minimap)
 
 
+# field text windows (bank 127 $EDB2: left, top, width, height in screen tiles for the windows
+# 0 dialogue, 1 yes / no, 2 item select, 3 gil, 4 map title) inside the GB view of the field
+# camera (40, 45): screen cols 5-24, rows 6-23. Dialogue as FF1's (owner-approved there): a box
+# across the top, 4 lines of 18 above the centred party (rows 6-11); the English dialogue text
+# re-wrapped at 18 columns (tools/ff3/insert.py's table builder run again with that width).
+FIELD_WINDOWS = {   # id: (left, top, width, height)       (NES: 2,2,28,10 / 2,18,8,10 / ...)
+    0: (5, 6, 20, 6), 1: (17, 14, 8, 8), 2: (5, 12, 20, 10), 3: (13, 18, 12, 4), 4: (5, 6, 20, 4)}
+# (even heights from even rows: a window's last row must not share an attribute quadrant with
+# the map row below it)
+DLG_W_GB = 18
+
+
+def dialogue(r):
+    import importlib.util, json
+    spec = importlib.util.spec_from_file_location('ff3insert', os.path.join(HERE, '..', 'ff3', 'insert.py'))
+    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
+    for e in json.load(open('script/ff3/names8800.json')): ins.NAMES[e['id']] = e['en']
+    def flow_gb(para, width, _flow=ins.flow):
+        lines = _flow(para, width)
+        if all(ins.vlen(l) <= width for l in lines): return lines
+        # a word longer than the line: break it after a hyphen (greedy fill)
+        toks = []
+        for w in para.split(' '):
+            if not w: continue
+            if ins.vlen(w) <= width: toks.append((w, True)); continue
+            parts = re.split(r'(?<=-)', w)
+            for k, pt in enumerate(parts):
+                if pt: toks.append((pt, k == 0))
+        out = []; cur = ''
+        for t, sp in toks:
+            cand = (cur + (' ' if sp and cur else '') + t) if cur else t
+            if ins.vlen(cand) <= width: cur = cand
+            else: out.append(cur); cur = t
+        if cur: out.append(cur)
+        assert all(ins.vlen(l) <= width for l in out), out
+        return out
+    ins.flow = flow_gb
+    ins.layout.__defaults__ = (DLG_W_GB,)
+    rep = []
+    ins.put_tables(r.d, rep)
+    r.log.append((0, 0, 'dialogue text re-wrapped at %d columns' % DLG_W_GB))
+    old = r.d[r.off(0x7F, 0xEDB2):r.off(0x7F, 0xEDB2) + 20]
+    assert old.hex() == '0202021202' '0212120e02' '1c081c0c1c' '0a0a0a0404', old.hex()
+    new = bytearray(20)
+    for k, (x, y, w, h) in FIELD_WINDOWS.items():
+        new[k], new[5 + k], new[10 + k], new[15 + k] = x, y, w, h
+    r.d[r.off(0x7F, 0xEDB2):r.off(0x7F, 0xEDB2) + 20] = new
+    r.log.append((0x7F, 0xEDB2, 'field text windows inside the GB view'))
+    # the windows start at an odd column (the GB view's first, col 5): their attributes need
+    # one more 16 x 16 quadrant than width / 2 (helper in the unreferenced code at $F435)
+    r.patch(0x7F, 0xF435, 'A6 3B CA 10 02 A6 3B A5', 'A5 3C 4A 69 01 85 86 60', 'window quadrants: width / 2 + 1')
+    r.patch(0x7E, 0xC99D, 'A5 3C 4A 85 86', '20 35 F4 EA EA', 'window attributes: one more quadrant')
+    r.patch(0x7E, 0xC9B0, 'AA CA', 'AA EA', 'window attribute update: one more quadrant')
+    # closing: the map redrawn under the windows, upward from the bottom metatile row (count,
+    # start = bottom / 2 + 1; FF3: rows 2-11 -> 5, 6 and rows 14-27 -> 7, 14)
+    r.patch(0x7E, 0xC9B9, 'A9 05 85 66 A2 06', 'A9 03 85 66 A2 06', 'close dialogue: rows 6-11')
+    r.patch(0x7E, 0xC9C4, 'A9 07 85 66 A2 0E', 'A9 05 85 66 A2 0B', 'close lower windows: rows 12-21')
+
+
 def apply(data):
     """English NES ROM bytes -> (GB-layout ROM bytes, code modules for tools/gb3/ff3src.py)"""
     r = Rom(data)
@@ -991,6 +1050,7 @@ def apply(data):
     battle_messages(r)
     magic_rows(r)
     field(r)
+    dialogue(r)
     return bytes(r.d), r.mods, r.log
 
 
