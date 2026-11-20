@@ -249,7 +249,25 @@ def main():
         if len(wrf) >= 3: break
         n = len(wrf)
         wrf.append((m.group(1)[0], m.group(2)[0], m.group(3)[0], add))
-        rc.g.idioms[('fix', a)] = ('hle_wrf%d' % n, end, 'NZC')
+        rc.g.idioms[('fix', a)] = ('pf:wrf_v%d' % n, end, 'NZC')
+    txr = {('c62', 0xDECE): 'a000b13ef0cce63ed002e63fc948902b4ca45c',      # menu text printer:
+           ('c62', 0xDEF1): 'ae0220a6558e0620a6548e06208c07208d0720e6544ccede',   # the loop head,
+           ('ex', 0x5CA4): 'ac005cd005a0ff4cf1deae022088d010a6558e0620a6548e06208d07204c04df'
+                           '48a554186920aaa55569008d06208e0620688d07204c04df'}  # letters (txrun_b)
+    def at(k): return (62 * 0x2000 + k[1] - 0xC000 if k[0] == 'c62' else 18 * 0x4000 + k[1] - 0x5C00)
+    if all(prg[at(k):at(k) + len(h) // 2].hex() == h for k, h in txr.items()):
+        rc.g.idioms[('c62', 0xDECE)] = ('pf:txrun_b', 0xDED2, 'NZCV')
+    else:
+        print('  menu text printer: code not found, not native')
+    dbox = ('a53c38e902851aa53d38e902851b208be12034e1c61bd0f92066e1',      # DrawBox rows (E0FD) and
+            '20bde1ad0220a5558d0620a5548d0620a61aa9fa8d0720a9ff8d0720cad0faa9fb8d0720a554186920'   # its row
+            '8554a555690085556020bde1ad0220a5558d0620a5548d0620a61aa9fc8d0720a9fd8d0720cad0faa9fe'  # routines
+            '8d07206020bde1ad0220a5558d0620a5548d0620a61aa9f78d0720a9f88d0720cad0faa9f98d0720a554'  # (E134-E1D4):
+            '1869208554a5556900855560a537f013a5ff8d0020a9008d05208d0520208bc62000fe60')           # dbox_b
+    if prg[fixo + 0x0FD:fixo + 0x118].hex() == dbox[0] and prg[fixo + 0x134:fixo + 0x1D5].hex() == dbox[1]:
+        rc.g.idioms[('fix', 0xE0FD)] = ('pf:dbox_b', 0xE118, 'NZCV', 'cond')
+    else:
+        print('  DrawBox: code not found, not native')
     wrf_src = 'WRF:\n' + ''.join('    db $%02X, $%02X, $%02X, %d\n' % w for w in wrf)
     for n in range(3):
         wrf_src += 'wrf_v%d:     ld a, %d\n            jp wrf_b\n' % (n, n) if n < len(wrf) else 'wrf_v%d:     ret\n' % n
@@ -267,7 +285,7 @@ def main():
         if (c[:5] == bytes.fromhex('b110c91090') and c[6] == 0x4D and c[9:] == bytes.fromhex('8d0720c8d0f1')
                 and far_sym['pr1'] + 6 + c[5] == far_sym['pr3'] and c[8] < 0x08):
             prow_off = c[7] | c[8] << 8
-            rc.g.idioms[('far', far_sym['pr1'])] = ('hle_prow1', far_sym['pr3'], 'NZC')
+            rc.g.idioms[('far', far_sym['pr1'])] = ('pf:prow_b', far_sym['pr3'], 'NZC')
         else:
             print('  far pr1: code not as expected, not native')
     prog, bank_of, banks = emit_program(rc)

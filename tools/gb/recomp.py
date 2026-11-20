@@ -67,7 +67,8 @@ class FF1:
               ('fix', 0xE14D): ('hle_wrow', 0xE153, 'NZ'),     # window rows (frame middles)
               ('fix', 0xE17F): ('hle_wrow', 0xE185, 'NZ'),
               ('fix', 0xE1A4): ('hle_wrow', 0xE1AA, 'NZ'),
-              ('c62', 0xDEF1): ('hle_tpair', 0xDF04, 'NZ'),  # menu text printer: one letter
+              ('c62', 0xDEF1): ('pf:tpair_b', 0xDF04, 'NZ'),  # menu text printer: one letter
+              ('b21', 0x80AE): ('pf:rlist_b', 0x80DB, 'NZCV'),  # PPU record list (name entry)
               ('c62', 0xD865): ('hle_palup', 0xD87F, 'NZC'),    # palette upload, every frame
               ('c62', 0xD874): ('hle_palup2', 0xD87F, 'NZC'),   #   (entered at its second loop)
               ('c62', 0xD6B8): ('rt_dlgdelay', 0xD6C3, 'NZ'),   # dialogue box split: timing loop
@@ -86,6 +87,7 @@ class FF1:
                   ('fix', 0xE14D): bytes.fromhex('8d0720cad0fa'),
                   ('fix', 0xE17F): bytes.fromhex('8d0720cad0fa'),
                   ('fix', 0xE1A4): bytes.fromhex('8d0720cad0fa'),
+                  ('b21', 0x80AE): bytes.fromhex('ad0220a000b110f0248d0620c8b1108d0620c8b110aac8b1108d0720c8cad0f798186510851090d8e6114cae80'),
                   ('c62', 0xDEF1): bytes.fromhex('ae0220a6558e0620a6548e06208c07208d0720'),
                   ('c62', 0xD865): bytes.fromhex('a50df00bbde0038d0720e8e01090f5bdc0038d0720e8e02090f5'),
                   ('c62', 0xD874): bytes.fromhex('bdc0038d0720e8e02090f5'),
@@ -122,12 +124,22 @@ class Recompiler:
         return any(sp == s and lo <= a < hi for s, lo, hi in self.g.skip)
 
     # ------------------------------------------------------------ control flow
+    def cond_idiom(self, k):
+        """an idiom that may decline (4th field): the original instruction runs then"""
+        return k in self.g.idioms and len(self.g.idioms[k]) > 3
+
     def succ(self, i):
         """static successors (space, addr) within compiled code; None entries = dynamic"""
+        k = (i.space, i.addr)
+        if self.cond_idiom(k):
+            return [(i.space, self.g.idioms[k][1])] + self.succ0(i)
+        return self.succ0(i)
+
+    def succ0(self, i):
         out = []
         k = (i.space, i.addr)
         if k in self.g.ext: return []
-        if k in self.g.idioms: return [(i.space, self.g.idioms[k][1])]
+        if k in self.g.idioms and not self.cond_idiom(k): return [(i.space, self.g.idioms[k][1])]
         if i.mn in ('RTS', 'RTI', 'BRK'): return []
         if i.mn == 'JMP':
             if i.mode == 'ind': return [None]
@@ -220,6 +232,7 @@ class Recompiler:
             if i.mn == 'JSR':
                 tk = self.target(i, i.arg)
                 o = [tk] if tk else [None]
+                if self.cond_idiom(k): o.append((k[0], self.g.idioms[k][1]))
             elif i.mn == 'RTS' or k in self.g.ext:
                 o = list(ret_sites.get(k, ())) or [None]
                 if k in self.rts_dispatch or any((i.space, i.addr - 2) in self.pla_drop for _ in [0]):
@@ -260,7 +273,7 @@ class Recompiler:
         entry_like = set(self.dyn_targets()) | {(k[0], k[1] + 3) for k, i in ins.items() if i.mn == 'JSR'}
         def defs(k):
             if k in self.g.ext: return frozenset(self.g.ext[k][1])
-            if k in self.g.idioms: return frozenset(self.g.idioms[k][2])
+            if k in self.g.idioms: return frozenset() if self.cond_idiom(k) else frozenset(self.g.idioms[k][2])
             i = ins[k]
             return frozenset() if i.mn == 'JSR' else frozenset(DEF.get(i.mn, ''))
         NZCV = frozenset('NZCV')
@@ -281,7 +294,7 @@ class Recompiler:
                     lo |= U if (s is None or s not in ins) else live_in[s]
                 if k in self.g.ext:
                     li = lo - frozenset(self.g.ext[k][1])
-                elif k in self.g.idioms:
+                elif k in self.g.idioms and not self.cond_idiom(k):
                     li = lo - frozenset(self.g.idioms[k][2])
                 elif i.mn == 'JSR':
                     li = lo                                     # = live_in(callee), set via outs
@@ -487,7 +500,12 @@ class Emitter:
         if k in rc.g.ext:
             self.o('jp ' + rc.g.ext[k][0]); return
         if k in rc.g.idioms:
-            self.o('call ' + rc.g.idioms[k][0]); self.jump(None, (i.space, rc.g.idioms[k][1])); return
+            # (a conditional idiom declines by returning past the jp: the instruction runs)
+            r = rc.g.idioms[k][0]                 # ('pf:NAME': a routine in bank PF_BANK)
+            if r.startswith('pf:'): self.o('ld hl, ' + r[3:]); self.o('call hle_pfj')
+            else: self.o('call ' + r)
+            self.jump(None, (i.space, rc.g.idioms[k][1]))
+            if not rc.cond_idiom(k): return
         h = getattr(self, 'x_' + mn, None)
         if h is None:
             rc.warn.append('no translation for %r' % i); self.o('call rt_fatal')
@@ -824,7 +842,7 @@ def emit_program(rc):
             # instruction falling through to a key that is not next in this bank
             i = rc.insns[k]
             nxt_keys = [s for s in rc.succ(i) if s is not None and s[1] == i.addr + i.size]
-            if i.mn not in ("JMP", "RTS", "RTI", "BRK") and k not in rc.g.ext and k not in rc.g.idioms:
+            if i.mn not in ("JMP", "RTS", "RTI", "BRK") and k not in rc.g.ext and (k not in rc.g.idioms or rc.cond_idiom(k)):
                 ft = (i.space, i.addr + i.size) if not (i.space == 'c62' and i.addr + i.size == 0xE000) else None
                 if ft is not None and (n + 1 >= len(keys) or keys[n + 1] != ft):
                     if ft in rc.insns:

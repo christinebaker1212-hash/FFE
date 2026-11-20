@@ -5178,7 +5178,7 @@ bgsrc:      push bc
 ; bank PF_BANK routines through HL (hle_pfj)
 section bank 0, $3EE3
 hle_pfj:    push af                         ; HL = a routine in bank PF_BANK (stubs
-            ld a, PF_BANK                   ;   hle_prow1 / hle_tpair / hle_prt: HL is
+            ld a, PF_BANK                   ;   the recompiler's pf: idioms: HL is
             ld [$2000], a                   ;   free at the recompiled code's calls)
             pop af
             call rt_jp_hl
@@ -9366,6 +9366,311 @@ tpair_b:    push af                         ; (the letter, carry)
             pop af
             ret
 
+; ---- c62:DECE-DED1 (menu text printer loop head: LDY #0 / LDA ($3E),Y) and every letter
+; (>= $48) after it, natively: INC $3E/$3F, the English mode dispatch ex:5CA4 by the mode at
+; $5C00 (0: dakuten byte $FF and the letter, tpair_b as c62:DEF1; 1: the letter at $55:$54, the
+; upper row; else: at $55:$54 + $20, the lower row), then c62:DF04 INC $54 (build.py checks
+; the NES bytes). Returns at the first byte < $48: A = it, Y = 0; N, Z from A; C and V as the
+; last letter left them (entry values if none); X = the last letter's cell address low byte
+; ($54 before its INC, or $54 + $20), kept if none. Each cell straight to the shadow and the GB
+; map when the LCD is off (or a CGB masked load), the cell is nametable 0's and no cell is
+; nametable 1's; otherwise through the PPU routines.
+txrun_b:    push af                         ; [SP + 2]: the flags out (C)
+            ldh a, [code_bank]
+            push af
+            ld a, PF_BANK                   ; (the helpers come back to code_bank)
+            ldh [code_bank], a
+            call .st                        ; C = the increment, D = the fast-write state
+.lp:        ld hl, NES_RAM + $3E            ; (in the loop: B temporary, C = increment,
+            ld a, [hl+]                     ;   D = state, E = X)
+            ld h, [hl]
+            ld l, a
+            ld a, h
+            cp $20
+            jr c, .ram
+            cp $60
+            jr c, .gr
+            cp $80
+            jr nc, .gr
+            add a, $40                      ; save RAM $6000 -> $A000
+            ld h, a
+            ld a, [hl]
+            jr .rd
+.ram:       and $07
+            or high(NES_RAM)
+            ld h, a
+            ld a, [hl]
+            jr .rd
+.gr:        call nes_rd
+            ld a, l
+.rd:        cp $48
+            jp c, .end
+            ld hl, NES_RAM + $3E            ; INC $3E / $3F
+            inc [hl]
+            jr nz, .i3
+            inc l
+            inc [hl]
+.i3:        ld b, a                         ; (B = the letter)
+            ld a, [EX_RAM]                  ; the mode
+            and a
+            jr nz, .m12
+            push bc                         ; 0: Y = $FF at $55:$54, the letter one increment on
+            ld b, $FF
+            ld a, [NES_RAM + $54]
+            ld l, a
+            ld a, [NES_RAM + $55]
+            call .fp
+            pop bc
+            jr c, .s0
+            ld a, [NES_RAM + $54]
+            add a, c
+            ld l, a
+            ld a, [NES_RAM + $55]
+            adc a, 0
+            call .fp
+            jr c, .s0
+            ld a, [NES_RAM + $54]           ; X = $54, v = $55:$54 + 2 increments
+            ld e, a
+            ld a, c
+            add a, a
+            add a, e
+            ldh [ppu_vl], a
+            ld a, [NES_RAM + $55]
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            jr .fd
+.s0:        ld a, b                         ; (anything else: tpair_b)
+            ld c, $FF
+            call tpair_b
+            call .st
+            jr .sd
+.m12:       dec a
+            jr nz, .m2
+            ld a, [NES_RAM + $54]           ; 1: the letter at $55:$54
+            ld l, a
+            ld a, [NES_RAM + $55]
+            call .fp
+            jr c, .s1
+            ld a, [NES_RAM + $54]           ; X = $54, v = $55:$54 + the increment
+            ld e, a
+            add a, c
+            ldh [ppu_vl], a
+            ld a, [NES_RAM + $55]
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            jr .fd
+.s1:        ld a, [NES_RAM + $54]
+            ld l, a
+            ld a, [NES_RAM + $55]
+            ld h, b
+            call .put1
+            call .st
+            jr .sd
+.m2:        ld a, [NES_RAM + $55]           ; else: at ($55:$54) + $20 (CLC / ADC #$20 /
+            ld h, a                         ;   ADC #$00: C and V from the high byte)
+            ld a, [NES_RAM + $54]
+            add a, $20
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld e, a                         ; (E = the high byte)
+            sbc a, a
+            and $10
+            push hl
+            ld hl, sp + 4                   ; (the flags out: under HL and the code bank)
+            res 4, [hl]
+            or [hl]
+            ld [hl], a                      ; C
+            pop hl
+            ld a, e
+            xor h
+            and e
+            and $80
+            rrca
+            ldh [vfl], a                    ; V
+            ld a, e
+            call .fp                        ; (keeps E and L)
+            jr c, .s2
+            ld a, l                         ; v = the cell + the increment, X = its low byte
+            add a, c
+            ldh [ppu_vl], a
+            ld a, e
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            ld e, l
+            jr .f2
+.s2:        ld a, e
+            ld h, b
+            call .put1
+            call .st
+            jr .nx
+.fd:        ld hl, sp + 2
+            set 4, [hl]                     ; C = 1 (CMP #$48; nothing after changes it)
+.f2:        xor a                           ; ($2002 read: vblank flag and latch cleared;
+            ldh [vbl_flag], a               ;   the two $2006 writes leave the latch at 0)
+            ldh [ppu_latch], a
+            inc a                           ; DMG: the map is scanned when the LCD goes on
+            ldh [dmg_scan], a
+            jr .nx
+.sd:        ld hl, sp + 2
+            set 4, [hl]                     ; C = 1
+.nx:        ld hl, NES_RAM + $54            ; INC $54
+            inc [hl]
+            jp .lp
+.end:       ld d, a                         ; (the byte)
+            pop af
+            ldh [code_bank], a
+            pop hl                          ; L = the flags out
+            ld a, l
+            and $10
+            ld l, a
+            ld a, d
+            ldh [nzv], a
+            and a
+            jr nz, .e1
+            set 7, l
+.e1:        ld h, d
+            ld bc, 0                        ; Y = 0
+            ld d, b
+            push hl
+            pop af
+            ret
+.st:        ldh a, [ppu_ctrl]               ; C = 1 or 32; D = $80: cells through the PPU
+            and 4                           ;   routines, 0: LCD off, 1: CGB masked load
+            ld c, 1                         ;   (straight to the shadow and the GB map;
+            jr z, .s3                       ;   masked: the shadow, the map rebuilt when shown)
+            ld c, 32
+.s3:        ld d, $80
+            ldh a, [own1_lo]
+            ld b, a
+            ldh a, [own1_hi]
+            or b
+            ret nz
+            ldh a, [lcd_on]
+            and a
+            jr z, .s4
+            ld a, [VLCD]
+            cp 1
+            ret nz
+            ldh a, [dlg_on]
+            and a
+            ret nz
+            ld d, 1
+            ret
+.s4:        ld d, 0
+            ret
+.fp:        bit 7, d                        ; tile B at A:L (PPU address, high byte A) when it is
+            jr nz, .fn                      ;   a map cell of nametable 0 and D allows: NC;
+            and $3F                         ;   else C (nothing written). Keeps B-E, L.
+            cp $20
+            ret c
+            bit 2, a
+            jr nz, .fn                      ; (nametable 1, palettes)
+            and 3
+            ld h, a
+            cp 3
+            jr c, .fy
+            ld a, l
+            cp $C0
+            jr nc, .fn                      ; (attributes)
+            ld a, h
+.fy:        add a, high(NT_SH)
+            ld h, a
+            ld [hl], b                      ; shadow
+            bit 0, d
+            jr nz, .fm
+            add a, $98 - high(NT_SH)
+            ld h, a
+            ld [hl], b                      ; GB map
+            and a
+            ret
+.fm:        ld a, 1
+            ld [MAP_RB], a                  ; (masked: the GB map rebuilt when shown)
+            and a
+            ret
+.fn:        scf
+            ret
+.put1:      ld b, h                         ; LDX $2002 / $2006 = A / $2006 = L / $2007 = H.
+            and $3F                         ;   Out: E = L (X), BC = 0, D = 0
+            ld d, a                         ; (D = the high byte, 6 bits)
+            ldh a, [lcd_on]
+            and a
+            jr z, .pf
+            ld a, [VLCD]
+            cp 1
+            jr nz, .ps
+            ldh a, [dlg_on]
+            and a
+            jr nz, .ps
+.pf:        ldh a, [own1_lo]
+            ld h, a
+            ldh a, [own1_hi]
+            or h
+            jr nz, .ps
+            ld a, d
+            cp $20
+            jr c, .ps
+            bit 2, a
+            jr nz, .ps                      ; (nametable 1, palettes)
+            and 3
+            ld e, a
+            cp 3
+            jr c, .pk
+            ld a, l
+            cp $C0
+            jr nc, .ps                      ; (attributes)
+.pk:        ld a, e
+            add a, high(NT_SH)
+            ld h, a
+            ld [hl], b                      ; shadow
+            ld a, [VLCD]
+            cp 1
+            jr nz, .pm
+            ld [MAP_RB], a                  ; (masked: the GB map rebuilt when shown)
+            jr .px
+.pm:        ld a, e
+            add a, $98
+            ld h, a
+            ld [hl], b                      ; GB map
+.px:        ld a, 1                         ; DMG: the map is scanned when the LCD goes on
+            ldh [dmg_scan], a
+            ldh a, [ppu_ctrl]               ; v = the cell + the increment
+            and 4
+            ld a, 1
+            jr z, .pi
+            ld a, 32
+.pi:        add a, l
+            ldh [ppu_vl], a
+            ld a, d
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            xor a                           ; ($2002 read: vblank flag and latch cleared;
+            ldh [vbl_flag], a               ;   the two $2006 writes leave the latch at 0)
+            ldh [ppu_latch], a
+            ld e, l
+            ld bc, 0
+            ld d, b
+            ret
+.ps:        ld e, l                         ; (the PPU routines keep BC and DE)
+            push hl
+            call rt_ppu_r2
+            pop hl
+            push hl
+            ld a, d
+            call rt_ppu_w6
+            pop hl
+            ld a, l
+            call rt_ppu_w6
+            ld a, b
+            call rt_ppu_w7
+            ld bc, 0
+            ld d, b
+            ret
+
 ; ---- far pr1 (gb_layout prow, the prologue's row writer): LDA ($10),Y / CMP #$10 / BCC pr3 /
 ; EOR POFF / STA $2007 / INY / BNE pr1. Each letter as rt_ppu_w7 would write it, without its
 ; generic path: DMG, LCD on, increment 1, nametable 0, no cell drawn by nametable 1, no
@@ -9496,7 +9801,14 @@ wrf_b:      push af                         ; (entry flags)
             ldh [sh_u3], a                  ; R
             ld a, [hl]
             ldh [sh_l2], a                  ; add
-            xor a
+            ld a, [NES_RAM + $1A]
+            ld e, a                         ; X
+            call wrow_do
+            jp wrf_fin
+
+; one window row (wrf_b, dbox_b): $2002 read, v = $55:$54, sh_l1 (L), E x sh_u2 (M), sh_u3 (R)
+; as STA $2007 writes. Out: D = 0; BC, E, HL clobbered.
+wrow_do:    xor a
             ldh [vbl_flag], a
             ldh [ppu_latch], a
             ld a, [NES_RAM + $55]
@@ -9504,8 +9816,6 @@ wrf_b:      push af                         ; (entry flags)
             ldh [ppu_vh], a
             ld a, [NES_RAM + $54]
             ldh [ppu_vl], a
-            ld a, [NES_RAM + $1A]
-            ld e, a                         ; X
             ldh a, [lcd_on]
             and a
             jr z, .lk
@@ -9580,9 +9890,11 @@ wrf_b:      push af                         ; (entry flags)
             call .row                       ; GB map
 .md:        ld a, 1
             ldh [dmg_scan], a
-            jr .fin
+            ld d, 0
+            ret
 .g1:        pop hl
-.gen:       ldh a, [code_bank]              ; (the PPU routines come back to code_bank)
+.gen:       push bc
+            ldh a, [code_bank]              ; (the PPU routines come back to code_bank)
             push af
             ld a, PF_BANK
             ldh [code_bank], a
@@ -9598,7 +9910,19 @@ wrf_b:      push af                         ; (entry flags)
             call rt_ppu_w7
             pop af
             ldh [code_bank], a
-.fin:       pop bc                          ; (Y)
+            pop bc
+            ld d, 0
+            ret
+.row:       ldh a, [sh_l1]                  ; HL: L, E x M, R (E = X)
+            ld [hl+], a
+            ldh a, [sh_u2]
+.rm:        ld [hl+], a
+            dec e
+            jr nz, .rm
+            ldh a, [sh_u3]
+            ld [hl], a
+            ret
+wrf_fin:    pop bc                          ; (Y)
             ld e, 0                         ; X = 0
             ld d, 0
             ldh a, [sh_l2]
@@ -9646,14 +9970,177 @@ wrf_b:      push af                         ; (entry flags)
             push hl
             pop af
             ret
-.row:       ldh a, [sh_l1]                  ; HL: L, E x M, R (E = X)
+
+; ---- fix:E0FD-E117 (DrawBox's rows when $37 = 0, no frame per row): $1A = $3C - 2, $1B =
+; $3D - 2; the top row (F7, F8 x $1A, F9), $1B middle rows (FA, FF.., FB), the bottom row (FC,
+; FD.., FE), each as wrf_b; $54/$55 one row down (ADC) after the top and each middle row.
+; A conditional idiom (build.py checks the NES bytes): $37 != 0 or $3D < 3 declines (returns
+; past the caller's JP, every register and flag kept). Out: A = $FE, X = 0, $1B = 0, Y kept;
+; N = 1, Z = 0; C and V from the last middle row's ADC #$00.
+dbox_b:     push af
+            ld a, [NES_RAM + $37]
+            and a
+            jr nz, .dcl
+            ld a, [NES_RAM + $3D]
+            cp 3
+            jr c, .dcl
+            pop af
+            push bc                         ; (Y)
+            ldh a, [code_bank]
+            push af
+            ld a, PF_BANK
+            ldh [code_bank], a
+            ld a, [NES_RAM + $3C]
+            sub 2
+            ld [NES_RAM + $1A], a
+            ld a, [NES_RAM + $3D]
+            sub 2
+            ld [NES_RAM + $1B], a
+            ld a, $F7
+            ld bc, $F8F9
+            call .row
+.mid:       ld a, $FA
+            ld bc, $FFFB
+            call .row
+            ld hl, NES_RAM + $1B
+            dec [hl]
+            jr nz, .mid
+            ld a, $FC                       ; the bottom row: no ADC
+            ld bc, $FDFE
+            ldh [sh_l1], a
+            ld a, b
+            ldh [sh_u2], a
+            ld a, c
+            ldh [sh_u3], a
+            ld a, [NES_RAM + $1A]
+            ld e, a
+            call wrow_do
+            pop af
+            ldh [code_bank], a
+            pop bc
+            ld de, 0                        ; X = 0
+            ld a, $FE
+            ldh [nzv], a                    ; N
+            ldh a, [sh_l2]                  ; C (Z = 0)
+            ld l, a
+            ld h, $FE
+            push hl
+            pop af
+            ret
+.row:       ldh [sh_l1], a                  ; a row (L = A, M = B, R = C), then the ADC
+            ld a, b
+            ldh [sh_u2], a
+            ld a, c
+            ldh [sh_u3], a
+            ld a, [NES_RAM + $1A]
+            ld e, a
+            call wrow_do
+            ld hl, NES_RAM + $54            ; $54 += $20, $55 += carry (ADC #$00)
+            ld a, [hl]
+            add a, $20
             ld [hl+], a
-            ldh a, [sh_u2]
-.rm:        ld [hl+], a
-            dec e
-            jr nz, .rm
-            ldh a, [sh_u3]
+            ld a, [hl]
+            ld d, a                         ; (D = the old $55)
+            adc a, 0
             ld [hl], a
+            ld e, a
+            sbc a, a
+            and $10
+            ldh [sh_l2], a                  ; C
+            ld a, d                         ; V: (old ^ new) & new & $80
+            xor e
+            and e
+            and $80
+            rrca
+            ldh [vfl], a
+            ld d, 0
+            ret
+.dcl:       push hl                         ; decline: past the caller's JP (3 bytes)
+            ld hl, sp + 6                   ;   (HL, AF, hle_pfj's return, the caller's)
+            ld a, [hl]
+            add a, 3
+            ld [hl+], a
+            jr nc, .d1
+            inc [hl]
+.d1:        pop hl
+            pop af
+            ret
+
+; ---- b21:80AE-80DA (a list of PPU records: address high, low, count (0: 256), the bytes;
+; a 0 ends it): each record's $2002 read and $2006 writes, its bytes by izyrun0 (bank 0).
+; Out (at the RTS, b21:80DB): A = 0, Y = 0; N = 0, Z = 1; C, V from the last record's TYA /
+; CLC / ADC $10 (kept if none); X = 0 (kept if no record); $10/$11 at the 0.
+rlist_b:    push af                         ; [SP + 2]: the flags out (C)
+            ldh a, [code_bank]
+            push af
+            ld a, PF_BANK
+            ldh [code_bank], a
+.lp:        xor a                           ; LDA $2002: vblank flag and latch cleared
+            ldh [vbl_flag], a
+            ldh [ppu_latch], a
+            ld hl, NES_RAM + $10
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            push hl
+            call nes_rd
+            ld a, l
+            pop hl
+            and a
+            jr z, .end
+            and $3F                         ; $2006 (high), then low (latch back at 0)
+            ldh [ppu_vh], a
+            inc hl
+            push hl
+            call nes_rd
+            ld a, l
+            ldh [ppu_vl], a
+            pop hl
+            inc hl
+            call nes_rd
+            ld e, l                         ; X = the count
+            ld bc, 3                        ; Y = 3
+            ld a, $10
+            call izyrun0                    ; X bytes ($10),Y -> $2007 (Y += n, X = 0)
+            ld hl, NES_RAM + $10            ; TYA / CLC / ADC $10 / STA $10 (BCC / INC $11)
+            ld a, [hl]
+            ld d, a
+            add a, c
+            ld [hl+], a
+            ld b, a                         ; (B = the sum)
+            jr nc, .nc
+            inc [hl]
+.nc:        sbc a, a                        ; (A: $FF with the carry)
+            and $10
+            ld hl, sp + 2
+            res 4, [hl]
+            or [hl]
+            ld [hl], a                      ; C
+            ld a, c                         ; V: (Y ^ sum) & (M ^ sum) & $80
+            xor b
+            ld h, a
+            ld a, d
+            xor b
+            and h
+            and $80
+            rrca
+            ldh [vfl], a
+            ld bc, 0
+            ld d, b
+            jr .lp
+.end:       pop af
+            ldh [code_bank], a
+            pop hl                          ; (L = the flags out: C)
+            ld a, l
+            and $10
+            or $80                          ; Z
+            ld l, a
+            xor a
+            ldh [nzv], a
+            ld h, a
+            ld bc, 0                        ; Y = 0
+            push hl
+            pop af
             ret
 
 section bank PF_BANK, $7F00

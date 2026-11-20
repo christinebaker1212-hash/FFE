@@ -666,19 +666,6 @@ hle_wrow:                                  ; (bank HLE_BANK: wrow_b)
             call wrow_b
             jp hle_back
 
-hle_tpair:                                  ; c62:DEF1 one letter (bank PF_BANK: tpair_b)
-            ld hl, tpair_b
-            jp hle_pfj
-hle_wrf0:   ld hl, wrf_v0                   ; fix window-row routines (wrf_b, build.py WRF)
-            jp hle_pfj
-hle_wrf1:   ld hl, wrf_v1
-            jp hle_pfj
-hle_wrf2:   ld hl, wrf_v2
-            jp hle_pfj
-hle_prow1:                                  ; far pr1, the prologue rows (prow_b)
-            ld hl, prow_b
-            jp hle_pfj
-
 hle_palup:                                  ; c62:D865 palette upload (bank HLE_BANK: palup_b)
             push af
             ld a, HLE_BANK

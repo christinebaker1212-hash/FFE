@@ -843,6 +843,14 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   masked-load show done in the frame wait (it busy-waited mid-frame): CGB 9. Tools: lagcheck LAG_DUMP, sgbrun SGBRUN_CALLS / SGBRUN_PROF_SPOFF,
   gbrun cart-RAM dump.
 
+- **Speed, 2026-11-20:** recompiler: conditional idioms (a native routine may decline and
+  let the original code run: 4th field; it returns past the caller's JP) and `pf:NAME` idioms
+  (bank-60 routine called through hle_pfj, no bank-0 stub). Native: DrawBox rows fix:E0FD
+  (`dbox_b`, declines when $37 asks for a row per frame), menu text printer loop c62:DECE with
+  the English row modes (`txrun_b`, checks hoisted out of the letter loop), PPU record lists
+  b21:80AE (`rlist_b`, name entry grid). checkall 62/62. Lag: CGB 9 -> 8 (the class-select
+  redraw 1284 now in time), DMG ~160.
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette
