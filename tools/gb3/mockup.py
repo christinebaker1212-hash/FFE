@@ -260,6 +260,26 @@ def magic_options(nes, outd, base, cmd):
     print('wrote', outd, outs)
 
 
+DIG3 = {
+    '0': ["###", "#.#", "#.#", "#.#", "#.#", "#.#", "###"], '1': [".#.", "##.", ".#.", ".#.", ".#.", ".#.", "###"],
+    '2': ["###", "..#", "..#", "###", "#..", "#..", "###"], '3': ["###", "..#", "..#", ".##", "..#", "..#", "###"],
+    '4': ["#.#", "#.#", "#.#", "###", "..#", "..#", "..#"], '5': ["###", "#..", "#..", "###", "..#", "..#", "###"],
+    '6': ["###", "#..", "#..", "###", "#.#", "#.#", "###"], '7': ["###", "..#", "..#", ".#.", ".#.", ".#.", ".#."],
+    '8': ["###", "#.#", "#.#", "###", "#.#", "#.#", "###"], '9': ["###", "#.#", "#.#", "###", "..#", "..#", "###"],
+    '/': ["..#", "..#", ".#.", ".#.", ".#.", "#..", "#.."]}
+
+
+def mp_tiles(scr, c, r, digits, ink):
+    """the MP of the 8 spell levels in 3-px digits: each tile = digit + '/' (8 tiles)"""
+    x = c * 8
+    for k, d in enumerate(digits):
+        for part in (d, '/') if k < len(digits) - 1 else (d,):
+            for yy, row in enumerate(DIG3[part]):
+                for xx, v in enumerate(row):
+                    if v == '#': scr.im.putpixel((x + xx, r * 8 + yy), ink)
+            x += 4
+
+
 def menu_options(nes, outd, cmd):
     """field main menu mock-ups (160 x 144): per member name + HP / job + level / MP of the 8
     spell levels on 3 lines; commands opening over the party window (A: right, rows 0-8;
@@ -275,7 +295,7 @@ def menu_options(nes, outd, cmd):
             r = 1 + 3 * i
             F.draw(s, 1, r, nm, T.ink); F.draw(s, 11, r, '%3d/%3d' % (hp, 32), T.ink)
             F.draw(s, 1, r + 1, ' ' + job, T.ink); F.draw(s, 15, r + 1, 'Lv 1', T.ink)
-            F.draw(s, 1, r + 2, 'MP 9/9/9/9/0/0/0/0', T.ink)
+            F.draw(s, 2, r + 2, 'MP', T.ink); mp_tiles(s, 5, r + 2, '99970000', T.ink)
         s.window(0, 14, 20, 4)
         F.draw(s, 1, 15, 'Gil', T.ink); F.draw(s, 12, 15, '%6dG' % 9, T.ink)
         F.draw(s, 1, 16, 'Capacity', T.ink); F.draw(s, 12, 16, '%6dC' % 1, T.ink)
