@@ -57,6 +57,13 @@ status word. Commands (Items, Magic, Equip, Status, Save; cols 13-19 rows 0-6) a
 - Name entry: portrait + name window (0,0,20,6); letter grid (0,6,20,12) with 9 letters a row
   two columns apart, 5 of the 9 rows shown, scrolling as on the NES; hand over the left frame.
 
+## Row menu and world-map overview (approved 2026-11-20: `ff2_mock14_rows_map.png`)
+- Row menu (Select on the world map): camera 6 / 5 (its window NES (7,5,18,18) whole in the
+  view); portraits as background tiles as in the main menu (a guest makes four portraits,
+  48 sprites); front row at GB col 10, back row 4 columns right (NES 5: on the 16 x 16 grid).
+- World-map overview (B + Select with the ring): camera 6 / 9, the globe centred; the logo
+  above it is outside the view.
+
 ## To draft
 Items, magic, equipment, status, shops, keyword dialogue (Ask / Learn), save menu, name
 entry, prologue, title, ending, world map (B + Select), Select menu (options / formation /

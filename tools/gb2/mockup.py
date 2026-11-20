@@ -656,3 +656,66 @@ def new_game(nes_path, out):
     for k, s in enumerate(shots): sheet.paste(s.im, ((k % 3) * 168, (k // 3) * 152))
     sheet = sheet.resize((sheet.width * 2, sheet.height * 2), Image.NEAREST)
     p = os.path.join(out, 'ff2_mock13_newgame.png'); sheet.save(p); return p
+
+
+def loaded_frames(nes_path, presses, frames, ring=True):
+    """NES frames after loading a saved game: the party of the seed-1 path at frame 22580 is
+    written into SRAM slots 1 and 3 (checksum, $5A mark; ring flag on for the world-map
+    overview) at frame 100, the prologue ends at 3300 (A), slot 1 is loaded at 3420 (A);
+    presses = {frame: pad}; returns {frame: image}"""
+    from cynes import NES
+    import firstdiff as fd
+    import numpy as np
+    steps = fd.script_newgame(22600); fd.add_random(steps, 1)
+    n = NES(nes_path)
+    for f in range(22580): n.controller = steps[f]; n.step(1)
+    d = bytearray(n[0x6000 + i] for i in range(0x300))
+    if ring: d[0x1A] |= 2
+    d[0x2FE] = 0x5A; d[0x2FF] = (0xFF - sum(d[:0x2FF])) & 0xFF
+    n = NES(nes_path); out = {}
+    pads = {3300: 128, 3420: 128}; pads.update(presses)
+    hold = {}
+    for f, p in pads.items():
+        for j in range(f, f + 4): hold[j] = p
+    for f in range(max(frames) + 1):
+        if f == 100:
+            for s in (0, 2):
+                for i in range(0x300): n[0x6300 + 0x300 * s + i] = d[i]
+        n.controller = hold.get(f, 0); fr = n.step(1)
+        if f in frames: out[f] = Image.fromarray(np.array(fr))
+    return out
+
+
+def row_menu_map(nes_path, out):
+    """Select on the world map. Row menu (camera 6 / 5: its window NES (7,5,18,18) whole in
+    the view): portraits as background tiles as in the main menu (four 24 x 32 portraits are
+    48 sprites, a Game Boy shows 40; three fit, the guest makes four), front row at GB col
+    10, back row 4 columns right (NES: 5; the portraits stay on the 16 x 16 colour grid);
+    names and hand as the NES. World-map overview (B + Select with the ring): camera on the
+    globe (camera 6 / 9: NES rows 9-26, the globe centred), the FINAL FANTASY II logo above it is left out of the view."""
+    fr = loaded_frames(nes_path, {3800: 32, 3900: 4, 4000: 64, 4100: 96}, [3870, 3960, 4300])
+    pt = portraits(nes_path)
+    shots = []
+    nes_rm = fr[3870]
+    names = []
+    for k in range(3):                          # names cropped from the NES picture (row 9 + 4k)
+        names.append(dmg(nes_rm.crop((80, (9 + 4 * k) * 8, 128, (10 + 4 * k) * 8))))
+    for back in ((False, False, False, False), (False, True, False, True)):
+        s = Screen(bg=3)
+        s.window(1, 0, 18, 18)
+        for k in range(4):
+            img = pt[k] if k < len(pt) else pt[0]
+            x = 14 if back[k] else 10
+            s.im.paste(img.crop((4, 0, 28, 32)), (x * 8, (1 + 4 * k) * 8))
+            if k < 3: s.im.paste(names[k], (4 * 8, (4 + 4 * k) * 8))
+            else: s.text(4, 4 + 4 * k, 'Minwu')
+        _hand(s, 2 * 8, 4 * 8 - 4 + (32 if back[1] else 0), HAND16)
+        shots.append(s)
+    s = Screen(bg=3)
+    s.im.paste(fr[4300].crop((48, 72, 208, 216)), (0, 0))   # (NES colours: the dark ocean is the
+    #   backdrop in the mock-up shades)
+    shots.append(s)
+    sheet = Image.new('RGB', (168 * 3 - 8, 144), (255, 255, 255))
+    for k, s in enumerate(shots): sheet.paste(s.im, (k * 168, 0))
+    sheet = sheet.resize((sheet.width * 2, 288), Image.NEAREST)
+    p = os.path.join(out, 'ff2_mock14_rows_map.png'); sheet.save(p); return p
