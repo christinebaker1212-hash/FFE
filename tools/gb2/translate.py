@@ -66,7 +66,8 @@ class FF2:
            ('fix', 0xFC79): ('hle_mul8', 'NZC', 'C'), ('fix', 0xFC98): ('hle_mul16', 'NZC', 'C'),
            ('fix', 0xFCC3): ('hle_div16', 'NZC', 'C'),
            ('b11', 0x97D5): ('hle_initrng', 'NZC', 'C'),   # init rng (closed form, same end state)
-           ('fix', 0xC46E): ('hle_oamclr', 'NZ')}       # clear OAM data (rt/ff2_pal.s, native)
+           ('fix', 0xC46E): ('hle_oamclr', 'NZ'),       # clear OAM data (rt/ff2_pal.s, native)
+           ('fix', 0xD21B): ('hle_mapupd', 'NZC')}      # update map background (rt/ff2_banked.s, native)
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   fix:FA91-FA99: PHA $FA / PHA $99 / JMP ($0040): "jump (long)" calls through ($40)
     #   with a pushed return address: on the GB a call through the pointer, then $FA9A.

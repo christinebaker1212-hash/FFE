@@ -615,3 +615,370 @@ dmg_maps_b: push bc
 ; brightest level. Darkened while the palettes are faded: one shade per two brightness
 ; levels the brightest BG colour is below REF_LMAX (its level when the maps were last
 ; computed). Returns A = BGP.
+
+; ------------------------------------------------------------------ native field scroll
+; fix:D21B "update map background" (once per step on a normal map): D66A writes the new row
+; (vertical move: 2 x 16 metatiles = 64 tiles, wrapping into the other nametable) or column
+; (horizontal: 2 x 15, $2000 = 4 while it writes) from the buffer $0780-$07BF, D2FE then the
+; attribute bytes ($07D0 / $07E0 address, $07F0 value; 16 or 15 of them). Same writes, same
+; NES RAM ($80-$82, $32), registers and flags as the NES; on a DMG / SGB each tile is shaded
+; with its metatile's palette from the buffer ($07C0) instead of looking the cell up, and the
+; attribute bytes only go to the shadow (the cells they change were just written). CGB: every
+; write through rt_ppu_w7. (docs/gb-native-presentation.md, step 1)
+MU_N       = $DCD4          ; wrap index
+MU_YF      = $DCD5          ; Y at the end (16 / 15)
+MU_BA      = $DCD6          ; buffer pair (low bytes in page $07)
+MU_BB      = $DCD7
+MU_P       = $DCD8          ; palette of the tile being written
+MU_T       = $DCD9          ; the tile
+MU_GH      = $DCDA          ; its GB map address
+MU_GL      = $DCDB
+MU_WH      = $DCDC          ; wrap address (columns)
+MU_WL      = $DCDD
+hle_mapupd_b:
+            ld a, [NES_RAM + $30]           ; $80/$81 = $2000 + 64 * $30 + 2 * column
+            ld l, a                         ;   (+ $400: nametable 1)
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            add a, $20
+            ld d, a
+            ld a, [NES_RAM + $31]
+            cp 16
+            jr c, .c0
+            and $0F
+            inc d
+            inc d
+            inc d
+            inc d
+.c0:        add a, a
+            or l
+            ld e, a
+            ld [NES_RAM + $80], a
+            ld a, d
+            ld [NES_RAM + $81], a
+            ld a, [NES_RAM + $2D]
+            and 2
+            jp nz, .horiz
+            ld a, e                         ; vertical: $82 = 16 - column
+            and $1F
+            srl a
+            xor $0F
+            inc a
+            ld [NES_RAM + $82], a
+            ld [MU_N], a
+            ld a, $80
+            ld [MU_BA], a
+            ld a, $90
+            ld [MU_BB], a
+            call .vrow
+            ld a, [NES_RAM + $80]
+            add a, $20
+            ld [NES_RAM + $80], a
+            ld e, a
+            ld a, [NES_RAM + $81]
+            ld d, a
+            ld a, $A0
+            ld [MU_BA], a
+            ld a, $B0
+            ld [MU_BB], a
+            call .vrow
+            ld a, 16
+            ld [MU_YF], a
+            jp .attr
+.vrow:      ld a, d                         ; y = 0..15: BA[y], BB[y] at (D, E), +1 each;
+            xor 4                           ;   from y = $82 on in the other nametable's row
+            ld [MU_WH], a                   ;   (its start: the row start's $81 ^ 4,
+            ld a, e                         ;   $80 & $E0)
+            and $E0
+            ld [MU_WL], a
+            ld b, 0
+.vl:        ld a, [MU_N]
+            cp b
+            jr nz, .vn
+            ld a, [MU_WH]
+            ld d, a
+            ld a, [MU_WL]
+            ld e, a
+.vn:        call .pal
+            ld a, [MU_BA]
+            call .tile
+            inc e
+            ld a, [MU_BB]
+            call .tile
+            inc e
+            inc b
+            ld a, b
+            cp 16
+            jr nz, .vl
+            ret
+.horiz:     ld a, [NES_RAM + $30]           ; horizontal: $82 = 15 - $30
+            ld b, a
+            ld a, $0F
+            sub b
+            ld [NES_RAM + $82], a
+            ld [MU_N], a
+            ld a, 4
+            call rt_ppu_w0
+            ld a, $80
+            ld [MU_BA], a
+            ld a, $A0
+            ld [MU_BB], a
+            call .hcol
+            ld a, [NES_RAM + $81]
+            ld d, a
+            ld a, [NES_RAM + $80]
+            inc a
+            ld e, a
+            ld a, $90
+            ld [MU_BA], a
+            ld a, $B0
+            ld [MU_BB], a
+            call .hcol
+            ld a, $88
+            call rt_ppu_w0
+            ld a, 15
+            ld [MU_YF], a
+            jp .attr
+.hcol:      ld a, d                         ; y = 0..14: BA[y] at (D, E), BB[y] 32 below,
+            and $24                         ;   64 further each; from y = $82 on from the top
+            ld [MU_WH], a                   ;   of the same column
+            ld a, e
+            and $1F
+            ld [MU_WL], a
+            ld b, 0
+.hl:        ld a, [MU_N]
+            cp b
+            jr nz, .hn
+            ld a, [MU_WH]
+            ld d, a
+            ld a, [MU_WL]
+            ld e, a
+.hn:        call .pal
+            ld a, [MU_BA]
+            call .tile
+            call .d32
+            ld a, [MU_BB]
+            call .tile
+            call .d32
+            inc b
+            ld a, b
+            cp 15
+            jr nz, .hl
+            ret
+.d32:       ld a, e
+            add a, 32
+            ld e, a
+            ret nc
+            inc d
+            ret
+.pal:       ld a, b                         ; MU_P = $07C0[y] & 3
+            add a, $C0
+            ld l, a
+            ld h, high(NES_RAM) + 7
+            ld a, [hl]
+            and 3
+            ld [MU_P], a
+            ret
+.tile:      add a, b                        ; tile $07xx[y] to (D, E)
+            ld l, a
+            ld h, high(NES_RAM) + 7
+            ld a, [hl]
+            jp mu_write
+.attr:      ld a, [NES_RAM + $2D]           ; D2FE: X = $0F (vertical) / $0E .. 0
+            and 2
+            ld b, $0F
+            jr z, .a0
+            dec b
+.a0:        ld a, b
+            add a, $D0
+            ld l, a
+            ld h, high(NES_RAM) + 7
+            ld d, [hl]
+            add a, $10
+            ld l, a
+            ld e, [hl]
+            add a, $10
+            ld l, a
+            ld a, [hl]
+            call mu_attr
+            dec b
+            bit 7, b
+            jr z, .a0
+            ld a, e                         ; the PPU address left one past the last write
+            add a, 1
+            ldh [ppu_vl], a
+            ld a, d
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            xor a
+            ldh [ppu_latch], a
+            ldh [vbl_flag], a
+            ld [NES_RAM + $32], a
+            ldh [nzv], a                    ; N = 0
+            ld b, a
+            ld d, a
+            ld e, $FF                       ; X = $FF
+            ld a, [MU_YF]
+            ld c, a                         ; Y
+            xor a                           ; A = 0, Z = 1, carry = 1 (the last CPY)
+            scf
+            ret
+
+; tile A to NES address (D, E) with palette MU_P (DMG / SGB fast; CGB through rt_ppu_w7).
+; Keeps B, C, D, E.
+mu_write:   push bc
+            push de
+            push hl
+            ld [MU_T], a
+            ldh a, [is_cgb]
+            and a
+            jr z, .dmg
+            ld a, d
+            and $3F
+            ldh [ppu_vh], a
+            ld a, e
+            ldh [ppu_vl], a
+            ld a, [MU_T]
+            call rt_ppu_w7
+            jr .x
+.dmg:       ld a, d                         ; B = offset high (0-3), C = 4 for nametable 1,
+            and 4                           ;   L = offset low
+            ld c, a
+            ld a, d
+            and 3
+            ld b, a
+            add a, $98                      ; GB map address
+            ld [MU_GH], a
+            ld l, e
+            ld a, e
+            ld [MU_GL], a
+            ld a, b
+            or c
+            add a, high(NT_SH)
+            ld h, a
+            ld a, [MU_T]
+            ld d, a
+            ld a, [hl]                      ; shadow; Z = the same tile
+            ld [hl], d
+            cp d
+            push af
+            call own_set
+            pop af
+            jr z, .vram
+            ldh a, [lcd_on]                 ; (LCD off: the scan when it goes on)
+            and a
+            jr nz, .sh
+            inc a
+            ldh [dmg_scan], a
+            jr .vram
+.sh:        ld l, d                         ; shading: fixed by the tileset - nothing; another
+            ld h, high(TILE_PAL)            ;   palette - re-coded for this one; the same -
+            ld a, [hl]                      ;   a parked tile is marked again
+            bit 7, a
+            jr nz, .vram
+            ld a, [MU_P]
+            cp [hl]
+            jr z, .pk
+            ld [hl], a
+            ld a, d
+            call dmg_mark
+            jr .vram
+.pk:        ld c, d
+            call bm_addr
+            ld a, l
+            add a, low(DEFER_BM) - low(DIRTY_BM)
+            ld l, a
+            ld a, [hl]
+            and b
+            jr z, .vram
+            ld a, b
+            cpl
+            and [hl]
+            ld [hl], a
+            ld a, d
+            call dmg_mark
+.vram:      ld a, [MU_GH]
+            ld h, a
+            ld a, [MU_GL]
+            ld l, a
+            ld a, [MU_T]
+            ld d, a
+            ldh a, [lcd_on]
+            and a
+            jr nz, .q
+            ld [hl], d
+            jr .x
+.q:         ldh a, [q_tail]
+            ld e, a
+            inc a
+            ld b, a
+.f:         ldh a, [q_head]
+            cp b
+            jr nz, .r
+            call q_drain1
+            jr .f
+.r:         ld a, l
+            ld c, h
+            ld h, high(QH)
+            ld l, e
+            ld [hl], c
+            inc h
+            ld [hl], a
+            inc h
+            ld [hl], d
+            ld a, b
+            ldh [q_tail], a
+.x:         pop hl
+            pop de
+            pop bc
+            ret
+
+; attribute byte A to NES address (D, E): DMG / SGB the shadow only (and the SGB's attribute
+; map again); CGB through rt_ppu_w7. Keeps B, C, D, E.
+mu_attr:    push bc
+            push de
+            push hl
+            ld [MU_T], a
+            ldh a, [is_cgb]
+            and a
+            jr z, .dmg
+            ld a, d
+            and $3F
+            ldh [ppu_vh], a
+            ld a, e
+            ldh [ppu_vl], a
+            ld a, [MU_T]
+            call rt_ppu_w7
+            jr .x
+.dmg:       ld a, d
+            and 7
+            add a, high(NT_SH)
+            ld h, a
+            ld l, e
+            ld a, [MU_T]
+            cp [hl]
+            jr z, .x
+            ld [hl], a
+            ldh a, [lcd_on]
+            and a
+            jr nz, .on
+            inc a
+            ldh [dmg_scan], a
+            jr .x
+.on:        ldh a, [sgb_glob]
+            and a
+            jr nz, .x
+            ld a, 1
+            ldh [sgb_dirty], a
+            ldh [sgb_adirty], a
+.x:         pop hl
+            pop de
+            pop bc
+            ret

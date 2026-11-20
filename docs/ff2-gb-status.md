@@ -488,7 +488,20 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   quad_chk 6%, cell_pal 4%, dmg_cell 4%.
   (Debug note: `GB_SAVE=K` needs a frame limit beyond wait K, else an old build/gb2.state is
   read.)
-- Next (step 1, second part): native field drawing that knows each metatile's palette
+- **Step 1, second part (2026-11-20): native "update map background" (fix:D21B, once per
+  step: D66A's 64 / 30 tiles + D2FE's 16 / 15 attribute bytes)** (`hle_mapupd`,
+  rt/ff2_banked.s; translator ext): the same writes into the nametable shadow and the GB map,
+  NES RAM ($80-$82, $32), registers and flags as the NES; on a DMG / SGB each tile is shaded
+  with its metatile's palette from the scroll buffer ($07C0) with no cell lookups (fixed
+  tiles skipped, others re-coded only on a palette change), the attribute bytes only go to
+  the shadow; CGB writes through rt_ppu_w7. Before, a step cost ~64 000 DMG cycles (~800 per
+  write) and a step comes every 8 frames. Result (lagcheck, random 30000): DMG +9.2% ->
+  +8.1%; the walking windows measured before 17041 / 17101: +21 / +25 -> +10 / +8 frames per
+  60. RAM identical (random 30000, DMG and CGB); shots of the walking scenes match the NES.
+- Next (step 1, third part): the remaining field costs (dialogue window: text printer
+  fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
+  then screen loads, music, sprites. Earlier plan text:
+  native field drawing that knows each metatile's palette
   (fix:D5BA builds the row / column buffer $0780-$07CF with the metatile attributes at
   $07C0): draw the buffer natively into the GB map with tiles pre-shaded per palette (a
   second GB tile for the tiles used with two palettes, in free BG slots), and the dialogue
