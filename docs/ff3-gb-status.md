@@ -121,12 +121,27 @@ Measured in mGBA (CGB double speed) with the `newgame` input: real frames betwee
 frames (GB `VBL_CNT`, NES emulator frames): `tools/gb3/lagcheck.py NES GB FROM TO [--step
 N]` (per-waited-frame lead and total); mGBA cycle profiles (`SGBRUN_PROF2=300
 SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one frame of CPU).
-- **Result: the opening battle keeps pace overall**: from waited-for 2400 (field) to 4332 (end
-  of the battle) the GB takes 2002 frames, the NES 2001. Battle start: the GB builds the rng
-  table at once (the NES spends 25 frames) but loads the battle graphics in ~30 frames (NES
-  11); the fade-in keeps pace. In the battle, the first round's animations still lose ~9
-  frames over ~190 waited frames (frames that need ~1.1 frames of CPU: HP window redraw +
-  sprite animation), and the GB gains them back later where the NES has lag frames.
+- **Result (2026-11-20): every measured battle keeps pace.** Opening battle (`newgame` script)
+  and ten battles in the cave (`explore` script: walk, A in battle; RAM identical to the NES
+  through waited-for frame 29,626): the GB is level with or ahead of the NES at every point
+  of each battle's gradual course, and ends each battle 14-96 frames ahead (the NES has lag
+  frames the GB does not). Whole run (waited 2400-35841): GB 33,646 frames, NES 34,250
+  (-1.8%). First-round drift of the opening battle fixed (it came from single frames needing
+  just over one frame of CPU: HP window redraw, attack-order sort, status sprites).
+- Open: a few single steps where the GB takes 17-25 frames more (the map load after the
+  opening battle: GB ~23 frames vs NES 9; the start of battle 2; one step in battle 3; one
+  field step); the map loader (tilemap decompression through `(zp),Y` from ROM, map
+  properties, background updates) is the next target. Bank 0 has ~800 bytes left.
+- Measuring with state-dependent scripts needs `lagcheck.py --resync` (sgbrun
+  `SGBRUN_CLOCK`: the GB input clock set to the NES's at the instruction where a waited-for
+  frame ends, as firstdiff.py does), else the GB's input drifts onto another game path.
+- Natives / idioms added for that (2026-11-20): `p34:8F57` sort, `FBEF` random (closed form),
+  `p34:966A` English text line copy, `p32:9FE4` status sprites, `b40:9F00` ExRAM text-engine
+  reload, `p2e:A697` / `A78D` monster attribute tables, `F9DA` / `DEEA` tile copies, small
+  fixed-bank helpers (`FD20`-`FD47`, `F8AA`, `F8CB`, `F8F2`, `F8FE`, `FB80`, `FBAA`), inline
+  PRG-RAM `(zp),Y` loads / stores, `(zp),Y` copy and 256-byte PPU block idioms, CHR tiles of
+  `rt_ppu_copy` into the staging copy, the write cache set up at `$2006`, BPL/BMI peephole,
+  cheaper cross-bank stubs (placed after the runtime in bank 0).
 - Done: bulk `$2007` paths (map-row runs with step 1 and 32, `rt_ppu_copy` pieces, CHR runs
   inside a tile, `(zp),Y` upload idiom `rt_ppu_izy`, whole attribute tables `attr_put64`);
   attribute writes ~10x faster (one address computation per quadrant pair); fill idiom 24
@@ -151,7 +166,7 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   raster split); belongs in the window layer (FF1 lesson).
 
 ## Next
-1. Speed: the first battle round (above); then other battles (bosses, magic animations), the
-   field, menus.
+1. Speed: the map loader (field entry after battles, doors / stairs), then bosses and magic
+   animations (need further input scripts), menus.
 2. Raster split in the runtime (LYC, window layer), sound (APU -> GB, FF1/FF2 model).
 3. Mock-ups for the owner (battle, dialogue, main menu), then the re-layouts.
