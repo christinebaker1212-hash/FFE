@@ -172,6 +172,16 @@ int main(int argc, char** argv) {
 			while (core->frameCounter(core) == fc) {
 				core->step(core);
 				if (nclk && f > 30) resync(core, clk, nclk, &lastw, pads, npads);
+				if (getenv("SGBRUN_CALLERS")) {         /* PC = ADDR (bank 0): the return address on the stack */
+					static int ca = -1; if (ca < 0) ca = strtoul(getenv("SGBRUN_CALLERS"), 0, 16);
+					uint32_t pc = 0; core->readRegister(core, "pc", &pc);
+					if ((pc & 0xFFFF) == (unsigned) ca && nprof < 2000000) {
+						uint32_t sp = 0; core->readRegister(core, "sp", &sp); sp &= 0xFFFF;
+						unsigned ra = core->rawRead8(core, sp, -1) | core->rawRead8(core, sp + 1, -1) << 8;
+						unsigned nn = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
+						profs[nprof] = 0x2000000u | (unsigned) ((struct GB*) core->board)->memory.currentBank << 16 | ra; proff[nprof++] = nn;
+					}
+				}
 				int take;
 				if (getenv("SGBRUN_PROFC")) {           /* (with SGBRUN_PROFC: every PROF2 cycles, halts included) */
 					static uint64_t nextc = 0;
@@ -276,7 +286,7 @@ int main(int argc, char** argv) {
 	/* frame-wait counter of the runtime ($D830), to confirm the game ran */
 	unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 	printf("frames %d, video %ux%u, NES frame waits %u, KEY1 %02X\n", frames, w, h, n, core->busRead8(core, 0xFF4D));
-	if (prof || prof2) for (int k = 0; k < nprof; k++) printf("%s %02X:%04X %u\n", (profs[k] >> 24) ? "S" : "P", (profs[k] >> 16) & 0xFF, profs[k] & 0xFFFF, proff[k]);
+	if (prof || prof2) for (int k = 0; k < nprof; k++) printf("%s %02X:%04X %u\n", (profs[k] >> 24) == 2 ? "C" : (profs[k] >> 24) ? "S" : "P", (profs[k] >> 16) & 0xFF, profs[k] & 0xFFFF, proff[k]);
 	core->deinit(core);
 	return 0;
 }

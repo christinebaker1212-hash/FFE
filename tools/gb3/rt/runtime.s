@@ -2192,7 +2192,24 @@ rt_ppu_copy:
 .lp:        ld a, b
             and a
             jr z, .one
-            ldh a, [wc_n]                   ; a cached run with step 1: whole pieces of it
+            cp 16                           ; CHR, step 1, tile-aligned, a whole tile left:
+            jr c, .nt                       ;   straight into the staging copy
+            ldh a, [ppu_vh]
+            cp $20
+            jr nc, .nt
+            ldh a, [ppu_ctrl]
+            and 4
+            jr nz, .nt
+            ldh a, [ppu_vl]
+            and $0F
+            jr nz, .nt
+            call .tile
+            ld a, b
+            sub 16
+            ld b, a
+            jr nz, .lp
+            jp .end
+.nt:        ldh a, [wc_n]                   ; a cached run with step 1: whole pieces of it
             and a
             jr z, .one
             ldh a, [wc_inc]
@@ -2323,7 +2340,17 @@ rt_ppu_copy:
 ; window (RAM, PRG-RAM, a ROM window) and Y does not wrap; else one at a time. Returns
 ; A = the last byte, X = 0, Y + count, Z = 1, N = 0 (nzv), C kept. D = 0, B = 0.
 rt_ppu_izy: push af                         ; (C: kept)
-            ld a, e
+            ld a, e                         ; 256 bytes from Y = 0: two halves of 128
+            or c
+            jr nz, .hb1
+            pop af
+            push hl
+            ld e, 128
+            call .hb
+            pop hl
+            ld e, 128
+.hb:        push af
+.hb1:       ld a, e
             and a
             jr z, .slow
             add a, c                        ; Y + X <= 256
@@ -2680,6 +2707,73 @@ rt_copy_izy:
             set 7, [hl]                     ; Z = 1
             pop hl
             pop af
+            ret
+
+; (rt_ppu_copy) 16 bytes from HL (bank D, 0 = RAM) -> the tile at the PPU address in the
+; staging copy (plane 0 -> even bytes, plane 1 -> odd), marked; PPU address + 16; nt_a = the
+; last byte. B, C, D, E kept.
+rt_ppu_copy.tile:
+            push bc
+            push de
+            xor a
+            ldh [wc_n], a                   ; (no cached run across this)
+            ld a, d
+            and a
+            jr z, .t0
+            ld [MBC5_BANKL], a
+.t0:        ldh a, [ppu_vh]
+            ld c, a
+            and $10
+            swap a
+            add a, 2
+            ld b, a                         ; B = WRAM bank 2 / 3
+            ld a, c
+            and $0F
+            or high(STAGE)
+            ld d, a
+            ldh a, [ppu_vl]
+            ld e, a                         ; DE = the tile in the staging copy
+            ld a, b
+            ldh [rSVBK], a
+            ld c, 8
+.p0:        ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            dec c
+            jr nz, .p0
+            ld a, e
+            sub 15
+            ld e, a
+            ld c, 8
+.p1:        ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            dec c
+            jr nz, .p1
+            ldh [nt_a], a
+            ld a, 1
+            ldh [rSVBK], a
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            push hl
+            ldh a, [ppu_vl]
+            ld l, a
+            ldh a, [ppu_vh]
+            ld h, a
+            call tile_mark
+            ldh a, [ppu_vl]
+            add a, 16
+            ldh [ppu_vl], a
+            jr nc, .t1
+            ldh a, [ppu_vh]
+            inc a
+            and $3F
+            ldh [ppu_vh], a
+.t1:        pop hl
+            pop de
+            pop bc
             ret
 
 rt_izy_wr:
