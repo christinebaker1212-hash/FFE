@@ -56,6 +56,83 @@ def source_base(src, nes, srcdir, gb=False):
                                      *(['--gb'] if gb else [])), cwd=ROOT)
 
 
+DMG_MSG = ['This Game Pak', 'is designed only', 'for use with the', 'Game Boy Color', 'system.']
+
+
+def dmg_msg_src():
+    """Color-only cartridge on a monochrome Game Boy (release requirement, docs/
+    gb-release-checklist.md): a screen with DMG_MSG in the project's own font
+    (tools/latin_font.py), LCD switched off only in the vblank, then a halt with no interrupt
+    enabled (low power). In the runtime tables bank; boot jumps here on A <> $11."""
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    from latin_font import G
+    chars = sorted(set(''.join(DMG_MSG)) - {' '})
+    tiles = [bytes(16)]                                     # tile 0: blank
+    for ch in chars:
+        rows = [sum(0x80 >> x for x, v in enumerate(r) if v == '#') for r in G[ch]]
+        if ch in 'gjpqy,;': rows = [0] + rows               # (descenders: rows 1-7)
+        else: rows = rows + [0]
+        tiles.append(bytes(b for r in rows for b in (r, r)))   # colour 3 ink on colour 0
+    code = {ch: i + 1 for i, ch in enumerate(chars)}
+    mp = bytearray(18 * 32)
+    top = (18 - 2 * len(DMG_MSG) + 1) // 2
+    for k, line in enumerate(DMG_MSG):
+        c0 = (20 - len(line)) // 2
+        for i, ch in enumerate(line):
+            if ch != ' ': mp[(top + 2 * k) * 32 + c0 + i] = code[ch]
+    db = lambda b: '\n'.join('    db ' + ', '.join('$%02X' % v for v in b[i:i + 16]) for i in range(0, len(b), 16))
+    t = b''.join(tiles)
+    return """section bank RT_TABLES, $7800
+dmg_msg:    ldh a, [rLY]                    ; (the boot ROM leaves the LCD on: off in the vblank)
+            cp 144
+            jr c, dmg_msg
+            xor a
+            ldh [rLCDC], a
+            ld hl, DMSG_T
+            ld de, $8000
+            ld bc, %d
+.t:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec bc
+            ld a, b
+            or c
+            jr nz, .t
+            ld hl, $9800
+            ld bc, $400
+.z:         xor a
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .z
+            ld hl, DMSG_M
+            ld de, $9800
+            ld bc, %d
+.m:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec bc
+            ld a, b
+            or c
+            jr nz, .m
+            xor a
+            ldh [rSCX], a
+            ldh [rSCY], a
+            ldh [rIE], a
+            ld a, $E4
+            ldh [$FF47], a                  ; BGP: colour 3 black, 0 white
+            ld a, $91                       ; LCD on, BG on, tiles $8000, map $9800
+            ldh [rLCDC], a
+.h:         halt                            ; (no interrupt enabled: stays here, low power)
+            jr .h
+DMSG_T:
+%s
+DMSG_M:
+%s
+""" % (len(t), len(mp), db(t), db(bytes(mp)))
+
+
 def oam_attr_src():
     """OAM_ATTR ($3D00, bank 0): NES sprite attribute byte -> CGB OAM attributes (palette
     bits 0-1, priority bit 5 -> bit 7, horizontal / vertical flip bits 6 / 7 -> bits 5 / 6);
@@ -108,7 +185,7 @@ def main():
     # (the cross-bank stubs continue bank 0 right after the runtime, up to OAM_ATTR at $3C00)
     head, sep, rest = prog.partition('section bank DYN_BANK')
     stubs = head.split('\n', 1)[1] if head.startswith('section bank 0') else head
-    src_all = rt + '\n' + stubs + '\n' + gb1.nes_rgb_src() + '\n' + oam_attr_src() + '\n' + sep + rest
+    src_all = rt + '\n' + stubs + '\n' + gb1.nes_rgb_src() + '\n' + oam_attr_src() + '\n' + dmg_msg_src() + '\n' + sep + rest
     open(opt['--out'] + '.s', 'w').write(src_all)
     print('N-branch peephole: %d' % getattr(rc, 'n_npeep', 0))
     print('translated: %d instructions, %d code banks (%.1fs), %d dynamic targets'

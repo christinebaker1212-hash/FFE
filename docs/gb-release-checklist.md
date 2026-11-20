@@ -67,7 +67,7 @@ Checked with automated tools (as Nintendo's KENSA / Lot Check suites did):
 | Soft reset A+B+Start+Select | **missing** | **missing** | **missing** |
 | Memory / registers cleared at boot | verify (`memclr` covers WRAM?) | verify | verify |
 | Cross-hardware | DMG / SGB / CGB tested in emulators; owner's GBC hardware test; GBA, Pocket untested | verify | CGB only |
-| Color-only warning screen | n/a | n/a | **missing**: on a DMG the boot just halts (`runtime.s` `.dmg`) |
+| Color-only warning screen | n/a | n/a | done 2026-11-20 (`build.py dmg_msg_src`: "This Game Pak is designed only for use with the Game Boy Color system.", project font, LCD off in V-Blank, then halt); seen in PyBoy DMG, mGBA DMG and SGB; hardware check pending |
 | Hardware names in text | check the scripts | check | check |
 | CGB colour use | NES palettes per tile | verify | NES palettes per tile |
 | Undisclosed code | test hooks in the binary: `TEST_PAD` mode ($D83E = $A5), `rst $38` trap / `DBG` record; remove or document. Env test switches (`GB_DLG_TEST`, `GB3_TEST_MINI`, ...) must be off | same | same (`GB3_TEST_MINI`, `FF3_TEST_GOBLIN`) |

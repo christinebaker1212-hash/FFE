@@ -175,8 +175,9 @@ boot:       di
             ld sp, STACK_TOP
             cp $11                          ; A = $11 on a Game Boy Color
             jr z, .cgb
-.dmg:       halt                            ; (Color-only cartridge: stop on other models)
-            jr .dmg
+.dmg:       ld a, RT_TABLES                 ; (Color-only cartridge: the message screen on
+            ld [MBC5_BANKL], a              ;   other models, build.py dmg_msg_src)
+            jp dmg_msg
 .cgb:       ld a, 1                         ; double speed (KEY1 + STOP, interrupts off)
             ldh [rKEY1], a
             xor a
