@@ -27,22 +27,35 @@ def main():
     ap.add_argument('--input', default='newgame'); ap.add_argument('--step', type=int, default=1)
     ap.add_argument('--jump', type=int, default=2)
     ap.add_argument('--frames', type=int, default=0, help='GB frames to run (default: TO * 1.25)')
+    ap.add_argument('--resync', action='store_true', help='set the GB input clock to the NES\'s at '
+                    'each waited-for frame (sgbrun SGBRUN_CLOCK), for scripts that steer by game state')
     a = ap.parse_args()
     from cynes import NES
     pad = INPUTS[a.input]
     n = NES(a.nes); W = Waits(n); k = 0; f = 0; nesw = {}
+    import cmpshots; cmpshots.CUR_NES = n
+    clock = {}
     while k < a.to + 200 and f < (a.to + 200) * 4:
         n.controller = pad(k + 1); n.step(1); f += 1; k = W.update()
         nesw.setdefault(n.ff3_waits, f)
+        clock.setdefault(n.ff3_waits, k)
     tmp = tempfile.mkdtemp(prefix='lagcheck')
     try:
         pads = os.path.join(tmp, 'pads.bin')
-        open(pads, 'wb').write(bytes(W.latch.get(j, W.latch.get(j - 1, 0)) for j in range(a.to + 200)))
+        # (sgbrun puts file byte k + 1 in test-mode slot k; slot k must hold the NES's latch
+        #  after frame k, as firstdiff.py feeds it)
+        open(pads, 'wb').write(bytes(W.latch.get(j - 1, W.latch.get(j - 2, 0)) for j in range(a.to + 200)))
         cmd = [os.path.join(ROOT, 'build', 'sgbrun'), a.gb, str(a.frames or int(a.to * 1.25) + 600),
                os.path.join(tmp, 'q'), '--cgb', '--padfile', pads]
         for j in range(a.frm, a.to + 1, a.step): cmd += ['--nshot', str(j)]
-        out = subprocess.run(cmd, env=dict(os.environ, SGBRUN_PEEK='D830'), capture_output=True,
-                             text=True).stdout + ''
+        env = dict(os.environ, SGBRUN_PEEK='D830')
+        if a.resync:
+            import struct
+            cf = os.path.join(tmp, 'clock.bin')
+            top = max(clock) + 1
+            open(cf, 'wb').write(b''.join(struct.pack('<H', clock.get(w, 0) & 0xFFFF) for w in range(top)))
+            env['SGBRUN_CLOCK'] = cf
+        out = subprocess.run(cmd, env=env, capture_output=True, text=True).stdout + ''
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     gbw = {}

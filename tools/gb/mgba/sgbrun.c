@@ -104,6 +104,14 @@ int main(int argc, char** argv) {
 		core->savedataRestore(core, sram, n, false);
 	}
 	char path[1024];
+	/* SGBRUN_CLOCK=FILE (FF3 test mode): u16 per waited-for frame = the NES input clock at that
+	   wait; whenever WAIT_CNT ($D834) advances, NMI_CNT ($D830) is set to it (as firstdiff.py),
+	   so scripted input stays on the NES's game path whatever the GB's timing */
+	static uint16_t clk[65536]; long nclk = 0; unsigned lastw = 0;
+	if (getenv("SGBRUN_CLOCK")) {
+		FILE* cf = fopen(getenv("SGBRUN_CLOCK"), "rb");
+		if (cf) { nclk = fread(clk, 2, 65536, cf); fclose(cf); }
+	}
 	for (int f = 1; f <= frames; f++) {
 		if (poke_list) {
 			unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
@@ -160,6 +168,26 @@ int main(int argc, char** argv) {
 						uint32_t sp = 0; core->readRegister(core, "sp", &sp); sp &= 0xFFFF;
 						unsigned ra = core->rawRead8(core, sp, -1) | core->rawRead8(core, sp + 1, -1) << 8;
 						profs[nprof] = 0x1000000u | (unsigned) ((struct GB*) core->board)->memory.currentBank << 16 | ra; proff[nprof++] = nn;
+					}
+				}
+			}
+		} else if (nclk) {                              /* exact resync: at the instruction where WAIT_CNT moves */
+			uint32_t fc = core->frameCounter(core);
+			while (core->frameCounter(core) == fc) {
+				core->step(core);
+				unsigned w = core->rawRead8(core, 0xD834, 1) | core->rawRead8(core, 0xD835, 1) << 8;
+				if (w != lastw && f > 30) {
+					lastw = w;
+					if (w < (unsigned) nclk) {
+						unsigned c = clk[w];
+						core->rawWrite8(core, 0xD830, 1, c & 0xFF);
+						core->rawWrite8(core, 0xD831, 1, c >> 8);
+						struct GB* gbm = (struct GB*) core->board;
+						for (unsigned k = c; k < c + 32; k++) {
+							unsigned char v = k + 1 < npads ? pads[k + 1] : 0, r = 0;
+							for (int b = 0; b < 8; b++) if (v & (1 << b)) r |= 0x80 >> b;
+							if (gbm->memory.sram && gbm->sramSize >= 0x8000) gbm->memory.sram[0x6000 + (k & 0xFF)] = r;
+						}
 					}
 				}
 			}

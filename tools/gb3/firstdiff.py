@@ -54,6 +54,7 @@ def main():
         lo, hi = (int(v, 16) for v in r.split('-')); ign |= set(range(lo, hi + 1))
     # NES: RAM at each counted frame
     n = NES(a.nes); W = Waits(n); nes_ram = {}; k = 0; f = 0; latched = {}; wk = 0; nes_clock = {}
+    import cmpshots; cmpshots.CUR_NES = n
     sram0 = bytes(n[0x6000 + i] for i in range(0x2000))   # power-on save RAM (the game reads
                                                          #   unwritten save RAM: copied to the GB)
     while k < a.frames and f < a.frames * 4 + 1000:

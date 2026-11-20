@@ -31,6 +31,27 @@ def newgame_pad(w):
     return A
 INPUTS['newgame'] = newgame_pad
 
+CUR_NES = None                            # (set by the runners: state-dependent scripts)
+
+def explore_pad(w):
+    """newgame through the opening battle and scene (to wait 4600), then a walk in the cave
+    for random encounters: blocks of 96 waits, a direction held for the first 48 (the
+    direction from a fixed pseudo-random sequence), A tapped every 16 waits (dialogue). In
+    battle mode ($0100 = JMP $FB57, read from the NES in CUR_NES) only A, every 16 waits
+    (Fight, first target). The pads are recorded from the NES run (Waits.latch) and fed to
+    the GB, so the GB sees the same presses."""
+    if w < 4600: return newgame_pad(w)
+    n = CUR_NES
+    if n is not None and n[0x100] == 0x4C and n[0x101] == 0x57 and n[0x102] == 0xFB:
+        return A if w % 16 < 3 else 0
+    b = (w - 4600) // 96; ph = (w - 4600) % 96
+    if ph % 16 < 3 and ph >= 48: return A
+    if ph < 48:
+        d = (b * 1103515245 + 12345) >> 16 & 3
+        return (1, 2, 4, 8)[d]           # Right, Left, Down, Up
+    return 0
+INPUTS['explore'] = explore_pad
+
 class Waits:
     """NES frames as the GB runtime counts them (NMI_CNT): NMIs that end a synchronous wait
     (RAM vector $0100 = JMP $FF2A) or end the battle / cutscene wait $FB80 (JMP $FB57
