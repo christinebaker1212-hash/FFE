@@ -1767,6 +1767,7 @@ SC_P1      = $DCD8          ; off the view (no PAL_USED), else the view
 SC_VR      = $DCD9          ; first view row, first view column
 SC_VC      = $DCDA
 SC_N       = $DCDC          ; sc_seg: cells left, the owner byte (rotating)
+SEEN       = $B000          ; (cart RAM bank 3 during the scan) tile -> seen
 SC_OB      = $DCDD
 dmg_scan_all_b:
             push bc
@@ -1778,10 +1779,16 @@ dmg_scan_all_b:
             xor a
             ldh [dmg_scan], a
             ld [PAL_USED], a
-            ld hl, REF_BM
-            ld b, 32
+            ld a, 3                         ; tiles seen: a byte each in cart RAM bank 3 $B000
+            ld [$4000], a                   ;   (bank 3 for the scan: it runs with the LCD off;
+            xor a                           ;   the test runners' pads are at $A000)
+            ld hl, SEEN
 .z:         ld [hl+], a
-            dec b
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec l
+            inc l
             jr nz, .z
             ldh a, [cam_y]                  ; the view: map row (scroll_y + cam_y) mod 240 / 8,
             ld b, a                         ;   column (scroll_x + cam_x) / 8
@@ -1848,6 +1855,22 @@ dmg_scan_all_b:
             pop bc
             dec b
             jr nz, .vr
+            ld hl, SEEN                     ; REF_BM from the table (bit k of byte i: tile 8i + k)
+            ld bc, REF_BM
+.rb:        ld e, 8
+.rbt:       ld a, [hl+]
+            add a, $FF                      ; (carry: seen)
+            rr d
+            dec e
+            jr nz, .rbt
+            ld a, d
+            ld [bc], a
+            inc c
+            ld a, l
+            and a
+            jr nz, .rb
+            xor a
+            ld [$4000], a
             ld e, 0                         ; tiles in use and parked: marked again (they are
 .pb:        ld a, e                         ;   needed now)
             add a, low(REF_BM)
@@ -1988,22 +2011,9 @@ sc_seg:     ld a, b
             ld [hl], b
             ld a, c
             call dmg_mark
-.ref:       ld a, c                         ; REF_BM |= bit C
-            and 7
-            ld l, a
-            ld h, high(BITS8)
-            ld b, [hl]
-            ld a, c
-            rrca
-            rrca
-            rrca
-            and $1F
-            or low(REF_BM)
-            ld l, a
-            ld h, high(REF_BM)
-            ld a, [hl]
-            or b
-            ld [hl], a
+.ref:       ld h, high(SEEN)                ; tile C seen
+            ld l, c
+            ld [hl], h
             ld a, e                         ; next column (a new owner byte every 8)
             inc a
             and 31
