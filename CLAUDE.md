@@ -80,6 +80,21 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   and compare emulated RAM frame by frame (as in `tools/split/equiv.py`), plus
   screenshots of every re-laid-out screen.
 
+## Owner's decisions (2026-11-20, later; binding)
+- **The plain Game Boy (DMG) must reach 0 lag frames**, as the Color already does.
+- **Use the FF1 disassemblies beyond building from the ROM**, to reduce, and where possible
+  remove, the GB's emulation of the NES: its PPU, APU and mapper. Data formats, tables and what
+  routines do come from the disassembly. `github.com/Entroper/FF1Disassembly` is cloned into
+  `build/ref/` at work time and never committed; it is the US release, so match it to the
+  Japanese ROM. The GB build then draws maps, sprites, battle and menus with native GB code
+  and GB-ready data made at build time from the user's ROM, instead of converting NES PPU
+  writes at run time. Game state stays as on the NES: the RAM checks keep passing. Never copy
+  game code or data into the repo; every game byte still comes from the user's ROM at build
+  time.
+- **Lot Check 2.3 (cart RAM off after each access): the owner expects it to be met**, not
+  waived. Work out the memory layout that makes it possible: what FF1 really uses of
+  $6000-$7FFF, what the runtime needs, and what can live elsewhere.
+
 ## Release requirements (owner's decision, 2026-11-20: absolutely required)
 No GB/GBC release of FF1, FF2 or FF3 until every Nintendo Lot Check standard in
 `docs/gb-release-checks.md` is met and checked: header and boot integrity, LCD off only in
