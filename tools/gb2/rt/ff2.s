@@ -848,6 +848,9 @@ hle_rcopy:  push af
             inc l
             dec l                           ; Z = 1
             ret
+hle_csum:   call rt_fcs                     ; fix:DAD4 save slot checksum (native)
+            db HLE_BANK
+            dw hle_csum_b
 hle_mexp:   call rt_fcs                     ; b00:9D97 map load metatile expansion (native)
             db HLE_BANK
             dw hle_mexp_b

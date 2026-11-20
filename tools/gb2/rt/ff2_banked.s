@@ -3015,6 +3015,82 @@ hle_mscan_b:
             ccf
             ret
 
+; fix:DAD4-DADE (save slot checksum): CLC / ADC ($80),Y / INY / BNE, INC $81 / DEX / BNE - the
+; 8-bit sum of X pages (from Y) at ($80). Cart RAM through GB pointers, else byte by byte.
+; Exit: A = the sum, carry of the last add, X = Y = 0, $81 advanced, N = 0, Z = 1.
+hle_csum_b:
+            ld d, a                         ; D = the sum
+            ld a, [NES_RAM + $81]
+            cp $60
+            jr c, .gen
+            ld b, a
+            ld a, e                         ; (pages: X, 0 = 256: generic)
+            and a
+            jr z, .gen
+            add a, b
+            jr c, .gen
+            cp $81
+            jr nc, .gen
+.pg:        ld a, [NES_RAM + $80]
+            ld l, a
+            ld a, [NES_RAM + $81]
+            add a, $40
+            ld h, a
+            ld b, 0                         ; (B = the last carry)
+.by:        ld a, l                         ; HL = ($80) + Y
+            push hl
+            add a, c
+            ld l, a
+            jr nc, .h
+            inc h
+.h:         ld a, d
+            add a, [hl]
+            ld d, a
+            pop hl
+            ld b, 0
+            jr nc, .nc
+            inc b
+.nc:        inc c
+            jr nz, .by
+            ld hl, NES_RAM + $81
+            inc [hl]
+            dec e
+            jr nz, .pg
+            jr .x
+.gen:       ld b, 0                         ; (as the NES, through nes_rd)
+.gb:        ld a, [NES_RAM + $80]
+            add a, c
+            ld l, a
+            ld a, [NES_RAM + $81]
+            adc a, 0
+            ld h, a
+            push de
+            call nes_rd
+            pop de
+            ld a, d
+            add a, l
+            ld d, a
+            ld b, 0
+            jr nc, .gc
+            inc b
+.gc:        inc c
+            jr nz, .gb
+            ld hl, NES_RAM + $81
+            inc [hl]
+            dec e
+            jr nz, .gb
+.x:         xor a
+            ldh [nzv], a
+            ld a, b
+            rrca                            ; carry of the last add
+            ld a, d
+            ld bc, 0
+            ld de, 0
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1
+            ret
+
 section bank HLE_BANK, $7F00
 BITS8:      db 1, 2, 4, 8, 16, 32, 64, 128      ; (page start: low byte = bit number)
 
