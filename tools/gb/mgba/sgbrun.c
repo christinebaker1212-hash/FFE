@@ -1,7 +1,7 @@
 /* Headless mGBA runner for SGB testing of the GB builds (palettes, border, packets).
  *
  * usage: sgbrun ROM FRAMES OUTPREFIX [--dmg] [--press KEYS@FRAME+HOLD ...] [--shot FRAME ...]
- *        [--padfile FILE] [--nshot K ...]
+ *        [--padfile FILE] [--nshot K ...] [--model DMG|MGB|SGB|SGB2|CGB|AGB]
  *   --padfile: one NES pad byte per NES frame (bit 0 right .. 7 A, as the NES latched it),
  *     applied while the runtime's NES frame count ($D830) is that frame (as firstdiff.py);
  *   --nshot K: screenshot when the NES frame count first reaches K;
@@ -70,6 +70,7 @@ static void vchk_store(struct SM83Core* cpu, uint16_t a, int8_t v) {
 	vchk_store8(cpu, a, v);
 }
 
+static const char* model_arg = 0;
 int main(int argc, char** argv) {
 	if (argc < 4) { fprintf(stderr, "usage: sgbrun ROM FRAMES OUTPREFIX [--dmg] [--press K@F+H] [--shot F]\n"); return 2; }
 	int frames = atoi(argv[2]); const char* out = argv[3];
@@ -82,6 +83,7 @@ int main(int argc, char** argv) {
 	for (int i = 4; i < argc; i++) {
 		if (!strcmp(argv[i], "--dmg")) dmg = 1;
 		else if (!strcmp(argv[i], "--cgb")) dmg = 2;
+		else if (!strcmp(argv[i], "--model") && i + 1 < argc) { model_arg = argv[++i]; if (!dmg) dmg = 1; }   /* MGB (Pocket), SGB2, AGB (GBA), ... */
 		else if (!strcmp(argv[i], "--press") && i + 1 < argc && np < 256) {
 			const char* s = argv[++i]; const char* at = strchr(s, '@');
 			presses[np].keys = parse_keys(s);
@@ -104,7 +106,7 @@ int main(int argc, char** argv) {
 	if (!core || !core->init(core)) { fprintf(stderr, "no core for %s\n", argv[1]); return 1; }
 	mCoreInitConfig(core, NULL);
 	/* the model for every kind of cart header (a dual-mode cart would otherwise run as CGB) */
-	const char* model = dmg == 2 ? "CGB" : dmg ? "DMG" : "SGB";
+	const char* model = model_arg ? model_arg : dmg == 2 ? "CGB" : dmg ? "DMG" : "SGB";
 	mCoreConfigSetValue(&core->config, "gb.model", model);
 	mCoreConfigSetValue(&core->config, "sgb.model", model);
 	mCoreConfigSetValue(&core->config, "cgb.model", model);
@@ -188,8 +190,8 @@ int main(int argc, char** argv) {
 					static unsigned lyat = 0; if (!lyat) lyat = strtoul(getenv("SGBRUN_LYAT"), 0, 16);
 					uint32_t pc = 0; core->readRegister(core, "pc", &pc);
 					static int lbank = -2; if (lbank == -2) lbank = getenv("SGBRUN_BANK") ? (int) strtoul(getenv("SGBRUN_BANK"), 0, 16) : -1;   /* (SGBRUN_BANK=HEX: only in that ROM bank) */
-					if ((pc & 0xFFFF) == lyat && (lbank < 0 || lyat < 0x4000 || ((struct GB*) core->board)->memory.currentBank == lbank)) fprintf(stderr, "L %u %u %u\n", core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8,
-						core->rawRead8(core, 0xFF44, -1), core->rawRead8(core, 0xD832, 1) | core->rawRead8(core, 0xFF05, -1) << 8);
+					if ((pc & 0xFFFF) == lyat && (lbank < 0 || lyat < 0x4000 || ((struct GB*) core->board)->memory.currentBank == lbank)) { uint32_t ra = 0; core->readRegister(core, "a", &ra); fprintf(stderr, "L %u %u %u A %02X\n", core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8,
+						core->rawRead8(core, 0xFF44, -1), core->rawRead8(core, 0xD832, 1) | core->rawRead8(core, 0xFF05, -1) << 8, ra & 0xFF); }
 					if ((pc & 0xFFFF) == lyat && getenv("SGBRUN_LYMEM") && (lbank < 0 || lyat < 0x4000 || ((struct GB*) core->board)->memory.currentBank == lbank)) {   /* (+ 8 bytes there) */
 						unsigned a0 = strtoul(getenv("SGBRUN_LYMEM"), 0, 16); fprintf(stderr, "M");
 						for (unsigned a = a0; a < a0 + 8; a++) fprintf(stderr, " %02X", core->busRead8(core, a)); fprintf(stderr, "\n"); }

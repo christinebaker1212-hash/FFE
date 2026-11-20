@@ -21,8 +21,10 @@ State: `asm_sm83.make_rom` writes `NINTENDO_LOGO`. Verify against Pan Docs.
 
 1.2 **Checksums**: the header complement checksum at $014D (over $0134-$014C) and the
 16-bit global checksum at $014E-$014F must match the binary exactly.
-State: `make_rom` computes both; checked independently on the FF1 ROM (2026-11-20): both
-match. Still to do: add that check to the build itself.
+State: `make_rom` computes both. Since 2026-11-20 `build.check_header` recomputes them
+independently on every build and fails the build on a mismatch. It also checks the logo (by
+its SHA-1), the flags ($0143 $80, $0146 $03, $0147 $1B, $0149 $05) and the ROM size against
+$0148.
 
 1.3 **Hardware and memory flags** must match the real cartridge board:
 - cartridge type $0147 (MBC1/2/3/5, RTC, Rumble);
@@ -41,10 +43,10 @@ State, FF1:
 FF3 must use CGB $C0. Check every flag against the board the ROM is meant for.
 
 1.4 **Unused ROM space** is padded consistently ($FF or $00), with no leftover data.
-State: `make_rom` fills the image with $FF before the banks go in. Two things need checking:
-- the tail of each partly used bank;
-- the bank-ID bytes at $7FFE-$7FFF of the code/runtime banks. These are deliberate and must
-  be documented (4.3).
+State: `make_rom` fills the image with $FF and the assembler fills gaps between sections
+with $FF, so all unused space is $FF. The title is padded with $00, as the header format
+requires. The bank-ID bytes at $7FFE-$7FFF of the code/runtime banks are deliberate data
+(4.3).
 
 ## 2. Hardware and electrical safety
 
@@ -69,12 +71,18 @@ State:
 - CGB HDMA runs at LY 144-151.
 - OAM is written by DMA in vblank.
 
-Checker: `build/sgbrun` with env `SGBRUN_VCHK=1` wraps mGBA's CPU store function and counts
+Checker: `build/sgbrun` (rebuild after pulling) with env `SGBRUN_VCHK=1` wraps mGBA's CPU store function and counts
 every CPU write to VRAM in mode 3, or to OAM in mode 2/3, with the LCD on. Results
 (2026-11-20) over the whole 7650-wait battle script (new game, field, battle): 0 on DMG,
 0 on CGB, 0 on SGB (8711 waits).
 
-Still to do: the same over the field / shop / menu scripts, and on SameBoy.
+The same over 13 field / menu / shop scripts (covall.FIELD: dialogue, menu, items, magic,
+equip, status, shop_buy, shop_inn, minimap, puzzle, cure, lineup, bridge; input files from
+lagcheck, `tools/gb/vchkfield.py`): 0 on DMG, CGB and SGB.
+
+Not covered: SameBoy (its libretro core has no write hook). mGBA's PPU mode timing is close
+to hardware but not exact, so writes right at a mode boundary could still differ on real
+hardware.
 
 2.3 **Battery-backed save RAM protection**:
 - Disable cart RAM (write $00 to $0000-$1FFF on MBC carts) right after every read/write, so
@@ -124,8 +132,8 @@ code again. Boot switches the LCD off only in V-Blank, and skips that wait when 
 already off. On a Color, boot no longer toggles double speed when it is already on. Reset is
 never reached during a save copy, because no joypad read happens there.
 
-Tested in PyBoy, DMG and CGB: one reset; the frame counter starts over and the game runs on.
-The double-speed path on a real Color is still to test (PyBoy has no double speed).
+Tested in PyBoy (DMG, CGB) and in mGBA (DMG, SGB, CGB, AGB with double speed): the frame
+counter starts over and the game runs on. Real hardware is still to test.
 
 3.2 **Uninitialised memory**: WRAM, HRAM and save RAM hold random values at cold boot.
 Initialisation must clear all working memory and set all hardware registers explicitly.
@@ -152,6 +160,13 @@ cases of the attribute packet loops are guarded too.
 
 Test matrix before release: SameBoy and Gambatte (DMG, CGB) plus mGBA (SGB, CGB, GBA mode);
 real hardware where the owner can.
+
+State (2026-11-20, `sgbrun --model MGB|SGB2|AGB`): the battle script ran to frame wait 7300
+on Game Boy Pocket (MGB), SGB2 and Game Boy Advance (AGB: Color mode, double speed), with no
+VRAM/OAM violations and correct pictures (field, battle). DMG, CGB and SGB are covered by
+the regular checks. On a GBA, Color games show darker; FF1 does not brighten its palettes on
+a GBA (possible later). Soft reset was tested on DMG, SGB, CGB and AGB in mGBA: the frame
+counter starts over, and double speed stays on, on CGB/AGB.
 
 3.4 (GBA only) Sleep Mode and Game Link Cable disconnect handling: not applicable to our GB
 ROMs.

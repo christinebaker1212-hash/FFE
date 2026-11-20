@@ -1153,8 +1153,8 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   release build are done. Still open:
   - cart RAM stays enabled during play (impossible on DMG: NES work RAM and runtime data
     live there; the separate save bank is the protection, documented);
-  - checksum check in the build;
-  - VRAM/OAM check over the field / menu scripts and on SameBoy;
-  - Color double speed after a soft reset on real hardware;
-  - the hardware matrix (DMG, Pocket, SGB, CGB, GBA);
-  - the builder's text.
+  - real hardware tests (the emulator matrix DMG / Pocket / SGB / SGB2 / CGB / GBA passes in
+    mGBA, including soft reset; the VRAM/OAM checker shows 0 over the battle script and 13
+    field / menu / shop scripts; the build checks the header on every build);
+  - the builder's text;
+  - DMG lag on the world map / puzzle screens (seen in the field-script runs).

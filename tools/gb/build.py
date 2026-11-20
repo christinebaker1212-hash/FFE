@@ -256,6 +256,18 @@ def vwf_tables(prg, far_sym):
             + 'section bank HLE_BANK, $6000\nVW_SHR:\n%s\n' % rows(shr))
 
 
+def check_header(rom, rom_banks):
+    """Lot Check 1.x (docs/gb-release-checks.md), recomputed independently of make_rom: the logo
+    (by its SHA-1), the header and global checksums, the flags this game needs, and the size."""
+    assert hashlib.sha1(bytes(rom[0x104:0x134])).hexdigest() == '0745fdef34132d1b3d488cfbdf0379a39fd54b4c', 'logo'
+    x = 0
+    for i in range(0x134, 0x14D): x = (x - rom[i] - 1) & 0xFF
+    assert rom[0x14D] == x, 'header checksum'
+    assert (sum(rom) - rom[0x14E] - rom[0x14F]) & 0xFFFF == rom[0x14E] << 8 | rom[0x14F], 'global checksum'
+    assert (rom[0x143], rom[0x146], rom[0x147], rom[0x149]) == (0x80, 0x03, 0x1B, 0x05), 'flags'
+    assert len(rom) == rom_banks * 0x4000 == 0x8000 << rom[0x148], 'ROM size'
+
+
 def main():
     args = sys.argv[1:]
     gb = '--gb' in args
@@ -613,6 +625,7 @@ def main():
     while size < top: size *= 2
     rom = make_rom(r.banks, 'FF1 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x05, sgb=True,
                    cgb=0x80)                          # dual-mode: DMG / SGB / CGB
+    check_header(rom, size)
     open(opt['--out'], 'wb').write(rom)
     open(opt['--out'][:-3] + '.sym', 'w').write(r.sym_file())
     used0 = len(r.banks[0])
