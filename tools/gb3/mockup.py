@@ -103,6 +103,23 @@ class Screen:
         self.im.resize((160 * scale, 144 * scale), Image.NEAREST).save(path)
 
 
+def hand_img(nes):
+    """FF3's hand cursor, cut from the NES frame of the command window (no input from wait
+    2690 of the explore script on)"""
+    import cmpshots
+    from cmpshots import INPUTS, Waits
+    from cynes import NES
+    n = NES(nes); cmpshots.CUR_NES = n; W = Waits(n); k = 0; pad = INPUTS['explore']
+    w0 = n.ff3_waits                       # (the emulator's wait count is per process)
+    while n.ff3_waits - w0 < 2760:
+        n.controller = pad(k + 1) if n.ff3_waits - w0 < 2690 else 0
+        fr = n.step(1); k = W.update()
+    im = Image.fromarray(fr.copy()).convert('RGB')
+    # the hand over the command window's frame (GB-layout ROM: x 16-31, y 160-175), with the
+    # frame and window behind it (the mock-ups put it at the same place: GB column 0)
+    return im.crop((16, 160, 32, 176))
+
+
 def battlefield(fr, s, party_col=18):
     """enemy area (NES cols 2-19, rows 6-17) -> GB cols 0-17, rows 0-11; party column at
     GB col party_col"""
@@ -119,8 +136,102 @@ def battlefield(fr, s, party_col=18):
 PARTY = [('AAAAAA', 32, 32), ('AAAAAB', 26, 32), ('BBBBBC', 32, 32), ('CCCCCD', 32, 32)]
 
 
+FONT = 0x1B000                                   # English font in the NES ROM: tile N = code N
+
+
+class RomFont:
+    """text from the English NES ROM's own font (letters as tools/ff3/insert.py codes them,
+    [xx] = a code: the icons)"""
+    def __init__(self, nes):
+        self.d = open(nes, 'rb').read()
+        from importlib import util
+        spec = util.spec_from_file_location('ff3insert', os.path.join(HERE, '..', 'ff3', 'insert.py'))
+        self.enc = None
+        src = open(os.path.join(HERE, '..', 'ff3', 'insert.py')).read()
+        ns = {}
+        exec(src[src.index('ENC = {'):src.index('NEW_GLYPHS')], ns)
+        self.enc = ns['ENC']
+
+    def codes(self, s):
+        import re
+        out = []; i = 0
+        while i < len(s):
+            m = re.match(r'\[([0-9A-F]{2})\]', s[i:])
+            if m: out.append(int(m.group(1), 16)); i += 4; continue
+            out.append(self.enc[s[i]]); i += 1
+        return out
+
+    def draw(self, scr, c, r, s, ink):
+        for k, code in enumerate(self.codes(s)):
+            if code == 0xFF: continue
+            o = 16 + FONT + code * 16
+            for y in range(8):
+                p0, p1 = self.d[o + y], self.d[o + 8 + y]
+                for x in range(8):
+                    v = ((p0 >> (7 - x)) & 1) | (((p1 >> (7 - x)) & 1) << 1)
+                    if v == 3: scr.im.putpixel(((c + k) * 8 + x, r * 8 + y), ink)
+
+
+def item_rows(name, count):
+    """FF3's English battle item entry (13 wide, two rows): the name and ':nn' on the main row
+    when the name fits 9, else part 1 above, part 2 and ':nn' below"""
+    import re
+    vis = re.sub(r'\[..\]', 'I', name)
+    tail = ':%2d' % count
+    if len(vis) <= 9: return ['', ' ' + name.ljust(10 + len(name) - len(vis)) + tail]
+    words = name.split(' ')
+    a = words[0]; b = ' '.join(words[1:])
+    return [' ' + a, '  ' + b.ljust(9) + tail]
+
+
+ITEMS = [('Potion', 5), ('Phoenix Tail', 2), ('[6B]Longsword', 1), ('[61]Leather Armor', 1),
+         ('Antidote', 3), ('Eye Drops', 2), ("Maiden's Kiss", 1), ('Echo Herb', 1)]
+SPELLS = [('1', ['[75]Fire', '[75]Blizzard', '[75]Sleep'], '9/9'), ('2', ['[75]Thunder', '[75]Poison', '[75]Blind'], '7/7'),
+          ('3', ['[75]Fira', '[75]Blizzara', '[75]Thundara'], '5/5'), ('4', ['[75]Break', '[75]Blizzaga', '[75]Shade'], '2/2')]
+
+
+def lists(nes, outd, base, cmd, hand):
+    """battle Item / Magic list mock-ups: (1) the list in a tall window (GB rows 8-17; the
+    battlefield's NES rows 6-13 above), (2) in the 6-row window (GB rows 12-17)"""
+    F = RomFont(nes); T = Tiles(cmd); outs = []
+    def field(rows):
+        s = Screen(T); battlefield(base, s)
+        s.im.paste((0, 0, 0), (0, rows * 8, 160, 144))
+        return s
+    def item_page(s, top, n):
+        s.window(0, top, 15, 2 * n + 2)
+        s.window(15, top, 15, 2 * n + 2)         # (the next column, cut by the screen edge)
+        for i, (nm, ct) in enumerate(ITEMS[:n]):
+            for j, line in enumerate(item_rows(nm, ct)):
+                F.draw(s, 1, top + 1 + 2 * i + j, line, T.ink)
+        for i, (nm, ct) in enumerate(ITEMS[4:4 + n]):
+            F.draw(s, 16, top + 2 + 2 * i, ' ' + nm[:3], T.ink)
+    def magic_page(s, top, n):
+        s.window(0, top, 20, 2 * n + 2)
+        for i, (lv, sp, mp) in enumerate(SPELLS[:n]):
+            r = top + 1 + 2 * i
+            F.draw(s, 1, r, sp[0], T.ink); F.draw(s, 10, r, sp[1], T.ink)
+            F.draw(s, 1, r + 1, sp[2], T.ink); F.draw(s, 11, r + 1, 'L' + lv + ' ' + mp, T.ink)
+    s = field(8); item_page(s, 8, 4); s.save(os.path.join(outd, 'L1_items_tall.png')); outs.append('L1_items_tall.png')
+    s = field(12); item_page(s, 12, 2); s.save(os.path.join(outd, 'L2_items_short.png')); outs.append('L2_items_short.png')
+    s = field(8); magic_page(s, 8, 4); s.save(os.path.join(outd, 'L3_magic_tall.png')); outs.append('L3_magic_tall.png')
+    s = field(12); magic_page(s, 12, 2); s.save(os.path.join(outd, 'L4_magic_short.png')); outs.append('L4_magic_short.png')
+    ims = [Image.open(os.path.join(outd, o)) for o in outs]
+    sheet = Image.new('RGB', (480 * 2 + 16, 432 * 2 + 16), (40, 40, 40))
+    for i, im in enumerate(ims):
+        sheet.paste(im, ((i % 2) * 496, (i // 2) * 448))
+    sheet.save(os.path.join(outd, 'lists_sheet.png'))
+    print('wrote', outd, outs)
+
+
 def main():
     nes, outd = sys.argv[1], sys.argv[2]
+    if len(sys.argv) > 3 and sys.argv[3] == 'lists':
+        os.makedirs(outd, exist_ok=True)
+        fr = capture(nes, [8950, 9000])
+        hand = None                        # (the cursor: as in the command window, not drawn)
+        lists(nes, outd, fr[8950], fr[9000], hand)
+        return
     os.makedirs(outd, exist_ok=True)
     fr = capture(nes, [8950, 9000])
     base, cmd = fr[8950], fr[9000]
