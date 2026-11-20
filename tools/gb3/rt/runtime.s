@@ -118,6 +118,7 @@ cam_x:      ds 1
 cam_y:      ds 1
 bcam:       ds 1                            ; battle cameras on ($5806, tools/gb3/layout.py)
 spl_bank:   ds 1                            ;   then map rows SPL_ROW.. carry the split's BG table
+oam_page:   ds 1                            ; NES page of the last OAM DMA ($4014)
 spl_oam:    ds 1                            ; battle split: GB OAM Y of the split line (+16),
 spl_dy:     ds 1                            ;   window camera Y - battlefield camera Y
 ovr_st:     ds 1                            ; screen camera ($5802/$5803): 1 set, 2 shown (back to
@@ -1795,7 +1796,8 @@ rebank_rng: ld a, MAP_BANK                  ; HL .. DE (exclusive): bank bit B
 
 ; ------------------------------------------------------------------ OAM, joypad, APU
 rt_io_w4014:                                ; OAM DMA from NES page A -> GB shadow OAM
-            push af                         ;   (64 NES sprites -> up to 40 GB sprites in view)
+            ldh [oam_page], a               ;   (64 NES sprites -> up to 40 GB sprites in view)
+            push af
             push bc
             push de
             add a, high(NES_RAM)
@@ -1898,7 +1900,10 @@ rt_io_w4014:                                ; OAM DMA from NES page A -> GB shad
             ldh [oam_end], a
             ld h, d
             ld l, e
-            ld de, 4
+            cp 160                          ; (a sprite rejected last has left its Y in this
+            jr nc, .f0                      ;   slot: clear it)
+            ld [hl], 0
+.f0:        ld de, 4
 .fl:        ld a, l
             cp b
             jr nc, .end
@@ -2137,6 +2142,8 @@ rt_mmc_w5807:                               ; GB layout, battle: list window (A 
             ldh [rLYC], a
             ld a, l
             ldh [spl_dy], a
+            ldh a, [oam_page]               ; (the sprites again for the new split: FF3 does
+            call rt_io_w4014                ;   not send its sprite page every frame)
             pop af
             ret
 rt_mmc_w5808:

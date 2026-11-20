@@ -27,12 +27,14 @@ def main():
     ap.add_argument('--freeze', type=int, default=0, help='no input from this waited-for frame on')
     ap.add_argument('--press', default='', help='W:PAD:N,.. : pad PAD for N waited-for frames from W (after --freeze)')
     ap.add_argument('--poke', default='', help='W:ADDR=VAL,.. : write NES RAM / PRG-RAM at waited-for frame W (both sides)')
+    ap.add_argument('--pressf', default='', help='F:PAD:N,.. : pad PAD for N NES frames from frame F after the poke (for loops that poll without waiting)')
     ap.add_argument('--dump', help='directory: also the GB memory at each shot (sgbrun SGBRUN_DUMP)')
     a = ap.parse_args()
     ws = [int(x) for x in a.waits.split(',')]
     presses = [tuple(int(v, 0) for v in p.split(':')) for p in a.press.split(',') if p]
     poke = (int(a.poke.split(':')[0]), a.poke.split(':', 1)[1]) if a.poke else None
-    poke_k = None
+    poke_k = None; fpk = 0
+    pressf = [tuple(int(v, 0) for v in p.split(':')) for p in a.pressf.split(',') if p]
     from cynes import NES
     import cmpshots
     pad = INPUTS[a.input]
@@ -42,6 +44,10 @@ def main():
         n.controller = pad(k + 1) if not a.freeze or n.ff3_waits < a.freeze else 0
         for pw, pv, pn in presses:
             if pw <= n.ff3_waits < pw + pn: n.controller = pv
+        if poke_k is not None:
+            fpk += 1
+            for pf, pv, pn in pressf:
+                if pf <= fpk < pf + pn: n.controller = pv
         if poke and poke_k is None and n.ff3_waits >= poke[0]:
             import numpy as np
             st = bytearray(n.save())
