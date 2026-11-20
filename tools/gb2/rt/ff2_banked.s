@@ -2027,8 +2027,7 @@ cgb_attr_all_b:
 
 ; b11:A43A "draw battle character sprite" (every battle frame, per party member X): 6 OAM
 ; entries (24 bytes at ($2C + 2X)) from the member's pose data at $7900 + 24 * pose (cart
-; RAM). FF2's steps: both multiplies through hle_mul8_b (incoming / outgoing carries), $00-$0F
-; as the NES leaves them, the pose bytes and OAM bytes read / written through GB pointers
+; RAM). FF2's steps ($00-$0F as the NES leaves them; the two multiplies as products, see .e8), the pose bytes and OAM bytes read / written through GB pointers
 ; (other addresses byte by byte through nes_rd / nes_wr). Exit as the NES: early ($7BA2,X
 ; bit 7 set) A, N = 1, Z = 0, carry and V kept; else Y = $18, Z = 1, C = 1, N = 0, V = bit 6 of
 ; $06, fill (no pose) A = $F0, X = $04, else A = the last byte, X = 6.
@@ -2061,15 +2060,18 @@ hle_bspr_b:
             ld [NES_RAM + $06], a
             and $7F
             ld [NES_RAM + $07], a
-            ld e, 8                         ; X = 8 / 6 (CMP #3), A = $04: multiply
-            cp 3
-            jr c, .e8
-            ld e, 6
-.e8:        ccf
-            ld a, [NES_RAM + $04]
-            call hle_mul8_b
-            ld a, [NES_RAM + $02]
-            ld [NES_RAM + $08], a
+            cp 3                            ; $08 = low($04 * (8 / 6 by CMP #3)): FF2's
+            ld a, [NES_RAM + $04]           ;   multiply leaves carry 0 ($02 starts at 0, none
+            jr nc, .e6                      ;   of its bits shift out in 8 steps), and $00-$03
+            add a, a                        ;   are overwritten below on every path that
+            add a, a                        ;   multiplies, so only the products count
+            add a, a                        ; ($07 < 3: x 8)
+            jr .e8
+.e6:        add a, a                        ; (x 6 = x 2 + x 4)
+            ld b, a
+            add a, a
+            add a, b
+.e8:        ld [NES_RAM + $08], a
             ld a, [NES_RAM + $07]           ; LDA #0 / LDX $07 / BEQ
             ld b, a
             inc a
@@ -2102,13 +2104,19 @@ hle_bspr_b:
             ld a, b
             jr z, .m2
             add a, 3
-.m2:        ld e, $18                       ; LDX #$18 / multiply
-            call hle_mul8_b
-            ld a, [NES_RAM + $02]           ; $00 / $01 = $7900 + the product (+ carry)
-            adc a, 0
+.m2:        ld l, a                         ; $00 / $01 = $7900 + A * 24 (LDX #$18 / multiply /
+            ld h, 0                         ;   ADC with the multiply's carry 0)
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, de
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, l
             ld [NES_RAM + $00], a
-            ld a, [NES_RAM + $03]
-            adc a, $79
+            ld a, h
+            add a, $79
             ld [NES_RAM + $01], a
             ld a, [NES_RAM + $04]           ; $02 / $03 = ($2C + 2X)
             add a, a
@@ -2439,6 +2447,57 @@ bs_put:     push hl
             pop bc
             pop af
             pop hl
+            ret
+
+; b11:9D82-9D8C (battle: the 32 palette bytes from $79A8 every other frame): LDA $79A8,X /
+; STA $2007 / INX / CPX #$20 / BNE. An unchanged palette entry only moves the PPU address;
+; others (or a non-palette address) through rt_ppu_w7. Exit: A = the last byte, X = $20,
+; N = 0, Z = 1, C = 1; Y kept.
+hle_palup_b:
+            push bc
+.lp:        ld hl, $B9A8
+            ld a, e
+            add a, l
+            ld l, a
+            jr nc, .h
+            inc h
+.h:         ld a, [hl]
+            ldh [tmp_lo], a
+            ld d, a
+            ldh a, [ppu_vh]
+            cp $3F
+            jr nz, .gen
+            ldh a, [ppu_vl]                 ; palette index ($10 / $14 / $18 / $1C = $00 / ..)
+            and $1F
+            ld l, a
+            and $13
+            cp $10
+            ld a, l
+            jr nz, .pn
+            and $0F
+.pn:        ld l, a
+            ld h, high(PAL_SH)
+            ld a, d
+            and $3F
+            cp [hl]
+            jr nz, .gen
+            call ppu_inc
+            jr .nx
+.gen:       ld a, d
+            call rt_ppu_w7
+.nx:        inc e
+            ld a, e
+            cp $20
+            jr nz, .lp
+            pop bc
+            ld d, 0
+            xor a
+            ldh [nzv], a
+            ldh a, [tmp_lo]
+            scf
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1, C = 1
             ret
 
 section bank HLE_BANK, $7F00

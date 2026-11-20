@@ -607,6 +607,10 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   Door loads DMG +56 -> +47, CGB +28 -> +24; battle load DMG +41, CGB +25. Random 1: DMG
   +0.9%, CGB -2.0%; RAM identical; DMG / CGB shots: background identical, a few sprites one
   step apart (frame timing).
+- Battle party entry: `hle_bspr` computes its two products directly (FF2's multiply always
+  leaves carry 0 and the routine overwrites $00-$03 afterwards); idiom b11:9D82 (the 32
+  battle palette bytes every other frame) -> `hle_palup` (unchanged entries only move the
+  PPU address). Window +16 -> +11. RAM identical (random 1 DMG / CGB, random 2, form 40).
 - Status of the owner's three (DMG, random 1): overworld walking / sailing at parity (walk
   scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
   remaining: battle entry (load +19 net, intro +39 / +32), door loads (+56 single wait,

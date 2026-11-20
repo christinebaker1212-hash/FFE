@@ -91,7 +91,9 @@ class FF2:
               # fix:E69E-E6A5 LDA ($80),Y / STA $2007 / INY / BNE: a graphics page (rt/ff2.s)
               ('fix', 0xE69E): ('hle_chrpg', 0xE6A6, 'NZ'),
               # b11:9DB1-9DB8 LDA ($02),Y / STA $2007 / INY / BPL: battle intro tiles (rt/ff2.s)
-              ('b11', 0x9DB1): ('hle_chr128', 0x9DB9, 'NZ')}
+              ('b11', 0x9DB1): ('hle_chr128', 0x9DB9, 'NZ'),
+              # b11:9D82-9D8C LDA $79A8,X / STA $2007 / INX / CPX #$20 / BNE: battle palettes
+              ('b11', 0x9D82): ('hle_palup', 0x9D8D, 'NZC')}
     # battle NMI handlers (run by rt_nmi_run through the dynamic table; RTI = ret)
     nmi_handlers = [('b12', 0x9A79), ('b05', 0xA9A2)]
     idiom_code = {('fix', 0xFA91): bytes.fromhex('a9fa48a999486c4000'),
@@ -101,7 +103,8 @@ class FF2:
                   ('b12', 0xA990): bytes.fromhex('a5acd0fc'),
                   ('fix', 0xD93B): bytes.fromhex('a20acad0fda9108d0120'),
                   ('fix', 0xE69E): bytes.fromhex('b1808d0720c8d0f8'),
-                  ('b11', 0x9DB1): bytes.fromhex('b1028d0720c810f8')}
+                  ('b11', 0x9DB1): bytes.fromhex('b1028d0720c810f8'),
+                  ('b11', 0x9D82): bytes.fromhex('bda8798d0720e8e020d0f5')}
     skip = [('fix', 0xFA2C, 0xFA48), ('fix', 0xFEA1, 0xFEAD), ('fix', 0xFEAF, 0xFEBF)]   # waits (but their entries) + NMI return stubs
 
 
