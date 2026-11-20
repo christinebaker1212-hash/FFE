@@ -596,15 +596,18 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
   remaining: battle entry (load +19 net, intro +39 / +32), door loads (+56 single wait,
   CGB +37), menu screens (+10..+28).
-- Next (step 1, third part): the remaining field costs (dialogue window: text printer
-  fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
-  then screen loads, music, sprites. Earlier plan text:
-  native field drawing that knows each metatile's palette
-  (fix:D5BA builds the row / column buffer $0780-$07CF with the metatile attributes at
-  $07C0): draw the buffer natively into the GB map with tiles pre-shaded per palette (a
-  second GB tile for the tiles used with two palettes, in free BG slots), and the dialogue
-  window's tiles fixed to the window palette, so neither path needs per-write cell lookups;
-  then the text printer. Select menu with suspend (design with the owner).
+- Next (speed, state 2026-11-20 after the steps above; DMG, random 1 +0.8%, CGB -2.0%):
+  1. Battle entry on DMG: intro ~1.25 GB frames per NES frame (+39 / +32 per 60 waits):
+     the tile copy from cart RAM (~14%), DMG re-coding of the dissolving enemy tiles (~20%,
+     mostly in spare time now), the game's own mask loop b11:9FE2 (~12%); the battle load
+     +19 net (CGB: load +28, intro at parity).
+  2. Door loads (one wait, LCD off): DMG +56 (scan 15%, map rows `mu_write` + `own_set`
+     18%, CHR copies 13%, indirect ROM reads 14%), CGB +28. Candidates: a faster
+     `own_set` in the HLE bank for `mu_write`, the indirect-read glue (translator: banked
+     pointers read directly), skip the DMG scan's parked check when nothing is parked.
+  3. Menus (+10..+28 windows), boot / title (+44, +39, one-time).
+  4. Then music, sprites (docs/gb-native-presentation.md order). Select menu with suspend
+     (design with the owner). Known DMG look issue: the black castle floor ($0x rule).
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
