@@ -1021,6 +1021,14 @@ def dialogue(r):
         assert all(ins.vlen(l) <= width for l in out), out
         return out
     ins.flow = flow_gb
+    _load = ins.load_rows
+    def load_gb(name):
+        rows = _load(name)
+        if name == 't8200':
+            for e in rows:
+                if e['id'] in MENU_TEXT: e['en'] = MENU_TEXT[e['id']]
+        return rows
+    ins.load_rows = load_gb
     ins.layout.__defaults__ = (DLG_W_GB,)
     rep = []
     ins.put_tables(r.d, rep)
@@ -1043,6 +1051,309 @@ def dialogue(r):
     r.patch(0x7E, 0xC9C4, 'A9 07 85 66 A2 0E', 'A9 05 85 66 A2 0B', 'close lower windows: rows 12-21')
 
 
+# field main menu (owner, 2026-11-20: mock-up N5B): party window on the left (GB cols 0-12),
+# one block per member: name + level / job (condensed) / HP (green) / MP of the 8 levels, the
+# member's lines pulled up 0 / 1 / 1 / 2 px and 3 px between members; commands top right, Gil
+# and Capacity in 4-px digits below them, the guest's name at the bottom right. NES side (this
+# ROM): camera (24, 0); party window (3, 0, 13, 22) with a blank row after each member (NES
+# rows 1-4 + 5i, spacer 5 + 5i); the right windows at NES cols 16-22. GB side (runtime, $5808 =
+# menu mode): the right windows on the GB window layer, the party window's pixel offsets by
+# SCY changes at fixed lines, the HP rows' palettes per tile ($5809 = member * 4 + palette;
+# FF3 colours them by attribute quadrant, which here would also take the frame or the job /
+# MP line). Text: one row per line ({0E}: the English one-row mode).
+MENU_WINDOWS = {0: (3, 0, 13, 22), 1: (16, 0, 7, 9), 2: (16, 13, 7, 5), 3: (16, 9, 7, 4)}
+JBGO, JBTAIL = 0x5D4E, 0x5D60           # ExRAM (tools/ff3/insert.py): bank 88 call / its return
+
+
+def menu_party_text():
+    out = ['{0E}']
+    for i in range(4):
+        c = '%02X' % (0x10 + i)
+        mp = ''.join('{14:%02X}{%s:%02X}' % (k + 1, c, 0x80 + k) for k in (3, 2, 1, 0))
+        mp += ''.join('{14:%02X}{%s:%02X}' % (k + 2, c, 0x80 + k) for k in (7, 6, 5, 4))
+        out.append('{%s:02}{14:07}{%s:00}\n{%s:01}\n{14:02}{%s:30}/{%s:31}{14:00}[77][79]\n'
+                   '%s{14:00}[78][79]' % (c, c, c, c, c, mp))
+        if i < 3: out.append('\n\n')
+    return ''.join(out)
+
+
+MENU_TEXT = {   # t8200 ids (GB layout; the MP of a level: 2 cells "_n", written right to left)
+    0x30: menu_party_text(),
+    0x31: '{0E}{15:00}Item\n{15:00}Magic\n{15:00}Equip\n{15:00}[E1][E2][E3][E4]\n{15:00}Order\n'
+          '{15:00}Job\n{15:00}Save',
+    0x32: '{0E}{07}',
+    0x33: '{0E}{14:01}[7B][7C][7D][7E]\n{14:03}[7F][CA]',   # (tiles drawn by SMALLNUM)
+}
+
+MENU_HP_SRC = '''
+    org $95B2
+hppal:              ; (was: HP text attributes) menu mode on; per member its HP palette:
+    lda #1          ;   0 green, 1 orange (status), 2 pink (dead / stone)
+    sta $5808
+    ldx #0
+    ldy #0
+.m:
+    lda $6102,x
+    and #$FE
+    beq .p
+    and #$C0
+    cmp #$01
+    lda #2
+    bcs .p
+    lda #1
+.p:
+    sta $80
+    tya
+    ora $80
+    sta $5809
+    iny
+    iny
+    iny
+    iny
+    txa
+    clc
+    adc #$40
+    tax
+    bne .m
+    rts
+mnuoff:             ; close menu: the GB's menu mode off
+    lda #0
+    sta $5808
+    jmp $C486       ; clear oam data (the call this replaces)
+'''
+
+SMALLNUM_SRC = '''
+SNB = $5EB4         ; ExRAM (battle only: the message window's save area): 6 tiles' plane 0
+DG = $5EE4          ; 12 characters: Gil (7 digits, G), Capacity (3 digits, C)
+    org $85E0
+disp2:              ; bank 88 $8000 (JOBF dispatch): Y = 15 -> smallnum
+    cpy #15
+    bne .o
+    jmp smallnum
+.o:
+    cpy #12
+    bne .z
+    jmp $8004
+.z:
+    jmp $8007
+smallnum:           ; Gil and Capacity in 4-px digits -> tiles $7B-$7F, $CA (main menu)
+    lda $601C
+    sta $80
+    lda $601D
+    sta $81
+    lda $601E
+    sta $82
+    lda #0
+    sta $85
+    tax
+    jsr conv
+    lda $601B
+    sta $80
+    lda #0
+    sta $81
+    sta $82
+    lda #8
+    sta $85
+    ldx #4
+    jsr conv
+    lda #11
+    sta DG+7
+    lda #12
+    sta DG+11
+    ldy #0
+    lda #6
+    sta $87
+    jsr blank
+    ldy #8
+    lda #10
+    sta $87
+    jsr blank
+    lda #0
+    sta $88
+    tax
+.t:
+    ldy $88
+    lda DG,y
+    asl a
+    asl a
+    asl a
+    sta $83
+    lda DG+1,y
+    asl a
+    asl a
+    asl a
+    sta $84
+    lda #8
+    sta $85
+.r:
+    ldy $84
+    lda GL,y
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    sta $86
+    ldy $83
+    lda GL,y
+    ora $86
+    sta SNB,x
+    inx
+    inc $83
+    inc $84
+    dec $85
+    bne .r
+    inc $88
+    inc $88
+    lda $88
+    cmp #12
+    bcc .t
+    jsr $FF00       ; wait for vblank
+    lda $FF         ; (increment 1)
+    and #$FB
+    sta $2000
+    lda $2002
+    lda #$07
+    sta $2006
+    lda #$B0
+    sta $2006
+    ldx #0
+.u:
+    ldy #8
+.p0:
+    lda SNB,x
+    sta $2007
+    inx
+    dey
+    bne .p0
+    ldy #8
+    lda #$FF
+.p1:
+    sta $2007
+    dey
+    bne .p1
+    cpx #40
+    bcc .u
+    lda #$0C
+    sta $2006
+    lda #$A0
+    sta $2006
+    ldy #8
+.q0:
+    lda SNB,x
+    sta $2007
+    inx
+    dey
+    bne .q0
+    ldy #8
+    lda #$FF
+.q1:
+    sta $2007
+    dey
+    bne .q1
+    lda $FF         ; (after the address writes: they set the scroll's nametable bits)
+    sta $2000
+    lda #0
+    sta $2005
+    sta $2005
+    jmp JBTAIL
+conv:               ; $80-$82 -> digits from power X (0: 10^6) on, to DG + $85
+    lda #0
+    sta $86
+.s:
+    lda $80
+    sec
+    sbc P0,x
+    sta $83
+    lda $81
+    sbc P1,x
+    sta $84
+    lda $82
+    sbc P2,x
+    bcc .n
+    sta $82
+    lda $84
+    sta $81
+    lda $83
+    sta $80
+    inc $86
+    bne .s
+.n:
+    ldy $85
+    lda $86
+    sta DG,y
+    inc $85
+    inx
+    cpx #7
+    bcc conv
+    rts
+blank:              ; leading zeros DG + Y .. $87 - 1 -> blank (10)
+    lda DG,y
+    bne .x
+    lda #10
+    sta DG,y
+    iny
+    cpy $87
+    bcc blank
+.x:
+    rts
+P0:
+    .db $40, $A0, $10, $E8, $64, $0A, $01
+P1:
+    .db $42, $86, $27, $03, $00, $00, $00
+P2:
+    .db $0F, $01, $00, $00, $00, $00, $00
+GL:
+'''
+
+
+SMALL_GLYPHS = {   # 3 x 7 (owner-approved mock-up N5B: tools/gb3/mockup.py DIG3)
+    '0': ["###", "#.#", "#.#", "#.#", "#.#", "#.#", "###"], '1': [".#.", "##.", ".#.", ".#.", ".#.", ".#.", "###"],
+    '2': ["###", "..#", "..#", "###", "#..", "#..", "###"], '3': ["###", "..#", "..#", ".##", "..#", "..#", "###"],
+    '4': ["#.#", "#.#", "#.#", "###", "..#", "..#", "..#"], '5': ["###", "#..", "#..", "###", "..#", "..#", "###"],
+    '6': ["###", "#..", "#..", "###", "#.#", "#.#", "###"], '7': ["###", "..#", "..#", ".#.", ".#.", ".#.", ".#."],
+    '8': ["###", "#.#", "#.#", "###", "#.#", "#.#", "###"], '9': ["###", "#.#", "#.#", "###", "..#", "..#", "###"],
+    ' ': ["..."] * 7, 'G': ["###", "#..", "#..", "#.#", "#.#", "#.#", "###"],
+    'C': ["###", "#..", "#..", "#..", "#..", "#..", "###"]}
+
+
+def small_glyph_table():
+    out = []
+    for ch in '0123456789 GC':
+        rows = [sum(0x80 >> x for x, v in enumerate(row) if v == '#') for row in SMALL_GLYPHS[ch]] + [0]
+        out.append('    .db ' + ', '.join('$%02X' % b for b in rows))
+    return '\n'.join(out) + '\n'
+
+
+def main_menu(r):
+    B3C, B3D, B88 = 0x3C, 0x3D, 88
+    j = lambda a: '%02X %02X' % (a & 0xFF, a >> 8)
+    # windows (bank 61 $AAF7 x, $AB1D y, $AB43 w, $AB69 h; ids 0-4 of the main menu)
+    olds = {0xAAF7: '0117170911', 0xAB1D: '0101121a1a', 0xAB43: '160808080c', 0xAB69: '1b11090303'}
+    for k, t in enumerate((0xAAF7, 0xAB1D, 0xAB43, 0xAB69)):
+        b = bytearray.fromhex(olds[t])
+        for w, rect in MENU_WINDOWS.items(): b[w] = rect[k]
+        r.patch(B3D, t, olds[t], b.hex(), 'main menu windows (GB layout)')
+    hp = r.module(MENU_HP_SRC)
+    assert hp['org'] + len(hp['bytes']) <= 0x960C + 16
+    o = r.off(B3C, 0x95B2)
+    r.d[o:o + len(hp['bytes'])] = hp['bytes']
+    r.mods.append(dict(hp, where=(B3C, 0x95B2 & 0x1FFF)))
+    r.log.append((B3C, 0x95B2, 'main menu: HP palettes per member for the GB ($5809), menu mode on'))
+    r.patch(B3D, 0xA685, '20 86 C4', '20 ' + j(hp['labels']['mnuoff']), 'close menu: GB menu mode off')
+    sm = r.module(SMALLNUM_SRC + small_glyph_table(), syms={'JBTAIL': JBTAIL})
+    o = r.off(B88, sm['org'])
+    assert sm['org'] + len(sm['bytes']) <= 0xA000
+    assert set(r.d[o:o + len(sm['bytes'])]) == {0xFF}
+    r.d[o:o + len(sm['bytes'])] = sm['bytes']
+    r.mods.append(dict(sm, where=(B88, sm['org'] & 0x1FFF)))
+    r.patch(B88, 0x8000, 'C0 0C D0', '4C ' + j(sm['labels']['disp2']), 'job bank dispatch: smallnum (Y = 15)')
+    r.patch(B3D, 0xA589, 'A2 03 A9 33 20 66 A6 A2 04 A9 34 20 66 A6',
+            'A2 03 A9 33 20 66 A6 A0 0F 20 ' + j(JBGO) + ' EA EA', 'main menu: Gil + Capacity window, 4-px digits')
+    for a in (0xA5AC, 0xA6D0):
+        r.patch(B3D, a, 'A9 00 20 00 80 A9 00 20 CB 80', 'A9 00 EA EA EA A9 00 EA EA EA',
+                'main menu: no class sprites, no guest sprite')
+
+
 def apply(data):
     """English NES ROM bytes -> (GB-layout ROM bytes, code modules for tools/gb3/ff3src.py)"""
     r = Rom(data)
@@ -1050,6 +1361,7 @@ def apply(data):
     battle_messages(r)
     magic_rows(r)
     field(r)
+    main_menu(r)
     dialogue(r)
     return bytes(r.d), r.mods, r.log
 
