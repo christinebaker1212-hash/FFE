@@ -556,6 +556,14 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   BNE, the map graphics pages) -> `hle_chrpg`, through the tile copier of `hle_ppucopy`
   (now `cp_core`, pointer address as a parameter). Door load DMG 100 -> 57 GB frames, CGB
   58 -> 37 (NES 10). Random 1, 30000: DMG +4.3% -> +2.4%, CGB -0.8% -> -1.6%; RAM identical.
+- DMG LCD-on scan (`dmg_scan_all`, every map cell's palette after drawing with the LCD off)
+  moved to the HLE bank and rewritten (`dmg_scan_all_b`: per-row set-up, bit masks from a
+  page-aligned table `BITS8` at $7F00, REF_BM only in the first pass, PAL_USED only in the
+  view pass; same end state): the wait after a door +27 -> +19 on DMG; DMG shots
+  pixel-identical. Fixed in `mu_write` (native map drawer, LCD on): a tile whose palette
+  the tileset fixed skipped the parked check, so tiles parked when the LCD went on stayed
+  uncoded when the rows were drawn later. (The black castle floor on DMG is the known
+  "darkest group of `$0x` colours is black" rule, not this.) DMG +2.1%; RAM identical.
 - Next (step 1, third part): the remaining field costs (dialogue window: text printer
   fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
   then screen loads, music, sprites. Earlier plan text:
