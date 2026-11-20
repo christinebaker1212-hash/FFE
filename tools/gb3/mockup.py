@@ -107,7 +107,13 @@ def battlefield(fr, s, party_col=18):
     """enemy area (NES cols 2-19, rows 6-17) -> GB cols 0-17, rows 0-11; party column at
     GB col party_col"""
     s.paste(fr.crop(ENEMY), 0, 0)
-    s.paste(fr.crop((PARTY_X, 48, PARTY_X + 16, 144)), party_col * 8, 0)
+    # party: NES members at y 45 + 28i (23 px tall): on the GB 24 px apart (owner: all four
+    # fully visible), from y 0
+    for i in range(4):
+        y0 = 45 + 28 * i
+        xs = [x for x in range(176, 240) for y in range(y0, y0 + 23) if sum(fr.getpixel((x, y))) > 60]
+        x0 = min(xs) if xs else PARTY_X           # (a member stepped forward: crop where it is)
+        s.paste(fr.crop((x0, y0, x0 + 16, y0 + 24)), party_col * 8, 24 * i)
 
 
 PARTY = [('AAAAAA', 32, 32), ('AAAAAB', 26, 32), ('BBBBBC', 32, 32), ('CCCCCD', 32, 32)]
@@ -162,6 +168,16 @@ def main():
     for i, (nm, hp, mx) in enumerate(PARTY):
         s.text(10, 13 + i, '%-6s%3d' % (nm, hp))
     s.save(os.path.join(outd, 'T1_target.png')); outs.append('T1_target.png')
+
+    # A-style targeting: enemy names over the party window's left part
+    s = Screen(T); battlefield(base, s)
+    s.window(0, 12, 20, 6)
+    for i, (nm, hp, mx) in enumerate(PARTY):
+        s.text(1, 13 + i, '%-6s %4d/%4d' % (nm, hp, mx))
+    s.window(0, 12, 9, 6)
+    s.text(1, 13, 'Goblin')
+    s.save(os.path.join(outd, 'A3_target.png')); outs.append('A3_target.png')
+    outs = ['A1_party.png', 'A2_command.png', 'A3_target.png', 'M1_message.png']
 
     # sheet: the NES frame and the mock-ups side by side (x2)
     ims = [Image.open(os.path.join(outd, o)).resize((320, 288), Image.NEAREST) for o in outs]

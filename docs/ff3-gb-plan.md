@@ -120,3 +120,12 @@ NES "GB-layout" ROM. Mock-ups (PNG, real font and graphics from the user's ROM, 
    (no FORMATION entry: FF3's main menu already has Order). **B + Select** changes the
    walking party member (the Famicom's Select action, `$F72C`).
 2. **Approach:** approved as in §3 ("go ahead with the plan").
+3. **Battle layout (2026-11-20, from the mock-ups `tools/gb3/mockup.py`):** the enemy area
+   unchanged in the top 12 rows (NES cols 2-19, rows 6-17: every formation fits); the party
+   column at the right edge, **all four members fully visible** (24 px apart instead of 28);
+   **layout A**: a full-width party window (name, HP current/max per line) in the bottom 6
+   rows, the command window and the enemy names (while targeting) opening over its left part
+   (9 columns); **messages in one full-width window** over the party window ("attacker →
+   target", hits, results); **shorter step forward** (half FF3's distance: the acting member
+   stays in the party column, no overlap with the enemies).
+
