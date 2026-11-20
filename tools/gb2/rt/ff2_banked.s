@@ -1954,7 +1954,34 @@ cgb_attr_all_b:
             srl a
             add a, $98
             ld h, a
-            ld e, 0
+            ld a, [SC_OW]                   ; no cell of the row nametable 1's, no override:
+            ld b, a                         ;   each attribute byte gives 4 cells at once
+            ld a, [OVR_ON]
+            or b
+            jr nz, .slow
+            ld a, [SC_AB]
+            ld c, a
+            ld b, high(NT_SH) + 3
+            ld e, 8
+.fa:        ld a, [bc]
+            inc c
+            bit 1, d
+            jr z, .ft
+            swap a
+.ft:        push af
+            and 3
+            ld [hl+], a
+            ld [hl+], a
+            pop af
+            rrca
+            rrca
+            and 3
+            ld [hl+], a
+            ld [hl+], a
+            dec e
+            jr nz, .fa
+            jr .rn
+.slow:      ld e, 0
 .c:         push hl
             ld b, 0                         ; B = 4 for a cell nametable 1 owns
             ld a, [SC_OW]
@@ -2014,7 +2041,7 @@ cgb_attr_all_b:
             inc e
             bit 5, e
             jr z, .c
-            inc d
+.rn:        inc d
             ld a, d
             cp 30
             jr nz, .r

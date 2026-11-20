@@ -625,13 +625,14 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
   remaining: battle entry (load +19 net, intro +39 / +32), door loads (+56 single wait,
   CGB +37), menu screens (+10..+28).
-- Next (speed, state 2026-11-20 after the steps above; DMG, random 1 +0.9%, CGB -2.0%):
-  1. Battle entry on DMG: windows +37 / +16 (load +41 single wait, the dissolve now keeps
-     pace, the party's entry ~+16); CGB load +25.
-  2. Door loads (one wait, LCD off): DMG +47, CGB +24: spread over the scan, the game's map
-     code (decompression b00:9D9E-9E47, buffers fix:D28D-D2FB / D5E0-D61C), indirect reads
-     through the generic helpers, CHR copies. Next big step would be a native map loader.
-  3. Menus (+10..+28 windows), boot / title (+44, +39, one-time).
+- Next (speed, state 2026-11-20 after the steps above; DMG, random 1 +0.5%, CGB -2.2%):
+  1. Battle: frames at parity on DMG; entry windows +36 / +11 (load +42 single wait, then
+     the party entry); a one-off +7 at the first turn's set-up. CGB load +25.
+  2. Door loads (one wait, LCD off): DMG +44, CGB +22: the DMG scan ~17% (field tiles all
+     differ, ~80 instructions per cell), the CHR copy ~13% (near its minimum), map cells
+     ~11%, the game's map code and indirect reads; CGB: tile copy, attribute rebuild (field
+     rows have nametable-1 cells), stage_sync. Next big step would be a native map loader.
+  3. Menus: opening +20, other screens +10..+20; boot / title (+44, +38, one-time).
   4. Then music, sprites (docs/gb-native-presentation.md order). Select menu with suspend
      (design with the owner). Known DMG look issue: the black castle floor ($0x rule).
 
