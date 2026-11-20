@@ -316,6 +316,10 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   layout through the field camera (mock-ups next).
 
 ## Known open items
+- **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3 known failures: cart
+  RAM enabled for good at boot (NES PRG-RAM lives in it), no soft reset, no Color-only warning
+  screen on a monochrome Game Boy (the boot halts), test hooks in the binary (`TEST_PAD`,
+  `rst $38` trap); the rest to verify item by item.
 - Field: the top screen row can show stale map rows (GB map rows 30-31) at the vertical wrap
   (NES 240 lines, GB map 256): FF1 solved it with an LYC split (pre-existing; seen as a black
   band or old menu cells at the top after a menu).

@@ -85,6 +85,14 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   and compare emulated RAM frame by frame (as in `tools/split/equiv.py`), plus
   screenshots of every re-laid-out screen.
 
+## Release requirements (owner's decision, 2026-11-20 — binding, all three ports)
+**No GB release (FF1, FF2 or FF3) until every item of `docs/gb-release-checklist.md` passes**:
+Nintendo of America Lot Check standards (header / logo / checksums / flags, LCD off only in
+V-Blank, VRAM / OAM timing, SRAM enabled only around access, save validation with an on-screen
+message, soft reset A+B+Start+Select, no assumed RAM contents, cross-hardware behaviour and the
+Color-only warning screen for FF3, Nintendo hardware names in text, meaningful CGB colour, no
+undisclosed debug code). Record each item's result in the port's status doc.
+
 ## Keeping this file current
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
@@ -830,6 +838,9 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   `docs/gb-handoff.md` "Speed work". checkall not re-run since the last coverage refresh.
 
 ## Remaining
+- **Before any release (all ports): `docs/gb-release-checklist.md`** (Lot Check standards;
+  known failures: SRAM kept enabled, no soft reset, test hooks in the binary, FF3 without the
+  Color-only warning screen).
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette
   steps; names up to 6 letters; music voices vs the NSF (sndcmp.py); then the owner's
