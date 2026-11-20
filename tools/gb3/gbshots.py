@@ -71,7 +71,7 @@ def main():
                '--cgb', '--padfile', pads]
         for w in ws: cmd += ['--nshot', str(clock[-w])]
         if poke: cmd += ['--poke', str(poke_k + 1), poke[1]]
-        env = dict(os.environ, SGBRUN_CLOCK=cf)
+        env = dict(os.environ, SGBRUN_CLOCK=cf, GB_CNT='CD80', GB_PRG='ff3')
         if a.dump: env['SGBRUN_DUMP'] = '1'
         res = subprocess.run(cmd, env=env, capture_output=True, text=True)
         if os.environ.get('GBSHOTS_LOG'):

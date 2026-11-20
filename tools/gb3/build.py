@@ -1,6 +1,9 @@
 """Build the Game Boy Color FF3 English ROM from the user's own NES ROM.
 
-usage: build.py ["Final Fantasy III (Japan).nes"] [--gb] [--nes EN.nes] [--cov DIR] [--out ROM]
+usage: build.py ["Final Fantasy III (Japan).nes"] [--gb] [--release] [--nes EN.nes] [--cov DIR] [--out ROM]
+
+--release: no test hooks (the test-pad input mode), cart RAM 8 KB in the header; check with
+tools/gb/lotcheck.py ROM --game ff3 --release (docs/gb-release-checklist.md)
 
 --gb: the GB screen layouts (tools/gb3/layout.py on the English NES ROM = build/ff3_gb.nes,
 source base build/ff3/src_gb, output build/ff3_gb.gbc)
@@ -56,33 +59,56 @@ def source_base(src, nes, srcdir, gb=False):
                                      *(['--gb'] if gb else [])), cwd=ROOT)
 
 
-DMG_MSG = ['This Game Pak', 'is designed only', 'for use with the', 'Game Boy Color', 'system.']
+DMG_MSG = ['This Game Pak', 'is designed only', 'for use with the', 'Game Boy Color™', 'system.']
+TM = ['####...#', '.#.##.##', '.#.#.#.#', '.#.#...#', '........', '........', '........', '........']
+SAVE_MSG = ['Save data error', '', '', '', '', '', 'Damaged save files', 'will be erased.',
+            '', '', 'Press the A Button.']
+SAVE_ROW0 = 3                       # SAVE_MSG from map row 3; "File n is damaged." at rows 5-7
+SAVE_FILE = 'File %d is damaged.'
+
+
+def font_tiles(text):
+    """tiles for the characters of text in the project font (tools/latin_font.py), colour 3
+    ink on colour 0; tile 0 blank. -> (tile bytes, {char: tile})"""
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    from latin_font import G
+    chars = sorted(set(text) - {' '})
+    tiles = [bytes(16)]
+    for ch in chars:
+        if ch == '™': src = TM
+        else: src = G[ch]
+        rows = [sum(0x80 >> x for x, v in enumerate(r) if v == '#') for r in src]
+        if ch in 'gjpqy,;': rows = [0] + rows               # (descenders: rows 1-7)
+        rows = (rows + [0] * 8)[:8]
+        tiles.append(bytes(b for r in rows for b in (r, r)))
+    return b''.join(tiles), {ch: i + 1 for i, ch in enumerate(chars)}
+
+
+def text_row(line, code):
+    r = bytearray(20); c0 = (20 - len(line)) // 2
+    for i, ch in enumerate(line):
+        if ch != ' ': r[c0 + i] = code[ch]
+    return bytes(r)
 
 
 def dmg_msg_src():
     """Color-only cartridge on a monochrome Game Boy (release requirement, docs/
     gb-release-checklist.md): a screen with DMG_MSG in the project's own font
     (tools/latin_font.py), LCD switched off only in the vblank, then a halt with no interrupt
-    enabled (low power). In the runtime tables bank; boot jumps here on A <> $11."""
-    sys.path.insert(0, os.path.join(ROOT, 'tools'))
-    from latin_font import G
-    chars = sorted(set(''.join(DMG_MSG)) - {' '})
-    tiles = [bytes(16)]                                     # tile 0: blank
-    for ch in chars:
-        rows = [sum(0x80 >> x for x, v in enumerate(r) if v == '#') for r in G[ch]]
-        if ch in 'gjpqy,;': rows = [0] + rows               # (descenders: rows 1-7)
-        else: rows = rows + [0]
-        tiles.append(bytes(b for r in rows for b in (r, r)))   # colour 3 ink on colour 0
-    code = {ch: i + 1 for i, ch in enumerate(chars)}
+    enabled (low power). In the runtime tables bank; boot jumps here on A <> $11.
+    Then save_check (called by the boot on a Color): the release checklist's save validation."""
+    t, code = font_tiles(''.join(DMG_MSG))
     mp = bytearray(18 * 32)
     top = (18 - 2 * len(DMG_MSG) + 1) // 2
     for k, line in enumerate(DMG_MSG):
-        c0 = (20 - len(line)) // 2
-        for i, ch in enumerate(line):
-            if ch != ' ': mp[(top + 2 * k) * 32 + c0 + i] = code[ch]
+        r = text_row(line, code); o = (top + 2 * k) * 32; mp[o:o + 20] = r
     db = lambda b: '\n'.join('    db ' + ', '.join('$%02X' % v for v in b[i:i + 16]) for i in range(0, len(b), 16))
-    t = b''.join(tiles)
-    return """section bank RT_TABLES, $7800
+    st, scode = font_tiles(''.join(SAVE_MSG) + ''.join(SAVE_FILE % n for n in (1, 2, 3)))
+    sm = bytearray(18 * 32)
+    for k, line in enumerate(SAVE_MSG):
+        if line: o = (SAVE_ROW0 + k) * 32; sm[o:o + 20] = text_row(line, scode)
+    sf = b''.join(text_row(SAVE_FILE % n, scode) for n in (1, 2, 3))
+    return """section bank RT_TABLES, $7000
 dmg_msg:    ldh a, [rLY]                    ; (the boot ROM leaves the LCD on: off in the vblank)
             cp 144
             jr c, dmg_msg
@@ -91,31 +117,14 @@ dmg_msg:    ldh a, [rLY]                    ; (the boot ROM leaves the LCD on: o
             ld hl, DMSG_T
             ld de, $8000
             ld bc, %d
-.t:         ld a, [hl+]
-            ld [de], a
-            inc de
-            dec bc
-            ld a, b
-            or c
-            jr nz, .t
+            call smcopy
             ld hl, $9800
             ld bc, $400
-.z:         xor a
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .z
+            call smclr
             ld hl, DMSG_M
             ld de, $9800
             ld bc, %d
-.m:         ld a, [hl+]
-            ld [de], a
-            inc de
-            dec bc
-            ld a, b
-            or c
-            jr nz, .m
+            call smcopy
             xor a
             ldh [rSCX], a
             ldh [rSCY], a
@@ -126,11 +135,169 @@ dmg_msg:    ldh a, [rLY]                    ; (the boot ROM leaves the LCD on: o
             ldh [rLCDC], a
 .h:         halt                            ; (no interrupt enabled: stays here, low power)
             jr .h
+smcopy:     ld a, [hl+]                     ; HL -> DE, BC bytes
+            ld [de], a
+            inc de
+            dec bc
+            ld a, b
+            or c
+            jr nz, smcopy
+            ret
+smclr:      xor a                           ; HL, BC bytes
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, smclr
+            ret
+
+; save data check (boot, LCD off, interrupts off, VRAM clear): each save slot ($A400 /
+; $A800 / $AC00, 1KB) whose "initialised" byte (+$19) is $5A must sum to $FF (the game's own
+; test, 3D:AE97); a slot that does not is damaged. Damaged slots: a message screen until the A
+; Button is pressed, then their "initialised" byte cleared (the game shows them empty). Cart
+; RAM is on only during the reads and the clear. No damaged slot: nothing shown.
+save_check: ld a, $0A
+            ld [MBC5_RAMG], a
+            ld c, 0                         ; C = damaged slots (bit 0-2)
+            ld e, 1                         ; E = this slot's bit
+            ld h, $A4
+.sl:        ld l, $19
+            ld a, [hl]
+            cp $5A
+            jr nz, .nx
+            ld l, 0
+            ld d, 4
+            ld b, h
+            xor a
+.sum:       add a, [hl]
+            inc l
+            jr nz, .sum
+            inc h
+            dec d
+            jr nz, .sum
+            ld h, b
+            inc a
+            jr z, .nx
+            ld a, c
+            or e
+            ld c, a
+.nx:        ld a, h
+            add a, 4
+            ld h, a
+            sla e
+            bit 3, e
+            jr z, .sl
+            xor a
+            ld [MBC5_RAMG], a
+            ld a, c
+            and a
+            ret z
+            push bc
+            ld hl, SMSG_T                   ; the message
+            ld de, $8000
+            ld bc, %d
+            call smcopy
+            ld hl, SMSG_M
+            ld de, $9800
+            ld bc, %d
+            call smcopy
+            pop bc
+            push bc
+            ld hl, SMSG_F                   ; "File n is damaged." for each damaged slot
+            ld de, $9800 + %d * 32
+.fl:        srl c
+            jr nc, .fs
+            push bc
+            ld bc, 20
+            call smcopy
+            pop bc
+            ld a, e
+            add a, 12
+            ld e, a
+            jr nc, .fn
+            inc d
+            jr .fn
+.fs:        ld a, l
+            add a, 20
+            ld l, a
+            jr nc, .fn
+            inc h
+.fn:        ld a, c
+            and a
+            jr nz, .fl
+            ld a, $80                       ; BG palette 0: white, greys, black
+            ldh [rBCPS], a
+            ld hl, SMSG_P
+            ld b, 8
+.pl:        ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .pl
+            ld a, $91                       ; LCD on, BG on, tiles $8000, map $9800
+            ldh [rLCDC], a
+            ld a, $10                       ; buttons: all released, then A pressed, then released
+            ldh [rP1], a
+.w1:        call .pad
+            jr nz, .w1
+.w2:        call .pad
+            bit 0, a
+            jr z, .w2
+.w3:        call .pad
+            jr nz, .w3
+            pop bc
+            ld a, $0A                       ; clear the damaged slots' "initialised" byte
+            ld [MBC5_RAMG], a
+            ld h, $A4
+            ld l, $19
+.cl:        srl c
+            jr nc, .cn
+            ld [hl], 0
+.cn:        ld a, h
+            add a, 4
+            ld h, a
+            ld a, c
+            and a
+            jr nz, .cl
+            xor a
+            ld [MBC5_RAMG], a
+            ld a, $30
+            ldh [rP1], a
+.wv:        ldh a, [rLY]                    ; LCD off in the vblank
+            cp 144
+            jr c, .wv
+            xor a
+            ldh [rLCDC], a
+            ld hl, $8000                    ; VRAM bank 0 clear again
+            ld bc, $2000
+            jp smclr
+.pad:       ld b, 4                         ; A = pressed buttons (1 = pressed), Z: none;
+.pd:        ldh a, [rLY]                    ;   read once a frame, a few times over
+.pw:        ldh a, [rLY]
+            cp 144
+            jr nz, .pw
+.pq:        ldh a, [rLY]
+            cp 144
+            jr z, .pq
+            dec b
+            jr nz, .pd
+            ldh a, [rP1]
+            ldh a, [rP1]
+            ldh a, [rP1]
+            cpl
+            and $0F
+            ret
 DMSG_T:
 %s
 DMSG_M:
 %s
-""" % (len(t), len(mp), db(t), db(bytes(mp)))
+SMSG_T:
+%s
+SMSG_M:
+%s
+SMSG_F:
+%s
+SMSG_P:     db $FF, $7F, $B5, $56, $4A, $29, $00, $00
+""" % (len(t), len(mp), len(st), len(sm), SAVE_ROW0 + 2, db(t), db(bytes(mp)), db(st), db(bytes(sm)), db(sf))
 
 
 def oam_attr_src():
@@ -150,10 +317,11 @@ def main():
     args = sys.argv[1:]
     opt = {'--cov': os.path.join(ROOT, 'build', 'ff3', 'cov'),
            '--out': None, '--nes': None}
-    pos = []; gb = False
+    pos = []; gb = False; release = False
     while args:
         a = args.pop(0)
         if a == '--gb': gb = True
+        elif a == '--release': release = True
         elif a in opt: opt[a] = args.pop(0)
         else: pos.append(a)
     opt['--out'] = opt['--out'] or os.path.join(ROOT, 'build', 'ff3_gb.gbc' if gb else 'ff3_en.gbc')
@@ -182,6 +350,13 @@ def main():
             print('  idiom %s:%04X: code not found, not used' % k); rc.g.idioms.pop(k, None)
     prog, bank_of, banks = emit_program(rc)
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in RT_FILES)
+    if release:                              # release build: no test hooks (docs/gb-release-checklist.md 4)
+        import re
+        rt, n = re.subn(r'^;@test\{.*?^;@test\}[^\n]*\n', '', rt, flags=re.S | re.M)
+        assert n >= 3
+        rt = re.sub(r'^;@rel ', '', rt, flags=re.M)        # release-only lines
+        for v in ('GB3_TEST_MINI', 'FF3_TEST_GOBLIN'):
+            if os.environ.get(v): raise SystemExit('release build with test switch %s set' % v)
     # (the cross-bank stubs continue bank 0 right after the runtime, up to OAM_ATTR at $3C00)
     head, sep, rest = prog.partition('section bank DYN_BANK')
     stubs = head.split('\n', 1)[1] if head.startswith('section bank 0') else head
@@ -202,7 +377,9 @@ def main():
     top = max(r.banks) + 1
     size = 2
     while size < top: size *= 2
-    rom = make_rom(r.banks, 'FF3 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x03, cgb=0xC0)
+    # cart RAM: the save slots in bank 0 ($A000-$AFFF); dev builds also read test pads from bank 3
+    rom = make_rom(r.banks, 'FF3 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x02 if release else 0x03,
+                   cgb=0xC0)
     open(opt['--out'], 'wb').write(rom)
     open(os.path.splitext(opt['--out'])[0] + '.sym', 'w').write(r.sym_file())
     print('wrote %s: %d KB, bank 0 used %d bytes' % (opt['--out'], len(rom) // 1024, len(r.banks[0])))

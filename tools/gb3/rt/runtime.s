@@ -13,30 +13,36 @@
 ; mirroring the second nametable continues at row 30, mod 32). NES palette RAM -> CGB
 ; palettes 0-3 (BG) and 0-3 (OBJ) through NES_RGB.
 
-STACK_TOP  = $D000          ; GB stack $CD00-$CFFF (the NES stack runs on it; FF3 keeps data in
+STACK_TOP  = $D000          ; GB stack $CDE4-$CFFF (the NES stack runs on it; FF3 keeps data in
                             ;   page 1 at $0100-$0161, so the stack stays out of NES RAM), outside
                             ;   the switchable WRAM bank $D000-$DFFF
 NES_RAM    = $C000          ; $0000-$07FF
-EX_RAM     = $C800          ; $5C00-$5FFF
+PRG6       = $C800          ; PRG-RAM $6000-$63FF (game state; WRAM, not battery-backed)
+PRG7       = $D000          ; PRG-RAM $7000-$7FFF: WRAM bank 1, the main thread's bank
+SAVE_RAM   = $A000          ; cart RAM (battery): the save slots $6400-$6FFF at $A400-$AFFF and
+                            ;   the save count $7F38-$7F3A at $A038-$A03A, switched on only around
+                            ;   each access (release checklist: SRAM protection; rt_sram_*)
+RT_WBANK   = 6              ; WRAM bank 6: the runtime's tables (NT_SH, OVR_*, ATTR_STALE, LK_TAB)
+EX_RAM     = $DC00          ;   and ExRAM $5C00-$5FFF (bank 6; game accesses switch to it)
 OAM_SH     = $CC00          ; GB shadow OAM (160 bytes)
 PAL_SH     = $CCA0          ; NES palette RAM (32)
 TILE_DIRTY = $CCC0          ; NES tiles written since their last copy to VRAM (bit per tile, 64;
                             ;   must end at $CCFF: hd_flush stops when L wraps)
 STAGE      = $D000          ; NES pattern tables in GB format: table 0 in WRAM bank 2, table 1
                             ;   in bank 3 (copied to VRAM by DMA in the vblank, hd_flush)
-NT_SH      = $D000          ; NES nametables (2 x 1KB after mirroring), WRAM bank 1
-DBG        = $D820          ; fault info: code, HL, SP, stack top (16)  (the addresses FF1's
-NMI_CNT    = $D830          ; 16-bit count of NES frame waits             test runners read:
-VBL_CNT    = $D832          ; 16-bit count of GB frames                   tools/gb/gambatte/
-WAIT_CNT   = $D834          ; 16-bit count of NES frames the main thread waited for (tools/gb3/firstdiff.py)
-OVR_ROWS   = $D840          ; map rows with palettes set by $5809 / $580C (bit per row, 4)
-OVR_FC     = $D850          ;   per row: first column set, count (30 + 30)
-OVR_NC     = $D870
-ATTR_STALE = $D900          ; per attribute byte (nametable * 64 + index): 1 = stale (128)
-OVR_R      = $D844          ; $580A row, $580B first column (WRAM bank 1)
-OVR_C      = $D845
-TEST_PAD   = $D83E          ; $A5: test runner input mode (later)         gbrun.c)
-LK_TAB     = $DA00          ; dynamic-target lookup cache (512 bytes, WRAM bank 1; lookup)
+NT_SH      = $D800          ; NES nametables (2 x 1KB after mirroring), WRAM bank MAP_BANK
+DBG        = $CD80          ; fault info: code, HL, SP, stack top (16)  (fixed WRAM; the test
+NMI_CNT    = $CD90          ; 16-bit count of NES frame waits             runners read them:
+VBL_CNT    = $CD92          ; 16-bit count of GB frames                   GB_CNT=CD80 for
+WAIT_CNT   = $CD94          ; 16-bit count of NES frames the main thread waited for (tools/gb3/firstdiff.py)
+OVR_ROWS   = $CDA0          ; map rows with palettes set by $5809 / $580C (bit per row, 4;
+OVR_FC     = $CDA4          ;   fixed WRAM) per row: first column set, count (30 + 30)
+OVR_NC     = $CDC4
+ATTR_STALE = $D900          ; per attribute byte (nametable * 64 + index): 1 = stale (128; bank RT_WBANK)
+OVR_R      = $CD9A          ; $580A row, $580B first column (fixed WRAM)
+OVR_C      = $CD9B
+TEST_PAD   = $CD9E          ; $A5: test runner input mode (dev builds only) gbrun.c)
+LK_TAB     = $DA00          ; dynamic-target lookup cache (512 bytes, WRAM bank RT_WBANK; lookup)
 PC_BUF     = $CD00          ; rt_ppu_copy: one piece (<= 32 bytes; the stack's far end, never reached)
 NC_BUF     = $CD40          ; nat_chr64: 64 bytes for a nametable destination
 MAP_SH     = $D000          ; GB map (VRAM bank 0 $9800-$9BFF) and its attributes (VRAM bank 1),
@@ -160,13 +166,14 @@ mnu_b:      ds 1
 wrap_d:     ds 1                            ; field: SCY step at the NES's vertical seam (0: none)
 wrap_l:     ds 1                            ;   and its LYC line
 attr_st:    ds 1                            ; ATTR_STALE in use (menu closed)
+sram_busy:  ds 1                            ; frames since the last save-RAM write < 30: no soft reset
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
 section bank 0, $0000
 rt_jp_hl:   jp hl
 section bank 0, $0038
-            jp rst38_trap                   ; execution ran into $FF bytes: record and stop
+            jp rst38_entry                  ; execution ran into $FF bytes: record and stop
 section bank 0, $0040
             jp vblank_isr
 section bank 0, $0048
@@ -184,18 +191,27 @@ boot:       di
 .dmg:       ld a, RT_TABLES                 ; (Color-only cartridge: the message screen on
             ld [MBC5_BANKL], a              ;   other models, build.py dmg_msg_src)
             jp dmg_msg
-.cgb:       ld a, 1                         ; double speed (KEY1 + STOP, interrupts off)
-            ldh [rKEY1], a
-            xor a
+.cgb:       xor a
             ldh [rIE], a
+            ldh [rNR52], a                  ; sound off (all sound registers cleared)
+            ld [MBC5_RAMG], a               ; cart RAM off (on only around each save access)
+            ldh a, [rKEY1]                  ; double speed (KEY1 + STOP, interrupts off), unless
+            bit 7, a                        ;   already on (soft reset)
+            jr nz, .fast
+            ld a, 1
+            ldh [rKEY1], a
             ld a, $30
             ldh [rP1], a
             stop
-.wv:        ldh a, [rLY]
+.fast:      ldh a, [rLCDC]
+            bit 7, a
+            jr z, .off
+.wv:        ldh a, [rLY]                    ; LCD off only in the vblank (release checklist)
             cp 144
             jr c, .wv
             xor a
-            ldh [rLCDC], a                  ; LCD off (only here, at power-on)
+            ldh [rLCDC], a                  ; LCD off (only here: power-on / soft reset)
+.off:
             ld a, 1
             ldh [rVBK], a
             ld hl, $8000                    ; clear both VRAM banks
@@ -209,21 +225,17 @@ boot:       di
             ld hl, $C000                    ; clear WRAM (not the stack $CF00-$CFFF in use)
             ld bc, $0F00
             call memclr
-            ld a, 4                         ; WRAM bank 4: zeros (DMA source, map clears)
-            ldh [rSVBK], a
+            ld a, 7                         ; every switchable WRAM bank (7 .. 1: bank 4 =
+.wb:        ldh [rSVBK], a                  ;   zeros for DMA, MAP_BANK, RT_WBANK, PRG7 = bank 1)
+            push af
             ld hl, $D000
             ld bc, $1000
             call memclr
-            ld a, MAP_BANK                  ; GB map / attribute shadows
+            pop af
+            dec a
+            jr nz, .wb
+            inc a
             ldh [rSVBK], a
-            ld hl, $D000
-            ld bc, $1000
-            call memclr
-            ld a, 1
-            ldh [rSVBK], a
-            ld hl, $D000
-            ld bc, $1000
-            call memclr
             ld hl, $FE00                    ; clear OAM
             ld bc, $A0
             call memclr
@@ -240,11 +252,19 @@ boot:       di
             inc de
             dec b
             jr nz, .cd
-            ld a, $0A                       ; cart RAM on, RAM bank 0 (NES $6000-$7FFF)
-            ld [MBC5_RAMG], a
-            xor a
+            xor a                           ; cart RAM bank 0 (the save slots), RAM left off
             ld [MBC5_RAMB], a
             ld [MBC5_BANKH], a
+            ldh [rSCX], a
+            ldh [rSCY], a
+            ldh [rWY], a
+            ldh [rWX], a
+            ldh [rSTAT], a
+            ldh [rLYC], a
+            ldh [rVBK], a
+            ld a, RT_TABLES                 ; save data check (build.py save_check_src): damaged
+            ld [MBC5_BANKL], a              ;   save files are reported on screen, then erased
+            call save_check
             ld a, CAM_X
             ldh [cam_x], a
             ld a, CAM_Y
@@ -271,6 +291,19 @@ boot:       di
             call rt_dyn_call
 .stop:      halt
             jr .stop
+
+; soft reset (A + B + Start + Select, polled by the vblank interrupt; release checklist): sound
+; and cart RAM off, then the boot path (memory and registers set up again, the game restarted).
+; Never inside a save access (cart RAM is on only within sram_rd / sram_wr, interrupts may hit
+; there: cart RAM is switched off first) and not while a save is being written (sram_busy).
+soft_reset: di
+            xor a
+            ldh [rIE], a
+            ldh [rNR52], a
+            ld [MBC5_RAMG], a
+            ld sp, STACK_TOP
+            ld a, $11
+            jp boot
 
 memclr:     xor a                           ; HL = start, BC = count
             ld [hl+], a
@@ -551,18 +584,33 @@ vblank_isr: push af
             ldh [frame_tick], a
             ld a, $80
             ldh [ppu_stat], a
-            ldh a, [rSVBK]                  ; (VBL_CNT is in WRAM bank 1: the main thread may
-            push af                         ;   have a staging bank selected)
-            ld a, 1
-            ldh [rSVBK], a
-            ld hl, VBL_CNT
+            ld hl, VBL_CNT                  ; (fixed WRAM)
             inc [hl]
             jr nz, .c
             inc hl
             inc [hl]
-.c:         pop af
-            ldh [rSVBK], a
-            pop hl
+.c:         ldh a, [sram_busy]              ; soft reset: A + B + Select + Start, checked every
+            and a                           ;   frame, unless a save was written in the last 30
+            jr z, .sr                       ;   frames (no save cut in half; release checklist)
+            dec a
+            ldh [sram_busy], a
+            jr .nsr
+.sr:        ldh a, [rP1]                    ; (the main thread's select lines: restored after)
+            and $30
+            ld h, a
+            ld a, $10
+            ldh [rP1], a
+            ldh a, [rP1]
+            ldh a, [rP1]
+            ldh a, [rP1]
+            ldh a, [rP1]
+            cpl
+            and $0F
+            cp $0F
+            ld a, h
+            ldh [rP1], a
+            jp z, soft_reset
+.nsr:       pop hl
             pop af
             reti
 
@@ -1102,7 +1150,9 @@ rt_ppu_w7:
             ld e, a
             cp 2
             jr z, .fchr
-            ldh a, [wc_nl]                  ; nametable shadow (WRAM bank 1)
+            ld a, MAP_BANK                  ; (NT_SH and MAP_SH: WRAM bank MAP_BANK)
+            ldh [rSVBK], a
+            ldh a, [wc_nl]                  ; nametable shadow
             ld l, a
             add a, e
             ldh [wc_nl], a
@@ -1121,8 +1171,6 @@ rt_ppu_w7:
             adc a, 0
             res 2, a
             ldh [wc_mh], a
-            ld a, MAP_BANK
-            ldh [rSVBK], a
             ldh a, [wv]
             ld [hl], a
             ld a, 1
@@ -1216,9 +1264,13 @@ rt_ppu_w7:
             add a, h
             add a, high(NT_SH)
             ld h, a
+            ld a, MAP_BANK
+            ldh [rSVBK], a
             ld a, [hl]                      ; (old value: attribute writes compare)
             ldh [c_q], a
             ld [hl], c                      ; shadow
+            ld a, 1
+            ldh [rSVBK], a
             inc hl                          ; (next cell's shadow address, for the cache)
             ld a, l
             ldh [wc_nl], a
@@ -1625,7 +1677,12 @@ rt_ppu_r7:  push af                         ; $2007 read (buffered; nametables f
             add a, b
             add a, high(NT_SH)
             ld h, a
-            ld a, [hl]
+            ld a, MAP_BANK
+            ldh [rSVBK], a
+            ld b, [hl]
+            ld a, 1
+            ldh [rSVBK], a
+            ld a, b
             jr .buf
 .pal:       ld a, l
             and $1F
@@ -1661,10 +1718,16 @@ attr_apply: ldh [c_val], a
             or l
             ld l, a
             ld h, high(ATTR_STALE)
+            ld a, RT_WBANK                  ; (WRAM bank RT_WBANK)
+            ldh [rSVBK], a
             ld a, [hl]
+            ld [hl], 0
+            ld h, a
+            ld a, 1
+            ldh [rSVBK], a
+            ld a, h
             and a
             jr z, .np
-            ld [hl], 0
             ld a, d
             cpl
             ldh [c_q], a
@@ -2152,22 +2215,27 @@ rt_io_r4016:                                ; next button in NES order (A B Sel 
             ret
 read_buttons:                               ; -> A: bit 0 A, 1 B, 2 Select, 3 Start, 4 Up,
             push bc                         ;   5 Down, 6 Left, 7 Right (1 = pressed)
+;@test{     (dev builds only: build.py --release drops this block, release checklist 4)
             ld a, [TEST_PAD]                ; test runner mode (gbrun / sgbrun): the pad of
             cp $A5                          ;   NES frame wait k from cart RAM bank 3
             jr nz, .real                    ;   $A000 + (k & $FF), in this bit order
             push hl
             ld a, 3
             ld [MBC5_RAMB], a
+            ld a, $0A
+            ld [MBC5_RAMG], a
             ld a, [NMI_CNT]
             ld l, a
             ld h, $A0
             ld b, [hl]
             xor a
+            ld [MBC5_RAMG], a
             ld [MBC5_RAMB], a
             ld a, b
             pop hl
             pop bc
             ret
+;@test}
 .real:      ld a, $20
             ldh [rP1], a
             ldh a, [rP1]
@@ -2513,7 +2581,8 @@ izrd:       ld a, h                         ; HL = NES address (AF pushed by the
             ret
 .prg:       cp $60
             jr c, .other
-            add a, $40                      ; PRG-RAM $6000-$7FFF -> $A000
+            call prg_page                   ; PRG-RAM (save slots: nes_rd)
+            jr c, .other
             ld h, a
             ld l, [hl]
             pop af
@@ -2547,7 +2616,8 @@ rt_izy_fill:
             jr c, .slow
             cp $80
             jr nc, .slow
-            add a, $40                      ; PRG-RAM -> $A000
+            call prg_page                   ; PRG-RAM (save slots: the slow way)
+            jr c, .slow
             ld h, a
             jr .fill
 .ram:       and $07
@@ -2668,7 +2738,9 @@ rt_ppu_copy:
             ld [MBC5_BANKL], a
             pop de
             push hl
-            ldh a, [wc_nl]                  ; buffer -> nametable shadow (bank 1)
+            ld a, MAP_BANK                  ; buffer -> nametable shadow (bank MAP_BANK)
+            ldh [rSVBK], a
+            ldh a, [wc_nl]
             ld l, a
             ldh a, [wc_nh]
             ld h, a
@@ -2680,6 +2752,8 @@ rt_ppu_copy:
             dec e
             jr nz, .s2
             pop de
+            ld a, 1
+            ldh [rSVBK], a
             ld a, l
             ldh [wc_nl], a
             ld a, h
@@ -2831,11 +2905,11 @@ rt_ppu_izy: push af                         ; (C: kept)
             ld h, a
             xor a
             jr .go
-.prgc:      and $1F
-            cp $1F
-            jr z, .slow1
-            ld a, h
-.prg:       add a, $40                      ; PRG-RAM $6000 -> $A000
+.prgc:      ld a, h
+            call prg_cross                  ; (the next page must follow in the GB map)
+            jr .prg2
+.prg:       call prg_page                   ; PRG-RAM (save slots: the slow way)
+.prg2:      jr c, .slow1
             ld h, a
             xor a
             jr .go
@@ -2919,8 +2993,9 @@ rt_lda_nes:                                 ; (HL = NES address -> A, F clobbere
             jr z, .ram
             cp $60
             jr nz, .oth
-            ld a, h                         ; PRG-RAM $6000 -> $A000
-            add a, $40
+            ld a, h                         ; PRG-RAM (save slots: .oth)
+            call prg_page
+            jr c, .oth
             ld h, a
             ld a, [hl]
             ret
@@ -2983,7 +3058,8 @@ rt_sta_nes:                                 ; (HL = NES address, D = the value; 
             cp $60
             jr nz, .oth
             ld a, h
-            add a, $40
+            call prg_page                   ; (save slots: .oth)
+            jr c, .oth
             ld h, a
             ld a, d
             ld [hl], a
@@ -3031,6 +3107,8 @@ izmap:      push hl
             ret
 .cy:        cp $FF
             jr z, .no
+            cp $63                          ; (PRG-RAM $63xx -> $64xx: not contiguous)
+            jr z, .no
             ld l, a                         ; (the end's page H + 1 must be in the same window)
             inc a
             xor l
@@ -3053,7 +3131,8 @@ izmap:      push hl
             pop af
             xor a
             ret
-.prg:       add a, $40
+.prg:       call prg_page                   ; (save slots: no)
+            jr c, .no
             ld h, a
             pop af
             xor a
@@ -3144,7 +3223,30 @@ rt_copy_izy:
 ; staging copy (plane 0 -> even bytes, plane 1 -> odd), marked; PPU address + 16; nt_a = the
 ; last byte. B, C, D, E kept.
 rt_ppu_copy.tile:
+            ld a, d                         ; source in PRG-RAM $7000-$7FFF (WRAM bank 1,
+            and a                           ;   unseen once the staging bank is in): through
+            jr nz, ppc_tile                 ;   PC_BUF (fixed WRAM)
+            ld a, h
+            and $F0
+            cp high(PRG7)
+            jr nz, ppc_tile
             push bc
+            push de
+            ld de, PC_BUF
+            ld c, 16
+ppc_bb:     ld a, [hl+]
+            ld [de], a
+            inc e
+            dec c
+            jr nz, ppc_bb
+            pop de
+            pop bc
+            push hl
+            ld hl, PC_BUF
+            call ppc_tile
+            pop hl
+            ret
+ppc_tile:   push bc
             push de
             xor a
             ldh [wc_n], a                   ; (no cached run across this)
@@ -3228,7 +3330,8 @@ rt_izy_wr:
             jr c, .other
             cp $80
             jr nc, .other
-            add a, $40                      ; PRG-RAM $6000 -> $A000
+            call prg_page                   ; PRG-RAM (save slots: nes_wr)
+            jr c, .other
             ld h, a
             pop af
             ld [hl], a
@@ -3249,6 +3352,64 @@ rt_izx_wr:  push af
             pop af
             ret
 
+;; PRG-RAM map (docs/gb-release-checklist.md, SRAM protection): A = NES page $60-$7F ->
+; NC, A = GB page: $60-$63 -> PRG6 ($C8-$CB, fixed WRAM), $70-$7F -> PRG7 ($D0-$DF, WRAM
+; bank 1); C for the save-slot pages $64-$6F (cart RAM: sram_rd / sram_wr). Other regs kept.
+prg_page:   sub $70
+            jr c, .six
+            add a, high(PRG7)
+            ret
+.six:       cp $F4                          ; ($60-$63 - $70 = $F0-$F3)
+            ccf
+            ret c
+            sub $F0 - high(PRG6)
+            ret
+; as prg_page, and C also when page A + 1 does not follow in the GB map ($63, $7F)
+prg_cross:  cp $63
+            jr z, .no
+            cp $7F
+            jr nz, prg_page
+.no:        scf
+            ret
+; cart RAM (battery): switched on only around each access. HL = NES address $6400-$6FFF
+; (save slots, at $A400-$AFFF) or SV_CNT_NES.. (the save count, at $A038-$A03A).
+; sram_rd -> L (A, F clobbered); sram_wr: the value in wtmp (A, F clobbered).
+sram_rd:    call sram_adr
+            ld a, $0A
+            ld [MBC5_RAMG], a
+            ld l, [hl]
+            xor a
+            ld [MBC5_RAMG], a
+            ret
+sram_wr:    call sram_adr
+            ld a, $0A
+            ld [MBC5_RAMG], a
+            ldh a, [wtmp]
+            ld [hl], a
+            xor a
+            ld [MBC5_RAMG], a
+            ld a, 30                        ; (a save being written: soft reset held off)
+            ldh [sram_busy], a
+            ret
+sram_adr:   ld a, h
+            cp $70
+            jr c, .s
+            ld h, high(SAVE_RAM)            ; $7F38-$7F3A -> $A038-$A03A
+            ret
+.s:         add a, high(SAVE_RAM) - $60
+            ld h, a
+            ret
+; the save count ($7F38-$7F3A, translate.py: absolute accesses only): A -> / -> A, F kept
+rt_svc_rd:  push af                         ; HL = NES address -> L
+            call sram_rd
+            pop af
+            ret
+rt_svc_wr:  push af                         ; HL = NES address, A = the value
+            ldh [wtmp], a
+            call sram_wr
+            pop af
+            ret
+
 nes_rd:     ld a, h                         ; HL = NES address -> L (A, F clobbered)
             cp $20
             jr nc, .n1
@@ -3261,7 +3422,8 @@ nes_rd:     ld a, h                         ; HL = NES address -> L (A, F clobbe
             jr c, .low
             cp $80
             jr nc, .rom
-            add a, $40                      ; PRG-RAM $6000 -> $A000
+            call prg_page                   ; PRG-RAM
+            jp c, sram_rd                   ; (save slots: cart RAM)
             ld h, a
             ld l, [hl]
             ret
@@ -3282,9 +3444,13 @@ nes_rd:     ld a, h                         ; HL = NES address -> L (A, F clobbe
             jp rt_rd_f
 .low:       cp $5C
             jr c, .io
-            add a, $6C                      ; ExRAM $5C00 -> $C800
+            add a, high(EX_RAM) - $5C       ; ExRAM $5C00 -> EX_RAM (WRAM bank RT_WBANK)
             ld h, a
+            ld a, RT_WBANK
+            ldh [rSVBK], a
             ld l, [hl]
+            ld a, 1
+            ldh [rSVBK], a
             ret
 .io:        cp $20
             jr c, .bad
@@ -3312,17 +3478,22 @@ nes_wr:     ld a, h                         ; HL = NES address, value in wtmp (A
             jr c, .low
             cp $80
             ret nc
-            add a, $40
+            call prg_page                   ; PRG-RAM
+            jp c, sram_wr                   ; (save slots: cart RAM)
             ld h, a
             ldh a, [wtmp]
             ld [hl], a
             ret
 .low:       cp $5C
             jr c, .io
-            add a, $6C
+            add a, high(EX_RAM) - $5C       ; ExRAM (WRAM bank RT_WBANK)
             ld h, a
+            ld a, RT_WBANK
+            ldh [rSVBK], a
             ldh a, [wtmp]
             ld [hl], a
+            ld a, 1
+            ldh [rSVBK], a
             ret
 .io:        cp $20
             jr c, .bad
@@ -3525,6 +3696,8 @@ lookup:
            push af
             push bc
             push de
+            ld a, RT_WBANK                  ; (LK_TAB: WRAM bank RT_WBANK)
+            ldh [rSVBK], a
             ld d, h
             ld e, l
             ld a, d                         ; C = key
@@ -3564,6 +3737,8 @@ lookup:
             ld a, [hl+]
             ld h, [hl]
             ld l, a
+            ld a, 1
+            ldh [rSVBK], a
             pop de
             pop bc
             pop af
@@ -3620,6 +3795,8 @@ lookup:
             ld [hl], d
             ld h, d
             ld l, a
+            ld a, 1
+            ldh [rSVBK], a
             pop de
             pop bc
             pop af
@@ -3631,6 +3808,8 @@ lookup:
             inc hl
             jr .lp
 .miss:      pop hl
+            ld a, 1
+            ldh [rSVBK], a
             ldh a, [code_bank]
             ld [MBC5_BANKL], a
             ld h, d
@@ -3774,6 +3953,8 @@ rt_unwind_a:
 ; (caller on the stack), 3/4 = indirect read/write of I/O (HL = NES address)
 rt_fatal:   ld a, 2
 rt_fault:   di
+;@rel       jp soft_reset                   ; (release builds: an internal error restarts the game)
+;@test{     (dev builds: the fault record for the test runners)
             ld [DBG], a
             ld a, l
             ld [DBG + 1], a
@@ -3788,13 +3969,17 @@ rt_fault:   di
             ldh a, [code_bank]
             ld [DBG + 7], a
 rt_halted:  jr rt_halted
+;@test}
 
 BIT_MASK:   db 1, 2, 4, 8, 16, 32, 64, 128
 PAIR_MASK:  db 3, 12, 48, 192
 
-rst38_trap: di                              ; rst $38 (opcode $FF) reached: DBG+8 = SP,
+rst38_entry: di                             ; rst $38 (opcode $FF) reached: DBG+8 = SP,
+;@rel       jp soft_reset                   ; (release builds: restart the game)
+;@test{     (dev builds: the record for the test runners, then stop)
             ld [DBG + 8], sp                ;   DBG+10.. = stack words; then stop
             ld a, $38
             ld [DBG], a
 .s:         halt
             jr .s
+;@test}

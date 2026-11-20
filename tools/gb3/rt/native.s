@@ -43,7 +43,7 @@ nat_9111:   ld a, e
             ldh a, [nt_x]                   ; $83 = palette | palette override
             add a, $93
             ld l, a
-            ld h, $BD                       ; ($7D93 + X, $7D97 + X: X < 4)
+            ld h, $DD                       ; ($7D93 + X, $7D97 + X: X < 4)
             ld a, [hl]
             inc l
             inc l
@@ -84,7 +84,7 @@ nat_9111:   ld a, e
             ld [MBC5_BANKL], a
             ld a, [NES_RAM + $82]           ; the 6 tiles -> $7301 + 4i: bit 7 set: the value,
             ld c, a                         ;   else + $82
-            ld de, $B301
+            ld de, $D301
 .tl:        ld a, [hl+]
             bit 7, a
             jr z, .ta
@@ -124,11 +124,11 @@ nat_9111:   ld a, e
             ld a, h
             sub $40
             ld h, a                         ; HL = position / flip data (GB)
-            ld de, $B300
+            ld de, $D300
             ld a, [NES_RAM + $98]           ; back attack gets an h-flip ($90D2: $78C3 = $88)
             and a
             jr z, .pl
-            ld a, [$B8C3]
+            ld a, [$D8C3]
             cp $88
             jr z, .pb
 .pl:        ldh a, [n9_y]                   ; y += $8E
@@ -180,7 +180,7 @@ nat_9111:   ld a, e
             ld a, [NES_RAM + $C8]           ; buffer -> $0200 + $C8 (X wraps in the page)
             ld e, a
             ld d, high(NES_RAM + $200)
-            ld hl, $B300
+            ld hl, $D300
             ld c, 12
 .c2:        ld a, [hl+]
             ld [de], a
@@ -298,7 +298,7 @@ nat_chr64:
             jr z, .nf
             ldh [nt_x], a
             ld l, a
-            ld h, $B3                       ; flip table $7300 (GB $B300)
+            ld h, $D3                       ; flip table $7300 (GB $D300, WRAM bank 1)
             ld a, [hl]
             ldh [nt_a], a
             ret
@@ -335,8 +335,9 @@ attr_put64:
             ld a, c
             add a, $C0
             ld l, a
-            ld a, [hl]
-            ld d, a                         ; D = old
+            ld a, MAP_BANK                  ; (NT_SH: WRAM bank MAP_BANK)
+            ldh [rSVBK], a
+            ld d, [hl]                      ; D = old
             push hl
             ld hl, NC_BUF
             ld a, l
@@ -348,12 +349,16 @@ attr_put64:
             jr z, .same
             ld [hl], a
             ld e, a
+            ld a, 1
+            ldh [rSVBK], a
             ld a, d
             ldh [c_q], a
             ld a, e
             ld l, c
             call attr_apply                 ; (keeps B, C)
-.same:      inc c
+.same:      ld a, 1
+            ldh [rSVBK], a
+            inc c
             ld a, c
             cp $40
             jr nz, .lp
@@ -422,9 +427,17 @@ chr64_fast: ldh a, [ppu_vl]
             ld h, a
             ld a, DATA + 63
             jr .src
-.lowsrc:    cp $60                          ; PRG-RAM $6000-$7FFF (decompressed graphics) ->
-            jr c, .ramsrc                   ;   GB $A000; RAM $0000-$07FF -> $C000
-            add a, $40
+.lowsrc:    cp $60                          ; PRG-RAM (decompressed graphics; contiguous in
+            jr c, .ramsrc                   ;   the GB map); RAM $0000-$07FF -> $C000
+            ldh a, [ch_n]
+            dec a
+            add a, l
+            ld a, h
+            jr nc, .lp1
+            call prg_cross
+            jr .lp2
+.lp1:       call prg_page
+.lp2:       jr c, .no
             ld h, a
             ldh a, [code_bank]              ; (no ROM bank needed)
             jr .src
@@ -434,7 +447,41 @@ chr64_fast: ldh a, [ppu_vl]
             ld h, a
             ldh a, [code_bank]
 .src:       ld [MBC5_BANKL], a
-            push hl                         ; mark the 4 tiles dirty
+            ld b, 0                         ; (B = 1: bounced through the flip table)
+            ldh a, [ch_fl]                  ; flip table ($7300) or a PRG-RAM $7xxx source:
+            and a                           ;   both in WRAM bank 1, unseen once the staging
+            jr nz, .bnc                     ;   bank is in: the bytes through NC_BUF first
+            ld a, h
+            and $F0
+            cp high(PRG7)
+            jr nz, .nob
+.bnc:       ldh a, [ch_n]
+            ld c, a
+            ld de, NC_BUF
+            ldh a, [ch_fl]
+            and a
+            jr nz, .bf
+.bc:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec c
+            jr nz, .bc
+            jr .bd
+.bf:        inc b
+.bf1:       ld a, [hl+]
+            ldh [nt_x], a                   ; (X = the source byte, A = the table's)
+            push hl
+            ld l, a
+            ld h, high(PRG7) + 3
+            ld a, [hl]
+            pop hl
+            ld [de], a
+            ldh [nt_a], a
+            inc e
+            dec c
+            jr nz, .bf1
+.bd:        ld hl, NC_BUF
+.nob:       push hl                         ; mark the 4 tiles dirty
             ldh a, [ppu_vl]
             ld l, a
             ldh a, [ppu_vh]
@@ -466,9 +513,6 @@ chr64_fast: ldh a, [ppu_vl]
             ldh a, [ppu_vl]
             ld e, a
             pop hl
-            ldh a, [ch_fl]                  ; flip table on: the slow loop
-            and a
-            jr nz, .flp
             ldh a, [ch_n]                   ; plane 0 -> even, plane 1 -> odd bytes
             ld c, a
 .pl:        ld a, [hl+]
@@ -492,45 +536,15 @@ chr64_fast: ldh a, [ppu_vl]
 .pl2:       ld a, c
             and a
             jr nz, .pl
+            ld a, b                         ; (flip: nt_a / nt_x set by the bounce)
+            and a
+            jr nz, .done
             dec hl                          ; A = the last byte (no table: X = $92 = 0)
             ld a, [hl]
             ldh [nt_a], a
             xor a
             ldh [nt_x], a
             jr .done
-.flp:       ld b, a
-            ldh a, [ch_n]
-            swap a
-            and $0F
-            ld c, a
-.tile:      push bc
-            ld c, 8                         ; plane 0 -> even bytes
-.p0:        ld a, [hl+]
-            call .flip
-            ld [de], a
-            inc e
-            inc e
-            dec c
-            jr nz, .p0
-            ld a, e
-            sub 15
-            ld e, a
-            ld c, 8                         ; plane 1 -> odd bytes
-.p1:        ld a, [hl+]
-            call .flip
-            ld [de], a
-            inc e
-            inc e
-            dec c
-            jr nz, .p1
-            dec e                           ; next tile
-            ld a, e
-            and a
-            jr nz, .t2
-            inc d
-.t2:        pop bc
-            dec c
-            jr nz, .tile
 .done:
             ld a, 1
             ldh [rSVBK], a
@@ -552,22 +566,6 @@ chr64_fast: ldh a, [ppu_vl]
             ret
 .no:        scf
             ret
-.flip:      ldh [nt_x], a                   ; the source byte: X if the table is on
-            inc b
-            dec b
-            jr z, .nf
-            push hl
-            ld l, a
-            ld h, $B3                       ; flip table $7300 (GB $B300)
-            ld a, [hl]
-            pop hl
-            ldh [nt_a], a
-            ret
-.nf:        ldh [nt_a], a
-            xor a
-            ldh [nt_x], a
-            ldh a, [nt_a]
-            ret
 
 ; ------------------------------------------------------------------ fix:F897
 ; copy color palettes to ppu ($7CF7-$7D16 -> $3F00-$3F1F, every battle frame): straight into
@@ -581,7 +579,7 @@ nat_f897:
             pop af
               ld a, c                         ; (Y is kept)
             ldh [nt_x], a
-            ld hl, $BCF7                    ; PRG-RAM $7CF7
+            ld hl, $DCF7                    ; PRG-RAM $7CF7
             ld de, PAL_SH
             ld c, 0                         ; C = palette index 0-31
 .lp:        ld a, c
@@ -619,7 +617,7 @@ nat_f897:
             ld e, $20
             ld d, 0
             ld b, 0
-            ld a, [$BD16]                   ; A = $7D16 (the last byte)
+            ld a, [$DD16]                   ; A = $7D16 (the last byte)
             scf                             ; C = 1, Z = 1 (CPX #$20)
             ld h, a
             ld a, 0
@@ -1090,15 +1088,15 @@ nat_fb89:   add a, a                        ; $8000: bank 2A & $7F (even), $A000
 ; Out: A = $FF, Y = 0, Z = 1, N = 0, C kept; X kept.
 nat_9754:   push af
             xor a
-            ld [$BAC0], a                   ; $7AC0
+            ld [$DAC0], a                   ; $7AC0
             ld [NES_RAM + $4E], a
             ld [NES_RAM + $18], a
             ld a, $72
-            ld [$BAC1], a                   ; $7AC1
+            ld [$DAC1], a                   ; $7AC1
             ld [NES_RAM + $4F], a
             inc a
             ld [NES_RAM + $19], a
-            ld hl, $B200                    ; $7200 (PRG-RAM)
+            ld hl, $D200                    ; $7200 (PRG-RAM)
             ld a, $FF
             ld b, 64
 .f:         ld [hl+], a
@@ -1192,7 +1190,7 @@ nat_bd2a:   ld hl, NES_RAM + $264
             ld a, e
             add a, $80
             ld l, a
-            ld h, $B3                       ; $7380 + X (PRG-RAM)
+            ld h, $D3                       ; $7380 + X (PRG-RAM)
             ld a, [hl+]
             ld [NES_RAM + $7E], a
             ld a, [hl]
@@ -1233,7 +1231,7 @@ nat_bd2a:   ld hl, NES_RAM + $264
             ld a, h
             adc a, 0
             ld [NES_RAM + $83], a
-            add a, $40                      ; (PRG-RAM -> GB $A000)
+            add a, high(PRG7) - $70          ; (PRG-RAM $79xx -> GB)
             ld h, a
             ld a, [hl]
             ldh [nt_a], a
@@ -1252,7 +1250,7 @@ nat_bd2a:   ld hl, NES_RAM + $264
             ld [hl+], a
             ld a, [NES_RAM + $86]           ; tile
             ld [hl+], a
-            ld a, [$B8C3]                   ; back attack ($78C3 = $88): $43, else $03
+            ld a, [$D8C3]                   ; back attack ($78C3 = $88): $43, else $03
             cp $88
             ld a, $43
             jr z, .ba
@@ -1500,11 +1498,11 @@ nat_f8aa:   ld a, 2
 
 ; p34:$A549 write spaces to text buffer: $7AD7 + X = 0, then $FF at X - 1 downwards while X
 ; stays positive (DEX / BPL). Out: A = $FF, X as the loop leaves it (N = 1), C kept, Y kept.
-nat_a549:   ld hl, $BAD7                    ; ($7AD7 in PRG-RAM)
+nat_a549:   ld hl, $DAD7                    ; ($7AD7 in PRG-RAM)
             add hl, de
             ld [hl], 0
             dec e
-.lp:        ld hl, $BAD7
+.lp:        ld hl, $DAD7
             add hl, de
             ld [hl], $FF
             dec e
@@ -1572,13 +1570,13 @@ nat_fbaa:   ld a, [NES_RAM + $13]
 ; ------------------------------------------------------------------ p2e:A697 / A78D
 ; reset attribute tables: $7D27-$7D66 = $FF, $7D27-$7D2E = $AA, $7D2F-$7D36 = $FA.
 ; Out: X = 0, A = $FA, Z = 1, N = 0, C kept; Y kept.
-nat_a697:   ld hl, $BD27                    ; ($7D27 in PRG-RAM)
+nat_a697:   ld hl, $DD27                    ; ($7D27 in PRG-RAM)
             ld a, $FF
             ld e, $40
 .f:         ld [hl+], a
             dec e
             jr nz, .f
-            ld hl, $BD27
+            ld hl, $DD27
             ld a, $AA
             ld e, 8
 .a:         ld [hl+], a
@@ -1648,16 +1646,16 @@ nat_a78d:   ld a, e
             ld [NES_RAM + $1F], a           ; height
             ld d, 0
 .row:       ld e, 0
-.col:       ld a, [$BE8E]                   ; $A6FB: $7E8E set: the flash palette $7E90
+.col:       ld a, [$DE8E]                   ; $A6FB: $7E8E set: the flash palette $7E90
             and a
             jr z, .np
-            ld a, [$BE90]
+            ld a, [$DE90]
             jr .pd
 .np:        ld a, [NES_RAM + $1A]           ; A = $7D17 + $1A, shifted left $1B + 1 times
             ld l, a                         ;   into $7E
             ld h, 0
             push de
-            ld de, $BD17
+            ld de, $DD17
             add hl, de
             ld d, [hl]
             ld a, [NES_RAM + $1B]
@@ -1736,7 +1734,7 @@ nat_a78d:   ld a, e
             push af
             ld d, 0
             ld a, l
-            ld hl, $BD27
+            ld hl, $DD27
             add hl, de
             and [hl]
             ld e, a
@@ -1822,6 +1820,8 @@ nat_9f00:   push af
             ld h, a
             ld l, 0
             ld de, EX_RAM
+            ld a, RT_WBANK                  ; (ExRAM: WRAM bank RT_WBANK)
+            ldh [rSVBK], a
             ld b, 0
 .cp:        ld a, [hl+]
             ld [de], a
@@ -1838,6 +1838,8 @@ nat_9f00:   push af
             dec b
             jr nz, .cp
             ld l, a                         ; (the last byte copied: $83FF)
+            ld a, 1
+            ldh [rSVBK], a
             ldh a, [code_bank]
             ld [MBC5_BANKL], a
             xor a
@@ -1904,7 +1906,7 @@ nat_9fe4:   ldh a, [data_bank8]
             ld a, [NES_RAM + $A3]
             add a, $B7
             ld l, a
-            ld h, $BD                       ; ($7DB7 + $A3)
+            ld h, $DD                       ; ($7DB7 + $A3)
             ld a, [hl]
             cp $FF
             jr z, .ns
@@ -1965,7 +1967,7 @@ nat_9fe4:   ldh a, [data_bank8]
 .fast:      ld a, [NES_RAM + $A3]           ; status of the character ($7DB7 + $A3):
             add a, $B7                      ;   palette / y offset from $A051 / $A049 once
             ld l, a
-            ld h, $BD
+            ld h, $DD
             ld a, [hl]
             ldh [c_q], a
             cp $FF
@@ -2091,20 +2093,24 @@ nat_966a:   ld a, BCONV_GB                  ; (GB layout, tools/gb3/layout.py: l
             ld a, [NES_RAM + $18]
 .g0:        call nat_a558
             call .cy
-            ld hl, $BAD7                    ; HL = $7AD7 + X (X = 0)
+            ld hl, $DAD7                    ; HL = $7AD7 + X (X = 0)
             ld c, 0                         ; Y
 .line:      ld a, [NES_RAM + $4E]           ; DE = ($4E) + Y (NES)
             add a, c
             ld e, a
             ld a, [NES_RAM + $4F]
             adc a, 0
-            ld d, a
-            sub $60                         ; in PRG-RAM up to + 255: written in place
-            cp $1F
+            ld d, a                         ; in PRG-RAM up to + 255 (contiguous in the GB
+            sub $70                         ;   map: $6000-$62FF, $7000-$7EFF): in place
+            cp $0F
+            jr c, .p7
+            add a, $10
+            cp 3
             jr nc, .sch
-            ld a, d
-            add a, $40
-            ld d, a
+            add a, high(PRG6)
+            jr .pd
+.p7:        add a, high(PRG7)
+.pd:        ld d, a
 .ch:        ld a, [hl+]
             and a
             jr z, .end
@@ -2246,7 +2252,7 @@ nat_fbef:   ld h, a
             inc [hl]
             ld l, a
             ld h, 0
-            ld de, $BBE3                    ; ($7BE3 in PRG-RAM)
+            ld de, $DBE3                    ; ($7BE3 in PRG-RAM)
             add hl, de
             ld a, [hl]
             ld e, a                         ; HL = d * t
@@ -2433,9 +2439,9 @@ far_9f98:
             inc a
             cp 4
             jr c, .sb
-            ld a, 1
+            ld a, MAP_BANK                  ; nametables (WRAM bank MAP_BANK)
             ldh [rSVBK], a
-            ld hl, NT_SH                    ; nametables
+            ld hl, NT_SH
 .c2:        xor a
             ld [hl+], a
             ld a, h
@@ -2509,7 +2515,7 @@ far_fc27:   ld hl, NES_RAM                  ; seed: A + the zero page with carri
             ld [NES_RAM + $22], a
             ld b, a                         ; B = s
             ld de, 1                        ; DE = v
-            ld hl, $BBE3                    ; table ($7BE3)
+            ld hl, $DBE3                    ; table ($7BE3)
 .rnd:       push hl
             ld h, d                         ; HL = v * s (s = 3: v + 2v; 5: v + 4v)
             ld l, e
@@ -2593,7 +2599,7 @@ far_fc27:   ld hl, NES_RAM                  ; seed: A + the zero page with carri
             ld [NES_RAM + $20], a
             srl h                           ; LSR $1F (C = bit 0) / ROR $1E
             rra
-            ld [$BCE2], a                   ; table[255]
+            ld [$DCE2], a                   ; table[255]
             push af                         ; (A and the ROR's carry)
             xor a                           ; Y = 0 (INY wrapped): Z = 1, N = 0
             ldh [nzv], a
@@ -2782,7 +2788,7 @@ far_8f57:   ld a, [NES_RAM + $1D]           ; GB bases of the two tables
             or high(NES_RAM)
             ld h, a
             ret
-.mp:        add a, $40
+.mp:        call prg_page
             ld h, a
             ret
 
@@ -2834,11 +2840,14 @@ far_5808:   and a
 .off:       ldh a, [mnu]
             and a
             jr z, .rest
+            ld a, RT_WBANK                  ; (ATTR_STALE: WRAM bank RT_WBANK)
+            ldh [rSVBK], a
             ld hl, ATTR_STALE               ; (menu closed: every attribute byte stale: the
             ld a, 1                         ;   map shares its cells between the nametables,
 .st:        ld [hl+], a                     ;   and the menu left its palettes on cells the
             bit 7, l                        ;   next screen draws from the other one, whose
             jr z, .st                       ;   attribute values need not change)
+            ldh [rSVBK], a
             ldh [attr_st], a
             xor a
             ldh [mnu], a
@@ -2900,7 +2909,7 @@ far_5808:   and a
             add a, $C0
             ld l, a
             ld h, high(NT_SH) + 3
-            ld a, 1
+            ld a, MAP_BANK                  ; (NT_SH: WRAM bank MAP_BANK)
             ldh [rSVBK], a
             ld a, [hl]
             bit 1, d                        ; quadrant: row bit 1 -> high nibble, col bit 1

@@ -48,7 +48,7 @@ def main():
         cmd = [os.path.join(ROOT, 'build', 'sgbrun'), a.gb, str(a.frames or int(a.to * 1.25) + 600),
                os.path.join(tmp, 'q'), '--cgb', '--padfile', pads]
         for j in range(a.frm, a.to + 1, a.step): cmd += ['--nshot', str(j)]
-        env = dict(os.environ, SGBRUN_PEEK='D830')
+        env = dict(os.environ, SGBRUN_PEEK='CD90', GB_CNT='CD80', GB_PRG='ff3')   # (runtime.s NMI_CNT, DBG)
         if a.resync:
             import struct
             cf = os.path.join(tmp, 'clock.bin')
@@ -60,6 +60,8 @@ def main():
         out = subprocess.run(cmd, env=env, capture_output=True, text=True).stdout + ''
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    for l in out.splitlines():
+        if l.startswith(('lotcheck', 'svbk', 'wwatch')): print(l[:1500])   # (env SGBRUN_LOTCHECK=1: release checklist 2)
     gbw = {}
     for l in out.splitlines():
         if not l.startswith('peek'): continue

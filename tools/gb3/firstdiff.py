@@ -5,10 +5,10 @@ usage: PYTHONPATH=build/emu3 firstdiff.py NES GB FRAMES [--input NAME] [--from K
 
 The NES (cynes, build/emu3) and the GB (PyBoy, CGB mode) run with the same input
 (tools/gb3/cmpshots.py INPUTS). Two clocks, counted the same way on both:
-  - input frames (NES nmi_count, GB NMI_CNT $D830): NMIs through JMP $FF2A (a wait) or
+  - input frames (NES nmi_count, GB NMI_CNT $CD90): NMIs through JMP $FF2A (a wait) or
     JMP $FB57 (the battle / cutscene handler) in the RAM vector $0100; the GB reads the
     pad the NES latched in the same frame (pad_history; test-mode slots);
-  - waited-for frames (NES ff3_waits, GB WAIT_CNT $D834): the equivalence points, where
+  - waited-for frames (NES ff3_waits, GB WAIT_CNT $CD94): the equivalence points, where
     the main thread waits ($FF36, or the $FB80 loop for the asynchronous handler). NES
     RAM at that NMI; GB at wait_vbl entry (WAIT_CNT = k - 1) or where rt_wait_nmi runs the
     handler (rt_async.cnt, WAIT_CNT = k).
@@ -29,6 +29,13 @@ def sym(path):
         a, n = l.split()
         b, o = a.split(':'); s[n] = (int(b, 16), int(o, 16))
     return s
+
+def prg_at(ad):
+    """PyBoy memory key of NES PRG-RAM byte ad in the GB build (runtime.s PRG6 / PRG7 / SAVE_RAM)"""
+    if 0x7F38 <= ad <= 0x7F3A: return (0, 0xA000 + ad - 0x7F00)
+    if ad < 0x6400: return 0xC800 + ad - 0x6000
+    if ad < 0x7000: return (0, 0xA000 + ad - 0x6000)
+    return (1, 0xD000 + ad - 0x7000)
 
 def gb_order(v):                        # NES pad (bit 0 Right .. 7 A) -> runtime (bit 0 A .. 7 Right)
     r = 0
@@ -90,7 +97,7 @@ def main():
     st = {'diffs': 0, 'checked': 0, 'last': 0}
 
     def feed(kk):
-        m[1, 0xD83E] = 0xA5
+        m[0xCD9E] = 0xA5
         for j in range(kk, kk + 40):                 # slot j: the NES's latch after frame j
             v = W.latch.get(j)
             if v is None: v = W.latch.get(j - 1, 0)
@@ -104,7 +111,7 @@ def main():
         c = nes_clock.get(kk)
         if c is not None:
             c -= before                          # (at a wait's entry its frame is not counted yet)
-            m[1, 0xD830] = c & 0xFF; m[1, 0xD831] = c >> 8
+            m[0xCD90] = c & 0xFF; m[0xCD91] = c >> 8
             feed(c)
         if kk not in nes_ram: return
         st['checked'] += 1
@@ -113,19 +120,23 @@ def main():
         if a.show:
             lo, hi = a.show
             print('frame %d NES %s | GB %s   (GB input clock %d, NES %s)' % (kk, nes_ram[kk][lo:hi + 1].hex(),
-                  g[lo:hi + 1].hex(), m[1, 0xD830] | m[1, 0xD831] << 8, nes_clock.get(kk)))
+                  g[lo:hi + 1].hex(), m[0xCD90] | m[0xCD91] << 8, nes_clock.get(kk)))
         if d and st['diffs'] < a.max:
             st['diffs'] += 1
             print('frame %d: %d bytes differ: %s' % (kk, len(d), ' '.join(
                 '%04X:%02X/%02X' % (i, nes_ram[kk][i], g[i]) for i in d[:24])))
 
-    def nmi(): return m[1, 0xD830] | m[1, 0xD831] << 8
-    def waits(): return m[1, 0xD834] | m[1, 0xD835] << 8
+    def nmi(): return m[0xCD90] | m[0xCD91] << 8
+    def waits(): return m[0xCD94] | m[0xCD95] << 8
     def on_wait(ctx):
+        if not st.get('prg0'):               # (the boot cleared WRAM: the NES's power-on PRG-RAM
+            st['prg0'] = 1                   #   in the game state / work areas too, as before)
+            for i in list(range(0x400)) + list(range(0x1000, 0x2000)):
+                if not 0x7F38 <= 0x6000 + i <= 0x7F3A: m[prg_at(0x6000 + i)] = sram0[i]
         if poke and not st.get('poked') and waits() + 1 >= poke[0]:
             for ad, v in poke[1]:
                 if ad < 0x800: m[0xC000 + ad] = v
-                else: m[0, 0xA000 + ad - 0x6000] = v
+                else: m[prg_at(ad)] = v
             st['poked'] = 1
         feed(nmi()); check(waits() + 1, 1)
     def on_async(ctx):
@@ -135,7 +146,7 @@ def main():
     pb.hook_register(*S['wait_vbl'], on_wait, None)
     pb.hook_register(*S['rt_async.cnt'], on_async, None)
     pb.hook_register(*S['rt_async.c'], on_frame, None)
-    for i in range(0x2000): m[0, 0xA000 + i] = sram0[i]
+    for i in range(0x2000): m[prg_at(0x6000 + i)] = sram0[i]
     feed(0)
     t = 0
     while st['last'] < k and t < a.frames * 6 + 2000:
@@ -143,10 +154,13 @@ def main():
         if st['diffs'] >= a.max: break
     if a.sram:
         lo, hi = (int(v, 16) for v in a.sram.split('-'))
-        d = [x for x in range(lo, hi + 1) if m[0, 0xA000 + x - 0x6000] != nes_sram[x - 0x6000]]
+        d = [x for x in range(lo, hi + 1) if m[prg_at(x)] != nes_sram[x - 0x6000]]
         print('PRG-RAM %04X-%04X at the end: %d bytes differ %s' % (lo, hi, len(d),
-              ' '.join('%04X:%02X/%02X' % (x, nes_sram[x - 0x6000], m[0, 0xA000 + x - 0x6000]) for x in d[:16])))
-    dbg = [m[1, 0xD820 + i] for i in range(16)]
+              ' '.join('%04X:%02X/%02X' % (x, nes_sram[x - 0x6000], m[prg_at(x)]) for x in d[:16])))
+    if os.environ.get('FD_BANKS'):           # debug: 16 bytes at ADDR in each WRAM bank
+        ad = int(os.environ['FD_BANKS'], 16)
+        for b in range(8): print('WRAM bank %d %04X: %s' % (b, ad, bytes(m[b, ad + i] for i in range(16)).hex()))
+    dbg = [m[0xCD80 + i] for i in range(16)]
     print('GB: %d GB frames, reached frame %d, %d frames compared, %d with differences; DBG %s'
           % (t, st['last'], st['checked'], st['diffs'], ' '.join('%02X' % x for x in dbg)))
     if dbg[0] == 0x38:

@@ -361,11 +361,44 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
 - Checks: explore 12000 and the menu / status / equip / item / magic sequences identical;
   field and battle shots clean.
 
+## Release checklist work (2026-11-20, owner: "address the gaps in the lot check requirements")
+Results per item: `docs/gb-release-checklist.md` (FF3 column); every item passes except the
+cross-hardware check on a Game Boy Advance (untested).
+- **Cart RAM only around save accesses.** Measured first (cynes write / read watch, 3 x 40k
+  frames of random play): FF3 uses all of $6000-$63FF and $7000-$7FFF as work RAM; the save
+  slots $6400-$6FFF are touched only by the save / load / slot-check code, and the save count
+  $7F38-$7F3A is the only other battery data. New map (runtime.s `PRG6` / `PRG7` / `SAVE_RAM`):
+  $6000-$63FF -> fixed WRAM $C800 (ExRAM's old place), $7000-$7FFF -> WRAM bank 1 $D000 (the
+  main thread's bank), slots / save count -> cart RAM bank 0 through `sram_rd` / `sram_wr` /
+  `rt_svc_rd` / `rt_svc_wr` (RAM on for the one byte). ExRAM moved to WRAM bank 6 ($DC00; the
+  translator brackets each absolute ExRAM access with `ld hl, $FF70 / ld [hl], 6 .. 1`), with
+  `LK_TAB`, `ATTR_STALE` (bank 6, `RT_WBANK`); `NT_SH` moved into `MAP_BANK` at $D800; `DBG` /
+  frame counters / `OVR_*` to fixed WRAM $CD80-$CDE3 (test tools: `GB_CNT=CD80`). Page map
+  `prg_page` / `prg_cross` in every indirect path, `prg_inline` in the translator's inline
+  (zp),Y loads / stores, `gb_ram_run` for the copy / fill idioms (no run across a map seam).
+  Natives that read PRG-RAM while a staging bank is in go through a bounce buffer (chr64 fast
+  path via `NC_BUF`, flip table included; `rt_ppu_copy.tile` via `PC_BUF`).
+- **Soft reset** (vblank poll, `sram_busy` hold-off), **save check** at boot (`save_check`),
+  **boot** clears all of WRAM / VRAM / OAM / HRAM and sets the registers, LCD off only in the
+  vblank (also after a soft reset; double speed not switched twice).
+- **Release build** `build.py --gb --release`; `lotcheck.py`: 13 / 13; terminology: GB dialogue
+  "A Button" / "B Button", system message $4E "You can turn the power off now." (the NES's
+  "Hold RESET while you turn the power off" names a button the Game Boy does not have).
+- Checks after the change: firstdiff explore 12000, menu, status, equip, magic, job and save
+  sequences identical to the NES (save: slot bytes $6400-$6FFF identical in cart RAM); mGBA
+  `SGBRUN_LOTCHECK` explore 2000-12000 and the save sequence: no violation; the save / detail
+  screens as before; lag explore 2000-12000 +0.7% (was +0.6%).
+- Found with the PRG-RAM compare (old, not from this change): FF3's water animation buffer
+  ($7380 / $7F00) is filled by reading tiles back through $2007, and the runtime returns 0 for
+  CHR reads, so the GB's water animation tiles are blank (to fix with the native presentation).
+- Tools: `tools/gb/lotcheck.py`, `tools/gb/termcheck.py`, sgbrun `SGBRUN_LOTCHECK` /
+  `SGBRUN_SVBK` / `SGBRUN_WWATCH` / `SGBRUN_SRAMOUT`, `--sram` now also writes the cart RAM
+  directly; firstdiff `prg_at` (the new map), `FD_BANKS=ADDR`.
+
 ## Known open items
-- **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3 known failures: cart
-  RAM enabled for good at boot (NES PRG-RAM lives in it), no soft reset, test hooks in the binary (`TEST_PAD`,
-  `rst $38` trap); the rest to verify item by item. Done: the Color-only screen on DMG / SGB
-  (`build.py dmg_msg_src`, seen in PyBoy and mGBA).
+- **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3: all items pass
+  (2026-11-20) except the Game Boy Advance check (untested); re-run the checks on the final build.
+- Water animation tiles blank (CHR read-back through $2007 returns 0).
 - Warp (`p3c:9B5F` TSX / TXS arithmetic) and the inn's `TXS` from a saved X (`p3c:9039`) use
   FF2's approximate helpers: need a semantic version (as FF2's open item).
 - Sound: APU writes ignored for now.

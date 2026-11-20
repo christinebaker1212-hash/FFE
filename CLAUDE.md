@@ -839,8 +839,10 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
 
 ## Remaining
 - **Before any release (all ports): `docs/gb-release-checklist.md`** (Lot Check standards;
-  known failures: SRAM kept enabled, no soft reset, test hooks in the binary, FF3 without the
-  Color-only warning screen).
+  tools: `tools/gb/lotcheck.py`, `tools/gb/termcheck.py`, sgbrun `SGBRUN_LOTCHECK=1`. FF3 passes
+  every item (2026-11-20) but the GBA check; FF1 / FF2: soft reset, release build and the SRAM
+  rule still fail - the SRAM rule needs the owner: a DMG has too little work RAM, options in the
+  checklist).
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette
   steps; names up to 6 letters; music voices vs the NSF (sndcmp.py); then the owner's
@@ -851,4 +853,6 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   message windows, battle cameras in the runtime), RAM-identical to its NES layout ROM.
   Main menu re-laid out (owner's mock N5B; GB menu mode $5808: window layer + SCY steps),
   RAM-identical; Status / Equip / Item / Magic / Job / Save re-laid out (owner's mocks); field
-  vertical wrap fixed; Color-only screen added. Next: load menu, prophecy, name entry, shops.
+  vertical wrap fixed; Color-only screen added; Lot Check items done (work RAM in Color WRAM,
+  cart RAM only around save accesses, soft reset, save check screen, `--release` build).
+  Next: condensed font for all names (owner), load menu, prophecy, name entry, shops.

@@ -363,12 +363,44 @@ def nes_region(a):
 MMC_W = (0x5105, 0x5114, 0x5115, 0x5116, 0x5203, 0x5204) + tuple(range(0x5800, 0x5810))
 
 
+# PRG-RAM on the GB (docs/gb-release-checklist.md, SRAM protection): the game state
+# $6000-$63FF in fixed WRAM $C800, the work area $7000-$7FFF in WRAM bank 1 ($D000, the
+# main thread's bank); the save slots $6400-$6FFF and the save count $7F38-$7F3A in cart RAM
+# (battery), reached only through the runtime's rt_svc_* / sram_* helpers, which switch the
+# cart RAM on around each access. ExRAM is in WRAM bank 6 (EX_BANK): accesses switch to it.
+SAVE_ABS = range(0x7F38, 0x7F3B)
+EX_BANK = 6
+
+
+def save_addr(a):
+    return 0x6400 <= a < 0x7000 or a in SAVE_ABS
+
+
 def gb_ram(a):
+    """GB address of NES RAM / PRG-RAM byte a in the main thread's memory map, None when
+    it has none (ExRAM: banked; save slots: cart RAM; I/O, ROM)"""
     r = nes_region(a)
     if r == 'ram': return 0xC000 + (a & 0x7FF)
-    if r == 'ex': return 0xC800 + a - 0x5C00
-    if r == 'sram': return 0xA000 + a - 0x6000
+    if r == 'sram':
+        if save_addr(a): return None
+        return 0xC800 + a - 0x6000 if a < 0x6400 else 0xD000 + a - 0x7000
     return None
+
+
+def gb_ram_run(a, n):
+    """gb_ram(a) when the n bytes from a map to n consecutive GB bytes, else None"""
+    g = gb_ram(a); e = gb_ram(a + n - 1) if a + n - 1 <= 0xFFFF else None
+    if g is None or e is None or e - g != n - 1: return None
+    if nes_region(a) == 'ram' and (a & 0x7FF) + n > 0x800: return None
+    return g
+
+
+def prg_inline(lb):
+    """(zp),Y inline: H = NES page -> GB page for the game state $60-$63 and the work area
+    $70-$7F (A clobbered); anything else to label lb_s (the helper)"""
+    return ['ld a, h', 'sub $70', 'jr nc, %s_7' % lb, 'add a, $10', 'cp 4', 'jr nc, %s_s' % lb,
+            'add a, $C8', 'jr %s_h' % lb, '%s_7:' % lb, 'cp $10', 'jr nc, %s_s' % lb, 'add a, $D0',
+            '%s_h:' % lb, 'ld h, a']
 
 
 class Emitter:
@@ -414,7 +446,11 @@ class Emitter:
         a = i.arg; idx = self.index_reg()
         r = nes_region(a)
         if m in ('zp', 'zpx', 'zpy'): r = 'ram'
-        if r in ('ram', 'ex', 'sram'):
+        if r == 'sram' and save_addr(a):               # cart RAM: switched on for the read
+            self.addr_hl(a, idx); self.o('call rt_svc_rd'); return 'l'
+        if r == 'ex':                                  # (Emitter.run switches the WRAM bank)
+            self.addr_hl(0xDC00 + a - 0x5C00, idx); return '[hl]'
+        if r in ('ram', 'sram'):
             self.addr_hl(gb_ram(a), idx); return '[hl]'
         if r in ('rom8', 'roma', 'romf'):
             # the window's 8KB bank at $4000 (+ $2000 for an odd bank: the helper adds it);
@@ -437,8 +473,7 @@ class Emitter:
         if m == 'izy' and reg == 'a' and not self.keep:     # no flag live: PRG-RAM inline
             lb = label(i.space, i.addr)
             self.o('ld d, a', 'ld hl, $%04X' % (0xC000 + i.arg), 'ld a, [hl+]', 'ld h, [hl]', 'ld l, a',
-                   'add hl, bc', 'ld a, h', 'sub $60', 'cp $20', 'jr nc, %s_s' % lb, 'add a, $A0',
-                   'ld h, a', 'ld [hl], d', 'ld a, d', 'ld d, 0', 'jr %s_d' % lb, '%s_s:' % lb,
+                   'add hl, bc', *prg_inline(lb), 'ld [hl], d', 'ld a, d', 'ld d, 0', 'jr %s_d' % lb, '%s_s:' % lb,
                    'call rt_sta_nes', '%s_d:' % lb)
             return
         if m in ('izy', 'izx'):
@@ -447,8 +482,13 @@ class Emitter:
             return
         a = i.arg; idx = self.index_reg()
         r = 'ram' if m in ('zp', 'zpx', 'zpy') else nes_region(a)
+        if r == 'sram' and save_addr(a):               # cart RAM: switched on for the write
+            if reg != 'a': self.o('push af', 'ld a, %s' % reg)
+            self.addr_hl(a, idx); self.o('call rt_svc_wr')
+            if reg != 'a': self.o('pop af')
+            return
         if r in ('ram', 'ex', 'sram'):
-            g = gb_ram(a)
+            g = gb_ram(a) if r != 'ex' else 0xDC00 + a - 0x5C00
             if idx is None and reg == 'a': self.o('ld [$%04X], a' % g)
             else:
                 self.addr_hl(g, idx); self.o('ld [hl], %s' % reg)
@@ -473,7 +513,9 @@ class Emitter:
         r = 'ram' if i.mode in ('zp', 'zpx') else nes_region(a)
         if r not in ('ram', 'ex', 'sram'):
             self.rc.warn.append('RMW on %s at %r' % (r, i)); return None
-        self.addr_hl(gb_ram(a), self.index_reg()); return True
+        if r == 'sram' and save_addr(a):
+            raise RuntimeError('RMW on the save area (cart RAM) at %r' % (i,))
+        self.addr_hl(gb_ram(a) if r != 'ex' else 0xDC00 + a - 0x5C00, self.index_reg()); return True
 
     # -- flags ------------------------------------------------------------------------
     def set_nz_reg(self, reg):
@@ -511,9 +553,12 @@ class Emitter:
             self.o('call ' + rc.g.idioms[k][0]); self.jump(None, (i.space, rc.g.idioms[k][1])); return
         h = getattr(self, 'x_' + mn, None)
         if h is None:
-            rc.warn.append('no translation for %r' % i); self.o('call rt_fatal')
-        else:
-            h()
+            rc.warn.append('no translation for %r' % i); self.o('call rt_fatal'); return
+        ex = (i.mode in ('abs', 'abx', 'aby') and mn not in ('JMP', 'JSR')
+              and nes_region(i.arg) == 'ex')
+        if ex: self.o('ld hl, $FF70', 'ld [hl], %d' % EX_BANK)      # ExRAM: WRAM bank 6
+        h()
+        if ex: self.o('ld hl, $FF70', 'ld [hl], 1')                 # (ld: flags, A kept)
 
     # loads / stores
     def ppu_idiom(self):
@@ -529,7 +574,9 @@ class Emitter:
             return False
         reg = 'e' if r == 'X' else 'c'; pair = 'de' if r == 'X' else 'bc'
         src = i.arg; reg_src = nes_region(src); n = k.arg or 256
-        if reg_src in ('ram', 'ex', 'sram'): sh = gb_ram(src); bank = None
+        if reg_src in ('ram', 'ex', 'sram'):
+            sh = gb_ram_run(src, n); bank = None
+            if sh is None: return False
         elif reg_src in ('rom8', 'roma'):
             if (src & 0x1FFF) + n > 0x2000: return False
             sh = 0x4000 + (src & 0x1FFF); bank = reg_src
@@ -567,7 +614,8 @@ class Emitter:
         if i.mode != 'izy': return False
         st = self.rc.insns.get((i.space, i.addr + 2)); j = self.rc.insns.get((i.space, i.addr + 5))
         k = self.rc.insns.get((i.space, i.addr + 6)); l = self.rc.insns.get((i.space, i.addr + 8))
-        if not (st and j and k and l and st.mn == 'STA' and st.mode == 'aby' and gb_ram(st.arg) is not None
+        if not (st and j and k and l and st.mn == 'STA' and st.mode == 'aby'
+                and gb_ram_run(st.arg, 256) is not None
                 and j.mn == 'INY' and k.mn == 'CPY' and k.mode == 'imm' and l.mn == 'BNE' and l.arg == i.addr):
             return False
         g = gb_ram(st.arg)
@@ -598,8 +646,7 @@ class Emitter:
         if self.i.mode == 'izy' and 'C' not in self.keep:   # PRG-RAM inline, else helper
             lb = label(self.i.space, self.i.addr)
             self.o('ld hl, $%04X' % (0xC000 + self.i.arg), 'ld a, [hl+]', 'ld h, [hl]', 'ld l, a',
-                   'add hl, bc', 'ld a, h', 'sub $60', 'cp $20', 'jr nc, %s_s' % lb, 'add a, $A0',
-                   'ld h, a', 'ld a, [hl]', 'jr %s_d' % lb, '%s_s:' % lb, 'call rt_lda_nes',
+                   'add hl, bc', *prg_inline(lb), 'ld a, [hl]', 'jr %s_d' % lb, '%s_s:' % lb, 'call rt_lda_nes',
                    '%s_d:' % lb)
             self.set_nz_reg('a'); return
         if self.i.mode in ('abs', 'abx', 'aby') and 'C' not in self.keep:
@@ -623,7 +670,7 @@ class Emitter:
         """STA abs,X|Y / INX|INY / CPX|CPY #n / BNE back, abs in RAM: a fill of the index range
         up to n (as the loop ends: index = n, Z = 1, C = 1, N = 0, A kept)"""
         i = self.i
-        if i.mode not in ('abx', 'aby') or gb_ram(i.arg) is None: return False
+        if i.mode not in ('abx', 'aby') or gb_ram_run(i.arg, 256) is None: return False
         r = 'X' if i.mode == 'abx' else 'Y'
         j = self.rc.insns.get((i.space, i.addr + 3)); k = self.rc.insns.get((i.space, i.addr + 4))
         l = self.rc.insns.get((i.space, i.addr + 6))
@@ -650,14 +697,16 @@ class Emitter:
         r = 'X' if i.mode == 'abx' else 'Y'
         st = self.rc.insns.get((i.space, i.addr + 3)); j = self.rc.insns.get((i.space, i.addr + 6))
         k = self.rc.insns.get((i.space, i.addr + 7)); l = self.rc.insns.get((i.space, i.addr + 9))
-        if not (st and j and k and l and st.mn == 'STA' and st.mode == i.mode and gb_ram(st.arg) is not None
+        if not (st and j and k and l and st.mn == 'STA' and st.mode == i.mode
+                and gb_ram_run(st.arg, k.arg or 256) is not None
                 and j.mn == 'IN' + r and k.mn == 'CP' + r and k.mode == 'imm' and l.mn == 'BNE' and l.arg == i.addr):
             return False
         reg = 'e' if r == 'X' else 'c'; pair = 'de' if r == 'X' else 'bc'
         src = i.arg; reg_src = nes_region(src)
         n = k.arg or 256
         if reg_src in ('ram', 'ex', 'sram'):
-            sh = gb_ram(src); bank = None
+            sh = gb_ram_run(src, n); bank = None
+            if sh is None: return False
         elif reg_src in ('rom8', 'roma'):
             if (src & 0x1FFF) + n > 0x2000: return False
             sh = 0x4000 + (src & 0x1FFF); bank = reg_src

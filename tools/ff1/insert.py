@@ -53,6 +53,8 @@ def wrap(text, width=W):
     return lines
 
 def enc(s):
+    if '--gb' in sys.argv:                   # GB build: Nintendo terminology (docs/gb-release-checklist.md 4)
+        s = s.replace('A button', 'A Button').replace('B button', 'B Button')
     out = bytearray(); i = 0
     while i < len(s):
         if s[i] == '{':

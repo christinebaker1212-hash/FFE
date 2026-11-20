@@ -1024,6 +1024,9 @@ def dialogue(r):
     _load = ins.load_rows
     def load_gb(name):
         rows = _load(name)
+        for e in rows:                                        # Nintendo terminology (release
+            if isinstance(e.get('en'), str):                  #   checklist 4; tools/gb/termcheck.py)
+                e['en'] = e['en'].replace('A button', 'A Button').replace('B button', 'B Button')
         if name == 't8200':
             for e in rows:
                 if e['id'] in MENU_TEXT: e['en'] = MENU_TEXT[e['id']]
@@ -1033,6 +1036,8 @@ def dialogue(r):
         if e['id'] in EQUIP_MSGS:                             #   18 columns
             t = e['en']; assert t.startswith('{0E}'), t
             MENU_TEXT[e['id']] = '{0E}' + '\n'.join(flow_gb(t[4:].replace('\n', ' '), 18))
+    MENU_TEXT[0x4E] = '{0E}You can turn the\npower off now.'  # (the NES's "Hold RESET while you turn
+                                                         #   the power off": a Game Boy has no RESET)
     ins.layout.__defaults__ = (DLG_W_GB,)
     rep = []
     ins.put_tables(r.d, rep)
