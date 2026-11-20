@@ -352,9 +352,17 @@ def main():
         fhi = exi[m[0] + 1] | exi[m[0] + 2] << 8
         flo = exi[m[0] + 5] | exi[m[0] + 6] << 8
         rows = []
+        nat = {}                                       # (far routines run natively: their bank-0
+        if os.path.exists(nes + '.farsym'):            #   trampoline, bank byte $FF)
+            for l in open(nes + '.farsym'):
+                fa, fn = l.split()
+                if fn in FAR_EXT: nat[int(fa, 16)] = FAR_EXT[fn][0]
         for x in range(nfar):
             lo, hi = exi[flo - 0x5C00 + x], exi[fhi - 0x5C00 + x]
             tk = ('far', (lo | hi << 8) + 1)
+            if tk[1] in nat:
+                rows.append('    db $%02X, $FF, low(%s), high(%s)\n' % (lo, nat[tk[1]], nat[tk[1]]))
+                continue
             if tk not in rc.insns: rows = None; break
             lab = 'L_far_%04X' % tk[1]
             rows.append('    db $%02X, bank(%s), low(%s), high(%s)\n' % (lo, lab, lab, lab))
@@ -445,9 +453,20 @@ def main():
         print('  music engine: code not as expected, not native')
     mus_src = ''.join('%s = $%04X\n' % (k, mus.get(k, 0x8000)) for k in
                       ('MUS_SCORE_HI', 'MUS_P2C', 'MUS_ENVSPD', 'MUS_LENS', 'MUS_OCT', 'MUS_FREQS', 'MUS_ENVPAT'))
+    if mus:                                          # the engine's tables (octaves .. envelope
+        lo = min(mus[k] for k in ('MUS_OCT', 'MUS_FREQS', 'MUS_LENS', 'MUS_ENVSPD', 'MUS_ENVPAT'))
+        hi = mus['MUS_ENVPAT'] + 16 * 32             #   patterns) into bank RT_TABLES (mrd reads
+        tab = prg[b13 + lo:b13 + hi]                 #   them there)
+        mt_defs = 'MT_LO = $%04X\nMT_LEN = $%04X\n' % (lo, hi - lo)
+        mtab_src = '\nsection bank RT_TABLES, $7000\nMTAB:\n' + ''.join(
+            '    db ' + ', '.join('$%02X' % x for x in tab[i:i + 16]) + '\n' for i in range(0, len(tab), 16))
+    else:
+        mt_defs = 'MT_LO = $FFFF\nMT_LEN = 0\nMTAB = $7000\n'
+        mtab_src = ''
     prog, bank_of, banks = emit_program(rc)
     print('  routines copied into calling banks: %d bytes' % getattr(rc, 'clone_bytes', 0))
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s', 'sgb.s'))
+    rt = mt_defs + rt
     rt += '\nPROW_OFF = NES_RAM + $%04X\n' % prow_off
     rt += '\nsection bank HLE_BANK, $7800\n' + wrow3_src     # (build-time table from the ROM)
     rt += '\nsection bank PF_BANK, $7C00\n' + wrf_src
@@ -457,6 +476,7 @@ def main():
     rt += '\n' + apu_tables() + '\nSND_MASK = $%02X\n' % int(os.environ.get('GB_SND_MASK', 'FF'), 16) + 'MDF_ON = %d\n' % int(os.environ.get('GB_MDF', '1'))
     rt += open(os.path.join(HERE, 'rt', 'apu_core.s')).read()
     rt += mus_src + open(os.path.join(HERE, 'rt', 'mus.s')).read()
+    rt += mtab_src
     rt += '\n' + vwf_tables(prg, far_sym)            # (before ff1_native.s: VW_GR_NES)
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ff1_native.s')).read()
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ramchk.s')).read() + '\n' + ramchk_src()

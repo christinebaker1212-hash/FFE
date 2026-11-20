@@ -1805,8 +1805,9 @@ rt_wait_nmi:
             inc hl
             inc [hl]
 .nc:        pop hl
-            ld a, [VBL_CNT]                 ; (the count at the wait's entry: spare-time work
-            ld [VBL_ENT], a                 ;   below that runs into the vblank costs no frame,
+            call vbl_late                   ; (entered in a vblank no wait has ended in: as the
+            ld [VBL_ENT], a                 ;   NES, whose NMI comes at once when FF1 enables it
+                                            ;   during its vblank; spare-time work
             ldh a, [is_cgb]                 ;   as the NES NMI comes during its wait loop)
             and a
             call z, dmg_frame

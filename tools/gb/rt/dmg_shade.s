@@ -560,7 +560,16 @@ izyrun0:    ldh [tmp_lo], a                 ; (zp)
             dec a
             add a, l
             cp $C0
-            jp nc, .slow
+            jr c, .ok
+            ld a, h                         ; (a run of attribute bytes, DMG: the shadow only,
+            cp 3                            ;   as rt_ppu_w7's .at; mixed runs byte by byte)
+            jp nz, .slow
+            ld a, l
+            cp $C0
+            jp c, .slow
+            ldh a, [is_cgb]
+            and a
+            jp nz, .slow
 .ok:        ld a, l                         ; offset and n kept
             ld [IZ_OFF], a
             ld a, h
@@ -642,7 +651,13 @@ izyrun0:    ldh [tmp_lo], a                 ; (zp)
             jr nz, .cs
             ld [IZ_LAST], a
             pop hl
-            ld a, [VLCD]                    ; GB map (LCD off; masked: rebuilt when shown)
+            ld a, [IZ_OFF + 1]              ; (attribute bytes: no GB map, no owners; the
+            cp 3                            ;   palettes from them when the LCD goes on)
+            jr nz, .nat
+            ld a, [IZ_OFF]
+            cp $C0
+            jr nc, .ats
+.nat:       ld a, [VLCD]                    ; GB map (LCD off; masked: rebuilt when shown)
             and a
             jr z, .mp
             ld a, 1
@@ -686,6 +701,18 @@ izyrun0:    ldh [tmp_lo], a                 ; (zp)
             and a
             jr nz, .cg
             ld a, 1
+            ldh [dmg_scan], a
+            jr .cg
+.ats:       ld c, b                         ; (attribute run done: C = Y)
+            ld b, 0
+            ldh a, [code_bank]
+            ld [$2000], a
+            ld a, [IZ_OFF]
+            ld l, a
+            ld a, [IZ_OFF + 1]
+            ld h, a
+            ld a, 1
+            ld [CGB_RP], a
             ldh [dmg_scan], a
 .cg:        ld a, [NF_N]                    ; v += n (within nametable 0), Y += n
             ld d, a

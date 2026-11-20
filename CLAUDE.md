@@ -1028,6 +1028,18 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   sampler (bank:PC of one frame into NES $0340-$03B7, target / skip poked by gbrun --poke),
   Gambatte event log with per-routine events; the NES-side instruction profile per frame.
 
+- **2026-11-20 (later):** frame wait entered during the GB vblank (LY 144-153, LCD on) in which
+  no wait has ended yet returns at once (`vbl_late`; the NES: FF1 enabling NMI with the vblank
+  flag set gets its NMI at once; no catch-up otherwise); farjsr's dispatch (FARX) can point at
+  a native far routine's bank-0 trampoline (bank byte $FF); the music engine's tables
+  (octaves .. envelope patterns, bank 13 $B2F3-$B5C8) copied into bank RT_TABLES at build
+  time and read there by mrd; izyrun0 copies runs of attribute bytes (nametable 0, DMG, LCD
+  off) in bulk. Tried and dropped: a last-tile cache for bg_mat (WRAM clash, no gain), keeping
+  DMG loads masked (shadows only, map rebuilt at switch-on: slower at the battle start).
+  checkall 62/62 (n53, n54, n56). DMG 43 -> 40, CGB 0 (-7). Scratch tools: the in-ROM sampler
+  now records the mapped bank's ID ($7FFE) and works with the LCD off (frame tick every 69th
+  sample); `psmany.sh` samples many frames in parallel (env SKIPS).
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette

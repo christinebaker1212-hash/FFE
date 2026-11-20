@@ -54,28 +54,5 @@ mus_play:   ld a, RT_TABLES
             pop af
             ret
 
-; HL = NES address -> A (bank RT_TABLES mapped again); keeps BC, DE, HL
-mrd:        push hl
-            ld a, h
-            sub $80
-            cp $40
-            jr nc, .o
-            add a, $40
-            ld h, a
-            ldh a, [data_bank8]
-            ld [$2000], a
-            ld h, [hl]
-            ld a, RT_TABLES
-            ld [$2000], a
-            ld a, h
-            pop hl
-            ret
-.o:         push de
-            call nes_rd
-            pop de
-            ld a, RT_TABLES
-            ld [$2000], a
-            ld a, l
-            pop hl
-            ret
+
 

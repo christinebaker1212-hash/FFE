@@ -14473,6 +14473,8 @@ rt_farx:    pop hl                          ; (the idiom's return: this is a jum
             ldh [sv_a], a
             ld a, [hl+]
             ldh [fc_bank], a
+            inc a                           ; ($FF: a far routine run natively, its bank-0
+            jr z, .nat                      ;   trampoline: a jump; it returns as the RTS)
             ld a, [hl+]
             ld h, [hl]
             ld l, a
@@ -14481,6 +14483,14 @@ rt_farx:    pop hl                          ; (the idiom's return: this is a jum
             inc a
             dec a
             jp rt_dyn_go
+.nat:       ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            pop af
+            ldh a, [sv_a]
+            inc a
+            dec a
+            jp hl
 
 ; ---- b12:BF8F: swap $90-$9F with $6D97-$6DA6 (cart RAM bank 0; one page). Out: A = the old
 ; $9F, X = 16, Y = 0; N = 0, Z = 1; C kept.
@@ -16614,4 +16624,72 @@ bg_mat:     push af                         ; (C: the bank mapped now if its ID 
             ld a, c
             ld [$2000], a
             pop af
+            ret
+
+section bank 0, $33E0
+; frame wait entry: A = the VBL_CNT to wait past: the current one, or the one before when the
+; LCD is on, LY is in the vblank (144-153) and no frame wait has ended in this vblank yet (the
+; NES: FF1 enabling NMI with the vblank flag set gets its NMI at once). Keeps the rest.
+vbl_late:   ldh a, [lcd_on]
+            and a
+            jr z, .n
+            ldh a, [$FF44]
+            cp 144
+            jr c, .n
+            push hl
+            ld hl, VBL_SEEN
+            ld a, [VBL_CNT]
+            cp [hl]
+            pop hl
+            jr z, .n
+            dec a
+            ret
+.n:         ld a, [VBL_CNT]
+            ret
+
+section bank 0, $2F40
+; HL = NES address -> A (bank RT_TABLES mapped again); keeps BC, DE, HL
+mrd:        push hl
+            ld a, l                         ; (the engine's tables, copied into this bank by
+            sub low(MT_LO)                  ;   build.py at MTAB: read here, no bank switch)
+            ld l, a
+            ld a, h
+            sbc a, high(MT_LO)
+            jr c, .nt
+            ld h, a
+            cp high(MT_LEN)
+            jr c, .in
+            jr nz, .nt
+            ld a, l
+            cp low(MT_LEN)
+            jr nc, .nt
+            ld a, h
+.in:        add a, high(MTAB)
+            ld h, a
+            ld a, [hl]
+            pop hl
+            ret
+.nt:        pop hl
+            push hl
+            ld a, h
+            sub $80
+            cp $40
+            jr nc, .o
+            add a, $40
+            ld h, a
+            ldh a, [data_bank8]
+            ld [$2000], a
+            ld h, [hl]
+            ld a, RT_TABLES
+            ld [$2000], a
+            ld a, h
+            pop hl
+            ret
+.o:         push de
+            call nes_rd
+            pop de
+            ld a, RT_TABLES
+            ld [$2000], a
+            ld a, l
+            pop hl
             ret
