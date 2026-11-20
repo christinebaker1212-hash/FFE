@@ -2262,8 +2262,11 @@ nat_9fe4:   ldh a, [data_bank8]
 ; to $4E ($A558); code $01: $4E += 2 * $18, Y = 0 (next line); code $02 n: Y += n; $00 ends.
 ; Out as the NES: A = 0, Z = 1, N = 0 (or, if Y wraps, the last character with Z = 1), C from
 ; the last carry-producing step; X, Y as the loop leaves them.
-nat_966a:   ld a, [NES_RAM + $18]
-            call nat_a558
+nat_966a:   ld a, BCONV_GB                  ; (GB layout, tools/gb3/layout.py: lines start in
+            and a                           ;   the first buffer row and a newline is one row)
+            jr nz, .g0
+            ld a, [NES_RAM + $18]
+.g0:        call nat_a558
             call .cy
             ld hl, $BAD7                    ; HL = $7AD7 + X (X = 0)
             ld c, 0                         ; Y
@@ -2321,10 +2324,15 @@ nat_966a:   ld a, [NES_RAM + $18]
             ret
 .spec:      cp 1
             jr nz, .c2
-            push hl                         ; next line: $4E += 2 * $18 (ASL: carry in)
-            ld a, [NES_RAM + $18]
+            push hl                         ; next line: $4E += 2 * $18 (ASL: carry in;
+            ld a, [NES_RAM + $18]           ;   GB layout: $18)
+            ld l, a
+            ld a, BCONV_GB
+            and a
+            ld a, l
+            jr nz, .g1
             add a, a
-            call nat_a558
+.g1:        call nat_a558
             call .cy
             pop hl
             ld c, 0

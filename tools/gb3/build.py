@@ -102,7 +102,11 @@ def main():
     print('translated: %d instructions, %d code banks (%.1fs), %d dynamic targets'
           % (len(rc.insns), len(banks), time.time() - t, rc.n_dyn))
     t = time.time()
-    r = asm(src_all, syms={'DATA': DATA, 'RT_TABLES': RT_TABLES, 'CODE_BANK0': CODE0, 'RESET_NES': rc.g.reset[1]})
+    # GB layout ROM (tools/gb3/layout.py)? natives that follow patched routines check it
+    o = 16 + 0x34 * 0x2000 + (0x966A & 0x1FFF)
+    bconv_gb = 1 if open(nes, 'rb').read()[o:o + 2] == bytes.fromhex('A900') else 0
+    r = asm(src_all, syms={'DATA': DATA, 'RT_TABLES': RT_TABLES, 'CODE_BANK0': CODE0, 'RESET_NES': rc.g.reset[1],
+                           'BCONV_GB': bconv_gb})
     print('assembled (%.1fs)' % (time.time() - t))
     for n in range(64):                                    # NES 8KB banks 2n, 2n+1
         r.banks[DATA + n] = bytearray(prg[2 * n * 0x2000:(2 * n + 2) * 0x2000])
