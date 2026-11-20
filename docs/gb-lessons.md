@@ -115,3 +115,11 @@ it in FF1 (file / routine names in this repo).
 - When the field camera changes, re-check every screen laid out for the old one (title menu,
   world map, FORMATION). Screens that set their own camera must restore the field camera on
   every exit path (FF1's shop returned without a screen clear: `shopw` stub).
+
+## Release requirements (all ports)
+Every port must meet the Nintendo Lot Check standards in `docs/gb-release-checks.md` before
+any release (owner, 2026-11-20). Design for them from the start in FF2/FF3: keep save data
+apart from working buffers (cart RAM disabled after each save access), clear memory at boot,
+soft reset, LCD/VRAM/OAM timing, no debug code in release builds, and for FF3 a "Game Boy
+Color only" screen on older systems.
+

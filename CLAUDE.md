@@ -80,6 +80,15 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   and compare emulated RAM frame by frame (as in `tools/split/equiv.py`), plus
   screenshots of every re-laid-out screen.
 
+## Release requirements (owner's decision, 2026-11-20: absolutely required)
+No GB/GBC release of FF1, FF2 or FF3 until every Nintendo Lot Check standard in
+`docs/gb-release-checks.md` is met and checked: header and boot integrity, LCD off only in
+V-Blank, VRAM/OAM access windows, save RAM disabled after each access plus save validation
+with an error message, soft reset (A+B+Start+Select), memory cleared at boot, the
+DMG/Pocket/SGB/CGB/GBA compatibility matrix (FF3: a "Game Boy Color only" screen on older
+systems), Nintendo's hardware names ("Game Pak", "Control Pad", ...), meaningful CGB colour,
+and no undocumented debug code.
+
 ## Keeping this file current
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
@@ -1116,3 +1125,9 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   steps; names up to 6 letters; music voices vs the NSF (sndcmp.py); then the owner's
   play-test.
 - FF2: separate session (`docs/ff2-gb-brief.md`). FF3 (GBC only): not started.
+- **Before any release (required, owner 2026-11-20): Nintendo Lot Check standards,
+  `docs/gb-release-checks.md`.** Known gaps in FF1: cart RAM stays enabled (save RAM
+  protection needs a design change: runtime shadows live in cart RAM banks 1-3, NES work RAM
+  in bank 0), no save-corruption message, no soft reset, test-runner mode / rst $38 trap left
+  in the ROM, "CARTRIDGE" wording on the RAM-check screen, LCDC / VRAM / OAM access audit
+  and the hardware matrix not done yet.

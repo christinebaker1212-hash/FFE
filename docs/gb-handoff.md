@@ -4,6 +4,12 @@ Read `CLAUDE.md` first: it holds the owner's binding decisions, the targets, the
 what the repo may contain, and a running status. This file is the detailed state of the
 work in progress and how to continue it.
 
+## Release gate (owner's decision 2026-11-20: absolutely required)
+No release of any GB port until every Nintendo Lot Check standard in
+`docs/gb-release-checks.md` is met and checked (header/boot, LCD and VRAM/OAM timing, save RAM
+protection and validation, soft reset, memory init, hardware matrix, Nintendo's names, CGB
+colour, no undocumented debug code). Known FF1 gaps are listed there and in `CLAUDE.md`.
+
 ## Session setup (cloud container, nothing persists outside git)
 ```bash
 mkdir -p roms   # put the user's ROMs here (never commit): "Final Fantasy I, II (Japan).nes", "Final Fantasy III (Japan).nes"
