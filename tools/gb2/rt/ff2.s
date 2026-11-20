@@ -476,23 +476,75 @@ cp_core:    ld d, l                         ; (D = zp for the byte path)
             ld a, [CP_SRAM]
             and a
             jr nz, .cs
-.cr:        ld b, 8
-.p0:        ld a, [hl+]
+.cr:        ld b, 0                         ; (16 bytes unrolled: plane 0 rows to the
+                                            ;   even bytes, plane 1 to the odd ones)
+            ld a, [hl+]
             ld [de], a
             inc e
             inc e
-            dec b
-            jr nz, .p0
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
             ld a, e
             sub 15
             ld e, a
-            ld b, 8
-.p1:        ld a, [hl+]
+            ld a, [hl+]
             ld [de], a
             inc e
             inc e
-            dec b
-            jr nz, .p1
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
             jr .cd
 .cs:        call .pl                        ; a plane at a time through CP_BUF (bank 0 ->
             ld a, e                         ;   buffer, bank 1 -> shadow): plane 0 to the
@@ -1189,23 +1241,75 @@ copy_core:  ld a, e
             ld d, a
             ld a, 1
             ld [$4000], a
-.copy:      ld b, 8
-.p0:        ld a, [hl+]
+.copy:      ld b, 0                         ; (16 bytes unrolled: plane 0 rows to the
+                                            ;   even bytes, plane 1 to the odd ones)
+            ld a, [hl+]
             ld [de], a
             inc e
             inc e
-            dec b
-            jr nz, .p0
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
             ld a, e
             sub 15
             ld e, a
-            ld b, 8
-.p1:        ld a, [hl+]
+            ld a, [hl+]
             ld [de], a
             inc e
             inc e
-            dec b
-            jr nz, .p1
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
             ldh [tmp_lo], a                 ; last byte
             ld a, d
             cp $D0
