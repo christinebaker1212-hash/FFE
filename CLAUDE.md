@@ -1091,6 +1091,25 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   lands one frame later in Gambatte: a phase effect of a shorter boot; the loads' own lag went
   down further), CGB 0 (-8).
 
+- **OAM layout with room at both ends (2026-11-20, later):** a whole OAM conversion leaves up
+  to 12 GB slots free above the entries (from the last layout's size; 4 kept below), hides
+  them and every slot below its lowest; an incremental conversion places an entry coming into
+  view above every entry with a GB entry in the next free slot above (OC_TOP), one below every
+  one in the next free slot below (OC_BOT), and an entry coming back into its own hole from
+  this layout (OC_POS + entry + 1 = the layout's number, OC_EPO); the changed-entry list's
+  leading run above the highest is taken in ascending order (`oc_rev`). Battle: whole
+  conversions 21 -> 4 (hit effects 52-63 and the cursor 0-3 appearing were whole ones).
+  Visible sprites identical to the build before at 1600+ points (DMG and CGB; one-frame
+  differences in when sprites appear at two screen changes). b12:AF9D (12 bytes copied by a
+  ROM offset table) native (`ecopy_b`). Tried and dropped: OAM conversion during the deferred
+  switch-on (slot loads disturbed it: field entry / battle start +1), tighter switch-on
+  budgets (LON_END 244 / maps as a big step: +1 to +2), pf calls without the bank-0
+  trampoline (impossible: the caller's own bank is switched out).
+  DMG sprite pages: a whole-page copy from the same ROM page as last time onto a page no byte
+  write changed since (LZ_SRC + 4 * page + 3: `lz_dirty`, set by the byte-write paths) does
+  nothing (`lz_same`: no stale slots, no compares later; the battle start re-uploads its
+  party page); spr_mat's compare four rows a pass. checkall 62/62. Lag: DMG 26 -> 24, CGB -8.
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette

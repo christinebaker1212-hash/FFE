@@ -479,23 +479,6 @@ dmg_attr:   push bc
             pop bc
             ret
 
-; brightness of NES colour A (0-63): 0 black .. 8 white (the 2C02 rows, the grey column
-; a bit brighter). Keeps all registers but A.
-lum:        push hl
-            and $3F
-            ld hl, LUM_TAB
-            add a, l
-            ld l, a
-            jr nc, .nc
-            inc h
-.nc:        ld a, [hl]
-            pop hl
-            ret
-LUM_TAB:
-            db 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0
-            db 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 0, 0, 0
-            db 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0, 0, 0
-            db 8, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0
 
 ; retile_b (bank HLE_BANK): both planes of a tile (and TILE_USE) by pf2_b in bank PF_BANK
 pf2_call:   push af
@@ -822,31 +805,91 @@ spr_mat:    push af
             ld [$4000], a
             ld a, d
             ld [$2000], a
-            ld d, 0                         ; (D = OR of the differences)
-            ld e, 8                         ; plane 0 -> even bytes, plane 1 -> odd
-.p0:        ld a, [bc]
+            ld d, 0                         ; (D = OR of the differences; plane 0 -> even
+            ld a, 2                         ;   bytes, plane 1 -> odd; four rows a pass)
+.p0:        push af
+            ld a, [bc]
+            inc bc
+            ld e, a
             xor [hl]
             or d
             ld d, a
+            ld [hl], e
+            inc l
+            inc l
             ld a, [bc]
             inc bc
-            ld [hl+], a
+            ld e, a
+            xor [hl]
+            or d
+            ld d, a
+            ld [hl], e
             inc l
-            dec e
+            inc l
+            ld a, [bc]
+            inc bc
+            ld e, a
+            xor [hl]
+            or d
+            ld d, a
+            ld [hl], e
+            inc l
+            inc l
+            ld a, [bc]
+            inc bc
+            ld e, a
+            xor [hl]
+            or d
+            ld d, a
+            ld [hl], e
+            inc l
+            inc l
+            pop af
+            dec a
             jr nz, .p0
             ld a, l
             sub 15
             ld l, a
-            ld e, 8
-.p1:        ld a, [bc]
+            ld a, 2
+.p1:        push af
+            ld a, [bc]
+            inc bc
+            ld e, a
             xor [hl]
             or d
             ld d, a
+            ld [hl], e
+            inc l
+            inc l
             ld a, [bc]
             inc bc
-            ld [hl+], a
+            ld e, a
+            xor [hl]
+            or d
+            ld d, a
+            ld [hl], e
             inc l
-            dec e
+            inc l
+            ld a, [bc]
+            inc bc
+            ld e, a
+            xor [hl]
+            or d
+            ld d, a
+            ld [hl], e
+            inc l
+            inc l
+            ld a, [bc]
+            inc bc
+            ld e, a
+            xor [hl]
+            or d
+            ld d, a
+            ld [hl], e
+            inc l
+            inc l
+            pop af
+            dec a
             jr nz, .p1
             ld a, d
             and a
@@ -1059,7 +1102,7 @@ lz_init:    ld a, 3                         ; boot: no sprite page left in ROM (
             ld [$4000], a                   ;   BG page known as copied from ROM (BG_SRC)
             ld hl, LZ_BM
             xor a
-            ld b, 32
+            ld b, 96                        ;   (and LZ_SRC: bank 0 matches no copy)
 .lz:        ld [hl+], a
             dec b
             jr nz, .lz

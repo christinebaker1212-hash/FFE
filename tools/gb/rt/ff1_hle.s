@@ -76,10 +76,9 @@ hle_chr_pages:
                                             ;   in LZ_SRC, its tiles marked in LZ_BM: spr_mat
                                             ;   copies a tile to the shadow when a slot load or
                                             ;   a write needs it); its resident slots reloaded
-                                            ;   by the next OAM conversion
-            ld e, a
-            ld a, 3
-            ld [$4000], a
+                                            ;   by the next OAM conversion (the same ROM
+            ld e, a                         ;   page again onto an unchanged one: nothing,
+            call lz_same                    ;   lz_same; cart RAM bank 3 on)
             ld a, e
             add a, a
             add a, a
@@ -394,6 +393,10 @@ hle_chr_pages:
             jr .nx
 .cd:        pop de
             pop hl
+            ld a, d                         ; (a sprite tile: its page now differs from ROM)
+            and $F0
+            cp high(SPR_SHADOW)
+            call z, lz_dirty1
 .copy:      ld b, 8
 .p0:        ld a, [hl+]
             ld [de], a

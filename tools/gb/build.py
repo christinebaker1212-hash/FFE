@@ -352,6 +352,11 @@ def main():
         print('  DrawBox: code not found, not native')
     if prg[12 * 0x4000 - 0x8000 + 0x97A7:12 * 0x4000 - 0x8000 + 0x97B2].hex() == 'a200a9f09d0002e8d0fa60':  # b12:97A7
         rc.g.idioms[('b12', 0x97A7)] = ('pf:oclr_b', 0x97B1, 'NZ')            #   cleared ($F0)
+    if hashlib.sha1(prg[12 * 0x4000 - 0x8000 + 0xAF9D:12 * 0x4000 - 0x8000 + 0xAFE3]).hexdigest() == \
+            '654aa1d448230ee0353ea47e965cc445d15bbb62':                         # b12:AF9D (12 bytes
+        rc.g.idioms[('b12', 0xAF9D)] = ('pf:ecopy_b', 0xAFE3, 'NZC')          #   ($9C) -> ($9A))
+    else:
+        print('  b12 AF9D copy: code not found, not native')
     if hashlib.sha1(prg[12 * 0x4000 - 0x8000 + 0xAE09:12 * 0x4000 - 0x8000 + 0xAE2B]).hexdigest() == \
             'f5dd673103a769fd0c63953bc9e91ff7dfcfa4f2':                         # b12:AE09 (A x X,
         rc.g.idioms[('b12', 0xAE09)] = ('pf:mul8_b', 0xAE2A, 'NZC')           #   shift and add)
@@ -537,6 +542,9 @@ def main():
     rt += mus_src + open(os.path.join(HERE, 'rt', 'mus.s')).read()
     rt += mtab_src
     rt += '\n' + vwf_tables(prg, far_sym)            # (before ff1_native.s: VW_GR_NES)
+    o12 = 12 * 0x4000 - 0x8000                       # b12:AFCB, ecopy_b's index pairs
+    rt += '\nsection bank PF_BANK, $7B20\necopy_t:\n            db ' + ', '.join(
+        '$%02X' % x for x in prg[o12 + 0xAFCB:o12 + 0xAFE3]) + '\n'
     sq = [x * x // 4 for x in range(512)]            # quarter squares for mul8_b (a x b =
     rows = lambda b: '\n'.join('            db ' + ', '.join('$%02X' % v for v in b[i:i + 16])
                                for i in range(0, len(b), 16))   #   sq(a + b) - sq(|a - b|))

@@ -2366,8 +2366,7 @@ rt_ppu_w7g: push af
             cp d                            ;   other sprites again when they appear): the
             jr z, .sps                      ;   slot stays
             ld [hl], d
-            xor a
-            ld [$4000], a
+            call lz_dirty                   ; (the page differs from its ROM copy now)
             ld a, b                         ; tile = (v >> 4) & $FF
             swap a
             ld b, a

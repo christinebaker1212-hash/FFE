@@ -10983,6 +10983,13 @@ OC_POS     = $A800          ;   GB slot of each NES entry with a GB entry (index
 OC_LIST    = $A6C8          ;   changed entries (occmp, up to 16)
 OC_DF      = $A6D8          ;   a slot load deferred in this conversion (whole conversions)
 OC_ST      = $A6D9          ;   the slots in use stamped in this incremental conversion
+OC_TOP     = $A6DA          ;   the layout of the last whole conversion (kept by incremental
+OC_BOT     = $A6DB          ;   ones): highest / lowest GB slot in use (OAM_SH offsets), and
+OC_MAXI    = $A6DC          ;   the highest / lowest NES entry with a GB entry ($FF: none);
+OC_MINI    = $A6DD          ;   free slots above OC_TOP / below OC_BOT take entries coming into
+                            ;   view above / below them (NES order kept)
+OC_EPO     = $A6DE          ;   whole conversions so far (mod 256): OC_POS + entry + 1 = the one
+                            ;   that gave the entry its slot (a hole it left is its own)
 oamconv_b:  and $07
             add a, high(NES_RAM)
             ld h, a
@@ -11099,7 +11106,7 @@ oamconv_b:  and $07
             cpl
             add a, 9
             ld c, a
-            ld de, OAM_SH + 156
+            call oc_resv                    ; (DE = the first slot; top slots left free)
             ld l, $FC
             ld a, [hl]
             cp $EF
@@ -11420,6 +11427,9 @@ oamconv_b:  and $07
             ld a, e
             sub 3
             ld [hl], a
+            inc l
+            ld a, [OC_EPO]
+            ld [hl], a
             pop hl
             ld a, e                         ; the slot below (filled from the end)
             sub 7
@@ -11486,6 +11496,7 @@ oamconv_b:  and $07
             sub low(OC_LIST)
             jr z, .same
             ldh [o_cx], a                   ; entries left
+            call oc_rev                     ; (entries above every GB one: ascending)
             xor a
             ld [OC_ST], a
             ld a, low(OC_LIST)
@@ -11543,12 +11554,15 @@ oamconv_b:  and $07
             jr nc, .nn
             ld a, [OC_MISS]
             and a
-            jr z, .ab                       ; (comes into view: no slot for it)
+            jr z, .nw                       ; (comes into view: a free slot above / below?)
             inc d                           ; in its slot
             ld a, [de]
             dec d
-            call .vput
+.vp:        call .vput
             jr .cu
+.nw:        call oc_new                     ; (a free slot above / below: A, OC_POS set)
+            jp c, .ab
+            jr .vp
 .nn:        ld a, [OC_MISS]                 ; none now: its slot hidden
             and a
             jr z, .cu
@@ -11723,6 +11737,7 @@ oamconv_b:  and $07
 ; A = p (the lowest GB slot in use; 160: none): the slots below that the last conversion
 ; used are hidden; OAM_USED = the count
 .endr:      ld e, a
+            ld [OC_BOT], a
             ld a, [OC_DF]                   ; a load deferred: no sprites this frame (they
             and a                           ;   appear together once their tiles are in,
             jr z, .nd                       ;   not part of a figure)
@@ -11738,28 +11753,23 @@ oamconv_b:  and $07
             ld [OAM_USED], a
             jr .rx
 .nd:
-            ld a, 160
-            sub e
+            ld a, [OC_TOP]                  ; every slot below p hidden (a layout with free
+            add a, 4                        ;   slots at both ends: whatever an earlier one
+            sub e                           ;   left there); OAM_USED = the slots in use
             rrca
             rrca
-            ld c, a
-            ld a, [OAM_USED]
-            ld b, a
-            ld a, c
             ld [OAM_USED], a
-            ld a, b
-            sub c
-            jr c, .rx
-            jr z, .rx
-            ld b, a
             ld d, high(OAM_SH)
-.rc:        ld a, e
-            sub 4
-            ld e, a
             xor a
+.rc:        inc e
+            dec e
+            jr z, .rx
+            dec e
+            dec e
+            dec e
+            dec e
             ld [de], a
-            dec b
-            jr nz, .rc
+            jr .rc
 .rx:        xor a
             ld [$4000], a
             inc a
@@ -11770,6 +11780,10 @@ oamconv_b:  and $07
 ; the forward conversion (more than 40 in view): slots 0-39, the last entries dropped
 oc_fwd:     xor a
             ld [OAM_CLEAN], a
+            ld [OC_BOT], a                  ; (a full layout: the next whole conversion leaves
+            ld a, 156                       ;   no slots free at the top, no overflow again)
+            ld [OC_TOP], a
+            xor a
             ld [$4000], a
             ldh a, [cam_y]
             cpl
@@ -18184,3 +18198,327 @@ rl_cpy:     ld a, c
             jr nz, .l
             ret
 
+; ---- b12:AF9D-AFAC (12 bytes from ($9C) to ($9A), each pair of offsets from the table at
+; b12:AFCB: JSR AFAF while $6C8E < $18; then JMP AFE3), natively: the bytes by the runtime's
+; (zp),Y read / write; $6C8E = $18; A = $18, X = $17, Y = the last offset; N = 0, Z = C = 1
+; (CMP #$18); V kept. ecopy_t: the table, copied by build.py.
+section bank PF_BANK, $7B40
+ecopy_b:    ldh a, [code_bank]              ; (the helpers come back to code_bank)
+            push af
+            ld a, PF_BANK
+            ldh [code_bank], a
+            ld hl, ecopy_t
+            ld d, 12
+.l:         ld c, [hl]
+            inc hl
+            ld b, 0
+            push hl
+            ld l, $9C
+            call rt_izy_rd
+            ld a, l
+            pop hl
+            ld c, [hl]
+            inc hl
+            push hl
+            ld l, $9A
+            call rt_izy_wr
+            pop hl
+            dec d
+            jr nz, .l
+            ld a, $18
+            ld [$A000 + $0C8E], a
+            pop af
+            ldh [code_bank], a
+            xor a
+            ldh [nzv], a
+            ld e, $17                       ; X
+            ld d, a
+            ld b, a
+            ld hl, $1890                    ; A = $18; Z, C
+            push hl
+            pop af
+            ret
+
+; oamconv_b's whole conversion, before its entries (H = the NES page, cart RAM bank 3 on):
+; R = the free GB slots (40 less the entries of the last layout) less 4 kept below, at most
+; 12, left free (hidden) at the top for entries coming into view above the others later;
+; DE = the first slot to fill; OC_TOP, OC_MAXI / OC_MINI ($FF) set; OC_EPO + 1. Keeps BC, H.
+section bank HLE_BANK, $5D48
+oc_resv:    push bc
+            ld a, [OC_EPO]
+            inc a
+            ld [OC_EPO], a
+            ld a, [OC_BOT]                  ; the entries of the last layout (OC_TOP + 4 -
+            ld b, a                         ;   OC_BOT) / 4 for the count (a jump in the
+            ld a, [OC_TOP]                  ;   count: more than 40 - R in view goes to the
+            add a, 4                        ;   forward conversion, as with more than 40)
+            sub b
+            jr nc, .c1
+            xor a
+.c1:        rrca
+            rrca
+            and $3F
+            ld b, a
+            ld a, 36
+            sub b
+            jr nc, .rg
+            xor a
+.rg:        cp 12
+            jr c, .rr
+            ld a, 12
+.rr:        ld b, a
+            ld de, OAM_SH + 156
+            and a
+            jr z, .rd
+            xor a
+.rh:        ld [de], a
+            ld a, e
+            sub 4
+            ld e, a
+            xor a
+            dec b
+            jr nz, .rh
+.rd:        ld a, e
+            ld [OC_TOP], a
+            ld a, $FE                       ; (OC_MAXI / OC_MINI found when first needed)
+            ld [OC_MAXI], a
+            pop bc
+            ret
+
+; oamconv_b's incremental conversion: NES entry L (HL -> it, DE -> its copy) comes into view
+; with no GB entry: a free slot above OC_TOP if it is above every entry with a GB entry, below
+; OC_BOT if below every one (NES order kept); A = the slot, OC_POS set, NC. Else C.
+oc_new:     push hl                         ; its own slot from this layout (a hole it left)?
+            ld h, d
+            ld l, e
+            inc h                           ; (OC_POS + entry + 1: the layout that gave it)
+            inc l
+            ld a, [OC_EPO]
+            cp [hl]
+            jr nz, .f0
+            dec l
+            ld a, [hl]
+            pop hl
+            and a
+            ret
+.f0:        pop hl
+.fr:        ld a, [OC_MAXI]                 ; above the highest: the slot above OC_TOP
+            cp $FE
+            jr nz, .k
+            ld a, [OC_BOT]                  ; (an empty layout: the whole page at once)
+            sub 4
+            push hl
+            ld hl, OC_TOP
+            cp [hl]
+            pop hl
+            jr z, .ab
+            call oc_mm
+.k:         cp $FF
+            jr z, .ab
+            cp l
+            jr nc, .nb
+            ld a, [OC_TOP]
+            cp 156
+            jr nc, .ab
+            add a, 4
+            ld [OC_TOP], a
+            push af
+            ld a, l
+            ld [OC_MAXI], a
+            jr .np
+.nb:        ld a, [OC_MINI]                 ; below the lowest: the slot below OC_BOT
+            cp l
+            jr c, .ab
+            jr z, .ab
+            ld a, [OC_BOT]
+            sub 4
+            jr c, .ab
+            ld [OC_BOT], a
+            push af
+            ld a, l
+            ld [OC_MINI], a
+            ld a, [OAM_USED]                ; (one more in use from the bottom: hidden again
+            inc a                           ;   by the next whole conversion's .endr)
+            ld [OAM_USED], a
+.np:        pop af
+            inc d                           ; OC_POS[entry] = the slot, from this layout
+            ld [de], a
+            push af
+            inc e
+            ld a, [OC_EPO]
+            ld [de], a
+            dec e
+            pop af
+            dec d
+            and a                           ; (NC: placed)
+            ret
+.ab:        scf
+            ret
+
+; oamconv_b's incremental conversion: the leading run of OC_LIST (occmp lists the entries
+; descending) whose entries are above OC_MAXI reversed, so that entries coming into view
+; above the others take the free slots above OC_TOP in ascending order (those coming into
+; view below keep the descending order the slots below OC_BOT need). Keeps H.
+oc_rev:     push hl
+            ld a, [OC_MAXI]
+            cp $FF
+            jr z, .x
+            ld b, a
+            ld hl, OC_LIST
+            ldh a, [o_cx]
+            ld c, a
+            ld e, 0
+.r1:        ld a, [hl+]
+            cp b
+            jr c, .r2
+            jr z, .r2
+            inc e
+            dec c
+            jr nz, .r1
+.r2:        ld a, e
+            cp 2
+            jr c, .x
+            ld hl, OC_LIST
+            add a, low(OC_LIST) - 1
+            ld c, a
+            ld b, high(OC_LIST)
+.r3:        ld a, l
+            cp c
+            jr nc, .x
+            ld d, [hl]
+            ld a, [bc]
+            ld [hl], a
+            ld a, d
+            ld [bc], a
+            inc l
+            dec c
+            jr .r3
+.x:         pop hl
+            ret
+
+; OC_MAXI / OC_MINI: the highest / lowest NES entry with a slot from this layout (OC_POS +
+; entry + 1 = OC_EPO; holes count, they stay their entries'), $FF if none. A = OC_MAXI.
+; Keeps BC, DE, HL.
+oc_mm:      push hl
+            push bc
+            ld a, [OC_EPO]
+            ld b, a
+            ld c, $FF                       ; (C: the lowest so far)
+            ld hl, OC_POS + $FD             ; (entries 63..0: the epoch byte)
+            ld a, $FF
+            ld [OC_MAXI], a
+.l:         ld a, [hl]
+            cp b
+            jr nz, .n
+            ld a, l
+            dec a
+            ld c, a
+            ld a, [OC_MAXI]
+            inc a
+            jr nz, .n
+            ld a, c
+            ld [OC_MAXI], a
+.n:         ld a, l
+            sub 4
+            ld l, a
+            jr nc, .l
+            ld a, c
+            ld [OC_MINI], a
+            ld a, [OC_MAXI]
+            pop bc
+            pop hl
+            ret
+
+; (moved out of dmg_shade.s's bank-0 section)
+section bank 0, $3D40
+; brightness of NES colour A (0-63): 0 black .. 8 white (the 2C02 rows, the grey column
+; a bit brighter). Keeps all registers but A.
+lum:        push hl
+            and $3F
+            ld hl, LUM_TAB
+            add a, l
+            ld l, a
+            jr nc, .nc
+            inc h
+.nc:        ld a, [hl]
+            pop hl
+            ret
+LUM_TAB:
+            db 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0
+            db 4, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 0, 0, 0
+            db 6, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 0, 0, 0
+            db 8, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0, 0
+
+; ---- DMG sprite pages left in ROM: LZ_SRC + 4 * page + 3 = 1 once a byte write changed the
+; page's shadow (lz_dirty: B = page; cart RAM bank 0 after; keeps all but A, F). lz_same (E =
+; page, HL = the source in the ROM window): a whole-page copy from the same ROM page as last
+; time onto a page no byte write changed since: nothing to do, to hle_chr_pages.fsk (the page
+; done; cart RAM bank 0); else the mark cleared, cart RAM bank 3 on, back. Keeps BC, DE, HL.
+section bank 0, $3E80
+lz_dirty:   push hl
+            ld a, 3
+            ld [$4000], a
+            ld a, b
+            add a, a
+            add a, a
+            add a, low(LZ_SRC) + 3
+            ld l, a
+            ld h, high(LZ_SRC)
+            ld [hl], 1
+            xor a
+            ld [$4000], a
+            pop hl
+            ret
+lz_dirty1:  push bc                         ; (D = SPR_SHADOW page: cart RAM bank 1 after)
+            ld a, d
+            sub high(SPR_SHADOW)
+            ld b, a
+            call lz_dirty
+            pop bc
+            ld a, 1
+            ld [$4000], a
+            ret
+lz_same:    push hl
+            push bc
+            push de
+            ld a, 3
+            ld [$4000], a
+            ld a, e
+            add a, a
+            add a, a
+            add a, low(LZ_SRC)
+            ld c, a
+            ld b, high(LZ_SRC)
+            ldh a, [data_bank8]
+            ld e, a
+            ld a, [bc]
+            cp e
+            jr nz, .no
+            inc c
+            ld a, [bc]
+            cp l
+            jr nz, .no
+            inc c
+            ld a, [bc]
+            cp h
+            jr nz, .no
+            inc c
+            ld a, [bc]
+            and a
+            jr nz, .no
+            pop de
+            pop bc
+            pop hl
+            add sp, 2                       ; (not back: the page is done)
+            xor a
+            ld [$4000], a
+            jp hle_chr_pages.fsk
+.no:        ld a, c
+            or 3
+            ld c, a
+            xor a
+            ld [bc], a
+            pop de
+            pop bc
+            pop hl
+            ret
