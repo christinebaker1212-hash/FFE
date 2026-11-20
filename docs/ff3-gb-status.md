@@ -268,6 +268,16 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
 - Tools: `firstdiff.py --freeze/--press/--poke`, sgbrun `SGBRUN_TRAP=ADDR` (last 64 PCs when
   PC reaches ADDR; needs `SGBRUN_PROF2` for the per-instruction loop), gbshots
   `GBSHOTS_LOG=FILE`, `GBSHOTS_KEEP=1`.
+- Owner after seeing it built: "I did like the small font and the slashes" / "I like the big
+  numbers for HP": the MP row in 3-px digits with slashes (mock N6 tried both; HP keeps the
+  English font). 20 static tiles ("0/".."9/", "0".."9", `mp_tiles()`) drawn by SMALLNUM over
+  the word tiles the main menu never shows (Leviathan, Catastrophe, Text Speed: $E5-$F6,
+  plus $C9 / $CF), 5 tiles per vblank, then the MP cells (NES rows 4 + 5m, cols 6-13) from
+  $6130 + $40m + 2l; closing the menu ($A685 -> `mnuoff` -> bank 88 `restore`) copies those
+  20 glyphs back from a build-time copy of the ROM font (RT1/RT2). `RST` ($5FFE, ExRAM image
+  byte $FF) = $A5 while the MP tiles are in place (no upload when the menu is redrawn
+  without closing). Checked: Item menu shows the restored tiles, the main menu after it
+  the MP digits again; firstdiff menu sequence identical.
 - Open: the sub-menus (Item, Magic, Equip, Status, Order, Job, Save) still use the NES
   layout through the field camera (mock-ups next).
 

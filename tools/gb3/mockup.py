@@ -381,6 +381,41 @@ def menu_all_fit(nes, outd, cmd):
         F.draw(s, 14, 14, 'Sara', T.ink)
         s.save(os.path.join(outd, 'N5%s_aligned.png' % tag))
         print('wrote', os.path.join(outd, 'N5%s_aligned.png' % tag))
+    # owner (after N5B was built): "I did like the small font and the slashes": N6 = N5B with
+    # HP current/max and the 8 levels' MP in the 3-px digits with slashes (as N3)
+    def dig_at(x, y, ch):
+        for yy, row in enumerate(DIG3[ch]):
+            for xx, v in enumerate(row):
+                if v == '#': s.im.putpixel((x + xx, y + yy), ink_now[0])
+    ink_now = [T.ink]
+    s = Screen(T)
+    s.window(0, 0, 13, 18)
+    sh = (0, 1, 1, 2)
+    mps = ['99970000', '99975300', '99999999', '30000000']
+    for i, (nm, _, hp, mx, lv, m1, m2) in enumerate(party2):
+        r = 1 + 4 * i
+        F.draw(s, 1, r, nm, T.ink, dy=sh[0]); F.draw(s, 8, r, 'Lv%2d' % lv, T.ink, dy=sh[0])
+        condensed(s, 1, r + 1, jobs[i], T.ink, 11, dy=sh[1])
+        F.draw(s, 1, r + 2, '[77][79]', green, dy=sh[2] + 1)
+        ink_now[0] = green
+        x = 3 * 8 + 1
+        for ch in '%d/%d' % (hp, mx): dig_at(x, (r + 2) * 8 - sh[2], ch); x += 4
+        F.draw(s, 1, r + 3, '[78][79]', T.ink, dy=sh[3] + 1)
+        ink_now[0] = T.ink
+        x = 3 * 8 + 1
+        for k, d in enumerate(mps[i]):
+            dig_at(x, (r + 3) * 8 - sh[3], d); x += 4
+            if k < 7: dig_at(x, (r + 3) * 8 - sh[3], '/'); x += 4
+    s.window(13, 0, 7, 9)
+    for i, c in enumerate(['Item', 'Magic', 'Equip', None, 'Order', 'Job', 'Save']):
+        if c: F.draw(s, 14, 1 + i, c, T.ink)
+        else: condensed(s, 14, 1 + i, 'Status', T.ink, 5)
+    s.window(13, 9, 7, 4)
+    small_text(s, 14 * 8 + 6, 10 * 8, '9999999G', T.ink); small_text(s, 14 * 8 + 6, 11 * 8, '    255C', T.ink)
+    s.window(13, 13, 7, 5)
+    F.draw(s, 14, 14, 'Sara', T.ink)
+    s.save(os.path.join(outd, 'N6_small_digits.png'))
+    print('wrote', os.path.join(outd, 'N6_small_digits.png'))
 
 
 def menu_options(nes, outd, cmd):

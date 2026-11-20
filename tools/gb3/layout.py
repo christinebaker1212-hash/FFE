@@ -1069,8 +1069,7 @@ def menu_party_text():
     out = ['{0E}']
     for i in range(4):
         c = '%02X' % (0x10 + i)
-        mp = ''.join('{14:%02X}{%s:%02X}' % (k + 1, c, 0x80 + k) for k in (3, 2, 1, 0))
-        mp += ''.join('{14:%02X}{%s:%02X}' % (k + 2, c, 0x80 + k) for k in (7, 6, 5, 4))
+        mp = ''         # (the MP cells: SMALLNUM, small digits with slashes)
         out.append('{%s:02}{14:07}{%s:00}\n{%s:01}\n{14:02}{%s:30}/{%s:31}{14:00}[77][79]\n'
                    '%s{14:00}[78][79]' % (c, c, c, c, c, mp))
         if i < 3: out.append('\n\n')
@@ -1119,19 +1118,28 @@ hppal:              ; (was: HP text attributes) menu mode on; per member its HP 
     tax
     bne .m
     rts
-mnuoff:             ; close menu: the GB's menu mode off
+mnuoff:             ; close menu: the GB's menu mode off, the word tiles back
     lda #0
     sta $5808
+    ldy #12
+    lda #$FE
+    jsr JBGO
     jmp $C486       ; clear oam data (the call this replaces)
 '''
 
 SMALLNUM_SRC = '''
 SNB = $5EB4         ; ExRAM (battle only: the message window's save area): 6 tiles' plane 0
 DG = $5EE4          ; 12 characters: Gil (7 digits, G), Capacity (3 digits, C)
+MPC = $5EF0         ; MP cell codes (4 x 8)
+RST = $5FFE         ; $A5: the MP tiles are in the word tiles' place (ExRAM image: $FF)
     org $85E0
-disp2:              ; bank 88 $8004 (JOBF dispatch, Y = 12: was JMP sq): A = $FF -> smallnum
-    cmp #$FF        ;   (numsq passes a text column)
+disp2:              ; bank 88 $8004 (JOBF dispatch, Y = 12: was JMP sq): A = $FF -> smallnum,
+    cmp #$FF        ;   $FE -> restore (numsq passes a text column)
     beq smallnum
+    cmp #$FE
+    bne .q
+    jmp restore
+.q:
     jmp SQ
 smallnum:           ; Gil and Capacity in 4-px digits -> tiles $7B-$7F, $CA (main menu)
     lda $601C
@@ -1247,12 +1255,229 @@ smallnum:           ; Gil and Capacity in 4-px digits -> tiles $7B-$7F, $CA (mai
     sta $2007
     dey
     bne .q1
+    jsr fin
+    ; MP of the 8 levels per member (owner: the small digits with slashes): tile codes
+    ; "d/" ($E5 + d) for levels 1-7, "d" (DTILE) for level 8, MP at $6130 + $40 m + 2 l
+    ldx #0
+    ldy #0
+.mm:
+    lda #0
+    sta $85
+.ml:
+    stx $86
+    lda $85
+    asl a
+    clc
+    adc $86
+    tax
+    lda $6130,x
+    cmp #10
+    bcc .ok
+    lda #9
+.ok:
+    ldx $85
+    cpx #7
+    bcs .la
+    clc
+    adc #$E5
+    bne .st
+.la:
+    tax
+    lda DTILE,x
+.st:
+    sta MPC,y
+    iny
+    ldx $86
+    inc $85
+    lda $85
+    cmp #8
+    bcc .ml
+    txa
+    clc
+    adc #$40
+    tax
+    bne .mm
+    lda RST         ; the 20 MP tiles: in place unless the menu closed since
+    cmp #$A5
+    beq .nm
+    lda #$0E        ; $E5-$EE ("0/" - "9/"), 5 tiles per vblank
+    ldy #$50
+    ldx #0
+    jsr tiles5
+    lda #$0E
+    ldy #$A0
+    ldx #40
+    jsr tiles5
+    lda #$0E        ; $EF-$F3, $F4-$F6 ("0" - "7")
+    ldy #$F0
+    ldx #80
+    jsr tiles5
+    jsr $FF00
+    jsr inc1
+    lda #$0F
+    sta $2006
+    lda #$40
+    sta $2006
+    ldx #120
+    ldy #3
+    jsr tiles
+    lda #$0C        ; $C9 ("8"), $CF ("9")
+    sta $2006
+    lda #$90
+    sta $2006
+    ldy #1
+    jsr tiles
+    lda #$0C
+    sta $2006
+    lda #$F0
+    sta $2006
+    ldy #1
+    jsr tiles
+    jsr fin
+    lda #$A5
+    sta RST
+.nm:
+    jsr $FF00       ; the MP cells (NES rows 4 + 5 m, cols 6-13)
+    jsr inc1
+    ldx #0
+    ldy #0
+.nr:
+    lda NTH,y
+    sta $2006
+    lda NTL,y
+    sta $2006
+    lda #8
+    sta $85
+.nc:
+    lda MPC,x
+    sta $2007
+    inx
+    dec $85
+    bne .nc
+    iny
+    cpy #4
+    bcc .nr
+    jsr fin
+    jmp JBTAIL
+restore:            ; menu closed: the word tiles under the MP tiles back (from the font)
+    lda RST
+    cmp #$A5
+    beq .r
+    jmp JBTAIL
+.r:
+    lda #0
+    sta RST
+    lda #$0E
+    ldx #0
+    ldy #$50
+    jsr rest5
+    lda #$0E
+    ldx #80
+    ldy #$A0
+    jsr rest5
+    lda #$0E
+    ldx #160
+    ldy #$F0
+    jsr rest5
+    jsr $FF00
+    jsr inc1
+    lda #$0F
+    sta $2006
+    lda #$40
+    sta $2006
+    ldx #0
+.r2:
+    lda RT2,x
+    sta $2007
+    inx
+    cpx #48
+    bne .r2
+    lda #$0C
+    sta $2006
+    lda #$90
+    sta $2006
+.r3:
+    lda RT2,x
+    sta $2007
+    inx
+    cpx #64
+    bne .r3
+    lda #$0C
+    sta $2006
+    lda #$F0
+    sta $2006
+.r4:
+    lda RT2,x
+    sta $2007
+    inx
+    cpx #80
+    bne .r4
+    jsr fin
+    jmp JBTAIL
+rest5:              ; next vblank: 5 tiles (80 bytes) from RT1 + X to PPU A:Y
+    pha
+    jsr $FF00
+    jsr inc1
+    pla
+    sta $2006
+    sty $2006
+    ldy #80
+.l:
+    lda RT1,x
+    sta $2007
+    inx
+    dey
+    bne .l
+    jmp fin
+tiles5:             ; next vblank: 5 tiles from MPT + X to PPU A:Y
+    pha
+    jsr $FF00
+    jsr inc1
+    pla
+    sta $2006
+    sty $2006
+    ldy #5
+    jsr tiles
+    jmp fin
+tiles:              ; Y tiles: 8 plane-0 bytes from MPT + X each, plane 1 $FF
+    sty $86
+.t:
+    lda #8
+    sta $85
+.a:
+    lda MPT,x
+    sta $2007
+    inx
+    dec $85
+    bne .a
+    lda #$FF
+    ldy #8
+.b:
+    sta $2007
+    dey
+    bne .b
+    dec $86
+    bne .t
+    rts
+inc1:
+    lda $FF
+    and #$FB
+    sta $2000
+    lda $2002
+    rts
+fin:
     lda $FF         ; (after the address writes: they set the scroll's nametable bits)
     sta $2000
     lda #0
     sta $2005
     sta $2005
-    jmp JBTAIL
+    rts
+NTH:
+    .db $20, $21, $21, $22
+NTL:
+    .db $86, $26, $C6, $66
+DTILE:
+    .db $EF, $F0, $F1, $F2, $F3, $F4, $F5, $F6, $C9, $CF
 conv:               ; $80-$82 -> digits from power X (0: 10^6) on, to DG + $85
     lda #0
     sta $86
@@ -1310,6 +1535,7 @@ SMALL_GLYPHS = {   # 3 x 7 (owner-approved mock-up N5B: tools/gb3/mockup.py DIG3
     '6': ["###", "#..", "#..", "###", "#.#", "#.#", "###"], '7': ["###", "..#", "..#", ".#.", ".#.", ".#.", ".#."],
     '8': ["###", "#.#", "#.#", "###", "#.#", "#.#", "###"], '9': ["###", "#.#", "#.#", "###", "..#", "..#", "###"],
     ' ': ["..."] * 7, 'G': ["###", "#..", "#..", "#.#", "#.#", "#.#", "###"],
+    '/': ["..#", "..#", ".#.", ".#.", ".#.", "#..", "#.."],
     'C': ["###", "#..", "#..", "#..", "#..", "#..", "###"]}
 
 
@@ -1321,6 +1547,15 @@ def small_glyph_table():
     return '\n'.join(out) + '\n'
 
 
+def mp_tiles():
+    """plane 0 of the 20 MP tiles: "0/" .. "9/" then "0" .. "9" (3-px digits, 4 px a cell)"""
+    g = lambda ch: [sum(0x80 >> x for x, v in enumerate(row) if v == '#') for row in SMALL_GLYPHS[ch]] + [0]
+    out = bytearray()
+    for d in '0123456789': out += bytes(a | (b >> 4) for a, b in zip(g(d), g('/')))
+    for d in '0123456789': out += bytes(g(d))
+    return bytes(out)
+
+
 def main_menu(r):
     B3C, B3D, B88 = 0x3C, 0x3D, 88
     j = lambda a: '%02X %02X' % (a & 0xFF, a >> 8)
@@ -1330,14 +1565,21 @@ def main_menu(r):
         b = bytearray.fromhex(olds[t])
         for w, rect in MENU_WINDOWS.items(): b[w] = rect[k]
         r.patch(B3D, t, olds[t], b.hex(), 'main menu windows (GB layout)')
-    hp = r.module(MENU_HP_SRC)
+    hp = r.module(MENU_HP_SRC, syms={'JBGO': JBGO})
     assert hp['org'] + len(hp['bytes']) <= 0x960C + 16
     o = r.off(B3C, 0x95B2)
     r.d[o:o + len(hp['bytes'])] = hp['bytes']
     r.mods.append(dict(hp, where=(B3C, 0x95B2 & 0x1FFF)))
     r.log.append((B3C, 0x95B2, 'main menu: HP palettes per member for the GB ($5809), menu mode on'))
     r.patch(B3D, 0xA685, '20 86 C4', '20 ' + j(hp['labels']['mnuoff']), 'close menu: GB menu mode off')
-    sm = r.module(SMALLNUM_SRC + small_glyph_table(), syms={'JBTAIL': JBTAIL, 'SQ': 0x801C})
+    font = lambda c: bytes(r.d[16 + FONT + c * 16:16 + FONT + c * 16 + 16])
+    words = list(range(0xE5, 0xF7)) + [0xC9, 0xCF]
+    assert all(font(c)[8:] == b'\xff' * 8 for c in words)
+    rt = b''.join(font(c) for c in words)
+    dbs = lambda lab, b: lab + ':\n' + ''.join('    .db ' + ', '.join('$%02X' % v for v in b[k:k + 16]) + '\n'
+                                              for k in range(0, len(b), 16))
+    sm = r.module(SMALLNUM_SRC + small_glyph_table() + dbs('MPT', mp_tiles()) + dbs('RT1', rt[:240])
+                  + dbs('RT2', rt[240:]), syms={'JBTAIL': JBTAIL, 'SQ': 0x801C})
     o = r.off(B88, sm['org'])
     assert sm['org'] + len(sm['bytes']) <= 0xA000
     assert set(r.d[o:o + len(sm['bytes'])]) == {0xFF}
