@@ -77,6 +77,16 @@ SGB_MIN    = 12
 NT_NOW     = $D87D          ; nt_tile: check the cell's palette at once (not in spare time)
 MAP_RB     = $CCFF          ; CGB masked load: GB map to rebuild from the shadows when shown
 CGB_RP     = $CCEF          ; CGB: cell palettes stale (owners changed with the LCD off; repal_b at LCD on)
+LON_ST     = $D820          ; DMG deferred switch-on (lon_b; the DBG area is written only on a fault):
+LON_ROW    = $D821          ;   step, next scan row, map scanned, switch on now, scan disturbed,
+LON_SCN    = $D822          ;   re-coding with a time limit
+LON_RDY    = $D823
+LON_DIRTY  = $D824
+LON_LIM    = $D825
+LON_CNT    = $D826          ;   frames pending (LON_MAXF: the rest at once)
+LON_MAXF   = 6
+LON_END    = 250            ; (TIMA: stop at 250 of 188..255; an atomic step only below LON_HALF)
+LON_HALF   = 240
 BLK_REQ    = $D85C          ; the battle message window's blanked cells to the GB map (vblank)
 PB_ROW     = $D85D          ; CGB: rows of vshow_own's buffer built ahead (vpre)
 OAM_CLEAN  = $D85E          ; oamconv_b: no sprite slot invalidated since its last run (1)
@@ -1800,6 +1810,9 @@ rt_wait_nmi:
             ldh a, [is_cgb]                 ;   as the NES NMI comes during its wait loop)
             and a
             call z, dmg_frame
+            ld a, [LON_ST]                  ; (DMG: a deferred switch-on's work)
+            and a
+            call nz, lon_tramp
             ldh a, [is_sgb]
             and a
             call nz, sgb_frame
@@ -1818,6 +1831,9 @@ rt_wait_nmi:
             jr .w                           ;   after the ei's next instruction)
 .dn:        ei
             ld [VBL_SEEN], a
+            ld a, [LON_RDY]                 ; (the deferred switch-on, at a frame's start)
+            and a
+            call nz, lon_on
 .go:        pop hl
             xor a
             ldh [frame_flag], a
@@ -1951,6 +1967,8 @@ rt_ppu_w1:  push af
             ldh a, [is_cgb]
             and a
             jr nz, .lon
+            call lon_start                  ; DMG: deferred to the frame waits (NZ), or now
+            jp nz, .ret
             ldh a, [dmg_scan]               ; DMG: tiles' palettes (and the palettes in use)
             push af                         ;   from the whole map if it was drawn with the
             and a                           ;   LCD off; then the palette maps if the palettes
@@ -1988,7 +2006,10 @@ rt_ppu_w1:  push af
             ld a, [VBL_CNT]                 ; frames lost while the LCD was off are not
             ld [VBL_SEEN], a                ;   caught up (the screen fades in at its pace)
             jr .ret
-.off:       ldh a, [lcd_on]
+.off:       xor a                           ; (a deferred switch-on dropped)
+            ld [LON_ST], a
+            ld [LON_RDY], a
+            ldh a, [lcd_on]
             and a
             jr z, .ret
             ldh a, [is_cgb]                 ; CGB: the LCD stays on, the screen masked black

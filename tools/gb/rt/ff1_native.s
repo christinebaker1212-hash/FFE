@@ -1999,7 +1999,13 @@ tile_use:   ld bc, 0
 ; DE = the next TBLK block (with the LCD on, waits while all 8 are queued). Keeps BC, HL.
 blk_alloc:  ldh a, [lcd_on]
             and a
-            jr z, .bk
+            jr nz, .wb
+            ld a, [LON_ST]                  ; (LCD off: TBLK is SC_NP's second half: a
+            cp 2                            ;   deferred scan in progress starts again)
+            jr nz, .bk
+            ld a, 1
+            ld [LON_DIRTY], a
+            jr .bk
 .wb:        ld a, [TB_H]
             ld d, a
             ld a, [TB_T]
@@ -2826,33 +2832,14 @@ vt_code:    push bc
             ret
 
 ; HL = a TBLK block with a tile in GB byte order: each row through the masks at RM (rt_anf)
-; in place; sh_u1..3 = pixels of colour index 1..3 (any row). Keeps nothing.
-anf_rows:   ld a, 8
-            ld [RM + 8], a
-            xor a
-            ldh [sh_u1], a
-            ldh [sh_u2], a
-            ldh [sh_u3], a
-.row:       ld b, [hl]                      ; p0
+; in place (sprload_b; eight rows unrolled). Keeps nothing.
+anf_rows:
+            ld b, [hl]                      ; p0
             inc l
             ld c, [hl]                      ; p1
             ld a, b
             and c
-            ld d, a                         ; p0 & p1 (index 3)
-            xor b                           ; index 1
-            ld e, a
-            ldh a, [sh_u1]
-            or e
-            ldh [sh_u1], a
-            ld a, d                         ; index 2
-            xor c
-            ld e, a
-            ldh a, [sh_u2]
-            or e
-            ldh [sh_u2], a
-            ldh a, [sh_u3]
-            or d
-            ldh [sh_u3], a
+            ld d, a                         ; p0 & p1
             ld a, [RM + 4]                  ; plane 1
             and b
             ld e, a
@@ -2882,10 +2869,251 @@ anf_rows:   ld a, 8
             xor e
             ld [hl+], a
             inc l
-            ld a, [RM + 8]
-            dec a
-            ld [RM + 8], a
-            jr nz, .row
+            ld b, [hl]                      ; p0
+            inc l
+            ld c, [hl]                      ; p1
+            ld a, b
+            and c
+            ld d, a                         ; p0 & p1
+            ld a, [RM + 4]                  ; plane 1
+            and b
+            ld e, a
+            ld a, [RM + 5]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 6]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 7]
+            xor e
+            ld [hl-], a
+            ld a, [RM]                      ; plane 0
+            and b
+            ld e, a
+            ld a, [RM + 1]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 2]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 3]
+            xor e
+            ld [hl+], a
+            inc l
+            ld b, [hl]                      ; p0
+            inc l
+            ld c, [hl]                      ; p1
+            ld a, b
+            and c
+            ld d, a                         ; p0 & p1
+            ld a, [RM + 4]                  ; plane 1
+            and b
+            ld e, a
+            ld a, [RM + 5]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 6]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 7]
+            xor e
+            ld [hl-], a
+            ld a, [RM]                      ; plane 0
+            and b
+            ld e, a
+            ld a, [RM + 1]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 2]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 3]
+            xor e
+            ld [hl+], a
+            inc l
+            ld b, [hl]                      ; p0
+            inc l
+            ld c, [hl]                      ; p1
+            ld a, b
+            and c
+            ld d, a                         ; p0 & p1
+            ld a, [RM + 4]                  ; plane 1
+            and b
+            ld e, a
+            ld a, [RM + 5]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 6]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 7]
+            xor e
+            ld [hl-], a
+            ld a, [RM]                      ; plane 0
+            and b
+            ld e, a
+            ld a, [RM + 1]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 2]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 3]
+            xor e
+            ld [hl+], a
+            inc l
+            ld b, [hl]                      ; p0
+            inc l
+            ld c, [hl]                      ; p1
+            ld a, b
+            and c
+            ld d, a                         ; p0 & p1
+            ld a, [RM + 4]                  ; plane 1
+            and b
+            ld e, a
+            ld a, [RM + 5]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 6]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 7]
+            xor e
+            ld [hl-], a
+            ld a, [RM]                      ; plane 0
+            and b
+            ld e, a
+            ld a, [RM + 1]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 2]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 3]
+            xor e
+            ld [hl+], a
+            inc l
+            ld b, [hl]                      ; p0
+            inc l
+            ld c, [hl]                      ; p1
+            ld a, b
+            and c
+            ld d, a                         ; p0 & p1
+            ld a, [RM + 4]                  ; plane 1
+            and b
+            ld e, a
+            ld a, [RM + 5]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 6]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 7]
+            xor e
+            ld [hl-], a
+            ld a, [RM]                      ; plane 0
+            and b
+            ld e, a
+            ld a, [RM + 1]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 2]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 3]
+            xor e
+            ld [hl+], a
+            inc l
+            ld b, [hl]                      ; p0
+            inc l
+            ld c, [hl]                      ; p1
+            ld a, b
+            and c
+            ld d, a                         ; p0 & p1
+            ld a, [RM + 4]                  ; plane 1
+            and b
+            ld e, a
+            ld a, [RM + 5]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 6]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 7]
+            xor e
+            ld [hl-], a
+            ld a, [RM]                      ; plane 0
+            and b
+            ld e, a
+            ld a, [RM + 1]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 2]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 3]
+            xor e
+            ld [hl+], a
+            inc l
+            ld b, [hl]                      ; p0
+            inc l
+            ld c, [hl]                      ; p1
+            ld a, b
+            and c
+            ld d, a                         ; p0 & p1
+            ld a, [RM + 4]                  ; plane 1
+            and b
+            ld e, a
+            ld a, [RM + 5]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 6]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 7]
+            xor e
+            ld [hl-], a
+            ld a, [RM]                      ; plane 0
+            and b
+            ld e, a
+            ld a, [RM + 1]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 2]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 3]
+            xor e
+            ld [hl+], a
+            inc l
             ret
 
 ; NES sprite tile o_t is not resident: take the next slot not used by this frame's
@@ -3873,7 +4101,8 @@ palup2_b:   ld c, e                         ; c62:D874: from X on, $03C0 + X
             ldh a, [ppu_vl]
             cp c
             jr nz, .sl
-.fl:        ld a, c
+.fl:        jp pu_fast                      ; (unrolled, pu_fast)
+.fl0:       ld a, c
             cp 16
             jr nz, .fn
             ld hl, NES_RAM + $03D0
@@ -3890,10 +4119,14 @@ palup2_b:   ld c, e                         ; c62:D874: from X on, $03C0 + X
             xor b
             and $3F
             jr z, .fs
-            ld a, c
-            ldh [ppu_vl], a
-            ld a, b
-            call rt_ppu_w7                  ; (keeps all registers)
+            ld a, b                         ; a changed colour: the shadow and its flags (as
+            and $3F                         ;   rt_ppu_w7g's palette write; v set at the end)
+            ld [de], a
+            ld a, 1
+            ldh [pal_dirty], a
+            ldh [maps_due], a
+            xor a
+            ldh [pal_age], a
 .fs:        inc c
             ld a, c
             cp 32
@@ -4929,60 +5162,6 @@ hle_boxrow: ld a, [$AAA1]                   ; ($6AA1: the box width)
 ; (the source is read through the data bank). Out as at c62:D158: A = $FF, Y = 0, X as the
 ; NES leaves it (0 after a run); $10-$14 as on the NES; Z = 1, C = 1, N = 0.
 MDC_X      = $DCD5
-section bank 0, $3E80
-hle_mapdec: ld a, e
-            ld [MDC_X], a
-            ldh a, [data_bank8]
-            ld [$2000], a
-            ld a, [NES_RAM + $10]
-            ld l, a
-            ld a, [NES_RAM + $11]
-            sub $40
-            ld h, a                         ; HL = source ($8000 -> $4000)
-            ld a, [NES_RAM + $12]
-            ld e, a
-            ld a, [NES_RAM + $13]
-            add a, $40
-            ld d, a                         ; DE = destination ($7000 -> $B000)
-.lp:        ld a, [hl]
-            bit 7, a
-            jr nz, .run
-            ld [de], a
-            inc de
-            inc l
-            jr nz, .lp
-            call .ih
-            jr .lp
-.run:       cp $FF
-            jp z, mdc_end
-            and $7F
-            ld [NES_RAM + $14], a
-            ld b, a
-            call .inc
-            ld c, [hl]                      ; count (0: 256)
-            ld a, b
-            call fillde
-            xor a
-            ld [MDC_X], a
-            inc l
-            jr nz, .lp
-            call .ih
-            jr .lp
-.inc:       inc l
-            ret nz
-.ih:        inc h
-            bit 7, h                        ; (NES $C000: the next bank at $8000)
-            ret z
-            ld h, $40
-            ld a, [NES_RAM + $15]
-            inc a
-            add a, a
-            or $80
-            call rt_mmc_w5115
-            ldh a, [data_bank8]
-            ld [$2000], a
-            ret
-
 ; (hle_mapdec's end, in the bank-0 space after hle_boxrow)
 section bank 0, $3FA6
 mdc_end:       ld a, l
@@ -6064,7 +6243,22 @@ SC_NP      = $DE00          ; scan_b: palette each tile is drawn with ($FF: not 
 scan_b:     push bc
             push de
             push hl
-            ld a, 1
+            call scb_init
+            jr c, .done
+            ld d, 0
+.rw:        call scb_row
+            inc d
+            ld a, d
+            cp 30
+            jr nz, .rw
+            call scb_fin
+.done:      pop hl
+            pop de
+            pop bc
+            ret
+; scan_b in pieces (also run in the frame waits' spare time by lon_b): scb_init (carry: a
+; one-palette screen, done), scb_row for rows D = 0-29, scb_fin
+scb_init:   ld a, 1
             ldh [sgb_dirty], a
             ldh [sgb_adirty], a
             xor a
@@ -6179,7 +6373,9 @@ scan_b:     push bc
             inc h
 .uh:        dec c
             jr nz, .uc
-            jp .settle
+            call scb_settle
+            scf
+            ret
 .full:      ldh a, [cam_y]                  ; the view: map row (scroll_y + cam_y) mod 240 / 8,
             ld b, a                         ;   column (scroll_x + cam_x) / 8
             ldh a, [scroll_y]
@@ -6202,8 +6398,10 @@ scan_b:     push bc
             ld [SC_VC], a
             xor a
             ld [PAL_USED], a
-            ld d, 0                         ; every cell, rows 0-29: SC_NP |= its palette;
-.r:         ld a, [SC_VR]                   ;   the view's rows: PAL_USED (view row: (D - VR)
+            and a                           ; (carry clear: rows to scan)
+            ret
+scb_row:                                    ; row D: SC_NP |= its cells' palettes; the
+.r:         ld a, [SC_VR]                   ;   view's rows: PAL_USED (view row: (D - VR)
             ld b, a                         ;   mod 30 < 18). In battle only the view's rows:
             ld a, d                         ;   a fixed camera and no scrolling, so the other
             sub b                           ;   rows never show (their tiles keep codings
@@ -6220,11 +6418,8 @@ scan_b:     push bc
 .vr:        call scn_tab
             call scn_rowf
             call scn_pu
-.rn:        inc d
-            ld a, d
-            cp 30
-            jr nz, .r
-            ld hl, SC_NP                    ; a tile drawn with two palettes: bit 7, and the
+.rn:        ret
+scb_fin:    ld hl, SC_NP                    ; a tile drawn with two palettes: bit 7, and the
             ld c, 0                         ;   view's cells decide (the last one; out of the
 .cf:        ld a, [hl]                      ;   view: the lowest); C = how many
             ld b, a
@@ -6238,7 +6433,7 @@ scan_b:     push bc
             ld a, c
             and a
             call nz, scn_view
-.settle:    ld e, 0                         ; each tile used: REF_BM; drawn with another palette
+scb_settle: ld e, 0                         ; each tile used: REF_BM; drawn with another palette
 .t:         ld l, e                         ;   than it is coded for: TILE_PAL, marked; the
             ld h, high(SC_NP)               ;   same palette but parked: marked again
             ld a, [hl]
@@ -6315,9 +6510,6 @@ scan_b:     push bc
             ld [FR_AGE], a
             ld [FR_EMPTY], a
             ld [FR_POS], a
-            pop hl
-            pop de
-            pop bc
             ret
 
 ; scan_b, map row D: SC_TL / SC_TH (tile row offset, page of nametable 0) and SP_T[nt * 16
@@ -8088,7 +8280,12 @@ rtb_b:      ldh [sh_u3], a
             ld a, d
             and a
             jr nz, .bit
-.nb:        inc e
+.nb:        ld a, [LON_LIM]                 ; (lon_b: stop when the frame's time is up;
+            and a                           ;   the bytes done are clear)
+            jr z, .nl
+            call lon_time
+            jr c, .early
+.nl:        inc e
             ld a, e
             cp 32
             jr nz, .byte
@@ -8098,6 +8295,9 @@ rtb_b:      ldh [sh_u3], a
             jr z, .rq
             xor a
 .rq:        ldh [rq_any], a
+            ret
+.early:     ld a, 1
+            ldh [rq_any], a
             ret
 .one:       ldh [sh_tile], a                ; tile A
             swap a                          ; HL = shadow tile (RAM bank 1)
@@ -9419,8 +9619,14 @@ prow_b:     ldh a, [code_bank]
             push af
             ld a, PF_BANK
             ldh [code_bank], a
-.lp:        ld l, $10
+            ld b, 0                         ; (B: $80 | the palette of the letter before, in
+            xor a                           ;   the same attribute quadrant)
+            ldh [sh_nt], a
+.lp:        push bc                         ; (B = 0 for the read: Y = C)
+            ld b, 0
+            ld l, $10
             call rt_izy_rd
+            pop bc
             ld a, l
             cp $10
             jr c, .code
@@ -9432,6 +9638,7 @@ prow_b:     ldh a, [code_bank]
             jr nz, .lp
             pop af                          ; (Y wrapped)
             ldh [code_bank], a
+            ld b, 0
             xor a
             ldh [nzv], a
             ldh a, [w7v]
@@ -9443,6 +9650,7 @@ prow_b:     ldh a, [code_bank]
 .code:      ld h, a
             pop af
             ldh [code_bank], a
+            ld b, 0
             ld a, $80
             ldh [nzv], a
             ld l, 0
@@ -9493,11 +9701,34 @@ prow_b:     ldh a, [code_bank]
             cp [hl]
             jr z, .inc                      ; the same tile, same owner: nothing changes
             ld [hl], a                      ; shadow
-            push bc
-            ld b, d                         ; B:L = offset (nametable 0)
-            ld l, e
-            call dmg_cell                   ; the tile's palette (A = tile)
-            pop bc
+            bit 0, e                        ; the cell's palette: an odd column right after
+            jr z, .pe                       ;   the letter before shares its quadrant
+            bit 7, b
+            jr nz, .pk
+.pe:        push de
+            ld a, e
+            and 31
+            ld l, a                         ; col
+            ld a, e
+            swap a
+            rrca
+            and $07
+            ld h, a
+            ld a, d
+            add a, a
+            add a, a
+            add a, a
+            or h                            ; row
+            ld e, l
+            call cell_pal                   ; (sh_nt = 0)
+            pop de
+            or $80
+            ld b, a
+.pk:        ldh a, [w7v]
+            ld h, a
+            ld a, b
+            and 3
+            call dmg_tile_p                 ; the tile checked for that palette
             ld a, d                         ; GB map
             add a, $98
             ld h, a
@@ -9514,7 +9745,8 @@ prow_b:     ldh a, [code_bank]
             and $3F
             ldh [ppu_vh], a
             ret
-.gen:       ldh a, [w7v]
+.gen:       ld b, 0                         ; (anything else: the cache dropped)
+            ldh a, [w7v]
             jp rt_ppu_w7
 
 ; ---- fix window-row routines, from the LDA $2002 after their JSR $E1BD to their RTS (build.py:
@@ -14170,4 +14402,540 @@ hle_swap90: push af
             pop af
             ld de, 16
             ld bc, 0
+            ret
+
+; (moved to bank 0's free space)
+hle_mapdec: ld a, e
+            ld [MDC_X], a
+            ldh a, [data_bank8]
+            ld [$2000], a
+            ld a, [NES_RAM + $10]
+            ld l, a
+            ld a, [NES_RAM + $11]
+            sub $40
+            ld h, a                         ; HL = source ($8000 -> $4000)
+            ld a, [NES_RAM + $12]
+            ld e, a
+            ld a, [NES_RAM + $13]
+            add a, $40
+            ld d, a                         ; DE = destination ($7000 -> $B000)
+.lp:        ld a, [hl]
+            bit 7, a
+            jr nz, .run
+            ld [de], a
+            inc de
+            inc l
+            jr nz, .lp
+            call .ih
+            jr .lp
+.run:       cp $FF
+            jp z, mdc_end
+            and $7F
+            ld [NES_RAM + $14], a
+            ld b, a
+            call .inc
+            ld c, [hl]                      ; count (0: 256)
+            ld a, c
+            dec a
+            cp 8                            ; (1-8: here; else fillde)
+            ld a, b
+            jr nc, .fl
+.sr:        ld [de], a
+            inc de
+            dec c
+            jr nz, .sr
+            jr .fd
+.fl:        call fillde
+.fd:
+            xor a
+            ld [MDC_X], a
+            inc l
+            jr nz, .lp
+            call .ih
+            jr .lp
+.inc:       inc l
+            ret nz
+.ih:        inc h
+            bit 7, h                        ; (NES $C000: the next bank at $8000)
+            ret z
+            ld h, $40
+            ld a, [NES_RAM + $15]
+            inc a
+            add a, a
+            or $80
+            call rt_mmc_w5115
+            ldh a, [data_bank8]
+            ld [$2000], a
+            ret
+
+
+; ---- palup2_b's fast path (v = $3F00 + C, increment 1): C = the first index, HL -> its colour
+; ($03D0 from index 16 on). Each colour compared with the shadow at its constant index; a
+; changed one to the shadow and its flags (pu_chg, as rt_ppu_w7g's palette write).
+section bank HLE_BANK, $7500
+pu_fast:    ld a, c
+            cp 32
+            jr nc, .end
+            push hl
+            ld l, c
+            ld h, 0
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, de
+            add hl, hl
+            add hl, hl
+            add hl, de                      ; C * 13 (one entry)
+            cp 16
+            jr c, .lo
+            inc hl                          ; (past the source reload after entry 15)
+            inc hl
+            inc hl
+.lo:        ld de, .e0
+            add hl, de
+            ld d, h
+            ld e, l
+            pop hl
+            push de
+            ret
+.e0:        ld a, [hl+]
+            ld b, a
+            ld e, $00
+            ld a, [PAL_SH + $00]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e1:        ld a, [hl+]
+            ld b, a
+            ld e, $01
+            ld a, [PAL_SH + $01]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e2:        ld a, [hl+]
+            ld b, a
+            ld e, $02
+            ld a, [PAL_SH + $02]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e3:        ld a, [hl+]
+            ld b, a
+            ld e, $03
+            ld a, [PAL_SH + $03]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e4:        ld a, [hl+]
+            ld b, a
+            ld e, $04
+            ld a, [PAL_SH + $04]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e5:        ld a, [hl+]
+            ld b, a
+            ld e, $05
+            ld a, [PAL_SH + $05]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e6:        ld a, [hl+]
+            ld b, a
+            ld e, $06
+            ld a, [PAL_SH + $06]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e7:        ld a, [hl+]
+            ld b, a
+            ld e, $07
+            ld a, [PAL_SH + $07]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e8:        ld a, [hl+]
+            ld b, a
+            ld e, $08
+            ld a, [PAL_SH + $08]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e9:        ld a, [hl+]
+            ld b, a
+            ld e, $09
+            ld a, [PAL_SH + $09]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e10:        ld a, [hl+]
+            ld b, a
+            ld e, $0A
+            ld a, [PAL_SH + $0A]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e11:        ld a, [hl+]
+            ld b, a
+            ld e, $0B
+            ld a, [PAL_SH + $0B]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e12:        ld a, [hl+]
+            ld b, a
+            ld e, $0C
+            ld a, [PAL_SH + $0C]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e13:        ld a, [hl+]
+            ld b, a
+            ld e, $0D
+            ld a, [PAL_SH + $0D]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e14:        ld a, [hl+]
+            ld b, a
+            ld e, $0E
+            ld a, [PAL_SH + $0E]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e15:        ld a, [hl+]
+            ld b, a
+            ld e, $0F
+            ld a, [PAL_SH + $0F]
+            xor b
+            and $3F
+            call nz, pu_chg
+            ld hl, NES_RAM + $03D0
+.e16:        ld a, [hl+]
+            ld b, a
+            ld e, $00
+            ld a, [PAL_SH + $00]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e17:        ld a, [hl+]
+            ld b, a
+            ld e, $11
+            ld a, [PAL_SH + $11]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e18:        ld a, [hl+]
+            ld b, a
+            ld e, $12
+            ld a, [PAL_SH + $12]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e19:        ld a, [hl+]
+            ld b, a
+            ld e, $13
+            ld a, [PAL_SH + $13]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e20:        ld a, [hl+]
+            ld b, a
+            ld e, $04
+            ld a, [PAL_SH + $04]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e21:        ld a, [hl+]
+            ld b, a
+            ld e, $15
+            ld a, [PAL_SH + $15]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e22:        ld a, [hl+]
+            ld b, a
+            ld e, $16
+            ld a, [PAL_SH + $16]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e23:        ld a, [hl+]
+            ld b, a
+            ld e, $17
+            ld a, [PAL_SH + $17]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e24:        ld a, [hl+]
+            ld b, a
+            ld e, $08
+            ld a, [PAL_SH + $08]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e25:        ld a, [hl+]
+            ld b, a
+            ld e, $19
+            ld a, [PAL_SH + $19]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e26:        ld a, [hl+]
+            ld b, a
+            ld e, $1A
+            ld a, [PAL_SH + $1A]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e27:        ld a, [hl+]
+            ld b, a
+            ld e, $1B
+            ld a, [PAL_SH + $1B]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e28:        ld a, [hl+]
+            ld b, a
+            ld e, $0C
+            ld a, [PAL_SH + $0C]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e29:        ld a, [hl+]
+            ld b, a
+            ld e, $1D
+            ld a, [PAL_SH + $1D]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e30:        ld a, [hl+]
+            ld b, a
+            ld e, $1E
+            ld a, [PAL_SH + $1E]
+            xor b
+            and $3F
+            call nz, pu_chg
+.e31:        ld a, [hl+]
+            ld b, a
+            ld e, $1F
+            ld a, [PAL_SH + $1F]
+            xor b
+            and $3F
+            call nz, pu_chg
+.end:       ld a, 32
+            ldh [ppu_vl], a                 ; v = $3F20
+            ld c, a
+            jp palup2_b.x
+pu_chg:     ld a, b
+            and $3F
+            ld d, high(PAL_SH)
+            ld [de], a
+            ld a, 1
+            ldh [pal_dirty], a
+            ldh [maps_due], a
+            xor a
+            ldh [pal_age], a
+            ret
+
+section bank 0, $3000
+; ---- DMG deferred switch-on (bank 0 helpers). lon_start (rt_ppu_w1, the LCD off and the NES
+; switching on): NZ = deferred to lon_b (not on the SGB, in the prologue or at a battle
+; start, which keep the old path); lon_on: the LCD on, from the frame wait right after its tick
+lon_start:  ldh a, [is_sgb]
+            and a
+            jr nz, .now
+            ldh a, [pro_mode]
+            and a
+            jr nz, .now
+            ldh a, [in_battle]              ; (a battle starts with flashes: its maps would be
+            bit 7, a                        ;   taken from them; it keeps the old switch-on)
+            jr nz, .now
+            ld a, [LON_ST]
+            and a
+            ret nz                          ; (already pending)
+            xor a
+            ld [LON_SCN], a
+            ld [LON_RDY], a
+            ld [LON_LIM], a
+            ld [LON_CNT], a
+            inc a
+            ld [LON_ST], a                  ; (NZ)
+            ret
+.now:       xor a                           ; (Z)
+            ret
+lon_on:     xor a
+            ld [LON_RDY], a
+            ld [LON_ST], a
+            ld a, LCDC_ON
+            ldh [$FF40], a
+            ld a, 1
+            ldh [lcd_on], a
+            ret
+lon_tramp:  ldh a, [lcd_on]
+            and a
+            ret nz
+            push bc
+            push de
+            push hl
+            ld hl, lon_b
+            call hle_pfj
+            pop hl
+            pop de
+            pop bc
+            ret
+; carry: not enough of the frame left for an atomic step (forced: never)
+lon_half:   ld a, [LON_CNT]
+            cp LON_MAXF
+            ccf
+            ccf
+            ret nc
+            ldh a, [$FF05]
+            cp LON_HALF
+            ccf
+            ret
+; carry: the frame's time is up (a tick since the wait's entry, or TIMA at LON_END)
+lon_time:   ld a, [LON_CNT]                 ; (pending LON_MAXF frames: no limit)
+            cp LON_MAXF
+            ccf
+            ccf
+            ret nc
+            push hl
+            ld hl, VBL_ENT
+            ld a, [VBL_CNT]
+            cp [hl]
+            pop hl
+            scf
+            ret nz
+            ldh a, [$FF05]
+            cp LON_END
+            ccf
+            ret
+
+; ---- lon_b (PF_BANK, from the frame wait while the LCD is off): the switch-on's map scan
+; (scb_init / scb_row / scb_fin), palette maps and re-coding (rtb_b) in the frame's spare
+; time; an atomic step only with LON_HALF left; a scan disturbed by writes (dmg_scan) or a
+; sprite slot load (LON_DIRTY) starts again; done: LON_RDY (lon_on at the next frame start).
+; Steps (LON_ST): 1 scan begin, 2 rows, 3 maps, 4 re-coding, 5 check, 6 waiting.
+section bank PF_BANK, $7400
+lon_b:      ldh a, [code_bank]              ; (the bank-0 helpers come back to code_bank)
+            push af
+            ld a, PF_BANK
+            ldh [code_bank], a
+            ld a, [LON_CNT]                 ; (one more frame pending)
+            cp 255
+            jr z, .lp
+            inc a
+            ld [LON_CNT], a
+.lp:        call lon_time
+            jr c, .x
+            ld a, [LON_ST]
+            cp 1
+            jr z, .s1
+            cp 2
+            jr z, .s2
+            cp 3
+            jr z, .s3
+            cp 4
+            jr z, .s4
+            cp 5
+            jr z, .s5
+.x:         pop af
+            ldh [code_bank], a
+            ret
+.s1:        ldh a, [dmg_scan]
+            and a
+            jr z, .to3
+            call lon_half
+            jr c, .x
+            xor a
+            ld [LON_DIRTY], a
+            ld [LON_ROW], a
+            inc a
+            ld [LON_SCN], a
+            call scb_init                   ; (clears dmg_scan)
+            jr c, .s1o                      ; (one palette: done)
+            ld a, 2
+            ld [LON_ST], a
+            jr .lp
+.s1o:       ld a, 1
+            ldh [maps_due], a
+.to3:       ld a, 3
+            ld [LON_ST], a
+            jr .lp
+.s2:        ld a, [LON_DIRTY]
+            ld b, a
+            ldh a, [dmg_scan]
+            or b
+            jr nz, .rst
+            ld a, [LON_ROW]
+            cp 30
+            jr z, .fin
+            ld d, a
+            call scb_row
+            ld a, [LON_ROW]
+            inc a
+            ld [LON_ROW], a
+            jr .lp
+.fin:       call lon_half
+            jr c, .x
+            call scb_fin
+            ld a, 1
+            ldh [maps_due], a
+            jr .to3
+.rst:       ld a, 1                         ; (disturbed: the scan again)
+            ld [LON_ST], a
+            ldh [dmg_scan], a
+            jr .lp
+.s3:        ldh a, [maps_due]               ; palette maps (as dmg_frame: from the target
+            and a                           ;   if the live palette is a fade of it, else once
+            jr z, .to4                      ;   the palettes have been stable PAL_STABLE
+            call lon_half                   ;   frames: a flash at a battle start does not
+            jr c, .x                        ;   make the maps; forced: at once)
+            call dmg_target
+            jr c, .mn
+            ldh a, [pal_age]
+            cp 255
+            jr z, .ma
+            inc a
+            ldh [pal_age], a
+.ma:        cp PAL_STABLE
+            jr nc, .mn
+            ld a, [LON_CNT]
+            cp LON_MAXF
+            jr c, .x
+.mn:        call dmg_maps_now
+.to4:       ld a, 4
+            ld [LON_ST], a
+            jr .lp
+.s4:        ld a, 1
+            ld [LON_LIM], a
+            ld a, [LON_SCN]
+            call rtb_b
+            xor a
+            ld [LON_LIM], a
+            call .dirty
+            jr nz, .lp
+            ld a, 5
+            ld [LON_ST], a
+            jr .lp
+.s5:        ldh a, [dmg_scan]               ; anything since? that step again (palette
+            and a                           ;   changes: dmg_frame once the LCD is on, as
+            jr nz, .rst                     ;   after the old switch-on)
+            call .dirty
+            ld a, 4
+            jr nz, .st
+            ld a, 1
+            ld [LON_RDY], a
+            ld a, 6
+.st:        ld [LON_ST], a
+            jp .lp
+.dirty:     ld hl, DIRTY_BM                 ; NZ: tiles still marked
+            ld b, 32
+            xor a
+.d:         or [hl]
+            inc l
+            dec b
+            jr nz, .d
+            and a
             ret

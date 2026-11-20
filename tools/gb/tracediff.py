@@ -2,7 +2,7 @@
 lockstep to frame wait K-1 (as firstdiff.py), then trace NES instructions and GB labels
 (L_space_addr hooks) for frame K and compare the two sequences.
 usage: PYTHONPATH=build/emu tracediff.py NES GB K [--random SEED | --battle]"""
-import sys
+import os, sys
 sys.path.insert(0, __file__.rsplit('/', 1)[0])
 from compare import sync_sram, GB, new_game_script
 from nescode import space_of_index
@@ -58,6 +58,8 @@ for m in steps:
         for n, (b, a) in sym.items():
             if n.startswith('L_') and n.count('_') == 2:
                 at.setdefault((b, a), []).append(n[2:])
+            elif n.startswith('C') and '_L_' in n and n.count('_') == 3 and '.' not in n:   # (copies in calling banks)
+                at.setdefault((b, a), []).append(n.split('_L_')[1])
         for (b, a), names in at.items():       # empty translations share an address
             gb.pb.hook_register(b, a, lambda ctx: gbtrace.extend(ctx), sorted(names))
         hooked = True
@@ -73,6 +75,21 @@ for v in nt:
     sp, a = space_of_index(v >> 8)
     if sp == 'fix' and (0xFECF <= a < 0xFEDB or 0xFEDC <= a < 0xFEF1): continue   # NMI handler / wait loop
     nseq.append('%s_%04X' % (sp, a))
+if os.environ.get('TD_SPACE'):                    # env TD_SPACE=b12,..: only those spaces (natives
+    keep = tuple(x + '_' for x in os.environ['TD_SPACE'].split(','))   #   skip NES code elsewhere)
+    nseq = [x for x in nseq if x.startswith(keep)]
+    gbtrace[:] = [x for x in gbtrace if x.startswith(keep)]
+if os.environ.get('TD_SKIP'):                     # env TD_SKIP=sp:A-B,..: ranges left out of both
+    rng = []
+    for t in os.environ['TD_SKIP'].split(','):
+        sp, ab = t.split(':'); a0, b0 = (int(x, 16) for x in ab.split('-')); rng.append((sp, a0, b0))
+    out = lambda x: any(x.startswith(sp + "_") and a0 <= int(x.split("_")[1][:4], 16) < b0 for sp, a0, b0 in rng)
+    nseq = [x for x in nseq if not out(x)]
+    gbtrace[:] = [x for x in gbtrace if not out(x)]
+gbtrace[:] = [x for x in gbtrace if '.' not in x]  # (local labels inside a translation)
+if os.environ.get('TD_DUMP'):                     # env TD_DUMP=FILE: both sequences
+    with open(os.environ['TD_DUMP'], 'w') as fh:
+        fh.write('NES ' + ' '.join(nseq) + '\nGB ' + ' '.join(gbtrace) + '\n')
 print('NES %d instructions, GB %d labels' % (len(nseq), len(gbtrace)))
 # GB labels only exist for compiled instructions; compare in order
 i = nseq.index(gbtrace[0]) if gbtrace and gbtrace[0] in nseq[:50] else 0

@@ -947,6 +947,32 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   - Bank 0 has ~3 KB free again ($2800-$33FF; the far-call stubs shrank with the copies).
   - Still lagging in battle: one frame per round on DMG (box redraw frames ~10 lines over in
     Gambatte; mGBA and Gambatte differ on which ones).
+  - Then: the palette upload (c62:D865 native) writes a changed colour's shadow directly (no
+    generic PPU write); sprite slot coding (anf_rows) without the unused colour tally,
+    unrolled; short runs of the map decompression filled in place. Coverage regenerated (do not
+    build while covall runs: a half-written build/cov3 compiled a build that diverged).
+    Tools: tracediff hooks the copied routines and takes env TD_SPACE / TD_SKIP / TD_DUMP.
+    DMG 107 -> 103, CGB 0; checkall 62/62.
+  - Palette upload unrolled (pu_fast: each colour at its constant shadow index, a computed
+    entry for FF1's mid-table entry point); prologue row writer reuses the palette of the
+    letter before within an attribute quadrant (dmg_tile_p). DMG 103 -> 101.
+  - **DMG deferred switch-on** (lon_b): when the NES switches rendering on with the GB LCD off,
+    the map scan (split into scb_init / scb_row / scb_fin), palette maps and re-coding run in
+    the following frame waits' spare time (timed by TIMA with the LCD off), the LCD still off
+    (white, as during the load); then the LCD goes on right after a frame wait's tick
+    (lon_on). A scan disturbed by writes or a sprite slot load (TBLK = SC_NP's second half)
+    starts again; maps as dmg_frame (target if the live palette is a fade of it, else after
+    PAL_STABLE frames); after LON_MAXF (6) frames the rest at once. Not on the SGB, in the
+    prologue or at a battle start (its flashes would make the maps). Screens now appear up to
+    ~6 frames later after a load (field entry, class select), the game at its pace; pictures
+    identical once shown (VRAM at 326 points). DMG 101 -> 84, CGB 0; checkall 62/62.
+  - Where the DMG lag is (lagcheck steps): screen loads ~60 frames (field entry 13, battle
+    start 15, new-game screens 12, name entries 3 x 6), prologue ~20 (half-band starts:
+    row drawing through the VRAM queue + re-coding on top of ~95 samples of base load), battle
+    ~20 (frames the NES itself spends two frames on; the GB ends 10-25 lines late). The loads
+    are CPU-bound throughout (CHR copies, map decompression and drawing, the LCD-on scan and
+    re-coding): small cuts do not move them; they need the build-time DMG shading / native
+    loaders of docs/gb-native-presentation.md.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

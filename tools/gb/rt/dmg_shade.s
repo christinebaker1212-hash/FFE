@@ -348,6 +348,13 @@ dmg_target: push af                         ; (native in bank PF_BANK: dmg_targe
             call dmg_target_b
             jp hle_back
 
+; A = palette, H = tile: as dmg_cell for a cell whose palette is known (prow_b)
+dmg_tile_p: push bc
+            push de
+            push hl
+            ld d, h
+            jr dmg_cell_e
+
 ; A = tile drawn with NES palette 3 (a dialogue box cell in the window): coded for it
 dmg_tile3:  push bc
             push de

@@ -159,7 +159,7 @@ int main(int argc, char** argv) {
 					static unsigned lyat = 0; if (!lyat) lyat = strtoul(getenv("SGBRUN_LYAT"), 0, 16);
 					uint32_t pc = 0; core->readRegister(core, "pc", &pc);
 					if ((pc & 0xFFFF) == lyat) fprintf(stderr, "L %u %u %u\n", core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8,
-						core->rawRead8(core, 0xFF44, -1), core->rawRead8(core, 0xD832, 1));
+						core->rawRead8(core, 0xFF44, -1), core->rawRead8(core, 0xD832, 1) | core->rawRead8(core, 0xFF05, -1) << 8);
 				}
 				if (getenv("SGBRUN_TRACE")) {           /* SGBRUN_TRACE=A-B: bank:PC SP of every instruction in waits A-B */
 					static int ta = -1, tb = -1; if (ta < 0) sscanf(getenv("SGBRUN_TRACE"), "%d-%d", &ta, &tb);
