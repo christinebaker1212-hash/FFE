@@ -538,8 +538,81 @@ def sub_menus(nes, outd, cmd):
     print('wrote', os.path.join(outd, 'sub_menus.png'))
 
 
+def job_save(nes, outd, cmd):
+    """job and save screens for the GB: J1 one job per row (2 pages), J2 two columns (name +
+    level; the chosen job's CP cost in the header), V1 save: file list + the chosen file's party"""
+    F = RomFont(nes); T = Tiles(cmd)
+    green = (128, 208, 16)
+    jobs = ['Onion Knight', 'Warrior', 'Monk', 'White Wizard', 'Black Wizard', 'Red Wizard', 'Hunter',
+            'Knight', 'Thief', 'Scholar', 'Geomancer', 'Dragon Knight', 'Viking', 'Karateka',
+            'Magic Knight', 'Illusionist', 'Bard', 'Warlock', 'Guru', 'Summoner', 'Sage', 'Ninja']
+    lv = [12, 1, 3, 5, 1, 2, 1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    cp = [0, 8, 8, 8, 8, 8, 12, 12, 12, 12, 16, 16, 16, 16, 20, 20, 20, 24, 24, 28, 32, 32]
+    def jname(sc, c, r, j, n=7):
+        from latin_font import packed_label, COND, TIGHT
+        if len(jobs[j]) <= 7 and len(jobs[j]) <= n: F.draw(sc, c, r, jobs[j], T.ink); return
+        for k in range(n, 9):
+            if packed_label(jobs[j], k, COND, fg=3, bg=0) or packed_label(jobs[j], k, TIGHT, fg=3, bg=0):
+                condensed(sc, c, r, jobs[j], T.ink, k); return
+    def header(sc, extra=None):
+        sc.window(0, 0, 20, 4)
+        F.draw(sc, 1, 1, 'AAAAAA', T.ink); jname(sc, 8, 1, 0)
+        F.draw(sc, 1, 2, 'Capacity', T.ink); F.draw(sc, 15, 2, '%3d' % 15, T.ink)
+        if extra: extra(sc)
+    outs = []
+    # J1: one job a row: name, Lv, CP cost; 13 a page
+    sc = Screen(T); header(sc)
+    sc.window(0, 3, 20, 15)
+    F.draw(sc, 9, 4, 'Lv', T.ink); F.draw(sc, 15, 4, 'CP', T.ink)
+    for i in range(12):
+        jname(sc, 2, 5 + i, i); F.draw(sc, 9, 5 + i, '%2d' % lv[i], T.ink); F.draw(sc, 14, 5 + i, '%3d' % cp[i], T.ink)
+    sc.save(os.path.join(outd, 'J1_jobs_rows.png')); outs.append('J1_jobs_rows.png')
+    # J2: two columns of name + level (all 22 on one page); the chosen job's cost in the header
+    sc = Screen(T)
+    sc.window(0, 0, 20, 4)
+    F.draw(sc, 1, 1, 'AAAAAA', T.ink); jname(sc, 8, 1, 0)
+    F.draw(sc, 1, 2, 'CP', T.ink); F.draw(sc, 4, 2, '%3d' % 15, T.ink)
+    condensed(sc, 9, 2, 'Needs', T.ink, 3); F.draw(sc, 13, 2, '%3d' % cp[3], T.ink)
+    sc.window(0, 3, 20, 15)
+    for i in range(22):
+        c, r = (1 + 9 * (i % 2), 4 + i // 2)
+        jname(sc, c, r, i, 6); dig_x = (c + 6) * 8 + 2
+        x = dig_x
+        for ch in '%2d' % lv[i]:
+            if ch != ' ':
+                for yy, row in enumerate(DIG3[ch]):
+                    for xx, v in enumerate(row):
+                        if v == '#': sc.im.putpixel((x + xx, r * 8 + yy), T.ink)
+            x += 4
+    sc.save(os.path.join(outd, 'J2_jobs_columns.png')); outs.append('J2_jobs_columns.png')
+    # V1: save: label + prompt, the three files one line each, the chosen file's party below
+    sc = Screen(T)
+    sc.window(0, 0, 20, 4); F.draw(sc, 1, 1, 'Please choose the', T.ink); F.draw(sc, 1, 2, 'file to save to.', T.ink)
+    sc.window(0, 3, 20, 5)
+    for i, t in enumerate(['1  AAAAAA  Lv 12', '2  -', '3  -']): F.draw(sc, 2, 4 + i, t, T.ink)
+    sc.window(0, 7, 20, 11)
+    party = [('AAAAAA', 12, 128, 140), ('AAAAAB', 11, 97, 120), ('BBBBBC', 11, 88, 102), ('CCCCCD', 10, 75, 99)]
+    F.draw(sc, 17, 8, '%2d' % 3, T.ink)            # (the save count, as FF3's slot shows it)
+    for i, (nm, l, hp, mx) in enumerate(party):
+        r = 10 + 2 * i
+        F.draw(sc, 1, r, nm, T.ink); F.draw(sc, 8, r, 'Lv%2d' % l, T.ink)
+        small_text(sc, 13 * 8 + 1, r * 8, '%d/%d' % (hp, mx), green)
+
+    sc.save(os.path.join(outd, 'V1_save.png')); outs.append('V1_save.png')
+    ims = [Image.open(os.path.join(outd, o)) for o in outs]
+    sheet = Image.new('RGB', (480 * 3 + 32, 432), (40, 40, 40))
+    for i, im in enumerate(ims): sheet.paste(im, (i * 496, 0))
+    sheet.save(os.path.join(outd, 'job_save.png'))
+    print('wrote', os.path.join(outd, 'job_save.png'))
+
+
 def main():
     nes, outd = sys.argv[1], sys.argv[2]
+    if len(sys.argv) > 3 and sys.argv[3] == 'jobsave':
+        os.makedirs(outd, exist_ok=True)
+        fr = capture(nes, [9000])
+        job_save(nes, outd, fr[9000])
+        return
     if len(sys.argv) > 3 and sys.argv[3] == 'sub':
         os.makedirs(outd, exist_ok=True)
         fr = capture(nes, [9000])

@@ -312,7 +312,13 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
     in the unused delete-spell routine); `stcl` moved into equip's dead class-sprite routine.
   - Checks: magic (pokes: a Black Mage with MP; page turns), item, equip, status sequences and
     explore 12000: identical.
-- Open: the sub-menus Job, Save (need a save with crystals / the world map) still use the NES
+- Job / Save mock-ups (`mockup.py NES OUT jobsave`: J1 one job a row, 2 pages; J2 two columns
+  of name + level, the chosen job's cost in the header; V1 save: prompt, the three files one
+  line each, the chosen file's party below) sent to the owner. Test states: Job with
+  `--poke W:6021=01` (a crystal), Save with `--poke W:002D=00` (world map flag).
+- Lag (lagcheck explore 2000-12000, Gambatte): +0.6% in total, all in screen-load steps
+  (+5 / +16 / +7 / +16 frames); steady play at pace.
+- Open: the sub-menus Job, Save still use the NES
   layout through the field camera (mock-ups next).
 
 ## Field fixes (2026-11-20)
