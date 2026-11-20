@@ -453,7 +453,19 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   group). With a non-black backdrop, value 1 (the darkest group) is now shaded by its
   darkest level (`dmg_shade.s` `.lum`, `LSL[0]`). Checked: DMG credits black with the ball
   visible; 12 DMG shots along the new-game / random path identical before and after.
-- Next: Select menu with suspend (design with the owner); speed check of the new screens.
+- **Speed check (2026-11-20, lagcheck, Gambatte, random seed 1, 30000 frames):** CGB -0.9%
+  (keeps pace, catch-up); DMG +10.6%, the same as before this session's runtime changes
+  (measured on the commit before them, window by window), so nothing here slowed DMG. The
+  earlier "+3.9%" was on a different path (the prologue / name entry changes moved the
+  random path). DMG lags in long field stretches (castle, dialogue: waits 17000-19000,
+  21300-22900, +20-30 frames per 60 waits) and at screen loads (+90-230 per window).
+  Profile (mGBA, PC every 200 instructions, waits 17000-19000): rt_ppu_w7 11%, OAM
+  conversion 6%, the OAM clear loop fix:C46E 7% (translated), delay loops 4%, DMG cell /
+  attribute bookkeeping ~10% together, music engine (bank 13) a few %.
+  First step: fix:C46E native (`hle_oamclr`, rt/ff2_pal.s): DMG +9.4%. Random 30000 on DMG
+  and CGB identical.
+- Next: DMG field speed (nametable writes, OAM conversion, cell bookkeeping); Select menu
+  with suspend (design with the owner).
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).

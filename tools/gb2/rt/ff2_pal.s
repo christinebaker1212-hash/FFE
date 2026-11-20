@@ -89,3 +89,16 @@ cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ pa
             jr nz, .lg
 .end:       pop de
             ret
+
+; fix:C46E "clear OAM data" (every frame; ~7% of the DMG field time translated): $0200-$02FF
+; = $F0, $26 = 0. Exit as the NES: A = 0, X = $FF, N = 0, Z = 1, carry kept.
+hle_oamclr: ld hl, NES_RAM + $200
+            ld a, $F0
+.l:         ld [hl], a
+            inc l
+            jr nz, .l                       ; (leaves Z = 1, carry untouched)
+            ld a, l
+            ld [NES_RAM + $26], a
+            ldh [nzv], a
+            ld e, $FF
+            ret
