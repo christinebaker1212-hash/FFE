@@ -362,8 +362,8 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   field and battle shots clean.
 
 ## Release checklist work (2026-11-20, owner: "address the gaps in the lot check requirements")
-Results per item: `docs/gb-release-checklist.md` (FF3 column); every item passes except the
-cross-hardware check on a Game Boy Advance (untested).
+Results per item: `docs/gb-release-checklist.md` (FF3 column); every item passes in emulators
+(Game Boy Advance as mGBA's AGB model: the same run as on the Color); real GBA hardware untested.
 - **Cart RAM only around save accesses.** Measured first (cynes write / read watch, 3 x 40k
   frames of random play): FF3 uses all of $6000-$63FF and $7000-$7FFF as work RAM; the save
   slots $6400-$6FFF are touched only by the save / load / slot-check code, and the save count
@@ -396,8 +396,8 @@ cross-hardware check on a Game Boy Advance (untested).
   directly; firstdiff `prg_at` (the new map), `FD_BANKS=ADDR`.
 
 ## Known open items
-- **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3: all items pass
-  (2026-11-20) except the Game Boy Advance check (untested); re-run the checks on the final build.
+- **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3: all items pass in
+  emulators (2026-11-20; GBA hardware untested); re-run the checks on the final build.
 - Water animation tiles blank (CHR read-back through $2007 returns 0).
 - Warp (`p3c:9B5F` TSX / TXS arithmetic) and the inn's `TXS` from a saved X (`p3c:9039`) use
   FF2's approximate helpers: need a semantic version (as FF2's open item).

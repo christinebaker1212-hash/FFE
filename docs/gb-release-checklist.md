@@ -67,7 +67,8 @@ Checked with automated tools (as Nintendo's KENSA / Lot Check suites did):
   frame end, cart RAM accessed while off (counts + the first cases with PC / LY / mode).
   `SGBRUN_SVBK=LO-HI` (FF3): translated code running with a WRAM bank other than 1;
   `SGBRUN_WWATCH=ADDR:BANK`: writes to a WRAM address. `GB_CNT=CD80` / `GB_PRG=ff3` for FF3.
-  `tools/gb3/lagcheck.py` passes these through (prints the `lotcheck:` line).
+  `tools/gb3/lagcheck.py` passes these through (prints the `lotcheck:` line). `--agb`: the
+  Game Boy Advance model (a GBA running a Color game).
 - Release builds: `tools/gb3/build.py --gb --release` (FF3): the test-pad input mode and the
   fault / `rst $38` records are left out (`;@test{ .. ;@test}` blocks in the runtime), faults
   restart the game instead (`;@rel` lines), cart RAM 8 KB in the header; refuses to build with a
@@ -83,7 +84,7 @@ Checked with automated tools (as Nintendo's KENSA / Lot Check suites did):
 | Save validation + message | verify the game's own checks; add the message | verify | **pass**: boot `save_check` (`build.py`): each slot marked used ($5A) must pass FF3's own sum test; damaged slots are listed on a screen ("Save data error / File n is damaged. / Damaged save files will be erased. / Press the A Button."), cleared only after the A Button (checked in mGBA and PyBoy with a crafted save: damaged slot cleared, valid slot kept) |
 | Soft reset A+B+Start+Select | **missing** | **missing** | **pass**: polled in the vblank interrupt (`runtime.s`), held off for 30 frames after any save-RAM write; sound and cart RAM off, then the boot path (memory and registers set up again; checked in mGBA in the prologue and on the name screen) |
 | Memory / registers cleared at boot | verify (`memclr` covers WRAM?) | verify | **pass**: VRAM banks 0 / 1, WRAM $C000-$CEFF and banks 1-7, OAM, HRAM cleared; sound off, cart RAM off, SCX / SCY / WX / WY / STAT / LYC / VBK set; the game's PRG-RAM areas start from zero (the NES game initialises what it reads, apart from tiles read back from the PPU: see FF3 status) |
-| Cross-hardware | DMG / SGB / CGB tested in emulators; owner's GBC hardware test; GBA, Pocket untested | verify | CGB in mGBA / PyBoy / Gambatte; GBA in GBC mode untested (needs hardware or a GBA emulator run) |
+| Cross-hardware | DMG / SGB / CGB tested in emulators; owner's GBC hardware test; GBA, Pocket untested | verify | CGB in mGBA / PyBoy / Gambatte; Game Boy Advance as mGBA's AGB model (`sgbrun --agb`): the same run as on the Color (same frame and instruction counts over 3200 frames, no `SGBRUN_LOTCHECK` violation), colours darker as on a GBA screen (optional later: brighter palettes when boot register B bit 0 says GBA); real GBA hardware untested |
 | Color-only warning screen | n/a | n/a | **pass**: "This Game Pak is designed only for use with the Game Boy Color(TM) system." (TM glyph added), LCD off in V-Blank, then halt; seen in PyBoy DMG, mGBA DMG and SGB |
 | Hardware names in text | **pass** in the GB build after `enc()` writes "A Button" / "B Button" (`termcheck.py ff1`) | **fails**: "RESET" in the save message (`termcheck.py ff2`) | **pass** (`termcheck.py ff3`: "A Button" / "B Button" in the GB dialogue, the NES "Hold RESET" message replaced by "You can turn the power off now.") |
 | CGB colour use | NES palettes per tile | verify | NES palettes per tile |

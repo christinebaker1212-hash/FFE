@@ -1,6 +1,6 @@
 /* Headless mGBA runner for SGB testing of the GB builds (palettes, border, packets).
  *
- * usage: sgbrun ROM FRAMES OUTPREFIX [--dmg] [--press KEYS@FRAME+HOLD ...] [--shot FRAME ...]
+ * usage: sgbrun ROM FRAMES OUTPREFIX [--dmg | --cgb | --agb] [--press KEYS@FRAME+HOLD ...] [--shot FRAME ...]
  *        [--padfile FILE] [--nshot K ...]
  *   --padfile: one NES pad byte per NES frame (bit 0 right .. 7 A, as the NES latched it),
  *     applied while the runtime's NES frame count ($D830) is that frame (as firstdiff.py);
@@ -180,6 +180,7 @@ int main(int argc, char** argv) {
 	for (int i = 4; i < argc; i++) {
 		if (!strcmp(argv[i], "--dmg")) dmg = 1;
 		else if (!strcmp(argv[i], "--cgb")) dmg = 2;
+		else if (!strcmp(argv[i], "--agb")) dmg = 3;     /* a Game Boy Advance running a Color game */
 		else if (!strcmp(argv[i], "--press") && i + 1 < argc && np < 256) {
 			const char* s = argv[++i]; const char* at = strchr(s, '@');
 			presses[np].keys = parse_keys(s);
@@ -206,7 +207,7 @@ int main(int argc, char** argv) {
 	if (!core || !core->init(core)) { fprintf(stderr, "no core for %s\n", argv[1]); return 1; }
 	mCoreInitConfig(core, NULL);
 	/* the model for every kind of cart header (a dual-mode cart would otherwise run as CGB) */
-	const char* model = dmg == 2 ? "CGB" : dmg ? "DMG" : "SGB";
+	const char* model = dmg == 3 ? "AGB" : dmg == 2 ? "CGB" : dmg ? "DMG" : "SGB";
 	mCoreConfigSetValue(&core->config, "gb.model", model);
 	mCoreConfigSetValue(&core->config, "sgb.model", model);
 	mCoreConfigSetValue(&core->config, "cgb.model", model);
