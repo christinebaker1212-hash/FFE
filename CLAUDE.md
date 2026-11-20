@@ -1040,6 +1040,18 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   now records the mapped bank's ID ($7FFE) and works with the LCD off (frame tick every 69th
   sample); `psmany.sh` samples many frames in parallel (env SKIPS).
 
+- Recompiler: a JMP / JSR into $8000-$BFFF whose bank is $5115's at run time (ExRAM code: ex:5EAC
+  JMP $B957, ex:5E13 JMP $A8A9) checks nes_bank8 against its 1-3 compiled candidates and goes
+  straight to rt_dyn_go / rt_farcall (no lookup; env GB_DYNB=0 off). checkall 62/62, DMG 40,
+  CGB 0. Measured and dropped: incremental OAM conversions loading slots themselves (stamping
+  the slots in use costs more than the whole conversions it saves); DMG loads writing the
+  shadows only with the map rebuilt in the switch-on's spare time (menus -2, battle start and
+  field entry +3: their switch-on runs out of time); LON_MAXF 16 (one frame less, screens
+  later). Where the DMG lag is (40): new-game screens and menus ~16 (title / class select 5,
+  name entries 9, menu 2: FF1 draws them with the LCD off in 2 NES frames; the GB natives take
+  ~4), battle start 4, field entry 1, battle rounds ~19 (single heavy frames, 20-45% over:
+  panel rows, text, OAM conversion, music), prologue 1.
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette

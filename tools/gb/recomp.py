@@ -829,15 +829,36 @@ class Emitter:
             self.o('ld hl, $%04X' % gb_ram(i.arg), 'jp rt_jmp_ind'); return
         tk = self.rc.target(i, i.arg)
         if tk is None:
+            self.dyn_banked(i.arg, False)
             self.o('ld hl, $%04X' % i.arg, 'jp rt_dyn_jump'); return
         tk = self.rc.jmp_final(tk)
         if tk in self.rc.g.ext: self.o('jp ' + self.rc.g.ext[tk][0]); return
         self.jump(None, tk)
 
+    def dyn_banked(self, addr, call):
+        """JMP / JSR into $8000-$BFFF whose bank is the one at $5115 at run time: with 1-3
+        compiled candidates, a check of nes_bank8 against each (straight to rt_dyn_go /
+        rt_farcall, no lookup); the caller then emits the lookup for anything else. AF kept."""
+        if not 0x8000 <= addr < 0xC000 or os.environ.get('GB_DYNB') == '0': return False
+        cands = [(sp, a) for sp, a in self.rc.dyn_candidates(addr) if sp.startswith('b')]
+        if not 1 <= len(cands) <= 3: return False
+        i = self.i
+        for n, (sp, a) in enumerate(cands):
+            lab = label(sp, a)
+            nx = '.dbn%04X_%d' % (i.addr, n)
+            self.o('push af', 'ldh a, [nes_bank8]', 'cp %d' % int(sp[1:]), 'jr nz, %s' % nx,
+                   'ld a, bank(%s)' % lab, 'ldh [fc_bank], a', 'pop af', 'ld hl, %s' % lab)
+            if call: self.o('call rt_farcall', 'jr .dbx%04X' % i.addr)
+            else: self.o('jp rt_dyn_go')
+            self.o(nx + ':', 'pop af')
+        return True
+
     def x_JSR(self):
         i = self.i
         tk = self.rc.target(i, i.arg)
         if tk is None:
+            if self.dyn_banked(i.arg, True):
+                self.o('ld hl, $%04X' % i.arg, 'call rt_dyn_call', '.dbx%04X:' % i.addr); return
             self.o('ld hl, $%04X' % i.arg, 'call rt_dyn_call'); return
         if tk not in self.rc.insns and tk not in self.rc.g.ext:
             self.rc.warn.append('call to uncompiled %s:%04X from %r' % (tk[0], tk[1], i))

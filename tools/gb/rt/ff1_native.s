@@ -14910,7 +14910,7 @@ mpre:       ld a, MAPS_BANK0
 ; ---- palup2_b's fast path (v = $3F00 + C, increment 1): C = the first index, HL -> its colour
 ; ($03D0 from index 16 on). Each colour compared with the shadow at its constant index; a
 ; changed one to the shadow and its flags (pu_chg, as rt_ppu_w7g's palette write).
-section bank HLE_BANK, $7580
+section bank HLE_BANK, $7610
 pu_fast:    ld a, c
             cp 32
             jr nc, .end
