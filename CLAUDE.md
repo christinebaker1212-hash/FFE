@@ -49,6 +49,13 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   holds on DMG and CGB. Measure first (lagcheck, sgbrun SGBRUN_PROF2 buckets), reproduce each
   replaced routine's RAM side effects exactly, tiles converted at build time from the user's ROM.
   Write-up: `docs/gb-native-presentation.md`.
+- **Owner's mandate (2026-11-20), FF3 (Game Boy Color only): the Game Boy Color must not
+  emulate the NES while the game plays.** The recompiled code with an NES-hardware layer was a
+  good first solution; from now on replace the NES-hardware layer (PPU register / nametable /
+  attribute / CHR shims, MMC5 banking and IRQ, APU, the `$4014` sprite page) with native Game Boy
+  Color routines written from the everything8215 disassembly, routine by routine, until the
+  translated game code no longer calls it. The NES ROM is only the build's input. Plan and
+  worklist: `docs/ff3-native-plan.md` (`tools/gb3/nesmap.py` lists the remaining call sites).
 - **Owner's decision (2026-11-18): FF1 stays on the current approach (static recompilation of
   the user's ROM + native routines). FF2 and FF3 switch to their disassembly sources
   (everything8215/ff2, /ff3) as the base**, packed into the builder (fetched when the builder

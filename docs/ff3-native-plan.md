@@ -1,5 +1,11 @@
 # FF3 GBC: from "the NES running on a Game Boy" to native Game Boy code
 
+**Mandate (owner, 2026-11-20): the Game Boy Color must not emulate the NES while the game
+plays.** Goal: no translated routine calls the NES-hardware layer (`rt_ppu_*`, `rt_io_w4014`,
+`rt_mmc_*` banking / IRQ, `rt_apu_w`); every drawing, sprite, bank and sound routine of FF3 that
+touches NES hardware gets a native Game Boy Color version written from the disassembly. Progress
+is measured by `tools/gb3/nesmap.py` (static call sites left, and their share of GB time).
+
 Owner (2026-11-20): use the FF3 disassembly (everything8215/ff3, fetched to `build/src/ff3`,
 never committed) to reduce, and where possible eliminate, the need for the NES to run on the
 Game Boy; the NES ROM should only be the input of the build. This refines the native-presentation
