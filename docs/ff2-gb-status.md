@@ -528,6 +528,11 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   fix:E92A), so dialogue text and window attribute writes skip the cell lookups. DMG +5.5% ->
   +5.1%; dialogue windows 17041-17221: +11 / +8 / +13 -> +5 / +0 / +3. RAM identical; DMG
   dialogue shots correct.
+- **Native "draw object sprite" (b03:A902, NPCs every frame)** (`hle_objspr`): its 8 table
+  bytes in one banked copy (`rd8_bank`, bank 0 $3A6C) instead of 8 indirect reads with two
+  bank switches each (the field's "glue" cost: ~45 of the ~54 indirect ROM reads per frame
+  in the throne room). DMG +5.1% -> +4.3%; throne room +13 / +15 -> +2 / -1 / +5 / +6. RAM
+  identical (DMG / CGB); NPC shots correct.
 - Next (step 1, third part): the remaining field costs (dialogue window: text printer
   fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
   then screen loads, music, sprites. Earlier plan text:

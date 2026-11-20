@@ -1160,3 +1160,113 @@ hle_vtile_b:
             jr nz, .p
             pop de
             ret
+
+; b03:A902 "draw object sprite" (NPCs, every frame on a normal map): 4 OAM entries at
+; $0200 + $26 from $40 (x) / $41 (y) and the 8 bytes at ($80) (tile + $82, flags; ROM in bank
+; 3 for the NPC graphics table) - one banked copy of the 8 bytes instead of 8 indirect reads
+; with two bank switches each. Exit as the NES: $26 += 16, A = $26, X = the old $26, Y = 7,
+; N Z C V of the ADC.
+hle_objspr_b:
+            ld a, [NES_RAM + $81]           ; the 8 bytes -> VT_BUF
+            ld h, a
+            ld a, [NES_RAM + $80]
+            ld l, a
+            ld a, h
+            cp $20
+            jr c, .ram
+            cp $60
+            jr c, .io
+            cp $80
+            jr c, .sram
+            cp $C0
+            jr nc, .fix
+            sub $40                         ; $8000-$BFFF: the data image of the NES bank there
+            ld h, a
+            ldh a, [data_bank8]
+            jr .rd
+.fix:       sub $80                         ; $C000-$DFFF / $E000-$FFFF
+            ld h, a
+            cp $60
+            ld a, DATA + 31
+            jr nc, .rd
+            ldh a, [data_bankC]
+.rd:        call rd8_bank
+            jr .have
+.sram:      add a, $40                      ; NES $6000-$7FFF = cart RAM $A000-$BFFF
+            ld h, a
+            jr .copy
+.ram:       and $07
+            add a, high(NES_RAM)
+            ld h, a
+.copy:      ld de, VT_BUF
+            ld b, 8
+.cl:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .cl
+            jr .have
+.io:        ld a, 3
+            jp rt_fault
+.have:      ld a, [NES_RAM + $26]
+            ld [MU_T], a                    ; (the old $26: X at the end)
+            ld l, a
+            ld h, high(NES_RAM) + 2
+            ld a, [NES_RAM + $41]           ; y: entries 0 / 2 (+0, +8), y + 8: 1 / 3 (+4, +12)
+            ld [hl], a
+            set 3, l
+            ld [hl], a
+            add a, 8
+            res 3, l
+            set 2, l
+            ld [hl], a
+            set 3, l
+            ld [hl], a
+            ld a, [MU_T]                    ; x: entries 0 / 1 (+3, +7), x + 8: 2 / 3 (+11, +15)
+            add a, 3
+            ld l, a
+            ld a, [NES_RAM + $40]
+            ld [hl], a
+            set 2, l
+            ld [hl], a
+            add a, 8
+            set 3, l
+            ld [hl], a
+            res 2, l
+            ld [hl], a
+            ld a, [NES_RAM + $82]           ; tiles + $82 (+1), flags (+2), entry by entry
+            ld b, a
+            ld a, [MU_T]
+            inc a
+            ld l, a
+            ld de, VT_BUF
+            ld c, 4
+.pr:        ld a, [de]
+            inc e
+            add a, b
+            ld [hl+], a
+            ld a, [de]
+            inc e
+            ld [hl], a
+            ld a, l
+            add a, 3
+            ld l, a
+            dec c
+            jr nz, .pr
+            ld a, [MU_T]                    ; $26 += 16 (V: $70-$7F become negative)
+            ld e, a                         ; X
+            ld c, 0
+            cp $70
+            jr c, .nv
+            cp $80
+            jr nc, .nv
+            ld c, $40
+.nv:        ld a, c
+            ldh [vfl], a
+            ld bc, 7                        ; Y = 7 (B = 0)
+            ld d, b
+            ld a, e
+            add a, $10                      ; Z, C
+            ld [NES_RAM + $26], a
+            ldh [nzv], a                    ; N
+            ret

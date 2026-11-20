@@ -95,3 +95,17 @@ cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ pa
 hle_oamclr: call rt_fcs
             db HLE_BANK
             dw hle_oamclr_b
+
+; A = GB bank, HL = address in its $4000-$7FFF window: 8 bytes to VT_BUF, back to HLE_BANK
+; (for native routines in that bank that read NES ROM data). 20 bytes: fills to $3A80.
+rd8_bank:   ld [$2000], a
+            ld de, VT_BUF
+            ld b, 8
+.l:         ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .l
+            ld a, HLE_BANK
+            ld [$2000], a
+            ret
