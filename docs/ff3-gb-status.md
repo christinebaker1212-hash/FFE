@@ -283,7 +283,25 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   word-tile letters in the MP cells and the camera jumping for a few frames).
 - Sub-menu mock-ups (`mockup.py NES OUT sub`, S1-S5: item list, item target, magic, equip,
   status) sent to the owner.
-- Open: the sub-menus (Item, Magic, Equip, Status, Order, Job, Save) still use the NES
+- **Sub-menus (owner approved mocks S1-S5, status stats condensed on one page):**
+  - Status: window $1D (1,1,20,18), camera (8,8) (`stcam` in place of $956F at $A841), no
+    label window / class sprite; string $0147 for the GB (name + job, Lv + EXP, values right-
+    aligned); the condensed words (Proficiency, To next level, the 5 stats: 34 tiles,
+    `STATUS_WORDS`) and the MP digits drawn by bank 88 `status` on job-name tiles the member's
+    job does not use (`wslots`, job tile ranges `job_tiles()` as insert.py), restored from
+    JDATA on close (`WST` $5FFD); HP row green via the new row-palette register.
+  - Equip: windows 4 (1,1,20,11) and $1C (1,12,20,7) (free since the main menu / status no
+    longer open them; $0A / $0B stay for the shops), message window $1E (1,12,20,4), strings
+    $013E / $012F one row per line (count at column 15), messages re-wrapped at 18.
+  - Item: label 5 (1,1,20,3) "Item", list 6 (1,3,20,16) one item a row; the party window 7
+    (1,12,20,7, one line per member, green HP) drawn only when an item is used (`stuse` before
+    the target selection), prompt window $15 (1,9,20,4) above it (prompts re-wrapped at 18);
+    after the choice FF3's redraw ($AA8E) now opens the list window with its frame and undoes
+    the party window's palettes (`stcl`). Select-character hand table $A74F per line.
+  - GB runtime: row palettes `$580A` row / `$580B` column / `$580C` count * 4 + palette;
+    rows recorded (`OVR_ROWS`) and rebuilt from the NES attributes on `$5808` = 0.
+  - Checks: firstdiff status / equip / item sequences and explore 12000 identical.
+- Open: the sub-menus Magic, Job, Save still use the NES
   layout through the field camera (mock-ups next).
 
 ## Known open items

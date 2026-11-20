@@ -29,6 +29,9 @@ DBG        = $D820          ; fault info: code, HL, SP, stack top (16)  (the add
 NMI_CNT    = $D830          ; 16-bit count of NES frame waits             test runners read:
 VBL_CNT    = $D832          ; 16-bit count of GB frames                   tools/gb/gambatte/
 WAIT_CNT   = $D834          ; 16-bit count of NES frames the main thread waited for (tools/gb3/firstdiff.py)
+OVR_ROWS   = $D840          ; map rows with palettes set by $5809 / $580C (bit per row, 4)
+OVR_R      = $D844          ; $580A row, $580B first column (WRAM bank 1)
+OVR_C      = $D845
 TEST_PAD   = $D83E          ; $A5: test runner input mode (later)         gbrun.c)
 LK_TAB     = $DA00          ; dynamic-target lookup cache (512 bytes, WRAM bank 1; lookup)
 PC_BUF     = $CD00          ; rt_ppu_copy: one piece (<= 32 bytes; the stack's far end, never reached)
@@ -2267,9 +2270,17 @@ far_mmc:    push af
             pop hl
             pop af
             ret
-rt_mmc_w580A:
-rt_mmc_w580B:
-rt_mmc_w580C:
+rt_mmc_w580A:                               ; GB layout: palette of a row's cells: row,
+            ld [OVR_R], a
+            ret
+rt_mmc_w580B:                               ;   first column,
+            ld [OVR_C], a
+            ret
+rt_mmc_w580C:                               ;   count * 4 + palette (far_580C)
+            push af
+            push hl
+            ld hl, far_580C
+            jr far_mmc
 rt_mmc_w580D:
 rt_mmc_w580E:
 rt_mmc_w580F:

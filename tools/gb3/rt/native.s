@@ -2833,7 +2833,7 @@ far_5808:   and a
             ret
 .off:       ldh a, [mnu]
             and a
-            ret z
+            jr z, .rest
             xor a
             ldh [mnu], a
             ldh [rSTAT], a
@@ -2844,10 +2844,32 @@ far_5808:   and a
             ldh [cam_x], a
             ld a, CAM_Y
             ldh [cam_y], a
-            push bc
-            push de
-            ld d, 3                         ; HP rows 3, 8, 13, 18: palettes from NT_SH
-.rr:        ld e, 4
+.rest:      push bc                         ; rows with set palettes: from the NES attributes
+            push de                         ;   again (all 32 cells)
+            ld d, 0
+.rr:        ld a, d
+            and 7
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .rn
+            inc h
+.rn:        ld c, [hl]
+            ld a, d
+            rrca
+            rrca
+            rrca
+            and 3
+            add a, low(OVR_ROWS)
+            ld l, a
+            ld h, high(OVR_ROWS)
+            ld a, [hl]
+            and c
+            jr z, .nx
+            ld a, [hl]
+            xor c
+            ld [hl], a
+            ld e, 0
 .c:         ld a, d                         ; attribute byte NT_SH + $3C0 + (row >> 2) * 8
             and $1C                         ;   + (col >> 2)
             add a, a
@@ -2881,20 +2903,38 @@ far_5808:   and a
             ld [hl], b
             inc e
             ld a, e
-            cp 15
+            cp 32
             jr c, .c
             ld a, 1
             ldh [rSVBK], a
             ld a, d
             call mnu_mark
+.nx:        inc d
             ld a, d
-            add a, 5
-            ld d, a
-            cp 23
+            cp 30
             jr c, .rr
             pop de
             pop bc
             ret
+
+far_580C:   push bc                         ; A = count * 4 + palette: row OVR_R from column
+            push de                         ;   OVR_C
+            ld b, a
+            and 3
+            ld c, a
+            ldh a, [bg_bank]
+            or c
+            ld c, a
+            ld a, b
+            rrca
+            rrca
+            and $3F
+            ld b, a
+            ld a, [OVR_R]
+            ld d, a
+            ld a, [OVR_C]
+            ld e, a
+            jr mnu_set
 
 far_5809:   push bc                         ; A = member * 4 + palette: the member's HP row
             push de                         ;   (NES row 3 + 5 * member, cols 4-14)
@@ -2915,16 +2955,35 @@ far_5809:   push bc                         ; A = member * 4 + palette: the memb
             add a, 3
             ld d, a
             ld e, 4
-            call mnu_cell
+            ld b, 11
+mnu_set:    call mnu_cell                   ; B cells from row D column E: attribute C
             ld a, MAP_BANK
             ldh [rSVBK], a
-            ld b, 11
 .w:         ld a, c
             ld [hl+], a
             dec b
             jr nz, .w
             ld a, 1
             ldh [rSVBK], a
+            ld a, d                         ; (the row recorded for the restore)
+            and 7
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .n
+            inc h
+.n:         ld c, [hl]
+            ld a, d
+            rrca
+            rrca
+            rrca
+            and 3
+            add a, low(OVR_ROWS)
+            ld l, a
+            ld h, high(OVR_ROWS)
+            ld a, [hl]
+            or c
+            ld [hl], a
             ld a, d
             call mnu_mark
             pop de

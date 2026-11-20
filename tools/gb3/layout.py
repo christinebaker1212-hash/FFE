@@ -1029,6 +1029,10 @@ def dialogue(r):
                 if e['id'] in MENU_TEXT: e['en'] = MENU_TEXT[e['id']]
         return rows
     ins.load_rows = load_gb
+    for e in json.load(open('script/ff3/t8200.json')):        # equip messages (window $1E):
+        if e['id'] in EQUIP_MSGS:                             #   18 columns
+            t = e['en']; assert t.startswith('{0E}'), t
+            MENU_TEXT[e['id']] = '{0E}' + '\n'.join(flow_gb(t[4:].replace('\n', ' '), 18))
     ins.layout.__defaults__ = (DLG_W_GB,)
     rep = []
     ins.put_tables(r.d, rep)
@@ -1085,39 +1089,34 @@ MENU_TEXT = {   # t8200 ids (GB layout; the MP of a level: 2 cells "_n", written
     # the guest's name (code 07, only in the main menu's guest window, 5 columns): the given
     # name alone (owner-approved mock-up: "Sara")
     0xF8: 'Sara', 0xF9: 'Cid', 0xFD: 'Alus',
+
 }
 
 MENU_HP_SRC = '''
     org $95B2
-hppal:              ; (was: HP text attributes) menu mode on; per member its HP palette:
-    lda #1          ;   0 green, 1 orange (status), 2 pink (dead / stone)
+hppal:              ; (was: HP text attributes) menu mode on and the members' HP palettes
+    ldy #12         ;   (bank 88 hppal8)
+    lda #$FB
+    jmp JBGO
+stcam:              ; status / equip / item screens: their camera (windows from NES 1, 1)
+    lda #8
+    sta $5802
+    sta $5803
+    jmp $956F
+stpost:             ; status text drawn: HP palette, condensed words and MP digits (bank 88)
+    ldy #12
+    lda #$FD
+    jmp JBGO
+stuse:              ; item use: the party window (on demand) and its HP palettes, then the
+    jsr $A328       ;   target selection
+    ldy #12
+    lda #$FC
+    jsr JBGO
+    jmp $A715
+stcl:               ; item menu redrawn after a target choice: the party window's HP palettes
+    lda #0          ;   undone ($5808 = 0 rebuilds rows with set palettes)
     sta $5808
-    ldx #0
-    ldy #0
-.m:
-    lda $6102,x
-    and #$FE
-    beq .p
-    and #$C0
-    cmp #$01
-    lda #2
-    bcs .p
-    lda #1
-.p:
-    sta $80
-    tya
-    ora $80
-    sta $5809
-    iny
-    iny
-    iny
-    iny
-    txa
-    clc
-    adc #$40
-    tax
-    bne .m
-    rts
+    jmp $F44B       ; close menu 1 (the call this replaces)
 mnuoff:             ; close menu ($A685's last step, the screen clear): then the GB's menu
     jsr $F465       ;   mode off and the word tiles back
     lda #0
@@ -1132,6 +1131,8 @@ SNB = $5EB4         ; ExRAM (battle only: the message window's save area): 6 til
 DG = $5EE4          ; 12 characters: Gil (7 digits, G), Capacity (3 digits, C)
 MPC = $5EF0         ; MP cell codes (4 x 8)
 RST = $5FFE         ; $A5: the MP tiles are in the word tiles' place (ExRAM image: $FF)
+WST = $5FFD         ; $A5: the status words are on job-name tiles
+WT = $5EB4          ; status: the word tiles' numbers (WN)
     org $85E0
 disp2:              ; bank 88 $8004 (JOBF dispatch, Y = 12: was JMP sq): A = $FF -> smallnum,
     cmp #$FF        ;   $FE -> restore (numsq passes a text column)
@@ -1140,6 +1141,18 @@ disp2:              ; bank 88 $8004 (JOBF dispatch, Y = 12: was JMP sq): A = $FF
     bne .q
     jmp restore
 .q:
+    cmp #$FD
+    bne .q2
+    jmp status
+.q2:
+    cmp #$FC
+    bne .q3
+    jmp cwpal
+.q3:
+    cmp #$FB
+    bne .q4
+    jmp hppal8
+.q4:
     jmp SQ
 smallnum:           ; Gil and Capacity in 4-px digits -> tiles $7B-$7F, $CA (main menu)
     lda $601C
@@ -1256,12 +1269,41 @@ smallnum:           ; Gil and Capacity in 4-px digits -> tiles $7B-$7F, $CA (mai
     dey
     bne .q1
     jsr fin
-    ; MP of the 8 levels per member (owner: the small digits with slashes): tile codes
-    ; "d/" ($E5 + d) for levels 1-7, "d" (DTILE) for level 8, MP at $6130 + $40 m + 2 l
+    ; MP of the 8 levels per member (owner: the small digits with slashes)
     ldx #0
     ldy #0
 .mm:
-    lda #0
+    jsr mpcodes
+    txa
+    clc
+    adc #$40
+    tax
+    bne .mm
+    jsr mptiles
+    jsr $FF00       ; the MP cells (NES rows 4 + 5 m, cols 6-13)
+    jsr inc1
+    ldx #0
+    ldy #0
+.nr:
+    lda NTH,y
+    sta $2006
+    lda NTL,y
+    sta $2006
+    lda #8
+    sta $85
+.nc:
+    lda MPC,x
+    sta $2007
+    inx
+    dec $85
+    bne .nc
+    iny
+    cpy #4
+    bcc .nr
+    jsr fin
+    jmp JBTAIL
+mpcodes:            ; member X ($00/$40/..): its 8 MP cell codes to MPC + Y (Y advanced, X kept):
+    lda #0          ;   "d/" ($E5 + d) for levels 1-7, "d" (DTILE) for level 8; MP at $6130 + X + 2l
     sta $85
 .ml:
     stx $86
@@ -1292,14 +1334,13 @@ smallnum:           ; Gil and Capacity in 4-px digits -> tiles $7B-$7F, $CA (mai
     lda $85
     cmp #8
     bcc .ml
-    txa
-    clc
-    adc #$40
-    tax
-    bne .mm
-    lda RST         ; the 20 MP tiles: in place unless the menu closed since
+    rts
+mptiles:            ; the 20 MP tiles over the word tiles $E5-$F6, $C9, $CF (unless there)
+    lda RST
     cmp #$A5
-    beq .nm
+    bne .u
+    rts
+.u:
     lda #$0E        ; $E5-$EE ("0/" - "9/"), 5 tiles per vblank
     ldy #$50
     ldx #0
@@ -1336,30 +1377,254 @@ smallnum:           ; Gil and Capacity in 4-px digits -> tiles $7B-$7F, $CA (mai
     jsr fin
     lda #$A5
     sta RST
-.nm:
-    jsr $FF00       ; the MP cells (NES rows 4 + 5 m, cols 6-13)
-    jsr inc1
+    rts
+hpp:                ; member X: HP palette (0 green, 1 orange: a status, 2 pink: dead / stone)
+    lda $6102,x
+    and #$FE
+    beq .r
+    and #$C0
+    cmp #$01
+    lda #2
+    bcs .r
+    lda #1
+.r:
+    rts
+hppal8:             ; main menu: menu mode on, member m's palette p -> $5809 = 4m + p
+    lda #1
+    sta $5808
     ldx #0
     ldy #0
-.nr:
-    lda NTH,y
-    sta $2006
-    lda NTL,y
-    sta $2006
-    lda #8
-    sta $85
-.nc:
-    lda MPC,x
-    sta $2007
-    inx
-    dec $85
-    bne .nc
+.m:
+    jsr hpp
+    sta $80
+    tya
+    ora $80
+    sta $5809
     iny
-    cpy #4
-    bcc .nr
-    jsr fin
+    iny
+    iny
+    iny
+    txa
+    clc
+    adc #$40
+    tax
+    bne .m
     jmp JBTAIL
+cwpal:              ; item / magic party window: HP palettes of rows 13-16 (cols 9-19)
+    ldx #0
+    ldy #13
+.m:
+    jsr hpp
+    ora #11 * 4
+    sty $580A
+    pha
+    lda #9
+    sta $580B
+    pla
+    sta $580C
+    iny
+    txa
+    clc
+    adc #$40
+    tax
+    bne .m
+    jmp JBTAIL
+status:             ; status screen (A = $FD): HP palette, condensed words and the MP cells of
+    ldx $7F         ;   member $7F; the words on job-name tiles the member's job does not use
+    jsr hpp
+    ora #11 * 4
+    ldy #6
+    sty $580A
+    ldy #2
+    sty $580B
+    sta $580C
+    lda $84
+    pha
+    lda $85
+    pha
+    ldx $7F
+    ldy #0
+    jsr mpcodes
+    jsr mptiles
+    jsr wslots
+    lda #<WD
+    sta $84
+    lda #>WD
+    sta $85
+    lda #0
+    sta $88
+.u:
+    jsr $FF00
+    jsr inc1
+    lda #5
+    sta $87
+.v:
+    ldy $88
+    lda WT,y
+    jsr tadr
+    ldy #0
+.b:
+    lda ($84),y
+    sta $2007
+    iny
+    cpy #16
+    bne .b
+    lda $84
+    clc
+    adc #16
+    sta $84
+    bcc .n
+    inc $85
+.n:
+    inc $88
+    lda $88
+    cmp #WN
+    beq .d
+    dec $87
+    bne .v
+    jsr fin
+    jmp .u
+.d:
+    jsr fin
+    lda #$A5
+    sta WST
+    jsr $FF00       ; the cells: words, then the MP row
+    jsr inc1
+    ldx #0
+.w:
+    lda CH,x
+    sta $2006
+    lda CL,x
+    sta $2006
+    ldy CK,x
+    lda CN,x
+    sta $87
+.c:
+    lda WT,y
+    sta $2007
+    iny
+    dec $87
+    bne .c
+    inx
+    cpx #7
+    bne .w
+    lda #$20
+    sta $2006
+    lda #$E4
+    sta $2006
+    ldy #0
+.m:
+    lda MPC,y
+    sta $2007
+    iny
+    cpy #8
+    bne .m
+    jsr fin
+    pla
+    sta $85
+    pla
+    sta $84
+    jmp JBTAIL
+wslots:             ; WT = the tiles for the WN word tiles: 1, 2, .. skipping the job's
+    ldx $7F         ;   (JTS / JTL by the job of member $7F)
+    lda $6100,x
+    tax
+    lda JTS,x
+    sta $86
+    lda JTL,x
+    sta $87
+    ldy #0
+.l:
+    tya
+    clc
+    adc #1
+    ldx $87
+    beq .s
+    cmp $86
+    bcc .s
+    clc
+    adc $87
+.s:
+    sta WT,y
+    iny
+    cpy #WN
+    bne .l
+    rts
+tadr:               ; PPU address of BG tile A (pattern table 0)
+    pha
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    sta $2006
+    pla
+    asl a
+    asl a
+    asl a
+    asl a
+    sta $2006
+    rts
 restore:            ; menu closed: the word tiles under the MP tiles back (from the font)
+    lda WST         ; (status: the job-name tiles under its words first, from JDATA)
+    cmp #$A5
+    bne .nw
+    lda #0
+    sta WST
+    lda $84
+    pha
+    lda $85
+    pha
+    jsr wslots
+    lda #0
+    sta $88
+.ru:
+    jsr $FF00
+    jsr inc1
+    lda #5
+    sta $87
+.rv:
+    ldy $88
+    lda WT,y
+    jsr tadr
+    lda WT,y        ; ($84) = JDATA + (t - 1) * 16
+    sec
+    sbc #1
+    pha
+    asl a
+    asl a
+    asl a
+    asl a
+    sta $84
+    pla
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    clc
+    adc #>JDATA
+    sta $85
+    ldy #0
+.rb:
+    lda ($84),y
+    sta $2007
+    iny
+    cpy #16
+    bne .rb
+    inc $88
+    lda $88
+    cmp #WN
+    beq .rd
+    dec $87
+    bne .rv
+    jsr fin
+    jmp .ru
+.rd:
+    jsr fin
+    pla
+    sta $85
+    pla
+    sta $84
+.nw:
     lda RST
     cmp #$A5
     beq .r
@@ -1478,6 +1743,10 @@ NTL:
     .db $86, $26, $C6, $66
 DTILE:
     .db $EF, $F0, $F1, $F2, $F3, $F4, $F5, $F6, $C9, $CF
+CH:                 ; status words: PPU address, first word tile, count (STATUS_WORDS)
+    .db $20, $20, $21, $21, $21, $21, $21
+CL:
+    .db $82, $A2, $02, $0B, $22, $2B, $42
 conv:               ; $80-$82 -> digits from power X (0: 10^6) on, to DG + $85
     lda #0
     sta $86
@@ -1547,6 +1816,65 @@ def small_glyph_table():
     return '\n'.join(out) + '\n'
 
 
+STATUS_WORDS = ['Proficiency', 'To next level', 'Strength', 'Agility', 'Stamina', 'Intelligence', 'Spirit']
+STATUS_TEXT = ('{0E}{10:02}{14:07}{10:01}\n'                               # name, job
+               'Lv{14:02}{10:3E}{14:07}[76][7A][79]{14:0A}{10:32}\n'       # level, EXP
+               '{14:0F}{10:3D}\n'                                          # (Proficiency) value
+               '{14:0B}{10:FF}\n'                                          # (To next level) value
+               '{14:02}{10:30}/{10:31}{14:00}[77][79]\n'                   # HP
+               '[78][79]\n'                                                # MP (cells: SMALLNUM)
+               '{14:06}{10:38}{14:0F}{10:39}\n{14:06}{10:3A}{14:0F}{10:3B}\n{14:06}{10:3C}\n\n'
+               'Attack {10:46}x{14:0D}{10:33}\nHit rate{14:0D}{10:42}\n'
+               'Defense {10:47}x{14:0D}{10:34}\nEvasion rate{14:0D}{10:41}\n'
+               'Magic defense{14:0D}{10:36}\nMagic evasion{14:0D}{10:40}')
+
+
+MENU_TEXT[0x47] = STATUS_TEXT
+# equip (owner-approved mock-up S4): name / Attack / Defense / the 5 slots / Remove Equipment in
+# window 4 (1, 1, 20, 11), the item list one item per row in window $1C (1, 12, 20, 7)
+MENU_TEXT[0x3E] = ('{0E}{10:02}\n{14:01}Attack‥{14:0E}{10:33}\n{14:01}Defense‥{14:0E}{10:34}\n'
+                   '{15:01}{10:06}{10:43}\n{15:01}{10:07}{10:44}\n{15:01}{10:03}\n{15:01}{10:04}\n'
+                   '{15:01}{10:05}\n{15:01}Remove Equipment')
+EQUIP_MSGS = [0x6E, 0x6F] + list(range(0x3F, 0x47)) + list(range(0x5B, 0x66))   # (+ item prompts)
+MENU_TEXT[0x35] = '{0E}Item'
+MENU_TEXT[0x3D] = '{0E}' + '\n'.join('{17:01}{1A:%02X}{14:0F}{1C:%02X}' % (i, i) for i in range(32)) + '\n{17:01}{0F}'
+MENU_TEXT[0x3B] = '{0E}' + '\n'.join('{1%d:02}{14:07}[77][79]{14:09}{1%d:30}/{1%d:31}' % (m, m, m) for m in range(4))
+MENU_TEXT[0x2F] = '{0E}' + '\n'.join('{17:01}{20:%02X}{14:0F}{1C:%02X}' % (i, i) for i in range(32))
+
+
+def status_words():
+    """the condensed status words (owner-approved mock-up S5): NES tiles, counts"""
+    from latin_font import packed_label, COND
+    tiles = []; counts = []
+    for w in STATUS_WORDS:
+        for n in range(2, 9):
+            t = packed_label(w, n, COND, fg=3, bg=2)
+            if t: break
+        tiles += t; counts.append(n)
+    return b''.join(tiles), counts
+
+
+def job_tiles():
+    """tools/ff3/insert.py field_names: first tile and count of each job's condensed name
+    (jobs 0-21; 0, 0 for names of 7 letters or fewer)"""
+    import json
+    from latin_font import packed_label, COND, TIGHT
+    jobs = {e['id']: e['en'] for e in json.load(open('script/ff3/t8200.json'))}
+    st, ln = [], []; tile_no = 1
+    for j in range(22):
+        name = jobs[226 + j].rstrip(' ')
+        if len(name) <= 7: st.append(0); ln.append(0); continue
+        for n in range(4, 8):
+            t = packed_label(name, n, COND, fg=3, bg=2)
+            if t: break
+        else:
+            for n in range(4, 8):
+                t = packed_label(name, n, TIGHT, fg=3, bg=2)
+                if t: break
+        st.append(tile_no); ln.append(n); tile_no += n
+    return st, ln, tile_no - 1
+
+
 def mp_tiles():
     """plane 0 of the 20 MP tiles: "0/" .. "9/" then "0" .. "9" (3-px digits, 4 px a cell)"""
     g = lambda ch: [sum(0x80 >> x for x, v in enumerate(row) if v == '#') for row in SMALL_GLYPHS[ch]] + [0]
@@ -1569,6 +1897,8 @@ def main_menu(r):
     assert hp['org'] + len(hp['bytes']) <= 0x960C + 16
     o = r.off(B3C, 0x95B2)
     r.d[o:o + len(hp['bytes'])] = hp['bytes']
+    end = r.off(B3C, 0x961C)
+    r.d[o + len(hp['bytes']):end] = b'\xea' * (end - o - len(hp['bytes']))
     r.mods.append(dict(hp, where=(B3C, 0x95B2 & 0x1FFF)))
     r.log.append((B3C, 0x95B2, 'main menu: HP palettes per member for the GB ($5809), menu mode on'))
     r.patch(B3D, 0xA693, '4C 65 F4', '4C ' + j(hp['labels']['mnuoff']), 'close menu: then GB menu mode off, word tiles back')
@@ -1578,8 +1908,16 @@ def main_menu(r):
     rt = b''.join(font(c) for c in words)
     dbs = lambda lab, b: lab + ':\n' + ''.join('    .db ' + ', '.join('$%02X' % v for v in b[k:k + 16]) + '\n'
                                               for k in range(0, len(b), 16))
+    wd, wc = status_words()
+    js, jl, jt = job_tiles()
+    wn = sum(wc)
+    assert wn + max(jl) <= jt, (wn, jt)            # (the words fit on job tiles beside any job)
+    jd = 0x8200                                     # insert.py: JDATA (bank 88), the job tiles
+    assert r.d[r.off(B88, jd):r.off(B88, jd) + 16] == bytes(r.d[r.off(B88, jd):r.off(B88, jd) + 16])
+    ck = [sum(wc[:i]) for i in range(len(wc))]
+    tabs = dbs('WD', wd) + dbs('JTS', bytes(js)) + dbs('JTL', bytes(jl)) + dbs('CK', bytes(ck)) + dbs('CN', bytes(wc))
     sm = r.module(SMALLNUM_SRC + small_glyph_table() + dbs('MPT', mp_tiles()) + dbs('RT1', rt[:240])
-                  + dbs('RT2', rt[240:]), syms={'JBTAIL': JBTAIL, 'SQ': 0x801C})
+                  + dbs('RT2', rt[240:]) + tabs, syms={'JBTAIL': JBTAIL, 'SQ': 0x801C, 'WN': wn, 'JDATA': jd})
     o = r.off(B88, sm['org'])
     assert sm['org'] + len(sm['bytes']) <= 0xA000
     assert set(r.d[o:o + len(sm['bytes'])]) == {0xFF}
@@ -1588,6 +1926,43 @@ def main_menu(r):
     r.patch(B88, 0x8004, '4C 1C 80', '4C ' + j(sm['labels']['disp2']), 'job bank dispatch: smallnum (Y = 12, A = $FF)')
     r.patch(B3D, 0xA589, 'A2 03 A9 33 20 66 A6 A2 04 A9 34 20 66 A6',
             'A2 03 A9 33 20 66 A6 A0 0C A9 FF 20 ' + j(JBGO), 'main menu: Gil + Capacity window, 4-px digits')
+    # status screen (owner-approved mock-up S5): window $1D at (1, 1, 20, 18), camera (8, 8),
+    # no label window, no class sprite; the condensed words and the MP digits from bank 88
+    r.patch(B3D, 0xAAF7 + 0x1D, '01', '01', 'status window x'); r.patch(B3D, 0xAB1D + 0x1D, '01', '01', 'status window y')
+    r.patch(B3D, 0xAB43 + 0x1D, '1E', '14', 'status window: 20 wide')
+    r.patch(B3D, 0xAB69 + 0x1D, '1C', '12', 'status window: 18 high')
+    r.patch(B3D, 0xA841, '20 6F 95', '20 ' + j(hp['labels']['stcam']), 'status: GB camera (8, 8)')
+    r.patch(B3D, 0xA86B, 'A2 1C 20 F1 AA', 'EA EA 4C ' + j(hp['labels']['stpost']), 'status: words + MP digits, no label window')
+    r.patch(B3D, 0xA852, '20 29 81', 'EA EA EA', 'status: no class sprite')
+    # equip: its own windows (4 and $1C: no longer opened by the main menu / status), camera
+    # (8, 8) through stcam, no class sprite
+    for t, k in ((0xAAF7, 0), (0xAB1D, 1), (0xAB43, 2), (0xAB69, 3)):
+        r.d[r.off(B3D, t + 4)] = (1, 1, 20, 11)[k]
+        r.d[r.off(B3D, t + 0x1C)] = (1, 12, 20, 7)[k]
+    r.log.append((B3D, 0xAAF7, 'equip windows 4 / $1C'))
+    for t, k in ((0xAAF7, 0), (0xAB1D, 1), (0xAB43, 2), (0xAB69, 3)):
+        r.d[r.off(B3D, t + 0x1E)] = (1, 12, 20, 4)[k]
+    r.patch(B3C, 0x9BBF, '20 6F 95', '20 ' + j(hp['labels']['stcam']), 'equip: GB camera (8, 8)')
+    r.patch(B3C, 0x9BE1, 'A2 0A', 'A2 04', 'equip: window 4')
+    r.patch(B3C, 0x9C0A, 'A2 0B', 'A2 1C', 'equip: item list window $1C')
+    for a in (0x9BF3, 0x9C26):
+        r.patch(B3C, a, '20 5B 9D', 'EA EA EA', 'equip: no class sprite')
+    # item screen (owner-approved mock-ups S1 / S2): label 5 (1, 1, 20, 3), list 6 (1, 3, 20,
+    # 16) one item a row, the party window 7 (1, 12, 20, 7) only while a target is chosen
+    # (stuse; FF3 redraws the list after it), the prompt window $15 (1, 1, 20, 4) over the label
+    for w, rect in ((5, (1, 1, 20, 3)), (6, (1, 3, 20, 16)), (7, (1, 12, 20, 7)), (0x15, (1, 9, 20, 4))):
+        for t, k in ((0xAAF7, 0), (0xAB1D, 1), (0xAB43, 2), (0xAB69, 3)):
+            r.d[r.off(B3D, t + w)] = rect[k]
+    r.log.append((B3D, 0xAAF7, 'item windows 5 / 6 / 7 / $15'))
+    r.patch(B3C, 0x9ECC, '20 6F 95 20 28 A3', '20 ' + j(hp['labels']['stcam']) + ' EA EA EA',
+            'item: GB camera (8, 8), no party window until a target is chosen')
+    r.patch(B3D, 0xAA8E, '20 4B F4', '20 ' + j(hp['labels']['stcl']), 'item menu redraw: party window palettes undone')
+    r.patch(B3D, 0xAA93, '20 A0 AA', '20 F1 AA', 'item menu redraw: the list window with its frame (the party window covered it)')
+    r.patch(B3D, 0xA08B, '20 15 A7', '20 ' + j(hp['labels']['stuse']), 'item use: the party window, then the target')
+    r.patch(B3D, 0xA74F, '01 17 00 00 0F 17 00 00 01 1A 00 00 0F 1A 00 00',
+            '00 0D 00 00 00 0E 00 00 00 0F 00 00 00 10 00 00', 'select character: hand at each line of window 7')
+    for bank, a in ((B3C, 0x9F08), (B3C, 0x9F45), (B3D, 0xA733)):
+        r.patch(bank, a, '20 00 80', 'EA EA EA', 'item: no class sprites')
     r.patch(B3D, 0xA705, '01 05 00 00 01 0B 00 00 01 11 00 00 01 17 00 00',
             '02 01 00 00 02 05 00 00 02 09 00 00 02 0D 00 00', 'character select: hand at each name (GB rows)')
     for a in (0xA5AC, 0xA6D0):
