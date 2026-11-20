@@ -194,8 +194,22 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   ExRAM `minicam`, runtime `$5802`/`$5803` = screen camera until the screen goes off after
   it); checked with a test build (`GB3_TEST_MINI=1`: Select on the field opens it; gbshots
   `--press W:PAD:N`): the map box centred (GB x 14-145, y 14-130).
-- Open in battle: the item / magic lists (owner's choice), back attacks, bosses / large
-  formations.
+- **Item / Magic lists (owner's choice: tall window, item pages, magic rows as FF1):** `$1A`
+  bit 7 marks a list window for FF3's window routine ($8BC3 -> `winh`: 8 rows instead of 4,
+  and `$5807` = the GB's tall list camera: NES rows 19-28 from GB row 8, split at line 64,
+  SCY +40, sprites in the hidden band dropped). Items: the cursor column on the left (cols
+  2-16), the next column at cols 17-31 (its edge shows), left/right turn whole pages (page
+  routines in place of FF3's sideways scroll, `ITEMPG_SRC` at bank 53 $B2A7); the hands'
+  labels "R.Hand" / "L.Hand" (FF3 wrote Japanese codes the English font shows as "fGS" /
+  "aPnS", also in the plain English NES build). Magic: cols 2-21, per level row 1 = spells 1-2,
+  row 2 = spell 3 + level / MP, through the English row converter's constants (bank 87
+  mconv), cursor table $8B08 by spell position. Open: the unusable-spell mark has no cell of
+  its own.
+- Runtime fixes on the way: the LYC handler did not keep HL (hung PyBoy at a battle start);
+  bank 0 was full: the clear-VRAM native moved to the RT_TABLES bank behind a stub.
+- Tools: `gbshots.py --press W:PAD:N` and `--poke W:ADDR=VAL,..` (NES and GB alike), e.g.
+  member 1 as a Black Mage with spells: `--poke 2560:6100=04,6130=09,6131=09,6207=07`.
+- Open in battle: back attacks, bosses / large formations.
 
 ## Known open items
 - Warp (`p3c:9B5F` TSX / TXS arithmetic) and the inn's `TXS` from a saved X (`p3c:9039`) use

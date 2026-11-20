@@ -26,10 +26,13 @@ def main():
     ap.add_argument('--input', default='explore'); ap.add_argument('--scale', type=int, default=2)
     ap.add_argument('--freeze', type=int, default=0, help='no input from this waited-for frame on')
     ap.add_argument('--press', default='', help='W:PAD:N,.. : pad PAD for N waited-for frames from W (after --freeze)')
+    ap.add_argument('--poke', default='', help='W:ADDR=VAL,.. : write NES RAM / PRG-RAM at waited-for frame W (both sides)')
     ap.add_argument('--dump', help='directory: also the GB memory at each shot (sgbrun SGBRUN_DUMP)')
     a = ap.parse_args()
     ws = [int(x) for x in a.waits.split(',')]
     presses = [tuple(int(v, 0) for v in p.split(':')) for p in a.press.split(',') if p]
+    poke = (int(a.poke.split(':')[0]), a.poke.split(':', 1)[1]) if a.poke else None
+    poke_k = None
     from cynes import NES
     import cmpshots
     pad = INPUTS[a.input]
@@ -39,6 +42,13 @@ def main():
         n.controller = pad(k + 1) if not a.freeze or n.ff3_waits < a.freeze else 0
         for pw, pv, pn in presses:
             if pw <= n.ff3_waits < pw + pn: n.controller = pv
+        if poke and poke_k is None and n.ff3_waits >= poke[0]:
+            import numpy as np
+            st = bytearray(n.save())
+            for av in poke[1].split(','):
+                ad, v = (int(x, 16) for x in av.split('='))
+                st[(0x500A + ad) if ad < 0x800 else (0x23E2 + ad - 0x6000)] = v   # (cynes state offsets)
+            n.load(np.array(st, dtype=np.uint8)); poke_k = k
         fr = n.step(1); k = W.update()
         clock.setdefault(n.ff3_waits, k)
         for w in ws:
@@ -54,6 +64,7 @@ def main():
         cmd = [os.path.join(ROOT, 'build', 'sgbrun'), a.gb, str(int(k * 1.3) + 600), os.path.join(tmp, 'q'),
                '--cgb', '--padfile', pads]
         for w in ws: cmd += ['--nshot', str(clock[-w])]
+        if poke: cmd += ['--poke', str(poke_k + 1), poke[1]]
         env = dict(os.environ, SGBRUN_CLOCK=cf)
         if a.dump: env['SGBRUN_DUMP'] = '1'
         subprocess.run(cmd, env=env, capture_output=True)

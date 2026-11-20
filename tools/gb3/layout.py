@@ -700,6 +700,31 @@ def items_pages(r):
           'the hands: English labels R.Hand / L.Hand')
 
 
+def magic_rows(r):
+    """battle magic list (owner, 2026-11-20, as FF1's): two rows per level in an 18-column list
+    window, row 1 = spells 1 and 2, row 2 = spell 3 and the level / MP. Done through the
+    English row converter's constants (bank 87 mconv: names at row offsets 0 / 9 / 18 of an
+    18-wide row = spell 3 at the start of the next row; the level text and the marks row
+    pointer one row below instead of above). Open: the unusable-spell mark ('X') has no cell
+    of its own (it lands in row 2)."""
+    B87, B35 = 87, 0x35
+    r.patch(B87, 0xA2C9, '69 1C', '69 00', 'magic row: names on the first row')
+    r.patch(B87, 0xA2D1, '38 A5 4E E9 1C 85 1E A5 4F E9 00 85 1F', '18 A5 4E 69 12 85 1E A5 4F 69 00 85 1F',
+            'magic row: level / marks on the second row')
+    r.patch(B87, 0xA2DE, 'A0 02', 'A0 0A', 'magic row: level and MP from column 10')
+    r.patch(B87, 0xA39B, 'A9 1C 85 18', 'A9 12 85 18', 'magic row: width 18 (after a compact name)')
+    r.patch(B35, 0xB77E, 'A9 1C 85 18', 'A9 12 85 18', 'magic row: width 18')
+    r.patch(B35, 0xB785, 'A9 1C 20 58 A5', 'A9 24 20 58 A5', 'magic list: 2 rows of 18 per level')
+    r.patch(B35, 0xB80B, 'E9 38', 'E9 24', 'magic list scroll up: one level')
+    r.patch(B35, 0xB844, '69 38', '69 24', 'magic list scroll down: one level')
+    for a in (0xB796, 0xB818, 0xB851):
+        r.patch(B35, a, 'A9 01 85 18 A9 1E 85 19 A9 03 85 1A', 'A9 02 85 18 A9 15 85 19 A9 83 85 1A',
+                'magic window: cols 2-21, list window')
+    r.patch(0x34, 0x8B08, 'A8 08 B8 08 C8 08 D8 08 A8 50 B8 50 C8 50 D8 50 A8 98 B8 98 C8 98 D8 98',
+            'A0 18 B0 18 C0 18 D0 18 A0 60 B0 60 C0 60 D0 60 A8 18 B8 18 C8 18 D8 18',
+            'magic cursor: spells 1-2 on row 1, spell 3 on row 2')
+
+
 def battle_messages(r):
     B34 = 0x34
     x = r.module(MSGX_SRC)
@@ -798,6 +823,7 @@ def apply(data):
     r = Rom(data)
     battle(r)
     battle_messages(r)
+    magic_rows(r)
     field(r)
     return bytes(r.d), r.mods, r.log
 
