@@ -1037,6 +1037,7 @@ lz_init:    ld a, 3                         ; boot: no sprite page left in ROM (
             dec b
             jr nz, .lz
             call bgsrc_init
+            call bg_lzinit
             xor a
             ld [$4000], a
             ret

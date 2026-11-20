@@ -140,6 +140,13 @@ hle_chr_pages:
 .fdo:
             call bgsrc                      ; the same ROM page as last time, the shadow page
             jr z, .fsk                      ;   not written since: it holds these bytes already
+            call bg_lazy                    ; else left in ROM: its tiles copied into the
+            ld bc, 255                      ;   shadow when first used (bg_mat), marked for
+            add hl, bc                      ;   re-coding now; A = the page's last byte
+            ld a, [hl]
+            ld bc, 0
+            ldh [tmp_lo], a
+            jp .fm
             ld a, d
             add a, high(BG_SHADOW)
             ld d, a

@@ -474,6 +474,13 @@ def main():
         r.banks[DATA + n] = bytearray(rom_nes[n * 0x4000:(n + 1) * 0x4000])
     for bk, data in std_maps(rom_nes).items():        # standard maps decompressed (hle_mapdec)
         r.banks[bk] = data
+    for bk in range(RT_TABLES, 64):                  # bank ID ($A5, bank) at $7FFE of every
+        d = r.banks.setdefault(bk, bytearray())       #   code / runtime bank: bg_mat comes back
+        d.extend(b'\xff' * (0x4000 - len(d)))        #   to the bank that is mapped
+        assert d[0x3FFE] == 0xFF and d[0x3FFF] == 0xFF, 'bank %d: $7FFE used' % bk
+        d[0x3FFE] = 0xA5; d[0x3FFF] = bk
+    for bk in r.banks:
+        if not RT_TABLES <= bk < 64: assert r.banks[bk][0x3FFE:0x3FFF] != b'\xa5', 'bank %d: $7FFE = $A5' % bk
     top = max(r.banks) + 1
     size = 2
     while size < top: size *= 2

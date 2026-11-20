@@ -1011,6 +1011,23 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   gbrun's late in the battle (mGBA writes no $4014 in waits 6878-7032); measure battle frames
   in Gambatte (scratch event log), not mGBA.
 
+- **DMG loads and the prologue, 2026-11-20 (later):** prologue rows on a plain Game Boy: prow_b
+  takes palette 3 for every letter (all palettes shade alike there) and only queues the GB map
+  writes (written in the vblank; a row can appear one frame later); the copied font of a
+  fading row is shown as the font itself (copies never coded). OAM conversion skipped while a
+  DMG switch-on is deferred (LCD off; OAM shadow hidden, the next conversion a whole one); a
+  conversion that defers a slot load hides all sprites that frame (no half-loaded figures; they
+  appear together a frame or two later). DMG BG pattern pages copied whole with the LCD off are
+  left in ROM (`bg_lazy`, BG_LZ / BG_LZS in cart RAM bank 3 $A900): a tile is copied into the
+  shadow when re-coded (retile_b / rtb_b) or written by bytes (`bg_mat`); every code / runtime
+  bank carries its ID ($A5, bank) at $7FFE so bg_mat comes back to the bank that is mapped
+  (natives call the PPU routines with code_bank still the recompiled caller's). The deferred
+  switch-on scans only the view's rows; the others go to FRESH (`lon_frm`), checked once the
+  LCD is on; LON_MAXF 6 -> 10 (field entry appears ~4 frames later, battle ~2, the game at its
+  pace). checkall 62/62 (n43, n45, n49). DMG 62 -> 43, CGB 0. Scratch tools: in-ROM timer
+  sampler (bank:PC of one frame into NES $0340-$03B7, target / skip poked by gbrun --poke),
+  Gambatte event log with per-routine events; the NES-side instruction profile per frame.
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette

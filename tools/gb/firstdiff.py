@@ -126,7 +126,7 @@ guard = 0; prev = 0
 while state['k'] <= last and state['diff'] is None:
     gb.pb.tick(); guard += 1
     if state['k'] != prev: prev, guard = state['k'], 0
-    if guard > 2000: raise SystemExit('GB stuck before wait %d' % (state['k'] + 1))
+    if guard > 2000: raise SystemExit('GB stuck before wait %d (PC %02X:%04X SP %04X)' % (state['k'] + 1, gb.pb.memory[0x2000] if False else 0, gb.pb.register_file.PC, gb.pb.register_file.SP))
     if os.environ.get('STUCK_SAVE') and state['k'] + 1 >= int(os.environ['STUCK_SAVE']):
         with open('build/stuck.state', 'wb') as fh: gb.pb.save_state(fh)
         raise SystemExit('saved before wait %d' % (state['k'] + 1))

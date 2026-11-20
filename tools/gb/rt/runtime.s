@@ -84,7 +84,7 @@ LON_RDY    = $D823
 LON_DIRTY  = $D824
 LON_LIM    = $D825
 LON_CNT    = $D826          ;   frames pending (LON_MAXF: the rest at once)
-LON_MAXF   = 6
+LON_MAXF   = 10
 LON_END    = 250            ; (TIMA: stop at 250 of 188..255; an atomic step only below LON_HALF)
 LON_HALF   = 240
 BLK_REQ    = $D85C          ; the battle message window's blanked cells to the GB map (vblank)
@@ -2275,6 +2275,20 @@ rt_ppu_w7g: push af
             ldh a, [is_cgb]
             and a
             jr nz, .bgv
+            push bc                         ; (a tile still in ROM: into the shadow first)
+            ld a, h
+            swap a
+            ld b, a
+            ld a, l
+            swap a
+            and $0F
+            or b
+            ld b, a
+            ldh a, [code_bank]
+            ld c, a
+            ld a, b
+            call bg_mat
+            pop bc
             ld a, h                         ; DMG: the BG tile goes to the shadow; the tile is
             add a, high(BG_SHADOW)          ;   re-coded for its palette later
             ld h, a
@@ -2598,7 +2612,27 @@ rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (s
             push de                         ;   interrupt handlers come back to it)
             push hl
             ld b, a
-            ldh a, [code_bank]
+            ld a, [LON_ST]                  ; DMG, its switch-on deferred (LCD off, nothing
+            and a                           ;   shown): no conversion now; the next one
+            jr z, .cv                       ;   (once on) a whole one
+            ldh a, [lcd_on]
+            and a
+            jr nz, .cv
+            xor a
+            ld [OAM_CLEAN], a
+            ld [OAM_USED], a
+            ld hl, OAM_SH                   ; (hidden meanwhile: no stale sprites when the
+            ld b, 40                        ;   LCD comes on)
+.hd:        ld [hl+], a
+            inc l
+            inc l
+            inc l
+            dec b
+            jr nz, .hd
+            inc a
+            ldh [oam_pending], a
+            jr .sk
+.cv:        ldh a, [code_bank]
             push af
             ld a, HLE_BANK
             ldh [code_bank], a
@@ -2608,7 +2642,7 @@ rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (s
 .end:       pop af
             ldh [code_bank], a
             ld [$2000], a
-            pop hl
+.sk:        pop hl
             pop de
             pop bc
             pop af

@@ -1893,6 +1893,11 @@ retile_b:   push bc
             jr .cd
 .bk:        call blk_alloc                  ; DE = a free block
 .cd:        push de
+            push bc                         ; (still in ROM: into the shadow first)
+            ld c, HLE_BANK
+            ldh a, [sh_tile]
+            call bg_mat
+            pop bc
             ldh a, [sh_tile]                ; HL = the shadow tile (RAM bank 1)
             swap a
             ld l, a
@@ -5034,7 +5039,8 @@ hle_wrow3:  push af                         ; fix window rows: wrow3_b (bank HLE
 
 ; A = BG tile whose shadow bytes were written: its page's BG_SRC cleared. Keeps all registers.
 section bank 0, $3DD8
-bgsrc_inv:  push af
+bgsrc_inv:  call bg_lzclr                   ; (a whole tile written: no longer in ROM)
+            push af
             push hl
             and $F0
             rrca
@@ -6411,6 +6417,9 @@ scb_row:                                    ; row D: SC_NP |= its cells' palette
             jr c, .vr
             ldh a, [in_battle]
             bit 7, a
+            jr nz, .rn
+            ld a, [LON_ST]                  ; (the deferred switch-on: the view's rows only;
+            and a                           ;   the others go to FRESH afterwards: lon_frm)
             jr nz, .rn
             call scn_tab
             call scn_rowf
@@ -8379,6 +8388,10 @@ rtb_b:      ldh [sh_u3], a
             ldh [rq_any], a
             ret
 .one:       ldh [sh_tile], a                ; tile A
+            push bc                         ; (still in ROM: into the shadow first)
+            ld c, PF_BANK
+            call bg_mat
+            pop bc
             swap a                          ; HL = shadow tile (RAM bank 1)
             ld l, a
             and $0F
@@ -9722,6 +9735,15 @@ prow_b:     ldh a, [code_bank]
             jr .fs
 .nf:        xor a
 .fs:        ldh [o_cx], a
+            ldh a, [is_sgb]                 ; sh_u1 = $80 on a plain Game Boy in the
+            and a                           ;   prologue: every palette shades alike there,
+            ld a, 0                         ;   so a fading row's copied letters ($00-$7F)
+            jr nz, .so                      ;   are shown as the font itself ($80-$FF): the
+            ldh a, [pro_mode]               ;   copies are never coded (the NES shadow
+            and a                           ;   keeps them)
+            jr z, .so
+            ld a, $80
+.so:        ldh [sh_u1], a
 .lp:        push bc                         ; (B = 0 for the read: Y = C)
             ld b, 0
             ld l, $10
@@ -9787,7 +9809,12 @@ prow_b:     ldh a, [code_bank]
             cp [hl]
             jr z, .inc                      ; the same tile, same owner: nothing changes
             ld [hl], a                      ; shadow
-            bit 0, e                        ; the cell's palette: an odd column right after
+            ldh a, [sh_u1]                  ; (plain Game Boy, prologue: every palette
+            and a                           ;   shades alike: palette 3 for all)
+            jr z, .pc
+            ld b, $83
+            jr .pk
+.pc:        bit 0, e                        ; the cell's palette: an odd column right after
             jr z, .pe                       ;   the letter before shares its quadrant
             bit 7, b
             jr nz, .pk
@@ -9810,7 +9837,11 @@ prow_b:     ldh a, [code_bank]
             pop de
             or $80
             ld b, a
-.pk:        ldh a, [w7v]
+.pk:        ldh a, [sh_u1]
+            ld h, a
+            ldh a, [w7v]
+            or h
+            ldh [sh_u2], a                  ; (the tile shown)
             ld h, a
             ld a, b
             and 3
@@ -9819,8 +9850,13 @@ prow_b:     ldh a, [code_bank]
             add a, $98
             ld h, a
             ld l, e
-            ldh a, [w7v]
+            ldh a, [sh_u1]                  ; (prologue, plain Game Boy: queued only, the
+            and a                           ;   row is written in the vblank)
+            ldh a, [sh_u2]
+            jr nz, .qp
             call vram_put
+            jr .inc
+.qp:        call q_put
 .inc:       pop de
             ldh a, [ppu_vl]                 ; v += 1
             add a, 1
@@ -10822,6 +10858,7 @@ OC_HDR     = $A6C0          ; (cart RAM bank 3) oamconv_b's last input: page, ca
 OC_COPY    = $A700          ;   SPAL_KEY 0-3; the NES OAM page (256)
 OC_POS     = $A800          ;   GB slot of each NES entry with a GB entry (index = entry offset)
 OC_LIST    = $A6C8          ;   changed entries (occmp, up to 16)
+OC_DF      = $A6D8          ;   a slot load deferred in this conversion (whole conversions)
 oamconv_b:  and $07
             add a, high(NES_RAM)
             ld h, a
@@ -10925,6 +10962,8 @@ oamconv_b:  and $07
 .pk:        ld [OAM_CLEAN], a
             ld a, 3                         ; (cart RAM bank 3 on: each entry's GB slot to
             ld [$4000], a                   ;   OC_POS)
+            xor a                           ; (OC_DF: a slot load deferred in this conversion)
+            ld [OC_DF], a
             ldh a, [oam_frame]
             inc a
             ldh [oam_frame], a
@@ -11298,6 +11337,8 @@ oamconv_b:  and $07
             xor a                           ;   next conversion a whole one)
             ld [de], a
             ld [OAM_CLEAN], a
+            inc a
+            ld [OC_DF], a
             pop bc
             pop hl
             ret
@@ -11487,6 +11528,21 @@ oamconv_b:  and $07
 ; A = p (the lowest GB slot in use; 160: none): the slots below that the last conversion
 ; used are hidden; OAM_USED = the count
 .endr:      ld e, a
+            ld a, [OC_DF]                   ; a load deferred: no sprites this frame (they
+            and a                           ;   appear together once their tiles are in,
+            jr z, .nd                       ;   not part of a figure)
+            ld hl, OAM_SH
+            ld b, 40
+            xor a
+.hd:        ld [hl+], a
+            inc l
+            inc l
+            inc l
+            dec b
+            jr nz, .hd
+            ld [OAM_USED], a
+            jr .rx
+.nd:
             ld a, 160
             sub e
             rrca
@@ -15249,6 +15305,7 @@ lon_b:      ldh a, [code_bank]              ; (the bank-0 helpers come back to c
 .fin:       call lon_half
             jr c, .x
             call scb_fin
+            call lon_frm
             ld a, 1
             ldh [maps_due], a
             jr .to3
@@ -15327,6 +15384,40 @@ lon_b:      ldh a, [code_bank]              ; (the bank-0 helpers come back to c
             dec b
             jr nz, .d
             and a
+            ret
+
+; lon_b after its scan (the view's rows only; not in battle, where the camera stays): the
+; other rows' cells marked in FRESH, checked in the frame waits once the LCD is on
+lon_frm:    ldh a, [in_battle]
+            bit 7, a
+            ret nz
+            ld a, [SC_VR]                   ; rows (VR + 18 .. VR + 29) mod 30
+            add a, 18
+            ld b, 12
+.r:         cp 30
+            jr c, .r0
+            sub 30
+.r0:        ld c, a
+            add a, a
+            add a, a
+            ld l, a
+            ld h, high(FRESH)
+            ld a, $FF
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            ld a, c
+            inc a
+            dec b
+            jr nz, .r
+            xor a
+            ld [FR_AGE], a
+            ld [FR_EMPTY], a
+            ld [FR_PEND], a
+            ld [FR_POS], a
+            inc a
+            ld [FR_ANY], a
             ret
 
 ; ---- b12:9910-99D2 (battle, every frame: character A's six sprites) with the routines it runs
@@ -16294,3 +16385,233 @@ sl_chk:     ldh a, [is_cgb]
             ret
 
 
+
+section bank 0, $3140
+; A = value, HL = VRAM address: one entry at the end of the VRAM queue (LCD on), nothing
+; written now (prow_b in the prologue). Keeps BC, DE, HL.
+q_put:      push bc
+            push de
+            ld d, a
+            ldh a, [q_tail]
+            ld e, a
+            inc a
+            ld b, a
+.f:         ldh a, [q_head]
+            cp b
+            jr nz, .r
+            call q_drain1
+            jr .f
+.r:         push hl
+            ld a, l
+            ld c, h
+            ld h, high(QH)
+            ld l, e
+            ld [hl], c
+            inc h
+            ld [hl], a
+            inc h
+            ld [hl], d
+            pop hl
+            ld a, b
+            ldh [q_tail], a
+            pop de
+            pop bc
+            ret
+
+section bank 0, $3170
+; ---- DMG BG pages left in ROM (hle_chr_pages, a whole page with the LCD off): BG_LZ (cart RAM
+; bank 3) marks the tiles not yet in the shadow, BG_LZS the ROM bank and address of each page.
+BG_LZ      = $A900
+BG_LZS     = $A920
+; D = page, HL = its source (bank data_bank8): recorded, its 16 tiles marked. Keeps BC, DE, HL.
+bg_lazy:    push hl
+            push bc
+            ld a, 3
+            ld [$4000], a
+            ld b, h
+            ld c, l
+            ld a, d
+            add a, a
+            add a, a
+            add a, low(BG_LZS)
+            ld l, a
+            ld h, high(BG_LZS)
+            ldh a, [data_bank8]
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            ld [hl], b
+            ld a, d
+            add a, a
+            add a, low(BG_LZ)
+            ld l, a
+            ld a, $FF
+            ld [hl+], a
+            ld [hl], a
+            xor a
+            ld [$4000], a
+            pop bc
+            pop hl
+            ret
+; boot (cart RAM bank 3 on): no BG tile left in ROM
+bg_lzinit:  ld hl, BG_LZ
+            xor a
+            ld b, 32
+.l:         ld [hl+], a
+            dec b
+            jr nz, .l
+            ret
+; A = tile: its BG_LZ mark cleared (a whole tile written into the shadow). Keeps all registers.
+bg_lzclr:   push af
+            push bc
+            push hl
+            ld c, a
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(BG_LZ)
+            ld l, a
+            ld h, high(BG_LZ)
+            ld a, c
+            and 7
+            ld b, $FE
+            jr z, .bt
+.sh:        rlc b
+            dec a
+            jr nz, .sh
+.bt:        ld a, 3
+            ld [$4000], a
+            ld a, [hl]
+            and b
+            ld [hl], a
+            xor a
+            ld [$4000], a
+            pop hl
+            pop bc
+            pop af
+            ret
+; A = tile, C = the ROM bank to come back to: still in ROM (BG_LZ) -> copied into the shadow
+; now (GB byte order), mark cleared. Cart RAM bank 0 after. Keeps all registers.
+bg_mat:     push af                         ; (C: the bank mapped now if its ID is at $7FFE,
+            ld a, [$7FFE]                   ;   a code or runtime bank: natives call PPU
+            cp $A5                          ;   writes with code_bank still the recompiled
+            jr nz, .ci                      ;   caller's; callers keep their BC)
+            ld a, [$7FFF]
+            ld c, a
+.ci:        pop af
+            push af
+            push bc
+            push de
+            push hl
+            ld e, a
+            ld a, 3                         ; (not in ROM: nothing, no bank touched)
+            ld [$4000], a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(BG_LZ)
+            ld l, a
+            ld h, high(BG_LZ)
+            ld a, e
+            and 7
+            ld b, 1
+            jr z, .b0
+.s0:        sla b
+            dec a
+            jr nz, .s0
+.b0:        ld a, [hl]
+            and b
+            jr nz, .lz
+            xor a
+            ld [$4000], a
+            pop hl
+            pop de
+            pop bc
+            pop af
+            ret
+.lz:
+            ld a, 3
+            ld [$4000], a
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(BG_LZ)
+            ld l, a
+            ld h, high(BG_LZ)
+            ld a, e
+            and 7
+            ld b, 1
+            jr z, .bt
+.sh:        sla b
+            dec a
+            jr nz, .sh
+.bt:        ld a, [hl]
+            and b
+            jr z, .n
+            ld a, b
+            cpl
+            and [hl]
+            ld [hl], a
+            ld a, e
+            swap a
+            and $0F
+            add a, a
+            add a, a
+            add a, low(BG_LZS)
+            ld l, a
+            ld a, [hl+]
+            ld d, a                         ; D = ROM bank
+            ld a, [hl+]
+            ld c, a
+            ld b, [hl]
+            ld a, e
+            and $0F
+            swap a
+            add a, c
+            ld c, a
+            jr nc, .nc
+            inc b
+.nc:        ld a, e                         ; HL = shadow + tile * 16
+            swap a
+            ld l, a
+            and $0F
+            add a, high(BG_SHADOW)
+            ld h, a
+            ld a, l
+            and $F0
+            ld l, a
+            ld a, 1
+            ld [$4000], a
+            ld a, d
+            ld [$2000], a
+            ld e, 8
+.p0:        ld a, [bc]
+            inc bc
+            ld [hl+], a
+            inc l
+            dec e
+            jr nz, .p0
+            ld a, l
+            sub 15
+            ld l, a
+            ld e, 8
+.p1:        ld a, [bc]
+            inc bc
+            ld [hl+], a
+            inc l
+            dec e
+            jr nz, .p1
+.n:         xor a
+            ld [$4000], a
+            pop hl
+            pop de
+            pop bc
+            ld a, c
+            ld [$2000], a
+            pop af
+            ret
