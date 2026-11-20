@@ -301,7 +301,18 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   - GB runtime: row palettes `$580A` row / `$580B` column / `$580C` count * 4 + palette;
     rows recorded (`OVR_ROWS`) and rebuilt from the NES attributes on `$5808` = 0.
   - Checks: firstdiff status / equip / item sequences and explore 12000 identical.
-- Open: the sub-menus Magic, Job, Save still use the NES
+  - Magic: header $24 (1,1,20,4) name / Use Swap Item, list window 8 (1,4,20,15) (unused id;
+    item keeps 6): per level "Lv<n>  MP cur/max" and its 3 spells one per row, 3 levels a page
+    ($013C for the GB = page 1; `mpage` after FF3's copy to $7B01 calls bank 88 `mgpage`, which
+    moves the level digit / MP codes by 3p and the spell codes by 9p and ends the text past
+    level 8); the spell cursor moves one spell a step and `mmove` turns pages on left / right
+    (bank 88 `mgkey`, page in ExRAM $5FFF, reset when the menu closes). The party window for
+    item and magic targets is drawn by select character itself ($A717 -> `stsel`); the magic
+    list redraw opens window 8 with its frame and undoes the party window's palettes (`stmr`,
+    in the unused delete-spell routine); `stcl` moved into equip's dead class-sprite routine.
+  - Checks: magic (pokes: a Black Mage with MP; page turns), item, equip, status sequences and
+    explore 12000: identical.
+- Open: the sub-menus Job, Save (need a save with crystals / the world map) still use the NES
   layout through the field camera (mock-ups next).
 
 ## Known open items

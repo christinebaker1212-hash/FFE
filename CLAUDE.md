@@ -839,4 +839,4 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   re-layout built (`tools/gb3/layout.py`, `build.py --gb`; party column, full-width party and
   message windows, battle cameras in the runtime), RAM-identical to its NES layout ROM.
   Main menu re-laid out (owner's mock N5B; GB menu mode $5808: window layer + SCY steps),
-  RAM-identical; sub-menus next.
+  RAM-identical; Status / Equip / Item / Magic re-laid out (owner's mocks S1-S5); Job / Save next.

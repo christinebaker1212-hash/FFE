@@ -1107,16 +1107,39 @@ stpost:             ; status text drawn: HP palette, condensed words and MP digi
     ldy #12
     lda #$FD
     jmp JBGO
-stuse:              ; item use: the party window (on demand) and its HP palettes, then the
-    jsr $A328       ;   target selection
+stsel:              ; select character ($A715, item / magic targets): the party window on
+    sta $79F0       ;   demand and its HP palettes (the STA this replaces: A = 0)
+    jsr $A328
     ldy #12
     lda #$FC
+    jmp JBGO
+mpage:              ; character string copied ($A87A: JSR $D1B1): the magic list's page
+    pha
+    jsr $D1B1
+    pla
+    cmp #$3C
+    bne .r
+    ldy #12
+    lda #$FA
+    jmp JBGO
+.r:
+    rts
+mmove:              ; magic spell cursor: FF3's move (one spell a step), then left / right
+    jsr $91D9       ;   turn the page (bank 88 sets MPG bit 7: redraw)
+    ldy #12
+    lda #$F9
     jsr JBGO
-    jmp $A715
-stcl:               ; item menu redrawn after a target choice: the party window's HP palettes
-    lda #0          ;   undone ($5808 = 0 rebuilds rows with set palettes)
-    sta $5808
-    jmp $F44B       ; close menu 1 (the call this replaces)
+    lda MPG
+    bpl .r
+    and #$7F
+    sta MPG
+    ldx #8
+    lda #$3C
+    jsr $A875
+    lda #0
+    sta $79F0
+.r:
+    rts
 mnuoff:             ; close menu ($A685's last step, the screen clear): then the GB's menu
     jsr $F465       ;   mode off and the word tiles back
     lda #0
@@ -1132,6 +1155,7 @@ DG = $5EE4          ; 12 characters: Gil (7 digits, G), Capacity (3 digits, C)
 MPC = $5EF0         ; MP cell codes (4 x 8)
 RST = $5FFE         ; $A5: the MP tiles are in the word tiles' place (ExRAM image: $FF)
 WST = $5FFD         ; $A5: the status words are on job-name tiles
+MPG = $5FFF         ; magic list: page (bits 0-1), last left / right (4-5), redraw (7)
 WT = $5EB4          ; status: the word tiles' numbers (WN)
     org $85E0
 disp2:              ; bank 88 $8004 (JOBF dispatch, Y = 12: was JMP sq): A = $FF -> smallnum,
@@ -1153,6 +1177,14 @@ disp2:              ; bank 88 $8004 (JOBF dispatch, Y = 12: was JMP sq): A = $FF
     bne .q4
     jmp hppal8
 .q4:
+    cmp #$FA
+    bne .q5
+    jmp mgpage
+.q5:
+    cmp #$F9
+    bne .q6
+    jmp mgkey
+.q6:
     jmp SQ
 smallnum:           ; Gil and Capacity in 4-px digits -> tiles $7B-$7F, $CA (main menu)
     lda $601C
@@ -1564,7 +1596,100 @@ tadr:               ; PPU address of BG tile A (pattern table 0)
     asl a
     sta $2006
     rts
+mgkey:              ; magic list: left / right (new press, MPG bits 4-5 = last) turn the page
+    lda $20         ;   (MPG bits 0-1, 3 pages); a change sets bit 7 (redraw)
+    and #$03
+    tax
+    asl a
+    asl a
+    asl a
+    asl a
+    sta $86
+    lda MPG
+    and #$30
+    cmp $86
+    beq .x
+    lda MPG
+    and #$CF
+    ora $86
+    sta MPG
+    txa
+    beq .x
+    lsr a
+    lda MPG
+    and #$03
+    bcs .rt
+    cmp #0
+    beq .x
+    dec MPG
+    bne .f
+    beq .f
+.rt:
+    cmp #2
+    bcs .x
+    inc MPG
+.f:
+    lda MPG
+    ora #$80
+    sta MPG
+.x:
+    jmp JBTAIL
+mgpage:             ; magic list copied to $7B01: levels / MP / spells moved by 3 page levels;
+    lda MPG         ;   a level past the 8th ends the text
+    and #$03
+    sta $86
+    asl a
+    adc $86
+    sta $86         ; 3 * page (levels)
+    asl a
+    adc $86
+    sta $87         ; 9 * page (spells)
+    ldx #0
+.l:
+    lda $7B01,x
+    beq .x
+    cmp #$95        ; "L": the level line "Lv<d>"; past level 8: end here
+    bne .c
+    lda $7B03,x
+    clc
+    adc $86
+    cmp #$89
+    bcc .lv
+    lda #0
+    sta $7B01,x
+    beq .x
+.lv:
+    sta $7B03,x
+    inx
+    inx
+    inx
+    bne .l
+.c:
+    cmp #$10
+    bcc .n
+    cmp #$14
+    bcs .n
+    lda $7B02,x     ; character code 10-13 xx: MP ($80-$8F) + 3 p, spells ($08-$1F) + 9 p
+    cmp #$80
+    bcc .sp
+    clc
+    adc $86
+    sta $7B02,x
+    bne .k
+.sp:
+    clc
+    adc $87
+    sta $7B02,x
+.k:
+    inx
+.n:
+    inx
+    bne .l
+.x:
+    jmp JBTAIL
 restore:            ; menu closed: the word tiles under the MP tiles back (from the font)
+    lda #0          ;   (and the magic list's page back to the first)
+    sta MPG
     lda WST         ; (status: the job-name tiles under its words first, from JDATA)
     cmp #$A5
     bne .nw
@@ -1835,7 +1960,16 @@ MENU_TEXT[0x47] = STATUS_TEXT
 MENU_TEXT[0x3E] = ('{0E}{10:02}\n{14:01}Attack‥{14:0E}{10:33}\n{14:01}Defense‥{14:0E}{10:34}\n'
                    '{15:01}{10:06}{10:43}\n{15:01}{10:07}{10:44}\n{15:01}{10:03}\n{15:01}{10:04}\n'
                    '{15:01}{10:05}\n{15:01}Remove Equipment')
-EQUIP_MSGS = [0x6E, 0x6F] + list(range(0x3F, 0x47)) + list(range(0x5B, 0x66))   # (+ item prompts)
+EQUIP_MSGS = [0x6E, 0x6F] + list(range(0x3F, 0x47)) + list(range(0x5B, 0x66)) + [   # (+ item prompts,
+    0x67, 0x68, 0x6B, 0x73, 0x74, 0x75]                                              #   magic messages)
+# magic (owner-approved mock-up S3): header $24 (1, 1, 20, 4): name / Use Swap Item; list in
+# window 8 (1, 4, 20, 15): per level "Lv<n>  MP cur/max" and its 3 spells one per row, 3 levels
+# a page (bank 88 mgpage moves the copied text's level / MP / spell numbers by the page;
+# left / right turn it)
+MENU_TEXT[0x36] = '{0E}{14:01}{10:02}\n{15:01}Use{15:07}Swap{15:0D}Item'
+MENU_TEXT[0x3C] = '{0E}' + '\n'.join(
+    '{14:01}Lv%d{14:08}MP{14:0C}{10:%02X}/{10:%02X}\n' % (l + 1, 0x80 + l, 0x88 + l)
+    + '\n'.join('{16:01}{10:%02X}' % (8 + 3 * l + k) for k in range(3)) for l in range(3))
 MENU_TEXT[0x35] = '{0E}Item'
 MENU_TEXT[0x3D] = '{0E}' + '\n'.join('{17:01}{1A:%02X}{14:0F}{1C:%02X}' % (i, i) for i in range(32)) + '\n{17:01}{0F}'
 MENU_TEXT[0x3B] = '{0E}' + '\n'.join('{1%d:02}{14:07}[77][79]{14:09}{1%d:30}/{1%d:31}' % (m, m, m) for m in range(4))
@@ -1886,6 +2020,11 @@ def mp_tiles():
 
 def main_menu(r):
     B3C, B3D, B88 = 0x3C, 0x3D, 88
+    def find(bank, lo, hi, pat):
+        b = bytes.fromhex(pat.replace(' ', '')); o = r.off(bank, lo)
+        i = bytes(r.d[o:o + hi - lo]).find(b); assert i >= 0, pat
+        assert bytes(r.d[o + i + 1:o + hi - lo]).find(b) < 0, pat
+        return lo + i
     j = lambda a: '%02X %02X' % (a & 0xFF, a >> 8)
     # windows (bank 61 $AAF7 x, $AB1D y, $AB43 w, $AB69 h; ids 0-4 of the main menu)
     olds = {0xAAF7: '0117170911', 0xAB1D: '0101121a1a', 0xAB43: '160808080c', 0xAB69: '1b11090303'}
@@ -1893,7 +2032,7 @@ def main_menu(r):
         b = bytearray.fromhex(olds[t])
         for w, rect in MENU_WINDOWS.items(): b[w] = rect[k]
         r.patch(B3D, t, olds[t], b.hex(), 'main menu windows (GB layout)')
-    hp = r.module(MENU_HP_SRC, syms={'JBGO': JBGO})
+    hp = r.module(MENU_HP_SRC, syms={'JBGO': JBGO, 'MPG': 0x5FFF})
     assert hp['org'] + len(hp['bytes']) <= 0x960C + 16
     o = r.off(B3C, 0x95B2)
     r.d[o:o + len(hp['bytes'])] = hp['bytes']
@@ -1956,13 +2095,52 @@ def main_menu(r):
     r.log.append((B3D, 0xAAF7, 'item windows 5 / 6 / 7 / $15'))
     r.patch(B3C, 0x9ECC, '20 6F 95 20 28 A3', '20 ' + j(hp['labels']['stcam']) + ' EA EA EA',
             'item: GB camera (8, 8), no party window until a target is chosen')
-    r.patch(B3D, 0xAA8E, '20 4B F4', '20 ' + j(hp['labels']['stcl']), 'item menu redraw: party window palettes undone')
+    a = find(B3C, 0x9880, 0x98A0, 'A6 8F A9 00 9D 00 7C 60')
+    st = r.module('''
+    org $%04X
+stmr:               ; (the unused "delete spell" routine) magic list redrawn with its frame,
+    lda #0          ;   the party window's palettes undone
+    sta $5808
+    jmp $AAF1
+''' % a)
+    assert len(st['bytes']) == 8
+    r.d[r.off(B3C, a):r.off(B3C, a) + 8] = st['bytes']
+    r.mods.append(dict(st, where=(B3C, a & 0x1FFF)))
+    cl = r.module('''
+    org $9D5B
+stcl:               ; (equip's class sprite routine, no longer called) item menu redrawn after
+    lda #0          ;   a target choice: the party window's HP palettes undone ($5808 = 0
+    sta $5808       ;   rebuilds rows with set palettes)
+    jmp $F44B       ; close menu 1 (the call this replaces)
+''')
+    assert r.d[r.off(B3C, 0x9D5B):r.off(B3C, 0x9D5B) + 4] == bytes.fromhex('a9d88540')
+    r.d[r.off(B3C, 0x9D5B):r.off(B3C, 0x9D5B) + 8] = cl['bytes']
+    r.mods.append(dict(cl, where=(B3C, 0x9D5B & 0x1FFF)))
+    r.patch(B3D, 0xAA8E, '20 4B F4', '20 ' + j(cl['labels']['stcl']), 'item menu redraw: party window palettes undone')
     r.patch(B3D, 0xAA93, '20 A0 AA', '20 F1 AA', 'item menu redraw: the list window with its frame (the party window covered it)')
-    r.patch(B3D, 0xA08B, '20 15 A7', '20 ' + j(hp['labels']['stuse']), 'item use: the party window, then the target')
     r.patch(B3D, 0xA74F, '01 17 00 00 0F 17 00 00 01 1A 00 00 0F 1A 00 00',
             '00 0D 00 00 00 0E 00 00 00 0F 00 00 00 10 00 00', 'select character: hand at each line of window 7')
     for bank, a in ((B3C, 0x9F08), (B3C, 0x9F45), (B3D, 0xA733)):
         r.patch(bank, a, '20 00 80', 'EA EA EA', 'item: no class sprites')
+    # magic: windows, no class sprites / party window until a target, one spell a cursor step
+    for w, rect in ((8, (1, 4, 20, 15)), (0x24, (1, 1, 20, 4))):
+        for t, k in ((0xAAF7, 0), (0xAB1D, 1), (0xAB43, 2), (0xAB69, 3)):
+            r.d[r.off(B3D, t + w)] = rect[k]
+    r.log.append((B3D, 0xAAF7, 'magic windows 8 / $24'))
+    a = find(B3C, 0x9761, 0x9770, '20 85 A6 20 6F 95')
+    r.patch(B3C, a + 3, '20 6F 95', '20 ' + j(hp['labels']['stcam']), 'magic: GB camera (8, 8)')
+    a = find(B3C, 0x9761, 0x97A0, '20 98 D1 20 28 A3')
+    r.patch(B3C, a + 3, '20 28 A3', 'EA EA EA', 'magic: no party window until a target is chosen')
+    a = find(B3C, 0x9761, 0x97A0, 'A2 06 20 F1 AA A9 3C')
+    r.patch(B3C, a, 'A2 06', 'A2 08', 'magic: list window 8')
+    a = find(B3C, 0x9761, 0x97B0, 'A2 06 20 A6 AA A9 3C')
+    r.patch(B3C, a, 'A2 06 20 A6 AA', 'A2 08 20 ' + j(st['labels']['stmr']), 'magic: list window 8, redrawn with its frame (party window palettes undone)')
+    for a in (find(B3C, 0x979C, 0x97C0, 'A9 03 20 00 80'), find(B3C, 0x97D9, 0x97F0, 'A9 03 20 00 80')):
+        r.patch(B3C, a + 2, '20 00 80', 'EA EA EA', 'magic: no class sprites')
+    a = find(B3C, 0x97D9, 0x97F0, 'A9 0C 20 D9 91')
+    r.patch(B3C, a, 'A9 0C 20 D9 91', 'A9 04 20 ' + j(hp['labels']['mmove']), 'magic: one spell a step, left / right turn the page')
+    r.patch(B3D, 0xA717, '8D F0 79', '20 ' + j(hp['labels']['stsel']), 'select character: the party window first')
+    r.patch(B3D, 0xA87A, '20 B1 D1', '20 ' + j(hp['labels']['mpage']), 'character string: the magic list page')
     r.patch(B3D, 0xA705, '01 05 00 00 01 0B 00 00 01 11 00 00 01 17 00 00',
             '02 01 00 00 02 05 00 00 02 09 00 00 02 0D 00 00', 'character select: hand at each name (GB rows)')
     for a in (0xA5AC, 0xA6D0):
