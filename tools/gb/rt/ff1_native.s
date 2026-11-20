@@ -4365,403 +4365,6 @@ VW_VEND    = $AEA6
 VW_VSTR    = $AEB0
 VW_VSQ     = $C346          ; (NES $0346)
 VW_FIRST   = $7A
-vstr_b:     call vstr_n                     ; (out: B = D = 0, as the recompiled code keeps
-            ld b, 0                         ;   them: BC = Y, DE = X)
-            ld d, 0
-            ret
-vstr_n:     ld [VW_VC], a
-.l:         ld a, [VW_VEND]
-            ld c, a
-            ld a, [VW_VC]
-            cp c
-            ret nc                          ; index >= VEND
-            add a, low(VW_VSTR)
-            ld l, a
-            ld h, high(VW_VSTR)
-            ld a, [hl]
-            and a
-            ret z
-            cp $FD
-            jr nz, .c
-            inc l                           ; $FD $80+n: pen to tile n
-            ld a, [hl]
-            sub $80
-            add a, a
-            add a, a
-            add a, a
-            ld [VW_VX], a
-            ld hl, VW_VC
-            inc [hl]
-            jr .n
-.c:         call vchar_n
-.n:         ld hl, VW_VC
-            inc [hl]
-            jr nz, .l
-            ret
-
-vchar_n:    cp $FD
-            ret z
-            cp $FF
-            jr nz, .g
-            ld a, [VW_VX]                   ; space: 3 pixels
-            add a, 3
-            ld [VW_VX], a
-            ret
-.g:         sub VW_FIRST
-            ret c
-            ld e, a                         ; E = glyph
-            ld hl, vw_gw
-            add a, l
-            ld l, a
-            jr nc, .w
-            inc h
-.w:         ld a, [hl]
-            and a
-            ret z
-            ld [VW_VCNT], a
-            ld l, e                         ; HL = glyph * 8
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            push hl
-            ld bc, VW_GR_NES                ; $88/$89 = GR + glyph * 8 (NES address)
-            add hl, bc
-            ld a, l
-            ld [NES_RAM + $88], a
-            ld a, h
-            ld [NES_RAM + $89], a
-            pop hl
-            ld bc, vw_gr
-            add hl, bc
-            ld b, h
-            ld c, l                         ; BC = the glyph's rows
-            ld a, [VW_VX]
-            and 7
-            ld [VW_VSH], a
-            ld h, a                         ; H = shift
-            ld a, [VW_VX]
-            srl a
-            srl a
-            srl a
-            ld l, a                         ; L = tile
-            ld a, [VW_VN]
-            ld d, a                         ; D = tiles in the line
-            ld a, l
-            cp d
-            jp nc, .adv
-            ld [VW_VT2], a
-            add a, a
-            add a, a
-            add a, a
-            ld [VW_VOFF], a
-            ld e, a                         ; DE = the tile's first row in VW_BUF
-            ld a, h                         ; rows OR-ed in, unrolled: shift 0; shifted (the
-            and a                           ;   table page of row >> shift: VW_SHR + 2 *
-            jr z, .va                       ;   shift - 2, the next page: what spills into
-            add a, a                        ;   the next tile) within the line's last tile;
-            add a, high(VW_SHR) - 2         ;   shifted into the next tile too
-            ld h, a
-            inc l
-            ld a, l
-            cp d                            ; (carry: the next tile is in the line)
-            ld d, high(VW_BUF)
-            jr nc, .vb
-            ld a, [bc]
-            inc bc
-            and a
-            jr z, .z0
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            ld a, e
-            add a, 8
-            ld e, a
-            inc h
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            dec h
-            ld a, e
-            sub 8
-            ld e, a
-.z0:        inc e
-            ld a, [bc]
-            inc bc
-            and a
-            jr z, .z1
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            ld a, e
-            add a, 8
-            ld e, a
-            inc h
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            dec h
-            ld a, e
-            sub 8
-            ld e, a
-.z1:        inc e
-            ld a, [bc]
-            inc bc
-            and a
-            jr z, .z2
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            ld a, e
-            add a, 8
-            ld e, a
-            inc h
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            dec h
-            ld a, e
-            sub 8
-            ld e, a
-.z2:        inc e
-            ld a, [bc]
-            inc bc
-            and a
-            jr z, .z3
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            ld a, e
-            add a, 8
-            ld e, a
-            inc h
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            dec h
-            ld a, e
-            sub 8
-            ld e, a
-.z3:        inc e
-            ld a, [bc]
-            inc bc
-            and a
-            jr z, .z4
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            ld a, e
-            add a, 8
-            ld e, a
-            inc h
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            dec h
-            ld a, e
-            sub 8
-            ld e, a
-.z4:        inc e
-            ld a, [bc]
-            inc bc
-            and a
-            jr z, .z5
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            ld a, e
-            add a, 8
-            ld e, a
-            inc h
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            dec h
-            ld a, e
-            sub 8
-            ld e, a
-.z5:        inc e
-            ld a, [bc]
-            inc bc
-            and a
-            jr z, .z6
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            ld a, e
-            add a, 8
-            ld e, a
-            inc h
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            dec h
-            ld a, e
-            sub 8
-            ld e, a
-.z6:        inc e
-            ld a, [bc]
-            inc bc
-            and a
-            jr z, .z7
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            ld a, e
-            add a, 8
-            ld e, a
-            inc h
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            dec h
-            ld a, e
-            sub 8
-            ld e, a
-.z7:        inc e
-            jp .adv
-.va:        ld d, high(VW_BUF)
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or l
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or l
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or l
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or l
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or l
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or l
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or l
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or l
-            ld [de], a
-            inc e
-            jp .adv
-.vb:
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            inc e
-            ld a, [bc]
-            inc bc
-            ld l, a
-            ld a, [de]
-            or [hl]
-            ld [de], a
-            inc e
-.adv:       ld hl, VW_VSQ                   ; a squeezed word: no gap after the letter
-            ld a, [hl]
-            and a
-            jr z, .gap
-            dec [hl]
-            ld a, [VW_VCNT]
-            ld b, a
-            ld a, [VW_VX]
-            add a, b
-            ld [VW_VX], a
-            ret
-.gap:       ld a, [VW_VCNT]
-            ld b, a
-            ld a, [VW_VX]
-            scf
-            adc a, b
-            ld [VW_VX], a
-            ret
-
 ; ---- far vclear (gb_layout.py VWF_SRC): VN * 8 bytes of VBUF cleared (256 when that is 0),
 ; VX = 0. Out: A = X = 0, Y kept; N = 0, Z = 1, C = 1.
 vclear_b:   xor a
@@ -18693,3 +18296,144 @@ btx_f:
 .f5:        add a, $6E
             jr .fw
 
+
+; ---- far vstr / vchar in ROM bank VWF_BANK (hle_vstr), with the glyphs pre-shifted at build
+; time (build.py vwf_shift_tables): VWS_LO / VWS_HI = glyph -> its block of 8 x 16 bytes
+; (shift s: 8 rows for the glyph's tile, then the 8 rows spilling into the next tile); glyphs
+; without ink share a block of zeros. Same RAM as before (VC, VX, VSQ, VCNT, VSH, VT2, VOFF,
+; $88/$89, VBUF).
+section bank VWF_BANK, $4000
+vstr_b:     call vstr_n                     ; (out: B = D = 0, as the recompiled code keeps
+            ld b, 0                         ;   them: BC = Y, DE = X)
+            ld d, 0
+            ret
+vstr_n:     ld [VW_VC], a
+.l:         ld a, [VW_VEND]
+            ld c, a
+            ld a, [VW_VC]
+            cp c
+            ret nc                          ; index >= VEND
+            add a, low(VW_VSTR)
+            ld l, a
+            ld h, high(VW_VSTR)
+            ld a, [hl]
+            and a
+            ret z
+            cp $FD
+            jr nz, .c
+            inc l                           ; $FD $80+n: pen to tile n
+            ld a, [hl]
+            sub $80
+            add a, a
+            add a, a
+            add a, a
+            ld [VW_VX], a
+            ld hl, VW_VC
+            inc [hl]
+            jr .n
+.c:         call vchar_n
+.n:         ld hl, VW_VC
+            inc [hl]
+            jr nz, .l
+            ret
+
+vchar_n:    cp $FD
+            ret z
+            cp $FF
+            jr nz, .g
+            ld a, [VW_VX]                   ; space: 3 pixels
+            add a, 3
+            ld [VW_VX], a
+            ret
+.g:         sub VW_FIRST
+            ret c
+            ld e, a                         ; E = glyph
+            ld hl, vw_gw58
+            add a, l
+            ld l, a
+            jr nc, .w
+            inc h
+.w:         ld a, [hl]
+            and a
+            ret z
+            ld [VW_VCNT], a
+            ld l, e                         ; $88/$89 = GR + glyph * 8 (NES address)
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld bc, VW_GR_NES
+            add hl, bc
+            ld a, l
+            ld [NES_RAM + $88], a
+            ld a, h
+            ld [NES_RAM + $89], a
+            ld a, [VW_VX]
+            and 7
+            ld [VW_VSH], a
+            ld b, a                         ; B = shift
+            ld a, [VW_VX]
+            srl a
+            srl a
+            srl a                           ; A = tile
+            ld c, a
+            ld a, [VW_VN]
+            ld d, a                         ; D = tiles in the line
+            ld a, c
+            cp d
+            jr nc, .adv
+            ld [VW_VT2], a
+            add a, a
+            add a, a
+            add a, a
+            ld [VW_VOFF], a
+            push de
+            ld d, high(VWS_LO)              ; HL = the glyph's block + 16 * shift
+            ld a, [de]
+            ld l, a
+            inc d
+            ld a, [de]
+            ld h, a
+            ld a, b
+            swap a
+            add a, l
+            ld l, a
+            pop de
+            ld a, [VW_VOFF]
+            ld e, a                         ; E = VBUF offset of the tile, D = VN
+            ld a, c
+            inc a
+            cp d                            ; NC: tile + 1 >= VN, the line's last tile
+            ld d, high(VW_BUF)
+            ld a, b
+            jr nc, .one
+            and a
+            jr z, .one                      ; (shift 0: nothing spills)
+            ld c, 16
+            jr .rows
+.one:       ld c, 8
+.rows:      ld a, [de]
+            or [hl]
+            ld [de], a
+            inc l
+            inc e
+            dec c
+            jr nz, .rows
+.adv:       ld hl, VW_VSQ                   ; a squeezed word: no gap after the letter
+            ld a, [hl]
+            and a
+            jr z, .gap
+            dec [hl]
+            ld a, [VW_VCNT]
+            ld b, a
+            ld a, [VW_VX]
+            add a, b
+            ld [VW_VX], a
+            ret
+.gap:       ld a, [VW_VCNT]
+            ld b, a
+            ld a, [VW_VX]
+            scf
+            adc a, b
+            ld [VW_VX], a
+            ret

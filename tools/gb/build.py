@@ -247,7 +247,8 @@ def vwf_tables(prg, far_sym):
     of the English NES ROM into the native bank for vstr_b (rt/ff1_native.s)."""
     n = 256 - 0x7A
     if 'GW' not in far_sym or 'GR' not in far_sym:
-        return 'VW_GR_NES = 0\nsection bank HLE_BANK, $7A00\nvw_gw:\nvw_gr:\nsection bank HLE_BANK, $6000\nVW_SHR:\nvw_gw60:\n' + lpool_table(prg)
+        return ('VW_GR_NES = 0\nsection bank HLE_BANK, $7A00\nvw_gw:\nvw_gr:\nsection bank HLE_BANK, $6000\nVW_SHR:\nvw_gw60:\n'
+                'section bank VWF_BANK, $4300\nvw_gw58:\nVWS_LO:\nVWS_HI:\n' + lpool_table(prg))
     off = lambda a: FAR_BANK * 0x2000 + a - 0xC000
     gw = prg[off(far_sym['GW']):off(far_sym['GW']) + n]
     gr = prg[off(far_sym['GR']):off(far_sym['GR']) + 8 * n]
@@ -255,7 +256,20 @@ def vwf_tables(prg, far_sym):
     shr = bytearray()                                # shift s (1-7): page of b >> s, page of b << (8 - s)
     for sh in range(1, 8):
         shr += bytes(b >> sh for b in range(256)) + bytes((b << (8 - sh)) & 255 for b in range(256))
-    return ('VW_GR_NES = $%04X\nsection bank HLE_BANK, $7A00\nvw_gw:\n%s\nvw_gr:\n%s\n' % (far_sym['GR'], rows(gw), rows(gr))
+    blocks, ptr, data = {}, [], []                  # pre-shifted glyphs (vchar_n in VWF_BANK):
+    for g in range(n):                               #   per glyph 8 shifts x (8 rows of its tile,
+        rws = gr[8 * g:8 * g + 8]                    #   8 rows spilling into the next one)
+        if not any(rws): ptr.append(None); continue
+        blk = b''.join(bytes(x) for x in ([r >> s_ for r in rws] + [(r << (8 - s_)) & 0xFF for r in rws] for s_ in range(8)))
+        if blk not in blocks: blocks[blk] = len(blocks); data.append(blk)
+        ptr.append(blocks[blk])
+    zero = len(data); data.append(bytes(128))
+    addr = [0x4600 + 128 * (zero if p_ is None else p_) for p_ in ptr] + [0x4600 + 128 * zero] * (256 - n)
+    assert 0x4600 + 128 * len(data) <= 0x7F00
+    vws = ('section bank VWF_BANK, $4400\nVWS_LO:\n%s\nsection bank VWF_BANK, $4500\nVWS_HI:\n%s\n'
+           'section bank VWF_BANK, $4600\nVWS_DATA:\n%s\nsection bank VWF_BANK, $4300\nvw_gw58:\n%s\n'
+           % (rows([a_ & 0xFF for a_ in addr]), rows([a_ >> 8 for a_ in addr]), rows(b''.join(data)), rows(gw)))
+    return ('VW_GR_NES = $%04X\nsection bank HLE_BANK, $7A00\nvw_gw:\n%s\nvw_gr:\n%s\n' % (far_sym['GR'], rows(gw), rows(gr)) + vws
             + 'section bank PF_BANK, $6700\nvw_gw60:\n%s\n' % rows(gw) + lpool_table(prg)
             + 'section bank HLE_BANK, $6000\nVW_SHR:\n%s\n' % rows(shr))
 

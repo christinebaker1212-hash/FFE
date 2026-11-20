@@ -670,9 +670,9 @@ hle_vtile:                                  ; far vtile (bank HLE_BANK: vtile_b)
             ld [$2000], a
             call vtile_b
             jp hle_back
-hle_vstr:                                   ; far vstr (bank HLE_BANK: vstr_b)
+hle_vstr:                                   ; far vstr (bank VWF_BANK: vstr_b)
             push af
-            ld a, HLE_BANK
+            ld a, VWF_BANK
             ld [$2000], a
             pop af
             call vstr_b
