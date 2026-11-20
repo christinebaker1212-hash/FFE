@@ -850,6 +850,9 @@ mu_write:   push bc
             push de
             push hl
             ld [MU_T], a
+            ldh a, [lcd_on]                 ; LCD off: GB map, shadow, owner bit directly
+            and a
+            jp z, .off
             ld a, d                         ; B = offset high (0-3), C = 4 for nametable 1,
             and 4                           ;   L = offset low
             ld c, a
@@ -941,6 +944,80 @@ mu_write:   push bc
             ld a, b
             ldh [q_tail], a
 .x:         pop hl
+            pop de
+            pop bc
+            ret
+
+.off:       ld a, d                         ; GB map $9800 + offset (rows 0-29)
+            and 3
+            add a, $98
+            ld h, a
+            ld l, e
+            ld a, [MU_T]
+            ld [hl], a
+            ld b, a
+            ld a, d                         ; shadow (+ $400 for nametable 1)
+            and 7
+            add a, high(NT_SH)
+            ld h, a
+            ld [hl], b
+            ld a, e                         ; owner: OWN + (offset high) * 32 + low / 8,
+            and 7                           ;   bit low & 7 (set: nametable 1)
+            ld l, a
+            ld h, high(BITS8)
+            ld c, [hl]
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld l, a
+            ld a, d
+            and 3
+            swap a
+            add a, a
+            or l
+            ld l, a
+            ld h, high(OWN)
+            bit 2, d
+            jr z, .o0
+            ld a, [hl]                      ; nametable 1: 0 -> 1
+            and c
+            jr nz, .ok
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ldh a, [own1_lo]
+            add a, 1
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            adc a, 0
+            ldh [own1_hi], a
+            jr .chg
+.o0:        ld a, [hl]                      ; nametable 0: 1 -> 0
+            and c
+            jr z, .ok
+            ld a, c
+            cpl
+            and [hl]
+            ld [hl], a
+            ldh a, [own1_lo]
+            sub 1
+            ldh [own1_lo], a
+            ldh a, [own1_hi]
+            sbc a, 0
+            ldh [own1_hi], a
+.chg:       ldh a, [is_cgb]                 ; CGB: the cells' palettes when the LCD goes on
+            and a
+            jr z, .ok
+            ld a, 1
+            ld [CGB_SCAN], a
+.ok:        ldh a, [is_cgb]                 ; DMG / SGB: the scan when the LCD goes on
+            and a
+            jr nz, .xo
+            ld a, 1
+            ldh [dmg_scan], a
+.xo:        pop hl
             pop de
             pop bc
             ret

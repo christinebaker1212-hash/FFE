@@ -601,19 +601,22 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
 - Fill ppu (`hle_fill`): tile fill unrolled, DMG with the LCD on takes the tile path too;
   `hle_fill_nt` counts the changed owner bits at once. Battle load DMG +47 -> +42, CGB
   +28 -> +26. Random 1: DMG +1.1%, CGB -2.0%; RAM identical (random 1 DMG / CGB, random 2).
+- More load work: LCD-on scans skip a cell like the last one and owner lookups in rows without
+  nametable-1 cells; tile copy loops unrolled; `mu_write` with the LCD off writes the GB map
+  cell, the shadow and the owner bit directly (DMG scan / CGB attribute rebuild flagged).
+  Door loads DMG +56 -> +47, CGB +28 -> +24; battle load DMG +41, CGB +25. Random 1: DMG
+  +0.9%, CGB -2.0%; RAM identical; DMG / CGB shots: background identical, a few sprites one
+  step apart (frame timing).
 - Status of the owner's three (DMG, random 1): overworld walking / sailing at parity (walk
   scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
   remaining: battle entry (load +19 net, intro +39 / +32), door loads (+56 single wait,
   CGB +37), menu screens (+10..+28).
-- Next (speed, state 2026-11-20 after the steps above; DMG, random 1 +0.8%, CGB -2.0%):
-  1. Battle entry on DMG: intro ~1.25 GB frames per NES frame (+39 / +32 per 60 waits):
-     the tile copy from cart RAM (~14%), DMG re-coding of the dissolving enemy tiles (~20%,
-     mostly in spare time now), the game's own mask loop b11:9FE2 (~12%); the battle load
-     +19 net (CGB: load +28, intro at parity).
-  2. Door loads (one wait, LCD off): DMG +56 (scan 15%, map rows `mu_write` + `own_set`
-     18%, CHR copies 13%, indirect ROM reads 14%), CGB +28. Candidates: a faster
-     `own_set` in the HLE bank for `mu_write`, the indirect-read glue (translator: banked
-     pointers read directly), skip the DMG scan's parked check when nothing is parked.
+- Next (speed, state 2026-11-20 after the steps above; DMG, random 1 +0.9%, CGB -2.0%):
+  1. Battle entry on DMG: windows +37 / +16 (load +41 single wait, the dissolve now keeps
+     pace, the party's entry ~+16); CGB load +25.
+  2. Door loads (one wait, LCD off): DMG +47, CGB +24: spread over the scan, the game's map
+     code (decompression b00:9D9E-9E47, buffers fix:D28D-D2FB / D5E0-D61C), indirect reads
+     through the generic helpers, CHR copies. Next big step would be a native map loader.
   3. Menus (+10..+28 windows), boot / title (+44, +39, one-time).
   4. Then music, sprites (docs/gb-native-presentation.md order). Select menu with suspend
      (design with the owner). Known DMG look issue: the black castle floor ($0x rule).
