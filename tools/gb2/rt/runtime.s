@@ -14,6 +14,7 @@ QL         = $CE00
 QV         = $CF00
 NT_SH      = $D000          ; NES nametable shadow (2 × 1KB, vertical mirroring)
 PAL_SH     = $D800          ; NES palette RAM shadow (32)
+CP_SRAM    = $DCE6          ; cp_core: the source is in cart RAM (NES $6000-$7FFF)
 TSET_PEND  = $DCF8          ; DMG: a field tileset was loaded ($580B): fixed palettes at LCD-on
 PAL_DM     = $DCD0          ; CGB: palette entries changed since the last write (bitmap, 4)
 PAL_LEM    = $DCF7          ; CGB: emphasis bits | 1 of the last write

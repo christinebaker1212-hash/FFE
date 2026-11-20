@@ -570,6 +570,13 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   owned some), the attribute bytes through rt_ppu_w7. Menu opening on DMG +28 / +28 -> gone
   from the worst list. Random 1: DMG +1.8%, CGB -1.7%; RAM identical; DMG and CGB shots
   pixel-identical to the build before (7 screens incl. the menu opening).
+- Battle intro (enemies dissolving in, ~70 frames after the battle load: 3-4 GB frames per
+  wait on DMG): b11:9DA2 uploads 128 tile bytes from $7700 each frame byte by byte (every
+  byte marked its tile for re-coding). Idiom b11:9DB1 -> `hle_chr128` through `cp_core`,
+  which now also takes sources in cart RAM ($6000-$7FFF; bank switched per byte when the
+  destination is cart RAM too) and DMG with the LCD on (shadow + one re-coding mark per
+  tile). Battle intro windows DMG +84 / +84 -> +44 / +42; CGB +10 / +1. Random 1: DMG +1.3%,
+  CGB -1.7%; RAM identical; DMG / CGB intro shots pixel-identical to the build before.
 - Next (step 1, third part): the remaining field costs (dialogue window: text printer
   fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
   then screen loads, music, sprites. Earlier plan text:

@@ -344,8 +344,39 @@ hle_chrpg:  push af
             pop de
             jr cp_tail
 
+; b11:9DB1-9DB8 (battle intro, the enemies' dissolve: 128 bytes of tiles from $7700 per
+; frame): LDA ($02),Y / STA $2007 / INY / BPL. Exit: A = last byte, Y = $80, N = 1, Z = 0, X
+; and carry kept.
+hle_chr128: push af
+            ld a, c
+            cp $80
+            jr nc, .odd
+            push de
+            cpl
+            add a, $81                      ; $80 - Y bytes
+            ld e, a
+            ld l, $02
+            call cp_core
+            pop de
+.t:         ld a, $80
+            ldh [nzv], a
+            pop af
+            ldh a, [tmp_lo]
+            ld l, 1
+            inc l                           ; Z = 0
+            ret
+.odd:       ld l, $02                       ; Y >= $80 on entry: as the NES, byte by byte
+            call rt_izy_rd                  ;   while bit 7 of Y is clear after INY
+            ld a, l
+            ldh [tmp_lo], a
+            call rt_ppu_w7
+            inc c
+            bit 7, c
+            jr z, .odd
+            jr .t
+
 ; L = zero-page address of the source pointer, E = count (0 = 256), C = Y: LDA (zp),Y /
-; STA $2007 / INY, E times. Out: tmp_lo = last byte, C += count, B = D = E = 0.
+; STA $2007 / INY, E times (source $6000-$BFFF, tiles: whole tiles at once). Out: tmp_lo = last byte, C += count, B = D = E = 0.
 cp_core:    ld d, l                         ; (D = zp for the byte path)
             ld a, c
             and a
@@ -366,28 +397,30 @@ cp_core:    ld d, l                         ; (D = zp for the byte path)
             ld a, [hl+]
             ld h, [hl]
             ld l, a
-            ld a, h
-            cp $80
+            ld a, h                         ; source: $8000-$BFFF (ROM data bank) or
+            cp $60                          ;   $6000-$7FFF (cart RAM bank 0)
             jp c, .slow
             cp $C0
             jp nc, .slow
-            ldh a, [lcd_on]                 ; LCD on: CGB only (tile copy + DMA marks)
-            and a
-            jr z, .lok
-            ldh a, [is_cgb]
-            and a
-            jp z, .slow
-.lok:       ld a, e                         ; tiles: X / 16 (X = 0: 256 bytes)
+            ld a, e                         ; tiles: X / 16 (X = 0: 256 bytes)
             swap a
             and $0F
             jr nz, .tn
             ld a, 16
 .tn:        ldh [uw_y], a
-            ld a, h                         ; source HL = GB $4000 + ptr - $8000 (data bank)
-            sub $40
+            ld a, h
+            cp $80
+            jr c, .sram
+            sub $40                         ; source HL = GB $4000 + ptr - $8000 (data bank)
             ld h, a
             ldh a, [data_bank8]
             ld [$2000], a
+            xor a
+            jr .src
+.sram:      add a, $40                      ; NES $6000-$7FFF = GB $A000-$BFFF
+            ld h, a
+            ld a, 1
+.src:       ld [CP_SRAM], a
             push de
 .tile:      ldh a, [ppu_vl]
             and $F0
@@ -435,7 +468,15 @@ cp_core:    ld d, l                         ; (D = zp for the byte path)
             ld d, a
             ld a, 1
             ld [$4000], a
-.copy:      ld b, 8
+.copy:      ld a, d                         ; source and destination both in cart RAM
+            cp $A0                          ;   (banks 0 / 1): the bank switched per byte
+            jr c, .cr
+            cp $C0
+            jr nc, .cr
+            ld a, [CP_SRAM]
+            and a
+            jr nz, .cs
+.cr:        ld b, 8
 .p0:        ld a, [hl+]
             ld [de], a
             inc e
@@ -452,7 +493,28 @@ cp_core:    ld d, l                         ; (D = zp for the byte path)
             inc e
             dec b
             jr nz, .p1
-            ldh [tmp_lo], a                 ; last byte
+            jr .cd
+.cs:        ld b, 16                        ; GB byte order: rows of plane 0 to even bytes,
+.s0:        xor a                           ;   plane 1 to odd (E back by 15 after 8)
+            ld [$4000], a
+            ld a, [hl+]
+            ldh [wtmp], a
+            ld a, 1
+            ld [$4000], a
+            ldh a, [wtmp]
+            ld [de], a
+            inc e
+            inc e
+            dec b
+            jr z, .cd
+            ld a, b
+            cp 8
+            jr nz, .s0
+            ld a, e
+            sub 15
+            ld e, a
+            jr .s0
+.cd:        ldh [tmp_lo], a                 ; last byte
             ld a, d
             cp $D0
             jr c, .nst
