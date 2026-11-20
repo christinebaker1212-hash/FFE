@@ -867,6 +867,20 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   Lag: CGB 0, DMG 151.
 - **Owner's decision (2026-11-20): native presentation over recompiled logic** for all three
   ports: `docs/gb-native-presentation.md`. FF1 work follows it from here.
+- **Native presentation, step 1 (measure):** `tools/gb/profbuckets.py PROF SYM [--lagfile F]`
+  sorts an sgbrun profile into picture / music / sprites / game code / glue / interrupts /
+  timing. DMG, whole 7900-frame script (busy time): picture 22%, music 21% (engine 6.6%, APU
+  layer 13.5%, its ROM reads), sprites 18% (oamconv 12%, OAM clear 5%), game code 16%, glue
+  16%, interrupts 4%, timing 3%; the lagging waits alike.
+- **Step 2, native music engine** (`rt/mus.s`, bank RT_TABLES; `mus_play` / `mrd` in apu.s):
+  FF1's MusicPlay (b13:B000) written natively from the disassembly's description, same RAM
+  (checked: 62/62), APU writes straight into apu_write (unchanged registers skipped first),
+  song bytes read from bank 13 through `mrd`. build.py uses it only when the engine's bytes
+  hash to the expected value and takes the table addresses from the ROM's own operands
+  (env `GB_MUS=0` builds the recompiled engine). Checks: APU shadow / GB channel state
+  identical to the previous build at 301 points (DMG), VRAM identical, checkall 62/62.
+  Busy time -3.4% (DMG); lag: CGB 0, DMG 151 -> 145. What is left of music: the GB-side APU
+  layer (volume changes, the per-frame length / sweep clock).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

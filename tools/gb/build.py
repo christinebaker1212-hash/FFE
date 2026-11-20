@@ -288,6 +288,24 @@ def main():
             rc.g.idioms[('far', far_sym['pr1'])] = ('pf:prow_b', far_sym['pr3'], 'NZC')
         else:
             print('  far pr1: code not as expected, not native')
+    MUS_SHA1 = 'bd9d5ae99e4ca63c248c984e9c1b42df1844589f'   # (a hash of the code, not the code)
+    # FF1's music engine (b13:B000-B2F2) native (rt/mus.s) when its bytes are the expected ones;
+    # the table addresses from the ROM's own operands
+    mus = {}
+    b13 = 13 * 0x4000 - 0x8000
+    eng = prg[b13 + 0xB000:b13 + 0xB2F3]
+    if hashlib.sha1(eng).hexdigest() == MUS_SHA1:
+        w = lambda a: prg[b13 + a] | prg[b13 + a + 1] << 8
+        mus = dict(MUS_SCORE_HI=prg[b13 + 0xB043], MUS_P2C=w(0xB049), MUS_ENVSPD=w(0xB1FD),
+                   MUS_LENS=prg[b13 + 0xB2C3] | prg[b13 + 0xB2C7] << 8, MUS_OCT=w(0xB2D4),
+                   MUS_FREQS=prg[b13 + 0xB2D1] | prg[b13 + 0xB2D9] << 8,
+                   MUS_ENVPAT=prg[b13 + 0xB2E9] | prg[b13 + 0xB2ED] << 8)
+        if os.environ.get('GB_MUS', '1') == '1':
+            rc.g.ext[('b13', 0xB000)] = ('mus_play', 'NZCV')
+    else:
+        print('  music engine: code not as expected, not native')
+    mus_src = ''.join('%s = $%04X\n' % (k, mus.get(k, 0x8000)) for k in
+                      ('MUS_SCORE_HI', 'MUS_P2C', 'MUS_ENVSPD', 'MUS_LENS', 'MUS_OCT', 'MUS_FREQS', 'MUS_ENVPAT'))
     prog, bank_of, banks = emit_program(rc)
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s', 'sgb.s'))
     rt += '\nPROW_OFF = NES_RAM + $%04X\n' % prow_off
@@ -295,6 +313,7 @@ def main():
     rt += '\nsection bank PF_BANK, $7C00\n' + wrf_src
     rt += '\n' + apu_tables() + '\nSND_MASK = $%02X\n' % int(os.environ.get('GB_SND_MASK', 'FF'), 16) + 'MDF_ON = %d\n' % int(os.environ.get('GB_MDF', '1'))
     rt += open(os.path.join(HERE, 'rt', 'apu_core.s')).read()
+    rt += mus_src + open(os.path.join(HERE, 'rt', 'mus.s')).read()
     rt += '\n' + vwf_tables(prg, far_sym)            # (before ff1_native.s: VW_GR_NES)
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ff1_native.s')).read()
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ramchk.s')).read() + '\n' + ramchk_src()

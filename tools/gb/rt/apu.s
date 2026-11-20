@@ -43,3 +43,39 @@ apu_tick:   push af
             pop bc
             pop af
             ret
+
+; ---- the native music engine (rt/mus.s, bank RT_TABLES): b13:B000 (recomp ext, build.py)
+mus_play:   ld a, RT_TABLES
+            ld [$2000], a
+            call mus_play_b
+            push af
+            ldh a, [code_bank]
+            ld [$2000], a
+            pop af
+            ret
+
+; HL = NES address -> A (bank RT_TABLES mapped again); keeps BC, DE, HL
+mrd:        push hl
+            ld a, h
+            sub $80
+            cp $40
+            jr nc, .o
+            add a, $40
+            ld h, a
+            ldh a, [data_bank8]
+            ld [$2000], a
+            ld h, [hl]
+            ld a, RT_TABLES
+            ld [$2000], a
+            ld a, h
+            pop hl
+            ret
+.o:         push de
+            call nes_rd
+            pop de
+            ld a, RT_TABLES
+            ld [$2000], a
+            ld a, l
+            pop hl
+            ret
+
