@@ -77,6 +77,7 @@ NT_NOW     = $D87D          ; nt_tile: check the cell's palette at once (not in 
 MAP_RB     = $CCFF          ; CGB masked load: GB map to rebuild from the shadows when shown
 CGB_RP     = $CCEF          ; CGB: cell palettes stale (owners changed with the LCD off; repal_b at LCD on)
 PB_ROW     = $D85D          ; CGB: rows of vshow_own's buffer built ahead (vpre)
+OAM_CLEAN  = $D85E          ; oamconv_b: no sprite slot invalidated since its last run (1)
 VSHOW_P    = $CCDF          ; CGB: a masked load to show in the next frame wait (rendering on)
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
@@ -2170,6 +2171,8 @@ rt_ppu_w7g: push af
             ld l, a                         ;   OAM conversion
             ld h, high(SLOT_KEY)
             ld [hl], $FF
+            xor a
+            ld [OAM_CLEAN], a
             jr .done
 .nt:        cp $3F
             jr z, .pal

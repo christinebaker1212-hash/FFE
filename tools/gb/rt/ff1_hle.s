@@ -242,6 +242,8 @@ hle_chr_pages:
             ld l, a
             ld h, high(SPR_SLOT)
             ld b, 16
+            xor a
+            ld [OAM_CLEAN], a
 .fsl:       ld a, [hl+]
             cp $FF
             jr z, .fsn
@@ -456,6 +458,8 @@ hle_spr_tile:
             ld l, a                         ;   OAM conversion
             ld h, high(SLOT_KEY)
             ld [hl], $FF
+            xor a
+            ld [OAM_CLEAN], a
 .x:         xor a
             ld [$4000], a
             pop hl

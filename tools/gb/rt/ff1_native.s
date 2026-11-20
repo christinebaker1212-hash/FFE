@@ -4620,9 +4620,144 @@ vclear_b:   xor a
 ; view: GB y = NES y + 17 - cam_y * 8 (shown from -16), x = NES x + 8 - cam_x * 8 (from
 ; -8), its tile in a GB sprite slot (loaded on first use, coded for its palette), the
 ; attributes; a full GB table (40) ends the scan.
+OC_HDR     = $A6C0          ; (cart RAM bank 3) oamconv_b's last input: page, cam_x, cam_y,
+OC_COPY    = $A700          ;   SPAL_KEY 0-3; the NES OAM page (256)
 oamconv_b:  and $07
             add a, high(NES_RAM)
             ld h, a
+            ld a, 3                         ; the same input as last time (page, camera,
+            ld [$4000], a                   ;   codings, the entries in use; no slot changed
+            ld de, OC_HDR                   ;   since, oam_clean): nothing to do
+            ld a, [OAM_USED]                ; (few sprites last time: converting costs less
+            cp 6                            ;   than comparing; the copy is left invalid)
+            jr c, .pl
+            ld a, [OAM_CLEAN]
+            and a
+            jr z, .sv
+            ld a, [de]
+            cp h
+            jr nz, .sv
+            inc e
+            ldh a, [cam_x]
+            ld b, a
+            ld a, [de]
+            cp b
+            jr nz, .sv
+            inc e
+            ldh a, [cam_y]
+            ld b, a
+            ld a, [de]
+            cp b
+            jr nz, .sv
+            inc e
+            ld bc, SPAL_KEY
+            ld a, [bc]
+            ld l, a
+            ld a, [de]
+            cp l
+            jr nz, .sv
+            inc e
+            inc c
+            ld a, [bc]
+            ld l, a
+            ld a, [de]
+            cp l
+            jr nz, .sv
+            inc e
+            inc c
+            ld a, [bc]
+            ld l, a
+            ld a, [de]
+            cp l
+            jr nz, .sv
+            inc e
+            inc c
+            ld a, [bc]
+            ld l, a
+            ld a, [de]
+            cp l
+            jr nz, .sv
+            ld de, OC_COPY                  ; entries: y; the rest while y < $EF
+            ld l, e
+.cm:        ld a, [de]
+            cp [hl]
+            jr nz, .sv
+            cp $EF
+            jr nc, .ch
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .sv
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .sv
+            inc l
+            inc e
+            ld a, [de]
+            cp [hl]
+            jr nz, .sv
+            inc l
+            inc e
+            jr nz, .cm
+            jr .same
+.ch:        ld a, l
+            add a, 4
+            ld l, a
+            ld e, a
+            jr nz, .cm
+.same:      xor a
+            ld [$4000], a
+            ret
+.sv:        ld de, OC_HDR                   ; keep this input
+            ld a, h
+            ld [de], a
+            inc e
+            ldh a, [cam_x]
+            ld [de], a
+            inc e
+            ldh a, [cam_y]
+            ld [de], a
+            inc e
+            ld bc, SPAL_KEY
+            ld a, [bc]
+            ld [de], a
+            inc e
+            inc c
+            ld a, [bc]
+            ld [de], a
+            inc e
+            inc c
+            ld a, [bc]
+            ld [de], a
+            inc e
+            inc c
+            ld a, [bc]
+            ld [de], a
+            ld de, OC_COPY
+            ld l, e
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            jr nz, .cp
+            dec h
+            ld a, 1
+            jr .pk
+.pl:        xor a
+.pk:        ld [OAM_CLEAN], a
+            xor a
+            ld [$4000], a
             ldh a, [oam_frame]
             inc a
             ldh [oam_frame], a
@@ -9381,6 +9516,14 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
             ld a, PF_BANK                   ; (the helpers come back to code_bank)
             ldh [code_bank], a
             call .st                        ; C = the increment, D = the fast-write state
+            bit 7, d                        ; fast: a loop per row mode (the mode changes
+            jr nz, .lp                      ;   only by control codes, which end the run)
+            ld a, [EX_RAM]
+            and a
+            jp z, .q0
+            dec a
+            jp z, .q1
+            jp .q2
 .lp:        ld hl, NES_RAM + $3E            ; (in the loop: B temporary, C = increment,
             ld a, [hl+]                     ;   D = state, E = X)
             ld h, [hl]
@@ -9559,8 +9702,15 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
             and a
             ret nz
             ld d, 1
-            ret
+            jr .s5
 .s4:        ld d, 0
+.s5:        ld a, [NES_RAM + $55]           ; ($55 stays the same through the run: INC $54
+            and $3F                         ;   does not carry into it)
+            cp $20
+            jr c, .s6
+            bit 2, a
+            ret z
+.s6:        ld d, $80                       ; (not nametable 0's cells)
             ret
 .fp:        bit 7, d                        ; tile B at A:L (PPU address, high byte A) when it is
             jr nz, .fn                      ;   a map cell of nametable 0 and D allows: NC;
@@ -9593,6 +9743,165 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
             ret
 .fn:        scf
             ret
+.get:       ld hl, NES_RAM + $3E            ; A = the byte at ($3E)
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, h
+            cp $20
+            jr c, .gram
+            cp $60
+            jr c, .grom
+            cp $80
+            jr nc, .grom
+            add a, $40                      ; save RAM $6000 -> $A000
+            ld h, a
+            ld a, [hl]
+            ret
+.gram:      and $07
+            or high(NES_RAM)
+            ld h, a
+            ld a, [hl]
+            ret
+.grom:      call nes_rd
+            ld a, l
+            ret
+.adv:       ld hl, NES_RAM + $3E            ; INC $3E / $3F, INC $54; a letter written (D bit 6)
+            inc [hl]
+            jr nz, .av
+            inc l
+            inc [hl]
+.av:        ld hl, NES_RAM + $54
+            inc [hl]
+            set 6, d
+            ret
+.q0:        call .get                       ; mode 0 (D < $80): Y = $FF at $55:$54 and the
+            cp $48                          ;   letter one increment on, both map cells of
+            jr c, .q0x                      ;   nametable 0 ($55 checked by .st)
+            ld b, a
+            ld a, [NES_RAM + $54]
+            ld l, a
+            add a, c
+            jr c, .fs                       ; (the second cell past this 256: general path)
+            ld e, a                         ; (E = its low byte)
+            ld a, [NES_RAM + $55]
+            and 3
+            cp 3
+            jr nz, .q0k
+            ld a, e
+            cp $C0
+            jr nc, .fs                      ; (attributes)
+            ld a, 3
+.q0k:       add a, high(NT_SH)
+            ld h, a
+            ld [hl], $FF                    ; shadow: Y, the letter
+            ld l, e
+            ld [hl], b
+            bit 0, d
+            jr nz, .q0m
+            add a, $98 - high(NT_SH)        ; GB map: the letter, Y
+            ld h, a
+            ld [hl], b
+            ld a, [NES_RAM + $54]
+            ld l, a
+            ld [hl], $FF
+            jr .q0n
+.q0m:       ld a, 1
+            ld [MAP_RB], a                  ; (masked: the GB map rebuilt when shown)
+.q0n:       call .adv
+            jr .q0
+.fs:        ld a, b                         ; (a letter for the general path)
+            jp .rd
+.q0x:       bit 6, d                        ; the last letter's state: X = its $54, v = that
+            jp z, .end                      ;   + 2 increments, C = 1
+            push af
+            ld a, [NES_RAM + $54]
+            dec a
+            ld e, a
+            ld l, a
+            ld a, c
+            add a, a
+            add a, l
+.fv:        ldh [ppu_vl], a
+            ld a, [NES_RAM + $55]
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            ld hl, sp + 4                   ; (the flags out: under AF and the code bank)
+            set 4, [hl]
+.fz:        xor a                           ; ($2002 read: vblank flag and latch cleared)
+            ldh [vbl_flag], a
+            ldh [ppu_latch], a
+            inc a                           ; DMG: the map is scanned when the LCD goes on
+            ldh [dmg_scan], a
+            pop af
+            jp .end
+.q1:        call .get                       ; mode 1: the letter at $55:$54
+            cp $48
+            jr c, .q1x
+            ld b, a
+            ld a, [NES_RAM + $54]
+            ld l, a
+.fw:        ld a, [NES_RAM + $55]           ; (letter B at cell low L, $55's 256)
+            and 3
+            cp 3
+            jr nz, .q1k
+            ld a, l
+            cp $C0
+            jr nc, .fs
+            ld a, 3
+.q1k:       add a, high(NT_SH)
+            ld h, a
+            ld [hl], b
+            bit 0, d
+            jr nz, .q1m
+            add a, $98 - high(NT_SH)
+            ld h, a
+            ld [hl], b
+            jr .q1n
+.q1m:       ld a, 1
+            ld [MAP_RB], a
+.q1n:       call .adv
+            ld a, [EX_RAM]                  ; (back to this mode's loop)
+            dec a
+            jr z, .q1
+            jr .q2
+.q1x:       bit 6, d                        ; X = the last letter's $54, v = that + the
+            jp z, .end                      ;   increment, C = 1
+            push af
+            ld a, [NES_RAM + $54]
+            dec a
+            ld e, a
+            add a, c
+            jr .fv
+.q2:        call .get                       ; else: the letter at $55:$54 + $20 (the ADC
+            cp $48                          ;   with no carry: C = 0, V = 0)
+            jr c, .q2x
+            ld b, a
+            ld a, [NES_RAM + $54]
+            add a, $20
+            jr c, .fs                       ; (the carry: general path)
+            ld l, a
+            jr .fw
+.q2x:       bit 6, d                        ; X = the last letter's $54 + $20, v = that +
+            jp z, .end                      ;   the increment; C = 0, V = 0
+            push af
+            xor a
+            ldh [vfl], a
+            ld hl, sp + 4
+            res 4, [hl]
+            ld a, [NES_RAM + $54]
+            add a, $1F
+            ld e, a
+            ld l, a
+            ld a, c
+            add a, l
+            ldh [ppu_vl], a
+            ld a, [NES_RAM + $55]
+            adc a, 0
+            and $3F
+            ldh [ppu_vh], a
+            jr .fz
 .put1:      ld b, h                         ; LDX $2002 / $2006 = A / $2006 = L / $2007 = H.
             and $3F                         ;   Out: E = L (X), BC = 0, D = 0
             ld d, a                         ; (D = the high byte, 6 bits)

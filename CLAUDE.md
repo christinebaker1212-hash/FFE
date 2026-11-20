@@ -848,8 +848,12 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   (bank-60 routine called through hle_pfj, no bank-0 stub). Native: DrawBox rows fix:E0FD
   (`dbox_b`, declines when $37 asks for a row per frame), menu text printer loop c62:DECE with
   the English row modes (`txrun_b`, checks hoisted out of the letter loop), PPU record lists
-  b21:80AE (`rlist_b`, name entry grid). checkall 62/62. Lag: CGB 9 -> 8 (the class-select
-  redraw 1284 now in time), DMG ~160.
+  b21:80AE (`rlist_b`, name entry grid). Then the text loop per row mode with $55 checked
+  once per run (`txrun_b` .q0-.q2), and the OAM conversion skipped when its input (page,
+  camera, SPAL_KEY, the entries in use) equals the last one and no slot was invalidated
+  (`OAM_CLEAN`; copy in cart RAM bank 3 `OC_HDR`/`OC_COPY`; only when the last conversion
+  used 6+ sprites). checkall 62/62. **Lag on the 7650-wait script: CGB 0** (GB 7675 frames
+  for the NES's 7677), DMG ~157.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
