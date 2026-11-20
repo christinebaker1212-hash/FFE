@@ -739,6 +739,41 @@ cp_hl:      ld a, e
             ret
 
 
+; fix:F496 / F4B1 (boot, screen clears): STA $2007 / INY / BNE / DEX / BNE with Y = 0: X pages
+; of A through hle_fill (whole tiles / nametable cells in bulk). Exit: X = Y = 0, Z = 1, N = 0,
+; A and carry kept.
+hle_fillxy: push af
+            ld a, c
+            and a
+            jr nz, .gen
+            ld a, e
+            and a
+            jr z, .gen
+.pg:        pop af
+            push af
+            push de
+            ld e, 0
+            call hle_fill
+            pop de
+            dec e
+            jr nz, .pg
+            jr .x
+.gen:       pop af                          ; (Y != 0 or X = 0: as the NES, byte by byte)
+            push af
+            call rt_ppu_w7
+            inc c
+            jr nz, .gen
+            dec e
+            jr nz, .gen
+.x:         xor a
+            ldh [nzv], a
+            pop af
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1
+            ld e, 0
+            ret
+
 ; b11:9D68 "fill ppu" (STA $2007 / DEX / BNE: A = value, X = count, 0 = 256): whole tiles of a
 ; pattern table go in at once (both planes the constant: every GB byte = the value), marked
 ; as hle_ppucopy marks them; anything else byte by byte through rt_ppu_w7. Returns X = 0,
@@ -909,7 +944,29 @@ hle_fill:   ldh [tmp_lo], a
             jr nz, .gen
             ld a, h
             cp $C0
+            jr c, .ntok
+            ld a, d                         ; into the attribute bytes: the cells before
+            cp 3                            ;   $3C0 in bulk (count $3C0 - start), the rest
+            jr c, .s2                       ;   byte by byte
+            ld a, l
+            cp $C0
             jr nc, .gen
+            ld a, $C0
+            sub l
+            jr .s3
+.s2:        ld a, $C0                       ; (start $2C0-$2FF: $100 - low + $C0)
+            sub l
+.s3:        ld h, a                         ; H = cells, E = the rest
+            ld a, e
+            sub h
+            push af
+            ld e, h
+            call hle_fill_nt
+            pop af
+            ld e, a
+            and a
+            jr z, .done
+            jr .gen
 .ntok:      call hle_fill_nt
             jr .done
 .gen:       ldh a, [tmp_lo]
