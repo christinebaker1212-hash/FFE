@@ -1052,6 +1052,12 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   ~4), battle start 4, field entry 1, battle rounds ~19 (single heavy frames, 20-45% over:
   panel rows, text, OAM conversion, music), prologue 1.
 
+- OAM conversion: an incremental conversion whose changed entry needs a slot loads it there
+  (within the per-frame cap; a stale slot kept when its bytes are unchanged) instead of
+  converting the whole page; the slots in use are stamped first, only when a slot is
+  allocated (`.stmp`, once per conversion). Visible sprites identical at 263 (DMG) / 168 (CGB)
+  points; battle RAM identical. DMG 40 -> 39, CGB 0.
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette

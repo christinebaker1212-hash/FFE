@@ -10859,6 +10859,7 @@ OC_COPY    = $A700          ;   SPAL_KEY 0-3; the NES OAM page (256)
 OC_POS     = $A800          ;   GB slot of each NES entry with a GB entry (index = entry offset)
 OC_LIST    = $A6C8          ;   changed entries (occmp, up to 16)
 OC_DF      = $A6D8          ;   a slot load deferred in this conversion (whole conversions)
+OC_ST      = $A6D9          ;   the slots in use stamped in this incremental conversion
 oamconv_b:  and $07
             add a, high(NES_RAM)
             ld h, a
@@ -11364,6 +11365,8 @@ oamconv_b:  and $07
             sub low(OC_LIST)
             jr z, .same
             ldh [o_cx], a                   ; entries left
+            xor a
+            ld [OC_ST], a
             ld a, low(OC_LIST)
             ldh [o_y], a                    ; next one in the list
             ldh a, [cam_y]
@@ -11493,15 +11496,15 @@ oamconv_b:  and $07
             ld h, high(SPR_SLOT)
             ld a, [hl]
             cp $FF
-            jr z, .vab
+            jr z, .val                      ; (not resident: a slot now, within the cap)
             ld c, a
             or $80
             ld l, a
             ld h, high(SLOT_KEY)
             ld a, b
             cp [hl]
-            jr nz, .vab
-            ld h, high(SLOT_STAMP)
+            jr nz, .vld                     ; (another coding: loaded again, or a stale key)
+.vst:       ld h, high(SLOT_STAMP)
             ldh a, [oam_frame]
             ld [hl], a
             ld a, c
@@ -11519,11 +11522,82 @@ oamconv_b:  and $07
             pop hl
             pop de
             ret
+.val:       call sl_chk
+            jr c, .vab
+            call .stmp                      ; (first time in this conversion: the slots in use
+            ld a, b                         ;   stamped, so the new slot is none of them)
+            ldh [o_key], a
+            call spr_alloc
+            ld c, a
+            jr .vre
+.vld:       ld a, [hl]                      ; stale with this coding: the same bytes?
+            xor b
+            cp $80
+            jr nz, .vl2
+            ldh a, [o_t]
+            call spr_mat
+            ld a, 3
+            ld [$4000], a
+            ldh a, [wtmp]
+            and a
+            jr z, .vl2
+            ld [hl], b
+            jr .vst
+.vl2:       call sl_chk
+            jr c, .vab
+            ld a, b
+            ldh [o_key], a
+            call spr_load
+.vre:       ld a, 3                         ; (the load left cart RAM bank 0 on)
+            ld [$4000], a
+            ld a, c
+            or $80
+            ld l, a
+            jr .vst
 .vab:       pop bc
             pop hl
             pop de
             pop af                          ; (the return address)
             jr .ab
+; the GB table's slots stamped with a new frame number (once per conversion: OC_ST). Keeps
+; all but A, F.
+.stmp:      ld a, [OC_ST]
+            and a
+            ret nz
+            inc a
+            ld [OC_ST], a
+            push bc
+            push de
+            push hl
+            ldh a, [oam_frame]
+            inc a
+            ldh [oam_frame], a
+            ld d, a
+            ld hl, OAM_SH
+            ld e, 40
+.sp:        ld a, [hl+]
+            and a
+            jr z, .sn
+            inc l
+            ld a, [hl]
+            push hl
+            or $80
+            ld l, a
+            ld h, high(SLOT_STAMP)
+            ld [hl], d
+            pop hl
+            inc l
+            inc l
+            jr .sc
+.sn:        inc l
+            inc l
+            inc l
+.sc:        dec e
+            jr nz, .sp
+            pop hl
+            pop de
+            pop bc
+            ret
 
 ; A = p (the lowest GB slot in use; 160: none): the slots below that the last conversion
 ; used are hidden; OAM_USED = the count
