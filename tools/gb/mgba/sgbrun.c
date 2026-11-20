@@ -16,6 +16,7 @@
 #include <mgba/core/timing.h>
 #include <mgba/core/config.h>
 #include <mgba/internal/gb/gb.h>
+#include <mgba/internal/sm83/sm83.h>
 #include <mgba-util/vfs.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -45,6 +46,28 @@ static void save_ppm(const char* path, const color_t* buf, unsigned w, unsigned 
 		fwrite(px, 1, 3, f);
 	}
 	fclose(f);
+}
+
+/* env SGBRUN_VCHK=1 (Lot Check, docs/gb-release-checks.md 2.2): every CPU write to VRAM
+   ($8000-$9FFF) in mode 3 or to OAM ($FE00-$FE9F) in mode 2 / 3 with the LCD on is counted;
+   the first 40 are printed (VCHK bank:PC address mode LY). DMA / HDMA do not go through it. */
+static void (*vchk_store8)(struct SM83Core*, uint16_t, int8_t);
+static struct GB* vchk_gb;
+static unsigned vchk_n, vchk_shown;
+static void vchk_store(struct SM83Core* cpu, uint16_t a, int8_t v) {
+	struct GB* gb = vchk_gb;
+	if (gb->memory.io[0x40] & 0x80) {
+		int m = gb->video.mode;
+		if ((a >= 0x8000 && a < 0xA000 && m == 3) || (a >= 0xFE00 && a < 0xFEA0 && (m == 2 || m == 3))) {
+			vchk_n++;
+			if (vchk_shown < 40) {
+				vchk_shown++;
+				fprintf(stderr, "VCHK %02X:%04X wr %04X mode %d LY %d\n", cpu->pc < 0x4000 ? 0 : gb->memory.currentBank,
+				        cpu->pc, a, m, gb->memory.io[0x44]);
+			}
+		}
+	}
+	vchk_store8(cpu, a, v);
 }
 
 int main(int argc, char** argv) {
@@ -97,6 +120,11 @@ int main(int argc, char** argv) {
 	core->setVideoBuffer(core, buf, W);
 	if (!mCoreLoadFile(core, argv[1])) { fprintf(stderr, "cannot load %s\n", argv[1]); return 1; }
 	core->reset(core);
+	if (getenv("SGBRUN_VCHK")) {
+		vchk_gb = (struct GB*) core->board;
+		vchk_store8 = vchk_gb->cpu->memory.store8;
+		vchk_gb->cpu->memory.store8 = vchk_store;
+	}
 	if (sram_path) {
 		FILE* sf = fopen(sram_path, "rb");
 		if (!sf) { fprintf(stderr, "no sram file\n"); return 1; }
@@ -281,6 +309,7 @@ int main(int argc, char** argv) {
 	printf("frames %d, video %ux%u, NES frame waits %u, KEY1 %02X\n", frames, w, h, n, core->busRead8(core, 0xFF4D));
 	for (int k = 0; k < ncall; k++) printf("C %02X:%04X %u\n", (callr[k] >> 16) & 0xFF, callr[k] & 0xFFFF, callw[k]);
 	if (prof || prof2) for (int k = 0; k < nprof; k++) printf("%s %02X:%04X %u\n", (profs[k] >> 24) ? "S" : "P", (profs[k] >> 16) & 0xFF, profs[k] & 0xFFFF, proff[k]);
+	if (getenv("SGBRUN_VCHK")) printf("VCHK total %u\n", vchk_n);
 	core->deinit(core);
 	return 0;
 }

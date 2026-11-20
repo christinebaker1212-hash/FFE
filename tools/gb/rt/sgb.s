@@ -609,6 +609,8 @@ sgb_build:  xor a
             jr nz, .dn
             ld c, 2                         ; ATTR packets (sgb_nattr): all if any differs
             ldh a, [sgb_nattr]
+            and a                           ;   (none: nothing to compare; the loop below
+            jr z, .dn                       ;   would run 254 times)
             add a, 2
             ld e, a
 .d3:        call pk_diff
@@ -642,8 +644,10 @@ sgb_build:  xor a
             ld [$4000], a
             ret
 
-; C = packet: NZ if NEXT and SENT differ (RAM bank 2 on)
+; C = packet: NZ if NEXT and SENT differ (RAM bank 2 on). Keeps BC, DE, HL (the callers'
+; loops count in E).
 pk_diff:    push bc
+            push de
             push hl
             ld a, c
             swap a
@@ -661,6 +665,7 @@ pk_diff:    push bc
             dec b
             jr nz, .l
 .x:         pop hl
+            pop de
             pop bc
             ret
 
@@ -1214,13 +1219,16 @@ attr_mask:  push bc
             ldh a, [sgb_nattr]
             ld b, a
             xor a
+            or b                            ; (none: no bits)
+            jr z, .z
+            xor a
 .l:         scf
             rla
             dec b
             jr nz, .l
             add a, a
             add a, a
-            pop bc
+.z:         pop bc
             ret
 
 ; per-cell palettes (GRID) -> ATTR_BLK packets 2.. of NEXT: the whole screen in the most

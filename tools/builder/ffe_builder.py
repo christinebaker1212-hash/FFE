@@ -63,7 +63,7 @@ def build_ff1(rom, outdir, log):
         run(script_cmd('tools/gb/covall.py', nes, cov), log)
     log('4/4 recompiling for the Game Boy')
     out = os.path.join(outdir, 'Final Fantasy I (English, GB).gb')
-    run(script_cmd('tools/gb/build.py', '--gb', '--nes', nes, '--cov', cov, '--out', out), log)
+    run(script_cmd('tools/gb/build.py', '--gb', '--release', '--nes', nes, '--cov', cov, '--out', out), log)
     log('done: ' + out)
     return out
 

@@ -130,15 +130,19 @@ def ramchk_src():
                 if col[y]: v |= 0x80 >> (x0 + x)
             rows += [v, v]
         out += '    db %s\n' % ', '.join('$%02X' % b for b in rows)
-    out += 'ramchk_font_end:\nramchk_text:\n'
-    lines = ['CARTRIDGE RAM ERROR', '', 'THIS GAME NEEDS', '32 KB OF SAVE RAM', 'IN FOUR BANKS (MBC5)',
-             '', 'THIS CART DOES NOT', 'BANK ITS SAVE RAM.']
-    assert all(len(t) <= 20 for t in lines)
-    for r, t in enumerate(lines):
-        if not t: continue
-        off = 0x9800 + (4 + r) * 32 + (20 - len(t)) // 2
-        out += '    db $%02X, $%02X, %d, %s\n' % (off & 0xFF, off >> 8, len(t), ', '.join(str(chars.index(c)) for c in t))
-    out += '    db 0, 0\n'
+    out += 'ramchk_font_end:\n'
+    def rows(name, lines):                           # (Nintendo's names: "Game Pak", "A Button")
+        assert all(len(t) <= 20 for t in lines)
+        o = name + ':\n'
+        for r, t in enumerate(lines):
+            if not t: continue
+            off = 0x9800 + (4 + r) * 32 + (20 - len(t)) // 2
+            o += '    db $%02X, $%02X, %d, %s\n' % (off & 0xFF, off >> 8, len(t), ', '.join(str(chars.index(c)) for c in t))
+        return o + '    db 0, 0\n'
+    out += rows('ramchk_text', ['GAME PAK RAM ERROR', '', 'THIS GAME NEEDS', '32 KB OF SAVE RAM', 'IN FOUR BANKS (MBC5)',
+                               '', 'THIS GAME PAK DOES', 'NOT BANK ITS RAM.'])
+    out += rows('saverr_text', ['SAVE DATA ERROR', '', 'THE SAVED GAME IS', 'DAMAGED AND CANNOT', 'BE LOADED.', '',
+                               'PRESS THE A BUTTON', 'TO ERASE IT.'])
     return out
 
 
@@ -256,6 +260,8 @@ def main():
     args = sys.argv[1:]
     gb = '--gb' in args
     if gb: args.remove('--gb')
+    release = '--release' in args                    # (docs/gb-release-checks.md 4.3: no test-runner
+    if release: args.remove('--release')             #   input mode in a release ROM)
     name = 'ff1_gb' if gb else 'ff1_en'
     opt = {'--cov': os.path.join(ROOT, 'build', 'cov3' if gb else 'cov2'),
            '--out': os.path.join(ROOT, 'build', name + '.gb'), '--nes': None}
@@ -362,6 +368,23 @@ def main():
         rc.g.idioms[('b12', 0xAE09)] = ('pf:mul8_b', 0xAE2A, 'NZC')           #   shift and add)
     else:
         print('  b12 multiply: code not found, not native')
+    o14 = 14 * 0x4000 - 0x8000                       # b14:ABCE, after FF1's SaveGame: the save
+    if prg[o14 + 0xAB8D:o14 + 0xABD0].hex() == ('bd00609d0064bd00619d0065bd00629d0066bd00639d0067e8d0e5'   # copied
+            'a9558dfe64a9aa8dff64a9008dfd64a20018' '7d00647d00657d00667d0067e8d0f149ff8dfd64a956'):   # to its bank
+        rc.g.idioms[('b14', 0xABCE)] = ('pf:save_commit', 0xABD0, 'NZ')
+    else:
+        print('  b14 SaveGame: code not found, the save not committed to its own bank')
+    o12b = 12 * 0x4000 - 0x8000
+    shuf_ok = (prg[o12b + 0xA169:o12b + 0xA17A].hex() == 'a00db95ba199476888d0f78cf86a8c866b' and
+               prg[o12b + 0xA17A:o12b + 0xA1A4].hex() == 'a9118d8e68a900a20c205dae48a900a20c205daea868aab948'
+               '6848bd4868994868689d4868ce8e68d0db' and prg[o12b + 0xAE5D:o12b + 0xAE7B].hex() ==
+               '8daf68e88eb0688a38edaf688db6682027f2aeb6682009ae8a186daf6860' and
+               prg[fixo + 0x1227:fixo + 0x122A].hex() == '4cdcfc' and prg[fixo + 0x1CDC:fixo + 0x1CE6].hex() ==
+               'ae8a68ee8a68bde6fc60' and ('b12', 0xAE09) in rc.g.idioms)
+    if shuf_ok:                                      # b12:A169, the turn order shuffle (shuf_b)
+        rc.g.idioms[('b12', 0xA169)] = ('pf:shuf_b', 0xA1A4, 'NZCV')
+    else:
+        print('  b12 turn order shuffle: code not found, not native')
     faro = FAR_BANK * 0x2000 - 0xC000                # gb_layout vtext's scan for the frame: LDY #0 /
     pat = bytes.fromhex('a000b18ac9f79004c9ff9005c8c014d0f1')   # LDA ($8A),Y / CMP #$F7 / BCC /
     far = bytes(prg[FAR_BANK * 0x2000:(FAR_BANK + 1) * 0x2000])   # CMP #$FF / BCC / INY / CPY #20
@@ -531,6 +554,12 @@ def main():
     print('  routines copied into calling banks: %d bytes' % getattr(rc, 'clone_bytes', 0))
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in ('runtime.s', 'apu.s', 'ff1_hle.s', 'dmg_shade.s', 'sgb.s'))
     rt = mt_defs + rt
+    if release:
+        test_in = ('            ld a, [TEST_PAD]                ; (test runners: the pad of this NES frame from\n'
+                   '            cp $A5                          ;   cart RAM bank 3 $A000 + NMI_CNT low)\n'
+                   '            jr z, .test\n')
+        assert rt.count(test_in) == 1
+        rt = rt.replace(test_in, '')
     rt += '\nPROW_OFF = NES_RAM + $%04X\n' % prow_off
     rt += '\nsection bank HLE_BANK, $7800\n' + wrow3_src     # (build-time table from the ROM)
     rt += '\nsection bank PF_BANK, $7C00\n' + wrf_src
@@ -543,15 +572,21 @@ def main():
     rt += mtab_src
     rt += '\n' + vwf_tables(prg, far_sym)            # (before ff1_native.s: VW_GR_NES)
     o12 = 12 * 0x4000 - 0x8000                       # b12:AFCB, ecopy_b's index pairs
-    rt += '\nsection bank PF_BANK, $7B20\necopy_t:\n            db ' + ', '.join(
-        '$%02X' % x for x in prg[o12 + 0xAFCB:o12 + 0xAFE3]) + '\n'
     sq = [x * x // 4 for x in range(512)]            # quarter squares for mul8_b (a x b =
     rows = lambda b: '\n'.join('            db ' + ', '.join('$%02X' % v for v in b[i:i + 16])
                                for i in range(0, len(b), 16))   #   sq(a + b) - sq(|a - b|))
+    rngt = prg[fixo + 0x1CE6:fixo + 0x1CE6 + 256]   # shuf_b: FF1's RNG table, its bytes x 13 >> 8,
+    o12 = 12 * 0x4000 - 0x8000                       #   the turn order's start values (b12:A15C)
+    rt += ('\nsection bank PF_BANK, $6600\nSHUF_H:\n%s\n'
+           'section bank PF_BANK, $65F0\nSHUF_I:\n            db %s\n' % (rows([x * 13 >> 8 for x in rngt]),
+                                              ', '.join('$%02X' % x for x in prg[o12 + 0xA15C:o12 + 0xA169])))
+    rt += '\nsection bank PF_BANK, $7B20\necopy_t:\n            db ' + ', '.join(
+        '$%02X' % x for x in prg[o12 + 0xAFCB:o12 + 0xAFE3]) + '\n'
     rt += ('\nsection bank PF_BANK, $7900\nSQ_LO:\n%s\nsection bank PF_BANK, $4600\nSQ_HI:\n%s\n'
            % (rows([v & 255 for v in sq]), rows([v >> 8 for v in sq])))
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ff1_native.s')).read()
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ramchk.s')).read() + '\n' + ramchk_src()
+    rt += '\n' + open(os.path.join(HERE, 'rt', 'lot.s')).read()
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(
         '    db %s\n' % ', '.join(str(shade(c)) for c in range(r, r + 16)) for r in range(0, 64, 16))
     src_all = rt + '\n' + shade_src + '\n' + nes_rgb_src() + '\n' + border_src() + '\n' + prog
@@ -576,7 +611,7 @@ def main():
     top = max(r.banks) + 1
     size = 2
     while size < top: size *= 2
-    rom = make_rom(r.banks, 'FF1 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x03, sgb=True,
+    rom = make_rom(r.banks, 'FF1 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x05, sgb=True,
                    cgb=0x80)                          # dual-mode: DMG / SGB / CGB
     open(opt['--out'], 'wb').write(rom)
     open(opt['--out'][:-3] + '.sym', 'w').write(r.sym_file())

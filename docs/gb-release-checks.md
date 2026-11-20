@@ -21,7 +21,8 @@ State: `asm_sm83.make_rom` writes `NINTENDO_LOGO`. Verify against Pan Docs.
 
 1.2 **Checksums**: the header complement checksum at $014D (over $0134-$014C) and the
 16-bit global checksum at $014E-$014F must match the binary exactly.
-State: `make_rom` computes both. Add an independent check of the final ROM in the build.
+State: `make_rom` computes both; checked independently on the FF1 ROM (2026-11-20): both
+match. Still to do: add that check to the build itself.
 
 1.3 **Hardware and memory flags** must match the real cartridge board:
 - cartridge type $0147 (MBC1/2/3/5, RTC, Rumble);
@@ -31,7 +32,8 @@ State: `make_rom` computes both. Add an independent check of the final ROM in th
 
 State, FF1:
 - $0147 = $1B (MBC5+RAM+BATTERY).
-- RAM code $03 (32 KB, 4 banks).
+- RAM code $05 (64 KB, 8 banks; since 2026-11-20: banks 0-3 runtime and NES work RAM,
+  bank 4 the save, see 2.3).
 - ROM size from the bank count (2 MB).
 - SGB $03, CGB $80.
 - Licensee: old code $33, new code "00".
@@ -49,13 +51,15 @@ State: `make_rom` fills the image with $FF before the banks go in. Two things ne
 2.1 **LCD off only in V-Blank**: never clear LCDC bit 7 outside V-Blank. Doing so mid-frame
 can cause a burn line and can damage the screen.
 
-State:
-- DMG deferred switch-off turns the LCD off in the vblank handler (`dmg_loff`).
-- SGB waits for vblank in `rt_ppu_w1`.
-- CGB masked loads keep the LCD on.
+State: audited 2026-11-20. Every write that clears LCDC bit 7 waits for LY 144-153 first:
+- boot;
+- `rt_ppu_w1`: SGB, or DMG already in V-Blank;
+- `dmg_loff`: the deferred DMG switch-off in the vblank handler;
+- the SGB border transfer;
+- the save error screen.
 
-Still to audit: every write to LCDC in the runtime (boot, RAM-check screen, SGB border VRAM
-transfer, test paths).
+CGB masked loads keep the LCD on. All other LCDC writes change only window/sprite bits with
+the LCD on.
 
 2.2 **VRAM / OAM access windows**: write VRAM ($8000-$9FFF) and OAM ($FE00-$FE9F) only in
 H-Blank or V-Blank, or with the LCD off (switched off in V-Blank). Never write during mode 3.
@@ -65,9 +69,12 @@ State:
 - CGB HDMA runs at LY 144-151.
 - OAM is written by DMA in vblank.
 
-To do: audit every direct VRAM/OAM write, then run the game under an emulator that reports
-inaccessible VRAM/OAM writes (e.g. a debugger with access breakpoints) through all
-checkall/lagcheck scripts on DMG and CGB, with zero reports.
+Checker: `build/sgbrun` with env `SGBRUN_VCHK=1` wraps mGBA's CPU store function and counts
+every CPU write to VRAM in mode 3, or to OAM in mode 2/3, with the LCD on. Results
+(2026-11-20) over the whole 7650-wait battle script (new game, field, battle): 0 on DMG,
+0 on CGB, 0 on SGB (8711 waits).
+
+Still to do: the same over the field / shop / menu scripts, and on SameBoy.
 
 2.3 **Battery-backed save RAM protection**:
 - Disable cart RAM (write $00 to $0000-$1FFF on MBC carts) right after every read/write, so
@@ -76,31 +83,65 @@ checkall/lagcheck scripts on DMG and CGB, with zero reports.
   silently overwritten or reverted: show an explicit on-screen error message before the
   memory is initialised.
 
-State: not met. The runtime enables cart RAM once at boot (`runtime.s`, `ld a, $0A /
-ld [$0000], a`) and leaves it on. Two layouts depend on that:
+State (2026-11-20): partly met, by design.
+
+Done (`rt/lot.s`):
+- The committed save lives in its own cart RAM bank (bank 4). It has a 16-bit sum, the sum's
+  complement and a magic, written last. The bank is mapped only while the boot checks or
+  loads it, and while `save_commit` copies FF1's new save into it right after FF1's own
+  save routine (b14:ABCE). The copy goes 32 bytes at a time with interrupts off.
+- At boot: a sealed copy whose sum matches is loaded. A damaged one shows "SAVE DATA ERROR
+  ... PRESS THE A BUTTON TO ERASE IT." and is erased only after the A Button. With no copy
+  yet, a save FF1 left in bank 0 is taken over.
+- On a Game Pak with only 32 KB (no separate bank 4) the save stays in bank 0, as before.
+
+Tested in PyBoy: taking over an old save, loading a good one, the damaged case (message
+shown, nothing erased before the A Button), and an inn save copied with a valid sum (RAM
+still identical to the NES).
+
+Not met, and cannot be on DMG: switching cart RAM off after every access. The runtime
+enables cart RAM once at boot (`runtime.s`, `ld a, $0A / ld [$0000], a`) and leaves it on.
+Two layouts depend on that:
 - bank 0 holds the NES save/work RAM ($6000-$7FFF), which the recompiled game reads and
   writes all the time;
 - banks 1-3 hold runtime shadows: BG/sprite tile shadows, OAM conversion state, buffers.
 
-Meeting this rule needs a design change. Options:
-- move the working areas that are not save data out of cart RAM;
-- keep the save data in a separate area that is enabled only around FF1's own save/load.
+The DMG has only 8 KB of WRAM, so this data cannot move out of cart RAM. The protection is
+therefore the separate save bank: a stray write at power-off lands in the bank that is
+mapped (normally bank 0), never in the save's bank.
 
-The same applies to FF2/FF3. FF1's own save checksum check falls back to "no save"
-silently; the GB build must add the error message.
+FF2/FF3: design the save the same way from the start.
 
 ## 3. Software stability and system state
 
 3.1 **Soft reset**: A + B + Start + Select resets the game cleanly. No sound registers left
 stuck, and no save RAM write in progress gets corrupted.
-State: not implemented.
+
+State: done (2026-11-20, `read_buttons` -> `soft_reset` in `rt/lot.s`). It turns interrupts
+off, switches sound off (NR52 = 0 clears every sound register), selects cart RAM bank 0 and
+switches RAM off, waits until the four buttons are no longer all held, then runs the boot
+code again. Boot switches the LCD off only in V-Blank, and skips that wait when the LCD is
+already off. On a Color, boot no longer toggles double speed when it is already on. Reset is
+never reached during a save copy, because no joypad read happens there.
+
+Tested in PyBoy, DMG and CGB: one reset; the frame counter starts over and the game runs on.
+The double-speed path on a real Color is still to test (PyBoy has no double speed).
 
 3.2 **Uninitialised memory**: WRAM, HRAM and save RAM hold random values at cold boot.
 Initialisation must clear all working memory and set all hardware registers explicitly.
 
-State: to audit. One concrete risk: the test-runner input mode is switched on by the value
-$A5 at `TEST_PAD` ($D83E). Random WRAM at power-on could switch it on by chance. Clear it at
-boot, or remove the mode from release builds.
+State (2026-11-20):
+- Boot already cleared VRAM, WRAM (not the stack page), OAM and HRAM, so random WRAM cannot
+  switch on the test-runner mode (`TEST_PAD` is cleared). Release builds also leave that
+  mode out (4.3).
+- Boot now also clears the runtime's cart RAM banks 1-3 (`save_boot`).
+- Bank 0 (NES $6000-$7FFF) is battery-backed on the NES as well, and FF1 manages it itself,
+  so it is left alone.
+
+Clearing bank 2 exposed a real bug: the SGB packet compare (`pk_diff`) overwrote the caller's
+loop counter, so the loop's length depended on leftover bank-2 bytes. With bank 2 cleared,
+the SGB game slowed to a crawl at the class select. Fixed (pk_diff keeps DE). The zero-count
+cases of the attribute packet loops are guarded too.
 
 3.3 **Cross-hardware compatibility**:
 - Dual-mode titles (FF1, FF2: $0143 = $80) must run with no graphical glitches, speed
@@ -120,9 +161,9 @@ ROMs.
 4.1 **Exact hardware names** in all in-game text and manuals: "Game Boy", "Game Boy
 Advance", "Game Link Cable", "Control Pad" (not "D-pad" or "directional pad"), "Game Pak"
 (not "cartridge").
-State: the boot RAM-check screen (`build.ramchk_src`) says "CARTRIDGE RAM ERROR" and
-"THIS CART ..." and must say "Game Pak". Check all other runtime/builder text the player can
-see.
+State: the boot RAM-check screen now says "GAME PAK RAM ERROR" / "THIS GAME PAK DOES NOT
+BANK ITS RAM." (2026-11-20), and the save error says "PRESS THE A BUTTON". The game's own
+text is FF1's translation and names no hardware. Still to check: the builder's messages.
 
 4.2 **CGB colour use**: Game Boy Color modes must use colour meaningfully, not a single
 monochrome tint.
@@ -132,11 +173,18 @@ way for FF2/FF3.
 4.3 **No undisclosed code**: any debug menu, cheat code, sound test or hidden routine left in
 the final binary must be fully documented. Undocumented code means automatic rejection.
 
-Known items in the FF1 ROM to remove from release builds or document:
-- the test-runner pad mode (`TEST_PAD`, pads read from cart RAM bank 3);
-- the `rst $38` trap (`rst38_trap`) and its fault dump at `DBG`;
-- the bank-ID bytes at $7FFE;
-- the `GB_DLG_TEST` / `GB_SND_MASK` build options (must be off).
+Known items in the FF1 ROM, and how each is handled:
+- **Test-runner pad mode** (`TEST_PAD` = $A5: pads read from cart RAM bank 3): left out of
+  release builds (`build.py --release`; the builder passes it).
+- **`rst $38` trap** (`rst38_trap`): if execution runs into $FF bytes it records the stack at
+  `DBG` ($D820) and stops. This is a crash handler, documented here; it is never reached in
+  normal play.
+- **Bank-ID bytes** ($A5, bank number) at $7FFE of every code/runtime bank: data, read by
+  `bg_mat` to come back to the mapped bank.
+- **`GB_DLG_TEST` / `GB_SND_MASK` / `GB_MDF` / `GB_MUS` / `GB_MAPPRE` / `GB_DYNB` /
+  `GB_CLONE`**: build-time options for tests and comparisons. Release builds use the
+  defaults; `GB_DLG_TEST` and `GB_SND_MASK` must not be set.
+- **Soft reset and the save error screen**: documented in 3.1 and 2.3.
 
 ## Release gate
 

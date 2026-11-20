@@ -127,8 +127,8 @@ CAM_Y      = 48
 
 section hram, $FF80
 hram_dma:   ds 10
-apq_n:      ds 1                            ; sound queue (apu.s): count (bits 0-1), head (bit 7)
-apq_vbl:    ds 1                            ;   VBL_CNT at the last frame applied
+apq_n:      ds 1                            ; (spare)
+save_sep:   ds 1                            ; 1: the save has its own cart RAM bank (SAVE_BANK)
 sv_a:       ds 1
 fc_bank:    ds 1
 code_bank:  ds 1
@@ -302,10 +302,13 @@ section bank 0, $0150
 boot:       di
             ld sp, STACK_TOP
             push af                         ; A = $11 on a Game Boy Color
+            ldh a, [$FF40]                  ; (the LCD off only in the V-Blank; already off
+            bit 7, a                        ;   after a soft reset during a load: LY stays 0)
+            jr z, .lo
 .wv:        ldh a, [$FF44]
             cp 144
             jr c, .wv
-            xor a
+.lo:        xor a
             ldh [$FF40], a                  ; LCD off
             ld hl, $8000                    ; clear VRAM
             ld bc, $2000
@@ -326,37 +329,9 @@ boot:       di
             pop af
             cp $11
             jr nz, .dmg
-            ld a, 1
-            ldh [is_cgb], a
-            ld a, 1                         ; VRAM bank 1 (attributes) cleared too
-            ldh [$FF4F], a
-            ld hl, $8000
-            ld bc, $2000
-            call memclr
-            ld hl, $9C00                    ; window map (the mask): tile 0 of VRAM bank 1
-            ld bc, $400                     ;   (cleared above), palette 7: black
-.wm:        ld a, $0F
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .wm
-            xor a
-            ldh [$FF4F], a
-            ld a, $B8                       ; BG palette 7 (the mask): black
-            ldh [$FF68], a
-            xor a
-            ld b, 8
-.p7:        ldh [$FF69], a
-            dec b
-            jr nz, .p7
-            ld a, 1                         ; double speed (KEY1 + STOP, interrupts off)
-            ldh [$FF4D], a
-            xor a
-            ldh [$FFFF], a
-            ld a, $30
-            ldh [$FF00], a
-            stop
+            ld a, DYN_BANK                  ; (Color set-up: lot.s, cgb_boot)
+            ld [$2000], a
+            call cgb_boot
             jr .booted
 .dmg:       call dmg_init
             call sgb_detect
@@ -381,6 +356,7 @@ boot:       di
             ld a, DYN_BANK                  ; cart RAM banks 0-3 separate? (else a message)
             ld [$2000], a
             call ramchk
+            call save_boot                  ; (lot.s: runtime banks cleared, the save checked)
             ld hl, SPR_SLOT                 ; sprite tiles 0-127 resident in slots 0-127
             xor a
 .sm:        ld [hl+], a
@@ -2845,6 +2821,8 @@ read_buttons:                               ; A = A B Sel St U D L R (bit 0..7),
             cpl
             and $0F
             ld l, a                         ; A B Sel St
+            cp $0F                          ; all four: soft reset (lot.s)
+            jp z, sreset0
             ld a, $30
             ldh [$FF00], a
             ld a, l
@@ -2871,6 +2849,9 @@ read_buttons:                               ; A = A B Sel St U D L R (bit 0..7),
             ld [$4000], a
             ld a, l
             ret
+sreset0:    ld a, DYN_BANK                  ; A + B + Select + Start (read_buttons): lot.s
+            ld [$2000], a
+            jp soft_reset
 rt_io_r4015:
 rt_io_r4017:
 rt_io_rnone:

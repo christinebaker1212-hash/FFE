@@ -10508,6 +10508,7 @@ btx_b:      push af                         ; [SP + 2]: the flags out (C)
             push af
             ld a, PF_BANK
             ldh [code_bank], a
+            jp btx_f
 .lp:        ld hl, NES_RAM + $90
             ld a, [hl+]
             ld h, [hl]
@@ -10816,6 +10817,118 @@ bnm_b:      push af                         ; [SP + 4]: the flags out (C)
             ldh [code_bank], a
             push de                         ; (X)
             ld c, 0
+            ld a, [NES_RAM + $9F]           ; fast path: source in the $8000 ROM bank, the
+            and a                           ;   pairs in save RAM, $9F letters within both
+            jr z, .lp
+            ld hl, NES_RAM + $92
+            ld e, [hl]
+            inc l
+            ld d, [hl]                      ; DE = destination
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, de                      ; HL = its end
+            ld a, d
+            sub $60
+            cp $20
+            jr nc, .lp
+            ld a, h
+            sub $60
+            cp $20
+            jr nc, .lp
+            ld a, d
+            add a, $40
+            ld d, a                         ; (GB address)
+            ld hl, NES_RAM + $94
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a                         ; HL = source
+            ld a, h
+            sub $80
+            cp $40
+            jr nc, .lp
+            ld a, [NES_RAM + $9F]
+            add a, l
+            ld a, h
+            adc a, 0
+            sub $80
+            cp $40
+            jr nc, .lp
+            ld a, h
+            sub $40
+            ld h, a                         ; (rt_rd_8's window)
+.fl:        push hl
+            call rt_rd_8
+            ld a, l
+            pop hl
+            and a
+            jr z, .fz
+            inc hl
+            ld b, a
+            cp $7A
+            jr c, .fc
+            ld a, $FF
+            ld [de], a
+            inc de
+            ld a, b
+.fw:        ld [de], a
+            inc de
+            inc c
+            ld a, [NES_RAM + $9F]
+            cp c
+            jr nz, .fl
+            call .fe                        ; $9F letters: C = 1
+            jr .eq
+.fz:        call .fe                        ; a 0: C = 0 after a letter (else kept)
+            ld b, 0
+            ld a, c
+            and a
+            jr z, .out
+            ld hl, sp + 4
+            res 4, [hl]
+            jr .out
+.fe:        ld a, e                         ; $92 = the end, $9E = the last letter
+            ld [NES_RAM + $92], a
+            ld a, d
+            sub $40
+            ld [NES_RAM + $93], a
+            ld a, c
+            and a
+            ret z
+            ld a, b
+            ld [NES_RAM + $9E], a
+            ret
+.fc:        cp $70                          ; dakuten byte, then the tile
+            ld a, $C0
+            jr c, .f0
+            inc a
+.f0:        ld [de], a
+            inc de
+            ld a, $40
+            ldh [vfl], a
+            ld a, b
+            cp $57
+            jr nc, .f1
+            add a, $47
+            jr .fw
+.f1:        cp $5C
+            jr nc, .f2
+            add a, $4C
+            jr .fw
+.f2:        cp $6B
+            jr nc, .f3
+            add a, $73
+            jr .fw
+.f3:        cp $70
+            jr nc, .f4
+            add a, $78
+            jr .fw
+.f4:        cp $75
+            jr nc, .f5
+            add a, $33
+            jr .fw
+.f5:        add a, $6E
+            jr .fw
 .lp:        ld hl, NES_RAM + $94
             ld a, [hl+]
             ld h, [hl]
@@ -18522,3 +18635,189 @@ lz_same:    push hl
             pop bc
             pop hl
             ret
+
+; ---- b12:A169-A1A3 (battle round start: $6848-$6854 = the 13 bytes at b12:A15C (SHUF_I, copied
+; from the ROM by build.py), $6AF8 = $6B86 = 0, then the turn order $6849-$6855 shuffled by 17
+; swaps of two entries picked by AE5D(0, 12), i.e. (RNG byte x 13) >> 8, the RNG byte
+; T[$688A++] from the table at fix:FCE6 (SHUF_H = its bytes x 13 >> 8, build.py). RAM as
+; FF1 leaves it: $688E = 0, $68AF = 0, $68B0 = $68B6 = $68B4 = 13, $68B3 = 0, $68B5 = the last
+; product's low byte. Out: A = the value stored last (at the first pick), X = the first pick,
+; Y = the second; N = 0, Z = 1, C = 0, V = 0.
+section bank PF_BANK, $6545
+shuf_b:     ld hl, SHUF_I
+            ld de, $A848
+            ld c, 13
+.i:         ld a, [hl+]
+            ld [de], a
+            inc e
+            dec c
+            jr nz, .i
+            xor a
+            ld [$AAF8], a
+            ld [$AB86], a
+            ld a, $11
+            ld [$A88E], a
+            ld a, [$A88A]
+            ld b, a                         ; B = RNG index
+.p:         ld h, high(SHUF_H)
+            ld l, b
+            inc b
+            ld d, [hl]                      ; D = first pick
+            ld l, b
+            inc b
+            ld a, [hl]
+            ld c, a                         ; C = second pick
+            ld h, $A8
+            add a, $48
+            ld l, a                         ; HL = $6848 + second
+            ld a, d
+            add a, $48
+            ld e, a
+            ld a, [hl]                      ; A = its value
+            ld l, e
+            ld e, [hl]                      ; E = the first's
+            ld [hl], a
+            ld a, c
+            add a, $48
+            ld l, a
+            ld [hl], e
+            ld hl, $A88E
+            dec [hl]
+            jr nz, .p
+            ld a, b
+            ld [$A88A], a
+            dec a
+            add a, $E6                      ; the last RNG byte (fix:FCE6 + index, through
+            ld l, a                         ;   rt_rd_e) x 13, low byte
+            ld a, $7C
+            adc a, 0
+            ld h, a
+            ldh a, [code_bank]
+            push af
+            ld a, PF_BANK
+            ldh [code_bank], a
+            call rt_rd_e
+            pop af
+            ldh [code_bank], a
+            ld a, l
+            add a, a
+            add a, l
+            add a, a
+            add a, a
+            add a, l
+            ld [$A8B5], a
+            xor a
+            ld [$A8AF], a
+            ld [$A8B3], a
+            ldh [nzv], a
+            ldh [vfl], a
+            ld a, 13
+            ld [$A8B0], a
+            ld [$A8B6], a
+            ld [$A8B4], a
+            ld e, d
+            ld b, 0
+            ld d, 0
+            ld h, $A8
+            ld a, e
+            add a, $48
+            ld l, a
+            xor a                           ; (Z = 1, C = 0)
+            ld a, [hl]
+            ret
+
+; ---- btx_b's fast path (the text in ExRAM $5F00-$5FFF, the pairs in save RAM below $7E00)
+section bank PF_BANK, $7830
+btx_f:
+            ld hl, NES_RAM + $92            ; fast path: the text in ExRAM $5F00-$5FFF, the
+            ld a, [hl+]                     ;   pairs in save RAM below $7E00
+            ld e, a
+            ld a, [hl]
+            sub $60
+            cp $1E
+            jp nc, btx_b.lp
+            add a, $A0
+            ld d, a                         ; DE = destination (GB)
+            ld hl, NES_RAM + $90
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, h
+            cp $5F
+            jp nz, btx_b.lp
+            ld h, high(EX_RAM) + 3          ; HL = source (GB)
+            ld b, 0                         ; B: the last letter (0: none yet)
+.fl:        ld a, [hl]
+            cp $48
+            jr c, .fe                       ; (0 too)
+            ld b, a
+            cp $7A
+            jr c, .fc
+            ld a, $FF
+            ld [de], a
+            inc de
+            ld a, b
+.fw:        ld [de], a
+            inc de
+            inc l
+            jr nz, .fl
+            push af                         ; past $5FFF: the general loop goes on
+            call .fs
+            pop af
+            jp btx_b.lp
+.fe:        push af
+            call .fs
+            pop af
+            jp btx_b.end
+.fs:        ld a, l                         ; $90 / $92 / $9E, C as the last letter left it
+            ld [NES_RAM + $90], a
+            ld a, h
+            sub high(EX_RAM) - $5C
+            ld [NES_RAM + $91], a
+            ld a, e
+            ld [NES_RAM + $92], a
+            ld a, d
+            sub $40
+            ld [NES_RAM + $93], a
+            ld a, b
+            and a
+            ret z
+            ld [NES_RAM + $9E], a
+            ld hl, sp + 6
+            res 4, [hl]
+            cp $7A
+            jr c, .fs1
+            set 4, [hl]
+.fs1:       ld c, 0                         ; (Y = 0 after a letter: FCA7)
+            ret
+.fc:        cp $70                          ; dakuten byte, then the tile
+            ld a, $C0
+            jr c, .f0
+            inc a
+.f0:        ld [de], a
+            inc de
+            ld a, $40
+            ldh [vfl], a
+            ld a, b
+            cp $57
+            jr nc, .f1
+            add a, $47
+            jr .fw
+.f1:        cp $5C
+            jr nc, .f2
+            add a, $4C
+            jr .fw
+.f2:        cp $6B
+            jr nc, .f3
+            add a, $73
+            jr .fw
+.f3:        cp $70
+            jr nc, .f4
+            add a, $78
+            jr .fw
+.f4:        cp $75
+            jr nc, .f5
+            add a, $33
+            jr .fw
+.f5:        add a, $6E
+            jr .fw

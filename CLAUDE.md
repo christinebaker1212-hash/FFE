@@ -1119,6 +1119,28 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   nothing (`lz_same`: no stale slots, no compares later; the battle start re-uploads its
   party page); spr_mat's compare four rows a pass. checkall 62/62. Lag: DMG 26 -> 24, CGB -8.
 
+- **Battle frames and Lot Check items (2026-11-20, later):**
+  - Speed: FF1's battle turn-order shuffle b12:A169-A1A3 native (`shuf_b`; picks from a
+    table of the RNG bytes x 13 >> 8 built from the ROM). The battle name copy (`bnm_b`) and
+    text expansion (`btx_b` -> `btx_f`) got fast paths: ROM or ExRAM source and save RAM
+    destination checked once per string. checkall 62/62. DMG 24 -> 22, CGB 0.
+  - Lot Check (`docs/gb-release-checks.md`, new `rt/lot.s`):
+    - save in its own cart RAM bank 4 (header RAM 64 KB), with a sum and a magic;
+    - boot check: on a damaged save, the error screen and an A Button press before erasing;
+    - FF1's inn save copied to bank 4 (`save_commit`, b14:ABCE);
+    - soft reset (A+B+Start+Select);
+    - runtime cart RAM banks 1-3 cleared at boot;
+    - "Game Pak" wording;
+    - LCDC audit: all switch-offs in V-Blank;
+    - VRAM/OAM checker `sgbrun SGBRUN_VCHK=1`: 0 violations on DMG / CGB / SGB over the
+      battle script;
+    - `build.py --release` (no test-runner input mode; the builder uses it).
+  - Clearing bank 2 exposed a real SGB bug: `pk_diff` overwrote its caller's loop counter,
+    and the SGB game crawled at the class select. Fixed.
+  - Checks: checkall 62/62, the release ROM RAM-identical (battle 7650), save / soft-reset
+    tests in PyBoy (`scratchpad lot/savetest.py`, `rst.py`).
+  - Lag: DMG 23 (the frames that lag moved a little), CGB 0.
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette
@@ -1126,8 +1148,13 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   play-test.
 - FF2: separate session (`docs/ff2-gb-brief.md`). FF3 (GBC only): not started.
 - **Before any release (required, owner 2026-11-20): Nintendo Lot Check standards,
-  `docs/gb-release-checks.md`.** Known gaps in FF1: cart RAM stays enabled (save RAM
-  protection needs a design change: runtime shadows live in cart RAM banks 1-3, NES work RAM
-  in bank 0), no save-corruption message, no soft reset, test-runner mode / rst $38 trap left
-  in the ROM, "CARTRIDGE" wording on the RAM-check screen, LCDC / VRAM / OAM access audit
-  and the hardware matrix not done yet.
+  `docs/gb-release-checks.md`.** FF1 state: save bank, damaged-save message, soft reset,
+  boot clearing, "Game Pak" wording, LCDC audit, VRAM/OAM checker (battle script, 0) and the
+  release build are done. Still open:
+  - cart RAM stays enabled during play (impossible on DMG: NES work RAM and runtime data
+    live there; the separate save bank is the protection, documented);
+  - checksum check in the build;
+  - VRAM/OAM check over the field / menu scripts and on SameBoy;
+  - Color double speed after a soft reset on real hardware;
+  - the hardware matrix (DMG, Pocket, SGB, CGB, GBA);
+  - the builder's text.
