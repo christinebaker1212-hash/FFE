@@ -1,4 +1,5 @@
 """NES code coverage of an FF2 build under random play (checks the source code map).
+Test tool only: the GB build does not use coverage (build.py never runs the NES).
 usage: COV_LOG=OUT.bin PYTHONPATH=build/emu covrun.py ROM SEED FRAMES
 From power-on: random buttons (A weighted up, so the title, name entry, dialogue,
 menus and battles all get pressed through), with held/released spans."""

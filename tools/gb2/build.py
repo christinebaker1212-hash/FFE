@@ -1,6 +1,6 @@
 """Build the Game Boy (dual-mode DMG / SGB / CGB) FF2 English ROM from the user's own NES ROM.
 
-usage: build.py ["Final Fantasy I, II (Japan).nes"] [--gb] [--cov DIR] [--out ROM]
+usage: build.py ["Final Fantasy I, II (Japan).nes"] [--gb] [--release] [--out ROM]
   --gb: with the GB screen layout (tools/gb2/layout.py): build/ff2_gb.nes -> build/ff2_gb.gb
   --release (with --gb): build/ff2_release.gb without test-only code (the runtime's ;[test]
       blocks: the test-runner pad input); check it with tools/gb2/lotcheck.py --release
@@ -11,7 +11,9 @@ usage: build.py ["Final Fantasy I, II (Japan).nes"] [--gb] [--cov DIR] [--out RO
    build/src/ff2, the everything8215 listing) -> code map (tools/gb2/ff2code.py)
 3. translate (tools/gb2/translate.py) + runtime (tools/gb2/rt/*.s), assemble
 4. ROM: bank 0 runtime, banks DATA.. = the NES banks, then code banks
-Nothing game-specific is stored in the repo; everything comes from the NES ROM.
+Nothing game-specific is stored in the repo; everything comes from the NES ROM. The NES is
+never run: the code map, the stack tricks and the dynamic jump targets come from the
+disassembly (everything8215 listing) and the ROM's bytes, not from emulator coverage.
 """
 import os, re, sys, glob, hashlib, subprocess, time
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -71,8 +73,7 @@ def main():
         args.remove('--release')
         if not gb: raise SystemExit('--release needs --gb')
         if os.environ.get('GB_END_TEST'): raise SystemExit('--release: GB_END_TEST is a test build')
-    opt = {'--cov': os.path.join(ROOT, 'build', 'ff2', 'cov'),
-           '--out': os.path.join(ROOT, 'build', 'ff2_release.gb' if release else 'ff2_gb.gb' if gb else 'ff2_en.gb'),
+    opt = {'--out': os.path.join(ROOT, 'build', 'ff2_release.gb' if release else 'ff2_gb.gb' if gb else 'ff2_en.gb'),
            '--nes': None}
     pos = []
     while args:
@@ -90,9 +91,8 @@ def main():
         import json, translate
         for name, (bank, addr, routine, flags) in json.load(open(ext_side)).items():
             translate.FF2.ext[('b%02d' % bank if bank != 31 else 'fix', addr)] = (routine, flags)
-    covs = sorted(glob.glob(os.path.join(opt['--cov'], 's*.bin')))   # optional: stack-trick flags
     t = time.time()
-    cm = CodeMap(nes, srcdir, covs).build()
+    cm = CodeMap(nes, srcdir).build()               # (the disassembly's code map; no coverage)
     rc = Recompiler(cm)
     prg = open(nes, 'rb').read()[16:]
     for k, code in getattr(rc.g, 'idiom_code', {}).items():   # fixed bank = bank 31

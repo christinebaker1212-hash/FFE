@@ -727,4 +727,6 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   owner's go-ahead for the FF1 tools); FF3: the CGB-only screen.
 - FF1: the speed work above; Select menu (options / formation / suspend), name entry
   (design E), Disch disassembly BUGGED fixes, final builder exe.
-- FF2 (dual-mode) and FF3 (GBC only): not started (on the everything8215 sources).
+- FF2 (dual-mode): in progress (docs/ff2-gb-status.md). Its build never runs the NES: the
+  code map, stack tricks and jump targets come from the everything8215 disassembly and the
+  ROM bytes (no coverage logs). FF3 (GBC only): not started.

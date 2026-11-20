@@ -3,7 +3,8 @@
 Same interface as tools/gb/nescode.CodeMap (insns, decode, target_space, static_bank),
 but the instruction starts come from the source base (tools/gb2/ff2src.py --english ->
 SRCDIR/map.json: the everything8215 listing + insert.py's modules), not from coverage.
-Coverage logs (tools/gb2/covrun.py) only add their flags (stack tricks, memory regions).
+Coverage logs (tools/gb2/covrun.py) are accepted for the report (main) only; the build
+(tools/gb2/build.py) passes none: nothing in the GB ROM depends on running the NES.
 
 Code spaces:
   bNN  16KB bank NN (0-14) at $8000-$BFFF ($5115)     file NN*$4000

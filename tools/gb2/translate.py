@@ -2,7 +2,8 @@
 
 Adapted from tools/gb/recomp.py (FF1; copied, not shared). The instruction set comes
 from the source base (tools/gb2/ff2code.py: everything8215 listing + insert.py modules),
-so every routine is translated, executed in coverage or not. emit_program(rc) returns
+so every routine is translated; nothing comes from running the NES (no coverage logs:
+stack tricks and dynamic targets are found in the code and data of the source). emit_program(rc) returns
 SM83 assembly for every code bank plus bank-0 stubs and the dynamic-target table, to be
 assembled with tools/gb2/rt/*.s. See docs/ff2-gb-plan.md §3.
 
@@ -166,13 +167,8 @@ class Recompiler:
     def classify(self):
         self.pla_drop = {}             # PLA key -> 'pop' (first of the pair) / 'none' (second)
         self.rts_dispatch = set()
-        for k, i in self.insns.items():
-            if i.mn == 'PLA' and i.stk & 2:
-                nxt = self.insns.get((i.space, i.addr + 1))
-                if nxt is not None and nxt.mn == 'PLA' and nxt.stk & 2:
-                    self.pla_drop[k] = 'pop'; self.pla_drop[(i.space, i.addr + 1)] = 'none'
-        # Without coverage: a run of 2 or 4 PLAs that leaves by RTS / JMP within 8 straight-line
-        # instructions, with no PHA in the 16 bytes before, drops return addresses (b05:A021
+        # From the code alone (the disassembly, no NES run): a run of 2 or 4 PLAs that leaves
+        # by RTS / JMP within 8 straight-line instructions, with no PHA in the 16 bytes before, drops return addresses (b05:A021
         # battle victory exit, b11:AF16, fix:F194, ...)
         for (sp, a), i in self.insns.items():
             if i.mn != 'PLA' or (sp, a) in self.pla_drop: continue
@@ -193,17 +189,7 @@ class Recompiler:
             for m in range(n):
                 self.pla_drop[(sp, a + m)] = 'pop' if m % 2 == 0 else 'none'
             self.static_drops = getattr(self, 'static_drops', []) + [(sp, a, n)]
-        for k, i in self.insns.items():
-            if i.mn == 'PLA' and i.stk & 2 and k not in self.pla_drop:
-                self.warn.append('lone PLA popping a return address at %r' % i)
-            if i.mn == 'RTS' and i.stk & 1:
-                prev = self.insns.get((i.space, i.addr - 1))
-                if prev is not None and prev.mn == 'PLA' and (prev.space, prev.addr) in self.pla_drop:
-                    continue                                    # PLA PLA RTS: normal ret
-                if prev is not None and prev.mn == 'PHA':
-                    self.rts_dispatch.add(k)
-                else:
-                    self.warn.append('RTS with stack mismatch, not understood: %r' % i)
+        # RTS dispatch (PHA / PHA / RTS): none in FF2 (the "jump (long)" fix:FA91 is an idiom)
 
     # ------------------------------------------------------------ dynamic targets
     def dyn_targets(self):
@@ -211,12 +197,6 @@ class Recompiler:
         into $8000-$BFFF from code outside that bank."""
         t = set()
         for k, i in self.insns.items():
-            if i.cov & 6:                                   # reached by RTS or JMP (ind)
-                if i.cov & 4: t.add(k)
-                if i.cov & 2:
-                    # an RTS lands after a JSR normally; anything else is a dispatch target
-                    prev3 = self.insns.get((i.space, i.addr - 3))
-                    if prev3 is None or prev3.mn != 'JSR': t.add(k)
             if i.mn in ('JSR', 'JMP') and i.mode == 'abs' and self.target(i, i.arg) is None:
                 for c in self.dyn_candidates(i.arg): t.add(c)
                 if not self.dyn_candidates(i.arg): self.warn.append('no known code for %r' % i)

@@ -647,6 +647,24 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   4. Then music, sprites (docs/gb-native-presentation.md order). Select menu with suspend
      (design with the owner). Known DMG look issue: the black castle floor ($0x rule).
 
+## The NES is never run to build (2026-11-20, owner: use the disassembly so the NES need not run)
+- `tools/gb2/build.py` no longer reads coverage logs (`--cov` removed); `ff2code.CodeMap`
+  is built from the everything8215 listing + the ROM's bytes only, and `translate.py` has
+  no coverage paths left. Everything coverage used to give now comes from the source:
+  code / data (the listing), PLA pairs dropping return addresses (code pattern), RTS
+  dispatch (none in FF2; the "jump (long)" is an idiom), dynamic targets (data words and
+  immediate pointer pairs pointing at code, jump tables of JMPs, banked calls).
+- What coverage had still added was wrong: 20 dynamic targets and 7 warnings, all stale
+  (the logs were from an older ROM): instructions after the `JMP eN` stubs the layout
+  writes over replaced routines, `fix:FA9A` (handled by the `rt_call_ind40` idiom), and
+  mid-routine instructions that followed a `JSR` in the older ROM. With them gone the
+  dynamic table is 567 entries (was 587).
+- Checked on the coverage-free build: firstdiff random 1 (30000) DMG and CGB, random 2
+  (14000), random 3 CGB (20000), forced battles 0 / 40 / 120 (16000 each), the save
+  scenario: identical; lagcheck DMG +1 frame / 30000 (unchanged).
+- The NES still runs only in the test tools that compare the GB with it (firstdiff,
+  lagcheck, gbshots, covrun / covcheck); none is needed to build.
+
 ## Required before any release
 - The Lot Check requirements in `docs/gb-release-requirements.md` (owner, 2026-11-20:
   absolutely required). **FF2 state (2026-11-20):** done and checked: header / checksums /

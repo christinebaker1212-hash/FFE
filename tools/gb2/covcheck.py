@@ -1,6 +1,6 @@
 """Compare NES coverage logs (tools/gb2/covrun.py, COV_LOG) with the source code map
 (tools/gb2/ff2src.py --english OUT -> OUT/map.json): every executed instruction start
-must be a code start in the map.
+must be a code start in the map. (Test tool only: the build does not use coverage.)
 usage: covcheck.py SRCDIR COV.bin [COV.bin ...]"""
 import sys, json, collections
 COV_RAM = 0x200000; COV_SIZE = COV_RAM + 0x8000; BANK = 0x4000
