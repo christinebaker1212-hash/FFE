@@ -647,13 +647,8 @@ hle_fill:   ldh [tmp_lo], a
             ldh a, [ppu_vl]
             and $0F
             jp nz, .slow
-            ldh a, [lcd_on]                 ; LCD on: CGB only (tile copy + DMA marks)
-            and a
-            jr z, .lok
-            ldh a, [is_cgb]
-            and a
-            jp z, .slow
-.lok:       ld a, e                         ; tiles: X / 16 (X = 0: 16)
+            ld a, e                         ; tiles: X / 16 (X = 0: 16) (DMG with the LCD
+                                            ;   on too: shadow + one re-coding mark per tile)
             swap a
             and $0F
             jr nz, .tn
@@ -705,12 +700,39 @@ hle_fill:   ldh [tmp_lo], a
             ld d, a
             ld a, 1
             ld [$4000], a
-.fill:      ldh a, [tmp_lo]
-            ld b, 16
-.f:         ld [de], a
+.fill:      ldh a, [tmp_lo]                 ; (16 bytes, unrolled)
+            ld [de], a
             inc e
-            dec b
-            jr nz, .f
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
+            ld [de], a
+            inc e
             inc e                           ; DE = start + 17 (as hle_ppucopy's marks)
             ld a, d
             cp $D0
@@ -875,27 +897,29 @@ hle_fill_nt:
             ld e, a                         ; (E: changed bits; D: old byte)
             ld a, 1
             ld [F_CHG], a
-.pop:       srl e
-            jr nc, .pz
+            ld d, 0                         ; D = number of changed bits
+.pop:       inc d
+            ld a, e
+            dec a
+            and e
+            ld e, a
+            jr nz, .pop
             ldh a, [sh_nt]
             and a
             jr z, .pdec
-            ldh a, [own1_lo]
-            add a, 1
+            ldh a, [own1_lo]                ; own1 += D (nametable 1) / -= D
+            add a, d
             ldh [own1_lo], a
             ldh a, [own1_hi]
             adc a, 0
             ldh [own1_hi], a
-            jr .pz
+            jr .o8x
 .pdec:      ldh a, [own1_lo]
-            sub 1
+            sub d
             ldh [own1_lo], a
             ldh a, [own1_hi]
             sbc a, 0
             ldh [own1_hi], a
-.pz:        ld a, e
-            and a
-            jr nz, .pop
 .o8x:       pop hl
             ld a, l
             add a, 8

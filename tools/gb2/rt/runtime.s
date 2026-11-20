@@ -1484,14 +1484,8 @@ dmg_frame:                                  ; DMG shading, once per NES frame wi
             and a
             jr z, .a
 .now:       call dmg_maps_now
-.a:         ld a, [VBL_SEEN]                ; re-code RETILE_PER_FRAME marked tiles, 1 when
-            ld b, a                         ;   this NES frame already took its GB frame (the
-            ld a, [VBL_CNT]                 ;   picture catches up later; the game keeps time)
-            cp b
-            ld b, RETILE_PER_FRAME
-            jr z, .rt
-            ld b, 1
-.rt:        call dmg_retile_some
+.a:         ld b, RETILE_PER_FRAME          ; (always: fewer when the frame was late left
+            call dmg_retile_some            ;   battle menu text uncoded for up to a second)
 .more:      ldh a, [rq_any]                 ; more while the frame has time left (not behind,
             and a                           ;   LY < RT_LY) and a queue block is free
             jr z, .x

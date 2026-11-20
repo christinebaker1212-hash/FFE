@@ -579,10 +579,9 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   CGB -1.7%; RAM identical; DMG / CGB intro shots pixel-identical to the build before.
 - More battle-intro work: the tile copier moves cart-RAM sources a plane at a time through
   `CP_BUF` ($DCE7, unrolled); DMG re-coding: `anf_rows` skips the plane arithmetic for an
-  identity palette map (only the indices used are found; shots pixel-identical), and the
-  frame wait re-codes 1 marked tile instead of 3 when the NES frame already took its GB frame
-  (the picture catches up in spare time; the game and music keep time). Battle intro DMG
-  +44 / +41 -> +39 / +32. Random 1: DMG +0.8%; RAM identical.
+  identity palette map (only the indices used are found; shots pixel-identical). (A frame
+  wait re-coding only 1 marked tile when the frame was late was tried and removed: the
+  battle command window's text then showed up to ~50 frames late on DMG.)
 - CGB map rows: `mu_write` (native map drawer) no longer sends CGB cells through the generic
   rt_ppu_w7; the DMG branch minus the shading does the same (shadow, owner + the cell's CGB
   palette, GB map). CGB door loads +37 -> +33; RAM identical; CGB shots equal apart from
@@ -599,6 +598,9 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   writes through the generic helpers; the 6 entries unrolled on GB pointers). Battle intro
   DMG second window +32 -> +9. RAM
   identical (random 1 DMG / CGB, random 2, forced formation 40).
+- Fill ppu (`hle_fill`): tile fill unrolled, DMG with the LCD on takes the tile path too;
+  `hle_fill_nt` counts the changed owner bits at once. Battle load DMG +47 -> +42, CGB
+  +28 -> +26. Random 1: DMG +1.1%, CGB -2.0%; RAM identical (random 1 DMG / CGB, random 2).
 - Status of the owner's three (DMG, random 1): overworld walking / sailing at parity (walk
   scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
   remaining: battle entry (load +19 net, intro +39 / +32), door loads (+56 single wait,
