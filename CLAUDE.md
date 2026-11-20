@@ -966,6 +966,9 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
     prologue or at a battle start (its flashes would make the maps). Screens now appear up to
     ~6 frames later after a load (field entry, class select), the game at its pace; pictures
     identical once shown (VRAM at 326 points). DMG 101 -> 84, CGB 0; checkall 62/62.
+    Then a battle start too, its maps from the battle palette it fades in to ($6D34, not the
+    flashes): its picture identical frame for frame from 6146; the prologue row writer
+    decides its fast case once per row. DMG 84 -> 77, CGB 0; checkall 62/62.
   - Where the DMG lag is (lagcheck steps): screen loads ~60 frames (field entry 13, battle
     start 15, new-game screens 12, name entries 3 x 6), prologue ~20 (half-band starts:
     row drawing through the VRAM queue + re-coding on top of ~95 samples of base load), battle

@@ -9622,6 +9622,27 @@ prow_b:     ldh a, [code_bank]
             ld b, 0                         ; (B: $80 | the palette of the letter before, in
             xor a                           ;   the same attribute quadrant)
             ldh [sh_nt], a
+            ldh a, [is_cgb]                 ; o_cx = 1: the fast case (DMG, LCD on, no
+            and a                           ;   dialogue, increment 1, no cell drawn by
+            jr nz, .nf                      ;   nametable 1), decided once for the row
+            ldh a, [lcd_on]
+            and a
+            jr z, .nf
+            ldh a, [dlg_on]
+            and a
+            jr nz, .nf
+            ldh a, [ppu_ctrl]
+            and 4
+            jr nz, .nf
+            ldh a, [own1_lo]
+            ld h, a
+            ldh a, [own1_hi]
+            or h
+            jr nz, .nf
+            ld a, 1
+            jr .fs
+.nf:        xor a
+.fs:        ldh [o_cx], a
 .lp:        push bc                         ; (B = 0 for the read: Y = C)
             ld b, 0
             ld l, $10
@@ -9657,23 +9678,9 @@ prow_b:     ldh a, [code_bank]
             push hl
             pop af
             ret
-.put:       ldh a, [is_cgb]                 ; the letter (w7v) to the PPU
-            and a
-            jr nz, .gen
-            ldh a, [lcd_on]
+.put:       ldh a, [o_cx]                   ; the letter (w7v) to the PPU
             and a
             jr z, .gen
-            ldh a, [dlg_on]
-            and a
-            jr nz, .gen
-            ldh a, [ppu_ctrl]
-            and 4
-            jr nz, .gen
-            ldh a, [own1_lo]
-            ld h, a
-            ldh a, [own1_hi]
-            or h
-            jr nz, .gen
             ldh a, [ppu_vh]
             cp $20
             jr c, .gen
@@ -9745,7 +9752,9 @@ prow_b:     ldh a, [code_bank]
             and $3F
             ldh [ppu_vh], a
             ret
-.gen:       ld b, 0                         ; (anything else: the cache dropped)
+.gen:       xor a                           ; (anything else: the cache dropped, and the
+            ld b, a                         ;   fast case for the rest of the row)
+            ldh [o_cx], a
             ldh a, [w7v]
             jp rt_ppu_w7
 
@@ -14740,16 +14749,13 @@ pu_chg:     ld a, b
 
 section bank 0, $3000
 ; ---- DMG deferred switch-on (bank 0 helpers). lon_start (rt_ppu_w1, the LCD off and the NES
-; switching on): NZ = deferred to lon_b (not on the SGB, in the prologue or at a battle
-; start, which keep the old path); lon_on: the LCD on, from the frame wait right after its tick
+; switching on): NZ = deferred to lon_b (not on the SGB or in the prologue, which keep the
+; old path); lon_on: the LCD on, from the frame wait right after its tick
 lon_start:  ldh a, [is_sgb]
             and a
             jr nz, .now
             ldh a, [pro_mode]
             and a
-            jr nz, .now
-            ldh a, [in_battle]              ; (a battle starts with flashes: its maps would be
-            bit 7, a                        ;   taken from them; it keeps the old switch-on)
             jr nz, .now
             ld a, [LON_ST]
             and a
@@ -14892,6 +14898,9 @@ lon_b:      ldh a, [code_bank]              ; (the bank-0 helpers come back to c
             jr z, .to4                      ;   the palettes have been stable PAL_STABLE
             call lon_half                   ;   frames: a flash at a battle start does not
             jr c, .x                        ;   make the maps; forced: at once)
+            ldh a, [in_battle]              ; a battle start: from the battle palette it fades
+            bit 7, a                        ;   in to ($6D34), not its flashes
+            jr nz, .mb
             call dmg_target
             jr c, .mn
             ldh a, [pal_age]
@@ -14905,6 +14914,23 @@ lon_b:      ldh a, [code_bank]              ; (the bank-0 helpers come back to c
             cp LON_MAXF
             jr c, .x
 .mn:        call dmg_maps_now
+            jr .to4
+.mb:        ld hl, $A000 + $0D34            ; (cart RAM bank 0)
+            ld de, MPB
+            ld b, 16
+.mc:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .mc
+            xor a
+            ldh [maps_due], a
+            ldh [maps_wait], a
+            inc a
+            ldh [sgb_dirty], a
+            call dmg_maps
+            ld a, 1
+            ldh [pal_dirty], a
 .to4:       ld a, 4
             ld [LON_ST], a
             jr .lp
