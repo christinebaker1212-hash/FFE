@@ -30,6 +30,10 @@ def put(rom, bank, cpu, data, old=None):
 # GB view (docs/ff2-gb-screens.md): GB lines 0-95 = NES x 20-179, y 48-143 (enemy area +
 # party column); lines 96-143 = the windows (second camera).
 CAM_BATTLE = dict(x=2, fine=4, y=6, line=96, x2=0, y2=6)
+# field camera (tiles): the player sprite (NES x 112-127, y 109-124) centred: x 5 exactly; y 6
+# leaves it 3 px above centre (45 px would centre it but puts the 8-px window grid 5 px off
+# the screen's). The field windows (dialogue, keyword, shop) are laid out for it.
+FIELD_CAM = dict(x=5, y=6)
 
 FIX_SRC = '''
     org $F800
@@ -55,17 +59,22 @@ btlcam:                 ; fix:FAB9 (JMP $9639, init battle): battle cameras firs
     sta $5804
     sta GBPOOL          ; tile pool: made again for this battle
     jmp $9639
-fieldcam:               ; fix:FA0F (return from battle; LDA #$0E / JSR $FE1A): field camera
-    lda #6
-    sta $5800
-    sta $5801
-    lda #0
+fieldcam:               ; fix:FA0F (return from battle; LDA #$0E / JSR $FE1A): no fine X,
+    lda #0              ;   no split (the field camera: the map reload after a battle, b0:9C03
+                        ;   / b0:9C06 stubs, field_tileset())
     sta $5802
     sta $5803
     lda $FD             ; the field's $2000 (BG table 0) before the field reloads its tiles
     sta $2000           ;   (fix:E512; the GB sends a tile to BG or sprites by $2000 bit 4)
     lda #$0E
     jmp $FE1A
+wattr:                  ; fix:D13D (window attributes): metatiles the window covers, for a
+    lda $38             ;   window on an odd column too (the field camera is odd): A =
+    adc $3C             ;   (($38 + $3C + 1) >> 1) - ($38 >> 1); carry = $38 & 1 on entry
+    lsr a
+    sec
+    sbc $31
+    rts
 end:
 '''
 
@@ -2243,7 +2252,7 @@ def bank24(rom):
     tabs = B23_SRC[B23_SRC.index('BIT:    .db'):]
     mdata, msyms = menu_data(rom)
     src = '    org $8000\n    jmp gb_menu\n' + core + MENU_SRC + tabs + mdata + glyph_src(rom) + prophecy_data(rom)
-    return asm(src, syms=dict(RAM, **msyms, **PROPH_RAM, **EPI_SYMS))
+    return asm(src, syms=dict(RAM, **msyms, **PROPH_RAM, **EPI_SYMS, FCX=FIELD_CAM['x'], FCY=FIELD_CAM['y']))
 
 
 EPI = dict(x=6, y=9, w=20, h=16)     # epilogue window (b14:BAAF; NES (4,4,24,24)): text NES cols 6-25
@@ -2334,9 +2343,10 @@ gb_menu:
     jmp ($0000)
 MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit, gm_tparty, gm_shoptext, gm_slot, gm_ngcam, gm_prophecy, gm_rowinit, gm_rowdraw, gm_epage
 
-gm_exit:
-    lda #6
+gm_exit:                ; back to the field camera
+    lda #FCX
     sta $5800
+    lda #FCY
     sta $5801
     lda #0
     sta $580A
@@ -3972,12 +3982,41 @@ MBASE: .db 0, 40, 80, 120
 def battle(rom):
     c = CAM_BATTLE
     assert c['x2'] == 0
-    f = asm(FIX_SRC, syms=dict(RAM, CX=c['x'], CF=c['fine'], CY=c['y'], CX2=c['x2'], CY2=c['y2'], CL=c['line']))
+    f = asm(FIX_SRC, syms=dict(RAM, FCX=FIELD_CAM['x'], FCY=FIELD_CAM['y'], CX=c['x'], CF=c['fine'], CY=c['y'], CX2=c['x2'], CY2=c['y2'], CL=c['line']))
     assert f.org + len(f.bytes) <= 0xF850
     put(rom, 31, f.org, f.bytes)
     put(rom, 31, 0xFAB9, bytes([0x4C]) + f.labels['btlcam'].to_bytes(2, 'little'), old=bytes.fromhex('4c3996'))
     put(rom, 31, 0xFA0F, bytes([0x20]) + f.labels['fieldcam'].to_bytes(2, 'little') + b'\xEA\xEA',
         old=bytes.fromhex('a90e201afe'))
+    # text window attributes (fix:D13D / D157): the metatile count from the window's first to
+    # its last column (wattr), so a window on an odd column (field windows under the odd
+    # field camera) gets its last column's attributes too; D157 reuses that count ($86)
+    w = asm('''
+    org $D13D
+    lda $37
+    bne $D163
+    lda $3B
+    lsr a
+    sta $30
+    lda $38
+    lsr a
+    sta $31
+    jsr WATTR
+    sta $86
+    lda #$01
+    sta $2D
+    jmp $D24E
+    org $D157
+    lda $37
+    bne $D163
+    ldx $86
+    dex
+    jmp $D308
+    nop
+    nop
+''', syms=dict(WATTR=f.labels['wattr']))
+    put(rom, 31, 0xD13D, w.bytes[:0xD157 - 0xD13D], old=bytes.fromhex('a537d022a5384a8531a53b4a8530a53c4a8586a901852d4c4ed2'))
+    put(rom, 31, 0xD157, w.bytes[0xD157 - 0xD13D:], old=bytes.fromhex('a537d008a53c4aaaca4c08d3'))
     # party: y = slot * 24 + 48 (NES: * 27 + 44), base x 156 front / 160 back (NES 208 / 224):
     # GB x 140 / 144, every member in a 24-px slot of the 96-px battlefield
     put(rom, 11, 0x9B68, bytes([0xA2, 24]), old=bytes([0xA2, 0x1B]))
@@ -4177,7 +4216,7 @@ ab:
 # Owner's layout (ff2_mock2): the box over the top of the GB view (field camera 6 / 6: NES
 # screen columns 6-25, rows 6-13), 18 columns x 6 lines inside, the party visible below.
 DLG_GB_W = 18
-DLG_WIN = dict(left=6, top=6, width=20, height=8)     # text window 0 (fix:E9AA table)
+DLG_WIN = dict(left=5, top=6, width=20, height=8)     # text window 0 (fix:E9AA table)
 # system strings shown in window 0 on the field (chest, nothing there, lock, ship / airship
 # talk, keywords, save, warp, prayer, magic); the shop ones go with the shop layout
 SYS_FIELD = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 22, 25, 63, 64, 68, 71, 72,
@@ -4209,7 +4248,7 @@ def gb_wrap(ins, text, width=DLG_GB_W):
 
 # keyword menus (owner approved ff2_mock8): window 1 (Ask / Learn / Items) and window 2
 # (keyword / item list) in GB rows 10-17 under the dialogue box
-KW_WIN = {1: dict(left=6, top=16, width=8, height=6), 2: dict(left=6, top=16, width=20, height=8)}
+KW_WIN = {1: dict(left=5, top=16, width=8, height=6), 2: dict(left=5, top=16, width=20, height=8)}
 # item names wider than the 18 columns (owner: condensed letters on tiles of their own):
 # the last word in the condensed letters on fewer tiles (1-px gaps), in
 # font tiles unused by the English field text (kana $7B-$7F, $F0-$F6)
@@ -4422,8 +4461,8 @@ eq_upd:                 ; b14:B0B0 (equipment changed): slots text, the list's f
 '''
 
 SHOP_GIL = 82           # shop Gil window text (system string 28 is the main menu's now)
-SHOP_LIST = dict(left=6, top=6, width=20, height=10)   # NES screen: GB (0,0,20,10)
-SHOP_WIN3 = dict(left=14, top=16, width=12, height=4)  # Gil window: GB (8,10,12,4)
+SHOP_LIST = dict(left=5, top=6, width=20, height=10)   # NES screen: GB (0,0,20,10)
+SHOP_WIN3 = dict(left=13, top=16, width=12, height=4)  # Gil window: GB (8,10,12,4)
 
 
 def shop_layout(rom, ins, bank, sysone):
@@ -4813,7 +4852,7 @@ def dialogue(rom):
 def world_overview(rom):
     """world-map overview (B + Select with the ring, bank 9 $BA00; owner approved
     ff2_mock14): camera 6 / 9 (the globe NES y 80-207 centred, the logo above out of view),
-    field camera 6 / 6 after. Stub in bank 9's stale data ($BE20, rom-map.txt)."""
+    the field camera after. Stub in bank 9's stale data ($BE20, rom-map.txt)."""
     k = asm('''
     org $BE20
     lda #6
@@ -4821,10 +4860,12 @@ def world_overview(rom):
     lda #9
     sta $5801
     jsr $BA00
-    lda #6
+    lda #FCX
+    sta $5800
+    lda #FCY
     sta $5801
     rts
-''')
+''', syms=dict(FCX=FIELD_CAM['x'], FCY=FIELD_CAM['y']))
     assert k.org + len(k.bytes) <= 0xBE40
     put(rom, 9, k.org, k.bytes, old=bytes(len(k.bytes)))
     put(rom, 31, 0xC19F, bytes([0x20, 0x20, 0xBE]), old=bytes([0x20, 0x00, 0xBA]))
@@ -4877,13 +4918,28 @@ def field_tileset(rom):
     tset_fix_b; docs/gb-native-presentation.md). Stub in bank 0's unused $83CA-$83FF."""
     k = asm('''
     org $83CA
-tsetld:
+tsetld:                 ; normal map (re)loaded: field camera, tileset to fix
     sta $580B
+    pha
+    lda #FCX
+    sta $5800
+    lda #FCY
+    sta $5801
+    pla
     jmp $9CC3
-''')
+wmcam:                  ; b0:9C03 "init world map" (fix:C861): the field camera too (a loaded
+    pha                 ;   game starts here from the load menu's camera)
+    lda #FCX
+    sta $5800
+    lda #FCY
+    sta $5801
+    pla
+    jmp $9CA5
+''', syms=dict(FCX=FIELD_CAM['x'], FCY=FIELD_CAM['y']))
     assert k.org + len(k.bytes) <= 0x8400
     put(rom, 0, k.org, k.bytes, old=bytes(len(k.bytes)))
     put(rom, 31, 0xD0B4, bytes([0x20]) + k.labels['tsetld'].to_bytes(2, 'little'), old=bytes.fromhex('20069c'))
+    put(rom, 0, 0x9C03, bytes([0x4C]) + k.labels['wmcam'].to_bytes(2, 'little'), old=bytes.fromhex('4ca59c'))
 
 
 def apply(rom):

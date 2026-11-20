@@ -502,6 +502,17 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   identical (random 30000, DMG and CGB). Throne-room stretch profile (waits 21400-22100):
   sprite conversion (rt_io_w4014) 16%, OAM clear 7% (before unrolling), memory-read glue
   (nes_rd / rt_rd_8 / rt_izy_rd: a bank switch per ROM byte) ~16%.
+- **Player centred on the field (owner, 2026-11-20):** field camera x 5 tiles (was 6): the
+  player sprite (NES x 112-127, y 109-124) at GB x 72-87, centred; y stays 6 tiles (3 px
+  above centre: a 45-px camera would put the 8-px window grid 5 px off the screen's).
+  `layout.FIELD_CAM`; set by stubs at normal-map init (b0:$83CA, with the tileset flag) and
+  world-map init (b0:9C03 -> wmcam), by gm_exit (menus) and after the world-map overview; the
+  return from battle reloads the map (fieldcam only clears fine X / the split). Field
+  windows one column left (dialogue, keyword, shop list: left 5; Gil 13). Windows on an odd
+  column: fix:D13D / D157 count the metatiles from the window's first to its last column
+  (`wattr` in the GB fixed-bank code), else their last column kept the map's palette.
+  Checked: shots of dialogue, walking, throne room, world map, shop (CGB, DMG); RAM identical
+  (random 30000 DMG / CGB, shop scenario, load + world map scenario).
 - Next (step 1, third part): the remaining field costs (dialogue window: text printer
   fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
   then screen loads, music, sprites. Earlier plan text:

@@ -70,6 +70,10 @@ status word. Commands (Items, Magic, Equip, Status, Save; cols 13-19 rows 0-6) a
 - Credits: as the NES (crystal-ball portraits), the credit lines 3 columns further left so
   the longest name fits; THE END unchanged.
 
+## Field camera (owner, 2026-11-20)
+Player centred: camera x 5 tiles (exact), y 6 tiles (3 px above centre, keeps the window grid on
+the screen grid). Field windows (dialogue, keyword menus, shop) start at screen column 5.
+
 ## To draft
 Items, magic, equipment, status, shops, keyword dialogue (Ask / Learn), save menu, name
 entry, prologue, title, ending, world map (B + Select), Select menu (options / formation /
