@@ -2343,6 +2343,9 @@ rt_ppu_w7g: push af
             ld h, a
             ld a, 1
             ld [$4000], a
+            ld a, [hl]                      ; the same byte again (FF1 uploads its cursor and
+            cp d                            ;   other sprites again when they appear): the
+            jr z, .sps                      ;   slot stays
             ld [hl], d
             xor a
             ld [$4000], a
@@ -2365,6 +2368,9 @@ rt_ppu_w7g: push af
             ld [hl], $FF
             xor a
             ld [OAM_CLEAN], a
+            jr .done
+.sps:       xor a
+            ld [$4000], a
             jr .done
 .nt:        cp $3F
             jr z, .pal

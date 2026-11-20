@@ -208,19 +208,37 @@ vol_change: bit 4, e
             ld a, e
             and $0F
             call vscale
+            ld e, a                         ; E = the new volume
             sub d
             and $0F
             ret z                           ; same volume
-            ld d, a
-            ld a, e
-            and $0F
-            call vscale
-            ld [hl], a
-            inc c                           ; NRx2: $08 x (new - old) mod 16 ("zombie mode")
-.zm:        ld a, $08
+            ld [hl], e
+            inc c                           ; NRx2: $08 x (new - old) mod 16 ("zombie mode"),
+            cpl                             ;   as a run of writes: into it at 15 - count
+            add a, 16                       ;   (A = 15 - count)
+            add a, low(.zz)
+            ld l, a
+            ld a, high(.zz)
+            adc a, 0
+            ld h, a
+            ld a, $08
+            jp hl
+.zz:
             ldh [c], a
-            dec d
-            jr nz, .zm
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
             ret
 .env:       ld a, [hl]                      ; envelope mode: only a change from constant
             cp $FF                          ;   volume restarts the note

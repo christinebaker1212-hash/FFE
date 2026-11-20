@@ -14965,3 +14965,163 @@ lon_b:      ldh a, [code_bank]              ; (the bank-0 helpers come back to c
             jr nz, .d
             and a
             ret
+
+; ---- b12:9910-99D2 (battle, every frame: character A's six sprites) with the routines it runs
+; (998D, 99B4, 99D3, 97E9), natively; RAM as FF1 leaves it: $68B3 = $6BA8 + A (palette), $68AF
+; / $68B0 = x, $68B1 / $68B2 = y ($6AD3 / $6AD4 + 4A), $68B6 = 1 << A; down ($6AD1 bit A): tile
+; $1A + $6AD5,Y, x = $84, y + 8, two rows of three; else (with $6AD2 bit A: palette 3, pose $18
+; to $6AD6,Y, x = $8C) pose X = $6AD6,Y: three rows of two, tile $6AD5,Y + BDC_T[X] (the ROM's
+; table at b12:A00C, copied by build.py); each sprite at OAM entry $68B5 (y, tile, palette, x)
+; and $68B5 / $68B4 + 1; y + 8 after each row. Out (at the RTS): A = $68B1, N, Z, C, V of its
+; last ADC #8; X = pose + 3 (down: 0), Y = 4A.
+section bank PF_BANK, $7700
+bdc_b:      ld c, a
+            ld e, a
+            add a, low($ABA8)
+            ld l, a
+            ld h, high($ABA8)
+            ld a, [hl]
+            ld [$A8B3], a
+            ld a, c
+            add a, a
+            add a, a
+            ld c, a                         ; C = Y = 4A
+            add a, low($AAD3)
+            ld l, a
+            ld h, high($AAD3)
+            ld a, [hl+]
+            ld [$A8AF], a
+            ld [$A8B0], a
+            ld a, [hl]
+            ld [$A8B1], a
+            ld [$A8B2], a
+            ld a, 1                         ; $68B6 = 1 << A
+            ld b, e
+            inc b
+.sh:        dec b
+            jr z, .sd
+            add a, a
+            jr .sh
+.sd:        ld [$A8B6], a
+            ld b, a
+            ld e, 0                         ; (X = 0 after FF1's DEX loop)
+            ld a, [$AAD1]
+            and $0F
+            and b
+            jr nz, .dn
+            ld a, [$AAD2]
+            and $0F
+            and b
+            jr z, .np
+            ld a, 3
+            ld [$A8B3], a
+            ld a, c
+            add a, low($AAD6)
+            ld l, a
+            ld h, high($AAD6)
+            ld [hl], $18
+            ld a, $8C
+            ld [$A8AF], a
+            ld [$A8B0], a
+.np:        ld a, c
+            add a, low($AAD6)
+            ld l, a
+            ld h, high($AAD6)
+            ld e, [hl]                      ; X = pose
+            ld b, 3
+.row:       ld a, c                         ; $68B4 = $6AD5,Y + BDC_T[X]; X + 1
+            add a, low($AAD5)
+            ld l, a
+            ld h, high($AAD5)
+            ld a, [hl]
+            ld l, e
+            ld h, high(BDC_T)
+            add a, [hl]
+            ld [$A8B4], a
+            inc e
+            ld a, [$A8B0]
+            ld [$A8AF], a
+            call .spr
+            call .nx
+            ld hl, $A8B5
+            inc [hl]
+            dec l
+            inc [hl]
+            call .yd
+            dec b
+            jr nz, .row
+            jr .out
+.dn:        ld a, c
+            add a, low($AAD5)
+            ld l, a
+            ld h, high($AAD5)
+            ld a, [hl]
+            add a, $1A
+            ld [$A8B4], a
+            ld a, $84
+            ld [$A8AF], a
+            ld [$A8B0], a
+            call .yd
+            ld b, 2
+.r3:        ld a, [$A8B0]
+            ld [$A8AF], a
+            call .spr
+            call .nx
+            call .nx
+            ld hl, $A8B5
+            inc [hl]
+            dec l
+            inc [hl]
+            call .yd
+            dec b
+            jr nz, .r3
+.out:       ld a, [$A8B1]                   ; flags of the last y + 8
+            ld h, a
+            sub 8
+            cpl
+            and h
+            and $80
+            rrca
+            ldh [vfl], a                    ; V: before positive, after negative
+            ld a, h
+            ldh [nzv], a
+            ld b, 0
+            ld d, 0
+            ld l, 0
+            cp 8
+            jr nc, .c0
+            ld l, $10                       ; C: it wrapped
+.c0:        and a
+            jr nz, .z0
+            set 7, l
+.z0:        push hl
+            pop af
+            ret
+.spr:       ld a, [$A8B5]                   ; 97E9: the sprite at entry $68B5
+            add a, a
+            add a, a
+            ld l, a
+            ld h, high(NES_RAM + $0200)
+            ld a, [$A8B1]
+            ld [hl+], a
+            ld a, [$A8B4]
+            ld [hl+], a
+            ld a, [$A8B3]
+            ld [hl+], a
+            ld a, [$A8AF]
+            ld [hl], a
+            ret
+.nx:        ld hl, $A8B5                    ; 99D3: entry + 1, tile + 1, x + 8, the sprite
+            inc [hl]
+            dec l
+            inc [hl]
+            ld hl, $A8AF
+            ld a, [hl]
+            add a, 8
+            ld [hl], a
+            jr .spr
+.yd:        ld hl, $A8B1
+            ld a, [hl]
+            add a, 8
+            ld [hl], a
+            ret

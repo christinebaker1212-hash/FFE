@@ -303,6 +303,15 @@ def main():
         rc.g.idioms[('b12', 0x9ADA)] = ('pf:b9ad_b', 0x9AFC, 'NZC')
     else:
         print('  b12:9ADA: code not as expected, not native')
+    bdc_src = 'BDC_T:\n'                             # b12:9910-99E4 (a battle character's six
+    if (hashlib.sha1(prg[b12o + 0x9910:b12o + 0x99E5]).hexdigest() == '4966bcc5061b0caf22fe036cdb456388b831ae7d'   # sprites, every frame) and
+            and prg[b12o + 0x97E9:b12o + 0x980C].hex() == ('9848adb5680a0aa8adb368990202adb4689901'  # 97E9
+                                                          '02adb168990002adaf6899030268a860')):
+        bdc_src += ''.join('    db ' + ', '.join('$%02X' % x for x in prg[b12o + 0xA00C + i:b12o + 0xA00C + i + 16]) + '\n'
+                           for i in range(0, 256, 16))      # (the pose table at b12:A00C, from the ROM)
+        rc.g.idioms[('b12', 0x9910)] = ('pf:bdc_b', 0x99B3, 'NZCV')
+    else:
+        print('  b12:9910: code not as expected, not native')
                                                      # b12:BF13 battle sprite step: the two
     if (prg[b12o + 0xBF13:b12o + 0xBF26].hex() == '208fbfa594f0082026bf205ebfc694208fbf60'   # swaps of $90-$9F
             and prg[b12o + 0xBF8F:b12o + 0xBFA4].hex() == 'a200a010b59048bd976d9590689d976de888d0f060'):
@@ -372,6 +381,7 @@ def main():
     rt += '\nsection bank HLE_BANK, $7800\n' + wrow3_src     # (build-time table from the ROM)
     rt += '\nsection bank PF_BANK, $7C00\n' + wrf_src
     rt += '\nsection bank PF_BANK, $7B00\n' + b9ad_src
+    rt += '\nsection bank PF_BANK, $7600\n' + bdc_src
     rt += '\nsection bank 0, $2F00\n' + farx_src      # (bank 0, read by rt_farx)
     rt += '\n' + apu_tables() + '\nSND_MASK = $%02X\n' % int(os.environ.get('GB_SND_MASK', 'FF'), 16) + 'MDF_ON = %d\n' % int(os.environ.get('GB_MDF', '1'))
     rt += open(os.path.join(HERE, 'rt', 'apu_core.s')).read()
