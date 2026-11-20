@@ -1793,8 +1793,9 @@ mgpage:             ; magic list copied to $7B01: levels / MP / spells moved by 
 .x:
     jmp JBTAIL
 restore:            ; menu closed: the word tiles under the MP tiles back (from the font)
-    lda #0          ;   (and the magic list's page back to the first)
-    sta MPG
+    lda #0          ;   (and the magic list's page back to the first; the GB runtime's
+    sta MPG         ;   condensed-name tiles off: $580F)
+    sta $580F
     lda WST         ; (status: the job-name tiles under its words first, from JDATA)
     cmp #$A5
     bne .nw

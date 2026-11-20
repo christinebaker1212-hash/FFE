@@ -644,401 +644,31 @@ nat_9f98:                                   ; (body in the runtime tables bank: 
             ret
 
 ; ------------------------------------------------------------------ fix:FCF5
-; multiply (16-bit): $1C-$1F = $18:$19 * $1A:$1B, the NES loop step for step in registers
-; (same final $1A-$1F, A, carry). In: C (6502 carry) as the NES reads it. Out: X = 0, A = the
-; last $1F computed (0 if none), Z = 1, N = 0, C from the last ROR; Y kept.
-nat_fcf5:   push af                         ; (unrolled: 16 steps)
-            ld a, c
-            ldh [nt_y], a
-            ld a, [NES_RAM + $18]
-            ldh [n9_y], a
-            ld a, [NES_RAM + $19]
-            ldh [n9_x], a
-            ld a, [NES_RAM + $1A]
-            ld c, a
-            ld a, [NES_RAM + $1B]
-            ld b, a
-            ld de, 0                        ; D = $1F, E = $1E
-            ld hl, 0                        ; H = $1D, L = $1C
-            pop af                          ; (the incoming carry)
-            ld a, 0
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s0
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s0:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s1
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s1:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s2
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s2:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s3
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s3:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s4
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s4:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s5
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s5:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s6
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s6:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s7
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s7:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s8
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s8:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s9
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s9:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s10
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s10:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s11
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s11:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s12
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s12:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s13
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s13:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s14
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s14:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
-            rr b                            ; ROR $1B / ROR $1A
-            rr c
-            jr nc, .s15
-            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
-            add a, e
-            ld e, a
-            ldh a, [n9_x]
-            adc a, d
-            ld d, a                         ; (A = the last $1F computed)
-.s15:        rr d                            ; ROR $1F $1E $1D $1C
-            rr e
-            rr h
-            rr l
+; (body in the runtime tables bank: far_fcf5)
+nat_fcf5:
             push af
-            ld a, c
-            ld [NES_RAM + $1A], a
-            ld a, b
-            ld [NES_RAM + $1B], a
-            ld a, l
-            ld [NES_RAM + $1C], a
-            ld a, h
-            ld [NES_RAM + $1D], a
-            ld a, e
-            ld [NES_RAM + $1E], a
-            ld a, d
-            ld [NES_RAM + $1F], a
-            ld de, 0                        ; X = 0
-            ld b, 0
-            ldh a, [nt_y]
-            ld c, a
-            xor a
-            ldh [nzv], a
-            pop af                          ; A = the last $1F computed, carry of the last ROR
-            ld h, 0                         ; Z = 1 (DEX): from a register known to be 0
-            inc h
-            dec h
+            ld a, RT_TABLES
+            ld [MBC5_BANKL], a
+            pop af
+            call far_fcf5
+            push af
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            pop af
             ret
 
 ; ------------------------------------------------------------------ fix:FC92
-; divide (16-bit): $1C = $18:$19 / $1A:$1B, $1E = remainder, the NES loop step for step (same
-; final $18-$1F, A, carry). In: C (6502 carry). Out: as the NES RTS (early exit: A = 0, Z = 1,
-; X kept; else X = 0, A = $1F, Z = 1, N = 0, C from the last ROL); Y kept.
-nat_fc92:   push af
-            xor a
-            ld [NES_RAM + $1C], a
-            ld [NES_RAM + $1D], a
-            ld [NES_RAM + $1E], a
-            ld [NES_RAM + $1F], a
-            ld a, [NES_RAM + $18]
-            ld h, a
-            ld a, [NES_RAM + $19]
-            or h
-            jr z, .zero
-            ld a, [NES_RAM + $1A]
-            ld h, a
-            ld a, [NES_RAM + $1B]
-            or h
-            jr z, .zero
-            ld a, c
-            ldh [nt_y], a
-            ld a, [NES_RAM + $18]           ; HL = dividend ($19:$18), shifted out as the
-            ld l, a                         ;   quotient bits come in: HL = quotient ($1D:$1C)
-            ld a, [NES_RAM + $19]
-            ld h, a
-            ld a, [NES_RAM + $1A]
-            ld c, a
-            ld a, [NES_RAM + $1B]
-            ld b, a                         ; BC = divisor, DE = remainder ($1F:$1E)
-            ld de, 0
-            pop af                          ; the NES's ROL $18 takes the incoming carry first,
-            ld a, 0                         ;   then the zeros ROL $1D shifts out: $18:$19 end
-            rra                             ;   as 0 : C << 7; the last ROL leaves C = 0
-            ldh [nt_a], a
-            ld a, 4
-            ldh [nt_x], a
-.lp:
-            add hl, hl                      ; (dividend out of H, quotient bit into L)
-            rl e
-            rl d
-            ld a, e                         ; SEC / SBC: remainder - divisor
-            sub c
-            ld e, a
-            ld a, d
-            sbc a, b
-            ld d, a
-            jr nc, .q0
-            ld a, e                         ; borrow: restore (ADC), quotient bit 0
-            add a, c
-            ld e, a
-            ld a, d
-            adc a, b
-            ld d, a
-            jr .n0
-.q0:        inc l                           ; quotient bit 1
-.n0:
-            add hl, hl                      ; (dividend out of H, quotient bit into L)
-            rl e
-            rl d
-            ld a, e                         ; SEC / SBC: remainder - divisor
-            sub c
-            ld e, a
-            ld a, d
-            sbc a, b
-            ld d, a
-            jr nc, .q1
-            ld a, e                         ; borrow: restore (ADC), quotient bit 0
-            add a, c
-            ld e, a
-            ld a, d
-            adc a, b
-            ld d, a
-            jr .n1
-.q1:        inc l                           ; quotient bit 1
-.n1:
-            add hl, hl                      ; (dividend out of H, quotient bit into L)
-            rl e
-            rl d
-            ld a, e                         ; SEC / SBC: remainder - divisor
-            sub c
-            ld e, a
-            ld a, d
-            sbc a, b
-            ld d, a
-            jr nc, .q2
-            ld a, e                         ; borrow: restore (ADC), quotient bit 0
-            add a, c
-            ld e, a
-            ld a, d
-            adc a, b
-            ld d, a
-            jr .n2
-.q2:        inc l                           ; quotient bit 1
-.n2:
-            add hl, hl                      ; (dividend out of H, quotient bit into L)
-            rl e
-            rl d
-            ld a, e                         ; SEC / SBC: remainder - divisor
-            sub c
-            ld e, a
-            ld a, d
-            sbc a, b
-            ld d, a
-            jr nc, .q3
-            ld a, e                         ; borrow: restore (ADC), quotient bit 0
-            add a, c
-            ld e, a
-            ld a, d
-            adc a, b
-            ld d, a
-            jr .n3
-.q3:        inc l                           ; quotient bit 1
-.n3:
-            ldh a, [nt_x]
-            dec a
-            ldh [nt_x], a
-            jp nz, .lp
-            xor a
-            ld [NES_RAM + $18], a
-            ldh a, [nt_a]
-            ld [NES_RAM + $19], a
-            ld a, l
-            ld [NES_RAM + $1C], a
-            ld a, h
-            ld [NES_RAM + $1D], a
-            ld a, e
-            ld [NES_RAM + $1E], a
-            ld a, d
-            ld [NES_RAM + $1F], a
-            ld de, 0
-            ld b, 0
-            ldh a, [nt_y]
-            ld c, a
-            xor a                           ; X = 0, A = $1F, Z = 1, N = 0, C = 0
-            ldh [nzv], a
-            ld a, [NES_RAM + $1F]
-            ret
-.zero:      xor a                           ; early RTS: A = 0, Z = 1, N = 0, C kept, X kept
-            ldh [nzv], a
+; (body in the runtime tables bank: far_fc92)
+nat_fc92:
+            push af
+            ld a, RT_TABLES
+            ld [MBC5_BANKL], a
             pop af
-            ld a, 0
-            inc a
-            dec a
+            call far_fc92
+            push af
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            pop af
             ret
 
 ; ------------------------------------------------------------------ fix:FC27
@@ -1086,6 +716,260 @@ nat_fb89:   add a, a                        ; $8000: bank 2A & $7F (even), $A000
 ; ------------------------------------------------------------------ p34:9754
 ; init text buffer: $7200-$73FF = $FF, $7AC0 = $4E = $18 = 0, $7AC1 = $4F = $72, $19 = $73.
 ; Out: A = $FF, Y = 0, Z = 1, N = 0, C kept; X kept.
+; ------------------------------------------------------------------ ex: h_flush (one-row line)
+; The English one-row line flush (tools/ff3/insert.py h_flush, from its .one label; build.py
+; finds it in the ExRAM image): line $07A0, cells 0 .. $91 - 1 from column $38 of row $3B, the
+; rest up to $3C from column 0 of the other screen, written straight into the nametable shadow
+; and the GB map (native: no $2006 / $2007). RAM as the NES leaves it: $3A, the $2002 read's
+; effects (vblank flag, latch); X = the last cell + 1, Y = $3B; then the NES tail at $F715.
+nat_h1:     ldh a, [cv_n]                   ; names in this line: condensed tiles (far_cvr)
+            and a
+            jr z, .nc
+            push hl
+            ld hl, far_cvr
+            call far_call
+            pop hl
+.nc:        xor a
+            ldh [wc_n], a                   ; (no cached $2007 run; row mark forgotten)
+            ldh [mr_hi], a
+            ldh [ppu_stat], a
+            ldh [ppu_latch], a
+            ld a, [NES_RAM + $38]
+            ld [NES_RAM + $3A], a
+            ld e, 0
+            ld a, [NES_RAM + $91]
+            call h1_run
+            ld a, [NES_RAM + $3C]
+            ld b, a
+            ld a, e
+            cp b
+            jr nc, .d
+            ld a, [NES_RAM + $3A]
+            and $20
+            xor $20
+            ld [NES_RAM + $3A], a
+            ld a, [NES_RAM + $91]
+            ld e, a
+            ld a, b
+            call h1_run
+.d:         xor a
+            ldh [cv_n], a
+            ldh [cv_open], a
+            ld b, 0
+            ld d, 0
+            ld a, [NES_RAM + $3B]
+            ld c, a
+            jp L_fix_F715
+h1_run:     ldh [h1_lim], a                 ; cells E .. (do-while) < A from ($3A, $3B)
+            ld a, [NES_RAM + $3B]           ; HL = $2000 + row * 32 + column (+ $400: the
+            ld l, a                         ;   2nd screen)
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, [NES_RAM + $3A]
+            ld b, a
+            and $1F
+            or l
+            ld l, a
+            ld a, b
+            and $20
+            rrca
+            rrca
+            rrca
+            or $20
+            or h
+            ld h, a
+.c:         push hl
+            push de
+            xor a
+            ldh [cv_bk], a
+            ldh a, [cv_n]                   ; (condensed: CV_SUB 1 = blank, >= 2 = the tile
+            and a                           ;   in VRAM bank 1)
+            jr z, .t
+            ld h, high(CV_SUB)
+            ld a, e
+            add a, low(CV_SUB)
+            ld l, a
+            ld a, [hl]
+            and a
+            jr z, .t
+            ld c, $FF
+            dec a
+            jr z, .w
+            inc a
+            ld c, a
+            ld a, 8
+            ldh [cv_bk], a
+            jr .w
+.t:         ld a, e
+            add a, low(NES_RAM + $7A0)
+            ld e, a
+            ld a, high(NES_RAM + $7A0)
+            adc a, 0
+            ld d, a
+            ld a, [de]
+            ld c, a
+.w:         pop de
+            pop hl
+            push hl
+            push de
+            call nt_put
+            pop de
+            pop hl
+            inc hl
+            inc e
+            ldh a, [h1_lim]
+            ld b, a
+            ld a, e
+            cp b
+            jr c, .c
+            ret
+; tile C at NES nametable address HL ($2000-$2FFF) -> nametable shadow and GB map (row marked),
+; as rt_ppu_w7 does for a cell (attribute bytes: the shadow only). A, BC, DE, HL clobbered.
+nt_put:     ld a, h
+            and $0F
+            rrca
+            rrca
+            and 3
+            ld b, a
+            ldh a, [mirror]
+            and a
+            ld a, b
+            jr z, .v
+            srl a
+            jr .n
+.v:         and 1
+.n:         ld b, a                         ; B = nametable after mirroring
+            ld a, h
+            and 3
+            ld h, a                         ; HL = offset in it
+            push hl
+            ld a, b
+            add a, a
+            add a, a
+            add a, h
+            add a, high(NT_SH)
+            ld h, a
+            ld a, MAP_BANK                  ; (NT_SH, MAP_SH: WRAM bank MAP_BANK)
+            ldh [rSVBK], a
+            ld [hl], c
+            pop hl
+            ld a, h
+            cp 3
+            jr nz, .cell
+            ld a, l
+            cp $C0
+            jr nc, .x
+.cell:      call cell_map                   ; HL = GB map address
+            ld a, h
+            sub $98 - high(MAP_SH)
+            ld d, a
+            ld e, l
+            ld a, c
+            ld [de], a
+            ldh a, [cv_live]                ; condensed names on screen: the cell's VRAM bank
+            and a                           ;   bit (ATTR_SH = MAP_SH + $400) as cv_bk says
+            jr z, .nb
+            ld a, d
+            add a, 4
+            ld d, a
+            ld a, [de]
+            and $F7
+            ld b, a
+            ldh a, [cv_bk]
+            or b
+            ld b, a
+            ld a, [de]
+            cp b
+            jr z, .nb
+            ld a, b
+            ld [de], a
+            ld a, 1
+            ldh [rSVBK], a
+            push hl
+            ld de, attr_dirty
+            call row_mark
+            pop hl
+            jp map_mark
+.nb:        ld a, 1
+            ldh [rSVBK], a
+            jp map_mark
+.x:         ld a, 1
+            ldh [rSVBK], a
+            ret
+
+; pre-hooks (translate.py FF3.pre, GB only): fix:F3E4 push text pointer / fix:F3ED pop text
+; pointer bracket each nested string; in the menus ($37 <> 0, no battle) a nested string read from
+; ROM ($3F >= $80 at its end: item, spell, job names; not a character's name in RAM) between the
+; columns $90 at the two calls is a span to condense (far_cvr). All registers and flags kept.
+cv_beg:     push af
+            ldh a, [bcam]
+            and a
+            jr nz, .x
+            ld a, [NES_RAM + $37]
+            and a
+            jr z, .x
+            ld a, [NES_RAM + $90]
+            or $80
+            ldh [cv_open], a
+.x:         pop af
+            ret
+cv_end:     push af
+            ldh a, [cv_open]
+            and a
+            jr z, .x
+            push bc
+            push hl
+            ld l, a
+            xor a
+            ldh [cv_open], a
+            ld a, [NES_RAM + $3F]
+            cp $80
+            jr c, .y
+            ldh a, [cv_n]
+            cp 4
+            jr nc, .y
+            ld h, a
+            ld a, l
+            and $7F
+            ld l, a                         ; L = start
+            ld a, [NES_RAM + $90]
+            cp l
+            jr z, .y
+            jr c, .y
+            ld b, a                         ; B = end
+            ld a, h
+            add a, low(cv_s)
+            ld c, a
+            ld a, l
+            ldh [c], a
+            ld a, c
+            add a, 4
+            ld c, a
+            ld a, b
+            ldh [c], a
+            ld a, h
+            inc a
+            ldh [cv_n], a
+.y:         pop hl
+            pop bc
+.x:         pop af
+            ret
+; far call: HL = routine in the runtime tables bank (A, F, BC, DE pass; HL clobbered)
+far_call:   push af
+            ld a, RT_TABLES
+            ld [MBC5_BANKL], a
+            pop af
+            call rt_jp_hl
+            push af
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            pop af
+            ret
+
 ; ------------------------------------------------------------------ fix:C486
 ; clear oam data (every frame): $0200-$02FF = $F0, $26 = 0. Out as the NES: X = $FF, A = 0,
 ; N = 0, Z = 1, C kept (no flag-changing instruction but dec b; B = 0 after).
@@ -1313,74 +1197,17 @@ nat_bd2a:   ld hl, NES_RAM + $264
             ret
 
 ; ------------------------------------------------------------------ p34:95E1
-; convert hex to decimal: $18/$19 -> $1A-$1D (ten-thousands .. tens, + $80; leading zeros $FF)
-; and $1E (units + $80), by repeated subtraction as the NES does. Left as the NES leaves it:
-; $18 = units, $19 = 0, $1F = $FF, $20 / $21 = 10 / 0, X = 3, Y kept; A and flags from the
-; leading-zero scan: the first nonzero digit (Z = 0, N = 0, C = 1) or, all zero, $FF (N = 1,
-; Z = 0, C = 1).
+; (body in the runtime tables bank: far_95e1)
 nat_95e1:
-            ld a, [NES_RAM + $18]
-            ld l, a
-            ld a, [NES_RAM + $19]
-            ld h, a
-            ld de, -10000
-            call .dg
-            ld [NES_RAM + $1A], a
-            ld de, -1000
-            call .dg
-            ld [NES_RAM + $1B], a
-            ld de, -100
-            call .dg
-            ld [NES_RAM + $1C], a
-            ld de, -10
-            call .dg
-            ld [NES_RAM + $1D], a
-            ld a, l
-            ld [NES_RAM + $18], a
-            add a, $80
-            ld [NES_RAM + $1E], a
-            xor a
-            ld [NES_RAM + $19], a
-            ld [NES_RAM + $21], a
-            ld d, a
-            ld b, a
-            ld a, $0A
-            ld [NES_RAM + $20], a
-            ld a, $FF
-            ld [NES_RAM + $1F], a
-            ld e, 3                         ; X
-            ld hl, NES_RAM + $1A
-.z:         ld a, [hl]                      ; leading zeros -> $FF
-            cp $80
-            jr nz, .nz
-            ld a, $FF
-            ld [hl+], a
-            inc b
-            bit 2, b
-            jr z, .z
-            ld b, 0
-            ldh [nzv], a                    ; all zero: A = $FF, N = 1, Z = 0, C = 1
-            or a
-            scf
-            ret
-.nz:        ld b, 0                         ; A = the digit ($80 + d): Z = 0, N = 0, C = 1
             push af
-            xor a
-            ldh [nzv], a
+            ld a, RT_TABLES
+            ld [MBC5_BANKL], a
             pop af
-            scf
-            ret
-.dg:        ld b, $7F                       ; A = $80 + HL / K, HL = HL mod K (DE = -K)
-.dl:        inc b
-            add hl, de
-            jr c, .dl
-            ld a, l                         ; (one subtraction too many: add K back)
-            sub e
-            ld l, a
-            ld a, h
-            sbc a, d
-            ld h, a
-            ld a, b
+            call far_95e1
+            push af
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            pop af
             ret
 
 ; ------------------------------------------------------------------ fix:F8EA, F8E0, F8C5
@@ -2587,7 +2414,7 @@ far_fc27:   ld hl, NES_RAM                  ; seed: A + the zero page with carri
             ld a, e                         ; carry = bit 0 of $20 (the last ROR)
             rra
             ld c, $FF                       ; (Y = 255)
-            call nat_fcf5
+            call far_fcf5
             ld a, [NES_RAM + $1C]
             ld [NES_RAM + $18], a
             ld a, [NES_RAM + $1D]
@@ -2596,7 +2423,7 @@ far_fc27:   ld hl, NES_RAM                  ; seed: A + the zero page with carri
             ld [NES_RAM + $1A], a
             ld a, 4
             ld [NES_RAM + $1B], a           ; (loads keep the multiply's carry)
-            call nat_fc92
+            call far_fc92
             ld a, [NES_RAM + $1F]           ; SEC / SBC #2 / ORA $1E / BEQ / BCC
             sub 2
             jr c, .nf2                      ; ($1F < 2: keep)
@@ -3083,6 +2910,1034 @@ mnu_mark:   ld b, a                         ; attribute row A marked for the vbl
             ld [hl], a
             ld a, 1
             ldh [map_any], a
+            ret
+
+; ------------------------------------------------------------------ fix:FCF5
+; multiply (16-bit): $1C-$1F = $18:$19 * $1A:$1B, the NES loop step for step in registers
+; (same final $1A-$1F, A, carry). In: C (6502 carry) as the NES reads it. Out: X = 0, A = the
+; last $1F computed (0 if none), Z = 1, N = 0, C from the last ROR; Y kept.
+far_fcf5:   push af                         ; (unrolled: 16 steps)
+            ld a, c
+            ldh [nt_y], a
+            ld a, [NES_RAM + $18]
+            ldh [n9_y], a
+            ld a, [NES_RAM + $19]
+            ldh [n9_x], a
+            ld a, [NES_RAM + $1A]
+            ld c, a
+            ld a, [NES_RAM + $1B]
+            ld b, a
+            ld de, 0                        ; D = $1F, E = $1E
+            ld hl, 0                        ; H = $1D, L = $1C
+            pop af                          ; (the incoming carry)
+            ld a, 0
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s0
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s0:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s1
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s1:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s2
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s2:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s3
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s3:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s4
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s4:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s5
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s5:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s6
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s6:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s7
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s7:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s8
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s8:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s9
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s9:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s10
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s10:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s11
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s11:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s12
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s12:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s13
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s13:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s14
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s14:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            rr b                            ; ROR $1B / ROR $1A
+            rr c
+            jr nc, .s15
+            ldh a, [n9_y]                   ; CLC / ADC: $1E += $18, $1F += $19 + carry
+            add a, e
+            ld e, a
+            ldh a, [n9_x]
+            adc a, d
+            ld d, a                         ; (A = the last $1F computed)
+.s15:        rr d                            ; ROR $1F $1E $1D $1C
+            rr e
+            rr h
+            rr l
+            push af
+            ld a, c
+            ld [NES_RAM + $1A], a
+            ld a, b
+            ld [NES_RAM + $1B], a
+            ld a, l
+            ld [NES_RAM + $1C], a
+            ld a, h
+            ld [NES_RAM + $1D], a
+            ld a, e
+            ld [NES_RAM + $1E], a
+            ld a, d
+            ld [NES_RAM + $1F], a
+            ld de, 0                        ; X = 0
+            ld b, 0
+            ldh a, [nt_y]
+            ld c, a
+            xor a
+            ldh [nzv], a
+            pop af                          ; A = the last $1F computed, carry of the last ROR
+            ld h, 0                         ; Z = 1 (DEX): from a register known to be 0
+            inc h
+            dec h
+            ret
+
+; ------------------------------------------------------------------ fix:FC92
+; divide (16-bit): $1C = $18:$19 / $1A:$1B, $1E = remainder, the NES loop step for step (same
+; final $18-$1F, A, carry). In: C (6502 carry). Out: as the NES RTS (early exit: A = 0, Z = 1,
+; X kept; else X = 0, A = $1F, Z = 1, N = 0, C from the last ROL); Y kept.
+far_fc92:   push af
+            xor a
+            ld [NES_RAM + $1C], a
+            ld [NES_RAM + $1D], a
+            ld [NES_RAM + $1E], a
+            ld [NES_RAM + $1F], a
+            ld a, [NES_RAM + $18]
+            ld h, a
+            ld a, [NES_RAM + $19]
+            or h
+            jr z, .zero
+            ld a, [NES_RAM + $1A]
+            ld h, a
+            ld a, [NES_RAM + $1B]
+            or h
+            jr z, .zero
+            ld a, c
+            ldh [nt_y], a
+            ld a, [NES_RAM + $18]           ; HL = dividend ($19:$18), shifted out as the
+            ld l, a                         ;   quotient bits come in: HL = quotient ($1D:$1C)
+            ld a, [NES_RAM + $19]
+            ld h, a
+            ld a, [NES_RAM + $1A]
+            ld c, a
+            ld a, [NES_RAM + $1B]
+            ld b, a                         ; BC = divisor, DE = remainder ($1F:$1E)
+            ld de, 0
+            pop af                          ; the NES's ROL $18 takes the incoming carry first,
+            ld a, 0                         ;   then the zeros ROL $1D shifts out: $18:$19 end
+            rra                             ;   as 0 : C << 7; the last ROL leaves C = 0
+            ldh [nt_a], a
+            ld a, 4
+            ldh [nt_x], a
+.lp:
+            add hl, hl                      ; (dividend out of H, quotient bit into L)
+            rl e
+            rl d
+            ld a, e                         ; SEC / SBC: remainder - divisor
+            sub c
+            ld e, a
+            ld a, d
+            sbc a, b
+            ld d, a
+            jr nc, .q0
+            ld a, e                         ; borrow: restore (ADC), quotient bit 0
+            add a, c
+            ld e, a
+            ld a, d
+            adc a, b
+            ld d, a
+            jr .n0
+.q0:        inc l                           ; quotient bit 1
+.n0:
+            add hl, hl                      ; (dividend out of H, quotient bit into L)
+            rl e
+            rl d
+            ld a, e                         ; SEC / SBC: remainder - divisor
+            sub c
+            ld e, a
+            ld a, d
+            sbc a, b
+            ld d, a
+            jr nc, .q1
+            ld a, e                         ; borrow: restore (ADC), quotient bit 0
+            add a, c
+            ld e, a
+            ld a, d
+            adc a, b
+            ld d, a
+            jr .n1
+.q1:        inc l                           ; quotient bit 1
+.n1:
+            add hl, hl                      ; (dividend out of H, quotient bit into L)
+            rl e
+            rl d
+            ld a, e                         ; SEC / SBC: remainder - divisor
+            sub c
+            ld e, a
+            ld a, d
+            sbc a, b
+            ld d, a
+            jr nc, .q2
+            ld a, e                         ; borrow: restore (ADC), quotient bit 0
+            add a, c
+            ld e, a
+            ld a, d
+            adc a, b
+            ld d, a
+            jr .n2
+.q2:        inc l                           ; quotient bit 1
+.n2:
+            add hl, hl                      ; (dividend out of H, quotient bit into L)
+            rl e
+            rl d
+            ld a, e                         ; SEC / SBC: remainder - divisor
+            sub c
+            ld e, a
+            ld a, d
+            sbc a, b
+            ld d, a
+            jr nc, .q3
+            ld a, e                         ; borrow: restore (ADC), quotient bit 0
+            add a, c
+            ld e, a
+            ld a, d
+            adc a, b
+            ld d, a
+            jr .n3
+.q3:        inc l                           ; quotient bit 1
+.n3:
+            ldh a, [nt_x]
+            dec a
+            ldh [nt_x], a
+            jp nz, .lp
+            xor a
+            ld [NES_RAM + $18], a
+            ldh a, [nt_a]
+            ld [NES_RAM + $19], a
+            ld a, l
+            ld [NES_RAM + $1C], a
+            ld a, h
+            ld [NES_RAM + $1D], a
+            ld a, e
+            ld [NES_RAM + $1E], a
+            ld a, d
+            ld [NES_RAM + $1F], a
+            ld de, 0
+            ld b, 0
+            ldh a, [nt_y]
+            ld c, a
+            xor a                           ; X = 0, A = $1F, Z = 1, N = 0, C = 0
+            ldh [nzv], a
+            ld a, [NES_RAM + $1F]
+            ret
+.zero:      xor a                           ; early RTS: A = 0, Z = 1, N = 0, C kept, X kept
+            ldh [nzv], a
+            pop af
+            ld a, 0
+            inc a
+            dec a
+            ret
+
+; ------------------------------------------------------------------ p34:95E1
+; convert hex to decimal: $18/$19 -> $1A-$1D (ten-thousands .. tens, + $80; leading zeros $FF)
+; and $1E (units + $80), by repeated subtraction as the NES does. Left as the NES leaves it:
+; $18 = units, $19 = 0, $1F = $FF, $20 / $21 = 10 / 0, X = 3, Y kept; A and flags from the
+; leading-zero scan: the first nonzero digit (Z = 0, N = 0, C = 1) or, all zero, $FF (N = 1,
+; Z = 0, C = 1).
+far_95e1:
+            ld a, [NES_RAM + $18]
+            ld l, a
+            ld a, [NES_RAM + $19]
+            ld h, a
+            ld de, -10000
+            call .dg
+            ld [NES_RAM + $1A], a
+            ld de, -1000
+            call .dg
+            ld [NES_RAM + $1B], a
+            ld de, -100
+            call .dg
+            ld [NES_RAM + $1C], a
+            ld de, -10
+            call .dg
+            ld [NES_RAM + $1D], a
+            ld a, l
+            ld [NES_RAM + $18], a
+            add a, $80
+            ld [NES_RAM + $1E], a
+            xor a
+            ld [NES_RAM + $19], a
+            ld [NES_RAM + $21], a
+            ld d, a
+            ld b, a
+            ld a, $0A
+            ld [NES_RAM + $20], a
+            ld a, $FF
+            ld [NES_RAM + $1F], a
+            ld e, 3                         ; X
+            ld hl, NES_RAM + $1A
+.z:         ld a, [hl]                      ; leading zeros -> $FF
+            cp $80
+            jr nz, .nz
+            ld a, $FF
+            ld [hl+], a
+            inc b
+            bit 2, b
+            jr z, .z
+            ld b, 0
+            ldh [nzv], a                    ; all zero: A = $FF, N = 1, Z = 0, C = 1
+            or a
+            scf
+            ret
+.nz:        ld b, 0                         ; A = the digit ($80 + d): Z = 0, N = 0, C = 1
+            push af
+            xor a
+            ldh [nzv], a
+            pop af
+            scf
+            ret
+.dg:        ld b, $7F                       ; A = $80 + HL / K, HL = HL mod K (DE = -K)
+.dl:        inc b
+            add hl, de
+            jr c, .dl
+            ld a, l                         ; (one subtraction too many: add K back)
+            sub e
+            ld l, a
+            ld a, h
+            sbc a, d
+            ld h, a
+            ld a, b
+            ret
+
+
+; ------------------------------------------------------------------ condensed names (far)
+; far_cvr (nat_h1, spans in cv_s / cv_e): for each span of the line $07A0: leading cells whose
+; code has no condensed glyph (item icons) kept, the run of glyph codes after them (trailing
+; blanks dropped) packed in the condensed letters (CV_W / CV_G: tools/latin_font.py COND, built
+; by build.py; 1-px gaps) into as many tiles as the pixels need, written to the sprite table's
+; staging copy (WRAM bank 3, tiles CV_LO-CV_HI, their old contents saved once in bank 7) and
+; marked for the vblank DMA; CV_SUB says per cell: tile (bank 1), blank, or keep.
+CV_T0 = $CD96               ; scratch (fixed WRAM): span start, run end, cells, tiles
+CV_T1 = $CD97
+CV_T2 = $CD98
+CV_T3 = $CD99
+CV_T4 = $CD9C
+far_cvr:    push bc
+            push de
+            ld hl, CV_SUB
+            xor a
+            ld b, 64
+.z:         ld [hl+], a
+            dec b
+            jr nz, .z
+            ld e, 0                         ; E = span index
+.sp:        ldh a, [cv_n]
+            cp e
+            jr z, .end
+            jr c, .end
+            push de
+            call cvr_span
+            pop de
+            inc e
+            jr .sp
+.end:       ld a, 1
+            ldh [rSVBK], a
+            pop de
+            pop bc
+            ret
+; span E
+cvr_span:   ld a, e
+            add a, low(cv_e)
+            ld c, a
+            ldh a, [c]
+            cp 64
+            jr c, .e1
+            ld a, 64
+.e1:        ld d, a                         ; D = end
+            ld a, e
+            add a, low(cv_s)
+            ld c, a
+            ldh a, [c]
+            ld e, a                         ; E = start
+.lead:      ld a, e                         ; skip blanks and cells without a glyph (icons)
+            cp d
+            ret nc
+            call cv_code
+            cp $FF
+            jr z, .skip
+            call cv_w
+            and a
+            jr nz, .run
+.skip:      inc e
+            jr .lead
+.run:       ld a, e
+            ld [CV_T0], a                   ; run start
+.r1:        ld a, e
+            cp d
+            jr nc, .r2
+            call cv_code
+            cp $FF
+            jr z, .r3
+            call cv_w
+            and a
+            jr z, .r2
+.r3:        inc e
+            jr .r1
+.r2:        ld a, e
+            ld [CV_T1], a                   ; run end (cells kept after it)
+.tr:        ld a, [CV_T0]                   ; trailing blanks off
+            cp e
+            jr nc, .t2
+            dec e
+            call cv_code
+            cp $FF
+            jr z, .tr
+            inc e
+.t2:        ld a, [CV_T0]
+            ld b, a
+            ld a, e
+            sub b
+            cp 2
+            ret c                           ; (one letter: nothing to gain)
+            ld [CV_T2], a                   ; letters
+            ld hl, PC_BUF                   ; strip clear
+            xor a
+            ld c, 64
+.sc:        ld [hl+], a
+            dec c
+            jr nz, .sc
+            ld c, 0                         ; C = pixel column
+            ld a, [CV_T0]
+            ld e, a
+.gl:        ld a, [CV_T0]
+            cp e
+            jr z, .g0
+            inc c                           ; (gap)
+.g0:        call cv_code
+            call cv_glyph                   ; draws at C, C += width; NC = fits
+            ret c
+            inc e
+            ld a, [CV_T2]
+            ld b, a
+            ld a, [CV_T0]
+            add a, b
+            cp e
+            jr nz, .gl
+            ld a, c                         ; tiles = (pixels + 7) / 8 <= cells of the run
+            add a, 7
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld [CV_T3], a
+            ld b, a
+            ld a, [CV_T0]
+            ld c, a
+            ld a, [CV_T1]
+            sub c
+            cp b
+            ret c
+            ld a, [CV_T0]                   ; tiles: allocated, drawn, CV_SUB
+            ld e, a
+            ld c, 0                         ; C = strip tile
+.tl:        call cv_alloc                   ; -> A = tile, C (carry) = none left
+            jr c, .fail
+            ld b, a
+            ld h, high(CV_SUB)
+            ld a, e
+            add a, low(CV_SUB)
+            ld l, a
+            ld [hl], b
+            call cv_put                     ; tile B <- strip tile C
+            inc e
+            inc c
+            ld a, [CV_T3]
+            cp c
+            jr nz, .tl
+            ld a, [CV_T1]                   ; the rest of the run: blank
+            ld d, a
+.bl:        ld a, e
+            cp d
+            jr nc, .ok
+            ld h, high(CV_SUB)
+            add a, low(CV_SUB)
+            ld l, a
+            ld [hl], 1
+            inc e
+            jr .bl
+.ok:        ld a, 1
+            ldh [cv_live], a
+            ret
+.fail:      ld a, [CV_T0]                   ; (no tiles left: the name stays as it is)
+            ld c, a
+.f1:        ld a, c
+            cp e
+            ret nc
+            ld h, high(CV_SUB)
+            add a, low(CV_SUB)
+            ld l, a
+            ld [hl], 0
+            inc c
+            jr .f1
+cv_code:    push hl                         ; A = the code in cell E of the line
+            ld a, e
+            add a, low(NES_RAM + $7A0)
+            ld l, a
+            ld a, high(NES_RAM + $7A0)
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            pop hl
+            ret
+cv_w:       push hl                         ; A = glyph width of code A (0: none)
+            ld h, high(CV_W)
+            ld l, a
+            ld a, [hl]
+            pop hl
+            ret
+; glyph of code A at pixel C of the strip (8 tiles x 8 rows, plane 0); C += width. C: past 64
+cv_glyph:   push de
+            ld l, a
+            ld h, high(CV_W)
+            ld a, [hl]                      ; width
+            ld d, a
+            add a, c
+            cp 65
+            jr nc, .no
+            push af
+            ld a, l                         ; HL = CV_G + 8 * code
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            add a, high(CV_G)
+            ld h, a
+            ld a, c                         ; DE = strip + 8 * (C >> 3); B = C & 7
+            and 7
+            ld b, a
+            ld a, c
+            and $38
+            ld e, a
+            ld d, high(PC_BUF)
+            ld a, e
+            add a, low(PC_BUF)
+            ld e, a
+            ld c, 8
+.row:       push bc
+            ld a, [hl+]
+            ld c, 0                         ; A:C = the row >> B
+            inc b
+            jr .s1
+.s0:        srl a
+            rr c
+.s1:        dec b
+            jr nz, .s0
+            ld b, a
+            ld a, [de]
+            or b
+            ld [de], a
+            ld a, e
+            add a, 8
+            ld e, a
+            ld a, [de]
+            or c
+            ld [de], a
+            ld a, e
+            sub 7
+            ld e, a
+            pop bc
+            dec c
+            jr nz, .row
+            pop af
+            ld c, a
+            pop de
+            and a
+            ret
+.no:        pop de
+            scf
+            ret
+; A = a free tile of CV_LO-CV_HI (marked used); carry: none (after one scan of the map)
+cv_alloc:   push bc
+            push de
+            push hl
+            ld a, 7
+            ldh [rSVBK], a
+            ld c, 0                         ; C = tiles tried, E = map scanned
+            ld e, 0
+.n:         ld a, [CV_NEXT]
+            inc a
+            cp CV_HI + 1
+            jr nc, .w
+            cp CV_LO
+            jr nc, .n2
+.w:         ld a, CV_LO
+.n2:        ld [CV_NEXT], a
+            ld d, a
+            call cv_bit                     ; HL = CV_USED byte, B = mask
+            ld a, [hl]
+            and b
+            jr z, .got
+            inc c
+            ld a, c
+            cp CV_HI - CV_LO + 1
+            jr c, .n
+            ld a, e
+            and a
+            jr nz, .none
+            inc e
+            call cv_rescan
+            ld c, 0
+            jr .n
+.got:       ld a, [hl]
+            or b
+            ld [hl], a
+            ld a, d
+            and a
+            jr .x
+.none:      scf
+.x:         push af
+            ld a, 1
+            ldh [rSVBK], a
+            pop af
+            pop hl
+            pop de
+            pop bc
+            ret
+cv_bit:     ld a, d                         ; D = tile -> HL = CV_USED + D >> 3, B = 1 << (D & 7)
+            ld h, high(CV_USED)
+            push af
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(CV_USED)
+cv_bit2:    ld l, a
+            pop af
+            and 7
+            ld b, 1
+            inc a
+.b:         dec a
+            ret z
+            sla b
+            jr .b
+cv_sbit:    ld a, d                         ; the same in CV_SAVED
+            ld h, high(CV_SAVED)
+            push af
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(CV_SAVED)
+            jr cv_bit2
+; tiles in use again from the map: cells with the bank-1 bit, plus this line's (bank 7 selected)
+cv_rescan:  ld hl, CV_USED
+            xor a
+            ld c, 32
+.c:         ld [hl+], a
+            dec c
+            jr nz, .c
+            ld de, ATTR_SH
+.s:         ld a, MAP_BANK
+            ldh [rSVBK], a
+            ld a, [de]
+            bit 3, a
+            jr z, .s2
+            ld a, d
+            sub 4
+            ld h, a
+            ld l, e
+            ld a, [hl]                      ; the tile
+            push de
+            ld d, a
+            ld a, 7
+            ldh [rSVBK], a
+            call cv_bit
+            ld a, [hl]
+            or b
+            ld [hl], a
+            pop de
+.s2:        inc de
+            ld a, d
+            cp high(ATTR_SH) + 4
+            jr nz, .s
+            ld a, 7
+            ldh [rSVBK], a
+            ld hl, CV_SUB
+            ld c, 64
+.l:         ld a, [hl+]
+            cp 2
+            jr c, .l2
+            push hl
+            ld d, a
+            call cv_bit
+            ld a, [hl]
+            or b
+            ld [hl], a
+            pop hl
+.l2:        dec c
+            jr nz, .l
+            ret
+; tile B (sprite table) <- strip tile C: its old contents saved once (bank 7), the 16 bytes
+; written to the staging copy (bank 3, plane 1 = $FF: ink colour 3 on colour 2), marked.
+; All registers kept.
+cv_put:     push bc
+            push de
+            push hl
+            ld d, b                         ; D = tile
+            push bc
+            ld a, 7
+            ldh [rSVBK], a
+            call cv_sbit
+            ld a, [hl]
+            and b
+            jr nz, .sv
+            ld a, [hl]
+            or b
+            ld [hl], a
+            call cv_toff                    ; HL = 16 * tile
+            ld c, 16
+.cp:        ld a, 3                         ; staging tile (bank 3) -> CV_BAK (bank 7; same
+            ldh [rSVBK], a                  ;   addresses: STAGE = CV_BAK = $D000)
+            ld a, h
+            add a, high(STAGE)
+            ld h, a
+            ld b, [hl]
+            ld a, 7
+            ldh [rSVBK], a
+            ld [hl], b
+            ld a, h
+            sub high(STAGE)
+            ld h, a
+            inc hl
+            dec c
+            jr nz, .cp
+.sv:        pop bc                          ; C = strip tile
+            ld a, 3
+            ldh [rSVBK], a
+            call cv_toff
+            ld a, h
+            add a, high(STAGE)
+            ld h, a
+            ld a, c
+            add a, a
+            add a, a
+            add a, a
+            add a, low(PC_BUF)
+            ld e, a
+            ld a, d                         ; (D: the tile, for the mark)
+            ld [CV_T4], a
+            ld d, high(PC_BUF)
+            ld b, 8
+.w:         ld a, [de]
+            ld [hl+], a
+            ld a, $FF
+            ld [hl+], a
+            inc de
+            dec b
+            jr nz, .w
+            ld a, 1
+            ldh [rSVBK], a
+            ld a, [CV_T4]                   ; mark PPU $1000 + 16 * tile
+            ld d, a
+            call cv_toff
+            ld a, h
+            or $10
+            ld h, a
+            call tile_mark
+            ld a, 1
+            ldh [chr_dirty], a
+            pop hl
+            pop de
+            pop bc
+            ret
+cv_toff:    ld l, d                         ; HL = 16 * D
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ret
+
+; far_cvoff ($580F, menus closed): the saved sprite tiles back into the staging copy (marked),
+; every bank-1 bit in the map's attributes cleared (rows marked), nothing in use
+far_cvoff:  push bc
+            push de
+            ldh a, [cv_live]
+            and a
+            jr z, .x
+            xor a
+            ldh [cv_live], a
+            ldh [cv_n], a
+            ldh [cv_open], a
+            ld d, CV_LO
+.t:         ld a, 7
+            ldh [rSVBK], a
+            ld a, d
+            rrca
+            rrca
+            rrca
+            and $1F
+            add a, low(CV_SAVED)
+            ld l, a
+            ld h, high(CV_SAVED)
+            ld a, d
+            and 7
+            ld b, 1
+            inc a
+.m:         dec a
+            jr z, .m2
+            sla b
+            jr .m
+.m2:        ld a, [hl]
+            and b
+            jr z, .nx
+            ld a, b
+            cpl
+            and [hl]
+            ld [hl], a
+            ld l, d
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld c, 16
+.cp:        ld a, 7
+            ldh [rSVBK], a
+            ld a, h
+            add a, high(CV_BAK)
+            ld h, a
+            ld b, [hl]
+            sub high(CV_BAK) - high(STAGE)
+            ld h, a
+            ld a, 3
+            ldh [rSVBK], a
+            ld [hl], b
+            ld a, h
+            sub high(STAGE)
+            ld h, a
+            inc hl
+            dec c
+            jr nz, .cp
+            ld l, d
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            or $10
+            ld h, a
+            push de
+            call tile_mark
+            pop de
+            ld a, 1
+            ldh [chr_dirty], a
+.nx:        inc d
+            ld a, d
+            cp CV_HI + 1
+            jr nz, .t
+            ld a, 7                         ; nothing in use
+            ldh [rSVBK], a
+            ld hl, CV_USED
+            xor a
+            ld c, 32
+.u:         ld [hl+], a
+            dec c
+            jr nz, .u
+            ld a, MAP_BANK                  ; bank-1 bits off
+            ldh [rSVBK], a
+            ld hl, ATTR_SH
+.a:         res 3, [hl]
+            inc hl
+            ld a, h
+            cp high(ATTR_SH) + 4
+            jr nz, .a
+            ld a, $FF
+            ld hl, attr_dirty
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            ld a, 1
+            ldh [map_any], a
+.x:         ld a, 1
+            ldh [rSVBK], a
+            pop de
+            pop bc
             ret
 
 section bank 0, nat_end0

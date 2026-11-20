@@ -33,7 +33,8 @@ Static: 673 PPU call sites, 58 APU, 25 MMC5, 1763 glue calls in the translated c
 
 ## Order of work
 1. **OAM clear** (fix:C486, every frame): native `nat_c486` (done 2026-11-20, -9% busy time).
-2. **Text and windows** (menus first): the line printer (fix:F692 "draw one line of text"), the
+2. **Text and windows** (menus first; 2026-11-20: the one-row line flush is native, `nat_h1`,
+   with the condensed names; windows / screen init next): the line printer (fix:F692 "draw one line of text"), the
    window frame drawer (3D:AAF1 / fix:F44B), the menu screen init (fix:F7BB): native routines
    that write the GB map (and the attribute cells) directly from the text buffer $0780 / $07A0,
    with the NES's RAM results kept (buffer, $1F / $90 counters, nametable shadow only where the

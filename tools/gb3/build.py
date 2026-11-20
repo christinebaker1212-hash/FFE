@@ -300,6 +300,36 @@ SMSG_P:     db $FF, $7F, $B5, $56, $4A, $29, $00, $00
 """ % (len(t), len(mp), len(st), len(sm), SAVE_ROW0 + 2, db(t), db(bytes(mp)), db(st), db(bytes(sm)), db(sf))
 
 
+def cv_glyph_src():
+    """condensed-name glyphs for the native line printer (native.s far_cvr): CV_W ($6000, runtime
+    tables bank) = width per text code (0: not condensed, e.g. icons), CV_G ($6100) = 8 rows
+    per code, left-aligned (tools/latin_font.py COND, as the English job tiles; digits from the
+    normal letters, trimmed; descenders one row down; the space 2 px)"""
+    sys.path.insert(0, os.path.join(ROOT, 'tools'))
+    from latin_font import COND, G, DESC
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('ff3ins', os.path.join(ROOT, 'tools', 'ff3', 'insert.py'))
+    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
+    W = bytearray(256); R = bytearray(256 * 8)
+    def put(code, rows, desc):
+        w = len(rows[0])
+        rr = (['.' * w] + list(rows)) if desc else (list(rows) + ['.' * w])
+        rr = (rr + ['.' * w] * 8)[:8]
+        W[code] = w
+        for y, r in enumerate(rr): R[code * 8 + y] = sum(0x80 >> x for x, v in enumerate(r) if v == '#')
+    for ch, code in ins.ENC.items():
+        if ch == ' ': continue
+        if ch in COND: put(code, COND[ch], ch in DESC)
+        elif ch in G:
+            rows = list(G[ch]); cols = [x for x in range(len(rows[0])) if any(r[x] == '#' for r in rows)]
+            put(code, [r[cols[0]:cols[-1] + 1] for r in rows], ch in DESC)
+    W[0xFF] = 2                                            # space (empty rows)
+    lig = ['#.....', '#.....', '..###.', '.#....', '..##..', '....#.', '.###..']   # "'s" (code $C9)
+    put(ins.LIG_S, lig, False)
+    db = lambda b: '\n'.join('    db ' + ', '.join('$%02X' % v for v in b[i:i + 16]) for i in range(0, len(b), 16))
+    return 'section bank RT_TABLES, $6000\nCV_W:\n%s\nCV_G:\n%s\n' % (db(W), db(R))
+
+
 def oam_attr_src():
     """OAM_ATTR ($3D00, bank 0): NES sprite attribute byte -> CGB OAM attributes (palette
     bits 0-1, priority bit 5 -> bit 7, horizontal / vertical flip bits 6 / 7 -> bits 5 / 6);
@@ -337,6 +367,11 @@ def main():
         print('layout: %d patches -> %s' % (len(log), nes))
     srcdir = os.path.join(ROOT, 'build', 'ff3', 'src_gb' if gb else 'src_en')
     source_base(src, nes, srcdir, gb)
+    import translate                         # natives found in the ExRAM image (the English
+    img = open(nes, 'rb').read()[16 + 64 * 0x2000:16 + 64 * 0x2000 + 0x400]   #   patch's code)
+    k = img.find(bytes.fromhex('200AF4A200BDA0078D0720'))   # h_flush .one: JSR $F40A / LDX #0 / LDA $07A0,X / STA $2007
+    if k >= 0 and not os.environ.get('GB3_NO_NATIVE_TEXT'): translate.FF3.ext[('ex', 0x5C00 + k)] = ('nat_h1', 'NZC')
+    else: print('  h_flush not found: one-row lines through $2007')
     covs = sorted(glob.glob(os.path.join(opt['--cov'], 'c*.bin')))   # optional: stack-trick flags
     t = time.time()
     cm = CodeMap(nes, srcdir, covs).build()
@@ -360,7 +395,7 @@ def main():
     # (the cross-bank stubs continue bank 0 right after the runtime, up to OAM_ATTR at $3C00)
     head, sep, rest = prog.partition('section bank DYN_BANK')
     stubs = head.split('\n', 1)[1] if head.startswith('section bank 0') else head
-    src_all = rt + '\n' + stubs + '\n' + gb1.nes_rgb_src() + '\n' + oam_attr_src() + '\n' + dmg_msg_src() + '\n' + sep + rest
+    src_all = rt + '\n' + stubs + '\n' + gb1.nes_rgb_src() + '\n' + oam_attr_src() + '\n' + dmg_msg_src() + '\n' + cv_glyph_src() + '\n' + sep + rest
     open(opt['--out'] + '.s', 'w').write(src_all)
     print('N-branch peephole: %d' % getattr(rc, 'n_npeep', 0))
     print('translated: %d instructions, %d code banks (%.1fs), %d dynamic targets'

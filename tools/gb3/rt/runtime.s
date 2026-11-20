@@ -43,7 +43,17 @@ OVR_R      = $CD9A          ; $580A row, $580B first column (fixed WRAM)
 OVR_C      = $CD9B
 TEST_PAD   = $CD9E          ; $A5: test runner input mode (dev builds only) gbrun.c)
 LK_TAB     = $DA00          ; dynamic-target lookup cache (512 bytes, WRAM bank RT_WBANK; lookup)
-PC_BUF     = $CD00          ; rt_ppu_copy: one piece (<= 32 bytes; the stack's far end, never reached)
+PC_BUF     = $CD00          ; rt_ppu_copy: one piece (<= 32 bytes; the stack's far end, never reached);
+                            ;   far_cvr: the glyph strip (64)
+CV_SUB     = $CD40          ; far_cvr -> nat_h1: per cell of the line: 0 keep, 1 blank, else the
+                            ;   condensed tile (VRAM bank 1) (= NC_BUF, free while nat_h1 runs)
+CV_LO      = $10            ; condensed-name tiles: sprite pattern table (VRAM bank 1) $10-$DF,
+CV_HI      = $DF            ;   unused by the menus' sprites; their tiles saved in WRAM bank 7
+CV_BAK     = $D000          ;   ($D000 + 16 * tile) and put back when the menu closes ($580F)
+CV_SAVED   = $DE00          ; (WRAM bank 7) tiles saved (bit each)
+CV_USED    = $DE20          ;   tiles in use (bit each)
+CV_NEXT    = $DE40          ;   last tile given
+CV_TRY     = $DE41          ;   allocation: tiles tried, map scanned
 NC_BUF     = $CD40          ; nat_chr64: 64 bytes for a nametable destination
 MAP_SH     = $D000          ; GB map (VRAM bank 0 $9800-$9BFF) and its attributes (VRAM bank 1),
 ATTR_SH    = $D400          ;   1KB each, in WRAM bank MAP_BANK; dirty rows copied by DMA in the
@@ -166,6 +176,13 @@ mnu_b:      ds 1
 wrap_d:     ds 1                            ; field: SCY step at the NES's vertical seam (0: none)
 wrap_l:     ds 1                            ;   and its LYC line
 attr_st:    ds 1                            ; ATTR_STALE in use (menu closed)
+h1_lim:     ds 1                            ; nat_h1: end cell of the run
+cv_n:       ds 1                            ; condensed names (native text, far_cvr): spans of
+cv_open:    ds 1                            ;   this line (count; open span's start + $80;
+cv_s:       ds 4                            ;   starts; ends), any bank-1 cell in the map
+cv_e:       ds 4
+cv_live:    ds 1
+cv_bk:      ds 1                            ;   (nt_put: 8 = the cell's tile is in VRAM bank 1)
 sram_busy:  ds 1                            ; frames since the last save-RAM write < 30: no soft reset
 hram_end:   ds 1
 
@@ -1173,6 +1190,9 @@ rt_ppu_w7:
             ldh [wc_mh], a
             ldh a, [wv]
             ld [hl], a
+            ldh a, [cv_live]                ; (a condensed name's cell: its VRAM bank bit off)
+            and a
+            call nz, cv_clr_hl
             ld a, 1
             ldh [rSVBK], a
             ei
@@ -1292,7 +1312,15 @@ rt_ppu_w7:
             ldh [rSVBK], a
             ld a, c
             ld [de], a
-            ld a, 1
+            ldh a, [cv_live]                ; (a condensed name's cell: its VRAM bank bit off)
+            and a
+            jr z, .ncv
+            push hl
+            ld h, d
+            ld l, e
+            call cv_clr_hl
+            pop hl
+.ncv:       ld a, 1
             ldh [rSVBK], a
             ld a, l                         ; row already marked last time: skip
             and $E0
@@ -1862,6 +1890,25 @@ attr_apply: ldh [c_val], a
 
 ; HL = GB map address ($9800-$9BFF): mark its row in map_dirty (map_mark) or in the bitmap at
 ; DE (row_mark). A, F, D, E clobbered; HL, B, C kept.
+; HL = MAP_SH cell (WRAM bank MAP_BANK selected): a condensed name's cell (VRAM bank 1) back to
+; the BG table's bank, its attribute row marked. A clobbered; BC, DE, HL kept.
+cv_clr_hl:  push hl
+            ld a, h
+            add a, 4
+            ld h, a
+            bit 3, [hl]
+            jr z, .x
+            res 3, [hl]
+            push de
+            ld a, h
+            sub high(ATTR_SH) - $98
+            ld h, a
+            ld de, attr_dirty
+            call row_mark
+            pop de
+.x:         pop hl
+            ret
+
 map_mark:   ld de, map_dirty
 row_mark:   ld a, h                         ; row = (H & 3) << 3 | L >> 5: byte H & 3, bit L >> 5
             and 3
@@ -2451,9 +2498,13 @@ rt_mmc_w580C:                               ;   count * 4 + palette (far_580C)
             push hl
             ld hl, far_580C
             jr far_mmc
+rt_mmc_w580F:                               ; menus closed: condensed-name tiles off (far_cvoff)
+            push af
+            push hl
+            ld hl, far_cvoff
+            jr far_mmc
 rt_mmc_w580D:
 rt_mmc_w580E:
-rt_mmc_w580F:
             ret
 
 ; ------------------------------------------------------------------ ROM data reads
@@ -2772,7 +2823,13 @@ rt_ppu_copy:
             push de
 .s3:        ld a, [bc]
             ld [hl+], a
-            inc c
+            ldh a, [cv_live]
+            and a
+            jr z, .s3n
+            dec hl
+            call cv_clr_hl
+            inc hl
+.s3n:       inc c
             dec e
             jr nz, .s3
             pop de

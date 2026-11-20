@@ -97,6 +97,10 @@ class FF3:
            ('p34', 0x8F57): ('nat_8f57', 'NZC'),     # sort attack order list
            ('fix', 0xDEEA): ('nat_deea', 'NZ'),      # copy tiles to vram
            ('fix', 0xC486): ('nat_c486', 'NZ')}      # clear oam data ($0200-$02FF = $F0)
+    # GB-only calls at the start of an NES instruction (registers and flags kept): the text
+    # engine's push / pop of the text pointer bracket nested strings (names) for the native
+    # line printer's condensed names (native.s cv_beg / cv_end)
+    pre = {('fix', 0xF3E4): 'cv_beg', ('fix', 0xF3ED): 'cv_end'}
     for _a, _n in zip(range(0xFD3C, 0xFD41), ('nat_fd3c', 'nat_fd3d', 'nat_fd3e', 'nat_fd3f', 'nat_fd40')):
         ext[('fix', _a)] = (_n, 'NZC')               # asl x6 .. x2
     for _a, _n in zip(range(0xFD43, 0xFD48), ('nat_fd43', 'nat_fd44', 'nat_fd45', 'nat_fd46', 'nat_fd47')):
@@ -548,6 +552,8 @@ class Emitter:
     def run(self):
         i = self.i; mn = i.mn; rc = self.rc
         k = self.k
+        if k in getattr(rc.g, 'pre', {}):
+            self.o('call ' + rc.g.pre[k])
         if k in rc.g.ext:
             self.o('jp ' + rc.g.ext[k][0]); return
         if k in rc.g.idioms:

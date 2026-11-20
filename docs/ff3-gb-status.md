@@ -399,6 +399,27 @@ Results per item: `docs/gb-release-checklist.md` (FF3 column); every item passes
 NES running): plan and measurements in `docs/ff3-native-plan.md` (tool `tools/gb3/nesmap.py`).
 - First step: FF3's per-frame OAM clear (fix:C486) native (`nat_c486`): busy GB time -9%, lag
   explore 2000-12000 +0.6%; firstdiff explore 12000 identical.
+- Native line printer: the English one-row line flush (ExRAM h_flush from `.one`, found by
+  pattern in build.py) is `nat_h1`: the line $07A0 straight into the nametable shadow and the
+  GB map (`nt_put`), no `$2006` / `$2007`; the NES tail at $F715 kept. firstdiff explore 12000 /
+  magic / save identical; menu screens pixel-identical to the old path (`GB3_NO_NATIVE_TEXT=1`
+  builds the old path for comparison). Bank 0 room: the 16-bit multiply / divide and the
+  hex-to-decimal natives moved to the runtime tables bank behind stubs (806 bytes free).
+- **Condensed names (owner: all job, item and spell names in the condensed font, in lists and
+  menus; not in sentences)**, made by the native line printer: GB-only pre-hooks (translate.py
+  `FF3.pre`) at fix:F3E4 / F3ED (push / pop text pointer) record the columns of each nested ROM
+  string in a menu ($37 <> 0, not in battle) - item, spell and job names (a character's name is
+  in RAM: not marked). Per line, `far_cvr` packs each name (icons and leading blanks kept,
+  trailing blanks dropped) in `latin_font.COND` glyphs (1-px gaps, as the English long job names;
+  table CV_W / CV_G built by build.py `cv_glyph_src`) into as many tiles as its pixels need, in the
+  sprite pattern table's VRAM bank 1 (tiles $10-$DF, unused by the menus' sprites; their old
+  contents saved in WRAM bank 7, put back when the menu closes: bank 88 restore writes $580F).
+  The name's cells get the CGB attribute bank bit (`nt_put`, `cv_bk`); any later write to such a
+  cell clears it (`cv_clr_hl` in rt_ppu_w7 / rt_ppu_copy while `cv_live`). Tiles in use are found
+  again from the map's bank-1 cells when the pool runs out. RAM unchanged (the NES ROM only gains
+  `sta $580F`): firstdiff magic / job identical; item, job, equip, magic screens checked; the field
+  after closing the menu pixel-identical to the old path (sprite tiles back).
+  Not yet: battle item / magic lists (battle sprites use the sprite table), shops to check.
 
 ## Known open items
 - **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3: all items pass in
