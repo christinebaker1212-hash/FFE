@@ -982,3 +982,37 @@ mu_attr:    push bc
             pop de
             pop bc
             ret
+
+; fix:C46E "clear OAM data" (every frame): $0200-$02FF = $F0, $26 = 0. Exit as the NES:
+; A = 0, X = $FF, N = 0, Z = 1, carry as on entry.
+hle_oamclr_b:
+            push af                         ; (the caller's carry)
+            ld hl, NES_RAM + $200
+            ld a, $F0
+            ld e, 16
+.l:         ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec e
+            jr nz, .l
+            pop af
+            ld a, 0
+            ld [NES_RAM + $26], a
+            ldh [nzv], a
+            ld e, 1
+            dec e                           ; Z = 1, carry kept
+            ld e, $FF
+            ret

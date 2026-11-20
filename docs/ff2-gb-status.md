@@ -498,6 +498,10 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   write) and a step comes every 8 frames. Result (lagcheck, random 30000): DMG +9.2% ->
   +8.1%; the walking windows measured before 17041 / 17101: +21 / +25 -> +10 / +8 frames per
   60. RAM identical (random 30000, DMG and CGB); shots of the walking scenes match the NES.
+- OAM clear (fix:C46E) unrolled in the HLE bank (`hle_oamclr_b`): DMG +8.1% -> +7.8%. RAM
+  identical (random 30000, DMG and CGB). Throne-room stretch profile (waits 21400-22100):
+  sprite conversion (rt_io_w4014) 16%, OAM clear 7% (before unrolling), memory-read glue
+  (nes_rd / rt_rd_8 / rt_izy_rd: a bank switch per ROM byte) ~16%.
 - Next (step 1, third part): the remaining field costs (dialogue window: text printer
   fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
   then screen loads, music, sprites. Earlier plan text:
