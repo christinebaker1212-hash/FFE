@@ -285,6 +285,17 @@ gbnames:
     lda #0
     sta $24
     jmp names2
+winh:               ; menu window height (FF3 $8BC3: 4 rows on the GB): $1A bit 7 = a list
+    lda $1A         ;   window, 8 rows (the item / magic lists), and the GB's tall list camera
+    and #$80        ;   ($5807; open bus on the NES)
+    sta $5807
+    asl a
+    lda #4
+    bcc .h
+    asl a
+.h:
+    sta $30
+    rts
 '''
 NAMES2_SRC = '''
 NW = $5F2C
@@ -519,19 +530,174 @@ def battle(r):
     r.patch(B2F, 0xB39E, 'F0', 'F8', 'confused: step back 8 px')
     # battle windows: FF3's rows from 19 (row 18 is the enemy animations': hidden on the
     # GB), 4 rows of text (one tile row per line)
-    r.patch(B34, 0x8BC3, 'A9 08', 'A9 04', 'windows: 4 rows')
+    r.patch(B34, 0x8BC3, 'A9 08 85 30', 'A9 04 85 30', 'windows: 4 rows (list windows: 8, battle_messages)')
     r.patch(B34, 0x966A, 'A5 18', 'A9 00', 'text lines in the first buffer row (bconv)')
     r.patch(B34, 0x969C, 'A5 18', 'A9 00', 'text lines in the first buffer row (bconvb)')
     r.patch(B34, 0x967E, '0A', 'EA', 'bconv newline: one buffer row (was two)')
     r.patch(B34, 0x9BB0, 'A9 77 8D 0A 72 A9 79 8D 0B 72', 'EA' * 10, 'no HP header (on line 1 now)')
     r.patch(B34, 0x9CD4, 'A9 0B 85 18 A9 1E', 'A9 02 85 18 A9 15', 'party window cols 2-21')
     # cursors: command hand at NES x 16-31 (GB 0-15, over the window frame at the screen edge,
-    # as FF1) beside the text (col 4), one row per command; the list cursors one row per line
+    # as FF1) beside the text (col 4), one row per command
     r.patch(B34, 0x8B00, 'A8 10 B8 10 C8 10 D8 10', 'A0 18 A8 18 B0 18 B8 18', 'command cursor')
-    r.patch(B34, 0x8B08, 'A8 08 B8 08 C8 08 D8 08 A8 50 B8 50 C8 50 D8 50 A8 98 B8 98 C8 98 D8 98',
-            'A0 08 A8 08 B0 08 B8 08 A0 50 A8 50 B0 50 B8 50 A0 98 A8 98 B0 98 B8 98', 'list cursors: rows')
     for a in (0x9AD8, 0x9DD5):
         r.patch(B34, a, 'A9 01 85 18 A9 0A', 'A9 02 85 18 A9 0B', 'command / names window cols 2-11')
+
+
+# battle item list (owner, 2026-11-20): pages instead of FF3's sideways scroll. The cursor
+# column ($63) is always the left one ($66); its window at cols 2-16, the next column at
+# cols 17-31 (its edge shows at the GB's right); both are 8-row list windows ($1A bit 7: the
+# GB's tall list camera). The page routines take the place of the scroll routines.
+ITEMPG_SRC = '''
+POSI = $5F2D
+    org $B2A7
+pgright:            ; (scroll item list right) next page
+    inc $66
+    jmp pgdraw
+pgleft:             ; (scroll item list left) previous page
+    dec $66
+pgdraw:
+    lda $66
+    ldx #0
+    jsr drawcol
+    lda $66
+    clc
+    adc #1
+    ldx #1
+    jsr drawcol
+    lda $67         ; the selected item's cursor (cursor 1): on its page only
+    beq .hide
+    lda $69
+    cmp $66
+    bne .hide
+    lda #$A8
+    ldx $68
+    beq .y
+    clc
+.yl:
+    adc #$10
+    dex
+    bne .yl
+.y:
+    sta $1C
+    lda #$1C
+    sta $1D
+    lda #1
+    sta $1A
+    jmp $892E
+.hide:
+    lda $1C
+    pha
+    lda #$F0
+    sta $1C
+    lda #1
+    sta $1A
+    jsr $892E
+    pla
+    sta $1C
+    rts
+drawcol:            ; column A (0 = the hands, 1-8 inventory, 9 = none) at position X
+    stx POSI        ;   (0 left, 1 right)
+    cmp #9
+    bcs .blank
+    tax
+    beq .eq
+    dex
+    txa
+    asl a
+    asl a
+    asl a
+    sta $3D
+    jsr $B48B       ; draw inventory column (text)
+    jmp posopen
+.eq:
+    jmp $B419       ; draw equipped items (its window: posopen)
+.blank:
+    lda #$FF
+    ldx #7
+.b:
+    sta $34,x
+    dex
+    bpl .b
+    jsr $B1D8       ; (blank rows)
+posopen:
+    ldx POSI
+    lda POSL,x
+    sta $18
+    lda POSR,x
+    sta $19
+    lda #$83        ; both borders, list window
+    sta $1A
+    jmp $8B38
+redrawk:            ; (after an item use / swap) column X again, if shown
+    txa
+    ldx #0
+    cmp $66
+    beq .go
+    inx
+    sec
+    sbc #1
+    cmp $66
+    bne .no
+    adc #0
+.go:
+    jmp drawcol
+.no:
+    rts
+redraw0:
+    ldx #0
+    jmp redrawk
+iteminit:           ; the first page: columns 1 and 2
+    lda #1
+    sta $66
+    ldx #0
+    jsr drawcol
+    lda #2
+    ldx #1
+    jmp drawcol
+POSL:
+    .db $02, $11
+POSR:
+    .db $10, $1F
+RHT:                ; the hands' labels (FF3 wrote Japanese "right hand" / "left hand" codes
+    .db $9B, $BE, $91, $A4, $B1, $A7    ;   that the English font shows as "fGS" / "aPnS"):
+LHT:                ;   "R.Hand", "L.Hand"
+    .db $95, $BE, $91, $A4, $B1, $A7
+'''
+
+
+def items_pages(r):
+    B35 = 0x35
+    m = r.module(ITEMPG_SRC)
+    assert m['org'] + len(m['bytes']) <= 0xB419, hex(m['org'] + len(m['bytes']))
+    o = r.off(B35, 0xB2A7)
+    assert r.d[o:o + 4].hex() == 'a566c906'
+    r.d[o:r.off(B35, 0xB419)] = m['bytes'] + b'\xEA' * (0xB419 - 0xB2A7 - len(m['bytes']))
+    r.mods.append(dict(m, where=(B35, 0xB2A7 & 0x1FFF)))
+    r.log.append((B35, 0xB2A7, 'item list pages (in place of the scroll routines)'))
+    L = m['labels']
+    j = lambda a: '%02X %02X' % (a & 0xFF, a >> 8)
+    patch = r.patch
+    # POSI ($5F2D) is read by the first "draw equipped items" of the menu before a page is drawn
+    r.patch(0x40, 0x832D, 'FF', '00', 'item page position = 0 at reset (ExRAM image)')
+    patch(B35, 0xAF16, '20 62 B3', '20 ' + j(L['pgleft']), 'item list: previous page')
+    patch(B35, 0xAF41, '20 A7 B2', '20 ' + j(L['pgright']), 'item list: next page')
+    patch(B35, 0xAF37, 'A5 66 C9 07', 'A5 66 C9 08', 'item list: page to the last column too')
+    patch(B35, 0xADB9, 'A9 78 85 10', 'A9 00 85 10', 'item list: no scroll')
+    init = r.off(B35, 0xAE40)
+    assert r.d[init:init + 7].hex() == 'a900853d208bb4' and r.d[r.off(B35, 0xAE77):r.off(B35, 0xAE7A)].hex() == '20388b'
+    r.d[init:r.off(B35, 0xAE7A)] = bytes.fromhex('20' + j(L['iteminit']).replace(' ', '')) + b'\xEA' * (0xAE7A - 0xAE40 - 3)
+    r.log.append((B35, 0xAE40, 'item list: first page'))
+    patch(B35, 0xB47C, 'A9 01 85 18 A9 0F 85 19 A9 03 85 1A 4C 38 8B',
+            '4C ' + j(L['posopen']) + ' EA' * 12, 'equipped items: page position')
+    patch(B35, 0xB601, 'CA 8A 20 3F FD', '4C ' + j(L['redrawk']) + ' EA EA', 'item list: redraw a shown column')
+    patch(B35, 0xB5F9, 'A9 FF 8D 73 75 4C 19 B4', 'A9 FF 8D 73 75 4C ' + j(L['redraw0']), 'item list: redraw the hands if shown')
+    patch(B35, 0xB4E8, 'A9 08', 'A9 18', 'item cursor: hand over the window frame')
+    r.patch(0x34, 0x8B28, 'A8 08 B8 08 C8 08 D8 08', 'A8 18 B8 18 C8 18 D8 18', 'item list cursor table: x')
+    patch(B35, 0xAF3D, 'C5 63 F0 03', 'C5 63 EA EA', 'item list: right always turns the page')
+    lab = ('A2 05 BD %s 9D 0D 72 BD %s 9D 41 72 CA 10 F1' % (j(L['RHT']), j(L['LHT'])))
+    patch(B35, 0xB449, 'A9 C0 8D 01 72 8D 35 72 A9 9C 8D 0F 72 8D 44 72 A9 A9 8D 0D 72 A9 90 8D 0E 72 '
+          'A9 A4 8D 41 72 A9 99 8D 42 72 A9 B1 8D 43 72', lab + ' EA' * (41 - 17),
+          'the hands: English labels R.Hand / L.Hand')
 
 
 def battle_messages(r):
@@ -575,6 +741,9 @@ def battle_messages(r):
     t = m['labels']['tgtnames']
     for a in (0xA84E, 0xA9AF, 0xB9D4):
         r.patch(0x35, a, 'A9 10 20 0E FA', '20 %02X %02X EA EA' % (t & 0xFF, t >> 8), 'names while targeting')
+    w = n1['labels']['winh']
+    r.patch(B34, 0x8BC3, 'A9 04 85 30', '20 %02X %02X EA' % (w & 0xFF, w >> 8), 'window height: 4, list windows 8')
+    items_pages(r)
     # the close call ($94DF LDA $4B / JSR $8E14) -> msgclose
     c = m['labels']['msgclose']
     r.patch(B34, 0x94E0, '4B 20 14 8E', '4B 20 %02X %02X' % (c & 0xFF, c >> 8), 'close message window')

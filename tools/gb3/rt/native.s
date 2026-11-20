@@ -633,101 +633,16 @@ nat_f897:
 ; tile marked, the GB map cleared and the attributes reset (palette 0, the BG table's bank)
 ; by DMA in the next vblank (map_flush). Out: A = X = Y = 0, Z = 1, N = 0, C kept;
 ; PPU address $3000, latch reset.
-nat_9f98:
+nat_9f98:                                   ; (body in the runtime tables bank: far_9f98)
             push af
-            xor a
-            ldh [wc_n], a                   ; (the PPU address moves: no cached run)
+            ld a, RT_TABLES
+            ld [MBC5_BANKL], a
             pop af
-              push af
-            ld a, 2                         ; staging tables (WRAM banks 2, 3)
-.sb:        ldh [rSVBK], a
-            ld hl, STAGE
-            xor a
-            ld b, 0                         ; 256 x 16 bytes
-.c1:        ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            dec b
-            jr nz, .c1
-            ldh a, [rSVBK]
-            and 7                           ; (SVBK reads with bits 3-7 set)
-            inc a
-            cp 4
-            jr c, .sb
-            ld a, 1
-            ldh [rSVBK], a
-            ld hl, NT_SH                    ; nametables
-.c2:        xor a
-            ld [hl+], a
-            ld a, h
-            cp high(NT_SH) + 8
-            jr c, .c2
-            ld a, MAP_BANK                  ; GB map: tile 0; attributes: palette 0, the BG
-            ldh [rSVBK], a                  ;   table's bank
-            ld hl, MAP_SH
-.c5:        xor a
-            ld [hl+], a
-            ld a, h
-            cp high(MAP_SH) + 4
-            jr c, .c5
-            ldh a, [bg_bank]
-            ld b, a
-.c3:        ld a, b
-            ld [hl+], a
-            ld a, h
-            cp high(ATTR_SH) + 4
-            jr c, .c3
-            ld a, 1
-            ldh [rSVBK], a
-            ldh a, [bcam]                   ; (battle cameras: the window rows' bank)
-            and a
-            ldh a, [spl_bank]
-            call nz, rebank_spl
-            ld a, $FF
-            ld hl, map_dirty                ; (map_dirty, attr_dirty: 8 bytes in a row)
-            ld b, 8
-.c6:        ld [hl+], a
-            dec b
-            jr nz, .c6
-            ld hl, TILE_DIRTY               ; all 512 tiles
-            ld a, $FF
-.c4:        ld [hl+], a
-            inc l
-            dec l
-            jr nz, .c4
-            ld a, 1
-            ldh [chr_dirty], a
-            ldh [map_any], a
-            xor a
-            ldh [mr_hi], a
-            dec a
-            ldh [tm_hi], a
-            xor a
-            ldh [ppu_latch], a
-            ldh [ppu_stat], a
-            ldh [ppu_vl], a
-            ldh [nzv], a
-            ld a, $30
-            ldh [ppu_vh], a
-            ld bc, 0
-            ld de, 0
-            pop af                          ; (C kept)
-            ld a, 0
-            inc a
-            dec a                           ; Z = 1
+            call far_9f98
+            push af
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            pop af
             ret
 
 ; ------------------------------------------------------------------ fix:FCF5
@@ -2742,3 +2657,108 @@ nat_deea:   push af                         ; (C kept)
             dec a                           ; Z = 1 (DEX), carry kept
             ldh a, [nt_a]
             ret
+
+; ------------------------------------------------------------------ far natives
+; Cold natives, in the runtime tables bank (RT_TABLES, mapped by their bank-0 stubs; they
+; call only bank-0 code and make no ROM data reads, so no NES interrupt runs inside them).
+nat_end0:
+section bank RT_TABLES, $4000
+far_9f98:
+            push af
+            xor a
+            ldh [wc_n], a                   ; (the PPU address moves: no cached run)
+            pop af
+              push af
+            ld a, 2                         ; staging tables (WRAM banks 2, 3)
+.sb:        ldh [rSVBK], a
+            ld hl, STAGE
+            xor a
+            ld b, 0                         ; 256 x 16 bytes
+.c1:        ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec b
+            jr nz, .c1
+            ldh a, [rSVBK]
+            and 7                           ; (SVBK reads with bits 3-7 set)
+            inc a
+            cp 4
+            jr c, .sb
+            ld a, 1
+            ldh [rSVBK], a
+            ld hl, NT_SH                    ; nametables
+.c2:        xor a
+            ld [hl+], a
+            ld a, h
+            cp high(NT_SH) + 8
+            jr c, .c2
+            ld a, MAP_BANK                  ; GB map: tile 0; attributes: palette 0, the BG
+            ldh [rSVBK], a                  ;   table's bank
+            ld hl, MAP_SH
+.c5:        xor a
+            ld [hl+], a
+            ld a, h
+            cp high(MAP_SH) + 4
+            jr c, .c5
+            ldh a, [bg_bank]
+            ld b, a
+.c3:        ld a, b
+            ld [hl+], a
+            ld a, h
+            cp high(ATTR_SH) + 4
+            jr c, .c3
+            ld a, 1
+            ldh [rSVBK], a
+            ldh a, [bcam]                   ; (battle cameras: the window rows' bank)
+            and a
+            ldh a, [spl_bank]
+            call nz, rebank_spl
+            ld a, $FF
+            ld hl, map_dirty                ; (map_dirty, attr_dirty: 8 bytes in a row)
+            ld b, 8
+.c6:        ld [hl+], a
+            dec b
+            jr nz, .c6
+            ld hl, TILE_DIRTY               ; all 512 tiles
+            ld a, $FF
+.c4:        ld [hl+], a
+            inc l
+            dec l
+            jr nz, .c4
+            ld a, 1
+            ldh [chr_dirty], a
+            ldh [map_any], a
+            xor a
+            ldh [mr_hi], a
+            dec a
+            ldh [tm_hi], a
+            xor a
+            ldh [ppu_latch], a
+            ldh [ppu_stat], a
+            ldh [ppu_vl], a
+            ldh [nzv], a
+            ld a, $30
+            ldh [ppu_vh], a
+            ld bc, 0
+            ld de, 0
+            pop af                          ; (C kept)
+            ld a, 0
+            inc a
+            dec a                           ; Z = 1
+            ret
+
+
+section bank 0, nat_end0

@@ -47,6 +47,7 @@ BCAM_Y     = 48             ;   area x 20-159 at GB x 0-139, the party column at
 WCAM_X     = 16             ;   windows (NES rows 19-24 -> GB rows 12-17) at column 2 / row 7,
 WCAM_DY    = 8              ;   from GB line 96 (a LYC interrupt sets SCX / SCY in that line's
 SPLIT_LY   = 96             ;   hblank); NES row 18 (the enemy animations') is not shown
+TALL_LY    = 64             ;   (list windows: NES rows 19-28 from GB line 64, rows 14-18 hidden)
 SPL_ROW    = 18             ;   map rows from 18: the BG pattern table of the split's $2000
 
 section hram, $FF80
@@ -117,6 +118,8 @@ cam_x:      ds 1
 cam_y:      ds 1
 bcam:       ds 1                            ; battle cameras on ($5806, tools/gb3/layout.py)
 spl_bank:   ds 1                            ;   then map rows SPL_ROW.. carry the split's BG table
+spl_oam:    ds 1                            ; battle split: GB OAM Y of the split line (+16),
+spl_dy:     ds 1                            ;   window camera Y - battlefield camera Y
 ovr_st:     ds 1                            ; screen camera ($5802/$5803): 1 set, 2 shown (back to
                                             ;   the field camera when the screen goes off)
 uw_bank:    ds 1
@@ -275,9 +278,13 @@ stat_isr:   push af                         ; line SPLIT_LY - 1: the window came
             ldh a, [spl_x]
             add a, WCAM_X
             ldh [rSCX], a
+            push hl
             ldh a, [rSCY]
-            add a, WCAM_DY
+            ld l, a
+            ldh a, [spl_dy]
+            add a, l
             ldh [rSCY], a
+            pop hl
             pop af
             reti
 
@@ -1818,15 +1825,23 @@ rt_io_w4014:                                ; OAM DMA from NES page A -> GB shad
             jr nc, .s3
             cp 9
             jr c, .s3
-            cp SPLIT_LY + 16                ; (battle, below the split: the window camera;
-            jr c, .tp0                      ;   NES row 18 hidden)
-            ld [de], a
-            ldh a, [bcam]
+            ld [de], a                      ; (battle, below the split: the window camera;
+            ldh a, [bcam]                   ;   what the split hides is not shown)
             and a
+            jr z, .tp1
+            push hl
+            ldh a, [spl_oam]
+            ld l, a
             ld a, [de]
-            jr z, .tp0
-            sub WCAM_DY
-            cp SPLIT_LY + 16
+            cp l
+            jr c, .tp2
+            ld h, a
+            ldh a, [spl_dy]
+            cpl
+            inc a
+            add a, h
+            cp l
+            pop hl
             jr c, .s3
             ld [de], a
             inc l
@@ -1835,6 +1850,8 @@ rt_io_w4014:                                ; OAM DMA from NES page A -> GB shad
             add a, b
             add a, BCAM_X - WCAM_X
             jr .xc
+.tp2:       pop hl
+.tp1:       ld a, [de]
 .tp0:       ld [de], a                      ; (GB Y, kept if X is in view too)
             inc l
             inc l
@@ -2061,6 +2078,10 @@ rt_mmc_w5806:                               ; GB layout: battle cameras on (A <>
             ldh [cam_x], a
             ld a, BCAM_Y
             ldh [cam_y], a
+            ld a, SPLIT_LY + 16
+            ldh [spl_oam], a
+            ld a, WCAM_DY
+            ldh [spl_dy], a
             ld a, SPLIT_LY - 1
             ldh [rLYC], a
             ld a, $40                       ; STAT interrupt on LY = LYC
@@ -2103,7 +2124,21 @@ rt_mmc_w5803:                               ;   and Y; back to the field camera 
             ret
 rt_mmc_w5804:
 rt_mmc_w5805:
-rt_mmc_w5807:
+rt_mmc_w5807:                               ; GB layout, battle: list window (A <> 0: NES rows
+            push af                         ;   19-28 from GB row 8, the split at line 64) or
+            and a                           ;   the normal windows (rows 19-24 from GB row 12)
+            ld a, SPLIT_LY + 16
+            ld l, WCAM_DY
+            jr z, .n
+            ld a, TALL_LY + 16
+            ld l, WCAM_DY + (SPLIT_LY - TALL_LY)
+.n:         ldh [spl_oam], a
+            sub 17
+            ldh [rLYC], a
+            ld a, l
+            ldh [spl_dy], a
+            pop af
+            ret
 rt_mmc_w5808:
 rt_mmc_w5809:
 rt_mmc_w580A:
