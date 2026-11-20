@@ -473,8 +473,27 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   sprites native, DMG shading at build time). Profile buckets of the slow DMG stretch:
   picture 39%, glue 21%, game code 16%, OAM clear 7% (now native), music 7%, sprites 6%,
   timing loops 4%.
-- Next: step 1 of that plan, the field + dialogue path (native map and text drawing,
-  build-time DMG shading); Select menu with suspend (design with the owner).
+- **Step 1, first part (2026-11-20): tile palettes fixed by the field tileset (DMG / SGB).**
+  When a normal map is (re)loaded ("init map" fix:D09A calls "load map palette" at fix:D0B4
+  through a bank-0 stub at $83CA that writes the GB-only register $580B first), the runtime
+  derives each tile's palette from the tileset in NES RAM ($0500-$06FF tiles, $0700 palette
+  per metatile) at the next LCD-on (`tset_fix_b`, rt/ff2_banked.s): a tile drawn with one
+  palette gets `TILE_PAL` bit 7 and skips the cell lookups in `dmg_cell` / `dmg_attr` / the
+  scan; a new pattern (`dmg_markw`) clears the bit. `dmg_maps` moved to the HLE bank (bank 0
+  was full). RAM identical (random 30000, DMG and CGB); DMG shots match.
+  **No speed gain yet** (DMG +9.2%): in the slow stretches the work is the dialogue window
+  (its attribute writes fix:D2FE every few frames and its text tiles fix:F069: font / frame
+  tiles >= $80, not in the tileset) and the map tiles used with two palettes (30 of 101 in
+  the measured map). Profile after the change: rt_ppu_w7 13%, dmg_attr 11%, own_set 7%,
+  quad_chk 6%, cell_pal 4%, dmg_cell 4%.
+  (Debug note: `GB_SAVE=K` needs a frame limit beyond wait K, else an old build/gb2.state is
+  read.)
+- Next (step 1, second part): native field drawing that knows each metatile's palette
+  (fix:D5BA builds the row / column buffer $0780-$07CF with the metatile attributes at
+  $07C0): draw the buffer natively into the GB map with tiles pre-shaded per palette (a
+  second GB tile for the tiles used with two palettes, in free BG slots), and the dialogue
+  window's tiles fixed to the window palette, so neither path needs per-write cell lookups;
+  then the text printer. Select menu with suspend (design with the owner).
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).

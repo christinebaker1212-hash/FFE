@@ -1168,6 +1168,16 @@ rt_mmc_w5807:
 rt_mmc_w5808:
             ld [OVR_R0], a
             ret
+rt_mmc_w580B:                               ; GB-only: a field tileset was loaded (b0:9D6E ->
+            push af                         ;   stub after "load map properties"): the DMG
+            ld a, 1                         ;   fixes tile palettes at the next LCD-on
+            ld [TSET_PEND], a
+            pop af
+            ret
+tset_fix:   ld a, HLE_BANK                  ; (rt_ppu_w1, LCD going on; DMG / SGB)
+            ld [$2000], a
+            call tset_fix_b
+            jp hle_back
 rt_mmc_w5809:
             ld [OVR_R1], a
             ret

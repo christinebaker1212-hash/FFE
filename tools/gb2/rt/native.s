@@ -586,6 +586,8 @@ cell_fast:  push bc
             ld l, d
             ld h, high(TILE_PAL)
             ld a, [hl]
+            bit 7, a                        ; (fixed by the field tileset: kept)
+            jr nz, .pk
             cp e
             jr z, .pk
             ld [hl], e
@@ -1033,6 +1035,7 @@ retile_b:   push bc
             ld l, a
             ld h, high(TILE_PAL)
             ld a, [hl]
+            and 3
             add a, a
             add a, a
             add a, low(PAL_MAP)
@@ -1428,6 +1431,7 @@ vt_code:    push bc
             ld l, a                         ; PAL_MAP row of its palette: v0, v3
             ld h, high(TILE_PAL)
             ld a, [hl]
+            and 3
             add a, a
             add a, a
             add a, low(PAL_MAP)
@@ -1513,6 +1517,7 @@ vt_code:    push bc
             ld l, a
             ld h, high(TILE_PAL)
             ld a, [hl]
+            and 3
             add a, a
             add a, a
             add a, low(PAL_MAP)

@@ -14,6 +14,7 @@ QL         = $CE00
 QV         = $CF00
 NT_SH      = $D000          ; NES nametable shadow (2 × 1KB, vertical mirroring)
 PAL_SH     = $D800          ; NES palette RAM shadow (32)
+TSET_PEND  = $DCF8          ; DMG: a field tileset was loaded ($580B): fixed palettes at LCD-on
 PAL_DM     = $DCD0          ; CGB: palette entries changed since the last write (bitmap, 4)
 PAL_LEM    = $DCF7          ; CGB: emphasis bits | 1 of the last write
 DBG        = $D820          ; fault info: code, HL, SP, stack top
@@ -1507,6 +1508,9 @@ rt_ppu_w1:  push af
             ldh a, [is_cgb]
             and a
             jr nz, .lon
+            ld a, [TSET_PEND]               ; DMG: a field tileset loaded (fix palettes first)
+            and a
+            call nz, tset_fix
             ldh a, [dmg_scan]               ; DMG: tiles' palettes (and the palettes in use)
             push af                         ;   from the whole map if it was drawn with the
             and a                           ;   LCD off; then the palette maps if the palettes

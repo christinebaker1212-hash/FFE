@@ -141,6 +141,8 @@ dmg_markw:  push hl
             ld l, a
             ld h, high(CODED)
             ld [hl], $FF
+            ld h, high(TILE_PAL)            ; (new pattern: no longer the tileset's)
+            res 7, [hl]
             pop hl
             jp dmg_mark
 ; sh_p0 / sh_p1 (a tile row's planes) -> sh_m0..3 = masks of the pixels of index 0..3
@@ -235,6 +237,12 @@ dmg_cell:   push bc
             push de
             push hl
             ld d, a                         ; tile
+            push hl                         ; palette fixed by the field tileset (tset_fix):
+            ld l, a                         ;   no cell lookup, only the parked check
+            ld h, high(TILE_PAL)            ;   (L = the cell's offset is needed below)
+            bit 7, [hl]
+            pop hl
+            jr nz, .pk
             ld a, b
             and 4
             ldh [sh_nt], a
@@ -352,6 +360,25 @@ dmg_attr:   push bc
             ld a, d                         ; rows 30-31: attribute bytes, not cells
             cp 30
             jr nc, .s
+            ld a, d                         ; this nametable's tile there has a palette fixed
+            srl a                           ;   by the field tileset: nothing to re-shade
+            srl a
+            srl a
+            add a, high(NT_SH)
+            ld h, a
+            ldh a, [sh_nt]
+            add a, h
+            ld h, a
+            ld a, d
+            and 7
+            swap a
+            add a, a
+            or e
+            ld l, a
+            ld l, [hl]
+            ld h, high(TILE_PAL)
+            bit 7, [hl]
+            jr nz, .s
             call quad_chk                   ; quadrant whose palette did not change: skip
             jr z, .s
             call own_chk                    ; a cell another nametable drew: not this byte's
@@ -426,276 +453,11 @@ LUM_TAB:
 ; in the four BG palettes, darkest first, get 1 / 2 / 3, more than three levels being
 ; split into three groups at the two largest gaps between them. Tiles of palettes whose
 ; map changed are queued for re-coding. All colours black (faded out): nothing changes.
-dmg_maps:   push bc
-            push de
-            push hl
-            call bg_lmax
-            and a
-            jp z, .x
-            ld [REF_LMAX], a                ; brightness the BGP fade level is measured from
-            ld a, [PAL_SH]
-            call lum
-            ldh [sh_bk], a                  ; backdrop brightness
-            ld hl, LVF                      ; levels present (other than the backdrop's)
-            ld b, 9
-            xor a
-.cl:        ld [hl+], a
-            dec b
-            jr nz, .cl
-            ld c, 0
-.lv:        ld a, c
-            and 3
-            jr z, .mn
-            ld a, [PAL_USED]                ; palettes no cell uses: their colours left out
-            and a
-            jr z, .lu
-            ld b, a
-            ld a, c
-            srl a
-            srl a
-            inc a
-.lb:        rr b
-            dec a
-            jr nz, .lb
-            jr nc, .mn
-.lu:
-            ld l, c
-            ld h, high(PAL_SH)
-            ld a, [hl]
-            call lum
-            ld b, a
-            ldh a, [sh_bk]
-            cp b
-            jr z, .mn
-            ld a, b
-            add a, low(LVF)
-            ld l, a
-            ld h, high(LVF)
-            ld [hl], 1
-.mn:        inc c
-            ld a, c
-            cp 16
-            jr nz, .lv
-            ld e, 0                         ; LSL = the levels present, ascending; E = count
-            ld c, 0
-.ls:        ld a, c
-            add a, low(LVF)
-            ld l, a
-            ld h, high(LVF)
-            ld a, [hl]
-            and a
-            jr z, .ln
-            ld a, e
-            add a, low(LSL)
-            ld l, a
-            ld h, high(LSL)
-            ld [hl], c
-            inc e
-.ln:        inc c
-            ld a, c
-            cp 9
-            jr nz, .ls
-            xor a                           ; cuts (group ends): sh_s0 < sh_s1
-            ldh [sh_s0], a
-            inc a
-            ldh [sh_s1], a
-            ld a, e
-            cp 4
-            jr c, .asg
-            ld a, $FF
-            call .maxgap
-            ld d, a
-            call .maxgap
-            cp d
-            jr nc, .ord
-            ld b, a
-            ld a, d
-            ld d, b
-.ord:       ldh [sh_s1], a
-            ld a, d
-            ldh [sh_s0], a
-.asg:       ld a, e                         ; number of values in use
-            cp 4
-            jr c, .ng
-            ld a, 3
-.ng:        ld [NGRP], a
-            ld c, 0
-.as:        ld a, c
-            cp e
-            jr z, .pm
-            ld b, 1                         ; value = 1 + (i > cut 0) + (i > cut 1)
-            ldh a, [sh_s0]
-            cp c
-            jr nc, .a1
-            inc b
-.a1:        ldh a, [sh_s1]
-            cp c
-            jr nc, .a2
-            inc b
-.a2:        ld a, c
-            add a, low(LSL)
-            ld l, a
-            ld h, high(LSL)
-            ld a, [hl]                      ; level
-            ld d, a
-            add a, low(LVMAP)
-            ld l, a
-            ld h, high(LVMAP)
-            ld [hl], b
-            ld a, b                         ; GLUM[value] = its brightest level
-            add a, low(GLUM)
-            ld l, a
-            ld [hl], d
-            inc c
-            jr .as
-.pm:        ld c, 0                         ; palette
-.p:         ld a, c
-            add a, a
-            add a, a
-            ld l, a
-            ld h, high(PAL_SH)
-            ld de, RT_BUF
-            xor a
-            ld [de], a                      ; colour 0 -> 0
-            inc de
-            ld b, 3
-            ldh [sh_chg], a                 ; (0: all three like the backdrop so far)
-.pc:        inc l
-            ld a, [hl]
-            push hl
-            call lum
-            ld h, a
-            ldh a, [sh_bk]
-            cp h
-            ld a, 0
-            jr z, .pz
-            ld a, h
-            add a, low(LVMAP)
-            ld l, a
-            ld h, high(LVMAP)
-            ld a, [hl]
-            ld h, a
-            ld a, 1
-            ldh [sh_chg], a
-            ld a, h
-.pz:        pop hl
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .pc
-            ldh a, [sh_chg]                 ; a palette that is all backdrop keeps its map
-            and a
-            jr z, .nx
-            ld a, c                         ; compare with PAL_MAP[c]; copy; mark if changed
-            add a, a
-            add a, a
-            add a, low(PAL_MAP)
-            ld l, a
-            ld h, high(PAL_MAP)
-            ld de, RT_BUF
-            ld b, 4
-            xor a
-            ldh [sh_chg], a                 ; sh_chg: indices whose value changed (bit i)
-            inc a
-            ldh [sh_l1], a                  ; (bit of the index being compared)
-.cmp:       ld a, [de]
-            cp [hl]
-            jr z, .same
-            ld [hl], a
-            push bc
-            ldh a, [sh_l1]
-            ld b, a
-            ldh a, [sh_chg]
-            or b
-            ldh [sh_chg], a
-            pop bc
-.same:      ldh a, [sh_l1]
-            add a, a
-            ldh [sh_l1], a
-            inc de
-            inc hl
-            dec b
-            jr nz, .cmp
-            ldh a, [sh_chg]
-            and a
-            call nz, .markp
-.nx:        inc c
-            ld a, c
-            cp 4
-            jp nz, .p
-            call spr_maps
-.x:         pop hl
-            pop de
-            pop bc
-            ret
-.maxgap:    ; A = gap index to skip -> A = index i of the largest LSL[i+1] - LSL[i]
-            ldh [sh_l1], a                  ;   (the first one of equal gaps); keeps D, E
-            xor a
-            ldh [sh_l2], a
-            ldh [sh_l3], a
-            ld c, 0
-.mg:        ld a, c
-            inc a
-            cp e
-            jr nc, .mgx
-            ldh a, [sh_l1]
-            cp c
-            jr z, .mgn
-            ld a, c
-            add a, low(LSL)
-            ld l, a
-            ld h, high(LSL)
-            ld a, [hl+]
-            ld b, a
-            ld a, [hl]
-            sub b
-            ld b, a
-            ldh a, [sh_l2]
-            cp b
-            jr nc, .mgn
-            ld a, b
-            ldh [sh_l2], a
-            ld a, c
-            ldh [sh_l3], a
-.mgn:       inc c
-            jr .mg
-.mgx:       ldh a, [sh_l3]
-            ret
-.markp:     ; queue every tile coded for palette C that uses an index in sh_chg
-            push bc
-            ld hl, TILE_PAL
-.tk:        ld a, [hl]
-            cp c
-            jr nz, .tn
-            push hl
-            ld a, l                         ; its TILE_USE nibble
-            ld d, a
-            srl a
-            add a, low(TILE_USE)
-            ld l, a
-            ld h, high(TILE_USE)
-            ld a, [hl]
-            bit 0, d
-            jr z, .te
-            swap a
-.te:        and $0F
-            ld b, a
-            ldh a, [sh_chg]
-            and b
-            pop hl
-            jr z, .tn
-            ld a, l
-            call dmg_mark
-.tn:        inc l
-            jr nz, .tk
-            pop bc
-            ret
+dmg_maps:   ld a, HLE_BANK                  ; (the body is dmg_maps_b in bank HLE_BANK,
+            ld [$2000], a                   ;   rt/ff2_banked.s: bank 0 is full)
+            call dmg_maps_b
+            jp hle_back
 
-; BGP: value 0 = the backdrop's shade. Over a black backdrop, values 1-3 get dark grey /
-; light grey / white (two values: dark grey / white); otherwise each value the shade of its
-; brightest level. Darkened while the palettes are faded: one shade per two brightness
-; levels the brightest BG colour is below REF_LMAX (its level when the maps were last
-; computed). Returns A = BGP.
 dmg_bgp:    push bc
             push de
             push hl
@@ -1077,9 +839,11 @@ scan_cell:  push bc
             push af
             or [hl]
             ld [hl], a
-            ld l, c                         ; coded for palette B?
+            ld l, c                         ; coded for palette B? (fixed by the tileset: kept)
             ld h, high(TILE_PAL)
             ld a, [hl]
+            bit 7, a
+            jr nz, .pk
             cp b
             jr z, .pk
             ld [hl], b

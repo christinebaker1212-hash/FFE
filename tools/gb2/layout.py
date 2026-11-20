@@ -4868,10 +4868,29 @@ epage:                  ; fix:F399 (ending: epilogue pages, bank 24 gm_epage)
     put(rom, 31, 0xF399, bytes([0x20]) + L['epage'].to_bytes(2, 'little'), old=bytes.fromhex('20b0f3'))
 
 
+def field_tileset(rom):
+    """GB-only register $580B when a normal map is (re)loaded: "init map" (fix:D09A, also run
+    after a battle or menu) calls "load map palette" (b0:9C06) at fix:D0B4 once the tileset
+    ($0500-$077F) and graphics are in; that call goes through a stub that writes $580B first.
+    The world map's own call (fix:C864) is left alone (its tileset is not in RAM). The runtime
+    fixes the DMG shading of the tileset's tiles at the next LCD-on (rt/ff2_banked.s
+    tset_fix_b; docs/gb-native-presentation.md). Stub in bank 0's unused $83CA-$83FF."""
+    k = asm('''
+    org $83CA
+tsetld:
+    sta $580B
+    jmp $9CC3
+''')
+    assert k.org + len(k.bytes) <= 0x8400
+    put(rom, 0, k.org, k.bytes, old=bytes(len(k.bytes)))
+    put(rom, 31, 0xD0B4, bytes([0x20]) + k.labels['tsetld'].to_bytes(2, 'little'), old=bytes.fromhex('20069c'))
+
+
 def apply(rom):
     battle(rom)
     dialogue(rom)
     world_overview(rom)
+    field_tileset(rom)
     if os.environ.get('GB_END_TEST'):           # test builds only: Select on the field starts
         t = asm('    org $F0E2\n    jmp $F34D\n')       #   the ending (event $E7, fix:F34D)
         put(rom, 31, t.org, t.bytes)
