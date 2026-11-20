@@ -93,7 +93,10 @@ class FF2:
               # b11:9DB1-9DB8 LDA ($02),Y / STA $2007 / INY / BPL: battle intro tiles (rt/ff2.s)
               ('b11', 0x9DB1): ('hle_chr128', 0x9DB9, 'NZ'),
               # b11:9D82-9D8C LDA $79A8,X / STA $2007 / INX / CPX #$20 / BNE: battle palettes
-              ('b11', 0x9D82): ('hle_palup', 0x9D8D, 'NZC')}
+              ('b11', 0x9D82): ('hle_palup', 0x9D8D, 'NZC'),
+              # b11:9D24 STA ($24),Y / DEY / BPL; 9D4A LDA ($24),Y / STA ($26/$28/$2A),Y / INY /
+              # CPY #$10 / BNE (battle, every frame; rt/ff2_banked.s)
+              ('b11', 0x9D24): ('hle_bfill', 0x9D29, 'NZ'), ('b11', 0x9D4A): ('hle_bcopy', 0x9D57, 'NZC')}
     # battle NMI handlers (run by rt_nmi_run through the dynamic table; RTI = ret)
     nmi_handlers = [('b12', 0x9A79), ('b05', 0xA9A2)]
     idiom_code = {('fix', 0xFA91): bytes.fromhex('a9fa48a999486c4000'),
@@ -104,7 +107,9 @@ class FF2:
                   ('fix', 0xD93B): bytes.fromhex('a20acad0fda9108d0120'),
                   ('fix', 0xE69E): bytes.fromhex('b1808d0720c8d0f8'),
                   ('b11', 0x9DB1): bytes.fromhex('b1028d0720c810f8'),
-                  ('b11', 0x9D82): bytes.fromhex('bda8798d0720e8e020d0f5')}
+                  ('b11', 0x9D82): bytes.fromhex('bda8798d0720e8e020d0f5'),
+                  ('b11', 0x9D24): bytes.fromhex('91248810fb'),
+                  ('b11', 0x9D4A): bytes.fromhex('b12491269128912ac8c010d0f3')}
     skip = [('fix', 0xFA2C, 0xFA48), ('fix', 0xFEA1, 0xFEAD), ('fix', 0xFEAF, 0xFEBF)]   # waits (but their entries) + NMI return stubs
 
 

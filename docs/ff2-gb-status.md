@@ -611,6 +611,11 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   leaves carry 0 and the routine overwrites $00-$03 afterwards); idiom b11:9D82 (the 32
   battle palette bytes every other frame) -> `hle_palup` (unchanged entries only move the
   PPU address). Window +16 -> +11. RAM identical (random 1 DMG / CGB, random 2, form 40).
+- Battle frames: idioms b11:9D24 (STA ($24),Y / DEY / BPL: 64 OAM bytes $F0) -> `hle_bfill`
+  and b11:9D4A (16 bytes from ($24) to ($26), ($28), ($2A)) -> `hle_bcopy`, every battle
+  frame through the generic indirect helpers before (~35% of those frames on DMG). The
+  steady +6 battle windows (10021-10141, 12841) gone; no battle window above +2 after the
+  intro. RAM identical (random 1 DMG / CGB, random 2, form 40).
 - Status of the owner's three (DMG, random 1): overworld walking / sailing at parity (walk
   scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
   remaining: battle entry (load +19 net, intro +39 / +32), door loads (+56 single wait,

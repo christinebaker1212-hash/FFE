@@ -1390,6 +1390,12 @@ hle_bspr:   call rt_fcs                     ; b11:A43A draw battle character spr
 hle_palup:  call rt_fcs                     ; b11:9D82 battle palette upload (native)
             db HLE_BANK
             dw hle_palup_b
+hle_bfill:  call rt_fcs                     ; b11:9D24 battle OAM fill (native)
+            db HLE_BANK
+            dw hle_bfill_b
+hle_bcopy:  call rt_fcs                     ; b11:9D4A battle 16-byte copy (native)
+            db HLE_BANK
+            dw hle_bcopy_b
 hle_vtile:  call rt_fcs                    ; layout's vtile (banks 23 / 24: small-font tile upload)
             db HLE_BANK
             dw hle_vtile_b

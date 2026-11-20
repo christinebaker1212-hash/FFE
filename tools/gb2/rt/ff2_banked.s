@@ -2500,6 +2500,120 @@ hle_palup_b:
             dec l                           ; Z = 1, C = 1
             ret
 
+; b11:9D24-9D28 (battle, every frame): STA ($24),Y / DEY / BPL - A to ($24) + Y down to + 0.
+; Exit: Y = $FF, N = 1, Z = 0; A, X, carry kept.
+hle_bfill_b:
+            push af
+            ld d, a
+            bit 7, c                        ; (Y < $80, RAM below $0700: directly)
+            jr nz, .gen
+            ld a, [NES_RAM + $25]
+            cp $07
+            jr nc, .gen
+            add a, high(NES_RAM)
+            ld h, a
+            ld a, [NES_RAM + $24]
+            add a, c
+            ld l, a
+            jr nc, .h
+            inc h
+.h:         ld a, d
+            inc c
+.f:         ld [hl-], a
+            dec c
+            jr nz, .f
+            jr .x
+.gen:       ld a, d                         ; byte by byte
+            ld l, $24
+            call rt_izy_wr
+            dec c
+            bit 7, c
+            jr z, .gen
+.x:         ld c, $FF
+            ld d, 0
+            ld a, $80
+            ldh [nzv], a
+            pop af
+            push af
+            ld l, 1
+            inc l                           ; Z = 0
+            pop hl                          ; (A back, Z / carry as set: pop af would undo Z)
+            ld a, h
+            ret
+
+; b11:9D4A-9D55 (battle, every frame): LDA ($24),Y / STA ($26),Y / STA ($28),Y / STA ($2A),Y /
+; INY / CPY #$10 / BNE. Exit: A = the last byte, Y = $10, N = 0, Z = 1, C = 1; X kept.
+hle_bcopy_b:
+            ld a, [NES_RAM + $25]           ; all four pointers in RAM below $0700: directly
+            ld b, a
+            ld a, [NES_RAM + $27]
+            or b
+            ld b, a
+            ld a, [NES_RAM + $29]
+            or b
+            ld b, a
+            ld a, [NES_RAM + $2B]
+            or b
+            cp $07
+            jr nc, .gen
+.lp:        ld a, [NES_RAM + $24]           ; (each byte: 4 pointers + Y; < 16 bytes, so a
+            add a, c                        ;   page crossing is carried into the high byte)
+            ld l, a
+            ld a, [NES_RAM + $25]
+            adc a, high(NES_RAM)
+            ld h, a
+            ld d, [hl]
+            ld a, [NES_RAM + $26]
+            add a, c
+            ld l, a
+            ld a, [NES_RAM + $27]
+            adc a, high(NES_RAM)
+            ld h, a
+            ld [hl], d
+            ld a, [NES_RAM + $28]
+            add a, c
+            ld l, a
+            ld a, [NES_RAM + $29]
+            adc a, high(NES_RAM)
+            ld h, a
+            ld [hl], d
+            ld a, [NES_RAM + $2A]
+            add a, c
+            ld l, a
+            ld a, [NES_RAM + $2B]
+            adc a, high(NES_RAM)
+            ld h, a
+            ld [hl], d
+            inc c
+            ld a, c
+            cp $10
+            jr nz, .lp
+            jr .x
+.gen:       ld l, $24                       ; byte by byte
+            call rt_izy_rd
+            ld d, l
+            ld a, d
+            ld l, $26
+            call rt_izy_wr
+            ld l, $28
+            call rt_izy_wr
+            ld l, $2A
+            call rt_izy_wr
+            inc c
+            ld a, c
+            cp $10
+            jr nz, .gen
+.x:         ld b, 0
+            xor a
+            ldh [nzv], a
+            ld a, d
+            ld d, b
+            scf
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1, C = 1
+            ret
+
 section bank HLE_BANK, $7F00
 BITS8:      db 1, 2, 4, 8, 16, 32, 64, 128      ; (page start: low byte = bit number)
 
