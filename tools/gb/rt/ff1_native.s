@@ -1702,7 +1702,62 @@ vtile_b:    xor a
             inc e
             dec c
             jr nz, .cp
-            pop de
+            pop de                          ; the tile not in ROM (BG_LZ) and its shadow
+            push de                         ;   holding these rows already: nothing to
+            ld a, d                         ;   write, code or queue (the NES writes the
+            rrca                            ;   same bytes again when FF1 redraws a box)
+            rrca
+            rrca
+            and $1F
+            add a, low(BG_LZ)
+            ld l, a
+            ld h, high(BG_LZ)
+            ld a, d
+            and 7
+            ld b, 1
+            jr z, .zb
+.zs:        sla b
+            dec a
+            jr nz, .zs
+.zb:        ld a, 3
+            ld [$4000], a
+            ld a, [hl]
+            and b
+            ld c, a
+            xor a
+            ld [$4000], a
+            or c
+            jr nz, .wr
+            ld a, d
+            swap a
+            ld l, a
+            and $F0
+            ld c, a
+            ld a, l
+            and $0F
+            add a, high(BG_SHADOW)
+            ld h, a
+            ld l, c
+            ld de, RT_BUF
+            ld a, 1
+            ld [$4000], a
+            ld c, 8
+.cm:        ld a, [de]
+            cp [hl]
+            jr nz, .ne
+            inc hl
+            cp [hl]
+            jr nz, .ne
+            inc hl
+            inc e
+            dec c
+            jr nz, .cm
+            xor a
+            ld [$4000], a
+            jr .out
+.ne:        xor a
+            ld [$4000], a
+.wr:        pop de
             push de
             ld a, d
             swap a
@@ -16560,8 +16615,6 @@ q_put:      push bc
 section bank 0, $3170
 ; ---- DMG BG pages left in ROM (hle_chr_pages, a whole page with the LCD off): BG_LZ (cart RAM
 ; bank 3) marks the tiles not yet in the shadow, BG_LZS the ROM bank and address of each page.
-BG_LZ      = $A900
-BG_LZS     = $A920
 ; D = page, HL = its source (bank data_bank8): recorded, its 16 tiles marked. Keeps BC, DE, HL.
 bg_lazy:    push hl
             push bc
@@ -16822,3 +16875,295 @@ mrd:        push hl
             ld a, l
             pop hl
             ret
+
+; ---- gb_layout vbreak (and vcw), natively: the row from VC0 in VW tiles less VIND: VEND = its
+; end, VNEXT = the next row's start; VLIM, VLO, VSQ, VBRK, VCNT and Y (the last glyph's index)
+; as the NES routine leaves them. Its callers (vtext: JSR vclear, vrows: LDX VNEXT) use no
+; flag and no register after it; A / X / Y are set as on the NES all the same. Glyph widths
+; vw_gw60: a copy of the far bank's GW (build.py).
+VW_VW      = $AE9E
+VW_VIND    = $AE9F
+VW_VNEXT   = $AEA7
+VW_VC0     = $AEA8
+VW_VLIM    = $AEA9
+VW_VBRK    = $AEAA
+section bank PF_BANK, $6800
+vbrk_b:     ld a, [VW_VW]
+            add a, a
+            add a, a
+            add a, a
+            ld hl, VW_VIND
+            sub [hl]
+            ld [VW_VLIM], a
+            ld b, a                         ; B = VLIM
+            ld a, [VW_VC0]
+            ld e, a                         ; E = X
+            xor a
+            ld d, a                         ; D = VLO
+            ld [VW_VSQ], a
+            dec a
+            ld [VW_VBRK], a
+.l:         call .rd
+            and a
+            jr z, .all
+            cp $FE
+            jr z, .fe
+            cp $FD
+            jr nz, .nf
+            inc e                           ; $FD $80+n: VLO = 8n
+            call .rd
+            sub $80
+            add a, a
+            add a, a
+            add a, a
+            ld d, a
+            jr .ok
+.nf:        cp $FF
+            jr nz, .ch
+            ld a, e
+            ld [VW_VBRK], a
+            ld a, 3
+            jr .ad
+.ch:        call .cw
+.ad:        add a, d
+            ld d, a
+            jr z, .ok
+            dec a
+            cp b
+            jr z, .ok
+            jr nc, .over
+.ok:        inc e
+            jr nz, .l
+.all:       ld a, e
+            ld [VW_VEND], a
+            ld [VW_VNEXT], a
+            xor a
+.x:         ld h, a
+            ld a, d
+            ld [VW_VLO], a
+            ld a, h
+            ld b, 0
+            ld d, b
+            and a
+            ldh [nzv], a
+            ret
+.fe:        ld a, e
+            ld [VW_VEND], a
+            inc e
+            ld a, e
+            ld [VW_VNEXT], a
+            ld a, $FE
+            jr .x
+.over:      ld a, [VW_VBRK]
+            cp $FF
+            jr z, .cut
+            ld [VW_VEND], a
+            ld e, a
+            inc e
+            ld h, a
+            ld a, e
+            ld [VW_VNEXT], a
+            ld a, h
+            jr .x
+.cut:       ld a, e                         ; one word wider than the row: squeeze or cut
+            ld [VW_VSQ], a
+            ld a, [VW_VC0]
+            ld e, a
+            ld d, 0
+            xor a
+            ld [VW_VCNT], a
+.sw:        call .rd
+            and a
+            jr z, .swe
+            cp $FF
+            jr z, .swe
+            cp $FE
+            jr z, .swe
+            call .cw
+            add a, d
+            ld d, a
+            ld hl, VW_VCNT
+            inc [hl]
+            inc e
+            jr nz, .sw
+.swe:       ld a, d                         ; overflow = width - 1 - limit
+            dec a
+            sub b
+            jr c, .fit                      ; (fits after all: VLO = 0)
+            ld d, a
+            ld a, [VW_VCNT]
+            dec a
+            cp d
+            jr c, .nosq
+            jr .sq
+.fit:       ld d, 0
+.sq:        ld a, e                         ; the whole word on this row, VLO gaps dropped
+            ld [VW_VEND], a
+            call .rd
+            and a
+            jr z, .sq3
+            inc e
+.sq3:       ld a, e
+            ld [VW_VNEXT], a
+            ld a, d
+            ld [VW_VSQ], a
+            jr .x
+.nosq:      ld a, [VW_VSQ]                  ; cut at the overflowing letter
+            ld e, a
+            xor a
+            ld [VW_VSQ], a
+            ld a, [VW_VC0]
+            cp e
+            jr nz, .c2
+            inc e
+.c2:        ld a, e
+            ld [VW_VEND], a
+            ld [VW_VNEXT], a
+            xor a
+            jr .x
+.rd:        ld a, e                         ; A = VSTR[X]
+            add a, low(VW_VSTR)
+            ld l, a
+            ld a, high(VW_VSTR)
+            adc 0
+            ld h, a
+            ld a, [hl]
+            ret
+.cw:        sub VW_FIRST                    ; vcw (not a space): A = width + 1, Y = glyph
+            jr c, .cz
+            ld c, a
+            add a, low(vw_gw60)
+            ld l, a
+            ld a, high(vw_gw60)
+            adc 0
+            ld h, a
+            ld a, [hl]
+            and a
+            ret z
+            inc a
+            ret
+.cz:        xor a
+            ret
+
+; ---- gb_layout vtids, natively: VTID[k] for the VN cells from (VROW, VCOL) (the 9-column left
+; window's LPOOL tiles, else $A8 + 18(row-1) + col-2). Out as the NES routine: Y = VN, A / X
+; as its path leaves them, Z = C = 1 (CPY), N = 0; VLO. vw_lpool (page-aligned): the far
+; bank's 256 bytes from LPOOL (build.py), all an X can index.
+VW_VROW    = $AE9C
+VW_VCOL    = $AE9D
+VW_VTID    = NES_RAM + $0350
+section bank PF_BANK, $6C00
+vtids_b:    ld a, [$A927]                   ; (NES $6927: panel row 0, column 9)
+            cp $F9
+            jr nz, .full
+            ld a, [VW_VCOL]
+            cp 9
+            jr nc, .full
+            ld a, [VW_VROW]
+            dec a
+            ld [VW_VLO], a
+            ld h, a
+            add a, a
+            add a, a
+            add a, a
+            sub h
+            ld h, a
+            ld a, [VW_VCOL]
+            add a, h
+            sub 2
+            ld e, a                         ; X
+            ld a, [VW_VN]
+            ld b, a                         ; (0: 256 cells, as Y wraps)
+            ld c, a
+            ld hl, VW_VTID
+.l:         push hl
+            ld h, high(vw_lpool)
+            ld l, e
+            ld a, [hl]
+            pop hl
+            ld [hl+], a
+            inc e
+            dec b
+            jr nz, .l
+            jr .x
+.full:      ld a, [VW_VROW]
+            dec a
+            add a, a
+            ld [VW_VLO], a
+            ld h, a
+            add a, a
+            add a, a
+            add a, a
+            add a, h
+            ld hl, VW_VCOL
+            adc [hl]
+            adc $A6
+            ld d, a
+            ld a, [VW_VN]
+            ld b, a
+            ld c, a
+            ld hl, VW_VTID
+.f:         ld a, d
+            ld [hl+], a
+            inc d
+            dec b
+            jr nz, .f
+            ld a, d
+            ld d, b
+.x:         ld h, a
+            xor a
+            ldh [nzv], a
+            scf
+            ld a, h
+            ret
+
+; ---- gb_layout vtext's `.c` loop (LDY #0 / LDA VTID,Y / STA ($8A),Y / INY / CPY VN / BNE): the
+; row's cells show its tiles. Out: Y = VN, A = the last tile, Z = C = 1, N = 0; X kept.
+vtc_b:      ld hl, NES_RAM + $8A
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, h
+            sub $60
+            cp $1F
+            jr nc, .gen                     ; (save RAM below $7F00 only)
+            ld a, h
+            add a, $40
+            ld h, a
+            push de
+            ld a, [VW_VN]
+            ld b, a
+            ld c, a
+            ld de, VW_VTID
+.l:         ld a, [de]
+            ld [hl+], a
+            inc de
+            dec b
+            jr nz, .l
+            pop de
+.x:         ld h, a
+            xor a
+            ldh [nzv], a
+            scf
+            ld a, h
+            ret
+.gen:       ldh a, [code_bank]
+            push af
+            ld a, PF_BANK
+            ldh [code_bank], a
+            ld bc, 0
+.g:         ld hl, VW_VTID
+            add hl, bc
+            ld a, [hl]
+            ld l, $8A
+            call rt_izy_wr
+            inc c
+            ld a, [VW_VN]
+            cp c
+            jr nz, .g
+            pop af
+            ldh [code_bank], a
+            ld hl, VW_VTID - 1
+            add hl, bc
+            ld a, [hl]
+            jr .x

@@ -211,12 +211,35 @@ FAR_EXT = {'vtile': ('hle_vtile', 'NZC'),        # gb_layout.py's small-font til
 FAR_BANK = 40                                     # (8 KB bank of the far code)
 
 
+def vtids_at(prg):
+    """gb_layout vtids in the far bank (its bytes checked): (address, LPOOL address) or None."""
+    far = bytes(prg[FAR_BANK * 0x2000:(FAR_BANK + 1) * 0x2000])
+    hits = [m.start() for m in re.finditer(re.escape(bytes.fromhex('ad2769c9f9d02fad9d6ec909b028')), far)]
+    if len(hits) != 1: return None
+    b = bytearray(far[hits[0]:hits[0] + 0x5B])
+    lp = b[41] | b[42] << 8
+    b[41:43] = b'\0\0'
+    if b[40] != 0xBD or hashlib.sha1(b).hexdigest() != 'b6dad48f8ba3826c6a5e5e5de195cf57f93e1858': return None
+    if not 0xC000 <= lp <= 0xDF00: return None
+    return 0xC000 + hits[0], lp
+
+
+def lpool_table(prg):
+    """vw_lpool (PF bank, page-aligned) for vtids_b: the far bank's 256 bytes from LPOOL."""
+    v = vtids_at(prg)
+    if v is None: return 'section bank PF_BANK, $6B00\nvw_lpool:\n'
+    o = FAR_BANK * 0x2000 + v[1] - 0xC000
+    b = prg[o:o + 256]
+    return 'section bank PF_BANK, $6B00\nvw_lpool:\n' + '\n'.join(
+        '            db ' + ', '.join('$%02X' % x for x in b[i:i + 16]) for i in range(0, 256, 16)) + '\n'
+
+
 def vwf_tables(prg, far_sym):
     """The small-font glyph tables (widths GW, rows GR, codes $7A-$FF) copied from the far bank
     of the English NES ROM into the native bank for vstr_b (rt/ff1_native.s)."""
     n = 256 - 0x7A
     if 'GW' not in far_sym or 'GR' not in far_sym:
-        return 'VW_GR_NES = 0\nsection bank HLE_BANK, $7A00\nvw_gw:\nvw_gr:\nsection bank HLE_BANK, $6000\nVW_SHR:\n'
+        return 'VW_GR_NES = 0\nsection bank HLE_BANK, $7A00\nvw_gw:\nvw_gr:\nsection bank HLE_BANK, $6000\nVW_SHR:\nvw_gw60:\n' + lpool_table(prg)
     off = lambda a: FAR_BANK * 0x2000 + a - 0xC000
     gw = prg[off(far_sym['GW']):off(far_sym['GW']) + n]
     gr = prg[off(far_sym['GR']):off(far_sym['GR']) + 8 * n]
@@ -225,6 +248,7 @@ def vwf_tables(prg, far_sym):
     for sh in range(1, 8):
         shr += bytes(b >> sh for b in range(256)) + bytes((b << (8 - sh)) & 255 for b in range(256))
     return ('VW_GR_NES = $%04X\nsection bank HLE_BANK, $7A00\nvw_gw:\n%s\nvw_gr:\n%s\n' % (far_sym['GR'], rows(gw), rows(gr))
+            + 'section bank PF_BANK, $6700\nvw_gw60:\n%s\n' % rows(gw) + lpool_table(prg)
             + 'section bank HLE_BANK, $6000\nVW_SHR:\n%s\n' % rows(shr))
 
 
@@ -336,6 +360,28 @@ def main():
         rc.g.idioms[('far', 0xC000 + hits[0])] = ('pf:vscan_b', 0xC000 + hits[0] + len(pat), 'NZC')
     else:
         print('  vtext scan: not found, not native')
+    vbp = bytes.fromhex('ad9e6e0a0a0a38ed9f6e8da96eaea86ea9008d966e8d4603a9ff8daa6e')   # gb_layout vbreak
+    hits = [m.start() for m in re.finditer(re.escape(vbp), far)]   # (its bytes and vcw's checked)
+    vb = bytearray(far[hits[0]:hits[0] + 240]) if len(hits) == 1 else b''
+    vcw = vb[66] | vb[67] << 8 if vb and vb[65] == vb[148] == 0x20 and vb[66:68] == vb[149:151] else 0
+    if vb: vb[66:68] = vb[149:151] = b'\0\0'
+    vcb = far[vcw - 0xC000:vcw - 0xC000 + 25] if 0xC000 <= vcw < 0xDFE7 else b''
+    if (vb and hashlib.sha1(vb).hexdigest() == '820aeda23edf244d25f94b0322320f934a7efa5e' and
+            vcb[:11] == bytes.fromhex('c9fff00f38e97a900da8b9') and vcb[13:] == bytes.fromhex('f00718690160a90360a90060')):
+        rc.g.idioms[('far', 0xC000 + hits[0])] = ('pf:vbrk_b', 0xC000 + hits[0] + 96, 'NZC')
+    else:
+        print('  vbreak: not found, not native')
+    v = vtids_at(prg)                                # gb_layout vtids and vtext's cell loop
+    if v is not None:
+        rc.g.idioms[('far', v[0])] = ('pf:vtids_b', v[0] + 0x5A, 'NZC')
+    else:
+        print('  vtids: not found, not native')
+    pat = bytes.fromhex('a000b95003918ac8cc916ed0f5')
+    hits = [m.start() for m in re.finditer(re.escape(pat), far)]
+    if len(hits) == 1:
+        rc.g.idioms[('far', 0xC000 + hits[0])] = ('pf:vtc_b', 0xC000 + hits[0] + len(pat), 'NZC')
+    else:
+        print('  vtext cells: not found, not native')
     c62o = 62 * 0x2000 - 0xC000                     # c62:D25A PrepRowCol (with D1E6-D259) and
     if (hashlib.sha1(prg[c62o + 0xD1E6:c62o + 0xD2EB]).hexdigest() == '713eeab7a15c90a4e8e489b2ea423246f4319182'   # D403 (attribute positions):
             and os.environ.get('GB_PRC') != '0'):            # prc_b / pap_b (every map row / column)

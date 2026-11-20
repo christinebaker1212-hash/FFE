@@ -102,6 +102,8 @@ TILE_PAL   = $DB00          ;   palette each BG tile is coded for
 DIRTY_BM   = $DC00          ;   tiles queued for re-coding (bitmap)
 PAL_MAP    = $DC20          ;   value of each NES colour index, per palette
 RT_BUF     = $DC30          ;   one tile being re-coded
+BG_LZ      = $A900          ; (cart RAM bank 3) BG tiles still in ROM, 1 bit each (ff1_native.s bg_lazy)
+BG_LZS     = $A920          ; (cart RAM bank 3) their ROM bank and address per page
 DEFER_BM   = $DCA0          ;   marked tiles parked while no cell uses them (bitmap)
 PAL_USED   = $DC42          ;   BG palettes the map uses (bit p; 0 = not known: all)
 REF_BM     = $DC80          ;   tiles the map uses (bitmap, from dmg_scan_all)

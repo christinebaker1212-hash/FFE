@@ -1062,6 +1062,14 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   frame native (`vscan_b`, a pf idiom found by its bytes in the far bank). checkall 62/62.
   DMG 39 -> 36, CGB 0 (-8).
 
+- Battle text: gb_layout's vbreak (word wrap, with vcw), vtids and vtext's cell loop native
+  (`vbrk_b` / `vtids_b` / `vtc_b`, pf idioms found by their bytes; glyph widths and LPOOL copied
+  from the far bank at build time); on a plain Game Boy a text tile written again with the same
+  bytes (FF1 redrawing a box) is neither re-coded nor queued (`vtile_b`: not in ROM, shadow
+  equal). checkall 62/62; battle VRAM identical but for tiles arriving a frame apart.
+  DMG 36 -> 30, CGB 0. The in-ROM sampler's buffer (scratch) overlapped gb_layout's $0343-$0361:
+  moved to NES page 1.
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette
