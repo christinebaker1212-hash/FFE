@@ -3021,6 +3021,82 @@ hle_csum_b:
             dec l                           ; Z = 1
             ret
 
+; b14:B8B6-B8C4 (screen clear): STA $2007 x 4 / DEX / BNE - 4 * X bytes of A (X = 0: 1024) in
+; chunks of 256 through hle_fill. Exit: X = 0, Z = 1, N = 0, A, Y and carry kept.
+hle_fill4_b:
+            push af
+            ld l, e
+            ld h, 0
+            ld a, e
+            and a
+            jr nz, .n
+            inc h                           ; (X = 0: 256)
+.n:         add hl, hl
+            add hl, hl                      ; HL = bytes
+.ch:        pop af
+            push af
+            push hl
+            ld e, 0                         ; 256, or the rest (A = the value: H tested
+            inc h                           ;   without it)
+            dec h
+            jr nz, .full
+            ld e, l
+.full:      call hle_fill
+            pop hl
+            ld a, h
+            and a
+            jr z, .x
+            dec h
+            ld a, h
+            or l
+            jr nz, .ch
+.x:         xor a
+            ldh [nzv], a
+            ld b, a
+            ld d, a
+            ld e, a
+            pop af
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1
+            ret
+
+; fix:F496 / F4B1 (boot, screen clears): STA $2007 / INY / BNE / DEX / BNE with Y = 0: X pages
+; of A through hle_fill (whole tiles / nametable cells in bulk). Exit: X = Y = 0, Z = 1, N = 0,
+; A and carry kept.
+hle_fillxy_b:
+            push af
+            ld a, c
+            and a
+            jr nz, .gen
+            ld a, e
+            and a
+            jr z, .gen
+.pg:        pop af
+            push af
+            push de
+            ld e, 0
+            call hle_fill
+            pop de
+            dec e
+            jr nz, .pg
+            jr .x
+.gen:       pop af                          ; (Y != 0 or X = 0: as the NES, byte by byte)
+            push af
+            call rt_ppu_w7
+            inc c
+            jr nz, .gen
+            dec e
+            jr nz, .gen
+.x:         xor a
+            ldh [nzv], a
+            pop af
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1
+            ld e, 0
+            ret
+
 section bank HLE_BANK, $7F00
 BITS8:      db 1, 2, 4, 8, 16, 32, 64, 128      ; (page start: low byte = bit number)
 

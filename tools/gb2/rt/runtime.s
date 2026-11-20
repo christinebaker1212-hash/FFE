@@ -17,6 +17,7 @@ PAL_SH     = $D800          ; NES palette RAM shadow (32)
 CP_SRAM    = $DCE6          ; cp_core: the source is in cart RAM (NES $6000-$7FFF),
 CP_BUF     = $DCE7          ;   one plane of a tile on its way from cart RAM bank 0 to bank 1 (8)
 CP_HLM     = $DCDB          ; cp_core / cp_hl: 1 = called from copy_core (HL source) (BS_F's byte)
+CP_T0      = $D83F          ; cp_run: first tile
 CGB_SCAN   = $DCEF          ; CGB: cells / attributes changed with the LCD off (palettes at LCD-on)
 TSET_PEND  = $DCF8          ; DMG: a field tileset was loaded ($580B): fixed palettes at LCD-on
 PAL_DM     = $DCD0          ; CGB: palette entries changed since the last write (bitmap, 4)

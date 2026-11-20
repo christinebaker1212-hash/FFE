@@ -473,7 +473,33 @@ cp_hl:      ld a, e
             ld h, a
             ld a, 1
 .src:       ld [CP_SRAM], a
-            push de
+            and a                           ; DMG, ROM source, BG table, the run inside the
+            jr nz, .pt                      ;   table: all tiles at once (cp_run)
+            ldh a, [is_cgb]
+            and a
+            jr nz, .pt
+            ldh a, [ppu_vh]
+            and $10
+            ld b, a
+            ldh a, [ppu_ctrl]
+            and $10
+            xor b
+            jr nz, .pt
+            ldh a, [ppu_vh]                 ; B = first tile ((vh & $0F) << 4 | vl >> 4)
+            and $0F
+            swap a
+            ld b, a
+            ldh a, [ppu_vl]
+            swap a
+            and $0F
+            or b
+            ld b, a
+            ldh a, [uw_y]
+            add a, b
+            jr nc, .run
+            jr nz, .pt                      ; (past the table's end)
+.run:       jp cp_run
+.pt:        push de
 .tile:      ldh a, [ppu_vl]
             and $F0
             ld e, a
@@ -780,45 +806,6 @@ hle_pages0: push af
             dec l                           ; Z = 1
             ret
 
-; b14:B8B6-B8C4 (screen clear): STA $2007 x 4 / DEX / BNE - 4 * X bytes of A (X = 0: 1024) in
-; chunks of 256 through hle_fill. Exit: X = 0, Z = 1, N = 0, A, Y and carry kept.
-hle_fill4:  push af
-            ld l, e
-            ld h, 0
-            ld a, e
-            and a
-            jr nz, .n
-            inc h                           ; (X = 0: 256)
-.n:         add hl, hl
-            add hl, hl                      ; HL = bytes
-.ch:        pop af
-            push af
-            push hl
-            ld e, 0                         ; 256, or the rest (A = the value: H tested
-            inc h                           ;   without it)
-            dec h
-            jr nz, .full
-            ld e, l
-.full:      call hle_fill
-            pop hl
-            ld a, h
-            and a
-            jr z, .x
-            dec h
-            ld a, h
-            or l
-            jr nz, .ch
-.x:         xor a
-            ldh [nzv], a
-            ld b, a
-            ld d, a
-            ld e, a
-            pop af
-            ld l, 0
-            inc l
-            dec l                           ; Z = 1
-            ret
-
 ; b00:9E44-9E4C (map load): LDA $8B00,X / STA $0400,X / INX / BNE - the rest of the page from
 ; the ROM data image to RAM. Exit: A = the last byte, X = 0, N = 0, Z = 1; Y, carry kept.
 hle_rcopy:  push af
@@ -848,6 +835,12 @@ hle_rcopy:  push af
             inc l
             dec l                           ; Z = 1
             ret
+hle_fill4:  call rt_fcs                     ; b14:B8B6 screen clear (native)
+            db HLE_BANK
+            dw hle_fill4_b
+hle_fillxy: call rt_fcs                     ; fix:F496 / F4B1 page fills (native)
+            db HLE_BANK
+            dw hle_fillxy_b
 hle_csum:   call rt_fcs                     ; fix:DAD4 save slot checksum (native)
             db HLE_BANK
             dw hle_csum_b
@@ -857,41 +850,6 @@ hle_mexp:   call rt_fcs                     ; b00:9D97 map load metatile expansi
 hle_mscan:  call rt_fcs                     ; b00:9DDB map load scan (native)
             db HLE_BANK
             dw hle_mscan_b
-
-; fix:F496 / F4B1 (boot, screen clears): STA $2007 / INY / BNE / DEX / BNE with Y = 0: X pages
-; of A through hle_fill (whole tiles / nametable cells in bulk). Exit: X = Y = 0, Z = 1, N = 0,
-; A and carry kept.
-hle_fillxy: push af
-            ld a, c
-            and a
-            jr nz, .gen
-            ld a, e
-            and a
-            jr z, .gen
-.pg:        pop af
-            push af
-            push de
-            ld e, 0
-            call hle_fill
-            pop de
-            dec e
-            jr nz, .pg
-            jr .x
-.gen:       pop af                          ; (Y != 0 or X = 0: as the NES, byte by byte)
-            push af
-            call rt_ppu_w7
-            inc c
-            jr nz, .gen
-            dec e
-            jr nz, .gen
-.x:         xor a
-            ldh [nzv], a
-            pop af
-            ld l, 0
-            inc l
-            dec l                           ; Z = 1
-            ld e, 0
-            ret
 
 ; b11:9D68 "fill ppu" (STA $2007 / DEX / BNE: A = value, X = count, 0 = 256): whole tiles of a
 ; pattern table go in at once (both planes the constant: every GB byte = the value), marked
@@ -1328,6 +1286,87 @@ hle_fill_nt:
             ldh [ppu_vh], a
             ld e, 0                         ; X = 0
             pop bc
+            ret
+
+; cp_hl's DMG run: HL = source (data bank mapped), B = first BG tile, uw_y = tiles, C = Y.
+; The tiles go to the shadow back to back (cart RAM bank 1 once), then each is marked for
+; re-coding (dmg_markw). PPU address and Y += 16 per tile, tmp_lo = last byte; out as
+; cp_hl's tile loop (ROM bank back, B = D = E = 0, carry clear).
+cp_run:     ld a, b
+            ld [CP_T0], a
+            swap a
+            ld e, a
+            and $0F
+            add a, high(BG_SHADOW)
+            ld d, a
+            ld a, e
+            and $F0
+            ld e, a
+            ld a, 1
+            ld [$4000], a
+            ldh a, [uw_y]
+            ld b, a
+.t:
+            push bc
+            ld b, 8
+.p0:        ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            dec b
+            jr nz, .p0
+            ld a, e
+            sub 15
+            ld e, a
+            ld b, 8
+.p1:        ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            dec b
+            jr nz, .p1
+            pop bc
+            ldh [tmp_lo], a
+            dec e                           ; next tile (E wrapped: next page)
+            jr nz, .nd
+            inc d
+.nd:        dec b
+            jr nz, .t
+            xor a
+            ld [$4000], a
+            ldh a, [code_bank]
+            ld [$2000], a
+            ld a, [CP_T0]                   ; re-coding marks
+            ld e, a
+            ldh a, [uw_y]
+            ld b, a
+.m:         ld a, e
+            call dmg_markw
+            inc e
+            dec b
+            jr nz, .m
+            ldh a, [uw_y]                   ; PPU address and Y += 16 per tile
+            swap a
+            ld b, a
+            and $F0
+            ld e, a                         ; E = low byte of 16n, B = high
+            ld a, b
+            and $0F
+            ld b, a
+            ldh a, [ppu_vl]
+            add a, e
+            ldh [ppu_vl], a
+            ldh a, [ppu_vh]
+            adc a, b
+            and $3F
+            ldh [ppu_vh], a
+            ld a, c
+            add a, e
+            ld c, a
+            ld b, 0
+            ld d, b
+            ld e, b
+            and a                           ; (carry clear: done)
             ret
 
 ; fix:E50E "copy large data to ppu" (Y = 0; X pages of 256 bytes from ($80), INC $81 per
