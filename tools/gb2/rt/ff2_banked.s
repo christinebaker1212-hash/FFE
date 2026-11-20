@@ -2015,8 +2015,29 @@ hle_bspr_b:
             ld [BS_F], a
 .sl:        ld a, [NES_RAM + $08]           ; $0A + k = pose byte 1 + 4k + $08
             ld b, a
-            ld c, 1
             ld hl, NES_RAM + $0A
+            ld a, [BS_F]
+            and a
+            jr z, .s1
+            ld a, [NES_RAM + $00]           ; (direct: DE = source + 1)
+            add a, 1
+            ld e, a
+            ld a, [NES_RAM + $01]
+            adc a, $40
+            ld d, a
+            ld c, 6
+.f1:        ld a, [de]
+            add a, b
+            ld [hl+], a
+            ld a, e
+            add a, 4
+            ld e, a
+            jr nc, .f1n
+            inc d
+.f1n:       dec c
+            jr nz, .f1
+            jr .ns0
+.s1:        ld c, 1
 .l1:        ld a, c
             call bs_get
             add a, b
@@ -2026,7 +2047,7 @@ hle_bspr_b:
             ld c, a
             cp 25
             jr nz, .l1
-            ld a, [NES_RAM + $06]           ; BIT $06 / BPL: LDA $05 / BNE: swap the pairs
+.ns0:       ld a, [NES_RAM + $06]           ; BIT $06 / BPL: LDA $05 / BNE: swap the pairs
             bit 7, a
             jr z, .ns
             ld a, [NES_RAM + $05]
@@ -2062,7 +2083,123 @@ hle_bspr_b:
             jr z, .o4
             or $40
 .o4:        ld [NES_RAM + $05], a
+            ld a, [BS_F]                    ; direct: DE = source, HL = OAM bytes
+            and a
+            jr z, .s2
+            ld a, [NES_RAM + $00]
+            ld e, a
+            ld a, [NES_RAM + $01]
+            add a, $40
+            ld d, a
+            ld a, [NES_RAM + $02]
+            ld l, a
+            ld a, [NES_RAM + $03]
+            add a, high(NES_RAM)
+            ld h, a
             ld a, [NES_RAM + $07]
+            and a
+            jr nz, .fm
+            ld a, $F0
+            ld c, 24
+.ff:        ld [hl+], a
+            dec c
+            jr nz, .ff
+            ld a, [NES_RAM + $04]
+            ld e, a
+            ld h, $F0
+            jr .x
+.fm:        ld a, [NES_RAM + $09]
+            ld b, a
+            ld a, [NES_RAM + $08]
+            ld c, a
+            ld a, [de]
+            inc de
+            add a, b
+            ld [hl+], a
+            ld a, [NES_RAM + $0A]
+            ld [hl+], a
+            inc de
+            ld a, [NES_RAM + $05]
+            ld [hl+], a
+            inc de
+            ld a, [de]
+            inc de
+            add a, c
+            ld [hl+], a
+            ld a, [de]
+            inc de
+            add a, b
+            ld [hl+], a
+            ld a, [NES_RAM + $0B]
+            ld [hl+], a
+            inc de
+            ld a, [NES_RAM + $05]
+            ld [hl+], a
+            inc de
+            ld a, [de]
+            inc de
+            add a, c
+            ld [hl+], a
+            ld a, [de]
+            inc de
+            add a, b
+            ld [hl+], a
+            ld a, [NES_RAM + $0C]
+            ld [hl+], a
+            inc de
+            ld a, [NES_RAM + $05]
+            ld [hl+], a
+            inc de
+            ld a, [de]
+            inc de
+            add a, c
+            ld [hl+], a
+            ld a, [de]
+            inc de
+            add a, b
+            ld [hl+], a
+            ld a, [NES_RAM + $0D]
+            ld [hl+], a
+            inc de
+            ld a, [NES_RAM + $05]
+            ld [hl+], a
+            inc de
+            ld a, [de]
+            inc de
+            add a, c
+            ld [hl+], a
+            ld a, [de]
+            inc de
+            add a, b
+            ld [hl+], a
+            ld a, [NES_RAM + $0E]
+            ld [hl+], a
+            inc de
+            ld a, [NES_RAM + $05]
+            ld [hl+], a
+            inc de
+            ld a, [de]
+            inc de
+            add a, c
+            ld [hl+], a
+            ld a, [de]
+            inc de
+            add a, b
+            ld [hl+], a
+            ld a, [NES_RAM + $0F]
+            ld [hl+], a
+            inc de
+            ld a, [NES_RAM + $05]
+            ld [hl+], a
+            inc de
+            ld a, [de]
+            inc de
+            add a, c
+            ld [hl+], a
+            ld h, a                         ; (the last byte)
+            ld e, 6
+            jr .x
+.s2:        ld a, [NES_RAM + $07]
             and a
             jr nz, .main
             ld c, 0                         ; no pose: 24 x $F0

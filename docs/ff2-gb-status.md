@@ -596,7 +596,8 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   entries from the pose data at $7900 + 24 * pose): `hle_bspr`, FF2's steps with both
   multiplies through `hle_mul8_b`, pose / OAM bytes through GB pointers (byte-by-byte
   fallback for other addresses). It was ~24% of the battle-intro frames (indirect reads /
-  writes through the generic helpers). Battle intro DMG second window +32 -> +24. RAM
+  writes through the generic helpers; the 6 entries unrolled on GB pointers). Battle intro
+  DMG second window +32 -> +9. RAM
   identical (random 1 DMG / CGB, random 2, forced formation 40).
 - Status of the owner's three (DMG, random 1): overworld walking / sailing at parity (walk
   scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
