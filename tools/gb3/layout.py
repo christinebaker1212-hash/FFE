@@ -45,6 +45,7 @@ MALEN = $5E92       ; attacker's length on line 0 (0: none)
 MFIRST = $5E93      ; per window id (5): first line,
 MNUM  = $5E98       ;   number of lines,
 MCOL  = $5E9D       ;   first column
+NW    = $5F2C       ; enemy-names window: text width (8-18)
 MLINE = $5EA2       ; line image (18)
 MSAVE = $5EB4       ; the area under the window (6 x 20)
 WAIT1 = $8185       ; wait one frame
@@ -234,8 +235,90 @@ msgclose:           ; A = window id
     bne .r
     rts
 
+
+tgtnames:           ; choose targets (battle graphics $10) with the enemy-names window shown
+    jsr $9D9E       ;   over the command window (owner: names while targeting; FF3 redraws
+    lda #$10        ;   the command window after the command or a cancel)
+    jmp $FA0E
+nload:              ; monster name of type X -> $7AD7
+    lda #$40
+    sta $18
+    lda #$8A
+    sta $19
+    lda $7D6B,x
+    ldx #0
+    jmp $A609
+nadv:               ; text buffer offset + one row of the names window
+    lda NW
+    jmp $A558
 '''
 MSG_END = 0x8EB0
+
+# enemy-names window (FF3 $9D9E "update monster names", bank 52), one name per row and as wide
+# as the longest name shown (8-18 columns; a longer name takes two rows): pass 1 in place of
+# FF3's routine, pass 2 in the NOP space after the English text converter ($9716-$9753)
+NAMES1_SRC = '''
+NW = $5F2C
+    org $9D9E
+gbnames:
+    jsr $9754       ; init text buffer
+    lda #8
+    sta NW
+    ldx #3
+.l1:
+    lda $7DCE,x     ; monsters of type X left
+    beq .n1
+    stx $24
+    jsr nload
+    jsr mlen
+    ldx $24
+    cmp #19
+    bcc .c
+    lda #18
+.c:
+    cmp NW
+    bcc .n1
+    sta NW
+.n1:
+    dex
+    bpl .l1
+    lda #0
+    sta $24
+    jmp names2
+'''
+NAMES2_SRC = '''
+NW = $5F2C
+    org $9716
+names2:
+.l2:
+    ldx $24
+    lda $7DCE,x
+    beq .n2
+    jsr nload
+    jsr mlen
+    cmp NW
+    beq .s
+    bcc .s
+    jsr nadv        ; (two rows: the first part goes on the row above)
+.s:
+    lda NW
+    sta $18
+    jsr bconvb
+    jsr nadv
+.n2:
+    inc $24
+    lda $24
+    cmp #4
+    bne .l2
+    lda #2          ; window cols 2 .. 3 + NW
+    sta $18
+    lda NW          ; (carry set by CMP #4)
+    adc #2
+    sta $19
+    lda #3
+    sta $1A
+    jmp $8B38       ; open menu window
+'''
 MSGX_SRC = '''
 MLINE = $5EA2
 WAIT1 = $8185
@@ -472,6 +555,26 @@ def battle_messages(r):
     r.d[o:r.off(B34, MSG_END)] = m['bytes']
     r.log.append((B34, 0x8D1B, 'message window routines'))
     r.mods.append(dict(m, where=(B34, 0x8D1B & 0x1FFF)))
+    # enemy-names window
+    syms2 = dict(syms, **{k: v for k, v in m['labels'].items() if '.' not in k})
+    syms2['bconvb'] = 0x969C
+    syms2['names2'] = 0x9716
+    n1 = r.module(NAMES1_SRC, syms2)
+    n2 = r.module(NAMES2_SRC, syms2)
+    assert n1['org'] + len(n1['bytes']) <= 0x9DE4, hex(n1['org'] + len(n1['bytes']))
+    assert n2['org'] + len(n2['bytes']) <= 0x9754, hex(n2['org'] + len(n2['bytes']))
+    o1 = r.off(B34, 0x9D9E)
+    assert r.d[o1:o1 + 8].hex() == '205497a9008524a2'
+    r.d[o1:o1 + len(n1['bytes'])] = n1['bytes']
+    r.d[o1 + len(n1['bytes']):r.off(B34, 0x9DE4)] = b'\xEA' * (0x9DE4 - 0x9D9E - len(n1['bytes']))
+    o2 = r.off(B34, 0x9716)
+    assert set(r.d[o2:r.off(B34, 0x9754)]) == {0xEA}
+    r.d[o2:o2 + len(n2['bytes'])] = n2['bytes']
+    r.mods += [dict(n1, where=(B34, 0x9D9E & 0x1FFF)), dict(n2, where=(B34, 0x9716 & 0x1FFF))]
+    r.log.append((B34, 0x9D9E, 'enemy-names window as wide as the longest name'))
+    t = m['labels']['tgtnames']
+    for a in (0xA84E, 0xA9AF, 0xB9D4):
+        r.patch(0x35, a, 'A9 10 20 0E FA', '20 %02X %02X EA EA' % (t & 0xFF, t >> 8), 'names while targeting')
     # the close call ($94DF LDA $4B / JSR $8E14) -> msgclose
     c = m['labels']['msgclose']
     r.patch(B34, 0x94E0, '4B 20 14 8E', '4B 20 %02X %02X' % (c & 0xFF, c >> 8), 'close message window')
