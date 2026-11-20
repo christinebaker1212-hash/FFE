@@ -737,6 +737,8 @@ spr_mat:    push af
             push de
             push hl
             ld e, a
+            xor a                           ; (wtmp = 1: copied now, and its bytes were
+            ldh [wtmp], a                   ;   the shadow's already)
             ld a, 3
             ld [$4000], a
             ld a, e
@@ -793,8 +795,13 @@ spr_mat:    push af
             ld [$4000], a
             ld a, d
             ld [$2000], a
+            ld d, 0                         ; (D = OR of the differences)
             ld e, 8                         ; plane 0 -> even bytes, plane 1 -> odd
 .p0:        ld a, [bc]
+            xor [hl]
+            or d
+            ld d, a
+            ld a, [bc]
             inc bc
             ld [hl+], a
             inc l
@@ -805,12 +812,21 @@ spr_mat:    push af
             ld l, a
             ld e, 8
 .p1:        ld a, [bc]
+            xor [hl]
+            or d
+            ld d, a
+            ld a, [bc]
             inc bc
             ld [hl+], a
             inc l
             dec e
             jr nz, .p1
-            ldh a, [code_bank]
+            ld a, d
+            and a
+            jr nz, .df
+            inc a
+            ldh [wtmp], a
+.df:        ldh a, [code_bank]
             ld [$2000], a
 .n:         xor a
             ld [$4000], a

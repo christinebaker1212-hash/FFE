@@ -110,7 +110,27 @@ hle_chr_pages:
             ld bc, 0                        ; (Y = 0)
             ldh [tmp_lo], a
             ldh a, [ppu_vh]
-            jr .fsm
+            and $0F                         ; SLOT_KEY of its resident tiles marked stale
+            swap a
+            ld l, a
+            ld h, high(SPR_SLOT)
+            ld b, 16
+            xor a
+            ld [OAM_CLEAN], a
+.fkl:       ld a, [hl+]
+            cp $FF
+            jr z, .fkn
+            push hl
+            add a, low(SLOT_KEY)
+            ld l, a
+            ld h, high(SLOT_KEY)
+            set 7, [hl]                     ; (stale: key | $80; the OAM conversion checks
+            pop hl                          ;   the tile's new bytes when it is used: spr_mat)
+.fkn:       dec b
+            jr nz, .fkl
+            xor a
+            ld [$4000], a
+            jr .fsk
 .fd:        ldh a, [lcd_on]
             and a
             jr z, .fdo

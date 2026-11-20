@@ -998,6 +998,19 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   bank only) and SGBRUN_LYMEM (8 bytes with each SGBRUN_LYAT line). Note: sgbrun profile
   samples are ~400 GB cycles each (175 a frame).
 
+- **Sprites, 2026-11-20 (later):** DMG sprite slot loads capped at 8 per GB frame (`sl_chk`,
+  bank 0 $3100): a sprite over the cap stays hidden that frame and the next conversion is a
+  whole one, so the party appearing at a battle start no longer stalls a frame; a sprite page
+  upload marks resident slots stale (key | $80) instead of forgetting them, and the OAM
+  conversion keeps a stale slot when spr_mat finds the tile's bytes unchanged (cursor and
+  party tiles across the battle start); sprite tiles coded by the pf_0-pf_15 plane routines
+  straight from the shadow into the block (no mask setup, copy or anf_rows); b12:97A7 (OAM
+  page clear) native (`oclr_b`); recompiler: routines called from a cloned copy are cloned
+  too (5.8 KB copied). Visible sprites identical to the build before at 200+ points (DMG +
+  CGB). checkall 62/62 (n40). DMG 69 -> 62, CGB 0. Note: sgbrun's input diverges from
+  gbrun's late in the battle (mGBA writes no $4014 in waits 6878-7032); measure battle frames
+  in Gambatte (scratch event log), not mGBA.
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette

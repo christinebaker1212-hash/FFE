@@ -3193,12 +3193,8 @@ sprload_b:  push af
 .k5:        bit 5, b
             jr z, .k6
             set 3, e
-.k6:        ld hl, RM
-            ld a, d
-            call rt_anf
-            ld a, e
-            call rt_anf
-            push bc
+.k6:        push bc                         ; (C = slot)
+            push de                         ; (D / E: the planes' boolean functions)
             call blk_alloc                  ; DE = block
             ldh a, [o_t]                    ; (still in ROM: to the shadow first)
             call spr_mat
@@ -3213,19 +3209,20 @@ sprload_b:  push af
             ld h, a
             ld a, 1
             ld [$4000], a
-            ld c, 16
-.cp:        ld a, [hl+]
-            ld [de], a
+            pop bc                          ; B = plane 0's function, C = plane 1's: each
+            push bc                         ;   plane coded from the shadow into the block by
+            push hl                         ;   its own routine (pf_call: pf_0-pf_15)
+            push de
+            ld a, b
+            call pf_call
+            pop de
+            pop hl
+            pop bc
             inc e
-            dec c
-            jr nz, .cp
+            ld a, c
+            call pf_call
             xor a
             ld [$4000], a
-            ld a, e
-            sub 16
-            ld l, a
-            ld h, d
-            call anf_rows
             pop bc
             ld a, c                         ; BC = $8000 + slot * 16
             swap a
@@ -11270,14 +11267,40 @@ oamconv_b:  and $07
 .xr:        xor a                           ; out of view sideways: this entry's y hidden
             ld [de], a                      ;   again (else last frame's x and tile showed)
             ret
-.alloc:     ld a, b
+.alloc:     call sl_chk
+            jr c, .dfr
+            ld a, b
             ldh [o_key], a
             call spr_alloc
             ld c, a
             jr .ok
-.load:      ld a, b
+.load:      ld a, [hl]                      ; stale with this coding (a page upload since):
+            xor b                           ;   its bytes the same? (spr_mat brings it into
+            cp $80                          ;   the shadow now, wtmp = 1 if unchanged)
+            jr nz, .ld2
+            ldh a, [o_t]
+            call spr_mat
+            ld a, 3
+            ld [$4000], a
+            ldh a, [wtmp]
+            and a
+            jr z, .ld2
+            ld [hl], b
+            jr .ok2
+.ld2:       call sl_chk
+            jr c, .dfr
+            ld a, b
             ldh [o_key], a
             call spr_load
+            jr .ok
+.dfr:       dec e                           ; (this frame's slot loads used up: hidden now,
+            dec e                           ;   its GB entry left for the next one; the
+            xor a                           ;   next conversion a whole one)
+            ld [de], a
+            ld [OAM_CLEAN], a
+            pop bc
+            pop hl
+            ret
 .ok:        ld a, 3                         ; (the load left cart RAM bank 0 on)
             ld [$4000], a
             ld a, c
@@ -11825,14 +11848,37 @@ oc_fwd:     xor a
 .xrF:        xor a                           ; out of view sideways: this entry's y hidden
             ld [de], a                      ;   again (else last frame's x and tile showed)
             ret
-.allocF:     ld a, b
+.allocF:     call sl_chk
+            jr c, .dfrF
+            ld a, b
             ldh [o_key], a
             call spr_alloc
             ld c, a
             jr .okF
-.loadF:      ld a, b
+.loadF:      ld a, [hl]
+            xor b
+            cp $80
+            jr nz, .ld2F
+            ldh a, [o_t]
+            call spr_mat
+            ldh a, [wtmp]
+            and a
+            jr z, .ld2F
+            ld [hl], b
+            jr .ok2F
+.ld2F:       call sl_chk
+            jr c, .dfrF
+            ld a, b
             ldh [o_key], a
             call spr_load
+            jr .okF
+.dfrF:       dec e
+            dec e
+            xor a
+            ld [de], a
+            pop bc
+            pop hl
+            ret
 .okF:        ld a, c
             or $80
             ld l, a
@@ -14798,7 +14844,7 @@ mpre:       ld a, MAPS_BANK0
 ; ---- palup2_b's fast path (v = $3F00 + C, increment 1): C = the first index, HL -> its colour
 ; ($03D0 from index 16 on). Each colour compared with the shadow at its constant index; a
 ; changed one to the shadow and its flags (pu_chg, as rt_ppu_w7g's palette write).
-section bank HLE_BANK, $7500
+section bank HLE_BANK, $7580
 pu_fast:    ld a, c
             cp 32
             jr nc, .end
@@ -16067,6 +16113,32 @@ prc_b:      xor a
             pop bc
             ret
 
+; ---- b12:97A7 (battle: LDX #0 / LDA #$F0 / STA $0200,X / INX / BNE): the OAM page all $F0.
+; Out: A = $F0, X = 0, Z = 1, N = 0, carry kept.
+oclr_b:     push af
+            ld hl, NES_RAM + $0200
+            ld a, $F0
+            ld e, 32
+.l:
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec e
+            jr nz, .l
+            xor a
+            ldh [nzv], a
+            pop af
+            ld a, 0
+            inc a
+            dec a
+            ld a, $F0
+            ret
+
 ; ---- c62:D403 natively (FF1: 16 attribute positions of a row / column of the map: $07D0 +
 ; Y = $23 / $27, $07E0 + Y = $C0 | ($30 >> 1) << 3 | ($31 & 15) >> 1, $07F0 + Y = the
 ; quadrant mask $0F / $F0 & $33 / $CC), $31 + 1 (mod 32) per entry in a row (16), $30 + 1
@@ -16193,3 +16265,32 @@ pap_b:      ld a, [NES_RAM + $2D]           ; (state in registers / HRAM, RAM at
             ld a, b
             ld b, 0
             ret
+
+section bank 0, $3100
+; carry: no more sprite slot loads this GB frame (DMG: SL_MAX a frame; a sprite whose tile
+; is not loaded yet stays hidden until a later frame's conversion loads it). Keeps BC, DE.
+SL_V       = $D828          ; (fault-dump area) VBL_CNT of the loads counted in SL_N
+SL_N       = $D82F
+SL_MAX     = 8
+sl_chk:     ldh a, [is_cgb]
+            and a
+            ret nz
+            push hl
+            ld hl, SL_V
+            ld a, [VBL_CNT]
+            cp [hl]
+            jr z, .s
+            ld [hl], a
+            xor a
+            ld [SL_N], a
+.s:         ld a, [SL_N]
+            cp SL_MAX
+            ccf
+            jr c, .x
+            inc a
+            ld [SL_N], a
+            and a
+.x:         pop hl
+            ret
+
+

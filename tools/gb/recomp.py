@@ -975,24 +975,35 @@ def plan_clones(rc, banks, bank_of, sizes, code):
         cache[t] = seen
         return seen
     clones = {}
-    for bank, keys in banks:
+
+    def calls(ks, bank, cl):
         cand = set()
-        for k in keys:
+        for k in ks:
             for line in code[k]:
                 ls = line.strip()
                 if ls.startswith('call ') or ls.startswith('jp '):
                     m = LREF.search(ls)
                     if m:
                         t = (m.group(1), int(m.group(2), 16))
-                        if bank_of.get(t, bank) != bank: cand.add(t)
+                        if bank_of.get(t, bank) != bank and t not in cl: cand.add(t)
+        return cand
+    for bank, keys in banks:
         cl = set()
-        for t in sorted(cand, key=lambda t: (len(body(t) or ()) or 99999, t)):
-            bd = body(t)
-            if not bd: continue
-            new = {k for k in bd if bank_of.get(k) != bank and k not in cl}
-            cost = sum(sizes[k] for k in new) + 3 * len(new) // 8 + 8
-            if used[bank] + cost > BANK_LIMIT: continue
-            cl |= new; used[bank] += cost
+        cand = calls(keys, bank, cl)
+        tried = set()
+        while cand:                                       # (calls made by the copies: their
+            nxt = set()                                   #   targets are candidates too)
+            for t in sorted(cand, key=lambda t: (len(body(t) or ()) or 99999, t)):
+                tried.add(t)
+                bd = body(t)
+                if not bd: continue
+                new = {k for k in bd if bank_of.get(k) != bank and k not in cl}
+                if not new: continue
+                cost = sum(sizes[k] for k in new) + 3 * len(new) // 8 + 8
+                if used[bank] + cost > BANK_LIMIT: continue
+                cl |= new; used[bank] += cost
+                nxt |= calls(new, bank, cl)
+            cand = nxt - tried
         if cl: clones[bank] = cl
     return clones
 
