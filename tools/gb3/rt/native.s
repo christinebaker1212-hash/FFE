@@ -691,6 +691,10 @@ nat_9f98:
             jr c, .c3
             ld a, 1
             ldh [rSVBK], a
+            ldh a, [bcam]                   ; (battle cameras: the window rows' bank)
+            and a
+            ldh a, [spl_bank]
+            call nz, rebank_spl
             ld a, $FF
             ld hl, map_dirty                ; (map_dirty, attr_dirty: 8 bytes in a row)
             ld b, 8

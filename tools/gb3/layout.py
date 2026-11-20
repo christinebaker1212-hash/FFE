@@ -9,13 +9,15 @@ decisions: docs/ff3-gb-plan.md section 6.
 
 Battle (decision 3, with FF1 / FF2's battle rules):
 - cameras (GB runtime registers, open bus on the NES): battlefield camera NES x 20 / y 48
-  (pixels, $5802 / $5803), window camera (tiles, $5800 / $5801) = col 2 / row 6, split at GB
-  line 96 ($5804); field camera back after the battle
+  and window camera col 2 / row 7, split at GB line 96 (GB runtime, $5806 = 1); field camera
+  back after the battle ($5806 = 0)
 - party column GB x 140-159: front row NES x 160, back row 164; members 24 px apart from NES
   y 47 (GB rows 0-11, every sprite whole); acting members step 8 px (back row 12)
-- battle windows from NES row 18 (GB row 12) instead of 19, one tile row per text line (the
-  English text has no dakuten row): 4 text rows; party window cols 2-21 (GB 0-19), command
-  and enemy-name windows cols 2-11 (GB 0-9)
+- battle windows from NES row 19 as FF3 (GB row 12; the window camera is col 2 / row 7: NES
+  row 18 belongs to the enemy animations and is not shown), 6 rows high, one tile row per
+  text line (the English text has no dakuten row): 4 text rows; party window cols 2-21 (GB
+  0-19), command and enemy-name windows cols 2-11 (GB 0-9); battle messages in one
+  full-width window (see MSG_SRC)
 """
 import os, sys, re
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -29,7 +31,7 @@ ARROW_ROWS = ['........', '..#.....', '..##....', '#####...', '..##....', '..#..
               '........']
 
 # battle message window (bank 52, in place of FF3's open / close message window routines
-# $8D1B-$8E82 and their box table $8E83-$8EAF): one full-width window, NES rows 18-23 cols
+# $8D1B-$8E82 and their box table $8E83-$8EAF): one full-width window, NES rows 19-24 cols
 # 2-21 (GB rows 12-17), 4 lines of 18 columns. The first window opened saves the area and
 # draws an empty frame (a row per frame); each message then takes the next free line(s),
 # word-wrapped (a message needing more lines than are free covers the last ones); the target
@@ -240,7 +242,7 @@ WAIT1 = $8185
 PPUREG = $8D03
 SETADR = $F8E0
     org $5F30           ; (ExRAM, after MSAVE: the window's helpers)
-maddr:              ; ppu address of window row $1F, column 0 ($2242 + 32 row)
+maddr:              ; ppu address of window row $1F, column 0 ($2262 + 32 row)
     lda $1F
     asl a
     asl a
@@ -248,9 +250,10 @@ maddr:              ; ppu address of window row $1F, column 0 ($2242 + 32 row)
     asl a
     asl a
     clc
-    adc #$42
+    adc #$62
     tax
     lda #$22
+    adc #0
     jmp SETADR
 
 mput:               ; MLINE from column $1D on to text line $1F (0-3), in a frame
@@ -262,10 +265,11 @@ mput:               ; MLINE from column $1D on to text line $1F (0-3), in a fram
     asl a
     asl a
     clc
-    adc #$63
+    adc #$83
     adc $1D
     tax
     lda #$22
+    adc #0
     jsr SETADR
     ldy $1D
 .p:
@@ -430,16 +434,8 @@ def battle(r):
     r.patch(B2F, 0xB375, '20', '0C', 'step back (back row) 12 px')
     r.patch(B2F, 0xB362, 'F0', 'F8', 'confused: step back 8 px')
     r.patch(B2F, 0xB39E, 'F0', 'F8', 'confused: step back 8 px')
-    # the split between the battlefield and the windows: scanline 143 (was 151: windows
-    # from row 19)
-    for bank, a, why in ((0x2E, 0x9F1E, 'init battle'), (0x2F, 0xB8FC, 'battle intro end'),
-                         (0x32, 0x80D5, 'summon animation'), (0x10, 0x8BC4, 'final boss death')):
-        r.patch(bank, a, 'A9 97 85 03', 'A9 8F 85 03', 'battle split at scanline 143 (%s)' % why)
-    # battle windows: from row 18, 4 rows of text (one tile row per line)
-    r.patch(B34, 0x8B8F, '69 60 85 2A A9 00 69 22', '69 40 85 2A A9 00 69 22', 'windows from row 18 (nt 0)')
-    r.patch(B34, 0x8BA0, '69 60 85 2A A9 00 69 26', '69 40 85 2A A9 00 69 26', 'windows from row 18 (nt 1)')
-    r.patch(B34, 0x8BB0, 'A9 60', 'A9 40', 'windows from row 18 (overflow, nt 0)')
-    r.patch(B34, 0x8BBB, 'A9 60', 'A9 40', 'windows from row 18 (overflow, nt 1)')
+    # battle windows: FF3's rows from 19 (row 18 is the enemy animations': hidden on the
+    # GB), 4 rows of text (one tile row per line)
     r.patch(B34, 0x8BC3, 'A9 08', 'A9 04', 'windows: 4 rows')
     r.patch(B34, 0x966A, 'A5 18', 'A9 00', 'text lines in the first buffer row (bconv)')
     r.patch(B34, 0x969C, 'A5 18', 'A9 00', 'text lines in the first buffer row (bconvb)')

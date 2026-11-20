@@ -41,6 +41,12 @@ LCDC_ON    = %10010011      ; LCD on, window map $9800 (off), BG/window tiles $8
                             ;   BG map $9800, 8x8 OBJ on, BG priority on
 CAM_X      = 48             ; default camera (pixels): the centre of the NES picture
 CAM_Y      = 48
+BCAM_X     = 20             ; battle (GB layout): battlefield camera NES x 20 / y 48 (the enemy
+BCAM_Y     = 48             ;   area x 20-159 at GB x 0-139, the party column at GB 140-159);
+WCAM_X     = 16             ;   windows (NES rows 19-24 -> GB rows 12-17) at column 2 / row 7,
+WCAM_DY    = 8              ;   from GB line 96 (a LYC interrupt sets SCX / SCY in that line's
+SPLIT_LY   = 96             ;   hblank); NES row 18 (the enemy animations') is not shown
+SPL_ROW    = 18             ;   map rows from 18: the BG pattern table of the split's $2000
 
 section hram, $FF80
 hram_dma:   ds 10
@@ -108,6 +114,8 @@ spl_y:      ds 1
 spl_latch:  ds 1
 cam_x:      ds 1
 cam_y:      ds 1
+bcam:       ds 1                            ; battle cameras on ($5806, tools/gb3/layout.py)
+spl_bank:   ds 1                            ;   then map rows SPL_ROW.. carry the split's BG table
 uw_bank:    ds 1
 uw_ret:     ds 2
 uw_y:       ds 1
@@ -140,7 +148,7 @@ section bank 0, $0038
 section bank 0, $0040
             jp vblank_isr
 section bank 0, $0048
-            reti
+            jp stat_isr
 section bank 0, $0100
             nop
             jp boot
@@ -255,6 +263,20 @@ dma_code:   ld a, high(OAM_SH)              ; copied to HRAM: OAM DMA
 .w:         dec a
             jr nz, .w
             ret
+
+; ------------------------------------------------------------------ battle split (LYC)
+stat_isr:   push af                         ; line SPLIT_LY - 1: the window camera from the
+.w:         ldh a, [rSTAT]                  ;   next line (written in this line's hblank)
+            and 3
+            jr nz, .w
+            ldh a, [spl_x]
+            add a, WCAM_X
+            ldh [rSCX], a
+            ldh a, [rSCY]
+            add a, WCAM_DY
+            ldh [rSCY], a
+            pop af
+            reti
 
 ; ------------------------------------------------------------------ vblank
 vblank_isr: push af
@@ -687,6 +709,20 @@ rt_ppu_w0:  push af                         ; $2000
             ret
 .split:     pop af
             ldh [spl_ctrl], a
+            push af                         ; (its BG table: the window rows' bank bit)
+            and $10
+            rrca
+            ld l, a
+            ldh a, [spl_bank]
+            cp l
+            jr z, .sk
+            ld a, l
+            ldh [spl_bank], a
+            ldh a, [bcam]
+            and a
+            ld a, l
+            call nz, rebank_spl
+.sk:        pop af
             ret
 rt_ppu_w1:  ldh [ppu_mask], a               ; $2001
             ret
@@ -1491,6 +1527,16 @@ attr_apply: ldh [c_val], a
             ld a, d
             and $0F
             ret z
+            ldh a, [bcam]                   ; B = the bank bit of row E (battle cameras:
+            and a                           ;   the split's below SPL_ROW)
+            ldh a, [bg_bank]
+            jr z, .bk
+            ld a, e
+            cp SPL_ROW
+            ldh a, [bg_bank]
+            jr c, .bk
+            ldh a, [spl_bank]
+.bk:        ld b, a
             ld a, e                         ; HL = ATTR_SH + E * 32 + C (bit 5 of L clear:
             rrca                            ;   E is even)
             rrca
@@ -1665,18 +1711,36 @@ map_flush:  ld a, e
 rebank_attrs:
             push af
             push bc
+            push de
             push hl
             ld b, a
-            ld a, MAP_BANK
-            ldh [rSVBK], a
             ld hl, ATTR_SH
+            ld de, ATTR_SH + $400
+            ldh a, [bcam]                   ; (battle cameras: the rows above the split)
+            and a
+            jr z, rebank_rng
+            ld de, ATTR_SH + SPL_ROW * 32
+            jr rebank_rng
+rebank_spl:                                 ; A = bank bit for rows SPL_ROW.. (battle windows)
+            push af
+            push bc
+            push de
+            push hl
+            ld b, a
+            ld hl, ATTR_SH + SPL_ROW * 32
+            ld de, ATTR_SH + $400
+rebank_rng: ld a, MAP_BANK                  ; HL .. DE (exclusive): bank bit B
+            ldh [rSVBK], a
 .l:         ld a, [hl]
             and $F7
             or b
             ld [hl+], a
+            ld a, l
+            cp e
+            jr nz, .l
             ld a, h
-            cp high(ATTR_SH) + 4
-            jr c, .l
+            cp d
+            jr nz, .l
             ld a, 1
             ldh [rSVBK], a
             ld a, $FF
@@ -1688,6 +1752,7 @@ rebank_attrs:
             ld a, 1
             ldh [map_any], a
             pop hl
+            pop de
             pop bc
             pop af
             ret
@@ -1724,12 +1789,29 @@ rt_io_w4014:                                ; OAM DMA from NES page A -> GB shad
             jr nc, .s3
             cp 9
             jr c, .s3
-            ld [de], a                      ; (GB Y, kept if X is in view too)
+            cp SPLIT_LY + 16                ; (battle, below the split: the window camera;
+            jr c, .tp0                      ;   NES row 18 hidden)
+            ld [de], a
+            ldh a, [bcam]
+            and a
+            ld a, [de]
+            jr z, .tp0
+            sub WCAM_DY
+            cp SPLIT_LY + 16
+            jr c, .s3
+            ld [de], a
             inc l
             inc l
-            ld a, [hl-]                     ; NES X (HL -> attributes)
+            ld a, [hl-]
             add a, b
-            jr z, .sx
+            add a, BCAM_X - WCAM_X
+            jr .xc
+.tp0:       ld [de], a                      ; (GB Y, kept if X is in view too)
+            inc l
+            inc l
+.tp:        ld a, [hl-]                     ; NES X (HL -> attributes)
+            add a, b
+.xc:        jr z, .sx
             cp 168
             jr nc, .sx
             inc e
@@ -1941,11 +2023,49 @@ rt_mmc_w5801:
             ldh [cam_y], a
             pop af
             ret
+rt_mmc_w5806:                               ; GB layout: battle cameras on (A <> 0) / off
+            push af
+            ldh [bcam], a
+            and a
+            jr z, .off
+            ld a, BCAM_X
+            ldh [cam_x], a
+            ld a, BCAM_Y
+            ldh [cam_y], a
+            ld a, SPLIT_LY - 1
+            ldh [rLYC], a
+            ld a, $40                       ; STAT interrupt on LY = LYC
+            ldh [rSTAT], a
+            ldh a, [rIF]
+            and $FD
+            ldh [rIF], a
+            ldh a, [rIE]
+            or 2
+            ldh [rIE], a
+            ldh a, [spl_ctrl]               ; the window rows: the split's BG table
+            and $10
+            rrca
+            ldh [spl_bank], a
+            call rebank_spl
+            pop af
+            ret
+.off:       ldh a, [rIE]
+            and $FD
+            ldh [rIE], a
+            xor a
+            ldh [rSTAT], a
+            ld a, CAM_X
+            ldh [cam_x], a
+            ld a, CAM_Y
+            ldh [cam_y], a
+            ldh a, [bg_bank]
+            call rebank_attrs
+            pop af
+            ret
 rt_mmc_w5802:
 rt_mmc_w5803:
 rt_mmc_w5804:
 rt_mmc_w5805:
-rt_mmc_w5806:
 rt_mmc_w5807:
 rt_mmc_w5808:
 rt_mmc_w5809:
