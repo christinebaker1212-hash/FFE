@@ -583,6 +583,10 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   frame wait re-codes 1 marked tile instead of 3 when the NES frame already took its GB frame
   (the picture catches up in spare time; the game and music keep time). Battle intro DMG
   +44 / +41 -> +39 / +32. Random 1: DMG +0.8%; RAM identical.
+- CGB map rows: `mu_write` (native map drawer) no longer sends CGB cells through the generic
+  rt_ppu_w7; the DMG branch minus the shading does the same (shadow, owner + the cell's CGB
+  palette, GB map). CGB door loads +37 -> +33; RAM identical; CGB shots equal apart from
+  mid-draw moments of the dialogue box (VRAM queue timing).
 - Status of the owner's three (DMG, random 1): overworld walking / sailing at parity (walk
   scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
   remaining: battle entry (load +19 net, intro +39 / +32), door loads (+56 single wait,

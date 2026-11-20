@@ -844,24 +844,13 @@ hle_mapupd_b:
             scf
             ret
 
-; tile A to NES address (D, E) with palette MU_P (DMG / SGB fast; CGB through rt_ppu_w7).
-; Keeps B, C, D, E.
+; tile A to NES address (D, E) with palette MU_P: shadow, owner (CGB: the cell's palette from
+; its new nametable), DMG / SGB shading, GB map (as rt_ppu_w7's nametable path). Keeps B-E.
 mu_write:   push bc
             push de
             push hl
             ld [MU_T], a
-            ldh a, [is_cgb]
-            and a
-            jr z, .dmg
-            ld a, d
-            and $3F
-            ldh [ppu_vh], a
-            ld a, e
-            ldh [ppu_vl], a
-            ld a, [MU_T]
-            call rt_ppu_w7
-            jr .x
-.dmg:       ld a, d                         ; B = offset high (0-3), C = 4 for nametable 1,
+            ld a, d                         ; B = offset high (0-3), C = 4 for nametable 1,
             and 4                           ;   L = offset low
             ld c, a
             ld a, d
@@ -882,9 +871,12 @@ mu_write:   push bc
             ld [hl], d
             cp d
             push af
-            call own_set
+            call own_set                    ; (CGB: the cell's palette if the owner changed)
             pop af
             jr z, .vram
+            ldh a, [is_cgb]                 ; CGB: no shading
+            and a
+            jr nz, .vram
             ldh a, [lcd_on]                 ; (LCD off: the scan when it goes on)
             and a
             jr nz, .sh
