@@ -4693,7 +4693,10 @@ def sub_strings(ins):
             if spots: out.append(spots)
         return '\n'.join(out)
     save = {40: lines(sv[40].replace('{16:09}Yes{16:0D}No', '\n{16:03}Yes{16:08}No')), 41: lines(sv[41]),
-            42: '\n'.join(ins.flow(' '.join(l.strip() for l in sv[42].split('\n')), 18))}   # (sentences: flowed)
+            # 42: "Save complete!" only: the rest ("hold down the RESET button while you turn the
+            # power off") is about the Famicom; the Game Boy has no RESET button (Lot Check:
+            # hardware named correctly in all text). (Before: the whole text flowed at 18.)
+            42: sv[42].split('!')[0].strip() + '!'}
     out = {32: '{14:04}Magic\n{14:04}{10:02}', 34: '{14:04}Equip\n{14:04}{10:02}',
             33: 'HP {10:20}/{10:21}\nMP  {10:22}/ {10:23}',
             39: '{14:04}{10:02}\n{14:04}HP {10:20}/{10:21}\n{14:04}MP  {10:22}/ {10:23}\n{14:04}{10:00}',

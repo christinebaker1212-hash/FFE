@@ -649,12 +649,37 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
 
 ## Required before any release
 - The Lot Check requirements in `docs/gb-release-requirements.md` (owner, 2026-11-20:
-  absolutely required): header / checksums, LCD off only in V-Blank, VRAM / OAM access
-  windows, SRAM disabled after access + save validation with an on-screen message, soft
-  reset A + B + Start + Select, memory cleared at boot, DMG / Pocket / SGB / CGB / GBA
-  compatibility, Nintendo hardware names in all text, no undisclosed code (remove or
-  document `TEST_PAD`, the `rst $38` trap, test builds). The notes at the end of that file
-  list what is known to need work (cart RAM is enabled all the time; no soft reset yet).
+  absolutely required). **FF2 state (2026-11-20):** done and checked: header / checksums /
+  padding, LCD off only in V-Blank (re-check with interrupts off), VRAM / OAM windows
+  (PyBoy vs Gambatte screens), memory and registers cleared at boot (`boot_clr`), soft
+  reset A + B + Start + Select (`soft_reset`), save check at start-up with an on-screen
+  message before a damaged slot is cleared (`rt/save.s`), "Save complete!" without the
+  Famicom RESET advice, release build without the test-runner input
+  (`build.py --gb --release` -> `build/ff2_release.gb`), Pocket / GBA models in mGBA.
+  Documented deviation: cart RAM stays enabled (NES work RAM lives there). Open: the DMG
+  prologue fade's one-frame dark letter cells, real-hardware runs. Checker:
+  `tools/gb2/lotcheck.py` (see the requirements file for options).
+- Lot Check work (2026-11-20), details:
+  - `boot_w` (also the soft reset's entry): stack in HRAM, LCD off in V-Blank, sound off,
+    IF / IE / scroll / window / LYC / STAT / timer cleared, `boot_clr` (HLE bank: VRAM,
+    WRAM incl. CGB banks 2-7 and VRAM bank 1, cart RAM banks 1, 2 and bank 3 from $B000),
+    OAM, HRAM; double speed only switched if KEY1 says it is off (after a soft reset it is on).
+  - `rt_ppu_w1`: the first version disabled interrupts before waiting for the V-Blank; the
+    V-Blank interrupt then ran after the LCD was off and lost CGB tile copies (name-entry
+    letters missing). Now: wait with interrupts on, then `di`, LY 144-151 re-checked, write.
+  - Save: idiom b14:B27A -> `hle_savecp` (SGB bank: the copy, then the slot marked in the
+    header at cart RAM bank 3 $A100); `save_boot` from `boot_w.booted`. Save scenario for
+    firstdiff: `--random 1 --press 25500:B,25560:S,25640:U,25700:A,25800:A,25900:A,26000:A,
+    26100:A,26200:A,26300:A --poke 002D=00 --pokeat 25600` (menu at 25499, $2D bit 0 = 0:
+    "on the world map"; saves to file 1, then overwrites it): 25656 waits identical, DMG
+    and CGB.
+  - Speed: the re-checked LCD-off first cost DMG 8 frames per 30000 (the V-Blank queue
+    flush ran first and could fill the V-Blank, so the re-check waited a frame); while an
+    LCD-off waits (`lcdoff_req`) the V-Blank handler skips the flush (done with the LCD off
+    right after). lagcheck random 1: DMG 29957 GB frames for 29956 NES frames (+1), CGB -2.3%.
+  - Checks on the final build: firstdiff random 1 (30000) DMG / CGB, random 2 (14000),
+    save scenario DMG / CGB: identical; lotcheck static + LCD-off runs DMG / CGB + soft
+    reset DMG / CGB / release: all passed.
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).

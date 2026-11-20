@@ -59,35 +59,34 @@ build a release.
   the binary must be documented in the submission; undocumented code found during Lot
   Check meant rejection.
 
-## Where the current builds stand (notes to check, 2026-11-20; not yet verified)
+## Where the builds stand (2026-11-20)
 
-Points known from the code that need work or an audit before a release:
+Checker: `tools/gb2/lotcheck.py GB [--run NES FRAMES --random S] [--reset] [--release]`
+(header, padding, LCD-off audit of the assembled source, debug-code report; PyBoy runs for
+the LCD-off timing and the soft reset). It is written for FF2's runtime (labels `.lcdoff`,
+`soft_reset`); FF1 / FF3 need the same runtime changes before it applies to them.
 
-- Header: `tools/gb/asm_sm83.py` `make_rom` writes the header and both checksums; verify
-  the logo, the checksums, $0147-$0149 against the cartridge (MBC5 + RAM + battery; FF2
-  uses 4 cart RAM banks = 32 KB) and the padding of unused space in each built ROM. Test
-  copies made by `tools/gb2/ff2form.py` zero the global checksum: never a release ROM.
-- LCD off: the runtimes wait for LY >= 144 before clearing LCDC bit 7 (`rt_ppu_w1`); every
-  other LCD-off site (boot, SGB border transfer, test code) needs the same audit.
-- VRAM / OAM: writes with the LCD on go through the VRAM queue (flushed in V-Blank;
-  `q_drain1` waits for H-Blank / V-Blank), OAM by DMA in V-Blank; every native routine that
-  writes VRAM directly must be checked to do so only with the LCD off. PyBoy does not
-  model VRAM locking: check in Gambatte / mGBA.
-- SRAM: the runtimes keep cart RAM enabled at all times, because the NES work RAM at
-  $6000-$7FFF is mapped to cart RAM bank 0 (and bank 1 holds the DMG tile shadows, bank 3
-  the FF2 test-runner pads and the DMG scan's table). The "disable RAM after every access"
-  rule needs a design decision with the owner (e.g. NES work RAM in WRAM where it fits,
-  battery-backed RAM only for the save slots, enabled only while saving / loading).
-- Saves: the games' own save checksums (FF2 fix:DAD4) detect corrupt slots; a corrupt
-  slot must produce an explicit message before anything is initialised.
-- Soft reset (A + B + Start + Select): not implemented in the GB runtimes yet.
-- Memory clear at boot: the runtimes clear memory at boot (`memclr`); verify WRAM, HRAM,
-  SRAM handling and all hardware registers.
-- Hardware coverage: tested so far in PyBoy, Gambatte and mGBA (DMG, SGB, CGB); still
-  needed: Game Boy Pocket, GBA, and real hardware where possible.
-- FF3 (CGB only, $C0): the "Game Boy Color only" error screen on DMG / SGB.
-- Terminology: check every translated string (and any builder / manual text) for the exact
-  hardware names.
-- Undisclosed code: test-only paths in the runtimes (FF2 `TEST_PAD` $A5 test-runner pad
-  input, the `rst $38` debug trap, `GB_END_TEST` / `GB_DLG_TEST` test builds, debug hooks)
-  must be removed from release builds or documented.
+### FF2 (`tools/gb2`, build `python3 tools/gb2/build.py --gb --release` -> `build/ff2_release.gb`)
+
+| Requirement | State | How it is met / checked |
+|---|---|---|
+| Logo, checksums, flags, sizes | met | `make_rom`; lotcheck: logo, $014D, $014E, CGB $80, SGB $03 + licensee $33, type $1B (MBC5 + RAM + battery), ROM 1 MB = $05, RAM 32 KB = $03, entry point |
+| Padding | met | assembler filler $FF everywhere (gaps and bank ends); lotcheck |
+| LCD off only in V-Blank | met | three LCD-off writes, all labelled `.lcdoff`: boot (interrupts off, LY >= 144), `rt_ppu_w1` (wait for LY >= 144 with the V-Blank interrupt run first, then with interrupts off re-check LY 144-151 and write), SGB border transfer (boot). lotcheck: static audit (the other 5 LCDC writes keep bit 7 set) and PyBoy runs (30000 frames DMG and CGB: every LCD-off at LY 144-151) |
+| VRAM / OAM only in H-Blank / V-Blank / LCD off | checked | writes with the LCD on go through the V-Blank queue / HDMA, OAM by DMA in the V-Blank. Checked by comparing PyBoy (no VRAM locking) with Gambatte (hardware locking) at 38 points of 30000 frames of random play, DMG and CGB: same screens (one sprite animation frame of timing difference) |
+| SRAM disabled after every access | deviation (documented) | the NES work RAM $6000-$7FFF is cart RAM bank 0 and is read / written by the game every frame, and the runtime keeps DMG tile shadows (bank 1) and SGB packets (bank 2) in cart RAM, so RAM cannot be disabled between accesses. Moving NES work RAM to WRAM would need 8 KB of the 32 KB CGB WRAM that the runtime uses for tile copies (and all of a DMG's 8 KB WRAM): not possible on the DMG. Protection instead: the save slots are checked at start-up (next row), and a damaged one is reported |
+| Save data validated at start-up, message before init | met | `rt/save.s`: FF2's own slot rule (fix:DAC1: 768 bytes sum to $FF, byte $2FE = $5A); the runtime records the slots the game has saved to (FF2's save copy b14:B27A runs natively and marks the slot) in a header in cart RAM bank 3 (`FF2S`, slots, check byte). At boot a marked slot that fails the rule shows "THE SAVE IN FILE n IS DAMAGED AND CANNOT BE LOADED. IT WILL BE ERASED. PRESS THE A BUTTON." (own font), and only after the A Button is it cleared. No header (first use, older ROM): valid slots are marked, nothing cleared. FF2 itself never initialises the slots. Checked in PyBoy, DMG and CGB (no header / valid / damaged / no A press) |
+| Soft reset A + B + Start + Select | met | `read_buttons` -> `soft_reset`: sound off at once, then the boot path (`boot_w`); only from the joypad read, so never during a save copy. Save RAM (NES work RAM) is kept, as after a reset on the NES. lotcheck `--reset`: screen and NES RAM 400 waits after the reset = a fresh power-on (DMG, CGB); mGBA: SGB border kept, CGB double speed kept |
+| Memory cleared at boot | met | `boot_w` / `boot_clr`: LCD off in V-Blank, sound off, interrupts and IF cleared, scroll / window / LYC / STAT / timer set, VRAM (CGB: both banks), WRAM (CGB: banks 1-7), OAM, HRAM, the runtime's cart RAM (banks 1, 2, bank 3 from $B000); not the save RAM (bank 0) or the save header |
+| DMG / Pocket / SGB / CGB / GBA | checked in emulators; open: real hardware, DMG fade | DMG, SGB, CGB in PyBoy / Gambatte / mGBA; Pocket (mGBA model MGB: same picture as DMG, frame for frame) and GBA (mGBA model AGB: CGB mode, double speed) boot, play the opening and soft-reset correctly. Model runs: `sed 's/const char\* model = .*/const char* model = getenv("GB_MODEL") ? getenv("GB_MODEL") : (dmg == 2 ? "CGB" : dmg ? "DMG" : "SGB");/' tools/gb/mgba/sgbrun.c > build/modelrun.c && gcc -O2 build/modelrun.c -lmgba -o build/modelrun`, then `GB_MODEL=MGB build/modelrun ROM FRAMES OUT --dmg ...` (`AGB` with `--cgb`). Open: (1) on DMG / Pocket the prologue's text fade shows a dark block in a letter cell for single frames (tile re-coding one frame behind the palette while the fade dithers; it was there before these changes) - a visible glitch to remove before release; (2) real hardware |
+| CGB-only error screen | not applicable | FF2 is dual-mode ($80) |
+| Hardware names in text | met | the only hardware text, system string 42 "hold down the RESET button while you turn the power off" (Famicom), is "Save complete!" in the GB build; the save message says "A Button"; no other text names hardware |
+| CGB colour used | met | NES palettes -> CGB palettes, per-tile attributes |
+| No undisclosed code | met in `--release` | the test-runner pad input (TEST_PAD, `;[test]` blocks) is left out of release builds (lotcheck `--release`). Kept and disclosed here: the crash handlers `rt_fault` / `rst38_trap` (record the state in WRAM and stop if execution reaches uncompiled code or $FF filler; never reached in the checks) and the soft reset. `GB_END_TEST` (layout.py, ending test build) is refused by `--release` |
+
+### FF1 (`tools/gb`) and FF3
+
+FF1's runtime does not have these changes yet (boot clear, soft reset, LCD-off re-check,
+save check, release build); they port from FF2's runtime (same design) once the owner
+allows changes to the FF1 tools. FF3 (CGB only, $C0) needs the "Game Boy Color only"
+screen on DMG / SGB; FF3 is not started.

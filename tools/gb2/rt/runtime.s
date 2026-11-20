@@ -219,6 +219,7 @@ sgb_adirty: ds 1                            ; SGB: attributes / cells / camera c
 sgb_mask:   ds 1                            ; SGB screen mask: 1 = to blank (LCD went off), 2 = blanked, 3 = blanked until the packets built with the LCD on are out
 nmi_req:    ds 1                            ; FF2: an NES NMI to a battle handler is due (vblank_isr)
 in_nmi:     ds 1                            ; FF2: rt_nmi_run is running the handler
+lcdoff_req: ds 1                            ; rt_ppu_w1 waits for the V-Blank to turn the LCD off: vblank_isr skips its queue flush
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -300,7 +301,11 @@ boot_w:     di
             jr .booted
 .dmg:       call dmg_init
             call sgb_detect
-.booted:
+.booted:    ld a, SGB_BANK                  ; save slots checked (rt/save.s; a damaged one is
+            ld [$2000], a                   ;   reported on screen, then cleared)
+            call save_boot
+            ld a, 1
+            ld [$2000], a
             ld hl, dma_code                 ; OAM DMA routine to HRAM
             ld de, hram_dma
             ld b, 10
@@ -441,7 +446,9 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             ldh a, [$FF0F]                  ; DMG: the STAT write requested a STAT
             res 1, a                        ;   interrupt; drop it
             ldh [$FF0F], a
-            call flush_vbl
+            ldh a, [lcdoff_req]             ; (an LCD-off waiting: the queue is flushed with
+            and a                           ;   the LCD off right after, the V-Blank stays short)
+            call z, flush_vbl
             ldh a, [pal_dirty]              ; DMG: the shades for the next frame (the
             and a                           ;   registers are written next vblank)
             call nz, make_palettes
@@ -1616,6 +1623,8 @@ rt_ppu_w1:  push af
             ldh a, [is_sgb]
             and a
             call nz, sgb_lcd_off
+            ld a, 1
+            ldh [lcdoff_req], a
 .wv:        ldh a, [$FF44]                  ; LCD off only in the vblank: wait for it (the
             cp 144                          ;   vblank interrupt runs first), then with
             jr c, .wv                       ;   interrupts off check that it is still the
@@ -1627,6 +1636,7 @@ rt_ppu_w1:  push af
             jr nc, .wv1
             xor a
 .lcdoff:    ldh [$FF40], a
+            ldh [lcdoff_req], a
             ei
             ldh [lcd_on], a
             ld b, 0

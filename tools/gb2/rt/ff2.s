@@ -844,6 +844,9 @@ hle_fillxy: call rt_fcs                     ; fix:F496 / F4B1 page fills (native
 hle_csum:   call rt_fcs                     ; fix:DAD4 save slot checksum (native)
             db HLE_BANK
             dw hle_csum_b
+hle_savecp: call rt_fcs                     ; b14:B27A save copy, slot marked (rt/save.s)
+            db SGB_BANK
+            dw hle_savecp_b
 hle_mexp:   call rt_fcs                     ; b00:9D97 map load metatile expansion (native)
             db HLE_BANK
             dw hle_mexp_b

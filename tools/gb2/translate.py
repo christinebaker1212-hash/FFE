@@ -103,7 +103,8 @@ class FF2:
               # b00 map load: metatile expansion, the >= $39 scan, a ROM page to $0400 (rt/ff2*.s)
               ('b00', 0x9D97): ('hle_mexp', 0x9DD0, 'NZC'), ('b00', 0x9DDB): ('hle_mscan', 0x9DDF, 'NZC'),
               ('b00', 0x9E44): ('hle_rcopy', 0x9E4D, 'NZ'),
-              ('fix', 0xDAD4): ('hle_csum', 0xDADF, 'NZC')}   # save slot checksum (rt/ff2_banked.s)
+              ('fix', 0xDAD4): ('hle_csum', 0xDADF, 'NZC'),    # save slot checksum (rt/ff2_banked.s)
+              ('b14', 0xB27A): ('hle_savecp', 0xB288, 'NZ')}   # save copy + slot mark (rt/save.s)
     # battle NMI handlers (run by rt_nmi_run through the dynamic table; RTI = ret)
     nmi_handlers = [('b12', 0x9A79), ('b05', 0xA9A2)]
     idiom_code = {('fix', 0xFA91): bytes.fromhex('a9fa48a999486c4000'),
@@ -121,7 +122,8 @@ class FF2:
                   ('b14', 0xB8B6): bytes.fromhex('8d07208d07208d07208d0720cad0f1'),
                   ('b00', 0x9D97): bytes.fromhex('a488be0074a000bd00789180c8bd8078'),
                   ('b00', 0x9DDB): bytes.fromhex('b180c939'), ('b00', 0x9E44): bytes.fromhex('bd008b9d0004e8d0f7'),
-                  ('fix', 0xDAD4): bytes.fromhex('187180c8d0fae681cad0f5')}
+                  ('fix', 0xDAD4): bytes.fromhex('187180c8d0fae681cad0f5'),
+                  ('b14', 0xB27A): bytes.fromhex('b1829180c8d0f9e681e683cad0f2')}
     skip = [('fix', 0xFA2C, 0xFA48), ('fix', 0xFEA1, 0xFEAD), ('fix', 0xFEAF, 0xFEBF)]   # waits (but their entries) + NMI return stubs
 
 

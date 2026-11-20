@@ -721,7 +721,10 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
 
 ## Remaining
 - Before any release (FF1, FF2, FF3): the Lot Check requirements in
-  `docs/gb-release-requirements.md` (absolutely required).
+  `docs/gb-release-requirements.md` (absolutely required). FF2: done and checked except
+  the DMG prologue-fade flicker and real-hardware runs (`tools/gb2/lotcheck.py`,
+  `build.py --gb --release`); FF1: the same runtime changes still to port (needs the
+  owner's go-ahead for the FF1 tools); FF3: the CGB-only screen.
 - FF1: the speed work above; Select menu (options / formation / suspend), name entry
   (design E), Disch disassembly BUGGED fixes, final builder exe.
 - FF2 (dual-mode) and FF3 (GBC only): not started (on the everything8215 sources).

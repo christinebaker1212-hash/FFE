@@ -130,6 +130,9 @@ Possible next work: speed of screen transitions on DMG/SGB (nametable-write book
 The Lot Check requirements in `docs/gb-release-requirements.md` apply to FF1, FF2 and FF3
 (owner, 2026-11-20: absolutely required before a release). The FF1 "release" above was a
 local build made before this rule; it has not been checked against them.
+FF2 has them (see the table in that file): boot clear, soft reset, LCD off re-checked in
+V-Blank, save check with message (`tools/gb2/rt/save.s`), release build without test code,
+checker `tools/gb2/lotcheck.py`. FF1's runtime (`tools/gb/rt`) needs the same changes.
 
 ## Gotchas learned
 - B and D must stay 0 at all times (BC = Y, DE = X for indexed addressing).
