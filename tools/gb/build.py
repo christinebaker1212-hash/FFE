@@ -143,6 +143,10 @@ def ramchk_src():
                                '', 'THIS GAME PAK DOES', 'NOT BANK ITS RAM.'])
     out += rows('saverr_text', ['SAVE DATA ERROR', '', 'THE SAVED GAME IS', 'DAMAGED AND CANNOT', 'BE LOADED.', '',
                                'PRESS THE A BUTTON', 'TO ERASE IT.'])
+    out += rows('susperr_text', ['SUSPEND DATA ERROR', '', 'THE SUSPENDED GAME', 'IS DAMAGED AND', 'CANNOT BE RESUMED.', '',
+                                'PRESS THE A BUTTON', 'TO ERASE IT.'])
+    out += rows('opterr_text', ['SETTINGS ERROR', '', 'THE SAVED SOUND', 'SETTINGS ARE', 'DAMAGED.', '',
+                               'PRESS THE A BUTTON', 'TO RESET THEM.'])
     return out
 
 

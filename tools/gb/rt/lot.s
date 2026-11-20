@@ -87,20 +87,20 @@ soft_reset: di
             ld a, $11
 .go:        jp boot
 
-; ---- boot (LCD off, cart RAM on, bank 0; ROM bank DYN_BANK): the runtime's cart RAM banks
-; 1-3 cleared (working memory), then the save checked (see above).
-save_boot:  ld d, 1
-.cb:        ld a, d
+; ---- boot (LCD off, cart RAM on, bank 0; ROM bank DYN_BANK): the runtime's working cart RAM
+; cleared: bank 1 (tile shadows) and bank 3 $A000-$B0FF (SGB packets, sprite / BG bookkeeping,
+; buffers); not the suspend point (bank 2, bank 3 $B100-$BDFF) or the options (bank 3 $BF00),
+; which persist. Then the save checked (see above).
+save_boot:  ld a, 1
             ld [$4000], a
             ld hl, $A000
             ld bc, $2000
-            push de
             call memclr
-            pop de
-            inc d
-            ld a, d
-            cp 4
-            jr nz, .cb
+            ld a, 3
+            ld [$4000], a
+            ld hl, $A000
+            ld bc, $1100
+            call memclr
             xor a
             ldh [save_sep], a
             ld [$4000], a
@@ -122,10 +122,13 @@ save_boot:  ld d, 1
             ld [hl], b
             ld a, e
             cp $A5
-            ret nz
+            jr nz, .ns
             ld a, 1
             ldh [save_sep], a
-            ld a, SAVE_BANK
+            call sv_boot
+.ns:        call sp_boot                    ; the suspend point and the options, checked too
+            jp op_boot
+sv_boot:    ld a, SAVE_BANK
             ld [$4000], a
             call sv_magic
             jr nz, .new
@@ -160,19 +163,7 @@ save_boot:  ld d, 1
 .bad:       xor a                           ; damaged: say so, wait for the A Button
             ld [$4000], a
             ld hl, saverr_text
-            call msg_show
-.wa:        call .btn
-            jr z, .wa
-.wr:        call .btn
-            jr nz, .wr
-.wv:        ldh a, [$FF44]                  ; LCD off in the V-Blank, VRAM cleared again
-            cp 144
-            jr c, .wv
-            xor a
-            ldh [$FF40], a
-            ld hl, $8000
-            ld bc, $2000
-            call memclr
+            call err_wait
             ld hl, SV_DATA                  ; then erased: an empty save in both banks
             ld bc, $400
             call memclr
@@ -210,6 +201,22 @@ save_boot:  ld d, 1
             xor a
             ld [$4000], a
             ret
+
+; HL = message rows: shown (msg_show) until the A Button is pressed and released, then the LCD
+; off in the V-Blank and VRAM cleared again (boot: the LCD was off).
+err_wait:   call msg_show
+.wa:        call .btn
+            jr z, .wa
+.wr:        call .btn
+            jr nz, .wr
+.wv:        ldh a, [$FF44]
+            cp 144
+            jr c, .wv
+            xor a
+            ldh [$FF40], a
+            ld hl, $8000
+            ld bc, $2000
+            jp memclr
 .btn:       ld a, $10                       ; NZ: the A Button held
             ldh [$FF00], a
             ldh a, [$FF00]
@@ -218,6 +225,141 @@ save_boot:  ld d, 1
             ldh a, [$FF00]
             cpl
             and $01
+            ret
+
+; ---- the suspend point (bank 5 + 6, or 3 + 2 without a save bank; ff1_native.s susp_w): its
+; magic "SUSP" at SUSP_MAGIC, then the sum of its bytes and the sum's complement. A point
+; whose sum does not match is reported (A Button) and erased.
+sp_boot:    call .bank
+            ld [$4000], a
+            ld hl, SUSP_MAGIC
+            ld a, [hl+]
+            cp 'S'
+            jr nz, .x
+            ld a, [hl+]
+            cp 'U'
+            jr nz, .x
+            ld a, [hl+]
+            cp 'S'
+            jr nz, .x
+            ld a, [hl]
+            cp 'P'
+            jr nz, .x
+            ld de, 0                        ; the sum: SUSP_RAM's $0C00 bytes, then the copy's 8 KB
+            ld hl, SUSP_RAM
+.a:         ld a, [hl+]
+            add a, e
+            ld e, a
+            jr nc, .an
+            inc d
+.an:        ld a, h
+            cp high(SUSP_RAM + $0C00)
+            jr nz, .a
+            ldh a, [save_sep]
+            add a, a
+            add a, a
+            add a, 2
+            ld [$4000], a
+            ld hl, $A000
+.b:         ld a, [hl+]
+            add a, e
+            ld e, a
+            jr nc, .bn
+            inc d
+.bn:        ld a, h
+            cp $C0
+            jr nz, .b
+            call .bank
+            ld [$4000], a
+            ld hl, SUSP_MAGIC + 4
+            ld a, [hl+]
+            cp e
+            jr nz, .bad
+            ld a, [hl+]
+            cp d
+            jr nz, .bad
+            ld a, [hl+]
+            cpl
+            cp e
+            jr nz, .bad
+            ld a, [hl]
+            cpl
+            cp d
+            jr z, .x
+.bad:       xor a
+            ld [$4000], a
+            ld hl, susperr_text
+            call err_wait
+            call .bank
+            ld [$4000], a
+            xor a
+            ld [SUSP_MAGIC], a
+.x:         xor a
+            ld [$4000], a
+            ret
+.bank:      ldh a, [save_sep]
+            add a, a
+            add a, 3
+            ret
+
+; ---- the options (OPT_SAVE: BGM, SFX volume, $5A, check byte = ~(BGM + SFX + $5A); bank 4,
+; or 3): marked valid but not matching their check byte, they are reported (A Button) and
+; reset to 8 / 8 (then opt_load reads them).
+op_boot:    ldh a, [save_sep]
+            add a, 3
+            ld [$4000], a
+            ld hl, OPT_SAVE + 2
+            ld a, [hl]
+            cp $5A
+            jr nz, .x
+            ld a, [OPT_SAVE]
+            ld b, a
+            ld a, [OPT_SAVE + 1]
+            add a, b
+            add a, $5A
+            cpl
+            ld b, a
+            ld a, [OPT_SAVE + 3]
+            cp b
+            jr z, .x
+            xor a
+            ld [$4000], a
+            ld hl, opterr_text
+            call err_wait
+            ldh a, [save_sep]
+            add a, 3
+            ld [$4000], a
+            ld a, 8
+            ld [OPT_SAVE], a
+            ld [OPT_SAVE + 1], a
+            ld a, $95                       ; (~(8 + 8 + $5A))
+            ld [OPT_SAVE + 3], a
+            ld a, $5A
+            ld [OPT_SAVE + 2], a
+.x:         xor a
+            ld [$4000], a
+            ret
+
+; boot: the volumes kept with the options (else 8, 8)
+opt_load:   ldh a, [save_sep]
+            add a, 3
+            ld [$4000], a
+            ld a, 8
+            ld [VOL_BGM], a
+            ld [VOL_SFX], a
+            ld a, [OPT_SAVE + 2]
+            cp $5A
+            jr nz, .x
+            ld a, [OPT_SAVE]
+            cp 9
+            jr nc, .x
+            ld [VOL_BGM], a
+            ld a, [OPT_SAVE + 1]
+            cp 9
+            jr nc, .x
+            ld [VOL_SFX], a
+.x:         xor a
+            ld [$4000], a
             ret
 
 sv_magic:   ld hl, $A000                    ; Z: SAVE_BANK holds the magic
@@ -379,3 +521,181 @@ save_commit: ldh a, [save_sep]
             and a
             ret
 sc_magic:   db "FF1GBSV1"
+
+; ---- suspend points (moved from ff1_native.s; rt_mmc_r5802 / rt_mmc_w5802 map DYN_BANK)
+section bank DYN_BANK, $5800
+susp_r:
+            push af
+            call sb_ram
+            ld [$4000], a
+            ld hl, SUSP_MAGIC
+            ld a, [hl+]
+            cp 'S'
+            jr nz, .no
+            ld a, [hl+]
+            cp 'U'
+            jr nz, .no
+            ld a, [hl+]
+            cp 'S'
+            jr nz, .no
+            ld a, [hl]
+            cp 'P'
+            jr nz, .no
+            ld l, 1
+            jr .x
+.no:        ld l, 0
+.x:         xor a
+            ld [$4000], a
+            pop af
+            ret
+susp_w:
+            push af
+            push bc
+            push de
+            push hl
+            cp $A5
+            jr z, .save
+            cp $5A
+            jr z, .load
+            cp $E0
+            jr z, .erase
+            jr .x
+.save:      call sb_ram                     ; NES RAM and ExRAM -> SUSP_RAM (bank 5, or 3)
+            ld [$4000], a
+            ld hl, NES_RAM
+            ld de, SUSP_RAM
+            ld bc, $0C00
+            call .cp
+            ld a, 2                         ; save RAM (bank 0) -> bank 2 through QV (the
+            ld b, 32                        ;   VRAM queue is empty while the LCD is off)
+            ld hl, $A000
+.sv:        push bc
+            xor a
+            ld [$4000], a
+            push hl
+            ld de, QV
+            ld bc, 256
+            call .cp
+            pop hl
+            call sb_wram
+            ld [$4000], a
+            ld d, h
+            ld e, l
+            ld hl, QV
+            ld bc, 256
+            call .cp
+            ld h, d
+            ld l, e
+            pop bc
+            dec b
+            jr nz, .sv
+            call sp_sum                     ; the sum, then the magic (Lot Check 2.3)
+            call sb_ram
+            ld [$4000], a
+            ld hl, SUSP_MAGIC + 4
+            ld a, e
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            ld a, e
+            cpl
+            ld [hl+], a
+            ld a, d
+            cpl
+            ld [hl], a
+            ld hl, SUSP_MAGIC
+            ld a, 'S'
+            ld [hl+], a
+            ld a, 'U'
+            ld [hl+], a
+            ld a, 'S'
+            ld [hl+], a
+            ld [hl], 'P'
+            jr .x
+.load:      call sb_ram                     ; SUSP_RAM -> NES RAM (not page 1: the GB stack)
+            ld [$4000], a
+            ld hl, SUSP_RAM
+            ld de, NES_RAM
+            ld bc, $0100
+            call .cp
+            ld hl, SUSP_RAM + $0200
+            ld de, NES_RAM + $0200
+            ld bc, $0A00
+            call .cp
+            ld b, 32                        ; bank 2 -> save RAM
+            ld hl, $A000
+.ld:        push bc
+            call sb_wram
+            ld [$4000], a
+            push hl
+            ld de, QV
+            ld bc, 256
+            call .cp
+            pop hl
+            xor a
+            ld [$4000], a
+            ld d, h
+            ld e, l
+            ld hl, QV
+            ld bc, 256
+            call .cp
+            ld h, d
+            ld l, e
+            pop bc
+            dec b
+            jr nz, .ld
+.erase:     call sb_ram
+            ld [$4000], a
+            xor a
+            ld [SUSP_MAGIC], a
+.x:         xor a
+            ld [$4000], a
+            pop hl
+            pop de
+            pop bc
+            pop af
+            ret
+.cp:        ld a, [hl+]                     ; HL -> DE, BC bytes
+            ld [de], a
+            inc de
+            dec bc
+            ld a, b
+            or c
+            jr nz, .cp
+            ret
+
+sb_ram:     ldh a, [save_sep]               ; the suspend point's banks: 5 / 6 with a save bank
+            add a, a                        ;   of its own (64 KB), else 3 / 2
+            add a, 3
+            ret
+sb_wram:    ldh a, [save_sep]
+            add a, a
+            add a, a
+            add a, 2
+            ret
+sp_sum:     call sb_ram                     ; DE = the 16-bit sum of the suspend point (SUSP_RAM
+            ld [$4000], a                   ;   $0C00 bytes, then the save RAM copy's 8 KB)
+            ld de, 0
+            ld hl, SUSP_RAM
+.a:         ld a, [hl+]
+            add a, e
+            ld e, a
+            jr nc, .an
+            inc d
+.an:        ld a, h
+            cp high(SUSP_RAM + $0C00)
+            jr nz, .a
+            call sb_wram
+            ld [$4000], a
+            ld hl, $A000
+.b:         ld a, [hl+]
+            add a, e
+            ld e, a
+            jr nc, .bn
+            inc d
+.bn:        ld a, h
+            cp $C0
+            jr nz, .b
+            xor a
+            ld [$4000], a
+            ret

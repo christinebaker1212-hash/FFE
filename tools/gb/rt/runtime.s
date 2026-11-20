@@ -403,6 +403,8 @@ boot:       di
             ld a, CAM_Y
             ldh [cam_y], a
             call apu_init
+            ld a, DYN_BANK                  ; (lot.s)
+            ld [$2000], a
             call opt_load
             ld a, -68                       ; timer: 4096 Hz / 68 = 60.2 Hz frame tick while the LCD is off
             ld b, a
@@ -1807,9 +1809,14 @@ rt_wait_nmi:
             ld a, [VBL_CNT]                 ; (check and halt with interrupts off: a vblank
             cp l                            ;   between them made the halt sleep a whole
             jr nz, .dn                      ;   frame, when another interrupt such as the
-            halt                            ;   timer had woken the wait just before it;
-            ei                              ;   halt wakes on the pending interrupt, which runs
-            jr .w                           ;   after the ei's next instruction)
+            xor a                           ;   timer had woken the wait just before it;
+            ld [$0000], a                   ;   halt wakes on the pending interrupt, which runs
+            halt                            ;   after the ei's next instruction). Cart RAM is
+            nop                             ;   off while halted (Lot Check 2.3; no handler runs
+            ld a, $0A                       ;   meanwhile: interrupts are off) and on again
+            ld [$0000], a                   ;   before them. (nop: the halt bug repeats the
+            ei                              ;   byte after HALT when an interrupt is pending)
+            jr .w
 .dn:        ei
             ld [VBL_SEEN], a
             ld a, [LON_RDY]                 ; (the deferred switch-on, at a frame's start)
@@ -2911,21 +2918,21 @@ rt_mmc_w5800:                               ; camera X in tiles (GB layout code;
 ; there). $5802 write: $A5 = make a suspend point (NES RAM, ExRAM -> cart RAM bank 4, NES
 ; save RAM -> bank 5; the LCD must be off), $5A = restore it and erase it, $E0 = erase it;
 ; read: 1 if one exists. $5803 / $5804: BGM / SFX volume 0-8 (kept in cart RAM bank 3).
-SUSP_MAGIC = $B100          ; (cart RAM bank 3) "SUSP" when a suspend point is there
-SUSP_RAM   = $B200          ; (cart RAM bank 3) suspend: NES RAM + ExRAM ($0C00 bytes); bank 2: save RAM
-OPT_SAVE   = $BF00          ; (cart RAM bank 3) BGM, SFX volume, $5A when valid
-rt_mmc_r5802:                               ; (bank HLE_BANK: susp_r)
+SUSP_MAGIC = $B100          ; (cart RAM bank 5, or 3) "SUSP" when a suspend point is there, then its sum
+SUSP_RAM   = $B200          ; (cart RAM bank 5, or 3) suspend: NES RAM + ExRAM ($0C00 bytes); bank 6 (or 2): save RAM
+OPT_SAVE   = $BF00          ; (cart RAM bank 4, or 3 without a save bank) BGM, SFX, $5A, check
+rt_mmc_r5802:                               ; (bank DYN_BANK, lot.s: susp_r)
             push af
-            ld a, HLE_BANK
+            ld a, DYN_BANK
             ld [$2000], a
             call susp_r
             ldh a, [code_bank]
             ld [$2000], a
             pop af
             ret
-rt_mmc_w5802:                               ; (bank HLE_BANK: susp_w)
+rt_mmc_w5802:                               ; (bank DYN_BANK, lot.s: susp_w)
             push af
-            ld a, HLE_BANK
+            ld a, DYN_BANK
             ld [$2000], a
             pop af
             call susp_w
@@ -3039,12 +3046,18 @@ opt_put:    cp 9                            ; (0-8)
             ld a, 8
 .ok:        ld [hl], a
             push af
-            ld a, 3
+            ldh a, [save_sep]               ; (bank 4 with a save bank of its own, else 3)
+            add a, 3
             ld [$4000], a
             ld a, [VOL_BGM]
             ld [OPT_SAVE], a
+            ld l, a
             ld a, [VOL_SFX]
             ld [OPT_SAVE + 1], a
+            add a, l
+            add a, $5A
+            cpl
+            ld [OPT_SAVE + 3], a            ; (check byte: lot.s op_boot)
             ld a, $5A
             ld [OPT_SAVE + 2], a
             xor a
@@ -3060,27 +3073,6 @@ rt_mmc_r5804:
             ld hl, VOL_SFX
             ld l, [hl]
             ret
-; boot: the volumes kept in cart RAM bank 3 (else 8, 8)
-opt_load:   ld a, 3
-            ld [$4000], a
-            ld a, 8
-            ld [VOL_BGM], a
-            ld [VOL_SFX], a
-            ld a, [OPT_SAVE + 2]
-            cp $5A
-            jr nz, .x
-            ld a, [OPT_SAVE]
-            cp 9
-            jr nc, .x
-            ld [VOL_BGM], a
-            ld a, [OPT_SAVE + 1]
-            cp 9
-            jr nc, .x
-            ld [VOL_SFX], a
-.x:         xor a
-            ld [$4000], a
-            ret
-
 rt_mmc_w5801:                               ; camera Y in tiles
             push af
             ld a, 1

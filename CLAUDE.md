@@ -91,6 +91,10 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   writes at run time. Game state stays as on the NES: the RAM checks keep passing. Never copy
   game code or data into the repo; every game byte still comes from the user's ROM at build
   time.
+- **Mandate: the Game Boy and Game Boy Color must not emulate the NES while the game plays.**
+  Replace the NES-hardware layer (PPU / APU / mapper emulation) with native routines written
+  from the disassembly; the plan and its order are in `docs/gb-native-presentation.md`
+  ("Owner's mandate").
 - **Lot Check 2.3 (cart RAM off after each access): the owner expects it to be met**, not
   waived. Work out the memory layout that makes it possible: what FF1 really uses of
   $6000-$7FFF, what the runtime needs, and what can live elsewhere.
@@ -1155,6 +1159,22 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   - Checks: checkall 62/62, the release ROM RAM-identical (battle 7650), save / soft-reset
     tests in PyBoy (`scratchpad lot/savetest.py`, `rst.py`).
   - Lag: DMG 23 (the frames that lag moved a little), CGB 0.
+
+- **Lot Check 2.3 and the native-layer plan (2026-11-20, later):**
+  - Suspend point (banks 5 / 6, with a sum) and options (bank 4 $BF00, with a check byte)
+    moved out of the working banks; boot validates the save, suspend point and options, each
+    with an error screen.
+  - Cart RAM is off during V-Blank waits.
+  - Boot clears only the working parts of banks 1 / 3. The first version cleared the
+    suspend / options areas too; fixed.
+  - The literal rule (RAM off after every access) is impossible on DMG: FF1's working memory
+    is ~10 KB and the DMG has 8 KB of RAM; measured and documented in
+    `docs/gb-release-checks.md`.
+  - `tools/gb/ff1dis.py`: maps the disassembly's routine names onto the GB build's NES ROM
+    (807 placed, `build/ff1dis.map`).
+  - `tools/gb/hwsites.py`: inventory of the NES-hardware layer (780 call sites: picture 501,
+    sound 172, GB registers 60, OAM DMA 34, joypad 13; `build/hwsites.txt`).
+  - checkall 62/62; lag DMG 23, CGB 0.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

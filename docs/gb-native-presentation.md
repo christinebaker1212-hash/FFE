@@ -5,6 +5,46 @@ Approach for reaching **0% slowdown on DMG and CGB** in the FF1 / FF2 / FF3 Game
 method in CLAUDE.md ("keep recompiling the user's ROM; write native GB versions of hot
 routines, above all the graphics paths"); every rule there still holds.
 
+## Owner's mandate (2026-11-20, later; binding)
+
+**The Game Boy and Game Boy Color must not emulate the NES while the game plays.** The
+NES-hardware layer worked as a first solution. From here, it is to be replaced with native
+routines written from the disassembly (FF1: Entroper/FF1Disassembly, cloned into
+`build/ref/` at work time, never committed). The end state has no PPU, APU or mapper
+emulation at run time:
+- FF1's drawing, sprite and sound routines are native GB code that write GB VRAM, OAM and
+  sound registers directly.
+- Graphics, palettes and DMG shading come ready-made from build time, made from the user's
+  ROM.
+- Game logic stays the recompiled code from the user's ROM, with RAM identical to the NES.
+
+### FF1 plan (in this order)
+
+1. **Inventory.** List every site where the recompiled code still reaches the NES-hardware
+   layer: PPU registers (`rt_ppu_w*`, `rt_ppu_r*`), OAM DMA (`rt_io_w4014`), APU (`rt_apu_w`),
+   mapper (`rt_mmc_*`). For each, give how often it runs (profiles, coverage) and the
+   disassembly routine it belongs to (bank_0E/0F.asm etc., US release matched to the
+   Japanese ROM). Group the sites by subsystem.
+2. **Screen loads and tiles.** Make the CHR sets FF1 loads (map tilesets, battle backdrops
+   and enemies, font, sprites) into GB tiles at build time. On DMG, also pre-shade them per
+   palette set (map, battle, menu), so loads copy finished tiles and no tile is re-coded at
+   run time.
+3. **Maps.** Field and town drawing (row/column/attribute routines) write GB tile indices and
+   CGB attributes straight from the map data and the pre-shaded tileset. No nametable
+   shadow, owner tracking or DMG LCD-on scan.
+4. **Sprites.** The map-object, party and battle sprite routines write GB OAM directly
+   (GB-ready sprite tiles from build time). The per-frame NES OAM conversion goes. FF1's
+   OAM buffer ($0200) is still filled as on the NES, because it is RAM.
+5. **Text, windows, menus, battle panel.** Native GB map writes, completing the partial
+   natives (`txrun_b`, `dbox_b`, the battle panel rows, the small-font renderer).
+6. **Sound.** Sound effects and the remaining APU layer drive GB sound registers directly
+   (music already runs on a native engine).
+7. **Remove the emulation.** When no site is left, drop the PPU/APU/mapper layers. Keep the
+   build-time tables and the natives.
+
+Each step: RAM checks (checkall) identical; pictures compared with the step before; lagcheck
+DMG and CGB. A step is done only when its subsystem makes no NES-hardware call any more.
+
 ## The principle
 
 - **Game logic stays recompiled** from the user's ROM (formulas, RNG, events, menus' logic):

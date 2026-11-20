@@ -107,7 +107,28 @@ Tested in PyBoy: taking over an old save, loading a good one, the damaged case (
 shown, nothing erased before the A Button), and an inn save copied with a valid sum (RAM
 still identical to the NES).
 
-Not met, and cannot be on DMG: switching cart RAM off after every access. The runtime
+Since 2026-11-20 (later), also:
+- **Every battery-backed item has its own bank, mapped only while it is accessed:** the save
+  in bank 4 (with the options at $BF00, which now have a check byte), the suspend point in
+  bank 5 (NES RAM + ExRAM) and bank 6 (the work RAM copy), with a sum. Banks 0-3 are working
+  memory only.
+- **Each item is validated at boot,** with its own error screen ("SAVE DATA ERROR",
+  "SUSPEND DATA ERROR", "SETTINGS ERROR"; A Button) before it is erased or reset. Tested in
+  PyBoy: good and damaged options and suspend points.
+- **Cart RAM is switched off while the CPU waits for the V-Blank** (`rt_wait_nmi`: off right
+  before HALT, on right after; interrupts are off there, so no handler runs with it off).
+  In light frames that is most of the frame.
+- On a 32 KB Game Pak the old banks are used (3 / 2).
+- A suspend point or volume setting from an earlier build is not carried over to the new
+  banks.
+
+Not met literally, and cannot be on DMG: switching cart RAM off after every access. Measured
+(2026-11-20, NES emulator over the battle, 13 field scripts and 2 x 30000 frames of random
+play): FF1 changes 7,113 of the 8,192 bytes at $6000-$7FFF. The disassembly's layout agrees:
+$6000 game state, $6400 save, $6800-$6EFF battle / menu buffers, $6F00 map objects,
+$7000-$7FFF the 64 x 64 map. With the NES's 2 KB of RAM and the 1 KB ExRAM, the game's own
+working memory is about 10 KB, and the DMG has 8 KB of internal RAM in all. So on a DMG it
+has to stay in cart RAM, which must be on while the game code runs. Earlier analysis: The runtime
 enables cart RAM once at boot (`runtime.s`, `ld a, $0A / ld [$0000], a`) and leaves it on.
 Two layouts depend on that:
 - bank 0 holds the NES save/work RAM ($6000-$7FFF), which the recompiled game reads and
