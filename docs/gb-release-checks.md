@@ -178,7 +178,8 @@ Advance", "Game Link Cable", "Control Pad" (not "D-pad" or "directional pad"), "
 (not "cartridge").
 State: the boot RAM-check screen now says "GAME PAK RAM ERROR" / "THIS GAME PAK DOES NOT
 BANK ITS RAM." (2026-11-20), and the save error says "PRESS THE A BUTTON". The game's own
-text is FF1's translation and names no hardware. Still to check: the builder's messages.
+text is FF1's translation and names no hardware. The builder's messages say "Game Boy",
+"Super Game Boy", "Game Boy Color", and "ROM" for the source image (no "cart").
 
 4.2 **CGB colour use**: Game Boy Color modes must use colour meaningfully, not a single
 monochrome tint.

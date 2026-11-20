@@ -6,7 +6,7 @@ the ROM chosen here.
     FFE-Builder.exe --cli ROM OUTDIR     (console: FF1)
 
 Steps for Final Fantasy I (Game Boy / Super Game Boy / Game Boy Color): check the ROM's
-SHA-1, split the FF I・II cart into MMC5 ROMs (tools/split/build_mmc5.py), insert the
+SHA-1, split the FF I・II ROM into MMC5 ROMs (tools/split/build_mmc5.py), insert the
 English script with the GB layout (tools/ff1/insert.py --gb), make the code map by running
 the NES game in the bundled emulator (tools/gb/covall.py; the first build only, ~15-40
 minutes, then kept in OUTDIR/ffe_work), recompile to SM83 and assemble (tools/gb/build.py).
@@ -49,7 +49,7 @@ def build_ff1(rom, outdir, log):
         raise RuntimeError('%s is not the expected "Final Fantasy I, II (Japan).nes" (SHA-1 %s)' % (rom, SHA1_FF12))
     work = os.path.join(outdir, 'ffe_work')
     os.makedirs(work, exist_ok=True)
-    log('1/4 splitting the FF I・II cart')
+    log('1/4 splitting the FF I・II ROM')
     run(script_cmd('tools/split/build_mmc5.py', rom, work), log)
     log('2/4 English script, Game Boy layout')
     nes = os.path.join(work, 'ff1_gb.nes')
