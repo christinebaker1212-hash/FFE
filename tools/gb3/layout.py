@@ -1118,13 +1118,13 @@ hppal:              ; (was: HP text attributes) menu mode on; per member its HP 
     tax
     bne .m
     rts
-mnuoff:             ; close menu: the GB's menu mode off, the word tiles back
+mnuoff:             ; close menu ($A685's last step, the screen clear): then the GB's menu
+    jsr $F465       ;   mode off and the word tiles back
     lda #0
     sta $5808
     ldy #12
     lda #$FE
-    jsr JBGO
-    jmp $C486       ; clear oam data (the call this replaces)
+    jmp JBGO
 '''
 
 SMALLNUM_SRC = '''
@@ -1571,7 +1571,7 @@ def main_menu(r):
     r.d[o:o + len(hp['bytes'])] = hp['bytes']
     r.mods.append(dict(hp, where=(B3C, 0x95B2 & 0x1FFF)))
     r.log.append((B3C, 0x95B2, 'main menu: HP palettes per member for the GB ($5809), menu mode on'))
-    r.patch(B3D, 0xA685, '20 86 C4', '20 ' + j(hp['labels']['mnuoff']), 'close menu: GB menu mode off')
+    r.patch(B3D, 0xA693, '4C 65 F4', '4C ' + j(hp['labels']['mnuoff']), 'close menu: then GB menu mode off, word tiles back')
     font = lambda c: bytes(r.d[16 + FONT + c * 16:16 + FONT + c * 16 + 16])
     words = list(range(0xE5, 0xF7)) + [0xC9, 0xCF]
     assert all(font(c)[8:] == b'\xff' * 8 for c in words)

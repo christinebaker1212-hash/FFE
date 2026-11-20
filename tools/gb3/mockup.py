@@ -452,8 +452,99 @@ def menu_options(nes, outd, cmd):
     print('wrote', outd, outs)
 
 
+def sub_menus(nes, outd, cmd):
+    """field sub-menus for the GB (owner: SaGa-style full-width windows; the main menu's look):
+    S1 item list, S2 item target, S3 magic, S4 equip, S5 status"""
+    F = RomFont(nes); T = Tiles(cmd)
+    green = (128, 208, 16)
+    outs = []
+    def dig(sc, x, y, txt, ink):
+        for ch in txt:
+            if ch != ' ':
+                for yy, row in enumerate(DIG3[ch]):
+                    for xx, v in enumerate(row):
+                        if v == '#': sc.im.putpixel((x + xx, y + yy), ink)
+            x += 4
+    def mp_row(sc, c, r, mps, ink):
+        x = c * 8
+        for k, d in enumerate(mps):
+            dig(sc, x, r * 8, d, ink); x += 4
+            if k < 7: dig(sc, x, r * 8, '/', ink); x += 4
+    items = [(' Potion', 5), (' High Potion', 2), (' Phoenix Tail', 3), (' Elixir', 1), (' Eye Drops', 4),
+             (' Antidote', 6), (' Echo Herb', 2), (" Maiden's Kiss", 1), ('[6E]Fire Arrows', 20),
+             ('[69]Mythril Knife', 1), ('[62]Leather Cap', 2), ('[61]Leather Armor', 1), (" Lilith's Kiss", 1)]
+    def item_screen():
+        sc = Screen(T)
+        sc.window(0, 0, 20, 3); F.draw(sc, 1, 1, 'Item', T.ink)
+        sc.window(0, 2, 20, 16)
+        for i, (nm, n) in enumerate(items[:14]):
+            F.draw(sc, 2, 3 + i, nm, T.ink); F.draw(sc, 16, 3 + i, ':%2d' % n, T.ink)
+        return sc
+    sc = item_screen(); sc.save(os.path.join(outd, 'S1_items.png')); outs.append('S1_items.png')
+    sc = item_screen()
+    sc.window(0, 11, 20, 7)
+    party = [('AAAAAA', 28, 32), ('AAAAAB', 291, 999), ('BBBBBC', 1234, 9999), ('CCCCCD', 32, 32)]
+    for i, (nm, hp, mx) in enumerate(party):
+        F.draw(sc, 1, 12 + i, nm, T.ink); F.draw(sc, 8, 12 + i, '[77][79]', green, dy=1)
+        F.draw(sc, 10, 12 + i, '%4d/%-4d' % (hp, mx), green)
+    sc.save(os.path.join(outd, 'S2_item_target.png')); outs.append('S2_item_target.png')
+    # magic: header (name, commands), list: level line + one spell per row, 3 levels a page
+    sc = Screen(T)
+    sc.window(0, 0, 20, 4); F.draw(sc, 1, 1, 'AAAAAA', T.ink)
+    for c, w in ((2, 'Use'), (8, 'Swap'), (14, 'Item')): F.draw(sc, c, 2, w, T.ink)
+    sc.window(0, 3, 20, 15)
+    lv = [(1, '9/9', ['[74]Cure', '[74]Poisona', '[74]Sightro']), (2, '7/9', ['[75]Fire', '[75]Blizzard', '[75]Sleep']),
+          (3, '3/5', ['[74]Aero', '[74]Toad', '[74]Minimum'])]
+    for i, (l, m, sp) in enumerate(lv):
+        r = 4 + 4 * i
+        F.draw(sc, 1, r, 'Lv%d' % l, T.ink); F.draw(sc, 9, r, 'MP', T.ink); F.draw(sc, 13, r, m, T.ink)
+        for k, nm in enumerate(sp): F.draw(sc, 3, r + 1 + k, nm, T.ink)
+    sc.save(os.path.join(outd, 'S3_magic.png')); outs.append('S3_magic.png')
+    # equip: name, attack, defense; the five slots and "Remove Equipment"
+    sc = Screen(T)
+    sc.window(0, 0, 20, 5); F.draw(sc, 1, 1, 'AAAAAA', T.ink)
+    F.draw(sc, 2, 2, 'Attack[C3]', T.ink); F.draw(sc, 15, 2, '%3d' % 7, T.ink)
+    F.draw(sc, 2, 3, 'Defense[C3]', T.ink); F.draw(sc, 15, 3, '%3d' % 4, T.ink)
+    sc.window(0, 4, 20, 8)
+    for i, nm in enumerate(['[69]Knife', '   Left Hand', '[62]Leather Cap', '[61]Clothes', '   Arms', 'Remove Equipment']):
+        F.draw(sc, 2, 5 + i, nm, T.ink)
+    F.draw(sc, 16, 5, ': 1', T.ink)
+    sc.window(0, 11, 20, 7)
+    for i, (nm, n) in enumerate([('[69]Mythril Knife', 1), ('[69]Air Knife', 1), ('[68]Thunder Spear', 1)]):
+        F.draw(sc, 2, 12 + i, nm, T.ink); F.draw(sc, 16, 12 + i, ':%2d' % n, T.ink)
+    sc.save(os.path.join(outd, 'S4_equip.png')); outs.append('S4_equip.png')
+    # status: one window; stats and battle values in two columns of condensed words
+    sc = Screen(T)
+    sc.window(0, 0, 20, 18)
+    F.draw(sc, 1, 1, 'AAAAAA', T.ink); condensed(sc, 8, 1, 'Onion Knight', T.ink, 7)
+    F.draw(sc, 1, 2, 'Lv 1', T.ink); condensed(sc, 8, 2, 'Proficiency', T.ink, 6); F.draw(sc, 16, 2, '%3d' % 1, T.ink)
+    F.draw(sc, 1, 3, 'EXP', T.ink); F.draw(sc, 11, 3, '%7d' % 12, T.ink)
+    F.draw(sc, 1, 4, 'To next level', T.ink); F.draw(sc, 14, 4, '%4d' % 4, T.ink)
+    F.draw(sc, 1, 5, '[77][79]', green, dy=1); F.draw(sc, 4, 5, '%4d/%-4d' % (28, 32), green)
+    F.draw(sc, 1, 6, '[78][79]', T.ink, dy=1); mp_row(sc, 3, 6, '00000000', T.ink)
+    stats = [('Strength', '5'), ('Agility', '5'), ('Stamina', '5'), ('Intelligence', '5'), ('Spirit', '5')]
+    for i, (w, v) in enumerate(stats):
+        c, r = (1, 7 + i // 2) if i % 2 == 0 else (10, 7 + i // 2)
+        condensed(sc, c, r, w, T.ink, 6); F.draw(sc, c + 6, r, '%2s' % v, T.ink)
+    vals = [('Attack  1x', '7'), ('Hit rate', '86%'), ('Defense 0x', '4'), ('Evasion rate', '2%'),
+            ('Magic defense', '1'), ('Magic evasion', '5%')]
+    for i, (w, v) in enumerate(vals):
+        F.draw(sc, 1, 11 + i, w, T.ink); F.draw(sc, 15, 11 + i, '%3s' % v, T.ink)
+    sc.save(os.path.join(outd, 'S5_status.png')); outs.append('S5_status.png')
+    ims = [Image.open(os.path.join(outd, o)) for o in outs]
+    sheet = Image.new('RGB', (480 * 3 + 32, 432 * 2 + 16), (40, 40, 40))
+    for i, im in enumerate(ims): sheet.paste(im, ((i % 3) * 496, (i // 3) * 448))
+    sheet.save(os.path.join(outd, 'sub_menus.png'))
+    print('wrote', os.path.join(outd, 'sub_menus.png'))
+
+
 def main():
     nes, outd = sys.argv[1], sys.argv[2]
+    if len(sys.argv) > 3 and sys.argv[3] == 'sub':
+        os.makedirs(outd, exist_ok=True)
+        fr = capture(nes, [9000])
+        sub_menus(nes, outd, fr[9000])
+        return
     if len(sys.argv) > 3 and sys.argv[3] == 'menu':
         os.makedirs(outd, exist_ok=True)
         fr = capture(nes, [9000])

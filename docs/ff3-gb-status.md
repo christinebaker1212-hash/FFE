@@ -278,6 +278,11 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   byte $FF) = $A5 while the MP tiles are in place (no upload when the menu is redrawn
   without closing). Checked: Item menu shows the restored tiles, the main menu after it
   the MP digits again; firstdiff menu sequence identical.
+- Closing the menu: the restore and the GB menu mode off now come after FF3's screen clear
+  (`mnuoff` in place of $A693 JMP $F465), so the clear shows the menu as it was (before:
+  word-tile letters in the MP cells and the camera jumping for a few frames).
+- Sub-menu mock-ups (`mockup.py NES OUT sub`, S1-S5: item list, item target, magic, equip,
+  status) sent to the owner.
 - Open: the sub-menus (Item, Magic, Equip, Status, Order, Job, Save) still use the NES
   layout through the field camera (mock-ups next).
 
