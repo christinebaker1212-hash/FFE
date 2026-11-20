@@ -10593,6 +10593,163 @@ dmg_maprb_b: push bc
             pop bc
             ret
 
+; ---- fix:FA77-FA7A (battle text: LDX #0 / LDA ($90,X)) and each letter after it (>= $48:
+; FA87 JSR FA9C / JSR FCA7 / JMP FA77), natively: $9E = the letter, the pair (dakuten byte
+; $FF / $C0 / $C1, the tile) at ($92) and $92 += 2, $90 += 1; FF1's conversion ($48-$79:
+; ranges + $47 / $4C / $73 / $78, $C1 + $33 / $6E). Stops at a byte < $48 (or 0): A = it,
+; X = 0; N, Z from A; Y = 0, C (letter >= $7A), V (set below $7A) as the last letter left
+; them, or as on entry. Pointers into RAM, ExRAM or save RAM (else the idiom is not used:
+; build.py checks the bytes; anything else falls back to nes_rd / nes_wr).
+btx_b:      push af                         ; [SP + 2]: the flags out (C)
+            ldh a, [code_bank]              ; (nes_rd / nes_wr come back to code_bank)
+            push af
+            ld a, PF_BANK
+            ldh [code_bank], a
+.lp:        ld hl, NES_RAM + $90
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            call .rd                        ; A = the byte
+            and a
+            jr z, .end
+            cp $48
+            jr c, .end
+            ld [NES_RAM + $9E], a
+            ld d, $FF                       ; D = dakuten byte, A = tile
+            cp $7A
+            jr nc, .k                       ; (C = 1; V kept)
+            ld d, $C0
+            ld b, $47
+            cp $57
+            jr c, .ad
+            ld b, $4C
+            cp $5C
+            jr c, .ad
+            ld b, $73
+            cp $6B
+            jr c, .ad
+            ld b, $78
+            cp $70
+            jr c, .ad
+            ld d, $C1
+            ld b, $33
+            cp $75
+            jr c, .ad
+            ld b, $6E
+.ad:        add a, b                        ; (C = 0, V = 1: two positives giving a negative)
+            ld b, a
+            ld a, $40
+            ldh [vfl], a
+            ld a, b
+            ld hl, sp + 2
+            res 4, [hl]
+            jr .wr
+.k:         ld hl, sp + 2
+            set 4, [hl]
+.wr:        ld e, a                         ; ($92) + 1 = tile, ($92) = dakuten byte
+            ld hl, NES_RAM + $92
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, d
+            call .wb
+            inc hl
+            ld a, e
+            call .wb
+            ld hl, NES_RAM + $92            ; $92 += 2, $90 += 1
+            ld a, [hl]
+            add a, 2
+            ld [hl+], a
+            jr nc, .n2
+            inc [hl]
+.n2:        ld hl, NES_RAM + $90
+            inc [hl]
+            jr nz, .n1
+            inc l
+            inc [hl]
+.n1:        ld c, 0                         ; Y = 0
+            jr .lp
+.end:       ld b, a
+            ldh [nzv], a
+            pop af
+            ldh [code_bank], a
+            pop hl                          ; (L = flags: C)
+            ld a, l
+            and $10
+            ld l, a
+            ld a, b
+            and a
+            jr nz, .nz
+            set 7, l
+.nz:        ld h, b
+            ld b, 0
+            ld de, 0                        ; X = 0
+            push hl
+            pop af
+            ret
+.rd:        ld a, h                         ; HL = NES address -> A (keeps BC, DE)
+            cp $08
+            jr c, .rr
+            cp $5C
+            jr c, .ro
+            cp $60
+            jr c, .re
+            cp $80
+            jr nc, .ro
+            add a, $40                      ; save RAM
+            ld h, a
+            ld a, [hl]
+            ret
+.rr:        or high(NES_RAM)
+            ld h, a
+            ld a, [hl]
+            ret
+.re:        add a, $6C                      ; ExRAM $5C00 -> $C800
+            ld h, a
+            ld a, [hl]
+            ret
+.ro:        push de
+            call nes_rd
+            pop de
+            ld a, l
+            ret
+.wb:        push hl                         ; A -> NES address HL (keeps BC, DE, HL)
+            push af
+            ld a, h
+            cp $08
+            jr c, .wr0
+            cp $5C
+            jr c, .wo
+            cp $60
+            jr c, .we
+            cp $80
+            jr nc, .wo
+            add a, $40
+            ld h, a
+            pop af
+            ld [hl], a
+            pop hl
+            ret
+.wr0:       or high(NES_RAM)
+            ld h, a
+            pop af
+            ld [hl], a
+            pop hl
+            ret
+.we:        add a, $6C
+            ld h, a
+            pop af
+            ld [hl], a
+            pop hl
+            ret
+.wo:        pop af
+            push de
+            ldh [wtmp], a
+            call nes_wr
+            pop de
+            pop hl
+            ret
+
 section bank PF_BANK, $7F00
 NBIT60:     db 1, 2, 4, 8, 16, 32, 64, 128
 

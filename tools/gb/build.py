@@ -268,6 +268,13 @@ def main():
         rc.g.idioms[('fix', 0xE0FD)] = ('pf:dbox_b', 0xE118, 'NZCV', 'cond')
     else:
         print('  DrawBox: code not found, not native')
+    # battle text expansion loop (fix:FA77, FA9C, FAE7, FCA7, FCB7) native (btx_b): its bytes by hash
+    btx = hashlib.sha1(prg[fixo + 0x1A77:fixo + 0x1A90] + prg[fixo + 0x1A9C:fixo + 0x1AF2] +
+                       prg[fixo + 0x1CA7:fixo + 0x1CC4]).hexdigest()
+    if btx == 'd0a108d91cdbcacd2aa243cc30fcc235cb5a26eb':
+        rc.g.idioms[('fix', 0xFA77)] = ('pf:btx_b', 0xFA7B, 'NZCV')
+    else:
+        print('  battle text loop: code not as expected, not native', btx)
     wrf_src = 'WRF:\n' + ''.join('    db $%02X, $%02X, $%02X, %d\n' % w for w in wrf)
     for n in range(3):
         wrf_src += 'wrf_v%d:     ld a, %d\n            jp wrf_b\n' % (n, n) if n < len(wrf) else 'wrf_v%d:     ret\n' % n

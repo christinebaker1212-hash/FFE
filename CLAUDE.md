@@ -911,6 +911,11 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   when needed, copies nametable 0's shadow straight when no cell is nametable 1's (unrolled).
   DMG pictures identical at 376 points (the one-frame queued cell at 1840), checkall 62/62.
   DMG 138 -> 131.
+- FF1's battle text expansion loop (fix:FA77 + FA9C / FCA7: letter -> dakuten byte + tile pair
+  at ($92)) native (`btx_b`, a pf: idiom, used when the loop's bytes hash as expected): same
+  RAM ($90-$93, $9E) and exit registers. RAM identical (battle 7100 frames, checkall 62/62),
+  battle VRAM identical but for tiles arriving a frame apart. DMG 131 -> 121 (battle rounds
+  48 -> 38), CGB 0.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
