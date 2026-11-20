@@ -280,6 +280,56 @@ def mp_tiles(scr, c, r, digits, ink):
             x += 4
 
 
+def small_text(scr, x, y, s, ink):
+    """3-px digits / '/' / 'L' at pixel x, y (4 px per character)"""
+    extra = {'L': ["#..", "#..", "#..", "#..", "#..", "#..", "###"], 'C': ["###", "#..", "#..", "#..", "#..", "#..", "###"],
+             'G': ["###", "#..", "#..", "#.#", "#.#", "#.#", "###"], ' ': ["..."] * 7}
+    for ch in s:
+        g = DIG3.get(ch) or extra[ch]
+        for yy, row in enumerate(g):
+            for xx, v in enumerate(row):
+                if v == '#': scr.im.putpixel((x + xx, y + yy), ink)
+        x += 4
+    return x
+
+
+def condensed(scr, c, r, word, ink, ntiles=9):
+    from latin_font import packed_label, COND, TIGHT
+    t = packed_label(word, ntiles, COND, fg=3, bg=0) or packed_label(word, ntiles, TIGHT, fg=3, bg=0)
+    for k, tl in enumerate(t):
+        for y in range(8):
+            for x in range(8):
+                v = ((tl[y] >> (7 - x)) & 1) | (((tl[8 + y] >> (7 - x)) & 1) << 1)
+                if v: scr.im.putpixel(((c + k) * 8 + x, r * 8 + y), ink)
+
+
+def menu_all_fit(nes, outd, cmd):
+    """owner: job names and HP compressed so all fits, HP coloured as FF3 (green): party window
+    cols 0-11 (4 lines per member: name + level / job / HP / MP), commands at the top right,
+    Gil and Capacity below them, the guest's window at the bottom right"""
+    F = RomFont(nes); T = Tiles(cmd)
+    green = (128, 208, 16)
+    party = [('AAAAAA', 'Onion Knight', 28, 32, 1), ('AAAAAB', 'Black Mage', 291, 999, 12),
+             ('BBBBBC', 'White Mage', 1234, 9999, 99), ('CCCCCD', 'Magic Knight', 32, 32, 1)]
+    s = Screen(T)
+    s.window(0, 0, 12, 18)
+    for i, (nm, job, hp, mx, lv) in enumerate(party):
+        r = 1 + 4 * i
+        F.draw(s, 1, r, nm, T.ink); small_text(s, 8 * 8 + 2, r * 8, 'L%d' % lv, T.ink)
+        condensed(s, 1, r + 1, job, T.ink, 10)
+        F.draw(s, 1, r + 2, '[77][79]', green); small_text(s, 3 * 8 + 2, (r + 2) * 8, '%d/%d' % (hp, mx), green)
+        F.draw(s, 1, r + 3, '[78][79]', T.ink); mp_tiles(s, 3, r + 3, '99970000', T.ink)
+    s.window(12, 0, 8, 9)
+    for i, c in enumerate(['Item', 'Magic', 'Equip', 'Status', 'Order', 'Job', 'Save']):
+        F.draw(s, 13, 1 + i, c, T.ink)
+    s.window(12, 9, 8, 4)
+    small_text(s, 13 * 8 + 4, 10 * 8, '9999999G', T.ink); small_text(s, 13 * 8 + 4, 11 * 8, '    255C', T.ink)
+    s.window(12, 13, 8, 5)
+    F.draw(s, 13, 14, 'Sara', T.ink)
+    s.save(os.path.join(outd, 'N3_all_fit.png'))
+    print('wrote', os.path.join(outd, 'N3_all_fit.png'))
+
+
 def menu_options(nes, outd, cmd):
     """field main menu mock-ups (160 x 144): per member name + HP / job + level / MP of the 8
     spell levels on 3 lines; commands opening over the party window (A: right, rows 0-8;
@@ -320,6 +370,7 @@ def main():
         os.makedirs(outd, exist_ok=True)
         fr = capture(nes, [9000])
         menu_options(nes, outd, fr[9000])
+        menu_all_fit(nes, outd, fr[9000])
         return
     if len(sys.argv) > 3 and sys.argv[3] == 'magic':
         os.makedirs(outd, exist_ok=True)
