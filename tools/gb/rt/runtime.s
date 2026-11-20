@@ -1962,7 +1962,11 @@ dmg_loff:   ldh a, [lcd_on]
             ldh [pro_mode], a
             ldh a, [$FF06]                  ; (the timer's frame from now: this vblank counted)
             ldh [$FF05], a
-            ld b, 0
+            ld a, [MAP_RB]                  ; nothing went to the shadows only meanwhile: the
+            and a                           ;   rest of the load writes the GB map itself, as
+            jr nz, .kp                      ;   with an immediate switch-off
+            ld [VLCD], a
+.kp:        ld b, 0
             jp flush_q
 
 ; DMG, LCD off: the GB map (rows 0-29) from the shadows, each cell from the nametable that

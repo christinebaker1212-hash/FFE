@@ -906,6 +906,11 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   keeps the old wait. Checks: DMG pictures identical at 376 points (one one-frame queued cell),
   CGB identical apart from the prologue's text appearing sooner; checkall 62/62.
   Lag: CGB 0, DMG 143 -> 138.
+- The deferred switch-off leaves the masked mode when the LCD goes off with nothing written to
+  the shadows only meanwhile (the rest of the load writes the GB map itself); the rebuild,
+  when needed, copies nametable 0's shadow straight when no cell is nametable 1's (unrolled).
+  DMG pictures identical at 376 points (the one-frame queued cell at 1840), checkall 62/62.
+  DMG 138 -> 131.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

@@ -10463,7 +10463,67 @@ dmg_maprb_b: push bc
             xor a
             ld [MAP_RB], a
             ld de, $9800
-            ld hl, OWN
+            ldh a, [own1_lo]                ; no cell of nametable 1: nametable 0's shadow as
+            ld b, a                         ;   it is (960 bytes, 16 a pass)
+            ldh a, [own1_hi]
+            or b
+            jr nz, .ow
+            ld hl, NT_SH
+            ld c, 60
+.st:        ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            dec c
+            jr nz, .st
+            pop de
+            pop bc
+            ret
+.ow:        ld hl, OWN
 .by:        ld a, [hl+]
             push hl
             ld c, a
@@ -10494,12 +10554,30 @@ dmg_maprb_b: push bc
 .f:         ld a, h                         ; all of nametable 1
             add a, 4
             ld h, a
-.z:         ld b, 8
-.zc:        ld a, [hl+]
+.z:         ld a, [hl+]                     ; (8 cells)
             ld [de], a
             inc e
-            dec b
-            jr nz, .zc
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
 .nx:        pop hl
             ld a, e
             and a
