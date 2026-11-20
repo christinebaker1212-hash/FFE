@@ -1113,17 +1113,12 @@ stsel:              ; select character ($A715, item / magic targets): the party 
     ldy #12
     lda #$FC
     jmp JBGO
-mpage:              ; character string copied ($A87A: JSR $D1B1): the magic list's page
-    pha
-    jsr $D1B1
-    pla
-    cmp #$3C
-    bne .r
+jmove:              ; job list cursor: FF3's move (one job a step), then left / right turn the
+    jsr $91A3       ;   page (bank 88 jkey; the redraw in jmv2)
     ldy #12
-    lda #$FA
-    jmp JBGO
-.r:
-    rts
+    lda #$F7
+    jsr JBGO
+    jmp JMV2
 mmove:              ; magic spell cursor: FF3's move (one spell a step), then left / right
     jsr $91D9       ;   turn the page (bank 88 sets MPG bit 7: redraw)
     ldy #12
@@ -1177,10 +1172,22 @@ disp2:              ; bank 88 $8004 (JOBF dispatch, Y = 12: was JMP sq): A = $FF
     bne .q4
     jmp hppal8
 .q4:
-    cmp #$FA
+    cmp #$3C        ; (copied character strings: the magic list / the job list)
     bne .q5
     jmp mgpage
 .q5:
+    cmp #$4A
+    bne .q7
+    jmp jgpage
+.q7:
+    cmp #$F7
+    bne .q8
+    jmp jkey
+.q8:
+    cmp #$F6
+    bne .q9
+    jmp jsel8
+.q9:
     cmp #$F9
     bne .q6
     jmp mgkey
@@ -1596,6 +1603,99 @@ tadr:               ; PPU address of BG tile A (pattern table 0)
     asl a
     sta $2006
     rts
+jkey:               ; job list: left / right (new press) turn the page (jobs 13-22 on page 2
+    lda $20         ;   once available: $F38A >= 12); a turn puts the cursor on the first
+    and #$03        ;   entry and sets MPG bit 7 (redraw)
+    tax
+    asl a
+    asl a
+    asl a
+    asl a
+    sta $86
+    lda MPG
+    and #$30
+    cmp $86
+    beq .x
+    lda MPG
+    and #$CF
+    ora $86
+    sta MPG
+    txa
+    beq .x
+    lsr a
+    bcs .rt
+    lda MPG         ; left: back to page 1
+    and #$03
+    beq .x
+    dec MPG
+    jmp .f
+.rt:
+    lda MPG
+    and #$03
+    bne .x
+    jsr $F38A
+    cmp #12
+    bcc .x
+    inc MPG
+.f:
+    lda #0
+    sta $78F0
+    lda MPG
+    ora #$80
+    sta MPG
+.x:
+    jmp JBTAIL
+jsel8:              ; the chosen job: cursor index + 12 on page 2 (was LDA $78F0 LSR LSR)
+    lda $78F0
+    lsr a
+    lsr a
+    sta $8F
+    lda MPG
+    and #$03
+    beq .x
+    lda $8F
+    clc
+    adc #12
+    sta $8F
+.x:
+    jmp JBTAIL
+jgpage:             ; job list copied to $7B01: on page 2 the job numbers + 12 (codes 1E / 1F
+    lda MPG         ;   jj, character code 10 + level $48-$5D)
+    and #$7F
+    sta MPG
+    and #$03
+    beq .x
+    ldx #0
+.l:
+    lda $7B01,x
+    beq .x
+    cmp #$1E
+    beq .a
+    cmp #$1F
+    beq .a
+    cmp #$14
+    beq .k
+    cmp #$15
+    beq .k
+    cmp #$10
+    bcc .n
+    cmp #$14
+    bcs .n
+    lda $7B02,x
+    cmp #$48
+    bcc .k
+.a:
+    lda $7B02,x
+    clc
+    adc #12
+    sta $7B02,x
+.k:
+    inx
+.n:
+    inx
+    bne .l
+.x:
+    jmp JBTAIL
 mgkey:              ; magic list: left / right (new press, MPG bits 4-5 = last) turn the page
     lda $20         ;   (MPG bits 0-1, 3 pages); a change sets bit 7 (redraw)
     and #$03
@@ -1961,7 +2061,7 @@ MENU_TEXT[0x3E] = ('{0E}{10:02}\n{14:01}Attackâ€¥{14:0E}{10:33}\n{14:01}Defenseâ
                    '{15:01}{10:06}{10:43}\n{15:01}{10:07}{10:44}\n{15:01}{10:03}\n{15:01}{10:04}\n'
                    '{15:01}{10:05}\n{15:01}Remove Equipment')
 EQUIP_MSGS = [0x6E, 0x6F] + list(range(0x3F, 0x47)) + list(range(0x5B, 0x66)) + [   # (+ item prompts,
-    0x67, 0x68, 0x6B, 0x73, 0x74, 0x75]                                              #   magic messages)
+    0x67, 0x68, 0x6B, 0x73, 0x74, 0x75, 0x3A, 0x71, 0x4E]                            #   magic, job, save messages)
 # magic (owner-approved mock-up S3): header $24 (1, 1, 20, 4): name / Use Swap Item; list in
 # window 8 (1, 4, 20, 15): per level "Lv<n>  MP cur/max" and its 3 spells one per row, 3 levels
 # a page (bank 88 mgpage moves the copied text's level / MP / spell numbers by the page;
@@ -1971,6 +2071,22 @@ MENU_TEXT[0x3C] = '{0E}' + '\n'.join(
     '{14:01}Lv%d{14:08}MP{14:0C}{10:%02X}/{10:%02X}\n' % (l + 1, 0x80 + l, 0x88 + l)
     + '\n'.join('{16:01}{10:%02X}' % (8 + 3 * l + k) for k in range(3)) for l in range(3))
 MENU_TEXT[0x35] = '{0E}Item'
+# job (owner's choice, mock-up J1): header window $0C (1, 1, 20, 4): name + job, Capacity;
+# list window $0E (1, 4, 20, 15): "Lv  CP" and one job a row (name, level, CP cost), 12 a page
+# (page 2: the same text with the job numbers + 12, bank 88 jgpage; left / right turn it)
+MENU_TEXT[0x72] = '{0E}Not enough\nCapacity!'       # (was 25 columns with its leading blanks)
+# save (owner's choice, mock-up V1): prompt window $10 (1, 1, 20, 5); the three files one line
+# each in window $11 (1, 5, 20, 5) (files 2 / 3 print into it at rows 7 / 8: windows $12 / $13
+# only place their text); the chosen file's party in window $1F (1, 9, 20, 10), drawn by
+# `svdet` (in place of the slot sprites routine $8241) when the cursor moves
+MENU_TEXT[0x25] = '{0E}{10:02}{14:07}Lv{10:3E}{14:0F}{0D}'
+MENU_TEXT[0x7B] = '{0E}' + '\n'.join('{1%d:02}{14:07}Lv{1%d:3E}\n{14:01}[77][79]{14:03}{1%d:30}/{1%d:31}'
+                                     % (m, m, m, m) for m in range(4))
+MENU_TEXT[0x4C] = '{0E}This erases old\ndata.\n{15:08}Yes{15:0D}No'
+MENU_TEXT[0x4D] = '{0E}Saving is\ncomplete.'
+MENU_TEXT[0x48] = '{0E}{10:02}{14:07}{10:01}\nCapacity{14:0E}{08}'
+MENU_TEXT[0x4A] = '{0E}{14:08}Lv{14:0C}CP\n' + '\n'.join(
+    '{15:01}{1E:%02X}{14:08}{10:%02X}{14:0A}{1F:%02X}' % (j, 0x48 + j, j) for j in range(12))
 MENU_TEXT[0x3D] = '{0E}' + '\n'.join('{17:01}{1A:%02X}{14:0F}{1C:%02X}' % (i, i) for i in range(32)) + '\n{17:01}{0F}'
 MENU_TEXT[0x3B] = '{0E}' + '\n'.join('{1%d:02}{14:07}[77][79]{14:09}{1%d:30}/{1%d:31}' % (m, m, m) for m in range(4))
 MENU_TEXT[0x2F] = '{0E}' + '\n'.join('{17:01}{20:%02X}{14:0F}{1C:%02X}' % (i, i) for i in range(32))
@@ -2032,7 +2148,7 @@ def main_menu(r):
         b = bytearray.fromhex(olds[t])
         for w, rect in MENU_WINDOWS.items(): b[w] = rect[k]
         r.patch(B3D, t, olds[t], b.hex(), 'main menu windows (GB layout)')
-    hp = r.module(MENU_HP_SRC, syms={'JBGO': JBGO, 'MPG': 0x5FFF})
+    hp = r.module(MENU_HP_SRC, syms={'JBGO': JBGO, 'MPG': 0x5FFF, 'JMV2': 0x9698})
     assert hp['org'] + len(hp['bytes']) <= 0x960C + 16
     o = r.off(B3C, 0x95B2)
     r.d[o:o + len(hp['bytes'])] = hp['bytes']
@@ -2140,7 +2256,152 @@ stcl:               ; (equip's class sprite routine, no longer called) item menu
     a = find(B3C, 0x97D9, 0x97F0, 'A9 0C 20 D9 91')
     r.patch(B3C, a, 'A9 0C 20 D9 91', 'A9 04 20 ' + j(hp['labels']['mmove']), 'magic: one spell a step, left / right turn the page')
     r.patch(B3D, 0xA717, '8D F0 79', '20 ' + j(hp['labels']['stsel']), 'select character: the party window first')
-    r.patch(B3D, 0xA87A, '20 B1 D1', '20 ' + j(hp['labels']['mpage']), 'character string: the magic list page')
+    # job screen
+    for w, rect in ((0x0C, (1, 1, 20, 4)), (0x0E, (1, 4, 20, 15)), (0x20, (1, 8, 20, 6))):
+        for t, k in ((0xAAF7, 0), (0xAB1D, 1), (0xAB43, 2), (0xAB69, 3)):
+            r.d[r.off(B3D, t + w)] = rect[k]
+    r.log.append((B3D, 0xAAF7, 'job windows $0C / $0E, message $20'))
+    r.patch(B3C, 0x9635, '20 85 A6 20 6F 95', '20 85 A6 20 ' + j(hp['labels']['stcam']), 'job: GB camera (8, 8)')
+    r.patch(B3C, 0x964F, 'A2 0D 20 F1 AA A9 49 20 78 A6', 'EA EA EA EA EA EA EA EA EA EA', 'job: Capacity in the header (no CP window)')
+    r.patch(B3C, 0x965E, 'A2 0E 20 A6 AA', 'A2 0E 20 ' + j(st['labels']['stmr']), 'job list redrawn with its frame (after a message)')
+    r.patch(B3C, 0x966F, 'A9 08 20 A3 91', 'A9 04 20 ' + j(hp['labels']['jmove']), 'job: one job a step, left / right turn the page')
+    for a in (0x9674, 0x96E2):
+        r.patch(B3C, a, '20 98 96', 'EA EA EA', 'job: no class sprite')
+    jm = r.module('''
+    org $9698
+jmv2:               ; (the job menu's class sprite routine, no longer called) page turned:
+    lda MPG         ;   the job list redrawn
+    bpl .r
+    ldx #$0E
+    lda #$4A
+    jmp $A875
+.r:
+    rts
+''', syms={'MPG': 0x5FFF})
+    assert len(jm['bytes']) == 13 and r.d[r.off(B3C, 0x9698)] == 0xA9
+    r.d[r.off(B3C, 0x9698):r.off(B3C, 0x9698) + 13] = jm['bytes']
+    r.mods.append(dict(jm, where=(B3C, 0x9698 & 0x1FFF)))
+    js = r.module('''
+    org $96A5
+jsel:               ; the chosen job (bank 88 jsel8: + 12 on page 2)
+    ldy #12
+    lda #$F6
+    jsr JBGO
+''', syms={'JBGO': JBGO})
+    assert bytes(r.d[r.off(B3C, 0x96A5):r.off(B3C, 0x96A5) + 7]).hex() == 'adf0784a4a858f'
+    r.d[r.off(B3C, 0x96A5):r.off(B3C, 0x96A5) + 7] = js['bytes']
+    r.mods.append(dict(js, where=(B3C, 0x96A5 & 0x1FFF)))
+    mp = r.module('''
+    org $8ADE
+mpage:              ; (the unused 2-digit + percent routine) character string copied ($A87A:
+    pha             ;   JSR $D1B1): the magic / job list's page (bank 88, A = the string)
+    jsr $D1B1
+    pla
+    cmp #$3C
+    beq .m
+    cmp #$4A
+    bne .r
+.m:
+    ldy #12
+    jmp JBGO
+.r:
+    rts
+''', syms={'JBGO': JBGO})
+    assert len(mp['bytes']) <= 24 and bytes(r.d[r.off(B3C, 0x8ADE):r.off(B3C, 0x8ADE) + 2]).hex() == 'a581'
+    r.d[r.off(B3C, 0x8ADE):r.off(B3C, 0x8ADE) + len(mp['bytes'])] = mp['bytes']
+    r.mods.append(dict(mp, where=(B3C, 0x8ADE & 0x1FFF)))
+    r.patch(B3D, 0xA87A, '20 B1 D1', '20 ' + j(mp['labels']['mpage']), 'character string: the magic / job list page')
+    # save screen (and the title's load menu: the same slot windows)
+    for w, rect in ((0x10, (1, 1, 20, 5)), (0x11, (1, 5, 20, 5)), (0x12, (1, 6, 20, 5)), (0x13, (1, 7, 20, 5)),
+                    (0x1F, (1, 9, 20, 10))):
+        for t, k in ((0xAAF7, 0), (0xAB1D, 1), (0xAB43, 2), (0xAB69, 3)):
+            r.d[r.off(B3D, t + w)] = rect[k]
+    r.log.append((B3D, 0xAAF7, 'save windows $10-$13, $1F'))
+    r.patch(B3D, 0xA8C0, '20 85 A6 20 6F 95', '20 85 A6 20 ' + j(hp['labels']['stcam']), 'save: GB camera (8, 8)')
+    for a in (0xA9B4, 0xA9C0):
+        r.patch(B3D, a + 2, '20 F1 AA', '20 A6 AA', 'save files 2 / 3: text in the list window (no window of their own)')
+    r.patch(B3D, 0xAA3B, '01 07 00 00 01 0F 00 00 01 17 00 00', '00 06 00 00 00 07 00 00 00 08 00 00',
+            'save / load: the hand at each file line')
+    r.patch(B3C, 0x8B43, 'A2 19 A5 5D 9D 80 07 E8 A5 5E 9D 80 07 E8 A5 5F 9D 80 07',
+            'A2 0F A5 5D 9D A0 07 E8 A5 5E 9D A0 07 E8 A5 5F 9D A0 07', 'save count: in the line at column 15 (one-row text)')
+    lb = r.module('''
+    org $A984
+svlab:              ; (was the "Save" label window) the detail window's file: none yet
+    lda #$FF
+    sta $5FFF
+    nop
+    nop
+    nop
+    nop
+    nop
+''')
+    assert bytes(r.d[r.off(B3D, 0xA984):r.off(B3D, 0xA984) + 10]).hex() == 'a20f20f1aaa938206ba6'
+    r.d[r.off(B3D, 0xA984):r.off(B3D, 0xA984) + 10] = lb['bytes']
+    r.mods.append(dict(lb, where=(B3D, 0xA984 & 0x1FFF)))
+    sv = r.module('''
+    org $8241
+svdet:              ; (was: the slot's character sprites) A = the chosen file (0-2): when it
+    cmp MPG         ;   changes, window $1F shows that file's party (the slot copied to $6000
+    beq .r          ;   and back from FF3's backup at $7400, as the slot windows are drawn)
+    sta MPG
+    ldx #$1F
+    jsr $AAF1
+    ldx MPG
+    lda $62         ; (valid files: bit 2 file 1, bit 1 file 2, bit 0 file 3)
+    cpx #2
+    beq .b
+    lsr a
+    cpx #1
+    beq .b
+    lsr a
+.b:
+    and #1
+    beq .r
+    txa
+    asl a
+    asl a
+    clc
+    adc #$64
+    jsr $A9F9
+    lda #$7B
+    jsr $A678
+    sec
+    jsr $AA18
+.r:
+    rts
+svdet1:             ; after saving (A = file + 1): that file valid ($62: bit 2 file 1 .. bit 0
+    ldx #$FF        ;   file 3) and its party again (new data)
+    stx MPG
+    tax
+    lda #8
+.v:
+    lsr a
+    dex
+    bne .v
+    ora $62
+    sta $62
+    lda $79F0
+    lsr a
+    lsr a
+    and #3
+    jmp svdet
+svcam:              ; save screen shown (FF3's graphics load switched rendering off / on):
+    lda #8          ;   its camera (8, 8), then $959F (update ppu registers)
+    sta $5802
+    sta $5803
+    jmp $959F
+''', syms={'MPG': 0x5FFF})
+    assert len(sv['bytes']) <= 0x82A8 - 0x8241 and bytes(r.d[r.off(B3C, 0x8241):r.off(B3C, 0x8241) + 2]).hex() == 'd00c'
+    r.d[r.off(B3C, 0x8241):r.off(B3C, 0x8241) + len(sv['bytes'])] = sv['bytes']
+    r.mods.append(dict(sv, where=(B3C, 0x8241 & 0x1FFF)))
+    a = find(B3D, 0xA8C6, 0xA8F0, 'A9 02 8D 14 40 20 9F 95')
+    r.patch(B3D, a + 5, '20 9F 95', '20 ' + j(sv['labels']['svcam']), 'save: GB camera once shown')
+    end = r.off(B3C, 0x82A8)
+    o = r.off(B3C, 0x8241) + len(sv['bytes'])
+    r.d[o:end] = b'\xea' * (end - o)                  # (the old routine's rest: dead)
+    a = find(B3D, 0xAA67, 0xAA90, '18 69 11 AA 20 F1 AA A9 25 20 6B A6 68 18 69 01 20 00 80')
+    r.patch(B3D, a + 4, '20 F1 AA', '20 A6 AA', 'saved file: its line again in the list window')
+    r.patch(B3D, a + 16, '20 00 80', '20 ' + j(sv['labels']['svdet1']), 'saved file: the detail window (no class sprites)')
     r.patch(B3D, 0xA705, '01 05 00 00 01 0B 00 00 01 11 00 00 01 17 00 00',
             '02 01 00 00 02 05 00 00 02 09 00 00 02 0D 00 00', 'character select: hand at each name (GB rows)')
     for a in (0xA5AC, 0xA6D0):

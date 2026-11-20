@@ -318,7 +318,29 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   `--poke W:6021=01` (a crystal), Save with `--poke W:002D=00` (world map flag).
 - Lag (lagcheck explore 2000-12000, Gambatte): +0.6% in total, all in screen-load steps
   (+5 / +16 / +7 / +16 frames); steady play at pace.
-- Open: the sub-menus Job, Save still use the NES
+- **Job (owner's choice J1):** header $0C (1,1,20,4) name + job / "Capacity nnC" (the CP window
+  no longer opened); list $0E (1,4,20,15): "Lv  CP" and one job a row (name, level, ":" + CP
+  cost as FF3 prints it), 12 a page; page 2 = the same text with the job numbers + 12 (bank 88
+  `jgpage` on the $7B01 copy, through `mpage` - moved to the unused routine at $8ADE - which now
+  handles strings $3C and $4A); right turns to page 2 once 13+ jobs are open ($F38A >= 12),
+  left back (`jmove` + `jmv2` in the job menu's dead class-sprite routine $9698, bank 88 `jkey`);
+  the chosen job = cursor index + 12 on page 2 (`jsel` module at $96A5, bank 88 `jsel8`);
+  messages in window $20 (1,8,20,6) re-wrapped (string $72 "Not enough / Capacity!"); the list
+  redrawn with its frame after a message (`stmr`). Checked: page turns, Viking on page 2 gives
+  FF3's "not enough experience" message (the job mapping), RAM identical.
+- **Save (owner's choice V1):** prompt $10 (1,1,20,5); list $11 (1,5,20,5) with one line per
+  file (lead member, Lv, save count; string $0125 for the GB; files 2 / 3 print into it through
+  `AAA6` with windows $12 / $13 at rows 6 / 7; the save count routine $8B43 writes into the line
+  at column 15); detail window $1F (1,9,20,10): the chosen file's 4 members (name Lv / HP), string
+  $017B, drawn by `svdet` (in place of the slot sprite routine $8241: copies the slot to $6000,
+  prints, restores from FF3's backup $7400) when the cursor moves, and again after saving
+  (`svdet1`, which marks the file valid); no label window (`svlab`); camera set when shown
+  (`svcam` in place of $959F at $A8D6); messages re-wrapped ("This erases old / data." with
+  Yes / No on a third line). Checked on the NES and GB: save to file 1, detail, reopen.
+- **Still to do:** the title's load menu ("Continue": the same slot windows + its New Game
+  windows; not reached by the input scripts yet), the opening prophecy narration (28 columns,
+  35 lines at 18: needs pages), name entry, shops, the unseen field windows (yes/no, item
+  select, gil, map title).
   layout through the field camera (mock-ups next).
 
 ## Field fixes (2026-11-20)
