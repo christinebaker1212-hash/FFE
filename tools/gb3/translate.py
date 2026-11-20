@@ -431,8 +431,13 @@ class Emitter:
     def store(self, reg):
         """store register reg ('a', 'e', 'c') to the instruction's address"""
         i = self.i; m = i.mode
-        if m == 'izy' and reg == 'a' and not self.keep:     # no flag live: lean helper
-            self.o('ld l, $%02X' % i.arg, 'call rt_izy_sta'); return
+        if m == 'izy' and reg == 'a' and not self.keep:     # no flag live: PRG-RAM inline
+            lb = label(i.space, i.addr)
+            self.o('ld d, a', 'ld hl, $%04X' % (0xC000 + i.arg), 'ld a, [hl+]', 'ld h, [hl]', 'ld l, a',
+                   'add hl, bc', 'ld a, h', 'sub $60', 'cp $20', 'jr nc, %s_s' % lb, 'add a, $A0',
+                   'ld h, a', 'ld [hl], d', 'ld a, d', 'ld d, 0', 'jr %s_d' % lb, '%s_s:' % lb,
+                   'call rt_sta_nes', '%s_d:' % lb)
+            return
         if m in ('izy', 'izx'):
             if reg == 'a': self.o('ld l, $%02X' % i.arg, 'call rt_%s_wr' % m)
             else: self.o('push af', 'ld a, %s' % reg, 'ld l, $%02X' % i.arg, 'call rt_%s_wr' % m, 'pop af')
@@ -571,8 +576,12 @@ class Emitter:
 
     def x_LDA(self):
         if self.copy_idiom() or self.ppu_idiom() or self.ppu_izy_idiom() or self.copy_izy_idiom(): return
-        if self.i.mode == 'izy' and 'C' not in self.keep:   # lean helper: A direct, F free
-            self.o('ld l, $%02X' % self.i.arg, 'call rt_izy_lda')
+        if self.i.mode == 'izy' and 'C' not in self.keep:   # PRG-RAM inline, else helper
+            lb = label(self.i.space, self.i.addr)
+            self.o('ld hl, $%04X' % (0xC000 + self.i.arg), 'ld a, [hl+]', 'ld h, [hl]', 'ld l, a',
+                   'add hl, bc', 'ld a, h', 'sub $60', 'cp $20', 'jr nc, %s_s' % lb, 'add a, $A0',
+                   'ld h, a', 'ld a, [hl]', 'jr %s_d' % lb, '%s_s:' % lb, 'call rt_lda_nes',
+                   '%s_d:' % lb)
             self.set_nz_reg('a'); return
         if self.i.mode in ('abs', 'abx', 'aby') and 'C' not in self.keep:
             a = self.i.arg; r = nes_region(a)

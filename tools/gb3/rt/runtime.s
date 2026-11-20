@@ -2449,7 +2449,8 @@ rt_izy_lda: ld h, high(NES_RAM)
             ld h, [hl]
             ld l, a
             add hl, bc
-            ld a, h
+rt_lda_nes:                                 ; (HL = NES address -> A, F clobbered: the
+            ld a, h                         ;   inline (zp),Y loads' slow path)
             add a, a
             jr c, .rom
             ld a, h
@@ -2514,7 +2515,8 @@ rt_izy_sta: ld d, a
             ld h, [hl]
             ld l, a
             add hl, bc
-            ld a, h
+rt_sta_nes:                                 ; (HL = NES address, D = the value; D = 0 after,
+            ld a, h                         ;   A = the value: the inline stores' slow path)
             and $E0
             jr z, .ram
             cp $60
