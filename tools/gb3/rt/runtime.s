@@ -735,7 +735,87 @@ rt_ppu_w6:  push af                         ; $2006
             ldh a, [ppu_th]
             and $3F
             ldh [ppu_vh], a
-            pop af
+            cp $20                          ; a nametable cell with step 1: the write cache
+            jr c, .x                        ;   now, so that the first $2007 write goes the
+            cp $3F                          ;   fast way too
+            jr nc, .x
+            ldh a, [ppu_ctrl]
+            and 4
+            call z, wc_setup
+.x:         pop af
+            ret
+; write cache for the cell at the PPU address (nametable, step 1): its map row marked, then
+; the rest of the map row cached (as rt_ppu_w7's slow path leaves it after a write).
+wc_setup:   push bc
+            push de
+            push hl
+            ldh a, [ppu_vl]
+            ld l, a
+            ldh a, [ppu_vh]
+            ld h, a
+            and 3                           ; (attribute bytes: no cache)
+            cp 3
+            jr nz, .c
+            ld a, l
+            cp $C0
+            jr nc, .done
+.c:         ld a, h                         ; B = nametable 0 / 1 after mirroring
+            and $0F
+            rrca
+            rrca
+            and 3
+            ld b, a
+            ldh a, [mirror]
+            and a
+            ld a, b
+            jr z, .vm
+            srl a
+            jr .nt
+.vm:        and 1
+.nt:        ld b, a
+            ld a, h
+            and 3
+            ld h, a                         ; HL = offset in the nametable
+            ld a, b
+            add a, a
+            add a, a
+            add a, h
+            add a, high(NT_SH)
+            ldh [wc_nh], a
+            ld a, l
+            ldh [wc_nl], a
+            call cell_map                   ; HL = GB map address
+            ld a, l                         ; mark its row (unless marked last)
+            and $E0
+            ld e, a
+            ldh a, [mr_lo]
+            cp e
+            jr nz, .mk
+            ldh a, [mr_hi]
+            cp h
+            jr z, .cache
+.mk:        ld a, e
+            ldh [mr_lo], a
+            ld a, h
+            ldh [mr_hi], a
+            push hl
+            call map_mark
+            pop hl
+.cache:     ld a, l
+            ldh [wc_ml], a
+            ld a, h
+            sub $98 - high(MAP_SH)
+            ldh [wc_mh], a
+            ld a, 1
+            ldh [wc_inc], a
+            ld a, l
+            and 31
+            cpl
+            add a, 33                       ; 32 - column
+            ldh [wc_n], a
+.done:      pop hl
+            pop de
+            pop bc
             ret
 rt_ppu_w3:
 rt_ppu_w4:
@@ -1907,6 +1987,31 @@ rt_rd_a:
             call nz, rt_async
             pop af
             ret
+; LDA abs / abs,X / abs,Y from a ROM window with the carry dead (translate.py): HL = GB
+; address -> A; F clobbered (the caller sets N / Z); a safe point as rt_rd_*.
+rt_lda_8:   ldh a, [odd8]
+            or h
+            ld h, a
+            ldh a, [data_bank8]
+            jr lda_rd
+rt_lda_a:   ldh a, [oddA]
+            or h
+            ld h, a
+            ldh a, [data_bankA]
+            jr lda_rd
+rt_lda_f:   ld a, DATA + 63
+lda_rd:     ld [MBC5_BANKL], a
+            ld l, [hl]
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            ldh a, [async_req]              ; (safe point)
+            and a
+            ld a, l
+            ret z
+            push af
+            call rt_async
+            pop af
+            ret
 rt_rd_f:
            push af                         ; $C000-$FFFF: banks 126 / 127 = GB bank DATA + 63
             ld a, DATA + 63
@@ -2437,6 +2542,141 @@ rt_izy_sta: ld d, a
             pop af
             ret
 
+; HL = NES address of cp_n bytes (1-255) -> NC: HL = GB address, A = GB bank (0: RAM /
+; PRG-RAM) when they lie in one window (RAM, PRG-RAM, a ROM window); C: not (HL kept).
+izmap:      push hl
+            ldh a, [cp_n]
+            dec a
+            add a, l                        ; (carry: the end is in the next page)
+            ld a, h
+            jr c, .cy
+.cls:       cp $20
+            jr c, .ram
+            cp $60
+            jr c, .no
+            cp $80
+            jr c, .prg
+            cp $A0
+            jr c, .w8
+            cp $C0
+            jr c, .wa
+            sub $80                         ; $C000-$FFFF: banks 126 / 127
+            ld h, a
+            pop af
+            ld a, DATA + 63
+            and a
+            ret
+.cy:        cp $FF
+            jr z, .no
+            ld l, a                         ; (the end's page H + 1 must be in the same window)
+            inc a
+            xor l
+            and $E0
+            jr nz, .no
+            ld a, l
+            cp $07                          ; (RAM: not past $07FF / its mirrors)
+            jr z, .no
+            cp $0F
+            jr z, .no
+            cp $17
+            jr z, .no
+            ld a, l
+            pop hl
+            push hl
+            jr .cls
+.ram:       and 7
+            or high(NES_RAM)
+            ld h, a
+            pop af
+            xor a
+            ret
+.prg:       add a, $40
+            ld h, a
+            pop af
+            xor a
+            ret
+.w8:        and $1F
+            or $40
+            ld h, a
+            ldh a, [odd8]
+            or h
+            ld h, a
+            pop af
+            ldh a, [data_bank8]
+            and a
+            ret
+.wa:        and $1F
+            or $40
+            ld h, a
+            ldh a, [oddA]
+            or h
+            ld h, a
+            pop af
+            ldh a, [data_bankA]
+            and a
+            ret
+.no:        pop hl
+            scf
+            ret
+
+; LDA (zp),Y / STA abs,Y / INY / CPY #n / BNE (translate.py izy copy idiom): L = zp, C = Y,
+; cp_dl / cp_dh = GB address of abs + Y, cp_n = n - Y (0 = 256). Returns A = the last byte,
+; Z = 1, C = 1, nzv = 0 (the caller sets Y = n). B, C, D, E kept.
+rt_copy_izy:
+            ld a, l
+            ldh [wtmp], a                   ; (zp, for the slow path)
+            ld h, high(NES_RAM)
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            add hl, bc                      ; HL = first source byte (NES)
+            ldh a, [cp_n]
+            and a
+            jr z, .slow
+            add a, c                        ; (Y must not wrap)
+            jr nc, .map
+            jr nz, .slow
+.map:       call izmap
+            jp nc, rt_copy_n
+.slow:      push bc                         ; byte by byte: (zp) + Y as the NES reads it
+            push de
+            ldh a, [cp_dl]
+            ld e, a
+            ldh a, [cp_dh]
+            ld d, a
+            ldh a, [cp_n]
+            ld b, a
+.sl:        ldh a, [wtmp]                   ; ptr + Y (Y wraps as on the NES)
+            ld l, a
+            ld h, high(NES_RAM)
+            ld a, [hl+]
+            ld h, [hl]
+            add a, c
+            ld l, a
+            jr nc, .nc
+            inc h
+.nc:        call izrd_c
+            ld a, l
+            ld [de], a
+            inc de
+            inc c
+            dec b
+            jr nz, .sl
+            pop de
+            pop bc
+            ld l, a
+            xor a
+            ldh [nzv], a
+            ld a, l
+            scf
+            push af
+            push hl
+            ld hl, sp + 2
+            set 7, [hl]                     ; Z = 1
+            pop hl
+            pop af
+            ret
+
 rt_izy_wr:
            push af                         ; L = zp pointer; A -> ptr+Y
             ldh [wtmp], a
@@ -2721,7 +2961,9 @@ rt_txs:     push af                         ; SP = STACK_TOP - 2 * ($FF - X); A,
 rt_farcall:
            ; HL = target, fc_bank = its bank; A, F, BC, DE pass both ways
             ldh [sv_a], a
-            ldh a, [code_bank]
+            ldh a, [fc_bank]
+rt_fc2:     ldh [fc_bank], a                ; (translate.py stubs enter here: A = bank,
+            ldh a, [code_bank]              ;   HL = target, the caller's A in sv_a)
             push af
             ldh a, [fc_bank]
             ldh [code_bank], a

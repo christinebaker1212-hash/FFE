@@ -1975,3 +1975,257 @@ nat_chrn:   xor a
             scf
             ldh a, [nt_a]
             ret
+
+; ------------------------------------------------------------------ b40:9F00
+; reload the English text engine into ExRAM: $8000-$83FF (the $8000 window: bank $40, the
+; code's own) -> $5C00-$5FFF (the image the build translated). Out: X = 0, A = the byte at
+; $83FF, Z = 1, N = 0, C kept; Y kept.
+nat_9f00:   push af
+            ldh a, [data_bank8]
+            ld [MBC5_BANKL], a
+            ldh a, [odd8]
+            or $40
+            ld h, a
+            ld l, 0
+            ld de, EX_RAM
+            ld b, 0
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .cp
+            ld l, a                         ; (the last byte copied: $83FF)
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            xor a
+            ldh [nzv], a
+            ld de, 0
+            pop af
+            ld a, 0
+            inc a
+            dec a                           ; Z = 1 (INX to 0), carry kept
+            ld a, l
+            ret
+
+; ------------------------------------------------------------------ p32:9FE4
+; update status animation sprites (every battle frame, per character): 2 sprites from the
+; data at ($A1) (y, attributes, x; tile = $9F or 0) into $0200 + $A0.., with the status
+; palette / y offset ($A051 / $A049 + $7DB7[$A3]) when the character has a status. Data read
+; in place when the p32 pair is mapped as usual (one bank switch), else byte by byte.
+; Out: Y = 8, X = $A0 + 8, A = the last x written, Z = 1, C = 1, N = 0.
+nat_9fe4:   ldh a, [data_bank8]
+            ld b, a
+            ldh a, [data_bankA]
+            cp b
+            jr nz, .slw
+            ldh a, [odd8]
+            and a
+            jr nz, .slw
+            ldh a, [oddA]
+            cp $20
+            jr nz, .slw
+            ld a, b
+            ld [MBC5_BANKL], a
+            ld a, 1
+            jr .fs
+.slw:       xor a
+.fs:        ldh [n9_at], a                  ; (1: the pair is at $4000-$7FFF of one GB bank)
+            ld a, [NES_RAM + $A0]
+            ld e, a
+            ld c, 0
+            ld d, 0
+.lp:        call .src                       ; y = data + $9E
+            ld hl, NES_RAM + $9E
+            add a, [hl]
+            ld l, e
+            ld h, high(NES_RAM) + 2
+            ld [hl], a
+            inc c
+            inc l                           ; tile: $9F (then + 1), or 0 if $9F = $FF
+            ld a, [NES_RAM + $9F]
+            cp $FF
+            jr nz, .st
+            xor a
+            ld [hl], a
+            jr .at
+.st:        ld [hl], a
+            ld hl, NES_RAM + $9F
+            inc [hl]
+.at:        inc c                           ; attributes -> $A7
+            call .src
+            ld [NES_RAM + $A7], a
+            ld b, a
+            ld a, [NES_RAM + $A3]
+            add a, $B7
+            ld l, a
+            ld h, $BD                       ; ($7DB7 + $A3)
+            ld a, [hl]
+            cp $FF
+            jr z, .ns
+            ld d, a                         ; status: palette and y offset
+            ld hl, $A051
+            ld a, l
+            add a, d
+            ld l, a
+            call .rdn
+            ld l, a
+            ld a, b
+            and $FC
+            or l
+            ld b, a
+            ld [NES_RAM + $A7], a
+            ld hl, $A049
+            ld a, l
+            add a, d
+            ld l, a
+            call .rdn
+            ld [NES_RAM + $A8], a
+            ld l, e
+            ld h, high(NES_RAM) + 2
+            add a, [hl]
+            ld [hl], a
+            ld d, 0
+.ns:        ld l, e
+            ld h, high(NES_RAM) + 2
+            inc l
+            inc l
+            ld [hl], b                      ; $0202 + X = $A7
+            inc c
+            call .src                       ; x = data + $9D
+            ld hl, NES_RAM + $9D
+            add a, [hl]
+            ld l, e
+            ld h, high(NES_RAM) + 2
+            inc l
+            inc l
+            inc l
+            ld [hl], a
+            ldh [n9_x], a
+            inc c
+            ld a, e
+            add a, 4
+            ld e, a
+            ld a, c
+            cp 8
+            jr nz, .lp
+            ldh a, [code_bank]
+            ld [MBC5_BANKL], a
+            ld b, 0
+            xor a                           ; Z = 1, C = 1, N = 0 (CPY #8)
+            ldh [nzv], a
+            scf
+            ldh a, [n9_x]
+            ret
+.src:       ld a, [NES_RAM + $A1]           ; A = the byte at ($A1) + Y
+            add a, c
+            ld l, a
+            ld a, [NES_RAM + $A2]
+            adc a, 0
+            ld h, a
+.rdn:       ldh a, [n9_at]                  ; A = the byte at NES address HL
+            and a
+            jr z, .rs
+            bit 7, h
+            jr z, .rs
+            bit 6, h
+            jr nz, .rs
+            ld a, h
+            sub $40
+            ld h, a
+            ld a, [hl]
+            ret
+.rs:        call izrd_c
+            ld a, l
+            ret
+
+; ------------------------------------------------------------------ p34:966A (bconv)
+; English text: copy the line at $7AD7 + X into the text buffer at ($4E) + Y after adding $18
+; to $4E ($A558); code $01: $4E += 2 * $18, Y = 0 (next line); code $02 n: Y += n; $00 ends.
+; Out as the NES: A = 0, Z = 1, N = 0 (or, if Y wraps, the last character with Z = 1), C from
+; the last carry-producing step; X, Y as the loop leaves them.
+nat_966a:   ld a, [NES_RAM + $18]
+            call nat_a558
+            call .cy
+            ld e, 0                         ; X
+            ld c, 0                         ; Y
+.lp:        ld hl, $BAD7                    ; A = $7AD7 + X
+            ld a, l
+            add a, e
+            ld l, a
+            jr nc, .h
+            inc h
+.h:         ld a, [hl]
+            and a
+            jr z, .end
+            cp 1
+            jr nz, .c2
+            ld a, [NES_RAM + $18]           ; next line: $4E += 2 * $18 (ASL: carry in)
+            add a, a
+            call nat_a558
+            call .cy
+            inc e
+            ld c, 0
+            jr .lp
+.c2:        cp 2
+            jr nz, .ch
+            inc e                           ; Y += the next byte
+            inc hl
+            ld a, [hl]
+            add a, c
+            ld c, a
+            call .cy
+            inc e
+            jr nz, .lp
+            jr .ch                          ; (X wrapped: BNE falls through to the store)
+.ch:        ld b, a                         ; store at ($4E) + Y
+            ldh [wtmp], a
+            ld a, [NES_RAM + $4E]
+            add a, c
+            ld l, a
+            ld a, [NES_RAM + $4F]
+            adc a, 0
+            ld h, a
+            and $E0
+            cp $60
+            jr nz, .slow
+            ld a, h                         ; PRG-RAM (the text buffer)
+            add a, $40
+            ld h, a
+            ld [hl], b
+            jr .nx
+.slow:      call nes_wr
+.nx:        inc e
+            inc c
+            jr nz, .lp
+            ld b, 0                         ; (Y wrapped: RTS with A = the character, Z = 1)
+            xor a
+            ldh [nzv], a
+            ldh a, [n9_y]
+            rra
+            ldh a, [wtmp]
+            push af
+            ld hl, sp + 0
+            set 7, [hl]
+            pop af
+            ret
+.end:       ld b, 0
+            xor a
+            ldh [nzv], a
+            ldh a, [n9_y]
+            rra                             ; C back, A = 0
+            inc a
+            dec a                           ; Z = 1
+            ret
+.cy:        ld a, 0                         ; n9_y = the carry
+            rla
+            ldh [n9_y], a
+            ret

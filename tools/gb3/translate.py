@@ -89,7 +89,10 @@ class FF3:
            ('fix', 0xFD2C): ('nat_fd2c', 'NZ'),      # clear bit
            ('fix', 0xFD38): ('nat_fd38', 'NZ'),      # check bit
            ('p2e', 0xA697): ('nat_a697', 'NZ'),      # reset attribute tables
-           ('p2e', 0xA78D): ('nat_a78d', 'NZC')}     # set attribute table for monster
+           ('p2e', 0xA78D): ('nat_a78d', 'NZC'),     # set attribute table for monster
+           ('b40', 0x9F00): ('nat_9f00', 'NZ'),      # reload the ExRAM text engine
+           ('p32', 0x9FE4): ('nat_9fe4', 'NZC'),     # update status animation sprites
+           ('p34', 0x966A): ('nat_966a', 'NZC')}     # English text line copy (bconv)
     for _a, _n in zip(range(0xFD3C, 0xFD41), ('nat_fd3c', 'nat_fd3d', 'nat_fd3e', 'nat_fd3f', 'nat_fd40')):
         ext[('fix', _a)] = (_n, 'NZC')               # asl x6 .. x2
     for _a, _n in zip(range(0xFD43, 0xFD48), ('nat_fd43', 'nat_fd44', 'nat_fd45', 'nat_fd46', 'nat_fd47')):
@@ -549,11 +552,35 @@ class Emitter:
         self.jump(None, (i.space, i.addr + 9))
         return True
 
+    def copy_izy_idiom(self):
+        """LDA (zp),Y / STA abs,Y / INY / CPY #n / BNE back, abs in RAM: rt_copy_izy (bulk
+        when the source is one memory window; Y = n, A = the last byte, Z = 1, C = 1, N = 0)"""
+        i = self.i
+        if i.mode != 'izy': return False
+        st = self.rc.insns.get((i.space, i.addr + 2)); j = self.rc.insns.get((i.space, i.addr + 5))
+        k = self.rc.insns.get((i.space, i.addr + 6)); l = self.rc.insns.get((i.space, i.addr + 8))
+        if not (st and j and k and l and st.mn == 'STA' and st.mode == 'aby' and gb_ram(st.arg) is not None
+                and j.mn == 'INY' and k.mn == 'CPY' and k.mode == 'imm' and l.mn == 'BNE' and l.arg == i.addr):
+            return False
+        g = gb_ram(st.arg)
+        self.o('ld hl, $%04X' % g, 'add hl, bc', 'ld a, l', 'ldh [cp_dl], a', 'ld a, h', 'ldh [cp_dh], a',
+               'ld a, $%02X' % k.arg, 'sub c', 'ldh [cp_n], a', 'ld l, $%02X' % i.arg,
+               'call rt_copy_izy', 'ld c, $%02X' % k.arg)
+        self.jump(None, (i.space, i.addr + 10))
+        return True
+
     def x_LDA(self):
-        if self.copy_idiom() or self.ppu_idiom() or self.ppu_izy_idiom(): return
+        if self.copy_idiom() or self.ppu_idiom() or self.ppu_izy_idiom() or self.copy_izy_idiom(): return
         if self.i.mode == 'izy' and 'C' not in self.keep:   # lean helper: A direct, F free
             self.o('ld l, $%02X' % self.i.arg, 'call rt_izy_lda')
             self.set_nz_reg('a'); return
+        if self.i.mode in ('abs', 'abx', 'aby') and 'C' not in self.keep:
+            a = self.i.arg; r = nes_region(a)
+            if r in ('rom8', 'roma', 'romf'):            # ROM data, carry dead: A direct
+                gb = 0x4000 + (a & 0x1FFF) if r != 'romf' else 0x4000 + (a - 0xC000)
+                self.addr_hl(gb, self.index_reg())
+                self.o('call rt_lda_%s' % r[3:])
+                self.set_nz_reg('a'); return
         op = self.operand()
         if op != 'a': self.o('ld a, %s' % op)
         self.set_nz_reg('a')
@@ -923,7 +950,9 @@ def components(rc):
 
 
 def layout(rc, blocks):
-    """assign each component to a code bank; returns {key: bank} and per-bank line lists"""
+    """assign each component to a code bank; returns {key: bank} and per-bank line lists
+    (address order: a routine and the subroutines near it mostly share a bank; a greedy
+    static call-affinity packing was tried and gave more cross-bank calls)"""
     code = {k: lines for sp in blocks for k, lines in blocks[sp]}
     sizes = {k: sum(line_size(l) for l in code[k]) for k in code}
     comps = components(rc)
@@ -944,9 +973,38 @@ def layout(rc, blocks):
     return bank_of, banks, code, sizes
 
 
+def nbranch_peephole(rc, code):
+    """BPL / BMI right after an instruction whose code ends with LDH [nzv], A (N = bit 7 of A)
+    and reached only by that fall-through: test bit 7 of A (8 cycles) instead of reloading
+    nzv (24); the Z regeneration then comes from A as well. Returns the count."""
+    refs = set()
+    for lines in code.values():
+        for l in lines:
+            for m in re.findall(r'L_[a-z0-9]+_[0-9A-F]{4}\b', l): refs.add(m)
+    dyn = set(rc.dyn)
+    n = 0
+    for k, i in rc.insns.items():
+        if i.mn not in ('BPL', 'BMI') or k not in code or k in dyn or label(*k) in refs: continue
+        lines = code[k]
+        if lines[:2] != ['ld hl, nzv', 'bit 7, [hl]']: continue
+        prev = [p for p in rc.insns.values() if False]
+        pk = None
+        for d in (1, 2, 3):
+            q = (k[0], k[1] - d)
+            if q in rc.insns and rc.insns[q].size == d: pk = q; break
+        if pk is None or pk not in code or not code[pk] or code[pk][-1] != 'ldh [nzv], a': continue
+        pi = rc.insns[pk]
+        if pi.mn in ('JMP', 'RTS', 'RTI', 'BRK', 'JSR') or pk in rc.g.ext or pk in rc.g.idioms: continue
+        code[k] = ['bit 7, a'] + [('inc a' if l == 'inc [hl]' else 'dec a' if l == 'dec [hl]' else l)
+                                  for l in lines[2:]]
+        n += 1
+    return n
+
+
 def emit_program(rc):
     blocks = rc.compile()
     bank_of, banks, code, sizes = layout(rc, blocks)
+    rc.n_npeep = nbranch_peephole(rc, code)
     out = []
     xrefs = set()                                         # labels needing a bank-0 stub
     for bank, keys in banks:
@@ -967,10 +1025,13 @@ def emit_program(rc):
                     elif i.mn != 'JSR' or True:
                         out.append('    call rt_fatal')
     # stubs (bank 0): call rt_fcs reads the target's bank and address after the call
-    stubs = ['section bank 0, $2800']                   # (runtime below, NES_RGB at $3E00)
-    for lab in sorted(xrefs):
-        stubs += ['xs_%s:' % lab, '    call rt_fcs', '    db bank(%s)' % lab, '    dw %s' % lab,
-                  'xj_%s:' % lab, '    call xs_%s' % lab, '    ret']
+    stubs = ['section bank 0, $2400']                   # (runtime below, NES_RGB at $3E00)
+    jtargets = {l for l in xrefs if l.startswith('j:')}
+    for lab in sorted(l for l in xrefs if not l.startswith('j:')):
+        stubs += ['xs_%s:' % lab, '    ldh [sv_a], a', '    ld a, bank(%s)' % lab,
+                  '    ld hl, %s' % lab, '    jp rt_fc2']
+        if 'j:' + lab in jtargets:                      # (jump form only where jumped to)
+            stubs += ['xj_%s:' % lab, '    call xs_%s' % lab, '    ret']
     # dynamic targets (bank DYN_BANK): 256 buckets by (nes_lo + nes_hi + key) & $FF; index
     # of bucket pointers at $4000, each bucket = count, then entries of nes_lo, nes_hi,
     # key, gb_bank, gb_lo, gb_hi
@@ -1005,6 +1066,7 @@ def retarget(line, bank, bank_of, xrefs):
                 if tb is not None and tb != bank:
                     xrefs.add(tgt)
                     if op == 'jp ':
+                        xrefs.add('j:' + tgt)
                         # a jump into another bank: call the stub and return (keeps the
                         # caller's bank correct when the target finally returns)
                         if ',' in s:

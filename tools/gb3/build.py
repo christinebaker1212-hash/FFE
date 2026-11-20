@@ -95,6 +95,7 @@ def main():
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in RT_FILES)
     src_all = rt + '\n' + gb1.nes_rgb_src() + '\n' + oam_attr_src() + '\n' + prog
     open(opt['--out'] + '.s', 'w').write(src_all)
+    print('N-branch peephole: %d' % getattr(rc, 'n_npeep', 0))
     print('translated: %d instructions, %d code banks (%.1fs), %d dynamic targets'
           % (len(rc.insns), len(banks), time.time() - t, rc.n_dyn))
     t = time.time()
