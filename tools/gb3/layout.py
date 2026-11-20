@@ -20,12 +20,349 @@ Battle (decision 3, with FF1 / FF2's battle rules):
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..'))
+from asm6502 import asm
 B8 = 0x2000
+FONT = 0x1B000                          # English font: tile N = code N (PRG offset)
+ARROW = 0xCA                            # unused code (Japanese katakana A): the message arrow
+ARROW_ROWS = ['........', '..#.....', '..##....', '#####...', '..##....', '..#.....', '........',
+              '........']
+
+# battle message window (bank 52, in place of FF3's open / close message window routines
+# $8D1B-$8E82 and their box table $8E83-$8EAF): one full-width window, NES rows 18-23 cols
+# 2-21 (GB rows 12-17), 4 lines of 18 columns. The first window opened saves the area and
+# draws an empty frame (a row per frame); each message then takes the next free line(s),
+# word-wrapped (a message needing more lines than are free covers the last ones); the target
+# goes on the attacker's line after an arrow when it fits. Closing a window blanks its cells;
+# closing the last one restores the area. State in the English box save buffer (ExRAM $5E90,
+# free: FF3's boxes saved there).
+MSG_SRC = '''
+MCNT  = $5E90       ; windows open
+MUSED = $5E91       ; lines in use (0-4)
+MALEN = $5E92       ; attacker's length on line 0 (0: none)
+MFIRST = $5E93      ; per window id (5): first line,
+MNUM  = $5E98       ;   number of lines,
+MCOL  = $5E9D       ;   first column
+MLINE = $5EA2       ; line image (18)
+MSAVE = $5EB4       ; the area under the window (6 x 20)
+WAIT1 = $8185       ; wait one frame
+PPUREG = $8D03      ; ppu control / mask / scroll again
+SETADR = $F8E0      ; ppu address A (high) X (low)
+    org $8D1B
+msgopen:            ; A = window id: 0 attacker, 1 action, 2 target, 3 status, 4 message
+    sta $1E
+    lda MCNT
+    bne .o1
+    sta MUSED
+    sta MALEN
+    sta $1F
+    sta $1D
+.f:
+    jsr WAIT1
+    jsr maddr
+    lda $2007
+    ldx #20
+    ldy $1D
+.r:
+    lda $2007
+    sta MSAVE,y
+    iny
+    dex
+    bne .r
+    sty $1D
+    jsr maddr
+    ldy $1F
+    lda FL,y
+    sta $2007
+    lda FM,y
+    ldx #18
+.m:
+    sta $2007
+    dex
+    bne .m
+    lda FR,y
+    sta $2007
+    jsr PPUREG
+    inc $1F
+    lda $1F
+    cmp #6
+    bne .f
+.o1:
+    inc MCNT
+    ldx $1E
+    lda #0
+    sta MCOL,x
+    cpx #2
+    bne .nl
+    ldy #0              ; target: the arrow in front
+    lda #ARROW
+.i:
+    ldx $7AD7,y
+    sta $7AD7,y
+    iny
+    txa
+    bne .i
+    sta $7AD7,y
+    lda MALEN           ; on the attacker's line when it fits
+    beq .nl
+    jsr mlen
+    sec
+    adc MALEN
+    cmp #19
+    bcs .nl
+    jsr mclr
+    ldy MALEN
+    iny
+    ldx #0
+.a:
+    lda $7AD7,x
+    beq .ad
+    sta MLINE,y
+    inx
+    iny
+    bne .a
+.ad:
+    lda MALEN
+    sta $1D
+    sta MCOL+2
+    lda #0
+    sta $1F
+    sta MFIRST+2
+    lda #1
+    sta MNUM+2
+    jmp mput
+.nl:
+    lda #0              ; lines needed
+    sta $1B
+    sta $19
+.cn:
+    jsr mline
+    inc $19
+    ldx $1B
+    lda $7AD7,x
+    bne .cn
+    lda $19
+    cmp #5
+    bcc .c4
+    lda #4
+    sta $19
+.c4:
+    clc
+    adc MUSED
+    cmp #5
+    lda MUSED
+    bcc .st
+    lda #4
+    sec
+    sbc $19
+.st:
+    sta $1F
+    ldx $1E
+    sta MFIRST,x
+    lda $19
+    sta MNUM,x
+    clc
+    adc $1F
+    sta MUSED
+    cpx #0              ; the attacker alone on line 0: its length
+    bne .dr
+    lda $1F
+    ora #0
+    bne .dr
+    jsr mlen
+    sta MALEN
+.dr:
+    lda #0
+    sta $1B
+    sta $1D
+.dl:
+    jsr mline
+    jsr mput
+    inc $1F
+    dec $19
+    bne .dl
+    rts
+
+msgclose:           ; A = window id
+    tax
+    dec MCNT
+    beq .rs
+    lda MNUM,x
+    sta $19
+    lda MFIRST,x
+    sta $1F
+    lda MCOL,x
+    sta $1D
+    bne .bl
+    lda $1F
+    clc
+    adc $19
+    cmp MUSED
+    bne .bl
+    lda $1F
+    sta MUSED
+.bl:
+    jsr mclr
+.b2:
+    jsr mput
+    inc $1F
+    dec $19
+    bne .b2
+    rts
+.rs:
+    lda #0              ; the last one: the area back
+    sta $1F
+    sta $1D
+.r:
+    jsr WAIT1
+    jsr maddr
+    ldx #20
+    ldy $1D
+.rl:
+    lda MSAVE,y
+    sta $2007
+    iny
+    dex
+    bne .rl
+    sty $1D
+    jsr PPUREG
+    inc $1F
+    lda $1F
+    cmp #6
+    bne .r
+    rts
+
+'''
+MSG_END = 0x8EB0
+MSGX_SRC = '''
+MLINE = $5EA2
+WAIT1 = $8185
+PPUREG = $8D03
+SETADR = $F8E0
+    org $5F30           ; (ExRAM, after MSAVE: the window's helpers)
+maddr:              ; ppu address of window row $1F, column 0 ($2242 + 32 row)
+    lda $1F
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    clc
+    adc #$42
+    tax
+    lda #$22
+    jmp SETADR
+
+mput:               ; MLINE from column $1D on to text line $1F (0-3), in a frame
+    jsr WAIT1
+    lda $1F
+    asl a
+    asl a
+    asl a
+    asl a
+    asl a
+    clc
+    adc #$63
+    adc $1D
+    tax
+    lda #$22
+    jsr SETADR
+    ldy $1D
+.p:
+    lda MLINE,y
+    sta $2007
+    iny
+    cpy #18
+    bne .p
+    jmp PPUREG
+
+mclr:
+    ldy #17
+    lda #$FF
+.c:
+    sta MLINE,y
+    dey
+    bpl .c
+    rts
+
+mlen:               ; A = length of the text at $7AD7
+    ldx #0
+.l:
+    lda $7AD7,x
+    beq .e
+    inx
+    bne .l
+.e:
+    txa
+    rts
+
+mline:              ; MLINE = the next line of the text from $7AD7 + $1B (words; a word
+    jsr mclr        ;   longer than the line is cut)
+    ldy #0
+    ldx $1B
+.sk:
+    lda $7AD7,x
+    cmp #$FF
+    bne .w
+    inx
+    bne .sk
+.w:
+    lda $7AD7,x
+    beq .x
+    stx $1A
+    lda #0
+    sta $1C
+.wl:
+    lda $7AD7,x
+    beq .we
+    cmp #$FF
+    beq .we
+    inx
+    inc $1C
+    bne .wl
+.we:
+    tya
+    clc
+    adc $1C
+    cmp #19
+    bcc .put
+    cpy #0
+    bne .br
+    lda #18
+    sta $1C
+.put:
+    ldx $1A
+.pc:
+    lda $7AD7,x
+    sta MLINE,y
+    inx
+    iny
+    dec $1C
+    bne .pc
+    lda $7AD7,x
+    beq .x
+    cmp #$FF
+    bne .x
+    inx
+    iny
+    cpy #18
+    bcc .w
+    bcs .x
+.br:
+    ldx $1A
+.x:
+    stx $1B
+    rts
+
+FL: .db $F7, $FA, $FA, $FA, $FA, $FC
+FM: .db $F8, $FF, $FF, $FF, $FF, $FD
+FR: .db $F9, $FB, $FB, $FB, $FB, $FE
+'''
+MSGX_END = 0x6000
 
 
 class Rom:
     def __init__(self, data):
-        self.d = bytearray(data); self.log = []
+        self.d = bytearray(data); self.log = []; self.mods = []
 
     def off(self, bank, addr):
         return 16 + bank * B8 + (addr & 0x1FFF)
@@ -67,6 +404,11 @@ def battle(r):
     r.patch(B2F, 0xB375, '20', '0C', 'step back (back row) 12 px')
     r.patch(B2F, 0xB362, 'F0', 'F8', 'confused: step back 8 px')
     r.patch(B2F, 0xB39E, 'F0', 'F8', 'confused: step back 8 px')
+    # the split between the battlefield and the windows: scanline 143 (was 151: windows
+    # from row 19)
+    for bank, a, why in ((0x2E, 0x9F1E, 'init battle'), (0x2F, 0xB8FC, 'battle intro end'),
+                         (0x32, 0x80D5, 'summon animation'), (0x10, 0x8BC4, 'final boss death')):
+        r.patch(bank, a, 'A9 97 85 03', 'A9 8F 85 03', 'battle split at scanline 143 (%s)' % why)
     # battle windows: from row 18, 4 rows of text (one tile row per line)
     r.patch(B34, 0x8B8F, '69 60 85 2A A9 00 69 22', '69 40 85 2A A9 00 69 22', 'windows from row 18 (nt 0)')
     r.patch(B34, 0x8BA0, '69 60 85 2A A9 00 69 26', '69 40 85 2A A9 00 69 26', 'windows from row 18 (nt 1)')
@@ -82,10 +424,52 @@ def battle(r):
         r.patch(B34, a, 'A9 01 85 18 A9 0A', 'A9 02 85 18 A9 0B', 'command / names window cols 2-11')
 
 
+def battle_messages(r):
+    B34 = 0x34
+    x = asm(MSGX_SRC)
+    assert x.org + len(x.bytes) <= MSGX_END, hex(x.org + len(x.bytes))
+    xo = r.off(0x40, x.org - 0x5C00 + 0x8000)
+    assert set(r.d[xo:xo + len(x.bytes)]) == {0xFF}
+    r.d[xo:xo + len(x.bytes)] = x.bytes
+    r.log.append((0x40, x.org, 'message window helpers in ExRAM (%d bytes)' % len(x.bytes)))
+    r.mods.append(x)
+    r.patch(0x40, 0x8290, 'FF', '00', 'MCNT = 0 at reset (ExRAM image)')
+    syms = {k: v for k, v in x.labels.items() if '.' not in k}
+    syms['ARROW'] = ARROW
+    m = asm(MSG_SRC, syms=syms)
+    assert m.org == 0x8D1B and m.org + len(m.bytes) <= MSG_END, hex(m.org + len(m.bytes))
+    o = r.off(B34, 0x8D1B)
+    if r.d[o:o + 5].hex() != '8518203ffd' or r.d[r.off(B34, 0x8E83):r.off(B34, 0x8E85)].hex() != '6122':
+        raise SystemExit('layout: open message window / box table not found')
+    r.d[o:r.off(B34, MSG_END)] = m.bytes + b'\xEA' * (MSG_END - 0x8D1B - len(m.bytes))
+    r.log.append((B34, 0x8D1B, 'message window routines (%d bytes)' % len(m.bytes)))
+    r.mods.append(m)
+    # the close call ($94DF LDA $4B / JSR $8E14) -> msgclose
+    c = m.labels['msgclose']
+    r.patch(B34, 0x94E0, '4B 20 14 8E', '4B 20 %02X %02X' % (c & 0xFF, c >> 8), 'close message window')
+    # box texts: never split (one row of 64 in the buffer; the window wraps them itself)
+    for a in (0x9091, 0x90C1, 0x9168, 0x91BF, 0x91EF, 0x9253, 0x9313):
+        o = r.off(B34, a)
+        assert r.d[o] == 0xA9 and r.d[o + 2:o + 4] == bytes([0x85, 0x18]), hex(a)
+        r.d[o + 1] = 0x40
+    r.log.append((B34, 0x9091, 'box text widths 64'))
+    # the arrow glyph
+    lo = bytearray(8); hi = bytearray(8)
+    for y, row in enumerate(ARROW_ROWS):
+        for x in range(8):
+            c = 3 if row[x] == '#' else 2
+            if c & 1: lo[y] |= 0x80 >> x
+            if c & 2: hi[y] |= 0x80 >> x
+    o = 16 + FONT + ARROW * 16
+    r.d[o:o + 16] = bytes(lo + hi)
+    r.log.append((0, 0, 'arrow glyph $%02X' % ARROW))
+
+
 def main():
     src, out = sys.argv[1], sys.argv[2]
     r = Rom(open(src, 'rb').read())
     battle(r)
+    battle_messages(r)
     open(out, 'wb').write(bytes(r.d))
     print('layout: %d patches -> %s' % (len(r.log), out))
 
