@@ -98,7 +98,8 @@ class FF2:
               # CPY #$10 / BNE (battle, every frame; rt/ff2_banked.s)
               ('b11', 0x9D24): ('hle_bfill', 0x9D29, 'NZ'), ('b11', 0x9D4A): ('hle_bcopy', 0x9D57, 'NZC'),
               # fix:F496 / F4B1 STA $2007 / INY / BNE / DEX / BNE: X pages of A (rt/ff2.s)
-              ('fix', 0xF496): ('hle_fillxy', 0xF49F, 'NZ'), ('fix', 0xF4B1): ('hle_fillxy', 0xF4BA, 'NZ')}
+              ('fix', 0xF496): ('hle_fillxy', 0xF49F, 'NZ'), ('fix', 0xF4B1): ('hle_fillxy', 0xF4BA, 'NZ'),
+              ('b14', 0xB8B6): ('hle_fill4', 0xB8C5, 'NZ')}   # 4 x STA $2007 / DEX / BNE
     # battle NMI handlers (run by rt_nmi_run through the dynamic table; RTI = ret)
     nmi_handlers = [('b12', 0x9A79), ('b05', 0xA9A2)]
     idiom_code = {('fix', 0xFA91): bytes.fromhex('a9fa48a999486c4000'),
@@ -112,7 +113,8 @@ class FF2:
                   ('b11', 0x9D82): bytes.fromhex('bda8798d0720e8e020d0f5'),
                   ('b11', 0x9D24): bytes.fromhex('91248810fb'),
                   ('b11', 0x9D4A): bytes.fromhex('b12491269128912ac8c010d0f3'),
-                  ('fix', 0xF496): bytes.fromhex('8d0720c8d0faca'), ('fix', 0xF4B1): bytes.fromhex('8d0720c8d0faca')}
+                  ('fix', 0xF496): bytes.fromhex('8d0720c8d0faca'), ('fix', 0xF4B1): bytes.fromhex('8d0720c8d0faca'),
+                  ('b14', 0xB8B6): bytes.fromhex('8d07208d07208d07208d0720cad0f1')}
     skip = [('fix', 0xFA2C, 0xFA48), ('fix', 0xFEA1, 0xFEAD), ('fix', 0xFEAF, 0xFEBF)]   # waits (but their entries) + NMI return stubs
 
 

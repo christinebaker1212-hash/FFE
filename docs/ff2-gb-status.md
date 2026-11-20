@@ -621,6 +621,17 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   source check is exact at the end of a bank window. The menu portraits (our bank-24 loop)
   are a subroutine `pcopy` with a native replacement (`hle_pcopy`, NATIVE_EXT). Menu opening
   DMG +35 -> +20, doors +48 -> +44. Random 1: DMG +0.5%, CGB -2.2%; RAM identical.
+- Boot / title: idioms fix:F496 / F4B1 (STA $2007 / INY / BNE / DEX / BNE, page fills) ->
+  `hle_fillxy`, b14:B8B6 (4 x STA $2007 / DEX / BNE) -> `hle_fill4`, both through
+  `hle_fill` (whose nametable path now splits a run at the attribute bytes); the prologue
+  font copy in our bank 24 is a subroutine `pages0` with a native replacement (`pcopy` and
+  `pages0` moved to the end of MENU_SRC). Boot window +59 -> +10, title +53 -> +18; DMG
+  +0.2%. A first version of `hle_fill4` filled the nametable with its loop counter instead
+  of the value: invisible to the RAM checks, seen in the prologue shots. New check:
+  `firstdiff.py` with env PPU=1 rebuilds the NES nametables from the logged $2000 / $2005 /
+  $2006 / $2007 writes (latch reset at each wait: the wait stub reads $2002) and compares
+  them with the GB's NT_SH at every wait (it catches that bug). Random 1 DMG / CGB and
+  random 2: RAM and nametables identical.
 - Status of the owner's three (DMG, random 1): overworld walking / sailing at parity (walk
   scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
   remaining: battle entry (load +19 net, intro +39 / +32), door loads (+56 single wait,

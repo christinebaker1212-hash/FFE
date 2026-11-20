@@ -74,6 +74,9 @@ def nes_pass(nes, steps, limit, shots_at=(), pokes=(), poke_frame=9700):
     rev = [int('{:08b}'.format(i)[::-1], 2) for i in range(256)]
     w = 0; nrol = 0; nror = 0
     poke_wait = None
+    track = bool(os.environ.get('PPU'))         # env PPU=1: the nametables at each wait (from the
+    nt = bytearray(0x800); ppu = [0, 0, 0]       #   logged $2000/$2005/$2006/$2007 writes; FF2:
+    nes_pass.nt = {}                             #   vertical mirroring) for firstdiff's check
     for f in range(limit):
         if pokes and f == poke_frame:           # RAM pokes (the GB gets them at the same wait)
             for a, v in pokes:
@@ -87,6 +90,7 @@ def nes_pass(nes, steps, limit, shots_at=(), pokes=(), poke_frame=9700):
             if a == 0x100 and v == 0x40 and (shadow[0x100], shadow[0x101], shadow[0x102]) in WAIT_STUBS:
                 w += 1; nrol = nror = 0
                 nes_ram[w] = bytes(shadow[:0x800]); frame_of[w] = f
+                if track: nes_pass.nt[w] = bytes(nt); ppu[1] = 0   # (the wait stub reads $2002)
                 if w % WRAM_EVERY == 0: wram[w] = bytes(shadow[0x6000:0x8000])
             if a == 0x20:
                 nrol = nrol + 1 if ix == ROL20 else 0
@@ -94,6 +98,17 @@ def nes_pass(nes, steps, limit, shots_at=(), pokes=(), poke_frame=9700):
             elif a == 0x35:
                 nror = nror + 1 if ix == ROR35 else 0
                 if nror == 8: pads[w + 1] = rev[v]; nror = 0
+            if track and 0x2000 <= a < 0x2008:  # (ppu = ctrl, latch, address)
+                r = a & 7
+                if r == 0: ppu[0] = v
+                elif r == 5: ppu[1] ^= 1
+                elif r == 6:
+                    ppu[2] = ((v & 0x3F) << 8) | (ppu[2] & 0xFF) if ppu[1] == 0 else (ppu[2] & 0xFF00) | v
+                    ppu[1] ^= 1
+                elif r == 7:
+                    va = ppu[2] & 0x3FFF
+                    if 0x2000 <= va < 0x3F00: nt[(va & 0x400) | (va & 0x3FF)] = v
+                    ppu[2] = (ppu[2] + (32 if ppu[0] & 4 else 1)) & 0x7FFF
             if a < 0x2000: shadow[a & 0x7FF] = v
             elif a >= 0x6000: shadow[a] = v
         if f in shots_at: shot_w.append(w)
@@ -177,6 +192,13 @@ def main():
                 if a < 0x800: m[0xC000 + a] = v
                 else: m[0, 0xA000 + a - 0x6000] = v
         if state['diff'] is not None or k not in nes_ram: return
+        if k in getattr(nes_pass, 'nt', {}):    # PPU=1: the NES nametables against NT_SH
+            x = nes_pass.nt[k]; y = bytes(m[0xD000 + i] for i in range(0x800))
+            d = [i for i in range(0x800) if x[i] != y[i]]
+            if d:
+                state['diff'] = 'NES frame %d, wait %d, nametables (%d bytes): %s' % (frame_of[k], k, len(d), ' '.join(
+                    '%03X:%02X/%02X' % (i, x[i], y[i]) for i in d[:16]))
+                return
         a = nes_ram[k]; b = bytes(m[0xC000 + i] for i in range(0x800))
         d = [i for i in range(0x800) if a[i] != b[i] and not 0x100 <= i < 0x200 and i not in mask
              and not (i in TSX_SAVES and a[i] >= 0xC0 and b[i] >= 0xC0)]
