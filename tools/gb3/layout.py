@@ -596,11 +596,40 @@ def battle_messages(r):
     r.log.append((0, 0, 'arrow glyph $%02X' % ARROW))
 
 
+# minimap (the Sight spell on the overworld; its last screen setup, bank 58 $8C3F, before it
+# shows): a 16 x 16-tile map at NES cols
+# 8-23, rows 10-23 (sea x 64-191, y 80-191) in a frame: camera (48, 64) centres it; the runtime goes back to the field
+# camera when the screen goes off after it (the menu it returns to)
+MINI_SRC = '''
+    org $5FF0
+minicam:
+    lda #48
+    sta $5802       ; (GB runtime: screen camera X / Y, pixels; open bus on the NES)
+    lda #64
+    sta $5803
+    jmp $FF00       ; wait for vblank (the call this replaces)
+'''
+
+
+def field(r):
+    m = r.module(MINI_SRC)
+    assert m['org'] + len(m['bytes']) <= 0x6000
+    xo = r.off(0x40, m['org'] - 0x5C00 + 0x8000)
+    assert set(r.d[xo:xo + len(m['bytes'])]) == {0xFF}
+    r.d[xo:xo + len(m['bytes'])] = m['bytes']
+    r.mods.append(dict(m, where=(EXRAM, m['org'] - 0x5C00)))
+    r.log.append((0x40, m['org'], 'minimap camera (ExRAM)'))
+    r.patch(0x3A, 0x8C3F, '20 00 FF', '20 F0 5F', 'minimap: its camera')
+    if os.environ.get('GB3_TEST_MINI'):      # (test builds only: Select on the field shows the
+        r.patch(0x7F, 0xE36B, '4C 2C F7', '4C 63 C0', 'TEST: Select = minimap')   # minimap)
+
+
 def apply(data):
     """English NES ROM bytes -> (GB-layout ROM bytes, code modules for tools/gb3/ff3src.py)"""
     r = Rom(data)
     battle(r)
     battle_messages(r)
+    field(r)
     return bytes(r.d), r.mods, r.log
 
 

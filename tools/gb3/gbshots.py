@@ -25,9 +25,11 @@ def main():
     ap.add_argument('nes'); ap.add_argument('gb'); ap.add_argument('out'); ap.add_argument('waits')
     ap.add_argument('--input', default='explore'); ap.add_argument('--scale', type=int, default=2)
     ap.add_argument('--freeze', type=int, default=0, help='no input from this waited-for frame on')
+    ap.add_argument('--press', default='', help='W:PAD:N,.. : pad PAD for N waited-for frames from W (after --freeze)')
     ap.add_argument('--dump', help='directory: also the GB memory at each shot (sgbrun SGBRUN_DUMP)')
     a = ap.parse_args()
     ws = [int(x) for x in a.waits.split(',')]
+    presses = [tuple(int(v, 0) for v in p.split(':')) for p in a.press.split(',') if p]
     from cynes import NES
     import cmpshots
     pad = INPUTS[a.input]
@@ -35,6 +37,8 @@ def main():
     top = max(ws)
     while n.ff3_waits <= top:
         n.controller = pad(k + 1) if not a.freeze or n.ff3_waits < a.freeze else 0
+        for pw, pv, pn in presses:
+            if pw <= n.ff3_waits < pw + pn: n.controller = pv
         fr = n.step(1); k = W.update()
         clock.setdefault(n.ff3_waits, k)
         for w in ws:

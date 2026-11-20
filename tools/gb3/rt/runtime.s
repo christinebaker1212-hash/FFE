@@ -117,6 +117,8 @@ cam_x:      ds 1
 cam_y:      ds 1
 bcam:       ds 1                            ; battle cameras on ($5806, tools/gb3/layout.py)
 spl_bank:   ds 1                            ;   then map rows SPL_ROW.. carry the split's BG table
+ovr_st:     ds 1                            ; screen camera ($5802/$5803): 1 set, 2 shown (back to
+                                            ;   the field camera when the screen goes off)
 uw_bank:    ds 1
 uw_ret:     ds 2
 uw_y:       ds 1
@@ -726,6 +728,32 @@ rt_ppu_w0:  push af                         ; $2000
 .sk:        pop af
             ret
 rt_ppu_w1:  ldh [ppu_mask], a               ; $2001
+            push af
+            ldh a, [ovr_st]                 ; (a screen camera: until the screen it was set
+            and a                           ;   for goes off)
+            jr nz, .ovr
+            pop af
+            ret
+.ovr:       dec a
+            jr nz, .shown
+            pop af                          ; set: shown once rendering is on
+            push af
+            and $18
+            jr z, .x
+            ld a, 2
+            ldh [ovr_st], a
+            jr .x
+.shown:     pop af
+            push af
+            and $18
+            jr nz, .x
+            xor a                           ; off again: the field camera
+            ldh [ovr_st], a
+            ld a, CAM_X
+            ldh [cam_x], a
+            ld a, CAM_Y
+            ldh [cam_y], a
+.x:         pop af
             ret
 rt_ppu_r2:  push af                         ; $2002: vblank flag (cleared), latch reset
             ldh a, [ppu_stat]
@@ -2063,8 +2091,16 @@ rt_mmc_w5806:                               ; GB layout: battle cameras on (A <>
             call rebank_attrs
             pop af
             ret
-rt_mmc_w5802:
-rt_mmc_w5803:
+rt_mmc_w5802:                               ; GB layout: screen camera X (pixels)
+            ldh [cam_x], a
+            ret
+rt_mmc_w5803:                               ;   and Y; back to the field camera when the screen
+            ldh [cam_y], a                  ;   goes off after it has been shown
+            push af
+            ld a, 1
+            ldh [ovr_st], a
+            pop af
+            ret
 rt_mmc_w5804:
 rt_mmc_w5805:
 rt_mmc_w5807:

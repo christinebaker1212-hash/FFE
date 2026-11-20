@@ -188,8 +188,12 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   (`mockup.py NES OUT lists`: tall window GB rows 8-17 vs the 6-row window; items one column
   per page, magic rows as FF1: spells 1-2 / spell 3 + level and MP).
 - Field camera (owner: centre the player): the default camera is now (40, 45), the party
-  (NES x 112-127, y 109-124) at the GB screen's centre. The minimap still to check (no input
-  script reaches the world map yet).
+  (NES x 112-127, y 109-124) at the GB screen's centre; the overworld draws the walking
+  party at the same place (x $70, y $6C; ships y $6F, airships $5F). Minimap (the Sight spell
+  on the overworld): its own camera (48, 64) set at its last screen setup (bank 58 $8C3F ->
+  ExRAM `minicam`, runtime `$5802`/`$5803` = screen camera until the screen goes off after
+  it); checked with a test build (`GB3_TEST_MINI=1`: Select on the field opens it; gbshots
+  `--press W:PAD:N`): the map box centred (GB x 14-145, y 14-130).
 - Open in battle: the item / magic lists (owner's choice), back attacks, bosses / large
   formations.
 
