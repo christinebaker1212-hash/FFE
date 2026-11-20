@@ -351,6 +351,36 @@ def menu_all_fit(nes, outd, cmd):
     F.draw(s, 14, 14, 'Sara', T.ink)
     s.save(os.path.join(outd, 'N4_our_font.png'))
     print('wrote', os.path.join(outd, 'N4_our_font.png'))
+    # owner: "the HP and MP font is off alignment with the other fonts": FF3's HP / MP label
+    # glyphs sit 1 px lower than the letters and digits (rows 1-7, the font rows 0-6), and the
+    # 1 / 2 / 3 px shifts ran the lines into each other. N5: labels raised 1 px onto the digits'
+    # rows; A = every line on the 8-px grid (rows line up with the command window), members
+    # parted by a thin rule in the MP line's free bottom pixel row; B = the member's lines
+    # drawn 0 / 1 / 1 / 2 px higher (one even step), 3 px between members, no rule
+    grey = (120, 120, 120)
+    for tag, shifts, rule in (('A', (0, 0, 0, 0), True), ('B', (0, 1, 1, 2), False)):
+        s = Screen(T)
+        s.window(0, 0, 13, 18)
+        for i, (nm, _, hp, mx, lv, m1, m2) in enumerate(party2):
+            r = 1 + 4 * i
+            F.draw(s, 1, r, nm, T.ink, dy=shifts[0]); F.draw(s, 8, r, 'Lv%2d' % lv, T.ink, dy=shifts[0])
+            condensed(s, 1, r + 1, jobs[i], T.ink, 11, dy=shifts[1])
+            F.draw(s, 1, r + 2, '[77][79]', green, dy=shifts[2] + 1)
+            F.draw(s, 3, r + 2, '%4d/%-4d' % (hp, mx), green, dy=shifts[2])
+            F.draw(s, 1, r + 3, '[78][79]', T.ink, dy=shifts[3] + 1)
+            F.draw(s, 3, r + 3, m1 + ' ' + m2, T.ink, dy=shifts[3])
+            if rule and i < 3:
+                for x in range(10, 12 * 8 - 2, 2): s.im.putpixel((x, (r + 4) * 8 - 1), grey)
+        s.window(13, 0, 7, 9)
+        for i, c in enumerate(['Item', 'Magic', 'Equip', None, 'Order', 'Job', 'Save']):
+            if c: F.draw(s, 14, 1 + i, c, T.ink)
+            else: condensed(s, 14, 1 + i, 'Status', T.ink, 5)
+        s.window(13, 9, 7, 4)
+        small_text(s, 14 * 8 + 2, 10 * 8, '9999999G', T.ink); small_text(s, 14 * 8 + 2, 11 * 8, '    255C', T.ink)
+        s.window(13, 13, 7, 5)
+        F.draw(s, 14, 14, 'Sara', T.ink)
+        s.save(os.path.join(outd, 'N5%s_aligned.png' % tag))
+        print('wrote', os.path.join(outd, 'N5%s_aligned.png' % tag))
 
 
 def menu_options(nes, outd, cmd):
