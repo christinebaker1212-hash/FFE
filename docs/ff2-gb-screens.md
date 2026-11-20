@@ -64,6 +64,12 @@ status word. Commands (Items, Magic, Equip, Status, Save; cols 13-19 rows 0-6) a
 - World-map overview (B + Select with the ring): camera 6 / 9, the globe centred; the logo
   above it is outside the view.
 
+## Ending (approved 2026-11-20: `ff2_mock15_ending.png`)
+- Epilogue: the translation's lines kept (a line is a sentence), each balanced at 20 columns
+  and centred (no frame shows); two pages (11 / 9 lines), each held half the NES page's time.
+- Credits: as the NES (crystal-ball portraits), the credit lines 3 columns further left so
+  the longest name fits; THE END unchanged.
+
 ## To draft
 Items, magic, equipment, status, shops, keyword dialogue (Ask / Learn), save menu, name
 entry, prologue, title, ending, world map (B + Select), Select menu (options / formation /

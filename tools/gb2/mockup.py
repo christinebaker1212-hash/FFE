@@ -719,3 +719,47 @@ def row_menu_map(nes_path, out):
     for k, s in enumerate(shots): sheet.paste(s.im, (k * 168, 0))
     sheet = sheet.resize((sheet.width * 2, 288), Image.NEAREST)
     p = os.path.join(out, 'ff2_mock14_rows_map.png'); sheet.save(p); return p
+
+
+def ending(nes_path, out):
+    """Ending (event $E7, fix:F34D), camera 6 / 6. Epilogue: the same lines (the
+    translation's line breaks kept: a line is a sentence), each balanced at 20 columns and
+    centred (no window frame shows), two pages of 11 / 9 lines, each held half the NES
+    page's time (fix:F3B0: 4 waits -> 2 + 2). Credits: the crystal ball as on the NES, the
+    credit lines 3 columns further left (fix:BB2A: $224A -> $2247), so the longest name
+    (18 letters) ends at the view's last column; THE END in place."""
+    import json
+    from cynes import NES
+    import numpy as np
+    sys.path.insert(0, os.path.join(HERE, '..', 'gb2'))
+    import layout
+    ins = layout._insert_module()
+    rom = bytearray(open(nes_path, 'rb').read())
+    o = 16 + 31 * 0x4000 + 0xF0E2 - 0xC000
+    rom[o:o + 3] = bytes([0x4C, 0x4D, 0xF3])          # (test copy: Select starts the ending)
+    tmp = os.path.join(out, '_end_test.nes'); open(tmp, 'wb').write(rom)
+    fr = loaded_frames(tmp, {3800: 32}, [8500, 13000, 16000])
+    os.remove(tmp)
+    t = [e for e in json.load(open(os.path.join(HERE, '..', '..', 'script', 'ff2', 'ending.json'))) if e['id'] == 0][0]['en']
+    lines = []
+    for line in t.split('\n'):
+        lines += ins.balanced(line.strip(), 20) if line.strip() else ['']
+    while lines and not lines[-1]: lines.pop()
+    pages = [lines[:11], lines[12:]]
+    shots = []
+    for p in pages:
+        s = Screen(bg=3)
+        y0 = (18 - len(p)) // 2
+        for i, l in enumerate(p): s.text((20 - len(l)) // 2, y0 + i, l, fg=0, bg=3)
+        shots.append(s)
+    for f in (8500, 13000):
+        im = fr[f]
+        s = Screen(bg=3)
+        s.im.paste(im.crop((48, 48, 208, 192)), (0, 0))             # the ball (NES rows 6-23)
+        s.im.paste(im.crop((72, 144, 232, 168)), (0, 96))          # credit lines, 3 columns left
+        shots.append(s)
+    s = Screen(bg=3); s.im.paste(fr[16000].crop((48, 48, 208, 192)), (0, 0)); shots.append(s)
+    sheet = Image.new('RGB', (168 * 5 - 8, 144), (255, 255, 255))
+    for k, s in enumerate(shots): sheet.paste(s.im, (k * 168, 0))
+    sheet = sheet.resize((sheet.width * 2, 288), Image.NEAREST)
+    p = os.path.join(out, 'ff2_mock15_ending.png'); sheet.save(p); return p
