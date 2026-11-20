@@ -2243,7 +2243,13 @@ def bank24(rom):
     tabs = B23_SRC[B23_SRC.index('BIT:    .db'):]
     mdata, msyms = menu_data(rom)
     src = '    org $8000\n    jmp gb_menu\n' + core + MENU_SRC + tabs + mdata + glyph_src(rom) + prophecy_data(rom)
-    return asm(src, syms=dict(RAM, **msyms, **PROPH_RAM))
+    return asm(src, syms=dict(RAM, **msyms, **PROPH_RAM, **EPI_SYMS))
+
+
+EPI = dict(x=6, y=9, w=20, h=16)     # epilogue window (b14:BAAF; NES (4,4,24,24)): text NES cols 6-25
+EPI_SYMS = dict(EW_X=EPI['x'], EW_Y=EPI['y'], EW_W=EPI['w'], EW_H=EPI['h'], EVB=20, EP2=0xBFF0)   # EP2: page 2's
+#   address (data in bank 24 outside the code module, written by dialogue())
+B24L = [None]           # bank 24 labels (set by battle())
 
 
 PROPH_RAM = dict(ROWX=0x75C0, PPG=0xD2, PRP=0xD4, PP=0x7600, PN=0x7601, PI=0x7602, PJ=0x7603, PH=0x7604, PK=0x7605,
@@ -2326,7 +2332,7 @@ gb_menu:
     rts
 .go:
     jmp ($0000)
-MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit, gm_tparty, gm_shoptext, gm_slot, gm_ngcam, gm_prophecy, gm_rowinit, gm_rowdraw
+MJT:  .dw gm_init, gm_party, gm_gil, gm_attr, gm_exit, gm_tparty, gm_shoptext, gm_slot, gm_ngcam, gm_prophecy, gm_rowinit, gm_rowdraw, gm_epage
 
 gm_exit:
     lda #6
@@ -3613,6 +3619,42 @@ rowquads:               ; member VI's 4 quads at x VCX (cols VCX/8 .. +3, rows 6
     cmp #4
     bne .q
     rts
+gm_epage:               ; fix:F399 (ending, owner approved ff2_mock15): the epilogue's page 1
+    jsr ewait           ;   held 2 of the NES's 4 waits (fix:F3B0), page 2 (EP2, in the event
+    jsr ewait           ;   bank) drawn over it with b14:BAAF's window, held 2 waits
+    lda #1
+    sta $37
+    lda #EW_X
+    sta $38
+    lda #EW_X-1
+    sta $97
+    lda #EW_Y
+    sta $39
+    lda #EW_Y+2
+    sta $98
+    lda #EW_W
+    sta $3C
+    lda #EW_H
+    sta $3D
+    lda #EVB
+    sta $93
+    lda EP2
+    sta $3E
+    lda EP2+1
+    sta $3F
+    jsr $EAAC
+    jsr ewait
+ewait:                  ; fix:F3BC (232 frames), its music update through fix:C74F: C746
+    lda #232            ;   leaves the music bank in place (bank 24 is running here)
+    sta VCNT
+.l:
+    jsr $FE00
+    lda #2
+    sta $4014
+    jsr $C74F
+    dec VCNT
+    bne .l
+    rts
 gm_shoptext:            ; b14:90FD (shop list text, owner approved ff2_mock12): per item the
     ldx #0              ;   name (column 1, cursor spot) and the price under it at column
     ldy #0              ;   13, from the shop data at $7B00 (id, price index); into $7B20
@@ -4003,6 +4045,7 @@ gbm:                    ; main menu (bank 24): A = sub-command; back to bank 14
     assert len(b24.bytes) <= BANK, len(b24.bytes)
     rom[HDR + 24 * BANK:HDR + 25 * BANK] = b'\xFF' * BANK
     put(rom, 24, 0x8000, b24.bytes)
+    B24L[0] = b24.labels
     class E: pass
     e = E(); e.labels = labels
     for k, (name, rb, nes) in enumerate(ENTRIES):
@@ -4713,16 +4756,42 @@ def dialogue(rom):
                 used[b].put_ptr(0x8000 + 2 * e['id'], used[b].alloc(ins.enc(txt) + b'\0'))
             if name == 'events': free_ev = used[banks[0]].free
         data = b''                                          # the ending (as insert.ending)
+        assert ins.EV_BANK == EPI_SYMS['EVB']
+        page2 = None
         for e in json.load(open('script/ff2/ending.json')):
             if not e['en'].strip():
                 data += ins.enc(e['en']) + b'\0'; continue
+            if e['id'] == 0:                            # GB (ff2_mock15): 20 columns, two
+                W = EPI['w']                            #   pages of 11 rows, lines padded to
+                lines = []                              #   the width (page 2 covers page 1)
+                for line in e['en'].split('\n'):
+                    lines += ins.balanced(line.strip(), W) if line.strip() else ['']
+                while lines and not lines[-1]: lines.pop()
+                cut = lines.index('', lines.index('') + 1)   # the second blank line
+                p1, p2 = lines[:cut], lines[cut + 1:]          #   (after "Peace has returned ...")
+                assert len(p1) <= 11 and len(p2) <= 10, (len(p1), len(p2))
+                p2 = [''] * ((11 - len(p2)) // 2) + p2
+                p2 += [''] * (11 - len(p2))
+                pad = lambda l: (' ' * ((W - ins.vlen(l)) // 2) + l).ljust(W)
+                data += ins.enc('\n'.join(pad(l) for l in p1)) + b'\0'
+                page2 = ins.enc('\n'.join(pad(l) for l in p2)) + b'\0'
+                continue
             lines = []
             for line in e['en'].split('\n'):
                 for l in (ins.balanced(line.strip(), 24) if line.strip() else ['']):
                     lines.append(' ' * ((24 - ins.vlen(l)) // 2) + l if l else '')
             data += ins.enc('\n'.join(lines)) + b'\0'
-        a = ins.Bank(rom, ins.EV_BANK, free_ev).alloc(data)
+        evb = ins.Bank(rom, ins.EV_BANK, free_ev)
+        a = evb.alloc(data)
         put(rom, 14, 0xBAD2, bytes([a & 0xFF])); put(rom, 14, 0xBAD6, bytes([a >> 8]))
+        a2 = evb.alloc(page2)
+        put(rom, 24, EPI_SYMS['EP2'], a2.to_bytes(2, 'little'), old=b'\xFF\xFF')
+        w = EPI                                         # the epilogue window (b14:BAAF)
+        put(rom, 14, 0xBAB4, bytes([w['x']]), old=b'\x04')
+        put(rom, 14, 0xBABD, bytes([w['y']]), old=b'\x04')
+        put(rom, 14, 0xBAC6, bytes([w['w']]), old=b'\x18')
+        put(rom, 14, 0xBACA, bytes([w['h']]), old=b'\x18')
+        put(rom, 14, 0xBB2B, b'\x47', old=b'\x4A')      # credits 3 columns left ($2247)
         # field messages of the system table (bank 10 $8400) drawn in window 0: wrapped at
         # 18 too, into bank 10's space left after insert.py's names + system strings (its
         # allocations replayed on a scratch copy give the free list)
@@ -4784,6 +4853,9 @@ rowex:
     lda #0
     sta $2001
     rts
+epage:                  ; fix:F399 (ending: epilogue pages, bank 24 gm_epage)
+    lda #12
+    jmp GBM
 ''', syms=dict(GBM=g))
     assert k.org + len(k.bytes) <= 0xB87A
     put(rom, 14, k.org, k.bytes)
@@ -4793,12 +4865,16 @@ rowex:
     put(rom, 31, 0xF196, bytes([0x20]) + L['rowex'].to_bytes(2, 'little') + b'\xEA\xEA', old=bytes.fromhex('a9008d0120'))
     put(rom, 31, 0xF2B8, bytes([0x9F]), old=bytes([0xA7]))
     put(rom, 31, 0xF2BC, bytes([0xA0]), old=bytes([0xA8]))
+    put(rom, 31, 0xF399, bytes([0x20]) + L['epage'].to_bytes(2, 'little'), old=bytes.fromhex('20b0f3'))
 
 
 def apply(rom):
     battle(rom)
     dialogue(rom)
     world_overview(rom)
+    if os.environ.get('GB_END_TEST'):           # test builds only: Select on the field starts
+        t = asm('    org $F0E2\n    jmp $F34D\n')       #   the ending (event $E7, fix:F34D)
+        put(rom, 31, t.org, t.bytes)
 
 
 if __name__ == '__main__':

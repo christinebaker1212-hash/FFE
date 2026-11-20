@@ -438,7 +438,17 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   `SGBRUN_PEEK`); PyBoy has no double speed or VRAM locking and did not show it.
   Checks: random 30000 on DMG and CGB, overview / load scenario on DMG and CGB, shop
   scenario: identical.
-- Next: the ending; Select menu with suspend (design with the owner).
+- **Ending** (owner approved `ff2_mock15`): epilogue window (b14:BAAF) at NES (6, 9), 20
+  columns (`layout.EPI`); the translation's lines balanced at 20 and padded to the width;
+  two pages of 11 rows: page 1 is ending text 0 (event bank), page 2 a string of its own
+  (its address in bank 24 at `$BFF0`, outside the code module so the source map still
+  matches); `fix:F399` (the 4-wait hold `fix:F3B0`) -> bank 24 `gm_epage`: 2 waits, page 2,
+  2 waits (its own wait loop with `fix:C74F`: `F3BC`'s `C746` leaves the music bank in
+  place). Credits 3 columns left (`b14:BB2B` $224A -> $2247). Test builds: env
+  `GB_END_TEST=1` (layout.py: Select on the field starts the ending, `JMP $F34D` at fix:F0E2).
+  Checked: NES variant and Gambatte CGB shots of both pages, credits, THE END.
+- Next: DMG shading of the credits screen (background dark grey, the crystal ball fades into
+  it); Select menu with suspend (design with the owner).
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
