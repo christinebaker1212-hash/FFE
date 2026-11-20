@@ -1786,3 +1786,98 @@ sc_cell:    ld b, 0                         ; B = 4 for a cell nametable 1 owns
 
 section bank HLE_BANK, $7F00
 BITS8:      db 1, 2, 4, 8, 16, 32, 64, 128      ; (page start: low byte = bit number)
+
+; fix:F321 "clear nametable 0" (menus, screen changes): $2000-$23BF = 0, $23C0-$23FF = $FF.
+; With the LCD off and +1 increment: the shadow tiles, GB map rows 0-29 and the owners at
+; once (every cell nametable 0's; DMG: the scan when the LCD goes on; CGB: if nametable 1
+; owned cells, nametable 0's attributes on every cell again); the 64 attribute bytes
+; through rt_ppu_w7. Else byte by byte. Exit as the NES: A = $FF, X = Y = 0, N = 0, Z = 1,
+; C = 1 (CPY #$C0).
+hle_ntclr0_b:
+            call rt_ppu_r2                  ; LDA $2002 / $2006 = $20, $00
+            ld a, $20
+            call rt_ppu_w6
+            xor a
+            call rt_ppu_w6
+            ldh a, [lcd_on]
+            and a
+            jr nz, .gen
+            ldh a, [ppu_ctrl]
+            and 4
+            jr nz, .gen
+            ld hl, NT_SH                    ; shadow tiles
+            call .z960
+            ld hl, $9800                    ; GB map rows 0-29
+            call .z960
+            ldh a, [own1_lo]                ; owners: B = nametable 1 owned cells
+            ld b, a
+            ldh a, [own1_hi]
+            or b
+            ld b, a
+            xor a
+            ldh [own1_lo], a
+            ldh [own1_hi], a
+            ld hl, OWN
+            ld c, 120
+.ow:        ld [hl+], a
+            dec c
+            jr nz, .ow
+            ldh a, [is_cgb]
+            and a
+            jr nz, .cgb
+            inc a
+            ldh [dmg_scan], a
+            jr .at
+.cgb:       ld a, b
+            and a
+            jr z, .at
+            ld a, $0F
+            ldh [ap_chg], a
+            ld c, 0
+.ap:        ld a, c
+            call attr_apply
+            inc c
+            ld a, c
+            cp 64
+            jr nz, .ap
+.at:        ld a, $23                       ; the attribute bytes
+            ldh [ppu_vh], a
+            ld a, $C0
+            ldh [ppu_vl], a
+            ld b, 64
+.al:        ld a, $FF
+            call rt_ppu_w7
+            dec b
+            jr nz, .al
+            jr .x
+.gen:       ld de, 960
+.gl:        xor a
+            call rt_ppu_w7
+            dec de
+            ld a, d
+            or e
+            jr nz, .gl
+            ld b, 64
+.gl2:       ld a, $FF
+            call rt_ppu_w7
+            dec b
+            jr nz, .gl2
+.x:         ld bc, 0                        ; Y = 0
+            ld de, 0                        ; X = 0
+            xor a
+            ldh [nzv], a
+            ld a, $FF
+            scf
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1, C = 1
+            ret
+.z960:      xor a                           ; HL: 960 bytes of 0
+            ld c, 240
+.zl:        ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec c
+            jr nz, .zl
+            ret

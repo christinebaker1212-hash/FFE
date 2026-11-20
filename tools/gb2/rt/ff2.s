@@ -1138,6 +1138,9 @@ hle_objspr: call rt_fcs                    ; b03:A902 draw object sprite (native
 hle_water: call rt_fcs                     ; fix:C2F3 world-map water animation (native)
             db HLE_BANK
             dw hle_water_b
+hle_ntclr0: call rt_fcs                    ; fix:F321 clear nametable 0 (native)
+            db HLE_BANK
+            dw hle_ntclr0_b
 hle_vtile:  call rt_fcs                    ; layout's vtile (banks 23 / 24: small-font tile upload)
             db HLE_BANK
             dw hle_vtile_b

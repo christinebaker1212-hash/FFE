@@ -564,6 +564,12 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   the tileset fixed skipped the parked check, so tiles parked when the LCD went on stayed
   uncoded when the rows were drawn later. (The black castle floor on DMG is the known
   "darkest group of `$0x` colours is black" rule, not this.) DMG +2.1%; RAM identical.
+- Native "clear nametable 0" (fix:F321, menus / screen changes: 960 tiles 0, 64 attribute
+  bytes $FF): `hle_ntclr0` - with the LCD off and +1 increment the shadow, GB map rows 0-29
+  and the owners at once (CGB: nametable 0's attributes on every cell again if nametable 1
+  owned some), the attribute bytes through rt_ppu_w7. Menu opening on DMG +28 / +28 -> gone
+  from the worst list. Random 1: DMG +1.8%, CGB -1.7%; RAM identical; DMG and CGB shots
+  pixel-identical to the build before (7 screens incl. the menu opening).
 - Next (step 1, third part): the remaining field costs (dialogue window: text printer
   fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
   then screen loads, music, sprites. Earlier plan text:
