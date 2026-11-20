@@ -1561,6 +1561,58 @@ anf_rows:   ld a, 8
             ldh [sh_u1], a
             ldh [sh_u2], a
             ldh [sh_u3], a
+            ld a, [RM + 1]                  ; the identity (X0 = Y1 = $FF, the other masks 0:
+            ld b, a                         ;   the palette's values are its indices, as in
+            ld a, [RM + 2]                  ;   most NES palettes, dark to light): the pixels
+            or b                            ;   stay, only the indices used are found
+            ld b, a
+            ld a, [RM + 3]
+            or b
+            ld b, a
+            ld a, [RM + 4]
+            or b
+            ld b, a
+            ld a, [RM + 6]
+            or b
+            ld b, a
+            ld a, [RM + 7]
+            or b
+            jr nz, .row
+            ld a, [RM]
+            ld b, a
+            ld a, [RM + 5]
+            and b
+            inc a
+            jr nz, .row
+            ld de, 0                        ; D = rows' index 3 pixels, E = index 1
+.il:        ld a, [hl+]                     ; p0
+            ld b, a
+            ld a, [hl+]                     ; p1
+            ld c, a
+            and b
+            or d
+            ld d, a
+            ld a, c
+            cpl
+            and b
+            or e
+            ld e, a
+            ld a, b                         ; index 2
+            cpl
+            and c
+            ld b, a
+            ldh a, [sh_u2]
+            or b
+            ldh [sh_u2], a
+            ld a, [RM + 8]
+            dec a
+            ld [RM + 8], a
+            jr nz, .il
+            ld a, d
+            ldh [sh_u3], a
+            ld a, e
+            ldh [sh_u1], a
+            ret
 .row:       ld b, [hl]                      ; p0
             inc l
             ld c, [hl]                      ; p1

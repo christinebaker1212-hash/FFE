@@ -500,28 +500,71 @@ cp_core:    ld d, l                         ; (D = zp for the byte path)
             ld e, a
             call .pl
             jr .cd
-.pl:        push de
+.pl:        push de                         ; (unrolled)
             xor a
             ld [$4000], a
             ld de, CP_BUF
-            ld b, 8
-.pa:        ld a, [hl+]
+            ld a, [hl+]
             ld [de], a
             inc e
-            dec b
-            jr nz, .pa
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
             pop de
             ld a, 1                         ; bank 1 for the shadow
             ld [$4000], a
             push hl
             ld hl, CP_BUF
-            ld b, 8
-.pb:        ld a, [hl+]
+            ld a, [hl+]
             ld [de], a
             inc e
             inc e
-            dec b
-            jr nz, .pb
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc e
             pop hl
             ret
 .cd:        ldh [tmp_lo], a                 ; last byte

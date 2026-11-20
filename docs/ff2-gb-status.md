@@ -577,6 +577,16 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   destination is cart RAM too) and DMG with the LCD on (shadow + one re-coding mark per
   tile). Battle intro windows DMG +84 / +84 -> +44 / +42; CGB +10 / +1. Random 1: DMG +1.3%,
   CGB -1.7%; RAM identical; DMG / CGB intro shots pixel-identical to the build before.
+- More battle-intro work: the tile copier moves cart-RAM sources a plane at a time through
+  `CP_BUF` ($DCE7, unrolled); DMG re-coding: `anf_rows` skips the plane arithmetic for an
+  identity palette map (only the indices used are found; shots pixel-identical), and the
+  frame wait re-codes 1 marked tile instead of 3 when the NES frame already took its GB frame
+  (the picture catches up in spare time; the game and music keep time). Battle intro DMG
+  +44 / +41 -> +39 / +32. Random 1: DMG +0.8%; RAM identical.
+- Status of the owner's three (DMG, random 1): overworld walking / sailing at parity (walk
+  scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
+  remaining: battle entry (load +19 net, intro +39 / +32), door loads (+56 single wait,
+  CGB +37), menu screens (+10..+28).
 - Next (step 1, third part): the remaining field costs (dialogue window: text printer
   fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
   then screen loads, music, sprites. Earlier plan text:
