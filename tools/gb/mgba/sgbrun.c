@@ -151,8 +151,22 @@ int main(int argc, char** argv) {
 						uint32_t sp = 0; core->readRegister(core, "sp", &sp); sp &= 0xFFFF;
 						unsigned ra = core->rawRead8(core, sp, -1) | core->rawRead8(core, sp + 1, -1) << 8;
 						unsigned rb = ra < 0x4000 ? 0 : ((struct GB*) core->board)->memory.currentBank;
+						if (getenv("SGBRUN_CALLSP")) { ra = sp; rb = 0; }   /* (SGBRUN_CALLSP: SP at the entry instead) */
 						callr[ncall] = rb << 16 | ra; callw[ncall++] = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 					}
+				}
+				if (getenv("SGBRUN_TRACE")) {           /* SGBRUN_TRACE=A-B: bank:PC SP of every instruction in waits A-B */
+					static int ta = -1, tb = -1; if (ta < 0) sscanf(getenv("SGBRUN_TRACE"), "%d-%d", &ta, &tb);
+					int w = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
+					if (w >= ta && w <= tb) { uint32_t pc = 0, sp = 0; core->readRegister(core, "pc", &pc); core->readRegister(core, "sp", &sp);
+						pc &= 0xFFFF; fprintf(stderr, "T %02X:%04X %04X %d", pc < 0x4000 ? 0 : ((struct GB*) core->board)->memory.currentBank, pc, sp & 0xFFFF, w);
+						if (getenv("SGBRUN_STK") && pc == strtoul(getenv("SGBRUN_STK"), 0, 16)) for (int q = 0; q < 12; q++) fprintf(stderr, " %04X", core->rawRead8(core, (sp + 2 * q) & 0xFFFF, -1) | core->rawRead8(core, (sp + 2 * q + 1) & 0xFFFF, -1) << 8);
+						fprintf(stderr, "\n"); }   /* (SGBRUN_STK=PC: + 12 stack words there) */
+				}
+				if (getenv("SGBRUN_MINSP")) {           /* SGBRUN_MINSP: lowest SP (and the wait) over the run */
+					static unsigned minsp = 0xFFFF, minw = 0; uint32_t sp = 0; core->readRegister(core, "sp", &sp); sp &= 0xFFFF;
+					if (sp >= 0xC000 && sp < minsp) { minsp = sp; minw = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
+						uint32_t pc = 0; core->readRegister(core, "pc", &pc); fprintf(stderr, "minsp %04X wait %u pc %02X:%04X\n", minsp, minw, ((struct GB*) core->board)->memory.currentBank, pc & 0xFFFF); }
 				}
 				int take;
 				if (getenv("SGBRUN_PROFC")) {           /* (with SGBRUN_PROFC: every PROF2 cycles, halts included) */
