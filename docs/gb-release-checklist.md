@@ -99,6 +99,12 @@ areas in cart RAM banks 1-3 and the save copy in bank 0, selected only inside th
 (protects the save in practice, but cart RAM stays enabled: not the letter of the rule);
 (c) CGB-only carts (the FF3 design; replaces the owner's dual-mode decision). Needs the owner.
 
+FF1 / FF2 next steps (sessions with those ROMs; the FF3 session had only the FF3 ROM, so the
+FF1 / FF2 runtimes were not changed blind): port FF3's soft reset (vblank poll + `sram_busy`),
+boot clears / LCD-off wait, `;@test` / `;@rel` release blocks and `build.py --release`; run
+`lotcheck.py --game ff1|ff2 --release`, `termcheck.py`, and `SGBRUN_LOTCHECK=1` in DMG, SGB,
+CGB and `--agb` modes (FF1's counters: default `GB_CNT`); settle the SRAM option with the owner.
+
 Notes for the fixes:
 - SRAM: keep the NES work RAM ($6000-$7FFF) in GB WRAM / a RAM area that is not battery-backed
   and touch the battery-backed save area only inside the game's save / load routines (enable,
