@@ -352,6 +352,11 @@ def main():
         print('  DrawBox: code not found, not native')
     if prg[12 * 0x4000 - 0x8000 + 0x97A7:12 * 0x4000 - 0x8000 + 0x97B2].hex() == 'a200a9f09d0002e8d0fa60':  # b12:97A7
         rc.g.idioms[('b12', 0x97A7)] = ('pf:oclr_b', 0x97B1, 'NZ')            #   cleared ($F0)
+    if hashlib.sha1(prg[12 * 0x4000 - 0x8000 + 0xAE09:12 * 0x4000 - 0x8000 + 0xAE2B]).hexdigest() == \
+            'f5dd673103a769fd0c63953bc9e91ff7dfcfa4f2':                         # b12:AE09 (A x X,
+        rc.g.idioms[('b12', 0xAE09)] = ('pf:mul8_b', 0xAE2A, 'NZC')           #   shift and add)
+    else:
+        print('  b12 multiply: code not found, not native')
     faro = FAR_BANK * 0x2000 - 0xC000                # gb_layout vtext's scan for the frame: LDY #0 /
     pat = bytes.fromhex('a000b18ac9f79004c9ff9005c8c014d0f1')   # LDA ($8A),Y / CMP #$F7 / BCC /
     far = bytes(prg[FAR_BANK * 0x2000:(FAR_BANK + 1) * 0x2000])   # CMP #$FF / BCC / INY / CPY #20
@@ -532,6 +537,11 @@ def main():
     rt += mus_src + open(os.path.join(HERE, 'rt', 'mus.s')).read()
     rt += mtab_src
     rt += '\n' + vwf_tables(prg, far_sym)            # (before ff1_native.s: VW_GR_NES)
+    sq = [x * x // 4 for x in range(512)]            # quarter squares for mul8_b (a x b =
+    rows = lambda b: '\n'.join('            db ' + ', '.join('$%02X' % v for v in b[i:i + 16])
+                               for i in range(0, len(b), 16))   #   sq(a + b) - sq(|a - b|))
+    rt += ('\nsection bank PF_BANK, $7900\nSQ_LO:\n%s\nsection bank PF_BANK, $4600\nSQ_HI:\n%s\n'
+           % (rows([v & 255 for v in sq]), rows([v >> 8 for v in sq])))
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ff1_native.s')).read()
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ramchk.s')).read() + '\n' + ramchk_src()
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(

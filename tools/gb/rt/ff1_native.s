@@ -3435,20 +3435,41 @@ ntfill:     ld a, b
             ld a, h                         ;   palettes from it when the screen shows
             add a, high(NT_SH)              ;   (DMG: the LCD-on scan; CGB: repal_b)
             ld h, a
-            ld e, 0                         ; (E: a byte changed)
-.al:        ld a, [hl]
-            cp d
-            jr z, .as
-            ld [hl], d
-            ld e, 1
-.as:        inc l
-            dec bc
-            ld a, b
-            or c
-            jr z, .ae
-            ld a, l
+            ld e, 0                         ; (E: the bytes' differences, OR-ed)
+            ld a, l                         ; n = min(count, 256 - L): up to L wrapping
+            cpl
+            inc a                           ; (256 - L; 0: 256)
+            push bc
+            inc b
+            dec b
+            jr nz, .an                      ; (count >= 256)
             and a
+            jr z, .ac                       ; (256 - L = 256 > count)
+            cp c
+            jr c, .an
+.ac:        ld a, c
+.an:        ld b, a                         ; B = n (0: 256)
+            ld c, a
+.al:        ld a, [hl]
+            xor d
+            or e
+            ld e, a
+            ld [hl], d
+            inc l
+            dec b
             jr nz, .al
+            ld a, c                         ; count -= n
+            pop bc
+            and a
+            jr z, .a256
+            ld h, a
+            ld a, c
+            sub h
+            ld c, a
+            jr nc, .ae
+            dec b
+            jr .ae
+.a256:      dec b
 .ae:        ld a, l                         ; v: offset L, or the next nametable at 0
             ldh [ppu_vl], a
             and a
@@ -6442,7 +6463,9 @@ scb_init:   ld a, $FF
             inc h
 .uh:        dec c
             jr nz, .uc
-            call scb_settle
+            ld a, [LON_ST]                  ; (lon_b: scb_settle as a step of its own)
+            and a
+            call z, scb_settle
             scf
             ret
 .full:      ldh a, [cam_y]                  ; the view: map row (scroll_y + cam_y) mod 240 / 8,
@@ -9298,7 +9321,7 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
             push af
             ld a, PF_BANK                   ; (the helpers come back to code_bank)
             ldh [code_bank], a
-            call .st                        ; C = the increment, D = the fast-write state
+.rs:        call .st                        ; C = the increment, D = the fast-write state
             bit 7, d                        ; fast: a loop per row mode (the mode changes
             jr nz, .lp                      ;   only by control codes, which end the run)
             ld a, [EX_RAM]
@@ -9330,7 +9353,7 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
 .gr:        call nes_rd
             ld a, l
 .rd:        cp $48
-            jp c, .end
+            jp c, .chk
             ld hl, NES_RAM + $3E            ; INC $3E / $3F
             inc [hl]
             jr nz, .i3
@@ -9446,6 +9469,11 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
 .nx:        ld hl, NES_RAM + $54            ; INC $54
             inc [hl]
             jp .lp
+; a byte < $48 (A): 0 ends; with $37 = 0, code 1 (next line), 5-15 (the English patch's
+; ExRAM handlers through the table at ex:5CEA) and $14-$47 (ignored) are handled here as FF1
+; does (DED4 INC $3E, the compare chain from DF09, the handler, JMP DEC7 / DECE): RAM, X, C
+; and V as it leaves them; then the loop goes on (.rs). Anything else ends the run.
+.chk:       jp txc_chk                      ; (txc_chk: bank PF_BANK below)
 .end:       ld d, a                         ; (the byte)
             pop af
             ldh [code_bank], a
@@ -9558,7 +9586,9 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
             inc [hl]
             set 6, d
             ret
-.q0:        call .get                       ; mode 0 (D < $80): Y = $FF at $55:$54 and the
+.q0:        call txr_rn0                    ; (a run of letters at once, when it can)
+            jp c, .q0x                      ; (C: the run reached the end, A = that byte)
+            call .get                       ; mode 0 (D < $80): Y = $FF at $55:$54 and the
             cp $48                          ;   letter one increment on, both map cells of
             jr c, .q0x                      ;   nametable 0 ($55 checked by .st)
             ld b, a
@@ -9596,7 +9626,7 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
 .fs:        ld a, b                         ; (a letter for the general path)
             jp .rd
 .q0x:       bit 6, d                        ; the last letter's state: X = its $54, v = that
-            jp z, .end                      ;   + 2 increments, C = 1
+            jp z, .chk                      ;   + 2 increments, C = 1
             push af
             ld a, [NES_RAM + $54]
             dec a
@@ -9618,8 +9648,11 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
             inc a                           ; DMG: the map is scanned when the LCD goes on
             ldh [dmg_scan], a
             pop af
-            jp .end
-.q1:        call .get                       ; mode 1: the letter at $55:$54
+            jp .chk
+.q1:        xor a
+            call txr_rn1
+            jp c, .q1x
+            call .get                       ; mode 1: the letter at $55:$54
             cp $48
             jr c, .q1x
             ld b, a
@@ -9650,14 +9683,17 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
             jr z, .q1
             jr .q2
 .q1x:       bit 6, d                        ; X = the last letter's $54, v = that + the
-            jp z, .end                      ;   increment, C = 1
+            jp z, .chk                      ;   increment, C = 1
             push af
             ld a, [NES_RAM + $54]
             dec a
             ld e, a
             add a, c
             jr .fv
-.q2:        call .get                       ; else: the letter at $55:$54 + $20 (the ADC
+.q2:        ld a, $20
+            call txr_rn1
+            jp c, .q2x
+            call .get                       ; else: the letter at $55:$54 + $20 (the ADC
             cp $48                          ;   with no carry: C = 0, V = 0)
             jr c, .q2x
             ld b, a
@@ -9667,7 +9703,7 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
             ld l, a
             jr .fw
 .q2x:       bit 6, d                        ; X = the last letter's $54 + $20, v = that +
-            jp z, .end                      ;   the increment; C = 0, V = 0
+            jp z, .chk                      ;   the increment; C = 0, V = 0
             push af
             xor a
             ldh [vfl], a
@@ -10069,11 +10105,32 @@ wrow_do:    xor a
             pop bc
             ld d, 0
             ret
-.row:       ldh a, [sh_l1]                  ; HL: L, E x M, R (E = X)
-            ld [hl+], a
+.row:       ldh a, [sh_l1]                  ; HL: L, E x M, R (E = X, 0: 256; four at a
+            ld [hl+], a                     ;   time; D, E clobbered)
+            ld a, e
+            dec a
+            srl a
+            srl a
+            inc a
+            ld d, a                         ; D = passes of 4 (the first one partial)
+            ld a, e
+            dec a
+            and 3                           ; (count - 1) & 3: 3 = a whole first pass
+            ld e, a
             ldh a, [sh_u2]
+            bit 1, e
+            jr z, .r01
+            bit 0, e
+            jr nz, .rm
+            jr .r3
+.r01:       bit 0, e
+            jr nz, .r2
+            jr .r1
 .rm:        ld [hl+], a
-            dec e
+.r3:        ld [hl+], a
+.r2:        ld [hl+], a
+.r1:        ld [hl+], a
+            dec d
             jr nz, .rm
             ldh a, [sh_u3]
             ld [hl], a
@@ -10152,6 +10209,8 @@ dbox_b:     push af
             ld a, [NES_RAM + $3D]
             sub 2
             ld [NES_RAM + $1B], a
+            call dbx_fast                   ; (the whole box at once when it can: C)
+            jr c, .fin
             ld a, $F7
             ld bc, $F8F9
             call .row
@@ -10171,7 +10230,7 @@ dbox_b:     push af
             ld a, [NES_RAM + $1A]
             ld e, a
             call wrow_do
-            pop af
+.fin:       pop af
             ldh [code_bank], a
             pop bc
             ld de, 0                        ; X = 0
@@ -10231,7 +10290,8 @@ rlist_b:    push af                         ; [SP + 2]: the flags out (C)
             push af
             ld a, PF_BANK
             ldh [code_bank], a
-.lp:        xor a                           ; LDA $2002: vblank flag and latch cleared
+.lp:        call rl_fast                    ; (records from ROM straight to the shadow)
+            xor a                           ; LDA $2002: vblank flag and latch cleared
             ldh [vbl_flag], a
             ldh [ppu_latch], a
             ld hl, NES_RAM + $10
@@ -11396,16 +11456,14 @@ oamconv_b:  and $07
             ldh [o_key], a
             call spr_load
             jr .ok
-.dfr:       dec e                           ; (this frame's slot loads used up: hidden now,
-            dec e                           ;   its GB entry left for the next one; the
-            xor a                           ;   next conversion a whole one)
-            ld [de], a
-            ld [OAM_CLEAN], a
-            inc a
-            ld [OC_DF], a
+.dfr:       xor a                           ; (this frame's slot loads used up: no sprite
+            ld [OAM_CLEAN], a               ;   shows this frame (OC_DF) and no other load
+            inc a                           ;   can happen: the rest of the page is not
+            ld [OC_DF], a                   ;   converted; the next conversion a whole one)
             pop bc
             pop hl
-            ret
+            pop hl                          ; (the return into the entry list)
+            jp .endr
 .ok:        ld a, 3                         ; (the load left cart RAM bank 0 on)
             ld [$4000], a
             ld a, c
@@ -15366,6 +15424,16 @@ lon_half:   ld a, [LON_CNT]
             cp LON_HALF
             ccf
             ret
+; carry: not enough of the frame left for a big atomic step (about half a frame)
+lon_big:    ld a, [LON_CNT]
+            cp LON_MAXF
+            ccf
+            ccf
+            ret nc
+            ldh a, [$FF05]
+            cp LON_BIG
+            ccf
+            ret
 ; carry: the frame's time is up (a tick since the wait's entry, or TIMA at LON_END)
 lon_time:   ld a, [LON_CNT]                 ; (pending LON_MAXF frames: no limit)
             cp LON_MAXF
@@ -15388,7 +15456,8 @@ lon_time:   ld a, [LON_CNT]                 ; (pending LON_MAXF frames: no limit
 ; (scb_init / scb_row / scb_fin), palette maps and re-coding (rtb_b) in the frame's spare
 ; time; an atomic step only with LON_HALF left; a scan disturbed by writes (dmg_scan) or a
 ; sprite slot load (LON_DIRTY) starts again; done: LON_RDY (lon_on at the next frame start).
-; Steps (LON_ST): 1 scan begin, 2 rows, 3 maps, 4 re-coding, 5 check, 6 waiting.
+; Steps (LON_ST): 1 scan begin, 2 rows, 3 maps, 4 re-coding, 5 check, 6 waiting, 7 the
+; one-palette scan's scb_settle.
 section bank PF_BANK, $7400
 lon_b:      ldh a, [code_bank]              ; (the bank-0 helpers come back to code_bank)
             push af
@@ -15412,13 +15481,15 @@ lon_b:      ldh a, [code_bank]              ; (the bank-0 helpers come back to c
             jr z, .s4
             cp 5
             jr z, .s5
+            cp 7
+            jr z, .s7
 .x:         pop af
             ldh [code_bank], a
             ret
 .s1:        ldh a, [dmg_scan]
             and a
             jr z, .to3
-            call lon_half
+            call lon_big                    ; (up to ~0.4 frames)
             jr c, .x
             xor a
             ld [LON_DIRTY], a
@@ -15430,7 +15501,13 @@ lon_b:      ldh a, [code_bank]              ; (the bank-0 helpers come back to c
             ld a, 2
             ld [LON_ST], a
             jr .lp
-.s1o:       ld a, 1
+.s1o:       ld a, 7                         ; (one palette: scb_settle next)
+            ld [LON_ST], a
+            jr .lp
+.s7:        call lon_big
+            jr c, .x
+            call scb_settle
+            ld a, 1
             ldh [maps_due], a
 .to3:       ld a, 3
             ld [LON_ST], a
@@ -16808,7 +16885,7 @@ bg_mat:     push af                         ; (C: the bank mapped now if its ID 
             pop af
             ret
 
-section bank 0, $33E0
+section bank 0, $2DC0
 ; frame wait entry: A = the VBL_CNT to wait past: the current one, or the one before when the
 ; LCD is on, LY is in the vblank (144-153) and no frame wait has ended in this vblank yet (the
 ; NES: FF1 enabling NMI with the vblank flag set gets its NMI at once). Keeps the rest.
@@ -16903,28 +16980,27 @@ vbrk_b:     ld a, [VW_VW]
             ld [VW_VSQ], a
             dec a
             ld [VW_VBRK], a
-.l:         call .rd
+            call .rd                        ; HL = VSTR + X (walked along with X)
+.l:         ld a, [hl]
             and a
             jr z, .all
             cp $FE
             jr z, .fe
             cp $FD
-            jr nz, .nf
-            inc e                           ; $FD $80+n: VLO = 8n
-            call .rd
-            sub $80
-            add a, a
-            add a, a
-            add a, a
-            ld d, a
-            jr .ok
-.nf:        cp $FF
-            jr nz, .ch
-            ld a, e
-            ld [VW_VBRK], a
-            ld a, 3
-            jr .ad
-.ch:        call .cw
+            jr z, .fd
+            cp $FF
+            jr z, .sp
+            sub VW_FIRST                    ; vcw: width + 1 (0 for none), Y = glyph
+            jr c, .z0
+            ld c, a
+            push hl
+            ld h, high(vw_gw60)
+            ld l, a
+            ld a, [hl]
+            pop hl
+            and a
+            jr z, .ad
+            inc a
 .ad:        add a, d
             ld d, a
             jr z, .ok
@@ -16932,8 +17008,25 @@ vbrk_b:     ld a, [VW_VW]
             cp b
             jr z, .ok
             jr nc, .over
-.ok:        inc e
+.ok:        inc hl
+            inc e
             jr nz, .l
+            jr .all
+.z0:        xor a
+            jr .ad
+.sp:        ld a, e
+            ld [VW_VBRK], a
+            ld a, 3
+            jr .ad
+.fd:        inc hl                          ; $FD $80+n: VLO = 8n
+            inc e
+            ld a, [hl]
+            sub $80
+            add a, a
+            add a, a
+            add a, a
+            ld d, a
+            jr .ok
 .all:       ld a, e
             ld [VW_VEND], a
             ld [VW_VNEXT], a
@@ -17167,3 +17260,927 @@ vtc_b:      ld hl, NES_RAM + $8A
             add hl, bc
             ld a, [hl]
             jr .x
+
+; ---- RTS after LDA T+1,X / PHA / LDA T,X / PHA, T a constant table (recomp rts_table): HL = the
+; site's table (count, then per entry its target lo, hi, GB bank, GB address); X even, within
+; it and the pushed address + 1 the entry's target: jump there (rt_dyn_go), the pushes dropped;
+; else rt_rts_dispatch. Keeps A, F, BC, DE.
+section bank 0, $30B0
+rt_rtstab:  ldh [sv_a], a
+            push af
+            push de
+            push bc                         ; [SP+2] = X, [SP+7] = lo, [SP+9] = hi
+            ld b, h
+            ld c, l
+            ld hl, sp + 7
+            ld e, [hl]
+            inc hl
+            inc hl
+            ld d, [hl]
+            inc de                          ; DE = the target
+            ld hl, sp + 2
+            ld a, [hl]
+            ld h, b
+            ld l, c
+            rrca
+            jr c, .dyn
+            cp [hl]
+            jr nc, .dyn
+            inc hl
+            ld c, a
+            add a, a
+            add a, a
+            add a, c
+            ld c, a
+            ld b, 0
+            add hl, bc
+            ld a, [hl+]
+            cp e
+            jr nz, .dyn
+            ld a, [hl+]
+            cp d
+            jr nz, .dyn
+            ld a, [hl+]
+            ldh [fc_bank], a
+            ld a, [hl+]
+            ldh [tmp_lo], a
+            ld a, [hl]
+            ldh [wtmp], a
+            pop bc
+            pop de
+            pop af
+            pop hl
+            pop hl
+            ldh a, [wtmp]
+            ld h, a
+            ldh a, [tmp_lo]
+            ld l, a
+            ldh a, [sv_a]
+            jp rt_dyn_go
+.dyn:       pop bc
+            pop de
+            pop af
+            ldh a, [sv_a]
+            jp rt_rts_dispatch
+
+; HL = NES ROM address ($8000-$FFFF), DE = destination in cart RAM bank 3, B = bytes (1-64,
+; within one ROM region): copied up to and with the first byte < $48 (data_bank8 / data_bankC /
+; the fixed bank's data), C = the bytes before it, B = 0 if none came; code_bank mapped after,
+; cart RAM bank 3 left mapped.
+section bank 0, $3288
+rd_blk:     ld a, 3
+            ld [$4000], a
+            ld a, h
+            cp $C0
+            jr nc, .c
+            sub $40
+            ld h, a
+            ldh a, [data_bank8]
+            jr .go
+.c:         cp $E0
+            jr nc, .e
+            sub $80
+            ld h, a
+            ldh a, [data_bankC]
+            jr .go
+.e:         sub $80
+            ld h, a
+            ld a, DATA + 31
+.go:        ld [$2000], a
+            ld c, 0
+.l:         ld a, [hl+]
+            ld [de], a                      ; (the end byte too: B != 0 then)
+            cp $48
+            jr c, .x
+            inc de
+            inc c
+            dec b
+            jr nz, .l
+.x:         ldh a, [code_bank]
+            ld [$2000], a
+            ret
+
+; A run of letters at once (fast modes; C = increment, D = state, both kept; E, B, HL
+; clobbered): the string bytes at ($3E) up to the first < $48 (within its 256-byte page, up to
+; 64; from ROM copied to TX_BUF first), as far as every cell stays a map cell of nametable 0
+; and below 256; mode 0 only with increment 32 (the Y row and the letter row apart). The cells
+; as the letter loop writes them (shadow, then the GB map or MAP_RB when masked); then $3E/$3F
+; and $54 + n, D bit 6 if n > 0. C (carry) when the run ends at the string's end: A = that
+; byte (< $48; the letter loop's .qNx goes on with it); else NC and the letter loop goes on
+; with the byte after (or the letter the run could not take).
+section bank PF_BANK, $6D00
+txr_rn0:    ld a, c
+            cp 32
+            jr nz, txr_no
+            push bc
+            push de
+            call txr_src                    ; DE = the bytes, C = letters, B: end follows
+            jr z, txr_rx
+            push bc
+            push de
+            ld a, [NES_RAM + $55]
+            and 3
+            ld h, a
+            ld a, [NES_RAM + $54]
+            ld l, a
+            ld a, h                         ; n <= $E0 - L ($A0 - L in the last 256: attributes)
+            cp 3
+            ld a, $E0
+            jr nz, txr_r1
+            ld a, $A0
+txr_r1:     sub l
+            jr c, txr_rx2
+            jr z, txr_rx2
+            cp c
+            jr nc, txr_r2
+            ld c, a
+txr_r2:     ld a, h
+            add a, high(NT_SH)
+            ld h, a
+            call txr_r0w                    ; shadow
+            ld hl, sp + 5
+            bit 0, [hl]
+            jr nz, txr_rm
+            ld a, [NES_RAM + $55]
+            and 3
+            add a, $98
+            ld h, a
+            ld a, [NES_RAM + $54]
+            ld l, a
+            call txr_r0w                    ; GB map
+            jr txr_rup
+txr_rm:     ld a, 1
+            ld [MAP_RB], a
+            jr txr_rup
+txr_r0w:    push hl                         ; Y row: $FF x C; letter row (+32): the bytes
+            push de
+            ld b, c
+            ld a, $FF
+txr_ra:     ld [hl+], a
+            dec b
+            jr nz, txr_ra
+            pop de
+            pop hl
+            push de
+            ld a, l
+            add a, 32
+            ld l, a
+            ld b, c
+txr_rb:     ld a, [de]
+            inc de
+            ld [hl+], a
+            dec b
+            jr nz, txr_rb
+            pop de
+            ret
+txr_rup:    ld hl, NES_RAM + $3E            ; $3E/$3F += n, $54 += n, D bit 6
+            ld a, [hl]
+            add a, c
+            ld [hl+], a
+            jr nc, txr_ru1
+            inc [hl]
+txr_ru1:    ld hl, NES_RAM + $54
+            ld a, [hl]
+            add a, c
+            ld [hl], a
+            ld hl, sp + 5
+            set 6, [hl]
+            ld a, c                         ; all the letters taken and the end after them:
+            pop hl                          ;   A = that byte, C
+            pop de                          ; (D: end follows, E: letters counted)
+            cp e
+            jr nz, txr_rx
+            inc d
+            dec d
+            jr z, txr_rx
+            ld e, c
+            ld d, 0
+            add hl, de
+            ld b, [hl]                      ; (TX_BUF: cart RAM bank 3 still on)
+            xor a
+            ld [$4000], a
+            ld a, b
+            pop de
+            pop bc
+            scf
+            ret
+txr_rx2:    pop hl
+            pop hl
+txr_rx:     xor a                           ; (cart RAM bank 0 again; NC)
+            ld [$4000], a
+            pop de
+            pop bc
+            ret
+txr_no:     and a
+            ret
+txr_rn1:    push bc                         ; modes 1 / 2: A = the row offset (0 / $20)
+            push de
+            ld b, a
+            ld a, [NES_RAM + $54]
+            add a, b
+            jr c, txr_rx
+            ld l, a                         ; L = the first cell
+            push hl
+            call txr_src
+            pop hl
+            jr z, txr_rx
+            push bc
+            push de
+            ld a, [NES_RAM + $55]
+            and 3
+            ld h, a
+            cp 3                            ; n <= 256 - L ($C0 - L in the last 256)
+            jr nz, txr_r3
+            ld a, l
+            cp $C0
+            jr nc, txr_rx2
+            ld a, $C0
+            sub l
+            jr txr_r5
+txr_r3:     ld a, l
+            cpl
+            inc a
+            jr z, txr_r4                    ; (256: any n)
+txr_r5:     cp c
+            jr nc, txr_r4
+            ld c, a
+txr_r4:     ld a, h
+            add a, high(NT_SH)
+            ld h, a
+            push hl
+            call txr_r1w                    ; shadow
+            pop hl
+            ld a, l
+            ld hl, sp + 5
+            bit 0, [hl]
+            jr nz, txr_rm
+            ld l, a
+            ld a, [NES_RAM + $55]
+            and 3
+            add a, $98
+            ld h, a
+            call txr_r1w                    ; GB map
+            jr txr_rup
+txr_r1w:    push de
+            ld b, c
+txr_rc:     ld a, [de]
+            inc de
+            ld [hl+], a
+            dec b
+            jr nz, txr_rc
+            pop de
+            ret
+txr_src:    ld hl, NES_RAM + $3E            ; DE = the bytes at ($3E), C = letters before the
+            ld a, [hl+]                     ;   first byte < $48 (within the page, up to 64),
+            ld h, [hl]                      ;   B != 0 when that byte follows them (at DE + C);
+            ld l, a                         ;   Z when no letter
+            cpl
+            inc a                           ; B = 256 - L, at most 64
+            jr z, txr_s64
+            cp 64
+            jr c, txr_sb
+txr_s64:    ld a, 64
+txr_sb:     ld b, a
+            ld a, h
+            cp $20
+            jr c, txr_sr
+            cp $5C
+            jr c, txr_sno
+            cp $60
+            jr c, txr_se
+            cp $80
+            jr c, txr_ss
+            ld de, TX_BUF                   ; ROM: the letters (and the end) to TX_BUF
+            call rd_blk
+            ld de, TX_BUF
+            ld a, c
+            and a
+            ret
+txr_sr:     and 7                           ; RAM
+            or high(NES_RAM)
+            jr txr_sd
+txr_se:     add a, $6C                      ; ExRAM
+            jr txr_sd
+txr_ss:     add a, $40                      ; save RAM
+txr_sd:     ld d, a
+            ld e, l
+            push de
+            ld c, 0
+txr_cl:     ld a, [de]
+            cp $48
+            jr c, txr_cd
+            inc de
+            inc c
+            dec b
+            jr nz, txr_cl
+txr_cd:     pop de
+            ld a, c
+            and a
+            ret
+txr_sno:    xor a
+            ret
+
+; NZ when sprites show: the LCD on and not a DMG load blanked (VLCD 1 with the LCD on: BGP 0,
+; sprites off until the switch-off). Keeps BC, DE, HL.
+section bank 0, $32D0
+oam_hid:    ldh a, [lcd_on]
+            and a
+            ret z
+            ldh a, [is_cgb]
+            and a
+            ret nz
+            ld a, [VLCD]
+            dec a
+            ret
+
+; ---- b12:AE09 (A x X by shift and add: STA $68B3 / STX $68B4 / 8 x (LSR $68B3, ADC $68B4, ROR A,
+; ROR $68B5)), natively: $68B3 = 0, $68B4 = X, $68B5 = the low byte; A = the low byte, X = the
+; high byte; N, Z from the low byte, C = 0 (the bits shifted out of $68B5 are its initial
+; zeros); Y kept. (V: the routine's last ADC; its callers do not test it.)
+section bank PF_BANK, $6D00 + $200
+mul8_b:     push bc                         ; (quarter squares: SQ_LO / SQ_HI, build.py)
+            ld b, a
+            ld a, e
+            ld [$A8B4], a
+            add a, b                        ; s = A + X (9 bits): sq(s)
+            ld l, a
+            ld a, high(SQ_LO)
+            adc 0
+            ld h, a
+            ld c, [hl]
+            ld a, h
+            add a, high(SQ_HI) - high(SQ_LO)
+            ld h, a
+            ld d, [hl]
+            ld a, b                         ; |A - X|: sq of it
+            sub e
+            jr nc, .p
+            cpl
+            inc a
+.p:         ld l, a
+            ld h, high(SQ_LO)
+            ld a, c
+            sub [hl]
+            ld c, a                         ; C = the low byte
+            ld h, high(SQ_HI)
+            ld a, d
+            sbc a, [hl]
+            ld e, a                         ; X = the high byte
+            xor a
+            ld [$A8B3], a
+            ld d, a
+            ld a, c
+            ld [$A8B5], a
+            pop bc
+            ldh [nzv], a
+            and a                           ; (Z from A, C = 0)
+            ret
+
+; ---- dbox_b's rows at once ($1A / $1B set): when the LCD is off (or a load masked, no dialogue
+; box), the increment is 1, no cell is nametable 1's, $55 is in nametable 0's map and the box
+; ($3D rows of $3C cells from $55:$54, 32 apart) ends by the attributes. The shadow (and the
+; GB map, else MAP_RB when masked); as the row-by-row path leaves them: $1B = 0, $55:$54 + 32
+; x ($3D - 1), the PPU address after the bottom row, latch / vblank flag 0, dmg_scan, sh_l1 /
+; sh_u2 / sh_u3 = the bottom row's tiles, sh_l2 / vfl = C / V of the last ADC. C = 1 when
+; done (else nothing changed, C = 0). Keeps BC.
+section bank PF_BANK, $4410
+dbx_fast:   ldh a, [lcd_on]
+            and a
+            jr z, .k1
+            ld a, [VLCD]
+            cp 1
+            jr nz, .no
+            ldh a, [dlg_on]
+            and a
+            jr nz, .no
+.k1:        ldh a, [ppu_ctrl]
+            and 4
+            jr nz, .no
+            ldh a, [own1_lo]
+            ld e, a
+            ldh a, [own1_hi]
+            or e
+            jr nz, .no
+            ld a, [NES_RAM + $55]
+            and $3F
+            cp $20
+            jr c, .no
+            cp $3F
+            jr z, .no
+            bit 2, a
+            jr nz, .no
+            ld a, [NES_RAM + $3C]
+            cp 3                            ; (2: X = 0, 256 cells: the row path)
+            jr c, .no
+            push bc
+            ld a, [NES_RAM + $3D]           ; DE = 32 x (rows - 1)
+            dec a
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld d, h
+            ld e, l
+            ld a, [NES_RAM + $55]
+            and 3
+            ld h, a
+            ld a, [NES_RAM + $54]
+            ld l, a                         ; HL = the first row's offset
+            push hl
+            add hl, de                      ; the bottom row's offset
+            ld a, [NES_RAM + $3C]
+            add a, l
+            ld c, a
+            ld a, 0
+            adc a, h
+            ld b, a                         ; BC = its end
+            pop hl
+            ld a, b                         ; end <= $3C0
+            cp 3
+            jr c, .ok
+            jr nz, .no2
+            ld a, c
+            cp $C1
+            jr nc, .no2
+.ok:        push bc                         ; (the end)
+            push de
+            push hl
+            ld a, h
+            add a, high(NT_SH)
+            ld h, a
+            call .box                       ; shadow
+            pop hl
+            ld a, [VLCD]
+            cp 1
+            jr nz, .mp
+            ld [MAP_RB], a
+            jr .md
+.mp:        push hl
+            ld a, h
+            add a, $98
+            ld h, a
+            call .box                       ; GB map
+            pop hl
+.md:        pop de
+            pop bc
+            ld a, 1
+            ldh [dmg_scan], a
+            xor a
+            ldh [vbl_flag], a
+            ldh [ppu_latch], a
+            ld [NES_RAM + $1B], a
+            ld a, $FC
+            ldh [sh_l1], a
+            ld a, $FD
+            ldh [sh_u2], a
+            ld a, $FE
+            ldh [sh_u3], a
+            ld a, [NES_RAM + $3D]           ; the last ADC: $54 before it = ($54 + 32 x
+            sub 2                           ;   (rows - 2)) & $FF; $55 before it likewise
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, [NES_RAM + $54]
+            add a, l
+            ld l, a
+            ld a, [NES_RAM + $55]
+            adc a, h
+            ld h, a                         ; HL = $55:$54 before the last ADC
+            ld a, l
+            add a, $20
+            ld [NES_RAM + $54], a
+            ld a, h
+            adc a, 0
+            ld [NES_RAM + $55], a
+            ld e, a                         ; (E = the new $55, H = the old)
+            sbc a, a
+            and $10
+            ldh [sh_l2], a                  ; C
+            ld a, h
+            xor e
+            and e
+            and $80
+            rrca
+            ldh [vfl], a                    ; V
+            ld a, c                         ; the PPU address after the bottom row
+            ldh [ppu_vl], a
+            ld a, e
+            and $3C
+            or b
+            ldh [ppu_vh], a
+            pop bc
+            scf
+            ret
+.no2:       pop bc
+.no:        and a
+            ret
+.box:       ld a, $F7                       ; HL = the top row; DE = 32 x (rows - 1)
+            ld b, $F8
+            ld c, $F9
+            call .r
+            ld a, [NES_RAM + $3D]
+            sub 2
+            ld d, a
+.bm:        ld a, $FA
+            ld b, $FF
+            ld c, $FB
+            call .r
+            dec d
+            jr nz, .bm
+            ld a, $FC
+            ld b, $FD
+            ld c, $FE
+.r:         push hl                         ; one row: A, B x ($3C - 2), C; HL += 32
+            ld [hl+], a
+            ld a, [NES_RAM + $3C]
+            sub 2                           ; (>= 1)
+            ld e, a
+            and 3                           ; the rest one by one, then fours
+.rr:        jr z, .r4
+            ld [hl], b
+            inc hl
+            dec a
+            jr .rr
+.r4:        srl e
+            srl e
+            jr z, .re
+            ld a, b
+.rl:        ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec e
+            jr nz, .rl
+.re:        ld [hl], c
+            pop hl
+            ld a, l
+            add a, 32
+            ld l, a
+            ret nc
+            inc h
+            ret
+
+section bank PF_BANK, $6920
+txc_chk:       and a
+            jp z, txrun_b.end
+            ld b, a
+            ld a, [NES_RAM + $37]
+            and a
+            jr nz, txc_cx                      ; (DEC7: JSR E1BD when $37 != 0)
+            ld a, b
+            cp 1
+            jr z, txc_c1
+            cp $14
+            jr nc, txc_cig
+            cp 5
+            jr c, txc_cx
+            cp $10
+            jr nc, txc_cx
+            call txc_cinc
+            ld a, b                         ; 5-15: X = (code - 5) * 2 (TAX), V = 0 (SBC #5),
+            sub 5                           ;   C = 0 (ASL)
+            add a, a
+            ld e, a
+            xor a
+            ldh [vfl], a
+            ld hl, sp + 2
+            res 4, [hl]
+            ld a, e
+            add a, low(txc_jt)
+            ld l, a
+            ld a, high(txc_jt)
+            adc 0
+            ld h, a
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            jp hl
+txc_cx:        ld a, b
+            jp txrun_b.end
+txc_cig:       call txc_cinc                      ; $14-$47: nothing (CMP #$14: C = 1)
+            ld hl, sp + 2
+            set 4, [hl]
+            jp txrun_b.rs
+txc_c1:        call txc_cinc                      ; 1: $54 = ($54 & $E0 | $3A) + $40, $55 + carry
+            ld hl, NES_RAM + $3A            ;   (ADC #$00: C, V)
+            ld a, [NES_RAM + $54]
+            and $E0
+            or [hl]
+            add a, $40
+            ld [NES_RAM + $54], a
+            ld hl, NES_RAM + $55
+            ld a, [hl]
+            ld d, a
+            adc a, 0
+            ld [hl], a
+            ld c, a                         ; (C: free until .st; X = E kept)
+            sbc a, a
+            and $10
+            ld hl, sp + 2
+            res 4, [hl]
+            or [hl]
+            ld [hl], a
+            ld a, d                         ; V: (old ^ new) & new & $80
+            xor c
+            and c
+            and $80
+            rrca
+            ldh [vfl], a
+            jp txrun_b.rs
+txc_cinc:      ld hl, NES_RAM + $3E            ; INC $3E / $3F
+            inc [hl]
+            ret nz
+            inc l
+            inc [hl]
+            ret
+txc_jt:        dw txc_h5, txc_h6, txc_h7, txc_h8, txc_h9, txc_h10, txc_h11, txc_h12, txc_h13, txc_h14, txc_h15
+txc_h5:        ld a, [EX_RAM]                  ; 5D4C
+            ld [EX_RAM + 1], a
+            ld a, [NES_RAM + $54]
+            ld [EX_RAM + 2], a
+            ld a, 1
+            ld [EX_RAM], a
+            jp txrun_b.rs
+txc_h6:        ld a, [EX_RAM + 2]              ; 5D5B
+            ld [NES_RAM + $54], a
+            ld a, 2
+            ld [EX_RAM], a
+            jp txrun_b.rs
+txc_h7:        ld a, [EX_RAM + 1]              ; 5D64
+            ld [EX_RAM], a
+            jp txrun_b.rs
+txc_h9:        ld a, 2                         ; 5D6A
+            ld [EX_RAM], a
+            jp txrun_b.rs
+txc_h11:       xor a                           ; 5D6E
+            ld [EX_RAM + 3], a
+            ld [EX_RAM], a
+            jp txrun_b.rs
+txc_h12:       ld hl, NES_RAM + $54            ; 5D47
+            inc [hl]
+            jp txrun_b.rs
+txc_h10:       call txrun_b.get                       ; 5D8B
+            push af
+            call txc_cinc
+            pop af
+            ld [EX_RAM + 3], a
+            jp txrun_b.rs
+txc_h13:       call txrun_b.get                       ; 5D30
+            push af
+            call txc_cinc
+            pop af
+            ld [EX_RAM + 4], a
+            ld b, a
+            ld a, [NES_RAM + $54]
+            and $E0
+            or b
+            ld [NES_RAM + $54], a
+            jp txrun_b.rs
+txc_h8:        ld hl, NES_RAM + $3A            ; 5D79: $54 = ($54 & $E0 | $3A) + $20
+            ld a, [NES_RAM + $54]
+            and $E0
+            or [hl]
+            ld b, $20
+            jr txc_hadd
+txc_h14:       ld a, [NES_RAM + $54]           ; 5D00
+            ld [EX_RAM + 5], a
+            ld a, [NES_RAM + $55]
+            ld [EX_RAM + 6], a
+            ld a, 1
+            ld [EX_RAM], a
+            ld a, [EX_RAM + 2]
+            ld b, $40
+txc_hadd:      ld d, a                         ; $54 = A + B (CLC / ADC: C, V), $55 + carry
+            add a, b                        ;   (C, D: free until .st; X = E kept)
+            ld [NES_RAM + $54], a
+            ld c, a
+            jr nc, txc_ha1
+            ld hl, NES_RAM + $55
+            inc [hl]
+txc_ha1:       sbc a, a                        ; (C from the ADD still: SBC A gives 0 / $FF)
+            and $10
+            ld hl, sp + 2
+            res 4, [hl]
+            or [hl]
+            ld [hl], a
+            ld a, d                         ; V: (A ^ res) & (B ^ res) & $80
+            xor c
+            ld d, a
+            ld a, b
+            xor c
+            and d
+            and $80
+            rrca
+            ldh [vfl], a
+            jp txrun_b.rs
+txc_h15:       ld a, [EX_RAM + 5]              ; 5D1E
+            ld [NES_RAM + $54], a
+            ld a, [EX_RAM + 6]
+            ld [NES_RAM + $55], a
+            ld a, 2
+            ld [EX_RAM], a
+            jp txrun_b.rs
+
+; ---- rlist_b's records in bulk (bank 0: the list read from its ROM bank directly): while the
+; LCD is off (or a load masked, no dialogue box), the increment is 1, no cell is nametable 1's,
+; the list ($10) is in ROM and the record's cells are nametable 0's (offset + count <= $3C0,
+; the record within one 256-byte page... of its ROM region): its bytes to the shadow and the
+; GB map (MAP_RB when masked), dmg_scan, the PPU address after it, latch / vblank flag 0;
+; $10/$11 += (count + 3) & $FF with C (the flags-out slot of rlist_b) and V as its TYA /
+; CLC / ADC $10; X = 0 after a record (as izyrun0 leaves it). Returns at the 0 or at a record
+; it does not take (rlist_b's loop does that one). Keeps E if no record, D.
+section bank 0, $2DDC
+rl_fast:    ldh a, [lcd_on]
+            and a
+            jr z, .k1
+            ld a, [VLCD]
+            cp 1
+            ret nz
+            ldh a, [dlg_on]
+            and a
+            ret nz
+.k1:        ldh a, [ppu_ctrl]
+            and 4
+            ret nz
+            ldh a, [own1_lo]
+            ld b, a
+            ldh a, [own1_hi]
+            or b
+            ret nz
+            push de                         ; (X: 0 after a record, else kept)
+.rec:       ld hl, NES_RAM + $10
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, h                         ; ROM region: bank, GB address
+            cp $80
+            jr c, .x
+            cp $C0
+            jr nc, .c
+            sub $40
+            ld h, a
+            ldh a, [data_bank8]
+            jr .b
+.c:         cp $E0
+            jr nc, .e
+            sub $80
+            ld h, a
+            ldh a, [data_bankC]
+            jr .b
+.e:         sub $80
+            ld h, a
+            ld a, DATA + 31
+.b:         ld [$2000], a
+            ld a, h                         ; (the last page of an 8 KB area: the loop)
+            and $1F
+            cp $1F
+            jr z, .x
+            ld a, [hl+]                     ; address high (0: the end)
+            and a
+            jr z, .x
+            and $3F
+            cp $20
+            jr c, .x
+            cp $3F
+            jr z, .x
+            ld b, a                         ; B = $2006 high (6 bits)
+            and 7
+            cp 4
+            jr nc, .x
+            ld d, a                         ; D:E = the offset
+            ld a, [hl+]
+            ld e, a
+            ld a, [hl+]
+            ld c, a                         ; C = count (0: 256)
+            ld a, l                         ; the count's bytes within this 256 of the ROM
+            add a, c                        ;   address (a page crossing: rlist_b's loop)
+            jr c, .x
+            ld a, c
+            and a
+            jr z, .x
+            dec a                           ; offset + count <= $3C0
+            add a, e
+            ld a, d
+            adc a, 0
+            cp 3
+            jr c, .ok
+            jr nz, .x
+            ld a, c
+            dec a
+            add a, e
+            cp $C0
+            jr nc, .x
+.ok:        push bc
+            push de
+            push hl
+            ld a, d                         ; shadow
+            add a, high(NT_SH)
+            ld d, a
+            call rl_cpy
+            pop hl
+            pop de
+            pop bc
+            ld a, [VLCD]
+            cp 1
+            jr nz, .mp
+            ld [MAP_RB], a
+            jr .md
+.mp:        push de
+            push bc
+            ld a, d
+            add a, $98
+            ld d, a
+            call rl_cpy
+            pop bc
+            pop de
+.md:        ldh a, [is_cgb]
+            and a
+            jr nz, .mc
+            inc a
+            ldh [dmg_scan], a
+.mc:        xor a
+            ldh [vbl_flag], a
+            ldh [ppu_latch], a
+            ld a, c                         ; v = offset + count (6-bit high, mirror bits kept)
+            add a, e
+            ldh [ppu_vl], a
+            ld a, d
+            adc a, 0
+            ld d, a
+            ld a, b
+            and $FC
+            or d
+            ldh [ppu_vh], a
+            ld a, c                         ; $10 += (count + 3) & $FF (C, V)
+            add a, 3
+            ld b, a                         ; B = Y
+            ld hl, NES_RAM + $10
+            ld a, [hl]
+            ld d, a
+            add a, b
+            ld [hl+], a
+            ld e, a
+            jr nc, .n1
+            inc [hl]
+.n1:        sbc a, a
+            and $10
+            ld hl, sp + 6
+            res 4, [hl]
+            or [hl]
+            ld [hl], a
+            ld hl, sp + 0
+            xor a
+            ld [hl+], a                     ; (X = 0)
+            ld [hl], a
+            ld a, b                         ; V: (Y ^ sum) & (M ^ sum) & $80
+            xor e
+            ld c, a
+            ld a, d
+            xor e
+            and c
+            and $80
+            rrca
+            ldh [vfl], a
+            ldh a, [code_bank]
+            ld [$2000], a
+            jp .rec
+.x:         ldh a, [code_bank]
+            ld [$2000], a
+            pop de
+            ret
+; C bytes (1-255) from HL to DE, four at a time (the rest first). HL, DE advanced, C = 0.
+rl_cpy:     ld a, c
+            and 3
+            jr z, .q
+            ld b, a
+.r:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .r
+.q:         srl c
+            srl c
+            ret z
+.l:         ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            dec c
+            jr nz, .l
+            ret
+

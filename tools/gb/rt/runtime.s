@@ -87,6 +87,7 @@ LON_CNT    = $D826          ;   frames pending (LON_MAXF: the rest at once)
 LON_MAXF   = 10
 LON_END    = 250            ; (TIMA: stop at 250 of 188..255; an atomic step only below LON_HALF)
 LON_HALF   = 240
+LON_BIG    = 220            ; (TIMA: a step of up to half a frame only below it)
 BLK_REQ    = $D85C          ; the battle message window's blanked cells to the GB map (vblank)
 PB_ROW     = $D85D          ; CGB: rows of vshow_own's buffer built ahead (vpre)
 OAM_CLEAN  = $D85E          ; oamconv_b: no sprite slot invalidated since its last run (1)
@@ -104,6 +105,7 @@ PAL_MAP    = $DC20          ;   value of each NES colour index, per palette
 RT_BUF     = $DC30          ;   one tile being re-coded
 BG_LZ      = $A900          ; (cart RAM bank 3) BG tiles still in ROM, 1 bit each (ff1_native.s bg_lazy)
 BG_LZS     = $A920          ; (cart RAM bank 3) their ROM bank and address per page
+TX_BUF     = $AA00          ; (cart RAM bank 3) txrun_b: ROM strings copied by rd_blk, 64 bytes)
 DEFER_BM   = $DCA0          ;   marked tiles parked while no cell uses them (bitmap)
 PAL_USED   = $DC42          ;   BG palettes the map uses (bit p; 0 = not known: all)
 REF_BM     = $DC80          ;   tiles the map uses (bitmap, from dmg_scan_all)
@@ -2615,12 +2617,8 @@ rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (s
             push de                         ;   interrupt handlers come back to it)
             push hl
             ld b, a
-            ld a, [LON_ST]                  ; DMG, its switch-on deferred (LCD off, nothing
-            and a                           ;   shown): no conversion now; the next one
-            jr z, .cv                       ;   (once on) a whole one
-            ldh a, [lcd_on]
-            and a
-            jr nz, .cv
+            call oam_hid                    ; nothing shown (LCD off, or a DMG load blanked):
+            jr nz, .cv                      ;   no conversion now; the next a whole one
             xor a
             ld [OAM_CLEAN], a
             ld [OAM_USED], a

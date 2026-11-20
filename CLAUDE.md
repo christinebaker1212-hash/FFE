@@ -1070,6 +1070,27 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   DMG 36 -> 30, CGB 0. The in-ROM sampler's buffer (scratch) overlapped gb_layout's $0343-$0361:
   moved to NES page 1.
 
+- **Loads and battle text, 2026-11-20 (later):** RTS dispatch through a constant table (PHA /
+  PHA / RTS after LDA T+1,X / LDA T,X; recomp `rts_table`, runtime `rt_rtstab`: by X, the pushed
+  address checked); menu text printer: a run of letters at once (`txr_rn0` / `txr_rn1`: ROM
+  strings copied by `rd_blk` into cart RAM bank 3, the cells in one or two straight passes,
+  $3E / $54 once; the byte that ends the run returned to the letter loop), and the English
+  patch's control codes 1, 5-15 and $14+ handled inside it (`txc_chk`, as the ExRAM handlers:
+  RAM, X, C, V); DrawBox rows at once (`dbx_fast`, the checks once per box); PPU record lists
+  straight from ROM (`rl_fast`, bank 0); ntfill's attribute bytes in a tight loop; window
+  rows / record copies four at a time. Battle: b12:AE09 multiply native (`mul8_b`, quarter
+  squares from build.py tables), vbreak walks VSTR with a pointer. OAM conversion: none while
+  nothing shows (LCD off, or a DMG load blanked: `oam_hid`), and a conversion that defers a
+  slot load stops there (no sprite shows that frame anyway). Deferred switch-on: the
+  one-palette scan's scb_settle is a step of its own, and big steps (scan begin / settle)
+  start only with half a frame left (`LON_BIG`): no post-load frame overruns. The party
+  screen's load 3.3 -> 2.6 GB frames (mGBA trace, M-cycles from the opcodes: scratch
+  trcyc.py). NES page 1 is not free below the stack: FF1 keeps data at $0100 and
+  $0110-$0112 (the in-ROM sampler buffer moved to $C120-$C18B).
+  checkall 62/62. Lag (7650-wait script, Gambatte): DMG 30 -> 26 (the boot's first wait now
+  lands one frame later in Gambatte: a phase effect of a shorter boot; the loads' own lag went
+  down further), CGB 0 (-8).
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette

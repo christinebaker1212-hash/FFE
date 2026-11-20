@@ -173,6 +173,29 @@ class Recompiler:
             out.append((a, label(*tk)))
         return out
 
+    def rts_table(self, i):
+        """RTS after LDA T+1,X / PHA / LDA T,X / PHA with T a table in this space that no code
+        overlaps (ROM, or the ExRAM image): [(target = entry + 1, GB label)] while the entries
+        are compiled code, else None"""
+        if os.environ.get('GB_RTT') == '0' or i.space not in SPACES: return None
+        g = lambda d: self.insns.get((i.space, i.addr - d))
+        h1, l0, h0, l1 = g(1), g(4), g(5), g(8)
+        if None in (h1, l0, h0, l1): return None
+        if not (h1.mn == h0.mn == 'PHA' and l0.mn == l1.mn == 'LDA' and l0.mode == l1.mode == 'abx'
+                and l1.arg == l0.arg + 1): return None
+        base, off, size = SPACES[i.space]
+        T = l0.arg
+        out = []
+        for j in range(32):
+            a = T + 2 * j
+            if not base <= a < base + size - 1 or (i.space, a) in self.insns or (i.space, a + 1) in self.insns: break
+            o = off + a - base
+            e = (self.cm.rom[o] | self.cm.rom[o + 1] << 8) + 1 & 0xFFFF
+            tk = self.target(i, e)
+            if tk is None or tk not in self.insns: break
+            out.append((e, label(*tk)))
+        return out if len(out) >= 2 else None
+
     def jmp_final(self, t):
         """a JMP's target followed through JMP trampolines (to a native routine, or the code
         the chain ends at): compiled as a jump straight there"""
@@ -877,7 +900,14 @@ class Emitter:
         return None
 
     def x_RTS(self):
-        if self.k in self.rc.rts_dispatch: self.o('jp rt_rts_dispatch')
+        if self.k in self.rc.rts_dispatch:
+            tab = self.rc.rts_table(self.i)
+            if tab:                               # PHA / PHA / RTS through a constant table by X:
+                self.o('ld hl, .rt', 'jp rt_rtstab', '.rt:', 'db %d' % len(tab))   # (rt_rtstab
+                for a, lab in tab:                #   checks the pushed address)
+                    self.o('db $%02X, $%02X, bank(%s), low(%s), high(%s)' % (a & 0xFF, a >> 8, lab, lab, lab))
+                return
+            self.o('jp rt_rts_dispatch')
         else: self.o('ret')
 
     def x_RTI(self):
