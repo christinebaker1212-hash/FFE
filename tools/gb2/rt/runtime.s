@@ -42,7 +42,9 @@ SPAL_KEY   = $DCC0          ; NES sprite palette -> coding: values of indices 1-
 SPR_SHADOW = $A000          ; cart RAM bank 1: all 256 NES sprite tiles in GB format (4KB)
 NMI_CNT    = $D830          ; 16-bit count of NES frames (rt_wait_nmi calls), for profiling
 VBL_CNT    = $D832          ; 16-bit count of GB frames (vblank or timer ticks)
+;[test]
 TEST_PAD   = $D83E
+;[/test]
 ; FF2 GB-only palette override (rt/ff2.s)
 OVR_ON     = $DCF0          ; bit 7: override on
 OVR_C0     = $DCF1
@@ -236,50 +238,59 @@ section bank 0, $0100
 
 ; ------------------------------------------------------------------ boot
 section bank 0, $0150
-boot:       di
-            ld sp, STACK_TOP
-            push af                         ; A = $11 on a Game Boy Color
+boot:       di                              ; power-on: A = $11 on a Game Boy Color (and a
+            ld d, 0                         ;   Game Boy Advance), else DMG / Pocket / SGB
+            cp $11
+            jr nz, boot_w
+            inc d
+; D = 1 on a Game Boy Color; also the soft reset's entry (soft_reset). Everything the game
+; and the runtime use is cleared / set here, nothing is assumed from power-on.
+boot_w:     di
+            ld sp, $FFFE                    ; (the stack in HRAM while WRAM is cleared)
+            ldh a, [$FF40]                  ; LCD off, only in the vblank (interrupts are off)
+            bit 7, a
+            jr z, .off
 .wv:        ldh a, [$FF44]
             cp 144
             jr c, .wv
             xor a
-            ldh [$FF40], a                  ; LCD off
-            ld hl, $8000                    ; clear VRAM
-            ld bc, $2000
-            call memclr
-            ld hl, $C000                    ; clear WRAM (not the stack page $C100-$C1FF)
-            ld bc, $100
-            call memclr
-            ld hl, $C200
-            ld bc, $1E00
-            call memclr
+.lcdoff:    ldh [$FF40], a                  ; (.lcdoff: checked by lotcheck.py)
+.off:       xor a
+            ldh [$FF4F], a                  ; (CGB: VRAM bank 0, WRAM bank 1; no effect on DMG)
+            inc a
+            ldh [$FF70], a
+            xor a
+            ldh [$FF26], a                  ; sound off (all sound registers reset)
+            ldh [$FF0F], a
+            ldh [$FFFF], a
+            ldh [$FF42], a                  ; SCY, SCX, LYC, STAT, window
+            ldh [$FF43], a
+            ldh [$FF45], a
+            ldh [$FF41], a
+            ldh [$FF4A], a
+            ldh [$FF4B], a
+            ldh [$FF07], a                  ; timer off
+            ld a, HLE_BANK                  ; VRAM, WRAM and the scratch cart RAM cleared
+            ld [$2000], a                   ;   (boot_clr, HLE bank; keeps D)
+            call boot_clr
+            ld a, 1
+            ld [$2000], a
+            ld sp, STACK_TOP                ; (WRAM cleared: the stack back in NES page 1)
             ld hl, $FE00                    ; clear OAM
             ld bc, $A0
             call memclr
             ld hl, $FF80                    ; clear HRAM
             ld bc, $7F
             call memclr
-            pop af
-            cp $11
-            jr nz, .dmg
+            ld a, d
+            and a
+            jr z, .dmg
             ld a, 1
             ldh [is_cgb], a
-            ld a, 1                         ; VRAM bank 1 (attributes) cleared too
-            ldh [$FF4F], a
-            ld hl, $8000
-            ld bc, $2000
-            call memclr
-            ld hl, $9C00                    ; window map (the mask): tile 0 of VRAM bank 1
-            ld bc, $400                     ;   (cleared above), palette 0: the backdrop
-.wm:        ld a, $08
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .wm
-            xor a
-            ldh [$FF4F], a
-            ld a, 1                         ; double speed (KEY1 + STOP, interrupts off)
+            ldh a, [$FF4D]                  ; double speed (KEY1 + STOP, interrupts off;
+            bit 7, a                        ;   after a soft reset it is on already)
+            jr nz, .booted
+            ld a, 1
             ldh [$FF4D], a
             xor a
             ldh [$FFFF], a
@@ -376,6 +387,16 @@ boot:       di
             ld [$2000], a
             xor a
             jp L_fix_FE2E
+
+; A + B + Select + Start (read_buttons): the game starts again from power-on as far as
+; the runtime goes (sound off, memory and registers cleared in boot_w); the NES save RAM
+; (cart RAM bank 0) is kept. Called from the joypad read: no save RAM write is under way.
+soft_reset: di
+            xor a
+            ldh [$FF26], a                  ; sound off at once
+            ldh a, [is_cgb]
+            ld d, a
+            jp boot_w
 
 memclr:     xor a
             ld [hl+], a
@@ -1584,6 +1605,8 @@ rt_ppu_w1:  push af
             ld a, [VBL_CNT]                 ; frames lost while the LCD was off are not
             ld [VBL_SEEN], a                ;   caught up (the screen fades in at its pace)
             jr .ret
+.wv1:       ei                              ; (past the vblank: wait for the next)
+            jr .wv
 .off:       ldh a, [lcd_on]
             and a
             jr z, .ret
@@ -1593,11 +1616,18 @@ rt_ppu_w1:  push af
             ldh a, [is_sgb]
             and a
             call nz, sgb_lcd_off
-.wv:        ldh a, [$FF44]
+.wv:        ldh a, [$FF44]                  ; LCD off only in the vblank: wait for it (the
+            cp 144                          ;   vblank interrupt runs first), then with
+            jr c, .wv                       ;   interrupts off check that it is still the
+            di                              ;   vblank and write at once
+            ldh a, [$FF44]
             cp 144
-            jr c, .wv
+            jr c, .wv1
+            cp 152                          ;   (lines 144-151: at least a line to spare)
+            jr nc, .wv1
             xor a
-            ldh [$FF40], a
+.lcdoff:    ldh [$FF40], a
+            ei
             ldh [lcd_on], a
             ld b, 0
             call flush_q
@@ -2416,9 +2446,11 @@ rt_io_r4016:
             pop af
             ret
 read_buttons:                               ; A = A B Sel St U D L R (bit 0..7), 1 = pressed
+;[test]  (test builds only; build.py --release leaves the lines out to [/test])
             ld a, [TEST_PAD]                ; (test runners: the pad of this NES frame from
             cp $A5                          ;   cart RAM bank 3 $A000 + NMI_CNT low)
             jr z, .test
+;[/test]
             ld a, $20
             ldh [$FF00], a
             ldh a, [$FF00]
@@ -2448,9 +2480,15 @@ read_buttons:                               ; A = A B Sel St U D L R (bit 0..7),
             jr z, .l
             or $40
 .l:         bit 0, h
-            ret z
+            jr z, .sr
             or $80
-            ret
+.sr:        ld h, a                         ; A + B + Select + Start: soft reset
+            and $0F
+            cp $0F
+            ld a, h
+            ret nz
+            jp soft_reset
+;[test]
 .test:      ld a, 3
             ld [$4000], a
             ld a, [NMI_CNT]
@@ -2461,6 +2499,7 @@ read_buttons:                               ; A = A B Sel St U D L R (bit 0..7),
             ld [$4000], a
             ld a, l
             ret
+;[/test]
 rt_io_r4015:
 rt_io_r4017:
 rt_io_rnone:

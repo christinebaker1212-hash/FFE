@@ -3097,6 +3097,70 @@ hle_fillxy_b:
             ld e, 0
             ret
 
+; boot / soft reset (rt/runtime.s boot_w; LCD off, interrupts off, stack in HRAM): VRAM, WRAM
+; (CGB: banks 1-7, VRAM bank 1 with the window-map attributes), the runtime's scratch cart
+; RAM. D = 1 on a Game Boy Color. Ends with cart RAM bank 0, WRAM bank 1, VRAM bank 0.
+boot_clr:
+            ld hl, $8000                    ; clear VRAM
+            ld bc, $2000
+            call memclr
+            ld hl, $C000                    ; clear WRAM ($C000-$DFFF, the stack page too)
+            ld bc, $2000
+            call memclr
+            ld a, d                         ; CGB: WRAM banks 2-7 as well
+            and a
+            jr z, .w1
+            ld e, 2
+.wb:        ld a, e
+            ldh [$FF70], a
+            ld hl, $D000
+            ld bc, $1000
+            call memclr
+            inc e
+            ld a, e
+            cp 8
+            jr nz, .wb
+            ld a, 1
+            ldh [$FF70], a
+.w1:        ld a, $0A                       ; cart RAM: the runtime's scratch banks (1, 2 and
+            ld [$0000], a                   ;   bank 3 above $B000); never bank 0 (the NES
+            ld a, 1                         ;   save RAM) or bank 3 $A000-$AFFF (test-runner
+            ld [$4000], a                   ;   pads, the save mirror)
+            ld hl, $A000
+            ld bc, $2000
+            call memclr
+            ld a, 2
+            ld [$4000], a
+            ld hl, $A000
+            ld bc, $2000
+            call memclr
+            ld a, 3
+            ld [$4000], a
+            ld hl, $B000
+            ld bc, $1000
+            call memclr
+            xor a
+            ld [$4000], a
+            ld a, d                         ; CGB: VRAM bank 1 (attributes) cleared too
+            and a
+            ret z
+            ld a, 1
+            ldh [$FF4F], a
+            ld hl, $8000
+            ld bc, $2000
+            call memclr
+            ld hl, $9C00                    ; window map (the mask): tile 0 of VRAM bank 1
+            ld bc, $400                     ;   (cleared above), palette 0: the backdrop
+.wm:        ld a, $08
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .wm
+            xor a
+            ldh [$FF4F], a
+            ret
+
 section bank HLE_BANK, $7F00
 BITS8:      db 1, 2, 4, 8, 16, 32, 64, 128      ; (page start: low byte = bit number)
 

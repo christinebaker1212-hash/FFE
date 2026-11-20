@@ -2,6 +2,8 @@
 
 usage: build.py ["Final Fantasy I, II (Japan).nes"] [--gb] [--cov DIR] [--out ROM]
   --gb: with the GB screen layout (tools/gb2/layout.py): build/ff2_gb.nes -> build/ff2_gb.gb
+  --release (with --gb): build/ff2_release.gb without test-only code (the runtime's ;[test]
+      blocks: the test-runner pad input); check it with tools/gb2/lotcheck.py --release
 
 1. NES ROM -> MMC5 split (tools/split/build_mmc5.py) -> English (tools/ff2/insert.py)
    = build/ff2_en.nes
@@ -11,7 +13,7 @@ usage: build.py ["Final Fantasy I, II (Japan).nes"] [--gb] [--cov DIR] [--out RO
 4. ROM: bank 0 runtime, banks DATA.. = the NES banks, then code banks
 Nothing game-specific is stored in the repo; everything comes from the NES ROM.
 """
-import os, sys, glob, hashlib, subprocess, time
+import os, re, sys, glob, hashlib, subprocess, time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
@@ -64,8 +66,14 @@ def main():
     args = sys.argv[1:]
     gb = '--gb' in args
     if gb: args.remove('--gb')
+    release = '--release' in args                   # release build: no test-only code
+    if release:
+        args.remove('--release')
+        if not gb: raise SystemExit('--release needs --gb')
+        if os.environ.get('GB_END_TEST'): raise SystemExit('--release: GB_END_TEST is a test build')
     opt = {'--cov': os.path.join(ROOT, 'build', 'ff2', 'cov'),
-           '--out': os.path.join(ROOT, 'build', 'ff2_gb.gb' if gb else 'ff2_en.gb'), '--nes': None}
+           '--out': os.path.join(ROOT, 'build', 'ff2_release.gb' if release else 'ff2_gb.gb' if gb else 'ff2_en.gb'),
+           '--nes': None}
     pos = []
     while args:
         a = args.pop(0)
@@ -94,6 +102,8 @@ def main():
             print('  idiom %s:%04X: code not found, not used' % k); rc.g.idioms.pop(k, None)
     prog, bank_of, banks = emit_program(rc)
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in RT_FILES)
+    if release:                                     # ;[test] .. ;[/test]: test-runner paths
+        rt = re.sub(r'^;\[test\].*?^;\[/test\][^\n]*\n', '', rt, flags=re.S | re.M)
     rt += '\n' + gb1.apu_tables() + '\n' + open(os.path.join(HERE, 'rt', 'apu_core.s')).read()
     rt += '\n' + open(os.path.join(HERE, 'rt', 'native.s')).read()
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ff2_banked.s')).read()   # (continues bank HLE_BANK)

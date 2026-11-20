@@ -128,7 +128,7 @@ sgb_border: ld hl, MASK_FRZ
             cp 144
             jr c, .wv
             xor a
-            ldh [$FF40], a
+.lcdoff:    ldh [$FF40], a
             ld hl, $8000
             ld bc, $2000
             jp memclr
