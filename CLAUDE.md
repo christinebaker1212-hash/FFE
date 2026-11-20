@@ -838,3 +838,5 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   `docs/ff3-gb-status.md` (branch `claude/vibrant-davinci-lc8boi`). FF3 2026-11-20: battle
   re-layout built (`tools/gb3/layout.py`, `build.py --gb`; party column, full-width party and
   message windows, battle cameras in the runtime), RAM-identical to its NES layout ROM.
+  Main menu re-laid out (owner's mock N5B; GB menu mode $5808: window layer + SCY steps),
+  RAM-identical; sub-menus next.

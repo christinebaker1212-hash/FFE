@@ -229,7 +229,52 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   frame) depends on the battle input loop's polls per frame, as $14 does.
 - Open in battle: back attacks, bosses / large formations.
 
+## Main menu (2026-11-20, owner's choice: mock-up N5B)
+- Mock-ups (`mockup.py NES OUT menu`, N0-N5): owner chose the party window on the left with
+  one block per member (name + level / job condensed / HP green / MP of the 8 levels), "Lv"
+  and the HP / MP labels on the English font's rows (FF3's label glyphs sit 1 px lower: the
+  owner saw the misalignment), the member's lines pulled up 0 / 1 / 1 / 2 px with 3 px
+  between members (B over A = grid + rule), commands top right, Gil / Capacity in 4-px digits,
+  the guest's name at the bottom right.
+- NES side (`layout.main_menu`): camera (24, 0); windows (3,0,13,22) party, (16,0,7,9)
+  commands, (16,9,7,4) Gil + CP, (16,13,7,5) guest (window 4 no longer opened); strings
+  $0130-$0133 for the GB in one-row mode ({0E}): per member name / job / HP / MP rows and a
+  blank row (map rows 1-4 + 5i, 5 + 5i); the MP of a level is a 2-cell field, written right
+  to left so the blanks fall under the previous digit; the guest names "Sara" / "Cid" /
+  "Alus" (5 columns; only code 07 uses them). Gil and CP: `SMALLNUM_SRC` in bank 88 (free
+  space after the English job names, through the JOBF dispatch: Y = 12 with A = $FF) draws
+  6 tiles ($7B-$7F, $CA: unused in the field menus) in the vblank. HP colour: $95B2 rewritten
+  to send each member's palette (0 green, 1 orange, 2 pink) to the GB register $5809 and
+  switch the GB menu mode on ($5808); close menu ($A685) switches it off. Label glyphs
+  L V E H M P one row up in the font block; the level as "Lv" (English letters, $F2AC).
+  No class / guest sprites in the main menu loops; the character-select hand at each name.
+- GB runtime: `$5808` menu mode: camera (24, 0); the right windows (NES cols 16-22 = map
+  cols 16-31) copied by `map_flush` into the window map $9C00 (one DMA block per row,
+  rows 0-17), shown on the window layer from GB col 13 (WX 111, LCDC bits 5-6 in the
+  vblank); the party window's pixel offsets by SCY steps from the LYC interrupt (`mnu_isr`,
+  table `MNU_EV`: 12 steps, 3 per member: the job / HP lines up 1 px, the MP line 2 px, the
+  blank row's first 2 px as the gap, the bottom frame from line 136). `$5809` writes the
+  member's HP row palette per tile into the attribute shadow; menu mode off rebuilds those
+  rows from the NES attributes. The map flush starts a vblank byte earlier in menu mode
+  (window rows: 3 DMA blocks per row; a DMA after the vblank loses its writes).
+- Crash found with a guest (pre-existing): the guest name's text path pushes at fix:F2FC,
+  jumps to ExRAM `sname` and pops at fix:F0D5; the recompiler's cross-bank jump stub
+  (call + ret) sat in between. Fixed-bank and ExRAM code are now one component (same GB
+  bank, plain jumps).
+- Checks: `firstdiff.py ... --freeze 4500 --press 4520:16:3,4640:128:2,4720:64:2,4800:64:2,
+  4880:16:2` (open, Item, back, close, reopen): identical; explore 12000: identical after the
+  bank change; screens (mGBA CGB): menu, guest, Gil 9876543, CP 255, dead / poisoned
+  members (pink / orange HP, "Death" / "Poison" in place of Lv), character select.
+- Tools: `firstdiff.py --freeze/--press/--poke`, sgbrun `SGBRUN_TRAP=ADDR` (last 64 PCs when
+  PC reaches ADDR; needs `SGBRUN_PROF2` for the per-instruction loop), gbshots
+  `GBSHOTS_LOG=FILE`, `GBSHOTS_KEEP=1`.
+- Open: the sub-menus (Item, Magic, Equip, Status, Order, Job, Save) still use the NES
+  layout through the field camera (mock-ups next).
+
 ## Known open items
+- Field: the top screen row can show stale map rows (GB map rows 30-31) at the vertical wrap
+  (NES 240 lines, GB map 256): FF1 solved it with an LYC split (pre-existing; seen as a black
+  band or old menu cells at the top after a menu).
 - Warp (`p3c:9B5F` TSX / TXS arithmetic) and the inn's `TXS` from a saved X (`p3c:9039`) use
   FF2's approximate helpers: need a semantic version (as FF2's open item).
 - Sound: APU writes ignored for now.
@@ -237,8 +282,8 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   raster split); belongs in the window layer (FF1 lesson).
 
 ## Next
-1. Battle details (targeting names window, magic / item lists, back attack), then field
-   dialogue and menus (mock-ups to the owner first).
+1. Sub-menus (Item, Magic, Equip, Status, Order, Job, Save: mock-ups to the owner first),
+   the field's vertical wrap, battle details (back attacks, bosses).
 2. Native presentation (owner's decision 2026-11-20, `docs/gb-native-presentation.md`):
    profile the lagging screen loads (post-battle map load, doors / stairs) and replace their
    drawing with native GB routines; native music driver and sprites later.
