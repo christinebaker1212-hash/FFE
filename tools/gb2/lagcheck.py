@@ -4,7 +4,8 @@ For each window of NES frame waits (wait NMIs, see firstdiff.py), the NES's vide
 between the waits are compared with the GB's video frames between the same waits. A GB
 that keeps pace takes exactly as many; extra GB frames are lag (the game slower, music
 stretched). Input: firstdiff.py's scripts (new game, optional random play).
-usage: PYTHONPATH=build/emu lagcheck.py NES GB FRAMES [--random SEED] [--dmg] [--win 60]"""
+usage: PYTHONPATH=build/emu lagcheck.py NES GB FRAMES [--random SEED] [--press F:K,..] [--poke A=V,..
+       --pokeat F] [--form F] [--dmg] [--win 60]"""
 import os, sys, subprocess, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
@@ -20,11 +21,11 @@ def main():
         k = args.index(name)
         if flag: del args[k]; return True
         v = args[k + 1]; del args[k:k + 2]; return v
-    dmg = opt('--dmg', flag=True); win = int(opt('--win', '60')); rnd = opt('--random')
-    nes_path, gb_path, limit = args[0], args[1], int(args[2])
-    steps = fd.script_newgame(limit)
-    if rnd is not None: fd.add_random(steps, int(rnd))
-    nes_ram, pads, frame_of, wram, _ = fd.nes_pass(NES(nes_path), steps, limit)
+    dmg = opt('--dmg', flag=True); win = int(opt('--win', '60'))
+    # (the scenario options as firstdiff.py: --random S, --press F:K,.., --poke A=V,.. --pokeat F, --form)
+    nes_path, gb_path, steps, pokes, poke_at, limit = fd.scenario(args)
+    nes_ram, pads, frame_of, wram, _ = fd.nes_pass(NES(nes_path), steps, limit, (), pokes, poke_at)
+    pw = getattr(fd.nes_pass, 'poke_wait', None)
     last = max(frame_of)
     tmp = tempfile.mkdtemp()
     pf = os.path.join(tmp, 'pads.bin'); lf = os.path.join(tmp, 'lag.bin')
@@ -32,7 +33,8 @@ def main():
     open(pf, 'wb').write(bytes(pads.get(n + 1, 0) for n in range(last + 2)))
     gbrun = os.path.join(HERE, '..', '..', 'build', 'gbrun')
     cmd = [gbrun, gb_path, str(limit * 3), os.path.join(tmp, 'x'), '--padfile', pf, '--lagfile', lf,
-           '--nshot', str(last)] + (['--dmg'] if dmg else [])
+           '--nshot', str(last)] + (['--dmg'] if dmg else []) + \
+          (['--poke', str(pw + 1), ','.join('%04X=%02X' % kv for kv in pokes)] if pokes and pw is not None else [])
     out = subprocess.run(cmd, capture_output=True, text=True).stdout
     lag = open(lf, 'rb').read()
     waits = [lag[i] | lag[i + 1] << 8 for i in range(0, len(lag), 2)]   # wait count after each GB frame

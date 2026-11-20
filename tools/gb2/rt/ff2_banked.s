@@ -1270,3 +1270,289 @@ hle_objspr_b:
             ld [NES_RAM + $26], a
             ldh [nzv], a                    ; N
             ret
+
+; fix:C2F3 world-map water animation (every frame on the world map): $6D += 3 picks a pair
+; of pattern addresses from the table at $C34F (one bit-plane row of two tiles); the 16-bit
+; row ($80:$81) is read back, rotated a pixel left and written again. The same NES state as
+; the routine ($6D, $80, $81, X, A, N Z C V, PPU address / read buffer / latch / vblank flag);
+; the two bytes go through chr_w1 (DMG: only the changed tile row re-coded, instead of two
+; whole tiles marked for re-coding every frame).
+hle_water_b:
+            push bc
+            ld a, [NES_RAM + $6D]           ; CLC / ADC #3 (V: $7D-$7F become negative)
+            ld b, a
+            add a, 3
+            ld [NES_RAM + $6D], a
+            ld c, a
+            xor b
+            ld d, a
+            ld a, c
+            xor 3
+            and d
+            and $80
+            rrca
+            ldh [vfl], a
+            ld a, c
+            and $0F
+            add a, a
+            ld [MU_T], a                    ; X
+            add a, $4F                      ; the table pair: GB $434F + X in the fixed bank's
+            ld l, a                         ;   data image
+            ld h, $43
+            ld a, DATA + 31
+            call rd8_bank
+            xor a                           ; LDA $2002
+            ldh [vbl_flag], a
+            ldh [ppu_latch], a
+            ld a, [VT_BUF]
+            call .rd
+            ld [NES_RAM + $80], a
+            ld a, [VT_BUF + 1]
+            call .rd
+            ld [NES_RAM + $81], a
+            ld hl, NES_RAM + $80            ; ASL A ($80) / ROL $81 / ROL $80
+            ld a, [hl]
+            add a, a
+            inc l
+            rl [hl]
+            dec l
+            rl [hl]
+            ld a, [NES_RAM + $80]
+            ld d, a
+            ld a, [VT_BUF]
+            call .wr
+            ld a, [NES_RAM + $81]
+            ld d, a
+            ld a, [VT_BUF + 1]
+            call .wr
+            ld a, [MU_T]
+            ld e, a
+            ld d, 0
+            pop bc
+            ld a, [NES_RAM + $81]           ; A, N, Z = $81 (LDA $81); C = the bit ROL $80
+            ldh [nzv], a                    ;   shifted out = bit 0 of $81
+            ld h, a
+            rrca
+            ld a, h
+            inc a
+            dec a
+            ret
+.rd:        ldh [ppu_vl], a                 ; A = address low ($03xx): the two LDA $2007
+            ld a, $03
+            ldh [ppu_vh], a
+            call rt_ppu_r7
+            call rt_ppu_r7
+            ld a, l
+            ret
+.wr:        ldh [ppu_vl], a
+            ld a, $03
+            ldh [ppu_vh], a
+; D = byte to the NES pattern address ppu_vh / ppu_vl: rt_ppu_w7 with a fast DMG path. A BG
+; tile that is coded and not waiting (CODED != $FF, not in DIRTY_BM / DEFER_BM) whose new row
+; uses no colour index the tile did not use: the shadow byte and only that row re-coded
+; (its two GB bytes through vram_put). Otherwise rt_ppu_w7. Keeps BC, DE.
+chr_w1:     push bc
+            push de
+            ldh a, [is_cgb]
+            and a
+            jr nz, .gen
+            ldh a, [ppu_vh]
+            cp $20
+            jr nc, .gen
+            ld h, a
+            and $10
+            ld b, a
+            ldh a, [ppu_ctrl]
+            and $10
+            xor b
+            jr nz, .gen
+            ld a, h
+            and $0F
+            ld h, a                         ; H = tile high nibble
+            swap a
+            ld b, a
+            ldh a, [ppu_vl]
+            ld l, a
+            swap a
+            and $0F
+            or b
+            ld e, a                         ; E = tile
+            ldh [sh_tile], a
+            push hl
+            ld c, a
+            call bm_addr                    ; waiting for re-coding, parked, or coding unknown:
+            ld a, [hl]                      ;   the general path
+            and b
+            jr nz, .genp
+            ld a, l
+            add a, low(DEFER_BM) - low(DIRTY_BM)
+            ld l, a
+            ld a, [hl]
+            and b
+            jr nz, .genp
+            ld l, e
+            ld h, high(CODED)
+            ld a, [hl]
+            inc a
+            jr z, .genp
+            pop hl
+            ld a, l                         ; GB byte offset in the tile (plane 0 rows even,
+            and $0F                         ;   plane 1 odd)
+            cp 8
+            jr c, .p0
+            sub 8
+            add a, a
+            inc a
+            jr .pk
+.p0:        add a, a
+.pk:        ldh [sh_l1], a
+            ld b, a
+            ld a, l
+            and $F0
+            or b
+            ld l, a
+            ld a, h
+            add a, high(BG_SHADOW)
+            ld h, a
+            ld a, 1
+            ld [$4000], a
+            ld [hl], d
+            ld a, l
+            xor 1
+            ld l, a
+            ld c, [hl]                      ; the row's other plane
+            xor a
+            ld [$4000], a
+            bit 0, b
+            jr z, .ev
+            ld a, c
+            ld c, d
+            ld d, a
+.ev:        ld a, d                         ; D = p0, C = p1
+            ldh [sh_p0], a
+            ld a, c
+            ldh [sh_p1], a
+            ld l, 0                         ; L = colour indices the row uses (1-3)
+            ld a, c
+            cpl
+            and d
+            jr z, .n1
+            set 1, l
+.n1:        ld a, d
+            cpl
+            and c
+            jr z, .n2
+            set 2, l
+.n2:        ld a, d
+            and c
+            jr z, .n3
+            set 3, l
+.n3:        ld a, e                         ; an index the tile did not use: its coding key
+            srl a                           ;   changes (general path; the shadow byte is
+            add a, low(TILE_USE)            ;   simply written again)
+            ld c, a
+            ld b, high(TILE_USE)
+            ld a, [bc]
+            bit 0, e
+            jr z, .lo
+            swap a
+.lo:        and $0F
+            cpl
+            and l
+            jr nz, .gen
+            ld l, e                         ; masks of the tile's palette (as retile_b)
+            ld h, high(TILE_PAL)
+            ld a, [hl]
+            and 3
+            add a, a
+            add a, a
+            add a, low(PAL_MAP)
+            ld l, a
+            ld h, high(PAL_MAP)
+            ld bc, 0                        ; B = indices whose value has bit 0, C = bit 1
+            ld d, 1
+.m:         ld a, [hl+]
+            rrca
+            jr nc, .m0
+            ld e, a
+            ld a, b
+            or d
+            ld b, a
+            ld a, e
+.m0:        rrca
+            jr nc, .m1
+            ld a, c
+            or d
+            ld c, a
+.m1:        sla d
+            bit 4, d
+            jr z, .m
+            ld hl, RM
+            ld a, b
+            call rt_anf
+            ld a, c
+            call rt_anf
+            ldh a, [sh_p0]                  ; the row through the masks
+            ld b, a
+            ldh a, [sh_p1]
+            ld c, a
+            and b
+            ld d, a                         ; p0 & p1
+            ld a, [RM + 4]                  ; plane 1
+            and b
+            ld e, a
+            ld a, [RM + 5]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 6]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 7]
+            xor e
+            ldh [sh_m1], a
+            ld a, [RM]                      ; plane 0
+            and b
+            ld e, a
+            ld a, [RM + 1]
+            and c
+            xor e
+            ld e, a
+            ld a, [RM + 2]
+            and d
+            xor e
+            ld e, a
+            ld a, [RM + 3]
+            xor e
+            ld e, a
+            ldh a, [sh_tile]                ; VRAM: tiles 0-127 at $9000, 128-255 at $8800
+            swap a
+            ld b, a
+            and $F0
+            ld l, a
+            ldh a, [sh_l1]
+            and $0E
+            or l
+            ld l, a
+            ld a, b
+            and $0F
+            cp 8
+            jr nc, .hi
+            add a, $10
+.hi:        add a, $80
+            ld h, a
+            ld a, e
+            call vram_put
+            inc l
+            ldh a, [sh_m1]
+            call vram_put
+            call ppu_inc
+            pop de
+            pop bc
+            ret
+.genp:      pop hl
+.gen:       pop de
+            ld a, d
+            pop bc
+            jp rt_ppu_w7

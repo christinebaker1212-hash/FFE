@@ -533,6 +533,19 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   bank switches each (the field's "glue" cost: ~45 of the ~54 indirect ROM reads per frame
   in the throne room). DMG +5.1% -> +4.3%; throne room +13 / +15 -> +2 / -1 / +5 / +6. RAM
   identical (DMG / CGB); NPC shots correct.
+- **Overworld travel measured and native water animation (2026-11-20)**: `lagcheck.py` takes
+  firstdiff's scenario options (`--press`, `--poke`, `--pokeat`, `--form`). Save slot 1 loaded
+  by SRAM pokes at frame 100, then 40-frame holds R R D D L L U U on the world map: CGB kept
+  pace, DMG +2..+6 per 40 waits (~10%). Profile (mGBA): a quarter of the DMG time re-coded two
+  whole BG tiles every frame - the world map's water animation (fix:C2F3) reads one bit-plane
+  row of two tiles back through $2007, rotates it a pixel and writes it again, and every
+  pattern write marked its tile for a full re-coding. Native `hle_water` (ext fix:C2F3, HLE
+  bank): the same NES state ($6D, $80, $81, X, A, N Z C V, PPU address / buffer / latch); the
+  bytes through `chr_w1`, which on DMG re-codes only the written row of a coded, not-waiting
+  tile whose row adds no colour index (else rt_ppu_w7). Walking DMG: -2..+2 per 40 waits
+  (parity, the catch-up evens it out); RAM identical (walk scenario DMG / CGB, random 1 30000
+  DMG / CGB); DMG water shots correct. Random path unchanged (+4.3%, it hardly visits the
+  world map); its worst single waits are map loads (+85..+102) and the battle entry.
 - Next (step 1, third part): the remaining field costs (dialogue window: text printer
   fix:F069 and its window drawing; the throne-room stretch 21300-22900 still +16-23);
   then screen loads, music, sprites. Earlier plan text:
