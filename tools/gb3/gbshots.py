@@ -3,6 +3,7 @@ CGB double speed) with its input clock set to the NES's at each waited-for frame
 lagcheck.py --resync), so state-dependent input scripts (explore) stay on the NES's path.
 
 usage: PYTHONPATH=build/emu3 gbshots.py NES GB OUT.png W1,W2,.. [--input NAME] [--scale N]
+                                         [--freeze W]
 
 Left: the NES frame; right: the GB screen (160x144), both at the same pixel scale.
 Output in build/ only (it shows game graphics).
@@ -23,6 +24,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('nes'); ap.add_argument('gb'); ap.add_argument('out'); ap.add_argument('waits')
     ap.add_argument('--input', default='explore'); ap.add_argument('--scale', type=int, default=2)
+    ap.add_argument('--freeze', type=int, default=0, help='no input from this waited-for frame on')
+    ap.add_argument('--dump', help='directory: also the GB memory at each shot (sgbrun SGBRUN_DUMP)')
     a = ap.parse_args()
     ws = [int(x) for x in a.waits.split(',')]
     from cynes import NES
@@ -31,7 +34,8 @@ def main():
     n = NES(a.nes); cmpshots.CUR_NES = n; W = Waits(n); k = 0; clock = {}; frames = {}
     top = max(ws)
     while n.ff3_waits <= top:
-        n.controller = pad(k + 1); fr = n.step(1); k = W.update()
+        n.controller = pad(k + 1) if not a.freeze or n.ff3_waits < a.freeze else 0
+        fr = n.step(1); k = W.update()
         clock.setdefault(n.ff3_waits, k)
         for w in ws:
             if w not in frames and n.ff3_waits >= w:
@@ -46,7 +50,9 @@ def main():
         cmd = [os.path.join(ROOT, 'build', 'sgbrun'), a.gb, str(int(k * 1.3) + 600), os.path.join(tmp, 'q'),
                '--cgb', '--padfile', pads]
         for w in ws: cmd += ['--nshot', str(clock[-w])]
-        subprocess.run(cmd, env=dict(os.environ, SGBRUN_CLOCK=cf), capture_output=True)
+        env = dict(os.environ, SGBRUN_CLOCK=cf)
+        if a.dump: env['SGBRUN_DUMP'] = '1'
+        subprocess.run(cmd, env=env, capture_output=True)
         s = a.scale
         sheet = Image.new('RGB', ((256 + 8 + 160) * s, 244 * s * len(ws)), (40, 40, 40))
         d = ImageDraw.Draw(sheet)
@@ -57,6 +63,10 @@ def main():
             if os.path.exists(p):
                 sheet.paste(ppm(p).resize((160 * s, 144 * s), Image.NEAREST), ((256 + 8) * s, y))
             d.text((2, y + 2), 'wait %d' % w, fill=(255, 255, 0))
+            if a.dump and os.path.exists(p[:-4] + '.mem'):
+                os.makedirs(a.dump, exist_ok=True)
+                shutil.copy(p[:-4] + '.mem', os.path.join(a.dump, 'w%05d.mem' % w))
+                frames[w].save(os.path.join(a.dump, 'w%05d_nes.png' % w))
         sheet.save(a.out)
         print('wrote', a.out)
     finally:

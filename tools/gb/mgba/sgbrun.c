@@ -4,7 +4,8 @@
  *        [--padfile FILE] [--nshot K ...]
  *   --padfile: one NES pad byte per NES frame (bit 0 right .. 7 A, as the NES latched it),
  *     applied while the runtime's NES frame count ($D830) is that frame (as firstdiff.py);
- *   --nshot K: screenshot when the NES frame count first reaches K;
+ *   --nshot K: screenshot when the NES frame count first reaches K (env SGBRUN_DUMP=1: also
+ *     PREFIX_nNNNNN.mem: VRAM 0/1, WRAM $C000 + banks 1-7, OAM, HRAM);
  *   --sram FILE: initial cart RAM (e.g. the NES power-on save RAM in bank 0, as compare.sync_sram).
  *   --poke K ADDR=VAL,...: when the NES frame count first reaches K, write NES addresses (hex;
  *     $0000-$07FF = work RAM $C000.., $6000-$7FFF = cart RAM bank 0).
@@ -249,6 +250,19 @@ int main(int argc, char** argv) {
 					printf("\nRAM2:");
 					for (unsigned a = 0; a < 0x100; a++) printf("%s%02X", a % 16 ? " " : "\n ", core->rawRead8(core, 0xA000 + a, 2));
 					printf("\n");
+				}
+				if (getenv("SGBRUN_DUMP")) {                /* raw memory: VRAM banks 0/1 $8000-$9FFF, WRAM banks 0-7
+				                                             $D000-$DFFF (0 = $C000), OAM, HRAM -> PREFIX_nNNNNN.mem */
+					char mp[1100]; snprintf(mp, sizeof mp, "%s_n%05d.mem", out, nshots[k]);
+					FILE* mf = fopen(mp, "wb");
+					if (mf) {
+						for (int b = 0; b < 2; b++) for (unsigned a = 0x8000; a < 0xA000; a++) fputc(core->rawRead8(core, a, b), mf);
+						for (unsigned a = 0xC000; a < 0xD000; a++) fputc(core->busRead8(core, a), mf);
+						for (int b = 1; b < 8; b++) for (unsigned a = 0xD000; a < 0xE000; a++) fputc(core->rawRead8(core, a, b), mf);
+						for (unsigned a = 0xFE00; a < 0xFEA0; a++) fputc(core->busRead8(core, a), mf);
+						for (unsigned a = 0xFF80; a < 0x10000; a++) fputc(core->busRead8(core, a), mf);
+						fclose(mf);
+					}
 				}
 				if (getenv("SGBRUN_HD")) {                  /* CGB tile copy (WRAM 2) vs VRAM */
 					int bad = 0;

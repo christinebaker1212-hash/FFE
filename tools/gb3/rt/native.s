@@ -663,6 +663,7 @@ nat_9f98:
             dec b
             jr nz, .c1
             ldh a, [rSVBK]
+            and 7                           ; (SVBK reads with bits 3-7 set)
             inc a
             cp 4
             jr c, .sb

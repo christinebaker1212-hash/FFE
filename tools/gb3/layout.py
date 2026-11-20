@@ -442,6 +442,11 @@ def battle(r):
     r.patch(B34, 0x967E, '0A', 'EA', 'bconv newline: one buffer row (was two)')
     r.patch(B34, 0x9BB0, 'A9 77 8D 0A 72 A9 79 8D 0B 72', 'EA' * 10, 'no HP header (on line 1 now)')
     r.patch(B34, 0x9CD4, 'A9 0B 85 18 A9 1E', 'A9 02 85 18 A9 15', 'party window cols 2-21')
+    # cursors: command hand at NES x 16-31 (GB 0-15, over the window frame at the screen edge,
+    # as FF1) beside the text (col 4), one row per command; the list cursors one row per line
+    r.patch(B34, 0x8B00, 'A8 10 B8 10 C8 10 D8 10', 'A0 18 A8 18 B0 18 B8 18', 'command cursor')
+    r.patch(B34, 0x8B08, 'A8 08 B8 08 C8 08 D8 08 A8 50 B8 50 C8 50 D8 50 A8 98 B8 98 C8 98 D8 98',
+            'A0 08 A8 08 B0 08 B8 08 A0 50 A8 50 B0 50 B8 50 A0 98 A8 98 B0 98 B8 98', 'list cursors: rows')
     for a in (0x9AD8, 0x9DD5):
         r.patch(B34, a, 'A9 01 85 18 A9 0A', 'A9 02 85 18 A9 0B', 'command / names window cols 2-11')
 
