@@ -155,10 +155,35 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   each), OAM conversion (~5k cycles a frame), banked ROM reads, cross-bank calls (~400
   cycles each), the HP window redraw (text buffer through `STA (zp),Y`).
 
+## Battle re-layout (2026-11-20)
+- `tools/gb3/layout.py EN.nes OUT.nes` (also `layout.apply()`): the NES-side layout, patches
+  checked against the original bytes, new code as asm6502 modules. `ff3src.py --english --gb`
+  makes the source base of the layout ROM (`build/ff3/src_gb`), `build.py --gb` builds
+  `build/ff3_gb.nes` + `build/ff3_gb.gbc`.
+- Battle: party column (x 160/164, 24 px apart, step 8/12 px), windows from row 19 with one
+  row per text line (party window cols 2-21, command / names cols 2-11), command / list
+  cursors one row per line, the command hand over the frame at the screen edge; battle
+  messages in one full-width window (FF3's open / close message routines rewritten in place,
+  bank 52 $8D1B, helpers in ExRAM $5F30, state in the old box save buffer $5E90; arrow glyph
+  in the unused font code $CA). Camera on / off through `$5806` (ExRAM trampolines at $5E7F
+  around the battle's "reset ppu control" calls).
+- Runtime: `$5806` = battle cameras: battlefield NES (20, 48) at GB (0, 0); from GB line 96 a
+  LYC interrupt sets SCX = 16 + the split's X, SCY + 8 (window camera col 2 / row 7); map rows
+  18+ carry the BG table of the IRQ's `$2000` (`spl_bank`, `rebank_spl`); sprites below the
+  split use the window camera, NES row 18 hidden.
+- Fixed: the native "clear VRAM" (`nat_9f98`) never cleared sprite table 1 (SVBK reads with
+  bits 3-7 set): a stray tile on every party member's head. Native bconv in GB-layout mode
+  started lines at offset 1.
+- Checks: `firstdiff.py build/ff3_gb.nes build/ff3_gb.gbc 12000 --input explore --ignore
+  00C9-00CA,00D0-00DF,0014-0014`: identical through waited frame 11,881 (opening battle and
+  the cave battles with messages). Screens: `gbshots.py` (NES / mGBA CGB side by side, input
+  resync; `--freeze W`, `--dump DIR`): battlefield, party, command window + hand, messages as
+  the NES. Lag (`lagcheck.py ... 2000 12000 --input explore --resync --step 10`): +0.1% in
+  total; steps of +16 / +22 / +73 frames at screen loads (3854, 8544, 9877).
+- Open in battle: enemy names window while targeting, magic / item lists, back attacks,
+  bosses / large formations; a mock-up check by the owner.
+
 ## Known open items
-- Battle screen: the windows below the split (BG table 1 vs the battlefield's table, the
-  IRQ's `$2000/$2005` values) are not shown yet; the party sprites are outside the centre
-  camera. Both belong to the battle re-layout (step 4) and the split support in the runtime.
 - Warp (`p3c:9B5F` TSX / TXS arithmetic) and the inn's `TXS` from a saved X (`p3c:9039`) use
   FF2's approximate helpers: need a semantic version (as FF2's open item).
 - Sound: APU writes ignored for now.
@@ -166,7 +191,9 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
   raster split); belongs in the window layer (FF1 lesson).
 
 ## Next
-1. Speed: the map loader (field entry after battles, doors / stairs), then bosses and magic
-   animations (need further input scripts), menus.
-2. Raster split in the runtime (LYC, window layer), sound (APU -> GB, FF1/FF2 model).
-3. Mock-ups for the owner (battle, dialogue, main menu), then the re-layouts.
+1. Battle details (targeting names window, magic / item lists, back attack), then field
+   dialogue and menus (mock-ups to the owner first).
+2. Native presentation (owner's decision 2026-11-20, `docs/gb-native-presentation.md`):
+   profile the lagging screen loads (post-battle map load, doors / stairs) and replace their
+   drawing with native GB routines; native music driver and sprites later.
+3. Sound (APU -> GB, FF1/FF2 model) until the native music driver exists.

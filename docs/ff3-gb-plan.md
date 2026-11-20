@@ -126,6 +126,19 @@ NES "GB-layout" ROM. Mock-ups (PNG, real font and graphics from the user's ROM, 
    **layout A**: a full-width party window (name, HP current/max per line) in the bottom 6
    rows, the command window and the enemy names (while targeting) opening over its left part
    (9 columns); **messages in one full-width window** over the party window ("attacker →
-   target", hits, results); **shorter step forward** (half FF3's distance: the acting member
-   stays in the party column, no overlap with the enemies).
+   target", hits, results). Rows and step as FF1 / FF2 (owner: "take a look at what FF1
+   and FF2 do"): enemy area NES x 20-159 at GB x 0-139, party column GB x 140-159 (front row
+   NES x 160, back row 164), members 24 px apart from NES y 47, the acting member steps
+   forward 8 px (back row 12); a battlefield camera (pixels) and a tile-aligned window
+   camera, split at GB line 96.
+   Built (2026-11-20, `tools/gb3/layout.py`): windows on FF3's rows 19-24 (NES row 18 is
+   written by the enemy death animations, so it stays hidden: window camera col 2 / row 7),
+   one tile row per text line, party window cols 2-21, command / names windows cols 2-11,
+   command hand over the window frame at the screen edge (FF1). Messages: one window, lines
+   filled in order (attacker -> target on line 1 when it fits, the action, the result
+   word-wrapped at 18; a longer result covers the last lines).
+4. **Native presentation (owner, 2026-11-20, all three ports):** game logic recompiled from
+   the user's ROM, presentation (picture, sprites, music, screen loads) native GB code;
+   measure first (lagcheck, sgbrun profile buckets), reproduce each replaced routine's RAM
+   side effects exactly. `docs/gb-native-presentation.md`.
 

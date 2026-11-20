@@ -835,4 +835,6 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   steps; names up to 6 letters; music voices vs the NSF (sndcmp.py); then the owner's
   play-test.
 - FF2: separate session (`docs/ff2-gb-brief.md`). FF3 (GBC only): separate session, status in
-  `docs/ff3-gb-status.md` (branch `claude/vibrant-davinci-lc8boi`).
+  `docs/ff3-gb-status.md` (branch `claude/vibrant-davinci-lc8boi`). FF3 2026-11-20: battle
+  re-layout built (`tools/gb3/layout.py`, `build.py --gb`; party column, full-width party and
+  message windows, battle cameras in the runtime), RAM-identical to its NES layout ROM.
