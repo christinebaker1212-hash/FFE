@@ -897,6 +897,15 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   map's tiles are re-coded in spare time with the LCD off (battle start -1, field +1: the
   field draws on right after rendering is on); view-only LCD-on scan for every fixed-camera
   screen (they take the one-palette path already).
+- FF1's bank select fix:FE1A native (`hle_bank`, called directly from every JSR $FE03).
+  **DMG switch-off deferred to the next vblank** (no busy wait in rt_ppu_w1 when the NES turns
+  rendering off mid-frame): blank at once (white, no sprites), writes go to the shadows as in
+  a CGB masked load (VLCD 1; DMG BG CHR pages take the bulk path), the vblank handler switches
+  the LCD off (`dmg_loff`, timer frame restarted), the GB map is rebuilt from the shadows at
+  LCD-on only if it was written meanwhile (`dmg_maprb`); dmg_frame idle while pending. SGB
+  keeps the old wait. Checks: DMG pictures identical at 376 points (one one-frame queued cell),
+  CGB identical apart from the prologue's text appearing sooner; checkall 62/62.
+  Lag: CGB 0, DMG 143 -> 138.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
