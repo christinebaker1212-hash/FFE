@@ -315,14 +315,29 @@ SGBRUN_PROFC=1`, `profnes.py` groups samples by NES routine; ~470 samples = one 
 - Open: the sub-menus Job, Save (need a save with crystals / the world map) still use the NES
   layout through the field camera (mock-ups next).
 
+## Field fixes (2026-11-20)
+- Vertical wrap: the NES wraps the field at 480 lines (horizontal mirroring; 240 with
+  vertical), the GB map at 256. The vblank now works out the view's top in NES lines
+  (16-bit): past the seam the whole view gets SCY + 32 (16); across it an LYC interrupt
+  (`wrap_isr`, `wrap_d` / `wrap_l`) adds that step from the seam's line on, in the hblank
+  before. Battle and main-menu splits keep theirs. (Was: a black band / stale rows at the
+  top of the field.)
+- After the menu: thin strips in the menu palette on field rows: the HP-row palette restore
+  rebuilt all 32 cells of a row from nametable 0, but with the field scrolled sideways
+  columns 24-31 hold the other nametable's cells, whose attribute bytes FF3 rewrites with
+  the same values (skipped as unchanged). The restore now covers only the cells that were
+  set (`OVR_FC` / `OVR_NC` per row). The same mechanism left the menu's palette 3 on a
+  corner of the field: closing the menu now marks every attribute byte stale
+  (`ATTR_STALE`, 128 bytes; `attr_apply` applies all four quadrants of the first write to
+  a stale byte). (A complement of the shadow does not work: $FF -> $00 equals palette 0.)
+- Checks: explore 12000 and the menu / status / equip / item / magic sequences identical;
+  field and battle shots clean.
+
 ## Known open items
 - **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3 known failures: cart
   RAM enabled for good at boot (NES PRG-RAM lives in it), no soft reset, test hooks in the binary (`TEST_PAD`,
   `rst $38` trap); the rest to verify item by item. Done: the Color-only screen on DMG / SGB
   (`build.py dmg_msg_src`, seen in PyBoy and mGBA).
-- Field: the top screen row can show stale map rows (GB map rows 30-31) at the vertical wrap
-  (NES 240 lines, GB map 256): FF1 solved it with an LYC split (pre-existing; seen as a black
-  band or old menu cells at the top after a menu).
 - Warp (`p3c:9B5F` TSX / TXS arithmetic) and the inn's `TXS` from a saved X (`p3c:9039`) use
   FF2's approximate helpers: need a semantic version (as FF2's open item).
 - Sound: APU writes ignored for now.

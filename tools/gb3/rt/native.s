@@ -2834,6 +2834,12 @@ far_5808:   and a
 .off:       ldh a, [mnu]
             and a
             jr z, .rest
+            ld hl, ATTR_STALE               ; (menu closed: every attribute byte stale: the
+            ld a, 1                         ;   map shares its cells between the nametables,
+.st:        ld [hl+], a                     ;   and the menu left its palettes on cells the
+            bit 7, l                        ;   next screen draws from the other one, whose
+            jr z, .st                       ;   attribute values need not change)
+            ldh [attr_st], a
             xor a
             ldh [mnu], a
             ldh [rSTAT], a
@@ -2869,7 +2875,19 @@ far_5808:   and a
             ld a, [hl]
             xor c
             ld [hl], a
-            ld e, 0
+            ld a, d                         ; (only the cells set: first column, count)
+            add a, low(OVR_NC)
+            ld l, a
+            ld h, high(OVR_NC)
+            ld a, [hl]
+            ld b, a
+            ld a, d
+            add a, low(OVR_FC)
+            ld l, a
+            ld a, [hl]
+            ld e, a
+            add a, b
+            ldh [c_x], a                    ; (end column)
 .c:         ld a, d                         ; attribute byte NT_SH + $3C0 + (row >> 2) * 8
             and $1C                         ;   + (col >> 2)
             add a, a
@@ -2902,9 +2920,9 @@ far_5808:   and a
             ldh [rSVBK], a
             ld [hl], b
             inc e
-            ld a, e
-            cp 32
-            jr c, .c
+            ldh a, [c_x]
+            cp e
+            jr nz, .c
             ld a, 1
             ldh [rSVBK], a
             ld a, d
@@ -2956,7 +2974,16 @@ far_5809:   push bc                         ; A = member * 4 + palette: the memb
             ld d, a
             ld e, 4
             ld b, 11
-mnu_set:    call mnu_cell                   ; B cells from row D column E: attribute C
+mnu_set:    ld a, d                         ; B cells from row D column E: attribute C
+            add a, low(OVR_FC)              ;   (recorded for the restore)
+            ld l, a
+            ld h, high(OVR_FC)
+            ld [hl], e
+            ld a, d
+            add a, low(OVR_NC)
+            ld l, a
+            ld [hl], b
+            call mnu_cell
             ld a, MAP_BANK
             ldh [rSVBK], a
 .w:         ld a, c

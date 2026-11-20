@@ -30,6 +30,9 @@ NMI_CNT    = $D830          ; 16-bit count of NES frame waits             test r
 VBL_CNT    = $D832          ; 16-bit count of GB frames                   tools/gb/gambatte/
 WAIT_CNT   = $D834          ; 16-bit count of NES frames the main thread waited for (tools/gb3/firstdiff.py)
 OVR_ROWS   = $D840          ; map rows with palettes set by $5809 / $580C (bit per row, 4)
+OVR_FC     = $D850          ;   per row: first column set, count (30 + 30)
+OVR_NC     = $D870
+ATTR_STALE = $D900          ; per attribute byte (nametable * 64 + index): 1 = stale (128)
 OVR_R      = $D844          ; $580A row, $580B first column (WRAM bank 1)
 OVR_C      = $D845
 TEST_PAD   = $D83E          ; $A5: test runner input mode (later)         gbrun.c)
@@ -154,6 +157,9 @@ ch_fl:      ds 1
 mnu:        ds 1                            ; main menu mode ($5808, tools/gb3/layout.py)
 mnu_i:      ds 1                            ;   next SCY step (MNU_EV index * 2), SCY at line 0
 mnu_b:      ds 1
+wrap_d:     ds 1                            ; field: SCY step at the NES's vertical seam (0: none)
+wrap_l:     ds 1                            ;   and its LYC line
+attr_st:    ds 1                            ; ATTR_STALE in use (menu closed)
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -286,6 +292,9 @@ stat_isr:   push af                         ; line SPLIT_LY - 1: the window came
             ldh a, [mnu]                    ;   next line (written in this line's hblank)
             and a
             jr nz, mnu_isr
+            ldh a, [wrap_d]                 ; (field: the NES's vertical wrap)
+            and a
+            jr nz, wrap_isr
 .w:         ldh a, [rSTAT]                  ;   next line (written in this line's hblank)
             and 3
             jr nz, .w
@@ -296,6 +305,17 @@ stat_isr:   push af                         ; line SPLIT_LY - 1: the window came
             ldh a, [rSCY]
             ld l, a
             ldh a, [spl_dy]
+            add a, l
+            ldh [rSCY], a
+            pop hl
+            pop af
+            reti
+wrap_isr:   push hl                         ; field: from the seam's line on, SCY + DELTA (the
+            ld l, a                         ;   NES nametables wrap at 240 / 480 lines, the GB
+.w:         ldh a, [rSTAT]                  ;   map at 256), written in the hblank before it
+            and 3
+            jr nz, .w
+            ldh a, [rSCY]
             add a, l
             ldh [rSCY], a
             pop hl
@@ -394,12 +414,75 @@ vblank_isr: push af
             bit 1, h
             jr z, .v
             ld a, 240
-.v:         ld l, a
-            ldh a, [scroll_y]
-            add a, l
-            ld l, a
-            ldh a, [cam_y]
-            add a, l
+.v:         push bc                         ; NES line at the top of the view: P0 = nametable
+            push de                         ;   base + scroll + camera (16-bit); the NES wraps
+            ld e, a                         ;   at P = 480 (horizontal mirroring) or 240, the GB
+            ld d, 0                         ;   map at 256: past the seam the map is DELTA (32 /
+            ldh a, [scroll_y]               ;   16) further on: SCY + DELTA for the whole view,
+            add a, e                        ;   or from the seam's line on (wrap_isr)
+            ld e, a
+            jr nc, .a1
+            inc d
+.a1:        ldh a, [cam_y]
+            add a, e
+            ld e, a
+            jr nc, .a2
+            inc d
+.a2:        ld hl, 240
+            ldh a, [mirror]
+            and a
+            jr z, .p
+            ld hl, 480
+.p:         ld c, 0                         ; C = DELTA for a split (0: none)
+            ld a, e
+            sub l
+            ld b, a
+            ld a, d
+            sbc h
+            jr c, .sp
+            ld e, b                         ; whole view past the seam: P0 - P
+            jr .wr
+.sp:        ld a, l                         ; seam at line P - P0, if in view
+            sub e
+            ld b, a
+            ld a, h
+            sbc d
+            jr nz, .wr
+            ld a, b
+            cp 144
+            jr nc, .wr
+            dec a
+            ldh [wrap_l], a
+            ld a, h                         ; DELTA = 16 + 16 * (P > 255)
+            swap a
+            add a, 16
+            ld c, a
+.wr:        ldh a, [bcam]                   ; (battle / main menu: their own splits)
+            ld b, a
+            ldh a, [mnu]
+            or b
+            jr z, .wa
+            ld c, 0
+            jr .wb
+.wa:        ld a, c
+            and a
+            jr z, .woff
+            ldh a, [wrap_l]
+            ldh [rLYC], a
+            ld a, $40
+            ldh [rSTAT], a
+            ldh a, [rIE]
+            or 2
+            ldh [rIE], a
+            jr .wb
+.woff:      ldh a, [rIE]
+            and $FD
+            ldh [rIE], a
+.wb:        ld a, c
+            ldh [wrap_d], a
+            ld a, e
+            pop de
+            pop bc
             ldh [rSCY], a
             ld l, a
             ldh a, [mnu]
@@ -1568,7 +1651,25 @@ rt_ppu_r7:  push af                         ; $2007 read (buffered; nametables f
 ; each pair is one address computation. Keeps B, C.
 attr_apply: ldh [c_val], a
             ld d, a
-            ldh a, [c_q]
+            ldh a, [attr_st]                ; (stale bytes since a menu closed: the first
+            and a                           ;   write applies all four quadrants)
+            jr z, .ns
+            push hl
+            ld a, b
+            rrca
+            rrca
+            or l
+            ld l, a
+            ld h, high(ATTR_STALE)
+            ld a, [hl]
+            and a
+            jr z, .np
+            ld [hl], 0
+            ld a, d
+            cpl
+            ldh [c_q], a
+.np:        pop hl
+.ns:        ldh a, [c_q]
             xor d
             ret z                           ; unchanged
             push bc
