@@ -468,8 +468,13 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   rewrites whole rows): DMG +9.1%, CGB -0.9%. Random 30000 on DMG and CGB identical.
   (Screenshots of the dialogue scenes show the NES's own transitional states, e.g. a line
   twice while the text scrolls, a few frames late on the GB: the lag, not a drawing fault.)
-- Next: DMG field speed (nametable writes, OAM conversion, cell bookkeeping); Select menu
-  with suspend (design with the owner).
+- **Owner's decision (2026-11-20): keep DMG and make the presentation native** (not GBC-only):
+  approach in `docs/gb-native-presentation.md` (game logic recompiled, picture / music /
+  sprites native, DMG shading at build time). Profile buckets of the slow DMG stretch:
+  picture 39%, glue 21%, game code 16%, OAM clear 7% (now native), music 7%, sprites 6%,
+  timing loops 4%.
+- Next: step 1 of that plan, the field + dialogue path (native map and text drawing,
+  build-time DMG shading); Select menu with suspend (design with the owner).
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
