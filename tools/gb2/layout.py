@@ -2462,12 +2462,7 @@ gm_init:                ; LCD off (b14:ACE3): camera, portrait tiles, their pale
     adc #1
     jsr tileaddr
     ldy #0
-.cp:
-    lda (VQ),y
-    sta $2007
-    iny
-    cpy #192
-    bne .cp
+    jsr pcopy           ; (the 12 portrait tiles; native on the GB: NATIVE_EXT b24_pcopy)
 .next:
     inc VI
     lda VI
@@ -2723,6 +2718,13 @@ gm_party:               ; b14:AD0A (replaces the four member windows b14:B396)
     sta $7800,x
     inx
     bne .rs
+    rts
+pcopy:                  ; 192 bytes from (VQ) + Y to the PPU
+    lda (VQ),y
+    sta $2007
+    iny
+    cpy #192
+    bne pcopy
     rts
 gm_tparty:              ; item / spell target (b14:A909, A8E5, AC60 instead of b14:B396):
     lda #1              ;   window NES (1,13,20,6), member k on row 14+k: name cols 2-7,
@@ -4093,6 +4095,8 @@ gbm:                    ; main menu (bank 24): A = sub-command; back to bank 14
     put(rom, 24, 0x8000, b24.bytes)
     B24L[0] = b24.labels
     NATIVE_EXT['b24_vtile'] = (24, b24.labels['vtile'], 'hle_vtile', 'NZC')
+    assert RAM['VQ'] == 0xD4                     # (hle_pcopy reads the pointer at $D4)
+    NATIVE_EXT['b24_pcopy'] = (24, b24.labels['pcopy'], 'hle_pcopy', 'NZC')
     class E: pass
     e = E(); e.labels = labels
     for k, (name, rb, nes) in enumerate(ENTRIES):

@@ -344,6 +344,37 @@ hle_chrpg:  push af
             pop de
             jr cp_tail
 
+; layout bank 24 `pcopy` (menu portraits, NATIVE_EXT): LDA ($D4),Y / STA $2007 / INY / CPY
+; #192 / BNE, through cp_core. Exit: A = last byte, Y = 192, N = 0, Z = 1, C = 1; X kept.
+hle_pcopy:  ld a, c
+            cp 192
+            jr nc, .odd
+            push de
+            cpl
+            add a, 193                      ; 192 - Y bytes
+            ld e, a
+            ld l, $D4
+            call cp_core
+            pop de
+.x:         xor a
+            ldh [nzv], a
+            ldh a, [tmp_lo]
+            scf
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1, C = 1
+            ret
+.odd:       ld l, $D4                       ; (Y >= 192 on entry: byte by byte to Y = 192)
+            call rt_izy_rd
+            ld a, l
+            ldh [tmp_lo], a
+            call rt_ppu_w7
+            inc c
+            ld a, c
+            cp 192
+            jr nz, .odd
+            jr .x
+
 ; b11:9DB1-9DB8 (battle intro, the enemies' dissolve: 128 bytes of tiles from $7700 per
 ; frame): LDA ($02),Y / STA $2007 / INY / BPL. Exit: A = last byte, Y = $80, N = 1, Z = 0, X
 ; and carry kept.
@@ -377,11 +408,18 @@ hle_chr128: push af
 
 ; L = zero-page address of the source pointer, E = count (0 = 256), C = Y: LDA (zp),Y /
 ; STA $2007 / INY, E times (source $6000-$BFFF, tiles: whole tiles at once). Out: tmp_lo = last byte, C += count, B = D = E = 0.
-cp_core:    ld d, l                         ; (D = zp for the byte path)
+cp_core:    xor a                           ; (zero-page pointer mode)
+            ld [CP_HLM], a
+            ld d, l                         ; (D = zp for the byte path)
             ld a, c
             and a
-            jp nz, .slow
-            ld a, e
+            jp nz, cp_hl.slow
+            ld h, high(NES_RAM)             ; HL = the pointer
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+; HL = NES source, E = count (CP_HLM = 1: from copy_core; a refusal returns carry set)
+cp_hl:      ld a, e
             and $0F
             jp nz, .slow
             ldh a, [ppu_ctrl]
@@ -393,15 +431,29 @@ cp_core:    ld d, l                         ; (D = zp for the byte path)
             ldh a, [ppu_vl]
             and $0F
             jp nz, .slow
-            ld h, high(NES_RAM)             ; HL = the pointer
-            ld a, [hl+]
-            ld h, [hl]
-            ld l, a
-            ld a, h                         ; source: $8000-$BFFF (ROM data bank) or
-            cp $60                          ;   $6000-$7FFF (cart RAM bank 0)
-            jp c, .slow
+            ld a, h                         ; source: $8000-$BEFF (ROM data bank) or
+            cp $60                          ;   $6000-$7EFF (cart RAM bank 0): a full page
+            jp c, .slow                     ;   stays inside the window
             cp $C0
             jp nc, .slow
+            cp $80                          ; the last page of a window ($7F / $BF): the
+            jr z, .rok                      ;   copy must end inside it
+            cp $7F
+            jr z, .edge
+            cp $BF
+            jr nz, .rok
+.edge:      ld a, e
+            and a
+            jr nz, .en
+            ld a, l                         ; 256 bytes: from the page start only
+            and a
+            jp nz, .slow
+            jr .rok
+.en:        ld a, l
+            add a, e
+            jr nc, .rok
+            jp nz, .slow
+.rok:
             ld a, e                         ; tiles: X / 16 (X = 0: 256 bytes)
             swap a
             and $0F
@@ -668,8 +720,14 @@ cp_core:    ld d, l                         ; (D = zp for the byte path)
             ld b, 0
             ld d, b
             ld e, b
+            and a                           ; (carry clear: done)
             ret
-.slow:      ld l, d                         ; generic: LDA (zp),Y / STA $2007 / INY / DEX
+.slow:      ld a, [CP_HLM]                  ; from copy_core: refused (carry set)
+            and a
+            jr z, .szp
+            scf
+            ret
+.szp:       ld l, d                         ; generic: LDA (zp),Y / STA $2007 / INY / DEX
             call rt_izy_rd
             ld a, l
             ldh [tmp_lo], a
@@ -1161,198 +1219,14 @@ hle_copy_x: ld b, 0
 ; HL = NES source, E = count (0 = 256) -> the PPU at its address (tmp_lo = last byte).
 ; Whole tiles of a pattern table from ROM $8000-$BEFF in one go each (as hle_ppucopy),
 ; else byte by byte. Keeps C; B, D, E, HL clobbered.
-copy_core:  ld a, e
-            and $0F
-            jp nz, .slow
-            ldh a, [ppu_ctrl]
-            and 4
-            jp nz, .slow
-            ldh a, [ppu_vh]
-            cp $20
-            jp nc, .slow
-            ldh a, [ppu_vl]
-            and $0F
-            jp nz, .slow
-            ld a, h
-            cp $80
-            jp c, .slow
-            cp $BF
-            jp nc, .slow
-            ldh a, [lcd_on]                 ; LCD on: CGB only (tile copy + DMA marks)
-            and a
-            jr z, .lok
-            ldh a, [is_cgb]
-            and a
-            jp z, .slow
-.lok:       ld a, e
-            swap a
-            and $0F
-            jr nz, .tn
-            ld a, 16
-.tn:        ldh [uw_y], a
-            ld a, h                         ; GB $4000 + source - $8000 (data bank)
-            sub $40
-            ld h, a
-            ldh a, [data_bank8]
-            ld [$2000], a
-.tile:      ldh a, [ppu_vl]
-            and $F0
-            ld e, a
-            ldh a, [ppu_vh]
-            ld d, a
-            and $10
-            ld b, a
-            ldh a, [ppu_ctrl]
-            and $10
-            xor b
-            ld a, d                         ; (flags kept)
-            jr nz, .spr
-            and $0F
-            ld d, a
-            ldh a, [is_cgb]
-            and a
-            ld a, d
-            jr nz, .bgv
-            add a, high(BG_SHADOW)          ; DMG: BG tile to the shadow, re-coded later
-            ld d, a
-            ld a, 1
-            ld [$4000], a
-            jr .copy
-.bgv:       ld d, a
-            ldh a, [lcd_on]
-            and a
-            ld a, d
-            jr nz, .bgs
-            cp $08                          ; CGB, LCD off: VRAM (tiles 0-127 $9000, 128-255 $8800)
-            ld d, $90
-            jr c, .bg0
-            ld d, $80
-.bg0:       and $0F
-            add a, d
-            ld d, a
-            jr .copy
-.bgs:       add a, $D0                      ; CGB, LCD on: the tile copy (WRAM bank 2), marked
-            ld d, a
-            ld a, 2
-            ldh [$FF70], a
-            jr .copy
-.spr:       and $0F                         ; sprite table: the shadow (cart RAM bank 1)
-            add a, high(SPR_SHADOW)
-            ld d, a
-            ld a, 1
-            ld [$4000], a
-.copy:      ld b, 0                         ; (16 bytes unrolled: plane 0 rows to the
-                                            ;   even bytes, plane 1 to the odd ones)
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, e
-            sub 15
-            ld e, a
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            inc e
-            ldh [tmp_lo], a                 ; last byte
-            ld a, d
-            cp $D0
-            jr c, .nst
-            ld a, 1                         ; tile copy: WRAM bank 1 again, mark the tile
-            ldh [$FF70], a
-            push hl
-            ld a, e
-            sub 17
-            swap a
-            and $0F
-            ld e, a
-            ld a, d
-            sub $D0
-            swap a
-            or e
-            ld hl, BG_DIRTY
-            call hd_mark
+copy_core:  push bc                         ; whole tiles through cp_hl (cp_core's tile
+            push hl                         ;   copier: ROM / cart RAM sources, DMG with the
+            ld a, 1                         ;   LCD on too); refused: byte by byte
+            ld [CP_HLM], a
+            call cp_hl
             pop hl
-            jr .nx
-.nst:       cp $80
-            jr c, .nvr
-            cp $A0                          ; (VRAM $80-$97: nothing to mark)
-            jr c, .nx
-.nvr:       cp high(BG_SHADOW)
-            jr c, .spm
-            call ff2_bg_tile
-            jr .nx
-.spm:       call ff2_spr_tile
-.nx:        ldh a, [ppu_vl]                 ; v += 16
-            add a, 16
-            ldh [ppu_vl], a
-            ldh a, [ppu_vh]
-            adc a, 0
-            and $3F
-            ldh [ppu_vh], a
-            ldh a, [uw_y]
-            dec a
-            ldh [uw_y], a
-            jr nz, .tile
-            ldh a, [code_bank]
-            ld [$2000], a
-            ret
+            pop bc
+            ret nc
 .slow:      push hl
             call nes_rd
             ld a, l

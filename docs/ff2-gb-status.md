@@ -616,6 +616,11 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   frame through the generic indirect helpers before (~35% of those frames on DMG). The
   steady +6 battle windows (10021-10141, 12841) gone; no battle window above +2 after the
   intro. RAM identical (random 1 DMG / CGB, random 2, form 40).
+- `copy_core` (fix:E50E / E51E CHR copies) now goes through cp_core's tile copier (`cp_hl`
+  entry: ROM / cart RAM sources, DMG with the LCD on; a refusal falls back to bytes); the
+  source check is exact at the end of a bank window. The menu portraits (our bank-24 loop)
+  are a subroutine `pcopy` with a native replacement (`hle_pcopy`, NATIVE_EXT). Menu opening
+  DMG +35 -> +20, doors +48 -> +44. Random 1: DMG +0.5%, CGB -2.2%; RAM identical.
 - Status of the owner's three (DMG, random 1): overworld walking / sailing at parity (walk
   scenario); dialogue windows +5 / 0 / +3 / -5; battle phases mostly <= 0 (a few +6);
   remaining: battle entry (load +19 net, intro +39 / +32), door loads (+56 single wait,
