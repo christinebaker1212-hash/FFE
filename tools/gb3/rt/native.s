@@ -552,6 +552,7 @@ chr64_fast: ldh a, [ppu_vl]
             ld [MBC5_BANKL], a
             ld a, 1
             ldh [chr_dirty], a
+            ld [FRZW], a
             ldh a, [ch_n]                   ; PPU address + the bytes, Y = the bytes
             ld c, a
             ldh a, [ppu_vl]
@@ -2386,6 +2387,7 @@ far_9f98:
             jr nz, .c4
             ld a, 1
             ldh [chr_dirty], a
+            ld [FRZW], a
             ldh [map_any], a
             xor a
             ldh [mr_hi], a
@@ -2755,11 +2757,15 @@ far_5808:   and a
             ldh [attr_st], a
             xor a
             ldh [mnu], a
+            ld a, [FRZ]                     ; (a held menu screen keeps its raster: the vblank
+            and a                           ;   drops it when the next picture is shown)
+            jr nz, .keep
+            xor a
             ldh [rSTAT], a
             ldh a, [rIE]
             and $FD
             ldh [rIE], a
-            ld a, CAM_X
+.keep:      ld a, CAM_X
             ldh [cam_x], a
             ld a, CAM_Y
             ldh [cam_y], a
@@ -3917,6 +3923,7 @@ cv_put:     push bc
             call tile_mark
             ld a, 1
             ldh [chr_dirty], a
+            ld [FRZW], a
             pop hl
             pop de
             pop bc
@@ -4093,6 +4100,7 @@ far_cvoff:  push bc
             pop de
             ld a, 1
             ldh [chr_dirty], a
+            ld [FRZW], a
 .nx:        inc d
             ld a, d
             cp CV_HI + 1

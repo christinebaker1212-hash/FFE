@@ -103,7 +103,13 @@ class FF3:
     # GB-only calls at the start of an NES instruction (registers and flags kept): the text
     # engine's push / pop of the text pointer bracket nested strings (names) for the native
     # line printer's condensed names (native.s cv_beg / cv_end)
-    pre = {('fix', 0xF3E4): 'cv_beg', ('fix', 0xF3ED): 'cv_end'}
+    pre = {('fix', 0xF3E4): 'cv_beg', ('fix', 0xF3ED): 'cv_end',
+           # menu screens: picture held while a screen is built (main menu open, a menu window
+           # opened), shown once nothing has been drawn for FRZ_QUIET frames (runtime.s frz_on;
+           # the cursor frame wait 3D:A7CD also runs between a screen's drawing steps)
+           ('p3c', 0xA534): 'frz_on', ('p3c', 0xA666): 'frz_on', ('p3c', 0xAAF1): 'frz_on',
+           ('fix', 0xF7BB): 'frz_on', ('fix', 0xF44B): 'frz_on', ('fix', 0xF461): 'frz_on',
+           ('fix', 0xF465): 'frz_on'}
     for _a, _n in zip(range(0xFD3C, 0xFD41), ('nat_fd3c', 'nat_fd3d', 'nat_fd3e', 'nat_fd3f', 'nat_fd40')):
         ext[('fix', _a)] = (_n, 'NZC')               # asl x6 .. x2
     for _a, _n in zip(range(0xFD43, 0xFD48), ('nat_fd43', 'nat_fd44', 'nat_fd45', 'nat_fd46', 'nat_fd47')):

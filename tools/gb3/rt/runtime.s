@@ -13,7 +13,7 @@
 ; mirroring the second nametable continues at row 30, mod 32). NES palette RAM -> CGB
 ; palettes 0-3 (BG) and 0-3 (OBJ) through NES_RGB.
 
-STACK_TOP  = $D000          ; GB stack $CDE9-$CFFF (the NES stack runs on it; FF3 keeps data in
+STACK_TOP  = $D000          ; GB stack $CDED-$CFFF (the NES stack runs on it; FF3 keeps data in
                             ;   page 1 at $0100-$0161, so the stack stays out of NES RAM), outside
                             ;   the switchable WRAM bank $D000-$DFFF
 NES_RAM    = $C000          ; $0000-$07FF
@@ -41,6 +41,13 @@ OVR_NC     = $CDC4
 ATTR_STALE = $D900          ; per attribute byte (nametable * 64 + index): 1 = stale (128; bank RT_WBANK)
 NT_LOCK    = $CDE8          ; $580D: 0, or 1 + the nametable (after mirroring) the GB map shows;
                             ;   writes to the other one go to its shadow only (fixed WRAM)
+FRZ        = $CDE9          ; menu screen build: frames the picture has been held (0: off;
+FRZ_MAX    = 240            ;   frz_on pre-hooks, translate.py FF3.pre; fixed WRAM)
+FRZW       = $CDEA          ;   1: a map row or tile was marked since the last vblank
+FRZQ       = $CDEB          ;   frames in a row with nothing drawn (FRZ_QUIET: the screen is built)
+FRZ_QUIET  = 12
+MNU_SH     = $CDEC          ; menu mode of the picture shown (the LYC raster follows it while a
+                            ;   menu screen is held; mnu = the game's current mode)
 OVR_R      = $CD9A          ; $580A row, $580B first column (fixed WRAM)
 OVR_C      = $CD9B
 TEST_PAD   = $CD9E          ; $A5: test runner input mode (dev builds only) gbrun.c)
@@ -317,6 +324,33 @@ boot:       di
 ; and cart RAM off, then the boot path (memory and registers set up again, the game restarted).
 ; Never inside a save access (cart RAM is on only within sram_rd / sram_wr, interrupts may hit
 ; there: cart RAM is switched off first) and not while a save is being written (sram_busy).
+; menu screens (GB-only pre-hooks, translate.py FF3.pre): FF3 builds a menu screen window by
+; window over many frames (half-drawn windows on the GB's small screen); the picture is held from
+; the build's start (main menu open, a menu window opened, the menu nametable cleared, a menu
+; closed) until nothing has been drawn for FRZ_QUIET frames, then the backlog is uploaded and
+; the screen shown complete (vblank_isr). Registers and flags kept.
+frz_on:     push af
+            ld a, [FRZ]
+            and a
+            jr nz, .x
+            ld [FRZQ], a
+            ld [FRZW], a
+            inc a
+            ld [FRZ], a
+.x:         pop af
+            ret
+frz_rst:    ld a, [MNU_SH]                  ; held picture in menu mode: its raster again
+            and a                           ;   (A = FRZ kept)
+            ld a, [FRZ]
+            ret z
+            xor a
+            ldh [mnu_i], a
+            ldh a, [mnu_b]
+            ldh [rSCY], a
+            ld a, MNU_LYC0
+            ldh [rLYC], a
+            ld a, [FRZ]
+            ret
 soft_reset: di
             xor a
             ldh [rIE], a
@@ -343,9 +377,12 @@ dma_code:   ld a, high(OAM_SH)              ; copied to HRAM: OAM DMA
 
 ; ------------------------------------------------------------------ battle split (LYC)
 stat_isr:   push af                         ; line SPLIT_LY - 1: the window camera from the
-            ldh a, [mnu]                    ;   next line (written in this line's hblank)
+            ld a, [MNU_SH]                  ;   next line (written in this line's hblank)
             and a
             jr nz, mnu_isr
+            ldh a, [mnu]                    ; (menu mode not shown yet: nothing)
+            and a
+            jr nz, stat_x
             ldh a, [wrap_d]                 ; (field: the NES's vertical wrap)
             and a
             jr nz, wrap_isr
@@ -363,6 +400,8 @@ stat_isr:   push af                         ; line SPLIT_LY - 1: the window came
             ldh [rSCY], a
             pop hl
             pop af
+            reti
+stat_x:     pop af
             reti
 wrap_isr:   push hl                         ; field: from the seam's line on, SCY + DELTA (the
             ld l, a                         ;   NES nametables wrap at 240 / 480 lines, the GB
@@ -409,6 +448,48 @@ MNU_EV:     db 1, 29, 2, 39, 8, 46, 9, 61, 10, 71, 16, 78, 17, 93, 18, 103, 24, 
 ; ------------------------------------------------------------------ vblank
 vblank_isr: push af
             push hl
+            ld a, [FRZ]                     ; a menu screen being built: the last finished
+            and a                           ;   picture held (no OAM, palette, LCD / scroll,
+            jr z, .live                     ;   map, attribute or tile uploads; the shadows
+            bit 7, a                        ;   keep the changes), at most FRZ_MAX frames;
+            jr nz, .drain                   ;   then (bit 7) the map, attribute and tile
+            inc a                           ;   backlog uploaded under the old palettes, and
+            cp FRZ_MAX                      ;   the rest shown once it is all in VRAM
+            jr c, .held
+            xor a
+.held:      ld [FRZ], a
+            and a
+            jr z, .live
+            call frz_rst
+            ld a, [FRZW]                    ; (FRZ_QUIET frames in a row with nothing drawn: built)
+            ld h, a
+            xor a
+            ld [FRZW], a
+            ld a, h
+            and a
+            ld a, [FRZQ]
+            jr nz, .busy
+            inc a
+            cp FRZ_QUIET
+            jr c, .qset
+            ld a, $80
+            ld [FRZ], a
+            xor a
+            ld [FRZQ], a
+            jp .nm
+.busy:      xor a
+.qset:      ld [FRZQ], a
+            jp .nchr
+.drain:     call frz_rst
+            inc a
+            ld [FRZ], a
+            and $7F
+            cp 30
+            jp c, .nm
+            xor a
+            ld [FRZ], a
+.live:      ldh a, [mnu]
+            ld [MNU_SH], a
             ldh a, [oam_pending]
             and a
             jr z, .no_oam
@@ -587,7 +668,18 @@ vblank_isr: push af
             ldh [rSVBK], a
             pop de
             pop bc
-.nchr:      ldh a, [ppu_ctrl]               ; asynchronous NMI (battle / cutscenes): $0100 = JMP
+.nchr:      ld a, [FRZ]                     ; (backlog of a held menu screen uploaded: show)
+            bit 7, a
+            jr z, .nc0
+            ldh a, [map_any]
+            and a
+            jr nz, .nc0
+            ldh a, [chr_dirty]
+            and a
+            jr nz, .nc0
+            xor a
+            ld [FRZ], a
+.nc0:       ldh a, [ppu_ctrl]               ; asynchronous NMI (battle / cutscenes): $0100 = JMP
             bit 7, a                        ;   and NMIs on: run the handler at the next safe
             jr z, .nn                       ;   point
             ld a, [NES_RAM + $100]
@@ -1545,6 +1637,7 @@ tile_mark:  ld a, h                         ; dirty byte = tile >> 3 = H * 2 + (
             pop hl
             ld a, 1
             ldh [chr_dirty], a
+            ld [FRZW], a
             ret
 chr_store:  ld a, l                         ; byte k -> GB offset
             and $0F
@@ -1948,6 +2041,7 @@ row_mark:   ld a, h                         ; row = (H & 3) << 3 | L >> 5: byte 
             pop hl
             ld a, 1
             ldh [map_any], a
+            ld [FRZW], a
             ret
 
 ; vblank: dirty rows of one shadow -> VRAM by general-purpose DMA (runs within a bitmap byte,

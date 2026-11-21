@@ -483,6 +483,30 @@ NES running): plan and measurements in `docs/ff3-native-plan.md` (tool `tools/gb
   map DMA's LY window had no lower bound (a late V-Blank handler at LY 0 started a DMA in drawing
   time). Sent to the owner for the hardware test.
 
+## Owner's hardware test (2026-11-21): chest, menus
+Owner (real GBC / GBA): "treasure chest opening is broke, the menu is completely broken, the intro
+credits are broke"; asked to play the game by hand. Played the release ROM in SameBoy (GBC) with
+real joypad presses only (`build/gbrun` gained `--press F:KEYS:HOLD` / `--shot F` by GB frame,
+FF3 counters with env `GB_CNT=CD80`, FF3 pokes with `GB_PRG`, env `GBRUN_MODEL` for SameBoy's
+GBA model): new game, names, the first battle, the chest room of the first cave.
+- **Chest message**: printed in the two-row (dakuten) mode, two lines per page of the NES's
+  28-column window; the GB window cut it ("Inside the treasu"), and a one-line page showed its
+  line twice. Field messages of the t8200 table (dialogue ids $0100+: chests, locked door, inn,
+  Mini / Warp refusals, the Thief's lock) are now one-row mode ({0E}) at 18 columns
+  (`layout.FIELD_MSGS`). The chest itself opens as on the NES (checked).
+- **Menus**: FF3 builds each menu screen window by window over up to ~100 frames; on the GB's
+  small screen the half-built frames (windows missing, MP rows empty, members cut off, the line
+  spacing not yet applied) looked broken. Now the last finished picture is held while a menu
+  screen is built (GB-only pre-hooks `frz_on` at 3D:A534 main menu, 3D:A666 / 3D:AAF1 open menu
+  window, fix:F7BB menu nametable clear, fix:F44B / F461 / F465 close menu; no NES code changed),
+  until nothing has been drawn for 12 frames; then the map / attribute / tile backlog is uploaded
+  under the old palettes and the screen shown complete (runtime `FRZ`, `FRZW`, `FRZQ`, `MNU_SH`:
+  a held main menu keeps its raster spacing). Checked by hand: main menu, Item, Magic, Equip,
+  Status; RAM unchanged (pre-hooks only); Lot Check monitor 0 over the menu run.
+- Lot Check monitor (`sgbrun SGBRUN_LOTCHECK`) now also counts VRAM / OAM reads in drawing time and
+  palette writes in mode 3: 0.
+- Intro: the prophecy runs +3.2% slow (8 frames at each page start; lagcheck newgame 50-1700).
+
 ## Known open items
 - **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3: all items pass in
   emulators (2026-11-20; GBA hardware untested); re-run the checks on the final build.
