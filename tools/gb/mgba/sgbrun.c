@@ -139,6 +139,7 @@ int main(int argc, char** argv) {
 		vchk_frame = f;
 		if (poke_list) {
 			unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
+			if (getenv("SGBRUN_POKEF")) n = f;   /* (SGBRUN_POKEF: the poke frame is a GB frame) */
 			if (n >= (unsigned) poke_at) {
 				for (const char* p = poke_list; *p; ) {
 					unsigned a, v; int used;

@@ -59,6 +59,7 @@ C_OBJTBL   = $4400          ; FF1's object 2 x 2 tables
 C_INITPG   = $4500          ; new game: save page 0 and the game flags
 C_INITFLG  = $4600
 C_TESTPG   = $5E00          ; test builds: the save page to start with ($400)
+DMG_OBP_BLK = %10010000     ; on black (screens, battle): 1 white, 2 light grey, 3 dark grey
 DMG_OBP    = %11100000      ; sprite tiles hold brightness ranks: 1 white, 2 dark grey, 3 black
 M_MTOUT    = $5100
 M_MTIN     = $5300
@@ -77,6 +78,7 @@ C_FONTCGB  = $5000
 C_WINPAL   = $4700          ; CGB palette 7: FF1's window colours
 C_NESRGB   = $5D40          ; NES colour -> RGB555 (64 x 2)
 WIN_ATTR   = $0F            ; CGB window cell: palette 7, VRAM bank 1
+BLK_ATTR   = $0D            ; CGB cell outside the windows: palette 5 (all black), VRAM bank 1
 LCDC_WIN   = LCDC_ON | $60  ; window on, its map at $9C00
 BOX_LINES  = 64
 
@@ -705,8 +707,21 @@ move:       ld a, [moving]
             jr z, .lu
             ldh a, [pad]
             bit 1, a
+            jr nz, .mm
+            ld b, 8                         ; (Select a moment before B: up to 8 frames for B)
+.wb:        push bc
+            call wait_vbl
+            call read_pad
+            pop bc
+            ldh a, [pad]
+            bit 1, a
+            jr nz, .mm
+            bit 2, a                        ; (Select let go without B: the lineup)
             jr z, .lu
-            ld hl, minimap                   ; (FF1: the palettes cycle out first)
+            dec b
+            jr nz, .wb
+            jr .lu
+.mm:        ld hl, minimap                   ; (FF1: the palettes cycle out first)
             call pc_menu
             jp map_reload
 .lu:        ld hl, lineup                   ; (FF1: the palettes cycle out first)
@@ -2951,8 +2966,15 @@ pc_black:   ld a, 1
 ly_vbl:     xor a
             ld [ly_i], a
             ldh [rWY], a
-            ld a, 167
+            ld a, [ly_bgp]                  ; (a BGP list: the frame starts with its value)
+            and a
+            jr z, .wx
+            ld a, [ly_rst]
+            ldh [rBGP], a
+            jr .lc
+.wx:        ld a, 167
             ldh [rWX], a
+.lc:
             call lcd_get  
             bit 7, a
             ret z
@@ -3322,3 +3344,5 @@ sh_obp0:    ds 1
 sh_ps:      ds 1
 sh_stat:    ds 1
 gd_off:     ds 1                            ; the guard paused (RAM-only work)
+ly_bgp:     ds 1                            ; the raster list writes BGP (not WX)
+ly_rst:     ds 1                            ; ... and the frame starts with this BGP

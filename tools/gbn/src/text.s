@@ -33,6 +33,13 @@ text_init:  ldh a, [is_cgb]
             ldh [rBCPD], a
             dec b
             jr nz, .p
+            ld a, $A8                       ; BG palette 5: all black (outside the windows)
+            ldh [rBCPS], a
+            ld b, 8
+            xor a
+.k:         ldh [rBCPD], a
+            dec b
+            jr nz, .k
             ret
 
 ; load_map (LCD off), DMG: the font into the map's free tiles; the table kept in WRAM
@@ -372,8 +379,13 @@ stat_int:   push af
             add a, low(ly_tab) + 1
             ld l, a
             ld h, high(ly_tab)
+            ld a, [ly_bgp]                  ; (the prologue's fading line: BGP instead)
+            and a
             ld a, [hl+]
+            jr nz, .lyg
             ldh [rWX], a
+            jr .ly0
+.lyg:       ldh [rBGP], a
 .ly0:       ld a, [ly_i]
             inc a
             ld [ly_i], a

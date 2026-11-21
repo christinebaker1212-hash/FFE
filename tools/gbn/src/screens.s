@@ -35,9 +35,9 @@ scr_open:   call lcd_off                    ; (LCD off in V-Blank, interrupts of
             ld b, 18
             ld a, $20
             call fill32
-            ld hl, sattr
+            ld hl, sattr                    ; (outside the windows: black, as FF1's screens)
             ld b, 18
-            ld a, WIN_ATTR
+            ld a, BLK_ATTR
             call fill32
             ld hl, $9800                    ; VRAM map: blank
             ld b, 32
@@ -56,7 +56,7 @@ scr_open:   call lcd_off                    ; (LCD off in V-Blank, interrupts of
             ldh [rVBK], a
             ld hl, $9800
             ld b, 32
-            ld a, WIN_ATTR
+            ld a, BLK_ATTR
             call fill32
             xor a
             ldh [rVBK], a
@@ -82,8 +82,8 @@ scr_open:   call lcd_off                    ; (LCD off in V-Blank, interrupts of
             call far_copy
             ld a, %11100100
             call bgp_w
-            ld a, DMG_OBP
-            call obp0_w
+            ld a, DMG_OBP_BLK               ; (the screens' black windows: ranks 1-3 white,
+            call obp0_w                     ;   light grey, dark grey)
             ld hl, U_CURDMG
 .cur:       ld de, $8000 + 16 * CUR_TILE    ; the hand cursor
             ld bc, 64
@@ -115,6 +115,11 @@ scr_cls:    call oam_clr
             ld a, $20
             call fill32
             ld hl, sattr
+            ld b, 18
+            ld a, BLK_ATTR
+            jp fill32
+; the whole screen in the window colours (screens without a frame: name entry, prologue)
+scr_allwin: ld hl, sattr
             ld b, 18
             ld a, WIN_ATTR
             jp fill32
@@ -208,11 +213,10 @@ scr_classes:
             ld a, [scr_t0]                  ; HL = class block (32 tiles)
             ld l, a
             ld h, 0
-            add hl, hl                      ; x 512
+            add hl, hl                      ; x 2, then x 256: x 512 (32 tiles of 16 bytes)
             ld a, l
             ld l, 0
             ld h, a
-            add hl, hl
             ldh a, [is_cgb]
             and a
             ld bc, U_SPRDMG
@@ -238,6 +242,28 @@ scr_classes:
 scr_win:    push de
             call .w
             pop de
+            push bc                         ; its cells in the window colours
+            push de
+            call cell_addr
+            ld a, h
+            add a, 3                        ; (attributes at + $300)
+            ld h, a
+.ar:        push hl
+            ld b, d
+            ld a, WIN_ATTR
+.ac:        ld [hl+], a
+            dec b
+            jr nz, .ac
+            pop hl
+            ld a, l
+            add a, 32
+            ld l, a
+            jr nc, .an
+            inc h
+.an:        dec e
+            jr nz, .ar
+            pop de
+            pop bc
             ret
 .w:         push bc
             call cell_addr                  ; HL = smap + 32 y + x
@@ -448,11 +474,10 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
 .sok:       ldh a, [soft_rst]               ; the prologue first (not after a soft reset)
             and a
             jr nz, .np
-            xor a
-            ld [st_mode], a
-            ld b, STORY_FIRST
-            call story_show
-.np:        call scr_open
+            call pro_show
+.np:        ld a, TR_MINIMAP                ; FF1 IntroTitlePrepare: the crystal theme
+            call snd_track
+            call scr_open
             ld b, 6                         ; title menu (the GB layout: three boxes)
             ld c, 5
             ld d, 12
@@ -533,71 +558,6 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             ld hl, smap + 12 * 32 + 18
             ld [hl], a
             ret
-
-; party generation (FF1 PtyGen): per member, a direction cycles the class, A names it,
-; B goes back a member; after the fourth, A confirms, B returns to the fourth
-party_gen:  xor a
-            ld hl, pg_class
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl], a
-            ld hl, pg_names
-            ld b, 24
-            ld a, $20
-.n:         ld [hl+], a
-            dec b
-            jr nz, .n
-            xor a
-            ld [pg_mem], a
-.mem:       call pg_screen
-.ml:        call pg_draw_cur
-            call scr_frame
-            ldh a, [pad_new]
-            bit 0, a
-            jr nz, .a
-            bit 1, a
-            jr nz, .b
-            and $F0
-            jr z, .ml
-            ld a, [pg_mem]                  ; next class
-            ld l, a
-            ld h, 0
-            ld de, pg_class
-            add hl, de
-            ld a, [hl]
-            inc a
-            cp 6
-            jr c, .cs
-            xor a
-.cs:        ld [hl], a
-            call pg_screen
-            jr .ml
-.b:         ld a, [pg_mem]
-            and a
-            jr z, .ml
-            dec a
-            ld [pg_mem], a
-            jr .mem
-.a:         call name_input
-            jr c, .mem                      ; (B on an empty name: back to the boxes)
-            ld a, [pg_mem]
-            inc a
-            ld [pg_mem], a
-            cp 4
-            jr c, .mem
-            ld a, 4                         ; all four: confirm
-            ld [pg_mem], a
-            call pg_screen
-.cf:        call scr_frame
-            ldh a, [pad_new]
-            bit 0, a
-            ret nz
-            bit 1, a
-            jr z, .cf
-            ld a, 3
-            ld [pg_mem], a
-            jr .mem
 
 ; the four boxes (approved layout: 10 x 9 at (0,0) (10,0) (0,9) (10,9)): class sprite,
 ; class name, name
@@ -731,7 +691,8 @@ class_ptrs: dw str_class0, str_class1, str_class2, str_class3, str_class4, str_c
             dw str_class6, str_class7, str_class8, str_class9, str_class10, str_class11
 
 ; HL = a 0-ended copy of member pg_t's name (6 letters)
-name_buf:   ld a, [pg_t]
+name_buf:   push bc                         ; (keeps BC: the callers' text position)
+            ld a, [pg_t]
             ld l, a
             add a, a
             add a, l
@@ -750,12 +711,14 @@ name_buf:   ld a, [pg_t]
             xor a
             ld [de], a
             ld hl, pg_nb
+            pop bc
             ret
 
 ; name entry (the approved layout: the grid 10 x 9, two columns / rows apart; the name on
 ; the top row): A adds the letter, B removes the last (on an empty name: C, back), Start
 ; finishes (at least one letter); six letters finish too
 name_input: call scr_open
+            call scr_allwin
             ld c, 1                         ; the grid rows
             ld hl, grid_ptrs
             ld e, 9
@@ -1072,6 +1035,581 @@ ng_stats:   ld c, 0
             jp c, .m
             ret
 
+section bank 2, $7500                       ; (the prologue, party creation)
+
+; ---- the prologue as FF1's EnterIntroStory: the crystal theme; a blue screen; the lines
+; fade in one at a time, each over 64 frames (the colour stepping $00, $10, $20, $30 every 16
+; frames, flickering every other frame with the shade below: $01 blue under $00); A / B
+; finishes the line at once; when a page is shown, A / B goes on (after the last page: the
+; title); Start goes to the title at any time. Two pages (the GB's 18 rows). Colour: per line
+; palettes (2 shown, 3 waiting, 4 fading); DMG / SGB: a line is drawn when it starts and its
+; scanlines get the fading shade by BGP (the raster list in BGP mode).
+pro_show:   ld a, TR_MINIMAP
+            call snd_track
+            ld hl, pr_nes                   ; the five colours (COMMON's NES table)
+            ld de, pr_rgb
+.cc:        ld a, [hl+]
+            push hl
+            push de
+            add a, a
+            ld l, a
+            ld h, 0
+            ld bc, C_NESRGB
+            add hl, bc
+            ld bc, 2
+            ld a, COMMON
+            call far_copy
+            pop de
+            inc de
+            inc de
+            pop hl
+            ld a, l
+            cp low(pr_nes + 5)
+            jr nz, .cc
+            xor a
+            ld [st_pg], a
+.page:      call scr_open
+            xor a
+            ld [sfx_menu], a
+            ld hl, sattr                    ; every cell: the waiting palette
+            ld b, 18
+            ld a, $0B
+            call fill32
+            ld a, [st_pg]                   ; the page's text (menu text bank $7000)
+            add a, a
+            ld l, a
+            ld h, $70
+            ld de, scr_buf
+            ld bc, 2
+            ld a, MTEXT
+            call far_copy
+            ld a, [scr_buf]
+            ld l, a
+            ld a, [scr_buf + 1]
+            ld h, a
+            ld de, mtxt
+            ld bc, 200
+            ld a, MTEXT
+            call far_copy
+            ld hl, mtxt                     ; lines -> the first row: centred
+            ld c, 1
+.cn:        ld a, [hl+]
+            and a
+            jr z, .cd
+            cp $0A
+            jr nz, .cn
+            inc c
+            jr .cn
+.cd:        ld a, c
+            ld [pr_nl], a
+            ld a, 18
+            sub c
+            srl a
+            ld [pr_row0], a
+            ldh a, [is_cgb]                 ; Colour: every line drawn now (waiting palette)
+            and a
+            jr z, .np
+            xor a
+.dl:        ld [pr_i], a
+            call pr_line
+            ld a, [pr_i]
+            inc a
+            ld hl, pr_nl
+            cp [hl]
+            jr c, .dl
+.np:        ld a, $80 | 16                  ; Colour palettes 2 (shown), 3 (waiting), 4 (fading)
+            call bcps_w
+            ld hl, pr_rgb                   ; 2: $01 $01 $01 $30
+            call .c3
+            ld hl, pr_rgb + 8
+            call .c1
+            ld b, 4                         ; 3: all $01
+.p3:        ld hl, pr_rgb
+            call .c1
+            dec b
+            jr nz, .p3
+            ld hl, pr_rgb                   ; 4: $01 $01 $01 $01 (its colour 3 animated)
+            call .c3
+            ld hl, pr_rgb
+            call .c1
+            call scr_show
+            xor a
+            ld [pr_i], a
+.ln:        call pr_lptr                    ; (an empty line: nothing to fade)
+            jp z, .nx
+            ld a, [pr_i]
+            ld hl, pr_row0
+            add a, [hl]
+            ld [pr_row], a
+            ldh a, [is_cgb]
+            and a
+            jr nz, .lc
+            call pr_line                    ; DMG: drawn now, its scanlines black (BGP)
+            ld a, [pr_row]
+            add a, a
+            add a, a
+            add a, a
+            ld hl, ly_tab
+            ld [hl+], a
+            ld [hl], %11100111
+            inc hl
+            add a, 8
+            ld [hl+], a
+            ld [hl], %11100100
+            ld a, %11100100
+            ld [ly_rst], a
+            ld a, LCDC_ON
+            ld [ly_base], a
+            ld a, 1
+            ld [ly_bgp], a
+            ld a, 2
+            ld [ly_n], a
+            call scr_frame
+            ld a, [pr_row]
+            call sf_one
+            jr .an0
+.lc:        call scr_frame                  ; Colour: the line to the fading palette
+            ld a, $0C
+            call pr_rattr
+.an0:       xor a
+            ld [pr_cnt], a
+.an:        call scr_frame
+            ldh a, [pad_new]
+            bit 3, a
+            jp nz, .quit
+            and 3
+            jr nz, .dn
+            ld a, [pr_cnt]                  ; the colour: step = cnt / 16, the shade below on
+            ld b, a                         ;   odd frames
+            swap a
+            and 3
+            inc a                           ; (main: index step + 1)
+            bit 0, b
+            jr z, .mc
+            dec a                           ; (sub: the shade below; step 0: $01 blue)
+.mc:        ld c, a
+            ldh a, [is_cgb]
+            and a
+            jr z, .dm
+            ld a, c                         ; Colour: palette 4 colour 3
+            add a, a
+            add a, low(pr_rgb)
+            ld l, a
+            ld h, high(pr_rgb)
+            ld a, $80 | 38
+            ldh [rBCPS], a
+            ld a, [hl+]
+            ldh [rBCPD], a
+            ld a, [hl]
+            ldh [rBCPD], a
+            jr .ai
+.dm:        ld a, c                         ; DMG: the text shade (colour 0) of the line
+            ld hl, pr_shade
+            add a, l
+            ld l, a
+            jr nc, .ds
+            inc h
+.ds:        ld a, [hl]
+            or %11100100 & $FC
+            ld [ly_tab + 1], a
+.ai:        ld hl, pr_cnt
+            inc [hl]
+            ld a, [hl]
+            cp 64
+            jr c, .an
+.dn:        ldh a, [is_cgb]                 ; the line shown
+            and a
+            jr z, .dd
+            call scr_frame
+            ld a, $0A
+            call pr_rattr
+            jr .nx
+.dd:        call pr_lyoff
+.nx:        ld a, [pr_i]
+            inc a
+            ld [pr_i], a
+            ld hl, pr_nl
+            cp [hl]
+            jp c, .ln
+.w:         call scr_frame                  ; the page shown: A / B on, Start: the title
+            ldh a, [pad_new]
+            bit 3, a
+            jr nz, .quit
+            and 3
+            jr z, .w
+            ld hl, st_pg
+            inc [hl]
+            ld a, [hl]
+            cp STORY_FIRST
+            jp c, .page
+            ret
+.quit:      jp pr_lyoff
+.c3:        ld b, 3                         ; colour at HL three times, then (.c1) once
+.c3l:       call .c1
+            dec b
+            jr nz, .c3l
+            ret
+.c1:        push hl
+            ld a, [hl+]
+            call bcpd_w
+            ld a, [hl]
+            call bcpd_w
+            pop hl
+            ret
+
+; DMG: the raster list off, BGP as normal
+pr_lyoff:   ldh a, [is_cgb]
+            and a
+            ret nz
+            xor a
+            ld [ly_bgp], a
+            call ly_off
+            ld a, %11100100
+            jp bgp_w
+
+; Colour: the attributes of row pr_row (VRAM bank 1, in V-Blank) and its copy = A
+pr_rattr:   ld b, a
+            ld a, [pr_row]                  ; HL = $9800 + 32 row, DE = sattr + 32 row
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            push hl
+            ld de, sattr
+            add hl, de
+            ld d, h
+            ld e, l
+            pop hl
+            ld a, h
+            add a, $98
+            ld h, a
+            ld a, 1
+            ldh [rVBK], a
+            ld c, 20
+.l:         ld a, b
+            ld [hl+], a
+            ld [de], a
+            inc de
+            dec c
+            jr nz, .l
+            xor a
+            ldh [rVBK], a
+            ret
+
+; HL = the start of line pr_i of mtxt; Z if the line is empty
+pr_lptr:    ld hl, mtxt
+            ld a, [pr_i]
+            and a
+            jr z, .t
+            ld b, a
+.s:         ld a, [hl+]
+            cp $0A
+            jr nz, .s
+            dec b
+            jr nz, .s
+.t:         ld a, [hl]
+            and a
+            ret z
+            cp $0A
+            ret
+
+; line pr_i into the map copy, centred on row pr_row0 + pr_i
+pr_line:    call pr_lptr
+            ret z
+            ld de, pg_row
+            ld b, 0
+.c:         ld a, [hl+]
+            and a
+            jr z, .e
+            cp $0A
+            jr z, .e
+            ld [de], a
+            inc de
+            inc b
+            jr .c
+.e:         xor a
+            ld [de], a
+            ld a, 20
+            sub b
+            srl a
+            ld b, a
+            ld a, [pr_i]
+            ld hl, pr_row0
+            add a, [hl]
+            ld c, a
+            ld hl, pg_row
+            jp scr_str
+
+pr_nes:     db $01, $00, $10, $20, $30      ; FF1's intro colours (index 0 = the blue)
+pr_shade:   db 3, 2, 1, 0, 0                ; ... as DMG shades of the text
+
+; party generation (owner's design, 2026-11-21): the four boxes start as FF1's default party
+; (Warrior, Thief, Monk, Red Magician), no names; the Control Pad moves between them; A on a
+; member opens the job list (every job, its name and picture), then its name entry (B there:
+; back to the jobs; B in the jobs: back to the boxes). When all four have names: OK to begin
+; with this party? Yes starts the game, No puts everything back to the default, B returns
+; to the boxes.
+party_gen:
+.reset:     ld hl, pg_class
+            xor a
+.dc:        ld [hl+], a                     ; classes 0, 1, 2, 3
+            inc a
+            cp 4
+            jr c, .dc
+            ld hl, pg_names
+            ld b, 24
+            ld a, $20
+.n:         ld [hl+], a
+            dec b
+            jr nz, .n
+            xor a
+            ld [pg_mem], a
+.mem:       call pg_screen
+.ml:        call pg_draw_cur
+            call scr_frame
+            ldh a, [pad_new]
+            bit 0, a
+            jr nz, .a
+            ld b, 1
+            and $30                         ; left / right: the other column
+            jr nz, .mv
+            ldh a, [pad_new]
+            ld b, 2
+            and $C0                         ; up / down: the other row
+            jr z, .ml
+.mv:        ld a, [pg_mem]
+            xor b
+            ld [pg_mem], a
+            jr .ml
+.a:         ld a, [pg_mem]                  ; the member's class kept (a cancel restores it)
+            ld l, a
+            ld h, 0
+            ld de, pg_class
+            add hl, de
+            ld a, [hl]
+            ld [pg_old], a
+.job:       call job_select
+            jr c, .mem                      ; (B: back to the boxes)
+            call name_input
+            jr nc, .named
+            jr .job                         ; (B on an empty name: back to the jobs)
+.named:     call pg_all
+            jr nz, .mem
+            call pg_screen                  ; all four named: the question
+            call pg_ask
+            jr c, .mem                      ; (B: back to the boxes)
+            and a
+            jr nz, .reset                   ; No: everything back to the default
+            ret                             ; Yes
+
+; Z if all four members have a name (first letter not blank), NZ if one has none
+pg_all:     ld hl, pg_names
+            ld b, 4
+.l:         ld a, [hl]
+            cp $20
+            jr z, .no
+            ld a, l
+            add a, 6
+            ld l, a
+            jr nc, .c
+            inc h
+.c:         dec b
+            jr nz, .l
+            xor a                           ; all named: Z
+            ret
+.no:        or a                            ; (A = $20: NZ)
+            ret
+
+; the question over the boxes: OK to begin with this party? Yes / No; returns A = 0 Yes,
+; 1 No (NC), C on B
+pg_ask:     ld hl, oam_buf + 16             ; (the class sprites hidden under the window)
+            ld b, 24 * 4
+            xor a
+.h:         ld [hl+], a
+            dec b
+            jr nz, .h
+            ld bc, $0105
+            ld de, $1208
+            call scr_win
+            ld bc, $0306
+            ld hl, str_pgok
+            call scr_str
+            ld bc, $0609
+            ld hl, str_pgyes
+            call scr_str
+            ld bc, $0D09
+            ld hl, str_pgno
+            call scr_str
+            call scr_upd
+            xor a
+            ld [pg_t], a
+.l:         ld a, [pg_t]                    ; the hand left of Yes / No
+            and a
+            ld b, 4 * 8 - 4
+            jr z, .x
+            ld b, 11 * 8 - 4
+.x:         ld c, 9 * 8 - 4
+            call scr_cursor
+            call scr_frame
+            ldh a, [pad_new]
+            bit 0, a
+            jr nz, .a
+            bit 1, a
+            jr nz, .b
+            and $30
+            jr z, .l
+            ld a, [pg_t]
+            xor 1
+            ld [pg_t], a
+            jr .l
+.a:         ld a, [pg_t]
+            and a                           ; NC
+            ret
+.b:         scf
+            ret
+
+; the job list (every job: its picture and name, two columns of three): the cursor starts on
+; the member's job; A picks it (NC, the member's class set), B cancels (C, the class back)
+job_select: call scr_open
+            xor a
+            call scr_classes                ; the six jobs' pictures: sprite tiles 0-35
+            ld bc, $0000
+            ld de, $1412
+            call scr_win
+            xor a
+.e:         ld [pg_t], a                    ; job j: column j & 1, row j >> 1
+            call job_xy                     ; B = the name's column, C = the row of its picture
+            push bc
+            ld a, c                         ; the name below the picture (one or two lines)
+            add a, 3
+            ld c, a
+            ld a, [pg_t]
+            call class_str
+            call scr_str
+            pop bc
+            ld a, [pg_t]                    ; the picture: cells (name + 2 .. + 3, row .. + 2)
+            ld e, a
+            ld d, 0
+            ld hl, cls_pal
+            add hl, de
+            ld a, [hl]
+            ld [scr_t0], a
+            ld a, b
+            add a, 2
+            add a, a
+            add a, a
+            add a, a
+            ld b, a
+            ld a, c
+            add a, a
+            add a, a
+            add a, a
+            ld c, a
+            ld a, [pg_t]                    ; OAM entries 4 + 6 j
+            ld e, a
+            add a, a
+            add a, e
+            add a, a
+            push af
+            add a, 4
+            ld e, a
+            pop af                          ; tile base 6 j
+            call scr_spr23
+            ld a, [pg_t]
+            inc a
+            cp 6
+            jr c, .e
+            call scr_show
+            ld a, [pg_mem]                  ; the cursor on the member's job
+            ld l, a
+            ld h, 0
+            ld de, pg_class
+            add hl, de
+            ld a, [hl]
+            ld [pg_t], a
+.l:         ld a, [pg_t]                    ; the hand left of the picture
+            call job_xy
+            ld a, b
+            add a, a
+            add a, a
+            add a, a
+            sub 4
+            ld b, a
+            ld a, c
+            inc a
+            add a, a
+            add a, a
+            add a, a
+            ld c, a
+            call scr_cursor
+            call scr_frame
+            ldh a, [pad_new]
+            bit 0, a
+            jr nz, .a
+            bit 1, a
+            jr nz, .b
+            ld hl, pg_t
+            ld b, a
+            and $30                         ; left / right: the other column
+            jr z, .ud
+            ld a, [hl]
+            xor 1
+            ld [hl], a
+            jr .l
+.ud:        ld a, b
+            bit 6, a                        ; up: the row above (wrapping)
+            jr z, .dn
+            ld a, [hl]
+            sub 2
+            jr nc, .s
+            add a, 6
+            jr .s
+.dn:        bit 7, a
+            jr z, .l
+            ld a, [hl]
+            add a, 2
+            cp 6
+            jr c, .s
+            sub 6
+.s:         ld [hl], a
+            jr .l
+.a:         ld a, [pg_mem]
+            ld l, a
+            ld h, 0
+            ld de, pg_class
+            add hl, de
+            ld a, [pg_t]
+            ld [hl], a
+            and a                           ; NC
+            ret
+.b:         ld a, [pg_mem]                  ; (the class as it was)
+            ld l, a
+            ld h, 0
+            ld de, pg_class
+            add hl, de
+            ld a, [pg_old]
+            ld [hl], a
+            scf
+            ret
+
+; A = job -> B = its name's column (2 / 11), C = its picture's top row (1, 6, 11)
+job_xy:     ld b, 2
+            bit 0, a
+            jr z, .c
+            ld b, 11
+.c:         srl a
+            ld c, a
+            add a, a
+            add a, a
+            add a, c                        ; 5 x row
+            inc a
+            ld c, a
+            ret
+
+
 section wram, $CD00
 scr_t0:     ds 1
 scr_t1:     ds 1
@@ -1079,6 +1617,13 @@ ng_cur:     ds 1
 pg_mem:     ds 1
 pg_t:       ds 1
 pg_class:   ds 4
+pg_old:     ds 1
+pr_rgb:     ds 10                           ; the prologue's colours (RGB555)
+pr_nl:      ds 1
+pr_row0:    ds 1
+pr_row:     ds 1
+pr_i:       ds 1
+pr_cnt:     ds 1
 pg_names:   ds 24
 pg_nb:      ds 8
 pg_row:     ds 24

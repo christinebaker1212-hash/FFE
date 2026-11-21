@@ -79,6 +79,9 @@ def strings():
     out = {}
     for i, t in enumerate(TITLE): out['title%d' % i] = enc(t)
     out['saverr'] = enc(SAVE_ERROR)
+    out['pgok'] = enc('OK to begin\nwith this party?')    # (owner's wording, party creation)
+    out['pgyes'] = enc('Yes')
+    out['pgno'] = enc('No')
     for c in range(12):
         name = ff1_items.T[240 + c]
         out['class%d' % c] = enc('\n'.join(text.wrap(name, 8)))
@@ -228,7 +231,7 @@ def story_pages(rom=None):
     while lines and not lines[-1]: lines.pop()
     page = []
     for ln in lines:                                   # pages of up to 10 lines, broken at blanks
-        if len(page) >= 9 and ln == '':
+        if len(page) >= 12 and ln == '':        # (the prologue: a full screen a page)
             pages.append(page); page = []; continue
         page.append(ln)
     if page: pages.append(page)
