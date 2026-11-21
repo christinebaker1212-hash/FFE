@@ -35,7 +35,7 @@ static bool env_cb(unsigned cmd, void* data) {
 		if (!strcmp(v->key, "gambatte_gb_hwmode")) { v->value = dmg ? "GB" : "GBC"; return true; }
 		if (!strcmp(v->key, "gambatte_gb_colorization")) { v->value = "disabled"; return true; }
 		if (!strcmp(v->key, "gambatte_gb_internal_palette")) { v->value = "GB - DMG"; return true; }
-		if (!strcmp(v->key, "sameboy_model")) { v->value = dmg ? "Game Boy" : "Game Boy Color"; return true; }
+		if (!strcmp(v->key, "sameboy_model")) { v->value = getenv("GBRUN_MODEL") ? getenv("GBRUN_MODEL") : dmg ? "Game Boy" : "Game Boy Color"; return true; }
 		v->value = NULL; return false;
 	}
 	case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
@@ -87,12 +87,20 @@ static void wav_header(FILE* f, long bytes, int rate) {
 	s = 16; fwrite(&s, 2, 1, f); fwrite("data", 1, 4, f); v = bytes; fwrite(&v, 4, 1, f);
 }
 
+/* the runtime's counters: DBG at CNT, NMI_CNT +$10, TEST_PAD +$1E (FF1 $D820 = WRAM offset $1820;
+   FF3 $CD80: env GB_CNT=CD80) */
+static unsigned CO = 0x1820;
 int main(int argc, char** argv) {
 	if (argc < 4) { fprintf(stderr, "usage: gbrun ROM FRAMES OUT [options]\n"); return 2; }
 	int frames = atoi(argv[2]); const char* out = argv[3];
+	if (getenv("GB_CNT")) CO = strtoul(getenv("GB_CNT"), 0, 16) - 0xC000;
 	const char* padfile = NULL; const char* sram_path = NULL; const char* wav_path = NULL;
 	int nshots[1024]; int nns = 0; int done[1024] = { 0 }; int wav_from = 0;
 	int poke_at = 0; const char* poke_list = NULL; FILE* lagf = NULL; int until = 0;
+	/* real joypad input by GB frame: --press F:KEYS:HOLD (KEYS: A B S=Start E=Select U D L R),
+	   screenshots by GB frame: --shot F (OUT_fNNNNN.ppm) */
+	static int pr_f[4096], pr_h[4096]; static unsigned pr_k[4096]; int npr = 0;
+	static int sh_f[4096]; int nsh = 0;
 	for (int i = 4; i < argc; i++) {
 		if (!strcmp(argv[i], "--dmg")) dmg = 1;
 		else if (!strcmp(argv[i], "--padfile") && i + 1 < argc) padfile = argv[++i];
@@ -103,6 +111,18 @@ int main(int argc, char** argv) {
 		else if (!strcmp(argv[i], "--poke") && i + 2 < argc) { poke_at = atoi(argv[++i]); poke_list = argv[++i]; }
 		else if (!strcmp(argv[i], "--lagfile") && i + 1 < argc) lagf = fopen(argv[++i], "wb");
 		else if (!strcmp(argv[i], "--until") && i + 1 < argc) until = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--shot") && i + 1 < argc && nsh < 4096) sh_f[nsh++] = atoi(argv[++i]);
+		else if (!strcmp(argv[i], "--press") && i + 1 < argc && npr < 4096) {
+			char kb[32] = ""; int fr = 0, hd = 4; sscanf(argv[++i], "%d:%31[^:]:%d", &fr, kb, &hd);
+			unsigned k = 0;
+			for (char* c = kb; *c; c++) switch (*c) {
+				case 'A': k |= 1u << RETRO_DEVICE_ID_JOYPAD_A; break; case 'B': k |= 1u << RETRO_DEVICE_ID_JOYPAD_B; break;
+				case 'S': k |= 1u << RETRO_DEVICE_ID_JOYPAD_START; break; case 'E': k |= 1u << RETRO_DEVICE_ID_JOYPAD_SELECT; break;
+				case 'U': k |= 1u << RETRO_DEVICE_ID_JOYPAD_UP; break; case 'D': k |= 1u << RETRO_DEVICE_ID_JOYPAD_DOWN; break;
+				case 'L': k |= 1u << RETRO_DEVICE_ID_JOYPAD_LEFT; break; case 'R': k |= 1u << RETRO_DEVICE_ID_JOYPAD_RIGHT; break;
+			}
+			pr_f[npr] = fr; pr_h[npr] = hd; pr_k[npr++] = k;
+		}
 	}
 	unsigned char* pads = NULL; long npads = 0;
 	if (padfile) {
@@ -142,7 +162,7 @@ int main(int argc, char** argv) {
 	if (!wram || wsize < 0x2000) { fprintf(stderr, "no system RAM\n"); return 1; }
 	memset(wram, 0, wsize);      /* (cores with a boot ROM, e.g. SameBoy: no random frame counter) */
 	/* $D830 lives in WRAM bank 1 (offset $1830 both on DMG and on CGB) */
-#define NESF() (wram[0x1830] | wram[0x1831] << 8)
+#define NESF() (wram[CO + 0x10] | wram[CO + 0x11] << 8)
 	static const unsigned map[8] = { RETRO_DEVICE_ID_JOYPAD_RIGHT, RETRO_DEVICE_ID_JOYPAD_LEFT,
 		RETRO_DEVICE_ID_JOYPAD_DOWN, RETRO_DEVICE_ID_JOYPAD_UP, RETRO_DEVICE_ID_JOYPAD_START,
 		RETRO_DEVICE_ID_JOYPAD_SELECT, RETRO_DEVICE_ID_JOYPAD_B, RETRO_DEVICE_ID_JOYPAD_A };
@@ -155,6 +175,8 @@ int main(int argc, char** argv) {
 				unsigned a, v; int used;
 				if (sscanf(p, "%x=%x%n", &a, &v, &used) != 2) break;
 				if (a < 0x800) wram[a] = v;
+				else if (getenv("GB_PRG") && a >= 0x6000 && a < 0x6400) wram[0x0800 + a - 0x6000] = v;  /* FF3: $C800 */
+				else if (getenv("GB_PRG") && a >= 0x7000 && a < 0x8000) wram[0x1000 + a - 0x7000] = v;  /* FF3: WRAM bank 1 */
 				else if (a >= 0x6000 && a < 0x8000 && sram) sram[a - 0x6000] = v;
 				p += used; if (*p == ',') p++;
 			}
@@ -169,7 +191,7 @@ int main(int argc, char** argv) {
 			   (A B Sel St U D L R = bit 0..7: the NES order reversed) */
 			uint8_t* sr = p_retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
 			if (f > 30 && sr && p_retro_get_memory_size(RETRO_MEMORY_SAVE_RAM) >= 0x8000) {
-				wram[0x183E] = 0xA5;
+				wram[CO + 0x1E] = 0xA5;
 				for (unsigned k = n; k < n + 32; k++) {
 					unsigned char v = k + 1 < (unsigned) npads ? pads[k + 1] : 0, r = 0;
 					for (int b = 0; b < 8; b++) if (v & (1 << b)) r |= 0x80 >> b;
@@ -177,8 +199,13 @@ int main(int argc, char** argv) {
 				}
 			}
 		}
+		for (int q = 0; q < npr; q++) if (f >= pr_f[q] && f < pr_f[q] + pr_h[q]) keys |= pr_k[q];
 		wav_on = (int) n >= wav_from;
 		p_retro_run();
+		for (int q = 0; q < nsh; q++) if (sh_f[q] == f) {
+			char path[1100]; snprintf(path, sizeof path, "%s_f%05d.ppm", out, f);
+			FILE* o = fopen(path, "wb"); fprintf(o, "P6 160 144 255\n"); fwrite(frame, 1, sizeof frame, o); fclose(o);
+		}
 		n = NESF();
 		if (lagf) { uint16_t v = f > 30 ? n : 0; fwrite(&v, 2, 1, lagf); }
 		if (until && f > 30 && n >= (unsigned) until) break;
@@ -211,7 +238,7 @@ int main(int argc, char** argv) {
 	if (lagf) fclose(lagf);
 	printf("frames %d, NES frame waits %u, rate %d\n", f, NESF(), rate);
 	if (getenv("GBRUN_DBG")) {   /* the runtime's fault record DBG ($D820) and a few flags */
-		printf("DBG"); for (int i = 0; i < 16; i++) printf(" %02X", wram[0x1820 + i]); printf("\n");
+		printf("DBG"); for (int i = 0; i < 16; i++) printf(" %02X", wram[CO + i]); printf("\n");
 		printf("DDFF %02X\n", wram[0x1DFF]);
 	}
 	p_retro_deinit();

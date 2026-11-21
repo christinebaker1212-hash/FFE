@@ -28,6 +28,8 @@ def main():
     ap.add_argument('--press', default='', help='W:PAD:N,.. : pad PAD for N waited-for frames from W (after --freeze)')
     ap.add_argument('--poke', default='', help='W:ADDR=VAL,.. : write NES RAM / PRG-RAM at waited-for frame W (both sides)')
     ap.add_argument('--pressf', default='', help='F:PAD:N,.. : pad PAD for N NES frames from frame F after the poke (for loops that poll without waiting)')
+    ap.add_argument('--core', default='', help='sameboy / gambatte: the GB side in build/gbrun (libretro, '
+                    'hardware-like timing) instead of mGBA (no input-clock resync there)')
     ap.add_argument('--dump', help='directory: also the GB memory at each shot (sgbrun SGBRUN_DUMP)')
     a = ap.parse_args()
     ws = [int(x) for x in a.waits.split(',')]
@@ -67,11 +69,18 @@ def main():
         cf = os.path.join(tmp, 'clock.bin')
         open(cf, 'wb').write(b''.join(struct.pack('<H', clock[w] & 0xFFFF if w in clock else 0xFFFF)
                                       for w in range(max(clock) + 1)))   # (keys < 0: shot frames)
-        cmd = [os.path.join(ROOT, 'build', 'sgbrun'), a.gb, str(int(k * 1.3) + 600), os.path.join(tmp, 'q'),
-               '--cgb', '--padfile', pads]
+        if a.core:
+            cmd = [os.path.join(ROOT, 'build', 'gbrun'), a.gb, str(int(k * 1.3) + 600), os.path.join(tmp, 'q'),
+                   '--padfile', pads]
+        else:
+            cmd = [os.path.join(ROOT, 'build', 'sgbrun'), a.gb, str(int(k * 1.3) + 600), os.path.join(tmp, 'q'),
+                   '--cgb', '--padfile', pads]
         for w in ws: cmd += ['--nshot', str(clock[-w])]
         if poke: cmd += ['--poke', str(poke_k + 1), poke[1]]
         env = dict(os.environ, SGBRUN_CLOCK=cf, GB_CNT='CD80', GB_PRG='ff3')
+        if a.core:
+            env['GBRUN_CORE'] = os.path.join(ROOT, 'build', {'sameboy': 'sameboy_libretro.so',
+                                                             'gambatte': 'gambatte_libretro.so'}[a.core])
         if a.dump: env['SGBRUN_DUMP'] = '1'
         res = subprocess.run(cmd, env=env, capture_output=True, text=True)
         if os.environ.get('GBSHOTS_LOG'):

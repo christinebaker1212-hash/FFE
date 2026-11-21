@@ -994,6 +994,23 @@ FIELD_WINDOWS = {   # id: (left, top, width, height)       (NES: 2,2,28,10 / 2,1
 # (even heights from even rows: a window's last row must not share an attribute quadrant with
 # the map row below it)
 DLG_W_GB = 18
+# field messages of the t8200 table (dialogue ids $0100+: chests, doors, the inn, Mini / Warp
+# refusals): the NES prints them in the two-row (dakuten) mode, two lines per page in its 28-column
+# window, which the GB window cut ("Inside the treasu"; a one-line page repeated its line). On the
+# GB: the English one-row mode ({0E}), 18 columns, four lines a page. ({02} item / spell name,
+# {03} / {04} Gil amounts; [77][79] the two HP tiles.)
+FIELD_MSGS = {
+    1: 'From inside the\ntreasure chest,\nyou got\n{03} Gil!',
+    2: 'Inside the\ntreasure chest\nthere was\n{02}!\nSuddenly, monsters\nappeared!!',
+    3: 'The door is\nlocked!',
+    4: 'Innkeeper:\n"Welcome! To\nrestore your\nparty\'s [77][79], it\nwill cost\n{04} Gil.\nWill you stay the\nnight?"',
+    89: 'Inside the\ntreasure chest\nthere was\n{02}!',
+    118: 'In a place like\nthis,\n{02}!',
+    119: "It's too cramped\nhere to become\nbig.",
+    120: 'Warping impossible',
+    121: 'Magic cannot be\nused',
+    122: "With the Thief's\nspecial ability,\nthe lock opened\njust like that!",
+}
 
 
 def dialogue(r):
@@ -1036,6 +1053,10 @@ def dialogue(r):
         if name == 't8200':
             for e in rows:
                 if e['id'] in MENU_TEXT: e['en'] = MENU_TEXT[e['id']]
+                if e['id'] in FIELD_MSGS:
+                    assert all(ins.vlen(re.sub(r'\{0[234]\}', 'X' * 5, l)) <= 18 or '{02}' in l
+                               for l in FIELD_MSGS[e['id']].split('\n')), e['id']
+                    e['en'] = '{0E}' + FIELD_MSGS[e['id']]
                 if e['id'] == 0x21:                          # name entry grid: no middle gap
                     e['en'] = re.sub(r'\{17:([0-9A-F]{2})\}', lambda mm: '{17:%02X}' % MENU_TEXT_NAME_GRID.get(
                         int(mm.group(1), 16), int(mm.group(1), 16)), e['en'])

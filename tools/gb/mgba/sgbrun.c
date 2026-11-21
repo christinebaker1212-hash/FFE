@@ -38,7 +38,7 @@ static int prg_ff3 = 0;
    runs; reported: LCD switched off outside the vblank, VRAM writes in PPU mode 3, OAM writes
    in modes 2 / 3, OAM DMA or general-purpose HDMA outside the vblank, cart RAM left on at a
    frame end, cart RAM accessed while off. */
-static struct { unsigned long lcd, vram, oam, odma, gdma, ram_frames, ram_off_acc, insns, ram_on_insns; int ram_on; } lc;
+static struct { unsigned long lcd, vram, oam, odma, gdma, ram_frames, ram_off_acc, insns, ram_on_insns, vread, oread, pal; int ram_on; } lc;
 static int lc_ly0;
 static void lc_report(const char* what, struct mCore* core, unsigned addr, int f) {
 	static int shown[8]; int k = what[0] % 8;
@@ -68,6 +68,16 @@ static int lc_target(struct mCore* core, unsigned* addr, unsigned* val) {   /* w
 	case 0xCB: if ((n1 & 7) == 6 && (n1 < 0x40 || n1 >= 0x80)) { *val = 0x100; *addr = c->hl; return 1; } return 0;
 	}
 	return 0;
+}
+static unsigned lc_read_addr(struct mCore* core) {           /* the address the next insn reads (or $10000) */
+	struct GB* gb = core->board; struct SM83Core* c = gb->cpu;
+	unsigned pc = c->pc, op = core->busRead8(core, pc), a = 0x10000;
+	if (op == 0x0A) a = c->bc; else if (op == 0x1A) a = c->de;
+	else if (op == 0x2A || op == 0x3A || op == 0x7E || op == 0x46 || op == 0x4E || op == 0x56 || op == 0x5E
+	         || op == 0x66 || op == 0x6E || op == 0x34 || op == 0x35 || (op >= 0x86 && op <= 0xBE && (op & 7) == 6)) a = c->hl;
+	else if (op == 0xFA) a = core->busRead8(core, pc + 1) | core->busRead8(core, pc + 2) << 8;
+	else if (op == 0xCB && (core->busRead8(core, pc + 1) & 7) == 6) a = c->hl;
+	return a;
 }
 static int lc_reads_sram(struct mCore* core) {                 /* the next insn reads [hl] / [bc] / [de] / [nn] in $A000-$BFFF */
 	struct GB* gb = core->board; struct SM83Core* c = gb->cpu;
@@ -104,6 +114,11 @@ static void lc_pre(struct mCore* core, int f) {
 	lc.insns++; if (lc.ram_on) lc.ram_on_insns++;
 	lc_ly0 = -1;
 	if (!lc.ram_on && lc_reads_sram(core)) { lc.ram_off_acc++; lc_report("read of cart RAM while off", core, 0, f); }
+	if (on) {                                      /* reads the hardware blocks ($FF on a real Color) */
+		unsigned ra = lc_read_addr(core);
+		if (ra >= 0x8000 && ra < 0xA000 && gb->video.mode == 3) { lc.vread++; lc_report("VRAM read in mode 3", core, ra, f); }
+		if (ra >= 0xFE00 && ra < 0xFEA0 && gb->video.mode >= 2) { lc.oread++; lc_report("OAM read in mode 2/3", core, ra, f); }
+	}
 	if (!lc_target(core, &addr, &val)) return;
 	if (getenv("SGBRUN_WWATCH")) {                 /* ADDR:BANK (hex): writes there in that WRAM bank */
 		static unsigned wa = 0, wb = 0; static int wn = 0;
@@ -119,6 +134,7 @@ static void lc_pre(struct mCore* core, int f) {
 	else if (addr >= 0x8000 && addr < 0xA000 && on && mode == 3) { lc.vram++; lc_report("VRAM write in mode 3", core, addr, f); }
 	else if (addr >= 0xFE00 && addr < 0xFEA0 && on && mode >= 2) { lc.oam++; lc_report("OAM write in mode 2/3", core, addr, f); }
 	else if (addr == 0xFF40 && on && val < 0x100 && !(val & 0x80) && ly < 144) { lc.lcd++; lc_report("LCD off outside the vblank", core, addr, f); }
+	else if ((addr == 0xFF69 || addr == 0xFF6B) && on && mode == 3) { lc.pal++; lc_report("palette write in mode 3", core, addr, f); }
 	else if (addr == 0xFF46 && on && ly < 144) { lc.odma++; lc_report("OAM DMA outside the vblank", core, addr, f); }
 	else if (addr == 0xFF55 && on && val < 0x100 && !(val & 0x80)) lc_ly0 = ly;    /* general-purpose HDMA: checked after */
 }
@@ -475,8 +491,9 @@ int main(int argc, char** argv) {
 	if (lotchk)
 		printf("lotcheck: %lu instructions; LCD off outside vblank %lu, VRAM writes in mode 3 %lu, OAM writes in "
 		       "mode 2/3 %lu, OAM DMA outside vblank %lu, GDMA outside vblank %lu, frames ending with cart RAM on %lu, "
-		       "cart RAM accesses while off %lu, instructions with cart RAM on %lu\n", lc.insns, lc.lcd, lc.vram, lc.oam,
-		       lc.odma, lc.gdma, lc.ram_frames, lc.ram_off_acc, lc.ram_on_insns);
+		       "cart RAM accesses while off %lu, instructions with cart RAM on %lu, VRAM reads in mode 3 %lu, OAM reads "
+		       "in mode 2/3 %lu, palette writes in mode 3 %lu\n", lc.insns, lc.lcd, lc.vram, lc.oam,
+		       lc.odma, lc.gdma, lc.ram_frames, lc.ram_off_acc, lc.ram_on_insns, lc.vread, lc.oread, lc.pal);
 	if (prof || prof2) for (int k = 0; k < nprof; k++) printf("%s %02X:%04X %u\n", (profs[k] >> 24) == 2 ? "C" : (profs[k] >> 24) ? "S" : "P", (profs[k] >> 16) & 0xFF, profs[k] & 0xFFFF, proff[k]);
 	core->deinit(core);
 	return 0;
