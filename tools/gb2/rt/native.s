@@ -1137,6 +1137,24 @@ retile_b:   push bc
             and $F0
 .ust:       or c
             ld [hl], a
+            ld a, b                         ; USEDIX[its palette] |= the indices (DMG maps:
+            ld l, a                         ;   levels of used colours only)
+            ld h, high(TILE_PAL)
+            ld a, [hl]
+            and 3
+            add a, low(USEDIX)
+            ld l, a
+            ld h, high(USEDIX)
+            ld a, c
+            and a
+            jr z, .us0
+            bit 0, b
+            jr z, .us1
+            swap a
+.us1:       and $0E
+            or [hl]
+            ld [hl], a
+.us0:
             ldh a, [sh_s0]                  ; the coding it has now
             ld b, a
             ldh a, [sh_s1]

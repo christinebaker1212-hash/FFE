@@ -647,6 +647,57 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   4. Then music, sprites (docs/gb-native-presentation.md order). Select menu with suspend
      (design with the owner). Known DMG look issue: the black castle floor ($0x rule).
 
+## Select menu, suspend points, prologue on DMG, SGB fix (2026-11-21)
+- **Select menu** (owner's brief / decision 2026-11-19: Select on the field opens OPTIONS /
+  FORMATION / SUSPEND, B + Select keeps the minimap): `rt/selmenu.s`, native, on the window
+  layer with tiles in the sprite slots (BG untouched; slot cache emptied and window map
+  restored on the way out), letters and frame from the game's menu font (NES bank 9).
+  NES side (`layout.select_menu`): the Select sites fix:C181 (world map) / fix:CB9B (other
+  maps) are rewritten in place (no free fixed-bank bytes) to call bank-23 `gb_selw` /
+  `gb_seln` through `gbf` and branch on the result (0 the row screen F0E2 as before, 1 back,
+  2 the minimap); `gsel` returns 0 on the NES (behaviour as before), the GB replaces it
+  (NATIVE_EXT `hle_select`). OPTIONS: Battle Speed = the game's message speed `$601F`
+  (shown 1-8), BGM / SFX volume 0-8 (`VOL_BGM` / `VOL_SFX`; apu_core scales note volumes:
+  square 2 while `$E5` runs and the noise channel are SFX, the rest BGM; stored with a
+  check byte in cart RAM bank 3 `$A110`). SUSPEND: "Create a Suspend Point and return to
+  the Title? ..." Yes: snapshot, soft reset.
+- **Suspend points**: snapshot of WRAM (CGB: 8 banks), HRAM, VRAM (CGB: 2 banks), NES
+  work RAM without the save slots, DMG tile shadows, DMG scan table into cart RAM banks
+  4-12 (cart RAM now 128 KB, header `$0149 = $04`), header + 16-bit sum in bank 3 `$A120`,
+  model recorded (resumed only on the same model). At the load menu (b14:B642 rewritten to
+  call `gb_resume` / `gres` before FFFB0): "Continue from Suspend point?" Yes: erased and
+  restored, the game returns into the suspended menu and reloads the map; No: "Continue
+  from last save? / Start a New Game? The suspend point will be lost!" A damaged snapshot
+  (sum) gets a message and is erased. Copies in 128-byte chunks: snapshot ~1 s on DMG.
+  Checked in PyBoy DMG and CGB: menu, options, suspend -> title -> prompt -> resume on the
+  field; mGBA SGB: menu with its own SGB palette / attribute packet, field colours back.
+- **DMG prologue fade** (the open Lot Check item): fixed in the layout and the DMG shading:
+  each frame writes the attribute row before the line; a band is drawn into cells already
+  in the fade palette at the fade's first colour; the fade without the NES's odd-frame
+  dither (the colour changing every frame kept the shading from settling); attribute row
+  1 (blank rows 6-7 in view) in the shown palette so its colours count from the start; in
+  the shading: brightness levels only from colour indices the tiles use (`USEDIX`), a
+  tile whose used-index nibble is not known yet is re-coded on palette changes, two
+  levels give values 1 / 3 (the brightest keeps value 3), and spare frame time drains
+  full tile blocks in the H-Blank when the frame has no raster events. Result: no black
+  or garbled letters, steady background, bands fade in evenly; at most a single frame
+  with a letter late when a line is drawn.
+- **SGB hang fixed**: `pk_diff` clobbered DE, the end of sgb_build's ATTR loop; the
+  loop's end depended on cart RAM contents and, with that RAM cleared at boot (Lot Check
+  work), never came on a Super Game Boy (stuck in the prologue). Found with mGBA SGB.
+- **Builder**: FF2 enabled (`tools/builder/ffe_builder.py`, `--cli ROM OUT ff2`; the
+  workflow bundles everything8215/ff2 at a pinned commit); build.py `--work DIR` for the
+  intermediate files. Checked locally (unfrozen): the builder makes the release ROM.
+- Speed: the per-palette used-index scan (`USEDIX`) cost ~21 DMG frames / 30000 when it
+  ran at every shading recompute; now the full scan runs only with the LCD off (screen
+  loads) and retile_b ORs each re-coded tile's indices in while the LCD is on. A rule
+  that re-coded tiles with an unknown index nibble on every palette change was not
+  needed (prologue unchanged without it) and was removed.
+- Checks (final build of this step): firstdiff random 1 (30000) DMG / CGB, random 2, save
+  scenario: identical; lotcheck passed; lagcheck DMG 29962 GB frames / 29956 NES frames
+  (+6, +0.02%; before today's work +1), CGB -2.3%; battle, field and dialogue windows
+  unchanged.
+
 ## DMG vs CGB (2026-11-21)
 - Game state: identical (both match the NES at every frame wait; compared with each other
   at 29 points of random 1: only the sound driver's bytes `$B0-$EF`, which depend on when

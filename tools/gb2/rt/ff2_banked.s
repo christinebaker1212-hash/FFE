@@ -357,7 +357,7 @@ tset_fix_b: xor a
             ret
 
 ; DMG palette maps (moved from rt/dmg_shade.s dmg_maps: bank 0 is full); see there.
-USEDIX     = $CCD8          ; colour indices used per palette (4; fixed WRAM)
+
 dmg_maps_b: push bc
             push de
             push hl
@@ -374,6 +374,9 @@ dmg_maps_b: push bc
 .cl:        ld [hl+], a
             dec b
             jr nz, .cl
+            ldh a, [lcd_on]                 ; (LCD on: USEDIX kept, retile_b adds to it; the
+            and a                           ;   full scan only with the LCD off: screen
+            jr nz, .utx                     ;   loads)
             ld hl, USEDIX                   ; colour indices the tiles coded for each palette
             xor a                           ;   use (TILE_USE; 0 = not known: all): colours
             ld [hl+], a                     ;   at indices no tile uses are left out (FF2's
@@ -405,7 +408,7 @@ dmg_maps_b: push bc
             ld [hl], a
             inc c
             jr nz, .ut
-            ld c, 0
+.utx:       ld c, 0
 .lv:        ld a, c
             and 3
             jr z, .mn
@@ -661,9 +664,7 @@ dmg_maps_b: push bc
             jr z, .te
             swap a
 .te:        and $0F
-            jr nz, .tu                      ; (0: not known yet, e.g. a tile uploaded by a
-            ld a, $0F                       ;   native copy: re-coded to be safe)
-.tu:        ld b, a
+            ld b, a
             ldh a, [sh_chg]
             and b
             pop hl

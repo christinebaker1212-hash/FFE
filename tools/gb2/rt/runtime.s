@@ -23,6 +23,7 @@ TSET_PEND  = $DCF8          ; DMG: a field tileset was loaded ($580B): fixed pal
 PAL_DM     = $DCD0          ; CGB: palette entries changed since the last write (bitmap, 4)
 PAL_LEM    = $DCF7          ; CGB: emphasis bits | 1 of the last write
 DBG        = $D820          ; fault info: code, HL, SP, stack top
+USEDIX     = $CCD8          ; DMG maps: colour indices the tiles use, per palette (4)
 VOL_BGM    = $CCDC          ; Select menu: music / sound effect volume (0-8; rt/selmenu.s)
 VOL_SFX    = $CCDD
 SPR_SLOT   = $D900          ; NES sprite tile (0-255) -> GB slot 0-127, $FF = not resident
