@@ -181,11 +181,14 @@ def map_pack(rom, m, cls=0):
         mt_dmg[room] = bytes(tbl)
         cgb_bg[room] = b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in bg[p])
     assert len(var) <= 256, 'map %d: %d DMG tile variants' % (m, len(var))
-    sppal = [[pal[0x10]] + list(pal[0x10 + 4 * p + 1:0x10 + 4 * p + 4]) for p in range(2)]
-    cgb_obj = b''.join(rgb555(c).to_bytes(2, 'little') for p in range(2) for c in sppal[p])
+    sppal = [[pal[0x10]] + list(pal[0x10 + 4 * p + 1:0x10 + 4 * p + 4]) for p in range(4)]
+    cgb_obj = b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in sppal[p])
+    spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)
+    party = b''.join(spr_rank_tile(spr[16 * t:16 * t + 16], sppal[t >> 1 & 1]) for t in range(16))
     return dict(ts=ts, map=std_map(rom, m), mt_dmg_out=mt_dmg['out'], mt_dmg_in=mt_dmg['in'],
                 dmg_tiles=bytes(dmg_tiles), n_dmg=len(var), cgb_bg_out=cgb_bg['out'],
-                cgb_bg_in=cgb_bg['in'], cgb_obj=cgb_obj, obp=bytes(obj_shades(p) for p in sppal))
+                cgb_bg_in=cgb_bg['in'], cgb_obj=cgb_obj, party_dmg=party,
+                objs=map_objects(rom, m, len(var), sppal))
 
 
 OW_INFO, OW_CHR, INIT_UNSRAM = 0x8000, 0x8000, 0xB000   # BANK_OWINFO / BANK_MAPCHR / STARTUPINFO
@@ -226,15 +229,62 @@ def ow_pack(rom, cls=0):
                 var[key] = len(var); dmg += gb_tile(chr_[16 * nt:16 * nt + 16], key[1])
             tbl[128 * k + mt] = var[key]
     assert len(var) <= 256
-    sppal = [[pal[0x10]] + list(pal[0x10 + 4 * p + 1:0x10 + 4 * p + 4]) for p in range(2)]
-    return dict(prop=prop, tsa=tsa, mt_pal=mt_pal,
+    sppal = [[pal[0x10]] + list(pal[0x10 + 4 * p + 1:0x10 + 4 * p + 4]) for p in range(4)]
+    spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)
+    party = b''.join(spr_rank_tile(spr[16 * t:16 * t + 16], sppal[t >> 1 & 1]) for t in range(16))
+    return dict(prop=prop, tsa=tsa, mt_pal=mt_pal, party_dmg=party,
                 cgb_tiles=b''.join(gb_tile(chr_[16 * t:16 * t + 16]) for t in range(256)),
                 cgb_bg=b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in bg[p]),
                 cgb_obj=b''.join(rgb555(c).to_bytes(2, 'little') for p in range(2) for c in sppal[p]),
-                obp=bytes(obj_shades(p) for p in sppal), mt_dmg=bytes(tbl), dmg_tiles=bytes(dmg),
+                mt_dmg=bytes(tbl), dmg_tiles=bytes(dmg),
                 rows=[ow_row(rom, r) for r in range(256)],
                 start=(rom.rd(BANK_SMINFO, INIT_UNSRAM + 0x10) + 7) & 0xFF,
                 start_y=(rom.rd(BANK_SMINFO, INIT_UNSRAM + 0x11) + 7) & 0xFF)
+
+
+MAP_OBJECTS, OBJ_GFX, OBJ_CHR, INIT_FLAGS = 0xB400, 0xAE00, 0xA200, 0xAF00
+
+
+def obj_tables(rom):
+    """FF1's 2x2 tables for map objects: right, left, up, down (standing, walking), found in
+    the fixed bank by their first bytes"""
+    fix = rom.prg[-0x4000:]
+    i = fix.find(bytes([0x09, 0x42, 0x0B, 0x43, 0x08, 0x42, 0x0A, 0x43]))
+    assert i >= 0, 'object sprite tables not found'
+    return fix[i:i + 64]
+
+
+def spr_rank_tile(t16, pal):
+    """a sprite tile for DMG: colours 1-3 as brightness ranks (1 brightest .. 3 darkest), shown
+    through one OBJ palette (1 white, 2 dark grey, 3 black); 0 stays transparent"""
+    order = sorted(range(1, 4), key=lambda i: -lum(pal[i]))
+    rank = [0, 0, 0, 0]
+    for r_, i in enumerate(order): rank[i] = r_ + 1
+    return gb_tile(t16, rank)
+
+
+def map_objects(rom, m, n_bg, sppal):
+    """map m's objects: the 15 slots (id, x + flags, y, sprite tile base) and the graphics:
+    a 16-tile block per distinct graphic, placed in VRAM tiles the BG does not use (party at
+    0-15, then 16-127, then down from 255 above the BG's 128+ variants)"""
+    raw = rom.rd(BANK_SMINFO, MAP_OBJECTS + 0x30 * m, 45)
+    free = list(range(16, 128, 16)) + list(range(240, 127 + max(0, n_bg - 128), -16))
+    free = [b for b in free if b < 128 or b >= 128 + max(0, n_bg - 128)]
+    base = {}; dmg = bytearray(); cgb = bytearray(); blocks = []
+    slots = bytearray()
+    for i in range(15):
+        oid, xf, y = raw[3 * i], raw[3 * i + 1], raw[3 * i + 2]
+        g = rom.rd(BANK_SMINFO, OBJ_GFX + oid) if oid else 0
+        if oid and g not in base:
+            assert free, 'map %d: no sprite tiles left' % m
+            base[g] = free.pop(0)
+            chr_ = rom.rd(BANK_MAPCHR, OBJ_CHR + 0x100 * g, 0x100)
+            for t in range(16):                          # NES palette 2 / 3 by tile (bit 1)
+                dmg += spr_rank_tile(chr_[16 * t:16 * t + 16], sppal[2 + (t >> 1 & 1)])
+                cgb += gb_tile(chr_[16 * t:16 * t + 16])
+            blocks.append(base[g])
+        slots += bytes([oid, xf, y, base.get(g, 0) if oid else 0])
+    return dict(slots=bytes(slots), blocks=bytes(blocks), dmg=bytes(dmg), cgb=bytes(cgb))
 
 
 def common_pack(rom, cls=0):
@@ -244,7 +294,9 @@ def common_pack(rom, cls=0):
     tele += rom.rd(BANK_SMINFO, EXIT_TELE_X, 16) + rom.rd(BANK_SMINFO, EXIT_TELE_Y, 16)
     tele += b''.join(rom.rd(BANK_SMINFO, a, 32) for a in (ENTR_TELE_X, ENTR_TELE_Y, ENTR_TELE_MAP))
     return dict(spr_tiles=b''.join(gb_tile(spr[16 * t:16 * t + 16]) for t in range(16)),
-                mapman=mapman_table(rom), tele=tele)
+                mapman=mapman_table(rom), tele=tele, objtbl=obj_tables(rom),
+                init_unsram=rom.rd(BANK_SMINFO, INIT_UNSRAM, 256),
+                init_flags=rom.rd(BANK_SMINFO, INIT_FLAGS, 256))
 
 
 def db(name, data, per=16):

@@ -41,7 +41,15 @@ M_BGOUT    = $5000
 M_BGIN     = $5020
 M_OBJ      = $5040
 M_OBP      = $5050
-M_TS       = $5052
+M_TS       = $5060
+M_PARTYDMG = $7200          ; the party sprite pre-shaded for this map (DMG)
+M_OBJBLK   = $7340          ; object graphics blocks: tile bases, count at $7350
+M_OBJDMG   = $6800          ; object tiles pre-shaded (DMG), a 256-byte block each
+M_OBJCGB   = $7400          ; object tiles as they are (CGB)
+C_OBJTBL   = $4400          ; FF1's object 2 x 2 tables
+C_INITPG   = $4500          ; new game: save page 0 and the game flags
+C_INITFLG  = $4600
+DMG_OBP    = %11100000      ; sprite tiles hold brightness ranks: 1 white, 2 dark grey, 3 black
 M_MTOUT    = $5100
 M_MTIN     = $5300
 M_TILES    = $5800
@@ -114,11 +122,15 @@ start:      di
             jr nz, .dc
             ld a, $FF
             ld [mt_force], a
-            ld a, COMMON                    ; party sprite tiles at $8000
+            ld a, COMMON                    ; new game: save page 0 and the game flags from the ROM
             ld [MBC_BANK], a
-            ld hl, C_SPR
-            ld de, $8000
-            ld bc, 16 * 16
+            ld hl, C_INITPG
+            ld de, unsram
+            ld bc, 256
+            call memcpy
+            ld hl, C_INITFLG
+            ld de, game_flags
+            ld bc, 256
             call memcpy
             ld a, 3
             ld [facing], a
@@ -146,6 +158,7 @@ start:      di
 main:       call wait_vbl
             call read_pad
             call move
+            call obj_frame
             call set_scroll
             call make_oam
             jr main
@@ -163,6 +176,8 @@ vblank:     push af
             push bc
             push de
             push hl
+            ld hl, frame
+            inc [hl]
             call hram_dma
             ldh a, [scx]
             ldh [rSCX], a
@@ -276,14 +291,22 @@ load_map:   ld [cur_map], a
             ld hl, M_BGOUT
             ld a, $80
             call cgb_pal32
-            ld a, $80
+            ld a, $80                       ; OBJ palettes 0-3 (NES sprite palettes)
             ldh [rOCPS], a
             ld hl, M_OBJ
-            ld b, 16
+            ld b, 32
 .op:        ld a, [hl+]
             ldh [rOCPD], a
             dec b
             jr nz, .op
+            ld a, COMMON                    ; party sprite tiles at $8000 (as they are)
+            ld [MBC_BANK], a
+            ld hl, C_SPR
+            ld de, $8000
+            ld bc, 16 * 16
+            call memcpy
+            ld hl, M_OBJCGB
+            call obj_tiles
             jr .drw
 .dmg:       ld a, [map_bank]                ; DMG: pre-shaded variants 0-127 -> $9000,
             ld [MBC_BANK], a                ;   128-255 -> $8800
@@ -296,11 +319,16 @@ load_map:   ld [cur_map], a
             call memcpy
             ld a, %11100100                 ; tile values are shades
             ldh [rBGP], a
-            ld a, [M_OBP]
+            ld a, DMG_OBP
             ldh [rOBP0], a
-            ld a, [M_OBP + 1]
-            ldh [rOBP1], a
-.drw:       call draw_all
+            ld hl, M_PARTYDMG               ; party sprite pre-shaded for this map
+            ld de, $8000
+            ld bc, 16 * 16
+            call memcpy
+            ld hl, M_OBJDMG
+            call obj_tiles
+.drw:       call obj_load
+            call draw_all
             call set_scroll
             ldh a, [scx]
             ldh [rSCX], a
@@ -310,6 +338,38 @@ load_map:   ld [cur_map], a
             call hram_dma
             ld a, LCDC_ON
             ldh [rLCDC], a
+            ret
+
+; the map's object graphics blocks (HL = their tiles in the map bank, 256 bytes a block) to
+; their tile bases ($8000 + 16 x base; LCD off)
+obj_tiles:  ldh a, [maptype]
+            and a
+            ret nz
+            ld a, [map_bank]
+            ld [MBC_BANK], a
+            ld a, [M_OBJBLK + 16]
+            and a
+            ret z
+            ld b, a
+            ld de, M_OBJBLK
+.b:         push bc
+            push de
+            ld a, [de]                      ; tile base -> VRAM $8000 + 16 base
+            swap a
+            ld e, a
+            and $0F
+            add a, $80
+            ld d, a
+            ld a, e
+            and $F0
+            ld e, a
+            ld bc, 256
+            call memcpy
+            pop de
+            inc de
+            pop bc
+            dec b
+            jr nz, .b
             ret
 
 cgb_pal32:  ldh [rBCPS], a                  ; HL = 32 bytes of BG palettes 0-3
@@ -413,7 +473,17 @@ move:       ld a, [moving]
             bit 0, d
             ret nz
             jr .ok
-.smr:       ld a, d                         ; doors and rooms
+.smr:       push de                         ; an object there: blocked
+            push bc
+            ld a, [tx]
+            ld e, a
+            ld a, [ty]
+            ld d, a
+            call obj_at
+            pop bc
+            pop de
+            ret c
+            ld a, d                         ; doors and rooms
             and $1E
             cp $02
             jr z, .door
@@ -752,7 +822,7 @@ make_oam:   ld a, COMMON
             call .spr
             ld b, $58
             call .spr
-            ret
+            jp obj_draw
 .spr:       ld a, b
             ld [de], a
             inc de
@@ -762,19 +832,14 @@ make_oam:   ld a, COMMON
             ld a, [hl+]
             ld [de], a
             inc de
-            ld a, [hl+]                     ; NES attributes -> GB: flip bit 6 -> 5, palette
-            push bc                         ;   0-1 (CGB bits 0-2, DMG bit 4)
+            ld a, [hl+]                     ; NES attributes -> GB: flip bit 6 -> 5, CGB
+            push bc                         ;   palette 0-3 (DMG: one palette)
             ld b, a
             and $40
             rrca
             ld c, a
             ld a, b
             and 3
-            or c
-            ld c, a
-            ld a, b
-            and 1
-            swap a
             or c
             pop bc
             ld [de], a
@@ -1087,6 +1152,22 @@ ow_y:       ds 1
 fdepth:     ds 1                            ; floors pushed by normal teleports
 fstack:     ds 4 * 8                        ; x, y, room state, map
 warp_room:  ds 1
+obj_cur:    ds 1
+npc_seed:   ds 1
+o_tx:       ds 1
+o_ty:       ds 1
+o_sx:       ds 1
+o_sy:       ds 1
+o_tb:       ds 1
+
+section wram, $CA00
+objs:       ds 16 * 15                      ; map objects (objects.s)
+
+section wram, $D000
+unsram:     ds 256                          ; FF1's save page ($6000-$63FF): page 0
+ch_stats:   ds 256
+game_flags: ds 256
+ch_magic:   ds 256
 
 section hram, $FF80
 hram_dma:   ds 10
@@ -1098,4 +1179,5 @@ scy:        ds 1
 pal_req:    ds 1
 q_nolim:    ds 1
 maptype:    ds 1                            ; 0 standard map, 1 overworld
+frame:      ds 1                            ; frame counter
 cmask:      ds 1                            ; coordinate mask: 63 / 255

@@ -26,6 +26,9 @@ def data_banks(rom):
     place(banks, COMMON, 0x4000, c['spr_tiles'])
     place(banks, COMMON, 0x4100, c['mapman'])
     place(banks, COMMON, 0x4200, c['tele'])
+    place(banks, COMMON, 0x4400, c['objtbl'])                 # object 2x2 tables (64)
+    place(banks, COMMON, 0x4500, c['init_unsram'])            # new game: save page 0
+    place(banks, COMMON, 0x4600, c['init_flags'])             #   and the game flags
     for ts in range(8):
         t = data.tileset_pack(rom, ts)
         place(banks, TS_BANK0 + ts, 0x4000, t['prop'])
@@ -39,7 +42,9 @@ def data_banks(rom):
     place(banks, OW_TS, 0x4400, o['cgb_tiles'])
     place(banks, OW_INFO, 0x5000, o['cgb_bg'] + o['cgb_bg'])
     place(banks, OW_INFO, 0x5040, o['cgb_obj'])
-    place(banks, OW_INFO, 0x5050, o['obp'] + bytes([8]))
+    place(banks, OW_INFO, 0x5060, bytes([8]))
+    place(banks, OW_INFO, 0x7200, o['party_dmg'])
+    place(banks, OW_INFO, 0x7300, b'\0' * 64)                  # no objects
     place(banks, OW_INFO, 0x5100, o['mt_dmg'] + o['mt_dmg'])
     place(banks, OW_INFO, 0x5800, o['dmg_tiles'])
     place(banks, COMMON, 0x43C0, bytes([o['start'], o['start_y']]))
@@ -52,7 +57,14 @@ def data_banks(rom):
         place(banks, b, 0x5000, p['cgb_bg_out'])
         place(banks, b, 0x5020, p['cgb_bg_in'])
         place(banks, b, 0x5040, p['cgb_obj'])
-        place(banks, b, 0x5050, p['obp'] + bytes([p['ts']]))
+        place(banks, b, 0x5060, bytes([p['ts']]))
+        place(banks, b, 0x7200, p['party_dmg'])
+        ob = p['objs']
+        place(banks, b, 0x7300, ob['slots'].ljust(64, b'\0'))      # 15 x (id, x+flags, y, tile)
+        place(banks, b, 0x7340, ob['blocks'].ljust(16, b'\0'))     # tile bases of the blocks
+        place(banks, b, 0x7350, bytes([len(ob['blocks'])]))
+        place(banks, b, 0x6800, ob['dmg'])                         # DMG object tiles (pre-shaded)
+        place(banks, b, 0x7400, ob['cgb'])                          # CGB object tiles (raw)
         place(banks, b, 0x5100, p['mt_dmg_out'])
         place(banks, b, 0x5300, p['mt_dmg_in'])
         place(banks, b, 0x5800, p['dmg_tiles'])
@@ -67,9 +79,10 @@ def main():
     rom = data.Rom(nes)
     src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\n' % tuple(st) +
            open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +
-           open(os.path.join(HERE, 'src', 'main.s')).read())
+           open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'objects.s')).read())
     r = asm(src)
-    for lbl in ('qbuf', 'oam_buf'):
+    for lbl in ('qbuf', 'oam_buf', 'objs', 'game_flags'):
         assert r.labels[lbl] % 0x100 == 0, '%s at %04X not aligned' % (lbl, r.labels[lbl])
     banks = dict(r.banks)
     for b, blob in data_banks(rom).items():
