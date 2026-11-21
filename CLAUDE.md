@@ -99,6 +99,16 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   waived. Work out the memory layout that makes it possible: what FF1 really uses of
   $6000-$7FFF, what the runtime needs, and what can live elsewhere.
 
+## Owner's decision (2026-11-21; binding, replaces static recompilation for FF1)
+- **FF1 becomes 100% native code, absolutely no NES layer: a full hand-written rewrite**
+  (owner chose this over keeping the recompiled logic). The whole engine (field, battle,
+  menus, events, music) is our own SM83 code written from what the disassembly says each
+  routine does; only data comes from the user's ROM at build time. Plan, rules and
+  milestones: `docs/ff1-native.md`. The recompiled build (`tools/gb/`) stays buildable until
+  the native one (`tools/gbn/`) reaches parity.
+- In the native game: names up to 6 letters; FF3's weapon / armour / item / white / black
+  magic icons before item and spell names, taken from the user's FF3 ROM at build time.
+
 ## Release requirements (owner's decision, 2026-11-20: absolutely required)
 No GB/GBC release of FF1, FF2 or FF3 until every Nintendo Lot Check standard in
 `docs/gb-release-checks.md` is met and checked: header and boot integrity, LCD off only in
