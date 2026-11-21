@@ -1269,7 +1269,9 @@ message, soft reset); lag: field steps 16 frames (fixed a skipped frame per step
 early in the frame. Airship takeoff / landing animations, vehicle sprite order fixed.
 Pocket / SGB2 / GBA runs (mGBA, VRAM checker 0), the FFE Builder now makes FF1 from the native
 build, the ending as FF1 ("The End" drawing, timed pages), Chaos' dissolve.
-Next: the owner's play-test; FF1's screen transitions (palette cycling, story shutters). Lessons: docs/gb-lessons.md "Native rewrite".
+FF1's transitions: the battle transition (emphasis flashing + noise), palette cycling around
+menus / shops / battles, the screen wipe on map changes (window curtains via STAT).
+Next: the owner's play-test; the story pages' shutters. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

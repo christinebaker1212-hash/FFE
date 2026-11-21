@@ -240,5 +240,6 @@ one reaches parity, so the owner can keep playing).
    the recompiled build's rt/mus.s documents it) driving the GB APU directly; battle SFX.
 4. (done) Story scenes, prologue, the minimap, the 15-puzzle, options (message speed).
 5. (done) Battle polish: animations and poses; sound effects.
-6. (done) SGB, Lot Check pass, lag check, the builder. Left: the owner's play-test on hardware;
-   FF1's screen transitions (palette cycling, the story shutters) are instant cuts here.
+6. (done) SGB, Lot Check pass, lag check, the builder, FF1's transitions (the battle
+   transition's emphasis flashing, the palette cycling around menus / shops, the screen wipe on
+   map changes). Left: the owner's play-test on hardware; the story pages' shutters.
