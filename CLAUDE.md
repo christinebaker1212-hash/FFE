@@ -1274,6 +1274,8 @@ menus / shops / battles, the screen wipe on map changes (window curtains via STA
 The story pages' shutters; the bridge scene's music and FF1's credits pages (from the user's ROM);
 story pages turn behind closed shutters; Color loads behind a black mask (no white frames,
 VRAM checker 0, load times within FF1's NES times).
+Sound as the recompiled build (pulses at 5/8, the triangle's counters at a song's end; every song
+compared in SameBoy).
 Next: the owner's play-test. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining
