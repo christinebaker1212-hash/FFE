@@ -301,6 +301,9 @@ vblank:     push af
             ld a, [wp_on]                   ; (a screen wipe: the window from the top)
             and a
             call nz, wp_vbl
+            ld a, [ly_n]                    ; (the LCDC list: from its first line again)
+            and a
+            call nz, ly_vbl
             ldh a, [rLY]                    ; (a late handler: no VRAM writes outside V-Blank)
             cp 144
             jr c, .late
@@ -2608,6 +2611,9 @@ wp_top:     ds 1
 wp_bot:     ds 1
 wp_st:      ds 1
 wp_t:       ds 1
+ly_n:       ds 1                            ; (the LCDC list: entries, the next, its base)
+ly_i:       ds 1
+ly_base:    ds 1
 pc_hold:    ds 1                            ; (the cycle's colours: no map palette writes)
 pz_bcnt:    ds 1                            ; B presses on the overworld (FF1 joy_b: the puzzle)
 ts_bank:    ds 1
@@ -2914,3 +2920,31 @@ pc_black:   ld a, 1
             jr nz, .c
             ret
 
+; V-Blank with a WX list: the window enabled but out of sight (WX 167: its line counter
+; waits), the first entry's line
+ly_vbl:     xor a
+            ld [ly_i], a
+            ldh [rWY], a
+            ld a, 167
+            ldh [rWX], a
+            ldh a, [rLCDC]
+            bit 7, a
+            ret z
+            ld a, [ly_base]
+            ldh [rLCDC], a
+            ld a, [ly_tab]
+            ldh [rLYC], a
+            ret
+; the list off: the dialogue's line again
+ly_off:     xor a
+            ld [ly_n], a
+            ld a, BOX_LINES
+            ldh [rLYC], a
+            ld a, [lcdc_on]
+            ldh [rLCDC], a
+            ld a, 7
+            ldh [rWX], a
+            ret
+
+section wram, $CF98
+ly_tab:     ds 32                           ; (line, LCDC) x 16 (in one page)

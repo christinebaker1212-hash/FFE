@@ -2536,8 +2536,29 @@ story_show: ld [st_pg], a
             inc c
             jr .ln
 .done:      pop bc
+            ld a, [st_mode]                 ; (the prologue: no shutters)
+            and a
+            jr nz, .sh
             call scr_show
-            xor a                           ; FF1 Story_Wait: 512 frames at most
+            jr .so
+.sh:        call st_wmap                    ; FF1's shutters: closed (the window), then open
+            xor a
+            call st_shut
+            call scr_show
+            ld a, 167                       ; (from the first frame: the window's list)
+            ldh [rWX], a
+            ld a, LCDC_WIN
+            ldh [rLCDC], a
+            ld a, 1
+.op:        push af
+            call st_shut
+            call scr_frame
+            call scr_frame
+            pop af
+            inc a
+            cp 17
+            jr c, .op
+.so:        xor a                           ; FF1 Story_Wait: 512 frames at most
             ld [st_t], a
             ld a, 2
             ld [st_t + 1], a
@@ -2562,7 +2583,20 @@ story_show: ld [st_pg], a
             inc hl
             dec [hl]
             jr nz, .w
-.nx:        ld hl, st_pg
+.nx:        ld a, [st_mode]
+            and a
+            jr z, .nc
+            ld a, 16                        ; the shutters close (FF1 Story_CloseShutters)
+.cs:        push af
+            call st_shut
+            call scr_frame
+            call scr_frame
+            pop af
+            dec a
+            cp $FF
+            jr nz, .cs
+            call ly_off
+.nc:        ld hl, st_pg
             inc [hl]
             ld hl, st_n
             dec [hl]
@@ -2570,6 +2604,7 @@ story_show: ld [st_pg], a
             ret
 
 section wram, $CE00
+st_k:       ds 1
 st_mode:    ds 1                            ; story pages: 0 prologue, 1 bridge, 2 ending
 st_t:       ds 2
 pen:        ds 2

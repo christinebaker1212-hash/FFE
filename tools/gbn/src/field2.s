@@ -1380,7 +1380,9 @@ te_addr:    ld a, e                         ; tile (y / 8) * 10 + x / 8; byte 8 
 ; ---- FF1 BattleTransition: 65 frames cycling the NES colour emphasis (a new mode every 4
 ; frames; CGB: the map's palettes with the channels not emphasised at 3/4; DMG / SGB: the
 ; shades darker), the music silenced, FF1's noise sweep (volume 15, period (n / 2) OR 3)
-bt_trans:   ld a, $80
+bt_trans:   ld a, [q_n]                     ; (the field's queue dropped: these variables
+            ld [q_rd], a                    ;   share its memory)
+            ld a, $80
             call snd_track
             xor a
             ld [bx_n], a
@@ -1558,6 +1560,12 @@ bx_apply:   ldh a, [is_cgb]
 ; the map): from $xC back to the map's colours. Sprites hidden. CGB: the map's NES palettes
 ; (map bank $73C0, the room's); DMG / SGB: the shades fade to black and back.
 PC_NES     = $73C0
+pc_rgb     = smap           ; (its variables in the screens' map copy: unused on the field,
+pc_buf     = smap + 128     ;   and the field's queue may still be drawing a room)
+pc_tgt     = smap + 160
+pc_cur     = smap + 176
+pc_dir     = smap + 192
+pc_f       = smap + 193
 pc_out:     xor a
             jr pc_go
 pc_in:      ld a, 1
@@ -1719,6 +1727,93 @@ pc_dmg:     ld b, 0
             jp pc_go.done
 .bgp:       db %11100100, %11111001, %11111110, %11111111
 
+; the shutters' window: every row the box's middle row (frame, empty inside), so the window
+; may start on any line (LCD off)
+st_wmap:    ld hl, $9C00
+            ld c, 18
+.r:         ld a, $13
+            ld [hl+], a
+            ld b, 18
+            ld a, $20
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            ld a, $14
+            ld [hl+], a
+            ld de, 12
+            add hl, de
+            dec c
+            jr nz, .r
+            ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, 1
+            ldh [rVBK], a
+            ld hl, $9C00
+            ld bc, 18 * 32
+.a:         ld a, WIN_ATTR
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .a
+            xor a
+            ldh [rVBK], a
+            ld a, 7
+            ldh [rWX], a
+            xor a
+            ldh [rWY], a
+            ret
+; the shutters A lines open (0-16) in each 16-line band of the box's inside (lines 24-119):
+; the LCDC list (window on from line band + A, off at the band's end); 16: off
+ST_TOP     = 24
+st_shut:    ld [st_k], a
+            xor a
+            ld [ly_n], a
+            ld a, [st_k]
+            cp 16
+            jp nc, ly_off
+            ld a, LCDC_WIN                  ; (the window on all frame, shown by WX)
+            ld [ly_base], a
+            ld hl, ly_tab
+            ld a, [st_k]
+            and a
+            jr nz, .b
+            ld a, ST_TOP - 1                ; closed: one window from the top to the end
+            ld [hl+], a
+            ld a, 7
+            ld [hl+], a
+            ld a, ST_TOP + 95
+            ld [hl+], a
+            ld a, 167
+            ld [hl+], a
+            ld a, 2
+            jr .n
+.b:         ld b, ST_TOP                    ; six bands
+            ld c, 6
+.bl:        ld a, [st_k]
+            add a, b
+            dec a
+            ld [hl+], a                     ; shown at band + k (LYC one line before)
+            ld a, 7
+            ld [hl+], a
+            ld a, b
+            add a, 15
+            ld [hl+], a                     ; hidden at the band's end
+            ld a, 167
+            ld [hl+], a
+            ld a, b
+            add a, 16
+            ld b, a
+            dec c
+            jr nz, .bl
+            ld a, 12
+.n:         ld [ly_n], a
+            ld a, [ly_tab]                  ; (the first line now, for a frame already begun)
+            ldh [rLYC], a
+            ret
+
+
 section wram, $C100                         ; (the map queue: free on these screens)
 lu_slot:    ds 32
 lu_cur:     ds 1
@@ -1756,9 +1851,3 @@ bx_bgp:     ds 1
 bx_t:       ds 2
 bx_pal:     ds 32
 bx_out:     ds 32
-pc_dir:     ds 1                            ; (the palette cycling)
-pc_f:       ds 1
-pc_tgt:     ds 16
-pc_cur:     ds 16
-pc_buf:     ds 32
-pc_rgb:     ds 128

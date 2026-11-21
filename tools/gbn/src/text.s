@@ -308,6 +308,9 @@ box_vbl:    ld a, [box_on]
 
 ; STAT (LYC = 64): the window off below the box
 stat_int:   push af
+            ld a, [ly_n]                    ; (a list of LCDC changes by line: the story's
+            and a                           ;   shutters)
+            jr nz, .ly
             ld a, [wp_on]                   ; (a screen wipe: the band's edges)
             and a
             jr nz, .wp
@@ -366,6 +369,30 @@ stat_int:   push af
             jr .mus
 .wm2:       pop af
             reti
+.ly:        push hl                         ; this entry's WX (the window shown / hidden),
+            ld a, [ly_i]                    ;   the next entry's line; after the last: the
+            add a, a                        ;   music
+            add a, low(ly_tab) + 1
+            ld l, a
+            ld h, high(ly_tab)
+            ld a, [hl+]
+            ldh [rWX], a
+.ly0:       ld a, [ly_i]
+            inc a
+            ld [ly_i], a
+            push bc
+            ld b, a
+            ld a, [ly_n]
+            cp b
+            pop bc
+            jr z, .lyl
+            ld a, [hl]
+            ldh [rLYC], a
+            pop hl
+            pop af
+            reti
+.lyl:       pop hl
+            jp .mus
 
 ; the dialogue in progress (main loop): A turns the page or closes the box
 dlg_frame:  ldh a, [pad_new]
