@@ -245,3 +245,8 @@ one reaches parity, so the owner can keep playing).
    map changes), the story pages' shutters, the bridge scene as FF1 (its music, the four story
    pages, then FF1's four credits pages read from the ROM's lut_CreditsText at build time, a
    32-frame stall). Left: the owner's play-test on hardware.
+7. (done) Loads on the Color behind a black mask (no white frames: the LCD stays on, palettes
+   black, a mode-2 STAT guard keeps VRAM writes out of mode 3; `lcd_off` / `lcd_on` in
+   main.s); DMG / SGB keep the LCD-off loads. Load times measured against FF1 on the NES:
+   menu 60 vs 63 frames from the press, town entry black 11 vs 12, battle start black 10 vs
+   20.

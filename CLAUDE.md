@@ -1271,7 +1271,9 @@ Pocket / SGB2 / GBA runs (mGBA, VRAM checker 0), the FFE Builder now makes FF1 f
 build, the ending as FF1 ("The End" drawing, timed pages), Chaos' dissolve.
 FF1's transitions: the battle transition (emphasis flashing + noise), palette cycling around
 menus / shops / battles, the screen wipe on map changes (window curtains via STAT).
-The story pages' shutters; the bridge scene's music and FF1's credits pages (from the user's ROM).
+The story pages' shutters; the bridge scene's music and FF1's credits pages (from the user's ROM);
+story pages turn behind closed shutters; Color loads behind a black mask (no white frames,
+VRAM checker 0, load times within FF1's NES times).
 Next: the owner's play-test. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining

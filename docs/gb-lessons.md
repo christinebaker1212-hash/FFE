@@ -136,6 +136,15 @@ Color only" screen on older systems.
 
 
 ## Native rewrite (2026-11-21)
+- Masked loads on the Color (native engine): with code that writes VRAM directly all over a
+  load, a mode-2 STAT interrupt that spins until mode 0 makes every write safe without
+  touching that code (the CPU only runs in mode 0 / V-Blank). Costs: ~half the CPU during the
+  load (fine at double speed, far too slow on a DMG: a town entry took 73 frames instead of
+  13, so DMG / SGB keep the LCD off); pause the guard around long RAM-only work and wait for
+  mode 0 / 1 when resuming. Palette RAM ignores writes in mode 3: start the 64-byte palette
+  read-back / restore early in the V-Blank (LY 144-147), not after a long V-Blank handler.
+  Restore the scroll registers with the palettes, or the first frame shows the old scroll.
+  Measure load times against the NES itself (cynes, frame by frame) before and after.
 - Check every new screen against the NES picture (tools/gb/formations.py / battleshot.py give
   NES reference shots) on both CGB and DMG before calling it done. The fiend / Chaos battle
   shipped with swapped cell nibbles and an off-by-one attribute row because only one mode was

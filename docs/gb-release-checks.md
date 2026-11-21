@@ -239,7 +239,11 @@ items are simpler than for the recompiled build above.
   $03).
 - 2.1 LCD off only in V-Blank: every switch-off goes through `lcd_off` (main.s: waits for LY
   144-152 with interrupts off, so no handler can push the write past the V-Blank; nothing if
-  the LCD is off already); boot waits likewise (skipped when the LCD is off); the SGB border
+  the LCD is off already). On a Color the LCD is not switched off for loads at all (a
+  switched-off LCD shows white there): the load runs behind a black mask (palettes read back
+  and set black in a V-Blank, sprites off, palette writes into shadows) while a mode-2 STAT
+  interrupt holds the CPU through each line's mode 3, so its VRAM writes never meet the
+  drawing; `lcd_on` restores palettes and scroll in LY 144-146; boot waits likewise (skipped when the LCD is off); the SGB border
   transfer waits in V-Blank. Found and fixed with the checker below: the STAT handler (the
   dialogue window split) and the V-Blank handler's dialogue window could switch a
   switched-off LCD on again when a request was left pending, so a screen's VRAM was then
@@ -249,7 +253,9 @@ items are simpler than for the recompiled build above.
   lines the world map's drawing needed). `sgbrun` with `SGBRUN_VCHK=1` (now also printing
   the frame): 0 on DMG, CGB and SGB over a battle (commands, magic, physical attacks,
   animations, messages), a new game (title, class select, name entry, field, menu), and a
-  field run through the menu, items, magic, weapons, lineup and world map.
+  field run through the menu, items, magic, weapons, lineup and world map; again after the
+  Color's masked loads (2026-11-21): 0 on all three over a battle, a town entry with the menu,
+  the world map / lineup / menu / sub-screens, the bridge story and a new game.
 - 2.3 Save RAM: cart RAM is enabled only while the save is checked, read or written (save.s
   routines in main.s), and switched off right after: met literally. The save has a mark
   ("FF1N") and a 16-bit sum; at boot a save whose mark is there but whose sum is wrong shows
