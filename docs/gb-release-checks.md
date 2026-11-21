@@ -230,6 +230,44 @@ Known items in the FF1 ROM, and how each is handled:
   defaults; `GB_DLG_TEST` and `GB_SND_MASK` must not be set.
 - **Soft reset and the save error screen**: documented in 3.1 and 2.3.
 
+## FF1 native build (tools/gbn/): state 2026-11-21
+
+The native engine (no NES layer) keeps all working memory in the GB's own WRAM, so several
+items are simpler than for the recompiled build above.
+
+- 1.1-1.4 Header: `make_rom` as above ($0143 $80, $0146 $03, $0147 $1B, $014B $33, RAM code
+  $03).
+- 2.1 LCD off only in V-Blank: every switch-off goes through `lcd_off` (main.s: waits for LY
+  144-152 with interrupts off, so no handler can push the write past the V-Blank; nothing if
+  the LCD is off already); boot waits likewise (skipped when the LCD is off); the SGB border
+  transfer waits in V-Blank. Found and fixed with the checker below: the STAT handler (the
+  dialogue window split) and the V-Blank handler's dialogue window could switch a
+  switched-off LCD on again when a request was left pending, so a screen's VRAM was then
+  written during drawing; both now leave a switched-off LCD alone.
+- 2.2 VRAM / OAM: map rows, tiles and text are written in V-Blank only (LY checks), or with
+  the LCD off; the SGB packets go out before the frame wait (sending one in the V-Blank took
+  lines the world map's drawing needed). `sgbrun` with `SGBRUN_VCHK=1` (now also printing
+  the frame): 0 on DMG, CGB and SGB over a battle (commands, magic, physical attacks,
+  animations, messages), a new game (title, class select, name entry, field, menu), and a
+  field run through the menu, items, magic, weapons, lineup and world map.
+- 2.3 Save RAM: cart RAM is enabled only while the save is checked, read or written (save.s
+  routines in main.s), and switched off right after: met literally. The save has a mark
+  ("FF1N") and a 16-bit sum; at boot a save whose mark is there but whose sum is wrong shows
+  "SAVE DATA ERROR / The saved game in the Game Pak is damaged. / Press the A Button to
+  erase it." and is erased only after the A Button (tested in PyBoy, DMG and CGB). No mark:
+  no save (a new Game Pak).
+- 3.1 Soft reset: A + B + Start + Select (read_pad) -> cart RAM off -> boot again (title,
+  no prologue).
+- 3.2 Boot clears WRAM ($C000-$DFFF), HRAM and VRAM (both banks on a Color) before use.
+- 3.3 Matrix: DMG (PyBoy, mGBA), CGB (mGBA), SGB with the border and palettes (mGBA);
+  Pocket / SGB2 / GBA: to run before release.
+- 4.1 Names: "Game Pak", "A Button" in the save error; the title, menus and the game's own
+  text (the project's translation) name no hardware.
+- 4.2 CGB colour: FF1's NES palettes per screen.
+- 4.3 Undisclosed code: the test-build options (`build.py --start`, `--init`, `--battle`,
+  `--enc`) set constants that are off in a normal build (the code they guard is inert);
+  nothing hidden is reachable by the player.
+
 ## Release gate
 
 Before any release, record in `CLAUDE.md` / `docs/gb-handoff.md` that each item above was

@@ -1263,7 +1263,11 @@ tracks), prologue / bridge story / ending, continue + soft reset, special floor 
 sound effects (menus, battle, ship / airship), battle animations and poses (FF1's, no blinking).
 lineup menu (Select), world map (B + Select), the leader's class on the map, 15-puzzle, message
 speed option, Super Game Boy (border, palettes per screen).
-Next: Lot Check pass, lag check, release. Lessons: docs/gb-lessons.md "Native rewrite".
+Lot Check pass for the native build (docs/gb-release-checks.md "FF1 native build": LCD off in
+V-Blank, VRAM/OAM checker 0 in DMG / CGB / SGB, save RAM off after each access, damaged-save
+message, soft reset); lag: field steps 16 frames (fixed a skipped frame per step), loops finish
+early in the frame. Airship takeoff / landing animations, vehicle sprite order fixed.
+Next: the GBA / Pocket / SGB2 runs, the builder switched to the native build, release. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
