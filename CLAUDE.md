@@ -1261,7 +1261,9 @@ FF1's formulas, magic, AI, items, rewards, level ups, fiend / Chaos graphics che
 the NES), random encounters, talk battles, vehicles, music (native engine, map / event
 tracks), prologue / bridge story / ending, continue + soft reset, special floor tiles.
 sound effects (menus, battle, ship / airship), battle animations and poses (FF1's, no blinking).
-Next: minimap, 15-puzzle, options, SGB, Lot Check pass, lag check, release. Lessons: docs/gb-lessons.md "Native rewrite".
+lineup menu (Select), world map (B + Select), the leader's class on the map, 15-puzzle, message
+speed option, Super Game Boy (border, palettes per screen).
+Next: Lot Check pass, lag check, release. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

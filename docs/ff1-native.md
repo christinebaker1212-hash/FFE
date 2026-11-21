@@ -206,6 +206,14 @@ one reaches parity, so the owner can keep playing).
   hit enemies, the screen shake on enemy attacks, enemies erased row by row, the victory cheer.
   No blinking (owner). Battle windows: blanked on screen before new text, rows go up whole.
 
+- Lineup menu (Select; FF1 EnterLineupMenu: slots sliding, the leader never dead / stone,
+  records reordered on leaving), the world map (B + Select on the overworld: the 128 x 128
+  picture made at build time from the user's ROM by FF1's rule, drawn a pixel row a frame with
+  FF1's tone, the marks), the party's map sprite is the leader's class (CGB colours, DMG ranks
+  per map). The 15-puzzle (B x 55, then A + B on the ship; FF1's pieces as 8 x 16 sprites,
+  shuffle, slides, the reward). The title's message speed (FF1's respond rate) sets the battle
+  message wait. Super Game Boy: the border, a palette set per screen (sgb.py, src/sgb.s).
+
 ## Next steps (native rewrite)
 1. (done) Vehicles (FF1 ProcessOWInput / OWCanMove, bank 0F): `vehicle` 1 foot, 2 canoe, 4 ship,
    8 airship; blocked if tile byte 0 & vehicle; on foot onto water: BoardCanoe (needs
@@ -224,9 +232,6 @@ one reaches parity, so the owner can keep playing).
    data_ChaosTSA in bank 0B: 8 x 8 / 14 x 12 TSA, their own palettes).
 3. (done: music) Music and sound effects: a native player for FF1's music data (bank 0D MusicPlay format:
    the recompiled build's rt/mus.s documents it) driving the GB APU directly; battle SFX.
-4. Story scenes (bridge, ending: translations/ff1_story.py, the approved 20 x 11 box),
-   prologue, the minimap (B + Select), the 15-puzzle, options (message speed), Chaos'
-   ending.
+4. (done) Story scenes, prologue, the minimap, the 15-puzzle, options (message speed).
 5. (done) Battle polish: animations and poses; sound effects.
-6. SGB (palettes per screen, border), Lot Check pass (gb-release-checks.md), lag check,
-   release build.
+6. (done: SGB) Lot Check pass (gb-release-checks.md), lag check, release build.
