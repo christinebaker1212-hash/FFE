@@ -72,3 +72,32 @@ def bank(rom):
     blob[0x2308] = (zero + 0x80) & 0xFF
     blob[0x2309:0x230D] = pal
     return bytes(blob)
+
+
+def puzzle(rom):
+    """FF1's 15-puzzle (bank 13: EnterMiniGame): the pieces' graphics (1bpp: the numbered
+    pieces as the low plane, the blank piece as the high plane, found through the code that
+    loads them) as 8 x 16 sprite tiles (left column TL / BL, right TR / BR), lut_PuzzleStart
+    (found by its use after the loader) and the reward (MinigameReward's immediate)"""
+    import re
+    b13 = rom.prg[13 * 0x4000:14 * 0x4000]
+    fix = rom.prg[15 * 0x4000:16 * 0x4000]
+    i = b13.find(bytes([0x85, 0x11, 0x85, 0x13]))
+    assert i > 0 and b13[i - 2] == 0xA9, 'puzzle graphics not found'
+    chr_ = b13[(b13[i - 1] << 8) - 0x8000:(b13[i - 1] << 8) - 0x8000 + 0x200]
+    start = None                                          # LDA lut,X / STA puzzle,X / DEX / BPL
+    for m in re.finditer(rb'\xA2\x0F\xBD(..)(?:\x9D..|\x95.)\xCA\x10', b13, re.S):
+        a = int.from_bytes(m.group(1), 'little') - 0x8000
+        if 0 <= a < 0x4000 and sorted(b13[a:a + 16]) == list(range(16)):
+            start = b13[a:a + 16]
+    assert start, 'puzzle start not found'
+    r = re.search(rb'\xA9(.)\x85\x10\xA9(.)\x85\x11\xA9\x00\x85\x12\x4C', fix, re.S)
+    assert r, 'puzzle reward not found'
+    reward = bytes([r.group(1)[0], r.group(2)[0]])
+    out = bytearray()
+    for p in range(16):
+        for k in (0, 2, 1, 3):                            # TL, BL | TR, BR
+            lo = chr_[32 * p + 8 * k:32 * p + 8 * k + 8]
+            hi = chr_[8 * k:8 * k + 8]
+            out += data.gb_tile(bytes(lo) + bytes(hi))
+    return bytes(out), start, reward

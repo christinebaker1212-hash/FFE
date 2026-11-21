@@ -228,7 +228,7 @@ sw_mute:    ds 1
 ; while the music engine leaves its square 2 alone (sq2_sfx = NES_RAM + $7E, FF1's own
 ; mechanism); the NES sweep runs here, two half-frame clocks a frame; the noise on CH4.
 SFX_TBL    = $6D00
-SFX_NZ     = $6E00          ; NES noise period -> NR43
+SFX_NZ     = $6E40          ; NES noise period -> NR43
 section bank 7, $4900
 ; once a frame (the STAT interrupt): a requested effect starts, the music, the effect's step
 snd_frame_b:

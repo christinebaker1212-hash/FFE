@@ -183,6 +183,8 @@ start:      di
             call memcpy
 .nti:       ld a, 3
             ld [facing], a
+            ld a, LCDC_ON                   ; (the STAT handler's LCDC: 8 x 16 sprites in the
+            ld [lcdc_on], a                 ;   15-puzzle)
             ld a, SND_BANK                  ; the sound on
             call sbank
             call snd_init_b
@@ -642,7 +644,31 @@ move:       ld a, [moving]
             ld hl, lineup
             call bank_call
             jp map_reload
-.na:        ldh a, [pad_new]                ; A on a standard map: talk to what is in front
+.na:        ldh a, [maptype]                ; the overworld: B presses counted (FF1 joy_b);
+            and a                           ;   the 55th with A + B held on the ship: the
+            jr z, .np                       ;   15-puzzle
+            ldh a, [pad_new]
+            bit 1, a
+            jr z, .pc
+            ld hl, pz_bcnt
+            inc [hl]
+.pc:        ld a, [pz_bcnt]
+            cp 55
+            jr nz, .np
+            ld a, [vehicle]
+            cp V_SHIP
+            jr nz, .np
+            ldh a, [pad]
+            and 3
+            cp 3
+            jr nz, .np
+            ld hl, pz_bcnt
+            inc [hl]
+            ld a, SCR_BANK
+            ld hl, puzzle
+            call bank_call
+            jp map_reload
+.np:        ldh a, [pad_new]                ; A on a standard map: talk to what is in front
             bit 0, a
             jr z, .nt
             ldh a, [maptype]
@@ -2418,6 +2444,8 @@ ps_cls:     ds 1                            ; (party_spr)
 ps_t:       ds 1
 ps_p:       ds 1
 ps_perm:    ds 2
+lcdc_on:    ds 1
+pz_bcnt:    ds 1                            ; B presses on the overworld (FF1 joy_b: the puzzle)
 ts_bank:    ds 1
 inroom:     ds 1
 door_x:     ds 1

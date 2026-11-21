@@ -305,7 +305,7 @@ box_vbl:    ld a, [box_on]
 
 ; STAT (LYC = 64): the window off below the box
 stat_int:   push af
-            ld a, LCDC_ON
+            ld a, [lcdc_on]
             ldh [rLCDC], a
             push bc                         ; and the music, once a frame, here (mid-frame:
             push de                         ;   V-Blank stays free for VRAM writes)

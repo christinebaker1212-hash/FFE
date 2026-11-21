@@ -59,7 +59,7 @@ def tables(rom):
 # data_BattleSoundEffects, found through PlayBattleSFX's table operand), in one format
 # (FF1's battle one): header total frames, square blocks, noise blocks, 0; blocks of 8 bytes
 # (square $4004-$4007 + frames, noise $400C, $400E + frames)
-SFX_IDS = ('move', 'sel', 'error', 'magic', 'enemyhit', 'hit')
+SFX_IDS = ('move', 'sel', 'error', 'magic', 'enemyhit', 'hit', 'puzerr')
 SFX_ADDR = 0x6D00
 
 
@@ -92,7 +92,13 @@ def sfx_data(rom):
         a = int.from_bytes(b12[t + 2 * k:t + 2 * k + 2], 'little') - 0x8000
         h = b12[a:a + 3]
         bt.append(bytes(h) + b'\0' + b12[a + 3:a + 3 + 8 * max(h[1], h[2])])
-    effects = [mov, sel, err] + bt
+    b13 = prg[13 * 0x4000:14 * 0x4000]                     # the 15-puzzle's error (EnterMiniGame)
+    m = one(rb'\xA9(.)\x8D\x04\x40\xA9(.)\x8D\x05\x40\xA9(.)\x8D\x06\x40\xA9(.)\x8D\x07\x40'
+            rb'\xA9(.)\x85\x7E', b13)
+    assert len(m) == 1, 'puzzle error sound not found'
+    v = m[0].groups()
+    pz = bytes([v[4][0], 1, 0, 0]) + b''.join(v[:4]) + bytes([v[4][0], 0, 0, 0])
+    effects = [mov, sel, err] + bt + [pz]
     base = SFX_ADDR + 2 * len(effects)
     ptrs, body = bytearray(), bytearray()
     for e in effects:

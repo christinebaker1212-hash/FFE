@@ -80,7 +80,7 @@ def snd_tables(rom):
     sfx, nz = sound.sfx_data(rom)
     return ('section bank 7, $6F00\n' + db(tsm) + 'section bank 7, $6F10\n' + db(vm) +
             'section bank 7, $7000\n' + db(ft) + 'section bank 7, $%04X\n' % sound.SFX_ADDR +
-            db(sfx) + 'section bank 7, $6E00\n' + db(nz))
+            db(sfx) + 'section bank 7, $6E40\n' + db(nz))
 
 
 def ui_strings():
@@ -152,6 +152,9 @@ def data_banks(rom, ff3=None, init=None):
     mt, mc = data.mapman_all(rom)                               # the leader's map sprite
     place(banks, minimap.MINI_BANK, 0x6400, mt)
     place(banks, minimap.MINI_BANK, 0x7000, mc)
+    pt, ps, pr = minimap.puzzle(rom)                            # the 15-puzzle
+    place(banks, minimap.MINI_BANK, 0x7400, pt)
+    place(banks, minimap.MINI_BANK, 0x7800, ps + pr)
     place(banks, OW_INFO, 0x7300, b'\0' * 64)                  # no objects
     place(banks, OW_INFO, 0x5100, o['mt_dmg'] + o['mt_dmg'])
     place(banks, OW_INFO, 0x5800, o['dmg_tiles'])
