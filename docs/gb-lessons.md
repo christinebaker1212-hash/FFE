@@ -110,6 +110,16 @@ it in FF1 (file / routine names in this repo).
 - Random play does not talk to people or cast rare spells: dispatch tables need explicit
   coverage (see above), not luck.
 
+- RAM checks do not see the picture, and the input scripts skip the prologue with a button.
+  Two picture bugs went unnoticed for days because of that (found by the release matrix,
+  2026-11-21): the SGB prologue text was invisible (a DMG-only shortcut also skipped the SGB
+  attribute packets), and on the CGB the prologue's second page stayed black (the vblank
+  spent itself on palettes every frame of the fade, so a masked load's tile copy was always
+  late and the mask never lifted). Before a release, boot each model with no input and look
+  at every screen in each mode, including the ones the scripts skip.
+- Run the full checkall before every commit, not a subset: six DMG menu checks differed for
+  ten commits (a text-code read through the ROM read-ahead) and only the full run showed it.
+
 ## Layout / camera
 
 - When the field camera changes, re-check every screen laid out for the old one (title menu,

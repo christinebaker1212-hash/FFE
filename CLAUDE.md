@@ -1214,6 +1214,13 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
     plain-DMG only. Known: on the SGB a half band's letters show a few wrong cells for ~10
     frames as its fade starts (SGB palettes arrive by packet, a few frames after the tiles).
     VCHK 0 on DMG / CGB / SGB over the 9000-frame script (n131).
+  - CGB prologue page 2 stayed black (since 2026-11-19, `vshow_def`): each vblank of the fade
+    spent itself on the palette upload, so the tile copy of the masked load was always late
+    (hd_any never cleared, VLCD stuck at 2). The upload without emphasis now goes straight
+    from NES_RGB (~half the time; `cgbp`, bank 0 $2FB2), and while a masked load waits for
+    tiles the vblank copies the tiles first and uploads the palettes in a later vblank
+    (`isr_pal`); vbl_regs unmasks only with both done (`vlcd_ok`). CGB pictures identical to
+    the build before at 70 points of the script; lag unchanged (DMG 18, CGB -6).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

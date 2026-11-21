@@ -248,6 +248,67 @@ hram_end:   ds 1
 w7v:        ds 1                            ; rt_ppu_w7: the value written
 
 ; ------------------------------------------------------------------ vectors
+; ---- CGB palettes (moved out of the full main section)
+section bank 0, $2FB2
+cgbp:       push de                         ; NES palette RAM -> CGB BG / OBJ palettes 0-3
+            ldh a, [ppu_mask]               ;   (RGB555 from NES_RGB, $3E00, or EMPH_RGB with
+            and $E0                         ;   the NES emphasis bits; colour 0 of each palette
+            swap a                          ;   is the universal backdrop; with the emphasis
+            rrca                            ;   bits e, the other components dimmed to 3/4 as
+            ld [EMPH_E], a                  ;   the 2C02 roughly does: the battle-start flashes)
+            ld de, NES_RGB
+            jp nz, cgb_palettes.go
+            ld a, $80                       ; no emphasis: straight from NES_RGB (256-aligned)
+            ldh [$FF68], a
+            ld hl, PAL_SH
+            ld c, $69
+            call .f16
+            ld a, $80
+            ldh [$FF6A], a
+            ld hl, PAL_SH + $10
+            ld c, $6B
+            call .f16
+            pop de
+            ret
+.f16:       ld b, 16
+.fl:        ld a, l
+            and 3
+            ld a, [hl+]
+            jr nz, .fc
+            ld a, [PAL_SH]
+.fc:
+            and $3F
+            add a, a
+            ld e, a
+            ld a, [de]
+            ldh [c], a
+            inc e
+            ld a, [de]
+            ldh [c], a
+            dec b
+            jr nz, .fl
+            ret
+
+section bank 0, $3074
+; vblank: CGB palettes when dirty, except while a masked load waits for tiles to be copied
+; (the tiles first; the mask hides the palettes, and vbl_regs unmasks only once both are in)
+isr_pal:    ldh a, [pal_dirty]
+            and a
+            ret z
+            ld a, [VLCD]
+            and a
+            jp z, make_palettes
+            ldh a, [hd_any]
+            and a
+            ret nz
+            jp make_palettes
+; Z: no tile copy pending and the palettes uploaded (a masked load can be shown)
+vlcd_ok:    ldh a, [hd_any]
+            ld b, a
+            ldh a, [pal_dirty]
+            or b
+            ret
+
 section bank 0, $0000
 rt_jp_hl:   jp hl
 ; NES APU write (L = register, A = value). A register written with the value it holds (the
@@ -490,9 +551,7 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
 .no_oam:    ldh a, [is_cgb]                 ; CGB palette RAM: only in vblank
             and a
             jr z, .pal_ok
-            ldh a, [pal_dirty]
-            and a
-            call nz, make_palettes
+            call isr_pal                    ; (bank 0 $3074)
 .pal_ok:    call vbl_regs                   ; BGP / OBP, LCDC, scroll, raster events
 .scy_done:  ldh a, [hd_any]                 ; CGB: tiles by HDMA first
             and a
@@ -678,8 +737,7 @@ stat_isr:   push af                         ; raster events (vbl_regs), each in 
 vbl_regs:   ld a, [VLCD]                    ; CGB: a masked load's writes done: shown
             cp 2
             jr nz, .vk
-            ldh a, [hd_any]
-            and a
+            call vlcd_ok                    ; (tiles copied, palettes uploaded)
             jr nz, .vk
             ldh a, [q_head]
             ld b, a
@@ -1293,7 +1351,7 @@ make_palettes:
             ldh [pal_dirty], a
             ldh a, [is_cgb]
             and a
-            call nz, cgb_palettes
+            call nz, cgbp
             ld hl, PAL_SH
             call pal4
             ld c, a
@@ -1322,15 +1380,8 @@ make_palettes:
             and a
             jp nz, sgb_obp
             jp dmg_obp
-cgb_palettes:                               ; NES palette RAM -> CGB BG / OBJ palettes 0-3
-            push de                         ;   (RGB555 from NES_RGB, $3E00, or EMPH_RGB with
-            ldh a, [ppu_mask]               ;   the NES emphasis bits; colour 0 of each BG
-            and $E0                         ;   palette is the universal backdrop; with the
-            swap a                          ;   emphasis bits e, the other components dimmed
-            rrca                            ;   to 3/4 as the 2C02 roughly does: the battle-
-            ld [EMPH_E], a                  ;   start flashes)
-            ld de, NES_RGB
-.go:        ld a, $80
+cgb_palettes:                               ; (entry: cgbp, bank 0 $2FB2; DE = NES_RGB
+.go:        ld a, $80                       ;   pushed, EMPH_E set: the emphasis path)
             ldh [$FF68], a
             ld hl, PAL_SH
             ld c, $69
@@ -4051,4 +4102,5 @@ hdma_flush: ldh a, [$FF70]
             pop af
             ldh [$FF70], a
             ret
+
 
