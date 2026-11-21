@@ -348,22 +348,16 @@ stat_int:   push af
             pop bc
             jr z, .wm
             jr c, .wm
-            ldh a, [rLCDC]
-            bit 7, a
-            jr z, .wm
-            ld a, [lcdc_on]
-            ldh [rLCDC], a
+            ld a, 167                       ; (hidden)
+            ldh [rWX], a
             ld a, [wp_bot]
             ldh [rLYC], a
             pop af
             reti
-.wb:        cp 2                            ; the bottom: the window on again; the music
+.wb:        cp 2                            ; the bottom: the window shown again; the music
             jr nc, .wm2
-            ldh a, [rLCDC]
-            bit 7, a
-            jr z, .wm
-            ld a, LCDC_WIN
-            ldh [rLCDC], a
+            ld a, 7
+            ldh [rWX], a
 .wm:        ld a, 2
             ld [wp_st], a
             jr .mus

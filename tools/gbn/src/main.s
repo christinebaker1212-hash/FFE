@@ -2751,6 +2751,8 @@ wipe_open:  xor a
             ldh [rLYC], a
             ld a, [lcdc_on]
             ldh [rLCDC], a
+            ld a, 7
+            ldh [rWX], a
             ret
 ; the window map black: the font's blank (DMG: its tile for this map, shade 3; CGB: in VRAM
 ; bank 1, palette 6 all black); with the LCD on, three rows a V-Blank
@@ -2878,13 +2880,13 @@ pc_menu:    push hl
             jp bank_call
 ; V-Blank during a wipe: the window on from line 0 (unless the band starts there), the STAT
 ; interrupt at the band's top
-wp_vbl:     ld a, 7
-            ldh [rWX], a
-            xor a
-            ldh [rWY], a
+wp_vbl:     xor a                           ; (the window enabled all frame, shown or hidden
+            ldh [rWY], a                    ;   by WX: 7 / 167)
             ldh a, [rLCDC]
             bit 7, a
             ret z
+            ld a, LCDC_WIN
+            ldh [rLCDC], a
             ld a, [wp_top]
             and a
             jr z, .z
@@ -2892,15 +2894,15 @@ wp_vbl:     ld a, 7
             ldh [rLYC], a
             xor a
             ld [wp_st], a
-            ld a, LCDC_WIN
-            ldh [rLCDC], a
+            ld a, 7
+            ldh [rWX], a
             ret
 .z:         ld a, 1
             ld [wp_st], a
             ld a, [wp_bot]
             ldh [rLYC], a
-            ld a, [lcdc_on]
-            ldh [rLCDC], a
+            ld a, 167
+            ldh [rWX], a
             ret
 ; the screen black before FF1's palette cycle in (LCD off)
 pc_black:   ld a, 1
