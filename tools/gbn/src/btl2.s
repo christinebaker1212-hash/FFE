@@ -412,7 +412,7 @@ bt_commands:
             ld a, [hl]
             cp 4
             jr c, .m
-            ret
+            jp bt_names_win                 ; (all chosen: the names again)
 .slot:      ld a, [bt_cm]
             add a, a
             add a, a
@@ -463,7 +463,6 @@ bt_cmd_one: ld a, [bt_cm]
             jr .l
 .b:         ld a, [bt_cm]
             call bt_step_back
-            call bt_names_win
             scf
             ret
 .a:         ld a, [bt_ccur]
@@ -500,7 +499,6 @@ bt_cmd_one: ld a, [bt_cm]
             ld [hl], $20
 .done:      ld a, [bt_cm]
             call bt_step_back
-            call bt_names_win
             and a
             ret
 ; the command hand: rows 13-16 at x 0, Run beside Fight at x 35
@@ -583,7 +581,7 @@ bt_left_clear:
             ld bc, $000C
             ld de, $0906
             call bt_win
-            jp scr_upd
+            jp bt_upd
 ; the left window's text: HL = lines ($0A between; a $09 before Run moves it to x 43)
 bt_left_text:
             push hl
@@ -615,7 +613,8 @@ bt_left_text:
             call .put
             pop hl
             jr .row
-.end:       ;
+.end:       call .put
+            jp bt_upd
 .put:       ld a, [bt_t + 12]
             cp 4
             ret nc
@@ -649,7 +648,6 @@ bt_left_text:
             inc hl
             dec b
             jr nz, .cc
-            call scr_upd
             ld hl, bt_t + 12
             inc [hl]
             ret
@@ -1946,7 +1944,7 @@ bt_msg_row: ld a, [bt_rows]
             inc hl
             dec b
             jr nz, .c
-            call scr_upd
+            call bt_upd
             ld hl, bt_rows
             inc [hl]
             ret
@@ -1994,7 +1992,7 @@ bt_msg_end: call bt_msg_head
             ld de, sattr + 12 * 32
             ld bc, 6 * 32
             call memcpy
-            call scr_upd
+            call bt_upd
             jp bt_names_win
 ; a message alone (A = FF1 message), no attacker line
 bt_say:     push af

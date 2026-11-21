@@ -811,8 +811,8 @@ bt_fiend_map:
             ld a, 8
             ld [bt_t + 4], a                ; width
             ld [bt_t + 5], a                ; rows
-            ld a, $32
-            ld [bt_t + 6], a                ; (top-left cell: x 3, y 2)
+            ld a, $23
+            ld [bt_t + 6], a                ; (top-left cell: x 3, y 2: low nibble x)
             jr .ld
 .ch:        ld hl, B_CHAOS
             ld bc, $C0
@@ -820,7 +820,7 @@ bt_fiend_map:
             ld [bt_t + 4], a
             ld a, 12
             ld [bt_t + 5], a
-            ld a, $10
+            ld a, $01                       ; (Chaos: x 1, y 0)
             ld [bt_t + 6], a
 .ld:        ld de, bt_stage
             ld a, BTL_DATA
@@ -925,7 +925,7 @@ bt_fpal:    ld a, c
             ld a, d
             srl a
             srl a
-            sub 2                           ; attribute row 0-3
+            sub 1                           ; attribute row 0-3 (FF1: grid rows 1-4)
             jr c, .z
             cp 4
             jr nc, .z
@@ -1326,6 +1326,15 @@ bt_vbl:     ld a, [bt_upn]
             ld [bt_updst + 1], a
             ret
 
+; the bottom rows (12-17: the windows) uploaded again in the next V-Blanks (a whole-screen
+; upload already under way keeps going: it reaches them too)
+bt_upd:     ld a, [sf_row]
+            cp 12
+            ret c
+            ld a, 12
+            ld [sf_row], a
+            ret
+
 ; one battle frame: V-Blank, map rows and staged tiles, the pad
 bt_frame:   call wait_vbl
             call sf_step
@@ -1666,7 +1675,7 @@ bt_name_row:
             inc hl
             dec b
             jr nz, .c
-            call scr_upd
+            call bt_upd
             ld hl, bt_t + 12
             inc [hl]
             ret

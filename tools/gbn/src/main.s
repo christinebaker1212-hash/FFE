@@ -295,9 +295,6 @@ vblank:     push af
             call q_flush
 .late:      ld a, 1
             ldh [vbl_done], a
-            ld a, SND_BANK                  ; the music, once a frame
-            ld [MBC_BANK], a
-            call snd_frame_b
             pop af
             call sbank
             pop hl

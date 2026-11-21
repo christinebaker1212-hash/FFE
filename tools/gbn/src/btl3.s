@@ -302,7 +302,7 @@ bt_mrow:    ld a, [bt_rows]
             inc hl
             dec b
             jr nz, .c
-            call scr_upd
+            call bt_upd
             ld hl, bt_rows
             inc [hl]
             ret
@@ -403,7 +403,7 @@ bt_msg_close:
             ld de, sattr + 12 * 32
             ld bc, 6 * 32
             call memcpy
-            jp scr_upd
+            jp bt_upd
 
 ; magic id A -> mg_d (8 bytes)
 bt_mload:   ld [mg_id], a
