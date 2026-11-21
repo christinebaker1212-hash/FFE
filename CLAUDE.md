@@ -865,3 +865,8 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   Native code in place of the NES layer (owner, 2026-11-20): plan `docs/ff3-native-plan.md`
   (OAM clear done; next native text / windows with the condensed names, music driver, map,
   sprites). Then load menu, prophecy, name entry, shops.
+  2026-11-21: prophecy, name entry, title menu, shops, opening credits, ending pages and end
+  credits laid out; native sound output; condensed names in menus and shops; GB map lock
+  ($580D); Lot Check re-run on the final code (all pass in emulators); release ROM built
+  locally and sent to the owner. Open: battle lists not condensed, water animation tiles,
+  real-hardware test.

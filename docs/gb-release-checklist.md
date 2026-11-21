@@ -74,6 +74,15 @@ Checked with automated tools (as Nintendo's KENSA / Lot Check suites did):
   restart the game instead (`;@rel` lines), cart RAM 8 KB in the header; refuses to build with a
   test switch (`GB3_TEST_MINI`, `FF3_TEST_GOBLIN`) set.
 
+## FF3 final check (2026-11-21, release build `build/ff3_gb_release.gbc`, local only)
+Re-run on the final code: `lotcheck.py --game ff3 --release` 13 of 13; `termcheck.py ff3` 0 flagged;
+`SGBRUN_LOTCHECK=1` over the explore script (waits 2000-12000, 83 M instructions) and the release
+ROM's boot (3600 frames): every counter 0. Found and fixed on the way: the V-Blank handler's map
+DMA (`map_flush`) checked only `LY + n < 151`, so a handler that ran late, after LY wrapped to 0,
+started a DMA in drawing time (one at boot frame 35); it now also needs LY >= 144 (as `hd_flush`).
+RAM equivalence on the same code: firstdiff explore 12000, ending, final ending (test hook):
+identical. Not checked: real GBA / Game Boy Color hardware (owner's test).
+
 ## Known state (2026-11-20; to be re-checked item by item before release)
 | Item | FF1 | FF2 | FF3 |
 |---|---|---|---|

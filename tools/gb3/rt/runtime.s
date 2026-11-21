@@ -1965,6 +1965,8 @@ map_flush:  ld a, e
             ld a, 4
 .t:         ld e, a
             ldh a, [rLY]
+            cp 144                          ; (a late handler: LY may have wrapped to 0)
+            jr c, .late
             add a, e
             cp 151
             jr nc, .late

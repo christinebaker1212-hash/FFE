@@ -450,9 +450,43 @@ NES running): plan and measurements in `docs/ff3-native-plan.md` (tool `tools/gb
   commands' waits (`--freeze 4500 --press 4520..`) move by +368.
 - Checks: explore 12000 identical; screens checked in mGBA.
 
+## Shops, ending, credits (2026-11-21)
+- **Shops** (`layout.shop`): the item list one row per item (price at the right edge), the Gil
+  window, camera from bank 88 `shopcam` (dispatch code $F4). Condensed names in shops: a name's 16
+  cells are snapshot at its end (`cv_end` -> CV_SNAP, WRAM bank 7) so the price digits printed
+  after it on the same line are not packed into it; the pool starts at tile $48 (the shop's
+  character sprites use $00-$3B).
+- **Opening credits** (crystal cutscene after the Wind Crystal, bank 1F L1F_A326): camera (48, 48)
+  (stub `ecam` at 1F:BFD8: NES cols 6-25 hold every staff line as it is), title from row 7.
+- **Ending pages** (L1F_B146): the eight story pages re-wrapped at 18 columns and centred
+  (`layout.ending`, from `script/ff3/epilogue.json`). The NES scrolls each page in from the other
+  nametable (480 lines); the GB map has 32 rows, so the new page landed on rows in view. On the
+  GB the ending keeps vertical mirroring (one nametable, wrapping at 240 as the runtime shows
+  it), every page goes to rows 18-29 (out of the view at camera (48, 0) while it is written)
+  and scrolls in from the bottom.
+- **Final ending** (L1F_B5B6: flyover, cast, staff credits, The End): camera (47, 45) (stub at
+  1F:A601, the old Japanese pages' place); the credits show nametable 1 while the GB map still
+  held nametable 0's flyover cells: new runtime register **$580D** (1 + NES nametable; 0 off,
+  `far_ntlock`) locks the GB map to one nametable - its tiles and attributes copied in from the
+  shadow, writes to the other one kept in its shadow only (rt_ppu_w7, wc_setup).
+- **English fix (insert.py `credits`, NES build too):** the eight supporting-cast names in the
+  cast roll were kana in the Japanese ROM and garbage with the English font; now Princess Sara,
+  Old Man Cid, Desch, Water Maiden Elia, The Four Old Men, Prince Alus, Doga the Wizard, Unne
+  and Parrot (the script's names), centred.
+- Test hook: env `GB3_TEST_END=1` (layout.py, test builds only) makes the prologue event run the
+  final ending (`--poke 5060:0050=80` on the cave field reaches it).
+- Checks: firstdiff identical (explore 12000; ending via $50 = $81; final ending via the test
+  hook), screenshots of every page (mGBA, CGB).
+- **Release build (2026-11-21)**: `python3 tools/gb3/build.py --gb --release --out
+  build/ff3_gb_release.gbc` (local only, never committed); Lot Check items re-run on it
+  (`docs/gb-release-checklist.md`, "FF3 final check"): all pass in emulators. Fixed with it: the
+  map DMA's LY window had no lower bound (a late V-Blank handler at LY 0 started a DMA in drawing
+  time). Sent to the owner for the hardware test.
+
 ## Known open items
 - **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3: all items pass in
   emulators (2026-11-20; GBA hardware untested); re-run the checks on the final build.
+- Battle item / magic lists not condensed (battle sprites use the sprite table).
 - Water animation tiles blank (CHR read-back through $2007 returns 0).
 - Warp (`p3c:9B5F` TSX / TXS arithmetic) and the inn's `TXS` from a saved X (`p3c:9039`) use
   FF2's approximate helpers: need a semantic version (as FF2's open item).
