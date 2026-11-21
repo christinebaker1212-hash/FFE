@@ -66,7 +66,7 @@ M_PARA     = $2A
 B_LVUP     = $7A00          ; battle data: level-up bytes (6 classes x 49 levels x 2)
 B_HITBON   = $7C80          ;   hit rate / magic defence bonuses (12 + 12)
 
-section bank 6, $4A00
+section bank 6, $4C00
 
 ; ---- the battle (replaces the placeholder loop): set up, rounds until it ends
 bt_run:     call bt_ch_init

@@ -10,7 +10,7 @@ B_AI       = $5600
 B_ATKNAME  = $7400
 MG_FIRE    = 4              ; (FF1: a confused enemy casts Fire on its own side)
 
-section bank 6, $5C00
+section bank 6, $6000
 
 ; ---- the spell list (approved: two levels a page, rows of spells 1 and 2, then spell 3 and
 ; the level with its MP; hands at x 0 / 80); A = spell id, [bt_mlv] = level; C set on B

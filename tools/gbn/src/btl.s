@@ -23,6 +23,8 @@ B_SHADE    = $5E00
 B_NAMES    = $6200
 B_MSGS     = $6C00
 B_RNG      = $7E00
+B_FIEND    = $6A00          ; FF1's fiend TSA (4 x $50: 8 x 8 + 16 attribute bytes), Chaos ($C0)
+B_CHAOS    = $6B40
 BT_FRAME   = $F7            ; window frame tiles $F7-$FF (FF1's order, as font codes $10-$18)
 BT_PARTY   = $80            ; party window line tiles (10 a member)
 BT_TEXT    = $A8            ; left window / message tiles (18 a row)
@@ -467,6 +469,9 @@ bt_enemy_gfx:
             ld bc, 8
             ld a, BTL_DATA
             call far_copy
+            ld a, [bt_type]                 ; (fiend / Chaos: by cell, bt_fiend_map)
+            cp 3
+            ret nc
             ld c, 0                         ; graphics 0-3: tile ranges
 .g:         ld a, c
             call bt_gfx_pal                 ; A = palette of its first user (0 / 1), C kept
@@ -747,7 +752,7 @@ nes_rgb:    and $3F
 bt_enemy_map:
             ld a, [bt_type]
             cp 3
-            ret nc
+            jp nc, bt_fiend_map
             ld c, 0
 .e:         ld a, c
             ld e, a
@@ -767,6 +772,189 @@ bt_enemy_map:
             cp 9
             jr c, .e
             ret
+; fiend (8 x 8 at cell (3, 2)) / Chaos (14 x 12 at (1, 0)): FF1's TSA and its attribute
+; bytes (4 x 4, each 32 x 32 pixels from NES row 8 / col 0 of the attribute grid row 1)
+bt_fiend_map:
+            ld a, [bt_type]
+            cp 4
+            jr z, .ch
+            ld a, [bt_form + 1]             ; fiend: TSA $50 x graphic
+            ld l, a
+            ld h, 0
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, hl
+            add hl, de                      ; x 5
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl                      ; x $50
+            ld de, B_FIEND
+            add hl, de
+            ld bc, $50
+            ld a, 8
+            ld [bt_t + 4], a                ; width
+            ld [bt_t + 5], a                ; rows
+            ld a, $32
+            ld [bt_t + 6], a                ; (top-left cell: x 3, y 2)
+            jr .ld
+.ch:        ld hl, B_CHAOS
+            ld bc, $C0
+            ld a, 14
+            ld [bt_t + 4], a
+            ld a, 12
+            ld [bt_t + 5], a
+            ld a, $10
+            ld [bt_t + 6], a
+.ld:        ld de, bt_stage
+            ld a, BTL_DATA
+            call far_copy
+            ld a, [bt_t + 4]                ; the attribute bytes after the TSA
+            ld b, a
+            ld a, [bt_t + 5]
+            ld c, a
+            xor a
+.mu:        add a, b
+            dec c
+            jr nz, .mu
+            ld [bt_t + 7], a                ; (TSA bytes)
+            ld hl, bt_save                  ; DMG: tiles shaded once (flags)
+            ld b, 128
+            xor a
+.fl:        ld [hl+], a
+            dec b
+            jr nz, .fl
+            ld a, low(bt_stage)
+            ld [ft_p], a
+            ld a, high(bt_stage)
+            ld [ft_p + 1], a
+            ld a, [bt_t + 6]
+            and $0F
+            ld b, a
+            ld a, [bt_t + 6]
+            swap a
+            and $0F
+            ld c, a                         ; B, C = the first cell
+            ld a, [bt_t + 5]
+            ld [bt_t + 8], a
+.r:         push bc
+            ld a, [bt_t + 4]
+            ld [bt_t + 9], a
+.c:         ld a, [ft_p]                    ; the tile
+            ld l, a
+            ld a, [ft_p + 1]
+            ld h, a
+            ld a, [hl+]
+            ld [bt_t + 10], a
+            ld a, l
+            ld [ft_p], a
+            ld a, h
+            ld [ft_p + 1], a
+            push bc
+            call bt_fpal
+            ld [bt_t + 11], a
+            pop bc
+            push bc
+            call cell_addr
+            ld a, [bt_t + 10]
+            ld [hl], a
+            inc h
+            inc h
+            inc h
+            ld a, [bt_t + 11]
+            ld [hl], a
+            call bt_fshade
+            pop bc
+            inc b
+            ld hl, bt_t + 9
+            dec [hl]
+            jr nz, .c
+            pop bc
+            inc c
+            ld hl, bt_t + 8
+            dec [hl]
+            jr nz, .r
+            ret
+; DMG: tile [bt_t+10] shaded by palette [bt_t+11] (2: B, else A), once
+bt_fshade:  ldh a, [is_cgb]
+            and a
+            ret nz
+            ld a, [bt_t + 10]
+            cp $12                          ; (the empty tiles stay black)
+            ret c
+            and $7F
+            ld l, a
+            ld h, high(bt_save)
+            ld a, [hl]
+            and a
+            ret nz
+            ld [hl], 1
+            ld a, [bt_t + 11]
+            cp 2
+            ld hl, bt_shade
+            jr nz, .a
+            ld hl, bt_shade + 4
+.a:         call bt_remap_set
+            ld a, [bt_t + 10]
+            ld b, 1
+            jp bt_remap_tiles
+; the NES palette of GB cell (B, C) from the fiend / Chaos attribute bytes (after the TSA in
+; bt_stage): NES row = C + 6, col = B + 1; attribute row (NES row / 4) - 2, col NES col / 4
+bt_fpal:    ld a, c
+            add a, 6
+            ld d, a                         ; NES row
+            ld a, b
+            inc a
+            ld e, a                         ; NES col
+            ld a, d
+            srl a
+            srl a
+            sub 2                           ; attribute row 0-3
+            jr c, .z
+            cp 4
+            jr nc, .z
+            add a, a
+            add a, a
+            ld l, a
+            ld a, e
+            srl a
+            srl a
+            cp 4
+            jr nc, .z
+            add a, l
+            ld l, a
+            ld a, [bt_t + 7]
+            add a, l
+            ld l, a
+            ld h, 0
+            ld a, low(bt_stage)
+            add a, l
+            ld l, a
+            ld a, high(bt_stage)
+            adc a, h
+            ld h, a
+            ld a, [hl]                      ; the byte; quadrant: (row & 2) * 2 + (col & 2)
+            ld l, a
+            ld a, d
+            and 2
+            add a, a
+            ld h, a
+            ld a, e
+            and 2
+            add a, h                        ; shift 0, 2, 4, 6
+            ld h, a
+            ld a, l
+            inc h
+.sh:        dec h
+            jr z, .x
+            rrca
+            jr .sh
+.x:         and 3
+            ret
+.z:         ld a, 1
+            ret
+
 ; enemy A -> B, C = its top-left cell, E = size, D = first tile (and bt_t = its palette)
 bt_epos:    ld e, a
             ld d, 0
@@ -1494,6 +1682,7 @@ vw_w:       ds 1
 vw_s:       ds 1
 bt_sbuf:    ds 40
 vw_icon:    ds 17
+ft_p:       ds 2
 section wram, $DB00
 vw_buf:     ds 160                          ; the small font's line buffer (page-aligned)
 section wram, $DC00

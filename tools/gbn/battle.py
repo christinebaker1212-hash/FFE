@@ -73,8 +73,10 @@ def data_bank(rom):
     put(0x5C80, rom.rd(BANK_BTLC, BTL_PALS, 64 * 4))
     put(0x5E00, dmg_shades(rom))
     names = strtab(0x6200, [enc(n) for n in ff1_monsters.M[:128]])
-    assert len(names) <= 0xA00
+    assert len(names) <= 0x800
     put(0x6200, names)
+    put(0x6A00, rom.rd(BANK_DOMAINS, 0x92E0, 0x140))                 # data_FiendTSA (4 x $50)
+    put(0x6B40, rom.rd(BANK_DOMAINS, 0x9420, 0xC0))                  # data_ChaosTSA
     msgs = strtab(0x6C00, [enc(ff1_battle.B.get(k, '')) for k in range(80)])
     assert len(msgs) <= 0x1100
     put(0x6C00, msgs)
