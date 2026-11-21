@@ -47,13 +47,15 @@ PC_BUF     = $CD00          ; rt_ppu_copy: one piece (<= 32 bytes; the stack's f
                             ;   far_cvr: the glyph strip (64)
 CV_SUB     = $CD40          ; far_cvr -> nat_h1: per cell of the line: 0 keep, 1 blank, else the
                             ;   condensed tile (VRAM bank 1) (= NC_BUF, free while nat_h1 runs)
-CV_LO      = $10            ; condensed-name tiles: sprite pattern table (VRAM bank 1) $10-$DF,
-CV_HI      = $DF            ;   unused by the menus' sprites; their tiles saved in WRAM bank 7
+CV_LO      = $48            ; condensed-name tiles: sprite pattern table (VRAM bank 1) $48-$DF,
+CV_HI      = $DF            ;   unused by the menus' sprites (characters $00-$3B, hand $E4-$E7);
+                            ;   their tiles saved in WRAM bank 7
 CV_BAK     = $D000          ;   ($D000 + 16 * tile) and put back when the menu closes ($580F)
 CV_SAVED   = $DE00          ; (WRAM bank 7) tiles saved (bit each)
 CV_USED    = $DE20          ;   tiles in use (bit each)
 CV_NEXT    = $DE40          ;   last tile given
 CV_TRY     = $DE41          ;   allocation: tiles tried, map scanned
+CV_SNAP    = $DE60          ;   the names' cells at their end (4 x 16, cv_end)
 NC_BUF     = $CD40          ; nat_chr64: 64 bytes for a nametable destination
 MAP_SH     = $D000          ; GB map (VRAM bank 0 $9800-$9BFF) and its attributes (VRAM bank 1),
 ATTR_SH    = $D400          ;   1KB each, in WRAM bank MAP_BANK; dirty rows copied by DMA in the

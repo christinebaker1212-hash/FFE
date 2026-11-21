@@ -954,6 +954,27 @@ cv_end:     push af
             ld a, h
             inc a
             ldh [cv_n], a
+            push de                         ; the name's cells as they are now (16) -> CV_SNAP
+            ld a, h                         ;   + 16 n (WRAM bank 7): the line may write over
+            swap a                          ;   them later (a price after a tab)
+            add a, low(CV_SNAP)
+            ld e, a
+            ld d, high(CV_SNAP)
+            ld a, l
+            add a, low(NES_RAM + $7A0)
+            ld l, a
+            ld h, high(NES_RAM + $7A0)
+            ld a, 7
+            ldh [rSVBK], a
+            ld b, 16
+.sn:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .sn
+            ld a, 1
+            ldh [rSVBK], a
+            pop de
 .y:         pop hl
             pop bc
 .x:         pop af
@@ -3428,6 +3449,8 @@ CV_T1 = $CD97
 CV_T2 = $CD98
 CV_T3 = $CD99
 CV_T4 = $CD9C
+CV_T5 = $CD9D               ;   the span's start, its snapshot (low byte)
+CV_T6 = $CD9F
 far_cvr:    push bc
             push de
             ld hl, CV_SUB
@@ -3453,6 +3476,10 @@ far_cvr:    push bc
             ret
 ; span E
 cvr_span:   ld a, e
+            swap a
+            add a, low(CV_SNAP)
+            ld [CV_T6], a
+            ld a, e
             add a, low(cv_e)
             ld c, a
             ldh a, [c]
@@ -3465,6 +3492,7 @@ cvr_span:   ld a, e
             ld c, a
             ldh a, [c]
             ld e, a                         ; E = start
+            ld [CV_T5], a
 .lead:      ld a, e                         ; skip blanks and cells without a glyph (icons)
             cp d
             ret nc
@@ -3546,7 +3574,12 @@ cvr_span:   ld a, e
             ld a, [CV_T0]                   ; tiles: allocated, drawn, CV_SUB
             ld e, a
             ld c, 0                         ; C = strip tile
-.tl:        call cv_alloc                   ; -> A = tile, C (carry) = none left
+.tl:        call cv_same                    ; (a cell written over since, not by a blank:
+            jr z, .tl1                      ;   the name stays as it is)
+            call cv_buf
+            cp $FF
+            jr nz, .fail
+.tl1:       call cv_alloc                   ; -> A = tile, C (carry) = none left
             jr c, .fail
             ld b, a
             ld h, high(CV_SUB)
@@ -3565,11 +3598,14 @@ cvr_span:   ld a, e
 .bl:        ld a, e
             cp d
             jr nc, .ok
+            call cv_same                    ; (cells written over since: kept)
+            jr nz, .bl2
             ld h, high(CV_SUB)
+            ld a, e
             add a, low(CV_SUB)
             ld l, a
             ld [hl], 1
-            inc e
+.bl2:       inc e
             jr .bl
 .ok:        ld a, 1
             ldh [cv_live], a
@@ -3585,15 +3621,43 @@ cvr_span:   ld a, e
             ld [hl], 0
             inc c
             jr .f1
-cv_code:    push hl                         ; A = the code in cell E of the line
+cv_code:    push hl                         ; A = the name's code in cell E (its snapshot)
+            ld a, [CV_T5]
+            ld l, a
+            ld a, e
+            sub l
+            cp 16
+            jr nc, .bl
+            ld l, a
+            ld a, [CV_T6]
+            add a, l
+            ld l, a
+            ld h, high(CV_SNAP)
+            ld a, 7
+            ldh [rSVBK], a
+            ld l, [hl]
+            ld a, 1
+            ldh [rSVBK], a
+            ld a, l
+            pop hl
+            ret
+.bl:        ld a, $FF
+            pop hl
+            ret
+cv_buf:     push hl                         ; A = the line's code in cell E now
             ld a, e
             add a, low(NES_RAM + $7A0)
             ld l, a
-            ld a, high(NES_RAM + $7A0)
-            adc a, 0
-            ld h, a
+            ld h, high(NES_RAM + $7A0)
             ld a, [hl]
             pop hl
+            ret
+cv_same:    call cv_buf                     ; Z: cell E still holds the name's code
+            push bc
+            ld b, a
+            call cv_code
+            cp b
+            pop bc
             ret
 cv_w:       push hl                         ; A = glyph width of code A (0: none)
             ld h, high(CV_W)

@@ -1207,8 +1207,20 @@ disp2:              ; bank 88 $8004 (JOBF dispatch, Y = 12: was JMP sq): A = $FF
     jmp mgkey
 .q10:
     cmp #$F5
-    bne .q6
+    bne .q11
     jmp nmcam
+.q11:
+    cmp #$F4
+    bne .q6
+    lda #8          ; shopcam: the shop's GB camera (8, 8), then the NES's scroll 0 / rendering
+    sta $5802
+    sta $5803
+    lda #0
+    sta $2005
+    sta $2005
+    lda #$1E
+    sta $2001
+    jmp JBTAIL
 .q6:
     jmp SQ
 nmcam:              ; name entry (each frame, via the character sprite routine 3D:B886): the
@@ -2119,6 +2131,9 @@ MENU_TEXT[0x4A] = '{0E}{14:08}Lv{14:0C}CP\n' + '\n'.join(
 MENU_TEXT[0x3D] = '{0E}' + '\n'.join('{17:01}{1A:%02X}{14:0F}{1C:%02X}' % (i, i) for i in range(32)) + '\n{17:01}{0F}'
 MENU_TEXT[0x3B] = '{0E}' + '\n'.join('{1%d:02}{14:07}[77][79]{14:09}{1%d:30}/{1%d:31}' % (m, m, m) for m in range(4))
 MENU_TEXT[0x2F] = '{0E}' + '\n'.join('{17:01}{20:%02X}{14:0F}{1C:%02X}' % (i, i) for i in range(32))
+# shop buy list (window $18): one item a row, the price (6 digits) at column 10, no "Gil" (the Gil
+# window shows it), the party sprites right of it
+MENU_TEXT[0x20] = '{0E}' + '\n'.join('{16:01}{19:%02X}{14:0A}{21:%02X}' % (i, i) for i in range(8))
 
 
 def status_words():
@@ -2546,6 +2561,42 @@ nmspr:              ; (was: x / y of the character sprite) camera and sprite pos
     r.log.append((B3D, 0xB895, 'name entry: GB layout'))
 
 
+def shop(r):
+    """shops on 20 x 18 (camera (8, 8)): title $14 (1, 1, 8, 4) and Gil $17 (8, 1, 13, 4) side by
+    side, options $16 (1, 5, 20, 4), message $15 (1, 9, 20, 4) as before, buy list $18 and sell
+    list $19 (1, 9, 20, 10): one item a row (8, as the NES's pages), the price in place of the
+    NES's second row; the party sprites (who can equip) in the list window's right columns"""
+    B3D = 0x3D
+    for w, geo in ((0x14, (1, 1, 8, 4)), (0x17, (8, 1, 13, 4)), (0x16, (1, 5, 20, 4)),
+                   (0x18, (1, 9, 20, 10)), (0x19, (1, 9, 20, 10))):
+        for t, k in ((0xAAF7, 0), (0xAB1D, 1), (0xAB43, 2), (0xAB69, 3)):
+            r.d[r.off(B3D, t + w)] = geo[k]
+    m = r.module('''
+    org $B369
+shopini:            ; shop screen: as the NES ($FD / $FF / $2000), then bank 88 shopcam (camera
+    lda #$88        ;   (8, 8), scroll 0, rendering on)
+    sta $FD
+    sta $FF
+    sta $2000
+    ldy #12
+    lda #$F4
+    jsr $5D4E
+    rts
+''')
+    o = r.off(B3D, 0xB369)
+    assert bytes(r.d[o:o + 23]) == bytes.fromhex('A98885FD85FF8D0020A9008D05208D0520A91E8D012060'), bytes(r.d[o:o+23]).hex()
+    r.d[o:o + len(m['bytes'])] = m['bytes']
+    r.d[o + len(m['bytes']):o + 23] = b'\xea' * (23 - len(m['bytes']))
+    r.mods.append(dict(m, where=(B3D, 0xB369 & 0x1FFF)))
+    o = r.off(B3D, 0xB335)                               # party sprites: x 144, y 72 + 16 k (24 px tall: overlapping, all on screen)
+    seg = bytes(r.d[o:o + 0x34])
+    for k, (y0, y1) in enumerate(((0x60, 0x48), (0x80, 0x58), (0xA0, 0x68), (0xC0, 0x78))):
+        i = seg.find(bytes.fromhex('A9D88540A9%02X8541' % y0)); assert i >= 0, k
+        r.patch(B3D, 0xB335 + i, 'A9 D8 85 40 A9 %02X 85 41' % y0, 'A9 90 85 40 A9 %02X 85 41' % y1,
+                'shop: party sprite %d in the list window' % k)
+    r.log.append((B3D, 0xAF1F, 'shops: GB layout'))
+
+
 MENU_TEXT_NAME_GRID = {0x0C: 0x0B, 0x0E: 0x0D, 0x10: 0x0F, 0x12: 0x11, 0x14: 0x13}
 
 
@@ -2558,6 +2609,7 @@ def apply(data):
     field(r)
     main_menu(r)
     name_entry(r)
+    shop(r)
     prophecy(r)
     dialogue(r)
     return bytes(r.d), r.mods, r.log
