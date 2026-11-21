@@ -85,6 +85,12 @@ section bank 0, $0150
 start:      di
             ld sp, $E000
             ld b, a                         ; A = $11 on a Game Boy Color
+            ld a, e                         ; (E = $A5: a soft reset / game over -> the title)
+            cp $A5
+            ld c, 0
+            jr nz, .sr
+            inc c
+.sr:
 .vw:        ldh a, [rLY]                    ; the LCD goes off only in V-Blank
             cp 144
             jr c, .vw
@@ -101,6 +107,8 @@ start:      di
             ld hl, $FF80
             ld de, $7F
             call memclr
+            ld a, c
+            ldh [soft_rst], a
             ld a, b
             cp $11
             ld a, 0
@@ -109,6 +117,9 @@ start:      di
 .dm:        ldh [is_cgb], a
             and a                           ; a Color: double speed (KEY1 + STOP)
             jr z, .ds
+            ldh a, [$FF4D]                  ; (already: a soft reset)
+            bit 7, a
+            jr nz, .ds
             xor a
             ldh [rIE], a
             ld a, $30
@@ -172,13 +183,24 @@ start:      di
             ld a, 3                         ; V-Blank and STAT interrupts
             ldh [rIE], a
             ei
+            ldh a, [soft_rst]               ; (after a soft reset: always the title)
+            and a
+            ld a, $FE
+            jr nz, .ti
             ld a, START_MAP                 ; (build.py: the title and a new game, unless
-            cp $FE                          ;   --start says otherwise)
+.ti:        cp $FE                          ;   --start says otherwise)
             jr nz, .nt
             ld a, SCR_BANK
             ld hl, ng_main
             call bank_call
+            ld a, [unsram + $10]            ; (new game or continue: the save page's
+            add a, 7                        ;   overworld position, + 7)
+            ld d, a
+            ld a, [unsram + $11]
+            add a, 7
+            ld e, a
             ld a, MAP_OW
+            jr .ld
 .nt:        cp MAP_OW
             jr nz, .st
             ld a, COMMON
@@ -290,7 +312,13 @@ read_pad:   ld a, $20
             ldh [pad], a
             ld a, $30
             ldh [rP1], a
-            ret
+            ld a, c                         ; A + B + Start + Select: soft reset (Lot Check)
+            and $0F
+            cp $0F
+            ret nz
+            xor a
+            ld [$0000], a                   ; (cart RAM off)
+            jp game_over
 
 ; ---- load standard map A with the party at (D = x, E = y): LCD off in V-Blank, graphics,
 ; palettes, the map drawn, LCD on
@@ -1478,13 +1506,92 @@ do_battle:  ld [btl_fid], a
             call map_reload
             scf
             ret
+; the save in cart RAM valid (its mark and sum)? C clear if so; load_game copies it in
+save_valid: ld a, $0A
+            ld [$0000], a
+            xor a
+            ld [$4000], a
+            ld hl, SAVE_MARK
+            ld a, [hl+]
+            cp $46
+            jr nz, .no
+            ld a, [hl+]
+            cp $46
+            jr nz, .no
+            ld a, [hl+]
+            cp $31
+            jr nz, .no
+            ld a, [hl+]
+            cp $4E
+            jr nz, .no
+            ld bc, 0
+            ld de, $400
+.s:         ld a, [hl+]
+            add a, c
+            ld c, a
+            ld a, b
+            adc a, 0
+            ld b, a
+            dec de
+            ld a, d
+            or e
+            jr nz, .s
+            ld a, [hl+]
+            cp c
+            jr nz, .no
+            ld a, [hl]
+            cp b
+            jr nz, .no
+            xor a
+            ld [$0000], a
+            ret
+.no:        xor a
+            ld [$0000], a
+            scf
+            ret
+load_game:  ld a, $0A
+            ld [$0000], a
+            xor a
+            ld [$4000], a
+            ld hl, SAVE_MARK + 4
+            ld de, unsram
+            ld bc, $400
+            call memcpy
+            xor a
+            ld [$0000], a
+            ret
+
 ; FF1 GameOver: back to the title
-game_over:  ld sp, $E000
+game_over:  di
+            ld sp, $E000
+            ld e, $A5
+            ldh a, [is_cgb]                 ; (start reads the console from A)
+            and a
+            ld a, 0
+            jp z, start
+            ld a, $11
             jp start
 
 ; ---- the save (Lot Check: a sum and a mark; cart RAM enabled only while it is written)
 SAVE_MARK  = $A000          ; "FF1N", then the save page ($400), then the sum (2)
-save_game:  ld a, $0A
+save_game:  ldh a, [maptype]                ; the overworld position (FF1: its scroll, - 7)
+            and a
+            ld a, [px]
+            ld b, a
+            ld a, [py]
+            ld c, a
+            jr nz, .ow
+            ld a, [ow_x]
+            ld b, a
+            ld a, [ow_y]
+            ld c, a
+.ow:        ld a, b
+            sub 7
+            ld [unsram + $10], a
+            ld a, c
+            sub 7
+            ld [unsram + $11], a
+            ld a, $0A
             ld [$0000], a
             xor a
             ld [$4000], a                   ; cart RAM bank 0
@@ -1582,3 +1689,4 @@ rombank:    ds 1                            ; the ROM bank mapped at $4000 (sban
 maptype:    ds 1                            ; 0 standard map, 1 overworld
 frame:      ds 1                            ; frame counter
 cmask:      ds 1                            ; coordinate mask: 63 / 255
+soft_rst:   ds 1

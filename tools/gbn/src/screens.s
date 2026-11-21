@@ -478,8 +478,11 @@ ng_main:    call scr_open
             ld bc, $040C
             ld hl, str_title2
             call scr_str
-            ld a, 1                         ; (no save yet: New Game)
-            ld [ng_cur], a
+            call save_valid                 ; a save: Continue first, else New Game
+            ld a, 0
+            jr nc, .sv
+            inc a
+.sv:        ld [ng_cur], a
             call scr_show
 .t:         ld a, [ng_cur]                  ; cursor left of the box
             add a, a
@@ -494,9 +497,23 @@ ng_main:    call scr_open
             call scr_cursor
             call scr_frame
             ldh a, [pad_new]
+            ld b, a
+            and $C0                         ; up / down: Continue <-> New Game
+            jr z, .ab
+            ld a, [ng_cur]
+            xor 1
+            ld [ng_cur], a
+            jr .t
+.ab:        ld a, b
             and $09                         ; A or Start
             jr z, .t
-            call party_gen
+            ld a, [ng_cur]
+            and a
+            jr nz, .new
+            call save_valid                 ; Continue: the saved game
+            jr c, .t
+            jp load_game
+.new:       call party_gen
             call ng_stats
             ret
 
