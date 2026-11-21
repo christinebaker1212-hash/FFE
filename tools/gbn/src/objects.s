@@ -538,7 +538,18 @@ obj_spr:    push de
             inc a
             add a, b
             ld [o_sy], a
-            pop hl                          ; slot
+            ld b, a                         ; (under the dialogue box: hidden)
+            ld a, [box_on]
+            and a
+            jr z, .vis
+            ld a, b
+            cp BOX_LINES + 16
+            jr nc, .vis
+            pop hl
+            pop de
+            scf
+            ret
+.vis:       pop hl                          ; slot
             push hl
             ld a, l                         ; the 2 x 2 table: facing x 16 + frame x 8
             add a, O_TALK
@@ -642,3 +653,5 @@ obj_spr:    push de
             ld [de], a
             inc de
             ret
+
+; HL = slot -> A = dialogue (talk routines: talk.s)

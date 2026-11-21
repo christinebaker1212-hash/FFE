@@ -8,7 +8,7 @@ ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
-import data
+import data, text
 
 COMMON, TS_BANK0, MAP_BANK0, OW_TS, OW_INFO, OW_ROWS, ROM_BANKS = 1, 8, 20, 16, 81, 84, 128
 
@@ -29,6 +29,13 @@ def data_banks(rom):
     place(banks, COMMON, 0x4400, c['objtbl'])                 # object 2x2 tables (64)
     place(banks, COMMON, 0x4500, c['init_unsram'])            # new game: save page 0
     place(banks, COMMON, 0x4600, c['init_flags'])             #   and the game flags
+    place(banks, COMMON, 0x4700, text.win_palette())
+    fd, fc = text.font_banks(rom)
+    place(banks, COMMON, 0x4800, fd)
+    place(banks, COMMON, 0x5000, fc)
+    place(banks, COMMON, 0x5800, rom.rd(14, 0x95D5, 4 * 208))  # talk data (TalkToObject's table)
+    for b, blob in text.dialogue_banks(90).items():
+        banks[b] = bytearray(blob)
     for ts in range(8):
         t = data.tileset_pack(rom, ts)
         place(banks, TS_BANK0 + ts, 0x4000, t['prop'])
@@ -65,6 +72,7 @@ def data_banks(rom):
         place(banks, b, 0x7350, bytes([len(ob['blocks'])]))
         place(banks, b, 0x6800, ob['dmg'])                         # DMG object tiles (pre-shaded)
         place(banks, b, 0x7400, ob['cgb'])                          # CGB object tiles (raw)
+        place(banks, b, 0x7F00, p['font_tbl'])                     # DMG font code -> tile
         place(banks, b, 0x5100, p['mt_dmg_out'])
         place(banks, b, 0x5300, p['mt_dmg_in'])
         place(banks, b, 0x5800, p['dmg_tiles'])
@@ -80,9 +88,15 @@ def main():
     src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\n' % tuple(st) +
            open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'objects.s')).read())
+           open(os.path.join(HERE, 'src', 'objects.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'talk.s')).read())
+    import re                                    # (constants from every module first: the
+    defs = [l for l in src.split('\n') if re.match(r'^[A-Za-z_]\w*\s+=', l)]   #   assembler
+    rest = [l for l in src.split('\n') if not re.match(r'^[A-Za-z_]\w*\s+=', l)] #   needs them
+    src = '\n'.join(defs + rest)                                                  #   defined first)
     r = asm(src)
-    for lbl in ('qbuf', 'oam_buf', 'objs', 'game_flags'):
+    for lbl in ('qbuf', 'oam_buf', 'objs', 'game_flags', 'font_tbl', 'win_buf'):
         assert r.labels[lbl] % 0x100 == 0, '%s at %04X not aligned' % (lbl, r.labels[lbl])
     banks = dict(r.banks)
     for b, blob in data_banks(rom).items():

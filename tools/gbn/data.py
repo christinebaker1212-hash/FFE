@@ -155,23 +155,33 @@ def tileset_pack(rom, ts):
                 cgb_tiles=b''.join(gb_tile(chr_[16 * t:16 * t + 16]) for t in range(128)))
 
 
+DOOR_MTS = (0x36, 0x37, 0x3B)           # FF1's door metatiles (drawn at run time)
+FONT_CODES = list(range(0x10, 0x19)) + list(range(0x20, 0x80))   # frame $10-$18, text $20-$7F
+
+
 def map_pack(rom, m, cls=0):
     """a standard map: metatiles, palettes (outside / in a room), and for DMG the tiles
-    pre-shaded per (tile, shading) with a metatile table for each room state"""
+    pre-shaded per (tile, shading) for the metatiles the map uses (and the door metatiles),
+    the in-room set only on maps with doors; the free BG tiles hold the font (DMG)"""
     ts = rom.rd(BANK_SMINFO, TILESETS + m)
     t = tileset_pack(rom, ts)
+    mp_ = std_map(rom, m)
+    used = sorted(set(mp_) | set(DOOR_MTS))
+    doors = any((t['prop'][2 * x] & 0x1E) in (2, 4) for x in used)
     pal = bytearray(rom.rd(BANK_SMINFO, SM_PAL + 0x30 * m, 0x30))
-    mp = rom.rd(BANK_SMINFO, MAPMAN_PAL + 2 * cls, 2)
-    pal[0x12], pal[0x16] = mp[0], mp[1]
+    mpal = rom.rd(BANK_SMINFO, MAPMAN_PAL + 2 * cls, 2)
+    pal[0x12], pal[0x16] = mpal[0], mpal[1]
     chr_ = rom.rd(BANK_TILESETCHR, 0x8000 + 0x800 * ts, 0x800)
-    var = {}; dmg_tiles = bytearray(); mt_dmg = {}
-    cgb_bg = {}
+    var = {}; dmg_tiles = bytearray(); mt_dmg = {}; cgb_bg = {}
     for room, off in (('out', 0), ('in', 0x20)):
         bg = [[pal[off]] + list(pal[off + 4 * p + 1:off + 4 * p + 4]) for p in range(4)]
+        cgb_bg[room] = b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in bg[p])
+        if room == 'in' and not doors:
+            mt_dmg[room] = mt_dmg['out']; continue
         msh = map_shades(bg)
         tbl = bytearray(512)
         for k in range(4):
-            for mt in range(128):
+            for mt in used:
                 nt, p = t['tsa'][128 * k + mt], t['mt_pal'][mt]
                 key = (nt, tuple(msh[c] for c in bg[p]))
                 if key not in var:
@@ -179,16 +189,21 @@ def map_pack(rom, m, cls=0):
                     dmg_tiles += gb_tile(chr_[16 * nt:16 * nt + 16], key[1])
                 tbl[128 * k + mt] = var[key]
         mt_dmg[room] = bytes(tbl)
-        cgb_bg[room] = b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in bg[p])
-    assert len(var) <= 256, 'map %d: %d DMG tile variants' % (m, len(var))
+    n = len(var)
     sppal = [[pal[0x10]] + list(pal[0x10 + 4 * p + 1:0x10 + 4 * p + 4]) for p in range(4)]
     cgb_obj = b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in sppal[p])
     spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)
-    party = b''.join(spr_rank_tile(spr[16 * t:16 * t + 16], sppal[t >> 1 & 1]) for t in range(16))
-    return dict(ts=ts, map=std_map(rom, m), mt_dmg_out=mt_dmg['out'], mt_dmg_in=mt_dmg['in'],
-                dmg_tiles=bytes(dmg_tiles), n_dmg=len(var), cgb_bg_out=cgb_bg['out'],
-                cgb_bg_in=cgb_bg['in'], cgb_obj=cgb_obj, party_dmg=party,
-                objs=map_objects(rom, m, len(var), sppal))
+    party = b''.join(spr_rank_tile(spr[16 * t_:16 * t_ + 16], sppal[t_ >> 1 & 1]) for t_ in range(16))
+    objs = map_objects(rom, m, n, sppal)
+    taken = set(range(n)) | set(b + k for b in objs['blocks'] if b >= 128 for k in range(16))
+    free = [x for x in range(256) if x not in taken]
+    assert len(free) >= len(FONT_CODES), 'map %d: %d BG tiles free for the font' % (m, len(free))
+    font_tbl = bytearray(128)
+    for code, tile in zip(FONT_CODES, free): font_tbl[code] = tile
+    return dict(ts=ts, map=mp_, mt_dmg_out=mt_dmg['out'], mt_dmg_in=mt_dmg['in'],
+                dmg_tiles=bytes(dmg_tiles), n_dmg=n, cgb_bg_out=cgb_bg['out'],
+                cgb_bg_in=cgb_bg['in'], cgb_obj=cgb_obj, party_dmg=party, objs=objs,
+                font_tbl=bytes(font_tbl))
 
 
 OW_INFO, OW_CHR, INIT_UNSRAM = 0x8000, 0x8000, 0xB000   # BANK_OWINFO / BANK_MAPCHR / STARTUPINFO
@@ -268,8 +283,7 @@ def map_objects(rom, m, n_bg, sppal):
     a 16-tile block per distinct graphic, placed in VRAM tiles the BG does not use (party at
     0-15, then 16-127, then down from 255 above the BG's 128+ variants)"""
     raw = rom.rd(BANK_SMINFO, MAP_OBJECTS + 0x30 * m, 45)
-    free = list(range(16, 128, 16)) + list(range(240, 127 + max(0, n_bg - 128), -16))
-    free = [b for b in free if b < 128 or b >= 128 + max(0, n_bg - 128)]
+    free = list(range(16, 128, 16)) + [b for b in range(240, 127, -16) if b >= n_bg]
     base = {}; dmg = bytearray(); cgb = bytearray(); blocks = []
     slots = bytearray()
     for i in range(15):

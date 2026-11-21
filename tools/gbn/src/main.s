@@ -60,11 +60,19 @@ TP_NOMOVE  = $01
 MT_CLOSED  = $36            ; FF1's door metatiles (MAPTILE_CLOSEDDOOR / OPENDOOR / LOCKEDDOOR)
 MT_OPEN    = $37
 MT_LOCKED  = $3B
+DLG_BANK   = 90             ; text.s: dialogue table / strings
+M_FONT     = $7F00          ; map bank: DMG font code -> tile
+C_FONTDMG  = $4800          ; common bank: the font for DMG (pre-shaded) / CGB, by code
+C_FONTCGB  = $5000
+C_WINPAL   = $4700          ; CGB palette 7: FF1's window colours
+WIN_ATTR   = $0F            ; CGB window cell: palette 7, VRAM bank 1
+LCDC_WIN   = LCDC_ON | $60  ; window on, its map at $9C00
+BOX_LINES  = 64
 
 section bank 0, $0040
             jp vblank
 section bank 0, $0048
-            reti
+            jp stat_int
 section bank 0, $0050
             reti
 section bank 0, $0100
@@ -97,6 +105,17 @@ start:      di
             jr nz, .dm
             inc a
 .dm:        ldh [is_cgb], a
+            and a                           ; a Color: double speed (KEY1 + STOP)
+            jr z, .ds
+            xor a
+            ldh [rIE], a
+            ld a, $30
+            ldh [rP1], a
+            ld a, 1
+            ldh [$FF4D], a
+            stop
+            nop
+.ds:
             xor a                           ; VRAM cleared (both banks on a Color)
             ldh [rVBK], a
             ld hl, $8000
@@ -122,6 +141,7 @@ start:      di
             jr nz, .dc
             ld a, $FF
             ld [mt_force], a
+            call text_init
             ld a, COMMON                    ; new game: save page 0 and the game flags from the ROM
             ld [MBC_BANK], a
             ld hl, C_INITPG
@@ -148,18 +168,27 @@ start:      di
 .st:        ld d, START_X
             ld e, START_Y
 .ld:        call load_map
+            ld a, BOX_LINES                 ; LYC: the dialogue box's bottom (window off)
+            ldh [rLYC], a
+            ld a, $40
+            ldh [rSTAT], a
             xor a
-            ldh [rIF], a
-            ld a, 1                         ; V-Blank interrupt
+            ldh [rIF], a                    ; (a STAT write on DMG can request one: dropped)
+            ld a, 3                         ; V-Blank and STAT interrupts
             ldh [rIE], a
             ei
 
 ; ---- main loop: one engine frame per GB frame
 main:       call wait_vbl
             call read_pad
-            call move
+            ld a, [box_on]
+            and a
+            jr z, .fld
+            call dlg_frame                  ; a dialogue: everything else waits
+            jr .drw
+.fld:       call move
             call obj_frame
-            call set_scroll
+.drw:       call set_scroll
             call make_oam
             jr main
 
@@ -186,6 +215,7 @@ vblank:     push af
             ldh a, [pal_req]
             and a
             call nz, bg_pal
+            call box_vbl
             ldh a, [rLY]                    ; (a late handler: no VRAM writes outside V-Blank)
             cp 144
             jr c, .late
@@ -217,6 +247,12 @@ read_pad:   ld a, $20
             cpl
             and $0F
             or b
+            ld c, a
+            ldh a, [pad]                    ; newly pressed this frame
+            cpl
+            and c
+            ldh [pad_new], a
+            ld a, c
             ldh [pad], a
             ld a, $30
             ldh [rP1], a
@@ -328,6 +364,7 @@ load_map:   ld [cur_map], a
             ld hl, M_OBJDMG
             call obj_tiles
 .drw:       call obj_load
+            call font_map
             call draw_all
             call set_scroll
             ldh a, [scx]
@@ -432,7 +469,13 @@ move:       ld a, [moving]
             sub b
             cp 24
             ret nc
-            ldh a, [pad]
+            ldh a, [pad_new]                ; A on a standard map: talk to what is in front
+            bit 0, a
+            jr z, .nt
+            ldh a, [maptype]
+            and a
+            jp z, talk
+.nt:        ldh a, [pad]
             ld bc, $0100                    ; B = dx, C = dy; facing in D
             ld d, 0
             bit 4, a
@@ -678,6 +721,45 @@ arrived:    ld a, [px]
             scf
             ret
 
+; talk to the object in front of the party (FF1: its talk routine picks the dialogue), or
+; "There's nothing there."
+talk:       ld a, [px]
+            ld e, a
+            ld a, [py]
+            ld d, a
+            ld a, [facing]
+            and a
+            jr nz, .f1
+            inc e
+.f1:        cp 1
+            jr nz, .f2
+            dec e
+.f2:        cp 2
+            jr nz, .f3
+            dec d
+.f3:        cp 3
+            jr nz, .f4
+            inc d
+.f4:        ld a, e
+            and 63
+            ld e, a
+            ld a, d
+            and 63
+            ld d, a
+            call obj_at                     ; C: HL inside the object's slot
+            ld a, 0
+            jr nc, .dlg
+            ld a, l
+            and $F0
+            ld l, a
+            push hl
+            ld bc, O_TALK
+            add hl, bc
+            ld [hl], 1                      ; it turns to the party
+            pop hl
+            call talk_obj                   ; A = dialogue
+.dlg:       jp dlg_open
+
 ; A = metatile -> D, E = its property bytes (the tileset bank)
 props:      add a, a
             ld l, a
@@ -699,6 +781,7 @@ door_draw:  ld a, [door_x]
             call q_mt
             ld a, $FF
             ld [mt_force], a
+            call text_init
             ret
 
 ; room state changed: CGB palettes in the next V-Blank; DMG: the visible metatiles again with
@@ -1174,6 +1257,7 @@ hram_dma:   ds 10
 is_cgb:     ds 1
 vbl_done:   ds 1
 pad:        ds 1
+pad_new:    ds 1
 scx:        ds 1
 scy:        ds 1
 pal_req:    ds 1
