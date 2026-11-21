@@ -31,7 +31,7 @@ jobs:
         shell: bash
         run: |
           pyinstaller --noconfirm --onefile --console --name FFE-Builder \
-            --add-data "tools;tools" --add-data "script;script" \
+            --add-data "tools;tools" --add-data "script;script" --add-data "translations;translations" \
             --collect-all cynes --hidden-import numpy --hidden-import PIL.Image \
             tools/builder/ffe_builder.py
       - name: Smoke test (no ROM needed)
