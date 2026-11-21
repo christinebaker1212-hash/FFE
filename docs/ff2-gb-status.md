@@ -647,6 +647,18 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   4. Then music, sprites (docs/gb-native-presentation.md order). Select menu with suspend
      (design with the owner). Known DMG look issue: the black castle floor ($0x rule).
 
+## FF2 release build (2026-11-21, owner: build a release and send it)
+Built locally from the owner's ROM (`python3 tools/gb2/build.py --gb --release`, commit
+843510e) and sent to the owner only (never committed or published). Checked on the release
+ROM: lotcheck static (header, checksums, 128 KB RAM, padding, LCD-off writes, no test
+input path) and soft reset on DMG and CGB; Select menu, options and the suspend round
+trip (suspend -> title -> Continue -> the field) in PyBoy DMG and CGB; boot and play on
+SGB (mGBA, border, menu palette), Pocket (MGB) and GBA (AGB) models. On the matching
+test build (same code with the test input path): RAM identical to the NES over random
+play (30000 frames DMG / CGB), random 2, the save scenario; DMG +6 frames / 30000,
+CGB -2.3%. Not checked: real hardware; the Windows builder exe (the workflow change is
+in, the build runs on GitHub's Windows runner).
+
 ## Select menu, suspend points, prologue on DMG, SGB fix (2026-11-21)
 - **Select menu** (owner's brief / decision 2026-11-19: Select on the field opens OPTIONS /
   FORMATION / SUSPEND, B + Select keeps the minimap): `rt/selmenu.s`, native, on the window
