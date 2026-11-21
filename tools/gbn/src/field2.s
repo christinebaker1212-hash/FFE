@@ -1553,6 +1553,172 @@ bx_apply:   ldh a, [is_cgb]
             ld hl, bx_out
             jp cgb_pal32
 
+; ---- FF1 CyclePalettes: out (before a menu, a shop, the lineup, the world map, the puzzle):
+; every 4 frames each colour's hue steps on until it passes $xC and turns black; in (back on
+; the map): from $xC back to the map's colours. Sprites hidden. CGB: the map's NES palettes
+; (map bank $73C0, the room's); DMG / SGB: the shades fade to black and back.
+PC_NES     = $73C0
+pc_out:     xor a
+            jr pc_go
+pc_in:      ld a, 1
+pc_go:      ld [pc_dir], a
+            call oam_clr
+            ldh a, [is_cgb]
+            and a
+            jp z, pc_dmg
+            ld a, [inroom]                  ; the target colours
+            and a
+            ld hl, PC_NES
+            jr z, .o
+            ld hl, PC_NES + 16
+.o:         ld de, pc_tgt
+            ld bc, 16
+            ld a, [map_bank]
+            call far_copy
+            ld hl, C_NESRGB                 ; NES colour -> RGB555 (the common bank's table)
+            ld de, pc_rgb
+            ld bc, 128
+            ld a, COMMON
+            call far_copy
+            ld hl, pc_tgt
+            ld de, pc_cur
+            ld b, 16
+.c:         ld a, [hl+]
+            ld c, a
+            ld a, [pc_dir]
+            and a
+            ld a, c
+            jr z, .s
+            cp $0F                          ; in: non-black colours start at $xC
+            jr z, .s
+            and $30
+            or $0C
+.s:         ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            ld a, 1                         ; FF1: the frame counter from 1, a step at each 4th
+            ld [pc_f], a
+.l:         ld a, [pc_f]
+            and 3
+            jr nz, .ns
+            call pc_step
+            jr z, .done
+.ns:        call pc_build
+            call wait_vbl
+            ld a, $80
+            ld hl, pc_buf
+            call cgb_pal32
+            ld hl, pc_f
+            inc [hl]
+            jr .l
+.done:      ld a, [pc_dir]
+            and a
+            jr nz, .fin
+            ld a, 1                         ; out: a cycle in when the map is back
+            ld [pc_req], a
+            ret
+.fin:       xor a                           ; in: the map's own palettes again
+            ld [pc_hold], a
+            ld a, 1
+            ldh [pal_req], a
+            ret
+; a step: Z set when every colour is done
+pc_step:    ld hl, pc_cur
+            ld de, pc_tgt
+            ld c, 0                         ; colours not done
+            ld b, 16
+.l:         ld a, [pc_dir]
+            and a
+            ld a, [hl]
+            jr nz, .rv
+            cp $0F                          ; out: black stays; chroma + 1, from $D black
+            jr z, .nx
+            inc c
+            and $0F
+            inc a
+            cp $0D
+            jr c, .o1
+            ld a, $0F
+            jr .wr
+.o1:        push bc
+            ld b, a
+            ld a, [hl]
+            and $30
+            or b
+            pop bc
+            jr .wr
+.rv:        push bc                         ; in: chroma - 1 until the target
+            ld b, a
+            ld a, [de]
+            cp b
+            pop bc
+            jr z, .nx
+            inc c
+            ld a, [hl]
+            dec a
+.wr:        ld [hl], a
+.nx:        inc hl
+            inc de
+            dec b
+            jr nz, .l
+            ld a, c
+            and a
+            ret
+; the current colours as RGB555 (pc_buf)
+pc_build:   ld hl, pc_cur
+            ld de, pc_buf
+            ld b, 16
+.l:         ld a, [hl+]
+            push hl
+            and $3F
+            add a, a
+            add a, low(pc_rgb)
+            ld l, a
+            ld a, high(pc_rgb)
+            adc a, 0
+            ld h, a
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl]
+            ld [de], a
+            inc de
+            pop hl
+            dec b
+            jr nz, .l
+            ret
+; DMG / SGB: three steps of 12 frames to black (out) or back (in)
+pc_dmg:     ld b, 0
+.l:         push bc
+            ld a, 12
+.w:         push af
+            call wait_vbl
+            pop af
+            dec a
+            jr nz, .w
+            pop bc
+            inc b
+            ld a, [pc_dir]
+            and a
+            ld a, b
+            jr z, .o
+            ld a, 3
+            sub b
+.o:         ld hl, .bgp
+            add a, l
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            ldh [rBGP], a
+            ld a, b
+            cp 3
+            jr c, .l
+            jp pc_go.done
+.bgp:       db %11100100, %11111001, %11111110, %11111111
+
 section wram, $C100                         ; (the map queue: free on these screens)
 lu_slot:    ds 32
 lu_cur:     ds 1
@@ -1590,3 +1756,9 @@ bx_bgp:     ds 1
 bx_t:       ds 2
 bx_pal:     ds 32
 bx_out:     ds 32
+pc_dir:     ds 1                            ; (the palette cycling)
+pc_f:       ds 1
+pc_tgt:     ds 16
+pc_cur:     ds 16
+pc_buf:     ds 32
+pc_rgb:     ds 128

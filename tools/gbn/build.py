@@ -154,6 +154,7 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, OW_INFO, 0x7200, o['party_dmg'])
     place(banks, OW_INFO, 0x7380, o['party_perm'])
     place(banks, OW_INFO, 0x73A0, o['sgb'])
+    place(banks, OW_INFO, 0x73C0, o['nes_bg'])                   # (the palette cycling)
     mt, mc = data.mapman_all(rom)                               # the leader's map sprite
     place(banks, minimap.MINI_BANK, 0x6400, mt)
     place(banks, minimap.MINI_BANK, 0x7000, mc)
@@ -180,6 +181,7 @@ def data_banks(rom, ff3=None, init=None):
         place(banks, b, 0x7200, p['party_dmg'])
         place(banks, b, 0x7380, p['party_perm'])
         place(banks, b, 0x73A0, p['sgb'])
+        place(banks, b, 0x73C0, p['nes_bg'])
         ob = p['objs']
         place(banks, b, 0x7300, ob['slots'].ljust(64, b'\0'))      # 15 x (id, x+flags, y, tile)
         place(banks, b, 0x7340, ob['blocks'].ljust(16, b'\0'))     # tile bases of the blocks

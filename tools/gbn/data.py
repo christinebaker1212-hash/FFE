@@ -222,10 +222,11 @@ def map_pack(rom, m, cls=0):
     mpal = rom.rd(BANK_SMINFO, MAPMAN_PAL + 2 * cls, 2)
     pal[0x12], pal[0x16] = mpal[0], mpal[1]
     chr_ = rom.rd(BANK_TILESETCHR, 0x8000 + 0x800 * ts, 0x800)
-    var = {}; dmg_tiles = bytearray(); mt_dmg = {}; cgb_bg = {}
+    var = {}; dmg_tiles = bytearray(); mt_dmg = {}; cgb_bg = {}; nes_bg = {}
     for room, off in (('out', 0), ('in', 0x20)):
         bg = [[pal[off]] + list(pal[off + 4 * p + 1:off + 4 * p + 4]) for p in range(4)]
         cgb_bg[room] = b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in bg[p])
+        nes_bg[room] = bytes(c for p in range(4) for c in bg[p])
         if room == 'in' and not doors:
             mt_dmg[room] = mt_dmg['out']; continue
         msh = map_shades(bg)
@@ -253,7 +254,7 @@ def map_pack(rom, m, cls=0):
     return dict(ts=ts, map=mp_, mt_dmg_out=mt_dmg['out'], mt_dmg_in=mt_dmg['in'],
                 dmg_tiles=bytes(dmg_tiles), n_dmg=n, cgb_bg_out=cgb_bg['out'],
                 cgb_bg_in=cgb_bg['in'], cgb_obj=cgb_obj, party_dmg=party, objs=objs,
-                party_perm=party_perms(rom, pal),
+                party_perm=party_perms(rom, pal), nes_bg=nes_bg['out'] + nes_bg['in'],
                 sgb=sgb_cols([[pal[0]] + list(pal[4 * p + 1:4 * p + 4]) for p in range(4)], chr_,
                              t['tsa'], t['mt_pal'], {m_: mp_.count(m_) for m_ in set(mp_)}),
                 font_tbl=bytes(font_tbl))
@@ -313,6 +314,7 @@ def ow_pack(rom, cls=0):
                 veh_dmg=b''.join(spr_rank_tile(vch[16 * t:16 * t + 16], sppal[2]) for t in range(96)),
                 mt_dmg=bytes(tbl), dmg_tiles=bytes(dmg),
                 rows=rows, sgb=sgb_cols(bg, chr_, tsa, mt_pal, freq),
+                nes_bg=bytes(c for p in range(4) for c in bg[p]) * 2,
                 start=(rom.rd(BANK_SMINFO, INIT_UNSRAM + 0x10) + 7) & 0xFF,
                 start_y=(rom.rd(BANK_SMINFO, INIT_UNSRAM + 0x11) + 7) & 0xFF)
 

@@ -366,6 +366,11 @@ read_pad:   ld a, $20
 load_map:   ld [cur_map], a
             xor a                           ; (the field: no menu sounds)
             ld [sfx_menu], a
+            ld a, [ml_keep]                 ; (a new map, not the reload after a menu: no
+            and a                           ;   palette cycle)
+            jr nz, .rl
+            ld [pc_req], a
+.rl:
             ld a, [cur_map]
             ld b, a
             ld a, d
@@ -482,8 +487,36 @@ load_map:   ld [cur_map], a
             call make_oam
             call hram_dma
             call map_music
+            ld a, [pc_req]                  ; (a palette cycle in to follow: black first)
+            and a
+            call nz, pc_black
             ld a, LCDC_ON
             ldh [rLCDC], a
+            ret
+; HL = a screen of SCR_BANK: FF1's palette cycle out, then the screen
+pc_menu:    push hl
+            ld a, SCR_BANK
+            ld hl, pc_out
+            call bank_call
+            pop hl
+            ld a, SCR_BANK
+            jp bank_call
+; the screen black before FF1's palette cycle in (LCD off)
+pc_black:   ld a, 1
+            ld [pc_hold], a
+            call oam_clr
+            ld a, $FF
+            ldh [rBGP], a
+            ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, $80
+            ldh [rBCPS], a
+            ld b, 32
+            xor a
+.c:         ldh [rBCPD], a
+            dec b
+            jr nz, .c
             ret
 
 ; the map drawn again after a full screen (menu): position, room and objects as they were
@@ -499,9 +532,17 @@ map_reload: ld a, [inroom]
             call load_map
             pop af
             and a
-            ret z
+            jr z, .pc
             ld [inroom], a
-            jp room_redraw
+            call room_redraw
+.pc:        ld a, [pc_req]                  ; FF1: the palettes cycle in
+            and a
+            ret z
+            xor a
+            ld [pc_req], a
+            ld a, SCR_BANK
+            ld hl, pc_in
+            jp bank_call
 
 ; the overworld: the vehicles' sprite tiles (FF1's OW objects) to sprite tiles $10-$6F
 veh_tiles:  ldh a, [maptype]
@@ -556,6 +597,9 @@ cgb_pal32:  ldh [rBCPS], a                  ; HL = 32 bytes of BG palettes 0-3
 ; V-Blank, CGB: the BG palettes for the room state
 bg_pal:     xor a
             ldh [pal_req], a
+            ld a, [pc_hold]                 ; (a palette cycle in progress: its own colours)
+            and a
+            ret nz
             ldh a, [is_cgb]
             and a
             ret z
@@ -608,9 +652,8 @@ move:       ld a, [moving]
             ldh a, [pad_new]                ; Start: the main menu
             bit 3, a
             jr z, .nm
-            ld a, SCR_BANK
-            ld hl, menu_main
-            call bank_call
+            ld hl, menu_main                   ; (FF1: the palettes cycle out first)
+            call pc_menu
             ld a, [menu_act]                ; Warp / Exit cast in the menu
             and a
             jp z, map_reload
@@ -632,13 +675,11 @@ move:       ld a, [moving]
             ldh a, [pad]
             bit 1, a
             jr z, .lu
-            ld a, SCR_BANK
-            ld hl, minimap
-            call bank_call
+            ld hl, minimap                   ; (FF1: the palettes cycle out first)
+            call pc_menu
             jp map_reload
-.lu:        ld a, SCR_BANK
-            ld hl, lineup
-            call bank_call
+.lu:        ld hl, lineup                   ; (FF1: the palettes cycle out first)
+            call pc_menu
             jp map_reload
 .na:        ldh a, [maptype]                ; the overworld: B presses counted (FF1 joy_b);
             and a                           ;   the 55th with A + B held on the ship: the
@@ -660,9 +701,8 @@ move:       ld a, [moving]
             jr nz, .np
             ld hl, pz_bcnt
             inc [hl]
-            ld a, SCR_BANK
-            ld hl, puzzle
-            call bank_call
+            ld hl, puzzle                   ; (FF1: the palettes cycle out first)
+            call pc_menu
             jp map_reload
 .np:        ldh a, [pad_new]                ; A on a standard map: talk to what is in front
             bit 0, a
@@ -800,9 +840,8 @@ arrived:    ld a, [px]
             and a
             jr z, .nsh
             ld [shop_arg], a
-            ld a, SCR_BANK
-            ld hl, shop_main
-            call bank_call
+            ld hl, shop_main                ; (FF1: the palettes cycle out first)
+            call pc_menu
             xor a                           ; (out of the room, as FF1)
             ld [inroom], a
             call map_reload
@@ -916,9 +955,12 @@ arrived:    ld a, [px]
             jr nz, .nbr
             ld a, $80
             ld [unsram + $16], a
+            push de
+            ld a, SCR_BANK                  ; (FF1: the palettes cycle out first)
+            ld hl, pc_out
+            call bank_call
             ld a, STORY_FIRST
             ld b, 4
-            push de
             ld hl, story_show
             ld a, SCR_BANK
             call bank_call_ab
@@ -937,9 +979,8 @@ arrived:    ld a, [px]
             ld [shop_arg], a
             xor a
             ld [shop_pend], a
-            ld a, SCR_BANK
-            ld hl, shop_main
-            call bank_call
+            ld hl, shop_main                ; (FF1: the palettes cycle out first)
+            call pc_menu
             call map_reload
             scf
             ret
@@ -2380,7 +2421,9 @@ do_battle:  ld [btl_fid], a
             ld b, STORY_END - STORY_FIRST - 4
             call story_show
             jp the_end
-.ok:        call map_reload
+.ok:        ld a, 1                         ; (FF1: back on the map, the palettes cycle in)
+            ld [pc_req], a
+            call map_reload
             scf
             ret
 ; the save in cart RAM valid (its mark and sum)? C clear if so; load_game copies it in
@@ -2567,6 +2610,8 @@ ps_perm:    ds 2
 lcdc_on:    ds 1
 air_y:      ds 1                            ; the airship's y while taking off / landing
 respond:    ds 1                            ; FF1 respondrate (0-7)
+pc_req:     ds 1                            ; a palette cycle in when the map is back
+pc_hold:    ds 1                            ; (the cycle's colours: no map palette writes)
 pz_bcnt:    ds 1                            ; B presses on the overworld (FF1 joy_b: the puzzle)
 ts_bank:    ds 1
 inroom:     ds 1
