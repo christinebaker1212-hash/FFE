@@ -298,6 +298,9 @@ vblank:     push af
             and a
             call nz, bg_pal
             call box_vbl
+            ld a, [wp_on]                   ; (a screen wipe: the window from the top)
+            and a
+            call nz, wp_vbl
             ldh a, [rLY]                    ; (a late handler: no VRAM writes outside V-Blank)
             cp 144
             jr c, .late
@@ -363,7 +366,17 @@ read_pad:   ld a, $20
 
 ; ---- load standard map A with the party at (D = x, E = y): LCD off in V-Blank, graphics,
 ; palettes, the map drawn, LCD on
-load_map:   ld [cur_map], a
+; a map transition (FF1: the screen wiped closed, the map loaded, wiped open)
+load_map_w: push af
+            ld a, 1
+            ld [wp_req], a
+            pop af
+load_map:   push af
+            ld a, [wp_req]
+            and a
+            call nz, wipe_close
+            pop af
+            ld [cur_map], a
             xor a                           ; (the field: no menu sounds)
             ld [sfx_menu], a
             ld a, [ml_keep]                 ; (a new map, not the reload after a menu: no
@@ -490,33 +503,11 @@ load_map:   ld [cur_map], a
             ld a, [pc_req]                  ; (a palette cycle in to follow: black first)
             and a
             call nz, pc_black
+            ld a, [wp_req]                  ; (a transition: wiped open)
+            and a
+            jr nz, wipe_open
             ld a, LCDC_ON
             ldh [rLCDC], a
-            ret
-; HL = a screen of SCR_BANK: FF1's palette cycle out, then the screen
-pc_menu:    push hl
-            ld a, SCR_BANK
-            ld hl, pc_out
-            call bank_call
-            pop hl
-            ld a, SCR_BANK
-            jp bank_call
-; the screen black before FF1's palette cycle in (LCD off)
-pc_black:   ld a, 1
-            ld [pc_hold], a
-            call oam_clr
-            ld a, $FF
-            ldh [rBGP], a
-            ldh a, [is_cgb]
-            and a
-            ret z
-            ld a, $80
-            ldh [rBCPS], a
-            ld b, 32
-            xor a
-.c:         ldh [rBCPD], a
-            dec b
-            jr nz, .c
             ret
 
 ; the map drawn again after a full screen (menu): position, room and objects as they were
@@ -934,7 +925,7 @@ arrived:    ld a, [px]
             ld a, [hl+]
             ld [warp_room], a
             ld a, [hl]
-            call load_map
+            call load_map_w
             ld a, [warp_room]               ; (FF1 restores the room state too)
             and a
             jr z, .wr
@@ -947,7 +938,7 @@ arrived:    ld a, [px]
             ld a, [ow_y]
             ld e, a
             ld a, MAP_OW
-            call load_map
+            call load_map_w
             scf
             ret
 .ow:        ld a, [unsram + $16]            ; the bridge crossed: the story (FF1 bridgescene)
@@ -1061,7 +1052,7 @@ arrived:    ld a, [px]
             ld bc, C_ENTRM - C_ENTRY
             add hl, bc
             ld a, [hl]                      ; map
-            call load_map
+            call load_map_w
             scf
             ret
 .exit:      xor a                           ; exit to the overworld at FF1's exit position
@@ -1081,7 +1072,7 @@ arrived:    ld a, [px]
             ld l, a
             ld e, [hl]
             ld a, MAP_OW
-            call load_map
+            call load_map_w
             scf
             ret
 .norm:      call do_tele
@@ -1130,7 +1121,7 @@ do_tele:    push de                         ; push this floor
             ld a, [hl]                      ; map
             ld d, b
             ld e, c
-            call load_map
+            call load_map_w
             scf
             ret
 
@@ -2611,6 +2602,12 @@ lcdc_on:    ds 1
 air_y:      ds 1                            ; the airship's y while taking off / landing
 respond:    ds 1                            ; FF1 respondrate (0-7)
 pc_req:     ds 1                            ; a palette cycle in when the map is back
+wp_req:     ds 1                            ; (the screen wipe: requested, on, band, state)
+wp_on:      ds 1
+wp_top:     ds 1
+wp_bot:     ds 1
+wp_st:      ds 1
+wp_t:       ds 1
 pc_hold:    ds 1                            ; (the cycle's colours: no map palette writes)
 pz_bcnt:    ds 1                            ; B presses on the overworld (FF1 joy_b: the puzzle)
 ts_bank:    ds 1
@@ -2669,3 +2666,251 @@ cmask:      ds 1                            ; coordinate mask: 63 / 255
 soft_rst:   ds 1
 nzv:        ds 1                            ; (the music engine's flag bytes)
 vfl:        ds 1
+
+section bank 0, $3900                       ; (the screen wipe, the palette cycle's helpers)
+; ---- FF1 ScreenWipe_Close / _Open: the window layer (a black map) covers the screen above
+; and below a band that closes on the middle (2 lines a frame each side) or opens from it;
+; the STAT handler switches the window off at the band's top and on at its bottom. Sprites
+; hidden, the music stopped; FF1's sound on square 1 (12.5 %, volume 8, sweeping down, its
+; pitch from the visible lines every fourth frame).
+wipe_close: push de
+            ld a, $80
+            call snd_track
+            call oam_clr
+            call wp_map                     ; (the window map black, LCD on: in V-Blanks)
+            xor a
+            ld [wp_top], a
+            ld a, 144
+            ld [wp_bot], a
+            ld a, 1
+            ld [wp_on], a
+.l:         call wait_vbl
+            call wp_snd
+            ld hl, wp_top
+            ld a, [hl]
+            add a, 2
+            ld [hl], a
+            ld b, a
+            ld hl, wp_bot
+            ld a, [hl]
+            sub 2
+            ld [hl], a
+            cp b
+            jr z, .x
+            jr nc, .l
+.x:         call wait_vbl
+            pop de
+            ret
+wipe_open:  xor a
+            ld [wp_req], a
+            call oam_clr                    ; (FF1: no sprites while it opens)
+            call hram_dma
+            call wp_map
+            ld a, 72
+            ld [wp_top], a
+            ld [wp_bot], a
+            ld a, 1
+            ld [wp_on], a
+            ld a, 7
+            ldh [rWX], a
+            xor a
+            ldh [rWY], a
+            ld a, LCDC_WIN                  ; (the first frame covered)
+            ldh [rLCDC], a
+.l:         call wait_vbl
+            call wp_snd
+            ld hl, wp_top
+            ld a, [hl]
+            sub 2
+            jr nc, .t
+            xor a
+.t:         ld [hl], a
+            ld hl, wp_bot
+            ld a, [hl]
+            add a, 2
+            cp 145
+            jr c, .b
+            ld a, 144
+.b:         ld [hl], a
+            cp 144
+            jr c, .l
+            ld a, [wp_top]
+            and a
+            jr nz, .l
+            call wait_vbl
+            xor a
+            ld [wp_on], a
+            ldh [$FF12], a                  ; (square 1 silent; the music goes on)
+            ld a, BOX_LINES
+            ldh [rLYC], a
+            ld a, [lcdc_on]
+            ldh [rLCDC], a
+            ret
+; the window map black: the font's blank (DMG: its tile for this map, shade 3; CGB: in VRAM
+; bank 1, palette 6 all black); with the LCD on, three rows a V-Blank
+wp_map:     ld a, $20
+            call code_tile
+            ld [wp_t], a
+            ldh a, [rLCDC]
+            bit 7, a
+            jr z, .off
+            ld c, 0
+.r:         call wait_vbl
+            call .rows
+            ld a, c
+            cp 18
+            jr c, .r
+            jr .pal
+.off:       ld c, 0
+.o:         call .rows
+            ld a, c
+            cp 18
+            jr c, .o
+.pal:       ldh a, [is_cgb]
+            and a
+            ret z
+            ldh a, [rLCDC]                  ; (palette 6 black: in V-Blank or LCD off)
+            bit 7, a
+            call nz, wait_vbl
+            ld a, $80 | 48
+            ldh [rBCPS], a
+            ld b, 8
+            xor a
+.p:         ldh [rBCPD], a
+            dec b
+            jr nz, .p
+            ret
+.rows:      ld b, 3                         ; rows C .. C + 2 of $9C00
+.rw:        push bc
+            ld l, c
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $9C00
+            add hl, de
+            ld b, 20
+            ld a, [wp_t]
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            ldh a, [is_cgb]
+            and a
+            jr z, .na
+            ld a, l
+            sub 20
+            ld l, a
+            ld a, h
+            sbc a, 0
+            ld h, a
+            ld a, 1
+            ldh [rVBK], a
+            ld b, 20
+            ld a, $0E                       ; (palette 6, VRAM bank 1)
+.a:         ld [hl+], a
+            dec b
+            jr nz, .a
+            xor a
+            ldh [rVBK], a
+.na:        pop bc
+            inc c
+            dec b
+            jr nz, .rw
+            ret
+; FF1's wipe sound, every fourth frame: period (255 - 3 / 2 visible lines) x 8
+wp_snd:     ldh a, [frame]
+            and 3
+            ret nz
+            ld a, [wp_top]
+            ld b, a
+            ld a, [wp_bot]
+            sub b
+            jr nc, .v
+            xor a
+.v:         ld b, a                         ; visible lines (GB) x 3 / 2: FF1's 224-line scale
+            srl a
+            add a, b
+            jr nc, .s
+            ld a, 255
+.s:         cpl                             ; 255 - that
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl                      ; x 8: the NES period
+            add hl, hl                      ; (x 2: the table's entries)
+            ld de, S_FREQ
+            add hl, de
+            ld a, SND_BANK
+            ld [fc_bank], a
+            call far_byte
+            ld e, a
+            inc hl
+            call far_byte
+            ld d, a
+            ld a, %00011010                 ; sweep: time 1, down in pitch, shift 2
+            ldh [$FF10], a
+            xor a                           ; 12.5 %
+            ldh [$FF11], a
+            ld a, $80                       ; volume 8
+            ldh [$FF12], a
+            ld a, e
+            ldh [$FF13], a
+            ld a, d
+            or $80
+            ldh [$FF14], a
+            ret
+; HL = a screen of SCR_BANK: FF1's palette cycle out, then the screen
+pc_menu:    push hl
+            ld a, SCR_BANK
+            ld hl, pc_out
+            call bank_call
+            pop hl
+            ld a, SCR_BANK
+            jp bank_call
+; V-Blank during a wipe: the window on from line 0 (unless the band starts there), the STAT
+; interrupt at the band's top
+wp_vbl:     ld a, 7
+            ldh [rWX], a
+            xor a
+            ldh [rWY], a
+            ldh a, [rLCDC]
+            bit 7, a
+            ret z
+            ld a, [wp_top]
+            and a
+            jr z, .z
+            dec a
+            ldh [rLYC], a
+            xor a
+            ld [wp_st], a
+            ld a, LCDC_WIN
+            ldh [rLCDC], a
+            ret
+.z:         ld a, 1
+            ld [wp_st], a
+            ld a, [wp_bot]
+            ldh [rLYC], a
+            ld a, [lcdc_on]
+            ldh [rLCDC], a
+            ret
+; the screen black before FF1's palette cycle in (LCD off)
+pc_black:   ld a, 1
+            ld [pc_hold], a
+            call oam_clr
+            ld a, $FF
+            ldh [rBGP], a
+            ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, $80
+            ldh [rBCPS], a
+            ld b, 32
+            xor a
+.c:         ldh [rBCPD], a
+            dec b
+            jr nz, .c
+            ret
+

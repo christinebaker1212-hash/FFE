@@ -308,13 +308,16 @@ box_vbl:    ld a, [box_on]
 
 ; STAT (LYC = 64): the window off below the box
 stat_int:   push af
+            ld a, [wp_on]                   ; (a screen wipe: the band's edges)
+            and a
+            jr nz, .wp
             ldh a, [rLCDC]                  ; (a request left pending while the LCD went off:
             bit 7, a                        ;   it stays off)
             jr z, .off
             ld a, [lcdc_on]
             ldh [rLCDC], a
 .off:
-            push bc                         ; and the music, once a frame, here (mid-frame:
+.mus:       push bc                         ; and the music, once a frame, here (mid-frame:
             push de                         ;   V-Blank stays free for VRAM writes)
             push hl
             ldh a, [rombank]
@@ -328,6 +331,40 @@ stat_int:   push af
             pop de
             pop bc
             pop af
+            reti
+.wp:        ld a, [wp_st]                   ; the band's top: the window off (an empty band:
+            and a                           ;   it stays on), the bottom next
+            jr nz, .wb
+            inc a
+            ld [wp_st], a
+            ld a, [wp_top]
+            push bc
+            ld b, a
+            ld a, [wp_bot]
+            cp b
+            pop bc
+            jr z, .wm
+            jr c, .wm
+            ldh a, [rLCDC]
+            bit 7, a
+            jr z, .wm
+            ld a, [lcdc_on]
+            ldh [rLCDC], a
+            ld a, [wp_bot]
+            ldh [rLYC], a
+            pop af
+            reti
+.wb:        cp 2                            ; the bottom: the window on again; the music
+            jr nc, .wm2
+            ldh a, [rLCDC]
+            bit 7, a
+            jr z, .wm
+            ld a, LCDC_WIN
+            ldh [rLCDC], a
+.wm:        ld a, 2
+            ld [wp_st], a
+            jr .mus
+.wm2:       pop af
             reti
 
 ; the dialogue in progress (main loop): A turns the page or closes the box
