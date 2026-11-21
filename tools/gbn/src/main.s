@@ -685,7 +685,14 @@ move:       ld a, [moving]
             xor a
             ld [mcount], a
             jp draw_edge
-.door:      ld a, [inroom]                  ; into a room: palette, the open door drawn
+.door:      ld a, d                         ; a locked door: only with the Mystic Key (FF1)
+            and $1E
+            cp $04
+            jr nz, .dr
+            ld a, [ITEMS + 5]
+            and a
+            ret z
+.dr:        ld a, [inroom]                  ; into a room: palette, the open door drawn
             and a
             jr nz, .ok
             push bc
@@ -741,7 +748,40 @@ arrived:    ld a, [px]
             call map_reload
             scf
             ret
-.nsh:       ld a, d                         ; a battle tile (FF1 SMMove_Battle)
+.nsh:       push de                         ; poison (FF1 MapPoisonDamage); damage tiles:
+            call ow_poison                  ;   everyone - 1 HP, not below 1
+            pop de
+            ld a, d
+            and $1E
+            cp $0C
+            jr nz, .ndm
+            push de
+            xor a
+.dm:        push af
+            call ch_rec
+            ld a, l
+            add a, CH_HP
+            ld l, a
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl-]
+            and a
+            jr nz, .dd
+            ld a, c
+            cp 2
+            jr c, .dn
+.dd:        ld a, [hl]
+            sub 1
+            ld [hl+], a
+            ld a, [hl]
+            sbc a, 0
+            ld [hl], a
+.dn:        pop af
+            inc a
+            cp 4
+            jr c, .dm
+            pop de
+.ndm:       ld a, d                         ; a battle tile (FF1 SMMove_Battle)
             and $1E
             cp $0A
             jr nz, .nbt
