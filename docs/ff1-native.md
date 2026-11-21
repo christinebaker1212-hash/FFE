@@ -182,8 +182,14 @@ one reaches parity, so the owner can keep playing).
   "FF1N", the page, a 16-bit sum); A+B+Start+Select resets to the title (Lot Check); the
   save records the overworld position (FF1: scroll = position - 7) in save page $10/$11.
 
+- Vehicles (main.s ow_canmove / ow_abutton / veh_oam): canoe, ship, airship with FF1's rules
+  (board / unboard / dock, the canal object, landing only where tile byte 0 bit 3 is clear,
+  no encounters in the air, 3/256 on the ship), the vehicle sprites from FF1's tables and OW
+  object graphics, walking poison damage, the caravan, chime tiles. The bridge sets FF1's
+  bridgescene flag (the story scene itself: next).
+
 ## Next steps (native rewrite)
-1. Vehicles (FF1 ProcessOWInput / OWCanMove, bank 0F): `vehicle` 1 foot, 2 canoe, 4 ship,
+1. (done) Vehicles (FF1 ProcessOWInput / OWCanMove, bank 0F): `vehicle` 1 foot, 2 canoe, 4 ship,
    8 airship; blocked if tile byte 0 & vehicle; on foot onto water: BoardCanoe (needs
    has_canoe = save $12, tile byte 0 bit 1 clear) or BoardShip (ship_vis/x/y = save $00-$02
    at the target); ship: moving onto land = UnboardBoat (tile byte 0 bit 0 clear) and
