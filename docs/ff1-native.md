@@ -188,6 +188,12 @@ one reaches parity, so the owner can keep playing).
   object graphics, walking poison damage, the caravan, chime tiles. The bridge sets FF1's
   bridgescene flag (the story scene itself: next).
 
+- Story pages (prologue before the title, the bridge story), fiend / Chaos battle graphics,
+  music (sound.py / snd.s: FF1's music engine as native code from the recompiled build's port,
+  song data from a copy of the user's bank 13, output to the GB channels with a period ->
+  frequency table made at build time; map / vehicle / event tracks). Not yet: sound effects
+  (battle hits, menu cursor), the ending sequence after Chaos.
+
 ## Next steps (native rewrite)
 1. (done) Vehicles (FF1 ProcessOWInput / OWCanMove, bank 0F): `vehicle` 1 foot, 2 canoe, 4 ship,
    8 airship; blocked if tile byte 0 & vehicle; on foot onto water: BoardCanoe (needs
@@ -204,7 +210,7 @@ one reaches parity, so the owner can keep playing).
    $10-$6F) and its vehicle sprite tables.
 2. Fiend / Chaos battle graphics (FF1 PrepareEnemyFormation_Fiend / _Chaos, data_FiendTSA /
    data_ChaosTSA in bank 0B: 8 x 8 / 14 x 12 TSA, their own palettes).
-3. Music and sound effects: a native player for FF1's music data (bank 0D MusicPlay format:
+3. (done: music) Music and sound effects: a native player for FF1's music data (bank 0D MusicPlay format:
    the recompiled build's rt/mus.s documents it) driving the GB APU directly; battle SFX.
 4. Story scenes (bridge, ending: translations/ff1_story.py, the approved 20 x 11 box),
    prologue, the minimap (B + Select), the 15-puzzle, options (message speed), Chaos'
