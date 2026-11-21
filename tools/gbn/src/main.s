@@ -183,6 +183,9 @@ start:      di
             call memcpy
 .nti:       ld a, 3
             ld [facing], a
+            ld a, SND_BANK                  ; the sound on
+            call sbank
+            call snd_init_b
             ld a, BOX_LINES                 ; LYC: the dialogue box's bottom (window off)
             ldh [rLYC], a
             ld a, $40
@@ -228,6 +231,7 @@ start:      di
             jr nz, .vh
             inc a
 .vh:        ld [vehicle], a
+            call map_music
             ld a, START_ROOM                ; (test builds: start inside a room)
             and a
             jr z, .nr
@@ -291,6 +295,9 @@ vblank:     push af
             call q_flush
 .late:      ld a, 1
             ldh [vbl_done], a
+            ld a, SND_BANK                  ; the music, once a frame
+            ld [MBC_BANK], a
+            call snd_frame_b
             pop af
             call sbank
             pop hl
@@ -457,6 +464,7 @@ load_map:   ld [cur_map], a
             ldh [rSCY], a
             call make_oam
             call hram_dma
+            call map_music
             ld a, LCDC_ON
             ldh [rLCDC], a
             ret
@@ -1886,6 +1894,50 @@ ow_poison:  xor a
             jr c, .m
             ret
 
+; ---- sound: the music engine's song data reader (bank 0: maps the data bank, then back to
+; the sound bank; safe in the V-Blank handler: no shared variables)
+mrd:        push hl
+            ld a, h
+            sub $40
+            ld h, a
+            ld a, MUS_DATA
+            ld [MBC_BANK], a
+            ld a, [hl]
+            push af
+            ld a, SND_BANK
+            ld [MBC_BANK], a
+            pop af
+            pop hl
+            ret
+; A = a music track (FF1's numbers)
+snd_track:  ld [NES_RAM + $4B], a
+            ret
+; the map's music: the overworld by vehicle, a standard map by its tileset (FF1)
+map_music:  ldh a, [maptype]
+            and a
+            jr z, .sm
+            ld a, [vehicle]
+            ld l, a
+            ld h, high(S_VEHMUS)
+            ld a, l
+            add a, low(S_VEHMUS)
+            ld l, a
+            jr .rd
+.sm:        ld a, [ts_bank]
+            sub TS_BANK0
+            add a, low(S_TSMUS)
+            ld l, a
+            ld h, high(S_TSMUS)
+.rd:        ld a, SND_BANK
+            ld [fc_bank], a
+            call far_byte
+            ld b, a
+            ld a, [NES_RAM + $4B]           ; (already playing it: kept)
+            cp b
+            ret z
+            ld a, b
+            jr snd_track
+
 ; ---- encounters and battles
 B_RATES    = $4A00          ; battle data bank: encounter rate per map (+1), domains, lut_RNG,
 B_DOMAINS  = $4800          ;   the formation weights
@@ -2138,3 +2190,5 @@ maptype:    ds 1                            ; 0 standard map, 1 overworld
 frame:      ds 1                            ; frame counter
 cmask:      ds 1                            ; coordinate mask: 63 / 255
 soft_rst:   ds 1
+nzv:        ds 1                            ; (the music engine's flag bytes)
+vfl:        ds 1

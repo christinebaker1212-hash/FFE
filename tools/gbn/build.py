@@ -8,7 +8,7 @@ ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
-import data, text, talkconst, ui, names, battle
+import data, text, talkconst, ui, names, battle, sound
 
 COMMON, TS_BANK0, MAP_BANK0, OW_TS, OW_INFO, OW_ROWS, ROM_BANKS = 1, 8, 20, 16, 81, 84, 128
 
@@ -73,6 +73,14 @@ def magic_defs(rom):
     return '\n'.join(out) + '\n'
 
 
+def snd_tables(rom):
+    ft, tsm, vm = sound.tables(rom)
+    db = lambda b: ''.join('            db ' + ', '.join('$%02X' % x for x in b[i:i + 16]) + '\n'
+                           for i in range(0, len(b), 16))
+    return ('section bank 7, $6F00\n' + db(tsm) + 'section bank 7, $6F10\n' + db(vm) +
+            'section bank 7, $7000\n' + db(ft))
+
+
 def ui_strings():
     """the screens' strings as str_<name> labels in code bank 2"""
     out = ['section bank 2, $7000']
@@ -109,6 +117,7 @@ def data_banks(rom, ff3=None, init=None):
     banks[names.NAMES_BANK] = nb
     banks[ui.MTEXT_BANK] = bytearray(ui.mtext_bank())
     banks[battle.BTL_DATA] = bytearray(battle.data_bank(rom))
+    banks[sound.MUS_DATA] = bytearray(rom.prg[13 * 0x4000:14 * 0x4000])   # FF1's music data
     for b, blob in battle.chr_banks(rom).items(): banks[b] = bytearray(blob)
     place(banks, COMMON, 0x5D40, b''.join(data.rgb555(c).to_bytes(2, 'little') for c in range(64)))
     banks[3] = bytearray(ui.gfx_bank(rom))                     # UI_GFX
@@ -181,7 +190,7 @@ def main():
             else: n = 1
             for j in range(int(n)): init.append((int(k, 16) + j, int(v, 16)))
     src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\nSTART_ROOM = %s\n' % tuple(st) +
-           'TEST_INIT = %d\n' % (1 if init else 0) +
+           'TEST_INIT = %d\n' % (1 if init else 0) + sound.mus_defs(rom) +
            'STORY_FIRST = %d\n' % ui.story_pages()[1] +
            'ENC_OW = %s\n' % (a[a.index('--enc') + 1] if '--enc' in a else '10') +
            'START_BATTLE = %s\n' % (a[a.index('--battle') + 1] if '--battle' in a else '$FF') + talk_defs(rom) + item_defs(rom) + magic_defs(rom) +
@@ -195,7 +204,10 @@ def main():
            open(os.path.join(HERE, 'src', 'shop.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl2.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'btl3.s')).read() + '\n' + 'section bank 6, $7800\n' +
+           open(os.path.join(HERE, 'src', 'btl3.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
+           snd_tables(rom) +
+           'section bank 6, $7800\n' +
            battle.vwf_source() + ui_strings())
     import re                                    # (constants from every module first: the
     defs = [l for l in src.split('\n') if re.match(r'^[A-Za-z_]\w*\s+=', l)]   #   assembler
