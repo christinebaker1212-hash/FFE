@@ -150,3 +150,10 @@ one reaches parity, so the owner can keep playing).
   constants are read from the ROM's routines (talkconst.item_routines / magic_routines).
   Save: the save page to cart RAM with a mark and a sum. Test builds: `build.py --init
   ADDR=VAL,..` seeds the save page.
+- Shops (shop.s, from FF1's EnterShop and shop loops): weapon / armour (buy, give to a member
+  with a free slot, sell for half, stats readjusted), item shops and the caravan (99 at most),
+  white / black magic (class permissions, already known, the level full), inn (HP / MP full,
+  saved), clinic (revive with 1 HP). Shop type, items, inn / clinic prices and magic
+  permissions come from the ROM's tables (names.shop_tables); entered by walking onto a door
+  tile whose second property byte is a shop number, as FF1. Layout: speech (0,0,20,6),
+  title, commands / Yes-No / names, the 5-item list with prices, Gil.

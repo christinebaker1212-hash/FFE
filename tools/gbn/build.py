@@ -179,7 +179,8 @@ def main():
            open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'talk.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'screens.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + ui_strings())
+           open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'shop.s')).read() + '\n' + ui_strings())
     import re                                    # (constants from every module first: the
     defs = [l for l in src.split('\n') if re.match(r'^[A-Za-z_]\w*\s+=', l)]   #   assembler
     rest = [l for l in src.split('\n') if not re.match(r'^[A-Za-z_]\w*\s+=', l)] #   needs them

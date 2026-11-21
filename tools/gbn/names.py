@@ -100,6 +100,38 @@ def equip_tables(rom):
                 atype=armour_types(rom))
 
 
+def shop_tables(rom):
+    """FF1's shops: type per shop id (71, found by EnterShop's lookup in the fixed bank),
+    each shop's 5 items (or the inn / clinic price) from lut_ShopData (found by
+    LoadShopInventory), the classes' magic permissions (12 x 8, lut_MagicPermisPtr)"""
+    import re
+    b14 = rom.prg[14 * 0x4000:15 * 0x4000]; b15 = rom.prg[15 * 0x4000:16 * 0x4000]
+    sd = None
+    for m in re.finditer(re.escape(bytes([0x0A, 0xAA, 0xBD])), b14):
+        i = m.start()
+        if b14[i + 5:i + 7] == b'\x85\x10' and b14[i + 10:i + 14] == bytes([0x85, 0x11, 0xA0, 0x04]):
+            sd = b14[i + 3] | b14[i + 4] << 8; sid = b14[i - 1]
+    assert sd, 'shop data not found'
+    i = b15.find(bytes([0xA6, sid, 0xBD]))
+    assert i >= 0, 'shop types not found'
+    t = b15[i + 3] | b15[i + 4] << 8
+    types = b15[t - 0xC000:t - 0xC000 + 71]
+    items = bytearray()
+    for k in range(71):
+        p = b14[sd - 0x8000 + 2 * k] | b14[sd - 0x8000 + 2 * k + 1] << 8
+        items += b14[p - 0x8000:p - 0x8000 + 5]
+    i = [m.start() for m in re.finditer(re.escape(bytes([0x38, 0xE9, 0xB0])), b14)
+         if b14[m.start() - 5:m.start() - 3] == b'\x85\x11'][0]
+    k = i
+    while not (b14[k] == 0xBD and b14[k + 3:k + 5] == b'\x85\x10'): k -= 1
+    mp = b14[k + 1] | b14[k + 2] << 8
+    perms = bytearray()
+    for c in range(12):
+        p = b14[mp - 0x8000 + 2 * c] | b14[mp - 0x8000 + 2 * c + 1] << 8
+        perms += b14[p - 0x8000:p - 0x8000 + 8]
+    return bytes(types), bytes(items), bytes(perms)
+
+
 def inv_icons(ff3):
     """the icons inverted (an equipped item): DMG and CGB tiles by font code (32 each)"""
     import text
@@ -130,4 +162,8 @@ def names_bank(rom, ff3=None):
     d, c = inv_icons(ff3)
     blob[0x3600:0x3800] = d
     blob[0x3800:0x3A00] = c
+    t, it, pm = shop_tables(rom)
+    blob[0x3A00:0x3A47] = t                       # $7A00 shop type per shop id
+    blob[0x3B00:0x3B00 + len(it)] = it            # $7B00 5 items per shop
+    blob[0x3D00:0x3D60] = pm                      # $7D00 magic permissions (8 per class)
     return blob

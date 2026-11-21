@@ -648,6 +648,23 @@ arrived:    ld a, [px]
             ldh a, [maptype]
             and a
             jr nz, .ow
+            ld a, d                         ; a door with a shop number: the shop
+            and $1E
+            cp $02
+            jr nz, .nsh
+            ld a, e
+            and a
+            jr z, .nsh
+            ld [shop_arg], a
+            ld a, SCR_BANK
+            ld hl, shop_main
+            call bank_call
+            xor a                           ; (out of the room, as FF1)
+            ld [inroom], a
+            call map_reload
+            scf
+            ret
+.nsh:
             ld a, d
             and $C0
             cp $80

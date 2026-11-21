@@ -88,6 +88,9 @@ def strings():
     out['gil'] = enc('Gil')
     out['items'] = enc(M[3].strip())
     out['magic'] = enc('Magic')
+    out['yesno'] = enc(sm.S[15])
+    out['buysell'] = enc(sm.S[10])
+    out['buyleave'] = enc(sm.S[11])
     out['weapons'] = enc(M[52].strip())
     out['armor'] = enc(M[62].strip())
     out['eqcmd'] = enc('Equip  Swap  Drop')
@@ -143,4 +146,17 @@ def mtext_bank():
         body += enc('\n'.join(out[:7])) + b'\0'
     blob[0:0x80] = ptrs
     blob[0x80:0x80 + len(body)] = body
+    assert 0x80 + len(body) <= 0x2000
+    body = bytearray(); ptrs = bytearray()          # $6000: the shop texts (FF1's shop strings)
+    for k in range(64):
+        t = re.sub(r'\{[0-9A-F]{2}\}', '', sm.S.get(k, ''))
+        lines = t.split('\n')
+        if k < 8:                                   # the shop names: the title window (8 wide)
+            lines = text.wrap(t.strip(), 8)
+        elif len(lines) > 4 or max(len(x) for x in lines) > 18:
+            lines = text.wrap(' '.join(x.strip() for x in lines))[:4]
+        ptrs += (0x6080 + len(body)).to_bytes(2, 'little')
+        body += enc('\n'.join(lines)) + b'\0'
+    blob[0x2000:0x2080] = ptrs
+    blob[0x2080:0x2080 + len(body)] = body
     return bytes(blob)
