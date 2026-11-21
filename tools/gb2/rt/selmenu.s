@@ -1216,3 +1216,92 @@ su_load:    di
             ld sp, hl
             ld a, 1
             ret
+
+; ================================================================ native joypad
+; (docs/ff2-gb-native-layer.md step 1) FF2's two joypad reads, natively: the GB buttons
+; once (pad_read; test harnesses inject their pad at pad_read.got), then the bytes the NES
+; loops build, with the registers and flags they leave.
+section bank 0, $3F80
+pad_read:   call read_buttons               ; A = A B Sel St U D L R (bits 0-7)
+.got:       ret
+hle_pad20:  call rt_fcs                     ; fix:DBA9 read joypad registers -> $20
+            db SGB_BANK
+            dw hle_pad20_b
+hle_pad35:  call rt_fcs                     ; fix:FC38-FC4F (battle) -> $35
+            db SGB_BANK
+            dw hle_pad35_b
+
+section bank SGB_BANK, $7700
+; fix:DBA9: 8 x (LDA $4016 / AND #3 / CMP #1 / ROL $20): $20 = A B Sel St U D L R
+; (bits 7-0), carry = the last ROL's, A = the last read (R), X = 0, Z = 1, N = 0
+hle_pad20_b:
+            push bc
+            call pad_read
+            ld h, a
+            ld a, [NES_RAM + $20]
+            ld l, a
+            ld b, 8
+.l:         srl h                           ; C = the next button (A first)
+            rl l
+            dec b
+            jr nz, .l
+            ld a, l
+            ld [NES_RAM + $20], a
+            ld a, 0                         ; (carry kept from here on)
+            bit 0, l
+            jr z, .r
+            inc a
+.r:         push af
+            xor a
+            ldh [nzv], a
+            pop af
+            ld e, 0
+            ld d, 0
+            inc d
+            dec d                           ; Z = 1
+            pop bc
+            ret
+; fix:FC38-FC4F: strobe, 8 x (LDA $4016 / ROR A / BCS / ROR A / ROR $35): $35 = R L D U St
+; Sel B A (bits 7-0, the GB order), carry = the last ROR's, X = 0, Z = 1, N = 0
+hle_pad35_b:
+            push bc
+            call pad_read
+            ld h, a
+            ld a, [NES_RAM + $35]
+            ld l, a
+            ld b, 8
+.l:         srl h
+            rr l
+            dec b
+            jr nz, .l
+            ld a, l
+            ld [NES_RAM + $35], a
+            push af
+            xor a
+            ldh [nzv], a
+            pop af
+            ld e, 0
+            ld d, 0
+            inc d
+            dec d
+            pop bc
+            ret
+
+; ================================================================ native bank switch
+; fix:FE1A (the English patch's MMC5 bank switch, also behind FE03 / FA7F): NES bank A at
+; $8000 for the game's data and calls ($5115 = 2 A | $80 on the NES), then A >> 4 as its
+; four LSR leave it (carry = bit 3, Z, N = 0). (docs/ff2-gb-native-layer.md)
+section bank 0, $3FA0
+hle_bank:   push af
+            and $3F
+            ldh [nes_bank8], a
+            add a, DATA
+            ldh [data_bank8], a
+            xor a
+            ldh [nzv], a
+            pop af
+            srl a
+            srl a
+            srl a
+            srl a
+            ret

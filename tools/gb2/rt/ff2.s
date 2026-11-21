@@ -19,7 +19,9 @@ rt_wait_fa2a:
             push af
             ld a, $40
             ld [NES_RAM + $100], a
-            call rt_ppu_r2
+            xor a                           ; (LDA $2002: vblank flag, latch)
+            ldh [vbl_flag], a
+            ldh [ppu_latch], a
             pop af
             ld a, $FA
             jr wait_nz
@@ -36,7 +38,9 @@ rt_wait_fead:
             push af
             ld a, $40
             ld [NES_RAM + $100], a
-            call rt_ppu_r2
+            xor a                           ; (LDA $2002: vblank flag, latch)
+            ldh [vbl_flag], a
+            ldh [ppu_latch], a
             pop af
             ld a, $FE
 wait_nz:    ldh [nzv], a                    ; N = 1
@@ -314,11 +318,14 @@ spr_cam2:   push bc
 ; table, +1 increment; BG or sprite table by $2000 bit 4 (as rt_ppu_w7); else per byte.
 hle_ppucopy:
             push af                         ; caller's carry
-            call rt_ppu_r2
+            xor a                           ; LDA $2002, PPU address ($01, $00)
+            ldh [vbl_flag], a
+            ldh [ppu_latch], a
             ld a, [NES_RAM + $01]
-            call rt_ppu_w6
+            and $3F
+            ldh [ppu_vh], a
             ld a, [NES_RAM + $00]
-            call rt_ppu_w6
+            ldh [ppu_vl], a
             ld c, 0                         ; Y = 0
             ld l, $02
             call cp_core

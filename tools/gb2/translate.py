@@ -72,7 +72,18 @@ class FF2:
            ('b03', 0xA902): ('hle_objspr', 'NZCV'),     # draw object sprite (rt/ff2_banked.s, native)
            ('fix', 0xC2F3): ('hle_water', 'NZCV'),      # world-map water animation (rt/ff2_banked.s, native)
            ('fix', 0xF321): ('hle_ntclr0', 'NZC'),      # clear nametable 0 (rt/ff2_banked.s, native)
-           ('b11', 0xA43A): ('hle_bspr', 'NZCV')}       # draw battle character sprite (rt/ff2_banked.s, native)
+           ('b11', 0xA43A): ('hle_bspr', 'NZCV'),       # draw battle character sprite (rt/ff2_banked.s, native)
+           ('fix', 0xDBA9): ('hle_pad20', 'NZC'),       # read joypad registers (rt/selmenu.s, native joypad)
+           ('fix', 0xFE1A): ('hle_bank', 'NZC'),        # switch prg bank (rt/selmenu.s, native)
+           ('fix', 0xDC30): ('hle_palcp', 'NZC'),       # copy colour palettes to ppu (rt/native_layer.s)
+           ('fix', 0xFD4B): ('hle_scr4b', 'NZ'),        # battlefield scroll (rt/native_layer.s)
+           ('fix', 0xCDF5): ('hle_cdf5', 'NZC'),        # update ppu registers, normal map (rt/native_layer.s)
+           ('b13', 0x9C1F): ('far:hle_apuout_b', 'NZC'),      # update apu registers, music (rt/native_layer.s)
+           ('fix', 0xF069): ('far:hle_txrow_b', 'NZC'),
+           ('fix', 0xDCB5): ('far:hle_palbg_b', 'NZC'),     # copy color palettes to ppu (BG)
+           ('fix', 0xD2FE): ('far:hle_dlgatt_b', 'NZ'),
+           ('fix', 0xD308): ('far:hle_dlgatt8_b', 'NZ'),
+           ('fix', 0xE9DC): ('far:hle_scr00_b', 'NZ')}      # clear ppu scrolling registers     # update dialog window attributes       # copy text to ppu (rt/native_layer.s)
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   fix:FA91-FA99: PHA $FA / PHA $99 / JMP ($0040): "jump (long)" calls through ($40)
     #   with a pushed return address: on the GB a call through the pointer, then $FA9A.
@@ -105,7 +116,9 @@ class FF2:
               ('b00', 0x9D97): ('hle_mexp', 0x9DD0, 'NZC'), ('b00', 0x9DDB): ('hle_mscan', 0x9DDF, 'NZC'),
               ('b00', 0x9E44): ('hle_rcopy', 0x9E4D, 'NZ'),
               ('fix', 0xDAD4): ('hle_csum', 0xDADF, 'NZC'),    # save slot checksum (rt/ff2_banked.s)
-              ('b14', 0xB27A): ('hle_savecp', 0xB288, 'NZ')}   # save copy + slot mark (rt/save.s)
+              ('b14', 0xB27A): ('hle_savecp', 0xB288, 'NZ'),   # save copy + slot mark (rt/save.s)
+              ('fix', 0xFC38): ('hle_pad35', 0xFC50, 'NZC'),   # battle joypad read (rt/selmenu.s)
+              ('fix', 0xFD60): ('hle_scr60', 0xFD6C, 'NZ')}    # menu scroll after the sprite-0 hit (rt/native_layer.s)
     # battle NMI handlers (run by rt_nmi_run through the dynamic table; RTI = ret)
     nmi_handlers = [('b12', 0x9A79), ('b05', 0xA9A2)]
     idiom_code = {('fix', 0xFA91): bytes.fromhex('a9fa48a999486c4000'),
@@ -124,7 +137,9 @@ class FF2:
                   ('b00', 0x9D97): bytes.fromhex('a488be0074a000bd00789180c8bd8078'),
                   ('b00', 0x9DDB): bytes.fromhex('b180c939'), ('b00', 0x9E44): bytes.fromhex('bd008b9d0004e8d0f7'),
                   ('fix', 0xDAD4): bytes.fromhex('187180c8d0fae681cad0f5'),
-                  ('b14', 0xB27A): bytes.fromhex('b1829180c8d0f9e681e683cad0f2')}
+                  ('b14', 0xB27A): bytes.fromhex('b1829180c8d0f9e681e683cad0f2'),
+                  ('fix', 0xFC38): bytes.fromhex('a9018d1640a9008d1640a208ad16406ab0016a6635cad0f4'),
+                  ('fix', 0xFD60): bytes.fromhex('a53a29ff8d0020a5388d0520')}
     skip = [('fix', 0xFA2C, 0xFA48), ('fix', 0xFEA1, 0xFEAD), ('fix', 0xFEAF, 0xFEBF)]   # waits (but their entries) + NMI return stubs
 
 
@@ -424,6 +439,11 @@ class Emitter:
                 self.addr_hl(g, idx); self.o('ld [hl], %s' % reg)
             return
         name = None
+        if r == 'ppu' and a & 7 in (3, 4): return       # OAM address / data: no GB effect
+        if r == 'ppu' and a & 7 == 0:                   # control: the runtime's copy
+            if reg == 'a': self.o('ldh [ppu_ctrl], a')
+            else: self.o('push af', 'ld a, %s' % reg, 'ldh [ppu_ctrl], a', 'pop af')
+            return
         if r == 'ppu': name = 'rt_ppu_w%d' % (a & 7)
         elif r == 'io': name = 'rt_io_w%04X' % a if a in (0x4014, 0x4016) else 'rt_apu_w'
         elif r == 'mmc': name = 'rt_mmc_w%04X' % a if a in (0x5115, 0x5116, 0x5800, 0x5801, 0x5802, 0x5803, 0x5804, 0x5805, 0x5806, 0x5807, 0x5808, 0x5809, 0x580A, 0x580B) else None
@@ -474,7 +494,13 @@ class Emitter:
         i = self.i; mn = i.mn; rc = self.rc
         k = self.k
         if k in rc.g.ext:
-            self.o('jp ' + rc.g.ext[k][0]); return
+            r = rc.g.ext[k][0]
+            if r.startswith('far:'):                    # banked native routine: called in place
+                r = r[4:]
+                for l in ('call rt_fcs', 'db bank(%s)' % r, 'dw %s' % r): self.o(l)   # (returns to our caller)
+            else:
+                self.o('jp ' + r)
+            return
         if k in rc.g.idioms:
             self.o('call ' + rc.g.idioms[k][0]); self.jump(None, (i.space, rc.g.idioms[k][1])); return
         h = getattr(self, 'x_' + mn, None)
@@ -756,6 +782,8 @@ def line_size(line):
     mn = parts[0].lower()
     from asm_sm83 import _split_args
     args = _split_args(parts[1]) if len(parts) > 1 else []
+    if mn == 'db': return len(args)
+    if mn == 'dw': return 2 * len(args)
     return len(encode(mn, args, lambda e: 0, 0x4000, 1))
 
 
@@ -784,6 +812,9 @@ def layout(rc, blocks):
     """assign each component to a code bank; returns {key: bank} and per-bank line lists"""
     code = {k: lines for sp in blocks for k, lines in blocks[sp]}
     sizes = {k: sum(line_size(l) for l in code[k]) for k in code}
+    for k in code:                                  # (room for in-place far calls: retarget)
+        sizes[k] += sum(1 if l.strip().startswith('call L_') else 2 if l.strip().startswith('jp L_') else 0
+                        for l in code[k])
     comps = components(rc)
     comps.sort(key=lambda c: (min(c)[0], min(c)[1]))
     bank_of = {}
@@ -858,13 +889,17 @@ def retarget(line, bank, bank_of, xrefs):
                 sp, a = tgt[2:].rsplit('_', 1)
                 tb = bank_of.get((sp, int(a, 16)))
                 if tb is not None and tb != bank:
-                    xrefs.add(tgt)
                     if op == 'jp ':
                         # a jump into another bank: call the stub and return (keeps the
                         # caller's bank correct when the target finally returns)
                         if ',' in s:
                             cond = s[len(op):].split(',')[0].strip()
+                            xrefs.add(tgt)
                             return 'jp %s, xj_%s' % (cond, tgt)
-                        return 'jp xj_%s' % tgt
-                    return line.replace(tgt, 'xs_' + tgt)
+                        return 'rst $08\n    db bank(%s)\n    dw %s\n    ret' % (tgt, tgt)
+                    if ',' in s:
+                        xrefs.add(tgt)
+                        return line.replace(tgt, 'xs_' + tgt)
+                    # (rt_fci: the far call in place)
+                    return 'rst $08\n    db bank(%s)\n    dw %s' % (tgt, tgt)
     return line

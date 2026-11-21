@@ -228,6 +228,22 @@ hram_end:   ds 1
 ; ------------------------------------------------------------------ vectors
 section bank 0, $0000
 rt_jp_hl:   jp hl
+section bank 0, $0008
+; rst $08 / db bank / dw target: a call into another ROM bank, the three bytes in place
+; (translate.py, cross-bank calls; no bank-0 stub). A, F, BC, DE pass both ways.
+rt_fci:     ldh [sv_a], a
+            pop hl
+            ld a, [hl+]
+            ldh [fc_bank], a
+            inc hl
+            inc hl
+            push hl                         ; return past the three bytes
+            dec hl
+            ld a, [hl-]                     ; target high, low
+            ld l, [hl]
+            ld h, a
+            ldh a, [sv_a]
+            jp rt_farcall
 section bank 0, $0038
             jp rst38_trap                   ; execution ran into $FF bytes: record and stop
 section bank 0, $0040
@@ -2107,6 +2123,8 @@ rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (s
             add a, high(NES_RAM)
             ld h, a
             ld l, 0
+            xor a                           ; (no DMA of a half-built shadow: a vblank during
+            ldh [oam_pending], a            ;   the conversion keeps the last whole one)
             ldh a, [oam_frame]
             inc a
             ldh [oam_frame], a

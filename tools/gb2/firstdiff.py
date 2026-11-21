@@ -17,6 +17,23 @@ import sys, os, random
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from compare import GB, sync_sram, UP, DOWN, LEFT, RIGHT, A, B, START
+from compare import GB as _GB1
+
+
+class GB(_GB1):
+    """compare.GB (tools/gb) with the pad fed where the FF2 build reads the buttons: the
+    native joypad routines read them at pad_read.got (docs/ff2-gb-native-layer.md); the
+    NES-layer strobe (rt_io_w4016) is still hooked for any path that uses it"""
+    def feed_pads(self, sym, pad_of):
+        rev = [int('{:08b}'.format(i)[::-1], 2) for i in range(256)]
+
+        def hook(_):
+            m = self.pb.memory
+            v = pad_of(m[0xD830] | m[0xD831] << 8)
+            if v is not None: self.pb.register_file.A = rev[v]
+        if 'pad_read.got' in sym: self.pb.hook_register(*sym['pad_read.got'], hook, None)
+        b, a = sym['rt_io_w4016']
+        self.pb.hook_register(b, a + 5, hook, None)
 from cynes import NES
 
 # zero-page bytes where FF2 saves S (TSX / STX, later LDX / TXS: b14:919A -> 91FD): the GB

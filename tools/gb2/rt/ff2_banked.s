@@ -3224,11 +3224,12 @@ BITS8:      db 1, 2, 4, 8, 16, 32, 64, 128      ; (page start: low byte = bit nu
 ; through rt_ppu_w7. Else byte by byte. Exit as the NES: A = $FF, X = Y = 0, N = 0, Z = 1,
 ; C = 1 (CPY #$C0).
 hle_ntclr0_b:
-            call rt_ppu_r2                  ; LDA $2002 / $2006 = $20, $00
+            xor a                           ; LDA $2002 / PPU address $2000
+            ldh [vbl_flag], a
+            ldh [ppu_latch], a
+            ldh [ppu_vl], a
             ld a, $20
-            call rt_ppu_w6
-            xor a
-            call rt_ppu_w6
+            ldh [ppu_vh], a
             ldh a, [lcd_on]
             and a
             jr nz, .gen

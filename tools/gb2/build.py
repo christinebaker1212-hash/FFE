@@ -28,7 +28,7 @@ from asm_sm83 import asm, make_rom
 import build as gb1                       # tools/gb/build.py: shared tables (APU, NES colours, border)
 
 SHA1_FF12 = '4b22c2c88fc71eacf270ea51ef218944bb4c536a'
-RT_FILES = ('runtime.s', 'apu.s', 'hle.s', 'ff2.s', 'dmg_shade.s', 'sgb.s', 'save.s', 'selmenu.s')   # (ff2.s continues bank 0)
+RT_FILES = ('runtime.s', 'apu.s', 'hle.s', 'ff2.s', 'dmg_shade.s', 'sgb.s', 'save.s', 'selmenu.s', 'native_layer.s')   # (ff2.s continues bank 0)
 
 
 def selmenu_text():

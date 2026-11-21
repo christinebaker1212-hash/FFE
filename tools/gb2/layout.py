@@ -348,14 +348,21 @@ vtile:                  ; A = tile: its 16 bytes (plane 0 VBUF + 8 VC, plane 1 $
     clc
     rts
 scroll:
-    lda MSCR            ; field menu (camera 1 / 1): its $2000, no scroll, the music
+    jsr scrw
+    lda MSCR            ; field menu: the music
+    beq .r
+    jmp $C74F
+.r:
+    rts
+scrw:                   ; (native on the GB: NATIVE_EXT b2x_scrw)
+    lda MSCR            ; field menu (camera 1 / 1): its $2000, no scroll
     beq .b
     lda $FF
     sta $2000
     lda #0
     sta $2005
     sta $2005
-    jmp $C74F
+    rts
 .b:
     lda $3B
     sta $2000
@@ -631,6 +638,18 @@ ntwin:
     sta VLINE
 .row:
     jsr $FA2A
+    jsr ntrow
+    jsr scroll
+    inc VLINE
+    lda VLINE
+    cmp VH
+    beq .x
+    jmp .row
+.x:
+    rts
+
+; ---- one window row (line VLINE) of ntwin (native on the GB: NATIVE_EXT b23_ntrow)
+ntrow:
     lda VROW            ; PPU address of the row
     clc
     adc VLINE
@@ -704,13 +723,6 @@ ntwin:
     lda FTILE+7
 .end:
     sta $2007
-    jsr scroll
-    inc VLINE
-    lda VLINE
-    cmp VH
-    beq .x
-    jmp .row
-.x:
     rts
 
 ; ---- party window (replaces b12:912A): GB cols 8-19, rows 12-17 = NES rows 18-23; one
@@ -3392,9 +3404,25 @@ pfade:                  ; b14:B965: palette 2 colour 3 up in four steps of 16 fr
 .e:
     rts
 pframe:                 ; one frame (b14:B9B0): a line (PRLEN), the attribute row (PAR),
-    jsr $FE00           ;   palettes, scroll, music, joypad (A / B -> PEXIT); the attribute
-                        ;   row before the line (a plain Game Boy tile has one shading: a font
-                        ;   tile written into a cell still fading would be shaded dim)
+    jsr $FE00           ;   palettes, scroll, music, joypad (A / B -> PEXIT)
+    jsr pfdraw
+    jsr $DC30
+    lda $FF
+    sta $2000
+    lda #0
+    sta $2005
+    sta $2005
+    sta $24
+    sta $25
+    jsr $C74F
+    jsr $DBA2
+    lda $24
+    ora $25
+    sta PEXIT
+    rts
+pfdraw:                 ; the attribute row before the line (a plain Game Boy tile has one
+                        ;   shading: a font tile written into a cell still fading would be
+                        ;   shaded dim); native on the GB: NATIVE_EXT b24_pfdraw
     lda PAR
     bmi .nl
     asl a
@@ -3442,19 +3470,6 @@ pframe:                 ; one frame (b14:B9B0): a line (PRLEN), the attribute ro
     lda #0
     sta PRLEN
 .nb:
-    jsr $DC30
-    lda $FF
-    sta $2000
-    lda #0
-    sta $2005
-    sta $2005
-    sta $24
-    sta $25
-    jsr $C74F
-    jsr $DBA2
-    lda $24
-    ora $25
-    sta PEXIT
     rts
 gm_rowinit:             ; fix:F110 (row menu, rendering off; owner approved ff2_mock14): the
     jsr gm_init         ;   portrait tiles / palettes as the main menu, camera 6 / 5; the
@@ -3892,6 +3907,9 @@ gm_attr2:               ; window palette, portrait quads of shown members their 
     bne .m
 gm_aw:                  ; the 64 bytes to $23C0 in one vblank
     jsr $FA2A
+    jsr gmattr
+    jmp scroll
+gmattr:                 ; (native on the GB: NATIVE_EXT b24_gmattr)
     lda #$23
     sta $2006
     lda #$C0
@@ -3903,7 +3921,7 @@ gm_aw:                  ; the 64 bytes to $23C0 in one vblank
     inx
     cpx #64
     bne .w
-    jmp scroll
+    rts
 
 gm_gil:                 ; Gil amount (24 bits, $601C) in small digits, right edge of the
     lda #1              ;   Gil window's first line (NES row 16, cols 14-19)
@@ -4106,6 +4124,9 @@ def battle(rom):
     NATIVE_EXT['b23_vtile'] = (23, b23.labels['vtile'], 'hle_vtile', 'NZC')
     NATIVE_EXT['b23_gsel'] = (23, b23.labels['gsel'], 'hle_select', 'NZ')
     NATIVE_EXT['b23_gres'] = (23, b23.labels['gres'], 'hle_resume', 'NZ')
+    NATIVE_EXT['b23_ntrow'] = (23, b23.labels['ntrow'], 'far:hle_ntrow_b', 'NZC')
+    NATIVE_EXT['b23_scrw'] = (23, b23.labels['scrw'], 'far:hle_scrw_b', 'NZ')
+    assert RAM['MSCR'] == 0x7FEA                 # (hle_scrw_b)
     select_menu(rom, f.labels['gbf'])
     labels = {}
     for org, end, ks in ((0xFFD0, 0xFFFA, range(0, 8)), (0xFEEC, 0xFF00, range(8, 12))):   # (free:
@@ -4139,6 +4160,14 @@ gbm:                    ; main menu (bank 24): A = sub-command; back to bank 14
     assert RAM['VQ'] == 0xD4                     # (hle_pcopy reads the pointer at $D4)
     NATIVE_EXT['b24_pcopy'] = (24, b24.labels['pcopy'], 'hle_pcopy', 'NZC')
     NATIVE_EXT['b24_pages0'] = (24, b24.labels['pages0'], 'hle_pages0', 'NZ')
+    NATIVE_EXT['b24_pfdraw'] = (24, b24.labels['pfdraw'], 'far:hle_pdraw_b', 'NZC')
+    assert (PROPH_RAM['PRP'], PROPH_RAM['PRM'], PROPH_RAM['PRLEN'], PROPH_RAM['PRA'], PROPH_RAM['PAR'],
+            PROPH_RAM['PATT']) == (0xD4, 0x760A, 0x760B, 0x760C, 0x7608, 0x7609)   # (hle_pdraw_b)
+    NATIVE_EXT['b24_gmattr'] = (24, b24.labels['gmattr'], 'far:hle_gmattr_b', 'NZC')
+    if 'scrw' in b24.labels:
+        NATIVE_EXT['b24_scrw'] = (24, b24.labels['scrw'], 'far:hle_scrw_b', 'NZ')
+    if 'ntrow' in b24.labels:
+        NATIVE_EXT['b24_ntrow'] = (24, b24.labels['ntrow'], 'far:hle_ntrow_b', 'NZC')
     class E: pass
     e = E(); e.labels = labels
     for k, (name, rb, nes) in enumerate(ENTRIES):

@@ -1767,3 +1767,137 @@ sprload_b:  push af
             pop af
             ret
 
+
+; ---- nametable run for the native routines: A = count (1-255), MD_SRC = GB source
+; address, MD_HI / MD_LO = NES address. The bytes go to the PPU as rt_ppu_w7 writes them
+; (address + 1 or + 32 per byte by $2000 bit 2); the PPU address is left after the run
+; (ppu_vh / vl). A cell of nametable 0 that already holds the byte is skipped while
+; nametable 1 owns no GB cell (rt_ppu_w7's rule). NC_FILL nonzero: the first source byte
+; count times (cleared on return). Keeps nothing.
+NC_FILL    = $DCF9
+nt_copy:    ld [MD_CNT], a
+            ld a, 1
+            ld [NT_NOW], a
+.lp:        ld hl, MD_SRC
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld d, [hl]                      ; D = the byte
+            ld a, [NC_FILL]                 ; (NC_FILL: the same byte again)
+            and a
+            jr nz, .nf
+            inc hl
+.nf:        ld a, l
+            ld [MD_SRC], a
+            ld a, h
+            ld [MD_SRC + 1], a
+            ld a, [MD_HI]
+            ld h, a
+            ld a, [MD_LO]
+            ld l, a
+            ld a, h
+            cp $20
+            jr c, .gen
+            cp $3F
+            jr nc, .gen
+            and 3
+            cp 3
+            jr nz, .cell
+            ld a, l
+            cp $C0
+            jr nc, .att                     ; (attribute bytes: nt_attr)
+.cell:      ld a, h
+            and 4
+            jr nz, .put
+            ldh a, [own1_lo]
+            ld e, a
+            ldh a, [own1_hi]
+            or e
+            jr nz, .put
+            ld a, h
+            and 3
+            add a, high(NT_SH)
+            ld b, h
+            ld h, a
+            ld a, [hl]
+            ld h, b
+            cp d
+            jr z, .inc
+.put:       call nt_tile
+            jr .inc
+.att:       call nt_attr
+.inc:       ldh a, [ppu_ctrl]
+            and 4
+            ld a, 1
+            jr z, .i1
+            ld a, 32
+.i1:        ld hl, MD_LO
+            add a, [hl]
+            ld [hl-], a
+            ld a, [hl]
+            adc a, 0
+            and $3F
+            ld [hl], a
+            jr .nx
+.gen:       ld a, h
+            ldh [ppu_vh], a
+            ld a, l
+            ldh [ppu_vl], a
+            ld a, d
+            call rt_ppu_w7
+            ldh a, [ppu_vh]
+            ld [MD_HI], a
+            ldh a, [ppu_vl]
+            ld [MD_LO], a
+.nx:        ld hl, MD_CNT
+            dec [hl]
+            jr nz, .lp
+            xor a
+            ld [NT_NOW], a
+            ld [NC_FILL], a
+            ld a, [MD_HI]
+            ldh [ppu_vh], a
+            ld a, [MD_LO]
+            ldh [ppu_vl], a
+            ret
+
+; HL = NES attribute address ($23C0-$23FF / $27C0-$27FF), D = value: as rt_ppu_w7's
+; attribute path (shadow; changed quadrants -> CGB palette numbers / DMG shading, or the
+; scan when the LCD goes on). Keeps D.
+nt_attr:    ld a, h
+            and 4
+            ld c, a                         ; C = 4 for nametable 1
+            add a, high(NT_SH) + 3
+            ld h, a                         ; HL = shadow byte
+            ld a, [hl]
+            xor d
+            ret z                           ; unchanged
+            call quad_mask
+            ldh [ap_chg], a
+            ld [hl], d
+            ld a, c                         ; B = index (0-63) + $40 for nametable 1
+            swap a
+            ld b, a
+            ld a, l
+            sub $C0
+            or b
+            ld b, a
+            ldh a, [is_cgb]
+            and a
+            jr z, .dmg
+            ldh a, [lcd_on]
+            and a
+            jr nz, .cat
+            ld a, 1
+            ld [CGB_SCAN], a
+            ret
+.cat:       ld a, b
+            jp attr_apply
+.dmg:       ldh a, [lcd_on]
+            and a
+            jr nz, .dat
+            ld a, 1
+            ldh [dmg_scan], a
+            ret
+.dat:       ld a, b
+            jp dmg_attr
