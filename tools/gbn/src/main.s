@@ -168,7 +168,12 @@ start:      di
 .st:        ld d, START_X
             ld e, START_Y
 .ld:        call load_map
-            ld a, BOX_LINES                 ; LYC: the dialogue box's bottom (window off)
+            ld a, START_ROOM                ; (test builds: start inside a room)
+            and a
+            jr z, .nr
+            ld [inroom], a
+            call room_redraw
+.nr:        ld a, BOX_LINES                 ; LYC: the dialogue box's bottom (window off)
             ldh [rLYC], a
             ld a, $40
             ldh [rSTAT], a
@@ -677,7 +682,13 @@ arrived:    ld a, [px]
             call load_map
             scf
             ret
-.norm:      push de                         ; push this floor (FF1: for a later warp)
+.norm:      call do_tele
+            scf
+            ret
+
+; a normal teleport (E = its number): this floor pushed (FF1: for a later warp), the new map
+do_tele:    push de                         ; push this floor
+
             ld a, [fdepth]
             cp 8
             jr nc, .nf

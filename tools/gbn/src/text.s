@@ -288,7 +288,7 @@ dlg_frame:  ldh a, [pad_new]
             jp dlg_page
 .close:     xor a
             ld [box_on], a
-            ret
+            jp talk_after                   ; (a teleport / battle the talk asked for)
 
 section wram, $CB00
 win_buf:    ds 160

@@ -109,3 +109,22 @@ one reaches parity, so the owner can keep playing).
   push x / y / room / map, a warp pops it or returns to the overworld position the party
   entered from). The game starts at the new game's overworld position from the initial save
   page. Checked: start -> Coneria town -> warp out (mGBA, PyBoy).
+- Map objects (objects.s): FF1's 15 slots per map with the visibility game flags (hidden ones
+  kept, raw id), one object steps per frame after a wait (frame counter + seed, as FF1),
+  collision with tiles / the party / each other, a pixel every two frames, walking in place
+  when stationary, shown by room state, at most 9 drawn (40 sprites). Sprite tile blocks per
+  distinct graphic placed by the build around the map's BG tiles (DMG: pre-shaded to
+  brightness ranks, one OBJ palette; CGB: 4 OBJ palettes). Game state ($400-byte save page)
+  initialised from the ROM's new-game tables.
+- Text (text.s, text.py): our Latin font + FF1's window frame tiles; DMG: placed per map in the
+  free BG tiles (variants now only for the metatiles a map uses: at least 108 tiles free);
+  CGB: VRAM bank 1, palette 7 = FF1's window colours. The English dialogue (translation files)
+  re-wrapped at build time to the approved box: 20 x 8 in the window layer, 18 x 6 text,
+  pages on A; cut at line 64 by LYC; objects under it hidden. CGB runs in double speed.
+- Talking (talk.s, talkconst.py): FF1's 42 talk routine kinds written natively; each object's
+  kind comes from the ROM's jump table (named as the disassembly names it: one address per
+  name, checked), its 4 data bytes from the ROM's talk table, and the routines' constants
+  (object ids, battles, teleports, item addresses) from the operands in the ROM. Effects:
+  game flags, items, objects shown / hidden, the class change, the smith's sword (the ROM's
+  weapon slot table), teleports after the box closes (battles: later). Checked: townsperson
+  and the King of Coneria (DMG / CGB).

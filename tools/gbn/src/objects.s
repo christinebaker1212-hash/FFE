@@ -23,6 +23,7 @@ O_WAIT     = 11
 O_FACE     = 12             ; 0 right, 1 left, 2 up, 3 down
 O_MOVE     = 13             ; nonzero while stepping
 O_TALK     = 14             ; nonzero: face the party (talking)
+O_RAW      = 15             ; the slot's object id even while hidden (FF1: mapobj_rawid)
 MAX_DRAWN  = 9              ; objects drawn (9 x 4 + the party's 4 = 40 sprites)
 
 section bank 0, $1000
@@ -40,8 +41,8 @@ obj_load:   ld hl, objs
             ld de, objs
             ld b, 15
 .l:         push bc
-            ld a, [hl+]                     ; id: kept only if its game flag says visible
-            ld c, a
+            ld a, [hl+]                     ; id: shown only while its game flag says visible
+            ld c, a                         ;   (the slot kept either way, FF1: rawid)
             and a
             jr z, .none
             push hl
@@ -50,9 +51,17 @@ obj_load:   ld hl, objs
             ld a, [hl]
             pop hl
             and 1
-            jr z, .none
             ld a, c
-            ld [de], a                      ; +0 id
+            jr nz, .vis
+            xor a
+.vis:       ld [de], a                      ; +0 id (0: hidden)
+            push de
+            ld a, e
+            add a, O_RAW
+            ld e, a
+            ld a, c
+            ld [de], a                      ; +15 raw id
+            pop de
             inc de
             ld a, [hl+]
             ld c, a

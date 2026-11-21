@@ -8,7 +8,7 @@ ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
-import data, text
+import data, text, talkconst
 
 COMMON, TS_BANK0, MAP_BANK0, OW_TS, OW_INFO, OW_ROWS, ROM_BANKS = 1, 8, 20, 16, 81, 84, 128
 
@@ -18,6 +18,34 @@ def place(banks, bank, addr, blob):
     o = addr - 0x4000
     assert o + len(blob) <= 0x4000, 'bank %d overflow at %04X' % (bank, addr)
     b[o:o + len(blob)] = blob
+
+
+DIS = os.path.join(ROOT, 'build', 'ref', 'FF1Disassembly', 'Final Fantasy Disassembly')
+
+
+def weapon_slots(rom):
+    """FF1's weapon slot offsets (16), from FindEmptyWeaponSlot's operand in the fixed bank"""
+    fix = rom.prg[-0x4000:]
+    i = 0
+    while True:
+        i = fix.find(bytes([0xA0, 0x00, 0xBE]), i)
+        assert i >= 0, 'weapon slot finder not found'
+        a = fix[i + 3] | fix[i + 4] << 8
+        if fix[i + 5:i + 8] == bytes([0xBD, 0x00, 0x61]):
+            return fix[a - 0xC000:a - 0xC000 + 16]
+        i += 1
+
+
+def talk_defs(rom):
+    """TK_<routine>_<n> = the n-th operand of FF1's talk routine (save-RAM addresses mapped to
+    the engine's copy at $D000)"""
+    _, ops = talkconst.extract(rom, DIS)
+    out = []
+    for n, lst in ops.items():
+        for k, (t, v, mn) in enumerate(lst):
+            if t == 'a' and 0x6000 <= v < 0x6400: v = 0xD000 + v - 0x6000
+            out.append('TK_%s_%d = $%04X' % (n, k, v))
+    return '\n'.join(out) + '\n'
 
 
 def data_banks(rom):
@@ -33,7 +61,10 @@ def data_banks(rom):
     fd, fc = text.font_banks(rom)
     place(banks, COMMON, 0x4800, fd)
     place(banks, COMMON, 0x5000, fc)
-    place(banks, COMMON, 0x5800, rom.rd(14, 0x95D5, 4 * 208))  # talk data (TalkToObject's table)
+    place(banks, COMMON, 0x5800, rom.rd(14, talkconst.TALK_DATA, 4 * talkconst.N_OBJ))  # talk data
+    kind, _ = talkconst.extract(rom, DIS)
+    place(banks, COMMON, 0x5C00, kind)                         # talk routine kind per object id
+    place(banks, COMMON, 0x5D00, weapon_slots(rom))
     for b, blob in text.dialogue_banks(90).items():
         banks[b] = bytearray(blob)
     for ts in range(8):
@@ -83,9 +114,10 @@ def main():
     a = sys.argv[1:]
     nes = a[a.index('--nes') + 1] if '--nes' in a else os.path.join(ROOT, 'build', 'ff1_gb.nes')
     out = a[a.index('--out') + 1] if '--out' in a else os.path.join(ROOT, 'build', 'ff1n.gb')
-    st = a[a.index('--start') + 1].split(',') if '--start' in a else ('$FF', '0', '0')
+    st = a[a.index('--start') + 1].split(',') if '--start' in a else ['$FF', '0', '0']
+    st = (list(st) + ['0'])[:4]                  # MAP,X,Y[,ROOM]
     rom = data.Rom(nes)
-    src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\n' % tuple(st) +
+    src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\nSTART_ROOM = %s\n' % tuple(st) + talk_defs(rom) +
            open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'objects.s')).read() + '\n' +
