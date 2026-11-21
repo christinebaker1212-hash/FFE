@@ -25,13 +25,18 @@ jobs:
           git apply ../tools/emu/cynes.patch
           python -m pip install --upgrade pip
           python -m pip install .
+      - name: FF2 disassembly (everything8215/ff2, the code map for FF2; bundled, never committed)
+        shell: bash
+        run: |
+          git clone -q https://github.com/everything8215/ff2.git build/src/ff2
+          git -C build/src/ff2 checkout -q 8d26190877e02151c57fd9124a7831377ab0d57b
       - name: Python packages
         run: python -m pip install numpy pillow pyinstaller
       - name: Freeze the builder
         shell: bash
         run: |
           pyinstaller --noconfirm --onefile --console --name FFE-Builder \
-            --add-data "tools;tools" --add-data "script;script" \
+            --add-data "tools;tools" --add-data "script;script" --add-data "build/src/ff2;build/src/ff2" \
             --collect-all cynes --hidden-import numpy --hidden-import PIL.Image \
             tools/builder/ffe_builder.py
       - name: Smoke test (no ROM needed)
@@ -39,6 +44,7 @@ jobs:
         run: |
           ./dist/FFE-Builder.exe --run tools/gb/asm_sm83.py 2>&1 | tail -2 || true
           ./dist/FFE-Builder.exe --cli nonexistent.nes "$RUNNER_TEMP" 2>&1 | tail -2 || true
+          ./dist/FFE-Builder.exe --cli nonexistent.nes "$RUNNER_TEMP" ff2 2>&1 | tail -2 || true
       - uses: actions/upload-artifact@v4
         with:
           name: FFE-Builder

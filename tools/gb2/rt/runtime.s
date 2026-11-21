@@ -23,6 +23,8 @@ TSET_PEND  = $DCF8          ; DMG: a field tileset was loaded ($580B): fixed pal
 PAL_DM     = $DCD0          ; CGB: palette entries changed since the last write (bitmap, 4)
 PAL_LEM    = $DCF7          ; CGB: emphasis bits | 1 of the last write
 DBG        = $D820          ; fault info: code, HL, SP, stack top
+VOL_BGM    = $CCDC          ; Select menu: music / sound effect volume (0-8; rt/selmenu.s)
+VOL_SFX    = $CCDD
 SPR_SLOT   = $D900          ; NES sprite tile (0-255) -> GB slot 0-127, $FF = not resident
 SLOT_TILE  = $DA00          ; GB slot -> NES sprite tile ($FF = free)
 SLOT_STAMP = $DA80          ; GB slot -> frame number of its last use in OAM
@@ -277,33 +279,20 @@ boot_w:     di
             ld a, 1
             ld [$2000], a
             ld sp, STACK_TOP                ; (WRAM cleared: the stack back in NES page 1)
-            ld hl, $FE00                    ; clear OAM
-            ld bc, $A0
-            call memclr
             ld hl, $FF80                    ; clear HRAM
             ld bc, $7F
             call memclr
-            ld a, d
+            ld a, d                         ; (CGB: double speed and OAM in boot_more)
             and a
             jr z, .dmg
             ld a, 1
             ldh [is_cgb], a
-            ldh a, [$FF4D]                  ; double speed (KEY1 + STOP, interrupts off;
-            bit 7, a                        ;   after a soft reset it is on already)
-            jr nz, .booted
-            ld a, 1
-            ldh [$FF4D], a
-            xor a
-            ldh [$FFFF], a
-            ld a, $30
-            ldh [$FF00], a
-            stop
             jr .booted
 .dmg:       call dmg_init
             call sgb_detect
-.booted:    ld a, SGB_BANK                  ; save slots checked (rt/save.s; a damaged one is
-            ld [$2000], a                   ;   reported on screen, then cleared)
-            call save_boot
+.booted:    ld a, SGB_BANK                  ; OAM, CGB double speed, the save slots checked
+            ld [$2000], a                   ;   (rt/save.s; a damaged one is reported on
+            call boot_more                  ;   screen, then cleared)
             ld a, 1
             ld [$2000], a
             ld hl, dma_code                 ; OAM DMA routine to HRAM
@@ -1532,8 +1521,13 @@ dmg_frame:                                  ; DMG shading, once per NES frame wi
             ld a, [TB_T]
             sub b
             cp 8
-            jr nc, .x
-            ld b, 1
+            jr c, .rt
+            ld a, [EV_N]                    ; blocks full: the oldest written now in the
+            and a                           ;   H-Blank (q_drain1), unless this frame has
+            jr nz, .x                       ;   raster events (no interrupt delayed then)
+            call q_drain1
+            jr .more
+.rt:        ld b, 1
             call dmg_retile_some
             jr .more
 .x:         pop bc

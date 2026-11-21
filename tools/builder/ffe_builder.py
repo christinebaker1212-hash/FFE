@@ -3,14 +3,17 @@ the user's own NES ROM files. Nothing of the games is included: every game byte 
 the ROM chosen here.
 
     FFE-Builder.exe                      (window)
-    FFE-Builder.exe --cli ROM OUTDIR     (console: FF1)
+    FFE-Builder.exe --cli ROM OUTDIR [ff1|ff2]   (console; default ff1)
 
 Steps for Final Fantasy I (Game Boy / Super Game Boy / Game Boy Color): check the ROM's
 SHA-1, split the FF I・II cart into MMC5 ROMs (tools/split/build_mmc5.py), insert the
 English script with the GB layout (tools/ff1/insert.py --gb), make the code map by running
 the NES game in the bundled emulator (tools/gb/covall.py; the first build only, ~15-40
 minutes, then kept in OUTDIR/ffe_work), recompile to SM83 and assemble (tools/gb/build.py).
-Final Fantasy II and III: not available yet."""
+Final Fantasy II (Game Boy / Super Game Boy / Game Boy Color): same ROM; English script and
+GB layout (tools/ff2/insert.py, tools/gb2/layout.py), the code map from the everything8215
+disassembly bundled with the builder (no emulator run), recompiled to SM83 as a release
+build (tools/gb2/build.py --gb --release). Final Fantasy III: not available yet."""
 import hashlib, os, subprocess, sys, threading
 # modules the bundled tools scripts import (run through runpy inside the frozen builder,
 # where PyInstaller only packs what it sees imported here)
@@ -28,7 +31,7 @@ from pyrun import script_cmd, run_script
 SHA1_FF12 = '4b22c2c88fc71eacf270ea51ef218944bb4c536a'      # Final Fantasy I・II (Japan)
 SHA1_FF3 = 'c4443fc24625e3c2bb859525eb44b6b3a80e7c35'       # Final Fantasy III (Japan)
 GAMES = [('Final Fantasy I', 'ff1', SHA1_FF12, True),
-         ('Final Fantasy II', 'ff2', SHA1_FF12, False),
+         ('Final Fantasy II', 'ff2', SHA1_FF12, True),
          ('Final Fantasy III', 'ff3', SHA1_FF3, False)]
 
 
@@ -68,9 +71,25 @@ def build_ff1(rom, outdir, log):
     return out
 
 
+def build_ff2(rom, outdir, log):
+    if sha1(rom) != SHA1_FF12:
+        raise RuntimeError('%s is not the expected "Final Fantasy I, II (Japan).nes" (SHA-1 %s)' % (rom, SHA1_FF12))
+    work = os.path.join(outdir, 'ffe_work', 'ff2')
+    os.makedirs(work, exist_ok=True)
+    out = os.path.join(outdir, 'Final Fantasy II (English, GB).gb')
+    log('Final Fantasy II: English script, Game Boy layout, recompiling (release build)')
+    run(script_cmd('tools/gb2/build.py', rom, '--gb', '--release', '--work', work, '--out', out), log)
+    log('done: ' + out)
+    return out
+
+
+BUILD = {'ff1': build_ff1, 'ff2': build_ff2}
+
+
 def cli(argv):
     rom, outdir = argv[0], argv[1] if len(argv) > 1 else os.getcwd()
-    build_ff1(rom, outdir, lambda s: print(s, flush=True))
+    game = argv[2] if len(argv) > 2 else 'ff1'
+    BUILD[game](rom, outdir, lambda s: print(s, flush=True))
 
 
 def gui():
@@ -104,16 +123,17 @@ def gui():
 
         def work():
             try:
-                rom = rows['ff1'].get()
-                if not rom: raise RuntimeError('choose the "Final Fantasy I, II (Japan).nes" file first')
+                todo = [(k, rows[k].get()) for k in ('ff1', 'ff2') if rows[k].get()]
+                if not todo: raise RuntimeError('choose the "Final Fantasy I, II (Japan).nes" file first')
                 os.makedirs(outv.get(), exist_ok=True)
-                build_ff1(rom, outv.get(), log)
+                for key, rom in todo:
+                    BUILD[key](rom, outv.get(), log)
             except Exception as e:
                 log('ERROR: %s' % e)
             finally:
                 w.after(0, lambda: btn.config(state='normal'))
         threading.Thread(target=work, daemon=True).start()
-    btn = tk.Button(w, text='Build Final Fantasy I for Game Boy', command=go); btn.pack(pady=(0, 8))
+    btn = tk.Button(w, text='Build for Game Boy', command=go); btn.pack(pady=(0, 8))
     w.mainloop()
 
 

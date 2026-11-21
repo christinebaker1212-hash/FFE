@@ -634,8 +634,11 @@ sgb_build:  xor a
             ld [$4000], a
             ret
 
-; C = packet: NZ if NEXT and SENT differ (RAM bank 2 on)
+; C = packet: NZ if NEXT and SENT differ (RAM bank 2 on). Keeps BC, DE, HL (sgb_build's
+; ATTR loop keeps its end in E: clobbering it made the loop's end depend on cart RAM
+; contents, and with that RAM cleared at boot it never ended on a Super Game Boy)
 pk_diff:    push bc
+            push de
             push hl
             ld a, c
             swap a
@@ -653,6 +656,7 @@ pk_diff:    push bc
             dec b
             jr nz, .l
 .x:         pop hl
+            pop de
             pop bc
             ret
 

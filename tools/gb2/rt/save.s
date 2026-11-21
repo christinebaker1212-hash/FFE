@@ -168,7 +168,25 @@ sv_valid:   call sv_slot
             cp $5A
             ret
 
-; ---- boot (rt/runtime.s, LCD off, interrupts off, cart RAM enabled)
+; ---- boot (rt/runtime.s, LCD off, interrupts off, cart RAM enabled): OAM cleared, CGB
+; double speed (KEY1 + STOP; after a soft reset it is on already), then the save check
+boot_more:  ld hl, $FE00
+            ld bc, $A0
+            call memclr
+            call sm_boot                    ; (the Select menu's volumes: rt/selmenu.s)
+            ldh a, [is_cgb]
+            and a
+            jr z, save_boot
+            ldh a, [$FF4D]
+            bit 7, a
+            jr nz, save_boot
+            ld a, 1
+            ldh [$FF4D], a
+            xor a
+            ldh [$FFFF], a
+            ld a, $30
+            ldh [$FF00], a
+            stop
 save_boot:  ld a, 3
             ld [$4000], a
             call sv_hdr_ok

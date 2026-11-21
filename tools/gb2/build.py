@@ -1,6 +1,8 @@
 """Build the Game Boy (dual-mode DMG / SGB / CGB) FF2 English ROM from the user's own NES ROM.
 
-usage: build.py ["Final Fantasy I, II (Japan).nes"] [--gb] [--release] [--out ROM]
+usage: build.py ["Final Fantasy I, II (Japan).nes"] [--gb] [--release] [--out ROM] [--work DIR]
+  --work: intermediate files (English NES ROMs, the source base) there (the builder's
+      work folder); default: next to --out, source base in build/ff2
   --gb: with the GB screen layout (tools/gb2/layout.py): build/ff2_gb.nes -> build/ff2_gb.gb
   --release (with --gb): build/ff2_release.gb without test-only code (the runtime's ;[test]
       blocks: the test-runner pad input); check it with tools/gb2/lotcheck.py --release
@@ -26,7 +28,40 @@ from asm_sm83 import asm, make_rom
 import build as gb1                       # tools/gb/build.py: shared tables (APU, NES colours, border)
 
 SHA1_FF12 = '4b22c2c88fc71eacf270ea51ef218944bb4c536a'
-RT_FILES = ('runtime.s', 'apu.s', 'hle.s', 'ff2.s', 'dmg_shade.s', 'sgb.s', 'save.s')   # (ff2.s continues bank 0)
+RT_FILES = ('runtime.s', 'apu.s', 'hle.s', 'ff2.s', 'dmg_shade.s', 'sgb.s', 'save.s', 'selmenu.s')   # (ff2.s continues bank 0)
+
+
+def selmenu_text():
+    """the Select menu / suspend texts (owner's brief) as menu-font tiles for rt/selmenu.s:
+    tile = code - $80 for the letters $80-$CF, blank $FF -> T_BLANK (88), $FE next line,
+    $FF end; lines wrapped at 18 columns"""
+    import textwrap
+    sys.path.insert(0, os.path.join(ROOT, 'tools', 'ff2'))
+    import insert as ins
+    def tiles(text):
+        out = []
+        for k, line in enumerate(text.split('\n')):
+            if k: out.append(0xFE)
+            for c in ins.enc(line):
+                assert c == 0xFF or 0x80 <= c < 0xD0, (text, c)
+                out.append(88 if c == 0xFF else c - 0x80)
+        return out + [0xFF]
+    def wrap(t): return '\n'.join(textwrap.wrap(t, 18))
+    T = dict(SMT_SEL='Options\nFormation\nSuspend',
+             SMT_OPT='Battle Speed\nBGM Volume\nSFX Volume',
+             SMT_SUS=wrap('Create a Suspend Point and return to the Title?') + '\n\n' +
+                     wrap('Suspend points are retained when turning off the Power.'),
+             SMT_YES='Yes', SMT_NO='No',
+             SMT_CONT=wrap('Continue from Suspend point?'),
+             SMT_LOST1=wrap('Continue from last save?') + '\n\n' + wrap('The suspend point will be lost!'),
+             SMT_LOST2=wrap('Start a New Game?') + '\n\n' + wrap('The suspend point will be lost!'),
+             SMT_BAD=wrap('The Suspend Point is damaged and cannot be used. It will be erased.') + '\n\n' +
+                     wrap('Press the A Button.'))
+    for k, v in T.items(): assert v.count('\n') <= 7, k
+    out = 'section bank SGB_BANK, $7800\n'
+    for k, v in T.items():
+        out += '%s: db %s\n' % (k, ', '.join(str(x) for x in tiles(v)))
+    return out, 'SM_DIG0 = %d\n' % (ins.ENC['0'] - 0x80)
 
 
 def nes_english(src, out_dir, gb=False):
@@ -74,7 +109,7 @@ def main():
         if not gb: raise SystemExit('--release needs --gb')
         if os.environ.get('GB_END_TEST'): raise SystemExit('--release: GB_END_TEST is a test build')
     opt = {'--out': os.path.join(ROOT, 'build', 'ff2_release.gb' if release else 'ff2_gb.gb' if gb else 'ff2_en.gb'),
-           '--nes': None}
+           '--nes': None, '--work': None}
     pos = []
     while args:
         a = args.pop(0)
@@ -83,8 +118,10 @@ def main():
     src = pos[0] if pos else os.path.join(ROOT, 'roms', 'Final Fantasy I, II (Japan).nes')
     out_dir = os.path.dirname(os.path.abspath(opt['--out']))
     os.makedirs(out_dir, exist_ok=True)
-    nes = opt['--nes'] or nes_english(src, out_dir, gb)
-    srcdir = os.path.join(ROOT, 'build', 'ff2', 'src_gb' if gb else 'src_en')
+    work = os.path.abspath(opt['--work']) if opt['--work'] else out_dir   # (intermediate files)
+    os.makedirs(work, exist_ok=True)
+    nes = opt['--nes'] or nes_english(src, work, gb)
+    srcdir = os.path.join(work if opt['--work'] else os.path.join(ROOT, 'build'), 'ff2', 'src_gb' if gb else 'src_en')
     source_base(src, nes, srcdir, gb)
     ext_side = nes + '.ext.json'                    # native replacements of our own layout
     if os.path.exists(ext_side):                    #   routines (layout.NATIVE_EXT)
@@ -108,6 +145,8 @@ def main():
     rt += '\n' + open(os.path.join(HERE, 'rt', 'native.s')).read()
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ff2_banked.s')).read()   # (continues bank HLE_BANK)
     rt += '\n' + open(os.path.join(HERE, 'rt', 'ff2_pal.s')).read()      # (bank 0 $39E0: CGB palettes)
+    smt, sme = selmenu_text()                                           # (SGB bank $7800: menu texts;
+    rt = sme + rt + '\n' + smt                                         #   the digit equate first)
     shade_src = 'section bank 0, $3F00\nshade_tab:\n' + ''.join(
         '    db %s\n' % ', '.join(str(gb1.shade(c)) for c in range(r, r + 16)) for r in range(0, 64, 16))
     src_all = rt + '\n' + shade_src + '\n' + gb1.nes_rgb_src() + '\n' + gb1.border_src() + '\n' + prog
@@ -121,7 +160,7 @@ def main():
     top = max(r.banks) + 1
     size = 2
     while size < top: size *= 2
-    rom = make_rom(r.banks, 'FF2 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x03, sgb=True,
+    rom = make_rom(r.banks, 'FF2 ENGLISH', cart_type=0x1B, rom_banks=size, ram_size_code=0x04, sgb=True,   # 128 KB RAM (suspend point)
                    cgb=0x80)                          # dual-mode: DMG / SGB / CGB
     open(opt['--out'], 'wb').write(rom)
     open(opt['--out'][:-3] + '.sym', 'w').write(r.sym_file())

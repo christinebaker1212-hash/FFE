@@ -1,6 +1,6 @@
 """Lot Check checks for a built Game Boy ROM (docs/gb-release-requirements.md).
 
-usage: python3 tools/gb2/lotcheck.py GB [--cgb 80|C0|none] [--no-sgb] [--type 1B] [--ram 3]
+usage: python3 tools/gb2/lotcheck.py GB [--cgb 80|C0|none] [--no-sgb] [--type 1B] [--ram 4]
        [--run NES FRAMES [--random SEED]] [--reset] [--release]
 
 Static (always):
@@ -188,7 +188,7 @@ def main():
         if name in a: a.remove(name); return True
         return False
     cgb = opt('--cgb', '80'); cgb = None if cgb == 'none' else int(cgb, 16)
-    ctype = int(opt('--type', '1B'), 16); ram = int(opt('--ram', '3'), 16)
+    ctype = int(opt('--type', '1B'), 16); ram = int(opt('--ram', '4'), 16)
     sgb = not flag('--no-sgb'); release = flag('--release'); reset = flag('--reset')
     run = flag('--run')
     gb_path = a.pop(0)

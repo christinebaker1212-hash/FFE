@@ -357,6 +357,7 @@ tset_fix_b: xor a
             ret
 
 ; DMG palette maps (moved from rt/dmg_shade.s dmg_maps: bank 0 is full); see there.
+USEDIX     = $CCD8          ; colour indices used per palette (4; fixed WRAM)
 dmg_maps_b: push bc
             push de
             push hl
@@ -373,10 +374,54 @@ dmg_maps_b: push bc
 .cl:        ld [hl+], a
             dec b
             jr nz, .cl
+            ld hl, USEDIX                   ; colour indices the tiles coded for each palette
+            xor a                           ;   use (TILE_USE; 0 = not known: all): colours
+            ld [hl+], a                     ;   at indices no tile uses are left out (FF2's
+            ld [hl+], a                     ;   prologue: an unused grey in palette 3 put
+            ld [hl+], a                     ;   the blue background in a grey value while
+            ld [hl], a                      ;   the band faded in)
+            ld c, 0
+.ut:        ld l, c
+            ld h, high(TILE_PAL)
+            ld a, [hl]
+            and 3
+            add a, low(USEDIX)
+            ld e, a
+            ld a, c
+            srl a
+            add a, low(TILE_USE)
+            ld l, a
+            ld h, high(TILE_USE)
+            ld a, [hl]
+            bit 0, c
+            jr z, .ul
+            swap a
+.ul:        and $0E
+            jr nz, .uk
+            ld a, $0E
+.uk:        ld l, e
+            ld h, high(USEDIX)
+            or [hl]
+            ld [hl], a
+            inc c
+            jr nz, .ut
             ld c, 0
 .lv:        ld a, c
             and 3
             jr z, .mn
+            ld b, a                         ; (index C & 3 used by palette C >> 2's tiles?)
+            ld a, c
+            srl a
+            srl a
+            add a, low(USEDIX)
+            ld l, a
+            ld h, high(USEDIX)
+            ld a, [hl]
+.ib:        rrca
+            dec b
+            jr nz, .ib
+            rrca
+            jr nc, .mn
             ld a, [PAL_USED]                ; palettes no cell uses: their colours left out
             and a
             jr z, .lu
@@ -450,7 +495,12 @@ dmg_maps_b: push bc
             jr c, .ng
             ld a, 3
 .ng:        ld [NGRP], a
-            ld c, 0
+            cp 2                            ; two levels: values 1 and 3 (both cuts at 0), so
+            jr nz, .n2c                     ;   the brightest keeps value 3 when a third level
+            xor a                           ;   comes and goes (a fade: no re-coding of every
+            ldh [sh_s0], a                  ;   tile in the brightest colour each time)
+            ldh [sh_s1], a
+.n2c:       ld c, 0
 .as:        ld a, c
             cp e
             jr z, .pm
@@ -611,7 +661,9 @@ dmg_maps_b: push bc
             jr z, .te
             swap a
 .te:        and $0F
-            ld b, a
+            jr nz, .tu                      ; (0: not known yet, e.g. a tile uploaded by a
+            ld a, $0F                       ;   native copy: re-coded to be safe)
+.tu:        ld b, a
             ldh a, [sh_chg]
             and b
             pop hl

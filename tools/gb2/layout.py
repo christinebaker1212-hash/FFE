@@ -92,7 +92,41 @@ RAM = dict(MV=0x75F0, GBIDX=0x7FDF, GBRB=0x7FE0, GBPOOL=0x7FE1, VX=0x7FE2, VN=0x
 ENTRIES = [('gb_party', 0x0C, 0x912A), ('gb_names', 0x0C, 0x910D), ('gb_names', 0x0C, 0x981D),
            ('gb_cmds', 0x0C, 0x982C), ('gb_msgopen', 0x05, 0xAA57), ('gb_msgclose', 0x05, 0xAB4F),
            ('gb_magic', 0x0C, None), ('gb_magcost', 0x0C, None), ('gb_gear', 0x0C, None),
-           ('gb_lootscr', 0x05, None), ('gb_lootf', 0x05, None), ('gb_lootnav', 0x05, None)]
+           ('gb_lootscr', 0x05, None), ('gb_lootf', 0x05, None), ('gb_lootnav', 0x05, None),
+           # Select menu / suspend prompt (called as LDX #k / JSR gbf from the patched sites in
+           # select_menu(); no fixed-bank entry)
+           ('gb_selw', 0x0E, None), ('gb_seln', 0x0E, None), ('gb_resume', 0x0E, None)]
+SEL_SRC = '''
+gb_selw:                ; world map Select (fix:C181): B + Select with the ring -> the minimap
+    lda $20             ;   (GBARG = 2), else the Select menu (gsel: GBARG 0 the row screen,
+    and #$40            ;   1 back to the field)
+    beq .m
+    lda $601A
+    and #$02
+    beq .m
+    lda #2
+    sta GBARG
+    rts
+.m:
+    jmp gsel
+gb_seln:                ; other maps (fix:CB9B): the Select menu, its result in $22 (the
+    jsr gsel            ;   site's LSR $22 clears it, as fix:CB9B did with STA $22)
+    lda GBARG
+    sta $22
+    rts
+gb_resume:              ; the load menu (b14:B642): as it did before FFFB0, then the suspend
+    lda #0              ;   prompt (gres)
+    sta $4015
+    lda #$05
+    sta $08
+    jmp gres
+gsel:                   ; NES: the row screen, as before (GB: the Select menu, rt/selmenu.s)
+    lda #0
+    sta GBARG
+    rts
+gres:                   ; NES: nothing (GB: the suspend prompt, rt/selmenu.s)
+    rts
+'''
 # (None: called from a patched JSR, not replacing a routine)
 
 ENT_SRC = '''
@@ -3147,6 +3181,16 @@ gm_prophecy:            ; b14:B8DD (prophecy, owner approved ff2_mock13; renderi
     ldx #5
     ldy #0
     jsr pages0          ; (native on the GB: NATIVE_EXT b24_pages0)
+    lda #$23            ; attribute row 1 (rows 4-7) in the shown palette: rows 6-7 are in
+    sta $2006           ;   the view and never hold text (the pages use rows 9-20), so the
+    lda #$C8            ;   shown palette is on screen from the start and its colours count
+    sta $2006           ;   for the plain Game Boy's shading (else the letters were coded
+    lda #$FF            ;   for it only once the first line was shown); the blank tile is
+    ldx #8              ;   the same blue in palettes 1-3
+.p6:
+    sta $2007
+    dex
+    bne .p6
     jsr $FE00           ; (as b14:B8DD-B8EF)
     jsr $DC30
     lda #0
@@ -3193,21 +3237,22 @@ gm_prophecy:            ; b14:B8DD (prophecy, owner approved ff2_mock13; renderi
     cmp PH
     beq .hj
 .hd:
-    lda #0              ; draw them with the copy tiles
-    sta PRM
+    lda PH              ; the half's attribute row in the fade palette first: attribute row
+    lsr a               ;   PH / 2, top half $5A (the bottom hidden), bottom half $AF (the
+    sta PAR             ;   top shown); palette 2 colour 3 at the fade's first step, so
+    lda #$5A            ;   the copy tiles are only ever drawn in fading cells (one shading
+    bcc .a0             ;   per tile on the plain Game Boy)
+    lda #$AF
+.a0:
+    sta PATT
+    lda #0
+    sta $03CB
+    sta PRM             ; draw them with the copy tiles
     jsr pdraw
     lda PEXIT
     beq .k1
     rts
 .k1:
-    lda PH              ; fade the half in: attribute row PH / 2, top half $5A (the
-    lsr a               ;   bottom hidden), bottom half $AF (the top shown)
-    sta PAR
-    lda #$5A
-    bcc .a0
-    lda #$AF
-.a0:
-    sta PATT
     jsr pfade
     lda PEXIT
     beq .k2
@@ -3257,7 +3302,7 @@ gm_prophecy:            ; b14:B8DD (prophecy, owner approved ff2_mock13; renderi
 .k5:
     lda #$55
     sta PATT
-    lda #1
+    lda #2              ; (attribute rows 2-5: the text rows; row 1 stays in the shown palette)
     sta PAR
 .ca:
     jsr pframe
@@ -3324,10 +3369,10 @@ pdraw:                  ; draw lines PI .. PJ - 1 in mode PRM (0 copy tiles, 1 f
     jmp .l
 .e:
     rts
-pfade:                  ; b14:B965: palette 2 colour 3 up in four steps of 16 frames,
-    lda #0              ;   alternating with the step below on odd frames
-    sta P64
-.lp:
+pfade:                  ; b14:B965: palette 2 colour 3 up in four steps of 16 frames (the
+    lda #0              ;   NES's alternation with the step below on odd frames left out: a
+    sta P64             ;   colour changing every frame keeps the plain Game Boy's shading
+.lp:                    ;   of the band's tiles from settling, letters showed one by one)
     lda P64
     sta $03CB
 .fr:
@@ -3337,7 +3382,7 @@ pfade:                  ; b14:B965: palette 2 colour 3 up in four steps of 16 fr
     inc $F0
     lda $F0
     and #$0F
-    bne .odd
+    bne .fr
     lda P64
     clc
     adc #$10
@@ -3346,21 +3391,29 @@ pfade:                  ; b14:B965: palette 2 colour 3 up in four steps of 16 fr
     bcc .lp
 .e:
     rts
-.odd:
-    lsr a
-    bcc .lp
-    lda $03CB
-    sec
-    sbc #$10
-    bpl .s
-    lda #$01
-.s:
-    sta $03CB
-    jmp .fr
 pframe:                 ; one frame (b14:B9B0): a line (PRLEN), the attribute row (PAR),
-    jsr $FE00           ;   palettes, scroll, music, joypad (A / B -> PEXIT)
+    jsr $FE00           ;   palettes, scroll, music, joypad (A / B -> PEXIT); the attribute
+                        ;   row before the line (a plain Game Boy tile has one shading: a font
+                        ;   tile written into a cell still fading would be shaded dim)
+    lda PAR
+    bmi .nl
+    asl a
+    asl a
+    asl a
+    ora #$C0
+    tax
+    lda #$23
+    sta $2006
+    stx $2006
+    lda PATT
+    ldx #8
+.at:
+    sta $2007
+    dex
+    bne .at
+.nl:
     lda PRLEN
-    beq .na
+    beq .nb
     lda PRA+1
     sta $2006
     lda PRA
@@ -3388,23 +3441,6 @@ pframe:                 ; one frame (b14:B9B0): a line (PRLEN), the attribute ro
     bne .c
     lda #0
     sta PRLEN
-.na:
-    lda PAR
-    bmi .nb
-    asl a
-    asl a
-    asl a
-    ora #$C0
-    tax
-    lda #$23
-    sta $2006
-    stx $2006
-    lda PATT
-    ldx #8
-.at:
-    sta $2007
-    dex
-    bne .at
 .nb:
     jsr $DC30
     lda $FF
@@ -4064,10 +4100,13 @@ def battle(rom):
     # bank 23 + entries
     rom[HDR + 23 * BANK:HDR + 24 * BANK] = b'\xFF' * BANK
     b23 = bank23(rom, dict(gbf=f.labels['gbf']),
-                 '\nRETB: .db %s\n' % ', '.join('$%02X' % rb for name, rb, nes in ENTRIES))
+                 '\nRETB: .db %s\n' % ', '.join('$%02X' % rb for name, rb, nes in ENTRIES) + SEL_SRC)
     assert len(b23.bytes) <= BANK
     put(rom, 23, 0x8000, b23.bytes)
     NATIVE_EXT['b23_vtile'] = (23, b23.labels['vtile'], 'hle_vtile', 'NZC')
+    NATIVE_EXT['b23_gsel'] = (23, b23.labels['gsel'], 'hle_select', 'NZ')
+    NATIVE_EXT['b23_gres'] = (23, b23.labels['gres'], 'hle_resume', 'NZ')
+    select_menu(rom, f.labels['gbf'])
     labels = {}
     for org, end, ks in ((0xFFD0, 0xFFFA, range(0, 8)), (0xFEEC, 0xFF00, range(8, 12))):   # (free:
         ent = 'org $%04X\n' % org                                                          #  rom info,
@@ -4076,7 +4115,7 @@ def battle(rom):
         e = asm(ent, syms=dict(gbf=f.labels['gbf']))
         assert e.org + len(e.bytes) <= end
         put(rom, 31, e.org, e.bytes); labels.update(e.labels)
-    assert len(ENTRIES) <= 12
+    assert len([1 for name, rb, nes in ENTRIES[12:] if nes is not None]) == 0   # (12+: no entry)
     g = asm('''
     org $F8F0
 gbm:                    ; main menu (bank 24): A = sub-command; back to bank 14
@@ -4104,7 +4143,7 @@ gbm:                    ; main menu (bank 24): A = sub-command; back to bank 14
     e = E(); e.labels = labels
     for k, (name, rb, nes) in enumerate(ENTRIES):
         if nes is not None: put(rom, rb, nes, bytes([0x4C]) + e.labels['e%d' % k].to_bytes(2, 'little'))
-    ent = {name: e.labels['e%d' % k] for k, (name, rb, nes) in enumerate(ENTRIES)}
+    ent = {name: e.labels['e%d' % k] for k, (name, rb, nes) in enumerate(ENTRIES) if k < 12}
     put(rom, 12, 0x9DE3, bytes([0x20]) + ent['gb_magic'].to_bytes(2, 'little'), old=bytes([0x20, 0x50, 0x92]))
     put(rom, 12, 0xA058, bytes([0x4C]) + ent['gb_gear'].to_bytes(2, 'little'), old=bytes([0x4C, 0x50, 0x92]))
     # Gear cursor (b12:BFCD: right hand, left hand, item 1, item 2): hand at the screen edge
@@ -4113,6 +4152,67 @@ gbm:                    ; main menu (bank 24): A = sub-command; back to bank 14
         old=bytes.fromhex('a9238d0620'))
     loot(rom, ent)
     gear_updown(rom)
+
+
+def select_menu(rom, gbf):
+    """Select menu sites (owner's brief: Select opens OPTIONS / FORMATION / SUSPEND, B + Select
+    keeps the minimap): fix:C181 (world map) and fix:CB9B (other maps) call bank 23 gb_selw /
+    gb_seln through gbf and branch on the result (0 the row screen fix:F0E2, 1 back, 2 the
+    minimap); b14:B642 (the load menu) calls gb_resume (the suspend prompt) before FFFB0.
+    The fixed bank has no free bytes, so the sites are rewritten in their own space."""
+    k = {name: i for i, (name, rb, nes) in enumerate(ENTRIES)}
+    w = asm('''
+    org $C181
+    lda $22
+    beq $C1B0
+    lda #$30
+    sta $400C
+    jsr $DDA4
+    ldx #KW
+    jsr GBF
+    lda GBARG
+    beq .row
+    lsr a
+    bcs .done
+    lda #$09
+    jsr $FE03
+    jsr $BE20
+.done:
+    jmp $C8BC
+.row:
+    jsr $F0E2
+    jmp $C8BC
+''', syms=dict(RAM, KW=k['gb_selw'], GBF=gbf))
+    assert w.org + len(w.bytes) <= 0xC1B0
+    put(rom, 31, 0xC181, w.bytes + b'\xEA' * (0xC1B0 - 0xC181 - len(w.bytes)),
+        old=bytes.fromhex('a522f02ba9308d0c4020a4dd'))
+    n = asm('''
+    org $CB9B
+    lda $22
+    beq $CBB3
+    lda #$02
+    jsr $DDA4
+    ldx #KN
+    jsr GBF
+    lsr $22
+    bcs .done
+    jsr $F0E2
+.done:
+    jmp $D07B
+''', syms=dict(RAM, KN=k['gb_seln'], GBF=gbf))
+    assert len(n.bytes) == 0xCBB3 - 0xCB9B
+    put(rom, 31, 0xCB9B, n.bytes, old=bytes.fromhex('a522f014a9008522a90220a4dd'))
+    r = asm('''
+    org $B642
+    lda #$00
+    sta $2001
+    ldx #KR
+    jsr GBF
+    jsr $FFB0
+    nop
+    nop
+''', syms=dict(RAM, KR=k['gb_resume'], GBF=gbf))
+    put(rom, 14, 0xB642, r.bytes, old=bytes.fromhex('a9008d01208d1540a9058508'))
 
 
 def gear_updown(rom):
@@ -4886,7 +4986,7 @@ def world_overview(rom):
 ''', syms=dict(FCX=FIELD_CAM['x'], FCY=FIELD_CAM['y']))
     assert k.org + len(k.bytes) <= 0xBE40
     put(rom, 9, k.org, k.bytes, old=bytes(len(k.bytes)))
-    put(rom, 31, 0xC19F, bytes([0x20, 0x20, 0xBE]), old=bytes([0x20, 0x00, 0xBA]))
+    # (fix:C19F JSR $BA00 -> JSR $BE20: done by select_menu(), which rewrote that site)
 
     row_menu(rom)
 

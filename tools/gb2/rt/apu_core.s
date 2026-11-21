@@ -126,6 +126,7 @@ vol_byte:   bit 4, a
             jr z, .env
             and $0F
             ld [hl], a
+            call vscale                     ; (the Select menu's BGM / SFX volume)
             swap a
             or $08                          ; add mode, period 0: no envelope steps; $08 writes
             ret                             ;   while playing raise the volume by one
@@ -139,7 +140,52 @@ vol_byte:   bit 4, a
 .nc:        ld a, [hl]
             pop hl
             ld [hl], $FF
-            or $F0
+            push bc
+            ld b, a
+            ld a, 15
+            call vscale
+            swap a
+            or b
+            pop bc
+            ret
+
+; Select menu volumes (VOL_BGM / VOL_SFX, 0-8, 8 = as the NES). FF2's sound effects use
+; square 2 while $E5 (the sound effect counter) runs, and the noise channel; the music
+; square 1, square 2 and the triangle. HL = the channel's APU_CV entry -> A = its factor.
+vfac:       ld a, l
+            sub low(APU_CV)
+            cp 3
+            jr z, .sfx
+            cp 1
+            jr nz, .bgm
+            ld a, [NES_RAM + $E5]
+            and a
+            jr z, .bgm
+.sfx:       ld a, [VOL_SFX]
+            ret
+.bgm:       ld a, [VOL_BGM]
+            ret
+; A = volume 0-15, HL = APU_CV entry -> A = volume * factor / 8 (rounded). Keeps BC, DE, HL.
+vscale:     push bc
+            ld b, a
+            call vfac
+            cp 8
+            jr nc, .full
+            ld c, a
+            xor a
+            inc c
+            dec c
+            jr z, .x
+.m:         add a, b
+            dec c
+            jr nz, .m
+            add a, 4
+            srl a
+            srl a
+            srl a
+            jr .x
+.full:      ld a, b
+.x:         pop bc
             ret
 
 ; B = pulse, E = new $4000 / $4004 value
@@ -155,7 +201,10 @@ p_ctl:      call pbase
             ld hl, APU_CV
             call hl_b
             ; C = NRx1, HL = APU_CV entry, E = control: a volume change
-vol_change: bit 4, e
+vol_change: call vfac                       ; (a volume below 8: no zombie steps,
+            cp 8                            ;   the note restarts at the scaled volume)
+            jr c, .re
+            bit 4, e
             jr z, .env
             ld a, [hl]
             cp $FF
@@ -331,8 +380,20 @@ w_tri:      ld a, c
             ld [APU_ON + 2], a
             ld a, $80
             ldh [$FF1A], a                  ; DAC on
+            ld a, [VOL_BGM]                 ; 100 % (Select menu BGM volume: 8 -> 100 %,
+            cp 8                            ;   4-7 -> 50 %, 1-3 -> 25 %, 0 -> off)
             ld a, $20
-            ldh [$FF1C], a                  ; 100 %
+            jr nc, .tv
+            ld a, [VOL_BGM]
+            cp 4
+            ld a, $40
+            jr nc, .tv
+            ld a, [VOL_BGM]
+            and a
+            ld a, $60
+            jr nz, .tv
+            xor a
+.tv:        ldh [$FF1C], a
             call t_freq
             or $80
             ldh [$FF1E], a                  ; restart
