@@ -274,7 +274,11 @@ menu_main:  xor a
             ret nz
             jp .re
 .n1:        cp 4
-            jr nz, .l                       ; (equipment: next)
+            jr z, .st
+            sub 2                           ; weapons (0) / armour (1)
+            call equip_menu
+            jp .re
+.st:
             call pick_char                  ; status: whose
             jr c, .re
             call status_scr
@@ -1424,7 +1428,7 @@ mg_draw:    call scr_cls
             ld b, 1
             push bc
             call pen_at
-            ld a, $4C                       ; "L1  MP 9/9"
+            ld a, $4C                       ; L1  MP 9/9
             call pen_ch
             ld a, [mg_lv]
             add a, $31
@@ -1718,6 +1722,743 @@ m_out:      push bc
             ld [menu_act], a
             ret
 
+; ---- the weapon / armour menus (FF1 EnterEquipMenu): top (0,0,20,4) title and the Equip /
+; Swap / Drop commands; two members a page in (0,4,20,7) / (0,11,20,7): name, then the four slots (icon
+; at column 1, inverted when equipped; the name from column 2; the hand cut off at the
+; screen's left edge)
+N_WSTAT    = $7300          ; names bank: weapon stats (8 bytes), armour (4), permissions
+N_ASTAT    = $7440
+N_WPERM    = $7500
+N_APERM    = $7550
+N_ATYPE    = $75A0
+N_INVDMG   = $7600
+N_INVCGB   = $7800
+INV_TILE   = $A0            ; inverted icons at BG $A0 + icon code
+CLS_BB     = 2              ; Black Belt / Master: no weapon / armour bonuses (FF1)
+CLS_MA     = 8
+equip_menu: ld [eq_kind], a
+            and a
+            ld a, $18                       ; FF1 equipoffset: ch_weapons / ch_armor
+            jr z, .k
+            ld a, $1C
+.k:         ld [eq_off], a
+            call eq_sort                    ; FF1 SortEquipmentList, the item box, stats unadjusted
+            call eq_tobox
+            call eq_unadj
+            call inv_gfx
+            xor a
+            ld [eq_cur], a
+            ld [eq_mode], a
+            call eq_draw
+            call scr_show
+.mode:      ld a, [eq_mode]                 ; the mode cursor: x 0 / 56 / 104, row 2
+            ld b, 0
+            and a
+            jr z, .m1
+            ld b, 56
+            dec a
+            jr z, .m1
+            ld b, 104
+.m1:        ld c, 12
+            call scr_cursor
+            call scr_frame
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .exit
+            bit 0, a
+            jr nz, .sub
+            ld hl, eq_mode
+            bit 4, a
+            jr nz, .rt
+            bit 5, a
+            jr z, .mode
+            ld a, [hl]                      ; left
+            dec a
+            cp 3
+            jr c, .ms
+            ld a, 2
+            jr .ms
+.rt:        ld a, [hl]
+            inc a
+            cp 3
+            jr c, .ms
+            xor a
+.ms:        ld [hl], a
+            jr .mode
+.exit:      call eq_frombox                 ; back into the records, sorted, stats readjusted
+            call eq_sort
+            jp eq_readj
+.sub:       ld a, [eq_mode]
+            and a
+            jr z, .equip
+            dec a
+            jr z, .swap
+            ; drop: A twice on an item
+.drop:      call eq_pick
+            jr c, .mode
+            call eq_item
+            and a
+            jr z, .drop
+            ld b, 1                         ; confirm: the hand twice (FF1 flickers it)
+            call eq_pick2
+            jr c, .drop
+            call eq_item
+            ld [hl], 0
+            call eq_redraw
+            jr .drop
+.equip:     call eq_pick
+            jp c, .mode
+            call eq_item
+            and a
+            jr z, .equip
+            bit 7, a
+            jr nz, .tog                     ; equipped: always off
+            call eq_legal
+            jr c, .equip
+            call eq_item
+.tog:       xor $80
+            ld [hl], a
+            call eq_redraw
+            jr .equip
+.swap:      call eq_pick
+            jp c, .mode
+            ld b, 0
+            call eq_pick2                   ; the second slot (both hands shown)
+            jr c, .swap
+            ld a, [eq_cur]                  ; swapped, both unequipped
+            ld e, a
+            ld d, 0
+            ld hl, eq_box
+            add hl, de
+            ld a, [eq_cur2]
+            ld e, a
+            push hl
+            ld hl, eq_box
+            add hl, de
+            pop de
+            ld a, [de]
+            and $7F
+            ld b, a
+            ld a, [hl]
+            and $7F
+            ld [de], a
+            ld [hl], b
+            call eq_redraw
+            jr .swap
+
+; the slot cursor: C set on B; the hand at the slot (eq_cur), page by member
+eq_pick:    ld a, [eq_cur]
+            call eq_hand
+            call scr_frame
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .b
+            bit 0, a
+            ret nz                          ; (C clear)
+            and $C0
+            jr z, eq_pick
+            ld b, a
+            ld a, [eq_cur]
+            ld c, a
+            bit 7, b
+            jr z, .up
+            inc a
+            and 15
+            jr .mv
+.up:        dec a
+            and 15
+.mv:        ld [eq_cur], a
+            xor c                           ; another page (member pair): redraw
+            and 8
+            jr z, eq_pick
+            call eq_redraw
+            jr eq_pick
+.b:         scf
+            ret
+; the second hand (eq_cur kept, a second cursor eq_cur2 moved); B = 1: on the same slot only
+eq_pick2:   ld a, [eq_cur]
+            ld [eq_cur2], a
+.l:         ld a, [eq_cur2]
+            push bc
+            call eq_hand
+            ld hl, oam_buf                  ; the first hand into OAM 4-7 (same page only)
+            ld de, oam_buf + 16
+            ld c, 16
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec c
+            jr nz, .c
+            ld a, [eq_cur]
+            ld hl, eq_cur2
+            xor [hl]
+            and 8
+            jr z, .sp
+            xor a
+            ld [oam_buf + 16], a
+            ld [oam_buf + 20], a
+            ld [oam_buf + 24], a
+            ld [oam_buf + 28], a
+.sp:        ld a, [eq_cur]                  ; first hand at eq_cur in 0-3
+            call eq_hand
+            ld hl, oam_buf
+            ld de, oam_buf + 16
+            ld c, 16
+.sw:        ld a, [de]                      ; swap: 0-3 = second, 4-7 = first
+            ld b, [hl]
+            ld [hl+], a
+            ld a, b
+            ld [de], a
+            inc de
+            dec c
+            jr nz, .sw
+            call scr_frame                  ; (read_pad clobbers BC)
+            pop bc
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .b
+            bit 0, a
+            jr nz, .a
+            ld c, a
+            ld a, b
+            and a
+            jr nz, .l                       ; (confirm: no moving)
+            ld a, c
+            and $C0
+            jr z, .l
+            ld a, [eq_cur2]
+            ld d, a
+            bit 7, c
+            jr z, .up
+            inc a
+            and 15
+            jr .mv
+.up:        dec a
+            and 15
+.mv:        ld [eq_cur2], a
+            xor d
+            and 8
+            jr z, .l
+            push bc
+            ld a, [eq_cur]
+            push af
+            ld a, [eq_cur2]
+            ld [eq_cur], a
+            call eq_redraw
+            pop af
+            ld [eq_cur], a
+            pop bc
+            jr .l
+.a:         and a
+            ret
+.b:         scf
+            ret
+; the hand at slot A: x -8 (cut off), y of the slot's row
+eq_hand:    ld b, a
+            and 3
+            ld c, a
+            ld a, b
+            and 4                           ; member in the pair
+            ld a, 6
+            jr z, .t
+            ld a, 13
+.t:         add a, c
+            add a, a
+            add a, a
+            add a, a
+            sub 4
+            ld c, a
+            ld b, $F8
+            jp scr_cursor
+
+; HL = the slot eq_cur in the box, A = its item
+eq_item:    ld a, [eq_cur]
+            ld e, a
+            ld d, 0
+            ld hl, eq_box
+            add hl, de
+            ld a, [hl]
+            ret
+
+; the records' slots <-> the box; FF1 SortEquipmentList (gaps removed)
+eq_tobox:   ld de, eq_box
+            ld c, 0
+.m:         ld a, [eq_off]
+            add a, c
+            ld l, a
+            ld h, high(ch_stats)
+            ld b, 4
+.s:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .s
+            ld a, c
+            add a, $40
+            ld c, a
+            jr nz, .m
+            ret
+eq_frombox: ld de, eq_box
+            ld c, 0
+.m:         ld a, [eq_off]
+            add a, c
+            ld l, a
+            ld h, high(ch_stats)
+            ld b, 4
+.s:         ld a, [de]
+            inc de
+            ld [hl+], a
+            dec b
+            jr nz, .s
+            ld a, c
+            add a, $40
+            ld c, a
+            jr nz, .m
+            ret
+eq_sort:    ld c, 0
+.m:         ld a, [eq_off]
+            add a, c
+            ld l, a
+            ld h, high(ch_stats)
+            push hl
+            ld de, scr_buf                  ; the four, then back without the empty ones
+            ld b, 4
+.cp:        ld a, [hl]
+            ld [de], a
+            ld [hl+], a
+            inc de
+            dec b
+            jr nz, .cp
+            pop hl
+            push hl
+            xor a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            pop hl
+            ld de, scr_buf
+            ld b, 4
+.pt:        ld a, [de]
+            inc de
+            and a
+            jr z, .n
+            ld [hl+], a
+.n:         dec b
+            jr nz, .pt
+            ld a, c
+            add a, $40
+            ld c, a
+            jr nz, .m
+            ret
+
+; the class may use the item (FF1 IsEquipLegal: permission words, $800 >> class); C set if
+; not; equipping it unequips the member's other weapons / armour of the same type
+eq_legal:   and $7F
+            dec a
+            ld [eq_t], a
+            add a, a
+            ld e, a
+            ld d, 0
+            ld a, [eq_kind]
+            and a
+            ld hl, N_WPERM
+            jr z, .w
+            ld hl, N_APERM
+.w:         add hl, de
+            ld de, scr_buf
+            ld bc, 2
+            ld a, NAMES
+            call far_copy
+            ld a, [eq_cur]                  ; the class bit
+            rlca
+            rlca
+            rlca
+            rlca
+            and $C0
+            ld l, a
+            ld h, high(ch_stats)
+            ld a, [hl]
+            ld [eq_cls], a
+            ld b, a
+            ld hl, $0800
+.sh:        ld a, b
+            and a
+            jr z, .bit
+            srl h
+            rr l
+            dec b
+            jr .sh
+.bit:       ld a, [scr_buf]
+            and l
+            ld b, a
+            ld a, [scr_buf + 1]
+            and h
+            or b
+            jr z, .ok
+            scf
+            ret
+.ok:        ld a, [eq_cur]                  ; the member's four slots
+            and $0C
+            ld e, a
+            ld d, 0
+            ld hl, eq_box
+            add hl, de
+            ld a, [eq_kind]
+            and a
+            jr nz, .arm
+            ld b, 4                         ; a weapon: every weapon off
+.wo:        res 7, [hl]
+            inc hl
+            dec b
+            jr nz, .wo
+            and a
+            ret
+.arm:       push hl                         ; armour: the same type off
+            ld a, [eq_t]
+            call eq_atype
+            ld [eq_t], a
+            pop hl
+            ld b, 4
+.ao:        bit 7, [hl]
+            jr z, .an
+            ld a, [hl]
+            and $7F
+            dec a
+            push hl
+            push bc
+            call eq_atype
+            pop bc
+            pop hl
+            ld c, a
+            ld a, [eq_t]
+            cp c
+            jr nz, .an
+            res 7, [hl]
+.an:        inc hl
+            dec b
+            jr nz, .ao
+            and a
+            ret
+; A = armour index (0-based) -> A = its type
+eq_atype:   ld l, a
+            ld h, 0
+            ld de, N_ATYPE
+            add hl, de
+            ld a, NAMES
+            ld [fc_bank], a
+            jp far_byte
+
+; the stats with / without the equipment (FF1 UnadjustEquipStats / ReadjustEquipStats and
+; the Black Belt / Master rules)
+eq_unadj:   xor a
+            ld [eq_adj], a
+            jr eq_adjall
+eq_readj:   ld a, 1
+            ld [eq_adj], a
+eq_adjall:  ld c, 0
+.m:         push bc
+            ld a, c
+            ld [eq_ch], a
+            ld a, [eq_off]
+            add a, c
+            ld l, a
+            ld h, high(ch_stats)
+            ld b, 4
+.s:         ld a, [hl+]
+            bit 7, a
+            jr z, .n
+            push hl
+            push bc
+            call eq_one
+            pop bc
+            pop hl
+.n:         dec b
+            jr nz, .s
+            call eq_bb
+            pop bc
+            ld a, c
+            add a, $40
+            ld c, a
+            jr nz, .m
+            ret
+; one equipped item A: weapon hit / damage, armour evasion / absorb / resistance
+eq_one:     and $7F
+            dec a
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            ld a, [eq_kind]
+            and a
+            jr nz, .a
+            add hl, hl
+            ld de, N_WSTAT
+            add hl, de
+            ld de, scr_buf
+            ld bc, 2
+            ld a, NAMES
+            call far_copy
+            ld a, [eq_ch]
+            add a, $21                      ; hit rate, damage
+            ld l, a
+            ld h, high(ch_stats)
+            ld a, [scr_buf]
+            ld b, a
+            ld a, [scr_buf + 1]
+            ld c, a
+            ld a, [eq_adj]
+            and a
+            jr z, .wsub
+            ld a, [hl]
+            add a, b
+            ld [hl-], a
+            ld a, [hl]
+            add a, c
+            ld [hl], a
+            ret
+.wsub:      ld a, [hl]
+            sub b
+            ld [hl-], a
+            ld a, [hl]
+            sub c
+            ld [hl], a
+            ret
+.a:         ld de, N_ASTAT
+            add hl, de
+            ld de, scr_buf
+            ld bc, 3
+            ld a, NAMES
+            call far_copy
+            ld a, [eq_ch]
+            add a, $23                      ; evasion
+            ld l, a
+            ld h, high(ch_stats)
+            ld a, [scr_buf]
+            ld b, a
+            ld a, [eq_adj]
+            and a
+            jr z, .asub
+            ld a, [hl]                      ; on: evasion - penalty, absorb +, resistance |=
+            sub b
+            ld [hl], a
+            ld a, l
+            sub 1
+            ld l, a
+            ld a, [scr_buf + 1]
+            add a, [hl]
+            ld [hl], a
+            ld a, l
+            add a, 2
+            ld l, a
+            ld a, [scr_buf + 2]
+            or [hl]
+            ld [hl], a
+            ret
+.asub:      ld a, [hl]                      ; off: only the evasion back (FF1)
+            add a, b
+            ld [hl], a
+            ret
+; Black Belt / Master (FF1 Unadjust / ReadjustBBEquipStats)
+eq_bb:      ld a, [eq_ch]
+            ld l, a
+            ld h, high(ch_stats)
+            ld a, [eq_kind]
+            and a
+            jr nz, .arm
+            ld a, [eq_adj]
+            and a
+            jr nz, .wre
+            ld a, [hl]                      ; weapons off: BB damage 0
+            cp CLS_BB
+            jr z, .z
+            cp CLS_MA
+            ret nz
+.z:         ld a, l
+            add a, $20
+            ld l, a
+            ld [hl], 0
+            ret
+.wre:       ld a, [hl]
+            cp CLS_BB
+            jr z, .bw
+            cp CLS_MA
+            ret nz
+.bw:        ld a, l
+            add a, $20
+            ld l, a
+            ld a, [hl]                      ; damage 0: no weapon: 2 (level + 1)
+            and a
+            jr z, .nw
+            ld a, l                         ; with one: + strength / 2
+            sub $10
+            ld l, a
+            ld a, [hl]
+            srl a
+            ld b, a
+            ld a, l
+            add a, $10
+            ld l, a
+            ld a, [hl]
+            add a, b
+            ld [hl], a
+            ret
+.nw:        ld a, l
+            add a, $06                      ; level ($26)
+            ld l, a
+            ld a, [hl]
+            inc a
+            add a, a
+            ld b, a
+            ld a, l
+            sub $06
+            ld l, a
+            ld [hl], b
+            ret
+.arm:       ld a, [eq_adj]
+            and a
+            jr nz, .are
+            ld a, l                         ; armour off: absorb and resistance 0
+            add a, $22
+            ld l, a
+            xor a
+            ld [hl+], a
+            inc hl
+            ld [hl], a
+            ret
+.are:       ld a, [hl]
+            cp CLS_BB
+            jr z, .ba
+            cp CLS_MA
+            ret nz
+.ba:        ld a, l
+            add a, $22
+            ld l, a
+            ld a, [hl]
+            and a
+            ret nz
+            ld a, l
+            add a, $04                      ; level ($26)
+            ld l, a
+            ld a, [hl]
+            inc a
+            ld b, a
+            ld a, l
+            sub $04
+            ld l, a
+            ld [hl], b
+            ret
+
+; inverted icons to BG $A0 + code (LCD off)
+inv_gfx:    ldh a, [rLCDC]
+            bit 7, a
+            jr z, .off
+.w:         ldh a, [rLY]
+            cp 144
+            jr c, .w
+            xor a
+            ldh [rLCDC], a
+.off:       ldh a, [is_cgb]
+            and a
+            ld hl, N_INVDMG
+            jr z, .d
+            ld hl, N_INVCGB
+.d:         ld de, $8A00
+            ld bc, 512
+            ld a, NAMES
+            jp far_copy
+
+eq_redraw:  call eq_draw
+            jp scr_upd
+eq_draw:    call scr_cls
+            ld bc, $0000
+            ld de, $1404
+            call scr_win
+            ld bc, $0004
+            ld de, $1407
+            call scr_win
+            ld bc, $000B
+            ld de, $1407
+            call scr_win
+            ld bc, $0101
+            call pen_at
+            ld a, [eq_kind]
+            and a
+            ld hl, str_weapons
+            jr z, .t
+            ld hl, str_armor
+.t:         call pen_str
+            ld bc, $0202
+            call pen_at
+            ld hl, str_eqcmd
+            call pen_str
+            ld a, [eq_cur]                  ; the pair: members 2 page, 2 page + 1
+            and 8
+            rrca
+            rrca
+            ld [eq_ch], a                   ; (0 / 2)
+            ld c, 5
+            call .mem
+            ld a, [eq_ch]
+            inc a
+            ld [eq_ch], a
+            ld c, 12
+.mem:       push bc                         ; name row C, slots below
+            ld b, 1
+            call pen_at
+            ld a, [eq_ch]
+            call pen_name
+            pop bc
+            ld a, [eq_ch]
+            add a, a
+            add a, a
+            ld [eq_t], a                    ; box index
+            ld b, 4
+.sl:        inc c
+            push bc
+            ld a, [eq_t]
+            ld e, a
+            ld d, 0
+            ld hl, eq_box
+            add hl, de
+            ld a, [hl]
+            and a
+            jr z, .em
+            ld [eq_it], a
+            ld b, 1
+            call pen_at
+            ld a, [eq_it]                   ; the name (icon + letters) into scr_buf
+            and $7F
+            ld b, 27                        ; weapons: name 27 + n, armour 67 + n
+            ld c, a
+            ld a, [eq_kind]
+            and a
+            jr z, .wn
+            ld b, 67
+.wn:        ld a, b
+            add a, c
+            call pen_iname
+            ld a, [eq_it]                   ; equipped: the icon inverted
+            bit 7, a
+            jr z, .em
+            pop bc
+            push bc
+            ld b, 1
+            call cell_addr
+            ld a, [hl]
+            add a, INV_TILE
+            ld [hl], a
+            inc h
+            inc h
+            inc h
+            ld [hl], WIN_ATTR & 7           ; (CGB: VRAM bank 0)
+.em:        ld hl, eq_t
+            inc [hl]
+            pop bc
+            dec b
+            jr nz, .sl
+            ret
+
 section wram, $CE00
 pen:        ds 2
 pen_l:      ds 2
@@ -1739,4 +2480,15 @@ mg_cur:     ds 1
 mg_lv:      ds 1
 mg_mp:      ds 1
 mg_hp:      ds 1
+eq_kind:    ds 1
+eq_off:     ds 1
+eq_cur:     ds 1
+eq_cur2:    ds 1
+eq_mode:    ds 1
+eq_t:       ds 1
+eq_it:      ds 1
+eq_cls:     ds 1
+eq_ch:      ds 1
+eq_adj:     ds 1
+eq_box:     ds 16
 mtxt:       ds 160

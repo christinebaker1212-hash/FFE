@@ -103,7 +103,7 @@ def data_banks(rom, ff3=None, init=None):
     kind, _ = talkconst.extract(rom, DIS)
     place(banks, COMMON, 0x5C00, kind)                         # talk routine kind per object id
     place(banks, COMMON, 0x5D00, weapon_slots(rom))           # weapon slots (16), armour (16)
-    nb = names.names_bank(rom)
+    nb = names.names_bank(rom, ff3)
     nb[0x3000:0x3200] = rom.rd(0x0D, 0xBC00, 0x200)            # item prices (FF1 lut_ItemPrices)
     nb[0x3200:0x3300] = rom.rd(0x00, 0xB100, 0x100)            # chest contents (lut_Treasure)
     banks[names.NAMES_BANK] = nb

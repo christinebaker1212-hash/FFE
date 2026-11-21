@@ -136,3 +136,17 @@ one reaches parity, so the owner can keep playing).
   the ROM's class table; level-1 MP for the magicians. Ends on the overworld start. Banked
   code never maps another bank into its own window: data from other banks via far_copy.
   Checked: PyBoy (DMG), mGBA (CGB).
+- Menus (menu.s, code bank 2; screens now drawn into a RAM copy of the map, uploaded in
+  V-Blank, so descriptions and updates need no blank screen): main menu (party with HP and
+  level, commands, Gil, the four orbs from FF1's orb tiles), Items (13 a page; FF1's item
+  effects: Potion / Antidote / Golden Needle on a member, Sleeping Bag / Tent / Cottage with
+  the save question, Lute / Rod plates, Floating Stone, the fairy's bottle; descriptions from
+  the project's English re-wrapped), Magic (three levels a page; FF1's out-of-battle spells
+  with the ROM's spell ids and formulas: cure and heal families, Life / Full-Life, Pure,
+  Soft, Warp and Exit through the floor stack), Weapons / Armor (FF1's Equip / Swap / Drop,
+  class permissions, same-type unequip, stat adjustments incl. Black Belt / Master; an
+  equipped item shows its icon as a dark silhouette on a white box), Status (level,
+  experience, to the next level from FF1's table, stats, class sprite). Item / spell routine
+  constants are read from the ROM's routines (talkconst.item_routines / magic_routines).
+  Save: the save page to cart RAM with a mark and a sum. Test builds: `build.py --init
+  ADDR=VAL,..` seeds the save page.

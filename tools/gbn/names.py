@@ -78,8 +78,41 @@ def name_codes(rom, k, icons=True):
     return bytes(out)
 
 
-def names_bank(rom):
-    """$4000 256 pointers, the names (icon + letters, 0-terminated) after them"""
+def find14(rom, sig, off=0):
+    b14 = rom.prg[14 * 0x4000:15 * 0x4000]
+    i = b14.find(bytes(sig))
+    assert i >= 0, 'not found: ' + bytes(sig).hex()
+    return 0x8000 + i + off
+
+
+def equip_tables(rom):
+    """{weapon stats (40 x 8), armour stats (40 x 4), weapon / armour permissions (40 words
+    each), armour types (40)}; the permission tables found by FF1's IsEquipLegal code"""
+    import re
+    b14 = rom.prg[14 * 0x4000:15 * 0x4000]
+    perms = []
+    for m in re.finditer(re.escape(bytes([0xA6, 0x10, 0xBD])), b14):
+        i = m.start()
+        if b14[i + 5:i + 7] == bytes([0x25, 0x14]): perms.append(b14[i + 3] | b14[i + 4] << 8)
+    assert len(perms) == 2
+    return dict(wstat=rom.rd(BANK_EQUIP, WEAPONS, 320), astat=rom.rd(BANK_EQUIP, 0x8140, 160),
+                wperm=rom.rd(14, perms[0], 80), aperm=rom.rd(14, perms[1], 80),
+                atype=armour_types(rom))
+
+
+def inv_icons(ff3):
+    """the icons inverted (an equipped item): DMG and CGB tiles by font code (32 each)"""
+    import text
+    dmg = bytearray(512); cgb = bytearray(512)
+    for code, t16 in icon_tiles(ff3).items():
+        dmg[16 * code:16 * code + 16] = data.gb_tile(t16, (3, 2, 0, 3))
+        cgb[16 * code:16 * code + 16] = data.gb_tile(t16, (0, 1, 3, 0))
+    return bytes(dmg), bytes(cgb)
+
+
+def names_bank(rom, ff3=None):
+    """$4000 256 pointers, the names (icon + letters, 0-terminated) after them; $7300 the
+    equipment tables, $7600 / $7800 the inverted icons (DMG / CGB)"""
     blob = bytearray(b'\xff' * 0x4000)
     body = bytearray(); ptrs = bytearray()
     for k in range(256):
@@ -88,4 +121,13 @@ def names_bank(rom):
     blob[0:0x200] = ptrs
     blob[0x200:0x200 + len(body)] = body
     assert 0x200 + len(body) <= 0x3000
+    e = equip_tables(rom)
+    blob[0x3300:0x3440] = e['wstat']
+    blob[0x3440:0x34E0] = e['astat']
+    blob[0x3500:0x3550] = e['wperm']
+    blob[0x3550:0x35A0] = e['aperm']
+    blob[0x35A0:0x35C8] = e['atype']
+    d, c = inv_icons(ff3)
+    blob[0x3600:0x3800] = d
+    blob[0x3800:0x3A00] = c
     return blob
