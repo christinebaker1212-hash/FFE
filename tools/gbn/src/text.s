@@ -116,6 +116,16 @@ dlg_open:   ld l, a                         ; table entry: 3 x id
             call dlg_page
             ld a, 1
             ld [box_on], a
+            ld a, [dlgsfx]                  ; a fanfare / the treasure ditty (FF1 dlgsfx)
+            and a
+            ret z
+            cp 1
+            ld a, TR_DLGFAN
+            jr z, .t
+            ld a, TR_TREAS
+.t:         call snd_track
+            xor a
+            ld [dlgsfx], a
             ret
 
 ; the next page into the buffer (from dlg_ptr), upload restarted
@@ -313,6 +323,7 @@ dlg_frame:  ldh a, [pad_new]
             jp dlg_page
 .close:     xor a
             ld [box_on], a
+            call map_music                  ; (after a fanfare: the map's music again)
             jp talk_after                   ; (a teleport / battle the talk asked for)
 
 section wram, $CB00

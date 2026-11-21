@@ -49,6 +49,8 @@ battle:     ld a, [btl_fid]
             ld a, BTL_DATA
             call far_copy
             call bt_prep                    ; enemies generated (FF1 PrepareEnemyFormation)
+            ld a, TR_BATTLE                 ; (FF1: the battle music)
+            call snd_track
             xor a
             ld [bt_msgon], a
             call bt_screen
@@ -59,12 +61,18 @@ battle:     ld a, [btl_fid]
             cp 2
             jr z, .lost
             cp 1
-            call z, bt_victory
+            jr nz, .nv
+            ld a, TR_FANFARE                ; (FF1: the victory fanfare)
+            call snd_track
+            call bt_victory
+.nv:
             call bt_ch_exit
             call bt_end_screen
             xor a
             ret
-.lost:      call bt_ch_exit
+.lost:      ld a, TR_GAMEOVER
+            call snd_track
+            call bt_ch_exit
             call bt_end_screen
             ld a, 1
             ret

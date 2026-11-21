@@ -224,7 +224,9 @@ section bank 2, $4800
 
 ; ---- the main menu (approved layout): party (0,0,20,10), commands + Gil (0,9,12,9),
 ; orbs (12,10,8,8)
-menu_main:  xor a
+menu_main:  ld a, TR_MENU                   ; (FF1: the menu music)
+            call snd_track
+            xor a
             ld [mm_cur], a
             ld [menu_act], a
 .re:        call mm_draw

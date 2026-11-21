@@ -50,6 +50,8 @@ shop_main:  ld a, [shop_arg]
             call scr_open
             call sh_base
             call scr_show
+            ld a, TR_SHOP                   ; (FF1: the shop music)
+            call snd_track
             ld a, [sh_type]
             cp 2
             jp c, sh_equip
