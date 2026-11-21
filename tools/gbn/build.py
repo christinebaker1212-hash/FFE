@@ -127,6 +127,12 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, OW_TS, 0x4400, o['cgb_tiles'])
     place(banks, OW_INFO, 0x5000, o['cgb_bg'] + o['cgb_bg'])
     place(banks, OW_INFO, 0x5040, o['cgb_obj'])
+    place(banks, OW_INFO, 0x7400, o['veh_cgb'])                # vehicle sprites (FF1 OW objects)
+    place(banks, OW_INFO, 0x7A00, o['veh_dmg'])
+    fix = rom.prg[-0x4000:]                                     # FF1's vehicle sprite tables
+    place(banks, OW_INFO, 0x5070, fix[0xE3F9 - 0xC000:0xE3F9 - 0xC000 + 9])   # lut_VehicleSprY
+    place(banks, OW_INFO, 0x5080, fix[0xE4A6 - 0xC000:0xE4A6 - 0xC000 + 9])   # facing offsets
+    place(banks, OW_INFO, 0x50A0, fix[0xE4F6 - 0xC000:0xE4F6 - 0xC000 + 64])  # lut_VehicleSprTbl
     place(banks, OW_INFO, 0x5060, bytes([8]))
     place(banks, OW_INFO, 0x7200, o['party_dmg'])
     place(banks, OW_INFO, 0x7300, b'\0' * 64)                  # no objects

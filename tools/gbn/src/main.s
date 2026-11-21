@@ -46,6 +46,15 @@ M_PARTYDMG = $7200          ; the party sprite pre-shaded for this map (DMG)
 M_OBJBLK   = $7340          ; object graphics blocks: tile bases, count at $7350
 M_OBJDMG   = $6800          ; object tiles pre-shaded (DMG), a 256-byte block each
 M_OBJCGB   = $7400          ; object tiles as they are (CGB)
+M_VEHCGB   = $7400          ; the overworld (bank OW_INFO): vehicle sprites (CGB / DMG ranks),
+M_VEHDMG   = $7A00          ;   FF1's vehicle tables: sprite y, facing offsets, 2 x 2 frames
+M_VEHY     = $5070
+M_VEHFACE  = $5080
+M_VEHTBL   = $50A0
+V_FOOT     = 1
+V_CANOE    = 2
+V_SHIP     = 4
+V_AIR      = 8
 C_OBJTBL   = $4400          ; FF1's object 2 x 2 tables
 C_INITPG   = $4500          ; new game: save page 0 and the game flags
 C_INITFLG  = $4600
@@ -214,6 +223,11 @@ start:      di
 .st:        ld d, START_X
             ld e, START_Y
 .ld:        call load_map
+            ld a, [SV_VEH]                  ; the vehicle (save page $14; on foot if 0)
+            and a
+            jr nz, .vh
+            inc a
+.vh:        ld [vehicle], a
             ld a, START_ROOM                ; (test builds: start inside a room)
             and a
             jr z, .nr
@@ -405,6 +419,8 @@ load_map:   ld [cur_map], a
             call memcpy
             ld hl, M_OBJCGB
             call obj_tiles
+            ld hl, M_VEHCGB
+            call veh_tiles
             jr .drw
 .dmg:       ld a, [map_bank]                ; DMG: pre-shaded variants 0-127 -> $9000,
             call sbank                ;   128-255 -> $8800
@@ -425,6 +441,8 @@ load_map:   ld [cur_map], a
             call memcpy
             ld hl, M_OBJDMG
             call obj_tiles
+            ld hl, M_VEHDMG
+            call veh_tiles
 .drw:       ld a, [ml_keep]                 ; (a reload keeps the objects)
             and a
             call z, obj_load
@@ -459,6 +477,16 @@ map_reload: ld a, [inroom]
             ret z
             ld [inroom], a
             jp room_redraw
+
+; the overworld: the vehicles' sprite tiles (FF1's OW objects) to sprite tiles $10-$6F
+veh_tiles:  ldh a, [maptype]
+            and a
+            ret z
+            ld a, [map_bank]
+            call sbank
+            ld de, $8100
+            ld bc, 96 * 16
+            jp memcpy
 
 ; the map's object graphics blocks (HL = their tiles in the map bank, 256 bytes a block) to
 ; their tile bases ($8000 + 16 x base; LCD off)
@@ -576,6 +604,7 @@ move:       ld a, [moving]
             ldh a, [maptype]
             and a
             jp z, talk
+            jp ow_abutton                   ; (the overworld: the airship)
 .nt:        ldh a, [pad]
             ld bc, $0100                    ; B = dx, C = dy; facing in D
             ld d, 0
@@ -611,11 +640,13 @@ move:       ld a, [moving]
             call map_at                     ; A = metatile
             call props                      ; D, E = its two property bytes
             pop bc
-            ldh a, [maptype]                ; the overworld: blocked if the first byte has
-            and a                           ;   the vehicle's bit (1: on foot)
+            ldh a, [maptype]                ; the overworld: FF1's vehicle rules
+            and a
             jr z, .smr
-            bit 0, d
-            ret nz
+            push bc
+            call ow_canmove
+            pop bc
+            ret c
             jr .ok
 .smr:       push de                         ; an object there: blocked
             push bc
@@ -772,12 +803,42 @@ arrived:    ld a, [px]
             call load_map
             scf
             ret
-.ow:        bit 6, e                        ; overworld: random encounters (FF1 OWCanMove)
-            jr z, .owe
+.ow:        ld a, [vehicle]                 ; on foot: poison
+            cp V_FOOT
             push de
-            call enc_step
+            call z, ow_poison
             pop de
-            cp ENC_OW                       ; (FF1: 10 in 256 a step)
+            ld a, [shop_pend]               ; the caravan
+            and a
+            jr z, .nc
+            ld [shop_arg], a
+            xor a
+            ld [shop_pend], a
+            ld a, SCR_BANK
+            ld hl, shop_main
+            call bank_call
+            call map_reload
+            scf
+            ret
+.nc:        ld a, [no_enc]                  ; (boarding / landing steps: none)
+            and a
+            jr nz, .owe
+            ld a, [vehicle]
+            cp V_AIR
+            jr z, .owe
+            bit 6, e                        ; overworld: random encounters (FF1 OWCanMove)
+            jr z, .owe
+            ld a, [vehicle]                 ; (the ship: 3 in 256)
+            cp V_SHIP
+            ld c, ENC_OW
+            jr nz, .rt
+            ld c, 3
+.rt:        push de
+            push bc
+            call enc_step
+            pop bc
+            pop de
+            cp c                            ; (FF1: 10 in 256 a step)
             jr nc, .owe
             ld a, e                         ; the domain: land (8 x 8 grid), sea, river
             and 3
@@ -803,7 +864,10 @@ arrived:    ld a, [px]
             or b
 .dom:       call enc_form
             jp do_battle
-.owe:       bit 7, e                        ; second byte bit 7 = an entrance,
+.owe:       ld a, [vehicle]                 ; (flying: no entrances)
+            cp V_AIR
+            ret z
+            bit 7, e                        ; second byte bit 7 = an entrance,
             ret z                           ;   bits 0-5 its number
             ld a, [px]                      ; (the overworld position kept for the warp out)
             ld [ow_x], a
@@ -1077,7 +1141,10 @@ mulsign:    and a                           ; A = sign (-1 / 0 / 1) -> A = sign 
             ret
 
 ; ---- party sprite (FF1's 2x2 tables: tile, attributes for UL, DL, UR, DR)
-make_oam:   ld a, COMMON
+make_oam:   ldh a, [maptype]                ; the overworld: vehicles
+            and a
+            jp nz, veh_oam
+make_oam_f: ld a, COMMON
             call sbank
             ld a, [facing]
             add a, a
@@ -1124,6 +1191,156 @@ make_oam:   ld a, COMMON
             ld [de], a
             inc de
             ret
+
+; the overworld's sprites (FF1 DrawOWSprites): the party or its vehicle at the screen's
+; centre (FF1's vehicle frames, y by vehicle), the ship / airship where they stand
+veh_oam:    ld a, [vehicle]
+            cp V_FOOT
+            jr nz, .veh
+            call make_oam_f
+            jr .objs
+.veh:       ld hl, oam_buf                  ; (all hidden first)
+            ld b, 40
+            xor a
+.c:         ld [hl+], a
+            inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .c
+            ld a, [vehicle]
+            ld e, a
+            ld d, 0
+            ld a, [map_bank]
+            call sbank
+            ld hl, M_VEHY
+            add hl, de
+            ld a, [hl]
+            sub $6C - $50                   ; (FF1 y $6C on foot = our $50)
+            ld [vh_y], a
+            ld a, [facing]                  ; facing 0-3 (R L U D) -> FF1 bits 1, 2, 8, 4
+            ld e, a
+            ld hl, .fbit
+            add hl, de
+            ld e, [hl]
+            ld a, [map_bank]
+            call sbank
+            ld hl, M_VEHFACE
+            add hl, de
+            ld a, [hl]
+            ld b, a
+            ld a, [vehicle]
+            cp V_AIR
+            ldh a, [frame]
+            jr z, .fa
+            ld a, [mcount]
+.fa:        and 8
+            or b
+            ld e, a
+            ld hl, M_VEHTBL
+            add hl, de
+            ld a, [vehicle]                 ; tile base: ship $20, canoe $50, airship $38
+            ld c, $20
+            cp V_SHIP
+            jr z, .tb
+            ld c, $50
+            cp V_CANOE
+            jr z, .tb
+            ld c, $38
+.tb:        ld de, oam_buf
+            ld a, [vh_y]
+            ld b, a
+            call .two
+            ld a, [vh_y]
+            add a, 8
+            ld b, a
+            call .two
+.objs:      ld a, [vehicle]                 ; the ship / airship standing on the map
+            cp V_SHIP
+            jr z, .na
+            ld hl, SV_SHIP
+            ld c, $20
+            ld de, oam_buf + 16
+            call .obj
+.na:        ld a, [vehicle]
+            cp V_AIR
+            ret z
+            ld hl, SV_AIR
+            ld c, $38
+            ld de, oam_buf + 32
+            jr .obj
+.fbit:      db 1, 2, 8, 4
+.two:       ld a, $50                       ; a row: x 72, 80
+            call .spr
+            ld a, $58
+.spr:       push af
+            ld a, b
+            ld [de], a
+            inc de
+            pop af
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            add a, c
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            push bc
+            ld b, a
+            and $40
+            rrca
+            ld c, a
+            ld a, b
+            and 3
+            or c
+            pop bc
+            ld [de], a
+            inc de
+            ret
+.obj:       ld a, [hl+]                     ; visible and near: its 2 x 2 (the first frame)
+            and a
+            ret z
+            ld a, [hl+]                     ; screen x = 72 + 16 (x - px)
+            push hl
+            ld hl, px
+            sub [hl]
+            pop hl
+            add a, 4
+            cp 9
+            ret nc
+            sub 4
+            swap a
+            add a, $48
+            ld [vh_x], a
+            ld a, [hl]
+            push hl
+            ld hl, py
+            sub [hl]
+            pop hl
+            add a, 4
+            cp 9
+            ret nc
+            sub 4
+            swap a
+            add a, $50
+            ld [vh_y], a
+            push de
+            ld a, [map_bank]
+            call sbank
+            ld hl, M_VEHTBL
+            pop de
+            ld a, [vh_y]
+            ld b, a
+            call .ot
+            ld a, [vh_y]
+            add a, 8
+            ld b, a
+.ot:        ld a, [vh_x]
+            add a, 8
+            call .spr
+            ld a, [vh_x]
+            add a, 16
+            jr .spr
 
 ; ---- drawing metatiles into the 32 x 32 BG ring (queued; written in V-Blank)
 ; queue entry (8 bytes): VRAM address (lo, hi), tiles UL UR DL DR, CGB palette
@@ -1445,6 +1662,202 @@ dma_rom:    ld a, high(oam_buf)
             ret
 dma_end:
 
+; ---- vehicles (FF1 ProcessOWInput @Movement, OWCanMove, Board / Unboard / DockShip): D, E =
+; the target's property bytes, tx / ty the target; C set if the move is blocked
+SV_SHIP    = $D000          ; save page: ship (visible, x, y), airship, bridge, canal, canoe
+SV_AIR     = $D004
+SV_BRIDGE  = $D008
+SV_CANAL   = $D00C
+SV_CANOE   = $D012
+SV_VEH     = $D014
+ow_canmove: xor a
+            ld [no_enc], a
+            ld a, [vehicle]
+            cp V_AIR
+            jr z, .go                       ; the airship: anywhere
+            cp V_SHIP
+            jr z, .ship
+            cp V_CANOE
+            jr z, .canoe
+            ld a, d                         ; on foot
+            and V_FOOT
+            jr nz, .fb
+            ld a, d                         ; special tiles: the chime, the caravan
+            and $C0
+            jr z, .go
+            cp $40
+            jr nz, .car
+            ld a, [ITEMS + $0C]
+            and a
+            jr z, .no
+            jr .go
+.car:       cp $80
+            jr nz, .go
+            ld a, [game_flags + $13]        ; (FF1: shop 70 unless the fairy is out)
+            and 1
+            jr nz, .go
+            ld a, 70
+            ld [shop_pend], a
+            jr .go
+.fb:        ld a, 1                         ; blocked on foot: the bridge, a canoe, the ship
+            ld [no_enc], a
+            ld hl, SV_BRIDGE
+            call .at
+            jr nc, .brg
+            call .tcanoe
+            jr nc, .go
+            call .tship
+            jr nc, .go
+.no:        scf
+            ret
+.brg:       ld a, [unsram + $16]            ; (FF1 bridgescene: the bridge story once)
+            and a
+            jr nz, .go
+            inc a
+            ld [unsram + $16], a
+.go:        and a
+            ret
+.ship:      ld a, d
+            and V_SHIP
+            jr nz, .sb
+            ld hl, SV_CANAL                 ; water: not through the canal object
+            call .at
+            jr nc, .no
+            jr .go
+.sb:        call .tcanoe                    ; land: a canoe, else dock where allowed
+            jr nc, .go
+            ld a, d
+            and $21
+            cp $20
+            jr nz, .no
+            call .dock
+            ld a, V_FOOT
+            ld [vehicle], a
+            jr .go
+.canoe:     ld a, d
+            and V_CANOE
+            jr z, .go
+            bit 0, d                        ; onto land (walkable): on foot
+            jr nz, .cs
+            ld a, V_FOOT
+            ld [vehicle], a
+            ld a, 1
+            ld [no_enc], a
+            jr .go
+.cs:        call .tship
+            jr nc, .go
+            jr .no
+.tcanoe:    bit 1, d                        ; FF1 BoardCanoe
+            jr nz, .f
+            ld a, [SV_CANOE]
+            and a
+            jr z, .f
+            ld a, [vehicle]
+            cp V_SHIP
+            call z, .dock
+            ld a, V_CANOE
+            ld [vehicle], a
+            ld a, 1
+            ld [no_enc], a
+            and a
+            ret
+.tship:     ld hl, SV_SHIP                  ; FF1 BoardShip: the ship at the target
+            call .at
+            ret c
+            ld a, V_SHIP
+            ld [vehicle], a
+            ld a, 1
+            ld [no_enc], a
+            and a
+            ret
+.dock:      ld a, [px]                      ; FF1 DockShip: the ship stays here
+            ld [SV_SHIP + 1], a
+            ld a, [py]
+            ld [SV_SHIP + 2], a
+            ret
+.at:        ld a, [hl+]                     ; object (visible, x, y) at the target: C clear
+            and a
+            jr z, .f
+            ld a, [tx]
+            cp [hl]
+            jr nz, .f
+            inc hl
+            ld a, [ty]
+            cp [hl]
+            jr nz, .f
+            and a
+            ret
+.f:         scf
+            ret
+
+; A on the overworld (FF1): the airship lands (not on tiles with byte 0 bit 3), or the party
+; boards it on its tile
+ow_abutton: ld a, [vehicle]
+            cp V_AIR
+            jr z, .land
+            cp V_FOOT
+            ret nz
+            ld a, [SV_AIR]
+            and a
+            ret z
+            ld a, [px]
+            ld hl, SV_AIR + 1
+            cp [hl]
+            ret nz
+            ld a, [py]
+            inc hl
+            cp [hl]
+            ret nz
+            ld a, V_AIR
+            ld [vehicle], a
+            ret
+.land:      ld a, [px]
+            ld e, a
+            ld a, [py]
+            ld d, a
+            call map_at
+            call props
+            bit 3, d
+            ret nz
+            ld a, [px]
+            ld [SV_AIR + 1], a
+            ld a, [py]
+            ld [SV_AIR + 2], a
+            ld a, V_FOOT
+            ld [vehicle], a
+            ret
+
+; FF1 MapPoisonDamage: on foot, each poisoned member loses 1 HP a step (not below 1)
+ow_poison:  xor a
+.m:         push af
+            call ch_rec
+            inc hl
+            ld a, [hl]
+            cp 3
+            jr nz, .n
+            ld a, l
+            add a, CH_HP - 1
+            ld l, a
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl-]
+            and a
+            jr nz, .d
+            ld a, c
+            cp 2
+            jr c, .n
+.d:         ld a, [hl]
+            sub 1
+            ld [hl+], a
+            ld a, [hl]
+            sbc a, 0
+            ld [hl], a
+.n:         pop af
+            inc a
+            cp 4
+            jr c, .m
+            ret
+
 ; ---- encounters and battles
 B_RATES    = $4A00          ; battle data bank: encounter rate per map (+1), domains, lut_RNG,
 B_DOMAINS  = $4800          ;   the formation weights
@@ -1585,7 +1998,9 @@ save_game:  ldh a, [maptype]                ; the overworld position (FF1: its s
             ld b, a
             ld a, [ow_y]
             ld c, a
-.ow:        ld a, b
+.ow:        ld a, [vehicle]
+            ld [SV_VEH], a
+            ld a, b
             sub 7
             ld [unsram + $10], a
             ld a, c
@@ -1662,6 +2077,11 @@ o_sy:       ds 1
 o_tb:       ds 1
 
 section wram, $CF90
+vehicle:    ds 1
+no_enc:     ds 1
+shop_pend:  ds 1
+vh_y:       ds 1
+vh_x:       ds 1
 bstep:      ds 1
 bsign:      ds 1
 bcount:     ds 1

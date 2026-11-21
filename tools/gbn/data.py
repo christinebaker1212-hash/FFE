@@ -247,10 +247,13 @@ def ow_pack(rom, cls=0):
     sppal = [[pal[0x10]] + list(pal[0x10 + 4 * p + 1:0x10 + 4 * p + 4]) for p in range(4)]
     spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)
     party = b''.join(spr_rank_tile(spr[16 * t:16 * t + 16], sppal[t >> 1 & 1]) for t in range(16))
+    vch = rom.rd(BANK_MAPCHR, 0x9C00, 0x600)                  # FF1 LoadOWObjectCHR: sprites $10-$6F
     return dict(prop=prop, tsa=tsa, mt_pal=mt_pal, party_dmg=party,
                 cgb_tiles=b''.join(gb_tile(chr_[16 * t:16 * t + 16]) for t in range(256)),
                 cgb_bg=b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in bg[p]),
-                cgb_obj=b''.join(rgb555(c).to_bytes(2, 'little') for p in range(2) for c in sppal[p]),
+                cgb_obj=b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in sppal[p]),
+                veh_cgb=b''.join(gb_tile(vch[16 * t:16 * t + 16]) for t in range(96)),
+                veh_dmg=b''.join(spr_rank_tile(vch[16 * t:16 * t + 16], sppal[2]) for t in range(96)),
                 mt_dmg=bytes(tbl), dmg_tiles=bytes(dmg),
                 rows=[ow_row(rom, r) for r in range(256)],
                 start=(rom.rd(BANK_SMINFO, INIT_UNSRAM + 0x10) + 7) & 0xFF,
