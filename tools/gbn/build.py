@@ -117,7 +117,7 @@ def data_banks(rom, ff3=None, init=None):
     nb[0x3000:0x3200] = rom.rd(0x0D, 0xBC00, 0x200)            # item prices (FF1 lut_ItemPrices)
     nb[0x3200:0x3300] = rom.rd(0x00, 0xB100, 0x100)            # chest contents (lut_Treasure)
     banks[names.NAMES_BANK] = nb
-    banks[ui.MTEXT_BANK] = bytearray(ui.mtext_bank())
+    banks[ui.MTEXT_BANK] = bytearray(ui.mtext_bank(rom))
     banks[battle.BTL_DATA] = bytearray(battle.data_bank(rom))
     banks[sound.MUS_DATA] = bytearray(rom.prg[13 * 0x4000:14 * 0x4000])   # FF1's music data
     for b, blob in battle.chr_banks(rom).items(): banks[b] = bytearray(blob)
@@ -214,7 +214,7 @@ def main():
             for j in range(int(n)): init.append((int(k, 16) + j, int(v, 16)))
     src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\nSTART_ROOM = %s\n' % tuple(st) +
            'TEST_INIT = %d\n' % (1 if init else 0) + 'FONT_D0 = $%02X\n' % text.code_of('0') + sound.mus_defs(rom) + sound.sfx_defs() +
-           'STORY_FIRST = %d\nSTORY_END = %d\n' % (ui.story_pages()[1], len(ui.story_pages()[0])) +
+           'STORY_FIRST = %d\nSTORY_END = %d\nSTORY_CRED = %d\n' % (ui.story_pages(rom)[1], len(ui.story_pages(rom)[0]), ui.CREDIT_PAGES) +
            'ENC_OW = %s\n' % (a[a.index('--enc') + 1] if '--enc' in a else '10') +
            'START_BATTLE = %s\n' % (a[a.index('--battle') + 1] if '--battle' in a else '$FF') + talk_defs(rom) + item_defs(rom) + magic_defs(rom) +
            open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +

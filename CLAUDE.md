@@ -1271,7 +1271,8 @@ Pocket / SGB2 / GBA runs (mGBA, VRAM checker 0), the FFE Builder now makes FF1 f
 build, the ending as FF1 ("The End" drawing, timed pages), Chaos' dissolve.
 FF1's transitions: the battle transition (emphasis flashing + noise), palette cycling around
 menus / shops / battles, the screen wipe on map changes (window curtains via STAT).
-Next: the owner's play-test; the story pages' shutters. Lessons: docs/gb-lessons.md "Native rewrite".
+The story pages' shutters; the bridge scene's music and FF1's credits pages (from the user's ROM).
+Next: the owner's play-test. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

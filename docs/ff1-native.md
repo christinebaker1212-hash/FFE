@@ -242,4 +242,6 @@ one reaches parity, so the owner can keep playing).
 5. (done) Battle polish: animations and poses; sound effects.
 6. (done) SGB, Lot Check pass, lag check, the builder, FF1's transitions (the battle
    transition's emphasis flashing, the palette cycling around menus / shops, the screen wipe on
-   map changes). Left: the owner's play-test on hardware; the story pages' shutters.
+   map changes), the story pages' shutters, the bridge scene as FF1 (its music, the four story
+   pages, then FF1's four credits pages read from the ROM's lut_CreditsText at build time, a
+   32-frame stall). Left: the owner's play-test on hardware.

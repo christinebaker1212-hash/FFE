@@ -223,6 +223,10 @@ start:      di
             jr .ld
 .nt:        cp MAP_OW
             jr nz, .st
+            ld a, START_X                   ; (test builds: --start $FF,X,Y places the party)
+            and a
+            ld a, MAP_OW
+            jr nz, .st
             ld a, COMMON
             call sbank
             ld a, [C_OWSTART]
@@ -954,7 +958,7 @@ arrived:    ld a, [px]
             ld hl, pc_out
             call bank_call
             ld a, STORY_FIRST
-            ld b, 4
+            ld b, 4 + STORY_CRED
             ld hl, story_show
             ld a, SCR_BANK
             call bank_call_ab
@@ -1804,9 +1808,17 @@ bank_call_ab:
             push af
             ld a, SCR_BANK
             call sbank
+            ld a, TR_BRIDGE                 ; FF1's bridge music
+            call snd_track
             ld a, STORY_FIRST
-            ld b, 4
+            ld b, 4 + STORY_CRED                ; (the bridge: its story, FF1's credits)
             call story_show
+            ld b, $20                       ; FF1: $20 frames of stall before the exit
+.st:        push bc
+            call scr_frame
+            pop bc
+            dec b
+            jr nz, .st
             pop af
             jp sbank
 ; copy BC bytes from bank A, HL to DE (RAM / VRAM); the caller's bank mapped again
@@ -2411,8 +2423,8 @@ do_battle:  ld [btl_fid], a
             call snd_track
             ld a, 2
             ld [st_mode], a
-            ld a, STORY_FIRST + 4
-            ld b, STORY_END - STORY_FIRST - 4
+            ld a, STORY_FIRST + 4 + STORY_CRED
+            ld b, STORY_END - STORY_FIRST - 4 - STORY_CRED
             call story_show
             jp the_end
 .ok:        ld a, 1                         ; (FF1: back on the map, the palettes cycle in)

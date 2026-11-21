@@ -121,7 +121,7 @@ def string_table(base):
 MTEXT_BANK = 5
 
 
-def mtext_bank():
+def mtext_bank(rom=None):
     """the menu texts (FF1's menu strings: descriptions, prompts), wrapped to the GB windows:
     $4000 pointers by FF1's string id (64), the strings after them"""
     import re
@@ -162,7 +162,7 @@ def mtext_bank():
         body += enc('\n'.join(lines)) + b'\0'
     blob[0x2000:0x2080] = ptrs
     blob[0x2080:0x2080 + len(body)] = body
-    st, _, _ = story_bank_part()
+    st, _, _ = story_bank_part(rom)
     blob[0x3000:0x3000 + len(st)] = st
     return bytes(blob)
 
@@ -180,9 +180,45 @@ def story_texts():
     return got
 
 
-def story_pages():
-    """the pages (each up to 10 lines of 18): prologue first, then the story texts in order;
-    returns (pages, index of the first story page)"""
+CREDIT_PAGES = 4
+
+
+def credit_pages(rom):
+    """FF1's bridge-scene credits (bank 13 lut_CreditsText: 4 pages, already in Latin letters
+    in the ROM): per page its lines, each segment on the line of its NES row in the story box
+    (NES row 5 = our line 0), upper case"""
+    b13 = rom.prg[13 * 0x4000:14 * 0x4000]
+    t = None                                        # the table: 4 pointers, the first just
+    for a in range(0, 0x4000 - 8):                  #   past it, each page ending in $00
+        p0 = b13[a] | b13[a + 1] << 8
+        if p0 == 0x8000 + a + 8 and all(0x8000 + a + 8 <= (b13[a + 2 * k] | b13[a + 2 * k + 1] << 8)
+                                        < 0xC000 for k in range(4)) and b13[a + 9] in (0x20, 0x21, 0x22, 0x23):
+            t = a; break
+    assert t is not None, 'credits table not found'
+    pages = []
+    for p in range(CREDIT_PAGES):
+        a = (b13[t + 2 * p] | b13[t + 2 * p + 1] << 8) - 0x8000
+        lines = [''] * 10
+        while True:
+            lo, hi = b13[a], b13[a + 1]; a += 2
+            row = ((hi << 8 | lo) - 0x2000) // 32 - 5
+            s = ''
+            while b13[a] not in (0, 1):
+                c = b13[a]; a += 1
+                s += (chr(0x41 + c - 0x20) if 0x20 <= c <= 0x39 else ' ' if c == 0xFF
+                      else '-' if c == 0xC2 else '')
+            if 0 <= row < 10: lines[row] = ' '.join(s.split())
+            if b13[a] == 0: break
+            a += 1
+        while lines and not lines[-1]: lines.pop()
+        pages.append(lines)
+    return pages
+
+
+def story_pages(rom=None):
+    """the pages (each up to 10 lines of 18): prologue first, then the story texts in order
+    (with the ROM: FF1's credits after the bridge's four pages); returns (pages, index of the
+    first story page)"""
     st = story_texts()
     pages = []
     pro = st.get('prologue', {}).get(0, '')
@@ -204,12 +240,14 @@ def story_pages():
             ls.append(para.strip())
         ls = text.wrap(' '.join(x for x in ls if x)) if max(len(x) for x in ls) > 18 else ls
         pages.append([x for x in ls][:10])
+    if rom is not None:
+        pages[first + 4:first + 4] = credit_pages(rom)
     return pages, first
 
 
-def story_bank_part():
+def story_bank_part(rom=None):
     """$7000 in the menu text bank: pointers (64), the pages (lines joined by $0A)"""
-    pages, first = story_pages()
+    pages, first = story_pages(rom)
     body = bytearray(); ptrs = bytearray()
     for pg in pages[:64]:
         ptrs += (0x7080 + len(body)).to_bytes(2, 'little')
