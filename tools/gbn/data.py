@@ -159,6 +159,33 @@ DOOR_MTS = (0x36, 0x37, 0x3B)           # FF1's door metatiles (drawn at run tim
 FONT_CODES = list(range(0x10, 0x19)) + list(range(0x20, 0x80))   # frame $10-$18, text $20-$7F
 
 
+def party_perms(rom, pal):
+    """DMG: per class (12) and sprite palette 0 / 1 the brightness ranks of colours 1-3 (as
+    spr_rank_tile) with the class's two colours in place (FF1 MAPMAN_PAL): rank1 | rank2 << 2 |
+    rank3 << 4; the leader's sprite is ranked with them at run time"""
+    out = bytearray()
+    for c in range(12):
+        mp = rom.rd(BANK_SMINFO, MAPMAN_PAL + 2 * c, 2)
+        p2 = bytearray(pal); p2[0x12], p2[0x16] = mp[0], mp[1]
+        for p in (0, 1):
+            sp = [p2[0x10]] + list(p2[0x10 + 4 * p + 1:0x10 + 4 * p + 4])
+            order = sorted(range(1, 4), key=lambda i: -lum(sp[i]))
+            rank = [0] * 4
+            for r_, i in enumerate(order): rank[i] = r_ + 1
+            out.append(rank[1] | rank[2] << 2 | rank[3] << 4)
+    return bytes(out)
+
+
+def mapman_all(rom):
+    """the 12 classes' map sprites (16 tiles each, raw GB tiles) and their two colours as
+    RGB555 (FF1 LoadPlayerMapmanCHR / MAPMAN_PAL)"""
+    tiles = b''.join(gb_tile(rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * c + 16 * t, 16))
+                     for c in range(12) for t in range(16))
+    cols = b''.join(rgb555(x).to_bytes(2, 'little') for c in range(12)
+                    for x in rom.rd(BANK_SMINFO, MAPMAN_PAL + 2 * c, 2))
+    return tiles, cols
+
+
 def map_pack(rom, m, cls=0):
     """a standard map: metatiles, palettes (outside / in a room), and for DMG the tiles
     pre-shaded per (tile, shading) for the metatiles the map uses (and the door metatiles),
@@ -203,6 +230,7 @@ def map_pack(rom, m, cls=0):
     return dict(ts=ts, map=mp_, mt_dmg_out=mt_dmg['out'], mt_dmg_in=mt_dmg['in'],
                 dmg_tiles=bytes(dmg_tiles), n_dmg=n, cgb_bg_out=cgb_bg['out'],
                 cgb_bg_in=cgb_bg['in'], cgb_obj=cgb_obj, party_dmg=party, objs=objs,
+                party_perm=party_perms(rom, pal),
                 font_tbl=bytes(font_tbl))
 
 
@@ -248,7 +276,7 @@ def ow_pack(rom, cls=0):
     spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)
     party = b''.join(spr_rank_tile(spr[16 * t:16 * t + 16], sppal[t >> 1 & 1]) for t in range(16))
     vch = rom.rd(BANK_MAPCHR, 0x9C00, 0x600)                  # FF1 LoadOWObjectCHR: sprites $10-$6F
-    return dict(prop=prop, tsa=tsa, mt_pal=mt_pal, party_dmg=party,
+    return dict(prop=prop, tsa=tsa, mt_pal=mt_pal, party_dmg=party, party_perm=party_perms(rom, pal),
                 cgb_tiles=b''.join(gb_tile(chr_[16 * t:16 * t + 16]) for t in range(256)),
                 cgb_bg=b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in bg[p]),
                 cgb_obj=b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in sppal[p]),

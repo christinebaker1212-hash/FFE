@@ -16,6 +16,8 @@ TR_SHOP    = $4F
 TR_MENU    = $51
 TR_DLGFAN  = $54
 TR_TREAS   = $58
+TR_LINEUP  = $55
+TR_MINIMAP = $41
 
 section bank 7, $4000
 ; boot: sound on, the triangle's wave

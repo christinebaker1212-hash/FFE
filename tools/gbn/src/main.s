@@ -468,7 +468,8 @@ load_map:   ld [cur_map], a
             call obj_tiles
             ld hl, M_VEHDMG
             call veh_tiles
-.drw:       ld a, [ml_keep]                 ; (a reload keeps the objects)
+.drw:       call party_spr                  ; (the leader's class)
+            ld a, [ml_keep]                 ; (a reload keeps the objects)
             and a
             call z, obj_load
             xor a
@@ -624,7 +625,24 @@ move:       ld a, [moving]
             xor a
             ld [fdepth], a
             jp arrived.toow
-.nm:        ldh a, [pad_new]                ; A on a standard map: talk to what is in front
+.nm:        ldh a, [pad_new]                ; Select: FF1's lineup menu; with B held on the
+            bit 2, a                        ;   overworld, its world map
+            jr z, .na
+            ldh a, [maptype]
+            and a
+            jr z, .lu
+            ldh a, [pad]
+            bit 1, a
+            jr z, .lu
+            ld a, SCR_BANK
+            ld hl, minimap
+            call bank_call
+            jp map_reload
+.lu:        ld a, SCR_BANK
+            ld hl, lineup
+            call bank_call
+            jp map_reload
+.na:        ldh a, [pad_new]                ; A on a standard map: talk to what is in front
             bit 0, a
             jr z, .nt
             ldh a, [maptype]
@@ -1975,6 +1993,142 @@ ow_abutton: ld a, [vehicle]
 
 ; FF1 MapPoisonDamage: on foot, each poisoned member loses 1 HP a step (not below 1)
 section bank 0, $3200                       ; (main.s continued)
+MINI_BANK  = 97             ; (also: the 12 classes' map sprites at $6400, colours at $7000)
+M_PERM     = $7380          ; map bank: DMG rank permutations per class and sprite palette
+
+; the party's map sprite: the leader's class (FF1 LoadPlayerMapmanCHR, MAPMAN_PAL); LCD off.
+; CGB: the raw tiles, the class's colours as colour 2 of OBJ palettes 0 / 1; DMG: the tiles
+; ranked by brightness for this map (the build's permutations)
+party_spr:  ld a, [ch_stats]
+            ld [ps_cls], a
+            ldh a, [is_cgb]
+            and a
+            jr z, .dmg
+            ld a, [ps_cls]
+            add a, $64
+            ld h, a
+            ld l, 0
+            ld de, $8000
+            ld bc, 256
+            ld a, MINI_BANK
+            call far_copy
+            ld a, [ps_cls]
+            add a, a
+            add a, a
+            ld l, a
+            ld h, $70
+            ld de, scr_buf
+            ld bc, 4
+            ld a, MINI_BANK
+            call far_copy
+            ld a, $84
+            ldh [rOCPS], a
+            ld a, [scr_buf]
+            ldh [rOCPD], a
+            ld a, [scr_buf + 1]
+            ldh [rOCPD], a
+            ld a, $8C
+            ldh [rOCPS], a
+            ld a, [scr_buf + 2]
+            ldh [rOCPD], a
+            ld a, [scr_buf + 3]
+            ldh [rOCPD], a
+            ret
+.dmg:       ld a, [ps_cls]
+            add a, a
+            add a, low(M_PERM)
+            ld l, a
+            ld h, high(M_PERM)
+            ld de, ps_perm
+            ld bc, 2
+            ld a, [map_bank]
+            call far_copy
+            xor a
+.t:         ld [ps_t], a
+            ld a, [ps_cls]                  ; the tile's raw data
+            add a, $64
+            ld h, a
+            ld a, [ps_t]
+            swap a
+            ld l, a
+            ld de, scr_buf
+            ld bc, 16
+            ld a, MINI_BANK
+            call far_copy
+            ld a, [ps_t]                    ; palette 0 / 1 by the tile (bit 1)
+            rrca
+            and 1
+            ld e, a
+            ld d, 0
+            ld hl, ps_perm
+            add hl, de
+            ld a, [hl]
+            ld [ps_p], a
+            ld a, [ps_t]                    ; -> $8000 + 16 t
+            swap a
+            ld e, a
+            ld d, $80
+            ld hl, scr_buf
+            ld b, 8
+.r:         push bc
+            ld a, [hl+]
+            ld b, a                         ; B = lo, C = hi
+            ld a, [hl+]
+            ld c, a
+            push hl
+            push de
+            ld a, c                         ; masks of values 1, 2, 3
+            cpl
+            and b
+            ld d, a
+            ld a, b
+            cpl
+            and c
+            ld e, a
+            ld a, b
+            and c
+            ld h, a
+            ld a, [ps_p]
+            ld l, a
+            xor a                           ; new lo
+            bit 0, l
+            jr z, .a1
+            or d
+.a1:        bit 2, l
+            jr z, .a2
+            or e
+.a2:        bit 4, l
+            jr z, .a3
+            or h
+.a3:        ld b, a
+            xor a                           ; new hi
+            bit 1, l
+            jr z, .b1
+            or d
+.b1:        bit 3, l
+            jr z, .b2
+            or e
+.b2:        bit 5, l
+            jr z, .b3
+            or h
+.b3:        ld c, a
+            pop de
+            ld a, b
+            ld [de], a
+            inc de
+            ld a, c
+            ld [de], a
+            inc de
+            pop hl
+            pop bc
+            dec b
+            jr nz, .r
+            ld a, [ps_t]
+            inc a
+            cp 16
+            jr c, .t
+            ret
+
 ; FF1 sound: the error buzz (menus: not allowed)
 sfx_err:    ld a, SFX_ERROR
             ld [sfx_req], a
@@ -2260,6 +2414,10 @@ q_n:        ds 1
 q_rd:       ds 1
 cur_map:    ds 1
 map_bank:   ds 1
+ps_cls:     ds 1                            ; (party_spr)
+ps_t:       ds 1
+ps_p:       ds 1
+ps_perm:    ds 2
 ts_bank:    ds 1
 inroom:     ds 1
 door_x:     ds 1
