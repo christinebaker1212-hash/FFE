@@ -65,6 +65,13 @@ battle:     ld a, [btl_fid]
             ld a, TR_FANFARE                ; (FF1: the victory fanfare)
             call snd_track
             call bt_victory
+            ld a, [bt_type]                 ; Chaos defeated: the ending (A = 2)
+            cp 4
+            jr nz, .nv
+            call bt_ch_exit
+            call bt_end_screen
+            ld a, 2
+            ret
 .nv:
             call bt_ch_exit
             call bt_end_screen

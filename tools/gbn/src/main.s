@@ -1995,8 +1995,16 @@ do_battle:  ld [btl_fid], a
             ld hl, battle
             call bank_call
             and a
+            jr z, .ok
+            cp 2
             jr nz, game_over
-            call map_reload
+            ld a, SCR_BANK                  ; the ending: the story's last pages, the title
+            call sbank
+            ld a, STORY_FIRST + 4
+            ld b, STORY_END - STORY_FIRST - 4
+            call story_show
+            jr game_over
+.ok:        call map_reload
             scf
             ret
 ; the save in cart RAM valid (its mark and sum)? C clear if so; load_game copies it in
