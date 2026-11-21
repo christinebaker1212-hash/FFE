@@ -49,6 +49,7 @@ M_OBJCGB   = $7400          ; object tiles as they are (CGB)
 C_OBJTBL   = $4400          ; FF1's object 2 x 2 tables
 C_INITPG   = $4500          ; new game: save page 0 and the game flags
 C_INITFLG  = $4600
+C_TESTPG   = $5E00          ; test builds: the save page to start with ($400)
 DMG_OBP    = %11100000      ; sprite tiles hold brightness ranks: 1 white, 2 dark grey, 3 black
 M_MTOUT    = $5100
 M_MTIN     = $5300
@@ -152,7 +153,14 @@ start:      di
             ld de, game_flags
             ld bc, 256
             call memcpy
-            ld a, 3
+            ld a, TEST_INIT                 ; (test builds: a whole save page, build.py --init)
+            and a
+            jr z, .nti
+            ld hl, C_TESTPG
+            ld de, unsram
+            ld bc, $400
+            call memcpy
+.nti:       ld a, 3
             ld [facing], a
             ld a, BOX_LINES                 ; LYC: the dialogue box's bottom (window off)
             ldh [rLYC], a
@@ -624,6 +632,8 @@ arrived:    ld a, [px]
             ld d, a
             call map_at
             call props
+            ld a, d                         ; (FF1 tileprop_now: the item menu's checks)
+            ld [tprop_now], a
             ldh a, [maptype]
             and a
             jr nz, .ow
@@ -1312,6 +1322,41 @@ dma_rom:    ld a, high(oam_buf)
             jr nz, .w
             ret
 dma_end:
+
+; ---- the save (Lot Check: a sum and a mark; cart RAM enabled only while it is written)
+SAVE_MARK  = $A000          ; "FF1N", then the save page ($400), then the sum (2)
+save_game:  ld a, $0A
+            ld [$0000], a
+            xor a
+            ld [$4000], a                   ; cart RAM bank 0
+            ld hl, SAVE_MARK
+            ld a, $46
+            ld [hl+], a
+            ld a, $46
+            ld [hl+], a
+            ld a, $31
+            ld [hl+], a
+            ld a, $4E
+            ld [hl+], a
+            ld de, unsram
+            ld bc, 0                        ; the sum
+.c:         ld a, [de]
+            inc de
+            ld [hl+], a
+            add a, c
+            ld c, a
+            ld a, b
+            adc a, 0
+            ld b, a
+            ld a, d
+            cp high(unsram) + 4
+            jr c, .c
+            ld a, c
+            ld [hl+], a
+            ld [hl], b
+            xor a
+            ld [$0000], a
+            ret
 
 section wram, $C000
 oam_buf:    ds 160

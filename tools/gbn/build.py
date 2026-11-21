@@ -50,6 +50,17 @@ def talk_defs(rom):
     return '\n'.join(out) + '\n'
 
 
+def item_defs(rom):
+    """IT_<routine>_<n> = the n-th operand of FF1's item routine (as talk_defs)"""
+    ops, _ = talkconst.item_routines(rom, DIS)
+    out = []
+    for n, lst in ops.items():
+        for k, (t, v, mn) in enumerate(lst):
+            if t == 'a' and 0x6000 <= v < 0x6400: v = 0xD000 + v - 0x6000
+            out.append('IT_%s_%d = $%04X' % (n, k, v))
+    return '\n'.join(out) + '\n'
+
+
 def ui_strings():
     """the screens' strings as str_<name> labels in code bank 2"""
     out = ['section bank 2, $7000']
@@ -58,7 +69,7 @@ def ui_strings():
     return '\n'.join(out) + '\n'
 
 
-def data_banks(rom, ff3=None):
+def data_banks(rom, ff3=None, init=None):
     banks = {}
     data.FONT_CODES = text.field_codes()
     c = data.common_pack(rom)
@@ -68,6 +79,10 @@ def data_banks(rom, ff3=None):
     place(banks, COMMON, 0x4400, c['objtbl'])                 # object 2x2 tables (64)
     place(banks, COMMON, 0x4500, c['init_unsram'])            # new game: save page 0
     place(banks, COMMON, 0x4600, c['init_flags'])             #   and the game flags
+    if init:                                                   # test builds: a whole save page
+        pg = bytearray(c['init_unsram'] + bytes(256) + c['init_flags'] + bytes(256))
+        for a_, v in init: pg[a_] = v
+        place(banks, COMMON, 0x5E00, bytes(pg))
     place(banks, COMMON, 0x4700, text.win_palette())
     fd, fc = text.font_banks(rom, ff3)
     place(banks, COMMON, 0x4800, fd)
@@ -80,6 +95,7 @@ def data_banks(rom, ff3=None):
     nb[0x3000:0x3200] = rom.rd(0x0D, 0xBC00, 0x200)            # item prices (FF1 lut_ItemPrices)
     nb[0x3200:0x3300] = rom.rd(0x00, 0xB100, 0x100)            # chest contents (lut_Treasure)
     banks[names.NAMES_BANK] = nb
+    banks[ui.MTEXT_BANK] = bytearray(ui.mtext_bank())
     banks[3] = bytearray(ui.gfx_bank(rom))                     # UI_GFX
     for b, blob in text.dialogue_banks(90).items():
         banks[b] = bytearray(blob)
@@ -134,7 +150,17 @@ def main():
     st = (list(st) + ['0'])[:4]                  # MAP,X,Y[,ROOM]
     rom = data.Rom(nes)
     ff3 = names.ff3_rom(a[a.index('--ff3') + 1] if '--ff3' in a else None)
-    src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\nSTART_ROOM = %s\n' % tuple(st) + talk_defs(rom) +
+    init = None                                  # --init ADDR=VAL,.. (save page offsets $000-$3FF)
+    if '--init' in a:
+        init = []
+        for kv in a[a.index('--init') + 1].split(','):
+            k, v = kv.split('=')
+            if '*' in k:                         # ADDR*N=VAL: N bytes
+                k, n = k.split('*')
+            else: n = 1
+            for j in range(int(n)): init.append((int(k, 16) + j, int(v, 16)))
+    src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\nSTART_ROOM = %s\n' % tuple(st) +
+           'TEST_INIT = %d\n' % (1 if init else 0) + talk_defs(rom) + item_defs(rom) +
            open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'objects.s')).read() + '\n' +
@@ -150,7 +176,7 @@ def main():
     for lbl in ('qbuf', 'oam_buf', 'objs', 'game_flags', 'font_tbl', 'win_buf'):
         assert r.labels[lbl] % 0x100 == 0, '%s at %04X not aligned' % (lbl, r.labels[lbl])
     banks = dict(r.banks)
-    for b, blob in data_banks(rom, ff3).items():
+    for b, blob in data_banks(rom, ff3, init).items():
         assert b not in banks, 'bank %d used by code and data' % b
         banks[b] = blob
     img = make_rom(banks, 'FF1 NATIVE', cart_type=0x1B, rom_banks=ROM_BANKS, ram_size_code=0x03,

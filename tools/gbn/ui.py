@@ -86,6 +86,7 @@ def strings():
     for c in range(12): out['cname%d' % c] = enc(ff1_items.T[240 + c])
     out['mcmd'] = enc('\n'.join(x.strip() for x in sm.M[2].split('\n')))
     out['gil'] = enc('Gil')
+    out['items'] = enc(M[3].strip())
     out['level'] = enc('Level ')
     out['exp'] = enc('Experience')
     out['next'] = enc('Until next level')
@@ -104,3 +105,37 @@ def string_table(base):
     for n in names:
         ptrs += (a0 + len(body)).to_bytes(2, 'little'); body += s[n] + b'\0'
     return names, bytes(ptrs) + bytes(body)
+
+
+MTEXT_BANK = 5
+
+
+def mtext_bank():
+    """the menu texts (FF1's menu strings: descriptions, prompts), wrapped to the GB windows:
+    $4000 pointers by FF1's string id (64), the strings after them"""
+    import re
+    import ff1_shop_menu as sm
+    blob = bytearray(b'\xff' * 0x4000); body = bytearray(); ptrs = bytearray()
+    for k in range(64):
+        t = re.sub(r'\{[0-9A-F]{2}\}', '', sm.M.get(k, ''))
+        lines = []
+        for para in t.split('\n'):
+            para = para.strip()
+            if 'button...' in para:                       # "A button...Yes  B button...No"
+                lines += [x.strip() for x in para.split('  ') if x.strip()]
+            else:
+                lines.append(para)
+        out = []                                          # joined, rewrapped to 18 columns
+        buf = ''
+        for ln in lines:
+            if 'button...' in ln:
+                if buf: out += text.wrap(buf); buf = ''
+                out.append(ln)
+            else:
+                buf = (buf + ' ' + ln).strip()
+        if buf: out += text.wrap(buf)
+        ptrs += (0x4080 + len(body)).to_bytes(2, 'little')
+        body += enc('\n'.join(out[:7])) + b'\0'
+    blob[0:0x80] = ptrs
+    blob[0x80:0x80 + len(body)] = body
+    return bytes(blob)

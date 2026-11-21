@@ -29,6 +29,47 @@ def names_by_id(dis_dir):
     return names
 
 
+def routine_ops(b, at, starts=None):
+    """{name: [(type, value, mnemonic)]}: immediates and absolute addresses of each routine
+    (name -> address in the 16 KB bank image b), up to the next routine's start"""
+    starts = sorted(set(starts or at.values()))
+    ops = {}
+    for n, a in at.items():
+        end = min([s for s in starts if s > a] + [a + 0x60])
+        out = []; i = a
+        while i < end:
+            op = b[i - 0x8000]
+            if op not in OPS: break
+            mn, md = OPS[op]; l = LEN[md]; arg = b[i - 0x8000 + 1:i - 0x8000 + l]
+            if md == 'imm': out.append(('i', arg[0], mn))
+            elif md in ('abs', 'abx', 'aby') and mn not in ('JSR', 'JMP'):
+                out.append(('a', arg[0] | arg[1] << 8, mn))
+            i += l
+        ops[n] = out
+    return ops
+
+
+def item_routines(rom, dis_dir):
+    """FF1's item menu jump table (found by its dispatch code in bank 14), named as the
+    disassembly names it: {UseItem_x: ops}"""
+    import re as _re
+    b14 = rom.prg[14 * 0x4000:15 * 0x4000]
+    t = None
+    for m in _re.finditer(_re.escape(bytes([0x0A, 0xAA, 0xBD])), b14):
+        i = m.start()
+        if b14[i + 5:i + 7] == bytes([0x85, 0x10]) and b14[i + 12:i + 15] == bytes([0x6C, 0x10, 0x00]):
+            t = b14[i + 3] | b14[i + 4] << 8
+    assert t, 'item jump table not found'
+    src = open(os.path.join(dis_dir, 'bank_0E.asm'), encoding='latin-1').read()
+    i = src.index('@ItemJumpTable:'); j = src.index('UseItem_Bad:', i)
+    names = _re.findall(r'UseItem_\w+', src[i:j])
+    addr = [b14[t - 0x8000 + 2 * k] | b14[t - 0x8000 + 2 * k + 1] << 8 for k in range(len(names))]
+    at = {}
+    for n, a in zip(names, addr):
+        assert at.setdefault(n, a) == a, n
+    return routine_ops(b14, at), names
+
+
 def extract(rom, dis_dir):
     """(kind per object id, {kind: [(type, value)]}) from the ROM"""
     names = names_by_id(dis_dir)

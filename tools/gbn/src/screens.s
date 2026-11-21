@@ -120,6 +120,25 @@ scr_open:   ldh a, [rLCDC]
             ld bc, 12
             jp far_copy
 
+; the map copy cleared (blank, window attributes) with the LCD on
+scr_cls:    ld hl, smap
+            ld bc, 18 * 32
+.c:         ld a, $20
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .c
+            ld hl, sattr
+            ld bc, 18 * 32
+.a:         ld a, WIN_ATTR
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .a
+            ret
+
 ; the map copy to VRAM: with the LCD off all of it and the LCD on; with the LCD on in the
 ; next frames' V-Blanks (scr_frame)
 scr_show:   ldh a, [rLCDC]
