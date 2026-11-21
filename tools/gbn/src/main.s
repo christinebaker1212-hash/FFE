@@ -2445,6 +2445,7 @@ ps_t:       ds 1
 ps_p:       ds 1
 ps_perm:    ds 2
 lcdc_on:    ds 1
+respond:    ds 1                            ; FF1 respondrate (0-7)
 pz_bcnt:    ds 1                            ; B presses on the overworld (FF1 joy_b: the puzzle)
 ts_bank:    ds 1
 inroom:     ds 1

@@ -98,6 +98,12 @@ def data_bank(rom):
     i = fix.find(bytes([0] * 12 + [1] * 12 + [2] * 12))             # lut_FormationWeight
     assert i >= 0
     put(0x7F00, fix[i:i + 64])
+    import re                                                       # lut_RespondDelay (found
+    b11 = rom.prg[11 * 0x4000:12 * 0x4000]                          #   by its use: LDY rate /
+    m = re.search(rb'(?:\xAC\xFA\x00|\xA4\xFA)\xB9(..)\x8D', b11, re.S)  #   LDA lut,Y / STA)
+    assert m, 'respond delay table not found'
+    a = int.from_bytes(m.group(1), 'little') - 0x8000
+    put(0x7FF0, b11[a:a + 8])
     return bytes(b)
 
 

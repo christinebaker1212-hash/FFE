@@ -486,6 +486,7 @@ ng_main:    ldh a, [soft_rst]               ; the prologue first (not after a so
             ld bc, $040C
             ld hl, str_title2
             call scr_str
+            call .rate
             call save_valid                 ; a save: Continue first, else New Game
             ld a, 0
             jr nc, .sv
@@ -506,11 +507,27 @@ ng_main:    ldh a, [soft_rst]               ; the prologue first (not after a so
             call scr_frame
             ldh a, [pad_new]
             ld b, a
-            and $C0                         ; up / down: Continue <-> New Game
-            jr z, .ab
+            and $C0                         ; up / down: Continue <-> New Game (FF1: the select
+            jr z, .lr                       ;   sound)
             ld a, [ng_cur]
             xor 1
             ld [ng_cur], a
+            ld a, SFX_SEL
+            ld [sfx_req], a
+            jr .t
+.lr:        ld a, b                         ; left / right: FF1's respond rate 1-8 (battle
+            and $30                         ;   messages' wait)
+            jr z, .ab
+            ld a, [respond]
+            bit 4, b
+            jr z, .lf
+            inc a
+            jr .rs
+.lf:        dec a
+.rs:        and 7
+            ld [respond], a
+            call .rate
+            call scr_upd
             jr .t
 .ab:        ld a, b
             and $09                         ; A or Start
@@ -523,6 +540,11 @@ ng_main:    ldh a, [soft_rst]               ; the prologue first (not after a so
             jp load_game
 .new:       call party_gen
             call ng_stats
+            ret
+.rate:      ld a, [respond]                 ; the rate's digit after "Message Speed"
+            add a, FONT_D0 + 1
+            ld hl, smap + 12 * 32 + 18
+            ld [hl], a
             ret
 
 ; party generation (FF1 PtyGen): per member, a direction cycles the class, A names it,

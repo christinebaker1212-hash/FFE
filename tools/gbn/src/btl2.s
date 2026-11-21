@@ -1974,7 +1974,14 @@ bt_msg_end1:
 ; the message shown for a while (A skips), then the windows below again
 bt_msg_end: call bt_msg_head
             call bt_flush
-            ld b, 50
+            ld a, [respond]                 ; FF1 RespondDelay: the title's message speed
+            add a, low(B_RESPOND)
+            ld l, a
+            ld h, high(B_RESPOND)
+            ld a, BTL_DATA
+            ld [fc_bank], a
+            call far_byte
+            ld b, a
 .w:         push bc
             call bt_frame
             pop bc

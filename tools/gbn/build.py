@@ -202,7 +202,7 @@ def main():
             else: n = 1
             for j in range(int(n)): init.append((int(k, 16) + j, int(v, 16)))
     src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\nSTART_ROOM = %s\n' % tuple(st) +
-           'TEST_INIT = %d\n' % (1 if init else 0) + sound.mus_defs(rom) + sound.sfx_defs() +
+           'TEST_INIT = %d\n' % (1 if init else 0) + 'FONT_D0 = $%02X\n' % text.code_of('0') + sound.mus_defs(rom) + sound.sfx_defs() +
            'STORY_FIRST = %d\nSTORY_END = %d\n' % (ui.story_pages()[1], len(ui.story_pages()[0])) +
            'ENC_OW = %s\n' % (a[a.index('--enc') + 1] if '--enc' in a else '10') +
            'START_BATTLE = %s\n' % (a[a.index('--battle') + 1] if '--battle' in a else '$FF') + talk_defs(rom) + item_defs(rom) + magic_defs(rom) +

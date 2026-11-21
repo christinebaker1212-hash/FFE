@@ -25,6 +25,7 @@ B_MSGS     = $6C00
 B_RNG      = $7E00
 B_FIEND    = $6A00          ; FF1's fiend TSA (4 x $50: 8 x 8 + 16 attribute bytes), Chaos ($C0)
 B_CHAOS    = $6B40
+B_RESPOND  = $7FF0          ; FF1 lut_RespondDelay (8)
 BT_FRAME   = $F7            ; window frame tiles $F7-$FF (FF1's order, as font codes $10-$18)
 BT_PARTY   = $80            ; party window line tiles (10 a member)
 BT_TEXT    = $A8            ; left window / message tiles (18 a row)
