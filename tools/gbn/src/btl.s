@@ -559,11 +559,14 @@ bt_remap_tiles:
             add hl, hl
             ld de, $9000
             add hl, de
-            ld a, b
-            add a, a
-            add a, a
-            add a, a
-            ld b, a                         ; rows
+.t:         push bc                         ; B tiles (8 rows each: a row count would pass 255)
+            ld b, 8
+            call .tile
+            pop bc
+            dec b
+            jr nz, .t
+            ret
+.tile:
 .r:         ld a, [hl+]                     ; lo, hi -> the four colour masks
             ld d, a
             ld e, [hl]
