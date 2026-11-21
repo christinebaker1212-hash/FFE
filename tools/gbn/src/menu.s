@@ -427,11 +427,11 @@ orb_gfx:    ldh a, [is_cgb]
             ld a, UI_GFX
             call far_copy
             ld a, $B0
-            ldh [rBCPS], a
+            call bcps_w
             ld hl, scr_buf
             ld b, 8
 .p:         ld a, [hl+]
-            ldh [rBCPD], a
+            call bcpd_w
             dec b
             jr nz, .p
             ld hl, U_ORBCGB

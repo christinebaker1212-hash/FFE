@@ -645,7 +645,7 @@ bt_flash:   call bt_frame
             ld a, %11100100
             jr z, .d
             ld a, %10100100
-.d:         ldh [rBGP], a
+.d:         call bgp_w
             ret
 .cgb:       ld a, c
             call nes_rgb
@@ -653,11 +653,11 @@ bt_flash:   call bt_frame
             ld b, 4
             ld c, $80
 .p:         ld a, c
-            ldh [rBCPS], a
+            call bcps_w
             ld a, e
-            ldh [rBCPD], a
+            call bcpd_w
             ld a, d
-            ldh [rBCPD], a
+            call bcpd_w
             ld a, c
             add a, 8
             ld c, a

@@ -286,6 +286,9 @@ wait_vbl:   call sgb_tick                   ; (a Super Game Boy's queued packet:
 
 ; ---- V-Blank: OAM, scroll, palettes, queued metatiles
 vblank:     push af
+            ld a, [lmask]                   ; (a masked load: the frame counted, nothing else)
+            and a
+            jr nz, .mk
             push bc
             push de
             push hl
@@ -317,6 +320,25 @@ vblank:     push af
             ldh [vbl_done], a
             pop af
             call sbank
+            pop hl
+            pop de
+            pop bc
+            pop af
+            reti
+.mk:        push bc                         ; (and the music: the STAT handler only guards)
+            push de
+            push hl
+            ld hl, frame
+            inc [hl]
+            ld a, 1
+            ldh [vbl_done], a
+            ldh a, [rombank]
+            push af
+            ld a, SND_BANK
+            ld [MBC_BANK], a
+            call snd_frame_b
+            pop af
+            ld [MBC_BANK], a
             pop hl
             pop de
             pop bc
@@ -479,9 +501,9 @@ load_map:   push af
             ld bc, 128 * 16
             call memcpy
             ld a, %11100100                 ; tile values are shades
-            ldh [rBGP], a
+            call bgp_w
             ld a, DMG_OBP
-            ldh [rOBP0], a
+            call obp0_w
             ld hl, M_PARTYDMG               ; party sprite pre-shaded for this map
             ld de, $8000
             ld bc, 16 * 16
@@ -505,7 +527,7 @@ load_map:   push af
             ldh a, [scy]
             ldh [rSCY], a
             call make_oam
-            call hram_dma
+            call dma_safe
             call map_music
             ld a, [pc_req]                  ; (a palette cycle in to follow: black first)
             and a
@@ -514,8 +536,7 @@ load_map:   push af
             and a
             jr nz, wipe_open
             ld a, LCDC_ON
-            ldh [rLCDC], a
-            ret
+            jp lcd_on
 
 ; the map drawn again after a full screen (menu): position, room and objects as they were
 map_reload: ld a, [inroom]
@@ -584,12 +605,24 @@ obj_tiles:  ldh a, [maptype]
             jr nz, .b
             ret
 
-cgb_pal32:  ldh [rBCPS], a                  ; HL = 32 bytes of BG palettes 0-3
-            ld b, 32
+cgb_pal32:  ld b, 32                        ; HL = 32 bytes of BG palettes 0-3 (A = BCPS)
+pal_blk:    push af                         ; B bytes (a masked load: into the shadow)
+            ld a, [lmask]
+            and a
+            jr nz, .m
+            pop af
+            ldh [rBCPS], a
 .p:         ld a, [hl+]
             ldh [rBCPD], a
             dec b
             jr nz, .p
+            ret
+.m:         pop af
+            call bcps_w
+.q:         ld a, [hl+]
+            call bcpd_w
+            dec b
+            jr nz, .q
             ret
 
 ; V-Blank, CGB: the BG palettes for the room state
@@ -1542,7 +1575,10 @@ draw_all:   ld a, 1                         ; (LCD off: the flush without the LY
             ld c, 16
 .c:         push bc
             push de
+            ld a, [lmask]                   ; (a masked load: the guard paused while the
+            ld [gd_off], a                  ;   metatile is looked up, RAM only)
             call q_mt
+            call gd_resume
             ld c, 255
             call q_flush
             pop de
@@ -1850,15 +1886,6 @@ memclr:     xor a                           ; HL = start, DE = length
             or e
             jr nz, memclr
             ret
-memcpy:     ld a, [hl+]                     ; HL -> DE, BC bytes
-            ld [de], a
-            inc de
-            dec bc
-            ld a, b
-            or c
-            jr nz, memcpy
-            ret
-
 dma_rom:    ld a, high(oam_buf)
             ldh [rDMA], a
             ld a, 40
@@ -2260,21 +2287,6 @@ party_spr:  ld a, [ch_stats]
 
 ; the LCD off (Lot Check: only in V-Blank; interrupts off meanwhile, so no handler can run the
 ; write past the V-Blank); nothing if it is off already
-lcd_off:    ld a, [q_n]                     ; (the field's metatile queue dropped: a new
-            ld [q_rd], a                    ;   screen; the field redraws all of its map)
-            ldh a, [rLCDC]
-            bit 7, a
-            ret z
-            di
-.w:         ldh a, [rLY]
-            cp 144
-            jr c, .w
-            cp 153
-            jr nc, .w
-            xor a
-            ldh [rLCDC], a
-            reti
-
 ; FF1 sound: the error buzz (menus: not allowed)
 sfx_err:    ld a, SFX_ERROR
             ld [sfx_req], a
@@ -2722,7 +2734,7 @@ wipe_close: push de
 wipe_open:  xor a
             ld [wp_req], a
             call oam_clr                    ; (FF1: no sprites while it opens)
-            call hram_dma
+            call dma_safe
             call wp_map
             ld a, 72
             ld [wp_top], a
@@ -2734,7 +2746,7 @@ wipe_open:  xor a
             xor a
             ldh [rWY], a
             ld a, LCDC_WIN                  ; (the first frame covered)
-            ldh [rLCDC], a
+            call lcd_on
 .l:         call wait_vbl
             call wp_snd
             ld hl, wp_top
@@ -2771,7 +2783,7 @@ wipe_open:  xor a
 wp_map:     ld a, $20
             call code_tile
             ld [wp_t], a
-            ldh a, [rLCDC]
+            call lcd_get  
             bit 7, a
             jr z, .off
             ld c, 0
@@ -2789,14 +2801,14 @@ wp_map:     ld a, $20
 .pal:       ldh a, [is_cgb]
             and a
             ret z
-            ldh a, [rLCDC]                  ; (palette 6 black: in V-Blank or LCD off)
+            call lcd_get                    ; (palette 6 black: in V-Blank or LCD off)
             bit 7, a
             call nz, wait_vbl
             ld a, $80 | 48
-            ldh [rBCPS], a
+            call bcps_w
             ld b, 8
             xor a
-.p:         ldh [rBCPD], a
+.p:         call bcpd_w
             dec b
             jr nz, .p
             ret
@@ -2894,7 +2906,7 @@ pc_menu:    push hl
 ; interrupt at the band's top
 wp_vbl:     xor a                           ; (the window enabled all frame, shown or hidden
             ldh [rWY], a                    ;   by WX: 7 / 167)
-            ldh a, [rLCDC]
+            call lcd_get  
             bit 7, a
             ret z
             ld a, LCDC_WIN
@@ -2921,15 +2933,15 @@ pc_black:   ld a, 1
             ld [pc_hold], a
             call oam_clr
             ld a, $FF
-            ldh [rBGP], a
+            call bgp_w
             ldh a, [is_cgb]
             and a
             ret z
             ld a, $80
-            ldh [rBCPS], a
+            call bcps_w
             ld b, 32
             xor a
-.c:         ldh [rBCPD], a
+.c:         call bcpd_w
             dec b
             jr nz, .c
             ret
@@ -2941,7 +2953,7 @@ ly_vbl:     xor a
             ldh [rWY], a
             ld a, 167
             ldh [rWX], a
-            ldh a, [rLCDC]
+            call lcd_get  
             bit 7, a
             ret z
             ld a, [ly_base]
@@ -2962,3 +2974,351 @@ ly_off:     xor a
 
 section wram, $CF98
 ly_tab:     ds 32                           ; (line, LCDC) x 16 (in one page)
+
+
+section bank 0, $3C00                       ; (masked loads)
+
+; ---- masked loads (Color). FF1 blanks the screen (black) while it draws a new one; a Game Boy
+; Color whose LCD is off shows white, so a load keeps the LCD on behind black palettes, sprites off: the
+; palettes are read into shadows and set black in a V-Blank, palette writes during the load go
+; to the shadows, and a mode-2 STAT interrupt holds the CPU through each line's mode 3, so the
+; load writes VRAM directly as with the LCD off. lcd_on shows the screen: shadows back in a
+; V-Blank, the STAT interrupt as before.
+lcd_off:    ld a, [q_n]                     ; (the field's metatile queue dropped: a new
+            ld [q_rd], a                    ;   screen; the field redraws all of its map)
+            ld a, [lmask]
+            and a
+            ret nz
+            ldh a, [rLCDC]
+            bit 7, a
+            ret z
+            ldh a, [is_cgb]                 ; (a DMG / SGB: the LCD off, as before; the
+            and a                           ;   white of a switched-off LCD is the Color's
+            jr nz, .cgb                     ;   problem: docs/gb-lessons.md)
+            di
+.wd:        ldh a, [rLY]
+            cp 144
+            jr c, .wd
+            cp 153
+            jr nc, .wd
+            xor a
+            ldh [rLCDC], a
+            reti
+.cgb:       push bc
+            push hl
+            di
+.w0:        ldh a, [rLY]                    ; (a V-Blank with time left: LY 144-147; the
+            cp 144                          ;   palette work takes ~5 lines at double speed,
+            jr c, .w0                       ;   and palette RAM ignores writes in mode 3)
+            cp 148
+            jr nc, .w0
+.go:        ldh a, [rBGP]
+            ld [sh_bgp], a
+            ldh a, [rOBP0]
+            ld [sh_obp0], a
+            ld a, $FF
+            ldh [rBGP], a
+            ldh [rOBP0], a
+            ldh a, [is_cgb]
+            and a
+            jr z, .nc
+            ld hl, sh_pal                   ; CGB: the BG palettes read back, then black
+            ld c, 0
+.rd:
+            ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            bit 6, c
+            jr z, .rd
+            ld a, $80
+            ldh [rBCPS], a
+            ld b, 8
+            xor a
+.bk:
+            ldh [rBCPD], a
+            ldh [rBCPD], a
+            ldh [rBCPD], a
+            ldh [rBCPD], a
+            ldh [rBCPD], a
+            ldh [rBCPD], a
+            ldh [rBCPD], a
+            ldh [rBCPD], a
+            dec b
+            jr nz, .bk
+.nc:        ldh a, [rSTAT]
+            and $78
+            ld [sh_stat], a
+            ld a, $20                       ; the mode-2 interrupt only
+            ldh [rSTAT], a
+            ldh a, [rLCDC]
+            res 1, a
+            ldh [rLCDC], a
+            ld a, 1
+            ld [lmask], a
+            ldh a, [rIF]                    ; (a DMG's STAT write requests an interrupt)
+            and $FD
+            ldh [rIF], a
+            pop hl
+            pop bc
+            reti
+
+; the screen on (A = LCDC): after a masked load in the next V-Blank, the shadows back
+lcd_on:     push af
+            ld a, [lmask]
+            and a
+            jr nz, .m
+            pop af
+            ldh [rLCDC], a
+            ret
+.m:         push bc
+            push de
+            push hl
+            di
+.w:         ldh a, [rLY]                    ; (the start of a V-Blank: the 64 palette bytes
+            cp 144                          ;   take ~3 lines)
+            jr c, .w
+            cp 147
+            jr nc, .w
+            ldh a, [is_cgb]
+            and a
+            jr z, .d
+            ld a, $80
+            ldh [rBCPS], a
+            ld hl, sh_pal
+            ld b, 64
+.p:         ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .p
+.d:         ldh a, [scx]                    ; (the new screen's scroll, from its first frame)
+            ldh [rSCX], a
+            ldh a, [scy]
+            ldh [rSCY], a
+            ld a, [sh_bgp]
+            ldh [rBGP], a
+            ld a, [sh_obp0]
+            ldh [rOBP0], a
+            ld a, [sh_stat]
+            ldh [rSTAT], a
+            xor a
+            ld [lmask], a
+            ldh a, [rIF]
+            and $FD
+            ldh [rIF], a
+            pop hl
+            pop de
+            pop bc
+            pop af
+            ldh [rLCDC], a
+            reti
+
+; the guard resumed after RAM-only work: out of modes 2 / 3 first (the line's interrupt came
+; and went while paused)
+gd_resume:  ld a, [gd_off]
+            and a
+            ret z
+            xor a
+            ld [gd_off], a
+.w:         ldh a, [rSTAT]
+            and 2
+            jr nz, .w
+            ret
+
+; OAM DMA from the main code (interrupts off: none may run while the DMA holds the bus)
+dma_safe:   di
+            call hram_dma
+            reti
+
+; A = LCDC, bit 7 clear during a masked load (callers: "the LCD off" = write VRAM directly)
+lcd_get:    ld a, [lmask]
+            and a
+            ldh a, [rLCDC]
+            ret z
+            res 7, a
+            ret
+
+; palette writes: during a masked load into the shadows (A and the flags kept)
+bgp_w:      push af
+            ld a, [lmask]
+            and a
+            jr nz, .m
+            pop af
+            ldh [rBGP], a
+            ret
+.m:         pop af
+            ld [sh_bgp], a
+            ret
+obp0_w:     push af
+            ld a, [lmask]
+            and a
+            jr nz, .m
+            pop af
+            ldh [rOBP0], a
+            ret
+.m:         pop af
+            ld [sh_obp0], a
+            ret
+bcps_w:     push af
+            ld a, [lmask]
+            and a
+            jr nz, .m
+            pop af
+            ldh [rBCPS], a
+            ret
+.m:         pop af
+            ld [sh_ps], a
+            ret
+bcpd_w:     push af                         ; (masked: the flags not kept)
+            ld a, [lmask]
+            and a
+            jr nz, .m
+            pop af
+            ldh [rBCPD], a
+            ret
+.m:         pop af
+            push hl
+            push bc
+            ld c, a
+            ld a, [sh_ps]
+            ld b, a
+            and $3F
+            add a, low(sh_pal)
+            ld l, a
+            ld h, high(sh_pal)
+            ld [hl], c
+            bit 7, b
+            jr z, .s
+            inc b
+            res 6, b
+            ld a, b
+            ld [sh_ps], a
+.s:         ld a, c
+            pop bc
+            pop hl
+            ret
+
+memcpy:     srl b                           ; HL -> DE, BC bytes (BC = 0 after; unrolled:
+            rr c                            ;   1, 2, 4, then 8 at a time)
+            jr nc, .n1
+            ld a, [hl+]
+            ld [de], a
+            inc de
+.n1:        srl b
+            rr c
+            jr nc, .n2
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+.n2:        srl b
+            rr c
+            jr nc, .n4
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+.n4:        ld a, b
+            or c
+            ret z
+.l8:
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            dec bc
+            ld a, b
+            or c
+            jr nz, .l8
+            ret
+
+; fill: A to HL, B x 32 bytes (unrolled)
+fill32:     ld c, 4
+.l:         ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec c
+            jr nz, .l
+            dec b
+            jr nz, fill32
+            ret
+
+section wram, $D980
+sh_pal:     ds 64                           ; masked loads: the CGB BG palettes
+lmask:      ds 1
+sh_bgp:     ds 1
+sh_obp0:    ds 1
+sh_ps:      ds 1
+sh_stat:    ds 1
+gd_off:     ds 1                            ; the guard paused (RAM-only work)

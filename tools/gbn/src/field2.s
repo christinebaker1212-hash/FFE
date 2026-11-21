@@ -501,16 +501,16 @@ minimap:    call lcd_off                    ; (LCD off in V-Blank, interrupts of
             ld a, MINI_BANK
             call far_copy
             ld a, $80
-            ldh [rBCPS], a
+            call bcps_w
             ld hl, scr_buf
             ld b, 8
 .bp:        ld a, [hl+]
-            ldh [rBCPD], a
+            call bcpd_w
             dec b
             jr nz, .bp
             jr .spr
 .dmg:       ld a, %11100100
-            ldh [rBGP], a
+            call bgp_w
 .spr:       ld hl, MN_SPR                   ; sprite tiles 0-31
             ld de, $8000
             ld bc, $200
@@ -528,7 +528,7 @@ minimap:    call lcd_off                    ; (LCD off in V-Blank, interrupts of
             ld bc, 2
             call far_copy
             ld a, LCDC_ON
-            ldh [rLCDC], a
+            call lcd_on
             xor a                           ; 128 pixel rows, one a frame
             ld [mn_row], a
 .dr:        ld a, [mn_row]
@@ -689,7 +689,7 @@ mn_pal:     ldh a, [is_cgb]
             call mn_shade
             swap a
             or b
-            ldh [rOBP0], a
+            call obp0_w
             ret
 ; NES colour A -> DMG shade ($0F black, by the brightness row otherwise)
 mn_shade:   cp $0F
@@ -872,7 +872,7 @@ pz_pal_set: ldh a, [is_cgb]
             jr nz, .w
             ret
 .dmg:       ld a, [pz_obp]
-            ldh [rOBP0], a
+            call obp0_w
             ret
 ; FF1 MiniGame_ShufflePuzzle: 127 tries, each a random direction (lut_RNG by the frame
 ; counter) moving a piece into the gap when it can
@@ -1549,7 +1549,7 @@ bx_apply:   ldh a, [is_cgb]
             and a
             jr nz, .cgb
             ld a, [bx_bgp]
-            ldh [rBGP], a
+            call bgp_w
             ret
 .cgb:       ld a, $80
             ld hl, bx_out
@@ -1720,7 +1720,7 @@ pc_dmg:     ld b, 0
             adc a, 0
             ld h, a
             ld a, [hl]
-            ldh [rBGP], a
+            call bgp_w
             ld a, b
             cp 3
             jr c, .l

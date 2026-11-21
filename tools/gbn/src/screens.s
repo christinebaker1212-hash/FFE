@@ -32,29 +32,17 @@ scr_open:   call lcd_off                    ; (LCD off in V-Blank, interrupts of
             ld [sfx_menu], a
             call sgb_menu
             ld hl, smap                     ; the map copy: blank (code $20), window attributes
-            ld bc, 18 * 32
-.cl:        ld a, $20
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .cl
+            ld b, 18
+            ld a, $20
+            call fill32
             ld hl, sattr
-            ld bc, 18 * 32
-.cla:       ld a, WIN_ATTR
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .cla
+            ld b, 18
+            ld a, WIN_ATTR
+            call fill32
             ld hl, $9800                    ; VRAM map: blank
-            ld bc, $0400
-.cv:        ld a, $20
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .cv
+            ld b, 32
+            ld a, $20
+            call fill32
             ld hl, oam_buf                  ; no sprites
             ld b, 160
             xor a
@@ -67,13 +55,9 @@ scr_open:   call lcd_off                    ; (LCD off in V-Blank, interrupts of
             ld a, 1                         ; CGB: every cell palette 7, VRAM bank 1
             ldh [rVBK], a
             ld hl, $9800
-            ld bc, $0400
-.ca:        ld a, WIN_ATTR
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .ca
+            ld b, 32
+            ld a, WIN_ATTR
+            call fill32
             xor a
             ldh [rVBK], a
             ld a, UI_GFX                    ; OBJ palettes 0-3: FF1's battle sprite palettes
@@ -97,9 +81,9 @@ scr_open:   call lcd_off                    ; (LCD off in V-Blank, interrupts of
             ld bc, $07F0
             call far_copy
             ld a, %11100100
-            ldh [rBGP], a
+            call bgp_w
             ld a, DMG_OBP
-            ldh [rOBP0], a
+            call obp0_w
             ld hl, U_CURDMG
 .cur:       ld de, $8000 + 16 * CUR_TILE    ; the hand cursor
             ld bc, 64
@@ -127,26 +111,17 @@ oam_clr:    ld hl, oam_buf
 ; the map copy cleared (blank, window attributes) with the LCD on
 scr_cls:    call oam_clr
             ld hl, smap
-            ld bc, 18 * 32
-.c:         ld a, $20
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .c
+            ld b, 18
+            ld a, $20
+            call fill32
             ld hl, sattr
-            ld bc, 18 * 32
-.a:         ld a, WIN_ATTR
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .a
-            ret
+            ld b, 18
+            ld a, WIN_ATTR
+            jp fill32
 
 ; the map copy to VRAM: with the LCD off all of it and the LCD on; with the LCD on in the
 ; next frames' V-Blanks (scr_frame)
-scr_show:   ldh a, [rLCDC]
+scr_show:   call lcd_get  
             bit 7, a
             jr nz, scr_upd
             xor a
@@ -159,8 +134,7 @@ scr_show:   ldh a, [rLCDC]
             ld a, 18
             ld [sf_row], a
             ld a, LCDC_ON
-            ldh [rLCDC], a
-            ret
+            jp lcd_on
 scr_upd:    xor a
             ld [sf_row], a
             ret
@@ -968,7 +942,7 @@ ni_name:    ld a, [pg_mem]
             ld [hl], '-'
 .n:         ld hl, pg_nb
             ld bc, $0700
-            ldh a, [rLCDC]
+            call lcd_get  
             bit 7, a
             jp z, scr_str
             jp scr_str_on

@@ -299,7 +299,7 @@ box_vbl:    ld a, [box_on]
             ldh [rWX], a
             xor a
             ldh [rWY], a
-            ldh a, [rLCDC]                  ; (not while the LCD is off)
+            call lcd_get                    ; (not while the LCD is off)
             bit 7, a
             ret z
             ld a, LCDC_WIN
@@ -308,6 +308,9 @@ box_vbl:    ld a, [box_on]
 
 ; STAT (LYC = 64): the window off below the box
 stat_int:   push af
+            ld a, [lmask]                   ; (a masked load: held through mode 3)
+            and a
+            jr nz, .gd
             ld a, [ly_n]                    ; (a list of LCDC changes by line: the story's
             and a                           ;   shutters)
             jr nz, .ly
@@ -387,6 +390,14 @@ stat_int:   push af
             reti
 .lyl:       pop hl
             jp .mus
+.gd:        ld a, [gd_off]                  ; (paused: RAM-only work running)
+            and a
+            jr nz, .gr
+.g1:        ldh a, [rSTAT]                  ; modes 2 / 3: wait
+            and 2
+            jr nz, .g1
+.gr:        pop af
+            reti
 
 ; the dialogue in progress (main loop): A turns the page or closes the box
 dlg_frame:  ldh a, [pad_new]

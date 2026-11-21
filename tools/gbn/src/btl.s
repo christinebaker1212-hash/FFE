@@ -371,39 +371,27 @@ bt_screen:  call lcd_off                    ; (LCD off in V-Blank, interrupts of
             ldh [scy], a
             ld [box_on], a
             ld hl, $8000                    ; VRAM tiles (bank 0) and map cleared
-            ld bc, $2000
-.cl:        xor a
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .cl
+            ld b, 0                         ; (256 x 32 bytes)
+            xor a
+            call fill32
             ldh a, [is_cgb]
             and a
             jr z, .nc
             ld a, 1                         ; CGB: bank 1 map attributes 0
             ldh [rVBK], a
             ld hl, $9800
-            ld bc, $0400
-.ca:        xor a
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .ca
+            ld b, 32
+            xor a
+            call fill32
             xor a
             ldh [rVBK], a
 .nc:        ldh a, [is_cgb]                 ; DMG: the empty tiles black (FF1's black battlefield)
             and a
             jr nz, .nd
             ld hl, $9000
-            ld bc, $12 * 16
-.dk:        ld a, $FF
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .dk
+            ld b, $12 * 16 / 32
+            ld a, $FF
+            call fill32
 .nd:        call oam_clr
             call bt_frame_gfx
             call bt_enemy_gfx
@@ -679,12 +667,12 @@ bt_pal:     ldh a, [is_cgb]
             and a
             jr nz, .cgb
             ld a, %11100100
-            ldh [rBGP], a
+            call bgp_w
             ld a, %10010000                 ; ranks 1-3 white / light / dark (on black)
-            ldh [rOBP0], a
+            call obp0_w
             ret
 .cgb:       ld a, $80
-            ldh [rBCPS], a
+            call bcps_w
             ld hl, bt_pal0
             call .p4
             ld a, [bt_form + 10]
@@ -726,9 +714,9 @@ bt_pal:     ldh a, [is_cgb]
             push bc
             call nes_rgb
             ld a, e
-            ldh [rBCPD], a
+            call bcpd_w
             ld a, d
-            ldh [rBCPD], a
+            call bcpd_w
             pop bc
             pop hl
             dec b
@@ -740,9 +728,9 @@ bt_pal:     ldh a, [is_cgb]
             push bc
             call nes_rgb
             ld a, e
-            ldh [rBCPD], a
+            call bcpd_w
             ld a, d
-            ldh [rBCPD], a
+            call bcpd_w
             pop bc
             pop hl
             dec b
@@ -1260,7 +1248,7 @@ vwf_out:    push af
             ld [bt_upsrc], a
             ld a, h
             ld [bt_upsrc + 1], a
-            ldh a, [rLCDC]
+            call lcd_get  
             bit 7, a
             ret nz
             ld a, [bt_updst]                ; LCD off: copied now
@@ -1429,7 +1417,7 @@ bt_rowsup:  ld a, [bt_rmask]
 ; wait until every staged upload is done, tiles and map rows (new text never overwrites
 ; tiles the screen still shows: a window is blanked on screen before its text is staged,
 ; and its rows go up after all of it)
-bt_flush:   ldh a, [rLCDC]
+bt_flush:   call lcd_get  
             bit 7, a
             ret z
             ld a, [bt_upn]
