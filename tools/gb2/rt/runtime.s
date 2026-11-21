@@ -2114,7 +2114,8 @@ rt_ppu_r7:  push af                         ; buffered read (nametables from the
             jr .set
 
 ; ------------------------------------------------------------------ OAM DMA ($4014)
-rt_io_w4014:                                ; NES OAM page A -> GB OAM shadow (sent next vblank)
+gb_sprites:                                 ; the game's sprite table (page A) -> GB OAM shadow
+rt_io_w4014:                                ;   (sent next vblank); translate.py: STA $4014
             push af
             push bc
             push de

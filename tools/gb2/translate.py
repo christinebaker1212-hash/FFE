@@ -83,7 +83,9 @@ class FF2:
            ('fix', 0xDCB5): ('far:hle_palbg_b', 'NZC'),     # copy color palettes to ppu (BG)
            ('fix', 0xD2FE): ('far:hle_dlgatt_b', 'NZ'),
            ('fix', 0xD308): ('far:hle_dlgatt8_b', 'NZ'),
-           ('fix', 0xE9DC): ('far:hle_scr00_b', 'NZ')}      # clear ppu scrolling registers     # update dialog window attributes       # copy text to ppu (rt/native_layer.s)
+           ('fix', 0xE9DC): ('far:hle_scr00_b', 'NZ'),      # clear ppu scrolling registers
+           ('fix', 0xF689): ('far:hle_scr00_b', 'NZ'),      # (the same, splash screen)
+           ('b11', 0x9D7C): ('far:hle_palbtl_b', 'NZC')}    # copy color palettes to ppu (battle)     # update dialog window attributes       # copy text to ppu (rt/native_layer.s)
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   fix:FA91-FA99: PHA $FA / PHA $99 / JMP ($0040): "jump (long)" calls through ($40)
     #   with a pushed return address: on the GB a call through the pointer, then $FA9A.
@@ -118,10 +120,20 @@ class FF2:
               ('fix', 0xDAD4): ('hle_csum', 0xDADF, 'NZC'),    # save slot checksum (rt/ff2_banked.s)
               ('b14', 0xB27A): ('hle_savecp', 0xB288, 'NZ'),   # save copy + slot mark (rt/save.s)
               ('fix', 0xFC38): ('hle_pad35', 0xFC50, 'NZC'),   # battle joypad read (rt/selmenu.s)
-              ('fix', 0xFD60): ('hle_scr60', 0xFD6C, 'NZ')}    # menu scroll after the sprite-0 hit (rt/native_layer.s)
+              ('fix', 0xFD60): ('hle_scr60', 0xFD6C, 'NZ'),    # menu scroll after the sprite-0 hit (rt/native_layer.s)
+              # boot splash (fix:F476..): row fills and glyph tile uploads (rt/native_layer.s)
+              ('fix', 0xF565): ('far:hle_splrow0_b', 0xF580, 'NZ'),
+              ('fix', 0xF5D4): ('far:hle_splrow8_b', 0xF5EE, 'NZ'),
+              ('fix', 0xF632): ('far:hle_splchr8_b', 0xF649, 'NZC'),
+              ('fix', 0xF653): ('far:hle_splchr64_b', 0xF681, 'NZC')}
     # battle NMI handlers (run by rt_nmi_run through the dynamic table; RTI = ret)
     nmi_handlers = [('b12', 0x9A79), ('b05', 0xA9A2)]
     idiom_code = {('fix', 0xFA91): bytes.fromhex('a9fa48a999486c4000'),
+                  ('fix', 0xF565): bytes.fromhex('a5628d0620a5618d0620a5618580a2008e0720e680a580291fd0f5'),
+                  ('fix', 0xF5D4): bytes.fromhex('2c0220a5628d0620a5618d0620a2808e0720e680a580291fd0f5'),
+                  ('fix', 0xF632): bytes.fromhex('a9088d0620a9008d0620a200bd50038d0720e8e01090f5'),
+                  ('fix', 0xF653): bytes.fromhex('a5644a4a4a4a8d0620a5640a0a0a0a8d0620a200bd50038d0720e8e01090f5'
+                                                 'a5628d0620a5618d0620a5648d0720'),
                   ('fix', 0xFD46): bytes.fromhex('2c022070fb'), ('fix', 0xFD5B): bytes.fromhex('2c022050fb'),
                   ('b11', 0xA073): bytes.fromhex('2c022070fb'),
                   ('b05', 0xA70A): bytes.fromhex('a5acd0fc'), ('b12', 0xA630): bytes.fromhex('a5acd0fc'),
@@ -445,7 +457,7 @@ class Emitter:
             else: self.o('push af', 'ld a, %s' % reg, 'ldh [ppu_ctrl], a', 'pop af')
             return
         if r == 'ppu': name = 'rt_ppu_w%d' % (a & 7)
-        elif r == 'io': name = 'rt_io_w%04X' % a if a in (0x4014, 0x4016) else 'rt_apu_w'
+        elif r == 'io': name = 'gb_sprites' if a == 0x4014 else 'rt_io_w4016' if a == 0x4016 else 'rt_apu_w'
         elif r == 'mmc': name = 'rt_mmc_w%04X' % a if a in (0x5115, 0x5116, 0x5800, 0x5801, 0x5802, 0x5803, 0x5804, 0x5805, 0x5806, 0x5807, 0x5808, 0x5809, 0x580A, 0x580B) else None
         else:
             self.rc.warn.append('store to ROM %04X at %r' % (a, i)); return
@@ -502,7 +514,12 @@ class Emitter:
                 self.o('jp ' + r)
             return
         if k in rc.g.idioms:
-            self.o('call ' + rc.g.idioms[k][0]); self.jump(None, (i.space, rc.g.idioms[k][1])); return
+            r = rc.g.idioms[k][0]
+            if r.startswith('far:'):                    # banked native: rst $08 (returns here)
+                self.o('rst $08', 'db bank(%s)' % r[4:], 'dw %s' % r[4:])
+            else:
+                self.o('call ' + r)
+            self.jump(None, (i.space, rc.g.idioms[k][1])); return
         h = getattr(self, 'x_' + mn, None)
         if h is None:
             rc.warn.append('no translation for %r' % i); self.o('call rt_fatal')

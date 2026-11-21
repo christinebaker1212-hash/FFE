@@ -1199,6 +1199,17 @@ lineend:                ; upload line VLN (tiles PTILE + 17 * VLN) and write its
     pla
     sta VP
     jsr $FA2A           ; the row: NES row 19 + VLN, cols 1-18
+    jsr lnrow
+    jsr scroll
+    lda VLN             ; next free line
+    clc
+    adc #1
+    cmp MLINE
+    bcc .x
+    sta MLINE
+.x:
+    rts
+lnrow:                  ; (native on the GB: NATIVE_EXT b23_lnrow)
     lda VLN
     clc
     adc #19
@@ -1226,14 +1237,6 @@ lineend:                ; upload line VLN (tiles PTILE + 17 * VLN) and write its
     bne .w
     lda BLANKT          ; (the 18th cell)
     sta $2007
-    jsr scroll
-    lda VLN             ; next free line
-    clc
-    adc #1
-    cmp MLINE
-    bcc .x
-    sta MLINE
-.x:
     rts
 gb_msgclose:
     dec MOPEN
@@ -3407,11 +3410,7 @@ pframe:                 ; one frame (b14:B9B0): a line (PRLEN), the attribute ro
     jsr $FE00           ;   palettes, scroll, music, joypad (A / B -> PEXIT)
     jsr pfdraw
     jsr $DC30
-    lda $FF
-    sta $2000
-    lda #0
-    sta $2005
-    sta $2005
+    jsr pfscr
     sta $24
     sta $25
     jsr $C74F
@@ -3419,6 +3418,13 @@ pframe:                 ; one frame (b14:B9B0): a line (PRLEN), the attribute ro
     lda $24
     ora $25
     sta PEXIT
+    rts
+pfscr:                  ; control $FF, scroll 0 / 0, A = 0 (native on the GB: NATIVE_EXT b24_pfscr)
+    lda $FF
+    sta $2000
+    lda #0
+    sta $2005
+    sta $2005
     rts
 pfdraw:                 ; the attribute row before the line (a plain Game Boy tile has one
                         ;   shading: a font tile written into a cell still fading would be
@@ -4126,6 +4132,8 @@ def battle(rom):
     NATIVE_EXT['b23_gres'] = (23, b23.labels['gres'], 'hle_resume', 'NZ')
     NATIVE_EXT['b23_ntrow'] = (23, b23.labels['ntrow'], 'far:hle_ntrow_b', 'NZC')
     NATIVE_EXT['b23_scrw'] = (23, b23.labels['scrw'], 'far:hle_scrw_b', 'NZ')
+    NATIVE_EXT['b23_lnrow'] = (23, b23.labels['lnrow'], 'far:hle_lnrow_b', 'NZC')
+    assert (RAM['VLN'], RAM['VP'], RAM['BLANKT']) == (0x7FFE, 0xD2, 0x7888)   # (hle_lnrow_b)
     assert RAM['MSCR'] == 0x7FEA                 # (hle_scrw_b)
     select_menu(rom, f.labels['gbf'])
     labels = {}
@@ -4161,6 +4169,7 @@ gbm:                    ; main menu (bank 24): A = sub-command; back to bank 14
     NATIVE_EXT['b24_pcopy'] = (24, b24.labels['pcopy'], 'hle_pcopy', 'NZC')
     NATIVE_EXT['b24_pages0'] = (24, b24.labels['pages0'], 'hle_pages0', 'NZ')
     NATIVE_EXT['b24_pfdraw'] = (24, b24.labels['pfdraw'], 'far:hle_pdraw_b', 'NZC')
+    NATIVE_EXT['b24_pfscr'] = (24, b24.labels['pfscr'], 'far:hle_pfscr_b', 'NZ')
     assert (PROPH_RAM['PRP'], PROPH_RAM['PRM'], PROPH_RAM['PRLEN'], PROPH_RAM['PRA'], PROPH_RAM['PAR'],
             PROPH_RAM['PATT']) == (0xD4, 0x760A, 0x760B, 0x760C, 0x7608, 0x7609)   # (hle_pdraw_b)
     NATIVE_EXT['b24_gmattr'] = (24, b24.labels['gmattr'], 'far:hle_gmattr_b', 'NZC')

@@ -56,7 +56,10 @@ Starting point (2026-11-21, static call sites in the translated code): PPU 579 (
 
 Calls from game code into the layer over the 30000-frame random-1 run (hwprof): about
 330k before (2026-11-21 start: `$2007` 164k, `$4016` reads 139k, APU 71k, bank
-register 66k, ...), about 130k after the first batch (n6), less after n7.
+register 66k, ...), about 130k after the first batch (n6), about 30k PPU calls after n10,
+**about 9.6k after n12**: `$2002` reads 4.0k, `$2001` writes 3.3k, `$2007` 1.6k, `$2006`
+0.6k, `$2005` 0.1k (plus the native sprite conversion `gb_sprites` 20k and the sound
+driver's register calls 7.3k, which are native routines under their old entry names).
 
 Done (each checked with firstdiff DMG + CGB, random 2, the save scenario, lagcheck):
 - **Joypad** (fix:DBA9 -> `$20`, fix:FC38-FC4F -> `$35`): one read of the GB buttons into
@@ -78,6 +81,14 @@ Done (each checked with firstdiff DMG + CGB, random 2, the save scenario, lagche
 - **Prologue / prophecy lines** (layout pframe): line + attribute row native (`pfdraw` ->
   `hle_pdraw_b`).
 - **Dialogue window attributes** (fix:D2FE / D308) native (`hle_dlgatt_b`).
+- **Battle message lines** (layout `lnrow`), **main menu attributes** (layout `gmattr`),
+  **battle palettes** (b11:9D7C), the layout's **scroll** (`scrw`) and the prologue's
+  (`pfscr`), scroll 0 / 0 (fix:E9DC, F689).
+- **Boot splash** (fix:F476..): the row fills and glyph tile uploads (idioms at F565, F5D4,
+  F632, F653; translator idioms take `far:` names too). The tile copier (`cp_hl`) now
+  copies whole tiles from work RAM as well.
+- Attribute bytes from the native routines go through `nt_attr` (rt/native.s), not the
+  generic path; `STA $4014` calls the sprite conversion as `gb_sprites`.
 - Frame waits (fix:FA2A / FEAD), the native CHR copy and the native nametable clear set
   the PPU state directly instead of calling the `$2002` / `$2006` entries.
 - OAM tearing fix: the OAM conversion clears `oam_pending` at its start, so a V-Blank
@@ -90,9 +101,10 @@ from translated code in place (translator `ext` names `far:<label>`: `call rt_fc
 bank / dw label`, no bank-0 stub; bank 0 is full). `rt_fcs` is a tail call: it returns
 to the caller of the routine that contains it.
 
-Next by count: the boot splash glyphs (fix:F59F-F689, once per boot), the remaining layout
-screens (b24 portraits / rows, b23 lists), field map / battle CHR paths, `$2000` / `$2001`
-/ `$2005` writes in the layout's `scroll` routine, the battle OAM sites (`$2003` + `$4014`).
+What is left (n12): mostly single register accesses (`$2001` rendering on
+per field frame, `$2002` reads, `$2005` pairs) and small scattered writers (b24 portrait
+rows, b23 lists, b11 sequential fill / 8-tile copy addresses, the generic fallbacks of the
+older natives). APU calls are direct calls of the sound driver with a constant register.
 
 ## Checks for each step
 

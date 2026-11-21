@@ -777,6 +777,29 @@ in, the build runs on GitHub's Windows runner).
     save scenario DMG / CGB: identical; lotcheck static + LCD-off runs DMG / CGB + soft
     reset DMG / CGB / release: all passed.
 
+## Native layer (owner, 2026-11-21: "Replace the layer with native routines")
+Plan, progress and building blocks: `docs/ff2-gb-native-layer.md`. State 2026-11-21:
+- Native now: joypad (no `$4016` serial reads), bank switch, palette uploads (all / BG),
+  scroll writes (field, battle, menus, text window, the layout's `scroll`), the music
+  engine's sound output, text rows (fix:F069), menu window rows (layout `ntrow`), battle
+  message lines (layout `lnrow`), prologue lines (layout `pfdraw`), dialogue-window
+  attributes (fix:D2FE / D308), the main menu's attribute copy (layout `gmattr`);
+  `$2000` written directly, `$2003` / `$2004` dropped, `STA $4014` calls the sprite
+  conversion `gb_sprites`.
+- Layer calls over the random-1 run (30000 frames): ~330k -> ~9.6k PPU-register calls
+  (n12; mostly single `$2002` reads / `$2001` writes), plus the sprite conversion and the
+  sound driver under their old entry names. Also native: battle palettes, the boot
+  splash's row fills and glyph uploads, the prologue's scroll.
+- Translator: banked native routines in place (`far:`), cross-bank calls via `rst $08`
+  with the target inline (the 515 bank-0 stubs removed: ~5 KB of bank 0 free).
+- Checks on each batch: firstdiff random 1 (30000) DMG + CGB, random 2, save scenario:
+  identical; lagcheck DMG -0.1% / CGB -2.3% (0% slowdown kept); screens vs the release
+  build: the same apart from catch-up sampling phase (the new build is often a frame
+  ahead in showing queued VRAM writes).
+- Next: the boot splash glyphs (fix:F59F, needs a work-RAM source for the tile copier),
+  the remaining layout screens (b24 portraits / rows, b23 lists), field map and battle CHR
+  paths, battle OAM sites, `$2001` / `$2002` users.
+
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
 2. ~~English patch → source mapping~~ (plan §2, approved).

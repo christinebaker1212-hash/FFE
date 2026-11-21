@@ -439,8 +439,10 @@ cp_hl:      ld a, e
             and $0F
             jp nz, .slow
             ld a, h                         ; source: $8000-$BEFF (ROM data bank) or
-            cp $60                          ;   $6000-$7EFF (cart RAM bank 0): a full page
-            jp c, .slow                     ;   stays inside the window
+            cp $08                          ;   $6000-$7EFF (cart RAM bank 0): a full page
+            jr c, .edge                     ;   stays inside the window; work RAM: the
+            cp $60                          ;   copy inside one page
+            jp c, .slow
             cp $C0
             jp nc, .slow
             cp $80                          ; the last page of a window ($7F / $BF): the
@@ -468,7 +470,13 @@ cp_hl:      ld a, e
             ld a, 16
 .tn:        ldh [uw_y], a
             ld a, h
-            cp $80
+            cp $08
+            jr nc, .nw
+            add a, high(NES_RAM)            ; work RAM: GB $C000 + ptr
+            ld h, a
+            xor a
+            jr .src
+.nw:        cp $80
             jr c, .sram
             sub $40                         ; source HL = GB $4000 + ptr - $8000 (data bank)
             ld h, a

@@ -788,3 +788,223 @@ hle_gmattr_b:
 .run:       call rt_fcs                     ; (returns to .run's caller)
             db HLE_BANK
             dw nt_copy
+
+; ---- layout lnrow (battle message line VLN): NES row 19 + VLN, columns 1-18: 17 tiles
+; from (VP), then the blank tile. VSH / VT as the NES leaves them. Exit: A = the blank
+; tile with its N / Z, X = 0, Y = 17, C = 1 (CPY #17).
+hle_lnrow_b:
+            ld a, [$BFFE]                   ; r = VLN + 19
+            add a, 19
+            ld c, a
+            and 7
+            swap a
+            add a, a
+            ld [NR_VSH], a
+            or 1
+            ld [TX_LO], a
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld [NR_VT], a
+            or $20
+            and $3F
+            ld [TX_HI], a
+            xor a
+            ldh [ppu_latch], a
+            ld a, [NES_RAM + $D2]           ; (VP): NES -> GB address
+            ld [TX_SRC], a
+            ld a, [NES_RAM + $D3]
+            cp $60
+            jr c, .wr
+            add a, $40
+            jr .gh
+.wr:        add a, high(NES_RAM)
+.gh:        ld [TX_SRC + 1], a
+            ld a, 17
+            call .run
+            ld a, low(NR_BLANKT)
+            ld [TX_SRC], a
+            ld a, high(NR_BLANKT)
+            ld [TX_SRC + 1], a
+            ld a, 1
+            call .run
+            ld a, [NR_BLANKT]
+            ld d, a
+            and $80
+            ldh [nzv], a
+            ld e, $10                       ; (C)
+            ld a, d
+            and a
+            jr nz, .nz
+            set 7, e
+.nz:        ld h, d
+            ld l, e
+            push hl
+            pop af
+            ld bc, 17
+            ld de, 0
+            ret
+.run:       call rt_fcs                     ; (returns to .run's caller)
+            db HLE_BANK
+            dw nt_copy
+
+; ---- b11:9D7C copy color palettes to ppu (battle: the 32 entries from $79A8), then the PPU
+; address $3F00 and $0000. Exit: A = $3F, X = 0, N = 0, Z = 1, C = 1.
+hle_palbtl_b:
+            push bc
+            ld l, 0
+.l:         push hl
+            ld a, l
+            add a, low($B9A8)
+            ld l, a
+            ld a, high($B9A8)
+            adc a, 0
+            ld h, a
+            ld d, [hl]
+            pop hl
+            push hl
+            call gb_pal
+            pop hl
+            inc l
+            ld a, l
+            cp $20
+            jr nz, .l
+            xor a
+            ldh [ppu_vh], a
+            ldh [ppu_vl], a
+            ldh [ppu_latch], a
+            ldh [vbl_flag], a
+            ldh [nzv], a
+            pop bc
+            ld de, 0
+            ld a, $3F
+            ld h, a
+            ld l, $90                       ; (Z, C)
+            push hl
+            pop af
+            ret
+
+; ---- boot splash (fix:F476..), the PPU parts of the glyph routine (idioms):
+; fix:F565-F57F: from ($62, $61) to the row's end the tile 0 ($80 = $61 advanced to the
+; next row). Exit: A = 0, X = 0, N = 0, Z = 1, carry kept.
+hle_splrow0_b:
+            push af
+            ld a, [NES_RAM + $61]
+            ld [NES_RAM + $80], a
+            ld a, 0
+            jr spl_row
+; fix:F5D4-F5ED: the same from $80 with the tile $80 (LDA $2002 first). Exit: A = 0,
+; X = $80, N = V = 0, Z = 1, carry kept.
+hle_splrow8_b:
+            push af
+            ld a, $80
+spl_row:    ld [PD_B], a
+            ld e, a                         ; (X at the end)
+            xor a
+            ldh [ppu_latch], a
+            ldh [vbl_flag], a
+            ldh [nzv], a
+            ld a, [NES_RAM + $62]
+            and $3F
+            ld [TX_HI], a
+            ld a, [NES_RAM + $61]
+            ld [TX_LO], a
+            ld a, low(PD_B)
+            ld [TX_SRC], a
+            ld a, high(PD_B)
+            ld [TX_SRC + 1], a
+            ld a, 1
+            ld [NR_FILL], a
+            ld a, [NES_RAM + $80]           ; count = 32 - ($80 & 31); $80 -> next row
+            ld l, a
+            and $E0
+            add a, $20
+            ld [NES_RAM + $80], a
+            ld a, l
+            and $1F
+            cpl
+            add a, 33
+            push de
+            push bc
+            call .run
+            pop bc
+            pop de
+            pop af                          ; (carry)
+            ld a, 0
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1, carry kept
+            ret
+.run:       call rt_fcs                     ; (returns to .run's caller)
+            db HLE_BANK
+            dw nt_copy
+; fix:F632-F648: the glyph buffer $0350 (16 bytes) to the pattern table at $0800. Exit:
+; A = the last byte, X = $10, N = 0, Z = 1, C = 1.
+hle_splchr8_b:
+            ld a, $08
+            ld l, $00
+            call spl_chr
+            ld a, [NES_RAM + $035F]
+            jr spl_x
+; fix:F653-F680: the glyph buffer to tile $64 of the pattern table, then tile $64 at
+; ($62, $61). Exit: A = $64 with its N / Z, X = $10, C = 1.
+hle_splchr64_b:
+            ld a, [NES_RAM + $64]
+            swap a
+            ld l, a
+            and $0F
+            ld h, a
+            ld a, l
+            and $F0
+            ld l, a
+            ld a, h
+            call spl_chr
+            ld a, [NES_RAM + $62]
+            and $3F
+            ld [TX_HI], a
+            ld a, [NES_RAM + $61]
+            ld [TX_LO], a
+            ld a, low(NES_RAM + $64)
+            ld [TX_SRC], a
+            ld a, high(NES_RAM + $64)
+            ld [TX_SRC + 1], a
+            push bc
+            ld a, 1
+            call spl_row.run
+            pop bc
+            ld a, [NES_RAM + $64]
+spl_x:      ld d, a
+            and $80
+            ldh [nzv], a
+            ld a, d
+            and a
+            ld l, $10                       ; (C)
+            jr nz, .nz
+            ld l, $90                       ; (Z, C)
+.nz:        ld h, d
+            push hl
+            pop af
+            ld de, $0010
+            ret
+            ; A:L = pattern address: the 16 bytes from $0350 (copy_core; C kept)
+spl_chr:    and $3F
+            ldh [ppu_vh], a
+            ld a, l
+            ldh [ppu_vl], a
+            xor a
+            ldh [ppu_latch], a
+            push bc
+            ld hl, $0350
+            ld e, 16
+            call copy_core
+            pop bc
+            ret
+
+; ---- layout pfscr (prologue frame): control = $FF, scroll 0 / 0. Exit: A = 0, Z = 1,
+; N = 0, carry kept.
+hle_pfscr_b:
+            ld a, [NES_RAM + $FF]
+            ldh [ppu_ctrl], a
+            jp hle_scr00_b
