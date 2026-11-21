@@ -8,7 +8,7 @@ ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
-import data, text, talkconst, ui
+import data, text, talkconst, ui, names
 
 COMMON, TS_BANK0, MAP_BANK0, OW_TS, OW_INFO, OW_ROWS, ROM_BANKS = 1, 8, 20, 16, 81, 84, 128
 
@@ -24,16 +24,18 @@ DIS = os.path.join(ROOT, 'build', 'ref', 'FF1Disassembly', 'Final Fantasy Disass
 
 
 def weapon_slots(rom):
-    """FF1's weapon slot offsets (16), from FindEmptyWeaponSlot's operand in the fixed bank"""
+    """FF1's weapon and armour slot offsets (16 + 16), from the operands of FindEmptyWeaponSlot
+    and FindEmptyArmorSlot in the fixed bank"""
     fix = rom.prg[-0x4000:]
-    i = 0
-    while True:
+    out = []; i = 0
+    while len(out) < 2:
         i = fix.find(bytes([0xA0, 0x00, 0xBE]), i)
         assert i >= 0, 'weapon slot finder not found'
         a = fix[i + 3] | fix[i + 4] << 8
         if fix[i + 5:i + 8] == bytes([0xBD, 0x00, 0x61]):
-            return fix[a - 0xC000:a - 0xC000 + 16]
+            out.append(fix[a - 0xC000:a - 0xC000 + 16])
         i += 1
+    return out[0] + out[1]
 
 
 def talk_defs(rom):
@@ -56,8 +58,9 @@ def ui_strings():
     return '\n'.join(out) + '\n'
 
 
-def data_banks(rom):
+def data_banks(rom, ff3=None):
     banks = {}
+    data.FONT_CODES = text.field_codes()
     c = data.common_pack(rom)
     place(banks, COMMON, 0x4000, c['spr_tiles'])
     place(banks, COMMON, 0x4100, c['mapman'])
@@ -66,13 +69,17 @@ def data_banks(rom):
     place(banks, COMMON, 0x4500, c['init_unsram'])            # new game: save page 0
     place(banks, COMMON, 0x4600, c['init_flags'])             #   and the game flags
     place(banks, COMMON, 0x4700, text.win_palette())
-    fd, fc = text.font_banks(rom)
+    fd, fc = text.font_banks(rom, ff3)
     place(banks, COMMON, 0x4800, fd)
     place(banks, COMMON, 0x5000, fc)
     place(banks, COMMON, 0x5800, rom.rd(14, talkconst.TALK_DATA, 4 * talkconst.N_OBJ))  # talk data
     kind, _ = talkconst.extract(rom, DIS)
     place(banks, COMMON, 0x5C00, kind)                         # talk routine kind per object id
-    place(banks, COMMON, 0x5D00, weapon_slots(rom))
+    place(banks, COMMON, 0x5D00, weapon_slots(rom))           # weapon slots (16), armour (16)
+    nb = names.names_bank(rom)
+    nb[0x3000:0x3200] = rom.rd(0x0D, 0xBC00, 0x200)            # item prices (FF1 lut_ItemPrices)
+    nb[0x3200:0x3300] = rom.rd(0x00, 0xB100, 0x100)            # chest contents (lut_Treasure)
+    banks[names.NAMES_BANK] = nb
     banks[3] = bytearray(ui.gfx_bank(rom))                     # UI_GFX
     for b, blob in text.dialogue_banks(90).items():
         banks[b] = bytearray(blob)
@@ -126,6 +133,7 @@ def main():
     st = a[a.index('--start') + 1].split(',') if '--start' in a else ['$FE', '0', '0']
     st = (list(st) + ['0'])[:4]                  # MAP,X,Y[,ROOM]
     rom = data.Rom(nes)
+    ff3 = names.ff3_rom(a[a.index('--ff3') + 1] if '--ff3' in a else None)
     src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\nSTART_ROOM = %s\n' % tuple(st) + talk_defs(rom) +
            open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
@@ -141,7 +149,7 @@ def main():
     for lbl in ('qbuf', 'oam_buf', 'objs', 'game_flags', 'font_tbl', 'win_buf'):
         assert r.labels[lbl] % 0x100 == 0, '%s at %04X not aligned' % (lbl, r.labels[lbl])
     banks = dict(r.banks)
-    for b, blob in data_banks(rom).items():
+    for b, blob in data_banks(rom, ff3).items():
         assert b not in banks, 'bank %d used by code and data' % b
         banks[b] = blob
     img = make_rom(banks, 'FF1 NATIVE', cart_type=0x1B, rom_banks=ROM_BANKS, ram_size_code=0x03,

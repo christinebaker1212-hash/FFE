@@ -558,6 +558,124 @@ talk_after: ld a, [pend_telef]
             ld [pend_btlf], a               ; (battles: battle.s, later)
             ret
 
+; ---- treasure chests (FF1 OpenTreasureChest): A = chest number -> A = the dialogue
+NAMES      = 4                  ; names bank: $4000 name pointers, $7000 prices, $7200 chests
+N_PRICE    = $7000
+N_TREAS    = $7200
+ITEMS      = $D020              ; (FF1 items = save page + $20; gold = + $1C, 3 bytes)
+GOLD       = $D01C
+DLG_TCGET  = $F0
+DLG_FULL   = $F1
+DLG_EMPTY  = $F2
+open_chest: ld [tc_id], a
+            ld l, a
+            ld h, high(game_flags)
+            bit 2, [hl]                     ; opened
+            ld a, DLG_EMPTY
+            ret nz
+            ld a, NAMES
+            call sbank
+            ld a, [tc_id]
+            ld l, a
+            ld h, high(N_TREAS)
+            ld a, [hl]
+            ld [dlg_item], a
+            cp $1C
+            jr nc, .ni
+            add a, low(ITEMS)               ; an item: one more, up to 99
+            ld l, a
+            ld h, high(ITEMS)
+            ld a, [hl]
+            cp 99
+            jr nc, .o1
+            inc [hl]
+.o1:        call tc_open
+            ld a, [dlg_item]
+            cp $16                          ; key items: the fanfare, others the jingle
+            ld a, 1
+            jr c, .o2
+            inc a
+.o2:        ld [dlgsfx], a
+            ld a, DLG_TCGET
+            ret
+.ni:        cp $44
+            jr nc, .nw
+            sub $1B                         ; a weapon: 1-based index into a free slot
+            ld b, a
+            ld hl, C_WPNSLOT
+            jr .find
+.nw:        cp $6C
+            jr nc, .gold
+            sub $43                         ; armour
+            ld b, a
+            ld hl, C_WPNSLOT + 16
+.find:      ld a, COMMON
+            call sbank
+            ld c, 16
+.f:         ld a, [hl+]
+            ld e, a
+            ld d, high(ch_stats)
+            ld a, [de]
+            and a
+            jr z, .got
+            dec c
+            jr nz, .f
+            ld a, DLG_FULL
+            ret
+.got:       ld a, b
+            ld [de], a
+            jr .jg
+.gold:      ld l, a                         ; gold: the item's price (FF1 LoadPrice)
+            ld h, 0
+            add hl, hl
+            ld de, N_PRICE
+            add hl, de
+            ld a, [hl+]
+            ld c, a
+            ld b, [hl]
+            call add_gold
+.jg:        call tc_open
+            ld a, 2
+            ld [dlgsfx], a
+            ld a, DLG_TCGET
+            ret
+tc_open:    ld a, [tc_id]
+            ld l, a
+            ld h, high(game_flags)
+            set 2, [hl]
+            ret
+
+; gold += BC (at most 999999)
+add_gold:   ld hl, GOLD
+            ld a, [hl]
+            add a, c
+            ld [hl+], a
+            ld a, [hl]
+            adc a, b
+            ld [hl+], a
+            ld a, [hl]
+            adc a, 0
+            ld [hl], a
+            cp $0F                          ; 1000000 = $0F4240
+            jr c, .ok
+            jr nz, .max
+            dec hl
+            ld a, [hl-]
+            cp $42
+            jr c, .ok
+            jr nz, .max
+            ld a, [hl]
+            cp $40
+            ret c
+.max:       ld hl, GOLD                     ; 999999 = $0F423F
+            ld a, $3F
+            ld [hl+], a
+            ld a, $42
+            ld [hl+], a
+            ld [hl], $0F
+.ok:        ret
+
+
 section wram, $CCA0
 talk_id:    ds 1
 talk_slot:  ds 1
@@ -567,3 +685,7 @@ pend_tele:  ds 1
 pend_telef: ds 1
 pend_btl:   ds 1
 pend_btlf:  ds 1
+
+section wram, $CC90
+tc_id:      ds 1
+dlg_item:   ds 1

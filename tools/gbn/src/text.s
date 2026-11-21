@@ -48,7 +48,7 @@ font_map:   ld a, [map_bank]
             ldh a, [maptype]
             and a
             ret nz                          ; (the overworld shows no text box)
-            ld c, $10
+            ld c, $01                       ; (icons $01-$1F, frame $10-$18, letters)
 .l:         ld a, c                         ; tile for code C
             ld l, a
             ld h, high(font_tbl)
@@ -149,9 +149,34 @@ dlg_page:   ld hl, win_buf                  ; frame and blank inside
             cp $0A
             jr z, .nl
             cp $02
-            jr z, .ch                       ; (the item name: treasure, later)
+            jr z, .item
             call code_tile
             ld [hl+], a
+            jr .ch
+.item:      push de                         ; the item name (names bank), then the text again
+            ld a, NAMES
+            call sbank
+            ld a, [dlg_item]
+            ld e, a
+            ld d, 0
+            push hl
+            ld hl, $4000
+            add hl, de
+            add hl, de
+            ld a, [hl+]
+            ld d, [hl]
+            ld e, a
+            pop hl
+.in:        ld a, [de]
+            inc de
+            and a
+            jr z, .ie
+            call code_tile
+            ld [hl+], a
+            jr .in
+.ie:        ld a, [dlg_bank]
+            call sbank
+            pop de
             jr .ch
 .nl:        ld a, b                         ; next line: 20 cells on
             add a, 20

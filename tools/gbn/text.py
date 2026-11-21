@@ -20,8 +20,10 @@ def code_of(ch):
     return 0x7F if ch == '…' else ord(ch)
 
 
-def font_tiles(rom):
-    """{code: NES tile} for the frame and the glyphs (colour 2 background, 3 ink)"""
+def font_tiles(rom, ff3=None):
+    """{code: NES tile} for the frame, the glyphs (colour 2 background, 3 ink) and FF3's
+    icons (names.ICONS)"""
+    import names
     menu = rom.rd(9, MENU_CHR, 0x800)
     out = {}
     for i, t in enumerate(range(0xF7, 0x100)):
@@ -29,17 +31,34 @@ def font_tiles(rom):
     out[0x20] = menu[(0xFF - 0x80) * 16:(0xFF - 0x80) * 16 + 16]   # space = the blank inside
     for ch in latin_font.G:
         out[code_of(ch)] = latin_font.tile(ch, fg=3, bg=2)
+    out.update(names.icon_tiles(ff3))
     return out
 
 
-def font_banks(rom):
+DMG_ICON = (2, 1, 3, 0)                # DMG icons: outlines dark grey, details light grey
+
+
+def font_banks(rom, ff3=None):
     """the font for DMG (pre-shaded) and CGB (as it is), 128 tiles by code"""
-    f = font_tiles(rom)
+    import names
+    f = font_tiles(rom, ff3)
     dmg = bytearray(2048); cgb = bytearray(2048)
     for code, t16 in f.items():
-        dmg[16 * code:16 * code + 16] = data.gb_tile(t16, DMG_WIN)
+        dmg[16 * code:16 * code + 16] = data.gb_tile(t16, DMG_ICON if code in names.ICON_CODES else DMG_WIN)
         cgb[16 * code:16 * code + 16] = data.gb_tile(t16)
     return bytes(dmg), bytes(cgb)
+
+
+def field_codes():
+    """the font codes the field needs (DMG: loaded into each map's free tiles): the frame, the
+    letters the dialogue and the item names use, and the icons"""
+    import ff1_dialogue, ff1_items, names
+    used = set()
+    for t in list(ff1_dialogue.D.values()) + list(ff1_items.T.values()):
+        t = t.replace('{02}', '')
+        used |= set(code_of(ch) for ch in t if ch != '\n')
+    used.add(0x20)
+    return list(range(0x10, 0x19)) + sorted(c for c in used if 0x20 <= c < 0x80) + names.ICON_CODES
 
 
 def win_palette():
@@ -62,8 +81,10 @@ def wrap(text, width=DLG_W):
 def encode_dialogue(text):
     """reflowed as the GB layout (the Japanese breaks are layout breaks): 18 columns, pages of
     6 lines"""
-    text = text.replace('{02}', '\x02' * 1)
-    lines = wrap(text.replace('\n', ' '))
+    lines = []                         # (the item name on a line of its own)
+    for i, part in enumerate(text.replace('\n', ' ').split('{02}')):
+        if i: lines.append('\x02')
+        lines += wrap(part)
     out = bytearray()
     for i, ln in enumerate(lines):
         if i:

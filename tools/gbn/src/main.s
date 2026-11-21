@@ -769,8 +769,7 @@ talk:       ld a, [px]
             and 63
             ld d, a
             call obj_at                     ; C: HL inside the object's slot
-            ld a, 0
-            jr nc, .dlg
+            jr nc, .tile
             ld a, l
             and $F0
             ld l, a
@@ -781,6 +780,21 @@ talk:       ld a, [px]
             pop hl
             call talk_obj                   ; A = dialogue
 .dlg:       jp dlg_open
+.tile:      call map_at                     ; no object: the tile (FF1 TalkToSMTile)
+            call props
+            ld a, d
+            and $1E
+            cp $08                          ; a treasure chest
+            jr z, .tc
+            ld a, d
+            and $C2                         ; (teleports / doors: "nothing there")
+            ld a, 0
+            jr nz, .dlg
+            ld a, e                         ; the tile's own dialogue
+            jr .dlg
+.tc:        ld a, e
+            call open_chest
+            jr .dlg
 
 ; A = metatile -> D, E = its property bytes (the tileset bank)
 props:      add a, a
