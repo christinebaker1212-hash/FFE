@@ -194,6 +194,18 @@ one reaches parity, so the owner can keep playing).
   frequency table made at build time; map / vehicle / event tracks). Not yet: sound effects
   (battle hits, menu cursor), the ending sequence after Chaos.
 
+- Sound effects (snd.s, sound.sfx_data): FF1's menu cursor / select / error sounds (their
+  register values read from the ROM's code) and its three battle sounds (data_BattleSoundEffects),
+  played on CH2 / CH4 while the music leaves square 2 alone (FF1's sq2_sfx); the NES sweep runs in
+  software (two half-frame clocks a frame); the ship's and airship's noise on the overworld. Menu
+  sounds come from read_pad while a menu screen is open (sfx_menu); errors where FF1 plays them
+  (equip, drop, item / magic targets, a dead caster).
+- Battle animations (btl4.s, battle.obj_bank): FF1's poses (standing, walking, attacking, cheering,
+  crouching when low / ill, lying dead, stone), the walk forward / back, the weapon swing (the
+  weapon's graphic and palette), the spell cast (graphic, the background flash), explosions on
+  hit enemies, the screen shake on enemy attacks, enemies erased row by row, the victory cheer.
+  No blinking (owner). Battle windows: blanked on screen before new text, rows go up whole.
+
 ## Next steps (native rewrite)
 1. (done) Vehicles (FF1 ProcessOWInput / OWCanMove, bank 0F): `vehicle` 1 foot, 2 canoe, 4 ship,
    8 airship; blocked if tile byte 0 & vehicle; on foot onto water: BoardCanoe (needs
@@ -215,7 +227,6 @@ one reaches parity, so the owner can keep playing).
 4. Story scenes (bridge, ending: translations/ff1_story.py, the approved 20 x 11 box),
    prologue, the minimap (B + Select), the 15-puzzle, options (message speed), Chaos'
    ending.
-5. Battle polish: animations (weapon swing, spell flash, enemy explosion), the party
-   sprites' poses (walk forward when acting, kneel when low HP, dead / stone poses).
+5. (done) Battle polish: animations and poses; sound effects.
 6. SGB (palettes per screen, border), Lot Check pass (gb-release-checks.md), lag check,
    release build.

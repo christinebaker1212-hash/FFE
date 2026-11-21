@@ -1260,8 +1260,8 @@ spell names (from the user's FF3 ROM), battle (formations, approved layout, comm
 FF1's formulas, magic, AI, items, rewards, level ups, fiend / Chaos graphics checked against
 the NES), random encounters, talk battles, vehicles, music (native engine, map / event
 tracks), prologue / bridge story / ending, continue + soft reset, special floor tiles.
-Next: sound effects, battle animations, minimap, 15-puzzle, options, SGB, Lot Check pass,
-lag check, release. Lessons: docs/gb-lessons.md "Native rewrite".
+sound effects (menus, battle, ship / airship), battle animations and poses (FF1's, no blinking).
+Next: minimap, 15-puzzle, options, SGB, Lot Check pass, lag check, release. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
