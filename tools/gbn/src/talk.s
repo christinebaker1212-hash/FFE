@@ -23,7 +23,7 @@ talk_obj:   ld a, l
             ld de, C_TALKDAT
             add hl, de
             ld a, COMMON
-            ld [MBC_BANK], a
+            call sbank
             ld de, talk_d
             ld b, 4
 .c:         ld a, [hl+]
@@ -251,7 +251,7 @@ t_smith:    ld a, TK_Talk_Smith_0
             and a
             jp z, d1
             ld a, COMMON                    ; the first empty weapon slot of the party
-            ld [MBC_BANK], a
+            call sbank
             ld hl, C_WPNSLOT
             ld b, 16
 .s:         ld a, [hl+]

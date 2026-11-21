@@ -16,7 +16,7 @@ text_init:  ldh a, [is_cgb]
             and a
             ret z
             ld a, COMMON
-            ld [MBC_BANK], a
+            call sbank
             ld a, 1
             ldh [rVBK], a
             ld hl, C_FONTCGB                ; codes 0-127 -> $9000 + 16 code (bank 1)
@@ -37,7 +37,7 @@ text_init:  ldh a, [is_cgb]
 
 ; load_map (LCD off), DMG: the font into the map's free tiles; the table kept in WRAM
 font_map:   ld a, [map_bank]
-            ld [MBC_BANK], a
+            call sbank
             ld hl, M_FONT
             ld de, font_tbl
             ld bc, 128
@@ -66,7 +66,7 @@ font_map:   ld a, [map_bank]
             and $F0
             ld l, a
             ld a, COMMON
-            ld [MBC_BANK], a
+            call sbank
             push bc
             ld bc, 16
             call memcpy
@@ -106,7 +106,7 @@ dlg_open:   ld l, a                         ; table entry: 3 x id
             ld de, $4000
             add hl, de
             ld a, DLG_BANK
-            ld [MBC_BANK], a
+            call sbank
             ld a, [hl+]
             ld [dlg_bank], a
             ld a, [hl+]
@@ -133,7 +133,7 @@ dlg_page:   ld hl, win_buf                  ; frame and blank inside
             ld d, $17
             call .row3
             ld a, [dlg_bank]                ; the text
-            ld [MBC_BANK], a
+            call sbank
             ld a, [dlg_ptr]
             ld e, a
             ld a, [dlg_ptr + 1]

@@ -36,7 +36,7 @@ obj_load:   ld hl, objs
             and a
             ret nz                          ; (none on the overworld)
             ld a, [map_bank]
-            ld [MBC_BANK], a
+            call sbank
             ld hl, M_OBJS
             ld de, objs
             ld b, 15
@@ -616,7 +616,7 @@ obj_spr:    push de
             ld a, [de]
             ld [o_tb], a
             ld a, COMMON
-            ld [MBC_BANK], a
+            call sbank
             ld l, c
             ld h, high(C_OBJTBL)
             pop de                          ; (slot, unused now)

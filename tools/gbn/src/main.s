@@ -143,7 +143,7 @@ start:      di
             ld [mt_force], a
             call text_init
             ld a, COMMON                    ; new game: save page 0 and the game flags from the ROM
-            ld [MBC_BANK], a
+            call sbank
             ld hl, C_INITPG
             ld de, unsram
             ld bc, 256
@@ -158,7 +158,7 @@ start:      di
             cp MAP_OW                       ;   unless --start says otherwise)
             jr nz, .st
             ld a, COMMON
-            ld [MBC_BANK], a
+            call sbank
             ld a, [C_OWSTART]
             ld d, a
             ld a, [C_OWSTART + 1]
@@ -210,6 +210,8 @@ vblank:     push af
             push bc
             push de
             push hl
+            ldh a, [rombank]                ; (restored at the end: the handler switches)
+            push af
             ld hl, frame
             inc [hl]
             call hram_dma
@@ -228,6 +230,8 @@ vblank:     push af
             call q_flush
 .late:      ld a, 1
             ldh [vbl_done], a
+            pop af
+            call sbank
             pop hl
             pop de
             pop bc
@@ -298,7 +302,7 @@ load_map:   ld [cur_map], a
             ld a, b
             add a, MAP_BANK0
             ld [map_bank], a
-            ld [MBC_BANK], a
+            call sbank
             ld a, [M_TS]
             add a, TS_BANK0
             ld [ts_bank], a
@@ -315,7 +319,7 @@ load_map:   ld [cur_map], a
             and a
             jr z, .dmg
             ld a, [ts_bank]                 ; CGB: the tileset's tiles -> $9000 (0-127),
-            ld [MBC_BANK], a                ;   the overworld's 128-255 -> $8800
+            call sbank                ;   the overworld's 128-255 -> $8800
             ld hl, T_TILES
             ld de, $9000
             ld bc, 128 * 16
@@ -328,7 +332,7 @@ load_map:   ld [cur_map], a
             call memcpy
 .t1:
             ld a, [map_bank]
-            ld [MBC_BANK], a
+            call sbank
             ld hl, M_BGOUT
             ld a, $80
             call cgb_pal32
@@ -341,7 +345,7 @@ load_map:   ld [cur_map], a
             dec b
             jr nz, .op
             ld a, COMMON                    ; party sprite tiles at $8000 (as they are)
-            ld [MBC_BANK], a
+            call sbank
             ld hl, C_SPR
             ld de, $8000
             ld bc, 16 * 16
@@ -350,7 +354,7 @@ load_map:   ld [cur_map], a
             call obj_tiles
             jr .drw
 .dmg:       ld a, [map_bank]                ; DMG: pre-shaded variants 0-127 -> $9000,
-            ld [MBC_BANK], a                ;   128-255 -> $8800
+            call sbank                ;   128-255 -> $8800
             ld hl, M_TILES
             ld de, $9000
             ld bc, 128 * 16
@@ -388,7 +392,7 @@ obj_tiles:  ldh a, [maptype]
             and a
             ret nz
             ld a, [map_bank]
-            ld [MBC_BANK], a
+            call sbank
             ld a, [M_OBJBLK + 16]
             and a
             ret z
@@ -429,7 +433,7 @@ bg_pal:     xor a
             and a
             ret z
             ld a, [map_bank]
-            ld [MBC_BANK], a
+            call sbank
             ld hl, M_BGOUT
             ld a, [inroom]
             and a
@@ -644,7 +648,7 @@ arrived:    ld a, [px]
             and $3F
             ld l, a
             ld a, COMMON
-            ld [MBC_BANK], a
+            call sbank
             ld h, high(C_ENTRX)
             ld a, l
             add a, low(C_ENTRX)
@@ -665,7 +669,7 @@ arrived:    ld a, [px]
 .exit:      xor a                           ; exit to the overworld at FF1's exit position
             ld [fdepth], a
             ld a, COMMON
-            ld [MBC_BANK], a
+            call sbank
             ld a, e
             and 15
             ld l, a
@@ -712,7 +716,7 @@ do_tele:    push de                         ; push this floor
             ld [hl], a
 .nf:        pop de
             ld a, COMMON
-            ld [MBC_BANK], a
+            call sbank
             ld l, e
             ld h, high(C_TELEX)
             ld a, [hl]                      ; x
@@ -776,7 +780,7 @@ props:      add a, a
             ld l, a
             ld h, high(T_PROP)
             ld a, [ts_bank]
-            ld [MBC_BANK], a
+            call sbank
             ld a, [hl+]
             ld d, a
             ld e, [hl]
@@ -833,7 +837,7 @@ map_at:     ldh a, [maptype]
             rlca
             and 3
             add a, OW_ROWS
-            ld [MBC_BANK], a
+            call sbank
             ld a, d
             and 63
             add a, $40
@@ -842,7 +846,7 @@ map_at:     ldh a, [maptype]
             ld a, [hl]
             ret
 .sm:        ld a, [map_bank]
-            ld [MBC_BANK], a
+            call sbank
             ld l, d                         ; HL = M_MAP + 64 y + x
             ld h, 0
             add hl, hl
@@ -893,7 +897,7 @@ mulsign:    and a                           ; A = sign (-1 / 0 / 1) -> A = sign 
 
 ; ---- party sprite (FF1's 2x2 tables: tile, attributes for UL, DL, UR, DR)
 make_oam:   ld a, COMMON
-            ld [MBC_BANK], a
+            call sbank
             ld a, [facing]
             add a, a
             ld b, a
@@ -1078,11 +1082,11 @@ q_mt:       ldh a, [cmask]
             and a                           ;   pre-shaded for the room state (map bank)
             jr z, .dmg
             ld a, [ts_bank]
-            ld [MBC_BANK], a
+            call sbank
             ld b, high(T_MTCGB)
             jr .t
 .dmg:       ld a, [map_bank]
-            ld [MBC_BANK], a
+            call sbank
             ld b, high(M_MTOUT)
             ld a, [inroom]
             and a
@@ -1107,7 +1111,7 @@ q_mt:       ldh a, [cmask]
             ld a, [de]
             ld [hl+], a
             ld a, [ts_bank]                 ; palette
-            ld [MBC_BANK], a
+            call sbank
             ld e, c
             ld d, high(T_MTPAL)
             ld a, [de]
@@ -1194,6 +1198,47 @@ q_flush:    ld a, [q_n]
             jr nz, .e
             ret
 
+; ---- banks: every switch through sbank, so the V-Blank handler can restore the bank the
+; interrupted code runs in (banked modules call bank-0 code freely)
+sbank:      ldh [rombank], a
+            ld [MBC_BANK], a
+            ret
+; run routine HL in code bank A, then back to the caller's bank
+bank_call:  push af
+            ldh a, [rombank]
+            ld b, a
+            pop af
+            push bc
+            call sbank
+            call .jp
+            pop bc
+            push af
+            ld a, b
+            call sbank
+            pop af
+            ret
+.jp:        jp hl
+; copy BC bytes from bank A, HL to DE (RAM / VRAM); the caller's bank mapped again
+far_copy:   push af
+            ldh a, [rombank]
+            ld [fc_save], a
+            pop af
+            call sbank
+            call memcpy
+            ld a, [fc_save]
+            jp sbank
+; A = the byte at bank A' (fc_bank), HL; the caller's bank mapped again
+far_byte:   ldh a, [rombank]
+            ld [fc_save], a
+            ld a, [fc_bank]
+            call sbank
+            ld a, [hl]
+            push af
+            ld a, [fc_save]
+            call sbank
+            pop af
+            ret
+
 ; ---- helpers
 memclr:     xor a                           ; HL = start, DE = length
             ld [hl+], a
@@ -1246,6 +1291,8 @@ ow_y:       ds 1
 fdepth:     ds 1                            ; floors pushed by normal teleports
 fstack:     ds 4 * 8                        ; x, y, room state, map
 warp_room:  ds 1
+fc_save:    ds 1
+fc_bank:    ds 1
 obj_cur:    ds 1
 npc_seed:   ds 1
 o_tx:       ds 1
@@ -1273,6 +1320,7 @@ scx:        ds 1
 scy:        ds 1
 pal_req:    ds 1
 q_nolim:    ds 1
+rombank:    ds 1                            ; the ROM bank mapped at $4000 (sbank)
 maptype:    ds 1                            ; 0 standard map, 1 overworld
 frame:      ds 1                            ; frame counter
 cmask:      ds 1                            ; coordinate mask: 63 / 255
