@@ -15027,26 +15027,33 @@ lon_tramp:  ldh a, [lcd_on]
             pop de
             pop bc
             ret
+; NC: forced (pending LON_FORCE frames; a battle start LON_BFORCE: its sprite codings come
+; from the palettes at the maps step, which must not fall into the fade-in)
+lon_frc:    ldh a, [in_battle]
+            bit 7, a
+            ld a, [LON_CNT]
+            jr z, .n
+            cp LON_BFORCE
+            ret
+.n:         cp LON_FORCE
+            ret
 ; carry: not enough of the frame left for an atomic step
-lon_half:   ld a, [LON_CNT]                 ; (pending LON_FORCE frames: forced, never short)
-            cp LON_FORCE
+lon_half:   call lon_frc                    ; (pending LON_FORCE frames: forced, never short)
             ret nc
             ldh a, [$FF05]
             cp LON_HALF
             ccf
             ret
 ; carry: not enough of the frame left for a big atomic step (about half a frame)
-lon_big:    ld a, [LON_CNT]
-            cp LON_FORCE
+lon_big:    call lon_frc
             ret nc
             ldh a, [$FF05]
             cp LON_BIG
             ccf
             ret
 ; carry: the frame's time is up (a tick since the wait's entry, or TIMA at LON_END)
-lon_time:   ld a, [LON_CNT]                 ; (pending LON_MAXF frames: steps still in spare
-            cp LON_FORCE                    ;   time, only no restarts; LON_FORCE: no limit)
-            ret nc
+lon_time:   call lon_frc                    ; (pending LON_MAXF frames: steps still in spare
+            ret nc                          ;   time, only no restarts; LON_FORCE: no limit)
             push hl
             ld hl, VBL_ENT
             ld a, [VBL_CNT]
@@ -15140,7 +15147,9 @@ lon_b:      ldh a, [code_bank]              ; (the bank-0 helpers come back to c
             ld a, 1
             ldh [maps_due], a
             jr .to3
-.rst:       ld a, [LON_CNT]                 ; (disturbed: the scan again, unless pending
+.rst:       call lon_frc                    ; (forced: no restart)
+            jr nc, .nrs
+            ld a, [LON_CNT]                 ; (disturbed: the scan again, unless pending
             cp LON_MAXF                     ;   LON_MAXF frames already: then on, so a screen
             jr nc, .nrs                     ;   written every frame still comes on)
             ld a, 1
@@ -16253,7 +16262,7 @@ pap_b:      ld a, [NES_RAM + $2D]           ; (state in registers / HRAM, RAM at
             ld b, 0
             ret
 
-section bank 0, $3100
+section bank 0, $3330
 ; carry: no more sprite slot loads this GB frame (DMG: SL_MAX a frame; a sprite whose tile
 ; is not loaded yet stays hidden until a later frame's conversion loads it). Keeps BC, DE.
 SL_V       = $D828          ; (fault-dump area) VBL_CNT of the loads counted in SL_N
@@ -16269,27 +16278,42 @@ sl_chk:     ldh a, [is_cgb]
             cp [hl]
             jr z, .s
             ld [hl], a
-            xor a
-            ld [SL_N], a
+            ld a, [SL_N]                    ; a new frame: SL_N bits 0-3 = loads (0), bits 4-6
+            bit 7, a                        ;   = frames in a row whose loads the LY limit cut
+            jr z, .r0                       ;   (bit 7: cut this frame)
+            and $70
+            cp $70
+            jr z, .r1
+            add a, $10
+            jr .r1
+.r0:        xor a
+.r1:        ld [SL_N], a
 .s:         ld a, [SL_N]
+            and $0F
             cp SL_MAX
             ccf
             jr c, .x
             and a                           ; (after the first one of a frame: only while the
             jr z, .ok                       ;   frame has time left, LY < SL_LY, LCD on, when
             ld a, [OAM_USED]                ;   no sprite showed before: sprites appearing a few
-            and a                           ;   frames later, never shown ones hidden: no blink)
-            jr nz, .ok0
-            ldh a, [lcd_on]
+            and a                           ;   frames later, never shown ones hidden: no blink;
+            jr nz, .ok                      ;   after 3 frames cut in a row, no limit, so a
+            ldh a, [lcd_on]                 ;   screen that converts late still gets them)
             and a
-            jr z, .ok0
+            jr z, .ok
+            ld a, [SL_N]
+            and $70
+            cp $30
+            jr nc, .ok
             ldh a, [$FF44]
             cp SL_LY
-            ccf
-            jr c, .x
-.ok0:       ld a, [SL_N]
-.ok:        inc a
-            ld [SL_N], a
+            jr c, .ok
+            ld hl, SL_N
+            set 7, [hl]
+            scf
+            jr .x
+.ok:        ld hl, SL_N
+            inc [hl]
             and a
 .x:         pop hl
             ret

@@ -1216,11 +1216,22 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
     VCHK 0 on DMG / CGB / SGB over the 9000-frame script (n131).
   - CGB prologue page 2 stayed black (since 2026-11-19, `vshow_def`): each vblank of the fade
     spent itself on the palette upload, so the tile copy of the masked load was always late
-    (hd_any never cleared, VLCD stuck at 2). The upload without emphasis now goes straight
-    from NES_RGB (~half the time; `cgbp`, bank 0 $2FB2), and while a masked load waits for
-    tiles the vblank copies the tiles first and uploads the palettes in a later vblank
-    (`isr_pal`); vbl_regs unmasks only with both done (`vlcd_ok`). CGB pictures identical to
-    the build before at 70 points of the script; lag unchanged (DMG 18, CGB -6).
+    (hd_any never cleared, VLCD stuck at 2). Now (bank 0 $3080 / $3100): the palette upload
+    without emphasis goes straight from NES_RGB (`cgbp`, $2FB2); the CGB uploads palettes only
+    while the vblank has room (LY 144-148; a late upload was lost and cleared pal_dirty), a
+    masked load copies its tiles first and gets its palettes after the DMA (`isr_pal`,
+    `pal_unm`), and is unmasked there once tiles, palettes and the queue are done (vbl_regs
+    too: `vlcd_ok`); the end-of-vblank shade update is DMG / SGB only (`nd_pal`). A first
+    version (palettes skipped while masked) left the shops' windows dark green / black on the
+    CGB; found by the field-script picture tour (vchkfield.py env SHOTS / SHOTDIR).
+  - DMG, found by the release picture tour: class select showed no sprites (SL_LY 24 refused
+    every load after the first; now after 3 frames refused in a row the limit is lifted,
+    state in SL_N's high bits; sl_chk moved to bank 0 $3330), and the battle party sprites were
+    dark (LON_MAXF 30 let the battle start's maps step fall into the fade-in, coding the sprite
+    palettes dark: a battle start forces after LON_BFORCE = 10 frames again).
+  - Checks (n138): checkall 62/62; VCHK 0 on DMG / CGB / SGB over the battle script and all 22
+    field scripts; CGB pictures = n131 at 70 points but the prologue (now shown in time).
+    Lag: DMG 22, CGB -6.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

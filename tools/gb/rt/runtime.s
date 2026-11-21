@@ -90,6 +90,7 @@ LON_DIRTY  = $D824
 LON_LIM    = $D825
 LON_CNT    = $D826          ;   frames pending (LON_MAXF: the rest at once)
 LON_MAXF   = 30
+LON_BFORCE = 10             ; (a battle start: forced after 10, as before LON_MAXF 30)
 LON_FORCE  = 40             ; (frames pending: steps no longer wait for spare time)
 LON_END    = 250            ; (TIMA: stop at 250 of 188..255; an atomic step only below LON_HALF)
 LON_HALF   = 240
@@ -257,6 +258,7 @@ cgbp:       push de                         ; NES palette RAM -> CGB BG / OBJ pa
             rrca                            ;   bits e, the other components dimmed to 3/4 as
             ld [EMPH_E], a                  ;   the 2C02 roughly does: the battle-start flashes)
             ld de, NES_RGB
+            and a                           ; (RRCA leaves Z clear: test A)
             jp nz, cgb_palettes.go
             ld a, $80                       ; no emphasis: straight from NES_RGB (256-aligned)
             ldh [$FF68], a
@@ -289,24 +291,69 @@ cgbp:       push de                         ; NES palette RAM -> CGB BG / OBJ pa
             jr nz, .fl
             ret
 
-section bank 0, $3074
-; vblank: CGB palettes when dirty, except while a masked load waits for tiles to be copied
-; (the tiles first; the mask hides the palettes, and vbl_regs unmasks only once both are in)
+section bank 0, $3100
+; vblank start, CGB: the palettes when dirty and the vblank has room (LY 144-148: an upload
+; that runs into drawing is lost); a masked load with tiles to copy: the tiles first (the
+; mask hides the palettes; pal_unm uploads them after the DMA)
 isr_pal:    ldh a, [pal_dirty]
             and a
             ret z
             ld a, [VLCD]
             and a
-            jp z, make_palettes
+            jr z, pal_ly
             ldh a, [hd_any]
             and a
             ret nz
+pal_ly:     ldh a, [$FF44]                  ; (only while the vblank has room)
+            cp 144
+            ret c
+            cp 149
+            ret nc
+            jp make_palettes
+; end of the vblank, DMG / SGB: the shades for the next frame (the registers are written next
+; vblank); not the CGB (palette RAM only in the vblank: isr_pal / pal_unm)
+nd_pal:     ldh a, [is_cgb]
+            and a
+            ret nz
+            ldh a, [pal_dirty]
+            and a
+            ret z
             jp make_palettes
 ; Z: no tile copy pending and the palettes uploaded (a masked load can be shown)
 vlcd_ok:    ldh a, [hd_any]
             ld b, a
             ldh a, [pal_dirty]
             or b
+            ret
+
+section bank 0, $3080
+; vblank, CGB, after the tile DMA: palettes still due (left for the tiles) if there is room;
+; then a masked load waiting to be shown (VLCD 2) with all tiles and palettes in, no queued
+; write and no dialogue window is unmasked (LCDC as vbl_regs sets it)
+pal_unm:    ldh a, [pal_dirty]
+            and a
+            call nz, pal_ly
+            ld a, [VLCD]
+            cp 2
+            ret nz
+            call vlcd_ok
+            ret nz
+            ldh a, [q_head]
+            ld b, a
+            ldh a, [q_tail]
+            cp b
+            ret nz
+            ldh a, [dlg_l]
+            and a
+            ret nz
+            ld [VLCD], a                    ; (A = 0)
+            ld b, LCDC_ON & %11111101
+            ldh a, [ppu_mask]
+            bit 4, a
+            jr z, .ns
+            set 1, b
+.ns:        ld a, b
+            ldh [$FF40], a
             ret
 
 section bank 0, $0000
@@ -551,11 +598,12 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
 .no_oam:    ldh a, [is_cgb]                 ; CGB palette RAM: only in vblank
             and a
             jr z, .pal_ok
-            call isr_pal                    ; (bank 0 $3074)
+            call isr_pal                    ; (bank 0 $3100)
 .pal_ok:    call vbl_regs                   ; BGP / OBP, LCDC, scroll, raster events
 .scy_done:  ldh a, [hd_any]                 ; CGB: tiles by HDMA first
             and a
             call nz, hdma_flush
+            call pal_unm                    ; (bank 0 $3080)
             ldh a, [$FF0F]                  ; DMG: the STAT write requested a STAT
             res 1, a                        ;   interrupt; drop it
             ldh [$FF0F], a
@@ -569,9 +617,7 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             ld a, [VLCD]
             and a
             call nz, dmg_loff
-.nd:        ldh a, [pal_dirty]              ; DMG: the shades for the next frame (the
-            and a                           ;   registers are written next vblank)
-            call nz, make_palettes
+.nd:        call nd_pal                     ; DMG: the shades for the next frame (bank 0 $3100)
             ld a, 1
             ldh [frame_flag], a
             ld a, $80

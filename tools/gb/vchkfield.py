@@ -3,6 +3,7 @@ input script, on DMG, CGB and SGB (mGBA, build/sgbrun with env SGBRUN_VCHK=1: ev
 to VRAM in mode 3 or to OAM in mode 2 / 3 with the LCD on is counted).
 usage: PYTHONPATH=build/emu vchkfield.py NES GB UNTIL [--field SCRIPT | --newgame | --input MODE]
        [--poke P [--poke-at F]]
+  env SHOTS=K,K,.. SHOTDIR=DIR: also screenshots at those NES frame waits (DIR/MODE_nKKKKK.ppm)
   the input is made as lagcheck.py makes it (the NES run's latched pads); prints per mode the
   frames / NES frame waits reached and the violation count (and the first few)."""
 import os, sys, subprocess, tempfile
@@ -69,8 +70,11 @@ for m in ('dmg', 'cgb', 'sgb'):
     cmd = [exe, gb_path, str(until + 400), os.path.join(tmp, 's'), '--padfile', pf, '--sram', sf]
     if poke_nmi is not None: cmd += ['--poke', str(poke_nmi), pokes]
     if m != 'sgb': cmd.append('--' + m)
+    if os.environ.get('SHOTS'):
+        cmd[3] = os.path.join(os.environ.get('SHOTDIR', tmp), m)
+        for k in os.environ['SHOTS'].split(','): cmd += ['--nshot', k]
     r = subprocess.run(cmd, capture_output=True, text=True, env=dict(os.environ, SGBRUN_VCHK='1'))
-    tot = [l for l in r.stdout.split('\n') if l.startswith('VCHK total') or l.startswith('frames')]
+    tot = [l for l in r.stdout.split('\n') if l.startswith('VCHK total') or l.startswith('frames') or l.startswith('peek')]
     res.append('%s: %s' % (m, ' | '.join(tot)))
     first = [l for l in r.stderr.split('\n') if l.startswith('VCHK ')][:3]
     if first: res.append('   ' + ' / '.join(first))
