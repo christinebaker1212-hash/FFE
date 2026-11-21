@@ -1252,6 +1252,15 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
     shot); all field scripts + battle: fixed-camera screens 0-3 cells (writes in flight).
     checkall 64/64 (n139).
 
+## FF1 native rewrite (tools/gbn/, docs/ff1-native.md) - state 2026-11-21
+Done: maps, overworld, teleports, doors / rooms, objects, dialogue, all talk routines,
+treasure chests, title / class select / 6-letter name entry, main menu, items, magic,
+weapons / armor, status, shops / inn / clinic, save to cart RAM, FF3 icons before item /
+spell names (from the user's FF3 ROM). Next: battle (formations, screen with the approved
+layout, commands, FF1's formulas / AI / magic / items, rewards), random encounters, music
+and sound, vehicles and events, prologue / story scenes, ending, continue / options, SGB,
+Lot Check pass, release.
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette
