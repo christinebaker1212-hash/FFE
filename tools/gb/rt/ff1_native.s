@@ -18308,9 +18308,371 @@ btx_f:
 ; (shift s: 8 rows for the glyph's tile, then the 8 rows spilling into the next tile); glyphs
 ; without ink share a block of zeros. Same RAM as before (VC, VX, VSQ, VCNT, VSH, VT2, VOFF,
 ; $88/$89, VBUF).
-section bank VWF_BANK, $4000
-vstr_b:     call vstr_n                     ; (out: B = D = 0, as the recompiled code keeps
-            ld b, 0                         ;   them: BC = Y, DE = X)
+section bank VWF_BANK, $7400
+; vstr is lazy (deferred drawing): it computes everything the NES routine leaves in RAM
+; (VC, VX, VSQ, VCNT, VSH, VT2, VOFF, $88/$89) without drawing, and records a job in cart
+; RAM bank 3 (VX, VSQ and VN at the call, then the bytes of VSTR it went over). vclear is
+; lazy too (VX = 0; the clear pending, the jobs before it dropped). The jobs are drawn into
+; VBUF by vjob_run, which hle_vtile calls before the first tile upload after them (gb_layout's
+; vupload waits for a frame before it): the drawing lands in that light frame, not in the
+; frame that laid the text out. Only vchar and vtile use VBUF.
+VJ_CLR     = $AB00          ; (cart RAM bank 3) passes of 8 bytes to clear first, 0: none
+VJ_N       = $AB01          ; jobs recorded
+VJ_JOBS    = $AB10          ; jobs of 64 bytes: VX, VSQ, VN, length, bytes (up to VJ_MAX)
+VJ_MAX     = 60
+VJ_CAP     = 3
+vstr_b:     ld [VW_VC], a
+            ld c, a                         ; C = start
+            ld a, [VW_VX]                   ; the state at the call (for the job / a fallback)
+            ldh [wtmp], a
+            ld a, [VW_VSQ]
+            ld b, a
+            push bc
+            call vstr_dry
+            pop bc                          ; C = start, B = VSQ at the call
+            ld a, [VW_VC]
+            sub c                           ; A = bytes gone over
+            cp VJ_MAX + 1
+            jr nc, .now
+            ld e, a                         ; E = length
+            ld a, 3
+            ld [$4000], a
+            ld a, [VJ_N]
+            cp VJ_CAP
+            jr nc, .now0
+            ld d, a                         ; job slot: HL = VJ_JOBS + 64 * D
+            inc a
+            ld [VJ_N], a
+            ld a, d
+            rrca
+            rrca
+            and $C0
+            add a, low(VJ_JOBS)
+            ld l, a
+            ld a, high(VJ_JOBS)
+            adc a, 0
+            ld h, a
+            ldh a, [wtmp]
+            ld [hl+], a                     ; VX
+            ld [hl], b                      ; VSQ
+            inc hl
+            xor a
+            ld [$4000], a
+            ld a, [VW_VN]
+            ld d, a
+            ld a, 3
+            ld [$4000], a
+            ld [hl], d                      ; VN
+            inc hl
+            ld [hl], e                      ; length
+            inc hl
+            ld a, e
+            and a
+            jr z, .done
+            ld a, c                         ; the bytes, from VSTR + start
+            add a, low(VW_VSTR)
+            ld c, a
+            ld b, high(VW_VSTR)
+.cp:        xor a
+            ld [$4000], a
+            ld a, [bc]
+            inc bc
+            ld d, a
+            ld a, 3
+            ld [$4000], a
+            ld [hl], d
+            inc hl
+            dec e
+            jr nz, .cp
+.done:      xor a
+            ld [$4000], a
+            ld a, 1
+            ldh [apq_n], a                  ; (a job pending: hle_vtile)
+            ld b, 0
+            ld d, 0
+            ret
+.now0:      xor a                           ; no room for a job: the pending ones drawn, then
+            ld [$4000], a                   ;   this one at once (as before)
+.now:       push bc
+            call vjob_run
+            pop bc
+            ldh a, [wtmp]
+            ld [VW_VX], a
+            ld a, b
+            ld [VW_VSQ], a
+            ld a, c
+            call vstr_n
+            ld b, 0
+            ld d, 0
+            ret
+
+; vstr without drawing: the same walk and the same RAM results (vchar_dry per letter)
+vstr_dry:
+.l:         ld a, [VW_VEND]
+            ld c, a
+            ld a, [VW_VC]
+            cp c
+            ret nc
+            add a, low(VW_VSTR)
+            ld l, a
+            ld h, high(VW_VSTR)
+            ld a, [hl]
+            and a
+            ret z
+            cp $FD
+            jr nz, .c
+            inc l
+            ld a, [hl]
+            sub $80
+            add a, a
+            add a, a
+            add a, a
+            ld [VW_VX], a
+            ld hl, VW_VC
+            inc [hl]
+            jr .n
+.c:         call vchar_dry
+.n:         ld hl, VW_VC
+            inc [hl]
+            jr nz, .l
+            ret
+vchar_dry:  cp $FD
+            ret z
+            cp $FF
+            jr nz, .g
+            ld a, [VW_VX]
+            add a, 3
+            ld [VW_VX], a
+            ret
+.g:         sub VW_FIRST
+            ret c
+            ld e, a
+            ld hl, vw_gw58
+            add a, l
+            ld l, a
+            jr nc, .w
+            inc h
+.w:         ld a, [hl]
+            and a
+            ret z
+            ld [VW_VCNT], a
+            ld l, e
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld bc, VW_GR_NES
+            add hl, bc
+            ld a, l
+            ld [NES_RAM + $88], a
+            ld a, h
+            ld [NES_RAM + $89], a
+            ld a, [VW_VX]
+            and 7
+            ld [VW_VSH], a
+            ld a, [VW_VX]
+            srl a
+            srl a
+            srl a
+            ld c, a
+            ld a, [VW_VN]
+            ld d, a
+            ld a, c
+            cp d
+            jp nc, vchar_n.adv
+            ld [VW_VT2], a
+            add a, a
+            add a, a
+            add a, a
+            ld [VW_VOFF], a
+            jp vchar_n.adv
+
+; vclear, lazy: VX = 0, the clear (VN * 8 bytes, 256 for VN 0 mod 32) left pending, the
+; jobs before it dropped. Out as the NES routine: A = X = 0, Y kept; N = 0, Z = 1, C = 1.
+vclear_l:   xor a
+            ld [VW_VX], a
+            ldh [nzv], a
+            ld a, [VW_VN]
+            and $1F
+            jr nz, .n0
+            ld a, 32
+.n0:        ld e, a
+            ld a, 3
+            ld [$4000], a
+            ld a, e
+            ld [VJ_CLR], a
+            xor a
+            ld [VJ_N], a
+            ld [$4000], a
+            inc a
+            ldh [apq_n], a
+            xor a
+            ld de, 0
+            push af
+            pop hl
+            ld l, $90                       ; (Z, C)
+            push hl
+            pop af
+            ret
+
+; the pending clear and jobs into VBUF (the real VX, VN, VSQ, VCNT, VSH, VT2, VOFF, VC,
+; $88/$89 kept). Keeps all registers.
+vjob_run:   push af
+            push bc
+            push de
+            push hl
+            xor a
+            ldh [apq_n], a
+            ld hl, VW_VX                    ; save: VX VN, VCNT VSH VOFF, VT2, VC
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            push bc
+            inc l
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            ld d, a                         ; (VOFF; VLO at $AE96 not touched)
+            inc l
+            ld a, [hl]
+            ld e, a                         ; (VT2)
+            push bc
+            push de
+            ld a, [VW_VC]
+            ld b, a
+            ld a, [VW_VSQ]
+            ld c, a
+            push bc
+            ld a, [NES_RAM + $88]
+            ld b, a
+            ld a, [NES_RAM + $89]
+            ld c, a
+            push bc
+            ld a, 3
+            ld [$4000], a
+            ld a, [VJ_CLR]
+            ld e, a
+            xor a
+            ld [VJ_CLR], a
+            ld [$4000], a
+            ld a, e
+            and a
+            jr z, .jobs
+            ld hl, VW_BUF
+            xor a
+.cl:        ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec e
+            jr nz, .cl
+.jobs:      ld a, 3
+            ld [$4000], a
+            ld a, [VJ_N]
+            ld b, a
+            xor a
+            ld [VJ_N], a
+            ld [$4000], a
+            ld a, b
+            and a
+            jr z, .end
+            ld hl, VJ_JOBS
+.job:       push bc
+            push hl
+            ld a, 3
+            ld [$4000], a
+            ld a, [hl+]
+            ld b, a                         ; VX
+            ld a, [hl+]
+            ld c, a                         ; VSQ
+            ld a, [hl+]
+            ld d, a                         ; VN
+            ld a, [hl+]
+            ld e, a                         ; length
+            xor a
+            ld [$4000], a
+            ld a, b
+            ld [VW_VX], a
+            ld a, c
+            ld [VW_VSQ], a
+            ld a, d
+            ld [VW_VN], a
+            ld a, e
+            and a
+            jr z, .jn
+.ch:        ld a, 3
+            ld [$4000], a
+            ld a, [hl+]
+            ld b, a
+            ld c, [hl]                      ; (the byte after: a pen code's operand)
+            xor a
+            ld [$4000], a
+            ld a, b
+            cp $FD
+            jr nz, .gl
+            inc hl                          ; $FD $80+n: pen to tile n
+            dec e
+            ld a, c
+            sub $80
+            add a, a
+            add a, a
+            add a, a
+            ld [VW_VX], a
+            jr .nx
+.gl:        push de
+            push hl
+            call vchar_n
+            pop hl
+            pop de
+.nx:        dec e
+            jr nz, .ch
+.jn:        pop hl
+            ld de, 64
+            add hl, de
+            pop bc
+            dec b
+            jr nz, .job
+.end:       pop bc                          ; restore
+            ld a, b
+            ld [NES_RAM + $88], a
+            ld a, c
+            ld [NES_RAM + $89], a
+            pop bc
+            ld a, b
+            ld [VW_VC], a
+            ld a, c
+            ld [VW_VSQ], a
+            pop de
+            pop bc
+            ld hl, VW_VCNT
+            ld a, b
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            inc l
+            ld [hl], e
+            pop bc
+            ld hl, VW_VX
+            ld a, b
+            ld [hl+], a
+            ld [hl], c
+            pop hl
+            pop de
+            pop bc
+            pop af
+            ret
+
+vstr_r:     call vstr_n                     ; (the old entry: draws at once)
+            ld b, 0
             ld d, 0
             ret
 vstr_n:     ld [VW_VC], a

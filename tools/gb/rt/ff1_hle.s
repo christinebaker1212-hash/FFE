@@ -665,8 +665,14 @@ fresh_tramp:                                ; frame wait, DMG: fresh_scan (bank 
             ld [$2000], a
             ret
 
-hle_vtile:                                  ; far vtile (bank HLE_BANK: vtile_b)
-            ld a, HLE_BANK
+hle_vtile:                                  ; far vtile (bank HLE_BANK: vtile_b; first the
+            ldh a, [apq_n]                  ;   deferred text drawing, VWF_BANK vjob_run)
+            and a
+            jr z, .t
+            ld a, VWF_BANK
+            ld [$2000], a
+            call vjob_run
+.t:         ld a, HLE_BANK
             ld [$2000], a
             call vtile_b
             jp hle_back
@@ -1002,8 +1008,8 @@ hle_sw16:   push af
             ld a, [$AD74]
             ret
 
-hle_vclear:                                 ; far vclear (bank HLE_BANK: vclear_b)
-            ld a, HLE_BANK
+hle_vclear:                                 ; far vclear (bank VWF_BANK: vclear_l, lazy)
+            ld a, VWF_BANK
             ld [$2000], a
-            call vclear_b
+            call vclear_l
             jp hle_back
