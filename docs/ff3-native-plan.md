@@ -40,7 +40,8 @@ Static: 673 PPU call sites, 58 APU, 25 MMC5, 1763 glue calls in the translated c
    with the NES's RAM results kept (buffer, $1F / $90 counters, nametable shadow only where the
    game reads it back). The condensed names (owner's request) are made here: names in lists and
    menus packed into condensed tiles as the line is written.
-3. **Native music driver**: plays FF3's own song and sound-effect scripts (format: bank $36
+3. **Native music driver** (2026-11-21: the output stage is native, `snd_*`; the script /
+   envelope logic is still translated): plays FF3's own song and sound-effect scripts (format: bank $36
    routines "execute sound command", "update volume / pitch envelope", "init song") on the GB
    channels (pulse 1 / 2, wave for the triangle, noise), interface kept: $7F40-$7F49 (song id,
    flags, sound effect id, "playing" bit) as the game reads and writes them. Removes ~12% and

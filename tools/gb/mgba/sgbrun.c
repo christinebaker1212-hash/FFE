@@ -15,6 +15,7 @@
  */
 #include <mgba/core/core.h>
 #include <mgba/core/timing.h>
+#include <mgba/core/blip_buf.h>
 #include <mgba/core/config.h>
 #include <mgba/internal/gb/gb.h>
 #include <mgba/internal/sm83/sm83.h>
@@ -215,6 +216,8 @@ int main(int argc, char** argv) {
 	mCoreConfigSetValue(&core->config, "cgb.sgbModel", model);
 	mCoreConfigSetIntValue(&core->config, "sgb.borders", dmg ? 0 : 1);   /* --cgb: Game Boy Color */
 	mCoreConfigSetIntValue(&core->config, "useBios", 0);
+	mCoreConfigSetIntValue(&core->config, "volume", 0x100);   /* (SGBRUN_WAV: audible samples) */
+	mCoreConfigSetIntValue(&core->config, "mute", 0);
 	mCoreLoadConfig(core);
 	unsigned w, h;
 	core->desiredVideoDimensions(core, &w, &h);
@@ -222,6 +225,11 @@ int main(int argc, char** argv) {
 	color_t* buf = calloc(W * H, sizeof(color_t));
 	core->setVideoBuffer(core, buf, W);
 	if (!mCoreLoadFile(core, argv[1])) { fprintf(stderr, "cannot load %s\n", argv[1]); return 1; }
+	if (getenv("SGBRUN_WAV")) {
+		core->setAudioBufferSize(core, 4096);
+		// (mGBA sets the blip rates itself)
+
+	}
 	core->reset(core);
 	if (sram_path) {
 		FILE* sf = fopen(sram_path, "rb");
@@ -240,6 +248,14 @@ int main(int argc, char** argv) {
 	if (getenv("SGBRUN_CLOCK")) {
 		FILE* cf = fopen(getenv("SGBRUN_CLOCK"), "rb");
 		if (cf) { nclk = fread(clk, 2, 65536, cf); fclose(cf); }
+	}
+	/* SGBRUN_WAV=FILE: the sound as 16-bit stereo, 96000 Hz (mGBA's buffer rate here) */
+	FILE* wavf = NULL;
+	if (getenv("SGBRUN_WAV")) {
+		wavf = fopen(getenv("SGBRUN_WAV"), "wb");
+		unsigned char hd[44] = { 'R','I','F','F',0,0,0,0,'W','A','V','E','f','m','t',' ',16,0,0,0,1,0,2,0,
+			0x00,0x77,0x01,0, 0x00,0xDC,0x05,0, 4,0,16,0,'d','a','t','a',0,0,0,0 };
+		fwrite(hd, 1, 44, wavf);
 	}
 	for (int f = 1; f <= frames; f++) {
 		if (poke_list) {
@@ -346,6 +362,16 @@ int main(int argc, char** argv) {
 			}
 		} else
 		core->runFrame(core);
+		if (wavf) {
+			static short buf[2 * 4096];
+			blip_t* l = core->getAudioChannel(core, 0); blip_t* r = core->getAudioChannel(core, 1);
+			int n;
+			while ((n = blip_samples_avail(l)) > 0) {
+				if (n > 4096) n = 4096;
+				blip_read_samples(l, buf, n, 1); blip_read_samples(r, buf + 1, n, 1);
+				fwrite(buf, 4, n, wavf);
+			}
+		}
 		if (getenv("SGBRUN_LAG")) {                     /* SGBRUN_LAG=FILE: NES frame count per GB frame */
 			static FILE* lf = NULL;
 			if (!lf) lf = fopen(getenv("SGBRUN_LAG"), "wb");
@@ -432,6 +458,11 @@ int main(int argc, char** argv) {
 			snprintf(path, sizeof path, "%s_f%05d.ppm", out, f);
 			save_ppm(path, buf, w, h, W);
 		}
+	}
+	if (wavf) {                                          /* finish the WAV header */
+		long n = ftell(wavf) - 44; unsigned h[2] = { (unsigned) n + 36, (unsigned) n };
+		fseek(wavf, 4, SEEK_SET); fwrite(&h[0], 4, 1, wavf); fseek(wavf, 40, SEEK_SET); fwrite(&h[1], 4, 1, wavf);
+		fclose(wavf);
 	}
 	if (getenv("SGBRUN_SRAMOUT")) {                     /* the cart RAM at the end -> FILE */
 		struct GB* gbm = (struct GB*) core->board;

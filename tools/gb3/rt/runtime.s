@@ -2324,7 +2324,49 @@ rt_io_r4017:
 rt_io_rnone:
             ld l, 0
             ret
-rt_apu_w:   ret                             ; (sound: later)
+; direct APU writes outside the sound engine (native.s snd_*: the engine's own output is native):
+; L = register low byte. $4015: channel enables -> GB panning (NR51); the world map's noise
+; ($400C volume, $400E period, $400F start) -> CH4. Others ignored. A, F kept.
+rt_apu_w:   push af
+            push hl
+            push bc
+            ld b, a
+            ld a, l
+            cp $15
+            jr z, .en
+            cp $0C
+            jr z, .nv
+            cp $0E
+            jr z, .np
+            cp $0F
+            jr z, .nk
+.x:         pop bc
+            pop hl
+            pop af
+            ret
+.en:        ld a, b                         ; bits 0-3: pulse 1, pulse 2, triangle, noise
+            and $0F
+            ld b, a
+            swap a
+            or b
+            ldh [rNR51], a
+            jr .x
+.nv:        ld a, b
+            and $0F
+            swap a
+            jr nz, .nv2
+            ld a, $08
+.nv2:       ldh [rNR42], a
+            ld a, $80
+            ldh [rNR44], a
+            jr .x
+.np:        ld a, b
+            call snd_nr43
+            ldh [rNR43], a
+            jr .x
+.nk:        ld a, $80
+            ldh [rNR44], a
+            jr .x
 
 ; ------------------------------------------------------------------ MMC5 registers
 rt_mmc_w5114:                               ; 8KB bank at $8000

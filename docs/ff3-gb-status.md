@@ -420,6 +420,19 @@ NES running): plan and measurements in `docs/ff3-native-plan.md` (tool `tools/gb
   `sta $580F`): firstdiff magic / job identical; item, job, equip, magic screens checked; the field
   after closing the menu pixel-identical to the old path (sprite tiles back).
   Not yet: battle item / magic lists (battle sprites use the sprite table), shops to check.
+- **Sound (native output, 2026-11-21).** FF3 had no sound on the GB. The engine's two output
+  routines (b36:80AB music, b36:8030 sound effects) and its init (b36:81C3) are native
+  (`snd_mus` / `snd_sfx` / `snd_init`, bodies in the runtime tables bank): the engine's computed
+  register values ($7F6D-$7F8E) drive the GB channels directly - pulses on CH1 / CH2 (duty, 5/8
+  volume for the triangle balance, CH1 sweep), triangle on CH3 (a triangle wave; on while the
+  linear counter value is not 0), noise on CH4 (NES period -> NR43 table, short mode -> 7-bit),
+  frequency 2048 - u - (11 u >> 6), u = timer + 1 (0.06% off); restart on key-on and volume
+  changes. `$4015` writes -> NR51, the world map's direct noise writes -> CH4 (rt_apu_w). No APU
+  emulation. Checked: mGBA WAV capture (`sgbrun` env `SGBRUN_WAV=FILE`, 96 kHz): note pitches
+  equal the engine's timers (262 / 394 / 1045 Hz at three prologue points). RAM: explore 12000
+  identical except one scene (waits 2912-3073) where the faster sound output moves the
+  asynchronous NMI's pad read by a frame; the state converges after it. The script logic stays
+  translated for now (~12%); `GB3_NO_NATIVE_SOUND=1` builds the old output for comparison.
 
 ## Known open items
 - **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3: all items pass in
@@ -427,7 +440,6 @@ NES running): plan and measurements in `docs/ff3-native-plan.md` (tool `tools/gb
 - Water animation tiles blank (CHR read-back through $2007 returns 0).
 - Warp (`p3c:9B5F` TSX / TXS arithmetic) and the inn's `TXS` from a saved X (`p3c:9039`) use
   FF2's approximate helpers: need a semantic version (as FF2's open item).
-- Sound: APU writes ignored for now.
 - Field dialogue box: drawn into the map (the NES shows it from the other nametable by a
   raster split); belongs in the window layer (FF1 lesson).
 

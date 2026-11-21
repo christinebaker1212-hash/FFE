@@ -970,6 +970,40 @@ far_call:   push af
             pop af
             ret
 
+
+; sound output: bodies in the runtime tables bank (far_snd_*)
+snd_mus:    push hl
+            ld hl, far_snd_mus
+            jr snd_far
+snd_sfx:    push hl
+            ld hl, far_snd_sfx
+            jr snd_far
+snd_init:   push hl
+            ld hl, far_snd_init
+snd_far:    call far_call
+            pop hl
+            ret
+; NES noise period byte -> NR43 (A clobbered only)
+snd_nr43:   push hl
+            push af
+            and $0F
+            ld hl, NOI_TAB
+            add a, l
+            ld l, a
+            jr nc, .a
+            inc h
+.a:         pop af
+            and $80                         ; short mode -> 7-bit LFSR
+            rrca
+            rrca
+            rrca
+            rrca
+            or [hl]
+            pop hl
+            ret
+NOI_TAB:    db $00, $01, $02, $05, $15, $17, $25, $26, $27, $35, $37, $45, $47, $55, $65, $75
+
+
 ; ------------------------------------------------------------------ fix:C486
 ; clear oam data (every frame): $0200-$02FF = $F0, $26 = 0. Out as the NES: X = $FF, A = 0,
 ; N = 0, Z = 1, C kept (no flag-changing instruction but dec b; B = 0 after).
@@ -3939,5 +3973,380 @@ far_cvoff:  push bc
             pop de
             pop bc
             ret
+
+; ------------------------------------------------------------------ sound output (native)
+; FF3's sound engine (bank $36, recompiled) computes each channel's register values into
+; $7F6D-$7F8E (frequency lo / hi, volume, sweep, duty: index 0 pulse 1, 1 pulse 2, 2 triangle,
+; 3 noise, 5 pulse 2 sound effect, 6 noise sound effect) with a key-on bit (bit 0) in the
+; channel flags $7F4A-$7F50 (bit 7: active). Its two output routines (b36:80AB music, 8030
+; sound effects) are replaced by these: the values go to the GB channels (pulses -> CH1 / CH2,
+; triangle -> CH3 with a triangle wave, noise -> CH4); the key-on bits are cleared as the NES
+; routines do. A channel is restarted (trigger) on key-on and when its volume changes (the GB
+; takes a new volume only so); the frequency is written every frame.
+SND_RAM = $DF00             ; NES $7F00 (work area, WRAM bank 1)
+SND_V   = $CDE4             ; last GB volume written: CH1, CH2, CH3 (0 / 1), CH4 (fixed WRAM)
+far_snd_mus:    ld a, [SND_RAM + $42]           ; music enabled?
+            bit 7, a
+            ret z
+            push bc
+            push de
+            push hl
+            ld hl, SND_RAM + $4A            ; pulse 1
+            ld e, 0
+            ld b, 0
+            call snd_pch
+            ld a, [SND_RAM + $4F]           ; pulse 2 (unless its sound effect plays)
+            bit 7, a
+            jr nz, .p2
+            ld hl, SND_RAM + $4B
+            ld e, 1
+            ld b, 1
+            call snd_pch
+.p2:        call snd_tri
+            ld a, [SND_RAM + $50]           ; noise (unless its sound effect plays)
+            bit 7, a
+            jr nz, .n
+            ld hl, SND_RAM + $4D
+            ld e, 3
+            call snd_noi
+.n:         ld hl, SND_RAM + $4E            ; dmc: its key-on bit off (the NES disables it)
+            bit 7, [hl]
+            jr z, .d
+            res 0, [hl]
+.d:         pop hl
+            pop de
+            pop bc
+            ret
+far_snd_sfx:    ld a, [SND_RAM + $49]
+            and a
+            ret z
+            push bc
+            push de
+            push hl
+            ld hl, SND_RAM + $4F            ; pulse 2 sound effect
+            ld e, 5
+            ld b, 1
+            call snd_pch
+            ld hl, SND_RAM + $50            ; noise sound effect
+            ld e, 6
+            call snd_noi
+            pop hl
+            pop de
+            pop bc
+            ret
+; init sound (b36:81C3): RAM as the NES leaves it ($7F42, $7F40, $7F49, $7F4A-$7F50 = 0; A = 0,
+; X = $FF, N = 1, C kept), the GB
+; sound on (all channels silent, both sides, master volume full), the triangle wave loaded
+far_snd_init:   push af                     ; (carry kept, as the NES routine)
+            push bc
+            push hl
+            xor a
+            ld [SND_RAM + $42], a
+            ld [SND_RAM + $40], a
+            ld [SND_RAM + $49], a
+            ld hl, SND_RAM + $4A
+            ld b, 7
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            ldh [rNR52], a                  ; (off: registers cleared)
+            ld a, $80
+            ldh [rNR52], a
+            ld a, $77
+            ldh [rNR50], a
+            ld a, $FF
+            ldh [rNR51], a
+            ld hl, WAVE_RAM                 ; triangle: 0 .. 15, 15 .. 0
+            xor a
+.w1:        ld b, a
+            swap a
+            or b
+            inc a                           ; (pairs: 01, 23, .. ef)
+            ld [hl+], a
+            ld a, b
+            add a, 2
+            cp 16
+            jr c, .w1
+            ld a, $FE
+.w2:        ld b, a
+            swap a
+            dec b
+            or b
+            ld [hl+], a
+            ld a, b
+            dec a
+            bit 7, a
+            jr z, .w2
+            ld a, $08                       ; DACs on, silent
+            ldh [rNR12], a
+            ldh [rNR22], a
+            ldh [rNR42], a
+            xor a
+            ldh [rNR32], a
+            ld [SND_V], a
+            ld [SND_V + 1], a
+            ld [SND_V + 2], a
+            ld [SND_V + 3], a
+            ld a, $80
+            ldh [rNR30], a
+            pop hl
+            pop bc
+            pop af
+            ld a, 0                         ; out as the NES: A = 0, X = $FF (N = 1, Z = 0)
+            ld e, $FF
+            push af
+            ld a, $FF
+            ldh [nzv], a
+            pop af
+            ret
+; pulse channel: HL = flags byte, E = RAM index, B = GB channel (0: CH1, 1: CH2)
+snd_pch:    bit 7, [hl]
+            ret z
+            ld d, 0
+            bit 0, [hl]
+            jr z, .k
+            res 0, [hl]
+            inc d                           ; D = 1: key on
+.k:         ld h, high(SND_RAM)
+            ld a, e
+            add a, $89
+            ld l, a
+            ld c, [hl]                      ; duty | volume (NES register 0)
+            ld a, e
+            add a, $7B
+            ld l, a
+            ld a, [hl]
+            or c
+            ld c, a
+            ld a, b                         ; GB register base: $FF11 / $FF16
+            add a, a
+            add a, a
+            add a, b
+            add a, low(rNR11)
+            push bc
+            ld b, a                         ; B = NRx1
+            ld a, c
+            and $C0                         ; duty (the same codes)
+            ld c, b
+            ldh [c], a
+            pop bc
+            ld a, c
+            and $0F
+            push hl
+            ld hl, VOL58                    ; pulses at 5/8 (triangle balance)
+            add a, l
+            ld l, a
+            jr nc, .v0
+            inc h
+.v0:        ld a, [hl]
+            pop hl
+            push af                         ; GB volume
+            ld a, b                         ; changed: restart
+            add a, low(SND_V)
+            ld l, a
+            ld h, high(SND_V)
+            pop af
+            cp [hl]
+            jr z, .vs
+            ld [hl], a
+            ld d, 1
+.vs:        swap a
+            jr nz, .v1
+            ld a, $08
+.v1:        push af
+            ld a, b                         ; NRx2
+            add a, a
+            add a, a
+            add a, b
+            add a, low(rNR12)
+            ld c, a
+            pop af
+            ld h, a                         ; (written only with a restart)
+            ld a, d
+            and a
+            jr z, .nv
+            ld a, h
+            ldh [c], a
+.nv:        ld a, b                         ; sweep: CH1 only
+            and a
+            jr nz, .fq
+            ld h, high(SND_RAM)
+            ld a, e
+            add a, $82
+            ld l, a
+            ld a, [hl]
+            call snd_swp
+            ldh [rNR10], a
+.fq:        ld h, high(SND_RAM)             ; frequency
+            ld a, e
+            add a, $74
+            ld l, a
+            ld a, [hl]
+            and 7
+            ld c, a
+            ld a, e
+            add a, $6D
+            ld l, a
+            ld l, [hl]
+            ld h, c
+            call snd_fq                     ; HL = GB frequency
+            ld a, b
+            add a, a
+            add a, a
+            add a, b
+            add a, low(rNR13)
+            ld c, a
+            ld a, l
+            ldh [c], a
+            inc c
+            ld a, d
+            rrca                            ; (key on / restart: bit 7)
+            and $80
+            or h
+            ldh [c], a
+            ret
+; NES sweep byte (EPPP NSSS) -> NR10 (period in GB steps, negate, shift); off: 0
+snd_swp:    bit 7, a
+            jr z, .off
+            ld c, a
+            and $07
+            ld h, a                         ; shift
+            ld a, c
+            and $08                         ; negate
+            or h
+            ld h, a
+            ld a, c
+            swap a
+            and 7
+            inc a
+            cp 8
+            jr c, .p
+            ld a, 7
+.p:         swap a
+            or h
+            ret
+.off:       xor a
+            ret
+; HL = NES timer (11 bits) -> HL = GB frequency for a pulse: 2048 - 131072 * 16 (t + 1) /
+; 1789773 = 2048 - u - (11 u >> 6), u = t + 1 (0 below the GB's range). B, C, D, E kept.
+snd_fq:     push bc
+            push de
+            inc hl
+            ld d, h
+            ld e, l                         ; DE = u
+            add hl, hl
+            ld b, h
+            ld c, l
+            add hl, hl
+            add hl, hl
+            add hl, bc
+            add hl, de                      ; 11 u
+            ld a, l
+            and $C0
+            rlca
+            rlca
+            ld b, a
+            ld l, h
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            ld a, l
+            add a, b
+            ld l, a
+            jr nc, .a
+            inc h
+.a:         add hl, de                      ; u + (11 u >> 6)
+            ld a, l
+            cpl
+            ld l, a
+            ld a, h
+            cpl
+            ld h, a
+            inc hl                          ; -total
+            ld a, h
+            add a, 8                        ; 2048 - total
+            ld h, a
+            bit 7, a
+            jr z, .ok
+            ld hl, 0
+.ok:        pop de
+            pop bc
+            ret
+; triangle (index 2): on while its linear counter value ($7F7D & $7F) is not 0
+snd_tri:    ld hl, SND_RAM + $4C
+            bit 7, [hl]
+            ret z
+            ld d, 0
+            bit 0, [hl]
+            jr z, .k
+            res 0, [hl]
+            inc d
+.k:         ld a, [SND_RAM + $7D]
+            and $7F
+            jr z, .off
+            ld a, $20
+.off:       ldh [rNR32], a
+            ld hl, SND_V + 2
+            cp [hl]
+            jr z, .s
+            ld [hl], a
+            ld d, 1
+.s:         ld a, [SND_RAM + $76]
+            and 7
+            ld h, a
+            ld a, [SND_RAM + $6F]
+            ld l, a                         ; (the GB wave channel runs 32 steps a period
+            call snd_fq                     ;   too: the pulse formula gives the octave below)
+            ld a, d
+            and a
+            jr z, .f
+            ld a, $80
+            ldh [rNR30], a
+.f:         ld a, l
+            ldh [rNR33], a
+            ld a, d
+            rrca
+            and $80
+            or h
+            ldh [rNR34], a
+            ret
+; noise: HL = flags byte, E = RAM index (3 music, 6 sound effect): volume $7F7B + E, period
+; $7F6D + E (bits 0-3, bit 7 short mode)
+snd_noi:    bit 7, [hl]
+            ret z
+            ld d, 0
+            bit 0, [hl]
+            jr z, .k
+            res 0, [hl]
+            inc d
+.k:         ld h, high(SND_RAM)
+            ld a, e
+            add a, $6D
+            ld l, a
+            ld a, [hl]
+            call snd_nr43
+            ldh [rNR43], a
+            ld a, e
+            add a, $7B
+            ld l, a
+            ld a, [hl]
+            and $0F
+            ld hl, SND_V + 3
+            cp [hl]
+            jr z, .s
+            ld [hl], a
+            ld d, 1
+.s:         ld a, d
+            and a
+            ret z
+            ld a, [hl]
+            swap a
+            jr nz, .v
+            ld a, $08
+.v:         ldh [rNR42], a
+            ld a, $80
+            ldh [rNR44], a
+            ret
+VOL58:      db 0, 1, 1, 2, 2, 3, 4, 4, 5, 6, 6, 7, 7, 8, 9, 9
 
 section bank 0, nat_end0

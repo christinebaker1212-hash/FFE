@@ -96,7 +96,10 @@ class FF3:
            ('fix', 0xFBEF): ('nat_fbef', 'NZC'),     # random (X..A)
            ('p34', 0x8F57): ('nat_8f57', 'NZC'),     # sort attack order list
            ('fix', 0xDEEA): ('nat_deea', 'NZ'),      # copy tiles to vram
-           ('fix', 0xC486): ('nat_c486', 'NZ')}      # clear oam data ($0200-$02FF = $F0)
+           ('fix', 0xC486): ('nat_c486', 'NZ'),      # clear oam data ($0200-$02FF = $F0)
+           ('b36', 0x80AB): ('snd_mus', 'NZC'),      # update apu (music): native GB sound
+           ('b36', 0x8030): ('snd_sfx', 'NZC'),      # update apu (sound effects)
+           ('b36', 0x81C3): ('snd_init', 'NZC')}     # init sound
     # GB-only calls at the start of an NES instruction (registers and flags kept): the text
     # engine's push / pop of the text pointer bracket nested strings (names) for the native
     # line printer's condensed names (native.s cv_beg / cv_end)

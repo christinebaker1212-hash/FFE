@@ -372,6 +372,8 @@ def main():
     k = img.find(bytes.fromhex('200AF4A200BDA0078D0720'))   # h_flush .one: JSR $F40A / LDX #0 / LDA $07A0,X / STA $2007
     if k >= 0 and not os.environ.get('GB3_NO_NATIVE_TEXT'): translate.FF3.ext[('ex', 0x5C00 + k)] = ('nat_h1', 'NZC')
     else: print('  h_flush not found: one-row lines through $2007')
+    if os.environ.get('GB3_NO_NATIVE_SOUND'):   # (dev comparison: the NES output routines translated)
+        for a in (0x80AB, 0x8030, 0x81C3): translate.FF3.ext.pop(('b36', a), None)
     covs = sorted(glob.glob(os.path.join(opt['--cov'], 'c*.bin')))   # optional: stack-trick flags
     t = time.time()
     cm = CodeMap(nes, srcdir, covs).build()
