@@ -37,6 +37,7 @@ scr_open:   ldh a, [rLCDC]
             ld a, 18
             ld [sf_row], a
             ld [sfx_menu], a
+            call sgb_menu
             ld hl, smap                     ; the map copy: blank (code $20), window attributes
             ld bc, 18 * 32
 .cl:        ld a, $20

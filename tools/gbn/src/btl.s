@@ -415,6 +415,7 @@ bt_screen:  ldh a, [rLCDC]                  ; LCD off (V-Blank)
             call bt_enemy_gfx
             call bt_party_gfx
             call bt_pal
+            call sgb_battle
             ld hl, smap                     ; the map copy: empty ($00), palette 0
             ld bc, 18 * 32
 .sm:        xor a

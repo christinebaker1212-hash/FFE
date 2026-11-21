@@ -440,6 +440,7 @@ minimap:    ldh a, [rLCDC]
             ldh [scy], a
             ld a, $80                       ; (FF1: no music while it draws)
             call snd_track
+            call sgb_mini
             ldh a, [is_cgb]                 ; the 256 tiles cleared to the sea's colour (CGB
             and a                           ;   index 0; DMG: its shade, 3)
             ld a, $FF

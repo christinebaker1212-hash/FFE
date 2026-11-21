@@ -159,6 +159,29 @@ DOOR_MTS = (0x36, 0x37, 0x3B)           # FF1's door metatiles (drawn at run tim
 FONT_CODES = list(range(0x10, 0x19)) + list(range(0x20, 0x80))   # frame $10-$18, text $20-$7F
 
 
+def sgb_cols(bg, chr_, tsa, mt_pal, freq):
+    """SGB: one palette for a map (its screen scrolls): for each DMG shade (map_shades) the
+    NES colour with the most pixels on the map in that shade -> 4 x RGB555"""
+    msh = map_shades(bg)
+    cnt = {}
+    for mt, f in freq.items():
+        if not f: continue
+        p = mt_pal[mt]
+        for k in range(4):
+            t16 = chr_[16 * tsa[128 * k + mt]:16 * tsa[128 * k + mt] + 16]
+            for y in range(8):
+                for x in range(8):
+                    v = (t16[y] >> (7 - x) & 1) | (t16[8 + y] >> (7 - x) & 1) << 1
+                    c = bg[p][v]
+                    cnt[c] = cnt.get(c, 0) + f
+    out = bytearray()
+    for s, dflt in enumerate((0x30, 0x10, 0x00, 0x0F)):
+        cs = [c for c in cnt if msh.get(c) == s]
+        c = max(cs, key=lambda c: cnt[c]) if cs else dflt
+        out += rgb555(c).to_bytes(2, 'little')
+    return bytes(out)
+
+
 def party_perms(rom, pal):
     """DMG: per class (12) and sprite palette 0 / 1 the brightness ranks of colours 1-3 (as
     spr_rank_tile) with the class's two colours in place (FF1 MAPMAN_PAL): rank1 | rank2 << 2 |
@@ -231,6 +254,8 @@ def map_pack(rom, m, cls=0):
                 dmg_tiles=bytes(dmg_tiles), n_dmg=n, cgb_bg_out=cgb_bg['out'],
                 cgb_bg_in=cgb_bg['in'], cgb_obj=cgb_obj, party_dmg=party, objs=objs,
                 party_perm=party_perms(rom, pal),
+                sgb=sgb_cols([[pal[0]] + list(pal[4 * p + 1:4 * p + 4]) for p in range(4)], chr_,
+                             t['tsa'], t['mt_pal'], {m_: mp_.count(m_) for m_ in set(mp_)}),
                 font_tbl=bytes(font_tbl))
 
 
@@ -276,6 +301,10 @@ def ow_pack(rom, cls=0):
     spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)
     party = b''.join(spr_rank_tile(spr[16 * t:16 * t + 16], sppal[t >> 1 & 1]) for t in range(16))
     vch = rom.rd(BANK_MAPCHR, 0x9C00, 0x600)                  # FF1 LoadOWObjectCHR: sprites $10-$6F
+    rows = [ow_row(rom, r) for r in range(256)]
+    freq = {}
+    for r_ in rows:
+        for v in r_: freq[v & 0x7F] = freq.get(v & 0x7F, 0) + 1
     return dict(prop=prop, tsa=tsa, mt_pal=mt_pal, party_dmg=party, party_perm=party_perms(rom, pal),
                 cgb_tiles=b''.join(gb_tile(chr_[16 * t:16 * t + 16]) for t in range(256)),
                 cgb_bg=b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in bg[p]),
@@ -283,7 +312,7 @@ def ow_pack(rom, cls=0):
                 veh_cgb=b''.join(gb_tile(vch[16 * t:16 * t + 16]) for t in range(96)),
                 veh_dmg=b''.join(spr_rank_tile(vch[16 * t:16 * t + 16], sppal[2]) for t in range(96)),
                 mt_dmg=bytes(tbl), dmg_tiles=bytes(dmg),
-                rows=[ow_row(rom, r) for r in range(256)],
+                rows=rows, sgb=sgb_cols(bg, chr_, tsa, mt_pal, freq),
                 start=(rom.rd(BANK_SMINFO, INIT_UNSRAM + 0x10) + 7) & 0xFF,
                 start_y=(rom.rd(BANK_SMINFO, INIT_UNSRAM + 0x11) + 7) & 0xFF)
 

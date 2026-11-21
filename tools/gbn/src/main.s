@@ -153,7 +153,10 @@ start:      di
             call memclr
             xor a
             ldh [rVBK], a
-.v0:        ld hl, dma_rom                  ; OAM DMA routine into HRAM
+.v0:        ldh a, [is_cgb]                 ; a Super Game Boy? (palettes, the border)
+            and a
+            call z, sgb_detect
+            ld hl, dma_rom                  ; OAM DMA routine into HRAM
             ld de, hram_dma
             ld b, dma_end - dma_rom
 .dc:        ld a, [hl+]
@@ -275,7 +278,7 @@ wait_vbl:   xor a
             ldh a, [vbl_done]
             and a
             jr z, .w
-            ret
+            jp sgb_tick                     ; (a Super Game Boy's queued packets)
 
 ; ---- V-Blank: OAM, scroll, palettes, queued metatiles
 vblank:     push af
@@ -471,6 +474,7 @@ load_map:   ld [cur_map], a
             ld hl, M_VEHDMG
             call veh_tiles
 .drw:       call party_spr                  ; (the leader's class)
+            call sgb_map
             ld a, [ml_keep]                 ; (a reload keeps the objects)
             and a
             call z, obj_load

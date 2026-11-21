@@ -8,7 +8,7 @@ ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
-import data, minimap, text, talkconst, ui, names, battle, sound
+import data, minimap, sgb, text, talkconst, ui, names, battle, sound
 
 COMMON, TS_BANK0, MAP_BANK0, OW_TS, OW_INFO, OW_ROWS, ROM_BANKS = 1, 8, 20, 16, 81, 84, 128
 
@@ -123,6 +123,7 @@ def data_banks(rom, ff3=None, init=None):
     for b, blob in battle.chr_banks(rom).items(): banks[b] = bytearray(blob)
     banks[battle.BOBJ_BANK] = bytearray(battle.obj_bank(rom))
     banks[minimap.MINI_BANK] = bytearray(minimap.bank(rom))
+    banks[sgb.SGB_BANK] = bytearray(sgb.bank(rom))
     place(banks, COMMON, 0x5D40, b''.join(data.rgb555(c).to_bytes(2, 'little') for c in range(64)))
     banks[3] = bytearray(ui.gfx_bank(rom))                     # UI_GFX
     for b, blob in text.dialogue_banks(90).items():
@@ -149,6 +150,7 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, OW_INFO, 0x5060, bytes([8]))
     place(banks, OW_INFO, 0x7200, o['party_dmg'])
     place(banks, OW_INFO, 0x7380, o['party_perm'])
+    place(banks, OW_INFO, 0x73A0, o['sgb'])
     mt, mc = data.mapman_all(rom)                               # the leader's map sprite
     place(banks, minimap.MINI_BANK, 0x6400, mt)
     place(banks, minimap.MINI_BANK, 0x7000, mc)
@@ -171,6 +173,7 @@ def data_banks(rom, ff3=None, init=None):
         place(banks, b, 0x5060, bytes([p['ts']]))
         place(banks, b, 0x7200, p['party_dmg'])
         place(banks, b, 0x7380, p['party_perm'])
+        place(banks, b, 0x73A0, p['sgb'])
         ob = p['objs']
         place(banks, b, 0x7300, ob['slots'].ljust(64, b'\0'))      # 15 x (id, x+flags, y, tile)
         place(banks, b, 0x7340, ob['blocks'].ljust(16, b'\0'))     # tile bases of the blocks
@@ -219,6 +222,7 @@ def main():
            open(os.path.join(HERE, 'src', 'btl3.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl4.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field2.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'sgb.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
            'section bank 6, $7800\n' +
