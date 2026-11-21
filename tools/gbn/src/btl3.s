@@ -1278,6 +1278,312 @@ bt_en_ai:   ld a, [bt_who]
 .phys:      call bt_rnd_member
             jp bt_en_attack
 
+; ---- Medicine (FF1 BattleSubMenu_Drink): Potion / Antidote with their counts this battle
+bt_cmd_drink:
+            call bt_msg_win
+            xor a
+            ld [bt_rows], a
+            ld c, 0
+.r:         push bc
+            ld b, 18
+            call vwf_clr
+            pop bc
+            push bc
+            ld a, c
+            add a, $40
+            call bt_mname
+            ld hl, bt_sbuf
+            ld a, 8
+            call vwf_str
+            pop bc
+            push bc
+            ld e, c
+            ld d, 0
+            ld hl, bt_pots
+            add hl, de
+            ld a, [hl]
+            call nf_a
+            call num_fmt
+            ld hl, nf_dig + 4
+            ld de, bt_sbuf
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl]
+            ld [de], a
+            inc de
+            xor a
+            ld [de], a
+            ld hl, bt_sbuf
+            ld a, 80
+            call vwf_str
+            call bt_mrow
+            pop bc
+            inc c
+            ld a, c
+            cp 2
+            jr c, .r
+            xor a
+            ld [bt_mcur], a
+.l:         ld a, [bt_mcur]
+            add a, 13
+            add a, a
+            add a, a
+            add a, a
+            sub 4
+            ld c, a
+            ld b, 0
+            call bt_hand
+            call bt_frame
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .b
+            bit 0, a
+            jr nz, .a
+            and $C0
+            jr z, .l
+            ld a, [bt_mcur]
+            xor 1
+            ld [bt_mcur], a
+            jr .l
+.a:         ld a, [bt_mcur]                 ; none left: no
+            ld e, a
+            ld d, 0
+            ld hl, bt_pots
+            add hl, de
+            ld a, [hl]
+            and a
+            jr z, .l
+            push hl
+            call bt_hand_off
+            call bt_msg_close
+            call bt_names_win
+            call bt_target_member
+            pop hl
+            ret c
+            dec [hl]                        ; (one fewer to choose this round)
+            ld b, a
+            call bt_commands.slot
+            ld [hl], $08
+            inc hl
+            ld a, [bt_mcur]
+            add a, $40
+            ld [hl+], a
+            ld [hl], b
+            inc hl
+            ld a, [bt_mcur]
+            ld [hl], a
+            and a
+            ret
+.b:         call bt_hand_off
+            call bt_msg_close
+            scf
+            ret
+; a member drinks (FF1 Player_DoDrink): the item used, the potion's magic
+bt_pl_drink:
+            inc hl
+            ld a, [hl+]
+            ld [mg_id], a
+            ld a, [hl+]
+            ld [bt_tgt], a
+            ld a, [hl]                      ; 0 Potion, 1 Antidote: one fewer
+            add a, low(ITEMS + $19)
+            ld l, a
+            ld h, high(ITEMS)
+            ld a, [hl]
+            and a
+            jr z, .z
+            dec [hl]
+.z:         ld a, [mg_id]
+            call bt_mload
+            ld a, [bt_who]
+            or $80
+            ld [mg_caster], a
+            jp bt_cast
+
+; ---- Items (FF1 BattleSubMenu_Item): the member's weapons, then armour (a page each, left /
+; right turns); one with a spell casts it
+bt_cmd_item:
+            xor a
+            ld [bt_mpage], a
+.pg:        call bt_msg_win
+            xor a
+            ld [bt_rows], a
+            ld c, 0
+.r:         push bc
+            ld b, 18
+            call vwf_clr
+            pop bc
+            push bc
+            call bt_islot                   ; A = the item's name id (0: empty)
+            and a
+            jr z, .e
+            call bt_mname_item
+            ld hl, bt_sbuf
+            ld a, 8
+            call vwf_str
+.e:         call bt_mrow
+            pop bc
+            inc c
+            ld a, c
+            cp 4
+            jr c, .r
+            xor a
+            ld [bt_mcur], a
+.l:         ld a, [bt_mcur]
+            add a, 13
+            add a, a
+            add a, a
+            add a, a
+            sub 4
+            ld c, a
+            ld b, 0
+            call bt_hand
+            call bt_frame
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .b
+            bit 0, a
+            jr nz, .a
+            bit 4, a
+            jr nz, .flip
+            bit 5, a
+            jr nz, .flip
+            ld hl, bt_mcur
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr z, .l
+            ld a, [hl]
+            inc a
+            and 3
+            ld [hl], a
+            jr .l
+.up:        ld a, [hl]
+            dec a
+            and 3
+            ld [hl], a
+            jr .l
+.flip:      ld a, [bt_mpage]
+            xor 1
+            ld [bt_mpage], a
+            jp .pg
+.a:         ld a, [bt_mcur]                 ; its spell (data byte 3; 0: none)
+            ld c, a
+            call bt_islot
+            and a
+            jr z, .l
+            call bt_ispell
+            and a
+            jr z, .l
+            dec a
+            ld [bt_t + 7], a
+            call bt_hand_off
+            call bt_msg_close
+            call bt_names_win
+            ld a, [bt_t + 7]
+            call bt_mload
+            ld a, [mg_d + 3]
+            bit 1, a
+            jr nz, .en
+            bit 4, a
+            jr nz, .me
+            xor a
+            jr .set
+.en:        call bt_target_enemy
+            ret c
+            jr .set
+.me:        call bt_target_member
+            ret c
+.set:       ld b, a
+            call bt_commands.slot
+            ld [hl], $10
+            inc hl
+            ld a, [bt_t + 7]
+            ld [hl+], a
+            ld [hl], b
+            and a
+            ret
+.b:         call bt_hand_off
+            call bt_msg_close
+            scf
+            ret
+; slot C of the page (weapons / armour) -> A = the name id (0: empty), bt_t+8 = the index
+bt_islot:   ld a, [bt_cm]
+            rrca
+            rrca
+            ld b, a
+            ld a, [bt_mpage]
+            and a
+            ld a, $18
+            jr z, .w
+            ld a, $1C
+.w:         add a, b
+            add a, c
+            ld l, a
+            ld h, high(ch_stats)
+            ld a, [hl]
+            and $7F
+            ld [bt_t + 8], a
+            ret z
+            ld b, a
+            ld a, [bt_mpage]
+            and a
+            ld a, 27                        ; weapons: name 27 + n, armour 67 + n
+            jr z, .n
+            ld a, 67
+.n:         add a, b
+            ret
+; the name of item id A (the names bank) -> bt_sbuf
+bt_mname_item:
+            ld l, a
+            ld h, 0
+            add hl, hl
+            ld de, $4000
+            add hl, de
+            ld de, bt_sbuf
+            ld bc, 2
+            ld a, NAMES
+            call far_copy
+            ld a, [bt_sbuf]
+            ld l, a
+            ld a, [bt_sbuf + 1]
+            ld h, a
+            ld de, bt_sbuf
+            ld bc, 20
+            ld a, NAMES
+            jp far_copy
+; the spell of item bt_t+8 (weapon / armour data byte 3) -> A
+bt_ispell:  ld a, [bt_t + 8]
+            dec a
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            ld a, [bt_mpage]
+            and a
+            jr nz, .ar
+            add hl, hl
+            ld de, N_WSTAT + 3
+            jr .g
+.ar:        ld de, N_ASTAT + 3
+.g:         add hl, de
+            ld a, NAMES
+            ld [fc_bank], a
+            jp far_byte
+; a member uses an item (FF1 Player_DoItem): its spell
+bt_pl_item: inc hl
+            ld a, [hl+]
+            ld [mg_id], a
+            ld a, [hl]
+            ld [bt_tgt], a
+            ld a, [mg_id]
+            call bt_mload
+            ld a, [bt_who]
+            or $80
+            ld [mg_caster], a
+            jp bt_cast
+
 section wram, $C680
 mg_d:       ds 8
 mg_id:      ds 1
@@ -1307,3 +1613,4 @@ dv_hmult:   ds 1
 dv_morale:  ds 1
 dv_hit:     ds 1
 dv_player:  ds 1
+bt_pots:    ds 2

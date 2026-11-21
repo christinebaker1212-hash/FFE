@@ -370,6 +370,10 @@ bt_erec:    ld l, a
 
 ; ---- commands (FF1 GetCharacterBattleCommand): B goes back a member
 bt_commands:
+            ld a, [ITEMS + $19]             ; potions this round (FF1 btl_potion_heal / pure)
+            ld [bt_pots], a
+            ld a, [ITEMS + $1A]
+            ld [bt_pots + 1], a
             ld hl, bt_cmd
             ld b, 16
             xor a
@@ -468,8 +472,16 @@ bt_cmd_one: ld a, [bt_cm]
             cp 4
             jr z, .run
             cp 1
-            jr nz, .l                       ; (medicine, items: next)
+            jr nz, .md
             call bt_cmd_magic
+            jr c, .back
+            jr .done
+.md:        cp 2
+            jr nz, .it
+            call bt_cmd_drink
+            jr c, .back
+            jr .done
+.it:        call bt_cmd_item
             jr c, .back
             jr .done
 .fight:     call bt_names_win
@@ -943,6 +955,10 @@ bt_player_turn:
             jp nz, bt_try_run
             bit 6, a
             jp nz, bt_pl_magic
+            bit 3, a
+            jp nz, bt_pl_drink
+            bit 4, a
+            jp nz, bt_pl_item
             ld a, [bt_who]                  ; no command: asleep / paralysed?
             call ch_rec
             inc hl
