@@ -160,6 +160,9 @@ def data_banks(rom, ff3=None, init=None):
     pt, ps, pr = minimap.puzzle(rom)                            # the 15-puzzle
     place(banks, minimap.MINI_BANK, 0x7400, pt)
     place(banks, minimap.MINI_BANK, 0x7800, ps + pr)
+    te, tg = minimap.the_end(rom)                               # "The End"
+    place(banks, minimap.MINI_BANK, 0x7C00, te)
+    place(banks, minimap.MINI_BANK, 0x7820, tg)
     place(banks, OW_INFO, 0x7300, b'\0' * 64)                  # no objects
     place(banks, OW_INFO, 0x5100, o['mt_dmg'] + o['mt_dmg'])
     place(banks, OW_INFO, 0x5800, o['dmg_tiles'])

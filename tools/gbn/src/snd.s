@@ -17,6 +17,7 @@ TR_MENU    = $51
 TR_DLGFAN  = $54
 TR_TREAS   = $58
 TR_LINEUP  = $55
+TR_EPILOGUE = $43
 TR_MINIMAP = $41
 
 section bank 7, $4000

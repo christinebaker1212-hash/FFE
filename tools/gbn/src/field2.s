@@ -1154,6 +1154,229 @@ pz_draw:    ld a, [pz_anim]
             ld d, a
             ret
 
+; ---- FF1 DrawFancyTheEndGraphic: in a window, the 80 x 80 "The End" traced a pixel a frame
+; from FF1's moves (bit 0 right, 1 down, 2 left, 3 up; left / up win), then traced again,
+; filling leftwards from each downward move on the rows FF1's gradient allows (a pixel a
+; frame); then nothing more (FF1: the game ends there; a soft reset leaves)
+TE_MOVES   = $7C00          ; (MINI_BANK: minimap.the_end)
+TE_GRAD    = $7820
+TE_BUF     = smap           ; 800 bytes: the picture, 1 bit a pixel, as its tiles
+the_end:    call scr_open
+            xor a
+            ld [sfx_menu], a
+            ld bc, $0103
+            ld de, $120C
+            call scr_win
+            ld hl, smap + 4 * 32 + 5        ; the 10 x 10 cells: tiles $80 + 10 row + column
+            ld a, $80
+            ld c, 10
+.r:         ld b, 10
+            push hl
+.c:         ld [hl], a
+            set 1, h                        ; (attributes at + $300: palette 7, VRAM bank 0)
+            inc h
+            ld [hl], WIN_ATTR & 7
+            dec h
+            res 1, h
+            inc hl
+            inc a
+            dec b
+            jr nz, .c
+            pop hl
+            ld de, 32
+            add hl, de
+            dec c
+            jr nz, .r
+            ld hl, $8800                    ; the tiles: the window's inside (CGB colour 2;
+            ld bc, 100 * 8                  ;   DMG / SGB shade 3)
+.t:         ldh a, [is_cgb]
+            and a
+            ld a, $FF
+            jr z, .t1
+            xor a
+.t1:        ld [hl+], a
+            ld a, $FF
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .t
+            call scr_show
+            ld hl, TE_BUF                   ; (after the show: the buffer is the map copy)
+            ld bc, 800
+.z:         xor a
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .z
+            call te_start                   ; the outline
+.o:         call te_next
+            jr z, .f0
+            call te_move
+            call te_set
+            jr .o
+.f0:        call te_start                   ; the fill
+.f:         call te_next
+            jr z, .end
+            cp 2
+            jr z, .fill
+            cp 3
+            jr z, .fill
+            cp 7
+            jr z, .fill
+            call te_move
+            jr .f
+.fill:      push af
+            ld a, [te_x]
+            ld [te_fx], a
+            ld a, [te_y]
+            ld [te_fy], a
+            pop af
+            call te_move
+            ld a, [te_fy]
+            ld l, a
+            ld h, high(TE_GRAD)
+            ld a, MINI_BANK
+            ld [fc_bank], a
+            ld a, l
+            add a, low(TE_GRAD)
+            ld l, a
+            call far_byte
+            and a
+            jr z, .f
+.fl:        ld a, [te_fx]                   ; left a pixel, until the edge or a set pixel
+            dec a
+            bit 7, a
+            jr nz, .f
+            ld [te_fx], a
+            ld d, a
+            ld a, [te_fy]
+            ld e, a
+            call te_addr
+            and [hl]
+            jr nz, .f
+            ld a, [te_fx]
+            ld d, a
+            ld a, [te_fy]
+            ld e, a
+            call te_plot
+            jr .fl
+.end:       call scr_frame                  ; the end: the music plays on (soft reset only)
+            jr .end
+te_start:   ld a, 12                        ; FF1: from (12, 0), the moves from their start
+            ld [te_x], a
+            xor a
+            ld [te_y], a
+            ld a, low(TE_MOVES)
+            ld [te_src], a
+            ld a, high(TE_MOVES)
+            ld [te_src + 1], a
+            ret
+; the next move -> A (Z: the end)
+te_next:    ld a, [te_src]
+            ld l, a
+            ld a, [te_src + 1]
+            ld h, a
+            ld a, MINI_BANK
+            ld [fc_bank], a
+            call far_byte
+            inc hl
+            push af
+            ld a, l
+            ld [te_src], a
+            ld a, h
+            ld [te_src + 1], a
+            pop af
+            and a
+            ret
+; FF1 TheEnd_MovePos (A = the move)
+te_move:    ld b, a
+            and 5
+            jr z, .v
+            and 4
+            ld hl, te_x
+            jr nz, .lf
+            inc [hl]
+            jr .v
+.lf:        dec [hl]
+.v:         ld a, b
+            and $0A
+            ret z
+            and 8
+            ld hl, te_y
+            jr nz, .up
+            inc [hl]
+            ret
+.up:        dec [hl]
+            ret
+; the pixel at (te_x, te_y) set, shown (a frame)
+te_set:     ld a, [te_x]
+            ld d, a
+            ld a, [te_y]
+            ld e, a
+; pixel (D, E): set in the buffer, its tile row written in the next V-Blank
+te_plot:    call te_addr
+            or [hl]
+            ld [hl], a
+            push hl
+            push af
+            call wait_vbl
+            pop af
+            pop hl
+            ld b, a
+            ld a, l                         ; VRAM $8800 + 2 index (the buffer is 8 a tile)
+            sub low(TE_BUF)
+            ld e, a
+            ld a, h
+            sbc a, high(TE_BUF)
+            ld d, a
+            sla e
+            rl d
+            ld hl, $8800
+            add hl, de
+            ldh a, [is_cgb]
+            and a
+            ld a, b
+            jr z, .dmg
+            ld [hl], a                      ; CGB: colour 3 (white) where set
+            ret
+.dmg:       cpl                             ; DMG / SGB: shade 0 (white) where set
+            ld [hl+], a
+            ld [hl], a
+            ret
+; pixel (D = x, E = y) -> HL = its byte in the buffer, A = its mask
+te_addr:    ld a, e                         ; tile (y / 8) * 10 + x / 8; byte 8 tile + y & 7
+            and $F8
+            ld l, a
+            ld h, 0
+            ld b, h
+            ld c, l
+            add hl, hl
+            add hl, hl
+            add hl, bc
+            add hl, hl                      ; (y & $F8) x 10 = 8 x 10 (y / 8)
+            ld a, d
+            and $F8
+            ld c, a
+            ld b, 0
+            add hl, bc
+            ld a, e
+            and 7
+            ld c, a
+            add hl, bc
+            ld bc, TE_BUF
+            add hl, bc
+            ld a, d
+            and 7
+            ld b, a
+            ld a, $80
+            inc b
+.m:         dec b
+            ret z
+            rrca
+            jr .m
+
 section wram, $C100                         ; (the map queue: free on these screens)
 lu_slot:    ds 32
 lu_cur:     ds 1
@@ -1179,3 +1402,8 @@ pz_hi:      ds 1
 pz_pt:      ds 1
 pz_obp:     ds 1
 pz_rgb:     ds 6
+te_x:       ds 1
+te_y:       ds 1
+te_fx:      ds 1
+te_fy:      ds 1
+te_src:     ds 2

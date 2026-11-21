@@ -101,3 +101,21 @@ def puzzle(rom):
             hi = chr_[8 * k:8 * k + 8]
             out += data.gb_tile(bytes(lo) + bytes(hi))
     return bytes(out), start, reward
+
+
+def the_end(rom):
+    """FF1's "The End" drawing (bank 13 DrawFancyTheEndGraphic): the moves (data_TheEndDrawData,
+    found by the code that points theend_src at it; a zero ends them) and the fill gradient
+    (one byte per pixel row, found by its use: LDX filly / LDA lut,X / BEQ)"""
+    import re
+    b13 = rom.prg[13 * 0x4000:14 * 0x4000]
+    moves = None
+    for m in re.finditer(rb'\xA9(.)\x85\x62\xA9(.)\x85\x63', b13, re.S):
+        a = (m.group(2)[0] << 8 | m.group(1)[0]) - 0x8000
+        if 0 <= a < 0x4000 and b13.index(0, a) - a > 100:
+            moves = b13[a:b13.index(0, a) + 1]
+    assert moves, 'The End data not found'
+    g = re.search(rb'\xA6\x65\xBD(..)\xF0', b13, re.S)
+    assert g, 'The End gradient not found'
+    a = int.from_bytes(g.group(1), 'little') - 0x8000
+    return bytes(moves), bytes(b13[a:a + 80])

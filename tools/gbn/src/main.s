@@ -249,11 +249,7 @@ start:      di
             ld a, START_BATTLE              ; (test builds: a battle first)
             cp $FF
             jr z, .nb
-            ld [btl_fid], a
-            ld a, BTL_BANK
-            ld hl, battle
-            call bank_call
-            call map_reload
+            call do_battle                  ;   (as from the field: lost / the ending too)
 .nb:
 
 ; ---- main loop: one engine frame per GB frame
@@ -1765,6 +1761,8 @@ bank_call:  push af
 .jp:        jp hl
 ; bank_call with arguments: story_show (A = first page, B = pages) in bank SCR_BANK
 bank_call_ab:
+            ld a, 1                         ; (the bridge: FF1's page timing)
+            ld [st_mode], a
             ld a, STORY_FIRST
             ld [st_pg], a
             ldh a, [rombank]
@@ -2369,12 +2367,16 @@ do_battle:  ld [btl_fid], a
             jr z, .ok
             cp 2
             jr nz, game_over
-            ld a, SCR_BANK                  ; the ending: the story's last pages, the title
-            call sbank
+            ld a, SCR_BANK                  ; the ending (FF1 EnterEndingScene): the epilogue
+            call sbank                      ;   music, the story's last pages (input ignored),
+            ld a, TR_EPILOGUE               ;   then "The End" drawn; it stays (soft reset)
+            call snd_track
+            ld a, 2
+            ld [st_mode], a
             ld a, STORY_FIRST + 4
             ld b, STORY_END - STORY_FIRST - 4
             call story_show
-            jr game_over
+            jp the_end
 .ok:        call map_reload
             scf
             ret

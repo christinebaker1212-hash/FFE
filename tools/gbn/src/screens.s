@@ -475,6 +475,7 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             and a
             jr nz, .np
             xor a
+            ld [st_mode], a
             ld b, STORY_FIRST
             call story_show
 .np:        call scr_open

@@ -2537,13 +2537,32 @@ story_show: ld [st_pg], a
             jr .ln
 .done:      pop bc
             call scr_show
+            xor a                           ; FF1 Story_Wait: 512 frames at most
+            ld [st_t], a
+            ld a, 2
+            ld [st_t + 1], a
 .w:         call scr_frame
-            ldh a, [pad_new]
+            ld a, [st_mode]
+            and a
+            jr nz, .tm
+            ldh a, [pad_new]                ; the prologue: A the next page, Start skips
             bit 3, a
-            ret nz                          ; Start: the rest skipped
+            ret nz
             and $01
             jr z, .w
-            ld hl, st_pg
+            jr .nx
+.tm:        cp 2                            ; the ending: input ignored (FF1)
+            jr z, .ct
+            ldh a, [pad_new]                ; the bridge: A / B, or the time
+            and 3
+            jr nz, .nx
+.ct:        ld hl, st_t
+            dec [hl]
+            jr nz, .w
+            inc hl
+            dec [hl]
+            jr nz, .w
+.nx:        ld hl, st_pg
             inc [hl]
             ld hl, st_n
             dec [hl]
@@ -2551,6 +2570,8 @@ story_show: ld [st_pg], a
             ret
 
 section wram, $CE00
+st_mode:    ds 1                            ; story pages: 0 prologue, 1 bridge, 2 ending
+st_t:       ds 2
 pen:        ds 2
 pen_l:      ds 2
 nf_val:     ds 3
