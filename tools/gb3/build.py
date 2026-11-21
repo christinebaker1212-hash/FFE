@@ -330,6 +330,16 @@ def cv_glyph_src():
     return 'section bank RT_TABLES, $6000\nCV_W:\n%s\nCV_G:\n%s\n' % (db(W), db(R))
 
 
+def water_src(prg):
+    """WATER_T (runtime tables bank): NES 3A:$861E-$866D, the water animation's PPU low bytes
+    (rt/native.s far_858f), copied from the user's ROM at build time"""
+    o = 0x3A * 0x2000 + (0x861E & 0x1FFF)
+    t = prg[o:o + 0x50]
+    assert t[:4] == bytes.fromhex('20302131') and t[0x30:0x34] == bytes.fromhex('08180919'), t[:4].hex()
+    return 'section bank RT_TABLES, $5F00\nWATER_T:\n' + ''.join(
+        '    db %s\n' % ', '.join('$%02X' % v for v in t[k:k + 16]) for k in range(0, 0x50, 16))
+
+
 def oam_attr_src():
     """OAM_ATTR ($3D00, bank 0): NES sprite attribute byte -> CGB OAM attributes (palette
     bits 0-1, priority bit 5 -> bit 7, horizontal / vertical flip bits 6 / 7 -> bits 5 / 6);
@@ -397,7 +407,7 @@ def main():
     # (the cross-bank stubs continue bank 0 right after the runtime, up to OAM_ATTR at $3C00)
     head, sep, rest = prog.partition('section bank DYN_BANK')
     stubs = head.split('\n', 1)[1] if head.startswith('section bank 0') else head
-    src_all = rt + '\n' + stubs + '\n' + gb1.nes_rgb_src() + '\n' + oam_attr_src() + '\n' + dmg_msg_src() + '\n' + cv_glyph_src() + '\n' + sep + rest
+    src_all = rt + '\n' + stubs + '\n' + gb1.nes_rgb_src() + '\n' + oam_attr_src() + '\n' + dmg_msg_src() + '\n' + cv_glyph_src() + '\n' + water_src(prg) + '\n' + sep + rest
     open(opt['--out'] + '.s', 'w').write(src_all)
     print('N-branch peephole: %d' % getattr(rc, 'n_npeep', 0))
     print('translated: %d instructions, %d code banks (%.1fs), %d dynamic targets'

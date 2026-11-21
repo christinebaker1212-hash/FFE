@@ -99,7 +99,9 @@ class FF3:
            ('fix', 0xC486): ('nat_c486', 'NZ'),      # clear oam data ($0200-$02FF = $F0)
            ('b36', 0x80AB): ('snd_mus', 'NZC'),      # update apu (music): native GB sound
            ('b36', 0x8030): ('snd_sfx', 'NZC'),      # update apu (sound effects)
-           ('b36', 0x81C3): ('snd_init', 'NZC')}     # init sound
+           ('b36', 0x81C3): ('snd_init', 'NZC'),     # init sound
+           ('p3a', 0x858F): ('nat_858f', 'NZC'),     # field: update water animation (no PPU I/O)
+           ('p3a', 0x866E): ('nat_866e', 'NZC', 'C')}   # field: init water animation buffer
     # GB-only calls at the start of an NES instruction (registers and flags kept): the text
     # engine's push / pop of the text pointer bracket nested strings (names) for the native
     # line printer's condensed names (native.s cv_beg / cv_end)

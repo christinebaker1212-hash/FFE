@@ -219,80 +219,10 @@ boot:       di
 .dmg:       ld a, RT_TABLES                 ; (Color-only cartridge: the message screen on
             ld [MBC5_BANKL], a              ;   other models, build.py dmg_msg_src)
             jp dmg_msg
-.cgb:       xor a
-            ldh [rIE], a
-            ldh [rNR52], a                  ; sound off (all sound registers cleared)
-            ld [MBC5_RAMG], a               ; cart RAM off (on only around each save access)
-            ldh a, [rKEY1]                  ; double speed (KEY1 + STOP, interrupts off), unless
-            bit 7, a                        ;   already on (soft reset)
-            jr nz, .fast
-            ld a, 1
-            ldh [rKEY1], a
-            ld a, $30
-            ldh [rP1], a
-            stop
-.fast:      ldh a, [rLCDC]
-            bit 7, a
-            jr z, .off
-.wv:        ldh a, [rLY]                    ; LCD off only in the vblank (release checklist)
-            cp 144
-            jr c, .wv
-            xor a
-            ldh [rLCDC], a                  ; LCD off (only here: power-on / soft reset)
-.off:
-            ld a, 1
-            ldh [rVBK], a
-            ld hl, $8000                    ; clear both VRAM banks
-            ld bc, $2000
-            call memclr
-            xor a
-            ldh [rVBK], a
-            ld hl, $8000
-            ld bc, $2000
-            call memclr
-            ld hl, $C000                    ; clear WRAM (not the stack $CF00-$CFFF in use)
-            ld bc, $0F00
-            call memclr
-            ld a, 7                         ; every switchable WRAM bank (7 .. 1: bank 4 =
-.wb:        ldh [rSVBK], a                  ;   zeros for DMA, MAP_BANK, RT_WBANK, PRG7 = bank 1)
-            push af
-            ld hl, $D000
-            ld bc, $1000
-            call memclr
-            pop af
-            dec a
-            jr nz, .wb
-            inc a
-            ldh [rSVBK], a
-            ld hl, $FE00                    ; clear OAM
-            ld bc, $A0
-            call memclr
-            ld hl, $FF80                    ; clear HRAM
-            ld bc, $7F
-            call memclr
-            ld a, $FF                       ; (no CHR tile marked yet)
-            ldh [tm_hi], a
-            ld hl, dma_code                 ; OAM DMA routine to HRAM
-            ld de, hram_dma
-            ld b, 10
-.cd:        ld a, [hl+]
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .cd
-            xor a                           ; cart RAM bank 0 (the save slots), RAM left off
-            ld [MBC5_RAMB], a
-            ld [MBC5_BANKH], a
-            ldh [rSCX], a
-            ldh [rSCY], a
-            ldh [rWY], a
-            ldh [rWX], a
-            ldh [rSTAT], a
-            ldh [rLYC], a
-            ldh [rVBK], a
-            ld a, RT_TABLES                 ; save data check (build.py save_check_src): damaged
-            ld [MBC5_BANKL], a              ;   save files are reported on screen, then erased
-            call save_check
+.cgb:       ld a, RT_TABLES                 ; (the set-up in the runtime tables bank: far_boot)
+            ld [MBC5_BANKL], a
+            jp far_boot
+boot_tail:
             ld a, CAM_X
             ldh [cam_x], a
             ld a, CAM_Y
@@ -4198,3 +4128,4 @@ rst38_entry: di                             ; rst $38 (opcode $FF) reached: DBG+
 .s:         halt
             jr .s
 ;@test}
+

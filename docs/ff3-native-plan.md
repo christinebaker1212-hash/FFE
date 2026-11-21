@@ -46,17 +46,30 @@ Static: 673 PPU call sites, 58 APU, 25 MMC5, 1763 glue calls in the translated c
    channels (pulse 1 / 2, wave for the triangle, noise), interface kept: $7F40-$7F49 (song id,
    flags, sound effect id, "playing" bit) as the game reads and writes them. Removes ~12% and
    gives FF3 sound (none today).
-4. **Field map drawing** (fix:E1DC map main, fix:CA79 update map background, door / chest tile
+4. **Water animation** (done 2026-11-21): 3A:858F update / 3A:866E init are native (`far_858f`,
+   `far_866e`): the two CHR bytes per step go straight into the GB tile store (`chr_put`), the
+   buffers are built from it (`chr_get`) - no `$2006` / `$2007`; this also fixed the blank water
+   (the NES layer's CHR read-back returned 0). Address tables from the user's ROM at build time
+   (`build.py water_src` -> WATER_T). RAM: firstdiff explore 12000 identical; map 6 (water) via
+   `--poke 5305:0048=06,0050=01`: identical, PRG-RAM $7300-$7FFF identical but two sound flags.
+   Bank 0 headroom for it: the boot set-up (`far_boot`) and two RAM-only natives (`far_966a`,
+   `far_bd2a`) moved to the runtime tables bank (~300 bytes free). Natives must leave B = D = 0.
+5. **Field map drawing** (fix:E1DC map main, fix:CA79 update map background, door / chest tile
    updates fix:E715): native row / column writer into the GB map (as FF1's DrawMapRowCol).
-5. **Sprites**: object / character sprites (fix:DA3A draw object sprite, 3C:8198 draw sprite,
+6. **Sprites**: object / character sprites (fix:DA3A draw object sprite, 3C:8198 draw sprite,
    32:9FE4 battle status sprites) straight into GB OAM; the `$4014` page conversion only where
    the game's own OAM page stays.
-6. **Battle graphics and screen loads**: monster tilemaps (2E:9FAA), summon / fight effects, the
+7. **Battle graphics and screen loads**: monster tilemaps (2E:9FAA), summon / fight effects, the
    prophecy / cutscenes: tiles converted at build time, copied with HDMA.
-7. **Glue**: translator reads ROM data directly (banked pointers), same-bank placement of hot
+8. **Glue**: translator reads ROM data directly (banked pointers), same-bank placement of hot
    code and data, fewer farcalls; the dynamic-target lookup for the remaining indirect jumps.
 Each step: measure (nesmap profile), replace, firstdiff (explore 12000 + the menu / save / job /
 magic sequences), lot-check monitor (`SGBRUN_LOTCHECK`), screenshots.
+
+Profile 2026-11-21 (explore 2000-12000, mGBA CGB): busy time by runtime routine - `rt_ppu_w7`
+($2007 writes) 9.5%, `rt_io_w4014` (sprite page conversion) 8.7%, `rt_jp_hl` 5.3%, `rt_lda_nes`
+2.8%, `hd_flush` 2.7%, `lookup` 2.7%; translated game code 29%, PPU layer 22%, glue 10%. Next:
+the sprite page (step 6) and the field map / text writers that feed `rt_ppu_w7` (steps 2, 5).
 
 ## What stays NES-like for now
 - Game logic (battle formulas, events, RNG, menus' logic): recompiled from the user's ROM (the
