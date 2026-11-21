@@ -584,8 +584,8 @@ minimap:    call lcd_off                    ; (LCD off in V-Blank, interrupts of
             dec b
             jr nz, .t
             xor a                           ; FF1 Minimap_DrawSFX: 12.5 % duty, volume 6,
-            ldh [$FF16], a                  ;   restarted every frame
-            ld a, $60
+            ldh [$FF16], a                  ;   restarted every frame (pulses at 5/8: 4)
+            ld a, $40
             ldh [$FF17], a
             ld a, [mn_fq]
             ldh [$FF18], a

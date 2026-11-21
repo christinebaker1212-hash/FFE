@@ -250,3 +250,10 @@ one reaches parity, so the owner can keep playing).
    main.s); DMG / SGB keep the LCD-off loads. Load times measured against FF1 on the NES:
    menu 60 vs 63 frames from the press, town entry black 11 vs 12, battle start black 10 vs
    20.
+8. (done) Sound as the recompiled build: the pulses at 5/8 of FF1's volume (music, sound
+   effects, the world map's tone, the wipe; decays from 9 with longer steps), and the triangle's
+   linear and length counters when FF1 clears the control bit (a song's end: before, the last
+   triangle note sounded on forever after a jingle). Checked: every FF1 song ($41-$57) played on
+   the native and the recompiled build (whose voices were checked against the NES) in SameBoy:
+   per-frame pitch-class similarity 0.98-0.99 where both sound, the rests and the jingles'
+   lengths the same, loudness within ~5%.

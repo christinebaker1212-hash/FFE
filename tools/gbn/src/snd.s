@@ -51,6 +51,8 @@ snd_init_b: ld a, $80
             ld a, $80                       ; (no track yet: silent)
             ld [NES_RAM + $4B], a
             ret
+tri_lens:   db 10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14     ; the NES length table
+            db 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30
 snd_wave:   db $01, $23, $45, $67, $89, $AB, $CD, $EF, $FE, $DC, $BA, $98, $76, $54, $32, $10
 
 ; L = NES-style register of the engine ($00-$15), A = value, only if changed
@@ -112,6 +114,7 @@ aw:         push af
             ld [hl+], a                     ; NRx1 duty
             ld a, e
             and $0F
+            call p58
             swap a
             or $08                          ; (DAC on, constant volume)
             ld [hl+], a                     ; NRx2
@@ -139,7 +142,24 @@ aw:         push af
 .ftl:       ld hl, snd_sh + $0A
             ld c, 2
             jr .fl
-.fth:       ld hl, snd_sh + $0A
+.fth:       ld a, e                         ; (a new note: the length counter loaded, the
+            rrca                            ;   linear counter reloaded)
+            rrca
+            rrca
+            and $1F
+            add a, low(tri_lens)
+            ld l, a
+            ld h, high(tri_lens)
+            jr nc, .fl2
+            inc h
+.fl2:       ld a, [hl]
+            ld [tri_len], a
+            ld a, [snd_sh + 8]
+            bit 7, a
+            jr nz, .ft1
+            ld e, a
+            call .tlc
+.ft1:       ld hl, snd_sh + $0A
             ld c, 2
             jr .fh
 .fl:        call .freq                      ; the period's low byte: NRx3, NRx4 (no restart)
@@ -183,13 +203,39 @@ aw:         push af
             ld c, e
             pop af
             ret
-.tlin:      ld a, e                         ; the triangle: on while its linear counter is set
+.tlin:      xor a                           ; the triangle: control bit set: on while its
+            ld [tri_lc], a                  ;   linear counter value is set; clear: it runs
+            bit 7, e                        ;   out after value / 4 frames (FF1 ends a song
+            jr nz, .tl1                     ;   with $70: ~0.47 s)
+            call .tlc
+            jp .x
+.tl1:       ld a, e
             and $7F
             ld a, 0
             jr z, .toff
             ld a, $80
 .toff:      ldh [$FF1A], a
             jp .x
+.tlc:       ld a, e                         ; (the countdown: the linear counter's (v + 3) / 4
+            and $7F                         ;   frames or the length counter's len / 2,
+            jr z, .tl0                      ;   whichever runs out first: both count while
+            add a, 3                        ;   the control bit is clear)
+            srl a
+            srl a
+            ld e, a
+            ld a, [tri_len]
+            inc a
+            srl a
+            jr z, .tl0
+            cp e
+            jr c, .tls
+            ld a, e
+.tls:       ld [tri_lc], a
+            ld a, $80
+            ldh [$FF1A], a
+            ret
+.tl0:       ldh [$FF1A], a
+            ret
 .en:        bit 0, e                        ; $15: channels off
             jr nz, .e1
             xor a
@@ -225,6 +271,8 @@ sw_r:       ds 1                            ; the NES sweep ($4005), its divider
 sw_d:       ds 1
 sw_per:     ds 2
 sw_mute:    ds 1
+tri_lc:     ds 1                            ; the triangle's linear counter run out in N frames
+tri_len:    ds 1                            ; its length counter (half frames, last $400B)
 
 ; ---- sound effects (FF1's, data from the ROM: sound.sfx_data). The square part plays on CH2
 ; while the music engine leaves its square 2 alone (sq2_sfx = NES_RAM + $7E, FF1's own
@@ -234,7 +282,14 @@ SFX_NZ     = $6E40          ; NES noise period -> NR43
 section bank 7, $4900
 ; once a frame (the STAT interrupt): a requested effect starts, the music, the effect's step
 snd_frame_b:
-            ld a, [sfx_req]
+            ld a, [tri_lc]                  ; the triangle's linear counter
+            and a
+            jr z, .nt
+            dec a
+            ld [tri_lc], a
+            jr nz, .nt
+            ldh [$FF1A], a
+.nt:        ld a, [sfx_req]
             and a
             call nz, sfx_start
             call mus_play_b
@@ -309,7 +364,7 @@ sq_step:    ld a, [sq_n]
             and $C0
             ldh [$FF16], a                  ; NR21
             ld a, b
-            call nes_vol
+            call nes_vol_p
             ldh [$FF17], a                  ; NR22
             ld a, [hl+]                     ; $4005: the sweep
             ld [sw_r], a
@@ -433,6 +488,45 @@ blk_de:     ld a, [de]
             ld a, l
             ld [de], a
             pop hl
+            ret
+; the pulses at 5/8 of FF1's volume (as the recompiled build, owner's balance: the NES mixes
+; its triangle ~1.7x a full pulse, the GB wave channel can only match a full pulse):
+; A = 0-15 -> (5 A + 4) >> 3
+p58:        push bc
+            ld b, a
+            add a, a
+            add a, a
+            add a, b
+            add a, 4
+            srl a
+            srl a
+            srl a
+            pop bc
+            ret
+; nes_vol for a pulse: the level at 5/8; a decay from 9 instead of 15, its steps 5/3 as long
+; (the same length)
+nes_vol_p:  bit 4, a
+            jr z, .d
+            and $0F
+            call p58
+            swap a
+            ret
+.d:         and $0F
+            add a, 4
+            srl a
+            srl a                           ; n = 1-4 (as nes_vol)
+            ld b, a
+            add a, a
+            add a, a
+            add a, b
+            add a, 2                        ; (5 n + 2) / 3
+            ld b, 0
+.q:         sub 3
+            jr c, .qd
+            inc b
+            jr .q
+.qd:        ld a, b
+            or $90                          ; (from 9, down)
             ret
 ; A = NES volume byte (bit 4 constant volume, else decay at speed v) -> GB NRx2
 nes_vol:    bit 4, a

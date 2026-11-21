@@ -2886,7 +2886,7 @@ wp_snd:     ldh a, [frame]
             ldh [$FF10], a
             xor a                           ; 12.5 %
             ldh [$FF11], a
-            ld a, $80                       ; volume 8
+            ld a, $50                       ; volume 8 (pulses at 5/8: 5)
             ldh [$FF12], a
             ld a, e
             ldh [$FF13], a
