@@ -666,6 +666,8 @@ move:       ld a, [moving]
             pop bc
             pop de
             ret c
+            call sm_special                 ; crown / cube / orbs gates, the altars
+            ret c
             ld a, d                         ; doors and rooms
             and $1E
             cp $02
@@ -1737,6 +1739,56 @@ dma_rom:    ld a, high(oam_buf)
             jr nz, .w
             ret
 dma_end:
+
+; standard map special tiles (FF1 SMMove_Crown / Cube / 4Orbs / xOrb): D = the target's first
+; property byte; C set if blocked (keeps BC, DE)
+sm_special: ld a, d
+            and $1E
+            ld hl, ITEMS + $02              ; crown
+            cp $0E
+            jr z, .item
+            ld hl, ITEMS + $0E              ; cube
+            cp $10
+            jr z, .item
+            cp $12
+            jr z, .orbs
+            ld hl, ITEMS + $15              ; altars: earth $18, fire $1A, water $1C, air $1E
+            cp $18
+            jr z, .alt
+            ld hl, ITEMS + $12
+            cp $1A
+            jr z, .alt
+            inc hl
+            cp $1C
+            jr z, .alt
+            inc hl
+            cp $1E
+            jr z, .alt
+            and a
+            ret
+.item:      ld a, [hl]
+            and a
+            jr z, .no
+.fan:       ld a, TR_DLGFAN                 ; (FF1: the fanfare)
+            call snd_track
+            and a
+            ret
+.orbs:      ld a, [ITEMS + $12]
+            ld hl, ITEMS + $13
+            and [hl]
+            inc hl
+            and [hl]
+            inc hl
+            and [hl]
+            jr nz, .fan
+.no:        scf
+            ret
+.alt:       ld a, [hl]                      ; an altar: its orb lit (FF1 altar effect)
+            and a
+            ret nz
+            ld [hl], 1
+            and a
+            ret
 
 ; ---- vehicles (FF1 ProcessOWInput @Movement, OWCanMove, Board / Unboard / DockShip): D, E =
 ; the target's property bytes, tx / ty the target; C set if the move is blocked
