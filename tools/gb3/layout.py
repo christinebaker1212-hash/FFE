@@ -2600,6 +2600,104 @@ shopini:            ; shop screen: as the NES ($FD / $FF / $2000), then bank 88 
 MENU_TEXT_NAME_GRID = {0x0C: 0x0B, 0x0E: 0x0D, 0x10: 0x0F, 0x12: 0x11, 0x14: 0x13}
 
 
+def ending(r):
+    """the crystal cutscene texts (opening credits after the Wind Crystal, the ending's scrolling
+    pages; bank 1F L1F_A53D, page pointers $A5DF, pages in insert.py's EPI_BANK) on 20 x 18: the
+    cutscenes at camera (48, 48) (NES cols 6-25, rows 6-23: the staff lines as they are), the title
+    from row 7 (row 5 is above the view), the eight story pages wrapped at 18 and centred (opening
+    pages <= 8 rows, ending pages <= 12 rows: what L1F_A581 / L1F_B212 copy).
+    The ending scrolls each page in from the other nametable (horizontal mirroring, 480 lines);
+    the GB map has 32 rows, so a page written there would land on the rows in view. On the GB
+    the ending keeps vertical mirroring (one nametable, the scroll wraps at 240 as the runtime
+    shows it) and every page goes to rows 18-29, out of the view (camera (48, 0): rows 0-17)
+    while it is written; it scrolls in from the bottom as on the NES"""
+    import importlib.util, json, textwrap
+    spec = importlib.util.spec_from_file_location('ff3insert', os.path.join(HERE, '..', 'ff3', 'insert.py'))
+    ins = importlib.util.module_from_spec(spec); spec.loader.exec_module(ins)
+    B1F, EPI = 0x1F, ins.EPI_BANK
+    rd = lambda b, a: r.d[r.off(b, a)]
+    ptr = [rd(B1F, 0xA5DF + 2 * i) | rd(B1F, 0xA5E0 + 2 * i) << 8 for i in range(17)]
+    assert ptr[0] == 0x8000
+    def page(p):
+        o = r.off(EPI + (p >= 0xA000), p); out = bytearray()
+        while r.d[o]: out.append(r.d[o]); o += 1
+        return bytes(out) + b'\x00'
+    pages = [page(p) for p in ptr[:9]]                       # (title, staff: as they are)
+    for k, e in enumerate(json.load(open('script/ff3/epilogue.json'))):
+        para = ' '.join(re.sub(r'^\{COL:..\}', '', l).strip() for l in e['en'].split('\n') if l.strip())
+        lines = textwrap.wrap(para, 18)
+        assert len(lines) <= (8 if k < 3 else 12), (e['id'], lines)
+        out = bytearray()
+        for n, l in enumerate(lines):
+            b = ins.enc(l); assert len(b) <= 18, l
+            if n: out.append(0x01)
+            out += bytes([0x02, 6 + (20 - len(b)) // 2]) + b
+        if k >= 3: out = bytes([0x01]) * ((12 - len(lines)) // 2) + out   # (centred in rows 18-29)
+        pages.append(bytes(out) + b'\x00')
+    a = 0x8000; data = bytearray()
+    for i, pg in enumerate(pages):
+        r.d[r.off(B1F, 0xA5DF + 2 * i)] = a & 0xFF; r.d[r.off(B1F, 0xA5E0 + 2 * i)] = a >> 8
+        data += pg; a += len(pg)
+    assert len(data) + 255 <= 0x4000
+    r.d[r.off(EPI, 0x8000):r.off(EPI, 0x8000) + len(data)] = data   # (EPI and EPI + 1 follow)
+    r.log.append((EPI, 0x8000, 'ending: pages wrapped at 18 (%d bytes)' % len(data)))
+    # the title (text 0) and its clear (entry 2) from row 7
+    r.patch(B1F, 0xA5A6, '08 05 00', '08 07 00', 'ending: title from NES row 7')
+    r.patch(B1F, 0xA5AC, '08 05 02', '08 07 02', 'ending: title clear from NES row 7')
+    # camera (48, 48) for the opening and the ending cutscenes: a stub in the bank's free end
+    m = r.module('''
+    org $BFD8
+ecam:                ; opening: camera (48, 48)
+    lda #48
+    sta $5803
+    bne ecx
+ecam2:               ; ending: camera (48, 0)
+    lda #0
+    sta $5803
+ecx:
+    lda #48
+    sta $5802
+    jmp $A16C
+elock:               ; end credits (nametable 1 shown): the GB map shows nametable 1 only
+    lda #2
+    sta $580D
+    lda #$01
+    sta $CC
+    rts
+''')
+    o = r.off(B1F, 0xBFD8)
+    assert len(m['bytes']) <= 31 and not any(r.d[o:o + 31])
+    r.d[o:o + len(m['bytes'])] = m['bytes']
+    r.mods.append(dict(m, where=(B1F, 0xBFD8 & 0x1FFF)))
+    r.patch(B1F, 0xA0A4, '20 6C A1', '20 D8 BF', 'opening cutscene: GB camera (48, 48)')
+    # the final ending (cast, staff credits with a job sprite each side at NES x 47-207): camera
+    # (47, 45), its stub over the Japanese pages' old place ($A601-$A931, dead since insert.py
+    # moved the pages to EPI_BANK)
+    m3 = r.module('''
+    org $A601
+ecam3:
+    lda #47
+    sta $5802
+    lda #45
+    sta $5803
+    jmp $A16C
+''')
+    o = r.off(B1F, 0xA601)
+    r.d[o:o + len(m3['bytes'])] = m3['bytes']
+    r.mods.append(dict(m3, where=(B1F, 0xA601 & 0x1FFF)))
+    r.patch(B1F, 0xA012, '20 6C A1', '20 01 A6', 'final ending: GB camera (47, 45)')
+    r.patch(B1F, 0xB94A, 'A9 01 85 CC', '20 %02X BF EA' % (m['labels']['elock'] & 0xFF),
+            'end credits: GB map locked to nametable 1')
+    r.patch(B1F, 0xA009, '20 6C A1', '20 %02X BF' % (m['labels']['ecam2'] & 0xFF), 'ending cutscene: GB camera (48, 0)')
+    for n in range(13, 19):                                   # ending pages: rows 18-29
+        r.patch(B1F, 0xA5A6 + 3 * n + 1, '08', '12', 'ending page %d: NES rows 18-29' % (n - 13))
+    if os.environ.get('GB3_TEST_END'):                        # (test builds: event $DB -> the ending)
+        r.patch(B1F, 0xA000, '4C A4 A0', '4C 12 A0', 'TEST: the prologue event runs the ending')
+    o = r.off(B1F, 0xB146); i = bytes(r.d[o:o + 0x40]).find(bytes.fromhex('207D5CA901'))
+    assert i > 0
+    r.patch(B1F, 0xB146 + i, '20 7D 5C', '20 83 5C', 'ending: vertical mirroring kept (one nametable)')
+
+
 def apply(data):
     """English NES ROM bytes -> (GB-layout ROM bytes, code modules for tools/gb3/ff3src.py)"""
     r = Rom(data)
@@ -2611,6 +2709,7 @@ def apply(data):
     name_entry(r)
     shop(r)
     prophecy(r)
+    ending(r)
     dialogue(r)
     return bytes(r.d), r.mods, r.log
 

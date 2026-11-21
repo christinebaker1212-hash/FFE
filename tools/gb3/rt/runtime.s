@@ -13,7 +13,7 @@
 ; mirroring the second nametable continues at row 30, mod 32). NES palette RAM -> CGB
 ; palettes 0-3 (BG) and 0-3 (OBJ) through NES_RGB.
 
-STACK_TOP  = $D000          ; GB stack $CDE4-$CFFF (the NES stack runs on it; FF3 keeps data in
+STACK_TOP  = $D000          ; GB stack $CDE9-$CFFF (the NES stack runs on it; FF3 keeps data in
                             ;   page 1 at $0100-$0161, so the stack stays out of NES RAM), outside
                             ;   the switchable WRAM bank $D000-$DFFF
 NES_RAM    = $C000          ; $0000-$07FF
@@ -39,6 +39,8 @@ OVR_ROWS   = $CDA0          ; map rows with palettes set by $5809 / $580C (bit p
 OVR_FC     = $CDA4          ;   fixed WRAM) per row: first column set, count (30 + 30)
 OVR_NC     = $CDC4
 ATTR_STALE = $D900          ; per attribute byte (nametable * 64 + index): 1 = stale (128; bank RT_WBANK)
+NT_LOCK    = $CDE8          ; $580D: 0, or 1 + the nametable (after mirroring) the GB map shows;
+                            ;   writes to the other one go to its shadow only (fixed WRAM)
 OVR_R      = $CD9A          ; $580A row, $580B first column (fixed WRAM)
 OVR_C      = $CD9B
 TEST_PAD   = $CD9E          ; $A5: test runner input mode (dev builds only) gbrun.c)
@@ -1058,7 +1060,13 @@ wc_setup:   push bc
             jr .nt
 .vm:        and 1
 .nt:        ld b, a
-            ld a, h
+            ld a, [NT_LOCK]                 ; (map locked to the other nametable: no cache)
+            and a
+            jr z, .nlk
+            dec a
+            cp b
+            jr nz, .done
+.nlk:       ld a, h
             and 3
             ld h, a                         ; HL = offset in the nametable
             ld a, b
@@ -1299,7 +1307,13 @@ rt_ppu_w7:
             ld a, h
             ldh [wc_nh], a
             pop hl
-            ld a, h
+            ld a, [NT_LOCK]                 ; (map locked to the other nametable: shadow only)
+            and a
+            jr z, .nlk
+            dec a
+            cp b
+            jr nz, .done
+.nlk:       ld a, h
             cp 3
             jr nz, .cell
             ld a, l
@@ -2547,7 +2561,11 @@ rt_mmc_w580F:                               ; menus closed: condensed-name tiles
             push hl
             ld hl, far_cvoff
             jr far_mmc
-rt_mmc_w580D:
+rt_mmc_w580D:                               ; GB layout: the map shows one nametable (1 + NES
+            push af                         ;   nametable 0-3; 0 off) (far_ntlock)
+            push hl
+            ld hl, far_ntlock
+            jr far_mmc
 rt_mmc_w580E:
             ret
 

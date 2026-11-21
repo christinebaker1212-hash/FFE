@@ -3929,6 +3929,95 @@ cv_toff:    ld l, d                         ; HL = 16 * D
             add hl, hl
             ret
 
+; far_ntlock ($580D): A = 1 + NES nametable 0-3 -> the GB map locked to it (after mirroring):
+; its tiles and attributes copied in from the shadow (all rows marked); while locked, writes to
+; the other nametable stay in its shadow (rt_ppu_w7, wc_setup). A = 0: off. (The ending's
+; credits show nametable 1 while the map still holds nametable 0's last scene.)
+far_ntlock: and a
+            jr nz, .on
+            ld [NT_LOCK], a
+            ret
+.on:        push bc
+            push de
+            dec a
+            ld b, a
+            ldh a, [mirror]                 ; vertical: n & 1; horizontal: n >> 1
+            and a
+            ld a, b
+            jr z, .vm
+            srl a
+            jr .nt
+.vm:        and 1
+.nt:        ld b, a
+            inc a
+            ld [NT_LOCK], a
+            ld a, MAP_BANK
+            ldh [rSVBK], a
+            ld hl, 0
+.c:         push hl                         ; cells 0-$3BF: NT_SH + B * $400 -> MAP_SH
+            ld a, b
+            add a, a
+            add a, a
+            add a, h
+            add a, high(NT_SH)
+            ld d, a
+            ld e, l
+            ld a, [de]
+            ld c, a
+            call cell_map
+            ld a, h
+            sub $98 - high(MAP_SH)
+            ld h, a
+            ld [hl], c
+            pop hl
+            inc hl
+            ld a, h
+            cp 3
+            jr nz, .c
+            ld a, l
+            cp $C0
+            jr nz, .c
+            ld a, 1
+            ldh [rSVBK], a
+            ld l, 0
+.a:         push hl                         ; attribute bytes 0-63: all quadrants applied
+            ld a, b
+            add a, a
+            add a, a
+            add a, high(NT_SH) + 3
+            ld h, a
+            ld a, l
+            add a, $C0
+            ld l, a
+            ld a, MAP_BANK
+            ldh [rSVBK], a
+            ld e, [hl]
+            ld a, 1
+            ldh [rSVBK], a
+            pop hl
+            push hl
+            ld a, e
+            cpl
+            ldh [c_q], a
+            ld a, e
+            call attr_apply                 ; (keeps B, C)
+            pop hl
+            inc l
+            ld a, l
+            cp 64
+            jr nz, .a
+            ld a, $FF
+            ld hl, map_dirty
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            ld a, 1
+            ldh [map_any], a
+            pop de
+            pop bc
+            ret
+
 ; far_cvoff ($580F, menus closed): the saved sprite tiles back into the staging copy (marked),
 ; every bank-1 bit in the map's attributes cleared (rows marked), nothing in use
 far_cvoff:  push bc

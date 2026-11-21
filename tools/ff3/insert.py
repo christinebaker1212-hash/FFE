@@ -1823,6 +1823,37 @@ def epilogue(rom, report):
     put(rom, 31, 0xA56C, bytes([EPI_BANK // 2]))
     report.append('ending: %d bytes in banks %d-%d' % (len(data), EPI_BANK, EPI_BANK + 1))
 
+# ---- end credits: the supporting cast's names ------------------------------------------
+# The cast roll (bank 1F L1F_BA41: pointers 10/9640, 31 strings drawn 18 columns wide) has the
+# staff in romaji (two-letter codes, shown right by the English font) and eight names in kana,
+# which the English font turns into garbage. The names as the script has them, centred in the
+# 18 columns, on the kana names' row (4); the strings re-packed into their block, which may grow
+# into the zero padding up to $9A80 (the next table starts at $9A81, as in the Japanese ROM).
+CAST = {1: 'Princess Sara', 2: 'Old Man Cid', 3: 'Desch', 4: 'Water Maiden Elia',
+        5: 'The Four Old Men', 6: 'Prince Alus', 7: 'Doga the Wizard', 8: 'Unne and Parrot'}
+
+def credits(rom, report):
+    B = 16                                             # (8 KB bank 16 = $8000-$9FFF)
+    ptr = [get(rom, B, 0x9640 + 2 * i, 1)[0] | get(rom, B, 0x9641 + 2 * i, 1)[0] << 8 for i in range(31)]
+    assert ptr[0] == 0x967E and ptr[30] == 0x9A1E
+    def string(p):
+        out = bytearray()
+        while True:
+            c = get(rom, B, p, 1)[0]; p += 1; out.append(c)
+            if c == 0: return bytes(out)
+            if c == 0x02 or 0x10 <= c < 0x28: out.append(get(rom, B, p, 1)[0]); p += 1
+    strs = [string(p) for p in ptr]
+    for i, name in CAST.items():
+        assert strs[i].startswith(b'\x01' * 4 + b'\x02\x04'), i
+        b = enc(name); assert len(b) <= 18, name
+        strs[i] = b'\x01' * 4 + bytes([0x02, (18 - len(b)) // 2]) + b + b'\x00'
+    a = 0x967E; data = bytearray()
+    for i, st in enumerate(strs):
+        put(rom, B, 0x9640 + 2 * i, bytes([a & 0xFF, a >> 8])); data += st; a += len(st)
+    assert a <= 0x9A81 and not any(get(rom, B, 0x9A30, 0x9A81 - 0x9A30)), hex(a)
+    put(rom, B, 0x967E, bytes(data))
+    report.append('end credits: %d cast names (block $967E-$%04X)' % (len(CAST), a - 1))
+
 if __name__ == '__main__':
     rom = bytearray(open(sys.argv[1], 'rb').read())
     report = []
@@ -1832,5 +1863,6 @@ if __name__ == '__main__':
     engine(rom, report)
     menus(rom)
     epilogue(rom, report)
+    credits(rom, report)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report))
