@@ -11047,8 +11047,6 @@ oamconv_b:  and $07
             xor b                           ;   its bytes the same? (spr_mat brings it into
             cp $80                          ;   the shadow now, wtmp = 1 if unchanged)
             jr nz, .ld2
-            call sl_chk                     ; (the copy from ROM counts as a load: at most
-            jr c, .dfr                      ;   SL_MAX a frame, a battle start's party spread)
             ldh a, [o_t]
             call spr_mat
             ld a, 3
@@ -11267,8 +11265,6 @@ oamconv_b:  and $07
             xor b
             cp $80
             jr nz, .vl2
-            call sl_chk
-            jr c, .vab
             ldh a, [o_t]
             call spr_mat
             ld a, 3
@@ -11724,8 +11720,6 @@ oc_fwd:     xor a
             xor b
             cp $80
             jr nz, .ld2F
-            call sl_chk
-            jr c, .dfrF
             ldh a, [o_t]
             call spr_mat
             ldh a, [wtmp]
@@ -16250,6 +16244,7 @@ section bank 0, $3100
 SL_V       = $D828          ; (fault-dump area) VBL_CNT of the loads counted in SL_N
 SL_N       = $D82F
 SL_MAX     = 8
+SL_LY      = 24             ; (no more loads this frame from this line on)
 sl_chk:     ldh a, [is_cgb]
             and a
             ret nz
@@ -16265,7 +16260,20 @@ sl_chk:     ldh a, [is_cgb]
             cp SL_MAX
             ccf
             jr c, .x
-            inc a
+            and a                           ; (after the first one of a frame: only while the
+            jr z, .ok                       ;   frame has time left, LY < SL_LY, LCD on, when
+            ld a, [OAM_USED]                ;   no sprite showed before: sprites appearing a few
+            and a                           ;   frames later, never shown ones hidden: no blink)
+            jr nz, .ok0
+            ldh a, [lcd_on]
+            and a
+            jr z, .ok0
+            ldh a, [$FF44]
+            cp SL_LY
+            ccf
+            jr c, .x
+.ok0:       ld a, [SL_N]
+.ok:        inc a
             ld [SL_N], a
             and a
 .x:         pop hl
