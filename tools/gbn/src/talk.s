@@ -555,7 +555,10 @@ talk_after: ld a, [pend_telef]
             and a
             ret z
             xor a
-            ld [pend_btlf], a               ; (battles: battle.s, later)
+            ld [pend_btlf], a
+            ld a, [pend_btl]
+            call do_battle
+            and a
             ret
 
 ; ---- treasure chests (FF1 OpenTreasureChest): A = chest number -> A = the dialogue

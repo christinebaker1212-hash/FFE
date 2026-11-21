@@ -674,7 +674,32 @@ arrived:    ld a, [px]
             call map_reload
             scf
             ret
-.nsh:
+.nsh:       ld a, d                         ; a battle tile (FF1 SMMove_Battle)
+            and $1E
+            cp $0A
+            jr nz, .nbt
+            bit 7, e
+            jr z, .spk
+            call enc_step                   ; random: the map's rate
+            ld b, a
+            ld a, [cur_map]
+            inc a
+            ld l, a
+            ld h, high(B_RATES)
+            ld a, BTL_DATA
+            ld [fc_bank], a
+            call far_byte
+            ld c, a
+            ld a, b
+            cp c
+            jr nc, .nbt
+            ld a, [cur_map]
+            add a, 64
+            call enc_form
+            jp do_battle
+.spk:       ld a, e                         ; spiked: the second byte is the formation
+            jp do_battle
+.nbt:
             ld a, d
             and $C0
             cp $80
@@ -719,7 +744,38 @@ arrived:    ld a, [px]
             call load_map
             scf
             ret
-.ow:        bit 7, e                        ; overworld: second byte bit 7 = an entrance,
+.ow:        bit 6, e                        ; overworld: random encounters (FF1 OWCanMove)
+            jr z, .owe
+            push de
+            call enc_step
+            pop de
+            cp ENC_OW                       ; (FF1: 10 in 256 a step)
+            jr nc, .owe
+            ld a, e                         ; the domain: land (8 x 8 grid), sea, river
+            and 3
+            jr z, .land
+            cp 2
+            ld a, $42
+            jr z, .dom
+            ld a, [py]
+            rlca
+            and 1
+            or $40
+            jr .dom
+.land:      ld a, [px]
+            rlca
+            rlca
+            rlca
+            and 7
+            ld b, a
+            ld a, [py]
+            srl a
+            srl a
+            and $38
+            or b
+.dom:       call enc_form
+            jp do_battle
+.owe:       bit 7, e                        ; second byte bit 7 = an entrance,
             ret z                           ;   bits 0-5 its number
             ld a, [px]                      ; (the overworld position kept for the warp out)
             ld [ow_x], a
@@ -1361,6 +1417,71 @@ dma_rom:    ld a, high(oam_buf)
             ret
 dma_end:
 
+; ---- encounters and battles
+B_RATES    = $4A00          ; battle data bank: encounter rate per map (+1), domains, lut_RNG,
+B_DOMAINS  = $4800          ;   the formation weights
+B_FRNG     = $7D00
+B_WEIGHT   = $7F00
+; FF1 BattleStepRNG -> A
+enc_step:   ld a, [bsign]
+            bit 7, a
+            ld hl, bstep
+            jr nz, .neg
+            inc [hl]
+            jr nz, .d
+            jr .exp
+.neg:       dec [hl]
+            jr nz, .d
+.exp:       ld a, [bsign]
+            add a, $A0
+            ld [bsign], a
+.d:         ld a, [bstep]
+            ld l, a
+            ld h, high(B_FRNG)
+            ld a, BTL_DATA
+            ld [fc_bank], a
+            jp far_byte
+; FF1 GetBattleFormation: domain A -> A = a formation (weighted)
+enc_form:   ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, B_DOMAINS
+            add hl, de
+            push hl
+            ld hl, bcount
+            inc [hl]
+            ld l, [hl]
+            ld h, high(B_FRNG)
+            ld a, BTL_DATA
+            ld [fc_bank], a
+            call far_byte
+            and $3F
+            ld l, a
+            ld h, high(B_WEIGHT)
+            call far_byte
+            pop hl
+            add a, l
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld h, a
+            jp far_byte
+; a battle with formation A, then the map again (C set: the step handled); lost: game over
+do_battle:  ld [btl_fid], a
+            ld a, BTL_BANK
+            ld hl, battle
+            call bank_call
+            and a
+            jr nz, game_over
+            call map_reload
+            scf
+            ret
+; FF1 GameOver: back to the title
+game_over:  ld sp, $E000
+            jp start
+
 ; ---- the save (Lot Check: a sum and a mark; cart RAM enabled only while it is written)
 SAVE_MARK  = $A000          ; "FF1N", then the save page ($400), then the sum (2)
 save_game:  ld a, $0A
@@ -1432,6 +1553,11 @@ o_ty:       ds 1
 o_sx:       ds 1
 o_sy:       ds 1
 o_tb:       ds 1
+
+section wram, $CF90
+bstep:      ds 1
+bsign:      ds 1
+bcount:     ds 1
 
 section wram, $CA00
 objs:       ds 16 * 15                      ; map objects (objects.s)
