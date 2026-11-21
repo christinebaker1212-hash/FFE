@@ -2647,7 +2647,7 @@ def ending(r):
     for k, e in enumerate(json.load(open('script/ff3/epilogue.json'))):
         para = ' '.join(re.sub(r'^\{COL:..\}', '', l).strip() for l in e['en'].split('\n') if l.strip())
         lines = textwrap.wrap(para, 18)
-        assert len(lines) <= (8 if k < 3 else 12), (e['id'], lines)
+        assert len(lines) <= (7 if k < 3 else 12), (e['id'], lines)   # (opening: rows 15-21 in view)
         out = bytearray()
         for n, l in enumerate(lines):
             b = ins.enc(l); assert len(b) <= 18, l
@@ -2668,8 +2668,8 @@ def ending(r):
     # camera (48, 48) for the opening and the ending cutscenes: a stub in the bank's free end
     m = r.module('''
     org $BFD8
-ecam:                ; opening: camera (48, 48)
-    lda #48
+ecam:                ; opening: camera (48, 32) (the risen crystal in view)
+    lda #32
     sta $5803
     bne ecx
 ecam2:               ; ending: camera (48, 0)
@@ -2690,7 +2690,7 @@ elock:               ; end credits (nametable 1 shown): the GB map shows nametab
     assert len(m['bytes']) <= 31 and not any(r.d[o:o + 31])
     r.d[o:o + len(m['bytes'])] = m['bytes']
     r.mods.append(dict(m, where=(B1F, 0xBFD8 & 0x1FFF)))
-    r.patch(B1F, 0xA0A4, '20 6C A1', '20 D8 BF', 'opening cutscene: GB camera (48, 48)')
+    r.patch(B1F, 0xA0A4, '20 6C A1', '20 D8 BF', 'opening cutscene: GB camera (48, 32)')
     # the final ending (cast, staff credits with a job sprite each side at NES x 47-207): camera
     # (47, 45), its stub over the Japanese pages' old place ($A601-$A931, dead since insert.py
     # moved the pages to EPI_BANK)
@@ -2707,6 +2707,9 @@ ecam3:
     r.d[o:o + len(m3['bytes'])] = m3['bytes']
     r.mods.append(dict(m3, where=(B1F, 0xA601 & 0x1FFF)))
     r.patch(B1F, 0xA012, '20 6C A1', '20 01 A6', 'final ending: GB camera (47, 45)')
+    # the opening's third story page from row 15 like the first two (row 16 kept the second
+    # page's first row: a whole line in the Japanese, a fragment of the re-wrapped English)
+    r.patch(B1F, 0xA5A6 + 3 * 12 + 1, '10', '0F', 'opening story page 3: NES row 15')
     r.patch(B1F, 0xB94A, 'A9 01 85 CC', '20 %02X BF EA' % (m['labels']['elock'] & 0xFF),
             'end credits: GB map locked to nametable 1')
     r.patch(B1F, 0xA009, '20 6C A1', '20 %02X BF' % (m['labels']['ecam2'] & 0xFF), 'ending cutscene: GB camera (48, 0)')
