@@ -83,4 +83,13 @@ one reaches parity, so the owner can keep playing).
 
 ## Progress
 
-(updated as work goes on)
+- 2026-11-21: milestone 1 started. `tools/gbn/data.py` reads a standard map, its tileset
+  (properties, TSA, attributes), the map palettes, the tileset graphics and the party sprite
+  from the ROM, converts the tiles to GB format and pre-shades a variant per (tile, palette)
+  for DMG (all 61 maps fit: 112-121 variants). `tools/gbn/src/main.s` (1.3 KB): boot (DMG /
+  CGB, memory cleared, LCD off only in V-Blank), the map drawn into the 32 x 32 BG ring from
+  the metatile tables, the party sprite from FF1's 2 x 2 tables, walking one metatile per 16
+  frames with collision from the tile properties, the incoming row / column queued and written
+  in V-Blank (CGB palettes into VRAM bank 1). Coneria town walks in mGBA (CGB colours as the
+  NES). Next: DMG shades as the recompiled build's rules (the party blends in now), teleports,
+  doors / rooms, NPC objects, dialogue.
