@@ -302,7 +302,9 @@ bt_mrow:    ld a, [bt_rows]
             inc hl
             dec b
             jr nz, .c
-            call bt_upd
+            ld a, [bt_rows]
+            add a, 13
+            call bt_upd_row
             ld hl, bt_rows
             inc [hl]
             ret

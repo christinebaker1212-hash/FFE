@@ -1951,7 +1951,9 @@ bt_msg_row: ld a, [bt_rows]
             inc hl
             dec b
             jr nz, .c
-            call bt_upd
+            ld a, [bt_rows]
+            add a, 13
+            call bt_upd_row
             ld hl, bt_rows
             inc [hl]
             ret
@@ -1970,7 +1972,8 @@ bt_msg_win: ld a, [bt_msgon]                 ; (the rows below saved first)
             call memcpy
 .w:         ld bc, $000C
             ld de, $1406
-            jp bt_win
+            call bt_win
+            jp bt_upd                       ; (blank on screen before any text is staged)
 ; a one-line result and the end
 bt_msg_end1:
             call bt_msg_line

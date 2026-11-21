@@ -56,6 +56,7 @@ battle:     xor a                           ; (no menu sounds, no vehicle noise)
             call snd_track
             xor a
             ld [bt_msgon], a
+            ld [bt_rmask], a
             call bt_screen
             call bt_draw_party
             call bt_names
@@ -1308,16 +1309,58 @@ bt_vbl:     ld a, [bt_upn]
             ld e, a
             ld a, [bt_updst + 1]
             ld d, a
-.l:         ldh a, [rLY]                    ; (only in V-Blank: lines 144-151)
-            sub 144
-            cp 8
+.l:         ldh a, [rLY]                    ; (only in V-Blank: a tile takes under a line,
+            sub 144                         ;   so one may start up to line 152)
+            cp 9
             jr nc, .x
-            ld b, 16
-.c:         ld a, [hl+]
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
             ld [de], a
             inc de
-            dec b
-            jr nz, .c
             ld a, [bt_upn]
             dec a
             ld [bt_upn], a
@@ -1343,14 +1386,63 @@ bt_upd:     ld a, [sf_row]
 
 ; one battle frame: V-Blank, map rows and staged tiles, the pad
 bt_frame:   call wait_vbl
+            ld a, [bt_upn]                  ; (map rows only once their tiles are up)
+            and a
+            jr nz, .t
             call sf_step
-            call bt_vbl
+            call bt_rowsup
+.t:         call bt_vbl
             jp read_pad
-; wait until every staged upload is done
-bt_flush:   ld a, [bt_upn]
+; one text row's map row (A = 12-17) to upload, alone
+bt_upd_row: sub 12
+            ld b, a
+            inc b
+            xor a
+            scf
+.s:         rla
+            dec b
+            jr nz, .s
+            ld hl, bt_rmask
+            or [hl]
+            ld [hl], a
+            ret
+bt_rowsup:  ld a, [bt_rmask]
             and a
             ret z
-            call bt_frame
+            ld c, a
+            ld b, 12
+            ld d, 1
+.f:         ld a, c
+            and d
+            jr nz, .g
+            inc b
+            sla d
+            jr .f
+.g:         ldh a, [rLY]
+            cp 144
+            ret c
+            cp 152
+            ret nc
+            ld a, c
+            xor d
+            ld [bt_rmask], a
+            ld a, b
+            call sf_one
+            jr bt_rowsup
+; wait until every staged upload is done, tiles and map rows (new text never overwrites
+; tiles the screen still shows: a window is blanked on screen before its text is staged,
+; and its rows go up after all of it)
+bt_flush:   ldh a, [rLCDC]
+            bit 7, a
+            ret z
+            ld a, [bt_upn]
+            ld hl, bt_rmask
+            or [hl]
+            jr nz, .w
+            ld a, [sf_row]
+            cp 18
+            ret nc
+.w:         call bt_frame
             jr bt_flush
 
 ; ---- the party: sprites in their column, the party window
@@ -1587,7 +1679,8 @@ bt_dig3:    ld hl, nf_dig
 bt_left_win:
             ld bc, $000C
             ld de, $0906
-            jp bt_win
+            call bt_win
+            jp bt_upd
 bt_names:   ld b, 28                        ; up to 4 different names, rows 13-16, 7 tiles each
             xor a
             ld [bt_t + 12], a               ; row
@@ -1707,6 +1800,7 @@ bt_m:       ds 4
 bt_upn:     ds 1
 bt_upsrc:   ds 2
 bt_updst:   ds 2
+bt_rmask:   ds 1                            ; map rows 12-17 to upload (bits 0-5)
 vw_x:       ds 1
 vw_w:       ds 1
 vw_s:       ds 1
