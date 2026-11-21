@@ -42,6 +42,8 @@ FIELD += [('cure', '_30,S5,_80,D5,_40,A5,_100,A5,_150,A5,_150,A5,_150,D5,_40,D5,
 FIELD += [('lineup', '_30,T5,_100,D5,_20,A5,_150,A5,_40,D5,_30,A5,_100,B5,_100,_100,U30,_100,T5,_100,D5,_20,A5,_150,D5,_30,A5,_40,D5,_30,D5,_30,A5,_100,B5,_100,_300',
            4900, '')]   # Select: party order (its exit needs RTS-dispatch targets only this reaches)
 FIELD += [('bridge', '_30,D16,_60,D16,_200,_200,A5,_200,A5,_200,A5,_200', 5200, '6016=01')]   # story pages
+# walked from the field into Coneria's White Magic shop (no pokes; found the CGB map rebuild bug)
+FIELD += [('wmagic_walk', 'U16,_20,U16,_20,U16,_20,R16,_150,U16,_4,U16,_4,U16,_4,U16,_4,U16,_4,U16,_4,U16,_4,U16,_4,U16,_4,U16,_4,U16,_4,L16,_4,U16,_4,U16,_4,L16,_4,L16,_4,L16,_4,L16,_4,U16,_4,L16,_4,L16,_4,L16,_4,U16,_4,U16,_4,U16,_4,U16,_4,U16,_4,U16,_4,L16,_4,L16,_4,U16,_4,U16,_4,U40,_150,A5,_60,A5,_60,A5,_80,_300', 5300, '')]
 BATTLE = ['fight', 'run', 'fire1', 'cure4', 'magic4', 'items4', 'med1']     # battleseq.py modes
 
 

@@ -1232,6 +1232,15 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   - Checks (n138): checkall 62/62; VCHK 0 on DMG / CGB / SGB over the battle script and all 22
     field scripts; CGB pictures = n131 at 70 points but the prologue (now shown in time).
     Lag: DMG 22, CGB -6.
+  - Owner (2026-11-21): White Magic shop showed black around "Who will be learning the
+    magic?" on hardware. Reproduced only in SameBoy (mGBA hides it), walking into the shop with
+    no pokes (new covall script `wmagic_walk`, made by a closed-loop walker on FF1's map and
+    tile-property data): a write after a masked load's show (VLCD 2) set MAP_RB, and the
+    unmask ignored it, so the window cells stayed $00 in VRAM ($FF in the shadow). Present since
+    11-19. Now the unmask waits for MAP_RB / CGB_RP to be 0 and asks for the show again
+    (`vlcd_ok`). New check: `vchkfield.py` env SB=1 (SameBoy, VRAM vs nametable shadow at each
+    shot); all field scripts + battle: fixed-camera screens 0-3 cells (writes in flight).
+    checkall 64/64 (n139).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

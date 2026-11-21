@@ -319,8 +319,18 @@ nd_pal:     ldh a, [is_cgb]
             and a
             ret z
             jp make_palettes
-; Z: no tile copy pending and the palettes uploaded (a masked load can be shown)
-vlcd_ok:    ldh a, [hd_any]
+; Z: no tile copy pending and the palettes uploaded (a masked load can be shown); NZ too
+; while a map or cell-palette rebuild is pending (a write after the show marked it): the
+; show is asked for again (the frame wait's vshow_def DMAs them from the shadows)
+vlcd_ok:    ld a, [MAP_RB]
+            ld b, a
+            ld a, [CGB_RP]
+            or b
+            jr z, .t
+            ld a, 1
+            ld [VSHOW_P], a
+            ret
+.t:         ldh a, [hd_any]
             ld b, a
             ldh a, [pal_dirty]
             or b
