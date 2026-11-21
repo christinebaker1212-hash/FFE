@@ -250,6 +250,15 @@ one reaches parity, so the owner can keep playing).
    main.s); DMG / SGB keep the LCD-off loads. Load times measured against FF1 on the NES:
    menu 60 vs 63 frames from the press, town entry black 11 vs 12, battle start black 10 vs
    20.
+9. Owner's play-test of the first native ROM (2026-11-21), fixed: job pictures (read two
+   classes on: promoted jobs showed), party names (printed at column 0), party creation to the
+   owner's design (FF1's default party; A on a member: a job list with every job's picture and
+   name, then the name entry; all four named: OK to begin with this party? Yes / No, No resets
+   everything), the prologue as FF1's intro (crystal theme; blue screen; lines fading in one
+   at a time over 64 frames with FF1's colour steps and flicker; A / B finishes a line; pages
+   wait for A / B; Start: the title; Colour by palettes 2-4, DMG / SGB by a BGP raster list on
+   the fading line), black outside the windows on the Color, DMG sprites white / light / dark
+   on the black screens, the world map with Select pressed a moment before B.
 8. (done) Sound as the recompiled build: the pulses at 5/8 of FF1's volume (music, sound
    effects, the world map's tone, the wipe; decays from 9 with longer steps), and the triangle's
    linear and length counters when FF1 clears the control bit (a song's end: before, the last

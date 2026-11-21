@@ -136,6 +136,11 @@ Color only" screen on older systems.
 
 
 ## Native rewrite (2026-11-21)
+- Test from power-on the way a player does (title, New Game, every screen in order) before
+  handing over a ROM: test builds that start on the field (`--start`, `--battle`) skipped the
+  party creation, where the first native ROM had wrong job pictures, misplaced names and the
+  wrong default party. Compare each screen with the NES (cynes shots) for layout, colours and
+  animation, not only for "it runs".
 - Masked loads on the Color (native engine): with code that writes VRAM directly all over a
   load, a mode-2 STAT interrupt that spins until mode 0 makes every write safe without
   touching that code (the CPU only runs in mode 0 / V-Blank). Costs: ~half the CPU during the

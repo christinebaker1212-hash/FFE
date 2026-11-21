@@ -1276,6 +1276,13 @@ story pages turn behind closed shutters; Color loads behind a black mask (no whi
 VRAM checker 0, load times within FF1's NES times).
 Sound as the recompiled build (pulses at 5/8, the triangle's counters at a song's end; every song
 compared in SameBoy).
+Owner's play-test of the first native ROM (2026-11-21), fixed: job pictures off by a class
+(promoted jobs showed), party box names printed at column 0, party creation rebuilt to the owner's
+design (default party Warrior / Thief / Monk / Red Magician; A on a member: job list with every
+job's picture and name, then the name; all four named: "OK to begin with this party?" Yes / No,
+No resets), the prologue as FF1's intro (lines fading in one at a time, crystal theme), black
+outside the windows on the Color, visible DMG sprites on the black screens, Select-then-B opens
+the world map. Asked the owner: where the world map fails and which palettes look wrong.
 Next: the owner's play-test. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining
