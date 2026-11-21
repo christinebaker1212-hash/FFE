@@ -508,8 +508,10 @@ sfx_noise:  ld hl, sfx_fc
             ld c, a
             ld e, $0A
             jr .set
-.air:       add a, a
-            ld e, a
+.air:       dec b                           ; (2: twice the frame counter; 3: the airship's
+            jr nz, .tr                      ;   takeoff / landing, the frame counter itself)
+            add a, a
+.tr:        ld e, a
             ld c, $80
 .set:       ld a, [sfx_nmode]
             ld hl, sfx_nlast

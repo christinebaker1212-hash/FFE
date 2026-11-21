@@ -146,7 +146,10 @@ def data_banks(rom, ff3=None, init=None):
     fix = rom.prg[-0x4000:]                                     # FF1's vehicle sprite tables
     place(banks, OW_INFO, 0x5070, fix[0xE3F9 - 0xC000:0xE3F9 - 0xC000 + 9])   # lut_VehicleSprY
     place(banks, OW_INFO, 0x5080, fix[0xE4A6 - 0xC000:0xE4A6 - 0xC000 + 9])   # facing offsets
-    place(banks, OW_INFO, 0x50A0, fix[0xE4F6 - 0xC000:0xE4F6 - 0xC000 + 64])  # lut_VehicleSprTbl
+    vt = fix[0xE4F6 - 0xC000:0xE4F6 - 0xC000 + 64]           # lut_VehicleSprTbl (FF1's order
+    vt = b''.join(vt[8 * f:8 * f + 2] + vt[8 * f + 4:8 * f + 6] + vt[8 * f + 2:8 * f + 4] +
+                  vt[8 * f + 6:8 * f + 8] for f in range(8))  #   UL, DL, UR, DR -> UL, UR, DL, DR)
+    place(banks, OW_INFO, 0x50A0, vt)
     place(banks, OW_INFO, 0x5060, bytes([8]))
     place(banks, OW_INFO, 0x7200, o['party_dmg'])
     place(banks, OW_INFO, 0x7380, o['party_perm'])

@@ -1348,6 +1348,11 @@ veh_oam:    ld a, [vehicle]
             ld a, [hl]
             sub $6C - $50                   ; (FF1 y $6C on foot = our $50)
             ld [vh_y], a
+            ld a, [air_y]                   ; (the airship taking off / landing: its y)
+            and a
+            jr z, .ny
+            ld [vh_y], a
+.ny:
             ld a, [facing]                  ; facing 0-3 (R L U D) -> FF1 bits 1, 2, 8, 4
             ld e, a
             ld hl, .fbit
@@ -1394,11 +1399,23 @@ veh_oam:    ld a, [vehicle]
             call .obj
 .na:        ld a, [vehicle]
             cp V_AIR
-            ret z
+            jr z, .shd
             ld hl, SV_AIR
             ld c, $38
             ld de, oam_buf + 32
             jr .obj
+.shd:       ldh a, [frame]                  ; flying: FF1 DrawAirshipShadow, on the ground
+            rrca                            ;   every other frame (FF1's flicker)
+            ret nc
+            ld a, $48
+            ld [vh_x], a
+            ld a, $6F - $1C
+            ld [vh_y], a
+            ld c, $10                       ; (OW object tiles $10: the shadow; FF1
+            ld de, oam_buf + 32             ;   lut_OWObjectSprTbl's entry in our order)
+            ld hl, .shtbl
+            jr .od
+.shtbl:     db 0, 3, 1, 3, 2, 3, 3, 3
 .fbit:      db 1, 2, 8, 4
 .two:       ld a, $50                       ; a row: x 72, 80
             call .spr
@@ -1459,7 +1476,7 @@ veh_oam:    ld a, [vehicle]
             call sbank
             ld hl, M_VEHTBL
             pop de
-            ld a, [vh_y]
+.od:        ld a, [vh_y]
             ld b, a
             call .ot
             ld a, [vh_y]
@@ -2001,24 +2018,62 @@ ow_abutton: ld a, [vehicle]
             inc hl
             cp [hl]
             ret nz
-            ld a, V_AIR
+            ld a, V_AIR                     ; FF1 FlyAirship: the airship's music, the takeoff
             ld [vehicle], a
-            ret
-.land:      ld a, [px]
+            call map_music
+            jp air_up
+.land:      call air_down                   ; FF1 LandAirship: down first, then the tile: not
+            ld a, [px]                      ;   allowed (tile byte 0 bit 3): up again
             ld e, a
             ld a, [py]
             ld d, a
             call map_at
             call props
             bit 3, d
-            ret nz
+            jp nz, air_up
             ld a, [px]
             ld [SV_AIR + 1], a
             ld a, [py]
             ld [SV_AIR + 2], a
             ld a, V_FOOT
             ld [vehicle], a
+            jp map_music
+
+; FF1 AnimateAirshipTakeoff / AnimateAirshipLanding: the airship rises from y $6F to $4F
+; (lands: back), a pixel every second frame, its shadow, the noise (FF1: volume 8, the
+; frame counter as its period); then facing right
+air_up:     ld a, $6F - $1C
+            ld [air_y], a
+.l:         call air_frame
+            ldh a, [frame]
+            rrca
+            jr c, .l
+            ld hl, air_y
+            dec [hl]
+            ld a, [hl]
+            cp $4F - $1C
+            jr nc, .l
+            jr air_done
+air_down:   ld a, $4F - $1C
+            ld [air_y], a
+.l:         call air_frame
+            ldh a, [frame]
+            rrca
+            jr c, .l
+            ld hl, air_y
+            inc [hl]
+            ld a, [hl]
+            cp $70 - $1C
+            jr c, .l
+air_done:   xor a
+            ld [air_y], a
+            ld [facing], a
+            ld [sfx_nmode], a
             ret
+air_frame:  ld a, 3
+            ld [sfx_nmode], a
+            call veh_oam
+            jp wait_vbl
 
 ; FF1 MapPoisonDamage: on foot, each poisoned member loses 1 HP a step (not below 1)
 section bank 0, $3200                       ; (main.s continued)
@@ -2505,6 +2560,7 @@ ps_t:       ds 1
 ps_p:       ds 1
 ps_perm:    ds 2
 lcdc_on:    ds 1
+air_y:      ds 1                            ; the airship's y while taking off / landing
 respond:    ds 1                            ; FF1 respondrate (0-7)
 pz_bcnt:    ds 1                            ; B presses on the overworld (FF1 joy_b: the puzzle)
 ts_bank:    ds 1
