@@ -17,7 +17,7 @@ U_STATS    = $7140
 CUR_TILE   = $7C
 CH_NAME2   = $3E            ; the 5th and 6th letters of a name (6-letter names)
 
-section bank 2, $4000
+section bank 0, $2600                       ; (the framework: bank 0, for every screen)
 
 ; ---- the framework
 ; screen on with the LCD off: map cleared to blank, font, palettes, cursor tiles, no sprites
@@ -453,6 +453,8 @@ scr_spr23:  ld [scr_t1], a
 scr_frame:  call wait_vbl
             call sf_step
             jp read_pad
+
+section bank 2, $4000
 
 ; ---- new game: title menu, party generation
 ng_main:    call scr_open

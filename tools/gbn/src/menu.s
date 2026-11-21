@@ -19,7 +19,7 @@ CH_MAXHP   = $0C
 CH_LEVEL   = $26
 ORBS       = $D032          ; FF1 orb_fire .. orb_earth (items + $12)
 
-section bank 2, $4800
+section bank 0, $3000                       ; (the pen and numbers: bank 0, for every screen)
 
 ; ---- the pen
 ; pen at cell (B, C)
@@ -219,6 +219,8 @@ pen_iname:  ld l, a
             call far_copy
             ld hl, scr_buf
             jp pen_str
+
+section bank 2, $4800
 
 ; ---- the main menu (approved layout): party (0,0,20,10), commands + Gil (0,9,12,9),
 ; orbs (12,10,8,8)
