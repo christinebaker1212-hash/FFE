@@ -2484,8 +2484,15 @@ eq_draw:    call scr_cls
 story_show: ld [st_pg], a
             ld a, b
             ld [st_n], a
-.p:         call scr_open
-            xor a                           ; (no menu sounds on the story pages)
+            xor a
+            ld [st_cont], a
+.p:         ld a, [st_cont]                 ; (the next page behind closed shutters: the
+            and a                           ;   LCD stays on, FF1 shows the blue shutters)
+            jr z, .new
+            call scr_cls
+            jr .drw
+.new:       call scr_open
+.drw:       xor a                           ; (no menu sounds on the story pages)
             ld [sfx_menu], a
             ld bc, $0002
             ld de, $140E
@@ -2541,7 +2548,10 @@ story_show: ld [st_pg], a
             jr nz, .sh
             call scr_show
             jr .so
-.sh:        call st_wmap                    ; FF1's shutters: closed (the window), then open
+.sh:        ld a, [st_cont]
+            and a
+            jr nz, .sc
+            call st_wmap                    ; FF1's shutters: closed (the window), then open
             xor a
             call st_shut
             call scr_show
@@ -2549,7 +2559,13 @@ story_show: ld [st_pg], a
             ldh [rWX], a
             ld a, LCDC_WIN
             ldh [rLCDC], a
-            ld a, 1
+            jr .o1
+.sc:        call scr_show                   ; (still closed: the rows go up in V-Blanks)
+.su:        call scr_frame
+            ld a, [sf_row]
+            cp 18
+            jr c, .su
+.o1:        ld a, 1
 .op:        push af
             call st_shut
             call scr_frame
@@ -2595,7 +2611,10 @@ story_show: ld [st_pg], a
             dec a
             cp $FF
             jr nz, .cs
-            call ly_off
+            ld a, [st_n]                    ; (more pages: kept closed)
+            dec a
+            ld [st_cont], a
+            call z, ly_off
 .nc:        ld hl, st_pg
             inc [hl]
             ld hl, st_n
@@ -2606,6 +2625,7 @@ story_show: ld [st_pg], a
 section wram, $CE00
 st_k:       ds 1
 st_mode:    ds 1                            ; story pages: 0 prologue, 1 bridge, 2 ending
+st_cont:    ds 1                            ; story: the next page behind closed shutters
 st_t:       ds 2
 pen:        ds 2
 pen_l:      ds 2
@@ -2640,4 +2660,4 @@ eq_cls:     ds 1
 eq_ch:      ds 1
 eq_adj:     ds 1
 eq_box:     ds 16
-mtxt:       ds 160
+mtxt:       ds 200                          ; (story_show copies 200)
