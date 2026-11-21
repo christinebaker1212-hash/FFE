@@ -1,7 +1,7 @@
 """Build the native FF1 Game Boy ROM (docs/ff1-native.md) from the English NES ROM the
 existing pipeline makes. Game data is read from that ROM here, at build time; the bank layout
 is described at the top of tools/gbn/src/main.s.
-usage: python3 tools/gbn/build.py [--nes build/ff1_gb.nes] [--out build/ff1n.gb]"""
+usage: python3 tools/gbn/build.py [--nes build/ff1_gb.nes] [--out build/ff1n.gb] [--start MAP,X,Y]"""
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..', '..')
@@ -50,8 +50,10 @@ def main():
     a = sys.argv[1:]
     nes = a[a.index('--nes') + 1] if '--nes' in a else os.path.join(ROOT, 'build', 'ff1_gb.nes')
     out = a[a.index('--out') + 1] if '--out' in a else os.path.join(ROOT, 'build', 'ff1n.gb')
+    st = a[a.index('--start') + 1].split(',') if '--start' in a else ('0', '16', '23')
     rom = data.Rom(nes)
-    src = (open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +
+    src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\n' % tuple(st) +
+           open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +
            open(os.path.join(HERE, 'src', 'main.s')).read())
     r = asm(src)
     for lbl in ('qbuf', 'oam_buf'):

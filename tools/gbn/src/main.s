@@ -111,9 +111,9 @@ start:      di
             call memcpy
             ld a, 3
             ld [facing], a
-            ld a, 0                         ; Coneria, at the town's entrance
-            ld d, 16
-            ld e, 23
+            ld a, START_MAP                 ; (build.py: Coneria at the town's entrance unless
+            ld d, START_X                   ;   --start says otherwise)
+            ld e, START_Y
             call load_map
             xor a
             ldh [rIF], a
@@ -150,9 +150,12 @@ vblank:     push af
             ldh a, [pal_req]
             and a
             call nz, bg_pal
+            ldh a, [rLY]                    ; (a late handler: no VRAM writes outside V-Blank)
+            cp 144
+            jr c, .late
             ld c, MT_DRAWQ
             call q_flush
-            ld a, 1
+.late:      ld a, 1
             ldh [vbl_done], a
             pop hl
             pop de
@@ -316,7 +319,10 @@ move:       ld a, [moving]
             ld [mdy], a
             call arrived                    ; teleports
             ret c
-.idle:      ld a, [q_n]                     ; (a room redraw still being written: wait)
+.idle:      ld a, [q_rd]                    ; (a room redraw still being written: wait)
+            ld b, a
+            ld a, [q_n]
+            sub b
             cp 24
             ret nc
             ldh a, [pad]
@@ -445,8 +451,7 @@ props:      add a, a
             ret
 
 ; the door metatile B at (door_x, door_y), queued
-door_draw:  di
-            ld a, [door_x]
+door_draw:  ld a, [door_x]
             ld e, a
             ld a, [door_y]
             ld d, a
@@ -455,7 +460,6 @@ door_draw:  di
             call q_mt
             ld a, $FF
             ld [mt_force], a
-            ei
             ret
 
 ; room state changed: CGB palettes in the next V-Blank; DMG: the visible metatiles again with
@@ -466,15 +470,14 @@ room_redraw:
             ldh a, [is_cgb]
             and a
             ret nz
-            di
             ld a, [py]
             sub 5
             ld d, a
             ld b, 11
-.r:         ld a, [px]
-            sub 6
+.r:         ld a, [px]                      ; (11 x 11: the view and the line the step
+            sub 5                           ;   brings in)
             ld e, a
-            ld c, 13
+            ld c, 11
 .c:         push bc
             push de
             call q_mt
@@ -486,7 +489,6 @@ room_redraw:
             inc d
             dec b
             jr nz, .r
-            ei
             ret
 
 ; ---- metatile number at (E = x, D = y) of the map (the map bank left mapped)
@@ -596,7 +598,13 @@ make_oam:   ld a, COMMON
 
 ; ---- drawing metatiles into the 32 x 32 BG ring (queued; written in V-Blank)
 ; queue entry (8 bytes): VRAM address (lo, hi), tiles UL UR DL DR, CGB palette
-draw_all:   ld a, [py]                      ; the 16 x 16 metatiles around the party, LCD off
+draw_all:   ld a, 1                         ; (LCD off: the flush without the LY limit)
+            ldh [q_nolim], a
+            call .all
+            xor a
+            ldh [q_nolim], a
+            ret
+.all:       ld a, [py]                      ; the 16 x 16 metatiles around the party, LCD off
             sub 7
             ld d, a
             ld b, 16
@@ -619,11 +627,7 @@ draw_all:   ld a, [py]                      ; the 16 x 16 metatiles around the p
             jr nz, .r
             ret
 
-draw_edge:  di                              ; (no V-Blank flush while entries are added)
-            call .q
-            ei
-            ret
-.q:         ld a, [mdx]                     ; the line of metatiles entering the view
+draw_edge:  ld a, [mdx]                     ; the line of metatiles entering the view
             and a
             jr z, .vert
             ld b, 6                         ; right: column x + 6, left: x - 6
@@ -676,9 +680,12 @@ q_mt:       ld a, e
             ld a, d
             and 63
             ld d, a
-            ld a, [q_n]                     ; full: dropped (a redraw follows anyway)
-            cp 128
-            ret nc
+            ld a, [q_rd]                    ; full (255 queued): dropped (never seen)
+            ld b, a
+            ld a, [q_n]
+            inc a
+            cp b
+            ret z
             push de
             call map_at                     ; A = metatile
             pop de
@@ -687,8 +694,8 @@ q_mt:       ld a, e
             cp $FF
             jr z, .m
             ld c, a
-.m:         ld a, [q_n]                     ; HL = qbuf + 8 n
-            ld l, a
+.m:         ld a, [q_n]                     ; HL = qbuf + 8 n (a ring of 256 entries: q_n
+            ld l, a                         ;   written here only, q_rd by the flush only)
             ld h, 0
             add hl, hl
             add hl, hl
@@ -757,16 +764,17 @@ q_mt:       ld a, e
             ld d, high(T_MTPAL)
             ld a, [de]
             ld [hl], a
-            ld hl, q_n
+            ld hl, q_n                      ; (one INC: the entry is complete before it)
             inc [hl]
             ret
 
 ; write up to C queued metatiles to VRAM (V-Blank or LCD off)
 q_flush:    ld a, [q_n]
-            and a
+            ld b, a
+            ld a, [q_rd]
+            cp b
             ret z
-            ld a, [q_rd]                    ; HL = qbuf + 8 rd
-            ld l, a
+            ld l, a                         ; HL = qbuf + 8 rd
             ld h, 0
             add hl, hl
             add hl, hl
@@ -774,7 +782,14 @@ q_flush:    ld a, [q_n]
             ld a, h
             add a, high(qbuf)
             ld h, a
-.e:         ld a, [hl+]
+.e:         ldh a, [q_nolim]                ; (LCD off: no limit) in V-Blank: only while
+            and a                           ;   LY is 144-151, so no write lands in drawing
+            jr nz, .go
+            ldh a, [rLY]
+            sub 144
+            cp 8
+            ret nc
+.go:        ld a, [hl+]
             ld e, a
             ld a, [hl+]
             ld d, a                         ; DE = the UL cell
@@ -821,16 +836,14 @@ q_flush:    ld a, [q_n]
 .n:         ld a, [q_rd]
             inc a
             ld [q_rd], a
-            ld b, a
+            jr nz, .w
+            ld hl, qbuf                     ; (the ring wraps)
+.w:         ld b, a
             ld a, [q_n]
             cp b
-            jr z, .done
+            ret z
             dec c
             jr nz, .e
-            ret
-.done:      xor a
-            ld [q_n], a
-            ld [q_rd], a
             ret
 
 ; ---- helpers
@@ -861,7 +874,7 @@ dma_end:
 section wram, $C000
 oam_buf:    ds 160
             ds 96
-qbuf:       ds 8 * 128                      ; metatile queue ($C100-$C4FF)
+qbuf:       ds 8 * 256                      ; metatile queue, a ring ($C100-$C8FF)
 px:         ds 1
 py:         ds 1
 tx:         ds 1
@@ -889,3 +902,4 @@ pad:        ds 1
 scx:        ds 1
 scy:        ds 1
 pal_req:    ds 1
+q_nolim:    ds 1

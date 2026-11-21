@@ -93,3 +93,12 @@ one reaches parity, so the owner can keep playing).
   in V-Blank (CGB palettes into VRAM bank 1). Coneria town walks in mGBA (CGB colours as the
   NES). Next: DMG shades as the recompiled build's rules (the party blends in now), teleports,
   doors / rooms, NPC objects, dialogue.
+- 2026-11-21 (later): all 61 standard maps and 8 tilesets from the ROM (2 MB ROM: tilesets in
+  banks 8-15, a bank per map), run-time map loading, normal teleports (tile property bits 7-6
+  = 10 + FF1's teleport tables), doors and rooms as FF1 does them (no map change: the in-room
+  palette set, the door metatile redrawn; CGB swaps the BG palettes, DMG redraws the visible
+  metatiles with tiles pre-shaded for the in-room palettes; both sets fit 256 tiles on every
+  map, 242 at most). DMG shades by brightness rows (as the recompiled build). The metatile
+  queue is a 256-entry ring (no interrupt locks) and the V-Blank flush stops at line 152:
+  PyBoy showed entries half-written when 20 metatiles ran past V-Blank. Checked: Coneria town,
+  Coneria castle rooms on DMG and CGB (mGBA, PyBoy VRAM = expected metatiles).
