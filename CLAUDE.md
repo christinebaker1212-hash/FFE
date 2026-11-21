@@ -868,5 +868,8 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   2026-11-21: prophecy, name entry, title menu, shops, opening credits, ending pages and end
   credits laid out; native sound output; condensed names in menus and shops; GB map lock
   ($580D); Lot Check re-run on the final code (all pass in emulators); release ROM built
-  locally and sent to the owner. Open: battle lists not condensed, water animation tiles,
-  real-hardware test.
+  locally and sent to the owner. Owner's hardware test (2026-11-21): chest message (one-row mode,
+  18 columns), menus shown complete (picture held while FF3 builds a screen), crystal staff
+  credits fixed; native water animation (no NES PPU I/O; fixes the blank water). Open: battle
+  lists not condensed, the rest of the native-layer worklist (sprite page, field map / text
+  writers), prophecy +3% lag, real-hardware retest.

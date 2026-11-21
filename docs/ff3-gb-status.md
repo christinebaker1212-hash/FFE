@@ -510,12 +510,15 @@ GBA model): new game, names, the first battle, the chest room of the first cave.
   (camera Y 48 -> 32) and the third story page, drawn one row lower than the second, kept the
   second page's first row - a whole line in the Japanese, a fragment of the re-wrapped English
   ("Now, sweep away / turning the..."): now from row 15 too. firstdiff identical (poke $50 = $80).
+- **Native (owner: "start replacing NES recomp with native coding")**: the water animation
+  (3A:858F / 866E) native, no NES PPU I/O; it also fixes the blank water tiles (see
+  `docs/ff3-native-plan.md` step 4). Release build re-checked: lotcheck.py 13/13, Lot Check monitor
+  0 over the hand-played route (66 M instructions), firstdiff explore 12000 identical.
 
 ## Known open items
 - **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3: all items pass in
   emulators (2026-11-20; GBA hardware untested); re-run the checks on the final build.
 - Battle item / magic lists not condensed (battle sprites use the sprite table).
-- Water animation tiles blank (CHR read-back through $2007 returns 0).
 - Warp (`p3c:9B5F` TSX / TXS arithmetic) and the inn's `TXS` from a saved X (`p3c:9039`) use
   FF2's approximate helpers: need a semantic version (as FF2's open item).
 - Field dialogue box: drawn into the map (the NES shows it from the other nametable by a
