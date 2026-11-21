@@ -120,8 +120,17 @@ scr_open:   ldh a, [rLCDC]
             ld bc, 12
             jp far_copy
 
+oam_clr:    ld hl, oam_buf
+            ld b, 160
+            xor a
+.o:         ld [hl+], a
+            dec b
+            jr nz, .o
+            ret
+
 ; the map copy cleared (blank, window attributes) with the LCD on
-scr_cls:    ld hl, smap
+scr_cls:    call oam_clr
+            ld hl, smap
             ld bc, 18 * 32
 .c:         ld a, $20
             ld [hl+], a

@@ -87,6 +87,8 @@ def strings():
     out['mcmd'] = enc('\n'.join(x.strip() for x in sm.M[2].split('\n')))
     out['gil'] = enc('Gil')
     out['items'] = enc(M[3].strip())
+    out['magic'] = enc('Magic')
+    out['mp'] = enc('  MP ')
     out['level'] = enc('Level ')
     out['exp'] = enc('Experience')
     out['next'] = enc('Until next level')

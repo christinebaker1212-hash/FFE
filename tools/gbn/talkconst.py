@@ -70,6 +70,32 @@ def item_routines(rom, dis_dir):
     return routine_ops(b14, at), names
 
 
+MAGIC_NAMES = ['CURE', 'CUR2', 'CUR3', 'CUR4', 'HEAL', 'HEL3', 'HEL2', 'PURE', 'LIFE', 'LIF2',
+               'WARP', 'SOFT', 'EXIT']                   # the dispatch chain's order (disassembly)
+
+
+def magic_routines(rom):
+    """FF1's out-of-battle spells: the magic menu's dispatch chain (CMP #spell / BNE / JMP) in
+    bank 14: ({name: spell id}, {name: ops}, no-MP text, can't-cast text)"""
+    import re as _re
+    b14 = rom.prg[14 * 0x4000:15 * 0x4000]
+    for m in _re.finditer(b'\xc9', b14):
+        j = m.start(); ch = []
+        while b14[j] == 0xC9 and b14[j + 2:j + 4] == b'\xd0\x03' and b14[j + 4] == 0x4C:
+            ch.append((b14[j + 1], b14[j + 5] | b14[j + 6] << 8)); j += 7
+        if len(ch) == len(MAGIC_NAMES): break
+    else:
+        raise AssertionError('magic dispatch not found')
+    assert b14[j] == 0xA9
+    cant = b14[j + 1]
+    k = m.start()
+    while not (b14[k] == 0xA9 and b14[k + 2] == 0x20): k -= 1
+    nomp = b14[k + 1]
+    ids = {n: c[0] for n, c in zip(MAGIC_NAMES, ch)}
+    at = {n: c[1] for n, c in zip(MAGIC_NAMES, ch)}
+    return ids, routine_ops(b14, at), nomp, cant
+
+
 def extract(rom, dis_dir):
     """(kind per object id, {kind: [(type, value)]}) from the ROM"""
     names = names_by_id(dis_dir)

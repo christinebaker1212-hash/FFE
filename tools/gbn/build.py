@@ -61,6 +61,18 @@ def item_defs(rom):
     return '\n'.join(out) + '\n'
 
 
+def magic_defs(rom):
+    """MG_<spell>_ID = its spell id, MG_<spell>_<n> = the n-th operand of FF1's routine"""
+    ids, ops, nomp, cant = talkconst.magic_routines(rom)
+    out = ['MG_NOMP = $%02X' % nomp, 'MG_CANT = $%02X' % cant]
+    for n, i in ids.items():
+        out.append('MG_%s_ID = $%02X' % (n, i))
+        for k, (t, v, mn) in enumerate(ops[n]):
+            if t == 'a' and 0x6000 <= v < 0x6400: v = 0xD000 + v - 0x6000
+            out.append('MG_%s_%d = $%04X' % (n, k, v))
+    return '\n'.join(out) + '\n'
+
+
 def ui_strings():
     """the screens' strings as str_<name> labels in code bank 2"""
     out = ['section bank 2, $7000']
@@ -160,7 +172,7 @@ def main():
             else: n = 1
             for j in range(int(n)): init.append((int(k, 16) + j, int(v, 16)))
     src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\nSTART_ROOM = %s\n' % tuple(st) +
-           'TEST_INIT = %d\n' % (1 if init else 0) + talk_defs(rom) + item_defs(rom) +
+           'TEST_INIT = %d\n' % (1 if init else 0) + talk_defs(rom) + item_defs(rom) + magic_defs(rom) +
            open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'objects.s')).read() + '\n' +

@@ -520,7 +520,18 @@ move:       ld a, [moving]
             ld a, SCR_BANK
             ld hl, menu_main
             call bank_call
-            jp map_reload
+            ld a, [menu_act]                ; Warp / Exit cast in the menu
+            and a
+            jp z, map_reload
+            ldh a, [maptype]
+            and a
+            jp nz, map_reload               ; (on the overworld: nothing to leave)
+            ld a, [menu_act]
+            cp 1
+            jp z, arrived.warp
+            xor a
+            ld [fdepth], a
+            jp arrived.toow
 .nm:        ldh a, [pad_new]                ; A on a standard map: talk to what is in front
             bit 0, a
             jr z, .nt

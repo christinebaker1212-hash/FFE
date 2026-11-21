@@ -224,6 +224,7 @@ pen_iname:  ld l, a
 ; orbs (12,10,8,8)
 menu_main:  xor a
             ld [mm_cur], a
+            ld [menu_act], a
 .re:        call mm_draw
 .l:         ld a, [mm_cur]                  ; the hand left of the command
             add a, 10
@@ -263,8 +264,17 @@ menu_main:  xor a
             jr nz, .n0
             call item_menu
             jr .re
-.n0:        cp 4
-            jr nz, .l                       ; (magic, equipment: next)
+.n0:        cp 1
+            jr nz, .n1
+            call pick_char                  ; magic: whose
+            jr c, .re
+            call magic_menu
+            ld a, [menu_act]                ; (Warp / Exit: out of the menus)
+            and a
+            ret nz
+            jp .re
+.n1:        cp 4
+            jr nz, .l                       ; (equipment: next)
             call pick_char                  ; status: whose
             jr c, .re
             call status_scr
@@ -943,10 +953,11 @@ desc_show:  call desc_box
             jp scr_upd
 
 ; wait for A or B (C set on B)
-wait_ab:    call scr_frame
+wait_ab:    call oam_clr
+.w:         call scr_frame
             ldh a, [pad_new]
             and $03
-            jr z, wait_ab
+            jr z, .w
             rrca
             ccf
             ret
@@ -1294,6 +1305,419 @@ save_ask:   call desc_show
             scf
             ret
 
+; ---- the magic menu (approved layout): title (0,0,8,3), list (0,3,20,15): three levels a
+; page, each a line "L1  MP 9/9" and its three spells below from column 3; up / down step
+; through the slots, another level's page turns by itself
+magic_menu: ld [mg_ch], a
+            xor a
+            ld [mg_cur], a
+.re:        call mg_draw
+            call scr_show
+.l:         ld a, [mg_cur]                  ; hand: row of the slot
+            call mg_row
+            add a, a
+            add a, a
+            add a, a
+            sub 4
+            ld c, a
+            ld b, 0
+            call scr_cursor
+            call scr_frame
+            ldh a, [pad_new]
+            bit 1, a
+            ret nz
+            bit 0, a
+            jp nz, mg_use
+            and $C0
+            jr z, .l
+            ld b, a
+            ld a, [mg_cur]                  ; slots 0-23 (level * 3 + slot)
+            ld c, a
+            bit 7, b
+            jr z, .up
+            inc a
+            cp 24
+            jr c, .mv
+            xor a
+            jr .mv
+.up:        dec a
+            cp $FF
+            jr nz, .mv
+            ld a, 23
+.mv:        ld [mg_cur], a
+            ld a, [it_desc]
+            and a
+            jr nz, .rd
+            ld a, c
+            call mg_page
+            ld b, a
+            ld a, [mg_cur]
+            call mg_page
+            cp b
+            jr z, .l
+.rd:        call mg_draw
+            call scr_upd
+            jr .l
+
+; slot A -> page (9 slots a page) / screen row (5 + 4 (level in page) + slot)
+mg_page:    ld b, 0
+.p:         cp 9
+            jr c, .x
+            sub 9
+            inc b
+            jr .p
+.x:         ld a, b
+            ret
+mg_row:     cp 9
+            jr c, .r
+            sub 9
+            jr mg_row
+.r:         ld b, 0                         ; level in page, slot
+.l:         cp 3
+            jr c, .s
+            sub 3
+            inc b
+            jr .l
+.s:         ld c, a
+            ld a, b
+            add a, a
+            add a, a
+            add a, c
+            add a, 5
+            ret
+
+; HL = the member's magic data (ch_magic + $40 member)
+mg_data:    ld a, [mg_ch]
+            rrca
+            rrca
+            ld l, a
+            ld h, high(ch_magic)
+            ret
+
+mg_draw:    call scr_cls
+            xor a
+            ld [it_desc], a
+            ld bc, $0000
+            ld de, $0803
+            call scr_win
+            ld bc, $0003
+            ld de, $140F
+            call scr_win
+            ld bc, $0101
+            call pen_at
+            ld hl, str_magic
+            call pen_str
+            ld bc, $0901                    ; (the member's name beside the title)
+            call pen_at
+            ld a, [mg_ch]
+            call pen_name
+            ld a, [mg_cur]
+            call mg_page
+            ld b, a                         ; first level = 3 page
+            add a, a
+            add a, b
+            ld [mg_lv], a
+            ld c, 4
+.lv:        ld a, [mg_lv]
+            cp 8
+            ret nc
+            ld b, 1
+            push bc
+            call pen_at
+            ld a, $4C                       ; "L1  MP 9/9"
+            call pen_ch
+            ld a, [mg_lv]
+            add a, $31
+            call pen_ch
+            ld hl, str_mp
+            call pen_str
+            call mg_data
+            ld a, [mg_lv]
+            add a, $20
+            add a, l
+            ld l, a
+            push hl
+            ld a, [hl]
+            call nf_a
+            call pen_numl
+            ld a, $2F
+            call pen_ch
+            pop hl
+            ld a, l
+            add a, 8
+            ld l, a
+            ld a, [hl]
+            call nf_a
+            call pen_numl
+            pop bc
+            ld a, 3                         ; the three spells
+.sp:        push af
+            inc c
+            ld b, 2
+            push bc
+            call pen_at
+            call mg_data
+            ld a, [mg_lv]
+            add a, a
+            add a, a
+            add a, l
+            ld l, a
+            pop bc
+            pop af
+            push af
+            push bc
+            ld b, a                         ; slot = 3 - A
+            ld a, 3
+            sub b
+            add a, l
+            ld l, a
+            ld a, [hl]
+            and a
+            jr z, .em
+            ld b, a
+            ld a, [mg_lv]
+            add a, a
+            add a, a
+            add a, a
+            add a, b
+            add a, $AF                      ; FF1: spell id = level x 8 + spell - 1 + MG_START
+            call pen_iname
+.em:        pop bc
+            pop af
+            dec a
+            jr nz, .sp
+            inc c
+            ld hl, mg_lv
+            inc [hl]
+            ld a, c
+            cp 16
+            jr c, .lv
+            ret
+
+; ---- casting (FF1 MagicMenu_Loop @A_Pressed and the UseMagic routines)
+mg_use:     ld a, [mg_cur]                  ; level, slot
+            ld b, 0
+.l:         cp 3
+            jr c, .s
+            sub 3
+            inc b
+            jr .l
+.s:         ld c, a
+            ld a, b
+            ld [mg_lv], a
+            call mg_data                    ; MP of the level (FF1 UseMagic_GetRequiredMP)
+            ld a, l
+            add a, $20
+            add a, b
+            ld [mg_mp], a
+            ld e, a
+            ld d, h
+            ld a, [de]
+            and a
+            ld a, MG_NOMP
+            jp z, mg_show
+            ld a, b                         ; the spell id
+            add a, a
+            add a, a
+            add a, c
+            add a, l
+            ld l, a
+            ld a, [hl]
+            ld c, a
+            and a
+            ld a, MG_CANT
+            jp z, mg_show
+            ld a, b
+            add a, a
+            add a, a
+            add a, a
+            add a, c
+            add a, $AF
+            ld hl, mg_tbl                   ; the out-of-battle spells
+.f:         ld c, a
+            ld a, [hl+]
+            and a
+            jr z, .no
+            cp c
+            jr z, .go
+            inc hl
+            inc hl
+            ld a, c
+            jr .f
+.go:        ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            jp hl
+.no:        ld a, MG_CANT
+            jp mg_show
+mg_tbl:     db MG_CURE_ID
+            dw m_cure
+            db MG_CUR2_ID
+            dw m_cur2
+            db MG_CUR3_ID
+            dw m_cur3
+            db MG_CUR4_ID
+            dw m_cur4
+            db MG_HEAL_ID
+            dw m_heal
+            db MG_HEL2_ID
+            dw m_hel2
+            db MG_HEL3_ID
+            dw m_hel3
+            db MG_PURE_ID
+            dw m_pure
+            db MG_LIFE_ID
+            dw m_life
+            db MG_LIF2_ID
+            dw m_lif2
+            db MG_WARP_ID
+            dw m_warp
+            db MG_SOFT_ID
+            dw m_soft
+            db MG_EXIT_ID
+            dw m_exit
+            db 0
+mg_show:    call desc_show
+            jp magic_menu.l
+mg_spend:   ld a, [mg_mp]                   ; one MP of the level
+            ld l, a
+            ld h, high(ch_magic)
+            dec [hl]
+            ret
+mg_back:    jp magic_menu.re
+
+; Cure / Cura / Curaga: (frame AND m) OR b HP on a member not dead / stone
+m_cure:     ld b, MG_CURE_0
+            ld c, MG_CURE_1
+            jr m_curef
+m_cur2:     ld b, MG_CUR2_0
+            ld c, MG_CUR2_1
+            jr m_curef
+m_cur3:     ld b, MG_CUR3_0
+            ld c, MG_CUR3_1
+m_curef:    ldh a, [frame]
+            and b
+            or c
+            ld [mg_hp], a
+            ld a, MG_CUR3_2
+            call tgt_open
+.l:         call tgt_pick
+            jr c, mg_back
+            call ch_rec
+            inc hl
+            ld a, [hl-]
+            cp 1
+            jr z, .l
+            cp 2
+            jr z, .l
+            ld a, [mg_hp]
+            call hp_add
+            call mg_spend
+            jr m_done
+; Curaja: HP to the maximum (FF1 does not check ailments)
+m_cur4:     ld a, MG_CUR4_0
+            call tgt_open
+            call tgt_pick
+            jr c, mg_back
+            call ch_rec
+            call hp_full
+            call mg_spend
+m_done:     call tgt_redraw
+            call wait_ab
+            jr mg_back
+hp_full:    ld a, l
+            add a, CH_MAXHP
+            ld l, a
+            ld a, [hl+]
+            ld b, [hl]
+            dec hl
+            dec hl
+            ld [hl], b
+            dec hl
+            ld [hl], a
+            ret
+; Heal family: (frame AND m) + b HP to everyone, after A
+m_heal:     ld b, MG_HEAL_0
+            ld c, MG_HEAL_1
+            jr m_healf
+m_hel2:     ld b, MG_HEL2_0
+            ld c, MG_HEL2_1
+            jr m_healf
+m_hel3:     ld b, MG_HEL3_0
+            ld c, MG_HEL3_1
+m_healf:    ldh a, [frame]
+            and b
+            add a, c
+            ld [mg_hp], a
+            ld a, MG_HEL3_2
+            call desc_show
+            call wait_ab
+            jr c, mg_back
+            call scr_cls
+            ld a, [mg_hp]
+            call party_hp
+            call mg_spend
+            jr m_done
+; Life / Full-Life / Pure / Soft: cure the ailment on a member
+m_life:     ld a, MG_LIFE_0
+            ld b, 1
+            ld c, 1
+            jr m_curea
+m_lif2:     ld a, MG_LIF2_0
+            ld b, 1
+            ld c, 2
+            jr m_curea
+m_pure:     ld a, MG_PURE_0
+            ld b, 3
+            ld c, 0
+            jr m_curea
+m_soft:     ld a, MG_SOFT_0
+            ld b, 2
+            ld c, 0
+m_curea:    push bc
+            call tgt_open
+            pop bc
+.l:         push bc
+            call tgt_pick
+            pop bc
+            jp c, mg_back
+            push bc
+            call ch_rec
+            pop bc
+            inc hl
+            ld a, [hl]
+            cp b
+            jr nz, .l
+            ld [hl], 0
+            dec hl
+            ld a, c
+            and a
+            jr z, .sp
+            dec a
+            jr nz, .full
+            ld a, l                         ; Life: 1 HP
+            add a, CH_HP
+            ld l, a
+            ld [hl], 1
+            jr .sp
+.full:      call hp_full
+.sp:        call mg_spend
+            jp m_done
+; Warp / Exit: out of the menus, back a floor / to the overworld
+m_warp:     ld a, MG_WARP_0
+            ld b, 1
+            jr m_out
+m_exit:     ld a, MG_EXIT_0
+            ld b, 2
+m_out:      push bc
+            call desc_show
+            call mg_spend
+            call wait_ab
+            pop bc
+            ld a, b
+            ld [menu_act], a
+            ret
+
 section wram, $CE00
 pen:        ds 2
 pen_l:      ds 2
@@ -1309,4 +1733,10 @@ it_t:       ds 2
 it_id:      ds 1
 it_desc:    ds 1
 it_box:     ds 28
+menu_act:   ds 1
+mg_ch:      ds 1
+mg_cur:     ds 1
+mg_lv:      ds 1
+mg_mp:      ds 1
+mg_hp:      ds 1
 mtxt:       ds 160
