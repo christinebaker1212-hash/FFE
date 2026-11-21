@@ -914,7 +914,33 @@ vwf_ch:     cp $20
             add a, 3
             ld [vw_x], a
             ret
-.g:         sub $21                         ; glyph index (from '!')
+.g:         jr nc, .gl
+            ld l, a                         ; an icon ($01-$1F): its tile's low plane as ink
+            ld h, 0                         ;   (FF3's icons: colours 1 and 3), 8 wide
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, C_FONTCGB
+            add hl, de
+            ld de, vw_icon + 1
+            ld bc, 16
+            ld a, COMMON
+            call far_copy
+            ld hl, vw_icon + 1              ; rows: every other byte -> vw_icon + 1 .. + 8
+            ld de, vw_icon + 1
+            ld b, 8
+.ic:        ld a, [hl+]
+            inc hl
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .ic
+            ld a, 8
+            ld [vw_icon], a
+            ld hl, vw_icon
+            jr .w
+.gl:        sub $21                         ; glyph index (from '!')
             ld l, a
             ld h, 0
             ld e, l
@@ -925,7 +951,7 @@ vwf_ch:     cp $20
             add hl, de                      ; 9 bytes a glyph: width, 8 rows
             ld de, vwf_glyphs
             add hl, de
-            ld a, [hl+]
+.w:         ld a, [hl+]
             and a
             ret z
             ld [vw_w], a
@@ -1466,7 +1492,8 @@ bt_updst:   ds 2
 vw_x:       ds 1
 vw_w:       ds 1
 vw_s:       ds 1
-bt_sbuf:    ds 24
+bt_sbuf:    ds 40
+vw_icon:    ds 17
 section wram, $DB00
 vw_buf:     ds 160                          ; the small font's line buffer (page-aligned)
 section wram, $DC00

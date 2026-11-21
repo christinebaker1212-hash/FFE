@@ -78,6 +78,13 @@ def data_bank(rom):
     msgs = strtab(0x6C00, [enc(ff1_battle.B.get(k, '')) for k in range(80)])
     assert len(msgs) <= 0x1100
     put(0x6C00, msgs)
+    import names, ff1_items
+    an = [names.name_codes(rom, 176 + k) for k in range(64)]          # spell / potion / attack names
+    an += [enc(ff1_items.T.get(25, '')), enc(ff1_items.T.get(26, ''))]
+    an += [enc(r['en']) for r in ff1_monsters.rows[:26]]
+    at = strtab(0x7400, an)
+    assert len(at) <= 0x600
+    put(0x7400, at)
     put(0x7A00, rom.rd(BANK_DOMAINS, 0x9094, 6 * 49 * 2))           # data_LevelUpData_Raw
     b11 = rom.prg[11 * 0x4000:12 * 0x4000]                           # level-up hit / magic
     i = b11.find(bytes([3, 2, 3, 2, 1, 1, 3, 2, 3, 2, 1, 1]))       #   defence bonuses

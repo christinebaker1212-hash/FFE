@@ -467,7 +467,11 @@ bt_cmd_one: ld a, [bt_cm]
             jr z, .fight
             cp 4
             jr z, .run
-            jr .l                           ; (magic, medicine, items: next)
+            cp 1
+            jr nz, .l                       ; (medicine, items: next)
+            call bt_cmd_magic
+            jr c, .back
+            jr .done
 .fight:     call bt_names_win
             call bt_target_enemy
             jr c, .back
@@ -937,6 +941,8 @@ bt_player_turn:
             jr nz, .fight
             bit 5, a
             jp nz, bt_try_run
+            bit 6, a
+            jp nz, bt_pl_magic
             ld a, [bt_who]                  ; no command: asleep / paralysed?
             call ch_rec
             inc hl
@@ -1559,7 +1565,12 @@ bt_enemy_turn:
             call bt_msg_en
             ld a, M_CURED
             jp bt_msg_end1
-.cf:        ret                             ; (FF1: casts Fire on a random enemy: with magic)
+.cf:        ld a, MG_FIRE                   ; confused: Fire on a random enemy (FF1)
+            call bt_mload
+            ld a, [bt_who]
+            ld [mg_caster], a
+            call bt_rnd_enemy
+            jp bt_cast_en
 .mor:       ld a, [bt_who]                  ; morale: morale - 2 x leader level + random(0..50)
             call bt_erec                    ;   < 80: runs away
             ld de, E_MORALE
@@ -1603,8 +1614,7 @@ bt_enemy_turn:
             add hl, de
             ld [hl], $FF
             ret
-.ai:        call bt_rnd_member              ; (spells / special attacks: with magic)
-            jp bt_en_attack
+.ai:        jp bt_en_ai
 
 ; FF1 GetRandomPlayerTarget: slot 0 1/2, 1 1/4, 2 / 3 1/8; again if dead / stone
 bt_rnd_member:
@@ -1866,9 +1876,12 @@ bt_mtext:   dec a
             ld a, [bt_sbuf + 1]
             ld h, a
             ld de, bt_sbuf
-            ld bc, 24
+            ld bc, 39
             ld a, BTL_DATA
-            jp far_copy
+            call far_copy
+            xor a
+            ld [bt_sbuf + 39], a
+            ret
 ; a row of the message window: string HL (row 1 at x 0, later rows indented by 8)
 bt_msg_row: ld a, [bt_rows]
             cp 4

@@ -187,7 +187,8 @@ def main():
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'shop.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'btl2.s')).read() + '\n' + 'section bank 6, $7800\n' +
+           open(os.path.join(HERE, 'src', 'btl2.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'btl3.s')).read() + '\n' + 'section bank 6, $7800\n' +
            battle.vwf_source() + ui_strings())
     import re                                    # (constants from every module first: the
     defs = [l for l in src.split('\n') if re.match(r'^[A-Za-z_]\w*\s+=', l)]   #   assembler
