@@ -993,10 +993,13 @@ arrived:    ld a, [px]
             jp do_battle
 .owe:       ld a, [vehicle]                 ; (flying: no entrances)
             cp V_AIR
-            ret z
+            jr z, .ncy
             bit 7, e                        ; second byte bit 7 = an entrance,
-            ret z                           ;   bits 0-5 its number
-            ld a, [px]                      ; (the overworld position kept for the warp out)
+            jr z, .ncy                      ;   bits 0-5 its number
+            jr .ent
+.ncy:       and a                           ; (nothing: C clear, the next step at once)
+            ret
+.ent:       ld a, [px]                      ; (the overworld position kept for the warp out)
             ld [ow_x], a
             ld a, [py]
             ld [ow_y], a
