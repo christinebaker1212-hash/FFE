@@ -1256,10 +1256,11 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
 Done: maps, overworld, teleports, doors / rooms, objects, dialogue, all talk routines,
 treasure chests, title / class select / 6-letter name entry, main menu, items, magic,
 weapons / armor, status, shops / inn / clinic, save to cart RAM, FF3 icons before item /
-spell names (from the user's FF3 ROM). Next: battle (formations, screen with the approved
-layout, commands, FF1's formulas / AI / magic / items, rewards), random encounters, music
-and sound, vehicles and events, prologue / story scenes, ending, continue / options, SGB,
-Lot Check pass, release.
+spell names (from the user's FF3 ROM), battle (formations, approved layout, commands,
+FF1's formulas, magic, AI, items, rewards, level ups), random encounters, talk battles.
+Next: fiend / Chaos graphics, battle animations, music and sound (native engine), vehicles
+(ship, canoe, airship) and events, prologue / story scenes, ending, continue / options,
+SGB, Lot Check pass, release.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

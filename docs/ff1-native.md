@@ -171,3 +171,10 @@ one reaches parity, so the owner can keep playing).
   HP, stats, Black Belt adjustments), defeat -> back to the title. Random encounters (FF1's
   step RNG, overworld domains, map rates, spiked tiles) and talk battles. Test builds:
   `build.py --battle F` starts with formation F, `--enc N` sets the overworld rate.
+- Battle, part 2 (btl3.s): magic (the spell list two levels a page with FF3's icons rendered
+  into the small font, targets by the spell's target bits, FF1's 18 spell effects with its hit
+  / damage rules, the spells' messages from the ROM's table, ailment added / cured messages,
+  LOK2's evasion-down bug fixed), the enemy AI (spell / special attack chances, the lists in
+  turn), confused enemies casting Fire on their side, Medicine (Potion / Antidote with this
+  round's counts), Items (equipment spells, weapons / armour pages).
+  Not yet: fiend / Chaos graphics, battle animations and sound effects.
