@@ -434,6 +434,22 @@ NES running): plan and measurements in `docs/ff3-native-plan.md` (tool `tools/gb
   asynchronous NMI's pad read by a frame; the state converges after it. The script logic stays
   translated for now (~12%); `GB3_NO_NATIVE_SOUND=1` builds the old output for comparison.
 
+## Opening, name entry, title (2026-11-21)
+- **Prophecy** (`layout.prophecy`, `PROPHECY_PAGES`): the two NES narration pages as five of up to
+  16 lines, centred in 18 columns and vertically in the GB view (camera (8, 8) set by `ptext` at
+  each page); pages 2, 3, 5 in the empty dialogue entries 125, 130, 188 (empty in the Japanese too);
+  the fade-in stops at the last row in view. The hidden developer message (L3A_980F, a button
+  combination on the title: undisclosed code) is off; its routine's space holds `ptext`.
+- **Name entry** (`layout.name_entry`): name window $22 (4, 0, 20, 4) with the character sprite inside
+  (x 136, y 8), letter grid $23 (3, 4, 22, 14): ten letters a row two columns apart (the middle gap
+  dropped; the cursor table follows the string), camera (32, 0) from bank 88 `nmcam` (called by the
+  sprite routine 3D:B886 each frame), name cursor y / x moved.
+- **Title load menu**: "New Game" ($0C) and Text Speed ($21 at (11, 1, 10, 4)) side by side, the speed
+  digit at PPU $2073; the files below as on the save screen.
+- Test scripts (`cmpshots.py` OFF = 368): name entry now comes 368 waits later; the old check
+  commands' waits (`--freeze 4500 --press 4520..`) move by +368.
+- Checks: explore 12000 identical; screens checked in mGBA.
+
 ## Known open items
 - **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3: all items pass in
   emulators (2026-11-20; GBA hardware untested); re-run the checks on the final build.

@@ -1022,14 +1022,23 @@ def dialogue(r):
         return out
     ins.flow = flow_gb
     _load = ins.load_rows
+    ins.NARRATION = {('t8000', t): 0 for t in PROPHECY_IDS}      # (pages laid out already)
+    ins.centred = (lambda f: lambda text, width: text if width == 0 else f(text, width))(ins.centred)
     def load_gb(name):
         rows = _load(name)
+        if name == 't8000':                                    # opening prophecy: 5 GB pages
+            pt = prophecy_text(rows, ins)
+            for e in rows:
+                if e['id'] in pt: e['en'] = pt[e['id']]
         for e in rows:                                        # Nintendo terminology (release
             if isinstance(e.get('en'), str):                  #   checklist 4; tools/gb/termcheck.py)
                 e['en'] = e['en'].replace('A button', 'A Button').replace('B button', 'B Button')
         if name == 't8200':
             for e in rows:
                 if e['id'] in MENU_TEXT: e['en'] = MENU_TEXT[e['id']]
+                if e['id'] == 0x21:                          # name entry grid: no middle gap
+                    e['en'] = re.sub(r'\{17:([0-9A-F]{2})\}', lambda mm: '{17:%02X}' % MENU_TEXT_NAME_GRID.get(
+                        int(mm.group(1), 16), int(mm.group(1), 16)), e['en'])
         return rows
     ins.load_rows = load_gb
     for e in json.load(open('script/ff3/t8200.json')):        # equip messages (window $1E):
@@ -1194,10 +1203,24 @@ disp2:              ; bank 88 $8004 (JOBF dispatch, Y = 12: was JMP sq): A = $FF
     jmp jsel8
 .q9:
     cmp #$F9
-    bne .q6
+    bne .q10
     jmp mgkey
+.q10:
+    cmp #$F5
+    bne .q6
+    jmp nmcam
 .q6:
     jmp SQ
+nmcam:              ; name entry (each frame, via the character sprite routine 3D:B886): the
+    lda #$88        ;   sprite inside the name window (x 136, y 8), the GB camera (32, 0)
+    sta $40         ;   (tools/gb3/layout.py name_entry); X kept
+    lda #$08
+    sta $41
+    lda #32
+    sta $5802
+    lda #0
+    sta $5803
+    jmp JBTAIL
 smallnum:           ; Gil and Capacity in 4-px digits -> tiles $7B-$7F, $CA (main menu)
     lda $601C
     sta $80
@@ -2426,6 +2449,106 @@ svcam:              ; save screen shown (FF3's graphics load switched rendering 
     r.patch(0x7F, 0xF2AC, 'A9 5E 9D A0 07 A9 5F', 'A9 95 9D A0 07 A9 B9', 'level label: "Lv" in the English font')
 
 
+# opening prophecy (GB): the two narration pages (t8000 0, 1) as five of up to 16 lines, centred in
+# 18 columns (window $25 from column 2: NES columns 2-19) and vertically in the GB view (camera
+# x 8 / y 8: NES columns 1-20, rows 1-18); pages 2, 3, 5 in the empty dialogue entries 125, 130, 188 (unused, also
+# empty in the Japanese). Source lines (each a unit, as the NES's centred()) per page:
+PROPHECY_PAGES = [(0, (1, 2)), (0, (3, 4, 5, 6)), (0, (7, 8, 9, 10, 11, 12, 13)),
+                  (1, (3, 4)), (1, (5, 6, 7))]
+PROPHECY_IDS = (0, 125, 130, 1, 188)
+PROPHECY_W = 18
+
+
+def prophecy_text(rows, ins):
+    """{t8000 id: GB page text} (rows: the script's t8000 entries; ins: tools/ff3/insert.py)"""
+    src = {e['id']: (e['en'] or '').split('\n') for e in rows if e['id'] in (0, 1)}
+    out = {}
+    for (sid, ls), tid in zip(PROPHECY_PAGES, PROPHECY_IDS):
+        body = '\n'.join(src[sid][k] for k in ls if k < len(src[sid]))
+        lines = ins.centred(body, PROPHECY_W).split('\n')
+        assert len(lines) <= 16, (tid, len(lines))
+        out[tid] = '\n' * ((18 - len(lines)) // 2) + '\n'.join(lines)   # (text from NES row 1: view rows 1-18)
+    return out
+
+
+def prophecy(r):
+    """five pages (loop count 2 -> 5, page -> text id table, the GB camera at each page), the
+    fade-in up to the last row in view; the hidden developer message (L3A_980F, reached by a
+    button combination on the title: undisclosed code, release checklist) off, its routine's
+    space for the table"""
+    B3A = 0x3A
+    def find(bank, lo, hi, pat):
+        b = bytes.fromhex(pat.replace(' ', '')); o = r.off(bank, lo)
+        i = bytes(r.d[o:o + hi - lo]).find(b); assert i >= 0, pat
+        return lo + i
+    j = lambda v: '%02X %02X' % (v & 0xFF, v >> 8)
+    a = find(B3A, 0x8780, 0x8798, 'A5 08 20 24 C0 20 D3 87 E6 08 A5 08 C9 02')
+    m = r.module('''
+    org $980F
+devmsg:             ; (the developer message: off)
+    rts
+ptext:              ; prophecy page A (0-4): its text id, the GB camera (8, 8)
+    tax
+    lda #8
+    sta $5802
+    lda #8
+    sta $5803
+    lda PT,x
+    jmp $C024
+PT: .db %s
+''' % ', '.join(str(v) for v in PROPHECY_IDS))
+    o = r.off(B3A, 0x980F)
+    assert bytes(r.d[o:o + 3]) == bytes.fromhex('200CC0')
+    d0 = find(B3A, 0x9900, 0x999C, 'C0 30 0C 03 80 40 20 10 08 04 02 01')   # (its glyph data after the code)
+    r.d[o:o + len(m['bytes'])] = m['bytes']
+    r.d[o + len(m['bytes']):r.off(B3A, d0)] = b'\xea' * (d0 - 0x980F - len(m['bytes']))
+    r.mods.append(dict(m, where=(B3A, 0x980F & 0x1FFF)))
+    r.patch(B3A, a + 2, '20 24 C0', '20 ' + j(m['labels']['ptext']), 'prophecy: page -> text id, GB camera')
+    r.patch(B3A, a + 12, 'C9 02', 'C9 %02X' % len(PROPHECY_IDS), 'prophecy: %d pages' % len(PROPHECY_IDS))
+    b = find(B3A, 0x87D3, 0x87E6, '69 08 85 62 C9 F8')
+    r.patch(B3A, b + 4, 'C9 F8', 'C9 E8', 'prophecy: fade-in up to NES row 19 (the GB view)')
+    r.log.append((B3A, 0x980F, 'developer message off; prophecy page table'))
+
+
+def name_entry(r):
+    """name entry on 20 x 18: name window $22 (4, 0, 20, 4) with the character sprite inside,
+    letter grid $23 (3, 4, 22, 14): 10 letters a row two columns apart (no middle gap; the cursor
+    table follows the string's choice codes), camera (32, 0) - the grid's frames just past
+    the screen edge"""
+    B3D = 0x3D
+    j = lambda v: '%02X %02X' % (v & 0xFF, v >> 8)
+    # (the title's load menu: "New Game" in window $0C (1, 1, 20, 4, shared with the job
+    # header), Text Speed beside it in window $21, the files below as on the save screen)
+    for w, geo in ((0x22, (4, 0, 20, 4)), (0x23, (3, 4, 22, 14)), (0x21, (11, 1, 10, 4))):
+        for t, k in ((0xAAF7, 0), (0xAB1D, 1), (0xAB43, 2), (0xAB69, 3)):
+            r.d[r.off(B3D, t + w)] = geo[k]
+    m = r.module('''
+    org $B886
+nmspr:              ; (was: x / y of the character sprite) camera and sprite position: bank 88
+    ldy #12
+    lda #$F5
+    jsr $5D4E
+    jmp $8236
+    nop
+''')
+    o = r.off(B3D, 0xB886)
+    assert bytes(r.d[o:o + 11]) == bytes.fromhex('A9A08540A92085414C3682'), bytes(r.d[o:o + 11]).hex()
+    r.d[o:o + len(m['bytes'])] = m['bytes']
+    r.mods.append(dict(m, where=(B3D, 0xB886 & 0x1FFF)))
+    o = r.off(B3D, 0xB9CA)
+    seg = bytes(r.d[o:o + 0x30])
+    k = seg.find(bytes.fromhex('A9279D0002')); assert k >= 0
+    r.patch(B3D, 0xB9CA + k, 'A9 27', 'A9 0F', 'name cursor: y (name window at row 0)')
+    k = seg.find(bytes.fromhex('186948')); assert k >= 0
+    r.patch(B3D, 0xB9CA + k, '18 69 48', '18 69 30', 'name cursor: x (name from NES column 6)')
+    a = 0xBB7D + bytes(r.d[r.off(B3D, 0xBB7D):r.off(B3D, 0xBB7D) + 16]).find(bytes.fromhex('A9208D0620A97B'))
+    r.patch(B3D, a + 5, 'A9 7B', 'A9 73', 'title: text speed digit at NES column 19 (in window $21)')
+    r.log.append((B3D, 0xB895, 'name entry: GB layout'))
+
+
+MENU_TEXT_NAME_GRID = {0x0C: 0x0B, 0x0E: 0x0D, 0x10: 0x0F, 0x12: 0x11, 0x14: 0x13}
+
+
 def apply(data):
     """English NES ROM bytes -> (GB-layout ROM bytes, code modules for tools/gb3/ff3src.py)"""
     r = Rom(data)
@@ -2434,6 +2557,8 @@ def apply(data):
     magic_rows(r)
     field(r)
     main_menu(r)
+    name_entry(r)
+    prophecy(r)
     dialogue(r)
     return bytes(r.d), r.mods, r.log
 

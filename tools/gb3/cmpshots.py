@@ -15,6 +15,9 @@ INPUTS = {
     'newgame': None,                     # (newgame_pad below)
 }
 RIGHT = 1
+# the GB layout's opening prophecy has five pages (tools/gb3/layout.py prophecy): name entry
+# comes 368 waits later than with the NES's two (~1704 instead of ~1342); OFF shifts the scripts
+OFF = 368
 
 def newgame_pad(w):
     """A every 16 waits from 1000 (second narration page, New Game) until name entry
@@ -22,8 +25,8 @@ def newgame_pad(w):
     (6 letters + confirm), then Right (next letter of the grid) before the next name; then
     A every 16 waits (the opening scene)"""
     if w <= 1000: return 0
-    if w < 1360: return A if w % 16 < 4 else 0
-    k = (w - 1360) // 16; ph = (w - 1360) % 16
+    if w < 1360 + OFF: return A if w % 16 < 4 else 0
+    k = (w - 1360 - OFF) // 16; ph = (w - 1360 - OFF) % 16
     if ph >= 4: return 0
     per = 8                               # A x 7, then Right
     if k < 4 * per:
@@ -40,11 +43,11 @@ def explore_pad(w):
     battle mode ($0100 = JMP $FB57, read from the NES in CUR_NES) only A, every 16 waits
     (Fight, first target). The pads are recorded from the NES run (Waits.latch) and fed to
     the GB, so the GB sees the same presses."""
-    if w < 4600: return newgame_pad(w)
+    if w < 4600 + OFF: return newgame_pad(w)
     n = CUR_NES
     if n is not None and n[0x100] == 0x4C and n[0x101] == 0x57 and n[0x102] == 0xFB:
         return A if w % 16 < 3 else 0
-    b = (w - 4600) // 96; ph = (w - 4600) % 96
+    b = (w - 4600 - OFF) // 96; ph = (w - 4600 - OFF) % 96
     if ph % 16 < 3 and ph >= 48: return A
     if ph < 48:
         d = (b * 1103515245 + 12345) >> 16 & 3
