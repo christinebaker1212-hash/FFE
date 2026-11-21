@@ -178,3 +178,32 @@ one reaches parity, so the owner can keep playing).
   turn), confused enemies casting Fire on their side, Medicine (Potion / Antidote with this
   round's counts), Items (equipment spells, weapons / armour pages).
   Not yet: fiend / Chaos graphics, battle animations and sound effects.
+- Continue / soft reset: the title offers Continue when cart RAM holds a valid save (mark
+  "FF1N", the page, a 16-bit sum); A+B+Start+Select resets to the title (Lot Check); the
+  save records the overworld position (FF1: scroll = position - 7) in save page $10/$11.
+
+## Next steps (native rewrite)
+1. Vehicles (FF1 ProcessOWInput / OWCanMove, bank 0F): `vehicle` 1 foot, 2 canoe, 4 ship,
+   8 airship; blocked if tile byte 0 & vehicle; on foot onto water: BoardCanoe (needs
+   has_canoe = save $12, tile byte 0 bit 1 clear) or BoardShip (ship_vis/x/y = save $00-$02
+   at the target); ship: moving onto land = UnboardBoat (tile byte 0 bit 0 clear) and
+   DockShip (the ship stays where it was), canal (save $0C-$0E) lets the ship through, tile
+   byte 0 & $21 = $20 docks; canoe: UnboardBoat onto land, BoardShip; airship (save $04-$06):
+   A on the airship's tile flies (FlyAirship), A in the air lands (LandAirship: not where
+   tile byte 0 bit 3 is set); random encounters: 3/256 on the ship, none in the air (tile
+   byte 1 bit 6 only checked for foot / canoe / ship); MapPoisonDamage on foot (poisoned
+   members lose 1 HP a step, not below 1); caravan (tile byte 0 bits 7-6 = 10: shop 70 unless
+   the fairy object is shown); chime tiles need the Chime; IsOnBridge sets bridgescene (the
+   bridge story). Vehicle sprites: FF1's OW object graphics (bank 9 $9C00, sprite tiles
+   $10-$6F) and its vehicle sprite tables.
+2. Fiend / Chaos battle graphics (FF1 PrepareEnemyFormation_Fiend / _Chaos, data_FiendTSA /
+   data_ChaosTSA in bank 0B: 8 x 8 / 14 x 12 TSA, their own palettes).
+3. Music and sound effects: a native player for FF1's music data (bank 0D MusicPlay format:
+   the recompiled build's rt/mus.s documents it) driving the GB APU directly; battle SFX.
+4. Story scenes (bridge, ending: translations/ff1_story.py, the approved 20 x 11 box),
+   prologue, the minimap (B + Select), the 15-puzzle, options (message speed), Chaos'
+   ending.
+5. Battle polish: animations (weapon swing, spell flash, enemy explosion), the party
+   sprites' poses (walk forward when acting, kneel when low HP, dead / stone poses).
+6. SGB (palettes per screen, border), Lot Check pass (gb-release-checks.md), lag check,
+   release build.
