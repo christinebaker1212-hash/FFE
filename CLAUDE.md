@@ -1208,6 +1208,12 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
     ($2000-$5FFF) through the ROM read-ahead (rc_get), so ExRAM text codes came from GB ROM
     bank 0. They go through nes_rd now. tracediff.py takes `--field SCRIPT`.
   - Checks: checkall 62/62 (n130). Lag: DMG 20 -> 18, CGB 0 (-6).
+  - SGB prologue text was invisible (found by the release matrix, present since the DMG
+    prologue shading `pro_mode`): pro_mode skips dmg_attr, which also marks the SGB
+    attribute packets dirty, so the cells kept the waiting lines' palette. pro_mode is now
+    plain-DMG only. Known: on the SGB a half band's letters show a few wrong cells for ~10
+    frames as its fade starts (SGB palettes arrive by packet, a few frames after the tiles).
+    VCHK 0 on DMG / CGB / SGB over the 9000-frame script (n131).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

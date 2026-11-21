@@ -3062,7 +3062,14 @@ dlg_cell:   push hl
             xor a
             ret
 rt_mmc_w5807:                               ; the prologue's pages (GB layout code): DMG text shading
+            push af                         ;   (plain Game Boy only: on the SGB the cells'
+            ldh [pro_mode], a               ;   palettes follow the attributes, which
+            ldh a, [is_sgb]                 ;   pro_mode leaves alone)
+            and a
+            jr z, .s
+            xor a
             ldh [pro_mode], a
+.s:         pop af
             ret
 rt_mmc_w5806:                               ; dialogue box lines shown (opened at a page break)
             ldh [dlg_l], a
