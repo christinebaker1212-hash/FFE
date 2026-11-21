@@ -78,6 +78,11 @@ def data_bank(rom):
     msgs = strtab(0x6C00, [enc(ff1_battle.B.get(k, '')) for k in range(80)])
     assert len(msgs) <= 0x1100
     put(0x6C00, msgs)
+    put(0x7A00, rom.rd(BANK_DOMAINS, 0x9094, 6 * 49 * 2))           # data_LevelUpData_Raw
+    b11 = rom.prg[11 * 0x4000:12 * 0x4000]                           # level-up hit / magic
+    i = b11.find(bytes([3, 2, 3, 2, 1, 1, 3, 2, 3, 2, 1, 1]))       #   defence bonuses
+    assert i >= 0
+    put(0x7C80, b11[i:i + 24])
     fix = rom.prg[15 * 0x4000:16 * 0x4000]
     put(0x7D00, fix[0xF100 - 0xC000:0xF100 - 0xC000 + 256])         # lut_RNG
     put(0x7E00, fix[rng_table(fix) - 0xC000:][:256])                 # BattleRNG's table

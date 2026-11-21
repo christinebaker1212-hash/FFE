@@ -157,3 +157,17 @@ one reaches parity, so the owner can keep playing).
   permissions come from the ROM's tables (names.shop_tables); entered by walking onto a door
   tile whose second property byte is a shop number, as FF1. Layout: speech (0,0,20,6),
   title, commands / Yes-No / names, the 5-item list with prices, Gil.
+- Battle, part 1 (btl.s / btl2.s in bank 6, data bank 92, enemy graphics banks 93-94; from
+  FF1's banks 0B / 0C): formations and enemy generation (9-small / 4-large / mix; fiend /
+  Chaos graphics later), the screen in the approved layout (enemies from FF1's graphics pages,
+  DMG pre-shaded by the formation's palettes, CGB in FF1's colours; the party's battle
+  sprites; the windows with a small proportional font rendered into tiles and uploaded in
+  V-Blank), commands (Fight / Run; B goes back a member), FF1's turn order shuffle, physical
+  attacks with FF1's hit / damage / critical / ailment formulas (the weapon's critical rate,
+  element and category applied: FF1's bugs fixed as in the recompiled build), enemy morale /
+  sleep / paralysis / confusion recovery, running (level from the record), poison, messages
+  in the approved style (attacker -> target, result lines), victory with experience divided
+  by the members standing and gold, FF1's level ups (hit / magic defence bonuses, MP charges,
+  HP, stats, Black Belt adjustments), defeat -> back to the title. Random encounters (FF1's
+  step RNG, overworld domains, map rates, spiked tiles) and talk battles. Test builds:
+  `build.py --battle F` starts with formation F, `--enc N` sets the overworld rate.

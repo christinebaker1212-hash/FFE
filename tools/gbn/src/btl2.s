@@ -63,6 +63,8 @@ M_WOKE     = $27
 M_ASLEEP   = $28
 M_CURED    = $29
 M_PARA     = $2A
+B_LVUP     = $7A00          ; battle data: level-up bytes (6 classes x 49 levels x 2)
+B_HITBON   = $7C80          ;   hit rate / magic defence bonuses (12 + 12)
 
 section bank 6, $4A00
 
@@ -2153,10 +2155,396 @@ bt_victory: call bt_msg_new
             ld a, 0
             adc a, [hl]
             ld [hl], a
+            pop af
+            push af
+            call bt_lvchk                   ; enough for the next level: up (once, as FF1)
 .an:        pop af
             inc a
             cp 4
             jr c, .ax
+            ret
+
+; member A: experience >= the table's amount for its level -> a level up
+bt_lvchk:   ld [bt_lvm], a
+            call ch_rec
+            ld a, l
+            add a, CH_LEVEL
+            ld l, a
+            ld a, [hl]
+            cp 49
+            ret nc
+            ld e, a                         ; the table entry (3 bytes)
+            ld d, 0
+            ld h, d
+            ld l, e
+            add hl, hl
+            add hl, de
+            ld de, U_EXPTBL
+            add hl, de
+            ld de, bt_sbuf
+            ld bc, 3
+            ld a, UI_GFX
+            call far_copy
+            ld a, [bt_lvm]
+            call ch_rec
+            ld a, l
+            add a, CH_EXP
+            ld l, a
+            ld a, [hl+]                     ; experience - needed: no borrow -> level up
+            ld b, a
+            ld a, [bt_sbuf]
+            ld c, a
+            ld a, b
+            sub c
+            ld a, [hl+]
+            ld b, a
+            ld a, [bt_sbuf + 1]
+            ld c, a
+            ld a, b
+            sbc a, c
+            ld a, [hl]
+            ld b, a
+            ld a, [bt_sbuf + 2]
+            ld c, a
+            ld a, b
+            sbc a, c
+            ret c
+; FF1 LvlUp_LevelUp
+bt_levelup: ld a, [bt_lvm]
+            call ch_rec
+            ld a, l
+            ld [bt_lvr], a
+            ld a, CH_LEVEL
+            call bt_rf                      ; HL = record + A
+            ld a, [hl]
+            ld [bt_t], a                    ; old level (0-based)
+            inc [hl]
+            ld a, [bt_lvr]                  ; class
+            ld l, a
+            ld a, [hl]
+            ld [bt_lvc], a
+            ld e, a                         ; hit rate + bonus, magic defence + bonus (at most 200)
+            ld d, 0
+            ld hl, B_HITBON
+            add hl, de
+            ld a, BTL_DATA
+            ld [fc_bank], a
+            call far_byte
+            ld b, a
+            ld a, $21
+            call bt_rf
+            ld a, [hl]
+            add a, b
+            call bt_cap200
+            ld [hl], a
+            ld a, [bt_lvc]
+            add a, 12
+            ld e, a
+            ld hl, B_HITBON
+            add hl, de
+            call far_byte
+            ld b, a
+            ld a, $25
+            call bt_rf
+            ld a, [hl]
+            add a, b
+            call bt_cap200
+            ld [hl], a
+            ld a, [bt_lvc]                  ; the level's two bytes (class mod 6, level)
+            cp 6
+            jr c, .c6
+            sub 6
+.c6:        ld l, a                         ; 98 class + 2 level
+            ld h, 0
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl                      ; 32
+            push hl
+            add hl, hl                      ; 64
+            pop de
+            add hl, de                      ; 96
+            ld d, 0
+            ld a, [bt_lvc]
+            cp 6
+            jr c, .c7
+            sub 6
+.c7:        add a, a
+            ld e, a
+            add hl, de                      ; 98
+            ld a, [bt_t]
+            add a, a
+            ld e, a
+            add hl, de
+            ld de, B_LVUP
+            add hl, de
+            ld de, bt_lvd
+            ld bc, 2
+            ld a, BTL_DATA
+            call far_copy
+            ld a, [bt_lvc]                  ; MP charges (not Fighter / Thief and their upgrades?
+            and a                           ;   FF1: class 0 and 1 only)
+            jr z, .nmp
+            cp 1
+            jr z, .nmp
+            ld a, [bt_lvm]
+            rrca
+            rrca
+            add a, $28
+            ld l, a
+            ld h, high(ch_magic)
+            ld a, [bt_lvd + 1]
+            ld b, 8
+.mp:        rrca
+            jr nc, .mn
+            inc [hl]
+.mn:        inc l
+            dec b
+            jr nz, .mp
+            ld a, [bt_lvc]                  ; caps: Knight / Ninja 4, the others 9
+            ld c, 10
+            cp 6
+            jr z, .k
+            cp 7
+            jr nz, .cp
+.k:         ld c, 5
+.cp:        ld a, l
+            sub 8
+            ld l, a
+            ld b, 8
+.cl:        ld a, [hl]
+            cp c
+            jr nz, .cn
+            dec [hl]
+.cn:        inc l
+            dec b
+            jr nz, .cl
+.nmp:       ld a, $13                       ; HP: vitality / 4 + 1 (+ random 20-25 if bit 5)
+            call bt_rf
+            ld a, [hl]
+            srl a
+            srl a
+            inc a
+            ld [bt_t + 1], a
+            ld a, [bt_lvd]
+            and $20
+            jr z, .nb
+            ld a, 20
+            ld b, 25
+            call bt_randab
+            ld b, a
+            ld a, [bt_t + 1]
+            add a, b
+            ld [bt_t + 1], a
+.nb:        ld a, CH_MAXHP                  ; max HP + bonus (at most 999)
+            call bt_rf
+            ld a, [bt_t + 1]
+            add a, [hl]
+            ld [hl+], a
+            ld a, [hl]
+            adc a, 0
+            ld [hl-], a
+            ld d, a
+            ld e, [hl]
+            ld a, e
+            sub $E8                         ; >= 1000?
+            ld a, d
+            sbc a, 3
+            jr c, .hp
+            ld [hl], $E7
+            inc hl
+            ld [hl], 3
+.hp:        ld a, [bt_lvd]                  ; stats: bits 4-0 = strength .. luck, sure; else 1 in 4
+            add a, a
+            add a, a
+            add a, a
+            ld [bt_t + 2], a
+            xor a
+            ld [bt_t + 3], a                ; stat index
+            ld hl, bt_lvup
+.st:        push hl
+            ld a, [bt_t + 2]
+            add a, a
+            ld [bt_t + 2], a
+            ld a, 1
+            jr c, .inc
+            call bt_rng
+            and 3
+            ld a, 1
+            jr z, .inc
+            xor a
+.inc:       pop hl
+            ld [hl+], a
+            and a
+            jr z, .sn
+            push hl
+            ld a, [bt_t + 3]
+            add a, $10
+            call bt_rf
+            ld a, [hl]
+            inc a
+            cp 100
+            jr z, .s1
+            ld [hl], a
+.s1:        pop hl
+.sn:        ld a, [bt_t + 3]
+            inc a
+            ld [bt_t + 3], a
+            cp 5
+            jr c, .st
+            ld a, [bt_lvup]                 ; strength up to an even value: damage + 1
+            and a
+            jr z, .e1
+            ld a, $10
+            call bt_rf
+            bit 0, [hl]
+            jr nz, .e1
+            ld a, $20
+            call bt_rf
+            ld a, [hl]
+            inc a
+            cp 201
+            jr z, .e1
+            ld [hl], a
+.e1:        ld a, [bt_lvup + 1]             ; agility up: evade + 1
+            and a
+            jr z, .e2
+            ld a, $23
+            call bt_rf
+            ld a, [hl]
+            inc a
+            cp 201
+            jr z, .e2
+            ld [hl], a
+.e2:        ld a, [bt_lvc]                  ; Black Belt / Master without a weapon (FF1
+            cp CLS_BB                       ;   LvlUp_AdjustBBSubStats)
+            jr z, .bb
+            cp CLS_MA
+            jr nz, .msg
+.bb:        ld a, $18
+            call bt_rf
+            ld b, 4
+.bw:        bit 7, [hl]
+            jr nz, .msg
+            inc hl
+            dec b
+            jr nz, .bw
+            ld a, CH_LEVEL
+            call bt_rf
+            ld a, [hl]
+            inc a
+            ld b, a
+            ld a, $22
+            call bt_rf
+            ld [hl], b
+            sla b
+            ld a, $20
+            call bt_rf
+            ld [hl], b
+.msg:       ld a, [bt_lvm]                  ; messages: name, Level up!, Max HP N points, stats
+            call bt_msg_pl
+            ld a, 48
+            call bt_msg_line
+            ld a, [bt_t + 1]
+            call nf_a
+            ld hl, bt_sbuf + 16
+            push hl
+            ld a, 49
+            call bt_mtext                   ; "Max HP" + " " + N + " points"
+            ld hl, bt_sbuf
+            ld de, bt_line
+.m1:        ld a, [hl+]
+            and a
+            jr z, .m2
+            ld [de], a
+            inc de
+            jr .m1
+.m2:        ld a, $20
+            ld [de], a
+            inc de
+            push de
+            call num_fmt
+            pop de
+            ld hl, nf_dig
+.m3:        ld a, [hl+]
+            cp $20
+            jr z, .m4
+            ld [de], a
+            inc de
+.m4:        ld a, l
+            cp low(nf_dig + 6)
+            jr nz, .m3
+            push de
+            ld a, 50
+            call bt_mtext
+            pop de
+            ld hl, bt_sbuf
+.m5:        ld a, [hl+]
+            ld [de], a
+            inc de
+            and a
+            jr nz, .m5
+            pop hl
+            ld hl, bt_line
+            call bt_msg_row
+            call bt_msg_end
+            xor a                           ; each stat up: "Strength went up" ...
+            ld [bt_t + 3], a
+.sm:        ld a, [bt_t + 3]
+            ld e, a
+            ld d, 0
+            ld hl, bt_lvup
+            add hl, de
+            ld a, [hl]
+            and a
+            jr z, .smn
+            ld a, [bt_lvm]
+            call bt_msg_pl
+            call bt_msg_head
+            ld a, [bt_t + 3]
+            add a, 51
+            call bt_mtext
+            ld hl, bt_sbuf
+            ld de, bt_line
+.sc:        ld a, [hl+]
+            and a
+            jr z, .sd
+            ld [de], a
+            inc de
+            jr .sc
+.sd:        push de
+            ld a, 56
+            call bt_mtext
+            pop de
+            ld hl, bt_sbuf
+.se:        ld a, [hl+]
+            ld [de], a
+            inc de
+            and a
+            jr nz, .se
+            call bt_msg_head
+            ld hl, bt_line
+            call bt_msg_row
+            call bt_msg_end
+.smn:       ld a, [bt_t + 3]
+            inc a
+            ld [bt_t + 3], a
+            cp 5
+            jr c, .sm
+            ret
+; HL = the levelling member's record + A
+bt_rf:      ld l, a
+            ld a, [bt_lvr]
+            add a, l
+            ld l, a
+            ld h, high(ch_stats)
+            ret
+bt_cap200:  cp 201
+            ret c
+            ld a, 200
             ret
 ; a row "N" + string HL
 bt_numline: push hl
@@ -2231,6 +2619,11 @@ mt_rand:    ds 1
 mt_ailc:    ds 1
 bt_rexp:    ds 2
 bt_msgon:   ds 1
+bt_lvm:     ds 1
+bt_lvr:     ds 1
+bt_lvc:     ds 1
+bt_lvd:     ds 2
+bt_lvup:    ds 5
 section wram, $C500
 bt_save:    ds 12 * 32                      ; the rows under the message window
 section wram, $C400
