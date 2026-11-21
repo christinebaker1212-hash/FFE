@@ -1232,7 +1232,7 @@ hle_oamclr_b:
 ; tile: the shadow (cart RAM bank 1) and one re-coding mark; CGB BG tile: VRAM (LCD off) or
 ; the tile copy + HDMA mark; a sprite-table tile byte by byte through rt_ppu_w7. Exit: A =
 ; $FF, X = 8 VC + 8, Y = 0, Z = 1, N = 0, C = 0.
-VT_BUF     = $DCDE          ; plane 0 (8)
+VT_BUF     = $CCD0          ; plane 0 (8), in fixed WRAM: CGB paths switch $D000-$DFFF to the tile copy (bank 2)
 hle_vtile_b:
             ld d, a                         ; D = tile
             ld a, [$BFE5]                   ; X = 8 VC (VC = NES $7FE5); VBUF + X -> VT_BUF

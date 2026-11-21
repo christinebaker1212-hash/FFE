@@ -647,6 +647,21 @@ python3 tools/gb2/ff2src.py "roms/Final Fantasy I, II (Japan).nes" build/ff2/src
   4. Then music, sprites (docs/gb-native-presentation.md order). Select menu with suspend
      (design with the owner). Known DMG look issue: the black castle floor ($0x rule).
 
+## DMG vs CGB (2026-11-21)
+- Game state: identical (both match the NES at every frame wait; compared with each other
+  at 29 points of random 1: only the sound driver's bytes `$B0-$EF`, which depend on when
+  the runtime's audio code runs).
+- **Fixed: CGB battle windows without text** (since `2aabf3f`, the native `vtile`; found by
+  comparing DMG and CGB screens, confirmed in Gambatte): `hle_vtile_b` kept the letter rows
+  in `VT_BUF` = `$DCDE`, in the switchable WRAM bank, and read it after switching to bank 2
+  (the CGB tile copy), so it uploaded bytes of the tile copy. `VT_BUF` is now `$CCD0` (fixed
+  WRAM). Battle screens now match DMG (colours aside). RAM checks: random 1 DMG / CGB identical.
+- Remaining picture differences (DMG vs CGB): the DMG shading turns dark patterns black
+  (castle wall / floor stripe: two dark NES colours in one value), the DMG restores the
+  map under a closing dialogue box in ~10 frames (CGB ~3), the prologue fade (open item).
+  Tool: scratch `dmgcgb.py` (PyBoy DMG and CGB at the same waits: RAM, and whether the CGB
+  colours map onto DMG shades as a function).
+
 ## The NES is never run to build (2026-11-20, owner: use the disassembly so the NES need not run)
 - `tools/gb2/build.py` no longer reads coverage logs (`--cov` removed); `ff2code.CodeMap`
   is built from the everything8215 listing + the ROM's bytes only, and `translate.py` has
