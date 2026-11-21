@@ -80,6 +80,13 @@ The same over 13 field / menu / shop scripts (covall.FIELD: dialogue, menu, item
 equip, status, shop_buy, shop_inn, minimap, puzzle, cure, lineup, bridge; input files from
 lagcheck, `tools/gb/vchkfield.py`): 0 on DMG, CGB and SGB.
 
+2026-11-21 (release build): 0 on DMG, CGB and SGB over the battle script (9000 frames) and
+all 22 field scripts (covall.FIELD, incl. selmenu, tent, cure), with a picture of each
+script at five points in each mode (`vchkfield.py` env SHOTS / SHOTDIR) checked by eye; the
+release ROM's game state equals the NES (battle script on DMG and CGB, 30000 frames of
+random play). The picture tour found and fixed: SGB prologue text, CGB prologue page 2,
+DMG class-select sprites, DMG battle party shades.
+
 Not covered: SameBoy (its libretro core has no write hook). mGBA's PPU mode timing is close
 to hardware but not exact, so writes right at a mode boundary could still differ on real
 hardware.
