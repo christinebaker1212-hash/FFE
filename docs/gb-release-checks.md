@@ -255,7 +255,9 @@ items are simpler than for the recompiled build above.
   animations, messages), a new game (title, class select, name entry, field, menu), and a
   field run through the menu, items, magic, weapons, lineup and world map; again after the
   Color's masked loads (2026-11-21): 0 on all three over a battle, a town entry with the menu,
-  the world map / lineup / menu / sub-screens, the bridge story and a new game.
+  the world map / lineup / menu / sub-screens, the bridge story and a new game. SameBoy (CGB,
+  libretro core) runs the same town entry / menu / lineup cleanly, its town picture after the
+  masked load pixel-identical to mGBA's.
 - 2.3 Save RAM: cart RAM is enabled only while the save is checked, read or written (save.s
   routines in main.s), and switched off right after: met literally. The save has a mark
   ("FF1N") and a 16-bit sum; at boot a save whose mark is there but whose sum is wrong shows
