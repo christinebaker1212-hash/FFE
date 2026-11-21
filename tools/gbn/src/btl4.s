@@ -892,6 +892,130 @@ bt_erase_rows:
             jr nz, .r
             ret
 
+; ---- FF1 ChaosDeath: the fanfare's first 110 frames, the music stopped, a low rumble
+; (noise period 15) fading out; 8 x 256 frames: each a random tile 0-$79 (FF1's RandAX on the
+; battle RNG) loses one pixel row (per tile a random row, moved on each pass), the screen
+; shaking by 0-3 pixels; then the rumble's booms, 2 seconds, silence
+bt_chaos_death:
+            ld a, 110
+.w:         push af
+            call bt_frame
+            pop af
+            dec a
+            jr nz, .w
+            ld a, $80
+            call snd_track
+            xor a
+            ld [bt_cdn], a
+            ld a, SND_BANK                  ; the noise's period ($0F: the lowest)
+            ld hl, SFX_NZ + 15
+            ld [fc_bank], a
+            call far_byte
+            ld [bt_cdp], a
+            call bt_cd_noise
+            ld hl, bt_line                  ; the rows to erase: 256 random values
+            ld b, 0
+.f:         call bt_rng
+            ld [hl+], a
+            dec b
+            jr nz, .f
+            ld a, 8
+.o:         push af
+            xor a
+.i:         push af
+            cp $80
+            call z, bt_cd_noise
+            xor a                           ; the tile: RandAX(0, $79)
+            ld b, $79
+            call bt_randab
+            ld [bt_cdr], a
+            ld l, a
+            ld h, high(bt_line)
+            ld a, [hl]
+            and 7
+            add a, a
+            ld e, a                         ; VRAM $9000 + 16 tile + 2 row
+            ld a, [bt_cdr]
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld d, 0
+            add hl, de
+            ld de, $9000
+            add hl, de
+            push hl
+            call wait_vbl
+            pop hl
+            ldh a, [is_cgb]                 ; erased to the battlefield's black (CGB colour
+            and a                           ;   0; DMG shade 3)
+            ld a, $FF
+            jr z, .e
+            xor a
+.e:         ld [hl+], a
+            ld [hl], a
+            ld a, [bt_cdq]                  ; shake: x from the previous value, y from this
+            and 3
+            ldh [scx], a
+            ld a, [bt_cdr]
+            ld [bt_cdq], a
+            and 3
+            ldh [scy], a
+            pop af
+            dec a
+            jr nz, .i
+            ld hl, bt_line                  ; each tile's row moves on
+            ld b, 0
+.n:         inc [hl]
+            inc hl
+            dec b
+            jr nz, .n
+            call bt_cd_noise
+            pop af
+            dec a
+            jr nz, .o
+            xor a
+            ldh [scx], a
+            ldh [scy], a
+            ld a, 120                       ; 2 seconds of the booms
+.b:         push af
+            and $3F
+            jr nz, .bn
+            ld a, $F4                       ; (FF1's looping envelope: a boom a second)
+            ldh [$FF21], a
+            ld a, [bt_cdp]
+            ldh [$FF22], a
+            ld a, $80
+            ldh [$FF23], a
+.bn:        call wait_vbl
+            pop af
+            dec a
+            jr nz, .b
+            xor a
+            ldh [$FF21], a
+            ret
+; FF1 ChaosDeath_FadeNoise: the rumble one step quieter (15, 14, .. 0)
+bt_cd_noise:
+            ld a, [bt_cdn]
+            cp 16
+            ret nc
+            ld b, a
+            inc a
+            ld [bt_cdn], a
+            ld a, 15
+            sub b
+            swap a
+            ldh [$FF21], a                  ; constant volume
+            and a
+            ret z
+            ld a, [bt_cdp]
+            ldh [$FF22], a
+            ld a, $80
+            ldh [$FF23], a
+            ret
+
 section wram, $C700
 bt_px:      ds 4                            ; members' x (screen)
 bt_pose:    ds 4                            ; FF1 btl_chardraw_pose (+ P_DEAD / P_STONE)
@@ -907,5 +1031,9 @@ bt_ex:      ds 2                            ; explosion area (OAM coordinates), 
 bt_ey:      ds 2
 bt_exn:      ds 1
 bt_exs:      ds 1
+bt_cdn:     ds 1                            ; (Chaos' dissolve: rumble step, period, tiles)
+bt_cdp:     ds 1
+bt_cdr:     ds 1
+bt_cdq:     ds 1
 bt_tsa:     ds 48                           ; the pose and swing tables (from the object bank)
 bt_swing    = bt_tsa + $20

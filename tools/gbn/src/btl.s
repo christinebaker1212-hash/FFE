@@ -70,14 +70,15 @@ battle:     xor a                           ; (no menu sounds, no vehicle noise)
             ld a, TR_FANFARE                ; (FF1: the victory fanfare, the party cheers)
             call snd_track
             call bt_cheer
-            call bt_victory
-            ld a, [bt_type]                 ; Chaos defeated: the ending (A = 2)
-            cp 4
-            jr nz, .nv
+            ld a, [bt_type]                 ; Chaos defeated (FF1: no reward): his dissolve,
+            cp 4                            ;   then the ending (A = 2)
+            jr nz, .vic
+            call bt_chaos_death
             call bt_ch_exit
             call bt_end_screen
             ld a, 2
             ret
+.vic:       call bt_victory
 .nv:
             call bt_ch_exit
             call bt_end_screen
