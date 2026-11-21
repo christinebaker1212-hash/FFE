@@ -452,10 +452,16 @@ bt_pl_magic:
             and a
             jr z, .nomp
             dec [hl]
-.nomp:      ld a, SFX_MAGIC                 ; FF1 PreparePlayerMagAttack: the casting sound
-            ld [sfx_req], a
-            ld a, [mg_id]
+.nomp:      ld a, [mg_id]
             call bt_mload
+            ld a, SFX_MAGIC                 ; FF1 PreparePlayerMagAttack: the casting sound,
+            ld [sfx_req], a                 ;   WalkForwardAndCastMagic (the spell's graphic
+            ld a, [mg_d + 5]                ;   and colour)
+            ld [bt_ag], a
+            ld a, [mg_d + 6]
+            ld [bt_ac], a
+            ld a, [bt_who]
+            call bt_cast_anim
             ld a, [bt_who]
             or $80
             ld [mg_caster], a
@@ -682,8 +688,11 @@ bt_cast_en: ld [mg_def], a
             jr nz, .ok
             ld a, M_NOEFFECT
             jp bt_msg_end1
-.ok:        ld a, SFX_HIT                   ; FF1 BtlMag_LoadEnemyDefenderStats: "cha"
-            ld [sfx_req], a
+.ok:        call bt_flush
+            ld a, SFX_HIT                   ; FF1 BtlMag_LoadEnemyDefenderStats: "cha" and
+            ld [sfx_req], a                 ;   the explosions
+            ld a, [mg_def]
+            call bt_explode
             ld a, [mg_def]
             call bt_erec
             push hl
@@ -1408,6 +1417,10 @@ bt_pl_drink:
             dec [hl]
 .z:         ld a, [mg_id]
             call bt_mload
+            xor a                           ; FF1: an item's spell: the walk and the cheer,
+            ld [bt_ag], a                   ;   nothing drawn
+            ld a, [bt_who]
+            call bt_cast_anim
             ld a, [bt_who]
             or $80
             ld [mg_caster], a
@@ -1591,6 +1604,10 @@ bt_pl_item: inc hl
             ld [bt_tgt], a
             ld a, [mg_id]
             call bt_mload
+            xor a                           ; FF1: an item's spell: the walk and the cheer,
+            ld [bt_ag], a                   ;   nothing drawn
+            ld a, [bt_who]
+            call bt_cast_anim
             ld a, [bt_who]
             or $80
             ld [mg_caster], a

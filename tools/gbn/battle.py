@@ -160,3 +160,29 @@ def vwf_source():
             out.append(sum(cols[x][y] << (7 - x) for x in range(len(cols))))
     return 'vwf_glyphs:\n' + ''.join('            db ' + ', '.join(str(v) for v in out[k:k + 18]) + '\n'
                                     for k in range(0, len(out), 18))
+
+
+BOBJ_BANK = 96
+
+
+def obj_bank(rom):
+    """bank BOBJ_BANK: FF1's battle object graphics (lut_BatObjCHR, sprite tiles $80-$FF: weapon
+    swings $80-$AF, spells $B0-$EF, cursor, explosions $F4-$FF) for DMG ($4000, ranked: weapons
+    and explosions by FF1's weapon palette c / c - $10 / c - $20, spells by its magic palette
+    c / c - $10 / white) and CGB ($4800, raw); $5000 FF1's pose TSA (8 x 4) and weapon swing
+    TSA (2 x 8), found through DrawCharacter's operand"""
+    import re
+    import ui
+    blob = bytearray(b'\xff' * 0x4000)
+    src = rom.rd(ui.BANK_BTLCHR, ui.BAT_OBJ, 0x800)
+    for t in range(128):
+        t16 = src[16 * t:16 * t + 16]
+        pal = [0x0F, 0x10, 0x00, 0x30] if 0x30 <= t < 0x70 else [0x0F, 0x30, 0x10, 0x00]
+        blob[16 * t:16 * t + 16] = data.spr_rank_tile(t16, pal)
+        blob[0x800 + 16 * t:0x800 + 16 * t + 16] = data.gb_tile(t16)
+    b12 = rom.prg[12 * 0x4000:13 * 0x4000]
+    m = [m for m in re.finditer(rb'\xB9..\x18\x7D(..)\x8D', b12, re.S) if m.group(1)[1] >= 0x80]
+    assert len(m) == 1, 'pose table not found'
+    a = int.from_bytes(m[0].group(1), 'little') - 0x8000
+    blob[0x1000:0x1030] = b12[a:a + 0x30]
+    return bytes(blob)

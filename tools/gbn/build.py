@@ -121,6 +121,7 @@ def data_banks(rom, ff3=None, init=None):
     banks[battle.BTL_DATA] = bytearray(battle.data_bank(rom))
     banks[sound.MUS_DATA] = bytearray(rom.prg[13 * 0x4000:14 * 0x4000])   # FF1's music data
     for b, blob in battle.chr_banks(rom).items(): banks[b] = bytearray(blob)
+    banks[battle.BOBJ_BANK] = bytearray(battle.obj_bank(rom))
     place(banks, COMMON, 0x5D40, b''.join(data.rgb555(c).to_bytes(2, 'little') for c in range(64)))
     banks[3] = bytearray(ui.gfx_bank(rom))                     # UI_GFX
     for b, blob in text.dialogue_banks(90).items():
@@ -207,6 +208,7 @@ def main():
            open(os.path.join(HERE, 'src', 'btl.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl2.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl3.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'btl4.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
            'section bank 6, $7800\n' +

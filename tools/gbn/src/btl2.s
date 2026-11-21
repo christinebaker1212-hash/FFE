@@ -47,6 +47,7 @@ C_CAT      = 8
 C_ELEM     = 9
 C_CRIT     = 10
 C_WGFX     = 11
+C_WPLT     = 12
 M_HITS     = $2B            ; FF1 battle message numbers (text: entry n - 1)
 M_CRIT     = $2C
 M_DMG      = $2E
@@ -246,6 +247,10 @@ bt_ch_init: xor a
             inc de
             ld a, [scr_buf + 6]
             ld [de], a
+            inc de                          ; (and its palette colour)
+            ld a, [scr_buf + 7]
+            ld [de], a
+            dec de
             jr .bb
 .z:         xor a
             ld [de], a
@@ -255,6 +260,9 @@ bt_ch_init: xor a
             ld [de], a
             inc de
             ld [de], a
+            inc de
+            ld [de], a
+            dec de
 .bb:        pop hl                          ; Black Belt / Master unarmed: critical 2 level,
             ld a, [hl]                      ;   hits x 2
             cp CLS_BB
@@ -653,40 +661,6 @@ bt_left_text:
             ret
 bt_s_cmd:   db "Fight", $09, "Run", $0A, "Magic", $0A, "Medicine", $0A, "Items", 0
 
-; a member steps forward (x 124) / back (x 132): its sprites moved
-bt_step_fwd:
-            ld b, PARTY_X - 8
-            jr bt_movex
-bt_step_back:
-            ld b, PARTY_X
-bt_movex:   ld e, a                         ; OAM 4 + 6 A: six sprites' x
-            add a, a
-            add a, e
-            add a, a
-            add a, a
-            add a, a
-            add a, 16 + 1
-            ld l, a
-            ld h, high(oam_buf)
-            ld a, b
-            add a, 8
-            ld c, 3
-.r:         ld [hl], a
-            inc l
-            inc l
-            inc l
-            inc l
-            add a, 8
-            ld [hl], a
-            sub 8
-            inc l
-            inc l
-            inc l
-            inc l
-            dec c
-            jr nz, .r
-            ret
-
 ; ---- an enemy target (living enemies, in slot order): A = slot, C set on B
 bt_target_enemy:
             ld a, $FF
@@ -850,7 +824,8 @@ bt_round:   ld hl, bt_order                 ; 0-8 enemies, $80-$83 the members
             jr .chk
 .pl:        and 3
             call bt_player_turn
-.chk:       call bt_check_end
+.chk:       call bt_party_upd               ; (FF1: the members' natural poses again)
+            call bt_check_end
             ld a, [bt_result]
             and a
             ret nz
@@ -862,6 +837,7 @@ bt_round:   ld hl, bt_order                 ; 0-8 enemies, $80-$83 the members
             xor a
             ld [bt_first], a
             call bt_round_end               ; poison etc. (FF1 ApplyEndOfRoundEffects)
+            call bt_party_upd
             jp bt_check_end
 
 ; the battle over? all enemies gone: 1 won; the party all dead / stone: 2 lost
@@ -1133,11 +1109,25 @@ bt_pl_attack:
             call bt_msg_pl
             ld a, [bt_tgt]
             call bt_msg_to_en
-            ld a, [df_ails]                 ; FF1 DoExplosionEffect: the "cha" sound (not on
-            and AIL_DEAD | AIL_STONE        ;   an enemy already down)
+            call bt_msg_head                ; (the attacker -> target row first)
+            call bt_flush
+            ld a, [bt_who]                  ; FF1 WalkForwardAndStrike with the weapon's
+            call bt_cblk                    ;   graphic and palette (none: not drawn)
+            ld hl, C_WGFX
+            add hl, de
+            ld a, [hl+]
+            ld [bt_ag], a
+            ld a, [hl]
+            ld [bt_ac], a
+            ld a, [bt_who]
+            call bt_strike
+            ld a, [df_ails]                 ; FF1 DoExplosionEffect: the "cha" sound and the
+            and AIL_DEAD | AIL_STONE        ;   explosions (not on an enemy already down)
             jr nz, .ns
             ld a, SFX_HIT
             ld [sfx_req], a
+            ld a, [bt_tgt]
+            call bt_explode
 .ns:        call bt_phys
             pop hl                          ; back into the enemy's record
             ld de, E_HP
@@ -1218,8 +1208,11 @@ bt_en_attack:                               ; enemy [bt_who] -> member A
             call bt_msg_en
             ld a, [bt_tgt]
             call bt_msg_to_pl
-            ld a, SFX_ENEMYHIT              ; FF1: the "boom bash" sound
+            call bt_msg_head
+            call bt_flush
+            ld a, SFX_ENEMYHIT              ; FF1: the "boom bash" sound, the screen shakes
             ld [sfx_req], a
+            call bt_shake
             call bt_phys
             pop hl
             ld de, E_AIL
@@ -1664,6 +1657,7 @@ bt_rnd_member:
 
 ; an enemy off the screen (its cells empty)
 bt_erase_enemy:
+            jp bt_erase_rows                ; (row by row: btl4.s)
             ld [bt_t + 4], a
             call bt_epos
             ld a, e

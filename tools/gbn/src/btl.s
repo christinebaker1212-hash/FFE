@@ -66,8 +66,9 @@ battle:     xor a                           ; (no menu sounds, no vehicle noise)
             jr z, .lost
             cp 1
             jr nz, .nv
-            ld a, TR_FANFARE                ; (FF1: the victory fanfare)
+            ld a, TR_FANFARE                ; (FF1: the victory fanfare, the party cheers)
             call snd_track
+            call bt_cheer
             call bt_victory
             ld a, [bt_type]                 ; Chaos defeated: the ending (A = 2)
             cp 4
@@ -1447,24 +1448,12 @@ bt_flush:   ldh a, [rLCDC]
 
 ; ---- the party: sprites in their column, the party window
 bt_draw_party:
-            xor a
-.m:         push af
-            ld c, a                         ; y 24 member, x 132; standing pose
-            add a, a
-            add a, c
-            add a, a
-            add a, a
-            add a, a
-            ld c, a
-            ld b, PARTY_X
-            pop af
-            push af
-            call bt_spr
-            pop af
-            inc a
-            cp 4
-            jr c, .m
-            ret
+            ld a, BOBJ_BANK                 ; FF1's pose / swing tables
+            ld hl, BO_POSE
+            ld de, bt_tsa
+            ld bc, 48
+            call far_copy
+            jp bt_party_upd                 ; (each in its natural pose: btl4.s)
 ; member A's standing pose at (B, C): OAM 4 + 6 A .. (2 x 3 sprites)
 bt_spr:     ld [bt_t + 9], a
             ld e, a                         ; OAM: oam_buf + 16 + 24 A
