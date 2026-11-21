@@ -1176,6 +1176,29 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
     sound 172, GB registers 60, OAM DMA 34, joypad 13; `build/hwsites.txt`).
   - checkall 62/62; lag DMG 23, CGB 0.
 
+- **Native presentation steps, 2026-11-21:**
+  - Small-font renderer in its own ROM bank 58 (`VWF_BANK`) with the glyphs pre-shifted at
+    build time.
+  - Battle text drawing deferred (`vclear_l` / dry-run `vstr_b` record jobs in cart RAM
+    bank 3; `vjob_run` draws them from `hle_vtile` before the first tile upload, in the
+    light frame after the layout).
+  - Sprite tile copies from ROM (`spr_mat`) count against the per-frame slot-load cap.
+  - Name-entry tile upload b21:8861 native (`ct16_b`).
+  - Text-printer ROM read-ahead (`rc_get` / `rd32`, 32 bytes in NES page 1 $C120,
+    unchecked scratch).
+  - Fixed-camera DMG loads stay masked (`dmg_loff`, `fix_mask`); whole OAM conversions copy
+    only visible entries.
+  - Unused HLE glyph tables dropped (`pu_fast` moved to HLE $6000).
+  - Checks: RAM identical, VRAM identical at 504 / 579 / 661 points.
+  - DMG lag 23 -> 22, CGB 0.
+  - The exact list of GB frames that overrun (GB column >= 2 in `LAG_DUMP`; the NES column
+    jitters 2/0): LCD-off screen loads (name entry, class select, menus: GB 3 frames for
+    the NES's 2; fill, DrawBox and text printer ~60% of them), whole OAM conversions after
+    screen changes, the prologue band fade, field-entry re-coding, battle start, and 6
+    battle message / animation frames. They are 15-50% over, so small cuts do not move
+    the count. Next: the native loaders and sprites of `docs/gb-native-presentation.md`.
+  - Scratch sampler (`psbuild.sh`) buffer moved to $C148, 24 samples a window.
+
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
   (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette
