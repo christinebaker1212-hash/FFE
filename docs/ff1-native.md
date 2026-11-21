@@ -128,3 +128,11 @@ one reaches parity, so the owner can keep playing).
   game flags, items, objects shown / hidden, the class change, the smith's sword (the ROM's
   weapon slot table), teleports after the box closes (battles: later). Checked: townsperson
   and the King of Coneria (DMG / CGB).
+- New game (screens.s, ui.py; code bank 2, our own UI code): title (Continue / New Game /
+  Message Speed), FF1's class select in the approved 4-box layout (class battle sprites from
+  the ROM: DMG pre-shaded by brightness rank, CGB in FF1's battle sprite palettes), name entry
+  with **names up to 6 letters** (letter grid, B deletes / goes back, Start ends), then each
+  member's class, name (letters 5-6 at save-page offset $3E) and FF1's starting stats from
+  the ROM's class table; level-1 MP for the magicians. Ends on the overworld start. Banked
+  code never maps another bank into its own window: data from other banks via far_copy.
+  Checked: PyBoy (DMG), mGBA (CGB).
