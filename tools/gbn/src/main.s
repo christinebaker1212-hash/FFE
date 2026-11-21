@@ -379,7 +379,11 @@ load_map:   ld [cur_map], a
             call memcpy
             ld hl, M_OBJDMG
             call obj_tiles
-.drw:       call obj_load
+.drw:       ld a, [ml_keep]                 ; (a reload keeps the objects)
+            and a
+            call z, obj_load
+            xor a
+            ld [ml_keep], a
             call font_map
             call draw_all
             call set_scroll
@@ -392,6 +396,23 @@ load_map:   ld [cur_map], a
             ld a, LCDC_ON
             ldh [rLCDC], a
             ret
+
+; the map drawn again after a full screen (menu): position, room and objects as they were
+map_reload: ld a, [inroom]
+            push af
+            ld a, 1
+            ld [ml_keep], a
+            ld a, [px]
+            ld d, a
+            ld a, [py]
+            ld e, a
+            ld a, [cur_map]
+            call load_map
+            pop af
+            and a
+            ret z
+            ld [inroom], a
+            jp room_redraw
 
 ; the map's object graphics blocks (HL = their tiles in the map bank, 256 bytes a block) to
 ; their tile bases ($8000 + 16 x base; LCD off)
@@ -485,7 +506,14 @@ move:       ld a, [moving]
             sub b
             cp 24
             ret nc
-            ldh a, [pad_new]                ; A on a standard map: talk to what is in front
+            ldh a, [pad_new]                ; Start: the main menu
+            bit 3, a
+            jr z, .nm
+            ld a, SCR_BANK
+            ld hl, menu_main
+            call bank_call
+            jp map_reload
+.nm:        ldh a, [pad_new]                ; A on a standard map: talk to what is in front
             bit 0, a
             jr z, .nt
             ldh a, [maptype]

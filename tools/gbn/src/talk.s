@@ -689,3 +689,4 @@ pend_btlf:  ds 1
 section wram, $CC90
 tc_id:      ds 1
 dlg_item:   ds 1
+ml_keep:    ds 1

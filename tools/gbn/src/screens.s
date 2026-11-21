@@ -33,14 +33,32 @@ scr_open:   ldh a, [rLCDC]
             ld [box_on], a
             ldh [scx], a
             ldh [scy], a
-            ld hl, $9800                    ; map: blank (code $20)
-            ld bc, $0400
+            ld a, 18
+            ld [sf_row], a
+            ld hl, smap                     ; the map copy: blank (code $20), window attributes
+            ld bc, 18 * 32
 .cl:        ld a, $20
             ld [hl+], a
             dec bc
             ld a, b
             or c
             jr nz, .cl
+            ld hl, sattr
+            ld bc, 18 * 32
+.cla:       ld a, WIN_ATTR
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .cla
+            ld hl, $9800                    ; VRAM map: blank
+            ld bc, $0400
+.cv:        ld a, $20
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .cv
             ld hl, oam_buf                  ; no sprites
             ld b, 160
             xor a
@@ -78,9 +96,9 @@ scr_open:   ldh a, [rLCDC]
             ld hl, U_CURCGB
             jr .cur
 .dmg:       ld a, COMMON                    ; DMG: the font at tile = code
-            ld hl, C_FONTDMG + $100
-            ld de, $9100
-            ld bc, $0700
+            ld hl, C_FONTDMG + $10          ; (icons $01-$1F, frame, letters)
+            ld de, $9010
+            ld bc, $07F0
             call far_copy
             ld a, %11100100
             ldh [rBGP], a
@@ -102,9 +120,85 @@ scr_open:   ldh a, [rLCDC]
             ld bc, 12
             jp far_copy
 
-scr_show:   ld a, LCDC_ON
+; the map copy to VRAM: with the LCD off all of it and the LCD on; with the LCD on in the
+; next frames' V-Blanks (scr_frame)
+scr_show:   ldh a, [rLCDC]
+            bit 7, a
+            jr nz, scr_upd
+            xor a
+.r:         push af
+            call sf_one
+            pop af
+            inc a
+            cp 18
+            jr c, .r
+            ld a, 18
+            ld [sf_row], a
+            ld a, LCDC_ON
             ldh [rLCDC], a
             ret
+scr_upd:    xor a
+            ld [sf_row], a
+            ret
+; row A of the map copy (and its CGB attributes) to VRAM
+sf_one:     ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld d, h
+            ld e, l
+            ld bc, smap
+            add hl, bc
+            push hl
+            ld hl, $9800
+            add hl, de
+            ld d, h
+            ld e, l
+            pop hl
+            push de
+            push hl
+            ld b, 20
+.c:         ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .c
+            pop hl
+            pop de
+            ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, h
+            add a, 3                        ; (attributes: + $300)
+            ld h, a
+            ld a, 1
+            ldh [rVBK], a
+            ld b, 20
+.a:         ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .a
+            xor a
+            ldh [rVBK], a
+            ret
+; V-Blank (LCD on): rows still to upload, while the V-Blank lasts
+sf_step:    ld a, [sf_row]
+            cp 18
+            ret nc
+            ldh a, [rLY]
+            cp 144
+            ret c
+            cp 152
+            ret nc
+            ld a, [sf_row]
+            call sf_one
+            ld hl, sf_row
+            inc [hl]
+            jr sf_step
 
 ; the class battle sprites' standing poses (six classes from A) to sprite tiles 0-35
 scr_classes:
@@ -143,8 +237,12 @@ scr_classes:
             ret
 
 ; window: B = x, C = y, D = width, E = height (LCD off)
-scr_win:    push bc
-            call cell_addr                  ; HL = $9800 + 32 y + x
+scr_win:    push de
+            call .w
+            pop de
+            ret
+.w:         push bc
+            call cell_addr                  ; HL = smap + 32 y + x
             ld b, $10
             ld c, $11
             ld a, $12
@@ -187,7 +285,7 @@ scr_win:    push bc
             ld [hl], a
             ret
 
-; HL = $9800 + 32 C + B
+; HL = smap + 32 C + B (the map copy; attributes at + $300)
 cell_addr:  push de
             ld l, c
             ld h, 0
@@ -196,7 +294,7 @@ cell_addr:  push de
             add hl, hl
             add hl, hl
             add hl, hl
-            ld de, $9800
+            ld de, smap
             add hl, de
             ld a, l
             add a, b
@@ -234,26 +332,9 @@ scr_str:    push bc
 .x:         pop bc
             ret
 
-; the same with the LCD on: each cell written in mode 0 / 1
-scr_str_on: push bc
-            push hl
-            call cell_addr
-            ld d, h
-            ld e, l
-            pop hl
-.c:         ld a, [hl+]
-            and a
-            jr z, .x
-            ld b, a
-.w:         ldh a, [rSTAT]
-            and 2
-            jr nz, .w
-            ld a, b
-            ld [de], a
-            inc de
-            jr .c
-.x:         pop bc
-            ret
+; the same with the LCD on: into the copy, uploaded in the next V-Blanks
+scr_str_on: call scr_str
+            jp scr_upd
 
 ; the hand cursor at screen pixel (B = x, C = y), OAM entries 0-3
 scr_cursor: ld hl, cur_tbl
@@ -342,6 +423,7 @@ scr_spr23:  ld [scr_t1], a
 
 ; one frame: wait, pad, OAM
 scr_frame:  call wait_vbl
+            call sf_step
             jp read_pad
 
 ; ---- new game: title menu, party generation
@@ -942,3 +1024,8 @@ ni_y:       ds 1
 scr_buf:    ds 32
 cur_tbl:    ds 8
 cls_pal:    ds 12
+sf_row:     ds 1
+section wram, $D400
+smap:       ds 18 * 32                      ; the screen's map copy (attributes at + $300)
+section wram, $D700
+sattr:      ds 18 * 32
