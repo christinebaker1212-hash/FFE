@@ -133,3 +133,15 @@ apart from working buffers (cart RAM disabled after each save access), clear mem
 soft reset, LCD/VRAM/OAM timing, no debug code in release builds, and for FF3 a "Game Boy
 Color only" screen on older systems.
 
+
+
+## Native rewrite (2026-11-21)
+- Check every new screen against the NES picture (tools/gb/formations.py / battleshot.py give
+  NES reference shots) on both CGB and DMG before calling it done. The fiend / Chaos battle
+  shipped with swapped cell nibbles and an off-by-one attribute row because only one mode was
+  looked at, and only at a glance.
+- Keep the V-Blank interrupt short: VRAM uploads that wait for lines 144-151 starve if the
+  handler does other work there (the music engine in V-Blank froze DMG battles). Non-VRAM work
+  (music) runs from the line-64 STAT interrupt.
+- Look at several frames after an input, not one: a window that "looks fine" at one frame can
+  still take 40 frames to settle or never settle.

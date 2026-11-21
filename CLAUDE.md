@@ -1257,10 +1257,11 @@ Done: maps, overworld, teleports, doors / rooms, objects, dialogue, all talk rou
 treasure chests, title / class select / 6-letter name entry, main menu, items, magic,
 weapons / armor, status, shops / inn / clinic, save to cart RAM, FF3 icons before item /
 spell names (from the user's FF3 ROM), battle (formations, approved layout, commands,
-FF1's formulas, magic, AI, items, rewards, level ups), random encounters, talk battles.
-Next: fiend / Chaos graphics, battle animations, music and sound (native engine), vehicles
-(ship, canoe, airship) and events, prologue / story scenes, ending, continue / options,
-SGB, Lot Check pass, release.
+FF1's formulas, magic, AI, items, rewards, level ups, fiend / Chaos graphics checked against
+the NES), random encounters, talk battles, vehicles, music (native engine, map / event
+tracks), prologue / bridge story / ending, continue + soft reset, special floor tiles.
+Next: sound effects, battle animations, minimap, 15-puzzle, options, SGB, Lot Check pass,
+lag check, release. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
