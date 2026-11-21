@@ -145,3 +145,8 @@ Color only" screen on older systems.
   (music) runs from the line-64 STAT interrupt.
 - Look at several frames after an input, not one: a window that "looks fine" at one frame can
   still take 40 frames to settle or never settle.
+- PyBoy runs a dual-mode cart (header $80) as a Game Boy Color unless `cgb=False` is passed:
+  a "DMG" check in PyBoy without it tests the CGB path.
+- A "fix" isn't done until the picture that showed the bug has been looked at again: the DMG
+  white boxes behind large enemies survived a first fix aimed at the wrong cause (the real one:
+  a row counter overflowing at 36 tiles).
