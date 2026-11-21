@@ -9048,9 +9048,7 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
             ld h, a
             ld a, [hl]
             ret
-.grom:      call nes_rd
-            ld a, l
-            ret
+.grom:      jp rc_get                       ; ROM: through the read-ahead (rc_get)
 .adv:       ld hl, NES_RAM + $3E            ; INC $3E / $3F, INC $54; a letter written (D bit 6)
             inc [hl]
             jr nz, .av
@@ -10658,11 +10656,14 @@ oamconv_b:  and $07
             inc c
             ld a, [bc]
             ld [de], a
-            ld de, OC_COPY
-            ld l, e
+            ld de, OC_COPY                  ; (y of every entry; the other three bytes only of
+            ld l, e                         ;   the visible ones: occmp compares y alone where
+            push hl                         ;   both are hidden)
 .cp:        ld a, [hl+]
             ld [de], a
             inc e
+            cp $EF
+            jr nc, .ch
             ld a, [hl+]
             ld [de], a
             inc e
@@ -10673,7 +10674,15 @@ oamconv_b:  and $07
             ld [de], a
             inc e
             jr nz, .cp
-            dec h
+            jr .cd
+.ch:        inc l
+            inc l
+            inc l
+            inc e
+            inc e
+            inc e
+            jr nz, .cp
+.cd:        pop hl
             ld a, 1
             jr .pk
 .pl:        xor a
@@ -14712,7 +14721,7 @@ mpre:       ld a, MAPS_BANK0
 ; ---- palup2_b's fast path (v = $3F00 + C, increment 1): C = the first index, HL -> its colour
 ; ($03D0 from index 16 on). Each colour compared with the shadow at its constant index; a
 ; changed one to the shadow and its flags (pu_chg, as rt_ppu_w7g's palette write).
-section bank HLE_BANK, $7610
+section bank HLE_BANK, $6000
 pu_fast:    ld a, c
             cp 32
             jr nc, .end
@@ -18804,4 +18813,167 @@ vchar_n:    cp $FD
             scf
             adc a, b
             ld [VW_VX], a
+            ret
+
+; ---- b21:8861-887A (name entry, every frame): LDA $2002, PPU $1D00, then the 16 bytes at
+; b21:887C (CT16_T, copied by build.py) to $2007: sprite tile $D0. Unchanged bytes are left
+; alone by the generic path anyway, so when all 16 equal the sprite shadow (the tile brought
+; into the shadow first if still in ROM), only the PPU address moves on ($1D10); else the
+; generic writes. Out: A = the last byte, X = $10, Y kept; N = 0, Z = 1, C = 1 (CPX #$10).
+section bank PF_BANK, $6F40
+ct16_b:     ldh a, [code_bank]
+            push af
+            ld a, PF_BANK
+            ldh [code_bank], a
+            push bc
+            call rt_ppu_r2
+            ld a, $1D
+            call rt_ppu_w6
+            xor a
+            call rt_ppu_w6
+            ld a, $D0
+            call spr_mat
+            ld a, 1
+            ld [$4000], a
+            ld hl, CT16_T
+            ld de, SPR_SHADOW + $D0 * 16
+            ld c, 8
+.p0:        ld a, [de]                      ; plane 0 -> even bytes
+            cp [hl]
+            jr nz, .gen
+            inc hl
+            inc e
+            inc e
+            dec c
+            jr nz, .p0
+            ld de, SPR_SHADOW + $D0 * 16 + 1
+            ld c, 8
+.p1:        ld a, [de]                      ; plane 1 -> odd bytes
+            cp [hl]
+            jr nz, .gen
+            inc hl
+            inc e
+            inc e
+            dec c
+            jr nz, .p1
+            xor a
+            ld [$4000], a
+            ld a, $1D                       ; all the same: $1D10 (two $2006 writes leave the
+            call rt_ppu_w6                  ;   latch as the 16 data writes do)
+            ld a, $10
+            call rt_ppu_w6
+            jr .out
+.gen:       xor a
+            ld [$4000], a
+            ld a, $1D
+            call rt_ppu_w6
+            xor a
+            call rt_ppu_w6
+            ld hl, CT16_T
+            ld c, 16
+.w:         ld a, [hl+]
+            push hl
+            push bc
+            call rt_ppu_w7g
+            pop bc
+            pop hl
+            dec c
+            jr nz, .w
+.out:       pop bc
+            pop af
+            ldh [code_bank], a
+            xor a
+            ldh [nzv], a
+            ld de, $0010                    ; X = $10
+            ld a, [CT16_T + 15]
+            scf
+            ld h, a
+            ld l, $D0                       ; flags: Z = 1, C = 1 (bits 7, 4), N via nzv
+            push hl
+            pop af
+            ret
+
+; ---- txrun_b's ROM read-ahead (Lot Check-safe scratch: NES page 1 above FF1's $0100 /
+; $0110-$0112 and below the deepest stack seen, not part of the RAM checks; cleared at boot)
+
+section bank 0, $2F84
+; HL = NES ROM address ($8000-$FFFF), 32-aligned; DE = destination: 32 bytes copied (ROM
+; through its data bank, then code_bank mapped again). Keeps nothing.
+rd32:       ld a, h
+            cp $C0
+            jr nc, .c
+            sub $40
+            ld h, a
+            ldh a, [data_bank8]
+            jr .go
+.c:         cp $E0
+            jr nc, .e
+            sub $80
+            ld h, a
+            ldh a, [data_bankC]
+            jr .go
+.e:         sub $80
+            ld h, a
+            ld a, DATA + 31
+.go:        ld [$2000], a
+            ld b, 32
+.l:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .l
+            ldh a, [code_bank]
+            ld [$2000], a
+            ret
+
+; ---- txrun_b .get from ROM: a 32-byte read-ahead copy (RC_BUF; tag = the block's NES address
+; and its data bank). HL = NES address -> A. Keeps BC, DE.
+section bank PF_BANK, $7366
+rc_get:     push de                         ; ROM: through a 32-byte read-ahead copy (RC_BUF;
+            ld a, l                         ;   tag = the block's NES address and bank)
+            and $E0
+            ld e, a
+            ld a, [RC_HI]
+            cp h
+            jr nz, .rf
+            ld a, [RC_LO]
+            cp e
+            jr nz, .rf
+            call .rcb
+            ld d, a
+            ld a, [RC_B]
+            cp d
+            jr nz, .rf
+.rh:        ld a, l
+            and $1F
+            add a, low(RC_BUF)
+            ld e, a
+            ld d, high(RC_BUF)
+            ld a, [de]
+            pop de
+            ret
+.rf:        push bc
+            push hl
+            ld a, h
+            ld [RC_HI], a
+            ld a, e
+            ld [RC_LO], a
+            ld l, e
+            call .rcb
+            ld [RC_B], a
+            ld de, RC_BUF
+            call rd32
+            pop hl
+            pop bc
+            jr .rh
+.rcb:       ld a, h                         ; A = the data bank of address H
+            cp $C0
+            jr nc, .rc1
+            ldh a, [data_bank8]
+            ret
+.rc1:       cp $E0
+            jr nc, .rc2
+            ldh a, [data_bankC]
+            ret
+.rc2:       ld a, DATA + 31
             ret

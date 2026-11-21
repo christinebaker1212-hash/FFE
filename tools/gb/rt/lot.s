@@ -91,7 +91,9 @@ soft_reset: di
 ; cleared: bank 1 (tile shadows) and bank 3 $A000-$B0FF (SGB packets, sprite / BG bookkeeping,
 ; buffers); not the suspend point (bank 2, bank 3 $B100-$BDFF) or the options (bank 3 $BF00),
 ; which persist. Then the save checked (see above).
-save_boot:  ld a, 1
+save_boot:  xor a                           ; (txrun_b's ROM read-ahead: no block yet)
+            ld [RC_HI], a
+            ld a, 1
             ld [$4000], a
             ld hl, $A000
             ld bc, $2000

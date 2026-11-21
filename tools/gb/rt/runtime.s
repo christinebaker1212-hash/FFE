@@ -25,6 +25,10 @@ SLOT_KEY   = $D880          ; GB slot -> coding of its tile (SPAL_KEY value; $FF
 SGB_BANK   = 63             ; ROM bank of the SGB packet builder (sgb.s)
 HLE_BANK   = 62             ; ROM bank of the native FF1 routines (ff1_native.s)
 PF_BANK    = 60             ; ROM bank of the DMG tile-coding plane routines and the LCD-on map scan
+RC_BUF     = $C120          ; txrun_b's ROM read-ahead (NES page 1, unchecked scratch): 32 bytes
+RC_HI      = $C140          ;   from the NES address RC_HI:RC_LO in bank RC_B
+RC_LO      = $C141
+RC_B       = $C142
 VWF_BANK   = 58             ; ROM bank of the small-font renderer and its pre-shifted glyphs (ff1_native.s vstr_n)
 OC_BANK    = 59             ; ROM bank of oamconv_b's unrolled compare (ff1_native.s occmp)
 DYN_BANK   = 61             ; ROM bank of the dynamic-target table (recomp.py: buckets by low byte)
@@ -297,6 +301,26 @@ section bank 0, $0050
 section bank 0, $0100
             nop
             jp boot
+
+section bank 0, $0068
+; DMG / SGB LCD switched off on a fixed-camera screen (menus, new game, shops: not the battle,
+; not the field camera): the load writes only the shadows (VLCD 1) and the GB map is rebuilt
+; from them when the LCD goes on (MAP_RB, dmg_maprb), instead of every write going to both.
+fix_mask:   ldh a, [is_cgb]
+            and a
+            ret nz
+            ldh a, [in_battle]
+            and a
+            ret nz
+            ldh a, [cam_x]
+            cp CAM_X
+            jr nz, .m
+            ldh a, [cam_y]
+            cp CAM_Y
+            ret z
+.m:         ld a, 1
+            ld [VLCD], a
+            ret
 
 ; ------------------------------------------------------------------ boot
 section bank 0, $0150
@@ -2033,6 +2057,7 @@ rt_ppu_w1:  push af
             ldh [pro_mode], a               ; (the prologue sets it again on each page)
             ld b, 0
             call flush_q
+            call fix_mask                   ; (fixed-camera screens: shadows only, lot.s)
 .ret:       pop hl
             pop de
             pop bc
@@ -2054,7 +2079,17 @@ dmg_loff:   ldh a, [lcd_on]
             ldh [$FF05], a
             ld a, [MAP_RB]                  ; nothing went to the shadows only meanwhile: the
             and a                           ;   rest of the load writes the GB map itself, as
-            jr nz, .kp                      ;   with an immediate switch-off
+            jr nz, .kp                      ;   with an immediate switch-off; except on the
+            ldh a, [in_battle]              ;   fixed-camera screens (menus, new game, shops:
+            and a                           ;   not the battle, not the field camera), whose
+            jr nz, .dm                      ;   load writes only the shadows and has the GB map
+            ldh a, [cam_x]                  ;   rebuilt when it shows (dmg_maprb)
+            cp CAM_X
+            jr nz, .kp
+            ldh a, [cam_y]
+            cp CAM_Y
+            jr nz, .kp
+.dm:        xor a
             ld [VLCD], a
 .kp:        ld b, 0
             jp flush_q
@@ -4008,3 +4043,4 @@ hdma_flush: ldh a, [$FF70]
             pop af
             ldh [$FF70], a
             ret
+

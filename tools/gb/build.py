@@ -247,7 +247,7 @@ def vwf_tables(prg, far_sym):
     of the English NES ROM into the native bank for vstr_b (rt/ff1_native.s)."""
     n = 256 - 0x7A
     if 'GW' not in far_sym or 'GR' not in far_sym:
-        return ('VW_GR_NES = 0\nsection bank HLE_BANK, $7A00\nvw_gw:\nvw_gr:\nsection bank HLE_BANK, $6000\nVW_SHR:\nvw_gw60:\n'
+        return ('VW_GR_NES = 0\nsection bank PF_BANK, $6700\nvw_gw60:\n'
                 'section bank VWF_BANK, $4300\nvw_gw58:\nVWS_LO:\nVWS_HI:\n' + lpool_table(prg))
     off = lambda a: FAR_BANK * 0x2000 + a - 0xC000
     gw = prg[off(far_sym['GW']):off(far_sym['GW']) + n]
@@ -269,9 +269,8 @@ def vwf_tables(prg, far_sym):
     vws = ('section bank VWF_BANK, $4400\nVWS_LO:\n%s\nsection bank VWF_BANK, $4500\nVWS_HI:\n%s\n'
            'section bank VWF_BANK, $4600\nVWS_DATA:\n%s\nsection bank VWF_BANK, $4300\nvw_gw58:\n%s\n'
            % (rows([a_ & 0xFF for a_ in addr]), rows([a_ >> 8 for a_ in addr]), rows(b''.join(data)), rows(gw)))
-    return ('VW_GR_NES = $%04X\nsection bank HLE_BANK, $7A00\nvw_gw:\n%s\nvw_gr:\n%s\n' % (far_sym['GR'], rows(gw), rows(gr)) + vws
-            + 'section bank PF_BANK, $6700\nvw_gw60:\n%s\n' % rows(gw) + lpool_table(prg)
-            + 'section bank HLE_BANK, $6000\nVW_SHR:\n%s\n' % rows(shr))
+    return ('VW_GR_NES = $%04X\n' % far_sym['GR'] + vws
+            + 'section bank PF_BANK, $6700\nvw_gw60:\n%s\n' % rows(gw) + lpool_table(prg))
 
 
 def check_header(rom, rom_banks):
@@ -404,6 +403,11 @@ def main():
         rc.g.idioms[('b14', 0xABCE)] = ('pf:save_commit', 0xABD0, 'NZ')
     else:
         print('  b14 SaveGame: code not found, the save not committed to its own bank')
+    o21 = 21 * 0x4000 - 0x8000                       # b21:8861, name entry's sprite tile upload
+    if prg[o21 + 0x8861:o21 + 0x887C].hex() == 'ad0220a91d8d0620a9008d0620a200bd7c888d0720e8e010d0f560':
+        rc.g.idioms[('b21', 0x8861)] = ('pf:ct16_b', 0x887B, 'NZC')
+    else:
+        print('  b21 8861 tile upload: code not found, not native')
     o12b = 12 * 0x4000 - 0x8000
     shuf_ok = (prg[o12b + 0xA169:o12b + 0xA17A].hex() == 'a00db95ba199476888d0f78cf86a8c866b' and
                prg[o12b + 0xA17A:o12b + 0xA1A4].hex() == 'a9118d8e68a900a20c205dae48a900a20c205daea868aab948'
@@ -607,6 +611,8 @@ def main():
                                for i in range(0, len(b), 16))   #   sq(a + b) - sq(|a - b|))
     rngt = prg[fixo + 0x1CE6:fixo + 0x1CE6 + 256]   # shuf_b: FF1's RNG table, its bytes x 13 >> 8,
     o12 = 12 * 0x4000 - 0x8000                       #   the turn order's start values (b12:A15C)
+    rt += '\nsection bank PF_BANK, $6FF0\nCT16_T:\n            db %s\n' % ', '.join(
+        '$%02X' % x for x in prg[21 * 0x4000 - 0x8000 + 0x887C:21 * 0x4000 - 0x8000 + 0x888C])
     rt += ('\nsection bank PF_BANK, $6600\nSHUF_H:\n%s\n'
            'section bank PF_BANK, $65F0\nSHUF_I:\n            db %s\n' % (rows([x * 13 >> 8 for x in rngt]),
                                               ', '.join('$%02X' % x for x in prg[o12 + 0xA15C:o12 + 0xA169])))
