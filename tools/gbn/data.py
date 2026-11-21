@@ -138,42 +138,62 @@ def mapman_table(rom):
     return fix[i:i + 64]
 
 
-def map_pack(rom, m, cls=0):
-    """everything the field engine needs for standard map m"""
-    ts = rom.rd(BANK_SMINFO, TILESETS + m)
+NORM_TELE_X, NORM_TELE_Y, NORM_TELE_MAP = 0xAD00, 0xAD40, 0xAD80   # BANK_TELEPORTINFO = 0
+EXIT_TELE_X, EXIT_TELE_Y = 0xAC60, 0xAC70
+ENTR_TELE_X, ENTR_TELE_Y, ENTR_TELE_MAP = 0xAC00, 0xAC20, 0xAC40
+N_MAPS = 61
+
+
+def tileset_pack(rom, ts):
+    """a standard-map tileset: properties, metatile corner tiles (CGB: the NES tile numbers),
+    metatile palettes, the 128 BG tiles in GB form"""
     prop = rom.rd(BANK_SMINFO, SM_PROP + 256 * ts, 256)
     tsa = rom.rd(BANK_SMINFO, SM_TSA + 512 * ts, 512)
     attr = rom.rd(BANK_SMINFO, SM_ATTR + 128 * ts, 128)
+    chr_ = rom.rd(BANK_TILESETCHR, 0x8000 + 0x800 * ts, 0x800)
+    return dict(prop=prop, tsa=tsa, mt_pal=bytes(a & 3 for a in attr),
+                cgb_tiles=b''.join(gb_tile(chr_[16 * t:16 * t + 16]) for t in range(128)))
+
+
+def map_pack(rom, m, cls=0):
+    """a standard map: metatiles, palettes (outside / in a room), and for DMG the tiles
+    pre-shaded per (tile, shading) with a metatile table for each room state"""
+    ts = rom.rd(BANK_SMINFO, TILESETS + m)
+    t = tileset_pack(rom, ts)
     pal = bytearray(rom.rd(BANK_SMINFO, SM_PAL + 0x30 * m, 0x30))
     mp = rom.rd(BANK_SMINFO, MAPMAN_PAL + 2 * cls, 2)
     pal[0x12], pal[0x16] = mp[0], mp[1]
-    chr_ = rom.rd(BANK_TILESETCHR, 0x8000 + 0x800 * ts, 0x800)           # 128 BG tiles
-    spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)           # 16 sprite tiles
-    mt_pal = [a & 3 for a in attr]
-    bgpal = [[pal[0]] + list(pal[4 * p + 1:4 * p + 4]) for p in range(4)]
-    # CGB: the NES tiles as they are; DMG: a tile per (NES tile, palette) pre-shaded
-    cgb_tiles = b''.join(gb_tile(chr_[16 * t:16 * t + 16]) for t in range(128))
-    msh = map_shades(bgpal)
-    var = {}; dmg_tiles = bytearray()
-    mt_cgb = [[0] * 128 for _ in range(4)]; mt_dmg = [[0] * 128 for _ in range(4)]
-    for k in range(4):                                   # ul, ur, dl, dr
-        for mt in range(128):
-            t, p = tsa[128 * k + mt], mt_pal[mt]
-            mt_cgb[k][mt] = t
-            if (t, p) not in var:
-                var[(t, p)] = len(var)
-                dmg_tiles += gb_tile(chr_[16 * t:16 * t + 16], [msh[c] for c in bgpal[p]])
-            mt_dmg[k][mt] = var[(t, p)]
+    chr_ = rom.rd(BANK_TILESETCHR, 0x8000 + 0x800 * ts, 0x800)
+    var = {}; dmg_tiles = bytearray(); mt_dmg = {}
+    cgb_bg = {}
+    for room, off in (('out', 0), ('in', 0x20)):
+        bg = [[pal[off]] + list(pal[off + 4 * p + 1:off + 4 * p + 4]) for p in range(4)]
+        msh = map_shades(bg)
+        tbl = bytearray(512)
+        for k in range(4):
+            for mt in range(128):
+                nt, p = t['tsa'][128 * k + mt], t['mt_pal'][mt]
+                key = (nt, tuple(msh[c] for c in bg[p]))
+                if key not in var:
+                    var[key] = len(var)
+                    dmg_tiles += gb_tile(chr_[16 * nt:16 * nt + 16], key[1])
+                tbl[128 * k + mt] = var[key]
+        mt_dmg[room] = bytes(tbl)
+        cgb_bg[room] = b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in bg[p])
     assert len(var) <= 256, 'map %d: %d DMG tile variants' % (m, len(var))
-    cgb_bg = b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in bgpal[p])
     sppal = [[pal[0x10]] + list(pal[0x10 + 4 * p + 1:0x10 + 4 * p + 4]) for p in range(2)]
     cgb_obj = b''.join(rgb555(c).to_bytes(2, 'little') for p in range(2) for c in sppal[p])
-    obp = [obj_shades(sppal[p]) for p in range(2)]
-    return dict(ts=ts, map=std_map(rom, m), prop=prop, mt_cgb=mt_cgb, mt_dmg=mt_dmg,
-                mt_pal=mt_pal, cgb_tiles=cgb_tiles, dmg_tiles=bytes(dmg_tiles),
-                n_dmg=len(var), cgb_bg=cgb_bg, cgb_obj=cgb_obj, obp=obp,
-                spr_tiles=b''.join(gb_tile(spr[16 * t:16 * t + 16]) for t in range(16)),
-                mapman=mapman_table(rom))
+    return dict(ts=ts, map=std_map(rom, m), mt_dmg_out=mt_dmg['out'], mt_dmg_in=mt_dmg['in'],
+                dmg_tiles=bytes(dmg_tiles), n_dmg=len(var), cgb_bg_out=cgb_bg['out'],
+                cgb_bg_in=cgb_bg['in'], cgb_obj=cgb_obj, obp=bytes(obj_shades(p) for p in sppal))
+
+
+def common_pack(rom, cls=0):
+    """the party sprite, FF1's sprite tables, the teleport tables"""
+    spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)
+    tele = b''.join(rom.rd(BANK_SMINFO, a, 64) for a in (NORM_TELE_X, NORM_TELE_Y, NORM_TELE_MAP))
+    return dict(spr_tiles=b''.join(gb_tile(spr[16 * t:16 * t + 16]) for t in range(16)),
+                mapman=mapman_table(rom), tele=tele)
 
 
 def db(name, data, per=16):

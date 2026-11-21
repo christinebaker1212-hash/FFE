@@ -1,19 +1,46 @@
-; FF1 native engine (docs/ff1-native.md), milestone 1: boot, a standard map, walking.
-; Our own code. Game data comes from the ROM banks tools/gbn/build.py fills at build time:
-;   DATA_MAP  (bank 1): map (64 x 64), tile properties, metatile tables
-;   DATA_GFX  (bank 2): tiles, palettes, the party sprite tables
-; Every label of those banks is defined by the generated data source.
+; FF1 native engine (docs/ff1-native.md): boot, standard maps, walking, doors / rooms,
+; teleports. Our own code. Game data is in ROM banks filled at build time (tools/gbn/build.py):
+;   bank 1 (COMMON):  $4000 party sprite tiles (16), $4100 FF1's party sprite tables (64),
+;                     $4200 normal teleports: x (64), $4240 y (64), $4280 map (64)
+;   banks 8-15 (tileset t = TS_BANK0 + t): $4000 tile properties (256), $4100 metatile
+;                     corner tiles for CGB (UL, UR / DL, DR pages), $4300 metatile palettes
+;                     (128), $4400 the 128 BG tiles (CGB)
+;   banks 16- (map m = MAP_BANK0 + m): $4000 map (64 x 64), $5000 CGB BG palettes outside
+;                     (32), $5020 in a room (32), $5040 CGB OBJ palettes (16), $5050 DMG
+;                     OBP0 / OBP1, $5052 tileset, $5100 DMG metatile tiles outside (512),
+;                     $5300 in a room (512), $5800 DMG BG tiles (pre-shaded, up to 256)
 
-MT_DRAWQ   = 16             ; metatiles written per V-Blank at most
+MT_DRAWQ   = 20             ; metatiles written per V-Blank at most
 LCDC_ON    = $83            ; LCD on, BG tiles $8800 mode, BG map $9800, sprites 8x8 on
 MBC_BANK   = $2000
-DATA_MAP   = 1
-DATA_GFX   = 2
+COMMON     = 1
+TS_BANK0   = 8
+MAP_BANK0  = 16
 rVBK       = $FF4F
 rBCPS      = $FF68
 rBCPD      = $FF69
 rOCPS      = $FF6A
 rOCPD      = $FF6B
+T_PROP     = $4000
+T_MTCGB    = $4100
+T_MTPAL    = $4300
+T_TILES    = $4400
+M_MAP      = $4000
+M_BGOUT    = $5000
+M_BGIN     = $5020
+M_OBJ      = $5040
+M_OBP      = $5050
+M_TS       = $5052
+M_MTOUT    = $5100
+M_MTIN     = $5300
+M_TILES    = $5800
+C_SPR      = $4000
+C_MAPMAN   = $4100
+C_TELEX    = $4200
+TP_NOMOVE  = $01
+MT_CLOSED  = $36            ; FF1's door metatiles (MAPTILE_CLOSEDDOOR / OPENDOOR / LOCKEDDOOR)
+MT_OPEN    = $37
+MT_LOCKED  = $3B
 
 section bank 0, $0040
             jp vblank
@@ -74,19 +101,20 @@ start:      di
             inc de
             dec b
             jr nz, .dc
-            call gfx_load
-            ld a, 16                        ; party at the town's entrance, facing down
-            ld [px], a
-            ld a, 23
-            ld [py], a
+            ld a, $FF
+            ld [mt_force], a
+            ld a, COMMON                    ; party sprite tiles at $8000
+            ld [MBC_BANK], a
+            ld hl, C_SPR
+            ld de, $8000
+            ld bc, 16 * 16
+            call memcpy
             ld a, 3
             ld [facing], a
-            call draw_all
-            call set_scroll
-            call make_oam
-            call hram_dma
-            ld a, LCDC_ON
-            ldh [rLCDC], a
+            ld a, 0                         ; Coneria, at the town's entrance
+            ld d, 16
+            ld e, 23
+            call load_map
             xor a
             ldh [rIF], a
             ld a, 1                         ; V-Blank interrupt
@@ -109,7 +137,7 @@ wait_vbl:   xor a
             jr z, .w
             ret
 
-; ---- V-Blank: OAM, scroll, queued metatiles
+; ---- V-Blank: OAM, scroll, palettes, queued metatiles
 vblank:     push af
             push bc
             push de
@@ -119,6 +147,9 @@ vblank:     push af
             ldh [rSCX], a
             ldh a, [scy]
             ldh [rSCY], a
+            ldh a, [pal_req]
+            and a
+            call nz, bg_pal
             ld c, MT_DRAWQ
             call q_flush
             ld a, 1
@@ -152,6 +183,111 @@ read_pad:   ld a, $20
             ldh [rP1], a
             ret
 
+; ---- load standard map A with the party at (D = x, E = y): LCD off in V-Blank, graphics,
+; palettes, the map drawn, LCD on
+load_map:   ld [cur_map], a
+            ld b, a
+            ld a, d
+            ld [px], a
+            ld a, e
+            ld [py], a
+            xor a
+            ld [inroom], a
+            ld [moving], a
+            ld [mcount], a
+            ld [mdx], a
+            ld [mdy], a
+            ld [q_n], a
+            ld [q_rd], a
+            ld a, b
+            add a, MAP_BANK0
+            ld [map_bank], a
+            ld [MBC_BANK], a
+            ld a, [M_TS]
+            add a, TS_BANK0
+            ld [ts_bank], a
+            ldh a, [rLCDC]                  ; LCD off (in V-Blank)
+            bit 7, a
+            jr z, .off
+.vw:        ldh a, [rLY]
+            cp 144
+            jr c, .vw
+            xor a
+            ldh [rLCDC], a
+.off:       ldh a, [is_cgb]
+            and a
+            jr z, .dmg
+            ld a, [ts_bank]                 ; CGB: the tileset's 128 tiles -> $9000
+            ld [MBC_BANK], a
+            ld hl, T_TILES
+            ld de, $9000
+            ld bc, 128 * 16
+            call memcpy
+            ld a, [map_bank]
+            ld [MBC_BANK], a
+            ld hl, M_BGOUT
+            ld a, $80
+            call cgb_pal32
+            ld a, $80
+            ldh [rOCPS], a
+            ld hl, M_OBJ
+            ld b, 16
+.op:        ld a, [hl+]
+            ldh [rOCPD], a
+            dec b
+            jr nz, .op
+            jr .drw
+.dmg:       ld a, [map_bank]                ; DMG: pre-shaded variants 0-127 -> $9000,
+            ld [MBC_BANK], a                ;   128-255 -> $8800
+            ld hl, M_TILES
+            ld de, $9000
+            ld bc, 128 * 16
+            call memcpy
+            ld de, $8800
+            ld bc, 128 * 16
+            call memcpy
+            ld a, %11100100                 ; tile values are shades
+            ldh [rBGP], a
+            ld a, [M_OBP]
+            ldh [rOBP0], a
+            ld a, [M_OBP + 1]
+            ldh [rOBP1], a
+.drw:       call draw_all
+            call set_scroll
+            ldh a, [scx]
+            ldh [rSCX], a
+            ldh a, [scy]
+            ldh [rSCY], a
+            call make_oam
+            call hram_dma
+            ld a, LCDC_ON
+            ldh [rLCDC], a
+            ret
+
+cgb_pal32:  ldh [rBCPS], a                  ; HL = 32 bytes of BG palettes 0-3
+            ld b, 32
+.p:         ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .p
+            ret
+
+; V-Blank, CGB: the BG palettes for the room state
+bg_pal:     xor a
+            ldh [pal_req], a
+            ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, [map_bank]
+            ld [MBC_BANK], a
+            ld hl, M_BGOUT
+            ld a, [inroom]
+            and a
+            jr z, .o
+            ld hl, M_BGIN
+.o:         ld a, $80
+            jp cgb_pal32
+
 ; ---- movement on a standard map (FF1: one metatile in 16 frames, a pixel a frame)
 move:       ld a, [moving]
             and a
@@ -178,7 +314,12 @@ move:       ld a, [moving]
             ld [mcount], a
             ld [mdx], a
             ld [mdy], a
-.idle:      ldh a, [pad]
+            call arrived                    ; teleports
+            ret c
+.idle:      ld a, [q_n]                     ; (a room redraw still being written: wait)
+            cp 24
+            ret nc
+            ldh a, [pad]
             ld bc, $0100                    ; B = dx, C = dy; facing in D
             ld d, 0
             bit 4, a
@@ -197,28 +338,31 @@ move:       ld a, [moving]
             ret z
 .go:        ld a, d
             ld [facing], a
-            ld a, [px]                      ; the target metatile: blocked if its tile
-            add a, b                        ;   properties say so (bit 0 of the first byte)
+            ld a, [px]                      ; the target metatile
+            add a, b
             and 63
+            ld [tx], a
             ld e, a
             ld a, [py]
             add a, c
             and 63
+            ld [ty], a
             ld d, a
             push bc
             call map_at                     ; A = metatile
-            add a, a
-            ld l, a
-            ld h, 0
-            ld de, sm_prop
-            add hl, de
-            ld a, DATA_MAP
-            ld [MBC_BANK], a
-            ld a, [hl]
+            call props                      ; D, E = its two property bytes
             pop bc
-            bit 0, a
-            ret nz
-            ld a, b
+            ld a, d                         ; doors and rooms
+            and $1E
+            cp $02
+            jr z, .door
+            cp $04
+            jr z, .door
+            cp $06
+            jr z, .close
+            bit 0, d
+            ret nz                          ; TP_NOMOVE
+.ok:        ld a, b
             ld [mdx], a
             ld a, c
             ld [mdy], a
@@ -227,11 +371,128 @@ move:       ld a, [moving]
             xor a
             ld [mcount], a
             jp draw_edge
+.door:      ld a, [inroom]                  ; into a room: palette, the open door drawn
+            and a
+            jr nz, .ok
+            push bc
+            ld a, 1
+            ld [inroom], a
+            ld a, [tx]
+            ld [door_x], a
+            ld a, [ty]
+            ld [door_y], a
+            ld b, MT_OPEN
+            call door_draw
+            call room_redraw
+            pop bc
+            jr .ok
+.close:     ld a, [inroom]                  ; out of the room: palette, the door closed
+            and a
+            jr z, .ok
+            push bc
+            xor a
+            ld [inroom], a
+            ld b, MT_CLOSED
+            call door_draw
+            call room_redraw
+            pop bc
+            jr .ok
 
-; ---- metatile number at (E = x, D = y) of the map
-map_at:     ld a, DATA_MAP
+; the step ended on (px, py): normal teleports (FF1: first property byte bits 7-6 = 10,
+; second byte = teleport number). C: the map changed.
+arrived:    ld a, [px]
+            ld e, a
+            ld a, [py]
+            ld d, a
+            call map_at
+            call props
+            ld a, d
+            and $C0
+            cp $80
+            jr z, .norm
+            and a
+            ret
+.norm:      ld a, COMMON
             ld [MBC_BANK], a
-            ld l, d                         ; HL = sm_map + 64 y + x
+            ld l, e
+            ld h, high(C_TELEX)
+            ld a, [hl]                      ; x
+            ld b, a
+            ld a, l
+            add a, $40
+            ld l, a
+            ld a, [hl]                      ; y
+            ld c, a
+            ld a, l
+            add a, $40
+            ld l, a
+            ld a, [hl]                      ; map
+            ld d, b
+            ld e, c
+            call load_map
+            scf
+            ret
+
+; A = metatile -> D, E = its property bytes (the tileset bank)
+props:      add a, a
+            ld l, a
+            ld h, high(T_PROP)
+            ld a, [ts_bank]
+            ld [MBC_BANK], a
+            ld a, [hl+]
+            ld d, a
+            ld e, [hl]
+            ret
+
+; the door metatile B at (door_x, door_y), queued
+door_draw:  di
+            ld a, [door_x]
+            ld e, a
+            ld a, [door_y]
+            ld d, a
+            ld a, b
+            ld [mt_force], a
+            call q_mt
+            ld a, $FF
+            ld [mt_force], a
+            ei
+            ret
+
+; room state changed: CGB palettes in the next V-Blank; DMG: the visible metatiles again with
+; the other pre-shaded tiles (the lines entering later are drawn with the new state anyway)
+room_redraw:
+            ld a, 1
+            ldh [pal_req], a
+            ldh a, [is_cgb]
+            and a
+            ret nz
+            di
+            ld a, [py]
+            sub 5
+            ld d, a
+            ld b, 11
+.r:         ld a, [px]
+            sub 6
+            ld e, a
+            ld c, 13
+.c:         push bc
+            push de
+            call q_mt
+            pop de
+            pop bc
+            inc e
+            dec c
+            jr nz, .c
+            inc d
+            dec b
+            jr nz, .r
+            ei
+            ret
+
+; ---- metatile number at (E = x, D = y) of the map (the map bank left mapped)
+map_at:     ld a, [map_bank]
+            ld [MBC_BANK], a
+            ld l, d                         ; HL = M_MAP + 64 y + x
             ld h, 0
             add hl, hl
             add hl, hl
@@ -243,7 +504,7 @@ map_at:     ld a, DATA_MAP
             add a, l
             ld l, a
             ld a, h
-            adc a, high(sm_map)
+            adc a, high(M_MAP)
             ld h, a
             ld a, [hl]
             ret
@@ -280,7 +541,7 @@ mulsign:    and a                           ; A = sign (-1 / 0 / 1) -> A = sign 
             ret
 
 ; ---- party sprite (FF1's 2x2 tables: tile, attributes for UL, DL, UR, DR)
-make_oam:   ld a, DATA_GFX
+make_oam:   ld a, COMMON
             ld [MBC_BANK], a
             ld a, [facing]
             add a, a
@@ -294,9 +555,7 @@ make_oam:   ld a, DATA_GFX
             add a, a
             add a, a
             ld l, a
-            ld h, 0
-            ld de, mapman_tbl
-            add hl, de
+            ld h, high(C_MAPMAN)
             ld de, oam_buf
             ld bc, $5050                    ; B = y + 16, C = x + 8 (screen 64 / 72)
             call .spr
@@ -336,7 +595,7 @@ make_oam:   ld a, DATA_GFX
             ret
 
 ; ---- drawing metatiles into the 32 x 32 BG ring (queued; written in V-Blank)
-; queue entry: VRAM address (lo, hi), tiles UL UR DL DR, CGB palette
+; queue entry (8 bytes): VRAM address (lo, hi), tiles UL UR DL DR, CGB palette
 draw_all:   ld a, [py]                      ; the 16 x 16 metatiles around the party, LCD off
             sub 7
             ld d, a
@@ -409,25 +668,34 @@ draw_edge:  di                              ; (no V-Blank flush while entries ar
             jr nz, .vl
             ret
 
-; queue metatile (E = x, D = y), map coordinates taken mod 64
+; queue metatile (E = x, D = y), map coordinates taken mod 64; mt_force != $FF draws that
+; metatile instead of the map's (the doors)
 q_mt:       ld a, e
             and 63
             ld e, a
             ld a, d
             and 63
             ld d, a
+            ld a, [q_n]                     ; full: dropped (a redraw follows anyway)
+            cp 128
+            ret nc
             push de
-            call map_at                     ; A = metatile (bank DATA_MAP mapped)
+            call map_at                     ; A = metatile
             pop de
-            ld c, a                         ; C = metatile
-            ld a, [q_n]
+            ld c, a
+            ld a, [mt_force]
+            cp $FF
+            jr z, .m
+            ld c, a
+.m:         ld a, [q_n]                     ; HL = qbuf + 8 n
             ld l, a
-            add a, a
-            add a, a
-            add a, a
-            sub l                           ; 7 bytes an entry
-            ld l, a
-            ld h, high(qbuf)
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            add a, high(qbuf)
+            ld h, a
             ld a, d                         ; address $9800 + 32 (2y & 31) + (2x & 31)
             add a, a
             and 31
@@ -453,11 +721,18 @@ q_mt:       ld a, e
             inc l
             ld [hl], d
             inc l
-            ld b, high(mt_dmg_ul)           ; the tile tables: DMG pre-shaded or CGB
-            ldh a, [is_cgb]
+            ldh a, [is_cgb]                 ; the tile tables: CGB (tileset bank) or DMG
+            and a                           ;   pre-shaded for the room state (map bank)
+            jr z, .dmg
+            ld a, [ts_bank]
+            ld [MBC_BANK], a
+            ld b, high(T_MTCGB)
+            jr .t
+.dmg:       ld b, high(M_MTOUT)
+            ld a, [inroom]
             and a
             jr z, .t
-            ld b, high(mt_cgb_ul)
+            ld b, high(M_MTIN)
 .t:         ld e, c                         ; four tables of 128, one per corner (256-aligned)
             ld d, b
             ld a, [de]
@@ -476,8 +751,10 @@ q_mt:       ld a, e
             ld e, a
             ld a, [de]
             ld [hl+], a
-            ld e, c                         ; palette
-            ld d, high(mt_pal)
+            ld a, [ts_bank]                 ; palette
+            ld [MBC_BANK], a
+            ld e, c
+            ld d, high(T_MTPAL)
             ld a, [de]
             ld [hl], a
             ld hl, q_n
@@ -488,14 +765,15 @@ q_mt:       ld a, e
 q_flush:    ld a, [q_n]
             and a
             ret z
-            ld a, [q_rd]
+            ld a, [q_rd]                    ; HL = qbuf + 8 rd
             ld l, a
-            add a, a
-            add a, a
-            add a, a
-            sub l
-            ld l, a
-            ld h, high(qbuf)
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            add a, high(qbuf)
+            ld h, a
 .e:         ld a, [hl+]
             ld e, a
             ld a, [hl+]
@@ -517,6 +795,7 @@ q_flush:    ld a, [q_n]
             ld a, [hl+]
             ld [de], a                      ; DR
             ld b, [hl]                      ; CGB: the palette into VRAM bank 1
+            inc hl
             inc hl
             pop de
             ldh a, [is_cgb]
@@ -542,9 +821,8 @@ q_flush:    ld a, [q_n]
 .n:         ld a, [q_rd]
             inc a
             ld [q_rd], a
-            ld a, [q_n]
             ld b, a
-            ld a, [q_rd]
+            ld a, [q_n]
             cp b
             jr z, .done
             dec c
@@ -554,51 +832,6 @@ q_flush:    ld a, [q_n]
             ld [q_n], a
             ld [q_rd], a
             ret
-
-; ---- graphics and palettes (LCD off)
-gfx_load:   ld a, DATA_GFX
-            ld [MBC_BANK], a
-            ldh a, [is_cgb]
-            and a
-            jr z, .dmg
-            ld hl, cgb_tiles                ; BG: the tileset's 128 tiles -> $9000
-            ld de, $9000
-            ld bc, 128 * 16
-            call memcpy
-            ld a, $80                       ; BG palettes 0-3, OBJ palettes 0-1
-            ldh [rBCPS], a
-            ld hl, cgb_bg
-            ld b, 32
-.bp:        ld a, [hl+]
-            ldh [rBCPD], a
-            dec b
-            jr nz, .bp
-            ld a, $80
-            ldh [rOCPS], a
-            ld hl, cgb_obj
-            ld b, 16
-.op:        ld a, [hl+]
-            ldh [rOCPD], a
-            dec b
-            jr nz, .op
-            jr .spr
-.dmg:       ld hl, dmg_tiles                ; BG: pre-shaded variants 0-127 -> $9000,
-            ld de, $9000                    ;   128-255 -> $8800
-            ld bc, 128 * 16
-            call memcpy
-            ld de, $8800
-            ld bc, 128 * 16
-            call memcpy
-            ld a, %11100100                 ; tile values are shades
-            ldh [rBGP], a
-            ld a, [obp_vals]
-            ldh [rOBP0], a
-            ld a, [obp_vals + 1]
-            ldh [rOBP1], a
-.spr:       ld hl, spr_tiles                ; party sprite: 16 tiles at $8000
-            ld de, $8000
-            ld bc, 16 * 16
-            jp memcpy
 
 ; ---- helpers
 memclr:     xor a                           ; HL = start, DE = length
@@ -628,10 +861,11 @@ dma_end:
 section wram, $C000
 oam_buf:    ds 160
             ds 96
-qbuf:       ds 7 * 36                       ; metatile queue (page $C1)
-            ds 4
+qbuf:       ds 8 * 128                      ; metatile queue ($C100-$C4FF)
 px:         ds 1
 py:         ds 1
+tx:         ds 1
+ty:         ds 1
 facing:     ds 1
 moving:     ds 1
 mcount:     ds 1
@@ -639,6 +873,13 @@ mdx:        ds 1
 mdy:        ds 1
 q_n:        ds 1
 q_rd:       ds 1
+cur_map:    ds 1
+map_bank:   ds 1
+ts_bank:    ds 1
+inroom:     ds 1
+door_x:     ds 1
+door_y:     ds 1
+mt_force:   ds 1
 
 section hram, $FF80
 hram_dma:   ds 10
@@ -647,3 +888,4 @@ vbl_done:   ds 1
 pad:        ds 1
 scx:        ds 1
 scy:        ds 1
+pal_req:    ds 1
