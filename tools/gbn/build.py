@@ -8,7 +8,7 @@ ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
-import data, text, talkconst
+import data, text, talkconst, ui
 
 COMMON, TS_BANK0, MAP_BANK0, OW_TS, OW_INFO, OW_ROWS, ROM_BANKS = 1, 8, 20, 16, 81, 84, 128
 
@@ -48,6 +48,14 @@ def talk_defs(rom):
     return '\n'.join(out) + '\n'
 
 
+def ui_strings():
+    """the screens' strings as str_<name> labels in code bank 2"""
+    out = ['section bank 2, $7000']
+    for n, b in sorted(ui.strings().items()):
+        out.append(data.db('str_' + n, b + b'\0'))
+    return '\n'.join(out) + '\n'
+
+
 def data_banks(rom):
     banks = {}
     c = data.common_pack(rom)
@@ -65,6 +73,7 @@ def data_banks(rom):
     kind, _ = talkconst.extract(rom, DIS)
     place(banks, COMMON, 0x5C00, kind)                         # talk routine kind per object id
     place(banks, COMMON, 0x5D00, weapon_slots(rom))
+    banks[3] = bytearray(ui.gfx_bank(rom))                     # UI_GFX
     for b, blob in text.dialogue_banks(90).items():
         banks[b] = bytearray(blob)
     for ts in range(8):
@@ -114,7 +123,7 @@ def main():
     a = sys.argv[1:]
     nes = a[a.index('--nes') + 1] if '--nes' in a else os.path.join(ROOT, 'build', 'ff1_gb.nes')
     out = a[a.index('--out') + 1] if '--out' in a else os.path.join(ROOT, 'build', 'ff1n.gb')
-    st = a[a.index('--start') + 1].split(',') if '--start' in a else ['$FF', '0', '0']
+    st = a[a.index('--start') + 1].split(',') if '--start' in a else ['$FE', '0', '0']
     st = (list(st) + ['0'])[:4]                  # MAP,X,Y[,ROOM]
     rom = data.Rom(nes)
     src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\nSTART_ROOM = %s\n' % tuple(st) + talk_defs(rom) +
@@ -122,7 +131,8 @@ def main():
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'objects.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'talk.s')).read())
+           open(os.path.join(HERE, 'src', 'talk.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'screens.s')).read() + '\n' + ui_strings())
     import re                                    # (constants from every module first: the
     defs = [l for l in src.split('\n') if re.match(r'^[A-Za-z_]\w*\s+=', l)]   #   assembler
     rest = [l for l in src.split('\n') if not re.match(r'^[A-Za-z_]\w*\s+=', l)] #   needs them

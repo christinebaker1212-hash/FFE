@@ -154,8 +154,23 @@ start:      di
             call memcpy
             ld a, 3
             ld [facing], a
-            ld a, START_MAP                 ; (build.py: the overworld at the new game's position
-            cp MAP_OW                       ;   unless --start says otherwise)
+            ld a, BOX_LINES                 ; LYC: the dialogue box's bottom (window off)
+            ldh [rLYC], a
+            ld a, $40
+            ldh [rSTAT], a
+            xor a
+            ldh [rIF], a                    ; (a STAT write on DMG can request one: dropped)
+            ld a, 3                         ; V-Blank and STAT interrupts
+            ldh [rIE], a
+            ei
+            ld a, START_MAP                 ; (build.py: the title and a new game, unless
+            cp $FE                          ;   --start says otherwise)
+            jr nz, .nt
+            ld a, SCR_BANK
+            ld hl, ng_main
+            call bank_call
+            ld a, MAP_OW
+.nt:        cp MAP_OW
             jr nz, .st
             ld a, COMMON
             call sbank
@@ -173,15 +188,7 @@ start:      di
             jr z, .nr
             ld [inroom], a
             call room_redraw
-.nr:        ld a, BOX_LINES                 ; LYC: the dialogue box's bottom (window off)
-            ldh [rLYC], a
-            ld a, $40
-            ldh [rSTAT], a
-            xor a
-            ldh [rIF], a                    ; (a STAT write on DMG can request one: dropped)
-            ld a, 3                         ; V-Blank and STAT interrupts
-            ldh [rIE], a
-            ei
+.nr:
 
 ; ---- main loop: one engine frame per GB frame
 main:       call wait_vbl
