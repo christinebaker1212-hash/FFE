@@ -214,6 +214,12 @@ one reaches parity, so the owner can keep playing).
   shuffle, slides, the reward). The title's message speed (FF1's respond rate) sets the battle
   message wait. Super Game Boy: the border, a palette set per screen (sgb.py, src/sgb.s).
 
+- Lot Check pass (docs/gb-release-checks.md "FF1 native build"), lag (field steps 16 frames;
+  loops end early in the frame), the airship's takeoff / landing (FF1's animation, noise and
+  shadow), vehicles in FF1's 2 x 2 order, the ending as FF1 (epilogue music, timed pages,
+  "The End" traced and filled from the ROM's moves), Chaos' dissolve. The FFE Builder makes FF1
+  from this build (the FF III ROM, if chosen, for the icons).
+
 ## Next steps (native rewrite)
 1. (done) Vehicles (FF1 ProcessOWInput / OWCanMove, bank 0F): `vehicle` 1 foot, 2 canoe, 4 ship,
    8 airship; blocked if tile byte 0 & vehicle; on foot onto water: BoardCanoe (needs
@@ -234,4 +240,5 @@ one reaches parity, so the owner can keep playing).
    the recompiled build's rt/mus.s documents it) driving the GB APU directly; battle SFX.
 4. (done) Story scenes, prologue, the minimap, the 15-puzzle, options (message speed).
 5. (done) Battle polish: animations and poses; sound effects.
-6. (done: SGB) Lot Check pass (gb-release-checks.md), lag check, release build.
+6. (done) SGB, Lot Check pass, lag check, the builder. Left: the owner's play-test on hardware;
+   FF1's screen transitions (palette cycling, the story shutters) are instant cuts here.

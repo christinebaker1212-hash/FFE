@@ -1267,7 +1267,9 @@ Lot Check pass for the native build (docs/gb-release-checks.md "FF1 native build
 V-Blank, VRAM/OAM checker 0 in DMG / CGB / SGB, save RAM off after each access, damaged-save
 message, soft reset); lag: field steps 16 frames (fixed a skipped frame per step), loops finish
 early in the frame. Airship takeoff / landing animations, vehicle sprite order fixed.
-Next: the GBA / Pocket / SGB2 runs, the builder switched to the native build, release. Lessons: docs/gb-lessons.md "Native rewrite".
+Pocket / SGB2 / GBA runs (mGBA, VRAM checker 0), the FFE Builder now makes FF1 from the native
+build, the ending as FF1 ("The End" drawing, timed pages), Chaos' dissolve.
+Next: the owner's play-test; FF1's screen transitions (palette cycling, story shutters). Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
