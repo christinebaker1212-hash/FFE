@@ -2360,6 +2360,9 @@ enc_form:   ld l, a
             jp far_byte
 ; a battle with formation A, then the map again (C set: the step handled); lost: game over
 do_battle:  ld [btl_fid], a
+            ld a, SCR_BANK                  ; FF1 BattleTransition (the field's flashing, noise)
+            ld hl, bt_trans
+            call bank_call
             ld a, BTL_BANK
             ld hl, battle
             call bank_call

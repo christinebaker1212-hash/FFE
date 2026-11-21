@@ -1377,6 +1377,182 @@ te_addr:    ld a, e                         ; tile (y / 8) * 10 + x / 8; byte 8 
             rrca
             jr .m
 
+; ---- FF1 BattleTransition: 65 frames cycling the NES colour emphasis (a new mode every 4
+; frames; CGB: the map's palettes with the channels not emphasised at 3/4; DMG / SGB: the
+; shades darker), the music silenced, FF1's noise sweep (volume 15, period (n / 2) OR 3)
+bt_trans:   ld a, $80
+            call snd_track
+            xor a
+            ld [bx_n], a
+            ldh a, [is_cgb]
+            and a
+            jr z, .l
+            ld a, [inroom]                  ; the map's BG palettes (the room's, inside)
+            and a
+            ld hl, M_BGOUT
+            jr z, .o
+            ld hl, M_BGIN
+.o:         ld de, bx_pal
+            ld bc, 32
+            ld a, [map_bank]
+            call far_copy
+.l:         ld a, [bx_n]
+            and 3
+            jr nz, .w
+            ld a, [bx_n]                    ; emphasis bits: n bits 2-4 (FF1: n << 3 & $E0)
+            rrca
+            rrca
+            and 7
+            ld [bx_m], a
+            call bx_prep
+.w:         ld a, SND_BANK                  ; the noise period's NR43
+            ld [fc_bank], a
+            ld a, [bx_n]
+            srl a
+            or 3
+            and 15
+            add a, low(SFX_NZ)
+            ld l, a
+            ld h, high(SFX_NZ)
+            call far_byte
+            ld [bx_nz], a
+            call wait_vbl
+            ld a, [bx_n]
+            and 3
+            call z, bx_apply
+            ld a, $F0
+            ldh [$FF21], a
+            ld a, [bx_nz]
+            ldh [$FF22], a
+            ld a, $80
+            ldh [$FF23], a
+            ld hl, bx_n
+            inc [hl]
+            ld a, [hl]
+            cp $41
+            jr c, .l
+            xor a
+            ldh [$FF21], a
+            ret
+; the palettes / BGP for emphasis mode bx_m
+bx_prep:    ldh a, [is_cgb]
+            and a
+            jr nz, .cgb
+            ld a, [bx_m]                    ; DMG: one shade darker per emphasised channel
+            ld b, 0                         ;   (two at most)
+.cn:        and a
+            jr z, .cd
+            srl a
+            jr nc, .cn
+            inc b
+            jr .cn
+.cd:        ld a, b
+            cp 3
+            jr c, .c3
+            ld a, 2
+.c3:        ld hl, .bgp
+            add a, l
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            ld [bx_bgp], a
+            ret
+.bgp:       db %11100100, %11111001, %11111110
+.cgb:       ld hl, bx_pal
+            ld de, bx_out
+            ld b, 16
+.c:         push bc
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            ld b, a                         ; BC = colour
+            push hl
+            ld a, [bx_m]
+            and a
+            jr z, .st
+            ld a, c                         ; red: bits 0-4
+            and $1F
+            ld l, a
+            ld a, [bx_m]
+            bit 0, a
+            call z, .att
+            ld a, l
+            ld [bx_t], a
+            ld a, c                         ; green: bits 5-9
+            swap a
+            rrca
+            and 7
+            ld l, a
+            ld a, b
+            and 3
+            add a, a
+            add a, a
+            add a, a
+            or l
+            ld l, a
+            ld a, [bx_m]
+            bit 1, a
+            call z, .att
+            ld a, l
+            ld [bx_t + 1], a
+            ld a, b                         ; blue: bits 10-14
+            rrca
+            rrca
+            and $1F
+            ld l, a
+            ld a, [bx_m]
+            bit 2, a
+            call z, .att
+            ld a, l                         ; together again
+            add a, a
+            add a, a
+            ld b, a
+            ld a, [bx_t + 1]
+            ld l, a
+            srl a
+            srl a
+            srl a
+            or b
+            ld b, a
+            ld a, l
+            and 7
+            swap a
+            add a, a
+            ld c, a
+            ld a, [bx_t]
+            or c
+            ld c, a
+.st:        pop hl
+            ld a, c
+            ld [de], a
+            inc de
+            ld a, b
+            ld [de], a
+            inc de
+            pop bc
+            dec b
+            jr nz, .c
+            ret
+.att:       ld a, l                         ; x - x / 4
+            srl a
+            srl a
+            cpl
+            inc a
+            add a, l
+            ld l, a
+            ret
+bx_apply:   ldh a, [is_cgb]
+            and a
+            jr nz, .cgb
+            ld a, [bx_bgp]
+            ldh [rBGP], a
+            ret
+.cgb:       ld a, $80
+            ld hl, bx_out
+            jp cgb_pal32
+
 section wram, $C100                         ; (the map queue: free on these screens)
 lu_slot:    ds 32
 lu_cur:     ds 1
@@ -1407,3 +1583,10 @@ te_y:       ds 1
 te_fx:      ds 1
 te_fy:      ds 1
 te_src:     ds 2
+bx_n:       ds 1                            ; (bt_trans)
+bx_m:       ds 1
+bx_nz:      ds 1
+bx_bgp:     ds 1
+bx_t:       ds 2
+bx_pal:     ds 32
+bx_out:     ds 32
