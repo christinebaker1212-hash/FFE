@@ -45,7 +45,9 @@ def dmg_shades(rom):
         pb = list(rom.rd(BANK_BTLC, BTL_PALS + 4 * fd[11], 4))
         win = [0x0F, 0x00, 0x0F, 0x30]
         msh = data.map_shades([win, pa, pb, win])
-        out += bytes(msh[c] for c in pa) + bytes(msh[c] for c in pb)
+        sa = [msh[c] for c in pa]; sb = [msh[c] for c in pb]
+        sa[0] = sb[0] = 3                          # colour 0: the black battlefield
+        out += bytes(sa) + bytes(sb)
     return bytes(out)
 
 
@@ -74,9 +76,24 @@ def data_bank(rom):
     assert len(names) <= 0xA00
     put(0x6200, names)
     msgs = strtab(0x6C00, [enc(ff1_battle.B.get(k, '')) for k in range(80)])
-    assert len(msgs) <= 0x1400
+    assert len(msgs) <= 0x1100
     put(0x6C00, msgs)
+    fix = rom.prg[15 * 0x4000:16 * 0x4000]
+    put(0x7D00, fix[0xF100 - 0xC000:0xF100 - 0xC000 + 256])         # lut_RNG
+    put(0x7E00, fix[rng_table(fix) - 0xC000:][:256])                 # BattleRNG's table
+    i = fix.find(bytes([0] * 12 + [1] * 12 + [2] * 12))             # lut_FormationWeight
+    assert i >= 0
+    put(0x7F00, fix[i:i + 64])
     return bytes(b)
+
+
+def rng_table(fix):
+    """BattleRNG (LDX state / INC state / LDA table,X / RTS) in the fixed bank: its table"""
+    for i in range(3, len(fix) - 7):
+        if fix[i] == 0xEE and fix[i - 3] == 0xAE and fix[i - 2:i] == fix[i + 1:i + 3] and \
+           fix[i + 3] == 0xBD and fix[i + 6] == 0x60:
+            return fix[i + 4] | fix[i + 5] << 8
+    raise AssertionError('BattleRNG not found')
 
 
 def chr_banks(rom):
@@ -90,3 +107,42 @@ def chr_banks(rom):
                 blob[0x800 * p + 16 * t:0x800 * p + 16 * t + 16] = data.gb_tile(page[16 * t:16 * t + 16])
         out[ENEMY_CHR + half] = bytes(blob)
     return out
+
+
+def vwf_source():
+    """the small font for battle windows (our own glyphs, tools/latin_font.py: condensed where
+    there is one) as assembler data: per code $21-$8B a width and 8 row bytes (left-aligned);
+    $80-$89 small digits, $8A small slash, $8B an arrow"""
+    sys.path.insert(0, os.path.join(HERE, '..'))
+    import latin_font as L
+    dig3 = {
+        '0': ["###", "#.#", "#.#", "#.#", "#.#", "#.#", "###"],
+        '1': [".#.", "##.", ".#.", ".#.", ".#.", ".#.", "###"],
+        '2': ["###", "..#", "..#", "###", "#..", "#..", "###"],
+        '3': ["###", "..#", "..#", ".##", "..#", "..#", "###"],
+        '4': ["#.#", "#.#", "#.#", "###", "..#", "..#", "..#"],
+        '5': ["###", "#..", "#..", "###", "..#", "..#", "###"],
+        '6': ["###", "#..", "#..", "###", "#.#", "#.#", "###"],
+        '7': ["###", "..#", "..#", ".#.", ".#.", ".#.", ".#."],
+        '8': ["###", "#.#", "#.#", "###", "#.#", "#.#", "###"],
+        '9': ["###", "#.#", "#.#", "###", "..#", "..#", "###"],
+        '/': ["..#", "..#", ".#.", ".#.", ".#.", "#..", "#.."]}
+    arrow = ["......", "...#..", "....#.", "######", "....#.", "...#..", "......"]
+    out = []
+    for code in range(0x21, 0x8C):
+        rows = None
+        if 0x80 <= code <= 0x89: rows = dig3[str(code - 0x80)]
+        elif code == 0x8A: rows = dig3['/']
+        elif code == 0x8B: rows = arrow
+        if rows is not None:
+            cols = [[1 if y < 7 and rows[y][x] == '#' else 0 for y in range(8)] for x in range(len(rows[0]))]
+        else:
+            ch = '…' if code == 0x7F else chr(code)
+            if ch in L.COND: cols = L._glyph_cols(ch, L.COND)
+            elif ch in L.G: cols = L._glyph_cols(ch, L.G)
+            else: cols = []
+        out.append(len(cols))
+        for y in range(8):
+            out.append(sum(cols[x][y] << (7 - x) for x in range(len(cols))))
+    return 'vwf_glyphs:\n' + ''.join('            db ' + ', '.join(str(v) for v in out[k:k + 18]) + '\n'
+                                    for k in range(0, len(out), 18))

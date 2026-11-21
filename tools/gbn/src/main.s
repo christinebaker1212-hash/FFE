@@ -66,6 +66,7 @@ M_FONT     = $7F00          ; map bank: DMG font code -> tile
 C_FONTDMG  = $4800          ; common bank: the font for DMG (pre-shaded) / CGB, by code
 C_FONTCGB  = $5000
 C_WINPAL   = $4700          ; CGB palette 7: FF1's window colours
+C_NESRGB   = $5D40          ; NES colour -> RGB555 (64 x 2)
 WIN_ATTR   = $0F            ; CGB window cell: palette 7, VRAM bank 1
 LCDC_WIN   = LCDC_ON | $60  ; window on, its map at $9C00
 BOX_LINES  = 64
@@ -197,6 +198,15 @@ start:      di
             ld [inroom], a
             call room_redraw
 .nr:
+            ld a, START_BATTLE              ; (test builds: a battle first)
+            cp $FF
+            jr z, .nb
+            ld [btl_fid], a
+            ld a, BTL_BANK
+            ld hl, battle
+            call bank_call
+            call map_reload
+.nb:
 
 ; ---- main loop: one engine frame per GB frame
 main:       call wait_vbl

@@ -692,3 +692,4 @@ dlg_item:   ds 1
 ml_keep:    ds 1
 tprop_now:  ds 1
 shop_arg:   ds 1
+btl_fid:    ds 1

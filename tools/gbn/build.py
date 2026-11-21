@@ -8,7 +8,7 @@ ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
-import data, text, talkconst, ui, names
+import data, text, talkconst, ui, names, battle
 
 COMMON, TS_BANK0, MAP_BANK0, OW_TS, OW_INFO, OW_ROWS, ROM_BANKS = 1, 8, 20, 16, 81, 84, 128
 
@@ -108,6 +108,9 @@ def data_banks(rom, ff3=None, init=None):
     nb[0x3200:0x3300] = rom.rd(0x00, 0xB100, 0x100)            # chest contents (lut_Treasure)
     banks[names.NAMES_BANK] = nb
     banks[ui.MTEXT_BANK] = bytearray(ui.mtext_bank())
+    banks[battle.BTL_DATA] = bytearray(battle.data_bank(rom))
+    for b, blob in battle.chr_banks(rom).items(): banks[b] = bytearray(blob)
+    place(banks, COMMON, 0x5D40, b''.join(data.rgb555(c).to_bytes(2, 'little') for c in range(64)))
     banks[3] = bytearray(ui.gfx_bank(rom))                     # UI_GFX
     for b, blob in text.dialogue_banks(90).items():
         banks[b] = bytearray(blob)
@@ -172,7 +175,8 @@ def main():
             else: n = 1
             for j in range(int(n)): init.append((int(k, 16) + j, int(v, 16)))
     src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\nSTART_ROOM = %s\n' % tuple(st) +
-           'TEST_INIT = %d\n' % (1 if init else 0) + talk_defs(rom) + item_defs(rom) + magic_defs(rom) +
+           'TEST_INIT = %d\n' % (1 if init else 0) +
+           'START_BATTLE = %s\n' % (a[a.index('--battle') + 1] if '--battle' in a else '$FF') + talk_defs(rom) + item_defs(rom) + magic_defs(rom) +
            open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'objects.s')).read() + '\n' +
@@ -180,7 +184,10 @@ def main():
            open(os.path.join(HERE, 'src', 'talk.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'screens.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'shop.s')).read() + '\n' + ui_strings())
+           open(os.path.join(HERE, 'src', 'shop.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'btl.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'btl2.s')).read() + '\n' + 'section bank 6, $7800\n' +
+           battle.vwf_source() + ui_strings())
     import re                                    # (constants from every module first: the
     defs = [l for l in src.split('\n') if re.match(r'^[A-Za-z_]\w*\s+=', l)]   #   assembler
     rest = [l for l in src.split('\n') if not re.match(r'^[A-Za-z_]\w*\s+=', l)] #   needs them
