@@ -2377,14 +2377,7 @@ eq_bb:      ld a, [eq_ch]
             ret
 
 ; inverted icons to BG $A0 + code (LCD off)
-inv_gfx:    ldh a, [rLCDC]
-            bit 7, a
-            jr z, .off
-.w:         ldh a, [rLY]
-            cp 144
-            jr c, .w
-            xor a
-            ldh [rLCDC], a
+inv_gfx:    call lcd_off                    ; (LCD off in V-Blank, interrupts off)
 .off:       ldh a, [is_cgb]
             and a
             ld hl, N_INVDMG

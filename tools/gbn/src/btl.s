@@ -364,14 +364,7 @@ bt_prep_fiend:
             ret
 
 ; ---- the screen
-bt_screen:  ldh a, [rLCDC]                  ; LCD off (V-Blank)
-            bit 7, a
-            jr z, .off
-.w:         ldh a, [rLY]
-            cp 144
-            jr c, .w
-            xor a
-            ldh [rLCDC], a
+bt_screen:  call lcd_off                    ; (LCD off in V-Blank, interrupts off)
 .off:       xor a
             ldh [scx], a
             ldh [scy], a

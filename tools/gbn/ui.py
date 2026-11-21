@@ -65,6 +65,8 @@ def gfx_bank(rom):
 NAME_GRID = ['ABCDEFGHIJ', 'KLMNOPQRST', "UVWXYZ'.,-", 'abcdefghij', 'klmnopqrst',
              'uvwxyz!?&…', '0123456789', '():;/+%"[]', '          ']
 TITLE = ['Continue', 'New Game', 'Message Speed']
+SAVE_ERROR = ('SAVE DATA ERROR\n\nThe saved game in\nthe Game Pak is\ndamaged.\n\n'
+              'Press the A Button\nto erase it.')     # (Lot Check: Nintendo's names)
 
 
 def enc(s):
@@ -76,6 +78,7 @@ def strings():
     import ff1_items
     out = {}
     for i, t in enumerate(TITLE): out['title%d' % i] = enc(t)
+    out['saverr'] = enc(SAVE_ERROR)
     for c in range(12):
         name = ff1_items.T[240 + c]
         out['class%d' % c] = enc('\n'.join(text.wrap(name, 8)))

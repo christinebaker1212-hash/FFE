@@ -21,14 +21,7 @@ section bank 0, $2600                       ; (the framework: bank 0, for every 
 
 ; ---- the framework
 ; screen on with the LCD off: map cleared to blank, font, palettes, cursor tiles, no sprites
-scr_open:   ldh a, [rLCDC]
-            bit 7, a
-            jr z, .off
-.w:         ldh a, [rLY]
-            cp 144
-            jr c, .w
-            xor a
-            ldh [rLCDC], a
+scr_open:   call lcd_off                    ; (LCD off in V-Blank, interrupts off)
 .off:       xor a
             ld [box_on], a
             ld [sfx_nmode], a               ; (no ship / airship noise; menu sounds on)
@@ -460,7 +453,25 @@ scr_frame:  call wait_vbl
 section bank 2, $4000
 
 ; ---- new game: title menu, party generation
-ng_main:    ldh a, [soft_rst]               ; the prologue first (not after a soft reset)
+ng_main:    call save_state                 ; a damaged save: Lot Check's error message, erased
+            cp 2                            ;   only after the A Button
+            jr nz, .sok
+            call scr_open
+            xor a
+            ld [sfx_menu], a
+            ld bc, $0003
+            ld de, $140C
+            call scr_win
+            ld bc, $0105
+            ld hl, str_saverr
+            call scr_str
+            call scr_show
+.se:        call scr_frame
+            ldh a, [pad_new]
+            bit 0, a
+            jr z, .se
+            call save_erase
+.sok:       ldh a, [soft_rst]               ; the prologue first (not after a soft reset)
             and a
             jr nz, .np
             xor a

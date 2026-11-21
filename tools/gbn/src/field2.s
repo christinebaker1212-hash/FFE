@@ -424,14 +424,7 @@ MN_SPR     = $6000
 MN_MARKS   = $6200
 MN_PAL     = $6300
 MN_ZERO    = $6308
-minimap:    ldh a, [rLCDC]
-            bit 7, a
-            jr z, .off
-.w:         ldh a, [rLY]
-            cp 144
-            jr c, .w
-            xor a
-            ldh [rLCDC], a
+minimap:    call lcd_off                    ; (LCD off in V-Blank, interrupts off)
 .off:       xor a
             ld [box_on], a
             ld [sfx_menu], a

@@ -53,7 +53,7 @@ static void save_ppm(const char* path, const color_t* buf, unsigned w, unsigned 
    the first 40 are printed (VCHK bank:PC address mode LY). DMA / HDMA do not go through it. */
 static void (*vchk_store8)(struct SM83Core*, uint16_t, int8_t);
 static struct GB* vchk_gb;
-static unsigned vchk_n, vchk_shown;
+static unsigned vchk_n, vchk_shown; static int vchk_frame;
 static void vchk_store(struct SM83Core* cpu, uint16_t a, int8_t v) {
 	struct GB* gb = vchk_gb;
 	if (gb->memory.io[0x40] & 0x80) {
@@ -62,8 +62,8 @@ static void vchk_store(struct SM83Core* cpu, uint16_t a, int8_t v) {
 			vchk_n++;
 			if (vchk_shown < 40) {
 				vchk_shown++;
-				fprintf(stderr, "VCHK %02X:%04X wr %04X mode %d LY %d\n", cpu->pc < 0x4000 ? 0 : gb->memory.currentBank,
-				        cpu->pc, a, m, gb->memory.io[0x44]);
+				fprintf(stderr, "VCHK %02X:%04X wr %04X mode %d LY %d frame %d\n", cpu->pc < 0x4000 ? 0 : gb->memory.currentBank,
+				        cpu->pc, a, m, gb->memory.io[0x44], vchk_frame);
 			}
 		}
 	}
@@ -136,6 +136,7 @@ int main(int argc, char** argv) {
 	}
 	char path[1024];
 	for (int f = 1; f <= frames; f++) {
+		vchk_frame = f;
 		if (poke_list) {
 			unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 			if (n >= (unsigned) poke_at) {

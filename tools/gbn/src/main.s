@@ -99,12 +99,15 @@ start:      di
             ld c, 0
             jr nz, .sr
             inc c
-.sr:
-.vw:        ldh a, [rLY]                    ; the LCD goes off only in V-Blank
+.sr:        ldh a, [rLCDC]                  ; the LCD goes off only in V-Blank (if on)
+            bit 7, a
+            jr z, .lo
+.vw:        ldh a, [rLY]
             cp 144
             jr c, .vw
             xor a
             ldh [rLCDC], a
+.lo:
             ld hl, $C000                    ; work RAM cleared (Lot Check: no stale memory;
             ld de, $2000                    ;   inline: the stack lives in it)
 .wc:        xor a
@@ -272,13 +275,14 @@ main:       call wait_vbl
             call make_oam
             jr main
 
-wait_vbl:   xor a
+wait_vbl:   call sgb_tick                   ; (a Super Game Boy's queued packet: before the
+            xor a                           ;   wait, so it never takes V-Blank time)
             ldh [vbl_done], a
 .w:         halt
             ldh a, [vbl_done]
             and a
             jr z, .w
-            jp sgb_tick                     ; (a Super Game Boy's queued packets)
+            ret
 
 ; ---- V-Blank: OAM, scroll, palettes, queued metatiles
 vblank:     push af
@@ -403,15 +407,7 @@ load_map:   ld [cur_map], a
             ld a, [M_TS]
             add a, TS_BANK0
             ld [ts_bank], a
-.lcd:
-            ldh a, [rLCDC]                  ; LCD off (in V-Blank)
-            bit 7, a
-            jr z, .off
-.vw:        ldh a, [rLY]
-            cp 144
-            jr c, .vw
-            xor a
-            ldh [rLCDC], a
+.lcd:        call lcd_off                    ; (LCD off in V-Blank, interrupts off)
 .off:       ldh a, [is_cgb]
             and a
             jr z, .dmg
@@ -2159,6 +2155,23 @@ party_spr:  ld a, [ch_stats]
             jr c, .t
             ret
 
+; the LCD off (Lot Check: only in V-Blank; interrupts off meanwhile, so no handler can run the
+; write past the V-Blank); nothing if it is off already
+lcd_off:    ld a, [q_n]                     ; (the field's metatile queue dropped: a new
+            ld [q_rd], a                    ;   screen; the field redraws all of its map)
+            ldh a, [rLCDC]
+            bit 7, a
+            ret z
+            di
+.w:         ldh a, [rLY]
+            cp 144
+            jr c, .w
+            cp 153
+            jr nc, .w
+            xor a
+            ldh [rLCDC], a
+            reti
+
 ; FF1 sound: the error buzz (menus: not allowed)
 sfx_err:    ld a, SFX_ERROR
             ld [sfx_req], a
@@ -2308,6 +2321,46 @@ do_battle:  ld [btl_fid], a
             scf
             ret
 ; the save in cart RAM valid (its mark and sum)? C clear if so; load_game copies it in
+; the save's state (Lot Check): A = 0 none (no mark), 1 good, 2 damaged (mark, wrong sum)
+save_state: call save_valid
+            ld a, 1
+            ret nc
+            ld a, $0A
+            ld [$0000], a
+            xor a
+            ld [$4000], a
+            ld hl, SAVE_MARK
+            ld a, [hl+]
+            cp $46
+            jr nz, .none
+            ld a, [hl+]
+            cp $46
+            jr nz, .none
+            ld a, [hl+]
+            cp $31
+            jr nz, .none
+            ld a, [hl]
+            cp $4E
+            jr nz, .none
+            xor a
+            ld [$0000], a
+            ld a, 2
+            ret
+.none:      xor a
+            ld [$0000], a
+            ret
+; the damaged save erased (its mark cleared), after the player's A Button
+save_erase: ld a, $0A
+            ld [$0000], a
+            xor a
+            ld [$4000], a
+            ld hl, SAVE_MARK
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            ld [$0000], a
+            ret
 save_valid: ld a, $0A
             ld [$0000], a
             xor a

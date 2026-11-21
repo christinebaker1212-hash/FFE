@@ -299,14 +299,21 @@ box_vbl:    ld a, [box_on]
             ldh [rWX], a
             xor a
             ldh [rWY], a
+            ldh a, [rLCDC]                  ; (not while the LCD is off)
+            bit 7, a
+            ret z
             ld a, LCDC_WIN
             ldh [rLCDC], a
             ret
 
 ; STAT (LYC = 64): the window off below the box
 stat_int:   push af
+            ldh a, [rLCDC]                  ; (a request left pending while the LCD went off:
+            bit 7, a                        ;   it stays off)
+            jr z, .off
             ld a, [lcdc_on]
             ldh [rLCDC], a
+.off:
             push bc                         ; and the music, once a frame, here (mid-frame:
             push de                         ;   V-Blank stays free for VRAM writes)
             push hl
