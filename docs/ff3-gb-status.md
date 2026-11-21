@@ -506,6 +506,10 @@ GBA model): new game, names, the first battle, the chest room of the first cave.
 - Lot Check monitor (`sgbrun SGBRUN_LOTCHECK`) now also counts VRAM / OAM reads in drawing time and
   palette writes in mode 3: 0.
 - Intro: the prophecy runs +3.2% slow (8 frames at each page start; lagcheck newgame 50-1700).
+- **Crystal staff credits** (owner: "intro credits"): the risen crystal was cut at the top
+  (camera Y 48 -> 32) and the third story page, drawn one row lower than the second, kept the
+  second page's first row - a whole line in the Japanese, a fragment of the re-wrapped English
+  ("Now, sweep away / turning the..."): now from row 15 too. firstdiff identical (poke $50 = $80).
 
 ## Known open items
 - **Release requirements (binding): `docs/gb-release-checklist.md`.** FF3: all items pass in
