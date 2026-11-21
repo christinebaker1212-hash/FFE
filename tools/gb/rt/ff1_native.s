@@ -11038,6 +11038,8 @@ oamconv_b:  and $07
             xor b                           ;   its bytes the same? (spr_mat brings it into
             cp $80                          ;   the shadow now, wtmp = 1 if unchanged)
             jr nz, .ld2
+            call sl_chk                     ; (the copy from ROM counts as a load: at most
+            jr c, .dfr                      ;   SL_MAX a frame, a battle start's party spread)
             ldh a, [o_t]
             call spr_mat
             ld a, 3
@@ -11256,6 +11258,8 @@ oamconv_b:  and $07
             xor b
             cp $80
             jr nz, .vl2
+            call sl_chk
+            jr c, .vab
             ldh a, [o_t]
             call spr_mat
             ld a, 3
@@ -11711,6 +11715,8 @@ oc_fwd:     xor a
             xor b
             cp $80
             jr nz, .ld2F
+            call sl_chk
+            jr c, .dfrF
             ldh a, [o_t]
             call spr_mat
             ldh a, [wtmp]
