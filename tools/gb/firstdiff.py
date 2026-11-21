@@ -118,6 +118,8 @@ def on_wait(ctx):
     if os.environ.get('GBWATCH') and frame_of.get(k, 0) >= int(os.environ.get('WATCH_FROM', '0')):
         lo, hi = (int(x, 16) for x in os.environ['GBWATCH'].split('-'))
         print(frame_of.get(k), k, 'GB ', bytes(m[x] for x in range(lo, hi)).hex(' '))
+        if k in nes_ram and 0xC000 <= lo < 0xC800:
+            print(frame_of.get(k), k, 'NES', bytes(nes_ram[k][x - 0xC000] for x in range(lo, hi)).hex(' '))
 
 
 gb.pb.hook_register(*sym['rt_wait_nmi'], on_wait, None)

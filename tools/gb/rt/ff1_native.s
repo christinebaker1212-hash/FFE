@@ -9036,12 +9036,15 @@ txrun_b:    push af                         ; [SP + 2]: the flags out (C)
             cp $20
             jr c, .gram
             cp $60
-            jr c, .grom
+            jr c, .gio                      ; (I/O, ExRAM: not through the ROM read-ahead)
             cp $80
             jr nc, .grom
             add a, $40                      ; save RAM $6000 -> $A000
             ld h, a
             ld a, [hl]
+            ret
+.gio:       call nes_rd
+            ld a, l
             ret
 .gram:      and $07
             or high(NES_RAM)
@@ -15024,11 +15027,9 @@ lon_tramp:  ldh a, [lcd_on]
             pop de
             pop bc
             ret
-; carry: not enough of the frame left for an atomic step (forced: never)
-lon_half:   ld a, [LON_CNT]
-            cp LON_MAXF
-            ccf
-            ccf
+; carry: not enough of the frame left for an atomic step
+lon_half:   ld a, [LON_CNT]                 ; (pending LON_FORCE frames: forced, never short)
+            cp LON_FORCE
             ret nc
             ldh a, [$FF05]
             cp LON_HALF
@@ -15036,19 +15037,15 @@ lon_half:   ld a, [LON_CNT]
             ret
 ; carry: not enough of the frame left for a big atomic step (about half a frame)
 lon_big:    ld a, [LON_CNT]
-            cp LON_MAXF
-            ccf
-            ccf
+            cp LON_FORCE
             ret nc
             ldh a, [$FF05]
             cp LON_BIG
             ccf
             ret
 ; carry: the frame's time is up (a tick since the wait's entry, or TIMA at LON_END)
-lon_time:   ld a, [LON_CNT]                 ; (pending LON_MAXF frames: no limit)
-            cp LON_MAXF
-            ccf
-            ccf
+lon_time:   ld a, [LON_CNT]                 ; (pending LON_MAXF frames: steps still in spare
+            cp LON_FORCE                    ;   time, only no restarts; LON_FORCE: no limit)
             ret nc
             push hl
             ld hl, VBL_ENT
@@ -15143,14 +15140,32 @@ lon_b:      ldh a, [code_bank]              ; (the bank-0 helpers come back to c
             ld a, 1
             ldh [maps_due], a
             jr .to3
-.rst:       ld a, 1                         ; (disturbed: the scan again)
+.rst:       ld a, [LON_CNT]                 ; (disturbed: the scan again, unless pending
+            cp LON_MAXF                     ;   LON_MAXF frames already: then on, so a screen
+            jr nc, .nrs                     ;   written every frame still comes on)
+            ld a, 1
             ld [LON_ST], a
             ldh [dmg_scan], a
             jr .lp
+.nrs:       xor a
+            ld [LON_DIRTY], a
+            ldh [dmg_scan], a
+            ld a, [LON_ST]
+            cp 2
+            jp nz, .lp
+            ld a, [LON_ROW]                 ; (in the rows: go on with them)
+            ld d, a
+            cp 30
+            jp z, .fin
+            call scb_row
+            ld a, [LON_ROW]
+            inc a
+            ld [LON_ROW], a
+            jp .lp
 .s3:        ldh a, [maps_due]               ; palette maps (as dmg_frame: from the target
             and a                           ;   if the live palette is a fade of it, else once
             jr z, .to4                      ;   the palettes have been stable PAL_STABLE
-            call lon_half                   ;   frames: a flash at a battle start does not
+            call lon_big                    ;   frames: a flash at a battle start does not
             jr c, .x                        ;   make the maps; forced: at once)
             ldh a, [in_battle]              ; a battle start: from the battle palette it fades
             bit 7, a                        ;   in to ($6D34), not its flashes

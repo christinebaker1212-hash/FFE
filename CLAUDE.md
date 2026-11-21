@@ -1198,6 +1198,16 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
     battle message / animation frames. They are 15-50% over, so small cuts do not move
     the count. Next: the native loaders and sprites of `docs/gb-native-presentation.md`.
   - Scratch sampler (`psbuild.sh`) buffer moved to $C148, 24 samples a window.
+  - Sprite slot loads limited by scanline (SL_LY) when no sprite showed before: DMG 22 -> 20.
+  - DMG deferred switch-on: the scan no longer restarts once LON_MAXF (now 30) frames are
+    pending, so a screen written every frame still comes on; steps keep waiting for spare
+    time until LON_FORCE (40) frames, then run at once. Without that force limit the screen
+    never came on (a LON_BIG 196 test build stayed white in Gambatte).
+  - Bug found by the full checkall (present since the fixed-camera masked loads, n117: six
+    DMG field checks differed in $3E/$3F/$54): txrun_b's `.get` read I/O / ExRAM addresses
+    ($2000-$5FFF) through the ROM read-ahead (rc_get), so ExRAM text codes came from GB ROM
+    bank 0. They go through nes_rd now. tracediff.py takes `--field SCRIPT`.
+  - Checks: checkall 62/62 (n130). Lag: DMG 20 -> 18, CGB 0 (-6).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
