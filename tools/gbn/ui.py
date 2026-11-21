@@ -159,4 +159,57 @@ def mtext_bank():
         body += enc('\n'.join(lines)) + b'\0'
     blob[0x2000:0x2080] = ptrs
     blob[0x2080:0x2080 + len(body)] = body
+    st, _, _ = story_bank_part()
+    blob[0x3000:0x3000 + len(st)] = st
     return bytes(blob)
+
+
+def story_texts():
+    """{'prologue': {n: text}, 'story': {n: text}} from translations/ff1_story.py"""
+    import types
+    src = open(os.path.join(HERE, '..', '..', 'translations', 'ff1_story.py')).read()
+    got = {}
+    def fake_apply(path, d, *a, **k): got[os.path.basename(path).split('.')[0]] = d
+    g = {'__file__': os.path.join(HERE, '..', '..', 'translations', 'ff1_story.py'), '__name__': 'story'}
+    src = src.replace('from apply import apply', '')
+    g['apply'] = fake_apply
+    exec(compile(src, 'ff1_story.py', 'exec'), g)
+    return got
+
+
+def story_pages():
+    """the pages (each up to 10 lines of 18): prologue first, then the story texts in order;
+    returns (pages, index of the first story page)"""
+    st = story_texts()
+    pages = []
+    pro = st.get('prologue', {}).get(0, '')
+    lines = []
+    for sent in pro.split('\n'):
+        lines += text.wrap(sent.strip()) + ['']
+    while lines and not lines[-1]: lines.pop()
+    page = []
+    for ln in lines:                                   # pages of up to 10 lines, broken at blanks
+        if len(page) >= 9 and ln == '':
+            pages.append(page); page = []; continue
+        page.append(ln)
+    if page: pages.append(page)
+    first = len(pages)
+    for k in sorted(st.get('story', {})):
+        t = st['story'][k]
+        ls = []
+        for para in t.split('\n'):
+            ls.append(para.strip())
+        ls = text.wrap(' '.join(x for x in ls if x)) if max(len(x) for x in ls) > 18 else ls
+        pages.append([x for x in ls][:10])
+    return pages, first
+
+
+def story_bank_part():
+    """$7000 in the menu text bank: pointers (64), the pages (lines joined by $0A)"""
+    pages, first = story_pages()
+    body = bytearray(); ptrs = bytearray()
+    for pg in pages[:64]:
+        ptrs += (0x7080 + len(body)).to_bytes(2, 'little')
+        body += enc('\n'.join(pg)) + b'\0'
+    assert 0x80 + len(body) <= 0x1000
+    return bytes(ptrs.ljust(0x80, b'\0')) + bytes(body), first, len(pages)

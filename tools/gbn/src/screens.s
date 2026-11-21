@@ -457,7 +457,13 @@ scr_frame:  call wait_vbl
 section bank 2, $4000
 
 ; ---- new game: title menu, party generation
-ng_main:    call scr_open
+ng_main:    ldh a, [soft_rst]               ; the prologue first (not after a soft reset)
+            and a
+            jr nz, .np
+            xor a
+            ld b, STORY_FIRST
+            call story_show
+.np:        call scr_open
             ld b, 6                         ; title menu (the GB layout: three boxes)
             ld c, 5
             ld d, 12

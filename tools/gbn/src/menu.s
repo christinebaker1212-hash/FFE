@@ -2461,6 +2461,75 @@ eq_draw:    call scr_cls
             jr nz, .sl
             ret
 
+; ---- story pages (the prologue, the bridge, the ending): A = first page, B = pages; each a
+; window (0,2,20,14) with up to 12 centred lines; A turns the page, Start skips the rest
+story_show: ld [st_pg], a
+            ld a, b
+            ld [st_n], a
+.p:         call scr_open
+            ld bc, $0002
+            ld de, $140E
+            call scr_win
+            ld a, [st_pg]                   ; the page's text (menu text bank $7000)
+            add a, a
+            ld l, a
+            ld h, $70
+            ld de, scr_buf
+            ld bc, 2
+            ld a, MTEXT
+            call far_copy
+            ld a, [scr_buf]
+            ld l, a
+            ld a, [scr_buf + 1]
+            ld h, a
+            ld de, mtxt
+            ld bc, 200
+            ld a, MTEXT
+            call far_copy
+            ld hl, mtxt
+            ld c, 3
+.ln:        push hl                         ; a line: its length -> centred
+            ld b, 0
+.len:       ld a, [hl+]
+            and a
+            jr z, .le
+            cp $0A
+            jr z, .le
+            inc b
+            jr .len
+.le:        pop hl
+            ld a, 18
+            sub b
+            srl a
+            inc a
+            ld b, a
+            push bc
+            call pen_at
+.ch:        ld a, [hl+]
+            and a
+            jr z, .done
+            cp $0A
+            jr z, .nl
+            call pen_ch
+            jr .ch
+.nl:        pop bc
+            inc c
+            jr .ln
+.done:      pop bc
+            call scr_show
+.w:         call scr_frame
+            ldh a, [pad_new]
+            bit 3, a
+            ret nz                          ; Start: the rest skipped
+            and $01
+            jr z, .w
+            ld hl, st_pg
+            inc [hl]
+            ld hl, st_n
+            dec [hl]
+            jr nz, .p
+            ret
+
 section wram, $CE00
 pen:        ds 2
 pen_l:      ds 2
@@ -2470,6 +2539,8 @@ nf_dig:     ds 6
 mm_cur:     ds 1
 mm_t:       ds 1
 mm_pc:      ds 1
+st_pg:      ds 1
+st_n:       ds 1
 it_cur:     ds 1
 it_n:       ds 1
 it_t:       ds 2

@@ -803,7 +803,22 @@ arrived:    ld a, [px]
             call load_map
             scf
             ret
-.ow:        ld a, [vehicle]                 ; on foot: poison
+.ow:        ld a, [unsram + $16]            ; the bridge crossed: the story (FF1 bridgescene)
+            cp 1
+            jr nz, .nbr
+            ld a, $80
+            ld [unsram + $16], a
+            ld a, STORY_FIRST
+            ld b, 4
+            push de
+            ld hl, story_show
+            ld a, SCR_BANK
+            call bank_call_ab
+            pop de
+            call map_reload
+            scf
+            ret
+.nbr:       ld a, [vehicle]                 ; on foot: poison
             cp V_FOOT
             push de
             call z, ow_poison
@@ -1616,6 +1631,19 @@ bank_call:  push af
             pop af
             ret
 .jp:        jp hl
+; bank_call with arguments: story_show (A = first page, B = pages) in bank SCR_BANK
+bank_call_ab:
+            ld a, STORY_FIRST
+            ld [st_pg], a
+            ldh a, [rombank]
+            push af
+            ld a, SCR_BANK
+            call sbank
+            ld a, STORY_FIRST
+            ld b, 4
+            call story_show
+            pop af
+            jp sbank
 ; copy BC bytes from bank A, HL to DE (RAM / VRAM); the caller's bank mapped again
 far_copy:   push af
             ldh a, [rombank]
