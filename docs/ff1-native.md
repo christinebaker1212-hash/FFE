@@ -102,3 +102,10 @@ one reaches parity, so the owner can keep playing).
   queue is a 256-entry ring (no interrupt locks) and the V-Blank flush stops at line 152:
   PyBoy showed entries half-written when 20 metatiles ran past V-Blank. Checked: Coneria town,
   Coneria castle rooms on DMG and CGB (mGBA, PyBoy VRAM = expected metatiles).
+- Overworld: 256 x 256 (rows decompressed at build time into banks 84-87), its tileset (256
+  tiles, bank 16; palettes / DMG tiles bank 81, 236 DMG variants), movement blocked by the
+  vehicle bit (on foot: bit 0), entrances (second property byte bit 7 + FF1's entrance
+  table), exit teleports (FF1's exit table), warps and FF1's floor stack (normal teleports
+  push x / y / room / map, a warp pops it or returns to the overworld position the party
+  entered from). The game starts at the new game's overworld position from the initial save
+  page. Checked: start -> Coneria town -> warp out (mGBA, PyBoy).

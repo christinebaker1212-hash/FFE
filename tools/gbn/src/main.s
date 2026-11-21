@@ -4,8 +4,9 @@
 ;                     $4200 normal teleports: x (64), $4240 y (64), $4280 map (64)
 ;   banks 8-15 (tileset t = TS_BANK0 + t): $4000 tile properties (256), $4100 metatile
 ;                     corner tiles for CGB (UL, UR / DL, DR pages), $4300 metatile palettes
-;                     (128), $4400 the 128 BG tiles (CGB)
-;   banks 16- (map m = MAP_BANK0 + m): $4000 map (64 x 64), $5000 CGB BG palettes outside
+;                     (128), $4400 the 128 BG tiles (CGB); bank 16 the overworld's (256 tiles)
+;   bank 81: the overworld's palettes / DMG tiles as a map bank; banks 84-87 its rows
+;   banks 20- (map m = MAP_BANK0 + m): $4000 map (64 x 64), $5000 CGB BG palettes outside
 ;                     (32), $5020 in a room (32), $5040 CGB OBJ palettes (16), $5050 DMG
 ;                     OBP0 / OBP1, $5052 tileset, $5100 DMG metatile tiles outside (512),
 ;                     $5300 in a room (512), $5800 DMG BG tiles (pre-shaded, up to 256)
@@ -15,7 +16,17 @@ LCDC_ON    = $83            ; LCD on, BG tiles $8800 mode, BG map $9800, sprites
 MBC_BANK   = $2000
 COMMON     = 1
 TS_BANK0   = 8
-MAP_BANK0  = 16
+MAP_BANK0  = 20
+OW_TS      = 16             ; the overworld's tileset bank (as a tileset bank, 256 tiles)
+OW_INFO    = 81             ; the overworld's palettes / DMG tiles (as a map bank)
+OW_ROWS    = 84             ; banks 84-87: the overworld's 256 rows (64 a bank)
+MAP_OW     = $FF            ; load_map: the overworld
+C_EXITX    = $42C0          ; exit teleports (standard map -> overworld): x (16), y (16)
+C_EXITY    = $42D0
+C_ENTRX    = $42E0          ; entrance teleports (overworld -> map): x, y, map (32 each)
+C_ENTRY    = $4300
+C_ENTRM    = $4320
+C_OWSTART  = $43C0          ; the new game's overworld position (x, y)
 rVBK       = $FF4F
 rBCPS      = $FF68
 rBCPD      = $FF69
@@ -111,10 +122,20 @@ start:      di
             call memcpy
             ld a, 3
             ld [facing], a
-            ld a, START_MAP                 ; (build.py: Coneria at the town's entrance unless
-            ld d, START_X                   ;   --start says otherwise)
+            ld a, START_MAP                 ; (build.py: the overworld at the new game's position
+            cp MAP_OW                       ;   unless --start says otherwise)
+            jr nz, .st
+            ld a, COMMON
+            ld [MBC_BANK], a
+            ld a, [C_OWSTART]
+            ld d, a
+            ld a, [C_OWSTART + 1]
+            ld e, a
+            ld a, MAP_OW
+            jr .ld
+.st:        ld d, START_X
             ld e, START_Y
-            call load_map
+.ld:        call load_map
             xor a
             ldh [rIF], a
             ld a, 1                         ; V-Blank interrupt
@@ -203,12 +224,29 @@ load_map:   ld [cur_map], a
             ld [q_n], a
             ld [q_rd], a
             ld a, b
+            cp MAP_OW
+            jr nz, .sm
+            ld a, 1                         ; the overworld: 256 x 256, its own banks
+            ldh [maptype], a
+            ld a, $FF
+            ldh [cmask], a
+            ld a, OW_INFO
+            ld [map_bank], a
+            ld a, OW_TS
+            ld [ts_bank], a
+            jr .lcd
+.sm:        xor a
+            ldh [maptype], a
+            ld a, 63
+            ldh [cmask], a
+            ld a, b
             add a, MAP_BANK0
             ld [map_bank], a
             ld [MBC_BANK], a
             ld a, [M_TS]
             add a, TS_BANK0
             ld [ts_bank], a
+.lcd:
             ldh a, [rLCDC]                  ; LCD off (in V-Blank)
             bit 7, a
             jr z, .off
@@ -220,12 +258,19 @@ load_map:   ld [cur_map], a
 .off:       ldh a, [is_cgb]
             and a
             jr z, .dmg
-            ld a, [ts_bank]                 ; CGB: the tileset's 128 tiles -> $9000
-            ld [MBC_BANK], a
+            ld a, [ts_bank]                 ; CGB: the tileset's tiles -> $9000 (0-127),
+            ld [MBC_BANK], a                ;   the overworld's 128-255 -> $8800
             ld hl, T_TILES
             ld de, $9000
             ld bc, 128 * 16
             call memcpy
+            ldh a, [maptype]
+            and a
+            jr z, .t1
+            ld de, $8800
+            ld bc, 128 * 16
+            call memcpy
+.t1:
             ld a, [map_bank]
             ld [MBC_BANK], a
             ld hl, M_BGOUT
@@ -300,17 +345,19 @@ move:       ld a, [moving]
             ld [mcount], a
             cp 16
             ret nz
-            ld a, [mdx]                     ; step done
+            ldh a, [cmask]                  ; step done
+            ld c, a
+            ld a, [mdx]
             ld b, a
             ld a, [px]
             add a, b
-            and 63
+            and c
             ld [px], a
             ld a, [mdy]
             ld b, a
             ld a, [py]
             add a, b
-            and 63
+            and c
             ld [py], a
             xor a
             ld [moving], a
@@ -344,21 +391,29 @@ move:       ld a, [moving]
             ret z
 .go:        ld a, d
             ld [facing], a
+            ldh a, [cmask]
+            ld d, a
             ld a, [px]                      ; the target metatile
             add a, b
-            and 63
+            and d
             ld [tx], a
             ld e, a
             ld a, [py]
             add a, c
-            and 63
+            and d
             ld [ty], a
             ld d, a
             push bc
             call map_at                     ; A = metatile
             call props                      ; D, E = its two property bytes
             pop bc
-            ld a, d                         ; doors and rooms
+            ldh a, [maptype]                ; the overworld: blocked if the first byte has
+            and a                           ;   the vehicle's bit (1: on foot)
+            jr z, .smr
+            bit 0, d
+            ret nz
+            jr .ok
+.smr:       ld a, d                         ; doors and rooms
             and $1E
             cp $02
             jr z, .door
@@ -412,13 +467,127 @@ arrived:    ld a, [px]
             ld d, a
             call map_at
             call props
+            ldh a, [maptype]
+            and a
+            jr nz, .ow
             ld a, d
             and $C0
             cp $80
             jr z, .norm
+            cp $C0
+            jr z, .exit
+            cp $40
+            jr z, .warp
             and a
             ret
-.norm:      ld a, COMMON
+.warp:      ld a, [fdepth]                  ; warp: the previous floor, or the overworld where
+            and a                           ;   the party entered from
+            jr z, .toow
+            dec a
+            ld [fdepth], a
+            add a, a
+            add a, a
+            ld l, a
+            ld h, 0
+            ld bc, fstack
+            add hl, bc
+            ld d, [hl]                      ; x, y, room state, map
+            inc hl
+            ld e, [hl]
+            inc hl
+            ld a, [hl+]
+            ld [warp_room], a
+            ld a, [hl]
+            call load_map
+            ld a, [warp_room]               ; (FF1 restores the room state too)
+            and a
+            jr z, .wr
+            ld [inroom], a
+            call room_redraw
+.wr:        scf
+            ret
+.toow:      ld a, [ow_x]
+            ld d, a
+            ld a, [ow_y]
+            ld e, a
+            ld a, MAP_OW
+            call load_map
+            scf
+            ret
+.ow:        bit 7, e                        ; overworld: second byte bit 7 = an entrance,
+            ret z                           ;   bits 0-5 its number
+            ld a, [px]                      ; (the overworld position kept for the warp out)
+            ld [ow_x], a
+            ld a, [py]
+            ld [ow_y], a
+            xor a
+            ld [fdepth], a
+            ld a, e
+            and $3F
+            ld l, a
+            ld a, COMMON
+            ld [MBC_BANK], a
+            ld h, high(C_ENTRX)
+            ld a, l
+            add a, low(C_ENTRX)
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld h, a
+            ld d, [hl]                      ; x (C_ENTRX + n)
+            ld bc, C_ENTRY - C_ENTRX
+            add hl, bc
+            ld e, [hl]                      ; y
+            ld bc, C_ENTRM - C_ENTRY
+            add hl, bc
+            ld a, [hl]                      ; map
+            call load_map
+            scf
+            ret
+.exit:      xor a                           ; exit to the overworld at FF1's exit position
+            ld [fdepth], a
+            ld a, COMMON
+            ld [MBC_BANK], a
+            ld a, e
+            and 15
+            ld l, a
+            ld h, high(C_EXITX)
+            ld a, l
+            add a, low(C_EXITX)
+            ld l, a
+            ld d, [hl]
+            ld a, l
+            add a, 16
+            ld l, a
+            ld e, [hl]
+            ld a, MAP_OW
+            call load_map
+            scf
+            ret
+.norm:      push de                         ; push this floor (FF1: for a later warp)
+            ld a, [fdepth]
+            cp 8
+            jr nc, .nf
+            ld b, a
+            inc a
+            ld [fdepth], a
+            ld a, b
+            add a, a
+            add a, a
+            ld l, a
+            ld h, 0
+            ld bc, fstack
+            add hl, bc
+            ld a, [px]
+            ld [hl+], a
+            ld a, [py]
+            ld [hl+], a
+            ld a, [inroom]
+            ld [hl+], a
+            ld a, [cur_map]
+            ld [hl], a
+.nf:        pop de
+            ld a, COMMON
             ld [MBC_BANK], a
             ld l, e
             ld h, high(C_TELEX)
@@ -492,7 +661,23 @@ room_redraw:
             ret
 
 ; ---- metatile number at (E = x, D = y) of the map (the map bank left mapped)
-map_at:     ld a, [map_bank]
+map_at:     ldh a, [maptype]
+            and a
+            jr z, .sm
+            ld a, d                         ; overworld: bank OW_ROWS + y / 64, row (y & 63)
+            rlca                            ;   x 256 + x
+            rlca
+            and 3
+            add a, OW_ROWS
+            ld [MBC_BANK], a
+            ld a, d
+            and 63
+            add a, $40
+            ld h, a
+            ld l, e
+            ld a, [hl]
+            ret
+.sm:        ld a, [map_bank]
             ld [MBC_BANK], a
             ld l, d                         ; HL = M_MAP + 64 y + x
             ld h, 0
@@ -674,11 +859,13 @@ draw_edge:  ld a, [mdx]                     ; the line of metatiles entering the
 
 ; queue metatile (E = x, D = y), map coordinates taken mod 64; mt_force != $FF draws that
 ; metatile instead of the map's (the doors)
-q_mt:       ld a, e
-            and 63
+q_mt:       ldh a, [cmask]
+            ld b, a
+            ld a, e
+            and b
             ld e, a
             ld a, d
-            and 63
+            and b
             ld d, a
             ld a, [q_rd]                    ; full (255 queued): dropped (never seen)
             ld b, a
@@ -735,7 +922,9 @@ q_mt:       ld a, e
             ld [MBC_BANK], a
             ld b, high(T_MTCGB)
             jr .t
-.dmg:       ld b, high(M_MTOUT)
+.dmg:       ld a, [map_bank]
+            ld [MBC_BANK], a
+            ld b, high(M_MTOUT)
             ld a, [inroom]
             and a
             jr z, .t
@@ -893,6 +1082,11 @@ inroom:     ds 1
 door_x:     ds 1
 door_y:     ds 1
 mt_force:   ds 1
+ow_x:       ds 1                            ; the overworld position while on a standard map
+ow_y:       ds 1
+fdepth:     ds 1                            ; floors pushed by normal teleports
+fstack:     ds 4 * 8                        ; x, y, room state, map
+warp_room:  ds 1
 
 section hram, $FF80
 hram_dma:   ds 10
@@ -903,3 +1097,5 @@ scx:        ds 1
 scy:        ds 1
 pal_req:    ds 1
 q_nolim:    ds 1
+maptype:    ds 1                            ; 0 standard map, 1 overworld
+cmask:      ds 1                            ; coordinate mask: 63 / 255

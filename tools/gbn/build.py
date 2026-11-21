@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
 import data
 
-COMMON, TS_BANK0, MAP_BANK0, ROM_BANKS = 1, 8, 16, 128
+COMMON, TS_BANK0, MAP_BANK0, OW_TS, OW_INFO, OW_ROWS, ROM_BANKS = 1, 8, 20, 16, 81, 84, 128
 
 
 def place(banks, bank, addr, blob):
@@ -32,6 +32,19 @@ def data_banks(rom):
         place(banks, TS_BANK0 + ts, 0x4100, t['tsa'])          # UL, UR / DL, DR pages
         place(banks, TS_BANK0 + ts, 0x4300, t['mt_pal'])
         place(banks, TS_BANK0 + ts, 0x4400, t['cgb_tiles'])
+    o = data.ow_pack(rom)
+    place(banks, OW_TS, 0x4000, o['prop'])
+    place(banks, OW_TS, 0x4100, o['tsa'])
+    place(banks, OW_TS, 0x4300, o['mt_pal'])
+    place(banks, OW_TS, 0x4400, o['cgb_tiles'])
+    place(banks, OW_INFO, 0x5000, o['cgb_bg'] + o['cgb_bg'])
+    place(banks, OW_INFO, 0x5040, o['cgb_obj'])
+    place(banks, OW_INFO, 0x5050, o['obp'] + bytes([8]))
+    place(banks, OW_INFO, 0x5100, o['mt_dmg'] + o['mt_dmg'])
+    place(banks, OW_INFO, 0x5800, o['dmg_tiles'])
+    place(banks, COMMON, 0x43C0, bytes([o['start'], o['start_y']]))
+    for row in range(256):
+        place(banks, OW_ROWS + row // 64, 0x4000 + (row % 64) * 256, o['rows'][row])
     for m in range(data.N_MAPS):
         p = data.map_pack(rom, m)
         b = MAP_BANK0 + m
@@ -50,7 +63,7 @@ def main():
     a = sys.argv[1:]
     nes = a[a.index('--nes') + 1] if '--nes' in a else os.path.join(ROOT, 'build', 'ff1_gb.nes')
     out = a[a.index('--out') + 1] if '--out' in a else os.path.join(ROOT, 'build', 'ff1n.gb')
-    st = a[a.index('--start') + 1].split(',') if '--start' in a else ('0', '16', '23')
+    st = a[a.index('--start') + 1].split(',') if '--start' in a else ('$FF', '0', '0')
     rom = data.Rom(nes)
     src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\n' % tuple(st) +
            open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +

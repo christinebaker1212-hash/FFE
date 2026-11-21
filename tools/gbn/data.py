@@ -188,10 +188,61 @@ def map_pack(rom, m, cls=0):
                 cgb_bg_in=cgb_bg['in'], cgb_obj=cgb_obj, obp=bytes(obj_shades(p) for p in sppal))
 
 
+OW_INFO, OW_CHR, INIT_UNSRAM = 0x8000, 0x8000, 0xB000   # BANK_OWINFO / BANK_MAPCHR / STARTUPINFO
+
+
+def ow_row(rom, row):
+    """overworld row (256 metatiles), decompressed as FF1's row loader does"""
+    ptr = rom.rd(1, 0x8000 + 2 * row) | rom.rd(1, 0x8001 + 2 * row) << 8
+    out = bytearray(); p = ptr
+    while len(out) < 256:
+        a = rom.rd(1, p)
+        if a == 0xFF: break
+        if a < 0x80:
+            out.append(a); p += 1
+        else:
+            n = rom.rd(1, p + 1)
+            out += bytes([a & 0x7F]) * (n if n else 256); p += 2
+    return bytes(out[:256].ljust(256, b'\0'))
+
+
+def ow_pack(rom, cls=0):
+    """the overworld: tileset (properties, metatiles, palettes, 256 BG tiles), DMG pre-shaded
+    tiles, the 256 rows"""
+    blk = rom.rd(BANK_SMINFO, OW_INFO, 0x400)
+    prop, tsa, attr, pal = blk[:256], blk[256:768], blk[768:896], bytearray(blk[0x380:0x3B0])
+    mp = rom.rd(BANK_SMINFO, MAPMAN_PAL + 2 * cls, 2)
+    pal[0x12], pal[0x16] = mp[0], mp[1]
+    mt_pal = bytes(a & 3 for a in attr)
+    chr_ = rom.rd(BANK_MAPCHR, OW_CHR, 0x1000)
+    bg = [[pal[0]] + list(pal[4 * p + 1:4 * p + 4]) for p in range(4)]
+    msh = map_shades(bg)
+    var = {}; dmg = bytearray(); tbl = bytearray(512)
+    for k in range(4):
+        for mt in range(128):
+            nt, p = tsa[128 * k + mt], mt_pal[mt]
+            key = (nt, tuple(msh[c] for c in bg[p]))
+            if key not in var:
+                var[key] = len(var); dmg += gb_tile(chr_[16 * nt:16 * nt + 16], key[1])
+            tbl[128 * k + mt] = var[key]
+    assert len(var) <= 256
+    sppal = [[pal[0x10]] + list(pal[0x10 + 4 * p + 1:0x10 + 4 * p + 4]) for p in range(2)]
+    return dict(prop=prop, tsa=tsa, mt_pal=mt_pal,
+                cgb_tiles=b''.join(gb_tile(chr_[16 * t:16 * t + 16]) for t in range(256)),
+                cgb_bg=b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in bg[p]),
+                cgb_obj=b''.join(rgb555(c).to_bytes(2, 'little') for p in range(2) for c in sppal[p]),
+                obp=bytes(obj_shades(p) for p in sppal), mt_dmg=bytes(tbl), dmg_tiles=bytes(dmg),
+                rows=[ow_row(rom, r) for r in range(256)],
+                start=(rom.rd(BANK_SMINFO, INIT_UNSRAM + 0x10) + 7) & 0xFF,
+                start_y=(rom.rd(BANK_SMINFO, INIT_UNSRAM + 0x11) + 7) & 0xFF)
+
+
 def common_pack(rom, cls=0):
     """the party sprite, FF1's sprite tables, the teleport tables"""
     spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)
     tele = b''.join(rom.rd(BANK_SMINFO, a, 64) for a in (NORM_TELE_X, NORM_TELE_Y, NORM_TELE_MAP))
+    tele += rom.rd(BANK_SMINFO, EXIT_TELE_X, 16) + rom.rd(BANK_SMINFO, EXIT_TELE_Y, 16)
+    tele += b''.join(rom.rd(BANK_SMINFO, a, 32) for a in (ENTR_TELE_X, ENTR_TELE_Y, ENTR_TELE_MAP))
     return dict(spr_tiles=b''.join(gb_tile(spr[16 * t:16 * t + 16]) for t in range(16)),
                 mapman=mapman_table(rom), tele=tele)
 
