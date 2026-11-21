@@ -450,7 +450,9 @@ bt_pl_magic:
             and a
             jr z, .nomp
             dec [hl]
-.nomp:      ld a, [mg_id]
+.nomp:      ld a, SFX_MAGIC                 ; FF1 PreparePlayerMagAttack: the casting sound
+            ld [sfx_req], a
+            ld a, [mg_id]
             call bt_mload
             ld a, [bt_who]
             or $80
@@ -578,7 +580,13 @@ bt_cast_pl: ld [mg_def], a
             jr z, .ok
             ld a, M_NOEFFECT
             jp bt_msg_end1
-.ok:        ld a, [hl]
+.ok:        ld a, [mg_caster]               ; FF1 BtlMag_LoadPlayerDefenderStats: a member's
+            rlca                            ;   spell the heal sound, an enemy's the "cha"
+            ld a, SFX_MAGIC
+            jr c, .sf
+            ld a, SFX_HIT
+.sf:        ld [sfx_req], a
+            ld a, [hl]
             ld [dv_ail], a
             ld a, l
             add a, CH_HP - 1
@@ -672,7 +680,9 @@ bt_cast_en: ld [mg_def], a
             jr nz, .ok
             ld a, M_NOEFFECT
             jp bt_msg_end1
-.ok:        ld a, [mg_def]
+.ok:        ld a, SFX_HIT                   ; FF1 BtlMag_LoadEnemyDefenderStats: "cha"
+            ld [sfx_req], a
+            ld a, [mg_def]
             call bt_erec
             push hl
             ld de, E_HPMAX

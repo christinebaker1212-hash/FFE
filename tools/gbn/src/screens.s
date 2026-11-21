@@ -31,10 +31,12 @@ scr_open:   ldh a, [rLCDC]
             ldh [rLCDC], a
 .off:       xor a
             ld [box_on], a
+            ld [sfx_nmode], a               ; (no ship / airship noise; menu sounds on)
             ldh [scx], a
             ldh [scy], a
             ld a, 18
             ld [sf_row], a
+            ld [sfx_menu], a
             ld hl, smap                     ; the map copy: blank (code $20), window attributes
             ld bc, 18 * 32
 .cl:        ld a, $20

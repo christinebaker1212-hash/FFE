@@ -1133,7 +1133,12 @@ bt_pl_attack:
             call bt_msg_pl
             ld a, [bt_tgt]
             call bt_msg_to_en
-            call bt_phys
+            ld a, [df_ails]                 ; FF1 DoExplosionEffect: the "cha" sound (not on
+            and AIL_DEAD | AIL_STONE        ;   an enemy already down)
+            jr nz, .ns
+            ld a, SFX_HIT
+            ld [sfx_req], a
+.ns:        call bt_phys
             pop hl                          ; back into the enemy's record
             ld de, E_HP
             add hl, de
@@ -1213,6 +1218,8 @@ bt_en_attack:                               ; enemy [bt_who] -> member A
             call bt_msg_en
             ld a, [bt_tgt]
             call bt_msg_to_pl
+            ld a, SFX_ENEMYHIT              ; FF1: the "boom bash" sound
+            ld [sfx_req], a
             call bt_phys
             pop hl
             ld de, E_AIL

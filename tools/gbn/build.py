@@ -77,8 +77,10 @@ def snd_tables(rom):
     ft, tsm, vm = sound.tables(rom)
     db = lambda b: ''.join('            db ' + ', '.join('$%02X' % x for x in b[i:i + 16]) + '\n'
                            for i in range(0, len(b), 16))
+    sfx, nz = sound.sfx_data(rom)
     return ('section bank 7, $6F00\n' + db(tsm) + 'section bank 7, $6F10\n' + db(vm) +
-            'section bank 7, $7000\n' + db(ft))
+            'section bank 7, $7000\n' + db(ft) + 'section bank 7, $%04X\n' % sound.SFX_ADDR +
+            db(sfx) + 'section bank 7, $6E00\n' + db(nz))
 
 
 def ui_strings():
@@ -190,7 +192,7 @@ def main():
             else: n = 1
             for j in range(int(n)): init.append((int(k, 16) + j, int(v, 16)))
     src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\nSTART_ROOM = %s\n' % tuple(st) +
-           'TEST_INIT = %d\n' % (1 if init else 0) + sound.mus_defs(rom) +
+           'TEST_INIT = %d\n' % (1 if init else 0) + sound.mus_defs(rom) + sound.sfx_defs() +
            'STORY_FIRST = %d\nSTORY_END = %d\n' % (ui.story_pages()[1], len(ui.story_pages()[0])) +
            'ENC_OW = %s\n' % (a[a.index('--enc') + 1] if '--enc' in a else '10') +
            'START_BATTLE = %s\n' % (a[a.index('--battle') + 1] if '--battle' in a else '$FF') + talk_defs(rom) + item_defs(rom) + magic_defs(rom) +

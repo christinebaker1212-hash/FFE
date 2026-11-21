@@ -258,6 +258,11 @@ main:       call wait_vbl
             jr .drw
 .fld:       call move
             call obj_frame
+            ld a, [vehicle]                 ; FF1: the ship's / airship's noise (1 / 2)
+            and V_SHIP | V_AIR
+            rrca
+            rrca
+            ld [sfx_nmode], a
 .drw:       call set_scroll
             call make_oam
             jr main
@@ -330,7 +335,20 @@ read_pad:   ld a, $20
             ldh [pad], a
             ld a, $30
             ldh [rP1], a
-            ld a, c                         ; A + B + Start + Select: soft reset (Lot Check)
+            ld a, [sfx_menu]                ; menus: FF1's cursor sound on a new direction,
+            and a                           ;   its select sound on A / B
+            jr z, .ns
+            ldh a, [pad_new]
+            ld b, SFX_MOVE
+            and $F0
+            jr nz, .rq
+            ldh a, [pad_new]
+            and 3
+            jr z, .ns
+            ld b, SFX_SEL
+.rq:        ld a, b
+            ld [sfx_req], a
+.ns:        ld a, c                         ; A + B + Start + Select: soft reset (Lot Check)
             and $0F
             cp $0F
             ret nz
@@ -341,6 +359,9 @@ read_pad:   ld a, $20
 ; ---- load standard map A with the party at (D = x, E = y): LCD off in V-Blank, graphics,
 ; palettes, the map drawn, LCD on
 load_map:   ld [cur_map], a
+            xor a                           ; (the field: no menu sounds)
+            ld [sfx_menu], a
+            ld a, [cur_map]
             ld b, a
             ld a, d
             ld [px], a
@@ -1953,6 +1974,12 @@ ow_abutton: ld a, [vehicle]
             ret
 
 ; FF1 MapPoisonDamage: on foot, each poisoned member loses 1 HP a step (not below 1)
+section bank 0, $3200                       ; (main.s continued)
+; FF1 sound: the error buzz (menus: not allowed)
+sfx_err:    ld a, SFX_ERROR
+            ld [sfx_req], a
+            ret
+
 ow_poison:  xor a
 .m:         push af
             call ch_rec

@@ -52,3 +52,67 @@ def tables(rom):
     veh = next(v for v in mt.values() if v[1] == v[2] and v[4] != v[1])
     ts = next(v for v in mt.values() if v is not veh)
     return bytes(t), bytes(ts[:8]), bytes(veh)
+
+
+# sound effects: FF1's menu ones (bank 14 PlaySFX_MenuMove / _MenuSel, bank 15 PlaySFX_Error:
+# their register values are the code's immediates) and its three battle ones (bank 12
+# data_BattleSoundEffects, found through PlayBattleSFX's table operand), in one format
+# (FF1's battle one): header total frames, square blocks, noise blocks, 0; blocks of 8 bytes
+# (square $4004-$4007 + frames, noise $400C, $400E + frames)
+SFX_IDS = ('move', 'sel', 'error', 'magic', 'enemyhit', 'hit')
+SFX_ADDR = 0x6D00
+
+
+def sfx_data(rom):
+    import math, re
+    prg = rom.prg
+    b12, b14, b15 = (prg[n * 0x4000:(n + 1) * 0x4000] for n in (12, 14, 15))
+    one = lambda p, b: [m for m in re.finditer(p, b, re.S)]
+    m = one(rb'\xA9(.)\x8D\x04\x40\xA9(.)\x8D\x05\x40\xA9(.)\x8D\x06\x40\xA9(.)\x8D\x07\x40'
+            rb'\xA9(.)\x85\x7E', b14)
+    assert len(m) == 1, 'menu select sound not found'
+    v = m[0].groups()
+    sel = bytes([v[4][0], 1, 0, 0]) + b''.join(v[:4]) + bytes([v[4][0], 0, 0, 0])
+    m = one(rb'\xA9(.)\x8D\x04\x40\xA9(.)\x8D\x05\x40\xA9(.)\x8D\x06\x40\x4A\x8D\x07\x40\x85'
+            rb'\x7E', b14)
+    assert len(m) == 1, 'menu move sound not found'
+    v = m[0].groups()
+    n = v[2][0] >> 1
+    mov = bytes([n, 1, 0, 0]) + b''.join(v[:3]) + bytes([n, n, 0, 0, 0])
+    m = one(rb'\xA9(.)\x8D\x04\x40\xA9(.)\x8D\x05\x40\xA9(.)\x8D\x06\x40\xA9(.)\x8D\x07\x40'
+            rb'\x60', b15)
+    assert len(m) == 1, 'error sound not found'
+    v = m[0].groups()
+    err = bytes([17, 16, 0, 0]) + (b''.join(v) + bytes([1, 0, 0, 0])) * 16
+    m = one(rb'\x48\x20..\x68\x0A\xAA\xBD(..)', b12)
+    assert len(m) == 1, 'battle sounds not found'
+    t = int.from_bytes(m[0].group(1), 'little') - 0x8000
+    bt = []
+    for k in range(3):
+        a = int.from_bytes(b12[t + 2 * k:t + 2 * k + 2], 'little') - 0x8000
+        h = b12[a:a + 3]
+        bt.append(bytes(h) + b'\0' + b12[a + 3:a + 3 + 8 * max(h[1], h[2])])
+    effects = [mov, sel, err] + bt
+    base = SFX_ADDR + 2 * len(effects)
+    ptrs, body = bytearray(), bytearray()
+    for e in effects:
+        ptrs += (base + len(body)).to_bytes(2, 'little')
+        body += e
+    # NES noise periods -> GB NR43 (as the recompiled build)
+    periods = [4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068]
+    nz = []
+    for p in periods:
+        f = 1789773 / p
+        best = None
+        for sh in range(14):
+            for r in range(8):
+                g = 262144 / ((r or 0.5) * (1 << sh))
+                e = abs(math.log(g / f))
+                if best is None or e < best[0]:
+                    best = (e, sh << 4 | r)
+        nz.append(best[1])
+    return bytes(ptrs + body), bytes(nz)
+
+
+def sfx_defs():
+    return ''.join('SFX_%s = %d\n' % (n.upper(), i + 1) for i, n in enumerate(SFX_IDS))

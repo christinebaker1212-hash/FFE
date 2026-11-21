@@ -34,7 +34,10 @@ PARTY_X    = 132
 section bank 6, $4000
 
 ; ---- entry: formation [btl_fid] (bit 7: the B formation); returns A = 0 won / ran, 1 lost
-battle:     ld a, [btl_fid]
+battle:     xor a                           ; (no menu sounds, no vehicle noise)
+            ld [sfx_menu], a
+            ld [sfx_nmode], a
+            ld a, [btl_fid]
             and $7F
             ld l, a
             ld h, 0

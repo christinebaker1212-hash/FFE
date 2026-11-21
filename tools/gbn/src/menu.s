@@ -270,8 +270,19 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music)
             jr .re
 .n0:        cp 1
             jr nz, .n1
-            call pick_char                  ; magic: whose
-            jr c, .re
+.mp:        call pick_char                  ; magic: whose (not dead / stone: FF1's error
+            jr c, .re                       ;   sound)
+            push af
+            call ch_rec
+            inc hl
+            ld a, [hl]
+            dec a
+            cp 2
+            jr nc, .mok
+            pop af
+            call sfx_err
+            jr .mp
+.mok:       pop af
             call magic_menu
             ld a, [menu_act]                ; (Warp / Exit: out of the menus)
             and a
@@ -1117,11 +1128,11 @@ u_heal:     ld a, IT_UseItem_Heal_0
             jp c, item_menu.re
             call ch_rec
             inc hl
-            ld a, [hl]                      ; dead or stone: no
+            ld a, [hl]                      ; dead or stone: no (FF1's error sound)
             cp 1
-            jr z, .l
+            jr z, .er
             cp 2
-            jr z, .l
+            jr z, .er
             dec hl
             ld a, IT_UseItem_Heal_5
             call hp_add
@@ -1130,6 +1141,8 @@ u_heal:     ld a, IT_UseItem_Heal_0
             call tgt_redraw
             call wait_ab
             jp item_menu.re
+.er:        call sfx_err
+            jr .l
 u_pure:     ld a, IT_UseItem_Pure_0
             ld b, IT_UseItem_Pure_1
             ld hl, IT_UseItem_Pure_2
@@ -1149,7 +1162,7 @@ u_cure:     push hl
             inc hl
             ld a, [hl]
             cp b
-            jr nz, .l
+            jr nz, .er
             ld [hl], 0
             pop hl
             dec [hl]
@@ -1158,6 +1171,8 @@ u_cure:     push hl
             jp item_menu.re
 .x:         pop hl
             jp item_menu.re
+.er:        call sfx_err
+            jr .l
 
 ; ---- the target screen: the main menu's party window, the text below
 tgt_open:   push af
@@ -1615,13 +1630,15 @@ m_curef:    ldh a, [frame]
             inc hl
             ld a, [hl-]
             cp 1
-            jr z, .l
+            jr z, .er
             cp 2
-            jr z, .l
+            jr z, .er
             ld a, [mg_hp]
             call hp_add
             call mg_spend
             jr m_done
+.er:        call sfx_err
+            jr .l
 ; Curaja: HP to the maximum (FF1 does not check ailments)
 m_cur4:     ld a, MG_CUR4_0
             call tgt_open
@@ -1695,7 +1712,7 @@ m_curea:    push bc
             inc hl
             ld a, [hl]
             cp b
-            jr nz, .l
+            jr nz, .er
             ld [hl], 0
             dec hl
             ld a, c
@@ -1711,6 +1728,8 @@ m_curea:    push bc
 .full:      call hp_full
 .sp:        call mg_spend
             jp m_done
+.er:        call sfx_err
+            jr .l
 ; Warp / Exit: out of the menus, back a floor / to the overworld
 m_warp:     ld a, MG_WARP_0
             ld b, 1
@@ -1802,7 +1821,7 @@ equip_menu: ld [eq_kind], a
             jr c, .mode
             call eq_item
             and a
-            jr z, .drop
+            jr z, .dre                      ; (an empty slot: FF1's error sound)
             ld b, 1                         ; confirm: the hand twice (FF1 flickers it)
             call eq_pick2
             jr c, .drop
@@ -1818,12 +1837,16 @@ equip_menu: ld [eq_kind], a
             bit 7, a
             jr nz, .tog                     ; equipped: always off
             call eq_legal
-            jr c, .equip
+            jr c, .eqe
             call eq_item
 .tog:       xor $80
             ld [hl], a
             call eq_redraw
             jr .equip
+.eqe:       call sfx_err                    ; (not for this class)
+            jr .equip
+.dre:       call sfx_err
+            jr .drop
 .swap:      call eq_pick
             jp c, .mode
             ld b, 0
@@ -2469,6 +2492,8 @@ story_show: ld [st_pg], a
             ld a, b
             ld [st_n], a
 .p:         call scr_open
+            xor a                           ; (no menu sounds on the story pages)
+            ld [sfx_menu], a
             ld bc, $0002
             ld de, $140E
             call scr_win
