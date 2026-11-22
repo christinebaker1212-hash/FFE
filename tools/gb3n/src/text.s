@@ -80,10 +80,70 @@ t_page:     ld a, 1
             jr .ch
 .code:      cp $28
             jr nc, .put
-            cp $10
-            jr c, .ch                       ; $02-$0F: (amounts, item names: later) skipped
+            cp $02
+            jr nz, .c3
+            ld a, [t_item]                  ; $02: the item's name (fix:EF5B)
+            jr .name
+.c3:        cp $03
+            jr nz, .c5
+            ld a, [t_item]                  ; $03: its price (treasure gil: fix:EF6A)
+            call item_price
+            jr .num
+.c5:        cp $05
+            jr nz, .c10
+            ld hl, GS + $1C                 ; $05: the party's gil
+            ld a, [hl+]
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            ld a, [hl]
+            ld c, a
+.num:       call t_num
+            jp .ch
+.c10:       cp $10
+            jp c, .ch                       ; ($04, $06-$0F: later)
             call t_skip1                    ; $10-$27: one parameter byte
             ld a, b
+            cp $18
+            jr nz, .c14
+            ld a, c                         ; $18: an item's name (parameter)
+.name:      ld l, a                         ; GAME_BANK $4400 + 16 id
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $4400
+            add hl, de
+            ld b, 16
+            ld a, 1
+            ld [t_lead], a                  ; (leading blanks dropped)
+.nc:        ld a, GAME_BANK
+            ld [MBC5_BANKL], a
+            ld a, [hl+]
+            and a
+            jp z, .ch
+            cp $70                          ; (menu icons not in dialogue: fix:EF0E)
+            jr c, .ns
+            cp $FF
+            jr nz, .nf
+            ld a, [t_lead]
+            and a
+            jr nz, .ns
+            ld a, $FF
+.nf:        push af
+            xor a
+            ld [t_lead], a
+            pop af
+            push hl
+            push bc
+            call t_putc
+            pop bc
+            pop hl
+.ns:        dec b
+            jr nz, .nc
+            jp .ch
+.c14:       ld a, b
             cp $14
             jr nz, .nm
             ld a, c                         ; $14: column
@@ -112,6 +172,81 @@ t_page:     ld a, 1
             jr .ch
 .put:       call t_putc
             jr .ch
+
+; CDE = 24-bit number (C high) -> its digits (no leading zeros)
+t_num:      ld a, c
+            ld [n24 + 2], a
+            ld a, d
+            ld [n24 + 1], a
+            ld a, e
+            ld [n24], a
+            xor a
+            ld [t_lead], a
+            ld hl, t_pow
+            ld b, 7
+.d:         push bc
+            ld c, 0                         ; digit = how often the power subtracts
+.s:         ld a, [n24]
+            sub [hl]
+            ld e, a
+            inc hl
+            ld a, [n24 + 1]
+            sbc [hl]
+            ld d, a
+            inc hl
+            ld a, [n24 + 2]
+            sbc [hl]
+            dec hl
+            dec hl
+            jr c, .done
+            ld [n24 + 2], a
+            ld a, d
+            ld [n24 + 1], a
+            ld a, e
+            ld [n24], a
+            inc c
+            jr .s
+.done:      inc hl
+            inc hl
+            inc hl
+            pop bc
+            ld a, c
+            and a
+            jr nz, .pr
+            ld a, [t_lead]
+            and a
+            jr nz, .pr
+            ld a, b
+            dec a
+            jr nz, .nx                      ; (the last digit always)
+.pr:        ld a, 1
+            ld [t_lead], a
+            ld a, c
+            add a, $80
+            push hl
+            push bc
+            call t_putc
+            pop bc
+            pop hl
+.nx:        dec b
+            jr nz, .d
+            ret
+t_pow:      db $40, $42, $0F, $A0, $86, $01, $10, $27, $00, $E8, $03, $00
+            db $64, $00, $00, $0A, $00, $00, $01, $00, $00
+
+; A = item -> CDE = its price (10/9E00 + 2 id)
+item_price: ld l, a
+            ld h, 0
+            add hl, hl
+            ld de, $4200
+            add hl, de
+            ld a, GAME_BANK
+            ld [MBC5_BANKL], a
+            ld a, [hl+]
+            ld e, a
+            ld d, [hl]
+            ld c, 0
+            ret
 
 t_skip1:    ld hl, t_ptr
             inc [hl]
@@ -269,3 +404,6 @@ t_col:      ds 1
 t_row:      ds 1
 win_dirty:  ds 1
 win_on:     ds 1
+t_item:     ds 1                            ; FF3 $BB: the item of {02} / {03}
+t_lead:     ds 1
+n24:        ds 3

@@ -32,6 +32,9 @@ NPCT_BANK = WCHR_BANK + 1               # npc tables: $4000 graphics ids (worlds
 NPCL_BANK = 64                          # npc lists: $4000 + 64 index (12 records + 0)
 NPCG_BANK0 = 65                         # npc graphics (GB format): $4000 + $100 (g & 63), 2 banks
 EVT_BANK = 67                           # FF3 banks 2C / 2D (npc / trigger / event scripts) as they are
+GAME_BANK = 74                          # tables: $4000 / $4100 treasure contents (world 0 / others),
+                                        #   $4200 item prices (2 bytes), $4400 item names (16 each)
+TT_BANK = 75                            # per map: treasures + triggers (32 bytes), a bank a group
 TXT_BANK = 68                           # dialogue (text.py): index + strings, banks 68-
 WMAP_BANK0 = 48                         # world tilemaps (256 x 256): 4 banks each, 64 rows a bank
 WMAPS = (0, 0, 1, 2, 3)                 # world -> tilemap (worlds 0 and 1 share one)
@@ -160,6 +163,21 @@ def main():
     import text
     banks.update(text.pack(rom, TXT_BANK))
     banks[EVT_BANK] = bytearray(rom.b(0x2C, 0x8000, 0x4000))
+    g = bytearray(0x4000)
+    g[0x0000:0x0100], g[0x0100:0x0200] = rom.b(1, 0x9C00, 256), rom.b(1, 0x9D00, 256)
+    g[0x0200:0x0400] = rom.b(0x10, 0x9E00, 512)
+    for i in range(256):
+        nm = text.item_name(rom, i)[:15]
+        g[0x0400 + 16 * i:0x0400 + 16 * i + len(nm)] = nm
+    banks[GAME_BANK] = g
+    for grp in range(3):
+        w = group_world(grp)
+        tt = bytearray(0x4000)
+        for mid in range(256):
+            mp = rom.map_props(mid, w)
+            tt[32 * mid:32 * mid + 16] = rom.map_treasures(mp[14])
+            tt[32 * mid + 16:32 * mid + 32] = rom.map_triggers(mp[15])
+        banks[TT_BANK + grp] = tt
     src = open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + \
         open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' + \
         open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' + \
@@ -170,6 +188,7 @@ def main():
                        'TS_BANK': TS_BANK, 'MT_BANK': MT_BANK, 'SPR_BANK': SPR_BANK,
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, 'EVT_BANK': EVT_BANK,
+                       'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK,
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,
                        'DLG_TEST_T': int(opt['--dlg'].split(':')[0], 0) if opt['--dlg'] else 0})
     for b, d in banks.items(): r.banks[b] = bytearray(d)

@@ -2,8 +2,7 @@
 ; conditional list on event switches, then the dialogue ids -> $0740; 3C/92F3 / 9319) and the event
 ; scripts (2C/8600: one command a frame while the party stands still, fix:D219, 3B/A12B).
 ; Banks 2C / 2D are copied whole into EVT_BANK at build time (CPU $8000-$BFFF -> GB $4000-$7FFF).
-EV_DLG     = $CB80              ; FF3 $0740: the person's dialogue ids (32)
-EV_TRIG    = $CBA0              ; FF3 $7B00: the loaded trigger script (64)
+; (EV_DLG, EV_TRIG: main.s)
 
 section bank 0, $3000
 ; A pressed with the party standing: a person in front (fix:E494) -> its script
@@ -98,7 +97,7 @@ talk:       ld a, [px]                      ; the facing tile (fix:E4E9)
             ld l, a
             cp $C0
             jr c, .l
-            ret                             ; (no one: treasures / doors later)
+            jp treasure                     ; (no one: treasures, locked doors: fix:E917)
 .found:     ld a, [hl]                      ; the npc's script: 2C/8200 (world 0) / 2C/8400
             ld [ev_npc], a
             cp $E0
@@ -143,7 +142,209 @@ talk:       ld a, [px]                      ; the facing tile (fix:E4E9)
             dec b
             jr nz, .cp
             call ev_check                   ; -> event id
+            and a
+            ret z
             jp ev_start
+
+; fix:E917: the tile in front (E, D) is a locked door ($90-$9F) or a treasure ($D0-$DF chests,
+; $E0-$EF hidden ones, only while their switch is on) -> fix:E982 / F549, a message
+treasure:   push de
+            call map_at
+            pop de
+            ld [tr_t], a
+            ld l, a
+            ld h, high(M_P1)
+            bit 7, [hl]
+            ret z
+            inc h
+            ld a, [hl]
+            and $0F
+            ld [tr_n2], a
+            ld a, [tr_t]
+            cp $90
+            ret c
+            cp $A0
+            jr c, .locked
+            cp $D0
+            ret c
+            cp $F0
+            ret nc
+            ld a, e
+            ld [tr_x], a
+            ld a, d
+            ld [tr_y], a
+            ld a, [tr_t]
+            cp $E0
+            jr c, .give
+            ld a, [tr_n2]                   ; (hidden: only if still there)
+            call tr_open
+            ret nz
+.give:      ld a, [tr_n2]                   ; the treasure id -> its contents (01/9C00 / 9D00)
+            add a, low(M_TT)
+            ld l, a
+            ld h, high(M_TT)
+            ld a, [hl]
+            ld [tr_id2], a
+            ld l, a
+            ld h, $40
+            ld a, [cur_world]
+            and a
+            jr z, .c0
+            inc h
+.c0:        ld a, GAME_BANK
+            ld [MBC5_BANKL], a
+            ld a, [hl]
+            ld [t_item], a
+            ld a, [tr_t]                    ; a chest on a map whose chests hold gil
+            cp $E0
+            jr nc, .item
+            ld a, [M_ENT + 10]
+            and $20
+            jr z, .item
+            ld a, [t_item]                  ; gil: the item's price (fix:F5B2)
+            call item_price
+            call gil_add
+            call .toggle
+            ld a, $01
+            jr .msg
+.item:      ld a, [t_item]                  ; an item: 1 (arrows $4F-$56: 20)
+            ld [ev_par], a
+            ld b, 1
+            cp $4F
+            jr c, .q
+            cp $57
+            jr nc, .q
+            ld b, 20
+.q:         ld a, b
+            ld [tr_q], a
+            call ev_find                    ; (3C/937E)
+            ld a, $50                       ; "Can't carry anymore." (no change)
+            jr c, .show
+            ld a, [t_item]
+            ld [hl], a
+            ld a, l
+            add a, $20
+            ld l, a
+            ld a, [tr_q]
+            add a, [hl]
+            cp 99
+            jr c, .q99
+            ld a, 99
+.q99:       ld [hl], a
+            call .toggle
+            ld a, [tr_t]
+            cp $E0
+            ld a, $76                       ; (not a chest)
+            jr nc, .show
+            ld a, [tr_id2]
+            cp $E0
+            ld a, $59                       ; "Found ...!"
+            jr c, .msg
+            ld a, $02                       ; (with a battle: later)
+.msg:       push af                         ; a chest: opened ($7D) and redrawn
+            ld a, [tr_x]
+            ld e, a
+            ld a, [tr_y]
+            ld d, a
+            push de
+            call map_at
+            ld [hl], $7D
+            pop de
+            call q_mt
+            pop af
+.show:      ld c, a
+            ld a, 1
+            jp dlg_show
+.toggle:    ld a, [tr_id2]
+            call tr_sw
+            ld a, [hl]
+            xor b
+            ld [hl], a
+            ret
+.locked:    ld a, [GS + $0E]                ; the showing character a Thief (job 8): unlocked
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]
+            cp 8
+            ld a, $03                       ; "Locked."
+            jr nz, .show
+            ld hl, GS + $21
+            set 6, [hl]
+            ld a, $7A
+            jr .show
+
+; CDE added to the party's gil (fix:F5FF: capped when the high byte reaches $98)
+gil_add:    ld hl, GS + $1C
+            ld a, [hl]
+            add a, e
+            ld [hl+], a
+            ld a, [hl]
+            adc a, d
+            ld [hl+], a
+            ld a, [hl]
+            adc a, c
+            ld [hl], a
+            cp $98
+            ret c
+            ld [hl], $98
+            dec hl
+            ld [hl], $96
+            dec hl
+            ld [hl], $7F
+            ret
+
+; a trigger tile of type F stepped on (fix:E6BE): its event (2C/8880 + 2 trigger id)
+trig_ev:    add a, low(M_TT + 16)
+            ld l, a
+            ld h, high(M_TT + 16)
+            ld a, [hl]
+            ld l, a
+            ld h, 0
+            add hl, hl
+            ld de, $4880
+            add hl, de
+            ld a, EVT_BANK
+            ld [MBC5_BANKL], a
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            call ev_trig
+            call ev_vsw
+            call ev_check
+            and a
+            ret z
+            jp ev_start
+
+; 3C/9274: the toad / mini event switches from the party, the vehicle flags cleared
+ev_vsw:     ld a, [GS + $102]
+            ld b, a
+            ld a, [GS + $142]
+            and b
+            ld b, a
+            ld a, [GS + $182]
+            and b
+            ld b, a
+            ld a, [GS + $1C2]
+            and b
+            ld b, a
+            and $20
+            add a, a
+            ld c, a
+            ld a, b
+            and $08
+            swap a
+            or c
+            ld c, a
+            ld a, [GS + $2E]
+            and $3F
+            or c
+            ld [GS + $2E], a
+            ld hl, GS + $21
+            res 7, [hl]
+            ld a, [GS + $2F]
+            and $C3
+            ld [GS + $2F], a
+            ret
 
 ; HL = CPU address of a trigger script -> 64 bytes to EV_TRIG (fix:EA1B)
 ev_trig:    ld a, h
@@ -632,4 +833,10 @@ ev_w75:     ds 1
 ev_pad:     ds 1
 ev_npc:     ds 1
 n_ev:       ds 1
-ev_tmp:     ds 1                            ; (npc moves for an event: tile passability only)
+ev_tmp:     ds 1
+tr_t:       ds 1
+tr_n2:      ds 1
+tr_id2:     ds 1
+tr_q:       ds 1
+tr_x:       ds 1
+tr_y:       ds 1                            ; (npc moves for an event: tile passability only)

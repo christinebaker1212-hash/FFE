@@ -115,5 +115,14 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   / animation), party moves / facing, dialogue ($F0 / $F1), event and npc switches, items
   ($E7 / $F6, "Can't carry anymore."), gil, HP / MP restore, exits / entrances, waits, end.
   Checked: map 6, the elder Dahn's two pages.
+- 2026-11-22: treasures and trigger events: per-map treasure / trigger lists (10/A000 / A200 by
+  map properties bytes 14 / 15), chests opened at load by the treasure switches ($6040, all on
+  at a new game), A on a chest / hidden treasure (fix:E917 / F549: contents 01/9C00 / 9D00,
+  arrows x20, inventory 3C/937E, gil chests by item price 10/9E00, switch toggled, the chest
+  redrawn open, messages $0101 / $0102 / $0150 / $0159 / $0176), locked doors (Thief: unlocked
+  flag $6021, $017A, else $0103), type-F trigger tiles (2C/8880 scripts, 3C/9274 switch update,
+  then the tile's own passability), map titles (byte 2, t8200) when a map comes up; dialogue
+  codes {02} / {18} item names (icons and leading blanks dropped), {03} price, {05} gil.
+  Checked: map 181 chest (Potion), the cave's trigger scene.
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.

@@ -6,11 +6,7 @@
 ; (offset into N_ANIM: right $00, left $10, down $20, up $30)); N_OB2 = $7100 (+0/+1 tile
 ; properties & $37, +2 animation speed mask, +3 movement counter reset, +5 palette offset,
 ; +6 z-level).
-N_OBJ      = $C400
-N_OB2      = $C500
-GS         = $C800              ; FF3's save block $6000-$63FF (npc switches at +$80)
-N_ANIM     = $CC00              ; 3B/B41A animation frames (CGB attributes), 256 bytes
-N_RNG      = $CD00              ; fix:FE00 random number table
+; (N_OBJ, N_OB2, GS, N_ANIM, N_RNG: main.s)
 
 section bank 0, $2000
 ; boot: the tables to WRAM, the new-game npc switches (L3A_8E76: 00/B600 -> $6080)
@@ -23,7 +19,14 @@ npc_boot:   ld a, NPCT_BANK
             ld hl, $4600
             ld de, GS + $80
             ld bc, 64
-            jp memcpy
+            call memcpy
+            ld hl, GS + $40                 ; treasure switches: all on (unopened, L3A_8E76)
+            ld b, 64
+            ld a, $FF
+.t:         ld [hl+], a
+            dec b
+            jr nz, .t
+            ret
 
 ; object command 7 (normal maps): the map's npc list (map properties byte 4 -> 2C/8000)
 load_npcs:  ld hl, N_OBJ

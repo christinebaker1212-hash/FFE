@@ -48,6 +48,18 @@ def raw_string(rom, table, i):
     return bytes(out)
 
 
+def item_name(rom, i):
+    """an item / spell name (names table 18/8800 + 2 i, base bank 82), encoded, no terminator"""
+    po = rom.pa(0x18, 0x8800) + 2 * i
+    lo, hi = rom.prg[po], rom.prg[po + 1]
+    o = rom.pa(82 + (hi >> 5), ((hi & 0x1F) | 0x80) << 8 | lo)
+    out = bytearray()
+    while rom.prg[o]:
+        c = rom.prg[o]; o += 1
+        if c >= 0x28: out.append(c)
+    return bytes(out)
+
+
 def decode(b):
     """NES bytes -> the insert's text form ('{XX}', '{XX:YY}', '[XX]', '\\n')"""
     s = []; k = 0

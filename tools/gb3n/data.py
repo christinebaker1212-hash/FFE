@@ -156,6 +156,16 @@ class Rom:
         """destination maps of the world's entrance tiles (fix:C1C4: 00/8800, 00/8840 off world 0)"""
         return self.b(0, 0x8800 if w == 0 else 0x8840, 64)
 
+    def map_treasures(self, tid):
+        """16 treasure ids of a map (3A/936C: 10/A000 + 2 id, pointer | $2000 in bank $10)"""
+        po = self.pa(0x10, 0xA000) + 2 * tid
+        return self.b(0x10, ((self.prg[po + 1] | 0x20) << 8) | self.prg[po], 16)
+
+    def map_triggers(self, tid):
+        """16 trigger event ids of a map (3A/938A: 10/A200 + 2 id)"""
+        po = self.pa(0x10, 0xA200) + 2 * tid
+        return self.b(0x10, ((self.prg[po + 1] | 0x20) << 8) | self.prg[po], 16)
+
     # ---- npcs ------------------------------------------------------------------------------
     def npc_list(self, idx):
         """(L3B_B2FA) the npc records of list idx (map properties byte 4): pointer 2C/8000 + 2 idx

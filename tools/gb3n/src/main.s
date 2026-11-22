@@ -24,7 +24,15 @@ M_P2       = $DA00
 M_FACE     = $DB00              ; facing (NES order: R 1, L 2, D 4, U 8) -> frame offset
 M_FRAME    = $DB10              ; frames: TL, BL, TR, BR tile / CGB attribute pairs
 M_ENT      = $DB80              ; the map's entry (64 bytes, build.py pack)
+M_TT       = $DC00              ; the map's treasures (16) and triggers (16): 3A/9341
 W_ENT      = $DBC0              ; world map: the entrance tiles' destination maps (64)
+N_OBJ      = $C400
+N_OB2      = $C500
+GS         = $C800              ; FF3's save block $6000-$63FF (npc switches at +$80)
+N_ANIM     = $CC00              ; 3B/B41A animation frames (CGB attributes), 256 bytes
+N_RNG      = $CD00              ; fix:FE00 random number table
+EV_DLG     = $C600              ; FF3 $0740: the person's dialogue ids (32)
+EV_TRIG    = $C640              ; FF3 $7B00: the loaded trigger script (64)
 STEP       = 16                 ; frames per metatile (a pixel a frame)
 PX0        = 72                 ; the party's 16 x 16 sprite at screen (72, 64)
 PY0        = 64
@@ -144,6 +152,15 @@ main:       call wait_vbl
             and a
             jr z, .na
             call do_act
+            jr main
+            ld a, [m_title]                 ;   the map's title (fix:E24D)
+            cp $FF
+            jr z, .na
+            ld c, a
+            ld a, $FF
+            ld [m_title], a
+            ld a, 1
+            call dlg_show
             jr main
 .na:        ld a, [ev_on]                   ;   an event: one command, its party moves only
             and a
@@ -283,6 +300,25 @@ load_map:   ld a, [lcd_is]
             ld bc, $400
             call memcpy
             call .tset
+            ld a, [cur_grp]                 ; treasures / triggers: TT_BANK + group, 32 id
+            add a, TT_BANK
+            ld [MBC5_BANKL], a
+            ld a, [cur_map]
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            add a, $40
+            ld h, a
+            ld de, M_TT
+            ld bc, 32
+            call memcpy
+            ld a, [M_ENT + 8]               ; the map title (shown once the map is up)
+            ld [m_title], a
             call init_trig
             call load_npcs
             jp .gfx
@@ -585,8 +621,15 @@ init_trig:  ld hl, tr_cnt                   ; 32 tile counts + 16 type counts
             add a, [hl]                     ; the metatile copy
             ld e, a
             ld a, c
-            cp $1C                          ; (treasure: unopened for now, as a trigger)
-            ld d, high(M_P2)
+            cp $1C                          ; treasure chest: opened ones -> $7D (3A/91F7)
+            jr nz, .trg
+            ld a, [tr_id]
+            call tr_open
+            jr z, .trg
+            pop hl
+            ld [hl], $7D
+            jr .nx
+.trg:       ld d, high(M_P2)
             ld a, [de]
             ld hl, tr_id
             or [hl]
@@ -597,6 +640,40 @@ init_trig:  ld hl, tr_cnt                   ; 32 tile counts + 16 type counts
             ld a, h
             cp high(M_LAY) + 4
             jr nz, .lp
+            ret
+
+; A = the map's treasure n -> Z if its treasure switch is on (unopened: $6040 + id / 8, + 32
+; off world 0; HL = the switch byte, B = its bit)
+tr_open:    add a, low(M_TT)
+            ld l, a
+            ld h, high(M_TT)
+            ld a, [hl]
+tr_sw:      push af                         ; (A = treasure id)
+            and 7
+            ld b, a
+            ld a, 1
+            inc b
+.m:         dec b
+            jr z, .m1
+            add a, a
+            jr .m
+.m1:        ld b, a
+            pop af
+            srl a
+            srl a
+            srl a
+            ld c, a
+            ld a, [cur_world]
+            and a
+            ld a, c
+            jr z, .w
+            add a, $20
+.w:         add a, low(GS + $40)
+            ld l, a
+            ld h, high(GS + $40)
+            ld a, [hl]
+            and b
+            cp b                            ; Z: set
             ret
 
 ; ---- movement: a step is one metatile in STEP frames
@@ -680,7 +757,14 @@ move:       ld a, [moving]
             jr c, .def                      ; 2, 3, 7-B: no trigger
             cp $0F - 6
             ret c                           ; C, D, E impassable
-            jr .go2                         ; F event (scripts: later)
+            push de                         ; F: its event, then the tile's own passability
+            push hl
+            ld a, [act_id]
+            and $0F
+            call trig_ev
+            pop hl
+            pop de
+            jr .def
 .def:       ld a, l
 .plain:     call passable
             ret c
@@ -1243,6 +1327,7 @@ zlev:       ds 1
 q_n:        ds 1
 q_direct:   ds 1
 pad_old:    ds 1
+m_title:    ds 1
 pad_new:    ds 1
 mpad:       ds 1                            ; the pad as the movement sees it (events: theirs)
 lcd_is:     ds 1                            ; 1 once the LCD is on (loads masked)
