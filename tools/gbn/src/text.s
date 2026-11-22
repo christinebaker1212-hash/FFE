@@ -560,6 +560,7 @@ section wram, $CC00
 font_tbl:   ds 128                          ; code -> tile (page-aligned)
 section wram, $DD40                         ; (after the battle's tile stage)
 win_tx:     ds 160                          ; the dialogue page as written (typed from it)
+fd_pal      = win_tx                        ; (the fades' colours: no dialogue meanwhile)
 tw_i:       ds 1
 tw_acc:     ds 1
 tw_k:       ds 1

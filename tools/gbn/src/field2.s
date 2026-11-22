@@ -603,7 +603,9 @@ pc_tgt     = smap + 160
 pc_cur     = smap + 176
 pc_dir     = smap + 192
 pc_f       = smap + 193
-pc_out:     xor a
+pc_out:     ld a, 1                         ; (it stands for the next fade-out)
+            ld [fd_skip], a
+            xor a
             jr pc_go
 pc_in:      ld a, 1
 pc_go:      ld [pc_dir], a

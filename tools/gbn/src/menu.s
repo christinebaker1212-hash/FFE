@@ -941,7 +941,8 @@ IT_SAVETXT = IT_UseItem_House_5
 IT_PAGE    = 13
 item_menu:  xor a
             ld [it_cur], a
-.re:        call it_list                    ; FF1 DrawItemBox: the items held, orbs skipped
+.re:        call scr_open                   ; (a screen of its own: faded)
+            call it_list                    ; FF1 DrawItemBox: the items held, orbs skipped
             ld a, [it_n]
             and a
             jr nz, .has
@@ -1420,11 +1421,11 @@ u_cure:     push hl
 
 ; ---- the target screen: the main menu's party window, the text below
 tgt_open:   push af
-            call scr_cls
+            call scr_open                   ; (a screen of its own: faded)
             call tgt_draw
             pop af
             call desc_box
-            jp scr_upd
+            jp scr_show
 tgt_draw:   ld bc, $0000
             ld de, $140A
             call scr_win

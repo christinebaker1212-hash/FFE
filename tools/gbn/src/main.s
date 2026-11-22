@@ -550,7 +550,8 @@ load_map:   push af
             jp lcd_on
 
 ; the map drawn again after a full screen (menu): position, room and objects as they were
-map_reload: ld a, [inroom]
+map_reload: call fade_out
+            ld a, [inroom]
             push af
             ld a, 1
             ld [ml_keep], a
@@ -2135,6 +2136,266 @@ ow_abutton: ld a, [vehicle]
             ld [vehicle], a
             jp map_music
 
+section bank 0, $1480                       ; (the screen fades)
+; ---- the screen fades (owner, 2026-11-22: consistent, stylish transitions): every menu,
+; shop and sub-screen change fades out and in, four steps of two frames. The Color: the
+; palettes scaled to black (the masked load's colour); DMG / SGB: the shades to white (the
+; switched-off screen's colour). fade_out before a load (scr_open, map_reload), fade_in after
+; scr_show switches the new screen on; FF1's palette cycle before a menu stands for its
+; fade-out (fd_skip).
+fade_out:   call lcd_get
+            bit 7, a
+            ret z
+            ld a, [fd_skip]
+            and a
+            jr z, .go
+            xor a
+            ld [fd_skip], a
+            ret
+.go:        ldh a, [is_cgb]
+            and a
+            jr z, .dmg
+            call fd_vbl                     ; the palettes read in a V-Blank
+            ld a, $80
+            ldh [rBCPS], a
+            ld hl, fd_pal
+            ld c, 0
+.rb:        ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            bit 6, c
+            jr z, .rb
+            ld c, 0
+.ro:        ld a, c
+            ldh [$FF6A], a
+            ldh a, [$FF6B]
+            ld [hl+], a
+            inc c
+            bit 6, c
+            jr z, .ro
+            ld a, 3
+.l:         ld [fd_lv], a
+            call fd_step
+            ld a, [fd_lv]
+            dec a
+            cp $FF
+            jr nz, .l
+            jr .sv
+.dmg:       ldh a, [rBGP]
+            ld [fd_b], a
+            ldh a, [rOBP0]
+            ld [fd_o0], a
+            ldh a, [rOBP1]
+            ld [fd_o1], a
+            ld a, 1
+.dl:        ld [fd_lv], a
+            call fd_dmgw
+            call wait_vbl
+            call wait_vbl
+            ld a, [fd_lv]
+            inc a
+            cp 4
+            jr c, .dl
+.sv:        ld a, 1
+            ld [fd_saved], a
+            ret
+fade_in:    ld a, [fd_in]
+            and a
+            ret z
+            xor a
+            ld [fd_in], a
+            ldh a, [is_cgb]
+            and a
+            jr z, .dmg
+            ld a, 1
+.l:         ld [fd_lv], a
+            call fd_step
+            ld a, [fd_lv]
+            inc a
+            cp 5
+            jr c, .l
+            ret
+.dmg:       ld a, 2
+.dl:        ld [fd_lv], a
+            call fd_dmgw
+            call wait_vbl
+            call wait_vbl
+            ld a, [fd_lv]
+            dec a
+            cp $FF
+            jr nz, .dl
+            ret
+; CGB: fd_pal at fd_lv / 4 to the palettes (two frames)
+fd_step:    call fd_scale
+            call fd_vbl
+            ld a, $80
+            ldh [rBCPS], a
+            ld hl, fd_tmp
+            ld b, 64
+.b:         ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .b
+            ld a, $80
+            ldh [$FF6A], a
+            ld b, 64
+.o:         ld a, [hl+]
+            ldh [$FF6B], a
+            dec b
+            jr nz, .o
+            jp wait_vbl
+; a V-Blank with room for the palette work (LY 144-147)
+fd_vbl:     call wait_vbl
+            ldh a, [rLY]
+            cp 144
+            jr c, fd_vbl
+            cp 148
+            jr nc, fd_vbl
+            ret
+; fd_pal (64 colours) x fd_lv / 4 -> fd_tmp
+fd_scale:   ld hl, fd_pal
+            ld de, fd_tmp
+            ld b, 64
+.c:         push bc
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            ld b, a
+            push hl
+            ld a, c                         ; red
+            and 31
+            call fd_mul
+            ld l, a
+            ld a, b                         ; green
+            and 3
+            add a, a
+            add a, a
+            add a, a
+            ld h, a
+            ld a, c
+            swap a
+            rrca
+            and 7
+            or h
+            call fd_mul
+            ld h, a
+            ld a, b                         ; blue
+            rrca
+            rrca
+            and 31
+            call fd_mul
+            ld c, a
+            ld a, h
+            swap a
+            add a, a
+            and $E0
+            or l
+            ld [de], a
+            inc de
+            ld a, h
+            rrca
+            rrca
+            rrca
+            and 3
+            ld b, a
+            ld a, c
+            add a, a
+            add a, a
+            or b
+            ld [de], a
+            inc de
+            pop hl
+            pop bc
+            dec b
+            jr nz, .c
+            ret
+fd_mul:     push bc
+            ld c, a
+            ld a, [fd_lv]
+            ld b, a
+            xor a
+            inc b
+.m:         dec b
+            jr z, .x
+            add a, c
+            jr .m
+.x:         srl a
+            srl a
+            pop bc
+            ret
+; DMG / SGB: the shades lightened by fd_lv
+fd_dmgw:    ld a, [fd_b]
+            call fd_light
+            ldh [rBGP], a
+            ld a, [fd_o0]
+            call fd_light
+            ldh [rOBP0], a
+            ld a, [fd_o1]
+            call fd_light
+            ldh [rOBP1], a
+            ret
+fd_light:   ld c, a
+            ld e, 0
+            ld b, 4
+.f:         rlc c
+            rlc c
+            ld a, [fd_lv]
+            ld h, a
+            ld a, c
+            and 3
+            sub h
+            jr nc, .ok
+            xor a
+.ok:        sla e
+            sla e
+            or e
+            ld e, a
+            dec b
+            jr nz, .f
+            ld a, e
+            ret
+; lcd_on with a fade to come (fd_in): the new screen's colours kept, black / white first
+fd_on_cgb:  ld hl, sh_pal                   ; (in the V-Blank: BG from the shadows, OBJ read)
+            ld de, fd_pal
+            ld b, 64
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            ld c, 0
+.ro:        ld a, c
+            ldh [$FF6A], a
+            ldh a, [$FF6B]
+            ld [de], a
+            inc de
+            inc c
+            bit 6, c
+            jr z, .ro
+            ld a, $80
+            ldh [rBCPS], a
+            ldh [$FF6A], a
+            xor a
+            ld b, 64
+.z:         ldh [rBCPD], a
+            ldh [$FF6B], a
+            dec b
+            jr nz, .z
+            ret
+fd_on_dmg:  ldh a, [rBGP]
+            ld [fd_b], a
+            ldh a, [rOBP0]
+            ld [fd_o0], a
+            ldh a, [rOBP1]
+            ld [fd_o1], a
+            xor a
+            ldh [rBGP], a
+            ldh [rOBP0], a
+            ldh [rOBP1], a
+            ret
+
 section bank 0, $1400                       ; (main.s continued: the airship)
 ; pc_menu for the screens in F3_BANK (the world map, the 15-puzzle)
 pc_menu3:   push hl
@@ -3028,7 +3289,9 @@ section bank 0, $3C00                       ; (masked loads)
 ; to the shadows, and a mode-2 STAT interrupt holds the CPU through each line's mode 3, so the
 ; load writes VRAM directly as with the LCD off. lcd_on shows the screen: shadows back in a
 ; V-Blank, the STAT interrupt as before.
-lcd_off:    ld a, [q_n]                     ; (the field's metatile queue dropped: a new
+lcd_off:    xor a                           ; (any load: a skipped fade-out is spent)
+            ld [fd_skip], a
+            ld a, [q_n]                     ; (the field's metatile queue dropped: a new
             ld [q_rd], a                    ;   screen; the field redraws all of its map)
             ld a, [lmask]
             and a
@@ -3047,7 +3310,18 @@ lcd_off:    ld a, [q_n]                     ; (the field's metatile queue droppe
             jr nc, .wd
             xor a
             ldh [rLCDC], a
-            reti
+            ld a, [fd_saved]                ; (after a fade: the shades back, the screen off)
+            and a
+            jr z, .dx
+            xor a
+            ld [fd_saved], a
+            ld a, [fd_b]
+            ldh [rBGP], a
+            ld a, [fd_o0]
+            ldh [rOBP0], a
+            ld a, [fd_o1]
+            ldh [rOBP1], a
+.dx:        reti
 .cgb:       push bc
             push hl
             di
@@ -3066,7 +3340,30 @@ lcd_off:    ld a, [q_n]                     ; (the field's metatile queue droppe
             ldh a, [is_cgb]
             and a
             jr z, .nc
-            ld hl, sh_pal                   ; CGB: the BG palettes read back, then black
+            ld a, [fd_saved]                ; (after a fade: the colours it kept; the
+            and a                           ;   sprites' back, the BG ones black already)
+            jr z, .nf
+            xor a
+            ld [fd_saved], a
+            push de
+            ld hl, fd_pal
+            ld de, sh_pal
+            ld b, 64
+.fc:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .fc
+            pop de
+            ld a, $80
+            ldh [$FF6A], a
+            ld b, 64
+.fo:        ld a, [hl+]
+            ldh [$FF6B], a
+            dec b
+            jr nz, .fo
+            jr .nc
+.nf:        ld hl, sh_pal                   ; CGB: the BG palettes read back, then black
             ld c, 0
 .rd:
             ld a, c
@@ -3148,6 +3445,9 @@ lcd_on:     push af
             ld a, [lmask]
             and a
             jr nz, .m
+            ld a, [fd_in]                   ; (a fade-in to come: white first)
+            and a
+            call nz, fd_on_dmg
             pop af
             ldh [rLCDC], a
             ret
@@ -3163,7 +3463,12 @@ lcd_on:     push af
             ldh a, [is_cgb]
             and a
             jr z, .d
-            ld a, $80
+            ld a, [fd_in]                   ; (a fade-in to come: black first)
+            and a
+            jr z, .pp
+            call fd_on_cgb
+            jr .d
+.pp:        ld a, $80
             ldh [rBCPS], a
             ld hl, sh_pal
             ld b, 64
@@ -3358,6 +3663,8 @@ fill32:     ld c, 4
             jr nz, fill32
             ret
 
+section wram, $C880                         ; (the map's queue: free while a menu fades)
+fd_tmp:     ds 128
 section wram, $D980
 sh_pal:     ds 64                           ; masked loads: the CGB BG palettes
 lmask:      ds 1
@@ -3368,3 +3675,10 @@ sh_stat:    ds 1
 gd_off:     ds 1                            ; the guard paused (RAM-only work)
 ly_bgp:     ds 1                            ; the raster list writes BGP (not WX)
 ly_rst:     ds 1                            ; ... and the frame starts with this BGP
+fd_skip:    ds 1                            ; (the fades: skip the next fade-out, palettes
+fd_saved:   ds 1                            ;   kept for the load, a fade-in to come, the
+fd_in:      ds 1                            ;   step, the DMG shades)
+fd_lv:      ds 1
+fd_b:       ds 1
+fd_o0:      ds 1
+fd_o1:      ds 1

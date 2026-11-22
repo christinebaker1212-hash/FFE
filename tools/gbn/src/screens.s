@@ -21,7 +21,8 @@ section bank 0, $2600                       ; (the framework: bank 0, for every 
 
 ; ---- the framework
 ; screen on with the LCD off: map cleared to blank, font, palettes, cursor tiles, no sprites
-scr_open:   call lcd_off                    ; (LCD off in V-Blank, interrupts off)
+scr_open:   call fade_out                   ; (the screen before faded out)
+            call lcd_off                    ; (LCD off in V-Blank, interrupts off)
 .off:       xor a
             ld [box_on], a
             ld [sfx_nmode], a               ; (no ship / airship noise; menu sounds on)
@@ -145,8 +146,11 @@ scr_show:   call lcd_get
             jr c, .r
             ld a, 18
             ld [sf_row], a
+            ld a, 1                         ; (faded in)
+            ld [fd_in], a
             ld a, LCDC_ON
-            jp lcd_on
+            call lcd_on
+            jp fade_in
 scr_upd:    xor a
             ld [sf_row], a
             ret
