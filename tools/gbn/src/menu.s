@@ -250,18 +250,18 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music)
             jr nz, .up
             bit 7, a
             jr z, .l
-            ld a, [hl]                      ; down
-            inc a
-            cp 5
+            ld a, [hl]                      ; down (four commands: Items, Magic, Equip,
+            inc a                           ;   Status)
+            cp 4
             jr c, .s
             xor a
 .s:         ld [hl], a
             jr .l
 .up:        ld a, [hl]
             dec a
-            cp 5
+            cp 4
             jr c, .s
-            ld a, 4
+            ld a, 3
             jr .s
 .a:         ld a, [mm_cur]
             and a
@@ -288,10 +288,11 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music)
             and a
             ret nz
             jp .re
-.n1:        cp 4
+.n1:        cp 3
             jr z, .st
-            sub 2                           ; weapons (0) / armour (1)
-            call equip_menu
+            call pick_char                  ; Equip: whose (the equipment screen)
+            jr c, .re
+            call eqm_main
             jp .re
 .st:
             call pick_char                  ; status: whose
@@ -320,7 +321,7 @@ mm_draw:    call scr_open
             jr c, .m
             ld bc, $020A                    ; commands
             call pen_at
-            ld hl, str_mcmd
+            ld hl, str_mcmd4
             call pen_str
             ld bc, $0110                    ; Gil
             call pen_at

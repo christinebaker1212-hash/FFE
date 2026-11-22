@@ -1610,6 +1610,753 @@ job_xy:     ld b, 2
             ret
 
 
+
+; ---- the equipment screen (owner, 2026-11-22: a modern Final Fantasy style with a Game Boy
+; Color feel). Top (0,0,20,5): the member's picture, name, job, level; left / right: the
+; next member. Middle (0,5,20,7): the five slots (weapon, body, shield, helmet, gloves: icon
+; and name; an empty slot its type's icon and a dash). Bottom (0,12,20,6): Attack, Accuracy,
+; Defense, Evasion. A on a slot: the middle window lists Remove (when equipped) and every
+; unequipped item in the party's packs that fits the slot and the job; the bottom window shows
+; old > new (Colour: green better, red worse); A equips: an item from another member's pack
+; goes to this member, the one it replaces back into that pack (FF1's four weapons / four
+; armour a member keep). FF1's records and stat rules: stats unadjusted while the screen
+; is open (eq_unadj), sorted and readjusted when it closes.
+eqm_main:   ld [eqm_m], a
+            xor a
+            ld [eqm_t], a
+            call eqm_unadj
+.scr:       call eqm_draw
+.l:         ld a, [eqm_t]                   ; the hand left of the slot
+            add a, 6
+            call eqm_hand
+            call scr_frame
+            ldh a, [pad_new]
+            bit 1, a
+            jp nz, .exit
+            bit 0, a
+            jr nz, .list
+            ld hl, eqm_t
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            ld hl, eqm_m
+            bit 4, a
+            jr nz, .rt
+            bit 5, a
+            jr z, .l
+            ld a, [hl]                      ; left: the member before
+            dec a
+            and 3
+            ld [hl], a
+            jr .scr
+.rt:        ld a, [hl]
+            inc a
+            and 3
+            ld [hl], a
+            jr .scr
+.up:        ld a, [hl]
+            dec a
+            cp 5
+            jr c, .s
+            ld a, 4
+            jr .s
+.dn:        ld a, [hl]
+            inc a
+            cp 5
+            jr c, .s
+            xor a
+.s:         ld [hl], a
+            jr .l
+.list:      call eqm_cands
+            ld a, [eqm_n]
+            and a
+            jr nz, .lo
+            call sfx_err                    ; (nothing fits)
+            jr .l
+.lo:        xor a
+            ld [eqm_c], a
+            ld [eqm_top], a
+.ld:        call eqm_ldraw
+.lw:        ld a, [eqm_c]                   ; the hand left of the entry
+            ld hl, eqm_top
+            sub [hl]
+            add a, 6
+            call eqm_hand
+            call scr_frame
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .back
+            bit 0, a
+            jr nz, .take
+            ld hl, eqm_c
+            bit 6, a
+            jr nz, .lu
+            bit 7, a
+            jr z, .lw
+            ld a, [eqm_n]                   ; down
+            ld b, a
+            ld a, [hl]
+            inc a
+            cp b
+            jr c, .ls
+            xor a
+            jr .ls
+.lu:        ld a, [hl]
+            dec a
+            cp $FF
+            jr nz, .ls
+            ld a, [eqm_n]
+            dec a
+.ls:        ld [hl], a
+            ld hl, eqm_top                  ; (scrolled: five rows show)
+            cp [hl]
+            jr nc, .l1
+            ld [hl], a
+            jr .ld
+.l1:        sub [hl]
+            cp 5
+            jr c, .ld
+            ld a, [eqm_c]
+            sub 4
+            ld [hl], a
+            jr .ld
+.take:      call eqm_entry
+            call eqm_apply
+.back:      call eqm_sdraw                  ; the slots and the stats again
+            call scr_upd
+            jp .l
+.exit:      xor a                           ; FF1: sorted, stats readjusted
+            ld [eq_kind], a
+            ld a, $18
+            ld [eq_off], a
+            call eq_sort
+            call eq_readj
+            ld a, 1
+            ld [eq_kind], a
+            ld a, $1C
+            ld [eq_off], a
+            call eq_sort
+            jp eq_readj
+
+; the hand at text row A (x 0, cut off at the screen's left edge)
+eqm_hand:   add a, a
+            add a, a
+            add a, a
+            sub 4
+            ld c, a
+            ld b, 0
+            jp scr_cursor
+
+eqm_unadj:  ld a, 1
+            ld [eq_kind], a
+            ld a, $1C
+            ld [eq_off], a
+            call eq_unadj
+            xor a
+            ld [eq_kind], a
+            ld a, $18
+            ld [eq_off], a
+            jp eq_unadj
+
+; Colour: palettes 1 / 2 the window's with green / red text (the preview's better / worse)
+eqm_pal:    ld a, COMMON
+            ld hl, C_WINPAL
+            ld de, eqm_buf
+            ld bc, 8
+            call far_copy
+            ld a, $2A                       ; NES green
+            ld de, eqm_buf + 6
+            call .nes
+            ld a, $80 | 8
+            call .put
+            ld a, $26                       ; NES red
+            ld de, eqm_buf + 6
+            call .nes
+            ld a, $80 | 16
+.put:       call bcps_w
+            ld hl, eqm_buf
+            ld b, 8
+.p:         ld a, [hl+]
+            call bcpd_w
+            dec b
+            jr nz, .p
+            ret
+.nes:       add a, a
+            ld l, a
+            ld h, 0
+            ld bc, C_NESRGB
+            add hl, bc
+            ld bc, 2
+            ld a, COMMON
+            jp far_copy
+
+; the whole screen (LCD off / masked), shown
+eqm_draw:   call scr_open
+            call eqm_pal                    ; (masked: into the shadows)
+            ld a, [eqm_m]
+            call ch_rec
+            ld a, [hl]
+            ld [eqm_cls], a
+            call scr_classes                ; the member's job: sprite tiles 0-5
+            ld bc, $0000
+            ld de, $1405
+            call scr_win
+            ld bc, $0005
+            ld de, $1407
+            call scr_win
+            ld bc, $000C
+            ld de, $1406
+            call scr_win
+            ld a, [eqm_cls]                 ; the picture at cells (1-2, 1-3)
+            ld e, a
+            ld d, 0
+            ld hl, cls_pal
+            add hl, de
+            ld a, [hl]
+            ld [scr_t0], a
+            ld bc, $0808
+            ld e, 4
+            xor a
+            call scr_spr23
+            ld bc, $0401                    ; name, job, level
+            call pen_at
+            ld a, [eqm_m]
+            call pen_name
+            ld bc, $0402
+            call pen_at
+            ld a, [eqm_cls]
+            call class_str
+            call pen_str
+            ld bc, $0403
+            call pen_at
+            ld hl, str_level
+            call pen_str
+            ld a, [eqm_m]
+            call ch_rec
+            ld a, l
+            add a, $26
+            ld l, a
+            ld a, [hl]
+            inc a
+            call nf_a
+            call pen_numl
+            call eqm_sdraw
+            jp scr_show
+
+; the middle window: the five slots; the bottom: the stats
+eqm_sdraw:  call eqm_mclr
+            xor a
+.t:         ld [eqm_k], a
+            add a, 6
+            ld c, a
+            ld b, 2
+            call pen_at
+            ld a, [eqm_k]
+            call eqm_find
+            cp $FF
+            jr z, .e
+            call eqm_slot                   ; HL = the slot's byte
+            ld a, [hl]
+            call eqm_name
+            jr .n
+.e:         ld a, [eqm_k]                   ; empty: the type's icon, a dash
+            ld e, a
+            ld d, 0
+            ld hl, eqm_icons
+            add hl, de
+            ld a, [hl]
+            call pen_ch
+            ld a, '-'
+            call pen_ch
+.n:         ld a, [eqm_k]
+            inc a
+            cp 5
+            jr c, .t
+            ld a, [eqm_m]
+            call eqm_calc
+            ld hl, eqm_v
+            ld de, eqm_w
+            ld b, 4
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            jp eqm_stats
+
+; the middle window's rows cleared (and their colours)
+eqm_mclr:   ld c, 6
+.r:         ld b, 1
+            call pen_at
+            ld b, 18
+            call pen_sp
+            inc c
+            ld a, c
+            cp 11
+            jr c, .r
+            ret
+
+; the item list (eqm_ls from eqm_top) in the middle window, the preview in the bottom one
+eqm_ldraw:  call eqm_mclr
+            xor a
+.r:         ld [eqm_k], a
+            ld hl, eqm_top
+            add a, [hl]
+            ld hl, eqm_n
+            cp [hl]
+            jr nc, .p
+            ld e, a
+            ld a, [eqm_k]
+            add a, 6
+            ld c, a
+            ld b, 2
+            call pen_at
+            ld d, 0
+            ld hl, eqm_ls
+            add hl, de
+            ld a, [hl]
+            cp $FF
+            jr nz, .it
+            ld hl, str_eqrem
+            call pen_str
+            jr .nx
+.it:        call eqm_mslot                  ; HL = member A >> 2's slot A & 3
+            ld a, [hl]
+            call eqm_name
+.nx:        ld a, [eqm_k]
+            inc a
+            cp 5
+            jr c, .r
+.p:         call eqm_entry                  ; the preview: the change applied, the stats, undone
+            push af
+            call eqm_save
+            pop af
+            call eqm_apply
+            ld a, [eqm_m]
+            call eqm_calc
+            ld hl, eqm_v
+            ld de, eqm_w
+            ld b, 4
+.cw:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .cw
+            call eqm_rest
+            ld a, [eqm_m]
+            call eqm_calc
+            call eqm_stats
+            jp scr_upd
+
+; the bottom window: labels, values; when they differ the new value after '>' (Colour:
+; green better, red worse)
+eqm_stats:  ld bc, $010D
+            call pen_at
+            ld hl, str_eqst
+            call pen_str
+            xor a
+.r:         ld [eqm_k], a
+            add a, 13
+            ld c, a
+            ld b, 10
+            call pen_at
+            ld a, [eqm_k]
+            ld e, a
+            ld d, 0
+            ld hl, eqm_v
+            add hl, de
+            ld a, [hl]
+            call nf_a
+            ld b, 3
+            call pen_num
+            ld b, 13                        ; '>' and the new value, or blank
+            ld a, [eqm_k]
+            add a, 13
+            ld c, a
+            call pen_at
+            ld a, [eqm_k]
+            ld e, a
+            ld d, 0
+            ld hl, eqm_w
+            add hl, de
+            ld a, [hl]
+            ld hl, eqm_v
+            add hl, de
+            cp [hl]
+            ld b, WIN_ATTR
+            jr z, .same
+            ld b, $09                       ; (green: palette 1, VRAM bank 1)
+            jr nc, .up
+            ld b, $0A                       ; (red: palette 2)
+.up:        push bc
+            push af
+            ld a, '>'
+            call pen_ch
+            ld a, ' '
+            call pen_ch
+            pop af
+            call nf_a
+            ld b, 3
+            call pen_num
+            pop bc
+            jr .col
+.same:      push bc
+            ld b, 5
+            call pen_sp
+            pop bc
+.col:       ld a, [eqm_k]                   ; the colour of cells 13-17 of the row
+            add a, 13
+            ld c, a
+            push bc
+            ld b, 13
+            call cell_addr
+            pop bc
+            ld a, h
+            add a, 3
+            ld h, a
+            ld a, b
+            ld c, 5
+.cl:        ld [hl+], a
+            dec c
+            jr nz, .cl
+            ld a, [eqm_k]
+            inc a
+            cp 4
+            jr c, .r
+            ret
+
+; A = slot type (0 weapon, 1 body, 2 shield, 3 helmet, 4 gloves) -> A = the member's slot
+; (0-3) holding its equipped item of that type, $FF if none
+eqm_find:   ld [eqm_ft], a
+            ld c, 0
+.l:         ld a, c
+            ld [eqm_fj], a
+            call eqm_slotj
+            ld a, [hl]
+            bit 7, a
+            jr z, .n
+            call eqm_fits
+            jr nc, .y
+.n:         ld a, [eqm_fj]
+            inc a
+            ld c, a
+            cp 4
+            jr c, .l
+            ld a, $FF
+            ret
+.y:         ld a, [eqm_fj]
+            ret
+; HL = this member's slot eqm_fj of the kind of type eqm_ft
+eqm_slotj:  ld a, [eqm_m]
+            ld b, a
+            ld a, [eqm_fj]
+            jr eqm_ms2
+; HL = this member's slot of type eqm_k's kind holding its equipped item (eqm_find first)
+eqm_slot:   ld [eqm_fj], a
+            ld a, [eqm_k]
+            ld [eqm_ft], a
+            jr eqm_slotj
+; A = m * 4 + j -> HL = member m's slot j of the kind of type eqm_ft
+eqm_mslot:  ld b, a
+            srl b
+            srl b
+            and 3
+            ld c, a
+            ld a, c
+eqm_ms2:    push af                         ; B = member, A = slot
+            ld a, b
+            call ch_rec
+            ld a, [eqm_ft]
+            and a
+            ld a, $18
+            jr z, .w
+            ld a, $1C
+.w:         add a, l
+            ld l, a
+            pop af
+            add a, l
+            ld l, a
+            ret
+; A = slot byte: NC if the item is of type eqm_ft (weapons: any; armour: FF1's type)
+eqm_fits:   and $7F
+            jr nz, .i
+            scf                             ; (empty: does not fit)
+            ret
+.i:
+            ld b, a
+            ld a, [eqm_ft]
+            and a
+            ret z                           ; (a weapon: fits)
+            push hl
+            ld a, b
+            dec a
+            call eq_atype
+            pop hl
+            inc a
+            ld b, a
+            ld a, [eqm_ft]
+            cp b
+            jr nz, .no
+            and a                           ; NC
+            ret
+.no:        scf
+            ret
+
+; the candidates for slot eqm_t: Remove (if equipped), then every unequipped item in the
+; party's packs of that type that the member's job may use
+eqm_cands:  xor a
+            ld [eqm_n], a
+            ld a, [eqm_t]
+            ld [eqm_ft], a
+            call eqm_find
+            cp $FF
+            jr z, .m0
+            ld a, $FF
+            call .add
+.m0:        xor a
+.l:         ld [eqm_k], a                   ; m * 4 + j
+            ld a, [eqm_t]
+            ld [eqm_ft], a
+            ld a, [eqm_k]
+            call eqm_mslot
+            ld a, [hl]
+            and a
+            jr z, .n
+            bit 7, a
+            jr nz, .n
+            push af
+            call eqm_fits
+            pop bc
+            jr c, .n
+            ld a, b
+            and $7F
+            call eqm_legal
+            jr c, .n
+            ld a, [eqm_k]
+            call .add
+.n:         ld a, [eqm_k]
+            inc a
+            cp 16
+            jr c, .l
+            ret
+.add:       ld b, a
+            ld a, [eqm_n]
+            ld e, a
+            ld d, 0
+            ld hl, eqm_ls
+            add hl, de
+            ld [hl], b
+            inc a
+            ld [eqm_n], a
+            ret
+
+; A = item (1-based) of the kind of eqm_ft: C if the member's job may not use it (FF1
+; IsEquipLegal: the permission word's bit $800 >> class)
+eqm_legal:  dec a
+            add a, a
+            ld e, a
+            ld d, 0
+            ld a, [eqm_ft]
+            and a
+            ld hl, N_WPERM
+            jr z, .w
+            ld hl, N_APERM
+.w:         add hl, de
+            ld de, eqm_buf
+            ld bc, 2
+            ld a, NAMES
+            call far_copy
+            ld a, [eqm_cls]
+            ld b, a
+            ld hl, $0800
+.sh:        ld a, b
+            and a
+            jr z, .t
+            srl h
+            rr l
+            dec b
+            jr .sh
+.t:         ld a, [eqm_buf]
+            and l
+            ld b, a
+            ld a, [eqm_buf + 1]
+            and h
+            or b
+            ret z                           ; (Z: allowed, C clear)
+            scf
+            ret
+
+; A = the list entry under the cursor
+eqm_entry:  ld a, [eqm_c]
+            ld e, a
+            ld d, 0
+            ld hl, eqm_ls
+            add hl, de
+            ld a, [hl]
+            ret
+
+; apply entry A to slot type eqm_t: $FF removes the equipped item; m * 4 + j: this member
+; equips the item in member m's slot j (FF1's slots; an item from another member's pack
+; trades places with the one it replaces, or takes a free slot, or an unequipped one)
+eqm_apply:  ld [eqm_e], a
+            ld a, [eqm_t]
+            ld [eqm_ft], a
+            call eqm_find
+            ld [eqm_eq], a                  ; the equipped one's slot ($FF: none)
+            ld a, [eqm_e]
+            cp $FF
+            jr nz, .take
+            ld a, [eqm_eq]                  ; remove
+            cp $FF
+            ret z
+            ld [eqm_fj], a
+            call eqm_slotj
+            res 7, [hl]
+            ret
+.take:      call eqm_mslot                  ; DE = the item's slot
+            ld d, h
+            ld e, l
+            ld a, [eqm_e]
+            srl a
+            srl a
+            ld b, a
+            ld a, [eqm_m]
+            cp b
+            jr nz, .other
+            ld a, [eqm_eq]                  ; this member's own: the old one off, this on
+            cp $FF
+            jr z, .on
+            push de
+            ld [eqm_fj], a
+            call eqm_slotj
+            res 7, [hl]
+            pop de
+.on:        ld a, [de]
+            set 7, a
+            ld [de], a
+            ret
+.other:     ld a, [eqm_eq]                  ; the target slot: the equipped one's, a free
+            cp $FF                          ;   one, else the first unequipped one
+            jr nz, .tg
+            ld c, 0
+.fr:        ld a, c
+            ld [eqm_fj], a
+            push de
+            push bc
+            call eqm_slotj
+            pop bc
+            pop de
+            ld a, [hl]
+            and a
+            jr z, .tgh
+            inc c
+            ld a, c
+            cp 4
+            jr c, .fr
+            ld c, 0
+.fu:        ld a, c
+            ld [eqm_fj], a
+            push de
+            push bc
+            call eqm_slotj
+            pop bc
+            pop de
+            bit 7, [hl]
+            jr z, .tgh
+            inc c
+            jr .fu
+.tg:        ld [eqm_fj], a
+            push de
+            call eqm_slotj
+            pop de
+.tgh:       ld a, [hl]                      ; HL = target, DE = the item: swapped, the
+            and $7F                         ;   item equipped
+            ld b, a
+            ld a, [de]
+            set 7, a
+            ld [hl], a
+            ld a, b
+            ld [de], a
+            ret
+
+; the kind's slots of all four members saved / restored (the preview)
+eqm_save:   xor a
+            jr eqm_cp
+eqm_rest:   ld a, 1
+eqm_cp:     ld [eqm_sv], a
+            ld a, [eqm_t]
+            and a
+            ld a, $18
+            jr z, .w
+            ld a, $1C
+.w:         ld l, a
+            ld h, high(ch_stats)
+            ld de, eqm_bk
+            ld c, 4
+.m:         push hl
+            ld b, 4
+.b:         ld a, [eqm_sv]
+            and a
+            jr nz, .r
+            ld a, [hl+]
+            ld [de], a
+            jr .n
+.r:         ld a, [de]
+            ld [hl+], a
+.n:         inc de
+            dec b
+            jr nz, .b
+            pop hl
+            ld a, l
+            add a, $40
+            ld l, a
+            dec c
+            jr nz, .m
+            ret
+
+; member A's stats with the current equipment -> eqm_v (Attack, Accuracy, Defense, Evasion)
+eqm_calc:   ld [eqm_k], a
+            ld a, 1
+            ld [eq_adj], a
+            xor a
+            ld [eq_kind], a
+            ld a, $18
+            ld [eq_off], a
+            call eq_readj
+            ld a, 1
+            ld [eq_kind], a
+            ld a, $1C
+            ld [eq_off], a
+            call eq_readj
+            ld a, [eqm_k]
+            call ch_rec
+            ld a, l
+            add a, $20
+            ld l, a
+            ld a, [hl+]                     ; damage, hit rate, absorb, evasion
+            ld [eqm_v], a
+            ld a, [hl+]
+            ld [eqm_v + 1], a
+            ld a, [hl+]
+            ld [eqm_v + 2], a
+            ld a, [hl]
+            ld [eqm_v + 3], a
+            jp eqm_unadj
+
+; the name of slot byte A of the kind of type eqm_ft (icon + letters)
+eqm_name:   and $7F
+            ld b, a
+            ld a, [eqm_ft]
+            and a
+            ld a, 27                        ; weapons: names 28-67, armour 68-107
+            jr z, .w
+            ld a, 67
+.w:         add a, b
+            jp pen_iname
+
+eqm_icons:  db $19, $07, $05, $06, $08      ; empty slots: sword, armour, shield, helmet, gloves
+
 section wram, $CD00
 scr_t0:     ds 1
 scr_t1:     ds 1
@@ -1624,6 +2371,23 @@ pr_row0:    ds 1
 pr_row:     ds 1
 pr_i:       ds 1
 pr_cnt:     ds 1
+eqm_m:      ds 1
+eqm_t:      ds 1
+eqm_c:      ds 1
+eqm_top:    ds 1
+eqm_n:      ds 1
+eqm_k:      ds 1
+eqm_ft:     ds 1
+eqm_fj:     ds 1
+eqm_e:      ds 1
+eqm_eq:     ds 1
+eqm_cls:    ds 1
+eqm_sv:     ds 1
+eqm_v:      ds 4
+eqm_w:      ds 4
+eqm_buf:    ds 8
+eqm_ls:     ds 17
+eqm_bk:     ds 16
 pg_names:   ds 24
 pg_nb:      ds 8
 pg_row:     ds 24

@@ -82,6 +82,9 @@ def strings():
     out['pgok'] = enc('OK to begin\nwith this party?')    # (owner's wording, party creation)
     out['pgyes'] = enc('Yes')
     out['pgno'] = enc('No')
+    out['mcmd4'] = enc('Items\nMagic\nEquip\nStatus')          # (the main menu, owner 2026-11-22)
+    out['eqst'] = enc('Attack\nAccuracy\nDefense\nEvasion')
+    out['eqrem'] = enc('Remove')
     for c in range(12):
         name = ff1_items.T[240 + c]
         out['class%d' % c] = enc('\n'.join(text.wrap(name, 8)))
