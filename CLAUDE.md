@@ -1298,6 +1298,10 @@ sell list, spell first in magic shops, item quantities); the main menu with the 
 pictures; typewriter text (dialogue, shop speech, descriptions) at reading speed, A doubles
 it, soft click. World map / puzzle / The End moved to ROM bank 99. Details: docs/ff1-native.md
 items 11-16.
+Owner (2026-11-22, last): screens unified (headers, full-width windows, name entry in windows with
+one case at a time), fades for every menu / shop / sub-screen change, the hand hidden while a
+window changes, drawn bag icon for items; whole-game checks (61 maps, fiends, Chaos, ending,
+puzzle, inn, soft reset). Suggestions for menus / battle: docs/ff1-native-ideas.md (item 17).
 Next: the owner's play-test. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining

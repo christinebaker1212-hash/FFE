@@ -319,3 +319,25 @@ one reaches parity, so the owner can keep playing).
    page kept in win_tx at $DD40, its letters revealed into the box, one cell a V-Blank),
    shop speech and the menus' description windows (menu.s pen_type). Test builds:
    `build.py --dlg N` opens dialogue N after the map loads.
+17. Owner (2026-11-22, later): one style for all screens and consistent transitions.
+   - Fades (main.s fade_out / fade_in, bank 0 $1480): every menu, shop and sub-screen change
+     and leaving a menu / battle for the map fade out and in, 4 steps of 2 frames. Color: the
+     palettes scaled to black (fd_pal = the dialogue page buffer, fd_tmp $C880); DMG / SGB:
+     the shades to white (the switched-off screen's colour). FF1's palette cycle before a menu
+     stands for the fade-out (fd_skip). The first screen after power-on / a soft reset shows
+     without a fade on the Color (mGBA reads palette RAM back as 0 there).
+   - The hand hides while a window is still going up (scr_frame / bt_frame) and while text
+     types: it never shows in the wrong place.
+   - Items screen: a full-width header (gold title, Gil); Formation screen full width with a
+     title; item / spell target screens load as screens of their own (faded).
+   - Name entry in windows: the job's picture, its name and the name being written on top; the
+     letters one case at a time (SELECT switches), digits and signs below, rows two apart; the
+     cursor is the hand's finger tile (fits between two letters).
+   - Title: Continue grey (Color palette 4) and skipped when there is nothing to continue.
+   - Item shop asks How many?; Magic refused (error sound) for members without magic, and
+     left / right in the magic screen skip them.
+   - The items' icon: a drawn bag (own art in FF3's icon colours).
+   - Checked: all 61 standard maps load (Color + DMG), the eight fiends and Chaos won with the
+     ending and The End, the 15-puzzle, inn save, soft reset -> title -> New Game; VRAM checker
+     0 on Color, DMG and SGB over these runs.
+   Ideas for later (owner to choose): docs/ff1-native-ideas.md.
