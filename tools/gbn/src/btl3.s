@@ -15,8 +15,13 @@ section bank 6, $6000
 ; ---- the spell list (approved: two levels a page, rows of spells 1 and 2, then spell 3 and
 ; the level with its MP; hands at x 0 / 80); A = spell id, [bt_mlv] = level; C set on B
 bt_mag_menu:
+            ld hl, bt_lastm                 ; (the member's last spell slot)
+            call bt_memp
+            ld a, [hl]
+            cp 24
+            jr c, .m0
             xor a
-            ld [bt_mcur], a
+.m0:        ld [bt_mcur], a
             ld a, $FF
             ld [bt_mpage], a
 .l:         ld a, [bt_mcur]                 ; the page of the cursor's level
@@ -362,6 +367,10 @@ bt_cmd_magic:
             ret c
             push af
             call bt_names_win               ; (the names while targeting)
+            ld hl, bt_lastm                 ; (remembered)
+            call bt_memp
+            ld a, [bt_mcur]
+            ld [hl], a
             pop af
             ld [bt_t + 7], a                ; spell id
             call bt_mload                   ; its data -> mg_d

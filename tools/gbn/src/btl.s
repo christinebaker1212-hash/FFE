@@ -58,6 +58,12 @@ battle:     xor a                           ; (no menu sounds, no vehicle noise)
             xor a
             ld [bt_msgon], a
             ld [bt_rmask], a
+            dec a                           ; (no target remembered yet)
+            ld hl, bt_lastt
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
             call bt_screen
             call bt_draw_party
             call bt_names

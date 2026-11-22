@@ -2978,6 +2978,8 @@ o_sx:       ds 1
 o_sy:       ds 1
 o_tb:       ds 1
 dash:       ds 1                            ; this step at double speed (B held, on foot)
+bt_lastc:   ds 4                            ; battle: each member's last command, magic slot
+bt_lastm:   ds 4                            ;   (owner, 2026-11-22: the cursor remembered)
 
 section wram, $CF90
 vehicle:    ds 1

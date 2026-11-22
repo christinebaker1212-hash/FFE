@@ -434,8 +434,13 @@ bt_commands:
 bt_cmd_one: ld a, [bt_cm]
             call bt_step_fwd
             call bt_cmd_win
+            ld hl, bt_lastc                 ; (the member's last command: the hand there)
+            call bt_memp
+            ld a, [hl]
+            cp 4
+            jr c, .c0
             xor a
-            ld [bt_ccur], a
+.c0:        ld [bt_ccur], a
 .l:         call bt_cmd_hand
             call bt_frame
             ldh a, [pad_new]
@@ -474,10 +479,13 @@ bt_cmd_one: ld a, [bt_cm]
             scf
             ret
 .a:         ld a, [bt_ccur]
+            cp 4
+            jr z, .run                      ; (Run is not remembered)
+            ld hl, bt_lastc
+            call bt_memp
+            ld [hl], a
             and a
             jr z, .fight
-            cp 4
-            jr z, .run
             cp 1
             jr nz, .md
             call bt_cmd_magic
@@ -665,7 +673,16 @@ bt_s_cmd:   db "Fight", $09, "Run", $0A, "Magic", $0A, "Medicine", $0A, "Items",
 ; across, from the enemies' middles), wrapping round to the far side when none is that way.
 ; A = slot, C set on B
 bt_target_enemy:
-            ld a, $FF
+            ld hl, bt_lastt                 ; (the member's last target, while it lives)
+            call bt_memp
+            ld a, [hl]
+            cp 9
+            jr nc, .ff
+            call bt_ealive
+            jr z, .ff
+            ld [bt_tcur], a
+            jr .l
+.ff:        ld a, $FF
             ld [bt_tcur], a
             ld b, 10
 .f:         inc a                           ; the first living enemy
@@ -705,11 +722,24 @@ bt_target_enemy:
             call bt_tdir
             jr .l
 .a:         call bt_hand_off
+            ld hl, bt_lastt
+            call bt_memp
             ld a, [bt_tcur]
+            ld [hl], a
             and a
             ret
 .b:         call bt_hand_off
             scf
+            ret
+; HL += the member choosing (bt_cm)
+bt_memp:    push af                         ; (A and the flags kept)
+            ld a, [bt_cm]
+            add a, l
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld h, a
+            pop af
             ret
 ; enemy A's middle (in half cells): D = x, E = y
 bt_ectr:    call bt_epos
@@ -2749,6 +2779,7 @@ bt_tps:     ds 1
 bt_tj:      ds 1
 bt_tbs:     ds 1
 bt_tbj:     ds 1
+bt_lastt:   ds 4                            ; each member's last enemy target (this battle)
 section wram, $C500
 bt_save:    ds 12 * 32                      ; the rows under the message window
 section wram, $C400
