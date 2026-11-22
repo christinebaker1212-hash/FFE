@@ -2429,36 +2429,22 @@ bt_victory: call bt_msg_new
             ld [bt_rexp], a
             ld a, h
             ld [bt_rexp + 1], a
-            pop de                          ; gold
-            push de
+            pop de                          ; gold (shown in the results window)
+            ld a, e
+            ld [bt_rgold], a
+            ld a, d
+            ld [bt_rgold + 1], a
             ld b, d
             ld c, e
             call add_gold
-            call bt_msg_new                 ; "Experience up" N, "Gold" N
+            ld a, 1                         ; (level ups recorded for the results window)
+            ld [bt_res], a
             xor a
-            ld [bt_rows], a
-            ld a, 73
-            call bt_mtext
-            ld hl, bt_sbuf
-            call bt_msg_row
-            ld a, [bt_rexp]
-            ld [nf_val], a
-            ld a, [bt_rexp + 1]
-            ld [nf_val + 1], a
-            xor a
-            ld [nf_val + 2], a
-            ld hl, bt_s_pts
-            call bt_numline
-            pop de
-            ld a, e
-            ld [nf_val], a
-            ld a, d
-            ld [nf_val + 1], a
-            xor a
-            ld [nf_val + 2], a
-            ld hl, bt_s_gil
-            call bt_numline
-            call bt_msg_end
+            ld hl, res_on
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
             xor a                           ; experience to everyone standing (levels: next)
 .ax:        push af
             call ch_rec
@@ -2486,7 +2472,7 @@ bt_victory: call bt_msg_new
             inc a
             cp 4
             jr c, .ax
-            ret
+            jp bt_results
 
 ; member A: experience >= the table's amount for its level -> a level up
 bt_lvchk:   ld [bt_lvm], a
@@ -2768,7 +2754,10 @@ bt_levelup: ld a, [bt_lvm]
             ld a, $20
             call bt_rf
             ld [hl], b
-.msg:       ld a, [bt_lvm]                  ; messages: name, Level up!, Max HP N points, stats
+.msg:       ld a, [bt_res]                  ; (after a victory: kept for the results window)
+            and a
+            jp nz, bt_lvrec
+            ld a, [bt_lvm]                  ; messages: name, Level up!, Max HP N points, stats
             call bt_msg_pl
             ld a, 48
             call bt_msg_line
@@ -2897,6 +2886,322 @@ bt_numline: push hl
 bt_s_pts:   db "P", 0
 bt_s_gil:   db " Gil", 0
 
+
+section bank 6, $7480                       ; (the results window: after btl4)
+; a level up kept for the results window: the new level, the HP gain, the stats raised
+bt_lvrec:   ld a, CH_LEVEL
+            call bt_rf
+            ld b, [hl]
+            ld a, [bt_lvm]
+            ld e, a
+            ld d, 0
+            ld hl, res_lv
+            add hl, de
+            ld [hl], b
+            ld hl, res_hp
+            add hl, de
+            ld a, [bt_t + 1]
+            ld [hl], a
+            ld c, 0
+            ld hl, bt_lvup + 4
+            ld b, 5
+.m:         ld a, [hl-]
+            and a
+            jr z, .z
+            scf
+.z:         rl c
+            dec b
+            jr nz, .m
+            ld hl, res_st
+            add hl, de
+            ld [hl], c
+            ld hl, res_on
+            add hl, de
+            ld [hl], 1
+            ret
+
+; ---- the results window (owner, 2026-11-22): over the cleared enemy area (0,0,16,12),
+; Experience and Gil, then each member who went up a level (name, Level up!, the level; HP +
+; and the stats raised), two members a page; A / B turns the page / closes it
+bt_results: call bt_left_clear              ; (the names window empty: no one is left)
+            call bt_party_win               ; (the new maximum HP)
+            call bt_upd
+            xor a
+            ld [bt_res], a
+            ld [res_m], a                   ; the next member to show
+            ld a, 1
+            ld [res_pg], a                  ; (page 1: the experience and Gil first)
+.pg:        ld bc, $0000
+            ld de, $100C
+            call bt_win
+            xor a
+            ld [res_ln], a
+            ld a, [res_pg]
+            and a
+            jr z, .mem
+            ld de, bt_line                  ; Experience up N P
+            ld a, 73
+            call res_txt
+            ld a, $20
+            ld [de], a
+            inc de
+            ld hl, bt_rexp
+            call res_num
+            ld hl, bt_s_pts
+            call res_str
+            call res_put
+            ld de, bt_line                  ; N Gil
+            ld hl, bt_rgold
+            call res_num
+            ld hl, bt_s_gil
+            call res_str
+            call res_put
+            ld hl, res_ln                   ; (a blank row)
+            inc [hl]
+.mem:       ld a, [res_m]
+            cp 4
+            jr nc, .sh
+            ld e, a
+            ld d, 0
+            ld hl, res_on
+            add hl, de
+            ld a, [hl]
+            and a
+            jr z, .mn
+            ld a, [res_ln]                  ; two rows left?
+            cp 6
+            jr nc, .sh
+            ld de, bt_line                  ; name Level up! L n
+            ld a, [res_m]
+            call ch_rec
+            inc hl
+            inc hl
+            ld b, 4
+.nm:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .nm
+            ld a, l
+            add a, CH_NAME2 - 6
+            ld l, a
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl]
+            ld [de], a
+            inc de
+.tr:        dec de                          ; (the name's trailing blanks dropped)
+            ld a, [de]
+            cp $20
+            jr z, .tr
+            inc de
+            ld a, $20
+            ld [de], a
+            inc de
+            ld a, 48
+            call res_txt
+            ld hl, res_s_l
+            call res_str
+            ld a, [res_m]
+            ld l, a
+            ld h, 0
+            push de
+            ld de, res_lv
+            add hl, de
+            pop de
+            ld a, [hl]
+            inc a
+            ld [bt_t + 13], a
+            xor a
+            ld [bt_t + 14], a
+            ld hl, bt_t + 13
+            call res_num
+            call res_put
+            ld de, bt_line                  ; HP + n, the stats raised
+            ld hl, res_s_hp
+            call res_str
+            ld a, [res_m]
+            ld l, a
+            ld h, 0
+            push de
+            ld de, res_hp
+            add hl, de
+            pop de
+            ld a, [hl]
+            ld [bt_t + 13], a
+            xor a
+            ld [bt_t + 14], a
+            ld hl, bt_t + 13
+            call res_num
+            ld a, [res_m]
+            ld l, a
+            ld h, 0
+            push de
+            ld de, res_st
+            add hl, de
+            pop de
+            ld a, [hl]
+            ld [bt_t + 15], a
+            ld hl, res_s_st
+.st:        ld a, [bt_t + 15]
+            srl a
+            ld [bt_t + 15], a
+            jr nc, .sn
+            push hl
+            call res_str
+            pop hl
+.sn:        inc hl                          ; (the next name: 5 bytes each)
+            inc hl
+            inc hl
+            inc hl
+            inc hl
+            ld a, l
+            cp low(res_s_st + 25)
+            jr nz, .st
+            call res_put
+.mn:        ld hl, res_m
+            inc [hl]
+            jp .mem
+.sh:        ld a, 12                        ; shown; A / B
+            ld [sf_row], a
+            xor a
+            ld [sf_row], a
+.w:         call bt_frame
+            ldh a, [pad_new]
+            and 3
+            jr z, .w
+            xor a
+            ld [res_pg], a
+            ld a, [res_m]                   ; more members left: another page
+            cp 4
+            jr nc, .cl
+            ld e, a
+            ld d, 0
+            ld hl, res_on
+            add hl, de
+.ml:        ld a, [hl+]
+            and a
+            jp nz, .pg
+            inc e
+            ld a, e
+            cp 4
+            jr c, .ml
+.cl:        ld hl, smap                     ; the window gone: the empty battlefield
+            ld c, 12
+.cr:        push hl
+            ld b, 16
+.cc:        ld [hl], 0
+            inc h
+            inc h
+            inc h
+            ld [hl], 0
+            dec h
+            dec h
+            dec h
+            inc hl
+            dec b
+            jr nz, .cc
+            pop hl
+            ld de, 32
+            add hl, de
+            dec c
+            jr nz, .cr
+            xor a
+            ld [sf_row], a
+            ld b, 8
+.cw:        push bc
+            call bt_frame
+            pop bc
+            dec b
+            jr nz, .cw
+            ret
+; FF1 message A's text appended at DE
+res_txt:    push de
+            call bt_mtext
+            pop de
+            ld hl, bt_sbuf
+; string HL appended at DE (0-ended, DE left on the 0)
+res_str:    ld a, [hl+]
+            ld [de], a
+            and a
+            ret z
+            inc de
+            jr res_str
+; the 16-bit number at HL appended at DE
+res_num:    ld a, [hl+]
+            ld [nf_val], a
+            ld a, [hl]
+            ld [nf_val + 1], a
+            xor a
+            ld [nf_val + 2], a
+            push de
+            call num_fmt
+            pop de
+            ld hl, nf_dig
+.s:         ld a, [hl]
+            cp $20
+            jr nz, .c
+            inc hl
+            jr .s
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, l
+            cp low(nf_dig + 6)
+            jr nz, .c
+            xor a
+            ld [de], a
+            ret
+; bt_line as the window's next text row (tiles $12 + 14 row, cells (1, 2 + row))
+res_put:    ld a, [res_ln]
+            cp 7
+            ret nc
+            ld b, 14
+            call vwf_clr
+            ld hl, bt_line
+            xor a
+            call vwf_str
+            ld a, [res_ln]
+            ld c, a
+            add a, a                        ; 14 row
+            ld b, a
+            add a, a
+            add a, a
+            add a, a
+            sub b
+            add a, $12
+            push af
+            ld b, 14
+            call vwf_out
+            pop af
+            ld e, a
+            ld a, [res_ln]
+            add a, 2
+            ld c, a
+            ld b, 1
+            call cell_addr
+            ld b, 14
+.c:         ld [hl], e
+            inc e
+            inc h
+            inc h
+            inc h
+            ld [hl], 3
+            dec h
+            dec h
+            dec h
+            inc hl
+            dec b
+            jr nz, .c
+            ld hl, res_ln
+            inc [hl]
+            ret
+res_s_l:    db " L", 0
+res_s_hp:   db "  HP +", 0
+res_s_st:   db " Str", 0, " Agi", 0, " Int", 0, " Vit", 0, " Lck", 0
+zz_end_b6_7480:
+
 section wram, $C100                         ; (the map's queue is free during a battle)
 bt_en:      ds 9 * 32
 bt_ch:      ds 4 * 16
@@ -2956,6 +3261,15 @@ bt_tj:      ds 1
 bt_tbs:     ds 1
 bt_tbj:     ds 1
 bt_lastt:   ds 4                            ; each member's last enemy target (this battle)
+bt_res:     ds 1                            ; (the results window: level ups recorded,
+bt_rgold:   ds 2                            ;   the gold, each member's new level, HP gain,
+res_on:     ds 4                            ;   stats raised, the page, row, next member)
+res_lv:     ds 4
+res_hp:     ds 4
+res_st:     ds 4
+res_pg:     ds 1
+res_ln:     ds 1
+res_m:      ds 1
 section wram, $C500
 bt_save:    ds 12 * 32                      ; the rows under the message window
 section wram, $C400

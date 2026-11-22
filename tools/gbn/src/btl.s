@@ -1238,8 +1238,11 @@ vwf_out:    push af
             add hl, hl
             add hl, hl
             add hl, hl
-            ld de, $8000                    ; ($80-$FF: $8800 + 16 (A - $80) = $8000 + 16 A)
-            add hl, de
+            ld de, $8000                    ; ($80-$FF: $8800 + 16 (A - $80) = $8000 + 16 A;
+            bit 3, h                        ;   $00-$7F: $9000 + 16 A, the BG's own half)
+            jr nz, .hi
+            ld de, $9000
+.hi:        add hl, de
             ld a, l
             ld [bt_updst], a
             ld a, h
