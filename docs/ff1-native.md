@@ -292,3 +292,11 @@ one reaches parity, so the owner can keep playing).
    cursor everywhere (fingertip just before the text, finger at its middle row; where the
    text starts at the window's first column the hand points at the second line or the
    picture instead of leaving only a fingertip on screen).
+13. Owner (2026-11-22): Magic and Status screens in the equipment screen's style (shared top
+   window `mtop`: picture, name, one-line job). Magic: HP on the top window; the eight levels
+   as gold L1 .. L8 headers with MP current / maximum, the member's three spells below each
+   (icon, name), scrolled with the hand; left / right: the next member; Cure / Cure 4 / Life /
+   Pure / Soft cast again and again with the target window open while MP lasts. Status: level;
+   HP, MP of every level (two rows), experience and what the next level needs; Str / Agi / Int /
+   Vit / Lck and Attack / Accuracy / Defense / Evasion in two columns; gold labels on the
+   Color (palette 3); left / right: the next member.

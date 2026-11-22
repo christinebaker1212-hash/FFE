@@ -2075,6 +2075,11 @@ eqm_pal:    ld a, COMMON
             ld de, eqm_buf + 6
             call .nes
             ld a, $80 | 16
+            call .put
+            ld a, $28                       ; NES yellow: the labels' gold (palette 3)
+            ld de, eqm_buf + 6
+            call .nes
+            ld a, $80 | 24
 .put:       call bcps_w
             ld hl, eqm_buf
             ld b, 8
@@ -2096,41 +2101,7 @@ eqm_pal:    ld a, COMMON
 eqm_draw:   call scr_open
             call eqm_pal                    ; (masked: into the shadows)
             ld a, [eqm_m]
-            call ch_rec
-            ld a, [hl]
-            ld [eqm_cls], a
-            call scr_classes                ; the member's job: sprite tiles 0-5
-            ld bc, $0000
-            ld de, $1405
-            call scr_win
-            ld bc, $0005
-            ld de, $1407
-            call scr_win
-            ld bc, $000C
-            ld de, $1406
-            call scr_win
-            ld a, [eqm_cls]                 ; the picture at cells (1-2, 1-3)
-            ld e, a
-            ld d, 0
-            ld hl, cls_pal
-            add hl, de
-            ld a, [hl]
-            ld [scr_t0], a
-            ld bc, $0808
-            ld e, 4
-            xor a
-            call scr_spr23
-            ld bc, $0401                    ; name, job, level
-            call pen_at
-            ld a, [eqm_m]
-            call pen_name
-            ld bc, $0402
-            call pen_at
-            ld a, [eqm_cls]
-            call class_str
-            call pen_str
-            ld bc, $0403
-            call pen_at
+            call mtop
             ld hl, str_level
             call pen_str
             ld a, [eqm_m]
@@ -2142,8 +2113,54 @@ eqm_draw:   call scr_open
             inc a
             call nf_a
             call pen_numl
+            ld bc, $0005
+            ld de, $1407
+            call scr_win
+            ld bc, $000C
+            ld de, $1406
+            call scr_win
             call eqm_sdraw
             jp scr_show
+
+; the member screens' top window (0,0,20,5): member A's picture (cells 1-2, 1-3), name,
+; job; the pen left at (4, 3) for the screen's third line; eqm_cls = the job
+mtop:       ld [mt_m], a
+            call ch_rec
+            ld a, [hl]
+            ld [eqm_cls], a
+            call scr_classes                ; the member's job: sprite tiles 0-5
+            ld bc, $0000
+            ld de, $1405
+            call scr_win
+            ld a, [eqm_cls]
+            ld e, a
+            ld d, 0
+            ld hl, cls_pal
+            add hl, de
+            ld a, [hl]
+            ld [scr_t0], a
+            ld bc, $0808
+            ld e, 4
+            xor a
+            call scr_spr23
+            ld bc, $0401
+            call pen_at
+            ld a, [mt_m]
+            call pen_name
+            ld bc, $0402                    ; (the job's name on one line)
+            call pen_at
+            ld a, [eqm_cls]
+            add a, a
+            ld e, a
+            ld d, 0
+            ld hl, cname_ptrs
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            call pen_str
+            ld bc, $0403
+            jp pen_at
 
 ; the middle window: the weapon, then the armour worn (FF1 has two kinds: weapons and
 ; armour); the bottom: the stats
@@ -2770,6 +2787,7 @@ eqm_buf:    ds 8
 eqm_ls:     ds 17
 eqm_bk:     ds 16
 eqm_rows:   ds 5
+mt_m:       ds 1
 eqm_nr:     ds 1
 pg_names:   ds 24
 pg_nb:      ds 8

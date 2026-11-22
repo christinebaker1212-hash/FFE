@@ -542,20 +542,15 @@ pick_char:  xor a
 ; ---- the status screen (approved layout): window (0,0,20,8): name + level, class,
 ; experience, until next level, the class sprite right of rows 1-3; window (0,7,20,11):
 ; strength .. luck, then damage, hit rate, absorb, evasion
+; ---- the status screen (owner, 2026-11-22: as the equipment screen): top (0,0,20,5)
+; picture, name, job, level; (0,5,20,7) HP, MP per level (levels 1-4, 5-8), experience and
+; what the next level needs; (0,11,20,7) the five stats and the four battle values; gold
+; labels on the Color; left / right: the next member; A / B: back
 status_scr: ld [mm_t], a
-            call scr_open
-            ld bc, $0000
-            ld de, $1408
-            call scr_win
-            ld bc, $0007
-            ld de, $140B
-            call scr_win
-            ld bc, $0101
-            call pen_at
+.re:        call scr_open
+            call eqm_pal
             ld a, [mm_t]
-            call pen_name
-            ld bc, $0A01
-            call pen_at
+            call mtop
             ld hl, str_level
             call pen_str
             ld a, [mm_t]
@@ -567,24 +562,87 @@ status_scr: ld [mm_t], a
             inc a
             call nf_a
             call pen_numl
-            ld bc, $0102                    ; class
+            ld bc, $0005
+            ld de, $1407
+            call scr_win
+            ld bc, $000B
+            ld de, $1407
+            call scr_win
+            ld bc, $0106                    ; gold labels: HP, MP, Exp, Next
+            ld hl, str_stlab
+            ld e, 2
+            call gold_str
+            ld bc, $0109
+            ld hl, str_stlab2
+            ld e, 4
+            call gold_str
+            ld bc, $010C                    ; Str .. Lck
+            ld hl, str_stl
+            ld e, 3
+            call gold_str
+            ld bc, $080C                    ; Attack .. Evasion
+            ld hl, str_eqst
+            ld e, 8
+            call gold_str
+            ld bc, $0C06                    ; HP current / maximum, ending at column 18
             call pen_at
             ld a, [mm_t]
             call ch_rec
-            ld a, [hl]
-            add a, a
-            ld e, a
-            ld d, 0
-            ld hl, cname_ptrs
-            add hl, de
-            ld a, [hl+]
-            ld h, [hl]
+            ld a, l
+            add a, CH_HP
             ld l, a
-            call pen_str
-            ld bc, $0103                    ; experience
+            push hl
+            call nf_w
+            ld b, 3
+            call pen_num
+            ld a, $2F
+            call pen_ch
+            pop hl
+            inc hl
+            inc hl
+            call nf_w
+            ld b, 3
+            call pen_num
+            ld bc, $0407                    ; MP: current / maximum of each level
             call pen_at
-            ld hl, str_exp
-            call pen_str
+            xor a
+.mp:        ld [mm_pc], a
+            cp 4
+            jr nz, .m1
+            ld bc, $0408
+            call pen_at
+.m1:        ld a, [mm_t]
+            rrca
+            rrca
+            ld l, a
+            ld h, high(ch_magic)
+            ld a, [mm_pc]
+            add a, $20
+            add a, l
+            ld l, a
+            ld a, [hl]
+            add a, $30
+            call pen_ch
+            ld a, $2F
+            call pen_ch
+            ld a, l
+            add a, 8
+            ld l, a
+            ld a, [hl]
+            add a, $30
+            call pen_ch
+            ld a, [mm_pc]                   ; (a space between, none at the border)
+            and 3
+            cp 3
+            jr z, .m2
+            ld a, $20
+            call pen_ch
+.m2:        ld a, [mm_pc]
+            inc a
+            cp 8
+            jr c, .mp
+            ld bc, $0D09                    ; experience
+            call pen_at
             ld a, [mm_t]
             call ch_rec
             ld a, l
@@ -596,101 +654,108 @@ status_scr: ld [mm_t], a
             ld [nf_val + 1], a
             ld a, [hl]
             ld [nf_val + 2], a
-            ld bc, $0D04
-            call pen_at
             ld b, 6
             call pen_num
-            ld bc, $0105                    ; until the next level
+            ld bc, $0D0A                    ; to the next level
             call pen_at
-            ld hl, str_next
-            call pen_str
             call exp_next
-            ld bc, $0D06
-            call pen_at
             ld b, 6
             call pen_num
-            ld a, [mm_t]                    ; stats: rows 8-12, values at columns 13-18
+            ld a, [mm_t]                    ; Str .. Lck at columns 5-6
             call ch_rec
             ld a, l
             add a, $10
             ld l, a
-            ld de, str_stats
-            ld c, 8
-            call st_rows
-            ld a, [mm_t]                    ; damage, hit rate, absorb, evasion: rows 13-16
+            ld bc, $050C
+            ld e, 5
+            ld d, 2
+            call st_vals
+            ld a, [mm_t]                    ; Attack .. Evasion at columns 16-18
             call ch_rec
             ld a, l
             add a, $20
             ld l, a
-            ld de, str_bstats
-            ld c, 13
-            call st_rows4
-            call st_sprite
+            ld bc, $100C
+            ld e, 4
+            ld d, 3
+            call st_vals
             call scr_show
 .w:         call scr_frame
             ldh a, [pad_new]
+            ld b, a
             and $03
+            ret nz
+            ld hl, mm_t
+            bit 4, b
+            jr nz, .rt
+            bit 5, b
             jr z, .w
-            ret
+            ld a, [hl]
+            dec a
+            jr .mv
+.rt:        ld a, [hl]
+            inc a
+.mv:        and 3
+            ld [hl], a
+            jp .re
 
-; rows of label (DE, lines) + value byte at HL+i, from row C, values right-aligned at 16-18
-st_rows:    ld b, 5
-            jr st_r
-st_rows4:   ld b, 4
-st_r:       push bc
-            push hl
-            ld b, 1
-            call pen_at
-            ld h, d
-            ld l, e
-.t:         ld a, [hl+]                     ; the label up to $0A / $00
-            and a
-            jr z, .e
-            cp $0A
-            jr z, .e
-            call pen_ch
-            jr .t
-.e:         ld d, h
-            ld e, l
-            pop hl
-            pop bc
-            push bc
+; E values (bytes at HL..) as D digits at column B, rows C..
+st_vals:    push bc
             push de
             push hl
-            ld a, [hl]
-            call nf_a
-            ld b, 16
             call pen_at
-            ld b, 3
+            pop hl
+            ld a, [hl+]
+            push hl
+            call nf_a
+            pop hl
+            pop de
+            push de
+            push hl
+            ld b, d
             call pen_num
             pop hl
-            inc hl
             pop de
             pop bc
             inc c
-            dec b
-            jr nz, st_r
+            dec e
+            jr nz, st_vals
             ret
 
-; the class's standing pose right of rows 1-3 (sprite tiles 0-5, palette from the class)
-st_sprite:  ld a, [mm_t]
-            call ch_rec
-            ld a, [hl]
-            call scr_classes                ; classes A.. -> tiles 0-35 (the first is A)
-            ld a, [mm_t]
-            call ch_rec
-            ld a, [hl]
-            ld e, a
-            ld d, 0
-            ld hl, cls_pal
-            add hl, de
-            ld a, [hl]
-            ld [scr_t0], a
-            xor a
-            ld e, 0
-            ld b, 136
-            ld c, 8
-            jp scr_spr23
+; the string HL (lines) from (B, C), each line's first E cells gold (Color: palette 3)
+gold_str:   push de
+            push bc
+            push hl
+            call pen_at
+            call pen_str
+            pop hl
+            ld d, 1                         ; (its lines)
+.n:         ld a, [hl+]
+            and a
+            jr z, .g
+            cp $0A
+            jr nz, .n
+            inc d
+            jr .n
+.g:         pop bc
+            pop hl
+            ld e, l
+.r:         push bc
+            push de
+            call cell_addr
+            ld a, h
+            add a, 3
+            ld h, a
+            ld a, $0B
+.c:         ld [hl+], a
+            dec e
+            jr nz, .c
+            pop de
+            pop bc
+            inc c
+            dec d
+            jr nz, .r
+            ret
 
 ; nf_val = experience to the next level (FF1: the level-up table minus the experience)
 exp_next:   ld a, [mm_t]
@@ -1312,34 +1377,34 @@ save_ask:   call desc_show
             scf
             ret
 
-; ---- the magic menu (approved layout): title (0,0,8,3), list (0,3,20,15): three levels a
-; page, each a line "L1  MP 9/9" and its three spells below from column 3; up / down step
-; through the slots, another level's page turns by itself
+; ---- the magic screen (owner, 2026-11-22: as the equipment screen): top (0,0,20,5)
+; picture, name, job, HP; list (0,5,20,13): the eight levels, each a gold L1 with its MP and
+; the member's three spells below it (icon and name), scrolled with the hand; left / right:
+; the next member; A casts FF1's out-of-battle spells (again and again while MP lasts)
 magic_menu: ld [mg_ch], a
             xor a
             ld [mg_cur], a
+            ld [mg_top], a
 .re:        call mg_draw
-            call scr_show
-.l:         ld a, [mg_cur]                  ; hand: row of the slot
-            call mg_row
-            add a, a
-            add a, a
-            add a, a
-            sub 4
+.l:         call mg_row                     ; the hand at the spell
             ld c, a
-            ld b, 0
-            call scr_cursor
+            ld b, 2
+            call cur_txt
             call scr_frame
             ldh a, [pad_new]
             bit 1, a
             ret nz
             bit 0, a
             jp nz, mg_use
+            ld hl, mg_ch
+            bit 4, a
+            jr nz, .rt
+            bit 5, a
+            jr nz, .lf
             and $C0
             jr z, .l
             ld b, a
-            ld a, [mg_cur]                  ; slots 0-23 (level * 3 + slot)
-            ld c, a
+            ld a, [mg_cur]                  ; slots 0-23 (level x 3 + slot)
             bit 7, b
             jr z, .up
             inc a
@@ -1352,45 +1417,66 @@ magic_menu: ld [mg_ch], a
             jr nz, .mv
             ld a, 23
 .mv:        ld [mg_cur], a
-            ld a, [it_desc]
-            and a
-            jr nz, .rd
-            ld a, c
-            call mg_page
-            ld b, a
-            ld a, [mg_cur]
-            call mg_page
-            cp b
+            call mg_scroll                  ; (NZ: the list moved)
             jr z, .l
-.rd:        call mg_draw
+            call mg_list
             call scr_upd
             jr .l
+.rt:        ld a, [hl]
+            inc a
+            jr .ch
+.lf:        ld a, [hl]
+            dec a
+.ch:        and 3
+            ld [hl], a
+            jr .re
 
-; slot A -> page (9 slots a page) / screen row (5 + 4 (level in page) + slot)
-mg_page:    ld b, 0
-.p:         cp 9
-            jr c, .x
-            sub 9
-            inc b
-            jr .p
-.x:         ld a, b
-            ret
-mg_row:     cp 9
-            jr c, .r
-            sub 9
-            jr mg_row
-.r:         ld b, 0                         ; level in page, slot
+; B = level, C = slot of mg_cur
+mg_lvsl:    ld a, [mg_cur]
+            ld b, 0
 .l:         cp 3
-            jr c, .s
+            ret c
             sub 3
+            ld c, a
             inc b
+            ld a, c
             jr .l
-.s:         ld c, a
+; mg_top so that the hand's row shows (rows 6-16: a level takes four); NZ when it moved
+mg_scroll:  call mg_lvsl
+            ld c, a
+            ld hl, mg_top
             ld a, b
+            cp [hl]
+            jr nc, .dn
+            ld [hl], a                      ; above: that level first
+            or 1
+            ret
+.dn:        ld d, 0
+.l:         ld a, b                         ; 4 (level - top) + 1 + slot <= 10
+            sub [hl]
+            add a, a
+            add a, a
+            inc a
+            add a, c
+            cp 11
+            jr c, .x
+            inc [hl]
+            inc d
+            jr .l
+.x:         ld a, d
+            and a
+            ret
+; A = the hand's row
+mg_row:     call mg_lvsl
+            ld c, a
+            ld a, [mg_top]
+            ld d, a
+            ld a, b
+            sub d
             add a, a
             add a, a
             add a, c
-            add a, 5
+            add a, 7
             ret
 
 ; HL = the member's magic data (ch_magic + $40 member)
@@ -1401,41 +1487,83 @@ mg_data:    ld a, [mg_ch]
             ld h, high(ch_magic)
             ret
 
-mg_draw:    call scr_cls
-            xor a
-            ld [it_desc], a
-            ld bc, $0000
-            ld de, $0803
-            call scr_win
-            ld bc, $0003
-            ld de, $140F
-            call scr_win
-            ld bc, $0101
-            call pen_at
-            ld hl, str_magic
-            call pen_str
-            ld bc, $0901                    ; (the member's name beside the title)
-            call pen_at
+mg_draw:    call scr_open
+            call eqm_pal
             ld a, [mg_ch]
-            call pen_name
-            ld a, [mg_cur]
-            call mg_page
-            ld b, a                         ; first level = 3 page
-            add a, a
-            add a, b
+            call mtop
+            ld a, $48                       ; HP current / maximum
+            call pen_ch
+            ld a, $50
+            call pen_ch
+            ld a, $20
+            call pen_ch
+            ld a, [mg_ch]
+            call ch_rec
+            ld a, l
+            add a, CH_HP
+            ld l, a
+            push hl
+            call nf_w
+            call pen_numl
+            ld a, $2F
+            call pen_ch
+            pop hl
+            inc hl
+            inc hl
+            call nf_w
+            call pen_numl
+            ld bc, $0005
+            ld de, $140D
+            call scr_win
+            call mg_list
+            jp scr_show
+
+; the list rows 6-16 from level mg_top
+mg_list:    ld c, 6                         ; (cleared, colours back)
+.cl:        ld b, 1
+            call pen_at
+            ld b, 18
+            call pen_sp
+            ld b, 1
+            call cell_addr
+            ld a, h
+            add a, 3
+            ld h, a
+            ld a, WIN_ATTR
+            ld b, 18
+.ca:        ld [hl+], a
+            dec b
+            jr nz, .ca
+            inc c
+            ld a, c
+            cp 17
+            jr c, .cl
+            ld a, [mg_top]
             ld [mg_lv], a
-            ld c, 4
+            ld c, 6
 .lv:        ld a, [mg_lv]
             cp 8
             ret nc
+            push bc                         ; the level: gold L1, MP 9/9 at columns 13-18
             ld b, 1
-            push bc
             call pen_at
-            ld a, $4C                       ; L1  MP 9/9
+            ld a, $4C
             call pen_ch
             ld a, [mg_lv]
             add a, $31
             call pen_ch
+            ld b, 1
+            call cell_addr
+            ld a, h
+            add a, 3
+            ld h, a
+            ld a, $0B
+            ld [hl+], a
+            ld [hl], a
+            pop bc
+            push bc
+            ld b, 11
+            call pen_at
             ld hl, str_mp
             call pen_str
             call mg_data
@@ -1443,39 +1571,33 @@ mg_draw:    call scr_cls
             add a, $20
             add a, l
             ld l, a
-            push hl
             ld a, [hl]
-            call nf_a
-            call pen_numl
+            add a, $30
+            call pen_ch
             ld a, $2F
             call pen_ch
-            pop hl
             ld a, l
             add a, 8
             ld l, a
             ld a, [hl]
-            call nf_a
-            call pen_numl
+            add a, $30
+            call pen_ch
             pop bc
-            ld a, 3                         ; the three spells
-.sp:        push af
+            xor a                           ; the three spells
+.sp:        ld [mg_hp], a
             inc c
+            ld a, c
+            cp 17
+            ret nc
             ld b, 2
-            push bc
             call pen_at
             call mg_data
             ld a, [mg_lv]
             add a, a
             add a, a
-            add a, l
-            ld l, a
-            pop bc
-            pop af
-            push af
-            push bc
-            ld b, a                         ; slot = 3 - A
-            ld a, 3
-            sub b
+            ld b, a
+            ld a, [mg_hp]
+            add a, b
             add a, l
             ld l, a
             ld a, [hl]
@@ -1488,16 +1610,18 @@ mg_draw:    call scr_cls
             add a, a
             add a, b
             add a, $AF                      ; FF1: spell id = level x 8 + spell - 1 + MG_START
+            push bc
             call pen_iname
-.em:        pop bc
-            pop af
-            dec a
-            jr nz, .sp
+            pop bc
+.em:        ld a, [mg_hp]
+            inc a
+            cp 3
+            jr c, .sp
             inc c
             ld hl, mg_lv
             inc [hl]
             ld a, c
-            cp 16
+            cp 17
             jr c, .lv
             ret
 
@@ -1585,8 +1709,9 @@ mg_tbl:     db MG_CURE_ID
             dw m_exit
             db 0
 mg_show:    call desc_show
-            jp magic_menu.l
-mg_spend:   ld a, [mg_mp]                   ; one MP of the level
+            call wait_ab
+            jp magic_menu.re
+mg_spend:   ld a, [mg_mp]                   ; one MP of the level; Z: none left
             ld l, a
             ld h, high(ch_magic)
             dec [hl]
@@ -1608,8 +1733,10 @@ m_curef:    ldh a, [frame]
             ld [mg_hp], a
             ld a, MG_CUR3_2
             call tgt_open
-.l:         call tgt_pick
-            jr c, mg_back
+            call tgt_pick
+            jr .t
+.l:         call tgt_pick2                  ; (owner, 2026-11-22: cast again and again,
+.t:         jr c, mg_back                   ;   the window open, while MP lasts)
             call ch_rec
             inc hl
             ld a, [hl-]
@@ -1620,17 +1747,24 @@ m_curef:    ldh a, [frame]
             ld a, [mg_hp]
             call hp_add
             call mg_spend
-            jr m_done
+            jr z, m_done
+            call tgt_redraw
+            jr .l
 .er:        call sfx_err
             jr .l
 ; Curaja: HP to the maximum (FF1 does not check ailments)
 m_cur4:     ld a, MG_CUR4_0
             call tgt_open
             call tgt_pick
-            jr c, mg_back
+            jr .t
+.l:         call tgt_pick2
+.t:         jr c, mg_back
             call ch_rec
             call hp_full
             call mg_spend
+            jr z, m_done
+            call tgt_redraw
+            jr .l
 m_done:     call tgt_redraw
             call wait_ab
             jr mg_back
@@ -1686,8 +1820,10 @@ m_soft:     ld a, MG_SOFT_0
 m_curea:    push bc
             call tgt_open
             pop bc
+            xor a
+            ld [mm_pc], a
 .l:         push bc
-            call tgt_pick
+            call tgt_pick2
             pop bc
             jp c, mg_back
             push bc
@@ -1711,7 +1847,11 @@ m_curea:    push bc
             jr .sp
 .full:      call hp_full
 .sp:        call mg_spend
-            jp m_done
+            jp z, m_done
+            push bc
+            call tgt_redraw
+            pop bc
+            jr .l
 .er:        call sfx_err
             jr .l
 ; Warp / Exit: out of the menus, back a floor / to the overworld
@@ -2160,6 +2300,7 @@ mg_cur:     ds 1
 mg_lv:      ds 1
 mg_mp:      ds 1
 mg_hp:      ds 1
+mg_top:     ds 1
 eq_kind:    ds 1
 eq_off:     ds 1
 eq_cur:     ds 1
