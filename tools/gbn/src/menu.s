@@ -1395,7 +1395,12 @@ u_heal:     ld a, IT_UseItem_Heal_0         ; (owner, 2026-11-22: used again and
             cp 2
             jr z, .er
             dec hl
-            ld a, IT_UseItem_Heal_5
+            call hp_atmax                   ; (full: no effect, the hand back)
+            jr nz, .ok
+            ld a, IT_UseItem_Heal_0
+            call no_eff
+            jr .l
+.ok:        ld a, IT_UseItem_Heal_5
             call hp_add
             ld hl, IT_UseItem_Heal_6
             dec [hl]
@@ -1991,7 +1996,12 @@ m_curef:    ldh a, [frame]
             jr z, .er
             cp 2
             jr z, .er
-            ld a, [mg_hp]
+            call hp_atmax                   ; (full: no effect, the hand back)
+            jr nz, .ok
+            ld a, MG_CUR3_2
+            call no_eff
+            jr .l
+.ok:        ld a, [mg_hp]
             call hp_add
             call mg_spend
             jr z, m_done
@@ -2007,7 +2017,12 @@ m_cur4:     ld a, MG_CUR4_0
 .l:         call tgt_pick2
 .t:         jr c, mg_back
             call ch_rec
-            call hp_full
+            call hp_atmax                   ; (full: no effect, the hand back)
+            jr nz, .ok
+            ld a, MG_CUR4_0
+            call no_eff
+            jr .l
+.ok:        call hp_full
             call mg_spend
             jr z, m_done
             call tgt_redraw
@@ -2026,6 +2041,69 @@ hp_full:    ld a, l
             dec hl
             ld [hl], a
             ret
+; Z: the member at HL (record) has HP at its maximum (HL kept)
+hp_atmax:   push hl
+            ld a, l
+            add a, CH_HP
+            ld l, a
+            ld a, [hl+]
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            ld a, [hl+]
+            cp e
+            jr nz, .x
+            ld a, [hl]
+            cp d
+.x:         pop hl
+            ret
+; Z: every member standing (not dead / stone) has HP at its maximum
+party_atmax:
+            xor a
+.m:         push af
+            call ch_rec
+            inc hl
+            ld a, [hl-]
+            cp 1
+            jr z, .n
+            cp 2
+            jr z, .n
+            call hp_atmax
+            jr nz, .no
+.n:         pop af
+            inc a
+            cp 4
+            jr c, .m
+            xor a                           ; (Z)
+            ret
+.no:        pop af
+            or 1                            ; (NZ)
+            ret
+; "It wouldn't have any effect." in the description window (owner, 2026-11-22), the error
+; sound; a button, then the prompt A again (at once)
+no_eff:     push af
+            call sfx_err
+            call hand_hide
+            ld bc, $0009
+            ld de, $1409
+            call scr_win
+            ld bc, $010A
+            call pen_at
+            call scr_upd
+            ld hl, str_noeff
+            call pen_type
+            call wait_ab
+            ld a, [tw_spd]                  ; (the prompt back at once)
+            push af
+            ld a, 4
+            ld [tw_spd], a
+            pop bc
+            pop af
+            push bc
+            call desc_box
+            pop af
+            ld [tw_spd], a
+            ret
 ; Heal family: (frame AND m) + b HP to everyone, after A
 m_heal:     ld b, MG_HEAL_0
             ld c, MG_HEAL_1
@@ -2039,7 +2117,17 @@ m_healf:    ldh a, [frame]
             and b
             add a, c
             ld [mg_hp], a
+            call party_atmax                ; (everyone standing full: no effect, the
+            jr nz, .go                      ;   spell list again)
+            call scr_open
+            call tgt_draw
             ld a, MG_HEL3_2
+            call desc_box
+            call scr_show
+            ld a, MG_HEL3_2
+            call no_eff
+            jp mg_back
+.go:        ld a, MG_HEL3_2
             call desc_show
             call wait_ab
             jr c, mg_back

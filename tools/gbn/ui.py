@@ -106,6 +106,7 @@ def strings():
     out['scantl'] = enc("Can't learn")
     out['sfull'] = enc('Full')
     out['sok'] = enc('OK')
+    out['noeff'] = enc("It wouldn't have\nany effect.")
     out['sknown'] = enc('Known')
     out['sheq'] = enc('Equip it now?')
     out['shwho'] = enc("Who's gonna\ncarry it?")      # (FF1's shop lines 17 / 21 hold variants)

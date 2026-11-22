@@ -317,6 +317,7 @@ bt_mrow:    ld a, [bt_rows]
 bt_target_member:
             ld a, [bt_cm]
             ld [bt_tcur], a
+bt_tm_again:                                ; (the hand where it was)
 .l:         ld a, [bt_tcur]
             ld c, a
             add a, a
@@ -384,7 +385,14 @@ bt_cmd_magic:
 .en:        call bt_target_enemy
             ret c
             jr .set
-.me:        call bt_target_member
+.me:        ld a, [mg_d + 4]                ; (HP recovery: not on a member at full HP)
+            and $FE
+            cp 6
+            jr nz, .mm
+            call bt_target_heal
+            ret c
+            jr .set
+.mm:        call bt_target_member
             ret c
 .set:       ld b, a
             call bt_commands.slot
@@ -1388,8 +1396,13 @@ bt_cmd_drink:
             call bt_hand_off
             call bt_msg_close
             call bt_names_win
-            call bt_target_member
-            pop hl
+            ld a, [bt_mcur]                 ; (the Potion: not on a member at full HP)
+            and a
+            jr nz, .an
+            call bt_target_heal
+            jr .at
+.an:        call bt_target_member
+.at:        pop hl
             ret c
             dec [hl]                        ; (one fewer to choose this round)
             ld b, a
@@ -1620,6 +1633,46 @@ bt_pl_item: inc hl
             or $80
             ld [mg_caster], a
             jp bt_cast
+
+; a member for an HP-recovering spell / the Potion: one at full HP refused with the message
+; bt_s_noeff (owner, 2026-11-22), the hand back where it was; A = member, C set on B
+bt_target_heal:
+            call bt_target_member
+.c:         ret c
+            push af
+            call ch_rec
+            inc hl                          ; (dead / stone: as FF1, allowed)
+            ld a, [hl-]
+            cp 1
+            jr z, .ok
+            cp 2
+            jr z, .ok
+            ld a, l
+            add a, CH_HP
+            ld l, a
+            ld a, [hl+]
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            ld a, [hl+]
+            cp e
+            jr nz, .ok
+            ld a, [hl]
+            cp d
+            jr nz, .ok
+            pop af
+            call sfx_err
+            call bt_msg_new
+            ld hl, bt_s_noeff
+            call bt_msg_row
+            call bt_msg_end
+            call bt_names_win
+            call bt_tm_again
+            jr .c
+.ok:        pop af
+            and a
+            ret
+bt_s_noeff: db "It wouldn't have any effect.", 0
 
 section wram, $C680
 mg_d:       ds 8
