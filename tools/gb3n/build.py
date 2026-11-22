@@ -151,7 +151,7 @@ def nes_rgb_src():
         '    dw %s\n' % ', '.join(str(x) for x in v[k:k + 8]) for k in range(0, 64, 8))
 
 
-MODULES = ('npc', 'text', 'event', 'menu', 'select', 'item', 'magic')
+MODULES = ('npc', 'text', 'event', 'menu', 'select', 'item', 'magic', 'equip')
 
 
 def engine_src():
@@ -167,7 +167,8 @@ def engine_src():
         c, r = split(rd(m))
         codes.append('\n'.join(l for l in c.split('\n') if not l.startswith('section bank 0,')))
         rams.append(r)
-    return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + main_code + '\n' +
+    zp = ''.join('Z_%02X = $%04X\n' % (n, 0xFFB0 + n - 0x18) for n in range(0x18, 0x60))
+    return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + zp + main_code + '\n' +
             '\n'.join(codes) + '\n' + main_ram + '\n' + '\n'.join(rams))
 
 
@@ -198,6 +199,7 @@ def main():
         g[0x0400 + 16 * i:0x0400 + 16 * i + len(nm)] = nm
     g[0x1400:0x1800] = rom.new_game_state()                    # $5400: the new-game save block
     g[0x1800:0x1880] = rom.b(0, 0x9690, 128)                   # $5800: walking character colours
+    g[0x2000:0x2800] = rom.prg[0x30 * 0x2000 + 0x1400:0x30 * 0x2000 + 0x1C00]   # $6000: 30/9400
     banks[GAME_BANK] = g
     for grp in range(3):
         w = group_world(grp)

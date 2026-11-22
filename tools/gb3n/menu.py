@@ -100,7 +100,14 @@ def rom_words(rom):
     t = text.decode(text.raw_string(rom, 't8200', 0x36))
     w = [x.strip() for x in re.split(r'\{[^}]*\}', t) if x.strip()]
     assert len(w) == 3, w
-    return {'s_use': w[0], 's_swap': w[1], 's_item': w[2]}
+    d = {'s_use': w[0], 's_swap': w[1], 's_item': w[2]}
+    t = text.decode(text.raw_string(rom, 't8200', 0x3E))       # equip: Attack… / Defense… / Remove
+    m = re.search(r'(Attack…)', t); n = re.search(r'(Defense…)', t); r = re.search(r'(Remove [A-Za-z]+)', t)
+    assert m and n and r, t
+    d.update(s_atk=m.group(1), s_def=n.group(1), s_rem=r.group(1))
+    for k, i in (('s_head', 0xDD), ('s_body', 0xDE), ('s_arms', 0xDF), ('s_rh', 0xE0), ('s_lh', 0xE1)):
+        d[k] = text.decode(text.raw_string(rom, 't8200', i)).strip()
+    return d
 
 
 def gb_text(rom=None):

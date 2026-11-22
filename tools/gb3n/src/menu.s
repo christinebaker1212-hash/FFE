@@ -13,7 +13,14 @@ PAL_HP     = $04                ;   palette 4 (green HP; 5 orange, 6 pink)
 
 section bank 0, $3800
 ; Start on the field (fix:E340)
-menu_open:  call oam_hide
+menu_open:  ld a, 3                         ; (each member's values from the equipment)
+.eq:        push af
+            call eq_calc
+            pop af
+            dec a
+            cp $FF
+            jr nz, .eq
+            call oam_hide
             ld a, MENU_BANK                 ; palettes: menu BG 0-3 -> CGB 4-7, OBJ likewise
             ld [MBC5_BANKL], a
             ld hl, $5340
@@ -131,6 +138,8 @@ mm_a:       ld a, [m_cur]
             jr z, .it
             cp 1
             jr z, .mg
+            cp 2
+            jr z, .eq
             cp 3
             jr z, .st
             cp 4
@@ -154,6 +163,13 @@ mm_a:       ld a, [m_cur]
             jp nz, mm_loop
             ld a, b
             call magic_menu
+            call mm_draw
+            ld a, 1
+            ld [m_dirty], a
+            jp mm_loop
+.eq:        call sel_member
+            jp c, mm_loop
+            call equip_menu
             call mm_draw
             ld a, 1
             ld [m_dirty], a
@@ -986,11 +1002,13 @@ m_put2:     push hl
             ld h, a
             pop af
             ld [hl], a
+            push af                         ; (A kept)
             ld a, h
             add a, high(MC_ATTR - MC_MAP)
             ld h, a
             ld a, [m_attr]
             ld [hl], a
+            pop af
             pop hl
             ret
 

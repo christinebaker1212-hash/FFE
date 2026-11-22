@@ -165,5 +165,16 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   multiplier job level / 32 + level / 16 + spirit / 16 + 1, divided by the living targets:
   3D/A466 / 3C/9B7A), MP - 1; Swap (3C/96F5); Item (3C/9897, $016B / $016E). Later: Exit /
   Warp / Sight.
+- 2026-11-22: FF3's equipment recalculation 31/AA16 (battle algorithm $05) written natively
+  (`src/equip.s` eq_calc: hand types, weapon type, element-boost bits (FF3's bug kept: cleared at
+  31/AF16), the 5 items' properties 30/9400, stat bonuses +5, mod. stats capped 99, hit
+  multiplier / %, Monk / Karateka unarmed attack, bow + arrow, dual wield, shields, absorbed /
+  weak elements, evade multiplier / %, defense, status resistance, magic evasion / defense ->
+  $611C-$612F; FF3's zero page as HRAM Z_xx, its $7400 buffer as WRAM). Check: on the new-game
+  party it reproduces FF3's own $6110-$612F byte for byte. Equip menu (mock S4): name, Attack… /
+  Defense… (from t8200 $3E), the 5 slots (empty: t8200 $DD-$E1), Remove Equipment (3C/9DA2),
+  taking items off (3C/9D68, "inventory full" $016B), the slot's inventory items (3C/9C3C: class
+  check, the weapon combination table 3C/9D4B, arrows up to 20, "Can't equip." $016F), values
+  recomputed after every change.
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.
