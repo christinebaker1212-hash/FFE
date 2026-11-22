@@ -31,6 +31,8 @@ NPCT_BANK = WCHR_BANK + 1               # npc tables: $4000 graphics ids (worlds
                                         #   table, $4600 new-game switches
 NPCL_BANK = 64                          # npc lists: $4000 + 64 index (12 records + 0)
 NPCG_BANK0 = 65                         # npc graphics (GB format): $4000 + $100 (g & 63), 2 banks
+EVT_BANK = 67                           # FF3 banks 2C / 2D (npc / trigger / event scripts) as they are
+TXT_BANK = 68                           # dialogue (text.py): index + strings, banks 68-
 WMAP_BANK0 = 48                         # world tilemaps (256 x 256): 4 banks each, 64 rows a bank
 WMAPS = (0, 0, 1, 2, 3)                 # world -> tilemap (worlds 0 and 1 share one)
 
@@ -146,7 +148,7 @@ def nes_rgb_src():
 
 def main():
     args = sys.argv[1:]
-    opt = {'--map': '181', '--group': '0', '--x': '255', '--y': '255',
+    opt = {'--map': '181', '--group': '0', '--x': '255', '--y': '255', '--dlg': '',
            '--out': os.path.join(ROOT, 'build', 'ff3n.gbc')}
     pos = []
     while args:
@@ -155,14 +157,21 @@ def main():
         else: pos.append(a)
     rom = Rom(pos[0] if pos else os.path.join(ROOT, 'build', 'ff3_en.nes'))
     banks, nl, nc = pack(rom)
+    import text
+    banks.update(text.pack(rom, TXT_BANK))
+    banks[EVT_BANK] = bytearray(rom.b(0x2C, 0x8000, 0x4000))
     src = open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + \
         open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' + \
-        open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
+        open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' + \
+        open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' + \
+        open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
     r = asm(src, syms={'START_MAP': int(opt['--map'], 0), 'START_GRP': int(opt['--group'], 0),
                        'START_X': int(opt['--x'], 0), 'START_Y': int(opt['--y'], 0),
                        'TS_BANK': TS_BANK, 'MT_BANK': MT_BANK, 'SPR_BANK': SPR_BANK,
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
-                       'NPCG_BANK0': NPCG_BANK0})
+                       'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, 'EVT_BANK': EVT_BANK,
+                       'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,
+                       'DLG_TEST_T': int(opt['--dlg'].split(':')[0], 0) if opt['--dlg'] else 0})
     for b, d in banks.items(): r.banks[b] = bytearray(d)
     size = 2
     while size < max(r.banks) + 1: size *= 2

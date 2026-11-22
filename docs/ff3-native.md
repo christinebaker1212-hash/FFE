@@ -102,5 +102,18 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   the party blocked by npcs (fix:E3F1, marks them touched). Sprites 3 pixels up as FF3 (party
   too). Checked against the NES (map 6 entered through a poked entrance trigger: elder and
   the two flower pots; NPC graphics slots of map 181 identical to the NES CHR RAM).
+- 2026-11-22: dialogue (`text.py`, `src/text.s`): every string of the four dialogue tables read
+  from the English ROM, the NES layout (26 columns) undone into paragraphs, laid out again for
+  the GB box (owner's request: pleasant pages): 18 columns, 4 lines a page, paragraphs balanced
+  (fewest lines, least ragged), whole paragraphs / sentences per page, a sentence longer than a
+  page split at a clause; the box in the window layer at the top (20 x 6), cut at line 48 by an
+  LYC interrupt, tiles above sprites; a page turns on any button (fix:ECAB).
+  Events (`src/event.s`): A in front of a person (fix:EA26 / E494; it turns to the party), its
+  script (2C/8200 / 8400: conditional blocks on the event switches, dialogue ids -> $0740),
+  the event script (2C/8600; banks 2C / 2D copied whole), one command a frame while the party
+  stands (fix:D219, $FE repeat of the previous command): npc commands (move / face / show / hide
+  / animation), party moves / facing, dialogue ($F0 / $F1), event and npc switches, items
+  ($E7 / $F6, "Can't carry anymore."), gil, HP / MP restore, exits / entrances, waits, end.
+  Checked: map 6, the elder Dahn's two pages.
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.

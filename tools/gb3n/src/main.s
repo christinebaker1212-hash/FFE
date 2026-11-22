@@ -28,11 +28,16 @@ W_ENT      = $DBC0              ; world map: the entrance tiles' destination map
 STEP       = 16                 ; frames per metatile (a pixel a frame)
 PX0        = 72                 ; the party's 16 x 16 sprite at screen (72, 64)
 PY0        = 64
-LCDC_ON    = %10010011          ; LCD on, BG $9800, tiles $8000, sprites on (8 x 8)
+LCDC_ON    = %11010011          ; LCD on, BG $9800, tiles $8000, sprites on (8 x 8), window map
+                                ;   $9C00 (the window itself on while a box shows: bit 5)
+WIN_ROWS   = 6                  ; the dialogue box: 6 rows of the window layer (text.s)
+WIN_LINE   = 48                 ;   the first screen line under it
 QMAX       = 32                 ; queued metatiles (a column / row of the view: 12)
 
 section bank 0, $0040
             jp vblank
+section bank 0, $0048
+            jp stat_isr
 section bank 0, $0100
             nop
             jp start
@@ -81,6 +86,12 @@ start:      di
             dec b
             jr nz, .cd
             call npc_boot
+            ld hl, win_attr                 ; dialogue box attributes: BG palette 3, priority
+            ld b, 32 * WIN_ROWS
+            ld a, $83
+.wa:        ld [hl+], a
+            dec b
+            jr nz, .wa
             ld a, START_GRP                 ; the test start (build.py --map / --group)
             ld [cur_grp], a
             cp 3                            ; (the world: group 0 / 1 = world 0 / 1, 2 = world 2,
@@ -100,19 +111,65 @@ start:      di
             ldh [rLCDC], a
             ld a, 1
             ld [lcd_is], a
+            ld a, 7                         ; the window: top left, cut by LYC
+            ldh [rWX], a
+            xor a
+            ldh [rWY], a
+            ld a, WIN_LINE - 1
+            ldh [rLYC], a
+            ld a, $40
+            ldh [rSTAT], a
             xor a
             ldh [rIF], a
-            ld a, 1
+            ld a, 3
             ldh [rIE], a
             ei
 
 ; ---- main loop: one engine frame per GB frame
 main:       call wait_vbl
             call read_pad
-            call move
+            ldh a, [pad]                    ; newly pressed buttons
+            ld b, a
+            ld a, [pad_old]
+            cpl
+            and b
+            ld [pad_new], a
+            ld a, b
+            ld [pad_old], a
+            ld [mpad], a
+            ld a, [moving]                  ; the party standing (fix:E20F):
+            and a
+            jr nz, .mv
+            ld a, [act]                     ;   a pending trigger (from an event)
+            and a
+            jr z, .na
+            call do_act
+            jr main
+.na:        ld a, [ev_on]                   ;   an event: one command, its party moves only
+            and a
+            jr z, .inp
+            call ev_step
+            ld a, [ev_pad]
+            ld [mpad], a
+            xor a
+            ld [ev_pad], a
+            jr .mv
+.inp:       ld a, [pad_new]                 ;   A: talk (fix:EA26)
+            bit 0, a
+            call nz, talk
+.mv:        call move
             call calc_pp
             call make_oam
             call npc_frame
+            ld a, DLG_TEST                  ; (test builds: A shows dialogue DLG_TEST of the
+            and a                           ;   people's table)
+            jr z, main
+            ldh a, [pad]
+            bit 0, a
+            jr z, main
+            ld a, DLG_TEST_T
+            ld c, DLG_TEST
+            call dlg_show
             jr main
 
 wait_vbl:   xor a
@@ -137,6 +194,16 @@ vblank:     push af
             ldh a, [scy]
             ldh [rSCY], a
             call q_flush
+            call win_vbl
+            ldh a, [rLCDC]                  ; the dialogue window (cut at line WIN_LINE)
+            res 5, a
+            ld b, a
+            ld a, [win_on]
+            and a
+            jr z, .w
+            set 5, b
+.w:         ld a, b
+            ldh [rLCDC], a
             ld a, 1
             ldh [vbl_flag], a
             pop hl
@@ -536,7 +603,7 @@ init_trig:  ld hl, tr_cnt                   ; 32 tile counts + 16 type counts
 move:       ld a, [moving]
             and a
             jr nz, .step
-            ldh a, [pad]
+            ld a, [mpad]
             ld b, a
             ld de, $0001                    ; D = dy, E = dx (two's complement)
             bit 4, b
@@ -1175,6 +1242,9 @@ facing:     ds 1
 zlev:       ds 1
 q_n:        ds 1
 q_direct:   ds 1
+pad_old:    ds 1
+pad_new:    ds 1
+mpad:       ds 1                            ; the pad as the movement sees it (events: theirs)
 lcd_is:     ds 1                            ; 1 once the LCD is on (loads masked)
 vc_left:    ds 1
 vc_bank:    ds 1

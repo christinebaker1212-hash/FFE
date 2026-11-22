@@ -495,7 +495,34 @@ npc_upd:    ld a, l
             ret
 ; frame (L3B_B23E)
 .frame:     ld d, h
-            ld a, l
+            ld a, l                         ; touched by the party's A (+D bit 7): this frame
+            add a, $0D                      ;   facing the party, frame 0 (L3B_B2C6)
+            ld e, a
+            ld a, [de]
+            bit 7, a
+            jr z, .nf
+            and $7F
+            ld [de], a
+            ld a, [facing]
+            ld b, $10                       ; party right -> it faces left
+            rrca
+            jr c, .fp
+            ld b, $00
+            rrca
+            jr c, .fp
+            ld b, $30
+            rrca
+            jr c, .fp
+            ld b, $20
+.fp:        ld a, l
+            add a, $20
+            ld [n_tb], a
+            ld a, b
+            ld [n_face], a
+            xor a
+            ld [n_fr], a
+            jp .an2
+.nf:        ld a, l
             inc a
             ld e, a
             ld a, [de]                      ; +1 type
@@ -572,6 +599,9 @@ npc_upd:    ld a, l
             add a, $0E
             ld e, a
             ld a, [de]
+            ld [n_face], a
+.an2:       ld d, h
+            ld a, [n_face]
             ld b, a
             ld a, [n_fr]
             add a, b
@@ -657,7 +687,10 @@ npc_upd:    ld a, l
 
 ; L3B_AF97: one npc a frame (n_cur cycles 0-11): stationary types ($80) never move; a counter
 ; between moves; then a random direction (fix:FE00 table, index n_rnd) if L3B_B110 allows it
-npc_rand:   ld a, [n_cur]
+npc_rand:   ld a, [ev_on]                   ; (not while an event runs)
+            and a
+            ret nz
+            ld a, [n_cur]
             add a, 16
             and $F0
             cp $C0
@@ -688,7 +721,16 @@ npc_rand:   ld a, [n_cur]
             dec a
             ld [de], a
             ret
-.go:        ld a, l
+.go:        ld a, [n_rnd]
+            inc a
+            ld [n_rnd], a
+            ld e, a
+            ld d, high(N_RNG)
+            ld a, [de]
+; L3B_AFDD: npc L takes a step: A & 3 = 0 right, 1 left, 2 down, 3 up (from its destination)
+npc_dir:    ld d, high(N_OBJ)
+            push af
+            ld a, l
             add a, 2
             ld e, a
             ld a, [de]
@@ -696,12 +738,7 @@ npc_rand:   ld a, [n_cur]
             inc e
             ld a, [de]
             ld c, a
-            ld a, [n_rnd]
-            inc a
-            ld [n_rnd], a
-            ld e, a
-            ld d, high(N_RNG)
-            ld a, [de]
+            pop af
             and 3
             jr z, .right
             dec a
@@ -834,7 +871,19 @@ npc_rand:   ld a, [n_cur]
 ; z-level, not onto an impassable / trigger tile or another level, not onto another npc's
 ; destination); carry set if not; else its tile properties and z-level updated
 npc_try:    push bc
+            ld a, [n_ev]                    ; (for an event: the tile's properties taken, the
+            and a                           ;   step always allowed: L3B_B110)
+            jr z, .norm
             inc h
+            ld a, l
+            add a, 6
+            ld e, a
+            ld d, h
+            dec h
+            ld a, [de]
+            ld [n_z], a
+            jp .tile
+.norm:      inc h
             ld a, l
             add a, 6
             ld e, a
@@ -866,7 +915,27 @@ npc_try:    push bc
             ld a, [hl]
             pop hl
             ld [n_p], a
-            bit 7, a
+            ld e, a
+            ld a, [n_ev]
+            and a
+            ld a, e
+            jr z, .t1
+            and 7                           ; (event: the z-level as the rule would leave it)
+            jr z, .ez0
+            cp 4
+            jr nc, .store
+            cp 3
+            jr z, .store
+            ld e, a
+            ld a, [n_z]
+            or e
+            cp 3
+            jr z, .store
+            ld [n_z], a
+            jr .store
+.ez0:       ld [n_z], a
+            jr .store
+.t1:        bit 7, a
             jr nz, .no
             and 7
             jr z, .z0
@@ -930,7 +999,7 @@ npc_try:    push bc
             ld e, a
             cp $C0
             jr c, .o
-            inc h                           ; N_OB2 +0 = properties & $37, +6 = z
+.store:     inc h                           ; N_OB2 +0 = properties & $37, +6 = z
             ld a, [n_p]
             and $37
             ld e, l
@@ -1022,6 +1091,7 @@ n_rnd:      ds 1
 n_z:        ds 1
 n_oz:       ds 1
 n_p:        ds 1
+n_face:     ds 1
 ppx:        ds 1                            ; the party's destination tile (FF3 $68 / $69)
 ppy:        ds 1
 ppx_pix:    ds 2                            ; the party's map pixel (x 16 + step), 16 bits
