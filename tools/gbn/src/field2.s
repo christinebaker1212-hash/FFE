@@ -414,6 +414,484 @@ lu_final:   ld hl, ch_stats                 ; (copies in the screen map buffer)
             jr c, .p
             ret
 
+; ---- FF1 BattleTransition: 65 frames cycling the NES colour emphasis (a new mode every 4
+; frames; CGB: the map's palettes with the channels not emphasised at 3/4; DMG / SGB: the
+; shades darker), the music silenced, FF1's noise sweep (volume 15, period (n / 2) OR 3)
+bt_trans:   ld a, [q_n]                     ; (the field's queue dropped: these variables
+            ld [q_rd], a                    ;   share its memory)
+            ld a, $80
+            call snd_track
+            xor a
+            ld [bx_n], a
+            ldh a, [is_cgb]
+            and a
+            jr z, .l
+            ld a, [inroom]                  ; the map's BG palettes (the room's, inside)
+            and a
+            ld hl, M_BGOUT
+            jr z, .o
+            ld hl, M_BGIN
+.o:         ld de, bx_pal
+            ld bc, 32
+            ld a, [map_bank]
+            call far_copy
+.l:         ld a, [bx_n]
+            and 3
+            jr nz, .w
+            ld a, [bx_n]                    ; emphasis bits: n bits 2-4 (FF1: n << 3 & $E0)
+            rrca
+            rrca
+            and 7
+            ld [bx_m], a
+            call bx_prep
+.w:         ld a, SND_BANK                  ; the noise period's NR43
+            ld [fc_bank], a
+            ld a, [bx_n]
+            srl a
+            or 3
+            and 15
+            add a, low(SFX_NZ)
+            ld l, a
+            ld h, high(SFX_NZ)
+            call far_byte
+            ld [bx_nz], a
+            call wait_vbl
+            ld a, [bx_n]
+            and 3
+            call z, bx_apply
+            ld a, $F0
+            ldh [$FF21], a
+            ld a, [bx_nz]
+            ldh [$FF22], a
+            ld a, $80
+            ldh [$FF23], a
+            ld hl, bx_n
+            inc [hl]
+            ld a, [hl]
+            cp $41
+            jr c, .l
+            xor a
+            ldh [$FF21], a
+            ret
+; the palettes / BGP for emphasis mode bx_m
+bx_prep:    ldh a, [is_cgb]
+            and a
+            jr nz, .cgb
+            ld a, [bx_m]                    ; DMG: one shade darker per emphasised channel
+            ld b, 0                         ;   (two at most)
+.cn:        and a
+            jr z, .cd
+            srl a
+            jr nc, .cn
+            inc b
+            jr .cn
+.cd:        ld a, b
+            cp 3
+            jr c, .c3
+            ld a, 2
+.c3:        ld hl, .bgp
+            add a, l
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            ld [bx_bgp], a
+            ret
+.bgp:       db %11100100, %11111001, %11111110
+.cgb:       ld hl, bx_pal
+            ld de, bx_out
+            ld b, 16
+.c:         push bc
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            ld b, a                         ; BC = colour
+            push hl
+            ld a, [bx_m]
+            and a
+            jr z, .st
+            ld a, c                         ; red: bits 0-4
+            and $1F
+            ld l, a
+            ld a, [bx_m]
+            bit 0, a
+            call z, .att
+            ld a, l
+            ld [bx_t], a
+            ld a, c                         ; green: bits 5-9
+            swap a
+            rrca
+            and 7
+            ld l, a
+            ld a, b
+            and 3
+            add a, a
+            add a, a
+            add a, a
+            or l
+            ld l, a
+            ld a, [bx_m]
+            bit 1, a
+            call z, .att
+            ld a, l
+            ld [bx_t + 1], a
+            ld a, b                         ; blue: bits 10-14
+            rrca
+            rrca
+            and $1F
+            ld l, a
+            ld a, [bx_m]
+            bit 2, a
+            call z, .att
+            ld a, l                         ; together again
+            add a, a
+            add a, a
+            ld b, a
+            ld a, [bx_t + 1]
+            ld l, a
+            srl a
+            srl a
+            srl a
+            or b
+            ld b, a
+            ld a, l
+            and 7
+            swap a
+            add a, a
+            ld c, a
+            ld a, [bx_t]
+            or c
+            ld c, a
+.st:        pop hl
+            ld a, c
+            ld [de], a
+            inc de
+            ld a, b
+            ld [de], a
+            inc de
+            pop bc
+            dec b
+            jr nz, .c
+            ret
+.att:       ld a, l                         ; x - x / 4
+            srl a
+            srl a
+            cpl
+            inc a
+            add a, l
+            ld l, a
+            ret
+bx_apply:   ldh a, [is_cgb]
+            and a
+            jr nz, .cgb
+            ld a, [bx_bgp]
+            call bgp_w
+            ret
+.cgb:       ld a, $80
+            ld hl, bx_out
+            jp cgb_pal32
+
+; ---- FF1 CyclePalettes: out (before a menu, a shop, the lineup, the world map, the puzzle):
+; every 4 frames each colour's hue steps on until it passes $xC and turns black; in (back on
+; the map): from $xC back to the map's colours. Sprites hidden. CGB: the map's NES palettes
+; (map bank $73C0, the room's); DMG / SGB: the shades fade to black and back.
+PC_NES     = $73C0
+pc_rgb     = smap           ; (its variables in the screens' map copy: unused on the field,
+pc_buf     = smap + 128     ;   and the field's queue may still be drawing a room)
+pc_tgt     = smap + 160
+pc_cur     = smap + 176
+pc_dir     = smap + 192
+pc_f       = smap + 193
+pc_out:     xor a
+            jr pc_go
+pc_in:      ld a, 1
+pc_go:      ld [pc_dir], a
+            call oam_clr
+            ldh a, [is_cgb]
+            and a
+            jp z, pc_dmg
+            ld a, [inroom]                  ; the target colours
+            and a
+            ld hl, PC_NES
+            jr z, .o
+            ld hl, PC_NES + 16
+.o:         ld de, pc_tgt
+            ld bc, 16
+            ld a, [map_bank]
+            call far_copy
+            ld hl, C_NESRGB                 ; NES colour -> RGB555 (the common bank's table)
+            ld de, pc_rgb
+            ld bc, 128
+            ld a, COMMON
+            call far_copy
+            ld hl, pc_tgt
+            ld de, pc_cur
+            ld b, 16
+.c:         ld a, [hl+]
+            ld c, a
+            ld a, [pc_dir]
+            and a
+            ld a, c
+            jr z, .s
+            cp $0F                          ; in: non-black colours start at $xC
+            jr z, .s
+            and $30
+            or $0C
+.s:         ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            ld a, 1                         ; FF1: the frame counter from 1, a step at each 4th
+            ld [pc_f], a
+.l:         ld a, [pc_f]
+            and 3
+            jr nz, .ns
+            call pc_step
+            jr z, .done
+.ns:        call pc_build
+            call wait_vbl
+            ld a, $80
+            ld hl, pc_buf
+            call cgb_pal32
+            ld hl, pc_f
+            inc [hl]
+            jr .l
+.done:      ld a, [pc_dir]
+            and a
+            jr nz, .fin
+            ld a, 1                         ; out: a cycle in when the map is back
+            ld [pc_req], a
+            ret
+.fin:       xor a                           ; in: the map's own palettes again
+            ld [pc_hold], a
+            ld a, 1
+            ldh [pal_req], a
+            ret
+; a step: Z set when every colour is done
+pc_step:    ld hl, pc_cur
+            ld de, pc_tgt
+            ld c, 0                         ; colours not done
+            ld b, 16
+.l:         ld a, [pc_dir]
+            and a
+            ld a, [hl]
+            jr nz, .rv
+            cp $0F                          ; out: black stays; chroma + 1, from $D black
+            jr z, .nx
+            inc c
+            and $0F
+            inc a
+            cp $0D
+            jr c, .o1
+            ld a, $0F
+            jr .wr
+.o1:        push bc
+            ld b, a
+            ld a, [hl]
+            and $30
+            or b
+            pop bc
+            jr .wr
+.rv:        push bc                         ; in: chroma - 1 until the target
+            ld b, a
+            ld a, [de]
+            cp b
+            pop bc
+            jr z, .nx
+            inc c
+            ld a, [hl]
+            dec a
+.wr:        ld [hl], a
+.nx:        inc hl
+            inc de
+            dec b
+            jr nz, .l
+            ld a, c
+            and a
+            ret
+; the current colours as RGB555 (pc_buf)
+pc_build:   ld hl, pc_cur
+            ld de, pc_buf
+            ld b, 16
+.l:         ld a, [hl+]
+            push hl
+            and $3F
+            add a, a
+            add a, low(pc_rgb)
+            ld l, a
+            ld a, high(pc_rgb)
+            adc a, 0
+            ld h, a
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl]
+            ld [de], a
+            inc de
+            pop hl
+            dec b
+            jr nz, .l
+            ret
+; DMG / SGB: three steps of 12 frames to black (out) or back (in)
+pc_dmg:     ld b, 0
+.l:         push bc
+            ld a, 12
+.w:         push af
+            call wait_vbl
+            pop af
+            dec a
+            jr nz, .w
+            pop bc
+            inc b
+            ld a, [pc_dir]
+            and a
+            ld a, b
+            jr z, .o
+            ld a, 3
+            sub b
+.o:         ld hl, .bgp
+            add a, l
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            call bgp_w
+            ld a, b
+            cp 3
+            jr c, .l
+            jp pc_go.done
+.bgp:       db %11100100, %11111001, %11111110, %11111111
+
+; the shutters' window: every row the box's middle row (frame, empty inside), so the window
+; may start on any line (LCD off)
+st_wmap:    ld hl, $9C00
+            ld c, 18
+.r:         ld a, $13
+            ld [hl+], a
+            ld b, 18
+            ld a, $20
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            ld a, $14
+            ld [hl+], a
+            ld de, 12
+            add hl, de
+            dec c
+            jr nz, .r
+            ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, 1
+            ldh [rVBK], a
+            ld hl, $9C00
+            ld bc, 18 * 32
+.a:         ld a, WIN_ATTR
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .a
+            xor a
+            ldh [rVBK], a
+            ld a, 7
+            ldh [rWX], a
+            xor a
+            ldh [rWY], a
+            ret
+; the shutters A lines open (0-16) in each 16-line band of the box's inside (lines 24-119):
+; the LCDC list (window on from line band + A, off at the band's end); 16: off
+ST_TOP     = 24
+st_shut:    ld [st_k], a
+            xor a
+            ld [ly_n], a
+            ld a, [st_k]
+            cp 16
+            jp nc, ly_off
+            ld a, LCDC_WIN                  ; (the window on all frame, shown by WX)
+            ld [ly_base], a
+            ld hl, ly_tab
+            ld a, [st_k]
+            and a
+            jr nz, .b
+            ld a, ST_TOP - 1                ; closed: one window from the top to the end
+            ld [hl+], a
+            ld a, 7
+            ld [hl+], a
+            ld a, ST_TOP + 95
+            ld [hl+], a
+            ld a, 167
+            ld [hl+], a
+            ld a, 2
+            jr .n
+.b:         ld b, ST_TOP                    ; six bands
+            ld c, 6
+.bl:        ld a, [st_k]
+            add a, b
+            dec a
+            ld [hl+], a                     ; shown at band + k (LYC one line before)
+            ld a, 7
+            ld [hl+], a
+            ld a, b
+            add a, 15
+            ld [hl+], a                     ; hidden at the band's end
+            ld a, 167
+            ld [hl+], a
+            ld a, b
+            add a, 16
+            ld b, a
+            dec c
+            jr nz, .bl
+            ld a, 12
+.n:         ld [ly_n], a
+            ld a, [ly_tab]                  ; (the first line now, for a frame already begun)
+            ldh [rLYC], a
+            ret
+
+
+zz_end_6100:
+section wram, $C100                         ; (the map queue: free on these screens)
+lu_slot:    ds 32
+lu_cur:     ds 1
+lu_cur2:    ds 1
+lu_mode:    ds 1
+mn_t:       ds 1
+mn_row:     ds 1
+mn_fq:      ds 2
+mn_fc:      ds 1
+mn_c1:      ds 1
+mn_c2:      ds 1
+mn_tmp:     ds 2
+pz_tab:     ds 18                           ; the puzzle (16 slots), the reward
+pz_cur:     ds 1
+pz_fc:      ds 1
+pz_c3:      ds 1
+pz_anim:    ds 1
+pz_old:     ds 1
+pz_step:    ds 1
+pz_dir:     ds 1
+pz_lo:      ds 1
+pz_hi:      ds 1
+pz_pt:      ds 1
+pz_obp:     ds 1
+pz_rgb:     ds 6
+te_x:       ds 1
+te_y:       ds 1
+te_fx:      ds 1
+te_fy:      ds 1
+te_src:     ds 2
+bx_n:       ds 1                            ; (bt_trans)
+bx_m:       ds 1
+bx_nz:      ds 1
+bx_bgp:     ds 1
+bx_t:       ds 2
+bx_pal:     ds 32
+bx_out:     ds 32
+
+section bank 99, $4000                      ; (F3_BANK: the world map, the 15-puzzle, The End)
+F3_BANK    = 99
 ; ---- FF1 EnterMinimap: the world map (128 x 128, at (16, 8)) drawn a pixel row a frame
 ; with FF1's drawing tone, then the "you are here" mark and the town / dungeon marks, their
 ; colours cycling (FF1 MinimapFrame); A or B leaves
@@ -1376,478 +1854,3 @@ te_addr:    ld a, e                         ; tile (y / 8) * 10 + x / 8; byte 8 
             rrca
             jr .m
 
-; ---- FF1 BattleTransition: 65 frames cycling the NES colour emphasis (a new mode every 4
-; frames; CGB: the map's palettes with the channels not emphasised at 3/4; DMG / SGB: the
-; shades darker), the music silenced, FF1's noise sweep (volume 15, period (n / 2) OR 3)
-bt_trans:   ld a, [q_n]                     ; (the field's queue dropped: these variables
-            ld [q_rd], a                    ;   share its memory)
-            ld a, $80
-            call snd_track
-            xor a
-            ld [bx_n], a
-            ldh a, [is_cgb]
-            and a
-            jr z, .l
-            ld a, [inroom]                  ; the map's BG palettes (the room's, inside)
-            and a
-            ld hl, M_BGOUT
-            jr z, .o
-            ld hl, M_BGIN
-.o:         ld de, bx_pal
-            ld bc, 32
-            ld a, [map_bank]
-            call far_copy
-.l:         ld a, [bx_n]
-            and 3
-            jr nz, .w
-            ld a, [bx_n]                    ; emphasis bits: n bits 2-4 (FF1: n << 3 & $E0)
-            rrca
-            rrca
-            and 7
-            ld [bx_m], a
-            call bx_prep
-.w:         ld a, SND_BANK                  ; the noise period's NR43
-            ld [fc_bank], a
-            ld a, [bx_n]
-            srl a
-            or 3
-            and 15
-            add a, low(SFX_NZ)
-            ld l, a
-            ld h, high(SFX_NZ)
-            call far_byte
-            ld [bx_nz], a
-            call wait_vbl
-            ld a, [bx_n]
-            and 3
-            call z, bx_apply
-            ld a, $F0
-            ldh [$FF21], a
-            ld a, [bx_nz]
-            ldh [$FF22], a
-            ld a, $80
-            ldh [$FF23], a
-            ld hl, bx_n
-            inc [hl]
-            ld a, [hl]
-            cp $41
-            jr c, .l
-            xor a
-            ldh [$FF21], a
-            ret
-; the palettes / BGP for emphasis mode bx_m
-bx_prep:    ldh a, [is_cgb]
-            and a
-            jr nz, .cgb
-            ld a, [bx_m]                    ; DMG: one shade darker per emphasised channel
-            ld b, 0                         ;   (two at most)
-.cn:        and a
-            jr z, .cd
-            srl a
-            jr nc, .cn
-            inc b
-            jr .cn
-.cd:        ld a, b
-            cp 3
-            jr c, .c3
-            ld a, 2
-.c3:        ld hl, .bgp
-            add a, l
-            ld l, a
-            ld a, h
-            adc a, 0
-            ld h, a
-            ld a, [hl]
-            ld [bx_bgp], a
-            ret
-.bgp:       db %11100100, %11111001, %11111110
-.cgb:       ld hl, bx_pal
-            ld de, bx_out
-            ld b, 16
-.c:         push bc
-            ld a, [hl+]
-            ld c, a
-            ld a, [hl+]
-            ld b, a                         ; BC = colour
-            push hl
-            ld a, [bx_m]
-            and a
-            jr z, .st
-            ld a, c                         ; red: bits 0-4
-            and $1F
-            ld l, a
-            ld a, [bx_m]
-            bit 0, a
-            call z, .att
-            ld a, l
-            ld [bx_t], a
-            ld a, c                         ; green: bits 5-9
-            swap a
-            rrca
-            and 7
-            ld l, a
-            ld a, b
-            and 3
-            add a, a
-            add a, a
-            add a, a
-            or l
-            ld l, a
-            ld a, [bx_m]
-            bit 1, a
-            call z, .att
-            ld a, l
-            ld [bx_t + 1], a
-            ld a, b                         ; blue: bits 10-14
-            rrca
-            rrca
-            and $1F
-            ld l, a
-            ld a, [bx_m]
-            bit 2, a
-            call z, .att
-            ld a, l                         ; together again
-            add a, a
-            add a, a
-            ld b, a
-            ld a, [bx_t + 1]
-            ld l, a
-            srl a
-            srl a
-            srl a
-            or b
-            ld b, a
-            ld a, l
-            and 7
-            swap a
-            add a, a
-            ld c, a
-            ld a, [bx_t]
-            or c
-            ld c, a
-.st:        pop hl
-            ld a, c
-            ld [de], a
-            inc de
-            ld a, b
-            ld [de], a
-            inc de
-            pop bc
-            dec b
-            jr nz, .c
-            ret
-.att:       ld a, l                         ; x - x / 4
-            srl a
-            srl a
-            cpl
-            inc a
-            add a, l
-            ld l, a
-            ret
-bx_apply:   ldh a, [is_cgb]
-            and a
-            jr nz, .cgb
-            ld a, [bx_bgp]
-            call bgp_w
-            ret
-.cgb:       ld a, $80
-            ld hl, bx_out
-            jp cgb_pal32
-
-; ---- FF1 CyclePalettes: out (before a menu, a shop, the lineup, the world map, the puzzle):
-; every 4 frames each colour's hue steps on until it passes $xC and turns black; in (back on
-; the map): from $xC back to the map's colours. Sprites hidden. CGB: the map's NES palettes
-; (map bank $73C0, the room's); DMG / SGB: the shades fade to black and back.
-PC_NES     = $73C0
-pc_rgb     = smap           ; (its variables in the screens' map copy: unused on the field,
-pc_buf     = smap + 128     ;   and the field's queue may still be drawing a room)
-pc_tgt     = smap + 160
-pc_cur     = smap + 176
-pc_dir     = smap + 192
-pc_f       = smap + 193
-pc_out:     xor a
-            jr pc_go
-pc_in:      ld a, 1
-pc_go:      ld [pc_dir], a
-            call oam_clr
-            ldh a, [is_cgb]
-            and a
-            jp z, pc_dmg
-            ld a, [inroom]                  ; the target colours
-            and a
-            ld hl, PC_NES
-            jr z, .o
-            ld hl, PC_NES + 16
-.o:         ld de, pc_tgt
-            ld bc, 16
-            ld a, [map_bank]
-            call far_copy
-            ld hl, C_NESRGB                 ; NES colour -> RGB555 (the common bank's table)
-            ld de, pc_rgb
-            ld bc, 128
-            ld a, COMMON
-            call far_copy
-            ld hl, pc_tgt
-            ld de, pc_cur
-            ld b, 16
-.c:         ld a, [hl+]
-            ld c, a
-            ld a, [pc_dir]
-            and a
-            ld a, c
-            jr z, .s
-            cp $0F                          ; in: non-black colours start at $xC
-            jr z, .s
-            and $30
-            or $0C
-.s:         ld [de], a
-            inc de
-            dec b
-            jr nz, .c
-            ld a, 1                         ; FF1: the frame counter from 1, a step at each 4th
-            ld [pc_f], a
-.l:         ld a, [pc_f]
-            and 3
-            jr nz, .ns
-            call pc_step
-            jr z, .done
-.ns:        call pc_build
-            call wait_vbl
-            ld a, $80
-            ld hl, pc_buf
-            call cgb_pal32
-            ld hl, pc_f
-            inc [hl]
-            jr .l
-.done:      ld a, [pc_dir]
-            and a
-            jr nz, .fin
-            ld a, 1                         ; out: a cycle in when the map is back
-            ld [pc_req], a
-            ret
-.fin:       xor a                           ; in: the map's own palettes again
-            ld [pc_hold], a
-            ld a, 1
-            ldh [pal_req], a
-            ret
-; a step: Z set when every colour is done
-pc_step:    ld hl, pc_cur
-            ld de, pc_tgt
-            ld c, 0                         ; colours not done
-            ld b, 16
-.l:         ld a, [pc_dir]
-            and a
-            ld a, [hl]
-            jr nz, .rv
-            cp $0F                          ; out: black stays; chroma + 1, from $D black
-            jr z, .nx
-            inc c
-            and $0F
-            inc a
-            cp $0D
-            jr c, .o1
-            ld a, $0F
-            jr .wr
-.o1:        push bc
-            ld b, a
-            ld a, [hl]
-            and $30
-            or b
-            pop bc
-            jr .wr
-.rv:        push bc                         ; in: chroma - 1 until the target
-            ld b, a
-            ld a, [de]
-            cp b
-            pop bc
-            jr z, .nx
-            inc c
-            ld a, [hl]
-            dec a
-.wr:        ld [hl], a
-.nx:        inc hl
-            inc de
-            dec b
-            jr nz, .l
-            ld a, c
-            and a
-            ret
-; the current colours as RGB555 (pc_buf)
-pc_build:   ld hl, pc_cur
-            ld de, pc_buf
-            ld b, 16
-.l:         ld a, [hl+]
-            push hl
-            and $3F
-            add a, a
-            add a, low(pc_rgb)
-            ld l, a
-            ld a, high(pc_rgb)
-            adc a, 0
-            ld h, a
-            ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, [hl]
-            ld [de], a
-            inc de
-            pop hl
-            dec b
-            jr nz, .l
-            ret
-; DMG / SGB: three steps of 12 frames to black (out) or back (in)
-pc_dmg:     ld b, 0
-.l:         push bc
-            ld a, 12
-.w:         push af
-            call wait_vbl
-            pop af
-            dec a
-            jr nz, .w
-            pop bc
-            inc b
-            ld a, [pc_dir]
-            and a
-            ld a, b
-            jr z, .o
-            ld a, 3
-            sub b
-.o:         ld hl, .bgp
-            add a, l
-            ld l, a
-            ld a, h
-            adc a, 0
-            ld h, a
-            ld a, [hl]
-            call bgp_w
-            ld a, b
-            cp 3
-            jr c, .l
-            jp pc_go.done
-.bgp:       db %11100100, %11111001, %11111110, %11111111
-
-; the shutters' window: every row the box's middle row (frame, empty inside), so the window
-; may start on any line (LCD off)
-st_wmap:    ld hl, $9C00
-            ld c, 18
-.r:         ld a, $13
-            ld [hl+], a
-            ld b, 18
-            ld a, $20
-.c:         ld [hl+], a
-            dec b
-            jr nz, .c
-            ld a, $14
-            ld [hl+], a
-            ld de, 12
-            add hl, de
-            dec c
-            jr nz, .r
-            ldh a, [is_cgb]
-            and a
-            ret z
-            ld a, 1
-            ldh [rVBK], a
-            ld hl, $9C00
-            ld bc, 18 * 32
-.a:         ld a, WIN_ATTR
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .a
-            xor a
-            ldh [rVBK], a
-            ld a, 7
-            ldh [rWX], a
-            xor a
-            ldh [rWY], a
-            ret
-; the shutters A lines open (0-16) in each 16-line band of the box's inside (lines 24-119):
-; the LCDC list (window on from line band + A, off at the band's end); 16: off
-ST_TOP     = 24
-st_shut:    ld [st_k], a
-            xor a
-            ld [ly_n], a
-            ld a, [st_k]
-            cp 16
-            jp nc, ly_off
-            ld a, LCDC_WIN                  ; (the window on all frame, shown by WX)
-            ld [ly_base], a
-            ld hl, ly_tab
-            ld a, [st_k]
-            and a
-            jr nz, .b
-            ld a, ST_TOP - 1                ; closed: one window from the top to the end
-            ld [hl+], a
-            ld a, 7
-            ld [hl+], a
-            ld a, ST_TOP + 95
-            ld [hl+], a
-            ld a, 167
-            ld [hl+], a
-            ld a, 2
-            jr .n
-.b:         ld b, ST_TOP                    ; six bands
-            ld c, 6
-.bl:        ld a, [st_k]
-            add a, b
-            dec a
-            ld [hl+], a                     ; shown at band + k (LYC one line before)
-            ld a, 7
-            ld [hl+], a
-            ld a, b
-            add a, 15
-            ld [hl+], a                     ; hidden at the band's end
-            ld a, 167
-            ld [hl+], a
-            ld a, b
-            add a, 16
-            ld b, a
-            dec c
-            jr nz, .bl
-            ld a, 12
-.n:         ld [ly_n], a
-            ld a, [ly_tab]                  ; (the first line now, for a frame already begun)
-            ldh [rLYC], a
-            ret
-
-
-zz_end_6100:
-section wram, $C100                         ; (the map queue: free on these screens)
-lu_slot:    ds 32
-lu_cur:     ds 1
-lu_cur2:    ds 1
-lu_mode:    ds 1
-mn_t:       ds 1
-mn_row:     ds 1
-mn_fq:      ds 2
-mn_fc:      ds 1
-mn_c1:      ds 1
-mn_c2:      ds 1
-mn_tmp:     ds 2
-pz_tab:     ds 18                           ; the puzzle (16 slots), the reward
-pz_cur:     ds 1
-pz_fc:      ds 1
-pz_c3:      ds 1
-pz_anim:    ds 1
-pz_old:     ds 1
-pz_step:    ds 1
-pz_dir:     ds 1
-pz_lo:      ds 1
-pz_hi:      ds 1
-pz_pt:      ds 1
-pz_obp:     ds 1
-pz_rgb:     ds 6
-te_x:       ds 1
-te_y:       ds 1
-te_fx:      ds 1
-te_fy:      ds 1
-te_src:     ds 2
-bx_n:       ds 1                            ; (bt_trans)
-bx_m:       ds 1
-bx_nz:      ds 1
-bx_bgp:     ds 1
-bx_t:       ds 2
-bx_pal:     ds 32
-bx_out:     ds 32

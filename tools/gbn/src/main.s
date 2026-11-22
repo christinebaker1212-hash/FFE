@@ -728,7 +728,7 @@ move:       ld a, [moving]
             jr nz, .wb
             jr .lu
 .mm:        ld hl, minimap                   ; (FF1: the palettes cycle out first)
-            call pc_menu
+            call pc_menu3
             jp map_reload
 .lu:        ld hl, lineup                   ; (FF1: the palettes cycle out first)
             call pc_menu
@@ -754,7 +754,7 @@ move:       ld a, [moving]
             ld hl, pz_bcnt
             inc [hl]
             ld hl, puzzle                   ; (FF1: the palettes cycle out first)
-            call pc_menu
+            call pc_menu3
             jp map_reload
 .np:        ldh a, [pad_new]                ; A on a standard map: talk to what is in front
             bit 0, a
@@ -2133,6 +2133,15 @@ ow_abutton: ld a, [vehicle]
             jp map_music
 
 section bank 0, $1400                       ; (main.s continued: the airship)
+; pc_menu for the screens in F3_BANK (the world map, the 15-puzzle)
+pc_menu3:   push hl
+            ld a, SCR_BANK
+            ld hl, pc_out
+            call bank_call
+            pop hl
+            ld a, F3_BANK
+            jp bank_call
+
 ; FF1 AnimateAirshipTakeoff / AnimateAirshipLanding: the airship rises from y $6F to $4F
 ; (lands: back), a pixel every second frame, its shadow, the noise (FF1: volume 8, the
 ; frame counter as its period); then facing right
@@ -2460,6 +2469,8 @@ do_battle:  ld [btl_fid], a
             ld a, STORY_FIRST + 4 + STORY_CRED
             ld b, STORY_END - STORY_FIRST - 4 - STORY_CRED
             call story_show
+            ld a, F3_BANK
+            call sbank
             jp the_end
 .ok:        ld a, 1                         ; (FF1: back on the map, the palettes cycle in)
             ld [pc_req], a

@@ -300,3 +300,12 @@ one reaches parity, so the owner can keep playing).
    HP, MP of every level (two rows), experience and what the next level needs; Str / Agi / Int /
    Vit / Lck and Attack / Accuracy / Defense / Evasion in two columns; gold labels on the
    Color (palette 3); left / right: the next member.
+14. Owner (2026-11-22): shops as the new menus. Weapon / armour shops: after the price, a
+   party window shows each member's Attack (weapons) or Defense (armour) now and with the item
+   (Color: green better, red worse; gold header), or Can't use / Full; then Equip it now?
+   (FF1's one weapon / one armour of each type). Selling: one scrolling list of every
+   unequipped item of the shop's kind in the party's packs, at half price. Magic shops: the
+   spell first, then the party window with OK / Known / Can't learn / Full per member. Item
+   shops: a quantity (up / down 1, right / left 10, at most what the Gil buys and 99 owned)
+   with the total. The world map, the 15-puzzle and The End moved to ROM bank 99 (F3_BANK)
+   to make room in bank 2.
