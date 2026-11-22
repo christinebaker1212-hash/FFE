@@ -2384,21 +2384,12 @@ fd_on_cgb:  ld hl, sh_pal                   ; (in the V-Blank: BG from the shado
             dec b
             jr nz, .z
             ret
-fd_on_off:  ldh a, [is_cgb]                 ; (the LCD off: the Color's palettes from the
-            and a                           ;   hardware itself)
-            jr z, fd_on_dmg
-            ld hl, fd_pal
-            ld c, 0
-.rb:        ld a, c
-            ldh [rBCPS], a
-            ldh a, [rBCPD]
-            ld [hl+], a
-            inc c
-            bit 6, c
-            jr z, .rb
-            ld d, h
-            ld e, l
-            jp fd_on_cgb.obj
+fd_on_off:  ldh a, [is_cgb]                 ; (the LCD off: only the first screen after
+            and a                           ;   power-on or a soft reset; the Color shows
+            jr z, fd_on_dmg                 ;   it at once: palette RAM read back is not
+            xor a                           ;   dependable there)
+            ld [fd_in], a
+            ret
 fd_on_dmg:  ldh a, [rBGP]
             ld [fd_b], a
             ldh a, [rOBP0]

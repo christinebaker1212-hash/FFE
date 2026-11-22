@@ -251,6 +251,13 @@ int main(int argc, char** argv) {
 		}
 		int shot = (f == frames);
 		for (int k = 0; k < ns; k++) if (shots[k] == f) shot = 1;
+		if (shot && getenv("SGBRUN_PEEKF")) {          /* (with --shot: N bytes of memory from a hex address) */
+			unsigned a0 = strtoul(getenv("SGBRUN_PEEKF"), 0, 16);
+			unsigned nb = getenv("SGBRUN_PEEKN") ? atoi(getenv("SGBRUN_PEEKN")) : 16;
+			printf("peek f%d %04X:", f, a0);
+			for (unsigned a = a0; a < a0 + nb; a++) printf(" %02X", core->busRead8(core, a));
+			printf("\n");
+		}
 		if (nns) {
 			unsigned n = core->rawRead8(core, 0xD830, 1) | core->rawRead8(core, 0xD831, 1) << 8;
 			for (int k = 0; k < nns; k++) if (!nshot_done[k] && n >= (unsigned) nshots[k]) {

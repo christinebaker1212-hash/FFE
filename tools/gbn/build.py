@@ -253,6 +253,8 @@ def main():
                    sgb=True, cgb=0x80)
     open(out, 'wb').write(img)
     open(out[:-3] + '.sym', 'w').write(r.sym_file())
+    open(out[:-3] + '.lab', 'w').write(''.join('%04x %s\n' % (a, n) for n, a in sorted(r.labels.items(), key=lambda x: x[1])
+                                               if isinstance(a, int) and 0xC000 <= a < 0x10000))
     print('wrote %s (%d KB), bank 0 used %d bytes' % (out, len(img) // 1024, len(r.banks[0])))
 
 
