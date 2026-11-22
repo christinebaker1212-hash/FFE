@@ -33,8 +33,10 @@ NPCL_BANK = 64                          # npc lists: $4000 + 64 index (12 record
 NPCG_BANK0 = 65                         # npc graphics (GB format): $4000 + $100 (g & 63), 2 banks
 EVT_BANK = 67                           # FF3 banks 2C / 2D (npc / trigger / event scripts) as they are
 GAME_BANK = 74                          # tables: $4000 / $4100 treasure contents (world 0 / others),
-                                        #   $4200 item prices (2 bytes), $4400 item names (16 each)
+                                        #   $4200 item prices (2 bytes), $4400 item names (16 each),
+                                        #   $5400 the new-game save block (1 KB)
 TT_BANK = 75                            # per map: treasures + triggers (32 bytes), a bank a group
+MENU_BANK = 78                          # field menus (menu.py)
 TXT_BANK = 68                           # dialogue (text.py): index + strings, banks 68-
 WMAP_BANK0 = 48                         # world tilemaps (256 x 256): 4 banks each, 64 rows a bank
 WMAPS = (0, 0, 1, 2, 3)                 # world -> tilemap (worlds 0 and 1 share one)
@@ -169,6 +171,7 @@ def main():
     for i in range(256):
         nm = text.item_name(rom, i)[:15]
         g[0x0400 + 16 * i:0x0400 + 16 * i + len(nm)] = nm
+    g[0x1400:0x1800] = rom.new_game_state()                    # $5400: the new-game save block
     banks[GAME_BANK] = g
     for grp in range(3):
         w = group_world(grp)
@@ -178,17 +181,20 @@ def main():
             tt[32 * mid:32 * mid + 16] = rom.map_treasures(mp[14])
             tt[32 * mid + 16:32 * mid + 32] = rom.map_triggers(mp[15])
         banks[TT_BANK + grp] = tt
+    import menu
+    banks[MENU_BANK] = menu.pack(rom, rgb555)
     src = open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + \
         open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' + \
         open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' + \
         open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' + \
-        open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
+        open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' + \
+        open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
     r = asm(src, syms={'START_MAP': int(opt['--map'], 0), 'START_GRP': int(opt['--group'], 0),
                        'START_X': int(opt['--x'], 0), 'START_Y': int(opt['--y'], 0),
                        'TS_BANK': TS_BANK, 'MT_BANK': MT_BANK, 'SPR_BANK': SPR_BANK,
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, 'EVT_BANK': EVT_BANK,
-                       'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK,
+                       'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,
                        'DLG_TEST_T': int(opt['--dlg'].split(':')[0], 0) if opt['--dlg'] else 0})
     for b, d in banks.items(): r.banks[b] = bytearray(d)

@@ -16,17 +16,12 @@ npc_boot:   ld a, NPCT_BANK
             ld de, N_ANIM
             ld bc, $200
             call memcpy
-            ld hl, $4600
-            ld de, GS + $80
-            ld bc, 64
-            call memcpy
-            ld hl, GS + $40                 ; treasure switches: all on (unopened, L3A_8E76)
-            ld b, 64
-            ld a, $FF
-.t:         ld [hl+], a
-            dec b
-            jr nz, .t
-            ret
+            ld a, GAME_BANK                 ; the new-game save block (L3A_8E76, build time)
+            ld [MBC5_BANKL], a
+            ld hl, $5400
+            ld de, GS
+            ld bc, $400
+            jp memcpy
 
 ; object command 7 (normal maps): the map's npc list (map properties byte 4 -> 2C/8000)
 load_npcs:  ld hl, N_OBJ

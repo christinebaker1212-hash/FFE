@@ -124,5 +124,14 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   then the tile's own passability), map titles (byte 2, t8200) when a map comes up; dialogue
   codes {02} / {18} item names (icons and leading blanks dropped), {03} price, {05} gil.
   Checked: map 181 chest (Potion), the cave's trigger scene.
+- 2026-11-22: new game state computed at build time as 3A L3A_8E76 (GAME_BANK $5400). Field
+  main menu (`menu.py`, `src/menu.s`), owner's mock N5B / N6: party window (name + Lv, job name
+  condensed from the ROM's names, HP cur/max in the status colour of 3C/95D7: green / orange /
+  pink, MP of the 8 levels in 3-px digits with slashes), commands (t8200 $0131), Gil / Capacity
+  in small digits, guest window; FF3's hand (fix:D5EB, tiles $E4). It is the window layer over
+  the whole screen with the menu palettes (fix:E1BC) in CGB palettes 4-7: the field's BG map,
+  tiles and palettes 0-3 are never touched, so opening / closing is one frame with no white
+  flash and no palette change on exit (the owner's three recompiled-build complaints). The
+  stack moved to WRAM 0 (the menu canvas is in WRAM bank 2).
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.

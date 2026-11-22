@@ -166,6 +166,31 @@ class Rom:
         po = self.pa(0x10, 0xA200) + 2 * tid
         return self.b(0x10, ((self.prg[po + 1] | 0x20) << 8) | self.prg[po], 16)
 
+    def new_game_state(self):
+        """the save block $6000-$63FF after FF3's new-game init (3A L3A_8E76): treasure switches on,
+        npc switches 00/B600, character 1 from 39/A000 (base stats), 39/BB88 (MP), 39/BBD8 (HP),
+        39/BBDA (stats), 39/BBF0 (equipment), no name, copied to the other three; world position
+        (41, 47)"""
+        g = bytearray(0x400)
+        g[0x09], g[0x0A] = 0x29, 0x2F
+        g[0x40:0x80] = b'\xFF' * 64
+        g[0x80:0xC0] = self.b(0, 0xB600, 64)
+        for x in range(2, 7):
+            v = self.u8(0x39, 0xA000 + x)
+            g[0x110 + x] = v; g[0x115 + x] = v
+        mp = self.b(0x39, 0xBB88, 8)
+        for k in range(8):
+            g[0x130 + 2 * k] = g[0x131 + 2 * k] = mp[k]
+        g[0x10E] = g[0x10C] = self.u8(0x39, 0xBBD8)
+        g[0x10F] = g[0x10D] = self.u8(0x39, 0xBBD9)
+        g[0x11C:0x130] = self.b(0x39, 0xBBDA, 0x14)
+        g[0x200:0x210] = self.b(0x39, 0xBBF0, 16)
+        g[0x106:0x10C] = b'\xFF' * 6
+        for k in (0x40, 0x80, 0xC0):
+            g[0x100 + k:0x140 + k] = g[0x100:0x140]
+            g[0x200 + k:0x240 + k] = g[0x200:0x240]
+        return bytes(g)
+
     # ---- npcs ------------------------------------------------------------------------------
     def npc_list(self, idx):
         """(L3B_B2FA) the npc records of list idx (map properties byte 4): pointer 2C/8000 + 2 idx

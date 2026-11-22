@@ -52,7 +52,7 @@ section bank 0, $0100
 
 section bank 0, $0150
 start:      di
-            ld sp, $DFFF
+            ld sp, $C800                    ; (WRAM 0: the menus switch WRAM banks)
             cp $11                          ; (Color only: other models stop here; the
             jr z, .cgb                      ;   message screen comes with the title milestone)
 .dmg:       halt
@@ -69,9 +69,14 @@ start:      di
             ldh [rP1], a
             stop
 .fast:      call lcd_off
-            ld hl, $C000                    ; memory cleared (Lot Check: nothing assumed)
-            ld de, $1F00
-            call memclr
+            ld hl, $C000                    ; memory cleared (Lot Check: nothing assumed; inline:
+            ld bc, $2000                    ;   the stack is in it)
+.clr:       xor a
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .clr
             ld hl, $FF80
             ld de, $7F
             call memclr
@@ -174,6 +179,11 @@ main:       call wait_vbl
 .inp:       ld a, [pad_new]                 ;   A: talk (fix:EA26)
             bit 0, a
             call nz, talk
+            ld a, [pad_new]                 ;   Start: the menu (fix:E340)
+            bit 3, a
+            jr z, .mv
+            call menu_open
+            jr main
 .mv:        call move
             call calc_pp
             call make_oam
@@ -212,11 +222,14 @@ vblank:     push af
             ldh [rSCY], a
             call q_flush
             call win_vbl
-            ldh a, [rLCDC]                  ; the dialogue window (cut at line WIN_LINE)
-            res 5, a
+            call menu_vbl
+            ldh a, [rLCDC]                  ; the dialogue window (cut at line WIN_LINE) or a
+            res 5, a                        ;   menu (the whole screen)
             ld b, a
             ld a, [win_on]
-            and a
+            ld c, a
+            ld a, [menu_on]
+            or c
             jr z, .w
             set 5, b
 .w:         ld a, b

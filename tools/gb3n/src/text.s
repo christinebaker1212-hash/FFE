@@ -385,13 +385,16 @@ win_vbl:    ld a, [win_dirty]
 
 ; LCD status interrupt (LYC = WIN_LINE - 1): the window off from the next line on
 stat_isr:   push af
+            ld a, [menu_on]                 ; (a menu: the whole screen)
+            and a
+            jr nz, .x
 .w:         ldh a, [rSTAT]
             and 3
             jr nz, .w
             ldh a, [rLCDC]
             res 5, a
             ldh [rLCDC], a
-            pop af
+.x:         pop af
             reti
 
 section wram, $CE00
