@@ -209,17 +209,327 @@ class Program:
             last = blk[-1]
             r.succ[s] = [x for x in self.out(last) if x in r.blocks]
 
+    # -------------------------------------------------------------- M3: values
+    # Per routine, a forward analysis of small sets of possible values (<= VMAX, else
+    # unknown) for A / X / Y / C and the zero-page bytes the routine uses as pointers,
+    # with per-routine write sets so a call only forgets what the callee (or an NMI
+    # handler run at a cross-bank return) can change. Facts: for each (zp),Y access the
+    # possible high bytes of its pointer.
+    VMAX = 4
+
+    def write_sets(self, facts=None):
+        """routine entry -> set of zero-page addresses it may write (None: any). A native
+        replacement (ext / idiom) has the NES code's RAM effects, so its set is that code's.
+        A (zp),Y write counts only if its pointer may point into page 0 (facts from the
+        previous round of values(); none: any)."""
+        rc = self.rc; ins = rc.insns; facts = facts or {}
+        dynset = set(k for k in rc.dyn if k in self.routines)
+        def cands(k):
+            """routines a dynamic JSR / JMP at k can reach: code at its address in any space
+            (absolute operand), else every dynamic target"""
+            i = ins[k]
+            if i.mode == 'abs':
+                c = set(x for x in rc.dyn_candidates(i.arg) if x in self.routines)
+                if c: return c
+            return dynset
+        def insn_writes(k):
+            """zero-page addresses one instruction may write (None: any)"""
+            o = self.ops[k]
+            if not o.mwrite: return set()
+            mm = o.mem
+            if mm.ind == 'izy':
+                f = facts.get(k)
+                return set() if f and f[0] >= 0x08 else None
+            if mm.ind is not None: return None
+            if mm.region != 'ram': return set()
+            a = mm.addr & 0x7FF
+            if mm.index is None: return {a} if a < 0x100 else set()
+            if ins[k].mode in ('zpx', 'zpy'):                # zp,X / zp,Y: anywhere in page 0
+                b = getattr(rc.g, 'zpx_writes', {}).get(k[0])   # (unless annotated)
+                return set(range(b[0], b[1] + 1)) if b else None
+            return set(range(a, 0x100)) if a < 0x100 else set()   # abs,X: no wrap
+        def raw(start, stop=None):
+            """writes of the NES code from start (native markers ignored) until stop / RTS;
+            callees by their sets (returns (set, callee entries)) or None"""
+            w = set(); calls = set(); seen = set(); work = [start]
+            while work:
+                k = work.pop()
+                if k in seen or k not in ins or k == stop: continue
+                seen.add(k); o = self.ops[k]; i = ins[k]
+                x = insn_writes(k)
+                if x is None: return None
+                w |= x
+                if o.kind == 'call':
+                    if o.target not in ins: calls |= cands(k)
+                    else: calls.add(o.target)
+                    work.append((i.space, i.addr + 3)); continue
+                if o.kind == 'jump' and o.target is None: calls |= dynset; continue
+                if o.kind == 'return': continue
+                for s2 in rc.succ(i):
+                    if s2 is None: return None
+                    work.append(s2)
+            return w, calls
+        own = {}; deps = {}
+        for e, r in self.routines.items():
+            w = set(); c = set(r.calls) | set(r.tails); ok = True
+            for d in r.dyncalls: c |= cands(d)
+            for k in r.keys:
+                if not ok: break
+                if k in rc.g.ext or k in rc.g.idioms:
+                    rr = raw(k, (k[0], rc.g.idioms[k][1]) if k in rc.g.idioms else None)
+                    if rr is None: ok = False; break
+                    w |= rr[0]; c |= rr[1]
+                    continue
+                x = insn_writes(k)
+                if x is None: ok = False; break
+                w |= x
+            own[e] = w if ok else None; deps[e] = c
+        ws = dict(own)
+        for c in set().union(*deps.values()) if deps else ():
+            if c not in ws:                                   # (callee not a routine: unknown)
+                ws[c] = None
+        changed = True
+        while changed:
+            changed = False
+            for e in self.routines:
+                if ws[e] is None: continue
+                acc = set(ws[e])
+                for c in deps[e]:
+                    cw = ws.get(c)
+                    if cw is None: acc = None; break
+                    acc |= cw
+                if acc is None or acc != ws[e]:
+                    ws[e] = acc; changed = True
+        nmi = set()
+        for h in rc.g.nmi_handlers:
+            hw = ws.get(h)
+            if hw is None: nmi = None; break
+            nmi |= hw
+        self.nmi_writes = nmi
+        return ws
+
+    def values(self):
+        facts = None
+        for rnd in range(6):                         # facts and write sets refine each other
+            ws = self.write_sets(facts)
+            nf = self._values(ws)
+            if nf == facts: break
+            facts = nf
+        self.izy_facts = facts
+        return facts
+
+    def _values(self, ws):
+        """one round, whole program: ranges (lo, hi) of A / X / Y / C and of every
+        zero-page byte used as a pointer; a routine reached only by static calls / tail
+        edges starts from the merge of its callers' states there, others from unknown"""
+        rc = self.rc
+        facts = {}                                     # izy key -> (lo, hi) of the pointer high byte / None
+        ptr = set()
+        for o in self.ops.values():
+            if o.mem is not None and o.mem.ind == 'izy':
+                ptr.add(o.mem.addr); ptr.add((o.mem.addr + 1) & 0xFF)
+        keys = ['A', 'X', 'Y', 'C'] + sorted(ptr)
+        unknown = {x: None for x in keys}
+        def merge(a, b):
+            if a is None: return dict(b)
+            out = {}
+            for x in keys:
+                va, vb = a.get(x), b.get(x)
+                out[x] = None if (va is None or vb is None) else (min(va[0], vb[0]), max(va[1], vb[1]))
+            return out
+        # entries whose state is unknown: reached dynamically, natively, by interrupt, or
+        # from code outside every routine walk
+        open_entry = set(k for k in rc.dyn) | set(rc.g.ext) | set(rc.g.nmi_handlers)
+        open_entry |= set((k[0], v[1]) for k, v in rc.g.idioms.items())
+        called = set()
+        for r in self.routines.values(): called |= r.calls | r.tails
+        for e in self.routines:
+            if e not in called: open_entry.add(e)
+        entry = {e: (dict(unknown) if e in open_entry else None) for e in self.routines}
+        work = [e for e in self.routines if entry[e] is not None]
+        inwork = set(work)
+        self._callsite = {}
+        while work:
+            e = work.pop(); inwork.discard(e)
+            r = self.routines[e]
+            inn = {r.entry: dict(entry[e])}
+            bw = [r.entry]
+            while bw:
+                b = bw.pop()
+                st = dict(inn[b])
+                for k in r.blocks[b]:
+                    o = self.ops[k]
+                    if o.kind == 'call' and o.target in self.routines:
+                        c = o.target
+                        m = merge(entry[c], st)
+                        if m != entry[c]:
+                            entry[c] = m
+                            if c not in inwork: work.append(c); inwork.add(c)
+                    self._step(k, st, ptr, ws, facts)
+                last = r.blocks[b][-1]
+                for t in self.out(last):                 # tail edges into other routines
+                    if t in r.tails and t in self.routines:
+                        m = merge(entry[t], st)
+                        if m != entry[t]:
+                            entry[t] = m
+                            if t not in inwork: work.append(t); inwork.add(t)
+                for s2 in r.succ[b]:
+                    m = merge(inn.get(s2), st)
+                    if s2 not in inn or m != inn[s2]: inn[s2] = m; bw.append(s2)
+        return facts
+
+    def rom_range(self, k, mm):
+        """(lo, hi) of the bytes a ROM operand can read: one byte, or the 256 from the base
+        for an indexed read; the bank at $8000 is the code's own (code of a bNN space runs
+        there), unknown from the fixed bank"""
+        sp = k[0]; a = mm.addr
+        if 0x8000 <= a < 0xC000:
+            if not sp.startswith('b'): return None
+            space = sp
+        elif a >= 0xC000: space = 'fix'
+        else: return None
+        base = 0x8000 if space != 'fix' else 0xC000
+        n = 1 if mm.index is None else 0x100
+        bs = [self.rc.cm.byte(space, x) for x in range(a, min(a + n, base + 0x4000))]
+        return (min(bs), max(bs)) if bs else None
+
+    def _step(self, k, st, ptr, ws, facts):
+        rc = self.rc; o = self.ops[k]; mn = o.mn; mm = o.mem
+        FULL = None
+        def rd():                                       # operand range
+            if o.imm is not None: return (o.imm, o.imm)
+            if mm is None or mm.ind is not None: return FULL
+            if mm.region == 'ram' and mm.index is None:
+                a = mm.addr & 0x7FF
+                return st.get(a, FULL)
+            if mm.region in ('rom8', 'romc', 'rome'): return self.rom_range(k, mm)
+            return FULL
+        def clobber_ptr_by(mm2, mode):
+            if mm2.ind is None and mm2.region == 'ram':
+                a = mm2.addr & 0x7FF
+                if mm2.index is None:
+                    if a in st: st[a] = FULL
+                else:
+                    for x in ptr:
+                        if mode in ('zpx', 'zpy') or a <= x < a + 0x100: st[x] = FULL
+            elif mm2.ind is not None:
+                f = facts.get(k)
+                if not (f is not None and f[0] >= 0x08):
+                    for x in ptr: st[x] = FULL
+        mode = rc.insns[k].mode
+        if mm is not None and mm.ind == 'izy':
+            hi = st.get((mm.addr + 1) & 0xFF)
+            if k in facts and facts[k] is None: pass
+            elif hi is None: facts[k] = None
+            else:
+                p = facts.get(k)
+                facts[k] = hi if p is None and k not in facts else (min(p[0], hi[0]), max(p[1], hi[1]))
+        if k in rc.g.idioms or k in rc.g.ext:
+            for x in st: st[x] = FULL
+            return
+        if mn in ('LDA', 'LDX', 'LDY'):
+            st[mn[2]] = rd()
+        elif mn in ('TAX', 'TAY', 'TXA', 'TYA'):
+            st[mn[2]] = st[mn[1]]
+        elif mn in ('STA', 'STX', 'STY'):
+            if mm.ind is None and mm.region == 'ram' and mm.index is None and (mm.addr & 0x7FF) in st:
+                st[mm.addr & 0x7FF] = st[mn[2]]
+            else:
+                clobber_ptr_by(mm, mode)
+        elif mn == 'CLC': st['C'] = (0, 0)
+        elif mn == 'SEC': st['C'] = (1, 1)
+        elif mn in ('ADC', 'SBC'):
+            v = rd(); a = st['A']; c = st['C']
+            if v is None or a is None or c is None:
+                st['A'] = st['C'] = FULL
+            else:
+                if mn == 'ADC': lo, hi = a[0] + v[0] + c[0], a[1] + v[1] + c[1]
+                else: lo, hi = a[0] - v[1] - (1 - c[0]), a[1] - v[0] - (1 - c[1])
+                if mn == 'ADC':
+                    cl, ch = (1 if lo > 0xFF else 0), (1 if hi > 0xFF else 0)
+                else:
+                    cl, ch = (1 if lo >= 0 else 0), (1 if hi >= 0 else 0)
+                st['C'] = (cl, ch)
+                if lo >= 0 and hi <= 0xFF: st['A'] = (lo, hi)
+                elif lo > 0xFF: st['A'] = (lo - 0x100, hi - 0x100)
+                elif hi < 0: st['A'] = (lo + 0x100, hi + 0x100)
+                else: st['A'] = FULL
+        elif mn == 'AND':
+            v = rd(); a = st['A']
+            if v is not None and v[0] == v[1]:
+                if a is not None and a[0] == a[1]: st['A'] = (a[0] & v[0],) * 2
+                else: st['A'] = (0, v[0])
+            elif a is not None and a[0] == a[1]: st['A'] = (0, a[0])
+            else: st['A'] = FULL
+        elif mn in ('ORA', 'EOR'):
+            v = rd(); a = st['A']
+            if v is not None and a is not None and v[0] == v[1] and a[0] == a[1]:
+                st['A'] = ((a[0] | v[0]) if mn == 'ORA' else (a[0] ^ v[0]),) * 2
+            else: st['A'] = FULL
+        elif mn in ('INX', 'DEX', 'INY', 'DEY'):
+            r = mn[2]; d = 1 if mn[0] == 'I' else -1; v = st[r]
+            st[r] = None if v is None or not (0 <= v[0] + d and v[1] + d <= 0xFF) else (v[0] + d, v[1] + d)
+        elif mn in ('INC', 'DEC') and mm is not None and mm.ind is None and mm.index is None \
+                and mm.region == 'ram' and (mm.addr & 0x7FF) in st:
+            a = mm.addr & 0x7FF; d = 1 if mn == 'INC' else -1; v = st[a]
+            st[a] = None if v is None or not (0 <= v[0] + d and v[1] + d <= 0xFF) else (v[0] + d, v[1] + d)
+        elif mn == 'JSR':
+            for x in ('A', 'X', 'Y', 'C'): st[x] = FULL
+            w = ws.get(o.target) if o.target in ws else None
+            nmi = self.nmi_writes
+            for x in ptr:
+                if w is None or nmi is None or x in w or x in nmi: st[x] = FULL
+        else:
+            for r in o.rdef:
+                if r in st: st[r] = FULL
+            if 'C' in o.fdef: st['C'] = FULL
+            if o.mwrite and mm is not None: clobber_ptr_by(mm, mode)
+
     # -------------------------------------------------------------- code generation
     def compile(self):
         """code per space in address order (translate.emit_program's input). M1: every
         instruction through translate.Emitter, as Recompiler.compile."""
         rc = self.rc
-        blocks = {}
+        rc.izy_facts = self.values()
+        rc.home = {}
+        blocks = self._emit()
+        self.choose_home(blocks)
+        if rc.home: blocks = self._emit()
+        return blocks
+
+    def _emit(self):
         from translate import SPACES
+        rc = self.rc; blocks = {}
+        rc.home_direct = 0; rc.izy_direct_n = 0
         for sp in SPACES:
             keys = sorted(a for s, a in rc.insns if s == sp)
             blocks[sp] = [((sp, a), rc.xlate(rc.insns[(sp, a)])) for a in keys]
         return blocks
+
+    # Home placement (M3 / M5): routines whose hot loops read ROM data run from bank 0
+    # with that data bank mapped at $4000, so the reads are plain loads. Candidates (from
+    # the dynamic profile, tools/gb2/hwprof.py HW_PREFIX=rt_izy_,rt_rd_): the music engine
+    # (space b13, its own bank's music data) and the field sprite drawing around fix:E102
+    # (sprite tables in the fixed bank at $E000-$FFFF).
+    HOME_CANDIDATES = [('space', 'b13', 13), ('key', ('fix', 0xE102), 31)]
+
+    def choose_home(self, blocks):
+        from translate import components, line_size, DATA, HOME_ORG, HOME_END
+        rc = self.rc
+        size = {k: sum(line_size(l) for l in lines) for sp in blocks for k, lines in blocks[sp]}
+        comps = components(rc)
+        room = (HOME_END - HOME_ORG) * 9 // 10          # (direct reads only shrink the code)
+        chosen = {}
+        for kind, what, nesbank in self.HOME_CANDIDATES:
+            for c in comps:
+                if (kind == 'space' and all(k[0] == what for k in c)) or (kind == 'key' and what in c):
+                    if any(k in chosen for k in c): continue
+                    if any(k in rc.g.ext for k in c): continue
+                    sz = sum(size[k] for k in c) + 3 * len(c) // 8 + 8
+                    if sz > room: continue
+                    room -= sz
+                    for k in c: chosen[k] = DATA + nesbank
+        rc.home = chosen
 
     # -------------------------------------------------------------- report
     def report(self, verbose=False):

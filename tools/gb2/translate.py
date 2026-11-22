@@ -25,6 +25,8 @@ DATA = 1                    # GB bank of NES 16KB bank 0's data image (NES bank 
 RT_TABLES = DATA + 32       # runtime tables (sound)
 CODE0 = DATA + 33           # first GB bank holding recompiled code
 BANK_LIMIT = 0x4000 - 8     # bytes per code bank (room for a closing jump)
+HOME_BASE = 0x1000          # bank_of value of home code: HOME_BASE + its data bank (code in bank 0)
+HOME_ORG, HOME_END = 0x2600, 0x39E0   # bank-0 area for home code (rt/native_layer.s helpers below, rt/ff2_pal.s after)
 ALL = frozenset('NZCV')
 # FF2: flags assumed live where control goes somewhere unknown (dynamic jumps / calls, returns to
 # them): not V. Every BVC / BVS in FF2 tests V from a BIT just before it (b11:9C32, A076, B102,
@@ -153,6 +155,11 @@ class FF2:
                   ('fix', 0xFC38): bytes.fromhex('a9018d1640a9008d1640a208ad16406ab0016a6635cad0f4'),
                   ('fix', 0xFD60): bytes.fromhex('a53a29ff8d0020a5388d0520')}
     skip = [('fix', 0xFA2C, 0xFA48), ('fix', 0xFEA1, 0xFEAD), ('fix', 0xFEAF, 0xFEBF)]   # waits (but their entries) + NMI return stubs
+    # Annotation (everything8215 disassembly, for ftrans' write sets): zero-page indexed
+    # stores of a space stay in this range. b13 (music engine): X is the channel id $C5
+    # (0-2), $C6 = 2 * id, $C7 = 4 * id, or a loop counter (L0D_987C X < 6, L0D_98AB X < $12,
+    # L0D_98C8 X < 4): $B0,X .. $C0,X stores land in $B0-$C1 (bound kept at $B0-$CF).
+    zpx_writes = {'b13': (0xB0, 0xCF)}
 
 
 class Recompiler:
@@ -411,11 +418,41 @@ class Emitter:
         if self.i.mode in ('zpx', 'zpy'): self.o('res 0, h')   # zero-page index wraps ($C0xx)
         if protect: self.o('pop af')
 
+    def izy_direct(self):
+        """(zp),Y whose pointer high byte is proven (ftrans facts) to lie in work RAM
+        $00-$06, ExRAM $5C-$5E or cart RAM $60-$7E (so ptr + Y stays in the region, which
+        maps linearly to GB memory): HL = GB address, inline. Returns False otherwise."""
+        i = self.i
+        if i.mode != 'izy': return False
+        f = getattr(self.rc, 'izy_facts', {}).get(self.k)     # (lo, hi) of the pointer high byte
+        if not f: return False
+        def reg(h):
+            return 'ram' if h <= 0x06 else 'ex' if 0x5C <= h <= 0x5E else 'sram' if 0x60 <= h <= 0x7E else None
+        rs = {reg(f[0]), reg(f[1])}
+        if len(rs) != 1 or None in rs: return False
+        off = {'ram': 0xC0, 'ex': 0x6C, 'sram': 0x40}[rs.pop()]
+        zp = 0xC000 + i.arg
+        protect = 'C' in self.keep or 'C' in USE.get(i.mn, '')
+        if f[0] == f[1]:
+            self.o('ld hl, $%04X' % zp, 'ld l, [hl]', 'ld h, $%02X' % ((f[0] + off) & 0xFF))
+            if protect: self.o('push af', 'add hl, bc', 'pop af')
+            else: self.o('add hl, bc')
+        else:                                         # (the NES pointer read as the runtime does: $FF -> $C100)
+            self.o('push af', 'ld hl, $%04X' % zp, 'ld a, [hl+]', 'ld h, [hl]', 'ld l, a',
+                   'ld a, h', 'add a, $%02X' % off, 'ld h, a', 'add hl, bc', 'pop af')
+        self.rc.izy_direct_n = getattr(self.rc, 'izy_direct_n', 0) + 1
+        return True
+
     def operand(self):
         """emit code that makes the source operand available; returns an SM83 operand
         string ('[hl]', 'l', or '$nn')."""
         i = self.i; m = i.mode
         if m == 'imm': return '$%02X' % i.arg
+        if self.izy_direct(): return '[hl]'
+        hb = getattr(self.rc, 'home', {}).get(self.k)
+        if m == 'izy' and hb is not None:                 # home code: pointer into the mapped bank
+            self.o('ld l, $%02X' % i.arg, 'call %s' % ('rt_izy_rdem' if hb == DATA + 31 else 'rt_izy_rd8m'))
+            return 'l'
         if m in ('izy', 'izx'):
             self.o('ld l, $%02X' % i.arg, 'call rt_%s_rd' % m)
             return 'l'
@@ -427,6 +464,11 @@ class Emitter:
         if r in ('rom8', 'romc', 'rome'):
             gb = 0x4000 + (a - 0x8000) if r == 'rom8' else 0x4000 + (a - 0xC000) if r == 'romc' else 0x6000 + (a - 0xE000)
             self.addr_hl(gb, idx)
+            hb = getattr(self.rc, 'home', {}).get(self.k)      # home code: its data bank is mapped
+            if hb is not None and ((r == 'rom8' and i.space.startswith('b') and hb == DATA + int(i.space[1:]))
+                                   or (r == 'rome' and hb == DATA + 31)):
+                self.rc.home_direct = getattr(self.rc, 'home_direct', 0) + 1
+                return '[hl]'
             self.o('call rt_rd_%s' % r[3:])
             return 'l'
         if r == 'ppu':
@@ -438,6 +480,8 @@ class Emitter:
     def store(self, reg):
         """store register reg ('a', 'e', 'c') to the instruction's address"""
         i = self.i; m = i.mode
+        if self.izy_direct():
+            self.o('ld [hl], %s' % reg); return
         if m in ('izy', 'izx'):
             if reg == 'a': self.o('ld l, $%02X' % i.arg, 'call rt_%s_wr' % m)
             else: self.o('push af', 'ld a, %s' % reg, 'ld l, $%02X' % i.arg, 'call rt_%s_wr' % m, 'pop af')
@@ -837,6 +881,13 @@ def layout(rc, blocks):
     bank_of = {}
     banks = []                                            # [(bank, [keys], size)]
     cur, used, keys = CODE0, 0, []
+    home = getattr(rc, 'home', {})
+    homes = defaultdict(list)
+    for c in comps:
+        if c[0] in home:
+            for k in c: bank_of[k] = HOME_BASE + home[c[0]]
+            homes[HOME_BASE + home[c[0]]].extend(c)
+    comps = [c for c in comps if c[0] not in home]
     for c in comps:
         c.sort()
         sz = sum(sizes[k] for k in c) + 3 * len(c) // 8 + 8   # slack for split jumps
@@ -847,6 +898,7 @@ def layout(rc, blocks):
         for k in c: bank_of[k] = cur
         keys.extend(c); used += sz
     if keys: banks.append((cur, keys))
+    for hb, ks in sorted(homes.items()): banks.append((hb, ks))
     return bank_of, banks, code, sizes
 
 
@@ -855,8 +907,13 @@ def emit_program(rc, blocks=None):
     bank_of, banks, code, sizes = layout(rc, blocks)
     out = []
     xrefs = set()                                         # labels needing a bank-0 stub
+    first_home = True
     for bank, keys in banks:
-        out.append('section bank %d, $4000' % bank)
+        if bank >= HOME_BASE:
+            if first_home: out.append('section bank 0, $%04X' % HOME_ORG); first_home = False
+            out.append('home_%02X:' % (bank - HOME_BASE))
+        else:
+            out.append('section bank %d, $4000' % bank)
         keys = sorted(keys)
         for n, k in enumerate(keys):
             out.append(label(*k) + ':')
@@ -875,7 +932,7 @@ def emit_program(rc, blocks=None):
     # stubs (bank 0): call rt_fcs reads the target's bank and address after the call
     stubs = ['section bank 0, $25C0']                   # (runtime below, colour tables from $3A00)
     for lab in sorted(xrefs):
-        stubs += ['xs_%s:' % lab, '    call rt_fcs', '    db bank(%s)' % lab, '    dw %s' % lab,
+        stubs += ['xs_%s:' % lab, '    call rt_fcs', '    db %s' % bank_expr(lab, bank_of), '    dw %s' % lab,
                   'xj_%s:' % lab, '    call xs_%s' % lab, '    ret']
     # dynamic targets (bank DYN_BANK): 256 buckets by (nes_lo + nes_hi + key) & $FF; index
     # of bucket pointers at $4000, each bucket = count, then entries of nes_lo, nes_hi,
@@ -891,9 +948,16 @@ def emit_program(rc, blocks=None):
         tab.append('dyn_b%d:' % h)
         tab.append('    db %d' % len(buckets[h]))
         for a, key, lab in buckets[h]:
-            tab.append('    db $%02X, $%02X, $%02X, bank(%s), low(%s), high(%s)' % (a & 0xFF, a >> 8, key, lab, lab, lab))
+            tab.append('    db $%02X, $%02X, $%02X, %s, low(%s), high(%s)' % (a & 0xFF, a >> 8, key, bank_expr(lab, bank_of), lab, lab))
     rc.n_dyn = sum(len(v) for v in buckets.values())
     return '\n'.join(stubs + tab + out) + '\n', bank_of, banks
+
+
+def bank_expr(lab, bank_of):
+    """the bank to map for a code label: its ROM bank, or a home routine's data bank"""
+    sp, a = lab[2:].rsplit('_', 1)
+    b = bank_of.get((sp, int(a, 16)))
+    return '$%02X' % (b - HOME_BASE) if b is not None and b >= HOME_BASE else 'bank(%s)' % lab
 
 
 def retarget(line, bank, bank_of, xrefs):
@@ -913,10 +977,10 @@ def retarget(line, bank, bank_of, xrefs):
                             cond = s[len(op):].split(',')[0].strip()
                             xrefs.add(tgt)
                             return 'jp %s, xj_%s' % (cond, tgt)
-                        return 'rst $08\n    db bank(%s)\n    dw %s\n    ret' % (tgt, tgt)
+                        return 'rst $08\n    db %s\n    dw %s\n    ret' % (bank_expr(tgt, bank_of), tgt)
                     if ',' in s:
                         xrefs.add(tgt)
                         return line.replace(tgt, 'xs_' + tgt)
                     # (rt_fci: the far call in place)
-                    return 'rst $08\n    db bank(%s)\n    dw %s' % (tgt, tgt)
+                    return 'rst $08\n    db %s\n    dw %s' % (bank_expr(tgt, bank_of), tgt)
     return line

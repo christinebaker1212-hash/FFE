@@ -1008,3 +1008,44 @@ hle_pfscr_b:
             ld a, [NES_RAM + $FF]
             ldh [ppu_ctrl], a
             jp hle_scr00_b
+
+; ---- home code (translate.py HOME_*: routines placed in bank 0 that run with their data
+; bank mapped at $4000): (zp),Y reads straight from the mapped bank when the pointer is in
+; its window, else as rt_izy_rd. L = zp pointer, C = Y (B = 0) -> L = the byte; A, F, BC,
+; DE kept.
+section bank 0, $25C0
+rt_izy_rd8m:                                ; data bank = the NES bank at $8000-$BFFF
+            push af
+            ld h, high(NES_RAM)
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            add hl, bc
+            ld a, h
+            sub $80
+            cp $40
+            jr nc, izy_m_other
+            add a, $40                      ; $8000-$BFFF -> $4000-$7FFF
+            ld h, a
+            ld l, [hl]
+            pop af
+            ret
+rt_izy_rdem:                                ; data bank = the fixed bank ($E000-$FFFF)
+            push af
+            ld h, high(NES_RAM)
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            add hl, bc
+            ld a, h
+            cp $E0
+            jr c, izy_m_other
+            sub $80                         ; $E000-$FFFF -> $6000-$7FFF
+            ld h, a
+            ld l, [hl]
+            pop af
+            ret
+izy_m_other:
+            call nes_rd
+            pop af
+            ret

@@ -68,6 +68,27 @@ Measures per milestone: helper calls (static and per frame), SM83 instructions p
 instruction, GB cycles per NES frame (lagcheck), ROM size; recorded in
 `docs/ff2-gb-status.md`.
 
+## Progress
+
+- **M1 done (2026-11-22):** `tools/gb2/ftrans.py`: 1,560 routines, 11,521 blocks, call graph,
+  IR per instruction; the build goes through it, ROM byte-identical to the previous build.
+  1,491 routines (33.99k of 33.4k+ instruction visits) have no stack tricks or dynamic control.
+- **M3 started:** whole-program range analysis (A / X / Y / C and the zero-page pointer bytes;
+  ROM operands read from the user's ROM; callers' states flow into routines reached only by
+  static calls; per-routine zero-page write sets, natives counted with the NES code's effects,
+  the NMI handlers' writes at every call). Annotation from the disassembly: the music
+  engine's zp,X stores stay in $B0-$CF. Result: 36 of 938 (zp),Y sites with a known pointer
+  range; 4 made direct (work / cart RAM). Most pointers are shared between RAM and ROM data by
+  one routine (text printers): per-call-site versions needed (later).
+- **Home placement:** the hot ROM-data readers run from bank 0 with their data bank mapped
+  at $4000 (translate.py `HOME_*`, ftrans `HOME_CANDIDATES`): the music engine (bank 13 data)
+  and the field sprite drawing around fix:E102 (fixed-bank sprite tables), 945 instructions.
+  Calls into them map the data bank (inline far call with the data bank, as for any bank);
+  inside, table reads from that bank are plain loads and pointer reads take a mapped fast
+  path (`rt_izy_rd8m` / `rt_izy_rdem`). Per frame (random 1): full pointer-helper reads
+  8.9 -> 2.4; cross-bank calls up 9.6 -> 13.4 (the sprite component's callees stay in the
+  code banks: placement along the call graph is M5). lagcheck DMG -1.7%, CGB -3.9%.
+
 ## Open bug reports (after this work, owner's order)
 
 - Battle messages show fragments of other text and appear late (GB side: message tiles

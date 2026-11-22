@@ -141,6 +141,8 @@ def main():
     fp = ftrans.Program(rc)                         #   (docs/ff2-gb-function-translator.md)
     fp.check()
     prog, bank_of, banks = emit_program(rc, fp.compile())
+    print('ftrans: %d routines, (zp),Y accesses made direct: %d, home code: %d instructions, direct ROM reads %d' % (
+        len(fp.routines), getattr(rc, 'izy_direct_n', 0), len(getattr(rc, 'home', {})), getattr(rc, 'home_direct', 0)))
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in RT_FILES)
     if release:                                     # ;[test] .. ;[/test]: test-runner paths
         rt = re.sub(r'^;\[test\].*?^;\[/test\][^\n]*\n', '', rt, flags=re.S | re.M)

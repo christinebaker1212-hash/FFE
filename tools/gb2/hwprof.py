@@ -2,7 +2,8 @@
 register emulation in rt/), and how often: PyBoy with firstdiff's input, a hook on each
 layer entry point, the caller's NES routine from the return address (source labels).
 The measure for replacing the layer with native routines (docs/ff2-gb-native-layer.md).
-usage: PYTHONPATH=build/emu hwprof.py NES GB FRAMES [--random S] [--press ..] [--top N]"""
+usage: PYTHONPATH=build/emu hwprof.py NES GB FRAMES [--random S] [--press ..] [--top N]
+env HW_PREFIX=rt_izy_,rt_rd_,rt_fci: profile other runtime entry points (comma-separated name prefixes)"""
 import os, sys, json, bisect, collections
 sys.path.insert(0, 'tools/gb'); sys.path.insert(0, 'tools/gb2')
 from cynes import NES
@@ -39,7 +40,8 @@ def on_wait(_):
     st['k'] = (m[0xD830] | m[0xD831] << 8) + 1
 gb.pb.hook_register(*sym['rt_frame'], on_wait, None)
 gb.feed_pads(sym, lambda n: pads.get(n + 1, 0))
-HW = [n for n in sym if n.startswith(('rt_ppu_w', 'rt_ppu_r', 'rt_apu_w', 'rt_io_', 'rt_mmc_w')) and '.' not in n]
+PREFIX = tuple(os.environ.get('HW_PREFIX', 'rt_ppu_w,rt_ppu_r,rt_apu_w,rt_io_,rt_mmc_w').split(','))
+HW = [n for n in sym if n.startswith(PREFIX) and '.' not in n]   # (env HW_PREFIX: other entry points)
 def hk(name):
     spv = gb.pb.register_file.SP; ret = m[spv] | m[spv + 1] << 8
     bank = m[0xFF8C] if ret >= 0x4000 else 0
