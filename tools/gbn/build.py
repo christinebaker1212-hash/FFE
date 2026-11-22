@@ -218,7 +218,8 @@ def main():
            'TEST_INIT = %d\n' % (1 if init else 0) + 'FONT_D0 = $%02X\n' % text.code_of('0') + sound.mus_defs(rom) + sound.sfx_defs() +
            'STORY_FIRST = %d\nSTORY_END = %d\nSTORY_CRED = %d\n' % (ui.story_pages(rom)[1], len(ui.story_pages(rom)[0]), ui.CREDIT_PAGES) +
            'ENC_OW = %s\n' % (a[a.index('--enc') + 1] if '--enc' in a else '10') +
-           'START_BATTLE = %s\n' % (a[a.index('--battle') + 1] if '--battle' in a else '$FF') + talk_defs(rom) + item_defs(rom) + magic_defs(rom) +
+           'START_BATTLE = %s\n' % (a[a.index('--battle') + 1] if '--battle' in a else '$FF') +
+           'START_DLG = %s\n' % (a[a.index('--dlg') + 1] if '--dlg' in a else '$FF') + talk_defs(rom) + item_defs(rom) + magic_defs(rom) +
            open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'objects.s')).read() + '\n' +

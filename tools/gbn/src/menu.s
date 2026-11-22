@@ -1113,10 +1113,69 @@ desc_box:   push af
             call mt_get
             ld bc, $010A
             call pen_at
-            ld hl, mtxt
-            call pen_str
             ld a, 1
             ld [it_desc], a
+            call scr_upd
+            ld hl, mtxt
+            jp pen_type
+
+; string HL typed at the pen (owner, 2026-11-22): a letter at a time at an adult's reading
+; speed, twice as fast with A held, a soft click; $0A: the next line. (The screen not shown:
+; at once.)
+pen_type:   call lcd_get
+            bit 7, a
+            jp z, pen_str
+            ld a, [sfx_menu]                ; (no menu sounds from A meanwhile)
+            push af
+            xor a
+            ld [sfx_menu], a
+            ld a, 256 - TW_RATE
+            ld [tw_acc], a
+.l:         ld a, [hl+]
+            and a
+            jr z, .x
+            cp $0A
+            jr z, .nl
+            cp $20
+            jr z, .sp
+            push hl
+            ld [tw_qt], a
+            ld hl, pen                      ; its cell: smap -> VRAM $9800 + the same offset
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, l
+            ld [tw_ql], a
+            ld a, h
+            sub high(smap) - $98
+            ld [tw_qh], a
+            ld a, [tw_qt]
+            call pen_ch
+            call tw_click
+.w:         call scr_frame
+            call tw_rate
+            jr nc, .w
+            pop hl
+            jr .l
+.sp:        call pen_ch
+            jr .l
+.nl:        push hl
+            ld hl, pen_l
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld de, 32
+            add hl, de
+            ld a, l
+            ld [pen_l], a
+            ld [pen], a
+            ld a, h
+            ld [pen_l + 1], a
+            ld [pen + 1], a
+            pop hl
+            jr .l
+.x:         pop af
+            ld [sfx_menu], a
             ret
 ; menu text A -> mtxt
 mt_get:     add a, a

@@ -189,7 +189,23 @@ sf_one:     ld l, a
             ldh [rVBK], a
             ret
 ; V-Blank (LCD on): rows still to upload, while the V-Blank lasts
-sf_step:    ld a, [sf_row]
+sf_step:    ld a, [tw_qh]                   ; (a typed letter: its cell first)
+            and a
+            jr z, .rw
+            ldh a, [rLY]
+            cp 144
+            jr c, .rw
+            cp 152
+            jr nc, .rw
+            ld a, [tw_ql]
+            ld l, a
+            ld a, [tw_qh]
+            ld h, a
+            ld a, [tw_qt]
+            ld [hl], a
+            xor a
+            ld [tw_qh], a
+.rw:        ld a, [sf_row]
             cp 18
             ret nc
             ldh a, [rLY]

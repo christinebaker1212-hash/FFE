@@ -129,9 +129,9 @@ sh_say:     push af
             call sh_text
             ld bc, $0101
             call pen_at
+            call scr_upd
             ld hl, mtxt
-            call pen_str
-            jp scr_upd
+            jp pen_type
 ; the price question: the price (sh_price) and text 14 (its first line empty)
 sh_ask:     ld bc, $0000
             ld de, $1406
@@ -724,9 +724,9 @@ sh_says:    push hl
             call scr_win
             ld bc, $0101
             call pen_at
+            call scr_upd
             pop hl
-            call pen_str
-            jp scr_upd
+            jp pen_type
 
 ; the party window over the list (0,5,20,7): a header row (6), the members (7-10), the
 ; name at column 2; the shop's words at column 8

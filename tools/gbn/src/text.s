@@ -214,7 +214,7 @@ dlg_page:   ld hl, win_buf                  ; frame and blank inside
             ld [dlg_more], a
 .up:        xor a
             ld [win_up], a
-            ret
+            jp tw_prep
 .row3:      ld a, b                         ; B, then C x 18, then D
             call code_tile
             ld [hl+], a
@@ -229,6 +229,63 @@ dlg_page:   ld hl, win_buf                  ; frame and blank inside
             ld a, d
             call code_tile
             ld [hl+], a
+            ret
+
+; the page typed (owner, 2026-11-22): the page kept in win_tx, its text cells blank in the box
+TW_RATE    = 90                             ; letters a frame x 256: about 21 a second, an adult's
+                                            ;   reading speed (250 words a minute); A held: twice
+tw_prep:    ld hl, win_buf
+            ld de, win_tx
+            ld b, 160
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            ld a, $18
+            call code_tile
+            ld c, a
+            ld hl, win_buf + 21
+            ld d, 6
+.r:         ld b, 18
+.b:         ld [hl], c
+            inc hl
+            dec b
+            jr nz, .b
+            inc hl
+            inc hl
+            dec d
+            jr nz, .r
+            ld a, 21
+            ld [tw_i], a
+            ld a, 256 - TW_RATE             ; (the first letter at once)
+            ld [tw_acc], a
+            xor a
+            ld [tw_qh], a
+            ret
+; this frame's share of letters: C set when the next one is due (A held: twice as fast)
+tw_rate:    ld b, TW_RATE
+            ldh a, [pad]
+            bit 0, a
+            jr z, .r
+            ld b, 2 * TW_RATE
+.r:         ld a, [tw_acc]
+            add a, b
+            ld [tw_acc], a
+            ret
+; the soft click of a typed letter (every second one): a short, quiet noise tick
+tw_click:   ld hl, tw_k
+            inc [hl]
+            bit 0, [hl]
+            ret z
+            ld a, $3C                       ; (16 ms, volume 5 falling, a bright period)
+            ldh [$FF20], a
+            ld a, $51
+            ldh [$FF21], a
+            ld a, $12
+            ldh [$FF22], a
+            ld a, $C0
+            ldh [$FF23], a
             ret
 
 ; A = code -> A = tile (CGB: the code itself, in VRAM bank 1; DMG: the map's table)
@@ -302,7 +359,22 @@ box_vbl:    ld a, [box_on]
             dec c
             jr nz, .r
             ret
-.show:      ld a, 7                         ; window at the top, cut at line 64 (STAT)
+.show:      ld a, [tw_qh]                   ; (a typed letter: its cell, while V-Blank lasts)
+            and a
+            jr z, .sh
+            ldh a, [rLY]
+            sub 144
+            cp 8
+            jr nc, .sh
+            ld a, [tw_ql]
+            ld l, a
+            ld a, [tw_qh]
+            ld h, a
+            ld a, [tw_qt]
+            ld [hl], a
+            xor a
+            ld [tw_qh], a
+.sh:        ld a, 7                         ; window at the top, cut at line 64 (STAT)
             ldh [rWX], a
             xor a
             ldh [rWY], a
@@ -411,13 +483,68 @@ stat_int:   push af
 .gr:        pop af
             reti
 
-; the dialogue in progress (main loop): A turns the page or closes the box
-dlg_frame:  ldh a, [pad_new]
-            bit 0, a
-            ret z
-            ld a, [win_up]                  ; (not before the page is up)
+; the dialogue in progress (main loop): the page typed a letter at a time (owner, 2026-11-22:
+; an adult's reading speed, twice as fast with A held, a soft click); then A turns the page
+; or closes the box
+dlg_frame:  ld a, [win_up]                  ; (not before the page is up)
             cp 8
             ret c
+            ld a, [tw_i]
+            cp 160
+            jr nc, .done
+            call tw_rate
+            ret nc
+            ld a, [tw_qh]                   ; (the last letter not written yet: next frame)
+            and a
+            ret nz
+            ld a, [tw_i]                    ; the next cell that differs from the blank box
+            ld e, a
+            ld d, 0
+.f:         ld a, e
+            cp 160
+            jr nc, .all
+            ld hl, win_tx
+            add hl, de
+            ld a, [hl]
+            ld hl, win_buf
+            add hl, de
+            cp [hl]
+            jr nz, .put
+            inc e
+            jr .f
+.all:       ld a, 160
+            ld [tw_i], a
+            ret
+.put:       ld [hl], a
+            ld [tw_qt], a
+            ld a, e
+            inc a
+            ld [tw_i], a
+            ld a, e                         ; its cell: $9C00 + 32 (e / 20) + e mod 20
+            ld b, 0
+.dv:        cp 20
+            jr c, .dd
+            sub 20
+            inc b
+            jr .dv
+.dd:        ld c, a
+            ld l, b
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, l
+            add a, c
+            ld [tw_ql], a
+            ld a, h
+            add a, $9C
+            ld [tw_qh], a
+            jp tw_click
+.done:      ldh a, [pad_new]
+            bit 0, a
+            ret z
             ld a, [dlg_more]
             and a
             jr z, .close
@@ -431,6 +558,14 @@ section wram, $CB00
 win_buf:    ds 160
 section wram, $CC00
 font_tbl:   ds 128                          ; code -> tile (page-aligned)
+section wram, $DD40                         ; (after the battle's tile stage)
+win_tx:     ds 160                          ; the dialogue page as written (typed from it)
+tw_i:       ds 1
+tw_acc:     ds 1
+tw_k:       ds 1
+tw_ql:      ds 1                            ; a typed letter waiting for V-Blank: its cell, tile
+tw_qh:      ds 1
+tw_qt:      ds 1
 section wram, $CC80
 box_on:     ds 1
 win_up:     ds 1

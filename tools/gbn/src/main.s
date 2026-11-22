@@ -258,6 +258,9 @@ start:      di
             ld [inroom], a
             call room_redraw
 .nr:
+            ld a, START_DLG                 ; (test builds: a dialogue first, build.py --dlg)
+            cp $FF
+            call nz, dlg_open
             ld a, START_BATTLE              ; (test builds: a battle first)
             cp $FF
             jr z, .nb

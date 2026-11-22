@@ -313,3 +313,9 @@ one reaches parity, so the owner can keep playing).
    with each member's battle pose (x 14, three rows) and name, level (or Dead / Stone /
    Poison) and HP / max beside it; commands (11,0,9,7); orbs (11,6,9,9); Gil (0,15,20,3).
    Choosing a member, the hand points at the picture; the command's hand stays.
+16. Owner (2026-11-22): text typed a letter at a time: about 21 letters a second (an adult's
+   reading speed, 250 words a minute: TW_RATE 90/256 a frame), twice as fast with A held,
+   a soft noise click every second letter (16 ms, volume 5 falling). Dialogue (text.s: the
+   page kept in win_tx at $DD40, its letters revealed into the box, one cell a V-Blank),
+   shop speech and the menus' description windows (menu.s pen_type). Test builds:
+   `build.py --dlg N` opens dialogue N after the map loads.
