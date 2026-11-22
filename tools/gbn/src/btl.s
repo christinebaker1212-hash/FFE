@@ -58,6 +58,7 @@ battle:     xor a                           ; (no menu sounds, no vehicle noise)
             xor a
             ld [bt_msgon], a
             ld [bt_rmask], a
+            ld [dn_t], a                    ; (no damage number showing)
             dec a                           ; (no target remembered yet)
             ld hl, bt_lastt
             ld [hl+], a
@@ -675,6 +676,8 @@ bt_pal:     ldh a, [is_cgb]
             call bgp_w
             ld a, %10010000                 ; ranks 1-3 white / light / dark (on black)
             call obp0_w
+            ld a, %11000000                 ; OBP1, the damage numbers: white ink, black
+            ldh [rOBP1], a                  ;   outline (SGB: the cell's darkest colour)
             ret
 .cgb:       ld a, $80
             call bcps_w
@@ -1413,6 +1416,7 @@ bt_frame:   ld a, [sf_row]                  ; (no hand while the window rows are
             call sf_step
             call bt_rowsup
 .t:         call bt_vbl
+            call bt_danim                   ; (the damage number's bounce)
             jp read_pad
 ; one text row's map row (A = 12-17) to upload, alone
 bt_upd_row: sub 12

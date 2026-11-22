@@ -731,179 +731,6 @@ bt_target_enemy:
 .b:         call bt_hand_off
             scf
             ret
-; the damage (nf_val) as a number over its target while the message shows (owner,
-; 2026-11-22): small-font digits as two sprites (tiles $F4-$F5, OAM 36-37), white (CGB OBJ
-; palette 4; DMG OBP0's colour 1), centred on an enemy, left of a member's sprite
-bt_dnum_w:  ld a, [hl+]                     ; (from the 16-bit damage at HL)
-            ld [nf_val], a
-            ld a, [hl]
-            ld [nf_val + 1], a
-            xor a
-            ld [nf_val + 2], a
-bt_dnum:    ld b, 2
-            call vwf_clr
-            xor a
-            ld [vw_x], a
-            call num_fmt
-            ld hl, nf_dig
-.s:         ld a, [hl]
-            cp $20
-            jr nz, .c
-            inc hl
-            jr .s
-.c:         ld a, [hl+]
-            push hl
-            call vwf_ch
-            pop hl
-            ld a, l
-            cp low(nf_dig + 6)
-            jr nz, .c
-            ld a, [vw_x]
-            ld [bt_dw], a
-            ld a, 1
-            ld [vw_spr], a
-            ld a, $F4
-            ld b, 2
-            call vwf_out
-            xor a
-            ld [vw_spr], a
-            ld hl, bt_stage                 ; the ink's rows kept (bt_sbuf)
-            ld de, bt_sbuf
-            ld b, 16
-.k:         ld a, [hl+]
-            ld [de], a
-            inc de
-            inc hl
-            dec b
-            jr nz, .k
-            ld hl, bt_stage                 ; an outline round the ink (colour 3: black /
-            ld de, bt_sbuf                  ;   dark grey), the ink colour 1 (white)
-            ld c, 0                         ; (row in the tile)
-.o:         ld a, [de]                      ; left / right
-            ld b, a
-            add a, a
-            ld [bt_t + 9], a
-            ld a, b
-            srl a
-            ld [bt_t + 10], a
-            ld a, c                         ; above (not on a tile's first row)
-            and a
-            jr z, .na
-            dec de
-            ld a, [de]
-            inc de
-            jr .ab
-.na:        xor a
-.ab:        ld [bt_t + 11], a
-            ld a, c                         ; below (not on its last)
-            cp 7
-            jr z, .nb
-            inc de
-            ld a, [de]
-            dec de
-            jr .bb
-.nb:        xor a
-.bb:        ld hl, bt_t + 9
-            or [hl]
-            inc hl
-            or [hl]
-            inc hl
-            or [hl]
-            ld [bt_t + 12], a
-            ld a, b                         ; outline = neighbours AND NOT ink
-            cpl
-            ld hl, bt_t + 12
-            and [hl]
-            ld [hl], a
-            push de
-            ld a, e                         ; stage row = 2 (index)
-            sub low(bt_sbuf)
-            add a, a
-            add a, low(bt_stage)
-            ld l, a
-            ld a, 0
-            adc a, high(bt_stage)
-            ld h, a
-            ld a, [bt_t + 12]
-            or b
-            ld [hl+], a                     ; low plane: ink + outline
-            ld a, [bt_t + 12]
-            ld [hl], a                      ; high plane: outline
-            pop de
-            inc de
-            inc c
-            ld a, c
-            and 7
-            ld c, a
-            ld a, e
-            cp low(bt_sbuf + 16)
-            jr nz, .o
-            ld a, [df_player]
-            and a
-            jr nz, .pl
-            ld a, [bt_tgt]                  ; an enemy: its middle
-            call bt_epos
-            ld a, b
-            add a, a
-            add a, e
-            add a, a
-            add a, a
-            ld d, a
-            ld a, [bt_dw]
-            srl a
-            ld l, a
-            ld a, d
-            sub l
-            ld d, a
-            ld a, c
-            add a, a
-            add a, e
-            add a, a
-            add a, a
-            sub 4
-            ld e, a
-            jr .put
-.pl:        ld a, [bt_tgt]                  ; a member: left of the sprite
-            and 3
-            ld c, a
-            add a, a
-            add a, c
-            add a, a
-            add a, a
-            add a, a
-            add a, 8
-            ld e, a
-            ld a, [bt_dw]
-            ld l, a
-            ld a, PARTY_X - 4
-            sub l
-            ld d, a
-.put:       ld hl, oam_buf + 144
-            ld a, e
-            add a, 16
-            ld [hl+], a
-            ld a, d
-            add a, 8
-            ld [hl+], a
-            ld a, $F4
-            ld [hl+], a
-            ld a, 4
-            ld [hl+], a
-            ld a, e
-            add a, 16
-            ld [hl+], a
-            ld a, d
-            add a, 16
-            ld [hl+], a
-            ld a, $F5
-            ld [hl+], a
-            ld [hl], 4
-            ret
-bt_dnum_off:
-            xor a
-            ld [oam_buf + 144], a
-            ld [oam_buf + 148], a
-            ret
 ; HL += the member choosing (bt_cm)
 bt_memp:    push af                         ; (A and the flags kept)
             ld a, [bt_cm]
@@ -1747,6 +1574,7 @@ bt_phys:    ld a, 168
             ld a, [mt_total + 1]
             or b
             jr nz, .dm
+            call bt_dmiss                   ; ("MISS!" over the target)
             ld a, M_MISS
             call bt_msg_line
             jp bt_msg_end
@@ -2887,6 +2715,221 @@ bt_s_pts:   db "P", 0
 bt_s_gil:   db " Gil", 0
 
 
+; ---- the damage as a number over its target while the message shows, popping up and
+; dropping back with a little bounce, as in FF3 (owner, 2026-11-22); "MISS!" the same. Bold
+; outlined glyphs (battle.py dn_tiles, BTL_DATA $4B00), one sprite each (tiles $F0-$F4: the
+; hand's, not shown meanwhile; put back afterwards), OAM 35-39, white (CGB OBJ palette 4)
+B_DNGLY    = $4B00
+DN_OAM     = oam_buf + 140
+DN_T0      = $F0
+bt_dnum_w:  ld a, [hl+]                     ; (from the 16-bit damage at HL)
+            ld [nf_val], a
+            ld a, [hl]
+            ld [nf_val + 1], a
+            xor a
+            ld [nf_val + 2], a
+            call num_fmt
+            ld hl, nf_dig
+            ld de, bt_dstr
+            ld b, 0
+.s:         ld a, [hl+]                     ; (the digits, no leading spaces)
+            sub $30
+            jr c, .n
+            ld [de], a
+            inc de
+            inc b
+.n:         ld a, l
+            cp low(nf_dig + 6)
+            jr nz, .s
+            jr bt_dpop
+bt_dmiss:   ld hl, dn_miss
+            ld de, bt_dstr
+            ld bc, 5
+            call memcpy
+            ld b, 5
+; B glyphs from bt_dstr over the target (bt_tgt; df_player: a member)
+bt_dpop:    ld a, b
+            and a
+            ret z
+            cp 6                            ; (at most 5 glyphs: OAM 35-39)
+            jr c, .nn
+            ld a, 5
+.nn:        ld [dn_n], a
+            call bt_flush                   ; (a previous upload first)
+            ld de, bt_stage
+            ld hl, bt_dstr
+            ld a, [dn_n]
+            ld b, a
+.g:         push bc
+            push hl
+            ld a, [hl]
+            swap a
+            ld l, a
+            ld h, high(B_DNGLY)
+            ld bc, 16
+            ld a, BTL_DATA
+            call far_copy                   ; (DE advances)
+            pop hl
+            inc hl
+            pop bc
+            dec b
+            jr nz, .g
+            ld hl, bt_stage
+            ld a, l
+            ld [bt_upsrc], a
+            ld a, h
+            ld [bt_upsrc + 1], a
+            xor a
+            ld [bt_updst], a
+            ld a, $8F
+            ld [bt_updst + 1], a
+            ld a, [dn_n]
+            ld [bt_upn], a
+            ld b, a                         ; width = 7 n + 1
+            add a, a
+            add a, a
+            add a, a
+            sub b
+            inc a
+            ld [bt_dw], a
+            ld a, [df_player]
+            and a
+            jr nz, .pl
+            ld a, [bt_tgt]                  ; an enemy: centred on it, at its middle
+            call bt_epos
+            ld a, b
+            add a, a
+            add a, e
+            add a, a
+            add a, a
+            ld d, a
+            ld a, [bt_dw]
+            srl a
+            ld l, a
+            ld a, d
+            sub l
+            ld d, a
+            ld a, c
+            add a, a
+            add a, e
+            add a, a
+            add a, a
+            sub 4
+            ld e, a
+            jr .put
+.pl:        ld a, [bt_tgt]                  ; a member: left of the sprite
+            and 3
+            ld c, a
+            add a, a
+            add a, c
+            add a, a
+            add a, a
+            add a, a
+            add a, 8
+            ld e, a
+            ld a, [bt_dw]
+            ld l, a
+            ld a, PARTY_X - 4
+            sub l
+            ld d, a
+.put:       ld a, d
+            ld [dn_x], a
+            ld a, e
+            ld [dn_y], a
+            ld a, 1
+            ld [dn_t], a
+            ret
+; each frame (bt_frame): the glyphs at their place in the bounce, once their tiles are up
+bt_danim:   ld a, [dn_t]
+            and a
+            ret z
+            ld a, [bt_upn]
+            and a
+            ret nz
+            push bc                         ; (bt_frame's callers keep registers in it)
+            push de
+            push hl
+            call .go
+            pop hl
+            pop de
+            pop bc
+            ret
+.go:        ld a, [dn_t]
+            cp DN_LEN
+            jr nc, .h
+            inc a
+            ld [dn_t], a
+.h:         ld e, a
+            ld d, 0
+            ld hl, dn_off - 2
+            add hl, de
+            ld a, [dn_y]
+            add a, [hl]
+            add a, 16
+            ld c, a                         ; OAM y
+            ld a, [dn_x]
+            add a, 8
+            ld b, a                         ; OAM x
+            ld hl, DN_OAM
+            ld a, [dn_n]
+            ld e, a
+            ld d, DN_T0
+.o:         ld a, c
+            ld [hl+], a
+            ld a, b
+            ld [hl+], a
+            add a, 7
+            ld b, a
+            ld a, d
+            ld [hl+], a
+            inc d
+            ld a, $14                       ; (CGB OBJ palette 4; DMG / SGB OBP1)
+            ld [hl+], a
+            dec e
+            jr nz, .o
+            ret
+; the number gone, the hand's tiles back
+bt_dnum_off:
+            ld a, [dn_t]
+            and a
+            ret z
+            xor a
+            ld [dn_t], a
+            ld hl, DN_OAM
+            ld b, 5
+.c:         ld [hl+], a
+            inc l
+            inc l
+            inc l
+            dec b
+            jr nz, .c
+            call bt_flush
+            ldh a, [is_cgb]
+            and a
+            ld hl, U_CURDMG
+            jr z, .d
+            ld hl, U_CURCGB
+.d:         ld de, bt_stage
+            ld bc, 64
+            ld a, UI_GFX
+            call far_copy
+            ld hl, bt_stage
+            ld a, l
+            ld [bt_upsrc], a
+            ld a, h
+            ld [bt_upsrc + 1], a
+            xor a
+            ld [bt_updst], a
+            ld a, $8F
+            ld [bt_updst + 1], a
+            ld a, 4
+            ld [bt_upn], a
+            ret
+dn_miss:    db 10, 11, 12, 12, 13           ; M I S S !
+; the bounce: y offsets by frame (up, back down, a smaller hop, at rest)
+dn_off:     db 0, 254, 252, 250, 249, 248, 248, 249, 250, 252, 254, 0, 254, 253, 253, 254, 0
+DN_LEN     = 17
+
 section bank 6, $7480                       ; (the results window: after btl4)
 ; a level up kept for the results window: the new level, the HP gain, the stats raised
 bt_lvrec:   ld a, CH_LEVEL
@@ -3260,7 +3303,12 @@ bt_tps:     ds 1
 bt_tj:      ds 1
 bt_tbs:     ds 1
 bt_tbj:     ds 1
-bt_lastt:   ds 4                            ; each member's last enemy target (this battle)
+bt_lastt:   ds 4
+dn_t:       ds 1                            ; the damage number: frame of its bounce (0: none)
+dn_n:       ds 1                            ;   glyphs, place
+dn_x:       ds 1
+dn_y:       ds 1
+bt_dstr:    ds 6                            ; each member's last enemy target (this battle)
 bt_res:     ds 1                            ; (the results window: level ups recorded,
 bt_rgold:   ds 2                            ;   the gold, each member's new level, HP gain,
 res_on:     ds 4                            ;   stats raised, the page, row, next member)

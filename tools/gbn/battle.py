@@ -10,6 +10,8 @@ bank BTL_DATA:
   $5C00 magic battle messages ($5C)     $5C80 battle palettes (64 x 4)
   $5E00 DMG shades per formation (128 x 8: palette A, palette B -> shade per colour index)
   $6200 enemy names: 128 pointers, strings     $6C00 battle messages: 80 pointers, strings
+  $4B00 the damage numbers' glyphs (our own pixel art, not game data: 0-9, M, I, S, !; GB tiles,
+  ink colour 1 with a colour 3 outline)
 banks ENEMY_CHR, +1: enemy graphics pages 0-7 / 8-15 at $4000 + $800 page (tile t at
   + 16 t, t = $12-$7F; GB 2bpp, colour indices as on the NES)
 """
@@ -59,6 +61,46 @@ def strtab(base, strings):
     return bytes(ptrs) + bytes(body)
 
 
+# the damage numbers (owner, 2026-11-22: pop and drop as in FF3, nicer to look at): bold 6 x 6
+# glyphs, drawn here (no game data), with a 1-pixel outline all round, as 8 x 8 sprite tiles
+DN_GLYPHS = [
+    ['.####.', '##..##', '##..##', '##..##', '##..##', '.####.'],    # 0
+    ['..##..', '.###..', '..##..', '..##..', '..##..', '.####.'],    # 1
+    ['.####.', '##..##', '...##.', '..##..', '.##...', '######'],    # 2
+    ['#####.', '....##', '..###.', '....##', '....##', '#####.'],    # 3
+    ['..###.', '.####.', '##.##.', '######', '...##.', '...##.'],    # 4
+    ['######', '##....', '#####.', '....##', '##..##', '.####.'],    # 5
+    ['.####.', '##....', '#####.', '##..##', '##..##', '.####.'],    # 6
+    ['######', '....##', '...##.', '..##..', '..##..', '..##..'],    # 7
+    ['.####.', '##..##', '.####.', '##..##', '##..##', '.####.'],    # 8
+    ['.####.', '##..##', '##..##', '.#####', '....##', '.####.'],    # 9
+    ['#....#', '##..##', '######', '##..##', '##..##', '##..##'],    # M
+    ['.####.', '..##..', '..##..', '..##..', '..##..', '.####.'],    # I
+    ['.#####', '##....', '.####.', '....##', '....##', '#####.'],    # S
+    ['..##..', '..##..', '..##..', '..##..', '......', '..##..'],    # !
+]
+
+
+def dn_tiles():
+    out = bytearray()
+    for g in DN_GLYPHS:
+        ink = [[0] * 8 for _ in range(8)]
+        for y, row in enumerate(g):
+            for x, c in enumerate(row):
+                if c == '#': ink[y + 1][x + 1] = 1
+        lo = []; hi = []
+        for y in range(8):
+            a = b = 0
+            for x in range(8):
+                o = not ink[y][x] and any(0 <= y + dy < 8 and 0 <= x + dx < 8 and ink[y + dy][x + dx]
+                                          for dy in (-1, 0, 1) for dx in (-1, 0, 1))
+                a = a << 1 | (1 if ink[y][x] or o else 0)          # colour 1 ink, 3 outline
+                b = b << 1 | (1 if o else 0)
+            lo.append(a); hi.append(b)
+        for y in range(8): out += bytes([lo[y], hi[y]])
+    return bytes(out)
+
+
 def data_bank(rom):
     import ff1_monsters, ff1_battle
     b = bytearray(b'\xff' * 0x4000)
@@ -66,6 +108,7 @@ def data_bank(rom):
     put(0x4000, rom.rd(BANK_DOMAINS, FORMATIONS, 128 * 16))
     put(0x4800, rom.rd(BANK_DOMAINS, DOMAINS, 64 * 8))
     put(0x4A00, battle_rates(rom))
+    put(0x4B00, dn_tiles())
     put(0x4C00, rom.rd(BANK_BTLC, ENEMY_STATS, 128 * 20))
     put(0x5600, rom.rd(BANK_BTLC, ENEMY_AI, 44 * 16))
     put(0x5900, rom.rd(BANK_BTLC, MAGIC_DATA, 0x5C * 8))
