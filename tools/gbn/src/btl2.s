@@ -2887,6 +2887,116 @@ bt_s_pts:   db "P", 0
 bt_s_gil:   db " Gil", 0
 
 
+section bank 6, $7360                       ; (the backdrop strip on the SGB: after btl4)
+; Super Game Boy: the strip's cells by an ATTR_CHR packet pair (rows 0-3 from cell 0: the
+; scenery palette 0 (greys), enemy cells 1, the party column the members' 2 / 3), then the
+; mask off; queued once the queue is empty (bt_frame), after the battle's own packets
+bt_bd_sgq:  ld a, [bt_bdsg]
+            and a
+            ret z
+            ld a, [sgb_qi]
+            ld hl, sgb_qn
+            cp [hl]
+            ret c
+            xor a
+            ld [bt_bdsg], a
+            ld [sgb_qi], a
+            ld hl, sgb_q
+            ld a, $3A                       ; ATTR_CHR, 2 packets: (0, 0), 80 cells, across
+            ld [hl+], a
+            xor a
+            ld [hl+], a
+            ld [hl+], a
+            ld a, 80
+            ld [hl+], a
+            xor a
+            ld [hl+], a
+            ld [hl+], a
+            ld c, 0                         ; y
+.r:         ld b, 0                         ; x
+.x:         ld d, 0                         ; (4 cells a byte, the first in bits 7-6)
+            ld e, 4
+.k:         push hl
+            push de
+            call .pal
+            pop de
+            pop hl
+            sla d
+            sla d
+            or d
+            ld d, a
+            inc b
+            dec e
+            jr nz, .k
+            ld a, d
+            ld [hl+], a
+            ld a, b
+            cp 20
+            jr c, .x
+            inc c
+            ld a, c
+            cp 4
+            jr c, .r
+            ld b, 6                         ; (the second packet's rest)
+            xor a
+.z:         ld [hl+], a
+            dec b
+            jr nz, .z
+            ld de, SG_UNM
+            ld b, 16
+.u:         ld a, [de]
+            ld [hl+], a
+            inc de
+            dec b
+            jr nz, .u
+            ld a, 3
+            ld [sgb_qn], a
+            ret
+.pal:       ld a, b                         ; cell (B, C) -> A = its SGB palette
+            and a
+            ret z
+            cp 15
+            jr nc, .m
+            push bc
+            call cell_addr
+            pop bc
+            inc h
+            inc h
+            inc h
+            ld a, [hl]
+            cp BD_PAL
+            ld a, 0
+            ret z
+            inc a
+            ret
+.m:         ld a, c                         ; (rows 0-2: member 0, row 3: member 1)
+            cp 3
+            ld a, 0
+            jr c, .mm
+            inc a
+.mm:        push bc
+            call ch_rec
+            ld a, [hl]
+            ld e, a
+            ld d, 0
+            ld hl, cls_pal
+            add hl, de
+            ld a, [hl]
+            pop bc
+            and a
+            ld a, 2
+            ret nz
+            inc a
+            ret
+; the strip changed: its SGB palettes again
+bt_bd_sgb:  ld a, [sgb_on]
+            and a
+            ret z
+            ld a, 1
+            ld [bt_bdsg], a
+            ret
+zz_end_b6_7360:
+
 section bank 6, $7480                       ; (the results window: after btl4)
 ; a level up kept for the results window: the new level, the HP gain, the stats raised
 bt_lvrec:   ld a, CH_LEVEL
@@ -3091,14 +3201,7 @@ bt_results: call bt_left_clear              ; (the names window empty: no one is
             ld c, 12
 .cr:        push hl
             ld b, 16
-.cc:        ld [hl], 0
-            inc h
-            inc h
-            inc h
-            ld [hl], 0
-            dec h
-            dec h
-            dec h
+.cc:        call bt_bd_put                  ; (the scenery back in the strip)
             inc hl
             dec b
             jr nz, .cc
@@ -3200,6 +3303,198 @@ res_put:    ld a, [res_ln]
 res_s_l:    db " L", 0
 res_s_hp:   db "  HP +", 0
 res_s_st:   db " Str", 0, " Agi", 0, " Int", 0, " Vit", 0, " Lck", 0
+; ---- the battle backdrop (FF1's scenery strip from the user's ROM): 4 rows x 14 columns in
+; the enemy area's top rows (cells 1-14, rows 0-3), behind the enemies at whole cells: a cell
+; an enemy leaves empty shows the scenery. Backdrop = FF1 lut_BtlBackdrops of the overworld
+; tile the party stands on (on a standard map: the tile it was entered from)
+B_BDLUT    = $4A80
+B_BDPAL    = $4B00
+B_BDSH     = $4B40
+B_BDLAY    = $4B80
+BD_PAL     = 4                              ; (CGB BG palette)
+bt_bd_get:  ldh a, [maptype]
+            and a
+            jr z, .sm
+            ld a, [px]
+            ld e, a
+            ld a, [py]
+            jr .rd
+.sm:        ld a, [ow_x]
+            ld e, a
+            ld a, [ow_y]
+.rd:        ld d, a
+            rlca                            ; the overworld row (bank OW_ROWS + y / 64)
+            rlca
+            and 3
+            add a, OW_ROWS
+            ld [fc_bank], a
+            ld a, d
+            and 63
+            add a, $40
+            ld h, a
+            ld l, e
+            call far_byte
+            and $7F
+            ld l, a
+            ld h, high(B_BDLUT)
+            ld a, l
+            add a, low(B_BDLUT)
+            ld l, a
+            ld a, BTL_DATA
+            ld [fc_bank], a
+            call far_byte
+            and $0F
+            ld [bt_bd], a
+            ld hl, B_BDLAY                  ; the column layout
+            ld de, bt_bdlay
+            ld bc, 14
+            ld a, BTL_DATA
+            jp far_copy
+; its 16 tiles -> BG tiles $01-$10 (LCD off); DMG: shaded by its palette
+bt_bd_gfx:  ld a, [bt_bd]
+            ld b, a
+            and 7
+            add a, a
+            add a, a
+            add a, a
+            add a, $40
+            ld h, a
+            ld l, $10                       ; (tile 1)
+            ld a, b
+            cp 8
+            ld a, ENEMY_CHR
+            jr c, .b
+            inc a
+.b:         ld de, $9010
+            ld bc, 16 * 16
+            call far_copy
+            ldh a, [is_cgb]
+            and a
+            ret nz
+            ld a, [bt_bd]
+            add a, a
+            add a, a
+            add a, low(B_BDSH)
+            ld l, a
+            ld h, high(B_BDSH)
+            ld de, scr_buf
+            ld bc, 4
+            ld a, BTL_DATA
+            call far_copy
+            ld hl, scr_buf
+            call bt_remap_set
+            ld a, 1
+            ld b, 16
+            jp bt_remap_tiles
+; CGB: its palette as BG palette BD_PAL (palette RAM index already there)
+bt_bd_pal:  ld a, [bt_bd]
+            add a, a
+            add a, a
+            add a, low(B_BDPAL)
+            ld l, a
+            ld h, high(B_BDPAL)
+            ld de, scr_buf
+            ld bc, 4
+            ld a, BTL_DATA
+            jp far_copy
+; the strip's empty cells (tile 0, $01-$11, $FF or an enemy tile with no pixels) filled
+bt_bd_map:  ld c, 0
+.r:         ld b, 1
+.c:         push bc
+            call cell_addr
+            ld a, [hl]
+            call bt_blank
+            call z, bt_bd_put
+            pop bc
+            inc b
+            ld a, b
+            cp 15
+            jr c, .c
+            inc c
+            ld a, c
+            cp 4
+            jr c, .r
+            ret
+; Z: tile A shows nothing (VRAM read only for enemy tiles: the LCD is off for those)
+bt_blank:   cp $FF
+            ret z
+            cp $12
+            jr c, .y
+            cp $80
+            jr nc, .n
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $9000
+            add hl, de
+            ldh a, [is_cgb]                 ; (colour 0: CGB 0 bits, DMG shade 3)
+            and a
+            ld e, 0
+            jr nz, .k
+            ld e, $FF
+.k:         ld b, 16
+.l:         ld a, [hl+]
+            cp e
+            ret nz
+            dec b
+            jr nz, .l
+            ret
+.y:         xor a
+            ret
+.n:         or 1
+            ret
+; cell HL of the map copy: the backdrop's tile if in the strip, else empty (BC, DE, HL kept)
+bt_bd_put:  push bc
+            push de
+            ld a, l
+            and 31
+            ld b, a                         ; x
+            ld a, l
+            swap a
+            rrca
+            and 7
+            ld c, a
+            ld a, h
+            sub high(smap)
+            add a, a
+            add a, a
+            add a, a
+            or c
+            ld c, a                         ; y
+            cp 4
+            jr nc, .z
+            ld a, b
+            dec a
+            cp 14
+            jr nc, .z
+            ld e, a
+            ld d, 0
+            push hl
+            ld hl, bt_bdlay
+            add hl, de
+            ld a, c
+            add a, a
+            add a, a
+            add a, [hl]
+            pop hl
+            ld [hl], a
+            ld a, BD_PAL
+            jr .w
+.z:         xor a
+            ld [hl], a
+.w:         inc h
+            inc h
+            inc h
+            ld [hl], a
+            dec h
+            dec h
+            dec h
+            pop de
+            pop bc
+            ret
 zz_end_b6_7480:
 
 section wram, $C100                         ; (the map's queue is free during a battle)
@@ -3260,7 +3555,10 @@ bt_tps:     ds 1
 bt_tj:      ds 1
 bt_tbs:     ds 1
 bt_tbj:     ds 1
-bt_lastt:   ds 4                            ; each member's last enemy target (this battle)
+bt_lastt:   ds 4
+bt_bd:      ds 1                            ; the battle's backdrop (0-15)
+bt_bdsg:    ds 1                            ; (SGB: the strip's packets wanted)
+bt_bdlay:   ds 14                           ; its column layout (from the ROM)                            ; each member's last enemy target (this battle)
 bt_res:     ds 1                            ; (the results window: level ups recorded,
 bt_rgold:   ds 2                            ;   the gold, each member's new level, HP gain,
 res_on:     ds 4                            ;   stats raised, the page, row, next member)

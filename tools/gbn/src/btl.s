@@ -64,6 +64,7 @@ battle:     xor a                           ; (no menu sounds, no vehicle noise)
             ld [hl+], a
             ld [hl+], a
             ld [hl], a
+            call bt_bd_get                  ; (the scenery: the overworld tile)
             call bt_screen
             call bt_draw_party
             call bt_names
@@ -401,9 +402,9 @@ bt_screen:  call lcd_off                    ; (LCD off in V-Blank, interrupts of
 .nd:        call oam_clr
             call bt_frame_gfx
             call bt_enemy_gfx
+            call bt_bd_gfx
             call bt_party_gfx
             call bt_pal
-            call sgb_battle
             ld hl, smap                     ; the map copy: empty ($00), palette 0
             ld bc, 18 * 32
 .sm:        xor a
@@ -421,6 +422,9 @@ bt_screen:  call lcd_off                    ; (LCD off in V-Blank, interrupts of
             or c
             jr nz, .sa
             call bt_enemy_map
+            call bt_bd_map
+            call sgb_battle                 ; (SGB: its packets, then the strip's: bt_frame)
+            call bt_bd_sgb
             call bt_party_win
             call bt_left_win
             ld a, 18
@@ -685,6 +689,9 @@ bt_pal:     ldh a, [is_cgb]
             ld a, [bt_form + 11]
             call .bp
             ld hl, bt_pal3
+            call .p4
+            call bt_bd_pal                  ; palette 4: the backdrop
+            ld hl, scr_buf
             call .p4
             ld a, UI_GFX
             ld hl, U_OBJPAL
@@ -1407,6 +1414,7 @@ bt_frame:   ld a, [sf_row]                  ; (no hand while the window rows are
             jr z, .w
 .h:         call hand_hide
 .w:         call wait_vbl
+            call bt_bd_sgq                  ; (SGB: the backdrop strip's palettes)
             ld a, [bt_upn]                  ; (map rows only once their tiles are up)
             and a
             jr nz, .t

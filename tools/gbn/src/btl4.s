@@ -865,14 +865,7 @@ bt_erase_rows:
 .r:         push bc
             push de
             call cell_addr
-.c:         ld [hl], 0
-            inc h
-            inc h
-            inc h
-            ld [hl], 0
-            dec h
-            dec h
-            dec h
+.c:         call bt_bd_put                  ; (the scenery back in the strip)
             inc hl
             dec d
             jr nz, .c
@@ -890,7 +883,7 @@ bt_erase_rows:
             ld hl, bt_t + 5
             dec [hl]
             jr nz, .r
-            ret
+            jp bt_bd_sgb                    ; (SGB: the strip's palettes again)
 
 ; ---- FF1 ChaosDeath: the fanfare's first 110 frames, the music stopped, a low rumble
 ; (noise period 15) fading out; 8 x 256 frames: each a random tile 0-$79 (FF1's RandAX on the

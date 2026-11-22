@@ -390,7 +390,7 @@ sgb_battle: ld a, [sgb_on]
             ld a, c
             cp 4
             jr c, .m
-            jp sgb_end
+            ret                             ; (the mask off after the backdrop strip: bt_bd_sgq)
 
 section bank 0, $1700                       ; (the packets)
 SG_MLT2:    db $89, $01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0

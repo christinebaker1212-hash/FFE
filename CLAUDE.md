@@ -1302,6 +1302,11 @@ Owner (2026-11-22, last): screens unified (headers, full-width windows, name ent
 one case at a time), fades for every menu / shop / sub-screen change, the hand hidden while a
 window changes, drawn bag icon for items; whole-game checks (61 maps, fiends, Chaos, ending,
 puzzle, inn, soft reset). Suggestions for menus / battle: docs/ff1-native-ideas.md (item 17).
+Owner (2026-11-22, last) chose: battle backdrops (FF1's scenery strip from the ROM behind the
+enemies by whole cells; Color in its NES colours, DMG shaded, SGB greys), battle conveniences
+(remembered command / target, damage numbers, one results window), Options (message / text
+speed, volume, kept in cart RAM), dash on B (encounters per step unchanged); HP bars and the
+Select repeat declined. Details: docs/ff1-native.md item 18.
 Next: the owner's play-test. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining

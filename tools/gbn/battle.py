@@ -10,8 +10,12 @@ bank BTL_DATA:
   $5C00 magic battle messages ($5C)     $5C80 battle palettes (64 x 4)
   $5E00 DMG shades per formation (128 x 8: palette A, palette B -> shade per colour index)
   $6200 enemy names: 128 pointers, strings     $6C00 battle messages: 80 pointers, strings
-banks ENEMY_CHR, +1: enemy graphics pages 0-7 / 8-15 at $4000 + $800 page (tile t at
-  + 16 t, t = $12-$7F; GB 2bpp, colour indices as on the NES)
+  $4A80 FF1 lut_BtlBackdrops (overworld tile -> backdrop, 128)
+  $4B00 FF1 lut_BackdropPal (16 x 4)    $4B40 DMG shades per backdrop (16 x 4)
+  $4B80 FF1's backdrop column layout (14: DrawBattleBackdropRow's table)
+banks ENEMY_CHR, +1: battle graphics pages 0-7 / 8-15 at $4000 + $800 page (tile t at
+  + 16 t; t = $00-$11: page p's backdrop, $12-$7F: enemies; GB 2bpp, colour indices as on
+  the NES)
 """
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -22,6 +26,7 @@ BTL_DATA, ENEMY_CHR = 92, 93
 BANK_DOMAINS, FORMATIONS, DOMAINS = 0x0B, 0x8400, 0x8000
 BANK_BTLC, ENEMY_STATS, ENEMY_AI, MAGIC_DATA, MAGIC_MSGS, BTL_PALS = 0x0C, 0x8520, 0x9020, 0x81E0, 0x84C0, 0x8F20
 BANK_BATTLECHR = 0x07
+BANK_OWINFO, BTL_BACKDROPS, BACKDROP_PAL = 0x00, 0xB300, 0xB200
 
 
 def enc(s):
@@ -66,6 +71,19 @@ def data_bank(rom):
     put(0x4000, rom.rd(BANK_DOMAINS, FORMATIONS, 128 * 16))
     put(0x4800, rom.rd(BANK_DOMAINS, DOMAINS, 64 * 8))
     put(0x4A00, battle_rates(rom))
+    put(0x4A80, rom.rd(BANK_OWINFO, BTL_BACKDROPS, 128))
+    bp = rom.rd(BANK_OWINFO, BACKDROP_PAL, 64)
+    assert all(bp[4 * k] == 0x0F for k in range(16)), 'backdrop palettes not found'
+    put(0x4B00, bp)
+    for k in range(16):
+        sh = data.shades(list(bp[4 * k:4 * k + 4])); sh[0] = 3       # (black: the battlefield)
+        put(0x4B40 + 4 * k, bytes(sh))
+    import re                                                       # (found by its use: LDA
+    fixb = rom.prg[15 * 0x4000:16 * 0x4000]                         #   lut,X / CLC / ADC tmp /
+    m = re.search(rb'\xBD(..)\x18(?:\x65.|\x6D..)\x8D\x07\x20\xE8(?:\xE4.|\xEC..)', fixb, re.S)
+    assert m, 'backdrop layout not found'                           #   STA $2007 / INX / CPX)
+    a = int.from_bytes(m.group(1), 'little') - 0xC000
+    put(0x4B80, fixb[a:a + 14])
     put(0x4C00, rom.rd(BANK_BTLC, ENEMY_STATS, 128 * 20))
     put(0x5600, rom.rd(BANK_BTLC, ENEMY_AI, 44 * 16))
     put(0x5900, rom.rd(BANK_BTLC, MAGIC_DATA, 0x5C * 8))
@@ -123,7 +141,7 @@ def chr_banks(rom):
         blob = bytearray(b'\xff' * 0x4000)
         for p in range(8):
             page = rom.rd(BANK_BATTLECHR + half, 0x8000 + 0x800 * p, 0x800)
-            for t in range(0x12, 0x80):
+            for t in range(0x00, 0x80):
                 blob[0x800 * p + 16 * t:0x800 * p + 16 * t + 16] = data.gb_tile(page[16 * t:16 * t + 16])
         out[ENEMY_CHR + half] = bytes(blob)
     return out

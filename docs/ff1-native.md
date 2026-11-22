@@ -341,3 +341,25 @@ one reaches parity, so the owner can keep playing).
      ending and The End, the 15-puzzle, inn save, soft reset -> title -> New Game; VRAM checker
      0 on Color, DMG and SGB over these runs.
    Ideas for later (owner to choose): docs/ff1-native-ideas.md.
+18. Owner (2026-11-22, last) chose from the ideas: battle backdrops yes, HP bars no, battle
+   conveniences yes (no Select repeat), Options yes, dash on B only if encounters keep pace.
+   - Dash (main.s `move`): B held on foot walks two pixels a frame; a step is still one step,
+     so the encounter counter runs per step as before (encounters come as often per tile).
+   - Options (main menu, menu.s bank 2 $7280): message speed (FF1's respond rate), text speed
+     (Slow / Normal / Fast / Faster / Instant), volume (NR50); kept in cart RAM bank 1 $BF00 with
+     a check byte, loaded at boot.
+   - Battle: each member's last command and target remembered for the next turn (a dead target:
+     the first living enemy); the damage number over the target for a moment (two outlined
+     sprites, OBJ palette 4 on the Color), beside the style-A message; at the end one results
+     window (Experience, Gil, then two members a page: level, HP gain, the stats that rose)
+     instead of a run of messages (btl2.s bank 6 $7480).
+   - Backdrops: FF1's scenery strip (DrawBattleBackdropRow's 4 x 14 layout, the backdrop from
+     lut_BtlBackdrops by the overworld tile under the party; on a standard map the tile it was
+     entered from) in the enemy area's top four rows, behind the enemies by whole cells: a cell
+     an enemy leaves empty (no pixels) shows the scenery, and an erased enemy's cells get it
+     back. Pixel blending was measured and set aside: most mixed cells need more than four
+     colours, which neither the Color nor the SGB can show in one cell. Color: the backdrop's
+     NES palette as BG palette 4; DMG: shaded by its palette; SGB: palette 0 (greys) by an
+     ATTR_CHR pair for rows 0-3 (`bt_bd_sgq`), queued after the battle's packets and before the
+     mask comes off. Data from the ROM at build time (battle.py: tiles 0-$11 of each battle
+     graphics page, lut_BtlBackdrops, lut_BackdropPal, the column layout found by its use).
