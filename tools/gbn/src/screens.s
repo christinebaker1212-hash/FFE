@@ -551,17 +551,14 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             inc a
 .sv:        ld [ng_cur], a
             call scr_show
-.t:         ld a, [ng_cur]                  ; cursor left of the box
+.t:         ld a, [ng_cur]                  ; the hand at Continue (row 6) / New Game (9),
+            ld c, a                         ;   column 8
             add a, a
+            add a, c
+            add a, 6
             ld c, a
-            add a, a
-            add a, c                        ; 6 x
-            add a, a
-            add a, a                        ; 24 x
-            add a, 36
-            ld c, a
-            ld b, 24
-            call scr_cursor
+            ld b, 8
+            call cur_txt
             call scr_frame
             ldh a, [pad_new]
             ld b, a
@@ -740,20 +737,13 @@ pg_draw_cur:
             inc hl
             ld [hl], 0
             ret
-.m:         call pg_box_xy
-            ld a, b
-            add a, a
-            add a, a
-            add a, a
+.m:         call pg_box_xy                  ; the hand at the job's picture (box + 4, its
+            ld a, b                         ;   middle row + 2)
+            add a, 4
             ld b, a
-            ld a, c
-            add a, 5
-            add a, a
-            add a, a
-            add a, a
-            sub 4
-            ld c, a
-            jp scr_cursor
+            inc c
+            inc c
+            jp cur_txt
 
 ; A = class -> HL = its name string
 class_str:  add a, a
@@ -842,21 +832,15 @@ name_input: call scr_open
             ld [ni_y], a
             call ni_name
             call scr_show
-.lp:        ld a, [ni_x]                    ; the hand left of the letter
-            add a, a
-            add a, a
-            add a, a
-            add a, a
-            sub 8
+.lp:        ld a, [ni_x]                    ; the hand at the letter (column 1 + 2 x,
+            add a, a                        ;   row 1 + 2 y)
+            inc a
             ld b, a
             ld a, [ni_y]
             add a, a
-            add a, a
-            add a, a
-            add a, a
-            add a, 4
+            inc a
             ld c, a
-            call scr_cursor
+            call cur_txt
             call scr_frame
             ldh a, [pad_new]
             bit 0, a
@@ -1765,13 +1749,13 @@ pg_ask:     ld hl, oam_buf + 16             ; (the class sprites hidden under th
             call scr_upd
             xor a
             ld [pg_t], a
-.l:         ld a, [pg_t]                    ; the hand left of Yes / No
+.l:         ld a, [pg_t]                    ; the hand at Yes / No (columns 6 / 13, row 9)
             and a
-            ld b, 4 * 8 - 4
+            ld b, 6
             jr z, .x
-            ld b, 11 * 8 - 4
-.x:         ld c, 9 * 8 - 4
-            call scr_cursor
+            ld b, 13
+.x:         ld c, 9
+            call cur_txt
             call scr_frame
             ldh a, [pad_new]
             bit 0, a
@@ -1849,21 +1833,12 @@ job_select: call scr_open
             add hl, de
             ld a, [hl]
             ld [pg_t], a
-.l:         ld a, [pg_t]                    ; the hand left of the picture
+.l:         ld a, [pg_t]                    ; the hand at the job's name (below its picture)
             call job_xy
-            ld a, b
-            add a, a
-            add a, a
-            add a, a
-            sub 4
-            ld b, a
-            ld a, c
-            inc a
-            add a, a
-            add a, a
-            add a, a
-            ld c, a
-            call scr_cursor
+            inc c
+            inc c
+            inc c
+            call cur_txt
             call scr_frame
             ldh a, [pad_new]
             bit 0, a
@@ -2059,13 +2034,9 @@ eqm_main:   ld [eqm_m], a
             jp eq_readj
 
 ; the hand at text row A (x 0, cut off at the screen's left edge)
-eqm_hand:   add a, a
-            add a, a
-            add a, a
-            sub 4
-            ld c, a
-            ld b, 0
-            jp scr_cursor
+eqm_hand:   ld c, a                         ; the hand at the entry (column 2, row A)
+            ld b, 2
+            jp cur_txt
 
 eqm_unadj:  ld a, 1
             ld [eq_kind], a

@@ -501,50 +501,17 @@ orb_pos:    db 14, 12, 16, 12, 14, 14, 16, 14
 ; ---- choose a member in the party window (hand left of the name): C set on B
 pick_char:  xor a
             ld [mm_pc], a
-.l:         ld a, [mm_pc]                   ; y = 8 (2 + 2 m) - 2: beside line 2
-            add a, a
-            add a, 2
-            add a, a
-            add a, a
-            add a, a
-            sub 2
+.l:         ld a, [mm_pc]                   ; the hand at the member's second line (row
+            add a, a                        ;   2 m + 2, column 2: the name at column 1 would
+            add a, 2                        ;   leave only the fingertip on screen)
             ld c, a
-            ld b, 0
-            call scr_cursor
+            ld b, 2
+            call cur_txt
             ld a, [mm_cur]                  ; (the command's hand stays: second cursor)
             add a, 10
-            add a, a
-            add a, a
-            add a, a
-            sub 4
-            add a, 16
-            ld [oam_buf + 16], a
-            ld [oam_buf + 24], a
-            add a, 8
-            ld [oam_buf + 20], a
-            ld [oam_buf + 28], a
-            ld a, 8
-            ld [oam_buf + 17], a
-            ld [oam_buf + 21], a
-            add a, 8
-            ld [oam_buf + 25], a
-            ld [oam_buf + 29], a
-            ld hl, oam_buf + 2
-            ld de, oam_buf + 18
+            ld c, a
             ld b, 2
-            ld a, [hl]
-            ld [de], a
-            ld a, [oam_buf + 6]
-            ld [oam_buf + 22], a
-            ld a, [oam_buf + 10]
-            ld [oam_buf + 26], a
-            ld a, [oam_buf + 14]
-            ld [oam_buf + 30], a
-            ld a, [oam_buf + 3]
-            ld [oam_buf + 19], a
-            ld [oam_buf + 23], a
-            ld [oam_buf + 27], a
-            ld [oam_buf + 31], a
+            call cur_txt2
             call scr_frame
             ldh a, [pad_new]
             bit 1, a
@@ -793,16 +760,12 @@ item_menu:  xor a
             ld [it_cur], a
 .c:         call it_draw
             call scr_show
-.l:         ld a, [it_cur]                  ; the hand: row 4 + (cur mod 13)
+.l:         ld a, [it_cur]                  ; the hand: row 4 + (cur mod 13), column 2
             call it_row
             add a, 4
-            add a, a
-            add a, a
-            add a, a
-            sub 4
             ld c, a
-            ld b, 0
-            call scr_cursor
+            ld b, 2
+            call cur_txt
             call scr_frame
             ldh a, [pad_new]
             bit 1, a
@@ -1221,16 +1184,12 @@ tgt_redraw: call tgt_draw
 tgt_pick:   xor a
             ld [mm_pc], a
 tgt_pick2:                                  ; (the hand where it was)
-.l:         ld a, [mm_pc]
+.l:         ld a, [mm_pc]                   ; (at the member's second line)
             add a, a
             add a, 2
-            add a, a
-            add a, a
-            add a, a
-            sub 2
             ld c, a
-            ld b, 0
-            call scr_cursor
+            ld b, 2
+            call cur_txt
             call scr_frame
             ldh a, [pad_new]
             bit 1, a

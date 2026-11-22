@@ -35,17 +35,16 @@ bt_mag_menu:
             ld a, c
             srl a
             add a, d
-            add a, 13
+            add a, 13                       ; (the text at x 16 / 96: the hand 17 px left,
+            add a, a                        ;   y = 8 row)
             add a, a
             add a, a
-            add a, a
-            sub 4
             ld e, a
             ld a, c
             and 1
-            ld b, 0
+            ld b, 16 - 17
             jr z, .x
-            ld b, 80
+            ld b, 96 - 17
 .x:         ld c, e
             call bt_hand
             call bt_frame
@@ -1346,14 +1345,13 @@ bt_cmd_drink:
             jr c, .r
             xor a
             ld [bt_mcur], a
-.l:         ld a, [bt_mcur]
+.l:         ld a, [bt_mcur]                 ; (the text at x 16: the hand 17 px left)
             add a, 13
             add a, a
             add a, a
             add a, a
-            sub 4
             ld c, a
-            ld b, 0
+            ld b, 16 - 17
             call bt_hand
             call bt_frame
             ldh a, [pad_new]
@@ -1455,14 +1453,13 @@ bt_cmd_item:
             jr c, .r
             xor a
             ld [bt_mcur], a
-.l:         ld a, [bt_mcur]
+.l:         ld a, [bt_mcur]                 ; (the text at x 16: the hand 17 px left)
             add a, 13
             add a, a
             add a, a
             add a, a
-            sub 4
             ld c, a
-            ld b, 0
+            ld b, 16 - 17
             call bt_hand
             call bt_frame
             ldh a, [pad_new]

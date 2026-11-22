@@ -146,6 +146,7 @@ int main(int argc, char** argv) {
 					if (sscanf(p, "%x=%x%n", &a, &v, &used) != 2) break;
 					if (a < 0x800) core->rawWrite8(core, 0xC000 + a, -1, v);
 					else if (a >= 0x6000 && a < 0x8000) core->rawWrite8(core, 0xA000 + a - 0x6000, 0, v);
+					else if (a >= 0xC000 && a < 0xE000) core->rawWrite8(core, a, -1, v);   /* (GB work RAM) */
 					p += used; if (*p == ',') p++;
 				}
 				poke_list = 0;

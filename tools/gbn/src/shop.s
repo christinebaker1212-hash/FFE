@@ -170,15 +170,11 @@ sh_menu:    ld a, b
             call scr_upd
             xor a
             ld [sh_cur], a
-.l:         ld a, [sh_cur]
+.l:         ld a, [sh_cur]                  ; the hand at the choice (column 12, row 7 + n)
             add a, 7
-            add a, a
-            add a, a
-            add a, a
-            sub 4
             ld c, a
-            ld b, 80
-            call scr_cursor
+            ld b, 12
+            call cur_txt
             call scr_frame
             ldh a, [pad_new]
             bit 1, a
@@ -337,16 +333,12 @@ sh_pick:    ld bc, $0005
             call scr_upd
             xor a
             ld [sh_cur], a
-.l:         ld a, [sh_cur]
+.l:         ld a, [sh_cur]                  ; the hand at the entry (column 2, row 6 + 2 n)
             add a, a
             add a, 6
-            add a, a
-            add a, a
-            add a, a
-            sub 4
             ld c, a
-            ld b, 0
-            call scr_cursor
+            ld b, 2
+            call cur_txt
             call scr_frame
             ldh a, [pad_new]
             bit 1, a

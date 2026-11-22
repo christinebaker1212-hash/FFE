@@ -510,20 +510,19 @@ bt_cmd_one: ld a, [bt_cm]
             and a
             ret
 ; the command hand: rows 13-16 at x 0, Run beside Fight at x 35
-bt_cmd_hand:
-            ld a, [bt_ccur]
-            cp 4
-            ld b, 0
-            ld c, 13 * 8 - 4
+bt_cmd_hand:                                ; (the hand's fingertip 1 px before the text,
+            ld a, [bt_ccur]                 ;   its finger at the text row's middle: x = text
+            cp 4                            ;   - 17, y = 8 row; cut off at the left edge)
+            ld b, 12 - 17
+            ld c, 13 * 8
             jr z, .r
             add a, 13
             add a, a
             add a, a
             add a, a
-            sub 4
             ld c, a
             jr bt_hand
-.r:         ld b, 32
+.r:         ld b, 50 - 17
             jr bt_hand
 ; FF1's hand cursor (sprite tiles $F0-$F3) at (B, C): OAM 0-3
 bt_hand:    ld hl, cur_tbl
@@ -590,7 +589,7 @@ bt_left_clear:
             ld de, $0906
             call bt_win
             jp bt_upd
-; the left window's text: HL = lines ($0A between; a $09 before Run moves it to x 43)
+; the left window's text: HL = lines ($0A between; a $09 before Run moves it to x 50)
 bt_left_text:
             push hl
             call bt_left_clear
@@ -601,7 +600,7 @@ bt_left_text:
             ld b, 7
             call vwf_clr
             pop hl
-            xor a
+            ld a, 4                         ; (4 px in: room for the hand)
             ld [vw_x], a
 .c:         ld a, [hl+]
             and a
@@ -610,7 +609,7 @@ bt_left_text:
             jr z, .nl
             cp $09
             jr nz, .g
-            ld a, 40
+            ld a, 42
             ld [vw_x], a
             jr .c
 .g:         push hl
@@ -661,18 +660,27 @@ bt_left_text:
             ret
 bt_s_cmd:   db "Fight", $09, "Run", $0A, "Magic", $0A, "Medicine", $0A, "Items", 0
 
-; ---- an enemy target (living enemies, in slot order): A = slot, C set on B
+; ---- an enemy target, chosen freely: the hand starts on the first living enemy; a direction
+; moves it to the nearest living enemy that way (distance that way + twice the distance
+; across, from the enemies' middles), wrapping round to the far side when none is that way.
+; A = slot, C set on B
 bt_target_enemy:
             ld a, $FF
             ld [bt_tcur], a
-            call .next
+            ld b, 10
+.f:         inc a                           ; the first living enemy
+            cp 9
+            jr nc, .l
+            call bt_ealive
+            jr z, .f
+            ld [bt_tcur], a
 .l:         ld a, [bt_tcur]                 ; the hand left of the enemy, at its middle row
             call bt_epos
             ld a, b
             add a, a
             add a, a
             add a, a
-            sub 14
+            sub 17
             ld b, a
             ld a, e
             add a, a
@@ -683,7 +691,7 @@ bt_target_enemy:
             add a, a
             add a, a
             add a, d
-            sub 8
+            sub 4
             ld c, a
             call bt_hand
             call bt_frame
@@ -694,11 +702,7 @@ bt_target_enemy:
             jr nz, .a
             and $F0
             jr z, .l
-            and $90                         ; down / right: next; up / left: previous
-            jr z, .pv
-            call .next
-            jr .l
-.pv:        call .prev
+            call bt_tdir
             jr .l
 .a:         call bt_hand_off
             ld a, [bt_tcur]
@@ -707,29 +711,105 @@ bt_target_enemy:
 .b:         call bt_hand_off
             scf
             ret
-.next:      ld a, [bt_tcur]
-            ld b, 10
-.n1:        inc a
-            cp 9
-            jr c, .n2
-            xor a
-.n2:        call bt_ealive
-            jr nz, .nf
-            dec b
-            jr nz, .n1
-.nf:        ld [bt_tcur], a
+; enemy A's middle (in half cells): D = x, E = y
+bt_ectr:    call bt_epos
+            ld a, b
+            add a, a
+            add a, e
+            ld d, a
+            ld a, c
+            add a, a
+            add a, e
+            ld e, a
             ret
-.prev:      ld a, [bt_tcur]
-            ld b, 10
-.p1:        dec a
+; the hand moved in direction A (pad bits: right $10, left $20, up $40, down $80)
+bt_tdir:    ld [bt_td], a
+            ld a, [bt_tcur]
+            call bt_ectr
+            ld a, d
+            ld [bt_tcx], a
+            ld a, e
+            ld [bt_tcy], a
+            xor a
+            ld [bt_tps], a
+.pass:      ld a, $FF
+            ld [bt_tbs], a                  ; the best score, its enemy
+            ld [bt_tbj], a
+            xor a
+.j:         ld [bt_tj], a
+            ld hl, bt_tcur
+            cp [hl]
+            jr z, .nx
+            call bt_ealive
+            jr z, .nx
+            call bt_ectr
+            ld a, d                         ; D = dx, E = dy (signed)
+            ld hl, bt_tcx
+            sub [hl]
+            ld d, a
+            ld a, e
+            ld hl, bt_tcy
+            sub [hl]
+            ld e, a
+            ld a, [bt_td]                   ; B = the distance that way, C = across
+            ld b, d
+            ld c, e
+            bit 4, a
+            jr nz, .w
+            ld a, d
+            cpl
+            inc a
+            ld b, a
+            ld a, [bt_td]
+            bit 5, a
+            jr nz, .w
+            ld b, e
+            ld c, d
+            bit 7, a
+            jr nz, .w
+            ld a, e
+            cpl
+            inc a
+            ld b, a
+.w:         ld a, [bt_tps]                  ; (wrapping round: every enemy counts, the
+            and a                           ;   farthest the other way first)
+            jr z, .p0
+            ld a, b
+            add a, 64
+            ld b, a
+            jr .ok
+.p0:        ld a, b                         ; (that way only)
+            dec a
+            bit 7, a
+            jr nz, .nx
+.ok:        ld a, c
+            bit 7, a
+            jr z, .ps
+            cpl
+            inc a
+.ps:        add a, a
+            add a, b
+            ld hl, bt_tbs
+            cp [hl]
+            jr nc, .nx
+            ld [hl], a
+            ld a, [bt_tj]
+            ld [bt_tbj], a
+.nx:        ld a, [bt_tj]
+            inc a
             cp 9
-            jr c, .p2
-            ld a, 8
-.p2:        call bt_ealive
-            jr nz, .nf
-            dec b
-            jr nz, .p1
-            jr .nf
+            jr c, .j
+            ld a, [bt_tbj]
+            cp $FF
+            jr nz, .fd
+            ld a, [bt_tps]
+            and a
+            ret nz                          ; (no other enemy)
+            inc a
+            ld [bt_tps], a
+            jr .pass
+.fd:        ld [bt_tcur], a
+            ret
 ; enemy A present and alive: NZ (A kept)
 bt_ealive:  push hl
             push de
@@ -2662,6 +2742,13 @@ bt_lvr:     ds 1
 bt_lvc:     ds 1
 bt_lvd:     ds 2
 bt_lvup:    ds 5
+bt_td:      ds 1                            ; (free targeting: direction, the hand's middle,
+bt_tcx:     ds 1                            ;   pass, candidate, best score and enemy)
+bt_tcy:     ds 1
+bt_tps:     ds 1
+bt_tj:      ds 1
+bt_tbs:     ds 1
+bt_tbj:     ds 1
 section wram, $C500
 bt_save:    ds 12 * 32                      ; the rows under the message window
 section wram, $C400
