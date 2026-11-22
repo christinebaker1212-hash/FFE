@@ -191,6 +191,18 @@ class Rom:
             g[0x200 + k:0x240 + k] = g[0x200:0x240]
         return bytes(g)
 
+    def equip_masks(self):
+        """per item / spell id: the 24-bit job mask of the jobs that may equip / cast it (35/B8FD:
+        30/9400 + 8 index (spells: id - $30), byte 7 & $7F = class, 00/8900 + 3 class = job bits,
+        job j = bit j counted from the low end of the third byte); 0 for the other items"""
+        out = bytearray(3 * 256)
+        for i in range(256):
+            if 0x98 <= i < 0xC8: continue
+            idx = i - 0x30 if i >= 0xC8 else i
+            cls = self.prg[0x30 * B8 + 0x1400 + 8 * idx + 7] & 0x7F
+            out[3 * i:3 * i + 3] = self.b(0, 0x8900 + 3 * cls, 3)
+        return bytes(out)
+
     # ---- npcs ------------------------------------------------------------------------------
     def npc_list(self, idx):
         """(L3B_B2FA) the npc records of list idx (map properties byte 4): pointer 2C/8000 + 2 idx

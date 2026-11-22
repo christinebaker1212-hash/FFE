@@ -151,7 +151,7 @@ def nes_rgb_src():
         '    dw %s\n' % ', '.join(str(x) for x in v[k:k + 8]) for k in range(0, 64, 8))
 
 
-MODULES = ('npc', 'text', 'event', 'menu', 'select', 'item')
+MODULES = ('npc', 'text', 'event', 'menu', 'select', 'item', 'magic')
 
 
 def engine_src():
@@ -173,7 +173,7 @@ def engine_src():
 
 def gb_text_syms(rom):
     import menu
-    return dict(menu.gb_text()[1], **menu.status_pack(rom)[1])
+    return dict(menu.gb_text(rom)[1], **menu.status_pack(rom)[1])
 
 
 def main():

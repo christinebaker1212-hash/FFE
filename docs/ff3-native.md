@@ -156,5 +156,14 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   (stone, toad, silence, blind, poison), Luck Mallet (mini toggled); a member the item does
   nothing for asks again (as 3D/A13C). Text decoder: t_open shared, a canvas target for menu
   messages. Later in this menu: the trash can, Midgard Bread, the Otter's Head, spell items.
+- 2026-11-22: Magic menu (`src/magic.s`, mock S3): name + Use / Swap / Item (words from t8200
+  $36), 3 levels a page ("Lv n  MP cur/max", 3 slots: the $6207 bit masks laid out as 3D/A2B4,
+  written back as 3D/A1C9); Use: the class check (per-item job masks precomputed from 30/9400
+  class bytes and 00/8900, 35/B8FD), MP of the level, the caster's status, then the field
+  spells of 3C/9971 (Cure 42 / Cura 125 / Curaga 180 / Curaja 220 or full on one, Life, Life2,
+  Heal, Soft, Blindna, Poisona, Toad, Mini) on one member or all (left / right; the healing
+  multiplier job level / 32 + level / 16 + spirit / 16 + 1, divided by the living targets:
+  3D/A466 / 3C/9B7A), MP - 1; Swap (3C/96F5); Item (3C/9897, $016B / $016E). Later: Exit /
+  Warp / Sight.
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.

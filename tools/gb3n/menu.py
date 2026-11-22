@@ -95,10 +95,18 @@ GB_TEXT = {
 GB_TEXT_AT = 0x5800
 
 
-def gb_text():
+def rom_words(rom):
+    """words of the ROM's menu strings: the magic menu's Use / Swap / Item (t8200 $36)"""
+    t = text.decode(text.raw_string(rom, 't8200', 0x36))
+    w = [x.strip() for x in re.split(r'\{[^}]*\}', t) if x.strip()]
+    assert len(w) == 3, w
+    return {'s_use': w[0], 's_swap': w[1], 's_item': w[2]}
+
+
+def gb_text(rom=None):
     """(bytes at MENU_BANK $5800, {label: address})"""
     out = bytearray(); syms = {}
-    for k, v in GB_TEXT.items():
+    for k, v in list(GB_TEXT.items()) + list((rom_words(rom) if rom else {}).items()):
         syms[k] = 0x4000 + GB_TEXT_AT - 0x4000 + len(out) + 0x0000
         out += text.encode(v) + b'\0'
     return bytes(out), syms
@@ -166,11 +174,13 @@ def pack(rom, rgb555):
     for k, w in enumerate(commands(rom)[:7]):
         w = w[:8]
         b[0x1600 + 8 * k:0x1600 + 8 * k + 8] = w + b'\xFF' * (8 - len(w))
-    t, _ = gb_text()
+    t, _ = gb_text(rom)
+    assert GB_TEXT_AT + len(t) <= STATUS_AT
     b[GB_TEXT_AT - 0x4000:GB_TEXT_AT - 0x4000 + len(t)] = t
     b[0x1C00:0x1C00 + 3 * 99] = rom.b(0x39, 0x80B0, 3 * 99)    # $5C00: EXP for each level
     ic = rom.prg[0x0D * 0x2000 + 0x1500:0x0D * 0x2000 + 0x1700]  # $5E00: item icons (0D/B500)
     b[0x1E00:0x2000] = b''.join(nes2gb(ic[16 * k:16 * k + 16]) for k in range(32))
+    b[0x2000:0x2300] = rom.equip_masks()                       # $6000: job masks per item / spell
     t, _ = status_pack(rom)
     assert STATUS_AT + len(t) <= 0x5C00
     b[STATUS_AT - 0x4000:STATUS_AT - 0x4000 + len(t)] = t

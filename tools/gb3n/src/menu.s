@@ -129,12 +129,31 @@ mm_loop:    call mm_cursor
 mm_a:       ld a, [m_cur]
             and a
             jr z, .it
+            cp 1
+            jr z, .mg
             cp 3
             jr z, .st
             cp 4
             jr z, .row
             jp mm_loop
 .it:        call item_menu
+            call mm_draw
+            ld a, 1
+            ld [m_dirty], a
+            jp mm_loop
+.mg:        call sel_member                 ; (3D/A5D7: not for the dead / stone)
+            jp c, mm_loop
+            ld b, a
+            rrca
+            rrca
+            add a, 2
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]
+            and $C0
+            jp nz, mm_loop
+            ld a, b
+            call magic_menu
             call mm_draw
             ld a, 1
             ld [m_dirty], a
