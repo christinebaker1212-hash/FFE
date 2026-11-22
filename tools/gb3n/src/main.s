@@ -90,6 +90,8 @@ start:      di
             call load_map
             ld a, LCDC_ON
             ldh [rLCDC], a
+            ld a, 1
+            ld [lcd_is], a
             xor a
             ldh [rIF], a
             ld a, 1
@@ -117,6 +119,9 @@ vblank:     push af
             push de
             push hl
             call hram_dma
+            ldh a, [pal_dirty]
+            and a
+            call nz, pal_up
             ldh a, [scx]
             ldh [rSCX], a
             ldh a, [scy]
@@ -155,7 +160,9 @@ read_pad:   ld a, $20
 
 ; ---- load map cur_map of group cur_grp: LCD off (V-Blank), the entry, layout, tileset tables,
 ; tiles, character, palettes; the start position when px = $FF
-load_map:   call lcd_off
+load_map:   ld a, [lcd_is]
+            and a
+            call z, lcd_off
             ld a, [cur_grp]                 ; the entry: bank MT_BANK + group, $4000 + 64 id
             add a, MT_BANK
             ld [MBC5_BANKL], a
@@ -205,53 +212,73 @@ load_map:   call lcd_off
             ld de, M_TL
             ld bc, $700
             call memcpy
-            ld a, [M_ENT + 2]               ; BG tiles -> VRAM bank 0 $8000
+            call init_trig
+            ld a, [lcd_is]                  ; a load during play: the picture behind black
+            and a
+            jr z, .vram
+            call pal_black
+.vram:      ld a, [M_ENT + 2]               ; BG tiles -> VRAM bank 0 $8000
             ld [MBC5_BANKL], a
             ld a, [M_ENT + 3]
             ld h, a
             ld l, 0
             ld de, $8000
-            ld bc, $1000
-            call memcpy
+            ld b, 0                         ; (256 blocks)
+            xor a
+            call vcopy
             ld a, SPR_BANK                  ; the walking character (job 0 for now) -> VRAM
             ld [MBC5_BANKL], a              ;   bank 1 $8000, its frames -> M_FACE / M_FRAME
-            ld a, 1
-            ldh [rVBK], a
             ld hl, $4000
             ld de, $8000
-            ld bc, $100
-            call memcpy
-            xor a
-            ldh [rVBK], a
+            ld b, 16
+            ld a, 1
+            call vcopy
+            ld a, SPR_BANK
+            ld [MBC5_BANKL], a
             ld hl, $7F00
             ld de, M_FACE
             ld bc, $50
             call memcpy
-            ld a, $80                       ; palettes: the 32 NES colours through NES_RGB
-            ldh [rBCPS], a
-            ldh [rOCPS], a
+            ld hl, pal_sh                   ; palettes: the 32 NES colours through NES_RGB ->
+            ld de, 128                      ;   the shadow (BG 0-31, OBJ 64-95; uploaded in
+            call memclr                     ;   V-Blank, or now)
             ld hl, M_ENT + 16
-            ld b, 16
-.bp:        call nes_col
-            ldh [rBCPD], a
+            ld bc, pal_sh
+.pc:        push bc
+            call nes_col
+            pop bc
+            ld [bc], a
+            inc bc
             ld a, d
-            ldh [rBCPD], a
-            dec b
-            jr nz, .bp
-            ld b, 16
-.op:        call nes_col
-            ldh [rOCPD], a
-            ld a, d
-            ldh [rOCPD], a
-            dec b
-            jr nz, .op
+            ld [bc], a
+            inc bc
+            ld a, c
+            cp low(pal_sh + 32)
+            jr nz, .p1
+            ld bc, pal_sh + 64
+.p1:        cp low(pal_sh + 96)
+            jr nz, .pc
             xor a
             ld [mcount], a
             ld [moving], a
             call set_scroll
-            ld a, 1                         ; the whole view: rows py - 5 .. py + 6, columns
-            ld [q_direct], a                ;   px - 5 .. px + 6 (written at once: LCD off)
-            ld a, [py]
+            ld a, [lcd_is]
+            and a
+            jr nz, .masked
+            ld a, 1                         ; boot (LCD off): the whole view written at once
+            ld [q_direct], a
+            call draw_view
+            xor a
+            ld [q_direct], a
+            jp pal_up
+.masked:    call draw_view                  ; (two rows a frame through the queue)
+            call wait_vbl
+            ld a, 1
+            ldh [pal_dirty], a
+            jp wait_vbl
+
+; the whole view: rows py - 5 .. py + 6, columns px - 5 .. px + 6
+draw_view:  ld a, [py]
             sub 5
             ld d, a
             ld c, 12
@@ -268,10 +295,176 @@ load_map:   call lcd_off
             dec b
             jr nz, .col
             inc d
-            dec c
+            ld a, [q_direct]                ; (masked: a V-Blank after every two rows)
+            and a
+            jr nz, .nx
+            bit 0, c
+            jr nz, .nx
+            push bc
+            push de
+            call wait_vbl
+            pop de
+            pop bc
+.nx:        dec c
             jr nz, .row
+            ret
+
+; palettes: the shadow -> CGB palette RAM (V-Blank or LCD off)
+pal_up:     ld a, $80
+            ldh [rBCPS], a
+            ldh [rOCPS], a
+            ld hl, pal_sh
+            ld b, 64
+.b:         ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .b
+            ld b, 64
+.o:         ld a, [hl+]
+            ldh [rOCPD], a
+            dec b
+            jr nz, .o
             xor a
-            ld [q_direct], a
+            ldh [pal_dirty], a
+            ret
+pal_black:  ld hl, pal_sh                   ; all black, shown at the next V-Blank
+            ld de, 128
+            call memclr
+            ld a, 1
+            ldh [pal_dirty], a
+            jp wait_vbl
+
+; B blocks of 16 bytes HL (ROM) -> DE (VRAM bank A): directly with the LCD off, else by
+; general-purpose DMA, 64 blocks a V-Blank (B = 0: 256 blocks)
+vcopy:      ld [vc_bank], a
+            ldh [rVBK], a
+            ld a, [lcd_is]
+            and a
+            jr nz, .dma
+            ld c, b                         ; memcpy B * 16 bytes
+            ld a, b
+            and a
+            jr nz, .m
+            ld c, 0
+.m:         push bc
+            ld b, 16
+.m1:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .m1
+            pop bc
+            dec c
+            jr nz, .m
+            xor a
+            ldh [rVBK], a
+            ret
+.dma:       ld a, b
+            ld [vc_left], a
+.d1:        push hl
+            push de
+            call wait_vbl
+            pop de
+            pop hl
+            ld a, h
+            ldh [rHDMA1], a
+            ld a, l
+            ldh [rHDMA2], a
+            ld a, d
+            ldh [rHDMA3], a
+            ld a, e
+            ldh [rHDMA4], a
+            ld a, [vc_left]
+            ld c, 64
+            and a
+            jr z, .d2                       ; (0 = 256 left)
+            cp 64
+            jr nc, .d2
+            ld c, a
+.d2:        ld a, [vc_bank]
+            ldh [rVBK], a
+            ld a, c
+            dec a
+            ldh [rHDMA5], a                 ; (general purpose: the CPU waits)
+            xor a
+            ldh [rVBK], a
+            ld a, c                         ; HL, DE += 16 C
+            swap a
+            ld b, a
+            and $F0
+            add a, l
+            ld l, a
+            ld a, b
+            and $0F
+            adc a, h
+            ld h, a
+            ld a, c
+            swap a
+            ld b, a
+            and $F0
+            add a, e
+            ld e, a
+            ld a, b
+            and $0F
+            adc a, d
+            ld d, a
+            ld a, [vc_left]
+            sub c
+            ld [vc_left], a
+            jr nz, .d1
+            ret
+
+; ---- triggers (3A L3A_91C8): trigger tiles $60-$63 / $70-$7C get, in layout order, the next id
+; of their type, ORed into the property byte 2 of their metatile copy ($80-$FF: TRIG_O + count)
+init_trig:  ld hl, tr_cnt                   ; 32 tile counts + 16 type counts
+            ld de, 48
+            call memclr
+            ld hl, M_LAY
+.lp:        ld a, [hl]
+            cp $60
+            jr c, .nx
+            cp $64
+            jr c, .tr
+            cp $70
+            jr c, .nx
+            cp $7D
+            jr nc, .nx
+.tr:        push hl
+            sub $60
+            ld c, a                         ; C = tile - $60
+            ld b, 0
+            ld hl, tr_cnt
+            add hl, bc
+            ld a, [hl]                      ; this tile's count
+            inc [hl]
+            ld [tr_n], a
+            ld hl, TRIG_T
+            add hl, bc
+            ld e, [hl]                      ; E = type
+            ld d, 0
+            ld hl, tr_cnt + 32
+            add hl, de
+            ld a, [hl]                      ; the type's next id
+            inc [hl]
+            ld [tr_id], a
+            ld hl, TRIG_O
+            add hl, bc
+            ld a, [tr_n]
+            add a, [hl]                     ; the metatile copy
+            ld e, a
+            ld a, c
+            cp $1C                          ; (treasure: unopened for now, as a trigger)
+            ld d, high(M_P2)
+            ld a, [de]
+            ld hl, tr_id
+            or [hl]
+            ld [de], a
+            pop hl
+            ld [hl], e                      ; the layout points at the copy
+.nx:        inc hl
+            ld a, h
+            cp high(M_LAY) + 4
+            jr nz, .lp
             ret
 
 ; ---- movement: a step is one metatile in STEP frames
@@ -317,9 +510,45 @@ move:       ld a, [moving]
             and $3F
             ld d, a
             call map_at
-            call passable
+            ld l, a                         ; a trigger tile (property 1 bit 7): fix:E669
+            ld h, high(M_P1)
+            bit 7, [hl]
+            jr z, .plain
+            inc h
+            ld a, [hl]                      ; property 2: type (high nibble), id
+            ld [act_id], a
+            swap a
+            and $0F
+            jr z, .t0                       ; 0 exit to the previous map
+            dec a
+            jr z, .t1                       ; 1 exit to the world map
+            sub 3
+            jr z, .t4                       ; 4 entrance
+            dec a
+            jr z, .t5                       ; 5 door
+            dec a
+            ret z                           ; 6 locked door (the unlock flag: later)
+            cp $0C - 6
+            jr c, .def                      ; 2, 3, 7-B: no trigger
+            cp $0F - 6
+            ret c                           ; C, D, E impassable
+            jr .go2                         ; F event (scripts: later)
+.def:       ld a, l
+.plain:     call passable
             ret c
-            ld a, 1
+            jr .go2
+.t0:        ld a, $40
+            jr .ta
+.t1:        ld a, $C0
+            jr .ta
+.t5:        push de                         ; the door shown open (metatile $7E)
+            call map_at
+            pop de
+            ld [hl], $7E
+            call q_mt
+.t4:        ld a, $80
+.ta:        ld [act], a
+.go2:       ld a, 1
             ld [moving], a
             xor a
             ld [mcount], a
@@ -343,7 +572,77 @@ move:       ld a, [moving]
             xor a
             ld [moving], a
             ld [mcount], a
+            ld a, [act]
+            and a
+            jr nz, do_act
 .sc:        jp set_scroll
+
+; ---- the trigger of the tile just reached (FF3 fix:E26A): $80 entrance: the map, group and
+; position pushed, the destination map (entrance id -> M_ENT + 48) at its start; $40 exit:
+; back to the pushed map and position; $C0 exit to the world map (the bottom of the stack
+; until the world maps are in)
+do_act:     ld b, a
+            xor a
+            ld [act], a
+            ld [zlev], a
+            ld a, b
+            cp $80
+            jr nz, .exit
+            ld a, [stk_n]
+            cp 16
+            ret nc
+            inc a
+            ld [stk_n], a
+            dec a
+            add a, a
+            add a, a
+            ld l, a
+            ld h, 0
+            ld de, stack
+            add hl, de
+            ld a, [cur_grp]
+            ld [hl+], a
+            ld a, [cur_map]
+            ld [hl+], a
+            ld a, [px]
+            ld [hl+], a
+            ld a, [py]
+            ld [hl], a
+            ld a, [act_id]
+            and $0F
+            add a, low(M_ENT + 48)
+            ld l, a
+            ld h, high(M_ENT + 48)
+            ld a, [hl]
+            ld [cur_map], a
+            ld a, $FF
+            ld [px], a
+            jp load_map
+.exit:      ld a, [stk_n]
+            and a
+            ret z
+            ld a, b
+            cp $C0
+            ld a, 1
+            jr z, .pop
+            ld a, [stk_n]
+.pop:       dec a
+            ld [stk_n], a
+            add a, a
+            add a, a
+            ld l, a
+            ld h, 0
+            ld de, stack
+            add hl, de
+            ld a, [hl+]
+            ld [cur_grp], a
+            ld a, [hl+]
+            ld [cur_map], a
+            ld a, [hl+]
+            ld [px], a
+            ld a, [hl]
+            ld [py], a
+            jp load_map
 
 nes_col:    ld a, [hl+]                     ; [HL++] NES colour -> A = low, D = high (RGB555)
             push hl
@@ -699,6 +998,17 @@ facing:     ds 1
 zlev:       ds 1
 q_n:        ds 1
 q_direct:   ds 1
+lcd_is:     ds 1                            ; 1 once the LCD is on (loads masked)
+vc_left:    ds 1
+vc_bank:    ds 1
+tr_cnt:     ds 48
+tr_n:       ds 1
+tr_id:      ds 1
+act:        ds 1                            ; trigger at the step's end: 0 none, $80 entrance
+act_id:     ds 1                            ;   (id), $40 previous map, $C0 world map
+stk_n:      ds 1                            ; map stack: entries of group, map, x, y
+stack:      ds 4 * 16
+pal_sh:     ds 128
 cur_map:    ds 1
 cur_grp:    ds 1
 fill_mt:    ds 1
@@ -706,6 +1016,7 @@ fill_mt:    ds 1
 section hram, $FF80
 hram_dma:   ds 10
 vbl_flag:   ds 1
+pal_dirty:  ds 1
 pad:        ds 1
 scx:        ds 1
 scy:        ds 1

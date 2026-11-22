@@ -66,6 +66,8 @@ def pack(rom):
             e[5], e[6], e[7] = mp[0] & 0x1F, mp[1] & 0x1F, mp[3]       # start x, y, fill
             e[8], e[9] = mp[2], mp[10]                                 # title, song
             e[10] = mp[1]                                              # flags (gil, water)
+            e[11] = mp[11]                                             # exit
+            e[48:64] = rom.b(0x10, ((mp[13] | 0x20) << 8) | mp[12], 16)  # entrances (dest maps)
             e[16:48] = rom.map_palettes(mid, w)                        # NES colours
             ent[g][64 * mid:64 * mid + 64] = e
     for g in range(3): banks[MT_BANK + g] = ent[g]
@@ -79,6 +81,13 @@ def pack(rom):
     sp[0x3F10:0x3F50] = bytes(v if k % 2 == 0 else cv(v) for k, v in enumerate(fr))
     banks[SPR_BANK] = sp
     return banks, len(lay_ix), len(chr_ix)
+
+
+def trig_src(rom):
+    """trigger tiles $60-$7F (3A L3A_91C8): type (3A/921F) and the metatile base (3A/923F)"""
+    tt, to = rom.b(0x3A, 0x921F, 32), rom.b(0x3A, 0x923F, 32)
+    return 'section bank 0, $3E80\nTRIG_T:\n    db %s\nTRIG_O:\n    db %s\n' % (
+        ', '.join(str(v) for v in tt), ', '.join(str(v) for v in to))
 
 
 def nes_rgb_src():
@@ -99,7 +108,7 @@ def main():
     rom = Rom(pos[0] if pos else os.path.join(ROOT, 'build', 'ff3_en.nes'))
     banks, nl, nc = pack(rom)
     src = open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + \
-        open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' + nes_rgb_src()
+        open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
     r = asm(src, syms={'START_MAP': int(opt['--map'], 0), 'START_GRP': int(opt['--group'], 0),
                        'TS_BANK': TS_BANK, 'MT_BANK': MT_BANK, 'SPR_BANK': SPR_BANK})
     for b, d in banks.items(): r.banks[b] = bytearray(d)
