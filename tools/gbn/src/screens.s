@@ -2206,17 +2206,16 @@ job_xy:     ld b, 2
 eqm_main:   ld [eqm_m], a
             xor a
             ld [eqm_t], a
+            ld [eqm_ot], a
             call eqm_unadj
 .scr:       call eqm_draw
-.l:         ld a, [eqm_t]                   ; the hand left of the slot
-            add a, 6
-            call eqm_hand
+.l:         call eqm_ohand                  ; the hand left of the slot / Optimize (loc.s)
             call scr_frame
             ldh a, [pad_new]
             bit 1, a
             jp nz, .exit
             bit 0, a
-            jr nz, .list
+            jr nz, .a
             ld hl, eqm_t
             bit 6, a
             jr nz, .up
@@ -2237,21 +2236,14 @@ eqm_main:   ld [eqm_m], a
             and 3
             ld [hl], a
             jr .scr
-.up:        ld a, [hl]                      ; (the rows in use: eqm_nr)
-            dec a
-            cp $FF
-            jr nz, .s
-            ld a, [eqm_nr]
-            dec a
-            jr .s
-.dn:        ld a, [eqm_nr]
-            ld b, a
-            ld a, [hl]
-            inc a
-            cp b
-            jr c, .s
-            xor a
-.s:         ld [hl], a
+.up:        call eqm_oup                    ; (the rows in use and Optimize: loc.s)
+            jr .l
+.dn:        call eqm_odn
+            jr .l
+.a:         ld a, [eqm_ot]                  ; Optimize (owner, 2026-11-22)
+            and a
+            jr z, .list
+            call eqm_opt
             jr .l
 .list:      call eqm_cands
             ld a, [eqm_n]
@@ -2395,7 +2387,7 @@ eqm_draw:   call scr_open
             call eqm_pal                    ; (masked: into the shadows)
             ld a, [eqm_m]
             call mtop
-            ld hl, str_level
+            ld hl, str_lv                   ; (short: Optimize beside it)
             call pen_str
             ld a, [eqm_m]
             call ch_rec
@@ -2406,6 +2398,10 @@ eqm_draw:   call scr_open
             inc a
             call nf_a
             call pen_numl
+            ld bc, $0B03                    ; (Optimize, bottom right: owner, 2026-11-22)
+            call pen_at
+            ld hl, str_eqopt
+            call pen_str
             ld bc, $0005
             ld de, $1407
             call scr_win
@@ -3065,6 +3061,7 @@ pr_cnt:     ds 1
 pr_cc:      ds 9                            ; (the fade: from R G B, to R G B, now R G B)
 eqm_m:      ds 1
 eqm_t:      ds 1
+eqm_ot:     ds 1
 eqm_c:      ds 1
 eqm_top:    ds 1
 eqm_n:      ds 1

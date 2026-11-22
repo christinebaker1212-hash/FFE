@@ -950,31 +950,37 @@ exp_next:   ld a, [mm_t]
 ; (0,9,20,9) over the list, 7 lines of 18
 MTEXT      = 5
 IT_SAVETXT = IT_UseItem_House_5
-IT_PAGE    = 13
+IT_PAGE    = 12
+IT_SORT    = unsram + $F5                   ; (Sort chosen: healing items first; kept in the save)
+; the Items screen (owner, 2026-11-22, from the WonderSwan Color remake): commands Use / Sort /
+; Key Items (0,0,12,5), the title and Gil (11,0,9,5), the list (0,4,20,14): Use lists the
+; consumables, Key Items the key items (used / read as before), Sort puts healing first
 item_menu:  xor a
             ld [it_cur], a
+            ld [it_cmd], a
+            ld [it_mode], a
+            ld [it_inl], a
 .re:        call scr_open                   ; (a screen of its own: faded)
             call eqm_pal                    ; (the gold title)
-            call it_list                    ; FF1 DrawItemBox: the items held, orbs skipped
+            call it_list
             ld a, [it_n]
             and a
-            jr nz, .has
-            call it_draw
-            ld a, 4                         ; "You have nothing."
-            call desc_box
-            call scr_show
-            jp wait_ab
-.has:       ld a, [it_cur]
+            jr nz, .c
+            xor a                           ; (nothing left on the page: the commands)
+            ld [it_inl], a
+.c:         ld a, [it_cur]
             ld hl, it_n
             cp [hl]
-            jr c, .c
+            jr c, .c2
             xor a
             ld [it_cur], a
-.c:         call it_draw
+.c2:        call it_draw
             call scr_show
-.l:         ld a, [it_cur]                  ; the hand: row 4 + (cur mod 13), column 2
-            call it_row
-            add a, 4
+            ld a, [it_inl]
+            and a
+            jp nz, .l
+.cm:        ld a, [it_cmd]                  ; the commands
+            inc a
             ld c, a
             ld b, 2
             call cur_txt
@@ -982,6 +988,68 @@ item_menu:  xor a
             ldh a, [pad_new]
             bit 1, a
             ret nz
+            bit 0, a
+            jr nz, .ca
+            and $C0
+            jr z, .cm
+            ld b, a
+            ld a, [it_cmd]
+            bit 7, b
+            jr z, .cu
+            inc a
+            cp 3
+            jr c, .cs
+            xor a
+            jr .cs
+.cu:        dec a
+            cp $FF
+            jr nz, .cs
+            ld a, 2
+.cs:        ld [it_cmd], a
+            jr .cm
+.ca:        ld a, [it_cmd]
+            cp 1
+            jr z, .sort
+            srl a                           ; Use: the consumables; Key Items: the key items
+            ld [it_mode], a
+            call it_list
+            xor a
+            ld [it_cur], a
+            ld a, [it_n]
+            and a
+            jr nz, .in
+            call it_draw                    ; (none: "You have nothing.")
+            ld a, 4
+            call desc_box
+            call scr_upd
+            call wait_ab
+            call it_draw
+            call scr_upd
+            jr .cm
+.in:        ld a, 1
+            ld [it_inl], a
+            call it_draw
+            call scr_upd
+            jr .l
+.sort:      ld a, 1                         ; healing items first, the consumables shown
+            ld [IT_SORT], a
+            xor a
+            ld [it_mode], a
+            ld [it_cur], a
+            call it_list
+            call it_draw
+            call scr_upd
+            jp .cm
+.l:         ld a, [it_cur]                  ; the hand: row 5 + (cur mod 12), column 2
+            call it_row
+            add a, 5
+            ld c, a
+            ld b, 2
+            call cur_txt
+            call scr_frame
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .lb
             bit 0, a
             jp nz, it_use
             and $C0
@@ -1016,122 +1084,14 @@ item_menu:  xor a
 .rd:        call it_draw
             call scr_upd
             jr .l
-
-; A = list index -> A = its page / its row in the page
-it_page:    ld b, 0
-.p:         cp IT_PAGE
-            jr c, .x
-            sub IT_PAGE
-            inc b
-            jr .p
-.x:         ld a, b
-            ret
-it_row:     cp IT_PAGE
-            ret c
-            sub IT_PAGE
-            jr it_row
-
-; the items held -> it_box, it_n
-it_list:    ld hl, ITEMS + 1
-            ld de, it_box
-            ld bc, $0100                    ; B = item id, C = count
-.i:         ld a, b
-            cp $12                          ; (orbs $12-$15 skipped)
-            jr c, .t
-            cp $16
-            jr c, .n
-            cp $1C
-            jr nc, .x
-.t:         ld a, [hl]
+.lb:        xor a                           ; B: back to the commands
+            ld [it_inl], a
+            ld a, [it_desc]
             and a
-            jr z, .n
-            ld a, b
-            ld [de], a
-            inc de
-            inc c
-.n:         inc hl
-            inc b
-            jr .i
-.x:         ld a, c
-            ld [it_n], a
-            ret
-
-; the item screen (the page of it_cur) into the map copy
-it_draw:    call scr_cls
-            xor a
-            ld [it_desc], a
-            ld bc, $0000                    ; (the header as the other screens': the
-            ld de, $1403                    ;   title in gold, the Gil on the right)
-            call scr_win
-            ld bc, $0003
-            ld de, $140F
-            call scr_win
-            ld bc, $0101
-            ld hl, str_items
-            ld e, 5
-            call gold_str
-            ld bc, $0901
-            call pen_at
-            ld hl, GOLD
-            ld a, [hl+]
-            ld [nf_val], a
-            ld a, [hl+]
-            ld [nf_val + 1], a
-            ld a, [hl]
-            ld [nf_val + 2], a
-            ld b, 6
-            call pen_num
-            ld a, $20
-            call pen_ch
-            ld hl, str_gil
-            call pen_str
-            ld a, [it_cur]
-            call it_page
-            ld b, a                         ; first = 13 page
-            add a, a
-            add a, b
-            add a, a
-            add a, a
-            add a, b
-            ld [it_t], a
-            ld c, 4
-.r:         ld a, [it_t]
-            ld hl, it_n
-            cp [hl]
-            ret nc
-            ld e, a
-            ld d, 0
-            ld hl, it_box
-            add hl, de
-            ld a, [hl]
-            ld [it_id], a
-            ld b, 2
-            push bc
-            call pen_at
-            ld a, [it_id]
-            call pen_iname
-            ld a, [it_id]                   ; consumables: the count
-            cp $16
-            jr c, .nc
-            add a, low(ITEMS)
-            ld l, a
-            ld h, high(ITEMS)
-            ld a, [hl]
-            call nf_a
-            pop bc
-            push bc
-            ld b, 17
-            call pen_at
-            ld b, 2
-            call pen_num
-.nc:        pop bc
-            inc c
-            ld hl, it_t
-            inc [hl]
-            ld a, c
-            cp 4 + IT_PAGE
-            jr c, .r
-            ret
+            jp z, .cm
+            call it_draw
+            call scr_upd
+            jp .cm
 
 ; FF1 menu text A (descriptions, prompts) in the window (0,9,20,9)
 desc_box:   push af
@@ -2629,6 +2589,9 @@ it_n:       ds 1
 it_t:       ds 2
 it_id:      ds 1
 it_desc:    ds 1
+it_cmd:     ds 1
+it_mode:    ds 1
+it_inl:     ds 1
 it_box:     ds 28
 menu_act:   ds 1
 mg_ch:      ds 1
