@@ -660,11 +660,13 @@ bg_pal:     xor a
 move:       ld a, [moving]
             and a
             jr z, .idle
-            ld a, [mcount]
-            inc a
+            ld a, [mcount]                  ; (a dash: two pixels a frame; the step still
+            inc a                           ;   ends at 16 and checks for an encounter, so
+            ld hl, dash                     ;   none is skipped: they come twice as fast)
+            add a, [hl]
             ld [mcount], a
             cp 16
-            ret nz
+            ret c
             ldh a, [cmask]                  ; step done
             ld c, a
             ld a, [mdx]
@@ -840,7 +842,16 @@ move:       ld a, [moving]
             ld [moving], a
             xor a
             ld [mcount], a
-            jp draw_edge
+            ld [dash], a                    ; B held, on foot: this step at double speed
+            ldh a, [pad]                    ;   (owner, 2026-11-22)
+            bit 1, a
+            jr z, .nd
+            ld a, [vehicle]
+            cp V_FOOT
+            jr nz, .nd
+            ld a, 1
+            ld [dash], a
+.nd:        jp draw_edge
 .door:      ld a, d                         ; a locked door: only with the Mystic Key (FF1)
             and $1E
             cp $04
@@ -2963,6 +2974,7 @@ o_ty:       ds 1
 o_sx:       ds 1
 o_sy:       ds 1
 o_tb:       ds 1
+dash:       ds 1                            ; this step at double speed (B held, on foot)
 
 section wram, $CF90
 vehicle:    ds 1
