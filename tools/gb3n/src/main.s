@@ -33,6 +33,13 @@ N_ANIM     = $CC00              ; 3B/B41A animation frames (CGB attributes), 256
 N_RNG      = $CD00              ; fix:FE00 random number table
 EV_DLG     = $C600              ; FF3 $0740: the person's dialogue ids (32)
 EV_TRIG    = $C640              ; FF3 $7B00: the loaded trigger script (64)
+MC_MAP     = $D000              ; canvas (WRAM bank 2): 32 x 18 tile codes
+MC_ATTR    = $D400              ;   and attributes
+MP_T       = $70                ; VRAM bank 1 tiles: MP digits 0/-9/, 0-9
+JOB_T      = $20                ;   job names, 12 a member
+SN_T       = $84                ;   small numbers (gil, capacity): 12
+PAL_TXT    = $07                ; attributes: palette 7 (window / white text), bank 0 tiles
+PAL_HP     = $04                ;   palette 4 (green HP; 5 orange, 6 pink)
 STEP       = 16                 ; frames per metatile (a pixel a frame)
 PX0        = 72                 ; the party's 16 x 16 sprite at screen (72, 64)
 PY0        = 64
@@ -182,7 +189,9 @@ main:       call wait_vbl
             ld a, [pad_new]                 ;   Start: the menu (fix:E340)
             bit 3, a
             jr z, .sl
-            call menu_open
+            ld a, CODE1
+            ld hl, menu_open
+            call far_call
             jr main
 .sl:        bit 2, a                        ;   Select: the Select menu; B + Select: the next
             jr z, .mv                       ;     member walks (fix:F72C)
@@ -191,7 +200,9 @@ main:       call wait_vbl
             jr z, .sm
             call next_char
             jr main
-.sm:        call sel_open
+.sm:        ld a, CODE1
+            ld hl, sel_open
+            call far_call
             jr main
 .mv:        call move
             call calc_pp
@@ -1327,6 +1338,42 @@ q_flush:    ld a, [q_n]
             ld [q_n], a
             ret
 
+; ---- banked code (the menus run in CODE1): bank-0 helpers that read another ROM bank restore
+; the caller's (code_bank) before returning
+; A = bank, HL = routine: call it with that bank in the window
+far_call:   ld [fc_bank], a
+            ld a, [code_bank]
+            push af
+            ld a, [fc_bank]
+            ld [code_bank], a
+            ld [MBC5_BANKL], a
+            call .jp
+            pop af
+            ld [code_bank], a
+            ld [MBC5_BANKL], a
+            ret
+.jp:        jp hl
+rbank:      push af                         ; the caller's bank back (flags kept)
+            ld a, [code_bank]
+            ld [MBC5_BANKL], a
+            pop af
+            ret
+; A = bank, HL = address -> A = the byte, HL + 1
+rd_byte:    ld [MBC5_BANKL], a
+            ld a, [hl+]
+            jr rbank
+; A = bank, HL -> DE, BC bytes
+rd_copy:    ld [MBC5_BANKL], a
+            call memcpy
+            jr rbank
+; vcopy from bank vc_src
+vcopyx:     push af
+            ld a, [vc_src]
+            ld [MBC5_BANKL], a
+            pop af
+            call vcopy
+            jr rbank
+
 ; ---- helpers
 lcd_off:    ldh a, [rLCDC]                  ; (Lot Check: only in V-Blank)
             bit 7, a
@@ -1376,6 +1423,9 @@ zlev:       ds 1
 q_n:        ds 1
 q_direct:   ds 1
 pad_old:    ds 1
+code_bank:  ds 1
+fc_bank:    ds 1
+vc_src:     ds 1
 m_title:    ds 1
 m_title2:   ds 1
 pad_new:    ds 1

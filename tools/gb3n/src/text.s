@@ -48,7 +48,7 @@ t_open:     ld b, a                         ; index: TXT_BANK $4000 + 3 (256 tab
             ld h, a
             ld a, [hl]
             and a
-            ret
+            jp rbank
 
 ; draw one page into win_buf from t_ptr; NZ if a page follows
 t_page:     ld a, 1
@@ -70,11 +70,11 @@ t_page:     ld a, 1
             ld [t_ptr + 1], a
             ld a, b
             and a
-            ret z                           ; end (Z)
+            jp z, rbank                     ; end (Z)
             cp $0B
             jr nz, .nl
             or a                            ; new page (NZ)
-            ret
+            jp rbank
 .nl:        cp $01
             jr nz, .code
             ld a, 1
@@ -311,7 +311,21 @@ t_putc:     ld b, a
 
 ; the frame (FEDF6 / FEE1D / FEE3E: $F7 $F8 $F9 / $FA $FB / $FC $FD $FE) and the attributes
 ; (BG palette 3, priority over sprites); the window shown
-win_open:   ld hl, win_buf
+win_open:   call font_box                   ; (world maps: the font in bank 1, the menu palette 7;
+            ld a, $83                       ;   normal maps: the map's window palette 3)
+            ld b, a
+            ldh a, [is_world]
+            and a
+            jr z, .na
+            call menu_pals
+            ld b, $8F
+.na:        ld a, b
+            ld hl, win_attr
+            ld b, 32 * WIN_ROWS
+.at:        ld [hl+], a
+            dec b
+            jr nz, .at
+            ld hl, win_buf
             ld a, $F7
             ld [hl+], a
             ld b, 18

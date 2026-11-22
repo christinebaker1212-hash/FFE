@@ -11,12 +11,12 @@ item_menu:  xor a
             ld a, $FF
             ld [it_mark], a
             ld a, MENU_BANK                 ; the icons
-            ld [MBC5_BANKL], a
+            ld [vc_src], a
             ld hl, $5E00
             ld de, $8000 + 16 * ICON_T
             ld b, 32
             ld a, 1
-            call vcopy
+            call vcopyx
 .redraw:    call it_draw
 .l:         call it_cursor
             call wait_vbl
@@ -172,10 +172,15 @@ it_name:    ld l, a
             add hl, hl
             ld de, $4400
             add hl, de
+            push bc                         ; (the name -> it_nbuf)
+            ld de, it_nbuf
+            ld bc, 16
+            ld a, GAME_BANK
+            call rd_copy
+            pop bc
+            ld hl, it_nbuf
             ld e, 15
-.c:         ld a, GAME_BANK
-            ld [MBC5_BANKL], a
-            ld a, [hl+]
+.c:         ld a, [hl+]
             and a
             ret z
             cp $70
@@ -600,3 +605,5 @@ it_pow:     ds 1
 m_sel2:     ds 1
 rnd_f5:     ds 1
 rnd_f6:     ds 1
+section wram, $CFE4
+it_nbuf:    ds 16

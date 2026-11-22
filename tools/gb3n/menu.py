@@ -91,6 +91,7 @@ GB_TEXT = {
     's_opt': 'Options', 's_sus': 'Suspend', 's_spd': 'Battle Speed', 's_bgm': 'Music Volume',
     's_sfx': 'Sound Volume', 's_sq1': 'Create a Suspend', 's_sq2': 'Point and return',
     's_sq3': 'to the Title?', 's_sq4': '', 's_yes': 'Yes', 's_no': 'No', 's_cap': 'Capacity',
+    's_off': 'You can turn the', 's_off2': 'power off now.',
 }
 GB_TEXT_AT = 0x5800
 
@@ -157,6 +158,36 @@ def status_pack(rom):
     return bytes(out), syms
 
 
+def code_data(rom, rgb555):
+    """the small tables the menu code (bank CODE1) reads, as labelled assembly data next to it"""
+    def db(label, data):
+        out = '%s:\n' % label
+        for k in range(0, len(data), 16):
+            out += '    db %s\n' % ', '.join(str(v) for v in data[k:k + 16])
+        return out
+    pal = rom.b(0x7F, 0xE1BC, 32)
+    pals = bytearray()
+    for c in pal:
+        v = rgb555(c); pals += bytes([v & 0xFF, v >> 8])
+    dig = bytes(int(DIG[d][y].replace('#', '1').replace('.', '0'), 2) for d in '0123456789' for y in range(5))
+    fr = rom.b(0x7E, 0xDCF2, 8)
+    cv = lambda a: ((a & 3) + 4) | 8 | ((a & 0x40) >> 1) | ((a & 0x80) >> 1)
+    hand = bytes((v + 0x10) & 0xFF if k % 2 == 0 else cv(v) for k, v in enumerate(fr))   # (tiles $10-)
+    cmd = bytearray()
+    for w in commands(rom)[:7]:
+        w = w[:8]; cmd += w + b'\xFF' * (8 - len(w))
+    names, tiles = job_names(rom)
+    counts = bytes(min(len(t), 12) for t in tiles)
+    src = db('MD_PALS', pals) + db('MD_DIGITS', dig) + db('MD_HAND', hand) + db('MD_CMD', cmd)
+    src += db('MD_COUNTS', counts) + db('MD_EXP', rom.b(0x39, 0x80B0, 3 * 99))
+    src += db('MD_MASKS', rom.equip_masks())
+    for k, v in list(GB_TEXT.items()) + list(rom_words(rom).items()):
+        src += db(k, text.encode(v) + b'\0')
+    for k, w in enumerate(STATUS_BIG):
+        src += db('st_b%d' % k, text.encode(w) + b'\0')
+    return src
+
+
 def pack(rom, rgb555):
     b = bytearray(0x4000)
     names, tiles = job_names(rom)
@@ -188,6 +219,9 @@ def pack(rom, rgb555):
     ic = rom.prg[0x0D * 0x2000 + 0x1500:0x0D * 0x2000 + 0x1700]  # $5E00: item icons (0D/B500)
     b[0x1E00:0x2000] = b''.join(nes2gb(ic[16 * k:16 * k + 16]) for k in range(32))
     b[0x2000:0x2300] = rom.equip_masks()                       # $6000: job masks per item / spell
+    f = rom.prg[0x0D * 0x2000 + 0x1700:0x0D * 0x2000 + 0x1700 + 144 * 16]   # $6400: the font ($70-)
+    b[0x2400:0x2400 + 144 * 16] = b''.join(nes2gb(f[16 * k:16 * k + 16]) for k in range(144))
+    b[0x2E00:0x2E40] = b[0x1400 + 0x40:0x1400 + 0x80]          # $6E00: the hand's 4 tiles ($E4-)
     t, _ = status_pack(rom)
     assert STATUS_AT + len(t) <= 0x5C00
     b[STATUS_AT - 0x4000:STATUS_AT - 0x4000 + len(t)] = t

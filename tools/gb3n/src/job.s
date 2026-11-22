@@ -202,11 +202,10 @@ jb_load:    ld l, a
             add hl, hl
             ld de, $4000
             add hl, de
-            ld a, JOB_BANK
-            ld [MBC5_BANKL], a
             ld de, jb_new
             ld bc, 8
-            jp memcpy
+            ld a, JOB_BANK
+            jp rd_copy
 
 ; 3D/AD85: each job's cost = |physical diff| + |lawful diff| of the nibbles, x 4, - its job level
 jb_costs:   ld a, [m_ch]
@@ -353,18 +352,18 @@ jb_row:     ld a, c
             ld d, a
             push bc
             ld a, [jb_j]
-            add a, low($5080)
+            add a, low(MD_COUNTS)
             ld c, a
-            ld a, high($5080)
+            ld a, high(MD_COUNTS)
             adc a, 0
             ld b, a
-            ld a, MENU_BANK
-            ld [MBC5_BANKL], a
             ld a, [bc]
             ld [jb_nt], a
             ld b, a
+            ld a, MENU_BANK
+            ld [vc_src], a
             ld a, 1
-            call vcopy
+            call vcopyx
             pop bc
             ld a, [jb_rc]
             ld c, a
@@ -457,13 +456,16 @@ jb_change:  ld a, [jb_cur]
             ld h, 0
             ld de, $5B88
             add hl, de
+            ld de, jb_tmp8
+            ld bc, 8
+            ld a, JOB_BANK
+            call rd_copy
+            ld hl, jb_tmp8
             ld a, [m_ch]
             add a, $31
             ld e, a
             ld d, high(GS + $100)
             ld b, 8
-            ld a, JOB_BANK
-            ld [MBC5_BANKL], a
 .mp:        ld a, [hl+]
             ld [de], a
             inc e
@@ -519,22 +521,29 @@ jb_level:   ld a, [m_ch]
             add a, a
             ld l, a
             ld h, $60                       ; (JOB_BANK $6000: the pointers, GB addresses)
+            ld de, jb_tmp8
+            ld bc, 2
             ld a, JOB_BANK
-            ld [MBC5_BANKL], a
-            ld a, [hl+]
-            ld h, [hl]
+            call rd_copy
+            ld a, [jb_tmp8]
             ld l, a
+            ld a, [jb_tmp8 + 1]
+            ld h, a
             ld a, [jb_lv]
             dec a
             add a, a
             ld e, a
             ld d, 0
             add hl, de
-            ld a, [hl+]
+            ld de, jb_tmp8
+            ld bc, 2
+            ld a, JOB_BANK
+            call rd_copy
+            ld a, [jb_tmp8]
             ld [jb_b82], a
             and 7
             ld [jb_b84], a
-            ld a, [hl]
+            ld a, [jb_tmp8 + 1]
             ld [jb_b83], a
             ld a, [m_ch]                    ; stats: bits 7-3 of $82 -> $6112-$6116 + amount
             add a, $12
@@ -587,5 +596,7 @@ jb_b83:     ds 1
 jb_b84:     ds 1
 jb_new:     ds 8
 jb_rc:      ds 1
+section wram, $C0F8
+jb_tmp8:    ds 8
 section wram, $C0DD
 jb_cost:    ds 23

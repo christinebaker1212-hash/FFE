@@ -184,5 +184,21 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   job, its level table replayed level by level 3D/AC31: stats + amount and MP + 1 capped at 99,
   mod. stats = base, current MP at most max), values recomputed. FF3's bank $39 copied whole
   into JOB_BANK. Menu messages up to 4 lines.
+- 2026-11-22: Save menu (`src/save.s`, owner's choice V1; on world maps only, as FF3): the three
+  files (lead member, Lv, save count) and the chosen file's party, "This erases old data." Yes /
+  No, FF3's slot format and checks (3D/AE5C / AE97: $6019 = $5A, the byte-sum complement in
+  $601A; the world position as FF3's view corner), the save count as $7F38-$7F3A, "Saving is
+  complete.", then "You can turn the power off now." (no RESET on a Game Boy); cart RAM bank 0,
+  enabled only around each access.
+  Bank 0 was full: the menu modules (menu, Select menu, item, magic, equip, job, save) now run in
+  their own ROM bank CODE1 (80), entered by a bank-0 far call; the small tables they read are
+  generated next to them (menu.py code_data: palettes, digits, the hand, command words, job-name
+  tile counts, EXP table, class masks, the GB-only words); tiles come from MENU_BANK through a DMA
+  helper (vcopyx); bank-0 routines that switch ROM banks (text, npc graphics, the walking
+  character) restore the caller's bank (rbank). World maps: their BG tiles $70-$FF are map
+  tiles, so the full-screen menus load the font there while they cover the screen and put the
+  world tiles back on closing; the dialogue box / Select boxes on world maps use a font copy in
+  VRAM bank 1 (no npcs there) and the menu window palette (the world palettes have none); the
+  hand moved to sprite tiles $10-$13.
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.

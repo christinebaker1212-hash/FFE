@@ -796,15 +796,13 @@ can_equip:  ld l, a
             ld c, l
             add hl, hl
             add hl, bc                      ; 3 id
-            ld de, $6000
+            ld de, MD_MASKS
             add hl, de
             ld a, [mg_caster]
             ld e, a
             ld d, high(GS + $100)
             ld a, [de]                      ; job: bit job of the 24 (byte 2 low)
             ld c, a
-            ld a, MENU_BANK
-            ld [MBC5_BANKL], a
             inc hl
             inc hl
             ld a, c

@@ -3,15 +3,8 @@
 ; white frame, no palette change); the menu's palettes in CGB palettes 4-7 (fix:E1BC), its own
 ; tiles in VRAM bank 1 (NPC tiles borrowed while it shows), the canvas built in WRAM bank 2 and
 ; copied by DMA in one V-Blank. Layout: the owner-approved mock N5B / N6 (tools/gb3n/menu.py).
-MC_MAP     = $D000              ; canvas (WRAM bank 2): 32 x 18 tile codes
-MC_ATTR    = $D400              ;   and attributes
-MP_T       = $70                ; VRAM bank 1 tiles: MP digits "0/".."9/", "0".."9"
-JOB_T      = $20                ;   job names, 12 a member
-SN_T       = $84                ;   small numbers (gil, capacity): 12
-PAL_TXT    = $07                ; attributes: palette 7 (window / white text), bank 0 tiles
-PAL_HP     = $04                ;   palette 4 (green HP; 5 orange, 6 pink)
+; (MC_MAP, MC_ATTR, MP_T, JOB_T, SN_T, PAL_TXT, PAL_HP: main.s)
 
-section bank 0, $3800
 ; Start on the field (fix:E340)
 menu_open:  ld a, 3                         ; (each member's values from the equipment)
 .eq:        push af
@@ -21,32 +14,16 @@ menu_open:  ld a, 3                         ; (each member's values from the equ
             cp $FF
             jr nz, .eq
             call oam_hide
-            ld a, MENU_BANK                 ; palettes: menu BG 0-3 -> CGB 4-7, OBJ likewise
-            ld [MBC5_BANKL], a
-            ld hl, $5340
-            ld de, pal_sh + 32
-            ld bc, 32
-            call memcpy
-            ld hl, $5360
-            ld de, pal_sh + 96
-            ld bc, 32
-            call memcpy
-            ld a, 1
-            ldh [pal_dirty], a
+            call menu_pals                  ; palettes: menu BG 0-3 -> CGB 4-7, OBJ likewise
             ld a, MENU_BANK                 ; tiles: MP digits, cursor
-            ld [MBC5_BANKL], a
+            ld [vc_src], a
             ld hl, $5100
             ld de, $8000 + 16 * MP_T
             ld b, 20
             ld a, 1
-            call vcopy
-            ld a, MENU_BANK
-            ld [MBC5_BANKL], a
-            ld hl, $5400
-            ld de, $8E00
-            ld b, 32
-            ld a, 1
-            call vcopy
+            call vcopyx
+            call hand_ld
+            call font_menu
             call mm_jobtiles
             ld a, 2                         ; the canvas
             ldh [rSVBK], a
@@ -97,10 +74,10 @@ mm_jobtiles: xor a                          ; the members' job names -> JOB_T + 
             ld e, d
             ld d, a
             ld a, MENU_BANK
-            ld [MBC5_BANKL], a
+            ld [vc_src], a
             ld b, 12
             ld a, 1
-            call vcopy
+            call vcopyx
             ld hl, m_i
             inc [hl]
             ld a, [hl]
@@ -124,13 +101,16 @@ mm_loop:    call mm_cursor
             dec a
             cp $FF
             jr nz, .s
-            ld a, 6
+            call mm_ncmd
+            dec a
             jr .s
 .d:         bit 7, a
             jr z, mm_loop
+            call mm_ncmd
+            ld b, a
             ld a, [m_cur]
             inc a
-            cp 7
+            cp b
             jr nz, .s
             xor a
 .s:         ld [m_cur], a
@@ -150,6 +130,13 @@ mm_a:       ld a, [m_cur]
             jr z, .row
             cp 5
             jr z, .job
+            ldh a, [is_world]               ; 6: Save (on a world map only: 3D/A59F)
+            and a
+            jp z, mm_loop
+            call save_menu
+            call mm_draw
+            ld a, 1
+            ld [m_dirty], a
             jp mm_loop
 .job:       ld a, [GS + $21]                ; (3D/A617: a crystal; not the dead / stone)
             and $1F
@@ -558,10 +545,8 @@ st_next:    ld a, [m_ch]
             add a, c                        ; 3 level
             ld l, a
             ld h, 0
-            ld de, $5C00                    ; (MENU_BANK: the table copied at build time)
+            ld de, MD_EXP                   ; (39/80B0, build time)
             add hl, de
-            ld a, MENU_BANK
-            ld [MBC5_BANKL], a
             ld a, [m_ch]
             add a, 3
             ld e, a
@@ -609,13 +594,11 @@ st_job:     ld a, [m_ch]
             ld l, a
             ld h, high(GS + $100)
             ld a, [hl]
-            add a, low($5080)
+            add a, low(MD_COUNTS)
             ld l, a
-            ld a, high($5080)
+            ld a, high(MD_COUNTS)
             adc a, 0
             ld h, a
-            ld a, MENU_BANK
-            ld [MBC5_BANKL], a
             ld e, [hl]
             ld a, PAL_TXT | 8
             ld [m_attr], a
@@ -637,8 +620,7 @@ st_job:     ld a, [m_ch]
 ; a condensed word (count, tiles at HL in MENU_BANK) -> VRAM bank 1 tiles st_tile.., placed at
 ; column B, row C
 st_cond:    ld a, MENU_BANK
-            ld [MBC5_BANKL], a
-            ld a, [hl+]
+            call rd_byte
             ld [st_n], a
             push bc
             ld a, [st_tile]                 ; DE = $8000 + 16 tile
@@ -650,10 +632,12 @@ st_cond:    ld a, MENU_BANK
             and $0F
             add a, $80
             ld d, a
+            ld a, MENU_BANK
+            ld [vc_src], a
             ld a, [st_n]
             ld b, a
             ld a, 1
-            call vcopy
+            call vcopyx
             pop bc
             ld a, PAL_TXT | 8
             ld [m_attr], a
@@ -672,19 +656,22 @@ st_cond:    ld a, MENU_BANK
             ld [m_attr], a
             ret
 
+; the commands the hand may reach: 7 on a world map, 6 elsewhere (no Save: 3D/A59F)
+mm_ncmd:    ldh a, [is_world]
+            and a
+            ld a, 6
+            ret z
+            inc a
+            ret
+
 ; B (3D/A646): the window off, the NPC tiles back, the field as it was
 menu_close: call oam_hide
             call wait_vbl
             ld a, 1
             ldh [rSVBK], a
+            call font_back
             call npc_gfx
-            ld a, SPR_BANK                  ; (the party's tiles too)
-            ld [MBC5_BANKL], a
-            ld hl, $4000
-            ld de, $8000
-            ld b, 16
-            ld a, 1
-            call vcopy
+            call char_gfx                   ; (the party's tiles too)
             xor a
             ld [menu_on], a
             jp wait_vbl
@@ -726,9 +713,7 @@ mm_cursor:  ld a, [m_cur]
             ld c, a                         ; y = row (1 + cur) 8
             ld b, 8 + 12 * 8 + 2            ; x: left of the words (column 12.25)
 cursor_at:  ld hl, oam_buf + 4 * 36           ; (the last four sprites; .hl: at HL)
-.hl:        ld a, MENU_BANK
-            ld [MBC5_BANKL], a
-            ld de, $5640
+.hl:        ld de, MD_HAND
             call .one                       ; TL
             ld a, c
             add a, 8
@@ -756,21 +741,6 @@ cursor_at:  ld hl, oam_buf + 4 * 36           ; (the last four sprites; .hl: at 
             ld [hl+], a
             ret
 
-cur_hide:   ld hl, oam_buf + 4 * 36
-            ld b, 4
-            jr oam_hide.l0
-oam_hide:   ld hl, oam_buf
-            ld b, 40
-.l0:        xor a
-.l:         ld [hl+], a
-            inc l
-            inc l
-            inc l
-            dec b
-            jr nz, .l
-            ret
-
-; ---- the main menu canvas (N5B / N6)
 mm_draw:    call m_clear
             ld bc, $0000                    ; party window
             ld de, $0D12
@@ -784,9 +754,7 @@ mm_draw:    call m_clear
             ld bc, $0D0D                    ; guest
             ld de, $0705
             call m_box
-            ld a, MENU_BANK                 ; the command words (t8200 $0131)
-            ld [MBC5_BANKL], a
-            ld hl, $5600
+            ld hl, MD_CMD                   ; the command words (t8200 $0131)
             ld bc, $0E01
 .cw:        push bc
             push hl
@@ -882,13 +850,11 @@ mm_member:  ld a, [m_i]
             ld l, a
             ld h, high(GS + $100)
             ld a, [hl]
-            add a, low($5080)
+            add a, low(MD_COUNTS)
             ld l, a
-            ld a, high($5080)
+            ld a, high(MD_COUNTS)
             adc a, 0
             ld h, a
-            ld a, MENU_BANK
-            ld [MBC5_BANKL], a
             ld a, [hl]
             ld e, a
             ld a, [m_i]
@@ -1007,39 +973,6 @@ m_clear:    ld hl, MC_MAP
             ret
 
 ; A = tile at column B, row C (attribute m_attr)
-m_put:      push af
-            ld a, PAL_TXT
-            ld [m_attr], a
-            pop af
-m_put2:     push hl
-            push af
-            ld a, c
-            ld l, a
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            ld a, l
-            add a, b
-            ld l, a
-            ld a, h
-            add a, high(MC_MAP)
-            ld h, a
-            pop af
-            ld [hl], a
-            push af                         ; (A kept)
-            ld a, h
-            add a, high(MC_ATTR - MC_MAP)
-            ld h, a
-            ld a, [m_attr]
-            ld [hl], a
-            pop af
-            pop hl
-            ret
-
-; E codes from HL ($FF ends early? no: $FF is a blank) at column B, row C
 m_codes:    ld a, [hl+]
             call m_put2
             inc b
@@ -1049,6 +982,8 @@ m_codes:    ld a, [hl+]
 
 ; a window frame: B, C = left, top; D, E = width, height (FEDF6 / FEE1D / FEE3E tiles)
 m_box:      push bc
+            ld a, [m_tattr]                 ; (the font's bank)
+            ld [m_attr], a
             ld a, $F7
             call m_put2
             ld a, d
@@ -1210,9 +1145,11 @@ sn_draw24:  push bc
             add a, a
             add a, a
             add a, b
-            add a, low($5300)
+            add a, low(MD_DIGITS)
             ld e, a
-            ld d, high($5300)
+            ld a, high(MD_DIGITS)
+            adc a, 0
+            ld d, a
             ld a, c
             srl a
             swap a                          ; tile * 16
@@ -1220,9 +1157,7 @@ sn_draw24:  push bc
             ld l, a
             ld h, high(sn_buf)
             ld b, 5
-.r:         ld a, MENU_BANK
-            ld [MBC5_BANKL], a
-            ld a, [de]
+.r:         ld a, [de]
             inc de
             bit 0, c                        ; (even digits at pixels 1-3, odd at 5-7)
             jr nz, .h
@@ -1315,36 +1250,6 @@ vcopy_w:    ld [vc_bank], a
             ret
 
 ; V-Blank (from the handler): the canvas when changed (map + attributes, 36 blocks each)
-menu_vbl:   ld a, [m_dirty]
-            and a
-            ret z
-            ld a, high(MC_MAP)
-            ldh [rHDMA1], a
-            xor a
-            ldh [rHDMA2], a
-            ld a, $9C
-            ldh [rHDMA3], a
-            xor a
-            ldh [rHDMA4], a
-            ld a, 36 - 1
-            ldh [rHDMA5], a
-            ld a, 1
-            ldh [rVBK], a
-            ld a, high(MC_ATTR)
-            ldh [rHDMA1], a
-            xor a
-            ldh [rHDMA2], a
-            ld a, $9C
-            ldh [rHDMA3], a
-            xor a
-            ldh [rHDMA4], a
-            ld a, 36 - 1
-            ldh [rHDMA5], a
-            xor a
-            ldh [rVBK], a
-            ld [m_dirty], a
-            ret
-
 section wram, $C680
 m_i:        ds 1
 m_row:      ds 1
@@ -1360,6 +1265,8 @@ sn_tile:    ds 1
 sn_dig:     ds 8
 m_digs:     ds 6
 m_sel:      ds 1
+m_tattr:    ds 1
+fnt_vb:     ds 1
 st_tile:    ds 1
 st_n:       ds 1
 section wram, $C700

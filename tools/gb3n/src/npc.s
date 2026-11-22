@@ -268,7 +268,7 @@ npc_gfx:    ld c, 0
             ld a, c
             cp 12
             jr nz, .s
-            ret
+            jp rbank
 
 ; ---- each frame (object command 6): movement, sprites (even frames slots 0-11, odd 11-0), then
 ; one npc's random movement

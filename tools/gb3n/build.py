@@ -153,10 +153,12 @@ def nes_rgb_src():
         '    dw %s\n' % ', '.join(str(x) for x in v[k:k + 8]) for k in range(0, 64, 8))
 
 
-MODULES = ('npc', 'text', 'event', 'menu', 'select', 'item', 'magic', 'equip', 'job')
+MODULES = ('npc', 'text', 'event', 'menucore', 'select')                     # bank 0
+CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save')  # bank CODE1
+CODE1 = 80
 
 
-def engine_src():
+def engine_src(rom=None):
     """main.s's code, then each module's code (its `section bank 0` lines dropped: the code
     continues in bank 0), then all RAM sections"""
     rd = lambda n: open(os.path.join(HERE, 'src', n + '.s')).read()
@@ -169,6 +171,14 @@ def engine_src():
         c, r = split(rd(m))
         codes.append('\n'.join(l for l in c.split('\n') if not l.startswith('section bank 0,')))
         rams.append(r)
+    codes.append('section bank %d, $4000' % CODE1)
+    for m in CODE1_MODULES:
+        c, r = split(rd(m))
+        codes.append('\n'.join(l for l in c.split('\n') if not l.startswith('section bank 0,')))
+        rams.append(r)
+    if rom is not None:
+        import menu
+        codes.append(menu.code_data(rom, rgb555))
     zp = ''.join('Z_%02X = $%04X\n' % (n, 0xFFB0 + n - 0x18) for n in range(0x18, 0x60))
     return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + zp + main_code + '\n' +
             '\n'.join(codes) + '\n' + main_ram + '\n' + '\n'.join(rams))
@@ -176,7 +186,7 @@ def engine_src():
 
 def gb_text_syms(rom):
     import menu
-    return dict(menu.gb_text(rom)[1], **menu.status_pack(rom)[1])
+    return {k: v for k, v in menu.status_pack(rom)[1].items() if k.startswith('st_c')}
 
 
 def main():
@@ -220,14 +230,14 @@ def main():
         v = (lp[2 * k] | lp[2 * k + 1] << 8) - 0x4000
         jb[0x2000 + 2 * k] = v & 0xFF; jb[0x2001 + 2 * k] = v >> 8
     banks[JOB_BANK] = jb
-    src = engine_src() + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
+    src = engine_src(rom) + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
     r = asm(src, syms={'START_MAP': int(opt['--map'], 0), 'START_GRP': int(opt['--group'], 0),
                        'START_X': int(opt['--x'], 0), 'START_Y': int(opt['--y'], 0),
                        'TS_BANK': TS_BANK, 'MT_BANK': MT_BANK, 'SPR_BANK': SPR_BANK,
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
-                       'JOB_BANK': JOB_BANK,
+                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1,
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,
                        'DLG_TEST_T': int(opt['--dlg'].split(':')[0], 0) if opt['--dlg'] else 0})
     for b, d in banks.items(): r.banks[b] = bytearray(d)

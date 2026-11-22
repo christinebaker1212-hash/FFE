@@ -7,7 +7,6 @@
 Z_BASE     = $FFB0              ; FF3 $18 -> $FFB0
 T74        = $C0A0              ; FF3 $7400
 
-section bank 0, $3C00
 ; A = member (0-3)
 eq_calc:    rrca
             rrca
@@ -153,14 +152,9 @@ eq_calc:    rrca
             add hl, hl
             ld bc, $6000
             add hl, bc
+            ld bc, 8
             ld a, GAME_BANK
-            ld [MBC5_BANKL], a
-            ld b, 8
-.ib:        ld a, [hl+]
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .ib
+            call rd_copy                    ; (DE advanced)
             pop bc
             inc c
             ld a, c
