@@ -58,7 +58,8 @@ battle:     xor a                           ; (no menu sounds, no vehicle noise)
             xor a
             ld [bt_msgon], a
             ld [bt_rmask], a
-            ld [dn_t], a                    ; (no damage number showing)
+            ld [dn_t], a                    ; (no damage number showing, no flinch)
+            ld [rc_t], a
             dec a                           ; (no target remembered yet)
             ld hl, bt_lastt
             ld [hl+], a

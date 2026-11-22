@@ -2741,7 +2741,11 @@ bt_dnum_w:  ld a, [hl+]                     ; (from the 16-bit damage at HL)
 .n:         ld a, l
             cp low(nf_dig + 6)
             jr nz, .s
-            jr bt_dpop
+            call bt_dpop
+            ld a, [df_player]               ; (a member hit: it flinches)
+            and a
+            ret z
+            jp rc_start
 bt_dmiss:   ld hl, dn_miss
             ld de, bt_dstr
             ld bc, 5
@@ -2887,9 +2891,10 @@ bt_danim:   ld a, [dn_t]
             ld [hl+], a
             dec e
             jr nz, .o
-            ret
+            jp rc_anim
 ; the number gone, the hand's tiles back
 bt_dnum_off:
+            call rc_end
             ld a, [dn_t]
             and a
             ret z
@@ -2929,6 +2934,83 @@ dn_miss:    db 10, 11, 12, 12, 13           ; M I S S !
 ; the bounce: y offsets by frame (up, back down, a smaller hop, at rest)
 dn_off:     db 0, 254, 252, 250, 249, 248, 248, 249, 250, 252, 254, 0, 254, 253, 253, 254, 0
 DN_LEN     = 17
+
+section bank 6, $7360                       ; (a member's flinch: after btl4)
+; ---- a member hit (owner, 2026-11-22: feedback for the party being attacked; no blinking):
+; its six sprites knocked a few pixels back (right, away from the enemies) and sliding back,
+; while the damage number pops
+rc_start:   ld a, [bt_tgt]
+            and 3
+            ld c, a                         ; OAM 4 + 6 m: oam_buf + 16 + 24 m (x at + 1)
+            add a, a
+            add a, c
+            add a, a
+            add a, a
+            add a, a
+            add a, low(oam_buf) + 17
+            ld l, a
+            ld a, high(oam_buf)
+            adc a, 0
+            ld h, a
+            ld a, l
+            ld [rc_p], a
+            ld a, h
+            ld [rc_p + 1], a
+            ld de, rc_bx
+            ld b, 6
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .c
+            ld a, 1
+            ld [rc_t], a
+            ret
+; each frame with the number (bt_danim): the offset of this frame
+rc_anim:    ld a, [rc_t]
+            and a
+            ret z
+            cp RC_LEN
+            jr nc, rc_end
+            inc a
+            ld [rc_t], a
+            ld e, a
+            ld d, 0
+            ld hl, rc_off - 2
+            add hl, de
+            ld c, [hl]
+            jr rc_put
+; back in place
+rc_end:     ld a, [rc_t]
+            and a
+            ret z
+            xor a
+            ld [rc_t], a
+            ld c, a
+rc_put:     ld a, [rc_p]
+            ld l, a
+            ld a, [rc_p + 1]
+            ld h, a
+            ld de, rc_bx
+            ld b, 6
+.p:         ld a, [de]                      ; (hidden sprites stay hidden)
+            and a
+            jr z, .n
+            add a, c
+.n:         ld [hl+], a
+            inc de
+            inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .p
+            ret
+rc_off:     db 4, 7, 8, 8, 7, 6, 5, 3, 2, 1, 0
+RC_LEN     = 11
+zz_end_b6_7360:
 
 section bank 6, $7480                       ; (the results window: after btl4)
 ; a level up kept for the results window: the new level, the HP gain, the stats raised
@@ -3308,7 +3390,10 @@ dn_t:       ds 1                            ; the damage number: frame of its bo
 dn_n:       ds 1                            ;   glyphs, place
 dn_x:       ds 1
 dn_y:       ds 1
-bt_dstr:    ds 6                            ; each member's last enemy target (this battle)
+bt_dstr:    ds 6
+rc_t:       ds 1                            ; a member's flinch: frame (0: none), OAM x pointer,
+rc_p:       ds 2                            ;   its sprites' own x
+rc_bx:      ds 6                            ; each member's last enemy target (this battle)
 bt_res:     ds 1                            ; (the results window: level ups recorded,
 bt_rgold:   ds 2                            ;   the gold, each member's new level, HP gain,
 res_on:     ds 4                            ;   stats raised, the page, row, next member)
