@@ -60,10 +60,8 @@ section bank 0, $0100
 section bank 0, $0150
 start:      di
             ld sp, $C800                    ; (WRAM 0: the menus switch WRAM banks)
-            cp $11                          ; (Color only: other models stop here; the
-            jr z, .cgb                      ;   message screen comes with the title milestone)
-.dmg:       halt
-            jr .dmg
+            cp $11                          ; (Color only: other models get the message)
+            jp nz, dmg_msg
 .cgb:       xor a
             ldh [rIE], a
             ldh [rNR52], a
@@ -328,7 +326,16 @@ read_pad:   ld a, $20
             ldh [pad], a
             ld a, $30
             ldh [rP1], a
-            ret
+            ldh a, [pad]                    ; A + B + Start + Select: the soft reset (Lot Check:
+            and $0F                         ;   cart RAM off, sound off, the boot path)
+            cp $0F
+            ret nz
+            di
+            xor a
+            ld [$0000], a
+            ldh [rNR52], a
+            ld a, $11
+            jp start
 
 ; ---- load map cur_map of group cur_grp: LCD off (V-Blank), the entry, layout, tileset tables,
 ; tiles, character, palettes; the start position when px = $FF
@@ -1382,6 +1389,75 @@ q_flush:    ld a, [q_n]
             xor a
             ld [q_n], a
             ret
+
+; ---- the Color-only message (the Game Pak needs a Game Boy Color): the font and a TM glyph,
+; the message centred, then halt (Lot Check: LCD off only in V-Blank)
+dmg_msg:    ldh a, [rLCDC]
+            bit 7, a
+            jr z, .off
+.w:         ldh a, [rLY]
+            cp 144
+            jr nz, .w
+            xor a
+            ldh [rLCDC], a
+.off:       ld a, MENU_BANK
+            ld [MBC5_BANKL], a
+            ld hl, $6400                    ; the font -> $8700 (2304 bytes)
+            ld de, $8700
+            ld bc, 144 * 16
+.f:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec bc
+            ld a, b
+            or c
+            jr nz, .f
+            ld hl, $9800                    ; the map: blanks
+            ld bc, $400
+.m:         ld a, $FF
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .m
+            ld hl, $6D00                    ; the lines (row, column, codes, 0; 0 ends)
+.l:         ld a, [hl+]
+            and a
+            jr z, .on
+            ld e, a                         ; DE = $9800 + 32 row + column
+            ld d, 0
+            sla e
+            rl d
+            sla e
+            rl d
+            sla e
+            rl d
+            sla e
+            rl d
+            sla e
+            rl d
+            ld a, [hl+]
+            add a, e
+            ld e, a
+            ld a, d
+            add a, $98
+            ld d, a
+.c:         ld a, [hl+]
+            and a
+            jr z, .l
+            ld [de], a
+            inc de
+            jr .c
+.on:        ld a, $C0                       ; colour 2 white, 3 black
+            ldh [$FF47], a                  ; (BGP)
+            xor a
+            ldh [rSCX], a
+            ldh [rSCY], a
+            ldh [rIE], a
+            ld a, %10010001
+            ldh [rLCDC], a
+.h:         halt
+            jr .h
 
 ; ---- banked code (the menus run in CODE1): bank-0 helpers that read another ROM bank restore
 ; the caller's (code_bank) before returning

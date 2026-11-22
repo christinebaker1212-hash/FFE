@@ -220,6 +220,17 @@ def pack(rom, rgb555):
     f = rom.prg[0x0D * 0x2000 + 0x1700:0x0D * 0x2000 + 0x1700 + 144 * 16]   # $6400: the font ($70-)
     b[0x2400:0x2400 + 144 * 16] = b''.join(nes2gb(f[16 * k:16 * k + 16]) for k in range(144))
     b[0x2E00:0x2E40] = b[0x1400 + 0x40:0x1400 + 0x80]          # $6E00: the hand's 4 tiles ($E4-)
+    # $6D00: the Color-only message (row, column, codes, 0; 0 ends); TM: this project's glyph
+    tm = ['###.#..#', '.#..####', '.#..#..#', '.#..#..#', '........', '........', '........', '........']
+    lo = bytes(int(r.replace('#', '1').replace('.', '0'), 2) for r in tm)
+    b[0x2400 + (0x7F - 0x70) * 16:0x2400 + (0x7F - 0x70) * 16 + 16] = bytes(x for r in range(8) for x in (lo[r], 0xFF))
+    msg = ['This Game Pak is', 'designed only for', 'use with the Game', 'Boy Color\x7f', 'system.']
+    out = bytearray()
+    for k, l in enumerate(msg):
+        enc = bytes(0x7F if ch == '\x7f' else text.ENC[ch] for ch in l)
+        out += bytes([5 + 2 * k, (20 - len(enc)) // 2]) + enc + b'\0'
+    out += b'\0'
+    b[0x2D00:0x2D00 + len(out)] = out
     t, _ = status_pack(rom)
     assert STATUS_AT + len(t) <= 0x5C00
     b[STATUS_AT - 0x4000:STATUS_AT - 0x4000 + len(t)] = t

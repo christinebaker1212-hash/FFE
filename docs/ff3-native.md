@@ -211,5 +211,9 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   earlier member's), then map 0 with world 0 at FF3's start position on the map stack. The LCD
   goes on once at boot with black palettes. `build.py` without --map / --group builds the real
   boot; with them the test start as before.
+- 2026-11-22: Lot Check items: the Color-only screen on other models ("This Game Pak is designed
+  only for use with the Game Boy Color(TM) system.", this project's TM glyph, LCD off in V-Blank,
+  then halt; checked in PyBoy DMG) and the soft reset (A + B + Start + Select in the joypad read:
+  cart RAM and sound off, the boot path).
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.
