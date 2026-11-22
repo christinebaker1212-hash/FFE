@@ -657,7 +657,8 @@ bg_pal:     xor a
             jr z, .o
             ld hl, M_BGIN
 .o:         ld a, $80
-            jp cgb_pal32
+            call cgb_pal32
+            jp text_pals                    ; (the windows' palette 7 and black 5 again)
 
 ; ---- movement on a standard map (FF1: one metatile in 16 frames, a pixel a frame)
 move:       ld a, [moving]
@@ -1278,8 +1279,7 @@ door_draw:  ld a, [door_x]
             call q_mt
             ld a, $FF
             ld [mt_force], a
-            call text_init
-            ret
+            ret                             ; (its palettes: bg_pal, in V-Blank)
 
 ; room state changed: CGB palettes in the next V-Blank; DMG: the visible metatiles again with
 ; the other pre-shaded tiles (the lines entering later are drawn with the new state anyway)
