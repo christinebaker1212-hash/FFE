@@ -176,5 +176,13 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   taking items off (3C/9D68, "inventory full" $016B), the slot's inventory items (3C/9C3C: class
   check, the weapon combination table 3C/9D4B, arrows up to 20, "Can't equip." $016F), values
   recomputed after every change.
+- 2026-11-22: Job menu (`src/job.s`, owner's choice J1): name + job, Capacity; the open jobs
+  (crystals: fix:F38A) one a row (condensed name, job level, CP cost), 12 a page (left / right);
+  CP costs as 3D/AD85 (nibble differences x 4 - job level, at least 0); the checks of 3D/AE23
+  (minimum level, no equipment, capacity) with their messages; "Change jobs?" (A); the change as
+  3D/AB8F (CP paid, job level / EXP swapped through $6210, base stats and MP growth of the new
+  job, its level table replayed level by level 3D/AC31: stats + amount and MP + 1 capped at 99,
+  mod. stats = base, current MP at most max), values recomputed. FF3's bank $39 copied whole
+  into JOB_BANK. Menu messages up to 4 lines.
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.

@@ -264,8 +264,10 @@ t_putc:     ld b, a
             ld a, [t_dest]                  ; (a menu canvas: at t_bx / t_by, 2 lines)
             and a
             jr z, .w
+            ld a, [t_maxr]
+            ld c, a
             ld a, [t_row]
-            cp 3
+            cp c
             ret nc
             ld a, [t_col]
             cp 19
@@ -441,6 +443,7 @@ t_row:      ds 1
 win_dirty:  ds 1
 win_on:     ds 1
 t_dest:     ds 1
+t_maxr:     ds 1
 t_bx:       ds 1
 t_by:       ds 1
 t_item:     ds 1                            ; FF3 $BB: the item of {02} / {03}

@@ -558,7 +558,9 @@ rnd_get:    ld a, [rnd_f6]
 
 ; a t8200 message's first page into the canvas at column B, row C (2 lines, 18 columns)
 m_msg1:     ld e, a
-            ld a, b
+            ld a, 3                         ; (2 lines)
+            ld [t_maxr], a
+m_msg1n:    ld a, b
             ld [t_bx], a
             ld a, c
             ld [t_by], a
@@ -578,8 +580,11 @@ m_msgbox:   push af
             ld de, $1406
             call m_box
             pop af
+            ld e, a
+            ld a, 5                         ; (4 lines)
+            ld [t_maxr], a
             ld bc, $0101
-            call m_msg1
+            call m_msg1n
             ld a, 1
             ld [m_dirty], a
             call cur_hide

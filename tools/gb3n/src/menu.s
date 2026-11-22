@@ -47,7 +47,18 @@ menu_open:  ld a, 3                         ; (each member's values from the equ
             ld b, 32
             ld a, 1
             call vcopy
-            xor a                           ; the members' job names
+            call mm_jobtiles
+            ld a, 2                         ; the canvas
+            ldh [rSVBK], a
+            call mm_draw
+            ld a, 1
+            ld [m_dirty], a
+            ld [menu_on], a
+            call wait_vbl
+            xor a
+            ld [m_cur], a
+            jp mm_loop
+mm_jobtiles: xor a                          ; the members' job names -> JOB_T + 12 m
             ld [m_i], a
 .jn:        ld a, [m_i]
             rrca
@@ -95,15 +106,8 @@ menu_open:  ld a, 3                         ; (each member's values from the equ
             ld a, [hl]
             cp 4
             jr nz, .jn
-            ld a, 2                         ; the canvas
-            ldh [rSVBK], a
-            call mm_draw
-            ld a, 1
-            ld [m_dirty], a
-            ld [menu_on], a
-            call wait_vbl
-            xor a
-            ld [m_cur], a
+            ret
+
 ; the main menu loop (3D/A5A9)
 mm_loop:    call mm_cursor
             call wait_vbl
@@ -144,6 +148,29 @@ mm_a:       ld a, [m_cur]
             jr z, .st
             cp 4
             jr z, .row
+            cp 5
+            jr z, .job
+            jp mm_loop
+.job:       ld a, [GS + $21]                ; (3D/A617: a crystal; not the dead / stone)
+            and $1F
+            jp z, mm_loop
+            call sel_member
+            jp c, mm_loop
+            ld b, a
+            rrca
+            rrca
+            add a, 2
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]
+            and $C0
+            jp nz, mm_loop
+            ld a, b
+            call job_menu
+            call mm_jobtiles
+            call mm_draw
+            ld a, 1
+            ld [m_dirty], a
             jp mm_loop
 .it:        call item_menu
             call mm_draw

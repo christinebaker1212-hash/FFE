@@ -36,6 +36,8 @@ GAME_BANK = 74                          # tables: $4000 / $4100 treasure content
                                         #   $4200 item prices (2 bytes), $4400 item names (16 each),
                                         #   $5400 the new-game save block (1 KB)
 TT_BANK = 75                            # per map: treasures + triggers (32 bytes), a bank a group
+JOB_BANK = 79                           # FF3 bank $39 at $4000 (job stats, level tables, MP growth),
+                                        #   $6000 the level-table pointers (3D/AD59) as GB addresses
 MENU_BANK = 78                          # field menus (menu.py)
 TXT_BANK = 68                           # dialogue (text.py): index + strings, banks 68-
 WMAP_BANK0 = 48                         # world tilemaps (256 x 256): 4 banks each, 64 rows a bank
@@ -151,7 +153,7 @@ def nes_rgb_src():
         '    dw %s\n' % ', '.join(str(x) for x in v[k:k + 8]) for k in range(0, 64, 8))
 
 
-MODULES = ('npc', 'text', 'event', 'menu', 'select', 'item', 'magic', 'equip')
+MODULES = ('npc', 'text', 'event', 'menu', 'select', 'item', 'magic', 'equip', 'job')
 
 
 def engine_src():
@@ -211,6 +213,13 @@ def main():
         banks[TT_BANK + grp] = tt
     import menu
     banks[MENU_BANK] = menu.pack(rom, rgb555)
+    jb = bytearray(0x4000)
+    jb[0:0x2000] = rom.prg[0x39 * 0x2000:0x3A * 0x2000]
+    lp = rom.b(0x3D, 0xAD59, 44)
+    for k in range(22):
+        v = (lp[2 * k] | lp[2 * k + 1] << 8) - 0x4000
+        jb[0x2000 + 2 * k] = v & 0xFF; jb[0x2001 + 2 * k] = v >> 8
+    banks[JOB_BANK] = jb
     src = engine_src() + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
     r = asm(src, syms={'START_MAP': int(opt['--map'], 0), 'START_GRP': int(opt['--group'], 0),
                        'START_X': int(opt['--x'], 0), 'START_Y': int(opt['--y'], 0),
@@ -218,6 +227,7 @@ def main():
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
+                       'JOB_BANK': JOB_BANK,
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,
                        'DLG_TEST_T': int(opt['--dlg'].split(':')[0], 0) if opt['--dlg'] else 0})
     for b, d in banks.items(): r.banks[b] = bytearray(d)
