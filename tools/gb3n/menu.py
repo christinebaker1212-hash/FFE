@@ -15,7 +15,7 @@ MENU_BANK layout:
   $5400  cursor / misc sprite tiles (0D/B400, 32 tiles, GB format)
   $5600  command words: 7 x 8 bytes (font codes, $FF padded); $5640 the hand's frame (OAM order)
 """
-import os, sys
+import os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..'))
 import text
@@ -104,6 +104,44 @@ def gb_text():
     return bytes(out), syms
 
 
+STATUS_COND = ('Proficiency', 'Strength', 'Agility', 'Stamina', 'Intelligence', 'Spirit')
+STATUS_BIG = ('To next level', 'Attack', 'Hit rate', 'Defense', 'Evasion rate', 'Magic defense',
+              'Magic evasion')
+STATUS_AT = 0x5900                              # big-font labels (codes), then condensed tiles
+
+
+def status_labels(rom):
+    """the status screen's words from t8200 $0147 (the ROM's English); "Magic evasion rate" as
+    "Magic evasion" (owner-approved mock S5)"""
+    t = text.decode(text.raw_string(rom, 't8200', 0x47))
+    words = [w.strip(' .…') for w in re.split(r'\{[^}]*\}|\[[^]]*\]|\n|…', t)]
+    words = [w for w in words if w and not w.isdigit() and w not in ('x',)]
+    for w in STATUS_COND + STATUS_BIG[:-1]: assert w in words, (w, words)
+    assert 'Magic evasion rate' in words
+    return words
+
+
+def status_pack(rom):
+    """(bytes, {label: address}): codes of STATUS_BIG (0-terminated), then for each condensed
+    word: count, tiles (GB format)"""
+    from latin_font import packed_label, COND
+    status_labels(rom)
+    out = bytearray(); syms = {}
+    for k, w in enumerate(STATUS_BIG):
+        syms['st_b%d' % k] = STATUS_AT + len(out)
+        out += text.encode(w) + b'\0'
+    for k, w in enumerate(STATUS_COND):
+        while (STATUS_AT + len(out) + 1) % 16: out.append(0)        # (DMA: tiles 16-aligned)
+        syms['st_c%d' % k] = STATUS_AT + len(out)
+        t = None
+        for n in range(1, 10):
+            t = packed_label(w, n, COND, fg=3, bg=2)
+            if t: break
+        out.append(len(t))
+        out += b''.join(bytes(b for r in range(8) for b in (tl[r], tl[8 + r])) for tl in t)
+    return bytes(out), syms
+
+
 def pack(rom, rgb555):
     b = bytearray(0x4000)
     names, tiles = job_names(rom)
@@ -130,4 +168,8 @@ def pack(rom, rgb555):
         b[0x1600 + 8 * k:0x1600 + 8 * k + 8] = w + b'\xFF' * (8 - len(w))
     t, _ = gb_text()
     b[GB_TEXT_AT - 0x4000:GB_TEXT_AT - 0x4000 + len(t)] = t
+    b[0x1C00:0x1C00 + 3 * 99] = rom.b(0x39, 0x80B0, 3 * 99)    # $5C00: EXP for each level
+    t, _ = status_pack(rom)
+    assert STATUS_AT + len(t) <= 0x5C00
+    b[STATUS_AT - 0x4000:STATUS_AT - 0x4000 + len(t)] = t
     return b

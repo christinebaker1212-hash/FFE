@@ -105,6 +105,8 @@ mm_loop:    call mm_cursor
             ld a, [m_new]
             bit 1, a
             jr nz, menu_close
+            bit 0, a
+            jr nz, mm_a
             bit 6, a                        ; up / down: the command (7, wrapping)
             jr z, .d
             ld a, [m_cur]
@@ -122,6 +124,484 @@ mm_loop:    call mm_cursor
             xor a
 .s:         ld [m_cur], a
             jr mm_loop
+
+; A on a command (3D/A5C2): 3 Status, 4 Order (the others: later)
+mm_a:       ld a, [m_cur]
+            cp 3
+            jr z, .st
+            cp 4
+            jr z, .row
+            jp mm_loop
+.st:        call sel_member
+            jp c, mm_loop
+            call status
+            call mm_draw
+            ld a, 1
+            ld [m_dirty], a
+            jp mm_loop
+.row:       call sel_member                 ; (3D/A696: the member's battle row $620F toggled,
+            jp c, mm_loop                   ;   again until B; not for the dead / stone)
+            ld [m_i], a
+            rrca
+            rrca
+            ld l, a
+            inc l
+            inc l
+            ld h, high(GS + $100)
+            ld a, [hl]
+            and $C0
+            jr nz, .row
+            ld a, l
+            add a, $0D
+            ld l, a
+            inc h
+            ld a, [hl]
+            xor 1
+            ld [hl], a
+            call mm_draw
+            ld a, 1
+            ld [m_dirty], a
+            jr .row
+
+; the character select hand (3D/A6B4): A = member (carry clear), B: carry set
+sel_member: ld a, [m_sel]
+.l:         ld [m_sel], a
+            add a, a
+            add a, a
+            inc a
+            add a, a
+            add a, a
+            add a, a
+            add a, 16 - 4
+            ld c, a
+            ld b, 8
+            call cursor_at
+            call wait_vbl
+            call read_pad
+            call m_keys
+            ld a, [m_new]
+            bit 1, a
+            jr nz, .b
+            bit 0, a
+            jr nz, .a
+            ld b, a
+            ld a, [m_sel]
+            bit 6, b
+            jr z, .d
+            dec a
+            and 3
+            jr .l
+.d:         bit 7, b
+            jr z, .l
+            inc a
+            and 3
+            jr .l
+.a:         ld a, [m_sel]
+            and a
+            ret
+.b:         scf
+            ret
+
+; ---- Status (3D/A83B; owner-approved mock S5): one page, labels from t8200 $0147
+status:     ld [m_i], a
+            rrca
+            rrca
+            ld [m_ch], a
+            ld a, $C0
+            ld [st_tile], a
+            call m_clear
+            ld bc, $0000
+            ld de, $1412
+            call m_box
+            ld a, [m_ch]                    ; name, job (condensed tiles at JOB_T + 12 m)
+            add a, 6
+            ld l, a
+            ld h, high(GS + $100)
+            ld bc, $0101
+            ld e, 6
+            call m_codes
+            ld bc, $0801
+            call st_job
+            ld bc, $0102                    ; "Lv" level
+            ld a, $95
+            call m_put
+            inc b
+            ld a, $B9
+            call m_put
+            ld a, 1                         ; ($6101 + 1)
+            call st_byte1
+            inc e
+            ld b, 5
+            call m_dec
+            ld hl, st_c0                    ; Proficiency (condensed), the job level ($6110 + 1)
+            ld bc, $0802
+            call st_cond
+            ld a, $10                       ; ($6110 + 1)
+            call st_byte1
+            inc e
+            ld b, 18
+            call m_dec
+            ld bc, $0103                    ; EXP ([76][7A][79]) and the amount
+            ld a, $76
+            call m_put
+            inc b
+            ld a, $7A
+            call m_put
+            inc b
+            ld a, $79
+            call m_put
+            ld a, 3
+            call st_n24
+            ld b, 18
+            ld c, 3
+            call m_dec24
+            ld hl, st_b0                    ; To next level (39/80B0 + 3 level - EXP)
+            ld bc, $0104
+            call m_str
+            call st_next
+            ld b, 18
+            ld c, 4
+            call m_dec24
+            ld a, [m_ch]                    ; HP (green: the status colour)
+            ld [m_ch], a
+            call mm_hpcol
+            ld bc, $0105
+            ld a, $77
+            call m_put2
+            inc b
+            ld a, $79
+            call m_put2
+            ld b, 4
+            ld a, [m_ch]
+            add a, $0C
+            call m_dec_l
+            ld a, $C7
+            call m_put2
+            inc b
+            ld a, [m_ch]
+            add a, $0E
+            call m_dec_l
+            ld a, 6                         ; MP (the main menu's row, at row 6)
+            ld [m_row], a
+            call mm_mprow
+            ld hl, st_c1                    ; Strength / Agility, Stamina / Intelligence, Spirit
+            ld bc, $0107                    ;   ($6117-$611B)
+            call st_cond
+            ld a, $17
+            ld bc, $0807
+            call st_stat
+            ld hl, st_c2
+            ld bc, $0A07
+            call st_cond
+            ld a, $18
+            ld bc, $1207
+            call st_stat
+            ld hl, st_c3
+            ld bc, $0108
+            call st_cond
+            ld a, $19
+            ld bc, $0808
+            call st_stat
+            ld hl, st_c4
+            ld bc, $0A08
+            call st_cond
+            ld a, $1A
+            ld bc, $1208
+            call st_stat
+            ld hl, st_c5
+            ld bc, $0109
+            call st_cond
+            ld a, $1B
+            ld bc, $0809
+            call st_stat
+            ld hl, st_b1                    ; Attack <mult>x  <power>
+            ld bc, $010B
+            call m_str
+            ld a, [m_ch]
+            add a, $21
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]
+            ld b, a
+            ld a, l
+            add a, 5
+            ld l, a
+            ld a, [hl]
+            add a, b
+            ld e, a
+            ld d, 0
+            ld bc, $090B
+            call m_dec
+            ld bc, $0A0B
+            ld a, $BB                       ; "x"
+            call m_put
+            call st_atk
+            ld bc, $120B
+            call m_dec
+            ld hl, st_b2                    ; Hit rate %
+            ld bc, $010C
+            call m_str
+            call st_hit
+            ld bc, $110C
+            call m_dec
+            ld bc, $120C
+            ld a, $C6
+            call m_put
+            ld hl, st_b3                    ; Defense <mult>x  <defense>
+            ld bc, $010D
+            call m_str
+            ld a, $2B
+            call st_byte1
+            ld bc, $090D
+            call m_dec
+            ld bc, $0A0D
+            ld a, $BB
+            call m_put
+            call st_def
+            ld bc, $120D
+            call m_dec
+            ld hl, st_b4                    ; Evasion rate %
+            ld bc, $010E
+            call m_str
+            ld a, $2C
+            call st_byte1
+            ld bc, $110E
+            call m_dec
+            ld bc, $120E
+            ld a, $C6
+            call m_put
+            ld hl, st_b5                    ; Magic defense
+            ld bc, $010F
+            call m_str
+            ld a, $1F
+            call st_byte1
+            ld bc, $120F
+            call m_dec
+            ld hl, st_b6                    ; Magic evasion %
+            ld bc, $0110
+            call m_str
+            ld a, $1E
+            call st_byte1
+            ld bc, $1110
+            call m_dec
+            ld bc, $1210
+            ld a, $C6
+            call m_put
+            ld a, 1
+            ld [m_dirty], a
+            call cur_hide
+.w:         call wait_vbl                   ; any of A / B: back
+            call read_pad
+            call m_keys
+            ld a, [m_new]
+            and 3
+            jr z, .w
+            ret
+
+; DE = the byte at the member's GS + $100 + A (+ m_ch)
+st_byte1:   ld b, a
+            ld a, [m_ch]
+            add a, b
+            ld l, a
+            ld h, high(GS + $100)
+            ld e, [hl]
+            ld d, 0
+            ret
+; a stat: the byte GS + $100 + m_ch + A, right-aligned ending column B
+st_stat:    push bc
+            call st_byte1
+            pop bc
+            jp m_dec
+; 3C/8A72: attack $6123 + $6128 (toad / mini: 1)
+st_atk:     call st_tm
+            ret z
+            ld a, $23
+            call st_byte1
+            ld a, l
+            add a, 5
+            ld l, a
+            ld a, [hl]
+            add a, e
+            ld e, a
+            ld a, 0
+            adc a, 0
+            ld d, a
+            ret
+; 3C/8A9D: defense $612D (toad / mini: 1)
+st_def:     call st_tm
+            ret z
+            ld a, $2D
+            jp st_byte1
+st_tm:      ld a, $02                       ; Z (and DE = 1) if toad / mini
+            call st_byte1
+            ld a, e
+            and $28
+            ld de, 1
+            jr z, .n
+            xor a
+            ret
+.n:         or 1
+            ret
+; 3C/89DE: hit % = $6127 ? ($6127 + $6122) / 2 : $6122
+st_hit:     ld a, $27
+            call st_byte1
+            ld a, e
+            and a
+            jr z, .s
+            ld a, l
+            sub 5
+            ld l, a
+            ld a, [hl]
+            add a, e
+            rra
+            ld e, a
+            ret
+.s:         ld a, $22
+            jp st_byte1
+; the 24-bit value at GS + $100 + m_ch + A -> n24
+st_n24:     ld b, a
+            ld a, [m_ch]
+            add a, b
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl+]
+            ld [n24], a
+            ld a, [hl+]
+            ld [n24 + 1], a
+            ld a, [hl]
+            ld [n24 + 2], a
+            ret
+; fix:F246: experience to the next level: 39/80B0 + 3 level - EXP (level >= 98: none)
+st_next:    ld a, [m_ch]
+            inc a
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]
+            cp $62
+            jr c, .c
+            xor a
+            ld [n24], a
+            ld [n24 + 1], a
+            ld [n24 + 2], a
+            ret
+.c:         ld c, a
+            add a, a
+            add a, c                        ; 3 level
+            ld l, a
+            ld h, 0
+            ld de, $5C00                    ; (MENU_BANK: the table copied at build time)
+            add hl, de
+            ld a, MENU_BANK
+            ld [MBC5_BANKL], a
+            ld a, [m_ch]
+            add a, 3
+            ld e, a
+            ld d, high(GS + $100)
+            ld a, [de]
+            ld b, a
+            ld a, [hl+]
+            sub b
+            ld [n24], a
+            inc e
+            ld a, [de]
+            ld b, a
+            ld a, [hl+]
+            sbc b
+            ld [n24 + 1], a
+            inc e
+            ld a, [de]
+            ld b, a
+            ld a, [hl]
+            sbc b
+            ld [n24 + 2], a
+            ret
+; n24 right-aligned, ending column B, row C (English digits)
+m_dec24:    push bc
+.l:         call div24
+            pop bc
+            push bc
+            add a, $80
+            call m_put2
+            pop bc
+            dec b
+            push bc
+            ld a, [n24]
+            ld c, a
+            ld a, [n24 + 1]
+            or c
+            ld c, a
+            ld a, [n24 + 2]
+            or c
+            jr nz, .l
+            pop bc
+            ret
+; the member's job name tiles (JOB_T + 12 m, loaded by menu_open) at column B, row C
+st_job:     ld a, [m_ch]
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]
+            add a, low($5080)
+            ld l, a
+            ld a, high($5080)
+            adc a, 0
+            ld h, a
+            ld a, MENU_BANK
+            ld [MBC5_BANKL], a
+            ld e, [hl]
+            ld a, PAL_TXT | 8
+            ld [m_attr], a
+            ld a, [m_i]
+            ld d, a
+            add a, a
+            add a, d
+            add a, a
+            add a, a
+            add a, JOB_T
+.t:         push af
+            call m_put2
+            pop af
+            inc a
+            inc b
+            dec e
+            jr nz, .t
+            ret
+; a condensed word (count, tiles at HL in MENU_BANK) -> VRAM bank 1 tiles st_tile.., placed at
+; column B, row C
+st_cond:    ld a, MENU_BANK
+            ld [MBC5_BANKL], a
+            ld a, [hl+]
+            ld [st_n], a
+            push bc
+            ld a, [st_tile]                 ; DE = $8000 + 16 tile
+            swap a
+            ld c, a
+            and $F0
+            ld e, a
+            ld a, c
+            and $0F
+            add a, $80
+            ld d, a
+            ld a, [st_n]
+            ld b, a
+            ld a, 1
+            call vcopy
+            pop bc
+            ld a, PAL_TXT | 8
+            ld [m_attr], a
+            ld a, [st_n]
+            ld e, a
+            ld a, [st_tile]
+.p:         push af
+            call m_put2
+            pop af
+            inc a
+            inc b
+            dec e
+            jr nz, .p
+            ld [st_tile], a
+            ld a, PAL_TXT
+            ld [m_attr], a
+            ret
 
 ; B (3D/A646): the window off, the NPC tiles back, the field as it was
 menu_close: call oam_hide
@@ -384,6 +864,13 @@ mm_member:  ld a, [m_i]
             ld [m_attr], a
             ld a, [m_row]                   ; MP: [78][79], the 8 levels' current MP
             add a, 3
+            ld [m_row], a
+            call mm_mprow
+            ret
+; the MP row (row m_row) of member m_ch
+mm_mprow:   ld a, PAL_TXT
+            ld [m_attr], a
+            ld a, [m_row]
             ld c, a
             ld b, 1
             ld a, $78
@@ -801,5 +1288,8 @@ menu_on:    ds 1
 sn_tile:    ds 1
 sn_dig:     ds 8
 m_digs:     ds 6
+m_sel:      ds 1
+st_tile:    ds 1
+st_n:       ds 1
 section wram, $C700
 sn_buf:     ds 64                           ; (page-aligned: DMA source)

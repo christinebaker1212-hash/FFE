@@ -141,5 +141,11 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   copy, then a restart). The boxes are the window layer at the top cut by LYC at the box's
   height (the field and the party stay visible below). Module code now placed one after the
   other in bank 0 by build.py (`engine_src`), RAM sections after.
+- 2026-11-22: character select (3D/A6B4), Status (mock S5: labels from t8200 $0147, condensed
+  where the mock has them, values as 3C/8998: level / job level + 1, EXP, to next level from
+  39/80B0, HP / MP, the 5 stats $6117-$611B, attack $6123 + $6128 with multiplier $6121 + $6126,
+  hit % (3C/89DE), defense $612D x $612B, evasion $612C, magic defense $611F, magic evasion
+  $611E; toad / mini 1), Order (3D/A696: battle row $620F toggled). Found: general-purpose
+  DMA ignores the low 4 bits of the source address (tile data must be 16-aligned).
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.

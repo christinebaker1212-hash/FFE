@@ -171,9 +171,9 @@ def engine_src():
             '\n'.join(codes) + '\n' + main_ram + '\n' + '\n'.join(rams))
 
 
-def gb_text_syms():
+def gb_text_syms(rom):
     import menu
-    return menu.gb_text()[1]
+    return dict(menu.gb_text()[1], **menu.status_pack(rom)[1])
 
 
 def main():
@@ -214,7 +214,7 @@ def main():
                        'START_X': int(opt['--x'], 0), 'START_Y': int(opt['--y'], 0),
                        'TS_BANK': TS_BANK, 'MT_BANK': MT_BANK, 'SPR_BANK': SPR_BANK,
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
-                       'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(), 'EVT_BANK': EVT_BANK,
+                       'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,
                        'DLG_TEST_T': int(opt['--dlg'].split(':')[0], 0) if opt['--dlg'] else 0})
