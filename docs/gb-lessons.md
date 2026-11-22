@@ -185,3 +185,21 @@ Color only" screen on older systems.
   (1/64 s): a test must wait. Some Color revisions read PCM12 wrongly in double speed.
 - mGBA's sound output has no high-pass filter: volume steps show as low-frequency content in
   any measurement (Game Boy mode too); compare like with like.
+
+## Banked code: cross-bank calls and bank-switching helpers (2026-11-22)
+- The assembler does not know banks: a `call` into another switchable bank assembles and then
+  runs whatever that address holds in the mapped bank. Moving FF1's Options to bank 99 left
+  the title calling `opt_save` from bank 2: New Game broke only after a soft reset.
+  `tools/gbn/xbank.py SYM` lists every call / jp / jr into another bank; after moving code,
+  the only entries left should be bank-0 code calling a bank that is mapped at that moment.
+- A bank-0 routine that switches the ROM bank and does not restore it (`text_pals` used to
+  select the common bank) is safe only from bank 0; called from a banked module it returns
+  into the wrong bank (a white screen at boot). Keep such helpers bank-neutral (data in RAM)
+  or restore the bank.
+- Functions that answer with a flag need it set at every exit: a loop that falls through
+  `cp N / jr c` leaves carry clear (FF1 `sv_any` said "a save exists" with none).
+- Find free space by runs of $FF in the built ROM per bank, not by the last label: bank 0 had
+  ~1.7 KB free after the screen framework.
+- Video study for new features (docs/gb-video-improvements.md): sample every frame at 2 fps,
+  then 60 fps around the moments that matter (an attack, a death, a transition), and measure
+  timings in frames before writing code.

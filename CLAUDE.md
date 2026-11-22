@@ -1314,7 +1314,13 @@ Owner (2026-11-22, later): map song restarted after every dialogue / menu (fixed
 menu centred, FF3-style popping damage numbers and MISS!, members flinch when hit, "It wouldn't have
 any effect." for healing at full HP (menus and battle), smoother prologue fades with A showing the
 page (docs/ff1-native.md items 20-21).
-Next: the owner's play-test. Lessons: docs/gb-lessons.md "Native rewrite".
+Owner (2026-11-22, last): improvements from the WonderSwan Color remake's videos without changing the
+NES / GB look (owner's picks): enemies flash as they act, "n HIT(S)" labels, enemy counts, members dart
+forward; place-name banner, place / play time on the main menu, Items Use / Sort / Key Items, Optimize,
+shop owned / worn counts, magic-shop slot pips, Options (B Dash, Cursor, Color window colour), Forget,
+three save files (docs/gb-video-improvements.md: what, how, and how to redo it for FF2 / FF3; docs/
+ff1-native.md item 22). New check: tools/gbn/xbank.py (calls into another bank).
+Next: the walking playthrough (DMG / SGB / CGB), then the owner's play-test. Lessons: docs/gb-lessons.md.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

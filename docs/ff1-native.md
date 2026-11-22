@@ -387,3 +387,14 @@ one reaches parity, so the owner can keep playing).
    own colours; DMG / SGB: 32 frames, lighter dither) and A / B show the whole page at once.
    Bug found on the way: dn_t was not cleared at a battle's start, so leftover RAM let the number
    routine write past OAM into battle RAM (it is cleared now; at most 5 glyphs).
+22. Owner (2026-11-22, last): improvements from the WonderSwan Color remake's videos, keeping the NES /
+   Game Boy look (docs/gb-video-improvements.md has what was seen, taken or not, and how to rebuild
+   each in FF2 / FF3). Battle: an enemy about to act flashes (silhouettes made at build time; Color
+   white / black with an outline, DMG / SGB white; fiends by palette on the Color), "n HIT(S)" in gold
+   over the attacker, each kind's count in the names window, members dart forward to swing / cast.
+   Field and menus: the place's name in a banner on entering a new place and on the main menu, the
+   play time (in unused save-page bytes), Items Use / Sort / Key Items, equipment Optimize, shops'
+   owned / worn counts and magic shops' slot pips, Options with B Dash, Cursor Remember / Reset and
+   (Color) the windows' colour, Forget (SELECT on the Magic screen), three save files with previews
+   (file 1 where the single save was). Fixed on the way: two calls into another bank (tools/gbn/
+   xbank.py now finds them).
