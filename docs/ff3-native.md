@@ -76,4 +76,22 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   ROM banks: 8 tilesets, 9-11 map entries (group 0: world 0 / props 02/A000, group 1: world 1 /
   props 02/B000, group 2: worlds 2+ / tables 00/8B00, 00/8D00), 12-27 layouts, 28-43 BG tiles,
   44 characters + frames.
-  Next: triggers (exits, entrances, doors, stairs: fix:E669 types), the world maps.
+- 2026-11-22: triggers: ids given at load as 3A L3A_91C8 (tiles $60-$63 / $70-$7C, per tile
+  and per type counters, TRIG_T / TRIG_O from 3A/921F / 923F); fix:E669 types: 0 exit to the
+  previous map, 1 exit to the world, 4 entrance, 5 door (shown open, metatile $7E), 6 locked door
+  (the unlock flag comes with events), C-E impassable, F event (scripts later). A map stack
+  (group, map, x, y; 16 levels) as FF3's nested `map main` calls ($29 / $2A / $48 pushed).
+  Map loads during play keep the LCD on (FF1 lesson): palettes black in V-Blank, tiles by
+  general-purpose DMA 64 blocks a V-Blank, the view through the queue two rows a frame, then the
+  palettes. Checked: town house door in and out (map 6 -> 7 -> 6).
+- 2026-11-22: world maps: tilemaps decoded at build time (06/9000.. row pointers + RLE, fix:CCBB /
+  CC47) into ROM banks 48-63 (worlds 0 / 1 share one), world tilesets (L3A_8F43: common
+  metatiles 0-63 + the world's 64-127, attributes, properties), tiles (FDDC6: 0A/8C00 + 0A/9400 +
+  $400 (w & 6)), palettes (L3A_9091), entrance destinations (00/8800, 00/8840). Groups 3-7 =
+  world 0-4 (`build.py --group 3 [--x --y]`); coordinates wrap at 256 on a world map. On foot:
+  impassable when property 1 bit 0 is set (fix:C65D mask 1); entrances (property 1 bit 7,
+  property 2 bit 7 clear) enter map 00/8800 + id of the world's map set, the world position
+  pushed. Checked (PyBoy state + pictures): world 0 walking, castle entrance -> map 78 ->
+  exit -> back on the world map at the entrance.
+  Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
+  owner's pleasant paging), random battles hook, vehicles later.

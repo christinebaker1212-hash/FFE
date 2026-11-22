@@ -104,6 +104,58 @@ class Rom:
         p[0x12], p[0x13], p[0x16], p[0x17] = c[0], c[1], c[2], c[3]
         return bytes(p)
 
+    # ---- world maps --------------------------------------------------------------------------
+    def world_tilemap(self, w):
+        """256 rows of 256 metatiles (FCCBB / FCC47): row pointers at 06/9000 (world 0 / 1), 06/9200,
+        06/9400, 06/9600 (fix:CC42); pointer + $1000: page low 5 bits | $80, bank 6 + the top 3
+        bits; RLE as the normal maps (bit 7: value, then count, 0 = 256)"""
+        hi = (0x90, 0x90, 0x92, 0x94, 0x96)[w]
+        out = bytearray()
+        for row in range(256):
+            po = 6 * B8 + ((hi << 8) - 0x8000) + 2 * row
+            lo, h = self.prg[po], (self.prg[po + 1] + 0x10) & 0xFF
+            o = (6 + (h >> 5)) * B8 + ((((h & 0x1F) | 0x80) << 8) | lo) - 0x8000
+            r = bytearray()
+            while len(r) < 256:
+                v = self.prg[o]; o += 1
+                if v & 0x80:
+                    n = self.prg[o]; o += 1
+                    r += bytes([v & 0x7F]) * (n or 256)
+                else:
+                    r.append(v)
+            out += r[:256]
+        return bytes(out)
+
+    def world_tileset(self, w):
+        """(L3A_8F43) 128 metatiles: 0-63 common (00/8000: TL, TR, BL, BR 64 each; attributes
+        00/8400), 64-127 per world (00/8100 + $100 (w >> 1): TL, TR, BL, BR 64 each; attributes
+        00/8440 + 32 (w & 6)); properties 00/8500 + $100 (w >> 1)"""
+        c = self.b(0, 0x8000, 0x100)
+        x = self.b(0, 0x8100 + 0x100 * (w >> 1), 0x100)
+        q = lambda k: c[64 * k:64 * k + 64] + x[64 * k:64 * k + 64]
+        at = self.b(0, 0x8400, 64) + self.b(0, 0x8440 + 32 * (w & 6), 64)
+        pr = self.b(0, 0x8500 + 0x100 * (w >> 1), 0x100)
+        pad = lambda t: bytes(t) + bytes(128)
+        return dict(tl=pad(q(0)), tr=pad(q(1)), bl=pad(q(2)), br=pad(q(3)), attr=pad(at),
+                    p1=pad(pr[0::2]), p2=pad(pr[1::2]))
+
+    def world_chr(self, w):
+        """PPU $0000-$0FFF on a world map (FDDC6): 0A/8C00 (128 tiles), 0A/9400 + $400 (w & 6)"""
+        a = 0x0A * B8 + 0x0C00
+        b = 0x0A * B8 + 0x1400 + 0x400 * (w & 6)
+        return self.prg[a:a + 0x800] + self.prg[b:b + 0x800]
+
+    def world_palettes(self, w, job=0):
+        """L3A_9091 on a world map: the base palettes, the walking character's colours"""
+        p = bytearray(self.bg_palettes(w) + self.obj_palettes(w))
+        c = self.b(0, 0x9690 + 4 * (job & 0x3F), 4)
+        p[0x12], p[0x13], p[0x16], p[0x17] = c[0], c[1], c[2], c[3]
+        return bytes(p)
+
+    def world_entrances(self, w):
+        """destination maps of the world's entrance tiles (fix:C1C4: 00/8800, 00/8840 off world 0)"""
+        return self.b(0, 0x8800 if w == 0 else 0x8840, 64)
+
     def char_chr(self, job=0):
         """16 map-character tiles (0E/8000 + $100 job, FDD2D)"""
         o = 0x0E * B8 + 0x100 * (job & 0x3F)

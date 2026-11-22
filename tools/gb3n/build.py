@@ -1,7 +1,8 @@
 """Build the native FF3 Game Boy Color ROM (tools/gb3n): the user's English NES ROM (made by the
 FF3 pipeline: tools/gb3/build.py -> build/ff3_en.nes) is the only input for game data.
 
-usage: build.py [EN.nes] [--map ID] [--world W] [--out ROM]"""
+usage: build.py [EN.nes] [--map ID] [--group G] [--x X --y Y] [--out ROM]
+  group 0-2: map sets (worlds 0, 1, 2+); 3 + w: world map w (then --x / --y: the party)"""
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
@@ -22,6 +23,11 @@ MT_BANK = 9                             # map entries: 64 bytes, (group * 256 + 
 LAY_BANK0 = 12                          # layouts: 16 a bank
 CHR_BANK0 = LAY_BANK0 + 16              # BG tile sets (GB format): 4 a bank
 SPR_BANK = CHR_BANK0 + 16               # walking characters: $4000 + $100 job; frames $7F00
+WLD_BANK = SPR_BANK + 1                 # world maps: tilesets $4000 + $700 k (k = w >> 1), entries
+                                        #   $7000 + 64 w, entrance destinations $7400 + 64 w
+WCHR_BANK = WLD_BANK + 1                # world BG tiles: $4000 + $1000 k
+WMAP_BANK0 = 48                         # world tilemaps (256 x 256): 4 banks each, 64 rows a bank
+WMAPS = (0, 0, 1, 2, 3)                 # world -> tilemap (worlds 0 and 1 share one)
 
 
 def group_world(g):
@@ -67,6 +73,7 @@ def pack(rom):
             e[8], e[9] = mp[2], mp[10]                                 # title, song
             e[10] = mp[1]                                              # flags (gil, water)
             e[11] = mp[11]                                             # exit
+            e[12] = TS_BANK                                            # tileset bank
             e[48:64] = rom.b(0x10, ((mp[13] | 0x20) << 8) | mp[12], 16)  # entrances (dest maps)
             e[16:48] = rom.map_palettes(mid, w)                        # NES colours
             ent[g][64 * mid:64 * mid + 64] = e
@@ -80,6 +87,24 @@ def pack(rom):
     cv = lambda a: (a & 3) | 8 | ((a & 0x40) >> 1) | ((a & 0x80) >> 1) | ((a & 0x20) << 2)
     sp[0x3F10:0x3F50] = bytes(v if k % 2 == 0 else cv(v) for k, v in enumerate(fr))
     banks[SPR_BANK] = sp
+    wb, wc = bytearray(b'\xFF' * 0x4000), bytearray(b'\xFF' * 0x4000)
+    for k in range(3):
+        d = rom.world_tileset(2 * k)
+        for i, key in enumerate(('tl', 'tr', 'bl', 'br', 'attr', 'p1', 'p2')):
+            wb[0x700 * k + 0x100 * i:0x700 * k + 0x100 * i + 0x100] = d[key]
+        c = rom.world_chr(2 * k)
+        wc[0x1000 * k:0x1000 * k + 0x1000] = b''.join(nes2gb(c[16 * i:16 * i + 16]) for i in range(256))
+    for w in range(5):
+        e = bytearray(64)
+        e[0], e[2], e[3], e[4] = WMAP_BANK0 + 4 * WMAPS[w], WCHR_BANK, 0x40 + 0x10 * (w >> 1), w >> 1
+        e[12] = WLD_BANK
+        e[16:48] = rom.world_palettes(w)
+        wb[0x3000 + 64 * w:0x3040 + 64 * w] = e
+        wb[0x3400 + 64 * w:0x3440 + 64 * w] = rom.world_entrances(w)
+    banks[WLD_BANK], banks[WCHR_BANK] = wb, wc
+    for k, w in enumerate((0, 2, 3, 4)):
+        t = rom.world_tilemap(w)
+        for i in range(4): banks[WMAP_BANK0 + 4 * k + i] = bytearray(t[0x4000 * i:0x4000 * i + 0x4000])
     return banks, len(lay_ix), len(chr_ix)
 
 
@@ -99,7 +124,8 @@ def nes_rgb_src():
 
 def main():
     args = sys.argv[1:]
-    opt = {'--map': '181', '--group': '0', '--out': os.path.join(ROOT, 'build', 'ff3n.gbc')}
+    opt = {'--map': '181', '--group': '0', '--x': '255', '--y': '255',
+           '--out': os.path.join(ROOT, 'build', 'ff3n.gbc')}
     pos = []
     while args:
         a = args.pop(0)
@@ -110,12 +136,15 @@ def main():
     src = open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + \
         open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
     r = asm(src, syms={'START_MAP': int(opt['--map'], 0), 'START_GRP': int(opt['--group'], 0),
-                       'TS_BANK': TS_BANK, 'MT_BANK': MT_BANK, 'SPR_BANK': SPR_BANK})
+                       'START_X': int(opt['--x'], 0), 'START_Y': int(opt['--y'], 0),
+                       'TS_BANK': TS_BANK, 'MT_BANK': MT_BANK, 'SPR_BANK': SPR_BANK,
+                       'WLD_BANK': WLD_BANK})
     for b, d in banks.items(): r.banks[b] = bytearray(d)
     size = 2
     while size < max(r.banks) + 1: size *= 2
     rom_bytes = make_rom(r.banks, 'FF3 NATIVE', cart_type=0x1B, rom_banks=size, ram_size_code=0x02, cgb=0xC0)
     open(opt['--out'], 'wb').write(rom_bytes)
+    open(os.path.splitext(opt['--out'])[0] + '.sym', 'w').write(r.sym_file() + ''.join('ff:%04x %s\n' % (a, n) for n, a in sorted(r.labels.items()) if n not in r.label_bank and isinstance(a, int)))
     print('wrote %s: %d KB, %d layouts, %d tile sets; start map %s group %s'
           % (opt['--out'], len(rom_bytes) // 1024, nl, nc, opt['--map'], opt['--group']))
 

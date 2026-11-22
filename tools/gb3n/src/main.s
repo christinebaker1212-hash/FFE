@@ -24,6 +24,7 @@ M_P2       = $DA00
 M_FACE     = $DB00              ; facing (NES order: R 1, L 2, D 4, U 8) -> frame offset
 M_FRAME    = $DB10              ; frames: TL, BL, TR, BR tile / CGB attribute pairs
 M_ENT      = $DB80              ; the map's entry (64 bytes, build.py pack)
+W_ENT      = $DBC0              ; world map: the entrance tiles' destination maps (64)
 STEP       = 16                 ; frames per metatile (a pixel a frame)
 PX0        = 72                 ; the party's 16 x 16 sprite at screen (72, 64)
 PY0        = 64
@@ -85,8 +86,10 @@ start:      di
             ld [cur_map], a
             ld a, 4                         ; (facing down)
             ld [facing], a
-            ld a, $FF                       ; (the map's own start position)
+            ld a, START_X                   ; ($FF: the map's own start position)
             ld [px], a
+            ld a, START_Y
+            ld [py], a
             call load_map
             ld a, LCDC_ON
             ldh [rLCDC], a
@@ -163,6 +166,13 @@ read_pad:   ld a, $20
 load_map:   ld a, [lcd_is]
             and a
             call z, lcd_off
+            ld a, [cur_grp]
+            cp 3
+            jp nc, .world
+            xor a
+            ldh [is_world], a
+            ld a, $3F
+            ldh [cmask], a
             ld a, [cur_grp]                 ; the entry: bank MT_BANK + group, $4000 + 64 id
             add a, MT_BANK
             ld [MBC5_BANKL], a
@@ -198,7 +208,48 @@ load_map:   ld a, [lcd_is]
             ld de, M_LAY
             ld bc, $400
             call memcpy
-            ld a, TS_BANK                   ; tileset tables -> M_TL..M_P2
+            call .tset
+            call init_trig
+            jp .gfx
+.world:     sub 3                           ; world map w: its entry and entrance table (bank
+            ld l, a                         ;   WLD_BANK $7000 / $7400 + 64 w)
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            add a, $70
+            ld h, a
+            ld a, WLD_BANK
+            ld [MBC5_BANKL], a
+            push hl
+            ld de, M_ENT
+            ld bc, 64
+            call memcpy
+            pop hl
+            ld a, h
+            add a, 4
+            ld h, a
+            ld de, W_ENT
+            ld bc, 64
+            call memcpy
+            ld a, 1
+            ldh [is_world], a
+            ld a, $FF
+            ldh [cmask], a
+            ld a, [px]                      ; (no position: FF3's new-game one, 41 + 7, 47 + 7)
+            inc a
+            jr nz, .wp
+            ld a, 48
+            ld [px], a
+            ld a, 54
+            ld [py], a
+.wp:        call .tset
+            jp .gfx
+.tset:      ld a, [M_ENT + 12]              ; tileset tables -> M_TL..M_P2 (bank e[12])
             ld [MBC5_BANKL], a
             ld a, [M_ENT + 4]
             ld l, 0
@@ -211,9 +262,8 @@ load_map:   ld a, [lcd_is]
             ld h, a
             ld de, M_TL
             ld bc, $700
-            call memcpy
-            call init_trig
-            ld a, [lcd_is]                  ; a load during play: the picture behind black
+            jp memcpy
+.gfx:       ld a, [lcd_is]                  ; a load during play: the picture behind black
             and a
             jr z, .vram
             call pal_black
@@ -503,14 +553,22 @@ move:       ld a, [moving]
             ld [facing], a
             ld a, [px]                      ; target metatile
             add a, e
-            and $3F
+            ld c, a
+            ldh a, [cmask]                  ; ($3F on a map, $FF on a world map)
+            and c
             ld e, a
             ld a, [py]
             add a, d
-            and $3F
+            ld c, a
+            ldh a, [cmask]                  ; ($3F on a map, $FF on a world map)
+            and c
             ld d, a
             call map_at
-            ld l, a                         ; a trigger tile (property 1 bit 7): fix:E669
+            ld l, a
+            ldh a, [is_world]
+            and a
+            jr nz, .wpass
+            ld a, l                         ; a trigger tile (property 1 bit 7): fix:E669
             ld h, high(M_P1)
             bit 7, [hl]
             jr z, .plain
@@ -537,6 +595,22 @@ move:       ld a, [moving]
 .plain:     call passable
             ret c
             jr .go2
+; world map (fix:C65D): impassable on foot when property 1 bit 0 is set; bit 7 with property 2
+; bit 7 clear: an entrance (fix:C1C4: destination 00/8800 / 00/8840 + id); bit 7 with bit 7:
+; an event (later); bit 6 random battles (later)
+.wpass:     ld h, high(M_P1)
+            ld a, [hl]
+            bit 0, a
+            ret nz
+            bit 7, a
+            jr z, .go2
+            inc h
+            ld a, [hl]
+            bit 7, a
+            jr nz, .go2
+            ld [act_id], a
+            ld a, $90
+            jr .ta
 .t0:        ld a, $40
             jr .ta
 .t1:        ld a, $C0
@@ -562,12 +636,16 @@ move:       ld a, [moving]
             ld a, [px]                      ; arrived
             ld hl, mdx
             add a, [hl]
-            and $3F
+            ld c, a
+            ldh a, [cmask]                  ; ($3F on a map, $FF on a world map)
+            and c
             ld [px], a
             ld a, [py]
             inc hl
             add a, [hl]
-            and $3F
+            ld c, a
+            ldh a, [cmask]                  ; ($3F on a map, $FF on a world map)
+            and c
             ld [py], a
             xor a
             ld [moving], a
@@ -586,11 +664,17 @@ do_act:     ld b, a
             ld [act], a
             ld [zlev], a
             ld a, b
+            cp $90
+            jr z, .went
             cp $80
             jr nz, .exit
-            ld a, [stk_n]
+            call .push
+            ret c
+            jr .ent
+.push:      ld a, [stk_n]
             cp 16
-            ret nc
+            ccf
+            ret c
             inc a
             ld [stk_n], a
             dec a
@@ -608,16 +692,31 @@ do_act:     ld b, a
             ld [hl+], a
             ld a, [py]
             ld [hl], a
-            ld a, [act_id]
+            and a
+            ret
+.ent:       ld a, [act_id]
             and $0F
             add a, low(M_ENT + 48)
             ld l, a
             ld h, high(M_ENT + 48)
-            ld a, [hl]
+.dest:      ld a, [hl]
             ld [cur_map], a
             ld a, $FF
             ld [px], a
             jp load_map
+.went:      call .push                      ; from a world map: the map set of world w
+            ld a, [cur_grp]                 ;   (0, 1, then 2) and W_ENT + id
+            sub 3
+            cp 2
+            jr c, .wg
+            ld a, 2
+.wg:        ld [cur_grp], a
+            ld a, [act_id]
+            and $3F
+            add a, low(W_ENT)
+            ld l, a
+            ld h, high(W_ENT)
+            jr .dest
 .exit:      ld a, [stk_n]
             and a
             ret z
@@ -685,7 +784,10 @@ passable:   ld l, a
             ret
 
 ; metatile at map (E = x, D = y), 0-63: inside 0-31 from the layout, else the fill metatile
-map_at:     ld a, e
+map_at:     ldh a, [is_world]
+            and a
+            jr nz, .world
+            ld a, e
             or d
             and $20
             jr nz, .fill
@@ -707,6 +809,20 @@ map_at:     ld a, e
             ld a, [hl]
             ret
 .fill:      ld a, [fill_mt]
+            ret
+.world:     ld a, d                         ; world map (256 x 256 in ROM): bank + y / 64,
+            rlca                            ;   $4000 + (y & 63) * 256 + x
+            rlca
+            and 3
+            ld hl, M_ENT
+            add a, [hl]
+            ld [MBC5_BANKL], a
+            ld a, d
+            and $3F
+            add a, $40
+            ld h, a
+            ld l, e
+            ld a, [hl]
             ret
 
 ; ---- scroll: the camera (map pixels) = party * 16 + step offset - (PX0, PY0)
@@ -841,10 +957,14 @@ draw_edge:  ld a, [mdx]
 
 ; queue metatile (E = x, D = y) (wrapped to 0-63): its ring cell, 4 tiles and palette
 q_mt:       ld a, e
-            and $3F
+            ld c, a
+            ldh a, [cmask]                  ; ($3F on a map, $FF on a world map)
+            and c
             ld e, a
             ld a, d
-            and $3F
+            ld c, a
+            ldh a, [cmask]                  ; ($3F on a map, $FF on a world map)
+            and c
             ld d, a
             push de
             call map_at
@@ -1017,6 +1137,8 @@ section hram, $FF80
 hram_dma:   ds 10
 vbl_flag:   ds 1
 pal_dirty:  ds 1
+cmask:      ds 1
+is_world:   ds 1
 pad:        ds 1
 scx:        ds 1
 scy:        ds 1
