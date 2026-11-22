@@ -4087,15 +4087,21 @@ def battle(rom):
 ''', syms=dict(WATTR=f.labels['wattr']))
     put(rom, 31, 0xD13D, w.bytes[:0xD157 - 0xD13D], old=bytes.fromhex('a537d022a5384a8531a53b4a8530a53c4a8586a901852d4c4ed2'))
     put(rom, 31, 0xD157, w.bytes[0xD157 - 0xD13D:], old=bytes.fromhex('a537d008a53c4aaaca4c08d3'))
-    # party: y = slot * 24 + 48 (NES: * 27 + 44), base x 156 front / 160 back (NES 208 / 224):
-    # GB x 140 / 144, every member in a 24-px slot of the 96-px battlefield
+    # party: y = slot * 24 + 48 (NES: * 27 + 44), base x 152 front / 160 back (NES 208 / 224):
+    # GB x 136 / 144, every member in a 24-px slot of the 96-px battlefield.
+    # The movement loops run until x equals their target exactly (2-px steps, 1-px for
+    # mini, the toad's hops 0,0,0,2,1,2,2,1 from any phase), so every distance is a
+    # multiple of 8 as on the NES: entry from x 240 (88 / 80), the step
+    # forward to x 136 (16 / 24), the knock-back to x 168 (16 / 8). (Base 156 with the NES
+    # step target 192 made the attacker walk around the whole screen to reach it.)
     put(rom, 11, 0x9B68, bytes([0xA2, 24]), old=bytes([0xA2, 0x1B]))
     put(rom, 11, 0x9B6F, bytes([0x69, 48]), old=bytes([0x69, 0x2C]))
-    put(rom, 11, 0xA102, bytes([0xA9, 156]), old=bytes([0xA9, 0xD0]))
+    put(rom, 11, 0xA102, bytes([0xA9, 152]), old=bytes([0xA9, 0xD0]))
     put(rom, 11, 0xA109, bytes([0xA9, 160]), old=bytes([0xA9, 0xE0]))
-    # big knock-back (b11:B11B: x to 240 in 4-px steps and back): to x 164, reached from both
-    # base x (156 / 160); x 240 is off the GB view (its right edge is NES x 180)
-    put(rom, 11, 0xB120, bytes([0xA9, 164]), old=bytes([0xA9, 0xF0]))
+    put(rom, 11, 0xA620, bytes([0xA9, 136]), old=bytes([0xA9, 0xC0]))   # step forward (b11:A620)
+    # big knock-back (b11:B11B: x to 240 in 4-px steps and back): to x 168; x 240 is off the
+    # GB view (its right edge is NES x 180)
+    put(rom, 11, 0xB120, bytes([0xA9, 168]), old=bytes([0xA9, 0xF0]))
     # one BG pattern table: the menu area keeps table 1 (no switch at the split, fix:FD60
     # AND #$EF -> AND #$FF), the menu does not scroll (b12:9AC6 scroll menu -> RTS)
     put(rom, 31, 0xFD63, bytes([0xFF]), old=bytes([0xEF]))

@@ -18,7 +18,7 @@ from collections import defaultdict
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
-from ff2code import CodeMap, SPACES, index_of
+from ff2code import CodeMap, SPACES, index_of   # (SPACES: also ftrans)
 from asm_sm83 import encode
 
 DATA = 1                    # GB bank of NES 16KB bank 0's data image (NES bank n -> DATA + n)
@@ -850,8 +850,8 @@ def layout(rc, blocks):
     return bank_of, banks, code, sizes
 
 
-def emit_program(rc):
-    blocks = rc.compile()
+def emit_program(rc, blocks=None):
+    if blocks is None: blocks = rc.compile()
     bank_of, banks, code, sizes = layout(rc, blocks)
     out = []
     xrefs = set()                                         # labels needing a bank-0 stub

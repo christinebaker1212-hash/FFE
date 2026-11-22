@@ -50,6 +50,13 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   the user's ROM + native routines). FF2 and FF3 switch to their disassembly sources
   (everything8215/ff2, /ff3) as the base**, packed into the builder (fetched when the builder
   is made, never committed to this repo); the English patches get ported onto those sources.
+- **Owner's decision (2026-11-22, FF2): all game code becomes native GB code through a
+  function-level translator in the builder** (whole routines lifted to an IR and compiled
+  to idiomatic SM83: real register allocation, no 6502 flag / stack emulation, regions and
+  banks resolved at build time), generated from the user's ROM at build time, never
+  hand-written game code in the repo. Same RAM effects as the NES (firstdiff), 0%
+  slowdown. This work comes before the open FF2 bug reports. Design and milestones:
+  `docs/ff2-gb-function-translator.md`.
 - **Static recompilation** of each game's own 6502 code to SM83, not a hand-written
   re-implementation. Game logic, formulas, RNG and events stay exactly as on the
   Famicom, and the English patch carries over without changes.

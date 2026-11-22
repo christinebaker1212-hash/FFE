@@ -137,7 +137,10 @@ def main():
             int(k[0][1:]) * 0x4000 + k[1] - 0x8000 if k[0].startswith('b') else None
         if off is None or prg[off:off + len(code)] != code or k not in cm.insns:
             print('  idiom %s:%04X: code not found, not used' % k); rc.g.idioms.pop(k, None)
-    prog, bank_of, banks = emit_program(rc)
+    import ftrans                                   # function-level front end
+    fp = ftrans.Program(rc)                         #   (docs/ff2-gb-function-translator.md)
+    fp.check()
+    prog, bank_of, banks = emit_program(rc, fp.compile())
     rt = '\n'.join(open(os.path.join(HERE, 'rt', f)).read() for f in RT_FILES)
     if release:                                     # ;[test] .. ;[/test]: test-runner paths
         rt = re.sub(r'^;\[test\].*?^;\[/test\][^\n]*\n', '', rt, flags=re.S | re.M)
