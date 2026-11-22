@@ -236,10 +236,10 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             ld [mm_cur], a
             ld [menu_act], a
 .re:        call mm_draw
-.l:         ld a, [mm_cur]                  ; the hand left of the command
-            add a, 10
+.l:         ld a, [mm_cur]                  ; the hand left of the command (column 12)
+            inc a
             ld c, a
-            ld b, 2
+            ld b, 12
             call cur_txt
             call scr_frame
             ldh a, [pad_new]
@@ -306,30 +306,35 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             call status_scr
             jr .re
 
-; the main menu drawn (LCD off), shown
+; the main menu (owner, 2026-11-22: the party's pictures back): party (0,0,12,15), each
+; member's battle picture (cells 2-3, three rows) with name, level (or Dead / Stone /
+; Poison) and HP / max beside it; commands (11,0,9,7); orbs (11,6,9,9); Gil (0,15,20,3)
 mm_draw:    call scr_open
             call orb_gfx
             ld bc, $0000
-            ld de, $140A
+            ld de, $0C0F
             call scr_win
-            ld bc, $0009
-            ld de, $0C09
+            ld bc, $0B00
+            ld de, $0907
             call scr_win
-            ld bc, $0C0A
-            ld de, $0808
+            ld bc, $0B06
+            ld de, $0909
+            call scr_win
+            ld bc, $000F
+            ld de, $1403
             call scr_win
             xor a
 .m:         push af
-            call mm_member
+            call mm_mem3
             pop af
             inc a
             cp 4
             jr c, .m
-            ld bc, $020A                    ; commands
+            ld bc, $0C01                    ; commands
             call pen_at
             ld hl, str_mcmd4
             call pen_str
-            ld bc, $0110                    ; Gil
+            ld bc, $0910                    ; Gil, ending at column 18
             call pen_at
             ld hl, GOLD
             ld a, [hl+]
@@ -346,6 +351,129 @@ mm_draw:    call scr_open
             call pen_str
             call orb_draw
             jp scr_show
+
+; member A in the main menu: the picture at x 14 (its job's battle pose: tiles 6 A, OAM 8 + 6 A),
+; name, level or ailment, HP / max from column 4, rows 1 + 3 A ..
+mm_mem3:    ld [mm_t], a
+            call ch_rec
+            ld a, [hl]
+            ld [scr_t1], a                  ; (the job)
+            ld l, a                         ; its pose: 6 tiles of the job's block
+            ld h, 0
+            add hl, hl
+            ld a, l
+            ld l, 0
+            ld h, a
+            ldh a, [is_cgb]
+            and a
+            ld bc, U_SPRDMG
+            jr z, .d
+            ld bc, U_SPRCGB
+.d:         add hl, bc
+            ld a, [mm_t]                    ; -> $8000 + 96 A
+            ld e, a
+            add a, a
+            add a, e
+            add a, a                        ; 6 A
+            swap a
+            ld e, a
+            and $0F
+            add a, $80
+            ld d, a
+            ld a, e
+            and $F0
+            ld e, a
+            ld bc, 96
+            ld a, UI_GFX
+            call far_copy
+            ld a, [scr_t1]                  ; its palette
+            ld e, a
+            ld d, 0
+            ld hl, cls_pal
+            add hl, de
+            ld a, [hl]
+            ld [scr_t0], a
+            ld a, [mm_t]                    ; at (16, 8 + 24 A)
+            ld c, a
+            add a, a
+            add a, c
+            add a, a
+            add a, a
+            add a, a
+            add a, 8
+            ld c, a
+            ld b, 14                        ; (2 pixels clear of the text)
+            ld a, [mm_t]
+            ld e, a
+            add a, a
+            add a, e
+            add a, a
+            push af
+            add a, 8
+            ld e, a
+            pop af
+            call scr_spr23
+            ld a, [mm_t]                    ; the name
+            ld c, a
+            add a, a
+            add a, c
+            inc a
+            ld c, a
+            ld b, 4
+            push bc
+            call pen_at
+            ld a, [mm_t]
+            call pen_name
+            pop bc
+            inc c
+            push bc
+            call pen_at
+            ld a, [mm_t]                    ; level, or the ailment (FF1 outside battle:
+            call ch_rec                     ;   1 dead, 2 stone, 3 poison)
+            inc hl
+            ld a, [hl-]
+            ld de, str_st_dead
+            cp 1
+            jr z, .w
+            ld de, str_st_stone
+            cp 2
+            jr z, .w
+            ld de, str_st_poison
+            cp 3
+            jr z, .w
+            ld a, l
+            add a, CH_LEVEL
+            ld l, a
+            ld a, $4C
+            call pen_ch
+            ld a, [hl]
+            inc a
+            call nf_a
+            call pen_numl
+            jr .hp
+.w:         ld h, d
+            ld l, e
+            call pen_str
+.hp:        pop bc
+            inc c
+            call pen_at
+            ld a, [mm_t]
+            call ch_rec
+            ld a, l
+            add a, CH_HP
+            ld l, a
+            push hl
+            call nf_w
+            ld b, 3
+            call pen_num
+            ld a, $2F
+            call pen_ch
+            pop hl
+            inc hl
+            inc hl
+            call nf_w
+            ld b, 3
+            jp pen_num
 
 ; member A's two lines: name, L level, HP / max; class or ailment
 mm_member:  ld [mm_t], a
@@ -496,21 +624,26 @@ orb_draw:   ld hl, orb_pos
             dec h
             inc hl
             ret
-orb_pos:    db 14, 12, 16, 12, 14, 14, 16, 14
+orb_pos:    db 13, 8, 15, 8, 13, 10, 15, 10
 
 ; ---- choose a member in the party window (hand left of the name): C set on B
 pick_char:  xor a
             ld [mm_pc], a
-.l:         ld a, [mm_pc]                   ; the hand at the member's second line (row
-            add a, a                        ;   2 m + 2, column 2: the name at column 1 would
-            add a, 2                        ;   leave only the fingertip on screen)
+.l:         ld a, [mm_pc]                   ; the hand at the member's picture (cells 2-3,
+            ld c, a                         ;   its middle row 2 + 3 m)
+            add a, a
+            add a, c
+            add a, 2
+            add a, a                        ; (pixels: the fingertip 2 before the picture
+            add a, a                        ;   at x 14)
+            add a, a
             ld c, a
-            ld b, 2
-            call cur_txt
+            ld b, 14 - 17
+            call scr_cursor
             ld a, [mm_cur]                  ; (the command's hand stays: second cursor)
-            add a, 10
+            inc a
             ld c, a
-            ld b, 2
+            ld b, 12
             call cur_txt2
             call scr_frame
             ldh a, [pad_new]

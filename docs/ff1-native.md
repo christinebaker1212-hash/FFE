@@ -309,3 +309,7 @@ one reaches parity, so the owner can keep playing).
    shops: a quantity (up / down 1, right / left 10, at most what the Gil buys and 99 owned)
    with the total. The world map, the 15-puzzle and The End moved to ROM bank 99 (F3_BANK)
    to make room in bank 2.
+15. Owner (2026-11-22): the party's pictures back on the main menu: party window (0,0,12,15)
+   with each member's battle pose (x 14, three rows) and name, level (or Dead / Stone /
+   Poison) and HP / max beside it; commands (11,0,9,7); orbs (11,6,9,9); Gil (0,15,20,3).
+   Choosing a member, the hand points at the picture; the command's hand stays.
