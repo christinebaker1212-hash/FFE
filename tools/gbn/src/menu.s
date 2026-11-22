@@ -1554,6 +1554,8 @@ magic_menu: ld [mg_ch], a
             ret nz
             bit 0, a
             jp nz, mg_use
+            bit 2, a                        ; SELECT: forget the spell (loc.s)
+            jp nz, mg_forget
             ld hl, mg_ch
             bit 4, a
             jr nz, .rt
@@ -1639,7 +1641,7 @@ mg_scroll:  call mg_lvsl
             add a, a
             inc a
             add a, c
-            cp 11
+            cp 9                            ; (rows 6-14: the hint window below)
             jr c, .x
             inc [hl]
             inc d
@@ -1694,8 +1696,9 @@ mg_draw:    call scr_open
             call nf_w
             call pen_numl
             ld bc, $0005
-            ld de, $140D
+            ld de, $140B
             call scr_win
+            call mg_hint                    ; (SELECT: Forget; loc.s)
             call mg_list
             jp scr_show
 
@@ -1717,7 +1720,7 @@ mg_list:    ld c, 6                         ; (cleared, colours back)
             jr nz, .ca
             inc c
             ld a, c
-            cp 17
+            cp 15
             jr c, .cl
             ld a, [mg_top]
             ld [mg_lv], a
@@ -1768,7 +1771,7 @@ mg_list:    ld c, 6                         ; (cleared, colours back)
 .sp:        ld [mg_hp], a
             inc c
             ld a, c
-            cp 17
+            cp 15
             ret nc
             ld b, 2
             call pen_at
@@ -1802,7 +1805,7 @@ mg_list:    ld c, 6                         ; (cleared, colours back)
             ld hl, mg_lv
             inc [hl]
             ld a, c
-            cp 17
+            cp 15
             jr c, .lv
             ret
 

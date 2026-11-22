@@ -716,6 +716,71 @@ sh_pstr:    call pen_str
             jr nz, .p
             ret
 
+; ---- the Magic screen (owner, 2026-11-22, from the WonderSwan Color remake): SELECT forgets
+; the spell under the hand, after a question; the hint in a window below the list
+mg_hint:    ld bc, $000F
+            ld de, $1403
+            call scr_win
+            ld bc, $0110
+            call pen_at
+            ld hl, mf_hint
+            jp pen_str
+mg_forget:  call mg_lvsl                    ; B = level, A = slot
+            ld c, a
+            call mg_data                    ; HL = the member's magic data
+            ld a, b
+            add a, a
+            add a, a
+            add a, c
+            add a, l
+            ld l, a
+            ld a, [hl]
+            and a
+            jr nz, .q
+            call sfx_err                    ; (an empty slot)
+            jp magic_menu.l
+.q:         push hl
+            ld c, a                         ; the spell's name id: $AF + 8 level + spell
+            ld a, b
+            add a, a
+            add a, a
+            add a, a
+            add a, c
+            add a, $AF
+            push af
+            ld bc, $0009
+            ld de, $1409
+            call scr_win
+            ld bc, $010A
+            call pen_at
+            ld hl, mf_q1
+            call pen_str
+            pop af
+            call pen_iname
+            ld a, $3F
+            call pen_ch
+            ld bc, $010C
+            call pen_at
+            ld hl, mf_q2
+            call pen_str
+            ld bc, $010D
+            call pen_at
+            ld hl, mf_q3
+            call pen_str
+            call scr_upd
+            call wait_ab
+            pop hl
+            jr c, .no
+            ld [hl], 0                      ; forgotten
+            ld a, SFX_SEL
+            ld [sfx_req], a
+.no:        call mg_draw
+            jp magic_menu.l
+mf_hint:    db "SELECT: Forget", 0
+mf_q1:      db "Forget ", 0
+mf_q2:      db "A Button: Yes", 0
+mf_q3:      db "B Button: No", 0
+
 ; the field's dash: Z if B is not held or the Options turned the dash off
 dash_b:     ld a, [opt_nodash]
             and a
