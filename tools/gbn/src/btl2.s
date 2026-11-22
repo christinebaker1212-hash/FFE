@@ -378,6 +378,7 @@ bt_erec:    ld l, a
 
 ; ---- commands (FF1 GetCharacterBattleCommand): B goes back a member
 bt_commands:
+            call bt_curr                    ; (Options: Cursor Reset)
             ld a, [ITEMS + $19]             ; potions this round (FF1 btl_potion_heal / pure)
             ld [bt_pots], a
             ld a, [ITEMS + $1A]
@@ -3013,6 +3014,23 @@ rc_put:     ld a, [rc_p]
             ret
 rc_off:     db 4, 7, 8, 8, 7, 6, 5, 3, 2, 1, 0
 RC_LEN     = 11
+; Options: Cursor Reset: each member's command, spell and target not remembered
+bt_curr:    ld a, [opt_curr]
+            and a
+            ret z
+            ld hl, bt_lastc
+            xor a
+            ld b, 8                         ; (bt_lastc, bt_lastm)
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            dec a
+            ld hl, bt_lastt
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            ret
 zz_end_b6_7360:
 
 section bank 6, $7480                       ; (the results window: after btl4)

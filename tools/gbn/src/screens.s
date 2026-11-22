@@ -2340,48 +2340,6 @@ eqm_unadj:  ld a, 1
             ld [eq_off], a
             jp eq_unadj
 
-; Colour: palettes 1 / 2 the window's with green / red text (the preview's better / worse)
-eqm_pal:    ld a, COMMON
-            ld hl, C_WINPAL
-            ld de, eqm_buf
-            ld bc, 8
-            call far_copy
-            ld a, $2A                       ; NES green
-            ld de, eqm_buf + 6
-            call .nes
-            ld a, $80 | 8
-            call .put
-            ld a, $26                       ; NES red
-            ld de, eqm_buf + 6
-            call .nes
-            ld a, $80 | 16
-            call .put
-            ld a, $28                       ; NES yellow: the labels' gold (palette 3)
-            ld de, eqm_buf + 6
-            call .nes
-            ld a, $80 | 24
-            call .put
-            ld a, $00                       ; NES grey: a choice not open now (palette 4)
-            ld de, eqm_buf + 6
-            call .nes
-            ld a, $80 | 32
-.put:       call bcps_w
-            ld hl, eqm_buf
-            ld b, 8
-.p:         ld a, [hl+]
-            call bcpd_w
-            dec b
-            jr nz, .p
-            ret
-.nes:       add a, a
-            ld l, a
-            ld h, 0
-            ld bc, C_NESRGB
-            add hl, bc
-            ld bc, 2
-            ld a, COMMON
-            jp far_copy
-
 ; the whole screen (LCD off / masked), shown
 eqm_draw:   call scr_open
             call eqm_pal                    ; (masked: into the shadows)

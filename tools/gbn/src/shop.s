@@ -1017,7 +1017,7 @@ sh_mpv:     call sh_wwin
             dec a
             jr z, .p
             ld hl, str_sfull
-.p:         call pen_str
+.p:         call sh_pstr                    ; (and the level's slots: loc.s)
             ld a, [sh_k]
             inc a
             cp 4
@@ -1079,6 +1079,8 @@ sh_sellall: xor a
 sh_pick:    xor a
             ld [sh_top], a
             ld [sh_cur], a
+            dec a                           ; (the owned / worn line: loc.s)
+            ld [sh_ocur], a
 .rd:        ld bc, $0005
             ld de, $140C
             call scr_win
@@ -1139,7 +1141,8 @@ sh_pick:    xor a
             jr c, .it
 .dn:        call sh_gold
             call scr_upd
-.l:         ld a, [sh_cur]                  ; the hand at the entry (column 2, row 6 + 2 n)
+.l:         call sh_own                     ; (how many owned / worn: loc.s)
+            ld a, [sh_cur]                  ; the hand at the entry (column 2, row 6 + 2 n)
             ld hl, sh_top
             sub [hl]
             add a, a
@@ -1410,3 +1413,4 @@ sh_wi:      ds 1
 sh_q:       ds 1
 sh_qmax:    ds 1
 sh_tot:     ds 3
+sh_ocur:    ds 1

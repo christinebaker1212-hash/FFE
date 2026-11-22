@@ -27,11 +27,9 @@ text_init:  ldh a, [is_cgb]
             ldh [rVBK], a
 ; the window palette 7 and the black palette 5 (CGB; also from bg_pal in V-Blank: a room's
 ; palettes cover them)
-text_pals:  ld a, COMMON
-            call sbank
-            ld a, $B8                       ; BG palette 7
+text_pals:  ld a, $B8                       ; BG palette 7 (the window colours: win_pal)
             ldh [rBCPS], a
-            ld hl, C_WINPAL
+            ld hl, win_pal
             ld b, 8
 .p:         ld a, [hl+]
             ldh [rBCPD], a

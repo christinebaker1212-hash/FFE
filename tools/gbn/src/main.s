@@ -196,7 +196,7 @@ start:      di
             ld a, SND_BANK                  ; the sound on
             call sbank
             call snd_init_b
-            ld a, SCR_BANK                  ; (the Options: from cart RAM, or defaults)
+            ld a, F3_BANK                   ; (the Options: from cart RAM, or defaults)
             ld hl, opt_load
             call bank_call
             ld a, BOX_LINES                 ; LYC: the dialogue box's bottom (window off)
@@ -848,8 +848,7 @@ move:       ld a, [moving]
             xor a
             ld [mcount], a
             ld [dash], a                    ; B held, on foot: this step at double speed
-            ldh a, [pad]                    ;   (owner, 2026-11-22)
-            bit 1, a
+            call dash_b                     ;   (owner, 2026-11-22; Options: Dash On / Off)
             jr z, .nd
             ld a, [vehicle]
             cp V_FOOT

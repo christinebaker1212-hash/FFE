@@ -303,7 +303,9 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             jp .re
 .n5:        cp 4
             jr nz, .n4
-            call opt_menu                   ; Options
+            ld a, F3_BANK                   ; Options (loc.s, bank 99)
+            ld hl, opt_menu
+            call bank_call
             jp .re
 .n4:        cp 3
             jr z, .st
@@ -868,40 +870,6 @@ st_vals:    push bc
             ret
 
 ; the string HL (lines) from (B, C), each line's first E cells gold (Color: palette 3)
-gold_str:   push de
-            push bc
-            push hl
-            call pen_at
-            call pen_str
-            pop hl
-            ld d, 1                         ; (its lines)
-.n:         ld a, [hl+]
-            and a
-            jr z, .g
-            cp $0A
-            jr nz, .n
-            inc d
-            jr .n
-.g:         pop bc
-            pop hl
-            ld e, l
-.r:         push bc
-            push de
-            call cell_addr
-            ld a, h
-            add a, 3
-            ld h, a
-            ld a, $0B
-.c:         ld [hl+], a
-            dec e
-            jr nz, .c
-            pop de
-            pop bc
-            inc c
-            dec d
-            jr nz, .r
-            ret
-
 ; nf_val = experience to the next level (FF1: the level-up table minus the experience)
 exp_next:   ld a, [mm_t]
             call ch_rec
@@ -2602,6 +2570,12 @@ mg_hp:      ds 1
 mg_top:     ds 1
 opt_cur:    ds 1
 opt_vol:    ds 1                            ; the master volume (0-7)
+opt_nodash: ds 1                            ; Options: 1 = B does not dash
+opt_curr:   ds 1                            ; Options: 1 = the battle cursor reset each turn
+win_r:      ds 1                            ; Options (Color): the windows' inside colour
+win_g:      ds 1
+win_b:      ds 1
+win_pal:    ds 8                            ; CGB palette 7 (the windows) as chosen
 tw_spd:     ds 1                            ; the typed text's speed (0-4: Slow .. Instant)
 eq_kind:    ds 1
 eq_off:     ds 1
@@ -2616,203 +2590,4 @@ eq_adj:     ds 1
 eq_box:     ds 16
 mtxt:       ds 200                          ; (story_show copies 200)
 
-section bank 2, $7280                       ; (the Options screen)
-; ---- Options (owner, 2026-11-22): Message Speed (FF1's battle message speed, as on the
-; title), Text Speed (the typed text: Slow, Normal = reading speed, Fast, Faster, Instant),
-; Volume (0-7, the master volume, at once). Header (0,0,20,3), list (0,3,20,15); up / down
-; pick, left / right change, B back (kept in cart RAM bank 1: opt_save)
-opt_menu:   call scr_open
-            call eqm_pal
-            ld bc, $0000
-            ld de, $1403
-            call scr_win
-            ld bc, $0101
-            ld hl, str_options
-            ld e, 7
-            call gold_str
-            ld bc, $0003
-            ld de, $140F
-            call scr_win
-            ld bc, $0205
-            call pen_at
-            ld hl, str_opt1
-            call pen_str
-            ld bc, $0207
-            call pen_at
-            ld hl, str_opt2
-            call pen_str
-            ld bc, $0209
-            call pen_at
-            ld hl, str_opt3
-            call pen_str
-            call opt_vals
-            call scr_show
-            xor a
-            ld [opt_cur], a
-.l:         ld a, [opt_cur]                 ; the hand at the setting (rows 5, 7, 9)
-            add a, a
-            add a, 5
-            ld c, a
-            ld b, 2
-            call cur_txt
-            call scr_frame
-            ldh a, [pad_new]
-            bit 1, a
-            jp nz, opt_save
-            ld hl, opt_cur
-            bit 6, a
-            jr nz, .up
-            bit 7, a
-            jr nz, .dn
-            ld b, 1
-            bit 4, a
-            jr nz, .ch
-            ld b, $FF
-            bit 5, a
-            jr z, .l
-.ch:        ld a, [opt_cur]                 ; B = +1 / -1, clamped
-            and a
-            ld hl, respond
-            ld c, 8
-            jr z, .v
-            dec a
-            ld hl, tw_spd
-            ld c, 5
-            jr z, .v
-            ld hl, opt_vol
-            ld c, 8
-.v:         ld a, [hl]
-            add a, b
-            cp c
-            jr nc, .l                       ; (past either end: no change)
-            ld [hl], a
-            call opt_apply
-            call opt_vals
-            call scr_upd
-            jr .l
-.up:        ld a, [hl]
-            dec a
-            cp 3
-            jr c, .s
-            ld a, 2
-            jr .s
-.dn:        ld a, [hl]
-            inc a
-            cp 3
-            jr c, .s
-            xor a
-.s:         ld [hl], a
-            jr .l
-; the three values, ending at column 18
-opt_vals:   ld bc, $1205
-            call pen_at
-            ld a, [respond]
-            add a, $31
-            call pen_ch
-            ld bc, $0C07
-            call pen_at
-            ld a, [tw_spd]
-            ld l, a
-            add a, a
-            add a, a
-            add a, a
-            sub l                           ; 7 a name
-            ld e, a
-            ld d, 0
-            ld hl, opt_spn
-            add hl, de
-            ld b, 7
-.n:         ld a, [hl+]
-            call pen_ch
-            dec b
-            jr nz, .n
-            ld bc, $1209
-            call pen_at
-            ld a, [opt_vol]
-            add a, $30
-            jp pen_ch
-opt_spn:    db "   Slow", " Normal", "   Fast", " Faster", "Instant"
-; the volume to the master volume (NR50)
-opt_apply:  ld a, [opt_vol]
-            ld b, a
-            swap a
-            or b
-            ldh [$FF24], a
-            ret
-; the options from cart RAM bank 1 $BF00 ("OP", the three, a check); defaults when not
-; valid (Lot Check: cart RAM on only meanwhile)
-OPT_RAM    = $BF00
-opt_load:   ld a, 1
-            ld [tw_spd], a
-            ld a, 7
-            ld [opt_vol], a
-            ld a, $0A
-            ld [$0000], a
-            ld a, 1
-            ld [$4000], a
-            ld hl, OPT_RAM
-            ld a, [hl+]
-            cp $4F
-            jr nz, .x
-            ld a, [hl+]
-            cp $50
-            jr nz, .x
-            ld a, [hl+]                     ; respond, text speed, volume, check
-            ld b, a
-            ld a, [hl+]
-            ld c, a
-            ld a, [hl+]
-            ld d, a
-            ld a, b
-            xor c
-            xor d
-            xor $5A
-            cp [hl]
-            jr nz, .x
-            ld a, b
-            cp 8
-            jr nc, .x
-            ld a, c
-            cp 5
-            jr nc, .x
-            ld a, d
-            cp 8
-            jr nc, .x
-            ld a, b
-            ld [respond], a
-            ld a, c
-            ld [tw_spd], a
-            ld a, d
-            ld [opt_vol], a
-.x:         xor a
-            ld [$0000], a
-            ld [$4000], a
-            jp opt_apply
-opt_save:   ld a, $0A
-            ld [$0000], a
-            ld a, 1
-            ld [$4000], a
-            ld hl, OPT_RAM
-            ld a, $4F
-            ld [hl+], a
-            ld a, $50
-            ld [hl+], a
-            ld a, [respond]
-            ld b, a
-            ld [hl+], a
-            ld a, [tw_spd]
-            ld c, a
-            ld [hl+], a
-            ld a, [opt_vol]
-            ld d, a
-            ld [hl+], a
-            ld a, b
-            xor c
-            xor d
-            xor $5A
-            ld [hl], a
-            xor a
-            ld [$0000], a
-            ld [$4000], a
-            ret
-zz_end_7280:
+

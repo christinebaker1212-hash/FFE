@@ -32,7 +32,13 @@ def font_tiles(rom, ff3=None):
     for ch in latin_font.G:
         out[code_of(ch)] = latin_font.tile(ch, fg=3, bg=2)
     out.update(names.icon_tiles(ff3))
+    out[0x0A] = names.own_tile(PIP_FULL)     # magic shops: a level's slot used / free
+    out[0x0B] = names.own_tile(PIP_FREE)
     return out
+
+
+PIP_FULL = ['........', '..###...', '.#####..', '.#####..', '.#####..', '..###...', '........', '........']
+PIP_FREE = ['........', '..###...', '.#...#..', '.#...#..', '.#...#..', '..###...', '........', '........']
 
 
 DMG_ICON = (2, 1, 3, 0)                # DMG icons: outlines dark grey, details light grey
