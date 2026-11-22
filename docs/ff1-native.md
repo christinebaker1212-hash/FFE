@@ -357,3 +357,11 @@ one reaches parity, so the owner can keep playing).
      then mock-ups of it across the full width and over the whole battlefield; the owner
      disliked all of them and chose the pure black battlefield. Removed (pixel blending was
      not possible either: most mixed cells need more than four colours).
+19. Owner (2026-11-22): "the music is still messed up; Cornelia messes up every other track".
+   Checked every song: FF1's engine (py65 on the ROM) and the GB engine agree exactly frame by frame,
+   fresh and after the town theme; SameBoy / Gambatte play them as FF1 (per voice: pitch, envelopes).
+   mGBA 0.10 in Color mode ignores the zombie-mode volume steps the GB sound layer uses for volume
+   changes inside a note, so there every envelope was garbled (the town theme changes volume nearly
+   every frame). The boot now tests zombie mode on a Color (snd.s `snd_zmb`, PCM12) and uses
+   restarts where it does not work; mGBA's envelopes now follow FF1's (correlation 0.75-0.98 per
+   voice, was 0.1). Tools: `sgbrun` env SGBRUN_WAV (sound, 48 kHz).

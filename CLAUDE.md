@@ -1307,6 +1307,9 @@ Owner (2026-11-22, last) chose: battle conveniences
 speed, volume, kept in cart RAM), dash on B (encounters per step unchanged); HP bars and the
 Select repeat declined; battle backdrops built, mocked up full width / full height, then removed
 (owner: pure black battlefield). Details: docs/ff1-native.md item 18.
+Music (owner: "still messed up", 2026-11-22): engine exact against FF1's own code for every song,
+fresh and after the town theme; mGBA (Color mode) ignored the zombie-mode volume steps: boot test
+picks restarts there (docs/ff1-native.md item 19, docs/gb-lessons.md "Music").
 Next: the owner's play-test. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining

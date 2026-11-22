@@ -164,3 +164,24 @@ Color only" screen on older systems.
 - A "fix" isn't done until the picture that showed the bug has been looked at again: the DMG
   white boxes behind large enemies survived a first fix aimed at the wrong cause (the real one:
   a row counter overflowing at 36 tiles).
+
+## Music: check the engine and the sound hardware separately (2026-11-22)
+- **Engine first, exactly:** run the game's own music code (6502, from the ROM) in py65 from the
+  GB engine's RAM state at a frame and compare the next frames' channel RAM and register values
+  (FF1: every song, fresh and after the town theme: identical). Audio comparisons cannot prove
+  this: pitch detectors pick harmonics, envelopes repeat every note so alignment slips by one.
+- **Measure audio robustly:** downsample very high-rate recordings first (SameBoy writes 2 MHz:
+  FFT bins of 64 Hz), cut frames at each machine's own rate (NES 60.10, GB 59.73 per second),
+  align by the pitch sequence, take levels from percentiles (a DC step inside a frame doubles a
+  peak-to-peak value), and run parallel jobs with separate output names.
+- **"Zombie mode" (NRx2 = $08 adds 1 to the playing volume) is right on hardware, SameBoy and
+  Gambatte, but mGBA 0.10 ignores it in Game Boy Color mode:** every volume change inside a note
+  is lost there (garbled envelopes, sustained decays). The native FF1 build tests it at boot on a
+  Color (a silent note, PCM12 read before and after one $08 write: 1 -> 2 works, 1 -> 1 not,
+  anything else = PCM12 unreadable, keep zombie mode) and otherwise changes volume by a restart
+  with the new level (mGBA's restart keeps the duty position and timer: no pitch loss there; on
+  hardware a restart reloads the timer: ~10-20 cents flat at FF1's change rate, so not used).
+- The hardware ignores a zombie write until the envelope clock's first tick after a restart
+  (1/64 s): a test must wait. Some Color revisions read PCM12 wrongly in double speed.
+- mGBA's sound output has no high-pass filter: volume steps show as low-frequency content in
+  any measurement (Game Boy mode too); compare like with like.

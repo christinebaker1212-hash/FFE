@@ -55,6 +55,62 @@ snd_init_b: ld a, $80
             ld [snd_cv + 1], a
             ld a, $80                       ; (no track yet: silent)
             ld [NES_RAM + $4B], a
+; volume changes inside a note use "zombie mode" (NRx2 = $08 adds 1 to the playing volume: no
+; restart, so no click and no lost phase). The Game Boy, the Game Boy Color and accurate
+; emulators do it; some emulators do not on the Color (mGBA 0.10: the write is ignored, the
+; music's envelopes are lost). On a Color: a test note at volume 1 (nothing to the speakers),
+; its output level read back from PCM12 ($FF76), one $08 write, read again: 1 then 2 = zombie
+; mode works; 1 then 1 = it does not (volume changes then restart the note); anything else
+; (PCM12 not readable, as some Color revisions in double speed): as the hardware, zombie mode
+            ld a, 1
+            ld [snd_zmb], a
+            ldh a, [is_cgb]
+            and a
+            ret z
+            xor a
+            ldh [$FF25], a                  ; (nothing to the speakers)
+            ldh [$FF10], a
+            ld a, $80
+            ldh [$FF11], a                  ; 50 % duty
+            ld a, $18
+            ldh [$FF12], a                  ; volume 1, up, no envelope steps
+            ld a, $C0
+            ldh [$FF13], a
+            ld a, $87
+            ldh [$FF14], a                  ; frequency $7C0, restart
+            call .zwait                     ; (the hardware ignores a write until the envelope
+            call .zmax                      ;   clock's first tick, 1/64 s)
+            ld d, b                         ; D = the level before
+            ld a, $08
+            ldh [$FF12], a                  ; zombie: + 1
+            call .zmax                      ; B = after
+            xor a
+            ldh [$FF12], a                  ; (channel 1 off again)
+            ld a, SND_MASK
+            ldh [$FF25], a
+            ld a, d
+            cp 1
+            ret nz
+            ld a, b
+            cp 1
+            ret nz
+            xor a
+            ld [snd_zmb], a
+            ret
+.zwait:     ld de, $4000                    ; (~55 ms)
+.zw:        dec de
+            ld a, d
+            or e
+            jr nz, .zw
+            ret
+.zmax:      ld bc, 0                        ; B = the highest level of 256 reads
+.zr:        ldh a, [$FF76]
+            and $0F
+            cp b
+            jr c, .zn
+            ld b, a
+.zn:        dec c
+            jr nz, .zr
             ret
 tri_lens:   db 10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14     ; the NES length table
             db 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30
@@ -128,7 +184,14 @@ aw:         push af
             ld a, [de]
             cp $FF
             jr z, .vr                       ; (unknown: set and restart)
-            push hl
+            ld a, [snd_zmb]                 ; (zombie mode does not work here: every change
+            and a                           ;   by a restart with the new volume)
+            jr nz, .zm
+            ld a, [de]
+            cp b
+            jp z, .x
+            jr .vr
+.zm:        push hl
             ld h, d
             ld l, e
             ld a, b
@@ -324,6 +387,7 @@ sw_mute:    ds 1
 tri_lc:     ds 1                            ; the triangle's linear counter run out in N frames
 tri_len:    ds 1                            ; its length counter (half frames, last $400B)
 snd_cv:     ds 2                            ; the pulses' GB volume now ($FF: unknown)
+snd_zmb:    ds 1                            ; 1: zombie mode works (volume steps), 0: restarts
 
 ; ---- sound effects (FF1's, data from the ROM: sound.sfx_data). The square part plays on CH2
 ; while the music engine leaves its square 2 alone (sq2_sfx = NES_RAM + $7E, FF1's own

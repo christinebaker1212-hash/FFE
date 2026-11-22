@@ -13,6 +13,7 @@
  * Build: gcc -O2 sgbrun.c -lmgba -o sgbrun   (Ubuntu: apt install libmgba-dev)
  */
 #include <mgba/core/core.h>
+#include <mgba/core/blip_buf.h>
 #include <mgba/core/timing.h>
 #include <mgba/core/config.h>
 #include <mgba/internal/gb/gb.h>
@@ -114,6 +115,8 @@ int main(int argc, char** argv) {
 	mCoreConfigSetValue(&core->config, "cgb.sgbModel", model);
 	mCoreConfigSetIntValue(&core->config, "sgb.borders", dmg ? 0 : 1);   /* --cgb: Game Boy Color */
 	mCoreConfigSetIntValue(&core->config, "useBios", 0);
+	mCoreConfigSetIntValue(&core->config, "volume", 0x100);   /* (no frontend: the default is silent) */
+	mCoreConfigSetIntValue(&core->config, "mute", 0);
 	mCoreLoadConfig(core);
 	unsigned w, h;
 	core->desiredVideoDimensions(core, &w, &h);
@@ -122,6 +125,12 @@ int main(int argc, char** argv) {
 	core->setVideoBuffer(core, buf, W);
 	if (!mCoreLoadFile(core, argv[1])) { fprintf(stderr, "cannot load %s\n", argv[1]); return 1; }
 	core->reset(core);
+	FILE* wavf = NULL; long wavn = 0;               /* SGBRUN_WAV=FILE: the sound (stereo 16-bit, 48 kHz) */
+	if (getenv("SGBRUN_WAV")) {
+		wavf = fopen(getenv("SGBRUN_WAV"), "wb"); fwrite("RIFF\0\0\0\0WAVEfmt \x10\0\0\0\x01\0\x02\0\x80\xbb\0\0\0\xee\x02\0\x04\0\x10\0data\0\0\0\0", 1, 44, wavf);
+		core->setAudioBufferSize(core, 8192);
+		for (int c = 0; c < 2; c++) blip_set_rates(core->getAudioChannel(core, c), core->frequency(core), 48000);
+	}
 	if (getenv("SGBRUN_VCHK")) {
 		vchk_gb = (struct GB*) core->board;
 		vchk_store8 = vchk_gb->cpu->memory.store8;
@@ -235,6 +244,12 @@ int main(int argc, char** argv) {
 			}
 		} else
 		core->runFrame(core);
+		if (wavf) {
+			struct blip_t* L = core->getAudioChannel(core, 0); struct blip_t* R = core->getAudioChannel(core, 1);
+			short sb[8192 * 2]; int n = blip_samples_avail(L); if (n > 8192) n = 8192;
+			blip_read_samples(L, sb, n, 1); blip_read_samples(R, sb + 1, n, 1);
+			fwrite(sb, 4, n, wavf); wavn += n;
+		}
 		if (getenv("SGBRUN_LAG")) {                     /* SGBRUN_LAG=FILE: NES frame count per GB frame */
 			static FILE* lf = NULL;
 			if (!lf) lf = fopen(getenv("SGBRUN_LAG"), "wb");
@@ -322,6 +337,9 @@ int main(int argc, char** argv) {
 	for (int k = 0; k < ncall; k++) printf("C %02X:%04X %u\n", (callr[k] >> 16) & 0xFF, callr[k] & 0xFFFF, callw[k]);
 	if (prof || prof2) for (int k = 0; k < nprof; k++) printf("%s %02X:%04X %u\n", (profs[k] >> 24) ? "S" : "P", (profs[k] >> 16) & 0xFF, profs[k] & 0xFFFF, proff[k]);
 	if (getenv("SGBRUN_VCHK")) printf("VCHK total %u\n", vchk_n);
+	if (wavf) {
+		uint32_t b = wavn * 4, r = b + 36; fseek(wavf, 4, SEEK_SET); fwrite(&r, 4, 1, wavf); fseek(wavf, 40, SEEK_SET); fwrite(&b, 4, 1, wavf); fclose(wavf);
+	}
 	core->deinit(core);
 	return 0;
 }
