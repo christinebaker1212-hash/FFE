@@ -731,6 +731,179 @@ bt_target_enemy:
 .b:         call bt_hand_off
             scf
             ret
+; the damage (nf_val) as a number over its target while the message shows (owner,
+; 2026-11-22): small-font digits as two sprites (tiles $F4-$F5, OAM 36-37), white (CGB OBJ
+; palette 4; DMG OBP0's colour 1), centred on an enemy, left of a member's sprite
+bt_dnum_w:  ld a, [hl+]                     ; (from the 16-bit damage at HL)
+            ld [nf_val], a
+            ld a, [hl]
+            ld [nf_val + 1], a
+            xor a
+            ld [nf_val + 2], a
+bt_dnum:    ld b, 2
+            call vwf_clr
+            xor a
+            ld [vw_x], a
+            call num_fmt
+            ld hl, nf_dig
+.s:         ld a, [hl]
+            cp $20
+            jr nz, .c
+            inc hl
+            jr .s
+.c:         ld a, [hl+]
+            push hl
+            call vwf_ch
+            pop hl
+            ld a, l
+            cp low(nf_dig + 6)
+            jr nz, .c
+            ld a, [vw_x]
+            ld [bt_dw], a
+            ld a, 1
+            ld [vw_spr], a
+            ld a, $F4
+            ld b, 2
+            call vwf_out
+            xor a
+            ld [vw_spr], a
+            ld hl, bt_stage                 ; the ink's rows kept (bt_sbuf)
+            ld de, bt_sbuf
+            ld b, 16
+.k:         ld a, [hl+]
+            ld [de], a
+            inc de
+            inc hl
+            dec b
+            jr nz, .k
+            ld hl, bt_stage                 ; an outline round the ink (colour 3: black /
+            ld de, bt_sbuf                  ;   dark grey), the ink colour 1 (white)
+            ld c, 0                         ; (row in the tile)
+.o:         ld a, [de]                      ; left / right
+            ld b, a
+            add a, a
+            ld [bt_t + 9], a
+            ld a, b
+            srl a
+            ld [bt_t + 10], a
+            ld a, c                         ; above (not on a tile's first row)
+            and a
+            jr z, .na
+            dec de
+            ld a, [de]
+            inc de
+            jr .ab
+.na:        xor a
+.ab:        ld [bt_t + 11], a
+            ld a, c                         ; below (not on its last)
+            cp 7
+            jr z, .nb
+            inc de
+            ld a, [de]
+            dec de
+            jr .bb
+.nb:        xor a
+.bb:        ld hl, bt_t + 9
+            or [hl]
+            inc hl
+            or [hl]
+            inc hl
+            or [hl]
+            ld [bt_t + 12], a
+            ld a, b                         ; outline = neighbours AND NOT ink
+            cpl
+            ld hl, bt_t + 12
+            and [hl]
+            ld [hl], a
+            push de
+            ld a, e                         ; stage row = 2 (index)
+            sub low(bt_sbuf)
+            add a, a
+            add a, low(bt_stage)
+            ld l, a
+            ld a, 0
+            adc a, high(bt_stage)
+            ld h, a
+            ld a, [bt_t + 12]
+            or b
+            ld [hl+], a                     ; low plane: ink + outline
+            ld a, [bt_t + 12]
+            ld [hl], a                      ; high plane: outline
+            pop de
+            inc de
+            inc c
+            ld a, c
+            and 7
+            ld c, a
+            ld a, e
+            cp low(bt_sbuf + 16)
+            jr nz, .o
+            ld a, [df_player]
+            and a
+            jr nz, .pl
+            ld a, [bt_tgt]                  ; an enemy: its middle
+            call bt_epos
+            ld a, b
+            add a, a
+            add a, e
+            add a, a
+            add a, a
+            ld d, a
+            ld a, [bt_dw]
+            srl a
+            ld l, a
+            ld a, d
+            sub l
+            ld d, a
+            ld a, c
+            add a, a
+            add a, e
+            add a, a
+            add a, a
+            sub 4
+            ld e, a
+            jr .put
+.pl:        ld a, [bt_tgt]                  ; a member: left of the sprite
+            and 3
+            ld c, a
+            add a, a
+            add a, c
+            add a, a
+            add a, a
+            add a, a
+            add a, 8
+            ld e, a
+            ld a, [bt_dw]
+            ld l, a
+            ld a, PARTY_X - 4
+            sub l
+            ld d, a
+.put:       ld hl, oam_buf + 144
+            ld a, e
+            add a, 16
+            ld [hl+], a
+            ld a, d
+            add a, 8
+            ld [hl+], a
+            ld a, $F4
+            ld [hl+], a
+            ld a, 4
+            ld [hl+], a
+            ld a, e
+            add a, 16
+            ld [hl+], a
+            ld a, d
+            add a, 16
+            ld [hl+], a
+            ld a, $F5
+            ld [hl+], a
+            ld [hl], 4
+            ret
+bt_dnum_off:
+            xor a
+            ld [oam_buf + 144], a
+            ld [oam_buf + 148], a
+            ret
 ; HL += the member choosing (bt_cm)
 bt_memp:    push af                         ; (A and the flags kept)
             ld a, [bt_cm]
@@ -1585,6 +1758,8 @@ bt_phys:    ld a, 168
             ld [nf_val + 2], a
             ld a, M_DMG
             call bt_msg_num
+            ld hl, mt_total                 ; (the number over the target)
+            call bt_dnum_w
             ld a, [mt_total]                ; HP - total (at least 0)
             ld b, a
             ld a, [df_hp]
@@ -2100,7 +2275,8 @@ bt_msg_end: call bt_msg_head
             jr nz, .x
             dec b
             jr nz, .w
-.x:         ld a, [bt_msgon]                ; the rows below back (the party window's tiles
+.x:         call bt_dnum_off
+            ld a, [bt_msgon]                ; the rows below back (the party window's tiles
             and a                           ;   are current), the names drawn again
             ret z
             xor a

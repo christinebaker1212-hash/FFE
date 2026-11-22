@@ -1016,7 +1016,9 @@ mg_apply:   call mg_conn_t                  ; connected: damage doubled
             xor a
             ld [nf_val + 2], a
             ld a, M_DMG
-            jp bt_msg_num
+            call bt_msg_num
+            ld hl, mg_dmg                   ; (the number over the target)
+            jp bt_dnum_w
 ef_undead:  ld a, 148                       ; only undead (category bit 3)
             ld [mg_hitc], a
             xor a

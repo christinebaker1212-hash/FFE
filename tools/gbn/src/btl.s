@@ -699,6 +699,20 @@ bt_pal:     ldh a, [is_cgb]
             ldh [rOCPD], a
             dec b
             jr nz, .o
+            xor a                           ; OBJ palette 4 (the damage numbers): 1 white,
+            ldh [rOCPD], a                  ;   3 black (the outline)
+            ldh [rOCPD], a
+            ld a, $FF
+            ldh [rOCPD], a
+            ld a, $7F
+            ldh [rOCPD], a
+            ld a, $FF
+            ldh [rOCPD], a
+            ld a, $7F
+            ldh [rOCPD], a
+            xor a
+            ldh [rOCPD], a
+            ldh [rOCPD], a
             ret
 .bp:        ld l, a                         ; battle palette A (4 NES colours) as RGB555
             ld h, 0
@@ -1275,7 +1289,13 @@ vwf_out:    push af
             ret
 ; row bits A -> C = low plane, bt_t+8 = high plane (CGB: ink colour 3 on 2; DMG: 0 on 3)
 vwf_row:    ld c, a
-            ldh a, [is_cgb]
+            ld a, [vw_spr]                  ; (sprite tiles: ink colour 1, the rest clear)
+            and a
+            jr z, .bg
+            xor a
+            ld [bt_t + 8], a
+            ret
+.bg:        ldh a, [is_cgb]
             and a
             jr z, .d
             ld a, $FF
@@ -1792,6 +1812,8 @@ vw_w:       ds 1
 vw_s:       ds 1
 bt_sbuf:    ds 40
 vw_icon:    ds 17
+vw_spr:     ds 1                            ; vwf_out makes sprite tiles (the damage numbers)
+bt_dw:      ds 1
 ft_p:       ds 2
 section wram, $DB00
 vw_buf:     ds 160                          ; the small font's line buffer (page-aligned)
