@@ -1122,7 +1122,8 @@ desc_box:   push af
 ; string HL typed at the pen (owner, 2026-11-22): a letter at a time at an adult's reading
 ; speed, twice as fast with A held, a soft click; $0A: the next line. (The screen not shown:
 ; at once.)
-pen_type:   call lcd_get
+pen_type:   call hand_hide                  ; (no hand while the text types)
+            call lcd_get
             bit 7, a
             jp z, pen_str
             ld a, [sfx_menu]                ; (no menu sounds from A meanwhile)

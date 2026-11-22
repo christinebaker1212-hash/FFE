@@ -100,6 +100,13 @@ scr_open:   call lcd_off                    ; (LCD off in V-Blank, interrupts of
             ld bc, 12
             jp far_copy
 
+; the hand (OAM 0-3) hidden; registers but A kept
+hand_hide:  xor a
+            ld [oam_buf], a
+            ld [oam_buf + 4], a
+            ld [oam_buf + 8], a
+            ld [oam_buf + 12], a
+            ret
 oam_clr:    ld hl, oam_buf
             ld b, 160
             xor a
@@ -481,7 +488,10 @@ scr_spr23:  ld [scr_t1], a
             ret
 
 ; one frame: wait, pad, OAM
-scr_frame:  call wait_vbl
+scr_frame:  ld a, [sf_row]                  ; (owner, 2026-11-22: no hand while a window is
+            cp 18                           ;   still going up: it shows once the screen is
+            call c, hand_hide               ;   whole, never over the old one)
+            call wait_vbl
             call sf_step
             ld a, [scr_mus]                 ; (FF1 MenuFrame / the shops: the music again
             and a                           ;   when a jingle has ended it)

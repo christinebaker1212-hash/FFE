@@ -1369,7 +1369,15 @@ bt_upd:     ld a, [sf_row]
             ret
 
 ; one battle frame: V-Blank, map rows and staged tiles, the pad
-bt_frame:   call wait_vbl
+bt_frame:   ld a, [sf_row]                  ; (no hand while the window rows are going up)
+            cp 12
+            jr c, .h
+            ld a, [bt_rmask]
+            ld hl, bt_upn
+            or [hl]
+            jr z, .w
+.h:         call hand_hide
+.w:         call wait_vbl
             ld a, [bt_upn]                  ; (map rows only once their tiles are up)
             and a
             jr nz, .t
