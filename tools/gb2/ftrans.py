@@ -486,11 +486,162 @@ class Program:
             if o.mwrite and mm is not None: clobber_ptr_by(mm, mode)
 
     # -------------------------------------------------------------- code generation
+    # -------------------------------------------------------------- M4: carry polarity
+    # In routines without stack tricks, the GB carry is not kept in 6502 polarity at every
+    # instruction: CMP / CPX / CPY / SBC leave it inverted (GB borrow = NOT 6502 C) and the
+    # state is tracked; BCC / BCS test the matching condition; a CCF is emitted only where
+    # the 6502 polarity is needed (ADC, rotates, PHP, calls, returns, jumps, natives) or at
+    # a block whose entry is shared by several paths (normalised at the end of the paths).
+    # rc.cfix[key]: set of 'pre' (CCF before), 'post' (CCF after the code), 'swap' (branch
+    # on the other condition), 'keep' (CMP / SBC: leave the result inverted), 'sbc_i'
+    # (SBC: carry already inverted, no CCF before).
+    NEEDS_N = {'ADC', 'ROL', 'ROR', 'PHP', 'JSR', 'RTS', 'RTI', 'JMP', 'BRK', 'TXS', 'TSX', 'PLP'}
+
+    def carry_states(self):
+        rc = self.rc; ins = rc.insns; cfix = {}
+        lazy = set()
+        rng = os.environ.get('LAZY_BISECT')               # debug: only routines lo <= index < hi
+        lo_i, hi_i = (int(x) for x in rng.split(',')) if rng else (0, 1 << 30)
+        for n, (e, r) in enumerate(sorted(self.routines.items())):
+            if not lo_i <= n < hi_i: continue
+            if r.tricks & {'pla_drop', 'tsx', 'txs', 'jmp_ind', 'dyn_jump'} or r.dyncalls: continue
+            for k in r.keys:
+                if len(self.owner[k]) == 1 and k not in rc.g.ext and k not in rc.g.idioms:
+                    lazy.add(k)
+        self.lazy = lazy
+        def step(k, s):
+            """state after instruction k from state s before it -> (s_out, flags)"""
+            i = ins[k]; mn = i.mn; f = set()
+            cl = 'C' in rc.live_in.get(k, ())
+            if k not in lazy:                           # (code outside the lazy set: 6502 polarity in)
+                if s == 'i' and cl: f.add('pre')
+                return 'n', f
+            lo = rc.live_out.get(k, frozenset('NZCV'))
+            v_sbc = mn == 'SBC' and 'V' in lo
+            if mn in self.NEEDS_N or v_sbc or mn == 'ADC':
+                if s == 'i' and cl: f.add('pre')
+                s = 'n'
+            elif mn == 'SBC':
+                if s == 'i' or (s == '?' and not cl): f.add('sbc_i')
+            elif mn in ('BCC', 'BCS'):
+                if s == 'i': f.add('swap')
+            if mn in ('CMP', 'CPX', 'CPY') or (mn == 'SBC' and not v_sbc):
+                if 'C' in lo: f.add('keep'); s = 'i'
+                else: s = '?'
+            elif mn in ('ADC', 'ROL', 'ROR', 'ASL', 'LSR', 'CLC', 'SEC', 'PLP', 'JSR', 'RTS'):
+                s = 'n'
+            elif 'C' not in lo:
+                s = '?'
+            return s, f
+        def meet(a, b):
+            if a is None: return b
+            if a == '?': return b
+            if b == '?' or a == b: return a
+            return 'X'                                  # conflict
+        for e, r in self.routines.items():
+            if not (r.keys & lazy): continue
+            preds = defaultdict(set)
+            for b, ss in r.succ.items():
+                for s2 in ss: preds[s2].add(b)
+            def fixed_n(b):
+                """entries that hold 6502 polarity: the routine entry, blocks after a call or
+                reached from code outside the lazy set"""
+                if b == r.entry or b not in lazy: return True
+                for p in preds[b]:
+                    last = r.blocks[p][-1]
+                    if last not in lazy or self.ops[last].kind == 'call': return True
+                return False
+            force = set(b for b in r.blocks if fixed_n(b))
+            def norm_end(b, st):
+                """the block ends in the inverted state with C live and flows into a block
+                that needs 6502 polarity (or leaves the routine): CCF at its end"""
+                last = r.blocks[b][-1]
+                return st == 'i' and 'C' in rc.live_out.get(last, ()) and \
+                    (not r.succ[b] or any(s2 in force for s2 in r.succ[b]))
+            while True:
+                inn = {}; out = {}
+                changed = True
+                while changed:
+                    changed = False
+                    for b in r.blocks:
+                        if b in force: si = 'n'
+                        else:
+                            si = None
+                            for p in preds[b]:
+                                if p in out: si = meet(si, out[p])
+                            if si is None: continue
+                            if si == 'X': si = 'n'          # (handled below)
+                        if inn.get(b) == si and b in out: continue
+                        inn[b] = si; st = si
+                        for k in r.blocks[b]: st, _ = step(k, st)
+                        if norm_end(b, st): st = 'n'
+                        if out.get(b) != st: out[b] = st; changed = True
+                # blocks whose predecessors disagree: force 6502 polarity there
+                newforce = set()
+                for b in r.blocks:
+                    if b in force: continue
+                    m = None
+                    for p in preds[b]:
+                        if p in out: m = meet(m, out[p])
+                    if m == 'X': newforce.add(b)
+                if not newforce: break
+                force |= newforce
+            # flags: per instruction, plus normalisation at the end of blocks flowing into a
+            # forced block in the inverted state
+            for b, blk in r.blocks.items():
+                if b not in inn: continue
+                st = inn[b]
+                for idx, k in enumerate(blk):
+                    st, f = step(k, st)
+                    if idx == len(blk) - 1 and norm_end(b, st):
+                        if self.ops[k].kind == 'branch':
+                            f.discard('swap'); f.add('pre')
+                        else:
+                            f.add('post')
+                    if f: cfix[k] = f
+        self.rc.cfix = cfix
+        return cfix
+
+    # -------------------------------------------------------------- M4: N flag
+    # BMI / BPL test bit 7 of the register that produced N when that instruction is in the
+    # same block of lazy code, the register is unchanged in between, nothing else reads N
+    # and neither N nor Z is needed after the branch: no store of N into HRAM, no reload.
+    NREG = {'LDA': 'A', 'ADC': 'A', 'SBC': 'A', 'AND': 'A', 'ORA': 'A', 'EOR': 'A', 'PLA': 'A', 'TXA': 'A',
+            'TYA': 'A', 'LDX': 'X', 'INX': 'X', 'DEX': 'X', 'TAX': 'X', 'LDY': 'Y', 'INY': 'Y', 'DEY': 'Y',
+            'TAY': 'Y'}
+
+    def n_tests(self):
+        rc = self.rc; ins = rc.insns; nsrc = {}; nskip = set()
+        GB = {'A': 'a', 'X': 'e', 'Y': 'c'}
+        for e, r in self.routines.items():
+            for b, blk in r.blocks.items():
+                for j, k in enumerate(blk):
+                    i = ins[k]
+                    if i.mn not in ('BMI', 'BPL') or k not in self.lazy: continue
+                    if rc.live_out.get(k, frozenset('NZCV')) & {'N', 'Z'}: continue
+                    for d in range(j - 1, -1, -1):
+                        kd = blk[d]; od = self.ops[kd]
+                        if kd not in self.lazy or od.kind != 'op': break
+                        if 'N' in od.fdef:
+                            reg = self.NREG.get(od.mn)
+                            if reg is None or (od.mn in ('ASL', 'LSR', 'ROL', 'ROR')): break
+                            if od.mn in ('ADC', 'SBC') and 'V' in rc.live_out.get(kd, ()): break
+                            ok = all(reg not in self.ops[blk[m]].rdef and 'N' not in self.ops[blk[m]].fuse
+                                     for m in range(d + 1, j))
+                            if ok:
+                                nsrc[k] = GB[reg]; nskip.add(kd)
+                            break
+                        if 'N' in od.fuse: break
+        rc.nsrc, rc.nskip = nsrc, nskip
+        return nsrc
+
     def compile(self):
         """code per space in address order (translate.emit_program's input). M1: every
         instruction through translate.Emitter, as Recompiler.compile."""
         rc = self.rc
         rc.izy_facts = self.values()
+        self.carry_states()
+        self.n_tests()
         rc.home = {}
         blocks = self._emit()
         self.choose_home(blocks)
@@ -514,21 +665,19 @@ class Program:
     HOME_CANDIDATES = [('space', 'b13', 13), ('key', ('fix', 0xE102), 31)]
 
     def choose_home(self, blocks):
-        from translate import components, line_size, DATA, HOME_ORG, HOME_END
+        from translate import line_size, DATA, HOME_ORG, HOME_END
         rc = self.rc
         size = {k: sum(line_size(l) for l in lines) for sp in blocks for k, lines in blocks[sp]}
-        comps = components(rc)
         room = (HOME_END - HOME_ORG) * 9 // 10          # (direct reads only shrink the code)
         chosen = {}
         for kind, what, nesbank in self.HOME_CANDIDATES:
-            for c in comps:
-                if (kind == 'space' and all(k[0] == what for k in c)) or (kind == 'key' and what in c):
-                    if any(k in chosen for k in c): continue
-                    if any(k in rc.g.ext for k in c): continue
-                    sz = sum(size[k] for k in c) + 3 * len(c) // 8 + 8
-                    if sz > room: continue
-                    room -= sz
-                    for k in c: chosen[k] = DATA + nesbank
+            if kind == 'space': ks = [k for k in rc.insns if k[0] == what]
+            else: ks = sorted(set().union(*(self.routines[e].keys for e in self.owner.get(what, ()))))
+            ks = [k for k in ks if k not in chosen]
+            sz = sum(size[k] for k in ks) + len(ks) // 4 + 16
+            if sz > room: continue
+            room -= sz
+            for k in ks: chosen[k] = DATA + nesbank
         rc.home = chosen
 
     # -------------------------------------------------------------- report

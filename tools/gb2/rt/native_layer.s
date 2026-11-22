@@ -4,241 +4,14 @@
 ; dynamic-target table uses its start), reached through bank-0 stubs (rt_fcs).
 
 section bank 0, $3FC0
-hle_palcp:  call rt_fcs                     ; fix:DC30 copy colour palettes to ppu
-            db DYN_BANK
-            dw hle_palcp_b
-hle_scr4b:  call rt_fcs                     ; fix:FD4B battlefield scroll
-            db DYN_BANK
-            dw hle_scr4b_b
-hle_scr60:  call rt_fcs                     ; fix:FD60-FD6B menu scroll (after the sprite-0 wait)
-            db DYN_BANK
-            dw hle_scr60_b
-hle_cdf5:   call rt_fcs                     ; fix:CDF5 update ppu registers (normal map)
-            db DYN_BANK
-            dw hle_cdf5_b
 
 section bank DYN_BANK, $6000
-; ---- primitive: NES palette entry L (0-31) = colour D. As the NES: $10 / $14 / $18 / $1C
-; are $00 / $04 / $08 / $0C. Changed entries: CGB palettes again (that entry; the backdrop:
-; all), DMG / SGB maps due. Keeps BC, DE.
-gb_pal:     ld a, l
-            and $1F
-            ld l, a
-            and $13
-            cp $10
-            ld a, l
-            jr nz, .pn
-            and $0F
-.pn:        ld l, a
-            ld h, high(PAL_SH)
-            ld a, d
-            and $3F
-            cp [hl]
-            ret z                           ; same colour: nothing changes
-            ld [hl], a
-            push bc
-            ld a, l
-            and a
-            jr nz, .pm
-            dec a                           ; the backdrop: every palette's colour 0
-            ld hl, PAL_DM
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl], a
-            jr .pd
-.pm:        ld c, a                         ; the entry's bit in PAL_DM
-            and 7
-            ld hl, BIT_MASK
-            add a, l
-            ld l, a
-            jr nc, .pc
-            inc h
-.pc:        ld b, [hl]
-            ld a, c
-            rrca
-            rrca
-            rrca
-            and 3
-            add a, low(PAL_DM)
-            ld l, a
-            ld h, high(PAL_DM)
-            ld a, [hl]
-            or b
-            ld [hl], a
-.pd:        ld a, 1
-            ldh [pal_dirty], a
-            ldh [maps_due], a
-            xor a
-            ldh [pal_age], a
-            pop bc
-            ret
 
-; ---- fix:DC30 copy colour palettes to ppu: the 32 bytes at $03C0 into the palettes, then
-; as the NES leaves the PPU: address $0000, latch reset, the vblank flag read (cleared).
-; Exit: A = 0, X = $20, Y kept, Z = 1, N = 0, C = 1.
-hle_palcp_b:
-            push bc
-            ld l, 0
-.l:         push hl
-            ld h, high(NES_RAM + $0300)
-            ld a, l
-            add a, $C0
-            ld l, a
-            ld d, [hl]
-            pop hl
-            push hl
-            call gb_pal
-            pop hl
-            inc l
-            ld a, l
-            cp $20
-            jr nz, .l
-            xor a
-            ldh [ppu_vh], a
-            ldh [ppu_vl], a
-            ldh [ppu_latch], a
-            ldh [vbl_flag], a
-            ldh [nzv], a
-            pop bc
-            ld e, $20
-            ld d, 0
-            scf
-            ld l, 0
-            inc l
-            dec l                           ; Z = 1, C = 1, A = 0
-            ret
 
-; ---- primitive: a scroll value as the NES's second register takes it (the first of a pair
-; is X, the second Y; reading the status register starts a pair again). A kept, flags kept.
-gb_scroll:  push af
-            ldh a, [ppu_latch]
-            xor 1
-            ldh [ppu_latch], a
-            jr z, .y
-            pop af
-            ldh [scroll_x], a
-            ret
-.y:         pop af
-            ldh [scroll_y], a
-            ret
 
-; A = the NES's A at the end: its N / Z (nzv, Z flag); carry kept
-nat_nz:     ldh [nzv], a
-            inc a
-            dec a
-            ret
 
-; ---- fix:FD4B (battle, after the battlefield split): control $3B, scroll $39 / $37.
-; Exit: A = $37 with its N / Z, carry kept.
-hle_scr4b_b:
-            ld a, [NES_RAM + $3B]
-            ldh [ppu_ctrl], a
-            ld a, [NES_RAM + $39]
-            call gb_scroll
-            ld a, [NES_RAM + $37]
-            call gb_scroll
-            jp nat_nz
 
-; ---- fix:FD60-FD6B (menus, after the sprite-0 hit): control $3A, one scroll value $38.
-; Exit: A = $38 with its N / Z, carry kept.
-hle_scr60_b:
-            ld a, [NES_RAM + $3A]
-            ldh [ppu_ctrl], a
-            ld a, [NES_RAM + $38]
-            call gb_scroll
-            jp nat_nz
 
-; ---- fix:CDF5 update ppu registers (normal map): $FF = control = $FD, scroll X = $29 * 16
-; | $35, Y = $2F * 16 | $36. Exit: A = Y with its N / Z, carry = bit 4 of $2F (its ASLs).
-hle_cdf5_b:
-            ld a, [NES_RAM + $FD]
-            ld [NES_RAM + $FF], a
-            ldh [ppu_ctrl], a
-            ld a, [NES_RAM + $29]
-            swap a
-            and $F0
-            ld l, a
-            ld a, [NES_RAM + $35]
-            or l
-            call gb_scroll
-            ld a, [NES_RAM + $2F]
-            swap a
-            ld l, a
-            and $F0
-            ld h, a
-            ld a, [NES_RAM + $36]
-            or h
-            ld h, a
-            ld a, l
-            rra                             ; carry = bit 4 of $2F
-            ld a, h
-            call gb_scroll
-            jp nat_nz
-
-; ---- b13:9C1F update apu registers: the music engine's channel shadow ($6F19 + 4 x + k,
-; work RAM) to the GB channels (sound core, rt_apu_w), channels enabled; per channel x
-; (square 1, square 2, triangle) unless its bit in $E6 is set, square 2 not while a sound
-; effect plays ($E5): register k when the update flag ($C0 + x, LSR) says so. Same RAM
-; effects as the NES ($E7, $C0-$C2). Exit: A = the last value loaded, X = 3, Y = 12, Z =
-; 1, C = 1, N = 0.
-hle_apuout_b:
-            ld a, $0F                       ; $4015 = status | $0F: all four enabled
-            ld l, $15
-            call rt_apu_w
-            ld a, [NES_RAM + $E6]
-            ld [NES_RAM + $E7], a
-            ldh [tmp_lo], a                 ; (the NES's A so far)
-            ld bc, 0                        ; B = channel, C = 4 x channel
-.ch:        ld hl, NES_RAM + $E7
-            srl [hl]
-            jr c, .nx
-            ld a, b
-            cp 1
-            jr nz, .go
-            ld a, [NES_RAM + $E5]
-            ldh [tmp_lo], a
-            and a
-            jr nz, .nx
-.go:        ld e, 0                         ; E = register k
-.k:         ld a, b
-            add a, $C0
-            ld l, a
-            ld h, high(NES_RAM)
-            srl [hl]
-            jr nc, .nk
-            ld a, c
-            add a, e
-            ld d, a                         ; D = 4 x + k (the APU register)
-            add a, $19
-            ld l, a
-            ld h, $AF                       ; $6F19 + 4 x + k (cart RAM bank 0)
-            ld a, [hl]
-            ldh [tmp_lo], a
-            ld l, d
-            call rt_apu_w
-.nk:        inc e
-            ld a, e
-            cp 4
-            jr nz, .k
-.nx:        ld a, c
-            add a, 4
-            ld c, a
-            inc b
-            ld a, b
-            cp 3
-            jr c, .ch
-            ld b, 0
-            ld d, 0
-            ld e, 3
-            xor a
-            ldh [nzv], a
-            ldh a, [tmp_lo]
-            scf
-            ld l, 0
-            inc l
-            dec l                           ; Z = 1, C = 1
-            ret
 
 ; ---- fix:F069 copy text to ppu (with the GB layout's one-row mode, h_flush / onerow):
 ; the text buffer rows $0780 (upper) and $07A0 (lower) at column $38, tile row $3B: the
@@ -632,40 +405,6 @@ hle_pdraw_b:
             db HLE_BANK
             dw nt_copy
 
-; ---- fix:DCB5 copy color palettes to ppu (the 16 BG entries from $03F0), then the PPU
-; address $3F00 and $0000 written (v = 0). Exit: A = 0, X = $10, N = 0, Z = 1, C = 1.
-hle_palbg_b:
-            push bc
-            ld l, 0
-.l:         push hl
-            ld h, high(NES_RAM + $0300)
-            ld a, l
-            add a, $F0
-            ld l, a
-            ld d, [hl]
-            pop hl
-            push hl
-            call gb_pal
-            pop hl
-            inc l
-            ld a, l
-            cp $10
-            jr nz, .l
-            xor a
-            ldh [ppu_vh], a
-            ldh [ppu_vl], a
-            ldh [ppu_latch], a
-            ldh [vbl_flag], a
-            ldh [nzv], a
-            pop bc
-            ld e, $10
-            ld d, 0
-            scf
-            ld l, 0
-            inc l
-            dec l                           ; Z = 1, C = 1, A = 0
-            ret
-
 ; ---- fix:D2FE update dialog window attributes: entries X = 15 (moving vertically) or 14
 ; down to 0: the byte $07F0 + X at the PPU address ($07D0 + X, $07E0 + X). Exit: A = the
 ; byte of entry 0, X = $FF, N = 1, Z = 0, C kept.
@@ -729,35 +468,7 @@ hle_dlgatt_b:
             db HLE_BANK
             dw nt_copy
 
-; ---- layout scrw (tools/gb2/layout.py scroll without the music): field menu (MSCR, NES
-; $7FEA): control = $FF, scroll 0 / 0; else control = $3B, scroll $39 / $37. Exit: A = the
-; last value with its N / Z, carry kept.
-hle_scrw_b:
-            ld a, [$BFEA]
-            inc a                           ; (carry kept)
-            dec a
-            jr z, .b
-            ld a, [NES_RAM + $FF]
-            ldh [ppu_ctrl], a
-            ld a, 0                         ; (carry kept)
-            call gb_scroll
-            call gb_scroll
-            jp nat_nz
-.b:         ld a, [NES_RAM + $3B]
-            ldh [ppu_ctrl], a
-            ld a, [NES_RAM + $39]
-            call gb_scroll
-            ld a, [NES_RAM + $37]
-            call gb_scroll
-            jp nat_nz
 
-; ---- fix:E9DC clear ppu scrolling registers: scroll 0 / 0. Exit: A = 0, Z = 1, N = 0,
-; carry kept.
-hle_scr00_b:
-            ld a, 0                         ; (carry kept)
-            call gb_scroll
-            call gb_scroll
-            jp nat_nz
 
 ; ---- layout gmattr (main menu): the 64 attribute bytes $77A0.. to $23C0. Exit: A = the
 ; last byte, X = 64, N = 0, Z = 1, C = 1 (CPX #64).
@@ -850,41 +561,6 @@ hle_lnrow_b:
             db HLE_BANK
             dw nt_copy
 
-; ---- b11:9D7C copy color palettes to ppu (battle: the 32 entries from $79A8), then the PPU
-; address $3F00 and $0000. Exit: A = $3F, X = 0, N = 0, Z = 1, C = 1.
-hle_palbtl_b:
-            push bc
-            ld l, 0
-.l:         push hl
-            ld a, l
-            add a, low($B9A8)
-            ld l, a
-            ld a, high($B9A8)
-            adc a, 0
-            ld h, a
-            ld d, [hl]
-            pop hl
-            push hl
-            call gb_pal
-            pop hl
-            inc l
-            ld a, l
-            cp $20
-            jr nz, .l
-            xor a
-            ldh [ppu_vh], a
-            ldh [ppu_vl], a
-            ldh [ppu_latch], a
-            ldh [vbl_flag], a
-            ldh [nzv], a
-            pop bc
-            ld de, 0
-            ld a, $3F
-            ld h, a
-            ld l, $90                       ; (Z, C)
-            push hl
-            pop af
-            ret
 
 ; ---- boot splash (fix:F476..), the PPU parts of the glyph routine (idioms):
 ; fix:F565-F57F: from ($62, $61) to the row's end the tile 0 ($80 = $61 advanced to the
@@ -1002,12 +678,6 @@ spl_chr:    and $3F
             pop bc
             ret
 
-; ---- layout pfscr (prologue frame): control = $FF, scroll 0 / 0. Exit: A = 0, Z = 1,
-; N = 0, carry kept.
-hle_pfscr_b:
-            ld a, [NES_RAM + $FF]
-            ldh [ppu_ctrl], a
-            jp hle_scr00_b
 
 ; ---- home code (translate.py HOME_*: routines placed in bank 0 that run with their data
 ; bank mapped at $4000): (zp),Y reads straight from the mapped bank when the pointer is in
@@ -1049,3 +719,337 @@ izy_m_other:
             call nes_rd
             pop af
             ret
+
+
+; ---- per-frame natives in bank 0 (called without a bank switch)
+section bank 0, $3700
+; ---- primitive: NES palette entry L (0-31) = colour D. As the NES: $10 / $14 / $18 / $1C
+; are $00 / $04 / $08 / $0C. Changed entries: CGB palettes again (that entry; the backdrop:
+; all), DMG / SGB maps due. Keeps BC, DE.
+gb_pal:     ld a, l
+            and $1F
+            ld l, a
+            and $13
+            cp $10
+            ld a, l
+            jr nz, .pn
+            and $0F
+.pn:        ld l, a
+            ld h, high(PAL_SH)
+            ld a, d
+            and $3F
+            cp [hl]
+            ret z                           ; same colour: nothing changes
+            ld [hl], a
+            push bc
+            ld a, l
+            and a
+            jr nz, .pm
+            dec a                           ; the backdrop: every palette's colour 0
+            ld hl, PAL_DM
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            jr .pd
+.pm:        ld c, a                         ; the entry's bit in PAL_DM
+            and 7
+            ld hl, BIT_MASK
+            add a, l
+            ld l, a
+            jr nc, .pc
+            inc h
+.pc:        ld b, [hl]
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and 3
+            add a, low(PAL_DM)
+            ld l, a
+            ld h, high(PAL_DM)
+            ld a, [hl]
+            or b
+            ld [hl], a
+.pd:        ld a, 1
+            ldh [pal_dirty], a
+            ldh [maps_due], a
+            xor a
+            ldh [pal_age], a
+            pop bc
+            ret
+
+; ---- fix:DC30 copy colour palettes to ppu: the 32 bytes at $03C0 into the palettes, then
+; as the NES leaves the PPU: address $0000, latch reset, the vblank flag read (cleared).
+; Exit: A = 0, X = $20, Y kept, Z = 1, N = 0, C = 1.
+hle_palcp_b:
+            push bc
+            ld l, 0
+.l:         push hl
+            ld h, high(NES_RAM + $0300)
+            ld a, l
+            add a, $C0
+            ld l, a
+            ld d, [hl]
+            pop hl
+            push hl
+            call gb_pal
+            pop hl
+            inc l
+            ld a, l
+            cp $20
+            jr nz, .l
+            xor a
+            ldh [ppu_vh], a
+            ldh [ppu_vl], a
+            ldh [ppu_latch], a
+            ldh [vbl_flag], a
+            ldh [nzv], a
+            pop bc
+            ld e, $20
+            ld d, 0
+            scf
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1, C = 1, A = 0
+            ret
+
+; ---- primitive: a scroll value as the NES's second register takes it (the first of a pair
+; is X, the second Y; reading the status register starts a pair again). A kept, flags kept.
+gb_scroll:  push af
+            ldh a, [ppu_latch]
+            xor 1
+            ldh [ppu_latch], a
+            jr z, .y
+            pop af
+            ldh [scroll_x], a
+            ret
+.y:         pop af
+            ldh [scroll_y], a
+            ret
+
+; A = the NES's A at the end: its N / Z (nzv, Z flag); carry kept
+nat_nz:     ldh [nzv], a
+            inc a
+            dec a
+            ret
+
+; ---- fix:FD4B (battle, after the battlefield split): control $3B, scroll $39 / $37.
+; Exit: A = $37 with its N / Z, carry kept.
+hle_scr4b_b:
+            ld a, [NES_RAM + $3B]
+            ldh [ppu_ctrl], a
+            ld a, [NES_RAM + $39]
+            call gb_scroll
+            ld a, [NES_RAM + $37]
+            call gb_scroll
+            jp nat_nz
+
+; ---- fix:FD60-FD6B (menus, after the sprite-0 hit): control $3A, one scroll value $38.
+; Exit: A = $38 with its N / Z, carry kept.
+hle_scr60_b:
+            ld a, [NES_RAM + $3A]
+            ldh [ppu_ctrl], a
+            ld a, [NES_RAM + $38]
+            call gb_scroll
+            jp nat_nz
+
+; ---- fix:CDF5 update ppu registers (normal map): $FF = control = $FD, scroll X = $29 * 16
+; | $35, Y = $2F * 16 | $36. Exit: A = Y with its N / Z, carry = bit 4 of $2F (its ASLs).
+hle_cdf5_b:
+            ld a, [NES_RAM + $FD]
+            ld [NES_RAM + $FF], a
+            ldh [ppu_ctrl], a
+            ld a, [NES_RAM + $29]
+            swap a
+            and $F0
+            ld l, a
+            ld a, [NES_RAM + $35]
+            or l
+            call gb_scroll
+            ld a, [NES_RAM + $2F]
+            swap a
+            ld l, a
+            and $F0
+            ld h, a
+            ld a, [NES_RAM + $36]
+            or h
+            ld h, a
+            ld a, l
+            rra                             ; carry = bit 4 of $2F
+            ld a, h
+            call gb_scroll
+            jp nat_nz
+
+; ---- fix:DCB5 copy color palettes to ppu (the 16 BG entries from $03F0), then the PPU
+; address $3F00 and $0000 written (v = 0). Exit: A = 0, X = $10, N = 0, Z = 1, C = 1.
+hle_palbg_b:
+            push bc
+            ld l, 0
+.l:         push hl
+            ld h, high(NES_RAM + $0300)
+            ld a, l
+            add a, $F0
+            ld l, a
+            ld d, [hl]
+            pop hl
+            push hl
+            call gb_pal
+            pop hl
+            inc l
+            ld a, l
+            cp $10
+            jr nz, .l
+            xor a
+            ldh [ppu_vh], a
+            ldh [ppu_vl], a
+            ldh [ppu_latch], a
+            ldh [vbl_flag], a
+            ldh [nzv], a
+            pop bc
+            ld e, $10
+            ld d, 0
+            scf
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1, C = 1, A = 0
+            ret
+
+
+; ---- layout scrw (tools/gb2/layout.py scroll without the music): field menu (MSCR, NES
+; $7FEA): control = $FF, scroll 0 / 0; else control = $3B, scroll $39 / $37. Exit: A = the
+; last value with its N / Z, carry kept.
+hle_scrw_b:
+            ld a, [$BFEA]
+            inc a                           ; (carry kept)
+            dec a
+            jr z, .b
+            ld a, [NES_RAM + $FF]
+            ldh [ppu_ctrl], a
+            ld a, 0                         ; (carry kept)
+            call gb_scroll
+            call gb_scroll
+            jp nat_nz
+.b:         ld a, [NES_RAM + $3B]
+            ldh [ppu_ctrl], a
+            ld a, [NES_RAM + $39]
+            call gb_scroll
+            ld a, [NES_RAM + $37]
+            call gb_scroll
+            jp nat_nz
+
+; ---- fix:E9DC clear ppu scrolling registers: scroll 0 / 0. Exit: A = 0, Z = 1, N = 0,
+; carry kept.
+hle_scr00_b:
+            ld a, 0                         ; (carry kept)
+            call gb_scroll
+            call gb_scroll
+            jp nat_nz
+
+; ---- b11:9D7C copy color palettes to ppu (battle: the 32 entries from $79A8), then the PPU
+; address $3F00 and $0000. Exit: A = $3F, X = 0, N = 0, Z = 1, C = 1.
+hle_palbtl_b:
+            push bc
+            ld l, 0
+.l:         push hl
+            ld a, l
+            add a, low($B9A8)
+            ld l, a
+            ld a, high($B9A8)
+            adc a, 0
+            ld h, a
+            ld d, [hl]
+            pop hl
+            push hl
+            call gb_pal
+            pop hl
+            inc l
+            ld a, l
+            cp $20
+            jr nz, .l
+            xor a
+            ldh [ppu_vh], a
+            ldh [ppu_vl], a
+            ldh [ppu_latch], a
+            ldh [vbl_flag], a
+            ldh [nzv], a
+            pop bc
+            ld de, 0
+            ld a, $3F
+            ld h, a
+            ld l, $90                       ; (Z, C)
+            push hl
+            pop af
+            ret
+
+; ---- layout pfscr (prologue frame): control = $FF, scroll 0 / 0. Exit: A = 0, Z = 1,
+; N = 0, carry kept.
+hle_pfscr_b:
+            ld a, [NES_RAM + $FF]
+            ldh [ppu_ctrl], a
+            jp hle_scr00_b
+
+; ---- b13:9C1F update apu registers: the music engine's channel shadow ($6F19 + 4 x + k,
+; work RAM) to the GB channels (sound core, rt_apu_w), channels enabled; per channel x
+; (square 1, square 2, triangle) unless its bit in $E6 is set, square 2 not while a sound
+; effect plays ($E5): register k when the update flag ($C0 + x, LSR) says so. Same RAM
+; effects as the NES ($E7, $C0-$C2). Exit: A = the last value loaded, X = 3, Y = 12, Z =
+; 1, C = 1, N = 0.
+hle_apuout_b:
+            ld a, $0F                       ; $4015 = status | $0F: all four enabled
+            ld l, $15
+            call rt_apu_w
+            ld a, [NES_RAM + $E6]
+            ld [NES_RAM + $E7], a
+            ldh [tmp_lo], a                 ; (the NES's A so far)
+            ld bc, 0                        ; B = channel, C = 4 x channel
+.ch:        ld hl, NES_RAM + $E7
+            srl [hl]
+            jr c, .nx
+            ld a, b
+            cp 1
+            jr nz, .go
+            ld a, [NES_RAM + $E5]
+            ldh [tmp_lo], a
+            and a
+            jr nz, .nx
+.go:        ld e, 0                         ; E = register k
+.k:         ld a, b
+            add a, $C0
+            ld l, a
+            ld h, high(NES_RAM)
+            srl [hl]
+            jr nc, .nk
+            ld a, c
+            add a, e
+            ld d, a                         ; D = 4 x + k (the APU register)
+            add a, $19
+            ld l, a
+            ld h, $AF                       ; $6F19 + 4 x + k (cart RAM bank 0)
+            ld a, [hl]
+            ldh [tmp_lo], a
+            ld l, d
+            call rt_apu_w
+.nk:        inc e
+            ld a, e
+            cp 4
+            jr nz, .k
+.nx:        ld a, c
+            add a, 4
+            ld c, a
+            inc b
+            ld a, b
+            cp 3
+            jr c, .ch
+            ld b, 0
+            ld d, 0
+            ld e, 3
+            xor a
+            ldh [nzv], a
+            ldh a, [tmp_lo]
+            scf
+            ld l, 0
+            inc l
+            dec l                           ; Z = 1, C = 1
+            ret
+

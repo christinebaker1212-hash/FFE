@@ -26,7 +26,7 @@ RT_TABLES = DATA + 32       # runtime tables (sound)
 CODE0 = DATA + 33           # first GB bank holding recompiled code
 BANK_LIMIT = 0x4000 - 8     # bytes per code bank (room for a closing jump)
 HOME_BASE = 0x1000          # bank_of value of home code: HOME_BASE + its data bank (code in bank 0)
-HOME_ORG, HOME_END = 0x2600, 0x39E0   # bank-0 area for home code (rt/native_layer.s helpers below, rt/ff2_pal.s after)
+HOME_ORG, HOME_END = 0x2600, 0x3680   # bank-0 area for home code (rt/native_layer.s helpers below, rt/ff2_pal.s after)
 ALL = frozenset('NZCV')
 # FF2: flags assumed live where control goes somewhere unknown (dynamic jumps / calls, returns to
 # them): not V. Every BVC / BVS in FF2 tests V from a BIT just before it (b11:9C32, A076, B102,
@@ -75,19 +75,19 @@ class FF2:
            ('fix', 0xC2F3): ('hle_water', 'NZCV'),      # world-map water animation (rt/ff2_banked.s, native)
            ('fix', 0xF321): ('hle_ntclr0', 'NZC'),      # clear nametable 0 (rt/ff2_banked.s, native)
            ('b11', 0xA43A): ('hle_bspr', 'NZCV'),       # draw battle character sprite (rt/ff2_banked.s, native)
-           ('fix', 0xDBA9): ('hle_pad20', 'NZC'),       # read joypad registers (rt/selmenu.s, native joypad)
+           ('fix', 0xDBA9): ('hle_pad20_b', 'NZC'),       # read joypad registers (rt/selmenu.s, native joypad)
            ('fix', 0xFE1A): ('hle_bank', 'NZC'),        # switch prg bank (rt/selmenu.s, native)
-           ('fix', 0xDC30): ('hle_palcp', 'NZC'),       # copy colour palettes to ppu (rt/native_layer.s)
-           ('fix', 0xFD4B): ('hle_scr4b', 'NZ'),        # battlefield scroll (rt/native_layer.s)
-           ('fix', 0xCDF5): ('hle_cdf5', 'NZC'),        # update ppu registers, normal map (rt/native_layer.s)
-           ('b13', 0x9C1F): ('far:hle_apuout_b', 'NZC'),      # update apu registers, music (rt/native_layer.s)
+           ('fix', 0xDC30): ('hle_palcp_b', 'NZC'),       # copy colour palettes to ppu (rt/native_layer.s)
+           ('fix', 0xFD4B): ('hle_scr4b_b', 'NZ'),        # battlefield scroll (rt/native_layer.s)
+           ('fix', 0xCDF5): ('hle_cdf5_b', 'NZC'),        # update ppu registers, normal map (rt/native_layer.s)
+           ('b13', 0x9C1F): ('hle_apuout_b', 'NZC'),      # update apu registers, music (rt/native_layer.s)
            ('fix', 0xF069): ('far:hle_txrow_b', 'NZC'),
-           ('fix', 0xDCB5): ('far:hle_palbg_b', 'NZC'),     # copy color palettes to ppu (BG)
+           ('fix', 0xDCB5): ('hle_palbg_b', 'NZC'),     # copy color palettes to ppu (BG)
            ('fix', 0xD2FE): ('far:hle_dlgatt_b', 'NZ'),
            ('fix', 0xD308): ('far:hle_dlgatt8_b', 'NZ'),
-           ('fix', 0xE9DC): ('far:hle_scr00_b', 'NZ'),      # clear ppu scrolling registers
-           ('fix', 0xF689): ('far:hle_scr00_b', 'NZ'),      # (the same, splash screen)
-           ('b11', 0x9D7C): ('far:hle_palbtl_b', 'NZC')}    # copy color palettes to ppu (battle)     # update dialog window attributes       # copy text to ppu (rt/native_layer.s)
+           ('fix', 0xE9DC): ('hle_scr00_b', 'NZ'),      # clear ppu scrolling registers
+           ('fix', 0xF689): ('hle_scr00_b', 'NZ'),      # (the same, splash screen)
+           ('b11', 0x9D7C): ('hle_palbtl_b', 'NZC')}    # copy color palettes to ppu (battle)     # update dialog window attributes       # copy text to ppu (rt/native_layer.s)
     # Idioms: NES address -> (runtime routine, resume address, flags defined)
     #   fix:FA91-FA99: PHA $FA / PHA $99 / JMP ($0040): "jump (long)" calls through ($40)
     #   with a pushed return address: on the GB a call through the pointer, then $FA9A.
@@ -121,8 +121,8 @@ class FF2:
               ('b00', 0x9E44): ('hle_rcopy', 0x9E4D, 'NZ'),
               ('fix', 0xDAD4): ('hle_csum', 0xDADF, 'NZC'),    # save slot checksum (rt/ff2_banked.s)
               ('b14', 0xB27A): ('hle_savecp', 0xB288, 'NZ'),   # save copy + slot mark (rt/save.s)
-              ('fix', 0xFC38): ('hle_pad35', 0xFC50, 'NZC'),   # battle joypad read (rt/selmenu.s)
-              ('fix', 0xFD60): ('hle_scr60', 0xFD6C, 'NZ'),    # menu scroll after the sprite-0 hit (rt/native_layer.s)
+              ('fix', 0xFC38): ('hle_pad35_b', 0xFC50, 'NZC'),   # battle joypad read (rt/selmenu.s)
+              ('fix', 0xFD60): ('hle_scr60_b', 0xFD6C, 'NZ'),    # menu scroll after the sprite-0 hit (rt/native_layer.s)
               # boot splash (fix:F476..): row fills and glyph tile uploads (rt/native_layer.s)
               ('fix', 0xF565): ('far:hle_splrow0_b', 0xF580, 'NZ'),
               ('fix', 0xF5D4): ('far:hle_splrow8_b', 0xF5EE, 'NZ'),
@@ -394,7 +394,9 @@ class Emitter:
         self.lo = rc.live_out.get(self.k, ALL)
         d = frozenset(DEF.get(i.mn, ''))
         self.need = self.lo & d                           # flags this instruction must produce
+        if self.k in getattr(rc, 'nskip', ()): self.need = self.need - {'N'}   # (N tested from the register)
         self.keep = self.lo - d                           # live flags it must not disturb
+        self.cf = getattr(rc, 'cfix', {}).get(self.k, ())   # carry polarity (ftrans.carry_states)
 
     def o(self, *ls):
         self.lines.extend(ls)
@@ -534,7 +536,7 @@ class Emitter:
         if 'N' in self.need: self.o('push af', 'ld a, [hl]', 'ldh [nzv], a', 'pop af')
 
     def fix_carry(self, inverted):
-        if inverted and 'C' in self.need: self.o('ccf')
+        if inverted and 'C' in self.need and 'keep' not in self.cf: self.o('ccf')
 
     def jump(self, cond, tk):
         """jp to compiled location tk (None = dynamic)"""
@@ -547,6 +549,11 @@ class Emitter:
 
     # -- main ------------------------------------------------------------------------
     def run(self):
+        if 'pre' in self.cf: self.o('ccf')
+        self.run1()
+        if 'post' in self.cf: self.o('ccf')
+
+    def run1(self):
         i = self.i; mn = i.mn; rc = self.rc
         k = self.k
         if k in rc.g.ext:
@@ -572,8 +579,13 @@ class Emitter:
 
     # loads / stores
     def x_LDA(self):
-        op = self.operand()
-        if op != 'a': self.o('ld a, %s' % op)
+        i = self.i
+        if i.mode in ('zp', 'abs') and (i.mode == 'zp' or nes_region(i.arg) in ('ram', 'ex', 'sram')):
+            g = gb_ram(i.arg if i.mode == 'abs' else i.arg)   # (direct: ld a, [nn])
+            self.o('ld a, [$%04X]' % g)
+        else:
+            op = self.operand()
+            if op != 'a': self.o('ld a, %s' % op)
         self.set_nz_reg('a')
 
     def x_LDX(self):
@@ -641,8 +653,9 @@ class Emitter:
             elif src != 'l': self.o('ld l, %s' % src)
             self.o('call rt_sbc_v')                   # takes/returns 6502-polarity carry
         else:
-            self.o('ccf', 'sbc a, %s' % src)
-            if 'C' in self.need: self.o('ccf')
+            if 'sbc_i' not in self.cf: self.o('ccf')
+            self.o('sbc a, %s' % src)
+            if 'C' in self.need and 'keep' not in self.cf: self.o('ccf')
         if 'N' in self.need: self.o('ldh [nzv], a')
 
     def compare(self, reg):
@@ -771,6 +784,11 @@ class Emitter:
     def branch(self, cond_true, flag_test=None):
         i = self.i
         tk = self.rc.target(i, i.arg)
+        ns = getattr(self.rc, 'nsrc', {}).get(self.k)
+        if flag_test and ns and flag_test[0] == 'nzv':    # N from the register (ftrans.n_tests)
+            self.o('bit 7, %s' % ns)
+            self.jump(cond_true, tk)
+            return
         if flag_test:
             hram, bit = flag_test
             regen = 'Z' in self.lo and hram == 'nzv'
@@ -790,8 +808,8 @@ class Emitter:
             return
         self.jump(cond_true, tk)
 
-    def x_BCC(self): self.branch('nc')
-    def x_BCS(self): self.branch('c')
+    def x_BCC(self): self.branch('c' if 'swap' in self.cf else 'nc')
+    def x_BCS(self): self.branch('nc' if 'swap' in self.cf else 'c')
     def x_BEQ(self): self.branch('z')
     def x_BNE(self): self.branch('nz')
     def x_BMI(self): self.branch('nz', ('nzv', 7))
@@ -811,11 +829,28 @@ class Emitter:
             self.o('ld hl, $%04X' % i.arg, 'jp rt_dyn_jump'); return
         self.jump(None, tk)
 
+    def thread(self, tk):
+        """follow JMP abs stubs (FF2: fix:FE00 JMP $FEAD wait for vblank, FE03 JMP $FE1A
+        switch bank ...) to the routine they lead to"""
+        for _ in range(4):
+            if tk is None or tk in self.rc.g.ext: return tk
+            j = self.rc.insns.get(tk)
+            if j is None or j.mn != 'JMP' or j.mode != 'abs' or tk in self.rc.g.idioms: return tk
+            nt = self.rc.target(j, j.arg)
+            if nt is None or (nt not in self.rc.insns and nt not in self.rc.g.ext): return tk
+            tk = nt
+        return tk
+
     def x_JSR(self):
         i = self.i
-        tk = self.rc.target(i, i.arg)
+        tk = self.thread(self.rc.target(i, i.arg))
         if tk is None:
             self.o('ld hl, $%04X' % i.arg, 'call rt_dyn_call'); return
+        if tk in self.rc.g.ext:                       # a native replacement: called directly
+            r = self.rc.g.ext[tk][0]
+            if r.startswith('far:'): self.o('rst $08', 'db bank(%s)' % r[4:], 'dw %s' % r[4:])
+            else: self.o('call ' + r)
+            return
         if tk not in self.rc.insns and tk not in self.rc.g.ext:
             self.rc.warn.append('call to uncompiled %s:%04X from %r' % (tk[0], tk[1], i))
             self.o('call rt_fatal'); return
@@ -883,11 +918,11 @@ def layout(rc, blocks):
     cur, used, keys = CODE0, 0, []
     home = getattr(rc, 'home', {})
     homes = defaultdict(list)
-    for c in comps:
-        if c[0] in home:
-            for k in c: bank_of[k] = HOME_BASE + home[c[0]]
-            homes[HOME_BASE + home[c[0]]].extend(c)
-    comps = [c for c in comps if c[0] not in home]
+    for k, hb in home.items():                            # home code (per instruction: cross-bank
+        bank_of[k] = HOME_BASE + hb                       #   fall-through / jumps are routed)
+        homes[HOME_BASE + hb].append(k)
+    comps = [[k for k in c if k not in home] for c in comps]
+    comps = [c for c in comps if c]
     for c in comps:
         c.sort()
         sz = sum(sizes[k] for k in c) + 3 * len(c) // 8 + 8   # slack for split jumps
@@ -930,7 +965,7 @@ def emit_program(rc, blocks=None):
                     elif i.mn != 'JSR' or True:
                         out.append('    call rt_fatal')
     # stubs (bank 0): call rt_fcs reads the target's bank and address after the call
-    stubs = ['section bank 0, $25C0']                   # (runtime below, colour tables from $3A00)
+    stubs = []                                          # (bank 0, after the home code)
     for lab in sorted(xrefs):
         stubs += ['xs_%s:' % lab, '    call rt_fcs', '    db %s' % bank_expr(lab, bank_of), '    dw %s' % lab,
                   'xj_%s:' % lab, '    call xs_%s' % lab, '    ret']
@@ -950,7 +985,11 @@ def emit_program(rc, blocks=None):
         for a, key, lab in buckets[h]:
             tab.append('    db $%02X, $%02X, $%02X, %s, low(%s), high(%s)' % (a & 0xFF, a >> 8, key, bank_expr(lab, bank_of), lab, lab))
     rc.n_dyn = sum(len(v) for v in buckets.values())
-    return '\n'.join(stubs + tab + out) + '\n', bank_of, banks
+    if stubs:
+        if first_home: out.append('section bank 0, $%04X' % HOME_ORG)
+        out.append('xstubs:')
+        out.extend(stubs)
+    return '\n'.join(tab + out) + '\n', bank_of, banks
 
 
 def bank_expr(lab, bank_of):

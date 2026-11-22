@@ -1224,14 +1224,8 @@ su_load:    di
 section bank 0, $3F80
 pad_read:   call read_buttons               ; A = A B Sel St U D L R (bits 0-7)
 .got:       ret
-hle_pad20:  call rt_fcs                     ; fix:DBA9 read joypad registers -> $20
-            db SGB_BANK
-            dw hle_pad20_b
-hle_pad35:  call rt_fcs                     ; fix:FC38-FC4F (battle) -> $35
-            db SGB_BANK
-            dw hle_pad35_b
 
-section bank SGB_BANK, $7700
+section bank 0, $3680                       ; (joypad natives: bank 0, called directly)
 ; fix:DBA9: 8 x (LDA $4016 / AND #3 / CMP #1 / ROL $20): $20 = A B Sel St U D L R
 ; (bits 7-0), carry = the last ROL's, A = the last read (R), X = 0, Z = 1, N = 0
 hle_pad20_b:

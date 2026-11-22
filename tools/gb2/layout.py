@@ -4137,7 +4137,7 @@ def battle(rom):
     NATIVE_EXT['b23_gsel'] = (23, b23.labels['gsel'], 'hle_select', 'NZ')
     NATIVE_EXT['b23_gres'] = (23, b23.labels['gres'], 'hle_resume', 'NZ')
     NATIVE_EXT['b23_ntrow'] = (23, b23.labels['ntrow'], 'far:hle_ntrow_b', 'NZC')
-    NATIVE_EXT['b23_scrw'] = (23, b23.labels['scrw'], 'far:hle_scrw_b', 'NZ')
+    NATIVE_EXT['b23_scrw'] = (23, b23.labels['scrw'], 'hle_scrw_b', 'NZ')
     NATIVE_EXT['b23_lnrow'] = (23, b23.labels['lnrow'], 'far:hle_lnrow_b', 'NZC')
     assert (RAM['VLN'], RAM['VP'], RAM['BLANKT']) == (0x7FFE, 0xD2, 0x7888)   # (hle_lnrow_b)
     assert RAM['MSCR'] == 0x7FEA                 # (hle_scrw_b)
@@ -4175,12 +4175,12 @@ gbm:                    ; main menu (bank 24): A = sub-command; back to bank 14
     NATIVE_EXT['b24_pcopy'] = (24, b24.labels['pcopy'], 'hle_pcopy', 'NZC')
     NATIVE_EXT['b24_pages0'] = (24, b24.labels['pages0'], 'hle_pages0', 'NZ')
     NATIVE_EXT['b24_pfdraw'] = (24, b24.labels['pfdraw'], 'far:hle_pdraw_b', 'NZC')
-    NATIVE_EXT['b24_pfscr'] = (24, b24.labels['pfscr'], 'far:hle_pfscr_b', 'NZ')
+    NATIVE_EXT['b24_pfscr'] = (24, b24.labels['pfscr'], 'hle_pfscr_b', 'NZ')
     assert (PROPH_RAM['PRP'], PROPH_RAM['PRM'], PROPH_RAM['PRLEN'], PROPH_RAM['PRA'], PROPH_RAM['PAR'],
             PROPH_RAM['PATT']) == (0xD4, 0x760A, 0x760B, 0x760C, 0x7608, 0x7609)   # (hle_pdraw_b)
     NATIVE_EXT['b24_gmattr'] = (24, b24.labels['gmattr'], 'far:hle_gmattr_b', 'NZC')
     if 'scrw' in b24.labels:
-        NATIVE_EXT['b24_scrw'] = (24, b24.labels['scrw'], 'far:hle_scrw_b', 'NZ')
+        NATIVE_EXT['b24_scrw'] = (24, b24.labels['scrw'], 'hle_scrw_b', 'NZ')
     if 'ntrow' in b24.labels:
         NATIVE_EXT['b24_ntrow'] = (24, b24.labels['ntrow'], 'far:hle_ntrow_b', 'NZC')
     class E: pass

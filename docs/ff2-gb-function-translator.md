@@ -89,6 +89,28 @@ instruction, GB cycles per NES frame (lagcheck), ROM size; recorded in
   8.9 -> 2.4; cross-bank calls up 9.6 -> 13.4 (the sprite component's callees stay in the
   code banks: placement along the call graph is M5). lagcheck DMG -1.7%, CGB -3.9%.
 
+- **M4 (2026-11-22):** carry polarity tracked instead of emulated (CMP / CPX / CPY / SBC
+  leave the GB carry inverted; BCC / BCS test the matching condition; a CCF only where
+  6502 polarity is needed: ADC, rotates, calls, returns, natives, joins of differing paths;
+  forward fixpoint per routine with normalisation at the ends of paths into forced blocks);
+  BMI / BPL test bit 7 of the register that produced N (same block, register unchanged,
+  N and Z dead after) instead of an N byte in HRAM; `LDA zp / abs` as `ld a, [nn]`.
+- **M5 (2026-11-22):** calls to native replacements go straight to the native (no detour
+  through the replaced routine's label in a code bank); calls through JMP stubs are threaded
+  to their target (fix:FE00 -> the frame wait, FE03 -> the bank switch, ...); home placement
+  per instruction (the whole music engine incl. its entry); the per-frame natives (joypad,
+  scroll, palette uploads, sound output) moved to bank 0, called without a bank switch.
+  Cross-bank calls per frame (random 1): 12.5 -> 7.2.
+- **M6 coverage (2026-11-22, build n19):** 1,491 of 1,560 routines (95.6%) clean;
+  26,902 of 33,379 instructions (80.6%) in the polarity-tracked set (the rest: code shared
+  by several routines, routines with stack tricks / dynamic control). Output 50.9k SM83
+  lines (1.53 per 6502 instruction; was ~2.0); CCF 2,036 -> 1,587; N byte 1,086 -> 649
+  references; V-flag helpers 0; remaining helpers: pointer reads 585 / writes 311 sites
+  (2.4 / 1.2 per frame), banked table reads 446 + 58 sites (4.0 per frame).
+  Open items for later passes: per-call-site versions of routines that take RAM and ROM
+  pointers (text printers), carry convention across calls, shared code in the tracked set,
+  banked table reads of hot routines (data next to code).
+
 ## Open bug reports (after this work, owner's order)
 
 - Battle messages show fragments of other text and appear late (GB side: message tiles
