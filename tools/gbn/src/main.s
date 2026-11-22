@@ -273,6 +273,7 @@ start:      di
 ; ---- main loop: one engine frame per GB frame
 main:       call wait_vbl
             call read_pad
+            call bn_main                    ; (the place banner, the play time: text.s)
             ld a, [box_on]
             and a
             jr z, .fld
@@ -319,6 +320,7 @@ vblank:     push af
             and a
             call nz, bg_pal
             call box_vbl
+            call pt_tick
             ld a, [wp_on]                   ; (a screen wipe: the window from the top)
             and a
             call nz, wp_vbl
@@ -531,8 +533,7 @@ load_map:   push af
             ld a, [ml_keep]                 ; (a reload keeps the objects)
             and a
             call z, obj_load
-            xor a
-            ld [ml_keep], a
+            call bn_ml                      ; (a new map, not a reload: its banner; text.s)
             call font_map
             call draw_all
             call set_scroll
@@ -3314,7 +3315,14 @@ section bank 0, $3C00                       ; (masked loads)
 ; to the shadows, and a mode-2 STAT interrupt holds the CPU through each line's mode 3, so the
 ; load writes VRAM directly as with the LCD off. lcd_on shows the screen: shadows back in a
 ; V-Blank, the STAT interrupt as before.
-lcd_off:    xor a                           ; (any load: a skipped fade-out is spent)
+lcd_off:    ld a, [bn_t]                    ; (the place-name banner: gone)
+            and a
+            jr z, .nb
+            xor a
+            ld [bn_t], a
+            ld a, BOX_LINES
+            ldh [rLYC], a
+.nb:        xor a                           ; (any load: a skipped fade-out is spent)
             ld [fd_skip], a
             ld a, [q_n]                     ; (the field's metatile queue dropped: a new
             ld [q_rd], a                    ;   screen; the field redraws all of its map)

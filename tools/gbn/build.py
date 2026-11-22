@@ -236,12 +236,13 @@ def main():
            open(os.path.join(HERE, 'src', 'btl3.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl4.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl5.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'loc.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field2.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sgb.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
            'section bank 6, $7800\n' +
-           battle.vwf_source() + ui_strings())
+           battle.vwf_source() + ui_strings() + ui.loc_source())
     import re                                    # (constants from every module first: the
     defs = [l for l in src.split('\n') if re.match(r'^[A-Za-z_]\w*\s+=', l)]   #   assembler
     rest = [l for l in src.split('\n') if not re.match(r'^[A-Za-z_]\w*\s+=', l)] #   needs them

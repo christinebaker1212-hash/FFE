@@ -127,6 +127,10 @@ dlg_open:   ld l, a                         ; table entry: 3 x id
             call dlg_page
             ld a, 1
             ld [box_on], a
+            xor a                           ; (a banner showing: gone, the box's cut again)
+            ld [bn_t], a
+            ld a, BOX_LINES
+            ldh [rLYC], a
             ld a, [dlgsfx]                  ; a fanfare / the treasure ditty (FF1 dlgsfx)
             and a
             ret z
@@ -320,6 +324,9 @@ code_tile:  push hl
 
 ; V-Blank: up to 4 box rows to the window map (CGB: and their attributes); then shown
 box_vbl:    ld a, [box_on]
+            and a
+            jr nz, .on
+            ld a, [bn_t]                    ; (the place-name banner: the same window)
             and a
             jr nz, .on
             ldh a, [rLCDC]                  ; closed: window off
@@ -572,6 +579,54 @@ dlg_frame:  ld a, [win_up]                  ; (not before the page is up)
             call map_music                  ; (after a fanfare: the map's music again)
             jp talk_after                   ; (a teleport / battle the talk asked for)
 
+; ---- the place-name banner and the play time (loc.s), from the field's main loop
+bn_main:    ld a, 1                         ; (the play time runs from here on)
+            ld [pt_on], a
+            ld a, [bn_req]                  ; (a new place: its banner)
+            and a
+            call nz, bn_start
+            ld a, [bn_t]
+            and a
+            ret z
+            jr bn_tick
+bn_ml:      ld a, [ml_keep]                 ; load_map: a new map (not a reload) asks for it
+            xor 1
+            ld [bn_req], a
+            xor a
+            ld [ml_keep], a
+            ret
+bn_start:   xor a
+            ld [bn_req], a
+            ld a, F3_BANK
+            ld hl, bn_prep
+            jp bank_call
+bn_tick:    dec a
+            ld [bn_t], a
+            ret nz
+            ld a, BOX_LINES
+            ldh [rLYC], a
+            ret
+; the play time (V-Blank): frames, seconds, minutes, hours to 99, in the save page
+pt_tick:    ld a, [pt_on]
+            and a
+            ret z
+            ld hl, PT_SAVE
+            ld b, 3
+.l:         inc [hl]
+            ld a, [hl]
+            cp 60
+            ret c
+            ld [hl], 0
+            inc hl
+            dec b
+            jr nz, .l
+            ld a, [hl]
+            cp 99
+            ret nc
+            inc [hl]
+            ret
+
+
 section wram, $CB00
 win_buf:    ds 160
 section wram, $CC00
@@ -591,3 +646,6 @@ win_up:     ds 1
 dlg_more:   ds 1
 dlg_bank:   ds 1
 dlg_ptr:    ds 2
+bn_t:       ds 1                            ; the place-name banner (loc.s): frames left,
+bn_last:    ds 1                            ;   the last place shown (+ 1), a new map loaded
+bn_req:     ds 1

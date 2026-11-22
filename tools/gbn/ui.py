@@ -125,6 +125,7 @@ def strings():
     for c in range(12): out['cname%d' % c] = enc(ff1_items.T[240 + c])
     out['mcmd'] = enc('\n'.join(x.strip() for x in sm.M[2].split('\n')))
     out['gil'] = enc('Gil')
+    out['ptime'] = enc('Time')
     out['items'] = enc(M[3].strip())
     out['magic'] = enc('Magic')
     out['yesno'] = enc(sm.S[15])
@@ -290,3 +291,29 @@ def story_bank_part(rom=None):
         body += enc('\n'.join(pg)) + b'\0'
     assert 0x80 + len(body) <= 0x1000
     return bytes(ptrs.ljust(0x80, b'\0')) + bytes(body), first, len(pages)
+
+
+# place names for the map-entry banner and the main menu (owner, 2026-11-22, as the WonderSwan
+# Color remake): the project's English names (docs/glossary-ff1.md, the dialogue's wording, the
+# Japanese names where the dialogue has none), by FF1 standard map number; no floors
+LOC_NAMES = ['Cornelia', 'Pravoka', 'Elfheim', 'Melmond', 'Crescent Lake', 'Gaia', 'Onrac', "Hawk's Wing",
+             'Cornelia Castle', 'Elf Castle', 'Northwest Castle', 'Castle of Ordeals', 'Temple of Chaos',
+             'Earth Cave', 'Gurgu Volcano', 'Ice Cave', 'Cardia Islands', "Bahamut's Cave", 'Waterfall Cave',
+             'Dwarf Cave', "Matoya's Cave", "Sarda's Cave", 'Marsh Cave', 'Mirage Tower', 'Undersea Shrine',
+             'Floating Castle', "Giant's Cave", 'World Map']
+LOC_MAP = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+           8, 11, 11, 22, 22, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 17, 23, 23,
+           24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 12, 12, 12, 12, 12, 12, 12, 12, 26]
+
+
+def loc_source():
+    """bank 99 $7000: loc_tab (map -> name), loc_ptr, the names (ASCII, 0-terminated)"""
+    assert len(LOC_MAP) == 61
+    out = ['section bank 99, $7000', 'loc_tab:']
+    out += ['            db ' + ', '.join(str(v) for v in LOC_MAP[k:k + 16]) for k in range(0, 61, 16)]
+    out.append('loc_ptr:')
+    out += ['            dw loc_s%d' % i for i in range(len(LOC_NAMES))]
+    for i, n in enumerate(LOC_NAMES):
+        assert len(n) <= 18
+        out.append('loc_s%d:      db %s, 0' % (i, ', '.join(str(ord(c)) for c in n)))
+    return '\n'.join(out) + '\n'

@@ -547,13 +547,18 @@ obj_spr:    push de
             inc a
             add a, b
             ld [o_sy], a
-            ld b, a                         ; (under the dialogue box: hidden)
-            ld a, [box_on]
+            ld b, a                         ; (under the dialogue box / the place banner:
+            ld a, [box_on]                  ;   hidden)
+            and a
+            ld a, BOX_LINES + 16
+            jr nz, .cut
+            ld a, [bn_t]
             and a
             jr z, .vis
-            ld a, b
-            cp BOX_LINES + 16
-            jr nc, .vis
+            ld a, BN_LINES + 16
+.cut:       cp b
+            jr c, .vis
+            jr z, .vis
             pop hl
             pop de
             scf

@@ -323,16 +323,16 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
 mm_draw:    call scr_open
             call orb_gfx
             ld bc, $0000
-            ld de, $0C0F
+            ld de, $0C0E
             call scr_win
             ld bc, $0B00                    ; (six commands)
             ld de, $0908
             call scr_win
             ld bc, $0B07
-            ld de, $0908
+            ld de, $0907
             call scr_win
-            ld bc, $000F
-            ld de, $1403
+            ld bc, $000D                    ; (owner, 2026-11-22: the place, the play time, the
+            ld de, $1405                    ;   Gil, as the WonderSwan Color remake: loc.s)
             call scr_win
             xor a
 .m:         push af
@@ -345,7 +345,12 @@ mm_draw:    call scr_open
             call pen_at
             ld hl, str_mcmd4
             call pen_str
-            ld bc, $0910                    ; Gil, ending at column 18
+            call mm_place
+            ld bc, $0110                    ; Gil, the amount ending at column 18
+            call pen_at
+            ld hl, str_gil
+            call pen_str
+            ld bc, $0D10
             call pen_at
             ld hl, GOLD
             ld a, [hl+]
@@ -356,10 +361,6 @@ mm_draw:    call scr_open
             ld [nf_val + 2], a
             ld b, 6
             call pen_num
-            ld a, $20
-            call pen_ch
-            ld hl, str_gil
-            call pen_str
             call orb_draw
             jp scr_show
 
