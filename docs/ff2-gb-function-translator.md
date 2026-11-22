@@ -72,7 +72,7 @@ instruction, GB cycles per NES frame (lagcheck), ROM size; recorded in
 
 - **M1 done (2026-11-22):** `tools/gb2/ftrans.py`: 1,560 routines, 11,521 blocks, call graph,
   IR per instruction; the build goes through it, ROM byte-identical to the previous build.
-  1,491 routines (33.99k of 33.4k+ instruction visits) have no stack tricks or dynamic control.
+  1,491 routines (nearly all of the 33.4k instructions) have no stack tricks or dynamic control.
 - **M3 started:** whole-program range analysis (A / X / Y / C and the zero-page pointer bytes;
   ROM operands read from the user's ROM; callers' states flow into routines reached only by
   static calls; per-routine zero-page write sets, natives counted with the NES code's effects,
