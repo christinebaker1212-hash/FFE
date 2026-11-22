@@ -353,13 +353,7 @@ one reaches parity, so the owner can keep playing).
      sprites, OBJ palette 4 on the Color), beside the style-A message; at the end one results
      window (Experience, Gil, then two members a page: level, HP gain, the stats that rose)
      instead of a run of messages (btl2.s bank 6 $7480).
-   - Backdrops: FF1's scenery strip (DrawBattleBackdropRow's 4 x 14 layout, the backdrop from
-     lut_BtlBackdrops by the overworld tile under the party; on a standard map the tile it was
-     entered from) in the enemy area's top four rows, behind the enemies by whole cells: a cell
-     an enemy leaves empty (no pixels) shows the scenery, and an erased enemy's cells get it
-     back. Pixel blending was measured and set aside: most mixed cells need more than four
-     colours, which neither the Color nor the SGB can show in one cell. Color: the backdrop's
-     NES palette as BG palette 4; DMG: shaded by its palette; SGB: palette 0 (greys) by an
-     ATTR_CHR pair for rows 0-3 (`bt_bd_sgq`), queued after the battle's packets and before the
-     mask comes off. Data from the ROM at build time (battle.py: tiles 0-$11 of each battle
-     graphics page, lut_BtlBackdrops, lut_BackdropPal, the column layout found by its use).
+   - Backdrops: built (FF1's scenery strip behind the enemies by whole cells, Color / DMG / SGB),
+     then mock-ups of it across the full width and over the whole battlefield; the owner
+     disliked all of them and chose the pure black battlefield. Removed (pixel blending was
+     not possible either: most mixed cells need more than four colours).

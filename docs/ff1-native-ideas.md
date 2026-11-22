@@ -1,9 +1,9 @@
 # FF1 native build: ideas for menus and battle (2026-11-22)
 
 Suggestions for the owner to choose from. Each uses something the Game Boy / Game Boy Color
-offers, or fixes something a 160 x 144 screen makes awkward. Owner's choices (2026-11-22): battle backdrops, the battle conveniences (remembered cursor,
+offers, or fixes something a 160 x 144 screen makes awkward. Owner's choices (2026-11-22): the battle conveniences (remembered cursor,
 damage numbers, results window), Options and dash are built (docs/ff1-native.md item 18);
-HP bars and Select-repeat declined. The rest is open. Where
+HP bars and Select-repeat declined; backdrops were built and then removed (owner: pure black). The rest is open. Where
 an idea needs FF1 graphics, they come from the user's ROM at build time, as everything else.
 
 ## Menus
