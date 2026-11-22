@@ -284,3 +284,11 @@ one reaches parity, so the owner can keep playing).
    a menu; No with a save: "Continue from last save? The suspend point will be lost!"; No
    again, or no save: the title. Music sounds checked against the owner's NSF (pulses 7/8,
    volume steps without retriggers).
+12. Owner (2026-11-22): the equipment screen has FF1's two kinds only: a Weapon row, then the
+   armour worn (one row per piece, in FF1's type order) and one empty armour row while fewer
+   than four are worn; an armour row lists every wearable armour in the party's packs, and a
+   piece replaces the worn piece of its type (FF1: one of each). Battle: free targeting (a
+   direction picks the nearest living enemy that way, wrapping round); one rule for the hand
+   cursor everywhere (fingertip just before the text, finger at its middle row; where the
+   text starts at the window's first column the hand points at the second line or the
+   picture instead of leaving only a fingertip on screen).

@@ -1949,15 +1949,18 @@ eqm_main:   ld [eqm_m], a
             and 3
             ld [hl], a
             jr .scr
-.up:        ld a, [hl]
+.up:        ld a, [hl]                      ; (the rows in use: eqm_nr)
             dec a
-            cp 5
-            jr c, .s
-            ld a, 4
+            cp $FF
+            jr nz, .s
+            ld a, [eqm_nr]
+            dec a
             jr .s
-.dn:        ld a, [hl]
+.dn:        ld a, [eqm_nr]
+            ld b, a
+            ld a, [hl]
             inc a
-            cp 5
+            cp b
             jr c, .s
             xor a
 .s:         ld [hl], a
@@ -2019,6 +2022,14 @@ eqm_main:   ld [eqm_m], a
             call eqm_apply
 .back:      call eqm_sdraw                  ; the slots and the stats again
             call scr_upd
+            ld a, [eqm_nr]                  ; (a row gone: the hand on the last)
+            ld b, a
+            ld a, [eqm_t]
+            cp b
+            jp c, .l
+            ld a, b
+            dec a
+            ld [eqm_t], a
             jp .l
 .exit:      xor a                           ; FF1: sorted, stats readjusted
             ld [eq_kind], a
@@ -2134,29 +2145,41 @@ eqm_draw:   call scr_open
             call eqm_sdraw
             jp scr_show
 
-; the middle window: the five slots; the bottom: the stats
+; the middle window: the weapon, then the armour worn (FF1 has two kinds: weapons and
+; armour); the bottom: the stats
 eqm_sdraw:  call eqm_mclr
+            call eqm_mkrows
             xor a
 .t:         ld [eqm_k], a
+            ld e, a
+            ld d, 0
+            ld hl, eqm_rows
+            add hl, de
+            ld a, [hl]
+            cp $FE
+            jr z, .n                        ; (no row)
+            push af
+            ld a, [eqm_k]
             add a, 6
             ld c, a
             ld b, 2
             call pen_at
             ld a, [eqm_k]
-            call eqm_find
+            ld [eqm_ft], a                  ; (0: weapons, else armour)
+            pop af
             cp $FF
             jr z, .e
-            call eqm_slot                   ; HL = the slot's byte
+            ld [eqm_fj], a
+            call eqm_slotj
             ld a, [hl]
             call eqm_name
             jr .n
-.e:         ld a, [eqm_k]                   ; empty: the type's icon, a dash
-            ld e, a
-            ld d, 0
-            ld hl, eqm_icons
-            add hl, de
-            ld a, [hl]
-            call pen_ch
+.e:         ld a, [eqm_k]                   ; empty: a sword or an armour icon, a dash
+            and a
+            ld a, $19
+            jr z, .ic
+            ld a, $07
+.ic:        call pen_ch
             ld a, '-'
             call pen_ch
 .n:         ld a, [eqm_k]
@@ -2393,34 +2416,69 @@ eqm_fits:   and $7F
 .no:        scf
             ret
 
-; the candidates for slot eqm_t: Remove (if equipped), then every unequipped item in the
-; party's packs of that type that the member's job may use
+; the rows: eqm_rows[0] = the member's weapon slot ($FF none); then its armour worn, one
+; piece of each type in FF1's order (body, shield, helmet, gloves), then $FF (an empty row
+; to put on another piece) while fewer than four are worn; $FE: no row. eqm_nr = rows.
+eqm_mkrows: ld hl, eqm_rows
+            ld a, $FE
+            ld b, 5
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            xor a
+            call eqm_find
+            ld [eqm_rows], a
+            ld a, 1
+            ld [eqm_nr], a
+            ld a, 1                         ; armour types 1-4
+.ty:        ld [eqm_k], a
+            call eqm_find
+            cp $FF
+            jr z, .tn
+            call .add
+.tn:        ld a, [eqm_k]
+            inc a
+            cp 5
+            jr c, .ty
+            ld a, [eqm_nr]
+            cp 5
+            ret nc
+            ld a, $FF
+.add:       ld b, a
+            ld a, [eqm_nr]
+            ld e, a
+            ld d, 0
+            ld hl, eqm_rows
+            add hl, de
+            ld [hl], b
+            inc a
+            ld [eqm_nr], a
+            ret
+
+; the candidates for row eqm_t: Remove (when the row has an item), then every unequipped
+; item of the row's kind (weapons / armour of any type) in the party's packs that the
+; member's job may use
 eqm_cands:  xor a
             ld [eqm_n], a
             ld a, [eqm_t]
             ld [eqm_ft], a
-            call eqm_find
+            ld e, a
+            ld d, 0
+            ld hl, eqm_rows
+            add hl, de
+            ld a, [hl]
             cp $FF
             jr z, .m0
             ld a, $FF
             call .add
 .m0:        xor a
 .l:         ld [eqm_k], a                   ; m * 4 + j
-            ld a, [eqm_t]
-            ld [eqm_ft], a
-            ld a, [eqm_k]
             call eqm_mslot
             ld a, [hl]
             and a
             jr z, .n
             bit 7, a
             jr nz, .n
-            push af
-            call eqm_fits
-            pop bc
-            jr c, .n
-            ld a, b
-            and $7F
             call eqm_legal
             jr c, .n
             ld a, [eqm_k]
@@ -2492,19 +2550,51 @@ eqm_entry:  ld a, [eqm_c]
 eqm_apply:  ld [eqm_e], a
             ld a, [eqm_t]
             ld [eqm_ft], a
-            call eqm_find
-            ld [eqm_eq], a                  ; the equipped one's slot ($FF: none)
+            ld e, a
+            ld d, 0
+            ld hl, eqm_rows
+            add hl, de
+            ld a, [hl]
+            ld [eqm_eq], a                  ; the row's slot ($FF: none)
             ld a, [eqm_e]
             cp $FF
-            jr nz, .take
-            ld a, [eqm_eq]                  ; remove
+            jr z, .rem
+            ld a, [eqm_t]                   ; armour: the piece worn of the new one's type
+            and a                           ;   (FF1: one of each) is replaced
+            jr z, .take
+            ld a, [eqm_e]
+            call eqm_mslot
+            ld a, [hl]
+            and $7F
+            dec a
+            call eq_atype
+            inc a
+            call eqm_find                   ; (eqm_ft = its type: still the armour kind)
+            cp $FF
+            jr z, .take
+            ld b, a
+            ld a, [eqm_eq]
+            cp $FF
+            jr nz, .two
+            ld a, b                         ; an empty row: that piece is the one replaced
+            ld [eqm_eq], a
+            jr .take
+.two:       cp b
+            jr z, .take
+            ld a, b                         ; another row's piece of that type: taken off
+            ld [eqm_fj], a
+            call eqm_slotj
+            res 7, [hl]
+            jr .take
+.rem:       ld a, [eqm_eq]                  ; remove
             cp $FF
             ret z
             ld [eqm_fj], a
             call eqm_slotj
             res 7, [hl]
             ret
-.take:      call eqm_mslot                  ; DE = the item's slot
+.take:      ld a, [eqm_e]
+            call eqm_mslot                  ; DE = the item's slot
             ld d, h
             ld e, l
             ld a, [eqm_e]
@@ -2645,7 +2735,6 @@ eqm_name:   and $7F
 .w:         add a, b
             jp pen_iname
 
-eqm_icons:  db $19, $07, $05, $06, $08      ; empty slots: sword, armour, shield, helmet, gloves
 
 zz_end_7500:
 section wram, $CD00
@@ -2680,6 +2769,8 @@ eqm_w:      ds 4
 eqm_buf:    ds 8
 eqm_ls:     ds 17
 eqm_bk:     ds 16
+eqm_rows:   ds 5
+eqm_nr:     ds 1
 pg_names:   ds 24
 pg_nb:      ds 8
 pg_row:     ds 24
