@@ -554,24 +554,24 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
 .np:        ld a, TR_MINIMAP                ; FF1 IntroTitlePrepare: the crystal theme
             call snd_track
             call scr_open
-            ld b, 6                         ; title menu (the GB layout: three boxes)
-            ld c, 5
+            ld b, 4                         ; title menu (the GB layout: three boxes, centred:
+            ld c, 5                         ;   owner, 2026-11-22)
             ld d, 12
             ld e, 3
             call scr_win
             ld c, 8
             call scr_win
-            ld b, 2
+            ld b, 1
             ld c, 11
             ld d, 18
             call scr_win
-            ld bc, $0806
+            ld bc, $0606
             ld hl, str_title0
             call scr_str
-            ld bc, $0809
+            ld bc, $0609
             ld hl, str_title1
             call scr_str
-            ld bc, $040C
+            ld bc, $030C
             ld hl, str_title2
             call scr_str
             call .rate
@@ -579,7 +579,7 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             call ng_cont                    ; a save or a suspend point: Continue first
             ld a, 0
             jr nc, .sv
-            ld hl, smap + $300 + 6 * 32 + 7 ; (nothing to continue: Continue grey, the
+            ld hl, smap + $300 + 6 * 32 + 5 ; (nothing to continue: Continue grey, the
             ld b, 10                        ;   hand stays on New Game)
 .gy:        ld [hl], $0C
             inc hl
@@ -595,7 +595,7 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             add a, c
             add a, 6
             ld c, a
-            ld b, 8
+            ld b, 6
             call cur_txt
             call scr_frame
             ldh a, [pad_new]
@@ -663,7 +663,7 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             ret
 .rate:      ld a, [respond]                 ; the rate's digit after Message Speed
             add a, FONT_D0 + 1
-            ld hl, smap + 12 * 32 + 18
+            ld hl, smap + 12 * 32 + 17
             ld [hl], a
             ret
 
