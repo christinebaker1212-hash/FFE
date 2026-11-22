@@ -2772,7 +2772,7 @@ save_state: call save_valid
             ld [$0000], a
             xor a
             ld [$4000], a
-            ld hl, SAVE_MARK
+            call sv_addr
             ld a, [hl+]
             cp $46
             jr nz, .none
@@ -2797,7 +2797,8 @@ save_erase: ld a, $0A
             ld [$0000], a
             xor a
             ld [$4000], a
-            ld hl, SAVE_MARK
+            call sv_addr                    ; (the file: loc.s)
+            xor a
             ld [hl+], a
             ld [hl+], a
             ld [hl+], a
@@ -2808,7 +2809,7 @@ save_valid: ld a, $0A
             ld [$0000], a
             xor a
             ld [$4000], a
-            ld hl, SAVE_MARK
+            call sv_addr
             ld a, [hl+]
             cp $46
             jr nz, .no
@@ -2850,7 +2851,7 @@ load_game:  ld a, $0A
             ld [$0000], a
             xor a
             ld [$4000], a
-            ld hl, SAVE_MARK + 4
+            call sv_addr4
             ld de, unsram
             ld bc, $400
             call memcpy
@@ -2894,7 +2895,7 @@ save_game:  ldh a, [maptype]                ; the overworld position (FF1: its s
             ld [$0000], a
             xor a
             ld [$4000], a                   ; cart RAM bank 0
-            ld hl, SAVE_MARK
+            call sv_addr
             ld a, $46
             ld [hl+], a
             ld a, $46

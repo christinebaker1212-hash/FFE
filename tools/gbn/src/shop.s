@@ -600,7 +600,7 @@ sh_inn:     ld a, $1B
             cp 4
             jr c, .hp
             call party_mp
-            call save_game
+            call sh_fsave                   ; (which file: loc.s)
             ld a, $1C
             call sh_say
             call wait_ab

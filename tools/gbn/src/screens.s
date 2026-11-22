@@ -511,24 +511,7 @@ scr_frame:  ld a, [sf_row]                  ; (owner, 2026-11-22: no hand while 
 section bank 2, $4000
 
 ; ---- new game: title menu, party generation
-ng_main:    call save_state                 ; a damaged save: Lot Check's error message, erased
-            cp 2                            ;   only after the A Button
-            jr nz, .sok
-            call scr_open
-            xor a
-            ld [sfx_menu], a
-            ld bc, $0003
-            ld de, $140C
-            call scr_win
-            ld bc, $0105
-            ld hl, str_saverr
-            call scr_str
-            call scr_show
-.se:        call scr_frame
-            ldh a, [pad_new]
-            bit 0, a
-            jr z, .se
-            call save_erase
+ng_main:    call sv_boot                    ; a damaged file: Lot Check's error message, erased
 .sok:       call sus_state                  ; a damaged suspend point: the same
             cp 2
             jr nz, .uok
@@ -628,7 +611,7 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
 .ab:        ld a, b
             and $09                         ; A or Start
             jr z, .t
-            call opt_save                   ; (the message speed kept, as in Options)
+            call opt_save0                  ; (the message speed kept, as in Options)
             ld a, [ng_cur]
             and a
             jr nz, .new
@@ -645,7 +628,7 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             ld a, 1
             ld [sus_res], a
             ret
-.cn:        call save_valid                 ; No: with a save, Continue from last save?
+.cn:        call sv_any                     ; No: with a save, Continue from last save?
             jp c, .np                       ;   The suspend point will be lost!
             ld hl, str_susc2
             ld a, 4
@@ -653,11 +636,14 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             call sus_ask
             and a
             jp nz, .np
-            call sus_erase
-            jp load_game
-.cs:        call save_valid                 ; the saved game
+            call file_load                  ; (which file: loc.s)
+            jp c, .np
+            jp sus_erase
+.cs:        call sv_any                     ; a saved game: which file (loc.s)
             jp c, .t
-            jp load_game
+            call file_load
+            jp c, .np
+            ret
 .new:       call party_gen
             call ng_stats
             ret
@@ -668,7 +654,7 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             ret
 
 ; NC: something to continue (a save, or a good suspend point)
-ng_cont:    call save_valid
+ng_cont:    call sv_any
             ret nc
             call sus_state
             dec a

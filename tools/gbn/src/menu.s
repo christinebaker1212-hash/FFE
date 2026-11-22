@@ -1159,16 +1159,6 @@ mt_get:     add a, a
 desc_show:  call desc_box
             jp scr_upd
 
-; wait for A or B (C set on B)
-wait_ab:    call oam_clr
-.w:         call scr_frame
-            ldh a, [pad_new]
-            and $03
-            jr z, .w
-            rrca
-            ccf
-            ret
-
 ; ---- using an item (FF1 ItemJumpTable / UseItem_x)
 it_use:     ld a, [it_cur]
             ld e, a
@@ -1528,10 +1518,7 @@ save_ask:   call desc_show
             call wait_ab
             ccf
             ret nc
-            ld a, IT_SAVETXT
-            call desc_show
-            call save_game
-            call wait_ab
+            call file_save                  ; (which file: loc.s; the screen redrawn after)
             scf
             ret
 

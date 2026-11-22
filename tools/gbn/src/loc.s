@@ -781,6 +781,90 @@ mf_q1:      db "Forget ", 0
 mf_q2:      db "A Button: Yes", 0
 mf_q3:      db "B Button: No", 0
 
+; ---- three save files (owner, 2026-11-22, from the WonderSwan Color remake): file k at cart RAM
+; bank 0 $A000 + $410 k ("FF1N", the save page, the sum: file 1 where the single save was)
+sv_addr:    ld a, [sv_slot]
+            add a, a
+            add a, a
+            add a, $A0
+            ld h, a
+            ld a, [sv_slot]
+            swap a
+            ld l, a
+            ret
+sv_addr4:   call sv_addr
+            ld a, l
+            add a, 4
+            ld l, a
+            ret
+; NC if any file holds a good save
+sv_any:     xor a
+.l:         ld [sv_slot], a
+            call save_valid
+            ret nc
+            ld a, [sv_slot]
+            inc a
+            cp 3
+            jr c, .l
+            scf                             ; (none)
+            ret
+; boot (from bank 2): each damaged file, Lot Check's error message, erased after the A Button
+sv_boot:    xor a
+.l:         ld [sv_slot], a
+            call save_state
+            cp 2
+            jr nz, .n
+            call scr_open
+            xor a
+            ld [sfx_menu], a
+            ld bc, $0003
+            ld de, $140C
+            call scr_win
+            ld bc, $0105
+            ld hl, str_saverr
+            call scr_str
+            call scr_show
+.w:         call scr_frame
+            ldh a, [pad_new]
+            bit 0, a
+            jr z, .w
+            call save_erase
+.n:         ld a, [sv_slot]
+            inc a
+            cp 3
+            jr c, .l
+            ret
+; the picker in bank 99: C set if cancelled
+file_load:  xor a
+            jr file_go
+file_save:  ld a, 1
+file_go:    ld [fp_mode], a
+            ld a, F3_BANK
+            ld hl, file_pick
+            jp bank_call
+; the inn (bank 2): the picker, then the shop's screen again
+sh_fsave:   call file_save
+            call scr_open
+            call eqm_pal
+            call sh_base
+            jp scr_show
+
+; the Options saved (from the title, bank 2)
+opt_save0:  ld a, F3_BANK
+            ld hl, opt_save
+            jp bank_call
+
+; wait for A or B (C set on B)
+wait_ab:    call oam_clr
+.w:         call scr_frame
+            ldh a, [pad_new]
+            and $03
+            jr z, .w
+            rrca
+            ccf
+            ret
+
+
 ; the field's dash: Z if B is not held or the Options turned the dash off
 dash_b:     ld a, [opt_nodash]
             and a
@@ -1197,6 +1281,370 @@ opt_save:   ld a, $0A
             ld [$4000], a
             ret
 
+section bank 99, $5000
+; ---- the file screen: three windows (0,6k,20,6), each "File k", the play time, the four names,
+; the leader's level and the Gil (or No data); the hand on a file; A loads (a good file) /
+; saves (a file with a save: Save over it? first); B: C set
+file_pick:  ld a, [sv_slot]                 ; (the hand on the file used last)
+            cp 3
+            jr c, .c
+            xor a
+.c:         ld [fp_cur], a
+            call fp_draw
+.l:         ld a, [fp_cur]
+            ld c, a
+            add a, a
+            add a, c
+            add a, a
+            inc a
+            ld c, a
+            ld b, 2
+            call cur_txt
+            call scr_frame
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .b
+            bit 0, a
+            jr nz, .a
+            and $C0
+            jr z, .l
+            ld b, a
+            ld a, [fp_cur]
+            bit 7, b
+            jr z, .u
+            inc a
+            cp 3
+            jr c, .s
+            xor a
+            jr .s
+.u:         dec a
+            cp $FF
+            jr nz, .s
+            ld a, 2
+.s:         ld [fp_cur], a
+            ld a, SFX_MOVE
+            ld [sfx_req], a
+            jr .l
+.b:         call oam_clr
+            scf
+            ret
+.a:         ld a, [fp_cur]
+            ld [sv_slot], a
+            call save_valid
+            ld a, [fp_mode]
+            jr c, .empty
+            and a
+            jr nz, .over
+            call oam_clr                    ; load
+            call load_game
+            and a
+            ret
+.empty:     and a
+            jr nz, .save
+            call sfx_err                    ; (nothing to load there)
+            jr .l
+.over:      call fp_clr                     ; Save over File k? A / B
+            ld a, [fp_cur]
+            call fp_row
+            push bc
+            call pen_at
+            ld hl, fp_s_over
+            call pen_str
+            ld a, [fp_cur]
+            add a, $31
+            call pen_ch
+            ld a, $3F
+            call pen_ch
+            pop bc
+            inc c
+            inc c
+            push bc
+            call pen_at
+            ld hl, mf_q2
+            call pen_str
+            pop bc
+            inc c
+            call pen_at
+            ld hl, mf_q3
+            call pen_str
+            call scr_upd
+            call oam_clr
+            call wait_ab
+            jr nc, .save
+            ld a, [fp_cur]
+            call fp_clr
+            ld a, [fp_cur]
+            call fp_one
+            call scr_upd
+            jp .l
+.save:      call oam_clr
+            call save_game
+            ld a, [fp_cur]                  ; the file's new contents, a moment
+            call fp_clr
+            ld a, [fp_cur]
+            call fp_one
+            call scr_upd
+            ld b, 60
+.w:         push bc
+            call scr_frame
+            pop bc
+            dec b
+            jr nz, .w
+            and a
+            ret
+fp_s_over:  db "Save over File ", 0
+fp_s_file:  db "File ", 0
+fp_s_none:  db "No data", 0
+fp_s_lv:    db "Lv ", 0
+fp_s_gil:   db " Gil", 0
+; the screen
+fp_draw:    call scr_open
+            call eqm_pal
+            xor a
+.k:         push af
+            ld c, a
+            add a, a
+            add a, c
+            add a, a
+            ld c, a
+            ld b, 0
+            ld de, $1406
+            call scr_win
+            pop af
+            push af
+            call fp_one
+            pop af
+            inc a
+            cp 3
+            jr c, .k
+            jp scr_show
+; A = file -> B = 2, C = its first text row
+fp_row:     ld c, a
+            add a, a
+            add a, c
+            add a, a
+            inc a
+            ld c, a
+            ld b, 2
+            ret
+; file A's text rows cleared
+fp_clr:     call fp_row
+            ld e, 4
+.r:         push bc
+            push de
+            ld b, 1
+            call pen_at
+            ld b, 18
+            call pen_sp
+            pop de
+            pop bc
+            inc c
+            dec e
+            jr nz, .r
+            ret
+; file A's contents
+fp_one:     ld [fp_k], a
+            ld [sv_slot], a
+            call fp_row                     ; "File k" in gold
+            push bc
+            call pen_at
+            ld hl, fp_s_file
+            call pen_str
+            ld a, [fp_k]
+            add a, $31
+            call pen_ch
+            pop bc
+            push bc
+            call cell_addr
+            ld a, h
+            add a, 3
+            ld h, a
+            ld a, $0B
+            ld b, 6
+.g:         ld [hl+], a
+            dec b
+            jr nz, .g
+            pop bc
+            push bc
+            call save_valid
+            pop bc
+            jr nc, .ok
+            inc c
+            call pen_at
+            ld hl, fp_s_none
+            jp pen_str
+.ok:        push bc
+            call fp_read
+            pop bc
+            push bc                         ; the time, h:mm ending at column 18
+            ld b, 14
+            ld a, [fp_buf + 29]
+            cp 10
+            jr c, .t1
+            dec b
+.t1:        call pen_at
+            ld a, [fp_buf + 29]
+            call fp_dec
+            ld a, $3A
+            call pen_ch
+            ld a, [fp_buf + 28]
+            call fp_two
+            pop bc
+            inc c                           ; the names: two a row (columns 2, 11)
+            ld hl, fp_buf
+            ld e, 0
+.nm:        push bc
+            push de
+            push hl
+            ld a, e
+            and 1
+            ld b, 2
+            jr z, .nx
+            ld b, 11
+.nx:        ld a, e
+            srl a
+            add a, c
+            ld c, a
+            call pen_at
+            pop hl
+            ld d, 6
+.ch:        ld a, [hl+]
+            and a
+            jr nz, .cp
+            ld a, $20                       ; (an unused letter: blank)
+.cp:        call pen_ch
+            dec d
+            jr nz, .ch
+            pop de
+            pop bc
+            inc e
+            ld a, e
+            cp 4
+            jr c, .nm
+            inc c                           ; the leader's level, the Gil
+            inc c
+            push bc
+            call pen_at
+            ld hl, fp_s_lv
+            call pen_str
+            ld a, [fp_buf + 24]
+            inc a
+            call fp_dec
+            pop bc
+            ld b, 9
+            call pen_at
+            ld hl, fp_buf + 25
+            ld a, [hl+]
+            ld [nf_val], a
+            ld a, [hl+]
+            ld [nf_val + 1], a
+            ld a, [hl]
+            ld [nf_val + 2], a
+            ld b, 6
+            call pen_num
+            ld hl, fp_s_gil
+            jp pen_str
+; the file's page (sv_slot): names (4 x 6), the leader's level (+24), the Gil (+25, 3),
+; minutes (+28), hours (+29) -> fp_buf (cart RAM on only meanwhile)
+fp_read:    ld a, $0A
+            ld [$0000], a
+            xor a
+            ld [$4000], a
+            call sv_addr4                   ; HL = the page
+            push hl
+            ld de, fp_buf
+            ld c, 0
+.m:         push hl
+            ld a, h                         ; member c: + $100 + $40 c
+            inc a
+            ld h, a
+            ld a, c
+            rrca
+            rrca
+            add a, l
+            ld l, a
+            push hl
+            inc hl
+            inc hl
+            ld b, 4
+.n4:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .n4
+            pop hl
+            ld a, l
+            add a, $3E
+            ld l, a
+            jr nc, .n5
+            inc h
+.n5:        ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl]
+            ld [de], a
+            inc de
+            pop hl
+            inc c
+            ld a, c
+            cp 4
+            jr c, .m
+            pop hl
+            push hl
+            inc h                           ; the leader's level (+ $126)
+            ld a, l
+            add a, $26
+            ld l, a
+            ld a, [hl]
+            ld [fp_buf + 24], a
+            pop hl
+            push hl
+            ld a, l                         ; play time (+ $F2, $F3)
+            add a, $F2
+            ld l, a
+            jr nc, .pt
+            inc h
+.pt:        ld a, [hl+]
+            ld [fp_buf + 28], a
+            ld a, [hl]
+            ld [fp_buf + 29], a
+            pop hl
+            ld a, l                         ; Gil (+ $1C)
+            add a, $1C
+            ld l, a
+            ld de, fp_buf + 25
+            ld b, 3
+.gd:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .gd
+            xor a
+            ld [$0000], a
+            ret
+; A in decimal without leading zeros (0-99) / with two digits
+fp_dec:     cp 10
+            jr c, fp_two.o
+fp_two:     ld c, 0
+.t:         cp 10
+            jr c, .d
+            sub 10
+            inc c
+            jr .t
+.d:         push af
+            ld a, c
+            add a, $30
+            call pen_ch
+            pop af
+.o:         add a, $30
+            jp pen_ch
+
+section wram, $C95C
+sv_slot:    ds 1                            ; the save file in use (0-2)
+fp_mode:    ds 1                            ; the file screen: 0 load, 1 save
+fp_cur:     ds 1
+fp_k:       ds 1
+fp_buf:     ds 30
 section wram, $CDE3
 loc_buf:    ds 19
 pt_on:      ds 1                            ; (play time counted: set by the field's loop)
