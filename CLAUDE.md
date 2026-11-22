@@ -1287,6 +1287,17 @@ Owner (2026-11-22): battle palettes (the battle and lineup loaders had the same 
 offset bug; SGB battle now per-member job palettes), a modern FF-style equipment screen (main
 menu Items / Magic / Equip / Status; slots with icons, the party's packs as one list, old > new
 preview in green / red on the Color), items used repeatedly (the target window stays open).
+Owner (2026-11-22, later), done: music checked against the owner's NSF (pulses 7/8, volume
+steps without retriggers: no buzz); Suspend back (main menu Suspend, the point in cart RAM
+bank 1 with a sum, Continue prompts, damaged-data screen); one rule for the hand cursor
+(fingertip just before the text, finger at its middle; at the left edge it points at the
+picture or second line instead); free enemy targeting by direction; equipment with Weapon and
+Armor only; Magic and Status screens in the equipment screen's style (spells cast again and
+again while MP lasts); shops as the new menus (party preview with stats, Equip it now?, one
+sell list, spell first in magic shops, item quantities); the main menu with the party's battle
+pictures; typewriter text (dialogue, shop speech, descriptions) at reading speed, A doubles
+it, soft click. World map / puzzle / The End moved to ROM bank 99. Details: docs/ff1-native.md
+items 11-16.
 Next: the owner's play-test. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining
