@@ -1283,6 +1283,10 @@ job's picture and name, then the name; all four named: "OK to begin with this pa
 No resets), the prologue as FF1's intro (lines fading in one at a time, crystal theme), black
 outside the windows on the Color, visible DMG sprites on the black screens, Select-then-B opens
 the world map. Asked the owner: where the world map fails and which palettes look wrong.
+Owner (2026-11-22): battle palettes (the battle and lineup loaders had the same job-picture
+offset bug; SGB battle now per-member job palettes), a modern FF-style equipment screen (main
+menu Items / Magic / Equip / Status; slots with icons, the party's packs as one list, old > new
+preview in green / red on the Color), items used repeatedly (the target window stays open).
 Next: the owner's play-test. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining

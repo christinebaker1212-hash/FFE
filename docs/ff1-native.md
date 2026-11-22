@@ -250,6 +250,15 @@ one reaches parity, so the owner can keep playing).
    main.s); DMG / SGB keep the LCD-off loads. Load times measured against FF1 on the NES:
    menu 60 vs 63 frames from the press, town entry black 11 vs 12, battle start black 10 vs
    20.
+10. Owner (2026-11-22): the battle party pictures / colours (the battle and lineup loaders read
+   the job pictures two classes on; SGB battle: each member's rows in its job's palette); the
+   equipment screen in a modern Final Fantasy style (screens.s eqm_*: main menu Items / Magic /
+   Equip / Status; one screen per member with picture, name, job, level, the five slots with
+   FF3's icons and Attack / Accuracy / Defense / Evasion; a slot lists Remove and every
+   unequipped item of the party's packs that fits the slot and the job, with an old > new preview,
+   green better / red worse on the Color; items from another member's pack trade places with
+   the replaced one, keeping FF1's four weapons / four armour per member and FF1's stat rules);
+   Potion / Antidote / Golden Needle used again and again (the target window stays open).
 9. Owner's play-test of the first native ROM (2026-11-21), fixed: job pictures (read two
    classes on: promoted jobs showed), party names (printed at column 0), party creation to the
    owner's design (FF1's default party; A on a member: a job list with every job's picture and
