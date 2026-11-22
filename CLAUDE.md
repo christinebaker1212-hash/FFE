@@ -873,3 +873,8 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   credits fixed; native water animation (no NES PPU I/O; fixes the blank water). Open: battle
   lists not condensed, the rest of the native-layer worklist (sprite page, field map / text
   writers), prophecy +3% lag, real-hardware retest.
+  2026-11-22: owner: "continue native translation of FF3 until 100% native code is achieved"
+  (FF1's approach: a hand-written native engine, data only from the ROM). **FF3 native engine:
+  `tools/gb3n`, plan and progress `docs/ff3-native.md`.** Milestone 1 started (a map from the
+  ROM's data, walking, no NES layer). Also fixed in the recompiled build: one-row menu cursors
+  (Item opened Magic), the battle "Miss" sprite in English.
