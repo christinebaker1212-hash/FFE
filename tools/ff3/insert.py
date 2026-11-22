@@ -1854,6 +1854,33 @@ def credits(rom, report):
     put(rom, B, 0x967E, bytes(data))
     report.append('end credits: %d cast names (block $967E-$%04X)' % (len(CAST), a - 1))
 
+# ---- battle: the "Miss" sprite over a target --------------------------------------------
+# Damage numbers are sprites; a miss shows sprite tiles $64 / $65 (bank 33 L33_AE13), the kana
+# ミス (font block, PRG $1B4C0). The English: "Miss" in the same style (colour 3 letters, a
+# colour-1 outline, row 0 empty), 16 x 8 over the two tiles.
+MISS_ART = ['#...#.#..##..##.',
+            '##.##...#...#...',
+            '#.#.#.#..#...#..',
+            '#...#.#...#...#.',
+            '#...#.#.##..##..']
+
+def miss_tiles(rom):
+    o = 16 + 0x1B4C0
+    assert rom[o:o + 4] == bytes.fromhex('007bff7f'), rom[o:o + 4].hex()
+    g = [[0] * 16 for _ in range(8)]
+    for r, line in enumerate(MISS_ART):
+        for x, ch in enumerate(line):
+            if ch == '#': g[r + 2][x] = 3
+    for r in range(8):
+        for x in range(16):
+            if g[r][x] == 0 and any(g[rr][xx] == 3 for rr in range(max(0, r - 1), min(8, r + 2))
+                                    for xx in range(max(0, x - 1), min(16, x + 2))):
+                g[r][x] = 1
+    for t in range(2):
+        p0 = bytes(sum(((g[r][8 * t + i] & 1) << (7 - i)) for i in range(8)) for r in range(8))
+        p1 = bytes(sum(((g[r][8 * t + i] >> 1) << (7 - i)) for i in range(8)) for r in range(8))
+        rom[o + 16 * t:o + 16 * t + 16] = p0 + p1
+
 if __name__ == '__main__':
     rom = bytearray(open(sys.argv[1], 'rb').read())
     report = []
@@ -1864,5 +1891,6 @@ if __name__ == '__main__':
     menus(rom)
     epilogue(rom, report)
     credits(rom, report)
+    miss_tiles(rom)
     open(sys.argv[2], 'wb').write(rom)
     print('\n'.join(report))
