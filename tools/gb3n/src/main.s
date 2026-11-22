@@ -23,6 +23,8 @@ M_P2       = $4A00
 M_PAL      = $4B00
 M_CHR      = $4C00
 M_SPR      = $5C00
+M_FACE     = $5D00              ; facing (NES order: R 1, L 2, D 4, U 8) -> frame offset
+M_FRAME    = $5D10              ; frames: TL, BL, TR, BR tile / CGB attribute pairs
 STEP       = 16                 ; frames per metatile (a pixel a frame)
 PX0        = 72                 ; the party's 16 x 16 sprite at screen (72, 64)
 PY0        = 64
@@ -82,6 +84,8 @@ start:      di
             ld [px], a
             ld a, START_Y
             ld [py], a
+            ld a, 4                         ; (facing down)
+            ld [facing], a
             call load_map
             ld a, LCDC_ON
             ldh [rLCDC], a
@@ -230,7 +234,17 @@ move:       ld a, [moving]
             ld [mdx], a
             ld a, d
             ld [mdy], a
-            ld a, b                         ; facing (for the sprite)
+            ld c, 1                         ; facing in FF3's order (R 1, L 2, D 4, U 8)
+            bit 4, b
+            jr nz, .f
+            inc c
+            bit 5, b
+            jr nz, .f
+            ld c, 8
+            bit 6, b
+            jr nz, .f
+            ld c, 4
+.f:         ld a, c
             ld [facing], a
             ld a, [px]                      ; target metatile
             add a, e
@@ -352,39 +366,55 @@ mulsign:    and a                           ; A = -1 / 0 / 1 -> A = sign * C
             inc a
             ret
 
-; ---- the party sprite: the walking character's tiles 0-3 (2 x 2), OBJ palettes 0 / 1
-make_oam:   ld hl, oam_buf
-            ld a, PY0 + 16
+; ---- the party sprite (fix:D8D3 / DA2B): frame = facing's offset | (step pixel & 8); on the
+; second frame the sprite moves a pixel (left while walking up / down, up otherwise)
+make_oam:   ld a, [facing]
+            ld l, a
+            ld h, high(M_FACE)
+            ld a, [hl]                      ; (M_FACE: $5D00 + facing)
+            ld b, a
+            ld a, [mcount]
+            and 8
+            or b
+            add a, low(M_FRAME)
+            ld e, a
+            ld d, high(M_FRAME)
+            ld b, PX0 + 8                   ; B = x, C = y (OAM coordinates)
+            ld c, PY0 + 16
+            ld a, [mcount]
+            and 8
+            jr z, .pos
+            ld a, [mdy]
+            and a
+            jr z, .up1
+            dec b
+            jr .pos
+.up1:       dec c
+.pos:       ld hl, oam_buf
+            call .spr                       ; TL
+            ld a, c
+            add a, 8
+            ld c, a
+            call .spr                       ; BL
+            ld a, b
+            add a, 8
+            ld b, a
+            ld a, c
+            sub 8
+            ld c, a
+            call .spr                       ; TR
+            ld a, c
+            add a, 8
+            ld c, a
+.spr:       ld a, c                         ; BR (falls through)
             ld [hl+], a
-            ld a, PX0 + 8
+            ld a, b
             ld [hl+], a
-            xor a
+            ld a, [de]
+            inc de
             ld [hl+], a
-            ld a, $08                       ; (VRAM bank 1, palette 0)
-            ld [hl+], a
-            ld a, PY0 + 16
-            ld [hl+], a
-            ld a, PX0 + 16
-            ld [hl+], a
-            ld a, 1
-            ld [hl+], a
-            ld a, $08
-            ld [hl+], a
-            ld a, PY0 + 24
-            ld [hl+], a
-            ld a, PX0 + 8
-            ld [hl+], a
-            ld a, 2
-            ld [hl+], a
-            ld a, $09
-            ld [hl+], a
-            ld a, PY0 + 24
-            ld [hl+], a
-            ld a, PX0 + 16
-            ld [hl+], a
-            ld a, 3
-            ld [hl+], a
-            ld a, $09
+            ld a, [de]
+            inc de
             ld [hl+], a
             ret
 

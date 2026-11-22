@@ -36,6 +36,12 @@ def map_bank(rom, mid, world):
     bank[0xC00:0x1C00] = b''.join(nes2gb(chr_[16 * k:16 * k + 16]) for k in range(256))
     sp = rom.char_chr(0)
     bank[0x1C00:0x1D00] = b''.join(nes2gb(sp[16 * k:16 * k + 16]) for k in range(16))
+    # walking character frames (fix:DC1A facing -> frame offset, fix:DC2A frames: TL, BL, TR, BR
+    # tile / NES attribute pairs), the attributes as CGB OAM bits (palette, flips, VRAM bank 1)
+    bank[0x1D00:0x1D10] = rom.b(0x7E, 0xDC1A, 16)
+    fr = rom.b(0x7E, 0xDC2A, 0x40)
+    cv = lambda a: (a & 3) | 8 | ((a & 0x40) >> 1) | ((a & 0x80) >> 1) | ((a & 0x20) << 2)
+    bank[0x1D10:0x1D50] = bytes(v if k % 2 == 0 else cv(v) for k, v in enumerate(fr))
     return bytes(bank), mp
 
 
