@@ -10,11 +10,16 @@ section bank 2, $6100
 ; less (56, 40): sprites at x 96, y 16 + 32 n, names at (6, 3 + 4 n), the hand at x 32.
 LU_X       = 96
 lineup:     call scr_open
+            call eqm_pal                    ; (the gold title, as the other screens)
             ld a, TR_LINEUP
             call snd_track
-            ld bc, $0300
-            ld de, $0E12
+            ld bc, $0000                    ; (full width, as the other screens)
+            ld de, $1412
             call scr_win
+            ld bc, $0101
+            ld hl, str_formation
+            ld e, 9
+            call gold_str
             xor a                           ; the slots: dead / stone, member, x, y, x, y to go
 .s:         push af
             ld l, a

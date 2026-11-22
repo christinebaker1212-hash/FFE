@@ -285,6 +285,13 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             call sfx_err
             jr .mp
 .mok:       pop af
+            push af                         ; (no magic at all: FF1's error sound too)
+            call mg_any
+            jr nz, .mk2
+            pop af
+            call sfx_err
+            jr .mp
+.mk2:       pop af
             call magic_menu
             ld a, [menu_act]                ; (Warp / Exit: out of the menus)
             and a
@@ -942,6 +949,7 @@ IT_PAGE    = 13
 item_menu:  xor a
             ld [it_cur], a
 .re:        call scr_open                   ; (a screen of its own: faded)
+            call eqm_pal                    ; (the gold title)
             call it_list                    ; FF1 DrawItemBox: the items held, orbs skipped
             ld a, [it_n]
             and a
@@ -1047,15 +1055,30 @@ it_list:    ld hl, ITEMS + 1
 it_draw:    call scr_cls
             xor a
             ld [it_desc], a
-            ld bc, $0000
-            ld de, $0803
+            ld bc, $0000                    ; (the header as the other screens': the
+            ld de, $1403                    ;   title in gold, the Gil on the right)
             call scr_win
             ld bc, $0003
             ld de, $140F
             call scr_win
             ld bc, $0101
-            call pen_at
             ld hl, str_items
+            ld e, 5
+            call gold_str
+            ld bc, $0901
+            call pen_at
+            ld hl, GOLD
+            ld a, [hl+]
+            ld [nf_val], a
+            ld a, [hl+]
+            ld [nf_val + 1], a
+            ld a, [hl]
+            ld [nf_val + 2], a
+            ld b, 6
+            call pen_num
+            ld a, $20
+            call pen_ch
+            ld hl, str_gil
             call pen_str
             ld a, [it_cur]
             call it_page
@@ -1616,14 +1639,37 @@ magic_menu: ld [mg_ch], a
             call mg_list
             call scr_upd
             jr .l
-.rt:        ld a, [hl]
-            inc a
+.rt:        ld b, 1                         ; (the next member with magic)
             jr .ch
-.lf:        ld a, [hl]
-            dec a
-.ch:        and 3
+.lf:        ld b, $FF
+.ch:        ld c, 4
+.cn:        ld a, [hl]
+            add a, b
+            and 3
             ld [hl], a
+            push bc
+            push hl
+            call mg_any
+            pop hl
+            pop bc
+            jr nz, .re
+            dec c
+            jr nz, .cn
             jr .re
+; member A has magic (any level's MP maximum): NZ
+mg_any:     rrca
+            rrca
+            add a, $28
+            ld l, a
+            ld h, high(ch_magic)
+            ld b, 8
+            xor a
+.l:         or [hl]
+            inc hl
+            dec b
+            jr nz, .l
+            and a
+            ret
 
 ; B = level, C = slot of mg_cur
 mg_lvsl:    ld a, [mg_cur]

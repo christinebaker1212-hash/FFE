@@ -85,7 +85,7 @@ def snd_tables(rom):
 
 def ui_strings():
     """the screens' strings as str_<name> labels in code bank 2"""
-    out = ['section bank 2, $7000']
+    out = ['section bank 2, $6C00']
     for n, b in sorted(ui.strings().items()):
         out.append(data.db('str_' + n, b + b'\0'))
     out.append('zz_end_7000:')

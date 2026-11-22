@@ -575,11 +575,19 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             ld hl, str_title2
             call scr_str
             call .rate
+            call eqm_pal                    ; (Color: the grey of a closed choice)
             call ng_cont                    ; a save or a suspend point: Continue first
             ld a, 0
             jr nc, .sv
-            inc a
+            ld hl, smap + $300 + 6 * 32 + 7 ; (nothing to continue: Continue grey, the
+            ld b, 10                        ;   hand stays on New Game)
+.gy:        ld [hl], $0C
+            inc hl
+            dec b
+            jr nz, .gy
+            ld a, 1
 .sv:        ld [ng_cur], a
+            ld [ng_lock], a
             call scr_show
 .t:         ld a, [ng_cur]                  ; the hand at Continue (row 6) / New Game (9),
             ld c, a                         ;   column 8
@@ -594,6 +602,9 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             ld b, a
             and $C0                         ; up / down: Continue <-> New Game (FF1: the select
             jr z, .lr                       ;   sound)
+            ld a, [ng_lock]
+            and a
+            jr nz, .t
             ld a, [ng_cur]
             xor 1
             ld [ng_cur], a
@@ -812,42 +823,54 @@ name_buf:   push bc                         ; (keeps BC: the callers' text posit
             pop bc
             ret
 
-; name entry (the approved layout: the grid 10 x 9, two columns / rows apart; the name on
-; the top row): A adds the letter, B removes the last (on an empty name: C, back), Start
-; finishes (at least one letter); six letters finish too
+; name entry (owner, 2026-11-22: in windows as the other screens; one case at a time):
+; top (0,0,20,5) the job's picture, its name, Select: abc / ABC, the name being written; the
+; letters (0,4,20,14): the case's 26 (rows 6, 8, 10) and the digits and signs (rows 12, 14,
+; 16), nine a row at columns 2 + 2 x; Select switches capitals / small letters; the cursor
+; the hand's finger (8 x 8, it fits the column between two letters). A adds the letter, B
+; removes the last (on an empty name: C, back), Start finishes (at least one letter); six
+; letters finish too
 name_input: call scr_open
-            call scr_allwin
-            ld c, 1                         ; the grid rows
-            ld hl, grid_ptrs
-            ld e, 9
-.g:         push de
-            push hl
+            ld bc, $0000
+            ld de, $1405
+            call scr_win
+            ld bc, $0004
+            ld de, $140E
+            call scr_win
+            ld a, [pg_mem]                  ; the job: its picture and name
+            ld e, a
+            ld d, 0
+            ld hl, pg_class
+            add hl, de
+            ld a, [hl]
+            ld [eqm_cls], a
+            call scr_classes
+            ld a, [eqm_cls]
+            ld e, a
+            ld d, 0
+            ld hl, cls_pal
+            add hl, de
+            ld a, [hl]
+            ld [scr_t0], a
+            ld bc, $0808
+            ld e, 4
+            xor a
+            call scr_spr23
+            ld bc, $0401
+            call pen_at
+            ld a, [eqm_cls]
+            add a, a
+            ld e, a
+            ld d, 0
+            ld hl, cname_ptrs
+            add hl, de
             ld a, [hl+]
             ld h, [hl]
             ld l, a
-            ld de, pg_row                   ; letters two cells apart
-            ld b, 10
-.gl:        ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, $20
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .gl
+            call pen_str
             xor a
-            ld [de], a
-            ld b, 1
-            ld hl, pg_row
-            call scr_str
-            inc c
-            inc c
-            pop hl
-            inc hl
-            inc hl
-            pop de
-            dec e
-            jr nz, .g
+            ld [ni_case], a
+            call ni_grid
             ld a, [pg_mem]                  ; the name so far (cleared)
             ld [pg_t], a
             call name_ptr
@@ -862,29 +885,29 @@ name_input: call scr_open
             ld [ni_y], a
             call ni_name
             call scr_show
-.lp:        ld a, [ni_x]                    ; the hand at the letter (column 1 + 2 x,
-            add a, a                        ;   row 1 + 2 y)
-            inc a
-            ld b, a
-            ld a, [ni_y]
-            add a, a
-            inc a
-            ld c, a
-            call cur_txt
+.lp:        call ni_cur
             call scr_frame
             ldh a, [pad_new]
             bit 0, a
             jr nz, .a
             bit 1, a
-            jr nz, .b
+            jp nz, .b
             bit 3, a
-            jr nz, .st
-            ld hl, ni_x
+            jp nz, .st
+            bit 2, a
+            jr z, .ns
+            ld a, [ni_case]                 ; Select: the other case
+            xor 1
+            ld [ni_case], a
+            call ni_grid
+            call scr_upd
+            jr .lp
+.ns:        ld hl, ni_x
             bit 4, a
             jr z, .nr
             ld a, [hl]
             inc a
-            cp 10
+            cp 9
             jr c, .sx
             xor a
 .sx:        ld [hl], a
@@ -893,29 +916,30 @@ name_input: call scr_open
             jr z, .nl
             ld a, [hl]
             dec a
-            cp 10
+            cp 9
             jr c, .sx
-            ld a, 9
+            ld a, 8
             jr .sx
 .nl:        ld hl, ni_y
             bit 6, a
             jr z, .nu
             ld a, [hl]
             dec a
-            cp 9
+            cp 6
             jr c, .sy
-            ld a, 8
+            ld a, 5
 .sy:        ld [hl], a
             jr .lp
 .nu:        bit 7, a
             jr z, .lp
             ld a, [hl]
             inc a
-            cp 9
+            cp 6
             jr c, .sy
             xor a
             jr .sy
-.a:         ld a, [ni_y]                    ; the letter: grid row y, column x
+.a:         ld a, [ni_y]                    ; the letter: its grid row, column x
+            call ni_row
             add a, a
             ld l, a
             ld h, 0
@@ -971,6 +995,63 @@ name_input: call scr_open
             and a                           ; NC: done
             ret
 
+; screen row y (0-5) -> A = its grid row (the case's three, then the signs')
+ni_row:     cp 3
+            jr nc, .s
+            ld b, a
+            ld a, [ni_case]
+            ld c, a
+            add a, a
+            add a, c
+            add a, b
+            ret
+.s:         add a, 3
+            ret
+; the six rows of letters drawn (rows 6-16, two apart) and the Select hint
+ni_grid:    xor a
+.g:         push af
+            call ni_row
+            add a, a
+            ld l, a
+            ld h, 0
+            ld de, grid_ptrs
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld de, pg_row                   ; letters two cells apart (none after the
+            ld b, 9                         ;   last: the frame)
+.gl:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr z, .ge
+            ld a, $20
+            ld [de], a
+            inc de
+            jr .gl
+.ge:        xor a
+            ld [de], a
+            pop af
+            push af
+            add a, a
+            add a, 6
+            ld c, a
+            ld b, 2
+            ld hl, pg_row
+            call scr_str
+            pop af
+            inc a
+            cp 6
+            jr c, .g
+            ld bc, $0402                    ; Select: the other case
+            ld hl, str_nisel
+            ld a, [ni_case]
+            and a
+            jr z, .h
+            ld hl, str_nisel2
+.h:         jp scr_str
+
 ; HL = member pg_mem's name (6 bytes)
 name_ptr:   ld a, [pg_mem]
             ld l, a
@@ -996,11 +1077,41 @@ ni_name:    ld a, [pg_mem]
             add hl, de
             ld [hl], '-'
 .n:         ld hl, pg_nb
-            ld bc, $0700
+            ld bc, $0403
             call lcd_get  
             bit 7, a
             jp z, scr_str
             jp scr_str_on
+
+; the grid's cursor: the hand's finger (its upper right tile) in the column before the letter
+ni_cur:     ld a, [ni_y]                    ; y = 8 (6 + 2 y) + 16
+            add a, a
+            add a, 6
+            add a, a
+            add a, a
+            add a, a
+            add a, 16
+            ld hl, oam_buf
+            ld [hl+], a
+            ld a, [ni_x]                    ; x = 8 (1 + 2 x) + 8
+            add a, a
+            inc a
+            add a, a
+            add a, a
+            add a, a
+            add a, 8
+            ld [hl+], a
+            ld a, [cur_tbl + 4]             ; (the hand's upper right tile, its colours)
+            add a, CUR_TILE
+            ld [hl+], a
+            ld a, [cur_tbl + 5]
+            and 3
+            ld [hl+], a
+            xor a                           ; (the rest of the hand hidden)
+            ld [oam_buf + 4], a
+            ld [oam_buf + 8], a
+            ld [oam_buf + 12], a
+            ret
 
 grid_ptrs:  dw str_grid0, str_grid1, str_grid2, str_grid3, str_grid4, str_grid5, str_grid6
             dw str_grid7, str_grid8
@@ -2110,6 +2221,11 @@ eqm_pal:    ld a, COMMON
             ld de, eqm_buf + 6
             call .nes
             ld a, $80 | 24
+            call .put
+            ld a, $00                       ; NES grey: a choice not open now (palette 4)
+            ld de, eqm_buf + 6
+            call .nes
+            ld a, $80 | 32
 .put:       call bcps_w
             ld hl, eqm_buf
             ld b, 8
@@ -2837,6 +2953,8 @@ sus_k:      ds 1
 sus_top:    ds 1
 sus_yr:     ds 1
 sus_res:    ds 1                            ; the title resumed a suspend point
+ng_lock:    ds 1                            ; the title: nothing to continue
+ni_case:    ds 1                            ; name entry: 0 capitals, 1 small letters
 section wram, $D400
 smap:       ds 18 * 32                      ; the screen's map copy (attributes at + $300)
 section wram, $D700

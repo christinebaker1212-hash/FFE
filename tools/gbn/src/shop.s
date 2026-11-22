@@ -715,7 +715,7 @@ sh_clinic:  ld hl, sh_nbuf                  ; the dead, as a list of names
 
 zz_end_5980:
 
-section bank 2, $6690                       ; (the shops as the new menus, owner 2026-11-22)
+section bank 2, $66C0                       ; (the shops as the new menus, owner 2026-11-22)
 
 ; the shopkeeper says string HL
 sh_says:    push hl
@@ -1262,7 +1262,9 @@ sh_qty:     ld a, [sh_it]
             call sh_say
             scf
             ret
-.some:      ld a, 1
+.some:      ld hl, str_howmany              ; (the shopkeeper asks)
+            call sh_says
+            ld a, 1
             ld [sh_q], a
             ld bc, $0005                    ; the window: the item, x count, total Gil
             ld de, $1406

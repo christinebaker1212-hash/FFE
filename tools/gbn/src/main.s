@@ -2365,7 +2365,7 @@ fd_on_cgb:  ld hl, sh_pal                   ; (in the V-Blank: BG from the shado
             inc de
             dec b
             jr nz, .c
-            ld c, 0
+.obj:       ld c, 0
 .ro:        ld a, c
             ldh [$FF6A], a
             ldh a, [$FF6B]
@@ -2384,6 +2384,21 @@ fd_on_cgb:  ld hl, sh_pal                   ; (in the V-Blank: BG from the shado
             dec b
             jr nz, .z
             ret
+fd_on_off:  ldh a, [is_cgb]                 ; (the LCD off: the Color's palettes from the
+            and a                           ;   hardware itself)
+            jr z, fd_on_dmg
+            ld hl, fd_pal
+            ld c, 0
+.rb:        ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            bit 6, c
+            jr z, .rb
+            ld d, h
+            ld e, l
+            jp fd_on_cgb.obj
 fd_on_dmg:  ldh a, [rBGP]
             ld [fd_b], a
             ldh a, [rOBP0]
@@ -3445,9 +3460,9 @@ lcd_on:     push af
             ld a, [lmask]
             and a
             jr nz, .m
-            ld a, [fd_in]                   ; (a fade-in to come: white first)
+            ld a, [fd_in]                   ; (a fade-in to come: white / black first)
             and a
-            call nz, fd_on_dmg
+            call nz, fd_on_off
             pop af
             ldh [rLCDC], a
             ret

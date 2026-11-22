@@ -62,8 +62,8 @@ def gfx_bank(rom):
     return bytes(blob)
 
 
-NAME_GRID = ['ABCDEFGHIJ', 'KLMNOPQRST', "UVWXYZ'.,-", 'abcdefghij', 'klmnopqrst',
-             'uvwxyz!?&…', '0123456789', '():;/+%"[]', '          ']
+NAME_GRID = ['ABCDEFGHI', 'JKLMNOPQR', 'STUVWXYZ ', 'abcdefghi', 'jklmnopqr',
+             "stuvwxyz'", '012345678', '9.,-!?&…(', '):;/+%"[]']   # (9 x 9, in a window)
 TITLE = ['Continue', 'New Game', 'Message Speed']
 SAVE_ERROR = ('SAVE DATA ERROR\n\nThe saved game in\nthe Game Pak is\ndamaged.\n\n'
               'Press the A Button\nto erase it.')     # (Lot Check: Nintendo's names)
@@ -92,6 +92,10 @@ def strings():
     out['pgno'] = enc('No')
     out['stlab'] = enc('HP\nMP')                     # (the status screen's gold labels)
     out['stlab2'] = enc('Exp\nNext')
+    out['nisel'] = enc('SELECT: abc')                   # (name entry: the other case)
+    out['nisel2'] = enc('SELECT: ABC')
+    out['formation'] = enc('Formation')                 # (the lineup screen's title)
+    out['howmany'] = enc('How many?')                   # (the item shop's quantity)
     out['satk'] = enc('Attack')                         # (the shops' party window)
     out['sdef'] = enc('Defense')
     out['scant'] = enc("Can't use")
