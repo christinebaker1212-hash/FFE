@@ -200,5 +200,16 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   world tiles back on closing; the dialogue box / Select boxes on world maps use a font copy in
   VRAM bank 1 (no npcs there) and the menu window palette (the world palettes have none); the
   hand moved to sprite tiles $10-$13.
+- 2026-11-22: the boot screens (`title.py`, `src/title.s`): a suspend point first ("Continue from
+  Suspend point?" Yes: restored and erased); the prophecy (t8000 0 / 1 from the ROM, unwrapped
+  and laid out as 8 GB pages of up to 8 centred lines of 18, broken at sentences; each page
+  fades in (the text colour only), holds 3 s or until a button, fades out); the load menu (New
+  Game, Battle Speed (FF3's message speed, left / right), the three files as on the save screen,
+  the chosen file's party; a file loads into the save block and starts on its world map at its
+  position); New Game: the name entry (t8200 $21 grid, ten letters a row; FF3's rules of 3D/B895:
+  six letters, A types and then confirms, B backs up into the previous member, no name like an
+  earlier member's), then map 0 with world 0 at FF3's start position on the map stack. The LCD
+  goes on once at boot with black palettes. `build.py` without --map / --group builds the real
+  boot; with them the test start as before.
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.

@@ -154,7 +154,7 @@ def nes_rgb_src():
 
 
 MODULES = ('npc', 'text', 'event', 'menucore', 'select')                     # bank 0
-CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save')  # bank CODE1
+CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save', 'title')  # bank CODE1
 CODE1 = 80
 
 
@@ -177,8 +177,9 @@ def engine_src(rom=None):
         codes.append('\n'.join(l for l in c.split('\n') if not l.startswith('section bank 0,')))
         rams.append(r)
     if rom is not None:
-        import menu
+        import menu, title
         codes.append(menu.code_data(rom, rgb555))
+        codes.append(title.code_data(rom))
     zp = ''.join('Z_%02X = $%04X\n' % (n, 0xFFB0 + n - 0x18) for n in range(0x18, 0x60))
     return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + zp + main_code + '\n' +
             '\n'.join(codes) + '\n' + main_ram + '\n' + '\n'.join(rams))
@@ -191,7 +192,7 @@ def gb_text_syms(rom):
 
 def main():
     args = sys.argv[1:]
-    opt = {'--map': '181', '--group': '0', '--x': '255', '--y': '255', '--dlg': '',
+    opt = {'--map': '', '--group': '0', '--x': '255', '--y': '255', '--dlg': '',
            '--out': os.path.join(ROOT, 'build', 'ff3n.gbc')}
     pos = []
     while args:
@@ -231,7 +232,9 @@ def main():
         jb[0x2000 + 2 * k] = v & 0xFF; jb[0x2001 + 2 * k] = v >> 8
     banks[JOB_BANK] = jb
     src = engine_src(rom) + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
-    r = asm(src, syms={'START_MAP': int(opt['--map'], 0), 'START_GRP': int(opt['--group'], 0),
+    title_on = opt['--map'] == '' and opt['--group'] == '0'
+    r = asm(src, syms={'START_MAP': int(opt['--map'] or '0', 0), 'START_GRP': int(opt['--group'], 0),
+                       'TITLE': 1 if title_on else 0,
                        'START_X': int(opt['--x'], 0), 'START_Y': int(opt['--y'], 0),
                        'TS_BANK': TS_BANK, 'MT_BANK': MT_BANK, 'SPR_BANK': SPR_BANK,
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,

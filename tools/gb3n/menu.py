@@ -92,6 +92,7 @@ GB_TEXT = {
     's_sfx': 'Sound Volume', 's_sq1': 'Create a Suspend', 's_sq2': 'Point and return',
     's_sq3': 'to the Title?', 's_sq4': '', 's_yes': 'Yes', 's_no': 'No', 's_cap': 'Capacity',
     's_off': 'You can turn the', 's_off2': 'power off now.',
+    's_cs1': 'Continue from', 's_cs2': 'Suspend point?',
 }
 GB_TEXT_AT = 0x5800
 
@@ -212,9 +213,6 @@ def pack(rom, rgb555):
     for k, w in enumerate(commands(rom)[:7]):
         w = w[:8]
         b[0x1600 + 8 * k:0x1600 + 8 * k + 8] = w + b'\xFF' * (8 - len(w))
-    t, _ = gb_text(rom)
-    assert GB_TEXT_AT + len(t) <= STATUS_AT
-    b[GB_TEXT_AT - 0x4000:GB_TEXT_AT - 0x4000 + len(t)] = t
     b[0x1C00:0x1C00 + 3 * 99] = rom.b(0x39, 0x80B0, 3 * 99)    # $5C00: EXP for each level
     ic = rom.prg[0x0D * 0x2000 + 0x1500:0x0D * 0x2000 + 0x1700]  # $5E00: item icons (0D/B500)
     b[0x1E00:0x2000] = b''.join(nes2gb(ic[16 * k:16 * k + 16]) for k in range(32))

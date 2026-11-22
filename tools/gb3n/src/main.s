@@ -112,21 +112,9 @@ start:      di
 .wa:        ld [hl+], a
             dec b
             jr nz, .wa
-            ld a, START_GRP                 ; the test start (build.py --map / --group)
-            ld [cur_grp], a
-            cp 3                            ; (the world: group 0 / 1 = world 0 / 1, 2 = world 2,
-            jr c, .wd                       ;   3 + w = world map w)
-            sub 3
-.wd:        ld [cur_world], a
-            ld a, START_MAP
-            ld [cur_map], a
             ld a, 4                         ; (facing down)
             ld [facing], a
-            ld a, START_X                   ; ($FF: the map's own start position)
-            ld [px], a
-            ld a, START_Y
-            ld [py], a
-            call load_map
+            call pal_up                     ; (black: nothing shows white)
             ld a, LCDC_ON
             ldh [rLCDC], a
             ld a, 1
@@ -144,6 +132,63 @@ start:      di
             ld a, 3
             ldh [rIE], a
             ei
+            ld a, TITLE                     ; the boot screens (tests: build.py --map / --group)
+            and a
+            jr z, .test
+            ld a, CODE1
+            ld hl, tl_flow
+            call far_call
+            ld a, [tl_res]
+            cp 2
+            jr z, .go                       ; (a suspend point: its place restored)
+            cp 1
+            jr z, .file
+            xor a                           ; new game: map 0 (the opening), from world 0 at
+            ld [cur_grp], a                 ;   FF3's start position ($6009 / $600A + 7)
+            ld [cur_map], a
+            ld [cur_world], a
+            ld a, 3
+            ld [stack], a
+            xor a
+            ld [stack + 1], a
+            ld a, [GS + $09]
+            add a, 7
+            ld [stack + 2], a
+            ld a, [GS + $0A]
+            add a, 7
+            ld [stack + 3], a
+            ld a, 1
+            ld [stk_n], a
+            ld a, $FF
+            ld [px], a
+            jr .go
+.file:      ld a, [GS + $08]                ; a file: its world map at its position
+            ld [cur_world], a
+            add a, 3
+            ld [cur_grp], a
+            xor a
+            ld [cur_map], a
+            ld [stk_n], a
+            ld a, [GS + $09]
+            add a, 7
+            ld [px], a
+            ld a, [GS + $0A]
+            add a, 7
+            ld [py], a
+            jr .go
+.test:      ld a, START_GRP
+            ld [cur_grp], a
+            cp 3                            ; (the world: group 0 / 1 = world 0 / 1, 2 = world 2,
+            jr c, .wd                       ;   3 + w = world map w)
+            sub 3
+.wd:        ld [cur_world], a
+            ld a, START_MAP
+            ld [cur_map], a
+            ld a, START_X                   ; ($FF: the map's own start position)
+            ld [px], a
+            ld a, START_Y
+            ld [py], a
+.go:        call load_map
 
 ; ---- main loop: one engine frame per GB frame
 main:       call wait_vbl
