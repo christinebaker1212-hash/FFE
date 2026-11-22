@@ -26,6 +26,11 @@ SPR_BANK = CHR_BANK0 + 16               # walking characters: $4000 + $100 job; 
 WLD_BANK = SPR_BANK + 1                 # world maps: tilesets $4000 + $700 k (k = w >> 1), entries
                                         #   $7000 + 64 w, entrance destinations $7400 + 64 w
 WCHR_BANK = WLD_BANK + 1                # world BG tiles: $4000 + $1000 k
+NPCT_BANK = WCHR_BANK + 1               # npc tables: $4000 graphics ids (worlds 0-1), $4100 (2+),
+                                        #   $4200 / $4300 speeds, $4400 frames, $4500 random
+                                        #   table, $4600 new-game switches
+NPCL_BANK = 64                          # npc lists: $4000 + 64 index (12 records + 0)
+NPCG_BANK0 = 65                         # npc graphics (GB format): $4000 + $100 (g & 63), 2 banks
 WMAP_BANK0 = 48                         # world tilemaps (256 x 256): 4 banks each, 64 rows a bank
 WMAPS = (0, 0, 1, 2, 3)                 # world -> tilemap (worlds 0 and 1 share one)
 
@@ -74,6 +79,7 @@ def pack(rom):
             e[10] = mp[1]                                              # flags (gil, water)
             e[11] = mp[11]                                             # exit
             e[12] = TS_BANK                                            # tileset bank
+            e[13] = mp[4]                                              # npc list
             e[48:64] = rom.b(0x10, ((mp[13] | 0x20) << 8) | mp[12], 16)  # entrances (dest maps)
             e[16:48] = rom.map_palettes(mid, w)                        # NES colours
             ent[g][64 * mid:64 * mid + 64] = e
@@ -102,6 +108,22 @@ def pack(rom):
         wb[0x3000 + 64 * w:0x3040 + 64 * w] = e
         wb[0x3400 + 64 * w:0x3440 + 64 * w] = rom.world_entrances(w)
     banks[WLD_BANK], banks[WCHR_BANK] = wb, wc
+    t = rom.npc_tables()
+    nt = bytearray(b'\xFF' * 0x4000)
+    cv = lambda a: (a & 3) | 8 | ((a & 0x40) >> 1) | ((a & 0x80) >> 1) | ((a & 0x20) << 2)
+    nt[0x0000:0x0100], nt[0x0100:0x0200] = t['g0'], t['g2']
+    nt[0x0200:0x0300], nt[0x0300:0x0400] = t['s0'], t['s1']
+    nt[0x0400:0x0500] = bytes(v if k % 2 == 0 else cv(v) for k, v in enumerate(t['anim']))
+    nt[0x0500:0x0600], nt[0x0600:0x0640] = t['rng'], t['sw']
+    banks[NPCT_BANK] = nt
+    nl = bytearray(0x4000)
+    for i in range(256):
+        for k, r in enumerate(rom.npc_list(i)): nl[64 * i + 4 * k:64 * i + 4 * k + 4] = r
+    banks[NPCL_BANK] = nl
+    for b in range(2):
+        banks[NPCG_BANK0 + b] = bytearray(b''.join(
+            b''.join(nes2gb(c[16 * k:16 * k + 16]) for k in range(16))
+            for c in (rom.npc_chr(64 * b + g) for g in range(64))))
     for k, w in enumerate((0, 2, 3, 4)):
         t = rom.world_tilemap(w)
         for i in range(4): banks[WMAP_BANK0 + 4 * k + i] = bytearray(t[0x4000 * i:0x4000 * i + 0x4000])
@@ -134,11 +156,13 @@ def main():
     rom = Rom(pos[0] if pos else os.path.join(ROOT, 'build', 'ff3_en.nes'))
     banks, nl, nc = pack(rom)
     src = open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + \
-        open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
+        open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' + \
+        open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
     r = asm(src, syms={'START_MAP': int(opt['--map'], 0), 'START_GRP': int(opt['--group'], 0),
                        'START_X': int(opt['--x'], 0), 'START_Y': int(opt['--y'], 0),
                        'TS_BANK': TS_BANK, 'MT_BANK': MT_BANK, 'SPR_BANK': SPR_BANK,
-                       'WLD_BANK': WLD_BANK})
+                       'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
+                       'NPCG_BANK0': NPCG_BANK0})
     for b, d in banks.items(): r.banks[b] = bytearray(d)
     size = 2
     while size < max(r.banks) + 1: size *= 2

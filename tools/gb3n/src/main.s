@@ -80,8 +80,13 @@ start:      di
             inc de
             dec b
             jr nz, .cd
+            call npc_boot
             ld a, START_GRP                 ; the test start (build.py --map / --group)
             ld [cur_grp], a
+            cp 3                            ; (the world: group 0 / 1 = world 0 / 1, 2 = world 2,
+            jr c, .wd                       ;   3 + w = world map w)
+            sub 3
+.wd:        ld [cur_world], a
             ld a, START_MAP
             ld [cur_map], a
             ld a, 4                         ; (facing down)
@@ -105,7 +110,9 @@ start:      di
 main:       call wait_vbl
             call read_pad
             call move
+            call calc_pp
             call make_oam
+            call npc_frame
             jr main
 
 wait_vbl:   xor a
@@ -210,9 +217,11 @@ load_map:   ld a, [lcd_is]
             call memcpy
             call .tset
             call init_trig
+            call load_npcs
             jp .gfx
 .world:     sub 3                           ; world map w: its entry and entrance table (bank
-            ld l, a                         ;   WLD_BANK $7000 / $7400 + 64 w)
+            ld [cur_world], a               ;   WLD_BANK $7000 / $7400 + 64 w)
+            ld l, a
             ld h, 0
             add hl, hl
             add hl, hl
@@ -248,6 +257,7 @@ load_map:   ld a, [lcd_is]
             ld a, 54
             ld [py], a
 .wp:        call .tset
+            call load_npcs
             jp .gfx
 .tset:      ld a, [M_ENT + 12]              ; tileset tables -> M_TL..M_P2 (bank e[12])
             ld [MBC5_BANKL], a
@@ -289,6 +299,11 @@ load_map:   ld a, [lcd_is]
             ld de, M_FACE
             ld bc, $50
             call memcpy
+            call npc_gfx
+            ld a, [px]                      ; the party's destination tile
+            ld [ppx], a
+            ld a, [py]
+            ld [ppy], a
             ld hl, pal_sh                   ; palettes: the 32 NES colours through NES_RGB ->
             ld de, 128                      ;   the shadow (BG 0-31, OBJ 64-95; uploaded in
             call memclr                     ;   V-Blank, or now)
@@ -563,6 +578,14 @@ move:       ld a, [moving]
             ldh a, [cmask]                  ; ($3F on a map, $FF on a world map)
             and c
             ld d, a
+            push de
+            call npc_block
+            pop de
+            ret c
+            ld a, e                         ; (the party's destination tile: FF3 $68 / $69)
+            ld [ppx], a
+            ld a, d
+            ld [ppy], a
             call map_at
             ld l, a
             ldh a, [is_world]
@@ -825,6 +848,40 @@ map_at:     ldh a, [is_world]
             ld a, [hl]
             ret
 
+; the party's map pixel (x 16 + step offset), for the npc sprites
+calc_pp:    ld a, [mcount]
+            ld c, a
+            ld a, [mdx]
+            call mulsign
+            ld e, a
+            ld a, [px]
+            ld hl, ppx_pix
+            call .one
+            ld a, [mdy]
+            call mulsign
+            ld e, a
+            ld a, [py]
+.one:       push hl                         ; [HL] = A 16 + E (E signed)
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld d, 0
+            bit 7, e
+            jr z, .p
+            dec d
+.p:         add hl, de
+            ld d, h
+            ld e, l
+            pop hl
+            ld a, e
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            ret
+
 ; ---- scroll: the camera (map pixels) = party * 16 + step offset - (PX0, PY0)
 set_scroll: ld a, [mcount]
             ld c, a
@@ -870,7 +927,7 @@ make_oam:   ld a, [facing]
             ld e, a
             ld d, high(M_FRAME)
             ld b, PX0 + 8                   ; B = x, C = y (OAM coordinates)
-            ld c, PY0 + 16
+            ld c, PY0 + 16 - 3              ; (3 pixels up as FF3: fix:D8CA)
             ld a, [mcount]
             and 8
             jr z, .pos

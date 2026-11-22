@@ -156,6 +156,39 @@ class Rom:
         """destination maps of the world's entrance tiles (fix:C1C4: 00/8800, 00/8840 off world 0)"""
         return self.b(0, 0x8800 if w == 0 else 0x8840, 64)
 
+    # ---- npcs ------------------------------------------------------------------------------
+    def npc_list(self, idx):
+        """(L3B_B2FA) the npc records of list idx (map properties byte 4): pointer 2C/8000 + 2 idx
+        (hi | $80), 4 bytes each (id, x, y, movement type / palette / direction), 0-terminated"""
+        po = self.pa(0x2C, 0x8000) + 2 * idx
+        a = ((self.prg[po + 1] | 0x80) << 8) | self.prg[po]
+        o = self.pa(0x2C, a)
+        out = []
+        while self.prg[o] and len(out) < 12:
+            out.append(bytes(self.prg[o:o + 4])); o += 4
+        return out
+
+    def npc_tables(self):
+        """graphics id per npc id (00/9400 worlds 0-1, 00/9500), speeds (01/9E00 world 0,
+        01/9F00: low nibble animation mask, high movement counter), the new-game npc switches
+        (00/B600 -> $6080, L3A_8E76), the animation frames (3B/B41A), the random table (fix:FE00)"""
+        return dict(g0=self.b(0, 0x9400, 256), g2=self.b(0, 0x9500, 256),
+                    s0=self.b(1, 0x9E00, 256), s1=self.b(1, 0x9F00, 256),
+                    sw=self.b(0, 0xB600, 64), anim=self.b(0x3B, 0xB41A, 256),
+                    rng=self.b(0x7F, 0xFE00, 256))
+
+    def npc_chr(self, g):
+        """16 tiles of npc graphics g (FDF41): < $40 0E/8000 + $100 g; < $58 8 tiles at 0A/8000 +
+        $80 (g - $40), twice; else 4 tiles at 0D/8800 + $40 (g - $58), four times"""
+        if g < 0x40:
+            o = 0x0E * B8 + 0x100 * g
+            return self.prg[o:o + 0x100]
+        if g < 0x58:
+            o = 0x0A * B8 + 0x80 * (g - 0x40)
+            return self.prg[o:o + 0x80] * 2
+        o = 0x0D * B8 + 0x800 + 0x40 * (g - 0x58)
+        return self.prg[o:o + 0x40] * 4
+
     def char_chr(self, job=0):
         """16 map-character tiles (0E/8000 + $100 job, FDD2D)"""
         o = 0x0E * B8 + 0x100 * (job & 0x3F)

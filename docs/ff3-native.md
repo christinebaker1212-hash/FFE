@@ -93,5 +93,14 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   property 2 bit 7 clear) enter map 00/8800 + id of the world's map set, the world position
   pushed. Checked (PyBoy state + pictures): world 0 walking, castle entrance -> map 78 ->
   exit -> back on the world map at the entrance.
+- 2026-11-22: NPCs (`src/npc.s`): object blocks in FF3's layout ($7000 / $7100 -> N_OBJ / N_OB2),
+  lists from 2C/8000 (map properties byte 4), npc switches (save block $6080, new-game values
+  00/B600), speeds (01/9E00 / 9F00), graphics ids (00/9400 / 9500) and the three graphics
+  formats of FDF41 (converted at build time), the animation frames (3B/B41A), FF3's random
+  movement (one npc a frame, fix:FE00 random table), npc passability (L3B_B110 / B0C5: party
+  destination, tile, z-level, other npcs), frame selection by movement type, priority halves,
+  the party blocked by npcs (fix:E3F1, marks them touched). Sprites 3 pixels up as FF3 (party
+  too). Checked against the NES (map 6 entered through a poked entrance trigger: elder and
+  the two flower pots; NPC graphics slots of map 181 identical to the NES CHR RAM).
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.
