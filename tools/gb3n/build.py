@@ -151,6 +151,31 @@ def nes_rgb_src():
         '    dw %s\n' % ', '.join(str(x) for x in v[k:k + 8]) for k in range(0, 64, 8))
 
 
+MODULES = ('npc', 'text', 'event', 'menu', 'select')
+
+
+def engine_src():
+    """main.s's code, then each module's code (its `section bank 0` lines dropped: the code
+    continues in bank 0), then all RAM sections"""
+    rd = lambda n: open(os.path.join(HERE, 'src', n + '.s')).read()
+    def split(t):
+        i = t.find('\nsection wram')
+        return (t, '') if i < 0 else (t[:i], t[i:])
+    main_code, main_ram = split(rd('main'))
+    codes, rams = [], []
+    for m in MODULES:
+        c, r = split(rd(m))
+        codes.append('\n'.join(l for l in c.split('\n') if not l.startswith('section bank 0,')))
+        rams.append(r)
+    return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + main_code + '\n' +
+            '\n'.join(codes) + '\n' + main_ram + '\n' + '\n'.join(rams))
+
+
+def gb_text_syms():
+    import menu
+    return menu.gb_text()[1]
+
+
 def main():
     args = sys.argv[1:]
     opt = {'--map': '181', '--group': '0', '--x': '255', '--y': '255', '--dlg': '',
@@ -172,6 +197,7 @@ def main():
         nm = text.item_name(rom, i)[:15]
         g[0x0400 + 16 * i:0x0400 + 16 * i + len(nm)] = nm
     g[0x1400:0x1800] = rom.new_game_state()                    # $5400: the new-game save block
+    g[0x1800:0x1880] = rom.b(0, 0x9690, 128)                   # $5800: walking character colours
     banks[GAME_BANK] = g
     for grp in range(3):
         w = group_world(grp)
@@ -183,17 +209,12 @@ def main():
         banks[TT_BANK + grp] = tt
     import menu
     banks[MENU_BANK] = menu.pack(rom, rgb555)
-    src = open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + \
-        open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' + \
-        open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' + \
-        open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' + \
-        open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' + \
-        open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
+    src = engine_src() + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
     r = asm(src, syms={'START_MAP': int(opt['--map'], 0), 'START_GRP': int(opt['--group'], 0),
                        'START_X': int(opt['--x'], 0), 'START_Y': int(opt['--y'], 0),
                        'TS_BANK': TS_BANK, 'MT_BANK': MT_BANK, 'SPR_BANK': SPR_BANK,
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
-                       'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, 'EVT_BANK': EVT_BANK,
+                       'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,
                        'DLG_TEST_T': int(opt['--dlg'].split(':')[0], 0) if opt['--dlg'] else 0})

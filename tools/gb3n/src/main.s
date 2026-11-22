@@ -181,8 +181,17 @@ main:       call wait_vbl
             call nz, talk
             ld a, [pad_new]                 ;   Start: the menu (fix:E340)
             bit 3, a
-            jr z, .mv
+            jr z, .sl
             call menu_open
+            jr main
+.sl:        bit 2, a                        ;   Select: the Select menu; B + Select: the next
+            jr z, .mv                       ;     member walks (fix:F72C)
+            ldh a, [pad]
+            bit 1, a
+            jr z, .sm
+            call next_char
+            jr main
+.sm:        call sel_open
             jr main
 .mv:        call move
             call calc_pp
@@ -402,14 +411,8 @@ load_map:   ld a, [lcd_is]
             ld b, 0                         ; (256 blocks)
             xor a
             call vcopy
-            ld a, SPR_BANK                  ; the walking character (job 0 for now) -> VRAM
-            ld [MBC5_BANKL], a              ;   bank 1 $8000, its frames -> M_FACE / M_FRAME
-            ld hl, $4000
-            ld de, $8000
-            ld b, 16
-            ld a, 1
-            call vcopy
-            ld a, SPR_BANK
+            call char_gfx                   ; the walking character -> VRAM bank 1 $8000
+            ld a, SPR_BANK                  ;   its frames -> M_FACE / M_FRAME
             ld [MBC5_BANKL], a
             ld hl, $7F00
             ld de, M_FACE
@@ -439,6 +442,7 @@ load_map:   ld a, [lcd_is]
             ld bc, pal_sh + 64
 .p1:        cp low(pal_sh + 96)
             jr nz, .pc
+            call char_pal
             xor a
             ld [mcount], a
             ld [moving], a

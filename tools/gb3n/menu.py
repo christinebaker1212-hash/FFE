@@ -86,6 +86,24 @@ def commands(rom):
     return words
 
 
+# the words of the GB-only screens (Select menu, suspend point): this project's text
+GB_TEXT = {
+    's_opt': 'Options', 's_sus': 'Suspend', 's_spd': 'Battle Speed', 's_bgm': 'Music Volume',
+    's_sfx': 'Sound Volume', 's_sq1': 'Create a Suspend', 's_sq2': 'Point and return',
+    's_sq3': 'to the Title?', 's_sq4': '', 's_yes': 'Yes', 's_no': 'No',
+}
+GB_TEXT_AT = 0x5800
+
+
+def gb_text():
+    """(bytes at MENU_BANK $5800, {label: address})"""
+    out = bytearray(); syms = {}
+    for k, v in GB_TEXT.items():
+        syms[k] = 0x4000 + GB_TEXT_AT - 0x4000 + len(out) + 0x0000
+        out += text.encode(v) + b'\0'
+    return bytes(out), syms
+
+
 def pack(rom, rgb555):
     b = bytearray(0x4000)
     names, tiles = job_names(rom)
@@ -110,4 +128,6 @@ def pack(rom, rgb555):
     for k, w in enumerate(commands(rom)[:7]):
         w = w[:8]
         b[0x1600 + 8 * k:0x1600 + 8 * k + 8] = w + b'\xFF' * (8 - len(w))
+    t, _ = gb_text()
+    b[GB_TEXT_AT - 0x4000:GB_TEXT_AT - 0x4000 + len(t)] = t
     return b

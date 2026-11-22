@@ -133,5 +133,13 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   tiles and palettes 0-3 are never touched, so opening / closing is one frame with no white
   flash and no palette change on exit (the owner's three recompiled-build complaints). The
   stack moved to WRAM 0 (the menu canvas is in WRAM bank 2).
+- 2026-11-22: the walking character from $600E (graphics: toad / mini / job, fix:DD2D; colours
+  3A/9050 incl. the Onion Knights' per-slot colours); B + Select = fix:F72C (next living member);
+  Select menu (owner's decision): Options (Battle Speed = FF3's message speed 1-8, Music / Sound
+  Volume 0-7) and Suspend ("Create a Suspend Point and return to the Title?" Yes / No: the save
+  block, the place and the map stack to cart RAM bank 1 with the RAM enabled only around the
+  copy, then a restart). The boxes are the window layer at the top cut by LYC at the box's
+  height (the field and the party stay visible below). Module code now placed one after the
+  other in bank 0 by build.py (`engine_src`), RAM sections after.
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.

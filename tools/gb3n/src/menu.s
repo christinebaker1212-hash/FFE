@@ -176,7 +176,7 @@ mm_cursor:  ld a, [m_cur]
             add a, 16 + 8 - 4
             ld c, a                         ; y = row (1 + cur) 8
             ld b, 8 + 12 * 8 + 2            ; x: left of the words (column 12.25)
-cursor_at:  ld hl, oam_buf
+cursor_at:  ld hl, oam_buf + 4 * 36           ; (the last four sprites)
             ld a, MENU_BANK
             ld [MBC5_BANKL], a
             ld de, $5640
@@ -207,9 +207,12 @@ cursor_at:  ld hl, oam_buf
             ld [hl+], a
             ret
 
+cur_hide:   ld hl, oam_buf + 4 * 36
+            ld b, 4
+            jr oam_hide.l0
 oam_hide:   ld hl, oam_buf
             ld b, 40
-            xor a
+.l0:        xor a
 .l:         ld [hl+], a
             inc l
             inc l
