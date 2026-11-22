@@ -40,11 +40,37 @@ def ff3_rom(path=None):
     return d[16:]
 
 
+# The items' icon: a drawstring bag (owner, 2026-11-22). FF3's own consumables have no icon
+# (their names start with a blank; its red ball is the summon-magic icon), so this one is our
+# own drawing in FF3's icon colours: '.' background (2), '#' outline (3), 'o' fill (1).
+BAG = ['........',
+       '..#.#...',
+       '...#....',
+       '..#o#...',
+       '.#ooo#..',
+       '#oo#oo#.',
+       '#ooooo#.',
+       '.#####..']
+
+
+def own_tile(rows):
+    """an NES 2bpp tile from rows of '.', 'o', '#' (colours 2, 1, 3)"""
+    col = {'.': 2, 'o': 1, '#': 3}
+    p0 = bytearray(8); p1 = bytearray(8)
+    for y, r in enumerate(rows):
+        for x, ch in enumerate(r):
+            c = col[ch]
+            if c & 1: p0[y] |= 0x80 >> x
+            if c & 2: p1[y] |= 0x80 >> x
+    return bytes(p0 + p1)
+
+
 def icon_tiles(ff3):
     """{code: NES tile} for the icons (blank tiles without the FF3 ROM)"""
     out = {}
     for code, t in ICONS.values():
         out[code] = ff3[FF3_FONT + 16 * t:FF3_FONT + 16 * t + 16] if ff3 else bytes(8) + b'\xff' * 8
+    out[ICONS['item'][0]] = own_tile(BAG)
     return out
 
 
