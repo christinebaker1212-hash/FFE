@@ -390,8 +390,9 @@ bt_strike:  ld [bt_am], a
             ld b, 0
             call bt_vpal
 .nl:        ld a, [bt_am]
-            ld b, -2
-            call bt_walk
+            ld b, -4                        ; (darting forward, the weapon up: btl5.s)
+            ld c, P_ATKB
+            call bt_dart
             ld a, 8                         ; 8 x: A frame (arm forward, weapon left of the
 .l:         push af                         ;   member) / B frame (arm back, weapon behind the
             and 2                           ;   head, its lower-left tile hidden)
@@ -446,8 +447,9 @@ bt_strike:  ld [bt_am], a
             call bt_dm
             call bt_2f
             ld a, [bt_am]
-            ld b, 2
-            call bt_walk
+            ld b, 4                         ; (darting back: btl5.s)
+            ld c, P_STAND
+            call bt_dart
             ld a, [bt_am]
             call bt_natural
             ld a, [bt_am]
@@ -469,8 +471,9 @@ bt_cast_anim:
             ld b, 1
             call bt_vpal
 .nl:        ld a, [bt_am]
-            ld b, -2
-            call bt_walk
+            ld b, -4                        ; (darting forward, cheering: btl5.s)
+            ld c, P_CHEER
+            call bt_dart
             ld a, 8
 .l:         push af
             ld a, [bt_am]
@@ -512,8 +515,9 @@ bt_cast_anim:
             call bt_dm
             call bt_2f
             ld a, [bt_am]
-            ld b, 2
-            call bt_walk
+            ld b, 4                         ; (darting back: btl5.s)
+            ld c, P_STAND
+            call bt_dart
             ld a, [bt_am]
             call bt_natural
             ld a, [bt_am]

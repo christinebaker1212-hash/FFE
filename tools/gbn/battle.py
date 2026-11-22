@@ -172,6 +172,99 @@ def chr_banks(rom):
     return out
 
 
+ESIL_BANK, HITL_BANK = 100, 102
+
+
+def sil_banks(rom):
+    """silhouettes of the enemy graphics (an acting enemy flashes, owner 2026-11-22, as in the
+    WonderSwan Color remake): for each page, each of FF1's four graphics (small 4 x 4 at $12 /
+    $22, large 6 x 6 at $32 / $56) as one picture: its pixels colour 2, a one-pixel outline
+    round it (inside the graphic's box) colour 1; same layout as ENEMY_CHR"""
+    out = {}
+    for half in range(2):
+        blob = bytearray(b'\xff' * 0x4000)
+        for p in range(8):
+            page = rom.rd(BANK_BATTLECHR + half, 0x8000 + 0x800 * p, 0x800)
+            for t0, n in ((0x12, 4), (0x22, 4), (0x32, 6), (0x56, 6)):
+                W = 8 * n
+                m = [[0] * W for _ in range(W)]
+                for r in range(n):
+                    for c in range(n):
+                        t = t0 + r * n + c
+                        for y in range(8):
+                            bits = page[16 * t + y] | page[16 * t + 8 + y]
+                            for x in range(8):
+                                m[8 * r + y][8 * c + x] = bits >> (7 - x) & 1
+                o = [[0] * W for _ in range(W)]
+                for y in range(W):
+                    for x in range(W):
+                        if not m[y][x]:
+                            o[y][x] = int(any(0 <= y + dy < W and 0 <= x + dx < W and m[y + dy][x + dx]
+                                              for dy in (-1, 0, 1) for dx in (-1, 0, 1)))
+                for r in range(n):
+                    for c in range(n):
+                        t = t0 + r * n + c
+                        a = 0x800 * p + 16 * t
+                        for y in range(8):
+                            lo = hi = 0
+                            for x in range(8):
+                                yy, xx = 8 * r + y, 8 * c + x
+                                lo = lo << 1 | o[yy][xx]
+                                hi = hi << 1 | m[yy][xx]
+                            blob[a + 2 * y] = lo
+                            blob[a + 2 * y + 1] = hi
+        out[ESIL_BANK + half] = bytes(blob)
+    return out
+
+
+# the hit count over the attacker ("2 HITS", as the WonderSwan Color remake shows it): our own
+# small letters (no game data), three 8 x 8 sprite tiles per count 1-39, ink colour 1 with a
+# colour 3 outline, right-aligned so it ends next to the attacker's side
+HL_DIG = {'0': ['###', '#.#', '#.#', '#.#', '#.#', '###'], '1': ['.#.', '##.', '.#.', '.#.', '.#.', '###'],
+          '2': ['###', '..#', '###', '#..', '#..', '###'], '3': ['###', '..#', '.##', '..#', '..#', '###'],
+          '4': ['#.#', '#.#', '#.#', '###', '..#', '..#'], '5': ['###', '#..', '###', '..#', '..#', '###'],
+          '6': ['###', '#..', '###', '#.#', '#.#', '###'], '7': ['###', '..#', '..#', '.#.', '.#.', '.#.'],
+          '8': ['###', '#.#', '###', '#.#', '#.#', '###'], '9': ['###', '#.#', '###', '..#', '..#', '###']}
+HL_LET = {'H': ['#.#', '#.#', '###', '#.#', '#.#'], 'I': ['#', '#', '#', '#', '#'],
+          'T': ['###', '.#.', '.#.', '.#.', '.#.'], 'S': ['.##', '#..', '.#.', '..#', '##.']}
+
+
+def hit_tiles():
+    out = bytearray()
+    for n in range(1, 40):
+        word = 'HIT' if n == 1 else 'HITS'
+        cols = []                                   # columns of 6 rows (letters bottom-aligned)
+        def put(g, top):
+            for x in range(len(g[0])):
+                col = [0] * 6
+                for y, row in enumerate(g):
+                    col[top + y] = int(row[x] == '#')
+                cols.append(col)
+            cols.append([0] * 6)
+        for d in str(n): put(HL_DIG[d], 0)
+        cols.append([0] * 6)
+        for ch in word: put(HL_LET[ch], 1)
+        cols.pop()
+        assert len(cols) <= 22, n
+        ink = [[0] * 24 for _ in range(8)]
+        x0 = 23 - len(cols)                         # right-aligned, outline column 23
+        for x, col in enumerate(cols):
+            for y in range(6):
+                ink[1 + y][x0 + x] = col[y]
+        for t in range(3):
+            for y in range(8):
+                lo = hi = 0
+                for x in range(8):
+                    X = 8 * t + x
+                    i = ink[y][X]
+                    o = not i and any(0 <= y + dy < 8 and 0 <= X + dx < 24 and ink[y + dy][X + dx]
+                                      for dy in (-1, 0, 1) for dx in (-1, 0, 1))
+                    lo = lo << 1 | (1 if i or o else 0)
+                    hi = hi << 1 | (1 if o else 0)
+                out += bytes([lo, hi])
+    return bytes(out)
+
+
 def vwf_source():
     """the small font for battle windows (our own glyphs, tools/latin_font.py: condensed where
     there is one) as assembler data: per code $21-$8B a width and 8 row bytes (left-aligned);

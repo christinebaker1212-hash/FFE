@@ -1588,6 +1588,7 @@ bt_phys:    ld a, 168
             call bt_msg_num
             ld hl, mt_total                 ; (the number over the target)
             call bt_dnum_w
+            call bt_hitlab                  ; (the hit count over the attacker: btl5.s)
             ld a, [mt_total]                ; HP - total (at least 0)
             ld b, a
             ld a, [df_hp]
@@ -1692,7 +1693,8 @@ bt_enemy_turn:
             call bt_msg_en
             ld a, M_CURED
             jp bt_msg_end1
-.cf:        ld a, MG_FIRE                   ; confused: Fire on a random enemy (FF1)
+.cf:        call bt_eflash                  ; (it flashes: btl5.s)
+            ld a, MG_FIRE                   ; confused: Fire on a random enemy (FF1)
             call bt_mload
             ld a, [bt_who]
             ld [mg_caster], a
@@ -1741,7 +1743,8 @@ bt_enemy_turn:
             add hl, de
             ld [hl], $FF
             ret
-.ai:        jp bt_en_ai
+.ai:        call bt_eflash                  ; (it flashes: btl5.s)
+            jp bt_en_ai
 
 ; FF1 GetRandomPlayerTarget: slot 0 1/2, 1 1/4, 2 / 3 1/8; again if dead / stone
 bt_rnd_member:
@@ -2900,8 +2903,8 @@ bt_dnum_off:
             ret z
             xor a
             ld [dn_t], a
-            ld hl, DN_OAM
-            ld b, 5
+            ld hl, HL_OAM                   ; (the hit label too: OAM 32-34)
+            ld b, 8
 .c:         ld [hl+], a
             inc l
             inc l

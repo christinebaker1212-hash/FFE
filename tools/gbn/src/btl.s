@@ -717,7 +717,7 @@ bt_pal:     ldh a, [is_cgb]
             xor a
             ldh [rOCPD], a
             ldh [rOCPD], a
-            ret
+            jp bt_pal5                      ; (OBJ 5, BG 6 / 7: btl5.s)
 .bp:        ld l, a                         ; battle palette A (4 NES colours) as RGB555
             ld h, 0
             add hl, hl
@@ -1754,8 +1754,7 @@ bt_name_row:
             ld a, BTL_DATA
             call far_copy
             ld hl, bt_sbuf
-            xor a
-            call vwf_str
+            call bt_nstr                    ; (with the kind's count: btl5.s)
             ld a, [bt_t + 12]               ; tiles BT_TEXT + 7 row
             ld c, a
             add a, a

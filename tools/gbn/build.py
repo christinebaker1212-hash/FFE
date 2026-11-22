@@ -122,6 +122,8 @@ def data_banks(rom, ff3=None, init=None):
     banks[battle.BTL_DATA] = bytearray(battle.data_bank(rom))
     banks[sound.MUS_DATA] = bytearray(rom.prg[13 * 0x4000:14 * 0x4000])   # FF1's music data
     for b, blob in battle.chr_banks(rom).items(): banks[b] = bytearray(blob)
+    for b, blob in battle.sil_banks(rom).items(): banks[b] = bytearray(blob)
+    place(banks, battle.HITL_BANK, 0x4000, battle.hit_tiles())
     banks[battle.BOBJ_BANK] = bytearray(battle.obj_bank(rom))
     banks[minimap.MINI_BANK] = bytearray(minimap.bank(rom))
     banks[sgb.SGB_BANK] = bytearray(sgb.bank(rom))
@@ -233,6 +235,7 @@ def main():
            open(os.path.join(HERE, 'src', 'btl2.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl3.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl4.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'btl5.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field2.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sgb.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
