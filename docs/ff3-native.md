@@ -215,5 +215,28 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   only for use with the Game Boy Color(TM) system.", this project's TM glyph, LCD off in V-Blank,
   then halt; checked in PyBoy DMG) and the soft reset (A + B + Start + Select in the joypad read:
   cart RAM and sound off, the boot path).
-  Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
-  owner's pleasant paging), random battles hook, vehicles later.
+- 2026-11-22: sound (`src/snd.s`; owner: "the music is horribly wrong. Reference and adapt this
+  music", with the NSF). FF3's own driver (bank $36: 8003 update, 8925 music, 8B9D effects, the
+  volume / pitch envelopes) written for the GB and run from the V-Blank interrupt; its variables
+  keep FF3's layout ($7F40-$7FFF at $CC40-$CCFF) and the song data are read from four GB banks
+  (81-84: FF3's bank $36 + one of the song banks $37 / $38 / $39 / $09, so the driver's NES
+  addresses map directly). Output: pulse 1 / 2 -> CH1 / CH2 (duty, volume, period through a
+  2048-entry period table; a volume change retriggers), triangle -> CH3 (a 32-step triangle
+  wave, silent when FF3's linear-counter value is 0), noise -> CH4 (NES period -> the nearest GB
+  NR43); the DMC voice only clears its key flag (FF3 only silences it). Checks
+  (`tools/gb3n/sndcmp.py`, with the owner's NSF, never kept in the repo):
+  - `state`: FF3's driver in the NSF (py65) and the GB driver (PyBoy) frame by frame from the song
+    start: all 63 songs in the NSF identical over 900 frames (song $36 is not in the NSF). This
+    found one bug (the DMC key flag).
+  - `voices`: each voice alone, NES by libgme (`build/nsfrender`), GB by mGBA (test builds with
+    env GB_SND_MASK = NR51), audio cut at each side's frame rate (NES 60.10 Hz, GB 59.73 Hz: the
+    GB plays the same frames 0.6% slower) and the GB put through the Color's output filter
+    (mGBA leaves it out; without it volume steps read as 60 Hz thumps). Pulses / triangle: the
+    same notes and lengths (frames sounding on one side only: 0-5 per voice, pitch median 0
+    cents); noise a little brighter (about +1-2 semitones of spectral centroid, the NR43 steps).
+  Music in the game: a map's song on every map load (property byte 10; bit 7: the song from
+  conditional trigger script $38 + n at 2C/8870, as fix:E8DB; checked: map 10 -> $0C as FF3), a
+  world map's song and sound effect from 3B/A027 / A047 by world and vehicle, event command $F8
+  (songs, fade out, resume, stop, sound effects), song 1 on the prophecy and the load menu.
+  `build.py --song N` builds a test ROM that plays song N throughout.
+  Next: battle (its music comes with it), shops / inns, vehicles.

@@ -104,7 +104,7 @@ undisclosed debug code). Record each item's result in the port's status doc.
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-19 late: DMG/CGB speed work, see gb-handoff.md)
+# GB port status (last updated 2026-11-22: FF3 native engine sound, see docs/ff3-native.md)
 
 **Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
 **Handoff: `docs/gb-handoff.md`** (session setup, current battle-layout work, exact next steps).
@@ -884,6 +884,9 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   recalculation ported, matching FF3's values), Status, Order, Job (J1, job change with FF3's
   level replay), Save (V1, FF3's file format), the Select menu (Options / Suspend) and B + Select;
   menus open in one frame with no white flash and leave the field's palettes untouched. Menu code
-  in its own ROM bank (CODE1) through a far call. Next: title / prophecy / load menu / suspend
-  resume, battle, music from the NSF, shops and inns. Also fixed in the recompiled build: one-row menu cursors
-  (Item opened Magic), the battle "Miss" sprite in English.
+  in its own ROM bank (CODE1) through a far call. Boot screens: suspend resume, prophecy, load
+  menu, name entry; Color-only screen and soft reset. Sound: FF3's own driver written for the GB
+  (`src/snd.s`), its state identical to the owner's NSF for all 63 songs (`tools/gb3n/sndcmp.py
+  state`), each voice's notes and lengths matching the NSF's audio (`sndcmp.py voices`); map /
+  world / event / title songs hooked. Next: battle, shops and inns, vehicles. Also fixed in the
+  recompiled build: one-row menu cursors (Item opened Magic), the battle "Miss" sprite in English.
