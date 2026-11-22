@@ -1480,6 +1480,124 @@ sus_menu:   ld hl, str_susq
             jp game_over
 
 zz_end_4000:
+section bank 2, $5F00                       ; (the prologue's colour fade)
+; Colour: palette 4 colour 3 = blue (pr_rgb 0) + (white (pr_rgb 4) - blue) x pr_cnt / 32, per
+; channel (the prologue's fading line)
+pr_cgbstep: ld hl, pr_rgb
+            call pr_split
+            ld hl, pr_cc
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            ld [hl], e
+            ld hl, pr_rgb + 8
+            call pr_split                   ; A, D, E = white's R, G, B
+            ld hl, pr_cc + 3
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            ld [hl], e
+            ld c, 0                         ; each channel
+.ch:        ld hl, pr_cc
+            ld b, 0
+            add hl, bc
+            ld d, [hl]                      ; D = from
+            inc hl
+            inc hl
+            inc hl
+            ld a, [hl]
+            sub d                           ; A = to - from (>= 0: blue to white)
+            jr nc, .p
+            xor a
+.p:         ld e, a
+            push bc
+            ld a, [pr_cnt]
+            ld b, a
+            ld hl, 0
+            ld a, b
+            and a
+            jr z, .m0
+.mu:        ld a, l                         ; HL = delta x cnt
+            add a, e
+            ld l, a
+            jr nc, .mn
+            inc h
+.mn:        dec b
+            jr nz, .mu
+.m0:        ld a, l                         ; / 32
+            rlca
+            rlca
+            rlca
+            and 7
+            ld l, a
+            ld a, h
+            add a, a
+            add a, a
+            add a, a
+            or l
+            add a, d
+            pop bc
+            ld hl, pr_cc + 6
+            ld b, 0
+            add hl, bc
+            ld [hl], a
+            inc c
+            ld a, c
+            cp 3
+            jr c, .ch
+            ld a, [pr_cc + 7]               ; RGB555: R | G << 5 | B << 10
+            ld b, a
+            rrca
+            rrca
+            rrca
+            and $E0
+            ld hl, pr_cc + 6
+            or [hl]
+            ld c, a                         ; low byte
+            ld a, b
+            srl a
+            srl a
+            srl a
+            ld b, a
+            ld a, [pr_cc + 8]
+            add a, a
+            add a, a
+            or b
+            ld b, a                         ; high byte
+            ld a, $80 | 38
+            ldh [rBCPS], a
+            ld a, c
+            ldh [rBCPD], a
+            ld a, b
+            ldh [rBCPD], a
+            ret
+; RGB555 at HL -> A = R, D = G, E = B
+pr_split:   ld a, [hl+]
+            ld c, a
+            ld b, [hl]
+            ld a, b
+            rrca
+            rrca
+            and $1F
+            ld e, a
+            ld a, c
+            rlca
+            rlca
+            rlca
+            and 7
+            ld d, a
+            ld a, b
+            and 3
+            add a, a
+            add a, a
+            add a, a
+            or d
+            ld d, a
+            ld a, c
+            and $1F
+            ret
+zz_end_5f00:
+
 section bank 2, $7500                       ; (the prologue, party creation)
 
 ; ---- the prologue as FF1's EnterIntroStory: the crystal theme; a blue screen; the lines
@@ -1618,37 +1736,31 @@ pro_show:   ld a, TR_MINIMAP
             call pr_rattr
 .an0:       xor a
             ld [pr_cnt], a
-.an:        call scr_frame
-            ldh a, [pad_new]
+.an:        call scr_frame                  ; (owner, 2026-11-22: smoother, and A / B show the
+            ldh a, [pad_new]                ;   whole page at once)
             bit 3, a
             jp nz, .quit
             and 3
-            jr nz, .dn
-            ld a, [pr_cnt]                  ; the colour: step = cnt / 16, the shade below on
-            ld b, a                         ;   odd frames
-            swap a
-            and 3
-            inc a                           ; (main: index step + 1)
-            bit 0, b
-            jr z, .mc
-            dec a                           ; (sub: the shade below; step 0: $01 blue)
-.mc:        ld c, a
+            jp nz, .all
             ldh a, [is_cgb]
             and a
             jr z, .dm
-            ld a, c                         ; Colour: palette 4 colour 3
-            add a, a
-            add a, low(pr_rgb)
-            ld l, a
-            ld h, high(pr_rgb)
-            ld a, $80 | 38
-            ldh [rBCPS], a
-            ld a, [hl+]
-            ldh [rBCPD], a
-            ld a, [hl]
-            ldh [rBCPD], a
+            call pr_cgbstep                 ; Colour: blue to white in PR_LEN even steps
             jr .ai
-.dm:        ld a, c                         ; DMG: the text shade (colour 0) of the line
+.dm:        ld a, [pr_cnt]                  ; DMG: the shade step = cnt / 8, the next one on
+            ld b, a                         ;   odd frames of a step's second half
+            rrca
+            rrca
+            rrca
+            and 3
+            ld c, a
+            bit 2, b
+            jr z, .ms
+            ldh a, [frame]
+            and 1
+            add a, c
+            ld c, a
+.ms:        ld a, c
             ld hl, pr_shade
             add a, l
             ld l, a
@@ -1660,7 +1772,7 @@ pro_show:   ld a, TR_MINIMAP
 .ai:        ld hl, pr_cnt
             inc [hl]
             ld a, [hl]
-            cp 64
+            cp PR_LEN
             jr c, .an
 .dn:        ldh a, [is_cgb]                 ; the line shown
             and a
@@ -1676,6 +1788,39 @@ pro_show:   ld a, TR_MINIMAP
             ld hl, pr_nl
             cp [hl]
             jp c, .ln
+            jr .w
+.all:       ldh a, [is_cgb]                 ; A / B: this line and every one after it shown
+            and a
+            jr z, .ad
+            call scr_frame
+            ld a, $0A
+            call pr_rattr
+            jr .an1
+.ad:        call pr_lyoff
+.an1:       ld a, [pr_i]
+            inc a
+            ld [pr_i], a
+            ld hl, pr_nl
+            cp [hl]
+            jr nc, .w
+            call pr_lptr
+            jr z, .an1
+            ld a, [pr_i]
+            ld hl, pr_row0
+            add a, [hl]
+            ld [pr_row], a
+            ldh a, [is_cgb]
+            and a
+            jr z, .ad2
+            call scr_frame                  ; (Colour: drawn already, the shown palette)
+            ld a, $0A
+            call pr_rattr
+            jr .an1
+.ad2:       call pr_line                    ; (DMG: drawn now, its row up in V-Blank)
+            call scr_frame
+            ld a, [pr_row]
+            call sf_one
+            jr .an1
 .w:         call scr_frame                  ; the page shown: A / B on, Start: the title
             ldh a, [pad_new]
             bit 3, a
@@ -1790,6 +1935,7 @@ pr_line:    call pr_lptr
 
 pr_nes:     db $01, $00, $10, $20, $30      ; FF1's intro colours (index 0 = the blue)
 pr_shade:   db 3, 2, 1, 0, 0                ; ... as DMG shades of the text
+PR_LEN     = 32                         ; frames a line takes to fade in
 
 ; party generation (owner's design, 2026-11-21): the four boxes start as FF1's default party
 ; (Warrior, Thief, Monk, Red Magician), no names; the Control Pad moves between them; A on a
@@ -2916,6 +3062,7 @@ pr_row0:    ds 1
 pr_row:     ds 1
 pr_i:       ds 1
 pr_cnt:     ds 1
+pr_cc:      ds 9                            ; (the fade: from R G B, to R G B, now R G B)
 eqm_m:      ds 1
 eqm_t:      ds 1
 eqm_c:      ds 1
