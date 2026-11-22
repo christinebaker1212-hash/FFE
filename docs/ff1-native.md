@@ -375,3 +375,15 @@ one reaches parity, so the owner can keep playing).
    Checked: talking in Cornelia, one engine step per frame (no restarts); the overworld theme after
    it matches FF1's NSF per voice as from a fresh start. Test builds: env GBN_VOLMODE 1 / 2 / 3 force
    the volume method (zombie mode / restarts / note starts only); 0 (release) = the boot test.
+21. Owner (2026-11-22, later): title menu centred (boxes at columns 4-15 / 1-18); damage numbers and
+   "MISS!" pop up over the target, drop back, hop once and rest, as in FF3 (our own bold 6 x 6 glyphs
+   with a 1-pixel outline, battle.py dn_tiles at BTL_DATA $4B00, one sprite each in OAM 35-39 with
+   the hand's tiles $F0-$F4 borrowed and restored; animated from bt_frame; DMG / SGB through OBP1:
+   white ink, black outline); a member hit flinches (its sprites knocked 8 px back and sliding into
+   place while the number shows; no blinking); healing a member at full HP (Potion, Cure family,
+   Full Cure; the Heal family when everyone standing is full) shows "It wouldn't have any effect."
+   with the error sound and returns to the target with nothing spent, in the menus and in battle;
+   the prologue's lines fade smoothly (Color: blue to white continuously over 32 frames, from FF1's
+   own colours; DMG / SGB: 32 frames, lighter dither) and A / B show the whole page at once.
+   Bug found on the way: dn_t was not cleared at a battle's start, so leftover RAM let the number
+   routine write past OAM into battle RAM (it is cleared now; at most 5 glyphs).

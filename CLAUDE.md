@@ -1310,6 +1310,10 @@ Select repeat declined; battle backdrops built, mocked up full width / full heig
 Music (owner: "still messed up", 2026-11-22): engine exact against FF1's own code for every song,
 fresh and after the town theme; mGBA (Color mode) ignored the zombie-mode volume steps: boot test
 picks restarts there (docs/ff1-native.md item 19, docs/gb-lessons.md "Music").
+Owner (2026-11-22, later): map song restarted after every dialogue / menu (fixed: mus_cur), title
+menu centred, FF3-style popping damage numbers and MISS!, members flinch when hit, "It wouldn't have
+any effect." for healing at full HP (menus and battle), smoother prologue fades with A showing the
+page (docs/ff1-native.md items 20-21).
 Next: the owner's play-test. Lessons: docs/gb-lessons.md "Native rewrite".
 
 ## Remaining
