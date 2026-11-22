@@ -1,0 +1,603 @@
+; FF3 for the Game Boy Color: the native engine (owner, 2026-11-22: 100% native code, no NES
+; layer). Written from what FF3's routines do (everything8215/ff3 disassembly); every game byte
+; comes from the user's ROM at build time (tools/gb3n/data.py, build.py).
+;
+; Milestone 1: boot on a Color, a normal map from the ROM's data (layout, tileset metatiles,
+; palettes, graphics), the party walking on it with FF3's passability rule.
+;
+; Memory: bank 0 code; map data bank MAPB (build.py): $4000 layout (32 x 32 metatiles), $4400
+; metatile tables TL / TR / BL / BR / ATTR / P1 / P2 (256 each), $4B00 CGB palettes (BG 64, OBJ
+; 64 bytes), $4C00 BG tiles (256, GB format), $5C00 the walking character (16 tiles).
+; VRAM: BG tiles bank 0 $8000 (NES tile n = GB tile n), sprite tiles bank 1 $8000; BG map
+; $9800 = a 16 x 16 metatile ring (map metatile (x, y) at cells (2x & 31, 2y & 31)).
+
+MAPB       = 1                  ; ROM bank of the map data (build.py)
+M_LAY      = $4000
+M_TL       = $4400
+M_TR       = $4500
+M_BL       = $4600
+M_BR       = $4700
+M_ATTR     = $4800
+M_P1       = $4900
+M_P2       = $4A00
+M_PAL      = $4B00
+M_CHR      = $4C00
+M_SPR      = $5C00
+STEP       = 16                 ; frames per metatile (a pixel a frame)
+PX0        = 72                 ; the party's 16 x 16 sprite at screen (72, 64)
+PY0        = 64
+LCDC_ON    = %10010011          ; LCD on, BG $9800, tiles $8000, sprites on (8 x 8)
+QMAX       = 32                 ; queued metatiles (a column / row of the view: 12)
+
+section bank 0, $0040
+            jp vblank
+section bank 0, $0100
+            nop
+            jp start
+
+section bank 0, $0150
+start:      di
+            ld sp, $DFFF
+            cp $11                          ; (Color only: other models stop here; the
+            jr z, .cgb                      ;   message screen comes with the title milestone)
+.dmg:       halt
+            jr .dmg
+.cgb:       xor a
+            ldh [rIE], a
+            ldh [rNR52], a
+            ldh a, [rKEY1]                  ; double speed
+            bit 7, a
+            jr nz, .fast
+            ld a, 1
+            ldh [rKEY1], a
+            ld a, $30
+            ldh [rP1], a
+            stop
+.fast:      call lcd_off
+            ld hl, $C000                    ; memory cleared (Lot Check: nothing assumed)
+            ld de, $1F00
+            call memclr
+            ld hl, $FF80
+            ld de, $7F
+            call memclr
+            ld a, 1
+            ldh [rVBK], a
+            ld hl, $8000
+            ld de, $2000
+            call memclr
+            xor a
+            ldh [rVBK], a
+            ld hl, $8000
+            ld de, $2000
+            call memclr
+            ld hl, dma_rom                  ; OAM DMA routine to HRAM
+            ld de, hram_dma
+            ld b, dma_end - dma_rom
+.cd:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .cd
+            ld a, START_X                   ; the map's start position (build.py)
+            ld [px], a
+            ld a, START_Y
+            ld [py], a
+            call load_map
+            ld a, LCDC_ON
+            ldh [rLCDC], a
+            xor a
+            ldh [rIF], a
+            ld a, 1
+            ldh [rIE], a
+            ei
+
+; ---- main loop: one engine frame per GB frame
+main:       call wait_vbl
+            call read_pad
+            call move
+            call make_oam
+            jr main
+
+wait_vbl:   xor a
+            ldh [vbl_flag], a
+.w:         halt
+            ldh a, [vbl_flag]
+            and a
+            jr z, .w
+            ret
+
+; ---- V-Blank: OAM, scroll, queued metatiles
+vblank:     push af
+            push bc
+            push de
+            push hl
+            call hram_dma
+            ldh a, [scx]
+            ldh [rSCX], a
+            ldh a, [scy]
+            ldh [rSCY], a
+            call q_flush
+            ld a, 1
+            ldh [vbl_flag], a
+            pop hl
+            pop de
+            pop bc
+            pop af
+            reti
+
+; ---- joypad: pad = held (bit 0 A, 1 B, 2 Select, 3 Start, 4 Right, 5 Left, 6 Up, 7 Down)
+read_pad:   ld a, $20
+            ldh [rP1], a
+            ldh a, [rP1]
+            ldh a, [rP1]
+            cpl
+            and $0F
+            swap a
+            ld b, a
+            ld a, $10
+            ldh [rP1], a
+            ldh a, [rP1]
+            ldh a, [rP1]
+            ldh a, [rP1]
+            ldh a, [rP1]
+            cpl
+            and $0F
+            or b
+            ldh [pad], a
+            ld a, $30
+            ldh [rP1], a
+            ret
+
+; ---- load the map: LCD off, tiles, palettes, the view drawn
+load_map:   call lcd_off
+            ld a, MAPB
+            ld [MBC5_BANKL], a
+            ld hl, M_CHR                    ; BG tiles -> VRAM bank 0 $8000
+            ld de, $8000
+            ld bc, $1000
+            call memcpy
+            ld a, 1
+            ldh [rVBK], a
+            ld hl, M_SPR                    ; the character -> VRAM bank 1 $8000
+            ld de, $8000
+            ld bc, $100
+            call memcpy
+            xor a
+            ldh [rVBK], a
+            ld a, $80                       ; palettes
+            ldh [rBCPS], a
+            ld hl, M_PAL
+            ld b, 64
+.bp:        ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .bp
+            ld a, $80
+            ldh [rOCPS], a
+            ld b, 64
+.op:        ld a, [hl+]
+            ldh [rOCPD], a
+            dec b
+            jr nz, .op
+            xor a
+            ld [mcount], a
+            ld [moving], a
+            call set_scroll
+            ld a, 1                         ; the whole view: rows py - 5 .. py + 6, columns
+            ld [q_direct], a                ;   px - 5 .. px + 6 (written at once: LCD off)
+            ld a, [py]
+            sub 5
+            ld d, a
+            ld c, 12
+.row:       ld a, [px]
+            sub 5
+            ld e, a
+            ld b, 12
+.col:       push bc
+            push de
+            call q_mt
+            pop de
+            pop bc
+            inc e
+            dec b
+            jr nz, .col
+            inc d
+            dec c
+            jr nz, .row
+            xor a
+            ld [q_direct], a
+            ret
+
+; ---- movement: a step is one metatile in STEP frames
+move:       ld a, [moving]
+            and a
+            jr nz, .step
+            ldh a, [pad]
+            ld b, a
+            ld de, $0001                    ; D = dy, E = dx (two's complement)
+            bit 4, b
+            jr nz, .go
+            ld e, $FF
+            bit 5, b
+            jr nz, .go
+            ld de, $FF00
+            bit 6, b
+            jr nz, .go
+            ld d, 1
+            bit 7, b
+            ret z
+.go:        ld a, e
+            ld [mdx], a
+            ld a, d
+            ld [mdy], a
+            ld a, b                         ; facing (for the sprite)
+            ld [facing], a
+            ld a, [px]                      ; target metatile
+            add a, e
+            and $3F
+            ld e, a
+            ld a, [py]
+            add a, d
+            and $3F
+            ld d, a
+            call map_at
+            call passable
+            ret c
+            ld a, 1
+            ld [moving], a
+            xor a
+            ld [mcount], a
+            call draw_edge                  ; the line of metatiles entering the view
+            ret
+.step:      ld a, [mcount]
+            inc a
+            ld [mcount], a
+            cp STEP
+            jr nz, .sc
+            ld a, [px]                      ; arrived
+            ld hl, mdx
+            add a, [hl]
+            and $3F
+            ld [px], a
+            ld a, [py]
+            inc hl
+            add a, [hl]
+            and $3F
+            ld [py], a
+            xor a
+            ld [moving], a
+            ld [mcount], a
+.sc:        jp set_scroll
+
+; FF3's rule (fix:E396 / E51C): property byte 1 of the metatile: bits 0-2 = 3 impassable;
+; 1 / 2 a floor level (passable only from the same level or stairs: $A5); 0 stairs (level
+; reset); 4-7 bridges. (Triggers, bit 7: passable for now; milestone 2 runs them.)
+; A = metatile -> C set if impassable.
+passable:   ld l, a
+            ld h, high(M_P1)
+            ld a, [hl]
+            and 7
+            jr z, .stairs
+            cp 4
+            jr nc, .ok
+            cp 3
+            jr z, .no
+            ld b, a
+            ld a, [zlev]
+            or b
+            cp 3
+            jr z, .no
+            ld [zlev], a
+.ok:        and a
+            ret
+.stairs:    xor a
+            ld [zlev], a
+            ret
+.no:        scf
+            ret
+
+; metatile at map (E = x, D = y), 0-63: inside 0-31 from the layout, else the fill metatile
+map_at:     ld a, e
+            or d
+            and $20
+            jr nz, .fill
+            ld a, d                         ; HL = M_LAY + y * 32 + x
+            and $1F
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, l
+            or e
+            ld l, a
+            ld a, h
+            add a, high(M_LAY)
+            ld h, a
+            ld a, [hl]
+            ret
+.fill:      ld a, FILL_MT
+            ret
+
+; ---- scroll: the camera (map pixels) = party * 16 + step offset - (PX0, PY0)
+set_scroll: ld a, [mcount]
+            ld c, a
+            ld a, [mdx]
+            call mulsign
+            ld b, a
+            ld a, [px]
+            swap a                          ; px * 16 (mod 256: the BG ring)
+            and $F0
+            add a, b
+            sub PX0
+            ldh [scx], a
+            ld a, [mdy]
+            call mulsign
+            ld b, a
+            ld a, [py]
+            swap a
+            and $F0
+            add a, b
+            sub PY0
+            ldh [scy], a
+            ret
+mulsign:    and a                           ; A = -1 / 0 / 1 -> A = sign * C
+            ret z
+            bit 7, a
+            ld a, c
+            ret z
+            cpl
+            inc a
+            ret
+
+; ---- the party sprite: the walking character's tiles 0-3 (2 x 2), OBJ palettes 0 / 1
+make_oam:   ld hl, oam_buf
+            ld a, PY0 + 16
+            ld [hl+], a
+            ld a, PX0 + 8
+            ld [hl+], a
+            xor a
+            ld [hl+], a
+            ld a, $08                       ; (VRAM bank 1, palette 0)
+            ld [hl+], a
+            ld a, PY0 + 16
+            ld [hl+], a
+            ld a, PX0 + 16
+            ld [hl+], a
+            ld a, 1
+            ld [hl+], a
+            ld a, $08
+            ld [hl+], a
+            ld a, PY0 + 24
+            ld [hl+], a
+            ld a, PX0 + 8
+            ld [hl+], a
+            ld a, 2
+            ld [hl+], a
+            ld a, $09
+            ld [hl+], a
+            ld a, PY0 + 24
+            ld [hl+], a
+            ld a, PX0 + 16
+            ld [hl+], a
+            ld a, 3
+            ld [hl+], a
+            ld a, $09
+            ld [hl+], a
+            ret
+
+; ---- metatiles into the BG ring: queued, written in V-Blank (directly while the LCD is off)
+; line entering the view at the start of a step (12 metatiles: a margin either side)
+draw_edge:  ld a, [mdx]
+            and a
+            jr z, .vert
+            ld b, 6                         ; column px + 6 (right) or px - 6 (left)
+            bit 7, a
+            jr z, .h1
+            ld b, -6
+.h1:        ld a, [px]
+            add a, b
+            ld e, a
+            ld a, [py]
+            sub 5
+            ld d, a
+            ld b, 12
+.hl:        push bc
+            push de
+            call q_mt
+            pop de
+            pop bc
+            inc d
+            dec b
+            jr nz, .hl
+            ret
+.vert:      ld a, [mdy]
+            ld b, 5                         ; row py + 5 (down) or py - 5 (up): the view shows
+            bit 7, a                        ;   rows py - 4 .. py + 4
+            jr z, .v1
+            ld b, -5
+.v1:        ld a, [py]
+            add a, b
+            ld d, a
+            ld a, [px]
+            sub 5
+            ld e, a
+            ld b, 12
+.vl:        push bc
+            push de
+            call q_mt
+            pop de
+            pop bc
+            inc e
+            dec b
+            jr nz, .vl
+            ret
+
+; queue metatile (E = x, D = y) (wrapped to 0-63): its ring cell, 4 tiles and palette
+q_mt:       ld a, e
+            and $3F
+            ld e, a
+            ld a, d
+            and $3F
+            ld d, a
+            push de
+            call map_at
+            pop de
+            ld c, a                         ; C = metatile
+            ld a, [q_n]
+            cp QMAX
+            ret nc                          ; (full: dropped; the queue holds a line)
+            ld l, a
+            inc a
+            ld [q_n], a
+            ld a, l                         ; entry = qbuf + 8 n
+            add a, a
+            add a, a
+            add a, a
+            ld l, a
+            ld h, high(qbuf)
+            ld a, e                         ; BG address = $9800 + (y & 15) * 64 + (x & 15) * 2
+            and $0F
+            add a, a
+            ld b, a
+            ld a, d
+            and 3
+            rrca
+            rrca
+            or b
+            ld [hl+], a                     ; low
+            ld a, d
+            and $0C
+            rrca
+            rrca
+            add a, $98
+            ld [hl+], a                     ; high
+            ld b, high(M_TL)                ; the four tiles and the palette
+            ld a, [bc]
+            ld [hl+], a
+            inc b
+            ld a, [bc]
+            ld [hl+], a
+            inc b
+            ld a, [bc]
+            ld [hl+], a
+            inc b
+            ld a, [bc]
+            ld [hl+], a
+            inc b
+            ld a, [bc]                      ; (ATTR: the NES attribute = CGB palette 0-3)
+            and 3
+            ld [hl+], a
+            ld a, [q_direct]
+            and a
+            ret z
+            jp q_flush                      ; (LCD off: at once)
+
+; written in V-Blank (or with the LCD off): each entry 4 tiles + 4 attribute cells
+q_flush:    ld a, [q_n]
+            and a
+            ret z
+            ld c, a
+            ld hl, qbuf
+.e:         ld a, [hl+]
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            ld a, [hl+]                     ; TL
+            ld [de], a
+            inc e
+            ld a, [hl+]                     ; TR
+            ld [de], a
+            ld a, e
+            add a, 31
+            ld e, a
+            jr nc, .n1
+            inc d
+.n1:        ld a, [hl+]                     ; BL
+            ld [de], a
+            inc e
+            ld a, [hl+]                     ; BR
+            ld [de], a
+            ld b, [hl]                      ; palette
+            inc hl
+            ld a, 1
+            ldh [rVBK], a
+            ld a, b
+            ld [de], a
+            dec e
+            ld [de], a
+            ld a, e
+            sub 32
+            ld e, a
+            jr nc, .n2
+            dec d
+.n2:        ld a, b
+            ld [de], a
+            inc e
+            ld [de], a
+            xor a
+            ldh [rVBK], a
+            inc hl                          ; (entries are 8 bytes)
+            dec c
+            jr nz, .e
+            xor a
+            ld [q_n], a
+            ret
+
+; ---- helpers
+lcd_off:    ldh a, [rLCDC]                  ; (Lot Check: only in V-Blank)
+            bit 7, a
+            ret z
+.w:         ldh a, [rLY]
+            cp 144
+            jr c, .w
+            xor a
+            ldh [rLCDC], a
+            ret
+memclr:     xor a                           ; HL = start, DE = length
+            ld [hl+], a
+            dec de
+            ld a, d
+            or e
+            jr nz, memclr
+            ret
+memcpy:     ld a, [hl+]                     ; HL -> DE, BC bytes
+            ld [de], a
+            inc de
+            dec bc
+            ld a, b
+            or c
+            jr nz, memcpy
+            ret
+dma_rom:    ld a, high(oam_buf)
+            ldh [rDMA], a
+            ld a, 40
+.w:         dec a
+            jr nz, .w
+            ret
+dma_end:
+
+
+section wram, $C000
+oam_buf:    ds 160
+            ds 96
+qbuf:       ds 8 * QMAX                     ; ($C100: page-aligned)
+px:         ds 1
+py:         ds 1
+mdx:        ds 1
+mdy:        ds 1
+mcount:     ds 1
+moving:     ds 1
+facing:     ds 1
+zlev:       ds 1
+q_n:        ds 1
+q_direct:   ds 1
+
+section hram, $FF80
+hram_dma:   ds 10
+vbl_flag:   ds 1
+pad:        ds 1
+scx:        ds 1
+scy:        ds 1
