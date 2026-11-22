@@ -875,6 +875,15 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   writers), prophecy +3% lag, real-hardware retest.
   2026-11-22: owner: "continue native translation of FF3 until 100% native code is achieved"
   (FF1's approach: a hand-written native engine, data only from the ROM). **FF3 native engine:
-  `tools/gb3n`, plan and progress `docs/ff3-native.md`.** Milestone 1 started (a map from the
-  ROM's data, walking, no NES layer). Also fixed in the recompiled build: one-row menu cursors
+  `tools/gb3n`, plan and progress `docs/ff3-native.md`.** Done so far (2026-11-22): all maps and
+  world maps from the ROM, walking / passability, triggers (exits, entrances, doors, chests,
+  locked doors, trigger events), masked map loads (no white frames), NPCs (movement, switches,
+  graphics), dialogue re-paginated for the GB box (owner's request), the event script
+  interpreter (talking, NPC scripts, switches, items, gil; the opening plays up to its battle),
+  field menus as the owner's mocks: main menu (N6), Item, Magic, Equip (FF3's equipment
+  recalculation ported, matching FF3's values), Status, Order, Job (J1, job change with FF3's
+  level replay), Save (V1, FF3's file format), the Select menu (Options / Suspend) and B + Select;
+  menus open in one frame with no white flash and leave the field's palettes untouched. Menu code
+  in its own ROM bank (CODE1) through a far call. Next: title / prophecy / load menu / suspend
+  resume, battle, music from the NSF, shops and inns. Also fixed in the recompiled build: one-row menu cursors
   (Item opened Magic), the battle "Miss" sprite in English.
