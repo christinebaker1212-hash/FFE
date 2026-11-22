@@ -169,6 +169,8 @@ def pack(rom, rgb555):
     t, _ = gb_text()
     b[GB_TEXT_AT - 0x4000:GB_TEXT_AT - 0x4000 + len(t)] = t
     b[0x1C00:0x1C00 + 3 * 99] = rom.b(0x39, 0x80B0, 3 * 99)    # $5C00: EXP for each level
+    ic = rom.prg[0x0D * 0x2000 + 0x1500:0x0D * 0x2000 + 0x1700]  # $5E00: item icons (0D/B500)
+    b[0x1E00:0x2000] = b''.join(nes2gb(ic[16 * k:16 * k + 16]) for k in range(32))
     t, _ = status_pack(rom)
     assert STATUS_AT + len(t) <= 0x5C00
     b[STATUS_AT - 0x4000:STATUS_AT - 0x4000 + len(t)] = t

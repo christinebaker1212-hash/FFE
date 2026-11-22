@@ -147,5 +147,14 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   hit % (3C/89DE), defense $612D x $612B, evasion $612C, magic defense $611F, magic evasion
   $611E; toad / mini 1), Order (3D/A696: battle row $620F toggled). Found: general-purpose
   DMA ignores the low 4 bits of the source address (tile data must be 16-aligned).
+- 2026-11-22: Item menu (`src/item.s`, mocks S1 / S2): the inventory one item a row (icon from
+  0D/B500 in VRAM bank 1, name, count), 13 rows scrolling; A marks, A again uses, A on another
+  swaps (3C/9FA5), B unmarks / leaves; use (3D/A033): prompt from t8200 $5B + n in a top box,
+  the item's row, a party window (name, HP in the status colour), the member hand; effects:
+  Potion 30 / Hi-Potion 120 (3D/A4B5 power: base + base * (random / 2) / 256, x 3, one target;
+  FF3's random table walk fix:C711), Elixir (HP / MP to max), Phoenix Down, the status cures
+  (stone, toad, silence, blind, poison), Luck Mallet (mini toggled); a member the item does
+  nothing for asks again (as 3D/A13C). Text decoder: t_open shared, a canvas target for menu
+  messages. Later in this menu: the trash can, Midgard Bread, the Otter's Head, spell items.
   Next: NPC objects, the event script interpreter and dialogue (text decoder, window, the
   owner's pleasant paging), random battles hook, vehicles later.

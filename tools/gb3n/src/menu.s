@@ -127,10 +127,17 @@ mm_loop:    call mm_cursor
 
 ; A on a command (3D/A5C2): 3 Status, 4 Order (the others: later)
 mm_a:       ld a, [m_cur]
+            and a
+            jr z, .it
             cp 3
             jr z, .st
             cp 4
             jr z, .row
+            jp mm_loop
+.it:        call item_menu
+            call mm_draw
+            ld a, 1
+            ld [m_dirty], a
             jp mm_loop
 .st:        call sel_member
             jp c, mm_loop
@@ -656,8 +663,8 @@ mm_cursor:  ld a, [m_cur]
             add a, 16 + 8 - 4
             ld c, a                         ; y = row (1 + cur) 8
             ld b, 8 + 12 * 8 + 2            ; x: left of the words (column 12.25)
-cursor_at:  ld hl, oam_buf + 4 * 36           ; (the last four sprites)
-            ld a, MENU_BANK
+cursor_at:  ld hl, oam_buf + 4 * 36           ; (the last four sprites; .hl: at HL)
+.hl:        ld a, MENU_BANK
             ld [MBC5_BANKL], a
             ld de, $5640
             call .one                       ; TL

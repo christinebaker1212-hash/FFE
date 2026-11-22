@@ -8,32 +8,7 @@
 
 section bank 0, $2800
 ; A = table (0 t8000 events, 1 t8200 messages, 2 t8400 / 3 t8600 people), C = id
-dlg_show:   ld b, a                         ; index: TXT_BANK $4000 + 3 (256 table + id)
-            ld a, TXT_BANK
-            ld [MBC5_BANKL], a
-            ld h, b
-            ld l, c
-            ld d, h
-            ld e, l
-            add hl, hl
-            add hl, de                      ; 3 (256 t + id)
-            ld a, h
-            add a, $40
-            ld h, a
-            ld a, [hl+]
-            ld [t_bank], a
-            ld a, [hl+]
-            ld [t_ptr], a
-            ld a, [hl]
-            ld [t_ptr + 1], a
-            ld a, [t_bank]                  ; (empty string: nothing shown)
-            ld [MBC5_BANKL], a
-            ld a, [t_ptr]
-            ld l, a
-            ld a, [t_ptr + 1]
-            ld h, a
-            ld a, [hl]
-            and a
+dlg_show:   call t_open
             ret z
             call win_open
 .page:      call win_clear
@@ -45,6 +20,35 @@ dlg_show:   ld b, a                         ; index: TXT_BANK $4000 + 3 (256 tab
             pop af
             jr nz, .page
             jp win_close
+
+; A = table, C = id -> t_bank / t_ptr (the TXT_BANK index); Z if the string is empty
+t_open:     ld b, a                         ; index: TXT_BANK $4000 + 3 (256 table + id)
+            ld a, TXT_BANK
+            ld [MBC5_BANKL], a
+            ld h, b
+            ld l, c
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, de
+            ld a, h
+            add a, $40
+            ld h, a
+            ld a, [hl+]
+            ld [t_bank], a
+            ld a, [hl+]
+            ld [t_ptr], a
+            ld a, [hl]
+            ld [t_ptr + 1], a
+            ld a, [t_bank]
+            ld [MBC5_BANKL], a
+            ld a, [t_ptr]
+            ld l, a
+            ld a, [t_ptr + 1]
+            ld h, a
+            ld a, [hl]
+            and a
+            ret
 
 ; draw one page into win_buf from t_ptr; NZ if a page follows
 t_page:     ld a, 1
@@ -257,7 +261,36 @@ t_skip1:    ld hl, t_ptr
 
 ; A = tile -> win_buf (row t_row, column t_col); the column advances
 t_putc:     ld b, a
+            ld a, [t_dest]                  ; (a menu canvas: at t_bx / t_by, 2 lines)
+            and a
+            jr z, .w
             ld a, [t_row]
+            cp 3
+            ret nc
+            ld a, [t_col]
+            cp 19
+            ret nc
+            push bc
+            ld c, a
+            ld a, [t_bx]
+            add a, c
+            dec a
+            ld c, b
+            ld b, a
+            ld a, [t_row]
+            ld e, a
+            ld a, [t_by]
+            add a, e
+            dec a
+            ld e, c
+            ld c, a
+            ld a, e
+            call m_put
+            pop bc
+            ld hl, t_col
+            inc [hl]
+            ret
+.w:         ld a, [t_row]
             cp WIN_ROWS - 1
             ret nc
             swap a                          ; row * 32
@@ -407,6 +440,9 @@ t_col:      ds 1
 t_row:      ds 1
 win_dirty:  ds 1
 win_on:     ds 1
+t_dest:     ds 1
+t_bx:       ds 1
+t_by:       ds 1
 t_item:     ds 1                            ; FF3 $BB: the item of {02} / {03}
 t_lead:     ds 1
 n24:        ds 3

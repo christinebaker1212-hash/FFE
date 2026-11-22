@@ -151,7 +151,7 @@ def nes_rgb_src():
         '    dw %s\n' % ', '.join(str(x) for x in v[k:k + 8]) for k in range(0, 64, 8))
 
 
-MODULES = ('npc', 'text', 'event', 'menu', 'select')
+MODULES = ('npc', 'text', 'event', 'menu', 'select', 'item')
 
 
 def engine_src():
