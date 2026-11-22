@@ -146,6 +146,34 @@ def trig_src(rom):
         ', '.join(str(v) for v in tt), ', '.join(str(v) for v in to))
 
 
+def snd_tab():
+    """NES pulse / triangle period t -> GB 11-bit frequency (2 bytes, little endian): the same
+    pitch (pulse: 1789773 / 16 (t + 1) = 131072 / (2048 - x); triangle: / 32 and 65536: the same x)"""
+    out = bytearray()
+    for t in range(2048):
+        x = round(2048 - 131072 * 16 * (t + 1) / 1789773)
+        x = max(0, min(2047, x))
+        out += bytes([x & 0xFF, x >> 8])
+    return bytes(out)
+
+
+def snd_noise():
+    """NES noise period index (0-15, +16 short mode) -> the GB NR43 nearest in frequency"""
+    per = [4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068]
+    import math
+    cands = []
+    for sft in range(14):
+        for r in range(8):
+            f = 524288 / (0.5 if r == 0 else r) / (2 ** (sft + 1))
+            cands.append((f, (sft << 4) | r))
+    out = bytearray(32)
+    for k, p in enumerate(per):
+        f = 1789773 / p
+        best = min(cands, key=lambda c: abs(math.log(c[0] / f)))[1]
+        out[k] = best; out[16 + k] = best | 8
+    return bytes(out)
+
+
 def nes_rgb_src():
     """NES colour -> RGB555 (bank 0)"""
     v = [rgb555(c) for c in range(64)]
@@ -153,7 +181,9 @@ def nes_rgb_src():
         '    dw %s\n' % ', '.join(str(x) for x in v[k:k + 8]) for k in range(0, 64, 8))
 
 
-MODULES = ('npc', 'text', 'event', 'menucore', 'select')                     # bank 0
+MODULES = ('npc', 'text', 'event', 'menucore', 'select', 'snd')              # bank 0
+SND_BANK0 = 81                          # sound: FF3 bank $36 at $4000 + a song bank ($37, $38, $39,
+                                        #   $09) at $6000: banks 81-84
 CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save', 'title')  # bank CODE1
 CODE1 = 80
 
@@ -181,8 +211,9 @@ def engine_src(rom=None):
         codes.append(menu.code_data(rom, rgb555))
         codes.append(title.code_data(rom))
     zp = ''.join('Z_%02X = $%04X\n' % (n, 0xFFB0 + n - 0x18) for n in range(0x18, 0x60))
-    return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + zp + main_code + '\n' +
-            '\n'.join(codes) + '\n' + main_ram + '\n' + '\n'.join(rams))
+    shadow = lambda t: t.replace('ld [MBC5_BANKL], a', 'ld [rom_bank], a\n            ld [MBC5_BANKL], a')
+    return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + zp + shadow(main_code) + '\n' +
+            shadow('\n'.join(codes)) + '\n' + main_ram + '\n' + '\n'.join(rams))
 
 
 def gb_text_syms(rom):
@@ -192,7 +223,7 @@ def gb_text_syms(rom):
 
 def main():
     args = sys.argv[1:]
-    opt = {'--map': '', '--group': '0', '--x': '255', '--y': '255', '--dlg': '',
+    opt = {'--map': '', '--group': '0', '--x': '255', '--y': '255', '--dlg': '', '--song': '',
            '--out': os.path.join(ROOT, 'build', 'ff3n.gbc')}
     pos = []
     while args:
@@ -213,6 +244,10 @@ def main():
     g[0x1400:0x1800] = rom.new_game_state()                    # $5400: the new-game save block
     g[0x1800:0x1880] = rom.b(0, 0x9690, 128)                   # $5800: walking character colours
     g[0x2000:0x2800] = rom.prg[0x30 * 0x2000 + 0x1400:0x30 * 0x2000 + 0x1C00]   # $6000: 30/9400
+    g[0x2800:0x3800] = snd_tab()                               # $6800: NES period -> GB frequency
+    g[0x3800:0x3820] = snd_noise()                             # $7800: NES noise -> NR43
+    g[0x3840:0x3860] = rom.b(0x3B, 0xA027, 32)                 # $7840: world map songs (3B/A006)
+    g[0x3880:0x38A0] = rom.b(0x3B, 0xA047, 32)                 # $7880: and their sound effects
     banks[GAME_BANK] = g
     for grp in range(3):
         w = group_world(grp)
@@ -231,6 +266,8 @@ def main():
         v = (lp[2 * k] | lp[2 * k + 1] << 8) - 0x4000
         jb[0x2000 + 2 * k] = v & 0xFF; jb[0x2001 + 2 * k] = v >> 8
     banks[JOB_BANK] = jb
+    for k, sb in enumerate((0x37, 0x38, 0x39, 0x09)):          # sound banks
+        banks[SND_BANK0 + k] = bytearray(rom.prg[0x36 * 0x2000:0x37 * 0x2000] + rom.prg[sb * 0x2000:(sb + 1) * 0x2000])
     src = engine_src(rom) + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
     title_on = opt['--map'] == '' and opt['--group'] == '0'
     r = asm(src, syms={'START_MAP': int(opt['--map'] or '0', 0), 'START_GRP': int(opt['--group'], 0),
@@ -240,7 +277,9 @@ def main():
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
-                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1,
+                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0,
+                       'TEST_SONG': int(opt['--song'], 0) if opt['--song'] else 255,
+                       'SND_MASK': int(os.environ.get('GB_SND_MASK', 'FF'), 16),     # (test builds: NR51)
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,
                        'DLG_TEST_T': int(opt['--dlg'].split(':')[0], 0) if opt['--dlg'] else 0})
     for b, d in banks.items(): r.banks[b] = bytearray(d)

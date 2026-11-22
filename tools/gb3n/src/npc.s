@@ -13,8 +13,11 @@ section bank 0, $2000
 npc_boot:   ld a, NPCT_BANK
             ld [MBC5_BANKL], a
             ld hl, $4400
-            ld de, N_ANIM
-            ld bc, $200
+            ld de, N_ANIM                   ; (the animation frames, then the random numbers)
+            ld bc, $100
+            call memcpy
+            ld de, N_RNG
+            ld bc, $100
             call memcpy
             ld a, GAME_BANK                 ; the new-game save block (L3A_8E76, build time)
             ld [MBC5_BANKL], a

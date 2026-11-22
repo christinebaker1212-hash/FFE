@@ -29,7 +29,7 @@ W_ENT      = $DBC0              ; world map: the entrance tiles' destination map
 N_OBJ      = $C400
 N_OB2      = $C500
 GS         = $C800              ; FF3's save block $6000-$63FF (npc switches at +$80)
-N_ANIM     = $CC00              ; 3B/B41A animation frames (CGB attributes), 256 bytes
+N_ANIM     = $DD00              ; 3B/B41A animation frames (CGB attributes), 256 bytes (WRAM bank 1)
 N_RNG      = $CD00              ; fix:FE00 random number table
 EV_DLG     = $C600              ; FF3 $0740: the person's dialogue ids (32)
 EV_TRIG    = $C640              ; FF3 $7B00: the loaded trigger script (64)
@@ -112,6 +112,7 @@ start:      di
             jr nz, .wa
             ld a, 4                         ; (facing down)
             ld [facing], a
+            call snd_init
             call pal_up                     ; (black: nothing shows white)
             ld a, LCDC_ON
             ldh [rLCDC], a
@@ -186,7 +187,10 @@ start:      di
             ld [px], a
             ld a, START_Y
             ld [py], a
-.go:        call load_map
+.go:        ld a, TEST_SONG                 ; (test builds: build.py --song)
+            cp $FF
+            call nz, snd_song
+            call load_map
 
 ; ---- main loop: one engine frame per GB frame
 main:       call wait_vbl
@@ -526,7 +530,33 @@ load_map:   ld a, [lcd_is]
             ld a, 1
             ldh [pal_dirty], a
             call wait_vbl
+            call map_song
             jp map_enter
+
+; the map's song (fix:E8CE): map property byte 10; bit 7: the song from conditional trigger
+; script $38 + n (2C/8870, 3C/9319), as event command $F8; a world map's from snd_world
+map_song:   ld a, TEST_SONG                 ; (test builds, build.py --song: that song throughout)
+            cp $FF
+            jp nz, snd_song
+            ldh a, [is_world]
+            and a
+            jp nz, snd_world
+            ld a, [M_ENT + 9]
+            bit 7, a
+            jp z, snd_song
+            and 7
+            add a, a
+            add a, low($4870)
+            ld l, a
+            ld h, high($4870)
+            ld a, EVT_BANK
+            ld [MBC5_BANKL], a
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            call ev_trig
+            call ev_check
+            jp snd_f8
 
 ; fix:E865 / E884: the start tile gives the z-level; a type-F trigger there runs its event
 map_enter:  ldh a, [is_world]
@@ -1544,6 +1574,7 @@ zlev:       ds 1
 q_n:        ds 1
 q_direct:   ds 1
 pad_old:    ds 1
+rom_bank:   ds 1
 code_bank:  ds 1
 fc_bank:    ds 1
 vc_src:     ds 1

@@ -142,7 +142,9 @@ tl_ask:     push hl
             ret
 
 ; ---- the prophecy: each page centred, faded in, held (any button: on), faded out
-tl_prophecy: ld a, low(TL_PRO)
+tl_prophecy: ld a, 1                        ; song 1 (3A/8798)
+            call snd_song
+            ld a, low(TL_PRO)
             ld [tl_ptr], a
             ld a, high(TL_PRO)
             ld [tl_ptr + 1], a
@@ -256,7 +258,9 @@ tl_fade:    ld b, a                         ; (5-bit channels: v = 31 * A / 16 ~
 
 ; ---- the load menu (3D/B9F6): New Game and the speed on top, the files below; A on a valid file
 ; loads it (the message speed of its slot), on New Game starts one (FF3's new-game state)
-tl_load:    call menu_pals
+tl_load:    ld a, 1                         ; song 1 (3D/BA4E; still playing after the prophecy)
+            call snd_song
+            call menu_pals
             ld a, 3
             ld [tl_cur], a                  ; (New Game first: 3D/BA44 cursor $0C)
 .draw:      call m_clear

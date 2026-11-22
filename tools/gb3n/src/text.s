@@ -443,7 +443,14 @@ stat_isr:   push af
             ldh a, [rLCDC]
             res 5, a
             ldh [rLCDC], a
-.x:         pop af
+.x:         push bc                         ; then a frame of sound (once a frame, mid-screen:
+            push de                         ;   the V-Blank stays for the VRAM copies)
+            push hl
+            call snd_frame
+            pop hl
+            pop de
+            pop bc
+            pop af
             reti
 
 section wram, $CE00
