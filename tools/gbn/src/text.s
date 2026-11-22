@@ -242,7 +242,13 @@ tw_prep:    ld hl, win_buf
             inc de
             dec b
             jr nz, .c
-            ld a, $18
+            ld a, [tw_spd]                  ; (Instant: the page as it is)
+            cp 4
+            jr nz, .ty
+            ld a, 160
+            ld [tw_i], a
+            ret
+.ty:        ld a, $18
             call code_tile
             ld c, a
             ld hl, win_buf + 21
@@ -264,15 +270,23 @@ tw_prep:    ld hl, win_buf
             ld [tw_qh], a
             ret
 ; this frame's share of letters: C set when the next one is due (A held: twice as fast)
-tw_rate:    ld b, TW_RATE
+tw_rate:    ld a, [tw_spd]                  ; (the Options' text speed)
+            ld e, a
+            ld d, 0
+            ld hl, tw_tab
+            add hl, de
+            ld b, [hl]
             ldh a, [pad]
             bit 0, a
             jr z, .r
-            ld b, 2 * TW_RATE
+            sla b                           ; (A held: twice, at most one a frame)
+            jr nc, .r
+            ld b, 255
 .r:         ld a, [tw_acc]
             add a, b
             ld [tw_acc], a
             ret
+tw_tab:     db 50, TW_RATE, 140, 200, 255   ; Slow, Normal (reading speed), Fast, Faster
 ; the soft click of a typed letter (every second one): a short, quiet noise tick
 tw_click:   ld hl, tw_k
             inc [hl]

@@ -628,6 +628,7 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
 .ab:        ld a, b
             and $09                         ; A or Start
             jr z, .t
+            call opt_save                   ; (the message speed kept, as in Options)
             ld a, [ng_cur]
             and a
             jr nz, .new

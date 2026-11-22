@@ -196,6 +196,9 @@ start:      di
             ld a, SND_BANK                  ; the sound on
             call sbank
             call snd_init_b
+            ld a, SCR_BANK                  ; (the Options: from cart RAM, or defaults)
+            ld hl, opt_load
+            call bank_call
             ld a, BOX_LINES                 ; LYC: the dialogue box's bottom (window off)
             ldh [rLYC], a
             ld a, $40
