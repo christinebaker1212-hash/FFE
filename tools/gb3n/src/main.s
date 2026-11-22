@@ -317,8 +317,8 @@ load_map:   ld a, [lcd_is]
             ld de, M_TT
             ld bc, 32
             call memcpy
-            ld a, [M_ENT + 8]               ; the map title (shown once the map is up)
-            ld [m_title], a
+            ld a, [M_ENT + 8]               ; the map title (shown once the map is up, when
+            ld [m_title2], a                ;   arriving from a world map: fix:E8C6)
             call init_trig
             call load_npcs
             jp .gfx
@@ -438,12 +438,39 @@ load_map:   ld a, [lcd_is]
             call draw_view
             xor a
             ld [q_direct], a
-            jp pal_up
+            call pal_up
+            jp map_enter
+
 .masked:    call draw_view                  ; (two rows a frame through the queue)
             call wait_vbl
             ld a, 1
             ldh [pal_dirty], a
-            jp wait_vbl
+            call wait_vbl
+            jp map_enter
+
+; fix:E865 / E884: the start tile gives the z-level; a type-F trigger there runs its event
+map_enter:  ldh a, [is_world]
+            and a
+            ret nz
+            ld a, [px]
+            ld e, a
+            ld a, [py]
+            ld d, a
+            call map_at
+            ld l, a
+            ld h, high(M_P1)
+            ld a, [hl]
+            ld b, a
+            and 3
+            ld [zlev], a
+            bit 7, b
+            ret z
+            inc h
+            ld a, [hl]
+            cp $F0
+            ret c
+            and $0F
+            jp trig_ev
 
 ; the whole view: rows py - 5 .. py + 6, columns px - 5 .. px + 6
 draw_view:  ld a, [py]
@@ -878,7 +905,12 @@ do_act:     ld b, a
             ld a, $FF
             ld [px], a
             jp load_map
-.went:      call .push                      ; from a world map: the map set of world w
+.went:      call .push
+            call .went2
+            ld a, [m_title2]
+            ld [m_title], a
+            ret
+.went2:                      ; from a world map: the map set of world w
             ld a, [cur_grp]                 ;   (0, 1, then 2) and W_ENT + id
             sub 3
             cp 2
@@ -1328,6 +1360,7 @@ q_n:        ds 1
 q_direct:   ds 1
 pad_old:    ds 1
 m_title:    ds 1
+m_title2:   ds 1
 pad_new:    ds 1
 mpad:       ds 1                            ; the pad as the movement sees it (events: theirs)
 lcd_is:     ds 1                            ; 1 once the LCD is on (loads masked)
