@@ -11,20 +11,19 @@
 ; VRAM: BG tiles bank 0 $8000 (NES tile n = GB tile n), sprite tiles bank 1 $8000; BG map
 ; $9800 = a 16 x 16 metatile ring (map metatile (x, y) at cells (2x & 31, 2y & 31)).
 
-MAPB       = 1                  ; ROM bank of the map data (build.py)
-M_LAY      = $4000
-M_TL       = $4400
-M_TR       = $4500
-M_BL       = $4600
-M_BR       = $4700
-M_ATTR     = $4800
-M_P1       = $4900
-M_P2       = $4A00
-M_PAL      = $4B00
-M_CHR      = $4C00
-M_SPR      = $5C00
-M_FACE     = $5D00              ; facing (NES order: R 1, L 2, D 4, U 8) -> frame offset
-M_FRAME    = $5D10              ; frames: TL, BL, TR, BR tile / CGB attribute pairs
+; Map arrays in WRAM bank 1 (loaded per map from the packed banks, build.py pack): FF3 rewrites
+; trigger tiles and their property bytes at run time, as on the NES ($7400, $0400-$06FF).
+M_LAY      = $D000              ; 32 x 32 metatiles
+M_TL       = $D400              ; metatile tables: TL / TR / BL / BR tile ids, palette, props 1 / 2
+M_TR       = $D500
+M_BL       = $D600
+M_BR       = $D700
+M_ATTR     = $D800
+M_P1       = $D900
+M_P2       = $DA00
+M_FACE     = $DB00              ; facing (NES order: R 1, L 2, D 4, U 8) -> frame offset
+M_FRAME    = $DB10              ; frames: TL, BL, TR, BR tile / CGB attribute pairs
+M_ENT      = $DB80              ; the map's entry (64 bytes, build.py pack)
 STEP       = 16                 ; frames per metatile (a pixel a frame)
 PX0        = 72                 ; the party's 16 x 16 sprite at screen (72, 64)
 PY0        = 64
@@ -80,12 +79,14 @@ start:      di
             inc de
             dec b
             jr nz, .cd
-            ld a, START_X                   ; the map's start position (build.py)
-            ld [px], a
-            ld a, START_Y
-            ld [py], a
+            ld a, START_GRP                 ; the test start (build.py --map / --group)
+            ld [cur_grp], a
+            ld a, START_MAP
+            ld [cur_map], a
             ld a, 4                         ; (facing down)
             ld [facing], a
+            ld a, $FF                       ; (the map's own start position)
+            ld [px], a
             call load_map
             ld a, LCDC_ON
             ldh [rLCDC], a
@@ -152,34 +153,95 @@ read_pad:   ld a, $20
             ldh [rP1], a
             ret
 
-; ---- load the map: LCD off, tiles, palettes, the view drawn
+; ---- load map cur_map of group cur_grp: LCD off (V-Blank), the entry, layout, tileset tables,
+; tiles, character, palettes; the start position when px = $FF
 load_map:   call lcd_off
-            ld a, MAPB
+            ld a, [cur_grp]                 ; the entry: bank MT_BANK + group, $4000 + 64 id
+            add a, MT_BANK
             ld [MBC5_BANKL], a
-            ld hl, M_CHR                    ; BG tiles -> VRAM bank 0 $8000
+            ld a, [cur_map]
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            add a, $40
+            ld h, a
+            ld de, M_ENT
+            ld bc, 64
+            call memcpy
+            ld a, [M_ENT + 7]
+            ld [fill_mt], a
+            ld a, [px]
+            inc a
+            jr nz, .pos
+            ld a, [M_ENT + 5]
+            ld [px], a
+            ld a, [M_ENT + 6]
+            ld [py], a
+.pos:       ld a, [M_ENT + 0]               ; layout -> M_LAY
+            ld [MBC5_BANKL], a
+            ld a, [M_ENT + 1]
+            ld h, a
+            ld l, 0
+            ld de, M_LAY
+            ld bc, $400
+            call memcpy
+            ld a, TS_BANK                   ; tileset tables -> M_TL..M_P2
+            ld [MBC5_BANKL], a
+            ld a, [M_ENT + 4]
+            ld l, 0
+            ld h, a                         ; $4000 + $700 ts
+            add a, a
+            add a, a
+            add a, a
+            sub h                           ; 7 ts
+            add a, $40
+            ld h, a
+            ld de, M_TL
+            ld bc, $700
+            call memcpy
+            ld a, [M_ENT + 2]               ; BG tiles -> VRAM bank 0 $8000
+            ld [MBC5_BANKL], a
+            ld a, [M_ENT + 3]
+            ld h, a
+            ld l, 0
             ld de, $8000
             ld bc, $1000
             call memcpy
+            ld a, SPR_BANK                  ; the walking character (job 0 for now) -> VRAM
+            ld [MBC5_BANKL], a              ;   bank 1 $8000, its frames -> M_FACE / M_FRAME
             ld a, 1
             ldh [rVBK], a
-            ld hl, M_SPR                    ; the character -> VRAM bank 1 $8000
+            ld hl, $4000
             ld de, $8000
             ld bc, $100
             call memcpy
             xor a
             ldh [rVBK], a
-            ld a, $80                       ; palettes
+            ld hl, $7F00
+            ld de, M_FACE
+            ld bc, $50
+            call memcpy
+            ld a, $80                       ; palettes: the 32 NES colours through NES_RGB
             ldh [rBCPS], a
-            ld hl, M_PAL
-            ld b, 64
-.bp:        ld a, [hl+]
+            ldh [rOCPS], a
+            ld hl, M_ENT + 16
+            ld b, 16
+.bp:        call nes_col
+            ldh [rBCPD], a
+            ld a, d
             ldh [rBCPD], a
             dec b
             jr nz, .bp
-            ld a, $80
-            ldh [rOCPS], a
-            ld b, 64
-.op:        ld a, [hl+]
+            ld b, 16
+.op:        call nes_col
+            ldh [rOCPD], a
+            ld a, d
             ldh [rOCPD], a
             dec b
             jr nz, .op
@@ -283,6 +345,19 @@ move:       ld a, [moving]
             ld [mcount], a
 .sc:        jp set_scroll
 
+nes_col:    ld a, [hl+]                     ; [HL++] NES colour -> A = low, D = high (RGB555)
+            push hl
+            and $3F
+            add a, a
+            ld l, a
+            ld h, 0
+            ld de, NES_RGB
+            add hl, de
+            ld a, [hl+]
+            ld d, [hl]
+            pop hl
+            ret
+
 ; FF3's rule (fix:E396 / E51C): property byte 1 of the metatile: bits 0-2 = 3 impassable;
 ; 1 / 2 a floor level (passable only from the same level or stairs: $A5); 0 stairs (level
 ; reset); 4-7 bridges. (Triggers, bit 7: passable for now; milestone 2 runs them.)
@@ -332,7 +407,7 @@ map_at:     ld a, e
             ld h, a
             ld a, [hl]
             ret
-.fill:      ld a, FILL_MT
+.fill:      ld a, [fill_mt]
             ret
 
 ; ---- scroll: the camera (map pixels) = party * 16 + step offset - (PX0, PY0)
@@ -624,6 +699,9 @@ facing:     ds 1
 zlev:       ds 1
 q_n:        ds 1
 q_direct:   ds 1
+cur_map:    ds 1
+cur_grp:    ds 1
+fill_mt:    ds 1
 
 section hram, $FF80
 hram_dma:   ds 10

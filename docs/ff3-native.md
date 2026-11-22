@@ -65,4 +65,15 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   memory, the map drawn into a 16 x 16 metatile BG ring, d-pad walking one metatile in 16
   frames with FF3's passability rule, the entering line queued and written in V-Blank, the
   character sprite), `tools/gb3n/build.py` (`build/ff3n.gbc`; `--map ID --world W`).
-  Next: walking animation and facing, then milestone 2 (all maps, triggers, NPCs, events).
+  Then: walking frames and facing from fix:DC1A / DC2A (attributes converted to CGB OAM).
+- 2026-11-22: milestone 2 started: every map packed at build time (`build.py pack`: 3 map
+  groups x 256 ids = 768 entries of 64 bytes: layout / tile set banks, tileset, start, fill,
+  title, song, flags, the 32 NES colours; 244 distinct layouts 16 a bank, 59 BG tile sets 4 a
+  bank, the 8 tilesets, the walking characters; 1 MB ROM). `load_map` (cur_grp / cur_map)
+  copies the entry, layout and tileset tables into WRAM bank 1 (FF3 rewrites trigger tiles at
+  run time), the tiles into VRAM and the palettes through NES_RGB. Checked: maps 1, 6, 12, 20,
+  40, 60, 100, 181 (castles, towns, shrine, field, crystal hall, cave).
+  ROM banks: 8 tilesets, 9-11 map entries (group 0: world 0 / props 02/A000, group 1: world 1 /
+  props 02/B000, group 2: worlds 2+ / tables 00/8B00, 00/8D00), 12-27 layouts, 28-43 BG tiles,
+  44 characters + frames.
+  Next: triggers (exits, entrances, doors, stairs: fix:E669 types), the world maps.
