@@ -64,11 +64,10 @@ lineup:     call scr_open
             ld a, [hl]
             ld l, a
             ld h, 0
-            add hl, hl
+            add hl, hl                      ; x 2, then x 256: x 512 (32 tiles of 16 bytes)
             ld a, l
             ld l, 0
             ld h, a
-            add hl, hl                      ; x 512
             ldh a, [is_cgb]
             and a
             ld bc, U_SPRDMG

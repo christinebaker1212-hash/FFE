@@ -41,6 +41,12 @@ def bank(rom):
              [0x30, 0x10, 0x00, 0x0F],                              # battle windows (black)
              [0x30, 0x36, 0x16, 0x0F],                              # the party column
              [mpal[i] for i in order]]                              # the world map
+    fix = rom.prg[-0x4000:]                                         # FF1's battle sprite
+    pi = fix.find(bytes([0x0F, 0x28, 0x18, 0x21, 0x0F, 0x16, 0x30, 0x36]))   #   palette 0 (Thief,
+    assert pi >= 0, 'battle sprite palettes not found'             #   Monk, White Magician)
+    sp0 = list(fix[pi:pi + 4])
+    rk = sorted(range(1, 4), key=lambda i: -data.lum(sp0[i]))      # (ranks as data.spr_rank_tile)
+    fixed.append([0x30, sp0[rk[1]], sp0[rk[2]], 0x0F])              # the party: palette 0 jobs
     for k, p in enumerate(fixed):
         blob[0x1B80 + 8 * k:0x1B88 + 8 * k] = b''.join(data.rgb555(c).to_bytes(2, 'little') for c in p)
     return bytes(blob)

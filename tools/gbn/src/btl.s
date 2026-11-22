@@ -617,11 +617,10 @@ bt_party_gfx:
             ld a, [hl]                      ; class -> its 32 tiles
             ld l, a
             ld h, 0
-            add hl, hl                      ; x 512
+            add hl, hl                      ; x 2, then x 256: x 512 (32 tiles of 16 bytes)
             ld a, l
             ld l, 0
             ld h, a
-            add hl, hl
             ldh a, [is_cgb]
             and a
             ld de, U_SPRDMG

@@ -324,12 +324,12 @@ sgb_battle: ld a, [sgb_on]
             ld hl, sgb_tmp
             ld c, 0
             call sgb_pal
-            ld hl, SG_FIXED + 16            ; PAL23: the party (2), the windows again (3)
-            ld de, sgb_tmp
+            ld hl, SG_FIXED + 16            ; PAL23: the party's two palettes (FF1's battle
+            ld de, sgb_tmp                  ;   sprite palettes 1 and 0)
             ld bc, 8
             ld a, SGB_BANK
             call far_copy
-            ld hl, SG_FIXED + 10
+            ld hl, SG_FIXED + 34
             ld de, sgb_tmp + 8
             ld bc, 6
             ld a, SGB_BANK
@@ -338,10 +338,61 @@ sgb_battle: ld a, [sgb_on]
             ld hl, sgb_tmp
             ld c, 0
             call sgb_pal
-            ld hl, SG_BTLATR
-            call sgb_put
+            call sgb_slot                   ; ATTR_BLK, two packets: the enemy area 1, each
+            push de                         ;   member's rows (3 m .. 3 m + 2 of the party
+            call sgb_slot                   ;   column) 2 or 3 by the job's palette
+            pop de
+            ld hl, SG_BTL2
+            ld b, 8
+.h:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .h
+            ld c, 0
+.m:         ld a, $03
+            ld [de], a
+            inc de
+            push de
+            ld a, c
+            call ch_rec
+            ld a, [hl]
+            ld e, a
+            ld d, 0
+            ld hl, cls_pal
+            add hl, de
+            ld a, [hl]
+            pop de
+            and a
+            ld a, $0A                       ; (palette 1 jobs: SGB palette 2)
+            jr nz, .r
+            ld a, $0F                       ; (palette 0 jobs: SGB palette 3)
+.r:         ld [de], a
+            inc de
+            ld a, 15
+            ld [de], a
+            inc de
+            ld a, c
+            add a, a
+            add a, c
+            ld [de], a
+            inc de
+            ld a, 19
+            ld [de], a
+            inc de
+            ld a, c
+            add a, a
+            add a, c
+            add a, 2
+            ld [de], a
+            inc de
+            inc c
+            ld a, c
+            cp 4
+            jr c, .m
             jp sgb_end
 
+section bank 0, $1700                       ; (the packets)
 SG_MLT2:    db $89, $01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 SG_MLT1:    db $89, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 SG_FRZ:     db $B9, $01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -353,6 +404,7 @@ SG_PCTTRN:  db $A1, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 SG_ALL0:    db $21, $01, $07, $00, 0, 0, 19, 17, 0, 0, 0, 0, 0, 0, 0, 0
 ; battle: the enemy area (1-14, 0-11) palette 1, else 0; the party column (15-19, 0-11) 2
 SG_BTLATR:  db $21, $02, $07, $05, 1, 0, 14, 11, $03, $0A, 15, 0, 19, 11, 0, 0
+SG_BTL2:    db $22, $05, $07, $05, 1, 0, 14, 11     ; (+ the four members' blocks)
 
 section wram, $C980
 sgb_on:     ds 1
