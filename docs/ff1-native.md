@@ -365,3 +365,13 @@ one reaches parity, so the owner can keep playing).
    every frame). The boot now tests zombie mode on a Color (snd.s `snd_zmb`, PCM12) and uses
    restarts where it does not work; mGBA's envelopes now follow FF1's (correlation 0.75-0.98 per
    voice, was 0.1). Tools: `sgbrun` env SGBRUN_WAV (sound, 48 kHz).
+20. Owner (2026-11-22, real Game Boy Color): "Cornelia specifically is wrong; once it plays, every
+   other song is messed up". Found: the map music restarted from the beginning after every dialogue
+   and every return from a menu, because map_music compared the wanted song with FF1's music_track
+   ($4B), which FF1 sets to 0 once a song plays. A restart also took square 2 back from a sound
+   effect still playing (the dialogue sound), so the two fought over the channel. Now snd_track
+   keeps the song asked for last (`mus_cur`) and map_music keeps a song that is already playing (as
+   FF1: the map song restarts only after another song, e.g. the menu, a shop, a battle, a fanfare).
+   Checked: talking in Cornelia, one engine step per frame (no restarts); the overworld theme after
+   it matches FF1's NSF per voice as from a fresh start. Test builds: env GBN_VOLMODE 1 / 2 / 3 force
+   the volume method (zombie mode / restarts / note starts only); 0 (release) = the boot test.

@@ -64,7 +64,13 @@ snd_init_b: ld a, $80
 ; (PCM12 not readable, as some Color revisions in double speed): as the hardware, zombie mode
             ld a, 1
             ld [snd_zmb], a
-            ldh a, [is_cgb]
+            ld a, VOL_FORCE                 ; (test builds: GBN_VOLMODE 1 zombie, 2 restarts,
+            and a                           ;   3 note starts only; 0 = the test below)
+            jr z, .auto
+            dec a
+            ld [snd_zmb], a
+            ret
+.auto:      ldh a, [is_cgb]
             and a
             ret z
             xor a
@@ -185,12 +191,17 @@ aw:         push af
             cp $FF
             jr z, .vr                       ; (unknown: set and restart)
             ld a, [snd_zmb]                 ; (zombie mode does not work here: every change
-            and a                           ;   by a restart with the new volume)
+            cp 2                            ;   by a restart with the new volume; 2, a test
+            jr z, .vs                       ;   build: the volume only at a note's start)
+            and a
             jr nz, .zm
             ld a, [de]
             cp b
             jp z, .x
             jr .vr
+.vs:        ld a, b
+            ld [de], a
+            jp .x
 .zm:        push hl
             ld h, d
             ld l, e
@@ -388,6 +399,7 @@ tri_lc:     ds 1                            ; the triangle's linear counter run 
 tri_len:    ds 1                            ; its length counter (half frames, last $400B)
 snd_cv:     ds 2                            ; the pulses' GB volume now ($FF: unknown)
 snd_zmb:    ds 1                            ; 1: zombie mode works (volume steps), 0: restarts
+mus_cur:    ds 1                            ; the music track asked for last (main.s snd_track)
 
 ; ---- sound effects (FF1's, data from the ROM: sound.sfx_data). The square part plays on CH2
 ; while the music engine leaves its square 2 alone (sq2_sfx = NES_RAM + $7E, FF1's own

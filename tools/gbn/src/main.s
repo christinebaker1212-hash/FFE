@@ -2654,7 +2654,8 @@ mrd:        push hl
             ret
 ; A = a music track (FF1's numbers)
 snd_track:  ld [NES_RAM + $4B], a
-            ret
+            ld [mus_cur], a                 ; (the song asked for last: FF1 sets $4B to 0 once
+            ret                             ;   a song plays, so it cannot tell what plays)
 ; the map's music: the overworld by vehicle, a standard map by its tileset (FF1)
 map_music:  ldh a, [maptype]
             and a
@@ -2675,9 +2676,10 @@ map_music:  ldh a, [maptype]
             ld [fc_bank], a
             call far_byte
             ld b, a
-            ld a, [NES_RAM + $4B]           ; (already playing it: kept)
-            cp b
-            ret z
+            ld a, [mus_cur]                 ; (already playing it: kept; owner, 2026-11-22:
+            cp b                            ;   it restarted after every dialogue and menu,
+            ret z                           ;   comparing with $4B, which reads 0 while a song
+                                            ;   plays)
             ld a, b
             jr snd_track
 
