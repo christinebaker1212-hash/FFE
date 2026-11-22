@@ -224,7 +224,13 @@ section bank 2, $4800
 
 ; ---- the main menu (approved layout): party (0,0,20,10), commands + Gil (0,9,12,9),
 ; orbs (12,10,8,8)
-menu_main:  ld a, TR_MENU                   ; (FF1: the menu music)
+menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after a jingle)
+            ld [scr_mus], a
+            call .in
+            xor a
+            ld [scr_mus], a
+            ret
+.in:        ld a, TR_MENU
             call snd_track
             xor a
             ld [mm_cur], a
@@ -1282,7 +1288,8 @@ hp_add:     push hl
             ld [hl-], a
             ld [hl], c
 .ok:        pop hl
-            ret
+            ld a, TR_HPUP                   ; FF1 MenuRecoverHP: the little gain-HP jingle
+            jp snd_track
 ; everyone not dead / stone: HP += A (FF1 MenuRecoverPartyHP)
 party_hp:   ld [it_t + 1], a
             xor a
@@ -2166,6 +2173,7 @@ story_show: ld [st_pg], a
             jr nz, .p
             ret
 
+zz_end_4800:
 section wram, $CE00
 st_k:       ds 1
 st_mode:    ds 1                            ; story pages: 0 prologue, 1 bridge, 2 ending

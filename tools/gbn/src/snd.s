@@ -20,6 +20,8 @@ TR_LINEUP  = $55
 TR_EPILOGUE = $43
 TR_MINIMAP = $41
 TR_BRIDGE  = $42
+TR_SAVED   = $56
+TR_HPUP    = $57
 
 section bank 7, $4000
 ; boot: sound on, the triangle's wave
@@ -27,8 +29,8 @@ snd_init_b: ld a, $80
             ldh [$FF26], a                  ; NR52 on
             ld a, $77
             ldh [$FF24], a                  ; NR50 full
-            ld a, $FF
-            ldh [$FF25], a                  ; NR51 all channels both sides
+            ld a, SND_MASK                  ; NR51 all channels both sides (test builds:
+            ldh [$FF25], a                  ;   env GBN_SND_MASK keeps some only)
             xor a
             ldh [$FF10], a                  ; NR10 no sweep
             ldh [$FF1A], a                  ; NR30 off
@@ -48,6 +50,9 @@ snd_init_b: ld a, $80
 .c:         ld [hl+], a
             dec b
             jr nz, .c
+            ld a, $FF
+            ld [snd_cv], a
+            ld [snd_cv + 1], a
             ld a, $80                       ; (no track yet: silent)
             ld [NES_RAM + $4B], a
             ret
@@ -109,12 +114,37 @@ aw:         push af
             jr .vol
 .vol2:      ld hl, $FF16
             ld c, 1
-.vol:       ld a, e
-            and $C0
-            ld [hl+], a                     ; NRx1 duty
-            ld a, e
-            and $0F
+.vol:       ld a, e                         ; (no restart for a volume change: FF1 changes the
+            and $C0                         ;   volume nearly every frame, and a restart resets
+            ld [hl+], a                     ;   the wave: a 60 Hz buzz and flat notes on the
+            ld a, e                         ;   GB. Steps of $08 to NRx2 ("zombie mode") move
+            and $0F                         ;   the playing volume, as the recompiled build)
             call p58
+            ld b, a                         ; B = the new GB volume
+            ld a, c
+            add a, low(snd_cv)
+            ld e, a
+            ld d, high(snd_cv)
+            ld a, [de]
+            cp $FF
+            jr z, .vr                       ; (unknown: set and restart)
+            push hl
+            ld h, d
+            ld l, e
+            ld a, b
+            sub [hl]
+            and $0F
+            ld [hl], b
+            pop hl                          ; HL = NRx2
+            jr z, .vx
+            ld d, a
+            ld a, $08
+.vz:        ld [hl], a
+            dec d
+            jr nz, .vz
+.vx:        jp .x
+.vr:        ld a, b
+            ld [de], a
             swap a
             or $08                          ; (DAC on, constant volume)
             ld [hl+], a                     ; NRx2
@@ -168,7 +198,27 @@ aw:         push af
             ld a, d
             ld [bc], a
             jr .x
-.fh:        call .freq                      ; the high byte: restart
+.fh:        call .freq                      ; the high byte: restart (the pulses with their
+            push af                         ;   current volume in NRx2 first)
+            ld a, c
+            sub low(snd_fh)
+            cp 2
+            jr nc, .ft
+            push de
+            add a, low(snd_cv)
+            ld e, a
+            ld d, high(snd_cv)
+            ld a, [de]
+            cp $FF
+            jr nz, .fk
+            xor a
+            ld [de], a
+.fk:        swap a
+            or $08
+            dec hl
+            ld [hl+], a
+            pop de
+.ft:        pop af
             ld [hl+], a
             ld a, d
             ld [bc], a
@@ -273,6 +323,7 @@ sw_per:     ds 2
 sw_mute:    ds 1
 tri_lc:     ds 1                            ; the triangle's linear counter run out in N frames
 tri_len:    ds 1                            ; its length counter (half frames, last $400B)
+snd_cv:     ds 2                            ; the pulses' GB volume now ($FF: unknown)
 
 ; ---- sound effects (FF1's, data from the ROM: sound.sfx_data). The square part plays on CH2
 ; while the music engine leaves its square 2 alone (sq2_sfx = NES_RAM + $7E, FF1's own
@@ -336,6 +387,8 @@ sfx_step:   ld a, [sfx_tot]
             dec a
             ld [sfx_tot], a
             jr nz, .on
+            ld a, $FF                       ; (square 2's volume unknown to the music again)
+            ld [snd_cv + 1], a
             ld a, [NES_RAM + $4B]           ; over: square 2 back to the music; silent if no
             and a                           ;   song plays
             jr z, .m
@@ -489,22 +542,23 @@ blk_de:     ld a, [de]
             ld [de], a
             pop hl
             ret
-; the pulses at 5/8 of FF1's volume (as the recompiled build, owner's balance: the NES mixes
-; its triangle ~1.7x a full pulse, the GB wave channel can only match a full pulse):
-; A = 0-15 -> (5 A + 4) >> 3
+; the pulses at 7/8 of FF1's volume: the voices' balance measured against FF1's NSF (libgme,
+; the owner's soundtrack): triangle / pulse 1 = 0.87 on the NES; the GB wave channel at full
+; level against pulses at 7/8 gives 0.86. A = 0-15 -> (7 A + 4) >> 3
 p58:        push bc
             ld b, a
             add a, a
             add a, a
-            add a, b
+            add a, a
+            sub b
             add a, 4
             srl a
             srl a
             srl a
             pop bc
             ret
-; nes_vol for a pulse: the level at 5/8; a decay from 9 instead of 15, its steps 5/3 as long
-; (the same length)
+; nes_vol for a pulse: the level at 7/8; a decay from 13 instead of 15 (its steps as nes_vol:
+; about the same length)
 nes_vol_p:  bit 4, a
             jr z, .d
             and $0F
@@ -515,18 +569,7 @@ nes_vol_p:  bit 4, a
             add a, 4
             srl a
             srl a                           ; n = 1-4 (as nes_vol)
-            ld b, a
-            add a, a
-            add a, a
-            add a, b
-            add a, 2                        ; (5 n + 2) / 3
-            ld b, 0
-.q:         sub 3
-            jr c, .qd
-            inc b
-            jr .q
-.qd:        ld a, b
-            or $90                          ; (from 9, down)
+            or $D0                          ; (from 13, down)
             ret
 ; A = NES volume byte (bit 4 constant volume, else decay at speed v) -> GB NRx2
 nes_vol:    bit 4, a

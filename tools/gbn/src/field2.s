@@ -583,8 +583,8 @@ minimap:    call lcd_off                    ; (LCD off in V-Blank, interrupts of
             dec b
             jr nz, .t
             xor a                           ; FF1 Minimap_DrawSFX: 12.5 % duty, volume 6,
-            ldh [$FF16], a                  ;   restarted every frame (pulses at 5/8: 4)
-            ld a, $40
+            ldh [$FF16], a                  ;   restarted every frame (pulses at 7/8: 5)
+            ld a, $50
             ldh [$FF17], a
             ld a, [mn_fq]
             ldh [$FF18], a
@@ -1813,6 +1813,7 @@ st_shut:    ld [st_k], a
             ret
 
 
+zz_end_6100:
 section wram, $C100                         ; (the map queue: free on these screens)
 lu_slot:    ds 32
 lu_cur:     ds 1

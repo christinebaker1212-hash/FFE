@@ -361,8 +361,27 @@ scr_str_on: call scr_str
             jp scr_upd
 
 ; the hand cursor at screen pixel (B = x, C = y), OAM entries 0-3
-scr_cursor: ld hl, cur_tbl
-            ld de, oam_buf
+; the hand pointing at text that starts at column B of row C (owner, 2026-11-22: one rule for
+; every cursor): the fingertip (the hand's column 15) 2 pixels before the first letter, the
+; finger (rows 2-5) level with the letters; cut off at the screen's left edge when it must be
+cur_txt:    ld de, oam_buf
+cur_tde:    ld a, b                         ; x = 8 B - 17, y = 8 C
+            add a, a
+            add a, a
+            add a, a
+            sub 17
+            ld b, a
+            ld a, c
+            add a, a
+            add a, a
+            add a, a
+            ld c, a
+            jr scr_cur_de
+; the same hand in OAM 4-7 (a second hand: the choice made, while another is picked)
+cur_txt2:   ld de, oam_buf + 16
+            jr cur_tde
+scr_cursor: ld de, oam_buf
+scr_cur_de: ld hl, cur_tbl
             ld a, c
             add a, 16
             ld c, a
@@ -448,7 +467,16 @@ scr_spr23:  ld [scr_t1], a
 ; one frame: wait, pad, OAM
 scr_frame:  call wait_vbl
             call sf_step
-            jp read_pad
+            ld a, [scr_mus]                 ; (FF1 MenuFrame / the shops: the music again
+            and a                           ;   when a jingle has ended it)
+            jr z, .p
+            ld b, a
+            ld a, [NES_RAM + $4B]
+            bit 7, a
+            jr z, .p
+            ld a, b
+            call snd_track
+.p:         jp read_pad
 
 section bank 2, $4000
 
@@ -1035,6 +1063,7 @@ ng_stats:   ld c, 0
             jp c, .m
             ret
 
+zz_end_4000:
 section bank 2, $7500                       ; (the prologue, party creation)
 
 ; ---- the prologue as FF1's EnterIntroStory: the crystal theme; a blue screen; the lines
@@ -2357,6 +2386,7 @@ eqm_name:   and $7F
 
 eqm_icons:  db $19, $07, $05, $06, $08      ; empty slots: sword, armour, shield, helmet, gloves
 
+zz_end_7500:
 section wram, $CD00
 scr_t0:     ds 1
 scr_t1:     ds 1
@@ -2365,6 +2395,7 @@ pg_mem:     ds 1
 pg_t:       ds 1
 pg_class:   ds 4
 pg_old:     ds 1
+scr_mus:    ds 1                            ; the menu's / shop's music, resumed after a jingle
 pr_rgb:     ds 10                           ; the prologue's colours (RGB555)
 pr_nl:      ds 1
 pr_row0:    ds 1

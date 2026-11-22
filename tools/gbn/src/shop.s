@@ -21,7 +21,13 @@ SH_NOSELL  = $1E
 section bank 2, $5980
 
 ; enter shop A (from the map: the door tile's shop number)
-shop_main:  ld a, [shop_arg]
+shop_main:  ld a, TR_SHOP                   ; (the shop music, again after a jingle: FF1)
+            ld [scr_mus], a
+            call .in
+            xor a
+            ld [scr_mus], a
+            ret
+.in:        ld a, [shop_arg]
             ld [sh_id], a
             ld e, a                         ; type, items (or the inn / clinic price)
             ld d, 0
@@ -896,6 +902,7 @@ sh_clinic:  ld hl, sh_nbuf                  ; the dead, as a list of names
             call wait_ab
             jp sh_clinic
 
+zz_end_5980:
 section wram, $CF40
 sh_id:      ds 1
 sh_type:    ds 1

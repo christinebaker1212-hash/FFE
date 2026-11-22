@@ -88,6 +88,7 @@ def ui_strings():
     out = ['section bank 2, $7000']
     for n, b in sorted(ui.strings().items()):
         out.append(data.db('str_' + n, b + b'\0'))
+    out.append('zz_end_7000:')
     return '\n'.join(out) + '\n'
 
 
@@ -213,6 +214,7 @@ def main():
             else: n = 1
             for j in range(int(n)): init.append((int(k, 16) + j, int(v, 16)))
     src = ('START_MAP = %s\nSTART_X = %s\nSTART_Y = %s\nSTART_ROOM = %s\n' % tuple(st) +
+           'SND_MASK = $%02X\n' % int(os.environ.get('GBN_SND_MASK', 'FF'), 16) +
            'TEST_INIT = %d\n' % (1 if init else 0) + 'FONT_D0 = $%02X\n' % text.code_of('0') + sound.mus_defs(rom) + sound.sfx_defs() +
            'STORY_FIRST = %d\nSTORY_END = %d\nSTORY_CRED = %d\n' % (ui.story_pages(rom)[1], len(ui.story_pages(rom)[0]), ui.CREDIT_PAGES) +
            'ENC_OW = %s\n' % (a[a.index('--enc') + 1] if '--enc' in a else '10') +

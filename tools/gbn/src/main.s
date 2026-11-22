@@ -2617,7 +2617,8 @@ save_game:  ldh a, [maptype]                ; the overworld position (FF1: its s
             ld [hl], b
             xor a
             ld [$0000], a
-            ret
+            ld a, TR_SAVED                  ; FF1 SaveGame: the "you saved your game" jingle
+            jp snd_track
 
 section wram, $C000
 oam_buf:    ds 160
@@ -2901,7 +2902,7 @@ wp_snd:     ldh a, [frame]
             ldh [$FF10], a
             xor a                           ; 12.5 %
             ldh [$FF11], a
-            ld a, $50                       ; volume 8 (pulses at 5/8: 5)
+            ld a, $70                       ; volume 8 (pulses at 7/8: 7)
             ldh [$FF12], a
             ld a, e
             ldh [$FF13], a
