@@ -264,6 +264,11 @@ items are simpler than for the recompiled build above.
   "SAVE DATA ERROR / The saved game in the Game Pak is damaged. / Press the A Button to
   erase it." and is erased only after the A Button (tested in PyBoy, DMG and CGB). No mark:
   no save (a new Game Pak).
+  The suspend point (2026-11-22, main menu Suspend) is kept the same way in cart RAM bank 1
+  (mark "FF1S", the field's state, a 16-bit sum; screens.s sus_*): enabled only while it is
+  checked, written or read; a damaged one shows "SUSPEND DATA ERROR / The suspended game in
+  the Game Pak is damaged. / Press the A Button to erase it." at boot (checked in SameBoy
+  with a cart RAM file whose bank 1 has the mark and a wrong sum).
 - 3.1 Soft reset: A + B + Start + Select (read_pad) -> cart RAM off -> boot again (title,
   no prologue).
 - 3.2 Boot clears WRAM ($C000-$DFFF), HRAM and VRAM (both banks on a Color) before use.

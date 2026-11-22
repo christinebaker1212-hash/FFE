@@ -238,13 +238,9 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
 .re:        call mm_draw
 .l:         ld a, [mm_cur]                  ; the hand left of the command
             add a, 10
-            add a, a
-            add a, a
-            add a, a
-            sub 4
             ld c, a
-            ld b, 0
-            call scr_cursor
+            ld b, 2
+            call cur_txt
             call scr_frame
             ldh a, [pad_new]
             bit 1, a
@@ -256,18 +252,18 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             jr nz, .up
             bit 7, a
             jr z, .l
-            ld a, [hl]                      ; down (four commands: Items, Magic, Equip,
-            inc a                           ;   Status)
-            cp 4
+            ld a, [hl]                      ; down (five commands: Items, Magic, Equip,
+            inc a                           ;   Status, Suspend)
+            cp 5
             jr c, .s
             xor a
 .s:         ld [hl], a
             jr .l
 .up:        ld a, [hl]
             dec a
-            cp 4
+            cp 5
             jr c, .s
-            ld a, 3
+            ld a, 4
             jr .s
 .a:         ld a, [mm_cur]
             and a
@@ -294,7 +290,11 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             and a
             ret nz
             jp .re
-.n1:        cp 3
+.n1:        cp 4
+            jr nz, .n4
+            call sus_menu                   ; Suspend (No: the menu again)
+            jp .re
+.n4:        cp 3
             jr z, .st
             call pick_char                  ; Equip: whose (the equipment screen)
             jr c, .re

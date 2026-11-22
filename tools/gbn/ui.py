@@ -67,6 +67,8 @@ NAME_GRID = ['ABCDEFGHIJ', 'KLMNOPQRST', "UVWXYZ'.,-", 'abcdefghij', 'klmnopqrst
 TITLE = ['Continue', 'New Game', 'Message Speed']
 SAVE_ERROR = ('SAVE DATA ERROR\n\nThe saved game in\nthe Game Pak is\ndamaged.\n\n'
               'Press the A Button\nto erase it.')     # (Lot Check: Nintendo's names)
+SUSP_ERROR = ('SUSPEND DATA ERROR\n\nThe suspended game\nin the Game Pak is\ndamaged.\n\n'
+              'Press the A Button\nto erase it.')
 
 
 def enc(s):
@@ -79,10 +81,16 @@ def strings():
     out = {}
     for i, t in enumerate(TITLE): out['title%d' % i] = enc(t)
     out['saverr'] = enc(SAVE_ERROR)
+    out['suserr'] = enc(SUSP_ERROR)
+    # Suspend (the recompiled build's wording): 18 letters a line
+    out['susq'] = enc('Create a Suspend\nPoint and return\nto the Title?\nSuspend points are\n'
+                      'retained when\nturning off the\nPower.')
+    out['susc1'] = enc('Continue from\nSuspend point?')
+    out['susc2'] = enc('Continue from last\nsave? The suspend\npoint will be\nlost!')
     out['pgok'] = enc('OK to begin\nwith this party?')    # (owner's wording, party creation)
     out['pgyes'] = enc('Yes')
     out['pgno'] = enc('No')
-    out['mcmd4'] = enc('Items\nMagic\nEquip\nStatus')          # (the main menu, owner 2026-11-22)
+    out['mcmd4'] = enc('Items\nMagic\nEquip\nStatus\nSuspend')          # (the main menu, owner 2026-11-22)
     out['eqst'] = enc('Attack\nAccuracy\nDefense\nEvasion')
     out['eqrem'] = enc('Remove')
     for c in range(12):

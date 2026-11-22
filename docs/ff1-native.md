@@ -275,3 +275,12 @@ one reaches parity, so the owner can keep playing).
    the native and the recompiled build (whose voices were checked against the NES) in SameBoy:
    per-frame pitch-class similarity 0.98-0.99 where both sound, the rests and the jingles'
    lengths the same, loudness within ~5%.
+11. Owner (2026-11-22): Suspend as in the recompiled build: main menu Items / Magic / Equip /
+   Status / Suspend; "Create a Suspend Point and return to the Title? Suspend points are
+   retained when turning off the Power." (No first); Yes saves the field's state (position,
+   map, floors, objects, vehicle, encounter counters, the whole save page) to cart RAM bank 1
+   with a mark and a sum and returns to the title. Continue (also with no save): "Continue
+   from Suspend point?" Yes restores it (erased once resumed) and re-enters the map as after
+   a menu; No with a save: "Continue from last save? The suspend point will be lost!"; No
+   again, or no save: the title. Music sounds checked against the owner's NSF (pulses 7/8,
+   volume steps without retriggers).

@@ -215,6 +215,12 @@ start:      di
             ld a, SCR_BANK
             ld hl, ng_main
             call bank_call
+            ld a, [sus_res]                 ; (a suspend point resumed: the map as after a
+            and a                           ;   menu, palettes cycled in)
+            jr z, .nsr
+            call map_reload
+            jp main
+.nsr:
             ld a, [unsram + $10]            ; (new game or continue: the save page's
             add a, 7                        ;   overworld position, + 7)
             ld d, a
@@ -2126,6 +2132,7 @@ ow_abutton: ld a, [vehicle]
             ld [vehicle], a
             jp map_music
 
+section bank 0, $1400                       ; (main.s continued: the airship)
 ; FF1 AnimateAirshipTakeoff / AnimateAirshipLanding: the airship rises from y $6F to $4F
 ; (lands: back), a pixel every second frame, its shadow, the noise (FF1: volume 8, the
 ; frame counter as its period); then facing right

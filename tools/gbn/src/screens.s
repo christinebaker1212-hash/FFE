@@ -499,7 +499,25 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             bit 0, a
             jr z, .se
             call save_erase
-.sok:       ldh a, [soft_rst]               ; the prologue first (not after a soft reset)
+.sok:       call sus_state                  ; a damaged suspend point: the same
+            cp 2
+            jr nz, .uok
+            call scr_open
+            ld bc, $0003
+            ld de, $140C
+            call scr_win
+            ld bc, $0105
+            ld hl, str_suserr
+            call scr_str
+            call scr_show
+.ue:        call scr_frame
+            ldh a, [pad_new]
+            bit 0, a
+            jr z, .ue
+            call sus_erase
+.uok:       xor a
+            ld [sus_res], a
+            ldh a, [soft_rst]               ; the prologue first (not after a soft reset)
             and a
             jr nz, .np
             call pro_show
@@ -527,7 +545,7 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             ld hl, str_title2
             call scr_str
             call .rate
-            call save_valid                 ; a save: Continue first, else New Game
+            call ng_cont                    ; a save or a suspend point: Continue first
             ld a, 0
             jr nc, .sv
             inc a
@@ -575,16 +593,48 @@ ng_main:    call save_state                 ; a damaged save: Lot Check's error 
             ld a, [ng_cur]
             and a
             jr nz, .new
-            call save_valid                 ; Continue: the saved game
-            jr c, .t
+            call sus_state                  ; Continue: a suspend point first
+            dec a
+            jr nz, .cs
+            ld hl, str_susc1                ; Continue from Suspend point?
+            ld a, 2
+            ld d, 0
+            call sus_ask
+            and a
+            jr nz, .cn
+            call sus_load                   ; Yes: the point (erased) and the map
+            ld a, 1
+            ld [sus_res], a
+            ret
+.cn:        call save_valid                 ; No: with a save, Continue from last save?
+            jp c, .np                       ;   The suspend point will be lost!
+            ld hl, str_susc2
+            ld a, 4
+            ld d, 1
+            call sus_ask
+            and a
+            jp nz, .np
+            call sus_erase
+            jp load_game
+.cs:        call save_valid                 ; the saved game
+            jp c, .t
             jp load_game
 .new:       call party_gen
             call ng_stats
             ret
-.rate:      ld a, [respond]                 ; the rate's digit after "Message Speed"
+.rate:      ld a, [respond]                 ; the rate's digit after Message Speed
             add a, FONT_D0 + 1
             ld hl, smap + 12 * 32 + 18
             ld [hl], a
+            ret
+
+; NC: something to continue (a save, or a good suspend point)
+ng_cont:    call save_valid
+            ret nc
+            call sus_state
+            dec a
+            ret z
+            scf
             ret
 
 ; the four boxes (approved layout: 10 x 9 at (0,0) (10,0) (0,9) (10,9)): class sprite,
@@ -1062,6 +1112,246 @@ ng_stats:   ld c, 0
             cp 4
             jp c, .m
             ret
+
+; ---- Suspend (as the recompiled build): a suspend point in cart RAM bank 1 (FF1S, the
+; field's state, a 16-bit sum), kept with the power off, erased when the game is resumed.
+; Lot Check: cart RAM enabled only while it is read or written.
+SUS_MARK   = $A000
+sus_blk:    dw px, o_tb + 1 - px            ; position, map, floors, objects' state
+            dw objs, 16 * 15
+            dw vehicle, 8
+            dw unsram, $400                 ; the save page, the party, flags, magic
+            dw bt_rngs, 1
+            dw maptype, 1
+            dw 0
+sus_on:     ld a, $0A
+            ld [$0000], a
+            ld a, 1
+            ld [$4000], a
+            ret
+sus_off:    push af
+            xor a
+            ld [$0000], a
+            ld [$4000], a
+            pop af
+            ret
+; the blocks <-> cart RAM from sus_cp: A = 0 write, 1 read, 2 only the sum; BC = the sum
+sus_copy:   ld [sus_dir], a
+            ld bc, 0
+            ld hl, sus_blk
+.e:         ld a, [hl+]
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            or e
+            ret z
+            ld a, [hl+]
+            ld [sus_n], a
+            ld a, [hl+]
+            ld [sus_n + 1], a
+            push hl
+            ld a, [sus_cp]
+            ld l, a
+            ld a, [sus_cp + 1]
+            ld h, a
+.c:         ld a, [sus_dir]
+            and a
+            jr nz, .rd
+            ld a, [de]
+            ld [hl], a
+            jr .s
+.rd:        dec a
+            ld a, [hl]
+            jr nz, .s
+            ld [de], a
+.s:         inc hl
+            inc de
+            add a, c
+            ld c, a
+            ld a, b
+            adc a, 0
+            ld b, a
+            push hl
+            ld hl, sus_n
+            ld a, [hl]
+            sub 1
+            ld [hl+], a
+            ld a, [hl]
+            sbc a, 0
+            ld [hl-], a
+            or [hl]
+            pop hl
+            jr nz, .c
+            ld a, l
+            ld [sus_cp], a
+            ld a, h
+            ld [sus_cp + 1], a
+            pop hl
+            jr .e
+sus_cp0:    ld a, low(SUS_MARK + 4)
+            ld [sus_cp], a
+            ld a, high(SUS_MARK + 4)
+            ld [sus_cp + 1], a
+            ret
+sus_end:    ld a, [sus_cp]                  ; HL = the sum's place
+            ld l, a
+            ld a, [sus_cp + 1]
+            ld h, a
+            ret
+; the suspend point made
+sus_write:  call sus_on
+            ld hl, SUS_MARK
+            ld a, $46
+            ld [hl+], a
+            ld [hl+], a
+            ld a, $31
+            ld [hl+], a
+            ld a, $53
+            ld [hl], a
+            call sus_cp0
+            xor a
+            call sus_copy
+            call sus_end
+            ld [hl], c
+            inc hl
+            ld [hl], b
+            jp sus_off
+; A = 0 none, 1 good, 2 damaged (the mark, a wrong sum)
+sus_state:  call sus_on
+            ld hl, SUS_MARK
+            ld a, [hl+]
+            cp $46
+            jr nz, .no
+            ld a, [hl+]
+            cp $46
+            jr nz, .no
+            ld a, [hl+]
+            cp $31
+            jr nz, .no
+            ld a, [hl]
+            cp $53
+            jr nz, .no
+            call sus_cp0
+            ld a, 2
+            call sus_copy
+            call sus_end
+            ld a, [hl+]
+            cp c
+            jr nz, .bad
+            ld a, [hl]
+            cp b
+            jr nz, .bad
+            ld a, 1
+            jp sus_off
+.bad:       ld a, 2
+            jp sus_off
+.no:        xor a
+            jp sus_off
+sus_erase:  call sus_on
+            xor a
+            ld hl, SUS_MARK
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            jp sus_off
+; the suspend point back into the game (the title's message speed kept), then erased
+sus_load:   ld a, [respond]
+            push af
+            call sus_on
+            call sus_cp0
+            ld a, 1
+            call sus_copy
+            call sus_off
+            pop af
+            ld [respond], a
+            xor a                           ; (the frame's passing state cleared)
+            ld [wp_req], a
+            ld [wp_on], a
+            ld [ly_n], a
+            ld [pc_hold], a
+            ld [shop_pend], a
+            ld a, LCDC_ON
+            ld [lcdc_on], a
+            ld a, $FF
+            ld [mt_force], a
+            ld a, 1
+            ld [pc_req], a
+            jr sus_erase
+; a question (HL, A lines) with Yes / No below, on its own screen; D = the choice first
+; (0 Yes, 1 No) -> A = 0 Yes, 1 No (B: No)
+sus_ask:    ld [sus_ln], a
+            ld a, d
+            ld [sus_k], a
+            push hl
+            call scr_open
+            ld a, [sus_ln]                  ; height = lines + 4, centred
+            add a, 4
+            ld e, a
+            ld a, 18
+            sub e
+            srl a
+            ld [sus_top], a
+            ld c, a
+            ld b, 0
+            ld d, 20
+            call scr_win
+            pop hl
+            ld a, [sus_top]
+            inc a
+            ld c, a
+            ld b, 1
+            call scr_str
+            ld a, [sus_top]
+            ld hl, sus_ln
+            add a, [hl]
+            add a, 2
+            ld [sus_yr], a
+            ld c, a
+            ld b, 6
+            ld hl, str_pgyes
+            call scr_str
+            ld a, [sus_yr]
+            ld c, a
+            ld b, 13
+            ld hl, str_pgno
+            call scr_str
+            call scr_show
+.l:         ld a, [sus_k]
+            and a
+            ld b, 6
+            jr z, .x
+            ld b, 13
+.x:         ld a, [sus_yr]
+            ld c, a
+            call cur_txt
+            call scr_frame
+            ldh a, [pad_new]
+            bit 0, a
+            jr nz, .a
+            bit 1, a
+            jr nz, .b
+            and $F0
+            jr z, .l
+            ld a, [sus_k]
+            xor 1
+            ld [sus_k], a
+            ld a, SFX_SEL
+            ld [sfx_req], a
+            jr .l
+.a:         ld a, [sus_k]
+            ret
+.b:         ld a, 1
+            ret
+; the main menu's Suspend: asked (No first); Yes: the point made, the title
+sus_menu:   ld hl, str_susq
+            ld a, 7
+            ld d, 1
+            call sus_ask
+            and a
+            ret nz
+            call sus_write
+            jp game_over
 
 zz_end_4000:
 section bank 2, $7500                       ; (the prologue, party creation)
@@ -2429,6 +2719,14 @@ scr_buf:    ds 32
 cur_tbl:    ds 8
 cls_pal:    ds 12
 sf_row:     ds 1
+sus_dir:    ds 1                            ; (Suspend)
+sus_n:      ds 2
+sus_cp:     ds 2
+sus_ln:     ds 1
+sus_k:      ds 1
+sus_top:    ds 1
+sus_yr:     ds 1
+sus_res:    ds 1                            ; the title resumed a suspend point
 section wram, $D400
 smap:       ds 18 * 32                      ; the screen's map copy (attributes at + $300)
 section wram, $D700
