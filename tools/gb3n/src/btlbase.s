@@ -358,9 +358,9 @@ b_div10:    ld hl, 0
 
 
 
-; ---- the 8 x 16 sprite mode (battle magic, btlfx.s): WRAM bank 5 holds the OAM ($D000), the
-; composed tile pairs ($D100, 32 bytes a pair -> VRAM bank 1 tiles S16_T0 + 2 n) and a mirror of
-; VRAM bank 1 tiles $00-$7F ($D800)
+; ---- the 8 x 16 sprite mode (battle magic, btlfx.s): WRAM bank 5 holds the OAM ($D000) and a
+; mirror of VRAM bank 1 tiles $00-$7F ($D800), bank 6 the composed tile pairs (32 bytes a pair ->
+; VRAM bank 1 tiles 2 n)
 s16_vbl:    ld a, [s16_lock]                ; (being built: the last picture stays)
             and a
             ret nz
@@ -372,7 +372,7 @@ s16_vbl:    ld a, [s16_lock]                ; (being built: the last picture sta
             ld a, 5
             ldh [rSVBK], a
             call hram_dma16
-            ld a, [s16_lo]                  ; dirty pairs lo..hi-1: at most 24 a V-Blank
+            ld a, [s16_lo]                  ; dirty pairs lo..hi-1 (WRAM 6): at most 24 a V-Blank
             ld b, a
             ld a, [s16_hi]
             sub b
@@ -382,6 +382,8 @@ s16_vbl:    ld a, [s16_lock]                ; (being built: the last picture sta
             jr c, .n
             ld a, 24
 .n:         ld c, a
+            ld a, 6
+            ldh [rSVBK], a
             ld l, b
             ld h, 0
             add hl, hl
@@ -396,10 +398,9 @@ s16_vbl:    ld a, [s16_lock]                ; (being built: the last picture sta
             ldh [rHDMA1], a
             ld a, l
             ldh [rHDMA2], a
-            pop hl
-            ld de, 16 * S16_T0              ; (VRAM $8000 + 16 tile)
-            add hl, de
+            pop hl                          ; (VRAM $8000 + 32 slot)
             ld a, h
+            or $80
             ldh [rHDMA3], a
             ld a, l
             ldh [rHDMA4], a
@@ -417,21 +418,49 @@ s16_vbl:    ld a, [s16_lock]                ; (being built: the last picture sta
 .x:         pop af
             ldh [rSVBK], a
             ret
-; the slots' pictures out of date (sprite tiles loaded in the 8 x 16 mode): all composed again
-s16_inv:    ldh a, [rSVBK]
+; sprite tiles loaded in the 8 x 16 mode (B tiles at VRAM DE): the slots composed from them out of
+; date (their keys emptied); the party paired again (its slots looked up again)
+s16_inv:    ld a, d
+            and $0F
+            swap a
+            ld c, a
+            ld a, e
+            swap a
+            and $0F
+            or c
+            ld c, a                         ; C = the first tile
+            ld a, b
+            and a
+            jr nz, .n
+            ld a, $80
+.n:         ld b, a                         ; B = tiles
+            ldh a, [rSVBK]
             push af
             ld a, 5
             ldh [rSVBK], a
-            ld hl, S16_K
-            ld b, 34 * 4
-            ld a, $FF
-.k:         ld [hl+], a
-            dec b
+            ld hl, S16_K0
+            ld e, 64
+.k:         ld a, [hl]
+            sub c
+            cp b
+            jr c, .x
+            ld a, l
+            add a, $80
+            ld l, a
+            ld a, [hl]
+            sub c
+            cp b
+            ld a, l
+            res 7, l
+            jr nc, .nx
+.x:         ld [hl], $FF
+.nx:        inc l
+            dec e
             jr nz, .k
             pop af
             ldh [rSVBK], a
-            ld hl, s16_sum
-            inc [hl]
+            ld a, $FF
+            ldh [s16_pp], a
             ret
 ; vcopy's VRAM bank 1 sprite tiles (DE < $8800) -> the mirror too (B tiles from HL; a source in
 ; $D000- through s16_bb)

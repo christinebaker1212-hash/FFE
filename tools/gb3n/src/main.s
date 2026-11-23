@@ -28,14 +28,16 @@ M_TT       = $DC00              ; the map's treasures (16) and triggers (16): 3A
 W_ENT      = $DBC0              ; world map: the entrance tiles' destination maps (64)
 N_OBJ      = $C400
 N_OB2      = $C500
-S16_OAM    = $D000              ; the 8 x 16 sprite mode (btlbase.s / btlfx.s): WRAM bank 5
-S16_STG    = $D100
-S16_MIR    = $D800
-S16_T0     = $32
-S16_W      = $D540              ; (WRAM 5) the sprites gathered: y, x, tile, attributes (64)
-S16_K      = $D640              ;   the slots' keys: top tile, flips, bottom tile, flips (34)
-S16_U      = $D6C8              ;   the slots used this frame (34)
-S16_PL     = $D6F0              ;   the pairs: y, x, attributes, slot, key (34 x 8)
+S16_OAM    = $D000              ; the 8 x 16 sprite mode (btlbase.s / btlfx.s), WRAM bank 5: the OAM,
+S16_K0     = $D100              ;   the slots' keys: top tile, its flips, bottom tile, its flips (64
+S16_K1     = $D140              ;   each),
+S16_K2     = $D180
+S16_K3     = $D1C0
+S16_W      = $D200              ;   the effect's sprites: y, x, tile, attributes (40),
+S16_A      = $D2A0              ;   the slots' last use (the build count),
+S16_PL     = $D2E0              ;   the pairs (the party's first): y, x, attributes, slot, key (34),
+S16_MIR    = $D800              ;   a mirror of VRAM bank 1 tiles $00-$7F;
+S16_STG    = $D000              ; WRAM bank 6: the slots' composed tiles (64 x 32 -> VRAM bank 1 $00-$7F)
 GS         = $C800              ; FF3's save block $6000-$63FF (npc switches at +$80)
 N_ANIM     = $DD00              ; 3B/B41A animation frames (CGB attributes), 256 bytes (WRAM bank 1)
 N_RNG      = $CD00              ; fix:FE00 random number table
@@ -1784,3 +1786,6 @@ pad:        ds 1
 scx:        ds 1
 scy:        ds 1
 hram_dma16: ds 10
+s16_eh:     ds 2                            ; (the 8 x 16 mode: the effect's sum, the party's pairs)
+s16_pp:     ds 1
+s16_fc:     ds 1

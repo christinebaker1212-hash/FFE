@@ -6,26 +6,35 @@
 ; The GB has 40 sprites; FF3's spells draw up to 36 next to the party's 24, so while a spell
 ; shows, the sprites are 8 x 16: the party's and the effect's 8 x 8 sprites are paired
 ; (vertical neighbours of one palette), each pair's two tiles composed (flips put into the
-; pixels) from a WRAM mirror of the sprite tiles into VRAM bank 1 tiles S16_T0- (34 pairs).
+; pixels) from a WRAM mirror of the sprite tiles into 64 slots (VRAM bank 1 tiles $00-$7F, back
+; from the mirror after; the least recently used slot taken for a new pair).
 N33        = -$4000             ; 33 address + N33 = the copy here
 FX_REV     = $5F00              ; (build.py: the bit-reversed bytes)
 F00        = $4000 - $9700      ; FXD: 00/9700-A1FF at $4000 (the hit frames)
 F06        = $4B00 - $8C00      ; FXD: 06/8C00-91FF at $4B00 (the spells' frame lists)
 F2E        = $5100 - $9100      ; FXD: 2E/9100-95FF at $5100 (the graphics properties)
 F34        = $5600 - $83A0      ; FXD: 34/83A0- at $5600 (the sounds)
-NSLOT      = 34
+NSLOT      = 64
+NPAIR      = 40
 
 ; ---- the mode on: the slots emptied, the first picture built, then shown from the V-Blank
 s16_start:  ldh a, [rSVBK]
             push af
             ld a, 5
             ldh [rSVBK], a
-            ld hl, S16_K
-            ld b, NSLOT * 4
+            ld hl, S16_K0
+            ld b, 0
             ld a, $FF
 .k:         ld [hl+], a
             dec b
             jr nz, .k
+            ld hl, S16_A
+            ld b, NSLOT
+            xor a
+.a:         ld [hl+], a
+            dec b
+            jr nz, .a
+            ldh [s16_fc], a
             pop af
             ldh [rSVBK], a
             xor a
@@ -36,6 +45,7 @@ s16_start:  ldh a, [rSVBK]
             ld [s16_lock], a
             dec a
             ld [s16_sum], a
+            ldh [s16_pp], a
             call s16_build
             ld a, 1
             ld [s16_on], a
@@ -98,148 +108,439 @@ mx_wait:    call s16_build
             ld [BZ + $C9], a
 .w:         jp wait_vbl
 
-; ---- the picture: the party's sprites (OAM 0-23) and the effect's (s16_in) as 8 x 16 pairs
-s16_build:  ld hl, oam_buf                  ; (nothing changed: the last picture stays)
-            ld bc, 0
+; ---- the picture: the party's sprites (OAM 0-23) and the effect's (s16_in) as 8 x 16 pairs; the
+; party's pairs kept while its sprites stay the same
+s16_build:  ld hl, oam_buf                  ; the sums: the party's, the effect's
             ld e, 96
-.h1:        ld a, [hl+]
-            add a, c
-            ld c, a
+            call .sum
+            ld a, [s16_sum]
+            cp c
+            jr nz, .pc
+            ld a, [s16_sum + 1]
+            cp b
+            jr z, .pk
+.pc:        ld a, c                         ; (the party changed)
+            ld [s16_sum], a
             ld a, b
-            rlca
-            xor c
-            ld b, a
-            dec e
-            jr nz, .h1
-            ld a, [s16_n]
-            and a
-            jr z, .h3
+            ld [s16_sum + 1], a
+            ld a, $FF
+            ldh [s16_pp], a
+.pk:        ld a, [s16_n]
             add a, a
             add a, a
             ld e, a
             ld hl, s16_in
-.h2:        ld a, [hl+]
-            add a, c
+            ld a, [s16_n]
             ld c, a
-            ld a, b
-            rlca
-            xor c
             ld b, a
-            dec e
-            jr nz, .h2
-.h3:        ld a, [s16_n]
-            xor b
-            ld b, a
-            ld a, [s16_sum]
+            and a
+            call nz, .sum0
+            ldh a, [s16_pp]
+            inc a
+            jr z, .go
+            ldh a, [s16_eh]
             cp c
-            jr nz, .ch
-            ld a, [s16_sum + 1]
+            jr nz, .go
+            ldh a, [s16_eh + 1]
             cp b
             ret z
-.ch:        ld a, c
-            ld [s16_sum], a
+.go:        ld a, c
+            ldh [s16_eh], a
             ld a, b
-            ld [s16_sum + 1], a
+            ldh [s16_eh + 1], a
             ld a, 1
             ld [s16_lock], a
             ldh a, [rSVBK]
             push af
             ld a, 5
             ldh [rSVBK], a
-            xor a                           ; gather (the effect first when in front)
+            ldh a, [s16_fc]                 ; (a new build: slots with this count are used)
+            inc a
+            ldh [s16_fc], a
+            ldh a, [s16_pp]
+            inc a
+            jr z, .np
+            dec a                           ; the party's pairs kept: their slots used
+            ld [s16_pn], a
+            and a
+            jr z, .fx
+            ld b, a
+            ld hl, S16_PL + 3
+.k1:        ld a, [hl]
+            cp NSLOT
+            jr nc, .k2
+            push hl
+            ld e, a
+            ld d, 0
+            ld hl, S16_A
+            add hl, de
+            ldh a, [s16_fc]
+            ld [hl], a
+            pop hl
+.k2:        ld de, 8
+            add hl, de
+            dec b
+            jr nz, .k1
+            jr .fx
+.np:        xor a                           ; the party paired again (its shown sprites -> W)
+            ld [s16_pn], a
             ld [s16_wn], a
-            ld de, S16_W
+            ld hl, oam_buf
+            ld b, 24
+            call .gather
+            call .pair
+            ld a, [s16_pn]
+            ldh [s16_pp], a
+.fx:        xor a                           ; the effect paired (after the party's)
+            ld [s16_wn], a
+            ld a, [s16_n]
+            and a
+            jr z, .look
+            ld b, a
+            ld hl, s16_in
+            call .gather
+            call .pair
+.look:      ld a, [s16_pn]                  ; the new pairs: their keys looked up in the slots
+            and a
+            jp z, .out
+            ld b, a
+            ld hl, S16_PL + 3
+.l1:        ld a, [hl]
+            inc a
+            jr nz, .l5                      ; (a slot already)
+            push bc
+            push hl
+            inc hl
+            ld a, [hl+]                     ; B = top tile: K0 searched
+            ld b, a
+            ld de, S16_K0
+            ld c, NSLOT
+.l2:        ld a, [de]
+            cp b
+            jr z, .l3
+.l2n:       inc e
+            dec c
+            jr nz, .l2
+            jr .l4
+.l3:        push hl                         ; (K1-K3 at +64 / +128 / +192)
+            push de
+            ld a, e
+            add a, $40
+            ld e, a
+            ld a, [de]
+            cp [hl]
+            jr nz, .l3n
+            inc hl
+            ld a, e
+            add a, $40
+            ld e, a
+            ld a, [de]
+            cp [hl]
+            jr nz, .l3n
+            inc hl
+            ld a, e
+            add a, $40
+            ld e, a
+            ld a, [de]
+            cp [hl]
+            jr nz, .l3n
+            pop de                          ; found: slot E - K0
+            pop hl
+            pop hl
+            push hl
+            ld a, e
+            sub low(S16_K0)
+            ld [hl], a
+            ld e, a
+            ld d, 0
+            ld hl, S16_A
+            add hl, de
+            ldh a, [s16_fc]
+            ld [hl], a
+            jr .l4
+.l3n:       pop de
+            pop hl
+            jr .l2n
+.l4:        pop hl
+            pop bc
+.l5:        ld de, 8
+            add hl, de
+            dec b
+            jr nz, .l1
+            ld a, [s16_pn]                  ; the others: the least recently used slot, composed
+            ld b, a
+            ld hl, S16_PL + 3
+.a1:        ld a, [hl]
+            inc a
+            jp nz, .a5
+            push bc
+            push hl
+            ld hl, S16_A                    ; (the oldest: the largest count - its count)
+            ld bc, $FF00                    ; (C = the best age, B = its slot)
+            ld e, 0
+            ldh a, [s16_fc]
+            ld d, a
+.a2:        ld a, d
+            sub [hl]
+            jr z, .a3                       ; (used this build)
+            cp c
+            jr c, .a3
+            ld c, a
+            ld b, e
+.a3:        inc hl
+            inc e
+            ld a, e
+            cp NSLOT
+            jr nz, .a2
+            ld a, b
+            pop hl
+            inc a
+            jr z, .a4x                      ; (none free)
+            dec a
+            ld [hl], a                      ; the slot, its count, its key
+            ld c, a
+            ld e, a
+            ld d, 0
+            push hl
+            ld hl, S16_A
+            add hl, de
+            ldh a, [s16_fc]
+            ld [hl], a
+            pop hl
+            push hl
+            inc hl
+            ld de, S16_K0
+            ld a, e
+            add a, c
+            ld e, a
+            ld a, [hl+]
+            ld [de], a
+            ld a, e
+            add a, $40
+            ld e, a
+            ld a, [hl+]
+            ld [de], a
+            ld a, e
+            add a, $40
+            ld e, a
+            ld a, [hl+]
+            ld [de], a
+            ld a, e
+            add a, $40
+            ld e, a
+            ld a, [hl]
+            ld [de], a
+            call s16_comp                   ; C = slot
+            pop hl
+            ld a, [s16_hi]                  ; dirty: lo..hi
+            ld b, a
+            ld a, [s16_lo]
+            cp b
+            jr c, .a6
+            ld a, c                         ; (nothing pending: lo = slot, hi = slot + 1)
+            ld [s16_lo], a
+            inc a
+            ld [s16_hi], a
+            jr .a4x
+.a6:        ld a, [s16_lo]
+            cp c
+            jr c, .a7
+            ld a, c
+            ld [s16_lo], a
+.a7:        ld a, [s16_hi]
+            dec a
+            cp c
+            jr nc, .a4x
+            ld a, c
+            inc a
+            ld [s16_hi], a
+.a4x:       pop bc
+.a5:        ld de, 8
+            add hl, de
+            dec b
+            jp nz, .a1
+.out:       ld de, S16_OAM                  ; the OAM: the effect's pairs first when in front
             ld a, [s16_front]
             and a
-            jr z, .pf
-            call .gfx
-            call .gpt
-            jr .g1
-.pf:        call .gpt
-            call .gfx
-.g1:        xor a                           ; pairs
-            ld [s16_pn], a
-            ld hl, S16_U
-            ld b, NSLOT
-.u:         ld [hl+], a
-            dec b
-            jr nz, .u
-            ld [s16_i], a
-.pi:        ld a, [s16_i]
-            ld hl, s16_wn
-            cp [hl]
-            jp nc, .pd
-            call .wp                        ; HL = W[i]
-            ld a, [hl]
+            jr z, .of
+            call .oe
+            call .op
+            jr .o2
+.of:        call .op
+            call .oe
+.o2:        ld a, e                         ; the rest hidden
+            cp 160
+            jr nc, .o4
+            xor a
+            ld [de], a
+            inc de
+            inc de
+            inc de
+            inc de
+            jr .o2
+.o4:        pop af
+            ldh [rSVBK], a
+            xor a
+            ld [s16_lock], a
+            ret
+.op:        ld hl, S16_PL                   ; the party's pairs: 0 .. pp - 1
+            ldh a, [s16_pp]
             and a
-            jp z, .pn                       ; (taken)
-            ld [hl], 0                      ; (y 0: taken)
+            ret z
+            ld b, a
+            jr .o1
+.oe:        ldh a, [s16_pp]                 ; the effect's: pp .. pn - 1
+            ld c, a
+            ld a, [s16_pn]
+            sub c
+            ret z
+            ret c
+            ld b, a
+            ld l, c
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            push de
+            ld de, S16_PL
+            add hl, de
+            pop de
+.o1:        ld a, e
+            cp 160
+            ret nc
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            cp NSLOT
+            jr c, .o3
+            dec de                          ; (no slot: hidden)
+            dec de
+            xor a
+            ld [de], a
+            inc de
+            inc de
+.o3:        add a, a
+            ld [de], a
+            inc de
+            ld a, c
+            ld [de], a
+            inc de
+            inc hl
+            inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .o1
+            ret
+; a sum of E bytes at HL -> BC (.sum0: from BC)
+.sum:       ld bc, 0
+.sum0:      ld a, [hl+]
+            add a, c
+            ld c, a
+            ld a, b
+            rlca
+            xor c
+            ld b, a
+            dec e
+            jr nz, .sum0
+            ret
+; B sprites at HL (shown ones: y 1-159) -> W (s16_wn)
+.gather:    ld de, S16_W
+.gc:        ld a, [hl]
+            and a
+            jr z, .gs
+            cp 160
+            jr nc, .gs
+            ld a, [s16_wn]
+            cp 40
+            ret nc
+            inc a
+            ld [s16_wn], a
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            jr .gn
+.gs:        inc hl
+            inc hl
+            inc hl
+            inc hl
+.gn:        dec b
+            jr nz, .gc
+            ret
+; W's sprites paired (x the same, palette / bank / priority the same, y 8 apart) -> PL
+.pair:      ld hl, S16_W
+            ld a, [s16_wn]
+            and a
+            ret z
+            ld [s16_i], a                   ; (left)
+.pi:        ld a, [hl]
+            and a
+            jp z, .pn
+            ld [hl], 0                      ; (taken)
             ld b, a                         ; B = y, C = x, D = tile, E = attributes
             inc hl
             ld a, [hl+]
             ld c, a
             ld a, [hl+]
             ld d, a
-            ld e, [hl]
-            ld a, [s16_i]                   ; the partner: x the same, the group the same, y +- 8
-            inc a
+            ld a, [hl-]
+            ld e, a
+            dec hl
+            dec hl
+            push hl                         ; (-> W[i])
+            ld a, [s16_i]
+            dec a
+            jr z, .single
             ld [s16_j], a
-.pj:        ld a, [s16_j]
-            ld hl, s16_wn
-            cp [hl]
-            jr nc, .single
-            call .wp
-            ld a, [hl+]
+            inc hl
+            inc hl
+            inc hl
+            inc hl
+.pj:        ld a, [hl]                      ; y_j
             and a
             jr z, .pjn
-            push af
-            ld a, [hl+]
-            cp c
-            jr nz, .pjx
             inc hl
-            ld a, [hl]
+            ld a, [hl-]
+            cp c
+            jr nz, .pjn
+            inc hl
+            inc hl
+            inc hl
+            ld a, [hl-]
+            dec hl
+            dec hl
             xor e
             and $9F
-            jr nz, .pjx
-            pop af
-            push af
+            jr nz, .pjn
+            ld a, [hl]
             sub b
             cp 8
             jr z, .bot
             cp -8
             jr z, .top
-.pjx:       pop af
-.pjn:       ld hl, s16_j
-            inc [hl]
-            jr .pj
-.bot:       pop af                          ; the partner below (HL -> its attributes): W[i] top
-            ld a, [hl-]
-            ld [s16_t + 3], a
-            ld a, [hl-]
-            ld [s16_t + 2], a
-            dec hl
-            ld [hl], 0
-            ld a, d
-            ld [s16_t], a
-            ld a, e
-            ld [s16_t + 1], a
-            jr .key
-.top:       pop af                          ; the partner above: it is the top
-            ld a, d
-            ld [s16_t + 2], a
-            ld a, e
-            ld [s16_t + 3], a
-            ld a, [hl-]
-            ld [s16_t + 1], a
-            ld e, a
-            ld a, [hl-]
-            ld [s16_t], a
-            dec hl
-            ld [hl], 0
-            ld a, b
-            sub 8
-            ld b, a
-            jr .key
+.pjn:       inc hl
+            inc hl
+            inc hl
+            inc hl
+            ld a, [s16_j]
+            dec a
+            ld [s16_j], a
+            jr nz, .pj
 .single:    ld a, d
             ld [s16_t], a
             ld a, e
@@ -247,9 +548,37 @@ s16_build:  ld hl, oam_buf                  ; (nothing changed: the last picture
             ld a, $FF
             ld [s16_t + 2], a
             ld [s16_t + 3], a
+            jr .key
+.bot:       ld [hl], 0                      ; the partner below: W[i] top
+            inc hl
+            inc hl
+            ld a, [hl+]
+            ld [s16_t + 2], a
+            ld a, [hl]
+            ld [s16_t + 3], a
+            ld a, d
+            ld [s16_t], a
+            ld a, e
+            ld [s16_t + 1], a
+            jr .key
+.top:       ld [hl], 0                      ; the partner above: it is the top
+            ld a, d
+            ld [s16_t + 2], a
+            ld a, e
+            ld [s16_t + 3], a
+            inc hl
+            inc hl
+            ld a, [hl+]
+            ld [s16_t], a
+            ld a, [hl]
+            ld [s16_t + 1], a
+            ld e, a
+            ld a, b
+            sub 8
+            ld b, a
 .key:       ld a, [s16_pn]                  ; the pair: y, x, attributes, slot $FF, key
-            cp NSLOT
-            jr nc, .pn
+            cp NPAIR
+            jr nc, .kx
             inc a
             ld [s16_pn], a
             dec a
@@ -282,285 +611,82 @@ s16_build:  ld hl, oam_buf                  ; (nothing changed: the last picture
             ld a, [s16_t + 3]
             and $60
             ld [hl], a
-.pn:        ld hl, s16_i
-            inc [hl]
-            jp .pi
-.pd:        ld a, [s16_pn]                  ; the keys found in the slots
-            and a
-            jp z, .out
-            ld hl, S16_PL
-            ld b, a
-.l1:        push bc
-            push hl
+.kx:        pop hl                          ; (-> W[i])
+.pn:        inc hl
             inc hl
             inc hl
             inc hl
-            push hl                         ; (-> the slot)
-            inc hl
-            ld de, S16_K
-            ld c, 0
-.l2:        ld a, [de]
-            cp [hl]
-            jr nz, .l3
-            push hl
-            push de
-            inc hl
-            inc de
-            ld a, [de]
-            cp [hl]
-            jr nz, .l4
-            inc hl
-            inc de
-            ld a, [de]
-            cp [hl]
-            jr nz, .l4
-            inc hl
-            inc de
-            ld a, [de]
-            cp [hl]
-            jr nz, .l4
-            pop de
-            pop hl
-            pop hl                          ; found: slot C
-            ld [hl], c
-            ld hl, S16_U
-            ld b, 0
-            add hl, bc
-            ld [hl], 1
-            jr .l5
-.l4:        pop de
-            pop hl
-.l3:        inc de
-            inc de
-            inc de
-            inc de
-            inc c
-            ld a, c
-            cp NSLOT
-            jr nz, .l2
-            pop hl
-.l5:        pop hl
-            ld de, 8
-            add hl, de
-            pop bc
-            dec b
-            jr nz, .l1
-            ld a, [s16_pn]                  ; the others: a free slot, composed
-            ld b, a
-            ld hl, S16_PL
-.a1:        push bc
-            push hl
-            inc hl
-            inc hl
-            inc hl
-            ld a, [hl]
-            inc a
-            jr nz, .a5
-            push hl
-            ld de, S16_U
-            ld c, 0
-.a2:        ld a, [de]
-            and a
-            jr z, .a3
-            inc de
-            inc c
-            ld a, c
-            cp NSLOT
-            jr nz, .a2
-            pop hl
-            jr .a5
-.a3:        ld a, 1
-            ld [de], a
-            pop hl
-            ld [hl], c
-            inc hl
-            push hl
-            ld l, c                         ; the key -> S16_K + 4 slot
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            ld de, S16_K
-            add hl, de
-            ld d, h
-            ld e, l
-            pop hl
-            push hl
-            ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, [hl]
-            ld [de], a
-            pop hl
-            call s16_comp                   ; HL -> the key, C = slot
-            ld a, [s16_hi]                  ; dirty: lo..hi
-            ld b, a
-            ld a, [s16_lo]
-            cp b
-            jr c, .a4
-            ld a, c                         ; (nothing pending: lo = hi = slot)
-            ld [s16_lo], a
-            inc a
-            ld [s16_hi], a
-            jr .a5
-.a4:        ld a, [s16_lo]
-            cp c
-            jr c, .a6
-            ld a, c
-            ld [s16_lo], a
-.a6:        ld a, [s16_hi]
+            ld a, [s16_i]
             dec a
-            cp c
-            jr nc, .a5
-            ld a, c
-            inc a
-            ld [s16_hi], a
-.a5:        pop hl
-            ld de, 8
-            add hl, de
-            pop bc
-            dec b
-            jr nz, .a1
-.out:       ld hl, S16_PL                   ; the OAM: y + 16, x + 8 as given (GB), the slot's tile
-            ld de, S16_OAM
-            ld a, [s16_pn]
-            and a
-            jr z, .o2
-            ld b, a
-.o1:        ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, [hl+]
-            ld c, a
-            ld a, [hl+]
-            cp NSLOT
-            jr c, .o3
-            dec de                          ; (no slot: hidden)
-            dec de
-            xor a
-            ld [de], a
-            inc de
-            inc de
-.o3:        add a, a
-            add a, S16_T0
-            ld [de], a
-            inc de
-            ld a, c
-            ld [de], a
-            inc de
-            inc hl
-            inc hl
-            inc hl
-            inc hl
-            dec b
-            jr nz, .o1
-.o2:        ld a, e                         ; the rest hidden
-            cp 160
-            jr nc, .o4
-            xor a
-            ld [de], a
-            inc de
-            inc de
-            inc de
-            inc de
-            jr .o2
-.o4:        pop af
-            ldh [rSVBK], a
-            xor a
-            ld [s16_lock], a
-            ret
-.wp:        ld l, a                         ; HL = S16_W + 4 A
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            ld a, l
-            add a, low(S16_W)
-            ld l, a
-            ld a, h
-            adc a, high(S16_W)
-            ld h, a
-            ret
-.gpt:       ld hl, oam_buf                  ; the party: OAM 0-23 shown ones
-            ld b, 24
-            jr .gc
-.gfx:       ld a, [s16_n]
-            and a
-            ret z
-            ld b, a
-            ld hl, s16_in
-.gc:        ld a, [hl]
-            and a
-            jr z, .gs
-            cp 160
-            jr nc, .gs
-            ld a, [s16_wn]
-            cp 64
-            ret nc
-            inc a
-            ld [s16_wn], a
-            ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, [hl+]
-            ld [de], a
-            inc de
-            jr .gn
-.gs:        inc hl
-            inc hl
-            inc hl
-            inc hl
-.gn:        dec b
-            jr nz, .gc
+            ld [s16_i], a
+            jp nz, .pi
             ret
 
-; slot C's two tiles from the key [HL] (top tile, flips, bottom tile, flips; $FF: blank)
+; slot C's two tiles from its key (top tile, flips, bottom tile, flips; $FF: blank): each composed
+; in s16_bb (the mirror, WRAM 5), then to WRAM 6 S16_STG + 32 slot
 s16_comp:   push bc
-            ld l, c                         ; DE = S16_STG + 32 slot
+            ld hl, S16_K0
+            ld a, l
+            add a, c
+            ld l, a
+            ld b, [hl]
+            ld a, l
+            add a, $40
+            ld l, a
+            ld c, [hl]
+            call .tile
+            pop bc
+            push bc
+            xor a
+            call .put
+            pop bc
+            push bc
+            ld hl, S16_K2
+            ld a, l
+            add a, c
+            ld l, a
+            ld b, [hl]
+            ld a, l
+            add a, $40
+            ld l, a
+            ld c, [hl]
+            call .tile
+            pop bc
+            push bc
+            ld a, 16
+            call .put
+            pop bc
+            ret
+; s16_bb -> WRAM 6 S16_STG + 32 C + A
+.put:       ld l, c
             ld h, 0
             add hl, hl
             add hl, hl
             add hl, hl
             add hl, hl
             add hl, hl
+            ld e, a
+            ld d, 0
+            add hl, de
             ld de, S16_STG
             add hl, de
             ld d, h
             ld e, l
-            ld l, c                         ; HL = S16_K + 4 slot
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            ld bc, S16_K
-            add hl, bc
-            ld a, [hl+]
-            ld b, a
-            ld a, [hl+]
-            ld c, a
-            push hl
-            call .tile
-            pop hl
-            ld a, [hl+]
-            ld b, a
-            ld c, [hl]
-            call .tile
-            pop bc
+            ld a, 6
+            ldh [rSVBK], a
+            ld hl, s16_bb
+            ld b, 16
+.p:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .p
+            ld a, 5
+            ldh [rSVBK], a
             ret
-; tile B (flips C: $20 h, $40 v) -> 16 bytes at DE
-.tile:      ld a, b
+; tile B (flips C: $20 h, $40 v) -> s16_bb
+.tile:      ld de, s16_bb
+            ld a, b
             cp $80
             jr c, .t1
             xor a                           ; (blank)
@@ -585,29 +711,35 @@ s16_comp:   push bc
             ld a, l
             add a, 14
             ld l, a
-.r:         ld a, [hl+]
-            call .rv
+.r:         bit 5, c
+            jr nz, .rh
+            ld a, [hl+]
             ld [de], a
             inc de
             ld a, [hl+]
-            call .rv
             ld [de], a
             inc de
-            bit 6, c
-            jr z, .r1
+            jr .r1
+.rh:        push bc
+            ld b, high(FX_REV)
+            ld c, [hl]
+            inc hl
+            ld a, [bc]
+            ld [de], a
+            inc de
+            ld c, [hl]
+            inc hl
+            ld a, [bc]
+            ld [de], a
+            inc de
+            pop bc
+.r1:        bit 6, c
+            jr z, .r2
             ld a, l
             sub 4
             ld l, a
-.r1:        dec b
+.r2:        dec b
             jr nz, .r
-            ret
-.rv:        bit 5, c
-            ret z
-            push hl
-            ld l, a
-            ld h, high(FX_REV)
-            ld a, [hl]
-            pop hl
             ret
 
 ; ---- 34/8577 attack animation 1: magic (and $10: ineffective, 34/8555)
@@ -786,7 +918,17 @@ mx_cast:    call ba_reset
             ld a, 8
             jr z, .c
             ld a, $0E
-.c:         jp ba_cfr
+.c:         ld e, a                         ; (the pose unchanged: not drawn again)
+            ld a, [BZ + $95]
+            ld c, a
+            ld b, 0
+            ld hl, W7 + $7D83
+            add hl, bc
+            ld a, [hl]
+            cp e
+            ret z
+            ld a, e
+            jp ba_cfr
 ; 33/B1CD / B1C3 / B1B9 the black / white / summon casting frame (33/B1D7 / B1E2 / B1EE by
 ; the frame counter / 4)
 mx_bfr:     ld hl, $B1D7 + N33
@@ -856,7 +998,7 @@ mx_bub:     xor a
             ld b, a
             ld a, [mx_t + 1]
             ld e, a
-            call ba_put
+            call mx_put
             ld hl, mx_t
             inc [hl]
             pop bc
@@ -904,7 +1046,7 @@ mx_star:    xor a
             or 3
             ld e, a
             ld d, $49
-            call ba_put
+            call mx_put
             ld hl, mx_t
             inc [hl]
             ld a, [hl]
@@ -1069,7 +1211,7 @@ mx_proj:    ld a, [W7 + $7E9A]
             or 3
             ld e, a
             ld d, $58
-            call ba_put
+            call mx_put
             pop de
             ret
 
@@ -1236,7 +1378,7 @@ mx_hfr:     call ba_reset
             ld hl, BZ + $8C
             add a, [hl]
             ld b, a
-            call ba_put
+            call mx_put
             pop hl
             pop bc
             dec b
@@ -1397,6 +1539,135 @@ mx_frd:     xor a
             ret
 ; 33/B5BB the reflection: 4 frames of the wall (32/9453 at a monster, 32/9473 at a member)
 mx_refl:    ret
+
+; FF3 sprite (B = x, C = y, D = tile, E = FF3 attributes) -> s16_in, placed as btlanim.s's ba_put
+; (ba_mode 0: by the member $95 in the party column, 1: the battlefield, 2: a projectile)
+mx_put:     ld a, d
+            and a
+            ret z
+            ld a, [ba_mode]
+            and a
+            jr z, .pc
+            dec a
+            jr z, .bf
+            ld a, [W7 + $78C3]              ; 2: x <= 128 as the battlefield, >= 192 as the party
+            cp $88                          ;   column, between them compressed; y - 32
+            ld a, b
+            jr nz, .j0
+            ld a, 240
+            sub b
+.j0:        cp 128
+            jr nc, .j1
+            sub 12
+            jr .j3
+.j1:        cp 192
+            jr nc, .j2
+            sub 128
+            ld h, a
+            add a, a
+            add a, h
+            srl a
+            srl a
+            srl a
+            add a, 116
+            jr .j3
+.j2:        sub 208
+            sra a
+            add a, 148
+.j3:        ld b, a
+            ld a, c
+            sub 32
+            ld c, a
+            jr .mir
+.bf:        ld a, c                         ; 1: (x - 12, y - 32); a back attack: 180 - x
+            sub 32
+            ld c, a
+            ld a, [W7 + $78C3]
+            cp $88
+            ld a, b
+            jr nz, .b1
+            cpl
+            add a, 181
+            ld b, a
+            ld a, e
+            xor $40
+            ld e, a
+            jr .w
+.b1:        sub 12
+            ld b, a
+            jr .w
+.pc:        ld a, [BZ + $95]                ; 0: y - (4 m + $1B); x - C0 + the member's base
+            ld l, a
+            add a, a
+            add a, a
+            add a, $1B
+            ld h, a
+            ld a, c
+            sub h
+            ld c, a
+            ld a, l
+            add a, low(BZ + $C0)
+            ld l, a
+            ld h, high(BZ + $C0)
+            ld a, b
+            sub [hl]
+            ld b, a
+            ld a, [W7 + $78C3]              ; (the base: 140 + (x - 208) / 2 + 8; back: 240 - x)
+            cp $88
+            ld a, [hl]
+            jr nz, .n
+            cpl
+            add a, 241
+.n:         sub 208
+            sra a
+            add a, 148
+            add a, b
+            ld b, a
+.mir:       ld a, [W7 + $78C3]
+            cp $88
+            jr nz, .w
+            ld a, 168                       ; (a back attack: mirrored)
+            sub b
+            ld b, a
+            ld a, e
+            xor $40
+            ld e, a
+.w:         ld a, e                         ; FF3 attributes -> GB
+            and 3
+            or 8
+            bit 6, e
+            jr z, .h
+            or $20
+.h:         bit 7, e
+            jr z, .v
+            or $40
+.v:         bit 5, e
+            jr z, .p
+            or $80
+.p:         ld e, a
+            ld a, [s16_n]
+            cp 40
+            ret nc
+            ld l, a
+            inc a
+            ld [s16_n], a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            ld a, l
+            add a, low(s16_in)
+            ld l, a
+            ld a, h
+            adc a, high(s16_in)
+            ld h, a
+            ld a, c
+            ld [hl+], a
+            ld a, b
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            ld [hl], e
+            ret
 
 ; ---- 33/AF6F the spell's graphics properties (2E/91D0 + 3 spell) -> $7E8B-$7E8D
 mx_props:   ld a, [W7 + $7E88]
