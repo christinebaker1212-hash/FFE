@@ -1699,7 +1699,9 @@ pro_show:   ld a, TR_MINIMAP
             call .c3
             ld hl, pr_rgb
             call .c1
+            call pr_first                   ; (the first page from power-on: white first)
             call scr_show
+            call pr_first2
             xor a
             ld [pr_i], a
 .ln:        call pr_lptr                    ; (an empty line: nothing to fade)
@@ -1850,6 +1852,19 @@ pro_show:   ld a, TR_MINIMAP
             call bcpd_w
             pop hl
             ret
+
+; the first page on the Color fades in from the boot logo's white (bank 104: btl6.s)
+pr_first:   ld hl, pr_wwhite
+            jr pr_fcall
+pr_first2:  ld hl, pr_wfade
+pr_fcall:   ld a, [st_pg]
+            and a
+            ret nz
+            ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, BTL6_BANK
+            jp bank_call
 
 ; DMG: the raster list off, BGP as normal
 pr_lyoff:   ldh a, [is_cgb]

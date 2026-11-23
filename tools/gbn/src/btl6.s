@@ -350,3 +350,121 @@ fl_fiend6:  ldh a, [is_cgb]
 ; ---- the CGB palettes for the additions (the end of bt_pal; OCPS at OBJ palette 5): OBJ 5 the
 ; hit label (gold ink, black outline), BG 6 / 7 the flash (white silhouette / black one with a
 ; white outline)
+
+section bank 104, $4800
+; ---- the prologue's first page faded in from white on the Color (owner, 2026-11-23: it showed
+; its solid blue at once after the boot logo's white). The Color shows the first screen after
+; power-on without the usual fade (fd_on_off), so the prologue fades its own palettes 2-4:
+; every colour from white (pr_cnt = 16) to its value (0), one step a frame.
+pr_wwhite:  ld a, 16                        ; (LCD off: before scr_show)
+            ld [pr_cnt], a
+            jr pr_wset
+pr_wfade:   ld a, 15
+.k:         ld [pr_cnt], a
+            call fd_vbl
+            call pr_wset
+            ld a, [pr_cnt]
+            dec a
+            cp $FF
+            jr nz, .k
+            ret
+; palettes 2 (blue x 3, white), 3 and 4 (blue x 4), each mixed toward white by pr_cnt / 16
+pr_wset:    ld hl, pr_rgb + 8
+            call pr_mix
+            push bc
+            ld hl, pr_rgb
+            call pr_mix
+            ld a, $80 | 16
+            ldh [rBCPS], a
+            ld e, 3
+            call .wr
+            pop hl
+            ld a, l
+            ldh [rBCPD], a
+            ld a, h
+            ldh [rBCPD], a
+            ld e, 8
+.wr:        ld a, c
+            ldh [rBCPD], a
+            ld a, b
+            ldh [rBCPD], a
+            dec e
+            jr nz, .wr
+            ret
+; RGB555 at HL mixed toward white by pr_cnt / 16 -> BC
+pr_mix:     ld a, [hl+]
+            ld c, a
+            ld b, [hl]
+            ld a, c                         ; R
+            and $1F
+            call .ch
+            ld [pr_cc], a
+            ld a, c                         ; G
+            rlca
+            rlca
+            rlca
+            and 7
+            ld d, a
+            ld a, b
+            and 3
+            add a, a
+            add a, a
+            add a, a
+            or d
+            call .ch
+            ld [pr_cc + 1], a
+            ld a, b                         ; B
+            rrca
+            rrca
+            and $1F
+            call .ch
+            ld [pr_cc + 2], a
+            ld a, [pr_cc + 1]               ; R | G << 5 | B << 10
+            ld d, a
+            rrca
+            rrca
+            rrca
+            and $E0
+            ld e, a
+            ld a, [pr_cc]
+            or e
+            ld c, a
+            ld a, d
+            srl a
+            srl a
+            srl a
+            ld d, a
+            ld a, [pr_cc + 2]
+            add a, a
+            add a, a
+            or d
+            ld b, a
+            ret
+.ch:        push bc                         ; A = t -> t + (31 - t) x pr_cnt / 16
+            ld e, a
+            ld a, 31
+            sub e
+            ld d, a
+            ld a, [pr_cnt]
+            ld b, a
+            ld hl, 0
+            and a
+            jr z, .z
+.m:         ld a, l
+            add a, d
+            ld l, a
+            jr nc, .n
+            inc h
+.n:         dec b
+            jr nz, .m
+.z:         ld a, l
+            swap a
+            and $0F
+            ld l, a
+            ld a, h
+            swap a
+            and $F0
+            or l
+            add a, e
+            pop bc
+            ret
