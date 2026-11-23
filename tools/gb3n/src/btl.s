@@ -37,6 +37,7 @@ btl_main:   call btl_flash
             xor a
             ld [W7 + $7ED8], a
             call btl_init
+            call init_cm                    ; (34/9CE3 init characters / monsters)
             call oam_hide                   ; (2E/9F8D clear oam data)
             call bg_init
             call btl_screen
@@ -125,7 +126,7 @@ btl_flash:  ld a, $95
 ; 3A/8533: the battle bg and flags of the map (39/BC00 + map; 39/BD00 off world 0)
 btl_bg:     ld a, [cur_map]
             ld l, a
-            ld h, $7C - $40                 ; (JOB_BANK holds FF3 bank $39 at $4000)
+            ld h, $5C                       ; (JOB_BANK: FF3 bank $39, NES $A000, at $4000)
             ld a, [cur_grp]
             and a
             jr z, .w
@@ -191,13 +192,18 @@ btl_init:   ld a, [W7 + $7ED8]
 
 ; FFC27: the battle's random table ($7BE3, 256 bytes) from a seed (FF3: the sum of its zero page;
 ; here the field's random counters and the frame count stand in for it)
-rng_init:   ld a, [rnd_f5]
+rng_init:   ld a, [btl_seedf]               ; (test hook: btlcmp.py sets the NES's seed)
+            cp $A5
+            ld a, [btl_seedv]
+            jr z, .sd
+            ld a, [rnd_f5]
             ld b, a
             ld a, [rnd_f6]
             add a, b
             ld b, a
             ldh a, [rDIV]
             add a, b
+.sd:
             ld [BZ + $15], a
             ld [BZ + $16], a
             ld [BZ + $17], a

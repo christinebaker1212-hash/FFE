@@ -367,7 +367,9 @@ mon_attrs:  xor a
             ld b, [hl]
             ld a, [BZ + $8D]
             and $3F
+            push de
             call bmul8
+            pop de
             ld l, a
             ld h, b
             add hl, de                      ; (2E/8Fxx -> BD_8F00 + xx)

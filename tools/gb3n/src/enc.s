@@ -241,6 +241,8 @@ battle_go:  ld a, [act_id]
 section wram, $C3E8
 btl_id:     ds 1
 btl_n:      ds 1
+btl_seedf:  ds 1                            ; (test hook: $A5 = use btl_seedv as the seed)
+btl_seedv:  ds 1
 rnd_f7:     ds 1
 enc_v:      ds 1
 enc_r:      ds 1
