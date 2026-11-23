@@ -283,9 +283,10 @@ def engine_src(rom=None):
             codes.append('\n'.join(l for l in c.split('\n') if not l.startswith('section bank 0,')))
             rams.append(r)
     codes.append('section bank %d, $4000' % CODE5)
-    c, r = split(rd('cut'))
-    codes.append(c)
-    rams.append(r)
+    for m in ('cut', 'fx'):
+        c, r = split(rd(m))
+        codes.append(c)
+        rams.append(r)
     zp = ''.join('Z_%02X = $%04X\n' % (n, 0xFFB0 + n - 0x18) for n in range(0x18, 0x60))
     shadow = lambda t: t.replace('ld [MBC5_BANKL], a', 'ld [rom_bank], a\n            ld [MBC5_BANKL], a')
     return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + zp + shadow(main_code) + '\n' +

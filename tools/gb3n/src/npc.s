@@ -310,6 +310,36 @@ npc_frame:  ld hl, fcnt
             ld l, a
             jr .h
 
+; 3B/AF7F the people's sprites without movement (event effects)
+npc_drawall: ld a, [npc_oam0]
+            and a
+            jr nz, .o
+            ld a, 16
+.o:         ld [oam_p], a
+            ld l, 0
+.s:         ld h, high(N_OBJ)
+            ld a, [hl]
+            and a
+            jr z, .n
+            push hl
+            call npc_upd.draw
+            pop hl
+.n:         ld a, l
+            add a, 16
+            ld l, a
+            cp $C0
+            jr nz, .s
+            ld a, [oam_p]
+            ld l, a
+            ld h, high(oam_buf)
+.h:         ld a, l
+            cp 160
+            ret nc
+            ld [hl], 0
+            add a, 4
+            ld l, a
+            jr .h
+
 npc_one:    ld h, high(N_OBJ)
             ld a, [hl]
             and a

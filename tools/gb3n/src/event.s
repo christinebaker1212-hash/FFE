@@ -722,7 +722,40 @@ ev_pl_cmd:  and $0F
 .face:      db 1, 2, 4, 8
 
 ; $D0-$E3 (3B/B555): restores and passage tiles now, the rest later
-ev_misc:    cp $D4
+ev_misc:    ld hl, .fx                      ; D0-D3, DA, E0-E2: the field effects (fx.s)
+            ld b, a
+.f:         ld a, [hl+]
+            and a
+            jr z, .nf
+            cp b
+            jr z, .go
+            inc hl
+            inc hl
+            jr .f
+.go:        ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, CODE5
+            jp far_call
+.fx:        db $D0
+            dw fx_shake
+            db $D1
+            dw fx_flashs
+            db $D2
+            dw fx_dark
+            db $D3
+            dw fx_light
+            db $DA
+            dw fx_dance
+            db $E0
+            dw fx_pal0
+            db $E1
+            dw fx_pal1
+            db $E2
+            dw fx_flash
+            db 0
+.nf:        ld a, b
+            cp $D4
             jr z, ev_hp
             cp $D5
             jr z, ev_mp

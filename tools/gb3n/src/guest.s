@@ -363,10 +363,12 @@ g_gfx:      ld a, [GUEST]
             ld b, 16
             ld a, 1
             call vcopyx
-            ldh a, [is_world]
+g_pal:      ldh a, [is_world]
             and a
             ret z
             ld a, [GUEST]
+            and a
+            ret z
             dec a
             and $0F
             add a, a

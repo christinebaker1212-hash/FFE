@@ -221,8 +221,17 @@ main:       call wait_vbl
             ld a, 1
             call dlg_show
             jr main
-.na:        ld a, [tst_choc]                ;   (test hook: $A5 opens the fat chocobo)
-            cp $A5
+.na:        ld a, [tst_choc]                ;   (test hooks: $A5 opens the fat chocobo, $D0-$E3
+            cp $D0                          ;     runs that event command)
+            jr c, .na1
+            ld b, a
+            xor a
+            ld [tst_choc], a
+            ld a, b
+            ld [ev_cmd], a
+            call ev_misc
+            jp main
+.na1:       cp $A5
             jr nz, .nt
             xor a
             ld [tst_choc], a
@@ -531,26 +540,7 @@ load_map:   ld a, [lcd_is]
             ld [ppx], a
             ld a, [py]
             ld [ppy], a
-            ld hl, pal_sh                   ; palettes: the 32 NES colours through NES_RGB ->
-            ld de, 128                      ;   the shadow (BG 0-31, OBJ 64-95; uploaded in
-            call memclr                     ;   V-Blank, or now)
-            ld hl, M_ENT + 16
-            ld bc, pal_sh
-.pc:        push bc
-            call nes_col
-            pop bc
-            ld [bc], a
-            inc bc
-            ld a, d
-            ld [bc], a
-            inc bc
-            ld a, c
-            cp low(pal_sh + 32)
-            jr nz, .p1
-            ld bc, pal_sh + 64
-.p1:        cp low(pal_sh + 96)
-            jr nz, .pc
-            call char_pal
+            call map_pals
             call g_init                     ; (3D/B627: the guest at the party's tile)
             call g_gfx
             xor a
@@ -575,6 +565,29 @@ load_map:   ld a, [lcd_is]
             call wait_vbl
             call map_song
             jp map_enter
+
+; the map's palettes: the 32 NES colours (M_ENT + 16) through NES_RGB -> the shadow (BG 0-31,
+; OBJ 64-95; uploaded in V-Blank, or now), the walking character's colours
+map_pals:   ld hl, pal_sh
+            ld de, 128
+            call memclr
+            ld hl, M_ENT + 16
+            ld bc, pal_sh
+.pc:        push bc
+            call nes_col
+            pop bc
+            ld [bc], a
+            inc bc
+            ld a, d
+            ld [bc], a
+            inc bc
+            ld a, c
+            cp low(pal_sh + 32)
+            jr nz, .p1
+            ld bc, pal_sh + 64
+.p1:        cp low(pal_sh + 96)
+            jr nz, .pc
+            jp char_pal
 
 ; the map's song (fix:E8CE): map property byte 10; bit 7: the song from conditional trigger
 ; script $38 + n (2C/8870, 3C/9319), as event command $F8; a world map's from snd_world

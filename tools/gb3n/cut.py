@@ -179,7 +179,8 @@ def pack2(rom):
         d[0x1300 + 2 * i] = (0x4000 + a) & 0xFF; d[0x1301 + 2 * i] = (0x4000 + a) >> 8
         d[a:a + len(st)] = st
         a += len(st)
-    assert a <= 0x4000
+    assert a <= 0x3F00
+    d[0x3F00:0x3FFC] = rom.b(0x3B, 0xADB1, 0xFC)                # $7F00: 3B/ADB1 the people's dance
     return d
 
 
