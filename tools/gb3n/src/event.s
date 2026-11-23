@@ -521,7 +521,7 @@ ev_step:    ld a, [ev_rep]
             jp hl
 ev_tab:     dw ev_none, ev_none, ev_none, ev_take    ; E4-E7
             dw ev_stclr, ev_stset, ev_gil, ev_tgil   ; E8-EB
-            dw ev_gcp, ev_tcp, ev_guest, ev_none     ; EC-EF (animations: later)
+            dw ev_gcp, ev_tcp, ev_guest, ev_spec     ; EC-EF
             dw ev_ndlg, ev_edlg, ev_esw1, ev_esw0    ; F0-F3
             dw ev_nsw1, ev_nsw0, ev_give, ev_btl     ; F4-F7
             dw ev_f8, ev_xexit, ev_xent, ev_xmap     ; F8-FB
@@ -573,6 +573,47 @@ ev_tcp:     ld a, [ev_par]
             ld c, 3
             jp dlg_show
 ; $EE set guest npc ($600B; its sprite: later)
+ev_spec:    ld a, CODE5                     ; $EF special animation (fx.s)
+            ld hl, fx_special
+            jp far_call
+; 3B/A9BA / 3A/901F metatile C <- metatile B (its four tiles, palette, properties)
+mt_copy:    ld h, high(M_TL)
+            ld d, h
+            ld l, b
+            ld e, c
+            ld b, 7
+.c:         ld a, [hl]
+            ld [de], a
+            inc h
+            inc d
+            dec b
+            jr nz, .c
+            ret
+; 3A/8FD8 world 3 loaded: the statues destroyed ($602E bits 1-4: metatiles $40-$43 <- 0) and
+; Saronia's gate ($602E bit 5: $4A <- 3)
+w3_fix:     ld a, [cur_world]
+            cp 3
+            ret nz
+            ld a, [GS + $2E]
+            ld [ev_tmp], a
+            ld bc, $0040
+.s:         ld a, [ev_tmp]
+            srl a
+            ld [ev_tmp], a
+            bit 0, a
+            jr z, .n
+            push bc
+            call mt_copy
+            pop bc
+.n:         inc c
+            ld a, c
+            cp $44
+            jr nz, .s
+            ld a, [GS + $2E]
+            bit 5, a
+            ret z
+            ld bc, $034A
+            jp mt_copy
 ev_guest:   ld a, [ev_par]                  ; $EE set the guest (3B/B6A5: init, its graphics)
             ld [GS + $0B], a
             and a

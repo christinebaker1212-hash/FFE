@@ -498,6 +498,7 @@ load_map:   ld a, [lcd_is]
             ld a, 54
             ld [py], a
 .wp:        call .tset
+            call w3_fix                     ; (3A/8FD8: world 3's statues and gate)
             call load_npcs
             jp .gfx
 .tset:      ld a, [M_ENT + 12]              ; tileset tables -> M_TL..M_P2 (bank e[12])
@@ -1330,7 +1331,7 @@ make_oam:   ld a, [pl_hide]                 ; (C9: the party hidden)
             ret
 .vis:       call veh_oam
             ret nz
-            ld a, [facing]
+            call spin_face                  ; (3E/D8F7: spinning)
             ld l, a
             ld h, high(M_FACE)
             ld a, [hl]                      ; (M_FACE: $5D00 + facing)

@@ -320,6 +320,32 @@ g_draw:     ld a, 16
 .z:         ld a, b
             ret
 
+; 3E/D8F7 the walker's facing as drawn: while $602F bit 6 is set it spins (a quarter turn every
+; 8 frames, 3E/DD02), the bit cleared after 64 frames
+spin_face:  ld a, [GS + $2F]
+            bit 6, a
+            jr z, .n
+            ld a, [spin_c]
+            add a, 4
+            ld [spin_c], a
+            jr nc, .s
+            ld hl, GS + $2F
+            res 6, [hl]
+.s:         ld a, [fcnt]
+            rrca
+            rrca
+            rrca
+            and 3
+            ld e, a
+            ld d, 0
+            ld hl, .t
+            add hl, de
+            ld a, [hl]
+            ret
+.n:         ld a, [facing]
+            ret
+.t:         db 1, 4, 2, 8
+
 ; 3B/BA5D the guest's graphics (16 tiles -> VRAM bank 1 $8100) and, on world maps, its colours
 ; (00/96F8 + 2 (guest - 1) -> OBJ palette 2 colours 2-3, colour 1 black)
 g_gfx:      ld a, [GUEST]
@@ -450,6 +476,7 @@ g_wait:     ds 1
 pl_hide:    ds 1
 npc_oam0:   ds 1
 tk_b:       ds 1
+spin_c:     ds 1
 section wram, $C394
 g_q:        ds 4
 g_c1:       ds 1                ; (colour 1)

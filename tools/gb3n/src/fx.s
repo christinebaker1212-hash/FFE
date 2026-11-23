@@ -352,6 +352,149 @@ fx_dance:   xor a
             call wait_vbl
             jr .f
 
+; $EF special animations (3B/A4FA): the game-state effects (vehicles, $602E statue / gate flags
+; with their metatile copies, $602F bit 6 the spinning walker) after each animation
+fx_special: ld a, [ev_par]
+            and $0F
+            add a, a
+            ld l, a
+            ld h, 0
+            ld de, .t
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            jp hl
+.t:         dw sp_0, sp_1, sp_2, sp_3, sp_4, sp_5, sp_6, sp_7
+            dw sp_8, sp_9, sp_a, sp_b, sp_c, sp_d, sp_e, sp_f
+; 0 (3B/A8A9): the Enterprise lands: on it, facing left, the ship on world 0
+sp_0:       call spa_0
+            ld a, 2
+            ld [facing], a
+            ld a, 5
+            ld [GS + $0F], a
+            ld a, 1
+            ld [GS + $00], a
+            xor a
+            ld [GS + $03], a
+            ret
+; 1 (3A/9AB8): the airship / boulder explodes: off it, its flag cleared, the walker spins, the
+; vehicle at (80, 80) shown
+sp_1:       call g_init
+            call spa_1
+            xor a
+            ld [GS + $0F], a
+            ld hl, GS + $20
+            res 0, [hl]
+            call sp_spin
+            ld a, $50
+            ld [GS + $01], a
+            ld [GS + $02], a
+            ld a, 1
+            ld [GS + $00], a
+            ret
+; 2 / 3 (3B/A609, A631), then 3B/A5BE (128 frames, the walker spinning)
+sp_2:       call spa_2
+            jr sp_5be
+sp_3:       call spa_3
+sp_5be:     call sp_spin
+            jp spa_5be
+; 4 (3B/A3EA, 3A/9A7B): Saronia's cannon balls, the airship shot down: off it, hidden, at (83, 71)
+; on world 3
+sp_4:       call spa_4
+            xor a
+            ld [GS + $0F], a
+            ld [GS + $00], a
+            ld a, $53
+            ld [GS + $01], a
+            ld a, $47
+            ld [GS + $02], a
+            ld a, 3
+            ld [GS + $03], a
+            ret
+; 5-8 (3B/A806): a statue destroyed: $602E bit 1-4, metatile $40-$43 <- 0 (3B/A9BA)
+sp_5:       ld b, 0
+            jr sp_st
+sp_6:       ld b, 1
+            jr sp_st
+sp_7:       ld b, 2
+            jr sp_st
+sp_8:       ld b, 3
+sp_st:      push bc
+            call spa_st
+            pop bc
+            ld a, b
+            add a, $40
+            ld c, a
+            ld a, 2
+.sh:        dec b
+            bit 7, b
+            jr nz, .s1
+            add a, a
+            jr .sh
+.s1:        ld hl, GS + $2E
+            or [hl]
+            ld [hl], a
+            ld b, 0
+            jr sp_mt
+; E: the Saronia gate opened: $602E bit 5, metatile $4A <- 3
+sp_e:       ld hl, GS + $2E
+            set 5, [hl]
+            ld bc, $034A
+sp_mt:      call mt_copy
+            jp draw_view
+; 9 (3B/A66A): the Invincible rises from the sea: aboard, facing left, it shown
+sp_9:       call spa_9
+            ld a, 2
+            ld [facing], a
+            ld a, 7
+            ld [GS + $0F], a
+            ld a, 1
+            ld [GS + $04], a
+            ret
+sp_a:       jp spa_a
+sp_b:       jp spa_b
+; C (3B/A264): Bahamut attacks, the walker spins
+sp_c:       call spa_c
+            jp sp_spin
+sp_d:       jp spa_d
+sp_f:       ret
+; $602F bit 6: the walker spins (3E/D8F7, cleared by itself 64 frames later)
+sp_spin:    ld hl, GS + $2F
+            set 6, [hl]
+            xor a
+            ld [spin_c], a
+            ret
+
+; the animations (for now: FF3's lengths in frames, the picture still)
+spa_0:      ld b, 64
+            jr spa_w
+spa_1:
+spa_4:
+spa_st:
+spa_5be:    ld b, 128
+            jr spa_w
+spa_2:      ld b, 243
+            call spa_w
+            ret
+spa_3:      ld b, 111
+            jr spa_w
+spa_9:      ld b, 64
+            call spa_w
+            ld b, 0
+            jr spa_w
+spa_a:
+spa_b:
+spa_c:
+spa_d:      ld b, 128
+spa_w:      push bc
+            call npc_drawall
+            call wait_vbl
+            pop bc
+            dec b
+            jr nz, spa_w
+            ret
+
 section wram, $CC00
 fx_ssx:      ds 1
 fx_tt:       ds 3
