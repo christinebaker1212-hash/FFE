@@ -321,6 +321,8 @@ ba_cgfx:    ld a, [BZ + $95]
 ba_tiles:   ld a, CHGFX_BANK
             ld de, $8000 + 16 * BA_TIL
 ba_tiles2:  ld [vc_src], a
+            ld a, 1                         ; (the numerals' tiles to be loaded again: sc_num)
+            ld [ba_dirty], a
             push bc
             ld a, 1
             call vcopyx
@@ -1317,3 +1319,4 @@ ba_p:       ds 1
 ba_pal:     ds 1
 ba_mode:    ds 1
 ba_t:       ds 4
+ba_dirty:   ds 1

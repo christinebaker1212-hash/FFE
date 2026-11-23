@@ -423,7 +423,19 @@ sc_anim:    jp ba_show
 
 ; $0C: the damage numerals ($7E4F: monsters 2 x slot, members $7E5F + 2 x id; $FFFF none,
 ; hi bit 6 miss, bit 7 restored): up to 4 targets at a time, 40 frames each
-sc_num:     ld a, $17
+sc_num:     ld a, [ba_dirty]                ; (an animation used their tiles: loaded again)
+            and a
+            jr z, .t0
+            xor a
+            ld [ba_dirty], a
+            ld a, BDATA_BANK
+            ld [vc_src], a
+            ld hl, $7000
+            ld de, $8000 + 16 * NUM_T
+            ld b, 13
+            ld a, 1
+            call vcopyx
+.t0:        ld a, $17
             ld [W7 + $7EC2], a
             xor a
             ld [btl_k], a                   ; target 0-11
