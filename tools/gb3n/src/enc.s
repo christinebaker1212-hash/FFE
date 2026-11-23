@@ -233,9 +233,12 @@ battle_go:  ld a, [act_id]
             call far_call
             ld a, 1
             ldh [rSVBK], a
-            ld a, [btl_res]                 ; defeated: back to the start (fix:C049)
-            bit 7, a
-            jp nz, start
+            ld a, [btl_res]                 ; defeated: back to the start (fix:C049; A = $11 as
+            bit 7, a                        ;   the soft reset: start checks for a Color by A)
+            jr z, .won
+            ld a, $11
+            jp start
+.won:
             ld a, $FF                       ; (no map title after a battle)
             ld [m_title], a
             ld [m_title2], a
