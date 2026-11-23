@@ -685,8 +685,24 @@ ev_npc_cmd: ld a, [ev_cmd]
             set 6, [hl]
             ret
 .sd:        cp $0D
-            ret nz                          ; (A / B jumps, E / F circles: later)
-            inc l                           ; D: off (and $B0)
+            jr z, .sd1
+            ld b, a                         ; A / B jumps, E circle, F spin (fx.s)
+            ld a, l
+            ld [fx_slot], a
+            ld a, b
+            ld hl, fx_jumpl
+            cp $0A
+            jr z, .fx
+            ld hl, fx_jumpr
+            cp $0B
+            jr z, .fx
+            ld hl, fx_circle
+            cp $0E
+            jr z, .fx
+            ld hl, fx_spin
+.fx:        ld a, CODE5
+            jp far_call
+.sd1:       inc l                           ; D: off (and $B0)
             ld a, [hl]
             and $B0
             ld [hl], a

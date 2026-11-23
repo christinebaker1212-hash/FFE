@@ -495,7 +495,187 @@ spa_w:      push bc
             jr nz, spa_w
             ret
 
+; ---- people's moves (3B/AB71, AC25, AC68): object fx_slot; drawn without moving, a frame each
+; $xA / $xB a jump left / right over one tile (48 frames, heights 3B/AC0C)
+fx_jumpl:   ld a, 1
+            jr fx_jump
+fx_jumpr:   xor a
+fx_jump:    ld [fx_75], a
+            xor a
+            ld [fx_74], a
+            ld a, [fx_slot]
+            ld l, a
+            ld h, high(N_OBJ)
+            ld a, l
+            add a, 5
+            ld l, a
+            dec [hl]                        ; y - 1, y sub-tile $0F
+            inc l
+            inc l
+            ld [hl], $0F
+.f:         ld a, [fx_slot]
+            ld l, a
+            ld h, high(N_OBJ)
+            ld a, [fx_75]
+            and a
+            ld a, l
+            add a, 6
+            ld l, a
+            ld a, [hl]
+            jr nz, .left
+            inc a                           ; right
+            and $0F
+            ld [hl], a
+            jr nz, .y
+            dec l
+            dec l
+            inc [hl]
+            inc l
+            inc l
+            jr .y
+.left:      sub 1
+            push af
+            and $0F
+            ld [hl], a
+            pop af
+            jr nc, .y
+            dec l
+            dec l
+            dec [hl]
+            inc l
+            inc l
+.y:         inc l                           ; +7: 3B/AC0C (mirrored after the middle) xor $0F
+            push hl
+            ld a, [fx_74]
+            cp $18
+            jr c, .y1
+            ld b, a
+            ld a, $2F
+            sub b
+.y1:        ld e, a
+            ld d, 0
+            ld hl, FX3B_DANCE - $100
+            add hl, de
+            ld a, CUTD2
+            call rd_byte
+            xor $0F
+            pop hl
+            ld [hl], a
+            ld hl, fx_74
+            inc [hl]
+            call npc_drawall                ; 3B/ABB1
+            call wait_vbl
+            ld a, [fx_74]
+            cp $30
+            jr c, .f
+            ld a, [fx_slot]                 ; sub-tiles 0, y + 1, destination x = x
+            ld l, a
+            ld h, high(N_OBJ)
+            ld a, l
+            add a, 6
+            ld l, a
+            xor a
+            ld [hl+], a
+            ld [hl], a
+            ld a, l
+            sub 2
+            ld l, a
+            inc [hl]
+            dec l
+            ld a, [hl]
+            dec l
+            dec l
+            ld [hl], a
+            ret
+; $xF a spin: a quarter turn every 8 frames, twice round (3B/AC64)
+fx_spin:    xor a
+            ld [fx_74], a
+.f:         ld hl, fcnt
+            inc [hl]
+            ld a, [hl]
+            and 7
+            cp 7
+            ld a, 0
+            ld hl, fx_74
+            adc a, [hl]
+            ld [hl], a
+            cp 8
+            ret nc
+            and 3
+            add a, low(FX3B_DANCE - $E8)
+            ld l, a
+            ld h, high(FX3B_DANCE - $E8)
+            ld a, CUTD2
+            call rd_byte
+            add a, a
+            add a, a
+            add a, a
+            ld b, a
+            ld a, [fx_slot]
+            add a, $0E
+            ld l, a
+            ld h, high(N_OBJ)
+            ld [hl], b
+            call npc_drawall
+            call wait_vbl
+            jr .f
+; $xE a circle (the dance's first $32 steps, a step every other frame)
+fx_circle:  xor a
+            ld [fx_74], a
+.f:         ld hl, fcnt
+            inc [hl]
+            ld a, [hl]
+            rrca
+            ld a, 0
+            ld hl, fx_74
+            adc a, [hl]
+            ld [hl], a
+            cp $32
+            jr nc, .end
+            ld e, a
+            ld d, 0
+            ld hl, FX3B_DANCE
+            add hl, de
+            ld a, FX3B_BANK
+            call rd_byte
+            ld [fx_tt], a
+            ld hl, FX3B_DANCE + $54
+            add hl, de
+            ld a, FX3B_BANK
+            call rd_byte
+            ld [fx_tt + 1], a
+            ld hl, FX3B_DANCE + $A8
+            add hl, de
+            ld a, FX3B_BANK
+            call rd_byte
+            swap a
+            ld b, a
+            ld a, [fx_slot]
+            add a, 6
+            ld l, a
+            ld h, high(N_OBJ)
+            ld a, [fx_tt]
+            ld [hl+], a
+            ld a, [fx_tt + 1]
+            ld [hl], a
+            ld a, l
+            add a, 7
+            ld l, a
+            ld [hl], b
+            call npc_drawall
+            call wait_vbl
+            jr .f
+.end:       ld a, [fx_slot]
+            add a, 6
+            ld l, a
+            ld h, high(N_OBJ)
+            xor a
+            ld [hl+], a
+            ld [hl], a
+            ret
+
 section wram, $CC00
+fx_slot:    ds 1
 fx_ssx:      ds 1
 fx_tt:       ds 3
 fx_wok:     ds 1

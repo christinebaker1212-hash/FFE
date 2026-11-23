@@ -179,8 +179,10 @@ def pack2(rom):
         d[0x1300 + 2 * i] = (0x4000 + a) & 0xFF; d[0x1301 + 2 * i] = (0x4000 + a) >> 8
         d[a:a + len(st)] = st
         a += len(st)
-    assert a <= 0x3F00
+    assert a <= 0x3E00
     d[0x3F00:0x3FFC] = rom.b(0x3B, 0xADB1, 0xFC)                # $7F00: 3B/ADB1 the people's dance
+    d[0x3E00:0x3E18] = rom.b(0x3B, 0xAC0C, 0x18)                # $7E00: 3B/AC0C a jump's heights
+    d[0x3E18:0x3E1C] = rom.b(0x3B, 0xAC64, 4)                   # $7E18: 3B/AC64 a spin's facings
     return d
 
 
