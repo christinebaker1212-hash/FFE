@@ -424,7 +424,10 @@ get_actions:
             and 1
             jr nz, .skip                    ; (jumping)
             call cmd_win
-            ld a, [BZ + $5F]                ; command, target cleared; item flag off
+            call atk_mem                    ; (34/98EE: the item flag off, a picked item back)
+            res 3, [hl]
+            call ret_item
+            ld a, [BZ + $5F]                ; command, target cleared
             add a, $2E
             ld c, a
             ld a, $5B
@@ -433,9 +436,11 @@ get_actions:
             ld [hl+], a
             ld [hl+], a
             ld [hl], a
-            call cmd_input                  ; -> A = 0 back, 1 chosen
+            call cmd_input                  ; -> A = 0 back, 1 chosen, 2 again from $52
             and a
             jr z, .back
+            cp 2
+            jp z, .next
 .skip:      ld hl, BZ + $52
             inc [hl]
             jr .next
@@ -577,6 +582,8 @@ cmd_input:  xor a
             jr z, .act
             cp $12
             jr z, .act
+            cp $14
+            jp z, bitem_menu
             ld a, $86                       ; (the other commands: not yet)
             ld [S49], a
             ld a, $FF
@@ -589,9 +596,17 @@ cmd_input:  xor a
             ret
 .fight:     ld a, 4                         ; 35/A848 do command: the targets
 .tcmd:      ld [BZ + $54], a
-            call target_mon
+            call .tc
+            push af
+            xor a                           ; (35/A86C: $54 cleared)
+            ld [BZ + $54], a
+            pop af
             and a
             jp z, .l
+            ret
+.tc:        call target_mon
+            and a
+            ret z
             ld a, [BZ + $5F]
             add a, $2F
             ld c, a
@@ -697,6 +712,13 @@ b_setcmd:   ld b, a
             call zpy
             ld [hl], b
             ret
+
+; HL = member $52's +$2C
+atk_mem:    call chr_ofs
+            add a, $2C
+            ld c, a
+            ld a, $5B
+            jp zpy
 
 ; ---- graphics $10 / 32/9A1C choose targets, FF3's cursor: monsters on a 2 x 4 grid by tilemap id
 ; (32/9EAD: $AF column, $B0 row), $B1 the mode (0 one monster, 1 all, 2 / 3 a monster type,

@@ -228,12 +228,13 @@ mon_row:    ld a, c
 .no:        and a
             ret
 
-; 34/8374 update inventory and run flag ($74: run / escape chosen); (the used items
-; returned: with the Item command)
+; 34/8374 update inventory and run flag: the items picked returned to the inventory (31/A65E
+; takes them when used), $74 = run / escape chosen
 inv_run:    xor a
             ld [BZ + $52], a
             ld [BZ + $74], a
-.m:         call chr_ofs
+.m:         call ret_item
+            call chr_ofs
             add a, $2E
             ld c, a
             ld a, $5B
@@ -459,4 +460,41 @@ psn_one:    ld a, l
             and $FE
             ld [hl], a
             pop hl
+            ret
+
+; 34/9AE7 return member $52's used item (+$3F) to the inventory (not one from a hand, +$3E)
+ret_item:   call chr_ofs
+            add a, $3F
+            ld c, a
+            ld a, $5B
+            call zpy
+            ld a, [hl]
+            and a
+            ret z
+            ld [BZ + $18], a
+            ld b, a
+            ld [hl], 0
+            dec hl
+            ld a, [hl]
+            ld [hl], 0
+            and a
+            ret nz
+            ld hl, GS + $C0
+            ld c, $20
+.f:         ld a, [hl+]
+            cp b
+            jr z, .inc
+            inc hl
+            dec c
+            jr nz, .f
+            ld hl, GS + $C0
+.e:         ld a, [hl+]
+            and a
+            jr z, .new
+            inc hl
+            jr .e
+.new:       dec hl
+            ld [hl], b
+            inc hl
+.inc:       inc [hl]
             ret
