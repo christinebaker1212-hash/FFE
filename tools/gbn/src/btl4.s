@@ -431,7 +431,9 @@ bt_strike:  ld [bt_am], a
 .nx:        ld hl, bt_swn
             dec [hl]
             jr nz, .sw
-            jp bt_2f
+            call bt_2f
+            jp bt_obj_off                   ; (the weapon put away: the hit count shows next,
+                                            ;   and OAM 0-3 in front hid it)
 .pa:        ld a, [bt_am]                   ; A frame: arm forward, the weapon left of the member
             ld e, a
             ld d, 0

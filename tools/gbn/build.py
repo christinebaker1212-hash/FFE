@@ -23,6 +23,17 @@ def place(banks, bank, addr, blob):
 DIS = os.path.join(ROOT, 'build', 'ref', 'FF1Disassembly', 'Final Fantasy Disassembly')
 
 
+def domains_source(rom):
+    """FF1's encounter domains, all 128 (64 overworld, 64 standard maps: map + 64), 8 formations
+    each (lut_Domains, bank $0B $8000), in bank 104 $4C00 (the battle data bank kept 64 only, so
+    every dungeon read its formations from the encounter rates and glyphs after them)"""
+    d = rom.rd(0x0B, 0x8000, 128 * 8)
+    out = ['section bank 104, $4C00', 'B_DOMAINS:']
+    for i in range(0, len(d), 16):
+        out.append('            db ' + ', '.join('$%02X' % b for b in d[i:i + 16]))
+    return '\n'.join(out) + '\n'
+
+
 def weapon_slots(rom):
     """FF1's weapon and armour slot offsets (16 + 16), from the operands of FindEmptyWeaponSlot
     and FindEmptyArmorSlot in the fixed bank"""
@@ -246,7 +257,8 @@ def main():
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
            'section bank 104, $4000\n' +              # (the small font's glyphs: bank BTL6)
-           battle.vwf_source() + ui.status_words() + ui_strings() + ui.loc_source())
+           battle.vwf_source() + ui.status_words() + ui_strings() + ui.loc_source() +
+           domains_source(rom))
     import re                                    # (constants from every module first: the
     defs = [l for l in src.split('\n') if re.match(r'^[A-Za-z_]\w*\s+=', l)]   #   assembler
     rest = [l for l in src.split('\n') if not re.match(r'^[A-Za-z_]\w*\s+=', l)] #   needs them

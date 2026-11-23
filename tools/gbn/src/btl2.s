@@ -3059,15 +3059,11 @@ bt_banner:  ld a, [ban_on]                  ; (shown: off first, a frame, so the
             xor a
             ld [win_up], a
             ld a, [ban_bot]                 ; (at the top: cut below its rows; at the bottom:
-            and a                           ;   the window kept on to the frame's end)
+            and a                           ;   kept on to the frame's end, once in place)
             ld a, BN_LINES
-            ld b, LCDC_ON
             jr z, .lt
             ld a, BOX_LINES
-            ld b, LCDC_WIN
 .lt:        ldh [rLYC], a
-            ld a, b
-            ld [lcdc_on], a
             ld a, 1
             ld [bn_t], a
             ld [ban_on], a
@@ -3075,6 +3071,11 @@ bt_banner:  ld a, [ban_on]                  ; (shown: off first, a frame, so the
             ld a, [win_up]
             cp 8
             jr c, .f
+            ld a, [ban_bot]                 ; (the window on below line 64 only now: set
+            and a                           ;   while the rows went up, with WY still 0, the
+            ret z                           ;   window's whole map showed from line 64 down:
+            ld a, LCDC_WIN                  ;   a message window of garbage)
+            ld [lcdc_on], a
             ret
 bt_ban_off: ld a, [ban_on]
             and a

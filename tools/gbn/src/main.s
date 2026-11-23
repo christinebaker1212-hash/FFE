@@ -2746,7 +2746,7 @@ map_music:  ldh a, [maptype]
 
 ; ---- encounters and battles
 B_RATES    = $4A00          ; battle data bank: encounter rate per map (+1), domains, lut_RNG,
-B_DOMAINS  = $4800          ;   the formation weights
+                            ;   the formation weights (B_DOMAINS: bank BTL6, build.py)
 B_FRNG     = $7D00
 B_WEIGHT   = $7F00
 ; FF1 BattleStepRNG -> A
@@ -2789,6 +2789,10 @@ enc_form:   ld l, a
             ld h, high(B_WEIGHT)
             call far_byte
             pop hl
+            push af
+            ld a, BTL6_BANK                 ; (the domain byte: bank BTL6)
+            ld [fc_bank], a
+            pop af
             add a, l
             ld l, a
             ld a, h
