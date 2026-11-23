@@ -188,6 +188,44 @@ ba_walk:                                    ; (2F/AF30: all members to their $7D
             cp 4
             jr nz, .d
             ret
+; 2F/B469 the battle start: the living members from off the screen ($F0; a back attack $30) walk
+; to their rows (frame 2, toad / mini $0B)
+ba_walkin:  call ba_save
+            ld c, 0
+.m:         ld b, 0
+            ld hl, W7 + $7D9B
+            add hl, bc
+            add hl, bc
+            ld a, [hl]
+            ld d, a
+            and $C0
+            jr nz, .n
+            ld a, d
+            and 5
+            ld a, 2
+            jr z, .f
+            ld a, $0B
+.f:         ld hl, W7 + $7D83
+            add hl, bc
+            ld [hl], a
+            ld a, [W7 + $78C3]
+            cp $88
+            ld a, $F0
+            jr nz, .x
+            ld a, $30
+.x:         ld hl, BZ + $C0
+            add hl, bc
+            ld [hl], a
+.n:         inc c
+            ld a, c
+            cp 4
+            jr nz, .m
+            xor a
+            ld [W7 + $7D7D], a
+            ld [W7 + $7CF4], a
+            call ba_walk
+            call ba_rest
+            jp chr_draw
 ; 33/BD45 member C a step (2 pixels; toad / mini 2 / 1 with their hops), its walking frame
 ba_move1:   ld b, 0
             ld hl, W7 + $7D7F

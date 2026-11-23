@@ -45,6 +45,7 @@ btl_main:   call btl_flash
             ld [lcd_is], a
             ld a, LCDC_ON
             ldh [rLCDC], a
+            call ba_walkin                  ; (2F/B469)
             call ui_init
             call btl_loop
             call btl_end
