@@ -286,18 +286,41 @@ veh_land:   ld a, [px]
             ld a, [py]
             ld d, a
             call map_at
+            ld [veh_tile], a
+            ld l, a
             ld h, high(M_P1)
             ld a, [hl]
             ld [veh_p1], a
             ld a, [cur_world]
             cp 4
-            ret nc                          ; (underwater: the Nautilus surfacing, later)
-            ld a, low(VEH_LAND)
+            jr c, .l
+            ld a, [veh_p1]                  ; (3E/C786 underwater: surface where bit 1 is clear)
+            and 2
+            ret nz
+            ld a, $AD
+            ld [S49], a
+            ld a, 3
+            jp veh_world
+.l:         ld a, low(VEH_LAND)
             call veh_tab
             ld b, a
             ld a, [veh_p1]
             and b
-            ret nz                          ; (no landing here; the Nautilus diving: later)
+            jr z, .land
+            ld a, [cur_world]               ; (no landing; the surface world's deep sea, tile $1E:
+            cp 3                            ;   the Nautilus dives, $6020 bit 7)
+            ret nz
+            ld a, [veh_tile]
+            cp $1E
+            ret nz
+            ld a, [GS + $20]
+            bit 7, a
+            ret z
+            ld a, $A9
+            ld [S49], a
+            ld a, 4
+            jp veh_world
+.land:
             ld a, [px]
             ld [GS + $01], a
             ld a, [py]
