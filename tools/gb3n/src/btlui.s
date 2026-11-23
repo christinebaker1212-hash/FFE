@@ -584,6 +584,8 @@ cmd_input:  xor a
             jr z, .act
             cp $14
             jp z, bitem_menu
+            cp $15
+            jp z, bmagic_menu
             ld a, $86                       ; (the other commands: not yet)
             ld [S49], a
             ld a, $FF
