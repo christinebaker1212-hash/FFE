@@ -209,7 +209,7 @@ veh_a:      ld a, [VEH]
             cp 4
             ret c
             cp 7
-            ret z                           ; (the Invincible's jump: later)
+            jp z, veh_jump
             jp veh_land
 .choco:     xor a                           ; (the chocobo runs off)
             ld [VEH], a
@@ -527,6 +527,35 @@ veh_parked: ld hl, oam_buf + 4 * 36
             cp b
             ret
 
+; 3D/B66F the Invincible's jump: three tiles on if the tile there lets it land (properties
+; 1 & $30 clear), three steps the move makes regardless of the tiles between
+veh_jump:   ld a, [facing]
+            ld de, $0003                    ; (D = dy, E = dx)
+            bit 0, a
+            jr nz, .t
+            ld e, $FD
+            bit 1, a
+            jr nz, .t
+            ld de, $0300
+            bit 2, a
+            jr nz, .t
+            ld d, $FD
+.t:         ld a, [px]
+            add a, e
+            ld e, a
+            ld a, [py]
+            add a, d
+            ld d, a
+            call map_at
+            ld l, a
+            ld h, high(M_P1)
+            ld a, [hl]
+            and $30
+            ret nz
+            ld a, 3
+            ld [veh_jn], a
+            ret
+
 ; 3E/C282 B on the world map: aboard the Invincible, its inside (3E/C292)
 veh_b:      ld a, [VEH]
             cp 7
@@ -541,5 +570,6 @@ section wram, $C3F1
 tst_choc:   ds 1
 veh_p1:     ds 1
 veh_tile:   ds 1
+veh_jn:     ds 1
 veh_off8:   ds 1
 veh_buf:    ds 8

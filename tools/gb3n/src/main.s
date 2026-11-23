@@ -840,6 +840,9 @@ tr_sw:      push af                         ; (A = treasure id)
 move:       ld a, [moving]
             and a
             jr nz, .step
+            ld a, [veh_jn]                  ; (the Invincible's jump: its steps, fix:C20E)
+            and a
+            jp nz, .jump
             ld a, [mpad]
             ld b, a
             ld de, $0001                    ; D = dy, E = dx (two's complement)
@@ -967,6 +970,27 @@ move:       ld a, [moving]
             push de
             call enc_world
             pop de
+            jr .go2
+.jump:      dec a
+            ld [veh_jn], a
+            jr nz, .j1
+            ld a, $A8                       ; (landing: sound $26)
+            ld [$CC49], a                   ; (snd.s S49)
+.j1:        ld a, [facing]                  ; the step in the facing direction, no checks
+            ld de, $0001
+            bit 0, a
+            jr nz, .j2
+            ld e, $FF
+            bit 1, a
+            jr nz, .j2
+            ld de, $0100
+            bit 2, a
+            jr nz, .j2
+            ld d, $FF
+.j2:        ld a, e
+            ld [mdx], a
+            ld a, d
+            ld [mdy], a
             jr .go2
 .t0:        ld a, $40
             jr .ta
