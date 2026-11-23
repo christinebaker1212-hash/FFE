@@ -188,10 +188,11 @@ CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save', 'ti
 ITEMN_BANK0 = 85                        # condensed item names (shop.py): banks 85-87
 BDATA_BANK = 88                         # battle data (encounter tables, formations, monsters)
 CODE2 = 89                              # battle code
-CODE2_MODULES = ('btl', 'btlgfx', 'btlcore', 'btleq', 'btlai', 'btlmain')
+CODE2_MODULES = ('btl', 'btlgfx', 'btlcore', 'btleq', 'btlai', 'btlmain', 'btlui')
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
 CHGFX_BANK = 95                         # battle characters (NES banks $28 / $29) as GB tiles
 BDATA2_BANK = 96                        # FF3 bank $30 (monsters, stat sets, scripts, items) at $4000
+BTXT_BANK = 97                          # battle strings ($0400-$07FF): index + strings, banks 97-
 CODE1 = 80
 
 
@@ -281,6 +282,7 @@ def main():
     bd[0x220C:0x2210] = rom.b(0x2F, 0xA2D0, 4)                 # $620C: 2F/A2D0 first tiles
     bd[0x2220:0x2234] = rom.b(0x2F, 0xB516, 20)                # $6220: 2F/B516 row x, start x / y
     bd[0x2800:0x2F00] = rom.b(0x32, 0x9100, 0x700)             # $6800: 32/9100- sprite frames
+    bd[0x2240:0x2298] = rom.b(0x34, 0x9B21, 88)                # $6240: 34/9B21 commands by job
     for k, a in enumerate((0x9100, 0x9200, 0x9300)):           # $6400: general use palettes
         bd[0x2400 + 0x100 * k:0x2500 + 0x100 * k] = rom.b(0, a, 0x100)
     banks[BDATA_BANK] = bd
@@ -288,6 +290,9 @@ def main():
         src = rom.prg[pair * 0x4000:pair * 0x4000 + 0x4000]
         banks[MGFX_BANK0 + k] = bytearray(b''.join(nes2gb(src[16 * t:16 * t + 16]) for t in range(1024)))
     banks[BDATA2_BANK] = bytearray(rom.b(0x30, 0x8000, 0x2000) + bytes(0x2000))
+    bt = text.pack_battle(rom, BTXT_BANK)
+    assert max(bt) < 100, max(bt)
+    banks.update(bt)
     src = rom.prg[0x14 * 0x4000:0x15 * 0x4000]                 # characters (NES banks $28 / $29)
     banks[CHGFX_BANK] = bytearray(b''.join(nes2gb(src[16 * t:16 * t + 16]) for t in range(1024)))
     import shop
@@ -323,7 +328,7 @@ def main():
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
-                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0, 'CHGFX_BANK': CHGFX_BANK, 'BDATA2_BANK': BDATA2_BANK,
+                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0, 'CHGFX_BANK': CHGFX_BANK, 'BDATA2_BANK': BDATA2_BANK, 'BTXT_BANK': BTXT_BANK,
                        'TEST_SONG': int(opt['--song'], 0) if opt['--song'] else 255,
                        'SND_MASK': int(os.environ.get('GB_SND_MASK', 'FF'), 16),     # (test builds: NR51)
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,

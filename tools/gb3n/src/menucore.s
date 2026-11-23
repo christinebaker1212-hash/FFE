@@ -37,6 +37,10 @@ m_put2:     push hl
 menu_vbl:   ld a, [m_dirty]
             and a
             ret z
+            ldh a, [rSVBK]                  ; (the canvas is WRAM bank 2: the battle runs with 3)
+            push af
+            ld a, 2
+            ldh [rSVBK], a
             ld a, high(MC_MAP)
             ldh [rHDMA1], a
             xor a
@@ -62,6 +66,8 @@ menu_vbl:   ld a, [m_dirty]
             xor a
             ldh [rVBK], a
             ld [m_dirty], a
+            pop af
+            ldh [rSVBK], a
             ret
 
 

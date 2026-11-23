@@ -18,7 +18,8 @@ import os, re, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', 'ff3'))
 
-TABLES = (('t8000', 0x8000, 66), ('t8200', 0x8200, 80), ('t8400', 0x8400, 72), ('t8600', 0x8600, 76))
+TABLES = (('t8000', 0x8000, 66), ('t8200', 0x8200, 80), ('t8400', 0x8400, 72), ('t8600', 0x8600, 76),
+          ('names8800', 0x8800, 82))      # (names8800: the battle strings $0400-$07FF, 1024 ids)
 NES_W = 26
 MENU_W = 20                     # (the NES menu windows' text width, {0E} strings)
 GB_W = 18
@@ -271,7 +272,7 @@ def pack(rom, bank0):
     the strings from bank0 $4C00 on"""
     banks = {bank0: bytearray(0x4000)}
     b, a = bank0, 0x0C00
-    for t, (name, _, _) in enumerate(TABLES):
+    for t, (name, _, _) in enumerate(TABLES[:4]):
         for i in range(256):
             s = gb_string(decode(raw_string(rom, name, i))) + b'\0'
             if a + len(s) > 0x4000:
@@ -280,6 +281,23 @@ def pack(rom, bank0):
             e = 3 * (256 * t + i)
             banks[bank0][e:e + 3] = bytes([b, (0x4000 + a) & 0xFF, (0x4000 + a) >> 8])
             a += len(s)
+    return banks
+
+
+def pack_battle(rom, bank0):
+    """the battle strings ($0400-$07FF, table names8800) as they are: {bank: bytes}, an index at
+    bank0 $4000 (1024 ids x 3 bytes: bank, address), the strings from $4C00"""
+    banks = {bank0: bytearray(0x4000)}
+    b, a = bank0, 0x0C00
+    for i in range(1024):
+        s = raw_string(rom, 'names8800', i)
+        if len(s) > 120: s = b''                       # (past the table's real entries)
+        s += b'\0'
+        if a + len(s) > 0x4000:
+            b += 1; a = 0; banks[b] = bytearray(0x4000)
+        banks[b][a:a + len(s)] = s
+        banks[bank0][3 * i:3 * i + 3] = bytes([b, (0x4000 + a) & 0xFF, (0x4000 + a) >> 8])
+        a += len(s)
     return banks
 
 
