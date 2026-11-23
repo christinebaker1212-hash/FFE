@@ -600,6 +600,8 @@ sh_draw:    call m_clear
             ld bc, $0101
             call m_msg1n
             ld a, [sh_band]                 ; the band: choices, name / How many?, gil
+            cp 3
+            jr z, .g                        ; (the fat chocobo: the gil only)
             ld hl, sh_main
             and a
             jr z, .c
@@ -625,7 +627,7 @@ sh_draw:    call m_clear
             ld l, a
 .t:         ld bc, $0306
             call m_str
-            ld hl, GS + $1C                 ; the gil: small digits and G (as the main menu)
+.g:         ld hl, GS + $1C                 ; the gil: small digits and G (as the main menu)
             ld a, [hl+]
             ld e, a
             ld a, [hl+]
@@ -653,6 +655,10 @@ sh_titles:  dw sh_title0, sh_title1, sh_title2, sh_title3
 
 ; list row sh_k: the goods (sh_mode 0: name, price) or inventory slot sh_top + k (name, count)
 sh_lrow:    ld a, [sh_mode]
+            cp 2
+            jp z, ch_orow
+            cp 3
+            jp z, ch_srow
             and a
             jr nz, .inv
             ld a, [sh_k]
@@ -1015,6 +1021,342 @@ inn_text:   ld a, e
             ldh a, [pad]                    ; (that press is not a new one for the next loop)
             ld [m_old], a
             jr .pg
+
+ch_list    = $DA00              ; (WRAM bank 2: the menus run with it)
+ch_n       = $DB00
+; ---- the fat chocobo (3D/B383): Yooo, need somethiiing? ($0151); Deposit / Withdraw / Exit ($0124,
+; a row each in the list); Deposit: the inventory, A puts a slot's items in his storage ($6300 +
+; item, 99 at most; key items $9A-$A3 refused; I can't eat no more of the same stuff! at 99);
+; Withdraw: the stored items, A takes one back (into its slot or a free one; a slot of 153 or more
+; keeps it there: FF3's compare; more than 99: the rest stays stored)
+choc_open:  xor a
+            ld [sh_ev], a
+            ld [sh_lc], a
+            call oam_hide
+            call menu_pals
+            call hand_ld
+            call font_menu
+            ld a, MENU_BANK
+            ld [vc_src], a
+            ld hl, $5E00
+            ld de, $8000 + 16 * ICON_T
+            ld b, 32
+            ld a, 1
+            call vcopyx
+            ld a, 2
+            ldh [rSVBK], a
+            ld a, 1
+            ld [menu_on], a
+            ld a, 3
+            ld [sh_band], a
+            ld a, $51
+            ld [sh_msg], a
+.top:       ld a, 2
+            ld [sh_mode], a
+            call sh_draw
+.o:         ld a, [sh_lc]
+            add a, SH_ROW
+            call sh_hand_row
+            call sh_frame
+            ld a, [m_new]
+            bit 1, a
+            jr nz, .close
+            bit 0, a
+            jr nz, .oa
+            ld b, a
+            ld a, [sh_lc]
+            bit 6, b
+            jr z, .od
+            and a
+            jr z, .o
+            dec a
+            jr .os
+.od:        bit 7, b
+            jr z, .o
+            cp 2
+            jr z, .o
+            inc a
+.os:        ld [sh_lc], a
+            call sh_move
+            jr .o
+.oa:        call sh_ok
+            ld a, [sh_lc]
+            and a
+            jr z, .give
+            dec a
+            jr z, .take
+.close:     call cur_hide
+            jp menu_close
+.give:      ld a, $52                       ; Whatcha gonna give meee?
+            ld [sh_msg], a
+            ld a, 1
+            jr .list
+.take:      ld a, $53                       ; Whaddaya want, ya saaay?
+            ld [sh_msg], a
+            call ch_build
+            ld a, 3
+.list:      ld [sh_mode], a
+            xor a
+            ld [sh_cur], a
+            ld [sh_top], a
+            call sh_draw
+.l:         ld a, [sh_cur]
+            ld b, a
+            ld a, [sh_top]
+            ld c, a
+            ld a, b
+            sub c
+            add a, SH_ROW
+            call sh_hand_row
+            call sh_frame
+            ld a, [m_new]
+            bit 1, a
+            jr nz, .lb
+            bit 0, a
+            jr nz, .la
+            ld b, a
+            ld a, [sh_cur]
+            bit 6, b
+            jr z, .ld
+            and a
+            jr z, .l
+            dec a
+            ld [sh_cur], a
+            call sh_move
+            ld b, a
+            ld a, [sh_top]
+            cp b
+            jr c, .l
+            jr z, .l
+            ld a, b
+            ld [sh_top], a
+            call sh_draw
+            jr .l
+.ld:        bit 7, b
+            jr z, .l
+            ld c, a
+            call ch_last
+            ld a, c
+            cp b
+            jr nc, .l
+            inc a
+            ld [sh_cur], a
+            call sh_move
+            ld b, a
+            ld a, [sh_top]
+            add a, 7
+            cp b
+            jr nc, .l
+            ld a, b
+            sub 7
+            ld [sh_top], a
+            call sh_draw
+            jr .l
+.lb:        call sh_ok
+            ld a, $51
+            ld [sh_msg], a
+            jp .top
+.la:        ld a, [sh_mode]
+            cp 1
+            call z, ch_give
+            ld a, [sh_mode]
+            cp 3
+            call z, ch_take
+            call sh_draw
+            jr .l
+
+; B = the list's last index (the inventory 31, the storage its count - 1)
+ch_last:    ld a, [sh_mode]
+            cp 3
+            ld b, 31
+            ret nz
+            ld a, [ch_n]
+            and a
+            jr z, .z
+            dec a
+.z:         ld b, a
+            ret
+
+; the stored items (3D/B570): ids with a count, from 1 up -> ch_list, ch_n
+ch_build:   ld hl, ch_list
+            ld de, $0100
+            call memclr
+            ld hl, GS + $301
+            ld de, ch_list
+            ld c, 1
+            xor a
+            ld [ch_n], a
+.s:         ld a, [hl+]
+            and a
+            jr z, .n
+            ld a, c
+            ld [de], a
+            inc de
+            ld a, [ch_n]
+            inc a
+            ld [ch_n], a
+.n:         inc c
+            jr nz, .s
+            ret
+
+; 3D/B4AE deposit inventory slot sh_cur
+ch_give:    ld a, [sh_cur]
+            add a, low(GS + $C0)
+            ld l, a
+            ld h, high(GS + $C0)
+            ld a, [hl]
+            and a
+            jr z, .err
+            cp $9A
+            jr c, .ok
+            cp $A4
+            jr c, .err
+.ok:        ld e, a
+            ld d, high(GS + $300)
+            ld a, [de]
+            cp $63
+            jr c, .eat
+            ld a, $55                       ; I can't eat no more of the same stuff!
+            ld [sh_msg], a
+            jp sh_ok
+.eat:       ld b, a
+            push hl
+            ld a, l
+            add a, $20
+            ld l, a
+            ld a, [hl]
+            add a, b
+            ld c, 0
+            cp $64
+            jr c, .st
+            sub $63
+            ld c, a
+            ld a, $63
+.st:        ld [de], a
+            ld [hl], c
+            pop hl
+            ld a, c
+            and a
+            jr nz, .m
+            ld [hl], a
+.m:         ld a, $54                       ; Time to diiig in. Munch munch...
+            ld [sh_msg], a
+            jp sh_ok
+.err:       ld a, $86
+            ld [S49], a
+            ret
+
+; 3D/B504 withdraw list entry sh_cur
+ch_take:    ld a, [sh_cur]
+            ld e, a
+            ld d, high(ch_list)
+            ld a, e
+            add a, low(ch_list)
+            ld e, a
+            jr nc, .p
+            inc d
+.p:         ld a, [de]
+            and a
+            jr z, ch_give.err
+            ld [sh_id], a
+            push de
+            call sh_find                    ; (3D/937E)
+            pop de
+            jr nc, .f
+            ld a, $56                       ; Your stuff's full, so I can't give it back
+            ld [sh_msg], a
+            jp sh_ok
+.f:         ld a, [sh_id]
+            ld c, a
+            ld b, high(GS + $300)
+            ld a, [hl]
+            and a
+            jr nz, .add
+            ld [hl], c                      ; (a free slot: all of it)
+            ld a, l
+            add a, $20
+            ld l, a
+            ld a, [bc]
+            ld [hl], a
+            xor a
+            ld [de], a
+            ld [bc], a
+            jr .done
+.add:       ld a, l
+            add a, $20
+            ld l, a
+            ld a, [hl]
+            cp $99
+            jr c, .a1
+            ld a, $57                       ; I'll hang on to what I can't give back
+            ld [sh_msg], a
+            jp sh_ok
+.a1:        push hl
+            ld h, b
+            ld l, c
+            add a, [hl]
+            pop hl
+            cp $64
+            jr nc, .a2
+            ld [hl], a
+            xor a
+            ld [de], a
+            ld [bc], a
+            jr .done
+.a2:        sub $63
+            ld [bc], a
+            ld [hl], $63
+.done:      ld a, $58                       ; Hang on a sec, I'm gettin' it out...
+            ld [sh_msg], a
+            jp sh_ok
+
+; list row sh_k: the options (mode 2) / a stored item and its count (mode 3)
+ch_orow:    ld a, [sh_k]
+            cp 3
+            ret nc
+            add a, a
+            ld e, a
+            ld d, 0
+            ld hl, ch_words
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, [sh_k]
+            add a, SH_ROW
+            ld c, a
+            ld b, 2
+            jp m_str
+ch_words:   dw ch_w0, ch_w1, ch_w2
+ch_srow:    ld a, [sh_top]
+            ld b, a
+            ld a, [sh_k]
+            add a, b
+            add a, low(ch_list)
+            ld l, a
+            ld a, high(ch_list)
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            and a
+            ret z
+            push af
+            call sh_name
+            pop af
+            ld e, a
+            ld d, high(GS + $300)
+            ld a, [de]
+            ld e, a
+            ld d, 0
+            ld a, [sh_k]
+            add a, SH_ROW
+            ld c, a
+            ld b, 16
+            ld a, $C8                       ; :
+            call m_put
+            ld b, 18
+            jp m_dec
+
 
 section wram, $C3B0
 sh_ev:      ds 1

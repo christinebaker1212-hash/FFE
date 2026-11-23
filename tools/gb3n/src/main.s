@@ -221,7 +221,16 @@ main:       call wait_vbl
             ld a, 1
             call dlg_show
             jr main
-.na:        ld a, [ev_on]                   ;   an event: one command, its party moves only
+.na:        ld a, [tst_choc]                ;   (test hook: $A5 opens the fat chocobo)
+            cp $A5
+            jr nz, .nt
+            xor a
+            ld [tst_choc], a
+            ld a, CODE1
+            ld hl, choc_open
+            call far_call
+            jr main
+.nt:        ld a, [ev_on]                   ;   an event: one command, its party moves only
             and a
             jr z, .inp
             call ev_step

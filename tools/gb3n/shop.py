@@ -71,4 +71,6 @@ def code_data(rom):
     src += db('sh_yes', text.encode(yn[0]) + b'\0') + db('sh_no', text.encode(yn[1]) + b'\0')
     gil = re.sub(r'\{[^}]*\}', '', t(0x05)).strip()
     src += db('sh_gil', text.encode(gil) + b'\0')
+    for k, (_, w) in enumerate(choices(t(0x24))):            # the fat chocobo: Deposit / Withdraw / Exit
+        src += db('ch_w%d' % k, text.encode(w) + b'\0')
     return src

@@ -467,7 +467,8 @@ veh_inv:    xor a                           ; (the world map's entrance 0)
             ld [act], a
             ret
 
-section wram, $C3F2
+section wram, $C3F1
+tst_choc:   ds 1
 veh_p1:     ds 1
 veh_off8:   ds 1
 veh_buf:    ds 8
