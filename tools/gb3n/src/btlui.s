@@ -5,15 +5,16 @@
 ; member chooses (34/9A69); the font in VRAM bank 1 tiles $70-$FF (text codes = tiles), the
 ; hand in VRAM bank 1 tiles $60-$63, palettes: the window CGB 7, the hand sprite palette 3.
 
-ui_init:    ld a, 1                         ; font -> VRAM bank 1 $70-
-            call font_ld
-            ld a, MENU_BANK                 ; hand -> VRAM bank 1 $60-$63
+ui_hand:    ld a, MENU_BANK                 ; hand -> VRAM bank 1 $60-$63
             ld [vc_src], a
             ld hl, $6E00
             ld de, $8000 + 16 * HAND_T
             ld b, 4
             ld a, 1
-            call vcopyx
+            jp vcopyx
+ui_init:    ld a, 1                         ; font -> VRAM bank 1 $70-
+            call font_ld
+            call ui_hand
             call menu_pals
             ld a, BDATA_BANK                ; numeral sprites -> VRAM bank 1 $40-$4C
             ld [vc_src], a

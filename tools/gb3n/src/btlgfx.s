@@ -777,56 +777,38 @@ attr_mask:  db $FC, $F3, $CF, $3F
 
 ; ---- the GB screen: VRAM tiles cleared (tile 0 = blank), BG map rows 0-13 from $7900 with the
 ; CGB palettes from $7D27, BG palettes 0-3 / OBJ 0-3 from $7CF7, the view from NES (20, 48)
-btl_screen: xor a                           ; (LCD off) VRAM bank 0 tile 0 blank
-            ldh [rVBK], a
-            ld hl, $8000
-            ld de, 16
+btl_screen: ld hl, W7 + $7300                ; (the LCD on, behind black: by DMA) zeros
+            ld de, $100
             call memclr
-            ld hl, $9800                    ; BG map: 32 x 32 tile 0, attributes 0
-            ld de, $400
-            call memclr
-            ld a, 1
-            ldh [rVBK], a
-            ld hl, $9800
-            ld de, $400
-            call memclr
+            ld a, CODE3
+            ld [vc_src], a
+            ld hl, W7 + $7300               ; VRAM bank 0 tile 0 blank
+            ld de, $8000
+            ld b, 1
             xor a
-            ldh [rVBK], a
-            ld hl, W7 + $7900               ; tiles
-            ld de, $9800
-            ld bc, 32 * BT_ROWS
-            call memcpy
-            ld a, 1                         ; palettes: $7D27 quadrant of NES row r + 5, col c
-            ldh [rVBK], a
-            ld de, $9800
-            ld b, 0                         ; row
-.r:         ld c, 0
-.c:         ld a, b
-            add a, 5
-            ld [BZ + $80], a
-            push bc
+            call vcopyx
+            ld de, $9800                    ; BG map: 32 x 32 tile 0, attributes 0
+.z:         push de
+            ld hl, W7 + $7300
+            ld b, 16
+            xor a
+            call vcopyx
+            pop de
             push de
-            call back_atk
-            jr nz, .na
-            ld a, 31                        ; (a back attack: the mirrored column, flipped)
-            sub c
-            ld c, a
-            call attr_get
-            or $20
-            jr .ha
-.na:        call attr_get
-.ha:        pop de
-            pop bc
-            ld [de], a
-            inc de
-            inc c
-            ld a, c
-            cp 32
-            jr nz, .c
-            inc b
-            ld a, b
-            cp BT_ROWS
-            jr nz, .r
+            ld hl, W7 + $7300
+            ld b, 16
+            ld a, 1
+            call vcopyx
+            pop de
+            ld hl, $100
+            add hl, de
+            ld d, h
+            ld e, l
+            ld a, d
+            cp $9C
+            jr nz, .z
+            call map_show                   ; tiles, palettes
+            call attr_push
             xor a
             ldh [rVBK], a
             ld hl, W7 + $7CF7               ; palettes
@@ -894,10 +876,10 @@ pal8:       ld b, 16
             ret
 
 ; FFA26's end: the fade (for now the screen off) and the field's WRAM bank
-btl_end:    call wait_vbl
-            call lcd_off
+btl_end:    call pal_black                  ; (the LCD stays on: the field loads behind black)
             xor a
-            ld [lcd_is], a
+            ld [menu_on], a                 ; (the battle's window off, as at boot)
+            ldh [rWY], a
             ldh [scx], a
             ldh [scy], a
             ld a, 1
@@ -1301,8 +1283,13 @@ boss_gfx:   ld a, [W7 + $7D73]
             jp vcopyx
 .s:         xor a
             ldh [rVBK], a
+            ld [btl_tmp + 1], a
             ld a, MGFX_BANK0 + 4            ; (summon graphics: each tile flipped)
             ld [btl_tmp], a
+            ld a, low($8700)
+            ld [btl_tmp + 2], a
+            ld a, high($8700)
+            ld [btl_tmp + 3], a
             ld de, $8700
             ld c, 144
 .t:         push bc
@@ -1327,13 +1314,55 @@ boss_gfx:   ld a, [W7 + $7D73]
             pop hl
             pop de
             push hl
-            ld hl, btl_spr
+            ld hl, btl_spr                  ; (into a chunk of 16 tiles, sent by DMA)
+            ld a, [btl_tmp + 1]
+            ld e, a
+            ld d, 0
+            sla e
+            rl d
+            sla e
+            rl d
+            sla e
+            rl d
+            sla e
+            rl d
+            push hl
+            ld hl, W7 + $7300
+            add hl, de
+            ld d, h
+            ld e, l
+            pop hl
             ld bc, 16
-            call memcpy                     ; (the LCD is off: straight into VRAM)
+            call memcpy
+            ld hl, btl_tmp + 1
+            inc [hl]
+            ld a, [hl]
+            cp 16
+            call z, .snd
             pop hl
             pop bc
             dec c
             jr nz, .t
+            ret
+.snd:       ld [hl], 0                      ; 16 tiles -> VRAM at btl_tmp + 2 / + 3
+            ld a, CODE3
+            ld [vc_src], a
+            ld a, [btl_tmp + 2]
+            ld e, a
+            ld a, [btl_tmp + 3]
+            ld d, a
+            push de
+            ld hl, W7 + $7300
+            ld b, 16
+            xor a
+            call vcopyx
+            pop hl
+            ld de, $100
+            add hl, de
+            ld a, l
+            ld [btl_tmp + 2], a
+            ld a, h
+            ld [btl_tmp + 3], a
             ret
 
 ; the battlefield's SCX: 20 (NES x 20 at the left edge), a back attack's mirror 76

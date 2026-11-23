@@ -6,7 +6,7 @@
 ; The GB has 40 sprites; FF3's spells draw up to 36 next to the party's 24, so while a spell
 ; shows, the sprites are 8 x 16: the party's and the effect's 8 x 8 sprites are paired
 ; (vertical neighbours of one palette), each pair's two tiles composed (flips put into the
-; pixels) from a WRAM mirror of the sprite tiles into 64 slots (VRAM bank 1 tiles $00-$7F, back
+; pixels) from a WRAM mirror of the sprite tiles into 56 slots (VRAM bank 1 tiles $00-$6F, back
 ; from the mirror after; the least recently used slot taken for a new pair).
 N33        = -$4000             ; 33 address + N33 = the copy here
 FX_REV     = $5F00              ; (build.py: the bit-reversed bytes)
@@ -17,7 +17,7 @@ F34        = $5600 - $83A0      ; FXD: 34/83A0- at $5600 (the sounds)
 F2E8       = $5660 - $8040      ; FXD: 2E/8040- at $5660 (the glare colours)
 F32        = $56C0 - $91C0      ; FXD: 32/91C0-920F at $56C0 (the fireball frames)
 F32B       = $5710 - $9450      ; FXD: 32/9450-948F at $5710 (the reflection)
-NSLOT      = 64
+NSLOT      = 56                  ; (tiles $00-$6F: the font is at $70-)
 NPAIR      = 40
 
 ; ---- the mode on: the slots emptied, the first picture built, then shown from the V-Blank
@@ -58,7 +58,7 @@ s16_start:  ldh a, [rSVBK]
 s16_stop:   xor a
             ld [s16_on], a
             ld [s16_n], a
-            ld hl, S16_MIR                  ; VRAM bank 1 tiles $00-$7F from the mirror (4 x 32)
+            ld hl, S16_MIR                  ; VRAM bank 1 tiles $00-$6F from the mirror (4 x 28)
             ld de, $8000
             ld b, 4
 .r:         push bc
@@ -68,10 +68,13 @@ s16_stop:   xor a
             pop de
             pop hl
             call .h
-            ld bc, $200
+            ld bc, $1C0
             add hl, bc
+            ld a, e
+            add a, $C0
+            ld e, a
             ld a, d
-            add a, 2
+            adc a, 1
             ld d, a
             pop bc
             dec b
@@ -91,7 +94,7 @@ s16_stop:   xor a
             ldh [rHDMA4], a
             ld a, 1
             ldh [rVBK], a
-            ld a, 32 - 1
+            ld a, 28 - 1
             ldh [rHDMA5], a
             xor a
             ldh [rVBK], a
@@ -807,6 +810,7 @@ mx_magic:   ld a, [W7 + $7E88]              ; the spell's sound
             call s16_stop
 .e:         ld a, 1                         ; (the numerals' tiles again: sc_num)
             ld [ba_dirty], a
+            call ui_hand                    ; (and the hand's: the spells' tiles reach $68)
             xor a
             ld [BZ + $CC], a
             ld a, [W7 + $7E9A]              ; 34/859F: on monsters, the split / brak2 / toad / mini

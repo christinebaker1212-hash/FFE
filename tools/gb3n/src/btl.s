@@ -7,10 +7,8 @@
 btl_pals   = $DF00              ; (WRAM bank 3, FF3's unused $7F00-: the palettes before the flash)
 
 btl_main:   call btl_flash
-            call lcd_off
-            xor a                           ; (the VRAM copies direct while the LCD is off)
-            ld [lcd_is], a
-            ld a, 3
+            call pal_black                  ; (the LCD stays on behind black: no white screen;
+            ld a, 3                         ;   the VRAM copies by DMA)
             ldh [rSVBK], a
             call inv_pair                   ; (3C/BC12: the inventory as pairs)
             ld hl, BZ                       ; FF3's battle RAM cleared (zero page, $7200-$7EFF)
