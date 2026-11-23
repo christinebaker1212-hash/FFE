@@ -3804,7 +3804,16 @@ fd_o1:      ds 1
 section bank 0, $1E00                       ; (main.s continued: the overworld's bridge / canal)
 ; FF1 DrawOWObj_BridgeCanal: the bridge (OAM 12-15) and the canal (16-19) where they stand, FF1
 ; lut_OWObjectSprTbl's 2 x 2 (UL UR DL DR here), OW object tiles + $10, palette 3
-ow_bc:      ld hl, SV_BRIDGE
+ow_bc:      ld a, [vehicle]                 ; on foot in a forest (FF1 inforest, tile
+            cp V_FOOT                       ;   property bit 4): the party's lower half
+            jr nz, .nf                      ;   hidden, the trees over it
+            ld a, [tprop_now]
+            and $10
+            jr z, .nf
+            xor a
+            ld [oam_buf + 4], a
+            ld [oam_buf + 12], a
+.nf:        ld hl, SV_BRIDGE
             ld de, oam_buf + 48
             ld bc, .brtbl
             call .obj
