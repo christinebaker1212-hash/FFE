@@ -104,7 +104,7 @@ undisclosed debug code). Record each item's result in the port's status doc.
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-23: FF3 native battle, see docs/ff3-native.md)
+# GB port status (last updated 2026-11-23: FF3 native cutscenes, see docs/ff3-native.md)
 
 **Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
 **Handoff: `docs/gb-handoff.md`** (session setup, current battle-layout work, exact next steps).
@@ -893,6 +893,9 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   FF3's battle logic ported (init, AI, target cursor, attack order, Fight, all magic effects,
   action script, poison, victory / level ups, save back); whole battles match the NES
   (`tools/gb3n/btlcmp.py --end`: save block identical); Item / Magic / job commands, bosses, back
-  attacks, the battle's end done. Vehicles started (`src/veh.s`: canoe, ship, airships, landing).
-  Next: the Invincible / Nautilus specifics, the fat chocobo, attack / spell animations. Also fixed in the
+  attacks, the battle's end done. Vehicles done (`src/veh.s`: canoe, ship, airships, landing, the
+  Invincible's sprite and jump, the Nautilus diving, the floating continent's edge), the fat chocobo,
+  chest battles. Cutscenes done (`src/cut.s`, `cut.py`: crystal prologue, epilogue, ending + end
+  credits, FF3's timing). Next: field effects ($D0-$DA, $E0-$E2), the guest NPC, the special
+  animations ($EF), attack / spell animations. Also fixed in the
   recompiled build: one-row menu cursors (Item opened Magic), the battle "Miss" sprite in English.

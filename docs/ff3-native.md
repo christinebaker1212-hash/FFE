@@ -304,3 +304,24 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   inside (A beside it, B aboard). Not yet: the Invincible's sprite and jump, the Nautilus diving /
   surfacing, the floating continent's edge, lift-off / landing animations, the chocobo running
   off, the fat chocobo.
+- 2026-11-23 (later): the Invincible (sprite 3C/8857, its jump 3D/B66F, parked with its shadow),
+  the Nautilus diving / surfacing, the floating continent's edge (airships down to worlds 2 / 3),
+  the fat chocobo (bank and withdraw, 3D/B383), monster-in-a-chest battles.
+- 2026-11-23 (later): **cutscenes** (`src/cut.s`, bank CODE5 with NES bank 1F at $6000; data
+  `cut.py`, banks CUTD / CUTD2): the crystal prologue ($DB, 1F/A326), the epilogue ($DC, 1F/B146)
+  and the ending with the end credits ($DD, 1F/B5B6 / B94A), all as native code from the
+  disassembly with FF3's timing. Kit: FF3's cutscene graphics directory (1F/A01B, its RLE
+  sources decompressed at build time), palette sets (1F/B300) and fades (1F/A0E8 / A10A), its
+  sprite list turned into GB OAM each frame (camera, culling, attributes), text pages re-laid out
+  for the GB view (staff lines as they are, story pages wrapped at 18 from the script). The
+  epilogue's pages scroll up through the 32-row BG ring (each row written as it comes into view);
+  star scenes run at FF3's NES pace (2 frames an iteration, a V-Blank count). Ending: the land
+  revealed from the middle, clouds, crystal, night / dawn / day, birds, flash; credits: the party
+  (names, levels), the cast, 20 staff pages revealed from the edges, THE END over the stars; FF3's
+  4-tiles-a-frame graphics pace kept so the credits keep the NES's timing (within 3%). Checked in
+  SameBoy against the NES (cynes) frame by frame at key points.
+  Next: the field effects ($D0 shake, $D1 / $E2 flash, $D2 / $D3 blue dusk, $DA dance, $E0 / $E1
+  palettes), show / hide player and guest, the guest NPC that follows the party ($EE), the
+  special animations ($EF: statues and the Saronia gate (map tiles + $602E, also re-applied on
+  world 3 loads), explosions, Bahamut, the Invincible rising, the circling stars), then battle
+  animations.
