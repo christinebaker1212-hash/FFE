@@ -206,6 +206,8 @@ CODE3_MODULES = ('btlgfx', 'btlui', 'btlmsg', 'btlloop', 'btlitem', 'btlmagm')
 CODE4 = 111                             # battle code: magic, victory, the other actions
 BDATA3_BANK = 112                       # 2A/8000 boss tilemaps, 2F/9068 boss graphics pointers
 CODE4_MODULES = ('btlmagic', 'btlwin', 'btlact2')
+CODE5 = 113                             # the cutscenes (cut.s at $4000, NES bank 1F at $6000)
+CUTD = 114                              # their graphics and text pages (cut.py)
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
 CHGFX_BANK = 95                         # battle characters (NES banks $28 / $29) as GB tiles
 BDATA2_BANK = 96                        # FF3 bank $30 (monsters, stat sets, scripts, items) at $4000
@@ -276,6 +278,10 @@ def engine_src(rom=None):
         for c, (_, r) in zip(c1, ss):
             codes.append('\n'.join(l for l in c.split('\n') if not l.startswith('section bank 0,')))
             rams.append(r)
+    codes.append('section bank %d, $4000' % CODE5)
+    c, r = split(rd('cut'))
+    codes.append(c)
+    rams.append(r)
     zp = ''.join('Z_%02X = $%04X\n' % (n, 0xFFB0 + n - 0x18) for n in range(0x18, 0x60))
     shadow = lambda t: t.replace('ld [MBC5_BANKL], a', 'ld [rom_bank], a\n            ld [MBC5_BANKL], a')
     return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + zp + shadow(main_code) + '\n' +
@@ -387,6 +393,8 @@ def main():
     banks[JOB_BANK] = jb
     for k, sb in enumerate((0x37, 0x38, 0x39, 0x09)):          # sound banks
         banks[SND_BANK0 + k] = bytearray(rom.prg[0x36 * 0x2000:0x37 * 0x2000] + rom.prg[sb * 0x2000:(sb + 1) * 0x2000])
+    import cut
+    cut_hi, banks[CUTD], cut_syms = cut.pack(rom, CUTD)
     src = engine_src(rom) + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
     title_on = opt['--map'] == '' and opt['--group'] == '0'
     r = asm(src, syms={'START_MAP': int(opt['--map'] or '0', 0), 'START_GRP': int(opt['--group'], 0),
@@ -397,11 +405,16 @@ def main():
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
                        'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0, 'CHGFX_BANK': CHGFX_BANK, 'BDATA2_BANK': BDATA2_BANK, 'BTXT_BANK': BTXT_BANK, 'CODE3': CODE3, 'CODE4': CODE4, 'BDATA3_BANK': BDATA3_BANK,
+                       'CODE5': CODE5, 'CUTD': CUTD, **cut_syms,
                        'TEST_SONG': int(opt['--song'], 0) if opt['--song'] else 255,
                        'SND_MASK': int(os.environ.get('GB_SND_MASK', 'FF'), 16),     # (test builds: NR51)
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,
                        'DLG_TEST_T': int(opt['--dlg'].split(':')[0], 0) if opt['--dlg'] else 0})
     for b, d in banks.items(): r.banks[b] = bytearray(d)
+    cb = r.banks.setdefault(CODE5, bytearray(0x4000))
+    cb.extend(bytes(0x4000 - len(cb)))
+    assert not any(cb[0x2000:]), 'cutscene code past $6000'
+    cb[0x2000:0x4000] = cut_hi
     size = 2
     while size < max(r.banks) + 1: size *= 2
     rom_bytes = make_rom(r.banks, 'FF3 NATIVE', cart_type=0x1B, rom_banks=size, ram_size_code=0x02, cgb=0xC0)

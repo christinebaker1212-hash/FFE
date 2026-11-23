@@ -239,7 +239,12 @@ main:       call wait_vbl
             xor a
             ld [ev_pad], a
             jr .mv
-.inp:       ld a, [pad_new]                 ;   A: talk (fix:EA26); on a world map the vehicles
+.inp:       ld a, [cut_req]                 ;   a cutscene pending (fix:E2F8)
+            and a
+            jr z, .inp0
+            call cut_go
+            jp main
+.inp0:      ld a, [pad_new]                 ;   A: talk (fix:EA26); on a world map the vehicles
             bit 0, a                        ;     (fix:C2B7)
             jr z, .st
             ldh a, [is_world]

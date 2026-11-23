@@ -707,6 +707,12 @@ ev_misc:    cp $D4
             jp z, start                     ; D8 reset the game
             cp $D9
             jr z, ev_chain
+            cp $DB                          ; DB / DC the prologue / epilogue: at the next input
+            jr z, ev_cut                    ;   check (fix:E2F8); DD the ending
+            cp $DC
+            jr z, ev_cut
+            cp $DD
+            jr z, ev_ending
             cp $DE
             jr z, ev_surf
             cp $DF
@@ -749,6 +755,29 @@ ev_pass:    ld hl, M_LAY
             or b
             ld d, a
             jp q_mt
+; $DB / $DC (3B/B5BA): FF3's $50 = $80 / $81, run by the field when it next checks the input
+ev_cut:     sub $DB - $80
+            ld [cut_req], a
+            ret
+; $DD the ending (1F/B5B6, then the end credits: it does not return)
+ev_ending:  ld a, CODE5
+            ld hl, cut_end
+            jp far_call
+; fix:E2F8 a cutscene pending: it runs, then the map is loaded again (fix:E7F8)
+cut_go:     ld b, a
+            xor a
+            ld [cut_req], a
+            ld hl, cut_pro
+            ld a, b
+            cp $80
+            jr z, .g
+            ld hl, cut_epi
+.g:         ld a, CODE5
+            call far_call
+            ld a, $FF                       ; (no map title)
+            ld [m_title], a
+            ld [m_title2], a
+            jp load_map
 ; $D9 the ship chained up at (169, 184) on world 3
 ev_chain:   ld a, $A9
             ld [GS + $01], a
@@ -1036,6 +1065,7 @@ ev_end:     xor a
             ret
 
 section wram, $C380
+cut_req:    ds 1
 ev_on:      ds 1
 ev_ptr:     ds 2
 ev_rep:     ds 1
