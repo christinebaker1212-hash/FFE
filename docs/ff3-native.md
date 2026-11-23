@@ -354,7 +354,13 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   (24 pairs a frame); least recently used slots are reused, the party's pairs kept while its
   sprites stay. Measured: the casting loop runs one step a frame as on the NES.
   Cross-bank stubs are 6 bytes now (`far_s`), which freed ~650 bytes of bank 0.
-  Remaining: the special spells (kill, quake, meteo, drain, flare wave, tsunami, glare, explode,
-  earthquake, enemy flame / blizzard / thunder), the reflection wall, toad / mini / brak2 /
-  split steps, summons (32/8CEF), the monster flash and death / run / defend / jump / scare /
-  cheer / buildup / cannon animations.
+  Then: the special spells (kill, drain, quake, earthquake with FF3's random shake, meteo,
+  tsunami, glare / explode flashes, enemy flame / blizzard / thunder with the party hidden as FF3
+  does), the reflection wall, the post-spell split / brak2 / toad / mini (state as FF3: slots,
+  experience counts), the monsters' pre-attack flash (attribute table by GDMA), the death /
+  escape wipe (2F/BB94: diagonal, the new tilemap over the old), defend, cheer, scare, buildup
+  (overload burst), jump (leaving / landing, $7E22), row changes, the party's escape, the victory
+  cheer tiles (2F/A963). Fixed: numerals ($69-$75) and the hand ($76-$79) moved off the members'
+  animation tiles (digits showed in victory poses). Parity: btlcmp `--end` identical (battles 0-4,
+  weapon pokes). Remaining: summons (32/8CEF, raster effects), the flare wave's cloud (10/8BD5),
+  the cannon, the boss death, the split's fade-in.
