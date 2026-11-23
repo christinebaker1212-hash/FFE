@@ -379,3 +379,14 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   cyclone (whirl sprites): all 24 summon attacks animate, with every random call FF3 makes.
   Remaining (visual only): those three in full, the tidal wave's waves, the flare wave's cloud
   (10/8BD5), the boss death, the split's fade-in.
+- 2026-11-23 (Lot Check on the native build, `docs/gb-release-checklist.md`): `build.py --release`
+  leaves out the test hooks (blocks marked `[TEST]`: tst_choc's event / animation runner, the
+  forced back attack, btlcmp's seed). `lotcheck.py --game ff3 --release` on it: 13 of 13 (header,
+  logo, checksums, flags, $FF padding: two world-map quarters of open sea are marked
+  `uniform_data_N` in the .sym, no test pad / test symbols). `termcheck.py ff3` (now also the
+  native engine's title / menu / shop text): 0 flagged. Items by section: 1 header: pass. 2 LCD
+  off only in V-Blank (lcd_off waits for LY >= 144; battles no longer turn it off at all), VRAM /
+  OAM / DMA timing (mGBA SGBRUN_LOTCHECK, see below), cart RAM enabled only around save accesses
+  (save.s), save check with a message: as on 2026-11-22. 3 soft reset, memory cleared at boot,
+  the Color-only screen: as on 2026-11-22; GBA: not checked (owner's hardware). 4 names: pass;
+  colour: the CGB palettes are FF3's; no undisclosed code in the --release build.
