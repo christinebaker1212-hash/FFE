@@ -419,8 +419,25 @@ get_actions:
             call zpy
             ld a, [hl+]
             and $C0
-            jr nz, .skip
-            ld a, [hl]
+            jr z, .alive
+            ld hl, W7 + $7CEB               ; (dead / stone)
+            inc [hl]
+            jr .skip
+.alive:     ld a, [hl]                      ; 35/A66C: confused -> 31/BF17, asleep / paralysed -> 1
+            and $E0
+            jr z, .nc
+            and $20
+            jr z, .slp
+            call conf_atk
+            jr .skip
+.slp:       ld a, [BZ + $5F]
+            add a, $2E
+            ld c, a
+            ld a, $5B
+            call zpy
+            ld [hl], 1
+            jr .skip
+.nc:        ld a, [hl]
             and 1
             jr nz, .skip                    ; (jumping)
             call cmd_win

@@ -822,3 +822,38 @@ item_eff:   ld a, 1
             ld a, $51                       ; Nothing happens
             ld [W7 + $78DA], a
             ret
+
+; 31/BF17 battle algorithm $09: get confused attack (fight a random living member)
+conf_atk:   ld a, [BZ + $52]
+            push af
+.r:         ld a, 3
+            call rnd_0a
+            ld [BZ + $26], a
+            ld [BZ + $52], a
+            call chr_ofs
+            inc a
+            ld c, a
+            ld a, $5B
+            call zpy
+            ld a, [hl+]
+            and $C0
+            jr nz, .r
+            ld a, [hl]
+            and 1
+            jr nz, .r
+            pop af
+            ld [BZ + $52], a
+            call chr_ofs
+            add a, $2E
+            ld c, a
+            ld a, $5B
+            call zpy
+            ld [hl], 4
+            inc hl
+            push hl
+            ld a, [BZ + $26]
+            call bitmask
+            pop hl
+            ld [hl+], a
+            ld [hl], 0
+            ret
