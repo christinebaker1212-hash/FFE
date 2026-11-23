@@ -1789,3 +1789,4 @@ hram_dma16: ds 10
 s16_eh:     ds 2                            ; (the 8 x 16 mode: the effect's sum, the party's pairs)
 s16_pp:     ds 1
 s16_fc:     ds 1
+s16_np:     ds 1

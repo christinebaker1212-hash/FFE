@@ -520,6 +520,7 @@ end_anim:   ld a, [W7 + $78D3]
             ret
 .v:         ld a, 7
             call snd_song
+            call ba_vgfx                    ; (2F/A963: the cheer tiles)
             xor a
             ld [BZ + $B6], a
 .f:         ld c, 0

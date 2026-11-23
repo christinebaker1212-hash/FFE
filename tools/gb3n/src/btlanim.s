@@ -342,6 +342,49 @@ ba_tiles2:  ld [vc_src], a
             dec b
             jr nz, .w
             ret
+; 2F/A963 the victory: each member's cheer tiles ($180 on, 6) -> $39 + 6 member
+ba_vgfx:    ld c, 0
+.l:         push bc
+            ld b, 0
+            ld hl, W7 + $7D8B
+            add hl, bc
+            ld a, [hl]
+            inc a
+            jr z, .n
+            ld a, c
+            call ba_cptr
+            ld de, $180
+            add hl, de
+            pop bc
+            push bc
+            ld a, c
+            add a, a
+            add a, c
+            add a, a
+            add a, $39
+            ld e, a
+            ld d, 0
+            push hl
+            ld l, e
+            ld h, d
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $8000
+            add hl, de
+            ld d, h
+            ld e, l
+            pop hl
+            ld b, 6
+            ld a, CHGFX_BANK
+            call ba_tiles2
+.n:         pop bc
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .l
+            ret
 ; 2F/A9B1 the member's hit tiles ($1E0 on, 6) -> $39
 ba_hgfx:    ld a, [BZ + $52]
             call ba_cptr

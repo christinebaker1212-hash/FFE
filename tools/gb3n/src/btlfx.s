@@ -14,6 +14,9 @@ F00        = $4000 - $9700      ; FXD: 00/9700-A1FF at $4000 (the hit frames)
 F06        = $4B00 - $8C00      ; FXD: 06/8C00-91FF at $4B00 (the spells' frame lists)
 F2E        = $5100 - $9100      ; FXD: 2E/9100-95FF at $5100 (the graphics properties)
 F34        = $5600 - $83A0      ; FXD: 34/83A0- at $5600 (the sounds)
+F2E8       = $5660 - $8040      ; FXD: 2E/8040- at $5660 (the glare colours)
+F32        = $56C0 - $91C0      ; FXD: 32/91C0-920F at $56C0 (the fireball frames)
+F32B       = $5710 - $9450      ; FXD: 32/9450-948F at $5710 (the reflection)
 NSLOT      = 64
 NPAIR      = 40
 
@@ -98,7 +101,9 @@ s16_stop:   xor a
 
 ; a frame: the picture built, FF3's pending sound effect started (FFAF2), V-Blank
 mx_wait:    call s16_build
-            ld a, [BZ + $C9]
+            call mx_snd
+            jp wait_vbl
+mx_snd:     ld a, [BZ + $C9]
             and a
             jr z, .w
             ld a, [BZ + $CA]
@@ -106,13 +111,16 @@ mx_wait:    call s16_build
             ld [S49], a
             xor a
             ld [BZ + $C9], a
-.w:         jp wait_vbl
+.w:         ret
 
 ; ---- the picture: the party's sprites (OAM 0-23) and the effect's (s16_in) as 8 x 16 pairs; the
 ; party's pairs kept while its sprites stay the same
-s16_build:  ld hl, oam_buf                  ; the sums: the party's, the effect's
+s16_build:  ld hl, oam_buf                  ; the sums: the party's (with the hidden flag), the effect's
             ld e, 96
             call .sum
+            ldh a, [s16_np]
+            xor b
+            ld b, a
             ld a, [s16_sum]
             cp c
             jr nz, .pc
@@ -185,10 +193,14 @@ s16_build:  ld hl, oam_buf                  ; the sums: the party's, the effect'
 .np:        xor a                           ; the party paired again (its shown sprites -> W)
             ld [s16_pn], a
             ld [s16_wn], a
+            ldh a, [s16_np]
+            and a
+            jr nz, .np1
             ld hl, oam_buf
             ld b, 24
             call .gather
             call .pair
+.np1:
             ld a, [s16_pn]
             ldh [s16_pp], a
 .fx:        xor a                           ; the effect paired (after the party's)
@@ -816,9 +828,9 @@ mx_anim:    ld a, [W7 + $7E9D]
             call ba_reset
             jp mx_wait
 .j:         jp hl
-mx_tab:     dw mx_norm, mx_norm, mx_norm, mx_norm, mx_norm, mx_life, mx_summ, mx_norm
-            dw mx_norm, mx_norm, mx_norm, mx_norm, mx_norm, mx_norm, mx_norm, mx_none
-            dw mx_norm, mx_norm, mx_norm
+mx_tab:     dw mx_norm, mx_kill, mx_quake, mx_meteo, mx_drain, mx_life, mx_summ, mx_norm
+            dw mx_norm, mx_flare, mx_tsun, mx_glare, mx_expl, mx_norm, mx_eq, mx_none
+            dw mx_flame, mx_bliz, mx_thun
 mx_none:    ret
 ; $06 summon / split: the sound
 mx_summ:    ld a, [W7 + $7E99]
@@ -845,6 +857,737 @@ mx_n2:      call mx_pre
             call mx_proj
             call ba_end
             jp mx_hit
+
+; ---- the special spells
+; 33/B911 the casting, the end, the hit's graphics
+mx_b911:    call mx_pre
+            call ba_end
+            jp mx_mgfx
+; $06 summon / split: the sound
+; $01 kill: 8 sprites spiralling out around the caster (128 -> 188), then to the target
+mx_kill:    call mx_pre
+            ld a, [W7 + $7E9B]
+            and a
+            jp z, ba_end
+            ld hl, BZ + $C9
+            inc [hl]
+            call mx_cast
+            call mx_wait
+            call mx_mgfx
+            call mx_cast
+            call mx_wait
+            call mx_vres
+            xor a
+            call mx_vdall
+            call mx_vcirc
+            ld a, 2
+            ld [ba_mode], a
+            ld a, $80
+            ld [BZ + $B6], a
+.f:         call mx_eclr
+            ld e, 0
+.s:         call mx_kxy
+            ld a, $FC
+            call mx_vaadd
+            ld a, [BZ + $B6]                ; x amplitude: sin(2 B6 & $7F) x B6 / 2 >> 8
+            add a, a
+            and $7F
+            call mx_sin
+            ld c, a
+            ld a, [BZ + $B6]
+            srl a
+            call mx_mul
+            ld hl, W7 + $7E30
+            ld d, 0
+            add hl, de
+            ld [hl], a
+            ld a, [BZ + $B6]                ; y: sin(B6 / 2 + $40 & $7F) x B6 / 2 >> 8
+            srl a
+            add a, $40
+            and $7F
+            call mx_sin
+            ld c, a
+            ld a, [BZ + $B6]
+            srl a
+            call mx_mul
+            ld hl, W7 + $7E26
+            ld d, 0
+            add hl, de
+            ld [hl], a
+            inc e
+            ld a, e
+            cp 8
+            jr nz, .s
+            ld hl, BZ + $B6
+            inc [hl]
+            call mx_wait
+            ld a, [BZ + $B6]
+            cp $BC
+            jr nz, .f
+            xor a                           ; 33/B417: to the target (vector 8: 33/B413[attacker])
+            ld [BZ + $B6], a
+            ld [W7 + $7E2E], a
+            ld [W7 + $7E38], a
+            ld a, [BZ + $95]
+            ld e, a
+            ld d, 0
+            ld hl, $B413 + N33
+            add hl, de
+            ld a, [hl]
+            ld e, 8
+            call mx_vaadd
+.k:         call mx_eclr
+            ld e, 0
+.k1:        call mx_vx
+            ld [BZ + $8C], a
+            call mx_vy
+            ld [BZ + $8E], a
+            call mx_kbase
+            push de
+            ld e, 8
+            call mx_vx
+            ld hl, BZ + $8D
+            add a, [hl]
+            ld [hl], a
+            call mx_vy
+            ld hl, BZ + $8F
+            add a, [hl]
+            ld [hl], a
+            pop de
+            call mx_one
+            ld a, $FC
+            call mx_vaadd
+            inc e
+            ld a, e
+            cp 8
+            jr nz, .k1
+            ld a, [W7 + $7E38]
+            add a, 4
+            ld [W7 + $7E38], a
+            ld [W7 + $7E2E], a
+            call mx_wait
+            call ba_inc
+            cp $30
+            jr nz, .k
+            jp ba_end
+; (the spiral's place: vector E's offsets, the caster's C0 - 8 / C4 + 8)
+mx_kxy:     call mx_vx
+            ld [BZ + $8C], a
+            call mx_vy
+            ld [BZ + $8E], a
+            call mx_kbase
+            jp mx_one
+mx_kbase:   ld a, [BZ + $95]
+            ld hl, BZ + $C0
+            add a, l
+            ld l, a
+            ld a, [hl]
+            sub 8
+            ld [BZ + $8D], a
+            ld a, l
+            add a, 4
+            ld l, a
+            ld a, [hl]
+            add a, 8
+            ld [BZ + $8F], a
+            ret
+; 33/B519 one sprite at ($8D + $8C, $8F + $8E) (signed offsets; off the frame: none), tile $49 / $4A
+; every 2 frames, palette 3
+mx_one:     push de
+            ld a, [BZ + $8C]
+            ld hl, BZ + $8D
+            bit 7, a
+            jr nz, .xn
+            add a, [hl]
+            jr c, .x
+            jr .y
+.xn:        add a, [hl]
+            jr nc, .x
+.y:         ld b, a
+            ld a, [BZ + $8E]
+            ld hl, BZ + $8F
+            bit 7, a
+            jr nz, .yn
+            add a, [hl]
+            jr c, .x
+            cp $90
+            jr nc, .x
+            jr .d
+.yn:        add a, [hl]
+            jr nc, .x
+.d:         ld c, a
+            ld a, [BZ + $B6]
+            and 2
+            rrca
+            add a, $49
+            ld d, a
+            ld e, 3
+            call mx_put
+.x:         pop de
+            ret
+; $04 drain: per target hit, 8 sprites closing in on it
+mx_drain:   call mx_b911
+            ld a, [W7 + $7E9B]
+            and a
+            ret z
+            call mx_mgfx
+            ld a, [W7 + $7E89]
+            ld [W7 + $7E8A], a
+            xor a
+            ld [BZ + $8A], a
+.t:         ld hl, W7 + $7E8A
+            sla [hl]
+            call c, .one
+            ld hl, BZ + $8A
+            inc [hl]
+            ld a, [hl]
+            cp 8
+            jr nz, .t
+            ret
+.one:       ld hl, BZ + $C9
+            inc [hl]
+            call ba_reset
+            call mx_wait
+            call mx_vres
+            ld a, $80
+            call mx_vdall
+            call mx_vcirc
+            call mx_wait
+            ld a, 2
+            ld [ba_mode], a
+.f:         call mx_eclr
+            ld e, 0
+.s:         call mx_vx
+            ld [BZ + $8C], a
+            call mx_vy
+            ld [BZ + $8E], a
+            ld a, [W7 + $7E9A]
+            bit 6, a
+            jr nz, .m
+            ld a, [BZ + $8A]                ; a member: C0 + 4, C4 + 8
+            ld hl, BZ + $C0
+            add a, l
+            ld l, a
+            ld a, [hl]
+            add a, 4
+            ld [BZ + $8D], a
+            ld a, l
+            add a, 4
+            ld l, a
+            ld a, [hl]
+            add a, 8
+            ld [BZ + $8F], a
+            jr .d
+.m:         ld a, [BZ + $8A]                ; a monster: its centre
+            add a, a
+            ld c, a
+            ld b, 0
+            ld hl, W7 + $7DD7
+            add hl, bc
+            ld a, [hl+]
+            ld [BZ + $8D], a
+            ld a, [hl]
+            ld [BZ + $8F], a
+.d:         call mx_one
+            ld a, $FC
+            call mx_vaadd
+            ld a, 4
+            call mx_vdsub
+            inc e
+            ld a, e
+            cp 8
+            jr nz, .s
+            ld hl, BZ + $B6
+            inc [hl]
+            call mx_wait
+            ld a, [W7 + $7E26]
+            cp 8
+            jr nc, .f
+            ret
+; $02 quake: members shaken 16 times; on monsters the caster's frames $5C-$5E, then the earthquake
+mx_quake:   call mx_b911
+            ld a, [W7 + $7E9B]
+            and a
+            ret z
+            ld hl, BZ + $C9
+            inc [hl]
+            ld a, [W7 + $7E9A]
+            bit 6, a
+            jr nz, .m
+            ld b, 16
+.l:         push bc
+            ld c, 1
+            call .sh
+            ld c, -1
+            call .sh
+            pop bc
+            dec b
+            jr nz, .l
+            ret
+.sh:        ld hl, BZ + $C0
+            ld b, 4
+.s:         ld a, [hl]
+            add a, c
+            ld [hl+], a
+            dec b
+            jr nz, .s
+            call chr_draw
+            call mx_wait
+            jp mx_wait
+.m:         call ba_save
+            call ba_reset
+            call ba_tm
+            ld a, 3
+            jr z, .c
+            ld a, $0C
+.c:         call ba_cfr
+            ld a, $5C
+            call ba_aspr0
+            ld a, $5D
+            call ba_aspr0
+            ld a, $5E
+            call ba_aspr0
+            call mx_shake
+            jp ba_end
+; $0E earthquake
+mx_eq:      call mx_b911
+            ld a, [W7 + $7E9B]
+            and a
+            ret z
+; 32/8C8D the earthquake: 16 frames, then 64 of the battlefield shaken (x 0-3, FF3's random)
+mx_shake:   ld b, 16
+.w:         push bc
+            call mx_wait
+            pop bc
+            dec b
+            jr nz, .w
+            ld hl, BZ + $C9
+            inc [hl]
+            ldh a, [scx]
+            ld [mx_s], a
+            ld b, $40
+.f:         push bc
+            call mx_wait
+            call ba_rnd255
+            and 3
+            ld hl, mx_s
+            add a, [hl]
+            ldh [scx], a
+            pop bc
+            dec b
+            jr nz, .f
+            ld a, [mx_s]
+            ldh [scx], a
+            jp mx_wait
+; $03 meteo / cave-in: 6 fireballs falling for 64 frames (x from FF3's random table)
+mx_meteo:   call mx_b911
+            ld a, [W7 + $7E9B]
+            and a
+            ret z
+            ld hl, W7 + $7900
+            ld b, 6
+.i:         xor a
+            ld [hl+], a
+            dec b
+            jr nz, .i
+            ld b, 6                         ; ($790C: the counters from 33/B9E0)
+            ld de, $B9E0 + N33
+            ld hl, W7 + $790C
+.i2:        ld a, [de]
+            inc de
+            ld [hl+], a
+            dec b
+            jr nz, .i2
+            ld hl, W7 + $7912
+            ld b, 6
+            xor a
+.i3:        ld [hl+], a
+            dec b
+            jr nz, .i3
+            ld hl, BZ + $C9
+            inc [hl]
+            ld a, $40
+            ld [BZ + $B6], a
+            ld a, 2
+            ld [ba_mode], a
+.f:         call mx_wait
+            call mx_eclr
+            ld e, 0
+.b:         ld d, 0
+            ld hl, W7 + $790C
+            add hl, de
+            dec [hl]
+            jr nz, .sh
+            ld [hl], $0A                    ; a new fireball: y 8, x = random & $38 + 33/B9DA
+            ld hl, W7 + $7906
+            add hl, de
+            ld [hl], 8
+            ld hl, BZ + $90
+            inc [hl]
+            ld a, [hl]
+            ld c, a
+            ld b, 0
+            ld hl, W7 + $7BE3
+            add hl, bc
+            ld a, [hl]
+            and $38
+            ld hl, $B9DA + N33
+            add hl, de
+            add a, [hl]
+            ld hl, W7 + $7900
+            add hl, de
+            ld [hl], a
+            ld hl, W7 + $7912
+            add hl, de
+            ld [hl], 1
+.sh:        ld hl, W7 + $7912
+            add hl, de
+            ld a, [hl]
+            and a
+            jr z, .n
+            ld hl, W7 + $7900
+            add hl, de
+            ld a, [hl]
+            and a
+            jr z, .off
+            cp $F8
+            jr z, .off
+            ld hl, W7 + $7906
+            add hl, de
+            ld a, [hl]
+            cp $88
+            jr nc, .off
+            push de
+            call .draw
+            pop de
+            ld hl, W7 + $7900               ; x +- 8 (towards the target side), y + 12
+            add hl, de
+            ld a, [W7 + $7E9A]
+            bit 6, a
+            ld a, [hl]
+            jr nz, .mm
+            add a, 8
+            jr .mx
+.mm:        sub 8
+.mx:        ld [hl], a
+            ld hl, W7 + $7906
+            add hl, de
+            ld a, [hl]
+            add a, $0C
+            ld [hl], a
+            jr .n
+.off:       ld hl, W7 + $7912
+            add hl, de
+            ld [hl], 0
+.n:         inc e
+            ld a, e
+            cp 6
+            jr nz, .b
+            ld hl, BZ + $B6
+            dec [hl]
+            jr nz, .f
+            ret
+.draw:      ld hl, W7 + $7900               ; 33/BA95: 32/91CB's 2 x 3 frame (by the side),
+            add hl, de                      ;   tiles 33/B9CE (small every other frame)
+            ld a, [hl]
+            ld [BZ + $8C], a
+            ld hl, W7 + $7906
+            add hl, de
+            ld a, [hl]
+            ld [BZ + $8D], a
+            ld hl, W7 + $790C
+            add hl, de
+            ld a, [hl]
+            and 1
+            ld c, 0
+            jr z, .d0
+            ld c, 6
+.d0:        ld a, [W7 + $7E9A]
+            and $40
+            ld hl, $91EF + F32
+            jr z, .d1
+            ld hl, $91D7 + F32
+.d1:        ld b, 6
+.d2:        push bc
+            push hl
+            ld a, FXD
+            call rd_byte                    ; y
+            ld d, a
+            ld a, [BZ + $8D]
+            add a, d
+            ld [mx_t], a
+            inc hl
+            ld a, FXD
+            call rd_byte                    ; attributes
+            or 3
+            ld [mx_t + 1], a
+            ld a, FXD
+            call rd_byte                    ; x
+            ld d, a
+            ld a, [BZ + $8C]
+            add a, d
+            ld [mx_t + 2], a
+            ld b, 0                         ; the tile: 33/B9CE + C
+            ld hl, $B9CE + N33
+            add hl, bc
+            ld d, [hl]
+            ld a, [mx_t + 2]
+            ld b, a
+            ld a, [mx_t]
+            ld c, a
+            ld a, [mx_t + 1]
+            ld e, a
+            call mx_put
+            pop hl
+            ld bc, 4
+            add hl, bc
+            pop bc
+            inc c
+            dec b
+            jr nz, .d2
+            ret
+; $0A tsunami: 13 rows of waves for 88 frames (x from FF3's random table)
+mx_tsun:    ld a, [W7 + $7E9B]
+            and a
+            ret z
+            ld hl, W7 + $7BE3
+            ld de, W7 + $7900
+            ld b, 13
+.i:         ld a, [hl+]
+            and 7
+            add a, $B0
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .i
+            ld a, $10
+            call mx_gfx
+            ld a, $BC
+            call ba_pal3
+            xor a
+            ld [BZ + $B6], a
+            ld hl, BZ + $C9
+            inc [hl]
+            ld a, 2
+            ld [ba_mode], a
+.f:         call mx_wait
+            call mx_eclr
+            ld a, [BZ + $B6]
+            and 1
+            add a, $2C
+            ld [BZ + $8D], a
+            ld e, 0
+.r:         ld a, [BZ + $B6]
+            and 3
+            ld d, 0
+            ld hl, W7 + $7900
+            add hl, de
+            add a, [hl]
+            ld [BZ + $8C], a
+            inc [hl]
+            push de
+            ld d, $4B                       ; 3 sprites $4B, $4A, $49 (x < $50: hidden)
+            ld b, 3
+.s:         push bc
+            ld a, [BZ + $8C]
+            cp $50
+            jr c, .sx
+            ld b, a
+            ld a, [BZ + $8D]
+            ld c, a
+            ld e, $43
+            push de
+            call mx_put
+            pop de
+.sx:        ld a, [BZ + $8C]
+            add a, 8
+            ld [BZ + $8C], a
+            dec d
+            pop bc
+            dec b
+            jr nz, .s
+            pop de
+            ld a, [BZ + $8D]
+            add a, 8
+            ld [BZ + $8D], a
+            inc e
+            ld a, e
+            cp 13
+            jr nz, .r
+            call ba_inc
+            cp $58
+            jr nz, .f
+            ret
+; $0B glare / mind blast / mega flare: the screen flashed in the spell's colour (2E/804B)
+mx_glare:   ld a, [W7 + $7E9B]
+            and a
+            ret z
+            ld hl, BZ + $C9
+            inc [hl]
+            ld a, [W7 + $7E88]
+            sub $38
+            ld l, a
+            ld h, 0
+            ld de, $804B + F2E8
+            add hl, de
+            ld a, FXD
+            call rd_byte
+            jr mx_fl1
+; $0C explode: red
+mx_expl:    ld a, [W7 + $7E99]
+            and a
+            ret z
+            ld a, $16
+mx_fl1:     ld hl, BZ + $C9
+            inc [hl]
+; 32/877F the backdrop flashed in A every 4 frames for 32 frames
+mx_flash:   ld [mx_s], a
+            ld b, $20
+.f:         push bc
+            call s16_build
+            call mx_snd
+            pop bc
+            push bc
+            ld a, b
+            and 3
+            ld a, $0F
+            jr nz, .c
+            ld a, [mx_s]
+.c:         call ba_bkd
+            pop bc
+            dec b
+            jr nz, .f
+            ret
+; $09 flare wave (the final boss): the casting, then red flashes (10/8BD5's cloud wave: later)
+mx_flare:   ld a, [W7 + $7E9B]
+            and a
+            ret z
+            call mx_b911
+            ld hl, BZ + $C9
+            inc [hl]
+            ld a, $16
+            jr mx_fl1
+; $10-$12 enemy flame / blizzard / thunder: 6 x 16 sprites over the party's column (FF3 clears the
+; party's sprites meanwhile), frames 06/8E20 + $60 n toggled every 4 frames, 32 frames
+mx_flame:   xor a
+            jr mx_emag
+mx_bliz:    ld a, 2
+            jr mx_emag
+mx_thun:    ld a, 4
+mx_emag:    push af
+            call mx_b911
+            pop af
+            ld [mx_s], a
+            ld a, [W7 + $7E9B]
+            and a
+            ret z
+            ld hl, BZ + $C9
+            inc [hl]
+            ld a, 1
+            ldh [s16_np], a
+            xor a
+            ld [BZ + $B6], a
+            ld a, 3
+            ld [ba_mode], a
+.f:         call mx_wait
+            ld a, [BZ + $B6]
+            and 4
+            rrca
+            rrca
+            ld hl, mx_s
+            add a, [hl]
+            call .fr
+            call ba_inc
+            and $20
+            jr z, .f
+            xor a
+            ldh [s16_np], a
+            ret
+.fr:        cp 5                            ; (frame 5 is FF3's $7360 buffer: all $FF)
+            jr nc, .x
+            ld l, a                         ; 06/8E20 + $60 frame
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, de
+            ld de, $8E20 + F06
+            add hl, de
+            push hl
+            call mx_eclr
+            pop hl
+            ld c, $18                       ; y $18 + 8 row, x $C8 + 8 column
+            ld b, 16
+.r:         push bc
+            ld b, $C8
+            ld e, 6
+.c:         push de
+            push hl
+            push bc
+            ld a, FXD
+            call rd_byte
+            pop bc
+            cp $FF
+            jr z, .n
+            push bc
+            ld d, a
+            and $C0
+            or 3
+            ld e, a
+            ld a, d
+            and $3F
+            add a, $49
+            ld d, a
+            call mx_put
+            pop bc
+.n:         pop hl
+            inc hl
+            ld a, b
+            add a, 8
+            ld b, a
+            pop de
+            dec e
+            jr nz, .c
+            pop bc
+            ld a, c
+            add a, 8
+            ld c, a
+            dec b
+            jr nz, .r
+.x:         ret
+; the effect's sprites cleared (FF3's sprites 6-13: the party stays)
+mx_eclr:    xor a
+            ld [s16_n], a
+            ret
+; A = sin(A) (FF3's table, signed) ; A x C >> 8 (unsigned)
+mx_sin:     push hl
+            push de
+            ld l, a
+            ld h, 0
+            ld de, CUT_SINE
+            add hl, de
+            ld a, CUTD
+            call rd_byte
+            pop de
+            pop hl
+            ret
+mx_mul:     push de
+            ld d, a
+            xor a
+            ld b, 8
+.l:         srl d
+            jr nc, .n
+            add a, c
+.n:         rra
+            dec b
+            jr nz, .l
+            pop de
+            ret
 
 ; ---- 33/B09B the casting (black: bubbles, white: stars)
 mx_pre:     call mx_props
@@ -1538,7 +2281,87 @@ mx_frd:     xor a
             pop hl
             ret
 ; 33/B5BB the reflection: 4 frames of the wall (32/9453 at a monster, 32/9473 at a member)
-mx_refl:    ret
+mx_refl:    ld a, 4
+            ld [BZ + $B6], a
+.f:         call mx_wait
+            call mx_eclr
+            ld a, [BZ + $95]
+            push af
+            ld a, [W7 + $7E9A]
+            bit 6, a
+            jr nz, .m
+            ld a, [BZ + $90]                ; a member: C0 - 16, C4 - 4 (placed by it)
+            ld [BZ + $95], a
+            ld hl, BZ + $C0
+            add a, l
+            ld l, a
+            ld a, [hl]
+            sub $10
+            ld [BZ + $8C], a
+            ld a, l
+            add a, 4
+            ld l, a
+            ld a, [hl]
+            sub 4
+            ld [BZ + $8D], a
+            xor a
+            ld [ba_mode], a
+            ld hl, $9473 + F32B
+            jr .d
+.m:         ld a, [BZ + $90]                ; a monster: its centre
+            add a, a
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7DD7
+            add hl, de
+            ld a, [hl+]
+            ld [BZ + $8C], a
+            ld a, [hl]
+            ld [BZ + $8D], a
+            ld a, 1
+            ld [ba_mode], a
+            ld hl, $9453 + F32B
+.d:         call .four
+            ld a, [BZ + $8D]
+            add a, $10
+            ld [BZ + $8D], a
+            call .four
+            pop af
+            ld [BZ + $95], a
+            ld hl, BZ + $B6
+            dec [hl]
+            jr nz, .f
+            jp ba_reset
+.four:      ld b, 4                         ; 4 sprites: dy, tile, attributes | 3, dx
+.s:         push bc
+            ld a, FXD
+            call rd_byte
+            ld c, a
+            ld a, [BZ + $8D]
+            add a, c
+            ld [mx_t], a
+            ld a, FXD
+            call rd_byte
+            ld d, a
+            ld a, FXD
+            call rd_byte
+            or 3
+            ld e, a
+            ld a, FXD
+            call rd_byte
+            ld c, a
+            ld a, [BZ + $8C]
+            add a, c
+            ld b, a
+            ld a, [mx_t]
+            ld c, a
+            push hl
+            call mx_put
+            pop hl
+            pop bc
+            dec b
+            jr nz, .s
+            ret
 
 ; FF3 sprite (B = x, C = y, D = tile, E = FF3 attributes) -> s16_in, placed as btlanim.s's ba_put
 ; (ba_mode 0: by the member $95 in the party column, 1: the battlefield, 2: a projectile)
@@ -1550,7 +2373,16 @@ mx_put:     ld a, d
             jr z, .pc
             dec a
             jr z, .bf
-            ld a, [W7 + $78C3]              ; 2: x <= 128 as the battlefield, >= 192 as the party
+            dec a
+            jr z, .pj
+            ld a, b                         ; 3: the party's column (enemy magic): x - 88, y - 32
+            sub 88
+            ld b, a
+            ld a, c
+            sub 32
+            ld c, a
+            jr .mir
+.pj:        ld a, [W7 + $78C3]              ; 2: x <= 128 as the battlefield, >= 192 as the party
             cp $88                          ;   column, between them compressed; y - 32
             ld a, b
             jr nz, .j0
