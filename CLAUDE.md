@@ -896,6 +896,7 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   attacks, the battle's end done. Vehicles done (`src/veh.s`: canoe, ship, airships, landing, the
   Invincible's sprite and jump, the Nautilus diving, the floating continent's edge), the fat chocobo,
   chest battles. Cutscenes done (`src/cut.s`, `cut.py`: crystal prologue, epilogue, ending + end
-  credits, FF3's timing). Next: field effects ($D0-$DA, $E0-$E2), the guest NPC, the special
-  animations ($EF), attack / spell animations. Also fixed in the
+  credits, FF3's timing). Field effects, the guest NPC, people's moves and the special animations
+  ($EF, `src/anim.s`) done, with FF3's world map objects. Next: attack / spell animations, then the
+  parity / Lot Check pass on the native build. Also fixed in the
   recompiled build: one-row menu cursors (Item opened Magic), the battle "Miss" sprite in English.

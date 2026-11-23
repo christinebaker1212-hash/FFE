@@ -325,3 +325,17 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   special animations ($EF: statues and the Saronia gate (map tiles + $602E, also re-applied on
   world 3 loads), explosions, Bahamut, the Invincible rising, the circling stars), then battle
   animations.
+- 2026-11-23 (later): **field effects and the rest of the event script**: the guest NPC ($EE: it
+  follows four steps behind on maps, onto the party's tile on world maps where the party waits
+  for it; its graphics / colours; B talks to it), show / hide party and guest (C8-CD), screen shake
+  ($D0), flash ($D1 / $E2), blue dusk and back ($D2 / $D3), map palettes ($E0 / $E1), people's
+  dance ($DA), jumps / circle / spin (object commands A / B / E / F), special animations ($EF,
+  `src/anim.s` in bank CODE6 with 3A / 3B / 3C tables at their NES addresses): explosions,
+  statues and Saronia's gate (map tiles + $602E, re-applied on world 3 loads), the airship /
+  boulder breaking up, cannon balls, the Enterprise landing, the Invincible rising, Bahamut,
+  circling stars and lights, the spinning walker ($602F bit 6). World map: FF3's extra sprite
+  graphics (3D/BDE0) and objects each frame (Leviathan's shadow, boulder, whirlpool, Hein's
+  castle and Bahamut orbits, the floating continent overhead, the chocobo running off).
+  Fixed: the parked-Invincible code had cleared OAM 4-27 on every map (people hidden on maps).
+  Test hook (RAM, `tst_choc`): $D0-$E3 runs that event command, $F0-$FF special animation n.
+  Next: battle animations, then the parity / Lot Check pass on the native build.
