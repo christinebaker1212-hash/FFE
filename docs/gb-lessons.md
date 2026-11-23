@@ -239,6 +239,25 @@ Color only" screen on older systems.
   sprites hidden under the window and a junk window palette in towns. List, for every shared
   region, which files read each variable (a script over the .lab and the sources does it).
 
+## Moving code breaks fall-throughs and registers (2026-11-23, later)
+- **A routine that ends by falling into the next one breaks when either moves.** `bt_lvchk` ended
+  with `ret c` and fell into `bt_levelup`; moving `bt_levelup` for room made it fall into
+  `bt_rf`, which returns: no level ups at all, for a whole release. End every routine with an
+  explicit `jp`/`ret`; before moving code, search for labels that nothing calls (a script over
+  the .sym and the sources lists them: here `bt_levelup` had no callers).
+- **A call inserted at a routine's top can clobber its argument.** `call bt_ban_off` at the top
+  of `bt_erase_enemy` overwrote A (the enemy's slot), so the dissolve and the erase hit other
+  cells and the dead enemy came back with the next row refresh. Save the arguments first.
+- **`push bc ... pop af` loses a counter:** F keeps only bits 4-7, so a count in C became 0
+  (the battle reward loop). Pop into the register you pushed.
+- **Records left uninitialised for unused slots** share RAM with the map queue; any loop over all
+  slots must not read them. Clear unused slots where the mode starts.
+- **Test like a player, from New Game, without pokes:** the owner found these by playing; the
+  test builds that start in a battle or a town with a poked save page hid them (levels never
+  checked past a test party's fixed level, the reward loop never compared with FF1's sums).
+  `scratchpad pt/grind2.py`: New Game, the field, battles fought with Fight, rewards checked
+  against FF1's sums from the ROM's enemy data, rests at the inn.
+
 ## Hardware traps found by the owner on real units (2026-11-23)
 - **Never retrigger channel 3 while it plays on a DMG / Pocket:** a trigger that meets the
   channel's wave RAM read corrupts the first bytes of wave RAM, permanently, so every later

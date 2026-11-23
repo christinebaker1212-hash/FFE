@@ -1333,7 +1333,7 @@ down): fixed; name grid 6 x 10 with the whole hand; battle: a swing per hit, the
 the swings, messages only for what numbers cannot show, a top window for spell / ability / target
 names, green healing numbers, low-HP colours, every ailment named (docs/ff1-native.md items 25-26).
 Owner (2026-11-23, last): names corrupted (Rienne -> RiRine), weapons lost, town transition breaking the message window / banner: one bug, the map objects' loop ran on through RAM (obj_anim clobbered its counter); fixed, found with a SameBoy write watchpoint (build/sameboy_watch.so, docs/gb-lessons.md). Battle name window at the bottom for top-row targets, SELECT hides it (docs/ff1-native.md item 27).
-Next: the walking playthrough (DMG / SGB / CGB), then the owner's play-test. Lessons: docs/gb-lessons.md.
+Owner (2026-11-23, last): "must be playable through normally": fixed rewards / level ups / dead enemies / weapons in battle, gradient (palette 0, music ticks, Options presses), save screen, wipe sound, intro fade, overworld bridge / canal, forest overlap (docs/ff1-native.md item 28). Priority now: a real playthrough from New Game with no pokes (harness: scratchpad pt/grind2.py), then the owner's new features (airship view mock-up, raster spells, reflections, SGB sounds / borders, animated water, smoother loads, sound test / bestiary). Lessons: docs/gb-lessons.md.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

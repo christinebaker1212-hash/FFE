@@ -468,3 +468,20 @@ one reaches parity, so the owner can keep playing).
    Continue and Suspend / resume keep them (checked in SameBoy with a party made in the game).
    Battle: the target's name window at the bottom for enemies in the top rows and for the first
    member (was hidden there); SELECT turns it off / on (owner).
+28. Owner (2026-11-23, last; "this game must be playable through normally"), fixed:
+   - the prologue fades in from the boot logo's white;
+   - gradient: the field windows repainted the map's palette 0 after Options (menus' copy left
+     on), the music skipped frames with no colour records, quick Options presses were lost (the
+     whole gradient rebuilt per press);
+   - battle: EXP / Gil (the reward loop lost its counter through `pop af` and read leftover
+     bytes of empty slots), no level ups at all (a fall-through broken by moving code), dead
+     enemies erased in the wrong place and coming back, names / counts not updated after a
+     blow, the weapon hidden in every swing (the hand-hide during tile uploads), the target
+     window drawn over while shown;
+   - the save screen cleared File 2's rows instead of the chosen file's;
+   - the wipe sound shared square 1 with the music engine, and the next song's first notes were
+     overwritten (the song now starts after the wipe opens);
+   - the overworld bridge and canal were never drawn; the party's lower half hidden in forests.
+   Checked by playing from New Game in SameBoy (grinding near Cornelia, the inn, saves): rewards
+   equal FF1's sums, levels 2 and 3 reached. Saves made with older ROMs can carry flags / names /
+   weapons damaged by the object-loop bug (item 27): start a new game.
