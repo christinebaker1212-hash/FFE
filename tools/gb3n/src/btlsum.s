@@ -475,10 +475,10 @@ sm_a7b:     ld b, $40
             ldh [rSVBK], a
             ret
 sm_jhl:     jp hl
-sm_tab:     dw sm_dash, sm_shk, sm_kick, sm_hold, sm_icy, sm_hold
+sm_tab:     dw sm_dash, sm_shk, sm_kick, sm_mesm, sm_icy, sm_dust
             dw sm_mind, sm_thun, sm_thun, sm_heal, sm_hell, sm_inf
             dw sm_clob, sm_stomp, sm_quake, sm_prot, sm_slash, sm_zan
-            dw sm_demon, sm_hold, sm_tidal, sm_aura, sm_rend, sm_mega
+            dw sm_demon, sm_cycl, sm_tidal, sm_aura, sm_rend, sm_mega
 ; (not yet ported: the creature holds 48 frames, then goes)
 sm_hold:    ld b, 48
 .w:         push bc
@@ -1210,6 +1210,95 @@ sm_flame:   ld e, a
 sm_87a0:    ld hl, $B040
             ld a, $11
             jp sm_gfx
+
+; $03 mesmerize (simplified: FF3 waves the battlefield line by line with raster timing; here the
+; whole battlefield sways, 128 frames, ramped in / out over 16 frames)
+sm_mesm:    ld hl, BZ + $C9
+            inc [hl]
+            ldh a, [scx]
+            ld [sm_t], a
+            xor a
+            ld [BZ + $B6], a
+.f:         ld a, [BZ + $B6]                ; the amplitude: 0-3 (16 frames in / out)
+            cp $10
+            jr c, .a
+            ld c, a
+            ld a, $80
+            sub c
+            cp $10
+            jr c, .a
+            ld a, $0F
+.a:         srl a
+            srl a
+            ld c, a
+            ld a, [BZ + $B6]
+            and $0F
+            cp 8
+            ld a, c
+            jr c, .p
+            cpl
+            inc a
+.p:         ld hl, sm_t
+            add a, [hl]
+            ldh [scx], a
+            call sm_drawb
+            call mx_wait
+            call ba_inc
+            cp $80
+            jr nz, .f
+            ld a, [sm_t]
+            ldh [scx], a
+            ret
+; $05 diamond dust (simplified: FF3's 48 drifting snowflakes; here the backdrop flashed light blue)
+sm_dust:    ld hl, BZ + $C9
+            inc [hl]
+            ld a, $0E
+            call sm_gfx0
+            ld a, $FF
+            call ba_pal3
+            ld a, $31
+            ld b, $40
+            jp sm_bkfl
+; $13 cyclone (simplified: 60 frames, Leviathan leaves, 16 frames, then 63 frames of the
+; battlefield shaken from FF3's random table, no random calls as FF3)
+sm_cycl:    ld b, 60
+.w:         push bc
+            call mx_wait
+            pop bc
+            dec b
+            jr nz, .w
+            call sm_out
+            call sm_w16
+            call mx_eclr
+            ld a, $FF
+            call ba_pal3
+            ld a, $0E
+            call sm_gfx0
+            ld hl, BZ + $C9
+            inc [hl]
+            ldh a, [scx]
+            ld [sm_t], a
+            ld b, 63
+.s:         push bc
+            call mx_wait
+            pop bc
+            push bc
+            ld a, b
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7BE3
+            add hl, de
+            ld a, [hl]
+            and 3
+            ld hl, sm_t
+            add a, [hl]
+            ldh [scx], a
+            pop bc
+            dec b
+            jr nz, .s
+            ld a, [sm_t]
+            ldh [scx], a
+            ret
 
 ; 32/8781 the backdrop A every 4 frames for B frames
 sm_bkfl:    ld [sm_t], a
