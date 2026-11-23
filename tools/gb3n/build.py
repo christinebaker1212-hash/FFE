@@ -184,7 +184,8 @@ def nes_rgb_src():
 MODULES = ('npc', 'text', 'event', 'menucore', 'select', 'snd')              # bank 0
 SND_BANK0 = 81                          # sound: FF3 bank $36 at $4000 + a song bank ($37, $38, $39,
                                         #   $09) at $6000: banks 81-84
-CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save', 'title')  # bank CODE1
+CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save', 'title', 'shop')  # bank CODE1
+ITEMN_BANK0 = 85                        # condensed item names (shop.py): banks 85-87
 CODE1 = 80
 
 
@@ -207,9 +208,10 @@ def engine_src(rom=None):
         codes.append('\n'.join(l for l in c.split('\n') if not l.startswith('section bank 0,')))
         rams.append(r)
     if rom is not None:
-        import menu, title
+        import menu, title, shop
         codes.append(menu.code_data(rom, rgb555))
         codes.append(title.code_data(rom))
+        codes.append(shop.code_data(rom))
     zp = ''.join('Z_%02X = $%04X\n' % (n, 0xFFB0 + n - 0x18) for n in range(0x18, 0x60))
     shadow = lambda t: t.replace('ld [MBC5_BANKL], a', 'ld [rom_bank], a\n            ld [MBC5_BANKL], a')
     return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + zp + shadow(main_code) + '\n' +
@@ -248,6 +250,10 @@ def main():
     g[0x3800:0x3820] = snd_noise()                             # $7800: NES noise -> NR43
     g[0x3840:0x3860] = rom.b(0x3B, 0xA027, 32)                 # $7840: world map songs (3B/A006)
     g[0x3880:0x38A0] = rom.b(0x3B, 0xA047, 32)                 # $7880: and their sound effects
+    import shop
+    nb, nflags = shop.name_tiles(rom)
+    g[0x3900:0x3A00] = nflags                                  # $7900: condensed item names
+    for k, d in nb.items(): banks[ITEMN_BANK0 + k] = d
     banks[GAME_BANK] = g
     for grp in range(3):
         w = group_world(grp)
@@ -277,7 +283,7 @@ def main():
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
-                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0,
+                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0,
                        'TEST_SONG': int(opt['--song'], 0) if opt['--song'] else 255,
                        'SND_MASK': int(os.environ.get('GB_SND_MASK', 'FF'), 16),     # (test builds: NR51)
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,

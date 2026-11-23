@@ -89,9 +89,18 @@ t_page:     ld a, 1
             ld a, [t_item]                  ; $02: the item's name (fix:EF5B)
             jr .name
 .c3:        cp $03
-            jr nz, .c5
+            jr nz, .c4
             ld a, [t_item]                  ; $03: its price (treasure gil: fix:EF6A)
             call item_price
+            jr .num
+.c4:        cp $04
+            jr nz, .c5
+            ld hl, t_gil                    ; $04: a shop / inn price (FF3 $61-$63: shop.s t_gil)
+            ld a, [hl+]
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            ld c, [hl]
             jr .num
 .c5:        cp $05
             jr nz, .c10
@@ -213,8 +222,9 @@ t_num:      ld a, c
 .done:      inc hl
             inc hl
             inc hl
+            ld a, c                         ; (the digit: C is the caller's again after pop)
             pop bc
-            ld a, c
+            ld c, a
             and a
             jr nz, .pr
             ld a, [t_lead]

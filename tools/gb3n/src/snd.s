@@ -61,12 +61,14 @@ six:        push bc
             pop bc
             ret
 
-; V-Blank: one frame of FF3's 8003 (the sound bank of the song selected; the bank restored)
+; V-Blank: one frame of FF3's 8003 (the sound bank of the song selected; the bank restored). The
+; driver runs from an interrupt: its bank writes go to the MBC5 register directly ($2100), so the
+; interrupted code's bank (rom_bank, the shadow every other bank switch keeps) is put back
 snd_frame:  ld a, [snd_on]
             and a
             ret z
             ld a, [snd_bank]
-            ld [MBC5_BANKL], a
+            ld [$2100], a                   ; (MBC5 ROM bank, not through the rom_bank shadow)
             ld a, [S43]                     ; (song $37: no effects)
             cp $37
             jr nz, .fx
@@ -84,7 +86,7 @@ snd_frame:  ld a, [snd_on]
             or b
             ld [S40], a
             ld a, [rom_bank]
-            ld [MBC5_BANKL], a
+            ld [$2100], a                   ; (MBC5 ROM bank, not through the rom_bank shadow)
             ret
 
 ; play song A (FF3: $7F43 = A, $7F42 = 1; the driver takes the song's bank when it starts it)
@@ -179,7 +181,7 @@ mus_update: ld a, [S42]
             ld [S43], a
             call snd_selbank
             ld a, [snd_bank]
-            ld [MBC5_BANKL], a
+            ld [$2100], a                   ; (MBC5 ROM bank, not through the rom_bank shadow)
             jr .same
 .start:     ld a, [S40]
             ld [S41], a
@@ -187,7 +189,7 @@ mus_update: ld a, [S42]
             ld [S40], a
             call snd_selbank
             ld a, [snd_bank]
-            ld [MBC5_BANKL], a
+            ld [$2100], a                   ; (MBC5 ROM bank, not through the rom_bank shadow)
             jp song_init
 .same:      ld a, $80
             ld [S42], a
@@ -201,7 +203,7 @@ mus_update: ld a, [S42]
             ld [S42], a
             call snd_selbank
             ld a, [snd_bank]
-            ld [MBC5_BANKL], a
+            ld [$2100], a                   ; (MBC5 ROM bank, not through the rom_bank shadow)
             jp song_init
 .ns:        bit 2, c                        ; stop
             call nz, mus_stopvol
@@ -1344,7 +1346,7 @@ sfx_mute:   ld a, [SFL + 5]
 
 ; ---- the GB output (FF3 8030 effects / 80AB music: the NES register writes as channel updates)
 snd_out:    ld a, GAME_BANK                 ; (the period table SND_TAB at GAME_BANK $6800)
-            ld [MBC5_BANKL], a
+            ld [$2100], a                   ; (MBC5 ROM bank, not through the rom_bank shadow)
             ld a, [S49]                     ; effects: pulse 2 (5) -> CH2, noise (6) -> CH4
             and a
             jr z, .mus

@@ -100,8 +100,6 @@ talk:       ld a, [px]                      ; the facing tile (fix:E4E9)
             jp treasure                     ; (no one: treasures, locked doors: fix:E917)
 .found:     ld a, [hl]                      ; the npc's script: 2C/8200 (world 0) / 2C/8400
             ld [ev_npc], a
-            cp $E0
-            ret nc                          ; (inns, shops, the fat chocobo: later)
             ld c, a
             ld b, $42                       ; (GB: $4200 / $4400 + 2 id)
             ld a, [cur_world]
@@ -120,6 +118,9 @@ talk:       ld a, [px]                      ; the facing tile (fix:E4E9)
             ld h, [hl]
             ld l, a
             call ev_trig                    ; -> EV_TRIG
+            ld a, [ev_npc]                  ; (fix:E9D3: $E0- inns, shops, the fat chocobo)
+            cp $E0
+            jr nc, shop_npc
             ld hl, EV_TRIG                  ; 3C/92F3: past the conditionals (blocks end with
             ld c, 0                         ;   $FF id; the list with a block starting $FF)
 .cl:        ld a, [hl]
@@ -142,6 +143,21 @@ talk:       ld a, [px]                      ; the facing tile (fix:E4E9)
             dec b
             jr nz, .cp
             call ev_check                   ; -> event id
+            and a
+            ret z
+            jp ev_start
+
+; fix:E9E8: an inn ($E0-$E2) or a shop ($E3-$FB; the fat chocobo $FC-: later), in bank CODE1
+; (shop.s); after an inn its event (FF3 $7B01 -> $6C)
+shop_npc:   cp $FC
+            ret nc
+            ld hl, shop_open
+            cp $E3
+            jr nc, .f
+            ld hl, inn_open
+.f:         ld a, CODE1
+            call far_call
+            ld a, [sh_ev]
             and a
             ret z
             jp ev_start
