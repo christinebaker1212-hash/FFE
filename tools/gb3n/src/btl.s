@@ -45,6 +45,10 @@ btl_main:   call btl_flash
             ld [lcd_is], a
             ld a, LCDC_ON
             ldh [rLCDC], a
+            call turn_start                 ; (34/8074: the first turn's start; the loop: next)
+            ld a, [W7 + $78BA]
+            and 1
+            call z, mon_think
 .wait:      call wait_vbl                   ; (for now: A ends the battle)
             call read_pad
             ld a, [pad_new]
