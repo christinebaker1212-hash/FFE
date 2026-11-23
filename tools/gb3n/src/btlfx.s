@@ -809,7 +809,73 @@ mx_magic:   ld a, [W7 + $7E88]              ; the spell's sound
             ld [ba_dirty], a
             xor a
             ld [BZ + $CC], a
+            ld a, [W7 + $7E9A]              ; 34/859F: on monsters, the split / brak2 / toad / mini
+            bit 6, a
+            ret z
+            ld a, [W7 + $7E9D]
+            cp 6
+            jr z, .sp
+            cp 7
+            jr z, .br
+            cp 8
+            jr z, .td
+            cp $0D
+            ret nz
+.td:        ld a, [W7 + $7E9B]              ; toad / mini (2F/BABA): exp counted, slots cleared
+            and a
+            ret z
+            ld [W7 + $7DCA], a
+            ld c, a
+            ld b, 0
+.t1:        sla c
+            jr nc, .t2
+            push bc
+            ld e, b
+            ld d, 0
+            ld hl, W7 + $7DA7
+            add hl, de
+            ld a, [hl]
+            ld [hl], $FF
+            cp $FF
+            jr z, .t3
+            ld e, a
+            ld hl, W7 + $7DD3
+            add hl, de
+            inc [hl]
+.t3:        pop bc
+.t2:        inc b
+            ld a, b
+            cp 8
+            jr nz, .t1
+            jp mon_redraw
+.br:        ld a, [W7 + $7E9B]              ; brak2: the hit ones in palette 3
+            ld [W7 + $7E8F], a
+            ld a, 3
+            ld [W7 + $7E90], a
+            call mon_flash
+            jp attr_push
+.sp:        ld a, [W7 + $7E99]              ; split (2F/B93A): the type into the first free slot
+            cp $FF
+            ret z
+            ld c, a
+            ld hl, W7 + $7DA7
+            ld b, 0
+.s1:        ld a, [hl]
+            cp $FF
+            jr z, .s2
+            inc hl
+            inc b
+            ld a, b
+            cp 6
+            jr nz, .s1
             ret
+.s2:        ld [hl], c
+            ld e, b
+            ld d, 0
+            ld hl, W7 + $7ECD
+            add hl, de
+            ld [hl], c
+            jp mon_redraw
 
 ; 33/BAFD the magic animation by type ($7E9D)
 mx_anim:    ld a, [W7 + $7E9D]

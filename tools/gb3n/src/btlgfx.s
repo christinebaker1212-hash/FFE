@@ -645,6 +645,16 @@ mon_flash:  call mon_attrs
             xor a
             ld [W7 + $7E8E], a
             ret
+; 2F/B96F / BABA the monsters drawn again (a split's new one, toad / mini's removed ones): the
+; tilemap, the counts, the attributes, to VRAM (FF3 fades a new one in through a second tilemap)
+mon_redraw: ld hl, W7 + $7900
+            ld de, 32 * BT_ROWS
+            call memclr
+            call mon_pos
+            call mon_count
+            call mon_attrs
+            call attr_push
+            jp map_show
 ; 2F/AF34 the attribute table to the GB: $7D27 -> the battlefield rows' palettes (VRAM bank 1,
 ; in a V-Blank: the rows built in W7 + $7300)
 attr_push:  ld hl, W7 + $7300
