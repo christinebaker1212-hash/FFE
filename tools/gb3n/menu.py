@@ -224,6 +224,9 @@ def pack(rom, rgb555):
     tm = ['###.#..#', '.#..####', '.#..#..#', '.#..#..#', '........', '........', '........', '........']
     lo = bytes(int(r.replace('#', '1').replace('.', '0'), 2) for r in tm)
     b[0x2400 + (0x7F - 0x70) * 16:0x2400 + (0x7F - 0x70) * 16 + 16] = bytes(x for r in range(8) for x in (lo[r], 0xFF))
+    ar = ['........', '..#.....', '..##....', '#####...', '..##....', '..#.....', '........', '........']
+    lo = bytes(int(r.replace('#', '1').replace('.', '0'), 2) for r in ar)   # $CA: the battle arrow
+    b[0x2400 + (0xCA - 0x70) * 16:0x2400 + (0xCA - 0x70) * 16 + 16] = bytes(x for r in range(8) for x in (lo[r], 0xFF))
     msg = ['This Game Pak is', 'designed only for', 'use with the Game', 'Boy Color\x7f', 'system.']
     out = bytearray()
     for k, l in enumerate(msg):

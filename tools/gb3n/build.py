@@ -188,7 +188,7 @@ CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save', 'ti
 ITEMN_BANK0 = 85                        # condensed item names (shop.py): banks 85-87
 BDATA_BANK = 88                         # battle data (encounter tables, formations, monsters)
 CODE2 = 89                              # battle code
-CODE2_MODULES = ('btl', 'btlgfx', 'btlcore', 'btleq', 'btlai', 'btlmain', 'btlui')
+CODE2_MODULES = ('btl', 'btlgfx', 'btlcore', 'btleq', 'btlai', 'btlmain', 'btlui', 'btlact', 'btlfight', 'btlmsg', 'btlloop')
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
 CHGFX_BANK = 95                         # battle characters (NES banks $28 / $29) as GB tiles
 BDATA2_BANK = 96                        # FF3 bank $30 (monsters, stat sets, scripts, items) at $4000
@@ -283,6 +283,12 @@ def main():
     bd[0x2220:0x2234] = rom.b(0x2F, 0xB516, 20)                # $6220: 2F/B516 row x, start x / y
     bd[0x2800:0x2F00] = rom.b(0x32, 0x9100, 0x700)             # $6800: 32/9100- sprite frames
     bd[0x2240:0x2298] = rom.b(0x34, 0x9B21, 88)                # $6240: 34/9B21 commands by job
+    bd[0x22A0:0x2336] = rom.b(0x34, 0x950D, 0x96)              # $62A0: 34/950D action scripts, types
+    bd[0x2340:0x2360] = rom.b(0x34, 0x8739, 0x20)              # $6340: 34/8739 monster rows by tilemap
+    f = rom.prg[0x0D * 0x2000 + 0x1700:0x0D * 0x2000 + 0x1700 + 144 * 16]   # $7000: numeral sprites
+    for k, c in enumerate(list(range(0x80, 0x8A)) + [text.ENC[ch] for ch in 'Mis']):
+        p0 = f[16 * (c - 0x70):16 * (c - 0x70) + 8]                 #   (the font's ink, clear around)
+        bd[0x3000 + 16 * k:0x3010 + 16 * k] = bytes(x for r in range(8) for x in (p0[r], p0[r]))
     for k, a in enumerate((0x9100, 0x9200, 0x9300)):           # $6400: general use palettes
         bd[0x2400 + 0x100 * k:0x2500 + 0x100 * k] = rom.b(0, a, 0x100)
     banks[BDATA_BANK] = bd

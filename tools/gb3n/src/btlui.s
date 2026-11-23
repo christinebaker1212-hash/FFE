@@ -6,6 +6,7 @@
 ; hand in VRAM bank 1 tiles $60-$63, palettes: the window CGB 7, the hand sprite palette 3.
 BD_CMDS    = BD_2F + $240       ; 34/9B21: 4 battle commands a job (build.py)
 HAND_T     = $60
+NUM_T      = $40                ; numeral sprite tiles in VRAM bank 1 ($40-$49 digits, $4A-$4C Miss)
 BTXT_IDX   = $4000              ; BTXT_BANK: 3 bytes a battle string ($0400 + index)
 BCV_BUF    = win_buf            ; (bank 0, the field's dialogue box buffer: 4 lines x 20)
 
@@ -19,6 +20,14 @@ ui_init:    ld a, 1                         ; font -> VRAM bank 1 $70-
             ld a, 1
             call vcopyx
             call menu_pals
+            ld a, BDATA_BANK                ; numeral sprites -> VRAM bank 1 $40-$4C
+            ld [vc_src], a
+            ld hl, $7000
+            ld de, $8000 + 16 * NUM_T
+            ld b, 13
+            ld a, 1
+            call vcopyx
+            call msg_reset
             ld a, PAL_TXT | 8
             ld [m_tattr], a
             ld a, 96

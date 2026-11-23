@@ -285,12 +285,13 @@ def pack(rom, bank0):
 
 
 def pack_battle(rom, bank0):
-    """the battle strings ($0400-$07FF, table names8800) as they are: {bank: bytes}, an index at
-    bank0 $4000 (1024 ids x 3 bytes: bank, address), the strings from $4C00"""
+    """the battle strings ($0400-$07FF, table names8800) as they are, then the t8200 strings
+    ($0100-$01FF: status names) as ids 1024-1279: {bank: bytes}, an index at bank0 $4000 (1280
+    ids x 3 bytes: bank, address), the strings from $4F00"""
     banks = {bank0: bytearray(0x4000)}
-    b, a = bank0, 0x0C00
-    for i in range(1024):
-        s = raw_string(rom, 'names8800', i)
+    b, a = bank0, 0x0F00
+    for i in range(1280):
+        s = raw_string(rom, 'names8800', i) if i < 1024 else raw_string(rom, 't8200', i - 1024)
         if len(s) > 120: s = b''                       # (past the table's real entries)
         s += b'\0'
         if a + len(s) > 0x4000:

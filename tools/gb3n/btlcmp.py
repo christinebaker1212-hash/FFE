@@ -36,6 +36,9 @@ SEED = 0
 
 def main():
     global SEED
+    turns = 0
+    if '--turns' in sys.argv:
+        i = sys.argv.index('--turns'); turns = int(sys.argv[i + 1]); del sys.argv[i:i + 2]
     bid = int(sys.argv[1], 0)
     nf = int(sys.argv[2]) if len(sys.argv) > 2 else 300
     gf = int(sys.argv[3]) if len(sys.argv) > 3 else 330
@@ -58,11 +61,48 @@ def main():
     else:
         print('seed from the counters not a table seed:', cand, '(counters', bytes(uses).hex(), ')')
     print('seed', SEED)
-    zp, w = native(bid, gf, sram0, seeds)
+    if turns:
+        ram, sram, nf2 = nes_turns(bid, turns)
+        zp, w = native(bid, gf, sram0, seeds, turns)
+        print('NES turn %d reached at frame %d' % (turns + 1, nf2))
+    else:
+        zp, w = native(bid, gf, sram0, seeds)
     report(sram, ram, zp, w)
+    if turns:
+        for name, a, b in TREGIONS:
+            n = (ram[a:b] if a < 0x800 else sram[a - 0x6000:b - 0x6000])
+            g = (zp[a:b] if a < 0x100 else w[0][a - 0x7200:b - 0x7200])
+            d = [i for i in range(len(n)) if n[i] != g[i]]
+            print('%-14s %s' % (name, 'identical' if not d else 'differ at ' + ' '.join('$%04X(%02X/%02X)' % (a + i, n[i], g[i]) for i in d[:10])))
 
 
-def native(bid, gf, sram0, seeds):
+TREGIONS = [('rng counters', 0x15, 0x18), ('exp counts', 0x7DD3, 0x7DDB), ('turn', 0x7BE2, 0x7BE3),
+            ('cmd counts', 0x78F0, 0x7900), ('over', 0x78D3, 0x78D4), ('statuses', 0x7EC4, 0x7ECC)]
+
+
+def nes_turns(bid, turns):
+    """the NES battle with A pressed every 20 frames until turn TURNS + 1 starts, then 300 frames"""
+    from cynes import NES
+    import numpy as np
+    n = NES(os.path.join(ROOT, 'build', 'ff3_en.nes'))
+    st = bytearray(open(os.path.join(ROOT, 'build', 'ff3', 'cave.state'), 'rb').read())
+    st[nb.RAM + 0x6A] = bid; st[nb.RAM + 0xAB] = 0x20
+    n.load(np.array(st, dtype=np.uint8))
+    f, stop = 0, None
+    while True:
+        n.controller = 0x80 if (stop is None and f >= 330 and f % 20 < 3) else 0
+        n.step(1)
+        f += 1
+        if stop is None and f % 10 == 0:
+            s = bytes(n.save())
+            if s[nb.SRAM + 0x1BE2] >= turns + 1 and f > 400: stop = f
+        if stop is not None and f >= stop + 300: break
+        if f > 20000: break
+    s = bytes(n.save())
+    return s[nb.RAM:nb.RAM + 0x800], s[nb.SRAM:nb.SRAM + 0x2000], stop
+
+
+def native(bid, gf, sram0, seeds, turns=0):
     from pyboy import PyBoy
     rom = os.path.join(ROOT, 'build', 'ff3n_w.gbc')
     sym = {}
@@ -71,7 +111,14 @@ def native(bid, gf, sram0, seeds):
         if len(p) == 2: sym[p[1]] = int(p[0].split(':')[1], 16)
     pb = PyBoy(rom, window='null', cgb=True)
     m = pb.memory
-    for f in range(gf):
+    f, stop = 0, None
+    while True:
+        if turns:
+            if stop is None and f >= 330 and f % 20 == 0: pb.button('a', 3)
+            if stop is None and f > 400 and m[3, 0xDBE2] >= turns + 1: stop = f
+            if stop is not None and f >= stop + 300: break
+            if f > 20000: break
+        elif f >= gf: break
         if f == 100: pb.button('right', 3)
         if f == 103:
             for i in range(0x400): m[0xC800 + i] = sram0[i]
@@ -79,6 +126,8 @@ def native(bid, gf, sram0, seeds):
                 m[sym['btl_seedf']] = 0xA5; m[sym['btl_seedv']] = SEED
         if f == 104: m[sym['act_id']] = bid; m[sym['act']] = 0x20
         pb.tick()
+        f += 1
+    if turns: print('GB turn %d reached at frame %s' % (turns + 1, stop))
     m[0xFF70] = 3
     zp = bytes(m[0xD000:0xD100]); w = bytes(m[0xD200:0xDF00]); gsb = bytes(m[0xC800:0xCC00])
     pb.stop(save=False)
