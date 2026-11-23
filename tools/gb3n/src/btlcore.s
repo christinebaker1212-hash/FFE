@@ -2,45 +2,6 @@
 ; zero page lives at BZ, its pointers there hold GB addresses ($57 = $6100 -> GS + $100, $59 =
 ; $6200 -> GS + $200, $5B = $7575 / $5D = $7675 -> W7 + ...). X / Y of the 6502 code are kept in
 ; RAM or registers as each routine needs; (zp),y through zpy.
-BD2_MON    = $4000              ; BDATA2_BANK: FF3 bank $30 at $4000: 30/8000 monster properties
-BD2_STAT   = $5000              ;   30/9000 stat sets (3 bytes)
-BD2_SPEC   = $5200              ;   30/9200 special attack scripts (8 bytes)
-JB_MODS    = $5B1A              ; JOB_BANK (FF3 bank $39, NES $A000, at $4000): 39/BB1A job modifiers
-
-; A = zero page offset of a pointer, C = Y -> HL = pointer + Y (BC, DE kept)
-zpy:        push de
-            ld e, a
-            ld d, high(BZ)
-            ld a, [de]
-            ld l, a
-            inc e
-            ld a, [de]
-            ld h, a
-            ld e, c
-            ld d, 0
-            add hl, de
-            pop de
-            ret
-; A = zero page offset: [pointer] += $40 (16 bits)
-zpadd40:    ld l, a
-            ld h, high(BZ)
-            ld a, [hl]
-            add a, $40
-            ld [hl+], a
-            ret nc
-            inc [hl]
-            ret
-; set pointer at zero page offset A to HL
-zpset:      push de
-            ld e, a
-            ld d, high(BZ)
-            ld a, l
-            ld [de], a
-            inc e
-            ld a, h
-            ld [de], a
-            pop de
-            ret
 
 ; 34/88E1: the character / monster pointers
 ptr_init:   ld a, $57
@@ -55,22 +16,6 @@ ptr_init:   ld a, $57
             ld a, $5D
             ld hl, W7 + $7675
             jp zpset
-
-; 31/BE90 get character offset: $5F = $52 * $40 (A)
-chr_ofs:    ld a, [BZ + $52]
-            rrca
-            rrca
-            and $C0
-            ld [BZ + $5F], a
-            ret
-
-; 31/BEB4 random (0..A) with counter 1
-rnd_0a:     ld c, a
-            ld a, 1
-            ld [BZ + $21], a
-            ld b, 0
-            ld a, c
-            jp rnd_xa
 
 ; 31/BE9D calculate pointer: $1C = $18 * $1A + ($20:$21) (sizes and indexes < 256)
 calc_ptr:   xor a
@@ -550,15 +495,6 @@ mon_b57a:   ld a, 1
             pop af
             ld [hl], a
             ret
-; FFD20 / FFD24: A = $80 >> A (the "set bit" table)
-bitmask:    ld b, a
-            ld a, $80
-            inc b
-.s:         dec b
-            ret z
-            rrca
-            jr .s
-
 ; ---- 34/87BE: flags, strike first / ambush / back attack (FF3's level contest)
 cm_87BE:    ld a, [W7 + $7ED8]
             and $BF

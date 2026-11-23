@@ -516,26 +516,6 @@ act_tab:    dw act_none, act_none, act_none, act_none, act_fight, act_defend, ac
             dw act_none, act_none, act_none, act_none, act_none
 act_none:   ret
 
-; HL = $7575 + 64 A
-rec_ptr:    rrca
-            rrca
-            ld l, a
-            and $C0
-            ld e, a
-            ld a, l
-            and 3
-            ld d, a
-            ld hl, W7 + $7575
-            add hl, de
-            ret
-
-; 35/A42E get attacker flags: A = [$6E] + $2C (HL there)
-atk_flags:  ld c, $2C
-            ld a, $6E
-            call zpy
-            ld a, [hl]
-            ret
-
 ; 34/9F7B set command id A (magic / item flags cleared)
 set_cmd:    push af
             ld c, $2E

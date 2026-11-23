@@ -3,8 +3,6 @@
 ; id -> $7400 + 8 n), stat bonuses (+5 each, capped at 99), attack / hit / defence / evasion /
 ; magic values into $34-$47 -> character properties +$12-$25 and $6100 + $1C-$2F, as FF3 does
 ; (its quirks kept: the element boosts cleared at 31/AF16, the discarded hit-count work).
-BD2_ITEM   = $5400              ; BDATA2: 30/9400 weapon / armour properties (8 bytes)
-EQ_P       = W7 + $7400         ; the five items' properties (helmet .. left hand)
 
 beq_update:  call chr_ofs
             ld c, a

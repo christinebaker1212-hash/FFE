@@ -2,7 +2,6 @@
 ; +$2F / +$30): nothing (dead, stone, toad, mini), asleep / paralysed, run (much stronger party),
 ; barrier shift (Hein / Amon every 3 turns), a special attack (its rate; bosses in script order),
 ; else fight a random living, not jumping member (confused: a random monster).
-BD2_ATK    = $58C0              ; BDATA2: 30/98C0 attack properties (8 bytes)
 
 mon_think:  xor a
             ld [BZ + $4A], a

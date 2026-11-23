@@ -4,21 +4,6 @@
 ; the field, the sound RAM ($7F40-) the driver's ($CC40). Pointers kept in RAM are GB addresses.
 ; The battle starts from the field (battle_go, act $20) as FF3's fix:E26A / FFA26: the flash,
 ; init, the battle main loop, the fade out; then the map is reloaded.
-BZ         = $D000              ; FF3 zero page in battle
-W7         = $6000              ; FF3 $7200-$7EFF + W7
-BD_BATTLE  = $5000              ; BDATA_BANK: 2E/8000 battles (monster set, count id)
-BD_SET     = $5400              ;   2E/8400 monster sets (palettes 2, monster ids 4)
-BD_COUNT   = $5A00              ;   2E/8A00 counts (min / max nibbles, 4 types)
-BD_GPROP   = $5B00              ;   2E/8B00 monster graphics properties
-BD_PAL     = $5C00              ;   2E/8C00 battle palettes (3 colours)
-BD_8F00    = $5F00              ;   2E/8F00-8FFF boss flags, attribute data
-BD_2F      = $6000              ;   2F/A4A4.. (placement tables)
-BD_GPAL    = $6400              ;   00/9100, 9200, 9300 general use palettes
-TB_PPU     = BD_2F + $00        ;   2F/A4A4 monster graphics ppu addresses
-TB_GFX     = BD_2F + $10        ;   2F/A4B4 graphics address / bank / size by size class
-TB_SIZE    = BD_2F + $28        ;   2F/A4CC width, height by size id
-TB_TYPES   = BD_2F + $36        ;   2F/A4DA monster types in each tilemap
-TB_POS     = BD_2F + $142       ;   2F/A5E6 position data pointers (NES addresses)
 btl_pals   = $DF00              ; (WRAM bank 3, FF3's unused $7F00-: the palettes before the flash)
 
 btl_main:   call btl_flash
@@ -129,10 +114,6 @@ btl_bg:     ld a, [cur_map]
             jr z, .w
             inc h
 .w:         ld a, JOB_BANK
-            jp rd_byte
-
-; a byte of BDATA_BANK at HL
-bd_rd:      ld a, BDATA_BANK
             jp rd_byte
 
 ; ---- 2E/9E8E init battle (the parts the native battle needs), FFC27 init rng, 2F/A02A load
@@ -267,168 +248,6 @@ rng_init:   ld a, [btl_seedf]               ; (test hook: btlcmp.py sets the NES
             ld hl, btl_k
             inc [hl]
             jr nz, .l
-            ret
-
-; FFCF5: (BZ+$18:$19) * (BZ+$1A:$1B) -> BZ+$1C..$1F (32 bits)
-bmul16:      ld a, [BZ + $18]
-            ld e, a
-            ld a, [BZ + $19]
-            ld d, a
-            ld a, [BZ + $1A]
-            ld c, a
-            ld a, [BZ + $1B]
-            ld b, a
-            ld hl, 0                        ; HL:IX-less: hi word in HL, lo word in btl_lo
-            xor a
-            ld [btl_lo], a
-            ld [btl_lo + 1], a
-            ld a, 16
-            ld [btl_n2], a
-.l:         srl b                           ; (BC >> 1, bit 0 -> carry)
-            rr c
-            jr nc, .s
-            add hl, de
-.s:         rr h                            ; (HL:lo) >> 1 with the carry in
-            rr l
-            ld a, [btl_lo + 1]
-            rra
-            ld [btl_lo + 1], a
-            ld a, [btl_lo]
-            rra
-            ld [btl_lo], a
-            ld a, [btl_n2]
-            dec a
-            ld [btl_n2], a
-            jr nz, .l
-            ld a, [btl_lo]
-            ld [BZ + $1C], a
-            ld a, [btl_lo + 1]
-            ld [BZ + $1D], a
-            ld a, l
-            ld [BZ + $1E], a
-            ld a, h
-            ld [BZ + $1F], a
-            ret
-
-; FFC92: (BZ+$18:$19) / (BZ+$1A:$1B) -> quotient BZ+$1C:$1D, remainder BZ+$1E:$1F
-bdiv16:      xor a
-            ld [BZ + $1C], a
-            ld [BZ + $1D], a
-            ld [BZ + $1E], a
-            ld [BZ + $1F], a
-            ld a, [BZ + $18]
-            ld e, a
-            ld a, [BZ + $19]
-            ld d, a
-            or e
-            ret z
-            ld a, [BZ + $1A]
-            ld c, a
-            ld a, [BZ + $1B]
-            ld b, a
-            or c
-            ret z
-            ld hl, 0                        ; remainder
-            ld a, 16
-            ld [btl_n2], a
-            xor a
-            ld [btl_lo], a                  ; quotient
-            ld [btl_lo + 1], a
-.l:         sla e                           ; (FF3 rotates the carry of the last step in: the
-            rl d                            ;   quotient bits; the dividend's bits out)
-            rl l
-            rl h
-            ld a, l
-            sub c
-            ld l, a
-            ld a, h
-            sbc b
-            ld h, a
-            jr nc, .ok
-            add hl, bc
-            scf
-.ok:        ccf                             ; (quotient bit: 1 if the subtraction held)
-            ld a, [btl_lo]
-            rla
-            ld [btl_lo], a
-            ld a, [btl_lo + 1]
-            rla
-            ld [btl_lo + 1], a
-            ld a, [btl_n2]
-            dec a
-            ld [btl_n2], a
-            jr nz, .l
-            ld a, [btl_lo]
-            ld [BZ + $1C], a
-            ld a, [btl_lo + 1]
-            ld [BZ + $1D], a
-            ld a, l
-            ld [BZ + $1E], a
-            ld a, h
-            ld [BZ + $1F], a
-            ret
-
-; FFCD6 / FF8EA: A * X (8 x 8) -> A = low, X(B) = high
-bmul8:       ld e, a
-            ld d, 0
-            ld hl, 0
-            ld a, b
-            ld c, 8
-.l:         srl a
-            jr nc, .s
-            add hl, de
-.s:         sla e
-            rl d
-            dec c
-            jr nz, .l
-            ld b, h
-            ld a, l
-            ret
-
-; FFBEF random (X..A): X in B, A = max; counter BZ+$21 selects $15 / $16 / $17
-rnd_xa:     ld c, a
-            ld a, b
-            ld [BZ + $20], a
-            cp $FF
-            jr nz, .a
-            ld a, b
-            and a
-            jr nz, .x
-.a:         ld a, c
-            and a
-            ret z
-            cp b
-            ret z
-            sub b
-            ld [BZ + $18], a
-            ld a, $80
-            ld [BZ + $1A], a
-            xor a
-            ld [BZ + $19], a
-            ld a, [BZ + $21]                ; rng counter (+1)
-            add a, low(BZ + $15)
-            ld l, a
-            ld h, high(BZ + $15)
-            ld a, [hl]
-            inc [hl]
-            add a, low(W7 + $7BE3)
-            ld l, a
-            ld h, high(W7 + $7BE3)
-            jr nc, .t
-            inc h
-.t:         ld a, [hl]
-            ld [BZ + $1B], a
-            call bmul16
-            ld a, [BZ + $1E]
-            ld b, a
-            ld a, [BZ + $1D]
-            bit 7, a
-            jr z, .r
-            inc b
-.r:         ld a, [BZ + $20]
-            add a, b
-            ret
-.x:         ld a, b                         ; (X = $FF, A <> 0: returns X)
             ret
 
 ; 2F/A02A load monster set: 2E/8000 + 2 index -> $7D67 / $7D68; 2E/8400 + 6 set -> $7D69..;

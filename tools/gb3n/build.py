@@ -3,7 +3,7 @@ FF3 pipeline: tools/gb3/build.py -> build/ff3_en.nes) is the only input for game
 
 usage: build.py [EN.nes] [--map ID] [--group G] [--x X --y Y] [--out ROM]
   group 0-2: map sets (worlds 0, 1, 2+); 3 + w: world map w (then --x / --y: the party)"""
-import os, sys
+import os, sys, re
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 sys.path.insert(0, HERE); sys.path.insert(0, os.path.join(ROOT, 'tools', 'gb'))
@@ -181,14 +181,16 @@ def nes_rgb_src():
         '    dw %s\n' % ', '.join(str(x) for x in v[k:k + 8]) for k in range(0, 64, 8))
 
 
-MODULES = ('npc', 'text', 'event', 'menucore', 'select', 'snd', 'enc')              # bank 0
+MODULES = ('npc', 'text', 'event', 'menucore', 'select', 'snd', 'enc', 'btlbase')   # bank 0
 SND_BANK0 = 81                          # sound: FF3 bank $36 at $4000 + a song bank ($37, $38, $39,
                                         #   $09) at $6000: banks 81-84
 CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save', 'title', 'shop')  # bank CODE1
 ITEMN_BANK0 = 85                        # condensed item names (shop.py): banks 85-87
 BDATA_BANK = 88                         # battle data (encounter tables, formations, monsters)
-CODE2 = 89                              # battle code
-CODE2_MODULES = ('btl', 'btlgfx', 'btlcore', 'btleq', 'btlai', 'btlmain', 'btlui', 'btlact', 'btlfight', 'btlmsg', 'btlloop')
+CODE2 = 89                              # battle code: the game logic
+CODE2_MODULES = ('btl', 'btlcore', 'btleq', 'btlai', 'btlmain', 'btlact', 'btlfight')
+CODE3 = 110                             # battle code: the presentation (graphics, windows, input)
+CODE3_MODULES = ('btlgfx', 'btlui', 'btlmsg', 'btlloop')
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
 CHGFX_BANK = 95                         # battle characters (NES banks $28 / $29) as GB tiles
 BDATA2_BANK = 96                        # FF3 bank $30 (monsters, stat sets, scripts, items) at $4000
@@ -219,11 +221,32 @@ def engine_src(rom=None):
         codes.append(menu.code_data(rom, rgb555))
         codes.append(title.code_data(rom))
         codes.append(shop.code_data(rom))
-    codes.append('section bank %d, $4000' % CODE2)
-    for m in CODE2_MODULES:
-        c, r = split(rd(m))
-        codes.append('\n'.join(l for l in c.split('\n') if not l.startswith('section bank 0,')))
-        rams.append(r)
+    # the two battle banks: calls between them go through bank-0 stubs (A passed and returned)
+    lab = lambda t: set(re.findall(r'^([A-Za-z_]\w*):', t, re.M))
+    src2 = [split(rd(m)) for m in CODE2_MODULES]
+    src3 = [split(rd(m)) for m in CODE3_MODULES]
+    l2 = set().union(*(lab(c) for c, _ in src2)); l3 = set().union(*(lab(c) for c, _ in src3))
+    used = {}
+    def xcalls(t, other, bank):
+        def f(mo):
+            if mo.group(3) in other:
+                used[mo.group(3)] = bank
+                return mo.group(1) + (mo.group(2) or '') + ' ' + mo.group(3) + '__f'
+            return mo.group(0)
+        t = re.sub(r'\b(call|jp)(\s+(?:nz|z|nc|c)\s*,)?\s+([A-Za-z_]\w*)\b', f, t)
+        for mo in re.finditer(r'\b(?:dw|ld\s+hl,)\s+([A-Za-z_]\w*)\b', t):
+            if mo.group(1) in other: raise SystemExit('cross-bank reference to %s' % mo.group(1))
+        return t
+    c2 = [xcalls(c, l3, CODE3) for c, _ in src2]
+    c3 = [xcalls(c, l2, CODE2) for c, _ in src3]
+    codes.insert(len(MODULES), ''.join(
+        '%s__f: ld [fx_a], a\n ld a, low(%s)\n ld [fx_t], a\n ld a, high(%s)\n ld [fx_t + 1], a\n'
+        ' ld a, %d\n jp far_x\n' % (n, n, n, b) for n, b in sorted(used.items())))
+    for bank, cs, srcs in ((CODE2, c2, src2), (CODE3, c3, src3)):
+        codes.append('section bank %d, $4000' % bank)
+        for c, (_, r) in zip(cs, srcs):
+            codes.append('\n'.join(l for l in c.split('\n') if not l.startswith('section bank 0,')))
+            rams.append(r)
     zp = ''.join('Z_%02X = $%04X\n' % (n, 0xFFB0 + n - 0x18) for n in range(0x18, 0x60))
     shadow = lambda t: t.replace('ld [MBC5_BANKL], a', 'ld [rom_bank], a\n            ld [MBC5_BANKL], a')
     return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + zp + shadow(main_code) + '\n' +
@@ -285,6 +308,7 @@ def main():
     bd[0x2240:0x2298] = rom.b(0x34, 0x9B21, 88)                # $6240: 34/9B21 commands by job
     bd[0x22A0:0x2336] = rom.b(0x34, 0x950D, 0x96)              # $62A0: 34/950D action scripts, types
     bd[0x2340:0x2360] = rom.b(0x34, 0x8739, 0x20)              # $6340: 34/8739 monster rows by tilemap
+    bd[0x2360:0x23B0] = rom.b(0x32, 0x9EAD, 0x50)              # $6360: 32/9EAD target grid by tilemap
     f = rom.prg[0x0D * 0x2000 + 0x1700:0x0D * 0x2000 + 0x1700 + 144 * 16]   # $7000: numeral sprites
     for k, c in enumerate(list(range(0x80, 0x8A)) + [text.ENC[ch] for ch in 'Mis']):
         p0 = f[16 * (c - 0x70):16 * (c - 0x70) + 8]                 #   (the font's ink, clear around)
@@ -334,7 +358,7 @@ def main():
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
-                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0, 'CHGFX_BANK': CHGFX_BANK, 'BDATA2_BANK': BDATA2_BANK, 'BTXT_BANK': BTXT_BANK,
+                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0, 'CHGFX_BANK': CHGFX_BANK, 'BDATA2_BANK': BDATA2_BANK, 'BTXT_BANK': BTXT_BANK, 'CODE3': CODE3,
                        'TEST_SONG': int(opt['--song'], 0) if opt['--song'] else 255,
                        'SND_MASK': int(os.environ.get('GB_SND_MASK', 'FF'), 16),     # (test builds: NR51)
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,

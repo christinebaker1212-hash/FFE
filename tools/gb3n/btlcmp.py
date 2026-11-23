@@ -55,7 +55,7 @@ def main():
     SEED = 0
     g = native(bid, gf, sram0, seeds)
     uses = [g[0][0x15 + k] for k in range(3)]
-    cand = [(nes_c[0] - uses[0]) & 0xFF]
+    cand = [(nes_c[2] - uses[2]) & 0xFF]
     if cand[0] in seeds:
         SEED = cand[0]
     else:
@@ -76,7 +76,7 @@ def main():
             print('%-14s %s' % (name, 'identical' if not d else 'differ at ' + ' '.join('$%04X(%02X/%02X)' % (a + i, n[i], g[i]) for i in d[:10])))
 
 
-TREGIONS = [('rng counters', 0x15, 0x18), ('exp counts', 0x7DD3, 0x7DDB), ('turn', 0x7BE2, 0x7BE3),
+TREGIONS = [('rng counters', 0x15, 0x18), ('exp counts', 0x7DD3, 0x7DD7), ('turn', 0x7BE2, 0x7BE3),
             ('cmd counts', 0x78F0, 0x7900), ('over', 0x78D3, 0x78D4), ('statuses', 0x7EC4, 0x7ECC)]
 
 

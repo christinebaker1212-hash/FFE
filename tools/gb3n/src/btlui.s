@@ -618,58 +618,478 @@ b_setcmd:   ld b, a
             ld [hl], b
             ret
 
-; graphics $10 choose targets (monsters): the hand left of a living monster; up / down / left /
-; right to the next one; A -> $B4 = its bit, $B5 = $80, A = 1; B -> A = 0
-target_mon: ld a, 0
-.f:         ld [btl_tgt], a                 ; the first living slot
-            call mon_alive
-            jr nz, .l
-            ld a, [btl_tgt]
-            inc a
-            cp 8
-            jr nz, .f
-            xor a
-            ret
-.l:         call mon_cursor
-            call b_hand
-            call b_keys
-            ld a, [btl_new]
-            bit 0, a
-            jr nz, .a
-            bit 1, a
-            jr nz, .b
-            and $F0
-            jr z, .l
+; ---- graphics $10 / 32/9A1C choose targets, FF3's cursor: monsters on a 2 x 4 grid by tilemap id
+; (32/9EAD: $AF column, $B0 row), $B1 the mode (0 one monster, 1 all, 2 / 3 a monster type,
+; 4 one member, 5 all members), $B2 the member; $B3 bit 1: start on the members, bit 0: groups
+; allowed (else modes 1, 2, 3, 5 are refused). A -> $B4 = the mask, $B5 = $C0 monsters / $40
+; members (bit 6 cleared for a single target), A = 1; B -> $B4 = 0, A = 0
+TS_GRID    = BD_2F + $360       ; 32/9EAD (build.py)
+target_sel: xor a
+            ld [BZ + $AF], a
+            ld [BZ + $B0], a
+            ld [BZ + $B2], a
+            ld a, [BZ + $B3]
             ld b, a
-.mv:        ld a, [btl_tgt]                 ; down / right: next, up / left: previous
-            bit 6, b
-            jr nz, .pv
-            bit 5, b
-            jr nz, .pv
+            and 1
+            ld [BZ + $B3], a
+            ld a, b
+            and 2
+            ld a, 4
+            jr z, .s
             inc a
-            jr .w
-.pv:        dec a
-.w:         and 7
-            ld [btl_tgt], a
-            call mon_alive
-            jr z, .mv
-            ld a, $98
-            ld [S49], a
-            jr .l
-.a:         ld a, $85
-            ld [S49], a
-            ld a, [btl_tgt]
-            call bitmask
-            ld [BZ + $B4], a
-            ld a, $80
-            ld [BZ + $B5], a
+.s:         ld [BZ + $B1], a
+            call ts_right
+.l:         call ts_show
+            call b_keys
+            call ts_input
+            ld a, [BZ + $AD]
+            ld b, a
+            ld a, [BZ + $AE]
+            or b
+            jr nz, .l
             ld b, $FF
             call b_hand
+            ld a, [BZ + $B4]
+            and a
+            ret z
             ld a, 1
             ret
-.b:         ld a, $85
+target_mon: xor a
+            ld [BZ + $B3], a
+            jp target_sel
+
+; the hand on the first target ($AD monsters, else $AE members)
+ts_show:    ld a, [BZ + $AD]
+            and a
+            jr z, .c
+            ld b, 0
+.m:         add a, a
+            jr c, .m1
+            inc b
+            jr .m
+.m1:        ld a, b
+            ld [btl_tgt], a
+            call mon_cursor
+            jp b_hand
+.c:         ld a, [BZ + $AE]
+            ld b, 0
+.n:         add a, a
+            jr c, .n1
+            inc b
+            ld c, a
+            ld a, b
+            cp 4
+            ret z
+            ld a, c
+            jr .n
+.n1:        ld a, b                         ; member b: left of its sprite
+            add a, a
+            add a, b
+            add a, a
+            add a, a
+            add a, a
+            add a, low(oam_buf)
+            ld l, a
+            ld h, high(oam_buf)
+            ld a, [hl+]
+            sub 16 - 4
+            ld c, a
+            ld a, [hl]
+            sub 8 + 16
+            ld b, a
+            jp b_hand
+
+; 32/9B8C: the input; groups refused unless $B3
+ts_input:   ld a, [BZ + $AD]
+            ld [btl_tmp], a
+            ld a, [BZ + $AE]
+            ld [btl_tmp + 1], a
+            ld a, [BZ + $AF]
+            ld [btl_tmp + 2], a
+            ld a, [BZ + $B0]
+            ld [btl_tmp + 3], a
+            ld a, [BZ + $B1]
+            ld [btl_tmp2], a
+            call ts_key
+            ld a, [BZ + $B3]
+            and a
+            ret nz
+            ld a, [BZ + $B1]
+            cp 4
+            ret z
+            and a
+            ret z
+            ld a, [btl_tmp2]
+            ld [BZ + $B1], a
+            ld a, [btl_tmp + 3]
+            ld [BZ + $B0], a
+            ld a, [btl_tmp + 2]
+            ld [BZ + $AF], a
+            ld a, [btl_tmp + 1]
+            ld [BZ + $AE], a
+            ld a, [btl_tmp]
+            ld [BZ + $AD], a
+            ret
+
+; 32/9BCD (one button alone)
+ts_key:     ld a, [btl_new]
+            and a
+            ret z
+            ld b, a
+            and $F0
+            jr z, .k
+            ld a, $98
             ld [S49], a
+.k:         ld a, b
+            cp $10
+            jr z, .right
+            cp $20
+            jr z, .left
+            cp $80
+            jp z, ts_down
+            cp $40
+            jp z, ts_up
+            cp 1
+            jr z, .a
+            cp 2
+            ret nz
+            xor a                           ; B
+            ld [BZ + $AD], a
+            ld [BZ + $AE], a
+            ld [BZ + $B4], a
+            ld [BZ + $B5], a
+            ld [btl_n2], a
+            ret
+.a:         ld a, $85
+            ld [S49], a
+            ld a, [BZ + $AD]
+            and a
+            jr z, .ac
+            ld [BZ + $B4], a
+            ld a, $C0
+            jr .a1
+.ac:        ld a, [BZ + $AE]
+            and $F0
+            ld [BZ + $B4], a
+            ld a, $40
+.a1:        ld [BZ + $B5], a
+            ld a, [BZ + $B4]                ; 32/9C50: a single target
+            ld b, 8
+            ld c, $80
+.sg:        cp c
+            jr z, .sg1
+            srl c
+            dec b
+            jr nz, .sg
+            jr .a2
+.sg1:       ld a, [BZ + $B5]
+            and $BF
+            ld [BZ + $B5], a
+.a2:        xor a
+            ld [BZ + $AD], a
+            ld [BZ + $AE], a
+            ret
+.right:     ld a, [W7 + $78C3]              ; (a back attack: the other way)
+            cp $88
+            jr nz, ts_right
+            jr ts_left
+.left:      ld a, [W7 + $78C3]
+            cp $88
+            jr nz, ts_left
+            ; (fall through)
+; 32/9C80
+ts_right:   ld a, [BZ + $B1]
+            cp 5
+            jp z, ts_chr
+            cp 4
+            jr z, .one
+            cp 1
+            ret z
+            cp 6
+            ret nc
+            ld a, [BZ + $AF]                ; 0 / 2 / 3: 9CAE
+            and a
+            jr z, .all
+            dec a
+            ld [BZ + $AF], a
+            call ts_ok
+            jp c, ts_mon
+            ld a, 1
+            ld [BZ + $B0], a
+.r:         call ts_ok
+            jp c, ts_mon
+            call ts_back
+            ld a, [BZ + $AF]
+            cp $FF
+            jr nz, .r
+.all:       xor a
+            ld [BZ + $B0], a
+            ld [BZ + $AF], a
+            jp ts_allm
+.one:       ld a, 3
+            ld [BZ + $AF], a
+            ld a, 1
+            ld [BZ + $B0], a
+.o:         call ts_ok
+            jp c, ts_mon
+            call ts_back
+            jr .o
+; 32/9CDC
+ts_left:    ld a, [BZ + $B1]
+            cp 1
+            jr z, .allm
+            cp 4
+            jp z, ts_allc
+            cp 5
+            ret z
+            cp 6
+            ret nc
+            ld a, [BZ + $AF]                ; 0 / 2 / 3: 9D08
+            cp 3
+            jp z, ts_chr
+            inc a
+            ld [BZ + $AF], a
+            call ts_ok
+            jp c, ts_mon
             xor a
+            ld [BZ + $B0], a
+.l:         call ts_ok
+            jp c, ts_mon
+            call ts_fwd
+            ld a, [BZ + $AF]
+            cp 4
+            jr nz, .l
+            jp ts_chr
+.allm:      xor a
+            ld [BZ + $AF], a
+            ld [BZ + $B0], a
+.m:         call ts_ok
+            jp c, ts_mon
+            call ts_fwd
+            jr .m
+; 32/9D4F
+ts_up:      ld a, [BZ + $B1]
+            and a
+            jr z, .m
+            cp 3
+            jp z, ts_mon
+            cp 4
+            ret nz
+.c:         ld a, [BZ + $B2]
+            dec a
+            and 3
+            ld [BZ + $B2], a
+            call ts_cok
+            jr nz, .c
+            jp ts_chr
+.m:         ld a, [BZ + $B0]
+            and a
+            jp z, ts_row2
+            dec a
+            ld [BZ + $B0], a
+            call ts_ok
+            jp c, ts_mon
+            ld hl, BZ + $B0
+            inc [hl]
+            jp ts_row2
+; 32/9D8E
+ts_down:    ld a, [BZ + $B1]
+            and a
+            jr z, .m
+            cp 2
+            jp z, ts_mon
+            cp 4
+            ret nz
+.c:         ld a, [BZ + $B2]
+            inc a
+            and 3
+            ld [BZ + $B2], a
+            call ts_cok
+            jr nz, .c
+            jp ts_chr
+.m:         ld a, [BZ + $B0]
+            and a
+            jp nz, ts_row3
+            inc a
+            ld [BZ + $B0], a
+            call ts_ok
+            jp c, ts_mon
+            ld hl, BZ + $B0
+            dec [hl]
+            jp ts_row3
+; 32/9C66 / 9C73 the grid walked forward / back
+ts_fwd:     ld a, [BZ + $B0]
+            inc a
+            and 1
+            ld [BZ + $B0], a
+            ret nz
+            ld hl, BZ + $AF
+            inc [hl]
+            ret
+ts_back:    ld a, [BZ + $B0]
+            dec a
+            and 1
+            ld [BZ + $B0], a
+            ret z
+            ld hl, BZ + $AF
+            dec [hl]
+            ret
+; the grid's slot at ($B0 & 1) x 4 + $AF -> A (HL = the entry)
+ts_slot:    ld a, [W7 + $7D7B]
+            add a, a
+            add a, a
+            add a, a
+            ld e, a
+            ld a, [BZ + $B0]
+            and 1
+            add a, a
+            add a, a
+            ld hl, BZ + $AF
+            add a, [hl]
+            add a, e
+            ld e, a
+            ld d, 0
+            ld hl, TS_GRID
+            add hl, de
+            jp bd_rd
+; 32/9D33: carry set if the grid place has a monster
+ts_ok:      call ts_slot
+            cp $FF
+            jr z, .n
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7DA7
+            add hl, de
+            ld a, [hl]
+            cp $FF
+            jr z, .n
+            scf
+            ret
+.n:         and a
+            ret
+; Z if member $B2 can be chosen (a job, not jumping)
+ts_cok:     ld a, [BZ + $B2]
+ts_cok0:    ld e, a
+            ld d, 0
+            ld hl, W7 + $7D8B
+            add hl, de
+            ld a, [hl]
+            cp $FF
+            jr z, .n
+            ld hl, W7 + $7E22
+            add hl, de
+            ld a, [hl]
+            and a
+            ret
+.n:         or 1
+            ret
+; 32/9DD0: one member (from $B2 on)
+ts_chr:     ld a, [BZ + $B2]
+            and 3
+            ld [BZ + $B2], a
+            call ts_cok
+            jr z, .ok
+            ld hl, BZ + $B2
+            inc [hl]
+            jr ts_chr
+.ok:        ld a, 3
+            ld [BZ + $AF], a
+            ld a, 1
+            ld [BZ + $B0], a
+            ld a, [BZ + $B2]
+            ld b, a
+            ld a, $88
+            inc b
+.k:         dec b
+            jr z, .k1
+            srl a
+            jr .k
+.k1:        ld [BZ + $AE], a
+            xor a
+            ld [BZ + $AD], a
+            ld a, 4
+            ld [BZ + $B1], a
+            ret
+; 32/9E03: one monster (the grid place)
+ts_mon:     call ts_slot
+            call bitmask
+            ld [BZ + $AD], a
+            xor a
+            ld [BZ + $AE], a
+            ld [BZ + $B1], a
+            ret
+; 32/9E1A: all members
+ts_allc:    xor a
+            ld [BZ + $AD], a
+            ld a, 5
+            ld [BZ + $B1], a
+            ld b, 0
+            ld c, 0
+.c:         ld a, c
+            push bc
+            call ts_cok0
+            pop bc
+            scf
+            jr z, .c1
+            and a
+.c1:        rl b
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .c
+            ld a, b
+            swap a
+            ld [BZ + $AE], a
+            ret
+; 32/9E49: all monsters
+ts_allm:    xor a
+            ld [BZ + $AD], a
+            ld [BZ + $AE], a
+            ld [BZ + $AF], a
+            ld [BZ + $B0], a
+            ld [BZ + $B2], a
+            inc a
+            ld [BZ + $B1], a
+            ld hl, W7 + $7DA7
+            ld b, 8
+            ld c, 0
+.m:         ld a, [hl+]
+            cp $FF
+            rl c
+            dec b
+            jr nz, .m
+            ld a, c
+            ld [BZ + $AD], a
+            ret
+; 32/9E71 / 9E78: the monsters of the grid place's type
+ts_row2:    ld a, 2
+            jr ts_row
+ts_row3:    ld a, 3
+ts_row:     ld [BZ + $B1], a
+            xor a
+            ld [BZ + $AD], a
+            ld [BZ + $AE], a
+            call ts_slot
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7DA7
+            add hl, de
+            ld a, [hl]
+            ld [BZ + $7E], a
+            ld b, a
+            ld hl, W7 + $7DA7
+            ld c, 0
+            ld e, 8
+.m:         ld a, [hl+]
+            cp b
+            scf
+            jr z, .m1
+            and a
+.m1:        rl c
+            dec e
+            jr nz, .m
+            ld a, c
+            ld [BZ + $AD], a
             ret
 ; NZ if monster slot btl_tgt is there and alive
 mon_alive:  ld a, [btl_tgt]
@@ -791,22 +1211,6 @@ b_box:      push bc
             call m_put2
             pop bc
             ret
-; DE = DE / 10, A = DE mod 10
-b_div10:    ld hl, 0
-            ld b, 16
-.l:         sla e
-            rl d
-            rl l
-            ld a, l
-            sub 10
-            jr c, .n
-            ld l, a
-            inc e
-.n:         dec b
-            jr nz, .l
-            ld a, l
-            ret
-
 section wram, $DFD8
 btl_m:      ds 1
 btl_cur:    ds 1

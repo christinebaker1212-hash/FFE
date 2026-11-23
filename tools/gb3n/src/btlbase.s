@@ -1,0 +1,355 @@
+; ---- battle helpers used by both battle code banks (bank 0): FF3 zero page pointers, random
+; numbers, multiply / divide, the battle data reads. Constants of the battle modules first.
+BZ         = $D000              ; FF3 zero page in battle
+W7         = $6000              ; FF3 $7200-$7EFF + W7
+BD_BATTLE  = $5000              ; BDATA_BANK: 2E/8000 battles (monster set, count id)
+BD_SET     = $5400              ;   2E/8400 monster sets (palettes 2, monster ids 4)
+BD_COUNT   = $5A00              ;   2E/8A00 counts (min / max nibbles, 4 types)
+BD_GPROP   = $5B00              ;   2E/8B00 monster graphics properties
+BD_PAL     = $5C00              ;   2E/8C00 battle palettes (3 colours)
+BD_8F00    = $5F00              ;   2E/8F00-8FFF boss flags, attribute data
+BD_2F      = $6000              ;   2F/A4A4.. (placement tables)
+BD_GPAL    = $6400              ;   00/9100, 9200, 9300 general use palettes
+TB_PPU     = BD_2F + $00        ;   2F/A4A4 monster graphics ppu addresses
+TB_GFX     = BD_2F + $10        ;   2F/A4B4 graphics address / bank / size by size class
+TB_SIZE    = BD_2F + $28        ;   2F/A4CC width, height by size id
+TB_TYPES   = BD_2F + $36        ;   2F/A4DA monster types in each tilemap
+TB_POS     = BD_2F + $142       ;   2F/A5E6 position data pointers (NES addresses)
+BD2_MON    = $4000              ; BDATA2_BANK: FF3 bank $30 at $4000: 30/8000 monster properties
+BD2_STAT   = $5000              ;   30/9000 stat sets (3 bytes)
+BD2_SPEC   = $5200              ;   30/9200 special attack scripts (8 bytes)
+JB_MODS    = $5B1A              ; JOB_BANK (FF3 bank $39, NES $A000, at $4000): 39/BB1A job modifiers
+BD2_ATK    = $58C0              ; BDATA2: 30/98C0 attack properties (8 bytes)
+BD2_ITEM   = $5400              ; BDATA2: 30/9400 weapon / armour properties (8 bytes)
+EQ_P       = W7 + $7400         ; the five items' properties (helmet .. left hand)
+
+; a byte of BDATA_BANK at HL
+bd_rd:      ld a, BDATA_BANK
+            jp rd_byte
+
+
+; FFCF5: (BZ+$18:$19) * (BZ+$1A:$1B) -> BZ+$1C..$1F (32 bits)
+bmul16:      ld a, [BZ + $18]
+            ld e, a
+            ld a, [BZ + $19]
+            ld d, a
+            ld a, [BZ + $1A]
+            ld c, a
+            ld a, [BZ + $1B]
+            ld b, a
+            ld hl, 0                        ; HL:IX-less: hi word in HL, lo word in btl_lo
+            xor a
+            ld [btl_lo], a
+            ld [btl_lo + 1], a
+            ld a, 16
+            ld [btl_n2], a
+.l:         srl b                           ; (BC >> 1, bit 0 -> carry)
+            rr c
+            jr nc, .s
+            add hl, de
+.s:         rr h                            ; (HL:lo) >> 1 with the carry in
+            rr l
+            ld a, [btl_lo + 1]
+            rra
+            ld [btl_lo + 1], a
+            ld a, [btl_lo]
+            rra
+            ld [btl_lo], a
+            ld a, [btl_n2]
+            dec a
+            ld [btl_n2], a
+            jr nz, .l
+            ld a, [btl_lo]
+            ld [BZ + $1C], a
+            ld a, [btl_lo + 1]
+            ld [BZ + $1D], a
+            ld a, l
+            ld [BZ + $1E], a
+            ld a, h
+            ld [BZ + $1F], a
+            ret
+
+
+; FFC92: (BZ+$18:$19) / (BZ+$1A:$1B) -> quotient BZ+$1C:$1D, remainder BZ+$1E:$1F
+bdiv16:      xor a
+            ld [BZ + $1C], a
+            ld [BZ + $1D], a
+            ld [BZ + $1E], a
+            ld [BZ + $1F], a
+            ld a, [BZ + $18]
+            ld e, a
+            ld a, [BZ + $19]
+            ld d, a
+            or e
+            ret z
+            ld a, [BZ + $1A]
+            ld c, a
+            ld a, [BZ + $1B]
+            ld b, a
+            or c
+            ret z
+            ld hl, 0                        ; remainder
+            ld a, 16
+            ld [btl_n2], a
+            xor a
+            ld [btl_lo], a                  ; quotient
+            ld [btl_lo + 1], a
+.l:         sla e                           ; (FF3 rotates the carry of the last step in: the
+            rl d                            ;   quotient bits; the dividend's bits out)
+            rl l
+            rl h
+            ld a, l
+            sub c
+            ld l, a
+            ld a, h
+            sbc b
+            ld h, a
+            jr nc, .ok
+            add hl, bc
+            scf
+.ok:        ccf                             ; (quotient bit: 1 if the subtraction held)
+            ld a, [btl_lo]
+            rla
+            ld [btl_lo], a
+            ld a, [btl_lo + 1]
+            rla
+            ld [btl_lo + 1], a
+            ld a, [btl_n2]
+            dec a
+            ld [btl_n2], a
+            jr nz, .l
+            ld a, [btl_lo]
+            ld [BZ + $1C], a
+            ld a, [btl_lo + 1]
+            ld [BZ + $1D], a
+            ld a, l
+            ld [BZ + $1E], a
+            ld a, h
+            ld [BZ + $1F], a
+            ret
+
+
+; FFCD6 / FF8EA: A * X (8 x 8) -> A = low, X(B) = high
+bmul8:       ld e, a
+            ld d, 0
+            ld hl, 0
+            ld a, b
+            ld c, 8
+.l:         srl a
+            jr nc, .s
+            add hl, de
+.s:         sla e
+            rl d
+            dec c
+            jr nz, .l
+            ld b, h
+            ld a, l
+            ret
+
+
+; FFBEF random (X..A): X in B, A = max; counter BZ+$21 selects $15 / $16 / $17
+rnd_xa:     ld c, a
+            ld a, b
+            ld [BZ + $20], a
+            cp $FF
+            jr nz, .a
+            ld a, b
+            and a
+            jr nz, .x
+.a:         ld a, c
+            and a
+            ret z
+            cp b
+            ret z
+            sub b
+            ld [BZ + $18], a
+            ld a, $80
+            ld [BZ + $1A], a
+            xor a
+            ld [BZ + $19], a
+            ld a, [BZ + $21]                ; rng counter (+1)
+            add a, low(BZ + $15)
+            ld l, a
+            ld h, high(BZ + $15)
+            ld a, [hl]
+            inc [hl]
+            add a, low(W7 + $7BE3)
+            ld l, a
+            ld h, high(W7 + $7BE3)
+            jr nc, .t
+            inc h
+.t:         ld a, [hl]
+            ld [BZ + $1B], a
+            call bmul16
+            ld a, [BZ + $1E]
+            ld b, a
+            ld a, [BZ + $1D]
+            bit 7, a
+            jr z, .r
+            inc b
+.r:         ld a, [BZ + $20]
+            add a, b
+            ret
+.x:         ld a, b                         ; (X = $FF, A <> 0: returns X)
+            ret
+
+
+; A = zero page offset of a pointer, C = Y -> HL = pointer + Y (BC, DE kept)
+zpy:        push de
+            ld e, a
+            ld d, high(BZ)
+            ld a, [de]
+            ld l, a
+            inc e
+            ld a, [de]
+            ld h, a
+            ld e, c
+            ld d, 0
+            add hl, de
+            pop de
+            ret
+
+; A = zero page offset: [pointer] += $40 (16 bits)
+zpadd40:    ld l, a
+            ld h, high(BZ)
+            ld a, [hl]
+            add a, $40
+            ld [hl+], a
+            ret nc
+            inc [hl]
+            ret
+
+; set pointer at zero page offset A to HL
+zpset:      push de
+            ld e, a
+            ld d, high(BZ)
+            ld a, l
+            ld [de], a
+            inc e
+            ld a, h
+            ld [de], a
+            pop de
+            ret
+
+
+; 31/BE90 get character offset: $5F = $52 * $40 (A)
+chr_ofs:    ld a, [BZ + $52]
+            rrca
+            rrca
+            and $C0
+            ld [BZ + $5F], a
+            ret
+
+
+; 31/BEB4 random (0..A) with counter 1
+rnd_0a:     ld c, a
+            ld a, 1
+            ld [BZ + $21], a
+            ld b, 0
+            ld a, c
+            jp rnd_xa
+
+
+; FFD20 / FFD24: A = $80 >> A (the "set bit" table)
+bitmask:    ld b, a
+            ld a, $80
+            inc b
+.s:         dec b
+            ret z
+            rrca
+            jr .s
+
+
+; HL = $7575 + 64 A
+rec_ptr:    rrca
+            rrca
+            ld l, a
+            and $C0
+            ld e, a
+            ld a, l
+            and 3
+            ld d, a
+            ld hl, W7 + $7575
+            add hl, de
+            ret
+
+
+; 35/A42E get attacker flags: A = [$6E] + $2C (HL there)
+atk_flags:  ld c, $2C
+            ld a, $6E
+            call zpy
+            ld a, [hl]
+            ret
+
+
+; 31/BC25 get target flags (A, HL = target + $2C)
+tgt_flags:  ld c, $2C
+            ld a, $70
+            call zpy
+            ld a, [hl]
+            ret
+
+
+; $24 = the attacker / the target
+at_ptr:     ld a, [BZ + $6E]
+            ld [BZ + $24], a
+            ld a, [BZ + $6F]
+            ld [BZ + $25], a
+            ret
+
+tg_ptr:     ld a, [BZ + $70]
+            ld [BZ + $24], a
+            ld a, [BZ + $71]
+            ld [BZ + $25], a
+            ret
+
+
+; DE = DE / 10, A = DE mod 10
+b_div10:    ld hl, 0
+            ld b, 16
+.l:         sla e
+            rl d
+            rl l
+            ld a, l
+            sub 10
+            jr c, .n
+            ld l, a
+            inc e
+.n:         dec b
+            jr nz, .l
+            ld a, l
+            ret
+
+
+
+; a call into the other battle bank (from a stub: [fx_a] = A, [fx_t] = the routine, A = its
+; bank): A, BC, DE passed; A, F, BC, DE, HL returned; the caller's bank back
+far_x:      ld [fx_b], a
+            ld a, [code_bank]
+            push af
+            ld a, [fx_b]
+            ld [code_bank], a
+            ld [MBC5_BANKL], a
+            ld a, [fx_t]
+            ld l, a
+            ld a, [fx_t + 1]
+            ld h, a
+            ld a, [fx_a]
+            call .jp
+            push af
+            push hl
+            ld hl, sp + 5
+            ld a, [hl]
+            ld [code_bank], a
+            ld [MBC5_BANKL], a
+            pop hl
+            pop af
+            inc sp
+            inc sp
+            ret
+.jp:        jp hl
+
+section wram, $DF60
+fx_a:       ds 1
+fx_t:       ds 2
+fx_b:       ds 1

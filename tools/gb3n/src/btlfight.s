@@ -428,13 +428,6 @@ init_at:    call atk_flags
             ld [hl], b
             ret
 
-; 31/BC25 get target flags (A, HL = target + $2C)
-tgt_flags:  ld c, $2C
-            ld a, $70
-            call zpy
-            ld a, [hl]
-            ret
-
 ; 31/A300 choose random target: A = highest index, [$22] = the records' base; $69 if none
 rnd_target: ld [BZ + $4A], a
             ld a, [BZ + $1A]
@@ -823,18 +816,6 @@ drain:      xor a
             dec hl
             rr [hl]
             ret
-; $24 = the attacker / the target
-at_ptr:     ld a, [BZ + $6E]
-            ld [BZ + $24], a
-            ld a, [BZ + $6F]
-            ld [BZ + $25], a
-            ret
-tg_ptr:     ld a, [BZ + $70]
-            ld [BZ + $24], a
-            ld a, [BZ + $71]
-            ld [BZ + $25], a
-            ret
-
 ; 31/B926 attack ineffective: the target out of the hit mask
 atk_ineff:  ld a, [W7 + $7EC1]
             call bitmask
