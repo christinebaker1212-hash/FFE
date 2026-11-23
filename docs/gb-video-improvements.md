@@ -16,8 +16,8 @@ the other Game Boy ports (FF2, FF3). The FF1 code is in `tools/gbn/src/btl5.s` (
 
 | Area | Remake | Taken? |
 |---|---|---|
-| Encounter | the map spins and shatters into triangles, then a white flash | no: not the NES look; FF1's own transition stays |
-| Battle field | painted backdrops, gradient blue windows with a bevelled frame | no (backdrops were tried and rejected earlier; the windows keep FF1's frame) |
+| Encounter | the map spins and shatters into triangles, then a white flash | yes, after a mock-up (owner, 2026-11-22): twist + zoom and shattering strips (raster effects; no rotation on a Game Boy), white flash, the battle fades in from white |
+| Battle field | painted backdrops, gradient blue windows with a bevelled frame | gradient windows yes on the Color (Options: Gradient On / Off), FF1's frame kept; backdrops no |
 | Enemy acting | flashes white, then black with a white outline, twice (about 4 frames each), then "1 HIT" over it | yes (the owner allowed this one blink) |
 | Member acting | darts forward in about 3 frames with the weapon raised, swings, "1 HIT" beside it | yes |
 | Hit count | gold "n HIT" label over the attacker, the damage number over the target | yes |
@@ -125,3 +125,29 @@ the other Game Boy ports (FF2, FF3). The FF1 code is in `tools/gbn/src/btl5.s` (
   ~1.7 KB free after the screen framework while its "used" figure said 15.9 KB.
 - **Free tiles depend on the moment.** In battle, the names window uses only the first 28
   text tiles, so an enemy's action can borrow the other 44 before its message is drawn.
+
+## Added after the mock-up (2026-11-22, owner: "it's okay to add the gradient windows and encounter transition")
+
+- **Encounter transition** (`loc.s bt_trans2`, tables `battle.py trans_tables`, bank 103): per frame
+  and line an SCX offset and a map-line offset, made at build time (26 frames of twist + zoom
+  towards the party, 18 of 8-line strips sliding apart). A STAT mode-0 interrupt (`text.s stat_rx`)
+  writes each next line's SCX / SCY from a WRAM buffer; the next frame's buffer is filled while
+  this one shows. The fade to white: the Color through a 8-level table, DMG / SGB by shades (the
+  SGB's colour 0 made white by a PAL01 packet, since all-zero shades show colour 0). The battle's
+  masked load and fade-in then run from white on the Color (`fd_wh`). The party sprite follows
+  the twist at its line. Any port: precompute the per-line tables; keep the handler to a few
+  loads and two register writes; restore STAT / LYC after.
+- **The party walks in** from the right edge (8 pixels apart, FF1's walking pose) before the first
+  command (`btl5.s bt_walkin`).
+- **Gradient windows (Color only; Options: Gradient)** (`loc.s gr_*`, `text.s stat_gr`): each window's
+  inside colour runs from the chosen window colour at its top to a third of it at its bottom.
+  Built from the windows the screen drew (`scr_win` records them): per line the last window drawn
+  owns it; a record per line where a colour changes (5-bit steps: about 10-20 per window); the
+  LYC interrupt one line before, the write in that line's H-Blank; the music in the longest gap;
+  windows side by side with another top (the main menu's right column) take palette 0, a copy of
+  the window palette (and the orbs' palette 6 goes with them). Paused during fades (the flat
+  colour fades with the rest). The field's dialogue box and the place banner get their own list
+  (with the box's cut). DMG / SGB stay flat (one palette for the screen).
+- **Main menu crystals** centred exactly: a 2 x 2 grid with one-tile gaps in the 7 x 5 interior.
+
+Lessons from this round: see docs/gb-lessons.md ("Shared work RAM").

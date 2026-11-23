@@ -117,7 +117,9 @@ oam_clr:    ld hl, oam_buf
             ret
 
 ; the map copy cleared (blank, window attributes) with the LCD on
-scr_cls:    call oam_clr
+scr_cls:    xor a                           ; (the gradient's windows: drawn again)
+            ld [gr_wn], a
+            call oam_clr
             ld hl, smap
             ld b, 18
             ld a, $20
@@ -134,7 +136,8 @@ scr_allwin: ld hl, sattr
 
 ; the map copy to VRAM: with the LCD off all of it and the LCD on; with the LCD on in the
 ; next frames' V-Blanks (scr_frame)
-scr_show:   call lcd_get  
+scr_show:   call gr_build                   ; (the windows' gradient: loc.s)
+            call lcd_get  
             bit 7, a
             jr nz, scr_upd
             xor a
@@ -266,7 +269,8 @@ scr_classes:
             ret
 
 ; window: B = x, C = y, D = width, E = height (LCD off)
-scr_win:    push de
+scr_win:    call gr_reg                     ; (the gradient's windows: loc.s)
+            push de
             call .w
             pop de
             push bc                         ; its cells in the window colours
@@ -492,7 +496,10 @@ scr_spr23:  ld [scr_t1], a
             ret
 
 ; one frame: wait, pad, OAM
-scr_frame:  ld a, [sf_row]                  ; (owner, 2026-11-22: no hand while a window is
+scr_frame:  ld a, [gr_dirty]                ; (a window since the screen showed: the gradient
+            and a                           ;   again)
+            call nz, gr_build
+            ld a, [sf_row]                  ; (owner, 2026-11-22: no hand while a window is
             cp 18                           ;   still going up: it shows once the screen is
             call c, hand_hide               ;   whole, never over the old one)
             call wait_vbl

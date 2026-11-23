@@ -129,6 +129,8 @@ dlg_open:   ld l, a                         ; table entry: 3 x id
             ld [bn_t], a
             ld a, BOX_LINES
             ldh [rLYC], a
+            ld a, 8                         ; (its gradient: loc.s)
+            call gr_box0
             ld a, [dlgsfx]                  ; a fanfare / the treasure ditty (FF1 dlgsfx)
             and a
             ret z
@@ -422,6 +424,9 @@ stat_int:   push af
             ld a, [wp_on]                   ; (a screen wipe: the band's edges)
             and a
             jr nz, .wp
+            ld a, [gr_on]                   ; (the windows' gradient: loc.s)
+            and a
+            jp nz, stat_gr
             ldh a, [rLCDC]                  ; (a request left pending while the LCD went off:
             bit 7, a                        ;   it stays off)
             jr z, .off
@@ -577,6 +582,7 @@ dlg_frame:  ld a, [win_up]                  ; (not before the page is up)
             jp dlg_page
 .close:     xor a
             ld [box_on], a
+            call gr_off                     ; (its gradient)
             call map_music                  ; (after a fanfare: the map's music again)
             jp talk_after                   ; (a teleport / battle the talk asked for)
 
@@ -606,7 +612,7 @@ bn_tick:    dec a
             ret nz
             ld a, BOX_LINES
             ldh [rLYC], a
-            ret
+            jp gr_off
 ; the play time (V-Blank): frames, seconds, minutes, hours to 99, in the save page
 pt_tick:    ld a, [pt_on]
             and a
@@ -645,6 +651,193 @@ stat_rx:    push hl
             pop hl
             pop af
             reti
+
+; ---- the windows' gradient (the Color; owner, 2026-11-22): an event list of lines where the
+; windows' inside colour changes (loc.s gr_make); the LYC interrupt one line before, the
+; writes in that line's H-Blank; specials: the dialogue box's cut (window off), the music
+GR_REC     = 4              ; line, mask (1 main, 2 alt, $40 music, $80 cut), main / alt colour
+                            ;   (the low byte of its entry in gr_ramp)
+stat_gr:    push bc
+            push de
+            push hl
+            ld a, [gr_p]
+            ld l, a
+            ld a, [gr_p + 1]
+            ld h, a
+            ld b, 0                         ; (B: the music after)
+            inc hl
+            ld a, [hl+]                     ; the mask (HL: the main colour)
+            ld c, a
+            bit 7, c
+            jr z, .nc
+            ldh a, [rLCDC]                  ; the box's cut: the window off from here
+            bit 7, a
+            jr z, .nc
+            ld a, [lcdc_on]
+            ldh [rLCDC], a
+.nc:        bit 6, c
+            jr z, .nm
+            inc b
+.nm:        ld a, c
+            and 3
+            jr z, .nx
+.w:         ldh a, [rSTAT]                  ; (the H-Blank of the line before)
+            and 3
+            jr nz, .w
+            bit 0, c
+            jr z, .na
+            push hl
+            ld a, [hl]
+            call .col
+            ld hl, gr_lm
+            call .pal
+            pop hl
+.na:        inc hl
+            bit 1, c
+            jr z, .nb
+            push hl
+            ld a, [hl]
+            call .col
+            ld hl, gr_la
+            call .pal
+            pop hl
+.nb:        inc hl
+            jr .nn
+.nx:        inc hl
+            inc hl
+.nn:        ld a, l
+            ld [gr_p], a
+            ld a, h
+            ld [gr_p + 1], a
+            call gr_lyc
+            ld a, b
+            pop hl
+            pop de
+            pop bc
+            and a
+            jp nz, stat_int.mus
+            pop af
+            reti
+.col:       ld l, a                         ; DE = the ramp's colour at low byte A
+            ld h, high(gr_ramp)
+            ld e, [hl]
+            inc l
+            ld d, [hl]
+            ret
+.pal:       ld a, [hl+]                     ; palettes' colour 2 (BCPS values, $FF ends)
+            cp $FF
+            ret z
+            ldh [rBCPS], a
+            ld a, e
+            ldh [rBCPD], a
+            ld a, d
+            ldh [rBCPD], a
+            jr .pal
+; LYC for the record at HL: its line (specials) or the line before (colours); $FF: none
+gr_lyc:     inc hl
+            ld a, [hl-]
+            and 3
+            ld a, [hl]
+            jr z, .s
+            dec a
+.s:         ldh [rLYC], a
+            ret
+; V-Blank: a new list taken, the first record's colours (line 0) written, the next LYC
+gr_vbl:     ld a, [gr_rst]                  ; (switched off / paused: the flat colour once)
+            and a
+            jr z, .on
+            xor a
+            ld [gr_rst], a
+            ld a, [win_pal + 4]
+            ld e, a
+            ld a, [win_pal + 5]
+            ld d, a
+            ld hl, gr_lm
+            call stat_gr.pal
+            ld hl, gr_la
+            call stat_gr.pal
+            ld a, [gr_on]                   ; (paused, not off: no events this frame)
+            and a
+            ret z
+            ld a, $FF
+            ldh [rLYC], a
+            ret
+.on:        ld a, [gr_on]
+            and a
+            ret z
+            ld a, [ly_n]
+            ld hl, wp_on
+            or [hl]
+            ld hl, fd_act                   ; (a fade: the flat colour fades with the rest)
+            or [hl]
+            jr z, .go
+            ld a, $FF
+            ldh [rLYC], a
+            ret
+.go:        ld a, [gr_new]
+            and a
+            jr z, .n
+            xor a
+            ld [gr_new], a
+            ld a, [gr_nb]
+            ld [gr_base], a
+            ld a, [gr_nb + 1]
+            ld [gr_base + 1], a
+            ld hl, gr_nlm                   ; (its palette lists: 16 bytes)
+            ld de, gr_lm
+            ld b, 16
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            ld a, [gr_p0]                   ; (palette 0: a copy of the window palette)
+            and a
+            jr z, .n
+            ld a, $80
+            ldh [rBCPS], a
+            ld hl, win_pal
+            ld b, 8
+.p0:        ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .p0
+.n:         ld a, [gr_base]
+            ld l, a
+            ld a, [gr_base + 1]
+            ld h, a
+            inc hl
+            inc hl
+            ld a, [hl+]
+            push hl
+            call stat_gr.col
+            ld hl, gr_lm
+            call stat_gr.pal
+            pop hl
+            ld a, [hl+]
+            push hl
+            call stat_gr.col
+            ld hl, gr_la
+            call stat_gr.pal
+            pop hl
+            ld a, l
+            ld [gr_p], a
+            ld a, h
+            ld [gr_p + 1], a
+            jp gr_lyc
+; the gradient off (a load, a screen without it, the box closed): LYC the box's again, the
+; flat colour back in the next V-Blank
+gr_off:     ld a, [gr_on]
+            and a
+            ret z
+            xor a
+            ld [gr_on], a
+            ld [gr_new], a
+            ld a, BOX_LINES
+            ldh [rLYC], a
+            ld a, 1
+            ld [gr_rst], a
+            ret
 
 section wram, $CB00
 win_buf:    ds 160

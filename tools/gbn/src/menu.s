@@ -2565,7 +2565,10 @@ opt_curr:   ds 1                            ; Options: 1 = the battle cursor res
 win_r:      ds 1                            ; Options (Color): the windows' inside colour
 win_g:      ds 1
 win_b:      ds 1
+opt_nograd: ds 1                            ; Options (Color): 1 = no window gradient (after
+                                            ;   win_b: the saved record's order)
 win_pal:    ds 8                            ; CGB palette 7 (the windows) as chosen
+opt_ver:    ds 1
 tw_spd:     ds 1                            ; the typed text's speed (0-4: Slow .. Instant)
 eq_kind:    ds 1
 eq_off:     ds 1

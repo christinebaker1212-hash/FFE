@@ -63,7 +63,9 @@ bn_prep:    ld a, [cur_map]
             ldh [rLYC], a
             ld a, BN_TIME
             ld [bn_t], a
-            ret
+            ld a, 3                         ; (its gradient)
+            ld [gr_cut], a
+            jp gr_box
 .row:       ld a, b                         ; B, C x 18, D
             call code_tile
             ld [hl+], a
@@ -865,6 +867,64 @@ wait_ab:    call oam_clr
             ret
 
 
+; ---- the windows' gradient's bank-0 side: windows recorded, builds through bank 99
+gr_reg:     push hl
+            ld a, [gr_wn]
+            cp GR_MAXW
+            jr nc, .x
+            inc a
+            ld [gr_wn], a
+            dec a
+            add a, a
+            add a, a
+            add a, low(gr_win)
+            ld l, a
+            ld a, high(gr_win)
+            adc a, 0
+            ld h, a
+            ld a, b
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            ld [hl], e
+            ld a, 1
+            ld [gr_dirty], a
+.x:         pop hl
+            ret
+gr_fd:      ld a, 1                         ; a fade: the gradient paused, the flat colour
+            ld [fd_act], a                  ;   back in the next V-Blank
+            ld a, [gr_on]
+            and a
+            ret z
+            ld a, 1
+            ld [gr_rst], a
+            ret
+gr_build:   push bc
+            push de
+            push hl
+            xor a
+            ld [gr_dirty], a
+            ld a, F3_BANK
+            ld hl, gr_menu
+            call bank_call
+            pop hl
+            pop de
+            pop bc
+            ret
+gr_box0:    ld [gr_cut], a
+            push bc
+            push de
+            push hl
+            ld a, F3_BANK
+            ld hl, gr_box
+            call bank_call
+            pop hl
+            pop de
+            pop bc
+            ret
+
 ; the field's dash: Z if B is not held or the Options turned the dash off
 dash_b:     ld a, [opt_nodash]
             and a
@@ -881,7 +941,7 @@ section bank 99, $4800
 ; colour (red, green, blue 0-31, shown at once). Header (0,0,20,3), list (0,3,20,15), one row a
 ; setting from row 5; up / down pick, left / right change, B back (kept in cart RAM bank 1)
 OPT_N_DMG  = 5
-OPT_N_CGB  = 8
+OPT_N_CGB  = 9
 opt_menu:   call scr_open
             call eqm_pal
             ld bc, $0000
@@ -950,7 +1010,7 @@ opt_menu:   call scr_open
             jr nc, .l                       ; (past either end: no change)
             ld [hl], a
             call opt_apply
-            ld a, [opt_cur]                 ; (a window colour: the palettes at once)
+            ld a, [opt_cur]                 ; (a window colour / the gradient: at once)
             cp 5
             call nc, opt_wnow
             call opt_vals
@@ -983,9 +1043,9 @@ opt_n:      ldh a, [is_cgb]
             ret
 os_title:   db "Options", 0
 os_labels:  db "Message Speed", 0, "Text Speed", 0, "Volume", 0, "B Dash", 0, "Cursor", 0
-            db "Window Red", 0, "Window Green", 0, "Window Blue", 0
-os_var:     dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, win_r, win_g, win_b
-os_max:     db 8, 5, 8, 2, 2, 32, 32, 32
+            db "Window Red", 0, "Window Green", 0, "Window Blue", 0, "Gradient", 0
+os_var:     dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, win_r, win_g, win_b, opt_nograd
+os_max:     db 8, 5, 8, 2, 2, 32, 32, 32, 2
 os_spn:     db "   Slow", " Normal", "   Fast", " Faster", "Instant"
 os_dash:    db " On", "Off"
 os_cur:     db "Remember", "   Reset"
@@ -1061,7 +1121,18 @@ opt_vals:   ld bc, $1205
             ld a, c
             cp 13
             jr c, .w
-            ret
+            ld bc, $100D                    ; Window Gradient On / Off
+            call pen_at
+            ld a, [opt_nograd]
+            ld l, a
+            add a, a
+            add a, l
+            ld e, a
+            ld d, 0
+            ld hl, os_dash
+            add hl, de
+            ld b, 3
+            jr .n
 .n:         ld a, [hl+]
             call pen_ch
             dec b
@@ -1104,7 +1175,11 @@ opt_wpal:   ld a, COMMON
 opt_wnow:   call opt_wpal
             call wait_vbl
             call text_pals
-            jp eqm_pal
+            call eqm_pal
+            ld a, [opt_nograd]              ; (the gradient from the new colour, or off)
+            and a
+            jp nz, gr_off
+            jp gr_menu
 ; FF1's window colour -> win_r / g / b (the defaults)
 opt_wdef:   ld a, COMMON
             ld hl, C_WINPAL + 4
@@ -1146,6 +1221,7 @@ opt_load:   ld a, 1
             xor a
             ld [opt_nodash], a
             ld [opt_curr], a
+            ld [opt_nograd], a
             call opt_wdef
             ld a, $0A
             ld [$0000], a
@@ -1156,6 +1232,9 @@ opt_load:   ld a, 1
             cp $4F
             jr nz, .x
             ld a, [hl+]
+            ld [opt_ver], a
+            cp $52
+            jr z, .q
             cp $51
             jr z, .q
             cp $50
@@ -1174,8 +1253,10 @@ opt_load:   ld a, 1
             jr nz, .x
             call .set3
             jr .x
-.q:         push hl                         ; "OQ": the eight, check
-            ld b, 8
+.q:         push hl                         ; "OQ": the eight, check ("OR": nine)
+            ld a, [opt_ver]
+            sub $49                         ; (8 / 9)
+            ld b, a
             ld c, $5A
 .qs:        ld a, [hl+]
             xor c
@@ -1196,8 +1277,10 @@ opt_load:   ld a, 1
             call .set3
             pop hl
             jr c, .x
-            ld de, opt_nodash               ; dash, cursor, r, g, b (checked: 0-1, 0-31)
-            ld b, 5
+            ld de, opt_nodash               ; dash, cursor, r, g, b (checked: 0-1, 0-31), gradient
+            ld a, [opt_ver]
+            sub $4C                         ; (5 / 6)
+            ld b, a
 .q5:        ld a, [hl+]
             ld [de], a
             inc de
@@ -1221,6 +1304,11 @@ opt_load:   ld a, 1
             or b
             cp 32
             call nc, opt_wdef
+            ld a, [opt_nograd]
+            cp 2
+            jr c, .x
+            xor a
+            ld [opt_nograd], a
 .x:         xor a
             ld [$0000], a
             ld [$4000], a
@@ -1255,10 +1343,10 @@ opt_save:   ld a, $0A
             ld hl, OPT_RAM
             ld a, $4F
             ld [hl+], a
-            ld a, $51
+            ld a, $52
             ld [hl+], a
-            ld de, os_var                   ; the eight values, then the check
-            ld b, 8
+            ld de, os_var                   ; the nine values, then the check
+            ld b, 9
             ld c, $5A
 .s:         push bc
             ld a, [de]
@@ -2059,7 +2147,800 @@ tr_r:       ds 1
 tr_g:       ds 1
 tr_sgp:     ds 14
 
-section wram, $CDE3
+section bank 99, $5C00
+; ---- the windows' gradient (the Color, Options: Window Gradient; owner, 2026-11-22): each
+; window's inside colour from the chosen window colour at its top to a third of it at its
+; bottom (one step per change of the 5-bit colour), written per line (text.s stat_gr).
+; Windows side by side with other tops (the main menu's right column) take palette 0, a copy
+; of the window palette, and the orbs' palette 6 goes with them.
+GR_A       = $C500          ; menus' event lists (the field's queue: free on menu screens)
+GR_B       = $C600
+GR_FA      = $CBA0          ; the field box's / banner's (12 records each)
+GR_FB      = $CBD0
+GR_MAXW    = 16
+; the menus' windows (scr_win) -> the list for the next V-Blank
+gr_menu:    ld a, [gr_wn]
+            and a
+            jp z, gr_off
+            call gr_ok
+            jp z, gr_off
+            call gr_ramp_mk
+            call gr_groups
+            call gr_pals
+            ld a, [gr_wn]
+            ld [gr_n], a
+            xor a
+            ld [gr_cut], a
+            ld hl, GR_A
+            ld de, GR_B
+            ld a, 60
+            jp gr_make
+; the field's box / banner: A = rows of the window layer from the top (cut below it)
+gr_box:     call gr_ok
+            jp z, gr_off
+            ld a, [gr_cut]
+            ld b, a
+            xor a
+            ld hl, gr_win
+            ld [hl+], a                     ; x 0, y 0, w 20, h rows
+            ld [hl+], a
+            ld a, 20
+            ld [hl+], a
+            ld a, b
+            ld [hl], a
+            ld a, 1
+            ld [gr_n], a
+            xor a
+            ld [gr_grp], a
+            call gr_ramp_mk
+            ld a, $80 | (7 * 8 + 4)         ; (the field: palette 7 only)
+            ld [gr_nlm], a
+            ld a, $FF
+            ld [gr_nlm + 1], a
+            ld [gr_nla], a
+            ld hl, GR_FA
+            ld de, GR_FB
+            ld a, 10
+            jp gr_make
+; Z: no gradient (not a Color, or switched off)
+gr_ok:      ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, [opt_nograd]
+            xor 1
+            ret
+; the ramp: 32 colours from (r, g, b) to (r, g, b) / 3
+gr_ramp_mk: ld hl, gr_ramp
+            ld c, 0
+.c:         push hl
+            ld a, [win_r]
+            call .ch
+            ld [gr_cx], a
+            ld a, [win_g]
+            call .ch
+            ld [gr_cy], a
+            ld a, [win_b]
+            call .ch
+            ld b, a                         ; RGB555: r | g << 5 | b << 10
+            ld a, [gr_cx]
+            ld e, a
+            ld a, [gr_cy]
+            ld d, a
+            ld a, d
+            swap a
+            rlca
+            and $E0
+            or e
+            pop hl
+            ld [hl+], a
+            ld a, d
+            rrca
+            rrca
+            rrca
+            and 3
+            ld e, a
+            ld a, b
+            add a, a
+            add a, a
+            or e
+            ld [hl+], a
+            inc c
+            ld a, c
+            cp 32
+            jr c, .c
+            ret
+.ch:        ld b, a                         ; v - (2 v / 3) c / 31 (to v / 3 at c = 31)
+            add a, a
+            ld e, 0
+            ld d, a                         ; 2 v (to 62)
+            push bc
+            ld b, c
+            xor a
+            inc b
+.m:         dec b                           ; 2 v c (to 1922)
+            jr z, .x
+            add a, d
+            jr nc, .m
+            inc e
+            jr .m
+.x:         ld l, a
+            ld h, e
+            ld de, -93                      ; / 93 (= 3 x 31)
+            ld b, $FF
+.d:         inc b
+            add hl, de
+            jr c, .d
+            ld a, b
+            pop bc
+            ld d, a
+            ld a, b
+            sub d
+            ret
+; groups: window i goes to the alt group when an earlier main window j has rows overlapping
+; it, columns apart (a shared border allowed) and another top or height
+gr_groups:  xor a
+            ld [gr_i], a
+.w:         xor a                           ; (main until shown otherwise)
+            ld [gr_g], a
+            ld [gr_j], a
+.j:         ld a, [gr_j]
+            ld hl, gr_i
+            cp [hl]
+            jr nc, .s
+            ld e, a
+            ld d, 0
+            ld hl, gr_grp
+            add hl, de
+            ld a, [hl]
+            and a
+            jr nz, .nj
+            call gr_beside                  ; windows gr_i, gr_j: C set when beside
+            jr nc, .nj
+            ld a, 1
+            ld [gr_g], a
+            jr .s
+.nj:        ld hl, gr_j
+            inc [hl]
+            jr .j
+.s:         ld a, [gr_i]
+            ld e, a
+            ld d, 0
+            ld hl, gr_grp
+            add hl, de
+            ld a, [gr_g]
+            ld [hl], a
+            ld hl, gr_i
+            inc [hl]
+            ld a, [gr_wn]
+            cp [hl]
+            jr nz, .w
+            ret
+; A = window -> HL = its (x, y, w, h)
+gr_wp:      add a, a
+            add a, a
+            add a, low(gr_win)
+            ld l, a
+            ld a, high(gr_win)
+            adc a, 0
+            ld h, a
+            ret
+; C set: windows gr_i (I) and gr_j (J) side by side with another top or height
+gr_beside:  ld a, [gr_j]
+            call gr_wp
+            ld d, h
+            ld e, l                         ; DE = J
+            ld a, [gr_i]
+            call gr_wp                      ; HL = I
+            inc hl                          ; rows overlap: yI < yJ + hJ and yJ < yI + hI
+            inc de
+            ld a, [de]
+            ld b, a                         ; yJ
+            inc de
+            inc de
+            ld a, [de]
+            add a, b
+            ld c, a                         ; yJ + hJ
+            dec de
+            dec de
+            dec de                          ; (DE = J)
+            ld a, [hl]                      ; yI
+            cp c
+            ret nc                          ; (NC: not beside)
+            inc hl
+            inc hl
+            add a, [hl]                     ; yI + hI
+            dec hl
+            dec hl
+            cp b
+            jr z, .nb
+            jr c, .nb
+            dec hl                          ; HL = I
+            ; columns apart (one shared allowed): xI >= xJ + wJ - 1 or xJ >= xI + wI - 1
+            ld a, [de]
+            ld b, a                         ; xJ
+            inc de
+            inc de
+            ld a, [de]
+            add a, b
+            dec a
+            ld c, a                         ; xJ + wJ - 1
+            dec de
+            dec de
+            ld a, [hl]
+            cp c
+            jr nc, .apart
+            inc hl
+            inc hl
+            add a, [hl]
+            dec a                           ; xI + wI - 1
+            dec hl
+            dec hl
+            ld c, a
+            ld a, b
+            cp c
+            jr c, .nb
+.apart:     inc hl                          ; another top or height
+            inc de
+            ld a, [de]
+            cp [hl]
+            jr nz, .yes
+            inc hl
+            inc hl
+            inc de
+            inc de
+            ld a, [de]
+            cp [hl]
+            jr nz, .yes
+.nb:        and a
+            ret
+.yes:       scf
+            ret
+; the palettes each group's windows use (colour 2 written per line): from the map copy's
+; attributes; the alt windows' palette-7 cells to palette 0 (a copy of palette 7)
+gr_pals:    xor a
+            ld [gr_pm], a
+            ld [gr_pa], a
+            ld [gr_i], a
+.w:         ld a, [gr_i]
+            call gr_wp
+            ld a, [hl+]
+            ld b, a                         ; x
+            ld a, [hl+]
+            ld c, a                         ; y
+            ld a, [hl+]
+            ld d, a                         ; w
+            ld e, [hl]                      ; h
+            ld a, [gr_i]
+            push de
+            ld e, a
+            ld d, 0
+            ld hl, gr_grp
+            add hl, de
+            ld a, [hl]
+            pop de
+            ld [gr_g], a
+.r:         push bc
+            push de
+            call cell_addr
+            ld a, h
+            add a, 3
+            ld h, a
+.c:         ld a, [gr_g]                    ; (an alt window's cell under a later main window:
+            and a                           ;   that window's)
+            jr z, .cv
+            push hl
+            push bc
+            push de
+            ld a, b
+            ld [gr_cx], a
+            ld a, c
+            ld [gr_cy], a
+            call gr_cov
+            pop de
+            pop bc
+            pop hl
+            jr c, .nx
+.cv:        ld a, [hl]
+            and 7
+            cp 5                            ; (palette 5: the black outside)
+            jr z, .nx
+            push bc
+            ld b, a
+            ld a, [gr_g]
+            and a
+            jr z, .mn
+            ld a, b                         ; alt: palette 7 -> 0
+            cp 7
+            jr nz, .ak
+            ld a, [hl]
+            and $F8
+            ld [hl], a
+            ld b, 0
+.ak:        ld a, b
+            call gr_bit
+            ld b, a
+            ld a, [gr_pa]
+            or b
+            ld [gr_pa], a
+            jr .pp
+.mn:        ld a, b
+            call gr_bit
+            ld b, a
+            ld a, [gr_pm]
+            or b
+            ld [gr_pm], a
+.pp:        pop bc
+.nx:        inc hl
+            inc b
+            dec d
+            jr nz, .c
+            pop de
+            pop bc
+            inc c
+            dec e
+            jr nz, .r
+            ld hl, gr_i
+            inc [hl]
+            ld a, [gr_wn]
+            cp [hl]
+            jp nz, .w
+            ld a, [gr_pa]                   ; (orbs in an alt window: palette 6 alt only)
+            bit 6, a
+            jr z, .l
+            ld a, [gr_pm]
+            res 6, a
+            ld [gr_pm], a
+.l:         ld a, [gr_pa]                   ; palette 0 used: a copy of palette 7 (into a
+            and 1                           ;   masked load's shadows now, and with the list
+            ld [gr_p0], a                   ;   in its V-Blank)
+            jr z, .ls
+            ld a, $80
+            call bcps_w
+            ld hl, win_pal
+            ld b, 8
+.p0:        ld a, [hl+]
+            call bcpd_w
+            dec b
+            jr nz, .p0
+.ls:        ld a, [gr_pm]                   ; the BCPS lists
+            ld hl, gr_nlm
+            call .lst
+            ld a, [gr_pa]
+            ld hl, gr_nla
+.lst:       ld c, 0
+.lb:        rrca
+            jr nc, .ln
+            push af
+            ld a, c
+            add a, a
+            add a, a
+            add a, a
+            add a, $84                      ; (colour 2, auto-increment)
+            ld [hl+], a
+            pop af
+.ln:        inc c
+            bit 3, c
+            jr z, .lb
+            ld [hl], $FF
+            ret
+; C set: cell (gr_cx, gr_cy) inside a main window drawn after window gr_i
+gr_cov:     ld a, [gr_i]
+.w:         inc a
+            ld hl, gr_wn
+            cp [hl]
+            ret nc                          ; (NC: none)
+            ld [gr_t], a
+            ld e, a
+            ld d, 0
+            ld hl, gr_grp
+            add hl, de
+            ld a, [hl]
+            and a
+            ld a, [gr_t]
+            jr nz, .w
+            call gr_wp
+            ld a, [gr_cx]                   ; x <= cx < x + w
+            sub [hl]
+            jr c, .n
+            inc hl
+            inc hl
+            cp [hl]
+            jr nc, .n
+            dec hl
+            ld a, [gr_cy]
+            sub [hl]
+            jr c, .n
+            inc hl
+            inc hl
+            cp [hl]
+            jr nc, .n
+            scf
+            ret
+.n:         ld a, [gr_t]
+            jr .w
+; A = palette -> A = its bit
+gr_bit:     ld b, a
+            ld a, 1
+            inc b
+.s:         dec b
+            ret z
+            add a, a
+            jr .s
+; the event list (HL / DE: its two buffers, A: records at most): per line each group's
+; owner (the last window drawn there) and its colour; a record where a colour changes; the
+; music in the longest gap; the box's cut
+gr_make:    ld [gr_lim], a
+            ld a, [gr_base]                 ; (the buffer not in use)
+            cp l
+            jr nz, .b
+            ld a, [gr_base + 1]
+            cp h
+            jr nz, .b
+            ld h, d
+            ld l, e
+.b:         ld a, l
+            ld [gr_nb], a
+            ld a, h
+            ld [gr_nb + 1], a
+            ld a, low(gr_ramp)              ; (both groups start at the top colour)
+            ld [gr_cm], a
+            ld [gr_ca], a
+            xor a
+            ld [gr_ln], a
+            ld [gr_rc], a
+.ln:        call gr_col                     ; E = main, C = alt (ramp low bytes; $FF none)
+            ld a, [gr_ln]
+            and a
+            jr z, .z
+            ld a, [gr_cut]
+            and a
+            jr z, .nc
+            add a, a
+            add a, a
+            add a, a
+            ld l, a
+            ld a, [gr_ln]
+            cp l
+            jp nc, .end                     ; (the box's cut)
+.nc:        xor a
+            ld [gr_mk], a
+            ld a, e
+            cp $FF
+            jr z, .na
+            ld a, [gr_cm]
+            call gr_same                    ; Z: the same colour as low byte E
+            jr z, .na
+            ld a, e
+            ld [gr_cm], a
+            ld a, 1
+            ld [gr_mk], a
+.na:        ld a, c
+            cp $FF
+            jr z, .nb
+            ld e, c
+            ld a, [gr_ca]
+            call gr_same
+            jr z, .nb
+            ld a, c
+            ld [gr_ca], a
+            ld a, [gr_mk]
+            or 2
+            ld [gr_mk], a
+.nb:        ld a, [gr_mk]
+            and a
+            jr z, .next
+            jr .rec
+.z:         ld a, e                         ; line 0: its colours (or the top colour)
+            cp $FF
+            jr z, .z1
+            ld [gr_cm], a
+.z1:        ld a, c
+            cp $FF
+            jr z, .z2
+            ld [gr_ca], a
+.z2:        ld a, 3
+            ld [gr_mk], a
+.rec:       ld a, [gr_lim]                  ; (room)
+            ld b, a
+            ld a, [gr_rc]
+            cp b
+            jr nc, .next
+            call gr_recp                    ; HL = record gr_rc
+            ld a, [gr_ln]
+            ld [hl+], a
+            ld a, [gr_mk]
+            ld [hl+], a
+            ld a, [gr_cm]
+            ld [hl+], a
+            ld a, [gr_ca]
+            ld [hl], a
+            ld hl, gr_rc
+            inc [hl]
+.next:      ld hl, gr_ln
+            inc [hl]
+            ld a, [hl]
+            cp 144
+            jp c, .ln
+.end:       ld a, [gr_cut]                  ; the cut (+ music) / the music in the longest gap
+            and a
+            jr z, .gap
+            add a, a
+            add a, a
+            add a, a
+            ld b, a
+            ld c, $C0
+            jr .add
+.gap:       call gr_gap                     ; B = the music's line
+            ld c, $40
+.add:       call gr_ins
+            ld a, [gr_rc]                   ; the end
+            call gr_recp.a
+            ld a, $FF
+            ld [hl+], a
+            xor a
+            ld [hl], a
+            ld a, 1                         ; for the next V-Blank
+            ld [gr_new], a
+            ld [gr_on], a
+            ret
+; HL = record gr_rc (A = record n: .a)
+gr_recp:    ld a, [gr_rc]
+.a:         add a, a
+            add a, a
+            ld l, a
+            ld a, [gr_nb]
+            add a, l
+            ld l, a
+            ld a, [gr_nb + 1]
+            adc a, 0
+            ld h, a
+            ret
+; Z: ramp entries at low bytes A and E hold the same colour
+gr_same:    ld l, a
+            ld h, high(gr_ramp)
+            ld a, [hl+]
+            ld b, [hl]
+            ld l, e
+            cp [hl]
+            ret nz
+            inc l
+            ld a, b
+            cp [hl]
+            ret
+; line gr_ln: E = the main owner's colour, C = the alt owner's (ramp low bytes; $FF none);
+; the last window drawn over the line owns it
+gr_col:     ld a, $FF
+            ld [gr_tm], a
+            ld [gr_ta], a
+            ld a, [gr_n]
+            ld [gr_t], a
+.w:         ld a, [gr_t]
+            and a
+            jr z, .x
+            dec a
+            ld [gr_t], a
+            ld e, a
+            ld d, 0
+            ld hl, gr_grp
+            add hl, de
+            ld a, [hl]
+            ld [gr_g], a
+            and a                           ; (that group already owned: the next)
+            ld a, [gr_tm]
+            jr z, .g
+            ld a, [gr_ta]
+.g:         cp $FF
+            jr nz, .w
+            ld a, [gr_t]
+            call gr_wp
+            inc hl
+            ld a, [hl+]
+            add a, a
+            add a, a
+            add a, a
+            ld b, a                         ; top line
+            inc hl
+            ld a, [hl]
+            add a, a
+            add a, a
+            add a, a
+            ld c, a                         ; lines
+            ld a, [gr_ln]
+            sub b
+            jr c, .w
+            cp c
+            jr nc, .w
+            ld d, a
+            dec c
+            call gr_idx                     ; A = 31 d / (lines - 1)
+            add a, a
+            add a, low(gr_ramp)
+            ld e, a
+            ld a, [gr_g]
+            and a
+            ld a, e
+            jr nz, .al
+            ld [gr_tm], a
+            jr .w
+.al:        ld [gr_ta], a
+            jr .w
+.x:         ld a, [gr_tm]
+            ld e, a
+            ld a, [gr_ta]
+            ld c, a
+            ret
+; A = 31 D / C (C > 0)
+gr_idx:     push bc
+            push de
+            ld a, d
+            ld l, a
+            ld h, 0
+            ld e, l
+            ld d, h
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl                      ; 32 d
+            ld a, l
+            sub e
+            ld l, a
+            ld a, h
+            sbc a, d
+            ld h, a                         ; 31 d
+            ld a, c
+            cpl
+            ld e, a
+            ld d, $FF
+            inc de                          ; -c
+            ld b, $FF
+.d:         inc b
+            add hl, de
+            jr c, .d
+            ld a, b
+            cp 32
+            jr c, .x
+            ld a, 31
+.x:         pop de
+            pop bc
+            ret
+; B = the first line of the longest gap between records (to 143)
+gr_gap:     ld a, [gr_nb]
+            ld l, a
+            ld a, [gr_nb + 1]
+            ld h, a
+            ld a, [gr_rc]
+            ld c, a
+            ld d, 0                         ; best length
+            ld b, 1
+.l:         ld e, [hl]                      ; this record's line
+            inc hl
+            inc hl
+            inc hl
+            inc hl
+            dec c
+            ld a, 144
+            jr z, .t
+            ld a, [hl]
+.t:         sub e                           ; the gap after it
+            cp d
+            jr c, .n
+            ld d, a
+            ld a, e
+            inc a
+            ld b, a
+.n:         ld a, c
+            and a
+            jr nz, .l
+            ld a, b
+            cp 144
+            ret c
+            ld b, 143
+            ret
+; insert record (line B, mask C, the colours as they stand) before the first record with a
+; later line; the same line: its mask ORed in
+gr_ins:     ld a, b
+            ld [gr_t], a
+            ld a, c
+            ld [gr_mk], a
+            ld a, [gr_nb]
+            ld l, a
+            ld a, [gr_nb + 1]
+            ld h, a
+            ld a, [gr_rc]
+            ld e, a                         ; records left
+.f:         ld a, e
+            and a
+            jr z, .at
+            ld a, [gr_t]
+            cp [hl]
+            jr z, .or
+            jr c, .at
+            inc hl
+            inc hl
+            inc hl
+            inc hl
+            dec e
+            jr .f
+.or:        inc hl
+            ld a, [gr_mk]
+            or [hl]
+            ld [hl], a
+            ret
+.at:        push hl                         ; the E records from HL up by one record
+            ld a, e
+            add a, a
+            add a, a
+            ld c, a                         ; bytes
+            ld b, 0
+            add hl, bc
+            dec hl
+            ld d, h
+            ld e, l
+            inc hl
+            inc hl
+            inc hl
+            inc hl                          ; HL = DE + 4
+            ld a, c
+            and a
+            jr z, .wr
+.mv:        ld a, [de]
+            ld [hl-], a
+            dec de
+            dec c
+            jr nz, .mv
+.wr:        pop hl
+            ld a, [gr_t]
+            ld [hl+], a
+            ld a, [gr_mk]
+            ld [hl+], a
+            ld a, [gr_cm]                   ; (colours: unused by a special record)
+            ld [hl+], a
+            ld a, [gr_ca]
+            ld [hl], a
+            ld hl, gr_rc
+            inc [hl]
+            ret
+
+section wram, $D640
+gr_ramp:    ds 64                           ; 32 colours
+gr_win:     ds GR_MAXW * 4                  ; the menus' windows (scr_win): x, y, w, h
+gr_grp:     ds GR_MAXW                      ; 0 main, 1 alt
+gr_wn:      ds 1
+gr_n:       ds 1
+gr_on:      ds 1
+gr_new:     ds 1
+gr_rst:     ds 1
+gr_dirty:   ds 1
+gr_p0:      ds 1
+fd_act:     ds 1
+gr_p:       ds 2
+gr_base:    ds 2
+gr_nb:      ds 2
+gr_lm:      ds 8                            ; BCPS lists in use: main, alt ($FF ends)
+gr_la:      ds 8
+gr_nlm:     ds 8                            ; the next list's
+gr_nla:     ds 8
+section wram, $D9CF
+gr_i:       ds 1
+gr_j:       ds 1
+gr_g:       ds 1
+gr_t:       ds 1
+gr_pm:      ds 1
+gr_pa:      ds 1
+gr_cm:      ds 1
+gr_ca:      ds 1
+gr_lim:     ds 1
+gr_ln:      ds 1
+gr_rc:      ds 1
+gr_mk:      ds 1
+gr_cut:     ds 1
+gr_tm:      ds 1
+gr_ta:      ds 1
+gr_cx:      ds 1
+gr_cy:      ds 1
+
+section wram, $CDE4
 loc_buf:    ds 19
 pt_on:      ds 1                            ; (play time counted: set by the field's loop)
 op_k:       ds 1                            ; (Optimize)

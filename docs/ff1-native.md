@@ -398,3 +398,7 @@ one reaches parity, so the owner can keep playing).
    (Color) the windows' colour, Forget (SELECT on the Magic screen), three save files with previews
    (file 1 where the single save was). Fixed on the way: two calls into another bank (tools/gbn/
    xbank.py now finds them).
+23. Owner (2026-11-22, after the mock-up video): the encounter transition (twist / zoom, shattering
+   strips, white flash, the battle fading in from white), the party walking in from the right, gradient
+   windows on the Color with Options: Gradient On / Off (the top the window colour itself, darker than the
+   mock-up), the main menu's crystals centred. Details: docs/gb-video-improvements.md.

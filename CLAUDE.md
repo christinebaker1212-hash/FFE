@@ -1320,6 +1320,9 @@ forward; place-name banner, place / play time on the main menu, Items Use / Sort
 shop owned / worn counts, magic-shop slot pips, Options (B Dash, Cursor, Color window colour), Forget,
 three save files (docs/gb-video-improvements.md: what, how, and how to redo it for FF2 / FF3; docs/
 ff1-native.md item 22). New check: tools/gbn/xbank.py (calls into another bank).
+Owner (2026-11-22, after the mock-up): encounter transition (raster twist / zoom / strips, white flash,
+battle from white), party walk-in, Color gradient windows with an Options switch, crystals centred
+(docs/ff1-native.md item 23).
 Next: the walking playthrough (DMG / SGB / CGB), then the owner's play-test. Lessons: docs/gb-lessons.md.
 
 ## Remaining

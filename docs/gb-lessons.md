@@ -203,3 +203,15 @@ Color only" screen on older systems.
 - Video study for new features (docs/gb-video-improvements.md): sample every frame at 2 fps,
   then 60 fps around the moments that matter (an attack, a death, a transition), and measure
   timings in frames before writing code.
+
+## Shared work RAM (2026-11-22)
+- Reusing another module's RAM is safe only for variables that module sets before every use.
+  The gradient's event lists first went into the battle's RAM; one byte there (`vw_spr`, "draw
+  text as sprites") is never reset by the battle, so every battle message turned grey. List
+  each region's variables and their initialisation before sharing it.
+- Sum the `ds` sizes per `section wram` and check the sections for overlaps after adding
+  variables: a new buffer at $CDE3 overlapped the last byte of the screen module's section (the
+  name entry's letter case).
+- Palette writes on the Color are ignored in mode 3: a per-line effect writes in the H-Blank of
+  the line before (LYC one line early, then wait for mode 0); whole-palette fades rewrite every
+  colour, so pause per-line palette effects during a fade.

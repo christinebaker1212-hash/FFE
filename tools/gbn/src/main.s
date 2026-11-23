@@ -321,6 +321,7 @@ vblank:     push af
             call nz, bg_pal
             call box_vbl
             call pt_tick
+            call gr_vbl                     ; (the windows' gradient: text.s)
             ld a, [wp_on]                   ; (a screen wipe: the window from the top)
             and a
             call nz, wp_vbl
@@ -2160,6 +2161,7 @@ section bank 0, $1480                       ; (the screen fades)
 fade_out:   call lcd_get
             bit 7, a
             ret z
+            call gr_fd                      ; (the gradient paused: loc.s)
             ld a, [fd_skip]
             and a
             jr z, .go
@@ -2214,12 +2216,15 @@ fade_out:   call lcd_get
             jr c, .dl
 .sv:        ld a, 1
             ld [fd_saved], a
+            xor a
+            ld [fd_act], a
             ret
 fade_in:    ld a, [fd_in]
             and a
             ret z
             xor a
             ld [fd_in], a
+            call gr_fd                      ; (the gradient paused meanwhile)
             ldh a, [is_cgb]
             and a
             jr z, .dmg
@@ -2232,6 +2237,7 @@ fade_in:    ld a, [fd_in]
             jr c, .l
             xor a                           ; (a white fade-in once only)
             ld [fd_wh], a
+            ld [fd_act], a
             ret
 .dmg:       ld a, 2
 .dl:        ld [fd_lv], a
@@ -2242,6 +2248,8 @@ fade_in:    ld a, [fd_in]
             dec a
             cp $FF
             jr nz, .dl
+            xor a
+            ld [fd_act], a
             ret
 ; CGB: fd_pal at fd_lv / 4 to the palettes (two frames)
 fd_step:    call fd_scale
@@ -3354,7 +3362,10 @@ section bank 0, $3C00                       ; (masked loads)
 ; to the shadows, and a mode-2 STAT interrupt holds the CPU through each line's mode 3, so the
 ; load writes VRAM directly as with the LCD off. lcd_on shows the screen: shadows back in a
 ; V-Blank, the STAT interrupt as before.
-lcd_off:    ld a, [bn_t]                    ; (the place-name banner: gone)
+lcd_off:    call gr_off                     ; (the windows' gradient off, its windows gone)
+            xor a
+            ld [gr_wn], a
+            ld a, [bn_t]                    ; (the place-name banner: gone)
             and a
             jr z, .nb
             xor a
