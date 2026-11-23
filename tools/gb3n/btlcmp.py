@@ -32,6 +32,7 @@ def table(seed):
 
 
 SEED = 0
+POKES = [(int(a, 16), int(v, 16)) for a, v in (kv.split('=') for kv in os.environ.get('BTL_POKE', '').split())]
 
 
 def main():
@@ -45,8 +46,11 @@ def main():
     nf = int(sys.argv[2]) if len(sys.argv) > 2 else 300
     gf = int(sys.argv[3]) if len(sys.argv) > 3 else 330
     st = open(os.path.join(ROOT, 'build', 'ff3', 'cave.state'), 'rb').read()
-    sram0 = st[nb.SRAM:nb.SRAM + 0x2000]
-    _, out = nb.run(bid, [], [], [(nf, 'd')])
+    sram0 = bytearray(st[nb.SRAM:nb.SRAM + 0x2000])
+    pokes = POKES
+    for a, v in pokes:                  # (env BTL_POKE="6203=4A ...": cart RAM pokes on both sides)
+        sram0[a - 0x6000] = v
+    _, out = nb.run(bid, [], [], [(nf, 'd')], pokes)
     ram, sram = out['d']
     nes_t = sram[0x1BE3:0x1CE3]
     seeds = [s for s in range(256) if table(s) == nes_t]
@@ -98,6 +102,7 @@ def nes_end(bid):
     n = NES(os.path.join(ROOT, 'build', 'ff3_en.nes'))
     st = bytearray(open(os.path.join(ROOT, 'build', 'ff3', 'cave.state'), 'rb').read())
     st[nb.RAM + 0x6A] = bid; st[nb.RAM + 0xAB] = 0x20
+    for a, v in POKES: st[nb.SRAM + a - 0x6000] = v
     n.load(np.array(st, dtype=np.uint8))
     n.watch = (0x60E0, 0x60FF)
     f, stop = 0, None
@@ -121,6 +126,7 @@ def nes_turns(bid, turns):
     n = NES(os.path.join(ROOT, 'build', 'ff3_en.nes'))
     st = bytearray(open(os.path.join(ROOT, 'build', 'ff3', 'cave.state'), 'rb').read())
     st[nb.RAM + 0x6A] = bid; st[nb.RAM + 0xAB] = 0x20
+    for a, v in POKES: st[nb.SRAM + a - 0x6000] = v
     n.load(np.array(st, dtype=np.uint8))
     f, stop = 0, None
     while True:

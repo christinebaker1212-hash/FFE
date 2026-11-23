@@ -213,7 +213,7 @@ CODE5 = 113                             # the cutscenes (cut.s at $4000, NES ban
 CUTD = 114                              # their graphics and text pages (cut.py)
 CUTD2 = 115                             # the end credits' strings, weapon tiles (cut.py)
 CODE6 = 116                             # the special animations (anim.s), 3A/9800 at $5800, 3B at $6000
-CODE7 = 118                             # battle animations (btlanim.s), 32/9000 at $5000, 33 at $6000
+CODE7 = 118                             # battle animations (btlanim.s), 32/9400 at $5400, 33 at $6000
 W0B_BANK = 117                          # NES bank 0B (world map sprites) as 512 GB tiles
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
 CHGFX_BANK = 95                         # battle characters (NES banks $28 / $29) as GB tiles
@@ -440,8 +440,8 @@ def main():
     ab[0x2000:0x4000] = rom.b(0x3B, 0xA000, 0x2000)            # $6000: 3B
     c7 = r.banks.setdefault(CODE7, bytearray(0x4000))
     c7.extend(bytes(0x4000 - len(c7)))
-    assert not any(c7[0x1000:]), 'battle animation code past $5000'
-    c7[0x1000:0x2000] = rom.b(0x32, 0x9000, 0x1000)            # $5000: 32/9000-9FFF
+    assert not any(c7[0x1400:]), 'battle animation code past $5400'
+    c7[0x1400:0x2000] = rom.b(0x32, 0x9400, 0xC00)             # $5400: 32/9400-9FFF
     c7[0x2000:0x4000] = rom.b(0x33, 0xA000, 0x2000)            # $6000: 33
     size = 2
     while size < max(r.banks) + 1: size *= 2

@@ -1,5 +1,5 @@
 ; ---- battle animations (FF3 2F/AF4E battle graphics, 33 animation functions, 32 sprite helpers),
-; bank CODE7: this code at $4000, NES 32/9000-9FFF at $5000 and 33 at $6000 (NES - $4000), so
+; bank CODE7: this code at $4000, NES 32/9400-9FFF at $5400 and 33 at $6000 (NES - $4000), so
 ; FF3's frame / sprite / hit tables are read where FF3 keeps them. Sprites are built in FF3's
 ; screen coordinates and placed for the GB layout: those of a member relative to its sprite in
 ; the party column (btlgfx chr_draw1), those on monsters by the battlefield's view; into OAM
@@ -406,13 +406,41 @@ ba_weapon:  ld a, [BZ + $95]                ; (33/A6C3: confused -> no hits)
             xor a
             ld [BZ + $BB], a
             ld [BZ + $BC], a
-.nc:        xor a
+.nc:        xor a                           ; right hand first
             ld [BZ + $CD], a
-            ld a, [W7 + $7E1F]
+            ld a, [W7 + $7E1F]              ; bow + arrow: the bow's hand alone
+            cp 3
+            jr nz, .a1
+            ld a, [W7 + $7E20]
+            cp 8
+            jr nz, .nb
+            xor a
+            jr .ba
+.a1:        cp 8
+            jr nz, .nb
+            ld a, [W7 + $7E20]
+            cp 3
+            jr nz, .nb
+            ld a, 1
+.ba:        ld [BZ + $CD], a
+            call ba_bc                      ; 33/A24C
+            ld a, 3
+            jr ba_whand
+.nb:        ld a, [W7 + $7E1F]              ; a harp: the right hand's hits for both
+            cp 4
+            jr z, .hp
+            ld a, [W7 + $7E20]
+            cp 4
+            jr nz, .two
+.hp:        call ba_bc
+.two:       ld a, [W7 + $7E1F]
             call ba_whand
             ld a, 1
             ld [BZ + $CD], a
             ld a, [W7 + $7E20]
+ba_bc:      ld a, [BZ + $BB]                ; 33/A24C
+            ld [BZ + $BC], a
+            ret
 ; 33/A094 one hand's animation by type (the hits capped by 33/A077)
 ba_whand:   ld [ba_wt], a
             xor a
@@ -444,8 +472,21 @@ ba_whand:   ld [ba_wt], a
             jr z, ba_w12                    ; 2: blunt
             cp 9
             jr z, ba_w9                     ; 9: claw
+            cp 3
+            jp z, ba_w3                     ; 3: bow
+            cp 4
+            jp z, ba_w4                     ; 4: harp
+            cp 5
+            jp z, ba_w5                     ; 5: boomerang
+            cp 6
+            jp z, ba_w6                     ; 6: full moon
+            cp 7
+            jp z, ba_w7                     ; 7: shuriken
+            cp 8                            ; 8: an arrow alone: as bare hands (33/A2F2)
+            jr z, .un
             and a
-            ret nz                          ; (3-8: bows, harp, thrown: later)
+            ret nz
+.un:
             ld a, [W7 + $7E1F]              ; 0: bare hands, when both hands are empty
             ld hl, W7 + $7E20
             or [hl]
@@ -833,13 +874,53 @@ ba_spr:     ld a, [BZ + $8E]
             ret
 
 ; FF3 sprite (B = x, C = y, D = tile, E = attributes) -> the next animation OAM slot; ba_mode 0:
-; relative to the attacker ($95) in the party column, 1: on the battlefield
+; relative to the attacker ($95) in the party column, 1: on the battlefield, 2: a projectile
 ba_put:     ld a, d
             and a
             ret z                           ; (tile 0: none)
             ld a, [ba_mode]
             and a
-            jr nz, .bf
+            jr z, .pc
+            cp 2
+            jr z, .pj
+            jr .bf
+.pj:        call ba_back                    ; projectiles: x <= 128 as the battlefield (x - 12),
+            ld a, b                         ;   x >= 192 as the party column, between them
+            jr nz, .j0                      ;   compressed (116 + 3 (x - 128) / 8); y - 32
+            ld a, 240
+            sub b
+.j0:        cp 128
+            jr nc, .j1
+            sub 12
+            jr .j3
+.j1:        cp 192
+            jr nc, .j2
+            sub 128
+            ld h, a
+            add a, a
+            add a, h
+            srl a
+            srl a
+            srl a
+            add a, 116
+            jr .j3
+.j2:        sub 208
+            sra a
+            add a, 148
+.j3:        ld b, a
+            ld a, c
+            sub 32
+            ld c, a
+            call ba_back
+            jr nz, .w
+            ld a, 168
+            sub b
+            ld b, a
+            ld a, e
+            xor $40
+            ld e, a
+            jr .w
+.pc:
             ld a, [BZ + $95]                ; the party column: y - (4 m + $1B); x - C0 + base
             ld l, a
             add a, a
@@ -956,7 +1037,11 @@ ba_hit:     push af
             and a
             jr z, ba_slice
             cp 3
-            ret nc                          ; (3-5: later)
+            jp z, ba_hit3
+            cp 4
+            jp z, ba_hit4
+            cp 5
+            jp z, ba_hit5
             ld e, $10                       ; 1: strike $10 / $11, 2: claw $12 / $13
             cp 1
             jr z, .t
@@ -1085,6 +1170,762 @@ ba_bkd:     ld [W7 + $7CF7], a
             ld [W7 + $7CF7 + 8], a
             ld [W7 + $7CF7 + 12], a
             jp ba_vblc
+
+
+; ---- the ranged and other weapons (33/A125-A2F1, A4D4-A7A4)
+; 33/A251 bow (and arrows): the hands' hit palettes swapped, 16 frames of drawing, the arrow
+ba_w3:      call ba_hits
+            ld a, [W7 + $7E17]
+            ld b, a
+            ld a, [W7 + $7E18]
+            ld [W7 + $7E17], a
+            ld a, b
+            ld [W7 + $7E18], a
+            call ba_hpal
+            call ba_save
+            xor a
+            ld [BZ + $B6], a
+            ld a, $AF
+            ld [S49], a
+.f:         call ba_reset
+            ld a, [BZ + $B6]
+            and 8
+            jr nz, .f2
+            ld a, [BZ + $CD]
+            and a
+            jr z, .r1
+            ld b, $0B                       ; left: frame 6, anim $0B, then anim 7
+            ld a, 6
+            call ba_fa
+            ld a, 7
+            call ba_aspr0
+            jr .w
+.r1:        ld a, 5
+            call ba_aspr0
+            ld b, 9
+            ld a, 1
+            call ba_af
+            jr .w
+.f2:        ld a, [BZ + $CD]
+            and a
+            jr z, .r2
+            ld b, $0C
+            ld a, 6
+            call ba_fa
+            ld a, 8
+            call ba_aspr0
+            jr .w
+.r2:        ld a, 6
+            call ba_aspr0
+            ld b, $0A
+            ld a, 1
+            call ba_af
+.w:         call ba_vblc
+            call ba_inc
+            and $10
+            jr z, .f
+            call ba_arrow                   ; 33/A6D2
+            jp ba_end
+
+; 33/A1A5 harp: per hit 16 frames, the strike every 8
+ba_w4:      call ba_hits
+            call ba_hpal
+            call ba_save
+            ld a, $8B
+            ld [S49], a
+.h:         xor a
+            ld [BZ + $B6], a
+            ld [BZ + $B9], a
+.f:         call ba_reset
+            ld a, [BZ + $CD]
+            and a
+            jr z, .r
+            ld b, $0F
+            ld a, 6
+            call ba_fa
+            jr .t
+.r:         ld b, $0E
+            ld a, 7
+            call ba_af
+.t:         ld a, [BZ + $B6]
+            and 8
+            jr z, .w
+            ld a, 1
+            call ba_hit
+.w:         call ba_vblc
+            call ba_inc
+            and $10
+            jr z, .f
+            ld hl, BZ + $BD
+            ld a, [hl]
+            and a
+            jr z, .e
+            dec [hl]
+            jr nz, .h
+.e:         ld a, $FF                       ; (33/AC3A: no sound stop)
+            call ba_rest
+            call ba_reset
+            call chr_draw
+            jp wait_vbl
+
+; 33/A125 / A12C full moon / boomerang: 16 frames of the throw, then the flight
+ba_w6:      ld a, 4
+            jr ba_w56
+ba_w5:      xor a
+ba_w56:     ld [BZ + $89], a
+            call ba_hits
+            call ba_hpal
+            call ba_save
+            xor a
+            ld [BZ + $B6], a
+            ld a, $BB
+            ld [S49], a
+.f:         call ba_reset
+            ld a, [BZ + $89]
+            cp 4
+            ld a, $14
+            jr z, .o
+            xor a
+.o:         ld [BZ + $88], a
+            ld a, [BZ + $B6]
+            and 8
+            jr nz, .f2
+            ld a, [BZ + $CD]
+            and a
+            jr z, .r1
+            ld a, [BZ + $88]
+            add a, $22
+            ld b, a
+            ld a, 7
+            call ba_af
+            jr .w
+.r1:        ld a, [BZ + $88]
+            add a, $20
+            ld b, a
+            ld a, 5
+            call ba_fa
+            jr .w
+.f2:        ld a, [BZ + $CD]
+            and a
+            jr z, .r2
+            ld a, [BZ + $88]
+            add a, $23
+            ld b, a
+            ld a, 6
+            call ba_af
+            jr .w
+.r2:        ld a, [BZ + $88]
+            add a, $21
+            ld b, a
+            ld a, 1
+            call ba_fa
+.w:         call ba_vblc
+            call ba_inc
+            and $10
+            jr z, .f
+            call ba_boom                    ; 33/A4D4
+            jp ba_end
+
+; 33/A1EF shuriken: 16 frames of the throw, then the flight
+ba_w7:      call ba_hits
+            call ba_hpal
+            call ba_save
+            xor a
+            ld [BZ + $B6], a
+            ld a, $AF
+            ld [S49], a
+.f:         call ba_reset
+            ld a, [BZ + $B6]
+            and 8
+            jr nz, .f2
+            ld a, [BZ + $CD]
+            and a
+            jr z, .r1
+            ld b, $1E
+            ld a, 7
+            call ba_fa
+            jr .w
+.r1:        ld b, $18
+            ld a, 5
+            call ba_fa
+            jr .w
+.f2:        ld a, [BZ + $CD]
+            and a
+            jr z, .r2
+            ld b, $1F
+            ld a, 6
+            call ba_fa
+            jr .w
+.r2:        ld b, $19
+            ld a, 1
+            call ba_fa
+.w:         call ba_vblc
+            call ba_inc
+            and $10
+            jr z, .f
+            call ba_shur                    ; 33/A5FE
+            jp ba_end
+
+; 33/A6C3 the attacker confused: carry; with $7E96 (member on member) also carry
+ba_noproj:  ld a, [W7 + $7E96]
+            and a
+            scf
+            ret nz
+            ld a, [BZ + $95]
+            ld c, a
+            ld b, 0
+            ld hl, W7 + $7D9B
+            add hl, bc
+            add hl, bc
+            bit 3, [hl]
+            scf
+            ret nz
+            and a
+            ret
+; the flight's set-up: vectors reset, the angle to the target (33/A7A5), amplitude A
+ba_vstart:  push af
+            call ba_vreset
+            call ba_angle
+            ld b, a                         ; 33/BFB1: both angles + A
+            ld hl, W7 + $7E3A
+            add a, [hl]
+            ld [hl], a
+            ld hl, W7 + $7E44
+            ld a, [hl]
+            add a, b
+            ld [hl], a
+            pop af
+            ld [W7 + $7E26], a
+            ld [W7 + $7E30], a
+            xor a
+            ld [BZ + $B6], a
+            ret
+; the projectile's x reached the target's centre? (x = C0 - 16 + vx): carry if not yet
+ba_reach:   call ba_vx
+            ld b, a
+            ld a, [BZ + $95]
+            ld c, a
+            ld hl, BZ + $C0
+            ld a, l
+            add a, c
+            ld l, a
+            ld a, [hl]
+            sub $10
+            add a, b
+            ld b, a
+            call ba_tctr
+            ld a, [BZ + $8C]
+            cp b
+            ret
+; 33/A6D2 the arrow: flies at 16 a frame to the target; then the first hit's arrow at the target
+; (32/987C), the rest by hit animation 3
+ba_arrow:   call ba_noproj
+            ret c
+            ld a, $10
+            call ba_vstart
+.f:         call ba_reset
+            ld a, [BZ + $CD]
+            and a
+            jr z, .r
+            ld a, 6
+            call ba_cfr
+            ld a, $16
+            call ba_proj
+            ld a, 8
+            call ba_aspr0
+            jr .w
+.r:         ld a, 6
+            call ba_aspr0
+            ld a, $14
+            call ba_proj
+            ld a, 1
+            call ba_cfr
+.w:         call wait_vbl
+            ld hl, BZ + $B6
+            inc [hl]
+            call ba_reach
+            jr nc, .hit
+            ld a, $10
+            call ba_vdadd
+            jr .f
+.hit:       call ba_reset
+            ld a, [BZ + $CD]
+            and a
+            jr z, .r2
+            ld b, 8
+            ld a, 6
+            call ba_fa
+            jr .h
+.r2:        ld b, 6
+            ld a, 1
+            call ba_af
+.h:         call ba_first
+            jr z, .w2
+            call ba_arr1                    ; 32/987C
+            ld hl, BZ + $BD
+            dec [hl]
+.w2:        call wait_vbl
+            ld a, [BZ + $BD]
+            and a
+            ret z
+            ld a, 3
+            jp ba_hit
+; the hand has hits (NZ)
+ba_first:   ld a, [BZ + $CD]
+            ld c, a
+            ld b, 0
+            ld hl, BZ + $BB
+            add hl, bc
+            ld a, [hl]
+            and a
+            ret
+; the projectile's end at (C0 - 16 + vx, C4 + 8 + vy)
+ba_pend:    call ba_vy
+            ld b, a
+            ld a, [BZ + $95]
+            ld c, a
+            ld hl, BZ + $C4
+            ld a, l
+            add a, c
+            ld l, a
+            ld a, [hl]
+            add a, 8
+            add a, b
+            ld [BZ + $8D], a
+            call ba_vx
+            ld b, a
+            ld a, [BZ + $95]
+            ld c, a
+            ld hl, BZ + $C0
+            ld a, l
+            add a, c
+            ld l, a
+            ld a, [hl]
+            sub $10
+            add a, b
+            ld [BZ + $8C], a
+            ret
+ba_arr1:    call ba_pend
+            ld a, [BZ + $CD]
+            and a
+            ld a, $52
+            jr z, ba_one
+            ld a, $4A
+            jr ba_one
+ba_shu1:    call ba_pend
+            ld a, [BZ + $CD]
+            and a
+            ld a, $4B
+            jr z, ba_one
+            ld a, $53
+; 32/988C one sprite (tile A) at ($8C, $8D) on the battlefield, sound $5A, then 6 frames
+ba_one:     ld d, a
+            ld a, $DA
+            ld [S49], a
+            ld a, 1
+            ld [ba_mode], a
+            ld a, [BZ + $8C]
+            ld b, a
+            ld a, [BZ + $8D]
+            ld c, a
+            ld e, 3
+            call ba_put
+            ld b, 6
+.w:         push bc
+            call wait_vbl
+            pop bc
+            dec b
+            jr nz, .w
+            ret
+; 32/9823 hits 3 / 4 (arrows / shuriken): each remaining hit a sprite around the target's centre
+; (random 0-$18 and 0-$26 less $10, a random 0-255 between them, as FF3)
+ba_hit4:    ld a, 1
+            jr ba_h34
+ba_hit3:    xor a
+ba_h34:     ld [ba_t + 3], a
+.l:         call ba_tctr
+            xor a
+            ld [BZ + $21], a
+            ld b, 0
+            ld a, $18
+            call rnd_xa
+            ld hl, BZ + $8C
+            add a, [hl]
+            sub $10
+            ld [hl], a
+            call ba_rnd255
+            xor a
+            ld [BZ + $21], a
+            ld b, 0
+            ld a, $26
+            call rnd_xa
+            ld hl, BZ + $8D
+            add a, [hl]
+            sub $10
+            ld [hl], a
+            ld a, [ba_t + 3]
+            and a
+            ld a, [BZ + $CD]
+            jr z, .ar
+            and a                           ; shuriken $4B / $53
+            ld a, $4B
+            jr z, .t
+            ld a, $53
+            jr .t
+.ar:        and a                           ; arrow $52 / $4A
+            ld a, $52
+            jr z, .t
+            ld a, $4A
+.t:         call ba_one
+            ld hl, BZ + $BD
+            dec [hl]
+            jr nz, .l
+            ret
+; 32/97EB hit 5 (boomerang): frame $10 / $11 at the target's centre + 16
+ba_hit5:    call ba_tctr
+            ld a, [BZ + $8C]
+            add a, $10
+            ld [BZ + $8C], a
+            ld a, [BZ + $8D]
+            add a, $10
+            ld [BZ + $8D], a
+            xor a
+            ld [BZ + $8F], a
+            ld a, [BZ + $CD]
+            add a, $10
+            ld [BZ + $8E], a
+            ld a, 1
+            ld [ba_mode], a
+            jp ba_spr
+; 33/A5FE the shuriken: 8 a frame + 16, then its first hit, the rest by hit animation 4
+ba_shur:    call ba_noproj
+            ret c
+            ld a, 8
+            call ba_vstart
+.f:         call ba_reset
+            ld a, [BZ + $CD]
+            and a
+            jr z, .r
+            ld a, 6
+            call ba_cfr
+            ld a, $1C
+            call ba_proj
+            jr .w
+.r:         ld a, 1
+            call ba_cfr
+            ld a, $1A
+            call ba_proj
+.w:         call wait_vbl
+            ld hl, BZ + $B6
+            inc [hl]
+            call ba_reach
+            jr nc, .hit
+            ld a, $10
+            call ba_vdadd
+            jr .f
+.hit:       call ba_reset
+            ld a, [BZ + $CD]
+            and a
+            ld a, 1
+            jr z, .h1
+            ld a, 6
+.h1:        call ba_cfr
+            call ba_first
+            jr z, .w2
+            call ba_shu1
+            ld hl, BZ + $BD
+            dec [hl]
+.w2:        call wait_vbl
+            ld a, [BZ + $BD]
+            and a
+            ret z
+            ld a, 4
+            jp ba_hit
+; 33/A4D4 the boomerang / full moon: out to the target (the distance growing, slowing near
+; half way), back with its hits (hit animation 5)
+ba_boom:    call ba_noproj
+            ret c
+            ld hl, BZ + $BD
+            sla [hl]
+            sla [hl]
+            sla [hl]
+            xor a
+            ld [BZ + $88], a
+            ld a, [BZ + $95]                ; $8A = (C0 + $16 - target centre x) / 2
+            ld c, a
+            ld b, 0
+            ld hl, BZ + $C0
+            add hl, bc
+            ld a, [hl]
+            add a, $16
+            push af
+            call ba_tctr
+            pop af
+            ld hl, BZ + $8C
+            sub [hl]
+            srl a
+            ld [BZ + $8A], a
+            ld a, $10
+            ld [BZ + $8B], a
+            ld a, $10
+            call ba_vstart
+.o:         call ba_reset
+            call .spr
+            call wait_vbl
+            ld hl, BZ + $B6
+            inc [hl]
+            call ba_vx                      ; reached: x = C0 - 16 + vx <= centre
+            ld b, a
+            ld a, [BZ + $95]
+            ld c, a
+            ld hl, BZ + $C0
+            ld a, l
+            add a, c
+            ld l, a
+            ld a, [hl]
+            sub $10
+            add a, b
+            ld b, a
+            call ba_tctr
+            ld a, [BZ + $8C]
+            cp b
+            jr nc, .back
+            ld a, [W7 + $7E26]
+            ld hl, BZ + $8A
+            cp [hl]
+            jr c, .o1
+            ld hl, BZ + $8B
+            dec [hl]
+            ld hl, BZ + $88
+            inc [hl]
+            inc [hl]
+            jr .o2
+.o1:        ld hl, BZ + $88
+            dec [hl]
+            dec [hl]
+            ld hl, BZ + $8B
+            inc [hl]
+.o2:        ld a, [BZ + $8B]
+            srl a
+            srl a
+            call ba_vdadd
+            call .fm
+            jr .o
+.back:      ld a, $DB
+            ld [S49], a
+            xor a
+            ld [BZ + $88], a
+.b:         call ba_reset
+            call .spr
+            ld a, [BZ + $BD]
+            and a
+            jr z, .b1
+            ld a, 5
+            call ba_hit
+            ld hl, BZ + $BD
+            dec [hl]
+.b1:        call wait_vbl
+            ld hl, BZ + $B6
+            inc [hl]
+            ld a, [W7 + $7E26]
+            cp 8
+            ret c
+            ld hl, BZ + $8A
+            cp [hl]
+            jr c, .b2
+            ld hl, BZ + $8B
+            inc [hl]
+            ld hl, BZ + $88
+            inc [hl]
+            inc [hl]
+            jr .b3
+.b2:        ld hl, BZ + $88
+            dec [hl]
+            dec [hl]
+            ld hl, BZ + $8B
+            dec [hl]
+.b3:        ld a, [BZ + $8B]
+            srl a
+            srl a
+            call ba_vdsub
+            call .fm
+            jr .b
+.fm:        ld a, [BZ + $89]                ; (the full moon: no rise)
+            cp 4
+            ret nz
+            xor a
+            ld [BZ + $88], a
+            ret
+.spr:       ld a, [BZ + $CD]                ; frame 6 / 1, the boomerang $2C / $24 (33/A4B1)
+            and a
+            jr z, .s1
+            ld a, 6
+            call ba_cfr
+            ld a, $2C
+            jr ba_projb
+.s1:        ld a, 1
+            call ba_cfr
+            ld a, $24
+; 33/A4B1 the boomerang sprite: frame A + (B6 / 2 & 3) + $89, at (vx, vy + $88)
+ba_projb:   ld [BZ + $82], a
+            call ba_vy
+            ld hl, BZ + $88
+            add a, [hl]
+            ld [BZ + $7F], a
+            call ba_vx
+            ld [BZ + $7E], a
+            ld a, [BZ + $B6]
+            srl a
+            and 3
+            ld hl, BZ + $82
+            add a, [hl]
+            ld hl, BZ + $89
+            add a, [hl]
+            jr ba_proj2
+; 33/A493 a projectile: frame A + (B6 / 4 & 1) at (vx, vy) from the attacker
+ba_proj:    ld [BZ + $82], a
+            call ba_vy
+            ld [BZ + $7F], a
+            call ba_vx
+            ld [BZ + $7E], a
+            ld a, [BZ + $B6]
+            srl a
+            srl a
+            and 1
+            ld hl, BZ + $82
+            add a, [hl]
+ba_proj2:   call ba_aspr0x
+            ld a, 2                         ; (in flight: the compressed mapping)
+            ld [ba_mode], a
+            jp ba_spr
+; ba_aspr without drawing: $8C / $8D / $8E / $8F set
+ba_aspr0x:  ld [BZ + $8E], a
+            ld a, [BZ + $95]
+            ld c, a
+            ld b, 0
+            ld hl, W7 + $7D9B
+            add hl, bc
+            add hl, bc
+            ld a, [hl]
+            and 8
+            rrca
+            rrca
+            rrca
+            ld [BZ + $8F], a
+            ld hl, BZ + $C0
+            add hl, bc
+            ld a, [BZ + $7E]
+            add a, [hl]
+            ld [BZ + $8C], a
+            ld hl, BZ + $C4
+            add hl, bc
+            ld a, [BZ + $7F]
+            add a, [hl]
+            ld [BZ + $8D], a
+            ret
+
+; ---- 33's vectors (vector 0): $7E26 / $7E30 amplitudes (y / x), $7E3A / $7E44 angles
+ba_vreset:  ld hl, W7 + $7E3A               ; 33/BF5F
+            ld b, 10
+.c:         ld [hl], 0
+            inc hl
+            dec b
+            jr nz, .c
+            ld b, 10
+.d:         ld [hl], $40
+            inc hl
+            dec b
+            jr nz, .d
+            ret
+ba_vx:      ld a, [W7 + $7E30]              ; 33/BF6F
+            ld e, a
+            ld a, [W7 + $7E44]
+            jr ba_vmul
+ba_vy:      ld a, [W7 + $7E26]              ; 33/BF7B
+            ld e, a
+            ld a, [W7 + $7E3A]
+; 33/BFC6 E x sin(A) (10/9A80, signed): FF3's ((2 s) & $FF) x E / 256, the sign put back
+ba_vmul:    ld l, a
+            ld h, 0
+            ld bc, CUT_SINE
+            add hl, bc
+            ld a, CUTD
+            call rd_byte
+            bit 7, a
+            jr z, .p
+            cpl
+            call .m
+            cpl
+            inc a
+            ret
+.p:
+.m:         add a, a                        ; (2 s) x E >> 8
+            ld d, a
+            xor a
+            ld b, 8
+.l:         srl d
+            jr nc, .n
+            add a, e
+.n:         rra
+            dec b
+            jr nz, .l
+            ret
+ba_vdadd:   ld b, a                         ; 33/BF87
+            ld hl, W7 + $7E26
+            ld a, [hl]
+            add a, b
+            ld [hl], a
+            ld hl, W7 + $7E30
+            ld a, [hl]
+            add a, b
+            ld [hl], a
+            ret
+ba_vdsub:   ld b, a                         ; 33/BF9C
+            ld hl, W7 + $7E26
+            ld a, [hl]
+            sub b
+            ld [hl], a
+            ld hl, W7 + $7E30
+            ld a, [hl]
+            sub b
+            ld [hl], a
+            ret
+; 33/A7A5 the angle from the attacker to the target ($B8): 33/A7E1[tilemap] + 33/A7D7[tilemap]
+; x attacker + target
+ba_angle:   ld a, [W7 + $7D7B]
+            ld e, a
+            ld d, 0
+            ld hl, $A7D7 + N32
+            add hl, de
+            ld a, [hl]
+            ld e, a
+            ld a, [BZ + $95]
+            ld d, a
+            xor a
+            inc d
+.m:         dec d
+            jr z, .m1
+            add a, e
+            jr .m
+.m1:        ld b, a
+            ld a, [BZ + $B8]
+            add a, b
+            ld c, a
+            ld a, [W7 + $7D7B]
+            add a, a
+            ld e, a
+            ld d, 0
+            ld hl, $A7E1 + N32
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld b, 0
+            add hl, bc
+            ld de, N32
+            add hl, de
+            ld a, [hl]
+            ret
 
 ; ---- 2F/B226 battle graphics $14: a member hit ($52): its hit tiles, then 33/A8B8: frame 4
 ; (toad / mini $0F) pushed back 8 (a crit 16, sound $46), shaken 4 times, back
