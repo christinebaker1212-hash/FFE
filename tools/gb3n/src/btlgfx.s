@@ -588,6 +588,100 @@ mon_attr1:  ld a, [BZ + $90]
             dec [hl]
             jr nz, .r
             ret
+; 2F/A738 the monsters in $7E8F flashed: the normal attributes, then their blocks palette $7E90
+mon_flash:  call mon_attrs
+            call pos_ptr
+            ld a, [W7 + $7E8F]
+            ld c, a
+            ld b, 8
+.m:         sla c
+            jr nc, .n
+            push bc
+            push hl
+            call bd_rd
+            ld [BZ + $8C], a
+            call bd_rd
+            ld [BZ + $8E], a
+            call bd_rd
+            ld [BZ + $90], a
+            add a, a
+            add a, low(TB_SIZE)
+            ld l, a
+            ld h, high(TB_SIZE)
+            call bd_rd
+            ld [BZ + $1E], a
+            call bd_rd
+            ld [BZ + $1F], a
+            ld a, [W7 + $7E90]
+            ld [BZ + $82], a
+.r:         ld c, 0
+.c:         ld a, [BZ + $8C]
+            add a, c
+            ld [BZ + $7E], a
+            ld a, [BZ + $8E]
+            ld [BZ + $80], a
+            push bc
+            call attr_set
+            pop bc
+            inc c
+            inc c
+            ld a, [BZ + $1E]
+            cp c
+            jr nz, .c
+            ld hl, BZ + $8E
+            inc [hl]
+            inc [hl]
+            ld hl, BZ + $1F
+            dec [hl]
+            dec [hl]
+            jr nz, .r
+            pop hl
+            pop bc
+.n:         inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .m
+            xor a
+            ld [W7 + $7E8E], a
+            ret
+; 2F/AF34 the attribute table to the GB: $7D27 -> the battlefield rows' palettes (VRAM bank 1,
+; in a V-Blank: the rows built in W7 + $7300)
+attr_push:  ld hl, W7 + $7300
+            ld b, 0
+.r:         ld c, 0
+.c:         ld a, b
+            add a, 5
+            ld [BZ + $80], a
+            push bc
+            push hl
+            call back_atk
+            jr nz, .na
+            ld a, 31
+            sub c
+            ld c, a
+            call attr_get
+            or $20
+            jr .ha
+.na:        call attr_get
+.ha:        pop hl
+            pop bc
+            ld [hl+], a
+            inc c
+            ld a, c
+            cp 32
+            jr nz, .c
+            inc b
+            ld a, b
+            cp BT_ROWS
+            jr nz, .r
+            ld a, CODE3
+            ld [vc_src], a
+            ld hl, W7 + $7300
+            ld de, $9800
+            ld b, 2 * BT_ROWS
+            ld a, 1
+            jp vcopyx
 ; 2F/A6FB: the next bit of the type's attribute data ($7D17 + $1A, bit position $1B)
 mon_bit:    ld a, [BZ + $1A]
             add a, low(W7 + $7D17)

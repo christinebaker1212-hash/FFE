@@ -2111,14 +2111,26 @@ ba_g20:     xor a
 
 ; ---- 2F/B01F battle graphics $1F: the attacking monster flashes (palette 3 on odd frames, 8
 ; frames; not for flare wave)
-ba_mflash:  ld a, [W7 + $7E9D]
-            cp 9
+ba_mflash:  ld a, [W7 + $7E98]              ; (34/8545: the attacker, palette 3)
+            ld [W7 + $7E8F], a
+            ld a, 3
+            ld [W7 + $7E90], a
+            ld a, [W7 + $7E9D]              ; 2F/B024 (not for flare wave): 8 frames, the flash
+            cp 9                            ;   every other (the attribute table pushed each)
             ret z
-            ld b, 8                         ; (the cells: the attribute rewrite comes with the
-.f:         push bc                         ;   monster palettes' port; the frames are kept)
-            call wait_vbl
-            pop bc
-            dec b
+            xor a
+            ld [BZ + $B6], a
+.f:         ld a, [BZ + $B6]
+            and 1
+            jr nz, .n
+            call mon_flash
+            jr .p
+.n:         call mon_attrs
+.p:         call attr_push
+            ld hl, BZ + $B6
+            inc [hl]
+            ld a, [hl]
+            cp 8
             jr nz, .f
             ret
 
