@@ -1525,12 +1525,11 @@ veh_oam:    ld a, [vehicle]
             ld hl, px
             sub [hl]
             pop hl
-            add a, 4
-            cp 9
-            ret nc
-            sub 4
+            add a, 4                        ; (-4 .. 4 only; swapped while positive: a
+            cp 9                            ;   negative offset swapped gave 16 d + 15, the
+            ret nc                          ;   object a tile too far right / down)
             swap a
-            add a, $48
+            add a, $48 - $40
             ld [vh_x], a
             ld a, [hl]
             push hl
@@ -1540,9 +1539,8 @@ veh_oam:    ld a, [vehicle]
             add a, 4
             cp 9
             ret nc
-            sub 4
             swap a
-            add a, $50
+            add a, $50 - $40
             ld [vh_y], a
             push de
             ld a, [map_bank]
@@ -3832,12 +3830,11 @@ ow_bc:      ld a, [vehicle]                 ; on foot in a forest (FF1 inforest,
             ld hl, px
             sub [hl]
             pop hl
-            add a, 4
+            add a, 4                        ; (swapped while positive, as veh_oam's .obj)
             cp 9
             ret nc
-            sub 4
             swap a
-            add a, $48 + 8
+            add a, $48 + 8 - $40
             ld b, a                         ; B = x of the left column
             ld a, [hl]
             ld hl, py
@@ -3845,9 +3842,8 @@ ow_bc:      ld a, [vehicle]                 ; on foot in a forest (FF1 inforest,
             add a, 4
             cp 9
             ret nc
-            sub 4
             swap a
-            add a, $50
+            add a, $50 - $40
             ld c, a                         ; C = y of the top row
             ld a, [vh_t]
             ld l, a
