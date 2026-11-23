@@ -845,6 +845,18 @@ auto-attacks, messages weird / out of order), a white flash when opening menus.
   frame (at most 8 owed). The NES's own pauses of the battle music are kept. Tools
   (scratchpad only, the NSF is never committed): NSF -> register stream (py65), NES and
   GB register streams per frame, NES APU synthesis vs Gambatte WAV (`gbrun --wav`).
+- **Dialogue pages** (owner: dialogue spaced out so it reads well as it advances, line
+  breaks in appropriate places; text unchanged). FF2 shows the next 6 lines of window 0
+  per A press (it moves the window's start one line at a time), so pages broke every 6
+  lines in the middle of sentences, and 35 texts ended with a blank line (an empty extra
+  page). `layout.gb_wrap` now lays out each text for the 6-line pages: a speaker turn or
+  a sentence that would run over the end of a page starts on the next page (blank lines
+  fill the rest), unless it is longer than a page; no blank line at the top of a page,
+  none at the end; lines broken by `_wrap_words` (as few lines as filling them gives,
+  fairly even, no one-word last line, no line ending in an article / short preposition
+  / pronoun, breaks after punctuation preferred, never right after a speaker's name).
+  Only line breaks and blank lines change. Pages per text (dialogue + events, 593
+  texts): 1 page 384 (unchanged), 2: 155 -> 143, 3: 33 -> 38, 4+: 18 -> 25.
 
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).

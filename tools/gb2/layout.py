@@ -4389,18 +4389,108 @@ def _insert_module():
     return ins
 
 
-def gb_wrap(ins, text, width=DLG_GB_W):
-    """insert.py's layout() at the GB width; a line still too wide (one long name with
-    punctuation: 3 lines in the whole script) loses its indent, then its trailing '...'
-    goes to a line of its own"""
-    lines = []
+DLG_PAGE = 6                # text rows of window 0: FF2 shows the next 6 lines per A press
+_SHORT_END = {'a', 'an', 'the', 'of', 'to', 'my', 'I', 'and', 'in', 'on', 'at', 'for', 'is', 'it', 'he', 'we',
+              'you', 'his', 'her', 'its', 'this', 'with', 'from', 'by', 'as', 'or', 'be', 'was', 'are'}
+
+
+def _wrap_words(ins, words, width, lead=0):
+    """words -> lines: the fewest lines (as many as filling each line would give), as even
+    as possible; no one short word alone on the last line, no line ending in an article or
+    a short preposition, breaks after punctuation preferred. None if a word is too wide."""
+    w = [ins.vlen(x) for x in words]
+    if any(x > width for x in w): return None
+    n = len(words)
+    def fits(i, j):                     # words i..j-1 on one line
+        return sum(w[i:j]) + (j - i - 1) + (lead if i == 0 else 0) <= width
+    greedy, i = 0, 0                    # the line count when filling lines
+    while i < n:
+        j = i + 1
+        while j < n and fits(i, j + 1): j += 1
+        greedy += 1; i = j
+    INF = float('inf')
+    best = [[INF] * (greedy + 1) for _ in range(n + 1)]
+    back = [[None] * (greedy + 1) for _ in range(n + 1)]
+    best[0][0] = 0
+    for i in range(n):
+        for k in range(greedy):
+            if best[i][k] == INF: continue
+            for j in range(i + 1, n + 1):
+                if not fits(i, j): break
+                last = j == n
+                slack = width - (sum(w[i:j]) + (j - i - 1) + (lead if i == 0 else 0))
+                c = 0 if last else slack * slack / 64 - (j - i) * 0.01 * (greedy - k)
+                end = words[j - 1]
+                if not last:
+                    if end.strip('"\'') in _SHORT_END: c += 40
+                    if end[-1:] in ',;.!?' or end.endswith(('."', '!"', '?"', '...')): c -= 8
+                    if end.endswith(':'): c += 100              # (a speaker's name)
+                elif j - i == 1 and k > 0 and w[i] < 6: c += 60
+                if best[i][k] + c < best[j][k + 1]:
+                    best[j][k + 1] = best[i][k] + c; back[j][k + 1] = i
+    if best[n][greedy] == INF: return None
+    lines, j, k = [], n, greedy
+    while j > 0:
+        i = back[j][k]; lines.append(' '.join(words[i:j])); j, k = i, k - 1
+    lines.reverse()
+    if lead: lines[0] = ' ' * lead + lines[0]
+    return lines
+
+
+def _sentences(words):
+    """a paragraph's words -> its sentences (a sentence ends with . ! ? or ... before a
+    word that starts with a capital, a quote or a name code)"""
+    out, cur = [], []
+    for k, x in enumerate(words):
+        cur.append(x)
+        nxt = words[k + 1] if k + 1 < len(words) else None
+        core = x.rstrip('"\')]')
+        if nxt is not None and core[-1:] in '.!?' and (nxt[:1].isupper() or nxt[:1] in '"[{'):
+            out.append(cur); cur = []
+    if cur: out.append(cur)
+    return out
+
+
+def gb_wrap(ins, text, width=DLG_GB_W, page=DLG_PAGE):
+    """dialogue for window 0 (18 columns, 6 lines per A press), text unchanged, layout only:
+    a speaker turn or a sentence that would run over the end of a page starts on the next
+    one (blank lines fill the page), unless it is longer than a page; lines broken evenly
+    (_wrap_words); no blank line at the top of a page, none at the end. A line still too
+    wide (one long name with punctuation) loses its indent, then its trailing '...' goes to
+    a line of its own (as insert.py's layout)."""
+    out = []
+    def room(): return page - len(out) % page
+    def pad():
+        if len(out) % page: out.extend([''] * room())
+    def flow(words, lead):
+        L = _wrap_words(ins, words, width, lead)
+        if L is None:                                   # (a word wider than a line)
+            L = []
+            for l in ins.flow(' ' * lead + ' '.join(words), width):
+                if ins.vlen(l) > width: l = l.lstrip(' ')
+                if ins.vlen(l) > width and l.endswith('...'): L += [l[:-3], '...']; continue
+                L.append(l)
+        return L
     for p in ins.paragraphs(text):
-        for l in (ins.flow(p, width) if p.strip() else ['']):
-            if ins.vlen(l) > width: l = l.lstrip(' ')
-            if ins.vlen(l) > width and l.endswith('...'):
-                lines += [l[:-3], '...']; continue
-            lines.append(l)
-    lines = [ins.fix_keyword_columns(l) for l in lines]
+        if not p.strip():
+            if len(out) % page: out.append('')          # (not at the top of a page)
+            continue
+        lead = len(p) - len(p.lstrip(' '))
+        sents = _sentences(p.strip(' ').split())
+        i = 0
+        while i < len(sents):
+            ld = lead if i == 0 else 0
+            whole = flow(sum(sents[i:], []), ld)
+            if len(whole) <= room(): out += whole; break
+            k = len(sents) - 1                          # most sentences that fit this page
+            while k > i and len(flow(sum(sents[i:k], []), ld)) > room(): k -= 1
+            if k > i:
+                out += flow(sum(sents[i:k], []), ld); pad(); i = k; continue
+            if len(out) % page and len(flow(sents[i], ld)) <= page:
+                pad(); continue                         # the sentence on the next page
+            out += whole; break                         # longer than a page: as it comes
+    while out and not out[-1].strip(): out.pop()
+    lines = [ins.fix_keyword_columns(l) for l in out]
     for l in lines: assert ins.vlen(l) <= width, (l, ins.vlen(l))
     return '\n'.join(lines)
 

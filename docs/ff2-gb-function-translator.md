@@ -111,11 +111,9 @@ instruction, GB cycles per NES frame (lagcheck), ROM size; recorded in
   pointers (text printers), carry convention across calls, shared code in the tracked set,
   banked table reads of hot routines (data next to code).
 
-## Open bug reports (after this work, owner's order)
-
-- Battle messages show fragments of other text and appear late (GB side: message tiles
-  reach VRAM after the window row that shows them).
-- Music differs from the NES (reference: the uploaded NSF, used only for comparison, never
-  committed).
-- White flash when opening the field menu.
-- Dialogue: native routines with pleasant line breaks and paging (text unchanged).
+## Bug reports (after this work, owner's order): fixed 2026-11-23
+All four are fixed (details in `docs/ff2-gb-status.md`, "Owner bug reports on the
+native-layer build"): battle messages (DMG text tile coding), music (the update now runs
+once per GB frame; the register stream already matched the NSF reference), the white
+flash (masked screen instead of LCD off), dialogue pages (sentence-aware 6-line pages and
+line breaks, text unchanged).

@@ -41,10 +41,10 @@ from cynes import NES
 # value (>= $C0 on both) there is not a difference
 TSX_SAVES = {0x04}
 WRAM_EVERY = int(os.environ.get('WRAM_EVERY', '50'))
-# Sound-driver state (ram-map.txt): music runs in real time, and in the battle phases with
-# an asynchronous NMI the GB ticks it at its own vblanks, so these may differ (not game
-# logic; the song id $6F25 stays compared). --strict compares them too.
-SOUND = set(range(0xB0, 0xF0)) | set(range(0x6F00, 0x6F25)) | set(range(0x6F26, 0x6F5E))   # + saved song state (b13:988E)
+# Sound-driver state (ram-map.txt): the GB plays the music update once per GB frame
+# (hle_musreq / mus_drain), so these may differ by a few frames (not game logic: the song
+# id $6F25 is read only by the music engine). --strict compares them too.
+SOUND = set(range(0xB0, 0xF0)) | set(range(0x6F00, 0x6F5E))   # + saved song state (b13:988E)
 WAIT_STUBS = {(0x4C, 0x3C, 0xFA), (0x4C, 0xA1, 0xFE)}
 
 
