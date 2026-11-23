@@ -216,6 +216,29 @@ Color only" screen on older systems.
   the line before (LYC one line early, then wait for mode 0); whole-palette fades rewrite every
   colour, so pause per-line palette effects during a fade.
 
+## Memory corruption: find the writer, do not guess (2026-11-23)
+- **A callee that uses a loop counter register as scratch turns the loop into a RAM walker.**
+  `obj_anim` (the map objects' step) used B as scratch; `obj_frame` loops over the 15 slots with
+  B. A finished step set B to the object's y, so the loop ran on through RAM in 16-byte
+  "objects", copying bytes +2/+3 to +4/+5 and clearing +8/+9/+13 wherever byte 0 was non-zero:
+  the dialogue / banner text buffer and font table ($CB00-$CCFF, broken message window and place
+  name), game flags, and with y = 0 (B wraps to 255) the party records at $D100: names
+  "Todd -> ToTo", "Rienne -> RiRine", weapons erased (the Warrior's record starts with class 0,
+  so the loop skipped it). It depended on townspeople's timing, so scripted runs missed it for
+  days while the owner saw it every session, and it looked like a shop / save / transition bug.
+  Save every register a loop keeps across a call, in the callee or at the call.
+- **Find the writer with a write watchpoint.** `build/sameboy_watch.so`: the SameBoy libretro core
+  with a write callback (scratch SameBoy tree, libretro.c patched): `SBSH_CORE=build/
+  sameboy_watch.so SB_WATCH=CC14-CC18 build/sbsh ROM` prints every write to the range with PC,
+  ROM bank, SP and the stack's top return addresses. Dump the suspect RAM (sbsh `r`), diff it
+  against a clean run, watch the changed bytes, map the PCs with the .sym file. The offsets of
+  the damaged bytes (here: +2..+11 of 16-byte records) often name the structure doing it.
+- **Variables that other screens read must not share the map's metatile queue** ($C100-$C8FF,
+  unioned with battle / shop / menu RAM): walking writes queue entries over them. The battle's
+  name-window flags (`ban_on`, `ban_attr`) lived there and the field's window code read them:
+  sprites hidden under the window and a junk window palette in towns. List, for every shared
+  region, which files read each variable (a script over the .lab and the sources does it).
+
 ## Hardware traps found by the owner on real units (2026-11-23)
 - **Never retrigger channel 3 while it plays on a DMG / Pocket:** a trigger that meets the
   channel's wave RAM read corrupts the first bytes of wave RAM, permanently, so every later

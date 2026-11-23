@@ -458,3 +458,13 @@ one reaches parity, so the owner can keep playing).
    - Room: the small font's glyphs (1 KB) and the acting enemy's flash moved to bank 104 (BTL6_BANK,
      src/btl6.s; bank-6 routines through x_* bank_call wrappers), level up / Chaos' death to bank
      6's freed space.
+27. Owner (2026-11-23, later): names corrupted after "Who will carry it?" (Rienne -> RiRine), weapons
+   not kept, the town transition breaking the message window and the place-name banner. One bug:
+   `obj_anim` clobbered `obj_frame`'s slot count (B), so after a townsperson finished a step the
+   object loop ran on through RAM (text buffers, font table, game flags, party records). Fixed by
+   saving BC; a write watchpoint over a long town idle shows 396 stray writes before, 0 after.
+   Also the battle name window's flags moved out of the map queue (walking overwrote them: sprites
+   hidden and a junk palette under field windows). Weapons were never lost by saves: Inn save /
+   Continue and Suspend / resume keep them (checked in SameBoy with a party made in the game).
+   Battle: the target's name window at the bottom for enemies in the top rows and for the first
+   member (was hidden there); SELECT turns it off / on (owner).
