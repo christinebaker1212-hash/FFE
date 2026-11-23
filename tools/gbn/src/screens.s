@@ -896,12 +896,12 @@ name_input: call scr_open
             call ni_grid
             call scr_upd
             jr .lp
-.ns:        ld hl, ni_x
-            bit 4, a
+.ns:        ld hl, ni_x                     ; (6 columns, 10 rows: owner, 2026-11-23, the
+            bit 4, a                        ;   whole hand before each letter)
             jr z, .nr
             ld a, [hl]
             inc a
-            cp 9
+            cp 6
             jr c, .sx
             xor a
 .sx:        ld [hl], a
@@ -910,45 +910,33 @@ name_input: call scr_open
             jr z, .nl
             ld a, [hl]
             dec a
-            cp 9
+            cp 6
             jr c, .sx
-            ld a, 8
+            ld a, 5
             jr .sx
 .nl:        ld hl, ni_y
             bit 6, a
             jr z, .nu
             ld a, [hl]
             dec a
-            cp 6
+            cp 10
             jr c, .sy
-            ld a, 5
+            ld a, 9
 .sy:        ld [hl], a
             jr .lp
 .nu:        bit 7, a
             jr z, .lp
             ld a, [hl]
             inc a
-            cp 6
+            cp 10
             jr c, .sy
             xor a
             jr .sy
-.a:         ld a, [ni_y]                    ; the letter: its grid row, column x
-            call ni_row
-            add a, a
-            ld l, a
-            ld h, 0
-            ld de, grid_ptrs
-            add hl, de
-            ld a, [hl+]
-            ld h, [hl]
-            ld l, a
+.a:         ld a, [ni_y]                    ; the letter at (x, y)
+            ld b, a
             ld a, [ni_x]
-            add a, l
-            ld l, a
-            ld a, h
-            adc a, 0
-            ld h, a
-            ld c, [hl]
+            call ni_char
+            ld c, a
             call name_ptr
             ld a, [ni_len]
             add a, l
@@ -989,22 +977,43 @@ name_input: call scr_open
             and a                           ; NC: done
             ret
 
-; screen row y (0-5) -> A = its grid row (the case's three, then the signs')
-ni_row:     cp 3
-            jr nc, .s
+; A = the symbol at column A (0-5), row B (0-9): rows 0-4 the case's 27 letters, rows 5-9 the
+; 27 signs, six a row (blanks: a space); FF1's grid strings hold them nine a row
+ni_char:    ld c, a
+            ld a, b
+            cp 5
+            jr c, .l
+            sub 5
             ld b, a
-            ld a, [ni_case]
-            ld c, a
+            ld e, 6                         ; (signs: grid rows 6-8)
+            jr .k
+.l:         ld a, [ni_case]                 ; (letters: the case's grid rows)
+            ld e, a
+            add a, a
+            add a, e
+            ld e, a
+.k:         ld a, b                         ; k = 6 row + column
+            add a, a
+            add a, b
             add a, a
             add a, c
+            cp 27
+            ld a, $20
+            ret nc
+            ld a, b
+            add a, a
             add a, b
-            ret
-.s:         add a, 3
-            ret
-; the six rows of letters drawn (rows 6-16, two apart) and the Select hint
-ni_grid:    xor a
-.g:         push af
-            call ni_row
+            add a, a
+            add a, c
+            ld c, 0                         ; grid row e + k / 9, column k mod 9
+.d:         cp 9
+            jr c, .m
+            sub 9
+            inc c
+            jr .d
+.m:         ld b, a
+            ld a, c
+            add a, e
             add a, a
             ld l, a
             ld h, 0
@@ -1013,30 +1022,50 @@ ni_grid:    xor a
             ld a, [hl+]
             ld h, [hl]
             ld l, a
-            ld de, pg_row                   ; letters two cells apart (none after the
-            ld b, 9                         ;   last: the frame)
-.gl:        ld a, [hl+]
-            ld [de], a
-            inc de
-            dec b
-            jr z, .ge
-            ld a, $20
-            ld [de], a
-            inc de
-            jr .gl
-.ge:        xor a
-            ld [de], a
+            ld a, b
+            add a, l
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            ret
+; the ten rows of symbols (rows 6-15, columns 3, 6, .. 18) and the Select hint
+ni_grid:    xor a
+.g:         push af
+            ld d, a                         ; (D = the row)
+            ld hl, pg_row
+            xor a
+.x:         push af
+            push hl
+            push de
+            ld c, a
+            ld b, d
+            ld a, c
+            call ni_char
+            pop de
+            pop hl
+            ld [hl+], a
+            pop af
+            inc a
+            cp 6
+            jr nc, .e
+            ld [hl], $20
+            inc hl
+            ld [hl], $20
+            inc hl
+            jr .x
+.e:         ld [hl], 0
             pop af
             push af
-            add a, a
             add a, 6
             ld c, a
-            ld b, 2
+            ld b, 3
             ld hl, pg_row
             call scr_str
             pop af
             inc a
-            cp 6
+            cp 10
             jr c, .g
             ld bc, $0402                    ; Select: the other case
             ld hl, str_nisel
@@ -1077,35 +1106,17 @@ ni_name:    ld a, [pg_mem]
             jp z, scr_str
             jp scr_str_on
 
-; the grid's cursor: the hand's finger (its upper right tile) in the column before the letter
-ni_cur:     ld a, [ni_y]                    ; y = 8 (6 + 2 y) + 16
+; the grid's cursor: the whole hand, its fingertip before the letter (cur_txt)
+ni_cur:     ld a, [ni_x]
+            ld b, a
             add a, a
+            add a, b
+            add a, 3
+            ld b, a
+            ld a, [ni_y]
             add a, 6
-            add a, a
-            add a, a
-            add a, a
-            add a, 16
-            ld hl, oam_buf
-            ld [hl+], a
-            ld a, [ni_x]                    ; x = 8 (1 + 2 x) + 8
-            add a, a
-            inc a
-            add a, a
-            add a, a
-            add a, a
-            add a, 8
-            ld [hl+], a
-            ld a, [cur_tbl + 4]             ; (the hand's upper right tile, its colours)
-            add a, CUR_TILE
-            ld [hl+], a
-            ld a, [cur_tbl + 5]
-            and 3
-            ld [hl+], a
-            xor a                           ; (the rest of the hand hidden)
-            ld [oam_buf + 4], a
-            ld [oam_buf + 8], a
-            ld [oam_buf + 12], a
-            ret
+            ld c, a
+            jp cur_txt
 
 grid_ptrs:  dw str_grid0, str_grid1, str_grid2, str_grid3, str_grid4, str_grid5, str_grid6
             dw str_grid7, str_grid8

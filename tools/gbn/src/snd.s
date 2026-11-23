@@ -297,6 +297,9 @@ aw:         push af
             ld a, d
             ld [bc], a
             ld e, a
+            ldh a, [is_cgb]                 ; (a Color: restarted every note, as before; its
+            and a                           ;   wave RAM does not suffer, and the ModRetro
+            jr nz, .ftc                     ;   Chromatic, an FPGA Color, wants the restart)
             ld a, [tri_on]
             and a
             jr z, .ftg
@@ -322,6 +325,12 @@ aw:         push af
             ld a, e
             or $80
             ld [hl], a
+            jp .x
+.ftc:       ld a, e
+            or $80
+            ld [hl], a
+            ld a, [tri_dac]
+            ld [tri_on], a
             jp .x
 ; HL = the period's bytes, C = channel -> A = GB frequency low, D = high; HL = NRx3; BC =
 ; its high-bits shadow
