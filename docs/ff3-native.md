@@ -373,6 +373,7 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   tidal wave (FF3's random shakes; the wave sprites still to draw), Bahamut's aura / rend.
   Fixed: the 8 x 16 mode's data had sat under the stack ($C800 down); its flags are in HRAM now,
   its sprite list in WRAM 5 and the tile mirror in WRAM 6.
-  Remaining: mesmerize, diamond dust, hellfire, inferno, cyclone (visual only, no random calls),
-  mega flare and the cannon (FF3's random places: needed for parity), the tidal wave's waves, the
-  flare wave's cloud (10/8BD5), the boss death, the split's fade-in.
+  Then mega flare and the cannon with FF3's random places (32/85F8 / 8600, counter 0).
+  Remaining: mesmerize, diamond dust, hellfire, inferno, cyclone (visual only: FF3 makes no
+  random calls there), the tidal wave's waves, the flare wave's cloud (10/8BD5), the boss death,
+  the split's fade-in.
