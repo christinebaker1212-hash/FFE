@@ -326,7 +326,7 @@ bt_en_init: ld c, 0
             ld a, [hl]
             pop hl
             cp $FF
-            jr z, .n
+            jr z, .z
             push bc
             push hl
             ld [bt_t], a
@@ -375,6 +375,12 @@ bt_en_init: ld c, 0
             cp 9
             jr c, .e
             ret
+.z:         ld b, 32                        ; (an empty slot: cleared; the records share RAM
+            xor a                           ;   with the map's queue, and a leftover "dead"
+.zl:        ld [hl+], a                     ;   byte there gave its EXP / Gil to the party)
+            dec b
+            jr nz, .zl
+            jr .n
 ; enemy A -> HL = its record (32 bytes)
 bt_erec:    ld l, a
             ld h, 0
@@ -2170,45 +2176,53 @@ bt_victory: call bt_msg_new
             ld hl, bt_line
             call bt_msg_row
             call bt_msg_end
-            ld hl, 0                        ; sums: experience, gold (enemies defeated)
-            ld de, 0
+            xor a                           ; sums: experience, gold (enemies defeated;
+            ld [bt_rexp], a                 ;   FF1: every slot with an enemy that died)
+            ld [bt_rexp + 1], a
+            ld [bt_rgold], a
+            ld [bt_rgold + 1], a
             ld c, 0
-.e:         push hl
-            push de
-            push bc
-            ld a, c
-            call bt_erec
-            push hl
-            ld de, E_AIL
-            add hl, de
-            ld a, [hl]
-            pop hl
-            and AIL_DEAD | AIL_STONE
-            jr z, .skip
-            ld a, [hl+]
-            ld c, a
-            ld a, [hl+]
-            ld b, a                         ; BC = experience
-            ld a, [hl+]
+.e:         ld a, c
+            call bt_eded                    ; HL = the record when slot C held an enemy
+            jr nc, .ne                      ;   now dead / stone
+            ld a, [hl+]                     ; experience
             ld e, a
-            ld d, [hl]                      ; DE = gold
-            pop af                          ; (the loop counter)
-            pop hl                          ; (gold sum)
-            add hl, de
-            ld d, h
-            ld e, l
-            pop hl                          ; (experience sum)
-            add hl, bc
-            ld b, a
-            ld c, a
-            jr .ne
-.skip:      pop bc
-            pop de
+            ld a, [hl+]
+            ld d, a
+            push hl
+            ld hl, bt_rexp
+            call .add
             pop hl
+            ld a, [hl+]                     ; gold
+            ld e, a
+            ld d, [hl]
+            ld hl, bt_rgold
+            call .add
 .ne:        inc c
             ld a, c
             cp 9
             jr c, .e
+            ld a, [bt_rexp]
+            ld l, a
+            ld a, [bt_rexp + 1]
+            ld h, a
+            ld a, [bt_rgold]
+            ld e, a
+            ld a, [bt_rgold + 1]
+            ld d, a
+            jr .sums
+.add:       ld a, [hl]                      ; [HL] += DE (16 bits, kept at $FFFF)
+            add a, e
+            ld [hl+], a
+            ld a, [hl]
+            adc a, d
+            ld [hl-], a
+            ret nc
+            ld a, $FF
+            ld [hl+], a
+            ld [hl], a
+            ret
+.sums:
             push de                         ; experience / survivors
             ld b, 0
             xor a
@@ -2294,6 +2308,28 @@ bt_victory: call bt_msg_new
             jr c, .ax
             jp bt_results
 
+; C set and HL = enemy A's record when slot A held an enemy that is now dead or stone
+bt_eded:    push bc
+            ld e, a
+            ld d, 0
+            ld hl, bt_eid
+            add hl, de
+            ld b, [hl]
+            call bt_erec
+            pop bc
+            inc b                           ; (id $FF: no enemy: NC)
+            jr z, .no
+            push hl
+            ld de, E_AIL
+            add hl, de
+            ld a, [hl]
+            pop hl
+            and AIL_DEAD | AIL_STONE
+            ret z
+            scf
+            ret
+.no:        and a
+            ret
 ; member A: experience >= the table's amount for its level -> a level up
 bt_lvchk:   ld [bt_lvm], a
             call ch_rec

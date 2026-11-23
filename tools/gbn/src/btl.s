@@ -1416,7 +1416,9 @@ bt_frame:   ld a, [sf_row]                  ; (no hand while the window rows are
             ld hl, bt_upn
             or [hl]
             jr z, .w
-.h:         call hand_hide
+.h:         ld a, [oam_buf + 2]             ; (only the hand: OAM 0-3 also carry the weapon
+            cp DN_T0                        ;   and the spell, tiles $D8-$DF; hiding them
+            call nc, hand_hide              ;   there took the weapon out of every swing)
 .w:         call wait_vbl
             ld a, [bt_upn]                  ; (map rows only once their tiles are up)
             and a
