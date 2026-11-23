@@ -339,3 +339,22 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   Fixed: the parked-Invincible code had cleared OAM 4-27 on every map (people hidden on maps).
   Test hook (RAM, `tst_choc`): $D0-$E3 runs that event command, $F0-$FF special animation n.
   Next: battle animations, then the parity / Lot Check pass on the native build.
+- 2026-11-23 (battle animations, `src/btlanim.s` CODE7, `src/btlfx.s` CODE8): attacks (FF3 33/A0C0:
+  blades, blunt, claws, bare hands, bow + arrows, harp, boomerang, full moon, shuriken; the
+  projectile vectors 33/BF5F-BFE4 with FF3's sine table, the angle to the target 33/A7A5, hit
+  animations 0-5 with FF3's random calls), monsters' attacks and the hit on members. Whole battles
+  with each weapon give the NES's save block (`BTL_POKE="6203=.. 6205=.." btlcmp.py ID --end`).
+  Magic (34/8577, 33/BAFD): the black / white casting, the flight to each target, the spell's hit
+  frames (06/8C00 lists, 00/9708 frames, 6 x 6 sprites). Item spells skip the casting as FF3 does
+  ($CC set). **The 8 x 16 sprite mode**: FF3 shows up to 36 effect sprites next to the party's 24
+  (NES: 64 sprites); the GB has 40. While a spell shows, the party's and the effect's 8 x 8 sprites
+  are paired into 8 x 16 sprites (vertical neighbours of one palette), each pair's tiles composed
+  (flips put into the pixels) from a WRAM 5 mirror of VRAM bank 1 sprite tiles into 64 slots
+  (tiles $00-$7F, restored from the mirror after), staged in WRAM 6 and sent by GDMA in V-Blank
+  (24 pairs a frame); least recently used slots are reused, the party's pairs kept while its
+  sprites stay. Measured: the casting loop runs one step a frame as on the NES.
+  Cross-bank stubs are 6 bytes now (`far_s`), which freed ~650 bytes of bank 0.
+  Remaining: the special spells (kill, quake, meteo, drain, flare wave, tsunami, glare, explode,
+  earthquake, enemy flame / blizzard / thunder), the reflection wall, toad / mini / brak2 /
+  split steps, summons (32/8CEF), the monster flash and death / run / defend / jump / scare /
+  cheer / buildup / cannon animations.
