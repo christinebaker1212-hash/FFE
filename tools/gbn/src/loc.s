@@ -1797,12 +1797,13 @@ ED_T0      = $C4
 ed_dissolve:
             xor a
             ldh [rVBK], a
-            ld a, [fl_e]                    ; cells
+            ld a, [fl_e]                    ; cells (E x E)
             ld b, a
+            ld c, a
             xor a
 .sq:        add a, b
-            dec b
-            jr nz, .sq                      ; (E x E)
+            dec c
+            jr nz, .sq
             ld [ed_n], a
             ld de, fl_tb                    ; the tiles' list
             ld a, ED_T0

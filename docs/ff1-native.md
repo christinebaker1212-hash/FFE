@@ -428,5 +428,11 @@ one reaches parity, so the owner can keep playing).
      together; a dead enemy breaks up in sliding strips (~30 frames; fiends: their flash, the
      screen shaking, slower); then the member darts back.
    - Running away: the party turns round (mirrored sprites) and runs off to the right.
+   Fiend deaths checked with a cheated test party (build.py --init: 999 HP, damage / hit rate /
+   absorb / evade 255) against the Lich and Tiamat on the Color and DMG. This found that the
+   dissolve's cell count was E + (E-1) + .. instead of E x E (normal enemies lost 10 of 16
+   tiles, fiends 36 of 64) and that the final clear used a normal enemy's position for a fiend
+   (its robe stayed through the results); both fixed, and the names window is counted again
+   once an enemy is gone.
    Open: party names "messed up after the inn save / a menu" not reproduced (names in RAM and
    on screen stay right through the inn save, the file screen and the menus, DMG and Color).

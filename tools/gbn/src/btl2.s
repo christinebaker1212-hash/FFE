@@ -1192,10 +1192,12 @@ bt_pl_attack:
             ld [hl], a
             and AIL_DEAD | AIL_STONE
             jr z, .alive
-            ld a, [bt_sv + 3]               ; defeated now (not down already): off the screen
-            and AIL_DEAD | AIL_STONE
+            ld a, [bt_sv + 3]               ; defeated now (not down already): off the screen,
+            and AIL_DEAD | AIL_STONE        ;   the names window counted again
+            jr nz, .alive
             ld a, [bt_tgt]
-            call z, bt_erase_enemy
+            call bt_erase_enemy
+            call bt_names_win
 .alive:
             ld a, [bt_who]                  ; then the member back in line
             jp bt_sback
@@ -1565,27 +1567,6 @@ bt_phys:    ld a, 168
 .ds:        call bt_msg_line
             jp bt_msg_end
 
-; new ailments A (FF1 PrintPlayerAilmentMessageFromAttack): a line per ailment
-bt_ail_msgs:
-            ld hl, bt_ailtab
-            ld b, 8
-.l:         rlca
-            jr nc, .n
-            push af
-            push bc
-            push hl
-            ld a, [hl]
-            call bt_msg_line
-            pop hl
-            pop bc
-            pop af
-.n:         inc hl
-            dec b
-            jr nz, .l
-            ret
-bt_ailtab:  db $13, $07, $04, $17, $09, $14, $1A, $20   ; confused, silenced, asleep, paralysed,
-                                                        ; dark, poisoned, stone, slain
-
 ; ---- an enemy's turn (FF1 Battle_DoEnemyTurn, Enemy_DoAi; spells: later)
 bt_enemy_turn:
             ld [bt_who], a
@@ -1742,6 +1723,16 @@ bt_erase_enemy:
             ld a, F3_BANK
             ld hl, ed_dissolve
             call bank_call
+            ld a, [bt_type]
+            cp 3
+            jr c, .x
+            pop af                          ; (a fiend: its 8 x 8 cells)
+            ld a, [fl_b]
+            ld b, a
+            ld a, [fl_c]
+            ld c, a
+            ld e, 8
+            jp bt_erase_box
 .x:         pop af
             jp bt_erase_rows                ; (what is left cleared row by row: btl4.s)
             ld [bt_t + 4], a
@@ -3164,6 +3155,27 @@ bt_flipm:   ld e, a
             ret
 
 section bank 6, $73F0                       ; (waking / paralysis: after the flinch)
+; new ailments A (FF1 PrintPlayerAilmentMessageFromAttack): a line per ailment
+bt_ail_msgs:
+            ld hl, bt_ailtab
+            ld b, 8
+.l:         rlca
+            jr nc, .n
+            push af
+            push bc
+            push hl
+            ld a, [hl]
+            call bt_msg_line
+            pop hl
+            pop bc
+            pop af
+.n:         inc hl
+            dec b
+            jr nz, .l
+            ret
+bt_ailtab:  db $13, $07, $04, $17, $09, $14, $1A, $20   ; confused, silenced, asleep, paralysed,
+                                                        ; dark, poisoned, stone, slain
+
 ; FF1 Battle_PlayerTryWakeup: random(0 .. 80) < max HP wakes
 bt_try_wake:
             ld a, [bt_who]

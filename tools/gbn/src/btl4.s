@@ -857,6 +857,8 @@ bt_cheer:   ld a, $40
 bt_erase_rows:
             ld [bt_t + 4], a
             call bt_epos
+; cells (B, C), E x E cleared row by row
+bt_erase_box:
             ld a, e
             ld [bt_t + 5], a
             ld d, e
