@@ -732,9 +732,13 @@ bt_target_enemy:
             jr nz, .b
             bit 0, a
             jr nz, .a
+            bit 2, a
+            jr nz, .sel
             and $F0
             jr z, .l
             call bt_tdir
+            jr .l
+.sel:       call bt_tban_sel
             jr .l
 .a:         call bt_hand_off
             call bt_tban_off
@@ -3020,8 +3024,16 @@ bt_banner:  ld b, 18
             ld [ban_attr], a
             xor a
             ld [win_up], a
+            ld a, [ban_bot]                 ; (at the top: cut below its rows; at the bottom:
+            and a                           ;   the window kept on to the frame's end)
             ld a, BN_LINES
-            ldh [rLYC], a
+            ld b, LCDC_ON
+            jr z, .lt
+            ld a, BOX_LINES
+            ld b, LCDC_WIN
+.lt:        ldh [rLYC], a
+            ld a, b
+            ld [lcdc_on], a
             ld a, 1
             ld [bn_t], a
             ld [ban_on], a
@@ -3037,6 +3049,9 @@ bt_ban_off: ld a, [ban_on]
             ld [ban_on], a
             ld [bn_t], a
             ld [ban_attr], a
+            ld [ban_bot], a
+            ld a, LCDC_ON
+            ld [lcdc_on], a
             ld a, BOX_LINES
             ldh [rLYC], a
             ret
@@ -3557,26 +3572,57 @@ bt_hpcol:   call ch_rec
             ret
 ; the target's name in the top window while it is chosen (owner, 2026-11-23); ban_last: the
 ; one shown ($FF none)
-bt_tban_e:  ld a, [bt_tcur]
+bt_tban_e:  ld a, [ban_hide]                ; (SELECT: none)
+            and a
+            jp nz, bt_ban_off
+            ld a, [bt_tcur]
             ld hl, ban_last
             cp [hl]
             ret z
             ld [hl], a
-            call bt_epos                    ; (an enemy under the window's rows: no window,
-            ld a, c                         ;   the hand and the enemy stay in sight)
+            call bt_epos                    ; (an enemy in the top rows: the window at the
+            ld a, c                         ;   bottom, the hand and the enemy stay in sight)
             cp 3
-            jp c, bt_ban_off
+            ld a, 0
+            adc a, a
+            ld hl, ban_bot
+            cp [hl]
+            push af
+            call nz, bt_ban_off             ; (moved: off first)
+            pop af
+            ld [ban_bot], a
             ld a, [bt_tcur]
             call bt_ename
             jp bt_banner
-bt_tban_p:  ld a, [bt_tcur]
+; SELECT in a target choice: the name window off / on again
+bt_tban_sel:
+            ld hl, ban_hide
+            ld a, [hl]
+            xor 1
+            ld [hl], a
+            ld a, $FF
+            ld [ban_last], a
+            ret
+bt_tban_p:  ld a, [ban_hide]                ; (SELECT: none)
+            and a
+            jp nz, bt_ban_off
+            ld a, [bt_tcur]
             or $80
             ld hl, ban_last
             cp [hl]
             ret z
             ld [hl], a
-            and 3                           ; (the first member stands under the window)
-            jp z, bt_ban_off
+            and 3                           ; (the first member stands under the top rows:
+            cp 1                            ;   the window at the bottom)
+            ld a, 0
+            adc a, a
+            ld hl, ban_bot
+            cp [hl]
+            push af
+            call nz, bt_ban_off
+            pop af
+            ld [ban_bot], a
+            ld a, [bt_tcur]
             call ch_rec
             inc hl
             inc hl

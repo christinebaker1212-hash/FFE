@@ -2582,5 +2582,8 @@ eq_ch:      ds 1
 eq_adj:     ds 1
 eq_box:     ds 16
 mtxt:       ds 200                          ; (story_show copies 200)
+ban_hide:   ds 1                            ; battle: SELECT hid the target's name window
+ban_bot:    ds 1                            ; battle: the name window at the bottom (a target
+                                            ;   in the top rows: owner, 2026-11-23)
 
 

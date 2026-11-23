@@ -404,14 +404,20 @@ box_vbl:    ld a, [box_on]
             ld [tw_qh], a
 .sh:        ld a, 7                         ; window at the top, cut at line 64 (STAT)
             ldh [rWX], a
-            xor a
-            ldh [rWY], a
+            ld a, [ban_on]                  ; (the battle's name window at the bottom: its
+            ld b, a                         ;   three rows from line 120)
+            ld a, [ban_bot]
+            and b
+            jr z, .wy
+            ld a, 144 - 24
+.wy:        ldh [rWY], a
             call lcd_get                    ; (not while the LCD is off)
             bit 7, a
             ret z
-            ld a, [ban_on]                  ; (the battle's top window: over the sprites too,
-            and a                           ;   which come back at its last line: owner,
-            ld a, LCDC_WIN                  ;   2026-11-23)
+            ld a, [ban_bot]                 ; (the battle's top window: over the sprites too,
+            cpl                             ;   which come back at its last line: owner,
+            and b                           ;   2026-11-23)
+            ld a, LCDC_WIN
             jr z, .wo
             res 1, a
 .wo:        ldh [rLCDC], a

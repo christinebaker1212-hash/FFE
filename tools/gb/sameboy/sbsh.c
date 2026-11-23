@@ -110,6 +110,7 @@ static unsigned parse_keys(const char* s) {   /* libretro joypad ids */
 	}
 	return k;
 }
+static int poke = -1;
 static int rd(unsigned a, uint8_t* out) {
 	for (unsigned i = 0; i < nmaps; i++) {
 		struct retro_memory_descriptor* m = &maps[i];
@@ -119,6 +120,7 @@ static int rd(unsigned a, uint8_t* out) {
 		else if ((a & m->select) != (m->start & m->select)) continue;
 		(void) sel;
 		size_t off = a - m->start; if (m->len) off %= m->len;
+		if (poke >= 0) ((uint8_t*) m->ptr)[m->offset + off] = (uint8_t) poke;
 		*out = ((uint8_t*) m->ptr)[m->offset + off];
 		return 1;
 	}
@@ -161,6 +163,9 @@ int main(int argc, char** argv) {
 			unsigned ad = strtoul(a1, 0, 16); int cnt = n > 2 ? atoi(a2) : 1;
 			for (int i = 0; i < cnt; i++) { uint8_t b = 0xFF; rd((ad + i) & 0xFFFF, &b); printf("%02X", b); }
 			printf("\n");
+		} else if (!strcmp(cmd, "p")) {             /* p ADDR VAL: poke a byte (hex) */
+			uint8_t b; poke = (int) strtoul(a2, 0, 16); rd(strtoul(a1, 0, 16) & 0xFFFF, &b); poke = -1;
+			printf("ok\n");
 		} else if (!strcmp(cmd, "s")) {
 			FILE* f = fopen(a1, "wb");
 			if (f) { fprintf(f, "P6\n160 144\n255\n"); fwrite(frame, 1, sizeof frame, f); fclose(f); }

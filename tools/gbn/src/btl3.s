@@ -338,6 +338,8 @@ bt_tm_again:                                ; (the hand where it was)
             jr nz, .b
             bit 0, a
             jr nz, .a
+            bit 2, a
+            jr nz, .sel
             ld hl, bt_tcur
             bit 6, a
             jr nz, .up
@@ -352,6 +354,8 @@ bt_tm_again:                                ; (the hand where it was)
             dec a
             and 3
             ld [hl], a
+            jr .l
+.sel:       call bt_tban_sel
             jr .l
 .a:         call bt_hand_off
             call bt_tban_off
