@@ -28,6 +28,14 @@ M_TT       = $DC00              ; the map's treasures (16) and triggers (16): 3A
 W_ENT      = $DBC0              ; world map: the entrance tiles' destination maps (64)
 N_OBJ      = $C400
 N_OB2      = $C500
+S16_OAM    = $D000              ; the 8 x 16 sprite mode (btlbase.s / btlfx.s): WRAM bank 5
+S16_STG    = $D100
+S16_MIR    = $D800
+S16_T0     = $32
+S16_W      = $D540              ; (WRAM 5) the sprites gathered: y, x, tile, attributes (64)
+S16_K      = $D640              ;   the slots' keys: top tile, flips, bottom tile, flips (34)
+S16_U      = $D6C8              ;   the slots used this frame (34)
+S16_PL     = $D6F0              ;   the pairs: y, x, attributes, slot, key (34 x 8)
 GS         = $C800              ; FF3's save block $6000-$63FF (npc switches at +$80)
 N_ANIM     = $DD00              ; 3B/B41A animation frames (CGB attributes), 256 bytes (WRAM bank 1)
 N_RNG      = $CD00              ; fix:FE00 random number table
@@ -103,6 +111,16 @@ start:      di
             inc de
             dec b
             jr nz, .cd
+            ld hl, dma_rom                  ; (the 8 x 16 sprite mode's: OAM from WRAM 5 $D000)
+            ld de, hram_dma16
+            ld b, dma_end - dma_rom
+.cd2:       ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .cd2
+            ld a, high(S16_OAM)
+            ldh [hram_dma16 + 1], a
             call npc_boot
             ld hl, win_attr                 ; dialogue box attributes: BG palette 3, priority
             ld b, 32 * WIN_ROWS
@@ -338,7 +356,16 @@ vblank:     push af
             push bc
             push de
             push hl
+            ld a, [s16_on]                  ; (battle magic: 8 x 16 sprites, btlfx.s)
+            and a
+            jr z, .o8
+            call s16_vbl
+            jr .od
+.o8:        ldh a, [rLCDC]
+            res 2, a
+            ldh [rLCDC], a
             call hram_dma
+.od:
             ldh a, [pal_dirty]
             and a
             call nz, pal_up
@@ -711,7 +738,20 @@ pal_black:  ld hl, pal_sh                   ; all black, shown at the next V-Bla
 
 ; B blocks of 16 bytes HL (ROM) -> DE (VRAM bank A): directly with the LCD off, else by
 ; general-purpose DMA, 64 blocks a V-Blank (B = 0: 256 blocks)
-vcopy:      ld [vc_bank], a
+vcopy:      cp 1                            ; (VRAM bank 1 sprite tiles: also into the mirror; in
+            jr nz, .nm                      ;   the 8 x 16 mode only there: btlbase.s)
+            push af
+            ld a, d
+            cp $88
+            jr nc, .nm0
+            call s16_mir
+            ld a, [s16_on]
+            and a
+            jr z, .nm0
+            pop af
+            jp s16_inv
+.nm0:       pop af
+.nm:        ld [vc_bank], a
             ldh [rVBK], a
             ld a, [lcd_is]
             and a
@@ -1743,3 +1783,4 @@ is_world:   ds 1
 pad:        ds 1
 scx:        ds 1
 scy:        ds 1
+hram_dma16: ds 10

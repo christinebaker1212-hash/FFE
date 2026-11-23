@@ -30,6 +30,10 @@ ba_show:    ld a, [W7 + $7E9A]              ; (FF3: rol x 3 through carry = bit 
 .s:         ld [W7 + $7E97], a
             and a
             jp z, ba_fightm
+            cp 1
+            jp z, mx_magic                  ; (btlfx.s)
+            cp $10
+            jp z, mx_ineff
             ld b, 12                        ; (others: for now a pause)
 .w:         call wait_vbl
             dec b
@@ -657,7 +661,9 @@ ba_rest:    ld hl, W7 + $7D87
 ; 33/A3F9 the attacker's 6 sprites hidden (re-drawn by chr_draw)
 ba_clr:     ret
 ; 33/A05E the animation sprites cleared
-ba_reset:   ld a, low(BA_OAM)
+ba_reset:   xor a
+            ld [s16_n], a
+            ld a, low(BA_OAM)
             ld [ba_p], a
             ld hl, BA_OAM
             ld b, 16
@@ -964,18 +970,7 @@ ba_put:     ld a, d
             jr .w
 .b1:        sub 12
             ld b, a
-.w:         ld a, [ba_p]
-            cp low(BA_OAM) + 64
-            ret nc
-            ld l, a
-            ld h, high(BA_OAM)
-            ld a, c
-            ld [hl+], a
-            ld a, b
-            ld [hl+], a
-            ld a, d
-            ld [hl+], a
-            ld a, e                         ; FF3 attributes -> GB (palette + 4: OBJ palettes are
+.w:         ld a, e                         ; FF3 attributes -> GB (palette + 4: OBJ palettes are
             and 3                           ;   the sprite ones; bank 1; flips; behind)
             or 8
             bit 6, e
@@ -987,9 +982,48 @@ ba_put:     ld a, d
 .v:         bit 5, e
             jr z, .p
             or $80
-.p:         ld [hl+], a
+.p:         ld e, a
+            ld a, [s16_on]                  ; (the 8 x 16 mode: into its list, btlfx.s)
+            and a
+            jr nz, .s16
+            ld a, [ba_p]
+            cp low(BA_OAM) + 64
+            ret nc
+            ld l, a
+            ld h, high(BA_OAM)
+            ld a, c
+            ld [hl+], a
+            ld a, b
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            ld a, e
+            ld [hl+], a
             ld a, l
             ld [ba_p], a
+            ret
+.s16:       ld a, [s16_n]
+            cp 40
+            ret nc
+            ld l, a
+            inc a
+            ld [s16_n], a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            ld a, l
+            add a, low(s16_in)
+            ld l, a
+            ld a, h
+            adc a, high(s16_in)
+            ld h, a
+            ld a, c
+            ld [hl+], a
+            ld a, b
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            ld [hl], e
             ret
 ; the attacker's GB x base: 140 + (x - 208) / 2 + 8 (a back attack: from 240 - x)
 ba_bx:      ld a, [hl]

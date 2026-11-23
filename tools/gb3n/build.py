@@ -214,6 +214,9 @@ CUTD = 114                              # their graphics and text pages (cut.py)
 CUTD2 = 115                             # the end credits' strings, weapon tiles (cut.py)
 CODE6 = 116                             # the special animations (anim.s), 3A/9800 at $5800, 3B at $6000
 CODE7 = 118                             # battle animations (btlanim.s), 32/9400 at $5400, 33 at $6000
+CODE8 = 119                             # magic animations (btlfx.s), 33 at $6000, bit-reversed bytes $5F00
+MAGG = 120                              # NES banks $2A-$2B (FF3's magic graphics) as GB tiles
+FXD = 121                               # magic animation data (btlfx.s)
 W0B_BANK = 117                          # NES bank 0B (world map sprites) as 512 GB tiles
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
 CHGFX_BANK = 95                         # battle characters (NES banks $28 / $29) as GB tiles
@@ -247,7 +250,7 @@ def engine_src(rom=None):
         codes.append(shop.code_data(rom))
     # the battle banks: calls between them go through bank-0 stubs (A passed and returned)
     lab = lambda t: set(re.findall(r'^([A-Za-z_]\w*):', t, re.M))
-    bb = [(CODE2, CODE2_MODULES), (CODE3, CODE3_MODULES), (CODE4, CODE4_MODULES), (CODE7, ('btlanim',))]
+    bb = [(CODE2, CODE2_MODULES), (CODE3, CODE3_MODULES), (CODE4, CODE4_MODULES), (CODE7, ('btlanim',)), (CODE8, ('btlfx',))]
     srcs = [[split(rd(m)) for m in mods] for _, mods in bb]
     labs = [set().union(*(lab(c) for c, _ in ss)) for ss in srcs]
     owner = {}
@@ -420,7 +423,7 @@ def main():
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
                        'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0, 'CHGFX_BANK': CHGFX_BANK, 'BDATA2_BANK': BDATA2_BANK, 'BTXT_BANK': BTXT_BANK, 'CODE3': CODE3, 'CODE4': CODE4, 'BDATA3_BANK': BDATA3_BANK,
-                       'CODE5': CODE5, 'CUTD': CUTD, 'CUTD2': CUTD2, 'CODE6': CODE6, 'W0B_BANK': W0B_BANK, 'CODE7': CODE7, **cut_syms,
+                       'CODE5': CODE5, 'CUTD': CUTD, 'CUTD2': CUTD2, 'CODE6': CODE6, 'W0B_BANK': W0B_BANK, 'CODE7': CODE7, 'CODE8': CODE8, 'MAGG': MAGG, 'FXD': FXD, **cut_syms,
                        'TEST_SONG': int(opt['--song'], 0) if opt['--song'] else 255,
                        'SND_MASK': int(os.environ.get('GB_SND_MASK', 'FF'), 16),     # (test builds: NR51)
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,
@@ -442,6 +445,19 @@ def main():
     assert not any(c7[0x1400:]), 'battle animation code past $5400'
     c7[0x1400:0x2000] = rom.b(0x32, 0x9400, 0xC00)             # $5400: 32/9400-9FFF
     c7[0x2000:0x4000] = rom.b(0x33, 0xA000, 0x2000)            # $6000: 33
+    c8 = r.banks.setdefault(CODE8, bytearray(0x4000))
+    c8.extend(bytes(0x4000 - len(c8)))
+    assert not any(c8[0x1F00:]), 'magic animation code past $5F00'
+    c8[0x1F00:0x2000] = bytes(int('{:08b}'.format(i)[::-1], 2) for i in range(256))
+    c8[0x2000:0x4000] = rom.b(0x33, 0xA000, 0x2000)            # $6000: 33
+    mg = rom.b(0x2A, 0x8000, 0x2000) + rom.b(0x2B, 0xA000, 0x2000)
+    r.banks[MAGG] = bytearray(b''.join(nes2gb(mg[16 * t:16 * t + 16]) for t in range(1024)))
+    fx = bytearray(0x4000)
+    fx[0x0000:0x0B00] = rom.b(0x00, 0x9700, 0x900) + rom.b(0x01, 0xA000, 0x200)
+    fx[0x0B00:0x1100] = rom.b(0x06, 0x8C00, 0x600)
+    fx[0x1100:0x1600] = rom.b(0x2E, 0x9100, 0x500)
+    fx[0x1600:0x1660] = rom.b(0x34, 0x83A0, 0x60)
+    r.banks[FXD] = fx
     size = 2
     while size < max(r.banks) + 1: size *= 2
     rom_bytes = make_rom(r.banks, 'FF3 NATIVE', cart_type=0x1B, rom_banks=size, ram_size_code=0x02, cgb=0xC0)

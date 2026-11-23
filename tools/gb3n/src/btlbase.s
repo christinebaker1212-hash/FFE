@@ -358,6 +358,130 @@ b_div10:    ld hl, 0
 
 
 
+; ---- the 8 x 16 sprite mode (battle magic, btlfx.s): WRAM bank 5 holds the OAM ($D000), the
+; composed tile pairs ($D100, 32 bytes a pair -> VRAM bank 1 tiles S16_T0 + 2 n) and a mirror of
+; VRAM bank 1 tiles $00-$7F ($D800)
+s16_vbl:    ld a, [s16_lock]                ; (being built: the last picture stays)
+            and a
+            ret nz
+            ldh a, [rLCDC]
+            set 2, a
+            ldh [rLCDC], a
+            ldh a, [rSVBK]
+            push af
+            ld a, 5
+            ldh [rSVBK], a
+            call hram_dma16
+            ld a, [s16_lo]                  ; dirty pairs lo..hi-1: at most 24 a V-Blank
+            ld b, a
+            ld a, [s16_hi]
+            sub b
+            jr z, .x
+            jr c, .x
+            cp 24
+            jr c, .n
+            ld a, 24
+.n:         ld c, a
+            ld l, b
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            push hl
+            ld de, S16_STG
+            add hl, de
+            ld a, h
+            ldh [rHDMA1], a
+            ld a, l
+            ldh [rHDMA2], a
+            pop hl
+            ld de, 16 * S16_T0              ; (VRAM $8000 + 16 tile)
+            add hl, de
+            ld a, h
+            ldh [rHDMA3], a
+            ld a, l
+            ldh [rHDMA4], a
+            ld a, 1
+            ldh [rVBK], a
+            ld a, c
+            add a, a
+            dec a
+            ldh [rHDMA5], a
+            xor a
+            ldh [rVBK], a
+            ld a, b
+            add a, c
+            ld [s16_lo], a
+.x:         pop af
+            ldh [rSVBK], a
+            ret
+; the slots' pictures out of date (sprite tiles loaded in the 8 x 16 mode): all composed again
+s16_inv:    ldh a, [rSVBK]
+            push af
+            ld a, 5
+            ldh [rSVBK], a
+            ld hl, S16_K
+            ld b, 34 * 4
+            ld a, $FF
+.k:         ld [hl+], a
+            dec b
+            jr nz, .k
+            pop af
+            ldh [rSVBK], a
+            ld hl, s16_sum
+            inc [hl]
+            ret
+; vcopy's VRAM bank 1 sprite tiles (DE < $8800) -> the mirror too (B tiles from HL; a source in
+; $D000- through s16_bb)
+s16_mir:    push bc
+            push de
+            push hl
+            ld a, d
+            add a, high(S16_MIR) - $80
+            ld d, a
+.t:         ld a, h
+            cp $D0
+            jr c, .dr
+            push de
+            ld de, s16_bb
+            ld c, 16
+.r:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec c
+            jr nz, .r
+            pop de
+            push hl
+            ld hl, s16_bb
+            call .w16
+            pop hl
+            jr .nx
+.dr:        call .w16
+.nx:        ld a, d
+            cp $E0
+            jr nc, .x
+            dec b
+            jr nz, .t
+.x:         pop hl
+            pop de
+            pop bc
+            ret
+.w16:       ldh a, [rSVBK]
+            push af
+            ld a, 5
+            ldh [rSVBK], a
+            ld c, 16
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec c
+            jr nz, .c
+            pop af
+            ldh [rSVBK], a
+            ret
+
 ; a call into the other battle bank (from a stub: [fx_a] = A, [fx_t] = the routine, A = its
 ; bank): A, BC, DE passed; A, F, BC, DE, HL returned; the caller's bank back
 ; the compact stubs: call far_s / db bank / dw routine (A, BC, DE passed; A, F, HL returned)
@@ -399,3 +523,20 @@ section wram, $DF60
 fx_a:       ds 1
 fx_t:       ds 2
 fx_b:       ds 1
+
+section wram, $C740
+s16_on:     ds 1
+s16_lo:     ds 1
+s16_hi:     ds 1
+s16_n:      ds 1                            ; effect sprites in s16_in
+s16_front:  ds 1                            ; the effect in front of the party
+s16_lock:   ds 1
+s16_sum:    ds 2
+s16_wn:     ds 1
+s16_pn:     ds 1
+s16_i:      ds 1
+s16_j:      ds 1
+s16_t:      ds 4
+s16_bb:     ds 16
+s16_in:     ds 4 * 40                       ; (y, x, tile, GB attributes)
+
