@@ -777,9 +777,7 @@ gr_vbl:     ld a, [gr_rst]                  ; (switched off / paused: the flat c
             ld a, [gr_on]                   ; (paused, not off: no events this frame)
             and a
             ret z
-            ld a, $FF
-            ldh [rLYC], a
-            ret
+            jr gr_mo
 .on:        ld a, [gr_on]
             and a
             ret z
@@ -788,10 +786,7 @@ gr_vbl:     ld a, [gr_rst]                  ; (switched off / paused: the flat c
             or [hl]
             ld hl, fd_in                    ; (a fade-in to come: black until it starts;
             or [hl]                         ;   during fades the ramp fades: gr_fdramp)
-            jr z, .go
-            ld a, $FF
-            ldh [rLYC], a
-            ret
+            jr nz, gr_mo
 .go:        ld a, [gr_new]
             and a
             jr z, .n
@@ -843,6 +838,15 @@ gr_vbl:     ld a, [gr_rst]                  ; (switched off / paused: the flat c
             ld a, h
             ld [gr_p + 1], a
             jp gr_lyc
+; a frame without colour records (paused, a fade): only the music's record, so the music still
+; plays once a frame (LYC $FF here skipped it in every fade with the gradient on)
+gr_mo:      ld hl, gr_mus
+            ld a, l
+            ld [gr_p], a
+            ld a, h
+            ld [gr_p + 1], a
+            jp gr_lyc
+gr_mus:     db BOX_LINES, $40, 0, 0, $FF, 0
 ; the gradient off (a load, a screen without it, the box closed): LYC the box's again, the
 ; flat colour back in the next V-Blank
 gr_off:     ld a, [gr_on]

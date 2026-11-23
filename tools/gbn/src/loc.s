@@ -1217,15 +1217,6 @@ opt_wpal:   ld a, COMMON
             or b
             ld [win_pal + 5], a
             ret
-; a colour changed: the palettes now (in V-Blank: palette 7 and the menus' 1-4)
-opt_wnow:   call opt_wpal
-            call wait_vbl
-            call text_pals
-            call eqm_pal
-            ld a, [opt_nograd]              ; (the gradient from the new colour, or off)
-            and a
-            jp nz, gr_off
-            jp gr_menu
 ; FF1's window colour -> win_r / g / b (the defaults)
 opt_wdef:   ld a, COMMON
             ld hl, C_WINPAL + 4
@@ -2450,7 +2441,9 @@ gr_menu:    ld a, [gr_wn]
 ; the field's box / banner: A = rows of the window layer from the top (cut below it)
 gr_box:     call gr_ok
             jp z, gr_off
-            ld a, [gr_cut]
+            xor a                           ; (no palette-0 copy: that is the menus' alt
+            ld [gr_p0], a                   ;   windows'; left on, it painted the map's
+            ld a, [gr_cut]                  ;   palette 0 in the window colours)
             ld b, a
             xor a
             ld hl, gr_win
@@ -3224,3 +3217,34 @@ op_be:      ds 1
 op_i:       ds 1
 op_e:       ds 1
 op_n:       ds 1
+
+section bank 99, $7200
+; a colour changed: the palettes now (in V-Blank: palette 7 and the menus' 1-4)
+opt_wnow:   call opt_wpal
+            call wait_vbl
+            call opt_p0
+            call text_pals
+            call eqm_pal
+            ld a, [opt_nograd]              ; (the gradient from the new colour, or off)
+            and a
+            jp nz, gr_off
+            ld a, [opt_cur]                 ; (switched on, or not on yet: built whole; a
+            cp 8                            ;   colour change: the ramp only, the windows
+            jp z, gr_menu                   ;   are the same; the whole build took frames,
+            ld a, [gr_on]                   ;   and quick presses were lost with their
+            and a                           ;   sounds)
+            jp z, gr_menu
+            jp gr_ramp_mk
+; Options: palette 0 again when it is the menus' alt windows' copy of palette 7 (a colour change)
+opt_p0:     ld a, [gr_p0]
+            and a
+            ret z
+            ld a, $80
+            call bcps_w
+            ld hl, win_pal
+            ld b, 8
+.l:         ld a, [hl+]
+            call bcpd_w
+            dec b
+            jr nz, .l
+            ret
