@@ -230,9 +230,16 @@ main:       call wait_vbl
             xor a
             ld [ev_pad], a
             jr .mv
-.inp:       ld a, [pad_new]                 ;   A: talk (fix:EA26)
-            bit 0, a
-            call nz, talk
+.inp:       ld a, [pad_new]                 ;   A: talk (fix:EA26); on a world map the vehicles
+            bit 0, a                        ;     (fix:C2B7)
+            jr z, .st
+            ldh a, [is_world]
+            and a
+            jr z, .tk
+            call veh_a
+            jr .st
+.tk:        call talk
+.st:
             ld a, [pad_new]                 ;   Start: the menu (fix:E340)
             bit 3, a
             jr z, .sl
@@ -479,6 +486,7 @@ load_map:   ld a, [lcd_is]
             xor a
             call vcopy
             call char_gfx                   ; the walking character -> VRAM bank 1 $8000
+            call veh_gfx                    ; (world maps: the vehicles' tiles)
             ld a, SPR_BANK                  ;   its frames -> M_FACE / M_FRAME
             ld [MBC5_BANKL], a
             ld hl, $7F00
@@ -924,8 +932,12 @@ move:       ld a, [moving]
 ; an event (later); bit 6 random battles (later)
 .wpass:     ld h, high(M_P1)
             ld a, [hl]
-            bit 0, a
-            ret nz
+            push hl
+            call veh_step                   ; (vehicles: veh.s)
+            pop hl
+            ret c
+            jr nz, .go2
+            ld a, [hl]
             bit 7, a
             jr z, .wb
             inc h
@@ -958,11 +970,12 @@ move:       ld a, [moving]
             ld [mcount], a
             call draw_edge                  ; the line of metatiles entering the view
             ret
-.step:      ld a, [mcount]
-            inc a
-            ld [mcount], a
+.step:      call veh_speed                  ; (3E/CD76: pixels a frame by vehicle)
+            ld hl, mcount
+            add a, [hl]
+            ld [hl], a
             cp STEP
-            jr nz, .sc
+            jr c, .sc
             ld a, [px]                      ; arrived
             ld hl, mdx
             add a, [hl]
@@ -1231,7 +1244,10 @@ mulsign:    and a                           ; A = -1 / 0 / 1 -> A = sign * C
 
 ; ---- the party sprite (fix:D8D3 / DA2B): frame = facing's offset | (step pixel & 8); on the
 ; second frame the sprite moves a pixel (left while walking up / down, up otherwise)
-make_oam:   ld a, [facing]
+make_oam:   call veh_parked
+            call veh_oam
+            ret nz
+            ld a, [facing]
             ld l, a
             ld h, high(M_FACE)
             ld a, [hl]                      ; (M_FACE: $5D00 + facing)

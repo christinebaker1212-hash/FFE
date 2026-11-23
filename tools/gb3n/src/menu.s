@@ -672,6 +672,7 @@ menu_close: call oam_hide
             call font_back
             call npc_gfx
             call char_gfx                   ; (the party's tiles too)
+            call veh_gfx
             xor a
             ld [menu_on], a
             jp wait_vbl

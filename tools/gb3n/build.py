@@ -101,6 +101,14 @@ def pack(rom):
     fr = rom.b(0x7E, 0xDC2A, 0x40)
     cv = lambda a: (a & 3) | 8 | ((a & 0x40) >> 1) | ((a & 0x80) >> 1) | ((a & 0x20) << 2)
     sp[0x3F10:0x3F50] = bytes(v if k % 2 == 0 else cv(v) for k, v in enumerate(fr))
+    vt = rom.prg[0x0B * 0x2000 + 0x0800:0x0B * 0x2000 + 0x0E00]   # $6000: 0B/8800 vehicles (96 tiles)
+    sp[0x2000:0x2600] = b''.join(nes2gb(vt[16 * k:16 * k + 16]) for k in range(96))
+    vf = rom.b(0x7E, 0xDCAA, 0x40)                             # $7F50: 3E/DCAA vehicle frames
+    sp[0x3F50:0x3F90] = bytes(v if k % 2 == 0 else cv(v) for k, v in enumerate(vf))
+    sp[0x3FA0:0x3FA8] = rom.b(0x7E, 0xD8CA, 8)                 # $7FA0: y by vehicle
+    sp[0x3FA8:0x3FB0] = rom.b(0x7E, 0xC6CD, 8)                 # $7FA8: passability masks
+    sp[0x3FB0:0x3FB8] = rom.b(0x7E, 0xC851, 8)                 # $7FB0: landing masks
+    sp[0x3FB8:0x3FC0] = rom.b(0x7E, 0xCD76, 8)                 # $7FB8: speeds
     banks[SPR_BANK] = sp
     wb, wc = bytearray(b'\xFF' * 0x4000), bytearray(b'\xFF' * 0x4000)
     for k in range(3):
@@ -181,7 +189,7 @@ def nes_rgb_src():
         '    dw %s\n' % ', '.join(str(x) for x in v[k:k + 8]) for k in range(0, 64, 8))
 
 
-MODULES = ('npc', 'text', 'event', 'menucore', 'select', 'snd', 'enc', 'btlbase')   # bank 0
+MODULES = ('npc', 'text', 'event', 'menucore', 'select', 'snd', 'enc', 'btlbase', 'veh')   # bank 0
 SND_BANK0 = 81                          # sound: FF3 bank $36 at $4000 + a song bank ($37, $38, $39,
                                         #   $09) at $6000: banks 81-84
 CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save', 'title', 'shop')  # bank CODE1
