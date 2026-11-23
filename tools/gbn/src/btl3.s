@@ -486,6 +486,7 @@ bt_pl_magic:
 ; an enemy's spell / special attack A (FF1 Enemy_DoMagicEffect)
 bt_en_magic:
             call bt_mload
+            call bt_ban_spell               ; (its name at the top: owner, 2026-11-23)
             ld a, [bt_who]
             ld [mg_caster], a
             call bt_erec
@@ -505,7 +506,11 @@ bt_en_magic:
 
 ; cast mg_d by mg_caster ($80 + member / enemy) on its targets (FF1's target bits; for an
 ; enemy caster the sides swap): 1 all foes, 2 one foe, 4 self, 8 all allies, $10 one ally
-bt_cast:    ld a, [mg_d + 4]
+bt_cast:    ld a, 1                         ; (messages: only what the numbers cannot say)
+            ld [bt_quiet], a
+            call bt_cast0
+            jp bt_ban_off                   ; (the top window gone with the action)
+bt_cast0:   ld a, [mg_d + 4]
             and a
             jr nz, .go
             ld a, [mg_caster]               ; no effect: "ineffective"
@@ -793,11 +798,7 @@ bt_cast_en: ld [mg_def], a
             jp bt_msg_end
 ; the spell's name as the first result line
 bt_msg_spell:
-            call bt_msg_head
-            ld a, [mg_id]
-            call bt_mname
-            ld hl, bt_sbuf
-            jp bt_msg_row
+            ret                             ; (the top window shows the spell: owner, 2026-11-23)
 
 ; FF1 BtlMag_PerformSpellEffect: the effect, its message, HP 0 = dead, ailment messages
 bt_effect:  ld a, [dv_ail]
@@ -817,9 +818,12 @@ bt_effect:  ld a, [dv_ail]
             ld h, [hl]
             ld l, a
             call .jp
-            ld a, [mg_conn]                 ; connected: the spell's message (FF1's table)
-            and a
+            ld a, [mg_conn]                 ; connected: the spell's message (FF1's table;
+            and a                           ;   not when a number shows it: owner, 2026-11-23)
             jr z, .nm
+            ld a, [dn_t]
+            and a
+            jr nz, .nm
             ld a, [mg_id]
             ld l, a
             ld h, 0
@@ -853,7 +857,7 @@ bt_effect:  ld a, [dv_ail]
             ld a, M_SLAIN
             jr nz, .dm
             ld a, M_TERM
-.dm:        jp bt_msg_line
+.dm:        jp bq_line
 .ch:        ld hl, bt_ailtab                ; per bit (confusion first): added / cured
             ld de, bt_curetab
             ld b, $80
@@ -1024,7 +1028,7 @@ mg_apply:   call mg_conn_t                  ; connected: damage doubled
             xor a
             ld [nf_val + 2], a
             ld a, M_DMG
-            call bt_msg_num
+            call bq_num
             ld hl, mg_dmg                   ; (the number over the target)
             jp bt_dnum_w
 ef_undead:  ld a, 148                       ; only undead (category bit 3)
@@ -1089,6 +1093,10 @@ ef_morale:  call mg_statprep                ; morale - effectivity (FF1: always 
 .s:         ld [dv_morale], a
             jp mg_mark
 ef_heal:    call mg_mark                    ; HP + random(E .. 2E) (at most 255), at most max
+            ld a, [dv_hp]                   ; (before: the green number's base)
+            ld [bt_hp0], a
+            ld a, [dv_hp + 1]
+            ld [bt_hp0 + 1], a
             ld a, [mg_d + 1]
             ld b, a
             xor a
@@ -1105,6 +1113,8 @@ ef_heal:    call mg_mark                    ; HP + random(E .. 2E) (at most 255)
             ld a, [dv_hp + 1]
             adc a, 0
             ld [dv_hp + 1], a
+            call mg_capmax
+            jp bt_healnum
 mg_capmax:  ld a, [dv_max]                  ; HP > max: max
             ld b, a
             ld a, [dv_hp]

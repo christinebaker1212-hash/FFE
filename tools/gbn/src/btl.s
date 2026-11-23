@@ -16,6 +16,7 @@
 BTL_BANK   = 6
 BTL_DATA   = 92
 ENEMY_CHR  = 93
+BTL6_BANK  = 104          ; battle, part 2 (btl6.s) and the small font's glyphs
 B_FORM     = $4000          ; data bank (battle.py)
 B_STATS    = $4C00
 B_PALS     = $5C80
@@ -1167,9 +1168,14 @@ vwf_ch:     cp $20
             add hl, hl
             add hl, hl
             add hl, hl
-            add hl, de                      ; 9 bytes a glyph: width, 8 rows
-            ld de, vwf_glyphs
+            add hl, de                      ; 9 bytes a glyph: width, 8 rows (in bank
+            ld de, vwf_glyphs               ;   BTL6_BANK: copied to vw_icon first)
             add hl, de
+            ld de, vw_icon
+            ld bc, 9
+            ld a, BTL6_BANK
+            call far_copy
+            ld hl, vw_icon
 .w:         ld a, [hl+]
             and a
             ret z

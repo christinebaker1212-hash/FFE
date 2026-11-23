@@ -368,8 +368,11 @@ box_vbl:    ld a, [box_on]
             jr z, .na
             ld a, 1
             ldh [rVBK], a
+            ld a, [ban_attr]                ; (the battle's top window: its palette)
+            and a
+            jr nz, .wa
             ld a, WIN_ATTR
-            ld b, 20
+.wa:        ld b, 20
 .at:        ld [de], a
             inc e
             dec b

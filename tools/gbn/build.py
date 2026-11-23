@@ -244,7 +244,7 @@ def main():
            open(os.path.join(HERE, 'src', 'sgb.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
-           'section bank 6, $7800\n' +
+           'section bank 104, $4000\n' +              # (the small font's glyphs: bank BTL6)
            battle.vwf_source() + ui_strings() + ui.loc_source())
     import re                                    # (constants from every module first: the
     defs = [l for l in src.split('\n') if re.match(r'^[A-Za-z_]\w*\s+=', l)]   #   assembler

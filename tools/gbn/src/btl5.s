@@ -357,7 +357,7 @@ fl_fiend:   ldh a, [is_cgb]
 ; hit label (gold ink, black outline), BG 6 / 7 the flash (white silhouette / black one with a
 ; white outline)
 bt_pal5:    ld hl, pal5_tab
-            ld b, 8
+            ld b, 16
 .o:         ld a, [hl+]
             ldh [rOCPD], a
             dec b
@@ -370,9 +370,6 @@ bt_pal5:    ld hl, pal5_tab
             dec b
             jr nz, .g
             ret
-pal5_tab:   db $00, $00, $DF, $0A, $FF, $7F, $00, $00
-            db $00, $00, $00, $00, $FF, $7F, $FF, $7F
-            db $00, $00, $FF, $7F, $00, $00, $00, $00
 
 ; ---- the hit count over the attacker (after the damage number): mt_conn hits, "n HIT(S)"
 ; (owner, 2026-11-22: as the WonderSwan Color remake), gold on the Color, white on DMG / SGB
@@ -511,7 +508,9 @@ bt_gw:      cp $20
             add hl, de
             ld de, vwf_glyphs
             add hl, de
-            ld a, [hl]
+            ld a, BTL6_BANK
+            ld [fc_bank], a
+            call far_byte
             inc a
             ret
 
@@ -623,3 +622,11 @@ dt_pose:    ds 1
 fl_tb:      ds 72                           ; tiles (36), attributes (36)
 bt_defer:   ds 1                            ; bt_phys working out the result only (no text, no numbers)
 bt_sv:      ds 4                            ; (the RNG and the defender's HP / ailments meanwhile)
+bt_swn:     ds 1                            ; swings left
+ex_one:     ds 1                            ; bt_explode: one burst
+bt_quiet:   ds 1                            ; messages: only what the numbers cannot say
+ban_on:     ds 1                            ; the top window shown
+ban_attr:   ds 1                            ; (text.s box_vbl: its palette, 0 = WIN_ATTR)
+ban_w:      ds 1
+dn_attr:    ds 1                            ; the number's OAM attribute
+bt_hp0:     ds 2                            ; HP before a heal

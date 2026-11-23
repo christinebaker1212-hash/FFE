@@ -399,11 +399,38 @@ bt_strike:  ld [bt_am], a
             pop bc
             dec b
             jr nz, .h
-            call bt_hitlab
-            call .pb
+            ld a, [mt_conn]                 ; a swing per hit (owner, 2026-11-23: at least
+            and a                           ;   one, at most 8), each hit's burst on the
+            jr nz, .n1                      ;   target; the hit count after the swings
+            inc a
+.n1:        cp 9
+            jr c, .n2
+            ld a, 8
+.n2:        ld [bt_swn], a
+.sw:        call .pb
             call bt_2f
-            call bt_2f
+            call bt_frame
             call .pa
+            ld a, [mt_conn]
+            and a
+            jr z, .nb
+            ld a, [bt_sv + 3]               ; (not on an enemy already down)
+            and AIL_DEAD | AIL_STONE
+            jr nz, .nb
+            ld a, SFX_HIT
+            ld [sfx_req], a
+            ld a, 1
+            ld [ex_one], a
+            ld a, [bt_tgt]
+            call bt_explode
+            xor a
+            ld [ex_one], a
+            jr .nx
+.nb:        call bt_2f
+            call bt_frame
+.nx:        ld hl, bt_swn
+            dec [hl]
+            jr nz, .sw
             jp bt_2f
 .pa:        ld a, [bt_am]                   ; A frame: arm forward, the weapon left of the member
             ld e, a
@@ -463,6 +490,8 @@ bt_sback:   ld [bt_am], a
 ; screen's background flashes the spell's colour (FF1 DoMagicFlash)
 bt_cast_anim:
             ld [bt_am], a
+            call bt_ban_spell               ; (the spell's name at the top: owner, 2026-11-23)
+            ld a, [bt_am]
             ld a, [bt_ag]
             and a
             jr z, .nl
@@ -724,7 +753,13 @@ bt_explode: push af
             add a, h
             ld [bt_ey + 1], a
             ld a, l
-.go:        ld [bt_exn], a
+.go:        ld b, a                         ; (ex_one: a single burst, a swing's)
+            ld a, [ex_one]
+            and a
+            ld a, b
+            jr z, .g1
+            ld a, 1
+.g1:        ld [bt_exn], a
 .l:         xor a
 .s:         push af
             ld [bt_exs], a
@@ -892,110 +927,6 @@ bt_erase_box:
             jr nz, .r
             ret
 
-; ---- FF1 ChaosDeath: the fanfare's first 110 frames, the music stopped, a low rumble
-; (noise period 15) fading out; 8 x 256 frames: each a random tile 0-$79 (FF1's RandAX on the
-; battle RNG) loses one pixel row (per tile a random row, moved on each pass), the screen
-; shaking by 0-3 pixels; then the rumble's booms, 2 seconds, silence
-bt_chaos_death:
-            ld a, 110
-.w:         push af
-            call bt_frame
-            pop af
-            dec a
-            jr nz, .w
-            ld a, $80
-            call snd_track
-            xor a
-            ld [bt_cdn], a
-            ld a, SND_BANK                  ; the noise's period ($0F: the lowest)
-            ld hl, SFX_NZ + 15
-            ld [fc_bank], a
-            call far_byte
-            ld [bt_cdp], a
-            call bt_cd_noise
-            ld hl, bt_line                  ; the rows to erase: 256 random values
-            ld b, 0
-.f:         call bt_rng
-            ld [hl+], a
-            dec b
-            jr nz, .f
-            ld a, 8
-.o:         push af
-            xor a
-.i:         push af
-            cp $80
-            call z, bt_cd_noise
-            xor a                           ; the tile: RandAX(0, $79)
-            ld b, $79
-            call bt_randab
-            ld [bt_cdr], a
-            ld l, a
-            ld h, high(bt_line)
-            ld a, [hl]
-            and 7
-            add a, a
-            ld e, a                         ; VRAM $9000 + 16 tile + 2 row
-            ld a, [bt_cdr]
-            ld l, a
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            ld d, 0
-            add hl, de
-            ld de, $9000
-            add hl, de
-            push hl
-            call wait_vbl
-            pop hl
-            ldh a, [is_cgb]                 ; erased to the battlefield's black (CGB colour
-            and a                           ;   0; DMG shade 3)
-            ld a, $FF
-            jr z, .e
-            xor a
-.e:         ld [hl+], a
-            ld [hl], a
-            ld a, [bt_cdq]                  ; shake: x from the previous value, y from this
-            and 3
-            ldh [scx], a
-            ld a, [bt_cdr]
-            ld [bt_cdq], a
-            and 3
-            ldh [scy], a
-            pop af
-            dec a
-            jr nz, .i
-            ld hl, bt_line                  ; each tile's row moves on
-            ld b, 0
-.n:         inc [hl]
-            inc hl
-            dec b
-            jr nz, .n
-            call bt_cd_noise
-            pop af
-            dec a
-            jr nz, .o
-            xor a
-            ldh [scx], a
-            ldh [scy], a
-            ld a, 120                       ; 2 seconds of the booms
-.b:         push af
-            and $3F
-            jr nz, .bn
-            ld a, $F4                       ; (FF1's looping envelope: a boom a second)
-            ldh [$FF21], a
-            ld a, [bt_cdp]
-            ldh [$FF22], a
-            ld a, $80
-            ldh [$FF23], a
-.bn:        call wait_vbl
-            pop af
-            dec a
-            jr nz, .b
-            xor a
-            ldh [$FF21], a
-            ret
 ; FF1 ChaosDeath_FadeNoise: the rumble one step quieter (15, 14, .. 0)
 bt_cd_noise:
             ld a, [bt_cdn]
