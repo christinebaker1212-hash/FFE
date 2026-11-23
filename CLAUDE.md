@@ -1323,6 +1323,12 @@ ff1-native.md item 22). New check: tools/gbn/xbank.py (calls into another bank).
 Owner (2026-11-22, after the mock-up): encounter transition (raster twist / zoom / strips, white flash,
 battle from white), party walk-in, Color gradient windows with an Options switch, crystals centred
 (docs/ff1-native.md item 23).
+Owner (2026-11-23), fixed: DMG / Pocket music (channel 3 retriggers corrupted wave RAM for good),
+the ambush round, rooms revealed on teleport arrival, the town wipe (black DMG curtains, no
+full-window frame), the gradient fading with the screen, attacks in the remake's measured timing,
+enemy deaths in sliding strips (fiends: flash + shake), the party turning and running off when
+escaping (docs/ff1-native.md item 24). Testing now in SameBoy (`build/sbsh`), not PyBoy (owner).
+Open: party names reported messed up after the inn save / a menu (not reproduced: asked the owner).
 Next: the walking playthrough (DMG / SGB / CGB), then the owner's play-test. Lessons: docs/gb-lessons.md.
 
 ## Remaining

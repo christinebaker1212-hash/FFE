@@ -402,3 +402,31 @@ one reaches parity, so the owner can keep playing).
    strips, white flash, the battle fading in from white), the party walking in from the right, gradient
    windows on the Color with Options: Gradient On / Off (the top the window colour itself, darker than the
    mock-up), the main menu's crystals centred. Details: docs/gb-video-improvements.md.
+24. Owner (2026-11-23), fixed:
+   - Music on DMG / Pocket (Cornelia, the Temple of Fiends, then every song): retriggering
+     channel 3 while it plays corrupts wave RAM on a plain Game Boy (reproduced in SameBoy:
+     `0123456789ABCDEF` became `BADCBA9889ABCDEF` on entering Cornelia, for good). The triangle
+     now changes pitch without a restart while it sounds (as the NES triangle keeps its phase);
+     a stopped channel is restarted with its DAC off and the wave RAM written again
+     (snd.s `.ft`, `nr30_w`). Checked in SameBoy on DMG, Pocket, Color 0-E and GBA.
+   - Monsters striking first: the party's command slots were never cleared, so each member ran
+     leftover bytes (a garbled spell).
+   - Teleports into a room behind a door: the room is shown from the start (build time:
+     data.room_teles finds the 9 such teleports in the user's ROM; load_map takes ml_room;
+     the Color picks the room palette at load).
+   - Town transition: on the overworld the DMG curtain tile was an overworld tile (water); a
+     solid black tile is added to the overworld's DMG set. The wipe's first frame showed the
+     window over the whole screen (enabled at WX 167; at the bottom edge with a late V-Blank).
+     DMG keeps the switched-off (white) screen while a map loads: the black masked load takes
+     38 frames there instead of 16.
+   - The gradient fades with the screen (ramp rebuilt per fade step; faster ramp builder).
+   - The file picker opens on the file in use (drawing the three files moved it to file 3).
+   - Attacks in the remake's timing (measured at 60 fps in the owner's videos): the result is
+     worked out first (a silent pass, RNG restored), then: dart forward 2 frames with the hit
+     count, 6 frames, weapon raised 4, swing, one hit burst at a time (3 frames each), the
+     number and all the text together, held 52 frames at message speed 1 (FF1: 120), cleared
+     together; a dead enemy breaks up in sliding strips (~30 frames; fiends: their flash, the
+     screen shaking, slower); then the member darts back.
+   - Running away: the party turns round (mirrored sprites) and runs off to the right.
+   Open: party names "messed up after the inn save / a menu" not reproduced (names in RAM and
+   on screen stay right through the inn save, the file screen and the menus, DMG and Color).

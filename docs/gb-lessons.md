@@ -215,3 +215,19 @@ Color only" screen on older systems.
 - Palette writes on the Color are ignored in mode 3: a per-line effect writes in the H-Blank of
   the line before (LYC one line early, then wait for mode 0); whole-palette fades rewrite every
   colour, so pause per-line palette effects during a fade.
+
+## Hardware traps found by the owner on real units (2026-11-23)
+- **Never retrigger channel 3 while it plays on a DMG / Pocket:** a trigger that meets the
+  channel's wave RAM read corrupts the first bytes of wave RAM, permanently, so every later
+  song's wave channel sounds wrong. Change the frequency without the trigger bit while the note
+  sounds; restart only a stopped channel, with the DAC off (NR30 = 0) and the wave RAM written
+  again. The Color does not corrupt; SameBoy shows it in DMG mode (read $FF30-$FF3F raw).
+- **WX 167 does not hide an enabled window:** with the window enabled and WX parked at 167 the
+  window covered the whole frame. Keep the window off (LCDC bit 5) when nothing should show.
+- **Test in SameBoy (and Gambatte), not PyBoy** (owner: PyBoy is inaccurate). `tools/gb/sameboy/
+  sbsh.c` drives the SameBoy libretro core with the mgsh protocol (frames with keys, bus reads,
+  PPM shots, 48 kHz WAV, save states, any model: DMG, Pocket, Color 0-E, GBA).
+- **Battle black on the DMG is colour 3**, not 0: effects that blank pixels must use the blank
+  tile's own value (read tile 0).
+- **Uninitialised WRAM flags bite later:** a "work out silently" flag left at its power-on value
+  skipped messages until the first attack set it. Clear new flags where the mode starts.

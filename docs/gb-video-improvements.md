@@ -151,3 +151,22 @@ the other Game Boy ports (FF2, FF3). The FF1 code is in `tools/gbn/src/btl5.s` (
 - **Main menu crystals** centred exactly: a 2 x 2 grid with one-tile gaps in the 7 x 5 interior.
 
 Lessons from this round: see docs/gb-lessons.md ("Shared work RAM").
+
+## Attack and death timing (owner, 2026-11-23: "really nail down the timing")
+Measured frame by frame (60 fps) in v1 at 25.9-28.4 s (a warrior, then a monk hitting goblins):
+
+| frame | remake | FF1 native now |
+|---|---|---|
+| 0 | the member darts forward (2 frames); "1 HIT" appears over it | the same |
+| 2-11 | stands there (6-9 frames) | 6 frames |
+| 12 | weapon raised (2-5 frames) | 4 frames |
+| 13-21 | the swing; a slash / burst on the target (~9 frames) | swing, one burst at a time, 3 frames each (3 small / 4 large / 8 fiend) |
+| 22 | the number pops over the target | the number and the message lines together (~26) |
+| +52 | number and label vanish together | message speed 1: 52 frames (table 52 44 36 30 24 16 8 1) |
+| +3 | a dead enemy breaks up in horizontal strips (~24 frames) | strips slide 2 px then go, row order 0 4 2 6 1 5 3 7 (~30 frames) |
+| +3 | the member darts back (2-3 frames) | 2 frames |
+
+How (any port): work the result out before animating (FF1's damage code run silently with the
+RNG saved and restored, then again for real), so labels can show early. Copy a dying enemy's
+shared tiles into free tiles before changing them. Touch VRAM only after STAT shows mode 0 / 1
+(mode 2 follows, still open), interrupts off for the access.
