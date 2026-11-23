@@ -78,6 +78,9 @@ talk:       ld a, [px]                      ; the facing tile (fix:E4E9)
             cp d
             jr nz, .n0
             pop hl
+            ld a, [tk_b]                    ; (B: someone there, fix:EAD0)
+            and a
+            ret nz
             inc l                           ; type & $30 = 0: it turns to the party
             ld a, [hl]
             dec l
@@ -97,6 +100,9 @@ talk:       ld a, [px]                      ; the facing tile (fix:E4E9)
             ld l, a
             cp $C0
             jr c, .l
+            ld a, [tk_b]                    ; (B, no one: the guest, fix:EA56)
+            and a
+            jp nz, g_talk
             jp treasure                     ; (no one: treasures, locked doors: fix:E917)
 .found:     ld a, [hl]                      ; the npc's script: 2C/8200 (world 0) / 2C/8400
             ld [ev_npc], a
@@ -567,9 +573,12 @@ ev_tcp:     ld a, [ev_par]
             ld c, 3
             jp dlg_show
 ; $EE set guest npc ($600B; its sprite: later)
-ev_guest:   ld a, [ev_par]
+ev_guest:   ld a, [ev_par]                  ; $EE set the guest (3B/B6A5: init, its graphics)
             ld [GS + $0B], a
-            ret
+            and a
+            ret z
+            call g_init
+            jp g_gfx
 ev_btl:     ld a, [ev_par]                  ; $F7 battle (3B/B703: after the event)
             ld [act_id], a
             ld a, $20
@@ -669,8 +678,16 @@ ev_pl_cmd:  and $0F
             jr z, .v7
             cp $0F
             jr z, .v1                       ; CF: the chocobo
+            cp $08                          ; C8 / C9 show / hide the party, CC / CD the guest
+            jr z, .sh7
+            cp $09
+            jr z, .hd7
+            cp $0C
+            jr z, .sh6
+            cp $0D
+            jr z, .hd6
             cp $0E
-            ret nz                          ; (show / hide, guest: later)
+            ret nz
             xor a                           ; CE: off the vehicle, the Invincible left here
             ld [GS + $0F], a
             ld a, [cur_world]
@@ -681,6 +698,18 @@ ev_pl_cmd:  and $0F
             ld [GS + $06], a
             ld a, 1
             ld [GS + $04], a
+            ret
+.sh7:       ld hl, pl_hide
+            res 7, [hl]
+            ret
+.hd7:       ld hl, pl_hide
+            set 7, [hl]
+            ret
+.sh6:       ld hl, pl_hide
+            res 6, [hl]
+            ret
+.hd6:       ld hl, pl_hide
+            set 6, [hl]
             ret
 .v1:        ld a, 1
             jr .v

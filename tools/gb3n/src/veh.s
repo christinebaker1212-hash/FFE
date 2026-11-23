@@ -478,7 +478,7 @@ veh_oam:    ldh a, [is_world]
 veh_offs:   db 0, $38, $20, $50, $68, $68, $68, $68
 
 ; the parked vehicle (3E/DAD4 ship, DB09, DB2F airships) -> OAM 36-39
-; after the people's sprites (npc_frame hides the rest): the Invincible (OAM 4-27), the parked
+; after the people's sprites (npc_frame hides the rest): the Invincible (OAM 8-31), the parked
 ; vehicle (36-39)
 veh_late:   call inv_parked
             ldh a, [is_world]
@@ -609,7 +609,10 @@ veh_jump:   ld a, [facing]
 
 ; 3E/D666 the parked Invincible (not while aboard): at ($6005, $6006 - 1) on world $6007, frame
 ; (frames & $10) x 2
-inv_parked: ld hl, oam_buf + 4 * 4              ; (OAM 4-27: cleared first)
+inv_parked: ldh a, [is_world]                 ; (world maps: OAM 8-31 cleared first; 4-7
+            and a                           ;   are the guest's)
+            ret z
+            ld hl, oam_buf + 4 * 8
             ld b, 24
 .c:         ld [hl], $F0
             inc hl
@@ -663,7 +666,7 @@ inv_parked: ld hl, oam_buf + 4 * 4              ; (OAM 4-27: cleared first)
             ; (fall through)
 ; 3C/8857 draw the Invincible: frame index A (3C/83E0 + A), from OAM (B, C): each sprite's dy,
 ; tile, attributes, dx (signed, adding up) to $FF; then its shadow (3C/8608, every other frame)
-; 24 below. OAM 4-27
+; 24 below. OAM 8-31
 inv_draw:   ld [veh_off8], a
             ld a, b
             ld [inv_x], a
@@ -682,7 +685,7 @@ inv_draw:   ld [veh_off8], a
             ld d, a
             ld hl, INV_LISTS - $83E0
             add hl, de
-            ld de, oam_buf + 4 * 4
+            ld de, oam_buf + 4 * 8
             call .list
             ld a, [fcnt]
             rra
@@ -714,8 +717,8 @@ inv_draw:   ld [veh_off8], a
             call rd_byte
             add a, b
             ld b, a
-            ld a, e                         ; (OAM 4-27 only)
-            cp low(oam_buf + 4 * 28)
+            ld a, e                         ; (OAM 8-31 only)
+            cp low(oam_buf + 4 * 32)
             ret z
             ld a, c
             ld [de], a

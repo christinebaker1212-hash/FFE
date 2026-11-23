@@ -277,9 +277,11 @@ npc_gfx:    ld c, 0
 ; one npc's random movement
 npc_frame:  ld hl, fcnt
             inc [hl]
-            ld hl, oam_buf + 16
-            ld a, l
-            ld [oam_p], a
+            ld a, [npc_oam0]                ; (after the party and the guest)
+            and a
+            jr nz, .o
+            ld a, 16
+.o:         ld [oam_p], a
             ld a, [fcnt]
             rrca
             jr c, .odd

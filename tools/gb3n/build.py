@@ -111,6 +111,9 @@ def pack(rom):
     sp[0x3FB8:0x3FC0] = rom.b(0x7E, 0xCD76, 8)                 # $7FB8: speeds
     it = rom.prg[0x0B * 0x2000 + 0x1A80:0x0B * 0x2000 + 0x1E80]   # $6600: 0B/9A80 the Invincible (64 tiles)
     sp[0x2600:0x2A00] = b''.join(nes2gb(it[16 * k:16 * k + 16]) for k in range(64))
+    gz = rom.prg[0x0D * 0x2000:0x0D * 0x2000 + 0x100]           # $6A00: 0D/8000 Guzco (16 tiles)
+    sp[0x2A00:0x2B00] = b''.join(nes2gb(gz[16 * k:16 * k + 16]) for k in range(16))
+    sp[0x2B00:0x2B20] = rom.b(0, 0x96F8, 32)                   # $6B00: 00/96F8 guest colours
     il = rom.b(0x3C, 0x83E0, 0x260)                            # $7000: 3C/83E0 its sprite lists
     sp[0x3000:0x3260] = bytes(il)
     banks[SPR_BANK] = sp
@@ -193,7 +196,7 @@ def nes_rgb_src():
         '    dw %s\n' % ', '.join(str(x) for x in v[k:k + 8]) for k in range(0, 64, 8))
 
 
-MODULES = ('npc', 'text', 'event', 'menucore', 'select', 'snd', 'enc', 'btlbase', 'veh')   # bank 0
+MODULES = ('npc', 'text', 'event', 'menucore', 'select', 'snd', 'enc', 'btlbase', 'veh', 'guest')   # bank 0
 SND_BANK0 = 81                          # sound: FF3 bank $36 at $4000 + a song bank ($37, $38, $39,
                                         #   $09) at $6000: banks 81-84
 CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save', 'title', 'shop')  # bank CODE1

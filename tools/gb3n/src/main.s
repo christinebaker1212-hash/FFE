@@ -261,12 +261,19 @@ main:       call wait_vbl
             ld hl, menu_open
             call far_call
             jr main
-.sl:        bit 1, a                        ;   B on a world map: the Invincible (fix:C282)
-            jr z, .sl0
+.sl:        bit 1, a                        ;   B on a world map: the Invincible (fix:C282);
+            jr z, .sl0                      ;     on a map: the guest (fix:EA9C)
             ldh a, [is_world]
             and a
-            call nz, veh_b
-            ld a, [pad_new]
+            jr z, .gb
+            call veh_b
+            jr .gb1
+.gb:        ld a, 1
+            ld [tk_b], a
+            call talk
+            xor a
+            ld [tk_b], a
+.gb1:       ld a, [pad_new]
 .sl0:       bit 2, a                        ;   Select: the Select menu; B + Select: the next
             jr z, .mv                       ;     member walks (fix:F72C)
             ldh a, [pad]
@@ -279,8 +286,10 @@ main:       call wait_vbl
             call far_call
             jr main
 .mv:        call move
+            call g_frame
             call calc_pp
             call make_oam
+            call g_draw
             call npc_frame
             call veh_late
             ld a, DLG_TEST                  ; (test builds: A shows dialogue DLG_TEST of the
@@ -542,6 +551,8 @@ load_map:   ld a, [lcd_is]
 .p1:        cp low(pal_sh + 96)
             jr nz, .pc
             call char_pal
+            call g_init                     ; (3D/B627: the guest at the party's tile)
+            call g_gfx
             xor a
             ld [mcount], a
             ld [moving], a
@@ -849,6 +860,8 @@ tr_sw:      push af                         ; (A = treasure id)
 move:       ld a, [moving]
             and a
             jr nz, .step
+            call g_waits                    ; (world maps: the party waits for the guest)
+            ret nz
             ld a, [veh_jn]                  ; (the Invincible's jump: its steps, fix:C20E)
             and a
             jp nz, .jump
@@ -1012,7 +1025,8 @@ move:       ld a, [moving]
             call q_mt
 .t4:        ld a, $80
 .ta:        ld [act], a
-.go2:       ld a, 1
+.go2:       call g_push
+            ld a, 1
             ld [moving], a
             xor a
             ld [mcount], a
@@ -1292,7 +1306,16 @@ mulsign:    and a                           ; A = -1 / 0 / 1 -> A = sign * C
 
 ; ---- the party sprite (fix:D8D3 / DA2B): frame = facing's offset | (step pixel & 8); on the
 ; second frame the sprite moves a pixel (left while walking up / down, up otherwise)
-make_oam:   call veh_oam
+make_oam:   ld a, [pl_hide]                 ; (C9: the party hidden)
+            bit 7, a
+            jr z, .vis
+            xor a
+            ld [oam_buf], a
+            ld [oam_buf + 4], a
+            ld [oam_buf + 8], a
+            ld [oam_buf + 12], a
+            ret
+.vis:       call veh_oam
             ret nz
             ld a, [facing]
             ld l, a
