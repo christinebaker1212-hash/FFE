@@ -227,6 +227,7 @@ rt_ac_wait:
             halt
             jr .lp
 .run:       call rt_nmi_run
+            call mus_drain
             jr .lp
 .done:      ldh [nzv], a                    ; N = 0
             pop af                          ; carry back
@@ -1013,9 +1014,8 @@ hle_fill:   ldh [tmp_lo], a
             jr nz, .tile
             ld e, 0                         ; X = 0
             jr .done
-.slow:      ldh a, [lcd_on]                 ; nametable cells (no attribute byte) with the LCD
-            and a                           ;   off: in bulk (hle_fill_nt), else byte by byte
-            jr nz, .gen
+.slow:      call fast_ok                    ; nametable cells (no attribute byte) with the LCD
+            jr nz, .gen                     ;   off or masked: in bulk (hle_fill_nt), else byte by byte
             ldh a, [ppu_ctrl]
             and 4
             jr nz, .gen
@@ -1105,12 +1105,16 @@ hle_fill_nt:
             ld [F_L0], a
             ld a, e
             ld [F_CNT], a
-            ldh a, [tmp_lo]                 ; GB map (LCD off), then the NES shadow
+            ldh a, [lcd_on]                 ; GB map (LCD off; masked: rebuilt when shown),
+            and a                           ;   then the NES shadow
+            jr nz, .nfm
+            ldh a, [tmp_lo]
             ld h, d
             ld b, e
 .fm:        ld [hl+], a
             dec b
             jr nz, .fm
+.nfm:
             ld a, [F_ADD]
             add a, d
             ld h, a
@@ -1255,7 +1259,13 @@ hle_fill_nt:
 .cgb:       ld a, [F_CHG]
             and a
             jr z, .adv
-            ld a, [F_D0]                    ; CGB: palettes of the run's cells (VRAM bank 1)
+            ldh a, [lcd_on]                 ; (masked: all cells' palettes when shown)
+            and a
+            jr z, .cgv
+            ld a, 1
+            ld [CGB_SCAN], a
+            jr .adv
+.cgv:       ld a, [F_D0]                    ; CGB: palettes of the run's cells (VRAM bank 1)
             ld d, a
             ld a, [F_L0]
             ld l, a
@@ -1635,7 +1645,7 @@ ovr_cell:                                   ; D = row, E = col (nametable 0): it
             call vram_put1
             pop de
             ret
-.dmg:       ldh a, [lcd_on]                 ; DMG: with the LCD off the map is scanned when it
+.dmg:       ldh a, [shade_on]                 ; DMG: with the LCD off the map is scanned when it
             and a                           ;   goes on; else the cell's tile checked now
             jr nz, .on
             inc a

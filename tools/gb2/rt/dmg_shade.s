@@ -205,7 +205,9 @@ vram_put:   push bc
             jr nz, .q
             ld [hl], d
             jr .x
-.q:         ldh a, [q_tail]
+.q:         call map_skip                   ; (masked: map rebuilt when shown)
+            jr c, .x
+            ldh a, [q_tail]
             ld e, a
             inc a
             ld b, a

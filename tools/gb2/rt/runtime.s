@@ -18,6 +18,9 @@ CP_SRAM    = $DCE6          ; cp_core: the source is in cart RAM (NES $6000-$7FF
 CP_BUF     = $DCE7          ;   one plane of a tile on its way from cart RAM bank 0 to bank 1 (8)
 CP_HLM     = $DCDB          ; cp_core / cp_hl: 1 = called from copy_core (HL source) (BS_F's byte)
 CP_T0      = $D83F          ; cp_run: first tile
+MUS_CR     = $DCE0          ; music updates owed (hle_musreq), played by mus_drain
+MUS_VBL    = $DCE1          ; VBL_CNT (low) of the last one played
+MUS_MAX    = 8              ; at most this many owed (more: dropped)
 CGB_SCAN   = $DCEF          ; CGB: cells / attributes changed with the LCD off (palettes at LCD-on)
 TSET_PEND  = $DCF8          ; DMG: a field tileset was loaded ($580B): fixed palettes at LCD-on
 PAL_DM     = $DCD0          ; CGB: palette entries changed since the last write (bitmap, 4)
@@ -86,6 +89,12 @@ TBLK       = $DE80          ; DMG: 8 re-coded tiles (16 bytes) waiting in the VR
 TB_T       = $D872          ;   blocks taken / freed (a ring)
 TB_H       = $D873
 NT_NOW     = $D87D          ; nt_tile: check the cell's palette at once (not in spare time)
+MAP_DIRTY  = $DCFF          ; masked screen: map cells written meanwhile (map_rebuild when shown)
+MB_ROW     = $DCFC          ; map_rebuild: row, cells left of a mixed row (natives' scratch, unused then)
+MB_N       = $DCFD
+MB_LO      = $DCFA          ;   (map_rebuild: row offset low / high part, owner byte index)
+MB_HI      = $DCFB
+MB_OI      = $DCFE
 VLCD       = $CCED          ; CGB: NES rendering off with the GB LCD kept on (the screen masked;
                             ;   a real GBC shows white with the LCD off, the NES black)
 EMPH_RGB   = $3A00          ; CGB: NES colours with emphasis e (1-7) at EMPH_RGB + e * $80
@@ -223,6 +232,7 @@ sgb_mask:   ds 1                            ; SGB screen mask: 1 = to blank (LCD
 nmi_req:    ds 1                            ; FF2: an NES NMI to a battle handler is due (vblank_isr)
 in_nmi:     ds 1                            ; FF2: rt_nmi_run is running the handler
 lcdoff_req: ds 1                            ; rt_ppu_w1 waits for the V-Blank to turn the LCD off: vblank_isr skips its queue flush
+shade_on:   ds 1                            ; DMG shading per write (LCD on and not masked); else one scan when shown
 hram_end:   ds 1
 
 ; ------------------------------------------------------------------ vectors
@@ -433,6 +443,10 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             push af                         ;   main thread may be in a tile copy bank)
             ld a, 1
             ldh [$FF70], a
+            ldh a, [$FF4F]                  ; CGB: VRAM bank 0 for the HDMA tiles and the
+            push af                         ;   queue (the main thread may be writing
+            xor a                           ;   palette numbers in bank 1)
+            ldh [$FF4F], a
             ldh a, [oam_pending]
             and a
             jr z, .no_oam
@@ -455,6 +469,20 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             ldh a, [lcdoff_req]             ; (an LCD-off waiting: the queue is flushed with
             and a                           ;   the LCD off right after, the V-Blank stays short)
             call z, flush_vbl
+            ld a, [VLCD]                    ; rendering back on: unmask once the queue and
+            cp 2                            ;   the HDMA tiles are out
+            jr nz, .vk
+            ldh a, [q_head]
+            ld b, a
+            ldh a, [q_tail]
+            cp b
+            jr nz, .vk
+            ldh a, [hd_any]
+            and a
+            jr nz, .vk
+            xor a
+            ld [VLCD], a
+.vk:
             ldh a, [pal_dirty]              ; DMG: the shades for the next frame (the
             and a                           ;   registers are written next vblank)
             call nz, make_palettes
@@ -469,6 +497,8 @@ vblank_isr: push af                         ; order: OAM, palettes, scroll, then
             inc hl
             inc [hl]
 .vc:        pop af
+            ldh [$FF4F], a
+            pop af
             ldh [$FF70], a
             pop hl
             pop de
@@ -977,7 +1007,12 @@ q_drain1:   push bc
             push de
             push hl
             di
-            ldh a, [q_head]
+            ld a, [VLCD]                    ; masked: several entries per hblank
+            and a
+            jr z, .one
+            call q_burst
+            jr .x
+.one:       ldh a, [q_head]
             ld e, a
             ldh a, [q_tail]
             cp e
@@ -1391,7 +1426,7 @@ own_set:    push af
             ldh a, [is_cgb]
             and a
             jr z, .x
-            ldh a, [lcd_on]                 ; (LCD off: all cells' palettes when it goes on)
+            ldh a, [shade_on]               ; (LCD off / masked: all cells' palettes when shown)
             and a
             jr nz, .cg
             inc a
@@ -1482,8 +1517,18 @@ rt_frame:                                   ; one NES frame (FF2 waits: rt/ff2.s
             ld a, l
             ld [VBL_SEEN], a
             jr .go
-.w:         halt
-            ld a, [VBL_CNT]
+.w:         ld a, [VLCD]                    ; masked with VRAM writes queued: drain them
+            and a                           ;   while waiting (else sleep)
+            jr z, .h
+            ldh a, [q_head]
+            ld h, a
+            ldh a, [q_tail]
+            cp h
+            jr z, .h
+            call q_drain1
+            jr .wc
+.h:         halt
+.wc:        ld a, [VBL_CNT]
             cp l
             jr z, .w
             ld [VBL_SEEN], a
@@ -1491,10 +1536,10 @@ rt_frame:                                   ; one NES frame (FF2 waits: rt/ff2.s
             xor a
             ldh [frame_flag], a
             pop af
-            ret
+            jp mus_drain                    ; (the music: one update per GB frame)
 
 dmg_frame:                                  ; DMG shading, once per NES frame with the LCD
-            ldh a, [lcd_on]                 ;   on (with it off, all of it when it goes on):
+            ldh a, [shade_on]                 ;   on (with it off, all of it when it goes on):
             and a                           ;   palette maps once the palettes have been
             ret z                           ;   stable for PAL_STABLE frames, then re-code a
             push bc                         ;   few marked tiles
@@ -1578,9 +1623,18 @@ rt_ppu_w1:  push af
             ldh [ppu_mask], a
             and $18
             jr z, .off
-            xor a
-            ld [VLCD], a                    ; (CGB: shown again)
-            ldh a, [lcd_on]
+            ld a, [VLCD]                    ; masked (rendering was off): DMG shading of what
+            cp 1                            ;   was drawn meanwhile (as at an LCD-on, through
+            jr nz, .vu                      ;   the queue), shown again once the queue has
+            call q_empty                    ;   drained (vblank_isr). Writes queued before
+            ld a, 2                         ;   the mask go first (else they would land on
+            ld [VLCD], a                    ;   the rebuilt map / palettes)
+            call shade_show
+            ld a, [MAP_DIRTY]
+            and a
+            call nz, map_rebuild
+            jr .ret
+.vu:        ldh a, [lcd_on]
             and a
             jr nz, .ret
             ld b, 0                         ; flush everything (LCD still off)
@@ -1620,6 +1674,7 @@ rt_ppu_w1:  push af
             ldh [$FF40], a
             ld a, 1
             ldh [lcd_on], a
+            ldh [shade_on], a
             ld a, [VBL_CNT]                 ; frames lost while the LCD was off are not
             ld [VBL_SEEN], a                ;   caught up (the screen fades in at its pace)
             jr .ret
@@ -1628,13 +1683,22 @@ rt_ppu_w1:  push af
 .off:       ldh a, [lcd_on]
             and a
             jr z, .ret
-            ; (CGB "VLCD", the LCD kept on and masked while the NES renders nothing, avoids
-            ;   the white of a real GBC's LCD-off, but every map write then waits for a
-            ;   vblank: loads became many times slower. Not used: the LCD goes off.)
+            ; NES rendering off: the LCD stays on, the screen masked to the backdrop (VLCD:
+            ; vbl_regs; sprites off), so no white LCD-off screen on a real Game Boy (owner,
+            ; 2026-11-22: white flash when opening menus). VRAM writes go through the queue,
+            ; drained in bursts in every hblank while masked (q_drain1, rt_frame).
+            ld a, [VLCD]
+            cp 1
+            jr z, .ret
+            ld a, 1
+            ld [VLCD], a
+            xor a
+            ldh [shade_on], a               ; (DMG: cells scanned when shown)
             ldh a, [is_sgb]
             and a
             call nz, sgb_lcd_off
-            ld a, 1
+            jr .ret
+            ld a, 1                         ; (the LCD-off path, kept for reference)
             ldh [lcdoff_req], a
 .wv:        ldh a, [$FF44]                  ; LCD off only in the vblank: wait for it (the
             cp 144                          ;   vblank interrupt runs first), then with
@@ -1873,7 +1937,7 @@ rt_ppu_w7:  push af
             and a
             ld a, b
             jr z, .dat
-            ldh a, [lcd_on]                 ; CGB, LCD off: all cells' palettes when it goes on
+            ldh a, [shade_on]               ; CGB, LCD off / masked: all cells' palettes when shown
             and a
             ld a, b
             jr nz, .cat
@@ -1882,7 +1946,7 @@ rt_ppu_w7:  push af
             jr .done
 .cat:       call attr_apply
             jr .done
-.dat:       ldh a, [lcd_on]                 ; (LCD off: the scan when it goes on)
+.dat:       ldh a, [shade_on]                 ; (LCD off: the scan when it goes on)
             and a
             ld a, b
             jr nz, .dat2
@@ -1915,7 +1979,7 @@ rt_ppu_w7:  push af
             ldh a, [sh_same]                ; DMG: the cell's tile shaded for its palette
             and a                           ;   (unless tile and owner are unchanged; with
             jr nz, .map2                    ;   the LCD off, once for the whole map when it
-            ldh a, [lcd_on]                 ;   goes on)
+            ldh a, [shade_on]                 ;   goes on)
             and a
             jr nz, .mcell
             inc a
@@ -1937,7 +2001,9 @@ rt_ppu_w7:  push af
             jr nz, .queue
             ld [hl], d
             jr .done
-.queue:     ldh a, [q_tail]
+.queue:     call map_skip                   ; (masked: the map is rebuilt when shown)
+            jr c, .done
+            ldh a, [q_tail]
             ld e, a
             inc a
             ld b, a

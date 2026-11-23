@@ -800,6 +800,52 @@ Plan, progress and building blocks: `docs/ff2-gb-native-layer.md`. State 2026-11
   the remaining layout screens (b24 portraits / rows, b23 lists), field map and battle CHR
   paths, battle OAM sites, `$2001` / `$2002` users.
 
+## Owner bug reports on the native-layer build (2026-11-22/23)
+Reports: music "horribly wrong", battles wrong (the acting member runs across the field,
+auto-attacks, messages weird / out of order), a white flash when opening menus.
+- **Battle walk** (fixed, committed 2bf0628): sprite positions of the GB battle layout
+  (layout.py A102 / A109 / A620 / B120).
+- **Battle messages** (fixed): on the DMG with the LCD on, the small-font text tiles were
+  coded by the FF1 routine (other buffer address, other background colour), so messages
+  showed fragments of older text. `hle_vtile_b` now codes them with `vt_code2` (FF2 buffer
+  `$CCD0`, colour 2 background).
+- **White flash** (fixed): NES rendering-off no longer turns the GB LCD off. The LCD stays
+  on with the screen masked to the backdrop and sprites off (`VLCD` = 1, `vbl_regs`);
+  VRAM writes go through the queue and are drained in bursts in every H-Blank while
+  masked (`q_burst`, `q_block_b`: 2 entries / 8 bytes per line at normal speed, 5 / 16 in
+  double speed); map writes are left out and the map rebuilt from the nametable shadow
+  when shown (`map_skip`, `map_rebuild`), the LCD-off fast paths run while masked
+  (`fast_ok`); when the NES turns rendering on: DMG shading of the changed cells, CGB the
+  palette numbers of every cell from the shadows (`cgb_attr_all`, burst version), then
+  the screen is unmasked in a V-Blank once the queue is empty. Fixed with it: map rows
+  16-29 were rebuilt two cells to the right (`swap` of a row number >= 16); CGB attribute
+  writes while masked are left to the rebuild (not applied one by one).
+  Found with Gambatte shot sheets of the story scenes (2026-11-23) and fixed: (1) a burst
+  wrote more queue entries than an H-Blank holds (5 x ~34 M-cycles in double speed), so
+  the last ones landed in mode 3 and were dropped (save-slot screen with holes): one sync
+  helper `hb_sync` for every burst (H-Blank start, or V-Blank lines 144-150 only), 3
+  entries per H-Blank on CGB, 1 on DMG, 16 inside the V-Blank; (2) the V-Blank handler ran
+  the tile HDMA and the queue while the main thread had VRAM bank 1 selected (palette
+  numbers being rebuilt), so tiles (the font after a battle: names, letters) went to bank
+  1: the handler now selects bank 0 and restores it; (3) writes queued before the mask
+  were drained after the map rebuild and overwrote it: the queue is emptied first
+  (`q_empty`).
+  Checks: CGB VRAM (tiles, map, palette numbers) equal to the pre-masked build at 7
+  points; firstdiff random 1 DMG / CGB, random 2, save scenario identical; lagcheck
+  random 1: DMG -2.4%, CGB -4.2% (CGB transitions now shorter than before: worst
+  +18 vs +24 GB frames).
+- **Music** (fixed, 2026-11-23): the GB music engine writes exactly the NSF reference's
+  register stream (prelude: 1860 frames identical; battle theme: identical values), and
+  Gambatte's DMG / CGB output follows the NES volumes and pitches. The fault was the
+  timing: the game runs the music update after its frame waits (field) or from the battle
+  NMI handler, and after a long frame the catch-up pacing runs up to 8 waits in one GB
+  frame, so the music played up to 8 times as fast (bursts after every battle phase and
+  screen load). Now the three calls of the update (fix:FA53, C754, C74B) only count an
+  update owed (`hle_musreq`), and `mus_drain` (frame wait, battle waits) plays one per GB
+  frame (at most 8 owed). The NES's own pauses of the battle music are kept. Tools
+  (scratchpad only, the NSF is never committed): NSF -> register stream (py65), NES and
+  GB register streams per frame, NES APU synthesis vs Gambatte WAV (`gbrun --wav`).
+
 ## Remaining (brief's milestones)
 1. ~~Setup~~ (done, see above).
 2. ~~English patch → source mapping~~ (plan §2, approved).

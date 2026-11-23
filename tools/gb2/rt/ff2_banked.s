@@ -374,7 +374,7 @@ dmg_maps_b: push bc
 .cl:        ld [hl+], a
             dec b
             jr nz, .cl
-            ldh a, [lcd_on]                 ; (LCD on: USEDIX kept, retile_b adds to it; the
+            ldh a, [shade_on]                 ; (LCD on: USEDIX kept, retile_b adds to it; the
             and a                           ;   full scan only with the LCD off: screen
             jr nz, .utx                     ;   loads)
             ld hl, USEDIX                   ; colour indices the tiles coded for each palette
@@ -764,8 +764,7 @@ hle_mapupd_b:
             and $E0
             ld [MU_WL], a
             ld b, 0
-            ldh a, [lcd_on]                 ; LCD off: the cells inline (.coff)
-            and a
+            call fast_ok                    ; LCD off (or masked): the cells inline (.coff)
             jr nz, .vl
 .vo:        ld a, [MU_N]
             cp b
@@ -847,8 +846,7 @@ hle_mapupd_b:
             and $1F
             ld [MU_WL], a
             ld b, 0
-            ldh a, [lcd_on]                 ; LCD off: the cells inline (.coff)
-            and a
+            call fast_ok                    ; LCD off (or masked): the cells inline (.coff)
             jr nz, .hl
 .ho:        ld a, [MU_N]
             cp b
@@ -879,13 +877,17 @@ hle_mapupd_b:
 ; LCD off: tile A to the cell at NES address (D, E): GB map, shadow, owner bit (own1 counted;
 ; CGB: CGB_SCAN on a change). Keeps B, D, E.
 .coff:      ld c, a
+            ld l, e
+            ldh a, [lcd_on]                 ; (masked: no map write)
+            and a
+            jr nz, .cnm
             ld a, d
             and 3
             add a, $98
             ld h, a
             ld l, e
             ld [hl], c
-            ld a, d
+.cnm:       ld a, d
             and 7
             add a, high(NT_SH)
             ld h, a
@@ -1030,9 +1032,8 @@ mu_write:   push bc
             push de
             push hl
             ld [MU_T], a
-            ldh a, [lcd_on]                 ; LCD off: GB map, shadow, owner bit directly
-            and a
-            jp z, .off
+            call fast_ok                    ; LCD off (or masked): shadow, owner bit (and the
+            jp z, .off                      ;   GB map with the LCD off) directly
             ld a, d                         ; B = offset high (0-3), C = 4 for nametable 1,
             and 4                           ;   L = offset low
             ld c, a
@@ -1060,7 +1061,7 @@ mu_write:   push bc
             ldh a, [is_cgb]                 ; CGB: no shading
             and a
             jr nz, .vram
-            ldh a, [lcd_on]                 ; (LCD off: the scan when it goes on)
+            ldh a, [shade_on]                 ; (LCD off: the scan when it goes on)
             and a
             jr nz, .sh
             inc a
@@ -1103,7 +1104,9 @@ mu_write:   push bc
             jr nz, .q
             ld [hl], d
             jr .x
-.q:         ldh a, [q_tail]
+.q:         call map_skip                   ; (masked: map rebuilt when shown)
+            jr c, .x
+            ldh a, [q_tail]
             ld e, a
             inc a
             ld b, a
@@ -1128,14 +1131,19 @@ mu_write:   push bc
             pop bc
             ret
 
-.off:       ld a, d                         ; GB map $9800 + offset (rows 0-29)
+.off:       ld a, [MU_T]
+            ld b, a
+            ld l, e
+            ldh a, [lcd_on]                 ; GB map $9800 + offset (rows 0-29; masked: no)
+            and a
+            jr nz, .onm
+            ld a, d
             and 3
             add a, $98
             ld h, a
             ld l, e
-            ld a, [MU_T]
-            ld [hl], a
-            ld b, a
+            ld [hl], b
+.onm:
             ld a, d                         ; shadow (+ $400 for nametable 1)
             and 7
             add a, high(NT_SH)
@@ -1228,7 +1236,7 @@ mu_attr:    push bc
             cp [hl]
             jr z, .x
             ld [hl], a
-            ldh a, [lcd_on]
+            ldh a, [shade_on]
             and a
             jr nz, .on
             inc a
@@ -1337,7 +1345,15 @@ hle_vtile_b:
             xor a
             ld [$4000], a
             ld a, d
-            call dmg_markw
+            ldh a, [shade_on]                 ; LCD on: coded now, into the VRAM queue
+            and a
+            ld a, d
+            jr z, .mk
+            push de
+            call vt_code2
+            pop de
+            jr .done
+.mk:        call dmg_markw
             jr .done
 .cgb:       ldh a, [lcd_on]
             and a
@@ -2120,7 +2136,12 @@ cgb_attr_all_b:
             ld [SC_OW], a
             ld d, 0
 .r:         call sc_row
-            ld a, d                         ; HL = $9800 + row * 32
+            ldh a, [lcd_on]                 ; masked (LCD on): the row into TBLK, then copied
+            and a                           ;   into VRAM bank 1 in bursts (.rn)
+            jr z, .rv
+            ld hl, TBLK
+            jr .rh
+.rv:        ld a, d                         ; HL = $9800 + row * 32
             and 7
             swap a
             add a, a
@@ -2131,6 +2152,7 @@ cgb_attr_all_b:
             srl a
             add a, $98
             ld h, a
+.rh:
             ld a, [SC_OW]                   ; no cell of the row nametable 1's, no override:
             ld b, a                         ;   each attribute byte gives 4 cells at once
             ld a, [OVR_ON]
@@ -2218,7 +2240,60 @@ cgb_attr_all_b:
             inc e
             bit 5, e
             jr z, .c
-.rn:        inc d
+.rn:        ldh a, [lcd_on]                 ; masked: TBLK -> VRAM bank 1 row, 8 bytes at
+            and a                           ;   the start of each hblank
+            jr z, .rn2
+            push de
+            ld a, d
+            and 7
+            swap a
+            add a, a
+            ld e, a
+            ld a, d
+            srl a
+            srl a
+            srl a
+            add a, $98
+            ld d, a
+            ld hl, TBLK
+            ld c, 4
+.rb:        di
+            ld a, 1                         ; (VRAM bank 1 again: an interrupt between the
+            ldh [$FF4F], a                  ;   bursts may have selected bank 0)
+            call hb_sync
+.rc:        ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            xor a
+            ldh [$FF4F], a
+            ei
+            dec c
+            jr nz, .rb
+            ld a, 1
+            ldh [$FF4F], a
+            pop de
+.rn2:       inc d
             ld a, d
             cp 30
             jr nz, .r
@@ -3230,16 +3305,19 @@ hle_ntclr0_b:
             ldh [ppu_vl], a
             ld a, $20
             ldh [ppu_vh], a
-            ldh a, [lcd_on]
-            and a
+            call fast_ok                    ; (LCD off or masked)
             jr nz, .gen
             ldh a, [ppu_ctrl]
             and 4
             jr nz, .gen
             ld hl, NT_SH                    ; shadow tiles
             call .z960
-            ld hl, $9800                    ; GB map rows 0-29
+            ldh a, [lcd_on]                 ; GB map rows 0-29 (masked: rebuilt when shown)
+            and a
+            jr nz, .nomap
+            ld hl, $9800
             call .z960
+.nomap:
             ldh a, [own1_lo]                ; owners: B = nametable 1 owned cells
             ld b, a
             ldh a, [own1_hi]

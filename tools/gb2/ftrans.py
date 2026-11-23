@@ -115,10 +115,21 @@ class Program:
         rc.dyn = rc.dyn_targets()
         self.ops = {k: lift(rc, k) for k in rc.insns}
         self.entries = self.find_entries()
-        self.routines = {e: self.walk(e) for e in sorted(self.entries)}
-        self.owner = defaultdict(set)            # key -> routine entries containing it
-        for e, r in self.routines.items():
-            for k in r.keys: self.owner[k].add(e)
+        preds = defaultdict(set)
+        for k in rc.insns:
+            for s2 in self.out(k):
+                if s2 is not None: preds[s2].add(k)
+        while True:                              # code reached from several routines: its own
+            self.routines = {e: self.walk(e) for e in sorted(self.entries)}   # routine
+            self.owner = defaultdict(set)        # key -> routine entries containing it
+            for e, r in self.routines.items():
+                for k in r.keys: self.owner[k].add(e)
+            new = set()
+            for k, ow in self.owner.items():
+                if len(ow) > 1 and any(self.owner.get(p) != ow for p in preds[k]):
+                    new.add(k)
+            if not new: break
+            self.entries |= new
         self.callers = defaultdict(set)
         for e, r in self.routines.items():
             for c in r.calls: self.callers[c].add(e)

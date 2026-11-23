@@ -683,7 +683,7 @@ spl_chr:    and $3F
 ; bank mapped at $4000): (zp),Y reads straight from the mapped bank when the pointer is in
 ; its window, else as rt_izy_rd. L = zp pointer, C = Y (B = 0) -> L = the byte; A, F, BC,
 ; DE kept.
-section bank 0, $25C0
+section bank 0, $3900
 rt_izy_rd8m:                                ; data bank = the NES bank at $8000-$BFFF
             push af
             ld h, high(NES_RAM)
@@ -1051,5 +1051,449 @@ hle_apuout_b:
             ld l, 0
             inc l
             dec l                           ; Z = 1, C = 1
+            ret
+
+; ---- masked screen (rt_ppu_w1 / q_drain1, rt/runtime.s): bank 0
+section bank 0, $3400
+; Masked screen (VLCD, sprites off: mode 3 stays short): at the start of an hblank (mode
+; 3 -> 0 edge) VRAM is free for the hblank and the next line's mode 2 (>= ~64 M-cycles at
+; normal speed, twice that in double speed): Q_BURST entries then (2 / 5 in double speed),
+; a tile block alone (two bytes per free moment). Interrupts off (caller). Keeps nothing.
+q_burst:    ldh a, [q_tail]
+            ld d, a
+            ldh a, [q_head]
+            ld e, a
+            cp d
+            ret z
+            call hb_sync                    ; (an entry costs ~34 M-cycles: 3 per H-Blank
+            ld b, 16                        ;   and OAM scan in double speed, 1 at normal
+            jr c, .lp                       ;   speed; 16 inside the V-Blank)
+            ld b, 1
+            ldh a, [is_cgb]
+            and a
+            jr z, .lp
+            ld b, 3
+.lp:        ld h, high(QV)
+            ld l, e
+            ld c, [hl]
+            dec h
+            ld a, [hl]
+            dec h
+            ld h, [hl]
+            ld l, a
+            inc h
+            dec h
+            jr z, .blk
+            bit 6, h
+            jr nz, .b1
+            ld [hl], c
+            jr .nx
+.b1:        res 6, h
+            ld a, 1
+            ldh [$FF4F], a
+            ld [hl], c
+            xor a
+            ldh [$FF4F], a
+.nx:        inc e
+            ld a, e
+            cp d
+            jr z, .done
+            dec b
+            jr nz, .lp
+.done:      ld a, e
+            ldh [q_head], a
+            ret
+.blk:       call q_block_b
+            inc e
+            jr .done
+
+; masked: a tile block (TBLK, VRAM address HL low / C high as q_block) in bursts: 8 bytes at
+; the start of each hblank (16 in double speed). Interrupts off. Keeps DE.
+q_block_b:  push de
+            ld d, c
+            ld a, l
+            and $F0
+            ld e, a
+            ld a, l
+            and 7
+            swap a
+            add a, low(TBLK)
+            ld l, a
+            ld h, high(TBLK)
+            ld b, 2
+            ldh a, [is_cgb]
+            and a
+            jr z, .s
+            ld b, 1
+.s:         ld c, 8                         ; bytes per burst: 8, or 16 in one go
+            dec b
+            jr nz, .w3
+            ldh a, [is_cgb]
+            and a
+            jr z, .w3
+            ld c, 16
+.w3:        call hb_sync
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec c
+            jr nz, .cp
+            ld a, e
+            and $0F
+            jr nz, .s
+            ld hl, TB_H
+            inc [hl]
+            pop de
+            ret
+
+
+; HL = VRAM address of a queued write: carry set if it is a map cell of rows 0-29 written
+; while masked (VLCD 1): not queued, MAP_DIRTY set (map_rebuild when shown). Keeps all but F.
+map_skip:   push af
+            ld a, [VLCD]
+            cp 1
+            jr nz, .no
+            ld a, h
+            sub $98
+            cp 4
+            jr nc, .no
+            cp 3
+            jr c, .yes
+            ld a, l
+            cp $C0
+            jr nc, .no
+.yes:       ld a, 1
+            ld [MAP_DIRTY], a
+            pop af
+            scf
+            ret
+.no:        pop af
+            and a
+            ret
+
+; the GB map rows 0-29 from the nametable shadow (each cell from the nametable that drew
+; it, OWN) through the queue (masked screen shown again)
+map_rebuild:
+            xor a
+            ld [MAP_DIRTY], a
+            ld [MB_ROW], a
+.row:       ld a, [MB_ROW]                  ; per row: all 32 cells from one nametable (its
+            add a, a                        ;   4 owner bytes 0 or $FF): that shadow row
+            add a, a                        ;   straight into the map, 8 bytes at the start
+            ld l, a                         ;   of each hblank (the screen is masked); a
+            ld h, high(OWN)                 ;   mixed row cell by cell through the queue
+            ld a, [hl+]
+            ld b, a
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            ld c, a                         ; C = OR of the 4
+            ld a, b
+            and [hl]
+            dec l
+            and [hl]
+            dec l
+            and [hl]                        ; A = AND
+            ld d, 0                         ; D = nametable page offset (0 / 4)
+            inc a
+            jr z, .n1                       ; all $FF: nametable 1
+            ld a, c
+            and a
+            jr nz, .mixed
+            jr .cp0
+.n1:        ld d, 4
+.cp0:       ld a, [MB_ROW]                  ; HL = shadow row, DE = map row
+            and 7
+            swap a
+            add a, a                        ; (row * 32: low byte / high bits)
+            ld l, a
+            ld a, [MB_ROW]
+            rrca
+            rrca
+            rrca
+            and 3
+            ld b, a
+            add a, high(NT_SH)
+            add a, d
+            ld h, a
+            ld a, b
+            add a, $98
+            ld d, a
+            ld e, l
+            ld c, 4
+.blk:       di
+.w3:        call hb_sync
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ei
+            dec c
+            jr nz, .blk
+            jr .next
+.mixed:     ld a, [MB_ROW]                  ; the row's 32 tiles, each from the nametable
+            and 7
+            swap a                          ;   that drew it, into a buffer on the stack;
+            add a, a                        ;   then as above
+            ld [MB_LO], a
+            ld a, [MB_ROW]
+            rrca
+            rrca
+            rrca
+            and 3
+            ld [MB_HI], a
+            ld a, [MB_ROW]
+            add a, a
+            add a, a
+            ld [MB_OI], a
+            add sp, -32
+            ld hl, sp + 0
+            ld d, h
+            ld e, l                         ; DE = buffer
+            ld c, 0                         ; C = cell 0-31
+.mc:        ld a, c
+            and 7
+            jr nz, .mb
+            ld a, [MB_OI]                   ; next owner byte (bit 0 = this cell)
+            ld l, a
+            ld h, high(OWN)
+            ld b, [hl]
+            inc a
+            ld [MB_OI], a
+.mb:        ld a, [MB_HI]
+            add a, high(NT_SH)
+            srl b
+            jr nc, .m0
+            add a, 4
+.m0:        ld h, a
+            ld a, [MB_LO]
+            add a, c
+            ld l, a
+            ld a, [hl]
+            ld [de], a
+            inc de
+            inc c
+            ld a, c
+            cp 32
+            jr nz, .mc
+            ld hl, sp + 0
+            ld a, [MB_HI]
+            add a, $98
+            ld d, a
+            ld a, [MB_LO]
+            ld e, a
+            ld c, 4
+.mbk:       di
+            call hb_sync
+.vc:        ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ei
+            dec c
+            jr nz, .mbk
+            add sp, 32
+.next:      ld a, [MB_ROW]
+            inc a
+            ld [MB_ROW], a
+            cp 30
+            jr c, .row
+            ret
+
+; masked screen shown again (rt_ppu_w1): DMG: the cells drawn while masked shaded as at an
+; LCD-on (palettes of the map's cells, palette maps, re-coding of the marked tiles; the
+; VRAM writes go through the queue), shading per write again. CGB: nothing (its attribute
+; and tile writes went through the queue / HDMA all along).
+shade_show: ldh a, [is_cgb]
+            and a
+            jr z, .dmg
+            call cgb_attr_all               ; CGB: every cell's palette (VRAM bank 1 in bursts)
+            jr .x
+.dmg:
+            ld a, [TSET_PEND]
+            and a
+            call nz, tset_fix
+            ldh a, [dmg_scan]
+            push af
+            and a
+            jr z, .nsc
+            call dmg_scan_all
+            ld a, 1
+            ldh [maps_due], a
+.nsc:       ldh a, [maps_due]
+            and a
+            call nz, dmg_maps_now
+            pop af
+            and a
+            jr z, .nsr
+            call dmg_retile_ref
+            jr .x
+.nsr:       ld b, 0
+            call dmg_retile_some
+.x:         ld a, 1
+            ldh [shade_on], a
+            ret
+
+; interrupts off: return at the start of an H-Blank (carry clear), or at once inside the
+; V-Blank lines 144-150 (carry set: a few lines to spare). Keeps all but A, F.
+hb_sync:    ldh a, [$FF41]
+            and 3
+            cp 1
+            jr nz, .nv
+            ldh a, [$FF44]
+            cp 151
+            ret c                           ; (C: lines 144-150)
+            jr hb_sync
+.nv:        cp 3
+            jr nz, hb_sync
+.w0:        ldh a, [$FF41]
+            and 3
+            cp 3
+            jr z, .w0
+            and a
+            ret
+
+; masked: every queued VRAM write done now (H-Blank bursts). Keeps all but A, F, B.
+q_empty:    ldh a, [q_head]
+            ld b, a
+            ldh a, [q_tail]
+            cp b
+            ret z
+            call q_drain1
+            jr q_empty
+
+; Z set: an LCD-off fast path may run (LCD off; or masked while the NES renders nothing: its
+; map writes are left out then and the map is rebuilt when shown, MAP_DIRTY). Keeps all but A, F.
+fast_ok:    ldh a, [lcd_on]
+            and a
+            ret z
+            ld a, [VLCD]
+            cp 1
+            ret nz
+            ld [MAP_DIRTY], a
+            xor a                           ; (Z)
+            ret
+
+; ---- music pacing: bank 0
+section bank 0, $3930
+; ---- the music update (b13:9800) in real time. The game runs it after its frame waits (field)
+; or from the battle NMI handler; on the GB several waits can pass in one GB frame (catch-up
+; after a long frame), which played the music several times as fast. Its calls only count
+; an update owed (hle_musreq); mus_drain (frame wait, battle waits) plays one per GB frame.
+; The sound driver's RAM ($B0-$EF, $6F00-$6F5D) runs on its own time, as before.
+; Exit as the routine's usual path: X = 3, Y = 12, Z = 1, C = 1, N = 0.
+hle_musreq: ld a, [MUS_CR]
+            cp MUS_MAX
+            jr nc, .x
+            inc a
+            ld [MUS_CR], a
+.x:         ld e, 3
+            ld c, 12
+            xor a
+            ldh [nzv], a
+            scf
+            ret
+
+; all registers and the runtime's scratch kept
+mus_drain:  push af
+            ld a, [MUS_CR]
+            and a
+            jr z, .x
+            push hl
+            ld a, [VBL_CNT]
+            ld hl, MUS_VBL
+            cp [hl]
+            jr z, .xh
+            ld [hl], a
+            ld hl, MUS_CR
+            dec [hl]
+            push bc
+            push de
+            ldh a, [nzv]
+            ld h, a
+            ldh a, [vfl]
+            ld l, a
+            push hl
+            ldh a, [sv_a]
+            ld h, a
+            ldh a, [wtmp]
+            ld l, a
+            push hl
+            ldh a, [tmp_lo]
+            ld h, a
+            ldh a, [fc_bank]
+            ld l, a
+            push hl
+            ldh a, [nes_bank8]
+            push af
+            ld a, $0D                       ; (NES bank 13 at $8000, as fix:C74F)
+            call hle_bank
+            ld bc, 0
+            rst $08
+            db DATA + 13
+            dw L_b13_9800
+            pop af
+            call hle_bank
+            pop hl
+            ld a, h
+            ldh [tmp_lo], a
+            ld a, l
+            ldh [fc_bank], a
+            pop hl
+            ld a, h
+            ldh [sv_a], a
+            ld a, l
+            ldh [wtmp], a
+            pop hl
+            ld a, h
+            ldh [nzv], a
+            ld a, l
+            ldh [vfl], a
+            pop de
+            pop bc
+.xh:        pop hl
+.x:         pop af
             ret
 

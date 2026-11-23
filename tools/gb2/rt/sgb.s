@@ -209,6 +209,9 @@ sgb_frame:  call sgb_scroll
             ldh a, [lcd_on]                 ; blanked: nothing while the LCD is off (the
             and a                           ;   screen is being drawn); once it is on, one
             jr z, .x                        ;   fresh build (it replaces anything pending)
+            ld a, [VLCD]                    ;   (masked: as off)
+            and a
+            jr nz, .x
             ld a, 3
             ldh [sgb_mask], a
             call sgb_build_far
@@ -392,6 +395,9 @@ sgb_scroll: push bc
             ldh a, [lcd_on]
             and a
             jr z, .save
+            ld a, [VLCD]                    ; (masked: as off)
+            and a
+            jr nz, .save
             ld a, [SGB_LSX]
             cp b
             jr nz, .mv

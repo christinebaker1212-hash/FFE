@@ -272,7 +272,7 @@ nt_tile:    ld a, h
             ldh a, [sh_same]
             and a
             jr nz, .map
-            ldh a, [lcd_on]
+            ldh a, [shade_on]
             and a
             jr nz, .cell
             inc a
@@ -804,7 +804,7 @@ mapattr_b:  xor a
             ldh a, [is_cgb]                 ; DMG with the LCD on: the fast path
             and a
             jr nz, .gen
-            ldh a, [lcd_on]
+            ldh a, [shade_on]
             and a
             jr z, .gen
             ld a, b
@@ -1571,6 +1571,141 @@ vt_code:    push bc
             pop bc
             ret
 
+
+; FF2 vtile (hle_vtile_b, LCD on): as vt_code for FF2's text tiles (ink colour 3 on colour
+; 2: plane 0 rows in VT_BUF, plane 1 $FF): coded at once for its palette into a block in the
+; VRAM queue, so it reaches VRAM before the row that shows it (the deferred re-coding took
+; several frames: message lines showed the party window's old letters).
+vt_code2:   push bc
+            push de
+            push hl
+            ldh [sh_tile], a
+            ld e, a
+            ld l, a                         ; PAL_MAP row of its palette: v0, v3
+            ld h, high(TILE_PAL)
+            ld a, [hl]
+            and 3
+            add a, a
+            add a, a
+            add a, low(PAL_MAP)
+            ld l, a
+            ld h, high(PAL_MAP)
+            inc l
+            inc l
+            ld a, [hl+]
+            ld b, a                         ; B = v2 (FF2 text: background colour 2)
+            ld c, [hl]                      ; C = v3
+            push de
+            call blk_alloc
+            ld h, d
+            ld l, e                         ; HL = block
+            pop de
+            push de
+            ld de, $CCD0                    ; (FF2 VT_BUF, rt/ff2_banked.s)
+            ld a, 8
+            ld [RM + 8], a
+            xor a
+            ld [RM], a                      ; (any pixel set)
+.row:       ld a, [de]
+            inc e
+            push de
+            ld d, a                         ; D = pixels
+            ld a, [RM]
+            or d
+            ld [RM], a
+            ld e, 0                         ; plane 0: v3 bit 0 where set, v2 bit 0 elsewhere
+            bit 0, c
+            jr z, .a0
+            ld e, d
+.a0:        bit 0, b
+            jr z, .b0
+            ld a, d
+            cpl
+            or e
+            ld e, a
+.b0:        ld [hl], e
+            inc l
+            ld e, 0                         ; plane 1
+            bit 1, c
+            jr z, .a1
+            ld e, d
+.a1:        bit 1, b
+            jr z, .b1
+            ld a, d
+            cpl
+            or e
+            ld e, a
+.b1:        ld [hl], e
+            inc l
+            pop de
+            ld a, [RM + 8]
+            dec a
+            ld [RM + 8], a
+            jr nz, .row
+            pop de                          ; E = tile
+            ld a, e                         ; TILE_USE nibble: index 3 if a pixel is set
+            srl a
+            add a, low(TILE_USE)
+            ld l, a
+            ld h, high(TILE_USE)
+            ld a, [RM]
+            and a
+            ld a, 4                         ; (index 2 always, 3 if a pixel is set)
+            jr z, .nu
+            ld a, 12
+.nu:        bit 0, e
+            jr z, .ulo
+            swap a
+            ld d, a
+            ld a, [hl]
+            and $0F
+            jr .ust
+.ulo:       ld d, a
+            ld a, [hl]
+            and $F0
+.ust:       or d
+            ld [hl], a
+            ld a, e                         ; CODED: its key for this palette
+            push de
+            ld l, a
+            ld h, high(TILE_PAL)
+            ld a, [hl]
+            and 3
+            add a, a
+            add a, a
+            add a, low(PAL_MAP)
+            ld l, a
+            ld h, high(PAL_MAP)
+            ld bc, 0
+            ld d, 1
+.m:         ld a, [hl+]
+            rrca
+            jr nc, .n0
+            push af
+            ld a, b
+            or d
+            ld b, a
+            pop af
+.n0:        rrca
+            jr nc, .n1
+            ld a, c
+            or d
+            ld c, a
+.n1:        sla d
+            ld a, d
+            cp 16
+            jr nz, .m
+            pop de
+            call tkey_bc
+            ld l, e
+            ld h, high(CODED)
+            ld [hl], a
+            call blk_send
+            pop hl
+            pop de
+            pop bc
+            ret
+
 ; HL = a TBLK block with a tile in GB byte order: each row through the masks at RM (rt_anf)
 ; in place; sh_u1..3 = pixels of colour index 1..3 (any row). Keeps nothing.
 anf_rows:   ld a, 8
@@ -1885,7 +2020,7 @@ nt_attr:    ld a, h
             ldh a, [is_cgb]
             and a
             jr z, .dmg
-            ldh a, [lcd_on]
+            ldh a, [shade_on]               ; (LCD off / masked: all cells' palettes when shown)
             and a
             jr nz, .cat
             ld a, 1
@@ -1893,7 +2028,7 @@ nt_attr:    ld a, h
             ret
 .cat:       ld a, b
             jp attr_apply
-.dmg:       ldh a, [lcd_on]
+.dmg:       ldh a, [shade_on]
             and a
             jr nz, .dat
             ld a, 1

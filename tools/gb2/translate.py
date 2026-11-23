@@ -26,7 +26,7 @@ RT_TABLES = DATA + 32       # runtime tables (sound)
 CODE0 = DATA + 33           # first GB bank holding recompiled code
 BANK_LIMIT = 0x4000 - 8     # bytes per code bank (room for a closing jump)
 HOME_BASE = 0x1000          # bank_of value of home code: HOME_BASE + its data bank (code in bank 0)
-HOME_ORG, HOME_END = 0x2600, 0x3680   # bank-0 area for home code (rt/native_layer.s helpers below, rt/ff2_pal.s after)
+HOME_ORG, HOME_END = 0x2800, 0x3400   # bank-0 area for home code (rt/native_layer.s helpers below, rt/ff2_pal.s after)
 ALL = frozenset('NZCV')
 # FF2: flags assumed live where control goes somewhere unknown (dynamic jumps / calls, returns to
 # them): not V. Every BVC / BVS in FF2 tests V from a BIT just before it (b11:9C32, A076, B102,
@@ -96,6 +96,11 @@ class FF2:
     #   follows), b11:A073 (wait for the end of vblank before a timed raster loop). No wait
     #   on the GB, V as the loop leaves it; the split itself is the battle layout's job.
     idioms = {('fix', 0xFA91): ('rt_call_ind40', 0xFA9A, 'NZ'),
+              # the three calls of the music update b13:9800 (fix:FA53 in the battle NMI's sound
+              # update, C754, and C74B's tail jump, resuming at the RTS C74E): one update owed,
+              # played by mus_drain at most once per GB frame (rt/native_layer.s)
+              ('fix', 0xFA53): ('hle_musreq', 0xFA56, 'NZC'), ('fix', 0xC754): ('hle_musreq', 0xC757, 'NZC'),
+              ('fix', 0xC74B): ('hle_musreq', 0xC74E, 'NZC'),
               ('fix', 0xFD46): ('rt_s0_clear', 0xFD4B, 'NZV'), ('fix', 0xFD5B): ('rt_s0_hit', 0xFD60, 'NZV'),
               ('b11', 0xA073): ('rt_s0_clear', 0xA078, 'NZV'),
               # LDA $AC / BNE (wait until the battle NMI handler has run): rt_ac_wait
@@ -131,6 +136,8 @@ class FF2:
     # battle NMI handlers (run by rt_nmi_run through the dynamic table; RTI = ret)
     nmi_handlers = [('b12', 0x9A79), ('b05', 0xA9A2)]
     idiom_code = {('fix', 0xFA91): bytes.fromhex('a9fa48a999486c4000'),
+                  ('fix', 0xFA53): bytes.fromhex('200098'), ('fix', 0xC754): bytes.fromhex('200098'),
+                  ('fix', 0xC74B): bytes.fromhex('4c009860'),
                   ('fix', 0xF565): bytes.fromhex('a5628d0620a5618d0620a5618580a2008e0720e680a580291fd0f5'),
                   ('fix', 0xF5D4): bytes.fromhex('2c0220a5628d0620a5618d0620a2808e0720e680a580291fd0f5'),
                   ('fix', 0xF632): bytes.fromhex('a9088d0620a9008d0620a200bd50038d0720e8e01090f5'),
