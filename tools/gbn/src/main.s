@@ -2230,6 +2230,8 @@ fade_in:    ld a, [fd_in]
             inc a
             cp 5
             jr c, .l
+            xor a                           ; (a white fade-in once only)
+            ld [fd_wh], a
             ret
 .dmg:       ld a, 2
 .dl:        ld [fd_lv], a
@@ -2327,6 +2329,9 @@ fd_scale:   ld hl, fd_pal
             ret
 fd_mul:     push bc
             ld c, a
+            ld a, [fd_wh]                   ; (from white: c + (31 - c) (4 - lv) / 4)
+            and a
+            jr nz, fd_mulw
             ld a, [fd_lv]
             ld b, a
             xor a
@@ -2349,6 +2354,27 @@ fd_dmgw:    ld a, [fd_b]
             ld a, [fd_o1]
             call fd_light
             ldh [rOBP1], a
+            ret
+fd_mulw:    push de
+            ld a, 31
+            sub c
+            ld d, a
+            ld a, [fd_lv]
+            ld b, a
+            ld a, 4
+            sub b
+            ld b, a
+            xor a
+            inc b
+.m:         dec b
+            jr z, .x
+            add a, d
+            jr .m
+.x:         srl a
+            srl a
+            add a, c
+            pop de
+            pop bc
             ret
 fd_light:   ld c, a
             ld e, 0
@@ -2391,12 +2417,25 @@ fd_on_cgb:  ld hl, sh_pal                   ; (in the V-Blank: BG from the shado
             ld a, $80
             ldh [rBCPS], a
             ldh [$FF6A], a
+            ld a, [fd_wh]                   ; (after the encounter transition: from white)
+            and a
+            jr nz, .zw
             xor a
             ld b, 64
 .z:         ldh [rBCPD], a
             ldh [$FF6B], a
             dec b
             jr nz, .z
+            ret
+.zw:        ld b, 32
+.zwl:       ld a, $FF
+            ldh [rBCPD], a
+            ldh [$FF6B], a
+            ld a, $7F
+            ldh [rBCPD], a
+            ldh [$FF6B], a
+            dec b
+            jr nz, .zwl
             ret
 fd_on_off:  ldh a, [is_cgb]                 ; (the LCD off: only the first screen after
             and a                           ;   power-on or a soft reset; the Color shows
@@ -2736,8 +2775,8 @@ enc_form:   ld l, a
             jp far_byte
 ; a battle with formation A, then the map again (C set: the step handled); lost: game over
 do_battle:  ld [btl_fid], a
-            ld a, SCR_BANK                  ; FF1 BattleTransition (the field's flashing, noise)
-            ld hl, bt_trans
+            ld a, F3_BANK                   ; the encounter transition (owner, 2026-11-22; loc.s)
+            ld hl, bt_trans2
             call bank_call
             ld a, BTL_BANK
             ld hl, battle
@@ -3443,6 +3482,9 @@ lcd_off:    ld a, [bn_t]                    ; (the place-name banner: gone)
             jr z, .rd
             ld a, $80
             ldh [rBCPS], a
+            ld a, [fd_wh]                   ; (after the encounter transition: white)
+            and a
+            jr nz, .bw
             ld b, 8
             xor a
 .bk:
@@ -3456,6 +3498,14 @@ lcd_off:    ld a, [bn_t]                    ; (the place-name banner: gone)
             ldh [rBCPD], a
             dec b
             jr nz, .bk
+            jr .nc
+.bw:        ld b, 32
+.bwl:       ld a, $FF
+            ldh [rBCPD], a
+            ld a, $7F
+            ldh [rBCPD], a
+            dec b
+            jr nz, .bwl
 .nc:        ldh a, [rSTAT]
             and $78
             ld [sh_stat], a

@@ -410,6 +410,9 @@ box_vbl:    ld a, [box_on]
 
 ; STAT (LYC = 64): the window off below the box
 stat_int:   push af
+            ld a, [rx_on]                   ; (the encounter transition: a line's scroll, loc.s)
+            and a
+            jr nz, stat_rx
             ld a, [lmask]                   ; (a masked load: held through mode 3)
             and a
             jr nz, .gd
@@ -625,6 +628,24 @@ pt_tick:    ld a, [pt_on]
             ret
 
 
+; the encounter transition (STAT mode 0 each line): the next line's SCX, SCY from rx_ptr
+stat_rx:    push hl
+            ld hl, rx_ptr
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, [hl+]
+            ldh [rSCX], a
+            ld a, [hl+]
+            ldh [rSCY], a
+            ld a, l
+            ld [rx_ptr], a
+            ld a, h
+            ld [rx_ptr + 1], a
+            pop hl
+            pop af
+            reti
+
 section wram, $CB00
 win_buf:    ds 160
 section wram, $CC00
@@ -647,3 +668,6 @@ dlg_ptr:    ds 2
 bn_t:       ds 1                            ; the place-name banner (loc.s): frames left,
 bn_last:    ds 1                            ;   the last place shown (+ 1), a new map loaded
 bn_req:     ds 1
+rx_on:      ds 1                            ; the encounter transition's raster: on, the next
+rx_ptr:     ds 2                            ;   line's SCX / SCY
+fd_wh:      ds 1                            ; a load masked / faded in from white (the Color)

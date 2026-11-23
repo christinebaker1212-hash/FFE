@@ -124,6 +124,7 @@ def data_banks(rom, ff3=None, init=None):
     for b, blob in battle.chr_banks(rom).items(): banks[b] = bytearray(blob)
     for b, blob in battle.sil_banks(rom).items(): banks[b] = bytearray(blob)
     place(banks, battle.HITL_BANK, 0x4000, battle.hit_tiles())
+    place(banks, battle.TRANS_BANK, 0x4000, battle.trans_tables())
     banks[battle.BOBJ_BANK] = bytearray(battle.obj_bank(rom))
     banks[minimap.MINI_BANK] = bytearray(minimap.bank(rom))
     banks[sgb.SGB_BANK] = bytearray(sgb.bank(rom))

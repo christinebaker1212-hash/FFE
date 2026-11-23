@@ -5,6 +5,7 @@
 
 ESIL_BANK  = 100            ; enemy silhouettes (2 banks, ENEMY_CHR's layout)
 HITL_BANK  = 102            ; "n HIT(S)" labels: 3 sprite tiles each, n = 1-39
+TRANS_BANK = 103            ; the encounter transition's tables (battle.py trans_tables)
 FL_T0      = $C4            ; free BG tiles while the names window shows (it uses $A8-$C3)
 HL_OAM     = oam_buf + 128  ; the label: OAM 32-34 (the damage number: 35-39)
 HL_T0      = $F4            ; its tiles ($F4: "MISS!" only, never shown with a label)
@@ -542,6 +543,70 @@ bt_dart:    ld [bt_am], a
             dec a
             jr nz, .l
             ret
+
+; ---- the party walks in from the right before the first command (owner, 2026-11-22): each
+; living member from past the screen's edge (8 pixels apart), 2 pixels a frame, FF1's walking
+; pose every 4 frames; then everyone's natural pose
+bt_walkin:  ld b, 0
+.i:         ld a, b
+            push bc
+            call ch_rec
+            pop bc
+            inc hl
+            ld a, [hl]
+            and AIL_DEAD | AIL_STONE
+            ld e, b
+            ld d, 0
+            ld hl, bt_px
+            add hl, de
+            jr nz, .n                       ; (the fallen: in place)
+            ld a, b
+            add a, a
+            add a, a
+            add a, a
+            add a, 160
+            ld [hl], a
+.n:         inc b
+            ld a, b
+            cp 4
+            jr c, .i
+            xor a
+            ld [dt_pose], a                 ; (the frame count)
+.f:         ld c, 0                         ; members still walking
+            ld b, 0
+.m:         ld e, b
+            ld d, 0
+            ld hl, bt_px
+            add hl, de
+            ld a, [hl]
+            cp PARTY_X + 1
+            jr c, .nx
+            sub 2
+            ld [hl], a
+            inc c
+            ld hl, bt_pose
+            add hl, de
+            ld a, [dt_pose]
+            and 4                           ; walk / stand every 4 frames
+            ld [hl], a
+            push bc
+            ld a, b
+            call bt_dm
+            pop bc
+.nx:        inc b
+            ld a, b
+            cp 4
+            jr c, .m
+            ld a, c
+            and a
+            jr z, .x
+            push bc
+            call bt_frame
+            pop bc
+            ld hl, dt_pose
+            inc [hl]
+            jr .f
+.x:         jp bt_party_upd
 
 section wram, $C760
 fl_b:       ds 1                            ; the flashing enemy: cell, size, first tile

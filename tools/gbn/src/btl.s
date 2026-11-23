@@ -68,6 +68,7 @@ battle:     xor a                           ; (no menu sounds, no vehicle noise)
             ld [hl], a
             call bt_screen
             call bt_draw_party
+            call bt_walkin                  ; (the party walks in: btl5.s)
             call bt_names
             call bt_run                     ; the battle (btl2.s)
             ld a, [bt_result]

@@ -328,3 +328,33 @@ def obj_bank(rom):
     a = int.from_bytes(m[0].group(1), 'little') - 0x8000
     blob[0x1000:0x1030] = b12[a:a + 0x30]
     return bytes(blob)
+
+
+TRANS_BANK = 103
+TR_TWIST, TR_SHATTER = 26, 18
+
+
+def trans_tables():
+    """the encounter transition (owner, 2026-11-22: from the WonderSwan Color remake, as raster
+    effects): per frame and screen line the SCX offset and the SCY offset (map line - screen
+    line); 26 frames of twist and zoom towards the party, 18 of 8-line strips sliding apart.
+    Then at $7200 the fade to white: 8 levels x 32 values (c + (31 - c) f / 8)"""
+    import math
+    out = bytearray(); cy = 72
+    for t in range(TR_TWIST):
+        a = 26 * (t / (TR_TWIST - 1)) ** 1.4; ph = t * 0.45; z = 1 + 0.9 * (t / (TR_TWIST - 1)) ** 2
+        dx = [a * math.sin(2 * math.pi * y / 144 * 1.3 + ph) for y in range(144)]
+        sy = [cy + (y - cy) / z for y in range(144)]
+        for y in range(144):
+            out += bytes([int(round(dx[y])) & 255, (int(sy[y]) - y) & 255])
+    for t in range(TR_SHATTER):
+        for y in range(144):
+            band = y // 8
+            sgn = 1 if band % 2 else -1
+            d = dx[y] + sgn * (3 + band % 3) * (t + 1) ** 1.5
+            out += bytes([int(round(d)) & 255, (int(sy[y]) - y) & 255])
+    assert len(out) <= 0x3200
+    out += b'\0' * (0x3200 - len(out))
+    for f in range(1, 9):
+        out += bytes(c + (31 - c) * f // 8 for c in range(32))
+    return bytes(out)

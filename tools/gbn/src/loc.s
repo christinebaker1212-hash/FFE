@@ -1645,6 +1645,420 @@ fp_mode:    ds 1                            ; the file screen: 0 load, 1 save
 fp_cur:     ds 1
 fp_k:       ds 1
 fp_buf:     ds 30
+section bank 99, $5600
+; ---- the encounter transition (owner, 2026-11-22: from the WonderSwan Color remake, as raster
+; effects any Game Boy can show): 26 frames of the map twisting and zooming towards the party,
+; 18 of its 8-line strips sliding apart while it fades to white, 6 white; the battle then
+; fades in from white. Per line SCX / SCY from battle.py trans_tables (bank TRANS_BANK), written
+; by the STAT mode-0 interrupt (stat_rx); FF1's noise as before.
+TR_BUF0    = $C200          ; (the field's queue: free now) frame buffers, 144 x (SCX, SCY)
+TR_BUF1    = $C320
+TR_PAL     = $C440          ; the faded palettes (BG 64, OBJ 64)
+TR_WT      = $C500          ; the fade table: 8 levels x 32 (page-aligned)
+TR_FR      = 44
+TR_TW      = 26
+bt_trans2:  ld a, [q_n]                     ; (the field's queue dropped)
+            ld [q_rd], a
+            ld a, $80
+            call snd_track
+            xor a
+            ld [bx_n], a
+            ld [tr_k], a
+            ld [tr_px], a
+            ldh a, [scx]
+            ld [tr_x0], a
+            ldh a, [scy]
+            ld [tr_y0], a
+            ldh a, [is_cgb]
+            and a
+            jr z, .dmg
+            call fd_vbl                     ; the colours now (read in a V-Blank)
+            ld hl, fd_pal
+            ld c, 0
+.rb:        ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            bit 6, c
+            jr z, .rb
+            ld c, 0
+.ro:        ld a, c
+            ldh [$FF6A], a
+            ldh a, [$FF6B]
+            ld [hl+], a
+            inc c
+            bit 6, c
+            jr z, .ro
+            ld hl, $7200
+            ld de, TR_WT
+            ld bc, 256
+            ld a, TRANS_BANK
+            call far_copy
+            jr .sp
+.dmg:       ldh a, [rBGP]
+            ld [fd_b], a
+            ldh a, [rOBP0]
+            ld [fd_o0], a
+            ldh a, [rOBP1]
+            ld [fd_o1], a
+.sp:        ld hl, oam_buf                  ; sprites: the party only (at the screen's middle)
+            ld b, 40
+.o:         ld a, [hl]
+            sub 16 + 64
+            cp 16
+            jr nc, .hd
+            inc hl
+            ld a, [hl-]
+            sub 8 + 72
+            cp 16
+            jr c, .kp
+.hd:        ld [hl], 0
+.kp:        ld a, l
+            add a, 4
+            ld l, a
+            dec b
+            jr nz, .o
+            call tr_prep                    ; frame 0
+            di
+            ld a, 1
+            ld [rx_on], a
+            ld a, $08                       ; (STAT: mode 0 each line, no LYC meanwhile)
+            ldh [rSTAT], a
+            ldh a, [rIF]
+            and $FD
+            ldh [rIF], a
+            ei
+.f:         call tr_buf                     ; line 0's scroll for the V-Blank to write
+            ld a, [hl+]
+            ldh [scx], a
+            ld a, [hl-]
+            ldh [scy], a
+            push hl
+            call tr_noise
+            call wait_vbl
+            pop hl
+            inc hl
+            inc hl
+            ld a, l
+            ld [rx_ptr], a
+            ld a, h
+            ld [rx_ptr + 1], a
+            call tr_pals                    ; (in this V-Blank)
+            ld a, $F0                       ; the noise
+            ldh [$FF21], a
+            ld a, [bx_nz]
+            ldh [$FF22], a
+            ld a, $80
+            ldh [$FF23], a
+            ld hl, bx_n
+            inc [hl]
+            call tr_party
+            ld a, [tr_k]                    ; (SGB: colour 0 white for the fade, at the strips)
+            cp TR_TW - 4
+            call z, tr_sgbw
+            ld hl, tr_k
+            inc [hl]
+            ld a, [hl]
+            cp TR_FR
+            jr nc, .end
+            call tr_prep
+            jr .f
+.end:       call wait_vbl                   ; white
+            di
+            xor a
+            ld [rx_on], a
+            ld a, $40
+            ldh [rSTAT], a
+            ld a, BOX_LINES
+            ldh [rLYC], a
+            ldh a, [rIF]
+            and $FD
+            ldh [rIF], a
+            ei
+            ld a, [tr_x0]
+            ldh [scx], a
+            ldh [rSCX], a
+            ld a, [tr_y0]
+            ldh [scy], a
+            ldh [rSCY], a
+            ldh a, [is_cgb]
+            and a
+            jr z, .dw
+            ld a, $80
+            ldh [rBCPS], a
+            ldh [$FF6A], a
+            ld b, 32
+.wc:        ld a, $FF
+            ldh [rBCPD], a
+            ldh [$FF6B], a
+            ld a, $7F
+            ldh [rBCPD], a
+            ldh [$FF6B], a
+            dec b
+            jr nz, .wc
+            ld a, 1                         ; (the battle's load and fade-in: white)
+            ld [fd_wh], a
+            jr .wt
+.dw:        xor a
+            ldh [rBGP], a
+            ldh [rOBP0], a
+            ldh [rOBP1], a
+.wt:        call oam_clr
+            ld b, 5
+.ww:        push bc
+            call wait_vbl
+            pop bc
+            dec b
+            jr nz, .ww
+            xor a                           ; (the noise off)
+            ldh [$FF21], a
+            ret
+; Super Game Boy: the map's palette with colour 0 white (all shades 0 at the fade's end)
+tr_sgbw:    ld a, [sgb_on]
+            and a
+            ret z
+            ld hl, M_SGB
+            ld de, tr_sgp
+            ld bc, 14
+            ld a, [map_bank]
+            call far_copy
+            ld a, $FF
+            ld [tr_sgp], a
+            ld a, $7F
+            ld [tr_sgp + 1], a
+            ld a, [sgb_qi]                  ; (the queue idle: from its start)
+            ld hl, sgb_qn
+            cp [hl]
+            jr nz, .q
+            xor a
+            ld [sgb_qi], a
+            ld [hl], a
+.q:         ld a, [sgb_qn]
+            cp 6
+            ret nc
+            ld hl, tr_sgp
+            ld c, 0
+            ld a, $01
+            jp sgb_pal
+; HL = frame tr_k's buffer
+tr_buf:     ld a, [tr_k]
+            rrca
+            ld hl, TR_BUF0
+            ret nc
+            ld hl, TR_BUF1
+            ret
+; frame tr_k's lines (the table plus the field's scroll) and, in the strips, its colours
+tr_prep:    ld a, [tr_k]                    ; HL = $4000 + 288 k
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, [tr_k]
+            add a, h
+            add a, $40
+            ld h, a
+            push hl
+            call tr_buf
+            ld d, h
+            ld e, l
+            pop hl
+            push de
+            ld bc, 288
+            ld a, TRANS_BANK
+            call far_copy
+            pop hl
+            ld a, [tr_x0]
+            ld d, a
+            ld a, [tr_y0]
+            ld e, a
+            ld b, 144
+.a:         ld a, [hl]
+            add a, d
+            ld [hl+], a
+            ld a, [hl]
+            add a, e
+            ld [hl+], a
+            dec b
+            jr nz, .a
+            xor a                           ; the fade level: (strip frame + 1) / 2, to 8
+            ld [tr_f], a
+            ld a, [tr_k]
+            sub TR_TW
+            ret c
+            inc a
+            srl a
+            cp 9
+            jr c, .lv
+            ld a, 8
+.lv:        ld [tr_f], a
+            and a
+            ret z
+            ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, [tr_f]                    ; Color: 64 colours through the table
+            dec a
+            swap a
+            add a, a                        ; 32 (level - 1)
+            ld [tr_t], a
+            ld hl, fd_pal
+            ld de, TR_PAL
+            ld b, 64
+.c:         push bc
+            ld a, [hl+]
+            ld c, a                         ; low: GGGRRRRR
+            ld a, [hl+]
+            ld b, a                         ; high: 0BBBBBGG
+            push hl
+            ld a, [tr_t]
+            ld h, high(TR_WT)
+            ld l, a
+            ld a, c                         ; red
+            and 31
+            add a, l
+            push hl
+            ld l, a
+            ld a, [hl]
+            pop hl
+            ld [tr_r], a
+            ld a, b                         ; green
+            and 3
+            add a, a
+            add a, a
+            add a, a
+            ld [tr_g], a
+            ld a, c
+            swap a
+            rrca
+            and 7
+            push hl
+            ld hl, tr_g
+            or [hl]
+            pop hl
+            add a, l
+            push hl
+            ld l, a
+            ld a, [hl]
+            pop hl
+            ld [tr_g], a
+            ld a, b                         ; blue
+            rrca
+            rrca
+            and 31
+            add a, l
+            ld l, a
+            ld a, [hl]
+            add a, a
+            add a, a
+            ld b, a                         ; (blue << 2)
+            ld a, [tr_g]
+            ld c, a
+            swap a
+            add a, a
+            and $E0
+            ld l, a
+            ld a, [tr_r]
+            or l
+            ld [de], a
+            inc de
+            ld a, c
+            rrca
+            rrca
+            rrca
+            and 3
+            or b
+            ld [de], a
+            inc de
+            pop hl
+            pop bc
+            dec b
+            jr nz, .c
+            ret
+; the frame's colours in the V-Blank (the strips: towards white)
+tr_pals:    ld a, [tr_f]
+            and a
+            ret z
+            ldh a, [is_cgb]
+            and a
+            jr z, .d
+            ld a, $80
+            ldh [rBCPS], a
+            ldh [$FF6A], a
+            ld hl, TR_PAL
+            ld b, 64
+.b:         ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .b
+            ld b, 64
+.ob:        ld a, [hl+]
+            ldh [$FF6B], a
+            dec b
+            jr nz, .ob
+            ret
+.d:         ld a, [tr_f]                    ; DMG / SGB: the shades a step lighter per 2 levels
+            srl a
+            ld [fd_lv], a
+            jp fd_dmgw
+; the noise's next period (FF1: from bx_n)
+tr_noise:   ld a, SND_BANK
+            ld [fc_bank], a
+            ld a, [bx_n]
+            srl a
+            or 3
+            and 15
+            add a, low(SFX_NZ)
+            ld l, a
+            ld h, high(SFX_NZ)
+            call far_byte
+            ld [bx_nz], a
+            ret
+; the party's sprites follow the twist at its line (72)
+tr_party:   call tr_buf
+            ld de, 72 * 2
+            add hl, de
+            ld a, [tr_x0]
+            ld b, a
+            ld a, [hl]
+            sub b                           ; this frame's offset there
+            ld b, a
+            ld a, [tr_px]
+            ld c, a
+            ld a, b
+            ld [tr_px], a
+            sub c                           ; the change
+            ld c, a
+            ld hl, oam_buf + 1
+            ld b, 40
+.s:         dec hl
+            ld a, [hl+]
+            and a
+            jr z, .n
+            ld a, [hl]
+            sub c
+            ld [hl], a
+.n:         ld a, l
+            add a, 4
+            ld l, a
+            dec b
+            jr nz, .s
+            ret
+
+section wram, $C4C0
+tr_k:       ds 1
+tr_x0:      ds 1
+tr_y0:      ds 1
+tr_px:      ds 1
+tr_f:       ds 1
+tr_t:       ds 1
+tr_r:       ds 1
+tr_g:       ds 1
+tr_sgp:     ds 14
+
 section wram, $CDE3
 loc_buf:    ds 19
 pt_on:      ds 1                            ; (play time counted: set by the field's loop)
