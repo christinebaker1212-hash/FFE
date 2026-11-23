@@ -919,13 +919,33 @@ gr_reg:     push hl
             ld [gr_dirty], a
 .x:         pop hl
             ret
-gr_fd:      ld a, 1                         ; a fade: the gradient paused, the flat colour
-            ld [fd_act], a                  ;   back in the next V-Blank
-            ld a, [gr_on]
+gr_fd:      ld a, 1                         ; a fade: the gradient fades with the screen
+            ld [fd_act], a                  ;   (owner, 2026-11-23: the gradient is the
+            ret                             ;   windows' colour, not a layer shown after)
+; a fade step (CGB, fd_lv 0-4): the ramp from the window colour at fd_lv / 4
+gr_fdramp:  ld a, [gr_on]
             and a
             ret z
-            ld a, 1
-            ld [gr_rst], a
+            ld a, [fd_wh]                   ; (no gradient in the white fades: battle)
+            and a
+            ret nz
+            ld hl, win_r
+            ld b, 3
+.p:         ld a, [hl]
+            push af
+            call fd_mul
+            ld [hl+], a
+            dec b
+            jr nz, .p
+            ld a, F3_BANK
+            ld hl, gr_ramp_mk
+            call bank_call
+            ld hl, win_b
+            ld b, 3
+.r:         pop af
+            ld [hl-], a
+            dec b
+            jr nz, .r
             ret
 gr_build:   push bc
             push de
@@ -2241,28 +2261,30 @@ gr_ok:      ldh a, [is_cgb]
             xor 1
             ret
 ; the ramp: 32 colours from (r, g, b) to (r, g, b) / 3
-gr_ramp_mk: ld hl, gr_ramp
-            ld c, 0
-.c:         push hl
-            ld a, [win_r]
-            call .ch
-            ld [gr_cx], a
-            ld a, [win_g]
-            call .ch
-            ld [gr_cy], a
-            ld a, [win_b]
-            call .ch
-            ld b, a                         ; RGB555: r | g << 5 | b << 10
-            ld a, [gr_cx]
-            ld e, a
-            ld a, [gr_cy]
+gr_ramp_mk: ld hl, win_r                     ; per channel: value v, step 2 v, a remainder
+            ld de, gr_vr                    ;   (v - floor(2 v c / 93): to v / 3 at c = 31)
+            ld b, 3
+.i:         ld a, [hl+]
+            ld [de], a                      ; value
+            inc de
+            add a, a
+            ld [de], a                      ; step
+            inc de
+            xor a
+            ld [de], a                      ; remainder
+            inc de
+            dec b
+            jr nz, .i
+            ld hl, gr_ramp
+            ld c, 32
+.c:         ld a, [gr_vg]                   ; RGB555: r | g << 5 | b << 10
             ld d, a
-            ld a, d
             swap a
             rlca
             and $E0
+            ld e, a
+            ld a, [gr_vr]
             or e
-            pop hl
             ld [hl+], a
             ld a, d
             rrca
@@ -2270,42 +2292,34 @@ gr_ramp_mk: ld hl, gr_ramp
             rrca
             and 3
             ld e, a
-            ld a, b
+            ld a, [gr_vb]
             add a, a
             add a, a
             or e
             ld [hl+], a
-            inc c
-            ld a, c
-            cp 32
-            jr c, .c
-            ret
-.ch:        ld b, a                         ; v - (2 v / 3) c / 31 (to v / 3 at c = 31)
-            add a, a
-            ld e, 0
-            ld d, a                         ; 2 v (to 62)
-            push bc
-            ld b, c
-            xor a
-            inc b
-.m:         dec b                           ; 2 v c (to 1922)
-            jr z, .x
-            add a, d
-            jr nc, .m
-            inc e
-            jr .m
-.x:         ld l, a
-            ld h, e
-            ld de, -93                      ; / 93 (= 3 x 31)
-            ld b, $FF
-.d:         inc b
-            add hl, de
-            jr c, .d
-            ld a, b
-            pop bc
-            ld d, a
-            ld a, b
-            sub d
+            push hl
+            ld hl, gr_vr
+            ld b, 3
+.s:         ld d, [hl]                      ; the next colour: remainder + step, each 93 one
+            inc hl                          ;   step down
+            ld a, [hl+]
+            add a, [hl]
+.d:         cp 93
+            jr c, .k
+            sub 93
+            dec d
+            jr .d
+.k:         ld [hl-], a
+            dec hl
+            ld [hl], d
+            inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .s
+            pop hl
+            dec c
+            jr nz, .c
             ret
 ; groups: window i goes to the alt group when an earlier main window j has rows overlapping
 ; it, columns apart (a shared border allowed) and another top or height
@@ -2970,6 +2984,9 @@ gr_tm:      ds 1
 gr_ta:      ds 1
 gr_cx:      ds 1
 gr_cy:      ds 1
+gr_vr:      ds 3                            ; (gr_ramp_mk: value, step, remainder per channel)
+gr_vg:      ds 3
+gr_vb:      ds 3
 
 section wram, $CDE4
 loc_buf:    ds 19

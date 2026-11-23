@@ -2265,6 +2265,7 @@ fade_in:    ld a, [fd_in]
             ret
 ; CGB: fd_pal at fd_lv / 4 to the palettes (two frames)
 fd_step:    call fd_scale
+            call gr_fdramp                  ; (the windows' gradient too: loc.s)
             call fd_vbl
             ld a, $80
             ldh [rBCPS], a

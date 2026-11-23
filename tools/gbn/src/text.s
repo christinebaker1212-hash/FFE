@@ -773,8 +773,8 @@ gr_vbl:     ld a, [gr_rst]                  ; (switched off / paused: the flat c
             ld a, [ly_n]
             ld hl, wp_on
             or [hl]
-            ld hl, fd_act                   ; (a fade: the flat colour fades with the rest)
-            or [hl]
+            ld hl, fd_in                    ; (a fade-in to come: black until it starts;
+            or [hl]                         ;   during fades the ramp fades: gr_fdramp)
             jr z, .go
             ld a, $FF
             ldh [rLYC], a
