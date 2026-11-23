@@ -743,7 +743,6 @@ mon_gone:   ld a, $0F                       ; 2F/BB5E: the animation palette bla
             ld [hl], a
             ld a, [W7 + $7DCA]              ;   the slots cleared, the tilemap rebuilt
             ld [BZ + $7E], a
-            call mon_vanish
             ld c, a
             ld hl, W7 + $7DA7
             ld b, 8
@@ -771,7 +770,61 @@ mon_gone:   ld a, $0F                       ; 2F/BB5E: the animation palette bla
             jr nz, .r
             call mon_pos
             call mon_count
+            call mon_wipe
             jp map_show
+
+; 2F/BB94 the wipe: the new tilemap over the old one, row k's column c at step c + k (25 columns
+; from the left, from the right in a back attack; 2 frames a step; sound $31)
+mon_wipe:   ld a, $B1
+            ld [S49], a
+            ld c, 0
+.s:         call wait_vbl
+            ld b, 0
+.r:         ld a, c
+            sub b
+            jr c, .n
+            cp 25
+            jr nc, .n
+            ld e, a
+            ld a, [W7 + $78C3]
+            cp $88
+            jr nz, .f
+            ld a, 31
+            sub e
+            ld e, a
+.f:         push bc
+            ld l, b                         ; offset 32 row + column
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld d, 0
+            add hl, de
+            push hl
+            ld de, W7 + $7900
+            add hl, de
+            ld a, [hl]
+            pop hl
+            ld de, $9800
+            add hl, de
+            ld b, a
+.w:         ldh a, [rSTAT]                  ; (VRAM: not while drawing)
+            and 2
+            jr nz, .w
+            ld [hl], b
+            pop bc
+.n:         inc b
+            ld a, b
+            cp BT_ROWS
+            jr nz, .r
+            call wait_vbl
+            inc c
+            ld a, c
+            cp 25 + BT_ROWS
+            jr nz, .s
+            ret
 
 ; 2F/B34D monsters run away (mask A): as their deaths, without experience
 mon_run:    ld [W7 + $7DCA], a
