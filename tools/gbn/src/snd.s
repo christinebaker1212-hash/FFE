@@ -145,7 +145,13 @@ aw:         push af
             ld b, high(snd_sh)
             ld a, e
             ld [bc], a
-            ld a, l
+            ld a, l                         ; (square 1 while a screen wipe plays its sound:
+            cp 4                            ;   the shadow only; the wipe ends by marking it
+            jr nc, .go                      ;   unknown, so the next note writes it all)
+            ld a, [wp_on]
+            and a
+            jp nz, .x
+.go:        ld a, l
             cp $00
             jr z, .vol1
             cp $04

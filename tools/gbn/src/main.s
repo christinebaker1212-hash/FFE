@@ -547,7 +547,9 @@ load_map:   push af
             ldh [rSCY], a
             call make_oam
             call dma_safe
-            call map_music
+            ld a, [wp_req]                  ; (a wipe: the map's song once it has opened;
+            and a                           ;   during it the wipe sound has square 1, and
+            call z, map_music               ;   the song's first notes were spoiled)
             ld a, [pc_req]                  ; (a palette cycle in to follow: black first)
             and a
             call nz, pc_black
@@ -3116,6 +3118,7 @@ wipe_close: push de
 .x:         call wait_vbl
             xor a                           ; (the wipe sound's sweep off again)
             ldh [$FF10], a
+            call snd_sq1rst
             pop de
             ret
 wipe_open:  xor a
@@ -3165,7 +3168,8 @@ wipe_open:  xor a
             ldh [rLCDC], a
             ld a, 7
             ldh [rWX], a
-            ret
+            call snd_sq1rst
+            jp map_music                    ; (the map's song now: load_map waited for it)
 ; the window map black: the font's blank (DMG: its tile for this map, shade 3; CGB: in VRAM
 ; bank 1, palette 6 all black); with the LCD on, three rows a V-Blank
 wp_map:     ld a, $20
@@ -3870,3 +3874,15 @@ ow_bc:      ld hl, SV_BRIDGE
             ret
 .brtbl:     db 4, 3, 5, 3, 6, 3, 7, 3
 .cntbl:     db 8, 3, 9, 3, 10, 3, 11, 3
+
+section bank 0, $1F00
+; square 1 after a wipe sound: the music engine's shadow / volume / frequency marked unknown, so
+; its next note writes every register (it skipped "unchanged" ones the wipe had changed)
+snd_sq1rst: ld a, $FF
+            ld [snd_sh], a
+            ld [snd_sh + 1], a
+            ld [snd_sh + 2], a
+            ld [snd_sh + 3], a
+            ld [snd_cv], a
+            ld [snd_fh], a
+            ret
