@@ -142,8 +142,12 @@ mon_gfx:    xor a
             jr z, .n
             ld a, [W7 + $7D7B]
             cp 9
-            jr z, .n                        ; (bosses: later)
-            call mon_gfx1
+            jr nz, .g
+            ld a, [btl_k]                   ; (2F/A3AB: a boss tilemap: slot 0's graphics)
+            and a
+            call z, boss_gfx
+            jr .n
+.g:         call mon_gfx1
 .n:         ld a, [btl_k]
             inc a
             cp 4
@@ -231,8 +235,39 @@ mon_gfx1:   ld a, [btl_k]                   ; props $7D73 + 2 type
             xor a                           ; (VRAM bank 0)
             jp vcopyx
 
-; 2F/A247 update monster positions: each slot's rectangle of tile ids in the tilemap
-mon_pos:    call pos_ptr
+; 2F/A247 update monster positions: each slot's rectangle of tile ids in the tilemap (a boss
+; tilemap: 2F/A21E, 12 rows of 18 from 2A/8000 + 216 id at $7922)
+mon_pos:    ld a, [W7 + $7D7B]
+            cp 9
+            jr nz, .np
+            ld a, [W7 + $7DA7]
+            cp $FF
+            ret z
+            ld a, [W7 + $7D73]
+            and $1F
+            ld e, a
+            ld d, 216
+            call bmul8x                     ; HL = 216 id
+            ld de, BD3_BTMAP
+            add hl, de
+            ld de, W7 + $7922
+            ld c, 12
+.br:        push bc
+            push de
+            ld bc, 18
+            ld a, BDATA3_BANK
+            call rd_copy
+            pop de
+            ld a, e
+            add a, 32
+            ld e, a
+            jr nc, .bn
+            inc d
+.bn:        pop bc
+            dec c
+            jr nz, .br
+            ret
+.np:        call pos_ptr
             ld c, 0                         ; slot
 .s:         push hl
             call bd_rd                      ; x
@@ -332,7 +367,32 @@ mon_rect:   ld a, [BZ + $8E]
 
 ; 2F/A6B1 update monster attribute table: A857 (attribute data, 4 bytes a type -> $7D17), A697
 ; (all palette 3, the bg rows palette 2), then each monster's 2 x 2 blocks from its bits
-mon_attrs:  xor a
+mon_attrs:  ld a, [W7 + $7D7B]              ; (2F/A820: a boss: 2E/8FC0 + 7 id, 8 bytes)
+            cp 9
+            jr nz, .nb
+            ld a, [W7 + $7D74]
+            and $3F
+            ld e, a
+            ld d, 7
+            call bmul8x
+            ld de, $7700                    ; (BDATA: 2E/8FC0)
+            add hl, de
+            ld de, W7 + $7D17
+            ld bc, 8
+            ld a, BDATA_BANK
+            call rd_copy
+            ld a, [W7 + $7D74]
+            bit 7, a
+            jr z, .ln0
+            ld hl, W7 + $7D17
+            ld b, 8
+.bx:        ld a, [hl]
+            cpl
+            ld [hl+], a
+            dec b
+            jr nz, .bx
+.ln0:       jp .after
+.nb:        xor a
 .l:         ld [btl_k], a                   ; 2F/A86C
             add a, low(W7 + $7D6B)
             ld l, a
@@ -401,7 +461,7 @@ mon_attrs:  xor a
             inc a
             cp 4
             jr nz, .l
-            ld hl, W7 + $7D27               ; A697
+.after:     ld hl, W7 + $7D27               ; A697
             ld b, $40
             ld a, $FF
 .f:         ld [hl+], a
@@ -1016,4 +1076,91 @@ chr_draw1:  ld b, 0
             ld a, b
             cp 6
             jr nz, .s
+            ret
+
+; HL = E x D
+bmul8x:     ld hl, 0
+            ld a, d
+            ld d, 0
+.l:         and a
+            ret z
+            srl a
+            jr nc, .s
+            add hl, de
+.s:         sla e
+            rl d
+            jr .l
+
+; 2F/A3B8 + A40B: the boss's 144 tiles (2F/9068: bbs---tt tttttttt; b the bank pair, s the
+; summon graphics, flipped to face the members) -> VRAM bank 0 tile $70
+boss_gfx:   ld a, [W7 + $7D73]
+            and $1F
+            add a, a
+            ld e, a
+            ld d, 0
+            ld hl, BD3_BPTR
+            add hl, de
+            ld a, BDATA3_BANK
+            call rd_byte
+            ld c, a
+            ld a, BDATA3_BANK
+            call rd_byte
+            ld b, a                         ; BC = the word
+            ld a, b
+            and 3
+            ld h, a
+            ld l, c
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $4000
+            add hl, de                      ; (the pair's NES $8000 -> GB $4000)
+            ld a, b
+            bit 5, a
+            jr nz, .s
+            rlca
+            rlca
+            and 3
+            add a, MGFX_BANK0
+            ld [vc_src], a
+            ld de, $8700
+            ld b, 144
+            xor a
+            jp vcopyx
+.s:         xor a
+            ldh [rVBK], a
+            ld a, MGFX_BANK0 + 4            ; (summon graphics: each tile flipped)
+            ld [btl_tmp], a
+            ld de, $8700
+            ld c, 144
+.t:         push bc
+            push de
+            ld de, btl_spr
+            ld bc, 16
+            ld a, [btl_tmp]
+            call rd_copy
+            push hl
+            ld hl, btl_spr
+            ld c, 16
+.f:         ld a, [hl]
+            ld b, 8
+.r:         rra
+            rl e
+            dec b
+            jr nz, .r
+            ld [hl], e
+            inc hl
+            dec c
+            jr nz, .f
+            pop hl
+            pop de
+            push hl
+            ld hl, btl_spr
+            ld bc, 16
+            call memcpy                     ; (the LCD is off: straight into VRAM)
+            pop hl
+            pop bc
+            dec c
+            jr nz, .t
             ret

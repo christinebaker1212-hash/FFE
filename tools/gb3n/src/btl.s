@@ -20,8 +20,12 @@ btl_main:   call btl_flash
             ld [W7 + $7CED], a
             call btl_bg                     ; (3A/8533: the map's battle bg and flags)
             ld [W7 + $7CEF], a
-            xor a
+            ld a, [cur_world]               ; (FFA26: the flags = field $78, the world)
             ld [W7 + $7ED8], a
+            ld a, [cur_map]                 ; (FFB17 pushed the field's zero page: $74C8 = the
+            ld [W7 + $74C8], a              ;   map id, $74C6 the vehicle)
+            xor a
+            ld [W7 + $74C6], a
             call btl_init
             call init_cm                    ; (34/9CE3 init characters / monsters)
             call oam_hide                   ; (2E/9F8D clear oam data)

@@ -512,10 +512,15 @@ ev_tab:     dw ev_none, ev_none, ev_none, ev_take    ; E4-E7
             dw ev_none, ev_none, ev_gil, ev_none     ; E8-EB (status: later; take gil later)
             dw ev_none, ev_none, ev_none, ev_none    ; EC-EF (cp, guest npc, animations: later)
             dw ev_ndlg, ev_edlg, ev_esw1, ev_esw0    ; F0-F3
-            dw ev_nsw1, ev_nsw0, ev_give, ev_none    ; F4-F7 (battle: later)
+            dw ev_nsw1, ev_nsw0, ev_give, ev_btl     ; F4-F7
             dw ev_f8, ev_xexit, ev_xent, ev_xmap     ; F8-FB
             dw ev_wait, ev_exit, ev_none, ev_end     ; FC-FF
 ev_none:    ret
+ev_btl:     ld a, [ev_par]                  ; $F7 battle (3B/B703: after the event)
+            ld [act_id], a
+            ld a, $20
+            ld [act], a
+            ret
 ev_f8:      ld a, [ev_par]                  ; $F8 song / sound effect (snd.s)
             jp snd_f8
 

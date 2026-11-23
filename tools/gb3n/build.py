@@ -192,6 +192,7 @@ CODE2_MODULES = ('btl', 'btlcore', 'btleq', 'btlai', 'btlmain', 'btlact', 'btlfi
 CODE3 = 110                             # battle code: the presentation (graphics, windows, input)
 CODE3_MODULES = ('btlgfx', 'btlui', 'btlmsg', 'btlloop', 'btlitem', 'btlmagm')
 CODE4 = 111                             # battle code: magic, victory, the other actions
+BDATA3_BANK = 112                       # 2A/8000 boss tilemaps, 2F/9068 boss graphics pointers
 CODE4_MODULES = ('btlmagic', 'btlwin', 'btlact2')
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
 CHGFX_BANK = 95                         # battle characters (NES banks $28 / $29) as GB tiles
@@ -331,6 +332,7 @@ def main():
     bd[0x3500:0x3600] = rom.b(1, 0xA24E, 256)                  # $7500: 01/A24E terrain attacks by map
     bd[0x3600:0x3601] = rom.b(0x35, 0xAB06, 1)                 # $7600: 35/AB06 terrain targeting
     bd[0x3610:0x3632] = rom.b(1, 0xA35E, 34)                   # $7610: 01/A35E item multipliers
+    bd[0x3700:0x3908] = rom.b(0x2E, 0x8FC0, 0x208)             # $7700: 2E/8FC0 boss attribute data
     bd[0x23D0:0x2400] = rom.b(0x2E, 0x91A0, 48)                # $63D0: 2E/91A0 item spells
     f = rom.prg[0x0D * 0x2000 + 0x1700:0x0D * 0x2000 + 0x1700 + 144 * 16]   # $7000: numeral sprites
     for k, c in enumerate(list(range(0x80, 0x8A)) + [text.ENC[ch] for ch in 'Mis']):
@@ -343,6 +345,7 @@ def main():
         src = rom.prg[pair * 0x4000:pair * 0x4000 + 0x4000]
         banks[MGFX_BANK0 + k] = bytearray(b''.join(nes2gb(src[16 * t:16 * t + 16]) for t in range(1024)))
     banks[BDATA2_BANK] = bytearray(rom.b(0x30, 0x8000, 0x2000) + bytes(0x2000))
+    banks[BDATA3_BANK] = bytearray(rom.b(0x2A, 0x8000, 0x2000) + rom.b(0x2E, 0x9068, 64) + bytes(0x2000 - 64))
     bt = text.pack_battle(rom, BTXT_BANK)
     assert max(bt) < 100, max(bt)
     banks.update(bt)
@@ -381,7 +384,7 @@ def main():
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
-                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0, 'CHGFX_BANK': CHGFX_BANK, 'BDATA2_BANK': BDATA2_BANK, 'BTXT_BANK': BTXT_BANK, 'CODE3': CODE3, 'CODE4': CODE4,
+                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0, 'CHGFX_BANK': CHGFX_BANK, 'BDATA2_BANK': BDATA2_BANK, 'BTXT_BANK': BTXT_BANK, 'CODE3': CODE3, 'CODE4': CODE4, 'BDATA3_BANK': BDATA3_BANK,
                        'TEST_SONG': int(opt['--song'], 0) if opt['--song'] else 255,
                        'SND_MASK': int(os.environ.get('GB_SND_MASK', 'FF'), 16),     # (test builds: NR51)
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,
