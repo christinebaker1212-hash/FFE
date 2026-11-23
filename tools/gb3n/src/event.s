@@ -510,13 +510,62 @@ ev_step:    ld a, [ev_rep]
             ld l, a
             jp hl
 ev_tab:     dw ev_none, ev_none, ev_none, ev_take    ; E4-E7
-            dw ev_none, ev_none, ev_gil, ev_none     ; E8-EB (status: later; take gil later)
-            dw ev_none, ev_none, ev_none, ev_none    ; EC-EF (cp, guest npc, animations: later)
+            dw ev_stclr, ev_stset, ev_gil, ev_tgil   ; E8-EB
+            dw ev_gcp, ev_tcp, ev_guest, ev_none     ; EC-EF (animations: later)
             dw ev_ndlg, ev_edlg, ev_esw1, ev_esw0    ; F0-F3
             dw ev_nsw1, ev_nsw0, ev_give, ev_btl     ; F4-F7
             dw ev_f8, ev_xexit, ev_xent, ev_xmap     ; F8-FB
             dw ev_wait, ev_exit, ev_none, ev_end     ; FC-FF
 ev_none:    ret
+; $EB take gil (3B/B80D: the parameter from the middle byte; too little: dialogue 2)
+ev_tgil:    ld a, [GS + $1E]
+            and a
+            jr nz, .t
+            ld a, [ev_par]
+            ld b, a
+            ld a, [GS + $1D]
+            cp b
+            jr nc, .t
+            call ev_end
+            ld a, 0
+            ld c, 2
+            jp dlg_show
+.t:         ld a, [ev_par]
+            ld b, a
+            ld a, [GS + $1D]
+            sub b
+            ld [GS + $1D], a
+            ld a, [GS + $1E]
+            sbc 0
+            ld [GS + $1E], a
+            ret nc
+            xor a
+            ld [GS + $1C], a
+            ld [GS + $1D], a
+            ld [GS + $1E], a
+            ret
+; $EC / $ED give / take capacity (255 at most; too little: dialogue 3)
+ev_gcp:     ld a, [ev_par]
+            ld b, a
+            ld a, [GS + $1B]
+            add a, b
+            jr nc, .s
+            ld a, $FF
+.s:         ld [GS + $1B], a
+            ret
+ev_tcp:     ld a, [ev_par]
+            ld b, a
+            ld a, [GS + $1B]
+            sub b
+            jr nc, ev_gcp.s
+            call ev_end
+            ld a, 0
+            ld c, 3
+            jp dlg_show
+; $EE set guest npc ($600B; its sprite: later)
+ev_guest:   ld a, [ev_par]
+            ld [GS + $0B], a
+            ret
 ev_btl:     ld a, [ev_par]                  ; $F7 battle (3B/B703: after the event)
             ld [act_id], a
             ld a, $20
@@ -644,7 +693,118 @@ ev_misc:    cp $D4
             jr z, ev_hp
             cp $D5
             jr z, ev_mp
+            cp $D6
+            ld b, $5B
+            jr z, ev_pass
+            cp $D7
+            ld b, $5C
+            jr z, ev_pass
+            cp $D8
+            jp z, start                     ; D8 reset the game
+            cp $D9
+            jr z, ev_chain
+            cp $DE
+            jr z, ev_surf
+            cp $DF
+            jr z, ev_hp1
+            cp $E8
+            jr z, ev_stclr
+            cp $E9
+            jr z, ev_stset
             ret
+; $D6 / $D7 open passage tile (3B/B8A6): the first $5B / $5C in the map becomes +2
+ev_pass:    ld hl, M_LAY
+            ld de, $0400
+.s:         ld a, [hl]
+            cp b
+            jr z, .f
+            inc hl
+            dec de
+            ld a, d
+            or e
+            jr nz, .s
+            ret
+.f:         add a, 2
+            ld [hl], a
+            ld a, l                         ; (x = offset & 31, y = offset / 32)
+            and $1F
+            ld e, a
+            ld a, h
+            sub high(M_LAY)
+            ld d, a
+            ld a, l
+            rlca
+            rlca
+            rlca
+            and 7
+            ld b, a
+            ld a, d
+            add a, a
+            add a, a
+            add a, a
+            or b
+            ld d, a
+            jp q_mt
+; $D9 the ship chained up at (169, 184) on world 3
+ev_chain:   ld a, $A9
+            ld [GS + $01], a
+            ld a, $B8
+            ld [GS + $02], a
+            ld a, 1
+            ld [GS + $00], a
+            ld a, 3
+            ld [GS + $03], a
+            ld a, [GS + $20]
+            or $20
+            ld [GS + $20], a
+            ret
+; $DE the surface world emerges (the world 3 from now on)
+ev_surf:    ld a, [GS + $11]
+            or $80
+            ld [GS + $11], a
+            ld a, 3
+            ld [cur_world], a
+            ret
+; $DF HP 1 for those at 0
+ev_hp1:     ld hl, GS + $10C
+            ld b, 4
+.l:         ld a, [hl+]
+            or [hl]
+            dec hl
+            jr nz, .n
+            ld [hl], 1
+.n:         ld a, l
+            add a, $40
+            ld l, a
+            jr nc, .c
+            inc h
+.c:         dec b
+            jr nz, .l
+            ret
+; $E8 / $E9 clear / set status (all members): $6102 and / or the parameter
+ev_stclr:   ld c, 0
+            jr ev_st
+ev_stset:   ld c, 1
+ev_st:      ld hl, GS + $102
+            ld b, 4
+.l:         ld a, [ev_par]
+            ld e, a
+            ld a, c
+            and a
+            ld a, [hl]
+            jr z, .and
+            or e
+            jr .s
+.and:       and e
+.s:         ld [hl], a
+            ld a, l
+            add a, $40
+            ld l, a
+            jr nc, .c
+            inc h
+.c:         dec b
+            jr nz, .l
+            jp char_gfx
 ev_hp:      ld hl, GS + $10C                ; max HP ($610E) -> HP ($610C), each character
             ld b, 4
 .l:         ld a, l
