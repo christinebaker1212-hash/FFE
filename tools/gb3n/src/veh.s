@@ -18,20 +18,97 @@ INV_LISTS  = $7000              ;   3C/83E0 its frames' pointers, the lists (dy,
 veh_gfx:    ldh a, [is_world]
             and a
             ret z
-            ld a, SPR_BANK
+            ld hl, .base                    ; 3D/BDE0: (0B tile, VRAM tile, count) from W0B_BANK
+            call .list
+            ld a, [GS + $20]                ; the other airships (tiles $68-$7F): bit 6 0B/8E00,
+            bit 6, a                        ;   bit 0 0B/8F80
+            ld hl, .alt6
+            call nz, .list
+            ld a, [GS + $20]
+            bit 0, a
+            ld hl, .alt0
+            call nz, .list
+            ld a, [cur_world]               ; worlds 2-3: the floating continent's shadow, bubble /
+            srl a                           ;   fish / cannonball / chain; 0-1: Bahamut, or Hein's
+            ld hl, .surf                    ;   castle (bits 2-3)
+            jr nz, .l
+            ld a, [GS + $20]
+            and $0C
+            ld hl, .bah
+            jr z, .l
+            ld hl, .hein
+.l:
+.list:      ld a, [hl+]                     ; 0B tile (16 bits), VRAM tile, count; 0 count ends
+            ld c, a
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld e, a
+            ld a, [hl+]
+            and a
+            ret z
+            push hl
+            push af
+            ld l, c                         ; source $4000 + 16 tile
+            ld h, b
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            add a, $40
+            ld h, a
+            ld a, e                         ; destination $8000 + 16 tile
+            swap a
+            ld d, a
+            and $F0
+            ld e, a
+            ld a, d
+            and $0F
+            or $80
+            ld d, a
+            pop af
+            ld b, a
+            ld a, W0B_BANK
             ld [vc_src], a
-            ld hl, VEH_TILES
-            ld de, $8200
-            ld b, 96
             ld a, 1
             call vcopyx
-            ld a, SPR_BANK                  ; (the Invincible -> tiles $C0-$FF)
-            ld [vc_src], a
-            ld hl, INV_TILES
-            ld de, $8C00
-            ld b, 64
-            ld a, 1
-            jp vcopyx
+            pop hl
+            jr .list
+.base:      dw $080
+            db $20, 96                      ; 0B/8800 canoe, chocobo, ship, Enterprise
+            dw $070
+            db $80, 16                      ; 0B/8700 explosions
+            dw $1E8
+            db $90, 8                       ; 0B/9E80 boulder
+            dw $190
+            db $98, 8                       ; 0B/9900 Leviathan's shadow
+            dw $1A8
+            db $C0, 64                      ; 0B/9A80 the Invincible
+            dw 0
+            db 0, 0
+.alt6:      dw $0E0
+            db $68, 24
+            dw 0
+            db 0, 0
+.alt0:      dw $0F8
+            db $68, 24
+            dw 0
+            db 0, 0
+.surf:      dw $198
+            db $A0, 16                      ; 0B/9980 the floating continent
+            dw $1F0
+            db $B0, 16                      ; 0B/9F00 bubble, fish, cannonball, chain
+            dw 0
+            db 0, 0
+.bah:       dw $150
+            db $A0, 32                      ; 0B/9500 Bahamut
+            dw 0
+            db 0, 0
+.hein:      dw $170
+            db $A0, 32                      ; 0B/9700 Hein's castle, whirlpool
+            dw 0
+            db 0, 0
 
 ; a byte of SPR_BANK at VEH_* + vehicle
 veh_tab:    ld e, a
