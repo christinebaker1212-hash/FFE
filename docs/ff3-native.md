@@ -266,3 +266,25 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   18-column rewrap ("You're carrying too much to buy more." no longer leaves "too" alone).
   Not yet: the shop's party sprites that show who can equip an item; the fat chocobo ($FC-).
   Next: battle (its music comes with it), vehicles.
+- 2026-11-23: **battle** (`src/btl*.s`), FF3's battle code ported routine by routine from the
+  disassembly, the presentation native. Logic in CODE2 (bank 89), presentation in CODE3 (bank
+  110), shared helpers in bank 0 (`btlbase.s`); build.py makes the bank-0 stubs for calls between
+  the two banks (A passed and returned). Done: encounters (map / world rates and groups), init
+  (monster set and counts, slots, character / monster properties, equipment 31/AA16, strike first
+  / ambush / back attack), FF3's target cursor (32/9A1C: the 2 x 4 grid per formation), monster
+  AI (31/A732 with the special-attack scripts and target rules), the attack order (34/9777 with
+  FF3's quicksort), the turn loop (34/8074), Fight (35/A104 knight cover, 30/9E8A + 31/A000: hits,
+  evade, elements, crits, damage, drain, weapon statuses, two hands), magic (31/AF77 and all 57
+  attack effects, reflect, the magic messages), the action script (34/8FF7 with its RAM effects:
+  text buffer, status merges, near fatal, monster deaths' experience and slots), poison, the
+  battle-over check, victory (35/BB49: experience, gil, capacity, drops, job and character level
+  ups), the save back, rows, the inventory consolidated, defeat -> the start. Presentation: the
+  battlefield and party column (owner's layout), one full-width message window for FF3's five
+  message windows (the target after the attacker behind an arrow, long texts wrapped), damage
+  numerals as sprites, monsters removed when they die. **Checks** (`btlcmp.py ID --turns N` /
+  `--end`: the NES from build/ff3/cave.state with the same party and seed, A pressed on both):
+  battles $04 / $08 identical after two turns (all battle state, the RNG counters included),
+  battle $10 (monster spells killing three members) after one turn, battle $04 to the field:
+  the save block $6000-$63FF identical. Not yet: Item / Magic / job commands for the members,
+  run / escape actions, confusion / sleep actions, bosses' graphics, back attacks, the walk-in,
+  attack / spell animations (a pause for now), summons' animations.

@@ -104,7 +104,7 @@ undisclosed debug code). Record each item's result in the port's status doc.
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-23: FF3 native engine shops / inns, see docs/ff3-native.md)
+# GB port status (last updated 2026-11-23: FF3 native battle, see docs/ff3-native.md)
 
 **Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
 **Handoff: `docs/gb-handoff.md`** (session setup, current battle-layout work, exact next steps).
@@ -889,6 +889,9 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   (`src/snd.s`), its state identical to the owner's NSF for all 63 songs (`tools/gb3n/sndcmp.py
   state`), each voice's notes and lengths matching the NSF's audio (`sndcmp.py voices`); map /
   world / event / title songs hooked; the NES pulse sweep emulated. Shops (buy 1 / 4 / 10, sell)
-  and inns as FF3, GB layout with condensed long item names (2026-11-23). Next: battle, vehicles,
-  the fat chocobo. Also fixed in the
+  and inns as FF3, GB layout with condensed long item names (2026-11-23). Battle (2026-11-23):
+  FF3's battle logic ported (init, AI, target cursor, attack order, Fight, all magic effects,
+  action script, poison, victory / level ups, save back); whole battles match the NES
+  (`tools/gb3n/btlcmp.py --end`: save block identical). Next: member Item / Magic / job commands,
+  run / escape, bosses, back attacks, animations; then vehicles, the fat chocobo. Also fixed in the
   recompiled build: one-row menu cursors (Item opened Magic), the battle "Miss" sprite in English.
