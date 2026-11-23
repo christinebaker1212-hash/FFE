@@ -13,6 +13,26 @@ sm_g       = W7 + $73E8
 ; ---- 34/85ED attack animation 2: summon
 sm_main:    xor a
             ld [sm_fl], a
+            ld [sm_wrap], a
+            ld hl, W7 + $7E26               ; 34/86D2: the monsters' rows ($7E26 + slot, $FF none)
+            ld b, 8
+            ld a, $FF
+.ri:        ld [hl+], a
+            dec b
+            jr nz, .ri
+            ld c, 7
+.rr:        push bc
+            call mon_row
+            pop bc
+            jr nc, .rn
+            ld e, c
+            ld d, 0
+            ld hl, W7 + $7E26
+            add hl, de
+            ld [hl], a
+.rn:        dec c
+            bit 7, c
+            jr z, .rr
             ld a, [W7 + $7E99]              ; the target ($B8)
             call ba_maskid
             ld [BZ + $B8], a
@@ -381,8 +401,13 @@ sm_draw:    call mx_eclr
             push hl
             ld hl, sm_x
             add a, [hl]
-            jr c, .n
+            jr nc, .ok
             ld b, a
+            ld a, [sm_wrap]                 ; ($7E95: wrapping allowed)
+            and a
+            jr z, .n
+            ld a, b
+.ok:        ld b, a
             ld a, [sm_y]
             add a, c
             dec a
@@ -451,7 +476,7 @@ sm_a7b:     ld b, $40
             ret
 sm_jhl:     jp hl
 sm_tab:     dw sm_dash, sm_shk, sm_kick, sm_hold, sm_icy, sm_hold
-            dw sm_mind, sm_thun, sm_thun, sm_heal, sm_hold, sm_hold
+            dw sm_mind, sm_thun, sm_thun, sm_heal, sm_hell, sm_inf
             dw sm_clob, sm_stomp, sm_quake, sm_prot, sm_slash, sm_zan
             dw sm_demon, sm_hold, sm_tidal, sm_aura, sm_rend, sm_mega
 ; (not yet ported: the creature holds 48 frames, then goes)
@@ -984,6 +1009,208 @@ sm_cannon:  call sm_psave
             jr nz, .s
             ret
 
+; $0A hellfire: Ifrit rises (15 frames), a fireball falls on the target (32/8F97), then 32 frames
+; of flames on it (32/8949)
+sm_hell:    call sm_87a0
+            xor a
+            ld [sm_x], a
+            ld [sm_y], a
+            inc a
+            ld [sm_wrap], a
+            ld b, 15
+.u:         push bc
+            ld hl, sm_x
+            dec [hl]
+            ld a, [sm_y]
+            sub 8
+            ld [sm_y], a
+            call sm_drawb
+            call ba_vblc
+            pop bc
+            dec b
+            jr nz, .u
+            call sm_w16
+            ld a, $BD
+            call ba_pal3
+            call mx_eclr
+            ld a, [BZ + $B8]
+            add a, a
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7DD7
+            add hl, de
+            ld a, [hl+]
+            ld [BZ + $84], a
+            ld a, [hl]
+            ld [BZ + $85], a
+            srl a
+            srl a
+            ld hl, BZ + $84
+            add a, [hl]
+            ld [BZ + $80], a
+            xor a
+            ld [BZ + $81], a
+            ld a, 1
+            ld [ba_mode], a
+.d:         call mx_eclr
+            ld hl, $8F97 + N32S
+            call sm_list
+            call mx_wait
+            ld hl, BZ + $80
+            dec [hl]
+            dec [hl]
+            ld a, [BZ + $81]
+            add a, 8
+            ld [BZ + $81], a
+            ld hl, BZ + $85
+            cp [hl]
+            jr c, .d
+            xor a
+            ld [BZ + $B6], a
+            ld hl, BZ + $C9
+            inc [hl]
+.f:         call mx_eclr
+            ld a, [BZ + $B8]
+            call sm_flame
+            call mx_wait
+            call ba_inc
+            cp $20
+            jr nz, .f
+            jp mx_eclr
+; $0B inferno: Ifrit glows (sprite palettes lit, 24 frames), slides off with red flashes, then
+; 64 frames of flames on the monsters row by row (back to front)
+sm_inf:     call sm_w16
+            call sm_87a0
+            xor a
+            ld [sm_x], a
+            ld [sm_y], a
+            inc a
+            ld [sm_wrap], a
+            ld a, $16
+            ld [sm_t], a
+.g:         ld hl, sm_x
+            inc [hl]
+            call sm_drawb
+            ld c, $10
+            call sm_cyc1
+            ld c, $14
+            call sm_cyc1
+            ld c, $18
+            call sm_cyc1
+            call ba_vblc
+            ld a, [sm_x]                    ; (the hue: 32/87E9 + x / 8)
+            srl a
+            srl a
+            srl a
+            ld e, a
+            ld d, 0
+            ld hl, $87E9 + N32S
+            add hl, de
+            ld a, [hl]
+            ld [sm_t], a
+            ld a, [sm_x]
+            cp $18
+            jr nz, .g
+            ld a, $1A
+            ld [BZ + $B6], a
+.o:         ld a, [sm_x]
+            sub 8
+            ld [sm_x], a
+            call sm_drawb
+            ld a, [BZ + $B6]
+            and 3
+            ld a, $16
+            jr z, .k
+            ld a, $0F
+.k:         call ba_bkd
+            ld hl, BZ + $B6
+            dec [hl]
+            jr nz, .o
+            call mx_eclr
+            ld a, $BD
+            call ba_pal3
+            xor a
+            ld [BZ + $B6], a
+.f:         call mx_eclr
+            ld a, [BZ + $B6]                ; the row: ~(B6 / 16) & 3
+            swap a
+            cpl
+            and 3
+            call sm_inrow
+            call mx_wait
+            call ba_inc
+            cp $40
+            jr nz, .f
+            jp mx_eclr
+; 32/889B the first two monsters in row A ($8C / $8D, $FF none), each its flames (a sound every
+; 16 frames)
+sm_inrow:   ld [BZ + $80], a
+            ld a, $FF
+            ld [BZ + $8C], a
+            ld [BZ + $8D], a
+            ld hl, W7 + $7E26
+            ld de, BZ + $8C
+            ld c, 0
+.l:         ld a, [BZ + $80]
+            cp [hl]
+            jr nz, .n
+            ld a, e
+            cp low(BZ + $8E)
+            jr nc, .n
+            ld a, c
+            ld [de], a
+            inc de
+.n:         inc hl
+            inc c
+            ld a, c
+            cp 8
+            jr nz, .l
+            ld a, [BZ + $8C]
+            cp $FF
+            call nz, .one
+            ld a, [BZ + $8D]
+            cp $FF
+            ret z
+.one:       push af
+            ld a, [BZ + $B6]
+            and $0F
+            jr nz, .s
+            ld hl, BZ + $C9
+            inc [hl]
+.s:         pop af
+; 32/8949 flames (32/8F8B frames by the counter) on monster A: centre x - 16, bottom - 39
+sm_flame:   ld e, a
+            ld d, 0
+            ld hl, W7 + $7E07
+            add hl, de
+            ld a, [hl]
+            sub $27
+            ld [BZ + $81], a
+            ld hl, W7 + $7DD7
+            add hl, de
+            add hl, de
+            ld a, [hl]
+            sub $10
+            ld [BZ + $80], a
+            ld a, [BZ + $B6]
+            and 2
+            ld e, a
+            ld d, 0
+            ld hl, $8F8B + N32S
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld de, N32S
+            add hl, de
+            ld a, 1
+            ld [ba_mode], a
+            jp sm_list
+; 32/87A0 graphics $11 + $B040 (Ifrit's flames)
+sm_87a0:    ld hl, $B040
+            ld a, $11
+            jp sm_gfx
+
 ; 32/8781 the backdrop A every 4 frames for B frames
 sm_bkfl:    ld [sm_t], a
 .f:         push bc
@@ -1257,3 +1484,4 @@ sm_x0:      ds 1
 sm_y0:      ds 1
 sm_fl:      ds 1
 sm_off:     ds 1
+sm_wrap:    ds 1
