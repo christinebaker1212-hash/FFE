@@ -331,6 +331,9 @@ vblank:     push af
             ldh [rLCDC], a
             ld a, 1
             ldh [vbl_flag], a
+            ldh a, [vbl_cnt]                ; (a V-Blank count: the cutscenes' pacing)
+            inc a
+            ldh [vbl_cnt], a
             pop hl
             pop de
             pop bc
@@ -1683,6 +1686,7 @@ fill_mt:    ds 1
 section hram, $FF80
 hram_dma:   ds 10
 vbl_flag:   ds 1
+vbl_cnt:    ds 1
 pal_dirty:  ds 1
 cmask:      ds 1
 is_world:   ds 1

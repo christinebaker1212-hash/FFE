@@ -186,5 +186,8 @@ def pack(rom, data_bank):
         d[ptab + 2 * i] = (0x4000 + a) & 0xFF; d[ptab + 2 * i + 1] = (0x4000 + a) >> 8
         d[a:a + len(b)] = b
         a += len(b)
+    sine = a                                            # 10/9A80 the stars' sine table
+    d[a:a + 256] = rom.b(0x10, 0x9A80, 256)
+    a += 256
     assert a <= 0x4000, hex(a)
-    return upper, d, {'CUT_PAGES': 0x4000 + ptab}
+    return upper, d, {'CUT_PAGES': 0x4000 + ptab, 'CUT_SINE': 0x4000 + sine}

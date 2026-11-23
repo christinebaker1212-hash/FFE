@@ -50,6 +50,7 @@ cs_init:    push bc
             ld [cs_cc], a
             ld [cs_b6], a
             ld [cs_b7], a
+            ld [cs_slow], a
             call cs_palc
             ld a, [cs_cx]
             ldh [scx], a
@@ -65,7 +66,9 @@ cs_on:      ld a, LCDC_ON
             ld [lcd_is], a
             ret
 ; the scene's end: the screen black (on: the map is loaded behind it), the field's WRAM bank
-cs_end:     call pal_black
+cs_end:     xor a
+            ld [cs_slow], a
+            call pal_black
             xor a
             ldh [scx], a
             ldh [scy], a
@@ -326,7 +329,19 @@ cs_oamc:    ld hl, CS_OAM
 
 ; FF8C5: a frame (the sprites); FF8B0: a frame with the palettes
 cs_vbl:     call cs_oamc
-            jp wait_vbl
+            ld a, [cs_slow]                 ; (FF3's star scenes: 2 frames an iteration, as on
+            and a                           ;   the NES, where they take that long: the second
+            jp z, wait_vbl                  ;   V-Blank since the last one)
+.w:         ldh a, [vbl_cnt]
+            ld hl, cs_last
+            sub [hl]
+            cp 2
+            jr nc, .ok
+            halt
+            jr .w
+.ok:        ldh a, [vbl_cnt]
+            ld [cs_last], a
+            ret
 cs_vblc:    call cs_palc
             jr cs_vbl
 ; 1F/A1EE B frames
@@ -778,7 +793,471 @@ pro_up:     ld c, $30
             jr nz, .f
             jp cs_vbl
 
-cut_epi:    ret
+; ---- the epilogue (1F/B146): the stars, five story pages scrolled up from below (FF3 writes
+; each into the other nametable and scrolls 240 lines; here the pages lie in a virtual column,
+; page p at rows 30 (p + 1) to + 17, and every row is written into the 32-row BG ring as it comes
+; into view), then the stars rush out (1F/B1A1)
+ST_A       = $D500              ; $7575 angle (y), $75B5 (x), $75F5 radius index, $7635 speed,
+ST_B       = $D540              ;   $7675 fraction, $76B5 age
+ST_R       = $D580
+ST_S       = $D5C0
+ST_F       = $D600
+ST_AGE     = $D640
+ST_SIN     = $D700              ; $7200 the sine table (10/9A80)
+
+cut_epi:    ld bc, 48 * 256 + 48
+            call cs_init
+            ld a, 6
+            call cs_palset
+            xor a                           ; graphics 0-4, the stars (B12D: 5)
+.g:         push af
+            call cs_gfx
+            pop af
+            inc a
+            cp 6
+            jr nz, .g
+            ld a, $30
+            ld [cs_pal + 3], a
+            xor a
+            ld [ep_v], a
+            ld [ep_v + 1], a
+            ld [ep_pend], a
+            ld [st_end], a
+            ld a, 19
+            ld [ep_next], a
+            ld a, $3C
+            call snd_song
+            call cs_on
+            call cs_vblc
+            call st_init                    ; 1F/B3EA
+            call cs_vblc
+            call st_draw
+            xor a
+            ld [cs_cc], a
+            call cs_fin
+            ld a, 1
+            ld [cs_slow], a
+            ldh a, [vbl_cnt]
+            ld [cs_last], a
+            ld a, $0D
+            ld [cs_k], a
+.p:         call cs_vblc                    ; 1F/B178
+            call st_draw
+            call st_move
+            ld b, 6                         ; 1F/B212: the page written over 6 frames
+.w:         push bc
+            call ep_frame
+            pop bc
+            dec b
+            jr nz, .w
+            ld bc, 240                      ; 1F/B1E7: scrolled 240 lines
+.s:         push bc
+            ld hl, ep_v
+            inc [hl]
+            jr nz, .s1
+            inc hl
+            inc [hl]
+.s1:        ld a, [ep_v]
+            ldh [scy], a
+            call ep_frame
+            pop bc
+            dec bc
+            ld a, b
+            or c
+            jr nz, .s
+            call cs_vblc
+            ld a, [cs_k]
+            cp $12
+            jr z, .n
+            ld b, 100                       ; 1F/B1D6
+.h:         push bc
+            call cs_vblc
+            call st_draw
+            call st_move
+            pop bc
+            dec b
+            jr nz, .h
+.n:         ld hl, cs_k
+            inc [hl]
+            ld a, [hl]
+            cp $13
+            jr nz, .p
+            ld a, 1                         ; 1F/B1A1 the stars rush out: speed 1-8, then fewer
+            ld [ep_cc], a
+            xor a
+            ld [ep_cd], a
+.f:         call cs_vblc
+            call st_draw
+            ld hl, ST_A                     ; 1F/B406 every star 2 on
+            ld b, 128
+.f2:        inc [hl]
+            inc [hl]
+            inc l
+            dec b
+            jr nz, .f2
+            ld a, [ep_cc]
+.f3:        push af
+            call st_move
+            pop af
+            dec a
+            jr nz, .f3
+            ld a, [ep_cc]
+            cp 8
+            jr z, .c
+            ld a, [ep_cd]
+            sub 8
+            ld [ep_cd], a
+            jr nz, .f
+            ld hl, ep_cc
+            inc [hl]
+            ld a, [hl]
+            cp 8
+            jr nz, .f
+.c:         ld hl, st_cnt
+            dec [hl]
+            jr nz, .f
+            jp cs_end
+
+; a frame of the scroll: the row coming into view written in the V-Blank, the stars
+ep_frame:   call ep_prep
+            call cs_vbl
+            ld a, [ep_pend]
+            and a
+            jr z, .s
+            xor a
+            ld [ep_pend], a
+.ly:        ldh a, [rLY]                    ; (in the V-Blank: a late frame waits for it)
+            cp 144
+            jr c, .ly
+            cp 152
+            jr nc, .ly
+            ld a, [ep_dst]
+            ld e, a
+            ld a, [ep_dst + 1]
+            ld d, a
+            ld hl, CS_ROWS
+            ld a, h
+            ldh [rHDMA1], a
+            ld a, l
+            ldh [rHDMA2], a
+            ld a, d
+            ldh [rHDMA3], a
+            ld a, e
+            ldh [rHDMA4], a
+            ld a, 1                         ; (2 blocks)
+            ldh [rHDMA5], a
+.s:         call st_draw
+            jp st_move
+; the next row (ep_next) when it is within 152 lines of the view's top: its 32 cells -> CS_ROWS
+ep_prep:    ld a, [ep_next]                 ; HL = 8 row
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, [ep_v]                    ; DE = V + 152
+            add a, 152
+            ld e, a
+            ld a, [ep_v + 1]
+            adc a, 0
+            ld d, a
+            ld a, e                         ; DE - HL < 0: not yet
+            sub l
+            ld a, d
+            sbc a, h
+            ret c
+            ld a, [ep_next]
+            ld c, a
+            inc a
+            ld [ep_next], a
+            ld a, c                         ; destination $9800 + 32 (row & 31)
+            and $1F
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $9800
+            add hl, de
+            ld a, l
+            ld [ep_dst], a
+            ld a, h
+            ld [ep_dst + 1], a
+            ld b, 0                         ; q = row / 30, k = row mod 30
+            ld a, c
+.q:         cp 30
+            jr c, .q1
+            sub 30
+            inc b
+            jr .q
+.q1:        ld c, a                         ; C = k, B = q
+            ld hl, CS_ROWS
+            ld a, $FF
+            ld d, 32
+.bl:        ld [hl+], a
+            dec d
+            jr nz, .bl
+            ld a, 1
+            ld [ep_pend], a
+            ld a, b                         ; page p = q - 1 (0-5), rows 0-17
+            and a
+            ret z
+            cp 7
+            ret nc
+            ld a, c
+            cp 18
+            ret nc
+            ld a, b
+            add a, 12                       ; page index 13 + p
+            add a, a
+            ld l, a
+            ld h, 0
+            ld de, CUT_PAGES
+            add hl, de
+            push bc
+            ld de, cs_tmp
+            ld bc, 2
+            ld a, CUTD
+            call rd_copy
+            pop bc
+            ld hl, cs_tmp                   ; + 2 + 20 k
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            inc hl
+            inc hl
+            ld a, c
+            and a
+            jr z, .k0
+            ld de, 20
+.k:         add hl, de
+            dec c
+            jr nz, .k
+.k0:        ld de, CS_ROWS + 6
+            ld bc, 20
+            ld a, CUTD
+            jp rd_copy
+
+; 1F/B476 + B3EA: angles 0 / $40, radius index 1, speed $FF, the sine table, 63 stars shown
+st_init:    ld hl, ST_A
+            ld b, 64
+.a:         xor a
+            ld [hl+], a
+            dec b
+            jr nz, .a
+            ld b, 64
+            ld a, $40
+.b:         ld [hl+], a
+            dec b
+            jr nz, .b
+            ld b, 64
+            ld a, 1
+.r:         ld [hl+], a
+            dec b
+            jr nz, .r
+            ld b, 64
+            ld a, $FF
+.s:         ld [hl+], a
+            dec b
+            jr nz, .s
+            ld hl, CUT_SINE
+            ld de, ST_SIN
+            ld bc, 256
+            ld a, CUTD
+            call rd_copy
+            ld a, $3F
+            ld [st_cnt], a
+            jp st_move
+
+; 1F/B413 move: fraction += speed; on a carry the star ages and comes in (radius index - 1);
+; at 0 it starts again (1F/B4FA / B50A by $B7, the angle from the random table by $B6)
+st_move:    ld c, 0
+.l:         ld b, high(ST_F)
+            ld a, c
+            add a, low(ST_F)
+            ld l, a
+            ld h, b
+            ld a, c
+            add a, low(ST_S)
+            ld e, a
+            ld d, high(ST_S)
+            ld a, [de]
+            add a, [hl]
+            ld [hl], a
+            jr nc, .n
+            ld a, c
+            add a, low(ST_AGE)
+            ld l, a
+            ld h, high(ST_AGE)
+            inc [hl]
+            ld a, c
+            add a, low(ST_R)
+            ld l, a
+            ld h, high(ST_R)
+            ld a, [hl]
+            dec a
+            and $7F
+            ld [hl], a
+            jr nz, .n
+            ld a, [cs_b7]                   ; a new star
+            ld e, a
+            inc a
+            ld [cs_b7], a
+            ld a, e
+            and $0F
+            ld e, a
+            ld d, 0
+            push hl
+            ld hl, $B4FA + N1F
+            add hl, de
+            ld a, [hl]
+            pop hl
+            ld [hl], a                      ; radius index
+            push hl
+            ld hl, $B50A + N1F
+            add hl, de
+            ld a, [hl]
+            pop hl
+            ld e, a
+            ld a, c
+            add a, low(ST_S)
+            ld l, a
+            ld h, high(ST_S)
+            ld [hl], e
+            ld a, c
+            add a, low(ST_AGE)
+            ld l, a
+            ld h, high(ST_AGE)
+            ld [hl], 0
+            ld hl, cs_b6
+            inc [hl]
+            ld l, [hl]
+            ld h, high(N_RNG)
+            ld a, [hl]
+            ld e, a
+            ld a, c
+            add a, low(ST_A)
+            ld l, a
+            ld h, high(ST_A)
+            ld [hl], e
+            ld a, e
+            add a, $40
+            ld e, a
+            ld a, c
+            add a, low(ST_B)
+            ld l, a
+            ld h, high(ST_B)
+            ld [hl], e
+.n:         inc c
+            ld a, c
+            cp $3F
+            jr nz, .l
+            ret
+
+; 1F/B39F the stars -> the sprite list: y = $78 + f(angle A), x = $80 + f(angle B), the tile by
+; age (1F/B370), palette 2 (0 for every 16th), behind the BG at the end (1F/B38B)
+st_draw:    call cs_oclr
+            ld a, [st_cnt]
+            and a
+            ret z
+            ld c, 0
+            ld de, CS_OAM
+.l:         ld a, c
+            add a, low(ST_A)
+            ld l, a
+            ld h, high(ST_A)
+            ld a, [hl]
+            call st_f
+            add a, $78
+            ld [de], a
+            inc e
+            ld a, c                         ; tile by age
+            add a, low(ST_AGE)
+            ld l, a
+            ld h, high(ST_AGE)
+            ld a, [hl]
+            ld b, 1
+            cp $78
+            jr nc, .t
+            inc b
+            cp $64
+            jr nc, .t
+            inc b
+            cp $3C
+            jr nc, .t
+            inc b
+.t:         ld a, b
+            ld [de], a
+            inc e
+            ld a, c
+            and $0F
+            jr z, .p
+            ld a, 2
+.p:         ld b, a
+            ld a, [st_end]
+            and a
+            jr z, .p1
+            set 5, b
+.p1:        ld a, b
+            ld [de], a
+            inc e
+            ld a, c
+            add a, low(ST_B)
+            ld l, a
+            ld h, high(ST_B)
+            ld a, [hl]
+            call st_f
+            add a, $80
+            ld [de], a
+            inc e
+            inc c
+            ld a, [st_cnt]
+            cp c
+            jr nz, .l
+            ret
+; 1F/B4A6 f(angle A) for star C: sine (signed by bit 7) x (1F/B51A[radius index] / 2), FF3's
+; 8-bit product (1F/B4E1: (2 s and $FF) x amplitude / 256)
+st_f:       push de
+            ld l, a
+            ld h, high(ST_SIN)
+            ld a, [hl]
+            ld d, a                         ; (D bit 7: the sign)
+            bit 7, a
+            jr z, .pos
+            cpl
+.pos:       add a, a
+            ld e, a
+            ld a, c
+            add a, low(ST_R)
+            ld l, a
+            ld h, high(ST_R)
+            ld l, [hl]
+            ld h, 0
+            push bc
+            ld bc, $B51A + N1F
+            add hl, bc
+            pop bc
+            ld a, [hl]
+            srl a
+            ld h, a                         ; H x E -> A (high byte)
+            ld l, 0
+            xor a
+            ld b, 8
+.m:         srl e
+            jr nc, .m1
+            add a, h
+.m1:        rra
+            rr l
+            dec b
+            jr nz, .m
+            bit 7, d
+            jr z, .x
+            cpl
+            inc a
+.x:         pop de
+            ret
 cut_end:    ret
 
 section wram, $D400
@@ -804,3 +1283,13 @@ cs_p:       ds 2
 cs_q:       ds 2
 cs_r:       ds 1
 cs_c:       ds 1
+ep_v:       ds 2                ; the scroll (lines)
+ep_next:    ds 1                ; the next row to write
+ep_pend:    ds 1
+ep_dst:     ds 2
+ep_cc:      ds 1
+ep_cd:      ds 1
+st_cnt:       ds 1                ; $CB stars shown
+st_end:     ds 1                ; $7EC2 (the end: stars behind the text)
+cs_slow:    ds 1
+cs_last:    ds 1
