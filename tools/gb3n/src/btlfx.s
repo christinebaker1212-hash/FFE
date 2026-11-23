@@ -924,6 +924,21 @@ mx_life:    ld a, [W7 + $7E9B]
             xor a
 .s:         ld [W7 + $7ECC], a
             jr mx_n2
+; 33/B943 (animation function $17): spell A's hit frames on the targets ($7E99), as brak2 (the
+; summons' thunder, the last three summons)
+mx_b943:    ld [W7 + $7E88], a
+            ld a, 7
+            ld [W7 + $7E9D], a
+            xor a
+            ld [W7 + $7EB8], a
+            ld [W7 + $7ECC], a
+            ld a, [W7 + $7E99]
+            ld [W7 + $7E9B], a
+            ld [W7 + $7E89], a
+            call mx_props
+            ld a, [W7 + $7E8D]
+            call ba_pal3
+            jp mx_hit
 ; $00 normal: the casting, the flight, the hit
 mx_norm:    xor a
             ld [W7 + $7ECC], a
