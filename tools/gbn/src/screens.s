@@ -2039,33 +2039,33 @@ pg_all:     ld hl, pg_names
 
 ; the question over the boxes: OK to begin with this party? Yes / No; returns A = 0 Yes,
 ; 1 No (NC), C on B
-pg_ask:     ld hl, oam_buf + 16             ; (the class sprites hidden under the window)
-            ld b, 24 * 4
-            xor a
+pg_ask:     ld hl, oam_buf + 16 + 12 * 4    ; (owner, 2026-11-23: the top row stays whole; the
+            ld b, 12 * 4                    ;   window on rows 8-12, between the rows of boxes:
+            xor a                           ;   only the lower two pictures hidden under it)
 .h:         ld [hl+], a
             dec b
             jr nz, .h
-            ld bc, $0105
-            ld de, $1208
+            ld bc, $0108
+            ld de, $1205
             call scr_win
-            ld bc, $0306
+            ld bc, $0309
             ld hl, str_pgok
             call scr_str
-            ld bc, $0609
+            ld bc, $060B
             ld hl, str_pgyes
             call scr_str
-            ld bc, $0D09
+            ld bc, $0D0B
             ld hl, str_pgno
             call scr_str
             call scr_upd
             xor a
             ld [pg_t], a
-.l:         ld a, [pg_t]                    ; the hand at Yes / No (columns 6 / 13, row 9)
+.l:         ld a, [pg_t]                    ; the hand at Yes / No (columns 6 / 13, row 11)
             and a
             ld b, 6
             jr z, .x
             ld b, 13
-.x:         ld c, 9
+.x:         ld c, 11
             call cur_txt
             call scr_frame
             ldh a, [pad_new]

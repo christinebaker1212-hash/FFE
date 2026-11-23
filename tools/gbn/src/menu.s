@@ -1551,8 +1551,9 @@ magic_menu: ld [mg_ch], a
             and $C0
             jr z, .l
             ld b, a
-            ld a, [mg_cur]                  ; slots 0-23 (level x 3 + slot)
-            bit 7, b
+            ld c, 24                        ; (levels without a spell skipped; at most once
+.st:        ld a, [mg_cur]                  ;   round: a member with MP but no spell yet)
+            bit 7, b                        ; slots 0-23 (level x 3 + slot)
             jr z, .up
             inc a
             cp 24
@@ -1564,7 +1565,13 @@ magic_menu: ld [mg_ch], a
             jr nz, .mv
             ld a, 23
 .mv:        ld [mg_cur], a
-            call mg_scroll                  ; (NZ: the list moved)
+            push bc
+            call mg_lvemp
+            pop bc
+            jr nz, .sk
+            dec c
+            jr nz, .st
+.sk:        call mg_scroll                  ; (NZ: the page turned)
             jr z, .l
             call mg_list
             call scr_upd
@@ -1601,6 +1608,19 @@ mg_any:     rrca
             and a
             ret
 
+; Z: no spell in mg_cur's level
+mg_lvemp:   call mg_lvsl
+            call mg_data
+            ld a, b
+            add a, a
+            add a, a
+            add a, l
+            ld l, a
+            ld a, [hl+]
+            or [hl]
+            inc hl
+            or [hl]
+            ret
 ; B = level, C = slot of mg_cur
 mg_lvsl:    ld a, [mg_cur]
             ld b, 0
@@ -1611,42 +1631,17 @@ mg_lvsl:    ld a, [mg_cur]
             inc b
             ld a, c
             jr .l
-; mg_top so that the hand's row shows (rows 6-16: a level takes four); NZ when it moved
+; one level a page (owner, 2026-11-23): mg_top = the hand's level; NZ when the page turned
 mg_scroll:  call mg_lvsl
-            ld c, a
             ld hl, mg_top
             ld a, b
             cp [hl]
-            jr nc, .dn
-            ld [hl], a                      ; above: that level first
-            or 1
+            ld [hl], a
             ret
-.dn:        ld d, 0
-.l:         ld a, b                         ; 4 (level - top) + 1 + slot <= 10
-            sub [hl]
-            add a, a
-            add a, a
-            inc a
-            add a, c
-            cp 9                            ; (rows 6-14: the hint window below)
-            jr c, .x
-            inc [hl]
-            inc d
-            jr .l
-.x:         ld a, d
-            and a
-            ret
-; A = the hand's row
+; A = the hand's row (the spells on rows 8, 10, 12)
 mg_row:     call mg_lvsl
-            ld c, a
-            ld a, [mg_top]
-            ld d, a
-            ld a, b
-            sub d
             add a, a
-            add a, a
-            add a, c
-            add a, 7
+            add a, 8
             ret
 
 ; HL = the member's magic data (ch_magic + $40 member)
@@ -1754,12 +1749,10 @@ mg_list:    ld c, 6                         ; (cleared, colours back)
             add a, $30
             call pen_ch
             pop bc
-            xor a                           ; the three spells
+            xor a                           ; the three spells, a row apart
 .sp:        ld [mg_hp], a
             inc c
-            ld a, c
-            cp 15
-            ret nc
+            inc c
             ld b, 2
             call pen_at
             call mg_data
@@ -1788,12 +1781,6 @@ mg_list:    ld c, 6                         ; (cleared, colours back)
             inc a
             cp 3
             jr c, .sp
-            inc c
-            ld hl, mg_lv
-            inc [hl]
-            ld a, c
-            cp 15
-            jr c, .lv
             ret
 
 ; ---- casting (FF1 MagicMenu_Loop @A_Pressed and the UseMagic routines)

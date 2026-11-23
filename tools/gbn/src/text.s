@@ -683,7 +683,7 @@ stat_gr:    push bc
             ld a, [gr_p + 1]
             ld h, a
             ld b, 0                         ; (B: the music after)
-            inc hl
+.rec:       inc hl
             ld a, [hl+]                     ; the mask (HL: the main colour)
             ld c, a
             bit 7, c
@@ -727,8 +727,16 @@ stat_gr:    push bc
             ld [gr_p], a
             ld a, h
             ld [gr_p + 1], a
-            call gr_lyc
-            ld a, b
+            call gr_lyc                     ; (A = the LYC set)
+            ld e, a                         ; its line already reached (records on lines
+            ldh a, [rLY]                    ;   next to each other, this one late): now,
+            cp e                            ;   its request dropped (owner, 2026-11-23: the
+            jr c, .done                     ;   line-40 record was lost, the magic list's
+            ldh a, [rIF]                    ;   top in the window above's darkest colour)
+            res 1, a
+            ldh [rIF], a
+            jr .rec
+.done:      ld a, b
             pop hl
             pop de
             pop bc

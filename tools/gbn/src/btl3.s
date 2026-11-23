@@ -31,21 +31,15 @@ bt_mag_menu:
             ld hl, bt_mpage
             cp [hl]
             call nz, bt_mag_page
-            ld a, [bt_mcur]                 ; the hand
-            call bt_mslot                   ; B level, C slot
-            ld a, b
-            and 1
+            ld a, [bt_mcur]                 ; the hand: a level a column (text at x 16 / 96,
+            call bt_mslot                   ;   the hand 17 px left); row 1 the levels, the
+            ld a, c                         ;   spells on rows 2-4 (y = 8 row)
+            add a, 14
             add a, a
-            ld d, a
-            ld a, c
-            srl a
-            add a, d
-            add a, 13                       ; (the text at x 16 / 96: the hand 17 px left,
-            add a, a                        ;   y = 8 row)
             add a, a
             add a, a
             ld e, a
-            ld a, c
+            ld a, b
             and 1
             ld b, 16 - 17
             jr z, .x
@@ -69,40 +63,38 @@ bt_mag_menu:
             jr nz, .dn
             bit 6, e
             jr z, .l
-            ld a, c                         ; up: slot 2 -> 0; 0 / 1 -> the level above
-            cp 2
-            jr nz, .u1
-            xor a
-            jr .set
-.u1:        ld a, b
-            dec a
+            ld a, c                         ; up: the slot above; from the top, the last slot
+            and a                           ;   of the page above
+            jr z, .u1
+            dec c
+            jr .set2
+.u1:        ld c, 2
+            ld d, $FE
+            jr .pg
+.dn:        ld a, c                         ; down: the slot below; from the bottom, the first
+            cp 2                            ;   slot of the page below
+            jr z, .d1
+            inc c
+            jr .set2
+.d1:        ld c, 0
+            ld d, 2
+.pg:        ld e, 4                         ; (pages without a spell skipped)
+.pn:        ld a, b
+            add a, d
             and 7
             ld b, a
-            ld a, c
-            and a
-            ld c, 2
-            jr z, .set2
-            ld c, 1
+            push bc
+            push de
+            call bt_mpgemp
+            pop de
+            pop bc
+            jr nz, .set2
+            dec e
+            jr nz, .pn
             jr .set2
-.dn:        ld a, c                         ; down: 0 -> 2; 1 / 2 -> the level below
-            and a
-            ld c, 2
-            jr z, .set2
-            ld a, b
-            inc a
-            and 7
-            ld b, a
-            ld a, c
-            cp 2
-            ld c, 0
-            jr z, .set2
-            ld c, 1                         ; (from slot 1: slot 1 below)
-            jr .set2
-.rl:        ld a, c                         ; left / right: 0 <-> 1
-            cp 2
-            jr z, .l
+.rl:        ld a, b                         ; left / right: the other level of the page
             xor 1
-            ld c, a
+            ld b, a
             jr .set2
 .set:       ld c, a
 .set2:      ld a, b
@@ -160,7 +152,8 @@ bt_mdata:   ld a, [bt_cm]
             ld l, a
             ld h, high(ch_magic)
             ret
-; page A (levels 2A, 2A + 1) into the message window
+; page A (levels 2A, 2A + 1) into the message window, a level a column (owner, 2026-11-23):
+; row 1 "L<n> MP <left>" of both, rows 2-4 their spells
 bt_mag_page:
             ld [bt_mpage], a
             ld a, [bt_msgon]
@@ -168,69 +161,42 @@ bt_mag_page:
             call z, bt_msg_win
             xor a
             ld [bt_rows], a
+            ld b, 18
+            call vwf_clr
             ld a, [bt_mpage]
             add a, a
             ld [bt_t + 6], a                ; level
-.lv:        ld b, 18                        ; row 1: spells 0, 1
-            call vwf_clr
-            ld c, 0
             ld a, 8
-            call bt_mspell
-            ld c, 1
-            ld a, 88
-            call bt_mspell
-            call bt_mrow
-            ld b, 18                        ; row 2: spell 2, "L<n> MP <cur>"
-            call vwf_clr
-            ld c, 2
-            ld a, 8
-            call bt_mspell
-            ld hl, bt_sbuf
-            ld a, $4C
-            ld [hl+], a
-            ld a, [bt_t + 6]
-            add a, $31
-            ld [hl+], a
-            ld a, $20
-            ld [hl+], a
-            ld a, $4D
-            ld [hl+], a
-            ld a, $50
-            ld [hl+], a
-            ld a, $20
-            ld [hl+], a
-            push hl
-            call bt_mdata
-            ld a, [bt_t + 6]
-            add a, $20
-            add a, l
-            ld l, a
-            ld a, [hl]
-            call nf_a
-            call num_fmt
-            pop de
-            ld hl, nf_dig + 5
-            ld a, [nf_dig + 4]
-            cp $20
-            jr z, .one
-            dec hl
-.one:       ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, l
-            cp low(nf_dig + 6)
-            jr nz, .one
-            xor a
-            ld [de], a
-            ld hl, bt_sbuf
-            ld a, 88
-            call vwf_str
-            call bt_mrow
+            call bt_mhdr
             ld hl, bt_t + 6
             inc [hl]
-            ld a, [bt_rows]
-            cp 4
-            jr c, .lv
+            ld a, 88
+            call bt_mhdr
+            call bt_mrow
+            xor a
+.sp:        push af                         ; slot
+            ld b, 18
+            call vwf_clr
+            ld a, [bt_mpage]
+            add a, a
+            ld [bt_t + 6], a
+            pop af
+            push af
+            ld c, a
+            ld a, 8
+            call bt_mspell
+            ld hl, bt_t + 6
+            inc [hl]
+            pop af
+            push af
+            ld c, a
+            ld a, 88
+            call bt_mspell
+            call bt_mrow
+            pop af
+            inc a
+            cp 3
+            jr c, .sp
             ret
 ; the spell in slot C of level [bt_t+6] at pixel A (icon + name)
 bt_mspell:  ld [vw_x], a
@@ -1723,3 +1689,67 @@ dv_morale:  ds 1
 dv_hit:     ds 1
 dv_player:  ds 1
 bt_pots:    ds 2
+
+section bank 6, $7F40                       ; (the spell list's helpers: bank 6 was full)
+; "L<n> MP <left>" of level [bt_t+6] at pixel A
+bt_mhdr:    push af
+            ld hl, bt_sbuf
+            ld a, $4C
+            ld [hl+], a
+            ld a, [bt_t + 6]
+            add a, $31
+            ld [hl+], a
+            ld a, $20
+            ld [hl+], a
+            ld a, $4D
+            ld [hl+], a
+            ld a, $50
+            ld [hl+], a
+            ld a, $20
+            ld [hl+], a
+            push hl
+            call bt_mdata
+            ld a, [bt_t + 6]
+            add a, $20
+            add a, l
+            ld l, a
+            ld a, [hl]
+            call nf_a
+            call num_fmt
+            pop de
+            ld hl, nf_dig + 5
+            ld a, [nf_dig + 4]
+            cp $20
+            jr z, .one
+            dec hl
+.one:       ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, l
+            cp low(nf_dig + 6)
+            jr nz, .one
+            xor a
+            ld [de], a
+            ld hl, bt_sbuf
+            pop af
+            jp vwf_str
+; Z: no spell on page B / 2 (levels B & 6, B & 6 + 1)
+bt_mpgemp:  call bt_mdata
+            ld a, b
+            and 6
+            add a, a
+            add a, a
+            add a, l
+            ld l, a
+            ld a, [hl+]
+            or [hl]
+            inc hl
+            or [hl]
+            inc hl
+            inc hl
+            or [hl]
+            inc hl
+            or [hl]
+            inc hl
+            or [hl]
+            ret
