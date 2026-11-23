@@ -196,8 +196,10 @@ obj_anim:   ldh a, [frame]
             pop hl
             ret
 .done:      push hl
-            ld a, l                         ; graphic position = physical, not moving
-            add a, O_PX
+            push bc                         ; (B is obj_frame's slot count: kept, or the loop
+            ld a, l                         ;   ran on through RAM as "objects", copying bytes
+            add a, O_PX                     ;   +2/+3 to +4/+5 of the window buffers, the font
+                                            ;   table, the party's names)
             ld e, a
             ld d, h
             ld a, [de]
@@ -211,6 +213,7 @@ obj_anim:   ldh a, [frame]
             inc de
             ld a, b
             ld [de], a
+            pop bc
             pop hl
             push hl
             ld a, l

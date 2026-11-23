@@ -307,8 +307,6 @@ bt_sv:      ds 4                            ; (the RNG and the defender's HP / a
 bt_swn:     ds 1                            ; swings left
 ex_one:     ds 1                            ; bt_explode: one burst
 bt_quiet:   ds 1                            ; messages: only what the numbers cannot say
-ban_on:     ds 1                            ; the top window shown
-ban_attr:   ds 1                            ; (text.s box_vbl: its palette, 0 = WIN_ATTR)
 ban_w:      ds 1
 dn_attr:    ds 1                            ; the number's OAM attribute
 bt_hp0:     ds 2                            ; HP before a heal
