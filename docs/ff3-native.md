@@ -362,5 +362,17 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   (overload burst), jump (leaving / landing, $7E22), row changes, the party's escape, the victory
   cheer tiles (2F/A963). Fixed: numerals ($69-$75) and the hand ($76-$79) moved off the members'
   animation tiles (digits showed in victory poses). Parity: btlcmp `--end` identical (battles 0-4,
-  weapon pokes). Remaining: summons (32/8CEF, raster effects), the flare wave's cloud (10/8BD5),
-  the cannon, the boss death, the split's fade-in.
+  weapon pokes). Then: the battle start walk-in (2F/B469); no white screen at a battle's start /
+  end (the LCD stays on behind black, as the field's loads; the battle's window off at its end);
+  summons (`src/btlsum.s`, CODE9 with bank 32 at $6000): FF3's casting, the party's palettes
+  cycled / faded, the creature from 2A/9440 (size, place, palettes, layout) as 8 x 16 pairs with
+  the party hidden (Leviathan 8 x 9 = 40 pairs), in / out; attacks done: chocobo dash / shake /
+  kick, Ramuh's mind blast and bolts (the hit frames via 33/B943), Ifrit's healing light, Titan's
+  clobber / stomp (FF3's random places) and earthen fury, Shiva's icy stare, Odin's protective
+  light / slash / Zantetsuken (FF3's state: experience, slots cleared), Leviathan's demon eye /
+  tidal wave (FF3's random shakes; the wave sprites still to draw), Bahamut's aura / rend.
+  Fixed: the 8 x 16 mode's data had sat under the stack ($C800 down); its flags are in HRAM now,
+  its sprite list in WRAM 5 and the tile mirror in WRAM 6.
+  Remaining: mesmerize, diamond dust, hellfire, inferno, cyclone (visual only, no random calls),
+  mega flare and the cannon (FF3's random places: needed for parity), the tidal wave's waves, the
+  flare wave's cloud (10/8BD5), the boss death, the split's fade-in.

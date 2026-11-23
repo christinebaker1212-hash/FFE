@@ -900,6 +900,7 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   ($EF, `src/anim.s`) done, with FF3's world map objects. Battle animations (2026-11-23): attacks with
   every weapon type (parity-checked), magic casting / flight / hit frames through an 8 x 16 sprite
   mode (the GB's 40 sprites; `src/btlfx.s`), special spells, job commands, monster flash / death wipe /
-  split / toad. Next: summons, then the
+  split / toad, walk-in, summons (framework + 17 of 24 attacks). Next: the rest of the summon attacks
+  (mega flare / cannon for random parity), then the
   parity / Lot Check pass on the native build. Also fixed in the
   recompiled build: one-row menu cursors (Item opened Magic), the battle "Miss" sprite in English.
