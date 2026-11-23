@@ -1214,6 +1214,12 @@ bt_pl_attack:
             jr nz, .alive
             ld a, [bt_tgt]
             call bt_erase_enemy
+            ld a, [bt_tgt]                  ; (gone from the names and counts, as a spell's
+            ld e, a                         ;   kill: it stayed listed after a blow)
+            ld d, 0
+            ld hl, bt_eid
+            add hl, de
+            ld [hl], $FF
             call bt_names_win
 .alive:
             ld a, [bt_who]                  ; then the member back in line
@@ -1720,9 +1726,11 @@ bt_rnd_member:
 
 ; an enemy off the screen (its cells empty)
 bt_erase_enemy:
-            call bt_ban_off                 ; (its tiles: the dissolve's)
             push af                         ; (owner, 2026-11-23: a proper death; bosses a
-            ld b, a                         ;   special one: loc.s ed_dissolve)
+            call bt_ban_off                 ;   special one: loc.s ed_dissolve; the name
+            pop af                          ;   window off first: its tiles are the
+            push af                         ;   dissolve's; A kept: the slot)
+            ld b, a
             ld a, [bt_type]
             cp 4
             jr nc, .x                       ; (Chaos: its own ending)
@@ -2308,17 +2316,9 @@ bt_victory: call bt_msg_new
             jr c, .ax
             jp bt_results
 
-; C set and HL = enemy A's record when slot A held an enemy that is now dead or stone
-bt_eded:    push bc
-            ld e, a
-            ld d, 0
-            ld hl, bt_eid
-            add hl, de
-            ld b, [hl]
-            call bt_erec
-            pop bc
-            inc b                           ; (id $FF: no enemy: NC)
-            jr z, .no
+; C set and HL = enemy A's record when it is dead or stone (empty slots are cleared at the
+; start, so never; bt_eid is $FF for every enemy gone, so not checked: spells' kills too)
+bt_eded:    call bt_erec
             push hl
             ld de, E_AIL
             add hl, de
@@ -2327,8 +2327,6 @@ bt_eded:    push bc
             and AIL_DEAD | AIL_STONE
             ret z
             scf
-            ret
-.no:        and a
             ret
 ; member A: experience >= the table's amount for its level -> a level up
 bt_lvchk:   ld [bt_lvm], a
@@ -2375,6 +2373,8 @@ bt_lvchk:   ld [bt_lvm], a
             ld a, b
             sbc a, c
             ret c
+            jp bt_levelup                   ; (it once followed here; moved, the fall-through
+                                            ;   reached bt_rf instead: no level ups at all)
 bt_rf:      ld l, a
             ld a, [bt_lvr]
             add a, l
@@ -2385,30 +2385,19 @@ bt_cap200:  cp 201
             ret c
             ld a, 200
             ret
-; a row "N" + string HL
-bt_numline: push hl
-            call num_fmt
-            ld hl, nf_dig
-            ld de, bt_line
-.s:         ld a, [hl]
-            cp $20
-            jr nz, .c
-            inc hl
-            jr .s
-.c:         ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, l
-            cp low(nf_dig + 6)
-            jr nz, .c
-            pop hl
-.t:         ld a, [hl+]
-            ld [de], a
-            inc de
-            and a
-            jr nz, .t
-            ld hl, bt_line
-            jp bt_msg_row
+; SELECT in a target choice: the name window off / on again
+bt_tban_sel:
+            ld hl, ban_hide
+            ld a, [hl]
+            xor 1
+            ld [hl], a
+            ld a, $FF
+            ld [ban_last], a
+            ret
+bt_tban_off:
+            ld a, $FF
+            ld [ban_last], a
+            jp bt_ban_off
 bt_s_pts:   db "P", 0
 bt_s_gil:   db " Gil", 0
 
@@ -2989,7 +2978,16 @@ BAN_T0     = $C4
 bt_ban_spell:
             ld a, [mg_id]
             call bt_mname
-bt_banner:  ld b, 18
+bt_banner:  ld a, [ban_on]                  ; (shown: off first, a frame, so the new name's
+            and a                           ;   tiles and rows never change under a shown
+            jr z, .go                       ;   window: garbage between selections)
+            ld a, [ban_bot]
+            push af
+            call bt_ban_off
+            pop af
+            ld [ban_bot], a
+            call bt_frame
+.go:        ld b, 18
             call vwf_clr
             ld hl, bt_sbuf
             xor a
@@ -3630,15 +3628,6 @@ bt_tban_e:  ld a, [ban_hide]                ; (SELECT: none)
             ld a, [bt_tcur]
             call bt_ename
             jp bt_banner
-; SELECT in a target choice: the name window off / on again
-bt_tban_sel:
-            ld hl, ban_hide
-            ld a, [hl]
-            xor 1
-            ld [hl], a
-            ld a, $FF
-            ld [ban_last], a
-            ret
 bt_tban_p:  ld a, [ban_hide]                ; (SELECT: none)
             and a
             jp nz, bt_ban_off
@@ -3681,10 +3670,6 @@ bt_tban_p:  ld a, [ban_hide]                ; (SELECT: none)
             xor a
             ld [de], a
             jp bt_banner
-bt_tban_off:
-            ld a, $FF
-            ld [ban_last], a
-            jp bt_ban_off
 
 section bank 6, $7480                       ; (the results window: after btl4)
 ; a level up kept for the results window: the new level, the HP gain, the stats raised
