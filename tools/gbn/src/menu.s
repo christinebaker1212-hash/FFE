@@ -638,7 +638,7 @@ orb_draw:   ld hl, orb_pos
             dec h
             inc hl
             ret
-orb_pos:    db 13, 9, 15, 9, 13, 11, 15, 11
+orb_pos:    db 13, 8, 16, 8, 13, 11, 16, 11  ; (centred in the window: one-tile gaps)
 
 ; ---- choose a member in the party window (hand left of the name): C set on B
 pick_char:  xor a
