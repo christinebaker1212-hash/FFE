@@ -418,12 +418,8 @@ b_waitA:    call b_keys
             jr z, b_waitA
             ret
 
-; $0B: the attack animation (for now a pause)
-sc_anim:    ld b, 12
-.w:         call wait_vbl
-            dec b
-            jr nz, .w
-            ret
+; $0B: the attack animation (34/8411: btlanim.s)
+sc_anim:    jp ba_show
 
 ; $0C: the damage numerals ($7E4F: monsters 2 x slot, members $7E5F + 2 x id; $FFFF none,
 ; hi bit 6 miss, bit 7 restored): up to 4 targets at a time, 40 frames each

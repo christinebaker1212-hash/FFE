@@ -213,6 +213,7 @@ CODE5 = 113                             # the cutscenes (cut.s at $4000, NES ban
 CUTD = 114                              # their graphics and text pages (cut.py)
 CUTD2 = 115                             # the end credits' strings, weapon tiles (cut.py)
 CODE6 = 116                             # the special animations (anim.s), 3A/9800 at $5800, 3B at $6000
+CODE7 = 118                             # battle animations (btlanim.s), 32/9000 at $5000, 33 at $6000
 W0B_BANK = 117                          # NES bank 0B (world map sprites) as 512 GB tiles
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
 CHGFX_BANK = 95                         # battle characters (NES banks $28 / $29) as GB tiles
@@ -246,7 +247,7 @@ def engine_src(rom=None):
         codes.append(shop.code_data(rom))
     # the battle banks: calls between them go through bank-0 stubs (A passed and returned)
     lab = lambda t: set(re.findall(r'^([A-Za-z_]\w*):', t, re.M))
-    bb = [(CODE2, CODE2_MODULES), (CODE3, CODE3_MODULES), (CODE4, CODE4_MODULES)]
+    bb = [(CODE2, CODE2_MODULES), (CODE3, CODE3_MODULES), (CODE4, CODE4_MODULES), (CODE7, ('btlanim',))]
     srcs = [[split(rd(m)) for m in mods] for _, mods in bb]
     labs = [set().union(*(lab(c) for c, _ in ss)) for ss in srcs]
     owner = {}
@@ -363,6 +364,7 @@ def main():
     bd[0x3610:0x3632] = rom.b(1, 0xA35E, 34)                   # $7610: 01/A35E item multipliers
     bd[0x3700:0x3908] = rom.b(0x2E, 0x8FC0, 0x208)             # $7700: 2E/8FC0 boss attribute data
     bd[0x23D0:0x2400] = rom.b(0x2E, 0x91A0, 48)                # $63D0: 2E/91A0 item spells
+    bd[0x2F00:0x2F20] = rom.b(0x34, 0x83F8, 0x20)              # $6F00: 34/83F8 attack animation ids
     f = rom.prg[0x0D * 0x2000 + 0x1700:0x0D * 0x2000 + 0x1700 + 144 * 16]   # $7000: numeral sprites
     for k, c in enumerate(list(range(0x80, 0x8A)) + [text.ENC[ch] for ch in 'Mis']):
         p0 = f[16 * (c - 0x70):16 * (c - 0x70) + 8]                 #   (the font's ink, clear around)
@@ -419,7 +421,7 @@ def main():
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
                        'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0, 'CHGFX_BANK': CHGFX_BANK, 'BDATA2_BANK': BDATA2_BANK, 'BTXT_BANK': BTXT_BANK, 'CODE3': CODE3, 'CODE4': CODE4, 'BDATA3_BANK': BDATA3_BANK,
-                       'CODE5': CODE5, 'CUTD': CUTD, 'CUTD2': CUTD2, 'CODE6': CODE6, 'W0B_BANK': W0B_BANK, **cut_syms,
+                       'CODE5': CODE5, 'CUTD': CUTD, 'CUTD2': CUTD2, 'CODE6': CODE6, 'W0B_BANK': W0B_BANK, 'CODE7': CODE7, **cut_syms,
                        'TEST_SONG': int(opt['--song'], 0) if opt['--song'] else 255,
                        'SND_MASK': int(os.environ.get('GB_SND_MASK', 'FF'), 16),     # (test builds: NR51)
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,
@@ -436,6 +438,11 @@ def main():
     ab[0x1400:0x1800] = rom.b(0x3C, 0x8400, 0x400)             # $5400: 3C/8400-87FF sprite lists
     ab[0x1800:0x2000] = rom.b(0x3A, 0x9800, 0x800)             # $5800: 3A/9800-9FFF
     ab[0x2000:0x4000] = rom.b(0x3B, 0xA000, 0x2000)            # $6000: 3B
+    c7 = r.banks.setdefault(CODE7, bytearray(0x4000))
+    c7.extend(bytes(0x4000 - len(c7)))
+    assert not any(c7[0x1000:]), 'battle animation code past $5000'
+    c7[0x1000:0x2000] = rom.b(0x32, 0x9000, 0x1000)            # $5000: 32/9000-9FFF
+    c7[0x2000:0x4000] = rom.b(0x33, 0xA000, 0x2000)            # $6000: 33
     size = 2
     while size < max(r.banks) + 1: size *= 2
     rom_bytes = make_rom(r.banks, 'FF3 NATIVE', cart_type=0x1B, rom_banks=size, ram_size_code=0x02, cgb=0xC0)
