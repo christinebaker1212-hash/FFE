@@ -106,7 +106,9 @@ def nes_end(bid):
         n.step(1)
         f += 1
         wl = n.watch
-        if stop is None and f > 400 and wl: stop = f
+        if stop is None and f > 400 and wl:
+            stop = f; res = bytes(n.save())[nb.SRAM + 0x18D3]
+            print('NES result $%02X' % res)
         if stop is not None and f >= stop + 60: break
     s = bytes(n.save())
     return s[nb.RAM:nb.RAM + 0x800], s[nb.SRAM:nb.SRAM + 0x2000], stop
@@ -164,7 +166,8 @@ def native(bid, gf, sram0, seeds, turns=0):
         if f == 104: m[sym['act_id']] = bid; m[sym['act']] = 0x20; m[sym['btl_res']] = 0xEE
         pb.tick()
         f += 1
-    if turns: print('GB turn %d reached at frame %s' % (turns + 1, stop))
+    if turns > 0: print('GB turn %d reached at frame %s' % (turns + 1, stop))
+    if turns < 0: print('GB back at frame %s, result $%02X' % (stop, m[sym['btl_res']]))
     m[0xFF70] = 3
     zp = bytes(m[0xD000:0xD100]); w = bytes(m[0xD200:0xDF00]); gsb = bytes(m[0xC800:0xCC00])
     pb.stop(save=False)

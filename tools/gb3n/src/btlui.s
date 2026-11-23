@@ -4,11 +4,6 @@
 ; English hp window: 34/9BA2); the command window (0, 0, 10, 6) over its left part while a
 ; member chooses (34/9A69); the font in VRAM bank 1 tiles $70-$FF (text codes = tiles), the
 ; hand in VRAM bank 1 tiles $60-$63, palettes: the window CGB 7, the hand sprite palette 3.
-BD_CMDS    = BD_2F + $240       ; 34/9B21: 4 battle commands a job (build.py)
-HAND_T     = $60
-NUM_T      = $40                ; numeral sprite tiles in VRAM bank 1 ($40-$49 digits, $4A-$4C Miss)
-BTXT_IDX   = $4000              ; BTXT_BANK: 3 bytes a battle string ($0400 + index)
-BCV_BUF    = win_buf            ; (bank 0, the field's dialogue box buffer: 4 lines x 20)
 
 ui_init:    ld a, 1                         ; font -> VRAM bank 1 $70-
             call font_ld
@@ -564,6 +559,24 @@ cmd_input:  xor a
             jr z, .row
             cp 3
             jr z, .row
+            cp 8
+            jp z, .jump
+            cp $0B
+            jp z, .terr
+            cp $0C
+            jr z, .tcmd
+            cp $0D
+            jr z, .tcmd
+            cp $0E
+            jr z, .tcmd
+            cp $10
+            jr z, .tcmd
+            cp $0F
+            jr z, .act
+            cp $11
+            jr z, .act
+            cp $12
+            jr z, .act
             ld a, $86                       ; (the other commands: not yet)
             ld [S49], a
             ld a, $FF
@@ -575,7 +588,7 @@ cmd_input:  xor a
             ld a, 1
             ret
 .fight:     ld a, 4                         ; 35/A848 do command: the targets
-            ld [BZ + $54], a
+.tcmd:      ld [BZ + $54], a
             call target_mon
             and a
             jp z, .l
@@ -591,6 +604,73 @@ cmd_input:  xor a
             dec hl
             ld a, [BZ + $54]
             ld [hl], a
+            ld a, 1
+            ret
+.jump:      xor a                           ; 35/A9AB: a monster target
+            ld [BZ + $B3], a
+            call target_sel
+            and a
+            jp z, .l
+            ld a, [BZ + $B5]
+            bit 7, a
+            jr z, .jump
+            ld a, [BZ + $5F]
+            add a, $2F
+            ld c, a
+            ld a, $5B
+            call zpy
+            ld a, [BZ + $B4]
+            ld [hl+], a
+            ld a, [BZ + $B5]
+            ld [hl-], a
+            dec hl
+            ld [hl], 8
+            ld a, 1
+            ret
+.terr:      ld a, [BZ + $5F]                ; 35/AA22: the action, the terrain's targets
+            add a, $2E
+            ld c, a
+            ld a, $5B
+            call zpy
+            ld [hl], $0B
+            call terr_atk
+            sub $50
+            inc a
+            ld b, a
+            ld hl, BD_TERRT
+            push bc
+            call bd_rd
+            pop bc
+.tb:        add a, a
+            dec b
+            jr nz, .tb
+            jr nc, .tall
+            ld a, [BZ + $5F]                ; (31/A2E9: a random monster)
+            ld c, a
+            ld b, 0
+            ld hl, W7 + $7575
+            add hl, bc
+            ld a, $6E
+            call zpset
+            ld hl, W7 + $7675
+            ld a, $22
+            call zpset
+            ld a, 7
+            call rnd_target
+            ld a, [W7 + $7E99]
+            ld d, $80
+            jr .tset
+.tall:      ld a, $FF
+            ld d, $C0
+.tset:      push af
+            ld a, [BZ + $5F]
+            add a, $2F
+            ld c, a
+            ld a, $5B
+            call zpy
+            pop af
+            ld [hl+], a
+            ld [hl], d
             ld a, 1
             ret
 .defend:    ld a, 5
@@ -623,7 +703,6 @@ b_setcmd:   ld b, a
 ; 4 one member, 5 all members), $B2 the member; $B3 bit 1: start on the members, bit 0: groups
 ; allowed (else modes 1, 2, 3, 5 are refused). A -> $B4 = the mask, $B5 = $C0 monsters / $40
 ; members (bit 6 cleared for a single target), A = 1; B -> $B4 = 0, A = 0
-TS_GRID    = BD_2F + $360       ; 32/9EAD (build.py)
 target_sel: xor a
             ld [BZ + $AF], a
             ld [BZ + $B0], a

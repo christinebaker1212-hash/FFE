@@ -3,13 +3,6 @@
 ; the job's multipliers) and job level, experience and level ups (39/A0B0, max hp from vitality,
 ; the job's stat bonuses 39/A1D6, MP); then the end of the battle (34/8306, 8170): equipment,
 ; status / hp / mp back to the save block, rows, the inventory consolidated.
-BD_MITEMS  = $7100              ; BDATA: 10/9B80 monster item sets (8 bytes)
-BD_MEXPID  = $7200              ;   10/9C80 monster experience id
-BD_MEXP    = $7300              ;   10/9D80 experience values (2 bytes)
-BD2_GOLD   = $5C58              ; BDATA2: 30/9C58 monster gold (2 bytes)
-JB_CP      = $52AE              ; JOB_BANK: 39/B2AE monster capacity
-JB_LVEXP   = $40B0              ;   39/A0B0 experience by level (3 bytes)
-JB_LVBON   = $41D6              ;   39/A1D6 level up bonuses (job x 196 + level x 2)
 
 victory:    xor a
             ld [W7 + $7570], a

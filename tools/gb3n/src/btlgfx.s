@@ -3,8 +3,6 @@
 ; ($7CF7), shown on the GB as BG map rows 0-13 (tiles and palettes from VRAM bank 0, the CGB
 ; attributes from FF3's attribute table), the view from NES (20, 48) (the approved layout: the
 ; battlefield in the top 96 lines, the windows below). Bosses and back attacks: later.
-TB_A2D0    = BD_2F + $20C       ; 2F/A2D0: first tile of each monster type (build.py)
-BT_ROWS    = 14
 
 ; 2F/A14A init monster / bg graphics + 2E/9D88 palettes + 2E/9E64 characters
 bg_init:    call chr_init
@@ -704,14 +702,6 @@ btl_end:    call wait_vbl
 ; the approved party column: x = 140 + (NES x - 208) / 2, y = 24 member + (NES y - $2C - 4
 ; member); the six sprites' offsets as FF3's (32/91CB templates, 32/972E tiles); tiles in VRAM
 ; bank 1 at FF3's indices (tile 1 + 14 member), palettes as FF3's ($7D93 | $7D97).
-BD_ROWX    = BD_2F + $220       ; 2F/B516: x by row (front, back; back attack +2)
-BD_START   = BD_2F + $224       ; 2F/B51A: start x 4, y 4 (back attack + 8)
-BD_SPR     = $6800              ; 32/9100-97FF
-SP_TMPL    = BD_SPR + $CB       ; 32/91CB template pointers (NES addresses)
-SP_IDX     = BD_SPR + $16B      ; 32/926B template id by frame (flipped: + $15)
-SP_OFS     = BD_SPR + $195      ; 32/9295 tile offset by member
-SP_FRAME   = BD_SPR + $62E      ; 32/972E 6 tiles a frame
-PARTY_OAM  = oam_buf            ; sprites 0-23 (6 a member)
 
 chr_gfx:    xor a
 .m:         ld [btl_k], a

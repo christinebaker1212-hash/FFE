@@ -1611,7 +1611,6 @@ mag_status: ld a, [BZ + $7C]
 
 ; 31/B9FA do reflect effect (monsters <-> members only; the spell reflectable, 31/BB0E): a random
 ; living target on the caster's side
-REFL_T     = BD_2F + $3B0       ; 31/BB0E (build.py)
 do_reflect: call atk_flags
             bit 7, a
             jr nz, .m
@@ -1801,7 +1800,6 @@ val_tgts:   xor a
 
 ; 35/A56F show magic message (the spell's own message, ineffective, absorbed / undead /
 ; backfired by $54)
-MAGMSG_T   = BD_2F + $3C0       ; 35/A5FD (build.py)
 mag_msg:    ld a, [W7 + $7E88]
             ld [BZ + $24], a
             cp $5B

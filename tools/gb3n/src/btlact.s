@@ -511,9 +511,9 @@ exec_action:
             ld h, [hl]
             ld l, a
             jp hl
-act_tab:    dw act_none, act_none, act_none, act_none, act_fight, act_defend, act_none, act_none
-            dw act_none, act_none, act_none, act_none, act_none, act_none, act_none, act_none
-            dw act_none, act_none, act_none, act_none, act_magic
+act_tab:    dw act_none, act_sleep, act_front, act_back, act_fight, act_defend, act_run, act_escape
+            dw act_jump, act_jump2, act_none, act_terrain, act_peep, act_scan, act_steal, act_build
+            dw act_sing, act_scare, act_cheer, act_item, act_magic
 act_none:   ret
 
 ; 34/9F7B set command id A (magic / item flags cleared)

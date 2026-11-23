@@ -5,12 +5,7 @@
 ; window (lines of 18; the target after the attacker behind an arrow when it fits; a window
 ; that finds no free line covers the last one; closing blanks its cells, the last one closed
 ; brings the party window back), damage numerals as sprites over the targets.
-SCRIPTS    = BD_2F + $2A0       ; 34/950D (build.py): script pointers, scripts, types at +$68
-SCR_TYPES  = SCRIPTS + $68      ; 34/9575: battle message variable types (nibbles)
-ROWTAB     = BD_2F + $340       ; 34/8739: monster rows by tilemap id (build.py)
 
-NUM_OAM    = oam_buf + 4 * 24   ; sprites 24-39 (the hand is hidden while actions run)
-ARROW      = $CA
 
 act_script: ld a, [W7 + $7EC2]
             and a
