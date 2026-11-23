@@ -34,6 +34,8 @@ ba_show:    ld a, [W7 + $7E9A]              ; (FF3: rol x 3 through carry = bit 
             jp z, mx_magic                  ; (btlfx.s)
             cp $10
             jp z, mx_ineff
+            cp $0E
+            jp c, mx_other                  ; (2-$0D: btlfx.s)
             ld b, 12                        ; (others: for now a pause)
 .w:         call wait_vbl
             dec b
@@ -159,6 +161,7 @@ ba_step:    ld [W7 + $7D7D], a
 .s:         ld [hl], a
             xor a
             ld [W7 + $7CF4], a
+ba_walk:                                    ; (2F/AF30: all members to their $7D7F)
 .mv:        ld c, 0                         ; 33/BE9A: each member a step, drawn, a frame
 .m:         push bc
             call ba_move1

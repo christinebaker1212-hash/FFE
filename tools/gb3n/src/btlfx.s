@@ -1589,6 +1589,543 @@ mx_mul:     push de
             pop de
             ret
 
+; ---- 34/8411 attack animations 2-$0D (summon: later; cannon: a pause)
+mx_other:   ld [mx_t], a
+            ld a, [W7 + $7E98]              ; 34/8532: the attacker
+            call ba_maskid
+            ld [BZ + $52], a
+            ld [BZ + $95], a
+            ld a, [mx_t]
+            sub 4
+            jr c, .p                        ; (2-3)
+            ld e, a
+            ld d, 0
+            ld hl, .t
+            add hl, de
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            jp hl
+.p:         ld b, 12
+.w:         call wait_vbl
+            dec b
+            jr nz, .w
+            ret
+.t:         dw mx_front, mx_back, mx_defend, mx_jump1, mx_jump2, mx_build, mx_scare, mx_cheer
+            dw .p, mx_run
+; 2F/B443 / B42A the member to the front / back row (16 pixels, walked)
+mx_front:   xor a
+            ld b, $F0
+            jr mx_row
+mx_back:    ld a, 1
+            ld b, $10
+mx_row:     ld [W7 + $7D7D], a
+            ld [mx_t + 1], a
+            ld a, [BZ + $95]
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7D7F
+            add hl, de
+            ld a, [hl]
+            add a, b
+            ld [hl], a
+            ld hl, W7 + $7D8F
+            add hl, de
+            ld a, [mx_t + 1]
+            ld [hl], a
+            xor a
+            ld [W7 + $7CF4], a
+            jp ba_walk
+; (A972: the attacker's frame A, B when toad / mini)
+mx_tfr:     ld c, a
+            push bc
+            call ba_tm
+            pop bc
+            ld a, c
+            jr z, .s
+            ld a, b
+.s:         jp ba_cfr
+; the start: palette A, graphics B, frames saved, the counter 0, sound C
+mx_jst:     push bc
+            call ba_pal3
+            pop bc
+            push bc
+            ld a, b
+            call mx_gfx
+            call ba_save
+            xor a
+            ld [BZ + $B6], a
+            pop bc
+            ld a, c
+            ld [S49], a
+            ret
+; 33/AC3A the end: the frames back, drawn, a frame
+mx_jend:    call ba_rest
+            call chr_draw
+            jp wait_vbl
+; 33/ABF7 defend: 32 frames of the shield ($38-$3B)
+mx_defend:  call ba_cgfx
+            ld a, $C1
+            ld bc, $03A0
+            call mx_jst
+.f:         call ba_reset
+            ld a, 8
+            ld b, $0E
+            call mx_tfr
+            ld a, [BZ + $B6]
+            and $18
+            rrca
+            rrca
+            rrca
+            add a, $38
+            call ba_aspr0
+            call wait_vbl
+            call ba_inc
+            and $20
+            jr z, .f
+            jp mx_jend
+; 33/A92B cheer: 32 frames, arms up / down every 8
+mx_cheer:   call ba_cgfx
+            ld a, $E5
+            ld bc, $00CB
+            call mx_jst
+.f:         call ba_reset
+            ld a, [BZ + $B6]
+            and 8
+            jr nz, .b
+            ld a, 5
+            ld b, $0E
+            call mx_tfr
+            xor a
+            jr .s
+.b:         ld a, 1
+            ld b, $0A
+            call mx_tfr
+            ld a, 1
+.s:         call ba_aspr0
+            call wait_vbl
+            call ba_inc
+            and $20
+            jr z, .f
+            jp mx_jend
+; 33/A988 scare: 32 frames, the face shaking (y +- 1 every 2 frames)
+mx_scare:   call ba_stepf
+            call ba_cgfx
+            ld a, $F1
+            ld bc, $018F
+            call mx_jst
+.f:         call ba_reset
+            ld a, 8
+            ld b, $0E
+            call mx_tfr
+            ld a, [BZ + $B6]
+            and 2
+            ld a, 1
+            jr z, .y
+            ld a, $FF
+.y:         ld [BZ + $7F], a
+            xor a
+            ld [BZ + $7E], a
+            ld a, 1
+            call ba_aspr
+            call wait_vbl
+            call ba_inc
+            and $20
+            jr z, .f
+            call mx_jend
+            jp ba_stepb
+; 33/AB27 buildup: 32 frames of the glow ($3C-$43); overloaded ($7E93): 8 frames of the burst
+mx_build:   ld a, [W7 + $7E93]
+            ld [W7 + $7E19], a
+            call ba_stepf
+            call ba_cgfx
+            call ba_hgfx
+            ld a, $BB
+            ld bc, $02A1
+            call mx_jst
+.f:         call ba_reset
+            ld a, 8
+            ld b, $0E
+            call mx_tfr
+            ld a, [BZ + $B6]
+            and 4
+            add a, $3C
+            ld [BZ + $88], a
+            call ba_aspr0
+            ld b, 3
+.g:         push bc
+            ld hl, BZ + $88
+            inc [hl]
+            ld a, [hl]
+            call ba_aspr0
+            pop bc
+            dec b
+            jr nz, .g
+            call wait_vbl
+            call ba_inc
+            and $20
+            jr z, .f
+            ld a, [W7 + $7E19]
+            and a
+            jr z, .x
+            ld a, $B0
+            ld [S49], a
+            xor a
+            ld [BZ + $B6], a
+.o:         call ba_reset
+            call chr_draw
+            ld a, 4
+            ld b, $0F
+            call mx_tfr
+            ld a, [BZ + $B6]                ; the four sparks: (-n, -n), (n, -n), (-n, n), (n, n)
+            cpl
+            inc a
+            ld c, a
+            ld a, [BZ + $B6]
+            ld b, a
+            ld a, c
+            ld d, c
+            ld e, $44
+            call .sp
+            ld a, b
+            ld d, c
+            ld e, $45
+            call .sp
+            ld a, c
+            ld d, b
+            ld e, $46
+            call .sp
+            ld a, b
+            ld d, b
+            ld e, $47
+            call .sp
+            call wait_vbl
+            call ba_inc
+            and 8
+            jr z, .o
+.x:         call mx_jend
+            jp ba_stepb
+.sp:        push bc                         ; x offset A (confused: inverted), y D, frame E
+            ld b, a
+            call ba_conf
+            ld a, b
+            jr z, .s1
+            cpl
+.s1:        ld [BZ + $7E], a
+            ld a, d
+            ld [BZ + $7F], a
+            ld a, e
+            call ba_aspr
+            pop bc
+            ret
+ba_conf:    ld a, [BZ + $95]                ; (33/ABE5: the attacker confused: NZ)
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7D9B
+            add hl, de
+            add hl, de
+            ld a, [hl]
+            and 8
+            ret
+; 33/AAB8 jump 1: 16 frames crouched, then up off the screen ($7E22: where it left)
+mx_jump1:   call ba_stepf
+            call ba_cgfx
+            call ba_save
+            xor a
+            ld [BZ + $B6], a
+            ld a, [BZ + $95]
+            ld e, a
+            ld d, 0
+            ld hl, BZ + $C0
+            add hl, de
+            ld a, [hl]
+            ld [mx_t + 1], a
+            ld a, $C4
+            ld [S49], a
+.c:         call ba_reset
+            ld a, 3
+            call ba_cfr
+            call wait_vbl
+            call ba_inc
+            and $10
+            jr z, .c
+.u:         call ba_reset
+            call .hl
+            ld a, [hl]
+            sub 8
+            ld [hl], a
+            ld a, l
+            sub 4
+            ld l, a
+            dec [hl]
+            dec [hl]
+            ld a, 7
+            call ba_cfr
+            call wait_vbl
+            call .hl
+            ld a, [hl]
+            cp $0A
+            jr nc, .u
+            ld a, l
+            sub 4
+            ld l, a
+            ld a, [hl]
+            ld [mx_t + 2], a
+            ld a, [mx_t + 1]
+            ld [hl], a
+            ld a, [BZ + $95]
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7E22
+            add hl, de
+            ld a, [mx_t + 2]
+            ld [hl], a
+            jp mx_jend
+.hl:        ld a, [BZ + $95]                ; HL -> C4 + attacker
+            add a, low(BZ + $C4)
+            ld l, a
+            ld h, high(BZ + $C4)
+            ret
+; 33/AA15 jump 2: down on the target ($B8) with the dragoon sprite, then back down to its row
+mx_jump2:   ld a, [W7 + $7E99]
+            call ba_maskid
+            ld [BZ + $B8], a
+            call ba_cgfx
+            ld a, $0A                       ; (2F/A1B3 graphics $0A: the jump tiles 14/B9C0 -> $49)
+            ld hl, $79C0
+            ld de, $8000 + 16 * $49
+            ld b, 6
+            call mx_ctile
+            ld a, $FD
+            call ba_pal3
+            call ba_save
+            ld a, [BZ + $95]
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7E22
+            add hl, de
+            ld a, [hl]
+            ld [hl], 0
+            ld hl, BZ + $C0
+            add hl, de
+            ld [hl], a
+            ld a, [BZ + $B8]                ; $8E = centre x - 8 + (bottom - 8) / 4, $90 the steps
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7E07
+            add hl, de
+            ld a, [hl]
+            sub 8
+            srl a
+            srl a
+            ld [BZ + $90], a
+            ld b, a
+            ld hl, W7 + $7DD7
+            add hl, de
+            add hl, de
+            ld a, [hl]
+            sub 8
+            add a, b
+            ld [BZ + $8E], a
+            ld hl, BZ + $90
+            srl [hl]
+            ld a, [hl]
+            ld [BZ + $91], a
+            xor a
+            ld [BZ + $7E], a
+.d:         call .st
+            ld a, [BZ + $7E]
+            add a, 8
+            ld [BZ + $7E], a
+            ld hl, BZ + $91
+            dec [hl]
+            jr nz, .d
+            ld a, [BZ + $90]
+            ld [BZ + $91], a
+            ld a, $B6
+            ld [S49], a
+.e:         call .st
+            ld a, [BZ + $7E]
+            sub 8
+            ld [BZ + $7E], a
+            ld hl, BZ + $91
+            dec [hl]
+            jr nz, .e
+            call ba_reset
+            ld b, 32
+.w:         call wait_vbl
+            dec b
+            jr nz, .w
+.l:         call ba_reset                   ; down to its row (33/AAA6)
+            call mx_jump1.hl
+            ld a, [hl]
+            add a, 8
+            ld [hl], a
+            ld a, l
+            sub 4
+            ld l, a
+            inc [hl]
+            inc [hl]
+            ld a, 8
+            call ba_cfr
+            call wait_vbl
+            call mx_jump1.hl
+            ld a, [BZ + $95]
+            ld e, a
+            ld d, 0
+            push hl
+            ld hl, $AAA6 + N33
+            add hl, de
+            ld a, [hl]
+            pop hl
+            cp [hl]
+            jr nz, .l
+            call mx_jend
+            jp ba_stepb
+.st:        call wait_vbl                   ; 33/AA02: the 6 sprites (32/91D7) at ($8E, $7E)
+            ld a, [BZ + $8E]
+            ld [BZ + $8C], a
+            ld a, [BZ + $7E]
+            ld [BZ + $8D], a
+            call ba_reset
+            ld a, 1
+            ld [ba_mode], a
+            ld hl, $91D7 + F32
+            ld c, $49
+            ld b, 6
+.s:         push bc
+            ld a, FXD
+            call rd_byte
+            ld b, a
+            ld a, [BZ + $8D]
+            add a, b
+            ld [mx_t], a
+            inc hl
+            inc hl
+            ld a, FXD
+            call rd_byte
+            ld b, a
+            ld a, [BZ + $8C]
+            add a, b
+            pop de
+            push de
+            ld b, a
+            ld a, [mx_t]
+            ld c, a
+            ld e, 3
+            push hl
+            call ba_put
+            pop hl
+            pop bc
+            inc c
+            dec b
+            jr nz, .s
+            ld hl, BZ + $8E
+            dec [hl]
+            dec [hl]
+            ret
+; B tiles from CHGFX_BANK HL -> VRAM bank 1 DE (FF969's 4 a frame)
+mx_ctile:   ld a, CHGFX_BANK
+            ld [vc_src], a
+            ld a, 1
+            ld [ba_dirty], a
+            push bc
+            ld a, 1
+            call vcopyx
+            pop bc
+            ld a, b
+            srl a
+            srl a
+            dec a
+            ret z
+            ret c
+            ld b, a
+.w:         call wait_vbl
+            dec b
+            jr nz, .w
+            ret
+; 34/84D7 run: a member's party (33/BC89: 32 frames turning round, then all walk off); monsters
+; flash, then (2F/BB5E, as their deaths) vanish
+mx_run:     ld a, [W7 + $7E9A]
+            bit 7, a
+            jr nz, .m
+            ld a, [W7 + $78D4]
+            and a
+            ret z
+            xor a
+            ld [BZ + $B6], a
+.f:         call ba_vblc                    ; (a different member flipped every 8 frames)
+            ld a, [BZ + $B6]
+            and $18
+            rrca
+            rrca
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7D9B
+            add hl, de
+            ld a, [hl]
+            and $C0
+            jr nz, .n
+            srl e
+            ld hl, W7 + $7D83
+            add hl, de
+            set 7, [hl]
+.n:         call chr_draw
+            call ba_inc
+            and $20
+            jr z, .f
+            ld a, $B3
+            ld [S49], a
+            ld c, 0
+.o:         ld b, 0                         ; each: off the screen ($F0; back attack: 0, faced)
+            ld hl, W7 + $7D9B
+            add hl, bc
+            add hl, bc
+            ld a, [hl]
+            and $C0
+            jr nz, .dd
+            ld a, [W7 + $78C3]
+            cp $88
+            ld a, $F0
+            jr nz, .o1
+            xor a
+.o1:        ld hl, W7 + $7D7F
+            add hl, bc
+            ld [hl], a
+            ld hl, W7 + $7D83
+            add hl, bc
+            res 7, [hl]
+            ld hl, W7 + $7D9B
+            add hl, bc
+            add hl, bc
+            set 3, [hl]
+            jr .on
+.dd:        ld hl, BZ + $C0                 ; (dead / stone: stay)
+            add hl, bc
+            ld a, [hl]
+            ld hl, W7 + $7D7F
+            add hl, bc
+            ld [hl], a
+.on:        inc c
+            ld a, c
+            cp 4
+            jr nz, .o
+            ld a, [W7 + $78C3]
+            cp $88
+            ld a, 1
+            jr nz, .o2
+            xor a
+.o2:        ld [W7 + $7D7D], a
+            xor a
+            ld [W7 + $7CF4], a
+            jp ba_walk
+.m:         call ba_mflash
+            ld a, [W7 + $78D4]
+            and a
+            ret z
+            jp mon_run
+
 ; ---- 33/B09B the casting (black: bubbles, white: stars)
 mx_pre:     call mx_props
             ld a, [W7 + $7E8B]

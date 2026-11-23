@@ -735,7 +735,7 @@ mon_deaths: ld a, $16
             ld a, b
             cp 8
             jr nz, .x
-            ld a, $0F                       ; 2F/BB5E: the animation palette black,
+mon_gone:   ld a, $0F                       ; 2F/BB5E: the animation palette black,
             ld hl, W7 + $7D13
             ld [hl+], a
             ld [hl+], a
@@ -773,6 +773,9 @@ mon_deaths: ld a, $16
             call mon_count
             jp map_show
 
+; 2F/B34D monsters run away (mask A): as their deaths, without experience
+mon_run:    ld [W7 + $7DCA], a
+            jr mon_gone
 ; the dying monsters (mask A, slot 0 the msb) fade: their palettes stepped to black (4 x 4
 ; frames; FF3 dissolves them), A kept
 mon_vanish: push af
