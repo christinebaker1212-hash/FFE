@@ -390,3 +390,10 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   (save.s), save check with a message: as on 2026-11-22. 3 soft reset, memory cleared at boot,
   the Color-only screen: as on 2026-11-22; GBA: not checked (owner's hardware). 4 names: pass;
   colour: the CGB palettes are FF3's; no undisclosed code in the --release build.
+  mGBA `SGBRUN_LOTCHECK=1` (sgbrun --cgb, 5000 frames: walking on the world map into an
+  encounter, the battle to a defeat, the restart): LCD off outside V-Blank 0, VRAM writes in mode 3
+  0, OAM writes in modes 2/3 0, OAM DMA / GDMA outside V-Blank 0, cart RAM on at a frame end 0, cart
+  RAM accessed while off 0, palette writes in mode 3 0. Found on the way: after a defeat the game
+  jumped to the boot with A not $11 and showed the Color-only screen (black) for good; it now
+  restarts as the soft reset does. Not yet run under the checker: a spell / summon in the 8 x 16
+  mode (GDMA in V-Blank by design), the release ROM's title and boot.
