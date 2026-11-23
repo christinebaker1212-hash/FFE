@@ -28,6 +28,16 @@ btl_main:   call btl_flash
             ld [W7 + $74C6], a
             call btl_init
             call init_cm                    ; (34/9CE3 init characters / monsters)
+            ld a, [btl_fba]                 ; (test hook: btl_fba = $88 forces a back attack)
+            cp $88
+            jr nz, .nf
+            call row_toggle
+            ld a, $88
+            ld [W7 + $78C3], a
+            ld [W7 + $78BA], a
+            xor a
+            ld [btl_fba], a
+.nf:
             call oam_hide                   ; (2E/9F8D clear oam data)
             call bg_init
             call btl_screen

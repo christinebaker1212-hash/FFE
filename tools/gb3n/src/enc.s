@@ -247,6 +247,7 @@ btl_n:      ds 1
 btl_seedf:  ds 1                            ; (test hook: $A5 = use btl_seedv as the seed)
 btl_seedv:  ds 1
 btl_res:    ds 1
+btl_fba:    ds 1                            ; (test hook: $88 = a back attack)
 rnd_f7:     ds 1
 enc_v:      ds 1
 enc_r:      ds 1

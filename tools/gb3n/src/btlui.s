@@ -1255,10 +1255,20 @@ mon_cursor: call pos_ptr
             ld [btl_py], a
             call bd_rd
             add a, a
-            add a, low(TB_SIZE) + 1
+            add a, low(TB_SIZE)
             ld l, a
             ld h, high(TB_SIZE)
-            call bd_rd                      ; height
+            call bd_rd                      ; width
+            ld b, a
+            call back_atk                   ; (a back attack: the mirrored columns)
+            jr nz, .nb
+            ld a, [btl_px]
+            add a, b
+            ld b, a
+            ld a, 32
+            sub b
+            ld [btl_px], a
+.nb:        call bd_rd                      ; height
             add a, a
             add a, a
             ld c, a
@@ -1274,7 +1284,7 @@ mon_cursor: call pos_ptr
             add a, a
             add a, a
             add a, a
-            sub 20 + 16
+            call sub_scx16
             jr nc, .x
             xor a
 .x:         ld b, a

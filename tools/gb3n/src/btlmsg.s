@@ -586,6 +586,15 @@ num_xy:     ld a, [btl_k]
             ld b, a                         ; w
             call bd_rd                      ; h
             ld c, a
+            call back_atk                   ; (a back attack: the mirrored columns)
+            jr nz, .nb
+            ld a, [btl_tmp]
+            add a, b
+            ld d, a
+            ld a, 32
+            sub d
+            ld [btl_tmp], a
+.nb:
             ld a, [btl_tmp]                 ; x = (col + w / 2) x 8 - 20 + 8
             add a, a
             add a, a
@@ -595,7 +604,7 @@ num_xy:     ld a, [btl_k]
             add a, a
             add a, a
             add a, d
-            sub 12
+            call sub_scx8
             ld b, a
             ld a, [btl_tmp + 1]             ; y = (row + h / 2) x 8 - 48 + 16
             add a, a

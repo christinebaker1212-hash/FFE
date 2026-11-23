@@ -266,7 +266,7 @@ mon_pos:    ld a, [W7 + $7D7B]
 .bn:        pop bc
             dec c
             jr nz, .br
-            ret
+            jp mon_mirror
 .np:        call pos_ptr
             ld c, 0                         ; slot
 .s:         push hl
@@ -301,8 +301,43 @@ mon_pos:    ld a, [W7 + $7D7B]
             ld a, c
             cp 8
             jr nz, .s
-            ret
+            jr mon_mirror
 .end:       pop hl
+            ; (fall through)
+; 2F/A29C: a back attack mirrors the tilemap's 14 rows
+mon_mirror: call back_atk
+            ret nz
+            ld hl, W7 + $7900
+            ld c, 14
+.r:         ld d, h
+            ld e, l
+            push hl
+            ld a, l
+            add a, 31
+            ld l, a
+            ld b, 16
+.x:         ld a, [de]
+            push af
+            ld a, [hl]
+            ld [de], a
+            pop af
+            ld [hl-], a
+            inc de
+            dec b
+            jr nz, .x
+            pop hl
+            ld a, l
+            add a, 32
+            ld l, a
+            jr nc, .n
+            inc h
+.n:         dec c
+            jr nz, .r
+            ret
+
+; Z if a back attack (2F/AF48)
+back_atk:   ld a, [W7 + $78C3]
+            cp $88
             ret
 ; HL = the tilemap id's position data (2F/A5E6 pointer -> BDATA)
 pos_ptr:    ld a, [W7 + $7D7B]
@@ -667,8 +702,16 @@ btl_screen: xor a                           ; (LCD off) VRAM bank 0 tile 0 blank
             ld [BZ + $80], a
             push bc
             push de
+            call back_atk
+            jr nz, .na
+            ld a, 31                        ; (a back attack: the mirrored column, flipped)
+            sub c
+            ld c, a
             call attr_get
-            pop de
+            or $20
+            jr .ha
+.na:        call attr_get
+.ha:        pop de
             pop bc
             ld [de], a
             inc de
@@ -691,7 +734,7 @@ btl_screen: xor a                           ; (LCD off) VRAM bank 0 tile 0 blank
             ld a, 1
             ldh [pal_dirty], a
             call chr_draw
-            ld a, 20                        ; the view: NES (20, 48) = tilemap row 1
+            call btl_scx                    ; the view: NES (20, 48) = tilemap row 1 (mirrored: 76)
             ldh [scx], a
             ldh [rSCX], a
             ld a, 8
@@ -839,8 +882,11 @@ chr_gfx:    xor a
             ret
 
 ; 2F/B4AC + B48D: start positions and frames (the walk-in: later; members at their row now)
-chr_pos:    ld hl, BD_START                 ; (no back attack: x 4, y 4 at 2F/B51A)
-            ld de, BZ + $C0
+chr_pos:    ld hl, BD_START                 ; (2F/B51A: x 4, y 4; a back attack's 8 on)
+            call back_atk
+            jr nz, .s0
+            ld hl, BD_START + 8
+.s0:        ld de, BZ + $C0
             ld bc, 8
             ld a, BDATA_BANK
             call rd_copy
@@ -850,7 +896,12 @@ chr_pos:    ld hl, BD_START                 ; (no back attack: x 4, y 4 at 2F/B5
             add hl, bc
             ld a, [hl]
             and 1
-            add a, low(BD_ROWX)
+            ld e, a
+            call back_atk                   ; (2F/B516 + 2 in a back attack)
+            ld a, e
+            jr nz, .r0
+            add a, 2
+.r0:        add a, low(BD_ROWX)
             ld l, a
             ld h, high(BD_ROWX)
             push bc
@@ -980,10 +1031,14 @@ chr_draw1:  ld b, 0
             add hl, bc
             or [hl]
             ld [BZ + $83], a
-            ld hl, BZ + $C0                 ; GB base: x = 140 + (x - 208) / 2 + 8
-            add hl, bc
+            ld hl, BZ + $C0                 ; GB base: x = 140 + (x - 208) / 2 + 8 (a back attack:
+            add hl, bc                      ;   from 240 - x, then mirrored on the GB screen)
+            call back_atk
             ld a, [hl]
-            sub 208
+            jr nz, .bx
+            ld a, 240
+            sub [hl]
+.bx:        sub 208
             sra a
             add a, 140 + 8
             ld [BZ + $8C], a
@@ -1037,6 +1092,7 @@ chr_draw1:  ld b, 0
             or [hl]
             ld c, a
             and $40
+            rrca                            ; (the NES h-flip, bit 6 -> the GB's bit 5)
             ld l, a
             ld a, c
             and 3
@@ -1048,6 +1104,17 @@ chr_draw1:  ld b, 0
             ld hl, BZ + $8C
             add a, [hl]
             ld [btl_ox], a
+            call back_atk
+            jr nz, .nb
+            ld a, [btl_ox]                  ; (mirrored: x = 168 - x, flipped)
+            ld l, a
+            ld a, 168
+            sub l
+            ld [btl_ox], a
+            ld a, [btl_oa]
+            xor $20
+            ld [btl_oa], a
+.nb:
             inc de
             ld a, b                         ; tile: bit 7 absolute, else + the member's offset
             add a, low(btl_tmp2)
@@ -1163,4 +1230,30 @@ boss_gfx:   ld a, [W7 + $7D73]
             pop bc
             dec c
             jr nz, .t
+            ret
+
+; the battlefield's SCX: 20 (NES x 20 at the left edge), a back attack's mirror 76
+btl_scx:    call back_atk
+            ld a, 20
+            ret nz
+            ld a, 76
+            ret
+; A - (SCX - 8) / A - SCX - 16 (carry if below 0)
+sub_scx8:   push bc
+            ld b, a
+            call btl_scx
+            sub 8
+            ld c, a
+            ld a, b
+            sub c
+            pop bc
+            ret
+sub_scx16:  push bc
+            ld b, a
+            call btl_scx
+            add a, 16
+            ld c, a
+            ld a, b
+            sub c
+            pop bc
             ret
