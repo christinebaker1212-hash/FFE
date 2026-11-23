@@ -233,6 +233,9 @@ battle_go:  ld a, [act_id]
             call far_call
             ld a, 1
             ldh [rSVBK], a
+            ld a, [btl_res]                 ; defeated: back to the start (fix:C049)
+            bit 7, a
+            jp nz, start
             ld a, $FF                       ; (no map title after a battle)
             ld [m_title], a
             ld [m_title2], a
@@ -243,6 +246,7 @@ btl_id:     ds 1
 btl_n:      ds 1
 btl_seedf:  ds 1                            ; (test hook: $A5 = use btl_seedv as the seed)
 btl_seedv:  ds 1
+btl_res:    ds 1
 rnd_f7:     ds 1
 enc_v:      ds 1
 enc_r:      ds 1

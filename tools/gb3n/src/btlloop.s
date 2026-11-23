@@ -61,7 +61,7 @@ btl_loop:   call turn_start                 ; 34/81C3
 .over:      call hp_win                     ; 34/811C
             ld a, [W7 + $78D3]
             and 2
-            ret nz
+            jr nz, .save                    ; (ran away)
             ld a, 2                         ; action script $02: Victory! / Annihilated...
             ld [W7 + $7EC2], a
             ld [W7 + $78D5], a
@@ -71,7 +71,35 @@ btl_loop:   call turn_start                 ; 34/81C3
             jr z, .v
             ld a, $1C
 .v:         ld [W7 + $78DA], a
-            jp act_script
+            cp $1C
+            jr z, .say
+            ld a, [W7 + $7CED]              ; (battles $78 / $73 with $7CEE: no message)
+            cp $78
+            jr z, .sp
+            cp $73
+            jr nz, .say
+.sp:        ld a, [W7 + $7CEE]
+            and a
+            jr nz, .save
+.say:       call act_script
+            ld a, [W7 + $78D3]              ; (graphics $11: the battle's end)
+            bit 7, a
+            jr nz, .cons                    ; (defeated)
+            call victory                    ; 35/BB49
+.save:      call btl_save                   ; 34/8306
+            ld a, [W7 + $78BA]
+            and 8
+            call nz, rows_flip              ; 34/88A4
+.cons:      call consol                     ; 34/8032 (31/BEBF)
+            ld a, [W7 + $7CED]
+            cp $79
+            ret nz
+            ld a, [W7 + $7CEE]
+            and a
+            ret z
+            xor a
+            ld [W7 + $78D3], a
+            ret
 
 ; 35/A458 check if battle is over: all members dead / stone $80, no monsters left $40
 btl_over:   ld a, [W7 + $78D3]

@@ -188,7 +188,7 @@ CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save', 'ti
 ITEMN_BANK0 = 85                        # condensed item names (shop.py): banks 85-87
 BDATA_BANK = 88                         # battle data (encounter tables, formations, monsters)
 CODE2 = 89                              # battle code: the game logic
-CODE2_MODULES = ('btl', 'btlcore', 'btleq', 'btlai', 'btlmain', 'btlact', 'btlfight', 'btlmagic')
+CODE2_MODULES = ('btl', 'btlcore', 'btleq', 'btlai', 'btlmain', 'btlact', 'btlfight', 'btlmagic', 'btlwin')
 CODE3 = 110                             # battle code: the presentation (graphics, windows, input)
 CODE3_MODULES = ('btlgfx', 'btlui', 'btlmsg', 'btlloop')
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
@@ -311,6 +311,7 @@ def main():
     bd[0x2360:0x23B0] = rom.b(0x32, 0x9EAD, 0x50)              # $6360: 32/9EAD target grid by tilemap
     bd[0x23B0:0x23BE] = rom.b(0x31, 0xBB0E, 14)                # $63B0: 31/BB0E spell reflectability
     bd[0x23C0:0x23CC] = rom.b(0x35, 0xA5FD, 12)                # $63C0: 35/A5FD spells with a message
+    bd[0x3100:0x3500] = rom.b(0x10, 0x9B80, 0x400)             # $7100: 10/9B80 drops, 9C80 exp ids, 9D80 exp
     f = rom.prg[0x0D * 0x2000 + 0x1700:0x0D * 0x2000 + 0x1700 + 144 * 16]   # $7000: numeral sprites
     for k, c in enumerate(list(range(0x80, 0x8A)) + [text.ENC[ch] for ch in 'Mis']):
         p0 = f[16 * (c - 0x70):16 * (c - 0x70) + 8]                 #   (the font's ink, clear around)

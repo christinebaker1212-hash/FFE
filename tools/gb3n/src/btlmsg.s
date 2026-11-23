@@ -409,18 +409,16 @@ sc_wait:    ld a, [GS + $10]
             ld [BZ + $24], a
             and a
             ret z
-.w:         call wait_vbl
-            call read_pad
-            ld a, [pad_new]
+.w:         call b_keys
+            ld a, [btl_new]
             bit 0, a
             ret nz
             ld hl, BZ + $24
             dec [hl]
             jr nz, .w
             ret
-b_waitA:    call wait_vbl
-            call read_pad
-            ld a, [pad_new]
+b_waitA:    call b_keys
+            ld a, [btl_new]
             bit 0, a
             jr z, b_waitA
             ret
@@ -878,7 +876,13 @@ st_mon:     ld [BZ + $18], a
 msg_reset:  xor a
             ld [msg_n], a
             ld [msg_lines], a
+            ld [msg_rest], a
             ld a, $FF
+            ld hl, msg_wl2
+            ld b, 5
+.c2:        ld [hl+], a
+            dec b
+            jr nz, .c2
             ld hl, msg_wl
             ld b, 5
 .c:         ld [hl+], a
@@ -893,6 +897,7 @@ msg_open:   ld [msg_w], a
             call z, msg_frame
             ld a, [msg_w]                   ; (opened again: the old cells first)
             call msg_close
+            call msg_wrap
             ld hl, btl_str                  ; the length (18 at most)
             ld b, 0
 .l:         ld a, [hl+]
@@ -984,7 +989,106 @@ msg_open:   ld [msg_w], a
             inc a
             ld c, a
             inc b
+            call msg_text
+            ld a, [msg_rest]                ; the rest of a wrapped text: a line of its own
+            and a
+            ret z
+            ld hl, msg_rest
+            ld de, btl_str
+            ld bc, 20
+            call memcpy
+            xor a
+            ld [msg_rest], a
+            call msg_free
+            ld a, [msg_w]
+            ld e, a
+            ld d, 0
+            ld hl, msg_wl2
+            add hl, de
+            ld [hl], c
+            push bc
+            ld hl, btl_str
+            ld de, win_buf
+            ld b, 18
+.r:         ld a, [hl+]
+            ld [de], a
+            inc de
+            and a
+            jr z, .r1
+            dec b
+            jr nz, .r
+            xor a
+            ld [de], a
+.r1:        pop bc
+            inc c
+            ld b, 1
             jp msg_text
+
+; a text longer than 18: cut at its last space within 19 cells, the rest -> msg_rest
+msg_wrap:   xor a
+            ld [msg_rest], a
+            ld hl, btl_str
+            ld b, 0
+.l:         ld a, [hl+]
+            and a
+            ret z
+            inc b
+            ld a, b
+            cp 19
+            jr c, .l
+            ld hl, btl_str + 18             ; the last space at or before cell 18
+            ld b, 18
+.s:         ld a, [hl]
+            cp $FF
+            jr z, .cut
+            dec hl
+            dec b
+            jr nz, .s
+            ld hl, btl_str + 18             ; (none: cut at 18)
+            ld a, [hl]
+            push hl
+            ld de, msg_rest
+            jr .cp
+.cut:       push hl
+            inc hl
+            ld de, msg_rest
+.cp:        ld c, 19
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            and a
+            jr z, .e
+            dec c
+            jr nz, .c
+            xor a
+            ld [de], a
+.e:         pop hl
+            ld [hl], 0
+            ret
+
+; the first free line -> C (its bit set), else the last (its owners lose it)
+msg_free:   ld a, [msg_lines]
+            ld e, a
+            ld c, 0
+            ld b, 1
+.f:         ld a, e
+            and b
+            jr z, .got
+            sla b
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .f
+            ld c, 3
+            ld b, 8
+            ld a, 3
+            push bc
+            call msg_owner
+            pop bc
+.got:       ld a, [msg_lines]
+            or b
+            ld [msg_lines], a
+            ret
 
 ; whoever owns line A (whole line) loses it
 msg_owner:  ld hl, msg_wl
@@ -1013,8 +1117,22 @@ msg_close:  push af
             dec [hl]
             ret
 
-; the cells of window A blanked (its line freed if it starts the line)
-msg_blank:  ld e, a
+; the cells of window A blanked (its line freed if it starts the line; its second line too)
+msg_blank:  push af
+            ld e, a
+            ld d, 0
+            ld hl, msg_wl2
+            add hl, de
+            ld a, [hl]
+            cp $FF
+            jr z, .one
+            ld [hl], $FF
+            ld c, a
+            call msg_unline
+            ld b, 0
+            call msg_clr
+.one:       pop af
+            ld e, a
             ld d, 0
             ld hl, msg_wl
             add hl, de
@@ -1028,19 +1146,10 @@ msg_blank:  ld e, a
             ld a, b
             and a
             jr nz, .k
-            ld a, c                         ; (the whole line: freed)
-            inc a
-            ld d, a
-            ld a, $80
-.s:         rlca
-            dec d
-            jr nz, .s
-            cpl
-            ld d, a
-            ld a, [msg_lines]
-            and d
-            ld [msg_lines], a
-.k:         ld hl, win_buf                  ; blanks from column B to 17
+            call msg_unline                 ; (the whole line: freed)
+.k:         ; (fall through)
+; line C blanked from column B
+msg_clr:    ld hl, win_buf                  ; blanks from column B to 17
             ld a, 18
             sub b
             ld d, a
@@ -1052,6 +1161,23 @@ msg_blank:  ld e, a
             inc c
             inc b
             jp msg_text
+
+; line C's bit freed
+msg_unline: push bc
+            ld a, c
+            inc a
+            ld d, a
+            ld a, $80
+.s:         rlca
+            dec d
+            jr nz, .s
+            cpl
+            ld d, a
+            ld a, [msg_lines]
+            and d
+            ld [msg_lines], a
+            pop bc
+            ret
 
 ; the window's frame and empty lines
 msg_frame:  call cv2
@@ -1101,3 +1227,7 @@ msg_w:      ds 1
 msg_len:    ds 1
 msg_tmp:    ds 1
 msg_alen:   ds 1
+msg_wl2:    ds 5                ; per window: a wrapped text's second line (FF: none)
+
+section wram, $DF00
+msg_rest:   ds 20               ; (WRAM bank 3, FF3's unused $7F00-: the flash's copy is gone)

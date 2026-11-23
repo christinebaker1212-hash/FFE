@@ -37,6 +37,8 @@ SEED = 0
 def main():
     global SEED
     turns = 0
+    if '--end' in sys.argv:
+        sys.argv.remove('--end'); turns = -1
     if '--turns' in sys.argv:
         i = sys.argv.index('--turns'); turns = int(sys.argv[i + 1]); del sys.argv[i:i + 2]
     bid = int(sys.argv[1], 0)
@@ -61,6 +63,14 @@ def main():
     else:
         print('seed from the counters not a table seed:', cand, '(counters', bytes(uses).hex(), ')')
     print('seed', SEED)
+    if turns < 0:
+        ram, sram, nf2 = nes_end(bid)
+        zp, w = native(bid, gf, sram0, seeds, -1)
+        print('NES back on the field at frame', nf2)
+        gsb = w[1]
+        d = [i for i in range(0x400) if sram[i] != gsb[i]]
+        print('save block $6000-$63FF', 'identical' if not d else 'differ at ' + ' '.join('$%04X(%02X/%02X)' % (0x6000 + i, sram[i], gsb[i]) for i in d[:24]))
+        return
     if turns:
         ram, sram, nf2 = nes_turns(bid, turns)
         zp, w = native(bid, gf, sram0, seeds, turns)
@@ -78,6 +88,28 @@ def main():
 
 TREGIONS = [('rng counters', 0x15, 0x18), ('exp counts', 0x7DD3, 0x7DD7), ('turn', 0x7BE2, 0x7BE3),
             ('cmd counts', 0x78F0, 0x7900), ('over', 0x78D3, 0x78D4), ('statuses', 0x7EC4, 0x7ECC)]
+
+
+def nes_end(bid):
+    """the NES battle with A pressed every 20 frames until the inventory is deinterlaced (back on
+    the field), then 60 frames"""
+    from cynes import NES
+    import numpy as np
+    n = NES(os.path.join(ROOT, 'build', 'ff3_en.nes'))
+    st = bytearray(open(os.path.join(ROOT, 'build', 'ff3', 'cave.state'), 'rb').read())
+    st[nb.RAM + 0x6A] = bid; st[nb.RAM + 0xAB] = 0x20
+    n.load(np.array(st, dtype=np.uint8))
+    n.watch = (0x60E0, 0x60FF)
+    f, stop = 0, None
+    while f < 30000:
+        n.controller = 0x80 if (stop is None and f >= 330 and f % 20 < 3) else 0
+        n.step(1)
+        f += 1
+        wl = n.watch
+        if stop is None and f > 400 and wl: stop = f
+        if stop is not None and f >= stop + 60: break
+    s = bytes(n.save())
+    return s[nb.RAM:nb.RAM + 0x800], s[nb.SRAM:nb.SRAM + 0x2000], stop
 
 
 def nes_turns(bid, turns):
@@ -113,7 +145,12 @@ def native(bid, gf, sram0, seeds, turns=0):
     m = pb.memory
     f, stop = 0, None
     while True:
-        if turns:
+        if turns < 0:
+            if stop is None and f >= 330 and f % 20 == 0: pb.button('a', 3)
+            if stop is None and f > 600 and (m[0xFF70] & 7) == 1 and m[sym['btl_res']] != 0xEE: stop = f
+            if stop is not None and f >= stop + 60: break
+            if f > 30000: break
+        elif turns:
             if stop is None and f >= 330 and f % 20 == 0: pb.button('a', 3)
             if stop is None and f > 400 and m[3, 0xDBE2] >= turns + 1: stop = f
             if stop is not None and f >= stop + 300: break
@@ -124,7 +161,7 @@ def native(bid, gf, sram0, seeds, turns=0):
             for i in range(0x400): m[0xC800 + i] = sram0[i]
             if True:
                 m[sym['btl_seedf']] = 0xA5; m[sym['btl_seedv']] = SEED
-        if f == 104: m[sym['act_id']] = bid; m[sym['act']] = 0x20
+        if f == 104: m[sym['act_id']] = bid; m[sym['act']] = 0x20; m[sym['btl_res']] = 0xEE
         pb.tick()
         f += 1
     if turns: print('GB turn %d reached at frame %s' % (turns + 1, stop))

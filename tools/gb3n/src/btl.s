@@ -12,6 +12,7 @@ btl_main:   call btl_flash
             ld [lcd_is], a
             ld a, 3
             ldh [rSVBK], a
+            call inv_pair                   ; (3C/BC12: the inventory as pairs)
             ld hl, BZ                       ; FF3's battle RAM cleared (zero page, $7200-$7EFF)
             ld de, $0F00
             call memclr
@@ -33,6 +34,11 @@ btl_main:   call btl_flash
             call ui_init
             call btl_loop
             call btl_end
+            ld a, 3
+            ldh [rSVBK], a
+            call inv_unpair                 ; (3C/BC2D)
+            ld a, [W7 + $78D3]              ; (defeated: FF3 starts the program again)
+            ld [btl_res], a
             ret
 
 ; fix:D34D: the flash (sound $95, 64 frames of the screen's greyscale bit toggling): the BG and
