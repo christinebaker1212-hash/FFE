@@ -389,37 +389,49 @@ bt_strike:  ld [bt_am], a
             ld a, [bt_ac]
             ld b, 0
             call bt_vpal
-.nl:        ld a, [bt_am]
-            ld b, -4                        ; (darting forward, the weapon up: btl5.s)
-            ld c, P_ATKB
-            call bt_dart
-            ld a, 8                         ; 8 x: A frame (arm forward, weapon left of the
-.l:         push af                         ;   member) / B frame (arm back, weapon behind the
-            and 2                           ;   head, its lower-left tile hidden)
-            ld a, [bt_am]
+.nl:        ld a, [bt_am]                   ; (the remake's timing, owner 2026-11-23: a dart
+            ld b, -4                        ;   forward, 6 frames there, the hit count, the
+            ld c, P_STAND                   ;   weapon raised 4 frames, the swing; the hit
+            call bt_dart                    ;   effect follows with the swing held)
+            ld b, 6
+.h:         push bc
+            call bt_frame
+            pop bc
+            dec b
+            jr nz, .h
+            call bt_hitlab
+            call .pb
+            call bt_2f
+            call bt_2f
+            call .pa
+            jp bt_2f
+.pa:        ld a, [bt_am]                   ; A frame: arm forward, the weapon left of the member
             ld e, a
             ld d, 0
             ld hl, bt_pose
             add hl, de
-            jr z, .b
             ld [hl], P_ATKF
             call bt_dm
             ld a, [bt_ag]
             and a
-            jr z, .f
+            ret z
             ld a, [bt_am]
             call bt_mxy
             ld a, b
             sub 16
             ld b, a
             ld hl, bt_swing
-            call bt_obj4
-            jr .f
-.b:         ld [hl], P_ATKB
+            jp bt_obj4
+.pb:        ld a, [bt_am]                   ; B frame: arm back, the weapon behind the head (its
+            ld e, a                         ;   lower-left tile hidden: FF1 hideLL)
+            ld d, 0
+            ld hl, bt_pose
+            add hl, de
+            ld [hl], P_ATKB
             call bt_dm
             ld a, [bt_ag]
             and a
-            jr z, .f
+            ret z
             ld a, [bt_am]
             call bt_mxy
             ld a, b
@@ -430,31 +442,21 @@ bt_strike:  ld [bt_am], a
             ld c, a
             ld hl, bt_swing + 8
             call bt_obj4
-            ld a, $FF                       ; (FF1 hideLL)
+            ld a, $FF
             ld [oam_buf + 8], a
-.f:         call bt_2f
-            pop af
-            dec a
-            jr nz, .l
+            ret
+; member A back in line after its strike: the weapon gone, a dart back, its natural pose
+bt_sback:   ld [bt_am], a
             call bt_obj_off
-            call bt_frame
             ld a, [bt_am]
-            ld e, a
-            ld d, 0
-            ld hl, bt_pose
-            add hl, de
-            ld [hl], P_STAND
-            call bt_dm
-            call bt_2f
-            ld a, [bt_am]
-            ld b, 4                         ; (darting back: btl5.s)
+            ld b, 4
             ld c, P_STAND
             call bt_dart
             ld a, [bt_am]
             call bt_natural
             ld a, [bt_am]
             call bt_dm
-            jp bt_2f
+            jp bt_frame
 
 ; ---- FF1 WalkForwardAndCastMagic: member A, spell graphic [bt_ag] (0: an item's spell, not
 ; drawn, no flash), colour [bt_ac]; the caster cheers, the spell's two frames beside it, the
@@ -690,7 +692,7 @@ bt_explode: push af
             ld [bt_ey], a
             ld a, 72 + 16
             ld [bt_ey + 1], a
-            ld a, 20
+            ld a, 8                         ; (bursts of 3 frames: the remake's ~10-frame hit)
             jr .go
 .one:       ld a, e
             call bt_epos                    ; cell (B, C), size E
@@ -711,10 +713,10 @@ bt_explode: push af
             ld a, e
             cp 6
             ld a, 24
-            ld l, 6
+            ld l, 3
             jr c, .sz
             ld a, 40
-            ld l, 8
+            ld l, 4
 .sz:        ld b, a
             add a, d
             ld [bt_ex + 1], a
@@ -751,14 +753,8 @@ bt_explode: push af
             ld c, a
             ld a, [bt_t + 13]
             ld b, a
-            ld a, [bt_exs]                   ; OAM 28 + 4 slot
-            add a, a
-            add a, a
-            add a, a
-            add a, a
-            add a, 112
-            ld l, a
-            ld h, high(oam_buf)
+            ld hl, oam_buf + 112            ; OAM 28-31 (one burst at a time, the remake's
+                                            ;   hit effect; the hit count / number: 32-39)
             ld a, [bt_t + 14]
             ld d, a
             ld e, 2
@@ -786,16 +782,14 @@ bt_explode: push af
             ld c, a
             dec e
             jr nz, .r
-            call bt_frame
+            call bt_frame                   ; (each burst 3 frames)
+            call bt_2f
             pop af
-            inc a
-            cp 3
-            jr c, .s
             ld hl, bt_exn
             dec [hl]
             jr nz, .l
-            ld hl, oam_buf + 112            ; all gone, a frame
-            ld b, 12
+            ld hl, oam_buf + 112            ; gone, a frame
+            ld b, 4
             xor a
 .c:         ld [hl+], a
             inc l

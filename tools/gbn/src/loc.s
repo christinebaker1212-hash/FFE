@@ -1784,6 +1784,226 @@ fp_cur:     ds 1
 fp_k:       ds 1
 fp_buf:     ds 30
 ml_room:    ds 1                            ; load_map: arrive inside a room (main.s room_chk)
+section bank 99, $4BC0                      ; (an enemy dies: bt_erase_enemy)
+
+; ---- an enemy dies (owner, 2026-11-23, as the WonderSwan Color remake: it breaks up in
+; horizontal strips). fl_b / fl_c = its cell, fl_e = its size (bank 6 bt_erase_enemy). Its
+; tiles are shared with others of its kind, so they are copied to the tiles free while the
+; names window shows (FL_T0) and its cells switched to the copies; then 16 steps, one pixel
+; row of every tile each (in the order 0 4 2 6 1 5 3 7): the row slides 2 pixels (odd rows
+; left, even right), then goes. A fiend's tiles are its own: changed in place, two frames a
+; step, the screen shaking and the hit sound every fourth step. VRAM only outside mode 3.
+ED_T0      = $C4
+ed_dissolve:
+            xor a
+            ldh [rVBK], a
+            ld a, [fl_e]                    ; cells
+            ld b, a
+            xor a
+.sq:        add a, b
+            dec b
+            jr nz, .sq                      ; (E x E)
+            ld [ed_n], a
+            ld de, fl_tb                    ; the tiles' list
+            ld a, ED_T0
+            ld [ed_t], a
+            xor a
+            ld [ed_r], a
+.r:         ld a, [fl_b]                    ; row ed_r: HL = its first cell in smap
+            ld b, a
+            ld a, [fl_c]
+            ld c, a
+            ld a, [ed_r]
+            add a, c
+            ld c, a
+            push de
+            call cell_addr
+            pop de
+            ld a, [fl_e]
+            ld b, a
+.c:         ld a, [bt_type]
+            cp 3
+            ld a, [hl]
+            jr nc, .own                     ; (a fiend: its own tile)
+            push bc
+            push de
+            push hl
+            call ed_tadr                    ; the tile copied to ed_t
+            push hl
+            ld a, [ed_t]
+            call ed_tadr
+            ld d, h
+            ld e, l
+            pop hl
+            ld b, 8
+.cp:        di
+            call ed_vw
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ei
+            dec b
+            jr nz, .cp
+            pop hl
+            ld a, [ed_t]                    ; the cell to the copy (smap and the screen)
+            ld [hl], a
+            push hl
+            ld de, $9800 - smap
+            add hl, de
+            ld e, a
+            di
+            call ed_vw
+            ld [hl], e
+            ei
+            pop hl
+            pop de
+            pop bc
+            ld a, [ed_t]
+            inc a
+            ld [ed_t], a
+            dec a
+.own:       ld [de], a
+            inc de
+            inc hl
+            dec b
+            jr nz, .c
+            ld hl, ed_r
+            inc [hl]
+            ld a, [fl_e]
+            cp [hl]
+            jr nz, .r
+.steps:     di                              ; the blank: tile 0's first row (the Color: colour
+            call ed_vw                      ;   0; DMG / SGB: the battle's black is colour 3)
+            ld a, [$9000]
+            ld [ed_bk], a
+            ei
+            xor a
+            ld [ed_s], a
+.st:        ld a, [ed_s]                    ; the row: order[step / 2]
+            srl a
+            ld e, a
+            ld d, 0
+            ld hl, ed_ord
+            add hl, de
+            ld a, [hl]
+            add a, a
+            ld [ed_row], a                  ; (its byte offset)
+            ld de, fl_tb
+            ld a, [ed_n]
+            ld b, a
+.t:         push bc
+            push de
+            ld a, [de]
+            call ed_tadr
+            ld a, [ed_row]
+            add a, l
+            ld l, a
+            di
+            call ed_vw
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl-]
+            ld c, a
+            ei
+            ld a, [ed_s]
+            bit 0, a
+            jr nz, .clr
+            ld a, [ed_bk]                   ; (the bits shifted in: the blank's)
+            ld e, a
+            ld a, [ed_row]                  ; slide: odd rows left, even rows right
+            bit 1, a
+            jr z, .rt
+            sla b
+            sla b
+            sla c
+            sla c
+            ld a, e
+            and $03
+            ld d, a
+            or b
+            ld b, a
+            ld a, d
+            or c
+            ld c, a
+            jr .wr
+.rt:        srl b
+            srl b
+            srl c
+            srl c
+            ld a, e
+            and $C0
+            ld d, a
+            or b
+            ld b, a
+            ld a, d
+            or c
+            ld c, a
+            jr .wr
+.clr:       ld a, [ed_bk]
+            ld b, a
+            ld c, a
+.wr:        di
+            call ed_vw
+            ld [hl], b
+            inc hl
+            ld [hl], c
+            ei
+            pop de
+            inc de
+            pop bc
+            dec b
+            jr nz, .t
+            ld a, [bt_type]                 ; a fiend: the screen shakes, the hit sound
+            cp 3
+            jr c, .w1
+            ld a, [ed_s]
+            and 1
+            ld a, 2
+            jr z, .sx
+            ld a, -2
+.sx:        ldh [scx], a
+            ld a, [ed_s]
+            and 3
+            jr nz, .w2
+            ld a, SFX_HIT
+            ld [sfx_req], a
+.w2:        call wait_vbl
+.w1:        call wait_vbl
+            ld hl, ed_s
+            inc [hl]
+            ld a, [hl]
+            cp 16
+            jr c, .st
+            xor a
+            ldh [scx], a
+            jp wait_vbl
+ed_ord:     db 0, 4, 2, 6, 1, 5, 3, 7
+; HL = VRAM of BG tile A ($8800 mode: $80-$FF at $8800, $00-$7F at $9000)
+ed_tadr:    ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            bit 7, a
+            jr nz, .hi
+            ld a, h
+            add a, $90
+            ld h, a
+            ret
+.hi:        ld a, h
+            add a, $80
+            ld h, a
+            ret
+; until VRAM is free (modes 0 / 1; mode 2 follows, VRAM still open): ~20 cycles of access
+ed_vw:      ldh a, [rSTAT]
+            and 2
+            jr nz, ed_vw
+            ret
+
 section bank 99, $5600
 ; ---- the encounter transition (owner, 2026-11-22: from the WonderSwan Color remake, as raster
 ; effects any Game Boy can show): 26 frames of the map twisting and zooming towards the party,
@@ -2987,6 +3207,12 @@ gr_cy:      ds 1
 gr_vr:      ds 3                            ; (gr_ramp_mk: value, step, remainder per channel)
 gr_vg:      ds 3
 gr_vb:      ds 3
+ed_n:       ds 1                            ; (ed_dissolve: cells, tile, rows left, step, row)
+ed_t:       ds 1
+ed_r:       ds 1
+ed_s:       ds 1
+ed_row:     ds 1
+ed_bk:      ds 1
 
 section wram, $CDE4
 loc_buf:    ds 19

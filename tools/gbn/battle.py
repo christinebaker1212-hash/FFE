@@ -146,7 +146,11 @@ def data_bank(rom):
     m = re.search(rb'(?:\xAC\xFA\x00|\xA4\xFA)\xB9(..)\x8D', b11, re.S)  #   LDA lut,Y / STA)
     assert m, 'respond delay table not found'
     a = int.from_bytes(m.group(1), 'little') - 0x8000
-    put(0x7FF0, b11[a:a + 8])
+    assert len(b11[a:a + 8]) == 8
+    put(0x7FF0, bytes([52, 44, 36, 30, 24, 16, 8, 1]))             # (owner, 2026-11-23: the
+                                                                    #   remake's timing, 52
+                                                                    #   frames at speed 1;
+                                                                    #   FF1: 120 .. 1)
     return bytes(b)
 
 

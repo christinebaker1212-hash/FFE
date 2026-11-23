@@ -76,6 +76,7 @@ bt_run:     call bt_ch_init
             ld [bt_msgon], a
             ld [bt_first], a
             ld [bt_result], a
+            ld [bt_defer], a
             ld hl, bt_cmd                   ; (no commands yet: a surprise round skips the
             ld b, 16                        ;   party's choices, its members then do nothing)
 .cc:        ld [hl+], a
@@ -1063,92 +1064,6 @@ bt_player_turn:
             ld a, [hl]
             jp bt_pl_attack
 
-; FF1 Battle_PlayerTryRun (the level from the member's record: FF1's bug fixed)
-bt_try_run: ld a, [bt_who]
-            call bt_msg_pl
-            ld a, [bt_first]
-            and a
-            jr nz, .ok
-            ld a, [bt_form + 13]
-            and 1
-            jr nz, .no
-            ld a, [bt_who]
-            call ch_rec
-            ld a, l
-            add a, CH_LEVEL
-            ld l, a
-            ld a, [hl]
-            add a, 15
-            ld b, a
-            xor a
-            call bt_randab                  ; random(0 .. level + 15) - luck > 0: away
-            ld b, a
-            ld a, [bt_who]
-            call ch_rec
-            ld a, l
-            add a, $14
-            ld l, a
-            ld a, [hl]
-            ld c, a
-            ld a, c
-            sub b                           ; luck - r > 0: away
-            jr z, .no
-            jr nc, .ok
-.no:        ld a, M_CANTRUN
-            jp bt_msg_end1
-.ok:        ld a, M_CLOSE
-            call bt_msg_end1
-            ld a, 3
-            ld [bt_result], a
-            ret
-; FF1 Battle_PlayerTryWakeup: random(0 .. 80) < max HP wakes
-bt_try_wake:
-            ld a, [bt_who]
-            call bt_msg_pl
-            xor a
-            ld b, $50
-            call bt_randab
-            ld c, a
-            ld a, [bt_who]                  ; max HP > r: woke
-            call ch_rec
-            ld a, l
-            add a, CH_MAXHP
-            ld l, a
-            ld a, [hl+]
-            ld d, a
-            ld a, [hl]
-            and a
-            jr nz, .wk
-            ld a, d
-            cp c
-            jr z, .sl
-            jr c, .sl
-.wk:        ld a, [bt_who]
-            call ch_rec
-            inc hl
-            res 5, [hl]
-            ld a, M_WOKE
-            jp bt_msg_end1
-.sl:        ld a, M_ASLEEP
-            jp bt_msg_end1
-; FF1 Battle_PlayerTryUnstun: 1 in 4
-bt_try_unstun:
-            ld a, [bt_who]
-            call bt_msg_pl
-            call bt_rng
-            and 3
-            jr z, .ok
-            ld a, M_PARA
-            jp bt_msg_end1
-.ok:        ld a, [bt_who]
-            call ch_rec
-            inc hl
-            res 4, [hl]
-            ld a, M_CURED
-            jp bt_msg_end1
-
-; ---- physical attacks (FF1 PlayerAttackEnemy_Physical / EnemyAttackPlayer_Physical /
-; DoPhysicalAttack): the attacker's and defender's numbers into ak_* / df_*
 bt_pl_attack:
             ld [bt_tgt], a
             ld a, [bt_who]                  ; attacker: the member's block and record
@@ -1221,12 +1136,29 @@ bt_pl_attack:
             ld [df_ails], a
             xor a
             ld [df_player], a
-            ld a, [bt_who]                  ; message: member -> enemy
-            call bt_msg_pl
-            ld a, [bt_tgt]
-            call bt_msg_to_en
-            call bt_msg_head                ; (the attacker -> target row first)
-            call bt_flush
+            ld a, [bt_rngs]                 ; the result worked out first (owner, 2026-11-23:
+            ld [bt_sv], a                   ;   the remake's timing: the hit count shows as
+            ld a, [df_hp]                   ;   the member darts forward, the number and the
+            ld [bt_sv + 1], a               ;   text together after the swing); then the same
+            ld a, [df_hp + 1]               ;   again for real
+            ld [bt_sv + 2], a
+            ld a, [df_ails]
+            ld [bt_sv + 3], a
+            xor a
+            ld [mt_conn], a                 ; (a fallen target: no hits counted)
+            inc a
+            ld [bt_defer], a
+            call bt_phys
+            xor a
+            ld [bt_defer], a
+            ld a, [bt_sv]
+            ld [bt_rngs], a
+            ld a, [bt_sv + 1]
+            ld [df_hp], a
+            ld a, [bt_sv + 2]
+            ld [df_hp + 1], a
+            ld a, [bt_sv + 3]
+            ld [df_ails], a
             ld a, [bt_who]                  ; FF1 WalkForwardAndStrike with the weapon's
             call bt_cblk                    ;   graphic and palette (none: not drawn)
             ld hl, C_WGFX
@@ -1244,7 +1176,11 @@ bt_pl_attack:
             ld [sfx_req], a
             ld a, [bt_tgt]
             call bt_explode
-.ns:        call bt_phys
+.ns:        ld a, [bt_who]                  ; message: member -> enemy, then the result
+            call bt_msg_pl
+            ld a, [bt_tgt]
+            call bt_msg_to_en
+            call bt_phys
             pop hl                          ; back into the enemy's record
             ld de, E_HP
             add hl, de
@@ -1255,9 +1191,14 @@ bt_pl_attack:
             ld a, [df_ails]
             ld [hl], a
             and AIL_DEAD | AIL_STONE
-            ret z
-            ld a, [bt_tgt]                  ; defeated: off the screen
-            jp bt_erase_enemy
+            jr z, .alive
+            ld a, [bt_sv + 3]               ; defeated now (not down already): off the screen
+            and AIL_DEAD | AIL_STONE
+            ld a, [bt_tgt]
+            call z, bt_erase_enemy
+.alive:
+            ld a, [bt_who]                  ; then the member back in line
+            jp bt_sback
 
 bt_en_attack:                               ; enemy [bt_who] -> member A
             ld [bt_tgt], a
@@ -1779,7 +1720,30 @@ bt_rnd_member:
 
 ; an enemy off the screen (its cells empty)
 bt_erase_enemy:
-            jp bt_erase_rows                ; (row by row: btl4.s)
+            push af                         ; (owner, 2026-11-23: a proper death; bosses a
+            ld b, a                         ;   special one: loc.s ed_dissolve)
+            ld a, [bt_type]
+            cp 4
+            jr nc, .x                       ; (Chaos: its own ending)
+            cp 3
+            jr c, .n
+            call fl_fiend                   ; a fiend: its flash first
+            ld bc, $0302
+            ld e, 8
+            jr .go
+.n:         ld a, b
+            call bt_epos
+.go:        ld hl, fl_b
+            ld a, b
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            ld [hl], e
+            ld a, F3_BANK
+            ld hl, ed_dissolve
+            call bank_call
+.x:         pop af
+            jp bt_erase_rows                ; (what is left cleared row by row: btl4.s)
             ld [bt_t + 4], a
             call bt_epos
             ld a, e
@@ -2020,7 +1984,10 @@ bt_mtext:   dec a
             ld [bt_sbuf + 39], a
             ret
 ; a row of the message window: string HL (row 1 at x 0, later rows indented by 8)
-bt_msg_row: ld a, [bt_rows]
+bt_msg_row: ld a, [bt_defer]                  ; (the result worked out first: nothing shown)
+            and a
+            ret nz
+            ld a, [bt_rows]
             cp 4
             ret nc
             push hl
@@ -2094,7 +2061,10 @@ bt_msg_win: ld a, [bt_msgon]                 ; (the rows below saved first)
 bt_msg_end1:
             call bt_msg_line
 ; the message shown for a while (A skips), then the windows below again
-bt_msg_end: call bt_msg_head
+bt_msg_end: ld a, [bt_defer]
+            and a
+            ret nz
+            call bt_msg_head
             call bt_flush
             ld a, [respond]                 ; FF1 RespondDelay: the title's message speed
             add a, low(B_RESPOND)
@@ -2731,7 +2701,10 @@ bt_s_gil:   db " Gil", 0
 B_DNGLY    = $4B00
 DN_OAM     = oam_buf + 140
 DN_T0      = $F0
-bt_dnum_w:  ld a, [hl+]                     ; (from the 16-bit damage at HL)
+bt_dnum_w:  ld a, [bt_defer]
+            and a
+            ret nz
+            ld a, [hl+]                     ; (from the 16-bit damage at HL)
             ld [nf_val], a
             ld a, [hl]
             ld [nf_val + 1], a
@@ -2755,7 +2728,10 @@ bt_dnum_w:  ld a, [hl+]                     ; (from the 16-bit damage at HL)
             and a
             ret z
             jp rc_start
-bt_dmiss:   ld hl, dn_miss
+bt_dmiss:   ld a, [bt_defer]
+            and a
+            ret nz
+            ld hl, dn_miss
             ld de, bt_dstr
             ld bc, 5
             call memcpy
@@ -3037,6 +3013,205 @@ bt_curr:    ld a, [opt_curr]
             ld [hl], a
             ret
 zz_end_b6_7360:
+
+section bank 6, $76D0                       ; (running away: after the results window)
+; FF1 Battle_PlayerTryRun (the level from the member's record: FF1's bug fixed)
+bt_try_run: ld a, [bt_who]
+            call bt_msg_pl
+            ld a, [bt_first]
+            and a
+            jr nz, .ok
+            ld a, [bt_form + 13]
+            and 1
+            jr nz, .no
+            ld a, [bt_who]
+            call ch_rec
+            ld a, l
+            add a, CH_LEVEL
+            ld l, a
+            ld a, [hl]
+            add a, 15
+            ld b, a
+            xor a
+            call bt_randab                  ; random(0 .. level + 15) - luck > 0: away
+            ld b, a
+            ld a, [bt_who]
+            call ch_rec
+            ld a, l
+            add a, $14
+            ld l, a
+            ld a, [hl]
+            ld c, a
+            ld a, c
+            sub b                           ; luck - r > 0: away
+            jr z, .no
+            jr nc, .ok
+.no:        ld a, M_CANTRUN
+            jp bt_msg_end1
+.ok:        ld a, M_CLOSE
+            call bt_msg_end1
+            call bt_runoff                  ; (owner, 2026-11-23: the party turns and runs off)
+            ld a, 3
+            ld [bt_result], a
+            ret
+
+; the party runs away: the members that can move turn round (sprites mirrored), a moment,
+; then run off to the right, 3 pixels a frame, FF1's walking pose every 4 frames
+bt_runoff:  ld a, SFX_MOVE                  ; (a little step sound as they turn)
+            ld [sfx_req], a
+            ld b, 0
+.t:         call .can
+            jr nz, .tn
+            push bc
+            ld a, b
+            call bt_dm
+            pop bc
+            push bc
+            ld a, b
+            call bt_flipm
+            pop bc
+.tn:        inc b
+            ld a, b
+            cp 4
+            jr c, .t
+            ld b, 10
+.w:         push bc
+            call bt_frame
+            pop bc
+            dec b
+            jr nz, .w
+            xor a
+            ld [dt_pose], a
+.f:         ld c, 0                         ; members still on the screen
+            ld b, 0
+.m:         call .can
+            jr nz, .nx
+            ld e, b
+            ld d, 0
+            ld hl, bt_px
+            add hl, de
+            ld a, [hl]
+            cp 168
+            jr nc, .nx
+            add a, 3
+            ld [hl], a
+            inc c
+            ld hl, bt_pose
+            add hl, de
+            ld a, [dt_pose]
+            and 4
+            ld [hl], a
+            push bc
+            ld a, b
+            call bt_dm
+            pop bc
+            push bc
+            ld a, b
+            call bt_flipm
+            pop bc
+.nx:        inc b
+            ld a, b
+            cp 4
+            jr c, .m
+            ld a, c
+            and a
+            ret z
+            call bt_frame
+            ld hl, dt_pose
+            inc [hl]
+            jr .f
+.can:       push bc                         ; NZ: member B cannot move (fallen, asleep, numb)
+            ld a, b
+            call ch_rec
+            inc hl
+            ld a, [hl]
+            pop bc
+            and AIL_DEAD | AIL_STONE | AIL_SLEEP | AIL_STUN
+            ret
+; member A's six sprites mirrored (each row's two tiles swapped, X flip)
+bt_flipm:   ld e, a
+            add a, a
+            add a, e
+            add a, a
+            add a, a
+            add a, a
+            add a, 16 + 2
+            ld l, a
+            ld h, high(oam_buf)
+            ld b, 3
+.r:         ld c, [hl]
+            ld a, l
+            add a, 4
+            ld l, a
+            ld a, [hl]
+            ld [hl], c
+            ld c, a
+            ld a, l
+            sub 4
+            ld l, a
+            ld [hl], c
+            inc l
+            set 5, [hl]
+            ld a, l
+            add a, 4
+            ld l, a
+            set 5, [hl]
+            inc l
+            inc l
+            inc l
+            dec b
+            jr nz, .r
+            ret
+
+section bank 6, $73F0                       ; (waking / paralysis: after the flinch)
+; FF1 Battle_PlayerTryWakeup: random(0 .. 80) < max HP wakes
+bt_try_wake:
+            ld a, [bt_who]
+            call bt_msg_pl
+            xor a
+            ld b, $50
+            call bt_randab
+            ld c, a
+            ld a, [bt_who]                  ; max HP > r: woke
+            call ch_rec
+            ld a, l
+            add a, CH_MAXHP
+            ld l, a
+            ld a, [hl+]
+            ld d, a
+            ld a, [hl]
+            and a
+            jr nz, .wk
+            ld a, d
+            cp c
+            jr z, .sl
+            jr c, .sl
+.wk:        ld a, [bt_who]
+            call ch_rec
+            inc hl
+            res 5, [hl]
+            ld a, M_WOKE
+            jp bt_msg_end1
+.sl:        ld a, M_ASLEEP
+            jp bt_msg_end1
+; FF1 Battle_PlayerTryUnstun: 1 in 4
+bt_try_unstun:
+            ld a, [bt_who]
+            call bt_msg_pl
+            call bt_rng
+            and 3
+            jr z, .ok
+            ld a, M_PARA
+            jp bt_msg_end1
+.ok:        ld a, [bt_who]
+            call ch_rec
+            inc hl
+            res 4, [hl]
+            ld a, M_CURED
+            jp bt_msg_end1
+
+; ---- physical attacks (FF1 PlayerAttackEnemy_Physical / EnemyAttackPlayer_Physical /
+; DoPhysicalAttack): the attacker's and defender's numbers into ak_* / df_*
 
 section bank 6, $7480                       ; (the results window: after btl4)
 ; a level up kept for the results window: the new level, the HP gain, the stats raised

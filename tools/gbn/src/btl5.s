@@ -621,3 +621,5 @@ fl_t:       ds 1
 fl_vb:      ds 1
 dt_pose:    ds 1
 fl_tb:      ds 72                           ; tiles (36), attributes (36)
+bt_defer:   ds 1                            ; bt_phys working out the result only (no text, no numbers)
+bt_sv:      ds 4                            ; (the RNG and the defender's HP / ailments meanwhile)
