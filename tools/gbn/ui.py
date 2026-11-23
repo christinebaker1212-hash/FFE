@@ -149,6 +149,15 @@ def strings():
     return out
 
 
+def status_words():
+    """the battle party lines' status words (bank 104: owner, 2026-11-23, every ailment)"""
+    out = ['section bank 104, $43D0']
+    for k, w in (('dead', 'Dead'), ('stone', 'Stone'), ('poison', 'Poison'), ('numb', 'Numb'), ('sleep', 'Sleep'),
+                 ('mute', 'Mute'), ('conf', 'Conf.'), ('blind', 'Blind')):
+        out.append('bst_%s: db %s, 0' % (k, ', '.join(str(b) for b in enc(w))))
+    return '\n'.join(out) + '\n'
+
+
 def string_table(base):
     """a pointer table (in the order of `names`) and the strings, for assembly at `base`"""
     s = strings()

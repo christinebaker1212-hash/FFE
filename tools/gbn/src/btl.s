@@ -1628,18 +1628,12 @@ bt_pline:   ld [bt_t + 11], a
             ld a, [hl]
             and a
             jr z, .out
-            ld de, str_st_dead
-            cp 1
-            jr z, .w
-            ld de, str_st_stone
-            cp 2
-            jr z, .w
-            ld de, str_st_poison
+            call bt_sttag                   ; (the worst one first: owner, 2026-11-23)
 .w:         ld h, d
             ld l, e
             ld de, bt_sbuf
-            ld bc, 16
-            ld a, SCR_BANK
+            ld bc, 8
+            ld a, BTL6_BANK
             call far_copy
             ld hl, bt_sbuf
             ld a, 50
@@ -1664,6 +1658,13 @@ bt_pline:   ld [bt_t + 11], a
             ld c, a
             ld b, 9
             call cell_addr
+            push hl
+            push de
+            ld a, [bt_t + 11]               ; (its colours: the HP's state, the Color)
+            call bt_hpcol
+            pop de
+            ld d, a
+            pop hl
             ld b, 10
 .c:         ld a, e
             ld [hl], a
@@ -1671,7 +1672,7 @@ bt_pline:   ld [bt_t + 11], a
             inc h
             inc h
             inc h
-            ld [hl], 3
+            ld [hl], d
             dec h
             dec h
             dec h

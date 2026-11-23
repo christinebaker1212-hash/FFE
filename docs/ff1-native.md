@@ -443,3 +443,18 @@ one reaches parity, so the owner can keep playing).
    (the melody bent into the bass), after: 521 / 656 / 1037 / 1312 Hz. The triangle restarts each
    note again on the Color (legato on the plain Game Boy only). Name entry: a 6 x 10 grid so the
    whole hand fits before each letter.
+26. Owner (2026-11-23, battle "up to par"; the owner chose from a list):
+   - A swing per hit (at least 1, at most 8), each hit's burst on the target; "n HIT(S)" only after
+     the swings, with the number.
+   - The bottom message window only for what numbers cannot show (owner's pick): no window for
+     plain hits / damage / misses / kills / "HP recovered!"; status effects, critical hits,
+     ineffective, running away, victory and level ups stay (bt_quiet, bq_line / bq_num).
+   - A top window (window layer cut at line 24, over the enemies and, with the sprites off for its
+     lines, over the party) with the spell / enemy ability / item spell's name during the cast, and
+     the target's name while one is chosen (hidden when the target stands under it).
+   - Healing numbers in green (CGB OBJ palette 6; DMG OBP0); party lines yellow under a quarter of
+     the HP, red when down (CGB BG palettes 4 / 5); every ailment named (Dead, Stone, Numb, Sleep,
+     Mute, Conf., Blind, Poison; before, any ailment but death / stone read "Poison").
+   - Room: the small font's glyphs (1 KB) and the acting enemy's flash moved to bank 104 (BTL6_BANK,
+     src/btl6.s; bank-6 routines through x_* bank_call wrappers), level up / Chaos' death to bank
+     6's freed space.

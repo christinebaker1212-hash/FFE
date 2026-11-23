@@ -685,6 +685,8 @@ bt_s_cmd:   db "Fight", $09, "Run", $0A, "Magic", $0A, "Medicine", $0A, "Items",
 ; across, from the enemies' middles), wrapping round to the far side when none is that way.
 ; A = slot, C set on B
 bt_target_enemy:
+            ld a, $FF
+            ld [ban_last], a
             ld hl, bt_lastt                 ; (the member's last target, while it lives)
             call bt_memp
             ld a, [hl]
@@ -703,7 +705,8 @@ bt_target_enemy:
             call bt_ealive
             jr z, .f
             ld [bt_tcur], a
-.l:         ld a, [bt_tcur]                 ; the hand left of the enemy, at its middle row
+.l:         call bt_tban_e                  ; (its name at the top)
+            ld a, [bt_tcur]                 ; the hand left of the enemy, at its middle row
             call bt_epos
             ld a, b
             add a, a
@@ -734,6 +737,7 @@ bt_target_enemy:
             call bt_tdir
             jr .l
 .a:         call bt_hand_off
+            call bt_tban_off
             ld hl, bt_lastt
             call bt_memp
             ld a, [bt_tcur]
@@ -741,6 +745,7 @@ bt_target_enemy:
             and a
             ret
 .b:         call bt_hand_off
+            call bt_tban_off
             scf
             ret
 ; HL += the member choosing (bt_cm)
@@ -2914,6 +2919,8 @@ bt_try_unstun:
 section bank 6, $77C0                       ; (2026-11-23: the battle's top window, quiet messages)
 pal5_tab:   db $00, $00, $DF, $0A, $FF, $7F, $00, $00
             db $00, $00, $00, $00, $E0, $03, $E7, $3F   ; (OBJ 6: healing numbers, green)
+            db $00, $00, $00, $00, $00, $00, $FF, $03   ; (BG 4: party line, HP low: yellow)
+            db $00, $00, $00, $00, $00, $00, $3F, $00   ; (BG 5: party line, down: red)
             db $00, $00, $00, $00, $FF, $7F, $FF, $7F
             db $00, $00, $FF, $7F, $00, $00, $00, $00
 ; a result line / "N text" unless quiet (owner, 2026-11-23: the window only says what the
@@ -2942,8 +2949,7 @@ BAN_T0     = $C4
 bt_ban_spell:
             ld a, [mg_id]
             call bt_mname
-bt_banner:  call bt_ban_off
-            ld b, 18
+bt_banner:  ld b, 18
             call vwf_clr
             ld hl, bt_sbuf
             xor a
@@ -3492,6 +3498,111 @@ bt_chaos_death:
             xor a
             ldh [$FF21], a
             ret
+
+
+; DE = the status word for ailment bits A (the worst first: dead, stone, numb, asleep, mute,
+; confused, blind, poisoned)
+bt_sttag:   ld de, bst_dead
+            bit 0, a
+            ret nz
+            ld de, bst_stone
+            bit 1, a
+            ret nz
+            ld de, bst_numb
+            bit 4, a
+            ret nz
+            ld de, bst_sleep
+            bit 5, a
+            ret nz
+            ld de, bst_mute
+            bit 6, a
+            ret nz
+            ld de, bst_conf
+            bit 7, a
+            ret nz
+            ld de, bst_blind
+            bit 3, a
+            ret nz
+            ld de, bst_poison
+            ret
+; A = member A's line palette: 5 down (dead / stone: red), 4 HP under a quarter (yellow),
+; 3 as the windows (owner, 2026-11-23; the Color only shows them)
+bt_hpcol:   call ch_rec
+            inc hl
+            ld a, [hl]
+            and AIL_DEAD | AIL_STONE
+            ld a, 5
+            ret nz
+            ld a, l
+            add a, CH_HP - 1
+            ld l, a
+            ld a, [hl+]                     ; HP x 4 < max?
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            sla e
+            rl d
+            sla e
+            rl d
+            ld a, [hl+]
+            ld c, a
+            ld b, [hl]
+            ld a, e
+            sub c
+            ld a, d
+            sbc a, b
+            ld a, 4
+            ret c
+            dec a
+            ret
+; the target's name in the top window while it is chosen (owner, 2026-11-23); ban_last: the
+; one shown ($FF none)
+bt_tban_e:  ld a, [bt_tcur]
+            ld hl, ban_last
+            cp [hl]
+            ret z
+            ld [hl], a
+            call bt_epos                    ; (an enemy under the window's rows: no window,
+            ld a, c                         ;   the hand and the enemy stay in sight)
+            cp 3
+            jp c, bt_ban_off
+            ld a, [bt_tcur]
+            call bt_ename
+            jp bt_banner
+bt_tban_p:  ld a, [bt_tcur]
+            or $80
+            ld hl, ban_last
+            cp [hl]
+            ret z
+            ld [hl], a
+            and 3                           ; (the first member stands under the window)
+            jp z, bt_ban_off
+            call ch_rec
+            inc hl
+            inc hl
+            ld de, bt_sbuf
+            ld b, 4
+.n:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .n
+            ld a, l
+            add a, CH_NAME2 - 6
+            ld l, a
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl]
+            ld [de], a
+            inc de
+            xor a
+            ld [de], a
+            jp bt_banner
+bt_tban_off:
+            ld a, $FF
+            ld [ban_last], a
+            jp bt_ban_off
 
 section bank 6, $7480                       ; (the results window: after btl4)
 ; a level up kept for the results window: the new level, the HP gain, the stats raised

@@ -409,8 +409,12 @@ box_vbl:    ld a, [box_on]
             call lcd_get                    ; (not while the LCD is off)
             bit 7, a
             ret z
-            ld a, LCDC_WIN
-            ldh [rLCDC], a
+            ld a, [ban_on]                  ; (the battle's top window: over the sprites too,
+            and a                           ;   which come back at its last line: owner,
+            ld a, LCDC_WIN                  ;   2026-11-23)
+            jr z, .wo
+            res 1, a
+.wo:        ldh [rLCDC], a
             ret
 
 ; STAT (LYC = 64): the window off below the box

@@ -1328,6 +1328,10 @@ the ambush round, rooms revealed on teleport arrival, the town wipe (black DMG c
 full-window frame), the gradient fading with the screen, attacks in the remake's measured timing,
 enemy deaths in sliding strips (fiends: flash + shake), the party turning and running off when
 escaping (docs/ff1-native.md item 24). Testing now in SameBoy (`build/sbsh`), not PyBoy (owner).
+Owner (2026-11-23, later): the wipe sound left square 1's sweep on (every song after a town bent
+down): fixed; name grid 6 x 10 with the whole hand; battle: a swing per hit, the hit count after
+the swings, messages only for what numbers cannot show, a top window for spell / ability / target
+names, green healing numbers, low-HP colours, every ailment named (docs/ff1-native.md items 25-26).
 Open: party names reported messed up after the inn save / a menu (not reproduced: asked the owner).
 Next: the walking playthrough (DMG / SGB / CGB), then the owner's play-test. Lessons: docs/gb-lessons.md.
 

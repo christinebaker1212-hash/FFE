@@ -315,10 +315,13 @@ bt_mrow:    ld a, [bt_rows]
 
 ; a member as target: the hand left of its sprite; A = member, C set on B
 bt_target_member:
+            ld a, $FF
+            ld [ban_last], a
             ld a, [bt_cm]
             ld [bt_tcur], a
 bt_tm_again:                                ; (the hand where it was)
-.l:         ld a, [bt_tcur]
+.l:         call bt_tban_p                  ; (the member's name at the top)
+            ld a, [bt_tcur]
             ld c, a
             add a, a
             add a, c
@@ -351,10 +354,12 @@ bt_tm_again:                                ; (the hand where it was)
             ld [hl], a
             jr .l
 .a:         call bt_hand_off
+            call bt_tban_off
             ld a, [bt_tcur]
             and a
             ret
 .b:         call bt_hand_off
+            call bt_tban_off
             scf
             ret
 
