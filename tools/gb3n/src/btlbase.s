@@ -382,6 +382,9 @@ s16_vbl:    ld a, [s16_lock]                ; (being built: the last picture sta
             jr c, .n
             ld a, 24
 .n:         ld c, a
+            ldh a, [rLY]                    ; (late in the V-Blank: the next one - Lot Check)
+            cp 149
+            jr nc, .x
             ld a, 6
             ldh [rSVBK], a
             ld l, b
