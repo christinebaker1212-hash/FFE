@@ -59,6 +59,20 @@ cs_init:    push bc
             ldh [scy], a
             ldh [rSCY], a
             ret
+; FF969 copies 4 tiles a frame while the screen is on: the frames beyond the DMA's one for A
+cs_tw:      ld b, a
+            ld a, [lcd_is]
+            and a
+            ret z
+            ld a, b
+            add a, 3
+            rrca
+            rrca
+            and $3F
+            dec a
+            ret z
+            ld b, a
+            jp cs_wait
 ; 1F/A0AD screen on
 cs_on:      ld a, LCDC_ON
             ldh [rLCDC], a
@@ -121,7 +135,11 @@ cs_gfx:     add a, a
             ld e, c
             ld b, a
             pop af
-            jp vcopyx
+            push bc
+            call vcopyx
+            pop bc
+            ld a, b
+            jp cs_tw
 .nt:        ld hl, cs_tmp                   ; a nametable (LCD off): tiles, then attributes
             ld a, [hl+]
             ld h, [hl]
@@ -218,7 +236,13 @@ cs_palc:    ld de, pal_sh
             ret
 .col:       push bc                         ; NES colour A -> [DE++] (RGB555)
             push de
-            and $3F
+            ld b, a
+            ld a, [cs_grey]                 ; (FF3's greyscale: the hue cleared)
+            and a
+            ld a, b
+            jr z, .c0
+            and $30
+.c0:        and $3F
             add a, a
             ld l, a
             ld h, 0
@@ -1258,7 +1282,1175 @@ st_f:       push de
             inc a
 .x:         pop de
             ret
-cut_end:    ret
+; ---- the ending (1F/B5B6): the land revealed from the middle, the clouds drifting, the crystal,
+; night to dawn to day, the birds, a flash; then the end credits (1F/B94A)
+CS_TXT     = $D100              ; $7900 the credits' text buffer (32 x 16)
+CS_Z       = $D800              ; a zero buffer (DMA source)
+
+cut_end:    ld bc, 48 * 256 + 40
+            call cs_init
+            ld a, 6                         ; 1F/B7B0 the land's tiles, the sprites
+            call cs_gfx
+            ld a, 7
+            call cs_gfx
+            ld hl, $4000 + 8 * 8            ; (the picture: entry 8, revealed row by row)
+            ld de, en_src
+            ld bc, 2
+            ld a, CUTD
+            call rd_copy
+            ld hl, en_wipe.out              ; (rows out of the view: now, the LCD off)
+            ld b, 12
+.o:         ld a, [hl+]
+            push hl
+            push bc
+            call en_row
+            pop bc
+            pop hl
+            dec b
+            jr nz, .o
+            ld a, 3
+            call cs_palset
+            ld a, 4                         ; the music stops
+            ld [S42], a
+            call cs_on
+            ld a, 2
+            ld [en_90], a
+            ld a, 16
+            ld [en_top], a
+            ld a, 15
+            ld [en_bot], a
+            xor a
+            ld [en_f], a
+            ld [en_sx], a
+            ld [cs_grey], a
+            call cs_vblc
+.w:         call cs_vbl                     ; 1F/B5D6 the band grows a line a frame each way
+            call en_wipe
+            ld hl, en_90
+            inc [hl]
+            inc [hl]
+            ld hl, en_f
+            inc [hl]
+            ld a, [hl]
+            cp 112
+            jr nz, .w
+            xor a
+            ld [cs_b6], a
+            ld [cs_b7], a
+            ld [en_91], a
+            ld a, $F6
+            ld [en_9e], a
+            ld a, $58
+            ld [en_9d], a
+.l1:        call en_frm                     ; 1F/B616
+            call en_ev
+            ld c, 0
+.ob:        push bc                         ; 1F/B783 the clouds (1F/B7A0: x + $90, y, -, list)
+            ld a, c
+            add a, a
+            add a, a
+            ld l, a
+            ld h, 0
+            ld de, $B7A0 + N1F
+            add hl, de
+            ld a, [en_90]
+            add a, [hl]
+            ld [en_x], a
+            inc hl
+            ld a, [hl+]
+            ld [en_y], a
+            inc hl
+            ld a, [hl]
+            call cs_slist
+            pop bc
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .ob
+            ld hl, cs_b6
+            inc [hl]
+            jr nz, .b6
+            ld hl, cs_b7
+            inc [hl]
+.b6:        ld a, [cs_b6]
+            and 7
+            jr nz, .l1
+            ld hl, en_90
+            dec [hl]
+            ld a, [cs_b7]
+            cp 12
+            jr nz, .l1
+            xor a
+            ld [cs_b6], a
+.l2:        call en_frm                     ; 1F/B63D the land fades, the crystal stays
+            call en_cry
+            ld a, [cs_b6]
+            and 7
+            jr nz, .l2n
+            xor a
+            call cs_dark
+            ld hl, $B6AE + N1F
+            ld de, cs_pal + 16
+            ld bc, 8
+            call memcpy
+.l2n:       ld hl, cs_b6
+            inc [hl]
+            ld a, [hl]
+            and $20
+            jr z, .l2
+            call en_frm
+            ld a, $3C
+            ld [en_90], a
+            xor a
+            ld [cs_b6], a
+.l3:        call cs_vblc                    ; 1F/B680 the flash (every 4 frames)
+            ld a, [cs_b6]
+            and 4
+            add a, a
+            add a, low($B69E + N1F)
+            ld l, a
+            ld a, high($B69E + N1F)
+            adc a, 0
+            ld h, a
+            ld de, cs_pal
+            ld b, 4
+.fl:        push bc
+            push hl
+            ld bc, 8
+            call memcpy
+            pop hl
+            pop bc
+            dec b
+            jr nz, .fl
+            ld hl, cs_b6
+            inc [hl]
+            ld hl, en_90
+            dec [hl]
+            jr nz, .l3
+            ld b, $1E
+            call cs_wait
+            jp cr_go
+
+; 1F/B5AB a frame (palettes), the sprite list cleared
+en_frm:     call cs_vblc
+            call cs_oclr
+            xor a
+            ld [cs_c8], a
+            ret
+; 1F/B6B6 the crystal at (48, 48): list 7 / 8 (every 4 frames)
+en_cry:     ld a, $30
+            ld [en_x], a
+            ld [en_y], a
+            ld a, [cs_b6]
+            and 4
+            rrca
+            rrca
+            add a, 7
+            jp cs_slist
+; the wipe's rows: the band (NES lines 120 - f - 1 .. 119 + f + 1); rows out of the view first
+en_wipe:    ld a, [en_f]
+            inc a
+            ld b, a
+            ld a, 120
+            sub b
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld c, a                         ; the top row
+            ld hl, en_top
+            ld a, [hl]
+            cp c
+            jr z, .t
+            jr c, .t
+            dec [hl]
+            ld a, [hl]
+            call en_row
+.t:         ld a, [en_f]
+            add a, 120
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld c, a
+            ld hl, en_bot
+            ld a, [hl]
+            cp c
+            ret nc
+            inc [hl]
+            ld a, [hl]
+            jp en_row
+.out:       db 0, 1, 2, 3, 4, 23, 24, 25, 26, 27, 28, 29
+; picture row A -> the BG map (tiles, then the CGB attributes)
+en_row:     ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            push hl
+            ld de, $9800
+            add hl, de
+            ld d, h
+            ld e, l
+            pop hl
+            push de
+            ld a, [en_src]
+            ld c, a
+            ld a, [en_src + 1]
+            ld b, a
+            add hl, bc
+            push hl
+            ld bc, 32
+            ld a, CUTD
+            call rd_copy
+            pop hl
+            ld bc, 960
+            add hl, bc
+            pop de
+            ld a, 1
+            ldh [rVBK], a
+            ld bc, 32
+            ld a, CUTD
+            call rd_copy
+            xor a
+            ldh [rVBK], a
+            ret
+
+; 1F/B6D1 the flyover's events by time ($B7 = frames / 256)
+en_ev:      ld a, [en_91]
+            and a
+            jr z, .t6
+            call en_cry
+            ld a, [cs_b7]                   ; (until $B7 = 5: greyscale every other frame)
+            cp 5
+            ld a, 0
+            jr nc, .g
+            ld a, [cs_grey]
+            xor 1
+.g:         ld [cs_grey], a
+.t6:        ld a, [cs_b7]
+            cp 6
+            jr z, .b705
+            cp 7
+            jr nz, .b72a
+            ld a, [cs_b6]
+            and a
+            jr nz, .b705
+            ld a, $FF                       ; (B7 = 7: a sound, song $3B)
+            ld [S49], a
+            ld a, $3B
+            call snd_song
+.b705:      ld a, [cs_b6]                   ; the birds: left a pixel every 2 frames, up every 8
+            bit 0, a
+            jr z, .b1
+            ld hl, en_9e
+            dec [hl]
+.b1:        ld a, [en_9e]
+            ld [en_x], a
+            ld a, [cs_b6]
+            and 7
+            jr nz, .b2
+            ld hl, en_9d
+            dec [hl]
+.b2:        ld a, [en_9d]
+            ld [en_y], a
+            ld a, [cs_b6]
+            and 8
+            rrca
+            rrca
+            rrca
+            add a, 9
+            call cs_slist
+.b72a:      ld a, [cs_b7]
+            cp 2
+            jr nz, .b733
+            ld a, [cs_b6]                   ; (B7 = 2: the picture shakes)
+            and 3
+            ld [en_sx], a
+            add a, 48
+            ldh [scx], a
+.b733:      ld a, [cs_b7]
+            cp 3
+            jr nz, .b771
+            ld a, [cs_b6]
+            bit 7, a
+            jr nz, .b75b
+            ld a, $30                       ; the crystal appears (lists 2-6, then 7)
+            ld [en_x], a
+            ld [en_y], a
+            ld a, [en_91]
+            and a
+            ret nz
+            ld a, [cs_b6]
+            and $38
+            rrca
+            rrca
+            rrca
+            add a, 2
+            cp 7
+            jr nz, .b757
+            ld hl, en_91
+            inc [hl]
+.b757:      jp cs_slist
+.b75b:      cp $80                          ; dawn: palette set 1 a step dark, then set 1
+            jr nz, .b767
+            ld a, 1
+            call cs_palset
+            xor a
+            jp cs_dark
+.b767:      cp $C0
+            ret nz
+            ld a, 1
+            jp cs_palset
+.b771:      cp 4
+            ret nz
+            ld a, [cs_b6]
+            cp $80
+            ret nz
+            ld a, 2                         ; day
+            jp cs_palset
+
+; 1F/B7C9 sprite list A (1F/B805) at (en_x, en_y), appended at cs_c8
+cs_slist:   add a, a
+            ld l, a
+            ld h, 0
+            ld de, $B805 + N1F
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld de, N1F
+            add hl, de
+            ld a, [cs_c8]
+            ld e, a
+            ld d, high(CS_OAM)
+.l:         ld a, [hl+]
+            cp $FF
+            jr z, .e
+            ld b, a
+            ld a, [en_y]
+            add a, b
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld b, a
+            ld a, [en_x]
+            add a, b
+            ld [de], a
+            inc e
+            jr .l
+.e:         ld a, e
+            ld [cs_c8], a
+            ret
+
+; ---- the end credits (1F/B94A): the party, the cast, the staff, THE END
+cr_go:      ld a, 1
+            ld [cs_cc], a
+            xor a
+            ld [cs_grey], a
+            ld a, 48                        ; (the credits' view: NES rows 6-23, cols 6-25)
+            ld [cs_cy], a
+            ldh [scy], a
+            ld a, 48
+            ld [cs_cx], a
+            ldh [scx], a
+            call cr_clr
+            ld a, 9                         ; tiles 0-3 blank, the font, the romaji
+            call cs_gfx
+            xor a
+            call cs_gfx
+            ld a, 1
+            call cs_gfx
+            ld a, 10
+            call cs_gfx
+            xor a
+            ld [cs_b6], a
+            ld [cr_c2], a
+            ld [cr_c5], a
+            ld [cr_c4], a
+            ld [cr_id], a
+            ld [cr_ac], a
+            call cs_oclr
+            call cr_b942
+            call cr_bd41                    ; "CAST"
+            xor a
+            call cs_fout
+            call cs_oclr
+            call cr_b942
+            call cr_party                   ; 1F/BC02
+            ld hl, cs_pal                   ; 1F/A1BC all black
+            ld b, 32
+            ld a, $0F
+.k:         ld [hl+], a
+            dec b
+            jr nz, .k
+            call cs_vbl
+            call cr_cast                    ; 1F/BCCD
+            call cs_oclr
+            call cr_b942
+            call cr_bd41                    ; "STAFF"
+            xor a
+            call cs_fout
+            ld a, 1
+            ld [cr_c4], a
+            ld [cr_ac], a
+            call cr_staff                   ; 1F/BBAB
+            ld a, 11                        ; THE END
+            call cs_gfx
+            call cr_b942
+            ld hl, CS_TXT
+            ld de, $200
+            call memclr
+            ld hl, $BA23 + N1F
+            ld de, CS_TXT + 6 * 32 + 4
+            ld bc, 10
+            call memcpy
+            ld hl, $BA2D + N1F
+            ld de, CS_TXT + 7 * 32 + 4
+            ld bc, 10
+            call memcpy
+            ld hl, $BA37 + N1F
+            ld de, CS_TXT + 8 * 32 + 4
+            ld bc, 10
+            call memcpy
+            call cr_put
+            ld a, 7
+            call cs_palset
+            xor a
+            call cs_fin
+            ld c, 10
+.wt:        ld b, $32
+            push bc
+            call cs_wait
+            pop bc
+            dec c
+            jr nz, .wt
+            ld a, 1                         ; the stars behind THE END, for ever
+            ld [st_end], a
+            ld a, 5
+            call cs_gfx
+            ld a, $30
+            ld [cs_pal + 3], a
+            call st_init
+            xor a
+            ld [cs_b6], a
+            ld a, 1
+            ld [cs_slow], a
+            ldh a, [vbl_cnt]
+            ld [cs_last], a
+.end:       call cs_vbl
+            call st_draw
+            call st_move
+            jr .end
+
+; the BG map cleared (tiles and attributes: 4 V-Blanks of DMA)
+cr_clr:     ld hl, CS_Z
+            ld de, $400
+            call memclr
+            ld de, $9800
+            call .two
+            ld a, 1
+            ldh [rVBK], a
+            ld de, $9800
+            call .two
+            xor a
+            ldh [rVBK], a
+            ret
+.two:       ld b, 2
+.h:         push bc
+            push de
+            ldh a, [rVBK]
+            push af
+            call cs_vbl
+            pop af
+            ldh [rVBK], a
+            pop de
+            ld hl, CS_Z
+            ld a, h
+            ldh [rHDMA1], a
+            ld a, l
+            ldh [rHDMA2], a
+            ld a, d
+            ldh [rHDMA3], a
+            ld a, e
+            ldh [rHDMA4], a
+            ld a, 63
+            ldh [rHDMA5], a
+            ld hl, $400
+            add hl, de
+            ld d, h
+            ld e, l
+            pop bc
+            dec b
+            jr nz, .h
+            ret
+
+; 1F/B942 palette set 4, a frame
+cr_b942:    ld a, 4
+            call cs_palset
+            jp cs_vblc
+; 1F/BD41 the next text, palette set 5, all faded in, 130 frames; 1F/BD56 the BG only
+cr_bd41:    call cr_text
+            call cr_put
+            ld a, 5
+            call cs_palset
+            xor a
+cr_bd4e:    call cs_fin
+            ld b, $82
+            jp cs_wait
+cr_bd56:    ld a, 5
+            call cs_palset
+            ld a, 1
+            jr cr_bd4e
+
+; 1F/BA41 the next credits string (10/9640) into the text buffer
+cr_text:    call cr_bclr
+            ld a, [cr_id]
+            ld l, a
+            inc a
+            ld [cr_id], a
+            ld h, 0
+            add hl, hl
+            ld de, $5300
+            add hl, de
+            ld de, cs_tmp
+            ld bc, 2
+            ld a, CUTD2
+            call rd_copy
+            ld hl, cs_tmp
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld de, cr_str
+            ld bc, 254
+            ld a, CUTD2
+            call rd_copy
+            ld hl, cr_str
+; FF3's text drawer (bconv): 00 end, 01 a new two-row line, 02 n n cells on, else a tile (on
+; the lower row of the line), into the 32-wide buffer
+cr_bconv:   ld de, CS_TXT + 32
+            ld c, 0
+.l:         ld a, [hl+]
+            and a
+            ret z
+            cp 1
+            jr nz, .n2
+            ld a, e
+            add a, 64
+            ld e, a
+            jr nc, .n1
+            inc d
+.n1:        ld c, 0
+            jr .l
+.n2:        cp 2
+            jr nz, .t
+            ld a, [hl+]
+            add a, c
+            ld c, a
+            jr .l
+.t:         push hl
+            ld b, a
+            ld a, e
+            add a, c
+            ld l, a
+            ld a, d
+            adc a, 0
+            ld h, a
+            ld [hl], b
+            pop hl
+            inc c
+            jr .l
+cr_bclr:    ld hl, CS_TXT                   ; 1F/A51F the buffer blank ($FF)
+            ld bc, $200
+.c:         ld a, $FF
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .c
+            ret
+; 1F/BA95 the buffer's 14 x 18 cells -> NES rows 8-21, cols 7-24 (a row a frame)
+cr_put:     ld hl, CS_TXT
+            ld de, $9800 + 8 * 32 + 7
+            ld c, 14
+.r:         push bc
+            push de
+            push hl
+            call cs_vbl
+            pop hl
+            pop de
+            push de
+            push hl
+            ld b, 18
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            pop hl
+            ld bc, 32
+            add hl, bc
+            pop de
+            ld a, e
+            add a, 32
+            ld e, a
+            jr nc, .n
+            inc d
+.n:         pop bc
+            dec c
+            jr nz, .r
+            ret
+
+; 1F/BC02 each member: walks in, swings, name and level, cheers, walks out
+cr_party:   xor a
+            ld [cr_c5], a
+.m:         ld a, [cr_c5]
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]                      ; job
+            ld [cr_c3], a
+            call cr_jobw
+            ld a, $68
+            ld [cr_c1], a
+            ld a, $F0
+            ld [cr_c0], a
+            xor a
+            ld [cs_b6], a
+.w1:        call cr_walk
+            ld a, [cr_c0]
+            cp $78
+            jr nz, .w1
+            xor a
+            ld [cr_95], a
+            call cr_swing
+            call cr_still
+            call cr_name
+            call cr_cheer
+            call cr_still
+            ld a, 1
+            call cs_fout
+            xor a
+            ld [cs_b6], a
+.w2:        call cr_walk
+            ld a, [cr_c0]
+            and a
+            jr nz, .w2
+            call cs_oclr
+            call cs_vblc
+            ld a, [cr_c5]
+            add a, $40
+            ld [cr_c5], a
+            jr nz, .m
+            ret
+; job cr_c3's sprites (1F/BE3A) and weapon (1F/BDEA, by 1F/BFC2)
+cr_jobw:    ld a, [cr_c3]
+            ld l, a                         ; 42 tiles of the characters' bank: job x 672
+            ld h, 0
+            ld d, h
+            ld e, l
+            add hl, hl                      ; x 42 = x 32 + x 8 + x 2
+            add hl, hl
+            add hl, hl
+            push hl
+            add hl, hl
+            add hl, hl
+            pop bc
+            add hl, bc
+            ld b, d
+            ld c, e
+            add hl, bc
+            add hl, bc
+            add hl, hl                      ; x 16
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld bc, $4000
+            add hl, bc
+            ld a, CHGFX_BANK
+            ld [vc_src], a
+            ld de, $8000
+            ld b, 42
+            ld a, 1
+            call vcopyx
+            ld a, 42
+            call cs_tw
+            ld a, [cr_c3]
+            ld e, a
+            ld d, 0
+            ld hl, $BFC2 + N1F
+            add hl, de
+            ld a, [hl]
+            ld l, a                         ; 2E/9098 + 3 n: -, tile, general palette
+            ld h, 0
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, de
+            ld de, $5000
+            add hl, de
+            ld de, cs_tmp
+            ld bc, 3
+            ld a, CUTD2
+            call rd_copy
+            ld a, [cs_tmp + 2]              ; FF877: 00/9100 / 9200 / 9300 + n
+            ld l, a
+            ld h, high(BD_GPAL)
+            ld a, BDATA_BANK
+            call rd_byte
+            ld [cr_gp], a
+            dec hl
+            inc h
+            ld a, BDATA_BANK
+            call rd_byte
+            ld [cr_gp + 1], a
+            dec hl
+            inc h
+            ld a, BDATA_BANK
+            call rd_byte
+            ld [cr_gp + 2], a
+            ld a, [cs_tmp + 1]              ; 4 tiles of 2B/B000 -> sprite tiles $80-$83
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld bc, $4000
+            add hl, bc
+            ld a, CUTD2
+            ld [vc_src], a
+            ld de, $8800
+            ld b, 4
+            ld a, 1
+            jp vcopyx
+; 1F/BDBB a walking frame: 2 pixels left
+cr_walk:    call en_frm
+            call cr_draw
+            ld a, [cs_b6]
+            and 4
+            rrca
+            rrca
+            ld [cr_c2], a
+            ld hl, cr_c0
+            dec [hl]
+            dec [hl]
+            ld hl, cs_b6
+            inc [hl]
+            ret
+; 1F/BED6 standing
+cr_still:   call cs_oclr
+            xor a
+            ld [cs_c8], a
+            ld a, 1
+            ld [cr_c2], a
+; 1F/BEE1 the character (6 sprites: 1F/BF35 frame cr_c2, 1F/BF5F palette by cr_c3, offsets
+; 1F/BF7D / BF83), and its mirror image when cr_c4 is set
+cr_draw:    xor a
+            call .one
+            ld a, [cr_c4]
+            and a
+            ret z
+.one:       ld [cr_cd], a
+            ld a, [cr_c2]
+            ld l, a
+            add a, a
+            add a, l
+            add a, a
+            add a, low($BF35 + N1F)
+            ld l, a
+            ld a, high($BF35 + N1F)
+            adc a, 0
+            ld h, a
+            push hl
+            ld a, [cr_c3]
+            ld e, a
+            ld d, 0
+            ld hl, $BF5F + N1F
+            add hl, de
+            ld a, [hl]
+            ld [cs_t + 2], a
+            pop hl
+            ld a, [cs_c8]
+            ld e, a
+            ld d, high(CS_OAM)
+            ld c, 0
+.s:         push hl
+            ld hl, $BF83 + N1F
+            ld b, 0
+            add hl, bc
+            ld a, [cr_c1]
+            add a, [hl]
+            ld [de], a
+            inc e
+            pop hl
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [cs_t + 2]
+            ld [de], a
+            inc e
+            push hl
+            ld hl, $BF7D + N1F
+            add hl, bc
+            ld a, [cr_c0]
+            add a, [hl]
+            ld [de], a
+            call cr_mir
+            inc e
+            pop hl
+            inc c
+            ld a, c
+            cp 6
+            jr nz, .s
+            ld a, e
+            ld [cs_c8], a
+            ret
+; 1F/BEBE a mirrored sprite: x = (x xor $FF) - 8, H flip toggled ([DE] = x)
+cr_mir:     ld a, [cr_cd]
+            and a
+            ret z
+            ld a, [de]
+            cpl
+            sub 8
+            ld [de], a
+            dec e
+            ld a, [de]
+            xor $40
+            ld [de], a
+            inc e
+            ret
+; 1F/BE80 the weapon (4 sprites, 1F/BF89 lists by frame), and its mirror
+cr_wpnd:    xor a
+            call .one
+            ld a, [cr_c4]
+            and a
+            ret z
+.one:       ld [cr_cd], a
+            ld a, [cs_b6]
+            and 4
+            rrca
+            add a, low($BF89 + N1F)
+            ld l, a
+            ld a, high($BF89 + N1F)
+            adc a, 0
+            ld h, a
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld bc, N1F
+            add hl, bc
+            ld a, [cs_c8]
+            ld e, a
+            ld d, high(CS_OAM)
+            ld c, 4
+.s:         ld a, [cr_c1]
+            add a, [hl]
+            inc hl
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [cr_c0]
+            add a, [hl]
+            inc hl
+            ld [de], a
+            call cr_mir
+            inc e
+            dec c
+            jr nz, .s
+            ld a, e
+            ld [cs_c8], a
+            ret
+; 1F/BD6E the swing: until $95 = 9 (1F/BB15: every 8 frames; the staff pages: a text column
+; pair every 4 frames, from both edges in)
+cr_swing:   xor a
+            ld [cs_b6], a
+            ld hl, cr_gp                    ; 1F/BD60 the weapon's colours: sprite palette 3
+            ld de, cs_pal + 29
+            ld bc, 3
+            call memcpy
+.l:         call cr_bb15
+            call cs_oclr
+            xor a
+            ld [cs_c8], a
+            call cr_draw
+            call cr_wpnd
+            ld a, [cs_b6]
+            and 4
+            rrca
+            rrca
+            add a, 2
+            ld [cr_c2], a
+            ld hl, cs_b6
+            inc [hl]
+            ld a, [cr_95]
+            cp 9
+            jr nz, .l
+            call en_frm
+            jp cr_draw
+cr_bb15:    ld a, [cr_ac]
+            and a
+            jr nz, .rv
+            ld a, [cs_b6]
+            and 7
+            jr nz, .f
+            ld hl, cr_95
+            inc [hl]
+.f:         jp cs_vblc
+.rv:        ld a, [cs_b6]
+            and 3
+            jr nz, .f
+            call cs_vbl
+            ld a, [cr_95]                   ; left: map col 7 + k <- col k; right: 24 - k <- 17 - k
+            ld c, a
+            ld b, 0
+            ld hl, CS_TXT
+            add hl, bc
+            ld de, $9800 + 8 * 32 + 7
+            ld a, e
+            add a, c
+            ld e, a
+            call .col
+            ld a, 17
+            sub c
+            ld l, a
+            ld h, 0
+            ld de, CS_TXT
+            add hl, de
+            ld a, 24
+            sub c
+            add a, low($9800 + 8 * 32)
+            ld e, a
+            ld d, high($9800 + 8 * 32)
+            call .col
+            ld hl, cr_95
+            inc [hl]
+            ret
+.col:       ld b, 14
+.c:         ld a, [hl]
+            ld [de], a
+            ld a, l
+            add a, 32
+            ld l, a
+            jr nc, .c1
+            inc h
+.c1:        ld a, e
+            add a, 32
+            ld e, a
+            jr nc, .c2
+            inc d
+.c2:        dec b
+            jr nz, .c
+            ret
+; 1F/BD9D the cheer: 128 frames (frames 4 / 5 every 16)
+cr_cheer:   xor a
+            ld [cs_b6], a
+.l:         call en_frm
+            call cr_draw
+            ld a, [cs_b6]
+            and $10
+            swap a
+            add a, 4
+            ld [cr_c2], a
+            ld hl, cs_b6
+            inc [hl]
+            bit 7, [hl]
+            jr z, .l
+            ret
+; 1F/BC67 the member's name and "lv" + level (+ 1, two digits)
+cr_name:    call cr_bclr
+            ld hl, cr_str
+            ld a, 1
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld a, 2
+            ld [hl+], a
+            ld a, 6
+            ld [hl+], a
+            ld d, h
+            ld e, l
+            ld a, [cr_c5]
+            add a, 6
+            ld l, a
+            ld h, high(GS + $100)
+            ld bc, 6
+            call memcpy
+            ld h, d
+            ld l, e
+            ld a, 1
+            ld [hl+], a
+            ld a, 2
+            ld [hl+], a
+            ld a, 7
+            ld [hl+], a
+            ld a, $18
+            ld [hl+], a
+            ld a, $22
+            ld [hl+], a
+            push hl
+            ld a, [cr_c5]
+            inc a
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]
+            inc a
+            ld b, $80
+.d:         cp 10
+            jr c, .d1
+            sub 10
+            inc b
+            jr .d
+.d1:        pop hl
+            ld [hl], b
+            inc hl
+            add a, $80
+            ld [hl+], a
+            ld [hl], 0
+            ld hl, cr_str
+            call cr_bconv
+            call cr_put
+            jp cr_bd56
+; 1F/BCCD the cast: 8 people (1F/BDD0 graphics, 1F/BF75 palettes), the fourth pair of two
+cr_cast:    xor a
+            ld [cr_c5], a
+            ld a, 1
+            ld [cr_c2], a
+            call cs_oclr
+            call cs_vblc
+.l:         ld a, [cr_c5]
+            ld e, a
+            ld d, 0
+            ld hl, $BDD0 + N1F
+            add hl, de
+            ld a, [hl]
+            ld l, a                         ; 1F/BDD8: 6 tiles at $BA20 + $60 id (bank $14)
+            ld h, 0
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, de
+            add hl, hl                      ; 6 id
+            ld de, $3A2
+            add hl, de
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $4000
+            add hl, de
+            ld a, CHGFX_BANK
+            ld [vc_src], a
+            ld de, $8000
+            ld b, 6
+            ld a, 1
+            call vcopyx
+            ld a, 6
+            call cs_tw
+            ld a, $78
+            ld [cr_c0], a
+            ld a, $68
+            ld [cr_c1], a
+            ld a, 4
+            call cs_palset
+            xor a
+            ld [cs_c8], a
+            call cs_oclr
+            ld a, [cr_c5]
+            ld e, a
+            ld d, 0
+            ld hl, $BF75 + N1F
+            add hl, de
+            ld a, [hl]
+            ld [cr_c3], a
+            ld a, [cr_c5]
+            cp 4
+            jr nz, .one
+            ld a, $84                       ; 1F/BD20
+            ld [cr_c0], a
+            ld a, 1
+            ld [cr_c2], a
+            ld [cr_c4], a
+            call cr_draw
+            ld a, $94
+            ld [cr_c0], a
+            ld a, 6
+            ld [cr_c2], a
+            call cr_draw
+            xor a
+            ld [cr_c4], a
+            ld a, 1
+            ld [cr_c2], a
+            jr .t
+.one:       call cr_draw
+.t:         call cr_bd41
+            xor a
+            call cs_fout
+            ld hl, cr_c5
+            inc [hl]
+            ld a, [hl]
+            cp 8
+            jr nz, .l
+            ret
+; 1F/BBAB the staff: 20 pages, a job on each side (1F/BFAD), the text revealed column by column
+cr_staff:   xor a
+            ld [cr_c6], a
+            call cr_b942
+.p:         ld a, $F0
+            ld [cr_c0], a
+            ld a, $68
+            ld [cr_c1], a
+            ld a, [cr_c6]
+            ld e, a
+            ld d, 0
+            ld hl, $BFAD + N1F
+            add hl, de
+            ld a, [hl]
+            ld [cr_c3], a
+            call cr_jobw
+            xor a
+            ld [cs_b6], a
+.w:         call cr_walk
+            ld a, [cr_c0]
+            cp $C0
+            jr nz, .w
+            call cr_still
+            call cr_bclr                    ; 1F/BADC the text area blank, palette set 5
+            call cr_put
+            ld a, 5
+            call cs_palset
+            call cs_vblc
+            xor a
+            ld [cr_95], a
+            call cr_text
+            call cr_swing
+            call cr_cheer
+            call cr_still
+            ld b, $3C
+            call cs_wait
+            xor a
+            call cs_fout
+            call cs_oclr
+            call cr_b942
+            ld hl, cr_c6
+            inc [hl]
+            ld a, [hl]
+            cp 20
+            jr nz, .p
+            ret
 
 section wram, $D400
 cs_pal:     ds 32               ; FF3's $7CF7 palettes
@@ -1293,3 +2485,30 @@ st_cnt:       ds 1                ; $CB stars shown
 st_end:     ds 1                ; $7EC2 (the end: stars behind the text)
 cs_slow:    ds 1
 cs_last:    ds 1
+en_src:     ds 2
+en_90:      ds 1
+en_91:      ds 1
+en_9d:      ds 1
+en_9e:      ds 1
+en_top:     ds 1
+en_bot:     ds 1
+en_f:       ds 1
+en_sx:      ds 1
+en_x:       ds 1
+en_y:       ds 1
+cs_c8:      ds 1
+cs_grey:    ds 1
+cr_c0:      ds 1
+cr_c1:      ds 1
+cr_c2:      ds 1
+cr_c3:      ds 1
+cr_c4:      ds 1
+cr_c5:      ds 1
+cr_c6:      ds 1
+cr_cd:      ds 1
+cr_95:      ds 1
+cr_ac:      ds 1
+cr_id:      ds 1
+cr_gp:      ds 3
+section wram, $DC00
+cr_str:     ds 256

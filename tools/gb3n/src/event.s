@@ -772,6 +772,9 @@ cut_go:     ld b, a
             cp $80
             jr z, .g
             ld hl, cut_epi
+            cp $81
+            jr z, .g
+            ld hl, cut_end                  ; ($82: the ending, for tests)
 .g:         ld a, CODE5
             call far_call
             ld a, $FF                       ; (no map title)

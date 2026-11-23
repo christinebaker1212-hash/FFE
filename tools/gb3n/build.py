@@ -208,6 +208,7 @@ BDATA3_BANK = 112                       # 2A/8000 boss tilemaps, 2F/9068 boss gr
 CODE4_MODULES = ('btlmagic', 'btlwin', 'btlact2')
 CODE5 = 113                             # the cutscenes (cut.s at $4000, NES bank 1F at $6000)
 CUTD = 114                              # their graphics and text pages (cut.py)
+CUTD2 = 115                             # the end credits' strings, weapon tiles (cut.py)
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
 CHGFX_BANK = 95                         # battle characters (NES banks $28 / $29) as GB tiles
 BDATA2_BANK = 96                        # FF3 bank $30 (monsters, stat sets, scripts, items) at $4000
@@ -395,6 +396,7 @@ def main():
         banks[SND_BANK0 + k] = bytearray(rom.prg[0x36 * 0x2000:0x37 * 0x2000] + rom.prg[sb * 0x2000:(sb + 1) * 0x2000])
     import cut
     cut_hi, banks[CUTD], cut_syms = cut.pack(rom, CUTD)
+    banks[CUTD2] = cut.pack2(rom)
     src = engine_src(rom) + '\n' + nes_rgb_src() + '\n' + trig_src(rom)
     title_on = opt['--map'] == '' and opt['--group'] == '0'
     r = asm(src, syms={'START_MAP': int(opt['--map'] or '0', 0), 'START_GRP': int(opt['--group'], 0),
@@ -405,7 +407,7 @@ def main():
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
                        'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0, 'CHGFX_BANK': CHGFX_BANK, 'BDATA2_BANK': BDATA2_BANK, 'BTXT_BANK': BTXT_BANK, 'CODE3': CODE3, 'CODE4': CODE4, 'BDATA3_BANK': BDATA3_BANK,
-                       'CODE5': CODE5, 'CUTD': CUTD, **cut_syms,
+                       'CODE5': CODE5, 'CUTD': CUTD, 'CUTD2': CUTD2, **cut_syms,
                        'TEST_SONG': int(opt['--song'], 0) if opt['--song'] else 255,
                        'SND_MASK': int(os.environ.get('GB_SND_MASK', 'FF'), 16),     # (test builds: NR51)
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,

@@ -159,6 +159,30 @@ def pages(rom):
     return out
 
 
+def pack2(rom):
+    """the second data bank: $4000 weapon tiles (2B/B000, 256, GB format), $5000 weapon
+    properties (2E/9098, 3 bytes each), $5300 the end credits' 31 strings (10/9640 pointers;
+    GB addresses), the strings after"""
+    from data import nes2gb
+    d = bytearray(0x4000)
+    src = rom.b(0x2B, 0xB000, 0x1000)
+    d[0:0x1000] = b''.join(nes2gb(src[16 * t:16 * t + 16]) for t in range(256))
+    d[0x1000:0x1300] = rom.b(0x2E, 0x9098, 0x300)
+    a = 0x1340
+    for i in range(31):
+        p = rom.u8(0x10, 0x9640 + 2 * i) | rom.u8(0x10, 0x9641 + 2 * i) << 8
+        st = bytearray()
+        while True:
+            c = rom.u8(0x10, p); p += 1; st.append(c)
+            if c == 0: break
+            if c == 2: st.append(rom.u8(0x10, p)); p += 1
+        d[0x1300 + 2 * i] = (0x4000 + a) & 0xFF; d[0x1301 + 2 * i] = (0x4000 + a) >> 8
+        d[a:a + len(st)] = st
+        a += len(st)
+    assert a <= 0x4000
+    return d
+
+
 def pack(rom, data_bank):
     """-> (the code bank's upper half: NES bank 1F, the data bank, syms)"""
     upper = bytearray(rom.b(B1F, 0xA000, 0x2000))
