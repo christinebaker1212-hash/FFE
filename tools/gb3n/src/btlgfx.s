@@ -9,6 +9,9 @@ BT_ROWS    = 14
 ; 2F/A14A init monster / bg graphics + 2E/9D88 palettes + 2E/9E64 characters
 bg_init:    call chr_init
             call pal_init
+            call chr_palid
+            call chr_gfx
+            call chr_pos
             call mon_gfx
             ld hl, W7 + $7900               ; 2F/A362 clear the monster tilemap
             ld de, 32 * BT_ROWS
@@ -627,6 +630,7 @@ btl_screen: xor a                           ; (LCD off) VRAM bank 0 tile 0 blank
             call pal8
             ld a, 1
             ldh [pal_dirty], a
+            call chr_draw
             ld a, 20                        ; the view: NES (20, 48) = tilemap row 1
             ldh [scx], a
             ldh [rSCX], a
@@ -691,4 +695,333 @@ btl_end:    call wait_vbl
             ldh [scy], a
             ld a, 1
             ldh [rSVBK], a
+            ret
+
+; ---- the party (2F/AA00 load character graphics, 2F/B4AC positions, 32/90EA draw): FF3's
+; positions ($C0 x, $C4 y) and frames ($7D83) kept; on the GB a member's base is mapped onto
+; the approved party column: x = 140 + (NES x - 208) / 2, y = 24 member + (NES y - $2C - 4
+; member); the six sprites' offsets as FF3's (32/91CB templates, 32/972E tiles); tiles in VRAM
+; bank 1 at FF3's indices (tile 1 + 14 member), palettes as FF3's ($7D93 | $7D97).
+BD_ROWX    = BD_2F + $220       ; 2F/B516: x by row (front, back; back attack +2)
+BD_START   = BD_2F + $224       ; 2F/B51A: start x 4, y 4 (back attack + 8)
+BD_SPR     = $6800              ; 32/9100-97FF
+SP_TMPL    = BD_SPR + $CB       ; 32/91CB template pointers (NES addresses)
+SP_IDX     = BD_SPR + $16B      ; 32/926B template id by frame (flipped: + $15)
+SP_OFS     = BD_SPR + $195      ; 32/9295 tile offset by member
+SP_FRAME   = BD_SPR + $62E      ; 32/972E 6 tiles a frame
+PARTY_OAM  = oam_buf            ; sprites 0-23 (6 a member)
+
+chr_gfx:    xor a
+.m:         ld [btl_k], a
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7D8B
+            add hl, de
+            ld a, [hl]
+            cp $FF
+            jr z, .n
+            ld c, a                         ; job (toad $18 / mini $19 from the status)
+            ld hl, W7 + $7D9B
+            add hl, de
+            add hl, de
+            ld a, [hl]
+            and 5
+            jr z, .j
+            ld b, 2
+            ld c, $18
+            and 4
+            jr nz, .t
+            ld b, 3
+            ld c, $19
+.t:         ld hl, W7 + $7DA3
+            add hl, de
+            ld [hl], b
+.j:         ld a, c                         ; 2F/AB3D: job * $2A0, toad / mini $3F80 / $3F00
+            ld hl, $7F80
+            cp $18
+            jr z, .p
+            ld hl, $7F00
+            cp $19
+            jr z, .p
+            ld l, a
+            ld h, 0
+            add hl, hl                      ; x $2A0 = x 32 x 21
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld d, h
+            ld e, l
+            ld b, 20
+.x:         add hl, de
+            dec b
+            jr nz, .x
+            ld de, $4000
+            add hl, de
+.p:         ld a, [btl_k]                   ; -> VRAM bank 1 tile 1 + 14 member
+            ld e, a
+            add a, a
+            add a, a
+            add a, a
+            sub e
+            add a, a
+            inc a
+            swap a
+            ld e, a
+            and $F0
+            ld c, a
+            ld a, e
+            and $0F
+            add a, $80
+            ld d, a
+            ld e, c
+            ld a, CHGFX_BANK
+            ld [vc_src], a
+            ld b, 14
+            ld a, 1
+            call vcopyx
+.n:         ld a, [btl_k]
+            inc a
+            cp 4
+            jr nz, .m
+            ret
+
+; 2F/B4AC + B48D: start positions and frames (the walk-in: later; members at their row now)
+chr_pos:    ld hl, BD_START                 ; (no back attack: x 4, y 4 at 2F/B51A)
+            ld de, BZ + $C0
+            ld bc, 8
+            ld a, BDATA_BANK
+            call rd_copy
+            ld c, 0
+.m:         ld b, 0
+            ld hl, W7 + $7D8F
+            add hl, bc
+            ld a, [hl]
+            and 1
+            add a, low(BD_ROWX)
+            ld l, a
+            ld h, high(BD_ROWX)
+            push bc
+            call bd_rd
+            pop bc
+            ld hl, W7 + $7D7F
+            add hl, bc
+            ld [hl], a
+            ld hl, BZ + $C0
+            add hl, bc
+            ld [hl], a                      ; (at the row: B48D after the walk-in)
+            ld hl, W7 + $7D9B
+            add hl, bc
+            add hl, bc
+            ld a, [hl]
+            ld d, 0
+            and $C0
+            jr nz, .f
+            ld a, [hl]
+            ld d, $0B
+            and 5
+            jr nz, .f
+            ld d, 2
+.f:         ld hl, W7 + $7D83
+            add hl, bc
+            ld [hl], d
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .m
+            ret
+
+; 2E/9E01: palette ids by job (2E/9E4A freelancer by member, 2E/9E4E by job) -> $7D93
+chr_palid:  ld c, 0
+.m:         ld b, 0
+            ld hl, W7 + $7D8B
+            add hl, bc
+            ld a, [hl]
+            and a
+            jr nz, .j
+            ld a, c
+            ld hl, chr_pfree
+            jr .r
+.j:         ld hl, chr_pjob
+.r:         ld e, a
+            ld d, 0
+            add hl, de
+            ld a, [hl]
+            ld hl, W7 + $7D93
+            add hl, bc
+            ld [hl], a
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .m
+            ret
+chr_pfree:  db 0, 1, 2, 0                           ; (2E/9E4A)
+chr_pjob:   db 0, 0, 1, 0, 1, 0, 2, 0, 2, 0, 1, 1   ; (2E/9E4E)
+            db 1, 1, 1, 2, 2, 1, 0, 2, 0, 0
+
+; 32/90EA for each member -> OAM sprites 6 m .. 6 m + 5
+chr_draw:   ld c, 0
+.m:         push bc
+            call chr_draw1
+            pop bc
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .m
+            ret
+chr_draw1:  ld b, 0
+            ld hl, W7 + $7D83
+            add hl, bc
+            ld a, [hl]
+            ld d, 0
+            bit 7, a                        ; (flipped)
+            jr z, .nf
+            ld d, $15
+.nf:        and $7F
+            ld [BZ + $90], a
+            ld hl, W7 + $7E22               ; (jumping: frame 0)
+            add hl, bc
+            ld a, [hl]
+            and a
+            jr z, .fr
+            xor a
+            ld [BZ + $90], a
+.fr:        ld a, [BZ + $90]                ; template: 32/91CB [ 926B / 9280 frame ]
+            add a, d
+            add a, low(SP_IDX)
+            ld l, a
+            ld a, high(SP_IDX)
+            adc a, 0
+            ld h, a
+            push bc
+            call bd_rd
+            add a, a
+            add a, low(SP_TMPL)
+            ld l, a
+            ld a, high(SP_TMPL)
+            adc a, 0
+            ld h, a
+            call bd_rd
+            ld e, a
+            call bd_rd
+            ld d, a
+            ld hl, BD_SPR - $9100
+            add hl, de
+            ld de, btl_spr
+            ld bc, 24
+            ld a, BDATA_BANK
+            call rd_copy
+            pop bc
+            ld a, c                         ; tile offset, palette
+            add a, low(SP_OFS)
+            ld l, a
+            ld h, high(SP_OFS)
+            push bc
+            call bd_rd
+            pop bc
+            ld [BZ + $82], a
+            ld b, 0
+            ld hl, W7 + $7D93
+            add hl, bc
+            ld a, [hl]
+            ld hl, W7 + $7D97
+            add hl, bc
+            or [hl]
+            ld [BZ + $83], a
+            ld hl, BZ + $C0                 ; GB base: x = 140 + (x - 208) / 2 + 8
+            add hl, bc
+            ld a, [hl]
+            sub 208
+            sra a
+            add a, 140 + 8
+            ld [BZ + $8C], a
+            ld hl, BZ + $C4                 ; y: (y - $2C - 4 m) (FF3's rows 28 px apart -> 24) + 16 + 1
+            add hl, bc
+            ld a, c
+            add a, a
+            add a, a
+            ld e, a                         ; 4 m
+            ld a, [hl]
+            sub e
+            sub $2C - 17
+            ld [BZ + $8E], a
+            ld a, [BZ + $90]                ; frame tiles: 32/972E + 6 frame
+            ld e, a
+            add a, a
+            add a, e
+            add a, a
+            add a, low(SP_FRAME)
+            ld l, a
+            ld a, high(SP_FRAME)
+            adc a, 0
+            ld h, a
+            push bc
+            ld de, btl_tmp2
+            ld bc, 6
+            ld a, BDATA_BANK
+            call rd_copy
+            pop bc
+            ld a, c                         ; OAM sprites 6 m ..
+            add a, a
+            add a, c
+            add a, a
+            add a, a
+            add a, a
+            ld e, a
+            ld d, 0
+            ld hl, PARTY_OAM
+            add hl, de
+            ld de, btl_spr
+            ld b, 0                         ; (sprite index)
+.s:         push hl
+            ld a, [de]                      ; template: y, (tile), attributes, x
+            ld hl, BZ + $8E
+            add a, [hl]
+            ld [btl_oy], a
+            inc de
+            inc de
+            ld a, [de]                      ; attributes: flip (bit 6), palette, VRAM bank 1
+            ld hl, BZ + $83
+            or [hl]
+            ld c, a
+            and $40
+            ld l, a
+            ld a, c
+            and 3
+            or 8
+            or l
+            ld [btl_oa], a
+            inc de
+            ld a, [de]
+            ld hl, BZ + $8C
+            add a, [hl]
+            ld [btl_ox], a
+            inc de
+            ld a, b                         ; tile: bit 7 absolute, else + the member's offset
+            add a, low(btl_tmp2)
+            ld l, a
+            ld a, high(btl_tmp2)
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            bit 7, a
+            jr z, .ro
+            and $7F
+            jr .tl
+.ro:        ld hl, BZ + $82
+            add a, [hl]
+.tl:        pop hl
+            ld c, a
+            ld a, [btl_oy]
+            ld [hl+], a
+            ld a, [btl_ox]
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            ld a, [btl_oa]
+            ld [hl+], a
+            inc b
+            ld a, b
+            cp 6
+            jr nz, .s
             ret

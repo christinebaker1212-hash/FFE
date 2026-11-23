@@ -695,8 +695,13 @@ mon_count:  xor a
             ld [W7 + $7DD2], a
             ret
 
-section wram, $C3F0
+section wram, $DF80                         ; (WRAM bank 3: FF3 $7F80-, unused in battle)
 btl_k:      ds 1
 btl_n2:     ds 1
 btl_lo:     ds 2
 btl_tmp:    ds 4
+btl_tmp2:   ds 6
+btl_spr:    ds 24
+btl_oy:     ds 1
+btl_ox:     ds 1
+btl_oa:     ds 1
