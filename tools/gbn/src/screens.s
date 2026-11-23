@@ -1718,9 +1718,10 @@ pro_show:   ld a, TR_MINIMAP
             add a, a
             add a, a
             add a, a
-            ld hl, ly_tab
-            ld [hl+], a
-            ld [hl], %11100111
+            dec a                           ; (a line early: the STAT handler's BGP write
+            ld hl, ly_tab                   ;   lands in that line's drawing, so the row's top
+            ld [hl+], a                     ;   line showed lit; the blank line above takes
+            ld [hl], $FF                    ;   it) all four colours black: hidden
             inc hl
             add a, 8
             ld [hl+], a
@@ -1737,7 +1738,10 @@ pro_show:   ld a, TR_MINIMAP
             ld a, [pr_row]
             call sf_one
             jr .an0
-.lc:        call scr_frame                  ; Colour: the line to the fading palette
+.lc:        call scr_frame                  ; Colour: the line to the fading palette, its
+            xor a                           ;   colour back to the blue first (it was still
+            ld [pr_cnt], a                  ;   the last line's white: every line showed
+            call pr_cgbstep                 ;   lit for a frame, then faded in from nothing)
             ld a, $0C
             call pr_rattr
 .an0:       xor a
@@ -1772,9 +1776,9 @@ pro_show:   ld a, TR_MINIMAP
             ld l, a
             jr nc, .ds
             inc h
-.ds:        ld a, [hl]
-            or %11100100 & $FC
-            ld [ly_tab + 1], a
+.ds:        ld a, [hl]                      ; (the step's whole BGP: every colour of the
+            ld [ly_tab + 1], a              ;   letters together; only colour 0 stepped
+                                            ;   before, and their grey edges showed at once)
 .ai:        ld hl, pr_cnt
             inc [hl]
             ld a, [hl]
@@ -1953,7 +1957,7 @@ pr_line:    call pr_lptr
             jp scr_str
 
 pr_nes:     db $01, $00, $10, $20, $30      ; FF1's intro colours (index 0 = the blue)
-pr_shade:   db 3, 2, 1, 0, 0                ; ... as DMG shades of the text
+pr_shade:   db $FF, $FE, $F9, $E4, $E4      ; ... as DMG BGP steps of the text (black to E4)
 PR_LEN     = 32                         ; frames a line takes to fade in
 
 ; party generation (owner's design, 2026-11-21): the four boxes start as FF1's default party
