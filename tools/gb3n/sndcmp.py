@@ -140,9 +140,12 @@ def voices(nsf, songs, secs):
             miss = 0; tot = 0
             for fn, srn, ln, fg_all, srg, lg_all in rec:
                 w = lg_all[L:L + nf]
-                if ln.max() > 0 and w.std() > 0:
+                if ln.max() == 0: continue
+                if w.std() > 0:
                     miss += int(((ln > 0.02 * ln.max()) != (w > 0.02 * w.max())).sum())
                     tot += np.corrcoef(ln, w)[0, 1]
+                else:                   # (GB silent there: every NES frame a miss)
+                    miss += int((ln > 0.02 * ln.max()).sum())
             return (-miss, tot)
         best = max(range(0, 200), key=score)
         for v, (name, mask) in enumerate(VOICES):

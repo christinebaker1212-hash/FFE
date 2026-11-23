@@ -20,6 +20,7 @@ sys.path.insert(0, os.path.join(HERE, '..', 'ff3'))
 
 TABLES = (('t8000', 0x8000, 66), ('t8200', 0x8200, 80), ('t8400', 0x8400, 72), ('t8600', 0x8600, 76))
 NES_W = 26
+MENU_W = 20                     # (the NES menu windows' text width, {0E} strings)
 GB_W = 18
 GB_LINES = 4
 PAGE = 0x0B
@@ -233,13 +234,14 @@ def gb_string(text):
     # column-set / multiple-choice strings (menus) are kept line for line
     if re.search(r'\{1[4-7]:', text):
         return encode(text)
-    paras = paragraphs_simple(text)
+    paras = paragraphs_simple(text, MENU_W if one_row else NES_W)
     return encode('\f'.join('\n'.join(p) for p in pages(paras)))
 
 
-def paragraphs_simple(text):
-    """undo the NES layout (insert.py flow at 26 columns): a line break where the next word would
-    have fitted is a paragraph break; blank lines separate; a speaker turn starts a paragraph"""
+def paragraphs_simple(text, nes_w=NES_W):
+    """undo the NES layout (insert.py flow at 26 columns; menu-window strings, {0E}, at 20): a line
+    break where the next word would have fitted is a paragraph break; blank lines separate; a
+    speaker turn starts a paragraph"""
     paras = []; cur = None; cur_last = ''
     for line in text.split('\n'):
         if line == '':
@@ -248,7 +250,7 @@ def paragraphs_simple(text):
             continue
         if cur is None:
             cur = line; cur_last = line; continue
-        wrapped = vlen(cur_last) + 1 + vlen(first_word(line)) > NES_W
+        wrapped = vlen(cur_last) + 1 + vlen(first_word(line)) > nes_w
         if wrapped and not SPEAKER.match(line):
             cur += ' ' + line
         else:

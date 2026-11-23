@@ -1394,27 +1394,59 @@ snd_out:    ld a, GAME_BANK                 ; (the period table SND_TAB at GAME_
             res 0, [hl]
             ret
 
-; E = channel, D = 0 CH1 / 1 CH2: key on (flag bit 0): duty, volume, period, trigger; else the
-; volume (a change retriggers) and the period low byte unless the sweep is on
+; E = channel, D = 0 CH1 / 1 CH2. As FF3's 80B1 / 80F5: key on (flag bit 0): duty, volume,
+; sweep, the whole period (and the NES sweep unit restarted); else duty, volume and the period's
+; low byte unless the sweep is on. The NES sweep unit runs here (o_sweep: CH2 has none on the GB,
+; and CH1's steps differ from the NES's); the GB gets the resulting period each frame, a volume
+; change (or the sweep's mute) retriggers.
 out_pulse:  ld a, d
             ld [o_ch], a
             ld a, e
             ld [SD0], a
+            call o_duty
+            ld a, low(SFR)
+            call six
+            ld c, [hl]                      ; C = period lo
+            ld a, low(SFH)
+            call six
+            ld b, [hl]                      ; B = period hi
+            call o_pp                       ; HL = o_per + 2 ch
             ld a, low(SFL)
+            push hl
             call six
             bit 0, [hl]
-            jr z, .hold
             res 0, [hl]
-            call o_duty
-            call o_vol
-            call o_freq
-            ld a, $80                       ; trigger
-            jp o_wr4
-.hold:      call o_duty
-            ld a, low(SVO)                  ; volume changed: retrigger
+            pop hl
+            jr z, .hold
+            ld [hl], c                      ; key on: the period, the divider reloaded
+            inc hl
+            ld a, b
+            and 7
+            ld [hl], a
+            ld a, 1
+            ld [o_trig], a
+            call o_swp
+            ld a, 1
+            ld [hl], a                      ; (o_swr: reload)
+            jr .sw
+.hold:      xor a
+            ld [o_trig], a
+            ld a, low(SSW)
+            push hl
+            call six
+            bit 7, [hl]
+            pop hl
+            jr nz, .sw
+            ld [hl], c                      ; (sweep off: the low byte, FF3's $4002 write)
+.sw:        call o_sweep                    ; two half-frame clocks a frame
+            call o_sweep
+            call o_mute                     ; A = 0 if muted
+            ld b, a
+            ld a, low(SVO)
             call six
             ld a, [hl]
             and $0F
+            and b                           ; (muted: volume 0)
             ld b, a
             ld a, [o_ch]
             ld e, a
@@ -1423,18 +1455,146 @@ out_pulse:  ld a, d
             add hl, de
             ld a, [hl]
             cp b
+            jr z, .nv
+            ld a, 1
+            ld [o_trig], a
+.nv:        ld a, [o_trig]
+            and a
             jr z, .f
-            call o_vol
-            call o_freq
+            ld [hl], b                      ; volume (remembered), period, trigger
+            ld a, b
+            swap a
+            ld b, a
+            ld a, [o_ch]
+            and a
+            ld a, b
+            jr nz, .v2
+            ldh [rNR12], a
+            jr .vf
+.v2:        ldh [rNR22], a
+.vf:        call o_perf
             ld a, $80
             jp o_wr4
-.f:         ld a, low(SSW)                  ; (sweep on: FF3 leaves the period)
-            call six
-            bit 7, [hl]
-            ret nz
-            call o_freq
+.f:         call o_perf
             xor a
             jp o_wr4
+
+; HL = o_per + 2 o_ch
+o_pp:       ld a, [o_ch]
+            add a, a
+            add a, low(o_per)
+            ld l, a
+            ld h, high(o_per)
+            ret
+; HL = o_swr + o_ch (and the divider at HL - 2)
+o_swp:      ld a, [o_ch]
+            add a, low(o_swr)
+            ld l, a
+            ld h, high(o_swr)
+            ret
+; o_per -> the GB frequency (SND_TAB) -> NRx3, o_hi
+o_perf:     call o_pp
+            ld e, [hl]
+            inc hl
+            ld d, [hl]
+            jp o_freq.de
+
+; the sweep's target from o_per and SSW: DE = target, B = SSW, C = 1 if the sweep would mute
+; (NES: period < 8, or an upward target above $7FF)
+o_target:   ld a, low(SSW)
+            call six
+            ld b, [hl]
+            call o_pp
+            ld e, [hl]
+            inc hl
+            ld d, [hl]
+            push de                         ; change = period >> shift
+            ld a, b
+            and 7
+            jr z, .s0
+.sh:        srl d
+            rr e
+            dec a
+            jr nz, .sh
+.s0:        pop hl                          ; HL = period
+            bit 3, b
+            jr nz, .neg
+            add hl, de                      ; up: period + change
+            ld d, h
+            ld e, l
+            ld a, h
+            cp 8
+            ld c, 1
+            jr nc, .lo
+            dec c
+            jr .lo
+.neg:       ld a, l                         ; down: period - change (pulse 1: - 1 more)
+            sub e
+            ld e, a
+            ld a, h
+            sbc d
+            ld d, a
+            ld a, [o_ch]
+            and a
+            jr nz, .n2
+            dec de
+.n2:        ld c, 0
+.lo:        call o_pp                       ; period < 8: muted
+            ld a, [hl+]
+            cp 8
+            ld a, [hl]
+            sbc 0
+            ret nc
+            ld c, 1
+            ret
+; A = 0 if the channel is muted by the sweep unit, else $0F
+o_mute:     call o_target
+            ld a, c
+            and a
+            ld a, $0F
+            ret z
+            xor a
+            ret
+; one half-frame clock of the NES sweep unit (APU: divider 0, enabled, shift > 0, not muting: the
+; period takes the target; then the divider counts down or reloads with P)
+o_sweep:    call o_target
+            call o_swp
+            dec hl
+            dec hl                          ; HL = o_swd + ch
+            ld a, [hl]
+            and a
+            jr nz, .cnt
+            bit 7, b
+            jr z, .rl
+            ld a, b
+            and 7
+            jr z, .rl
+            ld a, c
+            and a
+            jr nz, .rl
+            push hl
+            call o_pp
+            ld [hl], e
+            inc hl
+            ld [hl], d
+            pop hl
+.rl:        ld a, b                         ; the divider reloaded with P
+            swap a
+            and 7
+            ld [hl+], a
+            inc hl
+            ld [hl], 0                      ; (o_swr cleared)
+            ret
+.cnt:       inc hl
+            inc hl
+            ld a, [hl]                      ; a reload flag set: reload, else count down
+            and a
+            dec hl
+            dec hl
+            jr nz, .rl
+            dec [hl]
+            ret
+
 ; NRx1 duty (FF3 $30 / $70 / $B0 = 1/8, 1/4, 1/2 -> GB 0 / 1 / 2)
 o_duty:     ld a, low(SDU)
             call six
@@ -1486,7 +1646,7 @@ o_freq:     ld a, low(SFH)
             ld a, low(SFR)
             call six
             ld e, [hl]
-            ld hl, $6800                    ; SND_TAB: 2 bytes a period
+.de:        ld hl, $6800                    ; SND_TAB: 2 bytes a period (.de: DE = the period)
             add hl, de
             add hl, de
             ld a, [hl+]
@@ -1611,6 +1771,8 @@ apu_noise_off: xor a
 ; boot: the APU on, a triangle wave in CH3, the driver's init (81C3)
 snd_init:   ld a, $80
             ldh [rNR52], a
+            xor a                           ; (no GB sweep: the NES's runs in o_sweep)
+            ldh [rNR10], a
             ld a, $77
             ldh [rNR50], a
             ld a, SND_MASK                  ; ($FF; test builds: one voice, env GB_SND_MASK)
@@ -1649,3 +1811,9 @@ scmd:       ds 1
 o_ch:       ds 1
 o_hi:       ds 1
 o_lastv:    ds 4
+
+section wram, $C3A0
+o_per:      ds 4                            ; the pulses' NES periods (CH1, CH2)
+o_swd:      ds 2                            ; their sweep dividers
+o_swr:      ds 2                            ;   and reload flags (o_swd + 2)
+o_trig:     ds 1

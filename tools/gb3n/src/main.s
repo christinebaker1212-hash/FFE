@@ -537,7 +537,7 @@ load_map:   ld a, [lcd_is]
 ; script $38 + n (2C/8870, 3C/9319), as event command $F8; a world map's from snd_world
 map_song:   ld a, TEST_SONG                 ; (test builds, build.py --song: that song throughout)
             cp $FF
-            jp nz, snd_song
+            ret nz
             ldh a, [is_world]
             and a
             jp nz, snd_world
