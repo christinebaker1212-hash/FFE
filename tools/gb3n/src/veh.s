@@ -36,6 +36,8 @@ veh_tab:    ld e, a
 ; 3E/C65D + C4FC: the world map step onto property 1 = A (HL its M_P1 cell): carry = stop;
 ; else Z = an ordinary step (the caller's trigger / battle checks), NZ = a vehicle step (none)
 veh_step:   ld [veh_p1], a
+            ld a, l
+            ld [veh_tile], a
             ld a, low(VEH_MASK)
             call veh_tab
             ld b, a
@@ -56,7 +58,52 @@ veh_step:   ld [veh_p1], a
             ret nz
 .vs:        or 1                            ; (canoe / ship / chocobo: a plain step)
             ret
-.air:       or 1                            ; (airships: no triggers, no battles)
+.air:       ld a, [cur_world]               ; (airships: no triggers, no battles; 3E/C556)
+            and a
+            jr z, .w0
+            cp 4
+            jr z, .ok
+            ld a, [ppx]                     ; (the flooded / surface world: (32, 224) goes back up
+            cp $20                          ;   to the floating continent, 3E/C966)
+            jr nz, .ok
+            ld a, [ppy]
+            cp $E0
+            jr nz, .ok
+            ld a, [GS + $0C]
+            add a, 7
+            ld [px], a
+            ld a, [GS + $0D]
+            add a, 7
+            ld [py], a
+            xor a
+            jr veh_world
+.w0:        ld a, [veh_tile]                ; (the floating continent's edge, tile $64: down to
+            cp $64                          ;   world 2 / 3 at (32, 222), 3E/C566)
+            jr nz, .ok
+            ld a, [px]
+            sub 7
+            ld [GS + $0C], a
+            ld a, [py]
+            sub 7
+            ld [GS + $0D], a
+            ld a, $20
+            ld [px], a
+            ld a, $DE
+            ld [py], a
+            ld a, [GS + $21]
+            and $20
+            ld a, 2
+            jr z, veh_world
+            inc a
+            jr veh_world
+.ok:        or 1
+            ret
+; world A at (px, py): the world map loaded (the step dropped: carry)
+veh_world:  ld [cur_world], a
+            add a, 3
+            ld [cur_grp], a
+            call load_map
+            scf
             ret
 
 ; the vehicle can't go there (3E/C51B, C52B, C541): board the canoe or the ship, or get off
@@ -470,5 +517,6 @@ veh_inv:    xor a                           ; (the world map's entrance 0)
 section wram, $C3F1
 tst_choc:   ds 1
 veh_p1:     ds 1
+veh_tile:   ds 1
 veh_off8:   ds 1
 veh_buf:    ds 8
