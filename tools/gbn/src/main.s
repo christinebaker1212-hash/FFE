@@ -1460,8 +1460,9 @@ veh_oam:    ld a, [vehicle]
             add a, 8
             ld b, a
             call .two
-.objs:      ld a, [vehicle]                 ; the ship / airship standing on the map
-            cp V_SHIP
+.objs:      call ow_bc                      ; the bridge and the canal (FF1
+            ld a, [vehicle]                 ;   DrawOWObj_BridgeCanal); the ship / airship
+            cp V_SHIP                       ;   standing on the map
             jr z, .na
             ld hl, SV_SHIP
             ld c, $20
@@ -3795,3 +3796,77 @@ fd_lv:      ds 1
 fd_b:       ds 1
 fd_o0:      ds 1
 fd_o1:      ds 1
+
+section bank 0, $1E00                       ; (main.s continued: the overworld's bridge / canal)
+; FF1 DrawOWObj_BridgeCanal: the bridge (OAM 12-15) and the canal (16-19) where they stand, FF1
+; lut_OWObjectSprTbl's 2 x 2 (UL UR DL DR here), OW object tiles + $10, palette 3
+ow_bc:      ld hl, SV_BRIDGE
+            ld de, oam_buf + 48
+            ld bc, .brtbl
+            call .obj
+            ld hl, SV_CANAL
+            ld de, oam_buf + 64
+            ld bc, .cntbl
+.obj:       ld a, c
+            ld [vh_t], a
+            ld a, b
+            ld [vh_t + 1], a
+            ld a, [hl+]                     ; visible and near (screen x = 72 + 16 (x - px))
+            and a
+            ret z
+            ld a, [hl+]
+            push hl
+            ld hl, px
+            sub [hl]
+            pop hl
+            add a, 4
+            cp 9
+            ret nc
+            sub 4
+            swap a
+            add a, $48 + 8
+            ld b, a                         ; B = x of the left column
+            ld a, [hl]
+            ld hl, py
+            sub [hl]
+            add a, 4
+            cp 9
+            ret nc
+            sub 4
+            swap a
+            add a, $50
+            ld c, a                         ; C = y of the top row
+            ld a, [vh_t]
+            ld l, a
+            ld a, [vh_t + 1]
+            ld h, a
+            call .row
+            ld a, c
+            add a, 8
+            ld c, a
+.row:       call .spr
+            ld a, b
+            add a, 8
+            ld b, a
+            call .spr
+            ld a, b
+            sub 8
+            ld b, a
+            ret
+.spr:       ld a, c
+            ld [de], a
+            inc de
+            ld a, b
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            add a, $10
+            ld [de], a
+            inc de
+            ld a, [hl+]                     ; (attribute: the palette, no flips here)
+            and 3
+            ld [de], a
+            inc de
+            ret
+.brtbl:     db 4, 3, 5, 3, 6, 3, 7, 3
+.cntbl:     db 8, 3, 9, 3, 10, 3, 11, 3

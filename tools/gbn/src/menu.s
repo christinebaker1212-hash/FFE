@@ -2588,5 +2588,6 @@ ban_bot:    ds 1                            ; battle: the name window at the bot
 ban_on:     ds 1                            ; battle: the name window shown (read by text.s
 ban_attr:   ds 1                            ;   box_vbl on every screen: never in the map's
                                             ;   queue, whose entries overwrite it in the field)
+vh_t:       ds 2                            ; (overworld objects: the bridge / canal table)
 
 
