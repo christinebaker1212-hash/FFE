@@ -231,3 +231,11 @@ Color only" screen on older systems.
   tile's own value (read tile 0).
 - **Uninitialised WRAM flags bite later:** a "work out silently" flag left at its power-on value
   skipped messages until the first attack set it. Clear new flags where the mode starts.
+- **Reset every sound register an effect touches.** FF1's map-change wipe sound turns on square
+  1's hardware sweep (NR10 = $1A); the wipe silenced the channel but left the sweep on, and the
+  music engine never writes NR10, so every later square-1 note slid down in pitch: "Cornelia
+  breaks every song after it" (owner, real Game Boy Color and Chromatic). Found only when the
+  owner pointed at the transition sound; my earlier before/after recordings compared two broken
+  runs. Now the wipe clears NR10 when it ends and the music clears it at every square-1 note.
+  Check: read $FF10-$FF26 raw before and after each effect; compare against a run that never
+  plays the effect, not against another run that does.

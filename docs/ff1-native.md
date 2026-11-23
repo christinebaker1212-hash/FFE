@@ -436,3 +436,10 @@ one reaches parity, so the owner can keep playing).
    once an enemy is gone.
    Open: party names "messed up after the inn save / a menu" not reproduced (names in RAM and
    on screen stay right through the inn save, the file screen and the menus, DMG and Color).
+25. Owner (2026-11-23, real Game Boy Color and ModRetro Chromatic): the music broke after walking
+   into Cornelia, and every song after. The owner found the cause: the town-entry wipe sound left
+   square 1's hardware sweep on (NR10 = $1A), so every later note on that channel slid down. Fixed
+   (wipe clears NR10; the music clears it at each square-1 note). Cornelia's peaks before: 64-387 Hz
+   (the melody bent into the bass), after: 521 / 656 / 1037 / 1312 Hz. The triangle restarts each
+   note again on the Color (legato on the plain Game Boy only). Name entry: a 6 x 10 grid so the
+   whole hand fits before each letter.

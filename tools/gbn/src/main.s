@@ -3113,6 +3113,8 @@ wipe_close: push de
             jr z, .x
             jr nc, .l
 .x:         call wait_vbl
+            xor a                           ; (the wipe sound's sweep off again)
+            ldh [$FF10], a
             pop de
             ret
 wipe_open:  xor a
@@ -3154,7 +3156,8 @@ wipe_open:  xor a
             call wait_vbl
             xor a
             ld [wp_on], a
-            ldh [$FF12], a                  ; (square 1 silent; the music goes on)
+            ldh [$FF12], a                  ; (square 1 silent, its sweep off; the music
+            ldh [$FF10], a                  ;   goes on)
             ld a, BOX_LINES
             ldh [rLYC], a
             ld a, [lcdc_on]

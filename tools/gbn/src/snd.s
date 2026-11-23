@@ -278,7 +278,11 @@ aw:         push af
             sub low(snd_fh)
             cp 2
             jr nc, .ft
-            push de
+            and a                           ; (square 1: no hardware sweep; FF1's music
+            jr nz, .fs                      ;   never sweeps, and an effect's sweep left
+            ldh [$FF10], a                  ;   on bent every later note: owner, 2026-11-23)
+            xor a
+.fs:        push de
             add a, low(snd_cv)
             ld e, a
             ld d, high(snd_cv)
