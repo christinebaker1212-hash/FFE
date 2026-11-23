@@ -449,9 +449,9 @@ bt_commands:
             ret
 
 ; one member: step forward, the command window; C set on B (back a member)
-bt_cmd_one: ld a, [bt_cm]
-            call bt_step_fwd
-            call bt_cmd_win
+bt_cmd_one: call bt_cmd_win                 ; (first: its tiles go up while the member steps
+            ld a, [bt_cm]                   ;   forward; owner, 2026-11-23: the box stood empty
+            call bt_step_fwd                ;   6 frames, 10 on the plain Game Boy)
             ld hl, bt_lastc                 ; (the member's last command: the hand there)
             call bt_memp
             ld a, [hl]
