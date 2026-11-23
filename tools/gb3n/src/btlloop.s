@@ -82,7 +82,8 @@ btl_loop:   call turn_start                 ; 34/81C3
             and a
             jr nz, .save
 .say:       call act_script
-            ld a, [W7 + $78D3]              ; (graphics $11: the battle's end)
+            call end_anim                   ; (graphics $11: the battle's end)
+            ld a, [W7 + $78D3]
             bit 7, a
             jr nz, .cons                    ; (defeated)
             call victory                    ; 35/BB49
@@ -497,4 +498,74 @@ ret_item:   call chr_ofs
             ld [hl], b
             inc hl
 .inc:       inc [hl]
+            ret
+
+; 2F/B261 battle graphics $11: defeat: "The Requiem", A to go on (not battle $179); victory:
+; "Fanfare" and the members' cheer (128 frames: the cheer frame / frame 2 every 32), 21 more
+end_anim:   ld a, [W7 + $78D3]
+            bit 7, a
+            jr z, .v
+            ld a, $13
+            call snd_song
+.d:         ld a, [W7 + $7CEE]
+            and a
+            jr z, .w
+            ld a, [W7 + $7CED]
+            cp $79
+            ret z
+.w:         call b_keys
+            ld a, [btl_new]
+            bit 0, a
+            jr z, .d
+            ret
+.v:         ld a, 7
+            call snd_song
+            xor a
+            ld [BZ + $B6], a
+.f:         ld c, 0
+.m:         ld a, [W7 + $7D8B]
+            cp $FF
+            jr z, .n
+            ld b, 0
+            ld hl, W7 + $7D9B
+            add hl, bc
+            add hl, bc
+            ld a, [hl]
+            and $C0
+            jr nz, .n
+            ld a, [BZ + $B6]
+            and $20
+            ld d, a
+            ld a, [hl]
+            and 5
+            jr z, .p
+            ld a, d
+            and a
+            ld a, $0B
+            jr nz, .s
+            ld a, $0E
+            jr .s
+.p:         ld a, d
+            and a
+            ld a, 2
+            jr nz, .s
+            ld a, c
+            add a, $11
+.s:         ld hl, W7 + $7D83
+            add hl, bc
+            ld [hl], a
+.n:         inc c
+            ld a, c
+            cp 4
+            jr nz, .m
+            call chr_draw
+            call wait_vbl
+            ld hl, BZ + $B6
+            inc [hl]
+            bit 7, [hl]
+            jr z, .f
+            ld b, 21
+.z:         call wait_vbl
+            dec b
+            jr nz, .z
             ret
