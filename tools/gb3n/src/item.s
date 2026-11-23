@@ -539,27 +539,7 @@ mul8:       ld hl, 0
             jr nz, .l
             ret
 
-; fix:C711: the random table walked forward or back ($F5 / $F6)
-rnd_get:    ld a, [rnd_f6]
-            bit 7, a
-            jr nz, .dn
-            ld a, [rnd_f5]
-            inc a
-            ld [rnd_f5], a
-            jr nz, .get
-            jr .flip
-.dn:        ld a, [rnd_f5]
-            dec a
-            ld [rnd_f5], a
-            jr nz, .get
-.flip:      ld a, [rnd_f6]
-            add a, $A0
-            ld [rnd_f6], a
-.get:       ld a, [rnd_f5]
-            ld l, a
-            ld h, high(N_RNG)
-            ld a, [hl]
-            ret
+; (rnd_get, fix:C711: enc.s, bank 0)
 
 ; a t8200 message's first page into the canvas at column B, row C (2 lines, 18 columns)
 m_msg1:     ld e, a

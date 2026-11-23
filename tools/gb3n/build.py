@@ -181,11 +181,15 @@ def nes_rgb_src():
         '    dw %s\n' % ', '.join(str(x) for x in v[k:k + 8]) for k in range(0, 64, 8))
 
 
-MODULES = ('npc', 'text', 'event', 'menucore', 'select', 'snd')              # bank 0
+MODULES = ('npc', 'text', 'event', 'menucore', 'select', 'snd', 'enc')              # bank 0
 SND_BANK0 = 81                          # sound: FF3 bank $36 at $4000 + a song bank ($37, $38, $39,
                                         #   $09) at $6000: banks 81-84
 CODE1_MODULES = ('menu', 'selmenu', 'item', 'magic', 'equip', 'job', 'save', 'title', 'shop')  # bank CODE1
 ITEMN_BANK0 = 85                        # condensed item names (shop.py): banks 85-87
+BDATA_BANK = 88                         # battle data (encounter tables, formations, monsters)
+CODE2 = 89                              # battle code
+CODE2_MODULES = ('btl', 'btlgfx')
+MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
 CODE1 = 80
 
 
@@ -212,6 +216,11 @@ def engine_src(rom=None):
         codes.append(menu.code_data(rom, rgb555))
         codes.append(title.code_data(rom))
         codes.append(shop.code_data(rom))
+    codes.append('section bank %d, $4000' % CODE2)
+    for m in CODE2_MODULES:
+        c, r = split(rd(m))
+        codes.append('\n'.join(l for l in c.split('\n') if not l.startswith('section bank 0,')))
+        rams.append(r)
     zp = ''.join('Z_%02X = $%04X\n' % (n, 0xFFB0 + n - 0x18) for n in range(0x18, 0x60))
     shadow = lambda t: t.replace('ld [MBC5_BANKL], a', 'ld [rom_bank], a\n            ld [MBC5_BANKL], a')
     return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + zp + shadow(main_code) + '\n' +
@@ -250,6 +259,30 @@ def main():
     g[0x3800:0x3820] = snd_noise()                             # $7800: NES noise -> NR43
     g[0x3840:0x3860] = rom.b(0x3B, 0xA027, 32)                 # $7840: world map songs (3B/A006)
     g[0x3880:0x38A0] = rom.b(0x3B, 0xA047, 32)                 # $7880: and their sound effects
+    bd = bytearray(0x4000)                                     # BDATA_BANK: encounter tables
+    bd[0x0000:0x0010] = rom.b(0x2E, 0x9D40, 16)
+    bd[0x0010:0x0020] = rom.b(0x2E, 0x9CF0, 16)
+    bd[0x0020:0x0060] = rom.b(0x2E, 0x9D00, 64)
+    bd[0x0060:0x00A0] = rom.b(0x3D, 0xBD78, 64)
+    bd[0x0100:0x0200] = rom.b(0x2E, 0x92F0, 256)
+    bd[0x0200:0x0300] = rom.b(0x2E, 0x93F0, 256)
+    bd[0x0300:0x0400] = rom.b(0x39, 0xBE00, 256)
+    bd[0x0400:0x0500] = rom.b(0x39, 0xBF00, 256)
+    bd[0x0800:0x1000] = rom.b(0x2E, 0x94F0, 0x800)
+    bd[0x1000:0x1400] = rom.b(0x2E, 0x8000, 0x400)             # $5000: battles (set, count id)
+    bd[0x1400:0x1A00] = rom.b(0x2E, 0x8400, 0x600)             # $5400: monster sets (6 bytes)
+    bd[0x1A00:0x1B00] = rom.b(0x2E, 0x8A00, 0x100)             # $5A00: monster counts (4 bytes)
+    bd[0x1B00:0x1C00] = rom.b(0x2E, 0x8B00, 0x100)             # $5B00: monster graphics properties
+    bd[0x1C00:0x1F00] = rom.b(0x2E, 0x8C00, 0x300)             # $5C00: battle palettes (3 colours)
+    bd[0x1F00:0x2000] = rom.b(0x2E, 0x8F00, 0x100)             # $5F00: boss flags, attribute data
+    bd[0x2000:0x220C] = rom.b(0x2F, 0xA4A4, 0x20C)             # $6000: 2F/A4A4.. placement tables
+    bd[0x220C:0x2210] = rom.b(0x2F, 0xA2D0, 4)                 # $620C: 2F/A2D0 first tiles
+    for k, a in enumerate((0x9100, 0x9200, 0x9300)):           # $6400: general use palettes
+        bd[0x2400 + 0x100 * k:0x2500 + 0x100 * k] = rom.b(0, a, 0x100)
+    banks[BDATA_BANK] = bd
+    for k, pair in enumerate((0x10, 0x11, 0x12, 0x13, 0x06)):   # monster graphics as GB tiles
+        src = rom.prg[pair * 0x4000:pair * 0x4000 + 0x4000]
+        banks[MGFX_BANK0 + k] = bytearray(b''.join(nes2gb(src[16 * t:16 * t + 16]) for t in range(1024)))
     import shop
     nb, nflags = shop.name_tiles(rom)
     g[0x3900:0x3A00] = nflags                                  # $7900: condensed item names
@@ -283,7 +316,7 @@ def main():
                        'WLD_BANK': WLD_BANK, 'NPCT_BANK': NPCT_BANK, 'NPCL_BANK': NPCL_BANK,
                        'NPCG_BANK0': NPCG_BANK0, 'TXT_BANK': TXT_BANK, **gb_text_syms(rom), 'EVT_BANK': EVT_BANK,
                        'GAME_BANK': GAME_BANK, 'TT_BANK': TT_BANK, 'MENU_BANK': MENU_BANK,
-                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0,
+                       'JOB_BANK': JOB_BANK, 'CODE1': CODE1, 'SND_BANK0': SND_BANK0, 'ITEMN_BANK0': ITEMN_BANK0, 'BDATA_BANK': BDATA_BANK, 'CODE2': CODE2, 'MGFX_BANK0': MGFX_BANK0,
                        'TEST_SONG': int(opt['--song'], 0) if opt['--song'] else 255,
                        'SND_MASK': int(os.environ.get('GB_SND_MASK', 'FF'), 16),     # (test builds: NR51)
                        'DLG_TEST': int(opt['--dlg'].split(':')[1], 0) if opt['--dlg'] else 0,

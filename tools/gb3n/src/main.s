@@ -903,9 +903,22 @@ move:       ld a, [moving]
             pop de
             jr .def
 .def:       ld a, l
-.plain:     call passable
+            call passable
             ret c
             jr .go2
+.plain:     ld l, a                         ; property 1 bit 6: random battles (fix:E3A6, asked
+            ld h, high(M_P1)                ;   before the passability: an impassable tile then
+            bit 6, [hl]                     ;   drops the battle, fix:E3E5)
+            jr z, .pl
+            push hl
+            call enc_map
+            pop hl
+.pl:        ld a, l
+            call passable
+            jr nc, .go2
+            xor a
+            ld [act], a
+            ret
 ; world map (fix:C65D): impassable on foot when property 1 bit 0 is set; bit 7 with property 2
 ; bit 7 clear: an entrance (fix:C1C4: destination 00/8800 / 00/8840 + id); bit 7 with bit 7:
 ; an event (later); bit 6 random battles (later)
@@ -914,7 +927,7 @@ move:       ld a, [moving]
             bit 0, a
             ret nz
             bit 7, a
-            jr z, .go2
+            jr z, .wb
             inc h
             ld a, [hl]
             bit 7, a
@@ -922,6 +935,12 @@ move:       ld a, [moving]
             ld [act_id], a
             ld a, $90
             jr .ta
+.wb:        bit 6, a                        ; random battles (fix:C6F7)
+            jr z, .go2
+            push de
+            call enc_world
+            pop de
+            jr .go2
 .t0:        ld a, $40
             jr .ta
 .t1:        ld a, $C0
@@ -973,6 +992,10 @@ move:       ld a, [moving]
 do_act:     ld b, a
             xor a
             ld [act], a
+            ld a, b
+            cp $20
+            jp z, battle_go                 ; (a random battle: act_id = battle id)
+            xor a
             ld [zlev], a
             ld a, b
             cp $90
