@@ -277,6 +277,7 @@ main:       call wait_vbl
             call calc_pp
             call make_oam
             call npc_frame
+            call veh_late
             ld a, DLG_TEST                  ; (test builds: A shows dialogue DLG_TEST of the
             and a                           ;   people's table)
             jr z, main
@@ -1283,8 +1284,7 @@ mulsign:    and a                           ; A = -1 / 0 / 1 -> A = sign * C
 
 ; ---- the party sprite (fix:D8D3 / DA2B): frame = facing's offset | (step pixel & 8); on the
 ; second frame the sprite moves a pixel (left while walking up / down, up otherwise)
-make_oam:   call veh_parked
-            call veh_oam
+make_oam:   call veh_oam
             ret nz
             ld a, [facing]
             ld l, a

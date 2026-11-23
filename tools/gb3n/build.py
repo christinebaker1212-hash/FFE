@@ -109,6 +109,10 @@ def pack(rom):
     sp[0x3FA8:0x3FB0] = rom.b(0x7E, 0xC6CD, 8)                 # $7FA8: passability masks
     sp[0x3FB0:0x3FB8] = rom.b(0x7E, 0xC851, 8)                 # $7FB0: landing masks
     sp[0x3FB8:0x3FC0] = rom.b(0x7E, 0xCD76, 8)                 # $7FB8: speeds
+    it = rom.prg[0x0B * 0x2000 + 0x1A80:0x0B * 0x2000 + 0x1E80]   # $6600: 0B/9A80 the Invincible (64 tiles)
+    sp[0x2600:0x2A00] = b''.join(nes2gb(it[16 * k:16 * k + 16]) for k in range(64))
+    il = rom.b(0x3C, 0x83E0, 0x260)                            # $7000: 3C/83E0 its sprite lists
+    sp[0x3000:0x3260] = bytes(il)
     banks[SPR_BANK] = sp
     wb, wc = bytearray(b'\xFF' * 0x4000), bytearray(b'\xFF' * 0x4000)
     for k in range(3):

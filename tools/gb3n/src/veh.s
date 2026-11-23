@@ -11,6 +11,8 @@ VEH_MASK   = $7FA8              ;   3E/C6CD impassable when (property 1 & mask) 
 VEH_LAND   = $7FB0              ;   3E/C851 no landing where (property 1 & it)
 VEH_SPD    = $7FB8              ;   3E/CD76 pixels a frame
 VEH        = GS + $0F
+INV_TILES  = $6600              ; SPR_BANK: 0B/9A80 the Invincible (sprite tiles $C0-$FF)
+INV_LISTS  = $7000              ;   3C/83E0 its frames' pointers, the lists (dy, tile, attr, dx)
 
 ; the vehicles' tiles -> VRAM bank 1 tiles $20-$7F (world maps)
 veh_gfx:    ldh a, [is_world]
@@ -21,6 +23,13 @@ veh_gfx:    ldh a, [is_world]
             ld hl, VEH_TILES
             ld de, $8200
             ld b, 96
+            ld a, 1
+            call vcopyx
+            ld a, SPR_BANK                  ; (the Invincible -> tiles $C0-$FF)
+            ld [vc_src], a
+            ld hl, INV_TILES
+            ld de, $8C00
+            ld b, 64
             ld a, 1
             jp vcopyx
 
@@ -410,6 +419,32 @@ veh_oam:    ldh a, [is_world]
             ld a, [VEH]
             and a
             ret z
+            cp 7
+            jr nz, .nv
+            ld a, low(VEH_Y)                ; (3E/D622: the Invincible, frame facing x 2 + the
+            call veh_tab                    ;   animation every 4 frames)
+            add a, PY0 + 16 - $6F
+            ld c, a
+            ld b, PX0 + 8
+            ld a, [facing]
+            and $0F
+            add a, a
+            ld e, a
+            ld a, [fcnt]
+            and 4
+            add a, a
+            add a, a
+            add a, a
+            or e
+            ld [inv_f], a
+            ld a, $F0                       ; (the walker's OAM 0-3 off; drawn in veh_late)
+            ld [oam_buf], a
+            ld [oam_buf + 4], a
+            ld [oam_buf + 8], a
+            ld [oam_buf + 12], a
+            or 1
+            ret
+.nv:
             ld a, low(VEH_Y)                ; y = PY0 + 16 + (3E/D8CA - $6F)
             call veh_tab
             add a, PY0 + 16 - $6F
@@ -443,6 +478,22 @@ veh_oam:    ldh a, [is_world]
 veh_offs:   db 0, $38, $20, $50, $68, $68, $68, $68
 
 ; the parked vehicle (3E/DAD4 ship, DB09, DB2F airships) -> OAM 36-39
+; after the people's sprites (npc_frame hides the rest): the Invincible (OAM 4-27), the parked
+; vehicle (36-39)
+veh_late:   call inv_parked
+            ldh a, [is_world]
+            and a
+            jr z, veh_parked
+            ld a, [VEH]
+            cp 7
+            jr nz, veh_parked
+            ld a, low(VEH_Y)
+            call veh_tab
+            add a, PY0 + 16 - $6F
+            ld c, a
+            ld b, PX0 + 8
+            ld a, [inv_f]
+            call inv_draw
 veh_parked: ld hl, oam_buf + 4 * 36
             ld a, $F0
             ld [hl], a
@@ -556,6 +607,151 @@ veh_jump:   ld a, [facing]
             ld [veh_jn], a
             ret
 
+; 3E/D666 the parked Invincible (not while aboard): at ($6005, $6006 - 1) on world $6007, frame
+; (frames & $10) x 2
+inv_parked: ld hl, oam_buf + 4 * 4              ; (OAM 4-27: cleared first)
+            ld b, 24
+.c:         ld [hl], $F0
+            inc hl
+            inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .c
+            ldh a, [is_world]
+            and a
+            ret z
+            ld a, [VEH]
+            cp 7
+            ret z
+            ld a, [GS + $04]
+            and a
+            ret z
+            ld a, [GS + $07]
+            ld b, a
+            ld a, [cur_world]
+            cp b
+            ret nz
+            ld a, [GS + $05]
+            swap a
+            and $F0
+            ld b, a
+            ldh a, [scx]
+            ld c, a
+            ld a, b
+            sub c
+            cp 160 + 8
+            ret nc
+            add a, 8
+            ld b, a
+            ld a, [GS + $06]
+            dec a
+            swap a
+            and $F0
+            ld d, a
+            ldh a, [scy]
+            ld c, a
+            ld a, d
+            sub c
+            cp 144 + 16
+            ret nc
+            add a, 16 - 3
+            ld c, a
+            ld a, [fcnt]
+            and $10
+            add a, a
+            ; (fall through)
+; 3C/8857 draw the Invincible: frame index A (3C/83E0 + A), from OAM (B, C): each sprite's dy,
+; tile, attributes, dx (signed, adding up) to $FF; then its shadow (3C/8608, every other frame)
+; 24 below. OAM 4-27
+inv_draw:   ld [veh_off8], a
+            ld a, b
+            ld [inv_x], a
+            ld a, c
+            ld [inv_y], a
+            ld a, [veh_off8]
+            ld e, a
+            ld d, 0
+            ld hl, INV_LISTS
+            add hl, de
+            ld a, SPR_BANK
+            call rd_byte
+            ld e, a
+            ld a, SPR_BANK
+            call rd_byte
+            ld d, a
+            ld hl, INV_LISTS - $83E0
+            add hl, de
+            ld de, oam_buf + 4 * 4
+            call .list
+            ld a, [fcnt]
+            rra
+            ret nc
+            ld a, [inv_x]
+            ld b, a
+            ld a, [inv_y]
+            add a, $18
+            ld c, a
+            ld hl, INV_LISTS + $8608 - $83E0
+            jr .s
+.list:      ld a, [inv_x]                   ; (B, C the running position)
+            ld b, a
+            ld a, [inv_y]
+            ld c, a
+.s:         ld a, SPR_BANK
+            call rd_byte
+            cp $FF
+            ret z
+            add a, c
+            ld c, a
+            ld a, SPR_BANK
+            call rd_byte
+            ld [inv_t], a
+            ld a, SPR_BANK
+            call rd_byte
+            ld [inv_a], a
+            ld a, SPR_BANK
+            call rd_byte
+            add a, b
+            ld b, a
+            ld a, e                         ; (OAM 4-27 only)
+            cp low(oam_buf + 4 * 28)
+            ret z
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [inv_t]
+            ld [de], a
+            inc e
+            ld a, [inv_a]                   ; (NES flips / palette -> the GB's, VRAM bank 1)
+            push bc
+            ld c, a
+            and 3
+            or 8
+            ld b, a
+            ld a, c
+            and $40
+            rrca
+            or b
+            ld b, a
+            ld a, c
+            and $80
+            rrca
+            or b
+            ld b, a
+            ld a, c
+            and $20
+            rlca
+            rlca
+            or b
+            pop bc
+            ld [de], a
+            inc e
+            jr .s
+
 ; 3E/C282 B on the world map: aboard the Invincible, its inside (3E/C292)
 veh_b:      ld a, [VEH]
             cp 7
@@ -568,8 +764,15 @@ veh_inv:    xor a                           ; (the world map's entrance 0)
 
 section wram, $C3F1
 tst_choc:   ds 1
+
+section wram, $C310
 veh_p1:     ds 1
 veh_tile:   ds 1
 veh_jn:     ds 1
+inv_x:      ds 1
+inv_y:      ds 1
+inv_t:      ds 1
+inv_a:      ds 1
+inv_f:      ds 1
 veh_off8:   ds 1
 veh_buf:    ds 8
