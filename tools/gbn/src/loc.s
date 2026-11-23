@@ -952,9 +952,12 @@ gr_build:   push bc
             push hl
             xor a
             ld [gr_dirty], a
-            ld a, F3_BANK
+            ld a, [lmask]                   ; (a masked load: the guard paused, RAM only;
+            ld [gd_off], a                  ;   held through modes 2 / 3 it halved the
+            ld a, F3_BANK                   ;   build's time)
             ld hl, gr_menu
             call bank_call
+            call gd_resume
             pop hl
             pop de
             pop bc
@@ -2412,6 +2415,7 @@ tr_g:       ds 1
 tr_sgp:     ds 14
 
 section bank 99, $5C00
+gr_btab:    db 1, 2, 4, 8, 16, 32, 64, 128   ; (palette -> its bit: kept at $5C00, one page)
 ; ---- the windows' gradient (the Color, Options: Window Gradient; owner, 2026-11-22): each
 ; window's inside colour from the chosen window colour at its top to a third of it at its
 ; bottom (one step per change of the 5-bit colour), written per line (text.s stat_gr).
@@ -2657,93 +2661,116 @@ gr_beside:  ld a, [gr_j]
             ret
 ; the palettes each group's windows use (colour 2 written per line): from the map copy's
 ; attributes; the alt windows' palette-7 cells to palette 0 (a copy of palette 7)
-gr_pals:    xor a
-            ld [gr_pm], a
-            ld [gr_pa], a
-            ld [gr_i], a
-.w:         ld a, [gr_i]
-            call gr_wp
-            ld a, [hl+]
-            ld b, a                         ; x
-            ld a, [hl+]
-            ld c, a                         ; y
-            ld a, [hl+]
-            ld d, a                         ; w
-            ld e, [hl]                      ; h
-            ld a, [gr_i]
+gr_pals:    xor a                           ; (owner, 2026-11-23: the cell checks took ~6
+            ld [gr_pm], a                   ;   frames of a menu's load; now three tight
+            ld [gr_pa], a                   ;   passes)
+            ld [gr_i], a                    ; 1: the main windows' palettes (before any alt
+.m:         call gr_pw                      ;   window turns its palette-7 cells to 0)
+            jr nz, .mn
+.mr:        push bc
             push de
+            call gr_pcell
+            ld a, [gr_pm]
             ld e, a
-            ld d, 0
-            ld hl, gr_grp
-            add hl, de
-            ld a, [hl]
-            pop de
-            ld [gr_g], a
-.r:         push bc
-            push de
-            call cell_addr
-            ld a, h
-            add a, 3
-            ld h, a
-.c:         ld a, [gr_g]                    ; (an alt window's cell under a later main window:
-            and a                           ;   that window's)
-            jr z, .cv
-            push hl
-            push bc
-            push de
-            ld a, b
-            ld [gr_cx], a
-            ld a, c
-            ld [gr_cy], a
-            call gr_cov
-            pop de
-            pop bc
-            pop hl
-            jr c, .nx
-.cv:        ld a, [hl]
+.mc:        ld a, [hl+]
             and 7
             cp 5                            ; (palette 5: the black outside)
-            jr z, .nx
-            push bc
-            ld b, a
-            ld a, [gr_g]
-            and a
-            jr z, .mn
-            ld a, b                         ; alt: palette 7 -> 0
-            cp 7
-            jr nz, .ak
-            ld a, [hl]
-            and $F8
-            ld [hl], a
-            ld b, 0
-.ak:        ld a, b
-            call gr_bit
-            ld b, a
-            ld a, [gr_pa]
-            or b
-            ld [gr_pa], a
-            jr .pp
-.mn:        ld a, b
-            call gr_bit
-            ld b, a
-            ld a, [gr_pm]
-            or b
+            jr z, .ms
+            add a, low(gr_btab)
+            ld c, a
+            ld b, high(gr_btab)
+            ld a, [bc]
+            or e
+            ld e, a
+.ms:        dec d
+            jr nz, .mc
+            ld a, e
             ld [gr_pm], a
-.pp:        pop bc
-.nx:        inc hl
-            inc b
-            dec d
-            jr nz, .c
             pop de
             pop bc
             inc c
             dec e
-            jr nz, .r
-            ld hl, gr_i
+            jr nz, .mr
+.mn:        ld hl, gr_i
             inc [hl]
             ld a, [gr_wn]
             cp [hl]
-            jp nz, .w
+            jr nz, .m
+.r:         ld hl, gr_i                     ; 2: last window first: a main window marks its
+            ld a, [hl]                      ;   cells (attribute bit 4, unused by the
+            and a                           ;   hardware); an alt window's unmarked cells
+            jr z, .c0                       ;   (no later main window over them) count, and
+            dec [hl]                        ;   palette 7 there becomes 0
+            call gr_pw
+            jr nz, .al
+.rm:        push bc
+            push de
+            call gr_pcell
+.rmc:       set 4, [hl]
+            inc hl
+            dec d
+            jr nz, .rmc
+            pop de
+            pop bc
+            inc c
+            dec e
+            jr nz, .rm
+            jr .r
+.al:        push bc
+            push de
+            call gr_pcell
+            ld a, [gr_pa]
+            ld e, a
+.ac:        ld a, [hl]
+            bit 4, a
+            jr nz, .as
+            and 7
+            cp 5
+            jr z, .as
+            cp 7
+            jr nz, .ab
+            ld a, [hl]
+            and $F8
+            ld [hl], a
+            xor a
+.ab:        add a, low(gr_btab)
+            ld c, a
+            ld b, high(gr_btab)
+            ld a, [bc]
+            or e
+            ld e, a
+.as:        inc hl
+            dec d
+            jr nz, .ac
+            ld a, e
+            ld [gr_pa], a
+            pop de
+            pop bc
+            inc c
+            dec e
+            jr nz, .al
+            jr .r
+.c0:        xor a                           ; 3: the marks off again
+            ld [gr_i], a
+.c:         call gr_pw
+            jr nz, .cn
+.cr:        push bc
+            push de
+            call gr_pcell
+.cc:        res 4, [hl]
+            inc hl
+            dec d
+            jr nz, .cc
+            pop de
+            pop bc
+            inc c
+            dec e
+            jr nz, .cr
+.cn:        ld hl, gr_i
+            inc [hl]
+            ld a, [gr_wn]
+            cp [hl]
+            jr nz, .c
             ld a, [gr_pa]                   ; (orbs in an alt window: palette 6 alt only)
             bit 6, a
             jr z, .l
@@ -2783,53 +2810,85 @@ gr_pals:    xor a
             jr z, .lb
             ld [hl], $FF
             ret
-; C set: cell (gr_cx, gr_cy) inside a main window drawn after window gr_i
-gr_cov:     ld a, [gr_i]
-.w:         inc a
-            ld hl, gr_wn
-            cp [hl]
-            ret nc                          ; (NC: none)
-            ld [gr_t], a
+; window gr_i -> B, C, D, E = x, y, w, h; gr_g its group, NZ when alt
+gr_pw:      ld a, [gr_i]
             ld e, a
             ld d, 0
             ld hl, gr_grp
             add hl, de
             ld a, [hl]
-            and a
-            ld a, [gr_t]
-            jr nz, .w
+            ld [gr_g], a
+            ld a, [gr_i]
             call gr_wp
-            ld a, [gr_cx]                   ; x <= cx < x + w
-            sub [hl]
-            jr c, .n
-            inc hl
-            inc hl
-            cp [hl]
-            jr nc, .n
-            dec hl
-            ld a, [gr_cy]
-            sub [hl]
-            jr c, .n
-            inc hl
-            inc hl
-            cp [hl]
-            jr nc, .n
-            scf
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            ld d, a
+            ld e, [hl]
+            ld a, [gr_g]
+            and a
             ret
-.n:         ld a, [gr_t]
-            jr .w
-; A = palette -> A = its bit
-gr_bit:     ld b, a
-            ld a, 1
-            inc b
-.s:         dec b
-            ret z
-            add a, a
-            jr .s
+; HL = the map copy's attribute of cell (B, C)
+gr_pcell:   call cell_addr
+            ld a, h
+            add a, 3
+            ld h, a
+            ret
 ; the event list (HL / DE: its two buffers, A: records at most): per line each group's
 ; owner (the last window drawn there) and its colour; a record where a colour changes; the
 ; music in the longest gap; the box's cut
 gr_make:    ld [gr_lim], a
+            push hl
+            push de
+            xor a                           ; (line 0: the windows looked at)
+            ld [gr_nev], a
+            ld a, $FF                       ; (no owners yet)
+            ld hl, gr_so
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            ld a, [gr_n]                    ; each window's top and end line
+            and a
+            jr z, .p9
+            ld b, a
+            ld hl, gr_win + 1
+            ld de, gr_wt
+.p:         ld a, [hl+]                     ; y
+            inc hl
+            ld c, a
+            add a, a
+            add a, a
+            add a, a
+            ld [de], a                      ; top line
+            ld a, [hl+]                     ; h
+            add a, c
+            add a, a
+            add a, a
+            add a, a
+            push de
+            push af
+            ld a, e
+            add a, GR_MAXW
+            ld e, a
+            ld a, d
+            adc a, 0
+            ld d, a
+            pop af
+            ld [de], a                      ; end line (gr_wb)
+            pop de
+            inc de
+            inc hl                          ; (the next window's y)
+            dec b
+            jr nz, .p
+.p9:        pop de
+            pop hl
             ld a, [gr_base]                 ; (the buffer not in use)
             cp l
             jr nz, .b
@@ -2968,71 +3027,165 @@ gr_same:    ld l, a
             cp [hl]
             ret
 ; line gr_ln: E = the main owner's colour, C = the alt owner's (ramp low bytes; $FF none);
-; the last window drawn over the line owns it
-gr_col:     ld a, $FF
+; the last window drawn over the line owns it. Colour 31 d / (lines - 1) at its line d.
+; (Owner, 2026-11-23: a division per window and line took ~9 frames of a menu's load.) The
+; owners change only on the windows' top and end lines (gr_nev: the next one): the windows
+; are looked at there, a division made for a new owner; on the other lines each owner's
+; colour steps on
+gr_col:     ld a, [gr_ln]
+            ld d, a
+            ld hl, gr_nev
+            cp [hl]
+            jr nc, .full
+            ld e, 1                         ; (owners as on the line before)
+            call gr_gcs
+            ld c, a
+            push bc
+            ld e, 0
+            call gr_gcs
+            pop bc
+            ld e, a
+            ret
+.full:      ld a, 144                       ; the next top or end line after this one
+            ld [hl], a
+            ld a, [gr_n]
+            and a
+            jr z, .f9
+            ld c, a
+            ld hl, gr_wt
+.f:         ld a, [hl]
+            call .ev
+            push hl
+            ld a, l
+            add a, GR_MAXW
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld h, a
+            ld a, [hl]                      ; (gr_wb)
+            call .ev
+            pop hl
+            inc hl
+            dec c
+            jr nz, .f
+.f9:        ld a, $FF
             ld [gr_tm], a
             ld [gr_ta], a
             ld a, [gr_n]
-            ld [gr_t], a
-.w:         ld a, [gr_t]
+            ld c, a
+            ld b, 0
+.w:         ld a, c
             and a
             jr z, .x
-            dec a
-            ld [gr_t], a
-            ld e, a
-            ld d, 0
-            ld hl, gr_grp
-            add hl, de
-            ld a, [hl]
-            ld [gr_g], a
-            and a                           ; (that group already owned: the next)
-            ld a, [gr_tm]
-            jr z, .g
-            ld a, [gr_ta]
-.g:         cp $FF
-            jr nz, .w
-            ld a, [gr_t]
-            call gr_wp
-            inc hl
-            ld a, [hl+]
-            add a, a
-            add a, a
-            add a, a
-            ld b, a                         ; top line
-            inc hl
-            ld a, [hl]
-            add a, a
-            add a, a
-            add a, a
-            ld c, a                         ; lines
-            ld a, [gr_ln]
-            sub b
-            jr c, .w
-            cp c
-            jr nc, .w
-            ld d, a
             dec c
-            call gr_idx                     ; A = 31 d / (lines - 1)
+            ld hl, gr_wt
+            add hl, bc
+            ld a, d
+            cp [hl]                         ; (above its top)
+            jr c, .w
+            ld hl, gr_wb
+            add hl, bc
+            cp [hl]                         ; (below its bottom)
+            jr nc, .w
+            ld hl, gr_grp
+            add hl, bc
+            ld a, [hl]
+            ld hl, gr_tm
+            and a
+            jr z, .g
+            inc hl                          ; (gr_ta)
+.g:         ld a, [hl]
+            inc a
+            jr nz, .w                       ; (that group owned already)
+            ld [hl], c
+            ld a, [gr_tm]
+            ld e, a
+            ld a, [gr_ta]
+            or e
+            inc a
+            jr z, .w                        ; (one still free)
+.x:         ld a, [gr_ta]
+            ld e, 1
+            call gr_gc
+            ld c, a
+            push bc
+            ld a, [gr_tm]
+            ld e, 0
+            call gr_gc
+            pop bc
+            ld e, a
+            ret
+.ev:        cp d                            ; A after line D and before gr_nev: gr_nev
+            ret z
+            ret c
+            push hl
+            ld hl, gr_nev
+            cp [hl]
+            jr nc, .e9
+            ld [hl], a
+.e9:        pop hl
+            ret
+; HL = group E's state (gr_so: owner, colour, remainder, lines - 1)
+gr_sp:      ld a, e
+            add a, a
+            add a, a
+            add a, low(gr_so)
+            ld l, a
+            ld a, high(gr_so)
+            adc a, 0
+            ld h, a
+            ret
+; group E, the same owner as on the line before -> A = its colour one line on ($FF none)
+gr_gcs:     call gr_sp
+            ld a, [hl+]
+            cp $FF
+            ret z
+.st:        inc hl                          ; (HL = the remainder)
+            ld a, [hl+]
+            ld b, [hl]                      ; lines - 1
+            dec hl
+            add a, 31                       ; remainder + 31
+            dec hl
+.s:         cp b
+            jr c, .k
+            sub b
+            inc [hl]                        ; colour + 1
+            jr .s
+.k:         inc hl
+            ld [hl-], a
+.out:       ld a, [hl]
             add a, a
             add a, low(gr_ramp)
-            ld e, a
-            ld a, [gr_g]
-            and a
-            ld a, e
-            jr nz, .al
-            ld [gr_tm], a
-            jr .w
-.al:        ld [gr_ta], a
-            jr .w
-.x:         ld a, [gr_tm]
-            ld e, a
-            ld a, [gr_ta]
-            ld c, a
             ret
-; A = 31 D / C (C > 0)
-gr_idx:     push bc
-            push de
+; A = the owner of group E on line D ($FF none) -> A = its colour (ramp low byte; $FF)
+gr_gc:      ld c, a
+            call gr_sp
+            ld a, c
+            cp $FF
+            jr nz, .o
+            ld [hl], a                      ; (no owner)
+            ret
+.o:         cp [hl]
+            jr nz, .new
+            inc hl
+            jr gr_gcs.st                    ; (the same: one step)
+.new:       ld [hl], c                      ; a new owner: 31 d / (lines - 1)
+            inc hl
+            push hl
+            ld b, 0
+            ld hl, gr_wt
+            add hl, bc
+            ld a, [hl]
+            ld [gr_t], a                    ; top line
+            ld hl, gr_wb
+            add hl, bc
+            ld a, [hl]
+            ld hl, gr_t
+            sub [hl]
+            dec a
+            ld b, a                         ; B = lines - 1
             ld a, d
+            sub [hl]                        ; d
             ld l, a
             ld h, 0
             ld e, l
@@ -3041,29 +3194,39 @@ gr_idx:     push bc
             add hl, hl
             add hl, hl
             add hl, hl
-            add hl, hl                      ; 32 d
+            add hl, hl
             ld a, l
             sub e
             ld l, a
             ld a, h
             sbc a, d
             ld h, a                         ; 31 d
-            ld a, c
+            ld a, b
             cpl
             ld e, a
             ld d, $FF
-            inc de                          ; -c
-            ld b, $FF
-.d:         inc b
+            inc de                          ; -(lines - 1)
+            ld c, $FF
+.d:         inc c
             add hl, de
             jr c, .d
-            ld a, b
+            ld a, l                         ; remainder: HL + (lines - 1)
+            add a, b
+            ld e, a
+            pop hl
+            ld a, c
             cp 32
-            jr c, .x
+            jr c, .q
             ld a, 31
-.x:         pop de
-            pop bc
-            ret
+.q:         ld [hl+], a                     ; colour
+            ld a, e
+            ld [hl+], a                     ; remainder
+            ld [hl], b                      ; lines - 1
+            dec hl
+            dec hl
+            ld a, [gr_ln]
+            ld d, a
+            jr gr_gcs.out
 ; B = the first line of the longest gap between records (to 143)
 gr_gap:     ld a, [gr_nb]
             ld l, a
@@ -3181,6 +3344,11 @@ gr_lm:      ds 8                            ; BCPS lists in use: main, alt ($FF 
 gr_la:      ds 8
 gr_nlm:     ds 8                            ; the next list's
 gr_nla:     ds 8
+section wram, $DAA0
+gr_wt:      ds GR_MAXW                      ; (gr_make: each window's top line,
+gr_wb:      ds GR_MAXW                      ;   end line)
+gr_so:      ds 8                            ; per group: owner, colour, remainder, lines - 1
+gr_nev:     ds 1                            ; (the next line where the owners can change)
 section wram, $D9CF
 gr_i:       ds 1
 gr_j:       ds 1
