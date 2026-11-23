@@ -302,12 +302,20 @@ aw:         push af
             dec hl
             ld [hl+], a
             pop de
-.ft:        pop af                          ; the triangle: a new note
+.ft:        pop af                          ; a new note
             ld [hl+], a
             ld a, d
             ld [bc], a
             ld e, a
-            ldh a, [is_cgb]                 ; (a Color: restarted every note, as before; its
+            ld a, c                         ; (the pulses: always restarted; they ran into
+            sub low(snd_fh)                 ;   the triangle's legato below, and on a plain
+            cp 2                            ;   Game Boy with the wave sounding their notes
+            jr z, .ftr                      ;   never started: square 2 silent)
+            ld a, e
+            or $80
+            ld [hl], a
+            jp .x
+.ftr:       ldh a, [is_cgb]                 ; the triangle (a Color: restarted every note; its
             and a                           ;   wave RAM does not suffer, and the ModRetro
             jr nz, .ftc                     ;   Chromatic, an FPGA Color, wants the restart)
             ld a, [tri_on]
