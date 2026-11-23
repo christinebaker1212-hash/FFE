@@ -462,33 +462,38 @@ s16_inv:    ld a, d
             ld a, $FF
             ldh [s16_pp], a
             ret
-; vcopy's VRAM bank 1 sprite tiles (DE < $8800) -> the mirror too (B tiles from HL; a source in
-; $D000- through s16_bb)
+; vcopy's VRAM bank 1 sprite tiles (DE < $8800) -> the mirror too (WRAM 6; B tiles from HL; a
+; source in $D000- (WRAM 3) copied 2 bytes at a time)
 s16_mir:    push bc
             push de
             push hl
             ld a, d
             add a, high(S16_MIR) - $80
             ld d, a
-.t:         ld a, h
-            cp $D0
-            jr c, .dr
-            push de
-            ld de, s16_bb
-            ld c, 16
+            ldh a, [rSVBK]
+            ld c, a
+.t:         push bc
+            ld b, 8
 .r:         ld a, [hl+]
+            push af
+            ld a, [hl+]
+            push af
+            ld a, 6
+            ldh [rSVBK], a
+            pop af
+            inc de
+            ld [de], a
+            dec de
+            pop af
             ld [de], a
             inc de
-            dec c
+            inc de
+            ld a, c
+            ldh [rSVBK], a
+            dec b
             jr nz, .r
-            pop de
-            push hl
-            ld hl, s16_bb
-            call .w16
-            pop hl
-            jr .nx
-.dr:        call .w16
-.nx:        ld a, d
+            pop bc
+            ld a, d
             cp $E0
             jr nc, .x
             dec b
@@ -496,19 +501,6 @@ s16_mir:    push bc
 .x:         pop hl
             pop de
             pop bc
-            ret
-.w16:       ldh a, [rSVBK]
-            push af
-            ld a, 5
-            ldh [rSVBK], a
-            ld c, 16
-.c:         ld a, [hl+]
-            ld [de], a
-            inc de
-            dec c
-            jr nz, .c
-            pop af
-            ldh [rSVBK], a
             ret
 
 ; a call into the other battle bank (from a stub: [fx_a] = A, [fx_t] = the routine, A = its
@@ -552,20 +544,3 @@ section wram, $DF60
 fx_a:       ds 1
 fx_t:       ds 2
 fx_b:       ds 1
-
-section wram, $C740
-s16_on:     ds 1
-s16_lo:     ds 1
-s16_hi:     ds 1
-s16_n:      ds 1                            ; effect sprites in s16_in
-s16_front:  ds 1                            ; the effect in front of the party
-s16_lock:   ds 1
-s16_sum:    ds 2
-s16_wn:     ds 1
-s16_pn:     ds 1
-s16_i:      ds 1
-s16_j:      ds 1
-s16_t:      ds 4
-s16_bb:     ds 16
-s16_in:     ds 4 * 40                       ; (y, x, tile, GB attributes)
-

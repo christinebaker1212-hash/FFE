@@ -33,11 +33,20 @@ S16_K0     = $D100              ;   the slots' keys: top tile, its flips, bottom
 S16_K1     = $D140              ;   each),
 S16_K2     = $D180
 S16_K3     = $D1C0
-S16_W      = $D200              ;   the effect's sprites: y, x, tile, attributes (40),
-S16_A      = $D2A0              ;   the slots' last use (the build count),
-S16_PL     = $D2E0              ;   the pairs (the party's first): y, x, attributes, slot, key (34),
-S16_MIR    = $D800              ;   a mirror of VRAM bank 1 tiles $00-$7F;
-S16_STG    = $D000              ; WRAM bank 6: the slots' composed tiles (64 x 32 -> VRAM bank 1 $00-$7F)
+S16_W      = $D200              ;   the sprites gathered: y, x, tile, attributes (80),
+S16_A      = $D340              ;   the slots' last use (the build count),
+S16_PL     = $D380              ;   the pairs (the party's first): y, x, attributes, slot, key (40),
+S16_IN     = $D500              ;   the effect's sprites (80: y, x, tile, GB attributes),
+s16_sum    = $D640              ;   the build's variables;
+s16_wn     = $D642
+s16_pn     = $D643
+s16_i      = $D644
+s16_j      = $D645
+s16_t      = $D646
+s16_bk     = $D64A              ;   (the bank before the build, the bottom key kept)
+s16_x      = $D64B
+S16_STG    = $D000              ; WRAM bank 6: the slots' composed tiles (56 x 32 -> VRAM bank 1 $00-$6F),
+S16_MIR    = $D800              ;   a mirror of VRAM bank 1 tiles $00-$7F
 GS         = $C800              ; FF3's save block $6000-$63FF (npc switches at +$80)
 N_ANIM     = $DD00              ; 3B/B41A animation frames (CGB attributes), 256 bytes (WRAM bank 1)
 N_RNG      = $CD00              ; fix:FE00 random number table
@@ -1790,3 +1799,9 @@ s16_eh:     ds 2                            ; (the 8 x 16 mode: the effect's sum
 s16_pp:     ds 1
 s16_fc:     ds 1
 s16_np:     ds 1
+s16_on:     ds 1                            ; (HRAM: read by the V-Blank in any WRAM bank)
+s16_lock:   ds 1
+s16_lo:     ds 1
+s16_hi:     ds 1
+s16_n:      ds 1
+s16_front:  ds 1

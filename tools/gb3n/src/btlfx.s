@@ -38,6 +38,8 @@ s16_start:  ldh a, [rSVBK]
             dec b
             jr nz, .a
             ldh [s16_fc], a
+            ld a, $FF
+            ld [s16_sum], a
             pop af
             ldh [rSVBK], a
             xor a
@@ -47,7 +49,6 @@ s16_start:  ldh a, [rSVBK]
             ld [s16_front], a
             ld [s16_lock], a
             dec a
-            ld [s16_sum], a
             ldh [s16_pp], a
             call s16_build
             ld a, 1
@@ -82,7 +83,7 @@ s16_stop:   xor a
             ret
 .h:         ldh a, [rSVBK]
             push af
-            ld a, 5
+            ld a, 6
             ldh [rSVBK], a
             ld a, h
             ldh [rHDMA1], a
@@ -118,7 +119,13 @@ mx_snd:     ld a, [BZ + $C9]
 
 ; ---- the picture: the party's sprites (OAM 0-23) and the effect's (s16_in) as 8 x 16 pairs; the
 ; party's pairs kept while its sprites stay the same
-s16_build:  ld hl, oam_buf                  ; the sums: the party's (with the hidden flag), the effect's
+s16_build:  ldh a, [rSVBK]                  ; (WRAM 5 throughout; the bank kept there)
+            ld b, a
+            ld a, 5
+            ldh [rSVBK], a
+            ld a, b
+            ld [s16_bk], a
+            ld hl, oam_buf                  ; the sums: the party's (with the hidden flag), the effect's
             ld e, 96
             call .sum
             ldh a, [s16_np]
@@ -140,7 +147,7 @@ s16_build:  ld hl, oam_buf                  ; the sums: the party's (with the hi
             add a, a
             add a, a
             ld e, a
-            ld hl, s16_in
+            ld hl, S16_IN
             ld a, [s16_n]
             ld c, a
             ld b, a
@@ -154,17 +161,16 @@ s16_build:  ld hl, oam_buf                  ; the sums: the party's (with the hi
             jr nz, .go
             ldh a, [s16_eh + 1]
             cp b
-            ret z
+            jr nz, .go
+            ld a, [s16_bk]
+            ldh [rSVBK], a
+            ret
 .go:        ld a, c
             ldh [s16_eh], a
             ld a, b
             ldh [s16_eh + 1], a
             ld a, 1
             ld [s16_lock], a
-            ldh a, [rSVBK]
-            push af
-            ld a, 5
-            ldh [rSVBK], a
             ldh a, [s16_fc]                 ; (a new build: slots with this count are used)
             inc a
             ldh [s16_fc], a
@@ -212,7 +218,7 @@ s16_build:  ld hl, oam_buf                  ; the sums: the party's (with the hi
             and a
             jr z, .look
             ld b, a
-            ld hl, s16_in
+            ld hl, S16_IN
             call .gather
             call .pair
 .look:      ld a, [s16_pn]                  ; the new pairs: their keys looked up in the slots
@@ -393,7 +399,7 @@ s16_build:  ld hl, oam_buf                  ; the sums: the party's (with the hi
             inc de
             inc de
             jr .o2
-.o4:        pop af
+.o4:        ld a, [s16_bk]
             ldh [rSVBK], a
             xor a
             ld [s16_lock], a
@@ -473,7 +479,7 @@ s16_build:  ld hl, oam_buf                  ; the sums: the party's (with the hi
             cp 160
             jr nc, .gs
             ld a, [s16_wn]
-            cp 40
+            cp 80
             ret nc
             inc a
             ld [s16_wn], a
@@ -637,71 +643,69 @@ s16_build:  ld hl, oam_buf                  ; the sums: the party's (with the hi
             jp nz, .pi
             ret
 
-; slot C's two tiles from its key (top tile, flips, bottom tile, flips; $FF: blank): each composed
-; in s16_bb (the mirror, WRAM 5), then to WRAM 6 S16_STG + 32 slot
+; slot C's two tiles from its key (top tile, flips, bottom tile, flips; $FF: blank), composed from
+; the mirror into the staging (both WRAM 6)
 s16_comp:   push bc
-            ld hl, S16_K0
+            ld hl, S16_K0                   ; (the key: B, C top; D, E bottom)
             ld a, l
             add a, c
             ld l, a
-            ld b, [hl]
+            ld a, [hl]
+            ld [s16_t], a
             ld a, l
             add a, $40
             ld l, a
-            ld c, [hl]
-            call .tile
-            pop bc
-            push bc
-            xor a
-            call .put
-            pop bc
-            push bc
-            ld hl, S16_K2
-            ld a, l
-            add a, c
-            ld l, a
-            ld b, [hl]
+            ld a, [hl]
+            ld [s16_t + 1], a
             ld a, l
             add a, $40
             ld l, a
-            ld c, [hl]
-            call .tile
-            pop bc
-            push bc
-            ld a, 16
-            call .put
-            pop bc
-            ret
-; s16_bb -> WRAM 6 S16_STG + 32 C + A
-.put:       ld l, c
+            ld a, [hl]
+            ld [s16_t + 2], a
+            ld a, l
+            add a, $40
+            ld l, a
+            ld a, [hl]
+            ld [s16_t + 3], a
+            ld l, c                         ; DE = S16_STG + 32 slot
             ld h, 0
             add hl, hl
             add hl, hl
             add hl, hl
             add hl, hl
             add hl, hl
-            ld e, a
-            ld d, 0
-            add hl, de
             ld de, S16_STG
             add hl, de
             ld d, h
             ld e, l
+            ld a, [s16_t]
+            ld b, a
+            ld a, [s16_t + 1]
+            ld c, a
+            push bc
+            ld a, [s16_t + 2]
+            ld b, a
+            ld a, [s16_t + 3]
+            ld c, a
             ld a, 6
             ldh [rSVBK], a
-            ld hl, s16_bb
-            ld b, 16
-.p:         ld a, [hl+]
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .p
+            ld a, b
+            ld [s16_x], a
+            ld a, c
+            ld [s16_x + 1], a
+            pop bc
+            call .tile
+            ld a, [s16_x]
+            ld b, a
+            ld a, [s16_x + 1]
+            ld c, a
+            call .tile
             ld a, 5
             ldh [rSVBK], a
+            pop bc
             ret
-; tile B (flips C: $20 h, $40 v) -> s16_bb
-.tile:      ld de, s16_bb
-            ld a, b
+; tile B (flips C: $20 h, $40 v) -> 16 bytes at DE (WRAM 6)
+.tile:      ld a, b
             cp $80
             jr c, .t1
             xor a                           ; (blank)
@@ -1660,7 +1664,14 @@ mx_mul:     push de
             ret
 
 ; ---- 34/8411 attack animations 2-$0D (summon: later; cannon: a pause)
-mx_other:   ld [mx_t], a
+mx_other:   cp 2
+            jr nz, .o
+            ld a, [W7 + $7E98]              ; (2: the summon, btlsum.s)
+            call ba_maskid
+            ld [BZ + $52], a
+            ld [BZ + $95], a
+            jp sm_main
+.o:         ld [mx_t], a
             ld a, [W7 + $7E98]              ; 34/8532: the attacker
             call ba_maskid
             ld [BZ + $52], a
@@ -3085,7 +3096,7 @@ mx_put:     ld a, d
             or $80
 .p:         ld e, a
             ld a, [s16_n]
-            cp 40
+            cp 80
             ret nc
             ld l, a
             inc a
@@ -3093,12 +3104,12 @@ mx_put:     ld a, d
             ld h, 0
             add hl, hl
             add hl, hl
-            ld a, l
-            add a, low(s16_in)
-            ld l, a
-            ld a, h
-            adc a, high(s16_in)
-            ld h, a
+            push de
+            ld de, S16_IN
+            add hl, de
+            pop de
+            ld a, 5
+            ldh [rSVBK], a
             ld a, c
             ld [hl+], a
             ld a, b
@@ -3106,6 +3117,8 @@ mx_put:     ld a, d
             ld a, d
             ld [hl+], a
             ld [hl], e
+            ld a, 3
+            ldh [rSVBK], a
             ret
 
 ; ---- 33/AF6F the spell's graphics properties (2E/91D0 + 3 spell) -> $7E8B-$7E8D

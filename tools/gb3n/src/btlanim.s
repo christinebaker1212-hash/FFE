@@ -1086,8 +1086,8 @@ ba_put:     ld a, d
             ld a, l
             ld [ba_p], a
             ret
-.s16:       ld a, [s16_n]
-            cp 40
+.s16:       ld a, [s16_n]                   ; (WRAM 5: S16_IN)
+            cp 80
             ret nc
             ld l, a
             inc a
@@ -1095,12 +1095,12 @@ ba_put:     ld a, d
             ld h, 0
             add hl, hl
             add hl, hl
-            ld a, l
-            add a, low(s16_in)
-            ld l, a
-            ld a, h
-            adc a, high(s16_in)
-            ld h, a
+            push de
+            ld de, S16_IN
+            add hl, de
+            pop de
+            ld a, 5
+            ldh [rSVBK], a
             ld a, c
             ld [hl+], a
             ld a, b
@@ -1108,6 +1108,8 @@ ba_put:     ld a, d
             ld a, d
             ld [hl+], a
             ld [hl], e
+            ld a, 3
+            ldh [rSVBK], a
             ret
 ; the attacker's GB x base: 140 + (x - 208) / 2 + 8 (a back attack: from 240 - x)
 ba_bx:      ld a, [hl]
