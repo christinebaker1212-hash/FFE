@@ -453,7 +453,7 @@ sm_jhl:     jp hl
 sm_tab:     dw sm_dash, sm_shk, sm_kick, sm_hold, sm_icy, sm_hold
             dw sm_mind, sm_thun, sm_thun, sm_heal, sm_hold, sm_hold
             dw sm_clob, sm_stomp, sm_quake, sm_prot, sm_slash, sm_zan
-            dw sm_demon, sm_hold, sm_tidal, sm_aura, sm_rend, sm_hold
+            dw sm_demon, sm_hold, sm_tidal, sm_aura, sm_rend, sm_mega
 ; (not yet ported: the creature holds 48 frames, then goes)
 sm_hold:    ld b, 48
 .w:         push bc
@@ -554,8 +554,7 @@ sm_bgfl:    ld [sm_t], a
             call ba_inc
             cp $30
             jr nz, .f
-            call sm_prest
-            ret
+            jp sm_8547
 ; 32/87AD palette C's colours 1-3 in hue sm_t, the brightness rows stepping by the counter
 sm_cyc1:    ld a, [BZ + $B6]
             and 3
@@ -607,7 +606,8 @@ sm_thun:    call sm_psave
             call ba_inc
             cp 8
             jr nz, .f
-            call sm_prest
+            call mx_eclr
+            call sm_8547
             call ba_vblc
             call mx_eclr
             ld a, $2A
@@ -744,6 +744,140 @@ sm_tidal:   ld hl, $B160
             jr nz, .s
             ld a, [sm_t]
             ldh [scx], a
+            ret
+
+; $17 mega flare: 60 frames, 16 of the backdrop white (FF3 tints the screen), then 64 frames of
+; two explosions at FF3's random places (32/85F8 / 8600, a new place each 4th step) with BG
+; palettes 0 / 1 lit red; the end restores the palettes (32/8547 runs the explosion step once
+; more, as FF3)
+sm_mega:    ld b, 60
+.w:         push bc
+            call mx_wait
+            pop bc
+            dec b
+            jr nz, .w
+            xor a
+            ld [W7 + $7ED5], a
+            call sm_psave
+            xor a
+            ld [BZ + $B6], a
+            ld hl, BZ + $C9
+            inc [hl]
+.t:         ld a, $30
+            call ba_bkd
+            call ba_inc
+            and $10
+            jr z, .t
+            ld a, $0F                       ; (the backdrop black again: all four BG palettes)
+            ld [W7 + $7CF7], a
+            ld [W7 + $7CF7 + 4], a
+            ld [W7 + $7CF7 + 8], a
+            ld [W7 + $7CF7 + 12], a
+            ld hl, $B1C0
+            ld a, $11
+            call sm_gfx
+            ld a, $BD
+            call ba_pal3
+            call sm_pos1
+            call sm_pos2
+            ld a, 2
+            ld [BZ + $90], a
+            xor a
+            ld [BZ + $91], a
+.f:         call sm_854d
+            call s16_build
+            ld a, [BZ + $8F]
+            push af
+            ld a, $16
+            ld [sm_t], a
+            ld c, 0
+            call sm_cyc1
+            ld c, 4
+            call sm_cyc1
+            pop af
+            ld [BZ + $8F], a
+            call ba_vblc
+            call ba_inc
+            cp $40
+            jr nz, .f
+            call mx_eclr
+; 32/8547 the palettes back, then the explosion step once more (FF3 falls through)
+sm_8547:    call sm_prest
+; 32/854D: (cannon: the animation sprites; mega flare: all) cleared; on even steps $90 / $91
+; advance (0: a new random place), the explosions drawn (32/8F8F frames)
+sm_854d:    call mx_eclr
+            ld a, [BZ + $B6]
+            and 1
+            jr nz, .d
+            ld hl, BZ + $90
+            inc [hl]
+            ld a, [hl]
+            and 3
+            ld [hl], a
+            call z, sm_pos1
+            ld hl, BZ + $91
+            inc [hl]
+            ld a, [hl]
+            and 3
+            ld [hl], a
+            call z, sm_pos2
+.d:         ld a, 1
+            ld [ba_mode], a
+            ld a, [BZ + $90]
+            ld c, a
+            ld a, [BZ + $8C]
+            ld [BZ + $80], a
+            ld a, [BZ + $8D]
+            ld [BZ + $81], a
+            call .ex
+            ld a, [W7 + $7ED5]
+            and a
+            ret nz
+            ld a, [BZ + $91]
+            ld c, a
+            ld a, [BZ + $8E]
+            ld [BZ + $80], a
+            ld a, [BZ + $8F]
+            ld [BZ + $81], a
+.ex:        ld a, c                         ; frame C: 32/8F8F + 2 C (tiles + $38 for the cannon)
+            add a, a
+            ld e, a
+            ld d, 0
+            ld hl, $8F8F + N32S
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld de, N32S
+            add hl, de
+            jp sm_list
+; 32/85F8 / 8600 a random place: x 16-128, y 47-111 (FF3's random, counter 0) -> $8C / $8D, $8E / $8F
+sm_pos1:    call sm_rpos
+            ld a, b
+            ld [BZ + $8C], a
+            ld a, c
+            ld [BZ + $8D], a
+            ret
+sm_pos2:    call sm_rpos
+            ld a, b
+            ld [BZ + $8E], a
+            ld a, c
+            ld [BZ + $8F], a
+            ret
+sm_rpos:    xor a
+            ld [BZ + $21], a
+            ld b, $10
+            ld a, $80
+            call rnd_xa
+            push af
+            xor a
+            ld [BZ + $21], a
+            ld b, $2F
+            ld a, $6F
+            call rnd_xa
+            ld c, a
+            pop af
+            ld b, a
             ret
 
 ; 32/8781 the backdrop A every 4 frames for B frames
