@@ -247,7 +247,7 @@ load_mon:   ld e, a
             ld [BZ + $26], a
             ld a, b
             ld [BZ + $27], a
-            ld a, [BZ + $26]
+load_mon2:  ld a, [BZ + $26]                ; (31/A4FE: monster $26 into slot $27)
             push af
             ld l, a                         ; $24 = 30/8000 + 16 id (-> BDATA2)
             ld h, 0

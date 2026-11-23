@@ -30,7 +30,8 @@ btl_loop:   call turn_start                 ; 34/81C3
             jr nz, .over
             call mon_rows                   ; 34/8295
             call exec_action                ; 34/9DE4
-            ld a, [W7 + $7ED8]              ; (35/A56F the magic message: with magic)
+            call mag_msg                    ; 35/A56F
+            ld a, [W7 + $7ED8]
             and $DF
             ld [W7 + $7ED8], a
             call act_script                 ; 34/8FF7

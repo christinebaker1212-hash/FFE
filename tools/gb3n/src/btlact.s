@@ -513,7 +513,7 @@ exec_action:
             jp hl
 act_tab:    dw act_none, act_none, act_none, act_none, act_fight, act_defend, act_none, act_none
             dw act_none, act_none, act_none, act_none, act_none, act_none, act_none, act_none
-            dw act_none, act_none, act_none, act_none, act_none
+            dw act_none, act_none, act_none, act_none, act_magic
 act_none:   ret
 
 ; 34/9F7B set command id A (magic / item flags cleared)

@@ -126,4 +126,17 @@ act_reset:  ld a, $FF
             ld [BZ + $BC], a
             ld [W7 + $7E93], a
             ld [W7 + $78D4], a
+            ld [W7 + $7EC2], a
+            ld hl, W7 + $7E0F
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            ld [BZ + $72], a
+            ld [W7 + $7EDF], a
+            ld hl, BZ + $E0                 ; the status buffers
+            ld b, $20
+.e:         ld [hl+], a
+            dec b
+            jr nz, .e
             ret

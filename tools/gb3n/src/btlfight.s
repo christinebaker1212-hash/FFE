@@ -825,6 +825,7 @@ atk_ineff:  ld a, [W7 + $7EC1]
             and b
             ld [W7 + $7E9B], a
             ld a, [BZ + $7C]
+            and a
             ret
 
 ; 31/BBF3 apply status $24 (bit 0: status 2) to the target's buffer, with its message
