@@ -793,7 +793,12 @@ vcopy:      cp 1                            ; (VRAM bank 1 sprite tiles: also in
             ld [vc_left], a
 .d1:        push hl
             push de
-            call wait_vbl
+.dw:        call wait_vbl                   ; (and LY 144-147: 64 blocks end inside the V-Blank
+            ldh a, [rLY]                    ;   even after a long handler - Lot Check)
+            cp 144
+            jr c, .dw
+            cp 148
+            jr nc, .dw
             pop de
             pop hl
             ld a, h

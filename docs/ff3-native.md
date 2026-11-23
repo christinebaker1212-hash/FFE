@@ -395,5 +395,9 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   0, OAM writes in modes 2/3 0, OAM DMA / GDMA outside V-Blank 0, cart RAM on at a frame end 0, cart
   RAM accessed while off 0, palette writes in mode 3 0. Found on the way: after a defeat the game
   jumped to the boot with A not $11 and showed the Color-only screen (black) for good; it now
-  restarts as the soft reset does. Not yet run under the checker: a spell / summon in the 8 x 16
-  mode (GDMA in V-Blank by design), the release ROM's title and boot.
+  restarts as the soft reset does. The release ROM's boot and title (3600 frames) under the
+  checker found two general-purpose DMAs started after V-Blank had ended (vcopy right after a long
+  V-Blank handler; menu_vbl's second 36-block copy): both now start only at LY 144-147 / 144-150,
+  else in the next V-Blank. Then every counter 0 (52 instructions with cart RAM on: the boot's save
+  check between its enable and disable). Not yet run under the checker: a spell / summon in the
+  8 x 16 mode (its GDMA starts in its V-Blank handler, at most 24 pairs).

@@ -34,13 +34,18 @@ m_put2:     push hl
 
 ; E codes from HL ($FF ends early? no: $FF is a blank) at column B, row C
 
-menu_vbl:   ld a, [m_dirty]
-            and a
-            ret z
+menu_vbl:   ld a, [m_dirty]                 ; (1: the map then the attributes, 2: the attributes;
+            and a                           ;   each copy only while LY 144-150 leaves it time
+            ret z                           ;   in this V-Blank, else the next one: Lot Check)
             ldh a, [rSVBK]                  ; (the canvas is WRAM bank 2: the battle runs with 3)
             push af
             ld a, 2
             ldh [rSVBK], a
+            ld a, [m_dirty]
+            cp 2
+            jr z, .at
+            call .ok
+            jr nc, .x
             ld a, high(MC_MAP)
             ldh [rHDMA1], a
             xor a
@@ -51,6 +56,10 @@ menu_vbl:   ld a, [m_dirty]
             ldh [rHDMA4], a
             ld a, 36 - 1
             ldh [rHDMA5], a
+            ld a, 2
+            ld [m_dirty], a
+.at:        call .ok
+            jr nc, .x
             ld a, 1
             ldh [rVBK], a
             ld a, high(MC_ATTR)
@@ -66,10 +75,15 @@ menu_vbl:   ld a, [m_dirty]
             xor a
             ldh [rVBK], a
             ld [m_dirty], a
-            pop af
+.x:         pop af
             ldh [rSVBK], a
             ret
-
+.ok:        ldh a, [rLY]                    ; carry: LY 144-150
+            cp 144
+            ccf
+            ret nc
+            cp 151
+            ret
 
 cur_hide:   ld hl, oam_buf + 4 * 36
             ld b, 4
