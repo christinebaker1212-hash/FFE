@@ -234,9 +234,35 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
     (mGBA leaves it out; without it volume steps read as 60 Hz thumps). Pulses / triangle: the
     same notes and lengths (frames sounding on one side only: 0-5 per voice, pitch median 0
     cents); noise a little brighter (about +1-2 semitones of spectral centroid, the NR43 steps).
+    (Found with it: the alignment lag must come from all voices, a silent GB window counted as
+    misses, and the two frame rates kept apart, else the comparison drifts.)
   Music in the game: a map's song on every map load (property byte 10; bit 7: the song from
   conditional trigger script $38 + n at 2C/8870, as fix:E8DB; checked: map 10 -> $0C as FF3), a
   world map's song and sound effect from 3B/A027 / A047 by world and vehicle, event command $F8
   (songs, fade out, resume, stop, sound effects), song 1 on the prophecy and the load menu.
   `build.py --song N` builds a test ROM that plays song N throughout.
-  Next: battle (its music comes with it), shops / inns, vehicles.
+  Later the same day: the NES pulse sweep (rising / falling jingles, songs 48-53) runs in software
+  for both GB pulses (divider, reload, mute rule; the period's high bits kept from key-on as
+  FF3's hold path writes only $4002 / $4006). `sndcmp.py voices` over all songs: pulses and
+  triangle sound on the same frames as the NSF (a note's end differs by at most one frame: the GB
+  driver runs from the LCD interrupt, a third of the way into its frame), pitch median 0 cents;
+  sweep slides agree within the 2-frame measuring window. Fixed with it: the driver's bank
+  writes went through the rom_bank shadow, so code in another bank (CODE1 menus) lost its bank
+  when the interrupt returned; it now writes the MBC5 register directly.
+- 2026-11-23: shops and inns (`shop.py`, `src/shop.s`), from talking to persons $E3-$FB / $E0-$E2
+  (the trigger script loaded as FF3's $7B00). Shops as 3D/AF1F: buy 1 / 4 / 10 (FF3's discounts:
+  4p - 104p / 256, 10p - 510p / 256), not enough gil, 99 a slot, a free slot; sell 1 / all at
+  half price, key items and the toad / mini magic refused; FF3's cursor / confirm / error sounds.
+  GB layout (windows sharing borders, as FF1's GB shop): message 3 lines (rows 0-4), a band with
+  the choices (Buy / Sell / Exit, 1 / 4 / 10, 1 / All at FF3's columns) and the shop's name or
+  How many? beside the gil (rows 4-7), the eight goods one a row (rows 8-15: icon, name, price at
+  the right; the 135 names longer than ten letters drawn at build time in the condensed letters,
+  banks 85-87) or the inventory to sell (scrolling, name : count). Inns as 3C/8E8D: cost = living
+  members x 5 x the script's price, the question's pages in a box, Yes / No and the gil with its
+  last page, gil taken (or "You don't have enough money."), HP restored, then the inn's event.
+  Checked in PyBoy: buying (gil, inventory, discount prices), selling (75 Gil for a Potion),
+  the inn (40 Gil, HP to max). Fixed with it: t_num printed every number in text as 0 (chest
+  gil, prices); text code $04 (a price); menu strings ({0E}) unwrapped at 20 columns before the
+  18-column rewrap ("You're carrying too much to buy more." no longer leaves "too" alone).
+  Not yet: the shop's party sprites that show who can equip an item; the fat chocobo ($FC-).
+  Next: battle (its music comes with it), vehicles.
