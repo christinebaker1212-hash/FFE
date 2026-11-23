@@ -394,11 +394,8 @@ sp_1:       call g_init
             ld [GS + $00], a
             ret
 ; 2 / 3 (3B/A609, A631), then 3B/A5BE (128 frames, the walker spinning)
-sp_2:       call spa_2
-            jr sp_5be
-sp_3:       call spa_3
-sp_5be:     call sp_spin
-            jp spa_5be
+sp_2:       jp spa_2                        ; (each ends with 3B/A5BE: the walker spins)
+sp_3:       jp spa_3
 ; 4 (3B/A3EA, 3A/9A7B): Saronia's cannon balls, the airship shot down: off it, hidden, at (83, 71)
 ; on world 3
 sp_4:       call spa_4
@@ -466,34 +463,32 @@ sp_spin:    ld hl, GS + $2F
             ld [spin_c], a
             ret
 
-; the animations (for now: FF3's lengths in frames, the picture still)
-spa_0:      ld b, 64
-            jr spa_w
-spa_1:
-spa_4:
-spa_st:
-spa_5be:    ld b, 128
-            jr spa_w
-spa_2:      ld b, 243
-            call spa_w
-            ret
-spa_3:      ld b, 111
-            jr spa_w
-spa_9:      ld b, 64
-            call spa_w
-            ld b, 0
-            jr spa_w
-spa_a:
-spa_b:
-spa_c:
-spa_d:      ld b, 128
-spa_w:      push bc
-            call npc_drawall
-            call wait_vbl
-            pop bc
-            dec b
-            jr nz, spa_w
-            ret
+; the animations (anim.s, bank CODE6)
+spa_0:      ld hl, an_enter
+            jr spa
+spa_1:      ld hl, an_burst
+            jr spa
+spa_2:      ld hl, an_six
+            jr spa
+spa_3:      ld hl, an_sixteen
+            jr spa
+spa_4:      ld hl, an_saronia
+            jr spa
+spa_st:     ld hl, an_statue
+            jr spa
+spa_9:      ld hl, an_rise
+            jr spa
+spa_a:      ld hl, an_circa
+            jr spa
+spa_b:      ld hl, an_circb
+            jr spa
+spa_c:      ld hl, an_bahamut
+            jr spa
+spa_d:      ld hl, an_stars
+spa:        ld a, CODE6
+            jp far_call
+spa_5be:    ld hl, an_5be
+            jr spa
 
 ; ---- people's moves (3B/AB71, AC25, AC68): object fx_slot; drawn without moving, a frame each
 ; $xA / $xB a jump left / right over one tile (48 frames, heights 3B/AC0C)

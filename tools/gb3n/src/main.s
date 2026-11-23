@@ -229,7 +229,13 @@ main:       call wait_vbl
             ld [tst_choc], a
             ld a, b
             ld [ev_cmd], a
+            cp $F0                          ;   ($F0-$FF: special animation n)
+            jr nc, .na2
             call ev_misc
+            jp main
+.na2:       and $0F
+            ld [ev_par], a
+            call ev_spec
             jp main
 .na1:       cp $A5
             jr nz, .nt
@@ -301,6 +307,13 @@ main:       call wait_vbl
             call g_draw
             call npc_frame
             call veh_late
+            ldh a, [is_world]               ; (the world map's objects: anim.s)
+            and a
+            jr z, .nw
+            ld a, CODE6
+            ld hl, w_objs
+            call far_call
+.nw:
             ld a, DLG_TEST                  ; (test builds: A shows dialogue DLG_TEST of the
             and a                           ;   people's table)
             jr z, main

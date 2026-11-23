@@ -297,7 +297,13 @@ veh_a:      ld a, [VEH]
             cp 7
             jp z, veh_jump
             jp veh_land
-.choco:     xor a                           ; (the chocobo runs off)
+.choco:     ld a, $80                       ; (3E/C2E7: the chocobo runs off from (112, 111))
+            ld [ch_b0], a
+            ld a, $70
+            ld [ch_b1], a
+            ld a, $6F
+            ld [ch_b2], a
+            xor a
             ld [VEH], a
             jp snd_world
 .ship:      ld a, [GS + $20]                ; (the ship takes off as the Enterprise)

@@ -289,6 +289,10 @@ def engine_src(rom=None):
         c, r = split(rd(m))
         codes.append(c)
         rams.append(r)
+    codes.append('section bank %d, $4000' % CODE6)
+    c, r = split(rd('anim'))
+    codes.append(c)
+    rams.append(r)
     zp = ''.join('Z_%02X = $%04X\n' % (n, 0xFFB0 + n - 0x18) for n in range(0x18, 0x60))
     shadow = lambda t: t.replace('ld [MBC5_BANKL], a', 'ld [rom_bank], a\n            ld [MBC5_BANKL], a')
     return (open(os.path.join(ROOT, 'tools', 'gb3', 'rt', 'hw.s')).read() + '\n' + zp + shadow(main_code) + '\n' +
@@ -425,6 +429,13 @@ def main():
     cb.extend(bytes(0x4000 - len(cb)))
     assert not any(cb[0x2000:]), 'cutscene code past $6000'
     cb[0x2000:0x4000] = cut_hi
+    ab = r.banks.setdefault(CODE6, bytearray(0x4000))
+    ab.extend(bytes(0x4000 - len(ab)))
+    assert not any(ab[0x13C0:]), 'animation code past $53C0'
+    ab[0x13C0:0x1400] = rom.b(0x7E, 0xDCAA, 0x40)              # $53C0: 3E/DCAA vehicle frames
+    ab[0x1400:0x1800] = rom.b(0x3C, 0x8400, 0x400)             # $5400: 3C/8400-87FF sprite lists
+    ab[0x1800:0x2000] = rom.b(0x3A, 0x9800, 0x800)             # $5800: 3A/9800-9FFF
+    ab[0x2000:0x4000] = rom.b(0x3B, 0xA000, 0x2000)            # $6000: 3B
     size = 2
     while size < max(r.banks) + 1: size *= 2
     rom_bytes = make_rom(r.banks, 'FF3 NATIVE', cart_type=0x1B, rom_banks=size, ram_size_code=0x02, cgb=0xC0)
