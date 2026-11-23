@@ -292,13 +292,37 @@ aw:         push af
             dec hl
             ld [hl+], a
             pop de
-.ft:        pop af
+.ft:        pop af                          ; the triangle: a new note
             ld [hl+], a
             ld a, d
             ld [bc], a
+            ld e, a
+            ld a, [tri_on]
+            and a
+            jr z, .ftg
+            ld [hl], e                      ; sounding: the new pitch only, no restart (as the
+            jp .x                           ;   NES triangle, which keeps its phase; and a
+.ftg:       xor a                           ;   restart while the wave plays corrupts the
+            ldh [$FF1A], a                  ;   wave RAM on a plain Game Boy). Stopped: the
+            push hl                         ;   wave RAM written again (safe with the DAC off)
+            ld hl, snd_wave                 ;   and the note started
+            ld c, $30
+            ld b, 16
+.fw:        ld a, [hl+]
+            ldh [c], a
+            inc c
+            dec b
+            jr nz, .fw
+            pop hl
+            ld a, [tri_dac]
+            ldh [$FF1A], a
+            and a
+            jp z, .x                        ; (DAC off: no note, as before)
+            ld [tri_on], a
+            ld a, e
             or $80
             ld [hl], a
-            jr .x
+            jp .x
 ; HL = the period's bytes, C = channel -> A = GB frequency low, D = high; HL = NRx3; BC =
 ; its high-bits shadow
 .freq:      ld a, [hl+]
@@ -338,7 +362,7 @@ aw:         push af
             ld a, 0
             jr z, .toff
             ld a, $80
-.toff:      ldh [$FF1A], a
+.toff:      call nr30_w
             jp .x
 .tlc:       ld a, e                         ; (the countdown: the linear counter's (v + 3) / 4
             and $7F                         ;   frames or the length counter's len / 2,
@@ -356,10 +380,8 @@ aw:         push af
             ld a, e
 .tls:       ld [tri_lc], a
             ld a, $80
-            ldh [$FF1A], a
-            ret
-.tl0:       ldh [$FF1A], a
-            ret
+            jp nr30_w
+.tl0:       jp nr30_w
 .en:        bit 0, e                        ; $15: channels off
             jr nz, .e1
             xor a
@@ -371,9 +393,16 @@ aw:         push af
 .e2:        bit 2, e
             jp nz, .x
             xor a
-            ldh [$FF1A], a
+            call nr30_w
             jp .x
 snd_nrx3:   db $13, $18, $1D
+; NR30 = A (the wave channel's DAC): remembered; off also stops the channel (tri_on 0)
+nr30_w:     ldh [$FF1A], a
+            ld [tri_dac], a
+            and a
+            ret nz
+            ld [tri_on], a
+            ret
 
 section wram, $CFC0
 snd_sh:     ds 32                           ; the engine's register values (shadow)
@@ -400,6 +429,8 @@ tri_len:    ds 1                            ; its length counter (half frames, l
 snd_cv:     ds 2                            ; the pulses' GB volume now ($FF: unknown)
 snd_zmb:    ds 1                            ; 1: zombie mode works (volume steps), 0: restarts
 mus_cur:    ds 1                            ; the music track asked for last (main.s snd_track)
+tri_on:     ds 1                            ; the wave channel started and not stopped since
+tri_dac:    ds 1                            ; the last NR30 value
 
 ; ---- sound effects (FF1's, data from the ROM: sound.sfx_data). The square part plays on CH2
 ; while the music engine leaves its square 2 alone (sq2_sfx = NES_RAM + $7E, FF1's own
@@ -415,7 +446,7 @@ snd_frame_b:
             dec a
             ld [tri_lc], a
             jr nz, .nt
-            ldh [$FF1A], a
+            call nr30_w
 .nt:        ld a, [sfx_req]
             and a
             call nz, sfx_start

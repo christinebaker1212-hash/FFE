@@ -808,7 +808,9 @@ sv_any:     xor a
             inc a
             cp 3
             jr c, .l
-            scf                             ; (none)
+            xor a                           ; (none: file 1 for the hand)
+            ld [sv_slot], a
+            scf
             ret
 ; boot (from bank 2): each damaged file, Lot Check's error message, erased after the A Button
 sv_boot:    xor a
@@ -835,6 +837,8 @@ sv_boot:    xor a
             inc a
             cp 3
             jr c, .l
+            xor a
+            ld [sv_slot], a
             ret
 ; the picker in bank 99: C set if cancelled
 file_load:  xor a
@@ -856,6 +860,28 @@ opt_save0:  ld a, F3_BANK
             ld hl, opt_save
             jp bank_call
 
+; teleport A (0-63 normal, $80 + n entrance; COMMON mapped) lands inside a room behind a
+; door (build time: data.room_teles): the room state set for load_map, the door remembered
+; (owner, 2026-11-23: the room revealed before the party appears). Keeps C, DE, HL.
+room_chk:   push hl
+            ld hl, C_ROOMS
+            ld b, a
+.l:         ld a, [hl+]
+            cp $FF
+            jr z, .x
+            cp b
+            jr z, .f
+            inc hl
+            inc hl
+            jr .l
+.f:         ld a, [hl+]
+            ld [door_x], a
+            ld a, [hl]
+            ld [door_y], a
+            ld a, 1
+            ld [ml_room], a
+.x:         pop hl
+            ret
 ; wait for A or B (C set on B)
 wait_ab:    call oam_clr
 .w:         call scr_frame
@@ -1488,6 +1514,8 @@ fp_s_gil:   db " Gil", 0
 ; the screen
 fp_draw:    call scr_open
             call eqm_pal
+            ld a, [sv_slot]                 ; (fp_one reads each file through sv_slot: the
+            push af                         ;   file in use kept)
             xor a
 .k:         push af
             ld c, a
@@ -1505,6 +1533,8 @@ fp_draw:    call scr_open
             inc a
             cp 3
             jr c, .k
+            pop af
+            ld [sv_slot], a
             jp scr_show
 ; A = file -> B = 2, C = its first text row
 fp_row:     ld c, a
@@ -1733,6 +1763,7 @@ fp_mode:    ds 1                            ; the file screen: 0 load, 1 save
 fp_cur:     ds 1
 fp_k:       ds 1
 fp_buf:     ds 30
+ml_room:    ds 1                            ; load_map: arrive inside a room (main.s room_chk)
 section bank 99, $5600
 ; ---- the encounter transition (owner, 2026-11-22: from the WonderSwan Color remake, as raster
 ; effects any Game Boy can show): 26 frames of the map twisting and zooming towards the party,

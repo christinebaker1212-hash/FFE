@@ -76,6 +76,11 @@ bt_run:     call bt_ch_init
             ld [bt_msgon], a
             ld [bt_first], a
             ld [bt_result], a
+            ld hl, bt_cmd                   ; (no commands yet: a surprise round skips the
+            ld b, 16                        ;   party's choices, its members then do nothing)
+.cc:        ld [hl+], a
+            dec b
+            jr nz, .cc
             ld a, [bt_form + 13]            ; no-run formations: no surprise / first strike
             and 1
             jr nz, .loop

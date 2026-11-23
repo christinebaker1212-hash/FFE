@@ -99,6 +99,7 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, COMMON, 0x4000, c['spr_tiles'])
     place(banks, COMMON, 0x4100, c['mapman'])
     place(banks, COMMON, 0x4200, c['tele'])
+    place(banks, COMMON, 0x4340, c['rooms'])                  # teleports into rooms (C_ROOMS)
     place(banks, COMMON, 0x4400, c['objtbl'])                 # object 2x2 tables (64)
     place(banks, COMMON, 0x4500, c['init_unsram'])            # new game: save page 0
     place(banks, COMMON, 0x4600, c['init_flags'])             #   and the game flags
@@ -171,6 +172,7 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, OW_INFO, 0x7300, b'\0' * 64)                  # no objects
     place(banks, OW_INFO, 0x5100, o['mt_dmg'] + o['mt_dmg'])
     place(banks, OW_INFO, 0x5800, o['dmg_tiles'])
+    place(banks, OW_INFO, 0x7F00, o['font_tbl'])                 # (code $20: the black tile)
     place(banks, COMMON, 0x43C0, bytes([o['start'], o['start_y']]))
     for row in range(256):
         place(banks, OW_ROWS + row // 64, 0x4000 + (row % 64) * 256, o['rows'][row])

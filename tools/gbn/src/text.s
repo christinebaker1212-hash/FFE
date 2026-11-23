@@ -469,8 +469,13 @@ stat_int:   push af
             reti
 .wb:        cp 2                            ; the bottom: the window shown again; the music
             jr nc, .wm2
+            ld a, [wp_bot]                  ; (at the screen's bottom: nothing below it to
+            cp 144                          ;   cover; shown there, a late V-Blank left it
+            jr nc, .wm                      ;   over the whole next frame)
             ld a, 7
             ldh [rWX], a
+            ld a, LCDC_WIN
+            ldh [rLCDC], a
 .wm:        ld a, 2
             ld [wp_st], a
             jr .mus

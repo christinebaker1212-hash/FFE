@@ -297,7 +297,10 @@ def ow_pack(rom, cls=0):
             if key not in var:
                 var[key] = len(var); dmg += gb_tile(chr_[16 * nt:16 * nt + 16], key[1])
             tbl[128 * k + mt] = var[key]
-    assert len(var) <= 256
+    assert len(var) < 256
+    black = len(var)                            # a solid shade-3 tile: the screen wipe's
+    dmg += b'\xff' * 16                         #   curtains on the overworld (DMG / SGB)
+    font_tbl = bytearray(128); font_tbl[0x20] = black
     sppal = [[pal[0x10]] + list(pal[0x10 + 4 * p + 1:0x10 + 4 * p + 4]) for p in range(4)]
     spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)
     party = b''.join(spr_rank_tile(spr[16 * t:16 * t + 16], sppal[t >> 1 & 1]) for t in range(16))
@@ -312,7 +315,7 @@ def ow_pack(rom, cls=0):
                 cgb_obj=b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in sppal[p]),
                 veh_cgb=b''.join(gb_tile(vch[16 * t:16 * t + 16]) for t in range(96)),
                 veh_dmg=b''.join(spr_rank_tile(vch[16 * t:16 * t + 16], sppal[2]) for t in range(96)),
-                mt_dmg=bytes(tbl), dmg_tiles=bytes(dmg),
+                mt_dmg=bytes(tbl), dmg_tiles=bytes(dmg), font_tbl=bytes(font_tbl),
                 rows=rows, sgb=sgb_cols(bg, chr_, tsa, mt_pal, freq),
                 nes_bg=bytes(c for p in range(4) for c in bg[p]) * 2,
                 start=(rom.rd(BANK_SMINFO, INIT_UNSRAM + 0x10) + 7) & 0xFF,
@@ -363,6 +366,45 @@ def map_objects(rom, m, n_bg, sppal):
     return dict(slots=bytes(slots), blocks=bytes(blocks), dmg=bytes(dmg), cgb=bytes(cgb))
 
 
+def room_teles(rom):
+    """teleports that land inside a room behind a door (owner, 2026-11-23: the room shown when
+    the party arrives): from the destination, the tiles reachable without passing a door; a
+    room when that area meets a door and no room-exit tile (FF1's TP_SPEC_CLOSEROOM, which lies
+    outside the doors) and is small (a town's open ground can meet doors only). List of
+    (teleport: 0-63 normal, $80 + n entrance; door x, y), $FF at the end"""
+    from collections import deque
+    out = bytearray()
+    lists = [(i, rom.rd(BANK_SMINFO, NORM_TELE_MAP + i), rom.rd(BANK_SMINFO, NORM_TELE_X + i),
+              rom.rd(BANK_SMINFO, NORM_TELE_Y + i)) for i in range(64)]
+    lists += [(0x80 + i, rom.rd(BANK_SMINFO, ENTR_TELE_MAP + i), rom.rd(BANK_SMINFO, ENTR_TELE_X + i),
+               rom.rd(BANK_SMINFO, ENTR_TELE_Y + i)) for i in range(32)]
+    for k, m, x, y in lists:
+        if m >= 61 or (x, y) == (0, 0):
+            continue
+        t = tileset_pack(rom, rom.rd(BANK_SMINFO, TILESETS + m)); mp = std_map(rom, m)
+        prop = lambda a, b: t['prop'][2 * mp[64 * (b % 64) + a % 64]]
+        q = deque([(x, y)]); seen = {(x, y)}; doors = []; close = False
+        while q:
+            a, b = q.popleft()
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = ((a + dx) % 64, (b + dy) % 64)
+                if n in seen:
+                    continue
+                p = prop(*n); sp = p & 0x1E
+                if sp in (2, 4):
+                    if n not in doors: doors.append(n)
+                    continue
+                if sp == 6:
+                    close = True; continue
+                if p & 1:
+                    continue
+                seen.add(n); q.append(n)
+        if doors and not close and len(seen) < 400:
+            out += bytes([k, doors[0][0], doors[0][1]])
+    assert len(out) < 0x7F
+    return bytes(out) + b'\xff'
+
+
 def common_pack(rom, cls=0):
     """the party sprite, FF1's sprite tables, the teleport tables"""
     spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)
@@ -370,7 +412,7 @@ def common_pack(rom, cls=0):
     tele += rom.rd(BANK_SMINFO, EXIT_TELE_X, 16) + rom.rd(BANK_SMINFO, EXIT_TELE_Y, 16)
     tele += b''.join(rom.rd(BANK_SMINFO, a, 32) for a in (ENTR_TELE_X, ENTR_TELE_Y, ENTR_TELE_MAP))
     return dict(spr_tiles=b''.join(gb_tile(spr[16 * t:16 * t + 16]) for t in range(16)),
-                mapman=mapman_table(rom), tele=tele, objtbl=obj_tables(rom),
+                mapman=mapman_table(rom), tele=tele, objtbl=obj_tables(rom), rooms=room_teles(rom),
                 init_unsram=rom.rd(BANK_SMINFO, INIT_UNSRAM, 256),
                 init_flags=rom.rd(BANK_SMINFO, INIT_FLAGS, 256))
 

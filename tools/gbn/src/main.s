@@ -67,6 +67,7 @@ M_TILES    = $5800
 C_SPR      = $4000
 C_MAPMAN   = $4100
 C_TELEX    = $4200
+C_ROOMS    = $4340          ; teleports into rooms: (teleport, door x, y) .. $FF
 TP_NOMOVE  = $01
 MT_CLOSED  = $36            ; FF1's door metatiles (MAPTILE_CLOSEDDOOR / OPENDOOR / LOCKEDDOOR)
 MT_OPEN    = $37
@@ -436,8 +437,10 @@ load_map:   push af
             ld [px], a
             ld a, e
             ld [py], a
-            xor a
+            ld a, [ml_room]                 ; (a teleport into a room: shown from the start)
             ld [inroom], a
+            xor a
+            ld [ml_room], a
             ld [moving], a
             ld [mcount], a
             ld [mdx], a
@@ -486,7 +489,7 @@ load_map:   push af
 .t1:
             ld a, [map_bank]
             call sbank
-            ld hl, M_BGOUT
+            call room_bgp                   ; (inside a room after a teleport: its colours)
             ld a, $80
             call cgb_pal32
             ld a, $80                       ; OBJ palettes 0-3 (NES sprite palettes)
@@ -642,25 +645,6 @@ pal_blk:    push af                         ; B bytes (a masked load: into the s
             jr nz, .q
             ret
 
-; V-Blank, CGB: the BG palettes for the room state
-bg_pal:     xor a
-            ldh [pal_req], a
-            ld a, [pc_hold]                 ; (a palette cycle in progress: its own colours)
-            and a
-            ret nz
-            ldh a, [is_cgb]
-            and a
-            ret z
-            ld a, [map_bank]
-            call sbank
-            ld hl, M_BGOUT
-            ld a, [inroom]
-            and a
-            jr z, .o
-            ld hl, M_BGIN
-.o:         ld a, $80
-            call cgb_pal32
-            jp text_pals                    ; (the windows' palette 7 and black 5 again)
 
 ; ---- movement on a standard map (FF1: one metatile in 16 frames, a pixel a frame)
 move:       ld a, [moving]
@@ -1119,6 +1103,9 @@ arrived:    ld a, [px]
             ld l, a
             ld a, COMMON
             call sbank
+            ld a, l
+            or $80
+            call room_chk
             ld h, high(C_ENTRX)
             ld a, l
             add a, low(C_ENTRX)
@@ -1187,6 +1174,8 @@ do_tele:    push de                         ; push this floor
 .nf:        pop de
             ld a, COMMON
             call sbank
+            ld a, e
+            call room_chk
             ld l, e
             ld h, high(C_TELEX)
             ld a, [hl]                      ; x
@@ -1284,33 +1273,6 @@ door_draw:  ld a, [door_x]
 
 ; room state changed: CGB palettes in the next V-Blank; DMG: the visible metatiles again with
 ; the other pre-shaded tiles (the lines entering later are drawn with the new state anyway)
-room_redraw:
-            ld a, 1
-            ldh [pal_req], a
-            ldh a, [is_cgb]
-            and a
-            ret nz
-            ld a, [py]
-            sub 5
-            ld d, a
-            ld b, 11
-.r:         ld a, [px]                      ; (11 x 11: the view and the line the step
-            sub 5                           ;   brings in)
-            ld e, a
-            ld c, 11
-.c:         push bc
-            push de
-            call q_mt
-            pop de
-            pop bc
-            inc e
-            dec c
-            jr nz, .c
-            inc d
-            dec b
-            jr nz, .r
-            ret
-
 ; ---- metatile number at (E = x, D = y) of the map (the map bank left mapped)
 map_at:     ldh a, [maptype]
             and a
@@ -2150,6 +2112,56 @@ ow_abutton: ld a, [vehicle]
             ld a, V_FOOT
             ld [vehicle], a
             jp map_music
+
+section bank 0, $2540                       ; (main.s continued: room redraw, room palettes)
+; V-Blank, CGB: the BG palettes for the room state
+bg_pal:     xor a
+            ldh [pal_req], a
+            ld a, [pc_hold]                 ; (a palette cycle in progress: its own colours)
+            and a
+            ret nz
+            ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, [map_bank]
+            call sbank
+            call room_bgp
+            ld a, $80
+            call cgb_pal32
+            jp text_pals                    ; (the windows' palette 7 and black 5 again)
+; HL = the map's CGB BG palettes for the room state (map bank mapped)
+room_bgp:   ld hl, M_BGOUT
+            ld a, [inroom]
+            and a
+            ret z
+            ld hl, M_BGIN
+            ret
+room_redraw:
+            ld a, 1
+            ldh [pal_req], a
+            ldh a, [is_cgb]
+            and a
+            ret nz
+            ld a, [py]
+            sub 5
+            ld d, a
+            ld b, 11
+.r:         ld a, [px]                      ; (11 x 11: the view and the line the step
+            sub 5                           ;   brings in)
+            ld e, a
+            ld c, 11
+.c:         push bc
+            push de
+            call q_mt
+            pop de
+            pop bc
+            inc e
+            dec c
+            jr nz, .c
+            inc d
+            dec b
+            jr nz, .r
+            ret
 
 section bank 0, $1480                       ; (the screen fades)
 ; ---- the screen fades (owner, 2026-11-22: consistent, stylish transitions): every menu,
@@ -3280,11 +3292,12 @@ wp_vbl:     xor a                           ; (the window enabled all frame, sho
             call lcd_get  
             bit 7, a
             ret z
-            ld a, LCDC_WIN
-            ldh [rLCDC], a
             ld a, [wp_top]
             and a
             jr z, .z
+            ld a, LCDC_WIN
+            ldh [rLCDC], a
+            ld a, [wp_top]
             dec a
             ldh [rLYC], a
             xor a
@@ -3292,7 +3305,9 @@ wp_vbl:     xor a                           ; (the window enabled all frame, sho
             ld a, 7
             ldh [rWX], a
             ret
-.z:         ld a, 1
+.z:         ld a, LCDC_ON | $40             ; (no band at the top: the window off until the
+            ldh [rLCDC], a                  ;   bottom edge; parked at WX 167 instead, it
+            ld a, 1                         ;   covered the whole frame on hardware)
             ld [wp_st], a
             ld a, [wp_bot]
             ldh [rLYC], a
