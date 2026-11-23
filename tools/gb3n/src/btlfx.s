@@ -1709,7 +1709,8 @@ mx_other:   cp 2
             jr nz, .w
             ret
 .t:         dw mx_front, mx_back, mx_defend, mx_jump1, mx_jump2, mx_build, mx_scare, mx_cheer
-            dw .p, mx_run
+            dw mx_cannon, mx_run
+mx_cannon:  jp sm_cannon                    ; (btlsum.s)
 ; 2F/B443 / B42A the member to the front / back row (16 pixels, walked)
 mx_front:   xor a
             ld b, $F0

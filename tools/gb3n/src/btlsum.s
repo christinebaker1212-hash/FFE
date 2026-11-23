@@ -801,8 +801,9 @@ sm_mega:    ld b, 60
             cp $40
             jr nz, .f
             call mx_eclr
-; 32/8547 the palettes back, then the explosion step once more (FF3 falls through)
+; 32/8547 the palettes back, a frame
 sm_8547:    call sm_prest
+            jp ba_vblc
 ; 32/854D: (cannon: the animation sprites; mega flare: all) cleared; on even steps $90 / $91
 ; advance (0: a new random place), the explosions drawn (32/8F8F frames)
 sm_854d:    call mx_eclr
@@ -850,7 +851,15 @@ sm_854d:    call mx_eclr
             ld l, a
             ld de, N32S
             add hl, de
-            jp sm_list
+            ld a, [W7 + $7ED5]              ; (32/85EC: the cannon's tiles + $38)
+            and a
+            jr z, .t
+            ld a, $38
+.t:         ld [sm_off], a
+            call sm_list
+            xor a
+            ld [sm_off], a
+            ret
 ; 32/85F8 / 8600 a random place: x 16-128, y 47-111 (FF3's random, counter 0) -> $8C / $8D, $8E / $8F
 sm_pos1:    call sm_rpos
             ld a, b
@@ -878,6 +887,101 @@ sm_rpos:    xor a
             ld c, a
             pop af
             ld b, a
+            ret
+
+; ---- 32/84D7 animation function $19: the cannon: the ball's arc (vector 0, 32 frames), then
+; 96 frames of an explosion at FF3's random places (tiles + $38), BG palettes lit red
+sm_cannon:  call sm_psave
+            ld a, $D9
+            call ba_pal3
+            ld a, $0F
+            call sm_gfx0
+            call s16_start
+            call mx_vres
+            ld a, $60
+            call mx_vdall
+            xor a
+            ld [BZ + $8C], a
+            ld e, 0
+            ld a, $C0
+            call mx_vaadd
+            xor a
+            ld [BZ + $B6], a
+            ld a, $80
+            ld [S49], a
+.f:         call mx_eclr
+            ld hl, BZ + $8C
+            dec [hl]
+            dec [hl]
+            dec [hl]
+            ld e, 0
+            call mx_vy
+            ld [BZ + $8D], a
+            ld e, 0
+            ld a, $FE
+            call mx_vaadd
+            call .ball
+            call mx_wait
+            call ba_inc
+            cp $20
+            jr nz, .f
+            call mx_eclr
+            ld a, $BD
+            call ba_pal3
+            call sm_pos1
+            ld a, 2
+            ld [W7 + $7ED5], a
+            ld [BZ + $90], a
+.x:         call sm_854d
+            call s16_build
+            ld a, [BZ + $8F]
+            push af
+            ld a, $16
+            ld [sm_t], a
+            ld c, 0
+            call sm_cyc1
+            ld c, 4
+            call sm_cyc1
+            pop af
+            ld [BZ + $8F], a
+            call ba_vblc
+            call ba_inc
+            cp $60
+            jr nz, .x
+            call mx_eclr
+            call sm_8547
+            jp s16_stop
+.ball:      ld a, 2                         ; 32/848E: 4 sprites (32/91D7) at ($B0 + $8C, $60 + $8D),
+            ld [ba_mode], a                 ;   tiles $4D-
+            ld hl, $91D7 + N32S
+            ld d, $4D
+            ld b, 4
+.s:         push bc
+            ld a, [hl+]
+            add a, $60
+            ld c, a
+            ld a, [BZ + $8D]
+            adc a, c
+            ld c, a
+            inc hl
+            ld a, [hl+]
+            or 3
+            ld e, a
+            ld a, [hl+]
+            add a, $B0
+            ld b, a
+            ld a, [BZ + $8C]
+            adc a, b
+            ld b, a
+            push hl
+            push de
+            call mx_put
+            pop de
+            pop hl
+            inc d
+            pop bc
+            dec b
+            jr nz, .s
             ret
 
 ; 32/8781 the backdrop A every 4 frames for B frames
@@ -981,7 +1085,9 @@ sm_list:    ld a, [hl]
             ld a, [BZ + $81]
             add a, c
             ld c, a
-            ld a, [hl+]
+            ld a, [sm_off]
+            add a, [hl]
+            inc hl
             ld d, a
             ld a, [hl+]
             ld e, a
@@ -1150,3 +1256,4 @@ sm_t:       ds 1
 sm_x0:      ds 1
 sm_y0:      ds 1
 sm_fl:      ds 1
+sm_off:     ds 1
