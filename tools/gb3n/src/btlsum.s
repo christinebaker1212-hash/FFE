@@ -51,10 +51,7 @@ sm_main:    xor a
             jr .pf
 .p2:        ld a, 2
 .pf:        ld [W7 + $7E90], a
-            ld hl, W7 + $7D27               ; (the attribute table kept: $7440)
-            ld de, W7 + $7440
-            ld bc, $40
-            call memcpy
+            call sm_asave                   ; (the attribute table kept: FF3's $7440)
             ld a, [W7 + $7E99]
             ld [W7 + $7E8F], a
             call mon_flash
@@ -417,22 +414,46 @@ sm_attack:  ld a, [W7 + $7E91]
             ld a, [hl+]
             ld h, [hl]
             ld l, a
-            call .j
+            call sm_jhl
             ld a, [sm_fl]                   ; (the flash kept: the attribute table back)
             and a
             ret z
             xor a
             ld [sm_fl], a
-            ld hl, W7 + $7440
-            ld de, W7 + $7D27
-            ld bc, $40
-            call memcpy
+            call sm_arest
             jp attr_push
-.j:         jp hl
-sm_tab:     dw sm_dash, sm_shk, sm_kick, sm_hold, sm_hold, sm_hold
+; the attribute table ($7D27, 64) kept in WRAM 7 / back (attr_push builds its rows at $7300-)
+sm_asave:   ld hl, W7 + $7D27
+            ld de, $D000
+            jr sm_a7
+sm_arest:   ld hl, $D000
+            ld de, W7 + $7D27
+            ld a, 7
+            ld c, 3
+            jr sm_a7b
+sm_a7:      ld a, 3
+            ld c, 7
+sm_a7b:     ld b, $40
+.l:         ldh [rSVBK], a
+            push af
+            ld a, [hl+]
+            push af
+            ld a, c
+            ldh [rSVBK], a
+            pop af
+            ld [de], a
+            inc de
+            pop af
+            dec b
+            jr nz, .l
+            ld a, 3
+            ldh [rSVBK], a
+            ret
+sm_jhl:     jp hl
+sm_tab:     dw sm_dash, sm_shk, sm_kick, sm_hold, sm_icy, sm_hold
             dw sm_mind, sm_thun, sm_thun, sm_heal, sm_hold, sm_hold
-            dw sm_clob, sm_stomp, sm_quake, sm_hold, sm_hold, sm_hold
-            dw sm_hold, sm_hold, sm_hold, sm_hold, sm_rend, sm_hold
+            dw sm_clob, sm_stomp, sm_quake, sm_prot, sm_slash, sm_zan
+            dw sm_demon, sm_hold, sm_tidal, sm_aura, sm_rend, sm_hold
 ; (not yet ported: the creature holds 48 frames, then goes)
 sm_hold:    ld b, 48
 .w:         push bc
@@ -591,6 +612,140 @@ sm_thun:    call sm_psave
             call mx_eclr
             ld a, $2A
             jp mx_b943
+; $04 icy stare / $10 slash: 48 frames, BG palette 2 in palette $E8 every other 4 frames
+sm_icy:
+sm_slash:   ld hl, BZ + $C9
+            inc [hl]
+            call sm_psave
+            call attr_push
+            xor a
+            ld [BZ + $B6], a
+.f:         ld a, [BZ + $B6]
+            and 4
+            jr nz, .r
+            ld a, $E8
+            ld c, $09
+            call sm_pal
+            jr .s
+.r:         call sm_prest
+.s:         call sm_drawb
+            call ba_vblc
+            call ba_inc
+            cp $30
+            jr nz, .f
+            ret
+; $12 demon eye: (hit) the backdrop flashed light blue, the attributes shown, 16 frames
+sm_demon:   ld a, [W7 + $7E9B]
+            and a
+            ret z
+            ld hl, BZ + $C9
+            inc [hl]
+            ld a, $31
+            ld b, $20
+            call sm_bkfl
+            call attr_push
+            jp sm_w16
+; $0F protective light: blue-green; $15 aura: light blue
+sm_prot:    ld a, $2B
+            jr sm_fl2
+sm_aura:    ld a, $31
+sm_fl2:     ld b, $20
+            jp sm_bkfl
+; $11 zantetsuken: (not the escape check) 16 frames, the slash (the monsters' palettes faded),
+; then every target's experience counted and all monster slots cleared (FF3 skips the death
+; animation)
+sm_zan:     ld a, [W7 + $7E93]
+            and a
+            ret nz
+            call sm_w16
+            ld hl, BZ + $C9
+            inc [hl]
+            xor a                           ; (32/8BBC: 96 frames; the last 32 fade the monsters'
+            ld [BZ + $B6], a                ;   palettes every 8: FF3 slices the screen meanwhile)
+.f:         ld a, [BZ + $B6]
+            and $C0
+            jr z, .n
+            ld a, [BZ + $B6]
+            and 7
+            jr nz, .n
+            ld hl, W7 + $7CF7               ; (32/8C70: BG colours - $10, or black)
+            ld b, 8
+.c:         ld a, [hl]
+            and $F0
+            ld a, $0F
+            jr z, .k
+            ld a, [hl]
+            sub $10
+.k:         ld [hl+], a
+            dec b
+            jr nz, .c
+.n:         call sm_drawb
+            call ba_vblc
+            call ba_inc
+            cp $60
+            jr nz, .f
+            ld a, [W7 + $7E99]
+            ld c, a
+            ld b, 0
+.t:         sla c
+            jr nc, .t1
+            ld e, b
+            ld d, 0
+            ld hl, W7 + $7DA7
+            add hl, de
+            ld a, [hl]
+            cp $FF
+            jr z, .t1
+            ld e, a
+            ld hl, W7 + $7DD3
+            add hl, de
+            inc [hl]
+.t1:        inc b
+            ld a, b
+            cp 8
+            jr nz, .t
+            ld hl, W7 + $7DA7
+            ld b, 8
+            ld a, $FF
+.z:         ld [hl+], a
+            dec b
+            jr nz, .z
+            jp mon_redraw
+; $14 tidal wave: graphics $11 + $B160, 60 frames, Leviathan leaves, 16 frames, then 63 frames
+; of the battlefield shaken (FF3's random each frame: the waves' sprites later)
+sm_tidal:   ld hl, $B160
+            ld a, $11
+            call sm_gfx
+            ld b, 60
+.w:         push bc
+            call mx_wait
+            pop bc
+            dec b
+            jr nz, .w
+            call sm_out
+            call sm_w16
+            call mx_eclr
+            ld a, $BC
+            call ba_pal3
+            ld hl, BZ + $C9
+            inc [hl]
+            ldh a, [scx]
+            ld [sm_t], a
+            ld b, 63
+.s:         push bc
+            call mx_wait
+            call ba_rnd255
+            and 3
+            ld hl, sm_t
+            add a, [hl]
+            ldh [scx], a
+            pop bc
+            dec b
+            jr nz, .s
+            ld a, [sm_t]
+            ldh [scx], a
+            ret
+
 ; 32/8781 the backdrop A every 4 frames for B frames
 sm_bkfl:    ld [sm_t], a
 .f:         push bc
