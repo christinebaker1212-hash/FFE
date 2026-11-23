@@ -360,6 +360,16 @@ b_div10:    ld hl, 0
 
 ; a call into the other battle bank (from a stub: [fx_a] = A, [fx_t] = the routine, A = its
 ; bank): A, BC, DE passed; A, F, BC, DE, HL returned; the caller's bank back
+; the compact stubs: call far_s / db bank / dw routine (A, BC, DE passed; A, F, HL returned)
+far_s:      ld [fx_a], a
+            pop hl
+            ld a, [hl+]
+            push af
+            ld a, [hl+]
+            ld [fx_t], a
+            ld a, [hl]
+            ld [fx_t + 1], a
+            pop af
 far_x:      ld [fx_b], a
             ld a, [code_bank]
             push af

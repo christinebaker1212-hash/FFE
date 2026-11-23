@@ -278,8 +278,7 @@ def engine_src(rom=None):
         return t
     cs = [[xcalls(c, bank) for c, _ in ss] for (bank, _), ss in zip(bb, srcs)]
     codes.insert(len(MODULES), ''.join(
-        '%s__f: ld [fx_a], a\n ld a, low(%s)\n ld [fx_t], a\n ld a, high(%s)\n ld [fx_t + 1], a\n'
-        ' ld a, %d\n jp far_x\n' % (n, n, n, b) for n, b in sorted(used.items())))
+        '%s__f: call far_s\n db %d\n dw %s\n' % (n, b, n) for n, b in sorted(used.items())))
     for (bank, _), c1, ss in zip(bb, cs, srcs):
         codes.append('section bank %d, $4000' % bank)
         for c, (_, r) in zip(c1, ss):
