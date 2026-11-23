@@ -1468,7 +1468,8 @@ file_pick:  ld a, [sv_slot]                 ; (the hand on the file used last)
             jr nz, .save
             call sfx_err                    ; (nothing to load there)
             jr .l
-.over:      call fp_clr                     ; Save over File k? A / B
+.over:      ld a, [fp_cur]                  ; Save over File k? A / B (that file's rows
+            call fp_clr                     ;   cleared: A held fp_mode, so File 2's were)
             ld a, [fp_cur]
             call fp_row
             push bc
