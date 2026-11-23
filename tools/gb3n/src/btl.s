@@ -26,6 +26,7 @@ btl_main:   call btl_flash
             ld [W7 + $74C6], a
             call btl_init
             call init_cm                    ; (34/9CE3 init characters / monsters)
+; [TEST]
             ld a, [btl_fba]                 ; (test hook: btl_fba = $88 forces a back attack)
             cp $88
             jr nz, .nf
@@ -35,6 +36,7 @@ btl_main:   call btl_flash
             ld [W7 + $78BA], a
             xor a
             ld [btl_fba], a
+; [/TEST]
 .nf:
             call oam_hide                   ; (2E/9F8D clear oam data)
             call bg_init
@@ -189,10 +191,13 @@ btl_init:   ld a, [W7 + $7ED8]
 
 ; FFC27: the battle's random table ($7BE3, 256 bytes) from a seed (FF3: the sum of its zero page;
 ; here the field's random counters and the frame count stand in for it)
-rng_init:   ld a, [btl_seedf]               ; (test hook: btlcmp.py sets the NES's seed)
+rng_init:
+; [TEST]
+            ld a, [btl_seedf]               ; (test hook: btlcmp.py sets the NES's seed)
             cp $A5
             ld a, [btl_seedv]
             jr z, .sd
+; [/TEST]
             ld a, [rnd_f5]
             ld b, a
             ld a, [rnd_f6]

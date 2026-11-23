@@ -196,6 +196,7 @@ def nes_rgb_src():
         '    dw %s\n' % ', '.join(str(x) for x in v[k:k + 8]) for k in range(0, 64, 8))
 
 
+RELEASE = False
 MODULES = ('npc', 'text', 'event', 'menucore', 'select', 'snd', 'enc', 'btlbase', 'veh', 'guest')   # bank 0
 SND_BANK0 = 81                          # sound: FF3 bank $36 at $4000 + a song bank ($37, $38, $39,
                                         #   $09) at $6000: banks 81-84
@@ -229,7 +230,11 @@ CODE1 = 80
 def engine_src(rom=None):
     """main.s's code, then each module's code (its `section bank 0` lines dropped: the code
     continues in bank 0), then all RAM sections"""
-    rd = lambda n: open(os.path.join(HERE, 'src', n + '.s')).read()
+    def rd(n):                          # (--release: the test hooks' blocks left out)
+        t = open(os.path.join(HERE, 'src', n + '.s')).read()
+        if RELEASE:
+            t = re.sub(r'; \[TEST\].*?; \[/TEST\]\n', '', t, flags=re.S)
+        return t
     def split(t):
         i = t.find('\nsection wram')
         return (t, '') if i < 0 else (t[:i], t[i:])
@@ -310,6 +315,9 @@ def gb_text_syms(rom):
 
 def main():
     args = sys.argv[1:]
+    global RELEASE
+    if '--release' in args:
+        args.remove('--release'); RELEASE = True
     opt = {'--map': '', '--group': '0', '--x': '255', '--y': '255', '--dlg': '', '--song': '',
            '--out': os.path.join(ROOT, 'build', 'ff3n.gbc')}
     pos = []
@@ -472,7 +480,10 @@ def main():
     while size < max(r.banks) + 1: size *= 2
     rom_bytes = make_rom(r.banks, 'FF3 NATIVE', cart_type=0x1B, rom_banks=size, ram_size_code=0x02, cgb=0xC0)
     open(opt['--out'], 'wb').write(rom_bytes)
-    open(os.path.splitext(opt['--out'])[0] + '.sym', 'w').write(r.sym_file() + ''.join('ff:%04x %s\n' % (a, n) for n, a in sorted(r.labels.items()) if n not in r.label_bank and isinstance(a, int)))
+    uni = ''.join('%02x:4000 uniform_data_%d\n' % (b, b) for b in range(len(rom_bytes) // 0x4000)
+                  if len(set(rom_bytes[b * 0x4000:(b + 1) * 0x4000])) == 1 and rom_bytes[b * 0x4000] != 0xFF
+                  and b in r.banks)                # (data banks of one value, e.g. open sea: lotcheck.py)
+    open(os.path.splitext(opt['--out'])[0] + '.sym', 'w').write(r.sym_file() + uni + ''.join('ff:%04x %s\n' % (a, n) for n, a in sorted(r.labels.items()) if n not in r.label_bank and isinstance(a, int)))
     print('wrote %s: %d KB, %d layouts, %d tile sets; start map %s group %s'
           % (opt['--out'], len(rom_bytes) // 1024, nl, nc, opt['--map'], opt['--group']))
 

@@ -162,7 +162,7 @@ start:      di
             ei
             ld a, TITLE                     ; the boot screens (tests: build.py --map / --group)
             and a
-            jr z, .test
+            jr z, .direct
             ld a, CODE1
             ld hl, tl_flow
             call far_call
@@ -204,7 +204,7 @@ start:      di
             add a, 7
             ld [py], a
             jr .go
-.test:      ld a, START_GRP
+.direct:    ld a, START_GRP
             ld [cur_grp], a
             cp 3                            ; (the world: group 0 / 1 = world 0 / 1, 2 = world 2,
             jr c, .wd                       ;   3 + w = world map w)
@@ -250,7 +250,10 @@ main:       call wait_vbl
             ld a, 1
             call dlg_show
             jr main
-.na:        ld a, [tst_choc]                ;   (test hooks: $A5 opens the fat chocobo, $D0-$E3
+
+.na:
+; [TEST] (test hooks: removed by build.py --release)
+            ld a, [tst_choc]                ;   (test hooks: $A5 opens the fat chocobo, $D0-$E3
             cp $D0                          ;     runs that event command)
             jr c, .na1
             ld b, a
@@ -274,6 +277,7 @@ main:       call wait_vbl
             ld hl, choc_open
             call far_call
             jr main
+; [/TEST]
 .nt:        ld a, [ev_on]                   ;   an event: one command, its party moves only
             and a
             jr z, .inp

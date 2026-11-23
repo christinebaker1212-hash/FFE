@@ -18,7 +18,7 @@ SOURCES = {
             'tools/gb/build.py'],
     'ff2': ['script/ff2/*.json', 'translations/ff2*.py', 'translations/ff2/*', 'tools/ff2/insert.py', 'tools/gb2/*.py'],
     'ff3': ['script/ff3/*.json', 'translations/ff3*.py', 'translations/ff3/*', 'tools/ff3/insert.py', 'tools/gb3/layout.py',
-            'tools/gb3/build.py'],
+            'tools/gb3/build.py', 'tools/gb3n/title.py', 'tools/gb3n/menu.py', 'tools/gb3n/shop.py'],
 }
 BAD = [
     (r'\bGame ?boy\b|\bGameBoy\b|\bgame boy\b', 'Game Boy'),

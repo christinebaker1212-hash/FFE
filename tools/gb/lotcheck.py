@@ -60,9 +60,15 @@ def main():
     check('entry point $0100: nop / jp', d[0x100] == 0x00 and d[0x101] == 0xC3,
           '%02X %02X %02X %02X' % tuple(d[0x100:0x104]))
     bad_fill = []; bad_tail = []
+    symf = os.path.splitext(a.rom)[0] + '.sym'           # (banks the builder marks as data of one
+    data = set()                                          #  value: `uniform_data_N` at N:4000)
+    if os.path.exists(symf):
+        for l in open(symf):
+            p = l.split()
+            if len(p) == 2 and p[1].startswith('uniform_data_'): data.add(int(p[0].split(':')[0], 16))
     for b in range(len(d) // 0x4000):
         bank = d[b * 0x4000:(b + 1) * 0x4000]
-        if len(set(bank)) == 1 and bank[0] != 0xFF: bad_fill.append(b)
+        if len(set(bank)) == 1 and bank[0] != 0xFF and b not in data: bad_fill.append(b)
     check('unused banks filled with $FF', not bad_fill, 'banks %s' % bad_fill if bad_fill else '')
     if a.release:
         tp = g['test_pad']
