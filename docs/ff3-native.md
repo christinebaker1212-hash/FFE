@@ -288,3 +288,19 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   the save block $6000-$63FF identical. Not yet: Item / Magic / job commands for the members,
   run / escape actions, confusion / sleep actions, bosses' graphics, back attacks, the walk-in,
   attack / spell animations (a pause for now), summons' animations.
+- 2026-11-23 (later): battle commands Item (35/ADAF: FF3's hand / inventory grid, swaps with the
+  two-hand, shield and arrow rules, items used with their targets) and Magic (35/B648: the spell
+  list from the learned bits, X for spells the job can't cast, MP per level) in the owner's tall
+  list window; the job commands (jump, terrain, peep, scan, steal, buildup, sing, scare, cheer)
+  and their actions, run / escape, asleep / paralysed / confused members; bosses (2A/8000
+  tilemaps, 2E/9068 graphics, 2E/8FC0 attribute data: Land Turtle as the NES), event battles
+  ($F7), back attacks (mirrored battlefield, the party on the left), the battle's end (Fanfare
+  with the cheer, Requiem). Battle code now in banks 89 / 110 / 111 with bank-0 stubs. Checks:
+  battles $00-$04 end to end with the save block identical to the NES, $05-$08 the same defeat.
+- 2026-11-23 (later): **vehicles** (`src/veh.s`, FF3 bank 3E): the vehicle in $600F, passability
+  by vehicle, canoe / ship boarding and getting off (the ship parked), airships boarded with A,
+  the ship taking off as the Enterprise, landing by FF3's landing masks, speeds, the vehicle and
+  parked-vehicle sprites (0B/8800), the event commands $CA / $CB / $CE / $CF, the Invincible's
+  inside (A beside it, B aboard). Not yet: the Invincible's sprite and jump, the Nautilus diving /
+  surfacing, the floating continent's edge, lift-off / landing animations, the chocobo running
+  off, the fat chocobo.

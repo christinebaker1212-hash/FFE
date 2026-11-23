@@ -609,7 +609,32 @@ ev_pl_cmd:  and $0F
             ld a, [hl]
             ld [facing], a
             ret
-.x:         ret                             ; (show / hide, vehicles, guest: later)
+.x:         cp $0A                          ; CA: the Nautilus (6), CB: the Invincible (7)
+            jr z, .v6
+            cp $0B
+            jr z, .v7
+            cp $0F
+            jr z, .v1                       ; CF: the chocobo
+            cp $0E
+            ret nz                          ; (show / hide, guest: later)
+            xor a                           ; CE: off the vehicle, the Invincible left here
+            ld [GS + $0F], a
+            ld a, [cur_world]
+            ld [GS + $07], a
+            ld a, [px]
+            ld [GS + $05], a
+            ld a, [py]
+            ld [GS + $06], a
+            ld a, 1
+            ld [GS + $04], a
+            ret
+.v1:        ld a, 1
+            jr .v
+.v6:        ld a, 6
+            jr .v
+.v7:        ld a, 7
+.v:         ld [GS + $0F], a
+            ret
 .dirs:      db $10, $20, $80, $40           ; (pad bits: right, left, down, up)
 .face:      db 1, 2, 4, 8
 

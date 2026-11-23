@@ -892,6 +892,7 @@ ffe_builder.py` + `.github/workflows/ffe-builder.yml` (Windows exe, FF2/FF3 show
   and inns as FF3, GB layout with condensed long item names (2026-11-23). Battle (2026-11-23):
   FF3's battle logic ported (init, AI, target cursor, attack order, Fight, all magic effects,
   action script, poison, victory / level ups, save back); whole battles match the NES
-  (`tools/gb3n/btlcmp.py --end`: save block identical). Next: member Item / Magic / job commands,
-  run / escape, bosses, back attacks, animations; then vehicles, the fat chocobo. Also fixed in the
+  (`tools/gb3n/btlcmp.py --end`: save block identical); Item / Magic / job commands, bosses, back
+  attacks, the battle's end done. Vehicles started (`src/veh.s`: canoe, ship, airships, landing).
+  Next: the Invincible / Nautilus specifics, the fat chocobo, attack / spell animations. Also fixed in the
   recompiled build: one-row menu cursors (Item opened Magic), the battle "Miss" sprite in English.

@@ -185,16 +185,35 @@ veh_a:      ld a, [VEH]
             jr veh_board
 .f2:        ld a, [GS + $20]
             bit 6, a
-            ret z
+            jr z, .inv
             ld a, [GS + $03]
             ld b, a
             ld a, [cur_world]
             cp b
             ret nz
             call .here
-            ret nz
+            jr nz, .inv
             ld a, 6
             jr veh_board
+.inv:       ld a, [GS + $04]                ; 3E/C942: the Invincible here: its inside
+            and a
+            ret z
+            ld a, [GS + $07]
+            ld b, a
+            ld a, [cur_world]
+            cp b
+            ret nz
+            ld a, [GS + $05]
+            ld b, a
+            ld a, [px]
+            cp b
+            ret nz
+            ld a, [GS + $06]
+            ld b, a
+            ld a, [py]
+            cp b
+            ret nz
+            jr veh_inv
 .here:      ld a, [GS + $01]                ; Z if the parked vehicle is at the party's tile
             ld b, a
             ld a, [px]
@@ -436,6 +455,16 @@ veh_parked: ld hl, oam_buf + 4 * 36
             ld b, a
             ld a, [cur_world]
             cp b
+            ret
+
+; 3E/C282 B on the world map: aboard the Invincible, its inside (3E/C292)
+veh_b:      ld a, [VEH]
+            cp 7
+            ret nz
+veh_inv:    xor a                           ; (the world map's entrance 0)
+            ld [act_id], a
+            ld a, $90
+            ld [act], a
             ret
 
 section wram, $C3F2

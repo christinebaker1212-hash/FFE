@@ -247,7 +247,13 @@ main:       call wait_vbl
             ld hl, menu_open
             call far_call
             jr main
-.sl:        bit 2, a                        ;   Select: the Select menu; B + Select: the next
+.sl:        bit 1, a                        ;   B on a world map: the Invincible (fix:C282)
+            jr z, .sl0
+            ldh a, [is_world]
+            and a
+            call nz, veh_b
+            ld a, [pad_new]
+.sl0:       bit 2, a                        ;   Select: the Select menu; B + Select: the next
             jr z, .mv                       ;     member walks (fix:F72C)
             ldh a, [pad]
             bit 1, a
