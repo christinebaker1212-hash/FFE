@@ -257,7 +257,11 @@ treasure:   push de
             cp $E0
             ld a, $59                       ; "Found ...!"
             jr c, .msg
-            ld a, $02                       ; (with a battle: later)
+            ld a, [tr_id2]                  ; (FF3 F5A1: the treasure id is the battle, after
+            ld [act_id], a                  ;   "Found ...! A monster appeared!")
+            ld a, $20
+            ld [act], a
+            ld a, $02
 .msg:       push af                         ; a chest: opened ($7D) and redrawn
             ld a, [tr_x]
             ld e, a
