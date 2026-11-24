@@ -645,6 +645,11 @@ one reaches parity, so the owner can keep playing).
    - Done: party, Cornelia weapon / armour shops, levels outside Cornelia (inn, clinic), Temple of
      Fiends, Garland, the princess's warp, the King's bridge, the bridge story, Pravoka's inn,
      Bikke's pirates, the ship given ("I'll give ya my ship").
+   - Then: Elfheim by ship, its shops (weapon / armour upgrades, Heal and Pure bought and used on
+     the field), levels 6-10 outside Elfheim (135 battles, inns, Pure curing poison), the Marsh Cave
+     down to the Crown's floor (map 28), FF1's guard tile in front of the chest (formation 28, four
+     Piscodemons) and the Crown taken. At level 10 the party won but lost three members and fell on
+     the way out (FF1's game over, back to the title); being redone at level 13.
    - Found and fixed: the sound variables ran past $CFFF into the save page (ship / airship flags
      and the ship's position rewritten by the music: Bikke skipped the ship); `vh_t` shared the
      shop's `sh_id`. The assembler now guards the save page (`PROTECT_RAM`) and lists RAM sections.
