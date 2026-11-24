@@ -1355,7 +1355,8 @@ Then (item 34): colour correction fixed (enemy flash / party lines), FFL3-style 
 encounter transition (DMG at full pace), FF1's game-over message and fade; water in four bands, the
 reflection faded into the sea (item 35). Playthrough (item 36): New Game to Bikke's ship on Color and
 DMG; the sound variables overran the save page (ship / airship flags): fixed, guarded, saves repaired
-on load. Next: Elfland and on. Open: world-map borders
+on load. Then (Color): Elfheim, levels 10-13, Marsh Cave and the Crown (FF1's Piscodemon guard tile);
+Astos at level 13 beats a Fight-only party (FF1's RUB / DARK, absorb 40): training to 16. Open: world-map borders
 (await details), the playthrough.
 
 ## Remaining
