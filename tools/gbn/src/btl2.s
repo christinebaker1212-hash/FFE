@@ -2269,17 +2269,9 @@ bt_victory: call bt_msg_new
             or l
             jr nz, .d2
             inc l                           ; (at least 1)
-.d2:        ld a, l
-            ld [bt_rexp], a
-            ld a, h
-            ld [bt_rexp + 1], a
+.d2:        call kn_xexp                    ; (x the EXP multiplier: bt_rexp)
             pop de                          ; gold (shown in the results window)
-            ld a, e
-            ld [bt_rgold], a
-            ld a, d
-            ld [bt_rgold + 1], a
-            ld b, d
-            ld c, e
+            call kn_xgold                   ; (x the Gold multiplier: bt_rgold, BC)
             call add_gold
             ld a, 1                         ; (level ups recorded for the results window)
             ld [bt_res], a
@@ -4131,3 +4123,54 @@ bt_defeat:  ld a, TR_GAMEOVER
             ld a, 1                         ; (to white: the restart's blank screen follows)
             ld [fd_wh], a
             jp fade_out
+
+section bank 6, $72F0                       ; (the Konami Code's multipliers: owner, 2026-11-24)
+; HL experience a member -> x EXP multiplier (loc.s KN_EXP) -> bt_rexp
+kn_xexp:    ld a, [KN_EXP]
+            call kn_mul
+            ld a, l
+            ld [bt_rexp], a
+            ld a, h
+            ld [bt_rexp + 1], a
+            ret
+; DE gold -> x Gold multiplier -> bt_rgold, BC
+kn_xgold:   ld h, d
+            ld l, e
+            ld a, [KN_GOLD]
+            call kn_mul
+            ld a, l
+            ld [bt_rgold], a
+            ld a, h
+            ld [bt_rgold + 1], a
+            ld b, h
+            ld c, l
+            ret
+; HL x (1, 2, 4, 8, 12 by A = 0-4; only on a file with the code), kept at $FFFF
+kn_mul:     ld b, a
+            ld a, [KN_MARK]
+            cp $A5
+            ret nz
+            ld a, b
+            cp 5
+            ret nc
+            and a
+            ret z
+            cp 4
+            jr z, .x12
+.sh:        add hl, hl
+            jr c, .cap
+            dec b
+            jr nz, .sh
+            ret
+.x12:       add hl, hl                      ; x 4, then x 8 + x 4
+            jr c, .cap
+            add hl, hl
+            jr c, .cap
+            ld d, h
+            ld e, l
+            add hl, hl
+            jr c, .cap
+            add hl, de
+            ret nc
+.cap:       ld hl, $FFFF
+            ret

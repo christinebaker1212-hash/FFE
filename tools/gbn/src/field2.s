@@ -103,6 +103,7 @@ lineup:     call scr_open
             ld [lu_cur], a
             ld [lu_cur2], a
             ld [lu_mode], a
+            ld [kn_st], a
 .l:         call lu_sprites
             ld a, [lu_cur]                  ; the hand: x 32, the slot's y + 8
             call lu_slotp
@@ -121,7 +122,7 @@ lineup:     call scr_open
             jr z, .in
             cp 2
             jr nz, .l
-.in:        ldh a, [pad_new]
+.in:        call lu_kon                     ; (the key, through the Konami Code's watch)
             bit 1, a
             jr nz, .b
             bit 0, a
@@ -857,6 +858,11 @@ st_shut:    ld [st_k], a
             ldh [rLYC], a
             ret
 
+
+; the pad's new keys through the Konami Code's watch (loc.s kn_feed): A = the keys to act on
+lu_kon:     ld a, F3_BANK
+            ld hl, kn_feed
+            jp bank_call
 
 zz_end_6100:
 section wram, $C100                         ; (the map queue: free on these screens)

@@ -363,8 +363,7 @@ vblank:     push af
             jr c, .late
             ld c, MT_DRAWQ
             call q_flush
-.late:      ld a, 1
-            ldh [vbl_done], a
+.late:      call vbl_mus                    ; (vbl_done; a music tick held for V-Blank: now)
             pop af
             call sbank
             pop hl
@@ -3987,12 +3986,7 @@ timer_int:  push af
             jr nz, .go
             ldh a, [rLY]
             cp 124
-            jr c, .go
-            ld a, [mus_pend]                ; (later: counted)
-            inc a
-            ld [mus_pend], a
-            pop af
-            reti
+            jp nc, tm_dfr                   ; (near V-Blank: tm_dfr)
 .go:        call mus_tick
             pop af
             reti
@@ -4027,6 +4021,44 @@ mus_tick:   ld a, [mus_busy]
             inc a
             ld [mus_pend], a
             ret
+
+section bank 0, $1F18                       ; (the music timer: free room)
+; timer_int, a tick at LY 124-153: in V-Blank after this frame's uploads (vbl_mus) at once,
+; else held (run after the uploads, or at line 64)
+tm_dfr:     cp 144
+            jr c, .d
+            push hl
+            ld hl, frame
+            ld a, [vbl_up]
+            cp [hl]
+            pop hl
+            jr nz, .d
+            call mus_tick
+            pop af
+            reti
+.d:         ld a, [mus_pend]
+            inc a
+            ld [mus_pend], a
+            pop af
+            reti
+
+section bank 0, $1FDF                       ; (the music timer: after V-Blank's uploads)
+; the end of the V-Blank handler: its uploads done (a tick may run at once from now on, timer_int);
+; a tick held for V-Blank runs now, not at line 64 of the next frame (up to 10 ms late: the
+; rhythm uneven, owner 2026-11-24)
+vbl_mus:    ld a, 1
+            ldh [vbl_done], a
+            ld a, [frame]
+            ld [vbl_up], a
+            ld a, [mus_pend]
+            and a
+            ret z
+            dec a
+            ld [mus_pend], a
+            jp mus_tick
+
+section wram, $C99F
+vbl_up:     ds 1                            ; the frame whose V-Blank uploads are done (a tick may run)
 
 section wram, $DAD0
 tm_acc:     ds 1                            ; (the music timer: the fraction's sum,

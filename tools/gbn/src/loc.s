@@ -989,11 +989,15 @@ section bank 99, $4800
 ; Speed, Volume, B Dash On / Off, Cursor Remember / Reset, and on the Color the windows'
 ; colour (red, green, blue 0-31, shown at once). Header (0,0,20,3), list (0,3,20,15), one row a
 ; setting from row 5; up / down pick, left / right change, B back (kept in cart RAM bank 1)
-OPT_N_DMG  = 7
-OPT_N_CGB  = 12
+KN_MARK    = unsram + $F8   ; $A5: the Konami Code entered on this file's Formation menu (kept
+KN_EXP     = unsram + $F9   ;   in the save); the experience and Gil multipliers (0 Normal, 1 2X,
+KN_GOLD    = unsram + $FA   ;   2 4X, 3 8X, 4 12X; owner, 2026-11-24)
+OPT_ROWS   = 12             ; settings shown at once (rows 5-16); more scroll
 opt_menu:   xor a
             ld [opt_cur], a
-opt_redraw: call scr_open
+            ld [opt_top], a
+opt_redraw: call opt_mklist
+            call scr_open
             call eqm_pal
             ld bc, $0000
             ld de, $1403
@@ -1005,23 +1009,12 @@ opt_redraw: call scr_open
             ld bc, $0003
             ld de, $140F
             call scr_win
-            call opt_n
-            ld b, a
-            ld c, 5
-            ld hl, os_labels
-.lb:        push bc
-            push hl
-            ld b, 2
-            call pen_at
-            pop hl
-            call pen_str                    ; (HL past the string)
-            pop bc
-            inc c
-            dec b
-            jr nz, .lb
-            call opt_vals
+            call opt_rows
             call scr_show
-.l:         ld a, [opt_cur]                 ; the hand at the setting (row 5 + n)
+.l:         ld a, [opt_top]                 ; the hand at the setting (row 5 + n - top)
+            ld b, a
+            ld a, [opt_cur]
+            sub b
             add a, 5
             ld c, a
             ld b, 2
@@ -1030,7 +1023,6 @@ opt_redraw: call scr_open
             ldh a, [pad_new]
             bit 1, a
             jp nz, opt_save
-            ld hl, opt_cur
             bit 6, a
             jr nz, .up
             bit 7, a
@@ -1041,7 +1033,7 @@ opt_redraw: call scr_open
             ld b, $FF
             bit 5, a
             jr z, .l
-.ch:        ld a, [opt_cur]                 ; B = +1 / -1, clamped
+.ch:        call opt_id                     ; B = +1 / -1, clamped; E = the setting's id
             ld e, a
             ld d, 0
             ld hl, os_max
@@ -1058,15 +1050,19 @@ opt_redraw: call scr_open
             cp c
             jr nc, .l                       ; (past either end: no change)
             ld b, a
-            ld a, [opt_cur]
+            ld a, e
             cp 6
             jr z, .mm
             ld [hl], b
+            push de
             call opt_apply
-            ld a, [opt_cur]                 ; (a window colour / the gradient: at once)
+            pop de
+            ld a, e                         ; (a window colour / the gradient / LCD: at once)
             cp 7
-            call nc, opt_wnow
-            call opt_vals
+            jr c, .nw
+            cp 12
+            call c, opt_wnow
+.nw:        call opt_rows
             call scr_upd
             jr .l
 .mm:        call mmp_ok                     ; Modern MP (src/mmp.s): only with the wiki's data;
@@ -1084,165 +1080,25 @@ opt_redraw: call scr_open
             ld [hl], b
             call mmp_sync
             jp opt_redraw
-.up:        call opt_n
-            ld b, a
+.up:        ld hl, opt_cur
             ld a, [hl]
-            dec a
-            cp b
-            jr c, .s
-            ld a, b
-            dec a
-            jr .s
-.dn:        call opt_n
+            and a
+            jr nz, .u1
+            ld a, [opt_cnt]                 ; (from the first: the last)
+.u1:        dec a
+            ld [hl], a
+            jr .sc
+.dn:        ld hl, opt_cur
+            ld a, [opt_cnt]
             ld b, a
             ld a, [hl]
             inc a
             cp b
-            jr c, .s
+            jr c, .d1
             xor a
-.s:         ld [hl], a
-            jr .l
-; settings shown: A = 5 (DMG / SGB) or 8 (Color)
-opt_n:      ldh a, [is_cgb]
-            and a
-            ld a, OPT_N_DMG
-            ret z
-            ld a, OPT_N_CGB
-            ret
-os_title:   db "Options", 0
-os_labels:  db "Message Speed", 0, "Text Speed", 0, "Volume", 0, "B Dash", 0, "Cursor", 0
-            db "Auto Retarget", 0, "Modern MP", 0
-            db "Window Red", 0, "Window Green", 0, "Window Blue", 0, "Gradient", 0, "LCD", 0
-os_var:     dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, opt_retgt, opt_mmp, win_r, win_g, win_b, opt_nograd, opt_ccm
-os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2, 3
-os_sv:      dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, win_r, win_g, win_b, opt_nograd, opt_retgt, opt_mmp, opt_ccm
-                                            ; (the saved order: the older records' first nine)
-os_onoff:   db "Off", " On"
-os_lcd:     db "      Default", "GBC Corrected", "GBA Corrected"
-os_spn:     db "   Slow", " Normal", "   Fast", " Faster", "Instant"
-os_dash:    db " On", "Off"
-os_cur:     db "Remember", "   Reset"
-; the values, ending at column 18
-opt_vals:   ld bc, $1205
-            call pen_at
-            ld a, [respond]
-            add a, $31
-            call pen_ch
-            ld bc, $0C06
-            call pen_at
-            ld a, [tw_spd]
-            ld l, a
-            add a, a
-            add a, a
-            add a, a
-            sub l                           ; 7 a name
-            ld e, a
-            ld d, 0
-            ld hl, os_spn
-            add hl, de
-            ld b, 7
-            call .n
-            ld bc, $1207
-            call pen_at
-            ld a, [opt_vol]
-            add a, $30
-            call pen_ch
-            ld bc, $1008
-            call pen_at
-            ld a, [opt_nodash]
-            ld l, a
-            add a, a
-            add a, l
-            ld e, a
-            ld d, 0
-            ld hl, os_dash
-            add hl, de
-            ld b, 3
-            call .n
-            ld bc, $0B09
-            call pen_at
-            ld a, [opt_curr]
-            add a, a
-            add a, a
-            add a, a
-            ld e, a
-            ld d, 0
-            ld hl, os_cur
-            add hl, de
-            ld b, 8
-            call .n
-            ld bc, $100A                    ; Auto Retarget / Modern MP: Off / On
-            call pen_at
-            ld a, [opt_retgt]
-            call .oo
-            ld bc, $100B
-            call pen_at
-            ld a, [opt_mmp]
-            call .oo
-            ldh a, [is_cgb]
-            and a
-            ret z
-            ld hl, win_r
-            ld c, 12
-.w:         push hl
-            push bc
-            ld b, 17
-            call pen_at
-            pop bc
-            pop hl
-            ld a, [hl+]
-            push hl
-            push bc
-            call nf_a
-            ld b, 2
-            call pen_num
-            pop bc
-            pop hl
-            inc c
-            ld a, c
-            cp 15
-            jr c, .w
-            ld bc, $100F                    ; Window Gradient On / Off
-            call pen_at
-            ld a, [opt_nograd]
-            ld l, a
-            add a, a
-            add a, l
-            ld e, a
-            ld d, 0
-            ld hl, os_dash
-            add hl, de
-            ld b, 3
-            call .n
-            ld bc, $0610                    ; LCD colours (13 letters to column 18)
-            call pen_at
-            ld a, [opt_ccm]
-            ld l, a
-            add a, a
-            add a, l
-            add a, a
-            add a, a
-            add a, l                        ; 13 A
-            ld e, a
-            ld d, 0
-            ld hl, os_lcd
-            add hl, de
-            ld b, 13
-            jr .n
-.n:         ld a, [hl+]
-            call pen_ch
-            dec b
-            jr nz, .n
-            ret
-.oo:        ld l, a                         ; A = 0 / 1: "Off" / " On"
-            add a, a
-            add a, l
-            ld e, a
-            ld d, 0
-            ld hl, os_onoff
-            add hl, de
-            ld b, 3
-            jr .n
+.d1:        ld [hl], a
+.sc:        call opt_scroll
+            jp .l
 ; the volume to the master volume (NR50)
 opt_apply:  ld a, [opt_vol]
             ld b, a
@@ -2322,6 +2178,12 @@ tr_party:   call tr_buf
             dec b
             jr nz, .s
             ret
+
+section wram, $C4E0
+opt_top:    ds 1                            ; Options: the first setting shown
+opt_cnt:    ds 1                            ;   the settings listed
+opt_list:   ds 14                           ;   their ids
+kn_st:      ds 1                            ; the Konami Code's watch: keys matched so far
 
 section wram, $C4C0
 tr_k:       ds 1
@@ -3631,6 +3493,8 @@ ng_mode:    xor a
             xor 1
             ld [opt_mmp], a                 ;   Modern MP: Classic 0 / Modern 1
             ld [opt_retgt], a
+            xor a                           ; (a new file has no Konami Code: LCD Default)
+            ld [opt_ccm], a
             call opt_save0
             xor a
             ret
@@ -3654,3 +3518,272 @@ ngm_dm:     db "Modern offers", $0A, "gameplay similar", $0A, "to more modern", 
 section wram, $DAFC
 ngm_cur:    ds 1
 ngm_yn:     ds 1
+
+section bank 99, $7390                      ; (Options: the list's helpers and tables)
+; the list scrolled so the chosen setting shows (the rows drawn again when it moves)
+opt_scroll: ld a, [opt_top]
+            ld b, a
+            ld a, [opt_cur]
+            cp b
+            jr c, .s
+            sub b
+            cp OPT_ROWS
+            ret c
+            ld a, [opt_cur]
+            sub OPT_ROWS - 1
+.s:         ld [opt_top], a
+            call opt_rows
+            jp scr_upd
+; the chosen setting's id
+opt_id:     ld a, [opt_cur]
+opt_idx:    ld e, a                         ; list position A -> its id
+            ld d, 0
+            ld hl, opt_list
+            add hl, de
+            ld a, [hl]
+            ret
+; the settings shown: 0-6 always, 7-10 (window colours, gradient) on the Color, after the Konami
+; Code on this file 11 (LCD, Color) and 12-13 (EXP, Gold)
+opt_mklist: ld hl, opt_list
+            xor a
+.b:         ld [hl+], a
+            inc a
+            cp 7
+            jr c, .b
+            ld c, 7
+            ldh a, [is_cgb]
+            and a
+            jr z, .k
+            ld a, 7
+.c:         ld [hl+], a
+            inc a
+            cp 11
+            jr c, .c
+            ld c, 11
+            call kn_on
+            jr nz, .k
+            ld a, 11
+            ld [hl+], a
+            inc c
+.k:         call kn_on
+            jr nz, .x
+            ld a, 12
+            ld [hl+], a
+            inc a
+            ld [hl+], a
+            inc c
+            inc c
+.x:         ld a, c
+            ld [opt_cnt], a
+            ld a, [opt_cur]                 ; (kept in range)
+            cp c
+            ret c
+            xor a
+            ld [opt_cur], a
+            ld [opt_top], a
+            ret
+; Z if the Konami Code was entered on this file
+kn_on:      ld a, [KN_MARK]
+            cp $A5
+            ret
+; every row of the list (12)
+opt_rows:   ld c, 0
+.r:         ld a, [opt_top]
+            add a, c
+            ld b, a
+            ld a, [opt_cnt]
+            cp b
+            jr z, .e
+            jr c, .e
+            push bc
+            ld a, b
+            call opt_idx
+            pop bc
+            push bc
+            call opt_row
+            pop bc
+            jr .n
+.e:         push bc                         ; (past the list: blank)
+            ld a, c
+            add a, 5
+            ld c, a
+            call opt_clr
+            pop bc
+.n:         inc c
+            ld a, c
+            cp OPT_ROWS
+            jr c, .r
+            ret
+; row C (screen row) blank, columns 1-18
+opt_clr:    ld b, 1
+            call pen_at
+            ld b, 18
+            jp pen_sp
+; setting A on list row C: its name at column 2, its value ending at column 18
+opt_row:    push af
+            ld a, c
+            add a, 5
+            ld c, a
+            push bc
+            call opt_clr
+            pop bc
+            pop af
+            push af
+            push bc
+            ld hl, os_labels                ; (the id-th name)
+            ld e, a
+.f:         ld a, e
+            and a
+            jr z, .lb
+.z:         ld a, [hl+]
+            and a
+            jr nz, .z
+            dec e
+            jr .f
+.lb:        pop bc
+            push bc
+            push hl
+            ld b, 2
+            call pen_at
+            pop hl
+            call pen_str
+            pop bc
+            pop af                          ; A = the id, C = the row
+            ld e, a
+            ld d, 0
+            ld hl, os_fmt                   ; its value's column and format
+            add hl, de
+            add hl, de
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl]
+            push af
+            push de
+            call pen_at
+            pop de
+            ld hl, os_var
+            add hl, de
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld c, [hl]                      ; C = the value
+            pop af
+            and a
+            jr z, .d1
+            dec a
+            jr z, .spd
+            dec a
+            jr z, .d0
+            dec a
+            jr z, .dsh
+            dec a
+            jr z, .cur
+            dec a
+            jr z, .oo
+            dec a
+            jr z, .n2
+            dec a
+            jr z, .lcd
+            ld hl, os_mul                   ; EXP / Gold: Normal, 2X .. 12X
+            ld b, 6
+            jr opt_ostr
+.d1:        ld a, c                         ; Message Speed: 1-8
+            inc a
+.d0:        add a, $30
+            jp pen_ch
+.spd:       ld hl, os_spn
+            ld b, 7
+            jr opt_ostr
+.dsh:       ld hl, os_dash
+            ld b, 3
+            jr opt_ostr
+.cur:       ld hl, os_cur
+            ld b, 8
+            jr opt_ostr
+.oo:        ld hl, os_onoff
+            ld b, 3
+            jr opt_ostr
+.n2:        ld a, c
+            call nf_a
+            ld b, 2
+            jp pen_num
+.lcd:       ld hl, os_lcd
+            ld b, 13
+; the C-th name of B letters in table HL
+opt_ostr:   ld a, c
+            and a
+            jr z, .p
+            ld e, b
+            ld d, 0
+.m:         add hl, de
+            dec c
+            jr nz, .m
+.p:         ld a, [hl+]
+            call pen_ch
+            dec b
+            jr nz, .p
+            ret
+os_title:   db "Options", 0
+os_labels:  db "Message Speed", 0, "Text Speed", 0, "Volume", 0, "B Dash", 0, "Cursor", 0
+            db "Auto Retarget", 0, "Modern MP", 0
+            db "Window Red", 0, "Window Green", 0, "Window Blue", 0, "Gradient", 0, "LCD", 0
+            db "EXP", 0, "Gold", 0
+os_var:     dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, opt_retgt, opt_mmp, win_r, win_g, win_b, opt_nograd, opt_ccm
+            dw KN_EXP, KN_GOLD
+os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2, 3, 5, 5
+os_fmt:     db 18, 0, 12, 1, 18, 2, 16, 3, 11, 4, 16, 5, 16, 5, 17, 6, 17, 6, 17, 6, 16, 3, 6, 7
+            db 13, 8, 13, 8                 ; (the value's column, its format)
+os_sv:      dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, win_r, win_g, win_b, opt_nograd, opt_retgt, opt_mmp, opt_ccm
+                                            ; (the saved order: the older records' first nine)
+os_onoff:   db "Off", " On"
+os_lcd:     db "      Default", "GBC Corrected", "GBA Corrected"
+os_spn:     db "   Slow", " Normal", "   Fast", " Faster", "Instant"
+os_dash:    db " On", "Off"
+os_cur:     db "Remember", "   Reset"
+os_mul:     db "Normal", "    2X", "    4X", "    8X", "   12X"
+
+; ---- the Konami Code on the Formation menu (owner, 2026-11-24): Up Up Down Down Left Right Left
+; Right B A shows Options' LCD (Color) and EXP / Gold multipliers for this file (KN_MARK in the
+; save page). A = the keys the menu acts on: the B after the eight directions is held back (else
+; it would leave), the A that ends the code is used up
+kn_seq:     db $40, $40, $80, $80, $20, $10, $20, $10, $02, $01
+kn_feed:    ldh a, [pad_new]
+            and a
+            ret z
+            ld b, a
+            ld a, [kn_st]
+            ld e, a
+            ld d, 0
+            ld hl, kn_seq
+            add hl, de
+            ld a, b
+            cp [hl]
+            jr nz, .miss
+            inc e
+            ld a, e
+            ld [kn_st], a
+            cp 9
+            jr z, .hold
+            cp 10
+            jr z, .ok
+            ld a, b
+            ret
+.hold:      xor a
+            ret
+.ok:        xor a
+            ld [kn_st], a
+            ld a, $A5
+            ld [KN_MARK], a
+            ld a, SFX_MAGIC
+            ld [sfx_req], a
+            xor a
+            ret
+.miss:      ld a, b                         ; (a key off the code: from the start; an Up
+            cp $40                          ;   begins it again)
+            ld a, 0
+            jr nz, .z
+            inc a
+.z:         ld [kn_st], a
+            ld a, b
+            ret

@@ -666,3 +666,19 @@ one reaches parity, so the owner can keep playing).
      shop's `sh_id`. The assembler now guards the save page (`PROTECT_RAM`) and lists RAM sections.
    - Checked, not bugs: "Had no effect" when several members hit an enemy already dead (FF1, Auto
      Retarget off); a party wipe at sea at level 3 goes to FF1's game over and the title.
+37. Owner (2026-11-24, later):
+   - playthrough stopped at the Earth Cave (the test driver gained battle Medicine and running from
+     paralysing / stoning / killing formations first);
+   - DMG / Pocket music (real hardware: volumes / fades and timing differed from the Color): a plain
+     Game Boy now steps a volume down only by $08 writes (fifteen adds = one step down, LSDj's way
+     on every DMG) instead of the $F7 / $F8 pair (the mode-change rule, tested only on the Color);
+     a music tick held for V-Blank runs right after the V-Blank uploads (`vbl_mus`, `tm_dfr`), not at
+     line 64 of the next frame (up to 10 ms late, uneven rhythm). SameBoy: tick counts equal on both
+     systems (4347 / 4346 in 4320 frames of walking and battles), no tick waits for line 64 now;
+   - the Konami Code (Up Up Down Down Left Right Left Right B A) on the Formation menu (the B held
+     back, the A used up; FF1's magic sound) marks the file (save page $F8 = $A5): Options then show
+     LCD (Color) and EXP / Gold multipliers (Normal, 2X, 4X, 8X, 12X; $F9 / $FA in the save page,
+     applied to the battle's sums, kept at 65535). Without the mark the LCD option is hidden and the
+     colours Default (on loading a file and at New Game). Options are a table-driven list now (id,
+     variable, range, value column and format) that scrolls: 7 / 9 rows on a plain Game Boy, 11 / 14
+     on the Color (12 shown).

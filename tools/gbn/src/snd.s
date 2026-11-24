@@ -57,8 +57,11 @@ snd_init_b: ld a, $80
             ld [snd_tv + 1], a
             xor a
             ld [snd_mute], a
-            inc a
-            ld [snd_pair], a                ; (the Game Boy: as the hardware; a Color: tested)
+            ldh a, [is_cgb]                 ; a step down: two writes ($F7, $F8) on a Color
+            and a                           ;   (tested below); a plain Game Boy / Pocket only
+            jr z, .np                       ;   ever adds 1 (fifteen adds = 1 down: owner,
+            ld a, 1                         ;   2026-11-24, fades differed on real DMG /
+.np:        ld [snd_pair], a                ;   Pocket; LSDj's proven way on every DMG)
             ld a, $80                       ; (no track yet: silent)
             ld [NES_RAM + $4B], a
 ; volume changes inside a note use "zombie mode" (NRx2 = $08 adds 1 to the playing volume: no

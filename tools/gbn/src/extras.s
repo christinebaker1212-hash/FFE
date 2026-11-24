@@ -1015,7 +1015,12 @@ bs_mark:    call bs_on
 ; ---- a save page from the builds whose sound variables ran into it ($D000-$D004, until
 ; 2026-11-24): the ship's and the airship's flags not 0 / 1 are mended (the ship: given if the
 ; pirates were fought, at FF1's starting place; the airship: not found), so an old save plays on
-sv_fix:     ld a, [SV_SHIP]
+sv_fix:     ld a, [KN_MARK]                 ; (a file without the Konami Code: the LCD
+            cp $A5                          ;   colours Default, the option hidden; owner,
+            jr z, .k                        ;   2026-11-24)
+            xor a
+            ld [opt_ccm], a
+.k:         ld a, [SV_SHIP]
             cp 2
             jr c, .air
             ld a, [game_flags + 4]          ; (Bikke's event flag: bit 1)
