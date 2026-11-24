@@ -94,9 +94,8 @@ battle:     xor a                           ; (no menu sounds, no vehicle noise)
             call bt_end_screen
             xor a
             ret
-.lost:      ld a, TR_GAMEOVER
-            call snd_track
-            call bt_ch_exit
+.lost:      call bt_defeat                  ; (FF1 GameOver: its music, the message, any
+            call bt_ch_exit                 ;   button, the fade: btl2.s)
             call bt_end_screen
             ld a, 1
             ret

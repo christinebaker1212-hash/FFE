@@ -544,6 +544,8 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             call pro_show
 .np:        ld a, TR_MINIMAP                ; FF1 IntroTitlePrepare: the crystal theme
             call snd_track
+            ldh a, [soft_rst]               ; (after a game over / soft reset: the title fades
+            ld [fd_wh], a                   ;   in from white, as the restart's blank screen)
             call scr_open
             ld b, 4                         ; title menu (the GB layout: three boxes, centred:
             ld c, 5                         ;   owner, 2026-11-22)

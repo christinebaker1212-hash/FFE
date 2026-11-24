@@ -4076,3 +4076,58 @@ section wram, $C500
 bt_save:    ds 12 * 32                      ; the rows under the message window
 section wram, $C400
 bt_line:    ds 256                          ; a message line being built (page-aligned)
+
+section bank 6, $5F40                       ; (free space after mmp.s)
+; defeat (FF1 GameOver): "<leader>'s party" / "were wiped out" (FF1's own words, the battle
+; texts 61 and 59) in the message window until any button, then the screen fades out and the
+; game goes back to the title (owner, 2026-11-24: the message and the fade were missing)
+bt_defeat:  ld a, TR_GAMEOVER
+            call snd_track
+            xor a                           ; row 1: the leader's name (trailing blanks off)
+            call bt_msg_pl
+            ld a, [bt_lp]
+            ld e, a
+            ld d, high(bt_line)
+.tr:        ld a, e
+            cp low(bt_line)
+            jr z, .t0
+            dec de
+            ld a, [de]
+            cp $21
+            jr c, .tr
+            cp $FF
+            jr z, .tr
+            inc de
+.t0:        push de
+            ld a, 62                        ; + "'s party"
+            call bt_mtext
+            pop de
+            ld hl, bt_sbuf
+.c1:        ld a, [hl+]
+            ld [de], a
+            inc de
+            and a
+            jr nz, .c1
+            ld hl, bt_line
+            call bt_msg_row
+            ld a, 60                        ; row 2: "were wiped out"
+            call bt_mtext
+            ld hl, bt_sbuf
+            ld de, bt_line
+.c2:        ld a, [hl+]
+            ld [de], a
+            inc de
+            and a
+            jr nz, .c2
+            ld hl, bt_line
+            call bt_msg_row
+            call bt_msg_head
+            call bt_flush
+.w:         call bt_frame                   ; any button (FF1 WaitForAnyInput)
+            ldh a, [pad_new]
+            and a
+            jr z, .w
+            call bt_frame
+            ld a, 1                         ; (to white: the restart's blank screen follows)
+            ld [fd_wh], a
+            jp fade_out
