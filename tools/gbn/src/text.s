@@ -431,9 +431,9 @@ stat_int:   push af
             ld a, [ap_done]
             and a
             jp z, stat_ap
-.na:        ld a, [fx_on]                   ; (a spell's raster effect: its lines; fx.s)
-            and a
-            jr z, .nf
+.na:        ld a, [fx_on]                   ; (a spell's raster effect: its lines; fx.s;
+            cp 1                            ;   2: the target's own tiles, no lines)
+            jr nz, .nf
             ld a, [fx_done]
             and a
             jp z, stat_fx

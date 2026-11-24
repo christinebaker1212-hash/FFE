@@ -684,7 +684,12 @@ bt_cast_en: ld [mg_def], a
             jp bt_msg_end1
 .ok:        ld a, [mg_def]                  ; (an enemy in the top rows: the top window off,
             call bt_epos                    ;   the effect seen whole)
+            ld a, b                         ; (its cell and size for the raster effect: fx.s)
+            ld [fl_b], a
+            ld a, e
+            ld [fl_e], a
             ld a, c
+            ld [fl_c], a
             cp 3
             call c, bt_ban_off
             call bt_flush

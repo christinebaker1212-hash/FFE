@@ -5,6 +5,11 @@
 ; bursts are sprites). A mode-0 STAT interrupt per line writes the next line's SCX / SCY from
 ; tables made each frame in bank BTL6_BANK; from line 96 the battle's own STAT interrupt (the
 ; music's line). The top name window closes first (it uses the window's line split).
+; That moves whole lines: used only for a fiend / Chaos (alone on the field). Any other target
+; (owner, 2026-11-24: a spell's effect on its target only) gets its own ripple: its cells are
+; switched to copies of its tiles (FXT_* below) and each pass shifts the copies' pixel rows
+; by the element's offsets, the source rows kept in RAM (DMG: the unused attribute copy; the
+; Color: WRAM bank 2); the V-Blank uploads up to 10 tiles a frame; the cells back at the end.
 FX_SCX     = $C300          ; per line (96; the field's queue: free in battle)
 FX_SCY     = $C360
 FX_N       = 96
@@ -15,20 +20,36 @@ fx_start:   ld [fx_el], a
             xor a
             ld [fx_ph], a
             call bt_ban_off
+            ld a, [bt_type]                 ; (a fiend / Chaos: the lines; else its tiles)
+            cp 3
+            jr c, .t
             ld a, BTL6_BANK
             ld hl, fx_fill
             call bank_call
             ld a, 1
             ld [fx_on], a
             ret
+.t:         ld a, BTL6_BANK                 ; (fl_b / fl_c / fl_e: the target's cell, size)
+            ld hl, fxt_init
+            call bank_call
+            ld a, 2
+            ld [fx_on], a
+            ret
 fx_stop:    ld a, [fx_on]
             and a
             ret z
+            cp 2
+            jr z, .t
             xor a
             ld [fx_on], a
             inc a
             ld [fx_rest], a
             ret
+.t:         xor a                           ; (the uploads stop first: the V-Blank reads fx_on)
+            ld [fx_on], a
+            ld a, BTL6_BANK
+            ld hl, fxt_rest
+            jp bank_call
 fx_tick:    ld a, [fx_on]                   ; (from wait_vbl: every register kept)
             and a
             ret z
@@ -36,11 +57,18 @@ fx_tick:    ld a, [fx_on]                   ; (from wait_vbl: every register kep
             push bc
             push de
             push hl
+            cp 2
+            jr z, .t
             ld hl, fx_ph
             inc [hl]
             ld a, BTL6_BANK
             ld hl, fx_fill
             call bank_call
+            jr .x
+.t:         ld a, BTL6_BANK
+            ld hl, fxt_step
+            call bank_call
+.x:
             pop hl
             pop de
             pop bc
@@ -54,6 +82,8 @@ fx_vbl:     ld a, [fx_rest]
             ld a, [fx_on]
             and a
             ret z
+            cp 2
+            jp z, fxt_vbl
             xor a
             ld [fx_done], a
             ld a, [FX_SCX]
@@ -253,3 +283,510 @@ fx_ph:      ds 1
 fx_nx:      ds 1
 section wram, $DAFE
 fx_ny:      ds 1
+section wram, $C7F0
+fx_w:       ds 8                            ; one line of the row, one plane (E bytes)
+
+; ---- the target's own ripple (fx_on 2)
+FXT_STG    = bt_stage       ; staged tiles (10 x 16), then one tile row of the source (6 x 16)
+FXT_TMP    = FX_SCX         ; (fixed RAM: the Color maps WRAM bank 2 at $D000 while copying)
+FXT_MAX    = 10             ; tiles a pass step / a V-Blank
+section wram, $C3C0                         ; (after the line tables: free in battle)
+fxt_sh:     ds 48                           ; this pass's shift per pixel row (signed)
+fxt_e:      ds 1                            ; cells a side (4 / 6)
+fxt_ty:     ds 1                            ; next tile row to make
+fxt_up:     ds 1                            ; staged tiles waiting for V-Blank
+fxt_ui:     ds 1                            ; ... the next one
+fxt_i:      ds 1
+fxt_k:      ds 1
+fxt_s:      ds 1
+section wram, $C7C0
+fxt_orig:   ds 36                           ; the cells' own tiles
+fxt_dst:    ds FXT_MAX                      ; staged tiles' copy numbers
+
+section bank 0, $3F30
+; V-Blank (fx_on 2): staged tiles to their copies while the V-Blank lasts
+fxt_vbl:    ld a, [fxt_up]
+            and a
+            ret z
+            ld a, [bt_upn]                  ; (the battle's own tiles first: its uploads wait
+            and a                           ;   for V-Blank time, and the burst for them)
+            ret nz
+            push bc
+            push de
+            push hl
+.l:         ldh a, [rLY]
+            cp 144
+            jr c, .x
+            cp 150
+            jr nc, .x
+            ld a, [fxt_ui]
+            ld c, a
+            add a, low(fxt_dst)
+            ld l, a
+            ld h, high(fxt_dst)
+            ld a, [hl]                      ; DE = the copy's address ($8800 mode)
+            ld e, a
+            swap a
+            and $0F
+            ld d, a
+            ld a, e
+            swap a
+            and $F0
+            ld e, a
+            ld a, [hl]
+            bit 7, a
+            ld a, $90
+            jr z, .lo
+            ld a, $80
+.lo:        add a, d
+            ld d, a
+            ld a, c                         ; HL = staged tile c
+            swap a
+            ld l, a
+            and $0F
+            add a, high(FXT_STG)
+            ld h, a
+            ld a, l
+            and $F0
+            add a, low(FXT_STG)
+            ld l, a
+            jr nc, .nc
+            inc h
+.nc:        ld b, 16
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            ld hl, fxt_ui
+            inc [hl]
+            ld a, [fxt_up]
+            cp [hl]
+            jr nz, .l
+            xor a
+            ld [fxt_up], a
+.x:         pop hl
+            pop de
+            pop bc
+            ret
+
+section bank 104, $5300
+; copy number of tile i (A) -> A: $C4-$D7, then $01-$11
+fxt_cp:     cp 20
+            jr nc, .lo
+            add a, $C4
+            ret
+.lo:        sub 19
+            ret
+; HL = the source rows of tile A (the Color: $D000 + 16 A in WRAM bank 2; DMG: tiles 0-23 in the
+; attribute copy's rows 0-11 (unused without a Color, never written in a burst), 24-35 in the
+; gradient's RAM ($D640-$D6FF: the Color's only))
+fxt_src:    ld h, a
+            ldh a, [is_cgb]
+            and a
+            ld a, h
+            jr nz, .c
+            cp 24
+            jr c, .s
+            sub 24
+            call .x16
+            ld a, h
+            add a, high(gr_ramp)
+            ld h, a
+            ld a, l
+            add a, low(gr_ramp)
+            ld l, a
+            ret nc
+            inc h
+            ret
+.s:         call .x16
+            ld a, h
+            add a, high(sattr)
+            ld h, a
+            ret
+.c:         call .x16
+            ld a, h
+            add a, $D0
+            ld h, a
+            ret
+.x16:       swap a                          ; HL = 16 A
+            ld l, a
+            and $0F
+            ld h, a
+            ld a, l
+            and $F0
+            ld l, a
+            ret
+; tile A -> HL = its address ($8800 mode, as ed_tadr in bank 99)
+fxt_tadr:   ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            bit 7, a
+            jr nz, .hi
+            ld a, h
+            add a, $90
+            ld h, a
+            ret
+.hi:        ld a, h
+            add a, $80
+            ld h, a
+            ret
+; until VRAM is open (modes 0 / 1)
+fxt_vw:     ldh a, [rSTAT]
+            and 2
+            jr nz, fxt_vw
+            ret
+; the target (fl_b, fl_c, fl_e): its tiles to RAM and to the copies, its cells to the copies
+fxt_init:   xor a
+            ld [fxt_ty], a
+            ld [fxt_up], a
+            ld [fxt_ui], a
+            ld [fxt_i], a
+            ld a, [fl_e]
+            ld [fxt_e], a
+            ld a, [fl_c]
+            ld c, a
+.r:         ld a, [fl_b]
+            ld b, a
+            push bc
+            call cell_addr                  ; HL = the row's first cell (smap)
+            pop bc
+            ld a, [fxt_e]
+            ld b, a
+.c:         push bc
+            push hl
+            ld a, [hl]                      ; its tile
+            push af
+            ld a, [fxt_i]
+            add a, low(fxt_orig)
+            ld e, a
+            ld d, high(fxt_orig)
+            pop af
+            ld [de], a
+            call fxt_tadr                    ; HL = the tile's 16 bytes -> FXT_TMP
+            ld de, FXT_TMP
+            ld b, 8
+.rd:        di
+            call fxt_vw
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ei
+            dec b
+            jr nz, .rd
+            ld a, [fxt_i]                   ; -> the source store
+            call fxt_src
+            ld d, h
+            ld e, l
+            ld hl, FXT_TMP
+            ld b, 16
+            di
+            ldh a, [is_cgb]
+            and a
+            jr z, .s
+            ld a, 2
+            ldh [$FF70], a
+.s:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .s
+            ldh a, [is_cgb]
+            and a
+            jr z, .s1
+            ld a, 1
+            ldh [$FF70], a
+.s1:        ei
+            ld a, [fxt_i]                   ; -> its copy
+            call fxt_cp
+            call fxt_tadr
+            ld d, h
+            ld e, l
+            ld hl, FXT_TMP
+            ld b, 8
+.wr:        di
+            call fxt_vw
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ei
+            dec b
+            jr nz, .wr
+            pop hl                          ; the cell to the copy (smap and the screen)
+            push hl
+            ld a, [fxt_i]
+            call fxt_cp
+            ld [hl], a
+            ld de, $9800 - smap
+            add hl, de
+            ld e, a
+            di
+            call fxt_vw
+            ld [hl], e
+            ei
+            ld hl, fxt_i
+            inc [hl]
+            pop hl
+            inc hl
+            pop bc
+            dec b
+            jr nz, .c
+            inc c
+            ld a, [fl_c]
+            ld b, a
+            ld a, [fxt_e]
+            add a, b
+            cp c
+            jr nz, .r
+            ret
+; the cells back to their own tiles
+fxt_rest:   xor a
+            ld [fxt_up], a
+            ld [fxt_i], a
+            ld a, [fl_c]
+            ld c, a
+.r:         ld a, [fl_b]
+            ld b, a
+            push bc
+            call cell_addr
+            pop bc
+            ld a, [fxt_e]
+            ld b, a
+.c:         push hl
+            ld a, [fxt_i]
+            add a, low(fxt_orig)
+            ld e, a
+            ld d, high(fxt_orig)
+            ld a, [de]
+            ld [hl], a
+            ld de, $9800 - smap
+            add hl, de
+            ld e, a
+            di
+            call fxt_vw
+            ld [hl], e
+            ei
+            ld hl, fxt_i
+            inc [hl]
+            pop hl
+            inc hl
+            dec b
+            jr nz, .c
+            inc c
+            ld a, [fl_c]
+            ld b, a
+            ld a, [fxt_e]
+            add a, b
+            cp c
+            jr nz, .r
+            ret
+; a step (each frame): once the last tiles are up, the next tile rows staged (a new pass: the
+; phase on, the shifts made)
+fxt_step:   ld a, [fxt_up]
+            ld hl, bt_upn                   ; (the stage is the battle's too: not while its
+            or [hl]                         ;   own tiles wait there)
+            ret nz
+            ld a, [fxt_ty]
+            and a
+            jr nz, .rows
+            ld hl, fx_ph
+            inc [hl]
+            ld a, [fxt_e]                   ; rows: 8 E
+            add a, a
+            add a, a
+            add a, a
+            ld b, a
+            ld c, 0
+            ld hl, fxt_sh
+.sh:        push hl
+            push bc
+            call fx_line                    ; D = this row's shift (line C)
+            pop bc
+            pop hl
+            ld a, d
+            cp 4                            ; (at most 3 either way)
+            jr c, .s1
+            cp 256 - 3
+            jr nc, .s1
+            bit 7, a
+            ld a, 3
+            jr z, .s1
+            ld a, 256 - 3
+.s1:        ld [hl+], a
+            inc c
+            dec b
+            jr nz, .sh
+.rows:      xor a
+            ld [fxt_k], a                   ; slots staged
+.nr:        ld a, [fxt_e]
+            ld b, a
+            ld a, [fxt_k]
+            add a, b
+            cp FXT_MAX + 1
+            jr nc, .go
+            call fxt_row
+            ld a, [fxt_e]
+            ld b, a
+            ld a, [fxt_k]
+            add a, b
+            ld [fxt_k], a
+            ld a, [fxt_ty]
+            inc a
+            cp b
+            jr c, .n1
+            xor a
+.n1:        ld [fxt_ty], a
+            and a
+            jr nz, .nr
+.go:        xor a
+            ld [fxt_ui], a
+            ld a, [fxt_k]
+            ld [fxt_up], a                  ; (last: the V-Blank may take them now)
+            ret
+; tile row fxt_ty -> staged slots fxt_k.. (and their copy numbers)
+fxt_row:    ld a, [fxt_e]                   ; first tile: ty x E
+            ld b, a
+            ld a, [fxt_ty]
+            ld c, a
+            xor a
+.m:         add a, c
+            dec b
+            jr nz, .m
+            ld [fxt_i], a
+            call fxt_src                    ; its E tiles' source -> FXT_TMP
+            ld a, [fxt_e]
+            swap a
+            ld b, a                         ; 16 E bytes
+            ld de, FXT_TMP
+            di
+            ldh a, [is_cgb]
+            and a
+            jr z, .cp
+            ld a, 2
+            ldh [$FF70], a
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .cp
+            ldh a, [is_cgb]
+            and a
+            jr z, .c1
+            ld a, 1
+            ldh [$FF70], a
+.c1:        ei
+            ld a, [fxt_e]                   ; the copy numbers
+            ld b, a
+            ld a, [fxt_k]
+            add a, low(fxt_dst)
+            ld l, a
+            ld h, high(fxt_dst)
+            ld a, [fxt_i]
+            ld c, a
+.dn:        ld a, c
+            call fxt_cp
+            ld [hl+], a
+            inc c
+            dec b
+            jr nz, .dn
+            ld c, 0                         ; C = byte 0-15 within the tile (line x 2 + plane)
+.ln:        ld a, [fxt_ty]                  ; the shift: row 8 ty + line
+            add a, a
+            add a, a
+            add a, a
+            ld b, a
+            ld a, c
+            srl a
+            add a, b
+            add a, low(fxt_sh)
+            ld l, a
+            ld h, high(fxt_sh)
+            ld a, [hl]
+            ld [fxt_s], a
+            ld hl, FXT_TMP                  ; the E bytes of this line / plane -> fx_w
+            ld a, l
+            add a, c
+            ld l, a
+            ld de, fx_w
+            ld a, [fxt_e]
+            ld b, a
+.g:         ld a, [hl]
+            ld [de], a
+            inc de
+            ld a, l
+            add a, 16
+            ld l, a
+            jr nc, .g1
+            inc h
+.g1:        dec b
+            jr nz, .g
+            ld a, [fxt_s]
+            and a
+            jr z, .put
+            bit 7, a
+            jr nz, .left
+.right:     push af                         ; right: each pass, bit 0 into the next byte's bit 7,
+            ld hl, fx_w                     ;   the left edge's pixel kept
+            ld a, [hl]
+            rlca                            ; (C = the leftmost pixel)
+            ld a, [fxt_e]
+            ld b, a
+.rr:        rr [hl]
+            inc hl
+            dec b
+            jr nz, .rr
+            pop af
+            dec a
+            jr nz, .right
+            jr .put
+.left:      push af                         ; left: the right edge's pixel kept
+            ld a, [fxt_e]
+            dec a
+            add a, low(fx_w)
+            ld l, a
+            ld h, high(fx_w)
+            ld a, [hl]
+            rrca                            ; (C = the rightmost pixel)
+            ld a, [fxt_e]
+            ld b, a
+.rl:        rl [hl]
+            dec hl
+            dec b
+            jr nz, .rl
+            pop af
+            inc a
+            jr nz, .left
+.put:       ld a, [fxt_k]                   ; fx_w -> staged slots k.., byte C
+            swap a
+            add a, c
+            ld e, a
+            ld d, 0
+            ld hl, FXT_STG
+            add hl, de
+            ld de, fx_w
+            ld a, [fxt_e]
+            ld b, a
+.p:         ld a, [de]
+            inc de
+            ld [hl], a
+            ld a, l
+            add a, 16
+            ld l, a
+            jr nc, .p1
+            inc h
+.p1:        dec b
+            jr nz, .p
+            inc c
+            ld a, c
+            cp 16
+            jp c, .ln
+            ret
