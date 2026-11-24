@@ -650,6 +650,17 @@ one reaches parity, so the owner can keep playing).
      down to the Crown's floor (map 28), FF1's guard tile in front of the chest (formation 28, four
      Piscodemons) and the Crown taken. At level 10 the party won but lost three members and fell on
      the way out (FF1's game over, back to the title); being redone at level 13.
+   - Then (all as FF1, checked against the disassembly where it looked odd): the Crown at level 13,
+     Astos at 14 (a Fight-only party cannot beat him at 13: RUB / DARK, absorb 40; the battle RNG is
+     per use, so waiting does not change a fight), the Crystal (the Crown stays), Matoya's Herb, the
+     Elf doctor and prince (Mystic Key), the locked rooms (Elf castle, Cornelia: TNT), the princess's
+     Lute, Nerrick and the canal, Melmond, the Earth Cave down to the Vampire (beaten at 15) and the
+     Star Ruby. Spell deaths keep their HP (FF1's BtlMag_ApplyAilments). Melmond has no clinic or item
+     shop (the ROM's shop table). The inn's save screen offers the last file used.
+   - Stopped at the Earth Cave's way out: the test driver only fights (no spells, no items in battle)
+     and its party (absorb 16 on three members) is wiped by B3's random battles at level 16-17.
+     No game bug found since Bikke; the driver needed many fixes (shops, exits / warps, locked
+     doors, encounter transitions, entrance tiles).
    - Found and fixed: the sound variables ran past $CFFF into the save page (ship / airship flags
      and the ship's position rewritten by the music: Bikke skipped the ship); `vh_t` shared the
      shop's `sh_id`. The assembler now guards the save page (`PROTECT_RAM`) and lists RAM sections.
