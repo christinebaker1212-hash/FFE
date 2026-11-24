@@ -296,6 +296,7 @@ start:      di
 ; ---- main loop: one engine frame per GB frame
 main:       call wait_vbl
             call wa_tick                    ; (the sea and rivers move: wanim.s; in V-Blank)
+            call sgb_amb                    ; (SGB: waves / wind by vehicle: sgbx.s)
             call read_pad
             call bn_main                    ; (the place banner, the play time: text.s)
             ld a, [box_on]
@@ -534,7 +535,8 @@ load_map:   push af
             ld hl, M_VEHCGB
             call veh_tiles
             jr .drw
-.dmg:       ld a, [map_bank]                ; DMG: pre-shaded variants 0-127 -> $9000,
+.dmg:       call sgb_region                 ; (SGB: the border's colours by region: sgbx.s)
+            ld a, [map_bank]                ; DMG: pre-shaded variants 0-127 -> $9000,
             call sbank                ;   128-255 -> $8800
             ld hl, M_TILES
             ld de, $9000
@@ -2832,6 +2834,7 @@ enc_form:   ld l, a
             jp far_byte
 ; a battle with formation A, then the map again (C set: the step handled); lost: game over
 do_battle:  ld [btl_fid], a
+            call sgb_amb0                   ; (SGB: the ambience off: sgbx.s)
             ld a, F3_BANK                   ; the encounter transition (owner, 2026-11-22; loc.s)
             ld hl, bt_trans2
             call bank_call

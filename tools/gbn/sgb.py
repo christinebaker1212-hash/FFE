@@ -2,7 +2,9 @@
 tools/gb/sgb_border.py: drawn there, no game graphics), $5000 its map and palettes (PCT_TRN),
 $5880 per formation (128) the enemy palette's colours 1-3 (RGB555: per DMG shade 1-3 the
 formation's colour in that shade, battle.dmg_shades' grouping), $5B80 fixed palettes
-(4 colours each: menus, battle windows, the party column, the world map)."""
+(4 colours each: menus, battle windows, the party column, the world map), $5C00 the border's
+colours per region (owner's list, 2026-11-24: 9 x 32 bytes, palette 4: colours 1-5 change, the
+frame's whites and the crystals stay), $5E00 the region of each map (61)."""
 import os, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
@@ -49,4 +51,39 @@ def bank(rom):
     fixed.append([0x30, sp0[rk[1]], sp0[rk[2]], 0x0F])              # the party: palette 0 jobs
     for k, p in enumerate(fixed):
         blob[0x1B80 + 8 * k:0x1B88 + 8 * k] = b''.join(data.rgb555(c).to_bytes(2, 'little') for c in p)
+    import sgb_border, ui
+    for r, cols in enumerate(REGION_COLS):
+        pal = list(sgb_border.PAL)
+        if cols: pal[1:6] = cols
+        for i, (rr, gg, bb) in enumerate(pal):
+            c = (rr >> 3) | (gg >> 3) << 5 | (bb >> 3) << 10
+            blob[0x1C00 + 32 * r + 2 * i] = c & 0xFF; blob[0x1C01 + 32 * r + 2 * i] = c >> 8
+    for m in range(61):
+        blob[0x1E00 + m] = region_of(m, ui.LOC_NAMES[ui.LOC_MAP[m]])
     return bytes(blob)
+
+
+# the border's field and band colours per region (None: as drawn, the world's blue)
+REGION_COLS = [
+    None,                                                                     # 0 world
+    [(26, 14, 6), (52, 30, 12), (86, 52, 20), (150, 96, 40), (200, 140, 70)],     # 1 town
+    [(14, 14, 20), (32, 32, 44), (56, 56, 74), (110, 110, 140), (150, 150, 180)],  # 2 castle
+    [(20, 12, 6), (44, 26, 12), (70, 44, 22), (130, 84, 40), (175, 120, 62)],     # 3 cave
+    [(4, 18, 22), (8, 40, 50), (14, 66, 80), (30, 130, 150), (70, 180, 190)],     # 4 sea
+    [(20, 24, 40), (40, 52, 90), (70, 90, 140), (120, 160, 220), (180, 210, 250)],  # 5 sky
+    [(22, 4, 10), (48, 8, 20), (80, 14, 34), (150, 30, 60), (200, 60, 90)],       # 6 Chaos
+    [(10, 22, 30), (24, 48, 64), (40, 80, 104), (110, 170, 210), (170, 220, 245)],  # 7 ice
+    [(30, 8, 4), (64, 16, 8), (100, 28, 12), (190, 60, 30), (240, 110, 50)],      # 8 volcano
+]
+
+
+def region_of(m, name):
+    """map m (its place name) -> border region"""
+    if m < 8: return 1                                          # towns
+    if 'Castle' in name and 'Floating' not in name: return 2
+    if 'Temple' in name: return 6
+    if 'Undersea' in name or 'Waterfall' in name: return 4
+    if 'Floating' in name or 'Mirage' in name: return 5
+    if 'Ice' in name: return 7
+    if 'Volcano' in name: return 8
+    return 3                                                    # caves and the rest

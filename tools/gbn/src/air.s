@@ -68,7 +68,8 @@ ap_tick:    ldh a, [maptype]                ; (the overworld only: maptype 1)
             ret nz
             jp ap_row5
 ; off now (a menu opens): V-Blank puts the display back
-ap_stop:    ld a, [ap_on]
+ap_stop:    call sgb_amb0                   ; (menus: the SGB ambience off too: sgbx.s)
+            ld a, [ap_on]
             and a
             ret z
             xor a

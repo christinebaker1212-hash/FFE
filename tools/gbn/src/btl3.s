@@ -696,6 +696,9 @@ bt_cast_en: ld [mg_def], a
             ld a, SFX_HIT                   ; FF1 BtlMag_LoadEnemyDefenderStats: "cha" and
             ld [sfx_req], a                 ;   the explosions
             ld a, [mg_d + 2]                ; (the spell's raster effect while it bursts: fx.s)
+            push af
+            call sgb_spell                  ; (SGB: the SNES's thunder / quake / fire: sgbx.s)
+            pop af
             call fx_start
             ld a, [mg_def]
             call bt_explode
