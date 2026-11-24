@@ -4025,3 +4025,10 @@ tm_frac:    ds 1                            ;   its step,
 tm_base:    ds 1                            ;   the reload)
 mus_pend:   ds 1                            ; music ticks waiting for a safe moment
 mus_busy:   ds 1                            ; the music running (no second one nested)
+
+section wram, $CF78
+sgb_pn:     ds 1                            ; Super Game Boy menu pictures (loc.s sgb_pic)
+sgb_px:     ds 1
+sgb_py:     ds 1
+sgb_pk:     ds 1
+sgb_pl:     ds 4 * 4                        ; sprite slot, x, y, ATTR palette byte

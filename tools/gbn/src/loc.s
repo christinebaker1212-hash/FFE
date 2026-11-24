@@ -948,6 +948,39 @@ dash_b:     ld a, [opt_nodash]
 .no:        xor a
             ret
 ; (moved from screens.s / main.s: their bank-0 sections were full)
+; Super Game Boy: the party's pictures in their job colours on the menu screens (bank 99)
+sgb_pic0:   ld a, [sgb_on]                  ; (scr_spr23: B, C = the picture's x, y)
+            and a
+            ret z
+            push hl
+            push de
+            push bc
+            ld a, b
+            ld [sgb_px], a
+            ld a, c
+            ld [sgb_py], a
+            ld a, e
+            ld [sgb_pk], a
+            ld a, F3_BANK
+            ld hl, sgb_pic
+            call bank_call
+            pop bc
+            pop de
+            pop hl
+            ret
+sgb_pics0:  ld a, [sgb_on]                  ; (scr_show)
+            and a
+            ret z
+            push hl
+            push de
+            push bc
+            ld a, F3_BANK
+            ld hl, sgb_pics
+            call bank_call
+            pop bc
+            pop de
+            pop hl
+            ret
 ; the hand (OAM 0-3) hidden; registers but A kept
 hand_hide:  xor a
             ld [oam_buf], a
@@ -3852,3 +3885,219 @@ opt_objw:   ld a, $80
             dec b
             jr nz, .o
             ret
+
+section bank 99, $7800
+; ---- Super Game Boy, menu screens (polish, 2026-11-24): a sprite takes the colours of the cell
+; under it, so the party's pictures showed in the windows' white / grey. Each picture placed by
+; scr_spr23 (up to four on a screen) gets the battle's palette for its job's FF1 sprite palette
+; (SGB palette 2 / 3, their darkest colour the windows' blue: the cells' background); sent when
+; the screen is shown, again when a picture changes on a shown screen
+sgb_pic:    ld a, [sgb_py]                  ; (the cells are worked out when sent)
+            ld c, a
+            ld a, [scr_t0]                  ; FF1's sprite palette 1 jobs: SGB 2, else 3
+            and a
+            ld a, $0A
+            jr nz, .p
+            ld a, $0F
+.p:         ld e, a
+            ld hl, sgb_pl                   ; its sprite slot already listed: moved / changed?
+            ld a, [sgb_pn]
+            ld d, a
+.f:         ld a, d
+            and a
+            jr z, .new
+            ld a, [sgb_pk]
+            cp [hl]
+            jr z, .old
+            inc hl
+            inc hl
+            inc hl
+            inc hl
+            dec d
+            jr .f
+.old:       inc hl                          ; (moved within the same cells and the same
+            ld a, [sgb_px]                  ;   palette: nothing to send)
+            add a, 3
+            call sgb_c8
+            ld b, a
+            ld a, [hl]
+            add a, 3
+            call sgb_c8
+            cp b
+            jr nz, .ch
+            inc hl
+            ld a, c
+            add a, 3
+            call sgb_c8
+            ld b, a
+            ld a, [hl-]
+            add a, 3
+            call sgb_c8
+            cp b
+            jr nz, .ch
+            inc hl
+            inc hl
+            ld a, [hl-]
+            dec hl
+            cp e
+            jr nz, .ch
+            ld a, [sgb_px]                  ; (the place kept exact)
+            ld [hl+], a
+            ld [hl], c
+            ret
+.ch:        ld a, [sgb_px]
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            ld [hl], e
+            jr sgb_live
+.new:       ld a, [sgb_pn]
+            cp 4
+            ret nc                          ; (more than four: none coloured, all alike)
+            ld a, [sgb_pk]
+            ld [hl+], a
+            ld a, [sgb_px]
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            ld [hl], e
+            ld hl, sgb_pn
+            inc [hl]
+; on a shown screen: the attribute block again (the palettes are in)
+sgb_live:   ldh a, [rLCDC]
+            bit 7, a
+            ret z
+            ld a, [sgb_qi]
+            ld hl, sgb_qn
+            cp [hl]
+            jr c, .q
+            xor a
+            ld [sgb_qi], a
+            ld [hl], a
+.q:         ld a, [hl]
+            cp 5
+            ret nc
+            jr sgb_attr
+sgb_c8:     srl a
+            srl a
+            srl a
+            ret
+; scr_show: the screen's packets made again with the pictures' palettes and blocks
+sgb_pics:   ld a, [sgb_pn]
+            and a
+            ret z
+            cp 5
+            ret nc
+            call sgb_new
+            ld hl, SG_FIXED                 ; PAL01: the windows
+            ld a, $01
+            ld c, SGB_BANK
+            call sgb_pal
+            ld hl, SG_FIXED + 16            ; PAL23: the party's two, darkest = the windows' blue
+            ld de, sgb_tmp
+            ld bc, 8
+            ld a, SGB_BANK
+            call far_copy
+            ld hl, SG_FIXED + 34
+            ld de, sgb_tmp + 8
+            ld bc, 6
+            ld a, SGB_BANK
+            call far_copy
+            ld hl, SG_FIXED + 6
+            ld de, sgb_tmp + 6
+            ld bc, 2
+            ld a, SGB_BANK
+            call far_copy
+            ld hl, SG_FIXED + 6
+            ld de, sgb_tmp + 12
+            ld bc, 2
+            ld a, SGB_BANK
+            call far_copy
+            ld a, $09
+            ld hl, sgb_tmp
+            ld c, 0
+            call sgb_pal
+            call sgb_attr
+            jp sgb_end
+; ATTR_BLK (two packets): the screen palette 0, then each picture's cells
+sgb_attr:   call sgb_slot
+            push de
+            call sgb_slot
+            pop de
+            push de
+            ld b, 32
+            xor a
+.z:         ld [de], a
+            inc de
+            dec b
+            jr nz, .z
+            pop de
+            ld a, $22
+            ld [de], a
+            inc de
+            ld a, [sgb_pn]
+            inc a
+            ld [de], a
+            inc de
+            ld a, $07                       ; the whole screen: palette 0
+            ld [de], a
+            inc de
+            xor a
+            ld [de], a
+            inc de
+            ld [de], a
+            inc de
+            ld [de], a
+            inc de
+            ld a, 19
+            ld [de], a
+            inc de
+            ld a, 17
+            ld [de], a
+            inc de
+            ld hl, sgb_pl + 1               ; (x, y, palette of each)
+            ld a, [sgb_pn]
+            ld c, a
+.e:         ld a, $03                       ; inside + border
+            ld [de], a
+            inc de
+            inc hl
+            inc hl
+            ld a, [hl-]                     ; the palette
+            ld [de], a
+            inc de
+            dec hl
+            ld a, [hl+]                     ; x1 = (x + 3) / 8, y1 = (y + 3) / 8,
+            ld b, a                         ; x2 = (x + 12) / 8, y2 = (y + 20) / 8
+            add a, 3
+            call sgb_c8
+            ld [de], a
+            inc de
+            ld a, [hl]
+            add a, 3
+            call sgb_c8
+            ld [de], a
+            inc de
+            ld a, b
+            add a, 12
+            call sgb_c8
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            add a, 20
+            call sgb_c8
+            ld [de], a
+            inc de
+            inc hl                          ; (the next entry's x)
+            inc hl
+            dec c
+            jr nz, .e
+            ret
+
+section bank 0, $16F0                       ; (after refl_tick: the menu pictures' resets)
+sgb_menu0:  xor a                           ; (scr_open: no pictures yet)
+            ld [sgb_pn], a
+            jp sgb_menu
+sgb_btl0:   xor a                           ; (a battle: its own palettes)
+            ld [sgb_pn], a
+            jp sgb_battle

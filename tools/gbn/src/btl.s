@@ -406,7 +406,7 @@ bt_screen:  call lcd_off                    ; (LCD off in V-Blank, interrupts of
             call bt_enemy_gfx
             call bt_party_gfx
             call bt_pal
-            call sgb_battle
+            call sgb_btl0                   ; (no menu pictures: loc.s sgb_pic)
             ld hl, smap                     ; the map copy: empty ($00), palette 0
             ld bc, 18 * 32
 .sm:        xor a

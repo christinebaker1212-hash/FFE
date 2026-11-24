@@ -31,7 +31,7 @@ scr_open:   call fade_out                   ; (the screen before faded out)
             ld a, 18
             ld [sf_row], a
             ld [sfx_menu], a
-            call sgb_menu
+            call sgb_menu0                  ; (Super Game Boy: the menus' palette)
             ld hl, smap                     ; the map copy: blank (code $20), window attributes
             ld b, 18
             ld a, $20
@@ -132,7 +132,8 @@ scr_allwin: ld hl, sattr
 
 ; the map copy to VRAM: with the LCD off all of it and the LCD on; with the LCD on in the
 ; next frames' V-Blanks (scr_frame)
-scr_show:   call gr_build                   ; (the windows' gradient: loc.s)
+scr_show:   call sgb_pics0                  ; (Super Game Boy: the pictures' colours)
+            call gr_build                   ; (the windows' gradient: loc.s)
             call lcd_get  
             bit 7, a
             jr nz, scr_upd
@@ -449,6 +450,7 @@ scr_cur_de: ld hl, cur_tbl
 
 ; a class's standing pose (2 x 3 sprites) at (B = x, C = y): tile base A, OAM entry E x 4
 scr_spr23:  ld [scr_t1], a
+            call sgb_pic0                   ; (Super Game Boy: its job colours)
             ld a, e                         ; HL = oam_buf + 4 E
             add a, a
             add a, a
