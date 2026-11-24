@@ -53,7 +53,7 @@ battle:     xor a                           ; (no menu sounds, no vehicle noise)
             ld bc, 16
             ld a, BTL_DATA
             call far_copy
-            call bt_prep                    ; enemies generated (FF1 PrepareEnemyFormation)
+            call bs_seen0                   ; enemies generated (FF1 PrepareEnemyFormation)
             ld a, TR_BATTLE                 ; (FF1: the battle music)
             call snd_track
             xor a

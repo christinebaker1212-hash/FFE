@@ -116,8 +116,9 @@ def data_bank(rom):
     put(0x5C80, rom.rd(BANK_BTLC, BTL_PALS, 64 * 4))
     put(0x5E00, dmg_shades(rom))
     names = strtab(0x6200, [enc(n) for n in ff1_monsters.M[:128]])
-    assert len(names) <= 0x800
+    assert len(names) <= 0x600
     put(0x6200, names)
+    put(0x6800, bestiary_tab(rom))                                   # the bestiary (extras.s)
     put(0x6A00, rom.rd(BANK_DOMAINS, 0x92E0, 0x140))                 # data_FiendTSA (4 x $50)
     put(0x6B40, rom.rd(BANK_DOMAINS, 0x9420, 0xC0))                  # data_ChaosTSA
     msgs = strtab(0x6C00, [enc(ff1_battle.B.get(k, '')) for k in range(80)])
@@ -152,6 +153,27 @@ def data_bank(rom):
                                                                     #   frames at speed 1;
                                                                     #   FF1: 120 .. 1)
     return bytes(b)
+
+
+def bestiary_tab(rom):
+    """per enemy id: a formation that shows it (pure 9-small / 4-large first, then mixed,
+    fiend, Chaos), its graphic | palette bit as bt_egp, the battle type, 0; $FF: in none"""
+    t = [None] * 128
+    for pref in ((0, 1), (2,), (3, 4)):
+        for f in range(128):
+            fd = rom.rd(BANK_DOMAINS, FORMATIONS + 16 * f, 16)
+            ty = fd[0] >> 4
+            if ty not in pref:
+                continue
+            for g in range(1 if ty >= 3 else 4):
+                e = fd[2 + g]
+                q = fd[6 + g] | (fd[14 + g] if g < 2 else 0)
+                if e >= 128 or t[e] is not None or (ty < 3 and q == 0):
+                    continue
+                gr = (fd[1] >> (2 * g)) & 3
+                egp = (gr << 6) | ((fd[13] >> (7 - g)) & 1)
+                t[e] = bytes([f, egp if ty < 3 else 0, ty, 0])
+    return b''.join(x or b'\xff\xff\xff\x00' for x in t)
 
 
 def rng_table(fix):
