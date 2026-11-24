@@ -425,7 +425,13 @@ box_vbl:    ld a, [box_on]
 
 ; STAT (LYC = 64): the window off below the box
 stat_int:   push af
-            ld a, [rx_on]                   ; (the encounter transition: a line's scroll, loc.s)
+            ld a, [ap_on]                   ; (the airship's view: its lines; air.s)
+            and a
+            jr z, .na
+            ld a, [ap_done]
+            and a
+            jp z, stat_ap
+.na:        ld a, [rx_on]                   ; (the encounter transition: a line's scroll, loc.s)
             and a
             jr nz, stat_rx
             ld a, [lmask]                   ; (a masked load: held through mode 3)

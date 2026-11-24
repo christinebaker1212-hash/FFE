@@ -114,6 +114,35 @@ def cc_source():
     return '\n'.join(out) + '\n'
 
 
+def ap_source():
+    """the airship's view (src/air.s): per level k (0-32, smoothed) the SCY offset of each line
+    0-63 above the ship's line (the mock-up's curve: a line d above it shows the map d + t a d^2
+    above, so the horizon line shows ROOM lines up), the levels' horizons, the sky's colours"""
+    YC, ROOM = 64, 160
+    rows, hzs = [], []
+    for k in range(33):
+        t = k / 32; t = t * t * (3 - 2 * t)
+        hz = int(round(28 * t)); dmax = YC - hz
+        a = (ROOM - dmax) / (dmax * dmax) if dmax > 0 else 0
+        row = []
+        for y in range(YC):
+            d = YC - y
+            row.append(0 if y < hz else min(255, int(round(t * a * d * d))))
+        rows.append(row); hzs.append(hz)
+    top, hor = (6, 12, 28), (25, 28, 31)                 # RGB555 levels: deep blue to pale
+    sky = []
+    for y in range(32):
+        f = min(1.0, y / 27)
+        c = [int(round(top[i] + (hor[i] - top[i]) * f)) for i in range(3)]
+        sky.append(c[0] | c[1] << 5 | c[2] << 10)
+    out = ['section bank 99, $6600']
+    for row in rows:
+        out.append('            db ' + ', '.join(str(v) for v in row))
+    out.append('            db ' + ', '.join(str(v) for v in hzs))
+    out.append('            dw ' + ', '.join('$%04X' % v for v in sky))
+    return '\n'.join(out) + '\n'
+
+
 def ui_strings():
     """the screens' strings as str_<name> labels in code bank 2"""
     out = ['section bank 2, $6C00']
@@ -276,6 +305,7 @@ def main():
            open(os.path.join(HERE, 'src', 'sgb.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'mmp.s')).read() + '\n' + mmp_source() +
            open(os.path.join(HERE, 'src', 'cc.s')).read() + '\n' + cc_source() +
+           open(os.path.join(HERE, 'src', 'air.s')).read() + '\n' + ap_source() +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
            'section bank 104, $4000\n' +              # (the small font's glyphs: bank BTL6)

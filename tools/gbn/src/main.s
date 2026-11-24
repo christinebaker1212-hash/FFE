@@ -311,6 +311,7 @@ main:       call wait_vbl
             ld [sfx_nmode], a
 .drw:       call set_scroll
             call make_oam
+            call ap_tick                    ; (the airship's view: air.s)
             jr main
 
 wait_vbl:   call sgb_tick                   ; (a Super Game Boy's queued packet: before the
@@ -345,6 +346,7 @@ vblank:     push af
             call box_vbl
             call pt_tick
             call gr_vbl                     ; (the windows' gradient: text.s)
+            call ap_vbl                     ; (the airship's view: air.s)
             ld a, [wp_on]                   ; (a screen wipe: the window from the top)
             and a
             call nz, wp_vbl
@@ -1617,10 +1619,7 @@ draw_edge:  ld a, [mdx]                     ; the line of metatiles entering the
 .h1:        ld a, [px]
             add a, b
             ld e, a
-            ld a, [py]
-            sub 5
-            ld d, a
-            ld b, 11
+            call ap_hrows                   ; (D, B: rows py - 5 .. + 5; flying py - 10 .. + 5)
 .hl:        push bc
             push de
             call q_mt
@@ -1634,7 +1633,7 @@ draw_edge:  ld a, [mdx]                     ; the line of metatiles entering the
             ld b, 5
             bit 7, a
             jr z, .v1
-            ld b, $FB
+            call ap_up                      ; (B: py - 5; flying py - 11)
 .v1:        ld a, [py]
             add a, b
             ld d, a
@@ -2492,7 +2491,8 @@ fd_on_dmg:  ldh a, [rBGP]
 
 section bank 0, $1400                       ; (main.s continued: the airship)
 ; pc_menu for the screens in F3_BANK (the world map, the 15-puzzle)
-pc_menu3:   push hl
+pc_menu3:   call ap_stop
+            push hl
             ld a, SCR_BANK
             ld hl, pc_out
             call bank_call
@@ -2534,6 +2534,7 @@ air_done:   xor a
 air_frame:  ld a, 3
             ld [sfx_nmode], a
             call veh_oam
+            call ap_tick                    ; (the view rising / sinking: air.s)
             jp wait_vbl
 
 ; FF1 MapPoisonDamage: on foot, each poisoned member loses 1 HP a step (not below 1)
@@ -3306,7 +3307,8 @@ wp_snd:     ldh a, [frame]
             ldh [$FF14], a
             ret
 ; HL = a screen of SCR_BANK: FF1's palette cycle out, then the screen
-pc_menu:    push hl
+pc_menu:    call ap_stop                    ; (the airship's view off: air.s)
+            push hl
             ld a, SCR_BANK
             ld hl, pc_out
             call bank_call
