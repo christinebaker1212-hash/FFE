@@ -87,7 +87,8 @@ st_main:    call scr_open
             call pen_str
             call .num
             call scr_show
-.l:         ld bc, $0805                    ; (the hand before the number)
+.l:         ld bc, $0205                    ; (the hand before "Song", as the other lists:
+                                            ;   after it, it met the number or the label)
             call cur_txt
             call scr_frame
             ldh a, [pad_new]
@@ -192,15 +193,32 @@ bs_main:    call bs_load
             jr nz, .pd
             bit 5, b
             jr z, .l
-            sub BS_ROWS
-            jr nc, .mv
+            ld a, [bs_top]                  ; left / right: a page back / on, the list moved
+            sub BS_ROWS                     ;   and the hand kept on its row
+            jr nc, .lt
             xor a
-            jr .mv
-.pd:        add a, BS_ROWS
+.lt:        ld [bs_top], a
+            ld a, [bs_cur]
+            sub BS_ROWS
+            jr nc, .pg
+            xor a
+            jr .pg
+.pd:        ld a, [bs_top]
+            add a, BS_ROWS
+            cp 128 - BS_ROWS + 1
+            jr c, .pt
+            ld a, 128 - BS_ROWS
+.pt:        ld [bs_top], a
+            ld a, [bs_cur]
+            add a, BS_ROWS
             cp 128
-            jr c, .mv
+            jr c, .pg
             ld a, 127
-            jr .mv
+.pg:        ld [bs_cur], a
+            call bs_fix
+            call bs_names
+            call scr_upd
+            jp .l
 .dn:        inc a
             jr .w
 .up:        dec a
