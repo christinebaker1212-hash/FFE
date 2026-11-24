@@ -344,3 +344,7 @@ Color only" screen on older systems.
   same check before writing.
 - Mid-turn owner reports without a reproduction: check which system (the SGB look: black windows,
   grey frames, sprite colours from the cell's palette) before chasing the Color.
+- A masked load (LCD on behind black, a mode-2 interrupt holding the CPU through each line's
+  mode 3) leaves the main code about a third of the plain Game Boy's time: a town's load went
+  from 12 white frames to 71 black ones. The Color (double speed) can afford it; on the DMG the
+  LCD-off load stays (2026-11-24), unless the load's CPU work shrinks first.

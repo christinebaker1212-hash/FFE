@@ -3444,9 +3444,9 @@ lcd_off:    call gr_off                     ; (the windows' gradient off, its wi
             ldh a, [rLCDC]
             bit 7, a
             ret z
-            ldh a, [is_cgb]                 ; (a DMG / SGB: the LCD off, as before; the
-            and a                           ;   white of a switched-off LCD is the Color's
-            jr nz, .cgb                     ;   problem: docs/gb-lessons.md)
+            ldh a, [is_cgb]                 ; (a DMG / SGB: the LCD off, as before; a masked
+            and a                           ;   load there runs at a third of the speed (the
+            jr nz, .cgb                     ;   line guard): 71 frames for a town, 2026-11-24)
             di
 .wd:        ldh a, [rLY]
             cp 144
