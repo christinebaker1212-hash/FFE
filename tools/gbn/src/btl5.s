@@ -38,9 +38,10 @@ fl_fiend:   ld a, BTL6_BANK
             ld hl, fl_fiend6
             jp bank_call
 
-bt_pal5:    ld hl, pal5_tab
-            ld b, 16
+bt_pal5:    ld hl, pal5_tab                 ; (all 48 bytes corrected at once: HL then walks
+            ld b, 48                        ;   the corrected copy through both loops)
             call cc_copy                    ; (the LCD colour mode: cc.s)
+            ld b, 16
 .o:         ld a, [hl+]
             ldh [rOCPD], a
             dec b
