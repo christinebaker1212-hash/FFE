@@ -1334,6 +1334,11 @@ the swings, messages only for what numbers cannot show, a top window for spell /
 names, green healing numbers, low-HP colours, every ailment named (docs/ff1-native.md items 25-26).
 Owner (2026-11-23, last): names corrupted (Rienne -> RiRine), weapons lost, town transition breaking the message window / banner: one bug, the map objects' loop ran on through RAM (obj_anim clobbered its counter); fixed, found with a SameBoy write watchpoint (build/sameboy_watch.so, docs/gb-lessons.md). Battle name window at the bottom for top-row targets, SELECT hides it (docs/ff1-native.md item 27).
 Owner (2026-11-23, last): "must be playable through normally": fixed rewards / level ups / dead enemies / weapons in battle, gradient (palette 0, music ticks, Options presses), save screen, wipe sound, intro fade, overworld bridge / canal, forest overlap (docs/ff1-native.md item 28). Priority now: a real playthrough from New Game with no pokes (harness: scratchpad pt/grind2.py), then the owner's new features (airship view mock-up, raster spells, reflections, SGB sounds / borders, animated water, smoother loads, sound test / bestiary). Lessons: docs/gb-lessons.md.
+Owner (2026-11-23, night), fixed: dungeon encounter tables (all 128 domains), the target-window garbage, weapon over the hit
+count, intro fade from black (both systems), DMG square-2 notes, gradient menus as fast as flat ones (masked-load guard paused,
+per-line division and per-cell checks removed), lost gradient records on adjacent lines, every window colour 0-31 and 32 combinations checked
+(picture line by line, sound registers vs the gradient-off run; two music-timing faults in the line handler fixed), "OK to begin" no longer blanks the top row, magic menus (field: a level
+a page; battle: L1 L2 columns) (docs/ff1-native.md item 29).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

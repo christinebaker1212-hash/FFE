@@ -2989,10 +2989,29 @@ gr_make:    ld [gr_lim], a
             ld b, a
             ld c, $C0
             jr .add
-.gap:       call gr_gap                     ; B = the music's line
+.gap:       ld a, [gr_nb]                   ; the music: from the first record at or after the
+            ld l, a                         ;   line it has without the gradient, after its
+            ld a, [gr_nb + 1]               ;   colours (colour records interrupt it; in the
+            ld h, a                         ;   longest gap it could run into V-Blank, a fade
+            ld a, [gr_rc]                   ;   step a frame late; a record of its own on the
+            ld c, a                         ;   line before a colour record made that one a line
+.gm:        ld a, c                         ;   late; owner, 2026-11-23)
+            and a
+            jr z, .gn
+            ld a, [hl+]
+            cp BOX_LINES
+            jr nc, .gs
+            inc hl
+            inc hl
+            inc hl
+            dec c
+            jr .gm
+.gs:        set 6, [hl]
+            jr .fin
+.gn:        ld b, BOX_LINES                 ; (none after it: a record of its own)
             ld c, $40
 .add:       call gr_ins
-            ld a, [gr_rc]                   ; the end
+.fin:       ld a, [gr_rc]                   ; the end
             call gr_recp.a
             ld a, $FF
             ld [hl+], a
@@ -3227,39 +3246,6 @@ gr_gc:      ld c, a
             ld a, [gr_ln]
             ld d, a
             jr gr_gcs.out
-; B = the first line of the longest gap between records (to 143)
-gr_gap:     ld a, [gr_nb]
-            ld l, a
-            ld a, [gr_nb + 1]
-            ld h, a
-            ld a, [gr_rc]
-            ld c, a
-            ld d, 0                         ; best length
-            ld b, 1
-.l:         ld e, [hl]                      ; this record's line
-            inc hl
-            inc hl
-            inc hl
-            inc hl
-            dec c
-            ld a, 144
-            jr z, .t
-            ld a, [hl]
-.t:         sub e                           ; the gap after it
-            cp d
-            jr c, .n
-            ld d, a
-            ld a, e
-            inc a
-            ld b, a
-.n:         ld a, c
-            and a
-            jr nz, .l
-            ld a, b
-            cp 144
-            ret c
-            ld b, 143
-            ret
 ; insert record (line B, mask C, the colours as they stand) before the first record with a
 ; later line; the same line: its mask ORed in
 gr_ins:     ld a, b

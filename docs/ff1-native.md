@@ -485,3 +485,33 @@ one reaches parity, so the owner can keep playing).
    Checked by playing from New Game in SameBoy (grinding near Cornelia, the inn, saves): rewards
    equal FF1's sums, levels 2 and 3 reached. Saves made with older ROMs can carry flags / names /
    weapons damaged by the object-loop bug (item 27): start a new game.
+29. Owner (2026-11-23, night), fixed:
+   - dungeons used the overworld's encounter table (only FF1's 64 overworld domains were copied:
+     Iron Golems in the present Temple of Chaos); all 128 domains now come from the ROM;
+   - the battle name window flashed a message window of garbage between targets (`lcdc_on` set
+     before the window's rows were up); the weapon now goes away after the swings, so it no longer
+     covers the hit count;
+   - intro: no line shows before its fade (both systems); plain Game Boy: square 2 notes never
+     started (the triangle's legato path skipped the pulses' trigger);
+   - gradient menus: the build took ~15 frames of a menu's load (the masked load's STAT guard held
+     the CPU through modes 2 / 3 while it ran; a division per window and line; a coverage check
+     per cell); now 3 frames, the menu shows on the same frame as without the gradient, event
+     lists identical to the old build. Records on lines next to each other were lost when a
+     handler ran late (the magic list's top in the window above's darkest colour): the STAT
+     handler takes a reached record at once;
+   - every window colour 0-31 on each channel (through the Options screen), 32 combinations (the
+     cube's corners and 24 random ones, on the main menu and Items) and the field banner at 8
+     extreme colours: the ramp equals the model of `gr_ramp_mk`, and each palette value shows as
+     one screen colour on every line (cell palettes from the attribute map). Two timing faults
+     found and fixed: the music ran inside the line handler with interrupts off, so a colour
+     record after a short gap came a line late (line events may now interrupt the music; V-Blank
+     still waits), and the music sat in the longest gap, so it could start late and run into
+     V-Blank (a fade step a frame late): it now runs from the first record at or after line 64,
+     after that record's colours, as without the gradient. Sound: the music registers equal the
+     gradient-off run's frame for frame; only the cursor beep can start a frame apart, and with
+     bright colours leaving a menu takes 1-5 frames longer (~40 colour records a frame cost CPU
+     time while the menu fades out);
+   - party creation: "OK to begin with this party?" no longer blanks the top row (a 5-row window
+     between the rows of boxes; only the lower pictures hidden under it);
+   - magic menus (owner): the field list shows one level a page (its MP above, its spells below,
+     empty levels skipped); the battle list a level a column (L1 L2, MP, three spells each).

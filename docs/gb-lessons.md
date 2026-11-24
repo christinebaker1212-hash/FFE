@@ -281,3 +281,25 @@ Color only" screen on older systems.
   runs. Now the wipe clears NR10 when it ends and the music clears it at every square-1 note.
   Check: read $FF10-$FF26 raw before and after each effect; compare against a run that never
   plays the effect, not against another run that does.
+
+## Raster lists and guards (2026-11-23, night)
+- **A line-interrupt chain loses events on adjacent lines.** Each handler waits for its line's
+  H-Blank, then sets the next LYC. When it runs late, the next LYC lands on a line that has already
+  begun, and that interrupt never comes: one gradient record was lost every frame (a window's top
+  showed the window above's colour). After writing LYC, compare it with LY and handle a reached
+  event at once, clearing the STAT request so it is not handled twice.
+- **A STAT guard that holds the CPU through modes 2 / 3 halves the main code's speed.** The Color
+  masked loads guard VRAM writes that way; a RAM-only computation run during a load (the gradient
+  build: 15 frames) should pause the guard (`gd_off`) and resume it after (`gd_resume`).
+- **Sound checks across builds or options: compare the sound registers at each V-Blank, not the
+  audio samples.** A music tick on another line shifts every sample, while the registers per frame
+  must match exactly (the gradient run: equal apart from a cursor beep starting a frame apart).
+- **Per-line colour checks:** map each palette value written by the list to the screen colour
+  seen; one value showing as two colours means a lost or late record. Take each pixel's palette
+  from the attribute map (a shared window border follows its cell's palette, not the window
+  drawn last) and the most common colour per line (sprites over windows).
+- **Long work inside a line handler (the music) delays the next line events.** Let line events
+  interrupt it (IE = STAT only, `ei`; V-Blank must wait when its handler restores a ROM bank the
+  long work does not record), and never start it late in the frame: it runs into V-Blank and
+  every V-Blank wait behind it (fades, uploads) misses a frame. Do not give it a record of its own
+  on the line before another event: attach it to that event, after its writes.

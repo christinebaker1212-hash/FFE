@@ -453,7 +453,15 @@ stat_int:   push af
             push af
             ld a, SND_BANK
             ld [MBC_BANK], a
+            ldh a, [rIE]                    ; (line events may interrupt the music: a colour
+            push af                         ;   record after a short gap came a line late,
+            ld a, 2                         ;   owner, 2026-11-23; V-Blank waits: its handler
+            ldh [rIE], a                    ;   restores the ROM bank the music does not note)
+            ei
             call snd_frame_b
+            di
+            pop af
+            ldh [rIE], a
             pop af
             ld [MBC_BANK], a
             pop hl
