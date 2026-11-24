@@ -64,7 +64,7 @@ def gfx_bank(rom):
 
 NAME_GRID = ['ABCDEFGHI', 'JKLMNOPQR', 'STUVWXYZ ', 'abcdefghi', 'jklmnopqr',
              "stuvwxyz'", '012345678', '9.,-!?&…(', '):;/+%"[]']   # (9 x 9, in a window)
-TITLE = ['Continue', 'New Game', 'Message Speed']
+TITLE = ['Continue', 'New Game', 'Message Speed', 'Extras']
 SAVE_ERROR = ('SAVE DATA ERROR\n\nThe saved game in\nthe Game Pak is\ndamaged.\n\n'
               'Press the A Button\nto erase it.')     # (Lot Check: Nintendo's names)
 SUSP_ERROR = ('SUSPEND DATA ERROR\n\nThe suspended game\nin the Game Pak is\ndamaged.\n\n'

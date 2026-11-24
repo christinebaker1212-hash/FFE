@@ -387,6 +387,7 @@ def main():
            open(os.path.join(HERE, 'src', 'refl.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'wanim.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sgbx.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'extras.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
            'section bank 104, $4000\n' +              # (the small font's glyphs: bank BTL6)

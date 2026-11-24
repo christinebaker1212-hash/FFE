@@ -556,6 +556,10 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             ld c, 11
             ld d, 18
             call scr_win
+            ld b, 4                         ; (Extras: the sound test, the bestiary: extras.s)
+            ld c, 14
+            ld d, 12
+            call scr_win
             ld bc, $0606
             ld hl, str_title0
             call scr_str
@@ -564,6 +568,9 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             call scr_str
             ld bc, $030C
             ld hl, str_title2
+            call scr_str
+            ld bc, $060F
+            ld hl, str_title3
             call scr_str
             call .rate
             call eqm_pal                    ; (Color: the grey of a closed choice)
@@ -593,12 +600,9 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             ld b, a
             and $C0                         ; up / down: Continue <-> New Game (FF1: the select
             jr z, .lr                       ;   sound)
-            ld a, [ng_lock]
-            and a
-            jr nz, .t
-            ld a, [ng_cur]
-            xor 1
-            ld [ng_cur], a
+            ld a, EXTRA_BANK                ; (Continue / New Game / Extras: extras.s)
+            ld hl, ng_ud
+            call bank_call
             ld a, SFX_SEL
             ld [sfx_req], a
             jr .t
@@ -621,6 +625,8 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             jr z, .t
             call opt_save0                  ; (the message speed kept, as in Options)
             ld a, [ng_cur]
+            cp 3
+            jr z, .ext
             and a
             jr nz, .new
             call sus_state                  ; Continue: a suspend point first
@@ -652,6 +658,10 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             call file_load
             jp c, .np
             ret
+.ext:       ld a, EXTRA_BANK                ; the extras (extras.s), then the title again
+            ld hl, ex_menu
+            call bank_call
+            jp .np
 .new:       ld a, F3_BANK                   ; CLASSIC or MODERN first (owner; loc.s)
             ld hl, ng_mode
             call bank_call
