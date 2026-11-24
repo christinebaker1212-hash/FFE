@@ -295,6 +295,7 @@ start:      di
 
 ; ---- main loop: one engine frame per GB frame
 main:       call wait_vbl
+            call wa_tick                    ; (the sea and rivers move: wanim.s; in V-Blank)
             call read_pad
             call bn_main                    ; (the place banner, the play time: text.s)
             ld a, [box_on]

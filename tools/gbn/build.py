@@ -206,6 +206,9 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, OW_TS, 0x4400, o['cgb_tiles'])
     place(banks, OW_INFO, 0x5000, o['cgb_bg'] + o['cgb_bg'])
     place(banks, OW_INFO, 0x5040, o['cgb_obj'])
+    wa, wa_info = water_anim(o)                                 # (the animated sea and rivers)
+    place(banks, WANIM_BANK, 0x4000, wa)
+    print('water animation:', wa_info)
     place(banks, OW_INFO, 0x7400, o['veh_cgb'])                # vehicle sprites (FF1 OW objects)
     place(banks, OW_INFO, 0x7A00, o['veh_dmg'])
     fix = rom.prg[-0x4000:]                                     # FF1's vehicle sprite tables
@@ -261,6 +264,80 @@ def data_banks(rom, ff3=None, init=None):
     return banks
 
 
+WANIM_BANK = 106                                 # (src/wanim.s)
+def water_anim(o):
+    """the animated sea and rivers (owner's list, 2026-11-24; FF1 has none): the commonest open
+    sea metatile and river metatile of the overworld, each 16 x 16 picture shifted a pixel a
+    phase (sea sideways, river downwards), 16 phases, for the Color's tiles and the DMG's
+    pre-shaded ones. Only metatiles whose four tiles no other metatile uses (and that stay
+    consistent where they repeat a tile) move: coasts and land never change.
+    Bank layout: $4000 count; entries of 16 bytes from $4010 (Color tiles 4, DMG tiles 4, the
+    frames' offsets (Color, DMG)); frames: 16 x 64 bytes each."""
+    prop, tsa, tbl = o['prop'], o['tsa'], o['mt_dmg']
+    freq = {}
+    for r_ in o['rows']:
+        for v in r_: freq[v & 0x7F] = freq.get(v & 0x7F, 0) + 1
+    def kind(mt):
+        d = prop[2 * mt]
+        if not d & 1 or (d & 6) == 6: return None
+        return 'sea' if not d & 4 else 'river'
+    def dec(t):
+        px = [[0] * 8 for _ in range(8)]
+        for y in range(8):
+            lo, hi = t[2 * y], t[2 * y + 1]
+            for x in range(8): px[y][x] = (lo >> (7 - x) & 1) | (hi >> (7 - x) & 1) << 1
+        return px
+    def enc(px):
+        out = bytearray()
+        for y in range(8):
+            lo = hi = 0
+            for x in range(8):
+                v = px[y][x]; lo |= (v & 1) << (7 - x); hi |= (v >> 1) << (7 - x)
+            out += bytes([lo, hi])
+        return bytes(out)
+    def frames(tiles16, vertical):
+        q = [dec(t) for t in tiles16]                       # UL, UR, DL, DR
+        img = [[q[(y >= 8) * 2 + (x >= 8)][y & 7][x & 7] for x in range(16)] for y in range(16)]
+        out = []
+        for k in range(16):
+            sh = [[img[(y - k) % 16][x] if vertical else img[y][(x - k) % 16] for x in range(16)]
+                  for y in range(16)]
+            out.append([enc([[sh[qy * 8 + y][qx * 8 + x] for x in range(8)] for y in range(8)])
+                        for qy in range(2) for qx in range(2)])
+        return out
+    pos_c, pos_d = {}, {}                               # tile -> the corners it is used at
+    for k in range(4):
+        for mt in range(128):
+            pos_c.setdefault(tsa[128 * k + mt], set()).add(k)
+            pos_d.setdefault(tbl[128 * k + mt], set()).add(k)
+    ents, data_ = [], bytearray()
+    for want, vert in (('sea', False), ('river', True)):
+        cand = sorted((m for m in range(128) if kind(m) == want), key=lambda m: -freq.get(m, 0))
+        for mt in cand[:1]:
+            cid = [tsa[128 * k + mt] for k in range(4)]
+            did = [tbl[128 * k + mt] for k in range(4)]
+            fc = frames([o['cgb_tiles'][16 * t:16 * t + 16] for t in cid], vert)
+            fd = frames([o['dmg_tiles'][16 * t:16 * t + 16] for t in did], vert)
+            # every use of a tile, by any metatile at any corner, must get the same picture in
+            # every phase: the same corner as here, or a corner whose shifted quarter is equal
+            def same(ids, pos_of, fr):
+                for k, t in enumerate(ids):
+                    for k2 in pos_of[t]:
+                        if k2 != k and any(f[k2] != f[k] for f in fr): return False
+                return True
+            if not (same(cid, pos_c, fc) and same(did, pos_d, fd)): continue
+            oc = 0x4100 + 0x800 * len(ents)                    # (fixed places: entry e's Color
+            od = oc + 0x400                                     #   frames at $4100 + $800 e, DMG
+            data_ += b''.join(b''.join(f) for f in fc)          #   at + $400)
+            data_ += b''.join(b''.join(f) for f in fd)
+            ents.append(bytes(cid) + bytes(did) + oc.to_bytes(2, 'little') + od.to_bytes(2, 'little')
+                        + bytes(4))
+    blob = bytearray(0x100)
+    blob[0] = len(ents)
+    for i, e in enumerate(ents): blob[0x10 + 16 * i:0x20 + 16 * i] = e
+    return bytes(blob) + bytes(data_), [(e[0:4].hex(), e[4:8].hex()) for e in ents]
+
+
 def main():
     a = sys.argv[1:]
     nes = a[a.index('--nes') + 1] if '--nes' in a else os.path.join(ROOT, 'build', 'ff1_gb.nes')
@@ -308,6 +385,7 @@ def main():
            open(os.path.join(HERE, 'src', 'air.s')).read() + '\n' + ap_source() +
            open(os.path.join(HERE, 'src', 'fx.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'refl.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'wanim.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
            'section bank 104, $4000\n' +              # (the small font's glyphs: bank BTL6)
