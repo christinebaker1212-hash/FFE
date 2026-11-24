@@ -871,7 +871,7 @@ sh_readj:   xor a
 ; with sh_it worn (Color: green better, red worse), or Can't use / Full; sh_pv[m]: 0 may
 ; wear it, 1 can't, 2 no empty slot
 sh_epv:     call sh_wwin
-            ld bc, $0806
+            ld bc, $0B06                    ; (the heading over the values, columns 10-18)
             ld hl, str_satk
             ld a, [sh_type]
             and a
@@ -927,10 +927,10 @@ sh_epv:     call sh_wwin
             inc de
             dec b
             jr nz, .rs
-            ld a, [sh_k]                    ; now > with it
-            add a, 7
+            ld a, [sh_k]                    ; now > with it (ending at column 18: clear of
+            add a, 7                        ;   a six-letter name; owner 2026-11-24 polish)
             ld c, a
-            ld b, 8
+            ld b, 10
             call pen_at
             ld a, [eqm_w]
             call nf_a
@@ -957,7 +957,7 @@ sh_epv:     call sh_wwin
 .co:        ld a, [sh_k]
             add a, 7
             ld c, a
-            ld b, 14
+            ld b, 16
             call cell_addr
             ld a, h
             add a, 3
@@ -969,17 +969,20 @@ sh_epv:     call sh_wwin
             xor a
             ld [sh_wi], a
             jr .nx
-.wr:        ld a, [sh_k]                    ; Can't use / Full
+.wr:        ld a, [sh_k]                    ; Can't use / Full (ending at column 18)
             add a, 7
             ld c, a
-            ld b, 8
-            call pen_at
             ld a, [sh_wi]
             dec a
+            ld b, 10
             ld hl, str_scant
             jr z, .ws
+            ld b, 15
             ld hl, str_sfull
-.ws:        call pen_str
+.ws:        push hl
+            call pen_at
+            pop hl
+            call pen_str
 .nx:        ld a, [sh_k]
             ld e, a
             ld d, 0

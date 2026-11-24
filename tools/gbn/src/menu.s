@@ -366,8 +366,8 @@ mm_draw:    call scr_open
             call orb_draw
             jp scr_show
 
-; member A in the main menu: the picture at x 14 (its job's battle pose: tiles 6 A, OAM 8 + 6 A),
-; name, level or ailment, HP / max from column 4, rows 1 + 3 A ..
+; member A in the main menu: the picture at x 7 (its job's battle pose: tiles 6 A, OAM 8 + 6 A),
+; name, level or ailment, HP / max from column 3, rows 1 + 3 A ..
 mm_mem3:    ld [mm_t], a
             call ch_rec
             ld a, [hl]
@@ -416,7 +416,9 @@ mm_mem3:    ld [mm_t], a
             add a, a
             add a, 8
             ld c, a
-            ld b, 14                        ; (2 pixels clear of the text)
+            ld b, 7                         ; (1 pixel clear of the text at column 3: the
+                                            ;   HP / max ends at column 9, clear of the
+                                            ;   command hand; owner 2026-11-24 polish)
             ld a, [mm_t]
             ld e, a
             add a, a
@@ -433,7 +435,7 @@ mm_mem3:    ld [mm_t], a
             add a, c
             inc a
             ld c, a
-            ld b, 4
+            ld b, 3
             push bc
             call pen_at
             ld a, [mm_t]
@@ -652,8 +654,8 @@ pick_char:  xor a
             add a, a                        ;   at x 14)
             add a, a
             ld c, a
-            ld b, 14 - 17
-            call scr_cursor
+            ld b, 7 - 10                    ; (the fingertip on the picture's edge, x 7; the
+            call scr_cursor                 ;   hand cut by the screen's edge)
             ld a, [mm_cur]                  ; (the command's hand stays: second cursor)
             inc a
             ld c, a
