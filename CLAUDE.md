@@ -1351,7 +1351,9 @@ confirm sound through Color loads, SGB packet pulses (Garland text), people face
 box cut in H-Blank (docs/ff1-native.md item 32). Then: reflections on water, animated sea / rivers, SGB region borders and
 SNES sounds, Extras on the title (Sound Test, Bestiary kept in cart RAM with battle pictures and stats from the ROM)
 (item 33). Owner: weapon categories stay as the ROM has them; loads keep their length (DMG white loads stay).
-Open: enemy flashes / world-map borders (await details), the playthrough.
+Then (item 34): colour correction fixed (enemy flash / party lines), FFL3-style water, a lovelier
+encounter transition (DMG at full pace), FF1's game-over message and fade. Open: world-map borders
+(await details), the playthrough.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

@@ -616,3 +616,18 @@ one reaches parity, so the owner can keep playing).
      categories (FF1's bug fixed), so these are the bonuses in play now. Owner (2026-11-24): keep them
      as the ROM has them. Smoother loads: fine as long as they keep the same length (so the plain
      Game Boy keeps its short white loads).
+34. Owner (2026-11-24, later):
+   - Colour correction (GBC / GBA Corrected) broke the battle's extra palettes: `bt_pal5` corrected
+     16 of its 48 bytes and read BG 4-7 from the correction buffer's leftovers (the enemy flash as a
+     blue square, the party window's low-HP / down lines in junk colours). All 48 corrected now.
+   - Water as Final Fantasy Legend III's (studied in the owner's FFL3 ROM, motion only, FF1's own
+     tiles): a pixel per 16 frames, the 16 x 16 picture's halves in turn 8 frames apart (sea:
+     upper / lower sideways; river: left / right downwards, together when one tile fills every
+     corner); 32 half steps.
+   - Encounter transition made lovelier: two white pulses, a swirl (rolling ripple, drawn in to
+     the party), lines parting while the picture folds onto the party's line into white (colour
+     level per frame from a table). Its line handler reads page-aligned SCX / SCY tables by line
+     (`hrx`, ~47 cycles a line): the plain Game Boy keeps one step a frame (it took two, and showed
+     noise frames when a step ran late); the first frame no longer shows a broken picture.
+   - Game over as FF1: game-over music, "<leader>'s party / were wiped out", any button, a fade to
+     white, the title (fading in from white after a restart).
