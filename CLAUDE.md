@@ -1350,8 +1350,8 @@ Owner (2026-11-24, last), done: raster spell effects on the target only, Magic s
 confirm sound through Color loads, SGB packet pulses (Garland text), people face the party, bottom target window, banner /
 box cut in H-Blank (docs/ff1-native.md item 32). Then: reflections on water, animated sea / rivers, SGB region borders and
 SNES sounds, Extras on the title (Sound Test, Bestiary kept in cart RAM with battle pictures and stats from the ROM)
-(item 33). Open: DMG smoother loads (masked loads 4x slower), weapon categories out of step with FF1's enemy categories
-(asked the owner), enemy flashes / world-map borders (await details), the playthrough.
+(item 33). Owner: weapon categories stay as the ROM has them; loads keep their length (DMG white loads stay).
+Open: enemy flashes / world-map borders (await details), the playthrough.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

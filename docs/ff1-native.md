@@ -613,4 +613,6 @@ one reaches parity, so the owner can keep playing).
      ($04, the disassembly's "Giant") and Lizards / snakes the dragons' bit. The weapon data is
      out of step with them: Wyrmkiller carries $04, Great Sword $08 (Undead), Sun Blade $20 (Water),
      Coral Sword $10 (Were), Werebuster $41, Icebrand $02 (dragons). The native battle applies weapon
-     categories (FF1's bug fixed), so these are the bonuses in play now; asked the owner.
+     categories (FF1's bug fixed), so these are the bonuses in play now. Owner (2026-11-24): keep them
+     as the ROM has them. Smoother loads: fine as long as they keep the same length (so the plain
+     Game Boy keeps its short white loads).
