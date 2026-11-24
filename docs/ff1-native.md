@@ -587,3 +587,30 @@ one reaches parity, so the owner can keep playing).
      of the banner's next row).
    - Not reproduced (asked the owner for the system / enemy): enemy flashes broken, colourless menu
      borders on the world map (the SGB packet fix may cover it).
+33. Owner's list (2026-11-24), continued:
+   - Reflections on water (`src/refl.s`): on the overworld the party (or the ship) is mirrored in OAM
+     36-39 when water is below it, the far row wavering; CGB palettes 4-7 are the sprite palettes
+     darkened and tinted blue, DMG / SGB use OBP1.
+   - Animated sea and rivers (`src/wanim.s`, `build.py water_anim`, bank 106): the commonest sea and
+     river metatiles from the user's ROM, 16 phases made at build time, one upload every 8 frames in
+     V-Blank (not under the airship view).
+   - Super Game Boy: a border per region (world, town, castle, cave, sea, sky, Chaos, ice, volcano;
+     `sgb.py REGION_COLS`, `src/sgbx.s`, sent with the screen frozen and SCX / SCY 0), the SNES's
+     own sound effects (waves on the ship, wind in the airship; spell sounds in battle).
+   - Smoother loads: the Color already loads behind a black mask; on the plain Game Boy a masked
+     load costs ~4 times as long (71 against 12 frames), and its fades go to white, so the LCD-off
+     white is kept there.
+   - Extras on the title menu (`src/extras.s`, bank 107): a Sound Test (FF1's 24 songs, left / right,
+     A plays) and a Bestiary. The Bestiary marks every monster a battle generates (bank 0 `bs_seen0`
+     after `bt_prep`) in cart RAM bank 1 $BF80 ("BE", 16 bits, a check; cart RAM on only meanwhile),
+     kept for every save file. The list names the met monsters; an entry draws the monster with the
+     battle's own loaders from a formation that shows it (`battle.py bestiary_tab`, picked at build
+     time: pure formations first), moves the tiles to $92-$FF (the font stays at $9000; DMG shaded
+     as in battle, CGB palettes 1 / 2 from the formation), centres it (Chaos over the top 12 rows),
+     and lists HP, Attack, Defense, Evade, EXP, Gil, Weak / Resist (FF1's element bits) and the
+     traits Undead / Regen. Left / right step to the next met monster.
+   - FF1's other category bits are not shown: the ROM gives Goblins / Ogres / Gigas the same bit
+     ($04, the disassembly's "Giant") and Lizards / snakes the dragons' bit. The weapon data is
+     out of step with them: Wyrmkiller carries $04, Great Sword $08 (Undead), Sun Blade $20 (Water),
+     Coral Sword $10 (Were), Werebuster $41, Icebrand $02 (dragons). The native battle applies weapon
+     categories (FF1's bug fixed), so these are the bonuses in play now; asked the owner.

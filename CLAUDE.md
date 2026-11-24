@@ -1348,8 +1348,10 @@ numbers, deaths without sliding; volume-step clicks removed (two-write steps, al
 New Game; LCD colour correction (Color); the airship's view (src/air.s) (docs/ff1-native.md item 31).
 Owner (2026-11-24, last), done: raster spell effects on the target only, Magic shop Buy / Leave, hand only on whole windows,
 confirm sound through Color loads, SGB packet pulses (Garland text), people face the party, bottom target window, banner /
-box cut in H-Blank (docs/ff1-native.md item 32). Next: reflections, SGB sounds / borders, animated ocean, smoother loads,
-sound test / bestiary, the playthrough.
+box cut in H-Blank (docs/ff1-native.md item 32). Then: reflections on water, animated sea / rivers, SGB region borders and
+SNES sounds, Extras on the title (Sound Test, Bestiary kept in cart RAM with battle pictures and stats from the ROM)
+(item 33). Open: DMG smoother loads (masked loads 4x slower), weapon categories out of step with FF1's enemy categories
+(asked the owner), enemy flashes / world-map borders (await details), the playthrough.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
