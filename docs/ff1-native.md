@@ -639,3 +639,14 @@ one reaches parity, so the owner can keep playing).
    - Reflection more faded: on the Color each channel is 3/8 the sprite's and 5/8 the sea's main
      colour (taken by the build from the sea tile and its palette, through the LCD colour mode);
      DMG / SGB OBP1 light grey with a dark-grey outline only.
+36. Playthrough from New Game without RAM pokes (2026-11-24; SameBoy, Color and DMG; driver in the
+   session scratchpad: menu-driven shops by `sh_cur`, map / teleport / door data from the ROM, a
+   foot + ship overworld path search, saved states per stage):
+   - Done: party, Cornelia weapon / armour shops, levels outside Cornelia (inn, clinic), Temple of
+     Fiends, Garland, the princess's warp, the King's bridge, the bridge story, Pravoka's inn,
+     Bikke's pirates, the ship given ("I'll give ya my ship").
+   - Found and fixed: the sound variables ran past $CFFF into the save page (ship / airship flags
+     and the ship's position rewritten by the music: Bikke skipped the ship); `vh_t` shared the
+     shop's `sh_id`. The assembler now guards the save page (`PROTECT_RAM`) and lists RAM sections.
+   - Checked, not bugs: "Had no effect" when several members hit an enemy already dead (FF1, Auto
+     Retarget off); a party wipe at sea at level 3 goes to FF1's game over and the title.

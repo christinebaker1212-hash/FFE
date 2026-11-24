@@ -1353,7 +1353,9 @@ SNES sounds, Extras on the title (Sound Test, Bestiary kept in cart RAM with bat
 (item 33). Owner: weapon categories stay as the ROM has them; loads keep their length (DMG white loads stay).
 Then (item 34): colour correction fixed (enemy flash / party lines), FFL3-style water, a lovelier
 encounter transition (DMG at full pace), FF1's game-over message and fade; water in four bands, the
-reflection faded into the sea (item 35). Open: world-map borders
+reflection faded into the sea (item 35). Playthrough (item 36): New Game to Bikke's ship on Color and
+DMG; the sound variables overran the save page (ship / airship flags): fixed, guarded, saves repaired
+on load. Next: Elfland and on. Open: world-map borders
 (await details), the playthrough.
 
 ## Remaining
