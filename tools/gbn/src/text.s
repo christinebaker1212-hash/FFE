@@ -636,7 +636,11 @@ bn_start:   xor a
 bn_tick:    dec a
             ld [bn_t], a
             ret nz
-            ld a, BOX_LINES - 1
+            ld a, [box_on]                  ; (owner: the window off and hidden at once; the
+            and a                           ;   cut moved to the box's line alone left this
+            jr nz, .k                       ;   frame's window on to line 64: a whole box of
+            call win_kill                   ;   old cells for a frame)
+.k:         ld a, BOX_LINES - 1
             ldh [rLYC], a
             jp gr_off
 ; the play time (V-Blank): frames, seconds, minutes, hours to 99, in the save page

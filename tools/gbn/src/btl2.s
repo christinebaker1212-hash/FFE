@@ -3101,6 +3101,7 @@ bt_ban_off: ld a, [ban_on]
             ld [ban_bot], a
             ld a, LCDC_ON
             ld [lcdc_on], a
+            call win_kill                   ; (at once: see bn_tick)
             ld a, BOX_LINES - 1
             ldh [rLYC], a
             ret
