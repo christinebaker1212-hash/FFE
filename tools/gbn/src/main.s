@@ -1250,6 +1250,11 @@ talk:       ld a, [px]
             ld bc, O_TALK
             add hl, bc
             ld [hl], 1                      ; it turns to the party
+            ld bc, O_FACE - O_TALK          ; (and stays turned: its facing, as FF1; owner:
+            add hl, bc                      ;   not back to its old direction mid-talk)
+            ld a, [facing]
+            xor 1                           ; (right <-> left, up <-> down)
+            ld [hl], a
             pop hl
             call talk_obj                   ; A = dialogue
 .dlg:       jp dlg_open

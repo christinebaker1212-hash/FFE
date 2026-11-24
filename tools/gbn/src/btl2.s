@@ -3630,12 +3630,8 @@ bt_tban_e:  ld a, [ban_hide]                ; (SELECT: none)
             cp [hl]
             ret z
             ld [hl], a
-            call bt_epos                    ; (an enemy in the top rows: the window at the
-            ld a, c                         ;   bottom, the hand and the enemy stay in sight)
-            cp 3
-            ld a, 0
-            adc a, a
-            ld hl, ban_bot
+            ld a, 1                         ; (owner, 2026-11-24: at the bottom always, where
+            ld hl, ban_bot                  ;   the hand is: no move between top and bottom)
             cp [hl]
             push af
             call nz, bt_ban_off             ; (moved: off first)
@@ -3653,10 +3649,7 @@ bt_tban_p:  ld a, [ban_hide]                ; (SELECT: none)
             cp [hl]
             ret z
             ld [hl], a
-            and 3                           ; (the first member stands under the top rows:
-            cp 1                            ;   the window at the bottom)
-            ld a, 0
-            adc a, a
+            ld a, 1                         ; (at the bottom always: owner)
             ld hl, ban_bot
             cp [hl]
             push af
