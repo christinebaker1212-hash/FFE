@@ -387,8 +387,8 @@ bt_msg_close:
             ld hl, bt_save + 6 * 32
             ld de, sattr + 12 * 32
             ld bc, 6 * 32
-            call memcpy
-            jp bt_upd
+            jp memcpy                       ; (shown by what is drawn next: the names or the
+                                            ;   commands, so the left window never shows empty)
 
 ; magic id A -> mg_d (8 bytes)
 bt_mload:   ld [mg_id], a

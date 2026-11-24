@@ -103,7 +103,6 @@ def strings():
     out['satk'] = enc('Attack')                         # (the shops' party window)
     out['sdef'] = enc('Defense')
     out['scant'] = enc("Can't use")
-    out['scantl'] = enc("Can't learn")
     out['sfull'] = enc('Full')
     out['sok'] = enc('OK')
     out['noeff'] = enc("It wouldn't have\nany effect.")
@@ -172,6 +171,8 @@ def string_table(base):
 
 
 MTEXT_BANK = 5
+# shop strings kept as written: menus, Yes / No, the price line, the inn's dots, FF1's variants
+SHOP_KEEP = {10, 11, 14, 15, 17, 18, 21, 22, 28, 36}
 
 
 def mtext_bank(rom=None):
@@ -209,8 +210,10 @@ def mtext_bank(rom=None):
         lines = t.split('\n')
         if k < 8:                                   # the shop names: the title window (8 wide)
             lines = text.wrap(t.strip(), 8)
-        elif len(lines) > 4 or max(len(x) for x in lines) > 18:
-            lines = text.wrap(' '.join(x.strip() for x in lines))[:4]
+        elif k not in SHOP_KEEP or len(lines) > 4 or max(len(x) for x in lines) > 18:
+            flow = text.wrap(' '.join(x.strip() for x in lines))   # (speech: the NES window's
+            if len(flow) < len(lines) or max(len(x) for x in lines) > 18:      # breaks
+                lines = flow[:4]                    # dropped, 18 columns, when it saves lines)
         ptrs += (0x6080 + len(body)).to_bytes(2, 'little')
         body += enc('\n'.join(lines)) + b'\0'
     blob[0x2000:0x2080] = ptrs

@@ -607,8 +607,11 @@ bt_names_win:
             call bt_hand_off
             ld a, 0
             ld [bt_t + 12], a
-            call bt_left_clear
-            jp bt_names
+            ld bc, $000C                    ; (the window and its names first, then shown: each
+            ld de, $0906                    ;   name's tiles take a frame (bt_flush), and the
+            call bt_win                     ;   window went out empty meanwhile)
+            call bt_names
+            jp bt_upd
 ; the left window cleared (frame, empty inside)
 bt_left_clear:
             ld bc, $000C
@@ -2125,8 +2128,7 @@ bt_msg_end: ld a, [bt_defer]
             ld de, sattr + 12 * 32
             ld bc, 6 * 32
             call memcpy
-            call bt_upd
-            jp bt_names_win
+            jp bt_names_win                 ; (shown with the names in: bt_names_win)
 ; a message alone (A = FF1 message), no attacker line
 bt_say:     push af
             call bt_msg_new
@@ -3093,6 +3095,9 @@ bt_ban_off: ld a, [ban_on]
             ld [ban_bot], a
             ld a, LCDC_ON
             ld [lcdc_on], a
+.vb:        ldh a, [rLY]                    ; (in V-Blank: mid-frame, the lines already drawn
+            cp 144                          ;   kept a sliver of its border for a frame)
+            jr c, .vb
             call win_kill                   ; (at once: see bn_tick)
             ld a, BOX_LINES - 1
             ldh [rLYC], a

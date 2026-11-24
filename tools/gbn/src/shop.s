@@ -1013,13 +1013,14 @@ sh_mpv:     call sh_wwin
             ld a, [sh_k]
             add a, 7
             ld c, a
-            ld b, 8
+            ld b, 9                         ; (a space after a six-letter name)
             call pen_at
             pop af
             ld hl, str_sok
             and a
             jr z, .p
-            ld hl, str_scantl
+            ld hl, str_scant                ; (the equipment shops' wording: the longer
+                                            ;   one left no room after a six-letter name)
             dec a
             jr z, .p
             ld hl, str_sknown
