@@ -267,12 +267,12 @@ def data_banks(rom, ff3=None, init=None):
 WANIM_BANK = 106                                 # (src/wanim.s)
 def water_anim(o):
     """the animated sea and rivers (owner's list, 2026-11-24; FF1 has none): the commonest open
-    sea metatile and river metatile of the overworld, each 16 x 16 picture shifted a pixel a
-    phase (sea sideways, river downwards), 16 phases, for the Color's tiles and the DMG's
+    sea metatile and river metatile of the overworld, the halves of each 16 x 16 picture
+    shifted a pixel in turn (sea sideways, river downwards), 32 half steps, for the Color's tiles and the DMG's
     pre-shaded ones. Only metatiles whose four tiles no other metatile uses (and that stay
     consistent where they repeat a tile) move: coasts and land never change.
     Bank layout: $4000 count; entries of 16 bytes from $4010 (Color tiles 4, DMG tiles 4, the
-    frames' offsets (Color, DMG)); frames: 16 x 64 bytes each."""
+    frames' offsets (Color, DMG)); frames: 32 x 64 bytes each."""
     prop, tsa, tbl = o['prop'], o['tsa'], o['mt_dmg']
     freq = {}
     for r_ in o['rows']:
@@ -295,13 +295,20 @@ def water_anim(o):
                 v = px[y][x]; lo |= (v & 1) << (7 - x); hi |= (v >> 1) << (7 - x)
             out += bytes([lo, hi])
         return bytes(out)
-    def frames(tiles16, vertical):
+    def frames(tiles16, vertical, stagger=True):
+        # (owner, 2026-11-24: as Final Fantasy Legend III's water) a pixel per 16 frames, the two
+        # halves of the 16 x 16 picture taking turns 8 frames apart (sea: the upper and lower
+        # halves sideways; river: the left and right halves downwards): 32 half steps, one per
+        # 8 frames, half step j = the first half shifted (j + 1) / 2, the second j / 2
         q = [dec(t) for t in tiles16]                       # UL, UR, DL, DR
         img = [[q[(y >= 8) * 2 + (x >= 8)][y & 7][x & 7] for x in range(16)] for y in range(16)]
         out = []
-        for k in range(16):
-            sh = [[img[(y - k) % 16][x] if vertical else img[y][(x - k) % 16] for x in range(16)]
-                  for y in range(16)]
+        for j in range(32):
+            a, b = ((j + 1) // 2, j // 2) if stagger else (j // 2, j // 2)
+            if vertical:
+                sh = [[img[(y - (a if x < 8 else b)) % 16][x] for x in range(16)] for y in range(16)]
+            else:
+                sh = [[img[y][(x - (a if y < 8 else b)) % 16] for x in range(16)] for y in range(16)]
             out.append([enc([[sh[qy * 8 + y][qx * 8 + x] for x in range(8)] for y in range(8)])
                         for qy in range(2) for qx in range(2)])
         return out
@@ -316,8 +323,6 @@ def water_anim(o):
         for mt in cand[:1]:
             cid = [tsa[128 * k + mt] for k in range(4)]
             did = [tbl[128 * k + mt] for k in range(4)]
-            fc = frames([o['cgb_tiles'][16 * t:16 * t + 16] for t in cid], vert)
-            fd = frames([o['dmg_tiles'][16 * t:16 * t + 16] for t in did], vert)
             # every use of a tile, by any metatile at any corner, must get the same picture in
             # every phase: the same corner as here, or a corner whose shifted quarter is equal
             def same(ids, pos_of, fr):
@@ -325,10 +330,14 @@ def water_anim(o):
                     for k2 in pos_of[t]:
                         if k2 != k and any(f[k2] != f[k] for f in fr): return False
                 return True
+            for stag in (True, False):                          # (one tile at every corner,
+                fc = frames([o['cgb_tiles'][16 * t:16 * t + 16] for t in cid], vert, stag)  # as
+                fd = frames([o['dmg_tiles'][16 * t:16 * t + 16] for t in did], vert, stag)  # the
+                if same(cid, pos_c, fc) and same(did, pos_d, fd): break  # river: halves together)
             if not (same(cid, pos_c, fc) and same(did, pos_d, fd)): continue
-            oc = 0x4100 + 0x800 * len(ents)                    # (fixed places: entry e's Color
-            od = oc + 0x400                                     #   frames at $4100 + $800 e, DMG
-            data_ += b''.join(b''.join(f) for f in fc)          #   at + $400)
+            oc = 0x4100 + 0x1000 * len(ents)                   # (fixed places: entry e's Color
+            od = oc + 0x800                                     #   frames at $4100 + $1000 e, DMG
+            data_ += b''.join(b''.join(f) for f in fc)          #   at + $800)
             data_ += b''.join(b''.join(f) for f in fd)
             ents.append(bytes(cid) + bytes(did) + oc.to_bytes(2, 'little') + od.to_bytes(2, 'little')
                         + bytes(4))

@@ -1,9 +1,10 @@
 ; FF1 native engine: the animated sea and rivers (owner's list, 2026-11-24; FF1 has none). The
 ; build (build.py water_anim) finds the overworld's commonest sea and river metatiles whose tiles
 ; are only used where the shifted picture stays right (the same corner everywhere, or a tile
-; whose shifted quarters are equal), and makes 16 phases of each 16 x 16 picture shifted a pixel
-; (sea sideways, river downwards). Every 8 frames a new phase; its tiles go to VRAM right after
-; the frame wait, while the V-Blank lasts (the rest the next frame).
+; whose shifted quarters are equal), and makes 32 half steps of each 16 x 16 picture: as Final
+; Fantasy Legend III's water (owner, 2026-11-24), a pixel per 16 frames, the picture's two halves
+; in turn 8 frames apart (sea sideways, river downwards). Every 8 frames a new half step; its tiles
+; go to VRAM right after the frame wait, while the V-Blank lasts (the rest the next frame).
 WANIM_BANK = 106
 
 section bank 0, $3F94
@@ -13,17 +14,17 @@ wa_tick:    ldh a, [maptype]
             ld a, [ap_on]                   ; (not under the airship's view)
             and a
             ret nz
-            ldh a, [frame]
-            and 7
-            jr nz, .go
+            ldh a, [frame]                  ; (a new half step whenever frame / 8 changes:
+            rrca                            ;   a loop that misses the exact frame still
+            rrca                            ;   keeps the pace)
+            rrca
+            and 31
+            ld hl, wa_ph
+            cp [hl]
+            jr z, .go
+            ld [hl], a
             xor a
             ld [wa_i], a
-            ldh a, [frame]
-            rrca
-            rrca
-            rrca
-            and 15
-            ld [wa_ph], a
 .go:        ld a, [wa_i]
             cp 8
             ret nc
@@ -36,7 +37,7 @@ wa_tick:    ldh a, [maptype]
 
 section bank 0, $2591
 ; the next tiles of this phase while the V-Blank lasts (bank WANIM_BANK mapped): entry e's tile
-; for corner q at $4010 + 16 e + q (DMG + 4), its frame at $4100 + $800 e (DMG + $400) +
+; for corner q at $4010 + 16 e + q (DMG + 4), its frame at $4100 + $1000 e (DMG + $800) +
 ; 64 phase + 16 q
 wa_run:     ldh a, [rLY]
             sub 144
@@ -73,12 +74,11 @@ wa_run:     ldh a, [rLY]
             ld l, a
             srl a
             srl a
+            add a, e                        ; (DMG: + 8, E = 4 twice)
             add a, e
             ld e, a
             ld a, b
-            add a, a
-            add a, a
-            add a, a
+            swap a                          ; ($10 a entry)
             add a, e
             add a, $41
             ld h, a
