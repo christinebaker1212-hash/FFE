@@ -431,7 +431,13 @@ stat_int:   push af
             ld a, [ap_done]
             and a
             jp z, stat_ap
-.na:        ld a, [rx_on]                   ; (the encounter transition: a line's scroll, loc.s)
+.na:        ld a, [fx_on]                   ; (a spell's raster effect: its lines; fx.s)
+            and a
+            jr z, .nf
+            ld a, [fx_done]
+            and a
+            jp z, stat_fx
+.nf:        ld a, [rx_on]                   ; (the encounter transition: a line's scroll, loc.s)
             and a
             jr nz, stat_rx
             ld a, [lmask]                   ; (a masked load: held through mode 3)

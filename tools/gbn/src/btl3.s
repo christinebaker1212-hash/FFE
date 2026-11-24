@@ -690,8 +690,11 @@ bt_cast_en: ld [mg_def], a
             call bt_flush
             ld a, SFX_HIT                   ; FF1 BtlMag_LoadEnemyDefenderStats: "cha" and
             ld [sfx_req], a                 ;   the explosions
+            ld a, [mg_d + 2]                ; (the spell's raster effect while it bursts: fx.s)
+            call fx_start
             ld a, [mg_def]
             call bt_explode
+            call fx_stop
             ld a, [mg_def]
             call bt_erec
             push hl

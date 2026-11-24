@@ -497,12 +497,12 @@ scr_spr23:  ld [scr_t1], a
             ret
 
 ; one frame: wait, pad, OAM
-scr_frame:  ld a, [gr_dirty]                ; (a window since the screen showed: the gradient
-            and a                           ;   again)
-            call nz, gr_build
-            ld a, [sf_row]                  ; (owner, 2026-11-22: no hand while a window is
+scr_frame:  ld a, [sf_row]                  ; (owner, 2026-11-22: no hand while a window is
             cp 18                           ;   still going up: it shows once the screen is
-            call c, hand_hide               ;   whole, never over the old one)
+            call c, hand_hide               ;   whole, never over the old one; first: the
+            ld a, [gr_dirty]                ;   gradient build below spans frames)
+            and a                           ; (a window since the screen showed: the gradient
+            call nz, gr_build               ;   again)
             call wait_vbl
             call sf_step
             ld a, [scr_mus]                 ; (FF1 MenuFrame / the shops: the music again

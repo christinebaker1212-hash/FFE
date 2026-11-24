@@ -449,11 +449,19 @@ sh_item:    ld a, SH_WELCOME
 
 ; ---- magic shops (FF1 EnterShop_Magic, MagicShop_AssertLearn; owner, 2026-11-22: the
 ; spell first, then the party window with each member's OK / Known / Can't learn / Full)
-sh_magic:   call sh_invlist
+sh_magic:   ld a, SH_WELCOME                ; (FF1: Buy / Leave, again after every answer)
+            call sh_say
+.l:         ld hl, str_buyleave
+            ld b, 2
+            call sh_menu
+            ret c
+            and a
+            ret nz
+.pk:        call sh_invlist
             ld a, $18                       ; which magic
             call sh_say
             call sh_pick
-            ret c
+            jr c, .l
             ld a, [sh_it]
             sub $B0
             ld [sh_sp], a
@@ -464,7 +472,7 @@ sh_magic:   call sh_invlist
             push af
             call sh_base
             pop af
-            jr c, sh_magic
+            jr c, .pk
             ld [sh_k], a
             call sh_mstat
             and a
@@ -487,19 +495,17 @@ sh_magic:   call sh_invlist
             ld a, SH_NOMONEY
             call sh_say
             call wait_ab
-            jr sh_magic
+            jr .pk
 .buy:       ld a, [sh_k]
             call sh_mstat                   ; (HL = the free slot, C = the spell)
             ld [hl], c
             call sh_pay
-            ld a, SH_THANKS
+            ld a, SH_THANKS                 ; (Anything else I can do for ya?)
             call sh_say
-            call wait_ab
-            jr sh_magic
+            jr .l
 .cancel:    ld a, SH_TOOBAD
             call sh_say
-            call wait_ab
-            jr sh_magic
+            jr .l
 
 ; member sh_k and spell sh_sp: A = 0 may learn (HL = the level's free slot, C = the spell
 ; in its level, 1-8), 1 the job can't, 2 known, 3 the level full

@@ -565,8 +565,19 @@ sfx_step:   ld a, [sfx_tot]
             ld a, [NES_RAM + $4B]           ; over: square 2 back to the music; silent if no
             and a                           ;   song plays
             jr z, .m
+            ld a, [sw_mute]                 ; (the sweep silenced it already, DAC off: left
+            and a                           ;   off, no tick in the quiet of a screen change;
+            jr nz, .k                       ;   the music's next note turns it on)
             ld c, 1                         ; (silent as the NES: volume 0, DAC on)
             call sq_silence
+            jr .m
+.k:         ld a, [snd_mute]                ; (sq_silence's bookkeeping only)
+            or 2
+            ld [snd_mute], a
+            xor a
+            ld [snd_cv + 1], a
+            dec a
+            ld [snd_tv + 1], a
 .m:         xor a
             ldh [$FF21], a
             dec a

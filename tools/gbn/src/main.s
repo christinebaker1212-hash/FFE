@@ -314,7 +314,8 @@ main:       call wait_vbl
             call ap_tick                    ; (the airship's view: air.s)
             jr main
 
-wait_vbl:   call sgb_tick                   ; (a Super Game Boy's queued packet: before the
+wait_vbl:   call fx_tick                    ; (a spell's raster effect's next frame: fx.s)
+            call sgb_tick                   ; (a Super Game Boy's queued packet: before the
             xor a                           ;   wait, so it never takes V-Blank time)
             ldh [vbl_done], a
 .w:         halt
@@ -347,6 +348,7 @@ vblank:     push af
             call pt_tick
             call gr_vbl                     ; (the windows' gradient: text.s)
             call ap_vbl                     ; (the airship's view: air.s)
+            call fx_vbl                     ; (a spell's raster effect: fx.s)
             ld a, [wp_on]                   ; (a screen wipe: the window from the top)
             and a
             call nz, wp_vbl
@@ -3964,6 +3966,9 @@ timer_int:  push af
             ldh a, [rLCDC]
             bit 7, a
             jr z, .go
+            ld a, [lmask]                   ; (a masked load: nothing shows; at once, else
+            and a                           ;   held to its end, an effect's note with it)
+            jr nz, .go
             ldh a, [rLY]
             cp 124
             jr c, .go
