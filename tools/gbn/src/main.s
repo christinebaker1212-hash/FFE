@@ -1520,27 +1520,25 @@ veh_oam:    ld a, [vehicle]
 .obj:       ld a, [hl+]                     ; visible and near: its 2 x 2 (the first frame)
             and a
             ret z
-            ld a, [hl+]                     ; screen x = 72 + 16 (x - px)
-            push hl
+            ld a, [hl+]                     ; screen x = 72 + 16 (x - px), less the scroll
+            push hl                         ;   within a step (anchored to the map)
             ld hl, px
-            sub [hl]
+            call ob_pos
             pop hl
-            add a, 4                        ; (-4 .. 4 only; swapped while positive: a
-            cp 9                            ;   negative offset swapped gave 16 d + 15, the
-            ret nc                          ;   object a tile too far right / down)
-            swap a
-            add a, $48 - $40
-            ld [vh_x], a
+            ret c
+            sub 8
+            ld b, a
             ld a, [hl]
             push hl
             ld hl, py
-            sub [hl]
+            call ob_pos
             pop hl
-            add a, 4
-            cp 9
-            ret nc
-            swap a
-            add a, $50 - $40
+            ret c
+            ld c, a
+            call ob_step
+            ld a, b
+            ld [vh_x], a
+            ld a, c
             ld [vh_y], a
             push de
             ld a, [map_bank]
@@ -3826,29 +3824,22 @@ ow_bc:      ld a, [vehicle]                 ; on foot in a forest (FF1 inforest,
             ld [vh_t], a
             ld a, b
             ld [vh_t + 1], a
-            ld a, [hl+]                     ; visible and near (screen x = 72 + 16 (x - px))
-            and a
-            ret z
+            ld a, [hl+]                     ; visible and near (OAM x = 80 + 16 (x - px), less
+            and a                           ;   the scroll within a step: anchored to the map;
+            ret z                           ;   owner, 2026-11-24: it slid with the camera)
             ld a, [hl+]
             push hl
             ld hl, px
-            sub [hl]
+            call ob_pos
             pop hl
-            add a, 4                        ; (swapped while positive, as veh_oam's .obj)
-            cp 9
-            ret nc
-            swap a
-            add a, $48 + 8 - $40
+            ret c
             ld b, a                         ; B = x of the left column
             ld a, [hl]
             ld hl, py
-            sub [hl]
-            add a, 4
-            cp 9
-            ret nc
-            swap a
-            add a, $50 - $40
+            call ob_pos
+            ret c
             ld c, a                         ; C = y of the top row
+            call ob_step
             ld a, [vh_t]
             ld l, a
             ld a, [vh_t + 1]
@@ -3883,6 +3874,43 @@ ow_bc:      ld a, [vehicle]                 ; on foot in a forest (FF1 inforest,
             ret
 .brtbl:     db 4, 3, 5, 3, 6, 3, 7, 3
 .cntbl:     db 8, 3, 9, 3, 10, 3, 11, 3
+; A = an object's coordinate, HL = px / py -> A = 16 (A - [HL] + 5) (-5 .. 5 tiles away;
+; C set: farther)
+ob_pos:     sub [hl]
+            add a, 5
+            cp 11
+            ccf
+            ret c
+            swap a
+            and a
+            ret
+; B, C less the scroll within the step (mcount x mdx / mdy, as set_scroll)
+ob_step:    push hl
+            ld a, [mcount]
+            ld l, a
+            ld a, [mdx]
+            call .m
+            ld a, b
+            sub h
+            ld b, a
+            ld a, [mdy]
+            call .m
+            ld a, c
+            sub h
+            ld c, a
+            pop hl
+            ret
+.m:         ld h, 0                         ; H = sign (A) x L
+            and a
+            ret z
+            ld h, l
+            bit 7, a
+            ret z
+            ld a, h
+            cpl
+            inc a
+            ld h, a
+            ret
 
 section bank 0, $1F00
 ; square 1 after a wipe sound: the music engine's shadow / volume / frequency marked unknown, so
