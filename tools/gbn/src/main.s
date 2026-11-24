@@ -311,6 +311,7 @@ main:       call wait_vbl
             ld [sfx_nmode], a
 .drw:       call set_scroll
             call make_oam
+            call refl_tick                  ; (the reflection on water: refl.s)
             call ap_tick                    ; (the airship's view: air.s)
             jr main
 
@@ -518,6 +519,9 @@ load_map:   push af
             ldh [rOCPD], a
             dec b
             jr nz, .op
+            ld a, F3_BANK                   ; (OBJ 4-7: their darker copies, the reflection's)
+            ld hl, refl_pal
+            call bank_call
             ld a, COMMON                    ; party sprite tiles at $8000 (as they are)
             call sbank
             ld hl, C_SPR
@@ -542,6 +546,8 @@ load_map:   push af
             call bgp_w
             ld a, DMG_OBP
             call obp0_w
+            ld a, %10100100                 ; (OBP1: the reflection, dimmer: 1 light grey,
+            ldh [rOBP1], a                  ;   2 / 3 dark grey)
             ld hl, M_PARTYDMG               ; party sprite pre-shaded for this map
             ld de, $8000
             ld bc, 16 * 16
