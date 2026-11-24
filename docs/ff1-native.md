@@ -731,3 +731,15 @@ one reaches parity, so the owner can keep playing).
      in top-down over two frames when it opens.
    - Harness: parallel runs overwrote each other's shots (named by mode and frame): shots now carry
      the process id.
+40. Owner (2026-11-24, last): "continue polish".
+   - Super Game Boy: the party's pictures on menu screens (party creation, main menu, equip / status
+     headers, Formation) in their job colours. A sprite takes the colours of the cell under it, so
+     they showed in the windows' white / grey; each picture placed by scr_spr23 (up to four a
+     screen, keyed by its sprite slot) gets the battle's palette for its job's FF1 sprite palette
+     (SGB palette 2 / 3, darkest colour = the window blue), sent with an attribute block when the
+     screen is shown and again when a picture moves to other cells (Formation) or changes job.
+   - Bestiary: Left / Right turn a page (the list moves 13 rows, the hand keeps its row); Sound
+     Test: the hand before "Song", as the other lists.
+   - Checked: the ending from a Chaos test battle (`build.py --battle 123`, his HP poked) on the
+     Color and a plain Game Boy (dissolve, epilogue pages with their shutters); the Extras screens
+     and Bestiary entries on both; SGB battle colours unchanged.
