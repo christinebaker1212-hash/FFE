@@ -1734,6 +1734,25 @@ bt_mhdr:    push af
             ld hl, bt_sbuf
             pop af
             jp vwf_str
+; A held in battle (owner, 2026-11-24: quick selection by holding A): after 18 frames, a new
+; press every 6
+bt_arep:    ldh a, [pad]
+            rrca
+            jr nc, .z
+            ld a, [bt_ahold]
+            inc a
+            ld [bt_ahold], a
+            cp 18
+            ret c
+            ld a, 12
+            ld [bt_ahold], a
+            ldh a, [pad_new]
+            or 1
+            ldh [pad_new], a
+            ret
+.z:         xor a
+            ld [bt_ahold], a
+            ret
 ; A = an enemy slot -> A = it, or with Options' Auto Retarget the first living enemy when it is
 ; gone (none living: it); off by default: FF1's "ineffective"
 bt_retgt:   push bc
@@ -1777,3 +1796,6 @@ bt_mpgemp:  call bt_mdata
             inc hl
             or [hl]
             ret
+
+section wram, $DAD5
+bt_ahold:   ds 1                            ; (bt_arep: frames A has been held)

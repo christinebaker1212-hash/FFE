@@ -1427,7 +1427,8 @@ bt_frame:   ld a, [sf_row]                  ; (no hand while the window rows are
             call bt_rowsup
 .t:         call bt_vbl
             call bt_danim                   ; (the damage number's bounce)
-            jp read_pad
+            call read_pad
+            jp bt_arep                      ; (A held: pressed again and again)
 ; one text row's map row (A = 12-17) to upload, alone
 bt_upd_row: sub 12
             ld b, a
