@@ -422,6 +422,10 @@ section wram, $DC00
 ap_off:     ds 64                           ; the level's SCY offsets by line (page-aligned)
 ap_bgpt:    ds 64                           ; (DMG) BGP by line
 ap_sky:     ds 64                           ; (Color) the sky's colour by line
+                                            ; (the tables share the battle's tile stage: they
+                                            ;   are made again whenever the view comes on; the
+                                            ;   flags below must not: free bytes)
+section wram, $DAD6
 ap_on:      ds 1
 ap_rest:    ds 1
 ap_done:    ds 1
@@ -432,4 +436,5 @@ ap_scy0:    ds 1
 ap_bgp0:    ds 1
 ap_wrow:    ds 1
 ap_ns:      ds 1                            ; the next line's SCY, BGP
+section wram, $DAC9
 ap_nb:      ds 1
