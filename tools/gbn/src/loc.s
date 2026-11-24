@@ -59,7 +59,7 @@ bn_prep:    ld a, [cur_map]
             jr .c
 .go:        xor a
             ld [win_up], a
-            ld a, BN_LINES
+            ld a, BN_LINES - 1
             ldh [rLYC], a
             ld a, BN_TIME
             ld [bn_t], a
@@ -2028,7 +2028,7 @@ bt_trans2:  ld a, [q_n]                     ; (the field's queue dropped)
             ld [rx_on], a
             ld a, $40
             ldh [rSTAT], a
-            ld a, BOX_LINES
+            ld a, BOX_LINES - 1
             ldh [rLYC], a
             ldh a, [rIF]
             and $FD

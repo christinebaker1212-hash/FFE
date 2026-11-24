@@ -75,7 +75,7 @@ fx_vbl:     ld a, [fx_rest]
             ld [fx_rest], a
             ld a, $40
             ldh [rSTAT], a
-            ld a, BOX_LINES
+            ld a, BOX_LINES - 1
             ldh [rLYC], a
             ldh a, [scx]
             ldh [rSCX], a

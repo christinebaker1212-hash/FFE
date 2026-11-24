@@ -168,7 +168,7 @@ ap_vbl:     ld a, [ap_rest]
             ld [ap_rest], a
             ld a, $40
             ldh [rSTAT], a
-            ld a, BOX_LINES
+            ld a, BOX_LINES - 1
             ldh [rLYC], a
             ld a, [lcdc_on]
             ldh [rLCDC], a

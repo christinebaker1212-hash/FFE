@@ -200,7 +200,7 @@ start:      di
             ld a, F3_BANK                   ; (the Options: from cart RAM, or defaults)
             ld hl, opt_load
             call bank_call
-            ld a, BOX_LINES                 ; LYC: the dialogue box's bottom (window off)
+            ld a, BOX_LINES - 1                 ; LYC: the dialogue box's bottom (window off)
             ldh [rLYC], a
             ld a, $40
             ldh [rSTAT], a
@@ -3189,7 +3189,7 @@ wipe_open:  xor a
             ld [wp_on], a
             ldh [$FF12], a                  ; (square 1 silent, its sweep off; the music
             ldh [$FF10], a                  ;   goes on)
-            ld a, BOX_LINES
+            ld a, BOX_LINES - 1
             ldh [rLYC], a
             ld a, [lcdc_on]
             ldh [rLCDC], a
@@ -3394,7 +3394,7 @@ ly_vbl:     xor a
 ; the list off: the dialogue's line again
 ly_off:     xor a
             ld [ly_n], a
-            ld a, BOX_LINES
+            ld a, BOX_LINES - 1
             ldh [rLYC], a
             ld a, [lcdc_on]
             ldh [rLCDC], a
@@ -3422,7 +3422,7 @@ lcd_off:    call gr_off                     ; (the windows' gradient off, its wi
             jr z, .nb
             xor a
             ld [bn_t], a
-            ld a, BOX_LINES
+            ld a, BOX_LINES - 1
             ldh [rLYC], a
 .nb:        xor a                           ; (any load: a skipped fade-out is spent)
             ld [fd_skip], a

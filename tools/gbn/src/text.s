@@ -127,7 +127,7 @@ dlg_open:   ld l, a                         ; table entry: 3 x id
             ld [box_on], a
             xor a                           ; (a banner showing: gone, the box's cut again)
             ld [bn_t], a
-            ld a, BOX_LINES
+            ld a, BOX_LINES - 1
             ldh [rLYC], a
             ld a, 8                         ; (its gradient: loc.s)
             call gr_box0
@@ -455,7 +455,10 @@ stat_int:   push af
             ldh a, [rLCDC]                  ; (a request left pending while the LCD went off:
             bit 7, a                        ;   it stays off)
             jr z, .off
-            ld a, [lcdc_on]
+.hb:        ldh a, [rSTAT]                  ; (the cut's LYC is the line before: the window
+            and 3                           ;   off in its H-Blank; at the line itself, mode 2,
+            jr nz, .hb                      ;   the write came mid-line: owner, the banner's
+            ld a, [lcdc_on]                 ;   bottom line)
             ldh [rLCDC], a
 .off:
 .mus:       ld a, [mus_pend]                ; (the music: the timer's, main.s timer_int; a tick
@@ -633,7 +636,7 @@ bn_start:   xor a
 bn_tick:    dec a
             ld [bn_t], a
             ret nz
-            ld a, BOX_LINES
+            ld a, BOX_LINES - 1
             ldh [rLYC], a
             jp gr_off
 ; the play time (V-Blank): frames, seconds, minutes, hours to 99, in the save page
@@ -693,9 +696,12 @@ stat_gr:    push bc
             ld c, a
             bit 7, c
             jr z, .nc
-            ldh a, [rLCDC]                  ; the box's cut: the window off from here
-            bit 7, a
-            jr z, .nc
+            ldh a, [rLCDC]                  ; the box's cut: the window off from the next line
+            bit 7, a                        ;   (LYC the line before, gr_lyc), in this line's
+            jr z, .nc                       ;   H-Blank
+.wc:        ldh a, [rSTAT]
+            and 3
+            jr nz, .wc
             ld a, [lcdc_on]
             ldh [rLCDC], a
 .nc:        bit 6, c
@@ -767,7 +773,7 @@ stat_gr:    push bc
 ; LYC for the record at HL: its line (specials) or the line before (colours); $FF: none
 gr_lyc:     inc hl
             ld a, [hl-]
-            and 3
+            and $83                         ; (a cut too: the line before)
             ld a, [hl]
             jr z, .s
             dec a
@@ -868,7 +874,7 @@ gr_off:     ld a, [gr_on]
             xor a
             ld [gr_on], a
             ld [gr_new], a
-            ld a, BOX_LINES
+            ld a, BOX_LINES - 1
             ldh [rLYC], a
             ld a, 1
             ld [gr_rst], a

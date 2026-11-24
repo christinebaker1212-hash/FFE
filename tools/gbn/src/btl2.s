@@ -3074,9 +3074,9 @@ bt_banner:  ld a, [ban_on]                  ; (shown: off first, a frame, so the
             ld [win_up], a
             ld a, [ban_bot]                 ; (at the top: cut below its rows; at the bottom:
             and a                           ;   kept on to the frame's end, once in place)
-            ld a, BN_LINES
+            ld a, BN_LINES - 1
             jr z, .lt
-            ld a, BOX_LINES
+            ld a, BOX_LINES - 1
 .lt:        ldh [rLYC], a
             ld a, 1
             ld [bn_t], a
@@ -3101,7 +3101,7 @@ bt_ban_off: ld a, [ban_on]
             ld [ban_bot], a
             ld a, LCDC_ON
             ld [lcdc_on], a
-            ld a, BOX_LINES
+            ld a, BOX_LINES - 1
             ldh [rLYC], a
             ret
 ; HP restored (green: owner, 2026-11-23): mg_dmg = new - old HP (dv_hp, bt_hp0) over target
