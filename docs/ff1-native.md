@@ -743,3 +743,18 @@ one reaches parity, so the owner can keep playing).
    - Checked: the ending from a Chaos test battle (`build.py --battle 123`, his HP poked) on the
      Color and a plain Game Boy (dissolve, epilogue pages with their shutters); the Extras screens
      and Bestiary entries on both; SGB battle colours unchanged.
+41. Owner (2026-11-24, last): "polish the text formatting and appearance of all text boxes and their
+   text". Audited every text offline as the build lays it out (tools/gbn/text.py), then on screen.
+   - Dialogue (text.layout_pages): pages made of whole sentences, as few pages as the text needs, their
+     sizes even; each page wrapped with balanced breaks that keep the greedy line count: no lone short
+     last word (45 texts had one), lines end at sentences' ends where that costs little, no line ends on
+     a new sentence's first word. No page holds a single leftover line any more (31 did). Where the
+     translation ends a sentence with a line break and no punctuation before an opener ("...in the way /
+     At this rate..."), the break stays a line break: no words added (text.paragraphs, _sentence_break:
+     openers, "I" unless after a conjunction, signs in capitals; names keep their sentence).
+   - Story pages: balanced lines, centred in the window's 12 rows both ways; prologue lines balanced;
+     shop speech and the menu texts (item use, descriptions, prompts) laid out the same way (templates
+     and FF1's deliberate breaks kept: SHOP_KEEP).
+   - Item / magic target window: the name from column 3 with HP / max at the right, the job or ailment
+     below, the hand before the name (it sat on the job line and covered the next member's first
+     letter; the level dropped there, as FF1's own target screen).

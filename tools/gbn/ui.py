@@ -177,7 +177,7 @@ def _mwrap(t):
     """a menu text's lines: prose balanced (text.wrap_bal), templates (no lowercase) as before"""
     return text.wrap_bal(t) if any(c.islower() for c in t) else text.wrap(t)
 # shop strings kept as written: menus, Yes / No, the price line, the inn's dots, FF1's variants
-SHOP_KEEP = {10, 11, 14, 15, 17, 18, 21, 22, 28, 36}
+SHOP_KEEP = {10, 11, 14, 15, 17, 18, 21, 22, 28, 33, 36}   # (33: "O soul, / return to liiife!")
 
 
 def mtext_bank(rom=None):
@@ -217,7 +217,7 @@ def mtext_bank(rom=None):
             lines = text.wrap(t.strip(), 8)
         elif k not in SHOP_KEEP or len(lines) > 4 or max(len(x) for x in lines) > 18:
             flow = text.layout('\n'.join(x.strip() for x in lines))   # (speech: the NES window's
-            if len(flow) < len(lines) or max(len(x) for x in lines) > 18:      # breaks
+            if len(flow) <= len(lines) or max(len(x) for x in lines) > 18:     # breaks
                 lines = flow[:4]                    # dropped, 18 columns, when it saves lines)
         ptrs += (0x6080 + len(body)).to_bytes(2, 'little')
         body += enc('\n'.join(lines)) + b'\0'

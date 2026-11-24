@@ -1366,6 +1366,8 @@ colours after masked loads / file loads (palette 7 now written by every screen; 
 Polish sweep finished (item 39): battle top window closes in V-Blank, names window never shown empty,
 magic shop rows, shop speech re-flowed; dialogue, spells, shops, dungeons checked on Color / DMG.
 Then (item 40): SGB menu pictures in their job colours, Bestiary page turns, Sound Test hand; ending checked.
+Then (item 41): text layout: dialogue pages of whole sentences with balanced breaks (no orphans, no
+one-line pages), story pages centred, shop / menu texts re-flowed, target window re-laid.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

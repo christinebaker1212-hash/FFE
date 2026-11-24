@@ -138,7 +138,7 @@ def wrap_bal(para, width=DLG_W):
         ln = len(' '.join(words[i:j]))
         if ln > width: return INF
         if last:
-            return (10 if ln <= 4 else 4) * max(0, 8 - ln) ** 2
+            return (10 if ln <= 5 else 4) * max(0, 8 - ln) ** 2
         c = (width - ln) ** 2
         if words[j - 1][-1] not in SENT_END:            # (lines end at sentences' ends where
             c += 20                                     #   that costs little)
