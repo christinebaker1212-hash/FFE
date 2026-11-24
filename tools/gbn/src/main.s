@@ -509,6 +509,7 @@ load_map:   push af
             ldh [rOCPS], a
             ld hl, M_OBJ
             ld b, 32
+            call cc_copy                    ; (the LCD colour mode: cc.s)
 .op:        ld a, [hl+]
             ldh [rOCPD], a
             dec b
@@ -642,6 +643,7 @@ obj_tiles:  ldh a, [maptype]
 
 cgb_pal32:  ld b, 32                        ; HL = 32 bytes of BG palettes 0-3 (A = BCPS)
 pal_blk:    push af                         ; B bytes (a masked load: into the shadow)
+            call cc_copy                    ; (the LCD colour mode: cc.s)
             ld a, [lmask]
             and a
             jr nz, .m
@@ -2564,6 +2566,9 @@ party_spr:  ld a, [ch_stats]
             ld bc, 4
             ld a, MINI_BANK
             call far_copy
+            ld hl, scr_buf                  ; (the LCD colour mode: cc.s)
+            ld b, 4
+            call cc_inpl
             ld a, $84
             ldh [rOCPS], a
             ld a, [scr_buf]

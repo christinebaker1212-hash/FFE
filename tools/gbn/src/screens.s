@@ -70,6 +70,7 @@ scr_open:   call fade_out                   ; (the screen before faded out)
             ldh [rOCPS], a
             ld hl, scr_buf
             ld b, 32
+            call cc_copy                    ; (the LCD colour mode: cc.s)
 .op:        ld a, [hl+]
             ldh [rOCPD], a
             dec b
@@ -1573,6 +1574,11 @@ pr_cgbstep: ld hl, pr_rgb
             add a, a
             or b
             ld b, a                         ; high byte
+            ld d, b                         ; (the LCD colour mode: cc.s)
+            ld e, c
+            call cc_fix
+            ld b, d
+            ld c, e
             ld a, $80 | 38
             ldh [rBCPS], a
             ld a, c

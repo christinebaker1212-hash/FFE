@@ -102,6 +102,18 @@ def mmp_source():
         '            db ' + ', '.join(str(v) for v in t[k:k + 16]) + '\n' for k in range(0, len(t), 16))
 
 
+def cc_source():
+    """the Color's LCD colour correction (Options: LCD, owner 2026-11-24): per mode a 32-entry
+    curve applied to each channel before the saturation step (src/cc.s): GBC Corrected deepens
+    the mid-tones (the GBC panel washes them out), GBA Corrected lifts them (the GBA's darker
+    screen)"""
+    out = ['section bank 0, $2F80', 'cc_lut:']
+    for gam in (1.25, 0.70):
+        v = [min(31, round(31 * (c / 31) ** gam)) for c in range(32)]
+        out.append('            db ' + ', '.join(str(x) for x in v))
+    return '\n'.join(out) + '\n'
+
+
 def ui_strings():
     """the screens' strings as str_<name> labels in code bank 2"""
     out = ['section bank 2, $6C00']
@@ -263,6 +275,7 @@ def main():
            open(os.path.join(HERE, 'src', 'field2.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sgb.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'mmp.s')).read() + '\n' + mmp_source() +
+           open(os.path.join(HERE, 'src', 'cc.s')).read() + '\n' + cc_source() +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
            'section bank 104, $4000\n' +              # (the small font's glyphs: bank BTL6)

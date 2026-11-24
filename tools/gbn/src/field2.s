@@ -1204,7 +1204,7 @@ mn_rgb:     and $3F
             ld e, a
             ld a, [mn_tmp + 1]
             ld d, a
-            ret
+            jp cc_fix                       ; (the LCD colour mode: cc.s)
 
 ; ---- FF1 EnterMiniGame: the 15-puzzle in a window (5,4,10,10): the pieces as 8 x 16 sprite
 ; pairs (FF1's 16 x 16 pieces; 30 sprites), shuffled with 127 random moves (FF1's lut_RNG by
@@ -1350,6 +1350,7 @@ pz_pal_set: ldh a, [is_cgb]
             ldh [rOCPS], a
             ld hl, pz_rgb
             ld b, 6
+            call cc_copy                    ; (the LCD colour mode: cc.s)
 .w:         ld a, [hl+]
             ldh [rOCPD], a
             dec b

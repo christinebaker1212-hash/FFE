@@ -990,7 +990,7 @@ section bank 99, $4800
 ; colour (red, green, blue 0-31, shown at once). Header (0,0,20,3), list (0,3,20,15), one row a
 ; setting from row 5; up / down pick, left / right change, B back (kept in cart RAM bank 1)
 OPT_N_DMG  = 7
-OPT_N_CGB  = 11
+OPT_N_CGB  = 12
 opt_menu:   xor a
             ld [opt_cur], a
 opt_redraw: call scr_open
@@ -1112,12 +1112,13 @@ opt_n:      ldh a, [is_cgb]
 os_title:   db "Options", 0
 os_labels:  db "Message Speed", 0, "Text Speed", 0, "Volume", 0, "B Dash", 0, "Cursor", 0
             db "Auto Retarget", 0, "Modern MP", 0
-            db "Window Red", 0, "Window Green", 0, "Window Blue", 0, "Gradient", 0
-os_var:     dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, opt_retgt, opt_mmp, win_r, win_g, win_b, opt_nograd
-os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2
-os_sv:      dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, win_r, win_g, win_b, opt_nograd, opt_retgt, opt_mmp
+            db "Window Red", 0, "Window Green", 0, "Window Blue", 0, "Gradient", 0, "LCD", 0
+os_var:     dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, opt_retgt, opt_mmp, win_r, win_g, win_b, opt_nograd, opt_ccm
+os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2, 3
+os_sv:      dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, win_r, win_g, win_b, opt_nograd, opt_retgt, opt_mmp, opt_ccm
                                             ; (the saved order: the older records' first nine)
 os_onoff:   db "Off", " On"
+os_lcd:     db "      Default", "GBC Corrected", "GBA Corrected"
 os_spn:     db "   Slow", " Normal", "   Fast", " Faster", "Instant"
 os_dash:    db " On", "Off"
 os_cur:     db "Remember", "   Reset"
@@ -1212,6 +1213,21 @@ opt_vals:   ld bc, $1205
             ld hl, os_dash
             add hl, de
             ld b, 3
+            call .n
+            ld bc, $0610                    ; LCD colours (13 letters to column 18)
+            call pen_at
+            ld a, [opt_ccm]
+            ld l, a
+            add a, a
+            add a, l
+            add a, a
+            add a, a
+            add a, l                        ; 13 A
+            ld e, a
+            ld d, 0
+            ld hl, os_lcd
+            add hl, de
+            ld b, 13
             jr .n
 .n:         ld a, [hl+]
             call pen_ch
@@ -1259,7 +1275,9 @@ opt_wpal:   ld a, COMMON
             and 3
             or b
             ld [win_pal + 5], a
-            ret
+            ld hl, win_pal                  ; (the LCD colour mode: cc.s)
+            ld b, 8
+            jp cc_inpl
 ; FF1's window colour -> win_r / g / b (the defaults)
 opt_wdef:   ld a, COMMON
             ld hl, C_WINPAL + 4
@@ -2424,7 +2442,9 @@ gr_ramp_mk: ld hl, win_r                     ; per channel: value v, step 2 v, a
             pop hl
             dec c
             jr nz, .c
-            ret
+            ld hl, gr_ramp                  ; (the LCD colour mode: cc.s)
+            ld b, 64
+            jp cc_inpl
 ; groups: window i goes to the alt group when an earlier main window j has rows overlapping
 ; it, columns apart (a shared border allowed) and another top or height
 gr_groups:  xor a
@@ -3301,6 +3321,7 @@ opt_load:   ld a, 1
             ld [opt_nograd], a
             ld [opt_retgt], a               ; (Off by default: owner)
             ld [opt_mmp], a
+            ld [opt_ccm], a
             call opt_wdef
             ld a, $0A
             ld [$0000], a
@@ -3312,6 +3333,8 @@ opt_load:   ld a, 1
             jr nz, .x
             ld a, [hl+]
             ld [opt_ver], a
+            cp $54
+            jr z, .q
             cp $53
             jr z, .q
             cp $52
@@ -3336,9 +3359,9 @@ opt_load:   ld a, 1
             jr .x
 .q:         push hl                         ; "OQ": the eight, check ("OR": nine, "OS": eleven)
             ld a, [opt_ver]
-            sub $49                         ; (8 / 9 / 10: 11 for "OS")
+            sub $49                         ; (8 / 9 / 10: 11 for "OS", 12 for "OT")
             cp 10
-            jr nz, .qn
+            jr c, .qn
             inc a
 .qn:        ld b, a
             ld c, $5A
@@ -3363,9 +3386,9 @@ opt_load:   ld a, 1
             jr c, .x
             ld de, opt_nodash               ; dash, cursor, r, g, b (checked: 0-1, 0-31), gradient,
             ld a, [opt_ver]                 ;   then retarget, Modern MP ("OS")
-            sub $4C                         ; (5 / 6 / 8)
+            sub $4C                         ; (5 / 6 / 8 / 9 with the LCD mode)
             cp 7
-            jr nz, .qm
+            jr c, .qm
             inc a
 .qm:        ld b, a
 .q5:        ld a, [hl+]
@@ -3396,7 +3419,12 @@ opt_load:   ld a, 1
             jr c, .qg
             xor a
             ld [opt_nograd], a
-.qg:        ld a, [opt_retgt]               ; (0 / 1 each)
+.qg:        ld a, [opt_ccm]                 ; (0-2)
+            cp 3
+            jr c, .qq
+            xor a
+            ld [opt_ccm], a
+.qq:        ld a, [opt_retgt]               ; (0 / 1 each)
             ld b, a
             ld a, [opt_mmp]
             or b
@@ -3439,10 +3467,10 @@ opt_save:   ld a, $0A
             ld hl, OPT_RAM
             ld a, $4F
             ld [hl+], a
-            ld a, $53
+            ld a, $54
             ld [hl+], a
-            ld de, os_sv                    ; the eleven values, then the check
-            ld b, 11
+            ld de, os_sv                    ; the twelve values, then the check ("OT")
+            ld b, 12
             ld c, $5A
 .s:         push bc
             ld a, [de]

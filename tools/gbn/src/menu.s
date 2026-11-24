@@ -2571,6 +2571,7 @@ opt_nograd: ds 1                            ; Options (Color): 1 = no window gra
 opt_retgt:  ds 1                            ; Options: 1 = Auto Retarget (a gone enemy's attack
                                             ;   goes to another; owner, 2026-11-24)
 opt_mmp:    ds 1                            ; Options: 1 = Modern MP (Dawn of Souls MP)
+opt_ccm:    ds 1                            ; Options (Color): LCD colours 0 Default, 1 GBC, 2 GBA
 win_pal:    ds 8                            ; CGB palette 7 (the windows) as chosen
 opt_ver:    ds 1
 tw_spd:     ds 1                            ; the typed text's speed (0-4: Slow .. Instant)

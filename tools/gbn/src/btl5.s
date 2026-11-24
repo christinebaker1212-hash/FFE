@@ -40,6 +40,7 @@ fl_fiend:   ld a, BTL6_BANK
 
 bt_pal5:    ld hl, pal5_tab
             ld b, 16
+            call cc_copy                    ; (the LCD colour mode: cc.s)
 .o:         ld a, [hl+]
             ldh [rOCPD], a
             dec b

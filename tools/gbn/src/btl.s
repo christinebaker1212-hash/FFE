@@ -701,6 +701,7 @@ bt_pal:     ldh a, [is_cgb]
             ldh [rOCPS], a
             ld hl, scr_buf
             ld b, 32
+            call cc_copy                    ; (the LCD colour mode: cc.s)
 .o:         ld a, [hl+]
             ldh [rOCPD], a
             dec b
@@ -778,7 +779,7 @@ nes_rgb:    and $3F
             ld e, a
             ld a, [scr_buf + 29]
             ld d, a
-            ret
+            jp cc_fix                       ; (the LCD colour mode: cc.s)
 
 ; the enemies into the map copy (positions: FF1's, minus the camera (1, 6))
 bt_enemy_map:
