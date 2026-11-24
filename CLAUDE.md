@@ -1363,6 +1363,8 @@ Formation menu shows LCD (Color) and EXP / Gold x2-x12 in a scrolling Options li
 (main menu HP under the hand, shop preview alignment, empty spell slot, Formation fade). Colour correction checked screen by screen against a computed reference (GBC / GBA
 modes): fixed uncorrected colours (menu labels, prologue, battle flash, airship sky) and stale window
 colours after masked loads / file loads (palette 7 now written by every screen; likely #81) (item 38).
+Polish sweep finished (item 39): battle top window closes in V-Blank, names window never shown empty,
+magic shop rows, shop speech re-flowed; dialogue, spells, shops, dungeons checked on Color / DMG.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

@@ -713,3 +713,21 @@ one reaches parity, so the owner can keep playing).
      but kept `win_pal` corrected for the old mode (menus stayed corrected): it is made again.
    - Checked: after the fixes every screen of the tours matches the computed correction exactly in
      both modes (the rest: the Options value text, people walking, the water's phase).
+39. Owner (2026-11-24, last): "finish the polish sweep". Tours (scratchpad `pt2/pol/`): dialogue (townspeople
+   in Melmond on the Color, Bikke in Pravoka on a plain Game Boy; a talker that follows moving people),
+   battle magic (spells poked into the Red Mage, only her turn's frames kept: Fire / Cure / Blizzard),
+   whole battle rounds checked every second frame by a pixel test (names window empty, a window's
+   sliver at the top), magic / white / weapon shops and the inn, two dungeons (Earth Cave, Marsh Cave).
+   - Fixed: the battle's top name window closed mid-frame, leaving a sliver of its border on the
+     lines already drawn (now closed in V-Blank); the enemy names window showed empty for a frame or
+     two when it was redrawn (each name's tiles take a frame) and after a message closed (the rows
+     below were shown before the names were back): the names are drawn first, then shown.
+   - Fixed: the magic shop's party rows ran six-letter names into "Can't learn" (status from column
+     9 now, with the equipment shops' "Can't use"); shop speech is re-flowed to the 18-column window
+     when that saves lines ("Which magic will / you be learning?").
+   - Checked, as FF1: a member paralysed during the round still carries out the command chosen
+     before; attacks / spells on an enemy already dead "Had no effect" (Auto Retarget off); the
+     screen shakes when an enemy's hit lands. Remaining transition: the message window's rows come
+     in top-down over two frames when it opens.
+   - Harness: parallel runs overwrote each other's shots (named by mode and frame): shots now carry
+     the process id.
