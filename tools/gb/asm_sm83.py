@@ -28,6 +28,7 @@ constants. `section bank N, $addr` starts or continues code in ROM bank N at $ad
 """
 import re
 PROTECT_RAM = []                 # (lo, hi) RAM ranges no lower section may run into (set by builds)
+RAM_SECTIONS = []                # (start, end, line) of every RAM section after a build (for checks)
 
 R8 = {'b': 0, 'c': 1, 'd': 2, 'e': 3, 'h': 4, 'l': 5, '[hl]': 6, 'a': 7}
 R16 = {'bc': 0, 'de': 1, 'hl': 2, 'sp': 3}
@@ -187,12 +188,15 @@ def _asm_once(src, syms, promote):
                 if mn == 'section':
                     a0 = args[0].split()
                     if a0[0].lower() == 'bank':
+                        if ram and pass_no == 2: RAM_SECTIONS.append((ram_sec, pc, ram_line))
                         bank = ev(a0[1]); pc = ev(args[1]); ram = False
                         if not ((bank == 0 and pc < 0x4000) or (bank > 0 and 0x4000 <= pc < 0x8000)):
                             raise AsmError('address $%04X not in bank %d' % (pc, bank))
                         cur = banks.setdefault(bank, bytearray())
                     else:
+                        if ram and pass_no == 2: RAM_SECTIONS.append((ram_sec, pc, ram_line))
                         ram = True; bank = None; cur = None; pc = ev(args[1]); ram_sec = pc
+                        ram_line = lineno
                     continue
                 if mn == 'db':
                     out = []
