@@ -3464,3 +3464,147 @@ opt_save:   ld a, $0A
             ld [$0000], a
             ld [$4000], a
             ret
+
+; ---- new game: CLASSIC or MODERN (owner, 2026-11-24). A choice, its description, Ok to start on
+; ...? Yes / No; the settings set (all can be changed in Options): Classic: the cursor reset, no B
+; dash, no gradient, charges (Modern MP off), no Auto Retarget; Modern: the cursor remembered, B
+; dash, the gradient, Modern MP, Auto Retarget. A = 0 chosen, 1 back (B on the choice)
+section bank 99, $6200
+ng_mode:    xor a
+            ld [ngm_cur], a
+.re:        call scr_open
+            call eqm_pal
+            ld b, 4
+            ld c, 6
+            ld d, 12
+            ld e, 6
+            call scr_win
+            ld bc, $0707
+            ld hl, ngm_s0
+            call scr_str
+            ld bc, $0709
+            ld hl, ngm_s1
+            call scr_str
+            call scr_show
+.l:         ld a, [ngm_cur]                 ; the hand at row 7 / 9, column 7
+            add a, a
+            add a, 7
+            ld c, a
+            ld b, 7
+            call cur_txt
+            call scr_frame
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .b
+            bit 0, a
+            jr nz, .a
+            and $C0
+            jr z, .l
+            ld a, [ngm_cur]
+            xor 1
+            ld [ngm_cur], a
+            ld a, SFX_SEL
+            ld [sfx_req], a
+            jr .l
+.b:         ld a, 1
+            ret
+.a:         call scr_open                   ; the description (16 rows)
+            call eqm_pal
+            ld bc, $0000
+            ld de, $1412
+            call scr_win
+            ld a, [ngm_cur]
+            and a
+            ld hl, ngm_dc
+            jr z, .d
+            ld hl, ngm_dm
+.d:         ld bc, $0101
+            call scr_str
+            call scr_show
+.w:         call scr_frame                  ; A: the question; B: the choice again
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .re
+            and $09
+            jr z, .w
+            call scr_open                   ; Ok to start on ...? Yes / No (Yes first)
+            call eqm_pal
+            ld b, 0
+            ld c, 5
+            ld d, 20
+            ld e, 7
+            call scr_win
+            ld a, [ngm_cur]
+            and a
+            ld hl, ngm_qc
+            jr z, .q
+            ld hl, ngm_qm
+.q:         ld bc, $0106
+            call scr_str
+            ld bc, $0609
+            ld hl, ngm_yes
+            call scr_str
+            ld bc, $0D09
+            ld hl, ngm_no
+            call scr_str
+            call scr_show
+            xor a
+            ld [ngm_yn], a
+.y:         ld a, [ngm_yn]
+            and a
+            ld b, 6
+            jr z, .yx
+            ld b, 13
+.yx:        ld c, 9
+            call cur_txt
+            call scr_frame
+            ldh a, [pad_new]
+            bit 1, a
+            jp nz, .re
+            bit 0, a
+            jr nz, .ya
+            and $30
+            jr z, .y
+            ld a, [ngm_yn]
+            xor 1
+            ld [ngm_yn], a
+            ld a, SFX_SEL
+            ld [sfx_req], a
+            jr .y
+.ya:        ld a, [ngm_yn]
+            and a
+            jp nz, .re
+            ld a, [ngm_cur]                 ; the settings
+            and a
+            ld a, 1
+            jr z, .cl
+            xor a
+.cl:        ld [opt_nodash], a              ; Classic 1 (off) / Modern 0 (on)
+            ld [opt_curr], a                ;   1 reset / 0 remembered
+            ld [opt_nograd], a              ;   1 off / 0 on
+            xor 1
+            ld [opt_mmp], a                 ;   Modern MP: Classic 0 / Modern 1
+            ld [opt_retgt], a
+            call opt_save0
+            xor a
+            ret
+ngm_s0:     db "CLASSIC", 0
+ngm_s1:     db "MODERN", 0
+ngm_yes:    db "Yes", 0
+ngm_no:     db "No", 0
+ngm_qc:     db "Ok to start on", $0A, "CLASSIC?", 0
+ngm_qm:     db "Ok to start on", $0A, "MODERN?", 0
+ngm_dc:     db "Classic offers", $0A, "gameplay true to", $0A, "the original.", $0A
+            db "Manage spell", $0A, "charges with Inns", $0A, "or Houses, and", $0A
+            db "plan your battles", $0A, "carefully - the", $0A, "party will not", $0A
+            db "change their", $0A, "target after", $0A, "selection.", $0A, $0A
+            db "These settings can", $0A, "be changed at any", $0A, "time in OPTIONS.", 0
+ngm_dm:     db "Modern offers", $0A, "gameplay similar", $0A, "to more modern", $0A
+            db "Final Fantasy", $0A, "games. Dashing is", $0A, "enabled with B, MP", $0A
+            db "is shared across", $0A, "all spells, and", $0A, "the party will", $0A
+            db "change targets if", $0A, "the enemy is", $0A, "slain.", $0A, $0A
+            db "These settings can", $0A, "be changed at any", $0A, "time in OPTIONS.", 0
+
+section wram, $DAFC
+ngm_cur:    ds 1
+ngm_yn:     ds 1

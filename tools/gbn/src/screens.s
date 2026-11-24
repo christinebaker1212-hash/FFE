@@ -651,7 +651,12 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             call file_load
             jp c, .np
             ret
-.new:       call party_gen
+.new:       ld a, F3_BANK                   ; CLASSIC or MODERN first (owner; loc.s)
+            ld hl, ng_mode
+            call bank_call
+            and a
+            jp nz, .np
+            call party_gen
             call ng_stats
             ret
 .rate:      ld a, [respond]                 ; the rate's digit after Message Speed
