@@ -171,6 +171,11 @@ def string_table(base):
 
 
 MTEXT_BANK = 5
+
+
+def _mwrap(t):
+    """a menu text's lines: prose balanced (text.wrap_bal), templates (no lowercase) as before"""
+    return text.wrap_bal(t) if any(c.islower() for c in t) else text.wrap(t)
 # shop strings kept as written: menus, Yes / No, the price line, the inn's dots, FF1's variants
 SHOP_KEEP = {10, 11, 14, 15, 17, 18, 21, 22, 28, 36}
 
@@ -194,11 +199,11 @@ def mtext_bank(rom=None):
         buf = ''
         for ln in lines:
             if 'button...' in ln:
-                if buf: out += text.wrap(buf); buf = ''
+                if buf: out += _mwrap(buf); buf = ''
                 out.append(ln)
             else:
                 buf = (buf + ' ' + ln).strip()
-        if buf: out += text.wrap(buf)
+        if buf: out += _mwrap(buf)
         ptrs += (0x4080 + len(body)).to_bytes(2, 'little')
         body += enc('\n'.join(out[:7])) + b'\0'
     blob[0:0x80] = ptrs
@@ -211,7 +216,7 @@ def mtext_bank(rom=None):
         if k < 8:                                   # the shop names: the title window (8 wide)
             lines = text.wrap(t.strip(), 8)
         elif k not in SHOP_KEEP or len(lines) > 4 or max(len(x) for x in lines) > 18:
-            flow = text.wrap(' '.join(x.strip() for x in lines))   # (speech: the NES window's
+            flow = text.layout('\n'.join(x.strip() for x in lines))   # (speech: the NES window's
             if len(flow) < len(lines) or max(len(x) for x in lines) > 18:      # breaks
                 lines = flow[:4]                    # dropped, 18 columns, when it saves lines)
         ptrs += (0x6080 + len(body)).to_bytes(2, 'little')
@@ -280,7 +285,7 @@ def story_pages(rom=None):
     pro = st.get('prologue', {}).get(0, '')
     lines = []
     for sent in pro.split('\n'):
-        lines += text.wrap(sent.strip()) + ['']
+        lines += text.wrap_bal(sent.strip()) + ['']
     while lines and not lines[-1]: lines.pop()
     page = []
     for ln in lines:                                   # pages of up to 10 lines, broken at blanks
@@ -291,11 +296,8 @@ def story_pages(rom=None):
     first = len(pages)
     for k in sorted(st.get('story', {})):
         t = st['story'][k]
-        ls = []
-        for para in t.split('\n'):
-            ls.append(para.strip())
-        ls = text.wrap(' '.join(x for x in ls if x)) if max(len(x) for x in ls) > 18 else ls
-        pages.append([x for x in ls][:10])
+        body = text.layout(t.strip('\n'))[:12]          # (balanced lines, centred in the
+        pages.append([''] * ((12 - len(body)) // 2) + body)   #   window's 12 rows both ways)
     if rom is not None:
         pages[first + 4:first + 4] = credit_pages(rom)
     return pages, first

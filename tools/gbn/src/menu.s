@@ -492,30 +492,18 @@ mm_mem3:    ld [mm_t], a
             jp pen_num
 
 ; member A's two lines: name, L level, HP / max; class or ailment
-mm_member:  ld [mm_t], a
-            add a, a
-            inc a
+mm_member:  ld [mm_t], a                    ; (the target screen: name from column 3, room
+            add a, a                        ;   for the hand before it; HP / max ending at
+            inc a                           ;   column 18; the job or ailment below)
             ld c, a
-            ld b, 1
+            ld b, 3
+            push bc
             call pen_at
             ld a, [mm_t]
             call pen_name
-            ld a, $20
-            call pen_ch
-            ld a, $4C
-            call pen_ch
-            ld a, [mm_t]
-            call ch_rec
-            ld a, l
-            add a, CH_LEVEL
-            ld l, a
-            ld a, [hl]
-            inc a
-            call nf_a
-            ld b, 2
-            call pen_num
-            ld a, $20
-            call pen_ch
+            pop bc
+            ld b, 12
+            call pen_at
             ld a, [mm_t]
             call ch_rec
             ld a, l
@@ -537,7 +525,7 @@ mm_member:  ld [mm_t], a
             add a, a
             add a, 2
             ld c, a
-            ld b, 2
+            ld b, 3
             call pen_at
             ld a, [mm_t]
             call ch_rec
@@ -1402,11 +1390,11 @@ tgt_redraw: call tgt_draw
 tgt_pick:   xor a
             ld [mm_pc], a
 tgt_pick2:                                  ; (the hand where it was)
-.l:         ld a, [mm_pc]                   ; (at the member's second line)
+.l:         ld a, [mm_pc]                   ; (before the member's name)
             add a, a
-            add a, 2
+            inc a
             ld c, a
-            ld b, 2
+            ld b, 3
             call cur_txt
             call scr_frame
             ldh a, [pad_new]
