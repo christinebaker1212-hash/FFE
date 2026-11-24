@@ -549,3 +549,25 @@ one reaches parity, so the owner can keep playing).
      4, Dia in battle (10 -> 5), a level up (Red Mage L2, INT 10: max 10 -> 13 in both modes),
      the estimate for a Red Mage L20 INT 30 (246, as worked by hand), and the battle list and
      party window unchanged with the option off.
+31. Owner (2026-11-24, later):
+   - Modern MP's Dawn of Souls data kept in the repository (`tools/gbn/modern_mp.py`): no downloads.
+   - Battle: a spell's number and flinch went to whoever the previous attack hit (bt_effect never
+     set df_player / bt_tgt: a spell on an enemy after an enemy hit a member showed by the member);
+     effects, then numbers, then deaths (an enemy's death waits for its number's pop; the top window
+     closes before an effect under it); healing: no hit reaction, green ink with the damage
+     numbers' outline; enemy deaths: rows vanish in place (no sliding).
+   - Sound: the clicks at volume steps found by recording each channel of every song (NES model vs
+     SameBoy, DMG and Color) and counting samples that overshoot both neighbours: a step down was
+     fifteen +1 zombie writes (the channel played every louder level ~30 cycles). Now two writes
+     ($F7, $F8: verified on SameBoy DMG / Pocket / Color 0-E / GBA and Gambatte with a test ROM;
+     the Color tests it at boot, mGBA adds 1 instead), the tick's volume applied with the note's
+     restart, NRx2 and NRx4 3 cycles apart, $4015 off as volume 0 with the DAC on. All 24 songs:
+     Color 4 marks left (note-start phase resets, as the NES), plain Game Boy 0-3 per channel.
+   - New Game asks CLASSIC or MODERN (the owner's texts; Classic: charges, no retarget, cursor
+     reset, no dash, no gradient; Modern: the opposite).
+   - Options (Color): LCD Default / GBC Corrected / GBA Corrected (`src/cc.s`: a curve per channel
+     and raised saturation, applied where a screen's own colours are written; fades work from the
+     read-back palettes).
+   - The airship's view (`src/air.s`, the approved mock-up): per-line SCY from a mode-0 STAT
+     interrupt, a sky band (window; Color gradient, DMG shades and haze), blended with the ship's
+     height, rows py-10 .. py+5 streamed, off in menus.

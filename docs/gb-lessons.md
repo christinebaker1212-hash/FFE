@@ -319,3 +319,14 @@ Color only" screen on older systems.
   on first use (battle start, Magic / Status screens, Options). Options are global, files are not.
 - Test scripts: the RAM-backed "in battle" test (ROM bank 6 mapped) is false during bank-switched
   animations: confirm over several checks before deciding a battle ended.
+
+## Shared RAM, test harness traps (2026-11-24, later)
+- A flag the interrupt handlers read must never live in RAM another screen reuses: the airship
+  view's `ap_on` in the battle's tile stage made the per-line handler run in battles (DMG only,
+  by chance of the bytes). Tables may share RAM if they are rebuilt whenever the feature starts.
+- Code in a switchable bank must not call a bank-0 routine that maps another bank and leaves it
+  mapped (`q_mt` maps the map's bank): the return lands in the other bank's data. Save / restore
+  `rombank` in such a callee.
+- Screenshot helpers named by frame number overwrite each other across runs: copy per run.
+- Measure audio glitches per channel against the NES model; a square wave never overshoots both
+  neighbouring samples, a click does.
