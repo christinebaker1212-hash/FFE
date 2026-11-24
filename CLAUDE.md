@@ -1357,8 +1357,10 @@ reflection faded into the sea (item 35). Playthrough (item 36): New Game to Bikk
 DMG; the sound variables overran the save page (ship / airship flags): fixed, guarded, saves repaired
 on load. Then (Color): Elfheim, levels 10-13, Marsh Cave and the Crown (FF1's Piscodemon guard tile);
 Astos (14), Herb, Mystic Key, TNT, Lute, canal, Melmond, Vampire and the Star Ruby (15-16); the
-Fight-only test driver is wiped by Earth Cave B3 on the way out (no game bug since Bikke). Open: world-map borders
-(await details), the playthrough.
+Fight-only test driver is wiped by Earth Cave B3 on the way out (no game bug since Bikke); playthrough stopped (owner).
+Owner (2026-11-24, last): DMG / Pocket volume steps by $08 adds only (real-hardware fades); the Konami Code on the
+Formation menu shows LCD (Color) and EXP / Gold x2-x12 in a scrolling Options list (item 37); polish sweep started
+(main menu HP under the hand, shop preview alignment, empty spell slot, Formation fade). Open: world-map borders (#81).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

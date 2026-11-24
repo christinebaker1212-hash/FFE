@@ -98,6 +98,7 @@ lineup:     call scr_open
             cp 4
             jr c, .g
             call lu_names
+            call lu_sprites                 ; (the pictures fade in with the window)
             call scr_show
             xor a
             ld [lu_cur], a

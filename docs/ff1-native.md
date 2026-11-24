@@ -678,7 +678,9 @@ one reaches parity, so the owner can keep playing).
      few letters a frame); held ticks run at line 64 again;
    - polish: the main menu's member text from column 3 (picture at x 7): the command hand no longer
      covers the last HP digit; the shop's party preview values end at column 18 (a six-letter name
-     no longer runs into "Full" / "Can't use"), its heading over the values;
+     no longer runs into "Full" / "Can't use"), its heading over the values; the Magic screen's empty
+     slot gives the error sound only (it showed FF1's "use it in a place like this?" message); the
+     Formation menu's pictures fade in with its window (they appeared after the fade);
    - the Konami Code (Up Up Down Down Left Right Left Right B A) on the Formation menu (the B held
      back, the A used up; FF1's magic sound) marks the file (save page $F8 = $A5): Options then show
      LCD (Color) and EXP / Gold multipliers (Normal, 2X, 4X, 8X, 12X; $F9 / $FA in the save page,
