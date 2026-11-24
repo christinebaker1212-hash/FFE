@@ -1360,7 +1360,9 @@ Astos (14), Herb, Mystic Key, TNT, Lute, canal, Melmond, Vampire and the Star Ru
 Fight-only test driver is wiped by Earth Cave B3 on the way out (no game bug since Bikke); playthrough stopped (owner).
 Owner (2026-11-24, last): DMG / Pocket volume steps by $08 adds only (real-hardware fades); the Konami Code on the
 Formation menu shows LCD (Color) and EXP / Gold x2-x12 in a scrolling Options list (item 37); polish sweep started
-(main menu HP under the hand, shop preview alignment, empty spell slot, Formation fade). Open: world-map borders (#81).
+(main menu HP under the hand, shop preview alignment, empty spell slot, Formation fade). Colour correction checked screen by screen against a computed reference (GBC / GBA
+modes): fixed uncorrected colours (menu labels, prologue, battle flash, airship sky) and stale window
+colours after masked loads / file loads (palette 7 now written by every screen; likely #81) (item 38).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

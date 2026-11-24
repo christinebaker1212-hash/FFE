@@ -534,45 +534,9 @@ gold_str:   push de
             ret
 
 ; Colour: palettes 1 / 2 the window's with green / red text (the preview's better / worse)
-eqm_pal:    ld hl, win_pal                  ; (the window colours: the Options' choice)
-            ld de, eqm_buf
-            ld bc, 8
-            call memcpy
-            ld a, $2A                       ; NES green
-            ld de, eqm_buf + 6
-            call .nes
-            ld a, $80 | 8
-            call .put
-            ld a, $26                       ; NES red
-            ld de, eqm_buf + 6
-            call .nes
-            ld a, $80 | 16
-            call .put
-            ld a, $28                       ; NES yellow: the labels' gold (palette 3)
-            ld de, eqm_buf + 6
-            call .nes
-            ld a, $80 | 24
-            call .put
-            ld a, $00                       ; NES grey: a choice not open now (palette 4)
-            ld de, eqm_buf + 6
-            call .nes
-            ld a, $80 | 32
-.put:       call bcps_w
-            ld hl, eqm_buf
-            ld b, 8
-.p:         ld a, [hl+]
-            call bcpd_w
-            dec b
-            jr nz, .p
-            ret
-.nes:       add a, a
-            ld l, a
-            ld h, 0
-            ld bc, C_NESRGB
-            add hl, bc
-            ld bc, 2
-            ld a, COMMON
-            jp far_copy
+eqm_pal:    ld a, F3_BANK                   ; (body: eqm_palf, bank 99)
+            ld hl, eqm_palf
+            jp bank_call
 
 
 ; ---- shops (owner, 2026-11-22, from the WonderSwan Color remake): the item under the hand,
@@ -982,6 +946,25 @@ dash_b:     ld a, [opt_nodash]
             bit 1, a
             ret
 .no:        xor a
+            ret
+; (moved from screens.s / main.s: their bank-0 sections were full)
+; the hand (OAM 0-3) hidden; registers but A kept
+hand_hide:  xor a
+            ld [oam_buf], a
+            ld [oam_buf + 4], a
+            ld [oam_buf + 8], a
+            ld [oam_buf + 12], a
+            ret
+; A = the byte at bank A' (fc_bank), HL; the caller's bank mapped again
+far_byte:   ldh a, [rombank]
+            ld [fc_save], a
+            ld a, [fc_bank]
+            call sbank
+            ld a, [hl]
+            push af
+            ld a, [fc_save]
+            call sbank
+            pop af
             ret
 
 section bank 99, $4800
@@ -3161,10 +3144,11 @@ op_n:       ds 1
 section bank 99, $7200
 ; a colour changed: the palettes now (in V-Blank: palette 7 and the menus' 1-4)
 opt_wnow:   call opt_wpal
-            call wait_vbl
+            call opt_objp                   ; (the hand's colours: an LCD mode change)
+            call eqm_pal                    ; (its colours made, then V-Blank: the writes)
             call opt_p0
             call text_pals
-            call eqm_pal
+            call opt_objw
             ld a, [opt_nograd]              ; (the gradient from the new colour, or off)
             and a
             jp nz, gr_off
@@ -3493,8 +3477,9 @@ ng_mode:    xor a
             xor 1
             ld [opt_mmp], a                 ;   Modern MP: Classic 0 / Modern 1
             ld [opt_retgt], a
-            xor a                           ; (a new file has no Konami Code: LCD Default)
-            ld [opt_ccm], a
+            xor a                           ; (a new file has no Konami Code: LCD Default,
+            ld [opt_ccm], a                 ;   the window colours made again for it)
+            call opt_wpal
             call opt_save0
             xor a
             ret
@@ -3786,4 +3771,81 @@ kn_feed:    ldh a, [pad_new]
             inc a
 .z:         ld [kn_st], a
             ld a, b
+            ret
+
+section bank 99, $7700                      ; (the body of eqm_pal)
+eqm_palf:   ld de, eqm_c3                   ; colour 3 of palettes 1-4: NES green, red, yellow (the
+            ld a, $2A                       ;   labels' gold), grey (a choice not open now), corrected
+            call .nes                       ;   for the LCD mode (cc.s) before any palette write, so
+            ld a, $26                       ;   the writes stay in V-Blank when the LCD is on
+            call .nes
+            ld a, $28
+            call .nes
+            xor a
+            call .nes
+            ld hl, eqm_c3
+            ld b, 8
+            call cc_inpl
+            ld hl, win_pal                  ; colours 0-2: the window's (the Options' choice,
+            ld de, eqm_buf                  ;   already corrected)
+            ld bc, 8
+            call memcpy
+            ld a, [lmask]                   ; (the LCD on, not a masked load: the writes in
+            and a                           ;   V-Blank)
+            jr nz, .w
+            ldh a, [rLCDC]
+            add a, a
+            call c, wait_vbl
+.w:         ld de, eqm_c3
+            ld a, $80 | 8
+            call .put
+            ld a, $80 | 16
+            call .put
+            ld a, $80 | 24
+            call .put
+            ld a, $80 | 32
+.put:       call bcps_w
+            ld a, [de]
+            inc de
+            ld [eqm_buf + 6], a
+            ld a, [de]
+            inc de
+            ld [eqm_buf + 7], a
+            ld hl, eqm_buf
+            ld b, 8
+.p:         ld a, [hl+]
+            call bcpd_w
+            dec b
+            jr nz, .p
+            ret
+.nes:       push de
+            add a, a
+            ld l, a
+            ld h, 0
+            ld bc, C_NESRGB
+            add hl, bc
+            ld bc, 2
+            ld a, COMMON
+            call far_copy
+            pop de
+            inc de
+            inc de
+            ret
+; Options: the hand's colours (OBJ palettes 0-3) for a new LCD mode (cc.s): made ready, written
+opt_objp:   ld a, UI_GFX
+            ld hl, U_OBJPAL
+            ld de, scr_buf
+            ld bc, 32
+            call far_copy
+            ld hl, scr_buf
+            ld b, 32
+            jp cc_inpl
+opt_objw:   ld a, $80
+            ldh [rOCPS], a
+            ld hl, scr_buf
+            ld b, 32
+.o:         ld a, [hl+]
+            ldh [rOCPD], a
+            dec b
+            jr nz, .o
             ret

@@ -27,19 +27,19 @@ text_init:  ldh a, [is_cgb]
             ldh [rVBK], a
 ; the window palette 7 and the black palette 5 (CGB; also from bg_pal in V-Blank: a room's
 ; palettes cover them)
-text_pals:  ld a, $B8                       ; BG palette 7 (the window colours: win_pal)
-            ldh [rBCPS], a
-            ld hl, win_pal
+text_pals:  ld a, $B8                       ; BG palette 7 (the window colours: win_pal; a masked
+            call bcps_w                     ;   load: into its shadows, or the colours the last
+            ld hl, win_pal                  ;   fade-out kept would show instead)
             ld b, 8
 .p:         ld a, [hl+]
-            ldh [rBCPD], a
+            call bcpd_w
             dec b
             jr nz, .p
             ld a, $A8                       ; BG palette 5: all black (outside the windows)
-            ldh [rBCPS], a
+            call bcps_w
             ld b, 8
-            xor a
-.k:         ldh [rBCPD], a
+.k:         xor a
+            call bcpd_w
             dec b
             jr nz, .k
             ret

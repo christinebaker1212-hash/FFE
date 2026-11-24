@@ -61,6 +61,8 @@ scr_open:   call fade_out                   ; (the screen before faded out)
             call fill32
             xor a
             ldh [rVBK], a
+            call text_pals                  ; (the windows' palette 7 from win_pal: the Options'
+                                            ;   colour and LCD mode now, not the last screen's)
             ld a, UI_GFX                    ; OBJ palettes 0-3: FF1's battle sprite palettes
             ld hl, U_OBJPAL
             ld de, scr_buf
@@ -102,13 +104,6 @@ scr_open:   call fade_out                   ; (the screen before faded out)
             ld bc, 12
             jp far_copy
 
-; the hand (OAM 0-3) hidden; registers but A kept
-hand_hide:  xor a
-            ld [oam_buf], a
-            ld [oam_buf + 4], a
-            ld [oam_buf + 8], a
-            ld [oam_buf + 12], a
-            ret
 oam_clr:    ld hl, oam_buf
             ld b, 160
             xor a
@@ -1633,6 +1628,9 @@ pro_show:   ld a, TR_MINIMAP
             ld a, l
             cp low(pr_nes + 5)
             jr nz, .cc
+            ld hl, pr_rgb                   ; (the LCD colour mode: cc.s)
+            ld b, 10
+            call cc_inpl
             xor a
             ld [st_pg], a
 .page:      call scr_open
@@ -3011,6 +3009,7 @@ eqm_calc:   ld [eqm_k], a
             ld [eqm_v + 3], a
             jp eqm_unadj
 
+section bank 2, $7390                       ; (moved: the prologue's section was full)
 ; the name of slot byte A of the kind of type eqm_ft (icon + letters)
 eqm_name:   and $7F
             ld b, a
@@ -3056,6 +3055,7 @@ eqm_sv:     ds 1
 eqm_v:      ds 4
 eqm_w:      ds 4
 eqm_buf:    ds 8
+eqm_c3:     ds 8
 eqm_ls:     ds 17
 eqm_bk:     ds 16
 eqm_rows:   ds 5

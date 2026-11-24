@@ -23,7 +23,7 @@ x_nes_rgb:  and $3F                         ; (nes_rgb's copy)
             ld e, a
             ld a, [scr_buf + 29]
             ld d, a
-            ret
+            jp cc_fix                       ; (the LCD colour mode: cc.s)
 fl_main:
             ld a, [bt_form]                 ; source: the silhouette page, tile D
             and $0F

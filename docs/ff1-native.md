@@ -688,3 +688,28 @@ one reaches parity, so the owner can keep playing).
      colours Default (on loading a file and at New Game). Options are a table-driven list now (id,
      variable, range, value column and format) that scrolls: 7 / 9 rows on a plain Game Boy, 11 / 14
      on the Color (12 shown).
+38. Owner (2026-11-24, last): "check all existing screens against colour corrected screens".
+   - Method (scratchpad `pt2/cc_tour.py`, `cc_boot2.py`, `cc/cmp.py`): the same tour three times in
+     SameBoy with its own colour correction off (`sbsh` env `SB_CC=off`: raw RGB555 in the shots),
+     the LCD mode chosen in Options (Default, GBC, GBA Corrected); every Default shot mapped through
+     the correction (cc.s's curve and saturation, bit-exact in Python) and compared pixel by pixel:
+     each difference is a colour that skipped the correction or got it twice. Tours: town, main
+     menu, Items / Magic / Equip / Status / Options, Formation, a shop, the overworld, the world map,
+     an encounter and a battle; a soft reset (prologue, title, file select) and a file without the
+     Konami Code loaded after it.
+   - Fixed: the menus' green / red / gold / grey label colours (`eqm_pal`'s colour 3 came straight
+     from the NES table; now corrected, all four made before the palette writes, which wait for
+     V-Blank when the LCD is on; its body moved to bank 99); the prologue's colours (`pr_rgb`), the
+     battle flash's (`x_nes_rgb`) and the airship's sky (`ap_sky`) were never corrected; the hand's
+     colours now change with the LCD mode in Options at once.
+   - Fixed (all modes): screens never wrote the windows' palette 7 themselves and kept the last
+     screen's; `text_pals` wrote straight to palette RAM, so a masked load put the colours its
+     fade-out kept back over it; and a skipped fade-out (FF1's palette cycle before a menu) left an
+     older fade's colours to be used. Every screen (`scr_open`) and map load now writes palette 7 /
+     5 from `win_pal` through the shadows; the skipped fade-out keeps no colours. This is the likely
+     cause of #81 (menu borders without colours after the world map: palette 7 left as the world
+     map's), not reproduced exactly.
+   - Fixed: loading a file without the Konami Code (and New Game) set the LCD mode back to Default
+     but kept `win_pal` corrected for the old mode (menus stayed corrected): it is made again.
+   - Checked: after the fixes every screen of the tours matches the computed correction exactly in
+     both modes (the rest: the Options value text, people walking, the water's phase).

@@ -6,7 +6,7 @@
 ; loads); DMG / SGB: OBP1, a dimmer mapping. OAM 36-39 (unused on the overworld).
 REFL_OAM   = oam_buf + 144
 
-section bank 0, $1698
+section bank 0, $16A0
 refl_tick:  xor a                           ; (hidden first)
             ld [REFL_OAM], a
             ld [REFL_OAM + 4], a

@@ -512,6 +512,7 @@ load_map:   push af
             call room_bgp                   ; (inside a room after a teleport: its colours)
             ld a, $80
             call cgb_pal32
+            call text_pals                  ; (the boxes' palette 7: win_pal as it is now)
             ld a, $80                       ; OBJ palettes 0-3 (NES sprite palettes)
             ldh [rOCPS], a
             ld hl, M_OBJ
@@ -1897,17 +1898,6 @@ far_copy:   push af
             call memcpy
             ld a, [fc_save]
             jp sbank
-; A = the byte at bank A' (fc_bank), HL; the caller's bank mapped again
-far_byte:   ldh a, [rombank]
-            ld [fc_save], a
-            ld a, [fc_bank]
-            call sbank
-            ld a, [hl]
-            push af
-            ld a, [fc_save]
-            call sbank
-            pop af
-            ret
 
 ; ---- helpers
 memclr:     xor a                           ; HL = start, DE = length
@@ -2208,6 +2198,7 @@ fade_out:   call lcd_get
             jr z, .go
             xor a
             ld [fd_skip], a
+            ld [fd_saved], a                ; (no colours kept: the load reads them back)
             ret
 .go:        ldh a, [is_cgb]
             and a

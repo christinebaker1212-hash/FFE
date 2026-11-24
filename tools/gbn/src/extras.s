@@ -1018,8 +1018,14 @@ bs_mark:    call bs_on
 sv_fix:     ld a, [KN_MARK]                 ; (a file without the Konami Code: the LCD
             cp $A5                          ;   colours Default, the option hidden; owner,
             jr z, .k                        ;   2026-11-24)
+            ld a, [opt_ccm]
+            and a
+            jr z, .k
             xor a
             ld [opt_ccm], a
+            ld a, F3_BANK                   ; (the window colours made again for Default:
+            ld hl, opt_wpal                 ;   win_pal held the mode the title used)
+            call bank_call
 .k:         ld a, [SV_SHIP]
             cp 2
             jr c, .air

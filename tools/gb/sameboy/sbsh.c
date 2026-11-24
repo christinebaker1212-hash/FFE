@@ -38,6 +38,7 @@ static bool env_cb(unsigned cmd, void* data) {
 		if (!strncmp(v->key, "sameboy_model", 13)) { v->value = model; return true; }
 		if (!strcmp(v->key, "sameboy_high_pass_filter_mode")) { v->value = "accurate"; return true; }
 		if (!strcmp(v->key, "sameboy_border")) { v->value = "never"; return true; }
+		if (!strcmp(v->key, "sameboy_color_correction_mode") && getenv("SB_CC")) { v->value = getenv("SB_CC"); return true; }   /* SB_CC=off: raw RGB555 colours */
 		if (!strcmp(v->key, "gambatte_gb_hwmode")) { v->value = strstr(model, "Color") ? "GBC" : "GB"; return true; }
 		if (!strcmp(v->key, "gambatte_gb_colorization")) { v->value = "disabled"; return true; }
 		v->value = NULL; return false;

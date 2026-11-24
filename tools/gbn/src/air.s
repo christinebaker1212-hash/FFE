@@ -332,6 +332,9 @@ ap_frame:   ld a, [ap_on]
             ld de, ap_sky
             ld bc, 64
             call memcpy
+            ld hl, ap_sky                   ; (the LCD colour mode: cc.s)
+            ld b, 64
+            call cc_inpl
             ld a, %11100100                 ; (DMG: the overworld's BGP: its tiles are shades;
             ld [ap_bgp0], a                 ;   fades stop the view first)
 .on:
