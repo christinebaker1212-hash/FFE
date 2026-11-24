@@ -348,3 +348,15 @@ Color only" screen on older systems.
   mode 3) leaves the main code about a third of the plain Game Boy's time: a town's load went
   from 12 white frames to 71 black ones. The Color (double speed) can afford it; on the DMG the
   LCD-off load stays (2026-11-24), unless the load's CPU work shrinks first.
+
+## RAM sections running into each other (2026-11-24)
+- The FF1 native build's sound variables (snd.s, `section wram, $CFC0`) grew past $CFFF into FF1's
+  save page at $D000: the music engine rewrote the ship's flag / position and the airship's flag
+  every note. Found in the playthrough (Bikke skipped "take my ship": the ship flag was already
+  set at New Game) with the SameBoy write watchpoint on $D000-$D003.
+- The assembler gives no overlap error for RAM `ds` (unions are deliberate there), so a section
+  can silently run into the next. `asm_sm83.PROTECT_RAM` now names ranges no lower section may
+  run into (the FF1 native build protects the save page $D000-$D3FF); add any other region that
+  must stay intact.
+- Saves from the affected builds are mended on load / resume (extras.s `sv_fix`): ship / airship
+  flags other than 0 / 1 reset.

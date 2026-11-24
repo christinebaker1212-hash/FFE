@@ -1403,29 +1403,6 @@ sus_erase:  call sus_on
             ld [hl+], a
             ld [hl], a
             jp sus_off
-; the suspend point back into the game (the title's message speed kept), then erased
-sus_load:   ld a, [respond]
-            push af
-            call sus_on
-            call sus_cp0
-            ld a, 1
-            call sus_copy
-            call sus_off
-            pop af
-            ld [respond], a
-            xor a                           ; (the frame's passing state cleared)
-            ld [wp_req], a
-            ld [wp_on], a
-            ld [ly_n], a
-            ld [pc_hold], a
-            ld [shop_pend], a
-            ld a, LCDC_ON
-            ld [lcdc_on], a
-            ld a, $FF
-            ld [mt_force], a
-            ld a, 1
-            ld [pc_req], a
-            jr sus_erase
 ; a question (HL, A lines) with Yes / No below, on its own screen; D = the choice first
 ; (0 Yes, 1 No) -> A = 0 Yes, 1 No (B: No)
 sus_ask:    ld [sus_ln], a
@@ -3108,3 +3085,31 @@ section wram, $D400
 smap:       ds 18 * 32                      ; the screen's map copy (attributes at + $300)
 section wram, $D700
 sattr:      ds 18 * 32
+
+section bank 2, $7F50                       ; (moved: the title's section was full)
+; the suspend point back into the game (the title's message speed kept), then erased
+sus_load:   ld a, [respond]
+            push af
+            call sus_on
+            call sus_cp0
+            ld a, 1
+            call sus_copy
+            call sus_off
+            pop af
+            ld [respond], a
+            xor a                           ; (the frame's passing state cleared)
+            ld [wp_req], a
+            ld [wp_on], a
+            ld [ly_n], a
+            ld [pc_hold], a
+            ld [shop_pend], a
+            ld a, LCDC_ON
+            ld [lcdc_on], a
+            ld a, $FF
+            ld [mt_force], a
+            ld a, 1
+            ld [pc_req], a
+            call sus_erase
+            ld a, EXTRA_BANK                ; (a point from the builds whose sound variables
+            ld hl, sv_fix                   ;   ran into the save page: ship / airship mended)
+            jp bank_call

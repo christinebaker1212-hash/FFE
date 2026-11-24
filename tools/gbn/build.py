@@ -8,6 +8,8 @@ ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
+import asm_sm83
+asm_sm83.PROTECT_RAM[:] = [(0xD000, 0xD3FF)]          # FF1's save page (main.s unsram): only its own section
 import data, minimap, sgb, text, talkconst, ui, names, battle, sound
 
 COMMON, TS_BANK0, MAP_BANK0, OW_TS, OW_INFO, OW_ROWS, ROM_BANKS = 1, 8, 20, 16, 81, 84, 128

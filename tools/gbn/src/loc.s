@@ -1365,6 +1365,9 @@ file_pick:  ld a, [sv_slot]                 ; (the hand on the file used last)
             jr nz, .over
             call oam_clr                    ; load
             call load_game
+            ld a, EXTRA_BANK                ; (a save from the builds whose sound variables ran
+            ld hl, sv_fix                   ;   into the save page: ship / airship mended)
+            call bank_call
             and a
             ret
 .empty:     and a

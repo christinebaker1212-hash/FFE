@@ -491,11 +491,13 @@ snd_cv:     ds 2                            ; the pulses' GB volume now ($FF: un
 snd_tv:     ds 2                            ; the volume the engine asked for this tick ($FF none)
 snd_mute:   ds 1                            ; pulses silenced by $4015 until a new note (bits 0 / 1)
 snd_pair:   ds 1                            ; 1: a step down is NRx2 $F7, $F8 (both writes)
-snd_nr2:    ds 1
-snd_zmb:    ds 1                            ; 1: zombie mode works (volume steps), 0: restarts
-mus_cur:    ds 1                            ; the music track asked for last (main.s snd_track)
-tri_on:     ds 1                            ; the wave channel started and not stopped since
-tri_dac:    ds 1                            ; the last NR30 value
+
+section wram, $C998                         ; (2026-11-24: these five ran past $CFFF into FF1's save
+snd_nr2:    ds 1                            ;   page: the ship's flag / position and the airship's
+snd_zmb:    ds 1                            ;   flag changed with the music; Bikke never gave the
+mus_cur:    ds 1                            ;   ship. 1: zombie mode works (volume steps), 0:
+tri_on:     ds 1                            ;   restarts; the track asked for last; the wave channel
+tri_dac:    ds 1                            ;   started and not stopped since; the last NR30 value)
 
 ; ---- sound effects (FF1's, data from the ROM: sound.sfx_data). The square part plays on CH2
 ; while the music engine leaves its square 2 alone (sq2_sfx = NES_RAM + $7E, FF1's own

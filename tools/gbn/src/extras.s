@@ -1012,6 +1012,29 @@ bs_mark:    call bs_on
             ld [hl], c
             jp bs_off
 
+; ---- a save page from the builds whose sound variables ran into it ($D000-$D004, until
+; 2026-11-24): the ship's and the airship's flags not 0 / 1 are mended (the ship: given if the
+; pirates were fought, at FF1's starting place; the airship: not found), so an old save plays on
+sv_fix:     ld a, [SV_SHIP]
+            cp 2
+            jr c, .air
+            ld a, [game_flags + 4]          ; (Bikke's event flag: bit 1)
+            rrca
+            rrca
+            and 1
+            ld [SV_SHIP], a
+            ld a, COMMON                    ; (the ship's place: the ROM's new-game page)
+            ld hl, C_INITPG + 1
+            ld de, SV_SHIP + 1
+            ld bc, 2
+            call far_copy
+.air:       ld a, [SV_AIR]
+            cp 2
+            ret c
+            xor a
+            ld [SV_AIR], a
+            ret
+
 ; the title menu's up / down: Continue 0, New Game 1, Extras 3 (Continue left out while there is
 ; nothing to continue)
 ng_ud:      ldh a, [pad_new]

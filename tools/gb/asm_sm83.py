@@ -27,6 +27,7 @@ constants. `section bank N, $addr` starts or continues code in ROM bank N at $ad
 `section wram, $C000` / `section hram, $FF80` lay out RAM labels (ds only, no bytes).
 """
 import re
+PROTECT_RAM = []                 # (lo, hi) RAM ranges no lower section may run into (set by builds)
 
 R8 = {'b': 0, 'c': 1, 'd': 2, 'e': 3, 'h': 4, 'l': 5, '[hl]': 6, 'a': 7}
 R16 = {'bc': 0, 'de': 1, 'hl': 2, 'sp': 3}
@@ -191,7 +192,7 @@ def _asm_once(src, syms, promote):
                             raise AsmError('address $%04X not in bank %d' % (pc, bank))
                         cur = banks.setdefault(bank, bytearray())
                     else:
-                        ram = True; bank = None; cur = None; pc = ev(args[1])
+                        ram = True; bank = None; cur = None; pc = ev(args[1]); ram_sec = pc
                     continue
                 if mn == 'db':
                     out = []
@@ -206,7 +207,14 @@ def _asm_once(src, syms, promote):
                     emit(out); continue
                 if mn == 'ds':
                     n = ev(args[0])
-                    if ram: pc += n
+                    if ram:
+                        # (protected RAM: a section that starts below a protected range must
+                        # not run into it; the FF1 native build's save page, see PROTECT_RAM)
+                        for lo, hi in PROTECT_RAM:
+                            if ram_sec < lo and pc + n > lo:
+                                raise AsmError('RAM section from $%04X runs into $%04X-$%04X'
+                                               % (ram_sec, lo, hi))
+                        pc += n
                     else: emit([ev(args[1]) & 0xFF if len(args) > 1 else 0] * n)
                     continue
                 if mn == 'incbin_bytes':      # used by build scripts: incbin_bytes <sym of bytes>
