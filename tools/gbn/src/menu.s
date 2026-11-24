@@ -1807,7 +1807,20 @@ mg_use:     ld a, [mg_cur]                  ; level, slot
             ld a, b
             ld [mg_lv], a
             call mg_data                    ; MP of the level (FF1 UseMagic_GetRequiredMP)
-            ld a, l
+            push hl                         ; (an empty slot: the error sound only, as FF1's
+            ld a, b                         ;   cursor not taking it; no message, 2026-11-24)
+            add a, a
+            add a, a
+            add a, c
+            add a, l
+            ld l, a
+            ld a, [hl]
+            pop hl
+            and a
+            jr nz, .sp
+            call sfx_err
+            jp magic_menu.l
+.sp:        ld a, l
             add a, $20
             add a, b
             ld [mg_mp], a
