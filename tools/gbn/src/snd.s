@@ -53,6 +53,12 @@ snd_init_b: ld a, $80
             ld a, $FF
             ld [snd_cv], a
             ld [snd_cv + 1], a
+            ld [snd_tv], a
+            ld [snd_tv + 1], a
+            xor a
+            ld [snd_mute], a
+            inc a
+            ld [snd_pair], a                ; (the Game Boy: as the hardware; a Color: tested)
             ld a, $80                       ; (no track yet: silent)
             ld [NES_RAM + $4B], a
 ; volume changes inside a note use "zombie mode" (NRx2 = $08 adds 1 to the playing volume: no
@@ -90,6 +96,17 @@ snd_init_b: ld a, $80
             ld a, $08
             ldh [$FF12], a                  ; zombie: + 1
             call .zmax                      ; B = after
+            push bc                         ; a step down as two writes ($F7, $F8: the
+            ld hl, $FF12                    ;   hardware's and accurate emulators' rule; some
+            ld [hl], $F7                    ;   emulators add 1 instead): back to 1?
+            ld [hl], $F8
+            call .zmax
+            ld a, b
+            cp 1
+            jr z, .pk
+            xor a
+            ld [snd_pair], a                ; (no: steps down by fifteen steps up)
+.pk:        pop bc
             xor a
             ldh [$FF12], a                  ; (channel 1 off again)
             ld a, SND_MASK
@@ -186,96 +203,19 @@ aw:         push af
             jr .vol
 .vol2:      ld hl, $FF16
             ld c, 1
-.vol:       ld a, e                         ; (no restart for a volume change: FF1 changes the
-            and $C0                         ;   volume nearly every frame, and a restart resets
-            ld [hl+], a                     ;   the wave: a 60 Hz buzz and flat notes on the
-            ld a, e                         ;   GB. Steps of $08 to NRx2 ("zombie mode") move
-            and $0F                         ;   the playing volume, as the recompiled build)
-            call p58
-            ld b, a                         ; B = the new GB volume
-            ld a, c
-            add a, low(snd_cv)
-            ld e, a
-            ld d, high(snd_cv)
-            ld a, [de]
-            cp $FF
-            jr z, .vr                       ; (unknown: set and restart)
-            ld a, [snd_zmb]                 ; (zombie mode does not work here: every change
-            cp 2                            ;   by a restart with the new volume; 2, a test
-            jr z, .vs                       ;   build: the volume only at a note's start)
-            and a
-            jr nz, .zm
-            ld a, [de]
-            cp b
-            jp z, .x
-            jr .vr
-.vs:        ld a, b
-            ld [de], a
-            jp .x
-.zm:        push hl
-            ld h, d
-            ld l, e
-            ld a, b
-            sub [hl]
+.vol:       ld a, e                         ; the duty now; the volume a target, applied when
+            and $C0                         ;   the tick's writes are done (vol_apply: with
+            ld [hl+], a                     ;   the note's restart, if one follows, so the
+            ld a, e                         ;   old note never plays at the new volume)
             and $0F
-            ld [hl], b
-            pop hl                          ; HL = NRx2
-            jr z, .vx
-            ld d, a                         ; D = steps up (1-15; a step down is 15 up)
-            ldh a, [is_cgb]                 ; (owner, 2026-11-24: the audio not smooth. The
-            and a                           ;   channel plays every level on the way: a tick
-            jr z, .zu                       ;   per step. A Color: steps in the output's low
-            ld a, c                         ;   phase are silent, read from PCM12, briefly)
-            and a
-            ld a, $0F
-            jr z, .zp
-            ld a, $F0
-.zp:        ld e, a
-            ld b, 0
-.zq:        ldh a, [$FF76]
-            and e
-            jr z, .zu
-            dec b
-            jr nz, .zq
-.zu:        ld c, l                         ; the steps unrolled: 2 cycles each (the loop took
-            ld a, 15                        ;   6, the louder levels three times as long)
-            sub d
-            ld e, a
-            ld d, 0
-            ld hl, .unr
-            add hl, de
-            ld a, $08
-            jp hl
-.unr:       ldh [c], a
-            ldh [c], a
-            ldh [c], a
-            ldh [c], a
-            ldh [c], a
-            ldh [c], a
-            ldh [c], a
-            ldh [c], a
-            ldh [c], a
-            ldh [c], a
-            ldh [c], a
-            ldh [c], a
-            ldh [c], a
-            ldh [c], a
-            ldh [c], a
-.vx:        jp .x
-.vr:        ld a, b
-            ld [de], a
-            swap a
-            or $08                          ; (DAC on, constant volume)
-            ld [hl+], a                     ; NRx2
-            inc hl                          ; NRx4: restart with the frequency
+            call p58
+            ld b, a
             ld a, c
-            add a, low(snd_fh)
-            ld e, a
-            ld d, high(snd_fh)
-            ld a, [de]
-            or $80
-            ld [hl], a
-            jr .x
+            add a, low(snd_tv)
+            ld l, a
+            ld h, high(snd_tv)
+            ld [hl], b
+            jp .x
 .f1l:       ld hl, snd_sh + 2
             ld c, 0
             jr .fl
@@ -328,20 +268,56 @@ aw:         push af
             ldh [$FF10], a                  ;   on bent every later note: owner, 2026-11-23)
             xor a
 .fs:        push de
-            add a, low(snd_cv)
+            push hl
+            ld l, a                         ; (unmuted: snd_mute bit 0 / 1 = the channel)
+            inc a
+            cpl
+            ld e, a
+            ld a, [snd_mute]
+            and e
+            ld [snd_mute], a
+            ld a, l
+            add a, low(snd_tv)
+            ld l, a
+            ld h, high(snd_tv)
+            ld e, a
+            ld a, [hl]                      ; the target volume (else the current, else 0)
+            cp $FF
+            jr nz, .fv
+            ld a, e
+            sub low(snd_tv) - low(snd_cv)
+            ld l, a
+            ld h, high(snd_cv)
+            ld a, [hl]
+            cp $FF
+            jr nz, .fv
+            xor a
+.fv:        ld b, a
+            ld a, e
+            sub low(snd_tv) - low(snd_cv)
             ld e, a
             ld d, high(snd_cv)
-            ld a, [de]
-            cp $FF
-            jr nz, .fk
-            xor a
+            ld a, b
             ld [de], a
-.fk:        swap a
-            or $08
+            pop hl
+            swap a                          ; (NRx3 first; then NRx2 and the restart back to
+            or $08                          ;   back: a write to NRx2 moves a playing
+            ld [snd_nr2], a                 ;   channel's level by one until the restart
+            pop de                          ;   sets it, so the two come 3 cycles apart)
+            pop af
+            ld [hl+], a                     ; NRx3
+            ld a, d
+            ld [bc], a
+            or $80
+            ld d, a                         ; D = NRx4 with the restart
+            ld a, [snd_nr2]
             dec hl
-            ld [hl+], a
-            pop de
-.ft:        pop af                          ; a new note
+            dec hl
+            ld [hl+], a                     ; NRx2
+            inc l
+            ld [hl], d                      ; NRx4
+            jp .x
+.ft:        pop af                          ; a new note (the triangle)
             ld [hl+], a
             ld a, d
             ld [bc], a
@@ -448,14 +424,14 @@ aw:         push af
             ld a, $80
             jp nr30_w
 .tl0:       jp nr30_w
-.en:        bit 0, e                        ; $15: channels off
-            jr nz, .e1
-            xor a
-            ldh [$FF12], a
+.en:        bit 0, e                        ; $15: channels off: silent as the NES (volume 0
+            jr nz, .e1                      ;   with the DAC on: turning it off moves the
+            ld c, 0                         ;   output level, a pop), muted until a new note
+            call sq_silence
 .e1:        bit 1, e
             jr nz, .e2
-            xor a
-            ldh [$FF17], a
+            ld c, 1
+            call sq_silence
 .e2:        bit 2, e
             jp nz, .x
             xor a
@@ -512,6 +488,10 @@ sw_mute:    ds 1
 tri_lc:     ds 1                            ; the triangle's linear counter run out in N frames
 tri_len:    ds 1                            ; its length counter (half frames, last $400B)
 snd_cv:     ds 2                            ; the pulses' GB volume now ($FF: unknown)
+snd_tv:     ds 2                            ; the volume the engine asked for this tick ($FF none)
+snd_mute:   ds 1                            ; pulses silenced by $4015 until a new note (bits 0 / 1)
+snd_pair:   ds 1                            ; 1: a step down is NRx2 $F7, $F8 (both writes)
+snd_nr2:    ds 1
 snd_zmb:    ds 1                            ; 1: zombie mode works (volume steps), 0: restarts
 mus_cur:    ds 1                            ; the music track asked for last (main.s snd_track)
 tri_on:     ds 1                            ; the wave channel started and not stopped since
@@ -536,7 +516,8 @@ snd_frame_b:
             and a
             call nz, sfx_start
             call mus_play_b
-            jp sfx_step
+            call sfx_step
+            jp vol_apply
 
 sfx_start:  dec a
             add a, a
@@ -584,8 +565,8 @@ sfx_step:   ld a, [sfx_tot]
             ld a, [NES_RAM + $4B]           ; over: square 2 back to the music; silent if no
             and a                           ;   song plays
             jr z, .m
-            xor a
-            ldh [$FF17], a
+            ld c, 1                         ; (silent as the NES: volume 0, DAC on)
+            call sq_silence
 .m:         xor a
             ldh [$FF21], a
             dec a
@@ -855,3 +836,268 @@ sfx_noise:  ld hl, sfx_fc
 .rs:        ld a, c
             ld [sfx_nvol], a
             jr nz_set
+
+; ---- the pulses' volumes (owner, 2026-11-24: clicks at volume changes). FF1 moves a pulse's
+; volume by 1 nearly every frame. A step up is one NRx2 write of $F8 (+1, "zombie mode"); a step
+; down was fifteen such steps, and the channel played every level on the way (15 to 0 for about
+; 30 cycles: a tick at every step down, heard on a plain Game Boy, now and then on a Color). Now
+; a step down is two writes, $F7 then $F8 (the hardware's rule, as SameBoy and Gambatte on every
+; model: the first inverts the level, the second inverts it back one lower); between them one
+; write's time. To 0: a silent restart. The volume asked for in a tick is applied after it, so a
+; new note gets its volume with its restart (the old note never plays at the new volume first).
+section bank 7, $5000
+vol_apply:  ld c, 0
+            call .one
+            ld c, 1
+.one:       ld a, c
+            and a
+            jr nz, .g
+            ld a, [wp_on]                   ; (square 1 while a wipe sound plays: later)
+            and a
+            ret nz
+.g:         ld a, c
+            inc a
+            ld b, a
+            ld a, [snd_mute]                ; (silenced by $4015: until a new note)
+            and b
+            ret nz
+            ld a, c
+            add a, low(snd_tv)
+            ld l, a
+            ld h, high(snd_tv)
+            ld a, [hl]
+            cp $FF
+            ret z
+            ld b, a                         ; B = the volume asked for
+            ld a, l
+            sub low(snd_tv) - low(snd_cv)
+            ld e, a
+            ld d, h                         ; DE = the volume now
+            ld a, c
+            and a
+            ld hl, $FF12
+            jr z, .h
+            ld hl, $FF17
+.h:         ld a, [de]
+            cp b
+            ret z
+            cp $FF
+            jr z, .vr                       ; (unknown: set with a restart)
+            ld a, [snd_zmb]
+            cp 2
+            jr z, .vs                       ; (a test build: volumes at note starts only)
+            and a
+            jr z, .vr                       ; (no zombie mode here: restarts)
+            ld a, b
+            and a
+            jr z, .vr                       ; (to 0: a silent restart)
+            ld a, [de]
+            push af
+            ld a, b
+            ld [de], a
+            pop af                          ; A = the volume before, B = after
+            cp b
+            jr c, .up
+            sub b                           ; down by A (1-15)
+            ld e, a
+            ld a, [snd_pair]
+            and a
+            jr z, .dn15
+            ld a, 15                        ; two writes a step: into the unrolled pairs at
+            sub e                           ;   4 (15 - steps)
+            add a, a
+            add a, a
+            ld e, a
+            ld d, 0
+            push hl
+            ld hl, .pr
+            add hl, de
+            ld b, h
+            ld c, l
+            pop hl
+            ld de, $F7F8
+            push bc                         ; (the jump target)
+            ld a, l                         ; (a Color: right before the writes, in the
+            cp $17                          ;   output's low phase)
+            ld c, 0
+            jr nz, .c0
+            inc c
+.c0:        call vol_low
+            ret
+.dn15:      ld a, 16                        ; (no two-write step here: 16 - steps up)
+            sub e
+            jr .inc
+.up:        ld e, a
+            ld a, b
+            sub e                           ; steps up
+.inc:       ld e, a                         ; into the unrolled writes at 15 - steps
+            ld a, 15
+            sub e
+            ld e, a
+            ld d, 0
+            ld a, l                         ; (a Color: in the output's low phase)
+            cp $17
+            ld c, 0
+            jr nz, .c1
+            inc c
+.c1:        call vol_low
+            ld c, l
+            ld hl, .ui
+            add hl, de
+            ld a, $F8
+            jp hl
+.ui:        ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ret
+.pr:        ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ld [hl], d
+            ld [hl], e
+            nop
+            nop
+            ret
+.vs:        ld a, b
+            ld [de], a
+            ret
+.vr:        ld a, b                         ; NRx2 = the volume, restart (NRx4), 3 cycles
+            ld [de], a                      ;   apart
+            ld a, c
+            add a, low(snd_fh)
+            ld e, a
+            ld d, high(snd_fh)
+            ld a, [de]
+            or $80
+            ld d, a
+            ld a, b
+            swap a
+            or $08
+            ld [hl+], a
+            inc l
+            ld [hl], d
+            ret
+; a Color: wait (briefly) for channel C's output to be 0, so the writes are not heard
+vol_low:    ldh a, [is_cgb]
+            and a
+            ret z
+            push bc
+            ld a, c
+            and a
+            ld a, $0F
+            jr z, .m
+            ld a, $F0
+.m:         ld c, a
+            ld b, 0
+.q:         ldh a, [$FF76]
+            and c
+            jr z, .x
+            dec b
+            jr nz, .q
+.x:         pop bc
+            ret
+; pulse C silenced as the NES's $4015 does: volume 0 with the DAC on (turning it off moves the
+; output level: a pop), muted until its next note
+sq_silence: ld a, c
+            and a
+            jr nz, .g
+            ld a, [wp_on]
+            and a
+            ret nz
+.g:         ld a, c
+            inc a
+            ld b, a
+            ld a, [snd_mute]
+            or b
+            ld [snd_mute], a
+            ld a, c
+            add a, low(snd_cv)
+            ld l, a
+            ld h, high(snd_cv)
+            ld [hl], 0
+            ld a, l
+            add a, low(snd_tv) - low(snd_cv)
+            ld l, a
+            ld [hl], $FF
+            ld a, c
+            and a
+            ld hl, $FF12
+            jr z, .h
+            ld hl, $FF17
+.h:         ld a, c
+            add a, low(snd_fh)
+            ld e, a
+            ld d, high(snd_fh)
+            ld a, [de]
+            or $80
+            ld d, a
+            ld a, $08                       ; volume 0, DAC on; the restart 3 cycles after
+            ld [hl+], a
+            inc l
+            ld [hl], d
+            ret
