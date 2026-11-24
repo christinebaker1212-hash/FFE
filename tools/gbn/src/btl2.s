@@ -1087,7 +1087,8 @@ bt_player_turn:
             jp bt_pl_attack
 
 bt_pl_attack:
-            ld [bt_tgt], a
+            call bt_retgt                   ; (Options, Auto Retarget: a gone enemy's attack
+            ld [bt_tgt], a                  ;   goes to another; owner, 2026-11-24)
             ld a, [bt_who]                  ; attacker: the member's block and record
             call bt_cblk
             ld h, d

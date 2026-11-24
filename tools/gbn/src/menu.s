@@ -2554,6 +2554,9 @@ win_g:      ds 1
 win_b:      ds 1
 opt_nograd: ds 1                            ; Options (Color): 1 = no window gradient (after
                                             ;   win_b: the saved record's order)
+opt_retgt:  ds 1                            ; Options: 1 = Auto Retarget (a gone enemy's attack
+                                            ;   goes to another; owner, 2026-11-24)
+opt_mmp:    ds 1                            ; Options: 1 = Modern MP (Dawn of Souls MP)
 win_pal:    ds 8                            ; CGB palette 7 (the windows) as chosen
 opt_ver:    ds 1
 tw_spd:     ds 1                            ; the typed text's speed (0-4: Slow .. Instant)

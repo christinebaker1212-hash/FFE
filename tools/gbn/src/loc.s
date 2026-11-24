@@ -989,8 +989,8 @@ section bank 99, $4800
 ; Speed, Volume, B Dash On / Off, Cursor Remember / Reset, and on the Color the windows'
 ; colour (red, green, blue 0-31, shown at once). Header (0,0,20,3), list (0,3,20,15), one row a
 ; setting from row 5; up / down pick, left / right change, B back (kept in cart RAM bank 1)
-OPT_N_DMG  = 5
-OPT_N_CGB  = 9
+OPT_N_DMG  = 7
+OPT_N_CGB  = 11
 opt_menu:   call scr_open
             call eqm_pal
             ld bc, $0000
@@ -1060,7 +1060,7 @@ opt_menu:   call scr_open
             ld [hl], a
             call opt_apply
             ld a, [opt_cur]                 ; (a window colour / the gradient: at once)
-            cp 5
+            cp 7
             call nc, opt_wnow
             call opt_vals
             call scr_upd
@@ -1092,9 +1092,13 @@ opt_n:      ldh a, [is_cgb]
             ret
 os_title:   db "Options", 0
 os_labels:  db "Message Speed", 0, "Text Speed", 0, "Volume", 0, "B Dash", 0, "Cursor", 0
+            db "Auto Retarget", 0, "Modern MP", 0
             db "Window Red", 0, "Window Green", 0, "Window Blue", 0, "Gradient", 0
-os_var:     dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, win_r, win_g, win_b, opt_nograd
-os_max:     db 8, 5, 8, 2, 2, 32, 32, 32, 2
+os_var:     dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, opt_retgt, opt_mmp, win_r, win_g, win_b, opt_nograd
+os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2
+os_sv:      dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, win_r, win_g, win_b, opt_nograd, opt_retgt, opt_mmp
+                                            ; (the saved order: the older records' first nine)
+os_onoff:   db "Off", " On"
 os_spn:     db "   Slow", " Normal", "   Fast", " Faster", "Instant"
 os_dash:    db " On", "Off"
 os_cur:     db "Remember", "   Reset"
@@ -1147,11 +1151,19 @@ opt_vals:   ld bc, $1205
             add hl, de
             ld b, 8
             call .n
+            ld bc, $100A                    ; Auto Retarget / Modern MP: Off / On
+            call pen_at
+            ld a, [opt_retgt]
+            call .oo
+            ld bc, $100B
+            call pen_at
+            ld a, [opt_mmp]
+            call .oo
             ldh a, [is_cgb]
             and a
             ret z
             ld hl, win_r
-            ld c, 10
+            ld c, 12
 .w:         push hl
             push bc
             ld b, 17
@@ -1168,9 +1180,9 @@ opt_vals:   ld bc, $1205
             pop hl
             inc c
             ld a, c
-            cp 13
+            cp 15
             jr c, .w
-            ld bc, $100D                    ; Window Gradient On / Off
+            ld bc, $100F                    ; Window Gradient On / Off
             call pen_at
             ld a, [opt_nograd]
             ld l, a
@@ -1187,6 +1199,15 @@ opt_vals:   ld bc, $1205
             dec b
             jr nz, .n
             ret
+.oo:        ld l, a                         ; A = 0 / 1: "Off" / " On"
+            add a, a
+            add a, l
+            ld e, a
+            ld d, 0
+            ld hl, os_onoff
+            add hl, de
+            ld b, 3
+            jr .n
 ; the volume to the master volume (NR50)
 opt_apply:  ld a, [opt_vol]
             ld b, a
@@ -1251,164 +1272,6 @@ opt_wdef:   ld a, COMMON
             and $1F
             ld [win_b], a
             ret
-; the options from cart RAM bank 1 $BF00: "OQ", the eight, a check ("OP": the first three of
-; an older save); defaults when not valid (Lot Check: cart RAM on only meanwhile)
-OPT_RAM    = $BF00
-opt_load:   ld a, 1
-            ld [tw_spd], a
-            ld a, 7
-            ld [opt_vol], a
-            xor a
-            ld [opt_nodash], a
-            ld [opt_curr], a
-            ld [opt_nograd], a
-            call opt_wdef
-            ld a, $0A
-            ld [$0000], a
-            ld a, 1
-            ld [$4000], a
-            ld hl, OPT_RAM
-            ld a, [hl+]
-            cp $4F
-            jr nz, .x
-            ld a, [hl+]
-            ld [opt_ver], a
-            cp $52
-            jr z, .q
-            cp $51
-            jr z, .q
-            cp $50
-            jr nz, .x
-            ld a, [hl+]                     ; "OP": respond, text speed, volume, check
-            ld b, a
-            ld a, [hl+]
-            ld c, a
-            ld a, [hl+]
-            ld d, a
-            ld a, b
-            xor c
-            xor d
-            xor $5A
-            cp [hl]
-            jr nz, .x
-            call .set3
-            jr .x
-.q:         push hl                         ; "OQ": the eight, check ("OR": nine)
-            ld a, [opt_ver]
-            sub $49                         ; (8 / 9)
-            ld b, a
-            ld c, $5A
-.qs:        ld a, [hl+]
-            xor c
-            ld c, a
-            dec b
-            jr nz, .qs
-            ld a, c
-            cp [hl]
-            pop hl
-            jr nz, .x
-            ld a, [hl+]
-            ld b, a
-            ld a, [hl+]
-            ld c, a
-            ld a, [hl+]
-            ld d, a
-            push hl
-            call .set3
-            pop hl
-            jr c, .x
-            ld de, opt_nodash               ; dash, cursor, r, g, b (checked: 0-1, 0-31), gradient
-            ld a, [opt_ver]
-            sub $4C                         ; (5 / 6)
-            ld b, a
-.q5:        ld a, [hl+]
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .q5
-            ld a, [opt_nodash]
-            ld b, a
-            ld a, [opt_curr]
-            or b
-            cp 2
-            jr c, .qc
-            xor a
-            ld [opt_nodash], a
-            ld [opt_curr], a
-.qc:        ld a, [win_r]
-            ld b, a
-            ld a, [win_g]
-            or b
-            ld b, a
-            ld a, [win_b]
-            or b
-            cp 32
-            call nc, opt_wdef
-            ld a, [opt_nograd]
-            cp 2
-            jr c, .x
-            xor a
-            ld [opt_nograd], a
-.x:         xor a
-            ld [$0000], a
-            ld [$4000], a
-            call opt_wpal
-            ldh a, [is_cgb]                 ; (the window palette now: boot, LCD off)
-            and a
-            call nz, text_pals
-            jp opt_apply
-.set3:      ld a, b                         ; B, C, D in range: respond, speed, volume (C set:
-            cp 8                            ;   not)
-            jr nc, .bad
-            ld a, c
-            cp 5
-            jr nc, .bad
-            ld a, d
-            cp 8
-            jr nc, .bad
-            ld a, b
-            ld [respond], a
-            ld a, c
-            ld [tw_spd], a
-            ld a, d
-            ld [opt_vol], a
-            and a
-            ret
-.bad:       scf
-            ret
-opt_save:   ld a, $0A
-            ld [$0000], a
-            ld a, 1
-            ld [$4000], a
-            ld hl, OPT_RAM
-            ld a, $4F
-            ld [hl+], a
-            ld a, $52
-            ld [hl+], a
-            ld de, os_var                   ; the nine values, then the check
-            ld b, 9
-            ld c, $5A
-.s:         push bc
-            ld a, [de]
-            inc de
-            ld c, a
-            ld a, [de]
-            inc de
-            ld b, a
-            ld a, [bc]
-            pop bc
-            ld [hl+], a
-            xor c
-            ld c, a
-            dec b
-            jr nz, .s
-            ld a, c
-            ld [hl], a
-            xor a
-            ld [$0000], a
-            ld [$4000], a
-            ret
-
 section bank 99, $5000
 ; ---- the file screen: three windows (0,6k,20,6), each "File k", the play time, the four names,
 ; the leader's level and the Gil (or No data); the hand on a file; A loads (a good file) /
@@ -3384,7 +3247,7 @@ opt_wnow:   call opt_wpal
             and a
             jp nz, gr_off
             ld a, [opt_cur]                 ; (switched on, or not on yet: built whole; a
-            cp 8                            ;   colour change: the ramp only, the windows
+            cp 10                            ;   colour change: the ramp only, the windows
             jp z, gr_menu                   ;   are the same; the whole build took frames,
             ld a, [gr_on]                   ;   and quick presses were lost with their
             and a                           ;   sounds)
@@ -3402,4 +3265,180 @@ opt_p0:     ld a, [gr_p0]
             call bcpd_w
             dec b
             jr nz, .l
+            ret
+; the options from cart RAM bank 1 $BF00: "OQ", the eight, a check ("OP": the first three of
+; an older save); defaults when not valid (Lot Check: cart RAM on only meanwhile)
+OPT_RAM    = $BF00
+opt_load:   ld a, 1
+            ld [tw_spd], a
+            ld a, 7
+            ld [opt_vol], a
+            xor a
+            ld [opt_nodash], a
+            ld [opt_curr], a
+            ld [opt_nograd], a
+            ld [opt_retgt], a               ; (Off by default: owner)
+            ld [opt_mmp], a
+            call opt_wdef
+            ld a, $0A
+            ld [$0000], a
+            ld a, 1
+            ld [$4000], a
+            ld hl, OPT_RAM
+            ld a, [hl+]
+            cp $4F
+            jr nz, .x
+            ld a, [hl+]
+            ld [opt_ver], a
+            cp $53
+            jr z, .q
+            cp $52
+            jr z, .q
+            cp $51
+            jr z, .q
+            cp $50
+            jr nz, .x
+            ld a, [hl+]                     ; "OP": respond, text speed, volume, check
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            ld d, a
+            ld a, b
+            xor c
+            xor d
+            xor $5A
+            cp [hl]
+            jr nz, .x
+            call .set3
+            jr .x
+.q:         push hl                         ; "OQ": the eight, check ("OR": nine, "OS": eleven)
+            ld a, [opt_ver]
+            sub $49                         ; (8 / 9 / 10: 11 for "OS")
+            cp 10
+            jr nz, .qn
+            inc a
+.qn:        ld b, a
+            ld c, $5A
+.qs:        ld a, [hl+]
+            xor c
+            ld c, a
+            dec b
+            jr nz, .qs
+            ld a, c
+            cp [hl]
+            pop hl
+            jr nz, .x
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            ld d, a
+            push hl
+            call .set3
+            pop hl
+            jr c, .x
+            ld de, opt_nodash               ; dash, cursor, r, g, b (checked: 0-1, 0-31), gradient,
+            ld a, [opt_ver]                 ;   then retarget, Modern MP ("OS")
+            sub $4C                         ; (5 / 6 / 8)
+            cp 7
+            jr nz, .qm
+            inc a
+.qm:        ld b, a
+.q5:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .q5
+            ld a, [opt_nodash]
+            ld b, a
+            ld a, [opt_curr]
+            or b
+            cp 2
+            jr c, .qc
+            xor a
+            ld [opt_nodash], a
+            ld [opt_curr], a
+.qc:        ld a, [win_r]
+            ld b, a
+            ld a, [win_g]
+            or b
+            ld b, a
+            ld a, [win_b]
+            or b
+            cp 32
+            call nc, opt_wdef
+            ld a, [opt_nograd]
+            cp 2
+            jr c, .qg
+            xor a
+            ld [opt_nograd], a
+.qg:        ld a, [opt_retgt]               ; (0 / 1 each)
+            ld b, a
+            ld a, [opt_mmp]
+            or b
+            cp 2
+            jr c, .x
+            xor a
+            ld [opt_retgt], a
+            ld [opt_mmp], a
+.x:         xor a
+            ld [$0000], a
+            ld [$4000], a
+            call opt_wpal
+            ldh a, [is_cgb]                 ; (the window palette now: boot, LCD off)
+            and a
+            call nz, text_pals
+            jp opt_apply
+.set3:      ld a, b                         ; B, C, D in range: respond, speed, volume (C set:
+            cp 8                            ;   not)
+            jr nc, .bad
+            ld a, c
+            cp 5
+            jr nc, .bad
+            ld a, d
+            cp 8
+            jr nc, .bad
+            ld a, b
+            ld [respond], a
+            ld a, c
+            ld [tw_spd], a
+            ld a, d
+            ld [opt_vol], a
+            and a
+            ret
+.bad:       scf
+            ret
+opt_save:   ld a, $0A
+            ld [$0000], a
+            ld a, 1
+            ld [$4000], a
+            ld hl, OPT_RAM
+            ld a, $4F
+            ld [hl+], a
+            ld a, $53
+            ld [hl+], a
+            ld de, os_sv                    ; the eleven values, then the check
+            ld b, 11
+            ld c, $5A
+.s:         push bc
+            ld a, [de]
+            inc de
+            ld c, a
+            ld a, [de]
+            inc de
+            ld b, a
+            ld a, [bc]
+            pop bc
+            ld [hl+], a
+            xor c
+            ld c, a
+            dec b
+            jr nz, .s
+            ld a, c
+            ld [hl], a
+            xor a
+            ld [$0000], a
+            ld [$4000], a
             ret

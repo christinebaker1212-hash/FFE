@@ -512,6 +512,7 @@ bt_cast0:   ld a, [mg_d + 4]
             and 3
             jp bt_cast_pl
 .oneen:     ld a, [bt_tgt]
+            call bt_retgt                   ; (Auto Retarget)
             jp bt_cast_en
 .allen:     ld c, 0
 .ae:        ld a, c
@@ -1733,6 +1734,29 @@ bt_mhdr:    push af
             ld hl, bt_sbuf
             pop af
             jp vwf_str
+; A = an enemy slot -> A = it, or with Options' Auto Retarget the first living enemy when it is
+; gone (none living: it); off by default: FF1's "ineffective"
+bt_retgt:   push bc
+            ld c, a
+            ld a, [opt_retgt]
+            and a
+            jr z, .k
+            ld a, c
+            call bt_ealive
+            jr nz, .k
+            ld b, 0
+.f:         ld a, b
+            call bt_ealive
+            jr nz, .s
+            inc b
+            ld a, b
+            cp 9
+            jr c, .f
+            jr .k
+.s:         ld c, b
+.k:         ld a, c
+            pop bc
+            ret
 ; Z: no spell on page B / 2 (levels B & 6, B & 6 + 1)
 bt_mpgemp:  call bt_mdata
             ld a, b
