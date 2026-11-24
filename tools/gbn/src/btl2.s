@@ -1728,6 +1728,7 @@ bt_rnd_member:
 ; an enemy off the screen (its cells empty)
 bt_erase_enemy:
             push af                         ; (owner, 2026-11-23: a proper death; bosses a
+            call bt_dwait                   ;   (the damage number's pop finished first)
             call bt_ban_off                 ;   special one: loc.s ed_dissolve; the name
             pop af                          ;   window off first: its tiles are the
             push af                         ;   dissolve's; A kept: the slot)
@@ -2433,8 +2434,12 @@ bt_dnum_w:  ld a, [bt_defer]
             cp low(nf_dig + 6)
             jr nz, .s
             call bt_dpop
-            ld a, [df_player]               ; (a member hit: it flinches)
+            ld a, [df_player]               ; (a member hit: it flinches; not when healed)
             and a
+            ret z
+            ld a, [dn_attr]
+            and 7
+            cp 6
             ret z
             jp rc_start
 bt_dmiss:   ld a, [bt_defer]
@@ -2586,6 +2591,14 @@ bt_danim:   ld a, [dn_t]
             dec e
             jr nz, .o
             jp rc_anim
+; the damage number's pop played to its end (if one shows)
+bt_dwait:   ld a, [dn_t]
+            and a
+            ret z
+            cp DN_LEN
+            ret nc
+            call bt_frame
+            jr bt_dwait
 ; the number gone, the hand's tiles back
 bt_dnum_off:
             ld a, $14                       ; (the next number: damage colours)
@@ -2948,7 +2961,7 @@ bt_try_unstun:
 
 section bank 6, $77C0                       ; (2026-11-23: the battle's top window, quiet messages)
 pal5_tab:   db $00, $00, $DF, $0A, $FF, $7F, $00, $00
-            db $00, $00, $00, $00, $E0, $03, $E7, $3F   ; (OBJ 6: healing numbers, green)
+            db $00, $00, $E0, $03, $E0, $03, $00, $00   ; (OBJ 6: healing numbers: green ink, black outline)
             db $00, $00, $00, $00, $00, $00, $FF, $03   ; (BG 4: party line, HP low: yellow)
             db $00, $00, $00, $00, $00, $00, $3F, $00   ; (BG 5: party line, down: red)
             db $00, $00, $00, $00, $FF, $7F, $FF, $7F
@@ -3109,7 +3122,7 @@ bt_healnum: ld a, [dv_hp]
             ld [df_player], a
             ld a, [mg_def]
             ld [bt_tgt], a
-            ld a, $06                       ; (CGB OBJ palette 6 green; DMG / SGB OBP0)
+            ld a, $16                       ; (CGB OBJ palette 6 green; DMG / SGB OBP1 as the damage)
             ld [dn_attr], a
             ld hl, mg_dmg
             jp bt_dnum_w

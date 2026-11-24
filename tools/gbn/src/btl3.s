@@ -579,7 +579,10 @@ bt_cast_pl: ld [mg_def], a
             jr z, .ok
             ld a, M_NOEFFECT
             jp bt_msg_end1
-.ok:        ld a, [mg_caster]               ; FF1 BtlMag_LoadPlayerDefenderStats: a member's
+.ok:        ld a, [mg_def]                  ; (the first member stands under the top window:
+            and a                           ;   off, the effect and its number seen)
+            call z, bt_ban_off
+            ld a, [mg_caster]               ; FF1 BtlMag_LoadPlayerDefenderStats: a member's
             rlca                            ;   spell the heal sound, an enemy's the "cha"
             ld a, SFX_MAGIC
             jr c, .sf
@@ -679,7 +682,12 @@ bt_cast_en: ld [mg_def], a
             jr nz, .ok
             ld a, M_NOEFFECT
             jp bt_msg_end1
-.ok:        call bt_flush
+.ok:        ld a, [mg_def]                  ; (an enemy in the top rows: the top window off,
+            call bt_epos                    ;   the effect seen whole)
+            ld a, c
+            cp 3
+            call c, bt_ban_off
+            call bt_flush
             ld a, SFX_HIT                   ; FF1 BtlMag_LoadEnemyDefenderStats: "cha" and
             ld [sfx_req], a                 ;   the explosions
             ld a, [mg_def]
@@ -771,7 +779,11 @@ bt_msg_spell:
             ret                             ; (the top window shows the spell: owner, 2026-11-23)
 
 ; FF1 BtlMag_PerformSpellEffect: the effect, its message, HP 0 = dead, ailment messages
-bt_effect:  ld a, [dv_ail]
+bt_effect:  ld a, [dv_player]               ; (the number and the flinch: this target's, not
+            ld [df_player], a               ;   the last attack's: a spell on an enemy after
+            ld a, [mg_def]                  ;   an enemy hit a member showed by the member)
+            ld [bt_tgt], a
+            ld a, [dv_ail]
             ld [mg_ail0], a
             xor a
             ld [mg_conn], a

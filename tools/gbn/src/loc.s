@@ -1667,8 +1667,8 @@ section bank 99, $4BC0                      ; (an enemy dies: bt_erase_enemy)
 ; horizontal strips). fl_b / fl_c = its cell, fl_e = its size (bank 6 bt_erase_enemy). Its
 ; tiles are shared with others of its kind, so they are copied to the tiles free while the
 ; names window shows (FL_T0) and its cells switched to the copies; then 16 steps, one pixel
-; row of every tile each (in the order 0 4 2 6 1 5 3 7): the row slides 2 pixels (odd rows
-; left, even right), then goes. A fiend's tiles are its own: changed in place, two frames a
+; row of every tile going every second step (in the order 0 4 2 6 1 5 3 7), in place (owner,
+; 2026-11-24: no sliding; the slide code below is no longer reached). A fiend's tiles are its own: changed in place, two frames a
 ; step, the screen shaking and the hit sound every fourth step. VRAM only outside mode 3.
 ED_T0      = $C4
 ed_dissolve:
@@ -1760,7 +1760,10 @@ ed_dissolve:
             ei
             xor a
             ld [ed_s], a
-.st:        ld a, [ed_s]                    ; the row: order[step / 2]
+.st:        ld a, [ed_s]                    ; (owner, 2026-11-24: no sliding: on the even
+            bit 0, a                        ;   steps the rows stay in place)
+            jp z, .nx
+            ld a, [ed_s]                    ; the row: order[step / 2]
             srl a
             ld e, a
             ld d, 0
@@ -1834,7 +1837,7 @@ ed_dissolve:
             pop bc
             dec b
             jr nz, .t
-            ld a, [bt_type]                 ; a fiend: the screen shakes, the hit sound
+.nx:        ld a, [bt_type]                 ; a fiend: the screen shakes, the hit sound
             cp 3
             jr c, .w1
             ld a, [ed_s]
