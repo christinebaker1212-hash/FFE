@@ -1905,16 +1905,17 @@ ed_vw:      ldh a, [rSTAT]
 
 section bank 99, $5600
 ; ---- the encounter transition (owner, 2026-11-22: from the WonderSwan Color remake, as raster
-; effects any Game Boy can show): 26 frames of the map twisting and zooming towards the party,
-; 18 of its 8-line strips sliding apart while it fades to white, 6 white; the battle then
-; fades in from white. Per line SCX / SCY from battle.py trans_tables (bank TRANS_BANK), written
+; effects any Game Boy can show; made lovelier 2026-11-24): 8 frames of two white flashes, 24 of
+; the map swirling (a rolling ripple) and drawn in towards the party, 16 of its lines parting
+; (every other one left / right) as the picture folds onto the party's line and fades to white,
+; 6 white; the battle then fades in from white. Each frame's colour level from a table. Per line SCX / SCY from battle.py trans_tables (bank TRANS_BANK), written
 ; by the STAT mode-0 interrupt (stat_rx); FF1's noise as before.
-TR_BUF0    = $C200          ; (the field's queue: free now) frame buffers, 144 x (SCX, SCY)
-TR_BUF1    = $C320
+TR_BUF0    = $C2            ; (the field's queue: free now; battle temporaries, set when it starts)
+TR_BUF1    = $C6            ;   frame tables: page n SCX by line, n + 1 SCY (bytes $00-$8F)
 TR_PAL     = $C440          ; the faded palettes (BG 64, OBJ 64)
 TR_WT      = $C500          ; the fade table: 8 levels x 32 (page-aligned)
-TR_FR      = 44
-TR_TW      = 26
+TR_FR      = 48
+TR_TW      = 32          ; (the fade's first frame)
 bt_trans2:  ld a, [q_n]                     ; (the field's queue dropped)
             ld [q_rd], a
             ld a, $80
@@ -1948,7 +1949,7 @@ bt_trans2:  ld a, [q_n]                     ; (the field's queue dropped)
             inc c
             bit 6, c
             jr z, .ro
-            ld hl, $7200
+            ld hl, $7600
             ld de, TR_WT
             ld bc, 256
             ld a, TRANS_BANK
@@ -1979,29 +1980,29 @@ bt_trans2:  ld a, [q_n]                     ; (the field's queue dropped)
             jr nz, .o
             call tr_prep                    ; frame 0
             di
-            ld a, 1
-            ld [rx_on], a
+            call tr_buf                     ; (its tables from the start)
+            ld a, h
+            ldh [hrx], a
             ld a, $08                       ; (STAT: mode 0 each line, no LYC meanwhile)
             ldh [rSTAT], a
             ldh a, [rIF]
             and $FD
             ldh [rIF], a
             ei
-.f:         call tr_buf                     ; line 0's scroll for the V-Blank to write
-            ld a, [hl+]
+.f:         call tr_buf                     ; line 0's scroll for the V-Blank to write; the
+            ld l, 0                         ;   page shown after it
+            ld a, [hl]
             ldh [scx], a
-            ld a, [hl-]
+            inc h
+            ld a, [hl]
             ldh [scy], a
-            push hl
+            dec h
+            ld a, h
+            ld [tr_nx], a
             call tr_noise
             call wait_vbl
-            pop hl
-            inc hl
-            inc hl
-            ld a, l
-            ld [rx_ptr], a
-            ld a, h
-            ld [rx_ptr + 1], a
+            ld a, [tr_nx]                   ; (in this V-Blank: line 0's interrupt reads it)
+            ldh [hrx], a
             call tr_pals                    ; (in this V-Blank)
             ld a, $F0                       ; the noise
             ldh [$FF21], a
@@ -2012,8 +2013,8 @@ bt_trans2:  ld a, [q_n]                     ; (the field's queue dropped)
             ld hl, bx_n
             inc [hl]
             call tr_party
-            ld a, [tr_k]                    ; (SGB: colour 0 white for the fade, at the strips)
-            cp TR_TW - 4
+            ld a, [tr_k]                    ; (SGB: colour 0 white for the fade, before it)
+            cp TR_TW - 2
             call z, tr_sgbw
             ld hl, tr_k
             inc [hl]
@@ -2025,7 +2026,7 @@ bt_trans2:  ld a, [q_n]                     ; (the field's queue dropped)
 .end:       call wait_vbl                   ; white
             di
             xor a
-            ld [rx_on], a
+            ldh [hrx], a
             ld a, $40
             ldh [rSTAT], a
             ld a, BOX_LINES - 1
@@ -2099,14 +2100,14 @@ tr_sgbw:    ld a, [sgb_on]
             ld c, 0
             ld a, $01
             jp sgb_pal
-; HL = frame tr_k's buffer
+; H = frame tr_k's SCX page (L = 0)
 tr_buf:     ld a, [tr_k]
             rrca
-            ld hl, TR_BUF0
+            ld hl, TR_BUF0 << 8
             ret nc
-            ld hl, TR_BUF1
+            ld hl, TR_BUF1 << 8
             ret
-; frame tr_k's lines (the table plus the field's scroll) and, in the strips, its colours
+; frame tr_k's lines (the tables plus the field's scroll) and its colours
 tr_prep:    ld a, [tr_k]                    ; HL = $4000 + 288 k
             ld l, a
             ld h, 0
@@ -2125,43 +2126,56 @@ tr_prep:    ld a, [tr_k]                    ; HL = $4000 + 288 k
             ld e, l
             pop hl
             push de
-            ld bc, 288
+            ld bc, 144
+            ld a, TRANS_BANK
+            call far_copy                   ; (HL, DE: past the SCX run)
+            pop de
+            push de
+            inc d
+            ld bc, 144
             ld a, TRANS_BANK
             call far_copy
             pop hl
             ld a, [tr_x0]
             ld d, a
-            ld a, [tr_y0]
-            ld e, a
             ld b, 144
-.a:         ld a, [hl]
+.ax:        ld a, [hl]
             add a, d
             ld [hl+], a
-            ld a, [hl]
-            add a, e
+            dec b
+            jr nz, .ax
+            ld l, 0
+            inc h
+            ld a, [tr_y0]
+            ld d, a
+            ld b, 144
+.ay:        ld a, [hl]
+            add a, d
             ld [hl+], a
             dec b
-            jr nz, .a
-            xor a                           ; the fade level: (strip frame + 1) / 2, to 8
-            ld [tr_f], a
+            jr nz, .ay
+            ld a, TRANS_BANK                ; the frame's colour level (0 unchanged, 1 the
+            ld [fc_bank], a                 ;   map's own, 2-9 the fade's 1-8)
             ld a, [tr_k]
-            sub TR_TW
-            ret c
-            inc a
-            srl a
-            cp 9
-            jr c, .lv
-            ld a, 8
-.lv:        ld [tr_f], a
+            ld l, a
+            ld h, $77
+            call far_byte
+            ld [tr_f], a
             and a
             ret z
             ldh a, [is_cgb]
             and a
             ret z
-            ld a, [tr_f]                    ; Color: 64 colours through the table
+            ld a, [tr_f]
             dec a
+            jr nz, .fd
+            ld hl, fd_pal                   ; Color, level 1: the colours as they were
+            ld de, TR_PAL
+            ld bc, 128
+            jp memcpy
+.fd:        dec a                           ; Color: 64 colours through the table
             swap a
-            add a, a                        ; 32 (level - 1)
+            add a, a                        ; 32 (level - 2)
             ld [tr_t], a
             ld hl, fd_pal
             ld de, TR_PAL
@@ -2259,6 +2273,7 @@ tr_pals:    ld a, [tr_f]
             jr nz, .ob
             ret
 .d:         ld a, [tr_f]                    ; DMG / SGB: the shades a step lighter per 2 levels
+            dec a
             srl a
             ld [fd_lv], a
             jp fd_dmgw
@@ -2277,8 +2292,7 @@ tr_noise:   ld a, SND_BANK
             ret
 ; the party's sprites follow the twist at its line (72)
 tr_party:   call tr_buf
-            ld de, 72 * 2
-            add hl, de
+            ld l, 72
             ld a, [tr_x0]
             ld b, a
             ld a, [hl]
@@ -2313,6 +2327,7 @@ tr_y0:      ds 1
 tr_px:      ds 1
 tr_f:       ds 1
 tr_t:       ds 1
+tr_nx:      ds 1
 tr_r:       ds 1
 tr_g:       ds 1
 tr_sgp:     ds 14

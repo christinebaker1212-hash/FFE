@@ -3120,6 +3120,7 @@ cmask:      ds 1                            ; coordinate mask: 63 / 255
 soft_rst:   ds 1
 nzv:        ds 1                            ; (the music engine's flag bytes)
 vfl:        ds 1
+hrx:        ds 1                            ; the encounter transition: its tables' page (0 off)
 
 section bank 0, $3900                       ; (the screen wipe, the palette cycle's helpers)
 ; ---- FF1 ScreenWipe_Close / _Open: the window layer (a black map) covers the screen above

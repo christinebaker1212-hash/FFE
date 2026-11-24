@@ -357,30 +357,52 @@ def obj_bank(rom):
 
 
 TRANS_BANK = 103
-TR_TWIST, TR_SHATTER = 26, 18
+TR_FLASH, TR_SWIRL, TR_FADE = 8, 24, 16       # frames: 48 in all (loc.s TR_FR)
 
 
 def trans_tables():
-    """the encounter transition (owner, 2026-11-22: from the WonderSwan Color remake, as raster
-    effects): per frame and screen line the SCX offset and the SCY offset (map line - screen
-    line); 26 frames of twist and zoom towards the party, 18 of 8-line strips sliding apart.
-    Then at $7200 the fade to white: 8 levels x 32 values (c + (31 - c) f / 8)"""
+    """the encounter transition (owner, 2026-11-22: from the WonderSwan Color remake; made lovelier
+    2026-11-24): per frame 144 SCX offsets, then 144 SCY offsets (map line - screen line). 8 frames: two white flashes over the still map; 24: a swirl, a rolling ripple growing
+    (eased) with the map drawn in towards the party's line; 16: the lines part, every other one
+    left / right, while the picture folds onto the party's line and fades to white.
+    $7600: the fade to white, 8 levels x 32 values (c + (31 - c) f / 8); $7700: each frame's
+    colour level (0 as before, 1 the map's own colours, 2-9 the fade's levels 1-8)."""
     import math
-    out = bytearray(); cy = 72
-    for t in range(TR_TWIST):
-        a = 26 * (t / (TR_TWIST - 1)) ** 1.4; ph = t * 0.45; z = 1 + 0.9 * (t / (TR_TWIST - 1)) ** 2
-        dx = [a * math.sin(2 * math.pi * y / 144 * 1.3 + ph) for y in range(144)]
+    def ease(u): return u * u * (3 - 2 * u)                         # smoothstep
+    out = bytearray(); lv = bytearray(); cy = 72
+    def frame(dx, sy):                                              # 144 SCX, then 144 SCY
+        out.extend(int(round(dx[y])) & 255 for y in range(144))
+        out.extend((int(round(sy[y])) - y) & 255 for y in range(144))
+    for t in range(TR_FLASH):                                       # two flashes
+        frame([0] * 144, list(range(144)))
+        lv.append((3, 7, 3, 1)[t % 4])                          # (a pulse: DMG 1, 3, 1, 0)
+    dx = [0] * 144; sy = list(range(144))
+    for t in range(TR_SWIRL):                                       # the swirl
+        u = (t + 1) / TR_SWIRL
+        a = 22 * ease(u); ph = 0.55 * t
+        k1 = 2 * math.pi * (1.1 + 0.9 * u) / 144
+        z = 1 + 0.7 * ease(u) ** 2
+        dx = [a * math.sin(k1 * y + ph) + 0.35 * a * math.sin(2.7 * k1 * y - 1.3 * ph)
+              for y in range(144)]
+        sy = [cy + (y - cy) / z + 3 * ease(u) * math.sin(2 * math.pi * y / 48 + 0.8 * ph)
+              for y in range(144)]
+        frame(dx, sy)
+        lv.append(0)
+    for t in range(TR_FADE):                                        # part, fold, white
+        u = (t + 1) / TR_FADE
+        ph = 0.55 * (TR_SWIRL + t)
+        a = 22 * (1 - 0.5 * u)
+        k1 = 2 * math.pi * 2.0 / 144
+        part = 90 * ease(u) ** 1.5
+        z = 1.7 + 14 * ease(u) ** 2
+        dx = [a * math.sin(k1 * y + ph) + (part if y & 1 else -part) for y in range(144)]
         sy = [cy + (y - cy) / z for y in range(144)]
-        for y in range(144):
-            out += bytes([int(round(dx[y])) & 255, (int(sy[y]) - y) & 255])
-    for t in range(TR_SHATTER):
-        for y in range(144):
-            band = y // 8
-            sgn = 1 if band % 2 else -1
-            d = dx[y] + sgn * (3 + band % 3) * (t + 1) ** 1.5
-            out += bytes([int(round(d)) & 255, (int(sy[y]) - y) & 255])
-    assert len(out) <= 0x3200
-    out += b'\0' * (0x3200 - len(out))
+        frame(dx, sy)
+        lv.append(1 + max(1, min(8, int(round(8 * ease(u))))))
+    assert len(out) <= 0x3600
+    out += b'\0' * (0x3600 - len(out))
     for f in range(1, 9):
         out += bytes(c + (31 - c) * f // 8 for c in range(32))
+    out += b'\0' * (0x3700 - len(out))
+    out += bytes(lv)
     return bytes(out)

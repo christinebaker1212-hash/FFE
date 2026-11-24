@@ -1054,6 +1054,25 @@ bs_seen0:   call bt_prep
             ld hl, bs_mark
             jp bank_call
 
+section bank 0, $17C0                       ; (moved from text.s: its section was full)
+; the encounter transition (STAT mode 0 each line; A = hrx): the next line's SCX and SCY from
+; the frame's tables (page hrx: SCX by line, page hrx + 1: SCY), indexed by the line itself, so
+; nothing moves and a frame that takes longer only shows the same table again. Kept short:
+; ~47 cycles a line (the plain Game Boy took two frames a step with the pointer version)
+stat_rx:    push hl
+            ld h, a
+            ldh a, [rLY]
+            inc a
+            ld l, a
+            ld a, [hl]
+            ldh [rSCX], a
+            inc h
+            ld a, [hl]
+            ldh [rSCY], a
+            pop hl
+            pop af
+            reti
+
 section wram, $C996
 ex_cur:     ds 1
 st_i:       ds 1
