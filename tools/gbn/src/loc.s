@@ -3774,7 +3774,10 @@ kn_feed:    ldh a, [pad_new]
             ret
 
 section bank 99, $7700                      ; (the body of eqm_pal)
-eqm_palf:   ld de, eqm_c3                   ; colour 3 of palettes 1-4: NES green, red, yellow (the
+eqm_palf:   ldh a, [is_cgb]                 ; (a plain Game Boy: no colours)
+            and a
+            ret z
+            ld de, eqm_c3                   ; colour 3 of palettes 1-4: NES green, red, yellow (the
             ld a, $2A                       ;   labels' gold), grey (a choice not open now), corrected
             call .nes                       ;   for the LCD mode (cc.s) before any palette write, so
             ld a, $26                       ;   the writes stay in V-Blank when the LCD is on
