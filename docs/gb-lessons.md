@@ -330,3 +330,17 @@ Color only" screen on older systems.
 - Screenshot helpers named by frame number overwrite each other across runs: copy per run.
 - Measure audio glitches per channel against the NES model; a square wave never overshoots both
   neighbouring samples, a click does.
+
+## Line splits, SGB pulses, shared stages (2026-11-24, last)
+- A window cut at line N must be armed at LYC = N - 1 and written in that line's H-Blank: an
+  interrupt at line N's mode 2 goes through the dispatch and lands mid-line (measure a screenshot's
+  line N: 144 window pixels showed). Gradient records with a cut need the same.
+- SGB packets: hold every P1 pulse (reset, bits, stop) about 5 us. mGBA / SameBoy accept 2 us; a
+  real SGB can drop a packet, which shows as a screen keeping the previous screen's colours.
+- The Color's WRAM $D000-$DFFF is banked: a buffer there (bt_stage $DC00) moves with SVBK. Copy
+  between banks through fixed RAM ($C000-$CFFF) only.
+- A V-Blank uploader in the interrupt must yield to the main uploaders (bt_vbl): the plain Game Boy
+  has no spare V-Blank, and a loop waiting for bt_upn never ends. Shared stages (bt_stage) need the
+  same check before writing.
+- Mid-turn owner reports without a reproduction: check which system (the SGB look: black windows,
+  grey frames, sprite colours from the cell's palette) before chasing the Color.

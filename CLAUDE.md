@@ -1345,8 +1345,11 @@ the Japanese ROM (docs/ff1-data-audit.md); Options: Auto Retarget, Modern MP (Da
 tools/gbn/modern_mp.py; src/mmp.s); hold A for quick battle selection (docs/ff1-native.md item 30).
 Owner (2026-11-24, later), done: battle number / flinch on the right target, effects before numbers before deaths, healing
 numbers, deaths without sliding; volume-step clicks removed (two-write steps, all 24 songs measured); CLASSIC / MODERN at
-New Game; LCD colour correction (Color); the airship's view (src/air.s) (docs/ff1-native.md item 31). Next: raster spell
-effects, reflections, SGB sounds / borders, animated ocean, smoother loads, sound test / bestiary, the playthrough.
+New Game; LCD colour correction (Color); the airship's view (src/air.s) (docs/ff1-native.md item 31).
+Owner (2026-11-24, last), done: raster spell effects on the target only, Magic shop Buy / Leave, hand only on whole windows,
+confirm sound through Color loads, SGB packet pulses (Garland text), people face the party, bottom target window, banner /
+box cut in H-Blank (docs/ff1-native.md item 32). Next: reflections, SGB sounds / borders, animated ocean, smoother loads,
+sound test / bestiary, the playthrough.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

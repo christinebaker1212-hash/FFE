@@ -571,3 +571,19 @@ one reaches parity, so the owner can keep playing).
    - The airship's view (`src/air.s`, the approved mock-up): per-line SCY from a mode-0 STAT
      interrupt, a sky band (window; Color gradient, DMG shades and haze), blended with the ship's
      height, rows py-10 .. py+5 streamed, off in menus.
+32. Owner (2026-11-24, last):
+   - Raster spell effects on the target only (`src/fx.s`): the hit enemy's cells switch to copies of
+     its tiles ($C4-$D7, $01-$11), each pass shifts the copies' pixel rows by the element (fire,
+     ice, lightning, earth, others), the cells go back after the burst; group spells ripple each
+     enemy in turn; fiends / Chaos keep the per-line scroll (alone on the field).
+   - Magic shops: Buy / Leave first and after every "Anything else" (FF1's menu).
+   - The hand shows only once its window is whole (the Color's gradient build ran before the check).
+   - The confirm sound no longer hangs on one pitch while a Color load is masked (the timer's music
+     tick was held to the load's end).
+   - Super Game Boy packets: every pulse ~5 us (2 us dropped packets on a real SGB / exact emulator:
+     after Garland the field kept the battle's colours and its box text was unreadable).
+   - People keep facing the party while talked to; the battle target window is always at the bottom.
+   - The window cut under the place banner / dialogue box lands in H-Blank (line 24 showed 144 pixels
+     of the banner's next row).
+   - Not reproduced (asked the owner for the system / enemy): enemy flashes broken, colourless menu
+     borders on the world map (the SGB packet fix may cover it).
