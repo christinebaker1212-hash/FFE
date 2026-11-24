@@ -446,28 +446,13 @@ stat_int:   push af
             ld a, [lcdc_on]
             ldh [rLCDC], a
 .off:
-.mus:       push bc                         ; and the music, once a frame, here (mid-frame:
-            push de                         ;   V-Blank stays free for VRAM writes)
-            push hl
-            ldh a, [rombank]
-            push af
-            ld a, SND_BANK
-            ld [MBC_BANK], a
-            ldh a, [rIE]                    ; (line events may interrupt the music: a colour
-            push af                         ;   record after a short gap came a line late,
-            ld a, 2                         ;   owner, 2026-11-23; V-Blank waits: its handler
-            ldh [rIE], a                    ;   restores the ROM bank the music does not note)
-            ei
-            call snd_frame_b
-            di
-            pop af
-            ldh [rIE], a
-            pop af
-            ld [MBC_BANK], a
-            pop hl
-            pop de
-            pop bc
-            pop af
+.mus:       ld a, [mus_pend]                ; (the music: the timer's, main.s timer_int; a tick
+            and a                           ;   that came near V-Blank runs here)
+            jr z, .mx
+            dec a
+            ld [mus_pend], a
+            call mus_tick
+.mx:        pop af
             reti
 .wp:        ld a, [wp_st]                   ; the band's top: the window off (an empty band:
             and a                           ;   it stays on), the bottom next

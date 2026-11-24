@@ -88,7 +88,7 @@ section bank 0, $0040
 section bank 0, $0048
             jp stat_int
 section bank 0, $0050
-            reti
+            jp timer_int
 section bank 0, $0100
             nop
             jp start
@@ -206,7 +206,29 @@ start:      di
             ldh [rSTAT], a
             xor a
             ldh [rIF], a                    ; (a STAT write on DMG can request one: dropped)
-            ld a, 3                         ; V-Blank and STAT interrupts
+            ldh a, [is_cgb]                 ; the music's clock: the timer at the NES's frame
+            and a                           ;   rate, 60.0988 Hz (owner, 2026-11-24: the music
+            jr z, .tk                       ;   as the NES; a frame tick, 59.73 Hz, played every
+            ldh a, [$FF4D]                  ;   song 0.6 % slow; KEY1 reads $FF on a plain Game
+.tk:        bit 7, a                        ;   Boy: A = 0 there). 4096 Hz: 68.156 counts a tick
+            ld a, 188                       ;   (188 or 187 by 40 / 256); double speed (KEY1 bit
+            ld b, 40                        ;   7): 8192 Hz, 136.31 (120 or 119 by 79 / 256)
+            jr z, .tn
+            ld a, 120
+            ld b, 79
+.tn:        ld [tm_base], a
+            ldh [rTMA], a
+            ldh [rTIMA], a
+            ld a, b
+            ld [tm_frac], a
+            xor a
+            ld [mus_pend], a
+            ld [mus_busy], a
+            ld a, 4                         ; (timer on: 4096 Hz, 8192 Hz in double speed)
+            ldh [rTAC], a
+            xor a
+            ldh [rIF], a
+            ld a, 7                         ; V-Blank, STAT and timer interrupts
             ldh [rIE], a
             ei
             ldh a, [soft_rst]               ; (after a soft reset: always the title)
@@ -343,25 +365,16 @@ vblank:     push af
             pop bc
             pop af
             reti
-.mk:        push bc                         ; (and the music: the STAT handler only guards)
-            push de
-            push hl
+.mk:        push hl                         ; (the music: the timer's)
             ld hl, frame
             inc [hl]
             ld a, 1
             ldh [vbl_done], a
-            ldh a, [rombank]
-            push af
-            ld a, SND_BANK
-            ld [MBC_BANK], a
-            call snd_frame_b
-            pop af
-            ld [MBC_BANK], a
             pop hl
-            pop de
-            pop bc
             pop af
             reti
+
+
 
 ; ---- joypad: pad = buttons (bit 0 A, 1 B, 2 Select, 3 Start, 4 Right, 5 Left, 6 Up, 7 Down)
 read_pad:   ld a, $20
@@ -3923,3 +3936,72 @@ snd_sq1rst: ld a, $FF
             ld [snd_cv], a
             ld [snd_fh], a
             ret
+
+section bank 0, $1F40                       ; (the music timer)
+; the music and the sound effects, at the NES's frame rate (the timer: 60.0988 Hz). A tick near
+; or in V-Blank (LY 124-153, the LCD on) waits for the next line-64 STAT event (text.s
+; stat_int.mus): the main code's V-Blank uploads must not be held up (the music takes lines;
+; on a plain Game Boy, tiles written late were garbage)
+timer_int:  push af
+            push hl
+            ld a, [tm_acc]                  ; the next period: 68 / 136 counts, 69 / 137 at
+            ld hl, tm_frac                  ;   the fraction
+            add a, [hl]
+            ld [tm_acc], a
+            ld a, [tm_base]
+            jr nc, .p
+            dec a
+.p:         ldh [rTMA], a
+            pop hl
+            ldh a, [rLCDC]
+            bit 7, a
+            jr z, .go
+            ldh a, [rLY]
+            cp 124
+            jr c, .go
+            ld a, [mus_pend]                ; (later: counted)
+            inc a
+            ld [mus_pend], a
+            pop af
+            reti
+.go:        call mus_tick
+            pop af
+            reti
+; the music once: the sound bank in rombank meanwhile (V-Blank and the line events may interrupt
+; it; their handlers restore rombank); busy already (a nested call): counted for later
+mus_tick:   ld a, [mus_busy]
+            and a
+            jr nz, .def
+            inc a
+            ld [mus_busy], a
+            push bc
+            push de
+            push hl
+            ldh a, [rombank]
+            push af
+            ld a, SND_BANK
+            ldh [rombank], a
+            ld [MBC_BANK], a
+            ei
+            call snd_frame_b
+            di
+            pop af
+            ldh [rombank], a
+            ld [MBC_BANK], a
+            pop hl
+            pop de
+            pop bc
+            xor a
+            ld [mus_busy], a
+            ret
+.def:       ld a, [mus_pend]
+            inc a
+            ld [mus_pend], a
+            ret
+
+section wram, $DAD0
+tm_acc:     ds 1                            ; (the music timer: the fraction's sum,
+tm_frac:    ds 1                            ;   its step,
+tm_base:    ds 1                            ;   the reload)
+mus_pend:   ds 1                            ; music ticks waiting for a safe moment
+mus_busy:   ds 1                            ; the music running (no second one nested)

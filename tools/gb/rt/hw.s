@@ -2,6 +2,9 @@
 rP1   = $FF00
 rSB   = $FF01
 rDIV  = $FF04
+rTIMA = $FF05
+rTMA  = $FF06
+rTAC  = $FF07
 rIF   = $FF0F
 rLCDC = $FF40
 rSTAT = $FF41

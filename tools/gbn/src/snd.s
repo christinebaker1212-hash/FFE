@@ -120,7 +120,11 @@ snd_init_b: ld a, $80
             ret
 tri_lens:   db 10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14     ; the NES length table
             db 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30
-snd_wave:   db $01, $23, $45, $67, $89, $AB, $CD, $EF, $FE, $DC, $BA, $98, $76, $54, $32, $10
+snd_wave:   db $78, $9A, $BC, $DE, $FF, $ED, $CB, $A9, $87, $65, $43, $21, $00, $12, $34, $56
+                                            ; (the triangle from its middle: a restart plays
+                                            ;   sample 1 first, 8, next to the DAC's rest level
+                                            ;   (7.5): no click at a note's start; owner,
+                                            ;   2026-11-24. The NES triangle never jumps)
 
 ; L = NES-style register of the engine ($00-$15), A = value, only if changed
 awf:        push hl
@@ -217,11 +221,46 @@ aw:         push af
             ld [hl], b
             pop hl                          ; HL = NRx2
             jr z, .vx
-            ld d, a
+            ld d, a                         ; D = steps up (1-15; a step down is 15 up)
+            ldh a, [is_cgb]                 ; (owner, 2026-11-24: the audio not smooth. The
+            and a                           ;   channel plays every level on the way: a tick
+            jr z, .zu                       ;   per step. A Color: steps in the output's low
+            ld a, c                         ;   phase are silent, read from PCM12, briefly)
+            and a
+            ld a, $0F
+            jr z, .zp
+            ld a, $F0
+.zp:        ld e, a
+            ld b, 0
+.zq:        ldh a, [$FF76]
+            and e
+            jr z, .zu
+            dec b
+            jr nz, .zq
+.zu:        ld c, l                         ; the steps unrolled: 2 cycles each (the loop took
+            ld a, 15                        ;   6, the louder levels three times as long)
+            sub d
+            ld e, a
+            ld d, 0
+            ld hl, .unr
+            add hl, de
             ld a, $08
-.vz:        ld [hl], a
-            dec d
-            jr nz, .vz
+            jp hl
+.unr:       ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
+            ldh [c], a
 .vx:        jp .x
 .vr:        ld a, b
             ld [de], a
@@ -424,7 +463,26 @@ aw:         push af
             jp .x
 snd_nrx3:   db $13, $18, $1D
 ; NR30 = A (the wave channel's DAC): remembered; off also stops the channel (tri_on 0)
-nr30_w:     ldh [$FF1A], a
+nr30_w:     and a                           ; (off while sounding, a Color: when the wave is
+            jr nz, .w                       ;   at its middle, read from PCM34, briefly: the
+            ld a, [tri_on]                  ;   DAC off jumps to its rest level, 7.5; the NES
+            and a                           ;   triangle holds its step instead, no click)
+            jr z, .z
+            ldh a, [is_cgb]
+            and a
+            jr z, .z
+            push bc
+            ld b, 0
+.q:         ldh a, [$FF77]
+            and $0F
+            sub 6
+            cp 4
+            jr c, .qd
+            dec b
+            jr nz, .q
+.qd:        pop bc
+.z:         xor a
+.w:         ldh [$FF1A], a
             ld [tri_dac], a
             and a
             ret nz
