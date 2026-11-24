@@ -1,3 +1,6 @@
+#include <fcntl.h>
+#include <mgba/core/serialize.h>
+#include <mgba-util/vfs.h>
 /* Interactive headless mGBA runner: a test script (Python) drives the game closed-loop through
  * stdin / stdout, so it can react to what the game shows (positions, menus) instead of
  * replaying fixed presses. Used for play-throughs on DMG / SGB / CGB.
@@ -106,6 +109,14 @@ int main(int argc, char** argv) {
 				fclose(f);
 			}
 			printf("ok\n");
+		} else if (!strcmp(cmd, "p")) {             /* p ADDR VAL: poke a byte (hex) */
+			core->busWrite8(core, strtoul(a1, 0, 16) & 0xFFFF, strtoul(a2, 0, 16) & 0xFF);
+			printf("ok\n");
+		} else if (!strcmp(cmd, "S") || !strcmp(cmd, "L")) {   /* state save / load */
+			struct VFile* vf = VFileOpen(a1, cmd[0] == 'S' ? O_CREAT | O_TRUNC | O_WRONLY : O_RDONLY);
+			int ok = 0;
+			if (vf) { ok = cmd[0] == 'S' ? mCoreSaveStateNamed(core, vf, SAVESTATE_ALL) : mCoreLoadStateNamed(core, vf, SAVESTATE_ALL); vf->close(vf); }
+			printf("ok %d\n", ok);
 		} else if (!strcmp(cmd, "v")) {
 			printf("%u\n", vchk_n);
 		} else if (!strcmp(cmd, "q")) break;

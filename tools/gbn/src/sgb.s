@@ -144,13 +144,24 @@ sgb_delay:  push bc
             pop bc
             ret
 
-; HL = a 16-byte packet, sent bit by bit through P1. Keeps BC, DE.
+; HL = a 16-byte packet, sent bit by bit through P1. Keeps BC, DE. Every pulse (the reset,
+; each bit, the stop bit) held low for 6 cycles and high for 8 or more: the SGB wants about
+; 5 us each; at 2 us (one load between the writes) a real SGB / an exact emulator can miss a
+; bit and drop the packet (owner: the field kept a battle's colours, its text unreadable)
 sgb_send:   push bc
             push de
             xor a
             ldh [rP1], a
+            nop
+            nop
+            nop
+            nop
             ld a, $30
             ldh [rP1], a
+            nop
+            nop
+            nop
+            nop
             ld b, 16
 .byte:      ld e, [hl]
             inc hl
@@ -160,14 +171,24 @@ sgb_send:   push bc
             jr c, .one
             ld a, $20
 .one:       ldh [rP1], a
+            nop
+            nop
+            nop
+            nop
             ld a, $30
             ldh [rP1], a
+            nop
+            nop
             dec c
             jr nz, .bit
             dec b
             jr nz, .byte
             ld a, $20
             ldh [rP1], a
+            nop
+            nop
+            nop
+            nop
             ld a, $30
             ldh [rP1], a
             pop de
