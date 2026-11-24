@@ -31,6 +31,7 @@ bt_mag_menu:
             ld hl, bt_mpage
             cp [hl]
             call nz, bt_mag_page
+            call bt_mhrow                   ; (Modern MP: the hand's spell's cost)
             ld a, [bt_mcur]                 ; the hand: a level a column (text at x 16 / 96,
             call bt_mslot                   ;   the hand 17 px left); row 1 the levels, the
             ld a, c                         ;   spells on rows 2-4 (y = 8 row)
@@ -113,8 +114,7 @@ bt_mag_menu:
             add a, b
             ld e, a
             ld d, h
-            ld a, [de]
-            and a
+            call bt_mchg                    ; (charges left; Modern MP: the cost below)
             jp z, .l
             ld a, b
             add a, a
@@ -132,6 +132,8 @@ bt_mag_menu:
             add a, a
             add a, a
             add a, c
+            call bt_mcost                   ; (Modern MP: enough MP?)
+            jp c, .l
             and a
             ret
 .b:         scf
@@ -161,17 +163,7 @@ bt_mag_page:
             call z, bt_msg_win
             xor a
             ld [bt_rows], a
-            ld b, 18
-            call vwf_clr
-            ld a, [bt_mpage]
-            add a, a
-            ld [bt_t + 6], a                ; level
-            ld a, 8
-            call bt_mhdr
-            ld hl, bt_t + 6
-            inc [hl]
-            ld a, 88
-            call bt_mhdr
+            call bt_mhdraw                  ; (the header row: src/mmp.s)
             call bt_mrow
             xor a
 .sp:        push af                         ; slot
@@ -430,7 +422,9 @@ bt_pl_magic:
             call bt_msg_pl
             ld a, $07
             jp bt_msg_end1
-.ok:        ld a, [bt_who]                  ; one MP of the level
+.ok:        call bt_mpay                    ; (Modern MP: its cost paid)
+            jr c, .nomp
+            ld a, [bt_who]                  ; one MP of the level
             rrca
             rrca
             ld l, a
@@ -1700,6 +1694,9 @@ bt_mhdr:    push af
             ld a, [bt_t + 6]
             add a, $31
             ld [hl+], a
+            ld a, [opt_mmp]                 ; (Modern MP: the level alone)
+            and a
+            jr nz, .end
             ld a, $20
             ld [hl+], a
             ld a, $4D
@@ -1729,8 +1726,10 @@ bt_mhdr:    push af
             ld a, l
             cp low(nf_dig + 6)
             jr nz, .one
-            xor a
-            ld [de], a
+            ld h, d
+            ld l, e
+.end:       xor a
+            ld [hl], a
             ld hl, bt_sbuf
             pop af
             jp vwf_str

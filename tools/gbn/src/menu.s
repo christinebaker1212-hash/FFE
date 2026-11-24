@@ -694,6 +694,7 @@ pick_char:  xor a
 ; what the next level needs; (0,11,20,7) the five stats and the four battle values; gold
 ; labels on the Color; left / right: the next member; A / B: back
 status_scr: ld [mm_t], a
+            call mmp_sync                   ; (Modern MP: src/mmp.s)
 .re:        call scr_open
             call eqm_pal
             ld a, [mm_t]
@@ -752,6 +753,8 @@ status_scr: ld [mm_t], a
             call pen_num
             ld bc, $0407                    ; MP: current / maximum of each level
             call pen_at
+            call st_mmp                     ; (Modern MP: one current / maximum)
+            jr nz, .mpx
             xor a
 .mp:        ld [mm_pc], a
             cp 4
@@ -788,7 +791,7 @@ status_scr: ld [mm_t], a
             inc a
             cp 8
             jr c, .mp
-            ld bc, $0D09                    ; experience
+.mpx:       ld bc, $0D09                    ; experience
             call pen_at
             ld a, [mm_t]
             call ch_rec
@@ -1507,6 +1510,9 @@ party_mp:   xor a
             ld [hl+], a
             dec b
             jr nz, .c
+            pop af                          ; (Modern MP: full too)
+            push af
+            call mmp_full
 .n:         pop af
             inc a
             cp 4
@@ -1527,6 +1533,7 @@ save_ask:   call desc_show
 ; the member's three spells below it (icon and name), scrolled with the hand; left / right:
 ; the next member; A casts FF1's out-of-battle spells (again and again while MP lasts)
 magic_menu: ld [mg_ch], a
+            call mmp_sync                   ; (Modern MP: src/mmp.s)
             xor a
             ld [mg_cur], a
             ld [mg_top], a
@@ -1728,6 +1735,8 @@ mg_list:    ld c, 6                         ; (cleared, colours back)
             ld [hl], a
             pop bc
             push bc
+            call mg_mmpl                    ; (Modern MP: the member's MP; NZ drawn)
+            jr nz, .mpd
             ld b, 11
             call pen_at
             ld hl, str_mp
@@ -1748,7 +1757,7 @@ mg_list:    ld c, 6                         ; (cleared, colours back)
             ld a, [hl]
             add a, $30
             call pen_ch
-            pop bc
+.mpd:       pop bc
             xor a                           ; the three spells, a row apart
 .sp:        ld [mg_hp], a
             inc c
@@ -1777,6 +1786,7 @@ mg_list:    ld c, 6                         ; (cleared, colours back)
             push bc
             call pen_iname
             pop bc
+            call mg_mcrow                   ; (Modern MP: its cost)
 .em:        ld a, [mg_hp]
             inc a
             cp 3
@@ -1801,8 +1811,7 @@ mg_use:     ld a, [mg_cur]                  ; level, slot
             ld [mg_mp], a
             ld e, a
             ld d, h
-            ld a, [de]
-            and a
+            call mg_mchg                    ; (charges left; Modern MP: the cost below)
             ld a, MG_NOMP
             jp z, mg_show
             ld a, b                         ; the spell id
@@ -1822,6 +1831,8 @@ mg_use:     ld a, [mg_cur]                  ; level, slot
             add a, a
             add a, c
             add a, $AF
+            call mg_mchk                    ; (Modern MP: enough MP?)
+            jp c, mg_nomp
             ld hl, mg_tbl                   ; the out-of-battle spells
 .f:         ld c, a
             ld a, [hl+]
@@ -1869,7 +1880,10 @@ mg_tbl:     db MG_CURE_ID
 mg_show:    call desc_show
             call wait_ab
             jp magic_menu.re
-mg_spend:   ld a, [mg_mp]                   ; one MP of the level; Z: none left
+mg_spend:   ld a, [opt_mmp]                 ; (Modern MP: its cost; src/mmp.s)
+            and a
+            jp nz, mg_mpay
+            ld a, [mg_mp]                   ; one MP of the level; Z: none left
             ld l, a
             ld h, high(ch_magic)
             dec [hl]

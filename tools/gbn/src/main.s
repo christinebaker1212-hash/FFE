@@ -2815,6 +2815,7 @@ do_battle:  ld [btl_fid], a
             ld a, F3_BANK                   ; the encounter transition (owner, 2026-11-22; loc.s)
             ld hl, bt_trans2
             call bank_call
+            call mmp_sync                   ; (Modern MP: the party's MP in the mode in use)
             ld a, BTL_BANK
             ld hl, battle
             call bank_call

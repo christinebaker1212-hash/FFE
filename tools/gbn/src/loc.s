@@ -991,7 +991,9 @@ section bank 99, $4800
 ; setting from row 5; up / down pick, left / right change, B back (kept in cart RAM bank 1)
 OPT_N_DMG  = 7
 OPT_N_CGB  = 11
-opt_menu:   call scr_open
+opt_menu:   xor a
+            ld [opt_cur], a
+opt_redraw: call scr_open
             call eqm_pal
             ld bc, $0000
             ld de, $1403
@@ -1019,8 +1021,6 @@ opt_menu:   call scr_open
             jr nz, .lb
             call opt_vals
             call scr_show
-            xor a
-            ld [opt_cur], a
 .l:         ld a, [opt_cur]                 ; the hand at the setting (row 5 + n)
             add a, 5
             ld c, a
@@ -1057,7 +1057,11 @@ opt_menu:   call scr_open
             add a, b
             cp c
             jr nc, .l                       ; (past either end: no change)
-            ld [hl], a
+            ld b, a
+            ld a, [opt_cur]
+            cp 6
+            jr z, .mm
+            ld [hl], b
             call opt_apply
             ld a, [opt_cur]                 ; (a window colour / the gradient: at once)
             cp 7
@@ -1065,6 +1069,21 @@ opt_menu:   call scr_open
             call opt_vals
             call scr_upd
             jr .l
+.mm:        call mmp_ok                     ; Modern MP (src/mmp.s): only with the wiki's data;
+            and a                           ;   the owner's warning first (Yes: the party's MP
+            jr z, .l                        ;   converted), the screen again either way
+            push hl
+            push bc
+            ld a, SCR_BANK
+            ld hl, mmp_ask
+            call bank_call
+            pop bc
+            pop hl
+            and a
+            jp nz, opt_redraw
+            ld [hl], b
+            call mmp_sync
+            jp opt_redraw
 .up:        call opt_n
             ld b, a
             ld a, [hl]

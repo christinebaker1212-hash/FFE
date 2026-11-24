@@ -515,3 +515,37 @@ one reaches parity, so the owner can keep playing).
      between the rows of boxes; only the lower pictures hidden under it);
    - magic menus (owner): the field list shows one level a page (its MP above, its spells below,
      empty levels skipped); the battle list a level a column (L1 L2, MP, three spells each).
+30. Owner (2026-11-24):
+   - overworld: the bridge, canal and parked ship / airship anchored to the map (their sprites took
+     only the whole-tile offset to the party; the scroll within a step is now subtracted);
+   - sound closer to the NES on both systems: the music runs at the NES's 60.0988 Hz from the
+     timer (TAC 4096 Hz; TMA with a fraction: DMG 188 + 40/256, Color double speed 120 + 79/256;
+     604 ticks in 600 frames), ticks from line 124 on wait for the STAT line-64 event so V-Blank
+     uploads are never held up; the triangle starts at its middle and (Color) stops there; pulse
+     volume steps unrolled. Tools: `tools/gbn/sndref.py` (NES APU model reference from the NES
+     ROM, SameBoy recording of the GB build), the SameBoy watch core's `SB_VCHK=1`;
+   - data audit against the FF1 disassembly and the Japanese ROM: `tools/gbn/audit.py`,
+     `docs/ff1-data-audit.md` (no wrong address, no damaged data);
+   - Options: Auto Retarget (off by default: an attack or one-enemy spell on an enemy already gone
+     goes to the first living one), holding A in battle selects quickly (18 frames, then a press
+     every 6);
+   - Options: **Modern MP** (off by default; `src/mmp.s`, `tools/gbn/modern_mp.py`). Dawn of Souls
+     MP instead of charges. Data from the FINAL FANTASY wiki through its API when the build runs
+     (cached in `build/wiki/`, never committed; without it the option cannot be switched on):
+     spell costs ("Magic (Final Fantasy)", matched to spell ids by FF1's NES names), starting MP
+     and strong levels ("Final Fantasy stats"), the rule ("Stat growth": floor(INT / 4) + 1 a
+     level, +10-12 on a strong level or 1 in 8 otherwise; Knight / Ninja only after the class
+     change, Black Belt / Master never). Each member's MP sits in the magic page at +$30 (current,
+     maximum, a mark, the mode its MP is in); the maximum grows at every level up in both modes;
+     a mode change converts by the same weighted fraction (charges weighted by the average cost of
+     their level), after the owner's warning ("Switching between MP modes mid-game may leave you
+     with more or less MP than usual. Is this OK?"). A save from before the option gets its
+     maximum estimated (level, job, INT; Knight / Ninja from their charges). Shown: the battle
+     party window's MP at the right of the HP (Poison shortened to "Pois." then), the battle
+     list's header "L1 Cost n ... L2 MP m" (the hand's spell), the field Magic screen's
+     "MP cur/max" and each spell's cost, the Status screen's MP. Inns / the House fill it.
+     Checked from the town save (CGB and DMG): the switch both ways (3/2/1 charges -> 10/10 MP;
+     5/10 MP -> charges 2/1/1), Cure twice in the field (10 -> 4), "Not enough MP." for Dia at
+     4, Dia in battle (10 -> 5), a level up (Red Mage L2, INT 10: max 10 -> 13 in both modes),
+     the estimate for a Red Mage L20 INT 30 (246, as worked by hand), and the battle list and
+     party window unchanged with the option off.

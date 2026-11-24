@@ -3349,7 +3349,8 @@ bt_levelup: ld a, [bt_lvm]
             ld a, $20
             call bt_rf
             ld [hl], b
-.msg:       ld a, [bt_res]                  ; (after a victory: kept for the results window)
+.msg:       call mmp_lvup                   ; (Modern MP: the maximum grows; src/mmp.s)
+            ld a, [bt_res]                  ; (after a victory: kept for the results window)
             and a
             jp nz, bt_lvrec
             ld a, [bt_lvm]                  ; messages: name, Level up!, Max HP N points, stats

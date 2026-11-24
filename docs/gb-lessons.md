@@ -303,3 +303,19 @@ Color only" screen on older systems.
   long work does not record), and never start it late in the frame: it runs into V-Blank and
   every V-Blank wait behind it (fades, uploads) misses a frame. Do not give it a record of its own
   on the line before another event: attach it to that event, after its writes.
+
+## Timer music, KEY1, wiki data, options that change game data (2026-11-24)
+- Music at the NES's rate: drive it from the timer (TAC, TMA with a fractional reload), not from
+  V-Blank. A tick that falls near V-Blank must not run there (it held up the V-Blank uploads and
+  showed as garbage tiles on the DMG): defer it (`mus_pend`) to a STAT event mid-frame.
+- KEY1 ($FF4D) reads $FF on a DMG: test `is_cgb` before reading it (the timer ran at half rate).
+- `bank_call` passes only HL (the routine) and A (the bank) and clobbers B: pass arguments in WRAM
+  and save BC around it when the caller needs them. A table in another bank is read with
+  `far_byte`, never by address from the code bank that happens to be mapped.
+- Data from the web (the wiki for Modern MP) is fetched when the build runs, cached under
+  `build/`, and the feature is disabled when it is missing: the build never fails for it.
+- An option that changes how game data is read (Modern MP) keeps a per-member "mode" byte in the
+  save page: a file saved in one mode and loaded with the option set the other way is converted
+  on first use (battle start, Magic / Status screens, Options). Options are global, files are not.
+- Test scripts: the RAM-backed "in battle" test (ROM bank 6 mapped) is false during bank-switched
+  animations: confirm over several checks before deciding a battle ended.

@@ -155,6 +155,8 @@ def status_words():
     for k, w in (('dead', 'Dead'), ('stone', 'Stone'), ('poison', 'Poison'), ('numb', 'Numb'), ('sleep', 'Sleep'),
                  ('mute', 'Mute'), ('conf', 'Conf.'), ('blind', 'Blind')):
         out.append('bst_%s: db %s, 0' % (k, ', '.join(str(b) for b in enc(w))))
+    out.append('section bank 104, $4BE0')         # (Modern MP: Poison shortened, src/mmp.s)
+    out.append('bst_poisn: db %s, 0' % ', '.join(str(b) for b in enc('Pois.')))
     return '\n'.join(out) + '\n'
 
 

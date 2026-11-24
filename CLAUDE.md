@@ -1339,6 +1339,10 @@ count, intro fade from black (both systems), DMG square-2 notes, gradient menus 
 per-line division and per-cell checks removed), lost gradient records on adjacent lines, every window colour 0-31 and 32 combinations checked
 (picture line by line, sound registers vs the gradient-off run; two music-timing faults in the line handler fixed), "OK to begin" no longer blanks the top row, magic menus (field: a level
 a page; battle: L1 L2 columns) (docs/ff1-native.md item 29).
+Owner (2026-11-24), done: bridge / canal / parked vehicles anchored to the map; music from the timer at the NES's
+60.0988 Hz (both systems), triangle and volume-step clicks removed (tools/gbn/sndref.py); data audit vs the disassembly and
+the Japanese ROM (docs/ff1-data-audit.md); Options: Auto Retarget, Modern MP (Dawn of Souls MP from the wiki at build
+time, src/mmp.s, tools/gbn/modern_mp.py); hold A for quick battle selection (docs/ff1-native.md item 30).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

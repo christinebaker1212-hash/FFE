@@ -1632,16 +1632,18 @@ bt_pline:   ld [bt_t + 11], a
             and a
             jr z, .out
             call bt_sttag                   ; (the worst one first: owner, 2026-11-23)
+            call bt_stw                     ; (Modern MP: a shorter Poison)
 .w:         ld h, d
             ld l, e
             ld de, bt_sbuf
             ld bc, 8
             ld a, BTL6_BANK
             call far_copy
+            call bt_stx                     ; (x 50; Modern MP: after the HP)
             ld hl, bt_sbuf
-            ld a, 50
             call vwf_str
-.out:       ld a, [bt_t + 11]               ; tiles and map cells
+.out:       call bt_plmp                    ; (Modern MP: the MP at the right)
+            ld a, [bt_t + 11]               ; tiles and map cells
             ld c, a
             add a, a
             add a, a

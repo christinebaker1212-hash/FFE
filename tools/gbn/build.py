@@ -94,6 +94,14 @@ def snd_tables(rom):
             db(sfx) + 'section bank 7, $6E40\n' + db(nz))
 
 
+def mmp_source():
+    """the Modern MP table (tools/gbn/modern_mp.py: the wiki's Dawn of Souls data) at MMP_TAB"""
+    import modern_mp
+    t = modern_mp.tables()
+    return 'section bank %d, $7F00\n' % modern_mp.MMP_BANK + ''.join(
+        '            db ' + ', '.join(str(v) for v in t[k:k + 16]) + '\n' for k in range(0, len(t), 16))
+
+
 def ui_strings():
     """the screens' strings as str_<name> labels in code bank 2"""
     out = ['section bank 2, $6C00']
@@ -254,6 +262,7 @@ def main():
            open(os.path.join(HERE, 'src', 'loc.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field2.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sgb.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'mmp.s')).read() + '\n' + mmp_source() +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
            'section bank 104, $4000\n' +              # (the small font's glyphs: bank BTL6)
