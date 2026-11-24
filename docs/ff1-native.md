@@ -631,3 +631,11 @@ one reaches parity, so the owner can keep playing).
      noise frames when a step ran late); the first frame no longer shows a broken picture.
    - Game over as FF1: game-over music, "<leader>'s party / were wiped out", any button, a fade to
      white, the title (fading in from white after a restart).
+35. Owner (2026-11-24, last):
+   - Water finer: four bands of 4 lines (river: columns) per 16 x 16 picture, each a pixel per 16
+     frames, in turn 4 frames apart (order 0, 2, 1, 3): 64 steps; the build marks which tiles change
+     at each step and only those are copied. Color frames in bank 106, DMG frames in bank 108
+     (each with its own header).
+   - Reflection more faded: on the Color each channel is 3/8 the sprite's and 5/8 the sea's main
+     colour (taken by the build from the sea tile and its palette, through the LCD colour mode);
+     DMG / SGB OBP1 light grey with a dark-grey outline only.

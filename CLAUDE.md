@@ -1352,7 +1352,8 @@ box cut in H-Blank (docs/ff1-native.md item 32). Then: reflections on water, ani
 SNES sounds, Extras on the title (Sound Test, Bestiary kept in cart RAM with battle pictures and stats from the ROM)
 (item 33). Owner: weapon categories stay as the ROM has them; loads keep their length (DMG white loads stay).
 Then (item 34): colour correction fixed (enemy flash / party lines), FFL3-style water, a lovelier
-encounter transition (DMG at full pace), FF1's game-over message and fade. Open: world-map borders
+encounter transition (DMG at full pace), FF1's game-over message and fade; water in four bands, the
+reflection faded into the sea (item 35). Open: world-map borders
 (await details), the playthrough.
 
 ## Remaining

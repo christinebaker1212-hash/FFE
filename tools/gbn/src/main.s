@@ -549,8 +549,8 @@ load_map:   push af
             call bgp_w
             ld a, DMG_OBP
             call obp0_w
-            ld a, %10100100                 ; (OBP1: the reflection, dimmer: 1 light grey,
-            ldh [rOBP1], a                  ;   2 / 3 dark grey)
+            ld a, %10010100                 ; (OBP1: the reflection, faded: 1 / 2 light grey,
+            ldh [rOBP1], a                  ;   3 dark grey: a soft figure in the water)
             ld hl, M_PARTYDMG               ; party sprite pre-shaded for this map
             ld de, $8000
             ld bc, 16 * 16

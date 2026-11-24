@@ -149,10 +149,31 @@ win_kill:   ldh a, [rLCDC]
             ret
 
 section bank 99, $7F00
-; the Color: OBJ palettes 4-7 = 0-3 darker and bluer (LCD off or V-Blank: palette RAM read)
+; the Color: OBJ palettes 4-7 = 0-3 faded into the sea (owner, 2026-11-24: more like a game
+; reflection, more faded): each channel 3/8 the sprite's, 5/8 the sea's main colour (the build's,
+; WANIM_BANK $4008, through the LCD colour mode); LCD off or V-Blank: palette RAM read
 refl_pal:   ldh a, [is_cgb]
             and a
             ret z
+            ld a, WANIM_BANK                ; the water: DE = its colour, corrected
+            ld [fc_bank], a
+            ld hl, $4008
+            call far_byte
+            ld e, a
+            ld hl, $4009
+            call far_byte
+            ld d, a
+            call cc_fix
+            ld a, e
+            and 31
+            ld [refl_w], a
+            call .g
+            ld [refl_w + 1], a
+            ld a, d
+            rrca
+            rrca
+            and 31
+            ld [refl_w + 2], a
             ld c, 0                         ; byte index 0, 2, .. 30
 .l:         ld a, c
             ldh [rOCPS], a
@@ -165,30 +186,20 @@ refl_pal:   ldh a, [is_cgb]
             ld d, a                         ; DE = colour (b 14-10, g 9-5, r 4-0)
             ld a, e                         ; r
             and 31
-            call .dk
+            ld hl, refl_w
+            call .bl
             ld [refl_r], a
-            ld a, e                         ; g = (DE >> 5) & 31
-            and $E0
-            ld b, a
-            ld a, d
-            and 3
-            or b
-            rlca
-            rlca
-            rlca
-            and 31
-            call .dk
+            call .g                         ; g
+            ld hl, refl_w + 1
+            call .bl
             ld [refl_g], a
             ld a, d                         ; b
             rrca
             rrca
             and 31
-            call .dk
-            add a, 4
-            cp 32
-            jr c, .b1
-            ld a, 31
-.b1:        ld [refl_b], a
+            ld hl, refl_w + 2
+            call .bl
+            ld [refl_b], a
             ld a, [refl_g]                  ; pack: low = r | g << 5, high = g >> 3 | b << 2
             ld b, a
             rrca
@@ -226,17 +237,33 @@ refl_pal:   ldh a, [is_cgb]
             cp 32
             jr c, .l
             ret
-.dk:        ld b, a                         ; A x 5/8
+.g:         ld a, e                         ; A = green of DE
+            and $E0
+            ld b, a
+            ld a, d
+            and 3
+            or b
+            rlca
+            rlca
+            rlca
+            and 31
+            ret
+.bl:        ld b, a                         ; A = (3 A + 5 [HL]) / 8
+            add a, a
+            add a, b
+            ld b, a
+            ld a, [hl]
+            add a, a
+            add a, a
+            add a, [hl]
+            add a, b
             srl a
-            ld l, a
-            ld a, b
             srl a
             srl a
-            srl a
-            add a, l
             ret
 
 section wram, $C7F8
 refl_r:     ds 1
 refl_g:     ds 1
 refl_b:     ds 1
+refl_w:     ds 3

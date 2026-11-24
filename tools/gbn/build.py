@@ -206,8 +206,9 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, OW_TS, 0x4400, o['cgb_tiles'])
     place(banks, OW_INFO, 0x5000, o['cgb_bg'] + o['cgb_bg'])
     place(banks, OW_INFO, 0x5040, o['cgb_obj'])
-    wa, wa_info = water_anim(o)                                 # (the animated sea and rivers)
+    wa, wad, wa_info = water_anim(o)                            # (the animated sea and rivers)
     place(banks, WANIM_BANK, 0x4000, wa)
+    place(banks, WANIM_DMG, 0x4000, wad)
     print('water animation:', wa_info)
     place(banks, OW_INFO, 0x7400, o['veh_cgb'])                # vehicle sprites (FF1 OW objects)
     place(banks, OW_INFO, 0x7A00, o['veh_dmg'])
@@ -264,15 +265,20 @@ def data_banks(rom, ff3=None, init=None):
     return banks
 
 
-WANIM_BANK = 106                                 # (src/wanim.s)
+WANIM_BANK = 106                                 # (src/wanim.s; the DMG's frames in WANIM_DMG)
+WANIM_DMG = 108
 def water_anim(o):
     """the animated sea and rivers (owner's list, 2026-11-24; FF1 has none): the commonest open
-    sea metatile and river metatile of the overworld, the halves of each 16 x 16 picture
-    shifted a pixel in turn (sea sideways, river downwards), 32 half steps, for the Color's tiles and the DMG's
-    pre-shaded ones. Only metatiles whose four tiles no other metatile uses (and that stay
-    consistent where they repeat a tile) move: coasts and land never change.
-    Bank layout: $4000 count; entries of 16 bytes from $4010 (Color tiles 4, DMG tiles 4, the
-    frames' offsets (Color, DMG)); frames: 32 x 64 bytes each."""
+    sea metatile and river metatile of the overworld. Motion as Final Fantasy Legend III's water
+    (owner, 2026-11-24), made finer (owner: two more strips): the 16 x 16 picture in four bands
+    of 4 lines (river: 4 columns), each moving a pixel per 16 frames (sea sideways, river
+    downwards), the bands in turn 4 frames apart (order 0, 2, 1, 3): 64 steps, one per 4 frames;
+    bands together where one tile fills every corner (the river). Only metatiles whose tiles
+    stay right wherever they are used move: coasts and land never change.
+    Returns (Color bank, DMG bank, info). Each bank: $4000 count, $4008 the sea's main colour
+    (RGB555: the reflection's water), $4010 entries of 16 bytes (the bank's own 4 tiles),
+    $4080 per step a mask of the slots (entry * 4 + corner) that change at it; frames from
+    $4100 + $1000 e: 64 steps x 4 tiles x 16 bytes (the Color's / the DMG's pre-shaded)."""
     prop, tsa, tbl = o['prop'], o['tsa'], o['mt_dmg']
     freq = {}
     for r_ in o['rows']:
@@ -295,20 +301,17 @@ def water_anim(o):
                 v = px[y][x]; lo |= (v & 1) << (7 - x); hi |= (v >> 1) << (7 - x)
             out += bytes([lo, hi])
         return bytes(out)
+    ORDER = (0, 2, 1, 3)
     def frames(tiles16, vertical, stagger=True):
-        # (owner, 2026-11-24: as Final Fantasy Legend III's water) a pixel per 16 frames, the two
-        # halves of the 16 x 16 picture taking turns 8 frames apart (sea: the upper and lower
-        # halves sideways; river: the left and right halves downwards): 32 half steps, one per
-        # 8 frames, half step j = the first half shifted (j + 1) / 2, the second j / 2
         q = [dec(t) for t in tiles16]                       # UL, UR, DL, DR
         img = [[q[(y >= 8) * 2 + (x >= 8)][y & 7][x & 7] for x in range(16)] for y in range(16)]
         out = []
-        for j in range(32):
-            a, b = ((j + 1) // 2, j // 2) if stagger else (j // 2, j // 2)
+        for j in range(64):
+            sh_b = [((j + 3 - ORDER[b]) // 4 if stagger else j // 4) % 16 for b in range(4)]
             if vertical:
-                sh = [[img[(y - (a if x < 8 else b)) % 16][x] for x in range(16)] for y in range(16)]
+                sh = [[img[(y - sh_b[x // 4]) % 16][x] for x in range(16)] for y in range(16)]
             else:
-                sh = [[img[y][(x - (a if y < 8 else b)) % 16] for x in range(16)] for y in range(16)]
+                sh = [[img[y][(x - sh_b[y // 4]) % 16] for x in range(16)] for y in range(16)]
             out.append([enc([[sh[qy * 8 + y][qx * 8 + x] for x in range(8)] for y in range(8)])
                         for qy in range(2) for qx in range(2)])
         return out
@@ -317,34 +320,49 @@ def water_anim(o):
         for mt in range(128):
             pos_c.setdefault(tsa[128 * k + mt], set()).add(k)
             pos_d.setdefault(tbl[128 * k + mt], set()).add(k)
-    ents, data_ = [], bytearray()
+    def same(ids, pos_of, fr):
+        # every use of a tile, by any metatile at any corner, must get the same picture in
+        # every step: the same corner as here, or a corner whose shifted quarter is equal
+        for k, t in enumerate(ids):
+            for k2 in pos_of[t]:
+                if k2 != k and any(f[k2] != f[k] for f in fr): return False
+        return True
+    ents, dc, dd, masks, water = [], bytearray(), bytearray(), [0] * 64, 0x7E40
     for want, vert in (('sea', False), ('river', True)):
         cand = sorted((m for m in range(128) if kind(m) == want), key=lambda m: -freq.get(m, 0))
         for mt in cand[:1]:
             cid = [tsa[128 * k + mt] for k in range(4)]
             did = [tbl[128 * k + mt] for k in range(4)]
-            # every use of a tile, by any metatile at any corner, must get the same picture in
-            # every phase: the same corner as here, or a corner whose shifted quarter is equal
-            def same(ids, pos_of, fr):
-                for k, t in enumerate(ids):
-                    for k2 in pos_of[t]:
-                        if k2 != k and any(f[k2] != f[k] for f in fr): return False
-                return True
-            for stag in (True, False):                          # (one tile at every corner,
-                fc = frames([o['cgb_tiles'][16 * t:16 * t + 16] for t in cid], vert, stag)  # as
-                fd = frames([o['dmg_tiles'][16 * t:16 * t + 16] for t in did], vert, stag)  # the
-                if same(cid, pos_c, fc) and same(did, pos_d, fd): break  # river: halves together)
-            if not (same(cid, pos_c, fc) and same(did, pos_d, fd)): continue
-            oc = 0x4100 + 0x1000 * len(ents)                   # (fixed places: entry e's Color
-            od = oc + 0x800                                     #   frames at $4100 + $1000 e, DMG
-            data_ += b''.join(b''.join(f) for f in fc)          #   at + $800)
-            data_ += b''.join(b''.join(f) for f in fd)
-            ents.append(bytes(cid) + bytes(did) + oc.to_bytes(2, 'little') + od.to_bytes(2, 'little')
-                        + bytes(4))
-    blob = bytearray(0x100)
-    blob[0] = len(ents)
-    for i, e in enumerate(ents): blob[0x10 + 16 * i:0x20 + 16 * i] = e
-    return bytes(blob) + bytes(data_), [(e[0:4].hex(), e[4:8].hex()) for e in ents]
+            for stag in (True, False):
+                fc = frames([o['cgb_tiles'][16 * t:16 * t + 16] for t in cid], vert, stag)
+                fd = frames([o['dmg_tiles'][16 * t:16 * t + 16] for t in did], vert, stag)
+                if same(cid, pos_c, fc) and same(did, pos_d, fd): break
+            else:
+                continue
+            e = len(ents)
+            for j in range(64):
+                for qq in range(4):
+                    if fc[j][qq] != fc[j - 1][qq] or fd[j][qq] != fd[j - 1][qq]:
+                        masks[j] |= 1 << (4 * e + qq)
+            dc += b''.join(b''.join(f) for f in fc)
+            dd += b''.join(b''.join(f) for f in fd)
+            ents.append(bytes(cid) + bytes(did) + bytes(8))
+            if want == 'sea':                           # its main colour: the reflection's water
+                cnt = [0] * 4
+                for t in cid:
+                    for row in dec(o['cgb_tiles'][16 * t:16 * t + 16]):
+                        for v in row: cnt[v] += 1
+                k_ = cnt.index(max(cnt)); p_ = o['mt_pal'][mt]
+                water = int.from_bytes(o['cgb_bg'][8 * p_ + 2 * k_:8 * p_ + 2 * k_ + 2], 'little')
+    def head(dmg):                                      # (each bank's entries: its own tiles)
+        h = bytearray(0x100)
+        h[0] = len(ents)
+        h[8:10] = water.to_bytes(2, 'little')
+        for i_, e_ in enumerate(ents): h[0x10 + 16 * i_:0x14 + 16 * i_] = e_[4:8] if dmg else e_[0:4]
+        h[0x80:0xC0] = bytes(masks)
+        return bytes(h)
+    assert len(dc) <= 0x3F00
+    return head(0) + bytes(dc), head(1) + bytes(dd), [(e_[0:4].hex(), e_[4:8].hex()) for e_ in ents]
 
 
 def main():

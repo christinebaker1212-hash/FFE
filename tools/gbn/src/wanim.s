@@ -1,11 +1,13 @@
 ; FF1 native engine: the animated sea and rivers (owner's list, 2026-11-24; FF1 has none). The
 ; build (build.py water_anim) finds the overworld's commonest sea and river metatiles whose tiles
-; are only used where the shifted picture stays right (the same corner everywhere, or a tile
-; whose shifted quarters are equal), and makes 32 half steps of each 16 x 16 picture: as Final
-; Fantasy Legend III's water (owner, 2026-11-24), a pixel per 16 frames, the picture's two halves
-; in turn 8 frames apart (sea sideways, river downwards). Every 8 frames a new half step; its tiles
-; go to VRAM right after the frame wait, while the V-Blank lasts (the rest the next frame).
+; are only used where the shifted picture stays right, and makes 64 steps of each 16 x 16
+; picture: as Final Fantasy Legend III's water (owner, 2026-11-24), made finer (four bands of 4
+; lines / columns, each a pixel per 16 frames, in turn 4 frames apart; sea sideways, river
+; downwards). Every 4 frames a new step; the tiles that change at it (the build's mask) go to
+; VRAM right after the frame wait, while the V-Blank lasts (the rest the next frame). The
+; Color's frames in WANIM_BANK, the DMG's in WANIM_DMG (the same layout, header copied).
 WANIM_BANK = 106
+WANIM_DMG  = 108
 
 section bank 0, $3F94
 wa_tick:    ldh a, [maptype]
@@ -14,11 +16,10 @@ wa_tick:    ldh a, [maptype]
             ld a, [ap_on]                   ; (not under the airship's view)
             and a
             ret nz
-            ldh a, [frame]                  ; (a new half step whenever frame / 8 changes:
-            rrca                            ;   a loop that misses the exact frame still
-            rrca                            ;   keeps the pace)
+            ldh a, [frame]                  ; (a new step whenever frame / 4 changes)
             rrca
-            and 31
+            rrca
+            and 63
             ld hl, wa_ph
             cp [hl]
             jr z, .go
@@ -31,14 +32,18 @@ wa_tick:    ldh a, [maptype]
             ldh a, [rLCDC]
             bit 7, a
             ret z
+            ldh a, [is_cgb]
+            and a
             ld a, WANIM_BANK
-            call sbank
+            jr nz, .b
+            ld a, WANIM_DMG
+.b:         call sbank
             jp wa_run
 
 section bank 0, $2591
-; the next tiles of this phase while the V-Blank lasts (bank WANIM_BANK mapped): entry e's tile
-; for corner q at $4010 + 16 e + q (DMG + 4), its frame at $4100 + $1000 e (DMG + $800) +
-; 64 phase + 16 q
+; the next changed tiles of this step while the V-Blank lasts (the bank mapped): entry e's tile
+; for corner q at $4010 + 16 e + q, its frame at $4100 + $1000 e + 64 step + 16 q;
+; the step's mask at $4080 + step (bit 4 e + q)
 wa_run:     ldh a, [rLY]
             sub 144
             cp 8
@@ -54,15 +59,14 @@ wa_run:     ldh a, [rLY]
             dec a
             cp b
             jr c, .done
-            ldh a, [is_cgb]
-            and a
-            ld e, 0
-            jr nz, .c
-            ld e, 4
-.c:         ld a, b                         ; D = the tile
+            call wa_msk                     ; does the slot change at this step?
+            jr c, .go
+            ld hl, wa_i
+            inc [hl]
+            jr wa_run
+.go:        ld a, b                         ; D = the tile (the bank's own entry)
             swap a
             add a, $10
-            add a, e
             ld l, a
             ld a, c
             and 3
@@ -74,11 +78,9 @@ wa_run:     ldh a, [rLY]
             ld l, a
             srl a
             srl a
-            add a, e                        ; (DMG: + 8, E = 4 twice)
-            add a, e
             ld e, a
             ld a, b
-            swap a                          ; ($10 a entry)
+            swap a
             add a, e
             add a, $41
             ld h, a
@@ -107,6 +109,20 @@ wa_run:     ldh a, [rLY]
             jp wa_cp
 .done:      ld a, 8
             ld [wa_i], a
+            ret
+
+section bank 0, $17E0
+; C set if slot C changes at this step (its mask at $4080 + step, bank mapped)
+wa_msk:     ld a, [wa_ph]
+            add a, $80
+            ld l, a
+            ld h, $40
+            ld e, [hl]
+            ld a, c
+            inc a
+.sh:        rrc e
+            dec a
+            jr nz, .sh
             ret
 
 section bank 0, $1798
