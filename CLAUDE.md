@@ -1341,8 +1341,8 @@ per-line division and per-cell checks removed), lost gradient records on adjacen
 a page; battle: L1 L2 columns) (docs/ff1-native.md item 29).
 Owner (2026-11-24), done: bridge / canal / parked vehicles anchored to the map; music from the timer at the NES's
 60.0988 Hz (both systems), triangle and volume-step clicks removed (tools/gbn/sndref.py); data audit vs the disassembly and
-the Japanese ROM (docs/ff1-data-audit.md); Options: Auto Retarget, Modern MP (Dawn of Souls MP from the wiki at build
-time, src/mmp.s, tools/gbn/modern_mp.py); hold A for quick battle selection (docs/ff1-native.md item 30).
+the Japanese ROM (docs/ff1-data-audit.md); Options: Auto Retarget, Modern MP (Dawn of Souls MP, data kept in
+tools/gbn/modern_mp.py; src/mmp.s); hold A for quick battle selection (docs/ff1-native.md item 30).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

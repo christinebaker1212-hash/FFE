@@ -312,8 +312,8 @@ Color only" screen on older systems.
 - `bank_call` passes only HL (the routine) and A (the bank) and clobbers B: pass arguments in WRAM
   and save BC around it when the caller needs them. A table in another bank is read with
   `far_byte`, never by address from the code bank that happens to be mapped.
-- Data from the web (the wiki for Modern MP) is fetched when the build runs, cached under
-  `build/`, and the feature is disabled when it is missing: the build never fails for it.
+- Small fixed tables from outside sources (the wiki's Dawn of Souls MP data) go into the
+  repository as tool data (owner, 2026-11-24): never make the builder download anything.
 - An option that changes how game data is read (Modern MP) keeps a per-member "mode" byte in the
   save page: a file saved in one mode and loaded with the option set the other way is converted
   on first use (battle start, Magic / Status screens, Options). Options are global, files are not.

@@ -1,7 +1,7 @@
 ; FF1 native engine: "Modern MP" (owner, 2026-11-24; Options, off by default). With it on, magic
 ; costs MP as in Dawn of Souls instead of FF1's charges per spell level: each spell's cost and each
-; job's growth come from the FINAL FANTASY wiki at build time (tools/gbn/modern_mp.py, table at
-; MMP_TAB in bank MMP_BANK). A level's MP gain is floor(INT / 4) + 1, plus 10-12 on the job's
+; job's growth are Dawn of Souls data kept in tools/gbn/modern_mp.py (from the FINAL FANTASY wiki;
+; table at MMP_TAB in bank MMP_BANK). A level's MP gain is floor(INT / 4) + 1, plus 10-12 on the job's
 ; guaranteed strong levels or with a chance of 1 in 8 on the others; Fighter / Thief gain MP only
 ; as Knight / Ninja, Black Belt / Master never.
 ;
@@ -35,7 +35,7 @@ mmp_sync:   push hl
             pop de
             pop hl
             ret
-; A = nonzero when the build has the wiki's data (HL kept)
+; A = nonzero when the build has the Modern MP table (always; HL kept)
 mmp_ok:     push hl
             ld hl, MMP_TAB
             ld a, MMP_BANK
@@ -167,7 +167,7 @@ mmp_sbuf:   ds 12                           ; "current/maximum"
 
 section bank 105, $4000
 ; ---- every member: the fields made if missing, then converted when its mode is not the one in use
-mmp_sync_b: ld a, [MMP_TAB]                 ; (no wiki data: the option cannot be on)
+mmp_sync_b: ld a, [MMP_TAB]                 ; (no table: the option cannot be on)
             and a
             jr nz, .g
             ld [opt_mmp], a

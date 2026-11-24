@@ -530,8 +530,8 @@ one reaches parity, so the owner can keep playing).
      goes to the first living one), holding A in battle selects quickly (18 frames, then a press
      every 6);
    - Options: **Modern MP** (off by default; `src/mmp.s`, `tools/gbn/modern_mp.py`). Dawn of Souls
-     MP instead of charges. Data from the FINAL FANTASY wiki through its API when the build runs
-     (cached in `build/wiki/`, never committed; without it the option cannot be switched on):
+     MP instead of charges. Data taken once from the FINAL FANTASY wiki and kept in
+     `tools/gbn/modern_mp.py` (owner: in the repository, no downloads when building):
      spell costs ("Magic (Final Fantasy)", matched to spell ids by FF1's NES names), starting MP
      and strong levels ("Final Fantasy stats"), the rule ("Stat growth": floor(INT / 4) + 1 a
      level, +10-12 on a strong level or 1 in 8 otherwise; Knight / Ninja only after the class

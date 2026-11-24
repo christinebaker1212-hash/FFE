@@ -95,7 +95,7 @@ def snd_tables(rom):
 
 
 def mmp_source():
-    """the Modern MP table (tools/gbn/modern_mp.py: the wiki's Dawn of Souls data) at MMP_TAB"""
+    """the Modern MP table (tools/gbn/modern_mp.py: Dawn of Souls data kept there) at MMP_TAB"""
     import modern_mp
     t = modern_mp.tables()
     return 'section bank %d, $7F00\n' % modern_mp.MMP_BANK + ''.join(
