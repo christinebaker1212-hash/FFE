@@ -3287,25 +3287,25 @@ ng_mode:    xor a
             ld bc, $0000                    ; header (0,0,20,3)
             ld de, $1403
             call scr_win
-            ld bc, $0101
+            ld bc, $0501                    ; (centred: owner, 2026-11-25)
             ld hl, ngm_t
             ld e, 10
             call gold_str
             ld bc, $0003                    ; the styles (0,3,20,4)
             ld de, $1404
             call scr_win
-            ld bc, $0304
+            ld bc, $0704                    ; (centred on "Classic", the hand before them)
             ld hl, ngm_s0
             call scr_str
-            ld bc, $0305
+            ld bc, $0705
             ld hl, ngm_s1
             call scr_str
             call ngm_desc                   ; the description (0,7,20,11)
             call scr_show
-.l:         ld a, [ngm_cur]                 ; the hand at row 4 / 5, column 3
+.l:         ld a, [ngm_cur]                 ; the hand at row 4 / 5, column 7
             add a, 4
             ld c, a
-            ld b, 3
+            ld b, 7
             call cur_txt
             call scr_frame
             ldh a, [pad_new]
@@ -3332,12 +3332,15 @@ ng_mode:    xor a
             ld d, 20
             ld e, 7
             call scr_win
+            ld bc, $0306                    ; (each line centred)
+            ld hl, ngm_q0
+            call scr_str
             ld a, [ngm_cur]
             and a
             ld hl, ngm_qc
             jr z, .q
             ld hl, ngm_qm
-.q:         ld bc, $0106
+.q:         ld bc, $0307
             call scr_str
             ld bc, $0609
             ld hl, ngm_yes
@@ -3428,8 +3431,9 @@ ngm_s0:     db "Classic", 0
 ngm_s1:     db "Modern", 0
 ngm_yes:    db "Yes", 0
 ngm_no:     db "No", 0
-ngm_qc:     db "OK to begin in", $0A, "Classic style?", 0
-ngm_qm:     db "OK to begin in", $0A, "Modern style?", 0
+ngm_q0:     db "OK to begin in", 0
+ngm_qc:     db "Classic style?", 0
+ngm_qm:     db "Modern style?", 0
 ngm_dc:     db "The game's own", $0A, "rules: spells use", $0A, "charges, restored", $0A
             db "at Inns and with", $0A, "Cottages. No dash;", $0A, "targets stay put.", $0A
             db $0A, "Change any of this", $0A, "later in Config.", 0

@@ -941,3 +941,6 @@ one reaches parity, so the owner can keep playing).
 51. Owner (2026-11-25, last): "I picked A" (Classic / Modern, `docs/ff1-mode-menu-audit.md`): one Game Style screen
     with a live description of the highlighted style; checked on Color, DMG (Black / White windows) and SGB with the
     strict checker (0 findings, VRAM / OAM 0).
+52. Owner (2026-11-25, last): "Center the Game Style and prompts." The header, the two styles (the hand before them)
+    and each line of "OK to begin in / ... style?" centred; the description stays left-aligned. Then "Nintendo-ify the
+    Job selection and Job Picker screen": proposals in `docs/ff1-job-screens-proposals.md` (waiting for the owner).

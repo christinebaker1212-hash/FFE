@@ -1395,6 +1395,7 @@ Check wording, a strict Lot Check checker in SameBoy (SB_LCHK) and every fault i
 Color registers on DMG/SGB, palette / VRAM writes outside their windows, soft reset in fades, SGB reset border,
 opposite directions); "Battle Speed". Details: docs/gb-release-checks.md "Strict checker".
 Then (item 51): the Game Style screen (owner chose A): Classic / Modern with a live description.
+Then (item 52): Game Style centred; proposals for the party / job / name screens in docs/ff1-job-screens-proposals.md.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
