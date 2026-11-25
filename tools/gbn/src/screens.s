@@ -84,10 +84,8 @@ scr_open:   call fade_out                   ; (the screen before faded out)
             ld de, $9010
             ld bc, $07F0
             call far_copy
-            ld a, %11100100
-            call bgp_w
-            ld a, DMG_OBP_BLK               ; (the screens' black windows: ranks 1-3 white,
-            call obp0_w                     ;   light grey, dark grey)
+            call scr_dmgpal                 ; (black windows: sprite ranks 1-3 white, light
+                                            ;   grey, dark grey; or Options' White: loc.s)
             ld hl, U_CURDMG
 .cur:       ld de, $8000 + 16 * CUR_TILE    ; the hand cursor
             ld bc, 64

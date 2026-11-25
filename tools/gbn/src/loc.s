@@ -940,10 +940,20 @@ opt_redraw: call opt_mklist
             call opt_apply
             pop de
             ld a, e                         ; (a window colour / the gradient / LCD: at once)
-            cp 7
+            cp 14
+            jr nz, .w7
+            call scr_dmgpal
+            jr .nw
+.w7:        cp 7
             jr c, .nw
             cp 12
-            call c, opt_wnow
+            jr nc, .nw
+            ldh a, [is_cgb]
+            and a
+            jr z, .sw
+            call opt_wnow
+            jr .nw
+.sw:        call sgb_wlive
 .nw:        call opt_rows
             call scr_upd
             jr .l
@@ -3085,6 +3095,7 @@ opt_load:   ld a, 1
             ld [opt_retgt], a               ; (Off by default: owner)
             ld [opt_mmp], a
             ld [opt_ccm], a
+            ld [opt_dmgw], a
             call opt_wdef
             ld a, $0A
             ld [$0000], a
@@ -3096,6 +3107,8 @@ opt_load:   ld a, 1
             jr nz, .x
             ld a, [hl+]
             ld [opt_ver], a
+            cp $55                          ; ("OU": thirteen, the DMG's window shade)
+            jr z, .q
             cp $54
             jr z, .q
             cp $53
@@ -3168,7 +3181,12 @@ opt_load:   ld a, 1
             xor a
             ld [opt_nodash], a
             ld [opt_curr], a
-.qc:        ld a, [win_r]
+.qc:        ld a, [opt_dmgw]                ; (0 / 1)
+            cp 2
+            jr c, .qd
+            xor a
+            ld [opt_dmgw], a
+.qd:        ld a, [win_r]
             ld b, a
             ld a, [win_g]
             or b
@@ -3230,10 +3248,10 @@ opt_save:   ld a, $0A
             ld hl, OPT_RAM
             ld a, $4F
             ld [hl+], a
-            ld a, $54
+            ld a, $55
             ld [hl+], a
-            ld de, os_sv                    ; the twelve values, then the check ("OT")
-            ld b, 12
+            ld de, os_sv                    ; the thirteen values, then the check ("OU")
+            ld b, 13
             ld c, $5A
 .s:         push bc
             ld a, [de]
@@ -3403,7 +3421,7 @@ section wram, $DAFC
 ngm_cur:    ds 1
 ngm_yn:     ds 1
 
-section bank 99, $7390                      ; (Options: the list's helpers and tables)
+section bank 99, $52C0                      ; (Options: the list's helpers and tables)
 ; the list scrolled so the chosen setting shows (the rows drawn again when it moves)
 opt_scroll: ld a, [opt_top]
             ld b, a
@@ -3437,8 +3455,22 @@ opt_mklist: ld hl, opt_list
             ld c, 7
             ldh a, [is_cgb]
             and a
-            jr z, .k
-            ld a, 7
+            jr nz, .cg
+            ld a, [sgb_on]                  ; (owner's audit, 2026-11-25: the SGB's windows
+            and a                           ;   take the same three colours; the DMG a shade)
+            jr nz, .sg
+            ld a, 14
+            ld [hl+], a
+            inc c
+            jr .k
+.sg:        ld a, 7
+.s3:        ld [hl+], a
+            inc a
+            cp 10
+            jr c, .s3
+            ld c, 10
+            jr .k
+.cg:        ld a, 7
 .c:         ld [hl+], a
             inc a
             cp 11
@@ -3569,6 +3601,8 @@ opt_row:    push af
             jr z, .n2
             dec a
             jr z, .lcd
+            dec a
+            jr nz, .wnd
             ld hl, os_mul                   ; EXP / Gold: Normal, 2X .. 12X
             ld b, 6
             jr opt_ostr
@@ -3592,6 +3626,9 @@ opt_row:    push af
             call nf_a
             ld b, 2
             jp pen_num
+.wnd:       ld hl, os_wnd                   ; (the DMG's window shade)
+            ld b, 5
+            jr opt_ostr
 .lcd:       ld hl, os_lcd
             ld b, 13
 ; the C-th name of B letters in table HL
@@ -3612,13 +3649,14 @@ os_title:   db "Options", 0
 os_labels:  db "Message Speed", 0, "Text Speed", 0, "Volume", 0, "B Dash", 0, "Cursor", 0
             db "Auto Retarget", 0, "Modern MP", 0
             db "Window Red", 0, "Window Green", 0, "Window Blue", 0, "Gradient", 0, "LCD", 0
-            db "EXP", 0, "Gold", 0
+            db "EXP", 0, "Gold", 0, "Window", 0
 os_var:     dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, opt_retgt, opt_mmp, win_r, win_g, win_b, opt_nograd, opt_ccm
-            dw KN_EXP, KN_GOLD
-os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2, 3, 5, 5
+            dw KN_EXP, KN_GOLD, opt_dmgw
+os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2, 3, 5, 5, 2
 os_fmt:     db 18, 0, 12, 1, 18, 2, 16, 3, 11, 4, 16, 5, 16, 5, 17, 6, 17, 6, 17, 6, 16, 3, 6, 7
-            db 13, 8, 13, 8                 ; (the value's column, its format)
+            db 13, 8, 13, 8, 14, 9          ; (the value's column, its format)
 os_sv:      dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, win_r, win_g, win_b, opt_nograd, opt_retgt, opt_mmp, opt_ccm
+            dw opt_dmgw
                                             ; (the saved order: the older records' first nine)
 os_onoff:   db "Off", " On"
 os_lcd:     db "      Default", "GBC Corrected", "GBA Corrected"
@@ -3626,6 +3664,7 @@ os_spn:     db "   Slow", " Normal", "   Fast", " Faster", "Instant"
 os_dash:    db " On", "Off"
 os_cur:     db "Remember", "   Reset"
 os_mul:     db "Normal", "    2X", "    4X", "    8X", "   12X"
+os_wnd:     db "Black", "White"
 
 ; ---- the Konami Code on the Formation menu (owner, 2026-11-24): Up Up Down Down Left Right Left
 ; Right B A shows Options' LCD (Color) and EXP / Gold multipliers for this file (KN_MARK in the
@@ -3855,10 +3894,7 @@ sgb_pics:   ld a, [sgb_pn]
             cp 5
             ret nc
             call sgb_new
-            ld hl, SG_FIXED                 ; PAL01: the windows
-            ld a, $01
-            ld c, SGB_BANK
-            call sgb_pal
+            call alt_pal01                  ; PAL01: the windows (their colour), the gold labels
             call sgb_p23
             call sgb_attr
             jp sgb_end
@@ -3872,16 +3908,10 @@ sgb_p23:    ld hl, SG_FIXED + 16            ; PAL23: the party's two, darkest = 
             ld bc, 6
             ld a, SGB_BANK
             call far_copy
-            ld hl, SG_FIXED + 6
-            ld de, sgb_tmp + 6
-            ld bc, 2
-            ld a, SGB_BANK
-            call far_copy
-            ld hl, SG_FIXED + 6
+            ld de, sgb_tmp + 6              ; (darkest: the windows' inside)
+            call sgb_wc
             ld de, sgb_tmp + 12
-            ld bc, 2
-            ld a, SGB_BANK
-            call far_copy
+            call sgb_wc
             ld a, $09
             ld hl, sgb_tmp
             ld c, 0
@@ -3985,7 +4015,25 @@ alt_new:    ld a, 1                         ; (scr_open: a new screen; its glyph
             ld [alt_n], a
             ld [alt_g], a
             ld [sgb_pn], a
-            jp sgb_menu
+            ld a, F3_BANK
+            ld hl, sgb_menu9
+            jp bank_call
+; the screens' DMG shades: black windows (FF1's blue as black) or, Options' Window White, the
+; same inverted: dark text on white windows (owner's audit, 2026-11-25; not on the SGB)
+scr_dmgpal: ld a, [sgb_on]
+            and a
+            jr nz, .b
+            ld a, [opt_dmgw]
+            and a
+            jr z, .b
+            ld a, %00011011
+            call bgp_w
+            ld a, %11100100
+            jp obp0_w
+.b:         ld a, %11100100
+            call bgp_w
+            ld a, DMG_OBP_BLK
+            jp obp0_w
 
 section bank 99, $7B60
 ; ---- plain Game Boy / Super Game Boy: the Color shows labels in gold (attribute palette 3) and
@@ -4037,10 +4085,60 @@ alt_pal01:  ld hl, SG_FIXED                 ; PAL01: the windows, the gold label
             ld bc, 6
             ld a, SGB_BANK
             call far_copy
+            ld de, sgb_tmp + 6              ; (the windows' inside: Options' colour)
+            call sgb_wc
+            ld de, sgb_tmp + 12
+            call sgb_wc
             ld a, $01
             ld hl, sgb_tmp
             ld c, 0
             jp sgb_pal
+; [DE] = the windows' inside colour (Options: Window Red / Green / Blue, as the Color's), RGB555
+sgb_wc:     ld a, [win_g]
+            swap a
+            rlca
+            and $E0
+            ld b, a
+            ld a, [win_r]
+            or b
+            ld [de], a
+            inc de
+            ld a, [win_g]
+            rrca
+            rrca
+            rrca
+            and 3
+            ld b, a
+            ld a, [win_b]
+            add a, a
+            add a, a
+            or b
+            ld [de], a
+            ret
+; the menus' packets (scr_open): PAL01 with the windows' colour, the screen palette 0
+sgb_menu9:  ld a, [sgb_on]
+            and a
+            ret z
+            call sgb_new
+            call alt_pal01
+            ld hl, SG_ALL0
+            call sgb_put
+            jp sgb_end
+; Options on the SGB: a window colour changed: PAL01 again (no mask)
+sgb_wlive:  ld a, [sgb_on]
+            and a
+            ret z
+            ld a, [sgb_qi]
+            ld hl, sgb_qn
+            cp [hl]
+            jr c, .q
+            xor a
+            ld [sgb_qi], a
+            ld [hl], a
+.q:         ld a, [hl]
+            cp 5
+            ret nc
+            jp alt_pal01
 ; the screen's cells: gold / grey cells' glyphs to their ink copies; the gold area (alt_x0 ..)
 alt_pass:   ld a, [alt_ok]
             and a

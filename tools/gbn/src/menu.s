@@ -2575,6 +2575,7 @@ opt_retgt:  ds 1                            ; Options: 1 = Auto Retarget (a gone
                                             ;   goes to another; owner, 2026-11-24)
 opt_mmp:    ds 1                            ; Options: 1 = Modern MP (Dawn of Souls MP)
 opt_ccm:    ds 1                            ; Options (Color): LCD colours 0 Default, 1 GBC, 2 GBA
+opt_dmgw:   ds 1                            ; Options (plain Game Boy): windows 0 Black, 1 White
 win_pal:    ds 8                            ; CGB palette 7 (the windows) as chosen
 opt_ver:    ds 1
 tw_spd:     ds 1                            ; the typed text's speed (0-4: Slow .. Instant)
