@@ -858,3 +858,24 @@ one reaches parity, so the owner can keep playing).
    - RAM overlaps from this session's additions fixed (`tools/gbn/rammap.py`, new): the battle name
      window's flags on the shop's `sh_id`, the place-name buffer on the Suspend's and name entry's
      variables, the preset's last name on `crit_on`; the Options list holds 16 ids.
+46. Owner (2026-11-25, last): the DMG map shifting after talking, the shop hand over the icons, a blank first line
+   in the price question, 128X EXP stopping at level 2, spell descriptions for the magic shops.
+   - Plain Game Boy: while the dialogue box (or the place-name banner) showed, every line below it was one pixel
+     to the right (SameBoy; the Color unaffected). The box's window was cut below its last line by clearing LCDC
+     bit 5 in H-Blank. It is now hidden with WX = 167 and stays enabled until `box_vbl` switches it off in
+     V-Blank (stat_int `.hb`). Lines below the box and the banner match the map exactly on DMG, SGB and Color.
+   - Shop list: icon at column 2, name from 3, the hand in columns 0-1 (it covered the icons). A spell's level
+     moved from the row's end to the info window ('Level n' on the Own / Worn row, magic shops). Names there are
+     at most 16 letters (`sh_iname`, bank 99): 'Mythril Gauntlets', the one longer name sold, shows as
+     'Mythril Gauntlet' in the list and the count window.
+   - The price question ('30 Gil, see. / All right? / How about it?', after the inn's offer and every
+     purchase) began on the window's second row; now the first.
+   - EXP multipliers: FF1 levels a member at most once a battle, so 128X stopped at one level per fight. On a file
+     with a multiplier code (KN_MARK, EXP not Normal) `lv_all` (bank 104) repeats the level check while the
+     experience reaches the next level; the results record sums the HP gain (16-bit, `res_hph`) and ORs the stats
+     raised. A level-1 party reached level 17 in one battle at 128X (experience per battle stays capped at
+     65535, the reward's 16 bits). The stats raised take a row of their own in the results (all five fit).
+   - Spell descriptions: two proposals, all 64 spells each, in `docs/ff1-magic-descriptions.md` (the owner's
+     format and mine); waiting for the owner's choice. Found on the way: Shapera's data, as FF1's, raises the
+     enemies' evasion (a known FF1 bug); not changed.
+
