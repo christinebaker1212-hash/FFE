@@ -1548,8 +1548,9 @@ veh_oam:    ld a, [vehicle]
             call ob_step                    ;   at every step: owner, 2026-11-25)
             ld a, b
             ld [vh_x], a
-            ld a, c
-            ld [vh_y], a
+            ld a, c                         ; (FF1 Draw2x2Vehicle: on its tile, 3 lines below
+            add a, 3                        ;   the party on foot, as the ship sailing; owner,
+            ld [vh_y], a                    ;   2026-11-25: it jumped down when boarded)
             pop bc
             push de
             ld a, [map_bank]
@@ -1559,7 +1560,7 @@ veh_oam:    ld a, [vehicle]
 .od:        ld a, [vh_y]
             ld b, a
             call .ot
-            ld a, [vh_y]
+            ld a, b                         ; (.ot keeps B)
             add a, 8
             ld b, a
 .ot:        ld a, [vh_x]
