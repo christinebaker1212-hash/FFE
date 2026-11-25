@@ -240,3 +240,7 @@ recommended.
 Owner chose MM-A (with N1b, as sketched); done (`docs/ff1-native.md` item 50). Classic / Modern: no alternative
 chosen yet; its wording fixes M3 ("Cottages") and M4 ("Hold the B Button to dash.", a Lot Check item) are done,
 and "OPTIONS" became "Config" with the main menu's label.
+Then the owner chose Alternative A for Classic / Modern (2026-11-25): done (`ng_mode`, loc.s): a "Game Style" header,
+Classic / Modern, the highlighted style's description below (its rows pushed to VRAM in V-Blank at once, so the hand
+does not blink), "OK to begin in / Classic style?" Yes / No, B back to the title; the descriptions name every setting
+in Config's words (the Color's Modern text also the shaded windows). M5-M8 done with it.

@@ -938,3 +938,6 @@ one reaches parity, so the owner can keep playing).
       fixed: `docs/gb-release-checks.md` "Strict checker". Also: soft reset from every frame wait (fades), the four
       buttons let go before the restart, opposite directions filtered, the SGB border transfer with scroll 0.
     - "Battle Speed" on the title menu and in Config (the setting is FF1's battle message speed).
+51. Owner (2026-11-25, last): "I picked A" (Classic / Modern, `docs/ff1-mode-menu-audit.md`): one Game Style screen
+    with a live description of the highlighted style; checked on Color, DMG (Black / White windows) and SGB with the
+    strict checker (0 findings, VRAM / OAM 0).

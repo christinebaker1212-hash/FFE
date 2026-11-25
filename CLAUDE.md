@@ -1394,6 +1394,7 @@ Then (item 50): main menu MM-A (hand inside the command window, Order, START clo
 Check wording, a strict Lot Check checker in SameBoy (SB_LCHK) and every fault it found fixed (stray outline cells,
 Color registers on DMG/SGB, palette / VRAM writes outside their windows, soft reset in fades, SGB reset border,
 opposite directions); "Battle Speed". Details: docs/gb-release-checks.md "Strict checker".
+Then (item 51): the Game Style screen (owner chose A): Classic / Modern with a live description.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

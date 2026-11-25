@@ -3272,32 +3272,40 @@ opt_save:   ld a, $0A
             ld [$4000], a
             ret
 
-; ---- new game: CLASSIC or MODERN (owner, 2026-11-24). A choice, its description, Ok to start on
-; ...? Yes / No; the settings set (all can be changed in Options): Classic: the cursor reset, no B
-; dash, no gradient, charges (Modern MP off), no Auto Retarget; Modern: the cursor remembered, B
-; dash, the gradient, Modern MP, Auto Retarget. A = 0 chosen, 1 back (B on the choice)
+; ---- new game: Classic or Modern (owner, 2026-11-24; 2026-11-25: alternative A of
+; docs/ff1-mode-menu-audit.md): one screen: a "Game Style" header, the two styles, and below them
+; the highlighted style's description, changed as the cursor moves (as Nintendo's mode choices);
+; A: "OK to begin in ... style?" Yes / No (Yes first); B: back to the title. The settings set (all
+; can be changed in Config): Classic: the cursor reset, no B dash, no gradient, charges (Modern MP
+; off), no Auto Retarget; Modern: the cursor remembered, B dash, the gradient, Modern MP, Auto
+; Retarget. A = 0 chosen, 1 back (B on the choice)
 section bank 99, $6200
 ng_mode:    xor a
             ld [ngm_cur], a
 .re:        call scr_open
             call eqm_pal
-            ld b, 4
-            ld c, 6
-            ld d, 12
-            ld e, 6
+            ld bc, $0000                    ; header (0,0,20,3)
+            ld de, $1403
             call scr_win
-            ld bc, $0707
+            ld bc, $0101
+            ld hl, ngm_t
+            ld e, 10
+            call gold_str
+            ld bc, $0003                    ; the styles (0,3,20,4)
+            ld de, $1404
+            call scr_win
+            ld bc, $0304
             ld hl, ngm_s0
             call scr_str
-            ld bc, $0709
+            ld bc, $0305
             ld hl, ngm_s1
             call scr_str
+            call ngm_desc                   ; the description (0,7,20,11)
             call scr_show
-.l:         ld a, [ngm_cur]                 ; the hand at row 7 / 9, column 7
-            add a, a
-            add a, 7
+.l:         ld a, [ngm_cur]                 ; the hand at row 4 / 5, column 3
+            add a, 4
             ld c, a
-            ld b, 7
+            ld b, 3
             call cur_txt
             call scr_frame
             ldh a, [pad_new]
@@ -3312,29 +3320,12 @@ ng_mode:    xor a
             ld [ngm_cur], a
             ld a, SFX_SEL
             ld [sfx_req], a
+            call ngm_desc
+            call ngm_push
             jr .l
 .b:         ld a, 1
             ret
-.a:         call scr_open                   ; the description (16 rows)
-            call eqm_pal
-            ld bc, $0000
-            ld de, $1412
-            call scr_win
-            ld a, [ngm_cur]
-            and a
-            ld hl, ngm_dc
-            jr z, .d
-            ld hl, ngm_dm
-.d:         ld bc, $0101
-            call scr_str
-            call scr_show
-.w:         call scr_frame                  ; A: the question; B: the choice again
-            ldh a, [pad_new]
-            bit 1, a
-            jr nz, .re
-            and $09
-            jr z, .w
-            call scr_open                   ; Ok to start on ...? Yes / No (Yes first)
+.a:         call scr_open                   ; OK to begin in ... style? Yes / No (Yes first)
             call eqm_pal
             ld b, 0
             ld c, 5
@@ -3398,22 +3389,56 @@ ng_mode:    xor a
             call opt_save0
             xor a
             ret
-ngm_s0:     db "CLASSIC", 0
-ngm_s1:     db "MODERN", 0
+; the description window (0,7,20,11) with the highlighted style's text (into the map copy)
+ngm_desc:   ld bc, $0007
+            ld de, $140B
+            call scr_win
+            ld a, [ngm_cur]
+            and a
+            ld hl, ngm_dc
+            jr z, .d
+            ld hl, ngm_dm
+            ldh a, [is_cgb]                 ; (the Color: its shaded windows named too)
+            and a
+            jr z, .d
+            ld hl, ngm_dmc
+.d:         ld bc, $0108
+            jp scr_str
+; its rows 7-17 to VRAM now, each in a V-Blank's first lines with interrupts off (the screen's
+; own refresh would hide the hand while it runs: no blink on a cursor move)
+ngm_push:   ld a, 7
+.r:         push af
+.w:         ldh a, [rLY]
+            cp 144
+            jr c, .w
+            cp 150
+            jr nc, .w
+            pop af
+            push af
+            di
+            call sf_one
+            ei
+            pop af
+            inc a
+            cp 18
+            jr c, .r
+            ret
+ngm_t:      db "Game Style", 0
+ngm_s0:     db "Classic", 0
+ngm_s1:     db "Modern", 0
 ngm_yes:    db "Yes", 0
 ngm_no:     db "No", 0
-ngm_qc:     db "OK to start on", $0A, "CLASSIC?", 0
-ngm_qm:     db "OK to start on", $0A, "MODERN?", 0
-ngm_dc:     db "Classic offers", $0A, "gameplay true to", $0A, "the original.", $0A
-            db "Manage spell", $0A, "charges with Inns", $0A, "or Cottages, and", $0A
-            db "plan your battles", $0A, "carefully - the", $0A, "party will not", $0A
-            db "change their", $0A, "target after", $0A, "selection.", $0A, $0A
-            db "These settings can", $0A, "be changed at any", $0A, "time in Config.", 0
-ngm_dm:     db "Modern offers", $0A, "gameplay similar", $0A, "to more modern", $0A
-            db "Final Fantasy", $0A, "games. Hold the", $0A, "B Button to dash.", $0A
-            db "MP is shared by", $0A, "all spells, and", $0A, "the party will", $0A
-            db "change targets if", $0A, "the enemy is", $0A, "slain.", $0A, $0A
-            db "These settings can", $0A, "be changed at any", $0A, "time in Config.", 0
+ngm_qc:     db "OK to begin in", $0A, "Classic style?", 0
+ngm_qm:     db "OK to begin in", $0A, "Modern style?", 0
+ngm_dc:     db "The game's own", $0A, "rules: spells use", $0A, "charges, restored", $0A
+            db "at Inns and with", $0A, "Cottages. No dash;", $0A, "targets stay put.", $0A
+            db $0A, "Change any of this", $0A, "later in Config.", 0
+ngm_dm:     db "Spells share one", $0A, "MP pool. Hold the", $0A, "B Button to dash.", $0A
+            db "A fallen target is", $0A, "replaced; battle", $0A, "cursors are kept.", $0A
+            db $0A, "Change any of this", $0A, "later in Config.", 0
+ngm_dmc:    db "Spells share one", $0A, "MP pool. Hold the", $0A, "B Button to dash.", $0A
+            db "A fallen target is", $0A, "replaced; battle", $0A, "cursors are kept;", $0A
+            db "windows shaded.", $0A, "Change any of this", $0A, "later in Config.", 0
 
 section wram, $DAFC
 ngm_cur:    ds 1
