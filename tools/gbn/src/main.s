@@ -826,7 +826,7 @@ move:       ld a, [moving]
             and a
             jr z, .smr
             push bc
-            call ow_canmove
+            call ow_cmm
             pop bc
             ret c
             jr .ok
@@ -4348,3 +4348,18 @@ mr_menu:    ld a, 1
             ld [fd_in], a
             call map_reload
             jp fade_in
+
+section bank 0, $3E10                       ; (free space)
+; ow_canmove, then the vehicle's song when it changed (FF1: boarding / leaving the ship or the
+; canoe changes the music; owner, 2026-11-25: the overworld's never came back after the ship)
+ow_cmm:     ld a, [vehicle]
+            push af
+            call ow_canmove
+            pop hl                          ; (H = the vehicle before)
+            ret c
+            ld a, [vehicle]
+            cp h
+            ret z
+            call map_music
+            and a
+            ret
