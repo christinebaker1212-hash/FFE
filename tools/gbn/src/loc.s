@@ -1681,16 +1681,16 @@ bt_trans2:  ld a, [q_n]                     ; (the field's queue dropped)
             ld hl, fd_pal
             ld c, 0
 .rb:        ld a, c
-            ldh [rBCPS], a
-            ldh a, [rBCPD]
+            call bcps_w
+            call bcpd_r
             ld [hl+], a
             inc c
             bit 6, c
             jr z, .rb
             ld c, 0
 .ro:        ld a, c
-            ldh [$FF6A], a
-            ldh a, [$FF6B]
+            call ocps_w
+            call ocpd_r
             ld [hl+], a
             inc c
             bit 6, c
@@ -1790,20 +1790,11 @@ bt_trans2:  ld a, [q_n]                     ; (the field's queue dropped)
             ldh a, [is_cgb]
             and a
             jr z, .dw
-            ld a, $80
-            ldh [rBCPS], a
-            ldh [$FF6A], a
-            ld b, 32
-.wc:        ld a, $FF
-            ldh [rBCPD], a
-            ldh [$FF6B], a
-            ld a, $7F
-            ldh [rBCPD], a
-            ldh [$FF6B], a
-            dec b
-            jr nz, .wc
             ld a, 1                         ; (the battle's load and fade-in: white)
             ld [fd_wh], a
+            call fd_fill                    ; (white shown as a fade's colours: pal.s)
+            ld a, 3
+            ld [pal_dirty], a
             jr .wt
 .dw:        xor a
             ldh [rBGP], a
@@ -1996,33 +1987,6 @@ tr_prep:    ld a, [tr_k]                    ; HL = $4000 + 288 k
             dec b
             jr nz, .c
             ret
-; the frame's colours in the V-Blank (the strips: towards white)
-tr_pals:    ld a, [tr_f]
-            and a
-            ret z
-            ldh a, [is_cgb]
-            and a
-            jr z, .d
-            ld a, $80
-            ldh [rBCPS], a
-            ldh [$FF6A], a
-            ld hl, TR_PAL
-            ld b, 64
-.b:         ld a, [hl+]
-            ldh [rBCPD], a
-            dec b
-            jr nz, .b
-            ld b, 64
-.ob:        ld a, [hl+]
-            ldh [$FF6B], a
-            dec b
-            jr nz, .ob
-            ret
-.d:         ld a, [tr_f]                    ; DMG / SGB: the shades a step lighter per 2 levels
-            dec a
-            srl a
-            ld [fd_lv], a
-            jp fd_dmgw
 ; the noise's next period (FF1: from bx_n)
 tr_noise:   ld a, SND_BANK
             ld [fc_bank], a
@@ -3800,11 +3764,11 @@ opt_objp:   ld a, UI_GFX
             ld b, 32
             jp cc_inpl
 opt_objw:   ld a, $80
-            ldh [rOCPS], a
+            call ocps_w
             ld hl, scr_buf
             ld b, 32
 .o:         ld a, [hl+]
-            ldh [rOCPD], a
+            call ocpd_w
             dec b
             jr nz, .o
             ret

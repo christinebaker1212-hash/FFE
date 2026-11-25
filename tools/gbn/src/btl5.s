@@ -45,7 +45,7 @@ bt_pal5:    ld hl, pal5_tab                 ; (all 48 bytes corrected at once: H
             call cc_copy                    ; (the LCD colour mode: cc.s)
             ld b, 16
 .o:         ld a, [hl+]
-            ldh [rOCPD], a
+            call ocpd_w
             dec b
             jr nz, .o
             ld a, $80 | (4 * 8)             ; (BG 4 / 5: the party lines' yellow / red)
@@ -455,7 +455,7 @@ bub_init:   xor a
             ld [crit_on], a                 ; (no "CRITICAL!" left over)
             ret
 
-section bank 6, $7EB5                       ; (free space)
+section bank 6, $7EB6                       ; (free space)
 ; "CRITICAL!" a line under what it would cover (owner, 2026-11-25): a member's hit: its hit count
 ; (at the head); a member hit: the damage number (left of the sprite, bouncing upwards)
 crit_y:     ld a, [df_player]

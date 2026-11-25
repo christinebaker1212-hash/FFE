@@ -1160,17 +1160,17 @@ mn_pal:     ldh a, [is_cgb]
             ld a, [mn_c1]
             call mn_rgb
             ld a, $82
-            ldh [rOCPS], a
+            call ocps_w
             ld a, e
-            ldh [rOCPD], a
+            call ocpd_w
             ld a, d
-            ldh [rOCPD], a
+            call ocpd_w
             ld a, [mn_c2]
             call mn_rgb
             ld a, e
-            ldh [rOCPD], a
+            call ocpd_w
             ld a, d
-            ldh [rOCPD], a
+            call ocpd_w
             ret
 .dmg:       ld a, [mn_c1]                   ; OBP0: colours 1 / 2 as shades
             call mn_shade
@@ -1355,12 +1355,12 @@ pz_pal_set: ldh a, [is_cgb]
             and a
             jr z, .dmg
             ld a, $82
-            ldh [rOCPS], a
+            call ocps_w
             ld hl, pz_rgb
             ld b, 6
             call cc_copy                    ; (the LCD colour mode: cc.s)
 .w:         ld a, [hl+]
-            ldh [rOCPD], a
+            call ocpd_w
             dec b
             jr nz, .w
             ret

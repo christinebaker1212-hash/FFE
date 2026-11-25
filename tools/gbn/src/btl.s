@@ -698,29 +698,22 @@ bt_pal:     ldh a, [is_cgb]
             ld bc, 32
             call far_copy
             ld a, $80
-            ldh [rOCPS], a
+            call ocps_w
             ld hl, scr_buf
             ld b, 32
             call cc_copy                    ; (the LCD colour mode: cc.s)
 .o:         ld a, [hl+]
-            ldh [rOCPD], a
+            call ocpd_w
             dec b
             jr nz, .o
-            xor a                           ; OBJ palette 4 (the damage numbers): 1 white,
-            ldh [rOCPD], a                  ;   3 black (the outline)
-            ldh [rOCPD], a
-            ld a, $FF
-            ldh [rOCPD], a
-            ld a, $7F
-            ldh [rOCPD], a
-            ld a, $FF
-            ldh [rOCPD], a
-            ld a, $7F
-            ldh [rOCPD], a
-            xor a
-            ldh [rOCPD], a
-            ldh [rOCPD], a
+            ld hl, .p4d                     ; OBJ palette 4 (the damage numbers): 1 white,
+            ld b, 8                         ;   3 black (the outline)
+.q4:        ld a, [hl+]
+            call ocpd_w
+            dec b
+            jr nz, .q4
             jp bt_pal5                      ; (OBJ 5, BG 6 / 7: btl5.s)
+.p4d:       db $00, $00, $FF, $7F, $FF, $7F, $00, $00
 .bp:        ld l, a                         ; battle palette A (4 NES colours) as RGB555
             ld h, 0
             add hl, hl
@@ -749,7 +742,7 @@ bt_pal:     ldh a, [is_cgb]
             jr nz, .c
             ret
 .p4:        ld b, 4
-.q:         ld a, [hl+]
+.q:          ld a, [hl+]
             push hl
             push bc
             call nes_rgb

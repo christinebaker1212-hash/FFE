@@ -299,20 +299,20 @@ fl_fiend6:  ldh a, [is_cgb]
 .ph:        push bc
             call wait_vbl
             ld a, $88
-            ldh [rBCPS], a
+            call bcps_w
             pop bc
             push bc
             bit 0, b
             jr nz, .back
             ld c, 2                         ; white (colour 0 kept black)
 .wp:        xor a
-            ldh [rBCPD], a
-            ldh [rBCPD], a
+            call bcpd_w
+            call bcpd_w
             ld b, 3
 .wc:        ld a, $FF
-            ldh [rBCPD], a
+            call bcpd_w
             ld a, $7F
-            ldh [rBCPD], a
+            call bcpd_w
             dec b
             jr nz, .wc
             dec c
@@ -321,7 +321,7 @@ fl_fiend6:  ldh a, [is_cgb]
 .back:      ld hl, fl_tb
             ld b, 16
 .bc:        ld a, [hl+]
-            ldh [rBCPD], a
+            call bcpd_w
             dec b
             jr nz, .bc
 .hold:      ld b, 3
@@ -396,19 +396,19 @@ pr_wset:    ld hl, pr_rgb + 8
             ld hl, pr_rgb
             call pr_mix
             ld a, $80 | 16
-            ldh [rBCPS], a
+            call bcps_w
             ld e, 3
             call .wr
             pop hl
             ld a, l
-            ldh [rBCPD], a
+            call bcpd_w
             ld a, h
-            ldh [rBCPD], a
+            call bcpd_w
             ld e, 8
 .wr:        ld a, c
-            ldh [rBCPD], a
+            call bcpd_w
             ld a, b
-            ldh [rBCPD], a
+            call bcpd_w
             dec e
             jr nz, .wr
             ret

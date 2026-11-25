@@ -249,7 +249,8 @@ start:      di
             jr z, .nsr
             call map_reload
             jp main
-.nsr:
+.nsr:       call ng_out                     ; (a new game: the party screen fades out with
+                                            ;   its music, the world fades in: pal.s)
             ld a, [unsram + $10]            ; (new game or continue: the save page's
             add a, 7                        ;   overworld position, + 7)
             ld d, a
@@ -287,9 +288,11 @@ start:      di
             ld [inroom], a
             call room_redraw
 .nr:
+            call ng_in                      ; (a new game: the world fades in, pal.s)
             ld a, START_DLG                 ; (test builds: a dialogue first, build.py --dlg)
             cp $FF
             call nz, dlg_open
+            call t_shop                     ; (test builds: a shop first, build.py --shop)
             ld a, START_BATTLE              ; (test builds: a battle first)
             cp $FF
             jr z, .nb
@@ -353,6 +356,7 @@ vblank:     push af
             ldh a, [pal_req]
             and a
             call nz, bg_pal
+            call pal_up                     ; (the palette shadows, when changed: pal.s)
             call box_vbl
             call pt_tick
             call gr_vbl                     ; (the windows' gradient: text.s)
@@ -527,12 +531,12 @@ load_map:   push af
             call cgb_pal32
             call text_pals                  ; (the boxes' palette 7: win_pal as it is now)
             ld a, $80                       ; OBJ palettes 0-3 (NES sprite palettes)
-            ldh [rOCPS], a
+            call ocps_w
             ld hl, M_OBJ
             ld b, 32
             call cc_copy                    ; (the LCD colour mode: cc.s)
 .op:        ld a, [hl+]
-            ldh [rOCPD], a
+            call ocpd_w
             dec b
             jr nz, .op
             ld a, F3_BANK                   ; (OBJ 4-7: their darker copies, the reflection's)
@@ -2174,26 +2178,9 @@ fade_out:   call lcd_get
 .go:        ldh a, [is_cgb]
             and a
             jr z, .dmg
-            call fd_vbl                     ; the palettes read in a V-Blank
-            ld a, $80
-            ldh [rBCPS], a
-            ld hl, fd_pal
-            ld c, 0
-.rb:        ld a, c
-            ldh [rBCPS], a
-            ldh a, [rBCPD]
-            ld [hl+], a
-            inc c
-            bit 6, c
-            jr z, .rb
-            ld c, 0
-.ro:        ld a, c
-            ldh [$FF6A], a
-            ldh a, [$FF6B]
-            ld [hl+], a
-            inc c
-            bit 6, c
-            jr z, .ro
+            ld a, F3_BANK                   ; the colours from the shadows (never read
+            ld hl, fd_get                   ;   back: the gradient's line colours were)
+            call bank_call
             ld a, 3
 .l:         ld [fd_lv], a
             call fd_step
@@ -2213,6 +2200,7 @@ fade_out:   call lcd_get
             call fd_dmgw
             call wait_vbl
             call wait_vbl
+            call fd_xw                      ; (a slow fade: its extra frames, pal.s)
             ld a, [fd_lv]
             inc a
             cp 4
@@ -2231,6 +2219,9 @@ fade_in:    ld a, [fd_in]
             ldh a, [is_cgb]
             and a
             jr z, .dmg
+            ld a, F3_BANK                   ; (the new screen's colours: the shadows)
+            ld hl, fd_get
+            call bank_call
             ld a, 1
 .l:         ld [fd_lv], a
             call fd_step
@@ -2238,6 +2229,9 @@ fade_in:    ld a, [fd_in]
             inc a
             cp 5
             jr c, .l
+            ld a, F3_BANK                   ; (the shadows themselves again)
+            ld hl, fd_done
+            call bank_call
             xor a                           ; (a white fade-in once only)
             ld [fd_wh], a
             ld [fd_act], a
@@ -2247,6 +2241,7 @@ fade_in:    ld a, [fd_in]
             call fd_dmgw
             call wait_vbl
             call wait_vbl
+            call fd_xw                      ; (a slow fade: its extra frames, pal.s)
             ld a, [fd_lv]
             dec a
             cp $FF
@@ -2255,25 +2250,15 @@ fade_in:    ld a, [fd_in]
             ld [fd_act], a
             ret
 ; CGB: fd_pal at fd_lv / 4 to the palettes (two frames)
-fd_step:    call fd_scale
+fd_step:    call fd_scale                   ; (fd_tmp, shown by the V-Blank: pal.s)
             call gr_fdramp                  ; (the windows' gradient too: loc.s)
-            call fd_vbl
-            ld a, $80
-            ldh [rBCPS], a
-            ld hl, fd_tmp
-            ld b, 64
-.b:         ld a, [hl+]
-            ldh [rBCPD], a
-            dec b
-            jr nz, .b
-            ld a, $80
-            ldh [$FF6A], a
-            ld b, 64
-.o:         ld a, [hl+]
-            ldh [$FF6B], a
-            dec b
-            jr nz, .o
-            jp wait_vbl
+            ld a, 1
+            ld [pal_fd], a
+            ld a, 3
+            ld [pal_dirty], a
+            call wait_vbl
+            call wait_vbl
+            jp fd_xw                        ; (a slow fade: its extra frames, pal.s)
 ; a V-Blank with room for the palette work (LY 144-147)
 fd_vbl:     jp fd_vb2                       ; (screens.s: a late handler never stops it)
             ds 11
@@ -2349,6 +2334,7 @@ fd_mul:     push bc
             jr .m
 .x:         srl a
             srl a
+            call fd_fin                     ; (a fine fade: 8 levels, pal.s)
             pop bc
             ret
 ; DMG / SGB: the shades lightened by fd_lv
@@ -2368,7 +2354,7 @@ fd_mulw:    push de
             ld d, a
             ld a, [fd_lv]
             ld b, a
-            ld a, 4
+            call fd_4                       ; (4 levels; a fine fade 8)
             sub b
             ld b, a
             xor a
@@ -2379,6 +2365,7 @@ fd_mulw:    push de
             jr .m
 .x:         srl a
             srl a
+            call fd_fin
             add a, c
             pop de
             pop bc
@@ -2546,17 +2533,17 @@ party_spr:  ld a, [ch_stats]
             ld b, 4
             call cc_inpl
             ld a, $84
-            ldh [rOCPS], a
+            call ocps_w
             ld a, [scr_buf]
-            ldh [rOCPD], a
+            call ocpd_w
             ld a, [scr_buf + 1]
-            ldh [rOCPD], a
+            call ocpd_w
             ld a, $8C
-            ldh [rOCPS], a
+            call ocps_w
             ld a, [scr_buf + 2]
-            ldh [rOCPD], a
+            call ocpd_w
             ld a, [scr_buf + 3]
-            ldh [rOCPD], a
+            call ocpd_w
             ret
 .dmg:       ld a, [ps_cls]
             add a, a
@@ -2692,19 +2679,6 @@ ow_poison:  xor a
 
 ; ---- sound: the music engine's song data reader (bank 0: maps the data bank, then back to
 ; the sound bank; safe in the V-Blank handler: no shared variables)
-mrd:        push hl
-            ld a, h
-            sub $40
-            ld h, a
-            ld a, MUS_DATA
-            ld [MBC_BANK], a
-            ld a, [hl]
-            push af
-            ld a, SND_BANK
-            ld [MBC_BANK], a
-            pop af
-            pop hl
-            ret
 ; A = a music track (FF1's numbers)
 snd_track:  ld [NES_RAM + $4B], a
             ld [mus_cur], a                 ; (the song asked for last: FF1 sets $4B to 0 once
@@ -3450,77 +3424,11 @@ lcd_off:    call gr_off                     ; (the windows' gradient off, its wi
             ldh a, [is_cgb]
             and a
             jr z, .nc
-            ld a, [fd_saved]                ; (after a fade: the colours it kept; the
-            and a                           ;   sprites' back, the BG ones black already)
-            jr z, .nf
-            xor a
-            ld [fd_saved], a
-            push de
-            ld hl, fd_pal
-            ld de, sh_pal
-            ld b, 64
-.fc:        ld a, [hl+]
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .fc
-            pop de
-            ld a, $80
-            ldh [$FF6A], a
-            ld b, 64
-.fo:        ld a, [hl+]
-            ldh [$FF6B], a
-            dec b
-            jr nz, .fo
-            jr .nc
-.nf:        ld hl, sh_pal                   ; CGB: the BG palettes read back, then black
-            ld c, 0
-.rd:
-            ld a, c
+            xor a                           ; (the shadows are the screen's colours:
+            ld [fd_saved], a                ;   nothing read back from the screen; black,
+            ld a, $80                       ;   white after the encounter transition)
             ldh [rBCPS], a
-            ldh a, [rBCPD]
-            ld [hl+], a
-            inc c
-            ld a, c
-            ldh [rBCPS], a
-            ldh a, [rBCPD]
-            ld [hl+], a
-            inc c
-            ld a, c
-            ldh [rBCPS], a
-            ldh a, [rBCPD]
-            ld [hl+], a
-            inc c
-            ld a, c
-            ldh [rBCPS], a
-            ldh a, [rBCPD]
-            ld [hl+], a
-            inc c
-            ld a, c
-            ldh [rBCPS], a
-            ldh a, [rBCPD]
-            ld [hl+], a
-            inc c
-            ld a, c
-            ldh [rBCPS], a
-            ldh a, [rBCPD]
-            ld [hl+], a
-            inc c
-            ld a, c
-            ldh [rBCPS], a
-            ldh a, [rBCPD]
-            ld [hl+], a
-            inc c
-            ld a, c
-            ldh [rBCPS], a
-            ldh a, [rBCPD]
-            ld [hl+], a
-            inc c
-            bit 6, c
-            jr z, .rd
-            ld a, $80
-            ldh [rBCPS], a
-            ld a, [fd_wh]                   ; (after the encounter transition: white)
+            ld a, [fd_wh]
             and a
             jr nz, .bw
             ld b, 8
@@ -3569,6 +3477,9 @@ lcd_on:     push af
             ld a, [fd_in]                   ; (a fade-in to come: white / black first)
             and a
             call nz, fd_on_off
+            ldh a, [is_cgb]                 ; (the LCD off: the shadows up before it goes on)
+            and a
+            call nz, pal_on
             pop af
             ldh [rLCDC], a
             ret
@@ -3582,19 +3493,7 @@ lcd_on:     push af
             ldh a, [is_cgb]
             and a
             jr z, .d
-            ld a, [fd_in]                   ; (a fade-in to come: black first)
-            and a
-            jr z, .pp
-            call fd_on_cgb
-            jr .d
-.pp:        ld a, $80
-            ldh [rBCPS], a
-            ld hl, sh_pal
-            ld b, 64
-.p:         ld a, [hl+]
-            ldh [rBCPD], a
-            dec b
-            jr nz, .p
+            call pal_on                     ; (the shadows; black / white for a fade-in)
 .d:         ldh a, [scx]                    ; (the new screen's scroll, from its first frame)
             ldh [rSCX], a
             ldh a, [scy]
@@ -3663,41 +3562,43 @@ obp0_w:     push af
 .m:         pop af
             ld [sh_obp0], a
             ret
-bcps_w:     push af
-            ld a, [lmask]
-            and a
-            jr nz, .m
-            pop af
-            ldh [rBCPS], a
+; the palette shadows (pal.s in F3_BANK has the rest): A = the index as BCPS / OCPS
+; (bit 7: auto-increment); writes keep A and the flags, as the ldh they replace
+bcps_w:     ld [sh_ps], a
             ret
-.m:         pop af
-            ld [sh_ps], a
+ocps_w:     ld [sh_po], a
             ret
-bcpd_w:     push af                         ; (masked: the flags not kept)
-            ld a, [lmask]
-            and a
-            jr nz, .m
-            pop af
-            ldh [rBCPD], a
-            ret
-.m:         pop af
-            push hl
+ocpd_w:     push hl
             push bc
-            ld c, a
-            ld a, [sh_ps]
+            ld hl, sh_po
+            ld c, low(pal_ob)
+            jr pd_w
+bcpd_w:     push hl
+            push bc
+            ld hl, sh_ps
+            ld c, low(sh_pal)
+pd_w:       push af
             ld b, a
+            ld a, [hl]
+            push af
+            bit 7, a
+            jr z, .n
+            inc a
+            and $BF
+            ld [hl], a
+.n:         pop af
             and $3F
-            add a, low(sh_pal)
+            add a, c
             ld l, a
             ld h, high(sh_pal)
-            ld [hl], c
-            bit 7, b
-            jr z, .s
-            inc b
-            res 6, b
-            ld a, b
-            ld [sh_ps], a
-.s:         ld a, c
+            ld [hl], b
+            ld a, c                         ; dirty: BG ($80) bit 1, OBJ ($40) bit 0
+            rlca
+            rlca
+            ld hl, pal_dirty
+            or [hl]
+            ld [hl], a
+            pop af
             pop bc
             pop hl
             ret
@@ -4105,25 +4006,14 @@ pad_opp:    ld c, a
 
 section bank 0, $00C1                       ; (free space before the header)
 cgb_pal32:  ld b, 32                        ; HL = 32 bytes of BG palettes 0-3 (A = BCPS)
-pal_blk:    push af                         ; B bytes (a masked load: into the shadow)
+pal_blk:    push af                         ; B bytes from HL to the BG shadow (A = BCPS)
             call cc_copy                    ; (the LCD colour mode: cc.s)
-            ld a, [lmask]
-            and a
-            jr nz, .m
-            call pal_win
             pop af
-            ldh [rBCPS], a
-.p:         ld a, [hl+]
-            ldh [rBCPD], a
-            dec b
-            jr nz, .p
-            ret
-.m:         pop af
             call bcps_w
-.q:         ld a, [hl+]
+.p:         ld a, [hl+]
             call bcpd_w
             dec b
-            jr nz, .q
+            jr nz, .p
             ret
 
 section bank 0, $1F15                       ; (free space)
@@ -4299,3 +4189,131 @@ row_put:    ld b, a
             ret
 .s:         ld a, b
             jp row_safe
+
+section bank 0, $3E65                       ; (free space)
+; test builds (build.py --shop N): shop N first (after a second on the map), then the map again
+t_shop:     ld a, START_SHOP
+            cp $FF
+            ret z
+            ld a, F3_BANK
+            ld hl, t_shop2
+            jp bank_call
+
+section bank 99, $4F00                      ; (free space)
+t_shop2:    ld b, 60
+.w:         push bc
+            call wait_vbl
+            pop bc
+            dec b
+            jr nz, .w
+            ld a, START_SHOP
+            ld [shop_arg], a
+            ld hl, shop_main
+            call pc_menu
+            jp map_reload
+
+section wram, $D940
+pal_ob:     ds 64                           ; the Color's OBJ palettes (BG: sh_pal)
+section wram, $D9EF
+pal_dirty:  ds 1                            ; bit 1 BG, bit 0 OBJ changed: up in the V-Blank
+pal_fd:     ds 1                            ; a fade / transition shows fd_tmp
+sh_po:      ds 1                            ; the OBJ shadow's index (as OCPS)
+ng_new:     ds 1                            ; a new game: its fade into the world (pal.s)
+fd_slow:    ds 1                            ; a slow fade: extra frames a step
+fd_vol:     ds 1                            ; ... the music's master volume going down with it
+fd_fine:    ds 1                            ; a fine fade: 8 levels (fd_lv 0-8) instead of 4
+
+section bank 0, $0000                       ; (the RST vectors' room: no RST is used)
+; V-Blank: the changed palettes up (pal.s), not during a masked load (lcd_on shows them)
+pal_up:     ld a, [pal_dirty]
+            and a
+            ret z
+            ld a, [lmask]
+            and a
+            ret nz
+            ld a, F3_BANK
+            ld hl, pal_put
+            jp bank_call
+; LCD on: every palette up now (black / white when a fade-in follows)
+pal_on:     ld a, F3_BANK
+            ld hl, pal_on9
+            jp bank_call
+; a slow fade's extra frames (fd_slow) after each step
+fd_xw:      ld a, [fd_slow]
+            and a
+            ret z
+            ld a, F3_BANK
+            ld hl, fd_xw9
+            jp bank_call
+
+section bank 0, $00E6                       ; (free space)
+; A = the shadow's colour byte at the index (as reading BCPD / OCPD)
+ocpd_r:     push hl
+            ld a, [sh_po]
+            ld l, low(pal_ob)
+            jr pd_r
+bcpd_r:     push hl
+            ld a, [sh_ps]
+            ld l, low(sh_pal)
+pd_r:       and $3F
+            add a, l
+            ld l, a
+            ld h, high(sh_pal)
+            ld a, [hl]
+            pop hl
+            ret
+
+section bank 0, $17E4                       ; (free space)
+; a new game (ng_new): the party screen out, the world in, slowly (pal.s)
+ng_out:     ld a, [ng_new]
+            and a
+            ret z
+            ld a, F3_BANK
+            ld hl, ng_out9
+            jp bank_call
+ng_in:      ld a, [ng_new]
+            and a
+            ret z
+            ld a, F3_BANK
+            ld hl, ng_in9
+            jp bank_call
+
+section bank 0, $1798                       ; (free space)
+; a fine fade (fd_fine): the level product / 8 instead of / 4 (A = it / 4 already)
+fd_fin:     push af
+            ld a, [fd_fine]
+            and a
+            jr z, .n
+            pop af
+            srl a
+            ret
+.n:         pop af
+            ret
+fd_4:       ld a, [fd_fine]
+            and a
+            ld a, 4
+            ret z
+            ld a, 8
+            ret
+
+section bank 0, $3DF0                       ; (free space)
+; the music's NES address HL (FF1 bank 13 at $8000-$BFFF) -> A, the song bank mapped meanwhile.
+; NES $C000+ is no song data: $FF, as the open bus (a stray score pointer read disabled cart
+; RAM there: Lot Check checker)
+mrd:        ld a, h
+            cp $C0
+            ld a, $FF
+            ret nc
+            push hl
+            ld a, h
+            sub $40
+            ld h, a
+            ld a, MUS_DATA
+            ld [MBC_BANK], a
+            ld a, [hl]
+            push af
+            ld a, SND_BANK
+            ld [MBC_BANK], a
+            pop af
+            pop hl
+            ret

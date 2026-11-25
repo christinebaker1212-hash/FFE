@@ -69,12 +69,12 @@ scr_open:   call fade_out                   ; (the screen before faded out)
             ld bc, 32
             call far_copy
             ld a, $80
-            ldh [rOCPS], a
+            call ocps_w
             ld hl, scr_buf
             ld b, 32
             call cc_copy                    ; (the LCD colour mode: cc.s)
 .op:        ld a, [hl+]
-            ldh [rOCPD], a
+            call ocpd_w
             dec b
             jr nz, .op
             ld hl, U_CURCGB
@@ -662,6 +662,8 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             ld hl, pg_main
             call bank_call
             call ng_stats
+            ld a, 1                         ; (main.s: the fade into the world, pal.s)
+            ld [ng_new], a
             ret
 .rate:      ld a, [respond]                 ; the rate's digit after Battle Speed (column 16:
             add a, FONT_D0 + 1              ;   one column clear of the frame on each side)
@@ -1541,11 +1543,11 @@ pr_cgbstep: ld hl, pr_rgb
             ld c, e
             call pal_win                    ; (in a V-Blank: Lot Check checker)
             ld a, $80 | 38
-            ldh [rBCPS], a
+            call bcps_w
             ld a, c
-            ldh [rBCPD], a
+            call bcpd_w
             ld a, b
-            ldh [rBCPD], a
+            call bcpd_w
             ret
 ; RGB555 at HL -> A = R, D = G, E = B
 pr_split:   ld a, [hl+]

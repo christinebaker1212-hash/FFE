@@ -336,6 +336,32 @@ def town_water(rom):
         blob[0x400 + 2 * m:0x402 + 2 * m] = vram(d).to_bytes(2, 'little')
         blob[0x800 + 0x400 * m:0xC00 + 0x400 * m] = shifts(p['dmg_tiles'][16 * d:16 * d + 16])
     return bytes(blob)
+def refl_source(rom):
+    """the reflection's water (owner, 2026-11-25: the reflection should slip into the shore):
+    per overworld metatile one byte, a bit per 8 x 8 quarter drawn with open water (bit 0 UL,
+    1 UR, 2 DL, 3 DR): a quarter whose tile is one of the open sea's or the river's tiles (the
+    commonest sea and river metatiles of the map, as water_anim). Coasts drawn half in water
+    count by their quarters, whatever their walking property says. src/refl.s refl_clip."""
+    o = data.ow_pack(rom)
+    prop, tsa = o['prop'], o['tsa']
+    freq = {}
+    for r_ in o['rows']:
+        for v in r_: freq[v & 0x7F] = freq.get(v & 0x7F, 0) + 1
+    def kind(mt):
+        d = prop[2 * mt]
+        if not d & 1 or (d & 6) == 6: return None
+        return 'sea' if not d & 4 else 'river'
+    water = set()
+    for want in ('sea', 'river'):
+        cand = [mt for mt in range(128) if kind(mt) == want]
+        if cand:
+            mt = max(cand, key=lambda m: freq.get(m, 0))
+            water |= {tsa[128 * k + mt] for k in range(4)}
+    tab = [sum(1 << k for k in range(4) if tsa[128 * k + mt] in water) for mt in range(128)]
+    return ('section bank 111, $7F00\nREFL_WTAB:\n' +
+            ''.join('            db %s\n' % ', '.join('$%02X' % v for v in tab[i:i + 16]) for i in range(0, 128, 16)))
+
+
 def water_anim(o):
     """the animated sea and rivers (owner's list, 2026-11-24; FF1 has none): the commonest open
     sea metatile and river metatile of the overworld. Motion as Final Fantasy Legend III's water
@@ -480,7 +506,8 @@ def main():
            'STORY_FIRST = %d\nSTORY_END = %d\nSTORY_CRED = %d\n' % (ui.story_pages(rom)[1], len(ui.story_pages(rom)[0]), ui.CREDIT_PAGES) +
            'ENC_OW = %s\n' % (a[a.index('--enc') + 1] if '--enc' in a else '10') +
            'START_BATTLE = %s\n' % (a[a.index('--battle') + 1] if '--battle' in a else '$FF') +
-           'START_DLG = %s\n' % (a[a.index('--dlg') + 1] if '--dlg' in a else '$FF') + talk_defs(rom) + item_defs(rom) + magic_defs(rom) +
+           'START_DLG = %s\n' % (a[a.index('--dlg') + 1] if '--dlg' in a else '$FF') +
+           'START_SHOP = %s\n' % (a[a.index('--shop') + 1] if '--shop' in a else '$FF') + talk_defs(rom) + item_defs(rom) + magic_defs(rom) +
            open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'objects.s')).read() + '\n' +
@@ -490,6 +517,7 @@ def main():
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'shop.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'ul.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'pal.s')).read() + '\n' + refl_source(rom) + '\n' +
            open(os.path.join(HERE, 'src', 'btl.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl2.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl3.s')).read() + '\n' +

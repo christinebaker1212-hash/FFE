@@ -305,9 +305,8 @@ bt_vpal:    ld [bt_vc], a
             ld a, c
             sub $20
 .k2:        ld [hl], a
-            call wait_vbl
-            ld a, $80 | (2 * 8 + 2)
-            ldh [rOCPS], a
+            ld a, $80 | (2 * 8 + 2)         ; (to the shadow: up in the next V-Blank, pal.s)
+            call ocps_w
             ld hl, scr_buf
             ld b, 3
 .c:         ld a, [hl+]
@@ -315,9 +314,9 @@ bt_vpal:    ld [bt_vc], a
             push bc
             call nes_rgb                     ; DE = RGB555
             ld a, e
-            ldh [rOCPD], a
+            call ocpd_w
             ld a, d
-            ldh [rOCPD], a
+            call ocpd_w
             pop bc
             pop hl
             dec b

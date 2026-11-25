@@ -68,7 +68,9 @@ ap_tick:    ldh a, [maptype]                ; (the overworld only: maptype 1)
             ret nz
             jp ap_row5
 ; off now (a menu opens): V-Blank puts the display back
-ap_stop:    call sgb_amb0                   ; (menus: the SGB ambience off too: sgbx.s)
+ap_stop:    push hl                         ; (HL kept: pc_menu's routine. The SGB packet
+            call sgb_amb0                   ;   clobbered it, and opening a shop or the menu
+            pop hl                          ;   with the ambience on jumped into RAM: crash)
             ld a, [ap_on]
             and a
             ret z
