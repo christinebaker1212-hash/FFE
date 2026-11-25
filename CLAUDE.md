@@ -1403,6 +1403,7 @@ softlock), the V-Blank handler's VRAM bank, fade waits; all 128 formations fough
 Then (item 55): new game fades into the world (music with it); parked vehicles fixed; one palette logic (src/pal.s: shadows,
 V-Blank upload, fades never read the screen: blown-out borders); reflections fade and clip to drawn water; Config pages
 (proposals: docs/ff1-options-proposals.md); SGB shop / menu crash fixed. Strict checker 0 on all systems.
+Then (item 56): main menu: the parked command hand in place, no fade backing out of the member choice, pictures centred.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

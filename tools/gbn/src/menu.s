@@ -273,7 +273,7 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
 .n0:        cp 1
             jr nz, .n1
 .mp:        call pick_char                  ; magic: whose (not dead / stone: FF1's error
-            jr c, .re                       ;   sound)
+            jr c, .l                        ;   sound; B: the commands again, no fade)
             push af
             call ch_rec
             inc hl
@@ -312,7 +312,7 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             cp 3
             jr z, .st
             call pick_char                  ; Equip: whose (the equipment screen)
-            jr c, .re
+            jr c, .l
             call eqm_main
             jp .re
 .ord:       call lineup
@@ -321,7 +321,7 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             jp .re
 .st:
             call pick_char                  ; status: whose
-            jr c, .re
+            jr c, .l                        ; (B: the commands again, no fade)
             call status_scr
             jr .re
 
@@ -414,9 +414,9 @@ mm_mem3:    ld [mm_t], a
             add a, a
             add a, 8
             ld c, a
-            ld b, 7                         ; (1 pixel clear of the text at column 3: the
-                                            ;   HP / max ends at column 9, clear of the
-                                            ;   command hand; owner 2026-11-24 polish)
+            ld b, 8                         ; (off the window's frame line, the figure still
+                                            ;   clear of the text at column 3: centred in its
+                                            ;   column, owner 2026-11-25)
             ld a, [mm_t]
             ld e, a
             add a, a
@@ -647,10 +647,10 @@ pick_char:  xor a
             ld c, a
             ld b, 7 - 10                    ; (the fingertip on the picture's edge, x 7; the
             call scr_cursor                 ;   hand cut by the screen's edge)
-            ld a, [mm_cur]                  ; (the command's hand stays: second cursor)
-            inc a
-            ld c, a
-            ld b, 12
+            ld a, [mm_cur]                  ; (the command's hand stays: second cursor, at the
+            inc a                           ;   column the menu draws it: column 12 put it a
+            ld c, a                         ;   tile left, on the frame; owner 2026-11-25)
+            ld b, 13
             call cur_txt2
             call scr_frame
             ldh a, [pad_new]
@@ -676,7 +676,8 @@ pick_char:  xor a
 .a:         ld a, [mm_pc]
             and a
             ret
-.b:         scf
+.b:         call hand2_off                  ; (B: the second hand put away, main.s)
+            scf
             ret
 
 ; ---- the status screen (approved layout): window (0,0,20,8): name + level, class,

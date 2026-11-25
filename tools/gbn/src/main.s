@@ -4318,3 +4318,12 @@ mrd:        ld a, h
             pop af
             pop hl
             ret
+
+section bank 0, $1EEC                       ; (free space)
+; the second hand (OAM 4-7) put away (pick_char's B: the menu goes on without a redraw)
+hand2_off:  xor a
+            ld [oam_buf + 16], a
+            ld [oam_buf + 20], a
+            ld [oam_buf + 24], a
+            ld [oam_buf + 28], a
+            ret

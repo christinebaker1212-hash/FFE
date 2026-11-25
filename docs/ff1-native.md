@@ -998,3 +998,8 @@ one reaches parity, so the owner can keep playing).
       flags (the Color's line handler ran on a DMG).
     - Checked with the strict checker: all 128 formations on Color, DMG and SGB (0 findings), random play from the
       field on all three, the new-game sequence on all three.
+56. Owner (2026-11-25, last): main menu: the command's hand moved when a second hand appeared (member choice), better
+    centring, and no transition when backing out of the member choice. The parked hand was drawn at column 12 (the menu
+    draws it at 13): now 13, exactly where it was; B from the member choice returns to the commands on the same screen
+    (pick_char puts its second hand away; no redraw, no fade); the party's pictures moved one pixel right (x 8), off the
+    window's frame line: gaps to the frame now match the HP figures' on the right.
