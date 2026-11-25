@@ -91,8 +91,16 @@ def field_codes():
     return list(range(0x10, 0x19)) + sorted(c for c in used if 0x20 <= c < 0x80) + names.ICON_CODES
 
 
+WIN_BLUE = (0x00, 0x2A, 0x88)              # NES $01 as players know it (the 2C02 palette of today's
+                                            #   emulators, e.g. Mesen): the Color's default window colour
+                                            #   (owner, 2026-11-25: match the NES window colour)
+
+
 def win_palette():
-    return b''.join(data.rgb555(c).to_bytes(2, 'little') for c in WIN_PAL)
+    out = [data.rgb555(c) for c in WIN_PAL]
+    r, g, b = WIN_BLUE
+    out[2] = (r >> 3) | (g >> 3) << 5 | (b >> 3) << 10
+    return b''.join(v.to_bytes(2, 'little') for v in out)
 
 
 def wrap(text, width=DLG_W):

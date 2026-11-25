@@ -3597,7 +3597,9 @@ opt_row:    push af
 .lcd:       ld hl, os_lcd
             ld b, 13
             jr opt_ostr
-.sub:       ld a, $3E                       ; (the arrow)
+.sub:       dec a                           ; (format 11: nothing)
+            ret nz
+            ld a, $3E                       ; (the arrow)
             jp pen_ch
 ; the C-th name of B letters in table HL
 opt_ostr:   ld a, c
@@ -3618,13 +3620,14 @@ os_labels:  db "Battle Speed", 0, "Text Speed", 0, "Volume", 0, "B Dash", 0, "Cu
             db "Auto Retarget", 0, "Modern MP", 0
             db "Window Red", 0, "Window Green", 0, "Window Blue", 0, "Gradient", 0, "LCD", 0
             db "EXP", 0, "Gold", 0, "Window", 0, "No Encounters", 0
-            db "Controls", 0, "Window", 0, "Game", 0
+            db "Controls", 0, "Window", 0, "Game", 0, "Return to Default", 0
 os_var:     dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, opt_retgt, opt_mmp, win_r, win_g, win_b, opt_nograd, opt_ccm
-            dw KN_EXP, KN_GOLD, opt_dmgw, SC_NOENC, opt_pg, opt_pg, opt_pg
-os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2, 3, 5, 5, 2, 2, 1, 1, 1
+            dw KN_EXP, KN_GOLD, opt_dmgw, SC_NOENC, opt_pg, opt_pg, opt_pg, opt_pg
+os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2, 3, 5, 5, 2, 2, 1, 1, 1, 1
 os_fmt:     db 18, 0, 12, 1, 18, 2, 16, 3, 11, 4, 16, 5, 16, 5, 17, 6, 17, 6, 17, 6, 16, 3, 6, 7
             db 13, 8, 13, 8, 14, 9, 16, 5   ; (the value's column, its format)
             db 18, 10, 18, 10, 18, 10       ; (a page: its arrow)
+            db 18, 11                       ; (Return to Default: no value)
 os_sv:      dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, win_r, win_g, win_b, opt_nograd, opt_retgt, opt_mmp, opt_ccm
             dw opt_dmgw
                                             ; (the saved order: the older records' first nine)
@@ -4578,7 +4581,9 @@ section bank 99, $6560
 ; menus): Config holds Battle Speed, Text Speed, Volume and the pages Controls, Window and
 ; Game (ids 16-18, a ">" after their names); A or Right opens a page, B goes back to Config
 ; with the hand on it, B on Config saves and leaves
-opt_into:   sub 15                          ; (A = the page's id)
+opt_into:   cp 19                           ; (Return to Default)
+            jr z, opt_reset
+            sub 15                          ; (A = the page's id)
             ld [opt_pg], a
             xor a
             ld [opt_cur], a
@@ -4675,12 +4680,12 @@ opt_mklist: ld hl, opt_list
             jr c, .b1
             jr .x
 .p2:        ldh a, [is_cgb]                 ; Window: the Color's colours, gradient (LCD with
-            and a                           ;   the Konami Code); the DMG's shade
-            jr nz, .cg
+            and a                           ;   the Konami Code); the DMG's shade; then Return
+            jr nz, .cg                      ;   to Default
             ld a, 14
             ld [hl+], a
             inc c
-            jr .x
+            jr .rd
 .cg:        ld a, 7
 .c:         ld [hl+], a
             inc c
@@ -4688,8 +4693,11 @@ opt_mklist: ld hl, opt_list
             cp 11
             jr c, .c
             call kn_on
-            jr nz, .x
+            jr nz, .rd
             ld a, 11
+            ld [hl+], a
+            inc c
+.rd:        ld a, 19
             ld [hl+], a
             inc c
             jr .x
@@ -4711,3 +4719,23 @@ opt_mklist: ld hl, opt_list
             ld [opt_cur], a
             ld [opt_top], a
             ret
+
+section bank 99, $7DC0                      ; (free space)
+; Window: Return to Default (owner, 2026-11-25): the window colour (NES blue), the gradient on,
+; the LCD mode Default, the plain Game Boy's windows black; shown at once
+opt_reset:  call opt_wdef
+            xor a
+            ld [opt_nograd], a
+            ld [opt_ccm], a
+            ld [opt_dmgw], a
+            ldh a, [is_cgb]
+            and a
+            jr z, .d
+            call opt_wnow
+            jr .r
+.d:         ld a, [sgb_on]
+            and a
+            jr nz, .r
+            call scr_dmgpal
+.r:         call opt_rows
+            jp scr_upd
