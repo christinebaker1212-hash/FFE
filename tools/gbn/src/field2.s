@@ -420,7 +420,7 @@ lu_final:   ld hl, ch_stats                 ; (copies in the screen map buffer)
             inc a
             cp 4
             jr c, .p
-            ret
+            jp lu_who
 
 ; ---- FF1 BattleTransition: 65 frames cycling the NES colour emphasis (a new mode every 4
 ; frames; CGB: the map's palettes with the channels not emphasised at 3/4; DMG / SGB: the
@@ -1870,3 +1870,23 @@ te_addr:    ld a, e                         ; tile (y / 8) * 10 + x / 8; byte 8 
             rrca
             jr .m
 
+
+section bank 2, $7322                       ; (free space)
+; Order: the member shown on the map (SHOW_WHO) follows the person to their new slot
+lu_who:     ld a, [SHOW_WHO]
+            ld c, a
+            xor a
+.l:         push af
+            call lu_slotp
+            inc hl
+            ld a, [hl]                      ; (the member now in this slot)
+            cp c
+            jr z, .f
+            pop af
+            inc a
+            cp 4
+            jr c, .l
+            ret
+.f:         pop af
+            ld [SHOW_WHO], a
+            ret

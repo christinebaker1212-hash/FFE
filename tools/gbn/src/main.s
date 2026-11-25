@@ -754,9 +754,9 @@ move:       ld a, [moving]
 .mm:        ld hl, minimap                   ; (FF1: the palettes cycle out first)
             call pc_menu3
             jp map_reload
-.lu:        ld hl, lineup                   ; (FF1: the palettes cycle out first)
-            call pc_menu
-            jp map_reload
+.lu:        ld a, F3_BANK                   ; (Order is in the main menu now: Select shows the
+            ld hl, ps_next                  ;   next member on the map, the leader unchanged;
+            jp bank_call                    ;   owner, 2026-11-25)
 .na:        ldh a, [maptype]                ; the overworld: B presses counted (FF1 joy_b);
             and a                           ;   the 55th with A + B held on the ship: the
             jr z, .np                       ;   15-puzzle
@@ -2506,7 +2506,7 @@ M_PERM     = $7380          ; map bank: DMG rank permutations per class and spri
 ; the party's map sprite: the leader's class (FF1 LoadPlayerMapmanCHR, MAPMAN_PAL); LCD off.
 ; CGB: the raw tiles, the class's colours as colour 2 of OBJ palettes 0 / 1; DMG: the tiles
 ; ranked by brightness for this map (the build's permutations)
-party_spr:  ld a, [ch_stats]
+party_spr:  call ps_wcls                    ; (the member shown: Select on the map)
             ld [ps_cls], a
             ldh a, [is_cgb]
             and a
@@ -2515,7 +2515,7 @@ party_spr:  ld a, [ch_stats]
             add a, $64
             ld h, a
             ld l, 0
-            ld de, $8000
+            call ps_dst                     ; (DE = $8000, or the RAM copy)
             ld bc, 256
             ld a, MINI_BANK
             call far_copy
@@ -2576,8 +2576,7 @@ party_spr:  ld a, [ch_stats]
             ld [ps_p], a
             ld a, [ps_t]                    ; -> $8000 + 16 t
             swap a
-            ld e, a
-            ld d, $80
+            call ps_dde                     ; (E = A; D = $80, or the RAM copy)
             ld hl, scr_buf
             ld b, 8
 .r:         push bc
@@ -4369,3 +4368,123 @@ ow_brc:     ld hl, SV_BRIDGE
             ret nc
             ld hl, SV_CANAL
             jp ow_canmove.at
+
+section bank 0, $351A                       ; (free space)
+; party_spr's destination: VRAM, or the RAM copy Select's change draws first (ps_dh)
+ps_dst:     ld a, [ps_dh]
+            xor $80
+            ld d, a
+            ld e, 0
+            ret
+ps_dde:     ld e, a
+            ld a, [ps_dh]
+            xor $80
+            ld d, a
+            ret
+section bank 0, $3E40                       ; (free space)
+; A = the class of the member shown on the map (SHOW_WHO; not Dead / Stone: the next one;
+; all down: the leader)
+ps_wcls:    push hl
+            push bc
+            ld a, [SHOW_WHO]
+            ld c, a
+            ld b, 4
+.l:         ld a, c
+            and 3
+            ld c, a
+            rrca
+            rrca
+            ld l, a
+            ld h, high(ch_stats)
+            inc l
+            ld a, [hl]
+            and AIL_DEAD | AIL_STONE
+            jr z, .ok
+            inc c
+            dec b
+            jr nz, .l
+            ld l, 1
+.ok:        dec l
+            ld a, [hl]
+            pop bc
+            pop hl
+            ret
+
+section wram, $CFBD
+ps_dh:      ds 1                            ; party_spr: 0 VRAM, $41 the RAM copy at $C100
+
+section bank 99, $4F18                      ; (free space)
+SHOW_WHO   = unsram + $FD   ; the member shown on the map (kept in the save; owner, 2026-11-25)
+; Select on the map: the next member who is not Dead / Stone shown; drawn into a RAM copy, then
+; into VRAM in V-Blanks with the party's sprites hidden meanwhile
+ps_next:    ld a, [SHOW_WHO]
+            ld c, a
+            ld b, 3
+.f:         inc c                           ; the next one up
+            ld a, c
+            and 3
+            ld c, a
+            rrca
+            rrca
+            ld l, a
+            ld h, high(ch_stats)
+            inc l
+            ld a, [hl]
+            and AIL_DEAD | AIL_STONE
+            jr z, .got
+            dec b
+            jr nz, .f
+            jp sfx_err                      ; (no one else: the error sound)
+.got:       ld a, c
+            ld [SHOW_WHO], a
+            ld a, SFX_MOVE
+            ld [sfx_req], a
+.q:         ld a, [q_rd]                    ; (the map queue empty: its ring holds the copy)
+            ld b, a
+            ld a, [q_n]
+            cp b
+            jr z, .qe
+            call wait_vbl
+            jr .q
+.qe:        ld hl, oam_buf                  ; the party's tiles ($00-$0F) hidden
+            ld b, 40
+.h:         inc hl
+            inc hl
+            ld a, [hl-]
+            dec hl
+            cp $10
+            jr nc, .hn
+            xor a
+            ld [hl], a
+.hn:        ld a, l
+            add a, 4
+            ld l, a
+            dec b
+            jr nz, .h
+            call wait_vbl
+            ld a, $41
+            ld [ps_dh], a
+            call party_spr
+            xor a
+            ld [ps_dh], a
+            ld hl, $C100
+            ld de, $8000
+.v:         call wait_vbl
+.b:         di                              ; 16 bytes while LY is 144-152
+            ldh a, [rLY]
+            sub 144
+            cp 9
+            jr c, .c
+            ei
+            jr .v
+.c:         ld b, 16
+.cl:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .cl
+            ei
+            ld a, e
+            and a
+            jr nz, .b
+            ret
