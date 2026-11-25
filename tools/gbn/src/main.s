@@ -321,15 +321,6 @@ main:       call wait_vbl
             call ap_tick                    ; (the airship's view: air.s)
             jr main
 
-wait_vbl:   call fx_tick                    ; (a spell's raster effect's next frame: fx.s)
-            call sgb_tick                   ; (a Super Game Boy's queued packet: before the
-            xor a                           ;   wait, so it never takes V-Blank time)
-            ldh [vbl_done], a
-.w:         halt
-            ldh a, [vbl_done]
-            and a
-            jr z, .w
-            ret
 
 ; ---- V-Blank: OAM, scroll, palettes, queued metatiles
 vblank:     push af
@@ -405,6 +396,7 @@ read_pad:   ld a, $20
             cpl
             and $0F
             or b
+            call pad_opp                    ; (opposite directions together: neither)
             ld c, a
             ldh a, [pad]                    ; newly pressed this frame
             cpl
@@ -431,9 +423,7 @@ read_pad:   ld a, $20
             and $0F
             cp $0F
             ret nz
-            xor a
-            ld [$0000], a                   ; (cart RAM off)
-            jp game_over
+            jp sreset
 
 ; ---- load standard map A with the party at (D = x, E = y): LCD off in V-Blank, graphics,
 ; palettes, the map drawn, LCD on
@@ -660,26 +650,6 @@ obj_tiles:  ldh a, [maptype]
             jr nz, .b
             ret
 
-cgb_pal32:  ld b, 32                        ; HL = 32 bytes of BG palettes 0-3 (A = BCPS)
-pal_blk:    push af                         ; B bytes (a masked load: into the shadow)
-            call cc_copy                    ; (the LCD colour mode: cc.s)
-            ld a, [lmask]
-            and a
-            jr nz, .m
-            pop af
-            ldh [rBCPS], a
-.p:         ld a, [hl+]
-            ldh [rBCPD], a
-            dec b
-            jr nz, .p
-            ret
-.m:         pop af
-            call bcps_w
-.q:         ld a, [hl+]
-            call bcpd_w
-            dec b
-            jr nz, .q
-            ret
 
 
 ; ---- movement on a standard map (FF1: one metatile in 16 frames, a pixel a frame)
@@ -4104,4 +4074,97 @@ bt_res_clr: ld c, 12
             ld a, c
             cp 18
             jr c, .r
+            ret
+
+section bank 0, $17D0                       ; (free space)
+; the LCD on (not a masked load): wait for the first lines of a V-Blank (LY 144-150), so
+; palette writes made now are not dropped in mode 3 (Lot Check checker, 2026-11-25)
+pal_win:    ld a, [lmask]
+            and a
+            ret nz
+            ldh a, [rLCDC]
+            add a, a
+            ret nc
+.v:         ldh a, [rLY]
+            cp 144
+            jr c, .v
+            cp 151
+            jr nc, .v
+            ret
+
+section bank 0, $1459                       ; (free space)
+; A = the keys read: Up + Down or Left + Right held together count as neither (Lot Check: a
+; worn Control Pad or a test rig pressing both must not move the hand / the party both ways)
+pad_opp:    ld c, a
+            and $C0
+            cp $C0
+            jr nz, .ud
+            ld a, c
+            and $3F
+            ld c, a
+.ud:        ld a, c
+            and $30
+            cp $30
+            ld a, c
+            ret nz
+            and $CF
+            ret
+
+section bank 0, $00C1                       ; (free space before the header)
+cgb_pal32:  ld b, 32                        ; HL = 32 bytes of BG palettes 0-3 (A = BCPS)
+pal_blk:    push af                         ; B bytes (a masked load: into the shadow)
+            call cc_copy                    ; (the LCD colour mode: cc.s)
+            ld a, [lmask]
+            and a
+            jr nz, .m
+            call pal_win
+            pop af
+            ldh [rBCPS], a
+.p:         ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .p
+            ret
+.m:         pop af
+            call bcps_w
+.q:         ld a, [hl+]
+            call bcpd_w
+            dec b
+            jr nz, .q
+            ret
+
+section bank 0, $1F15                       ; (free space)
+wait_vbl:   call rst_chk                    ; (A + B + START + SELECT: a soft reset from any
+            call fx_tick                    ;   loop, fades and loads too: Lot Check)
+            call sgb_tick                   ; (a Super Game Boy's queued packet: before the
+            xor a                           ;   wait, so it never takes V-Blank time)
+            ldh [vbl_done], a
+.w:         halt
+            ldh a, [vbl_done]
+            and a
+            jr z, .w
+            ret
+rst_chk:    call btn_rd
+            ret nz
+; the soft reset (Lot Check: A + B + START + SELECT): cart RAM off, the four buttons let go
+; first (held, the game would start again and again), then the title
+sreset:     xor a
+            ld [$0000], a
+.w:         call btn_rd
+            jr z, .w
+            jp game_over
+
+section bank 0, $1DEB                       ; (free space)
+; A = the buttons' four bits (0: pressed), Z: all four held; P1 left as read_pad leaves it
+btn_rd:     ld a, $10
+            ldh [rP1], a
+            ldh a, [rP1]
+            ldh a, [rP1]
+            ldh a, [rP1]
+            ldh a, [rP1]
+            push af
+            ld a, $30
+            ldh [rP1], a
+            pop af
+            and $0F
             ret

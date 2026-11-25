@@ -180,6 +180,9 @@ ul_build:   xor a
             pop bc
             dec b
             jr nz, .p
+            ldh a, [is_cgb]                 ; (VBK on the Color only)
+            and a
+            ret z
             xor a
             ldh [rVBK], a
             ret
@@ -223,8 +226,12 @@ ul_wr:      push bc
             ret
 
 ; one picture (ul_x, ul_y, ul_t): its sprite pixels read, its outline added to the cells
-ul_pic:     xor a                           ; (sprite tiles: VRAM bank 0)
+ul_pic:     ldh a, [is_cgb]                 ; (sprite tiles: VRAM bank 0; VBK on the Color only)
+            and a
+            jr z, .v0
+            xor a
             ldh [rVBK], a
+.v0:
             ld a, [ul_t]
             ld l, a
             ld h, 0

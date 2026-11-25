@@ -1,8 +1,128 @@
 diff --git a/Core/memory.c b/Core/memory.c
-index 876a717..b678428 100644
+index 876a717..17c5f66 100644
 --- a/Core/memory.c
 +++ b/Core/memory.c
-@@ -1014,10 +1014,19 @@ static void write_mbc(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
+@@ -773,6 +773,111 @@ void GB_set_read_memory_callback(GB_gameboy_t *gb, GB_read_memory_callback_t cal
+     gb->read_memory_callback = callback;
+ }
+ 
++/* FFE patch: a strict Lot Check checker (env SB_LCHK=1): accesses a picky tester would flag,
++   printed once per (kind, instruction) as "LCHK kind addr=value pc bank:addr LY n"; GB_lchk_n counts all */
++#include <stdlib.h>
++__attribute__((visibility("default"))) unsigned GB_lchk_n = 0;
++int GB_lchk_flag = -1;
++static uint16_t lchk_ipc;
++static uint8_t lchk_ibank;
++static uint8_t lchk_w[0x8000 + 0x80];
++static struct { const char *w; uint16_t pc; uint8_t bank; } lchk_seen[512];
++static unsigned lchk_ns = 0;
++static bool lchk(void)
++{
++    if (GB_lchk_flag < 0) GB_lchk_flag = getenv("SB_LCHK") != NULL;
++    return GB_lchk_flag;
++}
++static void lchk_note(GB_gameboy_t *gb, const char *what, uint16_t addr, uint8_t v)
++{
++    GB_lchk_n++;
++    for (unsigned i = 0; i < lchk_ns; i++) {
++        if (lchk_seen[i].w == what && lchk_seen[i].pc == lchk_ipc && lchk_seen[i].bank == lchk_ibank) return;
++    }
++    if (lchk_ns < 512) {
++        lchk_seen[lchk_ns].w = what; lchk_seen[lchk_ns].pc = lchk_ipc; lchk_seen[lchk_ns].bank = lchk_ibank; lchk_ns++;
++    }
++    if (getenv("SB_LCHKV")) {
++        fprintf(stderr, "LCHK %s %04X=%02X pc %02X:%04X LY %d stack", what, addr, v, lchk_ibank, lchk_ipc, gb->current_line);
++        for (int k = 0; k < 8; k++) fprintf(stderr, " %04X", GB_safe_read_memory(gb, gb->sp + 2 * k) | GB_safe_read_memory(gb, gb->sp + 2 * k + 1) << 8);
++        fprintf(stderr, "\n");
++        return;
++    }
++    fprintf(stderr, "LCHK %s %04X=%02X pc %02X:%04X LY %d\n", what, addr, v, lchk_ibank, lchk_ipc, gb->current_line);
++}
++static int lchk_wi(GB_gameboy_t *gb, uint16_t a)
++{
++    if (a >= 0xC000 && a < 0xD000) return a - 0xC000;
++    if (a >= 0xD000 && a < 0xE000) {
++        unsigned b = GB_is_cgb_in_cgb_mode(gb) ? (gb->cgb_ram_bank ? gb->cgb_ram_bank : 1) : 1;
++        return b * 0x1000 + a - 0xD000;
++    }
++    if (a >= 0xFF80 && a < 0xFFFF) return 0x8000 + a - 0xFF80;
++    return -1;
++}
++static bool lchk_cgbreg(uint16_t a)
++{
++    if (a < 0xFF00 || a >= 0xFF80) return false;
++    uint8_t r = a & 0xFF;
++    return r == 0x4D || r == 0x4F || (r >= 0x51 && r <= 0x56) || (r >= 0x68 && r <= 0x6C) || r == 0x70 ||
++           (r >= 0x72 && r <= 0x77);
++}
++static bool lchk_unused(uint8_t r)
++{
++    return r == 0x03 || (r >= 0x08 && r <= 0x0E) || r == 0x15 || r == 0x1F || (r >= 0x27 && r <= 0x2F) ||
++           r == 0x4C || r == 0x4E || r == 0x50 || (r >= 0x57 && r <= 0x67) || (r >= 0x6D && r <= 0x6F) ||
++           r == 0x71 || r >= 0x78;
++}
++static void lchk_common(GB_gameboy_t *gb, uint16_t a, uint8_t v, bool w)
++{
++    if (a >= 0xFEA0 && a < 0xFF00) lchk_note(gb, w ? "PROHIB-W" : "PROHIB-R", a, v);
++    else if (a >= 0xE000 && a < 0xFE00) lchk_note(gb, w ? "ECHO-W" : "ECHO-R", a, v);
++    if (GB_is_dma_active(gb) && a < 0xFF00) lchk_note(gb, w ? "DMA-BUS-W" : "DMA-BUS-R", a, v);
++    if (a >= 0xA000 && a < 0xC000 && !gb->mbc_ram_enable) lchk_note(gb, w ? "CRAM-OFF-W" : "CRAM-OFF-R", a, v);
++    if (!GB_is_cgb_in_cgb_mode(gb) && lchk_cgbreg(a)) lchk_note(gb, w ? "CGBREG-W" : "CGBREG-R", a, v);
++}
++static void lchk_r(GB_gameboy_t *gb, uint16_t a)
++{
++    if (gb->in_dma_read) return;                    /* (the OAM DMA's own reads) */
++    lchk_common(gb, a, 0, false);
++    int i = lchk_wi(gb, a);
++    if (i >= 0 && !lchk_w[i]) lchk_note(gb, "UNINIT-R", a, 0);
++}
++static void lchk_wr(GB_gameboy_t *gb, uint16_t a, uint8_t v)
++{
++    lchk_common(gb, a, v, true);
++    if (a < 0x8000 && gb->cartridge_type->mbc_type == GB_MBC5) {
++        if (a >= 0x6000) lchk_note(gb, "MBC-W", a, v);
++        else if (a < 0x2000 && v != 0x0A && v != 0x00) lchk_note(gb, "RAMEN-VAL", a, v);
++    }
++    int i = lchk_wi(gb, a);
++    if (i >= 0) lchk_w[i] = 1;
++    if (a >= 0xFF00 && a < 0xFF80) {
++        uint8_t r = a & 0xFF;
++        if (lchk_unused(r)) lchk_note(gb, "UNUSED-IO-W", a, v);
++        if (r == 0x40 && !(v & 0x80) && (gb->io_registers[GB_IO_LCDC] & 0x80) && (gb->io_registers[GB_IO_STAT] & 3) != 1 &&
++            !GB_is_sgb(gb)) {   /* (the SGB: SameBoy writes LCDC value / old / value: checked on the DMG) */
++            if (getenv("SB_LCHKV")) fprintf(stderr, "  LCDOFF: v %02X lcdc %02X pc %04X LY reg %d line %d state %d stat %02X\n", v, gb->io_registers[GB_IO_LCDC], gb->pc, gb->io_registers[GB_IO_LY], gb->current_line, gb->display_state, gb->io_registers[GB_IO_STAT]);
++            lchk_note(gb, "LCDOFF-MIDFRAME", a, v);
++        }
++        if (r == 0x46 && v >= 0xE0) lchk_note(gb, "DMA-SRC", a, v);
++        if ((r == 0x69 || r == 0x6B) && gb->cgb_palettes_blocked) lchk_note(gb, "PAL-MODE3-W", a, v);
++    }
++}
++void GB_lchk_exec(GB_gameboy_t *gb, uint16_t pc, uint8_t op)
++{
++    if (!lchk()) return;
++    lchk_ipc = pc;
++    lchk_ibank = pc < 0x4000 ? 0 : (pc < 0x8000 ? gb->mbc_rom_bank : 0xFF);
++    if (!gb->boot_rom_finished) return;
++    if (pc >= 0x8000 && pc < 0xC000) lchk_note(gb, "EXEC-VRAM-CRAM", pc, op);
++    else if (pc >= 0xE000 && pc < 0xFF80) lchk_note(gb, "EXEC-ECHO-IO", pc, op);
++    if (op == 0x76 && !gb->ime && (gb->interrupt_enable & gb->io_registers[GB_IO_IF] & 0x1F))
++        lchk_note(gb, "HALT-BUG", pc, op);
++    if (op == 0x10 && !(GB_is_cgb(gb) && (gb->io_registers[GB_IO_KEY1] & 1))) lchk_note(gb, "STOP", pc, op);
++    if (!((gb->sp >= 0xC000 && gb->sp <= 0xE000) || gb->sp >= 0xFF80)) lchk_note(gb, "SP-RANGE", gb->sp, op);
++}
++
+ uint8_t GB_read_memory(GB_gameboy_t *gb, uint16_t addr)
+ {
+     GB_ASSERT_NOT_RUNNING_OTHER_THREAD(gb)
+@@ -782,6 +887,7 @@ uint8_t GB_read_memory(GB_gameboy_t *gb, uint16_t addr)
+         GB_debugger_test_read_watchpoint(gb, addr);
+     }
+ #endif
++    if (unlikely(GB_lchk_flag != 0) && lchk() && gb->boot_rom_finished) lchk_r(gb, addr);
+     if (unlikely(is_addr_in_dma_use(gb, addr))) {
+         if (GB_is_cgb(gb) && bus_for_addr(gb, addr) == GB_BUS_MAIN && gb->dma_current_src >= 0xE000) {
+             /* This is cart specific! Everdrive 7X on a CGB-A or 0 behaves differently. */
+@@ -1014,10 +1120,24 @@ static void write_mbc(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
      GB_update_mbc_mappings(gb);
  }
  
@@ -13,6 +133,11 @@ index 876a717..b678428 100644
 +static void vchk_note(GB_gameboy_t *gb, uint16_t addr)
 +{
 +    if (GB_vchk_n++ < 40) fprintf(stderr, "VCHK %04X pc %02X:%04X LY %d\n", addr, gb->pc < 0x4000 ? 0 : gb->mbc_rom_bank, gb->pc, gb->current_line);
++    if (GB_vchk_n < 40 && getenv("SB_LCHKV")) {
++        fprintf(stderr, "  stack");
++        for (int k = 0; k < 8; k++) fprintf(stderr, " %04X", GB_safe_read_memory(gb, gb->sp + 2 * k) | GB_safe_read_memory(gb, gb->sp + 2 * k + 1) << 8);
++        fprintf(stderr, "\n");
++    }
 +}
  static void write_vram(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
  {
@@ -22,7 +147,7 @@ index 876a717..b678428 100644
          //GB_log(gb, "Wrote %02x to %04x (VRAM) during mode 3\n", value, addr);
          return;
      }
-@@ -1373,6 +1382,7 @@ static void write_high_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
+@@ -1373,6 +1493,7 @@ static void write_high_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
      if (addr < 0xFF00) {
          GB_display_sync(gb);
          if (gb->oam_write_blocked) {
@@ -30,11 +155,34 @@ index 876a717..b678428 100644
              GB_trigger_oam_bug(gb, addr);
              return;
          }
+@@ -1826,6 +1947,7 @@ void GB_write_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
+         GB_debugger_test_write_watchpoint(gb, addr, value);
+     }
+ #endif
++    if (unlikely(GB_lchk_flag != 0) && lchk() && gb->boot_rom_finished) lchk_wr(gb, addr, value);
+     if (bus_for_addr(gb, addr) == GB_BUS_MAIN && addr < 0xFF00) {
+         gb->data_bus = value;
+         gb->data_bus_decay_countdown = gb->data_bus_decay;
+diff --git a/Core/sm83_cpu.c b/Core/sm83_cpu.c
+index 9c14e18..874440c 100644
+--- a/Core/sm83_cpu.c
++++ b/Core/sm83_cpu.c
+@@ -1701,7 +1701,10 @@ void GB_cpu_run(GB_gameboy_t *gb)
+     }
+     /* Run mode */
+     else if (!gb->halted) {
++        extern int GB_lchk_flag; extern void GB_lchk_exec(GB_gameboy_t *gb, uint16_t pc, uint8_t op);
++        if (unlikely(GB_lchk_flag != 0)) GB_lchk_exec(gb, gb->pc, 0xFF);   /* (FFE: the fetch's pc) */
+         uint8_t opcode = cycle_read(gb, gb->pc++);
++        if (unlikely(GB_lchk_flag != 0)) GB_lchk_exec(gb, gb->pc - 1, opcode);
+         if (unlikely(gb->hdma_on)) {
+             GB_hdma_run(gb);
+         }
 diff --git a/libretro/libretro.c b/libretro/libretro.c
-index 2cb699e..0f96717 100644
+index 2cb699e..f8c8969 100644
 --- a/libretro/libretro.c
 +++ b/libretro/libretro.c
-@@ -707,6 +707,15 @@ static void retro_set_memory_maps(void)
+@@ -707,6 +707,27 @@ static void retro_set_memory_maps(void)
      environ_cb(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &mmaps);
  }
  
@@ -47,10 +195,22 @@ index 2cb699e..0f96717 100644
 +        fprintf(stderr, "PC %02X:%04X LY %d\n", address < 0x4000 ? 0 : gb->mbc_rom_bank, address, gb->current_line);
 +    }
 +}
++static unsigned watch_lo = 0, watch_hi = 0;
++static bool watch_cb(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
++{
++    if (addr >= watch_lo && addr <= watch_hi) {
++        uint16_t sp = gb->sp;
++        fprintf(stderr, "W %04X=%02X PC %02X:%04X SP %04X LY %d stk %02X%02X %02X%02X %02X%02X\n", addr, value,
++                gb->pc < 0x4000 ? 0 : gb->mbc_rom_bank, gb->pc, sp, gb->current_line,
++                GB_safe_read_memory(gb, sp + 1), GB_safe_read_memory(gb, sp), GB_safe_read_memory(gb, sp + 3), GB_safe_read_memory(gb, sp + 2),
++                GB_safe_read_memory(gb, sp + 5), GB_safe_read_memory(gb, sp + 4));
++    }
++    return true;
++}
  static void init_for_current_model(unsigned id)
  {
      unsigned i = id;
-@@ -752,6 +761,11 @@ static void init_for_current_model(unsigned id)
+@@ -752,6 +773,16 @@ static void init_for_current_model(unsigned id)
  
      /* todo: attempt to make these more generic */
      GB_set_vblank_callback(&gameboy[0], (GB_vblank_callback_t) vblank1);
@@ -59,17 +219,22 @@ index 2cb699e..0f96717 100644
 +        while (*e && pclog_n < 16) { pclog_a[pclog_n++] = strtoul(e, &e, 16); if (*e == ',') e++; }
 +        GB_set_execution_callback(&gameboy[0], pclog_cb);
 +    }
++    if (getenv("SB_WATCH")) {
++        char *e = getenv("SB_WATCH");
++        watch_lo = strtoul(e, &e, 16); watch_hi = *e == '-' ? strtoul(e + 1, 0, 16) : watch_lo;
++        GB_set_write_memory_callback(&gameboy[0], watch_cb);
++    }
      GB_set_lcd_status_callback(&gameboy[0], lcd_status_change_1);
      if (emulated_devices == 2) {
          GB_set_vblank_callback(&gameboy[1], (GB_vblank_callback_t) vblank2);
 diff --git a/libretro/link.T b/libretro/link.T
-index b0c262d..7f7a195 100644
+index b0c262d..bb9f7db 100644
 --- a/libretro/link.T
 +++ b/libretro/link.T
 @@ -1,5 +1,5 @@
  {
 -   global: retro_*;
-+   global: retro_*; GB_vchk_n;
++   global: retro_*; GB_vchk_n; GB_lchk_n;
     local: *;
  };
  

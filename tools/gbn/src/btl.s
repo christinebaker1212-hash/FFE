@@ -1458,8 +1458,8 @@ bt_rowsup:  ld a, [bt_rmask]
 .g:         ldh a, [rLY]
             cp 144
             ret c
-            cp 152
-            ret nc
+            cp 150                          ; (a row takes ~2 lines: done before the music's
+            ret nc                          ;   tick at line 153; Lot Check)
             ld a, c
             xor d
             ld [bt_rmask], a

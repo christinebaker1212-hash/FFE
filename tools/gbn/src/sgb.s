@@ -109,6 +109,9 @@ sgb_detect: xor a
             jr nz, .r
             ld a, %11100100
             ldh [rBGP], a
+            xor a                           ; (no scroll: a soft reset from the field left it,
+            ldh [rSCX], a                   ;   and the SGB read a scrolled map as the border,
+            ldh [rSCY], a                   ;   covering the screen; Lot Check soft reset test)
             ld a, %10010001                 ; LCD on, BG tiles $8000, map $9800
             ldh [rLCDC], a
             ld b, 2
@@ -132,17 +135,6 @@ sgb_detect: xor a
             jr nz, .c2
             ret
 
-; B frames of busy waiting
-sgb_delay:  push bc
-.f:         ld de, 2508
-.l:         dec de
-            ld a, d
-            or e
-            jr nz, .l
-            dec b
-            jr nz, .f
-            pop bc
-            ret
 
 ; HL = a 16-byte packet, sent bit by bit through P1. Keeps BC, DE. Every pulse (the reset,
 ; each bit, the stop bit) held low for 6 cycles and high for 8 or more: the SGB wants about
@@ -468,4 +460,17 @@ sgb_epal:   push hl
             ld de, SG_ENEMY + $0A80         ; ($6300)
             ret
 .a:         ld de, SG_ENEMY + $0780         ; ($6000)
+            ret
+
+section bank 0, $3899                       ; (free space; moved for the soft reset's scroll fix)
+; B frames of busy waiting
+sgb_delay:  push bc
+.f:         ld de, 2508
+.l:         dec de
+            ld a, d
+            or e
+            jr nz, .l
+            dec b
+            jr nz, .f
+            pop bc
             ret

@@ -235,3 +235,8 @@ recommended.
 | N4 | Main menu | a Formation ("Order") command | small |
 | N5 | Main menu | low-HP / dead colours as in battle (Color) | small |
 | N6 | Main menu | MP / charges on the main menu (needs MM-B) | large |
+
+## Outcome (2026-11-25)
+Owner chose MM-A (with N1b, as sketched); done (`docs/ff1-native.md` item 50). Classic / Modern: no alternative
+chosen yet; its wording fixes M3 ("Cottages") and M4 ("Hold the B Button to dash.", a Lot Check item) are done,
+and "OPTIONS" became "Config" with the main menu's label.

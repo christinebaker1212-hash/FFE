@@ -1546,6 +1546,7 @@ pr_cgbstep: ld hl, pr_rgb
             call cc_fix
             ld b, d
             ld c, e
+            call pal_win                    ; (in a V-Blank: Lot Check checker)
             ld a, $80 | 38
             ldh [rBCPS], a
             ld a, c

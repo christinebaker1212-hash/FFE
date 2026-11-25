@@ -1390,6 +1390,10 @@ Then (item 48): black rounded outlines under the party's pictures on every menu 
 set, SGB windows black, SGB battles in their own colours again (broken since the audit's B12).
 Then (item 49): see-through pixels inside a picture (sprite on all four sides) black: the Black Magician's eyes in a
 black face on White / Color windows.
+Then (item 50): main menu MM-A (hand inside the command window, Order, START closes, cursor kept, HP colours), Lot
+Check wording, a strict Lot Check checker in SameBoy (SB_LCHK) and every fault it found fixed (stray outline cells,
+Color registers on DMG/SGB, palette / VRAM writes outside their windows, soft reset in fades, SGB reset border,
+opposite directions); "Battle Speed". Details: docs/gb-release-checks.md "Strict checker".
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

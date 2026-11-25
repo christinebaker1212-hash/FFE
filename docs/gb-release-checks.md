@@ -269,17 +269,63 @@ items are simpler than for the recompiled build above.
   checked, written or read; a damaged one shows "SUSPEND DATA ERROR / The suspended game in
   the Game Pak is damaged. / Press the A Button to erase it." at boot (checked in SameBoy
   with a cart RAM file whose bank 1 has the mark and a wrong sum).
-- 3.1 Soft reset: A + B + Start + Select (read_pad) -> cart RAM off -> boot again (title,
-  no prologue).
+- 3.1 Soft reset: A + B + Start + Select -> cart RAM off -> the four buttons let go -> boot
+  again (title, no prologue). Checked in `read_pad` and, since 2026-11-25, in every frame wait
+  (`wait_vbl` -> `rst_chk`, own P1 read), so fades and loops that read no pad reset too.
+  Tested on Color, DMG and SGB in a menu, a fiend battle, a menu's fade-in, the intro and the
+  title. Found with it: a reset from the scrolled field left SCX / SCY, and the SGB border
+  transfer at boot read a scrolled map (the border covered the screen): the transfer now sets
+  the scroll to 0.
 - 3.2 Boot clears WRAM ($C000-$DFFF), HRAM and VRAM (both banks on a Color) before use.
 - 3.3 Matrix: DMG (PyBoy, mGBA), CGB (mGBA), SGB with the border and palettes (mGBA);
   Pocket / SGB2 / GBA: to run before release.
-- 4.1 Names: "Game Pak", "A Button" in the save error; the title, menus and the game's own
-  text (the project's translation) name no hardware.
+- 4.1 Names (audited 2026-11-25, every string of the native build): "Game Pak", "A Button" /
+  "B Button" (the translation's "A button...Yes" capitalised at build time), "Control Pad"
+  (Sound Test, was "Left/Right"), "SELECT", "START"; "Hold the B Button to dash." (was "with
+  B"); "power" in the Suspend question. No other hardware names in the game's text.
 - 4.2 CGB colour: FF1's NES palettes per screen.
 - 4.3 Undisclosed code: the test-build options (`build.py --start`, `--init`, `--battle`,
-  `--enc`) set constants that are off in a normal build (the code they guard is inert);
-  nothing hidden is reachable by the player.
+  `--enc`, `--dlg`) set constants that are off in a normal build (the code they guard is
+  inert). Two player-reachable hidden features, to be listed on a submission sheet (they are
+  game features, not debug code; both tested on all three systems):
+  - the Konami Code on the Formation screen (Up Up Down Down Left Right Left Right B A):
+    Config gains LCD colour mode (Color) and EXP / Gold multipliers;
+  - the Sound Test code (songs 1 9 9 2 1 1 2 4 played in order), then a save loaded: EXP /
+    Gold up to 128X, No Encounters, Save anywhere (the main menu's Quit becomes Save).
+
+### Strict checker (2026-11-25, owner: "pass even the most stringent and picky of lot checkers")
+A SameBoy core with a Lot Check checker (`tools/gb/sameboy/sameboy-ffe.patch`, env
+`SB_LCHK=1`, `SB_LCHKV=1` adds the call stack; `GB_lchk_n` counts) flags, once per
+instruction: reads / writes of $FEA0-$FEFF and echo RAM; CPU bus use during OAM DMA; cart RAM
+access while disabled; MBC5 writes to $6000-$7FFF and RAM-enable values other than $00 / $0A;
+Color-only registers (VBK, SVBK, KEY1, HDMA, RP, palettes, OPRI) used on DMG / SGB; writes to
+unused I/O ($FF50 included); reads of WRAM / HRAM never written since power-on; the LCD
+switched off outside V-Blank (DMG model; SameBoy's SGB writes LCDC three times per write);
+OAM DMA from $E000+; CGB palette writes in mode 3 (dropped by the hardware); code run from
+VRAM / cart RAM / echo / I/O; HALT with IME off and an interrupt pending (the DMG halt bug);
+STOP other than the speed switch; SP outside WRAM / HRAM. With the existing VRAM / OAM
+checker (`GB_vchk_n`). Runs: random play from power-on (title, New Game, Classic / Modern,
+party, field, menus, battles; 50-60k frames each, several seeds), from a town, the overworld
+with encounters, a fiend battle and Chaos, each on Color, DMG and SGB; random presses include
+Up + Down, Left + Right and all four directions held.
+Found and fixed:
+- the menu pictures' outline (ul.s): a stale cell count (it lives in the field's queue) made
+  a later screen restore cells at stray offsets: writes into cart RAM space / echo RAM. Reset
+  with every new screen; offsets checked.
+- Color registers written on DMG / SGB: VBK at boot, in the battle's flash rows and in the
+  outline code; BCPS / BCPD in the intro. Now Color only.
+- CGB palette writes in mode 3: the masked load's fade-in palette work ran past V-Blank (now
+  starts at LY 144, RAM copy after the hardware writes), the gradient's per-line writes ran
+  out of H-Blank with many palettes (each now waits for mode 0 / 1), the palette cycling, the
+  intro fade and Config's window colour wrote mid-frame (`pal_win`: LY 144-150 first).
+- VRAM writes in mode 3 on DMG / SGB: a screen row copy interrupted by the music tick (row
+  copies now with interrupts off; the battle's row uploads start by LY 149), the DMG intro
+  writing its row after the frame wait (now through the V-Blank row writer), the gold / grey
+  glyph copies (alt_mk: an interrupt between the mode check and the write; now with
+  interrupts off across both).
+- Opposite directions: Up + Down / Left + Right held together count as neither (`pad_opp`).
+- RAM bank selects use banks 0-2 only (header: 32 KB, 4 banks).
+Result: 0 findings and VRAM / OAM checker 0 on every run after the fixes.
 
 ## Release gate
 

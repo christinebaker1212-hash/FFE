@@ -924,3 +924,17 @@ one reaches parity, so the owner can keep playing).
     the outer edge keeps its 1-px rounded outline. Worked out at run time from the sprite tiles (any pose); 24 rows of
     bit masks, no table. Checked: job list, party creation, Formation, main menu on Color and DMG White; VRAM/OAM
     checker 0.
+50. Owner (2026-11-25, last): main menu "MM-A" (from `docs/ff1-mode-menu-audit.md`), and "be certain that the game
+    would pass even the most stringent and picky of lot checkers"; then "Message Speed" -> "Battle Speed".
+    - Main menu: the command window from column 10 over the party window's edge, labels from column 13 so the whole
+      hand is inside it (Items / Magic / Equip / Status / Order / Config / Quit; Save with the Sound Test code), a
+      seventh command Order (FF1's lineup, also Select on the map), the orbs in a 6-row window, START closes the menu
+      as B does, the command cursor kept between openings, members under a quarter of their HP in gold and dead /
+      stoned members in red on the Color (grey ink on DMG / SGB), as in battle (menu.s, loc.s mm_wins / mm_hpc).
+      The Options screen is titled Config to match.
+    - Wording (Lot Check 4.1): "Hold the B Button to dash.", "A Button" / "B Button" in the translation's yes / no
+      prompts, "Control Pad: song", "Inns or Cottages", "time in Config.", the Suspend question's "power".
+    - A strict checker in SameBoy (`SB_LCHK=1`, `tools/gb/sameboy/sameboy-ffe.patch`) and what it found and what was
+      fixed: `docs/gb-release-checks.md` "Strict checker". Also: soft reset from every frame wait (fades), the four
+      buttons let go before the restart, opposite directions filtered, the SGB border transfer with scroll 0.
+    - "Battle Speed" on the title menu and in Config (the setting is FF1's battle message speed).

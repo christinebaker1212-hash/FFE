@@ -3052,6 +3052,7 @@ section bank 99, $7200
 opt_wnow:   call opt_wpal
             call opt_objp                   ; (the hand's colours: an LCD mode change)
             call eqm_pal                    ; (its colours made, then V-Blank: the writes)
+            call pal_win                    ; (the rest in a V-Blank too: Lot Check checker)
             call opt_p0
             call text_pals
             call opt_objw
@@ -4305,14 +4306,16 @@ alt_mk:     ld a, e
             ld e, a
             ld hl, alt_buf
             ld b, 16
-.w:         ldh a, [rLCDC]                  ; (LCD on: each byte in mode 0 / 1)
-            bit 7, a
+.w:         di                              ; (no interrupt between the check and the
+            ldh a, [rLCDC]                  ;   write: a music tick put it in mode 3 on the
+            bit 7, a                        ;   SGB; Lot Check checker)
             jr z, .wr
-.ws:        ldh a, [rSTAT]
+.ws:        ldh a, [rSTAT]                  ; (LCD on: each byte in mode 0 / 1)
             and 2
             jr nz, .ws
 .wr:        ld a, [hl+]
             ld [de], a
+            ei
             inc de
             dec b
             jr nz, .w
