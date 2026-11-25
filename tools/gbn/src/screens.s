@@ -667,7 +667,9 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             call bank_call
             and a
             jp nz, .np
-            call party_gen
+            ld a, PG_BANK                   ; the party (owner, 2026-11-25: P-A, K-A, N; pgen.s)
+            ld hl, pg_main
+            call bank_call
             call ng_stats
             ret
 .rate:      ld a, [respond]                 ; the rate's digit after Battle Speed (column 16:

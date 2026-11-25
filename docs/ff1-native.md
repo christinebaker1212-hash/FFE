@@ -944,3 +944,6 @@ one reaches parity, so the owner can keep playing).
 52. Owner (2026-11-25, last): "Center the Game Style and prompts." The header, the two styles (the hand before them)
     and each line of "OK to begin in / ... style?" centred; the description stays left-aligned. Then "Nintendo-ify the
     Job selection and Job Picker screen": proposals in `docs/ff1-job-screens-proposals.md` (waiting for the owner).
+53. Owner (2026-11-25, last): "P-A, K-A, N" for the party / job / name screens: built (src/pgen.s, bank 110); the job
+    picker marks the job with the hand instead of a cheering pose (outline rebuilds too slow with the screen on).
+    Details: `docs/ff1-job-screens-proposals.md` "Outcome".

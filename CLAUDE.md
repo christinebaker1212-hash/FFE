@@ -1396,6 +1396,7 @@ Color registers on DMG/SGB, palette / VRAM writes outside their windows, soft re
 opposite directions); "Battle Speed". Details: docs/gb-release-checks.md "Strict checker".
 Then (item 51): the Game Style screen (owner chose A): Classic / Modern with a live description.
 Then (item 52): Game Style centred; proposals for the party / job / name screens in docs/ff1-job-screens-proposals.md.
+Then (item 53): owner chose P-A, K-A, N: new party / job picker / name entry screens (src/pgen.s, bank 110).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

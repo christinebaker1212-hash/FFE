@@ -101,3 +101,20 @@ when the list opens (as now).
 ## Not changed by any of these
 The jobs, their order, the default party (Warrior / Thief / Monk / Red Magician), the preset names, the
 "OK to begin with this party?" question and what Yes / No / B do.
+
+## Outcome (2026-11-25)
+Owner: "P-A, K-A, N". Built in `src/pgen.s` (ROM bank 110, strings and the letter grid from `ui.pg_source()`),
+called from the title's New Game; the old bank-2 routines are no longer called.
+- P-A as sketched: "Light Warriors", one window, picture / job / name or "------" per member, the hand at the picture
+  (as the main menu), "A Button: Job/Name"; after a name the hand moves to the next member without one; START asks
+  "OK to begin with this party?" again once all four are named (the question now covers the whole width).
+- K-A: "Choose a Job", the six pictures in two rows of three (a row of six would put 12 sprites on a line: the
+  plain Game Boy shows 10), the job's name in gold, its line and starting stats below. Changed from the sketch:
+  the highlighted job does not cheer. A pose change rebuilds every picture outline cell with the screen on, which
+  took 20-30 frames on the Color and ~100 on the plain Game Boy with White windows, garbled meanwhile; the hand
+  marks the job instead, and a move redraws only the info window (two frames).
+- N as proposed: "Name the" / the job / "Yura--"; tabs ABC abc 123 (SELECT, the page's tab in gold); END under the
+  letters; the sixth letter moves the hand to END; START types a preset name when there is none, then moves to END;
+  A on END finishes (the error sound with no name).
+Screen changes are copied to VRAM row by row in V-Blanks (`pg_push`), so the hand never blinks. Checked in
+SameBoy on Color, DMG (Black / White windows) and SGB with the strict checker: 0 findings, VRAM / OAM 0.

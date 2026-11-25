@@ -191,6 +191,7 @@ def data_banks(rom, ff3=None, init=None):
     banks[battle.BOBJ_BANK] = bytearray(battle.obj_bank(rom))
     banks[minimap.MINI_BANK] = bytearray(minimap.bank(rom))
     banks[sgb.SGB_BANK] = bytearray(sgb.bank(rom))
+    assert ui.PG_BANK not in banks                             # (code: src/pgen.s)
     import spelldesc                                           # (the magic shops' descriptions)
     assert spelldesc.SDESC_BANK not in banks
     banks[spelldesc.SDESC_BANK] = bytearray(spelldesc.bank())
@@ -506,6 +507,7 @@ def main():
            open(os.path.join(HERE, 'src', 'wanim.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sgbx.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'extras.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'pgen.s')).read() + '\n' + ui.pg_source() +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
            'section bank 104, $6000\n' +              # (the small font's glyphs: bank BTL6)

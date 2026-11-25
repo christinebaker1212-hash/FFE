@@ -149,6 +149,37 @@ def strings():
     return out
 
 
+PG_BANK = 110          # party creation, job picker, name entry (src/pgen.s; owner 2026-11-25: P-A, K-A, N)
+JOB_DESC = ['Mighty in battle.', 'Quick and lucky.', 'Fights barehanded.', 'Blade and magic.',
+            'Heals and shields.', 'Destructive magic.']          # (our own lines, 18 letters at most)
+
+
+def pg_source():
+    """the strings and tables of src/pgen.s, in bank PG_BANK at $7800"""
+    import ff1_items
+    def db(lbl, b): return '%s: db %s' % (lbl, ', '.join(str(x) for x in b))
+    out = ['section bank %d, $7800' % PG_BANK]
+    st = {'hdr': 'Light Warriors', 'hint': 'A Button: Job/Name', 'none': '------', 'jhdr': 'Choose a Job',
+          'lab1': 'HP\nAgi\nVit', 'lab2': 'Str\nInt\nLck', 'nm': 'Name the', 'tab0': 'ABC', 'tab1': 'abc',
+          'tab2': '123', 'end': 'END', 'ok': 'OK to begin', 'ok2': 'with this party?', 'yes': 'Yes', 'no': 'No'}
+    for k, v in st.items():
+        out.append(db('pgs_' + k, enc(v.replace('\\n', '\n')) + b'\0'))
+    for c in range(6):
+        name = ff1_items.T[240 + c]
+        assert len(name) <= 14 and len(JOB_DESC[c]) <= 18
+        out.append(db('pgs_n%d' % c, enc(name) + b'\0'))
+        out.append(db('pgs_d%d' % c, enc(JOB_DESC[c]) + b'\0'))
+    out.append('pgs_np: dw ' + ', '.join('pgs_n%d' % c for c in range(6)))
+    out.append('pgs_dp: dw ' + ', '.join('pgs_d%d' % c for c in range(6)))
+    g = ''.join(NAME_GRID)                     # three pages of 5 x 6: capitals, small letters, signs
+    pages = [g[0:27], g[27:54], g[54:81]]
+    grid = b''
+    for pg in pages:
+        grid += enc(pg.ljust(30))
+    out.append(db('pgs_grid', grid))
+    return '\n'.join(out) + '\n'
+
+
 def status_words():
     """the battle party lines' status words (bank 104: owner, 2026-11-23, every ailment)"""
     import battle                                  # (each after its icon: owner, 2026-11-25;
