@@ -382,8 +382,8 @@ pr_wwhite:  ld a, 16                        ; (LCD off: before scr_show)
             jr pr_wset
 pr_wfade:   ld a, 15
 .k:         ld [pr_cnt], a
-            call fd_vbl
-            call pr_wset
+            call pr_wset                    ; (to the shadows, up in the V-Blank: pal.s)
+            call wait_vbl
             ld a, [pr_cnt]
             dec a
             cp $FF

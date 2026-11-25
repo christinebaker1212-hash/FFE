@@ -660,10 +660,10 @@ pc_go:      ld [pc_dir], a
             call pc_step
             jr z, .done
 .ns:        call pc_build
-            call wait_vbl
-            ld a, $80
-            ld hl, pc_buf
+            ld a, $80                       ; (to the shadows before the wait: up in this
+            ld hl, pc_buf                   ;   V-Blank, as the hardware writes were)
             call cgb_pal32
+            call wait_vbl
             ld hl, pc_f
             inc [hl]
             jr .l
@@ -1130,8 +1130,8 @@ minimap:    call lcd_off                    ; (LCD off in V-Blank, interrupts of
             xor a
             ld [mn_fc], a
 .fr:        call mn_colours                 ; FF1 MinimapFrame
+            call mn_pal                     ; (before the wait: up in this V-Blank)
             call wait_vbl
-            call mn_pal
             call read_pad
             ldh a, [pad_new]
             and 3

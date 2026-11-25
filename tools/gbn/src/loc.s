@@ -1036,6 +1036,7 @@ opt_wpal:   ld a, COMMON
             and 3
             or b
             ld [win_pal + 5], a
+            call wp_dark                    ; (colour 0: the letters' shadow, pal.s)
             ld hl, win_pal                  ; (the LCD colour mode: cc.s)
             ld b, 8
             jp cc_inpl
@@ -1693,7 +1694,9 @@ bt_trans2:  ld a, [q_n]                     ; (the field's queue dropped)
             ldh a, [is_cgb]
             and a
             jr z, .dmg
-            call fd_vbl                     ; the colours now (read in a V-Blank)
+            nop                             ; (the colours: the shadows, read any time)
+            nop
+            nop
             ld hl, fd_pal
             ld c, 0
 .rb:        ld a, c
@@ -1762,10 +1765,13 @@ bt_trans2:  ld a, [q_n]                     ; (the field's queue dropped)
             ld a, h
             ld [tr_nx], a
             call tr_noise
+            call tr_pals                    ; (to the shadows before the wait: this V-Blank)
             call wait_vbl
             ld a, [tr_nx]                   ; (in this V-Blank: line 0's interrupt reads it)
             ldh [hrx], a
-            call tr_pals                    ; (in this V-Blank)
+            nop
+            nop
+            nop
             ld a, $F0                       ; the noise
             ldh [$FF21], a
             ld a, [bx_nz]
@@ -2518,7 +2524,10 @@ gr_make:    ld [gr_lim], a
             add a, a
             add a, a
             add a, a
-            ld [de], a                      ; top line
+            add a, 3                        ; (3 lines in: its top border's lines start there;
+            ld [de], a                      ;   a border row shared with the window above keeps
+                                            ;   that window's colour in its first 3 lines, which
+                                            ;   are the window above's inside: owner, 2026-11-25)
             ld a, [hl+]                     ; h
             add a, c
             add a, a

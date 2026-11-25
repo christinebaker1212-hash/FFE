@@ -715,14 +715,14 @@ move:       ld a, [moving]
             ldh a, [pad_new]                ; Start: the main menu
             bit 3, a
             jr z, .nm
-            ld hl, menu_main                   ; (FF1: the palettes cycle out first)
-            call pc_menu
+            ld hl, menu_main                ; (the screen's own fade, as every other screen:
+            call pc_fade                    ;   owner, 2026-11-25; no colour cycle)
             ld a, [menu_act]                ; Warp / Exit cast in the menu
             and a
-            jp z, map_reload
+            jp z, mr_menu
             ldh a, [maptype]
             and a
-            jp nz, map_reload               ; (on the overworld: nothing to leave)
+            jp nz, mr_menu                  ; (on the overworld: nothing to leave)
             ld a, [menu_act]
             cp 1
             jp z, arrived.warp
@@ -4327,3 +4327,24 @@ hand2_off:  xor a
             ld [oam_buf + 24], a
             ld [oam_buf + 28], a
             ret
+
+section bank 0, $1FEF                       ; (free space)
+; a screen about to fade in (scr_show): the windows' gradient at level 0 too, so its first frame
+; is dark (it showed its full colour for a frame under the black palettes: owner, 2026-11-25)
+gr_dark:    ldh a, [is_cgb]
+            and a
+            ret z
+            xor a
+            ld [fd_lv], a
+            jp gr_fdramp
+
+section bank 0, $252A                       ; (free space)
+; a screen from the map with its own fade (the main menu): no colour cycle first
+pc_fade:    call ap_stop
+            ld a, SCR_BANK
+            jp bank_call
+; back from the main menu: the map faded in (no colour cycle: the menu had its own fade)
+mr_menu:    ld a, 1
+            ld [fd_in], a
+            call map_reload
+            jp fade_in

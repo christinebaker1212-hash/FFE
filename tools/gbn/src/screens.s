@@ -146,6 +146,7 @@ scr_show:   call sgb_pics0                  ; (Super Game Boy: the pictures' col
             ld [sf_row], a
             ld a, 1                         ; (faded in)
             ld [fd_in], a
+            call gr_dark                    ; (the gradient dark too from the first frame)
             ld a, LCDC_ON
             call lcd_on
             jp fade_in

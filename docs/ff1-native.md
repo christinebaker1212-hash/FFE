@@ -1003,3 +1003,13 @@ one reaches parity, so the owner can keep playing).
     draws it at 13): now 13, exactly where it was; B from the member choice returns to the commands on the same screen
     (pick_char puts its second hand away; no redraw, no fade); the party's pictures moved one pixel right (x 8), off the
     window's frame line: gaps to the frame now match the HP figures' on the right.
+57. Owner (2026-11-25, last): text shadow (owner chose the suggested one): on the Color a 1 px shadow down and right
+    of every letter (text.font_banks bakes it into the Color font in colour 0), and the windows' colour 0 is the window
+    colour at a quarter (pal.s wp_dark): darker than every line of the gradient, any Config colour; the frame's outer
+    line and the picture outlines take that near-black. The plain Game Boy keeps its black / white text (no gain).
+    Also: "slight lag" on menus after the palette rework: loops that waited for the V-Blank and then wrote colours now
+    write them first (the shadow is sent in that V-Blank, as the hardware writes were): FF1's colour cycle, the
+    encounter transition, the world map, the prologue fade. The main menu now opens and closes with the screen fades
+    every other screen uses (no colour cycle, shorter black). A frame of full-colour gradient under black palettes
+    before a fade-in removed (gr_dark). Shop: a window under another (shared border row) started its gradient 3 lines
+    early, inside the upper window: each window's gradient now starts 3 lines into its top row.

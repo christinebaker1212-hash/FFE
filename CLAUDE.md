@@ -1404,6 +1404,7 @@ Then (item 55): new game fades into the world (music with it); parked vehicles f
 V-Blank upload, fades never read the screen: blown-out borders); reflections fade and clip to drawn water; Config pages
 (proposals: docs/ff1-options-proposals.md); SGB shop / menu crash fixed. Strict checker 0 on all systems.
 Then (item 56): main menu: the parked command hand in place, no fade backing out of the member choice, pictures centred.
+Then (item 57): Color letter shadow (down-right, window colour at a quarter), menu fades like every screen, palette timing, shop gradient band.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

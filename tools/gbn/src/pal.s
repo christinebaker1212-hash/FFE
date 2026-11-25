@@ -130,7 +130,7 @@ fd_done:    xor a
 
 ; ---- the encounter transition's colours (loc.s bt_trans2: the strips towards white), each
 ; frame: to the shadows (up in the next V-Blank)
-section bank 99, $6191
+section bank 99, $6198
 tr_pals:    ld a, [tr_f]
             and a
             ret z
@@ -255,4 +255,38 @@ fd_xw9:     ld a, [fd_slow]
             ldh [$FF24], a
 .n:         dec b
             jr nz, .w
+            ret
+
+; ---- the letters' shadow (owner, 2026-11-25: a 1 px shadow down and right, not pure black but
+; dark enough on light and dark window colours; Color only). The Color font carries it in colour
+; 0 (text.font_banks), and the windows' colour 0 is the window colour at a quarter: darker than
+; every line of the gradient (the window colour down to a third), whatever colour Config sets.
+; The frame's outer edge and the pictures' outlines (colour 0 too) become this near-black.
+section bank 99, $7D90
+wp_dark:    ld a, [win_r]
+            srl a
+            srl a
+            ld c, a                         ; r / 4
+            ld a, [win_g]
+            srl a
+            srl a
+            ld d, a                         ; g / 4
+            swap a
+            rlca
+            and $E0
+            or c
+            ld [win_pal], a                 ; low: r | g << 5
+            ld a, d
+            rrca
+            rrca
+            rrca
+            and 3
+            ld c, a
+            ld a, [win_b]
+            srl a
+            srl a
+            add a, a
+            add a, a
+            or c
+            ld [win_pal + 1], a             ; high: g >> 3 | b << 2
             ret
