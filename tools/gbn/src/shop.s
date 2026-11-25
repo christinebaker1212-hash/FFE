@@ -1541,6 +1541,29 @@ so_worn:    db "   Worn ", 0
 section bank 2, $477E                       ; (free space)
 so_price:   db "Price", 0
 so_gil:     db "Gil", 0
+; the target screen again after a use (menu.s)
+tgt_redraw: ld c, 1                         ; (the inside only: the frame's bottom row is the
+.r:         push bc                         ;   text window's top, which stays: owner's audit,
+            ld b, 1                         ;   2026-11-25)
+            call cell_addr
+            ld a, $20
+            ld b, 18
+.f:         ld [hl+], a
+            dec b
+            jr nz, .f
+            pop bc
+            inc c
+            ld a, c
+            cp 9
+            jr c, .r
+            xor a
+.m:         push af
+            call mm_member
+            pop af
+            inc a
+            cp 4
+            jr c, .m
+            jp scr_upd
 
 
 section wram, $CF40

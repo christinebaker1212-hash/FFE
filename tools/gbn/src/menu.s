@@ -1386,8 +1386,6 @@ tgt_draw:   ld bc, $0000
             cp 4
             jr c, .m
             ret
-tgt_redraw: call tgt_draw
-            jp scr_upd
 ; the hand beside a member: A = member, C set on B
 tgt_pick:   xor a
             ld [mm_pc], a
