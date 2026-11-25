@@ -1,7 +1,8 @@
 """FF1 native build: Super Game Boy data. Bank SGB_BANK: $4000 the border's tiles (SNES 4bpp,
 tools/gb/sgb_border.py: drawn there, no game graphics), $5000 its map and palettes (PCT_TRN),
 $5880 per formation (128) the enemy palette's colours 1-3 (RGB555: per DMG shade 1-3 the
-formation's colour in that shade, battle.dmg_shades' grouping), $5B80 fixed palettes
+formation's colour in that shade, battle.dmg_shades' grouping; $6000 / $6300 the same from palette
+A / B alone, for battles whose enemies use only one), $5B80 fixed palettes
 (4 colours each: menus, battle windows, the party column, the world map), $5C00 the border's
 colours per region (owner's list, 2026-11-24: 9 x 32 bytes, palette 4: colours 1-5 change, the
 frame's whites and the crystals stay), $5E00 the region of each map (61)."""
@@ -29,13 +30,18 @@ def bank(rom):
         pb = list(rom.rd(battle.BANK_BTLC, battle.BTL_PALS + 4 * fd[11], 4))
         win = [0x0F, 0x00, 0x0F, 0x30]
         msh = data.map_shades([win, pa, pb, win])
-        cols = []
-        for s, dflt in ((1, 0x10), (2, 0x00), (3, 0x0F)):
-            cs = [c for c in pa[1:] + pb[1:] if msh.get(c) == s]
-            cs = sorted(cs, key=_grey)
-            cols.append(cs[0] if cs and s < 3 else dflt)
-        blob[0x1880 + 6 * f:0x1886 + 6 * f] = b''.join(
-            data.rgb555(c).to_bytes(2, 'little') for c in cols)
+        def pick(src, base=None):
+            cols = []
+            for k, (s, dflt) in enumerate(((1, 0x10), (2, 0x00), (3, 0x0F))):
+                cs = sorted([c for c in src if msh.get(c) == s], key=_grey)
+                cols.append(cs[0] if cs and s < 3 else (base[k] if base else dflt))
+            return b''.join(data.rgb555(c).to_bytes(2, 'little') for c in cols), cols
+        both, bc = pick(pa[1:] + pb[1:])
+        blob[0x1880 + 6 * f:0x1886 + 6 * f] = both
+        # (owner's audit, 2026-11-25: a battle whose enemies all use one of the two palettes takes
+        #   that palette's colours: $6000 + 6 f palette A only, $6300 + 6 f palette B only)
+        blob[0x2000 + 6 * f:0x2006 + 6 * f] = pick(pa[1:], bc)[0]
+        blob[0x2300 + 6 * f:0x2306 + 6 * f] = pick(pb[1:], bc)[0]
     mini = minimap.bank(rom)
     mpal = list(mini[0x2309:0x230D])
     order = sorted(range(4), key=lambda i: -data.lum(mpal[i]))      # shade order (as minimap.py)

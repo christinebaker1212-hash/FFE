@@ -539,115 +539,6 @@ eqm_pal:    ld a, F3_BANK                   ; (body: eqm_palf, bank 99)
             jp bank_call
 
 
-; ---- shops (owner, 2026-11-22, from the WonderSwan Color remake): the item under the hand,
-; how many the party owns (weapons / armour: and wears) on the speech window's last row
-sh_own:     ld a, [sh_cur]
-            ld hl, sh_ocur
-            cp [hl]
-            ret z
-            ld [hl], a
-            ld a, [sh_sell]
-            and a
-            ret nz
-            ld a, [sh_type]
-            cp 2
-            jr c, .eq
-            cp 6
-            ret c                           ; (magic, clinic, inn: none)
-            call .it                        ; items: the count held
-            ld a, [hl]
-            ld b, a
-            ld c, $FF
-            jr .draw
-.eq:        call .it
-            and a                           ; A = the shop's kind: weapons 0, armour 1
-            ld a, [hl]                      ; (L = id)
-            ld e, $1B
-            jr z, .w
-            ld e, $43
-.w:         sub e                           ; FF1's slot number (1-based)
-            ld e, a
-            ld bc, 0                        ; B owned, C worn
-            ld hl, ch_stats + $18
-            ld a, [sh_type]
-            and a
-            jr z, .m0
-            ld l, $1C
-.m0:        ld d, 4
-.m:         push hl
-            push de
-            ld d, 4
-.s:         ld a, [hl+]
-            push af
-            and $7F
-            cp e
-            jr nz, .ns
-            inc b
-            pop af
-            push af
-            bit 7, a
-            jr z, .ns
-            inc c
-.ns:        pop af
-            dec d
-            jr nz, .s
-            pop de
-            pop hl
-            ld a, l
-            add a, $40
-            ld l, a
-            dec d
-            jr nz, .m
-.draw:      push bc
-            ld bc, $0104
-            call pen_at
-            pop bc
-            push bc
-            ld hl, so_own
-            call pen_str
-            pop bc
-            push bc
-            ld a, b
-            call nf_a
-            ld b, 2
-            call pen_num
-            pop bc
-            ld a, c
-            cp $FF
-            jr z, .end
-            push bc
-            ld hl, so_worn
-            call pen_str
-            pop bc
-            ld a, c
-            call nf_a
-            ld b, 2
-            call pen_num
-.end:       jp scr_upd
-.it:        ld a, [sh_cur]                  ; HL = the item id's cell in sh_list (A = id),
-            ld e, a                         ;   then the item's count in the packs; A = kind
-            ld d, 0
-            ld hl, sh_list
-            add hl, de
-            ld a, [hl]
-            ld e, a
-            add a, low(ITEMS)
-            ld l, a
-            ld h, high(ITEMS)
-            ld a, [sh_type]
-            cp 2
-            ret nc
-            ld hl, sh_list                  ; (equipment: HL = the id's cell again)
-            ld a, [sh_cur]
-            add a, l
-            ld l, a
-            ld a, h
-            adc a, 0
-            ld h, a
-            ld a, [sh_type]
-            ret
-so_own:     db "Own ", 0
-so_worn:    db "   Worn ", 0
 
 ; magic shops: after a member's word, the level's three slots as pips (filled: a spell
 ; learnt), unless the job can't learn it
@@ -3520,8 +3411,8 @@ ngm_s0:     db "CLASSIC", 0
 ngm_s1:     db "MODERN", 0
 ngm_yes:    db "Yes", 0
 ngm_no:     db "No", 0
-ngm_qc:     db "Ok to start on", $0A, "CLASSIC?", 0
-ngm_qm:     db "Ok to start on", $0A, "MODERN?", 0
+ngm_qc:     db "OK to start on", $0A, "CLASSIC?", 0
+ngm_qm:     db "OK to start on", $0A, "MODERN?", 0
 ngm_dc:     db "Classic offers", $0A, "gameplay true to", $0A, "the original.", $0A
             db "Manage spell", $0A, "charges with Inns", $0A, "or Houses, and", $0A
             db "plan your battles", $0A, "carefully - the", $0A, "party will not", $0A

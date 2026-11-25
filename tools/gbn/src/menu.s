@@ -460,8 +460,10 @@ mm_mem3:    ld [mm_t], a
             ld a, l
             add a, CH_LEVEL
             ld l, a
-            ld a, $4C
-            call pen_ch
+            push hl                         ; ("Lv 15", as Equip / Status)
+            ld hl, str_lv
+            call pen_str
+            pop hl
             ld a, [hl]
             inc a
             call nf_a
@@ -689,7 +691,7 @@ status_scr: ld [mm_t], a
             call eqm_pal
             ld a, [mm_t]
             call mtop
-            ld hl, str_level
+            ld hl, str_lv                   ; ("Lv 15" on every screen)
             call pen_str
             ld a, [mm_t]
             call ch_rec

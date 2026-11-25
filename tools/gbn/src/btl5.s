@@ -142,8 +142,15 @@ bt_hitlab:  ld a, [mt_conn]
 
 ; ---- the enemy names window: the name (clipped to 51 pixels) and the kind's count in the
 ; narrow digits at its right end (owner, 2026-11-22: "Goblin 3"); HL = the name -> vw_buf
-bt_nstr:    xor a
+; (a name too long is cut at 47 pixels and ends in ".", a gap before the count: owner's audit,
+; 2026-11-25: "Tyrannosaur1")
+bt_nstr:    push hl                         ; (its right limit: bank BTL6 bt_nmeas)
+            ld a, BTL6_BANK
+            ld hl, bt_nmeas
+            call bank_call
+            xor a
             ld [vw_x], a
+            pop hl
 .c:         ld a, [hl+]
             and a
             jr z, .cnt
@@ -153,7 +160,8 @@ bt_nstr:    xor a
             ld b, a
             ld a, [vw_x]
             add a, b
-            cp 53                           ; (right edge past 51: stop)
+            ld hl, bt_nlim
+            cp [hl]
             jr nc, .cut
             pop af
             call vwf_ch
@@ -161,6 +169,8 @@ bt_nstr:    xor a
             jr .c
 .cut:       pop af
             pop hl
+            ld a, $2E                       ; "."
+            call vwf_ch
 .cnt:       ld a, [bt_t + 13]
             ld b, a
             ld hl, bt_eid
@@ -176,28 +186,6 @@ bt_nstr:    xor a
             ld [vw_x], a
             ld a, d
             jp vwf_ch
-; glyph A's advance: a space 3, a glyph its width + 1
-bt_gw:      cp $20
-            jr nz, .g
-            ld a, 3
-            ret
-.g:         sub $21
-            ld l, a
-            ld h, 0
-            ld e, l
-            ld d, h
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, de
-            ld de, vwf_glyphs
-            add hl, de
-            ld a, BTL6_BANK
-            ld [fc_bank], a
-            call far_byte
-            inc a
-            ret
-
 ; ---- a member darts forward / back (owner, 2026-11-22: moving forward while swinging or
 ; casting, not FF1's slow walk): A = member, B = pixels a frame, C = pose; 2 frames
 bt_dart:    ld [bt_am], a
@@ -410,3 +398,66 @@ ban_w:      ds 1
 dn_attr:    ds 1                            ; the number's OAM attribute
 bt_hp0:     ds 2                            ; HP before a heal
 ban_last:   ds 1                            ; the target whose name the top window shows
+
+section bank 6, $733B                       ; (free space after the Konami Code's multipliers)
+; glyph A's advance: a space 3, a glyph its width + 1
+bt_gw:      cp $20
+            jr nz, .g
+            ld a, 3
+            ret
+.g:         sub $21
+            ld l, a
+            ld h, 0
+            ld e, l
+            ld d, h
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, de
+            ld de, vwf_glyphs
+            add hl, de
+            ld a, BTL6_BANK
+            ld [fc_bank], a
+            call far_byte
+            inc a
+            ret
+
+section bank 104, $7F00
+; bt_nstr's limit for the name in bt_sbuf: 53 when it fits (up to 51 pixels), else 47 (cut, ".")
+bt_nmeas:   ld hl, bt_sbuf
+            ld c, 0
+.m:         ld a, [hl+]
+            and a
+            jr z, .d
+            cp $20
+            ld b, 3
+            jr z, .a
+            push hl
+            sub $21
+            ld l, a
+            ld h, 0
+            ld e, l
+            ld d, h
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, de
+            ld de, vwf_glyphs
+            add hl, de
+            ld b, [hl]
+            inc b
+            pop hl
+.a:         ld a, c
+            add a, b
+            ld c, a
+            jr .m
+.d:         ld a, c
+            cp 53
+            ld a, 53
+            jr c, .s
+            ld a, 47
+.s:         ld [bt_nlim], a
+            ret
+
+section wram, $CF75                         ; (free fixed RAM)
+bt_nlim:    ds 1                            ; bt_nstr: the name's right limit

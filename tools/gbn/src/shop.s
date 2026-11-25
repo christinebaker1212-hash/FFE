@@ -1091,8 +1091,8 @@ sh_pick:    xor a
             ld [sh_cur], a
             dec a                           ; (the owned / worn line: loc.s)
             ld [sh_ocur], a
-.rd:        ld bc, $0005
-            ld de, $140C
+.rd:        ld bc, $0005                    ; (one line an entry, six shown: owner's audit,
+            ld de, $1408                    ;   2026-11-25; the info window below: sh_info)
             call scr_win
             xor a
 .it:        ld [sh_k], a
@@ -1106,23 +1106,21 @@ sh_pick:    xor a
             and a
             jr z, .dn
             ld [sh_it], a
-            ld a, [sh_k]                    ; name at row 6 + 2 i, column 2
-            add a, a
+            ld a, [sh_k]                    ; name at row 6 + i, column 1 (17 letters fit)
             add a, 6
             ld c, a
-            ld b, 2
+            ld b, 1
             push bc
             call pen_at
             ld a, [sh_it]
             call pen_iname
             pop bc
-            inc c
-            ld a, [sh_it]                   ; spells: their level first
+            ld a, [sh_it]                   ; spells: their level at the right
             cp $B0
             jr c, .np
             cp $F0
             jr nc, .np
-            ld b, 3
+            ld b, 17
             push bc
             call pen_at
             ld a, $4C
@@ -1136,26 +1134,15 @@ sh_pick:    xor a
             add a, $31
             call pen_ch
             pop bc
-.np:        push bc
-            call .price
-            pop bc
-            ld b, 13                        ; the price, ending at column 18
-            call pen_at
-            ld hl, sh_price
-            call nf_w
-            ld b, 6
-            call pen_num
-            ld a, [sh_k]
+.np:        ld a, [sh_k]
             inc a
-            cp 5
+            cp 6
             jr c, .it
-.dn:        call sh_gold
-            call scr_upd
-.l:         call sh_own                     ; (how many owned / worn: loc.s)
-            ld a, [sh_cur]                  ; the hand at the entry (column 2, row 6 + 2 n)
-            ld hl, sh_top
+.dn:        call scr_upd
+.l:         call sh_info                    ; (price, owned / worn, Gil)
+            ld a, [sh_cur]                  ; the hand at the entry (row 6 + n; over the icon,
+            ld hl, sh_top                   ;   as the Equip list)
             sub [hl]
-            add a, a
             add a, 6
             ld c, a
             ld b, 2
@@ -1184,7 +1171,7 @@ sh_pick:    xor a
             jr z, .l
             ld [hl], e
             ld a, [sh_top]
-            add a, 4
+            add a, 5
             cp e
             jr nc, .l
             ld hl, sh_top
@@ -1398,6 +1385,163 @@ sh_pay3:    ld hl, GOLD
             call sh_gold
             jp scr_upd
 zz_end_6690:
+
+section bank 2, $73A1                       ; (free space)
+; ---- the list's info window (owner's audit, 2026-11-25; was the speech window's last row, on
+; its border): the item under the hand's price, how many the party owns (weapons / armour: and
+; wears; WonderSwan Color remake, owner 2026-11-22), the Gil; drawn when the hand moves
+sh_info:    ld a, [sh_cur]
+            ld hl, sh_ocur
+            cp [hl]
+            ret z
+            ld [hl], a
+            ld bc, $000D
+            ld de, $1405
+            call scr_win
+            ld a, [sh_cur]                  ; the price (selling: half)
+            ld e, a
+            ld d, 0
+            ld hl, sh_list
+            add hl, de
+            ld a, [hl]
+            ld [sh_it], a
+            call sh_pick.price
+            ld bc, $010E
+            call pen_at
+            ld hl, so_price
+            call pen_str
+            ld bc, $0D0E
+            call pen_at
+            ld hl, sh_price
+            call nf_w
+            ld b, 6
+            call pen_num
+            ld bc, $0110                    ; the Gil
+            call pen_at
+            ld hl, so_gil
+            call pen_str
+            ld bc, $0D10
+            call pen_at
+            ld hl, GOLD
+            ld a, [hl+]
+            ld [nf_val], a
+            ld a, [hl+]
+            ld [nf_val + 1], a
+            ld a, [hl]
+            ld [nf_val + 2], a
+            ld b, 6
+            call pen_num
+            call scr_upd
+            jp sh_own                       ; (owned / worn: buying equipment or items)
+
+section bank 2, $58BB                       ; (free space)
+sh_own:     ld a, [sh_sell]
+            and a
+            ret nz
+            ld a, [sh_type]
+            cp 2
+            jr c, .eq
+            cp 6
+            ret c                           ; (magic, clinic, inn: none)
+            call .it                        ; items: the count held
+            ld a, [hl]
+            ld b, a
+            ld c, $FF
+            jr .draw
+.eq:        call .it
+            and a                           ; A = the shop's kind: weapons 0, armour 1
+            ld a, [hl]                      ; (L = id)
+            ld e, $1B
+            jr z, .w
+            ld e, $43
+.w:         sub e                           ; FF1's slot number (1-based)
+            ld e, a
+            ld bc, 0                        ; B owned, C worn
+            ld hl, ch_stats + $18
+            ld a, [sh_type]
+            and a
+            jr z, .m0
+            ld l, $1C
+.m0:        ld d, 4
+.m:         push hl
+            push de
+            ld d, 4
+.s:         ld a, [hl+]
+            push af
+            and $7F
+            cp e
+            jr nz, .ns
+            inc b
+            pop af
+            push af
+            bit 7, a
+            jr z, .ns
+            inc c
+.ns:        pop af
+            dec d
+            jr nz, .s
+            pop de
+            pop hl
+            ld a, l
+            add a, $40
+            ld l, a
+            dec d
+            jr nz, .m
+.draw:      push bc
+            ld bc, $010F
+            call pen_at
+            pop bc
+            push bc
+            ld hl, so_own
+            call pen_str
+            pop bc
+            push bc
+            ld a, b
+            call nf_a
+            ld b, 2
+            call pen_num
+            pop bc
+            ld a, c
+            cp $FF
+            jr z, .end
+            push bc
+            ld hl, so_worn
+            call pen_str
+            pop bc
+            ld a, c
+            call nf_a
+            ld b, 2
+            call pen_num
+.end:       jp scr_upd
+.it:        ld a, [sh_cur]                  ; HL = the item id's cell in sh_list (A = id),
+            ld e, a                         ;   then the item's count in the packs; A = kind
+            ld d, 0
+            ld hl, sh_list
+            add hl, de
+            ld a, [hl]
+            ld e, a
+            add a, low(ITEMS)
+            ld l, a
+            ld h, high(ITEMS)
+            ld a, [sh_type]
+            cp 2
+            ret nc
+            ld hl, sh_list                  ; (equipment: HL = the id's cell again)
+            ld a, [sh_cur]
+            add a, l
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld h, a
+            ld a, [sh_type]
+            ret
+so_own:     db "Own ", 0
+so_worn:    db "   Worn ", 0
+
+section bank 2, $477E                       ; (free space)
+so_price:   db "Price", 0
+so_gil:     db "Gil", 0
+
 
 section wram, $CF40
 sh_id:      ds 1

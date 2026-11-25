@@ -317,7 +317,38 @@ sgb_map:    ld a, [sgb_on]
 sgb_mini:   ld hl, SG_FIXED + 24
             jr sgb_one
 ; battle: windows palette 0, the formation's enemies 1 (enemy area), the party 2 (its column)
-sgb_battle: ld a, [sgb_on]
+; (its body in bank 99: bank 0 was full)
+sgb_battle: ld a, F3_BANK
+            ld hl, sgb_btl99
+            jp bank_call
+
+section bank 0, $1700                       ; (the packets)
+SG_MLT2:    db $89, $01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+SG_MLT1:    db $89, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+SG_FRZ:     db $B9, $01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+SG_BLK:     db $B9, $03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+SG_UNM:     db $B9, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+SG_CHRTRN:  db $99, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+SG_PCTTRN:  db $A1, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+; ATTR_BLK: the whole screen palette 0
+SG_ALL0:    db $21, $01, $07, $00, 0, 0, 19, 17, 0, 0, 0, 0, 0, 0, 0, 0
+; battle: the enemy area (1-14, 0-11) palette 1, else 0; the party column (15-19, 0-11) 2
+SG_BTLATR:  db $21, $02, $07, $05, 1, 0, 14, 11, $03, $0A, 15, 0, 19, 11, 0, 0
+SG_BTL2:    db $22, $05, $07, $05, 1, 0, 14, 11     ; (+ the four members' blocks)
+
+section wram, $C980
+sgb_on:     ds 1
+sgb_qn:     ds 1
+sgb_qi:     ds 1
+sgb_gap:    ds 1
+sgb_tmp:    ds 14
+section wram, $C9A0
+sgb_q:      ds 6 * 16                       ; (6 slots, in one page)
+
+
+section bank 99, $7A80                      ; (sgb_battle's body: moved from bank 0)
+; battle: windows palette 0, the formation's enemies 1 (enemy area), the party 2 (its column)
+sgb_btl99:  ld a, [sgb_on]
             and a
             ret z
             call sgb_new
@@ -335,7 +366,7 @@ sgb_battle: ld a, [sgb_on]
             ld e, l
             add hl, hl
             add hl, de                      ; x 6
-            ld de, SG_ENEMY
+            call sgb_epal                   ; DE = the set for the enemies present
             add hl, de
             ld de, sgb_tmp + 8
             ld bc, 6
@@ -413,25 +444,28 @@ sgb_battle: ld a, [sgb_on]
             jr c, .m
             jp sgb_end
 
-section bank 0, $1700                       ; (the packets)
-SG_MLT2:    db $89, $01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-SG_MLT1:    db $89, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-SG_FRZ:     db $B9, $01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-SG_BLK:     db $B9, $03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-SG_UNM:     db $B9, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-SG_CHRTRN:  db $99, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-SG_PCTTRN:  db $A1, $00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-; ATTR_BLK: the whole screen palette 0
-SG_ALL0:    db $21, $01, $07, $00, 0, 0, 19, 17, 0, 0, 0, 0, 0, 0, 0, 0
-; battle: the enemy area (1-14, 0-11) palette 1, else 0; the party column (15-19, 0-11) 2
-SG_BTLATR:  db $21, $02, $07, $05, 1, 0, 14, 11, $03, $0A, 15, 0, 19, 11, 0, 0
-SG_BTL2:    db $22, $05, $07, $05, 1, 0, 14, 11     ; (+ the four members' blocks)
 
-section wram, $C980
-sgb_on:     ds 1
-sgb_qn:     ds 1
-sgb_qi:     ds 1
-sgb_gap:    ds 1
-sgb_tmp:    ds 14
-section wram, $C9A0
-sgb_q:      ds 6 * 16                       ; (6 slots, in one page)
+; DE = the SGB enemy colours' table for this battle: the formation's palette A alone, B alone,
+; or both (the enemies present: bt_egp bit 0; keeps HL; owner's audit, 2026-11-25)
+sgb_epal:   push hl
+            ld hl, bt_egp
+            ld a, [bt_ecount]
+            ld b, a
+            ld c, 0                         ; C: bit 0 palette A seen, bit 1 palette B seen
+.l:         ld a, [hl+]
+            and 1
+            inc a
+            or c
+            ld c, a
+            dec b
+            jr nz, .l
+            pop hl
+            ld de, SG_ENEMY
+            dec c
+            jr z, .a
+            dec c
+            ret nz
+            ld de, SG_ENEMY + $0A80         ; ($6300)
+            ret
+.a:         ld de, SG_ENEMY + $0780         ; ($6000)
+            ret
