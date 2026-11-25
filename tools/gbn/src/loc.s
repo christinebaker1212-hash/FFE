@@ -3991,9 +3991,11 @@ sgb_attr:   call sgb_slot
 
 section bank 0, $16F0                       ; (after refl_tick: the menu pictures' resets)
 sgb_menu0:  jp alt_new                       ; (scr_open: no pictures yet; a new screen)
-sgb_btl0:   xor a                           ; (a battle: its own palettes)
-            ld [sgb_pn], a
-            jp sgb_battle
+sgb_btl0:   xor a                           ; (a battle: its own palettes; no gold-label pass:
+            ld [sgb_pn], a                  ;   it sent the menus' palettes over the battle's
+            ld [alt_ok], a                  ;   on the SGB and its glyphs would take battle
+            ld [alt_g], a                   ;   (alt_g: the last screen's gold, alt_show's test)
+            jp sgb_battle                   ;   tiles $C0-$FF; since 3b67bca)
 
 section bank 0, $2CCE                       ; (free space)
 ; ---- plain Game Boy / Super Game Boy: the Color's gold labels and grey choices (attributes $0B /
