@@ -468,3 +468,190 @@ pr_mix:     ld a, [hl+]
             add a, e
             pop bc
             ret
+
+section bank 104, $5600
+; ---- the ailment bubbles (owner, 2026-11-25): each living member with an ailment shows it as a
+; round icon in front of its sprite (OAM 28-31; battle.py bubble_tiles after the hit labels),
+; several in turn, the worst first (as the party line's word). A member's bubble tile is its
+; lying pose's last tile (32 m + 31: only shown while it lies dead, when the bubble is gone and
+; the tile is put back). Every frame from bt_frame (bt_fhook); one tile upload a frame.
+BUB_SRC    = $4000 + 39 * 48 + 64
+bub_tick:   ld a, [bt_exn]                  ; (a hit burst owns OAM 28-31)
+            and a
+            ret nz
+            ld hl, bub_t
+            inc [hl]
+            xor a
+            ld [bub_up], a
+            ld c, 0
+.m:         push bc
+            call bub_one
+            pop bc
+            inc c
+            ld a, c
+            cp 4
+            jr c, .m
+            ret
+; member C: the bubble it wants (0 none, 1-7 bub_tab), its tile, its sprite
+bub_one:    ld a, c
+            ld [bub_m], a
+            call ch_rec
+            inc hl
+            ld b, [hl]                      ; (the ailment bits)
+            ld e, 0
+            bit 0, b                        ; (dead: none)
+            jr nz, .want
+            ld hl, bub_tab
+            ld d, 0
+            ld c, 7
+.cnt:       ld a, [hl+]
+            and b
+            jr z, .cn
+            inc d
+.cn:        dec c
+            jr nz, .cnt
+            ld a, d
+            and a
+            jr z, .want
+            ld a, [bub_t]                   ; the k-th of them (k: every 64 frames the next)
+            rlca
+            rlca
+            and 3
+.md:        cp d
+            jr c, .k
+            sub d
+            jr .md
+.k:         ld d, a
+            ld hl, bub_tab
+.fd:        inc e
+            ld a, [hl+]
+            and b
+            jr z, .fd
+            ld a, d
+            and a
+            jr z, .want
+            dec d
+            jr .fd
+.want:      ld a, [bub_m]
+            ld hl, bub_cur
+            add a, l
+            ld l, a
+            jr nc, .w1
+            inc h
+.w1:        ld a, [hl]
+            cp e
+            jr z, .oam
+            ld a, [bub_up]                  ; (its tile first: one upload a frame)
+            ld d, a
+            ld a, [bt_upn]
+            or d
+            jr nz, .hide
+            ld [hl], e
+            ld a, 1
+            ld [bub_up], a
+            ld a, e
+            and a
+            jr z, .orig
+            dec a                           ; the bubble's tile
+            swap a
+            ld l, a
+            ld h, 0
+            ld bc, BUB_SRC
+            add hl, bc
+            ld a, HITL_BANK
+            jr .cp
+.orig:      ld a, [bub_m]                   ; the lying pose's tile back (bt_party_gfx)
+            call ch_rec
+            ld a, [hl]
+            add a, a
+            ld h, a
+            ld l, $F0
+            inc h
+            ldh a, [is_cgb]
+            and a
+            ld bc, U_SPRDMG - $100
+            jr z, .o2
+            ld bc, U_SPRCGB - $100
+.o2:        add hl, bc
+            ld a, UI_GFX
+.cp:        ld de, bub_buf
+            ld bc, 16
+            call far_copy
+            ld hl, bt_upsrc
+            ld a, low(bub_buf)
+            ld [hl+], a
+            ld [hl], high(bub_buf)
+            ld a, [bub_m]                   ; $8000 + $200 m + $1F0
+            add a, a
+            add a, $81
+            ld [bt_updst + 1], a
+            ld a, $F0
+            ld [bt_updst], a
+            ld a, 1
+            ld [bt_upn], a
+            jr .hide
+.oam:       ld a, e
+            and a
+            jr z, .hide
+            ld a, [bub_m]                   ; beside the member's top-left sprite
+            ld c, a
+            add a, a
+            add a, c
+            add a, a
+            add a, a
+            add a, a
+            add a, 16
+            ld l, a
+            ld h, high(oam_buf)
+            ld a, [hl+]
+            and a
+            jr z, .hide
+            ld d, a
+            ld a, [hl]
+            sub 9
+            ld b, a
+            call bub_slot
+            ld a, d
+            ld [hl+], a
+            ld a, b
+            ld [hl+], a
+            ld a, [bub_m]                   ; tile 32 m + 31
+            swap a
+            add a, a
+            add a, 31
+            ld [hl+], a
+            ld a, e                         ; poisoned: green; numb / confused: gold; else white
+            cp 7
+            ld a, $16
+            jr z, .at
+            ld a, e
+            cp 2
+            ld a, $15
+            jr z, .at
+            ld a, e
+            cp 5
+            ld a, $15
+            jr z, .at
+            ld a, $14
+.at:        ld [hl], a
+            ret
+.hide:      call bub_slot
+            ld [hl], 0
+            ret
+bub_slot:   ld a, [bub_m]                   ; HL = OAM 28 + m
+            add a, a
+            add a, a
+            add a, 112
+            ld l, a
+            ld h, high(oam_buf)
+            ret
+; the ailments in the bubbles' order (battle.py BUB_ORDER): stone, numb, asleep, mute, confused,
+; blind, poisoned
+bub_tab:    db $02, $10, $20, $40, $80, $08, $04
+
+section wram, $C6D0
+bub_cur:    ds 4                            ; the bubble whose tile each member has (0: its own)
+bub_t:      ds 1
+bub_up:     ds 1
+bub_m:      ds 1
+bub_buf:    ds 16

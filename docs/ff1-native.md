@@ -758,3 +758,28 @@ one reaches parity, so the owner can keep playing).
    - Item / magic target window: the name from column 3 with HP / max at the right, the job or ailment
      below, the hand before the name (it sat on the job line and covered the next member's first
      letter; the level dropped there, as FF1's own target screen).
+42. Owner (2026-11-25): pre-battle ailments, the White Magic icon, criticals, ailment icons, doors,
+   glitches after big formations, then a new ROM.
+   - Poison (or stone) from before a battle showed as "Dead": the outside values (1 dead, 2 stone,
+     3 poison) were read as battle bits. `bt_ail_in` turns them into bits before anything is drawn.
+   - Doors: every closed / locked door metatile is drawn open while the party is inside a room
+     (`door_st` in `q_mt`), also after a warp; `room_redraw` on the Color redraws the door cells.
+   - White Magic icon in battle: the one-colour battle text inked both of the icon's colours, so the
+     orb came out a white blob. In battle names it is font code 2, the orb with its shine left out
+     (text.py; `bt_mname` swaps the code).
+   - "CRITICAL!": a gold label (battle.py, after the hit labels) beside the member concerned (the
+     attacker; the member hit when an enemy struck), shown for 40 frames (A skips), then the hit
+     count and the damage number as before; it replaces the "Critical hit!!" line (`bt_critlab`).
+   - Ailment icons (our own pictograms, battle.py AIL_PICT): each living member with an ailment shows a
+     round bubble in front of its sprite (OAM 28-31; several ailments take turns every 64 frames,
+     the worst first; green for poison, gold for numb / confused, white for the rest). A bubble's
+     tile is the lying pose's last tile (32 m + 31), handed back when the member dies (`bub_tick`,
+     bank 104, every battle frame through `bt_fhook`). The party line shows the icon before the
+     status word (small-font codes $8C-$93).
+   - After bigger formations (several level ups): the results window's second page wrote its text
+     into the first page's tiles while those still showed (jumbled lines): the window is shown empty
+     first (`res_pgw`). A message closing let the names / commands be written into its rows' tiles
+     while it still showed ("Goblin Guard 4d / Had no effect"): its text is blanked first
+     (`msg_blank`, both close paths).
+   - Tools: `GBN_GAPS=N build.py` lists the free runs of code bank N (the assembler now returns the
+     bytes it claimed).

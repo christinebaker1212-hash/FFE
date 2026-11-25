@@ -32,6 +32,8 @@ def font_tiles(rom, ff3=None):
     for ch in latin_font.G:
         out[code_of(ch)] = latin_font.tile(ch, fg=3, bg=2)
     out.update(names.icon_tiles(ff3))
+    w = out[names.ICONS['white'][0]]       # battle text (one ink colour): White Magic's orb with
+    out[0x02] = bytes(a & b for a, b in zip(w[:8], w[8:])) + w[8:]   # its shine left out
     out[0x0A] = names.own_tile(PIP_FULL)     # magic shops: a level's slot used / free
     out[0x0B] = names.own_tile(PIP_FREE)
     return out

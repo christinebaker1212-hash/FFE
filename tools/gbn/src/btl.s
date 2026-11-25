@@ -1427,7 +1427,7 @@ bt_frame:   ld a, [sf_row]                  ; (no hand while the window rows are
             call sf_step
             call bt_rowsup
 .t:         call bt_vbl
-            call bt_danim                   ; (the damage number's bounce)
+            call bt_fhook                   ; (the ailment bubbles, the damage number's bounce)
             call read_pad
             jp bt_arep                      ; (A held: pressed again and again)
 ; one text row's map row (A = 12-17) to upload, alone
@@ -1637,7 +1637,7 @@ bt_pline:   ld [bt_t + 11], a
 .w:         ld h, d
             ld l, e
             ld de, bt_sbuf
-            ld bc, 8
+            ld bc, 9                        ; (its icon, a blank, the word)
             ld a, BTL6_BANK
             call far_copy
             call bt_stx                     ; (x 50; Modern MP: after the HP)
@@ -1864,5 +1864,5 @@ bt_ail_in:  xor a
             inc a
             cp 4
             jr c, .m
-            ret
+            jp bub_init                     ; (the bubbles: none yet, btl5.s)
 

@@ -230,7 +230,13 @@ bt_mname:   ld l, a
             ld de, bt_sbuf
             ld bc, 20
             ld a, BTL_DATA
-            jp far_copy
+            call far_copy
+            ld hl, bt_sbuf                  ; (White Magic: its battle icon, font code 2: the
+            ld a, [hl]                      ;   orb without its shine, not a white blob in the
+            cp 3                            ;   one-colour battle text)
+            ret nz
+            dec [hl]
+            ret
 ; the buffer as message row [bt_rows] (tiles BT_TEXT + 18 row)
 bt_mrow:    ld a, [bt_rows]
             ld c, a
@@ -380,6 +386,7 @@ bt_msg_close:
             ret z
             xor a
             ld [bt_msgon], a
+            call msg_blank
             ld hl, bt_save
             ld de, smap + 12 * 32
             ld bc, 6 * 32

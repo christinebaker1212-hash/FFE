@@ -150,12 +150,14 @@ def strings():
 
 def status_words():
     """the battle party lines' status words (bank 104: owner, 2026-11-23, every ailment)"""
-    out = ['section bank 104, $43D0']
+    import battle                                  # (each after its icon: owner, 2026-11-25;
+    out = ['section bank 104, $4661']              #   battle.VWF_AIL, codes $8C-$93)
     for k, w in (('dead', 'Dead'), ('stone', 'Stone'), ('poison', 'Poison'), ('numb', 'Numb'), ('sleep', 'Sleep'),
                  ('mute', 'Mute'), ('conf', 'Conf.'), ('blind', 'Blind')):
-        out.append('bst_%s: db %s, 0' % (k, ', '.join(str(b) for b in enc(w))))
+        ic = 0x8C + battle.VWF_AIL.index(k)
+        out.append('bst_%s: db %d, 32, %s, 0' % (k, ic, ', '.join(str(b) for b in enc(w))))
     out.append('section bank 104, $4BE0')         # (Modern MP: Poison shortened, src/mmp.s)
-    out.append('bst_poisn: db %s, 0' % ', '.join(str(b) for b in enc('Pois.')))
+    out.append('bst_poisn: db %d, 32, %s, 0' % (0x8C + battle.VWF_AIL.index('poison'), ', '.join(str(b) for b in enc('Pois.'))))
     return '\n'.join(out) + '\n'
 
 

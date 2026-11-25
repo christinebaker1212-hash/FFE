@@ -1368,6 +1368,9 @@ magic shop rows, shop speech re-flowed; dialogue, spells, shops, dungeons checke
 Then (item 40): SGB menu pictures in their job colours, Bestiary page turns, Sound Test hand; ending checked.
 Then (item 41): text layout: dialogue pages of whole sentences with balanced breaks (no orphans, no
 one-line pages), story pages centred, shop / menu texts re-flowed, target window re-laid.
+Owner (2026-11-25), done (item 42): pre-battle Poison no longer shown as Dead; doors open whenever the party is
+inside; White Magic icon readable in battle; CRITICAL! label before hits / damage; ailment icon bubbles by the
+members and icons on the party lines; jumbled results page / message text after big formations fixed.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

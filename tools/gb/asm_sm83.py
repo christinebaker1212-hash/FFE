@@ -236,7 +236,9 @@ def _asm_once(src, syms, promote):
             except (KeyError, IndexError, ValueError, SyntaxError) as e:
                 raise AsmError('line %d: cannot assemble (%s)\n  %s' % (lineno, e, line.strip()))
         bank_of = dict(label_bank)
-    return Result(banks, labels, label_bank)
+    res = Result(banks, labels, label_bank)
+    res.claimed = claimed                   # (bank, offset) -> True: the bytes code / data took
+    return res
 
 
 def _mem(a):

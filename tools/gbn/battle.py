@@ -252,13 +252,59 @@ HL_DIG = {'0': ['###', '#.#', '#.#', '#.#', '#.#', '###'], '1': ['.#.', '##.', '
           '6': ['###', '#..', '###', '#.#', '#.#', '###'], '7': ['###', '..#', '..#', '.#.', '.#.', '.#.'],
           '8': ['###', '#.#', '###', '#.#', '#.#', '###'], '9': ['###', '#.#', '###', '..#', '..#', '###']}
 HL_LET = {'H': ['#.#', '#.#', '###', '#.#', '#.#'], 'I': ['#', '#', '#', '#', '#'],
-          'T': ['###', '.#.', '.#.', '.#.', '.#.'], 'S': ['.##', '#..', '.#.', '..#', '##.']}
+          'T': ['###', '.#.', '.#.', '.#.', '.#.'], 'S': ['.##', '#..', '.#.', '..#', '##.'],
+          'C': ['.##', '#..', '#..', '#..', '.##'], 'R': ['##.', '#.#', '##.', '#.#', '#.#'],
+          'A': ['.#.', '#.#', '###', '#.#', '#.#'], 'L': ['#..', '#..', '#..', '#..', '###'],
+          '!': ['#', '#', '#', '.', '#']}
+
+
+# ailment pictograms (owner, 2026-11-25: icons for Poison, Blind, Numb, ... in bubbles by the
+# members and on their party lines); our own drawings, 5 x 6
+AIL_PICT = {
+    'dead':   ['.###.', '#####', '#.#.#', '#####', '.###.', '.#.#.'],
+    'stone':  ['.###.', '##.##', '#.###', '###.#', '##.##', '.###.'],
+    'poison': ['..#..', '..#..', '.###.', '#####', '#####', '.###.'],
+    'numb':   ['...##', '..##.', '.####', '..##.', '.##..', '.#...'],
+    'sleep':  ['#####', '...#.', '..#..', '.#...', '#####', '.....'],
+    'mute':   ['#...#', '.#.#.', '..#..', '.#.#.', '#...#', '.....'],
+    'conf':   ['.###.', '#...#', '...#.', '..#..', '.....', '..#..'],
+    'blind':  ['.....', '#####', '#.#.#', '.....', '.....', '.....'],
+}
+BUB_ORDER = ['stone', 'numb', 'sleep', 'mute', 'conf', 'blind', 'poison']   # btl6 bub_tab
+VWF_AIL = ['dead', 'stone', 'poison', 'numb', 'sleep', 'mute', 'conf', 'blind']  # codes $8C-$93
+
+
+def bubble_tiles():
+    """a sprite tile per ailment (BUB_ORDER): a round bubble (colour 1) with the pictogram cut
+    out of it (colour 3)"""
+    disc = ['..####..', '.######.', '########', '########', '########', '########', '.######.', '..####..']
+    out = bytearray()
+    for k in BUB_ORDER:
+        pic = AIL_PICT[k]
+        oy = 2 if k == 'blind' else 1
+        for y in range(8):
+            lo = hi = 0
+            for x in range(8):
+                c = 1 if disc[y][x] == '#' else 0
+                py, px = y - oy, x - 1
+                if c and 0 <= py < len(pic) and 0 <= px < 5 and pic[py][px] == '#': c = 3
+                lo = lo << 1 | (c & 1)
+                hi = hi << 1 | (c >> 1)
+            out += bytes([lo, hi])
+    return bytes(out)
 
 
 def hit_tiles():
+    """the 39 "n HIT(S)" labels (3 tiles each), then "CRITICAL!" (4 tiles, at + 39 * 48), then
+    the ailment bubbles (at + 39 * 48 + 64)"""
+    return _labels([(str(n), 'HIT' if n == 1 else 'HITS', 3) for n in range(1, 40)] +
+                   [('', 'CRITICAL!', 4)]) + bubble_tiles()
+
+
+def _labels(specs):
     out = bytearray()
-    for n in range(1, 40):
-        word = 'HIT' if n == 1 else 'HITS'
+    for num, word, nt in specs:
+        W = 8 * nt
         cols = []                                   # columns of 6 rows (letters bottom-aligned)
         def put(g, top):
             for x in range(len(g[0])):
@@ -267,23 +313,25 @@ def hit_tiles():
                     col[top + y] = int(row[x] == '#')
                 cols.append(col)
             cols.append([0] * 6)
-        for d in str(n): put(HL_DIG[d], 0)
-        cols.append([0] * 6)
+        if num:
+            for d in num: put(HL_DIG[d], 0)
+            cols.append([0] * 6)
         for ch in word: put(HL_LET[ch], 1)
         cols.pop()
-        assert len(cols) <= 22, n
-        ink = [[0] * 24 for _ in range(8)]
-        x0 = 23 - len(cols)                         # right-aligned, outline column 23
+        assert len(cols) <= W - 2, (num, word)
+        ink = [[0] * W for _ in range(8)]
+        x0 = W - 1 - len(cols)                      # right-aligned, outline in the last column
+        if not num: x0 = (W - len(cols)) // 2       # (a word alone: centred)
         for x, col in enumerate(cols):
             for y in range(6):
                 ink[1 + y][x0 + x] = col[y]
-        for t in range(3):
+        for t in range(nt):
             for y in range(8):
                 lo = hi = 0
                 for x in range(8):
                     X = 8 * t + x
                     i = ink[y][X]
-                    o = not i and any(0 <= y + dy < 8 and 0 <= X + dx < 24 and ink[y + dy][X + dx]
+                    o = not i and any(0 <= y + dy < 8 and 0 <= X + dx < W and ink[y + dy][X + dx]
                                       for dy in (-1, 0, 1) for dx in (-1, 0, 1))
                     lo = lo << 1 | (1 if i or o else 0)
                     hi = hi << 1 | (1 if o else 0)
@@ -311,11 +359,12 @@ def vwf_source():
         '/': ["..#", "..#", ".#.", ".#.", ".#.", "#..", "#.."]}
     arrow = ["......", "...#..", "....#.", "######", "....#.", "...#..", "......"]
     out = []
-    for code in range(0x21, 0x8C):
+    for code in range(0x21, 0x94):
         rows = None
         if 0x80 <= code <= 0x89: rows = dig3[str(code - 0x80)]
         elif code == 0x8A: rows = dig3['/']
         elif code == 0x8B: rows = arrow
+        elif code >= 0x8C: rows = ['.....'] + AIL_PICT[VWF_AIL[code - 0x8C]] + ['.....']   # (one row down)
         if rows is not None:
             cols = [[1 if y < 7 and rows[y][x] == '#' else 0 for y in range(8)] for x in range(len(rows[0]))]
         else:

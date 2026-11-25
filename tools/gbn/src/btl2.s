@@ -1526,11 +1526,7 @@ bt_phys:    ld a, 168
             call nf_a
             ld a, M_HITS
             call bq_num
-.m1:        ld a, [mt_crits]
-            and a
-            jr z, .m2
-            ld a, M_CRIT
-            call bt_msg_line
+.m1:        call bt_critlab                 ; ("CRITICAL!" beside the member: btl5.s)
 .m2:        ld a, [mt_total]
             ld b, a
             ld a, [mt_total + 1]
@@ -2104,16 +2100,7 @@ bt_msg_end: ld a, [bt_defer]
             ld a, [bt_msgon]                ; the rows below back (the party window's tiles
             and a                           ;   are current), the names drawn again
             ret z
-            xor a
-            ld [bt_msgon], a
-            ld hl, bt_save
-            ld de, smap + 12 * 32
-            ld bc, 6 * 32
-            call memcpy
-            ld hl, bt_save + 6 * 32
-            ld de, sattr + 12 * 32
-            ld bc, 6 * 32
-            call memcpy
+            call bt_msg_close               ; (its text gone first: msg_blank)
             jp bt_names_win                 ; (shown with the names in: bt_names_win)
 ; a message alone (A = FF1 message), no attacker line
 bt_say:     push af
@@ -3664,6 +3651,38 @@ bt_tban_p:  ld a, [ban_hide]                ; (SELECT: none)
             ld [de], a
             jp bt_banner
 
+section bank 6, $5FA5
+; a later results page: the window shown empty first (its tiles still carry the page before)
+res_pgw:    ld a, [res_pg]
+            and a
+            ret nz
+            ld [sf_row], a
+.pw:        call bt_frame
+            ld a, [sf_row]
+            cp 18
+            jr c, .pw
+            ret
+
+; a message closing: its text gone first, then the windows below come back (bt_msg_close)
+msg_blank:
+            ld hl, smap + 13 * 32 + 1       ; (its text gone first: the names / commands that
+            ld c, 4                         ;   follow reuse the message rows' tiles, and were
+.bl:        ld b, 18                        ;   seen being written into them)
+            ld a, $FF
+.bc:        ld [hl+], a
+            dec b
+            jr nz, .bc
+            ld de, 32 - 18
+            add hl, de
+            dec c
+            jr nz, .bl
+            call bt_upd
+.bw:        call bt_frame
+            ld a, [sf_row]
+            cp 18
+            jr c, .bw
+            ret
+
 section bank 6, $7480                       ; (the results window: after btl4)
 ; a level up kept for the results window: the new level, the HP gain, the stats raised
 bt_lvrec:   ld a, CH_LEVEL
@@ -3711,6 +3730,7 @@ bt_results: call bt_left_clear              ; (the names window empty: no one is
 .pg:        ld bc, $0000
             ld de, $100C
             call bt_win
+            call res_pgw
             xor a
             ld [res_ln], a
             ld a, [res_pg]
@@ -3840,9 +3860,7 @@ bt_results: call bt_left_clear              ; (the names window empty: no one is
 .mn:        ld hl, res_m
             inc [hl]
             jp .mem
-.sh:        ld a, 12                        ; shown; A / B
-            ld [sf_row], a
-            xor a
+.sh:        xor a                           ; shown; A / B
             ld [sf_row], a
 .w:         call bt_frame
             ldh a, [pad_new]

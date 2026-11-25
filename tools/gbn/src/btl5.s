@@ -291,6 +291,103 @@ bt_walkin:  ld b, 0
             jr .f
 .x:         jp bt_party_upd
 
+section bank 6, $7EEB
+; ---- a critical hit (owner, 2026-11-25): "CRITICAL!" (battle.py: after the hit labels) beside
+; the member it concerns (the attacker; the member hit when an enemy struck), gold, before the
+; hit count and the damage number; tiles $F0-$F3 (the damage number's, not up yet)
+bt_critlab: ld a, [mt_crits]
+            and a
+            ret z
+            ld a, [bt_defer]
+            and a
+            ret nz
+            call bt_flush
+            ld hl, $4000 + 39 * 48
+            ld de, bt_stage
+            ld bc, 64
+            ld a, HITL_BANK
+            call far_copy
+            ld hl, bt_upsrc
+            ld a, low(bt_stage)
+            ld [hl+], a
+            ld [hl], high(bt_stage)
+            ld hl, bt_updst
+            ld a, low($8000 + 16 * DN_T0)
+            ld [hl+], a
+            ld [hl], high($8000 + 16 * DN_T0)
+            ld a, 4
+            ld [bt_upn], a
+            call bt_flush
+            ld a, [df_player]
+            and a
+            ld a, [bt_who]
+            jr z, .m
+            ld a, [bt_tgt]
+            and 3
+.m:         call bt_mxy                     ; left of the sprite, at its head
+            ld a, b
+            sub 33
+            ld b, a
+            jp crit_put
+; battle start: no member's tile holds a bubble yet (bt_ail_in)
+bub_init:   xor a
+            ld hl, bub_cur
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            ret
+
+section bank 6, $7FE8
+; every battle frame: the ailment bubbles (bank 104: btl6.s), then the damage number's bounce
+bt_fhook:   push bc
+            push de
+            push hl
+            ld a, BTL6_BANK
+            ld hl, bub_tick
+            call bank_call
+            pop hl
+            pop de
+            pop bc
+            jp bt_danim
+
+section bank 6, $5DBF
+crit_put:   ld hl, HL_OAM
+            ld d, DN_T0
+            ld e, 4
+.o:         ld a, c
+            ld [hl+], a
+            ld a, b
+            ld [hl+], a
+            add a, 8
+            ld b, a
+            ld a, d
+            ld [hl+], a
+            inc d
+            ld a, $15                       ; (CGB OBJ palette 5, gold; DMG / SGB OBP1)
+            ld [hl+], a
+            dec e
+            jr nz, .o
+            ld b, 40                        ; shown, then gone (A skips)
+.w:         push bc
+            call bt_frame
+            pop bc
+            ldh a, [pad_new]
+            and 1
+            jr nz, .x
+            dec b
+            jr nz, .w
+.x:         ld hl, HL_OAM
+            xor a
+            ld b, 4
+.c:         ld [hl+], a
+            inc l
+            inc l
+            inc l
+            dec b
+            jr nz, .c
+            ret
+
 section wram, $C760
 fl_b:       ds 1                            ; the flashing enemy: cell, size, first tile
 fl_c:       ds 1

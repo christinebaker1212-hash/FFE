@@ -872,7 +872,7 @@ bt_mhrow:   ld a, [opt_mmp]
 ; Poison shortened, the MP needs the room)
 bt_stx:     ld a, [opt_mmp]
             and a
-            ld a, 50
+            ld a, 44                        ; (the icon from x 44, the word after it)
             ret z
             ld a, [vw_x]
             inc a

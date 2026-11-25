@@ -419,7 +419,7 @@ def main():
            open(os.path.join(HERE, 'src', 'extras.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
-           'section bank 104, $4000\n' +              # (the small font's glyphs: bank BTL6)
+           'section bank 104, $6000\n' +              # (the small font's glyphs: bank BTL6)
            battle.vwf_source() + ui.status_words() + ui_strings() + ui.loc_source() +
            domains_source(rom))
     import re                                    # (constants from every module first: the
@@ -427,6 +427,13 @@ def main():
     rest = [l for l in src.split('\n') if not re.match(r'^[A-Za-z_]\w*\s+=', l)] #   needs them
     src = '\n'.join(defs + rest)                                                  #   defined first)
     r = asm(src)
+    if os.environ.get('GBN_GAPS'):              # free runs (16+ bytes) of a code bank: GBN_GAPS=6
+        gb = int(os.environ['GBN_GAPS']); run = []
+        for off in range(0x4000 + 1):
+            if off < 0x4000 and not r.claimed.get((gb, off)): run.append(off)
+            else:
+                if len(run) >= 16: print('bank %d free: $%04X-$%04X (%d)' % (gb, run[0] + (0x4000 if gb else 0), run[-1] + (0x4000 if gb else 0), len(run)))
+                run = []
     for lbl in ('qbuf', 'oam_buf', 'objs', 'game_flags', 'font_tbl', 'win_buf'):
         assert r.labels[lbl] % 0x100 == 0, '%s at %04X not aligned' % (lbl, r.labels[lbl])
     banks = dict(r.banks)
