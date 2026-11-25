@@ -1376,8 +1376,13 @@ redrawn inside the load); towns' water tile moves as the sea; DMG overworld wate
 lists; they ran into mode 3 since item 33); music ticks held in line 153 (battle uploads ran into mode 3). VRAM/OAM
 checker 0 on Color and DMG (SameBoy core with tools/gb/sameboy/sameboy-ffe.patch). Next: the owner's play-test.
 Owner (2026-11-25, later): water in castles / caves (none in FF1's maps: options W1-W4) and a polish pass on every
-menu with GB on par with CGB: audit done on Color / DMG / SGB, 25 proposals in docs/ff1-menu-audit.md, waiting for
-the owner's approval (nothing changed yet).
+menu with GB on par with CGB: audit done on Color / DMG / SGB, 25 proposals in docs/ff1-menu-audit.md.
+Owner: "W2, and do all of A, B and C" - done (item 45; outcomes in the audit file: B15 backed out as an SGB limit,
+C21's header and C24 not done, A5 / A6 / C25 not faults); also preset names on Start in name entry, CRITICAL! with the
+damage number and a line below what it would cover, and the Sound Test code (1 9 9 2 1 1 2 4, then a save loaded:
+EXP / Gold to 128X, No Encounters, Save with the exact place per file). Fixed on the way: the music switched cart RAM
+off at every note start (pointer register clobbered; the title never offered a suspend point), RAM overlaps (new
+tools/gbn/rammap.py). Next: the owner's play-test.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

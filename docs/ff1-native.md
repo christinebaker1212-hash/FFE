@@ -821,3 +821,40 @@ one reaches parity, so the owner can keep playing).
 44. Owner (2026-11-25, later): water in castles and caves; a polish pass on every menu, GB on par with CGB,
    audit first. Audit and proposals: `docs/ff1-menu-audit.md` (FF1's castle / cave maps have no water tiles;
    faults, DMG / SGB parity and polish items, waiting for approval).
+45. Owner (2026-11-25, later): "W2, and do all of A, B and C" (the audit, `docs/ff1-menu-audit.md`, with each
+   item's outcome), then name entry presets, CRITICAL! with the number and spaced from it, and the Sound
+   Test code. Checked in SameBoy on Color, plain Game Boy and Super Game Boy, VRAM/OAM checker 0.
+   - W2: the world map's waterfall (the one metatile whose two tiles only it uses, found at build time)
+     falls a pixel per water step, copied two frames after the step (bank 109 $6C00).
+   - A / B / C: see the audit file. Not faults after a look: A5 (a lying member's rows end above the next
+     member's), A6 (CLASSIC sets the gradient off by design), C25 (FF1's map mark blinks). B15 (SGB black
+     outside the windows) backed out: a frame cell holds outside and inside pixels and takes one palette.
+     C17 as one line an entry plus an info window (39 of 71 shop entries are too long for name and price
+     on one line). C24 left as is. On the DMG White window option the lit orbs show dark (inverted shades).
+   - Name entry: Start with no name types one of the job's preset names (owner's lists; base and promoted
+     jobs share one; never the same twice running); Start again accepts it, B clears it whole.
+   - CRITICAL! shows with the damage number (OAM 28-31, tiles $EC-$EF), a line below what it would cover:
+     a member's critical under its hit count (both by its head), an enemy's critical on a member under the
+     bouncing number (`crit_y`, bank 6 $7EB5).
+   - **The Sound Test code** (owner): songs 1 9 9 2 1 1 2 4 played in a row (the magic sound confirms)
+     arm it (`sc_arm`); the next save loaded, a file or the suspend point, gets `SC_MARK` ($5A, save page
+     $FB) and the Konami Code's `KN_MARK`. On such a file: EXP and Gold multipliers Normal, 2X, 4X, 8X,
+     12X, 24X, 48X, 64X, 128X (`kn_mul`, a capped 16 x 8 multiply, kept at 65535); Options 'No
+     Encounters' On / Off (save page $FC; `enc_step` still counts the step, the roll never fights; story
+     battles on fixed squares stay); the main menu's Suspend reads Save and opens the file screen: the file
+     as an inn's save plus the exact place (the suspend point's blocks: position, map, objects, vehicles,
+     the save page) in cart RAM bank 2 at $A000 + $600 x file, with its own sum. Loading that file resumes
+     there (as a suspend point, kept for later loads); an inn's save over the file drops the place. The
+     suspend routines take a cart RAM bank and offset (`sus_bk`, `sus_bo`; 0 = the suspend point).
+     Checked: code entry, resume, Options (128X, No Encounters), Save in Cornelia Castle, walk away, soft
+     reset, Continue, File 1: the party back on the saved square; overworld walk: 1 battle in 5 rolls
+     without the option, none in 8 with it.
+   - **Fixed (older than this work): cart RAM switched off by the music.** `snd.s` (`aw.fv`) kept a note's
+     volume in B, the high byte of BC = the frequency shadow's pointer; the write through BC went to
+     $06xx-$0Fxx, the MBC's RAM enable. Cart RAM went off at every note start: the title never saw a
+     suspend point (its check runs with the title music), and any save or load running across a note
+     could read $FF or lose writes. Found with a SameBoy write watch on $0000-$1FFF. The shadow is now
+     right too; register writes differ from before only in two restarts at volume 0 (no audible change).
+   - RAM overlaps from this session's additions fixed (`tools/gbn/rammap.py`, new): the battle name
+     window's flags on the shop's `sh_id`, the place-name buffer on the Suspend's and name entry's
+     variables, the preset's last name on `crit_on`; the Options list holds 16 ids.

@@ -4,7 +4,8 @@ Owner (2026-11-25): "a polish pass on every menu in the game to bring it up to a
 making certain GB is on par with CGB. Give suggestions, and I'll approve. First, audit every screen."
 Also: "animate the water in castles and caves."
 
-Nothing here is changed yet: every numbered item waits for the owner's approval.
+Owner's answer (2026-11-25): "W2, and do all of A, B and C". Outcomes at the end of this file and in
+`docs/ff1-native.md` item 45.
 
 ## How the audit was made
 SameBoy (patched core, `tools/gb/sameboy/sameboy-ffe.patch`), the same inputs on Game Boy Color, plain
@@ -91,3 +92,37 @@ banks already move where they show sea or river. Options for the owner:
 
 ## Proposed order
 A (faults) first, then B (parity), then the C items the owner picks.
+
+## Outcomes (2026-11-25)
+- W2 done: the world map's waterfall falls a pixel per water step (W1 / W3 / W4 not chosen).
+- A1 done by A2's layout: the shop's Gil window beside the list is gone (an info window below takes the
+  full width), so no two windows share a line there.
+- A2 done: one line an entry (names up to 17 letters inside the frame), six shown; an info window with the
+  price, Own / Worn and the Gil.
+- A3 done: after a use only the target window's inside is redrawn; the text window's top edge stays.
+- A4 done: a name too long is cut with '.' and a gap before the count ('Tyrannosa. 1').
+- A5 not a fault: the lying pose ends above the next member's rows.
+- A6 not a fault: CLASSIC sets the gradient off by design (Options turns it on).
+- A7 done ('OK to start on'); A8 done ('Lv 15' on the main menu, Equip and Status).
+- A9 done: per formation the SGB takes the enemy colours from palette A alone / B alone / both, by the
+  enemies present (the Tyrannosaurus blue as on the Color).
+- B10, B12 done: gold labels and grey choices in other inks on DMG / SGB (DMG light / dark grey; SGB a
+  gold palette over the labels' area).
+- B11 done: an arrow up / down between the values on every system (colours kept on the Color).
+- B13, B14 done: DMG Options 'Window' Black / White (White: dark text on white windows, the job pictures
+  readable; the lit orbs then show dark); SGB Options Window Red / Green / Blue as the Color's.
+- B15 backed out: a frame cell holds outside and inside pixels and takes one SGB palette (a blue halo or a
+  black inner rim), and screens with more windows than one attribute packet holds stayed blue. Hardware
+  limit; left blue.
+- C16 done: three pages (capitals / small letters / digits and signs, Select), rows with a blank row between.
+  Owner's addition: Start with no name types a preset name for the job.
+- C17 done as A2 (one line an entry plus the info window: 39 of the 71 entries are too long for the name
+  and the price on one line).
+- C18 done: '-' for a non-caster's MP; battle Magic with no spell: the error sound.
+- C19, C20, C22, C23 done (song names and 'Now playing'; Bestiary numbers; no empty window beside the
+  results; the key icon).
+- C21 half done: the still hand on the member picked first. The header window was not added: the four
+  24-pixel members at FF1's 32-pixel pitch need rows 2-17, so a header (rows 0-2) would cut the first one;
+  the title stays a gold label inside the window.
+- C24 left as is (labels up to 13 letters, values up to 7: one column with a gap does not fit 18).
+- C25 not a fault: FF1's 'you are here' mark blinks.

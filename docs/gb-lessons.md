@@ -385,3 +385,23 @@ Color only" screen on older systems.
 - Test-start builds (`--start`) have a party with 0 HP: give it stats with `--init` (character
   records at save page $100 + $40 n: HP $0A, max $0C, strength $10, damage $20, hit $21, level $26)
   before testing battles, or the game-over path resets RAM.
+
+## Registers that are pointers, MBC writes, RAM overlaps (2026-11-25, later)
+- **A stray write to $0000-$1FFF switches cart RAM off; one to $4000-$5FFF changes its bank.** The sound
+  engine kept a note's volume in B while BC still had to point at the frequency shadow; the `ld [bc], a`
+  that followed went to $0600-$0FFF, the MBC5's RAM enable. Cart RAM went off whenever a note started,
+  so any save, load or check that took longer than a note (the suspend point's 1.4 KB sum on the title
+  with its music playing) read $FF or wrote nothing, and the title never offered Continue. A write
+  watch on the MBC's ranges finds it at once: `SBSH_CORE=build/sameboy_watch.so SB_WATCH=0000-1FFF`
+  (and `4000-5FFF`) prints every write with value and bank:PC; a correct build shows only the save
+  routines' $0A / $00. Run it after any change to code that runs in interrupts.
+- **When a routine's register holds a pointer, give temporaries a register whose pair is free** (here H:
+  HL was popped right after). Writing through a half-clobbered pair is silent: nothing in RAM changes.
+- **The assembler does not check RAM sections against each other.** `python3 tools/gbn/rammap.py` lists
+  every `ds` by address and reports overlaps; four were found after one session (a new option byte
+  pushed a block onto the shop's variables, a moved buffer sat on the Suspend's and name entry's, two
+  "free" bytes taken twice). Run it after adding RAM; the overlaps it still lists are the documented
+  unions (read their comments).
+- **Save states and cart RAM in sbsh:** paths in `S` / `L` are relative to the repository root (the
+  process's cwd), not the script's. `c OFF N` reads the cartridge RAM (all banks: bank x $2000 + offset).
+  Run a flow that writes cart RAM from boot in one process when in doubt.
