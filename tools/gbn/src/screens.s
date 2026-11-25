@@ -2593,7 +2593,8 @@ eqm_stats:  ld bc, $010D
             ld b, $0A                       ; (red: palette 2)
 .up:        push bc
             push af
-            ld a, '>'
+            ld a, b                         ; (better / worse: the arrow up / down, codes
+            add a, $0C - $09                ;   $0C / $0D; owner's audit, 2026-11-25)
             call pen_ch
             ld a, ' '
             call pen_ch

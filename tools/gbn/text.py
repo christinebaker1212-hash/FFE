@@ -36,11 +36,15 @@ def font_tiles(rom, ff3=None):
     out[0x02] = bytes(a & b for a, b in zip(w[:8], w[8:])) + w[8:]   # its shine left out
     out[0x0A] = names.own_tile(PIP_FULL)     # magic shops: a level's slot used / free
     out[0x0B] = names.own_tile(PIP_FREE)
+    out[0x0C] = names.own_tile(ARROW_UP)     # previews: better / worse (owner's audit, 2026-11-25:
+    out[0x0D] = names.own_tile(ARROW_DOWN)   #   every system, not the Color's colours only)
     return out
 
 
 PIP_FULL = ['........', '..###...', '.#####..', '.#####..', '.#####..', '..###...', '........', '........']
 PIP_FREE = ['........', '..###...', '.#...#..', '.#...#..', '.#...#..', '..###...', '........', '........']
+ARROW_UP = ['........', '...#....', '..###...', '.#####..', '#######.', '........', '........', '........']
+ARROW_DOWN = ['........', '#######.', '.#####..', '..###...', '...#....', '........', '........', '........']
 
 
 DMG_ICON = (2, 1, 3, 0)                # DMG icons: outlines dark grey, details light grey

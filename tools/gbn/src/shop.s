@@ -938,8 +938,7 @@ sh_epv:     call sh_wwin
             call pen_num
             ld a, $20
             call pen_ch
-            ld a, '>'
-            call pen_ch
+            call sh_arrow                   ; ('>', or the arrow up / down)
             ld a, $20
             call pen_ch
             ld a, [eqm_w + 1]
@@ -1591,3 +1590,16 @@ sh_q:       ds 1
 sh_qmax:    ds 1
 sh_tot:     ds 3
 sh_ocur:    ds 1
+
+section bank 2, $7F90                       ; (free space)
+; the shops' preview: '>' between the values, the arrow up / down when the new one is better /
+; worse (owner's audit, 2026-11-25: every system; the Color also colours the value)
+sh_arrow:   ld a, [eqm_w + 1]
+            ld hl, eqm_w
+            cp [hl]
+            ld a, '>'
+            jr z, .p
+            ld a, $0C
+            jr nc, .p
+            inc a
+.p:         jp pen_ch
