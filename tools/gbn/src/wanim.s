@@ -8,30 +8,43 @@
 ; Color's frames in WANIM_BANK, the DMG's in WANIM_DMG (the same layout, header copied).
 WANIM_BANK = 106
 WANIM_DMG  = 108
+WTOWN_BANK = 109           ; the towns' water tile (build.py town_water)
 
 section bank 0, $3F94
-wa_tick:    ldh a, [maptype]
-            and a
-            ret z
-            ld a, [ap_on]                   ; (not under the airship's view)
+; every field frame. The water keeps its own step count (wa_t: only while it shows), so a menu,
+; a battle or a load holds it where it was; after a map load (wa_ok 0: its tiles back at their
+; first picture) every tile is drawn at the current step at once (wa_full)
+wa_tick:    ld a, [ap_on]                   ; (not under the airship's view)
             and a
             ret nz
-            ldh a, [frame]                  ; (a new step whenever frame / 4 changes)
-            rrca
-            rrca
-            and 63
+            ldh a, [rLCDC]
+            bit 7, a
+            ret z
+            ldh a, [maptype]
+            and a
+            jp z, wa_town                   ; (towns: their water tile)
+            call wa_step
             ld hl, wa_ph
             cp [hl]
-            jr z, .go
+            jr z, .same
             ld [hl], a
+            xor a
+            ld [wa_i], a
+            ld [wa_full], a
+.same:      jp wa_ow
+
+section bank 0, $13CB
+wa_ow:      ld a, [wa_ok]
+            and a
+            jr nz, .go
+            inc a
+            ld [wa_ok], a
+            ld [wa_full], a
             xor a
             ld [wa_i], a
 .go:        ld a, [wa_i]
             cp 8
             ret nc
-            ldh a, [rLCDC]
-            bit 7, a
-            ret z
             ldh a, [is_cgb]
             and a
             ld a, WANIM_BANK
@@ -39,6 +52,75 @@ wa_tick:    ldh a, [maptype]
             ld a, WANIM_DMG
 .b:         call sbank
             jp wa_run
+; A = this frame's step (0-63, a new one every 4 frames of shown water)
+wa_step:    ld hl, wa_t
+            inc [hl]
+            ld a, [hl]
+            rrca
+            rrca
+            and 63
+            ret
+
+section bank 0, $2F52
+; towns (tileset 0: maps 0-7), outside the rooms: their one water tile ($0F) moves as the sea,
+; in two bands of 4 lines (build.py town_water); a step's picture goes to VRAM in the V-Blank
+wa_town:    ld a, [cur_map]
+            cp 8
+            ret nc
+            ld a, [inroom]
+            and a
+            ret nz
+            call wa_step
+            ld b, a
+            ld hl, wa_ph
+            ld a, [wa_ok]
+            and a
+            jr z, .new
+            ld a, b
+            cp [hl]
+            ret z
+.new:       ldh a, [rLY]
+            sub 144
+            cp 8
+            ret nc
+            ld [hl], b
+            ld a, 1
+            ld [wa_ok], a
+            jp wt_cp
+
+section bank 0, $31CE
+; the town water tile's picture for step wa_ph (entry: the town, or 8 on the Color): its VRAM
+; address at $4400 + 2 entry, the pictures at $4800 + $400 entry + 16 step
+wt_cp:      ld a, WTOWN_BANK
+            call sbank
+            ldh a, [is_cgb]
+            and a
+            ld a, 8
+            jr nz, .t
+            ld a, [cur_map]
+.t:         ld c, a
+            add a, a
+            ld l, a
+            ld h, $44
+            ld e, [hl]
+            inc l
+            ld d, [hl]
+            ld a, c
+            add a, a
+            add a, a
+            add a, $48
+            ld h, a
+            ld a, [wa_ph]
+            swap a
+            ld l, a
+            and $0F
+            add a, h
+            ld h, a
+            ld a, l
+            and $F0
+            ld l, a
+            ld bc, 16
+            jp memcpy
 
 section bank 0, $2591
 ; the next changed tiles of this step while the V-Blank lasts (the bank mapped): entry e's tile
@@ -111,9 +193,13 @@ wa_run:     ldh a, [rLY]
             ld [wa_i], a
             ret
 
-section bank 0, $17E0
+section bank 0, $1459
 ; C set if slot C changes at this step (its mask at $4080 + step, bank mapped)
-wa_msk:     ld a, [wa_ph]
+wa_msk:     ld a, [wa_full]                 ; (after a load: every slot)
+            and a
+            scf
+            ret nz
+            ld a, [wa_ph]
             add a, $80
             ld l, a
             ld h, $40
@@ -139,3 +225,8 @@ wa_cp:      ld b, 16                        ; the tile's 16 bytes, then the next
 section wram, $C992                         ; (between the SGB variables and its queue)
 wa_i:       ds 1
 wa_ph:      ds 1
+
+section wram, $C6E8                         ; (after the battle's ailment bubbles)
+wa_t:       ds 1                            ; the water's own frame count
+wa_ok:      ds 1                            ; 0 after a map load: the tiles at their first picture
+wa_full:    ds 1                            ; a full redraw at this step

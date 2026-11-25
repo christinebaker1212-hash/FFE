@@ -212,6 +212,7 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, WANIM_BANK, 0x4000, wa)
     place(banks, WANIM_DMG, 0x4000, wad)
     print('water animation:', wa_info)
+    place(banks, WTOWN_BANK, 0x4000, town_water(rom))           # (the towns' water tile)
     place(banks, OW_INFO, 0x7400, o['veh_cgb'])                # vehicle sprites (FF1 OW objects)
     place(banks, OW_INFO, 0x7A00, o['veh_dmg'])
     fix = rom.prg[-0x4000:]                                     # FF1's vehicle sprite tables
@@ -269,6 +270,40 @@ def data_banks(rom, ff3=None, init=None):
 
 WANIM_BANK = 106                                 # (src/wanim.s; the DMG's frames in WANIM_DMG)
 WANIM_DMG = 108
+WTOWN_BANK = 109
+TOWN_WATER = 0x0F                                # (tileset 0's water tile: metatiles 39-41, 59)
+
+
+def town_water(rom):
+    """the towns' water (owner, 2026-11-25): tileset 0's one water tile, moving as the sea
+    (src/wanim.s wt_cp): two bands of 4 lines, each a pixel sideways per 16 frames, the bands
+    8 frames apart; 64 steps (one per 4 frames). $4400 per entry (towns = maps 0-7, 8 = the
+    Color) the tile's VRAM address, $4800 + $400 entry its 64 pictures (the DMG's pre-shaded).
+    """
+    def shifts(t16):
+        px = [[(t16[2 * y] >> (7 - x) & 1) | (t16[2 * y + 1] >> (7 - x) & 1) << 1 for x in range(8)]
+              for y in range(8)]
+        out = bytearray()
+        for j in range(64):
+            for y in range(8):
+                sh = ((j + 3 - 2 * (y // 4)) // 4) % 8
+                row = [px[y][(x - sh) % 8] for x in range(8)]
+                out += bytes([sum((v & 1) << (7 - x) for x, v in enumerate(row)),
+                              sum((v >> 1) << (7 - x) for x, v in enumerate(row))])
+        return bytes(out)
+    def vram(d): return (0x9000 + 16 * d) if d < 128 else (0x8000 + 16 * d)
+    t = data.tileset_pack(rom, 0)
+    blob = bytearray(0x2C00)
+    blob[0x410:0x412] = vram(TOWN_WATER).to_bytes(2, 'little')
+    blob[0x2800:0x2C00] = shifts(t['cgb_tiles'][16 * TOWN_WATER:16 * TOWN_WATER + 16])
+    for m in range(8):
+        assert rom.rd(data.BANK_SMINFO, data.TILESETS + m) == 0
+        p = data.map_pack(rom, m)
+        d = p['mt_dmg_out'][39]
+        assert all(p['mt_dmg_out'][128 * k + 39] == d for k in range(4))
+        blob[0x400 + 2 * m:0x402 + 2 * m] = vram(d).to_bytes(2, 'little')
+        blob[0x800 + 0x400 * m:0xC00 + 0x400 * m] = shifts(p['dmg_tiles'][16 * d:16 * d + 16])
+    return bytes(blob)
 def water_anim(o):
     """the animated sea and rivers (owner's list, 2026-11-24; FF1 has none): the commonest open
     sea metatile and river metatile of the overworld. Motion as Final Fantasy Legend III's water

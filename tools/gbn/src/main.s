@@ -467,6 +467,7 @@ load_map:   push af
             ld [mdy], a
             ld [q_n], a
             ld [q_rd], a
+            ld [wa_ok], a                   ; (the water's tiles back at their first picture)
             ld a, b
             cp MAP_OW
             jr nz, .sm

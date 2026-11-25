@@ -1,5 +1,8 @@
 # FFE — Faithful English translations of Final Fantasy I, II and III (Famicom)
 
+> **Current work handoff (2026-11-25):** [`docs/handoff-2026-11-25.md`](docs/handoff-2026-11-25.md)
+> (FF1 native Game Boy build: water animation in towns and holding its position; written, not yet tested).
+
 A from-scratch English translation of the three Famicom Final Fantasy games,
 done directly from the Japanese ROM text. It does not use any existing human
 translation as a source.
