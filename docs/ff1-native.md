@@ -968,3 +968,33 @@ one reaches parity, so the owner can keep playing).
       takes the next V-Blank's first line before the handler (`vb_top`), also in the party / name screens' row pushes.
     - **LCD off:** the frame wait and the LY waits return at once with the LCD off (no V-Blank would ever come).
     - **The battle's top window** gets a frame limit and then writes its rows itself (`box_fb` / `box_safe`).
+55. Owner (2026-11-25, last): "Nintendo-quality the sequence of going from the naming screen to the world map"; the
+    airship / ship / canoe corrupted on the world map; reflections faded in and out, with care at the sides; "one,
+    unified palette logic that the game calls for every scene" (shop menu borders blown out); Options in submenus
+    plus suggestions. Done:
+    - **New game into the world** (src/pal.s ng_out9 / ng_in9): the party screen fades out slowly (8 levels on the
+      Color, 3 shade steps on DMG / SGB) while the music's master volume goes down with it, a moment of silence on
+      black (white on the plain Game Boy, its switched-off screen), then the world map fades in slowly as the
+      overworld theme starts. The party's sprites are made before the fade-in (the vehicle is set after the load).
+    - **Parked ship / airship**: their tile base was overwritten by their screen y (`.obj` in make_oam), so they drew
+      other tiles at every step.
+    - **Palettes** (src/pal.s): the Color's 16 palettes live in shadows (sh_pal BG, pal_ob OBJ); every scene writes
+      them through bcps_w / bcpd_w, ocps_w / ocpd_w (pal_blk, text_pals), never the hardware; the V-Blank sends the
+      changed halves first (pal_up, deferred if the V-Blank has no room), lcd_on sends all; fades and the encounter
+      transition show a scaled copy (fd_tmp, pal_fd) and never read colours back from the screen. The old fade-out
+      and masked load read the hardware, catching the gradient's line colours and half-way fade colours as the
+      windows' colours (blown-out borders); and writes from the main code landed in drawing time (checker).
+    - **Reflections** (src/refl.s, bank 111): three strengths blended into the sea (Color) or lighter OBP1 (DMG /
+      SGB), the faintest every other frame (see-through); the strength rises while some part shows and falls when
+      none does; each sprite only over an 8 x 8 quarter drawn with open water (REFL_WTAB, made at build time from the
+      map's own sea and river tiles), so it slips into the shore in any direction exactly where the water is drawn;
+      mirrored about the party's foot (in a forest the legs are hidden but reflected).
+    - **Config pages**: Battle Speed, Text Speed, Volume, then Controls / Window / Game pages; proposals for new
+      options in `docs/ff1-options-proposals.md`. Volume always showed 0: fixed.
+    - Found on the way: on the Super Game Boy, opening a shop or menu while an ambience sound played jumped into RAM
+      (ap_stop clobbered pc_menu's HL: crash since item 33); a stray music score pointer read disabled cart RAM
+      (mrd returns $FF outside the song data); two row copies tested LY before disabling interrupts (an interrupt
+      between them pushed a row into drawing); the big-target raster spell on DMG stored tiles over the gradient's
+      flags (the Color's line handler ran on a DMG).
+    - Checked with the strict checker: all 128 formations on Color, DMG and SGB (0 findings), random play from the
+      field on all three, the new-game sequence on all three.

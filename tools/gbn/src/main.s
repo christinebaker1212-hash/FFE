@@ -4177,17 +4177,18 @@ box_fc:     ds 1
 section bank 0, $38E1                       ; (free space)
 ; map row A to VRAM now: in a V-Blank's first lines whole (interrupts off), else byte by byte
 row_put:    ld b, a
-            ldh a, [rLY]
+            di                              ; (off before the test: an interrupt between
+            ldh a, [rLY]                    ;   them pushed a row into line 0; checker)
             cp 144
             jr c, .s
             cp 150
             jr nc, .s
             ld a, b
-            di
             call sf_one
             ei
             ret
-.s:         ld a, b
+.s:         ei
+            ld a, b
             jp row_safe
 
 section bank 0, $3E65                       ; (free space)

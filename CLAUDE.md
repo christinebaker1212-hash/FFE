@@ -1400,6 +1400,9 @@ Then (item 53): owner chose P-A, K-A, N: new party / job picker / name entry scr
 Then (item 54): battle hangs / slow starts / garbage fixed: the menu outline builder ran on battles with stale counts (Color:
 1305 -> 153 frames to start, outline cells over the enemies), V-Blank-window uploads that never progressed on DMG (results
 softlock), the V-Blank handler's VRAM bank, fade waits; all 128 formations fought to the end on DMG / Color / SGB.
+Then (item 55): new game fades into the world (music with it); parked vehicles fixed; one palette logic (src/pal.s: shadows,
+V-Blank upload, fades never read the screen: blown-out borders); reflections fade and clip to drawn water; Config pages
+(proposals: docs/ff1-options-proposals.md); SGB shop / menu crash fixed. Strict checker 0 on all systems.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

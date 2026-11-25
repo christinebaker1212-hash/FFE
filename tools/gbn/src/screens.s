@@ -212,15 +212,15 @@ sf_step:    ld a, [tw_qh]                   ; (a typed letter: its cell first, w
 .rw:        ld a, [sf_row]
             cp 18
             ret nc
-            ldh a, [rLY]
-            cp 144
-            jp c, sf_slow
-            cp 152
+            di                              ; (no interrupt from the test through the row's
+            ldh a, [rLY]                    ;   copy: a music tick at line 153 pushed its last
+            cp 144                          ;   bytes into the next frame's drawing; Lot Check
+            jp c, sf_slow                   ;   checker, 2026-11-25)
+            cp 151
             jp nc, sf_slow
             ld a, [sf_row]
-            di                              ; (no interrupt in the row's copy: a music tick at
-            call sf_one                     ;   line 153 pushed its last bytes into the next
-            ei                              ;   frame's drawing; Lot Check checker, 2026-11-25)
+            call sf_one
+            ei
             ld hl, sf_row
             inc [hl]
             jr sf_step
@@ -3181,7 +3181,8 @@ scr_str_on: call scr_str
             jp scr_upd
 ; sf_step outside the V-Blank's window: one row byte by byte (row_safe), so a screen always
 ; comes up however late the frame's work runs (owner, 2026-11-25: a battle never went on)
-sf_slow:    ld a, [sf_row]
+sf_slow:    ei
+            ld a, [sf_row]
             call row_safe
             ld hl, sf_row
             inc [hl]

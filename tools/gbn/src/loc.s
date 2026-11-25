@@ -875,16 +875,14 @@ OPT_ROWS   = 12             ; settings shown at once (rows 5-16); more scroll
 opt_menu:   xor a
             ld [opt_cur], a
             ld [opt_top], a
+            ld [opt_pg], a
 opt_redraw: call opt_mklist
             call scr_open
             call eqm_pal
             ld bc, $0000
             ld de, $1403
             call scr_win
-            ld bc, $0101
-            ld hl, os_title
-            ld e, 7
-            call gold_str
+            call opt_title
             ld bc, $0003
             ld de, $140F
             call scr_win
@@ -901,8 +899,20 @@ opt_redraw: call opt_mklist
             call scr_frame
             ldh a, [pad_new]
             bit 1, a
-            jp nz, opt_save
-            bit 6, a
+            jr z, .nb
+            ld a, [opt_pg]                  ; (B in a page: back to Config)
+            and a
+            jp z, opt_save
+            call opt_back
+            jr .l
+.nb:        bit 0, a
+            jr z, .na
+            call opt_id                     ; (A on a page: into it)
+            cp 16
+            jr c, .l
+            call opt_into
+            jr .l
+.na:        bit 6, a
             jr nz, .up
             bit 7, a
             jr nz, .dn
@@ -913,7 +923,13 @@ opt_redraw: call opt_mklist
             bit 5, a
             jr z, .l
 .ch:        call opt_id                     ; B = +1 / -1, clamped; E = the setting's id
-            ld e, a
+            cp 16                           ; (a page: Right goes in)
+            jr c, .ch1
+            bit 7, b
+            jr nz, .l
+            call opt_into
+            jr .l
+.ch1:       ld e, a
             ld d, 0
             ld hl, os_max
             add hl, de
@@ -3434,53 +3450,6 @@ opt_idx:    ld e, a                         ; list position A -> its id
             ret
 ; the settings shown: 0-6 always, 7-10 (window colours, gradient) on the Color, after the Konami
 ; Code on this file 11 (LCD, Color) and 12-13 (EXP, Gold)
-opt_mklist: ld hl, opt_list
-            xor a
-.b:         ld [hl+], a
-            inc a
-            cp 7
-            jr c, .b
-            ld c, 7
-            ldh a, [is_cgb]
-            and a
-            jr nz, .cg
-            ld a, [sgb_on]                  ; (owner's audit, 2026-11-25: the SGB's windows
-            and a                           ;   take the same three colours; the DMG a shade)
-            jr nz, .sg
-            ld a, 14
-            ld [hl+], a
-            inc c
-            jr .k
-.sg:        jr .k                           ; (SGB: windows black, no colour settings)
-.cg:        ld a, 7
-.c:         ld [hl+], a
-            inc a
-            cp 11
-            jr c, .c
-            ld c, 11
-            call kn_on
-            jr nz, .k
-            ld a, 11
-            ld [hl+], a
-            inc c
-.k:         call kn_on
-            jr nz, .x
-            ld a, 12
-            ld [hl+], a
-            inc a
-            ld [hl+], a
-            inc c
-            inc c
-            call sc_lst
-.x:         ld a, c
-            ld [opt_cnt], a
-            ld a, [opt_cur]                 ; (kept in range)
-            cp c
-            ret c
-            xor a
-            ld [opt_cur], a
-            ld [opt_top], a
-            ret
 ; Z if the Konami Code was entered on this file
 kn_on:      ld a, [KN_MARK]
             cp $A5
@@ -3573,7 +3542,7 @@ opt_row:    push af
             dec a
             jr z, .spd
             dec a
-            jr z, .d0
+            jr z, .vol
             dec a
             jr z, .dsh
             dec a
@@ -3591,6 +3560,8 @@ opt_row:    push af
             jr opt_ostr
 .d1:        ld a, c                         ; Message Speed: 1-8
             inc a
+            jr .d0
+.vol:       ld a, c                         ; Volume: 0-7 (it showed 0 whatever the setting)
 .d0:        add a, $30
             jp pen_ch
 .spd:       ld hl, os_spn
@@ -3609,11 +3580,16 @@ opt_row:    push af
             call nf_a
             ld b, 2
             jp pen_num
-.wnd:       ld hl, os_wnd                   ; (the DMG's window shade)
+.wnd:       dec a                           ; (a page: its arrow)
+            jr nz, .sub
+            ld hl, os_wnd                   ; (the DMG's window shade)
             ld b, 5
             jr opt_ostr
 .lcd:       ld hl, os_lcd
             ld b, 13
+            jr opt_ostr
+.sub:       ld a, $3E                       ; (the arrow)
+            jp pen_ch
 ; the C-th name of B letters in table HL
 opt_ostr:   ld a, c
             and a
@@ -3633,11 +3609,13 @@ os_labels:  db "Battle Speed", 0, "Text Speed", 0, "Volume", 0, "B Dash", 0, "Cu
             db "Auto Retarget", 0, "Modern MP", 0
             db "Window Red", 0, "Window Green", 0, "Window Blue", 0, "Gradient", 0, "LCD", 0
             db "EXP", 0, "Gold", 0, "Window", 0, "No Encounters", 0
+            db "Controls", 0, "Window", 0, "Game", 0
 os_var:     dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, opt_retgt, opt_mmp, win_r, win_g, win_b, opt_nograd, opt_ccm
-            dw KN_EXP, KN_GOLD, opt_dmgw, SC_NOENC
-os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2, 3, 5, 5, 2, 2
+            dw KN_EXP, KN_GOLD, opt_dmgw, SC_NOENC, opt_pg, opt_pg, opt_pg
+os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2, 3, 5, 5, 2, 2, 1, 1, 1
 os_fmt:     db 18, 0, 12, 1, 18, 2, 16, 3, 11, 4, 16, 5, 16, 5, 17, 6, 17, 6, 17, 6, 16, 3, 6, 7
             db 13, 8, 13, 8, 14, 9, 16, 5   ; (the value's column, its format)
+            db 18, 10, 18, 10, 18, 10       ; (a page: its arrow)
 os_sv:      dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, win_r, win_g, win_b, opt_nograd, opt_retgt, opt_mmp, opt_ccm
             dw opt_dmgw
                                             ; (the saved order: the older records' first nine)
@@ -4584,4 +4562,143 @@ mm_hpc:     ld a, [mm_t]
             inc c
             dec e
             jr nz, .r
+            ret
+
+section bank 99, $6560
+; ---- Config's pages (owner, 2026-11-25: options consolidated into submenus, as Nintendo's
+; menus): Config holds Battle Speed, Text Speed, Volume and the pages Controls, Window and
+; Game (ids 16-18, a ">" after their names); A or Right opens a page, B goes back to Config
+; with the hand on it, B on Config saves and leaves
+opt_into:   sub 15                          ; (A = the page's id)
+            ld [opt_pg], a
+            xor a
+            ld [opt_cur], a
+            ld [opt_top], a
+            jr opt_page
+opt_back:   ld a, [opt_pg]
+            add a, 15
+            ld b, a
+            xor a
+            ld [opt_pg], a
+            ld [opt_cur], a
+            ld [opt_top], a
+            push bc
+            call opt_mklist
+            pop bc
+            ld hl, opt_list                 ; (the hand on the page's entry)
+            ld c, 0
+.f:         ld a, [hl+]
+            cp b
+            jr z, .h
+            inc c
+            jr .f
+.h:         ld a, c
+            ld [opt_cur], a
+; the list for the page now: its title, its rows (no fade: the same screen)
+opt_page:   call opt_mklist
+            call opt_title
+            call opt_rows
+            jp scr_upd
+; the header's text: Config, or the page's name
+opt_title:  ld c, 1
+            call opt_clr
+            ld a, [opt_pg]
+            and a
+            ld hl, os_title
+            jr z, .t
+            add a, 15                       ; (the page's label: id 15 + page)
+            ld e, a
+            ld hl, os_labels
+.z:         ld a, [hl+]
+            and a
+            jr nz, .z
+            dec e
+            jr nz, .z
+.t:         ld bc, $0101
+            ld e, 7
+            jp gold_str
+
+section wram, $D9FB
+opt_pg:     ds 1                            ; Config's page: 0 Config, 1 Controls, 2 Window, 3 Game
+
+; the settings shown on the page (opt_pg)
+section bank 99, $7668
+opt_mklist: ld hl, opt_list
+            ld c, 0
+            ld a, [opt_pg]
+            and a
+            jr z, .p0
+            dec a
+            jr z, .p1
+            dec a
+            jr z, .p2
+            ld a, 6                         ; Game: Modern MP; the codes' EXP, Gold, No
+            ld [hl+], a                     ;   Encounters
+            inc c
+            jr .k
+.p0:        xor a                           ; Config: the speeds and the volume, then the
+.b:         ld [hl+], a                     ;   pages (Window: not on the SGB, its windows
+            inc c                           ;   are black)
+            inc a
+            cp 3
+            jr c, .b
+            ld a, 16
+            ld [hl+], a
+            inc c
+            ldh a, [is_cgb]
+            and a
+            jr nz, .pw
+            ld a, [sgb_on]
+            and a
+            jr nz, .pg
+.pw:        ld a, 17
+            ld [hl+], a
+            inc c
+.pg:        ld a, 18
+            ld [hl+], a
+            inc c
+            jr .x
+.p1:        ld a, 3                         ; Controls: B Dash, Cursor, Auto Retarget
+.b1:        ld [hl+], a
+            inc c
+            inc a
+            cp 6
+            jr c, .b1
+            jr .x
+.p2:        ldh a, [is_cgb]                 ; Window: the Color's colours, gradient (LCD with
+            and a                           ;   the Konami Code); the DMG's shade
+            jr nz, .cg
+            ld a, 14
+            ld [hl+], a
+            inc c
+            jr .x
+.cg:        ld a, 7
+.c:         ld [hl+], a
+            inc c
+            inc a
+            cp 11
+            jr c, .c
+            call kn_on
+            jr nz, .x
+            ld a, 11
+            ld [hl+], a
+            inc c
+            jr .x
+.k:         call kn_on
+            jr nz, .x
+            ld a, 12
+            ld [hl+], a
+            inc a
+            ld [hl+], a
+            inc c
+            inc c
+            call sc_lst
+.x:         ld a, c
+            ld [opt_cnt], a
+            ld a, [opt_cur]                 ; (kept in range)
+            cp c
+            ret c
+            xor a
+            ld [opt_cur], a
+            ld [opt_top], a
             ret

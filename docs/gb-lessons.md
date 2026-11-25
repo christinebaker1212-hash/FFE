@@ -447,3 +447,17 @@ Color only" screen on older systems.
 - Test every battle to its end, not just its start: `scratchpad sc/bf3.py` fights each of the 128 formations with A
   until the field (PC log: `main`) or game over, and calls a run stuck when the screen does not change for 60
   presses.
+
+## Shadows, banks and shorelines (2026-11-25)
+- **Never read colours back from the screen.** The Color's palette RAM can hold a raster effect's line colour or a
+  fade's half-way colour at the moment it is read. Keep the screen's colours in RAM shadows written by every scene, send
+  them up at the V-Blank's start, and let fades and transitions show a scaled copy (src/pal.s).
+- **A routine that maps another ROM bank must not be called straight from a banked caller.** make_oam and map_at map
+  the map's bank; called from bank 99 / 111 they returned into the wrong bank (rst $38 loop, RAM overwritten with $39).
+  Go through bank_call, or a bank-0 wrapper that restores the bank (refl.s rw0 / rw1).
+- **Test LY with interrupts already off.** `ldh a, [rLY]` / `cp` / then `di`: an interrupt between the test and the
+  `di` can run past the V-Blank, and the copy that follows lands in drawing time.
+- **Water is what is drawn, not what the walking property says.** Coast metatiles are walkable but half drawn as
+  sea; the reflection decides by the 8 x 8 quarter's tile (a build-time table from the map's own water tiles).
+- **Keep a routine's argument registers across helpers that send SGB packets** (sgb_amb0 clobbered HL inside ap_stop:
+  pc_menu then bank-called a WRAM address).
