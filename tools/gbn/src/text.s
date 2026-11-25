@@ -458,8 +458,11 @@ stat_int:   push af
 .hb:        ldh a, [rSTAT]                  ; (the cut's LYC is the line before: the window
             and 3                           ;   off in its H-Blank; at the line itself, mode 2,
             jr nz, .hb                      ;   the write came mid-line: owner, the banner's
-            ld a, [lcdc_on]                 ;   bottom line)
-            ldh [rLCDC], a
+            ld a, 167                       ;   bottom line). Hidden by WX, still enabled: a
+            ldh [rWX], a                    ;   window switched off (LCDC bit 5) after its lines
+            ld a, [lcdc_on]                 ;   moved every line below one pixel right on the
+            or $60                          ;   plain Game Boy (owner, 2026-11-25); box_vbl
+            ldh [rLCDC], a                  ;   turns it off in V-Blank once the box is closed
 .off:
 .mus:       ld a, [mus_pend]                ; (the music: the timer's, main.s timer_int; a tick
             and a                           ;   that came near V-Blank runs here)

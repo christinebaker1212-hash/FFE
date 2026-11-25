@@ -138,8 +138,8 @@ sh_ask:     ld bc, $0000
             call scr_win
             ld a, SH_PRICE
             call sh_text
-            ld bc, $0102
-            call pen_at
+            ld bc, $0101                    ; (the first row: FF1's empty first line is skipped;
+            call pen_at                     ;   it left a blank row above: owner, 2026-11-25)
             ld hl, sh_price
             call nf_w
             call pen_numl
@@ -1105,34 +1105,14 @@ sh_pick:    xor a
             and a
             jr z, .dn
             ld [sh_it], a
-            ld a, [sh_k]                    ; name at row 6 + i, column 1 (17 letters fit)
-            add a, 6
-            ld c, a
-            ld b, 1
-            push bc
+            ld a, [sh_k]                    ; icon at row 6 + i, column 2, the name from 3 (the
+            add a, 6                        ;   hand in columns 0-1, clear of the icons: owner,
+            ld c, a                         ;   2026-11-25; a spell's level: the info window)
+            ld b, 2
             call pen_at
-            ld a, [sh_it]
-            call pen_iname
-            pop bc
-            ld a, [sh_it]                   ; spells: their level at the right
-            cp $B0
-            jr c, .np
-            cp $F0
-            jr nc, .np
-            ld b, 17
-            push bc
-            call pen_at
-            ld a, $4C
-            call pen_ch
-            ld a, [sh_it]
-            sub $B0
-            rrca
-            rrca
-            rrca
-            and 7
-            add a, $31
-            call pen_ch
-            pop bc
+            ld a, F3_BANK
+            ld hl, sh_iname
+            call bank_call
 .np:        ld a, [sh_k]
             inc a
             cp 6
@@ -1270,8 +1250,9 @@ sh_qty:     ld a, [sh_it]
             call scr_win
             ld bc, $0206
             call pen_at
-            ld a, [sh_it]
-            call pen_iname
+            ld a, F3_BANK
+            ld hl, sh_iname
+            call bank_call
 .dr:        call .tot
             ld bc, $0208
             call pen_at
@@ -1440,8 +1421,13 @@ sh_own:     ld a, [sh_sell]
             ld a, [sh_type]
             cp 2
             jr c, .eq
-            cp 6
-            ret c                           ; (magic, clinic, inn: none)
+            cp 4
+            jr nc, .nm
+            ld a, F3_BANK                   ; magic: the spell's level (it left the list's rows)
+            ld hl, sh_lvl
+            jp bank_call
+.nm:        cp 6
+            ret c                           ; (clinic, inn: none)
             call .it                        ; items: the count held
             ld a, [hl]
             ld b, a
@@ -1534,6 +1520,8 @@ sh_own:     ld a, [sh_sell]
             ld h, a
             ld a, [sh_type]
             ret
+
+section bank 2, $74E2                       ; (free space)
 so_own:     db "Own ", 0
 so_worn:    db "   Worn ", 0
 
@@ -1645,3 +1633,46 @@ st_nomp:    ld a, [mm_t]
             call pen_ch
             xor a
             ret
+
+section bank 99, $7500                      ; (free space)
+; item sh_it's icon and name at the pen, at most 16 letters (the shop's list and count windows:
+; the name from column 3 ends by 18; "Mythril Gauntlets", the one longer name sold, loses its s)
+sh_iname:   ld a, [sh_it]
+            ld l, a
+            ld h, 0
+            add hl, hl
+            ld de, $4000
+            add hl, de
+            ld de, scr_buf
+            ld bc, 2
+            ld a, NAMES
+            call far_copy
+            ld a, [scr_buf]
+            ld l, a
+            ld a, [scr_buf + 1]
+            ld h, a
+            ld de, scr_buf
+            ld bc, 20
+            ld a, NAMES
+            call far_copy
+            xor a
+            ld [scr_buf + 17], a            ; (icon + 16 letters)
+            ld hl, scr_buf
+            jp pen_str
+; a magic shop's info window: "Level n" on the owned / worn row
+sh_lvl:     ld bc, $010F
+            call pen_at
+            ld hl, .s
+            call pen_str
+            ld bc, $120F
+            call pen_at
+            ld a, [sh_it]
+            sub $B0
+            rrca
+            rrca
+            rrca
+            and 7
+            add a, $31
+            call pen_ch
+            jp scr_upd
+.s:         db "Level", 0
