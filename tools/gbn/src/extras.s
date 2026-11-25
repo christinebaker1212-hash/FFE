@@ -156,6 +156,149 @@ st_of:      db " / 24", 0
 st_h0:      db "Left/Right: song", 0
 st_h1:      db "A Button: play", 0
 st_h2:      db "B Button: back", 0
+; ---- name entry: Start with no name types one of the job's preset names, at random (owner,
+; 2026-11-25; base and promoted jobs share a list: Warrior / Knight .. Black Mage / Wizard)
+ni_preset:  ld a, [eqm_cls]
+            cp 6
+            jr c, .j
+            sub 6
+.j:         add a, a
+            ld l, a
+            ld h, 0
+            ld de, np_tab
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, [hl+]                     ; B = how many
+            ld b, a
+            ldh a, [rDIV]
+.m:         cp b
+            jr c, .k
+            sub b
+            jr .m
+.k:         ld c, a                         ; (not the one just shown again)
+            ld a, [np_last]
+            cp c
+            jr nz, .ok
+            inc c
+            ld a, c
+            cp b
+            jr c, .ok
+            ld c, 0
+.ok:        ld a, c
+            ld [np_last], a
+            ld e, a                         ; HL = the name (6 letters, blanks after)
+            add a, a
+            add a, e
+            add a, a
+            ld e, a
+            ld d, 0
+            add hl, de
+            ld a, [pg_mem]                  ; DE = the member's name
+            ld e, a
+            add a, a
+            add a, e
+            add a, a
+            add a, low(pg_names)
+            ld e, a
+            ld a, high(pg_names)
+            adc a, 0
+            ld d, a
+            ld bc, $0600                    ; B = 6 letters, C = its length
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            cp $20
+            jr z, .s
+            inc c
+.s:         dec b
+            jr nz, .c
+            ld a, c
+            ld [ni_len], a
+            ld a, 1
+            ld [ni_pre], a
+            ret
+np_tab:     dw np_0, np_1, np_2, np_3, np_4, np_5
+np_0:       db 12
+            db 65, 114, 103, 117, 115, 32
+            db 65, 114, 116, 104, 117, 114
+            db 65, 114, 117, 115, 32, 32
+            db 66, 97, 110, 111, 110, 32
+            db 66, 97, 114, 111, 110, 32
+            db 68, 101, 115, 104, 32, 32
+            db 68, 117, 110, 101, 32, 32
+            db 68, 111, 109, 97, 32, 32
+            db 71, 105, 111, 116, 116, 32
+            db 76, 101, 111, 32, 32, 32
+            db 83, 97, 115, 117, 117, 110
+            db 90, 101, 122, 97, 32, 32
+np_1:       db 11
+            db 66, 97, 107, 117, 32, 32
+            db 66, 105, 103, 103, 115, 32
+            db 66, 108, 97, 110, 107, 32
+            db 67, 117, 114, 116, 105, 115
+            db 68, 97, 114, 121, 108, 32
+            db 71, 101, 114, 97, 100, 32
+            db 75, 101, 108, 103, 97, 32
+            db 80, 117, 99, 107, 32, 32
+            db 83, 97, 114, 105, 115, 97
+            db 84, 117, 115, 115, 32, 32
+            db 87, 101, 100, 103, 101, 32
+np_2:       db 12
+            db 65, 114, 118, 105, 115, 32
+            db 83, 112, 117, 100, 32, 32
+            db 67, 105, 110, 110, 97, 32
+            db 77, 121, 114, 111, 110, 32
+            db 68, 111, 114, 103, 97, 110
+            db 68, 117, 110, 99, 97, 110
+            db 71, 111, 114, 110, 32, 32
+            db 77, 97, 100, 117, 105, 110
+            db 77, 97, 114, 99, 117, 115
+            db 79, 119, 97, 105, 110, 32
+            db 79, 119, 122, 101, 114, 32
+            db 87, 97, 108, 122, 32, 32
+np_3:       db 12
+            db 68, 117, 97, 110, 101, 32
+            db 69, 108, 97, 121, 110, 101
+            db 68, 105, 111, 110, 32, 32
+            db 74, 111, 106, 111, 32, 32
+            db 71, 105, 108, 108, 32, 32
+            db 75, 108, 117, 89, 97, 32
+            db 75, 111, 114, 121, 32, 32
+            db 76, 97, 108, 105, 98, 111
+            db 76, 111, 108, 97, 32, 32
+            db 77, 105, 100, 32, 32, 32
+            db 84, 111, 116, 32, 32, 32
+            db 89, 117, 114, 97, 32, 32
+np_4:       db 14
+            db 69, 108, 105, 97, 32, 32
+            db 74, 101, 110, 105, 99, 97
+            db 71, 108, 111, 114, 105, 97
+            db 83, 104, 97, 114, 111, 110
+            db 75, 117, 107, 117, 32, 32
+            db 76, 117, 99, 97, 32, 32
+            db 77, 105, 107, 111, 116, 111
+            db 78, 111, 97, 104, 32, 32
+            db 76, 121, 110, 110, 32, 32
+            db 82, 117, 98, 121, 32, 32
+            db 83, 97, 114, 97, 32, 32
+            db 83, 97, 114, 105, 110, 97
+            db 70, 97, 121, 101, 32, 32
+            db 83, 104, 101, 114, 107, 111
+np_5:       db 12
+            db 68, 101, 108, 105, 108, 97
+            db 76, 101, 111, 32, 32, 32
+            db 71, 105, 108, 108, 101, 115
+            db 71, 117, 110, 103, 104, 111
+            db 66, 111, 114, 103, 105, 110
+            db 72, 111, 109, 97, 99, 32
+            db 75, 111, 107, 107, 111, 108
+            db 75, 111, 107, 111, 32, 32
+            db 78, 105, 110, 97, 32, 32
+            db 83, 116, 101, 108, 108, 97
+            db 84, 111, 112, 97, 112, 97
+            db 90, 111, 107, 32, 32, 32
 st_now:     db "Now playing", 0
 st_names:   dw st_n0, st_n1, st_n2, st_n3, st_n4, st_n5, st_n6, st_n7, st_n8, st_n9, st_n10, st_n11, st_n12, st_n13, st_n14, st_n15, st_n16, st_n17, st_n18, st_n19, st_n20, st_n21, st_n22, st_n23
 st_n0:      db 80, 114, 101, 108, 117, 100, 101, 0
@@ -1206,3 +1349,6 @@ stat_rx:    push hl
 section wram, $C996
 ex_cur:     ds 1
 st_i:       ds 1
+
+section wram, $CF76                         ; (free fixed RAM)
+np_last:    ds 1                            ; name entry: the last preset shown

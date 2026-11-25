@@ -21,6 +21,7 @@ ICONS = {
     'gloves': (0x08, 0x63), 'bracelet': (0x09, 0x64), 'sword': (0x19, 0x6B),
     'knife': (0x1A, 0x69), 'axe': (0x1B, 0x6A), 'hammer': (0x1C, 0x67),
     'staff': (0x1D, 0x68), 'rod': (0x1E, 0x66), 'claw': (0x1F, 0x73),
+    'key': (0x0E, None),                # (our own drawing: KEY)
 }
 ICON_CODES = [c for c, _ in ICONS.values()]
 # FF1 weapon battle graphic (weapon data byte 6, high bits) -> icon
@@ -53,6 +54,18 @@ BAG = ['........',
        '.#####..']
 
 
+# Key items' icon (owner's audit, 2026-11-25: their own, not the consumables' bag): a key, our
+# own drawing in the same colours
+KEY = ['........',
+       '.##.....',
+       '#oo#....',
+       '#o.#####',
+       '#oo#o#o#',
+       '.##..#.#',
+       '........',
+       '........']
+
+
 def own_tile(rows):
     """an NES 2bpp tile from rows of '.', 'o', '#' (colours 2, 1, 3)"""
     col = {'.': 2, 'o': 1, '#': 3}
@@ -69,8 +82,10 @@ def icon_tiles(ff3):
     """{code: NES tile} for the icons (blank tiles without the FF3 ROM)"""
     out = {}
     for code, t in ICONS.values():
+        if t is None: continue
         out[code] = ff3[FF3_FONT + 16 * t:FF3_FONT + 16 * t + 16] if ff3 else bytes(8) + b'\xff' * 8
     out[ICONS['item'][0]] = own_tile(BAG)
+    out[ICONS['key'][0]] = own_tile(KEY)
     return out
 
 
@@ -83,7 +98,8 @@ def armour_types(rom):
 
 
 def icon_of(rom, k, name):
-    if 1 <= k <= 27: return 'item'
+    if 1 <= k <= 21: return 'key'           # (the key items and the orbs)
+    if 22 <= k <= 27: return 'item'
     if 28 <= k <= 67:
         g = rom.rd(BANK_EQUIP, WEAPONS + 8 * (k - 28) + 6)
         return WPN_GFX.get(g & 0xFC, 'sword')

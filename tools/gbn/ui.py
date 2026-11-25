@@ -94,6 +94,7 @@ def strings():
     out['stlab2'] = enc('Exp\nNext')
     out['nisel'] = enc('SELECT: abc')                   # (name entry: the other case)
     out['nisel2'] = enc('SELECT: ABC')
+    out['nisel3'] = enc('SELECT: 123')                  # (owner's audit, 2026-11-25: signs a page)
     out['options'] = enc('Options')                     # (the Options screen)
     out['opt1'] = enc('Message Speed')
     out['opt2'] = enc('Text Speed')

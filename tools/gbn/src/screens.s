@@ -891,6 +891,7 @@ name_input: call scr_open
             ld [ni_len], a
             ld [ni_x], a
             ld [ni_y], a
+            ld [ni_pre], a
             call ni_name
             call scr_show
 .lp:        call ni_cur
@@ -904,9 +905,12 @@ name_input: call scr_open
             jp nz, .st
             bit 2, a
             jr z, .ns
-            ld a, [ni_case]                 ; Select: the other case
-            xor 1
-            ld [ni_case], a
+            ld a, [ni_case]                 ; Select: the next page (capitals, small letters,
+            inc a                           ;   signs)
+            cp 3
+            jr c, .sc
+            xor a
+.sc:        ld [ni_case], a
             call ni_grid
             call scr_upd
             jr .lp
@@ -933,20 +937,22 @@ name_input: call scr_open
             jr z, .nu
             ld a, [hl]
             dec a
-            cp 10
+            cp 5
             jr c, .sy
-            ld a, 9
+            ld a, 4
 .sy:        ld [hl], a
             jr .lp
 .nu:        bit 7, a
             jr z, .lp
             ld a, [hl]
             inc a
-            cp 10
+            cp 5
             jr c, .sy
             xor a
             jr .sy
-.a:         ld a, [ni_y]                    ; the letter at (x, y)
+.a:         xor a                           ; (typed: not a preset name any more)
+            ld [ni_pre], a
+            ld a, [ni_y]                    ; the letter at (x, y)
             ld b, a
             ld a, [ni_x]
             call ni_char
@@ -968,7 +974,10 @@ name_input: call scr_open
             jp c, .lp
             and a                           ; six letters: done
             ret
-.b:         ld a, [ni_len]
+.b:         ld a, [ni_pre]                  ; (a preset name: cleared whole)
+            and a
+            jr nz, .bp
+            ld a, [ni_len]
             and a
             jr z, .back
             dec a
@@ -985,66 +994,30 @@ name_input: call scr_open
             jp .lp
 .back:      scf
             ret
-.st:        ld a, [ni_len]
-            and a
-            jp z, .lp
+.st:        ld a, [ni_len]                  ; Start: with no name, one of the job's preset
+            and a                           ;   names at random (owner, 2026-11-25: extras.s);
+            jr z, .pr                       ;   else done
+            xor a
+            ld [ni_pre], a
             and a                           ; NC: done
             ret
-
-; A = the symbol at column A (0-5), row B (0-9): rows 0-4 the case's 27 letters, rows 5-9 the
-; 27 signs, six a row (blanks: a space); FF1's grid strings hold them nine a row
-ni_char:    ld c, a
-            ld a, b
-            cp 5
-            jr c, .l
-            sub 5
-            ld b, a
-            ld e, 6                         ; (signs: grid rows 6-8)
-            jr .k
-.l:         ld a, [ni_case]                 ; (letters: the case's grid rows)
-            ld e, a
-            add a, a
-            add a, e
-            ld e, a
-.k:         ld a, b                         ; k = 6 row + column
-            add a, a
-            add a, b
-            add a, a
-            add a, c
-            cp 27
+.pr:        ld a, EXTRA_BANK
+            ld hl, ni_preset
+            call bank_call
+.pn:        call ni_name
+            jp .lp
+.bp:        xor a
+            ld [ni_pre], a
+            ld [ni_len], a
+            call name_ptr
+            ld b, 6
             ld a, $20
-            ret nc
-            ld a, b
-            add a, a
-            add a, b
-            add a, a
-            add a, c
-            ld c, 0                         ; grid row e + k / 9, column k mod 9
-.d:         cp 9
-            jr c, .m
-            sub 9
-            inc c
-            jr .d
-.m:         ld b, a
-            ld a, c
-            add a, e
-            add a, a
-            ld l, a
-            ld h, 0
-            ld de, grid_ptrs
-            add hl, de
-            ld a, [hl+]
-            ld h, [hl]
-            ld l, a
-            ld a, b
-            add a, l
-            ld l, a
-            ld a, h
-            adc a, 0
-            ld h, a
-            ld a, [hl]
-            ret
-; the ten rows of symbols (rows 6-15, columns 3, 6, .. 18) and the Select hint
+.bc:        ld [hl+], a
+            dec b
+            jr nz, .bc
+            jr .pn
+
+; the page's five rows of symbols (rows 6, 8, .. 14, columns 3, 6, .. 18) and the Select hint
 ni_grid:    xor a
 .g:         push af
             ld d, a                         ; (D = the row)
@@ -1072,6 +1045,7 @@ ni_grid:    xor a
 .e:         ld [hl], 0
             pop af
             push af
+            add a, a                        ; (a blank row between: owner's audit, 2026-11-25)
             add a, 6
             ld c, a
             ld b, 3
@@ -1079,12 +1053,15 @@ ni_grid:    xor a
             call scr_str
             pop af
             inc a
-            cp 10
+            cp 5
             jr c, .g
-            ld bc, $0402                    ; Select: the other case
+            ld bc, $0402                    ; Select: the next page
             ld hl, str_nisel
             ld a, [ni_case]
             and a
+            jr z, .h
+            ld hl, str_nisel3
+            dec a
             jr z, .h
             ld hl, str_nisel2
 .h:         jp scr_str
@@ -1128,6 +1105,7 @@ ni_cur:     ld a, [ni_x]
             add a, 3
             ld b, a
             ld a, [ni_y]
+            add a, a
             add a, 6
             ld c, a
             jp cur_txt
@@ -3083,7 +3061,8 @@ sus_top:    ds 1
 sus_yr:     ds 1
 sus_res:    ds 1                            ; the title resumed a suspend point
 ng_lock:    ds 1                            ; the title: nothing to continue
-ni_case:    ds 1                            ; name entry: 0 capitals, 1 small letters
+ni_case:    ds 1                            ; name entry: 0 capitals, 1 small letters, 2 signs
+ni_pre:     ds 1                            ; name entry: the name is a preset (Start)
 section wram, $D400
 smap:       ds 18 * 32                      ; the screen's map copy (attributes at + $300)
 section wram, $D700
@@ -3116,3 +3095,64 @@ sus_load:   ld a, [respond]
             ld a, EXTRA_BANK                ; (a point from the builds whose sound variables
             ld hl, sv_fix                   ;   ran into the save page: ship / airship mended)
             jp bank_call
+
+section bank 2, $47AD                       ; (moved: the title's section was full)
+; A = the symbol at column A (0-5), row B (0-9): rows 0-4 the case's 27 letters, rows 5-9 the
+; 27 signs, six a row (blanks: a space); FF1's grid strings hold them nine a row
+ni_char:    ld c, a
+            ld a, [ni_case]                 ; (page 2: the signs, grid rows 5-9)
+            cp 2
+            jr nz, .p
+            ld a, b
+            add a, 5
+            ld b, a
+.p:         ld a, b
+            cp 5
+            jr c, .l
+            sub 5
+            ld b, a
+            ld e, 6                         ; (signs: grid rows 6-8)
+            jr .k
+.l:         ld a, [ni_case]                 ; (letters: the case's grid rows)
+            ld e, a
+            add a, a
+            add a, e
+            ld e, a
+.k:         ld a, b                         ; k = 6 row + column
+            add a, a
+            add a, b
+            add a, a
+            add a, c
+            cp 27
+            ld a, $20
+            ret nc
+            ld a, b
+            add a, a
+            add a, b
+            add a, a
+            add a, c
+            ld c, 0                         ; grid row e + k / 9, column k mod 9
+.d:         cp 9
+            jr c, .m
+            sub 9
+            inc c
+            jr .d
+.m:         ld b, a
+            ld a, c
+            add a, e
+            add a, a
+            ld l, a
+            ld h, 0
+            ld de, grid_ptrs
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, b
+            add a, l
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            ret
