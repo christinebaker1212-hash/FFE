@@ -22,6 +22,7 @@ ICONS = {
     'knife': (0x1A, 0x69), 'axe': (0x1B, 0x6A), 'hammer': (0x1C, 0x67),
     'staff': (0x1D, 0x68), 'rod': (0x1E, 0x66), 'claw': (0x1F, 0x73),
     'key': (0x0E, None),                # (our own drawing: KEY)
+    'robe': (0x0F, None),               # (the owner's set: clothes and robes)
 }
 ICON_CODES = [c for c, _ in ICONS.values()]
 # FF1 weapon battle graphic (weapon data byte 6, high bits) -> icon
@@ -66,6 +67,28 @@ KEY = ['........',
        '........']
 
 
+# The owner's icon set (2026-11-25: "please use these icons for items and weapons"): the item,
+# six weapons and six armours, 8 x 8 each, white ink '#' and grey 'o' on the window ('.').
+# They replace FF3's tiles and the bag for these categories; key items and white / black magic
+# keep theirs.
+OWNER_ICONS = {
+    'item':     ['...###..', '....#...', '....#...', '...###..', '..#####.', '..#####.', '...###..', '...###..'],
+    'sword':    ['##......', '###.....', '.###....', '..###..#', '...####.', '....##..', '....#.#.', '...#...#'],
+    'hammer':   ['....#...', '.###.###', '.#######', '.#######', '........', '....#...', '....#...', '....#...'],
+    'knife':    ['......#.', '.....##.', '....###.', '.#.###..', '..###...', '..##....', '.#..#...', '........'],
+    'axe':      ['.#...#..', '.###.#.#', '.###.#.#', '.###.#..', '.#...#..', '.....#..', '.....#..', '.....#..'],
+    'staff':    ['.##.....', '#..#....', '#..#....', '.#..#...', '....#...', '.....#..', '......#.', '.......#'],
+    'claw':     ['........', '..#.#...', '......#.', '.#......', '.#....#.', '.#....#.', '.#....#.', '......#.'],
+    'armour':   ['........', '##....##', '#.o##o.#', '.######.', '.######.', '..####..', '.##..##.', '.#.oo.#.'],
+    'shield':   ['.#######', '.#.....#', '.#..#..#', '.#.###.#', '.#..#..#', '.#..#..#', '..#...#.', '...###..'],
+    'helmet':   ['..#####.', '.......#', '..#####.', '.#######', '....####', '....####', '..#####.', '.....###'],
+    'gloves':   ['........', '........', '..###...', '..####..', '..####..', '...####.', '.....#.#', '......#.'],
+    'bracelet': ['...###..', '..#...#.', '.#.....#', '.#.....#', '.#.....#', '.##...##', '..#####.', '...#o#..'],
+    'robe':     ['........', '###..###', '########', '.######.', '.######.', '.######.', '.######.', '........'],
+}
+OWNER_ICONS['rod'] = OWNER_ICONS['staff']            # (one staff for staves and rods)
+
+
 def own_tile(rows):
     """an NES 2bpp tile from rows of '.', 'o', '#' (colours 2, 1, 3)"""
     col = {'.': 2, 'o': 1, '#': 3}
@@ -84,8 +107,9 @@ def icon_tiles(ff3):
     for code, t in ICONS.values():
         if t is None: continue
         out[code] = ff3[FF3_FONT + 16 * t:FF3_FONT + 16 * t + 16] if ff3 else bytes(8) + b'\xff' * 8
-    out[ICONS['item'][0]] = own_tile(BAG)
     out[ICONS['key'][0]] = own_tile(KEY)
+    for name, rows in OWNER_ICONS.items():
+        out[ICONS[name][0]] = own_tile(rows)
     return out
 
 
@@ -105,6 +129,7 @@ def icon_of(rom, k, name):
         return WPN_GFX.get(g & 0xFC, 'sword')
     if 68 <= k <= 107:
         if 'Bracelet' in name or 'Ring' in name: return 'bracelet'
+        if name in ('Clothes', 'White Robe', 'Black Robe'): return 'robe'
         return ARM_TYPE[armour_types(rom)[k - 68]]
     if 176 <= k <= 239: return 'white' if (k - 176) % 8 < 4 else 'black'
     return None
