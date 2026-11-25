@@ -360,3 +360,28 @@ Color only" screen on older systems.
   must stay intact.
 - Saves from the affected builds are mended on load / resume (extras.s `sv_fix`): ship / airship
   flags other than 0 / 1 reset.
+
+## V-Blank copies, line 153 and the music timer (2026-11-25)
+- **Test LY right before the copy, not before the work that leads to it.** The water's uploader
+  tested LY, then spent a line on a mask and addresses: a copy passed at 151 began at 153 and ran
+  into line 0's mode 3. Put every per-item decision in build-time lists, and test LY last.
+- **Line 153 reads LY 0 on the plain Game Boy** (most of the line). A handler that defers work "from
+  line 124 on" by LY alone runs it in line 153: the music timer did, for ~10 lines, in the middle of
+  a V-Blank tile copy (the copy finished at line 9). Any interrupt that can land in V-Blank must
+  treat LY 0-1 as V-Blank too; a copy started late in line 152 has no room for any interrupt.
+- **Budget the DMG's V-Blank by measurement.** The FF1 native build's V-Blank handler runs until
+  line 148, so field uploads get lines 148-153 (about three 16-byte copies). Log LY at the routine's
+  entry (SameBoy core with `SB_PCLOG`, `tools/gb/sameboy/sameboy-ffe.patch`).
+- **Do not copy the same tile twice**: an entry whose four corners are one tile (the river) made four
+  identical copies per step.
+- **Animated tiles after a load**: a load puts the tiles back at their first picture; draw them at
+  the current step inside the load (LCD off / masked), not on the first field frame (FF1's palette
+  cycle shows ~60 frames before the field runs).
+- **Testing the VRAM/OAM checker in SameBoy:** build the libretro core from SameBoy (commit ea667ad
+  tested) with `tools/gb/sameboy/sameboy-ffe.patch` applied (`git apply`), RGBDS v0.9.1 on PATH and a
+  `hexdump` stand-in that prints `0x%02x, ` per byte; `build/sbsh` command `v` returns the count of
+  CPU writes the hardware dropped (VRAM in mode 3, OAM in modes 2-3), stderr lists the first 40 with
+  bank:PC and LY.
+- Test-start builds (`--start`) have a party with 0 HP: give it stats with `--init` (character
+  records at save page $100 + $40 n: HP $0A, max $0C, strength $10, damage $20, hit $21, level $26)
+  before testing battles, or the game-over path resets RAM.

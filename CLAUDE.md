@@ -1371,6 +1371,10 @@ one-line pages), story pages centred, shop / menu texts re-flowed, target window
 Owner (2026-11-25), done (item 42): pre-battle Poison no longer shown as Dead; doors open whenever the party is
 inside; White Magic icon readable in battle; CRITICAL! label before hits / damage; ailment icon bubbles by the
 members and icons on the party lines; jumbled results page / message text after big formations fixed.
+Owner (2026-11-25), done (item 43): the water holds its step through menus, battles and loads (its own counter,
+redrawn inside the load); towns' water tile moves as the sea; DMG overworld water copies fit V-Blank (build-time copy
+lists; they ran into mode 3 since item 33); music ticks held in line 153 (battle uploads ran into mode 3). VRAM/OAM
+checker 0 on Color and DMG (SameBoy core with tools/gb/sameboy/sameboy-ffe.patch). Next: the owner's play-test.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

@@ -783,3 +783,38 @@ one reaches parity, so the owner can keep playing).
      (`msg_blank`, both close paths).
    - Tools: `GBN_GAPS=N build.py` lists the free runs of code bank N (the assembler now returns the
      bytes it claimed).
+43. Owner (2026-11-25): "The ocean stops and restarts without holding its last known position" and "Add
+   the ocean effect to tiles in towns". Tested in SameBoy, Color and plain Game Boy (scratch scripts:
+   each water tile's VRAM matched every frame against the build's pictures, screen brightness, the
+   VRAM/OAM checker).
+   - Cause: the water's step came from the global frame counter, and every map load (also the reload
+     after a menu or a battle) put the tiles back at their first picture; FF1's palette cycle showed
+     that picture for ~60 frames, then the water jumped to wherever the counter had got to.
+   - The water keeps its own step count (`wa_t`), advanced only while water shows, so menus, battles
+     and loads hold it. `load_map` draws every water tile at that step while the LCD is off or masked
+     (`wa_drw` -> `wa_load`, bank 99, through `far_copy`), so the first picture is only ever in VRAM
+     on black (Color) or white (DMG) load frames. Checked after the main menu (town and overworld)
+     and after a battle (overworld): the step shown before is the step shown after, then it goes on.
+   - The first version kept `wa_t` / `wa_ok` / `wa_full` at $C6E8, inside the field's metatile queue
+     ($C100-$C8FF): walking wrote over them. Now at $CFB8 (fixed RAM after `ly_tab`).
+   - Towns (maps 0-7, tileset 0): the water tile ($0F; DMG: the map's pre-shaded copy, used only by
+     water metatiles 39-41 / 59, inside rooms too) moves as the sea: two bands of 4 lines, a pixel
+     sideways per 16 frames, 8 frames apart (`wa_town`, `wt_cp`; `build.py town_water`, bank 109).
+     A new picture every 8 frames; nothing else in the tile data changes.
+   - Plain Game Boy overworld water (wrong since item 33): the V-Blank handler leaves the water lines
+     148-153; each slot test cost a line and a copy passed at line 151 started at 153, so copies ran
+     into line 0's mode 3 (SameBoy: 184 dropped writes per 200 frames, half the frames with sea
+     corners at different steps). Now the build lists each step's copies (`$6200 + 16 step`: the
+     tiles that change, a tile shown at several corners once; `$6600 + 32 step`: every tile, for a
+     redraw) and `wa_run` tests LY right before each copy (start by line 151). The sea and river are
+     never torn within themselves on either system (DMG: the river sometimes a frame after the sea);
+     a step left unfinished is redrawn whole at the next.
+   - Battle (plain Game Boy, older than this work): `bt_vbl`'s tile uploads ran into line 0's mode 3
+     when the music timer cut in at line 153, whose LY reads 0, so the tick ran there (~10 lines).
+     Ticks read at LY 0-1 are now held to line 64 like those from line 124 on (`tm_late`), and
+     `bt_vbl` starts a tile by line 151.
+   - VRAM/OAM checker 0 on Color and DMG over: the town (motion, menu), the overworld (motion, menu,
+     a battle and back). No lag frames in the town (1200 frames, `wa_tick` every frame).
+   - Tools: `build/sbsh` `v` now reads the count from a SameBoy core built with
+     `tools/gb/sameboy/sameboy-ffe.patch` (dropped VRAM / OAM writes with bank:PC and LY; `SB_PCLOG=
+     addr,..` prints LY whenever code reaches those addresses).
