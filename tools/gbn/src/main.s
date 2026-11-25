@@ -561,7 +561,7 @@ load_map:   push af
             call obj_tiles
             ld hl, M_VEHDMG
             call veh_tiles
-.drw:       call party_spr                  ; (the leader's class)
+.drw:       call wa_drw                     ; (the water at its step: wanim.s; the leader's class)
             call sgb_map
             ld a, [ml_keep]                 ; (a reload keeps the objects)
             and a

@@ -12,7 +12,9 @@
  *   w PATH        start recording the sound (WAV 48 kHz stereo 16-bit) -> "ok CORE_RATE"
  *   W             stop recording                                       -> "ok"
  *   S PATH / L PATH  save / load a state                               -> "ok" / "err"
- *   v             (VRAM checker: not available on libretro, always 0)
+ *   v             VRAM/OAM checker: CPU writes the hardware dropped (VRAM in mode 3, OAM in
+ *                 modes 2-3) since boot, from a core patched to export GB_vchk_n (docs/gb-lessons.md
+ *                 "Testing"); 0 with a core without it
  *   q             quit
  * build: gcc -O2 -I/usr/include/libretro-common tools/gb/sameboy/sbsh.c -ldl -o build/sbsh
  * core:  build/sameboy_libretro.so (see docs/gb-lessons.md), env SBSH_CORE overrides */
@@ -142,6 +144,7 @@ int main(int argc, char** argv) {
 	p_retro_set_video_refresh(video_cb); p_retro_set_audio_sample(audio_cb);
 	p_retro_set_audio_sample_batch(audio_batch_cb); p_retro_set_input_poll(poll_cb);
 	p_retro_set_input_state(input_cb);
+	unsigned* vchk_n = (unsigned*) dlsym(h, "GB_vchk_n");   /* (patched SameBoy core only) */
 	FILE* rf = fopen(argv[1], "rb"); if (!rf) { perror(argv[1]); return 1; }
 	fseek(rf, 0, SEEK_END); long rsize = ftell(rf); fseek(rf, 0, SEEK_SET);
 	void* rom = malloc(rsize); if (fread(rom, 1, rsize, rf) != (size_t) rsize) return 1; fclose(rf);
@@ -183,7 +186,7 @@ int main(int argc, char** argv) {
 			if (cmd[0] == 'S') { if (p_retro_serialize(b, sz)) { FILE* f = fopen(a1, "wb"); if (f) { fwrite(b, 1, sz, f); fclose(f); ok = 1; } } }
 			else { FILE* f = fopen(a1, "rb"); if (f) { ok = fread(b, 1, sz, f) == sz && p_retro_unserialize(b, sz); fclose(f); } }
 			free(b); printf(ok ? "ok\n" : "err\n");
-		} else if (!strcmp(cmd, "v")) printf("0\n");
+		} else if (!strcmp(cmd, "v")) printf("%u\n", vchk_n ? *vchk_n : 0);
 		else if (!strcmp(cmd, "q")) break;
 		else printf("?\n");
 	}

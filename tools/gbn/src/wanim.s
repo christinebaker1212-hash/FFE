@@ -28,9 +28,11 @@ wa_tick:    ld a, [ap_on]                   ; (not under the airship's view)
             cp [hl]
             jr z, .same
             ld [hl], a
+            ld a, [wa_i]                    ; (the last step's tiles not all drawn yet: every
+            sub 8                           ;   tile at this one, else only those it changes)
+            ld [wa_full], a
             xor a
             ld [wa_i], a
-            ld [wa_full], a
 .same:      jp wa_ow
 
 section bank 0, $13CB
@@ -121,6 +123,117 @@ wt_cp:      ld a, WTOWN_BANK
             ld l, a
             ld bc, 16
             jp memcpy
+
+section bank 0, $3BD9
+; load_map, once the map's tiles are in VRAM (LCD off or a masked load): the water drawn at
+; the step it had reached, so a reload after a menu or a battle shows no first picture
+wa_drw:     ld a, F3_BANK
+            ld hl, wa_load
+            call bank_call
+            jp party_spr
+
+section bank 99, $7960
+; (bank F3_BANK) every water tile of the new map at step wa_t / 4: the towns' tile (wt_cp), or
+; the overworld's slots (the water bank's header and frames read through far_copy)
+wa_load:    ld a, [wa_t]
+            rrca
+            rrca
+            and 63
+            ld [wa_ph], a
+            ld a, 1
+            ld [wa_ok], a
+            ld a, 8                         ; (wa_tick: this step drawn, every tile)
+            ld [wa_i], a
+            xor a
+            ld [wa_full], a
+            ld a, [ap_on]
+            and a
+            ret nz
+            ldh a, [maptype]
+            and a
+            jr nz, .ow
+            ld a, [cur_map]                 ; towns (maps 0-7)
+            cp 8
+            ret nc
+            ld hl, wt_cp                    ; (bank 0 code; bank_call maps this bank back)
+            jp bank_call
+.ow:        ld c, 0                         ; C = slot (entry C / 4, corner C & 3)
+.sl:        ld a, c
+            srl a
+            srl a
+            ld b, a                         ; B = entry
+            ld hl, $4000                    ; (the entry count)
+            call wa_rd
+            dec a
+            cp b
+            ret c
+            ld a, b                         ; D = the slot's tile ($4010 + 16 entry + corner)
+            swap a
+            add a, $10
+            ld l, a
+            ld a, c
+            and 3
+            add a, l
+            ld l, a
+            ld h, $40
+            call wa_rd
+            ld d, a                         ; DE = its VRAM ($8800 mode)
+            swap a
+            ld e, a
+            and $0F
+            bit 7, d
+            jr z, .lo
+            add a, $80 - $90
+.lo:        add a, $90
+            ld d, a
+            ld a, e
+            and $F0
+            ld e, a
+            ld a, [wa_ph]                   ; HL = $4100 + $1000 entry + 64 step + 16 corner
+            ld l, a
+            srl a
+            srl a
+            ld h, a
+            ld a, b
+            swap a
+            add a, h
+            add a, $41
+            ld h, a
+            ld a, l
+            and 3
+            rrca
+            rrca
+            ld l, a
+            ld a, c
+            and 3
+            swap a
+            or l
+            ld l, a
+            push bc
+            call wa_bk
+            ld bc, 16
+            call far_copy
+            pop bc
+            inc c
+            ld a, c
+            cp 8
+            jr c, .sl
+            ret
+; A = the byte at HL in the water bank (keeps BC)
+wa_rd:      push bc
+            call wa_bk
+            ld de, wa_tmp
+            ld bc, 1
+            call far_copy
+            pop bc
+            ld a, [wa_tmp]
+            ret
+wa_bk:      ldh a, [is_cgb]
+            and a
+            ld a, WANIM_BANK
+            ret nz
+            ld a, WANIM_DMG
+            ret
 
 section bank 0, $2591
 ; the next changed tiles of this step while the V-Blank lasts (the bank mapped): entry e's tile
@@ -226,7 +339,9 @@ section wram, $C992                         ; (between the SGB variables and its
 wa_i:       ds 1
 wa_ph:      ds 1
 
-section wram, $C6E8                         ; (after the battle's ailment bubbles)
+section wram, $CFB8                         ; (after ly_tab; fixed RAM no screen shares: the map's
+                                            ;   queue $C100-$C8FF ran over these at $C6E8)
 wa_t:       ds 1                            ; the water's own frame count
 wa_ok:      ds 1                            ; 0 after a map load: the tiles at their first picture
 wa_full:    ds 1                            ; a full redraw at this step
+wa_tmp:     ds 1                            ; (wa_load: a byte of the water bank)
