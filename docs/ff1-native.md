@@ -915,3 +915,12 @@ one reaches parity, so the owner can keep playing).
      window colour settings left its Options list.
    - Battle: the field is black on every system, so the sprites' see-through parts already show black; no change.
 
+49. Owner (2026-11-25, last): "Black Magician job looks awful in the white background. It should have two 2px high eyes,
+    surrounded by black." The Black Magician's face (the shade under the hat, the two 2-px eyes in it) is see-through in
+    FF1's sprite and open to the outside below the brim, so the outline alone left it in the window colour. The outline
+    now starts from the figure's filled shape (`ul_fill`, src/ul.s): every see-through pixel with sprite pixels left and
+    right of it in its row and above and below it in its column is black too, as on the NES's black background. That
+    gives the black face around the eyes, and the narrow gaps in the other jobs' robes and arms go black the same way;
+    the outer edge keeps its 1-px rounded outline. Worked out at run time from the sprite tiles (any pose); 24 rows of
+    bit masks, no table. Checked: job list, party creation, Formation, main menu on Color and DMG White; VRAM/OAM
+    checker 0.

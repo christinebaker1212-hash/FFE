@@ -4,7 +4,8 @@
 ;
 ; A picture is a 2 x 3 sprite block (scr_spr23); its sprites keep FF1's three colours and see-through
 ; parts. The outline is drawn in the background under it: every window-inside pixel that touches a
-; sprite pixel above, below, left or right (not on a diagonal: rounded corners) turns black. The
+; sprite pixel above, below, left or right (not on a diagonal: rounded corners) turns black, and so
+; does every see-through pixel inside the figure (sprite on all four sides: ul_fill). The
 ; cells under the pictures get tiles of their own (copies of what was there, outline added):
 ; Color: VRAM bank 1 tiles $80-$FF, black = palette colour 0 (the window palette's outside black);
 ; plain Game Boy with White windows: tiles $94-$BF and $E0-$FF (the gold labels keep $C0-$DF),
@@ -12,7 +13,7 @@
 ; windows (plain Game Boy, Super Game Boy) the see-through parts already show black: nothing to do.
 ; The outline is worked out from the sprite tiles in VRAM, so any pose and screen works. Rebuilt at
 ; scr_show (LCD off) and at scr_upd when a picture moved or changed (LCD on: each VRAM access in
-; mode 0 / 1). RAM: the field's metatile queue (screens drop it: main.s), $C220-$C28F and the cells
+; mode 0 / 1). RAM: the field's metatile queue (screens drop it: main.s), $C220-$C2B4 and the cells
 ; at $C300-$C47F (the battle's raster tables and text line: unused on these screens).
 
 UL_MAXP    = 6              ; pictures on one screen
@@ -31,6 +32,7 @@ ul_r:       ds 1
 ul_k:       ds 1
 ul_m:       ds 4                            ; an outline row aligned to cells
 ul_tmp:     ds 16
+ul_f:       ds 48                           ; the filled shape (same page as ul_s: ul_x24)
 section wram, $C300                         ; (the battle's raster tables / text line: free here)
 ul_cell:    ds 128 * 3                      ; cells: map offset (2), the tile that was there
 
@@ -268,6 +270,7 @@ ul_pic:     xor a                           ; (sprite tiles: VRAM bank 0)
             ld h, a
             dec c
             jr nz, .tr
+            call ul_fill
             xor a                           ; box rows 0-25 (y - 1 .. y + 24)
             ld [ul_r], a
 .row:       call ul_orow                    ; ul_m = the row's outline, aligned to cells
@@ -314,11 +317,14 @@ ul_pic:     xor a                           ; (sprite tiles: VRAM bank 0)
 
 ; the 24-bit sprite row of box row A (A - 1 a sprite row 0-23, else none) -> C, D, E:
 ; bits 23-0 = x - 1 .. x + 22 (the sprite at bits 22-7)
-ul_s24:     dec a
+ul_f24:     ld b, low(ul_f)                 ; (the filled shape)
+            jr ul_x24
+ul_s24:     ld b, low(ul_s)
+ul_x24:     dec a
             cp 24
             jr nc, .z
             add a, a
-            add a, low(ul_s)
+            add a, b
             ld l, a
             ld h, high(ul_s)
             ld a, [hl+]                     ; M = left : right (bit 15 = x)
@@ -345,11 +351,11 @@ ul_s24:     dec a
             ld d, c
             ld e, c
             ret
-; ul_m = the outline of box row ul_r: (S << 1 | S >> 1 | S above | S below) and not S, shifted
-; right by (x - 1) & 7 so ul_m + 0 is the cell of pixel x - 1
+; ul_m = the black of box row ul_r: (F | F << 1 | F >> 1 | F above | F below) and not S, with F the
+; filled shape (ul_fill), shifted right by (x - 1) & 7 so ul_m + 0 is the cell of pixel x - 1
 ul_orow:    ld a, [ul_r]                    ; above (box row r - 1)
             dec a
-            call ul_s24
+            call ul_f24
             ld a, c
             ld [ul_m], a
             ld a, d
@@ -358,7 +364,7 @@ ul_orow:    ld a, [ul_r]                    ; above (box row r - 1)
             ld [ul_m + 2], a
             ld a, [ul_r]                    ; below (box row r + 1)
             inc a
-            call ul_s24
+            call ul_f24
             ld hl, ul_m
             ld a, c
             or [hl]
@@ -369,8 +375,20 @@ ul_orow:    ld a, [ul_r]                    ; above (box row r - 1)
             ld a, e
             or [hl]
             ld [hl], a
-            ld a, [ul_r]                    ; this row: S << 1 and S >> 1 added, S taken out
-            call ul_s24
+            ld a, [ul_r]                    ; this row's F itself
+            call ul_f24
+            ld hl, ul_m
+            ld a, c
+            or [hl]
+            ld [hl+], a
+            ld a, d
+            or [hl]
+            ld [hl+], a
+            ld a, e
+            or [hl]
+            ld [hl], a
+            ld a, [ul_r]                    ; this row: F << 1 and F >> 1 added, S taken out
+            call ul_f24
             push bc                         ; (C kept: S's first byte)
             push de
             ld a, e                         ; S << 1
@@ -415,6 +433,8 @@ ul_orow:    ld a, [ul_r]                    ; above (box row r - 1)
             ld [hl], a
             pop de
             pop bc
+            ld a, [ul_r]
+            call ul_s24
             ld hl, ul_m                     ; and not S
             ld a, c
             cpl
@@ -691,4 +711,100 @@ ul_vsrc:    push af
             ret
 .hi:        ld bc, $8800 - $800
             add hl, bc
+            ret
+
+section bank 99, $4A00                      ; (free space)
+; ul_f = the picture's filled shape (owner, 2026-11-25: the Black Magician's eyes surrounded by
+; black): every pixel with sprite pixels left and right of it in its row and above and below it in
+; its column, the sprite's own pixels included. See-through parts inside the figure (the face under
+; the Black Magician's hat, gaps in robes) turn black, as on the NES's black background.
+ul_fill:    ld hl, ul_s                     ; columns: sprite above (running OR from the top)
+            ld de, ul_f
+            ld bc, 0
+.t:         ld a, [hl+]
+            or b
+            ld b, a
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            or c
+            ld c, a
+            ld [de], a
+            inc de
+            ld a, l
+            cp low(ul_s + 48)
+            jr nz, .t
+            ld hl, ul_s + 47                ; and sprite below (running OR from the bottom)
+            ld de, ul_f + 47
+            ld bc, 0
+.b:         ld a, [hl-]
+            or c
+            ld c, a
+            ld a, [de]
+            and c
+            ld [de], a
+            dec de
+            ld a, [hl-]
+            or b
+            ld b, a
+            ld a, [de]
+            and b
+            ld [de], a
+            dec de
+            ld a, l
+            cp low(ul_s - 1)
+            jr nz, .b
+            ld hl, ul_s                     ; rows: between the leftmost and rightmost pixel
+.h:         ld a, [hl+]                     ; DE = the row (bit 15 = the left edge)
+            ld d, a
+            ld a, [hl+]
+            ld e, a
+            cpl                             ; BC = x | -x: the rightmost pixel and left of it
+            add a, 1
+            ld c, a
+            ld a, d
+            cpl
+            adc a, 0
+            or d
+            ld b, a
+            ld a, c
+            or e
+            ld c, a
+            ld a, d                         ; and the leftmost pixel and right of it
+            and a
+            jr z, .lo
+            call .sm
+            and b
+            ld b, a
+            jr .st
+.lo:        ld b, a                         ; (A = 0)
+            ld a, e
+            call .sm
+            and c
+            ld c, a
+.st:        push hl
+            ld de, ul_f - ul_s - 2
+            add hl, de
+            ld a, [hl]
+            and b
+            ld [hl+], a
+            ld a, [hl]
+            and c
+            ld [hl], a
+            pop hl
+            ld a, l
+            cp low(ul_s + 48)
+            jr nz, .h
+            ret
+.sm:        ld d, a                         ; A = A smeared right (A | A >> 1 | .. | A >> 7)
+            srl a
+            or d
+            ld d, a
+            srl a
+            srl a
+            or d
+            ld d, a
+            swap a
+            and $0F
+            or d
             ret

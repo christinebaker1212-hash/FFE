@@ -1388,6 +1388,8 @@ EXP pays; spell description proposals in docs/ff1-magic-descriptions.md. Then (i
 shops show it at once); every spell bug fixed (Slow on a slowed target, Shapera's data; the rest already right natively).
 Then (item 48): black rounded outlines under the party's pictures on every menu screen (src/ul.s), the owner's icon
 set, SGB windows black, SGB battles in their own colours again (broken since the audit's B12).
+Then (item 49): see-through pixels inside a picture (sprite on all four sides) black: the Black Magician's eyes in a
+black face on White / Color windows.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
