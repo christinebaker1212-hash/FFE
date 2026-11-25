@@ -920,7 +920,7 @@ bt_erase_box:
             push bc
             push de
             ld a, c
-            call sf_one
+            call row_put                    ; (in V-Blank, or byte by byte when late)
             pop de
             pop bc
             inc c

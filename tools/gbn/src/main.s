@@ -332,6 +332,17 @@ vblank:     push af
             push hl
             ldh a, [rombank]                ; (restored at the end: the handler switches)
             push af
+            ldh a, [is_cgb]                 ; (the Color: the VRAM bank kept for the code it
+            and a                           ;   interrupted; box_vbl / q_flush leave it at 0,
+            jr z, .v0                       ;   and an attribute row being written went into
+            ldh a, [rVBK]                   ;   the tile map: the garbled battles)
+.v0:        push af
+            ldh a, [is_cgb]                 ; (and bank 0 for its own map writes: with the
+            and a                           ;   interrupted code's bank 1 they went into the
+            jr z, .v2                       ;   attributes: mirrored letters)
+            xor a
+            ldh [rVBK], a
+.v2:
             ld hl, frame
             inc [hl]
             call hram_dma
@@ -361,6 +372,13 @@ vblank:     push af
 .late:      ld a, 1
             ldh [vbl_done], a
             pop af
+            ld b, a
+            ldh a, [is_cgb]
+            and a
+            jr z, .v1
+            ld a, b
+            ldh [rVBK], a
+.v1:        pop af
             call sbank
             pop hl
             pop de
@@ -1320,28 +1338,6 @@ map_at:     ldh a, [maptype]
             ld a, [hl]
             ret
 
-; ---- scroll: the party's metatile at screen (72, 64)
-set_scroll: ld a, [mcount]                  ; offset in the step
-            ld c, a
-            ld a, [mdx]
-            call mulsign
-            ld b, a
-            ld a, [px]
-            swap a
-            and $F0
-            add a, b
-            sub 72
-            ldh [scx], a
-            ld a, [mdy]
-            call mulsign
-            ld b, a
-            ld a, [py]
-            swap a
-            and $F0
-            add a, b
-            sub 64
-            ldh [scy], a
-            ret
 mulsign:    and a                           ; A = sign (-1 / 0 / 1) -> A = sign * C
             ret z
             bit 7, a
@@ -2277,13 +2273,8 @@ fd_step:    call fd_scale
             jr nz, .o
             jp wait_vbl
 ; a V-Blank with room for the palette work (LY 144-147)
-fd_vbl:     call wait_vbl
-            ldh a, [rLY]
-            cp 144
-            jr c, fd_vbl
-            cp 148
-            jr nc, fd_vbl
-            ret
+fd_vbl:     jp fd_vb2                       ; (screens.s: a late handler never stops it)
+            ds 11
 ; fd_pal (64 colours) x fd_lv / 4 -> fd_tmp
 fd_scale:   ld hl, fd_pal
             ld de, fd_tmp
@@ -4135,7 +4126,10 @@ pal_blk:    push af                         ; B bytes (a masked load: into the s
 
 section bank 0, $1F15                       ; (free space)
 wait_vbl:   call rst_chk                    ; (A + B + START + SELECT: a soft reset from any
-            call fx_tick                    ;   loop, fades and loads too: Lot Check)
+            ldh a, [rLCDC]                  ;   loop, fades and loads too: Lot Check)
+            bit 7, a                        ; (the LCD off: no V-Blank comes; at once, never a
+            ret z                           ;   hang)
+            call fx_tick
             call sgb_tick                   ; (a Super Game Boy's queued packet: before the
             xor a                           ;   wait, so it never takes V-Blank time)
             ldh [vbl_done], a
@@ -4168,3 +4162,138 @@ btn_rd:     ld a, $10
             pop af
             and $0F
             ret
+
+section bank 0, $384B                       ; (free space: moved for the V-Blank handler's VBK)
+; ---- scroll: the party's metatile at screen (72, 64)
+set_scroll: ld a, [mcount]                  ; offset in the step
+            ld c, a
+            ld a, [mdx]
+            call mulsign
+            ld b, a
+            ld a, [px]
+            swap a
+            and $F0
+            add a, b
+            sub 72
+            ldh [scx], a
+            ld a, [mdy]
+            call mulsign
+            ld b, a
+            ld a, [py]
+            swap a
+            and $F0
+            add a, b
+            sub 64
+            ldh [scy], a
+            ret
+
+section bank 0, $1FDF                       ; (free space)
+; A to VRAM at DE (DE + 1) in a mode where VRAM can be written (0 / 1), whatever the time: the
+; fallback of the V-Blank uploads when they miss their window, so they never wait for ever
+; (owner, 2026-11-25: a battle's results never came on a plain Game Boy)
+vput:       push af
+.w:         di
+            ldh a, [rSTAT]
+            and 2
+            jr z, .ok
+            ei
+            jr .w
+.ok:        pop af
+            ld [de], a
+            ei
+            inc de
+            ret
+
+section bank 0, $0FC8                       ; (free space)
+; map row A of the copy (and its Color attributes) to VRAM byte by byte (vput): sf_one's
+; fallback at any time of the frame
+row_safe:   ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld d, h
+            ld e, l
+            ld bc, smap
+            add hl, bc
+            ld a, d
+            add a, $98
+            ld d, a
+            push hl
+            push de
+            ld b, 20
+.c:         ld a, [hl+]
+            call vput
+            dec b
+            jr nz, .c
+            pop de
+            pop hl
+            ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, h
+            add a, 3
+            ld h, a
+            ld a, 1
+            ldh [rVBK], a
+            ld b, 20
+.d:         ld a, [hl+]
+            call vput
+            dec b
+            jr nz, .d
+            xor a
+            ldh [rVBK], a
+            ret
+
+section bank 0, $2E61                       ; (free space)
+; wait for the V-Blank (LY 144+) when the LCD is on; at once when it is off (LY stays 0 then:
+; a plain loop on LY would never end)
+vb_wait:    ldh a, [rLCDC]
+            bit 7, a
+            ret z
+.v:         ldh a, [rLY]
+            cp 144
+            jr c, .v
+            ret
+
+section bank 0, $25DD                       ; (free space)
+; the battle's top window going up (box_vbl in the V-Blank): C while its rows are not all up;
+; after 6 frames without them, the rest written from here (box_safe), so it never hangs
+box_fb:     ld a, [win_up]
+            cp 8
+            jr nc, .d
+            ld hl, box_fc
+            inc [hl]
+            ld a, [hl]
+            cp 6
+            jr c, .c
+            ld [hl], 0
+            ld a, BTL6_BANK
+            ld hl, box_safe
+            call bank_call
+.c:         scf
+            ret
+.d:         xor a                           ; (NC)
+            ld [box_fc], a
+            ret
+
+section wram, $CDF5
+box_fc:     ds 1
+
+section bank 0, $38E1                       ; (free space)
+; map row A to VRAM now: in a V-Blank's first lines whole (interrupts off), else byte by byte
+row_put:    ld b, a
+            ldh a, [rLY]
+            cp 144
+            jr c, .s
+            cp 150
+            jr nc, .s
+            ld a, b
+            di
+            call sf_one
+            ei
+            ret
+.s:         ld a, b
+            jp row_safe

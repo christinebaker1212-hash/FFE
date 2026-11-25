@@ -264,14 +264,25 @@ fl_put:     call wait_vbl
             jr nz, .r
             pop de
             ret
-.w:         push hl
+.w:         ldh a, [is_cgb]                 ; (outside the V-Blank's window: the row byte by
+            and a                           ;   byte, so it never waits for ever)
+            jr z, .w0
+            ld a, [fl_vb]
+            ldh [rVBK], a
+.w0:        ld a, [fl_e]
+            ld b, a
             push de
-            push bc
-            call wait_vbl
-            pop bc
+.wc:        ld a, [hl+]
+            call vput
+            dec b
+            jr nz, .wc
             pop de
-            pop hl
-            jr .r
+            ldh a, [is_cgb]
+            and a
+            jr z, .v1
+            xor a
+            ldh [rVBK], a
+            jr .v1
 ; fiends / Chaos (alone on the field): the Color turns BG palettes 1-2 white and back
 fl_fiend6:  ldh a, [is_cgb]
             and a
@@ -758,4 +769,56 @@ lv_rec:     call lv_all.lv
             ld hl, res_hph
             add hl, de
             inc [hl]
+            ret
+
+section bank 104, $46A0                     ; (free space before the status words at $4700)
+; the top window's rows still to go up (win_up .. 7: win_buf -> $9C00 + 32 row), byte by byte
+; (vput) from the main code; the V-Blank's box_vbl kept out meanwhile (bn_t 0)
+box_safe:   ld a, [bn_t]
+            push af
+            xor a
+            ld [bn_t], a
+.r:         ld a, [win_up]
+            cp 8
+            jr nc, .x
+            ld e, a
+            add a, a
+            add a, a
+            add a, e
+            add a, a
+            add a, a                        ; 20 row
+            ld l, a
+            ld h, high(win_buf)
+            ld a, e
+            swap a
+            add a, a                        ; 32 row
+            ld e, a
+            ld d, $9C
+            push de
+            ld b, 20
+.c:         ld a, [hl+]
+            call vput
+            dec b
+            jr nz, .c
+            pop de
+            ldh a, [is_cgb]
+            and a
+            jr z, .n
+            ld a, 1
+            ldh [rVBK], a
+            ld a, [ban_attr]
+            and a
+            jr nz, .w
+            ld a, WIN_ATTR
+.w:         ld b, 20
+.at:        call vput
+            dec b
+            jr nz, .at
+            xor a
+            ldh [rVBK], a
+.n:         ld hl, win_up
+            inc [hl]
+            jr .r
+.x:         pop af
+            ld [bn_t], a
             ret

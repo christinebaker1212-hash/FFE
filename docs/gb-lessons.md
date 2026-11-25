@@ -416,3 +416,34 @@ Color only" screen on older systems.
 - **VRAM with the LCD on: hold interrupts between the mode test and the access.** An interrupt between them
   (music timer, STAT) returns into mode 3; the SameBoy checker counted the writes. `di`, test STAT, access, `ei`.
 
+
+## Waits that must always end (2026-11-25, owner: a battle's results softlocked on DMG; battles slow to start)
+- **Never gate an upload on a V-Blank window without a fallback.** On the plain Game Boy the battle frame got control
+  back from `wait_vbl` at LY 148 almost every frame (the V-Blank handler itself takes ~4 lines), and some frames at
+  152-153 or even line 0. Uploads that ran only "while LY is 144-149/151" (map rows, tiles, the fiend flash rows)
+  then made no progress for as long as the frame stayed late, and every loop waiting for them (`bt_flush`, the
+  results) hung; when they did progress it was a tile or two a frame (slow battle starts). Now every such upload has
+  a fallback that always progresses: `vput` (one byte, written only in mode 0/1, interrupts off for the check and
+  the write), `row_safe` (a map row that way), `row_put` (a row in the window with interrupts off, else row_safe).
+- **The V-Blank handler keeps the VRAM bank of the code it interrupts** (Color): it saves VBK, selects bank 0 for
+  its own map writes (box_vbl, q_flush), and restores it. Before, an interrupted attribute row continued in bank 0
+  (tile numbers = attribute bytes) and the handler's tile rows could land in bank 1 (attribute bytes = tile
+  numbers: mirrored letters, wrong palettes) - the garbled battle in the owner's photo.
+- **No spin on LY with the LCD off** (LY stays 0): `vb_wait`, `pg_push` / `ngm_push` / `pal_win` check the LCD first;
+  `wait_vbl` returns at once with the LCD off (no V-Blank interrupt would ever set vbl_done).
+- **A wait for "a V-Blank with room" must not rely on the handler being short.** The Color's fade (`fd_vbl`) wanted
+  LY 144-147 after the frame wait and simply waited again otherwise; the handler returned at 146-148, so any heavier
+  frame missed it every time. Now a miss takes the next V-Blank's first line before its handler (`vb_top`: interrupts
+  on up to line 143, then off until 144) and drops that one V-Blank interrupt; `pg_push` / `ngm_push` use `vb_top` too.
+- **State that lives in shared RAM must be reset by every screen that reads it.** The picture outlines (ul.s) keep
+  their counts in the field's metatile queue and their cells in the battle's tables; only the menus' `scr_open`
+  cleared them, but the battle's `scr_show` / `scr_upd` ran the outline builder too. Entering a battle from the field,
+  it worked through hundreds of garbage "pictures" a VRAM byte at a time (each access waiting for a free line in the
+  Color's masked load: 1300 frames to start a battle) and stamped outline cells over the enemies (the salmon block
+  with mirrored letters in the owner's Pocket photo). Fixed at the battle's own reset (`sgb_btl0`), and the builder
+  now refuses out-of-range counts (`ul_chk`). Found by timing each step of the battle load with the PC-log core.
+- **Waits for the V-Blank handler's own work** (the battle's top window rows, `win_up`) get a frame limit and then
+  do the work themselves (`box_fb` -> `box_safe`).
+- Test every battle to its end, not just its start: `scratchpad sc/bf3.py` fights each of the 128 formations with A
+  until the field (PC log: `main`) or game over, and calls a run stuck when the screen does not change for 60
+  presses.

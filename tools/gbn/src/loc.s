@@ -3409,16 +3409,14 @@ ngm_desc:   ld bc, $0007
             jp scr_str
 ; its rows 7-17 to VRAM now, each in a V-Blank's first lines with interrupts off (the screen's
 ; own refresh would hide the hand while it runs: no blink on a cursor move)
-ngm_push:   ld a, 7
+ngm_push:   call lcd_get                    ; (nothing with the LCD off: the show copies it)
+            bit 7, a
+            ret z
+            ld a, 7
 .r:         push af
-.w:         ldh a, [rLY]
-            cp 144
-            jr c, .w
-            cp 150
-            jr nc, .w
+.w:         call vb_top                     ; (interrupts off: main.s / screens.s)
             pop af
             push af
-            di
             call sf_one
             ei
             pop af
@@ -4008,9 +4006,15 @@ sgb_attr:   call sgb_slot
             jr nz, .e
             ret
 
-section bank 0, $16F0                       ; (after refl_tick: the menu pictures' resets)
+section bank 0, $16E5                       ; (after refl_tick: the menu pictures' resets)
 sgb_menu0:  jp alt_new                       ; (scr_open: no pictures yet; a new screen)
 sgb_btl0:   xor a                           ; (a battle: its own palettes; no gold-label pass:
+            ld [ul_np], a                   ; (no pictures' outlines either: their counts live
+            ld [ul_nc], a                   ;   in the field's metatile queue and the cells in
+            ld [ul_dirty], a                ;   the battle's tables; stale, scr_show worked through
+                                            ;   hundreds of garbage pictures a VRAM byte at a time
+                                            ;   - battles 20 s to start on the Color, outline
+                                            ;   tiles over the enemies; owner, 2026-11-25)
             ld [sgb_pn], a                  ;   it sent the menus' palettes over the battle's
             ld [alt_ok], a                  ;   on the SGB and its glyphs would take battle
             ld [alt_g], a                   ;   (alt_g: the last screen's gold, alt_show's test)

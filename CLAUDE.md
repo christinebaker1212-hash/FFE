@@ -1397,6 +1397,9 @@ opposite directions); "Battle Speed". Details: docs/gb-release-checks.md "Strict
 Then (item 51): the Game Style screen (owner chose A): Classic / Modern with a live description.
 Then (item 52): Game Style centred; proposals for the party / job / name screens in docs/ff1-job-screens-proposals.md.
 Then (item 53): owner chose P-A, K-A, N: new party / job picker / name entry screens (src/pgen.s, bank 110).
+Then (item 54): battle hangs / slow starts / garbage fixed: the menu outline builder ran on battles with stale counts (Color:
+1305 -> 153 frames to start, outline cells over the enemies), V-Blank-window uploads that never progressed on DMG (results
+softlock), the V-Blank handler's VRAM bank, fade waits; all 128 formations fought to the end on DMG / Color / SGB.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

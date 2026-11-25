@@ -523,7 +523,7 @@ def main():
         for off in range(0x4000 + 1):
             if off < 0x4000 and not r.claimed.get((gb, off)): run.append(off)
             else:
-                if len(run) >= 16: print('bank %d free: $%04X-$%04X (%d)' % (gb, run[0] + (0x4000 if gb else 0), run[-1] + (0x4000 if gb else 0), len(run)))
+                if len(run) >= int(os.environ.get('GBN_GAPMIN', 16)): print('bank %d free: $%04X-$%04X (%d)' % (gb, run[0] + (0x4000 if gb else 0), run[-1] + (0x4000 if gb else 0), len(run)))
                 run = []
     for lbl in ('qbuf', 'oam_buf', 'objs', 'game_flags', 'font_tbl', 'win_buf'):
         assert r.labels[lbl] % 0x100 == 0, '%s at %04X not aligned' % (lbl, r.labels[lbl])

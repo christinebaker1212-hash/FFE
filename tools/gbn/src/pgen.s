@@ -321,15 +321,10 @@ pg_push:    call lcd_get
             bit 7, a
             ret z
 .r:         push bc
-.w:         ldh a, [rLY]
-            cp 144
-            jr c, .w
-            cp 150
-            jr nc, .w
+.w:         call vb_top                     ; (interrupts off: main.s / screens.s)
             pop bc
             push bc
             ld a, b
-            di
             call sf_one
             ei
             pop bc

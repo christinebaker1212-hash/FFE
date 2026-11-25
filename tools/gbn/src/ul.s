@@ -110,8 +110,8 @@ pic_upd:    ld a, [ul_dirty]
             jp alt_pass
 
 ; every picture's outline made again (the cells put back first)
-ul_build:   xor a
-            ld [ul_dirty], a
+ul_build:   call ul_chk                     ; (ul_dirty cleared, the counts checked)
+            nop
             ld a, [ul_nc]                   ; the cells put back (ul_ink still the last build's)
             and a
             jr z, .m
@@ -824,4 +824,22 @@ ul_fill:    ld hl, ul_s                     ; columns: sprite above (running OR 
             swap a
             and $0F
             or d
+            ret
+
+section bank 99, $4EC9                      ; (free space)
+; counts out of range: none (never garbage work: a stale count once stamped outlines over a
+; battle and took 20 s to start it on the Color; owner, 2026-11-25)
+ul_chk:     xor a
+            ld [ul_dirty], a
+            ld a, [ul_np]
+            cp UL_MAXP + 1
+            jr c, .np
+            xor a
+            ld [ul_np], a
+            ld [ul_nc], a
+.np:        ld a, [ul_nc]
+            cp 129
+            ret c
+            xor a
+            ld [ul_nc], a
             ret

@@ -1334,62 +1334,29 @@ bt_vbl:     ld a, [bt_upn]
             ld e, a
             ld a, [bt_updst + 1]
             ld d, a
-.l:         ldh a, [rLY]                    ; (only in V-Blank: a tile takes under a line;
+.l:         ldh a, [rLY]                    ; (in V-Blank: a tile takes under a line;
             sub 144                         ;   one started late in line 152 ran into line 0's
             cp 8                            ;   mode 3 if the music timer cut in: up to 151)
-            jr nc, .x
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
-            ld [de], a
-            inc e
-            ld a, [hl+]
+            jr nc, .sl
+            ld b, 16
+.c:         ld a, [hl+]
             ld [de], a
             inc de
+            dec b
+            jr nz, .c
             ld a, [bt_upn]
             dec a
             ld [bt_upn], a
             jr nz, .l
+            jr .x
+.sl:        ld b, 16                        ; (outside it: one tile byte by byte, so the
+.s:         ld a, [hl+]                     ;   uploads always go on: owner, 2026-11-25, a
+            call vput                       ;   battle's results never came on a plain Game
+            dec b                           ;   Boy)
+            jr nz, .s
+            ld a, [bt_upn]
+            dec a
+            ld [bt_upn], a
 .x:         ld a, l
             ld [bt_upsrc], a
             ld a, h
@@ -1457,15 +1424,20 @@ bt_rowsup:  ld a, [bt_rmask]
             jr .f
 .g:         ldh a, [rLY]
             cp 144
-            ret c
+            jr c, .sl
             cp 150                          ; (a row takes ~2 lines: done before the music's
-            ret nc                          ;   tick at line 153; Lot Check)
+            jr nc, .sl                      ;   tick at line 153; Lot Check)
             ld a, c
             xor d
             ld [bt_rmask], a
             ld a, b
-            call sf_one
-            jr bt_rowsup
+            call row_put                    ; (interrupts off for the row: a music tick inside
+            jr bt_rowsup                    ;   it pushed it into the next frame's drawing)
+.sl:        ld a, c                         ; (outside the window: one row byte by byte, so
+            xor d                           ;   the rows always go up)
+            ld [bt_rmask], a
+            ld a, b
+            jp row_safe
 ; wait until every staged upload is done, tiles and map rows (new text never overwrites
 ; tiles the screen still shows: a window is blanked on screen before its text is staged,
 ; and its rows go up after all of it)

@@ -3050,9 +3050,8 @@ bt_banner:  ld a, [ban_on]                  ; (shown: off first, a frame, so the
             ld a, 1
             ld [bn_t], a
             ld [ban_on], a
-.f:         call bt_frame                   ; (until its rows are up)
-            ld a, [win_up]
-            cp 8
+.f:         call bt_frame                   ; (until its rows are up; box_fb writes them
+            call box_fb                     ;   itself after 6 frames: never a hang)
             jr c, .f
             ld a, [ban_bot]                 ; (the window on below line 64 only now: set
             and a                           ;   while the rows went up, with WY still 0, the
@@ -3070,9 +3069,8 @@ bt_ban_off: ld a, [ban_on]
             ld [ban_bot], a
             ld a, LCDC_ON
             ld [lcdc_on], a
-.vb:        ldh a, [rLY]                    ; (in V-Blank: mid-frame, the lines already drawn
-            cp 144                          ;   kept a sliver of its border for a frame)
-            jr c, .vb
+            call vb_wait                    ; (in V-Blank: mid-frame, the lines already drawn
+                                            ;   kept a sliver of its border for a frame)
             call win_kill                   ; (at once: see bn_tick)
             ld a, BOX_LINES - 1
             ldh [rLYC], a

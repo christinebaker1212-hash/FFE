@@ -199,20 +199,14 @@ sf_one:     ld l, a
             ldh [rVBK], a
             ret
 ; V-Blank (LCD on): rows still to upload, while the V-Blank lasts
-sf_step:    ld a, [tw_qh]                   ; (a typed letter: its cell first)
-            and a
-            jr z, .rw
-            ldh a, [rLY]
-            cp 144
-            jr c, .rw
-            cp 152
-            jr nc, .rw
+sf_step:    ld a, [tw_qh]                   ; (a typed letter: its cell first, whenever VRAM
+            and a                           ;   is open: a wait for a V-Blank window could
+            jr z, .rw                       ;   miss frame after frame on the plain Game Boy)
+            ld d, a
             ld a, [tw_ql]
-            ld l, a
-            ld a, [tw_qh]
-            ld h, a
+            ld e, a
             ld a, [tw_qt]
-            ld [hl], a
+            call vput
             xor a
             ld [tw_qh], a
 .rw:        ld a, [sf_row]
@@ -220,9 +214,9 @@ sf_step:    ld a, [tw_qh]                   ; (a typed letter: its cell first)
             ret nc
             ldh a, [rLY]
             cp 144
-            ret c
+            jp c, sf_slow
             cp 152
-            ret nc
+            jp nc, sf_slow
             ld a, [sf_row]
             di                              ; (no interrupt in the row's copy: a music tick at
             call sf_one                     ;   line 153 pushed its last bytes into the next
@@ -385,9 +379,6 @@ scr_str:    push bc
 .x:         pop bc
             ret
 
-; the same with the LCD on: into the copy, uploaded in the next V-Blanks
-scr_str_on: call scr_str
-            jp scr_upd
 
 ; the hand cursor at screen pixel (B = x, C = y), OAM entries 0-3
 ; the hand pointing at text that starts at column B of row C (owner, 2026-11-22: one rule for
@@ -3180,4 +3171,48 @@ ni_char:    ld c, a
             adc a, 0
             ld h, a
             ld a, [hl]
+            ret
+
+section bank 0, $2C9F                       ; (free space)
+; the same with the LCD on: into the copy, uploaded in the next V-Blanks
+scr_str_on: call scr_str
+            jp scr_upd
+; sf_step outside the V-Blank's window: one row byte by byte (row_safe), so a screen always
+; comes up however late the frame's work runs (owner, 2026-11-25: a battle never went on)
+sf_slow:    ld a, [sf_row]
+            call row_safe
+            ld hl, sf_row
+            inc [hl]
+            ret
+
+; a V-Blank with room for the palette work (LY 144-147); the Color only. When the V-Blank
+; handler ran long (a battle's windows and gradient), the next V-Blank's first line is taken
+; before its handler, which then skips that one frame (its work a frame later): a late
+; handler once made a fade wait frame after frame (slow battle starts on the Pocket)
+fd_vb2:     ldh a, [rLCDC]                  ; (the LCD off: no wait)
+            add a, a
+            ret nc
+            call wait_vbl
+            ldh a, [rLY]
+            sub 144
+            cp 4
+            ret c
+.a:         call vb_top
+            ldh a, [rIF]                    ; (this V-Blank's interrupt dropped)
+            and $FE
+            ldh [rIF], a
+            ei
+            ret
+
+section bank 0, $2D14                       ; (free space)
+; the next V-Blank's first line, its interrupt not taken yet: interrupts on up to line 143
+; (line handlers, the music), then off; the caller enables them again. Never misses, however
+; long the V-Blank handler runs
+vb_top:     ldh a, [rLY]
+            cp 143
+            jr nz, vb_top
+            di
+.b:         ldh a, [rLY]
+            cp 144
+            jr nz, .b
             ret

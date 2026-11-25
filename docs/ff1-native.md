@@ -947,3 +947,24 @@ one reaches parity, so the owner can keep playing).
 53. Owner (2026-11-25, last): "P-A, K-A, N" for the party / job / name screens: built (src/pgen.s, bank 110); the job
     picker marks the job with the hand instead of a cheering pose (outline rebuilds too slow with the screen on).
     Details: `docs/ff1-job-screens-proposals.md` "Outcome".
+54. Owner (2026-11-25, last): "Sometimes, battles take an exceptionally long time to start. Especially outside
+    Elfheim. And when they do start, they look like this" (Analogue Pocket, Color mode: garbled party window, a salmon
+    block with mirrored letters over the enemies); then "Battle results softlocked on DMG during a battle" and "Make
+    certain to address ANY glitch that would cause ANY loading or softlocks during ANY battle". Causes found and fixed
+    (lessons: `docs/gb-lessons.md` "Waits that must always end"):
+    - **Slow starts and the garbage (Color):** the picture-outline builder (item 48, src/ul.s) also ran in the battle's
+      `scr_show` / `scr_upd`, with its counts left over from the field's metatile queue and its cells in the battle's
+      own tables. It worked through hundreds of garbage pictures a VRAM byte at a time (each access waiting for a free
+      line in the masked load) and stamped outline cells over the enemies. Reproduced outside Elfheim: 1305 frames from
+      the encounter to the first command, now 153 (92 for the next one). The battle's reset (`sgb_btl0`) clears the
+      outline state; `ul_chk` refuses out-of-range counts.
+    - **Hangs (DMG):** map-row, tile and flash-row uploads ran only inside a V-Blank window that the plain Game Boy's
+      battle frame almost never reached (the frame wait returned at line 148): the results and other waits for them
+      never ended. Every such upload now falls back to byte-by-byte writes in mode 0 / 1 (`vput`, `row_safe`,
+      `row_put`), so it always progresses; the typed letter queue too.
+    - **Wrong tiles (Color):** the V-Blank handler changed the VRAM bank under the code it interrupted (attribute rows
+      landing in the tile map, its own rows in the attributes); it now keeps the interrupted bank.
+    - **Fades (Color):** a fade step waited for "a V-Blank with room" again and again while the handler ran long; it now
+      takes the next V-Blank's first line before the handler (`vb_top`), also in the party / name screens' row pushes.
+    - **LCD off:** the frame wait and the LY waits return at once with the LCD off (no V-Blank would ever come).
+    - **The battle's top window** gets a frame limit and then writes its rows itself (`box_fb` / `box_safe`).
