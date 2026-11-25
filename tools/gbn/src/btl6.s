@@ -670,3 +670,85 @@ bub_t:      ds 1
 bub_up:     ds 1
 bub_m:      ds 1
 bub_buf:    ds 16
+
+section bank 104, $7E00                     ; (free space)
+; ---- level ups after a victory (owner, 2026-11-25: 128X EXP gave one level a battle). lv_all:
+; member bt_lvm levelled once already (bt_lvall); on a file with an EXP multiplier (a code and
+; not Normal) it goes on while the experience reaches the next level (FF1: one a battle).
+lv_all:     ld a, [KN_MARK]
+            cp $A5
+            ret nz
+            ld a, [KN_EXP]
+            and a
+            ret z
+.l:         call .lv
+            ld b, a
+            push bc
+            ld a, 6
+            ld hl, bt_lvchk_m
+            call bank_call
+            pop bc
+            call .lv
+            cp b
+            jr nz, .l
+            ret
+.lv:        ld a, [bt_lvm]                  ; A = its level (ch_rec's record)
+            rrca
+            rrca
+            add a, CH_LEVEL
+            ld l, a
+            ld h, high(ch_stats)
+            ld a, [hl]
+            ret
+; the results window's record of member bt_lvm's level up (bt_levelup, after a victory): the
+; level, the HP gain (summed over several), the stats raised (all of them)
+lv_rec:     call lv_all.lv
+            ld b, a
+            ld a, [bt_lvm]
+            ld e, a
+            ld d, 0
+            ld hl, res_lv
+            add hl, de
+            ld [hl], b
+            ld c, 0                         ; C = the stats raised (bit 0 strength .. 4 luck)
+            ld hl, bt_lvup + 4
+            ld b, 5
+.m:         ld a, [hl-]
+            and a
+            jr z, .z
+            scf
+.z:         rl c
+            dec b
+            jr nz, .m
+            ld hl, res_on
+            add hl, de
+            ld a, [hl]
+            ld [hl], 1
+            and a
+            jr nz, .acc
+            ld hl, res_st
+            add hl, de
+            ld [hl], c
+            ld hl, res_hph
+            add hl, de
+            ld [hl], 0
+            ld hl, res_hp
+            add hl, de
+            ld a, [bt_t + 1]
+            ld [hl], a
+            ret
+.acc:       ld hl, res_st
+            add hl, de
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ld hl, res_hp
+            add hl, de
+            ld a, [bt_t + 1]
+            add a, [hl]
+            ld [hl], a
+            ret nc
+            ld hl, res_hph
+            add hl, de
+            inc [hl]
+            ret

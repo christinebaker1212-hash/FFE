@@ -2279,7 +2279,8 @@ bt_victory: call bt_msg_new
             ld [hl], a
             pop af
             push af
-            call bt_lvchk                   ; enough for the next level: up (once, as FF1)
+            call bt_lvall                   ; enough for the next level: up (once, as FF1;
+                                            ;   again and again with a multiplier code)
 .an:        pop af
             inc a
             cp 4
@@ -3686,36 +3687,17 @@ msg_blank:
 
 section bank 6, $7480                       ; (the results window: after btl4)
 ; a level up kept for the results window: the new level, the HP gain, the stats raised
-bt_lvrec:   ld a, CH_LEVEL
-            call bt_rf
-            ld b, [hl]
-            ld a, [bt_lvm]
-            ld e, a
-            ld d, 0
-            ld hl, res_lv
-            add hl, de
-            ld [hl], b
-            ld hl, res_hp
-            add hl, de
-            ld a, [bt_t + 1]
-            ld [hl], a
-            ld c, 0
-            ld hl, bt_lvup + 4
-            ld b, 5
-.m:         ld a, [hl-]
-            and a
-            jr z, .z
-            scf
-.z:         rl c
-            dec b
-            jr nz, .m
-            ld hl, res_st
-            add hl, de
-            ld [hl], c
-            ld hl, res_on
-            add hl, de
-            ld [hl], 1
-            ret
+bt_lvrec:   ld a, BTL6_BANK                 ; (the results window's record: btl6.s lv_rec)
+            ld hl, lv_rec
+            jp bank_call
+; member A's level ups after a victory: FF1 gives one a battle; on a file with an EXP
+; multiplier (the codes), as many as the experience pays for (owner, 2026-11-25: 128X gave one)
+bt_lvall:   call bt_lvchk
+            ld a, BTL6_BANK
+            ld hl, lv_all
+            jp bank_call
+bt_lvchk_m: ld a, [bt_lvm]
+            jp bt_lvchk
 
 ; ---- the results window (owner, 2026-11-22): over the cleared enemy area (0,0,16,12),
 ; Experience and Gil, then each member who went up a level (name, Level up!, the level; HP +
@@ -3766,8 +3748,8 @@ bt_results: call bt_res_clr                 ; (no left window: no one is left; m
             ld a, [hl]
             and a
             jr z, .mn
-            ld a, [res_ln]                  ; two rows left?
-            cp 6
+            ld a, [res_ln]                  ; three rows left? (the stats: a row of their
+            cp 5                            ;   own, all five fit: several levels at once)
             jr nc, .sh
             ld de, bt_line                  ; name Level up! L n
             ld a, [res_m]
@@ -3828,10 +3810,18 @@ bt_results: call bt_res_clr                 ; (no left window: no one is left; m
             pop de
             ld a, [hl]
             ld [bt_t + 13], a
-            xor a
+            inc hl                          ; (res_hph: the high byte; DE is the line)
+            inc hl
+            inc hl
+            inc hl
+            ld a, [hl]
             ld [bt_t + 14], a
             ld hl, bt_t + 13
             call res_num
+            call res_put
+            ld de, bt_line
+            ld hl, res_s_in
+            call res_str
             ld a, [res_m]
             ld l, a
             ld h, 0
@@ -3995,6 +3985,7 @@ res_put:    ld a, [res_ln]
             ret
 res_s_l:    db " L", 0
 res_s_hp:   db "  HP +", 0
+res_s_in:   db " ", 0
 res_s_st:   db " Str", 0, " Agi", 0, " Int", 0, " Vit", 0, " Lck", 0
 zz_end_b6_7480:
 
@@ -4070,6 +4061,7 @@ bt_rgold:   ds 2                            ;   the gold, each member's new leve
 res_on:     ds 4                            ;   stats raised, the page, row, next member)
 res_lv:     ds 4
 res_hp:     ds 4
+res_hph:    ds 4                            ; (the HP gain's high byte: several levels at once)
 res_st:     ds 4
 res_pg:     ds 1
 res_ln:     ds 1
