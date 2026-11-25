@@ -754,6 +754,11 @@ stat_gr:    push bc
 .pal:       ld a, [hl+]                     ; palettes' colour 2 (BCPS values, $FF ends)
             cp $FF
             ret z
+            push af                         ; (each in H-Blank / V-Blank: many palettes on one
+.pw:        ldh a, [rSTAT]                  ;   line ran into mode 3, where the hardware drops
+            bit 1, a                        ;   the write: Lot Check checker, 2026-11-25)
+            jr nz, .pw
+            pop af
             ldh [rBCPS], a
             ld a, e
             ldh [rBCPD], a

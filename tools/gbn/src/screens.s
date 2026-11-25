@@ -224,7 +224,9 @@ sf_step:    ld a, [tw_qh]                   ; (a typed letter: its cell first)
             cp 152
             ret nc
             ld a, [sf_row]
-            call sf_one
+            di                              ; (no interrupt in the row's copy: a music tick at
+            call sf_one                     ;   line 153 pushed its last bytes into the next
+            ei                              ;   frame's drawing; Lot Check checker, 2026-11-25)
             ld hl, sf_row
             inc [hl]
             jr sf_step
@@ -668,9 +670,9 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             call party_gen
             call ng_stats
             ret
-.rate:      ld a, [respond]                 ; the rate's digit after Message Speed
-            add a, FONT_D0 + 1
-            ld hl, smap + 12 * 32 + 17
+.rate:      ld a, [respond]                 ; the rate's digit after Battle Speed (column 16:
+            add a, FONT_D0 + 1              ;   one column clear of the frame on each side)
+            ld hl, smap + 12 * 32 + 16
             ld [hl], a
             ret
 
@@ -1664,7 +1666,10 @@ pro_show:   ld a, TR_MINIMAP
             ld hl, pr_nl
             cp [hl]
             jr c, .dl
-.np:        ld a, $80 | 16                  ; Colour palettes 2 (shown), 3 (waiting), 4 (fading)
+.np:        ldh a, [is_cgb]                 ; (the Color only: Lot Check, no Color registers
+            and a                           ;   written on the other systems)
+            jr z, .npd
+            ld a, $80 | 16                  ; Colour palettes 2 (shown), 3 (waiting), 4 (fading)
             call bcps_w
             ld hl, pr_rgb                   ; 2: $01 $01 $01 $30
             call .c3
@@ -1679,7 +1684,7 @@ pro_show:   ld a, TR_MINIMAP
             call .c3
             ld hl, pr_rgb
             call .c1
-            call pr_first                   ; (the first page from power-on: white first)
+.npd:       call pr_first                   ; (the first page from power-on: white first)
             call scr_show
             call pr_first2
             xor a
@@ -1714,9 +1719,9 @@ pro_show:   ld a, TR_MINIMAP
             ld [ly_bgp], a
             ld a, 2
             ld [ly_n], a
-            call scr_frame
-            ld a, [pr_row]
-            call sf_one
+            ld a, [pr_row]                  ; (its row by sf_step in the V-Blank: written here
+            ld [sf_row], a                  ;   after the frame it could land in the drawing;
+            call scr_frame                  ;   Lot Check checker, 2026-11-25)
             jr .an0
 .lc:        call scr_frame                  ; Colour: the line to the fading palette, its
             xor a                           ;   colour back to the blue first (it was still
@@ -1807,9 +1812,9 @@ pro_show:   ld a, TR_MINIMAP
             call pr_rattr
             jr .an1
 .ad2:       call pr_line                    ; (DMG: drawn now, its row up in V-Blank)
-            call scr_frame
-            ld a, [pr_row]
-            call sf_one
+            ld a, [pr_row]                  ; (its row by sf_step in the V-Blank: written here
+            ld [sf_row], a                  ;   after the frame it could land in the drawing;
+            call scr_frame                  ;   Lot Check checker, 2026-11-25)
             jr .an1
 .w:         call scr_frame                  ; the page shown: A / B on, Start: the title
             ldh a, [pad_new]

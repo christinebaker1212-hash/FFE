@@ -3638,7 +3638,7 @@ opt_ostr:   ld a, c
             jr nz, .p
             ret
 os_title:   db "Config", 0                  ; (the main menu's label, MM-A)
-os_labels:  db "Message Speed", 0, "Text Speed", 0, "Volume", 0, "B Dash", 0, "Cursor", 0
+os_labels:  db "Battle Speed", 0, "Text Speed", 0, "Volume", 0, "B Dash", 0, "Cursor", 0
             db "Auto Retarget", 0, "Modern MP", 0
             db "Window Red", 0, "Window Green", 0, "Window Blue", 0, "Gradient", 0, "LCD", 0
             db "EXP", 0, "Gold", 0, "Window", 0, "No Encounters", 0

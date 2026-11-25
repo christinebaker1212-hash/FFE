@@ -235,9 +235,12 @@ fl_put:     call wait_vbl
             jr c, .w
             cp 152
             jr nc, .w
+            ldh a, [is_cgb]                 ; (VBK on the Color only: Lot Check)
+            and a
+            jr z, .v0
             ld a, [fl_vb]
             ldh [rVBK], a
-            ld a, [fl_e]
+.v0:        ld a, [fl_e]
             ld b, a
             push de
 .c:         ld a, [hl+]
@@ -246,8 +249,12 @@ fl_put:     call wait_vbl
             dec b
             jr nz, .c
             pop de
+            ldh a, [is_cgb]
+            and a
+            jr z, .v1
             xor a
             ldh [rVBK], a
+.v1:
             ld a, e
             add a, 32
             ld e, a

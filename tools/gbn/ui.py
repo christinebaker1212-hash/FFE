@@ -64,7 +64,7 @@ def gfx_bank(rom):
 
 NAME_GRID = ['ABCDEFGHI', 'JKLMNOPQR', 'STUVWXYZ ', 'abcdefghi', 'jklmnopqr',
              "stuvwxyz'", '012345678', '9.,-!?&…(', '):;/+%"[]']   # (9 x 9, in a window)
-TITLE = ['Continue', 'New Game', 'Message Speed', 'Extras']
+TITLE = ['Continue', 'New Game', 'Battle Speed', 'Extras']   # (owner, 2026-11-25: 'Battle Speed')
 SAVE_ERROR = ('SAVE DATA ERROR\n\nThe saved game in\nthe Game Pak is\ndamaged.\n\n'
               'Press the A Button\nto erase it.')     # (Lot Check: Nintendo's names)
 SUSP_ERROR = ('SUSPEND DATA ERROR\n\nThe suspended game\nin the Game Pak is\ndamaged.\n\n'
@@ -96,7 +96,7 @@ def strings():
     out['nisel2'] = enc('SELECT: ABC')
     out['nisel3'] = enc('SELECT: 123')                  # (owner's audit, 2026-11-25: signs a page)
     out['options'] = enc('Options')                     # (the Options screen)
-    out['opt1'] = enc('Message Speed')
+    out['opt1'] = enc('Battle Speed')
     out['opt2'] = enc('Text Speed')
     out['opt3'] = enc('Volume')
     out['formation'] = enc('Formation')                 # (the lineup screen's title)
@@ -152,7 +152,7 @@ def strings():
 def status_words():
     """the battle party lines' status words (bank 104: owner, 2026-11-23, every ailment)"""
     import battle                                  # (each after its icon: owner, 2026-11-25;
-    out = ['section bank 104, $4661']              #   battle.VWF_AIL, codes $8C-$93)
+    out = ['section bank 104, $4700']              #   battle.VWF_AIL, codes $8C-$93; $4700: room for btl6)
     for k, w in (('dead', 'Dead'), ('stone', 'Stone'), ('poison', 'Poison'), ('numb', 'Numb'), ('sleep', 'Sleep'),
                  ('mute', 'Mute'), ('conf', 'Conf.'), ('blind', 'Blind')):
         ic = 0x8C + battle.VWF_AIL.index(k)

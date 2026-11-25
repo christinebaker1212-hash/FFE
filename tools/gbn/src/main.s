@@ -144,9 +144,12 @@ start:      di
             stop
             nop
 .ds:
-            xor a                           ; VRAM cleared (both banks on a Color)
+            ldh a, [is_cgb]                 ; VRAM cleared (both banks on a Color; VBK is
+            and a                           ;   written on the Color only: Lot Check)
+            jr z, .d0
+            xor a
             ldh [rVBK], a
-            ld hl, $8000
+.d0:        ld hl, $8000
             ld de, $2000
             call memclr
             ldh a, [is_cgb]
@@ -2438,15 +2441,9 @@ fd_light:   ld c, a
             ld a, e
             ret
 ; lcd_on with a fade to come (fd_in): the new screen's colours kept, black / white first
-fd_on_cgb:  ld hl, sh_pal                   ; (in the V-Blank: BG from the shadows, OBJ read)
-            ld de, fd_pal
-            ld b, 64
-.c:         ld a, [hl+]
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .c
-.obj:       ld c, 0
+fd_on_cgb:  ld de, fd_pal + 64              ; (from the start of a V-Blank: OBJ read, all black;
+.obj:       ld c, 0                         ;   then BG from the shadows: RAM only. Lot Check
+                                            ;   checker: the old order ran into line 0)
 .ro:        ld a, c
             ldh [$FF6A], a
             ldh a, [$FF6B]
@@ -2467,7 +2464,7 @@ fd_on_cgb:  ld hl, sh_pal                   ; (in the V-Blank: BG from the shado
             ldh [$FF6B], a
             dec b
             jr nz, .z
-            ret
+            jr .cp
 .zw:        ld b, 32
 .zwl:       ld a, $FF
             ldh [rBCPD], a
@@ -2477,6 +2474,14 @@ fd_on_cgb:  ld hl, sh_pal                   ; (in the V-Blank: BG from the shado
             ldh [$FF6B], a
             dec b
             jr nz, .zwl
+.cp:        ld hl, sh_pal
+            ld de, fd_pal
+            ld b, 64
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c
             ret
 fd_on_off:  ldh a, [is_cgb]                 ; (the LCD off: only the first screen after
             and a                           ;   power-on or a soft reset; the Color shows
@@ -3608,11 +3613,9 @@ lcd_on:     push af
             push de
             push hl
             di
-.w:         ldh a, [rLY]                    ; (the start of a V-Blank: the 64 palette bytes
-            cp 144                          ;   take ~3 lines)
-            jr c, .w
-            cp 147
-            jr nc, .w
+.w:         ldh a, [rLY]                    ; (the start of a V-Blank: a fade's palette work
+            cp 144                          ;   takes ~8 lines)
+            jr nz, .w
             ldh a, [is_cgb]
             and a
             jr z, .d

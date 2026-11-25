@@ -40,6 +40,8 @@ section bank 99, $4D40                      ; (free space)
 ; scr_open (sgb_menu9): a new screen, no pictures, no cells
 ul_new:     xor a
             ld [ul_np], a
+            ld [ul_nc], a                   ; (Lot Check checker, 2026-11-25: the count lives in the
+                                            ;   field's queue too; a stale one restored stray cells)
             ld [ul_nc], a
             ld [ul_dirty], a
             ret
@@ -123,6 +125,14 @@ ul_build:   xor a
             push hl
             push bc
             ld c, a
+            ld a, d                         ; (an offset past the map: none of ours, skipped)
+            cp high(18 * 32)
+            jr c, .in
+            jr nz, .kp
+            ld a, e
+            cp low(18 * 32)
+            jr nc, .kp
+.in:
             ld hl, smap
             add hl, de
             ld a, [ul_nc]                   ; (this cell's tile: ul_code of its index)
