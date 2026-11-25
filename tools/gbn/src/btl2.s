@@ -152,21 +152,7 @@ bt_surprise:
 bt_ch_init: xor a
 .m:         push af
             call ch_rec
-            inc hl
-            ld a, [hl]                      ; outside ailment 1 dead, 2 stone, 3 poison
-            ld b, 0
-            cp 1
-            jr nz, .a1
-            ld b, AIL_DEAD
-.a1:        cp 2
-            jr nz, .a2
-            ld b, AIL_STONE
-.a2:        cp 3
-            jr nz, .a3
-            ld b, AIL_POISON
-.a3:        ld [hl], b
-            dec hl
-            pop af
+            pop af                          ; (ailments already in battle bits: bt_ail_in)
             push af
             call bt_cblk                    ; DE = the block
             push hl

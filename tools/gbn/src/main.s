@@ -1687,6 +1687,7 @@ q_mt:       ldh a, [cmask]
             push de
             call map_at                     ; A = metatile
             pop de
+            call door_st                    ; (inside a room every door shows open)
             ld c, a
             ld a, [mt_force]
             cp $FF
@@ -2158,9 +2159,6 @@ room_bgp:   ld hl, M_BGOUT
 room_redraw:
             ld a, 1
             ldh [pal_req], a
-            ldh a, [is_cgb]
-            and a
-            ret nz
             ld a, [py]
             sub 5
             ld d, a
@@ -2171,7 +2169,7 @@ room_redraw:
             ld c, 11
 .c:         push bc
             push de
-            call q_mt
+            call rr_cell                    ; (the Color: door cells only)
             pop de
             pop bc
             inc e
@@ -4032,3 +4030,35 @@ sgb_px:     ds 1
 sgb_py:     ds 1
 sgb_pk:     ds 1
 sgb_pl:     ds 4 * 4                        ; sprite slot, x, y, ATTR palette byte
+
+section bank 0, $3FC8                       ; (doors: every door open while inside a room)
+; A = the metatile to draw for map metatile A: a closed / locked door shows open inside a room
+; (owner, 2026-11-25: also after a warp or teleport inside); keeps BC, DE, HL
+door_st:    cp MT_CLOSED
+            jr z, .d
+            cp MT_LOCKED
+            ret nz
+.d:         push af
+            ld a, [inroom]
+            and a
+            jr z, .n
+            pop af
+            ld a, MT_OPEN
+            ret
+.n:         pop af
+            ret
+; room_redraw's cell (E, D): the Color only needs the doors again (its room state is in the
+; palettes); a plain Game Boy all of them (tiles shaded for the state)
+rr_cell:    ldh a, [is_cgb]
+            and a
+            jp z, q_mt
+            push de
+            call map_at
+            pop de
+            cp MT_CLOSED
+            jp z, q_mt
+            cp MT_LOCKED
+            jp z, q_mt
+            cp MT_OPEN
+            ret nz
+            jp q_mt

@@ -67,6 +67,7 @@ battle:     xor a                           ; (no menu sounds, no vehicle noise)
             ld [hl+], a
             ld [hl+], a
             ld [hl], a
+            call bt_ail_in                  ; (the ailments as battle bits before anything shows)
             call bt_screen
             call bt_draw_party
             call bt_walkin                  ; (the party walks in: btl5.s)
@@ -1839,3 +1840,29 @@ section wram, $DB00
 vw_buf:     ds 160                          ; the small font's line buffer (page-aligned)
 section wram, $DC00
 bt_stage:   ds 18 * 16                      ; tiles waiting for V-Blank
+
+section bank 6, $7EC8                       ; (free space before btl3.s $7F40)
+; the members' outside ailments (1 dead, 2 stone, 3 poison) as battle bits (FF1
+; ConvertOBAilmentToIB); before the party window is drawn, or poison (3) showed as dead + stone
+bt_ail_in:  xor a
+.m:         push af
+            call ch_rec
+            inc hl
+            ld a, [hl]
+            and 3
+            ld b, 0
+            jr z, .w
+            ld b, AIL_DEAD
+            dec a
+            jr z, .w
+            ld b, AIL_STONE
+            dec a
+            jr z, .w
+            ld b, AIL_POISON
+.w:         ld [hl], b
+            pop af
+            inc a
+            cp 4
+            jr c, .m
+            ret
+
