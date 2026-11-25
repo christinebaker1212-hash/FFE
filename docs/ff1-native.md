@@ -818,3 +818,6 @@ one reaches parity, so the owner can keep playing).
    - Tools: `build/sbsh` `v` now reads the count from a SameBoy core built with
      `tools/gb/sameboy/sameboy-ffe.patch` (dropped VRAM / OAM writes with bank:PC and LY; `SB_PCLOG=
      addr,..` prints LY whenever code reaches those addresses).
+44. Owner (2026-11-25, later): water in castles and caves; a polish pass on every menu, GB on par with CGB,
+   audit first. Audit and proposals: `docs/ff1-menu-audit.md` (FF1's castle / cave maps have no water tiles;
+   faults, DMG / SGB parity and polish items, waiting for approval).

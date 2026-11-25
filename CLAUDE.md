@@ -1375,6 +1375,9 @@ Owner (2026-11-25), done (item 43): the water holds its step through menus, batt
 redrawn inside the load); towns' water tile moves as the sea; DMG overworld water copies fit V-Blank (build-time copy
 lists; they ran into mode 3 since item 33); music ticks held in line 153 (battle uploads ran into mode 3). VRAM/OAM
 checker 0 on Color and DMG (SameBoy core with tools/gb/sameboy/sameboy-ffe.patch). Next: the owner's play-test.
+Owner (2026-11-25, later): water in castles / caves (none in FF1's maps: options W1-W4) and a polish pass on every
+menu with GB on par with CGB: audit done on Color / DMG / SGB, 25 proposals in docs/ff1-menu-audit.md, waiting for
+the owner's approval (nothing changed yet).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
