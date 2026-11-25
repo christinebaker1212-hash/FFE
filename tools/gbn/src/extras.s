@@ -114,6 +114,11 @@ st_main:    call scr_open
 .play:      ld a, [st_i]
             add a, ST_FIRST
             call snd_track
+            ld bc, $0208                    ; ("Now playing" under its name)
+            call pen_at
+            ld hl, st_now
+            call pen_str
+            call scr_upd
             jr .l
 .x:         ret
 .num:       ld bc, $0A05                    ; the song's number, 01-24, and its count
@@ -124,6 +129,26 @@ st_main:    call scr_open
             ld b, 2
             call pen_num
             ld hl, st_of
+            call pen_str
+            ld bc, $0208                    ; (not playing it yet: no "Now playing")
+            call pen_at
+            ld b, 16
+            call pen_sp
+            ld bc, $0207                    ; its name (owner's audit, 2026-11-25: ours, by where
+            call pen_at                     ;   FF1 plays it)
+            ld b, 16
+            call pen_sp
+            ld bc, $0207
+            call pen_at
+            ld a, [st_i]
+            add a, a
+            ld l, a
+            ld h, 0
+            ld de, st_names
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
             jp pen_str
 st_title:   db "Sound Test", 0
 st_l0:      db "Song", 0
@@ -131,6 +156,33 @@ st_of:      db " / 24", 0
 st_h0:      db "Left/Right: song", 0
 st_h1:      db "A Button: play", 0
 st_h2:      db "B Button: back", 0
+st_now:     db "Now playing", 0
+st_names:   dw st_n0, st_n1, st_n2, st_n3, st_n4, st_n5, st_n6, st_n7, st_n8, st_n9, st_n10, st_n11, st_n12, st_n13, st_n14, st_n15, st_n16, st_n17, st_n18, st_n19, st_n20, st_n21, st_n22, st_n23
+st_n0:      db 80, 114, 101, 108, 117, 100, 101, 0
+st_n1:      db 79, 112, 101, 110, 105, 110, 103, 32, 84, 104, 101, 109, 101, 0
+st_n2:      db 69, 110, 100, 105, 110, 103, 32, 84, 104, 101, 109, 101, 0
+st_n3:      db 77, 97, 105, 110, 32, 84, 104, 101, 109, 101, 0
+st_n4:      db 83, 97, 105, 108, 105, 110, 103, 32, 83, 104, 105, 112, 0
+st_n5:      db 65, 105, 114, 115, 104, 105, 112, 0
+st_n6:      db 84, 111, 119, 110, 0
+st_n7:      db 67, 97, 115, 116, 108, 101, 0
+st_n8:      db 69, 97, 114, 116, 104, 32, 67, 97, 118, 101, 0
+st_n9:      db 77, 97, 116, 111, 121, 97, 39, 115, 32, 67, 97, 118, 101, 0
+st_n10:      db 77, 97, 114, 115, 104, 32, 67, 97, 118, 101, 0
+st_n11:      db 85, 110, 100, 101, 114, 115, 101, 97, 32, 83, 104, 114, 105, 110, 101, 0
+st_n12:      db 70, 108, 111, 97, 116, 105, 110, 103, 32, 67, 97, 115, 116, 108, 101, 0
+st_n13:      db 84, 101, 109, 112, 108, 101, 32, 111, 102, 32, 67, 104, 97, 111, 115, 0
+st_n14:      db 83, 104, 111, 112, 0
+st_n15:      db 66, 97, 116, 116, 108, 101, 0
+st_n16:      db 77, 101, 110, 117, 0
+st_n17:      db 71, 97, 109, 101, 32, 79, 118, 101, 114, 0
+st_n18:      db 86, 105, 99, 116, 111, 114, 121, 0
+st_n19:      db 75, 101, 121, 32, 73, 116, 101, 109, 0
+st_n20:      db 70, 111, 114, 109, 97, 116, 105, 111, 110, 0
+st_n21:      db 83, 97, 118, 101, 100, 0
+st_n22:      db 82, 101, 99, 111, 118, 101, 114, 121, 0
+st_n23:      db 84, 114, 101, 97, 115, 117, 114, 101, 0
+
 
 ; ---- the bestiary: the 128 monsters in FF1's order, the ones met in battle by name (kept in
 ; cart RAM bank 1 for every save file; Lot Check: cart RAM on only meanwhile); A on a met one:
@@ -359,8 +411,32 @@ bs_names:   xor a
             call bs_name
             ld hl, BS_NM
             jr .w
-.u:         pop af
+.u:         pop af                          ; (unseen: its number, "012 - - - - -";
+            inc a                           ;   owner's audit, 2026-11-25)
+            ld c, $2F
+.hd:        inc c
+            sub 100
+            jr nc, .hd
+            add a, 100
+            push af
+            ld a, c
+            call pen_ch
+            pop af
+            ld c, $2F
+.td:        inc c
+            sub 10
+            jr nc, .td
+            add a, 10 + $30
+            push af
+            ld a, c
+            call pen_ch
+            pop af
+            call pen_ch
+            ld a, $20
+            call pen_ch
             ld hl, bs_unk
+            ld b, 11
+            jr .c
 .w:         ld b, 15
 .c:         ld a, [hl]
             and a
