@@ -55,6 +55,9 @@ def bank(rom):
     sp0 = list(fix[pi:pi + 4])
     rk = sorted(range(1, 4), key=lambda i: -data.lum(sp0[i]))      # (ranks as data.spr_rank_tile)
     fixed.append([0x30, sp0[rk[1]], sp0[rk[2]], 0x0F])              # the party: palette 0 jobs
+    fixed.append([0x30, 0x28, 0x00, 0x01])                          # (owner's audit, 2026-11-25:
+                                                                    #   menus' gold labels: colour
+                                                                    #   1 FF1's gold, as the Color's)
     for k, p in enumerate(fixed):
         blob[0x1B80 + 8 * k:0x1B88 + 8 * k] = b''.join(data.rgb555(c).to_bytes(2, 'little') for c in p)
     import sgb_border, ui

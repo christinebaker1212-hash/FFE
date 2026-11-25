@@ -737,6 +737,8 @@ bs_art:     ld a, b
             ld a, BTL_BANK
             ld hl, bt_enemy_map
             call bank_call
+            xor a                           ; (its tiles over $C0-$FF: no other inks)
+            ld [alt_ok], a
             ld hl, $9120                    ; the tiles to $8920
             ld de, $8920
             ld bc, $6E0

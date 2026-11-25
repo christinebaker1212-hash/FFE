@@ -151,7 +151,8 @@ scr_show:   call sgb_pics0                  ; (Super Game Boy: the pictures' col
             ld a, LCDC_ON
             call lcd_on
             jp fade_in
-scr_upd:    xor a
+scr_upd:    call alt_upd                    ; (DMG / SGB: gold / grey cells' inks: loc.s)
+            xor a
             ld [sf_row], a
             ret
 ; row A of the map copy (and its CGB attributes) to VRAM
@@ -1638,6 +1639,7 @@ pro_show:   ld a, TR_MINIMAP
 .page:      call scr_open
             xor a
             ld [sfx_menu], a
+            ld [alt_ok], a                  ; (its $0B / $0C cells are the fade's: no inks)
             ld hl, sattr                    ; every cell: the waiting palette
             ld b, 18
             ld a, $0B

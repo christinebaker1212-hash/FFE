@@ -132,7 +132,7 @@ wa_drw:     ld a, F3_BANK
             call bank_call
             jp party_spr
 
-section bank 99, $7960
+section bank 99, $7E00
 ; (bank F3_BANK) every water tile of the new map at step wa_t / 4: the towns' tile (wt_cp), or
 ; the overworld's slots (the water bank's header and frames read through far_copy)
 wa_load:    ld a, [wa_t]

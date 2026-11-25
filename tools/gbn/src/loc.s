@@ -749,31 +749,6 @@ wait_ab:    call oam_clr
 
 
 ; ---- the windows' gradient's bank-0 side: windows recorded, builds through bank 99
-gr_reg:     push hl
-            ld a, [gr_wn]
-            cp GR_MAXW
-            jr nc, .x
-            inc a
-            ld [gr_wn], a
-            dec a
-            add a, a
-            add a, a
-            add a, low(gr_win)
-            ld l, a
-            ld a, high(gr_win)
-            adc a, 0
-            ld h, a
-            ld a, b
-            ld [hl+], a
-            ld a, c
-            ld [hl+], a
-            ld a, d
-            ld [hl+], a
-            ld [hl], e
-            ld a, 1
-            ld [gr_dirty], a
-.x:         pop hl
-            ret
 gr_fd:      ld a, 1                         ; a fade: the gradient fades with the screen
             ld [fd_act], a                  ;   (owner, 2026-11-23: the gradient is the
             ret                             ;   windows' colour, not a layer shown after)
@@ -859,14 +834,14 @@ sgb_pic0:   ld a, [sgb_on]                  ; (scr_spr23: B, C = the picture's x
             pop de
             pop hl
             ret
-sgb_pics0:  ld a, [sgb_on]                  ; (scr_show)
-            and a
-            ret z
+sgb_pics0:  ldh a, [is_cgb]                 ; (scr_show; DMG / SGB: other inks, then the SGB's
+            and a                           ;   pictures and gold labels: alt_show)
+            ret nz
             push hl
             push de
             push bc
             ld a, F3_BANK
-            ld hl, sgb_pics
+            ld hl, alt_show
             call bank_call
             pop bc
             pop de
@@ -3884,7 +3859,10 @@ sgb_pics:   ld a, [sgb_pn]
             ld a, $01
             ld c, SGB_BANK
             call sgb_pal
-            ld hl, SG_FIXED + 16            ; PAL23: the party's two, darkest = the windows' blue
+            call sgb_p23
+            call sgb_attr
+            jp sgb_end
+sgb_p23:    ld hl, SG_FIXED + 16            ; PAL23: the party's two, darkest = the windows' blue
             ld de, sgb_tmp
             ld bc, 8
             ld a, SGB_BANK
@@ -3907,9 +3885,7 @@ sgb_pics:   ld a, [sgb_pn]
             ld a, $09
             ld hl, sgb_tmp
             ld c, 0
-            call sgb_pal
-            call sgb_attr
-            jp sgb_end
+            jp sgb_pal
 ; ATTR_BLK (two packets): the screen palette 0, then each picture's cells
 sgb_attr:   call sgb_slot
             push de
@@ -3926,28 +3902,24 @@ sgb_attr:   call sgb_slot
             ld a, $22
             ld [de], a
             inc de
-            ld a, [sgb_pn]
-            inc a
+            call sgb_nblk                   ; (the screen, the gold labels, the pictures)
             ld [de], a
             inc de
-            ld a, $07                       ; the whole screen: palette 0
+            ld a, $07                       ; the whole screen: palette 0 (3: black outside)
             ld [de], a
             inc de
-            xor a
-            ld [de], a
-            inc de
-            ld [de], a
-            inc de
-            ld [de], a
-            inc de
+            call sgb_scrb
             ld a, 19
             ld [de], a
             inc de
             ld a, 17
             ld [de], a
             inc de
+            call sgb_gblk
             ld hl, sgb_pl + 1               ; (x, y, palette of each)
             ld a, [sgb_pn]
+            and a                           ; (none: gold labels only)
+            ret z
             ld c, a
 .e:         ld a, $03                       ; inside + border
             ld [de], a
@@ -3986,9 +3958,370 @@ sgb_attr:   call sgb_slot
             ret
 
 section bank 0, $16F0                       ; (after refl_tick: the menu pictures' resets)
-sgb_menu0:  xor a                           ; (scr_open: no pictures yet)
-            ld [sgb_pn], a
-            jp sgb_menu
+sgb_menu0:  jp alt_new                       ; (scr_open: no pictures yet; a new screen)
 sgb_btl0:   xor a                           ; (a battle: its own palettes)
             ld [sgb_pn], a
             jp sgb_battle
+
+section bank 0, $2CCE                       ; (free space)
+; ---- plain Game Boy / Super Game Boy: the Color's gold labels and grey choices (attributes $0B /
+; $0C) in other inks (owner's audit, 2026-11-25; body in bank 99: alt_pass)
+alt_upd:    ldh a, [is_cgb]
+            and a
+            ret nz
+            push hl
+            push de
+            push bc
+            ld a, F3_BANK
+            ld hl, alt_pass
+            call bank_call
+            pop bc
+            pop de
+            pop hl
+            ret
+alt_new:    ld a, 1                         ; (scr_open: a new screen; its glyphs made again)
+            ld [alt_ok], a
+            xor a
+            ld [alt_n], a
+            ld [alt_g], a
+            ld [sgb_pn], a
+            jp sgb_menu
+
+section bank 99, $7B60
+; ---- plain Game Boy / Super Game Boy: the Color shows labels in gold (attribute palette 3) and
+; closed choices in grey (palette 4) with the same font; here those cells get a copy of their glyph
+; in another ink, made in tiles $C0-$FF (free on the menu screens): gold = shade 1 (the DMG's light
+; grey; the SGB's palette 1, gold), grey = shade 2 (dark grey). On the SGB the gold cells' area takes
+; palette 1 (its other colours the windows' own). Off on screens that use $C0-$FF or these palettes
+; otherwise (the prologue's fades, the Bestiary's entries: alt_ok 0)
+ALT_TBL    = $C500          ; key (code | $80 grey) -> tile (GR_A: the Color's gradient only)
+ALT_KEY    = $C600          ; tile - $C0 -> its key (GR_B)
+ALT_T0     = $C0
+ALT_MAX    = 64
+alt_show:   call alt_pass
+            ld a, [sgb_on]
+            and a
+            ret z
+            ld a, [sgb_pn]                  ; (no pictures: the gold labels' palette, if any)
+            and a
+            jr nz, .pc
+            ld a, [alt_g]
+            and a
+            ret z
+            jr alt_bshow
+.pc:        ld a, [alt_g]
+            and a
+            jp z, sgb_pics
+            ld a, [sgb_pn]                  ; (with four pictures no block is left: labels in
+            cp 4                            ;   the DMG's light grey)
+            jr c, .g
+            xor a
+            ld [alt_g], a
+            jp sgb_pics
+.g:         call sgb_new
+            call alt_pal01
+            call sgb_p23
+            call sgb_attr
+            jp sgb_end
+alt_bshow:  call sgb_new
+            call alt_pal01
+            call sgb_attr
+            jp sgb_end
+alt_pal01:  ld hl, SG_FIXED                 ; PAL01: the windows, the gold labels
+            ld de, sgb_tmp
+            ld bc, 8
+            ld a, SGB_BANK
+            call far_copy
+            ld hl, SG_FIXED + 42
+            ld de, sgb_tmp + 8
+            ld bc, 6
+            ld a, SGB_BANK
+            call far_copy
+            ld a, $01
+            ld hl, sgb_tmp
+            ld c, 0
+            jp sgb_pal
+; the screen's cells: gold / grey cells' glyphs to their ink copies; the gold area (alt_x0 ..)
+alt_pass:   ld a, [alt_ok]
+            and a
+            ret z
+            xor a
+            ld [alt_g], a
+            ld [alt_x1], a
+            ld [alt_y1], a
+            dec a
+            ld [alt_x0], a
+            ld [alt_y0], a
+            ld hl, sattr
+            ld c, 0
+.r:         ld b, 0
+.c:         ld a, [hl]
+            and 7
+            cp 3
+            jr z, .g
+            cp 4
+            jr nz, .n
+            ld d, $80
+            jr .t
+.g:         ld a, 1
+            ld [alt_g], a
+            ld a, [alt_x0]
+            cp b
+            jr c, .g1
+            ld a, b
+            ld [alt_x0], a
+.g1:        ld a, [alt_x1]
+            cp b
+            jr nc, .g2
+            ld a, b
+            ld [alt_x1], a
+.g2:        ld a, [alt_y0]
+            cp c
+            jr c, .g3
+            ld a, c
+            ld [alt_y0], a
+.g3:        ld a, [alt_y1]
+            cp c
+            jr nc, .g4
+            ld a, c
+            ld [alt_y1], a
+.g4:        ld d, 0
+.t:         push hl
+            ld a, h                         ; (the map copy's cell: sattr - $300)
+            sub 3
+            ld h, a
+            ld a, [hl]
+            cp $21                          ; (blanks, the frame, icons: as they are)
+            jr c, .s
+            cp $80
+            jr nc, .s
+            or d
+            push bc
+            call alt_get
+            pop bc
+            and a
+            jr z, .s
+            ld [hl], a
+.s:         pop hl
+.n:         inc hl
+            inc b
+            ld a, b
+            cp 20
+            jr c, .c
+            ld de, 12
+            add hl, de
+            inc c
+            ld a, c
+            cp 18
+            jr c, .r
+            ret
+; A = key -> A = its tile (made if new), 0 if the 64 are taken; keeps HL
+alt_get:    push hl
+            ld e, a
+            ld l, a
+            ld h, high(ALT_TBL)
+            ld a, [hl]
+            sub ALT_T0
+            jr c, .new
+            ld c, a
+            ld a, [alt_n]
+            cp c
+            jr z, .new
+            jr c, .new
+            push hl
+            ld h, high(ALT_KEY)
+            ld l, c
+            ld a, [hl]
+            pop hl
+            cp e
+            jr nz, .new
+            ld a, c
+            add a, ALT_T0
+            jr .x
+.new:       ld a, [alt_n]
+            cp ALT_MAX
+            jr nc, .full
+            ld c, a
+            inc a
+            ld [alt_n], a
+            ld a, c
+            add a, ALT_T0
+            ld [hl], a
+            push af
+            ld h, high(ALT_KEY)
+            ld l, c
+            ld [hl], e
+            call alt_mk
+            pop af
+            jr .x
+.full:      xor a
+.x:         pop hl
+            ret
+; tile C ($C0 + C) from key E: the DMG font's glyph (text shade 0) in shade 1 or (key bit 7) 2
+alt_mk:     ld a, e
+            ld [alt_k], a
+            ld a, c
+            ld [alt_t], a
+            ld a, e
+            and $7F
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, C_FONTDMG
+            add hl, de
+            ld de, alt_buf
+            ld bc, 16
+            ld a, COMMON
+            call far_copy
+            ld hl, alt_buf
+            ld b, 8
+.r:         ld a, [hl+]
+            ld d, a                         ; D = low plane, E = high plane
+            ld a, [hl-]
+            ld e, a
+            or d
+            cpl
+            ld c, a                         ; C = the text's pixels
+            ld a, [alt_k]
+            bit 7, a
+            jr nz, .i2
+            ld a, d
+            or c
+            ld [hl+], a
+            inc hl
+            jr .nx
+.i2:        inc hl
+            ld a, e
+            or c
+            ld [hl+], a
+.nx:        dec b
+            jr nz, .r
+            ld a, [alt_t]                   ; DE = $8C00 + 16 t
+            swap a
+            ld e, a
+            and $0F
+            add a, $8C
+            ld d, a
+            ld a, e
+            and $F0
+            ld e, a
+            ld hl, alt_buf
+            ld b, 16
+.w:         ldh a, [rLCDC]                  ; (LCD on: each byte in mode 0 / 1)
+            bit 7, a
+            jr z, .wr
+.ws:        ldh a, [rSTAT]
+            and 2
+            jr nz, .ws
+.wr:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .w
+            ret
+; the SGB's ATTR_BLK: the number of blocks; the gold labels' block (palette 1)
+sgb_nblk:
+.p:         ld a, [sgb_pn]
+            inc a
+            ld hl, alt_g
+            add a, [hl]
+            ret
+sgb_scrb:   xor a                           ; the screen block's palette 0, x1, y1 (SGB note:
+            ld [de], a                      ;   the windows' outside stays blue: a frame cell
+            inc de                          ;   holds outside and inside pixels and takes one
+            ld [de], a                      ;   palette; owner's audit 2026-11-25)
+            inc de
+            ld [de], a
+            inc de
+            ret
+sgb_gblk:
+.g:         ld a, [alt_g]
+            and a
+            ret z
+            ld a, $03
+            ld [de], a
+            inc de
+            ld a, $05                       ; (inside and border palette 1)
+            ld [de], a
+            inc de
+            ld a, [alt_x0]
+            ld [de], a
+            inc de
+            ld a, [alt_y0]
+            ld [de], a
+            inc de
+            ld a, [alt_x1]
+            ld [de], a
+            inc de
+            ld a, [alt_y1]
+            ld [de], a
+            inc de
+            ret
+
+section wram, $C640                         ; (GR_B's rest: the Color's gradient only)
+alt_n:      ds 1
+alt_ok:     ds 1
+alt_g:      ds 1
+alt_x0:     ds 1
+alt_y0:     ds 1
+alt_x1:     ds 1
+alt_y1:     ds 1
+alt_k:      ds 1
+alt_t:      ds 1
+alt_buf:    ds 16
+
+section bank 0, $3802                       ; (gr_reg: moved, it grew)
+gr_reg:     push hl
+            ld a, [gr_wn]                   ; (a window drawn again: listed once; owner's
+            and a                           ;   audit, 2026-11-25: the shops' speech window
+            jr z, .nw                       ;   was listed at every line said)
+            ld hl, gr_win
+.d:         push af
+            ld a, [hl+]
+            cp b
+            jr nz, .n3
+            ld a, [hl+]
+            cp c
+            jr nz, .n2
+            ld a, [hl+]
+            cp d
+            jr nz, .n1
+            ld a, [hl+]
+            cp e
+            jr nz, .n0
+            pop af
+            pop hl
+            ret
+.n3:        inc hl
+.n2:        inc hl
+.n1:        inc hl
+.n0:        pop af
+            dec a
+            jr nz, .d
+.nw:        ld a, [gr_wn]
+            cp GR_MAXW
+            jr nc, .x
+            inc a
+            ld [gr_wn], a
+            dec a
+            add a, a
+            add a, a
+            add a, low(gr_win)
+            ld l, a
+            ld a, high(gr_win)
+            adc a, 0
+            ld h, a
+            ld a, b
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            ld [hl], e
+            ld a, 1
+            ld [gr_dirty], a
+.x:         pop hl
+            ret
