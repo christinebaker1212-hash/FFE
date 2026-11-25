@@ -1982,8 +1982,7 @@ ow_canmove: xor a
             jr .go
 .fb:        ld a, 1                         ; blocked on foot: the bridge, a canoe, the ship
             ld [no_enc], a
-            ld hl, SV_BRIDGE
-            call .at
+            call ow_brc                     ; (the bridge, or the canal before it is blasted)
             jr nc, .brg
             call .tcanoe
             jr nc, .go
@@ -4363,3 +4362,10 @@ ow_cmm:     ld a, [vehicle]
             call map_music
             and a
             ret
+; on foot: the bridge or the canal at the target, C clear (FF1 IsOnBridge falls through to
+; IsOnCanal: the canal's land walks as a bridge until the canal is blasted; owner, 2026-11-25)
+ow_brc:     ld hl, SV_BRIDGE
+            call ow_canmove.at
+            ret nc
+            ld hl, SV_CANAL
+            jp ow_canmove.at
