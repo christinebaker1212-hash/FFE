@@ -815,10 +815,8 @@ dash_b:     ld a, [opt_nodash]
             ret
 ; (moved from screens.s / main.s: their bank-0 sections were full)
 ; Super Game Boy: the party's pictures in their job colours on the menu screens (bank 99)
-sgb_pic0:   ld a, [sgb_on]                  ; (scr_spr23: B, C = the picture's x, y)
-            and a
-            ret z
-            push hl
+sgb_pic0:   push hl                         ; (scr_spr23: B, C = the picture's x, y; the
+                                            ;   outline's record, then the SGB's: ul.s pic_rec)
             push de
             push bc
             ld a, b
@@ -828,20 +826,17 @@ sgb_pic0:   ld a, [sgb_on]                  ; (scr_spr23: B, C = the picture's x
             ld a, e
             ld [sgb_pk], a
             ld a, F3_BANK
-            ld hl, sgb_pic
+            ld hl, pic_rec
             call bank_call
             pop bc
             pop de
             pop hl
             ret
-sgb_pics0:  ldh a, [is_cgb]                 ; (scr_show; DMG / SGB: other inks, then the SGB's
-            and a                           ;   pictures and gold labels: alt_show)
-            ret nz
-            push hl
-            push de
+sgb_pics0:  push hl                         ; (scr_show: the pictures' outlines; DMG / SGB: other
+            push de                         ;   inks, then the SGB's pictures and gold labels)
             push bc
             ld a, F3_BANK
-            ld hl, alt_show
+            ld hl, pic_show
             call bank_call
             pop bc
             pop de
@@ -3465,13 +3460,7 @@ opt_mklist: ld hl, opt_list
             ld [hl+], a
             inc c
             jr .k
-.sg:        ld a, 7
-.s3:        ld [hl+], a
-            inc a
-            cp 10
-            jr c, .s3
-            ld c, 10
-            jr .k
+.sg:        jr .k                           ; (SGB: windows black, no colour settings)
 .cg:        ld a, 7
 .c:         ld [hl+], a
             inc a
@@ -4000,14 +3989,11 @@ sgb_btl0:   xor a                           ; (a battle: its own palettes; no go
 section bank 0, $2CCE                       ; (free space)
 ; ---- plain Game Boy / Super Game Boy: the Color's gold labels and grey choices (attributes $0B /
 ; $0C) in other inks (owner's audit, 2026-11-25; body in bank 99: alt_pass)
-alt_upd:    ldh a, [is_cgb]
-            and a
-            ret nz
-            push hl
+alt_upd:    push hl                         ; (and the pictures' outlines when one changed: ul.s)
             push de
             push bc
             ld a, F3_BANK
-            ld hl, alt_pass
+            ld hl, pic_upd
             call bank_call
             pop bc
             pop de
@@ -4032,8 +4018,8 @@ scr_dmgpal: ld a, [sgb_on]
             jr z, .b
             ld a, %00011011
             call bgp_w
-            ld a, %11100100
-            jp obp0_w
+            ld a, DMG_OBP_BLK               ; (sprites as on black: the pictures' black outline,
+            jp obp0_w                       ;   ul.s, sets them apart; owner, 2026-11-25)
 .b:         ld a, %11100100
             call bgp_w
             ld a, DMG_OBP_BLK
@@ -4049,7 +4035,7 @@ section bank 99, $7B60
 ALT_TBL    = $C500          ; key (code | $80 grey) -> tile (GR_A: the Color's gradient only)
 ALT_KEY    = $C600          ; tile - $C0 -> its key (GR_B)
 ALT_T0     = $C0
-ALT_MAX    = 64
+ALT_MAX    = 32             ; ($C0-$DF: the pictures' outlines take $E0-$FF on DMG: ul.s)
 alt_show:   call alt_pass
             ld a, [sgb_on]
             and a
@@ -4097,8 +4083,14 @@ alt_pal01:  ld hl, SG_FIXED                 ; PAL01: the windows, the gold label
             ld hl, sgb_tmp
             ld c, 0
             jp sgb_pal
-; [DE] = the windows' inside colour (Options: Window Red / Green / Blue, as the Color's), RGB555
-sgb_wc:     ld a, [win_g]
+; [DE] = the windows' inside colour on the SGB: black (owner, 2026-11-25: the SGB's blue window
+; black too; the Options' window colour no longer applies there)
+sgb_wc:     xor a
+            ld [de], a
+            inc de
+            ld [de], a
+            ret
+sgb_wc_rgb: ld a, [win_g]                   ; (the Options' colour, as before: unused)
             swap a
             rlca
             and $E0
@@ -4120,7 +4112,8 @@ sgb_wc:     ld a, [win_g]
             ld [de], a
             ret
 ; the menus' packets (scr_open): PAL01 with the windows' colour, the screen palette 0
-sgb_menu9:  ld a, [sgb_on]
+sgb_menu9:  call ul_new                     ; (no pictures' outlines yet: ul.s)
+            ld a, [sgb_on]
             and a
             ret z
             call sgb_new

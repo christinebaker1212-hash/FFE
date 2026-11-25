@@ -488,6 +488,7 @@ def main():
            open(os.path.join(HERE, 'src', 'screens.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'shop.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'ul.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl2.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl3.s')).read() + '\n' +
