@@ -893,4 +893,25 @@ one reaches parity, so the owner can keep playing).
      checks no other data lands there): the speech window shows the spell's description at once whenever
      the hand moves in the list (`sh_lvl`, after the info window's Level row). Saber's text is 'Attack +16'
      (its data gives no accuracy). Checked on Color and DMG in the White Magic shop; VRAM/OAM checker 0.
+48. Owner (2026-11-25, last): outlines on the party's pictures (from the mock-up: black removed, a 1-px black outline,
+   rounded corners), the owner's icon set for items / weapons / armour, and the Super Game Boy's blue windows black.
+   - Super Game Boy battles were in the menus' colours (blue field, grey sprites) since the audit's B12: the battle starts
+     from scr_open, which switched the gold-label pass on, and scr_show then sent the menus' palettes after the battle's.
+     `sgb_btl0` switches the pass off and clears its flag (on the plain Game Boy the pass could also have drawn into
+     battle tiles $C0-$FF).
+   - Icons (`names.OWNER_ICONS`, the owner's drawings): item (bottle), sword, hammer, knife, axe, staff (staves and rods),
+     nunchaku (FF1's claw type), body armour, clothes / robes (new code $0F), shield, helmet, gloves, ring / bracelet.
+     Key items and white / black magic keep theirs.
+   - Outlines (`src/ul.s`): the outline is drawn in the background under each picture: window-inside pixels next to a
+     sprite pixel (four sides only) turn black, in cells with tiles of their own, worked out from the sprite tiles in VRAM.
+     Rebuilt at scr_show and whenever a picture moves or changes (Formation swaps, job list, Equip member changes); a cell
+     the screen drew again meanwhile keeps the new drawing. Color: VRAM bank 1 tiles $80-$FF, palette 7's black; plain
+     Game Boy with White windows: tiles $94-$BF and $E0-$FF (gold-label glyphs now $C0-$DF), black = the pre-shaded font's
+     index 0, and the sprites there in the lighter shades used on black. Black windows (plain Game Boy, Super Game Boy)
+     need nothing: the see-through parts already show black. Checked: main menu, Equip, Formation (swaps), party
+     creation, job list, name entry on Color and DMG White; VRAM/OAM checker 0.
+   - Super Game Boy windows black: a picture's cells hold four colours (the shared one and three), so a coloured window
+     and a black outline cannot both show there; with black windows the pictures read as on the other systems. The SGB's
+     window colour settings left its Options list.
+   - Battle: the field is black on every system, so the sprites' see-through parts already show black; no change.
 

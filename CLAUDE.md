@@ -1386,6 +1386,8 @@ tools/gbn/rammap.py). Then (item 46): DMG map no longer 1 px right under the dia
 WX, not LCDC), shop list clear of the hand, price question from the first row, multiplier files level up as far as the
 EXP pays; spell description proposals in docs/ff1-magic-descriptions.md. Then (item 47): owner chose format B (built, magic
 shops show it at once); every spell bug fixed (Slow on a slowed target, Shapera's data; the rest already right natively).
+Then (item 48): black rounded outlines under the party's pictures on every menu screen (src/ul.s), the owner's icon
+set, SGB windows black, SGB battles in their own colours again (broken since the audit's B12).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

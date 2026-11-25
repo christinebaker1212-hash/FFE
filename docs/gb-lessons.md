@@ -405,3 +405,14 @@ Color only" screen on older systems.
 - **Save states and cart RAM in sbsh:** paths in `S` / `L` are relative to the repository root (the
   process's cwd), not the script's. `c OFF N` reads the cartridge RAM (all banks: bank x $2000 + offset).
   Run a flow that writes cart RAM from boot in one process when in doubt.
+
+## Assembler and comments, outline underlays (2026-11-25, last)
+- **The SM83 assembler reads a double quote inside a comment as the start of a string**: a comment holding
+  `"..."` fails with "unknown instruction ;". Quote the owner without double quotes in source comments.
+- **Outlines for sprites with no colour to spare**: when a sprite's palette is full, draw the outline in the
+  background under it (copies of the cells' tiles with the outline pixels set to a black the cells' palette has).
+  Work it out from the sprite tiles in VRAM so every pose and screen is covered, rebuild only when a picture
+  moves or changes, and put back only cells still showing the outline tile (the screen may have drawn there).
+- **VRAM with the LCD on: hold interrupts between the mode test and the access.** An interrupt between them
+  (music timer, STAT) returns into mode 3; the SameBoy checker counted the writes. `di`, test STAT, access, `ei`.
+
