@@ -1322,7 +1322,7 @@ vwf_row:    ld c, a
             ld [bt_t + 8], a
             ret
 
-; V-Blank: staged tiles to VRAM (a tile at a time while LY < 152)
+; V-Blank: staged tiles to VRAM (a tile at a time, each started by line 151)
 bt_vbl:     ld a, [bt_upn]
             and a
             ret z
@@ -1334,9 +1334,9 @@ bt_vbl:     ld a, [bt_upn]
             ld e, a
             ld a, [bt_updst + 1]
             ld d, a
-.l:         ldh a, [rLY]                    ; (only in V-Blank: a tile takes under a line,
-            sub 144                         ;   so one may start up to line 152)
-            cp 9
+.l:         ldh a, [rLY]                    ; (only in V-Blank: a tile takes under a line;
+            sub 144                         ;   one started late in line 152 ran into line 0's
+            cp 8                            ;   mode 3 if the music timer cut in: up to 151)
             jr nc, .x
             ld a, [hl+]
             ld [de], a

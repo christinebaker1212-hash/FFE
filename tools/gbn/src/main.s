@@ -3975,8 +3975,7 @@ timer_int:  push af
             ld a, [lmask]                   ; (a masked load: nothing shows; at once, else
             and a                           ;   held to its end, an effect's note with it)
             jr nz, .go
-            ldh a, [rLY]
-            cp 124
+            call tm_late                    ; (from line 124 to line 1: held)
             jr c, .go
             ld a, [mus_pend]                ; (later: counted; run at line 64, after the
             inc a                           ;   frame's V-Blank work: a tick run in V-Blank
@@ -4016,6 +4015,15 @@ mus_tick:   ld a, [mus_busy]
 .def:       ld a, [mus_pend]
             inc a
             ld [mus_pend], a
+            ret
+
+section bank 0, $3BE8
+; C set if a music tick may run now: LY 2-123. From line 124 on it is held to line 64 (V-Blank
+; uploads); also at LY 0-1: a tick that arrived in line 153 reads LY 0 here, and run then it held a
+; V-Blank tile copy (bt_vbl's) into line 9's mode 3 on the plain Game Boy
+tm_late:    ldh a, [rLY]
+            sub 2
+            cp 124 - 2
             ret
 
 section wram, $DAD0

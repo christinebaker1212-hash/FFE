@@ -3,7 +3,7 @@
 ; are only used where the shifted picture stays right, and makes 64 steps of each 16 x 16
 ; picture: as Final Fantasy Legend III's water (owner, 2026-11-24), made finer (four bands of 4
 ; lines / columns, each a pixel per 16 frames, in turn 4 frames apart; sea sideways, river
-; downwards). Every 4 frames a new step; the tiles that change at it (the build's mask) go to
+; downwards). Every 4 frames a new step; the tiles that change at it (the build's lists) go to
 ; VRAM right after the frame wait, while the V-Blank lasts (the rest the next frame). The
 ; Color's frames in WANIM_BANK, the DMG's in WANIM_DMG (the same layout, header copied).
 WANIM_BANK = 106
@@ -236,104 +236,64 @@ wa_bk:      ldh a, [is_cgb]
             ret
 
 section bank 0, $2591
-; the next changed tiles of this step while the V-Blank lasts (the bank mapped): entry e's tile
-; for corner q at $4010 + 16 e + q, its frame at $4100 + $1000 e + 64 step + 16 q;
-; the step's mask at $4080 + step (bit 4 e + q)
-wa_run:     ldh a, [rLY]
+; this step's copies while the V-Blank lasts (the water bank mapped; build.py water_anim): the
+; list at $6200 + 16 step (the tiles it changes) or, for a redraw (wa_full), $6600 + 32 step
+; (every tile); each a count, then (VRAM, frame) address pairs. wa_i = the next copy; a copy
+; (~1.3 lines on the plain Game Boy) starts only at LY 144-151, right after the test, so it ends
+; by line 153 (the DMG's V-Blank handler leaves the water lines 148-153; the old test, made
+; before the slot's mask and addresses, let a copy start at 153 and run into line 0's mode 3)
+wa_run:     ld a, [wa_ph]                   ; HL = 16 step
+            swap a
+            ld l, a
+            and $0F
+            ld h, a
+            ld a, l
+            and $F0
+            ld l, a
+            ld a, [wa_full]
+            and a
+            jr z, .ch
+            add hl, hl                      ; (a redraw: $6600 + 32 step)
+            ld a, h
+            add a, $66 - $62
+            ld h, a
+.ch:        ld a, h
+            add a, $62
+            ld h, a
+            ld a, [wa_i]
+            cp [hl]
+            jr nc, .done
+            add a, a                        ; HL = the copy's entry (inside the step's list)
+            add a, a
+            inc a
+            add a, l
+            ld l, a
+            ldh a, [rLY]
             sub 144
             cp 8
             ret nc
-            ld a, [wa_i]
-            cp 8
-            ret nc
-            ld c, a                         ; C = slot (entry C / 4, corner C & 3)
-            srl a
-            srl a
-            ld b, a
-            ld a, [$4000]
-            dec a
-            cp b
-            jr c, .done
-            call wa_msk                     ; does the slot change at this step?
-            jr c, .go
-            ld hl, wa_i
-            inc [hl]
-            jr wa_run
-.go:        ld a, b                         ; D = the tile (the bank's own entry)
-            swap a
-            add a, $10
-            ld l, a
-            ld a, c
-            and 3
-            add a, l
-            ld l, a
-            ld h, $40
+            ld e, [hl]                      ; DE = the tile in VRAM (16-aligned)
+            inc l
             ld d, [hl]
-            ld a, [wa_ph]                   ; HL = its frame
+            inc l
+            ld a, [hl+]                     ; HL = its frame
+            ld h, [hl]
             ld l, a
-            srl a
-            srl a
-            ld e, a
-            ld a, b
-            swap a
-            add a, e
-            add a, $41
-            ld h, a
-            ld a, l
-            and 3
-            rrca
-            rrca
-            ld l, a
-            ld a, c
-            and 3
-            swap a
-            or l
-            ld l, a
-            ld a, d                         ; DE = the tile's VRAM ($8800 mode)
-            swap a
-            ld e, a
-            and $0F
-            bit 7, d
-            jr z, .lo
-            add a, $80 - $90
-.lo:        add a, $90
-            ld d, a
-            ld a, e
-            and $F0
-            ld e, a
-            jp wa_cp
-.done:      ld a, 8
-            ld [wa_i], a
-            ret
-
-section bank 0, $1459
-; C set if slot C changes at this step (its mask at $4080 + step, bank mapped)
-wa_msk:     ld a, [wa_full]                 ; (after a load: every slot)
-            and a
-            scf
-            ret nz
-            ld a, [wa_ph]
-            add a, $80
-            ld l, a
-            ld h, $40
-            ld e, [hl]
-            ld a, c
-            inc a
-.sh:        rrc e
-            dec a
-            jr nz, .sh
-            ret
-
-section bank 0, $1798
-wa_cp:      ld b, 16                        ; the tile's 16 bytes, then the next slot
+            ld b, 8
 .cp:        ld a, [hl+]
             ld [de], a
-            inc de
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
             dec b
             jr nz, .cp
             ld hl, wa_i
             inc [hl]
-            jp wa_run
+            jr wa_run
+.done:      ld a, 8
+            ld [wa_i], a
+            ret
 
 section wram, $C992                         ; (between the SGB variables and its queue)
 wa_i:       ds 1

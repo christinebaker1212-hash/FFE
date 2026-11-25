@@ -314,8 +314,11 @@ def water_anim(o):
     stay right wherever they are used move: coasts and land never change.
     Returns (Color bank, DMG bank, info). Each bank: $4000 count, $4008 the sea's main colour
     (RGB555: the reflection's water), $4010 entries of 16 bytes (the bank's own 4 tiles),
-    $4080 per step a mask of the slots (entry * 4 + corner) that change at it; frames from
-    $4100 + $1000 e: 64 steps x 4 tiles x 16 bytes (the Color's / the DMG's pre-shaded)."""
+    frames from $4100 + $1000 e: 64 steps x 4 tiles x 16 bytes (the Color's / the DMG's
+    pre-shaded). The copies wa_run makes (src/wanim.s), per step: at $6200 + 16 step those of
+    the tiles that change at it, at $6600 + 32 step every tile (a redraw); each list a count,
+    then (VRAM address, frame address) words. A corner showing the same tile as an earlier
+    corner (the river) is copied once: the plain Game Boy has V-Blank lines 148-150 for them."""
     prop, tsa, tbl = o['prop'], o['tsa'], o['mt_dmg']
     freq = {}
     for r_ in o['rows']:
@@ -364,7 +367,8 @@ def water_anim(o):
             for k2 in pos_of[t]:
                 if k2 != k and any(f[k2] != f[k] for f in fr): return False
         return True
-    ents, dc, dd, masks, water = [], bytearray(), bytearray(), [0] * 64, 0x7E40
+    ents, dc, dd, water = [], bytearray(), bytearray(), 0x7E40
+    slots = {False: [], True: []}                       # (per bank: entry, corner, tile; changes)
     for want, vert in (('sea', False), ('river', True)):
         cand = sorted((m for m in range(128) if kind(m) == want), key=lambda m: -freq.get(m, 0))
         for mt in cand[:1]:
@@ -377,10 +381,13 @@ def water_anim(o):
             else:
                 continue
             e = len(ents)
-            for j in range(64):
-                for qq in range(4):
-                    if fc[j][qq] != fc[j - 1][qq] or fd[j][qq] != fd[j - 1][qq]:
-                        masks[j] |= 1 << (4 * e + qq)
+            for dmg, ids, fr in ((False, cid, fc), (True, did, fd)):
+                for qq in range(4):                     # a corner showing a tile an earlier
+                    if ids[qq] in ids[:qq]:             #   corner copies is never copied again
+                        assert all(f[qq] == f[ids.index(ids[qq])] for f in fr)
+                        continue
+                    slots[dmg].append((e, qq, ids[qq],
+                                       {j for j in range(64) if fr[j][qq] != fr[j - 1][qq]}))
             dc += b''.join(b''.join(f) for f in fc)
             dd += b''.join(b''.join(f) for f in fd)
             ents.append(bytes(cid) + bytes(did) + bytes(8))
@@ -396,10 +403,25 @@ def water_anim(o):
         h[0] = len(ents)
         h[8:10] = water.to_bytes(2, 'little')
         for i_, e_ in enumerate(ents): h[0x10 + 16 * i_:0x14 + 16 * i_] = e_[4:8] if dmg else e_[0:4]
-        h[0x80:0xC0] = bytes(masks)
         return bytes(h)
-    assert len(dc) <= 0x3F00
-    return head(0) + bytes(dc), head(1) + bytes(dd), [(e_[0:4].hex(), e_[4:8].hex()) for e_ in ents]
+    def lists(dmg):                                     # ($6200: the changes, $6600: redraws)
+        out = bytearray(0xC00)
+        def put(at, sl, j):
+            out[at] = len(sl)
+            for i_, (e_, q_, t_, _) in enumerate(sl):
+                va = (0x9000 + 16 * t_) if t_ < 128 else (0x8000 + 16 * t_)
+                src = 0x4100 + 0x1000 * e_ + 64 * j + 16 * q_
+                out[at + 1 + 4 * i_:at + 5 + 4 * i_] = va.to_bytes(2, 'little') + src.to_bytes(2, 'little')
+        for j in range(64):
+            ch = [x for x in slots[dmg] if j in x[3]]
+            assert len(ch) <= 3 and len(slots[dmg]) <= 7
+            put(16 * j, ch, j)
+            put(0x400 + 32 * j, slots[dmg], j)
+        return bytes(out)
+    assert len(dc) <= 0x2100
+    def bank(dmg, d_):
+        return head(dmg) + bytes(d_) + bytes(0x2100 - len(d_)) + lists(dmg)
+    return bank(False, dc), bank(True, dd), [(e_[0:4].hex(), e_[4:8].hex()) for e_ in ents]
 
 
 def main():

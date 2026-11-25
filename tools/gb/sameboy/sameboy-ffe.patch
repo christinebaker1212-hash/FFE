@@ -1,0 +1,75 @@
+diff --git a/Core/memory.c b/Core/memory.c
+index 876a717..b678428 100644
+--- a/Core/memory.c
++++ b/Core/memory.c
+@@ -1014,10 +1014,19 @@ static void write_mbc(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
+     GB_update_mbc_mappings(gb);
+ }
+ 
++
++/* FFE patch: count CPU writes the hardware drops (VRAM in mode 3, OAM in modes 2/3) */
++#include <stdio.h>
++__attribute__((visibility("default"))) unsigned GB_vchk_n = 0;
++static void vchk_note(GB_gameboy_t *gb, uint16_t addr)
++{
++    if (GB_vchk_n++ < 40) fprintf(stderr, "VCHK %04X pc %02X:%04X LY %d\n", addr, gb->pc < 0x4000 ? 0 : gb->mbc_rom_bank, gb->pc, gb->current_line);
++}
+ static void write_vram(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
+ {
+     GB_display_sync(gb);
+     if (unlikely(gb->vram_write_blocked)) {
++        vchk_note(gb, addr);
+         //GB_log(gb, "Wrote %02x to %04x (VRAM) during mode 3\n", value, addr);
+         return;
+     }
+@@ -1373,6 +1382,7 @@ static void write_high_memory(GB_gameboy_t *gb, uint16_t addr, uint8_t value)
+     if (addr < 0xFF00) {
+         GB_display_sync(gb);
+         if (gb->oam_write_blocked) {
++            vchk_note(gb, addr);
+             GB_trigger_oam_bug(gb, addr);
+             return;
+         }
+diff --git a/libretro/libretro.c b/libretro/libretro.c
+index 2cb699e..0f96717 100644
+--- a/libretro/libretro.c
++++ b/libretro/libretro.c
+@@ -707,6 +707,15 @@ static void retro_set_memory_maps(void)
+     environ_cb(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &mmaps);
+ }
+ 
++
++/* FFE scratch patch: SB_PCLOG=hex,hex... prints LY and the line's cycle when bank-0 code reaches them */
++static uint16_t pclog_a[16]; static unsigned pclog_n = 0;
++static void pclog_cb(GB_gameboy_t *gb, uint16_t address, uint8_t opcode)
++{
++    for (unsigned i = 0; i < pclog_n; i++) if (pclog_a[i] == address) {
++        fprintf(stderr, "PC %02X:%04X LY %d\n", address < 0x4000 ? 0 : gb->mbc_rom_bank, address, gb->current_line);
++    }
++}
+ static void init_for_current_model(unsigned id)
+ {
+     unsigned i = id;
+@@ -752,6 +761,11 @@ static void init_for_current_model(unsigned id)
+ 
+     /* todo: attempt to make these more generic */
+     GB_set_vblank_callback(&gameboy[0], (GB_vblank_callback_t) vblank1);
++    if (getenv("SB_PCLOG")) {
++        char *e = getenv("SB_PCLOG");
++        while (*e && pclog_n < 16) { pclog_a[pclog_n++] = strtoul(e, &e, 16); if (*e == ',') e++; }
++        GB_set_execution_callback(&gameboy[0], pclog_cb);
++    }
+     GB_set_lcd_status_callback(&gameboy[0], lcd_status_change_1);
+     if (emulated_devices == 2) {
+         GB_set_vblank_callback(&gameboy[1], (GB_vblank_callback_t) vblank2);
+diff --git a/libretro/link.T b/libretro/link.T
+index b0c262d..7f7a195 100644
+--- a/libretro/link.T
++++ b/libretro/link.T
+@@ -1,5 +1,5 @@
+ {
+-   global: retro_*;
++   global: retro_*; GB_vchk_n;
+    local: *;
+ };
+ 
