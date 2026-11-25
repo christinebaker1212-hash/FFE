@@ -488,8 +488,8 @@ scr_spr23:  ld [scr_t1], a
 
 ; one frame: wait, pad, OAM
 scr_frame:  ld a, [sf_row]                  ; (owner, 2026-11-22: no hand while a window is
-            cp 18                           ;   still going up: it shows once the screen is
-            call c, hand_hide               ;   whole, never over the old one; first: the
+            call sf_hide                    ;   still going up: it shows once the screen is
+                                            ;   whole, never over the old one; first: the
             ld a, [gr_dirty]                ;   gradient build below spans frames)
             and a                           ; (a window since the screen showed: the gradient
             call nz, gr_build               ;   again)
@@ -3220,3 +3220,16 @@ vb_top:     ldh a, [rLY]
             cp 144
             jr nz, .b
             ret
+
+section bank 0, $35E1                       ; (free space)
+; scr_frame: the hand hidden while rows go up (A = sf_row), unless a list is only being
+; redrawn in place (sf_hk: the Bestiary's scrolling; owner, 2026-11-25)
+sf_hide:    cp 18
+            ret nc
+            ld a, [sf_hk]
+            and a
+            ret nz
+            jp hand_hide
+
+section wram, $CFBE
+sf_hk:      ds 1                            ; 1: rows redrawn in place, the hand kept

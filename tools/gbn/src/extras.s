@@ -363,7 +363,12 @@ bs_main:    call bs_load
             ld [bs_cur], a
             ld [bs_top], a
 .re:        call bs_lscr
-.l:         ld a, [bs_cur]                  ; the hand before the name
+.l:         ld a, [sf_row]                  ; (the list's rows all up: the hand's rule as
+            cp 18                           ;   on every screen again)
+            jr c, .l0
+            xor a
+            ld [sf_hk], a
+.l0:        ld a, [bs_cur]                  ; the hand before the name
             ld b, a
             ld a, [bs_top]
             ld c, a
@@ -376,7 +381,7 @@ bs_main:    call bs_load
             call scr_frame
             call bs_pad
             bit 1, a
-            ret nz
+            jr nz, .bx
             bit 0, a
             jr nz, .a
             ld b, a
@@ -413,7 +418,7 @@ bs_main:    call bs_load
 .pg:        ld [bs_cur], a
             call bs_fix
             call bs_names
-            call scr_upd
+            call bs_upd
             jp .l
 .dn:        inc a
             jr .w
@@ -428,9 +433,14 @@ bs_main:    call bs_load
             cp b
             jr z, .l
             call bs_names                   ; (scrolled: the names again)
-            call scr_upd
-            jr .l
-.a:         ld a, [bs_cur]
+            call bs_upd
+            jp .l
+.bx:        xor a
+            ld [sf_hk], a
+            ret
+.a:         xor a
+            ld [sf_hk], a
+            ld a, [bs_cur]
             call bs_seen
             jr z, .l
             call bs_entry
@@ -448,6 +458,9 @@ bs_pad:     ldh a, [pad]
             ld a, [hl]
             cp 20
             jr c, .n
+            ld a, [sf_row]                  ; (the list's last scroll still going up: the
+            cp 18                           ;   next waits, so every row is seen; owner,
+            jr c, .n                        ;   2026-11-25: the bottom rows lagged)
             ld [hl], 16
             ld a, SFX_MOVE
             ld [sfx_req], a
@@ -1398,4 +1411,12 @@ sc_apply:   ld a, [sc_arm]
             ld [KN_MARK], a
             ld a, $5A
             ld [SC_MARK], a
+            ret
+
+; the list's 13 rows (screen rows 4-16) to VRAM again, the hand kept meanwhile
+bs_upd:     call alt_upd
+            ld a, 4
+            ld [sf_row], a
+            ld a, 1
+            ld [sf_hk], a
             ret
