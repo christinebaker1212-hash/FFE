@@ -83,8 +83,8 @@ def strings():
     out['saverr'] = enc(SAVE_ERROR)
     out['suserr'] = enc(SUSP_ERROR)
     # Suspend (the recompiled build's wording): 18 letters a line
-    out['susq'] = enc('Create a Suspend\nPoint and return\nto the Title?\nSuspend points are\n'
-                      'retained when\nturning off the\nPower.')
+    out['susq'] = enc('Create a Suspend\nPoint and return\nto the title?\nThe Suspend Point\n'
+                      'is kept when the\npower is turned\noff.')
     out['susc1'] = enc('Continue from\nSuspend point?')
     out['susc2'] = enc('Continue from last\nsave? The suspend\npoint will be\nlost!')
     out['pgok'] = enc('OK to begin\nwith this party?')    # (owner's wording, party creation)
@@ -112,7 +112,7 @@ def strings():
     out['shwho'] = enc("Who's gonna\ncarry it?")      # (FF1's shop lines 17 / 21 hold variants)
     out['shwhich'] = enc('Which one?')
     out['stl'] = enc('Str\nAgi\nInt\nVit\nLck')
-    out['mcmd4'] = enc('Items\nMagic\nEquip\nStatus\nOptions\nSuspend')          # (the main menu, owner 2026-11-22)
+    out['mcmd4'] = enc('Items\nMagic\nEquip\nStatus\nOrder\nConfig\nQuit')          # (the main menu, owner 2026-11-22)
     out['eqst'] = enc('Attack\nAccuracy\nDefense\nEvasion')
     out['eqrem'] = enc('Remove')
     for c in range(12):
@@ -192,16 +192,17 @@ def mtext_bank(rom=None):
     for k in range(64):
         t = re.sub(r'\{[0-9A-F]{2}\}', '', sm.M.get(k, ''))
         lines = []
+        t = t.replace('A button', 'A Button').replace('B button', 'B Button')   # (Lot Check)
         for para in t.split('\n'):
             para = para.strip()
-            if 'button...' in para:                       # "A button...Yes  B button...No"
+            if 'button...' in para.lower():                       # "A button...Yes  B button...No"
                 lines += [x.strip() for x in para.split('  ') if x.strip()]
             else:
                 lines.append(para)
         out = []                                          # joined, rewrapped to 18 columns
         buf = ''
         for ln in lines:
-            if 'button...' in ln:
+            if 'button...' in ln.lower():
                 if buf: out += _mwrap(buf); buf = ''
                 out.append(ln)
             else:

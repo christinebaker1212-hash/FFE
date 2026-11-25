@@ -232,19 +232,19 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             ret
 .in:        ld a, TR_MENU
             call snd_track
-            xor a
-            ld [mm_cur], a
-            ld [menu_act], a
+            xor a                           ; (the command cursor kept: owner 2026-11-25,
+            ld [menu_act], a                ;   MM-A; mm_wins keeps it in range)
 .re:        call mm_draw
-.l:         ld a, [mm_cur]                  ; the hand left of the command (column 12)
-            inc a
+.l:         ld a, [mm_cur]                  ; the hand left of the command (column 13: the
+            inc a                           ;   whole hand inside the window)
             ld c, a
-            ld b, 12
+            ld b, 13
             call cur_txt
             call scr_frame
             ldh a, [pad_new]
-            bit 1, a
-            ret nz                          ; B: back to the map
+            and $0A                         ; B or START: back to the map (the button that
+            ret nz                          ;   opens the menu closes it, as Nintendo's)
+            ldh a, [pad_new]
             bit 0, a
             jr nz, .a
             ld hl, mm_cur
@@ -252,18 +252,18 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             jr nz, .up
             bit 7, a
             jr z, .l
-            ld a, [hl]                      ; down (six commands: Items, Magic, Equip,
-            inc a                           ;   Status, Options, Suspend)
-            cp 6
+            ld a, [hl]                      ; down (seven commands: Items, Magic, Equip,
+            inc a                           ;   Status, Order, Config, Quit)
+            cp 7
             jr c, .s
             xor a
 .s:         ld [hl], a
             jr .l
 .up:        ld a, [hl]
             dec a
-            cp 6
+            cp 7
             jr c, .s
-            ld a, 5
+            ld a, 6
             jr .s
 .a:         ld a, [mm_cur]
             and a
@@ -297,21 +297,27 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             and a
             ret nz
             jp .re
-.n1:        cp 5
+.n1:        cp 6
             jr nz, .n5
             call mm_sus                     ; Suspend (No: the menu again), or Save
             jp .re
-.n5:        cp 4
+.n5:        cp 5
             jr nz, .n4
             ld a, F3_BANK                   ; Options (loc.s, bank 99)
             ld hl, opt_menu
             call bank_call
             jp .re
-.n4:        cp 3
+.n4:        cp 4                            ; Order: FF1's lineup (also Select on the map)
+            jr z, .ord
+            cp 3
             jr z, .st
             call pick_char                  ; Equip: whose (the equipment screen)
             jr c, .re
             call eqm_main
+            jp .re
+.ord:       call lineup
+            ld a, TR_MENU
+            call snd_track
             jp .re
 .st:
             call pick_char                  ; status: whose
@@ -319,23 +325,15 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             call status_scr
             jr .re
 
-; the main menu (owner, 2026-11-22: the party's pictures back): party (0,0,12,15), each
-; member's battle picture (cells 2-3, three rows) with name, level (or Dead / Stone /
-; Poison) and HP / max beside it; commands (11,0,9,7); orbs (11,6,9,9); Gil (0,15,20,3)
+; the main menu (owner, 2026-11-22: the party's pictures back; 2026-11-25: MM-A): party
+; (0,0,11,14), each member's battle picture with name, level (or Dead / Stone / Poison) and
+; HP / max beside it; commands (10,0,10,9) over its right edge; orbs (10,8,10,6); the place,
+; play time and Gil (0,13,20,5)
 mm_draw:    call scr_open
             call orb_gfx
-            ld bc, $0000
-            ld de, $0C0E
-            call scr_win
-            ld bc, $0B00                    ; (six commands)
-            ld de, $0908
-            call scr_win
-            ld bc, $0B07
-            ld de, $0907
-            call scr_win
-            ld bc, $000D                    ; (owner, 2026-11-22: the place, the play time, the
-            ld de, $1405                    ;   Gil, as the WonderSwan Color remake: loc.s)
-            call scr_win
+            ld a, F3_BANK                   ; the windows (loc.s mm_wins)
+            ld hl, mm_wins
+            call bank_call
             xor a
 .m:         push af
             call mm_mem3
@@ -343,7 +341,7 @@ mm_draw:    call scr_open
             inc a
             cp 4
             jr c, .m
-            ld bc, $0C01                    ; commands
+            ld bc, $0D01                    ; commands
             call pen_at
             ld hl, str_mcmd4
             call pen_str
@@ -491,7 +489,10 @@ mm_mem3:    ld [mm_t], a
             inc hl
             call nf_w
             ld b, 3
-            jp pen_num
+            call pen_num
+            ld a, F3_BANK                   ; its colours (loc.s mm_hpc)
+            ld hl, mm_hpc
+            jp bank_call
 
 ; member A's two lines: name, L level, HP / max; class or ailment
 mm_member:  ld [mm_t], a                    ; (the target screen: name from column 3, room
@@ -630,7 +631,7 @@ orb_draw:   ld hl, orb_pos
             dec h
             inc hl
             ret
-orb_pos:    db 13, 8, 16, 8, 13, 11, 16, 11  ; (centred in the window: one-tile gaps)
+orb_pos:    db 13, 9, 15, 9, 13, 11, 15, 11  ; (centred in the window, MM-A)
 
 ; ---- choose a member in the party window (hand left of the name): C set on B
 pick_char:  xor a
@@ -2620,9 +2621,9 @@ section bank 2, $6BD7                       ; (free space)
 mm_plc:     ld a, [SC_MARK]
             cp $5A
             jp nz, mm_place
-            ld bc, $0C06
+            ld bc, $0D07
             call pen_at
             ld hl, .s
             call pen_str
             jp mm_place
-.s:         db "Save   ", 0
+.s:         db "Save", 0

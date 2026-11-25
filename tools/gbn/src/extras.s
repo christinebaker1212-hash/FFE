@@ -154,7 +154,7 @@ st_main:    call scr_open
 st_title:   db "Sound Test", 0
 st_l0:      db "Song", 0
 st_of:      db " / 24", 0
-st_h0:      db "Left/Right: song", 0
+st_h0:      db "Control Pad: song", 0   ; (Lot Check: Nintendo's names)
 st_h1:      db "A Button: play", 0
 st_h2:      db "B Button: back", 0
 ; ---- name entry: Start with no name types one of the job's preset names, at random (owner,

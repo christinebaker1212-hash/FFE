@@ -3404,15 +3404,15 @@ ngm_no:     db "No", 0
 ngm_qc:     db "OK to start on", $0A, "CLASSIC?", 0
 ngm_qm:     db "OK to start on", $0A, "MODERN?", 0
 ngm_dc:     db "Classic offers", $0A, "gameplay true to", $0A, "the original.", $0A
-            db "Manage spell", $0A, "charges with Inns", $0A, "or Houses, and", $0A
+            db "Manage spell", $0A, "charges with Inns", $0A, "or Cottages, and", $0A
             db "plan your battles", $0A, "carefully - the", $0A, "party will not", $0A
             db "change their", $0A, "target after", $0A, "selection.", $0A, $0A
-            db "These settings can", $0A, "be changed at any", $0A, "time in OPTIONS.", 0
+            db "These settings can", $0A, "be changed at any", $0A, "time in Config.", 0
 ngm_dm:     db "Modern offers", $0A, "gameplay similar", $0A, "to more modern", $0A
-            db "Final Fantasy", $0A, "games. Dashing is", $0A, "enabled with B, MP", $0A
-            db "is shared across", $0A, "all spells, and", $0A, "the party will", $0A
+            db "Final Fantasy", $0A, "games. Hold the", $0A, "B Button to dash.", $0A
+            db "MP is shared by", $0A, "all spells, and", $0A, "the party will", $0A
             db "change targets if", $0A, "the enemy is", $0A, "slain.", $0A, $0A
-            db "These settings can", $0A, "be changed at any", $0A, "time in OPTIONS.", 0
+            db "These settings can", $0A, "be changed at any", $0A, "time in Config.", 0
 
 section wram, $DAFC
 ngm_cur:    ds 1
@@ -3637,7 +3637,7 @@ opt_ostr:   ld a, c
             dec b
             jr nz, .p
             ret
-os_title:   db "Options", 0
+os_title:   db "Config", 0                  ; (the main menu's label, MM-A)
 os_labels:  db "Message Speed", 0, "Text Speed", 0, "Volume", 0, "B Dash", 0, "Cursor", 0
             db "Auto Retarget", 0, "Modern MP", 0
             db "Window Red", 0, "Window Green", 0, "Window Blue", 0, "Gradient", 0, "LCD", 0
@@ -4500,4 +4500,89 @@ sva_menu:   ld a, 1
             call file_save
             xor a
             ld [sva_req], a
+            ret
+
+; ---- the main menu, MM-A (owner, 2026-11-25): the windows, and the members' lines in colour
+section bank 99, $4E40                      ; (free space)
+; the windows: party (0,0,11,14), the commands (10,0,10,9) over its right edge (the whole hand
+; inside: labels from column 13), the orbs (10,8,10,6), the place / time / Gil (0,13,20,5);
+; the command cursor kept from the last opening (in range)
+mm_wins:    ld a, [mm_cur]
+            cp 7
+            jr c, .k
+            xor a
+            ld [mm_cur], a
+.k:         call eqm_pal                    ; (palettes 2 / 3 / 4: red, gold, grey for mm_hpc)
+            ld bc, $0000
+            ld de, $0B0E
+            call scr_win
+            ld bc, $0A00
+            ld de, $0A09
+            call scr_win
+            ld bc, $0A08
+            ld de, $0A06
+            call scr_win
+            ld bc, $000D
+            ld de, $1405
+            jp scr_win
+; member mm_t's lines as the battle's party lines: HP under a quarter: the HP line gold (palette
+; 3); dead / stone: the ailment and HP lines red on the Color (palette 2), grey on the plain Game
+; Boy / Super Game Boy (palette 4: their grey ink, alt_pass)
+mm_hpc:     ld a, [mm_t]
+            call ch_rec
+            inc hl
+            ld a, [hl-]                     ; (outside battle: 1 dead, 2 stone, 3 poison)
+            dec a
+            cp 2
+            jr nc, .hp
+            ld e, 2
+            ldh a, [is_cgb]
+            and a
+            ld d, $0A
+            jr nz, .set
+            ld d, $0C
+            jr .set
+.hp:        ld a, l
+            add a, CH_HP
+            ld l, a
+            ld a, [hl+]                     ; HP x 4 < max?
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            sla e
+            rl d
+            sla e
+            rl d
+            ld a, [hl+]
+            ld c, a
+            ld b, [hl]
+            ld a, e
+            sub c
+            ld a, d
+            sbc a, b
+            ret nc
+            ld d, $0B
+            ld e, 1
+.set:       ld a, [mm_t]                    ; the last E of its rows 1 + 3 m .. 3 + 3 m
+            ld c, a
+            add a, a
+            add a, c
+            add a, 4
+            sub e
+            ld c, a
+            ld b, 3
+.r:         push bc
+            call cell_addr
+            ld a, h
+            add a, 3
+            ld h, a
+            ld b, 7
+.c:         ld [hl], d
+            inc hl
+            dec b
+            jr nz, .c
+            pop bc
+            inc c
+            dec e
+            jr nz, .r
             ret
