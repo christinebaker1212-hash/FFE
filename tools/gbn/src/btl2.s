@@ -3720,7 +3720,7 @@ bt_lvrec:   ld a, CH_LEVEL
 ; ---- the results window (owner, 2026-11-22): over the cleared enemy area (0,0,16,12),
 ; Experience and Gil, then each member who went up a level (name, Level up!, the level; HP +
 ; and the stats raised), two members a page; A / B turns the page / closes it
-bt_results: call bt_left_clear              ; (the names window empty: no one is left)
+bt_results: call bt_res_clr                 ; (no left window: no one is left; main.s)
             call bt_party_win               ; (the new maximum HP)
             call bt_upd
             xor a

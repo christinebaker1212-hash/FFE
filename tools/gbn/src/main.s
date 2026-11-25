@@ -4071,3 +4071,28 @@ rr_cell:    ldh a, [is_cgb]
             cp MT_OPEN
             ret nz
             jp q_mt
+
+section bank 0, $3878                       ; (free space after gr_reg)
+; the battle's results: the left window's cells (0-7, rows 12-17) empty, not an empty window
+; (owner's audit, 2026-11-25); the party window drawn next keeps its border
+bt_res_clr: ld c, 12
+.r:         push bc
+            ld b, 0
+            call cell_addr
+            ld b, 8
+            xor a
+.f:         ld [hl+], a
+            dec b
+            jr nz, .f
+            ld de, $0300 - 8
+            add hl, de
+            ld b, 8
+.a:         ld [hl+], a
+            dec b
+            jr nz, .a
+            pop bc
+            inc c
+            ld a, c
+            cp 18
+            jr c, .r
+            ret

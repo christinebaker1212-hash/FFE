@@ -116,6 +116,7 @@ lineup:     call scr_open
             ld c, a
             ld b, 32
             call scr_cursor
+            call lu_hand2                   ; (the first choice's still hand: shop.s)
             call scr_frame
             call lu_mode_step
             ld a, [lu_mode]                 ; input in modes 0 / 2 only

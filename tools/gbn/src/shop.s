@@ -1603,6 +1603,28 @@ sh_arrow:   ld a, [eqm_w + 1]
             jr nc, .p
             inc a
 .p:         jp pen_ch
+; Formation: while the second member is picked, a still hand at the first (OAM 28-31; owner's
+; audit, 2026-11-25)
+lu_hand2:   ld a, [lu_mode]
+            cp 2
+            jr nz, .h
+            ld a, [lu_cur2]
+            call lu_slotp
+            inc hl
+            inc hl
+            inc hl
+            ld a, [hl]
+            add a, 8
+            ld c, a
+            ld b, 32
+            ld de, oam_buf + 112
+            jp scr_cur_de
+.h:         xor a
+            ld [oam_buf + 112], a
+            ld [oam_buf + 116], a
+            ld [oam_buf + 120], a
+            ld [oam_buf + 124], a
+            ret
 ; the Status screen: a member with no MP at any level gets "-", not sixteen 0/0s (owner's audit,
 ; 2026-11-25); Z then
 st_nomp:    ld a, [mm_t]
