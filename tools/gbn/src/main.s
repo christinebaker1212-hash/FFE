@@ -876,16 +876,16 @@ move:       ld a, [moving]
             ld a, [ITEMS + 5]
             and a
             ret z
-.dr:        ld a, [inroom]                  ; into a room: palette, the open door drawn
+.dr:        ld a, [tx]                      ; (every door stepped on is the one to close
+            ld [door_x], a                  ;   later: a room left the way it was entered or
+            ld a, [ty]                      ;   another, after stairs or a teleport; owner,
+            ld [door_y], a                  ;   2026-11-25: a stale door drawn after stairs up)
+            ld a, [inroom]                  ; into a room: palette, the open door drawn
             and a
             jr nz, .ok
             push bc
             ld a, 1
             ld [inroom], a
-            ld a, [tx]
-            ld [door_x], a
-            ld a, [ty]
-            ld [door_y], a
             ld b, MT_OPEN
             call door_draw
             call room_redraw
