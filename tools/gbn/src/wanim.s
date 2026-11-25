@@ -305,3 +305,85 @@ wa_t:       ds 1                            ; the water's own frame count
 wa_ok:      ds 1                            ; 0 after a map load: the tiles at their first picture
 wa_full:    ds 1                            ; a full redraw at this step
 wa_tmp:     ds 1                            ; (wa_load: a byte of the water bank)
+
+section bank 0, $2D24                       ; (free space)
+; ---- the world map's waterfall (owner's audit, 2026-11-25, W2): its two tiles a pixel lower each
+; water step (8 pictures; build.py town_water, bank WTOWN_BANK $6C00), copied two frames after
+; the step changed (the sea's and rivers' copies are done by then), early in the V-Blank
+wf_tick:    ldh a, [maptype]
+            and a
+            ret z
+            ld a, [ap_on]
+            and a
+            ret nz
+            ldh a, [rLCDC]
+            bit 7, a
+            ret z
+            ld a, [wa_t]
+            and 3
+            cp 2
+            ret nz
+            ldh a, [rLY]                    ; (two tiles, ~2.6 lines on the plain Game Boy: a
+            sub 144                         ;   start by line 150 ends by 153)
+            cp 7
+            ret nc
+            ld a, WTOWN_BANK
+            call sbank
+            ldh a, [is_cgb]
+            and a
+            ld hl, $6C00
+            ld bc, $6C10
+            jr nz, .s
+            ld hl, $6C04
+            ld bc, $6D10
+.s:         ld a, [wa_t]                    ; BC += 32 x ((wa_t / 4) & 7)
+            rrca
+            rrca
+            and 7
+            swap a
+            add a, a
+            add a, c
+            ld c, a
+            ld a, b
+            adc a, 0
+            ld b, a
+            call .t
+.t:         ld e, [hl]                      ; a tile: [HL] its VRAM, BC its picture
+            inc hl                          ;   (eight bytes a pass, unrolled: both tiles in
+            ld d, [hl]                      ;   ~1.6 lines of the plain Game Boy)
+            inc hl
+            push hl
+            ld h, b
+            ld l, c
+            ld c, 2
+.c:
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            dec c
+            jr nz, .c
+            ld b, h
+            ld c, l
+            pop hl
+            ret

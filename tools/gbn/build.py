@@ -293,7 +293,35 @@ def town_water(rom):
         return bytes(out)
     def vram(d): return (0x9000 + 16 * d) if d < 128 else (0x8000 + 16 * d)
     t = data.tileset_pack(rom, 0)
-    blob = bytearray(0x2C00)
+    blob = bytearray(0x3000)
+    # the world map's waterfall (owner's audit, 2026-11-25, W2): the one metatile whose two tiles
+    # (left / right column, each repeated top and bottom) only it uses, falling a pixel each water
+    # step (8 steps): $6C00 the tiles' VRAM (Color, Color, DMG, DMG), $6C10 the Color's 8 x 2
+    # pictures, $6D10 the DMG's (src/wanim.s wf_tick)
+    o = data.ow_pack(rom)
+    wf = [mt for mt in range(128) if o['prop'][2 * mt] & 5 == 5 and o['tsa'][mt] == o['tsa'][256 + mt]
+          and o['tsa'][128 + mt] == o['tsa'][384 + mt] and o['tsa'][mt] != o['tsa'][128 + mt]
+          and all(o['tsa'][128 * k + m2] not in (o['tsa'][mt], o['tsa'][128 + mt])
+                  for k in range(4) for m2 in range(128) if m2 != mt)]
+    assert len(wf) == 1, 'waterfall: %r' % wf
+    mt = wf[0]
+    def fall(t16):
+        out = bytearray()
+        for st in range(8):
+            for y in range(8):
+                yy = (y - st) % 8
+                out += t16[2 * yy:2 * yy + 2]
+        return out
+    cid = [o['tsa'][mt], o['tsa'][128 + mt]]
+    did = [o['mt_dmg'][mt], o['mt_dmg'][128 + mt]]
+    hdr = b''.join(vram(x).to_bytes(2, 'little') for x in cid + did)
+    blob[0x2C00:0x2C08] = hdr
+    for k in range(2):
+        fc = fall(o['cgb_tiles'][16 * cid[k]:16 * cid[k] + 16])
+        fd = fall(o['dmg_tiles'][16 * did[k]:16 * did[k] + 16])
+        for st in range(8):
+            blob[0x2C10 + 32 * st + 16 * k:0x2C20 + 32 * st + 16 * k] = fc[16 * st:16 * st + 16]
+            blob[0x2D10 + 32 * st + 16 * k:0x2D20 + 32 * st + 16 * k] = fd[16 * st:16 * st + 16]
     blob[0x410:0x412] = vram(TOWN_WATER).to_bytes(2, 'little')
     blob[0x2800:0x2C00] = shifts(t['cgb_tiles'][16 * TOWN_WATER:16 * TOWN_WATER + 16])
     for m in range(8):
