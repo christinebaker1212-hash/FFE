@@ -878,4 +878,19 @@ one reaches parity, so the owner can keep playing).
    - Spell descriptions: two proposals, all 64 spells each, in `docs/ff1-magic-descriptions.md` (the owner's
      format and mine); waiting for the owner's choice. Found on the way: Shapera's data, as FF1's, raises the
      enemies' evasion (a known FF1 bug); not changed.
+47. Owner (2026-11-25, last): "Yes, fix all spell bugs. Format B."
+   - Spell bugs (the disassembly's BUGGED notes on magic, checked one by one against the native engine):
+     already right in the native engine: HARM on members (FF1 took the class as the category: Master /
+     Wizard counted as undead), Strike / Saber on members (FF1 never loaded or saved the attack), Saber's
+     hit bonus (FF1 wrote it to the wrong place; the data gives 0 anyway), Shape (FF1's JMP for BEQ: it always
+     missed), Dispel and the barriers on enemies (FF1 read the resistances from ROM and never saved them),
+     a confused enemy killing itself (the native turn loop checks the battle's end after every turn), Silence
+     stopping items (native: Magic only). Fixed now: Slow on a target already at its least shows no effect
+     (FF1 marked it as working); Shapera's data (FF1, Japanese and US alike: the evasion-UP effect $10 on all
+     enemies) gets Shape's evasion-down effect $0E at build time (`battle.magic_data`, only when the bytes
+     are as found).
+   - Magic shop descriptions, format B (`tools/gbn/spelldesc.py`, ROM bank 120 `SDESC_BANK`; the build
+     checks no other data lands there): the speech window shows the spell's description at once whenever
+     the hand moves in the list (`sh_lvl`, after the info window's Level row). Saber's text is 'Attack +16'
+     (its data gives no accuracy). Checked on Color and DMG in the White Magic shop; VRAM/OAM checker 0.
 

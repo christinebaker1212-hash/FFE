@@ -101,6 +101,18 @@ def dn_tiles():
     return bytes(out)
 
 
+
+def magic_data(rom):
+    """FF1's spell data (0x5C entries of 8 bytes) with FF1's data bug fixed (owner, 2026-11-25: every
+    spell bug fixed): Shapera (LOK2, spell $17) has the evasion-UP effect ($10) on all enemies, the
+    same as the US release; it gets Shape's evasion-down effect ($0E), as its name and FF1's own
+    descriptions intend. Only changed when the bytes are as found in the ROMs checked."""
+    d = bytearray(rom.rd(BANK_BTLC, MAGIC_DATA, 0x5C * 8))
+    k = 0x17 * 8
+    if d[k + 3] == 0x01 and d[k + 4] == 0x10 and d[6 * 8 + 4] == 0x0E:
+        d[k + 4] = 0x0E
+    return bytes(d)
+
 def data_bank(rom):
     import ff1_monsters, ff1_battle
     b = bytearray(b'\xff' * 0x4000)
@@ -111,7 +123,7 @@ def data_bank(rom):
     put(0x4B00, dn_tiles())
     put(0x4C00, rom.rd(BANK_BTLC, ENEMY_STATS, 128 * 20))
     put(0x5600, rom.rd(BANK_BTLC, ENEMY_AI, 44 * 16))
-    put(0x5900, rom.rd(BANK_BTLC, MAGIC_DATA, 0x5C * 8))
+    put(0x5900, magic_data(rom))
     put(0x5C00, rom.rd(BANK_BTLC, MAGIC_MSGS, 0x5C))
     put(0x5C80, rom.rd(BANK_BTLC, BTL_PALS, 64 * 4))
     put(0x5E00, dmg_shades(rom))

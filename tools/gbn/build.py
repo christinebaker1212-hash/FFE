@@ -191,6 +191,9 @@ def data_banks(rom, ff3=None, init=None):
     banks[battle.BOBJ_BANK] = bytearray(battle.obj_bank(rom))
     banks[minimap.MINI_BANK] = bytearray(minimap.bank(rom))
     banks[sgb.SGB_BANK] = bytearray(sgb.bank(rom))
+    import spelldesc                                           # (the magic shops' descriptions)
+    assert spelldesc.SDESC_BANK not in banks
+    banks[spelldesc.SDESC_BANK] = bytearray(spelldesc.bank())
     place(banks, COMMON, 0x5D40, b''.join(data.rgb555(c).to_bytes(2, 'little') for c in range(64)))
     banks[3] = bytearray(ui.gfx_bank(rom))                     # UI_GFX
     for b, blob in text.dialogue_banks(90).items():
@@ -525,6 +528,8 @@ def main():
     for b, blob in data_banks(rom, ff3, init).items():
         assert b not in banks, 'bank %d used by code and data' % b
         banks[b] = blob
+    import spelldesc                             # (the magic shops' descriptions: no other data there)
+    assert bytes(banks[spelldesc.SDESC_BANK][:128]) == spelldesc.bank()[:128], 'spell descriptions overwritten'
     img = make_rom(banks, 'FF1 NATIVE', cart_type=0x1B, rom_banks=ROM_BANKS, ram_size_code=0x03,
                    sgb=True, cgb=0x80)
     open(out, 'wb').write(img)

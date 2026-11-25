@@ -1,4 +1,7 @@
-# FF1 native: magic shop spell descriptions (two proposals, 2026-11-25)
+# FF1 native: magic shop spell descriptions (two proposals, 2026-11-25; the owner chose format B)
+
+Chosen: format B, built (`tools/gbn/spelldesc.py`; item 47). Changed from the proposal: Saber's third line is
+'Lasts the battle' (its data gives no accuracy bonus). Shapera now lowers evasion as described (its data fixed).
 
 Owner: a description for each spell in the magic shops, shown at once while the hand is on it, at most
 four lines (18 columns: the speech window's text area). Two formats below, all 64 spells each;

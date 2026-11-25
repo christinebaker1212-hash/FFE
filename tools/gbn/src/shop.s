@@ -1674,5 +1674,32 @@ sh_lvl:     ld bc, $010F
             and 7
             add a, $31
             call pen_ch
+            ld bc, $0000                    ; the spell's description in the speech window, at
+            ld de, $1406                    ;   once (owner, 2026-11-25: format B; text in
+            call scr_win                    ;   tools/gbn/spelldesc.py, ROM bank SDESC_BANK)
+            ld a, [sh_it]
+            sub $B0
+            ld l, a
+            ld h, 0
+            add hl, hl
+            ld de, $4000
+            add hl, de
+            ld de, mtxt
+            ld bc, 2
+            ld a, SDESC_BANK
+            call far_copy
+            ld a, [mtxt]
+            ld l, a
+            ld a, [mtxt + 1]
+            ld h, a
+            ld de, mtxt
+            ld bc, 64
+            ld a, SDESC_BANK
+            call far_copy
+            ld bc, $0101
+            call pen_at
+            ld hl, mtxt
+            call pen_str
             jp scr_upd
 .s:         db "Level", 0
+SDESC_BANK = 120                            ; (spelldesc.SDESC_BANK)

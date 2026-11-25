@@ -1073,13 +1073,12 @@ mg_ail_add: ld a, [mg_d + 1]
 ef_slow:    call mg_statprep                ; hits multiplier - 1 (at least 0)
             call mg_conn_t
             ret c
-            call mg_mark
-            ld a, [dv_hmult]
-            and a
-            ret z
+            ld a, [dv_hmult]                ; (already at its least: no effect, so the miss /
+            and a                           ;   "Ineffective" shows; FF1 showed it working:
+            ret z                           ;   owner, 2026-11-25: every spell bug fixed)
             dec a
             ld [dv_hmult], a
-            ret
+            jp mg_mark
 ef_morale:  call mg_statprep                ; morale - effectivity (FF1: always applied)
             ld a, [mg_rand]
             cp 200
