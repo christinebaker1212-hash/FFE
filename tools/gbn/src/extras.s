@@ -111,7 +111,8 @@ st_main:    call scr_open
             call .num
             call scr_upd
             jr .l
-.play:      ld a, [st_i]
+.play:      call sc_feed                    ; (the Sound Test code: loc.s SC_MARK)
+            ld a, [st_i]
             add a, ST_FIRST
             call snd_track
             ld bc, $0208                    ; ("Now playing" under its name)
@@ -1254,7 +1255,8 @@ bs_mark:    call bs_on
 ; ---- a save page from the builds whose sound variables ran into it ($D000-$D004, until
 ; 2026-11-24): the ship's and the airship's flags not 0 / 1 are mended (the ship: given if the
 ; pirates were fought, at FF1's starting place; the airship: not found), so an old save plays on
-sv_fix:     ld a, [KN_MARK]                 ; (a file without the Konami Code: the LCD
+sv_fix:     call sc_apply                   ; (the Sound Test code played: this file gets it)
+            ld a, [KN_MARK]                 ; (a file without the Konami Code: the LCD
             cp $A5                          ;   colours Default, the option hidden; owner,
             jr z, .k                        ;   2026-11-24)
             ld a, [opt_ccm]
@@ -1350,5 +1352,50 @@ section wram, $C996
 ex_cur:     ds 1
 st_i:       ds 1
 
-section wram, $CF76                         ; (free fixed RAM)
+section wram, $CF77                         ; (free fixed RAM)
 np_last:    ds 1                            ; name entry: the last preset shown
+
+section bank 107, $7E00                     ; (free space)
+; ---- the Sound Test code (owner, 2026-11-25): songs 1 9 9 2 1 1 2 4 played in a row arm it; the
+; next save loaded (a file or the suspend point) gets SC_MARK (and the Konami Code's KN_MARK)
+sc_seq:     db 1, 9, 9, 2, 1, 1, 2, 4
+sc_feed:    ld a, [st_i]                    ; B = the song's number (1-24)
+            inc a
+            ld b, a
+            ld a, [st_cq]
+            ld e, a
+            ld d, 0
+            ld hl, sc_seq
+            add hl, de
+            ld a, b
+            cp [hl]
+            jr nz, .miss
+            inc e
+            ld a, e
+            cp 8
+            jr c, .st
+            ld a, $5A
+            ld [sc_arm], a
+            ld a, SFX_MAGIC
+            ld [sfx_req], a
+            ld e, 0
+.st:        ld a, e
+            ld [st_cq], a
+            ret
+.miss:      ld a, b                         ; (a song off the code: from the start; song 1
+            cp 1                            ;   begins it again)
+            ld a, 0
+            jr nz, .z
+            inc a
+.z:         ld [st_cq], a
+            ret
+sc_apply:   ld a, [sc_arm]
+            cp $5A
+            ret nz
+            xor a
+            ld [sc_arm], a
+            ld a, $A5
+            ld [KN_MARK], a
+            ld a, $5A
+            ld [SC_MARK], a
+            ret

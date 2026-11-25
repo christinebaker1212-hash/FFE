@@ -4155,35 +4155,25 @@ kn_xgold:   ld h, d
             ld b, h
             ld c, l
             ret
-; HL x (1, 2, 4, 8, 12 by A = 0-4; only on a file with the code), kept at $FFFF
+; HL x (1, 2, 4, 8, 12 by A = 0-4; 24, 48, 64, 128 by 5-8 with the Sound Test code; only on a
+; file with a code), kept at $FFFF; keeps BC, DE
 kn_mul:     ld b, a
             ld a, [KN_MARK]
             cp $A5
             ret nz
             ld a, b
-            cp 5
+            cp 9
             ret nc
-            and a
-            ret z
-            cp 4
-            jr z, .x12
-.sh:        add hl, hl
-            jr c, .cap
-            dec b
-            jr nz, .sh
-            ret
-.x12:       add hl, hl                      ; x 4, then x 8 + x 4
-            jr c, .cap
-            add hl, hl
-            jr c, .cap
-            ld d, h
+            push bc
+            push de
+            ld d, h                         ; DE = the amount
             ld e, l
-            add hl, hl
-            jr c, .cap
-            add hl, de
-            ret nc
-.cap:       ld hl, $FFFF
-            ret
+            ld c, a
+            ld b, 0
+            ld hl, kn_fac
+            add hl, bc
+            ld c, [hl]                      ; C = the factor
+            jp kn_mlp
 
 section bank 6, $5FDA                       ; (free space)
 ; Magic chosen: a member who knows no spell gets the error sound and stays on the commands
@@ -4205,4 +4195,22 @@ bt_cmd_mag0:
             ld a, SFX_ERROR
             ld [sfx_req], a
             scf
+            ret
+
+section bank 6, $5DDC                       ; (free space)
+kn_fac:     db 1, 2, 4, 8, 12, 24, 48, 64, 128  ; (kn_mul's factors)
+kn_mlp:     ld hl, 0                        ; HL = DE x C, kept at $FFFF; BC, DE back
+            ld b, 8
+.lp:        add hl, hl
+            jr c, .cap
+            sla c
+            jr nc, .nx
+            add hl, de
+            jr c, .cap
+.nx:        dec b
+            jr nz, .lp
+            jr .r
+.cap:       ld hl, $FFFF
+.r:         pop de
+            pop bc
             ret

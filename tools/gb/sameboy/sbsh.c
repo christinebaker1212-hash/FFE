@@ -12,6 +12,8 @@
  *   w PATH        start recording the sound (WAV 48 kHz stereo 16-bit) -> "ok CORE_RATE"
  *   W             stop recording                                       -> "ok"
  *   S PATH / L PATH  save / load a state                               -> "ok" / "err"
+ *   c OFF N       read N bytes of the cartridge RAM (battery RAM, all banks: bank x $2000
+ *                 + offset) (hex)                                      -> hex bytes
  *   v             VRAM/OAM checker: CPU writes the hardware dropped (VRAM in mode 3, OAM in
  *                 modes 2-3) since boot, from a core patched to export GB_vchk_n (docs/gb-lessons.md
  *                 "Testing"); 0 with a core without it
@@ -140,6 +142,7 @@ int main(int argc, char** argv) {
 	SYM(retro_set_audio_sample_batch); SYM(retro_set_input_poll); SYM(retro_set_input_state);
 	SYM(retro_init); SYM(retro_load_game); SYM(retro_run); SYM(retro_get_system_av_info);
 	SYM(retro_serialize_size); SYM(retro_serialize); SYM(retro_unserialize);
+	SYM(retro_get_memory_data); SYM(retro_get_memory_size);
 	p_retro_set_environment(env_cb); p_retro_init();
 	p_retro_set_video_refresh(video_cb); p_retro_set_audio_sample(audio_cb);
 	p_retro_set_audio_sample_batch(audio_batch_cb); p_retro_set_input_poll(poll_cb);
@@ -186,6 +189,13 @@ int main(int argc, char** argv) {
 			if (cmd[0] == 'S') { if (p_retro_serialize(b, sz)) { FILE* f = fopen(a1, "wb"); if (f) { fwrite(b, 1, sz, f); fclose(f); ok = 1; } } }
 			else { FILE* f = fopen(a1, "rb"); if (f) { ok = fread(b, 1, sz, f) == sz && p_retro_unserialize(b, sz); fclose(f); } }
 			free(b); printf(ok ? "ok\n" : "err\n");
+		} else if (!strcmp(cmd, "c")) {             /* c OFF N: the cartridge RAM */
+			uint8_t* sr = (uint8_t*) p_retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+			size_t sl = p_retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
+			unsigned off = strtoul(a1, 0, 16); int cnt = n > 2 ? atoi(a2) : 1;
+			if (cnt == 0) printf("%zu", sl);
+			for (int i = 0; i < cnt; i++) printf("%02X", sr && off + i < sl ? sr[off + i] : 0xFF);
+			printf("\n");
 		} else if (!strcmp(cmd, "v")) printf("%u\n", vchk_n ? *vchk_n : 0);
 		else if (!strcmp(cmd, "q")) break;
 		else printf("?\n");

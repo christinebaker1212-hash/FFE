@@ -299,7 +299,7 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
             jp .re
 .n1:        cp 5
             jr nz, .n5
-            call sus_menu                   ; Suspend (No: the menu again)
+            call mm_sus                     ; Suspend (No: the menu again), or Save
             jp .re
 .n5:        cp 4
             jr nz, .n4
@@ -347,7 +347,7 @@ mm_draw:    call scr_open
             call pen_at
             ld hl, str_mcmd4
             call pen_str
-            call mm_place
+            call mm_plc                     ; (the place / play time rows; Save for Suspend)
             ld bc, $0110                    ; Gil, the amount ending at column 18
             call pen_at
             ld hl, str_gil
@@ -2593,6 +2593,8 @@ eq_ch:      ds 1
 eq_adj:     ds 1
 eq_box:     ds 16
 mtxt:       ds 200                          ; (story_show copies 200)
+
+section wram, $CF8C                         ; (moved 2026-11-25: opt_dmgw pushed it onto sh_id)
 ban_hide:   ds 1                            ; battle: SELECT hid the target's name window
 ban_bot:    ds 1                            ; battle: the name window at the bottom (a target
                                             ;   in the top rows: owner, 2026-11-23)
@@ -2604,3 +2606,23 @@ section wram, $C99D                         ; (moved 2026-11-24: it overlapped t
 vh_t:       ds 2                            ; (overworld objects: the bridge / canal table)
 
 
+
+section bank 2, $740E                       ; (free space)
+; the main menu's sixth command: Suspend, or Save with the Sound Test code (loc.s sva_menu)
+mm_sus:     ld a, [SC_MARK]
+            cp $5A
+            jp nz, sus_menu
+            ld a, F3_BANK
+            ld hl, sva_menu
+            jp bank_call
+
+section bank 2, $6BD7                       ; (free space)
+mm_plc:     ld a, [SC_MARK]
+            cp $5A
+            jp nz, mm_place
+            ld bc, $0C06
+            call pen_at
+            ld hl, .s
+            call pen_str
+            jp mm_place
+.s:         db "Save   ", 0

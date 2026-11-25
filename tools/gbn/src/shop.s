@@ -1591,7 +1591,7 @@ sh_qmax:    ds 1
 sh_tot:     ds 3
 sh_ocur:    ds 1
 
-section bank 2, $7F90                       ; (free space)
+section bank 2, $7F94                       ; (free space)
 ; the shops' preview: '>' between the values, the arrow up / down when the new one is better /
 ; worse (owner's audit, 2026-11-25: every system; the Color also colours the value)
 sh_arrow:   ld a, [eqm_w + 1]

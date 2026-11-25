@@ -874,6 +874,8 @@ section bank 99, $4800
 KN_MARK    = unsram + $F8   ; $A5: the Konami Code entered on this file's Formation menu (kept
 KN_EXP     = unsram + $F9   ;   in the save); the experience and Gil multipliers (0 Normal, 1 2X,
 KN_GOLD    = unsram + $FA   ;   2 4X, 3 8X, 4 12X; owner, 2026-11-24)
+SC_MARK    = unsram + $FB   ; $5A: the Sound Test code (1 9 9 2 1 1 2 4, then a save loaded; owner,
+SC_NOENC   = unsram + $FC   ;   2026-11-25): multipliers to 128X, No Encounters, the main menu's Save
 OPT_ROWS   = 12             ; settings shown at once (rows 5-16); more scroll
 opt_menu:   xor a
             ld [opt_cur], a
@@ -920,7 +922,7 @@ opt_redraw: call opt_mklist
             ld d, 0
             ld hl, os_max
             add hl, de
-            ld c, [hl]
+            call opt_mx
             ld hl, os_var
             add hl, de
             add hl, de
@@ -1113,10 +1115,8 @@ file_pick:  ld a, [sv_slot]                 ; (the hand on the file used last)
             jr nz, .over
             call oam_clr                    ; load
             call load_game
-            ld a, EXTRA_BANK                ; (a save from the builds whose sound variables ran
-            ld hl, sv_fix                   ;   into the save page: ship / airship mended)
-            call bank_call
-            and a
+            call sva_ld                     ; (its place, if saved with the Sound Test code's
+            and a                           ;   Save; sv_fix: old saves mended, the code applied)
             ret
 .empty:     and a
             jr nz, .save
@@ -1159,6 +1159,7 @@ file_pick:  ld a, [sv_slot]                 ; (the hand on the file used last)
             jp .l
 .save:      call oam_clr
             call save_game
+            call sva_after                  ; (the place with the main menu's Save; else none)
             ld a, [fp_cur]                  ; the file's new contents, a moment
             call fp_clr
             ld a, [fp_cur]
@@ -2074,7 +2075,7 @@ tr_party:   call tr_buf
 section wram, $C4E0
 opt_top:    ds 1                            ; Options: the first setting shown
 opt_cnt:    ds 1                            ;   the settings listed
-opt_list:   ds 14                           ;   their ids
+opt_list:   ds 16                           ;   their ids (15 at most: the codes)
 kn_st:      ds 1                            ; the Konami Code's watch: keys matched so far
 
 section wram, $C4C0
@@ -3040,7 +3041,8 @@ ed_s:       ds 1
 ed_row:     ds 1
 ed_bk:      ds 1
 
-section wram, $CDE4
+section wram, $CCC0                         ; (moved 2026-11-25: it overlapped the Suspend's and
+                                            ;   name entry's variables at $CDE4)
 loc_buf:    ds 19
 pt_on:      ds 1                            ; (play time counted: set by the field's loop)
 op_k:       ds 1                            ; (Optimize)
@@ -3489,6 +3491,7 @@ opt_mklist: ld hl, opt_list
             ld [hl+], a
             inc c
             inc c
+            call sc_lst
 .x:         ld a, c
             ld [opt_cnt], a
             ld a, [opt_cur]                 ; (kept in range)
@@ -3649,12 +3652,12 @@ os_title:   db "Options", 0
 os_labels:  db "Message Speed", 0, "Text Speed", 0, "Volume", 0, "B Dash", 0, "Cursor", 0
             db "Auto Retarget", 0, "Modern MP", 0
             db "Window Red", 0, "Window Green", 0, "Window Blue", 0, "Gradient", 0, "LCD", 0
-            db "EXP", 0, "Gold", 0, "Window", 0
+            db "EXP", 0, "Gold", 0, "Window", 0, "No Encounters", 0
 os_var:     dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, opt_retgt, opt_mmp, win_r, win_g, win_b, opt_nograd, opt_ccm
-            dw KN_EXP, KN_GOLD, opt_dmgw
-os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2, 3, 5, 5, 2
+            dw KN_EXP, KN_GOLD, opt_dmgw, SC_NOENC
+os_max:     db 8, 5, 8, 2, 2, 2, 2, 32, 32, 32, 2, 3, 5, 5, 2, 2
 os_fmt:     db 18, 0, 12, 1, 18, 2, 16, 3, 11, 4, 16, 5, 16, 5, 17, 6, 17, 6, 17, 6, 16, 3, 6, 7
-            db 13, 8, 13, 8, 14, 9          ; (the value's column, its format)
+            db 13, 8, 13, 8, 14, 9, 16, 5   ; (the value's column, its format)
 os_sv:      dw respond, tw_spd, opt_vol, opt_nodash, opt_curr, win_r, win_g, win_b, opt_nograd, opt_retgt, opt_mmp, opt_ccm
             dw opt_dmgw
                                             ; (the saved order: the older records' first nine)
@@ -3663,7 +3666,6 @@ os_lcd:     db "      Default", "GBC Corrected", "GBA Corrected"
 os_spn:     db "   Slow", " Normal", "   Fast", " Faster", "Instant"
 os_dash:    db " On", "Off"
 os_cur:     db "Remember", "   Reset"
-os_mul:     db "Normal", "    2X", "    4X", "    8X", "   12X"
 os_wnd:     db "Black", "White"
 
 ; ---- the Konami Code on the Formation menu (owner, 2026-11-24): Up Up Down Down Left Right Left
@@ -4422,4 +4424,85 @@ gr_reg:     push hl
             ld a, 1
             ld [gr_dirty], a
 .x:         pop hl
+            ret
+
+section bank 99, $7400                      ; (free space)
+; ---- the Sound Test code (owner, 2026-11-25: tracks 1 9 9 2 1 1 2 4, then a save loaded): EXP /
+; Gold multipliers up to 128X, No Encounters in Options, and the main menu's Suspend becomes Save:
+; the file (as an inn's save) plus the exact place (the suspend point's blocks) in cart RAM bank 2,
+; $A000 + $600 x file, loaded with that file. An inn's save over the file drops the place.
+os_mul:     db "Normal", "    2X", "    4X", "    8X", "   12X", "   24X", "   48X", "   64X", "  128X"
+; Z if this file has the code
+sc_on:      ld a, [SC_MARK]
+            cp $5A
+            ret
+; Options: the list (HL, C counted) gets No Encounters
+sc_lst:     call sc_on
+            ret nz
+            ld a, 15
+            ld [hl+], a
+            inc c
+            ret
+; Options: C = setting E's count (HL at os_max's entry): EXP / Gold 9 with the code
+opt_mx:     ld c, [hl]
+            ld a, e
+            cp 12
+            ret c
+            cp 14
+            ret nc
+            call sc_on
+            ret nz
+            ld c, 9
+            ret
+; the suspend routines (screens.s) pointed at file sv_slot's place, and back
+sva_set:    ld a, 1
+            ld [sus_bk], a
+            ld a, [sv_slot]
+            ld b, a
+            add a, a
+            add a, b
+            add a, a
+            ld [sus_bo], a
+            ret
+sva_clr:    xor a
+            ld [sus_bk], a
+            ld [sus_bo], a
+            ret
+; HL in bank SCR_BANK with the file's place
+sva_run:    push hl
+            call sva_set
+            pop hl
+            ld a, SCR_BANK
+            call bank_call
+            push af
+            call sva_clr
+            pop af
+            ret
+; after a save to file sv_slot: its place written (the main menu's Save) or dropped (an inn)
+sva_after:  ld a, [sva_req]
+            and a
+            ld hl, sus_write
+            jr nz, sva_run
+            ld hl, sus_erase
+            jr sva_run
+; after file sv_slot was loaded: its place, if any (resumed as a suspend point), else the map
+; from the save page; sv_fix either way (sus_load calls it)
+sva_ld:     ld hl, sus_state
+            call sva_run
+            dec a
+            jr nz, .no
+            ld hl, sus_load
+            call sva_run
+            ld a, 1
+            ld [sus_res], a
+            ret
+.no:        ld a, EXTRA_BANK
+            ld hl, sv_fix
+            jp bank_call
+; the main menu's Save (in Suspend's place): the file picker in save mode, the place with it
+sva_menu:   ld a, 1
+            ld [sva_req], a
+            call file_save
+            xor a
+            ld [sva_req], a
             ret

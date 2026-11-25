@@ -1248,7 +1248,8 @@ sus_blk:    dw px, o_tb + 1 - px            ; position, map, floors, objects' st
             dw 0
 sus_on:     ld a, $0A
             ld [$0000], a
-            ld a, 1
+            ld a, [sus_bk]                  ; (cart RAM bank 1; bank 2 for a file's place:
+            inc a                           ;   the Sound Test code's Save, sva_* in loc.s)
             ld [$4000], a
             ret
 sus_off:    push af
@@ -1312,7 +1313,8 @@ sus_copy:   ld [sus_dir], a
             jr .e
 sus_cp0:    ld a, low(SUS_MARK + 4)
             ld [sus_cp], a
-            ld a, high(SUS_MARK + 4)
+            ld a, [sus_bo]
+            add a, high(SUS_MARK + 4)
             ld [sus_cp + 1], a
             ret
 sus_end:    ld a, [sus_cp]                  ; HL = the sum's place
@@ -1322,7 +1324,7 @@ sus_end:    ld a, [sus_cp]                  ; HL = the sum's place
             ret
 ; the suspend point made
 sus_write:  call sus_on
-            ld hl, SUS_MARK
+            call sus_mk
             ld a, $46
             ld [hl+], a
             ld [hl+], a
@@ -1340,7 +1342,7 @@ sus_write:  call sus_on
             jp sus_off
 ; A = 0 none, 1 good, 2 damaged (the mark, a wrong sum)
 sus_state:  call sus_on
-            ld hl, SUS_MARK
+            call sus_mk
             ld a, [hl+]
             cp $46
             jr nz, .no
@@ -1371,7 +1373,7 @@ sus_state:  call sus_on
             jp sus_off
 sus_erase:  call sus_on
             xor a
-            ld hl, SUS_MARK
+            call sus_mk
             ld [hl+], a
             ld [hl+], a
             ld [hl+], a
@@ -3063,6 +3065,11 @@ sus_res:    ds 1                            ; the title resumed a suspend point
 ng_lock:    ds 1                            ; the title: nothing to continue
 ni_case:    ds 1                            ; name entry: 0 capitals, 1 small letters, 2 signs
 ni_pre:     ds 1                            ; name entry: the name is a preset (Start)
+sus_bk:     ds 1                            ; the suspend routines' cart RAM bank - 1 (0: the point)
+sus_bo:     ds 1                            ;   and its start's offset in pages (a file's place)
+sva_req:    ds 1                            ; the main menu's Save (the Sound Test code): the place too
+st_cq:      ds 1                            ; the Sound Test code: tracks matched so far
+sc_arm:     ds 1                            ; $5A: the code played, for the next save loaded
 section wram, $D400
 smap:       ds 18 * 32                      ; the screen's map copy (attributes at + $300)
 section wram, $D700
@@ -3091,10 +3098,20 @@ sus_load:   ld a, [respond]
             ld [mt_force], a
             ld a, 1
             ld [pc_req], a
-            call sus_erase
+            ld a, [sus_bk]                  ; (a file's place is kept: loaded again later)
+            and a
+            call z, sus_erase
             ld a, EXTRA_BANK                ; (a point from the builds whose sound variables
             ld hl, sv_fix                   ;   ran into the save page: ship / airship mended)
             jp bank_call
+
+section bank 2, $46F0                       ; (free space)
+; HL = the suspend point's start: $A000 (bank 1) or a file's place (bank 2, $A000 + $600 x file)
+sus_mk:     ld a, [sus_bo]
+            add a, high(SUS_MARK)
+            ld h, a
+            ld l, 0
+            ret
 
 section bank 2, $47AD                       ; (moved: the title's section was full)
 ; A = the symbol at column A (0-5), row B (0-9): rows 0-4 the case's 27 letters, rows 5-9 the

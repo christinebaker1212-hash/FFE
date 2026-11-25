@@ -295,12 +295,12 @@ aw:         push af
             cp $FF
             jr nz, .fv
             xor a
-.fv:        ld b, a
-            ld a, e
-            sub low(snd_tv) - low(snd_cv)
-            ld e, a
-            ld d, high(snd_cv)
-            ld a, b
+.fv:        ld h, a                         ; (the volume: in H, popped below; B is BC's, the
+            ld a, e                         ;   frequency shadow's pointer: with the volume in B
+            sub low(snd_tv) - low(snd_cv)   ;   the write below went to $0x00-$0FFF, the MBC's
+            ld e, a                         ;   RAM enable, and cut cart RAM off mid-save /
+            ld d, high(snd_cv)              ;   mid-load while music played; 2026-11-25)
+            ld a, h
             ld [de], a
             pop hl
             swap a                          ; (NRx3 first; then NRx2 and the restart back to

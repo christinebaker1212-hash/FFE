@@ -2783,15 +2783,20 @@ enc_step:   ld a, [bsign]
             jr .exp
 .neg:       dec [hl]
             jr nz, .d
-.exp:       ld a, [bsign]
-            add a, $A0
+.exp:       add a, $A0                      ; (A = bsign still)
             ld [bsign], a
-.d:         ld a, [bstep]
-            ld l, a
+.d:         ld l, [hl]                      ; (HL = bstep)
             ld h, high(B_FRNG)
             ld a, BTL_DATA
             ld [fc_bank], a
-            jp far_byte
+            call far_byte
+            ld l, a                         ; (No Encounters: the Sound Test code's Options;
+            ld a, [SC_NOENC]                ;   the step counted as before, no battle)
+            and a
+            ld a, l
+            ret z
+            ld a, $FF
+            ret
 ; FF1 GetBattleFormation: domain A -> A = a formation (weighted)
 enc_form:   ld l, a
             ld h, 0

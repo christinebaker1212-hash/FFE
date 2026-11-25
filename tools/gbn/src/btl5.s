@@ -321,7 +321,7 @@ bt_critlab: ld a, [mt_crits]
             ld a, b
             sub 33
             ld b, a
-            jp crit_put
+            jp crit_y
 
 section bank 6, $7FE8
 ; every battle frame: the ailment bubbles (bank 104: btl6.s), then the damage number's bounce
@@ -454,3 +454,15 @@ bub_init:   xor a
             ld [hl], a
             ld [crit_on], a                 ; (no "CRITICAL!" left over)
             ret
+
+section bank 6, $7EB5                       ; (free space)
+; "CRITICAL!" a line under what it would cover (owner, 2026-11-25): a member's hit: its hit count
+; (at the head); a member hit: the damage number (left of the sprite, bouncing upwards)
+crit_y:     ld a, [df_player]
+            and a
+            ld a, 10
+            jr z, .y
+            ld a, 18
+.y:         add a, c
+            ld c, a
+            jp crit_put
