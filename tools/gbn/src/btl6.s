@@ -230,7 +230,8 @@ fl_put:     call wait_vbl
             ld [fl_vb], a
             ld a, [fl_e]
             ld c, a
-.r:         ldh a, [rLY]
+.r:         di                              ; (interrupts off for the row: in V-Blank to the end)
+            ldh a, [rLY]
             cp 144
             jr c, .w
             cp 152
@@ -248,6 +249,7 @@ fl_put:     call wait_vbl
             inc de
             dec b
             jr nz, .c
+            ei
             pop de
             ldh a, [is_cgb]
             and a
@@ -264,7 +266,8 @@ fl_put:     call wait_vbl
             jr nz, .r
             pop de
             ret
-.w:         ldh a, [is_cgb]                 ; (outside the V-Blank's window: the row byte by
+.w:         ei
+            ldh a, [is_cgb]                 ; (outside the V-Blank's window: the row byte by
             and a                           ;   byte, so it never waits for ever)
             jr z, .w0
             ld a, [fl_vb]

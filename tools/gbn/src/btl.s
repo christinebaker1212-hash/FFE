@@ -1334,9 +1334,10 @@ bt_vbl:     ld a, [bt_upn]
             ld e, a
             ld a, [bt_updst + 1]
             ld d, a
-.l:         ldh a, [rLY]                    ; (in V-Blank: a tile takes under a line;
-            sub 144                         ;   one started late in line 152 ran into line 0's
-            cp 8                            ;   mode 3 if the music timer cut in: up to 151)
+.l:         di                              ; (interrupts off for the tile: one stretched by
+            ldh a, [rLY]                    ;   handlers ran into line 0's drawing; checker)
+            sub 144                         ; (in V-Blank: a tile takes ~1.4 lines; started
+            cp 8                            ;   by line 151, done in line 153)
             jr nc, .sl
             ld b, 16
 .c:         ld a, [hl+]
@@ -1344,12 +1345,14 @@ bt_vbl:     ld a, [bt_upn]
             inc de
             dec b
             jr nz, .c
+            ei
             ld a, [bt_upn]
             dec a
             ld [bt_upn], a
             jr nz, .l
             jr .x
-.sl:        ld b, 16                        ; (outside it: one tile byte by byte, so the
+.sl:        ei
+            ld b, 16                        ; (outside it: one tile byte by byte, so the
 .s:         ld a, [hl+]                     ;   uploads always go on: owner, 2026-11-25, a
             call vput                       ;   battle's results never came on a plain Game
             dec b                           ;   Boy)

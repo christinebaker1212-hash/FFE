@@ -1539,12 +1539,14 @@ veh_oam:    ld a, [vehicle]
             call ob_pos
             pop hl
             ret c
-            ld c, a
-            call ob_step
+            push bc                         ; (C: the tile base, kept; it was taken as the y,
+            ld c, a                         ;   so the parked ship / airship drew other tiles
+            call ob_step                    ;   at every step: owner, 2026-11-25)
             ld a, b
             ld [vh_x], a
             ld a, c
             ld [vh_y], a
+            pop bc
             push de
             ld a, [map_bank]
             call sbank

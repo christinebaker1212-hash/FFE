@@ -1437,8 +1437,7 @@ section bank 99, $4BC0                      ; (an enemy dies: bt_erase_enemy)
 ; step, the screen shaking and the hit sound every fourth step. VRAM only outside mode 3.
 ED_T0      = $C4
 ed_dissolve:
-            xor a
-            ldh [rVBK], a
+            call ed_vbk0                    ; (VBK 0 on the Color only: ul.s)
             ld a, [fl_e]                    ; cells (E x E)
             ld b, a
             ld c, a

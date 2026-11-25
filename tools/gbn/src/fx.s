@@ -389,7 +389,18 @@ fxt_src:    ld h, a
             cp 24
             jr c, .s
             sub 24
-            call .x16
+            cp 6                            ; (tiles 24-29: the gradient's ramp / windows, 30-35:
+            jr c, .g                        ;   the field box's records: Color-only data. Never
+            sub 6                           ;   the gradient's flags after them: gr_on set there
+            call .x16                       ;   ran the Color's line handler on a plain Game Boy;
+            ld a, l                         ;   owner, 2026-11-25)
+            add a, low(GR_FA)
+            ld l, a
+            ld a, h
+            adc a, high(GR_FA)
+            ld h, a
+            ret
+.g:         call .x16
             ld a, h
             add a, high(gr_ramp)
             ld h, a

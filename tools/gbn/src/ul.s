@@ -843,3 +843,10 @@ ul_chk:     xor a
             xor a
             ld [ul_nc], a
             ret
+; VRAM bank 0 on the Color (Color-only registers untouched on DMG / SGB: Lot Check checker)
+ed_vbk0:    ldh a, [is_cgb]
+            and a
+            ret z
+            xor a
+            ldh [rVBK], a
+            ret
