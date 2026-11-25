@@ -9,6 +9,8 @@ TRANS_BANK = 103            ; the encounter transition's tables (battle.py trans
 FL_T0      = $C4            ; free BG tiles while the names window shows (it uses $A8-$C3)
 HL_OAM     = oam_buf + 128  ; the label: OAM 32-34 (the damage number: 35-39)
 HL_T0      = $F4            ; its tiles ($F4: "MISS!" only, never shown with a label)
+CL_OAM     = oam_buf + 112  ; "CRITICAL!": OAM 28-31 (the bubbles' / bursts'), with the number
+CL_T0      = $EC            ;   tiles $EC-$EF (the message window's last cells: not while it shows)
 
 section bank 6, $7D00
 
@@ -289,20 +291,23 @@ bt_critlab: ld a, [mt_crits]
             ld a, [bt_defer]
             and a
             ret nz
+            ld a, [bt_msgon]                ; (its tiles are the message window's last four)
+            and a
+            ret nz
             call bt_flush
-            ld hl, $4000 + 39 * 48
-            ld de, bt_stage
+            ld hl, $4000 + 39 * 48          ; (staged after the damage number's glyphs)
+            ld de, bt_stage + 128
             ld bc, 64
             ld a, HITL_BANK
             call far_copy
             ld hl, bt_upsrc
-            ld a, low(bt_stage)
+            ld a, low(bt_stage + 128)
             ld [hl+], a
-            ld [hl], high(bt_stage)
+            ld [hl], high(bt_stage + 128)
             ld hl, bt_updst
-            ld a, low($8000 + 16 * DN_T0)
+            ld a, low($8000 + 16 * CL_T0)
             ld [hl+], a
-            ld [hl], high($8000 + 16 * DN_T0)
+            ld [hl], high($8000 + 16 * CL_T0)
             ld a, 4
             ld [bt_upn], a
             call bt_flush
@@ -317,14 +322,6 @@ bt_critlab: ld a, [mt_crits]
             sub 33
             ld b, a
             jp crit_put
-; battle start: no member's tile holds a bubble yet (bt_ail_in)
-bub_init:   xor a
-            ld hl, bub_cur
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl+], a
-            ld [hl], a
-            ret
 
 section bank 6, $7FE8
 ; every battle frame: the ailment bubbles (bank 104: btl6.s), then the damage number's bounce
@@ -340,9 +337,9 @@ bt_fhook:   push bc
             jp bt_danim
 
 section bank 6, $5DBF
-crit_put:   ld hl, HL_OAM
-            ld d, DN_T0
-            ld e, 4
+crit_put:   ld hl, CL_OAM                   ; (shown with the damage number, OAM 28-31: the
+            ld d, CL_T0                     ;   bubbles wait; bub_tick takes it away with the
+            ld e, 4                         ;   number)
 .o:         ld a, c
             ld [hl+], a
             ld a, b
@@ -356,24 +353,8 @@ crit_put:   ld hl, HL_OAM
             ld [hl+], a
             dec e
             jr nz, .o
-            ld b, 40                        ; shown, then gone (A skips)
-.w:         push bc
-            call bt_frame
-            pop bc
-            ldh a, [pad_new]
-            and 1
-            jr nz, .x
-            dec b
-            jr nz, .w
-.x:         ld hl, HL_OAM
-            xor a
-            ld b, 4
-.c:         ld [hl+], a
-            inc l
-            inc l
-            inc l
-            dec b
-            jr nz, .c
+            ld a, 1
+            ld [crit_on], a
             ret
 
 section wram, $C760
@@ -461,3 +442,15 @@ bt_nmeas:   ld hl, bt_sbuf
 
 section wram, $CF75                         ; (free fixed RAM)
 bt_nlim:    ds 1                            ; bt_nstr: the name's right limit
+crit_on:    ds 1                            ; "CRITICAL!" showing (OAM 28-31)
+
+section bank 6, $7465                       ; (free space)
+; battle start: no member's tile holds a bubble yet (bt_ail_in)
+bub_init:   xor a
+            ld hl, bub_cur
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+            ld [crit_on], a                 ; (no "CRITICAL!" left over)
+            ret

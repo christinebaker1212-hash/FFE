@@ -476,7 +476,22 @@ section bank 104, $5600
 ; lying pose's last tile (32 m + 31: only shown while it lies dead, when the bubble is gone and
 ; the tile is put back). Every frame from bt_frame (bt_fhook); one tile upload a frame.
 BUB_SRC    = $4000 + 39 * 48 + 64
-bub_tick:   ld a, [bt_exn]                  ; (a hit burst owns OAM 28-31)
+bub_tick:   ld a, [crit_on]                 ; ("CRITICAL!" owns OAM 28-31 while the damage
+            and a                           ;   number shows; then gone)
+            jr z, .nc
+            ld a, [dn_t]
+            and a
+            ret nz
+            ld [crit_on], a
+            ld hl, oam_buf + 112
+            ld b, 4
+.cl:        ld [hl+], a
+            inc l
+            inc l
+            inc l
+            dec b
+            jr nz, .cl
+.nc:        ld a, [bt_exn]                  ; (a hit burst owns OAM 28-31)
             and a
             ret nz
             ld hl, bub_t

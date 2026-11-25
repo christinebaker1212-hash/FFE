@@ -747,6 +747,8 @@ status_scr: ld [mm_t], a
             call pen_at
             call st_mmp                     ; (Modern MP: one current / maximum)
             jr nz, .mpx
+            call st_nomp                    ; (no MP at any level: "-": shop.s)
+            jr z, .mpx
             xor a
 .mp:        ld [mm_pc], a
             cp 4

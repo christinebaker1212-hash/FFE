@@ -1603,3 +1603,23 @@ sh_arrow:   ld a, [eqm_w + 1]
             jr nc, .p
             inc a
 .p:         jp pen_ch
+; the Status screen: a member with no MP at any level gets "-", not sixteen 0/0s (owner's audit,
+; 2026-11-25); Z then
+st_nomp:    ld a, [mm_t]
+            rrca
+            rrca
+            add a, $28
+            ld l, a
+            ld h, high(ch_magic)
+            ld b, 8
+            xor a
+.z:         or [hl]
+            inc l
+            dec b
+            jr nz, .z
+            and a
+            ret nz
+            ld a, $2D
+            call pen_ch
+            xor a
+            ret

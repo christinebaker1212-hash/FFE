@@ -492,7 +492,7 @@ bt_cmd_one: call bt_cmd_win                 ; (first: its tiles go up while the 
             jr z, .fight
             cp 1
             jr nz, .md
-            call bt_cmd_magic
+            call bt_cmd_mag0                ; (no spells known: refused)
             jr c, .back
             jr .done
 .md:        cp 2
@@ -1526,7 +1526,7 @@ bt_phys:    ld a, 168
             call nf_a
             ld a, M_HITS
             call bq_num
-.m1:        call bt_critlab                 ; ("CRITICAL!" beside the member: btl5.s)
+.m1:
 .m2:        ld a, [mt_total]
             ld b, a
             ld a, [mt_total + 1]
@@ -1546,6 +1546,7 @@ bt_phys:    ld a, 168
             call bq_num
             ld hl, mt_total                 ; (the number over the target)
             call bt_dnum_w
+            call bt_critlab                 ; ("CRITICAL!" with it: owner, 2026-11-25; btl5.s)
             call bt_hitlab_g                ; (the hit count over the attacker: btl5.s)
             ld a, [mt_total]                ; HP - total (at least 0)
             ld b, a
@@ -4182,4 +4183,26 @@ kn_mul:     ld b, a
             add hl, de
             ret nc
 .cap:       ld hl, $FFFF
+            ret
+
+section bank 6, $5FDA                       ; (free space)
+; Magic chosen: a member who knows no spell gets the error sound and stays on the commands
+; (owner's audit, 2026-11-25: the list opened empty)
+bt_cmd_mag0:
+            ld a, [bt_cm]
+            rrca
+            rrca
+            ld l, a
+            ld h, high(ch_magic)
+            ld b, $20
+            xor a
+.l:         or [hl]
+            inc l
+            dec b
+            jr nz, .l
+            and a
+            jp nz, bt_cmd_magic
+            ld a, SFX_ERROR
+            ld [sfx_req], a
+            scf
             ret
