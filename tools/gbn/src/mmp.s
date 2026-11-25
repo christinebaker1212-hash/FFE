@@ -920,11 +920,6 @@ bt_plmp:    ld a, [opt_mmp]
 
 ; ---- the menus (bank 2): Options' question, the Status and Magic screens
 section bank 2, $7230
-; Options: the owner's warning before the mode changes; A = 0 Yes, 1 No
-mmp_ask:    ld hl, str_mmpq
-            ld a, 7
-            ld d, 1
-            jp sus_ask
 ; Status screen (MP row 7): Modern MP: the member's MP as current / maximum ending at column
 ; 18 as the HP, NZ
 st_mmp:     ld a, [opt_mmp]
@@ -962,8 +957,6 @@ mg_mmpl:    ld a, [opt_mmp]
             or 1
             ret
 mg_s_mp:    db "MP ", 0
-str_mmpq:   db "Switching between", $0A, "MP modes mid-game", $0A, "may leave you with", $0A
-            db "more or less MP", $0A, "than usual.", $0A, $0A, "Is this OK?", 0
 ; Magic screen, a spell (slot value B of level [mg_lv], pen after its name, row C): Modern MP: its
 ; cost ending at column 18 (on the row below when the name leaves no room)
 mg_mcrow:   ld a, [opt_mmp]

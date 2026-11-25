@@ -927,6 +927,8 @@ opt_redraw: call opt_mklist
             jr c, .ch1
             bit 7, b
             jr nz, .l
+            cp 19                           ; (Return to Default: A only)
+            jr z, .l
             call opt_into
             jr .l
 .ch1:       ld e, a
@@ -971,20 +973,11 @@ opt_redraw: call opt_mklist
             call scr_upd
             jr .l
 .mm:        call mmp_ok                     ; Modern MP (src/mmp.s): only with the wiki's data;
-            and a                           ;   the owner's warning first (Yes: the party's MP
-            jr z, .l                        ;   converted), the screen again either way
-            push hl
-            push bc
-            ld a, SCR_BANK
-            ld hl, mmp_ask
-            call bank_call
-            pop bc
-            pop hl
-            and a
-            jp nz, opt_redraw
+            and a                           ;   the party's MP converted in proportion at once
+            jr z, .l                        ;   (no question: nothing is lost; 2026-11-25)
             ld [hl], b
             call mmp_sync
-            jp opt_redraw
+            jr .nw
 .up:        ld hl, opt_cur
             ld a, [hl]
             and a
