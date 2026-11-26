@@ -424,8 +424,6 @@ RF_STG     = $DC80          ; the tiles made (4 x 16; the airship view's sky tab
                             ;   the reflection shows: it is off in the air)
 RF_ROWS    = $DC40          ; (scratch: the airship view's DMG table, free likewise)
 RF_SRC     = $DC48
-RF_CK      = $DC58          ; metatile cache: 6 x (key, metatile)
-RF_CN      = $DC64
 RF_X       = $DC65
 RF_Y       = $DC66
 RF_I       = $DC67
@@ -445,8 +443,12 @@ rf_hid     = $DC34          ; 1: the reflection hidden this frame (its fade)
 rf_st      = $DC35          ; 1: the tiles kept are of another pose (refl_msk)
 RF_NEXT    = $DCD0          ; the four OAM entries once the tiles made are up (16 bytes)
 rf_la      = $DC6C
+rf_mtc     = $DDE8          ; the step's metatiles under the reflection (16; $FF: not read yet)
+rf_mtf     = $DDF8          ; the frame it last ran, then the tile and map they are for
+rf_mtx     = $DDF9
 
-refl_msk:   xor a
+refl_msk:   call rf_mtchk                   ; (the metatiles under it: kept for the step)
+            xor a
             ld [rf_st], a
             ld a, [rf_pend]                 ; (an upload half done: the tiles made stay)
             and a
@@ -464,11 +466,11 @@ refl_msk:   xor a
             xor a
             ld [rf_pend], a                 ; (none taken by the V-Blank while being made)
             ld [rf_upi], a
-            ld [RF_CN], a
             ld [rf_scls], a
             ld [RF_ANY], a
             xor a                           ; (the tiles show with this frame's sprites:
             ld [rf_la], a                   ;   rf_up9 patches the OAM; owner, 2026-11-26)
+            call rf_sxy
             xor a
 .e:         ld [RF_I], a
             call rf_one
@@ -545,20 +547,16 @@ rf_one:     ld a, [RF_I]
             cp 160
             ret nc
             sub 80                          ; Y: its top from the party's tile, the step on
-            ld b, a
-            push hl
-            ld a, [mdy]
-            call refl_st
+            ld b, a                         ;   (RF_SY / RF_SX: the frame's, rf_sxy)
+            ld a, [RF_SY]
+            add a, b
             ld [RF_Y], a
-            pop hl
             ld a, [hl+]
             sub 80
             ld b, a
-            push hl
-            ld a, [mdx]
-            call refl_st
+            ld a, [RF_SX]
+            add a, b
             ld [RF_X], a
-            pop hl
             ld a, [hl]
             ld [RF_T], a
             ld a, [RF_X]                    ; the 2 x 2 quarters under it: their mask rows
@@ -574,112 +572,55 @@ rf_one:     ld a, [RF_I]
             sra a
             sra a
             ld [RF_QY], a
-            ld de, RF_P
-            ld b, 0
-            ld a, $FE                       ; (RF_UA: the quarters' common whole value, or 1)
+            call rf_q4m                     ; the 2 x 2 quarters: RF_P, RF_UA
             ld [RF_UA], a
-.p:         push bc
-            push de
-            ld a, [RF_QX]
-            bit 0, b
-            jr z, .p1
-            inc a
-.p1:        ld c, a
-            ld a, [RF_QY]
-            bit 1, b
-            jr z, .p2
-            inc a
-.p2:        ld b, a
-            call rf_qp
-            ld b, a                         ; (all four alike and whole, or not)
-            ld a, [RF_UA]
-            cp $FE
-            jr z, .pu
-            cp b
-            jr z, .pv
-            ld b, 1
-.pu:        ld a, b
-            ld [RF_UA], a
-.pv:        pop de
-            ld a, l
-            ld [de], a
-            inc e
-            ld a, h
-            ld [de], a
-            inc e
-            pop bc
-            inc b
-            ld a, b
-            cp 4
-            jr c, .p
             ld a, [RF_UA]                   ; all four whole quarters alike: no rows to cut
             and a
             ret z                           ; (none water: hidden)
             inc a
             ld c, 1
             jr z, .k                        ; (all water: whole)
-            ld a, [RF_Y]                    ; C = row in the quarter pair (0-15)
-            and 7
-            ld c, a
-            ld b, $FF                       ; AND of the rows in B, OR in D, E = RF_ROWS slot
-            ld d, 0
-            ld e, low(RF_ROWS)
-.r:         push bc
-            push de
-            ld hl, RF_P                     ; the upper or the lower pair
-            ld a, c
-            cp 8
-            jr c, .up
-            ld hl, RF_P + 4
-            sub 8
-.up:        ld e, a                         ; E = row in the quarter
-            ld a, [hl+]
-            ld c, a
-            ld a, [hl+]
-            ld b, a
-            ld a, c
-            add a, e
-            ld c, a
-            jr nc, .u1
-            inc b
-.u1:        ld a, [bc]                      ; the left quarter's bits
-            ld d, a
+            ld a, [RF_Y]                    ; the 8 rows under it: the upper quarters' from
+            and 7                           ;   row (y & 7) on, then the lower ones', gathered
+            ld c, a                         ;   (left into RF_ROWS, right into RF_ROWR), then
+            ld de, RF_ROWS                  ;   shifted together by the unrolled variant for
+            ld a, [RF_PPL]                  ;   x & 7 (plain Game Boy pace, 2026-11-26: some
+            ld l, a                         ;   125 cycles a row before)
+            ld h, high(RF_P)
+            call rf_gat
             ld a, [RF_SH]
             and a
-            jr z, .z
-            ld a, [hl+]
-            ld c, a
-            ld b, [hl]
-            ld a, c
-            add a, e
-            ld c, a
-            jr nc, .u2
-            inc b
-.u2:        ld a, [bc]                      ; the right one's
-            ld e, a
-            ld a, [RF_SH]
-            ld b, a
-.s:         sla e                           ; (left, right) << sh: the window in D
-            rl d
-            dec b
-            jr nz, .s
-.z:         ld a, d                         ; A = the row's water bits
-            pop de
-            pop bc
-            ld l, e
-            ld h, high(RF_ROWS)
-            ld [hl], a
-            inc e
+            jr z, .s0
+            ld de, RF_ROWR
+            ld a, [RF_PPL]
+            add a, 2
             ld l, a
+            ld h, high(RF_P)
+            call rf_gat
+            ld a, [RF_SH]
+.s0:        add a, a
+            add a, low(rf_shj)
+            ld l, a
+            ld a, high(rf_shj)
+            adc a, 0
+            ld h, a
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            call rf_jhl
+            ld hl, RF_ROWS                  ; AND of the rows in B, OR in D
+            ld b, $FF
+            ld d, 0
+            ld c, 8
+.ac:        ld a, [hl+]
+            ld e, a
             and b
             ld b, a
-            ld a, l
+            ld a, e
             or d
             ld d, a
-            inc c
-            ld a, e
-            cp low(RF_ROWS) + 8
-            jr c, .r
+            dec c
+            jr nz, .ac
             ld a, d
             and a
             ret z                           ; (no water: hidden)
@@ -687,8 +628,6 @@ rf_one:     ld a, [RF_I]
             ld a, b
             inc a
             jr z, .k                        ; (all water: whole)
-            call rf_half                    ; (less than half over water: hidden; a corner
-            ret c                           ;   tile's slivers and tails; owner, 2026-11-26)
             call rf_tile
             ld c, 2
 .k:         ld a, [RF_I]                    ; kind C at bits 2 i
@@ -707,33 +646,69 @@ rf_one:     ld a, [RF_I]
 
 ; C = quarter column, B = quarter row (from the party's tile, signed): HL = that quarter's 8
 ; mask rows (the Color's REFL_MASK, the plain Game Boy's at + $1000)
-rf_qp:      ld a, b                         ; metatile key: column / 2, row / 2 (signed nibbles)
+rf_qp:      ld a, c                         ; the step's metatiles (4 x 4 around the party's
+            sra a                           ;   tile: columns -1..2, rows 0..3), each read once
+            inc a                           ;   a step with its mask pointer and its quarters'
+            cp 4                            ;   whole values (plain Game Boy pace, 2026-11-26:
+            jr nc, .slow                    ;   2.5 lines a quarter before)
+            ld e, a
+            ld a, b
             sra a
-            and $0F
+            cp 4
+            jr nc, .slow
+            add a, a
+            add a, a
+            add a, e
+            ld e, a                         ; E = the metatile's slot
+            add a, low(rf_mtc)
+            ld l, a
+            ld h, high(rf_mtc)
+            ld a, [hl]
+            inc a
+            call z, rf_qfill
+            ld a, b                         ; D = quarter (bit 0 column, bit 1 row)
+            and 1
+            add a, a
             ld d, a
             ld a, c
-            sra a
-            and $0F
-            swap a
+            and 1
             or d
-            ld d, a                         ; D = key
-            ld hl, RF_CK                    ; cached?
-            ld a, [RF_CN]
-            ld e, a
-.f:         ld a, e
+            ld d, a
+            ld a, e
+            add a, a
+            add a, a
+            add a, d
+            add a, low(RF_QUV)
+            ld l, a
+            ld h, high(RF_QUV)
+            ld a, [hl]
+            ld [RF_UV], a
+            ldh a, [maptype]
             and a
-            jr z, .miss
-            ld a, [hl+]
-            cp d
-            jr z, .hit
-            inc hl
-            dec e
-            jr .f
-.hit:       ld a, [hl]
-            jr .got
-.miss:      push bc
-            push de
-            push hl
+            jr z, .tw
+            ld a, e                         ; HL = the metatile's mask + 8 quarter
+            add a, low(RF_QLO)
+            ld l, a
+            ld a, d
+            add a, a
+            add a, a
+            add a, a
+            add a, [hl]
+            ld c, a
+            ld a, l
+            add a, 16
+            ld l, a
+            ld h, [hl]
+            ld l, c
+            ld a, [RF_UV]
+            ret
+.tw:        ld hl, RF_ROWS00                ; (a town: whole rows)
+            ld a, [RF_UV]
+            and a
+            ret z
+            ld hl, RF_ROWSFF
+            ret
+.slow:      push bc                         ; (beyond the step's slots: from the map)
             ld a, c                         ; E = px + column / 2, D = py + row / 2
             sra a
             ld e, a
@@ -754,19 +729,7 @@ rf_qp:      ld a, b                         ; metatile key: column / 2, row / 2 
             ld d, a
             call rw1
             and $7F
-            pop hl
-            pop de
             pop bc
-            ld e, a
-            ld a, [RF_CN]                   ; (cached, 6 at most)
-            cp 6
-            jr nc, .nc
-            inc a
-            ld [RF_CN], a
-            ld a, d
-            ld [hl+], a
-            ld [hl], e
-.nc:        ld a, e
 .got:       ld l, a
             ldh a, [maptype]                ; a town: its quarter flags, whole rows
             and a
@@ -829,41 +792,47 @@ rf_qp:      ld a, b                         ; metatile key: column / 2, row / 2 
             ld a, [RF_UV]
             ret
 
+; the metatile cache emptied on a new tile, a new map, or a frame the reflection did not run
+; (a menu, a shop, a battle: the field redrawn, the shop's buffer over it)
+rf_mtchk:   ld hl, rf_mtf
+            ldh a, [frame]
+            ld b, [hl]
+            ld [hl+], a
+            dec a
+            cp b
+            jr nz, .inv
+            ld a, [px]
+            cp [hl]
+            jr nz, .inv
+            inc hl
+            ld a, [py]
+            cp [hl]
+            jr nz, .inv
+            inc hl
+            ld a, [cur_map]
+            cp [hl]
+            ret z
+.inv:       ld a, $FF                       ; (and the sprites' memos)
+            ld [$DCE0], a
+            ld [$DCEA], a
+            ld [$DCF4], a
+            ld [$DC58], a
+            ld hl, rf_mtx
+            ld a, [px]
+            ld [hl+], a
+            ld a, [py]
+            ld [hl+], a
+            ld a, [cur_map]
+            ld [hl], a
+            ld hl, rf_mtc
+            ld a, $FF
+            ld b, 16
+.f:         ld [hl+], a
+            dec b
+            jr nz, .f
+            ret
 ; Z if nothing the tiles depend on changed since they were made (the party's place and step,
 ; the sprites' places and tiles); the new values kept
-rf_sig:     ld hl, RF_SIG
-            ld c, 0                         ; C: a difference
-            ld a, [px]
-            call .b
-            ld a, [py]
-            call .b
-            ld a, [mcount]
-            call .b
-            ld a, [mdx]
-            call .b
-            ld a, [mdy]
-            call .b
-            ld a, [moving]
-            call .b
-            ld a, [dash]
-            call .b
-            ld de, RF_OAM
-            ld b, 16
-.o:         ld a, [de]
-            inc e
-            call .b
-            dec b
-            jr nz, .o
-            ld a, c
-            and a
-            ret
-.b:         cp [hl]
-            jr z, .s
-            ld c, 1
-            ld [hl], a
-.s:         inc hl
-            ret
-
 ; RF_T's tile masked by RF_ROWS (the sprite is drawn upside down: tile row j at screen row 7 - j)
 ; into RF_STG + 16 RF_I
 rf_tile:    ld a, [RF_I]                    ; the source kept for this slot? (same tile, class)
@@ -937,25 +906,86 @@ rf_tile:    ld a, [RF_I]                    ; the source kept for this slot? (sa
             add a, low(RF_STG)
             ld e, a
             ld d, high(RF_STG)
-            ld c, 7                         ; tile row j: screen row 7 - j
-.t:         push hl
-            ld a, c
-            add a, low(RF_ROWS)
-            ld l, a
-            ld h, high(RF_ROWS)
-            ld b, [hl]
-            pop hl
+            ; tile row j: screen row 7 - j (unrolled)
+            ld a, [RF_ROWS + 7]
+            ld b, a
             ld a, [hl+]
             and b
             ld [de], a
-            inc de
+            inc e
             ld a, [hl+]
             and b
             ld [de], a
-            inc de
-            dec c
-            bit 7, c
-            jr z, .t
+            inc e
+            ld a, [RF_ROWS + 6]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [RF_ROWS + 5]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [RF_ROWS + 4]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [RF_ROWS + 3]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [RF_ROWS + 2]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [RF_ROWS + 1]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [RF_ROWS + 0]
+            ld b, a
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            and b
+            ld [de], a
             ret
 ; DE = the slot's kept source (RF_TD + 16 RF_I)
 rf_srcd:    ld a, [RF_I]
@@ -1171,33 +1201,6 @@ rf_corner:  ldh a, [maptype]                ; (towns: maptype 0, whole-tile wate
             ret nc
             inc d
             ret
-; C if fewer than half of the sprite's 64 pixels are over water (RF_ROWS' bits, counted by nibble)
-rf_half:    ld hl, RF_ROWS
-            ld c, 8
-            ld e, 0
-.r:         ld a, [hl]
-            and $0F
-            call .n
-            ld a, [hl+]
-            swap a
-            and $0F
-            call .n
-            dec c
-            jr nz, .r
-            ld a, e
-            cp 32
-            ret
-.n:         push hl
-            add a, low(rf_nib)
-            ld l, a
-            ld a, high(rf_nib)
-            adc a, 0
-            ld h, a
-            ld a, [hl]
-            add a, e
-            ld e, a
-            pop hl
-            ret
 rf_nib:     db 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4
 ; Z if the party's tiles (RF_OAM) are those the kept tiles were cut from (RF_SIG's copy)
 rf_pose:    ld hl, RF_OAM + 2
@@ -1354,3 +1357,1043 @@ section wram, $DA96
 rf_ckx:     ds 1                            ; rf_corner's last tile (x, y) and its result
 rf_cky:     ds 1
 rf_ckr:     ds 1
+
+section bank 111, $4B4F                     ; (free space)
+RF_ROWR    = $DC48          ; the right quarters' rows (rf_gat)
+rf_jhl:     jp hl
+; slot E (rf_mtc + E at HL) read: its metatile from the map (column (E & 3) - 1, row E / 4 from
+; the party's tile), its mask's address (RF_QLO / RF_QHI + E) and its four quarters' whole values
+; (RF_QUV + 4 E): the overworld's REFL_UNI (the plain Game Boy's + $200), a town's RF_TWAT.
+; B, C, E kept
+rf_qfill:   push bc
+            push de
+            push hl
+            ld a, e                         ; D = py + slot / 4, E = px + (slot & 3) - 1
+            srl a
+            srl a
+            ld d, a
+            ld a, [py]
+            add a, d
+            ld d, a
+            ld a, e
+            and 3
+            dec a
+            ld e, a
+            ld a, [px]
+            add a, e
+            ld e, a
+            ldh a, [cmask]
+            and e
+            ld e, a
+            ldh a, [cmask]
+            and d
+            ld d, a
+            call rw1
+            and $7F
+            pop hl
+            ld [hl], a
+            pop de
+            push de
+            ld c, a                         ; C = metatile
+            ld a, e
+            add a, low(RF_QLO)
+            ld l, a
+            ld h, high(RF_QLO)
+            ld a, c                         ; mask = REFL_MASK + 32 mt (+ $1000)
+            and 7
+            swap a
+            add a, a
+            ld [hl], a
+            ld a, l
+            add a, 16
+            ld l, a
+            ld a, c
+            srl a
+            srl a
+            srl a
+            add a, high(REFL_MASK)
+            ld b, a
+            ldh a, [is_cgb]
+            and a
+            jr nz, .c1
+            ld a, b
+            add a, $10
+            ld b, a
+.c1:        ld [hl], b
+            ld l, c                         ; HL = the whole values: 4 mt + table
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            ldh a, [maptype]
+            and a
+            ld de, RF_TWAT
+            jr z, .t
+            ld de, REFL_UNI
+            ldh a, [is_cgb]
+            and a
+            jr nz, .t
+            ld d, high(REFL_UNI) + 2
+.t:         add hl, de
+            pop de
+            push de
+            ld a, e
+            add a, a
+            add a, a
+            add a, low(RF_QUV)
+            ld e, a
+            ld d, high(RF_QUV)
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl]
+            ld [de], a
+            pop de
+            pop bc
+            ret
+RF_QLO     = $C0A0          ; the step's metatiles' mask addresses (16 + 16) and their quarters'
+RF_QHI     = $C0B0          ;   whole values (64): the 96 bytes after the OAM copy
+RF_QUV     = $C0C0
+; HL = the RF_P slot of an upper quarter (its lower one at + 4), C = first row, DE = 8 bytes:
+; the quarter's rows from C on, then the lower one's from its first
+rf_gat:     push hl
+            ld a, [hl+]
+            ld h, [hl]
+            add a, c
+            ld l, a
+            ld a, 8
+            sub c
+            ld b, a
+.u:         ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .u
+            pop hl
+            ld a, c
+            and a
+            ret z
+            ld a, l
+            add a, 4
+            ld l, a
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld b, c
+.l:         ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .l
+            ret
+rf_shj:     dw rf_sh0, rf_sh1, rf_sh2, rf_sh3, rf_sh4, rf_sh5, rf_sh6, rf_sh7
+rf_sh0:     ret                             ; (aligned: the left quarters' rows as they are)
+rf_sh1:     ; (left, right) << 1: the window's left byte
+            ld a, [RF_ROWS + 0]
+            ld h, a
+            ld a, [RF_ROWR + 0]
+            ld l, a
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 0], a
+            ld a, [RF_ROWS + 1]
+            ld h, a
+            ld a, [RF_ROWR + 1]
+            ld l, a
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 1], a
+            ld a, [RF_ROWS + 2]
+            ld h, a
+            ld a, [RF_ROWR + 2]
+            ld l, a
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 2], a
+            ld a, [RF_ROWS + 3]
+            ld h, a
+            ld a, [RF_ROWR + 3]
+            ld l, a
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 3], a
+            ld a, [RF_ROWS + 4]
+            ld h, a
+            ld a, [RF_ROWR + 4]
+            ld l, a
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 4], a
+            ld a, [RF_ROWS + 5]
+            ld h, a
+            ld a, [RF_ROWR + 5]
+            ld l, a
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 5], a
+            ld a, [RF_ROWS + 6]
+            ld h, a
+            ld a, [RF_ROWR + 6]
+            ld l, a
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 6], a
+            ld a, [RF_ROWS + 7]
+            ld h, a
+            ld a, [RF_ROWR + 7]
+            ld l, a
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 7], a
+            ret
+rf_sh2:     ; (left, right) << 2: the window's left byte
+            ld a, [RF_ROWS + 0]
+            ld h, a
+            ld a, [RF_ROWR + 0]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 0], a
+            ld a, [RF_ROWS + 1]
+            ld h, a
+            ld a, [RF_ROWR + 1]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 1], a
+            ld a, [RF_ROWS + 2]
+            ld h, a
+            ld a, [RF_ROWR + 2]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 2], a
+            ld a, [RF_ROWS + 3]
+            ld h, a
+            ld a, [RF_ROWR + 3]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 3], a
+            ld a, [RF_ROWS + 4]
+            ld h, a
+            ld a, [RF_ROWR + 4]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 4], a
+            ld a, [RF_ROWS + 5]
+            ld h, a
+            ld a, [RF_ROWR + 5]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 5], a
+            ld a, [RF_ROWS + 6]
+            ld h, a
+            ld a, [RF_ROWR + 6]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 6], a
+            ld a, [RF_ROWS + 7]
+            ld h, a
+            ld a, [RF_ROWR + 7]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 7], a
+            ret
+rf_sh3:     ; (left, right) << 3: the window's left byte
+            ld a, [RF_ROWS + 0]
+            ld h, a
+            ld a, [RF_ROWR + 0]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 0], a
+            ld a, [RF_ROWS + 1]
+            ld h, a
+            ld a, [RF_ROWR + 1]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 1], a
+            ld a, [RF_ROWS + 2]
+            ld h, a
+            ld a, [RF_ROWR + 2]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 2], a
+            ld a, [RF_ROWS + 3]
+            ld h, a
+            ld a, [RF_ROWR + 3]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 3], a
+            ld a, [RF_ROWS + 4]
+            ld h, a
+            ld a, [RF_ROWR + 4]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 4], a
+            ld a, [RF_ROWS + 5]
+            ld h, a
+            ld a, [RF_ROWR + 5]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 5], a
+            ld a, [RF_ROWS + 6]
+            ld h, a
+            ld a, [RF_ROWR + 6]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 6], a
+            ld a, [RF_ROWS + 7]
+            ld h, a
+            ld a, [RF_ROWR + 7]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 7], a
+            ret
+rf_sh4:     ; (left, right) << 4: the window's left byte
+            ld a, [RF_ROWS + 0]
+            ld h, a
+            ld a, [RF_ROWR + 0]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 0], a
+            ld a, [RF_ROWS + 1]
+            ld h, a
+            ld a, [RF_ROWR + 1]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 1], a
+            ld a, [RF_ROWS + 2]
+            ld h, a
+            ld a, [RF_ROWR + 2]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 2], a
+            ld a, [RF_ROWS + 3]
+            ld h, a
+            ld a, [RF_ROWR + 3]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 3], a
+            ld a, [RF_ROWS + 4]
+            ld h, a
+            ld a, [RF_ROWR + 4]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 4], a
+            ld a, [RF_ROWS + 5]
+            ld h, a
+            ld a, [RF_ROWR + 5]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 5], a
+            ld a, [RF_ROWS + 6]
+            ld h, a
+            ld a, [RF_ROWR + 6]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 6], a
+            ld a, [RF_ROWS + 7]
+            ld h, a
+            ld a, [RF_ROWR + 7]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 7], a
+            ret
+rf_sh5:     ; (left, right) << 5: the window's left byte
+            ld a, [RF_ROWS + 0]
+            ld h, a
+            ld a, [RF_ROWR + 0]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 0], a
+            ld a, [RF_ROWS + 1]
+            ld h, a
+            ld a, [RF_ROWR + 1]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 1], a
+            ld a, [RF_ROWS + 2]
+            ld h, a
+            ld a, [RF_ROWR + 2]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 2], a
+            ld a, [RF_ROWS + 3]
+            ld h, a
+            ld a, [RF_ROWR + 3]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 3], a
+            ld a, [RF_ROWS + 4]
+            ld h, a
+            ld a, [RF_ROWR + 4]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 4], a
+            ld a, [RF_ROWS + 5]
+            ld h, a
+            ld a, [RF_ROWR + 5]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 5], a
+            ld a, [RF_ROWS + 6]
+            ld h, a
+            ld a, [RF_ROWR + 6]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 6], a
+            ld a, [RF_ROWS + 7]
+            ld h, a
+            ld a, [RF_ROWR + 7]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 7], a
+            ret
+rf_sh6:     ; (left, right) << 6: the window's left byte
+            ld a, [RF_ROWS + 0]
+            ld h, a
+            ld a, [RF_ROWR + 0]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 0], a
+            ld a, [RF_ROWS + 1]
+            ld h, a
+            ld a, [RF_ROWR + 1]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 1], a
+            ld a, [RF_ROWS + 2]
+            ld h, a
+            ld a, [RF_ROWR + 2]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 2], a
+            ld a, [RF_ROWS + 3]
+            ld h, a
+            ld a, [RF_ROWR + 3]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 3], a
+            ld a, [RF_ROWS + 4]
+            ld h, a
+            ld a, [RF_ROWR + 4]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 4], a
+            ld a, [RF_ROWS + 5]
+            ld h, a
+            ld a, [RF_ROWR + 5]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 5], a
+            ld a, [RF_ROWS + 6]
+            ld h, a
+            ld a, [RF_ROWR + 6]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 6], a
+            ld a, [RF_ROWS + 7]
+            ld h, a
+            ld a, [RF_ROWR + 7]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 7], a
+            ret
+rf_sh7:     ; (left, right) << 7: the window's left byte
+            ld a, [RF_ROWS + 0]
+            ld h, a
+            ld a, [RF_ROWR + 0]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 0], a
+            ld a, [RF_ROWS + 1]
+            ld h, a
+            ld a, [RF_ROWR + 1]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 1], a
+            ld a, [RF_ROWS + 2]
+            ld h, a
+            ld a, [RF_ROWR + 2]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 2], a
+            ld a, [RF_ROWS + 3]
+            ld h, a
+            ld a, [RF_ROWR + 3]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 3], a
+            ld a, [RF_ROWS + 4]
+            ld h, a
+            ld a, [RF_ROWR + 4]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 4], a
+            ld a, [RF_ROWS + 5]
+            ld h, a
+            ld a, [RF_ROWR + 5]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 5], a
+            ld a, [RF_ROWS + 6]
+            ld h, a
+            ld a, [RF_ROWR + 6]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 6], a
+            ld a, [RF_ROWS + 7]
+            ld h, a
+            ld a, [RF_ROWR + 7]
+            ld l, a
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            ld [RF_ROWS + 7], a
+            ret
+
+section bank 111, $4560                     ; (free space)
+RF_QMXL    = $DC36          ; rf_q4: the metatile slots' columns / rows (x 4), quarter bits
+RF_QMXR    = $DC37
+RF_QMYT    = $DC38
+RF_QMYB    = $DC39
+RF_QKT     = $DC3A
+RF_SX      = $DC3B          ; the step's offset this frame (x, y: rf_sxy)
+RF_SY      = $DC3C
+RF_QKL     = $DC3D
+RF_QUA     = $DC3E
+; the step's pixels this frame for x and y (refl_st with rf_la 0, once a frame)
+rf_sxy:     ld a, [moving]
+            and a
+            jr z, .z
+            ld a, [mdx]
+            call .m
+            ld [RF_SX], a
+            ld a, [mdy]
+            call .m
+            ld [RF_SY], a
+            ret
+.z:         ld [RF_SX], a
+            ld [RF_SY], a
+            ret
+.m:         and a
+            ret z
+            bit 7, a
+            ld a, [mcount]
+            ret z
+            cpl
+            inc a
+            ret
+; the sprite's four quarters (RF_QX / RF_QY: upper left): RF_P (UL, UR, LL, LR mask rows), A = their
+; common whole value, or 1 (plain Game Boy pace, 2026-11-26: from the step's slots at once)
+rf_q4:      ld a, [RF_QX]
+            sra a
+            inc a
+            cp 4
+            jr nc, rf_q4s
+            ld [RF_QMXL], a
+            ld a, [RF_QX]
+            inc a
+            sra a
+            inc a
+            cp 4
+            jr nc, rf_q4s
+            ld [RF_QMXR], a
+            ld a, [RF_QY]
+            sra a
+            cp 4
+            jr nc, rf_q4s
+            add a, a
+            add a, a
+            ld [RF_QMYT], a
+            ld a, [RF_QY]
+            inc a
+            sra a
+            cp 4
+            jr nc, rf_q4s
+            add a, a
+            add a, a
+            ld [RF_QMYB], a
+            ld a, [RF_QY]
+            and 1
+            add a, a
+            ld [RF_QKT], a
+            ld a, [RF_QX]
+            and 1
+            ld [RF_QKL], a
+            ld hl, RF_P                     ; upper left
+            ld a, [RF_QMYT]
+            ld e, a
+            ld a, [RF_QMXL]
+            add a, e
+            ld e, a
+            ld a, [RF_QKT]
+            ld d, a
+            ld a, [RF_QKL]
+            or d
+            ld d, a
+            call rf_q1
+            ld [RF_QUA], a
+            ld hl, RF_P + 2                 ; upper right
+            ld a, [RF_QMYT]
+            ld e, a
+            ld a, [RF_QMXR]
+            add a, e
+            ld e, a
+            ld a, [RF_QKL]
+            xor 1
+            ld d, a
+            ld a, [RF_QKT]
+            or d
+            ld d, a
+            call rf_q1
+            call .ua
+            ld hl, RF_P + 4                 ; lower left
+            ld a, [RF_QMYB]
+            ld e, a
+            ld a, [RF_QMXL]
+            add a, e
+            ld e, a
+            ld a, [RF_QKT]
+            xor 2
+            ld d, a
+            ld a, [RF_QKL]
+            or d
+            ld d, a
+            call rf_q1
+            call .ua
+            ld hl, RF_P + 6                 ; lower right
+            ld a, [RF_QMYB]
+            ld e, a
+            ld a, [RF_QMXR]
+            add a, e
+            ld e, a
+            ld a, [RF_QKT]
+            xor 2
+            ld d, a
+            ld a, [RF_QKL]
+            xor 1
+            or d
+            ld d, a
+            call rf_q1
+            call .ua
+            ld a, 1
+            ld [RF_QF], a
+            ld a, [RF_QUA]
+            ret
+.ua:        ld b, a
+            ld a, [RF_QUA]
+            cp b
+            ret z
+            ld a, 1
+            ld [RF_QUA], a
+            ret
+RF_QF      = $DC3F          ; 1: rf_q4 took the step's slots (its codes can be kept)
+RF_PPL     = $DC6E          ; low byte of the sprite's 4 mask row pointers (page $DC: RF_P or
+                            ;   its memo's)
+; per sprite (RF_MEMO + 10 i: $DCE0 / $DCEA / $DCF4 / $DC58): key (QX + 2, QY << 4), RF_UA, the 4
+; pointers, last frame's for the same quarters (7 frames in 8 of a step)
+rf_mbase:   db $E0, $EA, $F4, $58
+RF_MEMO    = $DCE0
+; rf_q4 for sprite RF_I, kept between frames: A = whole value, RF_PPL its pointers
+rf_q4m:     ld a, [RF_QY]
+            swap a
+            ld b, a
+            ld a, [RF_QX]
+            add a, 2
+            and $0F
+            or b
+            ld b, a                         ; B = key
+            ld a, [RF_I]
+            add a, low(rf_mbase)
+            ld l, a
+            ld a, high(rf_mbase)
+            adc a, 0
+            ld h, a
+            ld l, [hl]
+            ld h, high(RF_MEMO)
+            ld a, [hl]
+            cp b
+            jr nz, .miss
+            inc l
+            ld a, [hl+]
+            ld c, a
+            ld a, l
+            ld [RF_PPL], a
+            ld a, c
+            ret
+.miss:      push hl
+            push bc
+            call rf_q4
+            pop bc
+            pop hl
+            ld c, a                         ; (A: the whole value)
+            ld a, [RF_QF]
+            and a
+            jr nz, .k
+            ld a, low(RF_P)                 ; (not from the slots: not kept)
+            ld [RF_PPL], a
+            ld a, $FF
+            ld [hl], a
+            ld a, c
+            ret
+.k:         ld [hl], b
+            inc l
+            ld [hl], c
+            inc l
+            ld a, l
+            ld [RF_PPL], a
+            ld de, RF_P
+            ld b, 8
+.cp:        ld a, [de]
+            inc e
+            ld [hl+], a
+            dec b
+            jr nz, .cp
+            ld a, c
+            ret
+; slot E, quarter D (bit 0 column, bit 1 row): its mask rows' address into [HL] (2 bytes), A =
+; its whole value
+rf_q1:      push hl
+            ld a, e
+            add a, low(rf_mtc)
+            ld l, a
+            ld h, high(rf_mtc)
+            ld a, [hl]
+            inc a
+            call z, rf_qfill
+            ld a, e
+            add a, a
+            add a, a
+            add a, d
+            add a, low(RF_QUV)
+            ld l, a
+            ld h, high(RF_QUV)
+            ld b, [hl]
+            ldh a, [maptype]
+            and a
+            jr z, .tw
+            ld a, e
+            add a, low(RF_QLO)
+            ld l, a
+            ld a, d
+            add a, a
+            add a, a
+            add a, a
+            add a, [hl]
+            ld c, a
+            ld a, l
+            add a, 16
+            ld l, a
+            ld a, [hl]
+            pop hl
+            ld [hl], c
+            inc hl
+            ld [hl], a
+            ld a, b
+            ret
+.tw:        pop hl                          ; (a town: whole rows)
+            ld a, b
+            and a
+            jr nz, .tf
+            ld [hl], low(RF_ROWS00)
+            inc hl
+            ld [hl], high(RF_ROWS00)
+            ret
+.tf:        ld [hl], low(RF_ROWSFF)
+            inc hl
+            ld [hl], high(RF_ROWSFF)
+            ret
+; (beyond the step's slots: each quarter through rf_qp)
+rf_q4s:     xor a
+            ld [RF_QF], a
+            ld de, RF_P
+            ld b, 0
+            ld a, $FE                       ; (RF_UA: the quarters' common whole value, or 1)
+            ld [RF_UA], a
+.p:         push bc
+            push de
+            ld a, [RF_QX]
+            bit 0, b
+            jr z, .p1
+            inc a
+.p1:        ld c, a
+            ld a, [RF_QY]
+            bit 1, b
+            jr z, .p2
+            inc a
+.p2:        ld b, a
+            call rf_qp
+            ld b, a                         ; (all four alike and whole, or not)
+            ld a, [RF_UA]
+            cp $FE
+            jr z, .pu
+            cp b
+            jr z, .pv
+            ld b, 1
+.pu:        ld a, b
+            ld [RF_UA], a
+.pv:        pop de
+            ld a, l
+            ld [de], a
+            inc e
+            ld a, h
+            ld [de], a
+            inc e
+            pop bc
+            inc b
+            ld a, b
+            cp 4
+            jr c, .p
+            ld a, [RF_UA]
+            ret
+
+section bank 111, $4F89                     ; (free space)
+; Z if nothing the tiles depend on changed since they were made (the party's place and step,
+; the sprites' places and tiles); the new values kept
+rf_sig:     ld hl, RF_SIG
+            ld c, 0                         ; C: a difference
+            ld de, px
+            ld b, 2
+            call .r
+            ld de, mcount                   ; (mcount, mdx, mdy)
+            ld b, 3
+            call .r
+            ld de, moving
+            ld b, 1
+            call .r
+            ld de, dash
+            ld b, 1
+            call .r
+            ld de, RF_OAM
+            ld b, 16
+            call .r
+            ld a, c
+            and a
+            ret
+.r:         ld a, [de]
+            inc de
+            cp [hl]
+            jr z, .n
+            ld [hl], a
+            ld c, 1
+.n:         inc hl
+            dec b
+            jr nz, .r
+            ret
