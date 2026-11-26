@@ -1425,6 +1425,9 @@ all water in step (DMG copies in idle H-Blanks), the Magic screen's picture kept
 screen with repeat and MP / item counts shown, reflections smooth again and cheaper on DMG, a window colour per save file,
 the airship's view as one even tilt over the whole screen (interrupts only on the lines that change). DMG black loads not done
 (owner: only if not longer; they would be about 3x).
+Then (item 63): DMG transitions to white instead of black (wipe curtains, palette cycles; SGB / Color keep black), the file
+screen's per-file gradient, battle name lookups guarded (the owner's "o&" window, not reproduced), the reflection's corner fade
+looking at the step's end; the "chopped head" on corner tiles not reproduced (screenshot asked for).
 
 ## Remaining
 - **FF1 (native build), before release:**
@@ -1433,8 +1436,10 @@ the airship's view as one even tilt over the whole screen (interrupts only on th
     test builds that jump there). In progress (2026-11-26).
   - Real hardware tests: the owner runs `docs/ff1-hardware-tests.md` (DMG, Pocket, SGB, CGB,
     GBA) and reports back.
-  - Black loads on the plain Game Boy: not done (owner, 2026-11-26: only if they do not make
-    loads longer; they need the screen on while loading, about 3x the load time).
+  - Black loads on the plain Game Boy: not done (they would take about 3x the load time); instead
+    its transitions now go to white (owner, 2026-11-26).
+  - Open reports, not reproduced: a stray "o&" window in battle (lookups guarded), the reflection
+    chopping the head when turning on a corner tile.
   - Known limits: SGB window frames stay blue (hardware: a frame tile holds one palette); on the
     plain Game Boy about 1% of coastal walking frames show the reflection a frame out of step.
 - Lot Check (`docs/gb-release-checks.md`): met in emulators for the native build (strict

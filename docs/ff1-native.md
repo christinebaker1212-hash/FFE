@@ -1136,3 +1136,17 @@ one reaches parity, so the owner can keep playing).
       line 56 on the plain Game Boy, no repeated frames; strict checker 0 on DMG / CGB / SGB.
     - Not done: black loads on the plain Game Boy (the owner: only if they do not make loads longer; they need
       the screen on while loading, about three times the load time).
+63. Owner (2026-11-26, after item 62).
+    - Plain Game Boy: transitions that went to black go to white, as its loads: the town / stairs wipe's curtains
+      (BGP 0 on their lines, the band in the scene's shades) and the palette cycle before shops, the world map and
+      the puzzle (to white and back). The Super Game Boy and the Color keep black, as their masked loads. (The world
+      map itself is drawn on black, a screen, not a transition: unchanged.)
+    - File screen (Color): each file shows its own gradient choice with its colour (a ramp per file, flat when that
+      file was saved with the gradient off; empty files the current colour and choice), following the fades.
+    - Battle: name and message lookups guarded (an enemy slot past 8, an enemy id past 127, an attack id past the
+      92 names, a party target past 3, a message number outside 1-80 give no window), for the owner's stray "o&"
+      window; not reproduced in some 200,000 frames of random battles.
+    - Reflection: stepping down or sideways, the shore-corner fade looks at the tile below the step's end (it came
+      up whole, then faded once the step ended).
+    - Not reproduced: the reflection "chopping the head" when turning sideways on a corner tile (turns there show
+      the new pose in the next frame, rows consistent); a screenshot / place asked for.
