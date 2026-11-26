@@ -15,11 +15,21 @@ import data, minimap, sgb, text, talkconst, ui, names, battle, sound
 COMMON, TS_BANK0, MAP_BANK0, OW_TS, OW_INFO, OW_ROWS, ROM_BANKS = 1, 8, 20, 16, 81, 84, 128
 
 
+PLACED = {}
+
+
 def place(banks, bank, addr, blob):
     b = banks.setdefault(bank, bytearray(b'\xff' * 0x4000))
     o = addr - 0x4000
     assert o + len(blob) <= 0x4000, 'bank %d overflow at %04X' % (bank, addr)
+    for a0, a1 in PLACED.get(bank, []):              # (no two blobs over each other: the
+        if a0 < addr + len(blob) and addr < a1:     #   overworld's font table sat on the
+            OVERLAPS.append((bank, addr, len(blob), a0, a1))  # DMG vehicle tiles' last 16)
+    PLACED.setdefault(bank, []).append((addr, addr + len(blob)))
     b[o:o + len(blob)] = blob
+
+
+OVERLAPS = []
 
 
 DIS = os.path.join(ROOT, 'build', 'ref', 'FF1Disassembly', 'Final Fantasy Disassembly')
@@ -235,7 +245,8 @@ def data_banks(rom, ff3=None, init=None):
     wt2_blob, wt2_src = town_water2(rom)                         # (its canal in shadow)
     place(banks, WT2_BANK, 0x4000, wt2_blob)
     place(banks, OW_INFO, 0x7400, o['veh_cgb'])                # vehicle sprites (FF1 OW objects)
-    place(banks, OW_INFO, 0x7A00, o['veh_dmg'])
+    assert 0x5800 + len(o['dmg_tiles']) <= 0x6A00
+    place(banks, OW_INFO, 0x6A00, o['veh_dmg'])                # (not $7A00: the font table's $7F00)
     fix = rom.prg[-0x4000:]                                     # FF1's vehicle sprite tables
     place(banks, OW_INFO, 0x5070, fix[0xE3F9 - 0xC000:0xE3F9 - 0xC000 + 9])   # lut_VehicleSprY
     place(banks, OW_INFO, 0x5080, fix[0xE4A6 - 0xC000:0xE4A6 - 0xC000 + 9])   # facing offsets
@@ -286,6 +297,7 @@ def data_banks(rom, ff3=None, init=None):
         place(banks, b, 0x5100, p['mt_dmg_out'])
         place(banks, b, 0x5300, p['mt_dmg_in'])
         place(banks, b, 0x5800, p['dmg_tiles'])
+    assert not OVERLAPS, ["bank %d $%04X+%d over $%04X-$%04X" % ov for ov in OVERLAPS]
     return banks
 
 

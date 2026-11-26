@@ -273,7 +273,8 @@ refl_t9:    ld a, [tl_lc]                   ; (a tall map's 8 x 16 frame: none; 
             jr nz, .off
             ldh a, [maptype]                ; (built in RF_OAM, then put in the OAM copy in
             and a                           ;   one go: a V-Blank during the work shows the
-            jr nz, .ow                      ;   last frame's, never a half-made one)
+            jr nz, .off                     ;   last frame's, never a half-made one. The
+                                            ;   overworld: none; owner, 2026-11-26)
             ld a, [cur_map]                 ; (standard maps: the towns, 0-7; owner,
             cp 8                            ;   2026-11-25)
             jr nc, .off

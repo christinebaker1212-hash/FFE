@@ -1428,6 +1428,8 @@ the airship's view as one even tilt over the whole screen (interrupts only on th
 Then (item 63): DMG transitions to white instead of black (wipe curtains, palette cycles; SGB / Color keep black), the file
 screen's per-file gradient, battle name lookups guarded (the owner's "o&" window, not reproduced), the reflection's corner fade
 looking at the step's end; the "chopped head" on corner tiles not reproduced (screenshot asked for).
+Then (item 64): no reflections on the overworld (towns keep theirs); the DMG canoe / vehicle tiles $60-$6F restored (the
+overworld bank's font table had been placed over them; build.py place() now refuses overlaps).
 
 ## Remaining
 - **FF1 (native build), before release:**
@@ -1438,8 +1440,8 @@ looking at the step's end; the "chopped head" on corner tiles not reproduced (sc
     GBA) and reports back.
   - Black loads on the plain Game Boy: not done (they would take about 3x the load time); instead
     its transitions now go to white (owner, 2026-11-26).
-  - Open reports, not reproduced: a stray "o&" window in battle (lookups guarded), the reflection
-    chopping the head when turning on a corner tile.
+  - Open report, not reproduced: a stray "o&" window in battle (lookups guarded). (The corner-tile
+    reflection report is moot: no reflections on the overworld now.)
   - Known limits: SGB window frames stay blue (hardware: a frame tile holds one palette); on the
     plain Game Boy about 1% of coastal walking frames show the reflection a frame out of step.
 - Lot Check (`docs/gb-release-checks.md`): met in emulators for the native build (strict

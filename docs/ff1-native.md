@@ -1150,3 +1150,8 @@ one reaches parity, so the owner can keep playing).
       up whole, then faded once the step ended).
     - Not reproduced: the reflection "chopping the head" when turning sideways on a corner tile (turns there show
       the new pose in the next frame, rows consistent); a screenshot / place asked for.
+64. Owner (2026-11-26, last).
+    - No reflections on the overworld (on foot or in a vehicle); towns keep theirs.
+    - Plain Game Boy / Super Game Boy: the canoe was invisible facing sideways, and the last 16 vehicle tiles ($60-$6F)
+      were blank: the overworld bank's font table ($7F00) had been placed over the DMG vehicle tiles ($7A00-$7FFF).
+      They moved to $6A00; build.py place() now refuses two blobs over each other (this was the only overlap).
