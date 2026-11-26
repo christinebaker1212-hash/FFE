@@ -268,7 +268,10 @@ section bank 111, $4000
 ; strengths: the Color blends its colours into the sea's, the plain Game Boy / SGB lighten
 ; OBP1), and on a sideways step each half of it is shown only over water: it slips into the
 ; shore column by column while it fades.
-refl_t9:    ldh a, [maptype]                ; (built in RF_OAM, then put in the OAM copy in
+refl_t9:    ld a, [tl_lc]                   ; (a tall map's 8 x 16 frame: none; tall.s)
+            and a
+            jr nz, .off
+            ldh a, [maptype]                ; (built in RF_OAM, then put in the OAM copy in
             and a                           ;   one go: a V-Blank during the work shows the
             jr nz, .ow                      ;   last frame's, never a half-made one)
             ld a, [cur_map]                 ; (standard maps: the towns, 0-7; owner,
@@ -1111,11 +1114,16 @@ section bank 0, $2E6D                       ; (free space)
 rf_dma:     call hram_dma
             jp rf_vbu
 section bank 0, $16CB                       ; (free space)
-rf_vbu:     ld a, [rf_pend]
+rf_vbu:     ldh a, [tl_mt]                  ; (a tall map: rf_vb9 every V-Blank, its sprite
+            cp 2                            ;   size and line handler; otherwise only for the
+            jr z, rf_vbt                    ;   reflection's masked tiles)
+            ld a, [rf_pend]
             and a
             ret z
-            ld a, REFL_BANK
-            ld hl, rf_up9
+            jr rf_vbt
+section bank 0, $1692                       ; (free space)
+rf_vbt:     ld a, REFL_BANK
+            ld hl, rf_vb9
             jp bank_call
 
 section bank 111, $4A10                     ; (free space)
@@ -2397,3 +2405,26 @@ rf_sig:     ld hl, RF_SIG
             dec b
             jr nz, .r
             ret
+
+section bank 111, $47D0                     ; (free space)
+; V-Blank after the OAM: a tall map's sprite size and line handler (tall.s tl_vb9), then the
+; reflection's masked tiles
+rf_vb9:     ldh a, [tl_mt]
+            cp 2
+            jr nz, .r
+            ldh a, [is_cgb]                 ; (the plain Game Boy: only when the size changes)
+            and a
+            jr nz, .t
+            ldh a, [rLCDC]
+            and 4
+            ld b, a
+            ld a, [tl_lc]
+            cp b
+            jr z, .r
+.t:         ld a, TALL_BANK
+            ld hl, tl_vb9
+            call bank_call
+.r:         ld a, [rf_pend]
+            and a
+            ret z
+            jp rf_up9

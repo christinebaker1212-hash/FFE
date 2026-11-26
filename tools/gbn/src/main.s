@@ -672,7 +672,7 @@ obj_tiles:  ldh a, [maptype]
             ld a, e
             and $F0
             ld e, a
-            ld bc, 256
+            call ot_bc                      ; (256 bytes a block; a tall map's 384)
             call memcpy
             pop de
             inc de
@@ -1373,9 +1373,9 @@ kern_ts:    ld hl, scr_buf + 17
             jp pen_str
 
 ; ---- party sprite (FF1's 2x2 tables: tile, attributes for UL, DL, UR, DR)
-make_oam:   ldh a, [maptype]                ; the overworld: vehicles
+make_oam:   ldh a, [tl_mt]                  ; the overworld: vehicles; a tall map: tall.s
             and a
-            jp nz, veh_oam
+            jp nz, mo_hook
 make_oam_f: ld a, COMMON
             call sbank
             ld a, [facing]
@@ -3298,22 +3298,16 @@ wp_vbl:     xor a                           ; (the window enabled all frame, sho
             ldh [rWX], a
             ret
 ; the screen black before FF1's palette cycle in (LCD off)
-pc_black:   ld a, 1
-            ld [pc_hold], a
-            call oam_clr
-            ld a, $FF
-            call bgp_w
-            ldh a, [is_cgb]
+pc_black:   ld a, TALL_BANK                 ; (tall.s pc_black9)
+            ld hl, pc_black9
+            jp bank_call
+; make_oam on the overworld (its vehicles) or a tall map (tall.s: 8 x 16 people)
+mo_hook:    ldh a, [maptype]
             and a
-            ret z
-            ld a, $80
-            call bcps_w
-            ld b, 32
-            xor a
-.c:         call bcpd_w
-            dec b
-            jr nz, .c
-            ret
+            jp nz, veh_oam
+            ld a, TALL_BANK
+            ld hl, tall_oam
+            jp bank_call
 
 ; V-Blank with a WX list: the window enabled but out of sight (WX 167: its line counter
 ; waits), the first entry's line
@@ -3363,6 +3357,7 @@ section bank 0, $3C00                       ; (masked loads)
 lcd_off:    call gr_off                     ; (the windows' gradient off, its windows gone)
             xor a
             ld [gr_wn], a
+            ld [tl_lc], a                   ; (a tall map's 8 x 16 frames end: tall.s)
             ld a, [bn_t]                    ; (the place-name banner: gone)
             and a
             jr z, .nb
@@ -4461,8 +4456,10 @@ ps_next:    ld a, [SHOW_WHO]
             jr z, .qe
             call wait_vbl
             jr .q
-.qe:        ld hl, pal_ob + 4               ; (the Color: the colours shown now kept: the new
-            ld de, $C200                    ;   ones go up with the last tiles; the queue's ring,
+.qe:        ld a, 1                         ; (tall.s: V-Blank's palette work held, its time
+            ld [tl_hold], a                 ;   for the copy)
+            ld hl, pal_ob + 4               ; (the Color: the colours shown now kept: the new
+            ld de, $C3C0                    ;   ones go up with the last tiles; the queue's ring,
             ld a, [hl+]                     ;   empty, holds the copies)
             ld [de], a
             inc e
@@ -4481,38 +4478,39 @@ ps_next:    ld a, [SHOW_WHO]
             xor a
             ld [ps_dh], a
             ld hl, pal_ob + 4               ; (its colours aside, the shown ones back)
-            ld de, $C200
+            ld de, $C3C0
             call .sw
             ld hl, pal_ob + 12
             call .sw
-            ld de, $C2EC                    ; the copy order at $C2EC: the 12 tiles not on screen,
-            ld c, 0                         ;   then the four on screen (OAM entries 0-3)
-.t:         call .vis
+            ld a, [tl_map]                  ; (a tall map: its pairs too, made from the copy
+            and a                           ;   into $C200-$C37F; tall.s)
+            jr z, .np
+            ld a, $C1
+            ld [tl_sh], a
+            ld de, $C200
+            ld a, TALL_BANK
+            ld hl, tl_pgen
+            call bank_call
+.np:        ld de, $C380                    ; the copy order at $C380: the tiles not on screen,
+            ld c, 0                         ;   then the four on screen (OAM entries 0-3; a tall
+.t:         call .vis                       ;   map's 8 x 16 frame: the two pairs)
             jr nz, .tn
             ld a, c
-            swap a
             ld [de], a
             inc e
-.tn:        inc c
-            ld a, c
-            cp 16
+.tn:        call .nxt
             jr c, .t
-            ld b, 0
-.fa:        ld a, b
-            add a, a
-            add a, a
-            add a, 2
-            ld l, a
-            ld h, high(oam_buf)
-            ld a, [hl]
-            swap a
+            ld c, 0
+.t2:        call .vis
+            jr z, .tm
+            ld a, c
             ld [de], a
             inc e
-            inc b
-            ld a, b
-            cp 4
-            jr c, .fa
-            ld bc, $C2EC                    ; four tiles a V-Blank: the picture on screen changes
+.tm:        call .nxt
+            jr c, .t2
+            ld a, $FF
+            ld [de], a
+            ld bc, $C380                    ; four tiles a V-Blank: the picture on screen changes
 .fw:        call wait_vbl                   ;   at once in the last one (the plain Game Boy's
             di                              ;   V-Blank work ends by line 148: about 400 cycles
             ldh a, [rLY]                    ;   of copying left to fit)
@@ -4521,41 +4519,62 @@ ps_next:    ld a, [SHOW_WHO]
             jr c, .fc
             ei
             jr .fw
-.fc:        ld a, [bc]
+.fc:        ld a, [bc]                      ; tile T: $C100 + 16 T -> $8000 + 16 T
+            push bc
+            swap a
+            ld l, a
+            and $0F
+            ld h, a
+            ld a, l
+            and $F0
             ld l, a
             ld e, a
-            ld h, $C1
-            ld d, $80
+            ld a, h
+            add a, $80
+            ld d, a
+            ld a, h
+            add a, $C1
+            ld h, a
             call ps_cp16
+            pop bc
             inc c
+            ld a, [bc]
+            cp $FF
+            jr z, .fd
             ld a, c
             and 3
             jr nz, .fc
-            ld a, c
-            cp low($C2FC)
-            jr z, .fd
             ei
             jr .fw
 .fd:
             ldh a, [is_cgb]
             and a
             jr z, .fx
-            ld hl, $C200                    ; the new colours: hardware and shadow
+            ld hl, $C3C0                    ; the new colours: hardware and shadow
             ld de, pal_ob + 4
             ld a, $84
             call .pc
             ld de, pal_ob + 12
             ld a, $8C
             call .pc
-.fx:        ei
+.fx:        xor a                           ; (tall.s: V-Blank's palette work again)
+            ld [tl_hold], a
+            ei
             ret
-; NZ if tile C is one of the party's four on screen (OAM entries 0-3)
+; NZ if tile C is one of the party's four on screen (OAM entries 0-3; 8 x 16: tiles T, T + 1)
 .vis:       ld hl, oam_buf + 2
             ld b, 4
 .vl:        ld a, [hl]
             cp c
             jr z, .vy
-            inc l
+            ld a, [tl_lc]
+            and a
+            jr z, .vn
+            ld a, [hl]
+            or 1
+            cp c
+            jr z, .vy
+.vn:        inc l
             inc l
             inc l
             inc l
@@ -4564,6 +4583,16 @@ ps_next:    ld a, [SHOW_WHO]
             xor a
             ret
 .vy:        or 1
+            ret
+; the next tile: C set while below 16 (40 on a tall map)
+.nxt:       inc c
+            ld a, [tl_map]
+            and a
+            ld a, c
+            jr nz, .n4
+            cp 16
+            ret
+.n4:        cp 40
             ret
 ; swap 2 bytes at HL (pal_ob) and DE (the copy)
 .sw:        ld b, 2

@@ -449,10 +449,8 @@ stat_int:   push af
             ld a, [wp_on]                   ; (a screen wipe: the band's edges)
             and a
             jr nz, .wp
-            ld a, [gr_on]                   ; (the windows' gradient: loc.s)
-            and a
-            jp nz, stat_gr
-            ldh a, [rLCDC]                  ; (a request left pending while the LCD went off:
+            jp stat_grt                     ; (the windows' gradient: loc.s; a tall map's bands)
+.lc:        ldh a, [rLCDC]                  ; (a request left pending while the LCD went off:
             bit 7, a                        ;   it stays off)
             jr z, .off
 .hb:        ldh a, [rSTAT]                  ; (the cut's LYC is the line before: the window

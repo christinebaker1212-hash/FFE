@@ -156,6 +156,10 @@ def ui_strings():
 
 def town_refl_base(p):
     """the first 8 sprite tiles no object, font or map tile of map pack p uses (0: none)"""
+    if p['objs']['tall']:                            # (a tall map: party 0-39, 24-tile blocks)
+        b = 40 + 24 * len(p['objs']['blocks'])
+        b = (b + 7) & ~7
+        return b if b + 8 <= 128 else 0
     bl = set(p['objs']['blocks']); nb = p['n_dmg']; ft = set(p['font_tbl']) - {0}
     lo = [b for b in range(16, 128, 16) if b not in bl]
     hi = [b for b in range(128, 256, 8) if all(b + k >= nb and b + k not in ft and
@@ -166,6 +170,7 @@ def town_refl_base(p):
 def data_banks(rom, ff3=None, init=None):
     banks = {}
     data.FONT_CODES = text.field_codes()
+    data.TALL = data.tall_maps(rom)
     c = data.common_pack(rom)
     place(banks, COMMON, 0x4000, c['spr_tiles'])
     place(banks, COMMON, 0x4100, c['mapman'])
@@ -273,7 +278,7 @@ def data_banks(rom, ff3=None, init=None):
         ob = p['objs']
         place(banks, b, 0x7300, ob['slots'].ljust(64, b'\0'))      # 15 x (id, x+flags, y, tile)
         place(banks, b, 0x7340, ob['blocks'].ljust(16, b'\0'))     # tile bases of the blocks
-        place(banks, b, 0x7350, bytes([len(ob['blocks'])]))
+        place(banks, b, 0x7350, bytes([len(ob['blocks']), 1 if ob['tall'] else 0]))  # (+1: tall)
         place(banks, b, 0x6800, ob['dmg'])                         # DMG object tiles (pre-shaded)
         place(banks, b, 0x7400, ob['cgb'])                          # CGB object tiles (raw)
         place(banks, b, 0x7F00, p['font_tbl'])                     # DMG font code -> tile
@@ -413,6 +418,22 @@ def town_water2(rom):
         hdr += bytes([a & 255, a >> 8, b, 0, c & 255, c >> 8, d, 0])
     src = 'section bank 99, $4A80\nWT2_HDR:\n' + '            db %s\n' % ', '.join('$%02X' % v for v in hdr)
     return bytes(blob), src
+
+
+def tall_source(rom):
+    """the tall maps' tables (src/tall.s, bank 113): FF1's frame tables re-laid as pairs"""
+    c = data.common_pack(rom)
+    pairs, ot16, ot8 = data.tall_pairs(c['objtbl'])
+    pp, pt16, pt8 = data.tall_pairs(c['mapman'])
+    assert pp == pairs
+    pt16 = bytes(v + 16 if i % 2 == 0 else v for i, v in enumerate(pt16))      # (party pairs at 16)
+    db = lambda name, b: name + ':\n' + ''.join('            db %s\n' % ', '.join('$%02X' % v for v in b[i:i + 16])
+                                              for i in range(0, len(b), 16))
+    rev = bytes(int('{:08b}'.format(i)[::-1], 2) for i in range(256))
+    return ('section bank 113, $7000\n' + db('TL_PT8', c['mapman']) + 'section bank 113, $7100\n' +
+            db('TL_PT16', pt16) + 'section bank 113, $7200\n' + db('TL_OT8', ot8) +
+            'section bank 113, $7300\n' + db('TL_OT16', ot16) + 'section bank 113, $7400\n' +
+            db('TL_PAIRS', bytes(v for p in pairs for v in p)) + 'section bank 113, $7F00\n' + db('TL_REV', rev))
 
 
 def refl_source(rom):
@@ -655,6 +676,7 @@ def main():
     data.FONT_CODES = text.field_codes()            # (before the sources: refl_source's town
                                                     #   table reads the maps' fonts; without it
                                                     #   Onrac had no tiles: owner's list, 2026-11-26)
+    data.TALL = data.tall_maps(rom)                  # (tall maps: 8 x 16 people; data.map_objects)
     ff3 = names.ff3_rom(a[a.index('--ff3') + 1] if '--ff3' in a else None)
     init = None                                  # --init ADDR=VAL,.. (save page offsets $000-$3FF)
     if '--init' in a:
@@ -684,6 +706,7 @@ def main():
            open(os.path.join(HERE, 'src', 'shop.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'ul.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'pal.s')).read() + '\n' + refl_source(rom) + '\n' + town_water2(rom)[1] + '\n' +
+           open(os.path.join(HERE, 'src', 'tall.s')).read() + '\n' + tall_source(rom) + '\n' +
            open(os.path.join(HERE, 'src', 'btl.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl2.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl3.s')).read() + '\n' +

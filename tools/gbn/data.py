@@ -343,12 +343,59 @@ def spr_rank_tile(t16, pal):
     return gb_tile(t16, rank)
 
 
+# ---- tall maps (owner, 2026-11-26: all Twelve Sages at once): a map with more than 9 objects in
+# one view (10 x 9 metatiles) draws its people as 8 x 16 sprites whenever more than the 8 x 8
+# budget is in view. A 16 x 16 frame is then two columns, each a top / bottom tile pair; FF1's
+# walking frames flip the legs alone, so a pair holds the bottom tile pre-flipped where the frame
+# flips it against the top. PAIRS: (top tile, bottom tile, bottom flipped against the top) for
+# FF1's 2 x 2 frame tables (C_OBJTBL / C_MAPMAN, same layout): 12 pairs, 24 tiles a picture.
+TALL = []                                       # (set by build.py: tall_maps)
+
+
+def tall_maps(rom):
+    out = []
+    for m in range(N_MAPS):
+        raw = rom.rd(BANK_SMINFO, MAP_OBJECTS + 0x30 * m, 45)
+        objs = [(raw[3 * i + 1] & 0x3F, raw[3 * i + 2]) for i in range(15) if raw[3 * i]]
+        best = max((sum(1 for x, y in objs if x0 <= x < x0 + 10 and y0 <= y < y0 + 9)
+                    for x0 in range(64) for y0 in range(64)), default=0)
+        if best > 9: out.append(m)
+    return out
+
+
+def tall_pairs(tbl):
+    """tbl: FF1's 2 x 2 frame table (8 frames x UL, DL, UR, DR as (tile, NES attribute)): the pairs
+    and the tables for 8 x 16 frames (per frame L, R: (2 pair, attribute)) and for 8 x 8 frames from
+    the pair layout (per frame UL, DL, UR, DR: (tile, attribute))"""
+    pairs = []; t16 = bytearray(); t8 = bytearray()
+    for f in range(8):
+        e = [(tbl[8 * f + 2 * i], tbl[8 * f + 2 * i + 1]) for i in range(4)]
+        for (tt, ta), (bt, ba) in ((e[0], e[1]), (e[2], e[3])):
+            key = (tt, bt, (ta ^ ba) >> 6 & 1)
+            if key not in pairs: pairs.append(key)
+            k = pairs.index(key)
+            t16 += bytes([2 * k, ta]); t8 += bytes([2 * k, ta, 2 * k + 1, ta & 0xFC | ba & 3])
+    assert len(pairs) == 12, pairs
+    return pairs, bytes(t16), bytes(t8)
+
+
+def hflip_tile(t16):
+    """a GB 2bpp tile mirrored left / right"""
+    rev = lambda b: int('{:08b}'.format(b)[::-1], 2)
+    return bytes(rev(b) for b in t16)
+
+
 def map_objects(rom, m, n_bg, sppal):
     """map m's objects: the 15 slots (id, x + flags, y, sprite tile base) and the graphics:
     a 16-tile block per distinct graphic, placed in VRAM tiles the BG does not use (party at
     0-15, then 16-127, then down from 255 above the BG's 128+ variants)"""
     raw = rom.rd(BANK_SMINFO, MAP_OBJECTS + 0x30 * m, 45)
-    free = list(range(16, 128, 16)) + [b for b in range(240, 127, -16) if b >= n_bg]
+    tall = m in TALL
+    if tall:                                         # (party 0-15, its pairs 16-39, then 24 a block)
+        free = list(range(40, 128 - 23, 24))
+        pairs = tall_pairs(obj_tables(rom))[0]
+    else:
+        free = list(range(16, 128, 16)) + [b for b in range(240, 127, -16) if b >= n_bg]
     base = {}; dmg = bytearray(); cgb = bytearray(); blocks = []
     slots = bytearray()
     for i in range(15):
@@ -358,12 +405,18 @@ def map_objects(rom, m, n_bg, sppal):
             assert free, 'map %d: no sprite tiles left' % m
             base[g] = free.pop(0)
             chr_ = rom.rd(BANK_MAPCHR, OBJ_CHR + 0x100 * g, 0x100)
-            for t in range(16):                          # NES palette 2 / 3 by tile (bit 1)
-                dmg += spr_rank_tile(chr_[16 * t:16 * t + 16], sppal[2 + (t >> 1 & 1)])
-                cgb += gb_tile(chr_[16 * t:16 * t + 16])
+            d16 = [spr_rank_tile(chr_[16 * t:16 * t + 16], sppal[2 + (t >> 1 & 1)]) for t in range(16)]
+            c16 = [gb_tile(chr_[16 * t:16 * t + 16]) for t in range(16)]
+            if tall:                                 # NES palette 2 / 3 by tile (bit 1)
+                for tt, bt, fl in pairs:
+                    dmg += d16[tt] + (hflip_tile(d16[bt]) if fl else d16[bt])
+                    cgb += c16[tt] + (hflip_tile(c16[bt]) if fl else c16[bt])
+            else:
+                for t in range(16):
+                    dmg += d16[t]; cgb += c16[t]
             blocks.append(base[g])
         slots += bytes([oid, xf, y, base.get(g, 0) if oid else 0])
-    return dict(slots=bytes(slots), blocks=bytes(blocks), dmg=bytes(dmg), cgb=bytes(cgb))
+    return dict(slots=bytes(slots), blocks=bytes(blocks), dmg=bytes(dmg), cgb=bytes(cgb), tall=tall)
 
 
 def room_teles(rom):
