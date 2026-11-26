@@ -2061,7 +2061,15 @@ GR_FA      = $CBA0          ; the field box's / banner's (12 records each)
 GR_FB      = $CBD0
 GR_MAXW    = 16
 ; the menus' windows (scr_win) -> the list for the next V-Blank
-gr_menu:    ld a, [gr_wn]
+gr_menu:    ld a, [fcw_on]                  ; (the file screen: each file's own: fcw_grad)
+            and a
+            jr z, .nf
+            ldh a, [is_cgb]
+            and a
+            jp nz, fcw_grad
+.nf:        xor a
+            ld [gr_rpx], a
+            ld a, [gr_wn]
             and a
             jp z, gr_off
             call gr_ok
@@ -2080,6 +2088,8 @@ gr_menu:    ld a, [gr_wn]
 ; the field's box / banner: A = rows of the window layer from the top (cut below it)
 gr_box:     call gr_ok
             jp z, gr_off
+            xor a
+            ld [gr_rpx], a
             xor a                           ; (no palette-0 copy: that is the menus' alt
             ld [gr_p0], a                   ;   windows'; left on, it painted the map's
             ld a, [gr_cut]                  ;   palette 0 in the window colours)
@@ -2114,68 +2124,6 @@ gr_ok:      ldh a, [is_cgb]
             xor 1
             ret
 ; the ramp: 32 colours from (r, g, b) to (r, g, b) / 3
-gr_ramp_mk: ld hl, win_r                     ; per channel: value v, step 2 v, a remainder
-            ld de, gr_vr                    ;   (v - floor(2 v c / 93): to v / 3 at c = 31)
-            ld b, 3
-.i:         ld a, [hl+]
-            ld [de], a                      ; value
-            inc de
-            add a, a
-            ld [de], a                      ; step
-            inc de
-            xor a
-            ld [de], a                      ; remainder
-            inc de
-            dec b
-            jr nz, .i
-            ld hl, gr_ramp
-            ld c, 32
-.c:         ld a, [gr_vg]                   ; RGB555: r | g << 5 | b << 10
-            ld d, a
-            swap a
-            rlca
-            and $E0
-            ld e, a
-            ld a, [gr_vr]
-            or e
-            ld [hl+], a
-            ld a, d
-            rrca
-            rrca
-            rrca
-            and 3
-            ld e, a
-            ld a, [gr_vb]
-            add a, a
-            add a, a
-            or e
-            ld [hl+], a
-            push hl
-            ld hl, gr_vr
-            ld b, 3
-.s:         ld d, [hl]                      ; the next colour: remainder + step, each 93 one
-            inc hl                          ;   step down
-            ld a, [hl+]
-            add a, [hl]
-.d:         cp 93
-            jr c, .k
-            sub 93
-            dec d
-            jr .d
-.k:         ld [hl-], a
-            dec hl
-            ld [hl], d
-            inc hl
-            inc hl
-            inc hl
-            dec b
-            jr nz, .s
-            pop hl
-            dec c
-            jr nz, .c
-            ld hl, gr_ramp                  ; (the LCD colour mode: cc.s)
-            ld b, 64
-            jp cc_inpl
 ; groups: window i goes to the alt group when an earlier main window j has rows overlapping
 ; it, columns apart (a shared border allowed) and another top or height
 gr_groups:  xor a
@@ -4757,68 +4705,9 @@ fcw_apply:  ld a, [FCW_B]
 section bank 99, $4B1A                      ; (free space)
 ; file fp_k (sv_slot): its window's cells (rows 6 k to 6 k + 5) on BG palette 4 + k, the window
 ; palette with the file's colour (none kept, or no save: palette 7 as it is)
-fcw_slot:   ldh a, [is_cgb]
-            and a
-            ret z
-            call save_valid
-            ret c
-            ld a, $0A
-            ld [$0000], a
-            xor a
-            ld [$4000], a
-            call sv_addr4
-            ld de, $F6
-            add hl, de
-            ld a, [hl]
-            ld [fcw_t], a
-            ld de, 8
-            add hl, de
-            ld a, [hl+]
-            ld [fcw_t + 1], a
-            ld a, [hl]
-            ld [fcw_t + 2], a
-            xor a
-            ld [$0000], a
-            ld a, [fcw_t]
-            bit 7, a
-            ret z
-            ld a, [win_r]
-            push af
-            ld a, [win_g]
-            push af
-            ld a, [win_b]
-            push af
-            ld a, [fcw_t]
-            and $1F
-            ld [win_b], a
-            ld a, [fcw_t + 1]
-            and $1F
-            ld [win_r], a
-            ld a, [fcw_t + 2]
-            and $1F
-            ld [win_g], a
-            call opt_wpal
-            ld a, [fp_k]                    ; palette 4 + k
-            add a, 4
-            add a, a
-            add a, a
-            add a, a
-            or $80
-            call bcps_w
-            ld hl, win_pal
-            ld b, 8
-.p:         ld a, [hl+]
-            call bcpd_w
-            dec b
-            jr nz, .p
-            pop af
-            ld [win_b], a
-            pop af
-            ld [win_g], a
-            pop af
-            ld [win_r], a
-            call opt_wpal
-            jp fcw_attr
+fcw_slot:   ld a, F3_BANK                   ; (fcw_slot9: bank 99 $6700, the room)
+            ld hl, fcw_slot9
+            jp bank_call
 section bank 99, $58A1                      ; (free space)
 fcw_attr:   ld a, [fp_k]                    ; HL = sattr + 32 x 6 k
             ld c, a
@@ -4884,7 +4773,410 @@ gr_sk:      and 7
 .k2:        pop af
 .k:         and a
             ret
-; the file screen left: oam cleared, the gradient's palettes as everywhere
-fcw_off:    xor a
-            ld [fcw_on], a
-            jp oam_clr
+; the file screen left: oam cleared
+fcw_off:    jp oam_clr                      ; (fcw_on stays while the screen shows: its Yes /
+                                            ;   No windows; lcd_off ends it: main.s fcw_goff)
+
+section bank 99, $6700                      ; (the file screen's colours and gradients)
+gr_ramp_mk: ld hl, win_r
+            ld de, gr_ramp
+            ld c, 1
+            call gr_rmk
+            ld hl, gr_ramp                  ; (the LCD colour mode: cc.s)
+            ld b, 64
+            call cc_inpl
+            ld a, [fcw_on]                  ; (the file screen: each file's ramp too, at the
+            and a                           ;   fade's level)
+            ret z
+            ldh a, [is_cgb]
+            and a
+            ret z
+            jp fcw_ramps
+; 32 colours at DE from the colour at HL (r, g, b): C = 1 down to a third, C = 0 flat
+gr_rmk:     push de
+            ld de, gr_vr                    ; per channel: value v, step 2 v, a remainder
+            ld b, 3                         ;   (v - floor(2 v c / 93): to v / 3 at c = 31)
+.i:         ld a, [hl+]
+            ld [de], a                      ; value
+            inc de
+            add a, a
+            bit 0, c
+            jr nz, .st
+            xor a                           ; (flat: no step)
+.st:        ld [de], a                      ; step
+            inc de
+            xor a
+            ld [de], a                      ; remainder
+            inc de
+            dec b
+            jr nz, .i
+            pop hl
+            ld c, 32
+.c:         ld a, [gr_vg]                   ; RGB555: r | g << 5 | b << 10
+            ld d, a
+            swap a
+            rlca
+            and $E0
+            ld e, a
+            ld a, [gr_vr]
+            or e
+            ld [hl+], a
+            ld a, d
+            rrca
+            rrca
+            rrca
+            and 3
+            ld e, a
+            ld a, [gr_vb]
+            add a, a
+            add a, a
+            or e
+            ld [hl+], a
+            push hl
+            ld hl, gr_vr
+            ld b, 3
+.s:         ld d, [hl]                      ; the next colour: remainder + step, each 93 one
+            inc hl                          ;   step down
+            ld a, [hl+]
+            add a, [hl]
+.d:         cp 93
+            jr c, .k
+            sub 93
+            dec d
+            jr .d
+.k:         ld [hl-], a
+            dec hl
+            ld [hl], d
+            inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .s
+            pop hl
+            dec c
+            jr nz, .c
+            ret
+
+; ---- each file's window on the file screen (owner, 2026-11-26: a file's gradient choice shown
+; too): its colour and gradient in fcw_c, palette 4 + k the window palette in its colour; the
+; Color's per-line list (fcw_grad) writes each file's ramp (gradient or flat) into its palette
+fcw_slot9:  ldh a, [is_cgb]
+            and a
+            ret z
+            ld a, [fp_k]                    ; fcw_c[k]: the current colour and gradient,
+            add a, a                        ;   unless the file keeps its own
+            add a, a
+            add a, low(fcw_c)
+            ld l, a
+            ld h, high(fcw_c)
+            ld a, [win_r]
+            ld [hl+], a
+            ld a, [win_g]
+            ld [hl+], a
+            ld a, [win_b]
+            ld [hl+], a
+            ld a, [opt_nograd]
+            xor 1
+            ld [hl], a
+            call save_valid
+            jr c, .set
+            ld a, $0A
+            ld [$0000], a
+            xor a
+            ld [$4000], a
+            call sv_addr4
+            ld de, $F6
+            add hl, de
+            ld a, [hl]
+            ld [fcw_t], a
+            ld de, 8
+            add hl, de
+            ld a, [hl+]
+            ld [fcw_t + 1], a
+            ld a, [hl]
+            ld [fcw_t + 2], a
+            xor a
+            ld [$0000], a
+            ld a, [fcw_t]
+            bit 7, a
+            jr z, .set
+            ld a, [fp_k]
+            add a, a
+            add a, a
+            add a, low(fcw_c)
+            ld l, a
+            ld h, high(fcw_c)
+            ld a, [fcw_t + 1]               ; r (bit 5: the gradient off)
+            ld b, a
+            and $1F
+            ld [hl+], a
+            ld a, [fcw_t + 2]
+            and $1F
+            ld [hl+], a
+            ld a, [fcw_t]
+            and $1F
+            ld [hl+], a
+            ld a, b
+            and $20
+            ld a, 1
+            jr z, .g
+            xor a
+.g:         ld [hl], a
+.set:       ld a, [win_r]                   ; palette 4 + k: the window palette in it
+            push af
+            ld a, [win_g]
+            push af
+            ld a, [win_b]
+            push af
+            ld a, [fp_k]
+            add a, a
+            add a, a
+            add a, low(fcw_c)
+            ld l, a
+            ld h, high(fcw_c)
+            ld a, [hl+]
+            ld [win_r], a
+            ld a, [hl+]
+            ld [win_g], a
+            ld a, [hl]
+            ld [win_b], a
+            call opt_wpal
+            ld a, [fp_k]
+            add a, 4
+            add a, a
+            add a, a
+            add a, a
+            or $80
+            call bcps_w
+            ld hl, win_pal
+            ld b, 8
+.p:         ld a, [hl+]
+            call bcpd_w
+            dec b
+            jr nz, .p
+            pop af
+            ld [win_b], a
+            pop af
+            ld [win_g], a
+            pop af
+            ld [win_r], a
+            call opt_wpal
+            jp fcw_attr
+; the three files' ramps (32 colours each, at FCW_RAMP + 64 k: down to a third, or flat), at the
+; fade's level (fd_mul)
+FCW_RAMP   = $C700          ; (the battle's state: free on the file screen)
+fcw_ramps:  xor a
+            ld [fcw_i], a
+.k:         ld a, [fcw_i]
+            add a, a
+            add a, a
+            add a, low(fcw_c)
+            ld l, a
+            ld h, high(fcw_c)
+            ld de, fcw_s
+            ld b, 3
+.s:         ld a, [hl+]
+            push bc
+            push de
+            push hl
+            call fd_mul
+            pop hl
+            pop de
+            pop bc
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .s
+            ld c, [hl]                      ; (1: a gradient)
+            ld a, [fcw_i]
+            rrca
+            rrca
+            ld e, a
+            ld d, high(FCW_RAMP)
+            ld hl, fcw_s
+            call gr_rmk
+            ld hl, fcw_i
+            inc [hl]
+            ld a, [hl]
+            cp 3
+            jr c, .k
+            ld hl, FCW_RAMP
+            ld b, 192
+            jp cc_inpl
+; the file screen's list (gr_menu): the files' windows are rows 6 k .. 6 k + 5 (lines 48 k ..
+; 48 k + 47), one file a line; files 0 and 2 through the main group (palettes 4 and 6), file 1
+; the alt group (palette 5); each file's colour at its window's top border row, then its ramp
+; over its inside (16 steps over 45 lines, a record only where the colour changes)
+fcw_grad:   ld a, [fd_lv]                   ; (the records from the full colours: built at a
+            push af                         ;   fade's start the ramps are black, alike; the
+            call fd_4                       ;   ramps at the fade's level after)
+            ld [fd_lv], a
+            call gr_ramp_mk                 ; (fcw_ramps with it)
+            ld a, high(FCW_RAMP) ^ high(gr_ramp)
+            ld [gr_rpx], a
+            ld hl, gr_nlm
+            ld a, $80 | (4 * 8 + 4)
+            ld [hl+], a
+            ld a, $80 | (6 * 8 + 4)
+            ld [hl+], a
+            ld [hl], $FF
+            ld hl, gr_nla
+            ld a, $80 | (5 * 8 + 4)
+            ld [hl+], a
+            ld [hl], $FF
+            xor a
+            ld [gr_p0], a
+            ld hl, GR_A                     ; (the buffer not in use)
+            ld a, [gr_base + 1]
+            cp h
+            jr nz, .b
+            ld h, high(GR_B)
+.b:         ld a, l
+            ld [gr_nb], a
+            ld a, h
+            ld [gr_nb + 1], a
+            xor a                           ; line 0: file 0's and file 1's top colours
+            ld [hl+], a
+            ld a, 3
+            ld [hl+], a
+            xor a
+            ld [gr_cm], a
+            ld [hl+], a
+            ld a, $40
+            ld [gr_ca], a
+            ld [hl+], a
+            ld a, 1
+            ld [gr_rc], a
+            xor a
+            ld [fcw_mus], a
+            ld [fcw_i], a
+.f:         ld a, [fcw_i]                   ; file k: its top border row's line 48 k
+            ld b, a
+            add a, a
+            add a, b
+            swap a                          ; 48 k
+            ld d, a
+            ld a, [fcw_i]
+            rrca
+            rrca
+            ld e, a                         ; E = its ramp's low byte (64 k)
+            call .rec                       ; (its top colour)
+            ld a, d
+            add a, 3
+            ld d, a                         ; (its inside from 48 k + 3)
+            xor a
+            ld [fcw_s], a                   ; (16 d / 45: d, accumulator, quotient)
+            ld [fcw_s + 1], a
+            ld [fcw_s + 2], a
+.l:         ld a, [fcw_s + 2]
+            add a, a
+            add a, a
+            ld c, a
+            ld a, [fcw_i]
+            rrca
+            rrca
+            add a, c
+            ld e, a
+            call .rec
+            inc d
+            ld a, [fcw_s + 1]
+            add a, 16
+.q:         cp 45
+            jr c, .qn
+            sub 45
+            push hl
+            ld hl, fcw_s + 2
+            inc [hl]
+            pop hl
+            jr .q
+.qn:        ld [fcw_s + 1], a
+            ld a, [fcw_s]
+            inc a
+            ld [fcw_s], a
+            cp 45
+            jr c, .l
+            ld a, [fcw_i]
+            inc a
+            ld [fcw_i], a
+            cp 3
+            jr c, .f
+            ld a, [fcw_mus]                 ; (the music: a record of its own when none came
+            and a                           ;   after BOX_LINES)
+            jr nz, .end
+            ld a, BOX_LINES
+            ld [hl+], a
+            ld a, $40
+            ld [hl+], a
+            ld a, [gr_cm]
+            ld [hl+], a
+            ld a, [gr_ca]
+            ld [hl+], a
+.end:       ld a, $FF
+            ld [hl+], a
+            xor a
+            ld [hl], a
+            pop af
+            ld [fd_lv], a
+            call fcw_ramps
+            ld a, 1
+            ld [gr_new], a
+            ld [gr_on], a
+            ret
+; line D, file fcw_i's colour at ramp low byte E: a record at HL (moved on) unless the file's
+; group has that colour already (D, E kept)
+.rec:       ld a, [fcw_i]
+            cp 1
+            ld a, [gr_cm]
+            jr nz, .rm
+            ld a, [gr_ca]
+.rm:        push hl
+            ld l, a                         ; the group's colour now vs the new one
+            ld h, high(FCW_RAMP)
+            ld a, [hl+]
+            ld b, [hl]
+            ld l, e
+            cp [hl]
+            jr nz, .new
+            inc l
+            ld a, b
+            cp [hl]
+.new:       pop hl
+            ret z
+            ld a, [gr_rc]                   ; (room: 60)
+            cp 60
+            ret nc
+            inc a
+            ld [gr_rc], a
+            ld c, 1
+            ld a, [fcw_i]
+            cp 1
+            ld a, e
+            jr nz, .mm
+            ld [gr_ca], a
+            inc c
+            jr .mw
+.mm:        ld [gr_cm], a
+.mw:        ld a, d
+            ld [hl+], a
+            cp BOX_LINES                    ; (the music on the first record from BOX_LINES)
+            jr c, .nm
+            ld a, [fcw_mus]
+            and a
+            jr nz, .nm
+            inc a
+            ld [fcw_mus], a
+            set 6, c
+.nm:        ld a, c
+            ld [hl+], a
+            ld a, [gr_cm]
+            ld [hl+], a
+            ld a, [gr_ca]
+            ld [hl+], a
+            ret
+section wram, $CAF0
+fcw_c:      ds 12                           ; per file: r, g, b, gradient (1 on)
+gr_rpx:     ds 1                            ; the gradient ramps' page ^ high(gr_ramp)
+fcw_mus:    ds 1
+section wram, $CDFC
+fcw_i:      ds 1
+fcw_s:      ds 3

@@ -3067,6 +3067,20 @@ wipe_close: ld a, TALL_BANK
 wipe_open:  ld a, TALL_BANK
             ld hl, wipe_open9
             jp bank_call
+; lcd_off: the windows' gradient off; the file screen gone: its per-file gradient lists (palettes 4-6, the ramps' page)
+; off, before gr_off writes the flat colour through the lists
+fcw_goff:   ld a, [fcw_on]
+            and a
+            jp z, gr_off
+            xor a
+            ld [fcw_on], a
+            ld [gr_rpx], a
+            dec a
+            ld [gr_lm], a
+            ld [gr_la], a
+            ld [gr_nlm], a
+            ld [gr_nla], a
+            jp gr_off
 ; STAT during a wipe (from text.s stat_int): the band's top, the window off (an empty band:
 ; it stays on), the bottom next
 stat_wp:    ld a, [wp_st]                   ; the band's top: the window off (an empty band:
@@ -3216,7 +3230,8 @@ section bank 0, $3C00                       ; (masked loads)
 ; to the shadows, and a mode-2 STAT interrupt holds the CPU through each line's mode 3, so the
 ; load writes VRAM directly as with the LCD off. lcd_on shows the screen: shadows back in a
 ; V-Blank, the STAT interrupt as before.
-lcd_off:    call gr_off                     ; (the windows' gradient off, its windows gone)
+lcd_off:    call fcw_goff                   ; (the windows' gradient off, its windows gone; the
+                                            ;   file screen's colours: loc.s)
             xor a
             ld [gr_wn], a
             ld [tl_lc], a                   ; (a tall map's 8 x 16 frames end: tall.s)

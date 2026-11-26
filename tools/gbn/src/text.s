@@ -711,8 +711,10 @@ stat_gr:    push bc
             jp nz, stat_int.mus
             pop af
             reti
-.col:       ld l, a                         ; DE = the ramp's colour at low byte A
-            ld h, high(gr_ramp)
+.col:       ld l, a                         ; DE = the ramp's colour at low byte A (its page:
+            ld a, [gr_rpx]                  ;   gr_ramp's, or the file screen's ramps:
+            xor high(gr_ramp)               ;   loc.s fcw_grad)
+            ld h, a
             ld e, [hl]
             inc l
             ld d, [hl]
