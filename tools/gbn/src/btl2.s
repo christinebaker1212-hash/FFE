@@ -1879,7 +1879,9 @@ bt_arrow:   ld a, [bt_lp]
             ld [bt_lp], a
             ret
 ; enemy (slot) A's name -> bt_sbuf
-bt_ename:   ld e, a
+bt_ename:   cp 9                            ; (no such slot: no name; owner, 2026-11-26: a
+            jr nc, bt_nonm                  ;   garbage name window "o&" seen in battle)
+            ld e, a
             ld d, 0
             ld hl, bt_eid
             add hl, de
@@ -1893,12 +1895,15 @@ bt_ename:   ld e, a
             add hl, de
             ld a, [hl]
             pop de
-.ok:        ld l, a
+.ok:        cp 128
+            jr nc, bt_nonm
+            ld l, a
             ld h, 0
             add hl, hl
             ld de, B_NAMES
             add hl, de
-            ld de, bt_sbuf
+; the string whose pointer is at HL (battle data) -> bt_sbuf (39 letters at most, ended)
+bt_pstr:    ld de, bt_sbuf
             ld bc, 2
             ld a, BTL_DATA
             call far_copy
@@ -1907,9 +1912,12 @@ bt_ename:   ld e, a
             ld a, [bt_sbuf + 1]
             ld h, a
             ld de, bt_sbuf
-            ld bc, 20
+            ld bc, 39
             ld a, BTL_DATA
-            jp far_copy
+            call far_copy
+            xor a
+            ld [bt_sbuf + 39], a
+            ret
 ; a new message: the line buffer and rows cleared
 bt_msg_new: xor a
             ld [bt_rows], a
@@ -1970,28 +1978,22 @@ bt_msg_num: push af
             jr nz, .t
             ld hl, bt_line
             jp bt_msg_row
-; FF1 battle message A -> bt_sbuf
-bt_mtext:   dec a
+; no name: an empty string (no window: bt_banner shows none for it)
+bt_nonm:    xor a
+            ld [bt_sbuf], a
+            ret
+; FF1 battle message A -> bt_sbuf (1-80; another: empty)
+bt_mtext:   cp 81
+            jr nc, bt_nonm
+            and a
+            jr z, bt_nonm
+            dec a
             ld l, a
             ld h, 0
             add hl, hl
             ld de, B_MSGS
             add hl, de
-            ld de, bt_sbuf
-            ld bc, 2
-            ld a, BTL_DATA
-            call far_copy
-            ld a, [bt_sbuf]
-            ld l, a
-            ld a, [bt_sbuf + 1]
-            ld h, a
-            ld de, bt_sbuf
-            ld bc, 39
-            ld a, BTL_DATA
-            call far_copy
-            xor a
-            ld [bt_sbuf + 39], a
-            ret
+            jr bt_pstr
 ; a row of the message window: string HL (row 1 at x 0, later rows indented by 8)
 bt_msg_row: ld a, [bt_defer]                  ; (the result worked out first: nothing shown)
             and a
@@ -2953,6 +2955,8 @@ bq_num:     ld b, a
 BAN_T0     = $C4
 bt_ban_spell:
             ld a, [mg_id]
+            cp 92                           ; (spells, potions, enemy abilities: no other)
+            ret nc
             call bt_mname
 bt_banner:  ld a, [ban_on]                  ; (shown: off first, a frame, so the new name's
             and a                           ;   tiles and rows never change under a shown
@@ -3621,6 +3625,8 @@ bt_tban_p:  ld a, [ban_hide]                ; (SELECT: none)
             pop af
             ld [ban_bot], a
             ld a, [bt_tcur]
+            cp 4                            ; (no such member: no window)
+            jp nc, bt_ban_off
             call ch_rec
             inc hl
             inc hl
