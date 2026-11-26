@@ -122,12 +122,12 @@ and no undocumented debug code.
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-26, late: FF1 native build, release candidate pending a playthrough and hardware tests)
+# GB port status (last updated 2026-11-26, night: FF1 native build finished: owner's full playthrough and real-hardware run passed)
 
 **Current FF1 build: the native rewrite (`tools/gbn/`, `docs/ff1-native.md`).** The long log below
 (recompiled build, `tools/gb/`) is history and reference; the native build replaced it.
 **For FF2 / FF3: `docs/gb-native-reuse.md`** (what made FF1 fully native, which modules carry over,
-the method).
+the method). Session briefs: `docs/ff2-gb-brief.md`, `docs/ff3-gb-brief.md`.
 **Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
 **Handoff (recompiled build, historical): `docs/gb-handoff.md`.**
 
@@ -1436,24 +1436,19 @@ town reflection made in time again (it was hidden in most walking frames), town 
 in V-Blank right after the OAM), the hands kept on all four members after casting a party-wide heal.
 
 ## Remaining
-- **FF1 (native build), before release:**
-  - A complete natural playthrough from New Game to the ending, with no pokes, on Game Boy and
-    on Color (the last natural run stopped at Earth Cave B3; later areas were checked through
-    test builds that jump there). In progress (2026-11-26).
-  - Real hardware tests: the owner runs `docs/ff1-hardware-tests.md` (DMG, Pocket, SGB, CGB,
-    GBA) and reports back.
-  - Black loads on the plain Game Boy: not done (they would take about 3x the load time); instead
-    its transitions now go to white (owner, 2026-11-26).
-  - Open report, not reproduced: a stray "o&" window in battle (lookups guarded). (The corner-tile
-    reflection report is moot: no reflections on the overworld now.)
-  - Known limits: SGB window frames stay blue (hardware: a frame tile holds one palette); on the
-    plain Game Boy about 1% of coastal walking frames show the reflection a frame out of step.
-- Lot Check (`docs/gb-release-checks.md`): met in emulators for the native build (strict
-  SameBoy checker 0 on DMG / CGB / SGB, cart RAM enabled only around each access, checksummed
-  saves with error screens, soft reset, boot clearing, wording, documented hidden codes). Open:
-  the hardware matrix above.
+- **FF1 (native build): finished (owner, 2026-11-26):** the owner played it through from New Game to
+  the ending and ran it on real hardware without problems. Left: the open report of a stray "o&"
+  window in battle (lookups guarded, never reproduced); known limits: SGB window frames stay blue
+  (a frame tile holds one palette), and on the plain Game Boy a 1-pixel strip of town reflection at
+  the water's edge in about 3% of walking frames. Black loads on the plain Game Boy not done (about
+  3x the load time); its transitions go to white instead.
+- Lot Check (`docs/gb-release-checks.md`): met for the native build (strict SameBoy checker 0 on
+  DMG / CGB / SGB, cart RAM enabled only around each access, checksummed saves with error screens,
+  soft reset, boot clearing, wording, documented hidden codes); the owner's hardware run passed.
 - FF2: separate session (`docs/ff2-gb-brief.md`, then `docs/gb-native-reuse.md`). FF3 (GBC
-  only): not started.
+  only): separate session (`docs/ff3-gb-brief.md`); its status will be in `docs/ff3-gb-status.md`.
+  Open owner decision for both: the base (the disassembly as `CLAUDE.md` says, or a native rewrite
+  as FF1 did; the briefs recommend the rewrite).
 - The recompiled build's old list (DMG loads, town walk, fades, 6-letter names, music voices,
   world map / puzzle lag) is closed: the native build has 0 lag on both systems, 6-letter
   names, its own fades and the music checked against the NSF.
