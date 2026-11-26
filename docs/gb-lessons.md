@@ -461,3 +461,16 @@ Color only" screen on older systems.
   sea; the reflection decides by the 8 x 8 quarter's tile (a build-time table from the map's own water tiles).
 - **Keep a routine's argument registers across helpers that send SGB packets** (sgb_amb0 clobbered HL inside ap_stop:
   pc_menu then bank-called a WRAM address).
+
+## Per-frame tile uploads on the plain Game Boy (2026-11-26)
+- The overworld's V-Blank handler alone runs to about line 149 on the plain Game Boy, and the water copies take
+  148-150: a main-loop copy after the frame wait has no room. Put a small per-frame upload in the handler right
+  after the OAM DMA (src/refl.s rf_dma), unrolled (5 cycles a byte), and keep it double-buffered: switch the
+  sprites to the new tiles only when all are up.
+- Sprites built over several steps in the main loop can be caught half-made by the DMA when the loop runs into
+  the next V-Blank: build them in a scratch copy and put them in the OAM copy in one short step with interrupts
+  off.
+- A heavy per-frame computation on the plain Game Boy shows as a step taking two frames (mcount advancing every
+  other frame): measure the step's pace against the build before. Move conversions to build time (pre-shaded
+  pictures, whole-quarter tables) and skip the work when its inputs have not changed.
+

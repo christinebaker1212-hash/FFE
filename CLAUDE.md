@@ -1405,6 +1405,10 @@ V-Blank upload, fades never read the screen: blown-out borders); reflections fad
 (proposals: docs/ff1-options-proposals.md); SGB shop / menu crash fixed. Strict checker 0 on all systems.
 Then (item 56): main menu: the parked command hand in place, no fade backing out of the member choice, pictures centred.
 Then (item 57): Color letter shadow (down-right, window colour at a quarter), menu fades like every screen, palette timing, shop gradient band.
+Then (item 58): NES-blue default window colour + Return to Default, Modern MP switch without a question, Select shows another
+member on the map, Bestiary fast scrolling, stale door after stairs, ship / canoe music, canal walkable before blasting, parked ship
+height, overworld reflections cut to the water pixel by pixel (coasts too), boss target hand and longer fiend defeat, "HP/word"
+party lines. Pending: town reflections and moving shadowed canal water (#40), weapon / armour management between jobs (#43).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

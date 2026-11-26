@@ -1013,3 +1013,28 @@ one reaches parity, so the owner can keep playing).
     every other screen uses (no colour cycle, shorter black). A frame of full-colour gradient under black palettes
     before a fade-in removed (gr_dark). Shop: a window under another (shared border row) started its gradient 3 lines
     early, inside the upper window: each window's gradient now starts 3 lines into its top row.
+58. Owner (2026-11-25/26): a list of fixes, each checked in SameBoy on the Color and the plain Game Boy (strict
+    VRAM / OAM checker 0, random play 4 x 20000 frames 0).
+    - Window colour: the Color's default is the NES window blue (text.py WIN_BLUE); Config, Window page: "Return to
+      Default" (window colour, gradient on, LCD mode Default, the Game Boy's windows black; A only).
+    - Modern MP: no question when it is switched (the party's MP is converted in proportion: nothing is lost).
+    - Select on the map shows the next member who is not Dead / Stone (SHOW_WHO in the save page, unsram + $FD);
+      the leader stays; Order keeps the person shown. The new picture is drawn into the map queue's ring and
+      copied in V-Blanks with the party's sprites hidden for those frames.
+    - Bestiary: holding a direction, the list's rows are redrawn in place (rows 4-16) and the next scroll waits
+      for them; the hand stays (sf_hk).
+    - Doors: the door closed on leaving a room is the last door stepped on (a stale door from another floor was
+      drawn after stairs up).
+    - Music: boarding / leaving the ship or canoe changes the song (ow_cmm).
+    - Canal: on foot its land walks as a bridge until it is blasted (FF1 IsOnBridge -> IsOnCanal).
+    - The parked ship / airship sits on its tile as FF1 draws it (3 lines below the party on foot).
+    - Reflections on the overworld are cut to the water pixel by pixel (coasts too): the build makes a water mask
+      per metatile quarter and pixel row (Color and plain Game Boy each from their own pictures), a whole-quarter
+      table, and the party's overworld pictures pre-shaded for the plain Game Boy; each frame the four mirrored
+      sprites are whole, hidden or masked into free sprite tiles $70-$73 / $74-$77, uploaded in the V-Blank
+      handler right after the OAM copy and switched only once all are up (src/refl.s). Nothing is redone while
+      nothing moved.
+    - Battle: the target hand sits left of a fiend's / Chaos's picture at its middle (the fiend's own extent
+      from its TSA); a fiend's defeat lasts about 3.3 times as long (8 flashes, 8 frames a dissolve step); the
+      party lines show "HP/word" with no icon (the bubble by the sprite shows it).
+
