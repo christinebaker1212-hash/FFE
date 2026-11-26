@@ -552,7 +552,7 @@ eqm_pk:     ld a, [eqm_m]
             ld a, [pk_m]
             ld [eqm_m], a
             jp eqm_main.scr
-section bank 2, $6BB2                       ; (free space)
+section bank 2, $7365                       ; (free space)
 ; the Equip screen's entries: Optimize (owner, 2026-11-22), Packs (top right)
 eqm_tops:   ld bc, $0B03
             call pen_at

@@ -1038,6 +1038,9 @@ sh_mpv:     call sh_wwin
 sh_sellall: xor a
             ld [sh_n], a
 .l:         ld [sh_k], a
+            call sh_whof                    ; (a member's pack only: sh_who)
+            jr nz, .n
+            ld a, [sh_k]
             srl a
             srl a
             call sh_slots
@@ -1085,7 +1088,13 @@ sh_sellall: xor a
 
 ; the list sh_list (ids, 0-ended, up to 16; five show, scrolled): A = the index chosen (the
 ; item in sh_it, its price in sh_price, halved when selling), C set on B
-sh_pick:    xor a
+sh_pick:    ld a, [sh_sell]                 ; (selling: Everyone / a member's pack under
+            and a                           ;   "Which one?"; left / right change it: owner,
+            jr z, .ns                       ;   2026-11-26)
+            ld a, PG_BANK
+            ld hl, sh_wl9
+            call bank_call
+.ns:        xor a
             ld [sh_top], a
             ld [sh_cur], a
             dec a                           ; (the owned / worn line: loc.s)
@@ -1132,6 +1141,9 @@ sh_pick:    xor a
             jr nz, .b
             bit 0, a
             jr nz, .a
+            and $30                         ; (left / right: selling, another pack)
+            jp nz, sh_lrb
+            ldh a, [pad_new]
             ld hl, sh_cur
             bit 6, a
             jr nz, .up
@@ -1703,3 +1715,110 @@ sh_lvl:     ld bc, $010F
             jp scr_upd
 .s:         db "Level", 0
 SDESC_BANK = 120                            ; (spelldesc.SDESC_BANK)
+
+section bank 2, $6BF3                       ; (free space)
+; sh_pick: left / right while selling: the next pack (sh_lr9), the list again
+sh_lrb:     ld a, PG_BANK
+            ld hl, sh_lr9
+            call bank_call
+            jp sh_pick.rd
+
+section bank 2, $741E                       ; (free space)
+; sh_sellall: NZ when slot sh_k's member is not the pack chosen (sh_who 1-4; 0: everyone)
+sh_whof:    ld a, [sh_who]
+            and a
+            ret z
+            dec a
+            ld b, a
+            ld a, [sh_k]
+            srl a
+            srl a
+            cp b
+            ret
+
+section bank 110, $6200                     ; (free space)
+; selling (owner, 2026-11-26): the list is Everyone's or one member's pack (sh_who 0 / 1-4),
+; left / right go round them (empty packs skipped); its name under "Which one?"
+sh_wl9:     xor a
+            ld [sh_who], a
+            jr sh_wre
+sh_lr9:     ld a, [sh_sell]
+            and a
+            ret z
+            ldh a, [pad_new]
+            ld b, a
+            ld c, 5
+.t:         ld a, [sh_who]
+            bit 4, b
+            jr z, .lf
+            inc a
+            cp 5
+            jr c, .s
+            xor a
+            jr .s
+.lf:        dec a
+            bit 7, a
+            jr z, .s
+            ld a, 4
+.s:         ld [sh_who], a
+            push bc
+            ld a, 2
+            ld hl, sh_sellall
+            call bank_call
+            pop bc
+            ld a, [sh_n]
+            and a
+            jr nz, .ok
+            dec c
+            jr nz, .t
+.ok:        xor a
+            ld [sh_top], a
+            ld [sh_cur], a
+            ld a, SFX_MOVE
+            ld [sfx_req], a
+            jr sh_wlab
+sh_wre:     ld a, 2                         ; (the list for this choice)
+            ld hl, sh_sellall
+            call bank_call
+; its name on the speech window's second row
+sh_wlab:    ld bc, $0102
+            call pen_at
+            ld b, 18
+            call pen_sp
+            ld bc, $0102
+            call pen_at
+            ld a, [sh_who]
+            and a
+            jr nz, .m
+            ld hl, str_every
+            call pen_str
+            jp scr_upd
+.m:         dec a                           ; (its name without the padding blanks)
+            call ch_rec
+            push hl
+            inc hl
+            inc hl
+            ld b, 4
+.c:         ld a, [hl+]
+            call .pc
+            dec b
+            jr nz, .c
+            pop hl
+            ld a, l
+            add a, CH_NAME2
+            ld l, a
+            ld a, [hl+]
+            call .pc
+            ld a, [hl]
+            call .pc
+            ld hl, str_spack
+            call pen_str
+            jp scr_upd
+.pc:        cp $21
+            ret c
+            jp pen_ch
+str_every:  db "Everyone", 0
+str_spack:  db "'s pack", 0
+
+section wram, $DBB3
+sh_who:     ds 1                            ; selling: 0 everyone, 1-4 that member's pack
