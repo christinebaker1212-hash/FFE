@@ -714,7 +714,7 @@ room_chk:   push hl
 .x:         pop hl
             ret
 ; wait for A or B (C set on B)
-wait_ab:    call oam_clr
+wait_ab:    call hands_off                  ; (the pictures stay: hands_off)
 .w:         call scr_frame
             ldh a, [pad_new]
             and $03

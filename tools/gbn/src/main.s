@@ -4241,6 +4241,24 @@ fd_xw:      ld a, [fd_slow]
             ld a, F3_BANK
             ld hl, fd_xw9
             jp bank_call
+; every hand (tiles $7C-$7F) off, other sprites kept: a message waiting for A / B over a screen
+; with pictures keeps them (owner, 2026-11-26: the Magic screen lost its picture, not its outline)
+hands_off:  ld hl, oam_buf + 2
+.l:         ld a, [hl]
+            and $FC
+            cp CUR_TILE
+            jr nz, .n
+            dec l
+            dec l
+            ld [hl], 0
+            inc l
+            inc l
+.n:         ld a, l
+            add a, 4
+            ld l, a
+            cp 162
+            jr c, .l
+            ret
 
 section bank 0, $00E6                       ; (free space)
 ; A = the shadow's colour byte at the index (as reading BCPD / OCPD)
