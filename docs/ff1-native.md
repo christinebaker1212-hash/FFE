@@ -1058,3 +1058,29 @@ one reaches parity, so the owner can keep playing).
       with the gradient off. Tool: a frame-by-frame check that each masked reflection tile is a subset of the
       party tile it mirrors (only the frame a pose changes may differ: the masks are made a frame ahead).
 
+60. Owner (2026-11-26): the list of what was not yet Nintendo quality, all fixed but the SGB window frames.
+    - Yes / No asked in place (Packs Drop, the main menu's Suspend in its bottom window, the title's Continue
+      questions; packs.s yn_ask); the Trade prompt names both items; on a file's first Equip visit a note about
+      Packs (PK_NOTE, unsram + $F7). No text shadow on the item icons (Color).
+    - Select on the map: the new member's tiles go up four a V-Blank, the four on screen last, all in one
+      V-Blank (main.s ps_next, bank 110): the picture never disappears.
+    - Bestiary: a scroll's rows go into the BG map not shown ($9C00), which is then shown in one V-Blank
+      (LCDC bit 3; the per-frame copies ly_base / lcdc_on too); leaving the list shows $9800 again (sf_mx is
+      sf_one / row_safe's map).
+    - Reflections: the cut tiles are made for the frame they show with (no look-ahead); after their upload the
+      V-Blank handler writes the four OAM entries prepared by the main code (RF_NEXT, rf_patch: 16 bytes
+      unrolled, fits even the plain Game Boy's late uploads). When the frame runs late and the tiles are kept,
+      cut parts whose pose changed are hidden that frame (rf_pose). While the reflection shows, map objects stop
+      at 8 (od_lim / rf_want). The town table is built from the real field font (it used the 105-code default
+      before the font was set): Onrac gets tiles $C8-$CF. The town water copy runs with interrupts off from its
+      line test (Onrac, plain Game Boy: a VRAM write at line 0).
+    - Fiend / Chaos target hand at the picture's left edge in the hand's rows (battle.py boss_hands, BTL_DATA
+      $7FE0; offsets in bt_tdx / bt_tdy); Chaos's hand whole on screen, pointing into him.
+    - Measured, no change needed: the world map draws a row a frame and the 15-puzzle slides without a stalled
+      frame on both systems; the Status screen's columns are tidy.
+    - Formation: a header window, members 3 rows apart, pictures a column clear of six-letter names; the
+      picture outlines are taken away while a member slides and drawn again at rest (lu_ulc).
+    - Title menu: Extras centred in its box.
+    - Not done: the plain Game Boy's white loads (black ones need the screen on while loading: about three
+      times the load time; the owner had chosen the loads' length); SGB window frames stay blue (hardware).
+    - docs/ff1-hardware-tests.md: the checklist for real hardware.

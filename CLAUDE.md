@@ -1410,6 +1410,9 @@ member on the map, Bestiary fast scrolling, stale door after stairs, ship / cano
 height, overworld reflections cut to the water pixel by pixel (coasts too), boss target hand and longer fiend defeat, "HP/word"
 party lines.
 Then (item 59): town reflections, the towns' shadowed canal water moving, Packs (Give / Trade / Drop between members, from the Equip screen).
+Then (item 60): the owner's "not Nintendo quality" list: Yes/No in place, Select swap without a blink, Bestiary scroll
+through the hidden BG map, reflections in step with the sprites (Onrac too), boss target hands from the pictures, Formation header,
+Extras centred; DMG black loads left to the owner (3x load time); hardware checklist docs/ff1-hardware-tests.md.
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
