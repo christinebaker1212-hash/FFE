@@ -289,6 +289,7 @@ refl_t9:    ldh a, [maptype]                ; (built in RF_OAM, then put in the 
             xor a
             ld [rf_hid], a
             call refl_msk
+            call c, rf_corner               ; (on a corner tile mostly land: fading out)
             ld hl, refl_lv                  ; the strength rises while some of it shows, and
             ld a, [hl]                      ;   falls when none does
             jr nc, .dn
@@ -686,6 +687,8 @@ rf_one:     ld a, [RF_I]
             ld a, b
             inc a
             jr z, .k                        ; (all water: whole)
+            call rf_half                    ; (less than half over water: hidden; a corner
+            ret c                           ;   tile's slivers and tails; owner, 2026-11-26)
             call rf_tile
             ld c, 2
 .k:         ld a, [RF_I]                    ; kind C at bits 2 i
@@ -1086,6 +1089,116 @@ rf_vbu:     ld a, [rf_pend]
             jp bank_call
 
 section bank 111, $4A10                     ; (free space)
+; refl_msk said some part shows (C): on the overworld, C cleared while the tile below the party
+; (where the reflection is drawn) is a shore tile at least half land (its water pixels 1-127 of 256): the reflection fades out there
+; (owner, 2026-11-26: wedges and tails on such corners). Worked out once per tile (rf_ck*)
+rf_corner:  ldh a, [maptype]                ; (towns: maptype 0, whole-tile water)
+            and a
+            scf
+            ret z
+            ld a, [px]
+            ld e, a
+            ld a, [py]                      ; (the tile below the party: where it is drawn)
+            inc a
+            ld d, a
+            ld hl, rf_ckx
+            ld a, [hl+]
+            cp e
+            jr nz, .new
+            ld a, [hl+]
+            cp d
+            jr nz, .new
+            ld a, [hl]                      ; (cached: 1 = a mostly-land shore tile)
+            jr .res
+.new:       ld hl, rf_ckx
+            ld [hl], e
+            inc hl
+            ld [hl], d
+            call rw1                        ; A = the party's metatile
+            and $7F
+            ld l, a                         ; HL = REFL_MASK + 32 mt (the plain Game Boy's + $1000)
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, REFL_MASK
+            ldh a, [is_cgb]
+            and a
+            jr nz, .cg
+            ld d, high(REFL_MASK) + $10
+.cg:        add hl, de
+            ld c, 32
+            ld e, 0
+            ld d, 0
+.b:         ld a, [hl]
+            and $0F
+            call .n
+            ld a, [hl+]
+            swap a
+            and $0F
+            call .n
+            dec c
+            jr nz, .b
+            ld a, d                         ; DE = water pixels (0-256)
+            and a
+            ld a, 0
+            jr nz, .st                      ; (256: all water)
+            ld a, e
+            and a
+            jr z, .st                       ; (no water: nothing shows there anyway)
+            cp 128
+            ld a, 0
+            jr nc, .st
+            inc a                           ; 1-127: a shore tile mostly land
+.st:        ld [rf_ckr], a
+.res:       and a
+            scf
+            ret z
+            xor a                           ; (NC: nothing shows)
+            ret
+.n:         push hl
+            add a, low(rf_nib)
+            ld l, a
+            ld a, high(rf_nib)
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            pop hl
+            add a, e
+            ld e, a
+            ret nc
+            inc d
+            ret
+; C if fewer than half of the sprite's 64 pixels are over water (RF_ROWS' bits, counted by nibble)
+rf_half:    ld hl, RF_ROWS
+            ld c, 8
+            ld e, 0
+.r:         ld a, [hl]
+            and $0F
+            call .n
+            ld a, [hl+]
+            swap a
+            and $0F
+            call .n
+            dec c
+            jr nz, .r
+            ld a, e
+            cp 32
+            ret
+.n:         push hl
+            add a, low(rf_nib)
+            ld l, a
+            ld a, high(rf_nib)
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            add a, e
+            ld e, a
+            pop hl
+            ret
+rf_nib:     db 0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4
 ; Z if the party's tiles (RF_OAM) are those the kept tiles were cut from (RF_SIG's copy)
 rf_pose:    ld hl, RF_OAM + 2
             ld de, RF_SIG + 7 + 2
@@ -1237,3 +1350,7 @@ rf_patch:   ld a, [rf_hid]
 
 section wram, $DA92
 rf_want:    ds 1                            ; 1: the reflection shows, OAM 36-39 its own
+section wram, $DA96
+rf_ckx:     ds 1                            ; rf_corner's last tile (x, y) and its result
+rf_cky:     ds 1
+rf_ckr:     ds 1
