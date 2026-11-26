@@ -39,6 +39,11 @@ memory, hold-A, enemy counts, low-HP colours, results window. Checked on the NES
 to be seen on screen. NES driver for tests: scratch (New Game, names typed by RAM state; FF3 needs
 6 letters + A and rejects duplicate names).
 
+## Mock-ups waiting for the owner
+- "Game Boy Color only" screen (`tools/gb3n/mockup.py build/mock3` -> `build/mock3/cgbonly.png`):
+  A = black text on white, B = title above a framed window, white on black. Wording "This Game
+  Pak is designed only for use on the Game Boy Color." (Lot Check 3.3 / 4.1 names).
+
 ## Next (after the decisions)
 - Map the listing's routine names onto the ROM (as `tools/gb/ff1dis.py` did for FF1).
 - Copy the build skeleton, generic modules and test tools into `tools/gb3n/`; boot screen, font,
