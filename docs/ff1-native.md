@@ -1051,4 +1051,10 @@ one reaches parity, so the owner can keep playing).
       Give it to another member (each shown with its free slots of that kind); to a full pack: pick the item it
       trades places with (FF1's Trade). SELECT: Drop (Yes / No, No first). The packs stay tidy: worn first, then
       by item, empty slots last. Worn items stay put (changed on the Equip screen).
+    - Fixes after the owner's play: the reflection's fourth source tile was kept past the end of its RAM page
+      (rf_srcd adds to the low byte only): the upper right of the reflection showed the wrong picture and the
+      change signature it overwrote never matched, so the masks were made again every frame (the world map's
+      slowdown). Lit crystals on the main menu: their box takes the window colour (palette 6 colour 2), also
+      with the gradient off. Tool: a frame-by-frame check that each masked reflection tile is a subset of the
+      party tile it mirrors (only the frame a pose changes may differ: the masks are made a frame ahead).
 
