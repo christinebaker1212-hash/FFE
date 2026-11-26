@@ -1134,11 +1134,7 @@ rf_corner:  ldh a, [maptype]                ; (towns: maptype 0, whole-tile wate
             and a
             scf
             ret z
-            ld a, [px]
-            ld e, a
-            ld a, [py]                      ; (the tile below the party: where it is drawn)
-            inc a
-            ld d, a
+            call rf_cpos                    ; (E, D: the tile below the party)
             ld hl, rf_ckx
             ld a, [hl+]
             cp e
@@ -2405,6 +2401,27 @@ rf_sig:     ld hl, RF_SIG
             dec b
             jr nz, .r
             ret
+
+section bank 111, $4745                     ; (free space)
+; rf_corner: E, D = the tile below the party, where its reflection is drawn
+rf_cpos:
+            ld a, [px]
+            ld e, a
+            ld a, [py]                      ; (the tile below the party: where it is drawn)
+            inc a
+            ld d, a
+            ld a, [moving]                  ; (stepping down or sideways: the one below the
+            and a                           ;   step's end, where the reflection is going; the
+            jr z, .pos                      ;   old one let it come up whole, then fade when
+            ld a, [mdy]                     ;   the step ended: owner, 2026-11-26. Up: as it
+            bit 7, a                        ;   was)
+            jr nz, .pos
+            add a, d
+            ld d, a
+            ld a, [mdx]
+            add a, e
+            ld e, a
+.pos:       ret
 
 section bank 111, $47D0                     ; (free space)
 ; V-Blank after the OAM: a tall map's sprite size and line handler (tall.s tl_vb9), then the
