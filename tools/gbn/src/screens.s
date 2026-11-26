@@ -2221,6 +2221,8 @@ eqm_main:   ld [eqm_m], a
             jp nz, .exit
             bit 0, a
             jr nz, .a
+            bit 2, a                        ; (SELECT: the packs)
+            jp nz, eqm_pk
             ld hl, eqm_t
             bit 6, a
             jr nz, .up
@@ -2248,6 +2250,8 @@ eqm_main:   ld [eqm_m], a
 .a:         ld a, [eqm_ot]                  ; Optimize (owner, 2026-11-22)
             and a
             jr z, .list
+            dec a
+            jp nz, eqm_pk                   ; (Packs: packs.s)
             call eqm_opt
             jr .l
 .list:      call eqm_cands
@@ -2361,10 +2365,7 @@ eqm_draw:   call scr_open
             inc a
             call nf_a
             call pen_numl
-            ld bc, $0B03                    ; (Optimize, bottom right: owner, 2026-11-22)
-            call pen_at
-            ld hl, str_eqopt
-            call pen_str
+            call eqm_tops                   ; (Optimize, bottom right; Packs, top right: packs.s)
             ld bc, $0005
             ld de, $1407
             call scr_win

@@ -1037,4 +1037,18 @@ one reaches parity, so the owner can keep playing).
     - Battle: the target hand sits left of a fiend's / Chaos's picture at its middle (the fiend's own extent
       from its TSA); a fiend's defeat lasts about 3.3 times as long (8 flashes, 8 frames a dissolve step); the
       party lines show "HP/word" with no icon (the bubble by the sprite shows it).
+59. Owner (2026-11-26), after the release: towns and the packs.
+    - Towns' canal in shadow (tileset 0's shadowed water tile and the corner where the shadow meets open water)
+      moves with the water; the corner keeps its edge (build.py town_water2, bank 112; src/wanim.s wt_cp2, each
+      tile copied only while the V-Blank lasts).
+    - Reflections in towns (maps 0-7): the water there is whole tiles, so a water flag per metatile quarter is
+      the mask; per town the first 8 sprite tiles no object, font or map tile uses (none in Onrac: only sprites
+      wholly on water show there); OAM 36-39 are left to a ninth map object when one shows; the Color blends
+      towards the town water's colour. On the plain Game Boy the masks are kept a frame when the frame is
+      already late (a step's end), so no frame is lost.
+    - Packs (src/packs.s, bank 107): from the Equip screen (its Packs entry, top right, or SELECT): one member's
+      four weapons and four armour (worn ones marked E; left / right the next member). A on an item not worn:
+      Give it to another member (each shown with its free slots of that kind); to a full pack: pick the item it
+      trades places with (FF1's Trade). SELECT: Drop (Yes / No, No first). The packs stay tidy: worn first, then
+      by item, empty slots last. Worn items stay put (changed on the Equip screen).
 

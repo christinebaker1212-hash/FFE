@@ -334,44 +334,20 @@ eqm_ohand:  ld a, [eqm_ot]
             and a
             jr z, .s
             ld bc, $0B03
-            jp cur_txt
+            dec a
+            jr z, .o
+            ld bc, $0D01                    ; (Packs, top right: packs.s)
+.o:         jp cur_txt
 .s:         ld a, [eqm_t]
             add a, 6
             jp eqm_hand
 ; up / down through Optimize and the rows in use (eqm_nr)
-eqm_oup:    ld a, [eqm_ot]
-            and a
-            jr nz, .last
-            ld a, [eqm_t]
-            and a
-            jr z, .opt
-            dec a
-            ld [eqm_t], a
-            ret
-.last:      xor a
-            ld [eqm_ot], a
-            ld a, [eqm_nr]
-            dec a
-            ld [eqm_t], a
-            ret
-.opt:       ld a, 1
-            ld [eqm_ot], a
-            ret
-eqm_odn:    ld a, [eqm_ot]
-            and a
-            jr nz, .first
-            ld a, [eqm_nr]
-            ld b, a
-            ld a, [eqm_t]
-            inc a
-            cp b
-            jr nc, eqm_oup.opt
-            ld [eqm_t], a
-            ret
-.first:     xor a
-            ld [eqm_ot], a
-            ld [eqm_t], a
-            ret
+eqm_oup:    ld a, PK_BANK                   ; (up / down with Packs: packs.s)
+            ld hl, eqm_oup2
+            jp bank_call
+eqm_odn:    ld a, PK_BANK
+            ld hl, eqm_odn2
+            jp bank_call
 
 ; ---- Optimize (owner, 2026-11-22, from the WonderSwan Color remake): the member takes the
 ; weapon with the best Attack and, one piece at a time, the armour that raises Defense most,

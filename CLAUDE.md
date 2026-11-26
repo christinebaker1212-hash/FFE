@@ -1408,7 +1408,8 @@ Then (item 57): Color letter shadow (down-right, window colour at a quarter), me
 Then (item 58): NES-blue default window colour + Return to Default, Modern MP switch without a question, Select shows another
 member on the map, Bestiary fast scrolling, stale door after stairs, ship / canoe music, canal walkable before blasting, parked ship
 height, overworld reflections cut to the water pixel by pixel (coasts too), boss target hand and longer fiend defeat, "HP/word"
-party lines. Pending: town reflections and moving shadowed canal water (#40), weapon / armour management between jobs (#43).
+party lines.
+Then (item 59): town reflections, the towns' shadowed canal water moving, Packs (Give / Trade / Drop between members, from the Equip screen).
 
 ## Remaining
 - FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk

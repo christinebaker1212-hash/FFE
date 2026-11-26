@@ -689,6 +689,7 @@ def main():
            open(os.path.join(HERE, 'src', 'wanim.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sgbx.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'extras.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'packs.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'pgen.s')).read() + '\n' + ui.pg_source() +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
