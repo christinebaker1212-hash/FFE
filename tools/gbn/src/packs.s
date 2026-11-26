@@ -786,3 +786,49 @@ mm_bot:     ld bc, $000D
             ld b, 6
             call pen_num
             jp scr_upd
+
+section bank 2, $66AA                       ; (free space)
+; the Equip screen drawn; on a file's first visit a note about Packs (pk_note), then what it covered
+eqm_drh:    call eqm_draw
+            ld a, [PK_NOTE]
+            and a
+            ret nz
+            ld a, PK_BANK
+            ld hl, pk_note
+            call bank_call
+            jr eqm_drh2
+section bank 2, $588A                       ; (free space)
+eqm_drh2:   ld bc, $0005                    ; (the slots' and the stats' windows again)
+            ld de, $1407
+            call scr_win
+            ld bc, $000C
+            ld de, $1406
+            call scr_win
+            call eqm_sdraw
+            jp scr_upd
+
+section bank 107, $7600                     ; (free space)
+PK_NOTE    = unsram + $F7                   ; the note about Packs shown (kept in the save)
+; the note (owner, 2026-11-26: make Packs easy to find), A or B closes it
+pk_note:    ld a, 1
+            ld [PK_NOTE], a
+            ld a, [gr_wn]
+            ld [yn_gw], a
+            ld bc, $000B
+            ld de, $1407
+            call scr_win
+            ld bc, $010C
+            ld hl, str_pknote
+            call scr_str
+            call scr_upd
+            call hand_hide
+.w:         call scr_frame
+            ldh a, [pad_new]
+            and 3
+            jr z, .w
+            ld a, [yn_gw]
+            ld [gr_wn], a
+            ld a, 1
+            ld [gr_dirty], a
+            ret
+str_pknote: db "Weapons and armour", $0A, "go between members", $0A, "in Packs (SELECT).", 0

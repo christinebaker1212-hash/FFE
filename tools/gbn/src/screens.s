@@ -2214,7 +2214,7 @@ eqm_main:   ld [eqm_m], a
             ld [eqm_t], a
             ld [eqm_ot], a
             call eqm_unadj
-.scr:       call eqm_draw
+.scr:       call eqm_drh                    ; (the first time: a note about Packs: packs.s)
 .l:         call eqm_ohand                  ; the hand left of the slot / Optimize (loc.s)
             call scr_frame
             ldh a, [pad_new]
