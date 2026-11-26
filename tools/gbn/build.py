@@ -154,6 +154,15 @@ def ui_strings():
     return '\n'.join(out) + '\n'
 
 
+def town_refl_base(p):
+    """the first 8 sprite tiles no object, font or map tile of map pack p uses (0: none)"""
+    bl = set(p['objs']['blocks']); nb = p['n_dmg']; ft = set(p['font_tbl']) - {0}
+    lo = [b for b in range(16, 128, 16) if b not in bl]
+    hi = [b for b in range(128, 256, 8) if all(b + k >= nb and b + k not in ft and
+          not any(b0 <= b + k < b0 + 16 for b0 in bl) for k in range(8))]
+    return lo[0] if lo else hi[0] if hi else 0
+
+
 def data_banks(rom, ff3=None, init=None):
     banks = {}
     data.FONT_CODES = text.field_codes()
@@ -486,19 +495,14 @@ def refl_source(rom):
     # the towns (tileset 0, maps 0-7; owner, 2026-11-25: "enable reflections in towns"): their water
     # is whole tiles (the water tile, the canal in shadow and its corner), so a quarter flag per
     # metatile ($FF water) is the mask (rows from RF_ROWSFF / RF_ROWS00); and per map the first 8
-    # sprite tiles no object, font or map tile uses for the masked tiles (0: none, Onrac)
+    # sprite tiles no object, font or map tile uses for the masked tiles (0: none)
     tt = data.tileset_pack(rom, 0)
     ttsa = tt['tsa']
     twet = {TOWN_WATER, ttsa[40], ttsa[256 + 41]}
     twat = bytes(0xFF if ttsa[128 * k + mt] in twet else 0 for mt in range(128) for k in range(4))
     tbase = bytearray()
     for m in range(8):
-        p = data.map_pack(rom, m)
-        bl = set(p['objs']['blocks']); nb = p['n_dmg']; ft = set(p['font_tbl']) - {0}
-        lo = [b for b in range(16, 128, 16) if b not in bl]
-        hi = [b for b in range(128, 256, 8) if all(b + k >= nb and b + k not in ft and
-              not any(b0 <= b + k < b0 + 16 for b0 in bl) for k in range(8))]
-        tbase.append(lo[0] if lo else hi[0] if hi else 0)
+        tbase.append(town_refl_base(data.map_pack(rom, m)))
     tbase += bytes([0x70, 0])                       # (8: the overworld; 9: no reflection)
     p0 = data.map_pack(rom, 0)
     c = 2 * (4 * tt['mt_pal'][39] + 2)
@@ -643,6 +647,9 @@ def main():
     st = a[a.index('--start') + 1].split(',') if '--start' in a else ['$FE', '0', '0']
     st = (list(st) + ['0'])[:4]                  # MAP,X,Y[,ROOM]
     rom = data.Rom(nes)
+    data.FONT_CODES = text.field_codes()            # (before the sources: refl_source's town
+                                                    #   table reads the maps' fonts; without it
+                                                    #   Onrac had no tiles: owner's list, 2026-11-26)
     ff3 = names.ff3_rom(a[a.index('--ff3') + 1] if '--ff3' in a else None)
     init = None                                  # --init ADDR=VAL,.. (save page offsets $000-$3FF)
     if '--init' in a:

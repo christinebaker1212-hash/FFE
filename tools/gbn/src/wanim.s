@@ -81,14 +81,16 @@ wa_town:    ld a, [cur_map]
             ld a, b
             cp [hl]
             ret z
-.new:       ldh a, [rLY]
-            sub 144
-            cp 8
-            ret nc
+.new:       di                              ; (interrupts off from the test through the copy:
+            ldh a, [rLY]                    ;   one between them pushed it into line 0 on the
+            sub 144                         ;   plain Game Boy; strict checker, Onrac)
+            cp 5
+            jr nc, .x
             ld [hl], b
             ld a, 1
             ld [wa_ok], a
-            jp wt_cp
+            call wt_cp
+.x:         reti
 
 section bank 0, $31CE
 ; the town water tile's picture for step wa_ph (entry: the town, or 8 on the Color): its VRAM

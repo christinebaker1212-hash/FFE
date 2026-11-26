@@ -439,7 +439,7 @@ obj_at:     ld hl, objs + O_PX
             ret
 
 ; the visible objects into OAM after the party (DE = the next OAM entry); the rest hidden
-obj_draw:   ld c, MAX_DRAWN
+obj_draw:   call od_lim                     ; (C = the number drawn)
             ldh a, [maptype]
             and a
             jr nz, .rest
@@ -672,3 +672,10 @@ obj_spr:    push de
             ret
 
 ; HL = slot -> A = dialogue (talk routines: talk.s)
+
+section bank 0, $146E                       ; (free space)
+; obj_draw's limit: 9, or 8 while the reflection shows (OAM 36-39 its own: refl.s)
+od_lim:     ld a, [rf_want]
+            xor MAX_DRAWN
+            ld c, a
+            ret

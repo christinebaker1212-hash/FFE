@@ -268,10 +268,7 @@ section bank 111, $4000
 ; strengths: the Color blends its colours into the sea's, the plain Game Boy / SGB lighten
 ; OBP1), and on a sideways step each half of it is shown only over water: it slips into the
 ; shore column by column while it fades.
-refl_t9:    ld a, [REFL_OAM]                ; (OAM 36-39 taken by a ninth map object: none)
-            and a
-            ret nz
-            ldh a, [maptype]                ; (built in RF_OAM, then put in the OAM copy in
+refl_t9:    ldh a, [maptype]                ; (built in RF_OAM, then put in the OAM copy in
             and a                           ;   one go: a V-Blank during the work shows the
             jr nz, .ow                      ;   last frame's, never a half-made one)
             ld a, [cur_map]                 ; (standard maps: the towns, 0-7; owner,
@@ -281,7 +278,17 @@ refl_t9:    ld a, [REFL_OAM]                ; (OAM 36-39 taken by a ninth map ob
             cp V_AIR
             jr z, .off
             call refl_mir                   ; the mirrored party, then only its parts over
-            call refl_msk                   ;   water (C: some part shows)
+            ld hl, RF_OAM                   ;   water (C: some part shows); the sprites as
+            ld de, RF_RAW                   ;   mirrored kept for rf_up9's OAM patch
+            ld b, 16
+.raw:       ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .raw
+            xor a
+            ld [rf_hid], a
+            call refl_msk
             ld hl, refl_lv                  ; the strength rises while some of it shows, and
             ld a, [hl]                      ;   falls when none does
             jr nc, .dn
@@ -293,7 +300,14 @@ refl_t9:    ld a, [REFL_OAM]                ; (OAM 36-39 taken by a ninth map ob
             jr z, .k
             dec a
 .s:         ld [hl], a
-.k:         and a
+.k:         and a                           ; (rf_want: a ninth map object yields OAM 36-39
+            ld b, 0                         ;   to it from the next frame: obj_draw; owner's
+            jr z, .kw                       ;   list, 2026-11-26)
+            inc b
+.kw:        push af
+            ld a, b
+            ld [rf_want], a
+            pop af
             jr z, .hide
             call refl_fade
             ld a, [refl_k]                  ; the faintest: every other frame (see-through)
@@ -302,12 +316,20 @@ refl_t9:    ld a, [REFL_OAM]                ; (OAM 36-39 taken by a ninth map ob
             ldh a, [frame]
             rrca
             jr nc, .put
-.hide:      xor a
+.hide:      ld a, 1                         ; (rf_up9: no patch while hidden)
+            ld [rf_hid], a
+            xor a
             ld [RF_OAM], a
             ld [RF_OAM + 4], a
             ld [RF_OAM + 8], a
             ld [RF_OAM + 12], a
-.put:       ld hl, RF_OAM
+.put:       ld a, [REFL_OAM]                ; (OAM 36-39 still a ninth object's this frame:
+            and a                           ;   left to it, and no patch in the V-Blank)
+            jr z, .pt
+            ld a, 1
+            ld [rf_hid], a
+            ret
+.pt:        ld hl, RF_OAM
             ld de, REFL_OAM
             ld b, 16
             di
@@ -320,6 +342,7 @@ refl_t9:    ld a, [REFL_OAM]                ; (OAM 36-39 taken by a ninth map ob
             ret
 .off:       xor a                           ; (off: the OAM copy itself; RF_OAM is the
             ld [refl_lv], a                 ;   airship view's table while it shows)
+            ld [rf_want], a
             ld [rf_pend], a
             ld [rf_acls], a
             ld [REFL_OAM], a
@@ -416,19 +439,25 @@ rf_scls    = $D9FE          ; the kinds made
 rf_aset    = $D9FF          ; the tile set shown (0: $70, 1: $74); bit 7: upload going (sprite
                             ;   index in bits 0-2 of rf_upi)
 rf_upi     = $DC6B
+RF_RAW     = $DC24          ; the four sprites as mirrored, before the kinds (16 bytes)
+rf_hid     = $DC34          ; 1: the reflection hidden this frame (its fade)
+rf_st      = $DC35          ; 1: the tiles kept are of another pose (refl_msk)
+RF_NEXT    = $DCD0          ; the four OAM entries once the tiles made are up (16 bytes)
 rf_la      = $DC6C
 
-refl_msk:   ld a, [rf_pend]                 ; (an upload half done: the tiles made stay)
+refl_msk:   xor a
+            ld [rf_st], a
+            ld a, [rf_pend]                 ; (an upload half done: the tiles made stay)
             and a
             jr z, .mk
             ld a, [rf_upi]
             and a
-            jr nz, .apply
+            jr nz, .stale
 .mk:        ldh a, [rLY]                    ; (the frame already late, line 44-143: the tiles
             cp 144                          ;   made stand a frame more, so no frame is lost;
             jr nc, .mk1                     ;   the plain Game Boy needs some 85 lines for
             cp 44                           ;   them, a step's end starts near line 80)
-            jr nc, .apply
+            jr nc, .stale
 .mk1:       call rf_sig                     ; (nothing moved: the tiles made stand)
             jr z, .apply
             xor a
@@ -437,12 +466,8 @@ refl_msk:   ld a, [rf_pend]                 ; (an upload half done: the tiles ma
             ld [RF_CN], a
             ld [rf_scls], a
             ld [RF_ANY], a
-            ld a, [moving]                  ; the step a frame on: 1 pixel, 2 on a dash
-            and a
-            jr z, .la
-            ld a, [dash]
-            inc a
-.la:        ld [rf_la], a
+            xor a                           ; (the tiles show with this frame's sprites:
+            ld [rf_la], a                   ;   rf_up9 patches the OAM; owner, 2026-11-26)
             xor a
 .e:         ld [RF_I], a
             call rf_one
@@ -450,8 +475,15 @@ refl_msk:   ld a, [rf_pend]                 ; (an upload half done: the tiles ma
             inc a
             cp 4
             jr c, .e
+            call rf_next
             ld a, 1
             ld [rf_pend], a
+            jr .apply
+.stale:     call rf_pose                    ; (kept, but the party's pose changed since: its cut
+            jr z, .apply                    ;   parts hidden this frame, not shown in the old
+            ld a, 1                         ;   pose; Onrac on the plain Game Boy runs late
+            ld [rf_st], a                   ;   several frames in a row; owner's list,
+            ld [rf_hid], a                  ;   2026-11-26; no patch in the V-Blank either)
 .apply:     ld hl, RF_OAM                   ; the kinds shown now
             ld a, [rf_acls]
             ld c, a
@@ -463,9 +495,13 @@ refl_msk:   ld a, [rf_pend]                 ; (an upload half done: the tiles ma
             jr .apn
 .ap1:       cp 2
             jr nz, .apn
+            ld a, [rf_st]                   ; (the pose changed since its tiles were cut: hidden)
+            and a
+            jr nz, .aph
             ld a, [rf_tb]                   ; (no tiles for it on this map: hidden)
             and a
             jr nz, .ap2
+.aph:       xor a
             ld [hl], a
             jr .apn
 .ap2:       inc l                           ; masked: its tile in the set shown
@@ -1034,7 +1070,7 @@ rf_up9:     ld a, [rf_pend]
             ld [rf_aset], a
             ld a, [rf_scls]
             ld [rf_acls], a
-            ret
+            jp rf_patch
 
 section bank 0, $2E6D                       ; (free space)
 ; the V-Blank handler: OAM, then at once the reflection's masked tiles (the plain Game Boy's
@@ -1048,3 +1084,156 @@ rf_vbu:     ld a, [rf_pend]
             ld a, REFL_BANK
             ld hl, rf_up9
             jp bank_call
+
+section bank 111, $4A10                     ; (free space)
+; Z if the party's tiles (RF_OAM) are those the kept tiles were cut from (RF_SIG's copy)
+rf_pose:    ld hl, RF_OAM + 2
+            ld de, RF_SIG + 7 + 2
+            ld b, 4
+.l:         ld a, [de]
+            cp [hl]
+            ret nz
+            ld a, l
+            add a, 4
+            ld l, a
+            ld a, e
+            add a, 4
+            ld e, a
+            dec b
+            jr nz, .l
+            ret
+; the four OAM entries the tiles made will need (the kinds made, the set not shown now), ready
+; for rf_patch's copy
+rf_next:    ld a, [rf_scls]
+            ld c, a
+            ld b, 0
+            ld hl, RF_RAW
+            ld de, RF_NEXT
+.e:         ld a, c
+            and 3
+            jr z, .hd
+            cp 2
+            jr z, .m
+            ld a, [hl+]                     ; whole: the sprite as mirrored
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            jr .nx
+.m:         ld a, [rf_tb]                   ; masked: its slot in the set not shown now
+            and a
+            jr z, .hd                       ; (no tiles on this map: hidden)
+            push bc
+            ld c, a
+            ld a, [rf_aset]
+            and 1
+            xor 1
+            add a, a
+            add a, a
+            add a, c
+            add a, b
+            ld c, a
+            ld a, [hl+]                     ; y, x, the slot, attributes
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            inc l
+            ld a, c
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            pop bc
+            jr .nx
+.hd:        xor a
+            ld [de], a
+            inc e
+            inc e
+            inc e
+            inc e
+            inc l
+            inc l
+            inc l
+            inc l
+.nx:        srl c
+            srl c
+            inc b
+            ld a, b
+            cp 4
+            jr c, .e
+            ret
+; all the masked tiles up: the reflection's four OAM entries (the hardware's, just loaded by
+; the DMA) set to the new kinds at once, so the tiles show with the frame's party
+; sprites, not a frame after (owner's list, 2026-11-26: a turn showed the old pose for a frame).
+; 16 bytes, unrolled: within a line, so even the plain Game Boy's late uploads (line 152) fit
+rf_patch:   ld a, [rf_hid]
+            and a
+            ret nz
+            ldh a, [rLY]                    ; (OAM open: the V-Blank's lines only; line 153
+            sub 144                         ;   reads 0 on the plain Game Boy: skipped)
+            cp 9
+            ret nc
+            ld hl, RF_NEXT
+            ld de, $FE00 + low(REFL_OAM)
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl]
+            ld [de], a
+            ret                             ; (the copy: the next frame's .apply; a frame
+                                            ;   missed shows the last picture again)
+
+section wram, $DA92
+rf_want:    ds 1                            ; 1: the reflection shows, OAM 36-39 its own
