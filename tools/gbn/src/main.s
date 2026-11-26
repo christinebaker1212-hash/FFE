@@ -1351,6 +1351,27 @@ mulsign:    and a                           ; A = sign (-1 / 0 / 1) -> A = sign 
             inc a
             ret
 
+; pen_iname's end: a name in scr_buf (icon + letters) longer than a list row's 17 cells gets its
+; final "ts" in one cell ('~', text.py KERN_TS; FF1's longer names all end in "Gauntlets"; owner,
+; 2026-11-26: Mythril Gauntlets ran onto the Equip window's border), then it is printed
+kern_ts:    ld hl, scr_buf + 17
+            ld a, [hl+]
+            and a
+            jr z, .p
+            ld a, [hl]
+            and a
+            jr nz, .p
+            dec hl
+            ld a, [hl]
+            cp $73                          ; (s)
+            jr nz, .p
+            dec hl
+            ld [hl], $7E                    ; (~: "ts")
+            inc hl
+            ld [hl], 0
+.p:         ld hl, scr_buf
+            jp pen_str
+
 ; ---- party sprite (FF1's 2x2 tables: tile, attributes for UL, DL, UR, DR)
 make_oam:   ldh a, [maptype]                ; the overworld: vehicles
             and a

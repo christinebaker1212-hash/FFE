@@ -217,8 +217,7 @@ pen_iname:  ld l, a
             ld bc, 20
             ld a, NAMES
             call far_copy
-            ld hl, scr_buf
-            jp pen_str
+            jp kern_ts                      ; (then pen_str)
 
 section bank 2, $4800
 
@@ -2609,3 +2608,4 @@ mm_plc:     ld a, [SC_MARK]
             call pen_str
             jp mm_place
 .s:         db "Save", 0
+

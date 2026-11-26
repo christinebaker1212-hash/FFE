@@ -36,11 +36,17 @@ def font_tiles(rom, ff3=None):
     out[0x02] = bytes(a & b for a, b in zip(w[:8], w[8:])) + w[8:]   # its shine left out
     out[0x0A] = names.own_tile(PIP_FULL)     # magic shops: a level's slot used / free
     out[0x0B] = names.own_tile(PIP_FREE)
+    rows = KERN_TS + ['........']            # '~': "ts" in one cell, for names over 16 letters
+    out[0x7E] = bytes(sum(0x80 >> x for x in range(8) if r[x] == '#') for r in rows) + bytes([0xFF] * 8)
     out[0x0C] = names.own_tile(ARROW_UP)     # previews: better / worse (owner's audit, 2026-11-25:
     out[0x0D] = names.own_tile(ARROW_DOWN)   #   every system, not the Color's colours only)
     return out
 
 
+# "ts" condensed into one cell (owner, 2026-11-26: "Mythril Gauntlets" ran onto the Equip window's
+# border; names stay whole: README rule 3): the menus' name printer uses it for the last two letters
+# of a name longer than the 16 a list row holds (menu.s kern_ts)
+KERN_TS = ['.#......', '.#......', '###..###', '.#..#...', '.#...##.', '.#.....#', '..#.###.']
 PIP_FULL = ['........', '..###...', '.#####..', '.#####..', '.#####..', '..###...', '........', '........']
 PIP_FREE = ['........', '..###...', '.#...#..', '.#...#..', '.#...#..', '..###...', '........', '........']
 ARROW_UP = ['........', '...#....', '..###...', '.#####..', '#######.', '........', '........', '........']
