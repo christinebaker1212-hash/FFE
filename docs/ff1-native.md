@@ -1105,3 +1105,34 @@ one reaches parity, so the owner can keep playing).
     - Open: all Twelve Sages at once (48 sprites; needs 8 x 16 object sprites or a mid-frame OAM reload),
       shoreline water animated with the sea and every water tile in step, a fake Mode 7 airship view, a window
       colour per save file.
+62. Owner (2026-11-26, last).
+    - Crescent Lake: all Twelve Sages at once. A map with more than 9 people in a 10 x 9 view (data.tall_maps:
+      Crescent Lake) draws its people as 8 x 16 sprites in the frames that need them (src/tall.s: pairs of
+      tiles made at build time, bottoms flipped; LCDC bit 2 switched in the V-Blank; on the Color a line handler
+      swaps OBJ colour 2 at the 8-line band edges, so each half keeps its own palette). Select, talking and
+      menus checked; strict checker 0 on both systems.
+    - Water: the coasts' and river banks' water moves with the sea / river, the land and the light foam within
+      3 pixels of land stay; every water tile moves in step (build.py water_anim: one list per step, sea and
+      river separately). On the plain Game Boy the copies go in the frame's idle H-Blanks (2 bytes per H-Blank,
+      lines up to 128; the V-Blank is full there), on the Color in the V-Blank. Marsh excluded (under 64 water
+      pixels a tile).
+    - Menus: a message waiting for A / B hides only the hands (tiles $7C-$7F), not every sprite: the Magic
+      screen's picture no longer vanishes while its outline stays (field-cast refusal, shops, saves).
+    - Menus: Heal / Healara / Healaga use the target screen too (a hand at every member, A casts again while MP
+      lasts, "It wouldn't have any effect." when all are full); the target screen's bottom row shows the caster's
+      "MP x/y" (the level's charges, or Modern MP's points) or "<item> xN", updated after each use.
+    - Reflection: cut pixel by pixel again on coast tiles (the half-over-water hiding that left chunks when
+      walking in from either side removed), and cheaper on the plain Game Boy (metatiles cached per step,
+      per-sprite quarter memo, unrolled row shifts): measured walking at the owner's corner start
+      ($FF,155,167): frame end median line 82 -> 47, no late frames on foot, dashing, marsh, Onrac or by ship;
+      the Color's picture identical frame by frame.
+    - Save files: each keeps its own window colour and gradient choice (save page bytes $F6 / $FE / $FF), set
+      when the file is loaded; the file screen shows each file in its own colour on the Color.
+    - Airship: the whole world slanted at one even tilt (owner: consistent, not curving to a horizon): every
+      line shows the ground foreshortened 1.4 : 1 around the ship's line, above and below; no sky band. The
+      flying map ring is rows py - 7 .. + 8. The scroll changes on about 2 lines in 5, so build.py stores each
+      height's change lines and an LY = LYC interrupt comes only there, waiting for that line's H-Blank (one
+      interrupt every line took half the plain Game Boy's time and dropped frames). Flying frames end by about
+      line 56 on the plain Game Boy, no repeated frames; strict checker 0 on DMG / CGB / SGB.
+    - Not done: black loads on the plain Game Boy (the owner: only if they do not make loads longer; they need
+      the screen on while loading, about three times the load time).

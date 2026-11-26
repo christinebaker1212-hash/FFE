@@ -122,7 +122,7 @@ and no undocumented debug code.
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-26: FF1 native build, release candidate pending a playthrough and hardware tests)
+# GB port status (last updated 2026-11-26, late: FF1 native build, release candidate pending a playthrough and hardware tests)
 
 **Current FF1 build: the native rewrite (`tools/gbn/`, `docs/ff1-native.md`).** The long log below
 (recompiled build, `tools/gb/`) is history and reference; the native build replaced it.
@@ -1420,6 +1420,11 @@ Extras centred; DMG black loads left to the owner (3x load time); hardware check
 Then (item 61): reflections off mostly-land shore corners, scrolling rows drawn a step ahead (no stale top / bottom rows),
 walking into the ship / canoe / airship, condensed "ts" for 17-letter names, enemy spell names up a second, Sell by pack,
 selling the replaced item. Open: Twelve Sages at once, shoreline / synced water, fake Mode 7 airship, colour per save file.
+Then (item 62): all Twelve Sages at once (8 x 16 people on crowded maps), coast / river-bank water moving with the sea and
+all water in step (DMG copies in idle H-Blanks), the Magic screen's picture kept under messages, all-party heals on the target
+screen with repeat and MP / item counts shown, reflections smooth again and cheaper on DMG, a window colour per save file,
+the airship's view as one even tilt over the whole screen (interrupts only on the lines that change). DMG black loads not done
+(owner: only if not longer; they would be about 3x).
 
 ## Remaining
 - **FF1 (native build), before release:**
@@ -1428,12 +1433,10 @@ selling the replaced item. Open: Twelve Sages at once, shoreline / synced water,
     test builds that jump there). In progress (2026-11-26).
   - Real hardware tests: the owner runs `docs/ff1-hardware-tests.md` (DMG, Pocket, SGB, CGB,
     GBA) and reports back.
-  - Owner's decision pending: black loads on the plain Game Boy (needs the screen on while
-    loading, about 3x the load time; the owner had chosen the loads' length).
+  - Black loads on the plain Game Boy: not done (owner, 2026-11-26: only if they do not make
+    loads longer; they need the screen on while loading, about 3x the load time).
   - Known limits: SGB window frames stay blue (hardware: a frame tile holds one palette); on the
     plain Game Boy about 1% of coastal walking frames show the reflection a frame out of step.
-  - Owner's open list (2026-11-26): all Twelve Sages at once (sprite budget), shoreline water moving
-    with the sea and all water in step, a fake Mode 7 airship view, a window colour per save file.
 - Lot Check (`docs/gb-release-checks.md`): met in emulators for the native build (strict
   SameBoy checker 0 on DMG / CGB / SGB, cart RAM enabled only around each access, checksummed
   saves with error screens, soft reset, boot clearing, wording, documented hidden codes). Open:

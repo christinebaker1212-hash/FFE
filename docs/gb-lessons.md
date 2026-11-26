@@ -474,3 +474,16 @@ Color only" screen on older systems.
   other frame): measure the step's pace against the build before. Move conversions to build time (pre-shaded
   pictures, whole-quarter tables) and skip the work when its inputs have not changed.
 
+## Line effects, idle H-Blanks and the test harness (2026-11-26, last)
+- A STAT interrupt on every line costs the plain Game Boy about half of each line (dispatch, pushes, table
+  reads). When the effect changes on only some lines (the airship's even tilt: about 2 in 5), list those lines
+  at build time and use LY = LYC on the line before each, waiting in the handler for that line's H-Blank before
+  writing: the write lands between lines, and a late interrupt only moves the change a line.
+- On the plain Game Boy the overworld's V-Blank is full; small per-frame copies (water) fit in the main loop's
+  idle lines instead: 2 bytes per H-Blank start with interrupts off, stopping at line 128, the rest in the
+  V-Blank if the loop runs late.
+- RAM used by the music engine is not in any `ds` section (NES_RAM = $DE00, the whole page): rammap.py cannot
+  see it. A table placed there (the airship's old sky colours at $DEC0) is overwritten every frame.
+- build/sbsh model names must be exactly "Game Boy", "Game Boy Color", "Super Game Boy"; anything else (e.g.
+  "dmg") silently runs as a Color, and plain Game Boy timing checks then pass for the wrong system.
+- Test the owner's own spot: a pace measured somewhere else said nothing about the frames the owner saw.
