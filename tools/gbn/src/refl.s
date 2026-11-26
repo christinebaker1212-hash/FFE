@@ -28,7 +28,7 @@ rw1:        ldh a, [rombank]
 
 section bank 0, $3584
 refl_mir:   ld hl, oam_buf                  ; mirrored about the party's foot (its rows are
-            ld de, REFL_OAM                 ;   fixed on the screen, y $50 / $58: foot $60)
+            ld de, RF_OAM                   ;   fixed on the screen, y $50 / $58: foot $60)
             ld b, 4
 .e:         ld a, [hl+]
             and a
@@ -71,7 +71,7 @@ refl_mir:   ld hl, oam_buf                  ; mirrored about the party's foot (i
             adc a, 0
             ld h, a
             ld b, [hl]
-            ld hl, REFL_OAM
+            ld hl, RF_OAM
             ld e, 4
 .w:         ld a, [hl+]
             cp $68
@@ -260,19 +260,14 @@ section bank 111, $4000
 ; strengths: the Color blends its colours into the sea's, the plain Game Boy / SGB lighten
 ; OBP1), and on a sideways step each half of it is shown only over water: it slips into the
 ; shore column by column while it fades.
-refl_t9:    xor a                           ; (hidden first)
-            ld [REFL_OAM], a
-            ld [REFL_OAM + 4], a
-            ld [REFL_OAM + 8], a
-            ld [REFL_OAM + 12], a
-            ldh a, [maptype]
-            and a
-            jr z, .off
+refl_t9:    ldh a, [maptype]                ; (built in RF_OAM, then put in the OAM copy in
+            and a                           ;   one go: a V-Blank during the work shows the
+            jr z, .off                      ;   last frame's, never a half-made one)
             ld a, [vehicle]
             cp V_AIR
             jr z, .off
             call refl_mir                   ; the mirrored party, then only its parts over
-            call refl_clip                  ;   water (C: some part shows)
+            call refl_msk                   ;   water (C: some part shows)
             ld hl, refl_lv                  ; the strength rises while some of it shows, and
             ld a, [hl]                      ;   falls when none does
             jr nc, .dn
@@ -289,18 +284,34 @@ refl_t9:    xor a                           ; (hidden first)
             call refl_fade
             ld a, [refl_k]                  ; the faintest: every other frame (see-through)
             cp 2
-            ret nc
+            jr nc, .put
             ldh a, [frame]
             rrca
-            ret nc
+            jr nc, .put
 .hide:      xor a
+            ld [RF_OAM], a
+            ld [RF_OAM + 4], a
+            ld [RF_OAM + 8], a
+            ld [RF_OAM + 12], a
+.put:       ld hl, RF_OAM
+            ld de, REFL_OAM
+            ld b, 16
+            di
+.c:         ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .c
+            ei
+            ret
+.off:       xor a                           ; (off: the OAM copy itself; RF_OAM is the
+            ld [refl_lv], a                 ;   airship view's table while it shows)
+            ld [rf_pend], a
+            ld [rf_acls], a
             ld [REFL_OAM], a
             ld [REFL_OAM + 4], a
             ld [REFL_OAM + 8], a
             ld [REFL_OAM + 12], a
-            ret
-.off:       xor a
-            ld [refl_lv], a
             ret
 ; the strength for the fade level (1-4 -> 1, 5-8 -> 2, 9-12 -> 3), its colours when it changed
 refl_fade:  ld a, [refl_lv]
@@ -328,103 +339,648 @@ refl_fade:  ld a, [refl_lv]
             ldh [rOBP1], a
             ret
 .ob:        db %01000000, %01010100, %10010100
-; each sprite only where the 8 x 8 quarter under its middle is drawn with open water (the
-; build's REFL_WTAB, from the map's own tiles): standing or stepping in any direction it slips
-; into the shore exactly where the water ends; C: some part shows
-refl_clip:  xor a
-            ld [rw_n], a                    ; (parts shown)
-            ld hl, REFL_OAM
-            ld b, 4
-.e:         push bc
-            push hl
-            ld a, [hl+]                     ; y: the middle from the party's top (OAM y - 16
-            and a                           ;   - 64 + 4), the step's pixels added
-            jr z, .nx
-            cp 160                          ; (off the screen: none)
-            jr nc, .land
-            sub 76
-            ld b, a
-            ld a, [mdy]
-            call .st
-            ld d, a                         ; D = pixels down from the party's tile
-            ld a, [hl]                      ; x: the same from its left (OAM x - 8 - 72 + 4)
-            sub 76
-            ld b, a
-            ld a, [mdx]
-            call .st
-            ld e, a                         ; E = pixels across
-            ld c, 1                         ; C = the quarter's bit (UL 1, UR 2, DL 4, DR 8)
-            bit 3, e
-            jr z, .q1
-            sla c
-.q1:        bit 3, d
-            jr z, .q2
-            sla c
-            sla c
-.q2:        ld a, e                         ; the metatile: the party's + pixels / 16
-            sra a
-            sra a
-            sra a
-            sra a
-            ld b, a
-            ld a, [px]
-            add a, b
-            ld e, a
-            ld a, d
-            sra a
-            sra a
-            sra a
-            sra a
-            ld b, a
-            ld a, [py]
-            add a, b
-            ld d, a
-            push bc
-            call rw1
-            pop bc
-            and $7F
-            add a, low(REFL_WTAB)
-            ld l, a
-            ld a, high(REFL_WTAB)
-            adc a, 0
-            ld h, a
-            ld a, [hl]
-            and c
-            jr nz, .nx
-.land:      pop hl
-            push hl
-            xor a
-            ld [hl], a                      ; (over land: hidden)
-.nx:        pop hl
-            ld a, [hl]
-            and a
-            jr z, .n2
-            ld a, 1
-            ld [rw_n], a
-.n2:        ld de, 4
-            add hl, de
-            pop bc
-            dec b
-            jr nz, .e
-            ld a, [rw_n]                    ; C: some part shows
-            rrca
-            ret
-; A = direction (-1 / 0 / 1), B = offset: B + direction x the step's pixels (signed)
-.st:        ld c, a
+; A = direction (-1 / 0 / 1), B = offset: B + direction x the step's pixels (signed), the
+; step one frame on (rf_la: what the screen shows when the tiles made now are up)
+refl_st:    ld c, a
             ld a, [moving]
             and a
             ld a, b
             ret z
+            ld a, [rf_la]
+            ld e, a
             ld a, [mcount]
+            add a, e
             bit 7, c
             jr nz, .neg
             dec c
             ld a, b
             ret nz                          ; (direction 0)
             ld a, [mcount]
+            add a, e
             add a, b
             ret
 .neg:       ld c, a
             ld a, b
             sub c
             ret
+
+; ---- the reflection cut to the water pixel by pixel (owner, 2026-11-25: on the coasts too,
+; only over their water). The build's REFL_MASK gives each overworld metatile's water as a bit
+; per pixel; each frame the four mirrored sprites get the water under them a frame on (the
+; step's next pixel) row by row: all water: the sprite as it is; none: hidden; some: its tile
+; masked into a free sprite tile. Those tiles go up in the next V-Blank (rf_up9) into the set
+; not shown ($70-$73 / $74-$77), and only once all are up does the set and the sprites' kinds
+; change, so a half-written tile never shows (the plain Game Boy may take two V-Blanks).
+RF_OAM     = $DC70          ; the four sprites made (copied into REFL_OAM at the end)
+RF_SIG     = $DC00          ; what the tiles were made from (23 bytes; the airship view's SCY
+                            ;   table, free likewise)
+RF_P       = $DC18          ; the four quarters' mask rows (2 x 2 pointers)
+RF_QX      = $DC20
+RF_QY      = $DC21
+RF_UA      = $DC22
+RF_UV      = $DC23
+RF_TC      = $DCC0          ; the source tiles kept: 4 x (tile, class) keys, then 4 x 16 bytes
+RF_TD      = $DCD0          ;   (free on the field: the battle's stage)
+RF_STG     = $DC80          ; the tiles made (4 x 16; the airship view's sky table, free while
+                            ;   the reflection shows: it is off in the air)
+RF_ROWS    = $DC40          ; (scratch: the airship view's DMG table, free likewise)
+RF_SRC     = $DC48
+RF_CK      = $DC58          ; metatile cache: 6 x (key, metatile)
+RF_CN      = $DC64
+RF_X       = $DC65
+RF_Y       = $DC66
+RF_I       = $DC67
+RF_ANY     = $DC68
+RF_SH      = $DC69
+RF_T       = $DC6A
+RF_YY      = $DC6D
+rf_pend    = $D9FC          ; 1: RF_STG / rf_scls wait for the V-Blank
+rf_acls    = $D9FD          ; the kinds shown (2 bits a sprite: 0 hidden, 1 whole, 2 masked)
+rf_scls    = $D9FE          ; the kinds made
+rf_aset    = $D9FF          ; the tile set shown (0: $70, 1: $74); bit 7: upload going (sprite
+                            ;   index in bits 0-2 of rf_upi)
+rf_upi     = $DC6B
+rf_la      = $DC6C
+
+refl_msk:   ld a, [rf_pend]                 ; (an upload half done: the tiles made stay)
+            and a
+            jr z, .mk
+            ld a, [rf_upi]
+            and a
+            jr nz, .apply
+.mk:        call rf_sig                     ; (nothing moved: the tiles made stand)
+            jr z, .apply
+            xor a
+            ld [rf_pend], a                 ; (none taken by the V-Blank while being made)
+            ld [rf_upi], a
+            ld [RF_CN], a
+            ld [rf_scls], a
+            ld [RF_ANY], a
+            ld a, [moving]                  ; the step a frame on: 1 pixel, 2 on a dash
+            and a
+            jr z, .la
+            ld a, [dash]
+            inc a
+.la:        ld [rf_la], a
+            xor a
+.e:         ld [RF_I], a
+            call rf_one
+            ld a, [RF_I]
+            inc a
+            cp 4
+            jr c, .e
+            ld a, 1
+            ld [rf_pend], a
+.apply:     ld hl, RF_OAM                   ; the kinds shown now
+            ld a, [rf_acls]
+            ld c, a
+            ld b, 0
+.ap:        ld a, c
+            and 3
+            jr nz, .ap1
+            ld [hl], a                      ; (hidden)
+            jr .apn
+.ap1:       cp 2
+            jr nz, .apn
+            inc l                           ; masked: its tile in the set shown
+            inc l
+            ld a, [rf_aset]
+            and 1
+            add a, a
+            add a, a
+            add a, $70
+            add a, b
+            ld [hl-], a
+            dec l
+.apn:       ld a, l
+            add a, 4
+            ld l, a
+            srl c
+            srl c
+            inc b
+            ld a, b
+            cp 4
+            jr c, .ap
+            ld a, [rf_scls]                 ; C: some part shows (of the ones made)
+            and a
+            ret z
+            scf
+            ret
+
+; sprite RF_I: its rows' water, its kind into rf_scls, its masked tile into RF_STG
+rf_one:     ld a, [RF_I]
+            add a, a
+            add a, a
+            add a, low(RF_OAM)
+            ld l, a
+            ld h, high(RF_OAM)
+            ld a, [hl+]
+            and a
+            ret z
+            cp 160
+            ret nc
+            sub 80                          ; Y: its top from the party's tile, the step on
+            ld b, a
+            push hl
+            ld a, [mdy]
+            call refl_st
+            ld [RF_Y], a
+            pop hl
+            ld a, [hl+]
+            sub 80
+            ld b, a
+            push hl
+            ld a, [mdx]
+            call refl_st
+            ld [RF_X], a
+            pop hl
+            ld a, [hl]
+            ld [RF_T], a
+            ld a, [RF_X]                    ; the 2 x 2 quarters under it: their mask rows
+            and 7
+            ld [RF_SH], a
+            ld a, [RF_X]
+            sra a
+            sra a
+            sra a
+            ld [RF_QX], a
+            ld a, [RF_Y]
+            sra a
+            sra a
+            sra a
+            ld [RF_QY], a
+            ld de, RF_P
+            ld b, 0
+            ld a, $FE                       ; (RF_UA: the quarters' common whole value, or 1)
+            ld [RF_UA], a
+.p:         push bc
+            push de
+            ld a, [RF_QX]
+            bit 0, b
+            jr z, .p1
+            inc a
+.p1:        ld c, a
+            ld a, [RF_QY]
+            bit 1, b
+            jr z, .p2
+            inc a
+.p2:        ld b, a
+            call rf_qp
+            ld b, a                         ; (all four alike and whole, or not)
+            ld a, [RF_UA]
+            cp $FE
+            jr z, .pu
+            cp b
+            jr z, .pv
+            ld b, 1
+.pu:        ld a, b
+            ld [RF_UA], a
+.pv:        pop de
+            ld a, l
+            ld [de], a
+            inc e
+            ld a, h
+            ld [de], a
+            inc e
+            pop bc
+            inc b
+            ld a, b
+            cp 4
+            jr c, .p
+            ld a, [RF_UA]                   ; all four whole quarters alike: no rows to cut
+            and a
+            ret z                           ; (none water: hidden)
+            inc a
+            ld c, 1
+            jr z, .k                        ; (all water: whole)
+            ld a, [RF_Y]                    ; C = row in the quarter pair (0-15)
+            and 7
+            ld c, a
+            ld b, $FF                       ; AND of the rows in B, OR in D, E = RF_ROWS slot
+            ld d, 0
+            ld e, low(RF_ROWS)
+.r:         push bc
+            push de
+            ld hl, RF_P                     ; the upper or the lower pair
+            ld a, c
+            cp 8
+            jr c, .up
+            ld hl, RF_P + 4
+            sub 8
+.up:        ld e, a                         ; E = row in the quarter
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            ld b, a
+            ld a, c
+            add a, e
+            ld c, a
+            jr nc, .u1
+            inc b
+.u1:        ld a, [bc]                      ; the left quarter's bits
+            ld d, a
+            ld a, [RF_SH]
+            and a
+            jr z, .z
+            ld a, [hl+]
+            ld c, a
+            ld b, [hl]
+            ld a, c
+            add a, e
+            ld c, a
+            jr nc, .u2
+            inc b
+.u2:        ld a, [bc]                      ; the right one's
+            ld e, a
+            ld a, [RF_SH]
+            ld b, a
+.s:         sla e                           ; (left, right) << sh: the window in D
+            rl d
+            dec b
+            jr nz, .s
+.z:         ld a, d                         ; A = the row's water bits
+            pop de
+            pop bc
+            ld l, e
+            ld h, high(RF_ROWS)
+            ld [hl], a
+            inc e
+            ld l, a
+            and b
+            ld b, a
+            ld a, l
+            or d
+            ld d, a
+            inc c
+            ld a, e
+            cp low(RF_ROWS) + 8
+            jr c, .r
+            ld a, d
+            and a
+            ret z                           ; (no water: hidden)
+            ld c, 1
+            ld a, b
+            inc a
+            jr z, .k                        ; (all water: whole)
+            call rf_tile
+            ld c, 2
+.k:         ld a, [RF_I]                    ; kind C at bits 2 i
+            ld b, a
+            ld a, c
+.ks:        dec b
+            bit 7, b
+            jr nz, .kd
+            add a, a
+            add a, a
+            jr .ks
+.kd:        ld hl, rf_scls
+            or [hl]
+            ld [hl], a
+            ret
+
+; C = quarter column, B = quarter row (from the party's tile, signed): HL = that quarter's 8
+; mask rows (the Color's REFL_MASK, the plain Game Boy's at + $1000)
+rf_qp:      ld a, b                         ; metatile key: column / 2, row / 2 (signed nibbles)
+            sra a
+            and $0F
+            ld d, a
+            ld a, c
+            sra a
+            and $0F
+            swap a
+            or d
+            ld d, a                         ; D = key
+            ld hl, RF_CK                    ; cached?
+            ld a, [RF_CN]
+            ld e, a
+.f:         ld a, e
+            and a
+            jr z, .miss
+            ld a, [hl+]
+            cp d
+            jr z, .hit
+            inc hl
+            dec e
+            jr .f
+.hit:       ld a, [hl]
+            jr .got
+.miss:      push bc
+            push de
+            push hl
+            ld a, c                         ; E = px + column / 2, D = py + row / 2
+            sra a
+            ld e, a
+            ld a, [px]
+            add a, e
+            ld e, a
+            ld a, b
+            sra a
+            ld d, a
+            ld a, [py]
+            add a, d
+            ld d, a
+            call rw1
+            and $7F
+            pop hl
+            pop de
+            pop bc
+            ld e, a
+            ld a, [RF_CN]                   ; (cached, 6 at most)
+            cp 6
+            jr nc, .nc
+            inc a
+            ld [RF_CN], a
+            ld a, d
+            ld [hl+], a
+            ld [hl], e
+.nc:        ld a, e
+.got:       ld l, a                         ; HL = 4 mt + quarter (the whole-quarter table's
+            ld h, 0                         ;   index), then x 8 + the mask table
+            add hl, hl
+            add hl, hl
+            ld a, b
+            and 1
+            add a, a
+            ld e, a
+            ld a, c
+            and 1
+            or e
+            ld e, a
+            ld d, 0
+            add hl, de
+            push hl
+            ld de, REFL_UNI
+            ldh a, [is_cgb]
+            and a
+            jr nz, .u
+            ld d, high(REFL_UNI) + 2
+.u:         add hl, de
+            ld a, [hl]
+            ld [RF_UV], a
+            pop hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, REFL_MASK
+            ldh a, [is_cgb]
+            and a
+            jr nz, .cg
+            ld d, high(REFL_MASK) + $10
+.cg:        add hl, de
+            ld a, [RF_UV]
+            ret
+
+; Z if nothing the tiles depend on changed since they were made (the party's place and step,
+; the sprites' places and tiles); the new values kept
+rf_sig:     ld hl, RF_SIG
+            ld c, 0                         ; C: a difference
+            ld a, [px]
+            call .b
+            ld a, [py]
+            call .b
+            ld a, [mcount]
+            call .b
+            ld a, [mdx]
+            call .b
+            ld a, [mdy]
+            call .b
+            ld a, [moving]
+            call .b
+            ld a, [dash]
+            call .b
+            ld de, RF_OAM
+            ld b, 16
+.o:         ld a, [de]
+            inc e
+            call .b
+            dec b
+            jr nz, .o
+            ld a, c
+            and a
+            ret
+.b:         cp [hl]
+            jr z, .s
+            ld c, 1
+            ld [hl], a
+.s:         inc hl
+            ret
+
+; RF_T's tile masked by RF_ROWS (the sprite is drawn upside down: tile row j at screen row 7 - j)
+; into RF_STG + 16 RF_I
+rf_tile:    ld a, [RF_I]                    ; the source kept for this slot? (same tile, class)
+            add a, a
+            add a, low(RF_TC)
+            ld l, a
+            ld h, high(RF_TC)
+            ld a, [RF_T]
+            cp [hl]
+            jr nz, .ld
+            inc l
+            ld a, [ps_cls]
+            cp [hl]
+            jr z, .m
+            dec l
+.ld:        ld a, [RF_T]
+            ld [hl+], a
+            ld a, [ps_cls]
+            ld [hl], a
+            ld a, [RF_T]
+            cp $10
+            jr nc, .veh
+            ld a, [RF_T]                    ; the party: the class's tile
+            swap a
+            ld l, a
+            ldh a, [is_cgb]
+            and a
+            jr z, .pd
+            ld a, [ps_cls]                  ; (the Color: MINI_BANK $64 + class, as it is)
+            add a, $64
+            ld h, a
+            call rf_srcd
+            ld bc, 16
+            ld a, MINI_BANK
+            call far_copy
+            jr .m
+.pd:        ld a, [ps_cls]                  ; (DMG / SGB: the build's pre-shaded overworld
+            add a, high(REFL_PDMG)          ;   copy in this bank, REFL_PDMG + 256 class)
+            ld h, a
+            call rf_srcd
+            ld b, 16
+.pc:        ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .pc
+            jr .m
+.veh:       sub $10                         ; a vehicle: the overworld's tiles (Color / DMG)
+            swap a
+            ld l, a
+            and $0F
+            ld h, a
+            ld a, l
+            and $F0
+            ld l, a
+            ld de, M_VEHCGB
+            ldh a, [is_cgb]
+            and a
+            jr nz, .vc
+            ld de, M_VEHDMG
+.vc:        add hl, de
+            call rf_srcd
+            ld bc, 16
+            ld a, OW_INFO
+            call far_copy
+.m:         call rf_srcd                    ; HL = the slot's source
+            ld h, d
+            ld l, e
+            ld a, [RF_I]
+            swap a
+            add a, low(RF_STG)
+            ld e, a
+            ld d, high(RF_STG)
+            ld c, 7                         ; tile row j: screen row 7 - j
+.t:         push hl
+            ld a, c
+            add a, low(RF_ROWS)
+            ld l, a
+            ld h, high(RF_ROWS)
+            ld b, [hl]
+            pop hl
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            and b
+            ld [de], a
+            inc de
+            dec c
+            bit 7, c
+            jr z, .t
+            ret
+; DE = the slot's kept source (RF_TD + 16 RF_I)
+rf_srcd:    ld a, [RF_I]
+            swap a
+            add a, low(RF_TD)
+            ld e, a
+            ld d, high(RF_TD)
+            ret
+; V-Blank (after the water): the masked tiles made into the set not shown, 16 bytes while LY
+; is 144-152; all up: that set and the kinds made are shown
+rf_up9:     ld a, [rf_pend]
+            and a
+            ret z
+.l:         ld a, [rf_upi]
+            cp 4
+            jr nc, .done
+            ld b, a                         ; masked? (kind 2)
+            ld a, [rf_scls]
+            inc b
+.k:         dec b
+            jr z, .kk
+            srl a
+            srl a
+            jr .k
+.kk:        and 3
+            cp 2
+            jr nz, .nx
+            ld a, [rf_upi]                  ; HL = RF_STG + 16 i, DE = tile ($70 / $74) + i
+            swap a
+            add a, low(RF_STG)
+            ld l, a
+            ld h, high(RF_STG)
+            ld a, [rf_aset]
+            and 1
+            xor 1
+            add a, a
+            add a, a
+            add a, $70
+            ld e, a
+            ld a, [rf_upi]
+            add a, e
+            swap a
+            ld e, a
+            and $0F
+            or $80
+            ld d, a
+            ld a, e
+            and $F0
+            ld e, a
+            ldh a, [rLY]                    ; (in the V-Blank handler: no interrupt comes)
+            sub 144
+            cp 8
+            jr nc, .late
+            ld a, [hl+]                     ; (unrolled: 5 cycles a byte)
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+.nx:        ld hl, rf_upi
+            inc [hl]
+            jr .l
+.late:      ret                             ; (the rest in the next V-Blank)
+.done:      xor a
+            ld [rf_upi], a
+            ld [rf_pend], a
+            ld a, [rf_aset]
+            xor 1
+            ld [rf_aset], a
+            ld a, [rf_scls]
+            ld [rf_acls], a
+            ret
+
+section bank 0, $2E6D                       ; (free space)
+; the V-Blank handler: OAM, then at once the reflection's masked tiles (the plain Game Boy's
+; V-Blank has room only this early: the map's rows and the water come after)
+rf_dma:     call hram_dma
+            jp rf_vbu
+section bank 0, $16CB                       ; (free space)
+rf_vbu:     ld a, [rf_pend]
+            and a
+            ret z
+            ld a, REFL_BANK
+            ld hl, rf_up9
+            jp bank_call

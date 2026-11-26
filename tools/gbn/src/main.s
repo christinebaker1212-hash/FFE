@@ -348,7 +348,7 @@ vblank:     push af
 .v2:
             ld hl, frame
             inc [hl]
-            call hram_dma
+            call rf_dma                     ; (OAM; then the reflection's masked tiles: refl.s)
             ldh a, [scx]
             ldh [rSCX], a
             ldh a, [scy]

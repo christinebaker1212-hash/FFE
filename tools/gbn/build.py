@@ -358,8 +358,67 @@ def refl_source(rom):
             mt = max(cand, key=lambda m: freq.get(m, 0))
             water |= {tsa[128 * k + mt] for k in range(4)}
     tab = [sum(1 << k for k in range(4) if tsa[128 * k + mt] in water) for mt in range(128)]
-    return ('section bank 111, $7F00\nREFL_WTAB:\n' +
-            ''.join('            db %s\n' % ', '.join('$%02X' % v for v in tab[i:i + 16]) for i in range(0, 128, 16)))
+    # per pixel (owner, 2026-11-25: the reflection on the coasts too, cut to their water): for
+    # each metatile, quarter and pixel row a byte, bit 7 the left pixel, set where the pixel
+    # shows a colour of the open sea's / river's pictures; only metatiles drawn next to water
+    # somewhere on the map (a blue roof inland stays dry). REFL_MASK + 32 mt + 8 quarter + row
+    tiles, pal, mt_pal = o['cgb_tiles'], o['cgb_bg'], o['mt_pal']
+    def px(mt, k, y, x):
+        t = tiles[16 * tsa[128 * k + mt]:16 * tsa[128 * k + mt] + 16]
+        v = (t[2 * y] >> (7 - x) & 1) | (t[2 * y + 1] >> (7 - x) & 1) << 1
+        c = 2 * (4 * mt_pal[mt] + v)
+        return pal[c] | pal[c + 1] << 8
+    wcol = {px(mt, k, y, x) for mt in range(128) if tab[mt] == 15
+            for k in range(4) for y in range(8) for x in range(8)}
+    wet = {mt for mt in range(128) if tab[mt] == 15}
+    near = set(wet)
+    rows = o['rows']
+    for y in range(256):
+        for x in range(256):
+            if rows[y][x] & 0x7F in wet:
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    near.add(rows[(y + dy) & 255][(x + dx) & 255] & 0x7F)
+    mask = bytearray(4096)
+    for mt in range(128):
+        if mt not in near: continue
+        for k in range(4):
+            for y in range(8):
+                mask[32 * mt + 8 * k + y] = sum(0x80 >> x for x in range(8) if px(mt, k, y, x) in wcol)
+    # the plain Game Boy's own: its pre-shaded tiles (a coast's water edge can be shaded as
+    # land there), the shades of the open water's pictures (REFL_MASK + $1000)
+    dt, mtd = o['dmg_tiles'], o['mt_dmg']
+    def pxd(mt, k, y, x):
+        t = dt[16 * mtd[128 * k + mt]:16 * mtd[128 * k + mt] + 16]
+        return (t[2 * y] >> (7 - x) & 1) | (t[2 * y + 1] >> (7 - x) & 1) << 1
+    wsh = {pxd(mt, k, y, x) for mt in wet for k in range(4) for y in range(8) for x in range(8)}
+    mask += bytes(4096)
+    for mt in range(128):
+        if mt not in near: continue
+        for k in range(4):
+            for y in range(8):
+                mask[4096 + 32 * mt + 8 * k + y] = sum(0x80 >> x for x in range(8) if pxd(mt, k, y, x) in wsh)
+    # the plain Game Boy's party on the overworld, every class pre-shaded as party_spr shades
+    # it there (its tiles ranked by o['party_perm'], palette by the tile's bit 1): the
+    # reflection's masked tiles read them as they are (REFL_PDMG + 256 class + 16 tile)
+    perm = o['party_perm']; pdmg = bytearray()
+    for c in range(12):
+        for t in range(16):
+            pb = perm[2 * c + (t >> 1 & 1)]
+            raw = rom.rd(data.BANK_MAPCHR, data.MAPMAN_CHR + 0x100 * c + 16 * t, 16)
+            pdmg += data.gb_tile(raw, (0, pb & 3, pb >> 2 & 3, pb >> 4 & 3))
+    # each quarter whole: $FF all water, $00 none, $01 mixed (Color at REFL_UNI, DMG + $200)
+    uni = bytearray()
+    for base in (0, 4096):
+        for mt in range(128):
+            for k in range(4):
+                rows8 = mask[base + 32 * mt + 8 * k:base + 32 * mt + 8 * k + 8]
+                uni.append(0xFF if all(v == 0xFF for v in rows8) else 0 if not any(rows8) else 1)
+    return ('section bank 111, $7000\nREFL_UNI:\n' +
+            ''.join('            db %s\n' % ', '.join('$%02X' % v for v in uni[i:i + 16]) for i in range(0, len(uni), 16)) +
+            'section bank 111, $7400\nREFL_PDMG:\n' +
+            ''.join('            db %s\n' % ', '.join('$%02X' % v for v in pdmg[i:i + 16]) for i in range(0, len(pdmg), 16)) +
+            'section bank 111, $5000\nREFL_MASK:\n' +
+            ''.join('            db %s\n' % ', '.join('$%02X' % v for v in mask[i:i + 16]) for i in range(0, len(mask), 16)))
 
 
 def water_anim(o):

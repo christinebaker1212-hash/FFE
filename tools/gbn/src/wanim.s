@@ -135,7 +135,16 @@ wa_drw:     ld a, F3_BANK
 section bank 99, $7E00
 ; (bank F3_BANK) every water tile of the new map at step wa_t / 4: the towns' tile (wt_cp), or
 ; the overworld's slots (the water bank's header and frames read through far_copy)
-wa_load:    ld a, [wa_t]
+wa_load:    xor a                           ; (a map's load: the reflection's tiles made
+            ld [rf_pend], a                 ;   again, none taken over: refl.s)
+            ld [rf_acls], a
+            ld [rf_upi], a
+            dec a                           ; (its kept source tiles: none)
+            ld [RF_TC], a
+            ld [RF_TC + 2], a
+            ld [RF_TC + 4], a
+            ld [RF_TC + 6], a
+            ld a, [wa_t]
             rrca
             rrca
             and 63
