@@ -13,38 +13,24 @@ AP_YC      = 64             ; the ship's line: 1:1 there
 AP_BANK    = 114            ; (build.py ap_source) AP_TAB: 33 levels' lists, 256 bytes apart
 
 section bank 0, $3E80                       ; (bank 0: the STAT and V-Blank parts, the streamer's)
-; draw_edge: the rows of a column entering the view (D = first, B = count)
-ap_hrows:   ld a, [vehicle]
-            cp V_AIR
-            ld a, [py]
-            jr z, .a
+; draw_edge: the rows of a column entering the view (D = first, B = count): py - 6 .. + 6
+; (the airship's view, which needed rows py - 7 .. + 8, is off: owner, 2026-11-26)
+ap_hrows:   ld a, [py]
             sub 6
             ld d, a
             ld b, 13
             ret
-.a:         sub 7
-            ld d, a
-            ld b, 16
+; draw_edge: the row to draw above / below (B, from py before the step): one beyond the row
+; entering (-6 / +6)
+ap_up:      ld b, $FA
             ret
-; draw_edge: the row to draw above (B, from py before the step): one beyond the row entering
-; (-6); flying, the view keeps rows py - 7 .. + 8, the whole ring: the new top one (-8)
-ap_up:      ld a, [vehicle]
-            cp V_AIR
-            ld b, $FA
-            ret nz
-            ld b, $F8
-            ret
-; draw_edge: the row to draw below (B, from py before the step): py + 6; flying the ring's new
-; bottom one, py + 9
-ap_dn:      ld a, [vehicle]
-            cp V_AIR
-            ld b, 6
-            ret nz
-            ld b, 9
+ap_dn:      ld b, 6
             ret
 
 ; the field's frame (main loop, air_frame): the view's level from the airship's height; on / off
-ap_tick:    ldh a, [maptype]                ; (the overworld only: maptype 1)
+ap_tick:    jr .off                         ; (owner, 2026-11-26: the airship's view removed;
+                                            ;   kept off, its code left for a later choice)
+            ldh a, [maptype]                ; (the overworld only: maptype 1)
             dec a
             jr nz, .off
             ld a, [vehicle]

@@ -1155,3 +1155,5 @@ one reaches parity, so the owner can keep playing).
     - Plain Game Boy / Super Game Boy: the canoe was invisible facing sideways, and the last 16 vehicle tiles ($60-$6F)
       were blank: the overworld bank's font table ($7F00) had been placed over the DMG vehicle tiles ($7A00-$7FFF).
       They moved to $6A00; build.py place() now refuses two blobs over each other (this was the only overlap).
+    - The airship's view removed (owner): flying shows the plain overworld again, with the field's own rows (py - 6 .. + 6);
+      ap_tick keeps it off, its code (src/air.s, build.py ap_source) left in place.

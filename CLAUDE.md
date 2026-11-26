@@ -1429,7 +1429,8 @@ Then (item 63): DMG transitions to white instead of black (wipe curtains, palett
 screen's per-file gradient, battle name lookups guarded (the owner's "o&" window, not reproduced), the reflection's corner fade
 looking at the step's end; the "chopped head" on corner tiles not reproduced (screenshot asked for).
 Then (item 64): no reflections on the overworld (towns keep theirs); the DMG canoe / vehicle tiles $60-$6F restored (the
-overworld bank's font table had been placed over them; build.py place() now refuses overlaps).
+overworld bank's font table had been placed over them; build.py place() now refuses overlaps); the airship's view removed
+(owner: flying shows the plain overworld; its code left off in src/air.s).
 
 ## Remaining
 - **FF1 (native build), before release:**
