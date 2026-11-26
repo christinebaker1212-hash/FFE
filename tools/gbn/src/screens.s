@@ -624,10 +624,9 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             call sus_state                  ; Continue: a suspend point first
             dec a
             jr nz, .cs
-            ld hl, str_susc1                ; Continue from Suspend point?
-            ld a, 2
-            ld d, 0
-            call sus_ask
+            ld a, PK_BANK                   ; Continue from Suspend point? (in place)
+            ld hl, yn_susc1
+            call bank_call
             and a
             jr nz, .cn
             call sus_load                   ; Yes: the point (erased) and the map
@@ -636,10 +635,9 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             ret
 .cn:        call sv_any                     ; No: with a save, Continue from last save?
             jp c, .np                       ;   The suspend point will be lost!
-            ld hl, str_susc2
-            ld a, 4
-            ld d, 1
-            call sus_ask
+            ld a, PK_BANK
+            ld hl, yn_susc2
+            call bank_call
             and a
             jp nz, .np
             call file_load                  ; (which file: loc.s)
@@ -1443,12 +1441,15 @@ sus_ask:    ld [sus_ln], a
 .b:         ld a, 1
             ret
 ; the main menu's Suspend: asked (No first); Yes: the point made, the title
-sus_menu:   ld hl, str_susq
-            ld a, 7
-            ld d, 1
-            call sus_ask
+sus_menu:   ld a, PK_BANK                   ; (asked in place: packs.s yn_susq)
+            ld hl, yn_susq
+            call bank_call
             and a
-            ret nz
+            jr z, .y
+            pop hl                          ; No: the bottom window again, the menu loop
+            call mm_bot
+            jp menu_main.l
+.y:
             call sus_write
             jp game_over
 

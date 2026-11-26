@@ -58,12 +58,14 @@ def font_banks(rom, ff3=None):
     for code, t16 in f.items():
         dmg[16 * code:16 * code + 16] = data.gb_tile(t16, DMG_ICON if code in names.ICON_CODES else DMG_WIN)
         cgb[16 * code:16 * code + 16] = data.gb_tile(t16)
-        if 0x20 <= code < 0x80 and code not in names.ICON_CODES:
+        if code in names.ICON_CODES:              # (the icons too: every ink, colours 0, 1, 3, casts it;
+            cgb[16 * code:16 * code + 16] = shadow_tile(cgb[16 * code:16 * code + 16], (0, 1, 3))
+        elif 0x20 <= code < 0x80:                 #   owner, 2026-11-26)
             cgb[16 * code:16 * code + 16] = shadow_tile(cgb[16 * code:16 * code + 16])
     return bytes(dmg), bytes(cgb)
 
 
-def shadow_tile(t):
+def shadow_tile(t, ink=(3,)):
     """the Color's letters with a 1 px shadow down and right (owner, 2026-11-25): a window pixel
     (colour 2) below and right of an ink pixel (colour 3) takes colour 0, which the windows' palette
     sets to the window colour at a quarter (src/pal.s wp_dark)"""
@@ -71,7 +73,7 @@ def shadow_tile(t):
     out = [row[:] for row in px]
     for y in range(7):
         for x in range(7):
-            if px[y][x] == 3 and px[y + 1][x + 1] == 2:
+            if px[y][x] in ink and px[y + 1][x + 1] == 2:
                 out[y + 1][x + 1] = 0
     b = bytearray()
     for row in out:

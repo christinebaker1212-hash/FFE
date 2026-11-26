@@ -62,21 +62,42 @@ pk_main9:   xor a
             ret
 .give:      call pk_movable                 ; (an item, not worn)
             jr c, .no
+            ld a, [gr_wn]                   ; (its window off the gradient's list after)
+            ld [yn_gw], a
             call pk_give
+            ld a, [yn_gw]
+            ld [gr_wn], a
+            ld a, 1
+            ld [gr_dirty], a
             call pk_mid                     ; (the packs again, in place)
             jp .l
 .drop:      call pk_movable
             jr c, .no
-            ld a, 2                         ; Drop it? (bank 2: the question's own screen)
-            ld hl, pk_ask
-            call bank_call
+            xor a                           ; Drop it? (in place: the item on the second line)
+            ld [yn_at], a
+            ld hl, str_ydrop
+            ld a, 2
+            ld d, 1
+            call yn_open
+            ld a, [yn_top]
+            add a, 2
+            ld [pk_row], a
+            ld c, a
+            ld b, 1
+            call pen_at
+            call pk_srcp
+            ld a, [pk_c]
+            call pk_item
+            call scr_upd
+            call yn_loop
             and a
-            jr nz, .scr
+            jr nz, .dn0
             call pk_srcp
             xor a
             ld [hl], a
             call pk_tidy
-            jr .scr
+.dn0:       call pk_mid
+            jp .l
 .no:        call sfx_err
             jr .l
 
@@ -120,19 +141,23 @@ pk_draw:    call scr_open
             call bank_call
             ld hl, str_pk
             call pen_str
-            ld bc, $0005
-            ld de, $140D
-            call scr_win
+            call pk_wins
             call pk_rows
             call pk_hint
             jp scr_show
 ; the packs window again (after Give: no fade)
-pk_mid:     ld bc, $0005
-            ld de, $140D
-            call scr_win
+pk_mid:     call pk_wins
             call pk_rows
             call pk_hint
             jp scr_upd
+; the packs' two windows: weapons (0,5,20,6), armour and the hint (0,10,20,8), sharing a border
+; (one tall window let the gradient's ramp start over half way down; owner, 2026-11-26)
+pk_wins:    ld bc, $0005
+            ld de, $1406
+            call scr_win
+            ld bc, $000A
+            ld de, $1408
+            jp scr_win
 pk_hint:    ld bc, $0110
             call pen_at
             ld hl, str_pkh
@@ -302,6 +327,40 @@ pk_give:    ld hl, pk_mem
             pop hl
             ld [hl], a
             jp pk_tidy
+; member A's name without its trailing blanks (pen_name's six letters, cut at the first blank)
+pk_tname:   call ch_rec
+            push hl
+            inc hl
+            inc hl
+            ld de, eqm_c3                   ; (the six letters gathered first)
+            ld b, 4
+.c1:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c1
+            pop hl
+            ld a, l
+            add a, CH_NAME2
+            ld l, a
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl]
+            ld [de], a
+            ld hl, eqm_c3
+            ld b, 6
+.p:         ld a, [hl+]
+            cp ' '
+            ret z
+            and a
+            ret z
+            cp $FF
+            ret z
+            call pen_ch
+            dec b
+            jr nz, .p
+            ret
 ; A = member -> A = its empty slots of the hand's kind
 pk_free:    ld [pk_k], a
             ld a, [pk_c]
@@ -333,18 +392,28 @@ pk_empty:   ld [pk_k], a
             jr .f
 
 ; the target's pack is full: its four items of the kind, A on one not worn trades places
-pk_trade:   ld bc, $0005
-            ld de, $140D
-            call scr_win
-            ld bc, $010C                    ; (Full: name / Trade for which?)
-            call pen_at
+pk_trade:   call pk_wins
+            ld bc, $010B                    ; (Name: pack full. / Trade the / the item / for
+            call pen_at                     ;   which item?)
+            ld a, [pk_t]
+            call pk_tname
             ld hl, str_pkfull
             call pen_str
-            ld a, [pk_t]
-            call pen_name
-            ld bc, $010D
+            ld bc, $010C
             call pen_at
             ld hl, str_pktr
+            call pen_str
+            ld a, $0D
+            ld [pk_row], a
+            ld c, a
+            ld b, 1
+            call pen_at
+            call pk_srcp
+            ld a, [pk_c]
+            call pk_item
+            ld bc, $010E
+            call pen_at
+            ld hl, str_pktr2
             call pen_str
             ld a, [pk_c]
             and 4
@@ -465,18 +534,14 @@ pk_tidy:    xor a
 str_pk:     db "Packs", 0
 str_pkh:    db "A:Give SELECT:Drop", 0
 str_pkto:   db "Give to:", 0
-str_pkfull: db "Full: ", 0
-str_pktr:   db "Trade for which?", 0
+str_pkfull: db ": pack full.", 0
+str_pktr:   db "Trade the", 0
+str_pktr2:  db "for which item?", 0
 
 section bank 2, $7345                       ; (free space; the packs screen's calls in bank 2)
 pk_mtop:    call eqm_pal                    ; the member's top window (mtop: the pen at (4, 3))
             ld a, [pk_m]
             jp mtop
-pk_ask:     ld hl, str_pkdrop
-            ld a, 1
-            ld d, 1
-            jp sus_ask
-str_pkdrop: db "Drop this item?", 0
 
 ; the Equip screen's Packs (bank 2): the packs screen, then the Equip screen again (its member)
 eqm_pk:     ld a, [eqm_m]
@@ -581,3 +646,143 @@ orb_gfx9:    ldh a, [is_cgb]
             ld a, UI_GFX
             jp far_copy
 
+
+section bank 107, $7400                     ; (free space)
+; ---- a Yes / No question in place (owner, 2026-11-26: Nintendo's menus ask over the screen, not
+; on a screen of their own): a full-width window over the screen (centred, or from row yn_at when
+; it is not 0); the caller draws again what it covered. HL = the text (this bank or RAM; up to 4
+; lines), A = lines, D = the first choice (0 Yes, 1 No) -> A = 0 Yes, 1 No (B: No)
+yn_ln      = eqm_bk + 12
+yn_k       = eqm_bk + 13
+yn_top     = eqm_bk + 14
+yn_h       = eqm_bk + 15
+yn_yr      = eqm_buf
+yn_gw      = eqm_buf + 1
+yn_at      = eqm_buf + 2
+yn_ask:     call yn_open
+yn_loop:    ld a, [yn_k]
+            and a
+            ld b, 6
+            jr z, .x
+            ld b, 13
+.x:         ld a, [yn_yr]
+            ld c, a
+            call cur_txt
+            call scr_frame
+            ldh a, [pad_new]
+            bit 0, a
+            jr nz, .a
+            bit 1, a
+            jr nz, .b
+            and $F0
+            jr z, yn_loop
+            ld a, [yn_k]
+            xor 1
+            ld [yn_k], a
+            jr yn_loop
+.a:         ld a, [yn_k]
+            jr .r
+.b:         ld a, 1
+.r:         push af                         ; (the window off the gradient's list)
+            xor a
+            ld [yn_at], a
+            ld a, [yn_gw]
+            ld [gr_wn], a
+            ld a, 1
+            ld [gr_dirty], a
+            pop af
+            ret
+yn_open:    ld [yn_ln], a
+            ld a, d
+            ld [yn_k], a
+            push hl
+            ld a, [gr_wn]
+            ld [yn_gw], a
+            ld a, [yn_ln]
+            add a, 4
+            ld [yn_h], a
+            ld e, a
+            ld a, [yn_at]
+            and a
+            jr nz, .t
+            ld a, 18
+            sub e
+            srl a
+.t:         ld [yn_top], a
+            ld c, a
+            ld b, 0
+            ld d, 20
+            ld a, [yn_h]
+            ld e, a
+            call scr_win
+            pop hl
+            ld a, [yn_top]
+            inc a
+            ld c, a
+            ld b, 1
+            call scr_str
+            ld a, [yn_top]
+            ld hl, yn_ln
+            add a, [hl]
+            add a, 2
+            ld [yn_yr], a
+            ld c, a
+            ld b, 6
+            call pen_at
+            ld hl, str_ynyes
+            call pen_str
+            ld a, [yn_yr]
+            ld c, a
+            ld b, 13
+            call pen_at
+            ld hl, str_ynno
+            call pen_str
+            jp scr_upd
+str_ynyes:  db "Yes", 0
+str_ynno:   db "No", 0
+; the main menu's Suspend (its bottom window, rows 13-17) and the title's Continue questions
+yn_susq:    ld a, 13
+            ld [yn_at], a
+            ld hl, str_ysusq
+            ld a, 1
+            ld d, 1
+            jp yn_ask
+yn_susc1:   xor a
+            ld [yn_at], a
+            ld hl, str_ysusc1
+            ld a, 2
+            ld d, 0
+            jp yn_ask
+yn_susc2:   xor a
+            ld [yn_at], a
+            ld hl, str_ysusc2
+            ld a, 2
+            ld d, 1
+            jp yn_ask
+str_ysusq:  db "Suspend and quit?", 0
+str_ysusc1: db "Continue from", $0A, "Suspend Point?", 0
+str_ysusc2: db "Load save and lose", $0A, "the Suspend Point?", 0
+str_ydrop:  db "Drop this item?", $0A, 0
+
+section bank 2, $71F9                       ; (free space)
+; the main menu's Suspend answered No: its bottom window again (bank 2: mm_plc), the menu loop
+mm_bot:     ld bc, $000D
+            ld de, $1405
+            call scr_win
+            call mm_plc
+            ld bc, $0110
+            call pen_at
+            ld hl, str_gil
+            call pen_str
+            ld bc, $0D10
+            call pen_at
+            ld hl, GOLD
+            ld a, [hl+]
+            ld [nf_val], a
+            ld a, [hl+]
+            ld [nf_val + 1], a
+            ld a, [hl]
+            ld [nf_val + 2], a
+            ld b, 6
+            call pen_num
+            jp scr_upd
