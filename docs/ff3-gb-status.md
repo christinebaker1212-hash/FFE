@@ -31,6 +31,14 @@ Check standard. Code will go in `tools/gb3n/`, docs in `docs/ff3-gb-*.md`.
    already has some: judge each in battle against FF3's own, keep FF3's where better, adapt ours
    to FF3's style where equal or ours has the edge (`docs/ff3-gb-battle-compare.md`).
 
+## Battle comparison (2026-11-26)
+`docs/ff3-gb-battle-compare.md`: FF3's own numbers, flash, step-forward, auto-retarget, spell names,
+deaths and speed setting stay; ours (adapted, FF3 wording) for the hit label, critical label, cursor
+memory, hold-A, enemy counts, low-HP colours, results window. Checked on the NES English build
+(cynes, one Altar Cave round) and in the listing; spells / healing / targeting / transition still
+to be seen on screen. NES driver for tests: scratch (New Game, names typed by RAM state; FF3 needs
+6 letters + A and rejects duplicate names).
+
 ## Next (after the decisions)
 - Map the listing's routine names onto the ROM (as `tools/gb/ff1dis.py` did for FF1).
 - Copy the build skeleton, generic modules and test tools into `tools/gb3n/`; boot screen, font,
