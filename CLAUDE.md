@@ -129,6 +129,7 @@ work remaining, scope and plan. Commit and push it with the work.
 **For FF2 / FF3: `docs/gb-native-reuse.md`** (what made FF1 fully native, which modules carry over,
 the method). Session briefs: `docs/ff2-gb-brief.md`, `docs/ff3-gb-brief.md`.
 **Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
+**FF3 (Game Boy Color only) status: `docs/ff3-gb-status.md`.**
 **Handoff (recompiled build, historical): `docs/gb-handoff.md`.**
 
 ## Scope and plan
