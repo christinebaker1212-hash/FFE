@@ -559,7 +559,7 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             ld bc, $030C
             ld hl, str_title2
             call scr_str
-            ld bc, $060F
+            ld bc, $070F                    ; (centred in its box; owner, 2026-11-26)
             ld hl, str_title3
             call scr_str
             call .rate
@@ -584,7 +584,10 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             add a, 6
             ld c, a
             ld b, 6
-            call cur_txt
+            cp 15                           ; (Extras: its word a column on)
+            jr nz, .h
+            inc b
+.h:         call cur_txt
             call scr_frame
             ldh a, [pad_new]
             ld b, a
