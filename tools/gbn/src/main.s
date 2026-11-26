@@ -4471,10 +4471,10 @@ ps_next:    ld a, [SHOW_WHO]
             ld hl, $C100
             ld de, $8000
 .v:         call wait_vbl
-.b:         di                              ; 16 bytes while LY is 144-152
-            ldh a, [rLY]
+.b:         di                              ; 16 bytes while LY is 144-150 (a block takes
+            ldh a, [rLY]                    ;   more than a line on the plain Game Boy)
             sub 144
-            cp 9
+            cp 7
             jr c, .c
             ei
             jr .v

@@ -483,7 +483,32 @@ def refl_source(rom):
             for k in range(4):
                 rows8 = mask[base + 32 * mt + 8 * k:base + 32 * mt + 8 * k + 8]
                 uni.append(0xFF if all(v == 0xFF for v in rows8) else 0 if not any(rows8) else 1)
-    return ('section bank 111, $7000\nREFL_UNI:\n' +
+    # the towns (tileset 0, maps 0-7; owner, 2026-11-25: "enable reflections in towns"): their water
+    # is whole tiles (the water tile, the canal in shadow and its corner), so a quarter flag per
+    # metatile ($FF water) is the mask (rows from RF_ROWSFF / RF_ROWS00); and per map the first 8
+    # sprite tiles no object, font or map tile uses for the masked tiles (0: none, Onrac)
+    tt = data.tileset_pack(rom, 0)
+    ttsa = tt['tsa']
+    twet = {TOWN_WATER, ttsa[40], ttsa[256 + 41]}
+    twat = bytes(0xFF if ttsa[128 * k + mt] in twet else 0 for mt in range(128) for k in range(4))
+    tbase = bytearray()
+    for m in range(8):
+        p = data.map_pack(rom, m)
+        bl = set(p['objs']['blocks']); nb = p['n_dmg']; ft = set(p['font_tbl']) - {0}
+        lo = [b for b in range(16, 128, 16) if b not in bl]
+        hi = [b for b in range(128, 256, 8) if all(b + k >= nb and b + k not in ft and
+              not any(b0 <= b + k < b0 + 16 for b0 in bl) for k in range(8))]
+        tbase.append(lo[0] if lo else hi[0] if hi else 0)
+    tbase += bytes([0x70, 0])                       # (8: the overworld; 9: no reflection)
+    p0 = data.map_pack(rom, 0)
+    c = 2 * (4 * tt['mt_pal'][39] + 2)
+    twc = p0['cgb_bg_out'][c:c + 2]
+    town = ('section bank 111, $4800\nRF_TWAT:\n' +
+            ''.join('            db %s\n' % ', '.join('$%02X' % v for v in twat[i:i + 16]) for i in range(0, 512, 16)) +
+            'RF_ROWSFF:  db ' + ', '.join(['$FF'] * 8) + '\nRF_ROWS00:  db ' + ', '.join(['0'] * 8) + '\n' +
+            'section bank 99, $469A\nRF_TWC:     db $%02X, $%02X\nRF_TBT:     db %s\n' %
+            (twc[0], twc[1], ', '.join('$%02X' % v for v in tbase)))
+    return (town + 'section bank 111, $7000\nREFL_UNI:\n' +
             ''.join('            db %s\n' % ', '.join('$%02X' % v for v in uni[i:i + 16]) for i in range(0, len(uni), 16)) +
             'section bank 111, $7400\nREFL_PDMG:\n' +
             ''.join('            db %s\n' % ', '.join('$%02X' % v for v in pdmg[i:i + 16]) for i in range(0, len(pdmg), 16)) +

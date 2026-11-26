@@ -117,7 +117,15 @@ section bank 99, $7F00
 refl_pal:   ldh a, [is_cgb]
             and a
             ret z
-            ld a, WANIM_BANK                ; the water: DE = its colour, corrected
+            ldh a, [maptype]                ; (a town: its water's colour, build.py RF_TWC)
+            and a
+            jr nz, .sea
+            ld a, [RF_TWC]
+            ld e, a
+            ld a, [RF_TWC + 1]
+            ld d, a
+            jr .cc
+.sea:       ld a, WANIM_BANK                ; the water: DE = its colour, corrected
             ld [fc_bank], a
             ld hl, $4008
             call far_byte
@@ -125,7 +133,7 @@ refl_pal:   ldh a, [is_cgb]
             ld hl, $4009
             call far_byte
             ld d, a
-            call cc_fix
+.cc:        call cc_fix
             ld a, e
             and 31
             ld [refl_w], a
@@ -260,10 +268,16 @@ section bank 111, $4000
 ; strengths: the Color blends its colours into the sea's, the plain Game Boy / SGB lighten
 ; OBP1), and on a sideways step each half of it is shown only over water: it slips into the
 ; shore column by column while it fades.
-refl_t9:    ldh a, [maptype]                ; (built in RF_OAM, then put in the OAM copy in
+refl_t9:    ld a, [REFL_OAM]                ; (OAM 36-39 taken by a ninth map object: none)
+            and a
+            ret nz
+            ldh a, [maptype]                ; (built in RF_OAM, then put in the OAM copy in
             and a                           ;   one go: a V-Blank during the work shows the
-            jr z, .off                      ;   last frame's, never a half-made one)
-            ld a, [vehicle]
+            jr nz, .ow                      ;   last frame's, never a half-made one)
+            ld a, [cur_map]                 ; (standard maps: the towns, 0-7; owner,
+            cp 8                            ;   2026-11-25)
+            jr nc, .off
+.ow:        ld a, [vehicle]
             cp V_AIR
             jr z, .off
             call refl_mir                   ; the mirrored party, then only its parts over
@@ -394,6 +408,7 @@ RF_ANY     = $DC68
 RF_SH      = $DC69
 RF_T       = $DC6A
 RF_YY      = $DC6D
+rf_tb      = $CFBC          ; the masked tiles' first sprite tile on this map (0: none)
 rf_pend    = $D9FC          ; 1: RF_STG / rf_scls wait for the V-Blank
 rf_acls    = $D9FD          ; the kinds shown (2 bits a sprite: 0 hidden, 1 whole, 2 masked)
 rf_scls    = $D9FE          ; the kinds made
@@ -408,7 +423,12 @@ refl_msk:   ld a, [rf_pend]                 ; (an upload half done: the tiles ma
             ld a, [rf_upi]
             and a
             jr nz, .apply
-.mk:        call rf_sig                     ; (nothing moved: the tiles made stand)
+.mk:        ldh a, [rLY]                    ; (the frame already late, line 44-143: the tiles
+            cp 144                          ;   made stand a frame more, so no frame is lost;
+            jr nc, .mk1                     ;   the plain Game Boy needs some 85 lines for
+            cp 44                           ;   them, a step's end starts near line 80)
+            jr nc, .apply
+.mk1:       call rf_sig                     ; (nothing moved: the tiles made stand)
             jr z, .apply
             xor a
             ld [rf_pend], a                 ; (none taken by the V-Blank while being made)
@@ -442,13 +462,20 @@ refl_msk:   ld a, [rf_pend]                 ; (an upload half done: the tiles ma
             jr .apn
 .ap1:       cp 2
             jr nz, .apn
-            inc l                           ; masked: its tile in the set shown
+            ld a, [rf_tb]                   ; (no tiles for it on this map: hidden)
+            and a
+            jr nz, .ap2
+            ld [hl], a
+            jr .apn
+.ap2:       inc l                           ; masked: its tile in the set shown
             inc l
             ld a, [rf_aset]
             and 1
             add a, a
             add a, a
-            add a, $70
+            ld e, a
+            ld a, [rf_tb]
+            add a, e
             add a, b
             ld [hl-], a
             dec l
@@ -679,6 +706,12 @@ rf_qp:      ld a, b                         ; metatile key: column / 2, row / 2 
             ld a, [py]
             add a, d
             ld d, a
+            ldh a, [cmask]                  ; (a town: 64 x 64)
+            and e
+            ld e, a
+            ldh a, [cmask]
+            and d
+            ld d, a
             call rw1
             and $7F
             pop hl
@@ -694,8 +727,34 @@ rf_qp:      ld a, b                         ; metatile key: column / 2, row / 2 
             ld [hl+], a
             ld [hl], e
 .nc:        ld a, e
-.got:       ld l, a                         ; HL = 4 mt + quarter (the whole-quarter table's
-            ld h, 0                         ;   index), then x 8 + the mask table
+.got:       ld l, a
+            ldh a, [maptype]                ; a town: its quarter flags, whole rows
+            and a
+            jr nz, .owm
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            ld a, b
+            and 1
+            add a, a
+            ld e, a
+            ld a, c
+            and 1
+            or e
+            ld e, a
+            ld d, 0
+            add hl, de
+            ld de, RF_TWAT
+            add hl, de
+            ld a, [hl]
+            ld [RF_UV], a
+            ld hl, RF_ROWS00
+            and a
+            ret z
+            ld hl, RF_ROWSFF
+            ret
+.owm:       ld h, 0                         ; HL = 4 mt + quarter (the whole-quarter table's
+                                            ;   index), then x 8 + the mask table
             add hl, hl
             add hl, hl
             ld a, b
@@ -889,12 +948,16 @@ rf_up9:     ld a, [rf_pend]
             add a, low(RF_STG)
             ld l, a
             ld h, high(RF_STG)
+            ld a, [rf_tb]                   ; (none on this map: nothing to copy)
+            and a
+            jr z, .nx
+            ld e, a
             ld a, [rf_aset]
             and 1
             xor 1
             add a, a
             add a, a
-            add a, $70
+            add a, e
             ld e, a
             ld a, [rf_upi]
             add a, e

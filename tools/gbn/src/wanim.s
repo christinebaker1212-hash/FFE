@@ -144,6 +144,20 @@ wa_load:    xor a                           ; (a map's load: the reflection's ti
             ld [RF_TC + 2], a
             ld [RF_TC + 4], a
             ld [RF_TC + 6], a
+            ldh a, [maptype]                ; (the masked tiles' place: build.py RF_TBT)
+            and a
+            ld a, 8
+            jr nz, .tb
+            ld a, [cur_map]
+            cp 8
+            jr c, .tb
+            ld a, 9
+.tb:        ld e, a
+            ld d, 0
+            ld hl, RF_TBT
+            add hl, de
+            ld a, [hl]
+            ld [rf_tb], a
             ld a, [wa_t]
             rrca
             rrca
