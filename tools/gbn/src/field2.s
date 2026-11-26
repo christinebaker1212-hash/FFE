@@ -602,7 +602,8 @@ bx_apply:   ldh a, [is_cgb]
 ; ---- FF1 CyclePalettes: out (before a menu, a shop, the lineup, the world map, the puzzle):
 ; every 4 frames each colour's hue steps on until it passes $xC and turns black; in (back on
 ; the map): from $xC back to the map's colours. Sprites hidden. CGB: the map's NES palettes
-; (map bank $73C0, the room's); DMG / SGB: the shades fade to black and back.
+; (map bank $73C0, the room's); SGB: the shades fade to black and back; the plain Game Boy:
+; to white and back (its loads are white).
 PC_NES     = $73C0
 pc_rgb     = smap           ; (its variables in the screens' map copy: unused on the field,
 pc_buf     = smap + 128     ;   and the field's queue may still be drawing a room)
@@ -742,36 +743,11 @@ pc_build:   ld hl, pc_cur
             dec b
             jr nz, .l
             ret
-; DMG / SGB: three steps of 12 frames to black (out) or back (in)
-pc_dmg:     ld b, 0
-.l:         push bc
-            ld a, 12
-.w:         push af
-            call wait_vbl
-            pop af
-            dec a
-            jr nz, .w
-            pop bc
-            inc b
-            ld a, [pc_dir]
-            and a
-            ld a, b
-            jr z, .o
-            ld a, 3
-            sub b
-.o:         ld hl, .bgp
-            add a, l
-            ld l, a
-            ld a, h
-            adc a, 0
-            ld h, a
-            ld a, [hl]
-            call bgp_w
-            ld a, b
-            cp 3
-            jr c, .l
+; DMG / SGB: three steps of 12 frames to white / black (out) or back (in) (tall.s pc_dmg9)
+pc_dmg:     ld a, TALL_BANK
+            ld hl, pc_dmg9
+            call bank_call
             jp pc_go.done
-.bgp:       db %11100100, %11111001, %11111110, %11111111
 
 ; the shutters' window: every row the box's middle row (frame, empty inside), so the window
 ; may start on any line (LCD off)

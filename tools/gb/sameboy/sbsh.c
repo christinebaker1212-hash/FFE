@@ -18,6 +18,7 @@
  *                 modes 2-3) since boot, from a core patched to export GB_vchk_n (docs/gb-lessons.md
  *                 "Testing"); 0 with a core without it
  *   q             quit
+ * F N KEYS: as f, printing each frame's count of dark pixels (finds black screens)
  * build: gcc -O2 -I/usr/include/libretro-common tools/gb/sameboy/sbsh.c -ldl -o build/sbsh
  * core:  build/sameboy_libretro.so (see docs/gb-lessons.md), env SBSH_CORE overrides */
 #include <dlfcn.h>
@@ -166,6 +167,15 @@ int main(int argc, char** argv) {
 			for (int i = 0; i < k; i++) { p_retro_run(); frame_no++; }
 			keys = 0;
 			printf("ok %ld\n", frame_no);
+		} else if (!strcmp(cmd, "F")) {             /* F N KEYS: N frames, each frame's dark pixel count (sum < 150) */
+			int k = atoi(a1); keys = n > 2 && a2[0] != '-' ? parse_keys(a2) : 0;
+			for (int i = 0; i < k; i++) {
+				p_retro_run(); frame_no++;
+				int d = 0; for (int j = 0; j < 160 * 144; j++) d += frame[j * 3] + frame[j * 3 + 1] + frame[j * 3 + 2] < 150;
+				printf(i ? ",%d" : "%d", d);
+			}
+			keys = 0;
+			printf("\n");
 		} else if (!strcmp(cmd, "r")) {
 			unsigned ad = strtoul(a1, 0, 16); int cnt = n > 2 ? atoi(a2) : 1;
 			for (int i = 0; i < cnt; i++) { uint8_t b = 0xFF; rd((ad + i) & 0xFFFF, &b); printf("%02X", b); }

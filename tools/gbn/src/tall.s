@@ -749,12 +749,17 @@ stat_tl9:   push de
             pop de
             ret
 
-; FF1's screen black before its palette cycle in (main.s pc_black; moved here for bank 0's room)
+; FF1's screen black (the plain Game Boy: white) before its palette cycle in (main.s pc_black; moved
+; here for bank 0's room)
 pc_black9:  ld a, 1
             ld [pc_hold], a
             call oam_clr
+            ld a, [sgb_on]                  ; (the plain Game Boy: white, the cycle in starts
+            and a                           ;   from white: field2.s pc_dmg)
             ld a, $FF
-            call bgp_w
+            jr nz, .k
+            xor a
+.k:         call bgp_w
             ldh a, [is_cgb]
             and a
             ret z
@@ -836,3 +841,279 @@ air_fr9:    ld a, 3
             call vo_b
             call ap_tick
             jp wait_vbl
+
+section bank 113, $5600                     ; (the screen wipe, moved from bank 0: main.s)
+; ---- FF1 ScreenWipe_Close / _Open: the window layer (a black map) covers the screen above
+; and below a band that closes on the middle (2 lines a frame each side) or opens from it;
+; the STAT handler switches the window off at the band's top and on at its bottom. Sprites
+; hidden, the music stopped; FF1's sound on square 1 (12.5 %, volume 8, sweeping down, its
+; pitch from the visible lines every fourth frame). The plain Game Boy (owner, 2026-11-26): the
+; curtains white, as its loads (BGP 0 on their lines: wp_vbl, text.s stat_int .wp); the Super
+; Game Boy and the Color keep them black, as their masked loads.
+wipe_close9: push de
+            call wp_wset
+            ld a, $80
+            call snd_track
+            call oam_clr
+            call wp_map                     ; (the window map black, LCD on: in V-Blanks)
+            xor a
+            ld [wp_top], a
+            ld a, 144
+            ld [wp_bot], a
+            ld a, 1
+            ld [wp_on], a
+.l:         call wait_vbl
+            call wp_snd
+            ld hl, wp_top
+            ld a, [hl]
+            add a, 2
+            ld [hl], a
+            ld b, a
+            ld hl, wp_bot
+            ld a, [hl]
+            sub 2
+            ld [hl], a
+            cp b
+            jr z, .x
+            jr nc, .l
+.x:         call wait_vbl
+            xor a                           ; (the wipe sound's sweep off again)
+            ldh [$FF10], a
+            call snd_sq1rst
+            pop de
+            ret
+wipe_open9: xor a
+            ld [wp_req], a
+            call oam_clr                    ; (FF1: no sprites while it opens)
+            call dma_safe
+            call wp_map
+            ld a, 72
+            ld [wp_top], a
+            ld [wp_bot], a
+            ld a, 1
+            ld [wp_on], a
+            ld a, 7
+            ldh [rWX], a
+            xor a
+            ldh [rWY], a
+            call wp_wset                    ; (the plain Game Boy: white from the first frame)
+            ld a, [wp_wh]
+            and a
+            jr z, .lo
+            xor a
+            ldh [rBGP], a
+.lo:        ld a, LCDC_WIN                  ; (the first frame covered)
+            call lcd_on
+.l:         call wait_vbl
+            call wp_snd
+            ld hl, wp_top
+            ld a, [hl]
+            sub 2
+            jr nc, .t
+            xor a
+.t:         ld [hl], a
+            ld hl, wp_bot
+            ld a, [hl]
+            add a, 2
+            cp 145
+            jr c, .b
+            ld a, 144
+.b:         ld [hl], a
+            cp 144
+            jr c, .l
+            ld a, [wp_top]
+            and a
+            jr nz, .l
+            call wait_vbl
+            xor a
+            ld [wp_on], a
+            ld a, [wp_wh]                   ; (the scene's shades: wp_vbl gave them already)
+            and a
+            jr z, .ow
+            ld a, [wp_bgp]
+            ldh [rBGP], a
+            xor a
+.ow:
+            ldh [$FF12], a                  ; (square 1 silent, its sweep off; the music
+            ldh [$FF10], a                  ;   goes on)
+            ld a, BOX_LINES - 1
+            ldh [rLYC], a
+            ld a, [lcdc_on]
+            ldh [rLCDC], a
+            ld a, 7
+            ldh [rWX], a
+            call snd_sq1rst
+            jp map_music                    ; (the map's song now: load_map waited for it)
+; the window map black: the font's blank (DMG: its tile for this map, shade 3; CGB: in VRAM
+; bank 1, palette 6 all black); with the LCD on, three rows a V-Blank
+wp_map:     ld a, $20
+            call code_tile
+            ld [wp_t], a
+            call lcd_get  
+            bit 7, a
+            jr z, .off
+            ld c, 0
+.r:         call wait_vbl
+            call .rows
+            ld a, c
+            cp 18
+            jr c, .r
+            jr .pal
+.off:       ld c, 0
+.o:         call .rows
+            ld a, c
+            cp 18
+            jr c, .o
+.pal:       ldh a, [is_cgb]
+            and a
+            ret z
+            call lcd_get                    ; (palette 6 black: in V-Blank or LCD off)
+            bit 7, a
+            call nz, wait_vbl
+            ld a, $80 | 48
+            call bcps_w
+            ld b, 8
+            xor a
+.p:         call bcpd_w
+            dec b
+            jr nz, .p
+            ret
+.rows:      ld b, 3                         ; rows C .. C + 2 of $9C00
+.rw:        push bc
+            ld l, c
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $9C00
+            add hl, de
+            ld b, 20
+            ld a, [wp_t]
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            ldh a, [is_cgb]
+            and a
+            jr z, .na
+            ld a, l
+            sub 20
+            ld l, a
+            ld a, h
+            sbc a, 0
+            ld h, a
+            ld a, 1
+            ldh [rVBK], a
+            ld b, 20
+            ld a, $0E                       ; (palette 6, VRAM bank 1)
+.a:         ld [hl+], a
+            dec b
+            jr nz, .a
+            xor a
+            ldh [rVBK], a
+.na:        pop bc
+            inc c
+            dec b
+            jr nz, .rw
+            ret
+; FF1's wipe sound, every fourth frame: period (255 - 3 / 2 visible lines) x 8
+wp_snd:     ldh a, [frame]
+            and 3
+            ret nz
+            ld a, [wp_top]
+            ld b, a
+            ld a, [wp_bot]
+            sub b
+            jr nc, .v
+            xor a
+.v:         ld b, a                         ; visible lines (GB) x 3 / 2: FF1's 224-line scale
+            srl a
+            add a, b
+            jr nc, .s
+            ld a, 255
+.s:         cpl                             ; 255 - that
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl                      ; x 8: the NES period
+            add hl, hl                      ; (x 2: the table's entries)
+            ld de, S_FREQ
+            add hl, de
+            ld a, SND_BANK
+            ld [fc_bank], a
+            call far_byte
+            ld e, a
+            inc hl
+            call far_byte
+            ld d, a
+            ld a, %00011010                 ; sweep: time 1, down in pitch, shift 2
+            ldh [$FF10], a
+            xor a                           ; 12.5 %
+            ldh [$FF11], a
+            ld a, $70                       ; volume 8 (pulses at 7/8: 7)
+            ldh [$FF12], a
+            ld a, e
+            ldh [$FF13], a
+            ld a, d
+            or $80
+            ldh [$FF14], a
+            ret
+; the plain Game Boy (not a Color, not a Super Game Boy): white curtains (wp_wh); the scene's
+; shades kept (wp_bgp, from BGP unless it is white already)
+wp_wset:    xor a
+            ld [wp_wh], a
+            ldh a, [is_cgb]
+            ld hl, sgb_on
+            or [hl]
+            ret nz
+            inc a
+            ld [wp_wh], a
+            ldh a, [rBGP]
+            and a
+            ret z
+            ld [wp_bgp], a
+            ret
+section wram, $CC8A
+wp_wh:      ds 1                            ; the wipe's curtains white (the plain Game Boy)
+wp_bgp:     ds 1                            ; ... and the scene's BGP between them
+
+section bank 113, $5800                     ; (the palette cycle's plain Game Boy / SGB steps: field2.s)
+; DMG / SGB: three steps of 12 frames to white / black (out) or back (in)
+pc_dmg9:    ld b, 0
+.l:         push bc
+            ld a, 12
+.w:         push af
+            call wait_vbl
+            pop af
+            dec a
+            jr nz, .w
+            pop bc
+            inc b
+            ld a, [pc_dir]
+            and a
+            ld a, b
+            jr z, .o
+            ld a, 3
+            sub b
+.o:         ld hl, .bgp
+            push af
+            ld a, [sgb_on]                  ; (the plain Game Boy: to white, as its loads;
+            and a                           ;   owner, 2026-11-26. The Super Game Boy: black,
+            jr nz, .sg                      ;   as its masked loads)
+            ld hl, .wht
+.sg:        pop af
+            add a, l
+            ld l, a
+            ld a, h
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            call bgp_w
+            ld a, b
+            cp 3
+            jr c, .l
+            ret
+.bgp:       db %11100100, %11111001, %11111110, %11111111
+.wht:       db %11100100, %10010000, %01000000, %00000000

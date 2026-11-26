@@ -3060,207 +3060,58 @@ vfl:        ds 1
 hrx:        ds 1                            ; the encounter transition: its tables' page (0 off)
 
 section bank 0, $3900                       ; (the screen wipe, the palette cycle's helpers)
-; ---- FF1 ScreenWipe_Close / _Open: the window layer (a black map) covers the screen above
-; and below a band that closes on the middle (2 lines a frame each side) or opens from it;
-; the STAT handler switches the window off at the band's top and on at its bottom. Sprites
-; hidden, the music stopped; FF1's sound on square 1 (12.5 %, volume 8, sweeping down, its
-; pitch from the visible lines every fourth frame).
-wipe_close: push de
-            ld a, $80
-            call snd_track
-            call oam_clr
-            call wp_map                     ; (the window map black, LCD on: in V-Blanks)
-            xor a
-            ld [wp_top], a
-            ld a, 144
-            ld [wp_bot], a
-            ld a, 1
-            ld [wp_on], a
-.l:         call wait_vbl
-            call wp_snd
-            ld hl, wp_top
-            ld a, [hl]
-            add a, 2
-            ld [hl], a
-            ld b, a
-            ld hl, wp_bot
-            ld a, [hl]
-            sub 2
-            ld [hl], a
-            cp b
-            jr z, .x
-            jr nc, .l
-.x:         call wait_vbl
-            xor a                           ; (the wipe sound's sweep off again)
-            ldh [$FF10], a
-            call snd_sq1rst
-            pop de
-            ret
-wipe_open:  xor a
-            ld [wp_req], a
-            call oam_clr                    ; (FF1: no sprites while it opens)
-            call dma_safe
-            call wp_map
-            ld a, 72
-            ld [wp_top], a
-            ld [wp_bot], a
-            ld a, 1
-            ld [wp_on], a
-            ld a, 7
-            ldh [rWX], a
-            xor a
-            ldh [rWY], a
-            ld a, LCDC_WIN                  ; (the first frame covered)
-            call lcd_on
-.l:         call wait_vbl
-            call wp_snd
-            ld hl, wp_top
-            ld a, [hl]
-            sub 2
-            jr nc, .t
-            xor a
-.t:         ld [hl], a
-            ld hl, wp_bot
-            ld a, [hl]
-            add a, 2
-            cp 145
-            jr c, .b
-            ld a, 144
-.b:         ld [hl], a
-            cp 144
-            jr c, .l
+; ---- the screen wipe (bank TALL_BANK: tall.s wipe_close9 / wipe_open9, for bank 0's room)
+wipe_close: ld a, TALL_BANK
+            ld hl, wipe_close9
+            jp bank_call
+wipe_open:  ld a, TALL_BANK
+            ld hl, wipe_open9
+            jp bank_call
+; STAT during a wipe (from text.s stat_int): the band's top, the window off (an empty band:
+; it stays on), the bottom next
+stat_wp:    ld a, [wp_st]                   ; the band's top: the window off (an empty band:
+            and a                           ;   it stays on), the bottom next
+            jr nz, .wb
+            inc a
+            ld [wp_st], a
             ld a, [wp_top]
-            and a
-            jr nz, .l
-            call wait_vbl
-            xor a
-            ld [wp_on], a
-            ldh [$FF12], a                  ; (square 1 silent, its sweep off; the music
-            ldh [$FF10], a                  ;   goes on)
-            ld a, BOX_LINES - 1
-            ldh [rLYC], a
-            ld a, [lcdc_on]
-            ldh [rLCDC], a
-            ld a, 7
-            ldh [rWX], a
-            call snd_sq1rst
-            jp map_music                    ; (the map's song now: load_map waited for it)
-; the window map black: the font's blank (DMG: its tile for this map, shade 3; CGB: in VRAM
-; bank 1, palette 6 all black); with the LCD on, three rows a V-Blank
-wp_map:     ld a, $20
-            call code_tile
-            ld [wp_t], a
-            call lcd_get  
-            bit 7, a
-            jr z, .off
-            ld c, 0
-.r:         call wait_vbl
-            call .rows
-            ld a, c
-            cp 18
-            jr c, .r
-            jr .pal
-.off:       ld c, 0
-.o:         call .rows
-            ld a, c
-            cp 18
-            jr c, .o
-.pal:       ldh a, [is_cgb]
-            and a
-            ret z
-            call lcd_get                    ; (palette 6 black: in V-Blank or LCD off)
-            bit 7, a
-            call nz, wait_vbl
-            ld a, $80 | 48
-            call bcps_w
-            ld b, 8
-            xor a
-.p:         call bcpd_w
-            dec b
-            jr nz, .p
-            ret
-.rows:      ld b, 3                         ; rows C .. C + 2 of $9C00
-.rw:        push bc
-            ld l, c
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            ld de, $9C00
-            add hl, de
-            ld b, 20
-            ld a, [wp_t]
-.c:         ld [hl+], a
-            dec b
-            jr nz, .c
-            ldh a, [is_cgb]
-            and a
-            jr z, .na
-            ld a, l
-            sub 20
-            ld l, a
-            ld a, h
-            sbc a, 0
-            ld h, a
-            ld a, 1
-            ldh [rVBK], a
-            ld b, 20
-            ld a, $0E                       ; (palette 6, VRAM bank 1)
-.a:         ld [hl+], a
-            dec b
-            jr nz, .a
-            xor a
-            ldh [rVBK], a
-.na:        pop bc
-            inc c
-            dec b
-            jr nz, .rw
-            ret
-; FF1's wipe sound, every fourth frame: period (255 - 3 / 2 visible lines) x 8
-wp_snd:     ldh a, [frame]
-            and 3
-            ret nz
-            ld a, [wp_top]
+            push bc
             ld b, a
             ld a, [wp_bot]
-            sub b
-            jr nc, .v
+            cp b
+            pop bc
+            jr z, .wm
+            jr c, .wm
+            ld a, 167                       ; (hidden)
+            ldh [rWX], a
+            ld a, [wp_wh]                   ; (the plain Game Boy's white curtains: the
+            and a                           ;   band in the scene's shades)
+            jr z, .wt
+            ld a, [wp_bgp]
+            ldh [rBGP], a
+.wt:        ld a, [wp_bot]
+            ldh [rLYC], a
+            pop af
+            reti
+.wb:        cp 2                            ; the bottom: the window shown again; the music
+            jr nc, .wm2
+            ld a, [wp_bot]                  ; (at the screen's bottom: nothing below it to
+            cp 144                          ;   cover; shown there, a late V-Blank left it
+            jr nc, .wm                      ;   over the whole next frame)
+            ld a, 7
+            ldh [rWX], a
+            ld a, LCDC_WIN
+            ldh [rLCDC], a
+            ld a, [wp_wh]                   ; (white below the band)
+            and a
+            jr z, .wm
             xor a
-.v:         ld b, a                         ; visible lines (GB) x 3 / 2: FF1's 224-line scale
-            srl a
-            add a, b
-            jr nc, .s
-            ld a, 255
-.s:         cpl                             ; 255 - that
-            ld l, a
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl                      ; x 8: the NES period
-            add hl, hl                      ; (x 2: the table's entries)
-            ld de, S_FREQ
-            add hl, de
-            ld a, SND_BANK
-            ld [fc_bank], a
-            call far_byte
-            ld e, a
-            inc hl
-            call far_byte
-            ld d, a
-            ld a, %00011010                 ; sweep: time 1, down in pitch, shift 2
-            ldh [$FF10], a
-            xor a                           ; 12.5 %
-            ldh [$FF11], a
-            ld a, $70                       ; volume 8 (pulses at 7/8: 7)
-            ldh [$FF12], a
-            ld a, e
-            ldh [$FF13], a
-            ld a, d
-            or $80
-            ldh [$FF14], a
-            ret
+            ldh [rBGP], a
+.wm:        ld a, 2
+            ld [wp_st], a
+            jp stat_int.mus
+.wm2:       pop af
+            reti
 ; HL = a screen of SCR_BANK: FF1's palette cycle out, then the screen
 pc_menu:    call ap_stop                    ; (the airship's view off: air.s)
             push hl
@@ -3277,7 +3128,16 @@ wp_vbl:     xor a                           ; (the window enabled all frame, sho
             call lcd_get  
             bit 7, a
             ret z
+            ld a, [wp_wh]                   ; (the plain Game Boy: the curtains white, BGP 0
+            and a                           ;   on their lines; the band the scene's shades)
+            jr z, .nw
             ld a, [wp_top]
+            and a
+            ld a, [wp_bgp]
+            jr z, .nw0                      ; (no curtain at the top: the scene's)
+            xor a
+.nw0:       ldh [rBGP], a
+.nw:        ld a, [wp_top]
             and a
             jr z, .z
             ld a, LCDC_WIN

@@ -470,39 +470,7 @@ stat_int:   push af
             call mus_tick
 .mx:        pop af
             reti
-.wp:        ld a, [wp_st]                   ; the band's top: the window off (an empty band:
-            and a                           ;   it stays on), the bottom next
-            jr nz, .wb
-            inc a
-            ld [wp_st], a
-            ld a, [wp_top]
-            push bc
-            ld b, a
-            ld a, [wp_bot]
-            cp b
-            pop bc
-            jr z, .wm
-            jr c, .wm
-            ld a, 167                       ; (hidden)
-            ldh [rWX], a
-            ld a, [wp_bot]
-            ldh [rLYC], a
-            pop af
-            reti
-.wb:        cp 2                            ; the bottom: the window shown again; the music
-            jr nc, .wm2
-            ld a, [wp_bot]                  ; (at the screen's bottom: nothing below it to
-            cp 144                          ;   cover; shown there, a late V-Blank left it
-            jr nc, .wm                      ;   over the whole next frame)
-            ld a, 7
-            ldh [rWX], a
-            ld a, LCDC_WIN
-            ldh [rLCDC], a
-.wm:        ld a, 2
-            ld [wp_st], a
-            jr .mus
-.wm2:       pop af
-            reti
+.wp:        jp stat_wp                      ; (the screen wipe's edges: main.s)
 .ly:        push hl                         ; this entry's WX (the window shown / hidden),
             ld a, [ly_i]                    ;   the next entry's line; after the last: the
             add a, a                        ;   music
