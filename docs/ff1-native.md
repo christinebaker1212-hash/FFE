@@ -1084,3 +1084,24 @@ one reaches parity, so the owner can keep playing).
     - Not done: the plain Game Boy's white loads (black ones need the screen on while loading: about three
       times the load time; the owner had chosen the loads' length); SGB window frames stay blue (hardware).
     - docs/ff1-hardware-tests.md: the checklist for real hardware.
+61. Owner (2026-11-26, later).
+    - Reflection: hidden over shore corners that are mostly land (the tile below the party at least half land
+      fades it out; cut pieces under half over water hidden); the build gives no mask to tiles under half water
+      (the marsh's blue dashes made the plain Game Boy cut the reflection every frame there).
+    - Overworld / towns scrolling: each new row / column is drawn a whole step ahead (rows py +- 6, columns
+      px +- 7; the airship's view, which shows the whole ring, keeps its rows), queued over the step (q_feed:
+      1 metatile a frame walking, 2 dashing) with the queue first in the V-Blank (3 metatiles): no stale rows at
+      the top / bottom while running; the plain Game Boy's marsh frames run on time.
+    - Boarding: the party walks into the ship / canoe (the vehicle drawn in front at its tile, the party's
+      leading half hidden from half way; the vehicle and its song take over when the step ends: veh_pend) and
+      sinks into the airship before it takes off.
+    - Menus: a name longer than a list row (the 17-letter Gauntlets) ends in one condensed "ts" cell (font
+      code '~', text.py KERN_TS; names stay whole).
+    - Battle: an enemy's spell / ability name stays in the top window a second at least (bt_bwait in
+      bt_ban_off), whatever the battle speed.
+    - Shops: Sell lists Everyone's items or one member's pack (left / right, empty packs skipped, "Dune's pack"
+      under "Which one?"); after buying and equipping, "Would you like me to buy the old one from you?" (Yes
+      sells the replaced item at half its price).
+    - Open: all Twelve Sages at once (48 sprites; needs 8 x 16 object sprites or a mid-frame OAM reload),
+      shoreline water animated with the sea and every water tile in step, a fake Mode 7 airship view, a window
+      colour per save file.

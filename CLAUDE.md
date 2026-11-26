@@ -1417,6 +1417,9 @@ Then (item 59): town reflections, the towns' shadowed canal water moving, Packs 
 Then (item 60): the owner's "not Nintendo quality" list: Yes/No in place, Select swap without a blink, Bestiary scroll
 through the hidden BG map, reflections in step with the sprites (Onrac too), boss target hands from the pictures, Formation header,
 Extras centred; DMG black loads left to the owner (3x load time); hardware checklist docs/ff1-hardware-tests.md.
+Then (item 61): reflections off mostly-land shore corners, scrolling rows drawn a step ahead (no stale top / bottom rows),
+walking into the ship / canoe / airship, condensed "ts" for 17-letter names, enemy spell names up a second, Sell by pack,
+selling the replaced item. Open: Twelve Sages at once, shoreline / synced water, fake Mode 7 airship, colour per save file.
 
 ## Remaining
 - **FF1 (native build), before release:**
@@ -1429,6 +1432,8 @@ Extras centred; DMG black loads left to the owner (3x load time); hardware check
     loading, about 3x the load time; the owner had chosen the loads' length).
   - Known limits: SGB window frames stay blue (hardware: a frame tile holds one palette); on the
     plain Game Boy about 1% of coastal walking frames show the reflection a frame out of step.
+  - Owner's open list (2026-11-26): all Twelve Sages at once (sprite budget), shoreline water moving
+    with the sea and all water in step, a fake Mode 7 airship view, a window colour per save file.
 - Lot Check (`docs/gb-release-checks.md`): met in emulators for the native build (strict
   SameBoy checker 0 on DMG / CGB / SGB, cart RAM enabled only around each access, checksummed
   saves with error screens, soft reset, boot clearing, wording, documented hidden codes). Open:
