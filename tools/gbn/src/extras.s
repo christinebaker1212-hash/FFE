@@ -379,6 +379,7 @@ bs_main:    call bs_load
             ld b, 3
             call cur_txt
             call scr_frame
+            call bs_flip
             call bs_pad
             bit 1, a
             jr nz, .bx
@@ -435,10 +436,12 @@ bs_main:    call bs_load
             call bs_names                   ; (scrolled: the names again)
             call bs_upd
             jp .l
-.bx:        xor a
+.bx:        call bs_home
+            xor a
             ld [sf_hk], a
             ret
-.a:         xor a
+.a:         call bs_home
+            xor a
             ld [sf_hk], a
             ld a, [bs_cur]
             call bs_seen
@@ -515,7 +518,12 @@ bs_seen:    ld b, a
             ret
 
 ; the list screen
-bs_lscr:    call bs_fix
+bs_lscr:    xor a                           ; ($9800 shown; $9C00 to be filled whole first)
+            ld [sf_mx], a
+            ld [bs_vis], a
+            ld [bs_ini], a
+            ld [bs_pend], a
+            call bs_fix
             call scr_open
             ld bc, $0000
             ld de, $1403
@@ -1413,10 +1421,80 @@ sc_apply:   ld a, [sc_arm]
             ld [SC_MARK], a
             ret
 
-; the list's 13 rows (screen rows 4-16) to VRAM again, the hand kept meanwhile
-bs_upd:     call alt_upd
-            ld a, 4
-            ld [sf_row], a
+; the list's 13 rows (screen rows 4-16) to VRAM again, the hand kept meanwhile: into the
+; BG map not shown, which is then shown in one V-Blank (LCDC bit 3), so no frame shows a list
+; half old, half new (owner, 2026-11-25: a row kept its old number for a frame)
+bs_upd:     call bs_done                    ; (a scroll still going up: finished first)
+            call alt_upd
+            ld a, [bs_vis]
+            xor 1
+            ld b, 4                         ; (rows 4-16; the first time into $9C00, all 18)
+            jr z, .t
+            ld a, [bs_ini]
+            and a
+            jr nz, .s
+            ld b, 0
+.s:         ld a, 4
+.t:         ld [sf_mx], a
             ld a, 1
+            ld [bs_pend], a
             ld [sf_hk], a
+            ld a, b
+            ld [sf_row], a
             ret
+; the hidden map complete: shown from this V-Blank (the next, if this one is too far on)
+bs_flip:    ld a, [bs_pend]
+            and a
+            ret z
+            ld a, [sf_row]
+            cp 18
+            ret c
+.w:         di
+            ldh a, [rLY]
+            sub 144
+            cp 8
+            jr c, .f
+            ei
+            call wait_vbl
+            jr .w
+.f:         ldh a, [rLCDC]
+            xor $08
+            ldh [rLCDC], a
+            ld hl, ly_base                  ; (the menus' line list and the dialogue line write
+            ld a, [hl]                      ;   these each frame: the plain Game Boy's windows)
+            xor $08
+            ld [hl], a
+            ld hl, lcdc_on
+            ld a, [hl]
+            xor $08
+            ld [hl], a
+            ei
+            ld a, [bs_vis]
+            xor 1
+            ld [bs_vis], a
+            jr z, .z
+            ld [bs_ini], a
+.z:         xor a
+            ld [bs_pend], a
+            ld [sf_mx], a
+            ret
+; leaving the list: $9800 shown again (the other screens know only it)
+bs_home:    call bs_done
+            ld a, [bs_vis]
+            and a
+            ret z
+            call bs_upd
+            jr bs_done
+; a scroll in flight finished and shown
+bs_done:    ld a, [bs_pend]
+            and a
+            ret z
+            call wait_vbl
+            call bs_flip
+            jr bs_done
+
+section wram, $DA8E
+sf_mx:      ds 1                            ; sf_one's map: 0 $9800, 4 $9C00 (the Bestiary)
+bs_vis:     ds 1                            ; the Bestiary's list: 1 while $9C00 is shown
+bs_ini:     ds 1                            ; 1 once $9C00 holds the whole screen
+bs_pend:    ds 1                            ; 1 while the hidden map's rows go up

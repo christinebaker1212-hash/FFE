@@ -4109,33 +4109,31 @@ row_safe:   ld l, a
             ld e, l
             ld bc, smap
             add hl, bc
-            ld a, d
+            ld a, [sf_mx]
             add a, $98
+            add a, d
             ld d, a
             push hl
             push de
-            ld b, 20
-.c:         ld a, [hl+]
-            call vput
-            dec b
-            jr nz, .c
+            call .cp
             pop de
             pop hl
             ldh a, [is_cgb]
             and a
             ret z
+            ldh [rVBK], a                   ; (is_cgb = 1: VRAM bank 1)
             ld a, h
             add a, 3
             ld h, a
-            ld a, 1
-            ldh [rVBK], a
-            ld b, 20
-.d:         ld a, [hl+]
-            call vput
-            dec b
-            jr nz, .d
+            call .cp
             xor a
             ldh [rVBK], a
+            ret
+.cp:        ld b, 20
+.c:         ld a, [hl+]
+            call vput
+            dec b
+            jr nz, .c
             ret
 
 section bank 0, $2E61                       ; (free space)

@@ -166,12 +166,10 @@ sf_one:     ld l, a
             ld e, l
             ld bc, smap
             add hl, bc
-            push hl
-            ld hl, $9800
-            add hl, de
-            ld d, h
-            ld e, l
-            pop hl
+            ld a, [sf_mx]                   ; (the map: $9800, or $9C00 for the Bestiary's
+            add a, $98                      ;   hidden copy)
+            add a, d
+            ld d, a
             push de
             push hl
             ld b, 20

@@ -17,7 +17,7 @@ pk_src     = eqm_bk + 8                     ; (2) the item's slot address
 pk_n       = eqm_bk + 10                    ; scratch
 pk_row     = eqm_bk + 11                    ; the row pk_item writes on
 
-section bank 107, $4D30
+section bank 107, $4D60
 ; the screen for member pk_m; back with pk_m the member last shown
 pk_main9:   xor a
             ld [pk_c], a
