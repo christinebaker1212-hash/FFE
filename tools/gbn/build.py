@@ -547,21 +547,22 @@ def refl_source(rom):
 
 
 def water_anim(o):
-    """the animated sea and rivers (owner's list, 2026-11-24; FF1 has none): the commonest open
-    sea metatile and river metatile of the overworld. Motion as Final Fantasy Legend III's water
-    (owner, 2026-11-24), made finer (owner: two more strips): the 16 x 16 picture in four bands
-    of 4 lines (river: 4 columns), each moving a pixel per 16 frames (sea sideways, river
-    downwards), the bands in turn 4 frames apart (order 0, 2, 1, 3): 64 steps, one per 4 frames;
-    bands together where one tile fills every corner (the river). Only metatiles whose tiles
-    stay right wherever they are used move: coasts and land never change.
-    Returns (Color bank, DMG bank, info). Each bank: $4000 count, $4008 the sea's main colour
-    (RGB555: the reflection's water), $4010 entries of 16 bytes (the bank's own 4 tiles),
-    frames from $4100 + $1000 e: 64 steps x 4 tiles x 16 bytes (the Color's / the DMG's
-    pre-shaded). The copies wa_run makes (src/wanim.s), per step: at $6200 + 16 step those of
-    the tiles that change at it, at $6600 + 32 step every tile (a redraw); each list a count,
-    then (VRAM address, frame address) words. A corner showing the same tile as an earlier
-    corner (the river) is copied once: the plain Game Boy has V-Blank lines 148-150 for them."""
+    """the animated water (owner's list, 2026-11-24; owner, 2026-11-26: the coasts' water moving with
+    the sea, the land still; all water in step). The commonest open sea metatile's 16 x 16 picture
+    moves as Final Fantasy Legend III's water, made finer: four bands of 4 lines, each a pixel
+    sideways per 16 frames, in turn 4 frames apart (order 0, 2, 1, 3): 64 steps, one per 4 frames.
+    Every overworld tile with water in it (the water colours of that picture; not the marsh's
+    dashes) is a slot: its water pixels show the moving picture at its corner, its land as drawn.
+    River tiles move the same way downwards, all columns together (a tile fills every corner of the
+    open river), a pixel per 16 frames, two steps after the sea's band (river step r = ((s + 2) / 4)
+    & 15), so their copies fall in other frames than the sea's.
+    Each bank (the Color's, the DMG's pre-shaded): $4008 the sea's main colour (RGB555: the
+    reflection's water); copy lists of records (VRAM address, its bit 0 set for 16 bytes else 8;
+    the bytes), ended by a zero word, packed from $4100: the sea's step s (from step s - 1) at the
+    word $4080 + 2 s, the river's step r at $4040 + 2 r, every slot whole at step 0 (a map's
+    load) at $4010."""
     prop, tsa, tbl = o['prop'], o['tsa'], o['mt_dmg']
+    ct, dt, pal, mtp = o['cgb_tiles'], o['dmg_tiles'], o['cgb_bg'], o['mt_pal']
     freq = {}
     for r_ in o['rows']:
         for v in r_: freq[v & 0x7F] = freq.get(v & 0x7F, 0) + 1
@@ -570,11 +571,7 @@ def water_anim(o):
         if not d & 1 or (d & 6) == 6: return None
         return 'sea' if not d & 4 else 'river'
     def dec(t):
-        px = [[0] * 8 for _ in range(8)]
-        for y in range(8):
-            lo, hi = t[2 * y], t[2 * y + 1]
-            for x in range(8): px[y][x] = (lo >> (7 - x) & 1) | (hi >> (7 - x) & 1) << 1
-        return px
+        return [[(t[2 * y] >> (7 - x) & 1) | (t[2 * y + 1] >> (7 - x) & 1) << 1 for x in range(8)] for y in range(8)]
     def enc(px):
         out = bytearray()
         for y in range(8):
@@ -583,87 +580,144 @@ def water_anim(o):
                 v = px[y][x]; lo |= (v & 1) << (7 - x); hi |= (v >> 1) << (7 - x)
             out += bytes([lo, hi])
         return bytes(out)
+    def colr(mt, v): p_ = mtp[mt]; return int.from_bytes(pal[8 * p_ + 2 * v:8 * p_ + 2 * v + 2], 'little')
+    def cidx(mt, c):
+        for v in range(4):
+            if colr(mt, v) == c: return v
+        return None
     ORDER = (0, 2, 1, 3)
-    def frames(tiles16, vertical, stagger=True):
-        q = [dec(t) for t in tiles16]                       # UL, UR, DL, DR
-        img = [[q[(y >= 8) * 2 + (x >= 8)][y & 7][x & 7] for x in range(16)] for y in range(16)]
-        out = []
-        for j in range(64):
-            sh_b = [((j + 3 - ORDER[b]) // 4 if stagger else j // 4) % 16 for b in range(4)]
-            if vertical:
-                sh = [[img[(y - sh_b[x // 4]) % 16][x] for x in range(16)] for y in range(16)]
-            else:
-                sh = [[img[y][(x - sh_b[y // 4]) % 16] for x in range(16)] for y in range(16)]
-            out.append([enc([[sh[qy * 8 + y][qx * 8 + x] for x in range(8)] for y in range(8)])
-                        for qy in range(2) for qx in range(2)])
+    def img16(tl):
+        q = [dec(t) for t in tl]
+        return [[q[(y >= 8) * 2 + (x >= 8)][y & 7][x & 7] for x in range(16)] for y in range(16)]
+    def shift(img, j, vert):
+        if vert:
+            return [[img[(y - j) % 16][x] for x in range(16)] for y in range(16)]
+        sh_b = [((j + 3 - ORDER[b]) // 4) % 16 for b in range(4)]
+        return [[img[y][(x - sh_b[y // 4]) % 16] for x in range(16)] for y in range(16)]
+    used = [m for m in range(128) if freq.get(m, 0)]
+    sea = max((m for m in used if kind(m) == 'sea'), key=lambda m: freq[m])
+    riv = max((m for m in used if kind(m) == 'river'), key=lambda m: freq[m])
+    wcol = {colr(sea, v) for k in range(4) for row in dec(ct[16 * tsa[128 * k + sea]:16 * tsa[128 * k + sea] + 16]) for v in row}
+    def nbr(m):
+        c = {}
+        for y in range(256):
+            for x in range(256):
+                if o['rows'][y][x] & 0x7F == m:
+                    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                        k_ = kind(o['rows'][(y + dy) & 255][(x + dx) & 255] & 0x7F)
+                        if k_: c[k_] = c.get(k_, 0) + 1
+        return max(c, key=c.get) if c else None
+    marsh = {m for m in used if not kind(m) and
+             0 < sum(colr(m, v) in wcol for k in range(4) for row in dec(ct[16 * tsa[128 * k + m]:16 * tsa[128 * k + m] + 16]) for v in row) < 64}
+    # (the marsh: a few blue dashes, under 64 water pixels a metatile; the coasts have 95+)
+    def water_of(m):
+        k_ = kind(m) or nbr(m)
+        return k_
+    # (metatile, corner) uses with water: the water mask from the Color's colours
+    # the shore's foam (owner, 2026-11-26: only the water moves): light water pixels reached from
+    # the land through light pixels within 3 steps stay as drawn, the waves move under them
+    lum = lambda c: (c & 31) + (c >> 5 & 31) + (c >> 10 & 31)
+    light = max(wcol, key=lum)
+    uses = []
+    for m in used:
+        if m in marsh: continue
+        mimg = img16([ct[16 * tsa[128 * k + m]:16 * tsa[128 * k + m] + 16] for k in range(4)])
+        mc = [[colr(m, mimg[y][x]) for x in range(16)] for y in range(16)]
+        foam = set(); front = [(x, y) for y in range(16) for x in range(16) if mc[y][x] not in wcol]
+        for d in range(3):
+            nxt = []
+            for x, y in front:
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        a_, b_ = x + dx, y + dy
+                        if 0 <= a_ < 16 and 0 <= b_ < 16 and mc[b_][a_] == light and (a_, b_) not in foam:
+                            foam.add((a_, b_)); nxt.append((a_, b_))
+            front = nxt
+        for k in range(4):
+            qy, qx = k >> 1, k & 1
+            pure = all(mc[qy * 8 + y][qx * 8 + x] in wcol for y in range(8) for x in range(8))
+            mask = [[mc[qy * 8 + y][qx * 8 + x] in wcol and (pure or (qx * 8 + x, qy * 8 + y) not in foam)
+                     for x in range(8)] for y in range(8)]       # (a tile all water: no foam in it)
+            if any(any(r_) for r_ in mask): uses.append((m, k, mask))
+    srcimg = {}
+    def src_of(m, dmg):
+        w = water_of(m)
+        if w == 'river':
+            # (a river metatile filling every corner with one tile: its own picture moves; else the
+            # open river's)
+            mm = m if kind(m) == 'river' and len({tsa[128 * k + m] for k in range(4)}) <= 2 and \
+                all(tsa[128 * k + m] == tsa[128 * (k ^ 2) + m] for k in range(4)) else riv
+        else:
+            mm = sea
+        key = (mm, dmg)
+        if key not in srcimg:
+            ids = [(tbl if dmg else tsa)[128 * k + mm] for k in range(4)]
+            srcimg[key] = img16([(dt if dmg else ct)[16 * t:16 * t + 16] for t in ids])
+        return w == 'river', mm, srcimg[key]
+    def slots(dmg):
+        out = {}                                        # tile -> (vertical, 64 or 16 pictures)
+        for m, k, mask in uses:
+            t = (tbl if dmg else tsa)[128 * k + m]
+            vert, mm, img = src_of(m, dmg)
+            px = dec((dt if dmg else ct)[16 * t:16 * t + 16])
+            pics = []
+            for j in range(16 if vert else 64):
+                sh = shift(img, j, vert)
+                qy, qx = k >> 1, k & 1
+                p_ = [[0] * 8 for _ in range(8)]
+                for y in range(8):
+                    for x in range(8):
+                        if not mask[y][x]: p_[y][x] = px[y][x]; continue
+                        v = sh[qy * 8 + y][qx * 8 + x]
+                        if not dmg:
+                            v = cidx(m, colr(mm, v))
+                            assert v is not None, (m, k)
+                        p_[y][x] = v
+                pics.append(enc(p_))
+            if t in out:
+                assert out[t] == (vert, pics), 'water tile %d used two ways' % t
+            out[t] = (vert, pics)
         return out
-    pos_c, pos_d = {}, {}                               # tile -> the corners it is used at
-    for k in range(4):
-        for mt in range(128):
-            pos_c.setdefault(tsa[128 * k + mt], set()).add(k)
-            pos_d.setdefault(tbl[128 * k + mt], set()).add(k)
-    def same(ids, pos_of, fr):
-        # every use of a tile, by any metatile at any corner, must get the same picture in
-        # every step: the same corner as here, or a corner whose shifted quarter is equal
-        for k, t in enumerate(ids):
-            for k2 in pos_of[t]:
-                if k2 != k and any(f[k2] != f[k] for f in fr): return False
-        return True
-    ents, dc, dd, water = [], bytearray(), bytearray(), 0x7E40
-    slots = {False: [], True: []}                       # (per bank: entry, corner, tile; changes)
-    for want, vert in (('sea', False), ('river', True)):
-        cand = sorted((m for m in range(128) if kind(m) == want), key=lambda m: -freq.get(m, 0))
-        for mt in cand[:1]:
-            cid = [tsa[128 * k + mt] for k in range(4)]
-            did = [tbl[128 * k + mt] for k in range(4)]
-            for stag in (True, False):
-                fc = frames([o['cgb_tiles'][16 * t:16 * t + 16] for t in cid], vert, stag)
-                fd = frames([o['dmg_tiles'][16 * t:16 * t + 16] for t in did], vert, stag)
-                if same(cid, pos_c, fc) and same(did, pos_d, fd): break
-            else:
-                continue
-            e = len(ents)
-            for dmg, ids, fr in ((False, cid, fc), (True, did, fd)):
-                for qq in range(4):                     # a corner showing a tile an earlier
-                    if ids[qq] in ids[:qq]:             #   corner copies is never copied again
-                        assert all(f[qq] == f[ids.index(ids[qq])] for f in fr)
-                        continue
-                    slots[dmg].append((e, qq, ids[qq],
-                                       {j for j in range(64) if fr[j][qq] != fr[j - 1][qq]}))
-            dc += b''.join(b''.join(f) for f in fc)
-            dd += b''.join(b''.join(f) for f in fd)
-            ents.append(bytes(cid) + bytes(did) + bytes(8))
-            if want == 'sea':                           # its main colour: the reflection's water
-                cnt = [0] * 4
-                for t in cid:
-                    for row in dec(o['cgb_tiles'][16 * t:16 * t + 16]):
-                        for v in row: cnt[v] += 1
-                k_ = cnt.index(max(cnt)); p_ = o['mt_pal'][mt]
-                water = int.from_bytes(o['cgb_bg'][8 * p_ + 2 * k_:8 * p_ + 2 * k_ + 2], 'little')
-    def head(dmg):                                      # (each bank's entries: its own tiles)
-        h = bytearray(0x100)
-        h[0] = len(ents)
-        h[8:10] = water.to_bytes(2, 'little')
-        for i_, e_ in enumerate(ents): h[0x10 + 16 * i_:0x14 + 16 * i_] = e_[4:8] if dmg else e_[0:4]
-        return bytes(h)
-    def lists(dmg):                                     # ($6200: the changes, $6600: redraws)
-        out = bytearray(0xC00)
-        def put(at, sl, j):
-            out[at] = len(sl)
-            for i_, (e_, q_, t_, _) in enumerate(sl):
-                va = (0x9000 + 16 * t_) if t_ < 128 else (0x8000 + 16 * t_)
-                src = 0x4100 + 0x1000 * e_ + 64 * j + 16 * q_
-                out[at + 1 + 4 * i_:at + 5 + 4 * i_] = va.to_bytes(2, 'little') + src.to_bytes(2, 'little')
-        for j in range(64):
-            ch = [x for x in slots[dmg] if j in x[3]]
-            assert len(ch) <= 3 and len(slots[dmg]) <= 7
-            put(16 * j, ch, j)
-            put(0x400 + 32 * j, slots[dmg], j)
-        return bytes(out)
-    assert len(dc) <= 0x2100
-    def bank(dmg, d_):
-        return head(dmg) + bytes(d_) + bytes(0x2100 - len(d_)) + lists(dmg)
-    return bank(False, dc), bank(True, dd), [(e_[0:4].hex(), e_[4:8].hex()) for e_ in ents]
+    def va(t): return (0x9000 + 16 * t) if t < 128 else (0x8000 + 16 * t)
+    def bank(dmg):
+        sl = slots(dmg)
+        b = bytearray(b'\xff' * 0x4000)
+        b[8:10] = water.to_bytes(2, 'little')
+        def rec(t, half, data):                         # half: 0 rows 0-3, 1 rows 4-7, 2 whole
+            a_ = va(t) + (8 if half == 1 else 0) + (1 if half == 2 else 0)
+            return a_.to_bytes(2, 'little') + data
+        pos = [0x4100]
+        def lst(recs):
+            blob = b''.join(recs) + bytes(2)
+            at = pos[0]
+            assert at + len(blob) <= 0x8000, 'water lists overflow'
+            b[at - 0x4000:at - 0x4000 + len(blob)] = blob
+            pos[0] += len(blob)
+            return at
+        for vert, n, index in ((False, 64, 0x4080), (True, 16, 0x4040)):
+            for j in range(n):
+                recs = []
+                for t, (v_, pics) in sorted(sl.items()):
+                    if v_ != vert: continue
+                    a_, p_ = pics[j], pics[j - 1]
+                    top, bot = a_[:8] != p_[:8], a_[8:] != p_[8:]
+                    if top and bot: recs.append(rec(t, 2, a_))
+                    elif top: recs.append(rec(t, 0, a_[:8]))
+                    elif bot: recs.append(rec(t, 1, a_[8:]))
+                at = lst(recs)
+                b[index - 0x4000 + 2 * j:index - 0x4000 + 2 * j + 2] = at.to_bytes(2, 'little')
+        at = lst([rec(t, 2, pics[0]) for t, (v_, pics) in sorted(sl.items())])
+        b[0x10:0x12] = at.to_bytes(2, 'little')
+        return bytes(b), len(sl)
+    cnt = [0] * 4
+    for t in [tsa[128 * k + sea] for k in range(4)]:
+        for row in dec(ct[16 * t:16 * t + 16]):
+            for v in row: cnt[v] += 1
+    k_ = cnt.index(max(cnt)); p_ = mtp[sea]
+    water = int.from_bytes(pal[8 * p_ + 2 * k_:8 * p_ + 2 * k_ + 2], 'little')
+    bc, nc = bank(False)
+    bd, nd = bank(True)
+    return bc, bd, 'sea %d, river %d, %d Color tiles, %d DMG tiles, marsh %s' % (sea, riv, nc, nd, sorted(marsh))
 
 
 def main():

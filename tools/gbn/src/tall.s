@@ -798,3 +798,41 @@ section bank 99, $6F7E                      ; (free space)
 tl_setf:    ld a, TALL_BANK
             ld hl, tl_set
             jp bank_call
+
+; FF1 AnimateAirshipTakeoff / AnimateAirshipLanding (moved from bank 0): the airship rises from y
+; $6F to $4F (lands: back), a pixel every second frame, its shadow, the noise (FF1: volume 8, the
+; frame counter as its period); then facing right
+section bank 113, $4F00
+air_up9:    ld a, $6F - $1C
+            ld [air_y], a
+.l:         call air_fr9
+            ldh a, [frame]
+            rrca
+            jr c, .l
+            ld hl, air_y
+            dec [hl]
+            ld a, [hl]
+            cp $4F - $1C
+            jr nc, .l
+            jr air_dn9
+air_down9:  ld a, $4F - $1C
+            ld [air_y], a
+.l:         call air_fr9
+            ldh a, [frame]
+            rrca
+            jr c, .l
+            ld hl, air_y
+            inc [hl]
+            ld a, [hl]
+            cp $70 - $1C
+            jr c, .l
+air_dn9:    xor a
+            ld [air_y], a
+            ld [facing], a
+            ld [sfx_nmode], a
+            ret
+air_fr9:    ld a, 3
+            ld [sfx_nmode], a
+            call vo_b
+            call ap_tick
+            jp wait_vbl

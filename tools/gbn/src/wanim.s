@@ -23,36 +23,24 @@ wa_tick:    ld a, [ap_on]                   ; (not under the airship's view)
             ldh a, [maptype]
             and a
             jp z, wa_town                   ; (towns: their water tile)
-            call wa_step
-            ld hl, wa_ph
-            cp [hl]
-            jr z, .same
-            ld [hl], a
-            ld a, [wa_i]                    ; (the last step's tiles not all drawn yet: every
-            sub 8                           ;   tile at this one, else only those it changes)
-            ld [wa_full], a
-            xor a
-            ld [wa_i], a
-.same:      jp wa_ow
+            jp wa_ow
 
 section bank 0, $13CB
-wa_ow:      ld a, [wa_ok]
+wa_ow:      ld a, [wa_ok]                   ; (after a map's load: wa_load drew the step)
             and a
-            jr nz, .go
-            inc a
-            ld [wa_ok], a
-            ld [wa_full], a
-            xor a
-            ld [wa_i], a
-.go:        ld a, [wa_i]
-            cp 8
-            ret nc
-            ldh a, [is_cgb]
-            and a
+            ret z
+            call wa_step
+            ld [WA_SEA + 3], a              ; the targets: the sea's step, the river's two
+            add a, 2                        ;   steps on (((s + 2) / 4) & 15: other frames
+            rrca                            ;   than the sea's band)
+            rrca
+            and 15
+            ld [WA_RIV + 3], a
+            ldh a, [is_cgb]                 ; (the plain Game Boy: its copies in the frame's
+            and a                           ;   idle H-Blanks, wa_late; its V-Blank is the
+            ret z                           ;   waterfall's and the map's)
             ld a, WANIM_BANK
-            jr nz, .b
-            ld a, WANIM_DMG
-.b:         call sbank
+            call sbank
             jp wa_run
 ; A = this frame's step (0-63, a new one every 4 frames of shown water)
 wa_step:    ld hl, wa_t
@@ -138,6 +126,14 @@ section bank 99, $7E00
 ; (bank F3_BANK) every water tile of the new map at step wa_t / 4: the towns' tile (wt_cp), or
 ; the overworld's slots (the water bank's header and frames read through far_copy)
 wa_load:    call tl_setf                    ; (tall or not: tall.s)
+            ld hl, hw_src                   ; (the water copier's helpers into HRAM)
+            ld c, low(HW_TIME)
+            ld b, hw_end - hw_src
+.hw:        ld a, [hl+]
+            ldh [c], a
+            inc c
+            dec b
+            jr nz, .hw
             xor a                           ; (a map's load: the reflection's tiles made
             ld [rf_pend], a                 ;   again, none taken over: refl.s)
             ld [rf_acls], a
@@ -183,67 +179,43 @@ wa_load:    call tl_setf                    ; (tall or not: tall.s)
             ret nc
             ld hl, wt_cp                    ; (bank 0 code; bank_call maps this bank back)
             jp bank_call
-.ow:        ld c, 0                         ; C = slot (entry C / 4, corner C & 3)
-.sl:        ld a, c
-            srl a
-            srl a
-            ld b, a                         ; B = entry
-            ld hl, $4000                    ; (the entry count)
+.ow:        ld hl, $4010                    ; the sea from its whole tiles at step 0 (the
+                                            ;   list at $4010), the river idle at 0; then
+            call wa_rd                      ;   every step up to now, without the V-Blank's
+            ld [WA_SEA], a                  ;   limit (LCD off or a masked load)
+            ld hl, $4011
             call wa_rd
-            dec a
-            cp b
-            ret c
-            ld a, b                         ; D = the slot's tile ($4010 + 16 entry + corner)
-            swap a
-            add a, $10
-            ld l, a
-            ld a, c
-            and 3
-            add a, l
-            ld l, a
-            ld h, $40
-            call wa_rd
-            ld d, a                         ; DE = its VRAM ($8800 mode)
-            swap a
-            ld e, a
-            and $0F
-            bit 7, d
-            jr z, .lo
-            add a, $80 - $90
-.lo:        add a, $90
-            ld d, a
-            ld a, e
-            and $F0
-            ld e, a
-            ld a, [wa_ph]                   ; HL = $4100 + $1000 entry + 64 step + 16 corner
-            ld l, a
-            srl a
-            srl a
-            ld h, a
-            ld a, b
-            swap a
-            add a, h
-            add a, $41
-            ld h, a
-            ld a, l
-            and 3
+            ld [WA_SEA + 1], a
+            xor a
+            ld [WA_SEA + 2], a
+            ld [WA_RIV], a
+            ld [WA_RIV + 1], a
+            ld [WA_RIV + 2], a
+            ld a, 63
+            ld [WA_SEA + 4], a
+            ld a, $80
+            ld [WA_SEA + 5], a
+            ld a, 15
+            ld [WA_RIV + 4], a
+            ld a, $40
+            ld [WA_RIV + 5], a
+            ld a, [wa_t]
             rrca
             rrca
-            ld l, a
-            ld a, c
-            and 3
-            swap a
-            or l
-            ld l, a
-            push bc
+            and 63
+            ld [WA_SEA + 3], a
+            add a, 2
+            rrca
+            rrca
+            and 15
+            ld [WA_RIV + 3], a
+            ld a, 1
+            ldh [wa_nl], a
             call wa_bk
-            ld bc, 16
-            call far_copy
-            pop bc
-            inc c
-            ld a, c
-            cp 8
-            jr c, .sl
+            ld hl, wa_run                   ; (bank 0 code, the water bank mapped)
+            call bank_call
+            xor a
+            ldh [wa_nl], a
             ret
 ; A = the byte at HL in the water bank (keeps BC)
 wa_rd:      push bc
@@ -268,62 +240,85 @@ section bank 0, $2591
 ; (~1.3 lines on the plain Game Boy) starts only at LY 144-151, right after the test, so it ends
 ; by line 153 (the DMG's V-Blank handler leaves the water lines 148-153; the old test, made
 ; before the slot's mask and addresses, let a copy start at 153 and run into line 0's mode 3)
-wa_run:     ld a, [wa_ph]                   ; HL = 16 step
-            swap a
-            ld l, a
-            and $0F
-            ld h, a
-            ld a, l
-            and $F0
-            ld l, a
-            ld a, [wa_full]
-            and a
-            jr z, .ch
-            add hl, hl                      ; (a redraw: $6600 + 32 step)
-            ld a, h
-            add a, $66 - $62
-            ld h, a
-.ch:        ld a, h
-            add a, $62
-            ld h, a
-            ld a, [wa_i]
-            cp [hl]
-            jr nc, .done
-            add a, a                        ; HL = the copy's entry (inside the step's list)
-            add a, a
-            inc a
-            add a, l
-            ld l, a
-            ldh a, [rLY]
-            sub 144
-            cp 8
-            ret nc
-            ld e, [hl]                      ; DE = the tile in VRAM (16-aligned)
-            inc l
-            ld d, [hl]
-            inc l
-            ld a, [hl+]                     ; HL = its frame
-            ld h, [hl]
-            ld l, a
-            ld b, 8
-.cp:        ld a, [hl+]
-            ld [de], a
-            inc e
+wa_run:     ld hl, WA_SEA
+            call wa_an
+            ret c
+            ld hl, WA_RIV
+; HL = an animator (list pointer, step, target, mask, index's low byte): its lists applied in turn
+; up to its target, a record at a time while the V-Blank lasts (wa_nl: no limit, a load). C: out
+; of time. Records: VRAM address (bit 0: 16 bytes, else 8), the bytes; a zero word ends a list
+wa_an:      push hl
+.n:         pop hl
+            push hl
             ld a, [hl+]
-            ld [de], a
-            inc e
-            dec b
-            jr nz, .cp
-            ld hl, wa_i
-            inc [hl]
-            jr wa_run
-.done:      ld a, 8
-            ld [wa_i], a
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            or e
+            jr nz, .rec
+            ld a, [hl+]                     ; (no list running: the next step's, if behind)
+            cp [hl]
+            jr z, .x
+            inc hl
+            inc a
+            and [hl]
+            ld c, a
+            inc hl
+            add a, a
+            add a, [hl]
+            ld l, a
+            ld h, $40
+            ld e, [hl]
+            inc hl
+            ld d, [hl]
+            pop hl
+            push hl
+            inc hl
+            inc hl
+            ld [hl], c
+.rec:       call HW_TIME                    ; (the time left: HRAM, hw_src)
+            jr c, .late
+            ld a, [de]
+            ld l, a
+            inc de
+            ld a, [de]
+            ld h, a
+            inc de
+            and a
+            jr z, .end
+            ld b, 8
+            bit 0, l
+            jr z, .c
+            res 0, l
+            ld b, 16
+.c:         call HW_CPY                     ; (B bytes DE -> HL: HRAM, hw_src)
+            pop hl
+            push hl
+            ld [hl], e
+            inc hl
+            ld [hl], d
+            jr .n
+.end:       pop hl
+            push hl
+            xor a
+            ld [hl+], a
+            ld [hl], a
+            jr .n
+.late:      pop hl
+            scf
+            ret
+.x:         pop hl
+            and a
             ret
 
 section wram, $C992                         ; (between the SGB variables and its queue)
 wa_i:       ds 1
-wa_ph:      ds 1
+wa_ph:      ds 1                            ; (the towns' water tile: its step)
+section wram, $CCF0
+WA_SEA:     ds 6                            ; wa_an's animators: list pointer, step, target,
+WA_RIV:     ds 6                            ;   mask, index (low byte; page $40)
+section hram, $FF9C
+wa_nl:      ds 1                            ; 1: no V-Blank limit (a load)
 
 section wram, $CFB8                         ; (after ly_tab; fixed RAM no screen shares: the map's
                                             ;   queue $C100-$C8FF ran over these at $C6E8)
@@ -473,3 +468,59 @@ wt_cp2:     ldh a, [is_cgb]
 .x:         ei
             pop hl
             ret
+
+; ---- wa_an's helpers, run from HRAM (copied there by wa_load; position independent: jr only)
+HW_TIME    = $FFA0
+HW_CPY     = HW_TIME + (hw_cpy - hw_src)
+section bank 99, $7A23                      ; (free space)
+; C when the time is out: wa_nl 0 the V-Blank (lines 144-151), 1 none (a load), 2 H-Blanks up to
+; line 127 (a record's last bytes 8 lines on) (the plain Game Boy's idle lines: wa_late)
+hw_src:     ldh a, [wa_nl]
+            cp 1
+            jr z, .ok
+            jr c, .vb
+            ldh a, [rLY]
+            cp 128
+            ccf
+            ret
+.vb:        ldh a, [rLY]
+            sub 144
+            cp 8
+            ccf
+            ret
+.ok:        and a
+            ret
+; B bytes DE -> HL (VRAM); in H-Blanks (wa_nl 2): 2 at each H-Blank's start, interrupts off
+hw_cpy:     ldh a, [wa_nl]
+            cp 2
+            jr z, .hb
+.c:         ld a, [de]
+            ld [hl+], a
+            inc de
+            dec b
+            jr nz, .c
+            ret
+.hb:        di
+.w3:        ldh a, [rSTAT]
+            and 3
+            cp 1                            ; (the V-Blank reached: the rest at once)
+            jr z, .vb
+            cp 3
+            jr nz, .w3
+.w0:        ldh a, [rSTAT]
+            and 3
+            jr nz, .w0
+            ld a, [de]
+            ld [hl+], a
+            inc de
+            ld a, [de]
+            ld [hl+], a
+            inc de
+            ei
+            dec b
+            dec b
+            jr nz, .hb
+            ret
+.vb:        ei
+            jr .c
+hw_end:

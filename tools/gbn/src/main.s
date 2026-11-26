@@ -325,8 +325,7 @@ main:       call wait_vbl
             call make_oam
             call bd_oam                     ; (boarding: the party into the vehicle)
             call refl_tick                  ; (the reflection on water: refl.s)
-            call ap_tick                    ; (the airship's view: air.s)
-            jr main
+            jp ap_tl                        ; (the airship's view: air.s; the DMG's water)
 
 
 ; ---- V-Blank: OAM, scroll, palettes, queued metatiles
@@ -2463,39 +2462,42 @@ pc_menu3:   call ap_stop
 ; FF1 AnimateAirshipTakeoff / AnimateAirshipLanding: the airship rises from y $6F to $4F
 ; (lands: back), a pixel every second frame, its shadow, the noise (FF1: volume 8, the
 ; frame counter as its period); then facing right
-air_up:     ld a, $6F - $1C
-            ld [air_y], a
-.l:         call air_frame
-            ldh a, [frame]
-            rrca
-            jr c, .l
-            ld hl, air_y
-            dec [hl]
-            ld a, [hl]
-            cp $4F - $1C
-            jr nc, .l
-            jr air_done
-air_down:   ld a, $4F - $1C
-            ld [air_y], a
-.l:         call air_frame
-            ldh a, [frame]
-            rrca
-            jr c, .l
-            ld hl, air_y
-            inc [hl]
-            ld a, [hl]
-            cp $70 - $1C
-            jr c, .l
-air_done:   xor a
-            ld [air_y], a
-            ld [facing], a
-            ld [sfx_nmode], a
+air_up:     ld a, TALL_BANK                 ; (air_up9 / air_down9: tall.s, for bank 0's room)
+            ld hl, air_up9
+            jp bank_call
+air_down:   ld a, TALL_BANK
+            ld hl, air_down9
+            jp bank_call
+; the main loop's end: the airship's view, then on the plain Game Boy the water's copies in the
+; frame's idle H-Blanks (wa_late)
+ap_tl:      call ap_tick
+            call wa_late
+            jp main
+wa_late:    ldh a, [is_cgb]                 ; (the plain Game Boy / SGB, the overworld, not under
+            and a                           ;   the box, the banner or the airship's view: their
+            ret nz                          ;   lines' handlers)
+            ldh a, [maptype]
+            and a
+            ret z
+            ld a, [wa_ok]
+            and a
+            ret z
+            ld a, [bn_t]
+            ld b, a
+            ld a, [box_on]
+            or b
+            ld b, a
+            ld a, [ap_on]
+            or b
+            ret nz
+            ld a, WANIM_DMG
+            call sbank
+            ld a, 2
+            ldh [wa_nl], a
+            call wa_run
+            xor a
+            ldh [wa_nl], a
             ret
-air_frame:  ld a, 3
-            ld [sfx_nmode], a
-            call veh_oam
-            call ap_tick                    ; (the view rising / sinking: air.s)
-            jp wait_vbl
 
 ; FF1 MapPoisonDamage: on foot, each poisoned member loses 1 HP a step (not below 1)
 section bank 0, $3200                       ; (main.s continued)
@@ -4140,10 +4142,14 @@ vb_wait:    ldh a, [rLCDC]
             jr c, .v
             ret
 
-section bank 0, $25DD                       ; (free space)
+section bank 0, $25F8                       ; (free space)
+box_fb:     ld a, BTL6_BANK                 ; (box_fb9: moved out of bank 0; flags kept)
+            ld hl, box_fb9
+            jp bank_call
+section bank 104, $48C0                     ; (free space)
 ; the battle's top window going up (box_vbl in the V-Blank): C while its rows are not all up;
 ; after 6 frames without them, the rest written from here (box_safe), so it never hangs
-box_fb:     ld a, [win_up]
+box_fb9:    ld a, [win_up]
             cp 8
             jr nc, .d
             ld hl, box_fc
@@ -4152,9 +4158,7 @@ box_fb:     ld a, [win_up]
             cp 6
             jr c, .c
             ld [hl], 0
-            ld a, BTL6_BANK
-            ld hl, box_safe
-            call bank_call
+            call box_safe
 .c:         scf
             ret
 .d:         xor a                           ; (NC)
