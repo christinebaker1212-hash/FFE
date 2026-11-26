@@ -23,10 +23,13 @@ Check standard. Code will go in `tools/gb3n/`, docs in `docs/ff3-gb-*.md`.
     living party member as the walking sprite** ($F72C), B makes the Invincible take off, A
     talks / acts. The world map is shown only by the Sight spell and Dwarf Bread ($A525).
 
-## Waiting for the owner
-1. Base: native rewrite (recommended) or the disassembly as the base.
-2. How the Select menu (Options / Formation / Suspend) opens in FF3.
-3. Which of FF1's conveniences and polish carry over.
+## Owner's decisions (2026-11-26)
+1. Base: **native rewrite** (as FF1).
+2. Select menu: **in the Start menu** (Config and Suspend added; FF3's Order = Formation; Select on
+   the map keeps showing the next member).
+3. Conveniences: **all four groups** (text / screens, battle, menus / Config / saves, extras). FF3
+   already has some: judge each in battle against FF3's own, keep FF3's where better, adapt ours
+   to FF3's style where equal or ours has the edge (`docs/ff3-gb-battle-compare.md`).
 
 ## Next (after the decisions)
 - Map the listing's routine names onto the ROM (as `tools/gb/ff1dis.py` did for FF1).

@@ -109,6 +109,18 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
 - In the native game: names up to 6 letters; FF3's weapon / armour / item / white / black
   magic icons before item and spell names, taken from the user's FF3 ROM at build time.
 
+## Owner's decisions for FF3 (2026-11-26; binding, replaces the disassembly base for FF3)
+- **FF3 becomes 100% native code, as FF1:** our own SM83 engine written from what the
+  everything8215/ff3 listing (`build/ref/ff3`, never committed; it is an annotated listing, not
+  source) says each routine does; every game byte from the user's ROM at build time; FF3's rules,
+  formulas, RNG and events exactly as on the Famicom. Code in `tools/gb3n/`, status in
+  `docs/ff3-gb-status.md`. (FF2's base is the FF2 session's decision.)
+- **Select menu in FF3:** Start opens FF3's main menu with Config and Suspend added as commands;
+  FF3's own Order is the Formation; Select on the map keeps FF3's job (show the next member).
+- **FF1's conveniences carry over** (text / screens, battle, menus / Config / saves, extras), but
+  FF3 already has some of them: compare each in battle, keep FF3's where it is better, and adapt
+  ours to FF3's style where they are about equal or ours has the edge.
+
 ## Release requirements (owner's decision, 2026-11-20: absolutely required)
 No GB/GBC release of FF1, FF2 or FF3 until every Nintendo Lot Check standard in
 `docs/gb-release-checks.md` is met and checked: header and boot integrity, LCD off only in
