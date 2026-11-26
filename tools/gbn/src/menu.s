@@ -2667,7 +2667,7 @@ tg_heal:    call tg_all
             call party_hp
             call mg_spend
             jp z, m_done
-            call tgt_redraw
+            call tgt_kept                   ; (the HP redrawn in place: the hands stay)
             jr tg_heal
 ; the hand beside each member's name (OAM 0-15); C set on B, else A
 tg_all:     xor a
@@ -2687,7 +2687,12 @@ tg_all:     xor a
             inc a
             cp 4
             jr c, .h
-.w:         call scr_frame
+.w:         ld a, [sf_row]                  ; (the rows all up: the hand's rule as on every
+            cp 18                           ;   screen again; owner, 2026-11-26: after A the
+            jr c, .w0                       ;   redraw hid the first hand, OAM 0-3, for good)
+            xor a
+            ld [sf_hk], a
+.w0:        call scr_frame
             ldh a, [pad_new]
             bit 1, a
             jr nz, .b
@@ -2695,8 +2700,14 @@ tg_all:     xor a
             jr z, .w
             and a
             ret
-.b:         scf
+.b:         xor a
+            ld [sf_hk], a
+            scf
             ret
+; the target screen's rows again with the hands kept (sf_hk: redrawn in place)
+tgt_kept:   ld a, 1
+            ld [sf_hk], a
+            jp tgt_redraw
 
 section wram, $CCFC
 tg_k:       ds 1                            ; the target screen's line: 1 magic, 2 items

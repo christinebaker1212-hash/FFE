@@ -1157,3 +1157,23 @@ one reaches parity, so the owner can keep playing).
       They moved to $6A00; build.py place() now refuses two blobs over each other (this was the only overlap).
     - The airship's view removed (owner): flying shows the plain overworld again, with the field's own rows (py - 6 .. + 6);
       ap_tick keeps it off, its code (src/air.s, build.py ap_source) left in place.
+65. Owner (2026-11-26, a video of Crescent Lake's bridge).
+    - Town reflection walking right (Color): the party facing right is drawn mirrored left to right (OAM X flip), but
+      its water mask was cut for the unmirrored tile, so the cut fell on the wrong side and the part over the land
+      showed. The mask rows are now reversed for a mirrored sprite (refl.s rf_xrev). Checked against a build with
+      no reflection, frame by frame: 0 reflection pixels over land walking right or left (up to 54 a frame before).
+    - Plain Game Boy reflection ("completely broken"): the tiles were made only when the reflection's work began
+      before line 44; since the frame's work grew it began at lines 39-62 and most walking frames kept the old
+      tiles and hid them. They take 7-53 lines now, so the cut is line 72 (the music's timer tick adds about 13
+      lines, the frame's end 6: no lag frame in 1,280 walking frames). The DMG now shows the reflection where the
+      Color does; left: a 1-pixel column at the water's edge in about 3% of walking frames (a step's first frame
+      with the music early: the last frame's tiles, a pixel behind the scroll).
+    - Town water standing still while walking: its 16-byte tile was copied right after the frame wait only up to
+      line 148, and a walking frame's V-Blank work reaches 149-153 there, on both systems. The step is now asked
+      for by the field frame (wa_tick) and copied in the next V-Blank right after the OAM (wt_vbl), once that field
+      frame has ended (a menu or a load in between keeps it from them); a load with the LCD on leaves it to that
+      V-Blank too. 80 of 80 steps copied while walking (DMG 8, Color 79 with the old cut; 0 before it).
+    - Field Heal / Healara / Healaga on the whole party: after A the first hand vanished. The HP redraw hid the main
+      hand (OAM 0-3) while its rows went up and the four hands were drawn only once; the redraw now counts as in
+      place (sf_hk, as the Bestiary's scrolling), so the hands stay.
+    - Strict checker 0 on DMG / CGB / SGB (random play from New Game, random walks in Crescent Lake).

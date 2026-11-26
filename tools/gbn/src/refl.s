@@ -460,11 +460,13 @@ refl_msk:   call rf_mtchk                   ; (the metatiles under it: kept for 
             ld a, [rf_upi]
             and a
             jr nz, .stale
-.mk:        ldh a, [rLY]                    ; (the frame already late, line 44-143: the tiles
+.mk:        ldh a, [rLY]                    ; (the frame already late, line 72-143: the tiles
             cp 144                          ;   made stand a frame more, so no frame is lost;
-            jr nc, .mk1                     ;   the plain Game Boy needs some 85 lines for
-            cp 44                           ;   them, a step's end starts near line 80)
-            jr nc, .stale
+            jr nc, .mk1                     ;   the plain Game Boy needs up to 53 lines for
+            cp 72                           ;   them, the music's tick 13 more, the frame's
+            jr nc, .stale                   ;   end 6. At line 44, the cut before 2026-11-26,
+                                            ;   it was late in most walking frames and the
+                                            ;   reflection hidden: owner, completely broken)
 .mk1:       call rf_sig                     ; (nothing moved: the tiles made stand)
             jr z, .apply
             xor a
@@ -632,6 +634,7 @@ rf_one:     ld a, [RF_I]
             ld a, b
             inc a
             jr z, .k                        ; (all water: whole)
+            call rf_xrev                    ; (facing right: the tile shown mirrored)
             call rf_tile
             ld c, 2
 .k:         ld a, [RF_I]                    ; kind C at bits 2 i
@@ -1113,6 +1116,7 @@ section bank 0, $2E6D                       ; (free space)
 ; the V-Blank handler: OAM, then at once the reflection's masked tiles (the plain Game Boy's
 ; V-Blank has room only this early: the map's rows and the water come after)
 rf_dma:     call hram_dma
+            call wt_vbl                     ; (the town water's step: wanim.s)
             jp rf_vbu
 section bank 0, $16CB                       ; (free space)
 rf_vbu:     ldh a, [tl_mt]                  ; (a tall map: rf_vb9 every V-Blank, its sprite
@@ -2423,6 +2427,41 @@ rf_cpos:
             add a, e
             ld e, a
 .pos:       ret
+
+section bank 111, $4763                     ; (free space)
+; a sprite drawn mirrored left to right (the party facing right: OAM X flip) has its tile's
+; columns the other way round: its mask rows reversed to match (owner, 2026-11-26: walking right
+; cut the wrong side, the reflection showed over the land at the water's edge)
+rf_xrev:    ld a, [RF_I]
+            add a, a
+            add a, a
+            add a, low(RF_OAM) + 3
+            ld l, a
+            ld h, high(RF_OAM)
+            bit 5, [hl]
+            ret z
+            ld hl, RF_ROWS
+            ld c, 8
+            ld d, high(rf_nrev)
+.r:         ld a, [hl]
+            and $0F
+            add a, low(rf_nrev)
+            ld e, a
+            ld a, [de]
+            swap a
+            ld b, a
+            ld a, [hl]
+            swap a
+            and $0F
+            add a, low(rf_nrev)
+            ld e, a
+            ld a, [de]
+            or b
+            ld [hl+], a
+            dec c
+            jr nz, .r
+            ret
+rf_nrev:    db 0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15
 
 section bank 111, $47D0                     ; (free space)
 ; V-Blank after the OAM: a tall map's sprite size and line handler (tall.s tl_vb9), then the

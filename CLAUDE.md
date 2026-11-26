@@ -1431,6 +1431,9 @@ looking at the step's end; the "chopped head" on corner tiles not reproduced (sc
 Then (item 64): no reflections on the overworld (towns keep theirs); the DMG canoe / vehicle tiles $60-$6F restored (the
 overworld bank's font table had been placed over them; build.py place() now refuses overlaps); the airship's view removed
 (owner: flying shows the plain overworld; its code left off in src/air.s).
+Then (item 65): town reflections walking right (the mask now mirrored with the party's sprite), the plain Game Boy's
+town reflection made in time again (it was hidden in most walking frames), town water moving while walking (copied
+in V-Blank right after the OAM), the hands kept on all four members after casting a party-wide heal.
 
 ## Remaining
 - **FF1 (native build), before release:**

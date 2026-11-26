@@ -356,8 +356,8 @@ vblank:     push af
             ldh [rSCX], a
             ldh a, [scy]
             ldh [rSCY], a
-            ld c, 3                         ; (the map's rows first, 3 metatiles: a running
-            call q_flush                    ;   step queues 15 per 8 frames; behind the rest
+            call qf_wt                      ; (the map's rows first, 3 metatiles: a running
+                                            ;   step queues 15 per 8 frames; behind the rest
                                             ;   of the handler the plain Game Boy managed 1 a
                                             ;   frame and new rows showed undrawn; owner,
                                             ;   2026-11-26)
@@ -2472,7 +2472,7 @@ air_down:   ld a, TALL_BANK
 ; frame's idle H-Blanks (wa_late)
 ap_tl:      call ap_tick
             call wa_late
-            jp main
+            jp wt_end                       ; (the town water's copy now due: wanim.s)
 wa_late:    ldh a, [is_cgb]                 ; (the plain Game Boy / SGB, the overworld, not under
             and a                           ;   the box, the banner or the airship's view: their
             ret nz                          ;   lines' handlers)
@@ -2500,6 +2500,10 @@ wa_late:    ldh a, [is_cgb]                 ; (the plain Game Boy / SGB, the ove
             ret
 
 ; FF1 MapPoisonDamage: on foot, each poisoned member loses 1 HP a step (not below 1)
+section wram, $CCAB                         ; (free)
+wt_req:     ds 1                            ; the town water's step: 1 asked (wa_town), 2 the
+                                            ;   field frame ended (wt_end): copied in V-Blank
+
 section bank 0, $3200                       ; (main.s continued)
 MINI_BANK  = 97             ; (also: the 12 classes' map sprites at $6400, colours at $7000)
 M_PERM     = $7380          ; map bank: DMG rank permutations per class and sprite palette

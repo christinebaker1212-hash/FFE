@@ -51,16 +51,21 @@ wa_step:    ld hl, wa_t
             and 63
             ret
 
-section bank 0, $2F52
+section bank 0, $3A2B                       ; (free space; was $2F52, grown)
 ; towns (tileset 0: maps 0-7), outside the rooms: their one water tile ($0F) moves as the sea,
 ; in two bands of 4 lines (build.py town_water); a step's picture goes to VRAM in the V-Blank
 wa_town:    ld a, [cur_map]
             cp 8
-            ret nc
+            jr nc, .no
             ld a, [inroom]
             and a
-            ret nz
-            call wa_step
+            jr nz, .no
+            ld a, [wt_req]                  ; (one the V-Blank did not take: wanted again,
+            and a                           ;   after this field frame)
+            jr z, .s
+            ld a, 1
+            ld [wt_req], a
+.s:         call wa_step
             ld b, a
             ld hl, wa_ph
             ld a, [wa_ok]
@@ -69,16 +74,39 @@ wa_town:    ld a, [cur_map]
             ld a, b
             cp [hl]
             ret z
-.new:       di                              ; (interrupts off from the test through the copy:
-            ldh a, [rLY]                    ;   one between them pushed it into line 0 on the
-            sub 144                         ;   plain Game Boy; strict checker, Onrac)
-            cp 5
-            jr nc, .x
-            ld [hl], b
-            ld a, 1
-            ld [wa_ok], a
-            call wt_cp
-.x:         reti
+.new:       ld [hl], b                      ; (the copy in the V-Blank after this field frame:
+            ld a, 1                         ;   wt_vbl. Here, right after the frame wait, the
+            ld [wa_ok], a                   ;   plain Game Boy's walking frames came at line
+            ld [wt_req], a                  ;   149-153, too late: the water stood still while
+            ret                             ;   the party walked; owner, 2026-11-26)
+.no:        xor a
+            ld [wt_req], a
+            ret
+
+section bank 0, $3195                       ; (free space)
+; V-Blank (main.s vblank): the map's first metatiles
+qf_wt:      ld c, 3
+            jp q_flush
+; V-Blank, right after the OAM (rf_dma; the plain Game Boy's reflection tiles and map rows come
+; after it, each with its own time check): the town water's step (wa_town) once a field frame
+; has ended (wt_end: 1 -> 2; a menu or a load in between keeps it from them)
+wt_vbl:     ld a, [wt_req]
+            cp 2
+            ret nz
+            ldh a, [maptype]
+            and a
+            ret nz
+            ldh a, [rLY]                    ; (up to line 149: 16 bytes, some 1.5 lines on the
+            sub 144                         ;   plain Game Boy; the canal's tiles check their
+            cp 6                            ;   own time)
+            ret nc
+            xor a
+            ld [wt_req], a
+            jp wt_cp
+; the main loop's end (ap_tl)
+wt_end:     ld hl, wt_req
+            sla [hl]
+            jp main
 
 section bank 0, $31CE
 ; the town water tile's picture for step wa_ph (entry: the town, or 8 on the Color): its VRAM
@@ -177,7 +205,13 @@ wa_load:    call tl_setf                    ; (tall or not: tall.s)
             ld a, [cur_map]                 ; towns (maps 0-7)
             cp 8
             ret nc
-            ld hl, wt_cp                    ; (bank 0 code; bank_call maps this bank back)
+            ldh a, [rLCDC]                  ; (the LCD on, a masked load: the V-Blank copies
+            bit 7, a                        ;   it, wt_vbl; at once it was written in line
+            jr z, .twn                      ;   44's drawing: strict checker, 2026-11-26)
+            ld a, 2
+            ld [wt_req], a
+            ret
+.twn:       ld hl, wt_cp                    ; (bank 0 code; bank_call maps this bank back)
             jp bank_call
 .ow:        ld hl, $4010                    ; the sea from its whole tiles at step 0 (the
                                             ;   list at $4010), the river idle at 0; then
@@ -444,9 +478,8 @@ wt_cp2:     ldh a, [is_cgb]
             ld a, d
             or e
             ret z
-            push hl
-            di
-            ldh a, [rLCDC]
+            push hl                         ; (no di / ei: run from the V-Blank handler, wt_vbl,
+            ldh a, [rLCDC]                  ;   or a load with the LCD off)
             bit 7, a
             jr z, .go
             ldh a, [rLY]
@@ -465,8 +498,7 @@ wt_cp2:     ldh a, [is_cgb]
             ld bc, 16
             ld a, WT2_BANK
             call far_copy
-.x:         ei
-            pop hl
+.x:         pop hl
             ret
 
 ; ---- wa_an's helpers, run from HRAM (copied there by wa_load; position independent: jr only)
