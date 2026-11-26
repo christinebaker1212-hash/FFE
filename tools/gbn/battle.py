@@ -160,6 +160,7 @@ def data_bank(rom):
     assert m, 'respond delay table not found'
     a = int.from_bytes(m.group(1), 'little') - 0x8000
     assert len(b11[a:a + 8]) == 8
+    put(0x7FE0, boss_hands(rom))                                    # B_HAND (btl2.s bt_tp9)
     put(0x7FF0, bytes([52, 44, 36, 30, 24, 16, 8, 1]))             # (owner, 2026-11-23: the
                                                                     #   remake's timing, 52
                                                                     #   frames at speed 1;
@@ -195,6 +196,38 @@ def rng_table(fix):
            fix[i + 3] == 0xBD and fix[i + 6] == 0x60:
             return fix[i + 4] | fix[i + 5] << 8
     raise AssertionError('BattleRNG not found')
+
+
+def boss_hands(rom):
+    """the target hand beside a fiend (graphics 0-3) / Chaos (4), from the pictures in the user's
+    ROM (owner's list, 2026-11-26: the Lich's hand 14 pixels from his body): per picture the
+    pixel x of its left edge within the hand's band of rows (the visible body, not a nearly empty
+    first tile column) and its middle row, from the picture's top-left cell. Chaos fills the
+    screen's left edge: his hand stays whole on screen, pointing into him (x at least 9)"""
+    def page(p):
+        return rom.rd(BANK_BATTLECHR + (p >> 3), 0x8000 + 0x800 * (p & 7), 0x800)
+    forms = rom.rd(BANK_DOMAINS, FORMATIONS, 128 * 16)
+    pg = {}
+    for f in range(128):                                            # graphic -> its page
+        t, g = forms[16 * f] >> 4, forms[16 * f + 1]
+        if t == 3: pg.setdefault(g, forms[16 * f] & 15)
+        if t == 4: pg.setdefault(4, forms[16 * f] & 15)
+    out = bytearray()
+    for g in range(5):
+        tsa, w, h = ((rom.rd(BANK_DOMAINS, 0x92E0 + 0x50 * g, 64), 8, 8) if g < 4 else
+                     (rom.rd(BANK_DOMAINS, 0x9420, 168), 14, 12))
+        chr_ = page(pg[g]); px = []
+        for r in range(h):
+            for c in range(w):
+                t = tsa[w * r + c]
+                if t < 0x12: continue                               # (not enemy tiles)
+                for y in range(8):
+                    bits = chr_[16 * t + y] | chr_[16 * t + 8 + y]
+                    px += [(8 * c + x, 8 * r + y) for x in range(8) if bits >> (7 - x) & 1]
+        ys = [y for _, y in px]; mid = (min(ys) + max(ys)) // 2
+        left = min(x for x, y in px if mid - 6 <= y <= mid + 6)
+        out += bytes([max(left, 9) if g == 4 else left, mid])
+    return bytes(out)
 
 
 def chr_banks(rom):

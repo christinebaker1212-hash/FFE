@@ -707,7 +707,8 @@ bt_target_enemy:
             add a, a
             add a, a
             add a, a
-            sub 17
+            ld hl, bt_tdx                   ; (- 17; a fiend / Chaos: from its picture's own
+            add a, [hl]                     ;   edge: bt_tp9)
             ld b, a
             ld a, e
             add a, a
@@ -718,7 +719,8 @@ bt_target_enemy:
             add a, a
             add a, a
             add a, d
-            sub 4
+            inc hl                          ; (- 4, or the picture's middle row - 4)
+            add a, [hl]
             ld c, a
             call bt_hand
             call bt_frame
@@ -2355,15 +2357,6 @@ bt_rf:      ld l, a
 bt_cap200:  cp 201
             ret c
             ld a, 200
-            ret
-; SELECT in a target choice: the name window off / on again
-bt_tban_sel:
-            ld hl, ban_hide
-            ld a, [hl]
-            xor 1
-            ld [hl], a
-            ld a, $FF
-            ld [ban_last], a
             ret
 bt_tban_off:
             ld a, $FF
@@ -4212,8 +4205,16 @@ bt_tpos:    ld b, a
             ld a, [bt_type]
             cp 3
             ld a, b
-            jp c, bt_epos
+            jp c, bt_epz
             jp bt_tpx
+section bank 6, $732C                       ; (free space)
+bt_epz:     ld b, a                         ; (an ordinary enemy: no pixel offsets)
+            ld a, -17
+            ld [bt_tdx], a
+            ld a, -4
+            ld [bt_tdy], a
+            ld a, b
+            jp bt_epos
 section bank 0, $35EC                       ; (free space)
 ; bt_tp9 in bank F3_BANK, B / C / E back (bank_call would restore BC)
 bt_tpx:     ldh a, [rombank]
@@ -4224,78 +4225,48 @@ bt_tpx:     ldh a, [rombank]
             pop af
             jp sbank
 section bank 99, $4981                      ; (free space)
-; fiend: the non-empty columns / rows of its 8 x 8 TSA (FF1's, BTL_DATA B_FIEND + $50 graphic)
-; at cell (3, 2); Chaos: his 14 x 12 at (1, 0). B = first column, C = first row, E = rows
+; fiend / Chaos: B, C = the picture's top-left cell (fiend (3, 2), Chaos (1, 0)), E = 0, and the
+; hand's pixel offsets from it (bt_tdx: the picture's left edge in the hand's rows, bt_tdy: its
+; middle row; build.py boss_hands, BTL_DATA B_HAND: 2 bytes a fiend graphic, then Chaos)
+B_HAND     = $7FE0
 bt_tp9:     ld a, [bt_type]
             cp 4
-            jr nz, .f
-            ld bc, $0100
-            ld e, 12
-            ret
-.f:         ld a, [bt_form + 1]             ; HL = B_FIEND + $50 graphic
+            ld a, 4
+            jr z, .g
+            ld a, [bt_form + 1]
+.g:         add a, a
             ld l, a
             ld h, 0
-            ld d, h
-            ld e, l
-            add hl, hl
-            add hl, hl
-            add hl, de
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            ld de, B_FIEND
+            ld de, B_HAND
             add hl, de
             ld a, BTL_DATA
             ld [fc_bank], a
-            ld a, 8
-            ld [bt_t + 8], a                ; first column
-            ld [bt_t + 9], a                ; first row
-            xor a
-            ld [bt_t + 10], a               ; last row
-            ld c, a
-.l:         call far_byte
-            and a
-            jr z, .n
-            ld a, c
-            and 7
-            ld b, a
-            ld a, [bt_t + 8]
-            cp b
-            jr c, .c1
-            ld a, b
-            ld [bt_t + 8], a
-.c1:        ld a, c
-            rrca
-            rrca
-            rrca
-            and 7
-            ld b, a
-            ld a, [bt_t + 9]
-            cp b
-            jr c, .c2
-            ld a, b
-            ld [bt_t + 9], a
-.c2:        ld a, [bt_t + 10]
-            cp b
-            jr nc, .n
-            ld a, b
-            ld [bt_t + 10], a
-.n:         inc hl
-            inc c
-            ld a, c
-            cp 64
-            jr c, .l
-            ld a, [bt_t + 9]
-            ld d, a
-            ld a, [bt_t + 10]
-            sub d
-            inc a
-            ld e, a
-            ld a, d
-            add a, 2
-            ld c, a
-            ld a, [bt_t + 8]
-            add a, 3
-            ld b, a
+            call far_byte
+            sub 17
+            ld [bt_tdx], a
+            inc hl
+            call far_byte
+            sub 4
+            ld [bt_tdy], a
+            ld e, 0
+            ld bc, $0302
+            ld a, [bt_type]
+            cp 4
+            ret nz
+            ld bc, $0100
+            ret
+
+section wram, $DA93
+bt_tdx:     ds 1                            ; the target hand's pixel offsets, less 17 / 4
+bt_tdy:     ds 1
+
+section bank 6, $76C3                       ; (free space; moved for bt_tdx: its section full)
+; SELECT in a target choice: the name window off / on again
+bt_tban_sel:
+            ld hl, ban_hide
+            ld a, [hl]
+            xor 1
+            ld [hl], a
+            ld a, $FF
+            ld [ban_last], a
             ret
