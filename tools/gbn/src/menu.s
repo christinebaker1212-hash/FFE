@@ -559,28 +559,9 @@ cname_ptrs: dw str_cname0, str_cname1, str_cname2, str_cname3, str_cname4, str_c
             dw str_cname6, str_cname7, str_cname8, str_cname9, str_cname10, str_cname11
 
 ; orb tiles to BG $80- (LCD off); CGB: the lit orbs' palette as BG palette 6
-orb_gfx:    ldh a, [is_cgb]
-            and a
-            ld hl, U_ORBDMG
-            jr z, .t
-            ld hl, U_ORBPAL
-            ld de, scr_buf
-            ld bc, 8
-            ld a, UI_GFX
-            call far_copy
-            ld a, $B0
-            call bcps_w
-            ld hl, scr_buf
-            ld b, 8
-.p:         ld a, [hl+]
-            call bcpd_w
-            dec b
-            jr nz, .p
-            ld hl, U_ORBCGB
-.t:         ld de, $8800
-            ld bc, 20 * 16
-            ld a, UI_GFX
-            jp far_copy
+orb_gfx:    ld a, PK_BANK                   ; (bank 107: packs.s)
+            ld hl, orb_gfx9
+            jp bank_call
 
 ; the four orbs (FF1 DrawOrbBox: fire, water / air, earth), lit or not
 orb_draw:   ld hl, orb_pos

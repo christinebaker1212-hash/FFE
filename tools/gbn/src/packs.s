@@ -551,3 +551,33 @@ eqm_odn2:    ld a, [eqm_ot]
             ld [eqm_t], a
             ret
 
+
+section bank 107, $7200                     ; (free space)
+; orb tiles to BG $80- (LCD off); CGB: the lit orbs' palette as BG palette 6 (from menu.s)
+orb_gfx9:    ldh a, [is_cgb]
+            and a
+            ld hl, U_ORBDMG
+            jr z, .t
+            ld hl, U_ORBPAL
+            ld de, scr_buf
+            ld bc, 8
+            ld a, UI_GFX
+            call far_copy
+            ld a, [win_pal + 4]             ; (the box behind: the window's colour, as the
+            ld [scr_buf + 4], a             ;   Config sets it; owner, 2026-11-26)
+            ld a, [win_pal + 5]
+            ld [scr_buf + 5], a
+            ld a, $B0
+            call bcps_w
+            ld hl, scr_buf
+            ld b, 8
+.p:         ld a, [hl+]
+            call bcpd_w
+            dec b
+            jr nz, .p
+            ld hl, U_ORBCGB
+.t:         ld de, $8800
+            ld bc, 20 * 16
+            ld a, UI_GFX
+            jp far_copy
+
