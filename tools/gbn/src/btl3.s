@@ -462,7 +462,8 @@ bt_pl_magic:
 ; an enemy's spell / special attack A (FF1 Enemy_DoMagicEffect)
 bt_en_magic:
             call bt_mload
-            call bt_ban_spell               ; (its name at the top: owner, 2026-11-23)
+            call bt_ban_en                  ; (its name at the top: owner, 2026-11-23; kept up a
+                                            ;   second at least: owner, 2026-11-26)
             ld a, [bt_who]
             ld [mg_caster], a
             call bt_erec
@@ -1827,3 +1828,16 @@ bt_mpgemp:  call bt_mdata
 
 section wram, $DAD5
 bt_ahold:   ds 1                            ; (bt_arep: frames A has been held)
+
+section bank 6, $6CF4                       ; (free space)
+; an enemy's spell / ability name at the top: its time noted (bt_bwait keeps it up a second)
+bt_ban_en:  call bt_ban_spell
+            ld a, BTL6_BANK
+            ld hl, bt_bmark
+            jp bank_call
+
+section bank 6, $5FF5                       ; (free space)
+; bt_ban_off's start: an enemy's spell name kept up its second first; A = ban_on
+bt_bw6:     ld a, BTL6_BANK
+            ld hl, bt_bwait
+            jp bank_call

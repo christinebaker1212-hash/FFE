@@ -3052,8 +3052,8 @@ bt_banner:  ld a, [ban_on]                  ; (shown: off first, a frame, so the
             ld a, LCDC_WIN                  ;   a message window of garbage)
             ld [lcdc_on], a
             ret
-bt_ban_off: ld a, [ban_on]
-            and a
+bt_ban_off: call bt_bw6                      ; (A = ban_on; an enemy's spell name up a second
+            and a                           ;   at least: owner, 2026-11-26)
             ret z
             xor a
             ld [ban_on], a

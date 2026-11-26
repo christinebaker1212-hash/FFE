@@ -825,3 +825,31 @@ box_safe:   ld a, [bn_t]
 .x:         pop af
             ld [bn_t], a
             ret
+
+section bank 104, $4000                     ; (free space)
+; an enemy's spell / ability name stays up at least BAN_MIN frames, whatever the battle speed
+; (owner, 2026-11-26: it must be readable at speed 8 too)
+BAN_MIN    = 60
+bt_bmark:   ld a, [frame]
+            ld [ban_t0], a
+            ld a, 1
+            ld [ban_min], a
+            ret
+bt_bwait:   ld a, [ban_min]
+            and a
+            jr z, .x
+            xor a
+            ld [ban_min], a
+.w:         ld a, [frame]
+            ld hl, ban_t0
+            sub [hl]
+            cp BAN_MIN
+            jr nc, .x
+            call x_frame
+            jr .w
+.x:         ld a, [ban_on]
+            ret
+
+section wram, $DBB1
+ban_t0:     ds 1
+ban_min:    ds 1
