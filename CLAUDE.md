@@ -122,10 +122,14 @@ and no undocumented debug code.
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-19 night: DMG/CGB speed work, see gb-handoff.md)
+# GB port status (last updated 2026-11-26: FF1 native build, release candidate pending a playthrough and hardware tests)
 
+**Current FF1 build: the native rewrite (`tools/gbn/`, `docs/ff1-native.md`).** The long log below
+(recompiled build, `tools/gb/`) is history and reference; the native build replaced it.
+**For FF2 / FF3: `docs/gb-native-reuse.md`** (what made FF1 fully native, which modules carry over,
+the method).
 **Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
-**Handoff: `docs/gb-handoff.md`** (session setup, current battle-layout work, exact next steps).
+**Handoff (recompiled build, historical): `docs/gb-handoff.md`.**
 
 ## Scope and plan
 FF1 first (dual-mode DMG/SGB/CGB), then FF2 (same engine family, dual-mode), then FF3
@@ -1415,18 +1419,22 @@ through the hidden BG map, reflections in step with the sprites (Onrac too), bos
 Extras centred; DMG black loads left to the owner (3x load time); hardware checklist docs/ff1-hardware-tests.md.
 
 ## Remaining
-- FF1 (owner's list, 2026-11-19): DMG screen loads (map scan + re-coding); DMG town walk
-  (~8% left: step frames); DMG fades: a simple fade (owner) instead of the NES palette
-  steps; names up to 6 letters; music voices vs the NSF (sndcmp.py); then the owner's
-  play-test.
-- FF2: separate session (`docs/ff2-gb-brief.md`). FF3 (GBC only): not started.
-- **Before any release (required, owner 2026-11-20): Nintendo Lot Check standards,
-  `docs/gb-release-checks.md`.** FF1 state: save bank, damaged-save message, soft reset,
-  boot clearing, "Game Pak" wording, LCDC audit, VRAM/OAM checker (battle script, 0) and the
-  release build are done. Still open:
-  - cart RAM stays enabled during play (impossible on DMG: NES work RAM and runtime data
-    live there; the separate save bank is the protection, documented);
-  - real hardware tests (the emulator matrix DMG / Pocket / SGB / SGB2 / CGB / GBA passes in
-    mGBA, including soft reset; the VRAM/OAM checker shows 0 over the battle script and 13
-    field / menu / shop scripts; the build checks the header on every build);
-  - DMG lag on the world map / puzzle screens (seen in the field-script runs).
+- **FF1 (native build), before release:**
+  - A complete natural playthrough from New Game to the ending, with no pokes, on Game Boy and
+    on Color (the last natural run stopped at Earth Cave B3; later areas were checked through
+    test builds that jump there). In progress (2026-11-26).
+  - Real hardware tests: the owner runs `docs/ff1-hardware-tests.md` (DMG, Pocket, SGB, CGB,
+    GBA) and reports back.
+  - Owner's decision pending: black loads on the plain Game Boy (needs the screen on while
+    loading, about 3x the load time; the owner had chosen the loads' length).
+  - Known limits: SGB window frames stay blue (hardware: a frame tile holds one palette); on the
+    plain Game Boy about 1% of coastal walking frames show the reflection a frame out of step.
+- Lot Check (`docs/gb-release-checks.md`): met in emulators for the native build (strict
+  SameBoy checker 0 on DMG / CGB / SGB, cart RAM enabled only around each access, checksummed
+  saves with error screens, soft reset, boot clearing, wording, documented hidden codes). Open:
+  the hardware matrix above.
+- FF2: separate session (`docs/ff2-gb-brief.md`, then `docs/gb-native-reuse.md`). FF3 (GBC
+  only): not started.
+- The recompiled build's old list (DMG loads, town walk, fades, 6-letter names, music voices,
+  world map / puzzle lag) is closed: the native build has 0 lag on both systems, 6-letter
+  names, its own fades and the music checked against the NSF.
