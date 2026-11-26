@@ -1608,9 +1608,11 @@ bt_pline:   ld [bt_t + 11], a
             ld bc, 9                        ; (its icon, a blank, the word)
             ld a, BTL6_BANK
             call far_copy
-            call bt_stx                     ; (x 50; Modern MP: after the HP)
-            ld hl, bt_sbuf + 1              ; (a blank, the word: the bubble by the sprite shows
-            call vwf_str                    ;   the icon; owner, 2026-11-26)
+            ld a, $8A                       ; (HP/word: the slash in the icon's blank; the
+            ld [bt_sbuf + 1], a             ;   bubble by the sprite shows the icon; owner,
+            call bt_stx                     ;   2026-11-26) (x 50; Modern MP: after the HP)
+            ld hl, bt_sbuf + 1
+            call vwf_str
 .out:       call bt_plmp                    ; (Modern MP: the MP at the right)
             ld a, [bt_t + 11]               ; tiles and map cells
             ld c, a
