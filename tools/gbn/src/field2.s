@@ -8,18 +8,21 @@ section bank 2, $6100
 ; A on one moves it left, A on another swaps them (the leader never dead / stone), B goes back
 ; or leaves; the records are reordered on leaving (FF1 LineupMenu_Finalize). FF1's positions
 ; less (56, 40): sprites at x 96, y 16 + 32 n, names at (6, 3 + 4 n), the hand at x 32.
-LU_X       = 96
+LU_X       = 104                ; (a column clear of six-letter names)
 lineup:     call scr_open
             call eqm_pal                    ; (the gold title, as the other screens)
             ld a, TR_LINEUP
             call snd_track
-            ld bc, $0000                    ; (full width, as the other screens)
-            ld de, $1412
+            ld bc, $0000                    ; a header window, as the other screens (owner's
+            ld de, $1403                    ;   list, 2026-11-26), the members below it
             call scr_win
             ld bc, $0101
             ld hl, str_formation
             ld e, 9
             call gold_str
+            ld bc, $0003
+            ld de, $140F
+            call scr_win
             xor a                           ; the slots: dead / stone, member, x, y, x, y to go
 .s:         push af
             ld l, a
@@ -47,10 +50,13 @@ lineup:     call scr_open
             ld a, LU_X
             ld [de], a
             inc de
-            ld a, b
-            swap a
+            ld a, b                         ; y 32 + 24 n (rows 4-15, under the header)
             add a, a
-            add a, 16
+            add a, b
+            add a, a
+            add a, a
+            add a, a
+            add a, 32
             ld c, a
             ld [de], a
             inc de
@@ -105,7 +111,8 @@ lineup:     call scr_open
             ld [lu_cur2], a
             ld [lu_mode], a
             ld [kn_st], a
-.l:         call lu_sprites
+.l:         call lu_ulc                     ; (the outlines: owner's list, 2026-11-26)
+            call lu_sprites
             ld a, [lu_cur]                  ; the hand: x 32, the slot's y + 8
             call lu_slotp
             inc hl
@@ -203,17 +210,9 @@ lineup:     call scr_open
             inc [hl]
             jp .l
 
-; slot A -> HL
-lu_slotp:   add a, a
-            add a, a
-            add a, a
-            add a, low(lu_slot)
-            ld l, a
-            ld h, high(lu_slot)
-            ret
 
 ; FF1 LineupMenu_ProcessMode: 1 the chosen one moves left (to x < 81), 3 the second right (to
-; 112), 4 both move to their places (y first, then x), then the slots swap
+; LU_X + 16), 4 both move to their places (y first, then x), then the slots swap
 lu_mode_step:
             ld a, [lu_mode]
             cp 1
@@ -234,7 +233,7 @@ lu_mode_step:
             inc hl
             inc hl
             ld a, [hl]
-            cp 112
+            cp LU_X + 16
             jr nc, .inc
             inc [hl]
             ret
@@ -306,13 +305,13 @@ lu_step:    call lu_slotp
 .rt:        inc [hl]
             scf
             ret
-; the names (6, 3 + 4 n) by slot
+; the names (6, 5 + 3 n) by slot
 lu_names:   xor a
 .n:         push af
             ld b, a
             add a, a
-            add a, a
-            add a, 3
+            add a, b
+            add a, 5
             ld c, a
             push bc
             ld b, 6
@@ -1890,3 +1889,35 @@ lu_who:     ld a, [SHOW_WHO]
 .f:         pop af
             ld [SHOW_WHO], a
             ret
+
+section bank 2, $7FEC                       ; (free space; moved: the lineup's section full)
+; slot A -> HL
+lu_slotp:   add a, a
+            add a, a
+            add a, a
+            add a, low(lu_slot)
+            ld l, a
+            ld h, high(lu_slot)
+            ret
+
+section bank 2, $5EE3                       ; (free space)
+; each loop, if the lineup's mode changed: sliding (1, 3, 4), the outlines taken away (one left
+; behind showed as a ghost); 
+; at rest (0, 2), drawn where the pictures are
+lu_ulc:     ld a, [lu_mode]
+            ld hl, lu_pm
+            cp [hl]
+            ret z
+            ld [hl], a
+            and a
+            jr z, .r
+            cp 2
+            jr z, .r
+            xor a
+            ld [ul_np], a
+            inc a
+            ld [ul_dirty], a
+.r:         jp scr_upd
+
+section wram, $DA95
+lu_pm:      ds 1                            ; the lineup's mode last seen (lu_ulc)

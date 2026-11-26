@@ -787,7 +787,7 @@ mm_bot:     ld bc, $000D
             call pen_num
             jp scr_upd
 
-section bank 2, $66AA                       ; (free space)
+section bank 2, $46F9                       ; (free space)
 ; the Equip screen drawn; on a file's first visit a note about Packs (pk_note), then what it covered
 eqm_drh:    call eqm_draw
             ld a, [PK_NOTE]
