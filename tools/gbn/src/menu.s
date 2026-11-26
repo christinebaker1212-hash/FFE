@@ -1139,7 +1139,9 @@ desc_show:  call desc_box
             jp scr_upd
 
 ; ---- using an item (FF1 ItemJumpTable / UseItem_x)
-it_use:     ld a, [it_cur]
+it_use:     ld a, 2                         ; (the target screen's line: the items left)
+            ld [tg_k], a
+            ld a, [it_cur]
             ld e, a
             ld d, 0
             ld hl, it_box
@@ -1358,6 +1360,7 @@ tgt_open:   push af
             call tgt_draw
             pop af
             call desc_box
+            call tg_info                    ; (the MP / the items left: owner, 2026-11-26)
             jp scr_show
 tgt_draw:   ld bc, $0000
             ld de, $140A
@@ -1834,6 +1837,8 @@ mg_use:     ld a, [mg_cur]                  ; level, slot
 .go:        ld a, [hl+]
             ld h, [hl]
             ld l, a
+            ld a, 1                         ; (the target screen's line: the MP)
+            ld [tg_k], a
             jp hl
 .no:        ld a, MG_CANT
             jp mg_show
@@ -2020,29 +2025,13 @@ m_hel2:     ld b, MG_HEL2_0
             jr m_healf
 m_hel3:     ld b, MG_HEL3_0
             ld c, MG_HEL3_1
-m_healf:    ldh a, [frame]
-            and b
-            add a, c
-            ld [mg_hp], a
-            call party_atmax                ; (everyone standing full: no effect, the
-            jr nz, .go                      ;   spell list again)
-            call scr_open
-            call tgt_draw
+m_healf:    ld a, b                         ; (owner, 2026-11-26: the target window as the
+            ld [tg_hb], a                   ;   one-member spells, a hand at everyone, cast
+            ld a, c                         ;   again and again while MP lasts)
+            ld [tg_hc], a
             ld a, MG_HEL3_2
-            call desc_box
-            call scr_show
-            ld a, MG_HEL3_2
-            call no_eff
-            jp mg_back
-.go:        ld a, MG_HEL3_2
-            call desc_show
-            call wait_ab
-            jr c, mg_back
-            call scr_cls
-            ld a, [mg_hp]
-            call party_hp
-            call mg_spend
-            jr m_done
+            call tgt_open
+            jp tg_heal
 ; Life / Full-Life / Pure / Soft: cure the ailment on a member
 m_life:     ld a, MG_LIFE_0
             ld b, 1
@@ -2609,3 +2598,107 @@ mm_plc:     ld a, [SC_MARK]
             jp mm_place
 .s:         db "Save", 0
 
+section bank 2, $7CA0                       ; (free space: the prologue moved to bank 113)
+; the target screen's last text row (owner, 2026-11-26): the caster's MP (tg_k 1: the level's
+; charges, or Modern MP's points) or the item's name and how many are left (tg_k 2)
+tg_info:    ld bc, $0110
+            call pen_at
+            ld b, 18
+            call pen_sp
+            ld a, [tg_k]
+            cp 1
+            jr z, .mg
+            cp 2
+            jp nz, scr_upd
+            ld bc, $0110
+            call pen_at
+            ld a, [it_id]
+            call pen_iname
+            ld a, $20
+            call pen_ch
+            ld a, $78                       ; x
+            call pen_ch
+            ld a, [it_id]
+            add a, low(ITEMS)
+            ld l, a
+            ld h, high(ITEMS)
+            ld a, [hl]
+            call nf_a
+            call pen_numl
+            jp scr_upd
+.mg:        ld c, 16
+            call mg_mmpl                    ; (Modern MP: the member's points; NZ drawn)
+            jr nz, .x
+            ld bc, $0C10                    ; the level's charges left / its maximum
+            call pen_at
+            ld hl, str_mp
+            call pen_str
+            call mg_data
+            ld a, [mg_lv]
+            add a, $20
+            add a, l
+            ld l, a
+            ld a, [hl]
+            add a, $30
+            call pen_ch
+            ld a, $2F
+            call pen_ch
+            ld a, l
+            add a, 8
+            ld l, a
+            ld a, [hl]
+            add a, $30
+            call pen_ch
+.x:         jp scr_upd
+; Heal / Healara / Healaga on the target screen: a hand at every member, A casts ((frame AND
+; tg_hb) + tg_hc HP to everyone standing), again while MP lasts; B back to the list
+tg_heal:    call tg_all
+            jp c, mg_back
+            call party_atmax                ; (everyone standing full: no effect, the hands back)
+            jr nz, .ok
+            ld a, MG_HEL3_2
+            call no_eff
+            jr tg_heal
+.ok:        ldh a, [frame]
+            ld hl, tg_hb
+            and [hl]
+            inc hl
+            add a, [hl]
+            call party_hp
+            call mg_spend
+            jp z, m_done
+            call tgt_redraw
+            jr tg_heal
+; the hand beside each member's name (OAM 0-15); C set on B, else A
+tg_all:     xor a
+.h:         push af
+            swap a
+            add a, low(oam_buf)
+            ld e, a
+            ld d, high(oam_buf)
+            pop af
+            push af
+            add a, a
+            inc a
+            ld c, a
+            ld b, 3
+            call cur_tde
+            pop af
+            inc a
+            cp 4
+            jr c, .h
+.w:         call scr_frame
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .b
+            bit 0, a
+            jr z, .w
+            and a
+            ret
+.b:         scf
+            ret
+
+section wram, $CCFC
+tg_k:       ds 1                            ; the target screen's line: 1 magic, 2 items
+tg_hb:      ds 1                            ; the Heal family's (frame AND b) + c
+tg_hc:      ds 1

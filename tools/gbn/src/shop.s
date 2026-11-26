@@ -1566,7 +1566,7 @@ tgt_redraw: ld c, 1                         ; (the inside only: the frame's bott
             inc a
             cp 4
             jr c, .m
-            jp scr_upd
+            jp tg_info                      ; (its line: the MP / items left; menu.s)
 
 
 section wram, $CF40

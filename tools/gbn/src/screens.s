@@ -529,7 +529,9 @@ ng_main:    call sv_boot                    ; a damaged file: Lot Check's error 
             ldh a, [soft_rst]               ; the prologue first (not after a soft reset)
             and a
             jr nz, .np
-            call pro_show
+            ld a, TALL_BANK                 ; (the prologue: bank 113)
+            ld hl, pro_show
+            call bank_call
 .np:        ld a, TR_MINIMAP                ; FF1 IntroTitlePrepare: the crystal theme
             call snd_track
             ldh a, [soft_rst]               ; (after a game over / soft reset: the title fades
@@ -1455,7 +1457,7 @@ sus_menu:   ld a, PK_BANK                   ; (asked in place: packs.s yn_susq)
             jp game_over
 
 zz_end_4000:
-section bank 2, $5F00                       ; (the prologue's colour fade)
+section bank 113, $5000                     ; (the prologue's colour fade; moved from bank 2)
 ; Colour: palette 4 colour 3 = blue (pr_rgb 0) + (white (pr_rgb 4) - blue) x pr_cnt / 32, per
 ; channel (the prologue's fading line)
 pr_cgbstep: ld hl, pr_rgb
@@ -1579,7 +1581,7 @@ pr_split:   ld a, [hl+]
             ret
 zz_end_5f00:
 
-section bank 2, $7500                       ; (the prologue, party creation)
+section bank 113, $5200                     ; (the prologue: moved from bank 2 for the menus' room)
 
 ; ---- the prologue as FF1's EnterIntroStory: the crystal theme; a blue screen; the lines
 ; fade in one at a time, each over 64 frames (the colour stepping $00, $10, $20, $30 every 16
@@ -1950,6 +1952,7 @@ PR_LEN     = 32                         ; frames a line takes to fade in
 ; back to the jobs; B in the jobs: back to the boxes). When all four have names: OK to begin
 ; with this party? Yes starts the game, No puts everything back to the default, B returns
 ; to the boxes.
+section bank 2, $7500                       ; (party creation)
 party_gen:
 .reset:     ld hl, pg_class
             xor a
