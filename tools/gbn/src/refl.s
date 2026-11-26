@@ -394,7 +394,8 @@ RF_QY      = $DC21
 RF_UA      = $DC22
 RF_UV      = $DC23
 RF_TC      = $DCC0          ; the source tiles kept: 4 x (tile, class) keys, then 4 x 16 bytes
-RF_TD      = $DCD0          ;   (free on the field: the battle's stage)
+RF_TD      = $DD00          ;   (in one page: rf_srcd adds to the low byte; the battle's
+                            ;   stage, free on the field)
 RF_STG     = $DC80          ; the tiles made (4 x 16; the airship view's sky table, free while
                             ;   the reflection shows: it is off in the air)
 RF_ROWS    = $DC40          ; (scratch: the airship view's DMG table, free likewise)
