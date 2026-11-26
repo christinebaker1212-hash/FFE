@@ -457,6 +457,11 @@ def refl_source(rom):
             if rows[y][x] & 0x7F in wet:
                 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                     near.add(rows[(y + dy) & 255][(x + dx) & 255] & 0x7F)
+    # (owner, 2026-11-26: a tile less than half water shows no reflection: refl.s hides those
+    # pieces anyway; the marsh's blue dashes next to the sea made the plain Game Boy cut the
+    # reflection every frame there and run late)
+    near = {mt for mt in near if sum(px(mt, k, y, x) in wcol for k in range(4) for y in range(8)
+                                     for x in range(8)) >= 128}
     mask = bytearray(4096)
     for mt in range(128):
         if mt not in near: continue

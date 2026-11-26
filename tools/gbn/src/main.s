@@ -318,7 +318,10 @@ main:       call wait_vbl
             rrca
             rrca
             ld [sfx_nmode], a
-.drw:       call set_scroll
+.drw:       ld a, F3_BANK                   ; (the line ahead: 3 metatiles a frame)
+            ld hl, q_feed
+            call bank_call
+            call set_scroll
             call make_oam
             call refl_tick                  ; (the reflection on water: refl.s)
             call ap_tick                    ; (the airship's view: air.s)
@@ -353,6 +356,11 @@ vblank:     push af
             ldh [rSCX], a
             ldh a, [scy]
             ldh [rSCY], a
+            ld c, 3                         ; (the map's rows first, 3 metatiles: a running
+            call q_flush                    ;   step queues 15 per 8 frames; behind the rest
+                                            ;   of the handler the plain Game Boy managed 1 a
+                                            ;   frame and new rows showed undrawn; owner,
+                                            ;   2026-11-26)
             ldh a, [pal_req]
             and a
             call nz, bg_pal
@@ -1281,16 +1289,6 @@ talk:       ld a, [px]
             call open_chest
             jr .dlg
 
-; A = metatile -> D, E = its property bytes (the tileset bank)
-props:      add a, a
-            ld l, a
-            ld h, high(T_PROP)
-            ld a, [ts_bank]
-            call sbank
-            ld a, [hl+]
-            ld d, a
-            ld e, [hl]
-            ret
 
 ; the door metatile B at (door_x, door_y), queued
 door_draw:  ld a, [door_x]
@@ -1572,7 +1570,9 @@ veh_oam:    ld a, [vehicle]
 
 ; ---- drawing metatiles into the 32 x 32 BG ring (queued; written in V-Blank)
 ; queue entry (8 bytes): VRAM address (lo, hi), tiles UL UR DL DR, CGB palette
-draw_all:   ld a, 1                         ; (LCD off: the flush without the LY limit)
+draw_all:   xor a                           ; (a line pending: superseded)
+            ld [de_n], a
+            inc a                           ; (LCD off: the flush without the LY limit)
             ldh [q_nolim], a
             call .all
             xor a
@@ -1604,47 +1604,9 @@ draw_all:   ld a, 1                         ; (LCD off: the flush without the LY
             jr nz, .r
             ret
 
-draw_edge:  ld a, [mdx]                     ; the line of metatiles entering the view
-            and a
-            jr z, .vert
-            ld b, 6                         ; right: column x + 6, left: x - 6
-            bit 7, a
-            jr z, .h1
-            ld b, $FA
-.h1:        ld a, [px]
-            add a, b
-            ld e, a
-            call ap_hrows                   ; (D, B: rows py - 5 .. + 5; flying py - 10 .. + 5)
-.hl:        push bc
-            push de
-            call q_mt
-            pop de
-            pop bc
-            inc d
-            dec b
-            jr nz, .hl
-            ret
-.vert:      ld a, [mdy]
-            ld b, 5
-            bit 7, a
-            jr z, .v1
-            call ap_up                      ; (B: py - 5; flying py - 11)
-.v1:        ld a, [py]
-            add a, b
-            ld d, a
-            ld a, [px]
-            sub 6
-            ld e, a
-            ld b, 13
-.vl:        push bc
-            push de
-            call q_mt
-            pop de
-            pop bc
-            inc e
-            dec b
-            jr nz, .vl
-            ret
+draw_edge:  ld a, F3_BANK                   ; (bank 99: de_line, q_feed)
+            ld hl, de_line
+            jp bank_call
 
 ; queue metatile (E = x, D = y), map coordinates taken mod 64; mt_force != $FF draws that
 ; metatile instead of the map's (the doors)
@@ -1737,13 +1699,14 @@ q_mt:       ldh a, [cmask]
             ld e, a
             ld a, [de]
             ld [hl+], a
-            ld a, [ts_bank]                 ; palette
-            call sbank
+            ldh a, [is_cgb]                 ; palette: the Color only (its tiles came from the
+            and a                           ;   tileset bank, mapped still; the plain Game Boy's
+            jr z, .np                       ;   shades are in its tiles)
             ld e, c
             ld d, high(T_MTPAL)
             ld a, [de]
             ld [hl], a
-            ld hl, q_n                      ; (one INC: the entry is complete before it)
+.np:        ld hl, q_n                      ; (one INC: the entry is complete before it)
             inc [hl]
             ret
 
@@ -4623,3 +4586,101 @@ ps_cp16:
             ld [de], a
             inc e
             ret
+
+section bank 0, $3E72                       ; (free space; moved: draw_edge's section full)
+; A = metatile -> D, E = its property bytes (the tileset bank)
+props:      add a, a
+            ld l, a
+            ld h, high(T_PROP)
+            ld a, [ts_bank]
+            call sbank
+            ld a, [hl+]
+            ld d, a
+            ld e, [hl]
+            ret
+
+section bank 0, $2D92                       ; (free space)
+; q_mt from banked code: the caller's bank back after it (q_mt switches to the map's banks)
+q_mtb:      ldh a, [rombank]
+            push af
+            call q_mt
+            pop af
+            jp sbank
+
+section bank 99, $4F18                      ; (free space: ps_next moved to bank 110)
+de_line:    call q_fall                     ; (a line still pending: queued now)
+            ld a, [mdx]                     ; the line of metatiles one beyond the one entering
+            and a                           ;   the view (drawn a whole step before it shows:
+            jr z, .vert                     ;   owner, 2026-11-26, the top / bottom rows showed
+            ld b, 7                         ;   stale tiles while running); right: column x + 7,
+            bit 7, a                        ;   left: x - 7
+            jr z, .h1
+            ld b, $F9
+.h1:        ld a, [px]
+            add a, b
+            ld e, a
+            call ap_hrows                   ; (D, B: rows py - 6 .. + 6; flying py - 10 .. + 5)
+            ld a, 1                         ; (down the column)
+            jr .st
+.vert:      ld a, [mdy]                     ; (B: py + 6 / py - 6; flying py + 5 / py - 11:
+            ld b, 6                         ;   the airship's view shows the whole ring)
+            bit 7, a
+            jr nz, .up
+            ld a, [vehicle]
+            cp V_AIR
+            jr nz, .v1
+            dec b
+            jr .v1
+.up:        call ap_up
+.v1:        ld a, [py]
+            add a, b
+            ld d, a
+            ld a, [px]
+            sub 7
+            ld e, a
+            ld b, 15
+            xor a                           ; (along the row)
+.st:        ld [de_dir], a                  ; the line, queued 3 metatiles a frame (q_feed:
+            ld a, e                         ;   the step's first frame was too heavy for the
+            ld [de_x], a                    ;   plain Game Boy)
+            ld a, d
+            ld [de_y], a
+            ld a, b
+            ld [de_n], a
+            ld a, [vehicle]                 ; (flying, a row enters at once: no line ahead)
+            cp V_AIR
+            ret nz
+            jp q_fall
+
+; the pending line (draw_edge): up to 3 metatiles a frame into the queue; q_fall: all of it
+q_fall:     ld c, 0
+            jr q_fc
+q_feed:     ld a, [dash]                    ; (1 a frame walking, 2 dashing: a step's 16 / 8
+            inc a                           ;   frames cover the line's 15; more than that
+            ld c, a                         ;   overran the plain Game Boy's frames)
+q_fc:       ld a, [de_n]
+            and a
+            ret z
+            dec a
+            ld [de_n], a
+            push bc
+            ld a, [de_x]
+            ld e, a
+            ld a, [de_y]
+            ld d, a
+            call q_mtb
+            ld hl, de_x                     ; (along the row: x + 1; down the column: y + 1)
+            ld a, [de_dir]
+            add a, l
+            ld l, a
+            inc [hl]
+            pop bc
+            dec c
+            jr nz, q_fc
+            ret
+
+section wram, $DA99
+de_x:       ds 1                            ; draw_edge's pending line: start x, y (de_y right
+de_y:       ds 1                            ;   after de_x), metatiles left, 1 down the column
+de_n:       ds 1
+de_dir:     ds 1

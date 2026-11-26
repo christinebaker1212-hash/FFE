@@ -19,18 +19,19 @@ ap_hrows:   ld a, [vehicle]
             cp V_AIR
             ld a, [py]
             jr z, .a
-            sub 5
+            sub 6
             ld d, a
-            ld b, 11
+            ld b, 13
             ret
 .a:         sub 10
             ld d, a
             ld b, 16
             ret
-; draw_edge: the row entering at the top (B = offset to py)
+; draw_edge: the row to draw above (B, from py): one beyond the row entering (-6); flying, the
+; perspective shows rows py - 10 .. + 5, the whole ring: the entering one (-11)
 ap_up:      ld a, [vehicle]
             cp V_AIR
-            ld b, $FB
+            ld b, $FA
             ret nz
             ld b, $F5
             ret
