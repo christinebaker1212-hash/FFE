@@ -323,6 +323,7 @@ main:       call wait_vbl
             call bank_call
             call set_scroll
             call make_oam
+            call bd_oam                     ; (boarding: the party into the vehicle)
             call refl_tick                  ; (the reflection on water: refl.s)
             call ap_tick                    ; (the airship's view: air.s)
             jr main
@@ -712,6 +713,7 @@ move:       ld a, [moving]
             ld [mcount], a
             ld [mdx], a
             ld [mdy], a
+            call veh_arr                    ; (a vehicle boarded on foot: now, its song)
             call arrived                    ; teleports
             ret c
 .idle:      ld a, [q_rd]                    ; (a room redraw still being written: wait)
@@ -1568,6 +1570,15 @@ veh_oam:    ld a, [vehicle]
             add a, 16
             jr .spr
 
+; boarding on foot (veh_pend: owner, 2026-11-26, the party walks into the ship / canoe instead
+; of turning into it): the canoe drawn on its tile, then bd_oam9 puts the vehicle over the party
+bd_oam:     ld a, [veh_pend]
+            and a
+            ret z
+            ld a, PG_BANK
+            ld hl, bd_oam9
+            jp bank_call
+
 ; ---- drawing metatiles into the 32 x 32 BG ring (queued; written in V-Blank)
 ; queue entry (8 bytes): VRAM address (lo, hi), tiles UL UR DL DR, CGB palette
 draw_all:   xor a                           ; (a line pending: superseded)
@@ -2000,7 +2011,7 @@ ow_canmove: xor a
             cp V_SHIP
             call z, .dock
             ld a, V_CANOE
-            ld [vehicle], a
+            call veh_set
             ld a, 1
             ld [no_enc], a
             and a
@@ -2009,7 +2020,7 @@ ow_canmove: xor a
             call .at
             ret c
             ld a, V_SHIP
-            ld [vehicle], a
+            call veh_set
             ld a, 1
             ld [no_enc], a
             and a
@@ -2052,6 +2063,9 @@ ow_abutton: ld a, [vehicle]
             inc hl
             cp [hl]
             ret nz
+            ld a, PG_BANK                   ; (the party into the airship first: bd_air9)
+            ld hl, bd_air9
+            call bank_call
             ld a, V_AIR                     ; FF1 FlyAirship: the airship's music, the takeoff
             ld [vehicle], a
             call map_music
@@ -4684,3 +4698,163 @@ de_x:       ds 1                            ; draw_edge's pending line: start x,
 de_y:       ds 1                            ;   after de_x), metatiles left, 1 down the column
 de_n:       ds 1
 de_dir:     ds 1
+
+section bank 0, $3BEF                       ; (free space)
+; ow_canmove's boarding: on foot the vehicle is pending until the step ends (veh_arr)
+veh_set:    ld b, a
+            ld a, [vehicle]
+            cp V_FOOT
+            ld a, b
+            jr nz, .n
+            ld [veh_pend], a
+            ret
+.n:         ld [vehicle], a
+            ret
+
+section bank 0, $292A                       ; (free space)
+veh_arr:    ld a, [veh_pend]
+            and a
+            ret z
+            ld [vehicle], a
+            xor a
+            ld [veh_pend], a
+            jp map_music
+
+section bank 0, $29F2                       ; (free space)
+; make_oam from banked code, the caller's bank back after it
+mo_b:       ldh a, [rombank]
+            push af
+            call make_oam
+            pop af
+            jp sbank
+
+section bank 110, $6000                     ; (free space)
+; boarding (veh_pend): the vehicle in front of the party in OAM 0-3 (the ship: its parked sprites,
+; OAM 4-7; the canoe: drawn as the game draws it, moved onto the target tile), the party after it;
+; from half way the party's leading half hidden (it has gone in)
+bd_oam9:    ld a, [veh_pend]
+            cp V_CANOE
+            jr z, .cn
+            ld de, oam_buf + 16
+            call bd_swap                    ; (DE: the party's entries now)
+            jr .hd
+.cn:        ld hl, oam_buf                  ; the party aside
+            ld de, bd_tmp
+            ld b, 16
+.c1:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c1
+            ld a, V_CANOE                   ; the canoe as the vehicle (OAM 0-3)
+            ld [vehicle], a
+            call vo_b
+            ld a, V_FOOT
+            ld [vehicle], a
+            ld a, [mcount]                  ; onto the target: + direction x (16 - mcount)
+            cpl
+            add a, 17
+            ld c, a
+            ld a, [mdx]
+            call mulsign
+            ld d, a
+            ld a, [mdy]
+            call mulsign
+            ld e, a
+            ld hl, oam_buf
+            ld b, 4
+.mv:        ld a, [hl]
+            add a, e
+            ld [hl+], a
+            ld a, [hl]
+            add a, d
+            ld [hl+], a
+            inc hl
+            inc hl
+            dec b
+            jr nz, .mv
+            ld hl, bd_tmp                   ; the party after it (OAM 20-23)
+            ld de, oam_buf + 80
+            ld b, 16
+.c2:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c2
+            ld de, oam_buf + 80
+.hd:        ld a, [mcount]
+            cp 8
+            ret c
+            ld a, [mdx]                     ; leading half: right UR DR, left UL DL, down DL DR,
+            ld b, %1100                     ;   up UL UR (entries UL, DL, UR, DR)
+            and a
+            jr z, .v
+            bit 7, a
+            jr z, .h
+            ld b, %0011
+            jr .h
+.v:         ld a, [mdy]
+            ld b, %1010
+            bit 7, a
+            jr z, .h
+            ld b, %0101
+.h:         jr bd_hide
+; swap 16 bytes oam_buf / DE; DE back at its start
+bd_swap:    ld hl, oam_buf
+            ld b, 16
+.l:         ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .l
+            ld a, e
+            sub 16
+            ld e, a
+            ret
+; hide the party's entries at DE whose bit is set in B (bit 0 the first)
+bd_hide:    ld c, 4
+.l:         srl b
+            jr nc, .n
+            xor a
+            ld [de], a
+.n:         inc e
+            inc e
+            inc e
+            inc e
+            dec c
+            jr nz, .l
+            ret
+; A on the airship: the party sinks into it (its lower half, then all of it, 8 frames each)
+bd_air9:    ld c, 16
+.f:         push bc
+            call mo_b
+            ld de, oam_buf + 32             ; (the parked airship: OAM 8-11)
+            call bd_swap
+            pop bc
+            push bc
+            ld b, %1010                     ; (DL, DR)
+            ld a, c
+            cp 9
+            jr nc, .h
+            ld b, %1111
+.h:         call bd_hide
+            call wait_vbl
+            pop bc
+            dec c
+            jr nz, .f
+            ret
+
+section wram, $DBA0
+veh_pend:   ds 1                            ; a vehicle boarded on foot, until the step ends
+bd_tmp:     ds 16                           ; the party's sprites while the canoe is drawn
+
+section bank 0, $16D8                       ; (free space)
+; veh_oam from banked code, the caller's bank back after it
+vo_b:       ldh a, [rombank]
+            push af
+            call veh_oam
+            pop af
+            jp sbank
