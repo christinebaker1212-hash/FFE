@@ -117,32 +117,33 @@ def cc_source():
 
 
 def ap_source():
-    """the airship's view (src/air.s): per level k (0-32, smoothed) the SCY offset of each line
-    0-63 above the ship's line (the mock-up's curve: a line d above it shows the map d + t a d^2
-    above, so the horizon line shows ROOM lines up), the levels' horizons, the sky's colours"""
-    YC, ROOM = 64, 160
-    rows, hzs = [], []
+    """the airship's view (src/air.s; owner, 2026-11-26: the whole world slanted, one even tilt,
+    no curve towards a horizon): per level k (0-32, smoothed with the ship's height) the SCY
+    offsets of the screen lines. The ground is foreshortened by the same ratio S on every line
+    around the ship's line (64, 1:1): line y shows the ground (64 - y) S pixels from the ship's,
+    so its SCY moves by (64 - y)(S - 1). S = 1.4 fits the flying ring (rows py - 7 .. + 8: 90
+    pixels ahead at the top, 112 behind at the bottom, the ring's edge row redrawn a step ahead).
+    An offset changes on only some lines (about 2 in 5 at full height): each level's list is
+    line 0's offset, then (line - 1, offset) for every line whose offset changes, then $FF (the
+    STAT interrupt comes at those lines only). Bank AP_BANK: level k's list at $4000 + 256 k"""
+    YC, S, H = 64, 1.4, 144
+    out = []
     for k in range(33):
         t = k / 32; t = t * t * (3 - 2 * t)
-        hz = int(round(28 * t)); dmax = YC - hz
-        a = (ROOM - dmax) / (dmax * dmax) if dmax > 0 else 0
-        row = []
-        for y in range(YC):
-            d = YC - y
-            row.append(0 if y < hz else min(255, int(round(t * a * d * d))))
-        rows.append(row); hzs.append(hz)
-    top, hor = (6, 12, 28), (25, 28, 31)                 # RGB555 levels: deep blue to pale
-    sky = []
-    for y in range(32):
-        f = min(1.0, y / 27)
-        c = [int(round(top[i] + (hor[i] - top[i]) * f)) for i in range(3)]
-        sky.append(c[0] | c[1] << 5 | c[2] << 10)
-    out = ['section bank 99, $6600']
-    for row in rows:
-        out.append('            db ' + ', '.join(str(v) for v in row))
-    out.append('            db ' + ', '.join(str(v) for v in hzs))
-    out.append('            dw ' + ', '.join('$%04X' % v for v in sky))
+        off = [int(round(t * (S - 1) * (YC - y))) & 0xFF for y in range(H)]
+        lst = [off[0]]
+        for y in range(1, H):
+            if off[y] != off[y - 1]:
+                lst += [y - 1, off[y]]
+        lst.append(0xFF)
+        assert len(lst) <= 128, 'airship view: list too long'
+        out.append('section bank %d, $%04X' % (AP_BANK, 0x4000 + 256 * k))
+        out.append('            db ' + ', '.join(str(v) for v in lst))
+    out[0] = out[0] + '\nAP_TAB:'
     return '\n'.join(out) + '\n'
+
+
+AP_BANK = 114
 
 
 def ui_strings():

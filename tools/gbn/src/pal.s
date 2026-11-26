@@ -15,8 +15,8 @@
 ; and never read colours back from the screen: the shadows stay the screen's real colours.
 ; (Reading the screen back caught the gradient's line colours and half-way fade colours as
 ; the windows' colours: blown-out borders after shop menus.)
-; Line effects stay direct: the gradient (text.s stat_gr / gr_vbl) and the airship's sky
-; (air.s ap_p7) change palette 7 by line; their frame starts after pal_up in the V-Blank.
+; Line effects stay direct: the gradient (text.s stat_gr / gr_vbl) changes palette 7 by line;
+; its frame starts after pal_up in the V-Blank.
 ; The plain Game Boy / Super Game Boy: BGP / OBP0 / OBP1 as before (bgp_w, obp0_w).
 
 section bank 99, $75A0

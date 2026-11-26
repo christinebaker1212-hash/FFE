@@ -4705,17 +4705,13 @@ de_line:    call q_fall                     ; (a line still pending: queued now)
 .h1:        ld a, [px]
             add a, b
             ld e, a
-            call ap_hrows                   ; (D, B: rows py - 6 .. + 6; flying py - 10 .. + 5)
+            call ap_hrows                   ; (D, B: rows py - 6 .. + 6; flying py - 7 .. + 8)
             ld a, 1                         ; (down the column)
             jr .st
-.vert:      ld a, [mdy]                     ; (B: py + 6 / py - 6; flying py + 5 / py - 11:
-            ld b, 6                         ;   the airship's view shows the whole ring)
-            bit 7, a
+.vert:      ld a, [mdy]                     ; (B: py + 6 / py - 6; flying py + 9 / py - 8:
+            bit 7, a                        ;   the ring py - 7 .. + 8, the whole of it)
             jr nz, .up
-            ld a, [vehicle]
-            cp V_AIR
-            jr nz, .v1
-            dec b
+            call ap_dn
             jr .v1
 .up:        call ap_up
 .v1:        ld a, [py]
