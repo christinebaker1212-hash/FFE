@@ -122,7 +122,7 @@ wt_cp:      ld a, WTOWN_BANK
             and $F0
             ld l, a
             ld bc, 16
-            jp memcpy
+            jp wt_cpx
 
 section bank 0, $3BD9
 ; load_map, once the map's tiles are in VRAM (LCD off or a masked load): the water drawn at
@@ -394,5 +394,65 @@ wf_tick:    ldh a, [maptype]
             jr nz, .c
             ld b, h
             ld c, l
+            pop hl
+            ret
+
+section bank 0, $3E30                       ; (free space)
+; wt_cp's end: the water tile, then the canal's shadowed tiles (wt_cp2)
+wt_cpx:     call memcpy
+            ld a, F3_BANK
+            ld hl, wt_cp2
+            jp bank_call
+
+section bank 99, $4AD0                      ; (after WT2_HDR)
+; the towns' canal in shadow (owner, 2026-11-25): its shadowed water tile and the corner with
+; the shadow's edge, at the water's step (build.py town_water2: WT2_HDR, pictures in WT2_BANK);
+; with the LCD on only while the V-Blank lasts (a tile left for the next step otherwise)
+WT2_BANK   = 112
+wt_cp2:     ldh a, [is_cgb]
+            and a
+            ld a, 8
+            jr nz, .t
+            ld a, [cur_map]
+.t:         add a, a
+            add a, a
+            add a, a
+            ld e, a
+            ld d, 0
+            ld hl, WT2_HDR
+            add hl, de
+            call .one
+.one:       ld e, [hl]                      ; DE = the tile's VRAM, B = its pictures' high byte
+            inc hl
+            ld d, [hl]
+            inc hl
+            ld b, [hl]
+            inc hl
+            inc hl
+            ld a, d
+            or e
+            ret z
+            push hl
+            di
+            ldh a, [rLCDC]
+            bit 7, a
+            jr z, .go
+            ldh a, [rLY]
+            sub 144
+            cp 7
+            jr nc, .x
+.go:        ld a, [wa_ph]                   ; HL = pictures + 16 step
+            swap a
+            ld l, a
+            and $0F
+            add a, b
+            ld h, a
+            ld a, l
+            and $F0
+            ld l, a
+            ld bc, 16
+            ld a, WT2_BANK
+            call far_copy
+.x:         ei
             pop hl
             ret

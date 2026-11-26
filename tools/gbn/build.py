@@ -217,6 +217,8 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, WANIM_DMG, 0x4000, wad)
     print('water animation:', wa_info)
     place(banks, WTOWN_BANK, 0x4000, town_water(rom))           # (the towns' water tile)
+    wt2_blob, wt2_src = town_water2(rom)                         # (its canal in shadow)
+    place(banks, WT2_BANK, 0x4000, wt2_blob)
     place(banks, OW_INFO, 0x7400, o['veh_cgb'])                # vehicle sprites (FF1 OW objects)
     place(banks, OW_INFO, 0x7A00, o['veh_dmg'])
     fix = rom.prg[-0x4000:]                                     # FF1's vehicle sprite tables
@@ -336,6 +338,74 @@ def town_water(rom):
         blob[0x400 + 2 * m:0x402 + 2 * m] = vram(d).to_bytes(2, 'little')
         blob[0x800 + 0x400 * m:0xC00 + 0x400 * m] = shifts(p['dmg_tiles'][16 * d:16 * d + 16])
     return bytes(blob)
+WT2_BANK = 112
+def town_water2(rom):
+    """the towns' canal water in shadow (owner, 2026-11-25: "add water movement to the darkened tiles
+    of the water"): tileset 0's shadowed water tile (metatiles 40 / 41, upper left) moves as the
+    water does, and the corner where the shadow's edge meets open water (41, lower left) moves on
+    both sides of its edge, the edge itself still (each row: up to its last shadow pixel the
+    shadow's picture, after it the water's). Returns (bank WT2_BANK blob from $4000, the header's
+    source: WT2_HDR, 8 bytes an entry (towns = maps 0-7 on the plain Game Boy, 8 = the Color):
+    shadow tile VRAM, its pictures' high byte, 0, corner tile VRAM, its pictures' high byte, 0;
+    VRAM 0: none). src/wanim.s wt_cp2."""
+    def dec(t16): return [[(t16[2 * y] >> (7 - x) & 1) | (t16[2 * y + 1] >> (7 - x) & 1) << 1 for x in range(8)]
+                          for y in range(8)]
+    def enc(px):
+        out = bytearray()
+        for row in px:
+            out += bytes([sum((v & 1) << (7 - x) for x, v in enumerate(row)),
+                          sum((v >> 1) << (7 - x) for x, v in enumerate(row))])
+        return bytes(out)
+    def frames(t16):                                  # as town_water: two bands of 4 lines
+        px = dec(t16)
+        return [[[px[y][(x - ((j + 3 - 2 * (y // 4)) // 4) % 8) % 8] for x in range(8)] for y in range(8)]
+                for j in range(64)]
+    def vram(d): return (0x9000 + 16 * d) if d < 128 else (0x8000 + 16 * d)
+    t = data.tileset_pack(rom, 0)
+    tsa = t['tsa']
+    sh_c, co_c = tsa[40], tsa[256 + 41]                # (UL of 40, DL of 41)
+    assert tsa[41] == sh_c and tsa[128 + 40] == TOWN_WATER and tsa[256 + 40] == sh_c
+    uses = lambda tid, tab: sorted((k, m) for k in range(4) for m in range(128) if tab[128 * k + m] == tid)
+    assert uses(sh_c, tsa) == [(0, 40), (0, 41), (2, 40)] and uses(co_c, tsa) == [(2, 41)], 'shared tiles'
+    cpx = dec(t['cgb_tiles'][16 * co_c:16 * co_c + 16])
+    edge = [max([x for x in range(8) if cpx[y][x] == 3] or [-1]) for y in range(8)]
+    def corner(fs, fw):
+        return b''.join(enc([[fs[j][y][x] if x <= edge[y] else fw[j][y][x] for x in range(8)] for y in range(8)])
+                        for j in range(64))
+    blob = bytearray(); hdr = bytearray()
+    def add(pics):
+        nonlocal blob
+        hi = 0x40 + len(blob) // 256
+        blob += pics
+        assert len(blob) <= 0x3F00
+        return hi
+    entries = {}
+    tl = t['cgb_tiles']
+    fs = frames(tl[16 * sh_c:16 * sh_c + 16]); fw = frames(tl[16 * TOWN_WATER:16 * TOWN_WATER + 16])
+    entries[8] = (vram(sh_c), add(b''.join(enc(f) for f in fs)), vram(co_c), add(corner(fs, fw)))
+    for m in range(8):
+        p = data.map_pack(rom, m)
+        md = p['mt_dmg_out']
+        if md[40] == 0 or md[256 + 41] == 0 or md[39] == 0:
+            entries[m] = (0, 0, 0, 0); continue
+        ds, dc, dw = md[40], md[256 + 41], md[39]
+        for tab in (p['mt_dmg_out'], p['mt_dmg_in']):
+            assert sorted(set(uses(dc, tab))) == [(2, 41)], 'DMG corner shared on map %d' % m
+        dt = p['dmg_tiles']
+        fs = frames(dt[16 * ds:16 * ds + 16]); fw = frames(dt[16 * dw:16 * dw + 16])
+        same = all(fs[j] == fs[0] for j in range(64))      # (a one-shade shadow: nothing moves)
+        sv = (0, 0) if same else (vram(ds), add(b''.join(enc(f) for f in fs)))
+        if not same:
+            for tab in (p['mt_dmg_out'], p['mt_dmg_in']):
+                assert sorted(set(uses(ds, tab))) == [(0, 40), (0, 41), (2, 40)], 'DMG shadow shared'
+        entries[m] = sv + (vram(dc), add(corner(fs, fw)))
+    for e in range(9):
+        a, b, c, d = entries[e]
+        hdr += bytes([a & 255, a >> 8, b, 0, c & 255, c >> 8, d, 0])
+    src = 'section bank 99, $4A80\nWT2_HDR:\n' + '            db %s\n' % ', '.join('$%02X' % v for v in hdr)
+    return bytes(blob), src
+
+
 def refl_source(rom):
     """the reflection's water (owner, 2026-11-25: the reflection should slip into the shore):
     per overworld metatile one byte, a bit per 8 x 8 quarter drawn with open water (bit 0 UL,
@@ -576,7 +646,7 @@ def main():
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'shop.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'ul.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'pal.s')).read() + '\n' + refl_source(rom) + '\n' +
+           open(os.path.join(HERE, 'src', 'pal.s')).read() + '\n' + refl_source(rom) + '\n' + town_water2(rom)[1] + '\n' +
            open(os.path.join(HERE, 'src', 'btl.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl2.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'btl3.s')).read() + '\n' +
