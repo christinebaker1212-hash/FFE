@@ -392,7 +392,7 @@ sh_equip:   ld a, SH_WELCOME
             ld l, a
             ld h, high(ch_stats)
             call sh_wear
-            call sh_readj
+            call sh_rdold                   ; (and the old one: shall I buy it?)
 .th:        ld a, SH_THANKS
             call sh_say
             jp .l
@@ -821,7 +821,9 @@ sh_free:    ld a, [sh_k]
             ret
 ; member sh_k wears slot HL: what it replaces taken off first (FF1: one weapon; one armour
 ; of each type)
-sh_wear:    push hl
+sh_wear:    xor a                           ; (the item it replaces: sh_old, for the offer)
+            ld [sh_old], a
+            push hl
             ld a, [hl]
             and $7F
             ld [sh_wi], a
@@ -849,6 +851,8 @@ sh_wear:    push hl
             pop hl
             jr nz, .n
 .off:       res 7, [hl]
+            ld a, l
+            ld [sh_old], a
 .n:         inc hl
             dec b
             jr nz, .u
@@ -1822,3 +1826,88 @@ str_spack:  db "'s pack", 0
 
 section wram, $DBB3
 sh_who:     ds 1                            ; selling: 0 everyone, 1-4 that member's pack
+
+section bank 2, $74F0                       ; (free space)
+; bought and worn: the stats again, then the offer for the item it replaced (sh_old9)
+sh_rdold:   call sh_readj
+            ld a, PG_BANK
+            ld hl, sh_old9
+            jp bank_call
+
+section bank 2, $58A2                       ; (free space)
+; the offer's question (SH_QBUF), Yes / No: A = 1 on Yes
+sh_ob1:     ld hl, SH_QBUF
+            call sh_says
+            ld hl, str_yesno
+            ld b, 2
+            call sh_menu
+            jr c, .n
+            and a
+            jr nz, .n
+            inc a
+            ret
+.n:         xor a
+            ret
+
+section bank 2, $66AF                       ; (free space)
+; the old item sh_it's price (sh_price), the pack's kind for eq_sort
+sh_ob2:     ld a, [sh_it]
+            call sh_getprice
+            ld a, [sh_type]
+            jp eq_setkind
+
+section bank 110, $6400                     ; (free space)
+; bought and worn (owner, 2026-11-26): "Would you like me to buy the old one from you?"; on
+; Yes the item it replaced (sh_old: its slot in ch_stats) is sold as Sell does (half its price)
+SH_QBUF    = $DE80
+sh_old9:    ld a, [sh_old]
+            and a
+            ret z
+            ld hl, str_shold                ; (the question through WRAM: sh_says reads bank 2)
+            ld de, SH_QBUF
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            and a
+            jr nz, .c
+            ld a, 2
+            ld hl, sh_ob1
+            call bank_call
+            and a
+            ret z
+            ld a, [sh_old]                  ; the item: weapon n -> $1B + n, armour $43 + n
+            ld l, a
+            ld h, high(ch_stats)
+            ld a, [hl]
+            and $7F
+            ld b, a
+            ld [hl], 0
+            ld a, [sh_type]
+            and a
+            ld a, $1B
+            jr z, .w
+            ld a, $43
+.w:         add a, b
+            ld [sh_it], a
+            ld a, 2
+            ld hl, sh_ob2
+            call bank_call
+            ld a, 2
+            ld hl, eq_sort
+            call bank_call
+            ld hl, sh_price + 1             ; half (FF1's selling price)
+            srl [hl]
+            dec hl
+            rr [hl]
+            ld a, [hl+]
+            ld c, a
+            ld b, [hl]
+            call add_gold
+            ld a, 2
+            ld hl, sh_gold
+            call bank_call
+            jp scr_upd
+str_shold:  db "Would you like me", $0A, "to buy the old one", $0A, "from you?", 0
+
+section wram, $DBB4
+sh_old:     ds 1                            ; the slot (ch_stats low byte) of the item replaced
