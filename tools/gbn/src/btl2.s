@@ -702,7 +702,7 @@ bt_target_enemy:
             ld [bt_tcur], a
 .l:         call bt_tban_e                  ; (its name at the top)
             ld a, [bt_tcur]                 ; the hand left of the enemy, at its middle row
-            call bt_epos
+            call bt_tpos
             ld a, b
             add a, a
             add a, a
@@ -4203,4 +4203,99 @@ kn_mlp:     ld hl, 0                        ; HL = DE x C, kept at $FFFF; BC, DE
 .cap:       ld hl, $FFFF
 .r:         pop de
             pop bc
+            ret
+
+section bank 6, $7471                       ; (free space)
+; the target hand's enemy area: B, C = cell, E = height in cells (a fiend / Chaos: its picture's
+; own extent, bt_tp9; owner, 2026-11-26: the hand left of the boss, at its middle)
+bt_tpos:    ld b, a
+            ld a, [bt_type]
+            cp 3
+            ld a, b
+            jp c, bt_epos
+            jp bt_tpx
+section bank 0, $35EC                       ; (free space)
+; bt_tp9 in bank F3_BANK, B / C / E back (bank_call would restore BC)
+bt_tpx:     ldh a, [rombank]
+            push af
+            ld a, F3_BANK
+            call sbank
+            call bt_tp9
+            pop af
+            jp sbank
+section bank 99, $4981                      ; (free space)
+; fiend: the non-empty columns / rows of its 8 x 8 TSA (FF1's, BTL_DATA B_FIEND + $50 graphic)
+; at cell (3, 2); Chaos: his 14 x 12 at (1, 0). B = first column, C = first row, E = rows
+bt_tp9:     ld a, [bt_type]
+            cp 4
+            jr nz, .f
+            ld bc, $0100
+            ld e, 12
+            ret
+.f:         ld a, [bt_form + 1]             ; HL = B_FIEND + $50 graphic
+            ld l, a
+            ld h, 0
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, hl
+            add hl, de
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, B_FIEND
+            add hl, de
+            ld a, BTL_DATA
+            ld [fc_bank], a
+            ld a, 8
+            ld [bt_t + 8], a                ; first column
+            ld [bt_t + 9], a                ; first row
+            xor a
+            ld [bt_t + 10], a               ; last row
+            ld c, a
+.l:         call far_byte
+            and a
+            jr z, .n
+            ld a, c
+            and 7
+            ld b, a
+            ld a, [bt_t + 8]
+            cp b
+            jr c, .c1
+            ld a, b
+            ld [bt_t + 8], a
+.c1:        ld a, c
+            rrca
+            rrca
+            rrca
+            and 7
+            ld b, a
+            ld a, [bt_t + 9]
+            cp b
+            jr c, .c2
+            ld a, b
+            ld [bt_t + 9], a
+.c2:        ld a, [bt_t + 10]
+            cp b
+            jr nc, .n
+            ld a, b
+            ld [bt_t + 10], a
+.n:         inc hl
+            inc c
+            ld a, c
+            cp 64
+            jr c, .l
+            ld a, [bt_t + 9]
+            ld d, a
+            ld a, [bt_t + 10]
+            sub d
+            inc a
+            ld e, a
+            ld a, d
+            add a, 2
+            ld c, a
+            ld a, [bt_t + 8]
+            add a, 3
+            ld b, a
             ret

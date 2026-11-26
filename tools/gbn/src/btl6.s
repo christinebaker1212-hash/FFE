@@ -295,7 +295,7 @@ fl_fiend6:  ldh a, [is_cgb]
             call .mk
             ld a, [bt_form + 11]
             call .mk
-            ld b, 4
+            ld b, 8                         ; (8 flashes: a boss's end lasts; owner, 2026-11-26)
 .ph:        push bc
             call wait_vbl
             ld a, $88

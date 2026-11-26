@@ -1611,22 +1611,29 @@ ed_dissolve:
             pop bc
             dec b
             jr nz, .t
-.nx:        ld a, [bt_type]                 ; a fiend: the screen shakes, the hit sound
-            cp 3
-            jr c, .w1
+.nx:        ld a, [bt_type]                 ; a fiend: the screen shakes, the hit sound;
+            cp 3                            ;   8 frames a step (owner, 2026-11-26: a boss's
+            jr c, .w1                       ;   end 3 to 4 times as long as it was)
             ld a, [ed_s]
             and 1
+            jr nz, .fw0
+            ld a, SFX_HIT
+            ld [sfx_req], a
+.fw0:       ld b, 8
+.fw:        ld a, b                         ; (the shake: 2 frames each way)
+            and 2
             ld a, 2
             jr z, .sx
             ld a, -2
 .sx:        ldh [scx], a
-            ld a, [ed_s]
-            and 3
-            jr nz, .w2
-            ld a, SFX_HIT
-            ld [sfx_req], a
-.w2:        call wait_vbl
+            push bc
+            call wait_vbl
+            pop bc
+            dec b
+            jr nz, .fw
+            jr .w3
 .w1:        call wait_vbl
+.w3:
             ld hl, ed_s
             inc [hl]
             ld a, [hl]
