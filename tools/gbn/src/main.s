@@ -754,7 +754,7 @@ move:       ld a, [moving]
 .mm:        ld hl, minimap                   ; (FF1: the palettes cycle out first)
             call pc_menu3
             jp map_reload
-.lu:        ld a, F3_BANK                   ; (Order is in the main menu now: Select shows the
+.lu:        ld a, PG_BANK                   ; (Order is in the main menu now: Select shows the
             ld hl, ps_next                  ;   next member on the map, the leader unchanged;
             jp bank_call                    ;   owner, 2026-11-25)
 .na:        ldh a, [maptype]                ; the overworld: B presses counted (FF1 joy_b);
@@ -4414,7 +4414,7 @@ ps_wcls:    push hl
 section wram, $CFBD
 ps_dh:      ds 1                            ; party_spr: 0 VRAM, $41 the RAM copy at $C100
 
-section bank 99, $4F18                      ; (free space)
+section bank 110, $7000                     ; (free space)
 SHOW_WHO   = unsram + $FD   ; the member shown on the map (kept in the save; owner, 2026-11-25)
 ; Select on the map: the next member who is not Dead / Stone shown; drawn into a RAM copy, then
 ; into VRAM in V-Blanks with the party's sprites hidden meanwhile
@@ -4447,45 +4447,181 @@ ps_next:    ld a, [SHOW_WHO]
             jr z, .qe
             call wait_vbl
             jr .q
-.qe:        ld hl, oam_buf                  ; the party's tiles ($00-$0F) hidden
-            ld b, 40
-.h:         inc hl
-            inc hl
-            ld a, [hl-]
-            dec hl
-            cp $10
-            jr nc, .hn
-            xor a
-            ld [hl], a
-.hn:        ld a, l
-            add a, 4
-            ld l, a
-            dec b
-            jr nz, .h
-            call wait_vbl
-            ld a, $41
+.qe:        ld hl, pal_ob + 4               ; (the Color: the colours shown now kept: the new
+            ld de, $C200                    ;   ones go up with the last tiles; the queue's ring,
+            ld a, [hl+]                     ;   empty, holds the copies)
+            ld [de], a
+            inc e
+            ld a, [hl]
+            ld [de], a
+            inc e
+            ld hl, pal_ob + 12
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl]
+            ld [de], a
+            ld a, $41                       ; the new picture into the RAM copy ($C100)
             ld [ps_dh], a
             call party_spr
             xor a
             ld [ps_dh], a
-            ld hl, $C100
-            ld de, $8000
-.v:         call wait_vbl
-.b:         di                              ; 16 bytes while LY is 144-150 (a block takes
-            ldh a, [rLY]                    ;   more than a line on the plain Game Boy)
+            ld hl, pal_ob + 4               ; (its colours aside, the shown ones back)
+            ld de, $C200
+            call .sw
+            ld hl, pal_ob + 12
+            call .sw
+            ld de, $C2EC                    ; the copy order at $C2EC: the 12 tiles not on screen,
+            ld c, 0                         ;   then the four on screen (OAM entries 0-3)
+.t:         call .vis
+            jr nz, .tn
+            ld a, c
+            swap a
+            ld [de], a
+            inc e
+.tn:        inc c
+            ld a, c
+            cp 16
+            jr c, .t
+            ld b, 0
+.fa:        ld a, b
+            add a, a
+            add a, a
+            add a, 2
+            ld l, a
+            ld h, high(oam_buf)
+            ld a, [hl]
+            swap a
+            ld [de], a
+            inc e
+            inc b
+            ld a, b
+            cp 4
+            jr c, .fa
+            ld bc, $C2EC                    ; four tiles a V-Blank: the picture on screen changes
+.fw:        call wait_vbl                   ;   at once in the last one (the plain Game Boy's
+            di                              ;   V-Blank work ends by line 148: about 400 cycles
+            ldh a, [rLY]                    ;   of copying left to fit)
             sub 144
-            cp 7
-            jr c, .c
+            cp 5
+            jr c, .fc
             ei
-            jr .v
-.c:         ld b, 16
-.cl:        ld a, [hl+]
+            jr .fw
+.fc:        ld a, [bc]
+            ld l, a
+            ld e, a
+            ld h, $C1
+            ld d, $80
+            call ps_cp16
+            inc c
+            ld a, c
+            and 3
+            jr nz, .fc
+            ld a, c
+            cp low($C2FC)
+            jr z, .fd
+            ei
+            jr .fw
+.fd:
+            ldh a, [is_cgb]
+            and a
+            jr z, .fx
+            ld hl, $C200                    ; the new colours: hardware and shadow
+            ld de, pal_ob + 4
+            ld a, $84
+            call .pc
+            ld de, pal_ob + 12
+            ld a, $8C
+            call .pc
+.fx:        ei
+            ret
+; NZ if tile C is one of the party's four on screen (OAM entries 0-3)
+.vis:       ld hl, oam_buf + 2
+            ld b, 4
+.vl:        ld a, [hl]
+            cp c
+            jr z, .vy
+            inc l
+            inc l
+            inc l
+            inc l
+            dec b
+            jr nz, .vl
+            xor a
+            ret
+.vy:        or 1
+            ret
+; swap 2 bytes at HL (pal_ob) and DE (the copy)
+.sw:        ld b, 2
+.s1:        ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .s1
+            ret
+; 2 colour bytes HL -> OCPS A, OCPD, and the shadow at DE
+.pc:        ldh [rOCPS], a
+            ld a, [hl+]
+            ldh [rOCPD], a
             ld [de], a
             inc de
-            dec b
-            jr nz, .cl
-            ei
-            ld a, e
-            and a
-            jr nz, .b
+            ld a, [hl+]
+            ldh [rOCPD], a
+            ld [de], a
+            ret
+
+section bank 110, $7200                     ; (free space)
+; 16 bytes HL -> DE (a tile; DE tile-aligned), unrolled: 5 cycles a byte
+ps_cp16:
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
             ret
