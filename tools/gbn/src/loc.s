@@ -1084,10 +1084,11 @@ file_pick:  ld a, [sv_slot]                 ; (the hand on the file used last)
             ld a, SFX_MOVE
             ld [sfx_req], a
             jr .l
-.b:         call oam_clr
+.b:         call fcw_off
             scf
             ret
-.a:         ld a, [fp_cur]
+.a:         call fcw_off
+            ld a, [fp_cur]
             ld [sv_slot], a
             call save_valid
             ld a, [fp_mode]
@@ -1096,6 +1097,7 @@ file_pick:  ld a, [sv_slot]                 ; (the hand on the file used last)
             jr nz, .over
             call oam_clr                    ; load
             call load_game
+            call fcw_apply                  ; (the file's own window colour)
             call sva_ld                     ; (its place, if saved with the Sound Test code's
             and a                           ;   Save; sv_fix: old saves mended, the code applied)
             ret
@@ -1139,12 +1141,14 @@ file_pick:  ld a, [sv_slot]                 ; (the hand on the file used last)
             call scr_upd
             jp .l
 .save:      call oam_clr
+            call fcw_pack                   ; (the window colour kept in the file)
             call save_game
             call sva_after                  ; (the place with the main menu's Save; else none)
             ld a, [fp_cur]                  ; the file's new contents, a moment
             call fp_clr
             ld a, [fp_cur]
             call fp_one
+            call fcw_slot
             call scr_upd
             ld b, 60
 .w:         push bc
@@ -1154,13 +1158,10 @@ file_pick:  ld a, [sv_slot]                 ; (the hand on the file used last)
             jr nz, .w
             and a
             ret
-fp_s_over:  db "Save over File ", 0
-fp_s_file:  db "File ", 0
-fp_s_none:  db "No data", 0
-fp_s_lv:    db "Lv ", 0
-fp_s_gil:   db " Gil", 0
 ; the screen
 fp_draw:    call scr_open
+            ld a, 1                         ; (palettes 4-6: the files' colours, not the gradient's)
+            ld [fcw_on], a
             call eqm_pal
             ld a, [sv_slot]                 ; (fp_one reads each file through sv_slot: the
             push af                         ;   file in use kept)
@@ -1177,6 +1178,7 @@ fp_draw:    call scr_open
             pop af
             push af
             call fp_one
+            call fcw_slot                   ; (its window in the file's colour: the Color)
             pop af
             inc a
             cp 3
@@ -2307,9 +2309,8 @@ gr_pals:    xor a                           ; (owner, 2026-11-23: the cell check
             ld a, [gr_pm]
             ld e, a
 .mc:        ld a, [hl+]
-            and 7
-            cp 5                            ; (palette 5: the black outside)
-            jr z, .ms
+            call gr_sk                      ; (palette 5: the black outside; 4-6: the file
+            jr c, .ms                       ;   screen's own colours, fcw_on)
             add a, low(gr_btab)
             ld c, a
             ld b, high(gr_btab)
@@ -4715,3 +4716,175 @@ opt_reset:  call opt_wdef
             call scr_dmgpal
 .r:         call opt_rows
             jp scr_upd
+
+; ---- a window colour per file (owner, 2026-11-26): kept in the save page's unused bytes ($F6: blue
+; | $80 when kept, $FE: red | $20 gradient off, $FF: green), set when the file is loaded; on the
+; file screen (the Color) each file's window in its own colour (BG palettes 4-6)
+FCW_B      = unsram + $F6
+FCW_R      = unsram + $FE
+FCW_G      = unsram + $FF
+section bank 99, $4F9D                      ; (free space)
+fcw_pack:   ld a, [win_b]
+            or $80
+            ld [FCW_B], a
+            ld a, [opt_nograd]
+            and a
+            ld a, [win_r]
+            jr z, .g
+            or $20
+.g:         ld [FCW_R], a
+            ld a, [win_g]
+            ld [FCW_G], a
+            ret
+fcw_apply:  ld a, [FCW_B]
+            bit 7, a
+            ret z                           ; (an older save: the colour as it was)
+            and $1F
+            ld [win_b], a
+            ld a, [FCW_R]
+            ld b, a
+            and $1F
+            ld [win_r], a
+            ld a, b
+            swap a
+            rrca
+            and 1
+            ld [opt_nograd], a
+            ld a, [FCW_G]
+            and $1F
+            ld [win_g], a
+            jp opt_wpal
+section bank 99, $4B1A                      ; (free space)
+; file fp_k (sv_slot): its window's cells (rows 6 k to 6 k + 5) on BG palette 4 + k, the window
+; palette with the file's colour (none kept, or no save: palette 7 as it is)
+fcw_slot:   ldh a, [is_cgb]
+            and a
+            ret z
+            call save_valid
+            ret c
+            ld a, $0A
+            ld [$0000], a
+            xor a
+            ld [$4000], a
+            call sv_addr4
+            ld de, $F6
+            add hl, de
+            ld a, [hl]
+            ld [fcw_t], a
+            ld de, 8
+            add hl, de
+            ld a, [hl+]
+            ld [fcw_t + 1], a
+            ld a, [hl]
+            ld [fcw_t + 2], a
+            xor a
+            ld [$0000], a
+            ld a, [fcw_t]
+            bit 7, a
+            ret z
+            ld a, [win_r]
+            push af
+            ld a, [win_g]
+            push af
+            ld a, [win_b]
+            push af
+            ld a, [fcw_t]
+            and $1F
+            ld [win_b], a
+            ld a, [fcw_t + 1]
+            and $1F
+            ld [win_r], a
+            ld a, [fcw_t + 2]
+            and $1F
+            ld [win_g], a
+            call opt_wpal
+            ld a, [fp_k]                    ; palette 4 + k
+            add a, 4
+            add a, a
+            add a, a
+            add a, a
+            or $80
+            call bcps_w
+            ld hl, win_pal
+            ld b, 8
+.p:         ld a, [hl+]
+            call bcpd_w
+            dec b
+            jr nz, .p
+            pop af
+            ld [win_b], a
+            pop af
+            ld [win_g], a
+            pop af
+            ld [win_r], a
+            call opt_wpal
+            jp fcw_attr
+section bank 99, $58A1                      ; (free space)
+fcw_attr:   ld a, [fp_k]                    ; HL = sattr + 32 x 6 k
+            ld c, a
+            add a, a
+            add a, c                        ; 3 k
+            swap a                          ; 48 k = 32 x 1.5 k ... (6 k rows x 32 = 192 k)
+            ld l, a                         ; (A = 48 k; x 4 = 192 k)
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            ld de, sattr
+            add hl, de
+            ld a, [fp_k]
+            add a, 4
+            ld c, a
+            ld e, 6
+.r:         ld b, 20
+.c:         ld a, [hl]                      ; (window cells: palette 7, and the title's 3: its
+            and 3                           ;   gold letters would stand on the shared colour)
+            cp 3
+            jr nz, .s
+            ld a, [hl]
+            and $F8
+            or c
+            ld [hl], a
+.s:         inc hl
+            dec b
+            jr nz, .c
+            ld a, l
+            add a, 12
+            ld l, a
+            jr nc, .n
+            inc h
+.n:         dec e
+            jr nz, .r
+            ret
+section wram, $CDF8
+fcw_t:      ds 3
+fcw_on:     ds 1                            ; 1: the file screen (gr_sk)
+section bank 99, $46A6                      ; (free space: the file screen's strings)
+fp_s_over:  db "Save over File ", 0
+fp_s_file:  db "File ", 0
+fp_s_none:  db "No data", 0
+fp_s_lv:    db "Lv ", 0
+fp_s_gil:   db " Gil", 0
+section bank 99, $61C5                      ; (free space)
+; gr_pals' palette test: A = a cell's attribute -> A = its palette, C when it takes no window
+; colour (5, the black outside; 4-6 on the file screen, its files' own colours)
+gr_sk:      and 7
+            cp 5
+            jr z, .s
+            cp 4
+            jr c, .k
+            cp 7
+            jr z, .k
+            push af
+            ld a, [fcw_on]
+            and a
+            jr z, .k2
+            pop af
+.s:         scf
+            ret
+.k2:        pop af
+.k:         and a
+            ret
+; the file screen left: oam cleared, the gradient's palettes as everywhere
+fcw_off:    xor a
+            ld [fcw_on], a
+            jp oam_clr
