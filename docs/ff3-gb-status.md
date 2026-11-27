@@ -396,6 +396,12 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   stacks merged; 20 arrows to a hand), B drops the mark or leaves; a swap or a cancel returns to the
   commands, as FF3. Dialogue's job names (\char[$01]) from t8200. Sound: volume changes inside a
   note by zombie-mode steps.
+- FF3's icons before item / spell names (its font tiles $60-$75 from the ROM, at our font codes
+  nothing else shows: the printable ASCII the text never uses and $18-$1E) and its small capitals
+  ($5C-$5F, $76-$7A: C G L V, E H M P X) as letters; names keep FF3's blank icon column.
+- The inventory interlaced for a battle and back (3D/BC12 / BC2D: the field keeps 32 ids then 32
+  counts, the battle id / count pairs): before, the battle read the field's layout as pairs (items
+  in battle and the rewards went wrong). Opened chests stay open when a map loads (3A/91F7).
 - Battle messages wrap at spaces over the window's rows (the English is longer than FF3's lines).
 - Fixed on the way: the party's cells after a big spell were restored one per row (a diagonal of
   blank cells over the top window), Odin's cells all showed column 0 of his map, Odin's charge
