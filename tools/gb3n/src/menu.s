@@ -12,7 +12,6 @@ rHDMA4     = $FF54
 rHDMA5     = $FF55
 M_T        = $C900          ; 32 x 18 tiles (copied whole by general DMA in V-Blank)
 M_A        = $CB40          ; 32 x 18 attributes
-M_STR      = $CE00          ; a string (40)
 M_HAND     = $EE            ; the hand (OBJ tile, VRAM bank 1; battle's SPR_HAND)
 M_ATTR     = $0F            ; window cells: palette 7, VRAM bank 1
 M_BLACK    = $01            ; outside the windows: colour 0 (VRAM bank 1 tile 1, cleared at boot)
@@ -617,7 +616,6 @@ m_label:    ld hl, m_labels
             jr .f
 
 ; ---- not yet: an error sound (first pass)
-m_job:
 m_config:
 m_suspend:  jp m_sfx_err
 
@@ -670,6 +668,24 @@ m_enter:    call wait_vbl
             ldh [rSTAT], a
             ld [guard_on], a
             %FAR B_BSCR, bs_objpal          ; OBJ palettes: FF3's battle character palettes
+            ld de, m_jpal
+            %FAR B_BSCR, bs_jpals
+            ret
+; member [m_who]'s picture again (a new job): the tiles behind the line guard, its palette id
+m_regfx:    call wait_vbl
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            ld a, 1
+            ldh [rVBK], a
+            ld a, [m_who]
+            ld c, a
+            call m_jobgfx
+            xor a
+            ldh [rVBK], a
+            ldh [rSTAT], a
+            ld [guard_on], a
             ld de, m_jpal
             %FAR B_BSCR, bs_jpals
             ret
@@ -3822,11 +3838,492 @@ m_target_all:
             jr nz, .o
             ret
 
+; ==== 5 Job (FF3's 3C/962F): the jobs the crystals give (3F/F38A), FF3's CP cost (3D/AD85), its
+; checks (3D/AE23) and change (3D/AB8F). Job data: 39/A000 (8 a job), level-ups 39/A1D6..,
+; first MP 39/BB88 (B_BDAT3 = NES $38 / $39)
+m_job:      ld a, [SRAM_PAGE + $21]         ; crystals (3D/A61B: none: no)
+            and $1F
+            jp z, m_sfx_err
+            call m_member
+            ret c
+            call m_who_off
+            ld [m_x7f], a
+            add 2
+            call m_sp1
+            and $C0
+            jp nz, m_sfx_err
+            ld a, [SRAM_PAGE + $21]         ; the last job (3F/F38A)
+            and $1F
+            ld b, 0
+            srl a
+            jr nc, .k
+            ld b, 5
+            srl a
+            jr nc, .k
+            ld b, 9
+            srl a
+            jr nc, .k
+            ld b, $10
+            srl a
+            jr nc, .k
+            ld b, $13
+            srl a
+            jr nc, .k
+            ld b, 21
+.k:         ld a, b
+            inc a
+            ld [m_jn], a
+            call j_costs
+            xor a
+            ld [m_icur], a
+            ld [m_top], a
+.scr:       call j_draw
+.lp:        ld a, [m_icur]
+            ld hl, m_top
+            sub [hl]
+            add 5
+            ld b, a
+            ld c, 1
+            call m_hand
+            call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            call m_sfx_ok
+            ld a, [m_icur]
+            ld [m_newj], a
+            ld b, a
+            ld a, [m_x7f]
+            call m_sp1
+            cp b
+            jr z, .err
+            call j_check                    ; A = message when not allowed
+            jr nc, .no
+            ld hl, m_s_chg                  ; "Change jobs? A..Yes B..No" (t8200 $70)
+            call m_msghl
+            call m_show
+            call m_waitkey
+            ldh a, [pad_new]
+            and PAD_A
+            jr z, .scr
+            call j_change
+            call m_regfx
+.x:         call m_sfx_ok                   ; (3C/961C: the equipment update)
+            ld a, [m_who]
+            ld c, a
+            %FAR B_BSCR, bs_fequip
+            ret
+.no:        call m_msg
+            call m_show
+            call m_waitkey
+            jr .scr
+.err:       call m_sfx_err
+            jr .lp
+.up:        ld a, [m_icur]
+            and a
+            jr z, .lp
+            dec a
+            jr .m
+.dn:        ld a, [m_icur]
+            inc a
+            ld hl, m_jn
+            cp [hl]
+            jr nc, .lp
+.m:         ld [m_icur], a
+            call m_sfx_move
+            ld hl, m_top
+            ld a, [m_icur]
+            cp [hl]
+            jr nc, .m1
+            ld [hl], a
+            jp .scr
+.m1:        sub [hl]
+            cp 12
+            jp c, .lp
+            ld a, [hl]
+            inc a
+            ld [hl], a
+            jp .scr
+; the screen: (0, 0) 20 x 4 name, job, CP; (0, 4) 20 x 14 the jobs (12 rows) and their costs
+j_draw:     call m_clear
+            call m_sprclr
+            ld de, $0000
+            ld bc, $0414
+            call m_win
+            ld a, [m_who]
+            ld de, $0101
+            call m_name
+            ld a, [m_x7f]
+            call m_sp1
+            add $E2
+            call m_t82
+            ld de, $0201
+            ld a, 13
+            call m_putsn
+            ld hl, m_cp
+            ld de, $010E
+            call m_puts0
+            ld a, [SRAM_PAGE + $1B]
+            ld l, a
+            ld h, 0
+            ld e, 16
+            ld b, 3
+            call m_num
+            ld de, $0400
+            ld bc, $0E14
+            call m_win
+            ld a, [m_top]
+            ld [m_row], a
+            ld d, 5
+.r:         ld a, [m_row]
+            ld hl, m_jn
+            cp [hl]
+            jr nc, .x
+            push de
+            add $E2
+            call m_t82
+            pop de
+            push de
+            ld e, 2
+            ld a, 13
+            call m_putsn
+            pop de
+            push de
+            ld a, [m_row]
+            ld hl, m_jcost
+            add l
+            ld l, a
+            jr nc, .c
+            inc h
+.c:         ld l, [hl]
+            ld h, 0
+            ld e, 16
+            ld b, 3
+            call m_num
+            pop de
+            ld a, [m_row]
+            inc a
+            ld [m_row], a
+            inc d
+            ld a, d
+            cp 17
+            jr nz, .r
+.x:         jp m_show
+; job j's 8 bytes -> HL (B_BDAT3 copy into m_jd + 8 k): j_load A = job, DE = buffer
+j_load:     ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld bc, $6000
+            add hl, bc
+            ld bc, 8
+            ld a, B_BDAT3
+            jp far_copy
+; FF3's cp needed for each job (3D/AD85): 4 x (|phys/mag difference| + |law/chaos difference|)
+; minus the new job's level, at least 0
+j_costs:    ld a, [m_x7f]
+            call m_sp1
+            ld de, m_jd + 8
+            call j_load
+            xor a
+.j:         ld [m_newj], a
+            ld de, m_jd
+            call j_load
+            ld a, [m_jd]
+            swap a
+            and 15
+            ld b, a
+            ld a, [m_jd + 8]
+            swap a
+            and 15
+            sub b
+            jr nc, .a1
+            cpl
+            inc a
+.a1:        ld c, a
+            ld a, [m_jd]
+            and 15
+            ld b, a
+            ld a, [m_jd + 8]
+            and 15
+            sub b
+            jr nc, .a2
+            cpl
+            inc a
+.a2:        add c
+            add a
+            add a
+            ld b, a
+            ld a, [m_newj]                  ; - the job's level ($6210 + 2 j)
+            add a
+            ld c, a
+            ld a, [m_x7f]
+            add $10
+            add c
+            ld l, a
+            ld h, high(SRAM_PAGE + $200)
+            ld a, b
+            sub [hl]
+            jr nc, .s
+            xor a
+.s:         ld b, a
+            ld a, [m_newj]
+            ld hl, m_jcost
+            add l
+            ld l, a
+            jr nc, .p
+            inc h
+.p:         ld [hl], b
+            ld a, [m_newj]
+            inc a
+            cp 23
+            jr nz, .j
+            ret
+; FF3's check (3D/AE23): C = allowed, else A = the message
+j_check:    ld a, [m_newj]
+            ld de, m_jd
+            call j_load
+            ld a, [m_x7f]                   ; level >= the job's minimum
+            inc a
+            call m_sp1
+            ld hl, m_jd + 1
+            cp [hl]
+            ld a, $3A
+            ccf
+            ret nc
+            ld a, [m_x7f]                   ; nothing equipped (slots 0-3, 5)
+            ld l, a
+            ld h, high(SRAM_PAGE + $200)
+            ld a, [hl+]
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            or [hl]
+            inc l
+            inc l
+            or [hl]
+            ld a, $71
+            ret nz
+            ld a, [m_newj]                  ; enough CP
+            ld hl, m_jcost
+            add l
+            ld l, a
+            jr nc, .c
+            inc h
+.c:         ld a, [SRAM_PAGE + $1B]
+            cp [hl]
+            ld a, $72
+            ccf
+            ret
+; FF3's change job (3D/AB8F)
+j_change:   ld a, [m_newj]
+            ld hl, m_jcost
+            add l
+            ld l, a
+            jr nc, .c
+            inc h
+.c:         ld a, [SRAM_PAGE + $1B]         ; CP - cost
+            sub [hl]
+            ld [SRAM_PAGE + $1B], a
+            ld a, [m_x7f]                   ; the old job's level / exp saved
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld a, [hl]
+            add a
+            ld b, a
+            ld a, l
+            add $10
+            ld l, a
+            ld a, [hl+]
+            ld c, [hl]
+            push af
+            ld a, [m_x7f]
+            add $10
+            add b
+            ld l, a
+            inc h
+            pop af
+            ld [hl+], a
+            ld [hl], c
+            ld a, [m_x7f]                   ; the new job, its level / exp
+            ld l, a
+            dec h
+            ld a, [m_newj]
+            ld [hl], a
+            add a
+            ld b, a
+            ld a, l
+            add $10
+            add b
+            ld l, a
+            inc h
+            ld a, [hl+]
+            ld c, [hl]
+            dec h
+            push af
+            ld a, [m_x7f]
+            add $10
+            ld l, a
+            pop af
+            ld [hl+], a
+            ld [hl], c
+            ld a, [m_x7f]                   ; base stats from the job (bytes 2-6)
+            add $12
+            ld e, a
+            ld d, high(SRAM_PAGE + $100)
+            ld hl, m_jd + 2
+            ld bc, 5
+            call memcpy
+            ld a, [m_x7f]                   ; status bit 0 (equipment to check)
+            add 2
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            set 0, [hl]
+            ld a, [m_jd + 7]                ; max MP of each level: 39/BB88 + 8 index
+            add a
+            add a
+            add a
+            ld l, a
+            ld h, 0
+            ld bc, $7B88
+            add hl, bc
+            ld de, m_tmp8
+            ld bc, 8
+            ld a, B_BDAT3
+            call far_copy
+            ld a, [m_x7f]
+            add $31
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld de, m_tmp8
+            ld b, 8
+.mp:        ld a, [de]
+            inc de
+            ld [hl+], a
+            inc l
+            dec b
+            jr nz, .mp
+            ld a, [m_x7f]                   ; the level-ups again with the new job's table
+            inc a
+            call m_sp1
+            ld [m_lvl], a
+            and a
+            jr z, .done
+            ld a, [m_newj]                  ; its table (3D/AD59: 39/xxxx -> B_BDAT3 - $2000)
+            add a
+            ld hl, job_prog
+            add l
+            ld l, a
+            jr nc, .t
+            inc h
+.t:         ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld bc, -$2000
+            add hl, bc
+            ld a, l
+            ld [m_jp], a
+            ld a, h
+            ld [m_jp + 1], a
+.lv:        ld a, [m_lvl]                   ; (level - 1) x 2
+            dec a
+            add a
+            ld c, a
+            ld a, [m_jp]
+            ld l, a
+            ld a, [m_jp + 1]
+            ld h, a
+            ld b, 0
+            add hl, bc
+            ld de, m_tmp8
+            ld bc, 2
+            ld a, B_BDAT3
+            call far_copy
+            ld a, [m_tmp8]
+            and 7
+            ld [m_jadd], a
+            ld a, [m_x7f]                   ; stats: bits 7-3 -> $6112-$6116 + n (99 at most)
+            add $12
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld a, [m_tmp8]
+            ld b, 5
+.st:        add a
+            push af
+            jr nc, .sn
+            ld a, [m_jadd]
+            add [hl]
+            cp 99
+            jr c, .s1
+            ld a, 99
+.s1:        ld [hl], a
+.sn:        pop af
+            inc l
+            dec b
+            jr nz, .st
+            ld a, [m_x7f]                   ; MP: bits 7-0 -> $613F, $613D .. $6131 + 1
+            add $3F
+            ld l, a
+            ld a, [m_tmp8 + 1]
+            ld b, 8
+.ms:        add a
+            push af
+            jr nc, .mn
+            ld a, [hl]
+            inc a
+            cp 99
+            jr c, .m1
+            ld a, 99
+.m1:        ld [hl], a
+.mn:        pop af
+            dec l
+            dec l
+            dec b
+            jr nz, .ms
+            ld a, [m_lvl]
+            dec a
+            ld [m_lvl], a
+            jr nz, .lv
+.done:      ld a, [m_x7f]                   ; mod. stats = base; current MP <= max
+            add $12
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld e, l
+            ld d, h
+            ld a, e
+            add 5
+            ld e, a
+            ld bc, 5
+            call memcpy
+            ld a, [m_x7f]
+            add $30
+            ld l, a
+            ld b, 8
+.cm:        inc l
+            ld a, [hl-]
+            cp [hl]
+            jr nc, .cn
+            ld [hl], a
+.cn:        inc l
+            inc l
+            dec b
+            jr nz, .cm
+            ret
+
 section bank B_MENU, $7C00
 sp_mask:    ds 56                           ; (3D/A20C, A244, A27C: from the ROM)
 sp_lvl:     ds 56
 sp_ptr:     ds 56
 wp_comb:    ds 16                           ; (3C/9D4B)
+job_prog:   ds 44                           ; (3D/AD59)
 
 section wram, $CD80
 m_cur:      ds 1
@@ -3874,3 +4371,13 @@ m_caster:   ds 1
 m_mpat:     ds 1
 m_q:        ds 1
 m_all:      ds 1
+m_jn:       ds 1
+m_newj:     ds 1
+m_jadd:     ds 1
+m_jp:       ds 2
+m_jd:       ds 16
+m_jcost:    ds 23
+m_tmp8:     ds 8
+
+section wram, $CEA0
+M_STR:      ds 80                           ; a string (the overlap check guards the variables)
