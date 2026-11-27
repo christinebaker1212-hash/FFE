@@ -1177,3 +1177,26 @@ one reaches parity, so the owner can keep playing).
       hand (OAM 0-3) while its rows went up and the four hands were drawn only once; the redraw now counts as in
       place (sf_hk, as the Bestiary's scrolling), so the hands stay.
     - Strict checker 0 on DMG / CGB / SGB (random play from New Game, random walks in Crescent Lake).
+66. Owner (2026-11-27): the battle "o&" window, still there at battle start, on an enemy's death and at the end.
+    - Reproduced in SameBoy (formation 10, Color): the message window showed "o&" where "The monsters strike
+      first!" / "Dune -> Shadow" / "Had no effect" belonged, in 119 of 2,000 frames.
+    - Cause: bt_msg_row closes the top name window (bt_ban_off) before saving HL, its string pointer. Closing it
+      waits a frame or more (an enemy's spell name stays up a second; the V-Blank), and the battle frames run
+      meanwhile left HL elsewhere, so the row was drawn from the wrong bytes: "o&". The window is open at battle
+      start, after a kill and at the end, so only then. (Item 63's lookup guards could not catch it: the
+      message number was right.)
+    - Fix: bt_ban_off keeps HL for every caller (bank 0 wrapper around btl2.s bt_ban_off6). Also: message,
+      results and left-window rows are mapped only once their letters are uploaded (vwf_outf), so a row never
+      shows its tiles' old letters.
+    - Checked: an "o&" pixel detector over every frame finds 0 (was 119); the right texts show in those frames.
+67. Owner (2026-11-27, a photo from an Analogue Pocket): the Undersea Shrine's water should move like the world map's.
+    - The shrine's blue bubble field is one metatile ($3C of tileset 5, the commonest metatile of maps 42-46) whose
+      four tiles only it uses. Its 16 x 16 picture now moves as the world map's sea: four bands of 4 lines, each a
+      pixel sideways per 16 frames, in turn 4 frames apart, 64 steps on the towns' water step.
+    - build.py shrine_water (bank 115): the Color's frames and the plain Game Boy's two shadings (floors 1-3 / 4-5),
+      found from the user's ROM at build time. src/wanim.s: the floors take the towns' path (wa_town, wa_load);
+      wt_cpq picks the towns' tile or the shrine's four (ws_cp: 64 bytes in V-Blank right after the OAM, from line
+      146-147, ending by ~150 on the plain Game Boy). The Temple of Chaos shares the tileset and stays as it was.
+    - Checked in SameBoy: the field changes every 4 frames in 4-line bands, nothing else on screen changes; no new
+      lag on either system (the walk's only long gaps are its map events, the same in the build before); strict
+      checker 0 on DMG / Color / SGB over 12,000 frames of random walking there.

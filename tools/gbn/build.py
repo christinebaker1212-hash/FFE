@@ -242,6 +242,7 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, WANIM_DMG, 0x4000, wad)
     print('water animation:', wa_info)
     place(banks, WTOWN_BANK, 0x4000, town_water(rom))           # (the towns' water tile)
+    place(banks, WSHR_BANK, 0x4000, shrine_water(rom))          # (the Undersea Shrine's water)
     wt2_blob, wt2_src = town_water2(rom)                         # (its canal in shadow)
     place(banks, WT2_BANK, 0x4000, wt2_blob)
     place(banks, OW_INFO, 0x7400, o['veh_cgb'])                # vehicle sprites (FF1 OW objects)
@@ -364,6 +365,59 @@ def town_water(rom):
         assert all(p['mt_dmg_out'][128 * k + 39] == d for k in range(4))
         blob[0x400 + 2 * m:0x402 + 2 * m] = vram(d).to_bytes(2, 'little')
         blob[0x800 + 0x400 * m:0xC00 + 0x400 * m] = shifts(p['dmg_tiles'][16 * d:16 * d + 16])
+    return bytes(blob)
+WSHR_BANK = 115
+SHRINE_MAPS = range(42, 47)                     # the Undersea Shrine's five floors
+def shrine_water(rom):
+    """the Undersea Shrine's water (owner, 2026-11-27: "none of the water animates like the world map
+    does"): the floors' blue bubble field is one metatile whose four tiles only it uses (found at build
+    time: the commonest metatile of maps 42-46); its 16 x 16 picture moves as the world map's sea
+    (water_anim: four bands of 4 lines, each a pixel sideways per 16 frames, in turn 4 frames apart),
+    64 steps on the towns' water step (src/wanim.s ws_cp). Bank WSHR_BANK: $4000 + 16 i (i = map - 42,
+    5 = the Color): the pictures' page, 0, the four tiles' VRAM (UL, UR, LL, LR); the pictures from
+    $4100, $1000 a set (the Color's, then each DMG shading once), 64 bytes a step."""
+    from collections import Counter
+    ts = rom.rd(data.BANK_SMINFO, data.TILESETS + SHRINE_MAPS[0])
+    assert all(rom.rd(data.BANK_SMINFO, data.TILESETS + m) == ts for m in SHRINE_MAPS)
+    t = data.tileset_pack(rom, ts)
+    cnt = Counter()
+    for m in SHRINE_MAPS: cnt.update(data.std_map(rom, m))
+    mt = cnt.most_common(1)[0][0]
+    cid = [t['tsa'][128 * k + mt] for k in range(4)]
+    assert all(t['tsa'][128 * k + m2] not in cid for k in range(4) for m2 in range(128) if m2 != mt), \
+        'shrine water: its tiles are shared'
+    def dec(t16): return [[(t16[2 * y] >> (7 - x) & 1) | (t16[2 * y + 1] >> (7 - x) & 1) << 1 for x in range(8)] for y in range(8)]
+    def enc(px):
+        out = bytearray()
+        for y in range(8):
+            out += bytes([sum((px[y][x] & 1) << (7 - x) for x in range(8)), sum((px[y][x] >> 1) << (7 - x) for x in range(8))])
+        return bytes(out)
+    ORDER = (0, 2, 1, 3)                         # (as water_anim's sea)
+    def frames(tiles4):
+        q = [dec(x) for x in tiles4]
+        img = [[q[(y >= 8) * 2 + (x >= 8)][y & 7][x & 7] for x in range(16)] for y in range(16)]
+        out = bytearray()
+        for j in range(64):
+            sh = [((j + 3 - ORDER[b]) // 4) % 16 for b in range(4)]
+            im = [[img[y][(x - sh[y // 4]) % 16] for x in range(16)] for y in range(16)]
+            for k in range(4):
+                out += enc([[im[(k >> 1) * 8 + y][(k & 1) * 8 + x] for x in range(8)] for y in range(8)])
+        return bytes(out)
+    def vram(d): return (0x9000 + 16 * d) if d < 128 else (0x8000 + 16 * d)
+    blob = bytearray(0x3100)
+    sets = [frames([t['cgb_tiles'][16 * c:16 * c + 16] for c in cid])]
+    def hdr(i, page, ids):
+        blob[16 * i:16 * i + 2] = bytes([page, 0])
+        blob[16 * i + 2:16 * i + 10] = b''.join(vram(d).to_bytes(2, 'little') for d in ids)
+    hdr(5, 0x41, cid)
+    for i, m in enumerate(SHRINE_MAPS):
+        p = data.map_pack(rom, m)
+        did = [p['mt_dmg_out'][128 * k + mt] for k in range(4)]
+        f = frames([p['dmg_tiles'][16 * d:16 * d + 16] for d in did])
+        if f not in sets: sets.append(f)
+        hdr(i, 0x41 + 0x10 * sets.index(f), did)
+    assert len(sets) <= 3, 'shrine water: %d picture sets' % len(sets)
+    for k, f in enumerate(sets): blob[0x100 + 0x1000 * k:0x100 + 0x1000 * k + len(f)] = f
     return bytes(blob)
 WT2_BANK = 112
 def town_water2(rom):
