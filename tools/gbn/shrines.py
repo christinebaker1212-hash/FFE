@@ -6,8 +6,7 @@ Floors are the user's Dawn of Souls map records (gba.py), each drawn in the FF1 
 boss depths are fixed floors, the others are the shrine's pool of floors in a random order (one of a group's
 alternatives a run). Encounter tables and treasure lists per depth: the FINAL FANTASY wiki's tables for the
 Dawn of Souls dungeons (names and rates only; monsters, items and their pictures come from the user's ROMs
-at build time). Non-combat floors whose Dawn of Souls events (puzzles, townsfolk, shops) are not made yet
-are walked through: their stairs are open."""
+at build time). The non-combat floors' people (townsfolk, shops, puzzles, fights): pgevents.py."""
 
 # floor: (Dawn of Souls map record, look, role, area); look: a GBA tileset number (postgame.LOOKS) or
 # 'out:grass' / 'out:sand' (an outdoor floor); area: the encounter table's area (None: no battles)

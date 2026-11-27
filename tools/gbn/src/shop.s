@@ -234,9 +234,7 @@ sh_menu:    ld a, b
 
 ; price of item A -> sh_price (FF1 LoadPrice)
 sh_getprice:
-            ld l, a
-            ld h, 0
-            add hl, hl
+            call sh_pix
             ld de, N_PRICE
             add hl, de
             ld de, sh_price
@@ -432,10 +430,8 @@ sh_item:    ld a, SH_WELCOME
             jr c, .l
             call sh_qty                     ; how many (owner, 2026-11-22)
             jr c, .l
-            ld a, [sh_it]
-            add a, low(ITEMS)
-            ld l, a
-            ld h, high(ITEMS)
+            ld a, [sh_it]                   ; (its count: it_cnt, a Dawn of Souls item's too)
+            call it_cnt
             ld a, [sh_q]
             add a, [hl]
             ld [hl], a
@@ -1207,9 +1203,7 @@ sh_pick:    ld a, [sh_sell]                 ; (selling: Everyone / a member's pa
 ; how many of sh_it (owner, 2026-11-22): up / down one, right / left ten, at most what the
 ; Gil buys and 99 in all; the total below; A buys (C clear, sh_q, sh_tot), B cancels
 sh_qty:     ld a, [sh_it]
-            add a, low(ITEMS)
-            ld l, a
-            ld h, high(ITEMS)
+            call it_cnt
             ld a, 99
             sub [hl]
             ld b, a                         ; room
@@ -1512,9 +1506,7 @@ sh_own:     ld a, [sh_sell]
             add hl, de
             ld a, [hl]
             ld e, a
-            add a, low(ITEMS)
-            ld l, a
-            ld h, high(ITEMS)
+            call it_cnt
             ld a, [sh_type]
             cp 2
             ret nc
@@ -1586,6 +1578,19 @@ sh_qmax:    ds 1
 sh_tot:     ds 3
 sh_ocur:    ds 1
 
+section bank 2, $7E40                       ; (free space)
+; HL = 2 x item A (an item shop's Dawn of Souls item C_CONS + k: its price at N_PRICE + $380 + 2 k)
+sh_pix:     ld l, a
+            ld h, 0
+            cp C_CONS
+            jr c, .n
+            ld a, [sh_type]
+            cp 6
+            jr nz, .n
+            inc h
+.n:         add hl, hl
+            ret
+
 section bank 2, $7F94                       ; (free space)
 ; the shops' preview: '>' between the values, the arrow up / down when the new one is better /
 ; worse (owner's audit, 2026-11-25: every system; the Color also colours the value)
@@ -1641,15 +1646,29 @@ st_nomp:    ld a, [mm_t]
             xor a
             ret
 
+section bank 99, $6A40                      ; (free space)
+; HL = the names bank's pointer of item sh_it (an item shop's Dawn of Souls item C_CONS + k: name 256 + k)
+sh_inix:    ld a, [sh_it]
+            ld l, a
+            ld h, 0
+            cp C_CONS
+            jr c, .n
+            ld a, [sh_type]
+            cp 6
+            jr nz, .n
+            ld a, l
+            add a, 256 - C_CONS
+            ld l, a
+            inc h
+.n:         add hl, hl
+            ld de, $4000
+            add hl, de
+            ret
+
 section bank 99, $7500                      ; (free space)
 ; item sh_it's icon and name at the pen, at most 16 letters (the shop's list and count windows:
 ; the name from column 3 ends by 18; "Mythril Gauntlets", the one longer name sold, loses its s)
-sh_iname:   ld a, [sh_it]
-            ld l, a
-            ld h, 0
-            add hl, hl
-            ld de, $4000
-            add hl, de
+sh_iname:   call sh_inix
             ld de, scr_buf
             ld bc, 2
             ld a, NAMES

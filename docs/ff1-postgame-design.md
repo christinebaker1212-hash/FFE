@@ -274,8 +274,36 @@ One engine for the four (`tools/gbn/shrines.py` the data, `postgame.py` the floo
   five Plus items (for good). Names: a 512-entry name table (names.py: consumables at 256 + k; new weapons /
   armour at codes $6C-$A1, whose FF1 gold amounts' names moved to 256 + code).
 
-Walked through for now (their Dawn of Souls events are not made): the non-combat floors' puzzles and people
-(flooded village, dancers, library, walkways' vanishing paths, Seahold's mermaids, the dragon hunt (its dragons met
-as random battles), beavers, dwarves, robots, children, Feyhome's fairies, the swamp's souls with Astos and the
-Vampire, the cursed town of B30, the towns' shops and inns), Hellfire's ship / airship / Thule, the fire shrine's
-timed damage (its floor as Gurgu's lava), the glittering fixed battles of the waterfall.
+The non-combat floors' people came next (section 13). Still as FF1's own floors: the walkways' vanishing paths,
+the fire shrine's timed damage (its floor as Gurgu's lava), the waterfall's glittering fixed battles, Hellfire's
+ship / airship.
+
+## 13. The floors' people: towns, shops, puzzles (2026-11-27, owner: "Finish the rest: towns, shops and the puzzle floors too")
+Dawn of Souls' event scripts are not decoded (docs/ff1-postgame-gba.md), so each floor's people are rebuilt from its
+messages (the user's GBA ROM, 660-1018) and the map: tools/gbn/pgevents.py.
+- **People**: map objects with ids $D0-$DE (FF1's objects end at $CF), FF1's own sprites (mermaids, fairies, dwarves,
+  robots, dragons, Bahamut, the Titan, Astos, the Vampire, knights, kids, sages, townsfolk). They are placed at build
+  time: spread over the cells the party can reach, quest-givers near the start, the hidden and the culprits far away;
+  one who stands still is never put where the way to the stairs, a chest or another person would be cut.
+- **Scripts** (src/pg.s pg_npc): say a line, if / set a floor flag, if all flags, if a shrine's boss is beaten, a
+  fight with an FF1 formation (FF1's battle banks for that battle, the floor's own again after it: pg_ffb), hide,
+  open a shop / inn, heal, MP full, HP halved, give an item, go to. A floor's 16 flags (save page $AB) clear on
+  arrival and its people all show again.
+- **Gates**: a floor with a gate holds its stairs (with its own words) until the gate's flags are set.
+- **The floors**: Earthgift's forest (two strangers to fight); Hellfire's overworld floors (Thule), the waterfall
+  (a robot's friend repaired with two parts: the stairs open), the robots' cavern, the fire shrine's bats;
+  Lifespring's Seahold (mermaids, their words before / after Gilgamesh falls, the door; item shop, inn), the
+  octopus (the Kraken), Omega's pursuer, Dark Bahamut's trial (beat his Red, Blue and Green Dragons, then he opens
+  the way), the beavers (send all six home: an Elixir, the way on), the library (scholars, three who block),
+  Ballerina the city of dance (dancers, item shop, inn); Whisperwind's Western Keep (the dead king, his queen, two
+  soldiers to fight: the way on), the swamp (the souls; Astos and the Vampire to beat), Feyhome (fairies: one heals,
+  one fills MP, two halve HP), the mages' village (mages; FF1's best white / black magic shops), the cursed town (its
+  people groan until the Phantom Train is beaten, then thank you; item shop, inn), the desert town's chain of trades
+  (candy, ocarina, Time Gear, pickaxe, Nerrick's autograph, Matoya's medicine, a tool, the house key, the proof of
+  fellowship, the Star Ruby: the giant gives a Megalixir; item shop, inn), the town of toys (find the hidden child:
+  the stairs open).
+- **Shops**: ids 71-78 after FF1's (names bank N_STYPE / N_SITEMS); item shops sell Dawn of Souls' consumables
+  (code $C0 + k: name 256 + k, price at N_PRICE + $380 + 2 k, the count by it_cnt); inns as FF1's.
+- **Floors whose stairs were in a pocket** (Dawn of Souls joins the parts by events): the stairs move into the
+  floor's largest part (Western Keep, Feyhome, the fire shrine, the overworld floors, the sunken floor, the
+  waterfall cavern).
