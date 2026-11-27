@@ -637,7 +637,8 @@ an_clr:     ld a, [an_sbase]                ; (a summon in sprites: the entries 
             jr nz, .m
             ret
 ; a frame of the animation (FF3's $F8B0 + $8AE6): V-Blank, the windows' rows, sprites, sound
-an_frame:   call wait_vbl
+an_frame:   call an_opre                    ; (a back attack: the sprites mirrored)
+            call wait_vbl
             ld a, [an_pfl]                  ; (a backdrop colour waiting: first in V-Blank)
             and a
             call nz, an_bput
@@ -653,8 +654,13 @@ an_frame:   call wait_vbl
             call an_wset
             call an_wqset
 .nw:
-            call xb_vrows
             call hram_dma
+            call an_opre
+            call an_sbgrw
+            call xb_vrows
+            ld a, [an_sbd]                  ; (a summon in the BG cells moved / its rows redrawn)
+            and a
+            call nz, an_sbgmv
             call snd_frame
             call read_pad
             ld hl, an_f
@@ -1379,43 +1385,39 @@ an_bgoff:   ld a, [an_bgm]
             ld [an_bgm], a
             call xb_party
             call an_frame
-            ld hl, SH_T + 16
-            ld de, MON_T + 16
-            ld b, 12
-.r:         push bc
-            ld b, 4
-.c:         ld a, [de]
-            ld [hl], a
-            push hl
+            ld d, 0                         ; rows 0-11, columns 16-19 from MON_T / MON_A (the
+.r:         ld e, 16                        ;   top window's cells left while it shows)
+.c:         ld a, d
+            cp 4
+            jr nc, .cp
+            ld a, [bs_topon]
+            and a
+            jr z, .cp
+            ld a, e
+            cp 18
+            jr c, .n
+.cp:        call an_shp                     ; HL = SH_T + 20 row + column
             push de
-            ld bc, SH_A - SH_T
+            ld bc, MON_T - SH_T
+            push hl
             add hl, bc
-            ld a, e                         ; (MON_A - MON_T = 240)
-            add 240
-            ld e, a
-            ld a, d
-            adc 0
-            ld d, a
-            ld a, [de]
-            ld [hl], a
-            pop de
+            ld a, [hl]
+            ld bc, MON_A - MON_T
+            add hl, bc
+            ld c, [hl]
             pop hl
-            inc hl
-            inc de
-            dec b
+            ld [hl], a
+            ld de, SH_A - SH_T
+            add hl, de
+            ld [hl], c
+            pop de
+.n:         inc e
+            ld a, e
+            cp 20
             jr nz, .c
-            ld a, l
-            add 16
-            ld l, a
-            jr nc, .r1
-            inc h
-.r1:        ld a, e
-            add 16
-            ld e, a
-            jr nc, .r2
             inc d
-.r2:        pop bc
-            dec b
+            ld a, d
+            cp 12
             jr nz, .r
             call wait_vbl
             ld a, 1
@@ -1428,50 +1430,46 @@ an_bgoff:   ld a, [an_bgm]
             ld [guard_on], a
             ret
 ; the cells of rows 0-11, columns 16-19 to VRAM (under the guard)
-an_bgw:     ld hl, SH_T + 16
-            ld de, $9800 + 16
-            ld c, 12
-.r:         push hl
-            push de
-            ld b, 4
-.t:         ld a, [hl+]
-            ld [de], a
-            inc e
-            dec b
-            jr nz, .t
-            pop de
-            pop hl
-            push hl
-            push de
+an_bgw:     ld d, 0                         ; (cells through an_mcell: mirrored in a back attack)
+.r:         ld e, 16
+.c:         push de
+            ld a, d                         ; SH_T + 20 row + column
+            add a
+            add a
+            ld l, a
+            add a
+            add a
+            add l
+            add e
+            ld l, a
+            ld h, 0
+            ld bc, SH_T
+            add hl, bc
+            ld a, [hl]
+            ld [an_mt], a
+            ld bc, SH_A - SH_T
+            add hl, bc
+            ld a, [hl]
+            ld [an_ma], a
+            call an_mcell
+            jr z, .n
+            ld a, [an_mt]
+            ld [hl], a
             ld a, 1
             ldh [rVBK], a
-            ld a, l
-            add low(SH_A - SH_T)
-            ld l, a
-            ld a, h
-            adc high(SH_A - SH_T)
-            ld h, a
-            ld b, 4
-.a:         ld a, [hl+]
-            ld [de], a
-            inc e
-            dec b
-            jr nz, .a
+            ld a, [an_ma]
+            xor b
+            ld [hl], a
             xor a
             ldh [rVBK], a
-            pop de
-            pop hl
-            ld a, l
-            add 20
-            ld l, a
-            jr nc, .h
-            inc h
-.h:         ld a, e
-            add 32
-            ld e, a
-            jr nc, .h2
+.n:         pop de
+            inc e
+            ld a, e
+            cp 20
+            jr nz, .c
             inc d
-.h2:        dec c
+            ld a, d
+            cp 12
             jr nz, .r
             ret
 ; ---- the spell's animation by its type ($7E9D, 33/BC2B) after the casting (a monster casts
@@ -3940,7 +3938,10 @@ an_pdraw:   ld a, [an_pdxx]
             ld c, a
             call an_div8
             pop de
-            bit 7, b
+            ld b, a                         ; (mul8 clobbered B: the sign again)
+            ld a, [an_pdy]
+            bit 7, a
+            ld a, b
             jr z, .q
             cpl
             inc a
@@ -4080,6 +4081,8 @@ an_lskip:   ds 1
 an_pfl:     ds 1
 an_pc:      ds 2
 an_pdx:     ds 1
+an_mt:      ds 1
+an_ma:      ds 1
 an_kk:      ds 1
 an_pxo:     ds 4
 an_pyo:     ds 4

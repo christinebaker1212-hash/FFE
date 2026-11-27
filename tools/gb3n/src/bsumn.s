@@ -478,11 +478,23 @@ an_sload:   ld a, [an_sid]
             xor a                           ; Ifrit, Titan: in sprites
             ld [an_smode], a
             ld [an_sbase], a
+            ld [an_sbv], a
+            ld [an_sbd], a
             ld a, [an_sid]
             cp 3
             jr z, .sp
             cp 4
-            jr nz, an_smap
+            jr z, .sp
+            ld b, a                         ; (a back attack: the window cannot be mirrored;
+            ld a, [bs_bk]                   ;   Chocobo, Shiva, Ramuh in sprites, Odin,
+            and a                           ;   Leviathan, Bahamut in the BG cells)
+            jr z, an_smap
+            ld a, b
+            cp 5
+            jr c, .sp
+            ld a, 2
+            ld [an_smode], a
+            ret
 .sp:        ld a, 1
             ld [an_smode], a
             ld a, [an_sw]                   ; entries: its cells that are not empty
@@ -658,7 +670,21 @@ an_wpos:    ld b, a
             ld a, [an_smode]
             and a
             ld a, b
+            jr z, .win
+            ld a, [an_smode]
+            cp 2
+            ld a, b
             jp nz, an_ssdraw
+            sra a                           ; (BG cells: drawn by an_frame, columns - A / 8)
+            sra a
+            sra a
+            cpl
+            inc a
+            ld [an_sbn], a
+            ld a, 1
+            ld [an_sbd], a
+            ret
+.win:
             ld a, [an_sx]
             bit 7, b
             jr nz, .m
@@ -782,7 +808,20 @@ an_s02:     ld a, 9
             jr nz, .f
             ret
 ; the summon's cells 0-8 (rows of 3) to the tiles at HL (FF3's numbers) in the next V-Blank
-an_sq9:     ld de, an_wq + 1
+an_sq9:     ld a, [an_smode]                ; (sprites: their tiles, entries 0-8)
+            and a
+            jr z, .w
+            ld de, oam_buf + 2
+            ld b, 9
+.s:         ld a, [hl+]
+            ld [de], a
+            ld a, e
+            add 4
+            ld e, a
+            dec b
+            jr nz, .s
+            ret
+.w:         ld de, an_wq + 1
             ld c, 0
 .c:         push hl
             ld a, c                         ; window row = an_sr0 + c / 3, column c mod 3
@@ -928,60 +967,57 @@ an_tcells:  ld a, c
             xor a
             ld [guard_on], a
             ret
-.rect:      ld a, [fl_y]
-            ld c, a
+.rect:      ld a, [fl_y]                    ; (cells through an_mcell)
+            ld d, a
             ld a, [fl_h]
-            ld b, a
-.r:         push bc
-            ld l, c                         ; SH_A + 20 y + x, $9800 + 32 y + x
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            ld d, h
-            ld e, l
-            add hl, hl
-            add hl, hl
-            add hl, de
-            ld a, [fl_x]
-            call an_hla
-            ld de, SH_A
-            add hl, de
-            push hl
-            ld l, c
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            ld a, [fl_x]
-            call an_hla
-            ld de, $9800
-            add hl, de
-            ld d, h
-            ld e, l
-            pop hl
+            ld [an_rh], a
+.r:         ld a, [fl_x]
+            ld e, a
             ld a, [fl_w]
-            ld b, a
-            ld a, 1
-            ldh [rVBK], a
-.c:         ld a, [an_tpc]
+            ld [an_rw], a
+.c:         push de
+            ld a, d                         ; SH_A + 20 y + x
+            add a
+            add a
+            ld l, a
+            add a
+            add a
+            add l
+            add e
+            ld l, a
+            ld h, 0
+            ld bc, SH_A
+            add hl, bc
+            ld c, [hl]
+            ld a, [an_tpc]
             cp $FF
-            ld a, [hl+]
-            jr z, .s2
+            jr z, .o
+            ld a, c
             and $F8
             ld c, a
             ld a, [an_tpc]
             or c
-.s2:        ld [de], a
-            inc de
-            dec b
-            jr nz, .c
+            ld c, a
+.o:         push bc
+            call an_mcell
+            ld a, b
+            pop bc
+            jr z, .sk
+            xor c
+            ld c, a
+            ld a, 1
+            ldh [rVBK], a
+            ld [hl], c
             xor a
             ldh [rVBK], a
-            pop bc
-            inc c
-            dec b
+.sk:        pop de
+            inc e
+            ld hl, an_rw
+            dec [hl]
+            jr nz, .c
+            inc d
+            ld hl, an_rh
+            dec [hl]
             jr nz, .r
             ret
 ; BG palette C = FF3's general palette A (black + its 3 colours), written in the next V-Blank
@@ -1378,6 +1414,8 @@ an_sotiles: ld a, [an_sprp]
 an_sgone:   ld a, [an_smode]
             and a
             jr z, .w
+            cp 2
+            jr z, an_sbgoff
             ld hl, oam_buf
             ld a, [an_sbase]
             ld b, a
@@ -1641,7 +1679,7 @@ an_s05:     ld a, 14
             add d
             call an_s58
             add 8
-            ld [an_kx], a
+            ld [an_kxi], a
             ld hl, dd_y
             add hl, bc
             ld a, [hl]
@@ -1661,7 +1699,7 @@ an_s05:     ld a, 14
             jr c, .nx
             ld a, [an_k2]
             ld [hl+], a
-            ld a, [an_kx]
+            ld a, [an_kxi]
             ld [hl+], a
             ld a, [an_t]
             and 1
@@ -1709,19 +1747,19 @@ an_s10:     ld de, $B040
             srl a
             srl a
             add d
-            ld [an_kx], a                   ; ($80)
+            ld [an_kxi], a                   ; ($80)
             xor a
             ld [an_k3], a                   ; ($81)
 .d:         call an_frame
             call an_clr
-            ld a, [an_kx]
+            ld a, [an_kxi]
             ld d, a
             ld a, [an_k3]
             ld e, a
             ld c, 0
             ld hl, $8F97
             call an_slist
-            ld hl, an_kx
+            ld hl, an_kxi
             dec [hl]
             dec [hl]
             ld a, [an_k3]
@@ -1923,7 +1961,7 @@ an_s13:     ld de, $B390
             call an_tcen
             ld a, d
             sub 24
-            ld [an_kx], a
+            ld [an_kxi], a
             ld a, e
             sub 24
             ld [an_ky], a
@@ -1943,7 +1981,7 @@ an_s13:     ld de, $B390
             ld a, $18
             call an_rnd
             ld [an_k5], a
-.d:         ld a, [an_kx]
+.d:         ld a, [an_kxi]
             ld hl, an_k4
             add [hl]
             ld d, a
@@ -1975,7 +2013,7 @@ an_s22:     ld a, $16
             ld a, d
             sub 4
             add 8
-            ld [an_kx], a
+            ld [an_kxi], a
             ld a, [fl_y]
             add a
             add a
@@ -2007,7 +2045,7 @@ an_s22:     ld a, $16
             jr c, .x
             ld a, e
             ld [hl+], a
-            ld a, [an_kx]
+            ld a, [an_kxi]
             ld [hl+], a
             ld a, [an_k5]
             and 1
@@ -2051,6 +2089,7 @@ an_s23:     ld b, 60
             jr nz, .wf
             ld a, $0F
             call an_backc
+            call an_frame                   ; (the black written before the palettes are saved)
             ld de, $B1C0
             call an_l11
             ld a, $BD
@@ -2163,6 +2202,9 @@ an_s17:     ld a, [$DE93]
             ret nz
             call an_w16
             call an_ssnd
+            xor a                           ; (a back attack: Odin's own drawing from here)
+            ld [an_sbv], a
+            ld [an_sbd], a
             ld a, 167                       ; (the window off: Odin in the BG cells)
             ld [an_wxv], a
             call an_frame
@@ -2251,20 +2293,21 @@ an_sbgdraw: call wait_vbl
             ld [guard_on], a
             ld a, $20
             ldh [rSTAT], a
+            ld a, [an_k4]                   ; the new place first, then the previous
+            ld [an_k5], a                   ;   place's cells it does not cover back to
+            xor a                           ;   the battlefield (no flicker)
+            ld [an_k2], a
+            call .cells
             ld a, [an_k4]
             and a
             jr z, .d
-            dec a                           ; the previous place back to the battlefield
+            ld [an_kc], a
+            dec a
             ld [an_k5], a
             ld a, 1
             ld [an_k2], a
             call .cells
-.d:         ld a, [an_k4]
-            ld [an_k5], a
-            xor a
-            ld [an_k2], a
-            call .cells
-            ld a, [an_won]
+.d:         ld a, [an_won]
             and a
             jr z, .s
             ld a, $40
@@ -2274,11 +2317,12 @@ an_sbgdraw: call wait_vbl
             ret
 .cells:     ld c, 0                         ; C = row in the summon
 .r:         ld b, 0
-.k:         ld a, [an_sc0]                  ; screen column = an_sc0 + B - an_k5
+.k:         ld a, [an_sc0]                  ; screen column = an_sc0 + B - an_k5 (signed)
             add b
             ld hl, an_k5
             sub [hl]
-            jr c, .n
+            bit 7, a
+            jr nz, .n
             cp 20
             jr nc, .n
             ld e, a
@@ -2292,7 +2336,11 @@ an_sbgdraw: call wait_vbl
             ld a, [an_sw]                   ; the map byte
             ld e, a
             ld a, c
-            call mul8
+            call mul8                       ; (clobbers B, D)
+            pop de
+            pop bc
+            push bc
+            push de
             ld a, l
             add b
             ld e, a
@@ -2322,30 +2370,62 @@ an_sbgdraw: call wait_vbl
             or $08
             ld [an_bga], a
             jr .w
-.o:         call an_shp                     ; the battlefield's own cell
+.o:         ld a, [an_kc]                   ; (covered by the new place: left)
+            cp $80
+            jr z, .o2
+            push de
+            ld a, [an_sc0]
+            ld b, a
+            ld a, e
+            sub b
+            ld hl, an_kc
+            add [hl]
+            bit 7, a
+            jr nz, .o1
+            ld hl, an_sw
+            cp [hl]
+            jr nc, .o1
+            ld [an_kxi], a
+            pop de
+            pop bc
+            push bc
+            push de
+            ld a, [an_sw]
+            ld e, a
+            ld a, c
+            call mul8
+            ld a, [an_kxi]
+            add l
+            ld e, a
+            ld a, [an_smp]
+            add e
+            ld l, a
+            ld a, [an_smp + 1]
+            adc 0
+            ld h, a
+            call an_sb
+            pop de
+            cp $FF
+            jr nz, .p
+            jr .o2
+.o1:        pop de
+.o2:        call an_shp                     ; the battlefield's own cell
             ld a, [hl]
             ld [an_bgi], a
             ld bc, SH_A - SH_T
             add hl, bc
             ld a, [hl]
             ld [an_bga], a
-.w:         ld l, d                         ; $9800 + 32 row + column
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            ld a, e
-            call an_hla
-            ld a, h
-            add $98
-            ld h, a
+.w:         push de
+            call an_mcell                   ; (mirrored in a back attack)
+            pop de
+            jr z, .p
             ld a, [an_bgi]
             ld [hl], a
             ld a, 1
             ldh [rVBK], a
             ld a, [an_bga]
+            xor b
             ld [hl], a
             xor a
             ldh [rVBK], a
@@ -2597,7 +2677,7 @@ an_s19:     ld b, 60
             cp 160
             jr nc, .nx
             add 8
-            ld [an_kx], a
+            ld [an_kxi], a
             ld a, [an_k2]                   ; y: $20 + 2 i, scaled
             add a
             add $20
@@ -2608,7 +2688,7 @@ an_s19:     ld b, 60
             jr c, .nx
             ld a, [an_ky]
             ld [hl+], a
-            ld a, [an_kx]
+            ld a, [an_kxi]
             ld [hl+], a
             ld a, $49
             ld [hl+], a
@@ -2767,7 +2847,7 @@ an_twave:   ld b, 3
             cp 160
             jr nc, .n
             add 8
-            ld [an_kx], a
+            ld [an_kxi], a
             ld a, e
             call an_s58
             add 16 - 8
@@ -2776,7 +2856,7 @@ an_twave:   ld b, 3
             jr c, .n
             ld a, [an_ky]
             ld [hl+], a
-            ld a, [an_kx]
+            ld a, [an_kxi]
             ld [hl+], a
             ld a, c
             ld [hl+], a
@@ -2826,6 +2906,8 @@ an_bpf:     ds 1
 an_bpq:     ds 9
 an_bgs:     ds 16
 an_bp2:     ds 1
+an_rh:      ds 1
+an_rw:      ds 1
 an_pfr:     ds 1
 an_pspin:   ds 1
 an_px0:     ds 1
@@ -2839,7 +2921,7 @@ an_sl2:     ds 1
 an_sl3:     ds 1
 an_sl4:     ds 1
 an_sbase:   ds 1
-an_smode:   ds 1
+an_smode:   ds 1                            ; (0 the window, 1 sprites, 2 BG cells)
 an_sox:     ds 1
 an_soy:     ds 1
 an_xa:      ds 1
@@ -2865,3 +2947,88 @@ section bank B_SUMN, $6800                  ; (after the 640 tiles)
 sm_lst:     ds $24C                         ; (32/8F8B-91D6: the attacks' sprite lists)
 sm_data:    ds $1C0                         ; (2A/9440: the summons' properties, maps)
 em_data:    ds 5 * $60                      ; (06/8E20: the monsters' Flame / Blizzard / Thunder)
+
+; ---- a summon in the BG cells (a back attack, 2): moved by an_frame after the rows (under the guard)
+section bank B_BANIM, $7B00
+an_sbgmv:   ld a, [c_split]                 ; (not while a raster effect runs)
+            and a
+            ret nz
+            xor a
+            ld [an_sbd], a
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            ld a, [an_sbn]                  ; the new place
+            ld [an_k5], a
+            xor a
+            ld [an_k2], a
+            call an_sbgdraw.cells
+            ld a, [an_sbv]                  ; (the old place's cells it does not cover back)
+            and a
+            jr z, .d
+            ld a, [an_sbn]
+            ld [an_kc], a
+            ld a, [an_sbo]
+            ld hl, an_sbn
+            cp [hl]
+            jr z, .d
+            ld [an_k5], a
+            ld a, 1
+            ld [an_k2], a
+            call an_sbgdraw.cells
+.d:         ld a, [an_sbn]
+            ld [an_sbo], a
+            ld a, 1
+            ld [an_sbv], a
+            jr an_sbgx
+an_sbgoff:  ld a, [an_sbv]                  ; its cells back to the battlefield's
+            and a
+            ret z
+            xor a
+            ld [an_sbv], a
+            ld [an_sbd], a
+            call wait_vbl
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            ld a, $80
+            ld [an_kc], a
+            ld a, [an_sbo]
+            ld [an_k5], a
+            ld a, 1
+            ld [an_k2], a
+            call an_sbgdraw.cells
+an_sbgx:    xor a
+            ldh [rSTAT], a
+            ld [guard_on], a
+            ret
+; (an_frame, before the rows) a row under the summon about to be drawn again: the summon after it
+an_sbgrw:   ld a, [an_sbv]
+            and a
+            ret z
+            ld a, [an_sr0]
+            ld hl, SH_D
+            call an_hla
+            ld a, [an_sh]
+            ld b, a
+.r:         ld a, [hl+]
+            and a
+            jr nz, .y
+            dec b
+            jr nz, .r
+            ret
+.y:         ld a, [an_sbo]
+            ld [an_sbn], a
+            ld a, 1
+            ld [an_sbd], a
+            ret
+
+section wram, $C5DA
+an_sbv:     ds 1                            ; (a summon in the BG cells: drawn; the offset drawn,
+an_sbo:     ds 1                            ;   the next; to draw)
+an_sbn:     ds 1
+an_sbd:     ds 1
+an_kc:      ds 1                            ; (a restore: the covering place, $80 none)
+an_kxi:     ds 1

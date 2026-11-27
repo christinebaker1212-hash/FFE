@@ -469,7 +469,7 @@ def main():
            open(os.path.join(HERE, 'src', 'wspr.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sa.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'mini.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'banim.s')).read() + '\n' + open(os.path.join(HERE, 'src', 'bsumn.s')).read() + '\n' + open(os.path.join(HERE, 'src', 'batfx.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'banim.s')).read() + '\n' + open(os.path.join(HERE, 'src', 'bsumn.s')).read() + '\n' + open(os.path.join(HERE, 'src', 'batfx.s')).read() + '\n' + open(os.path.join(HERE, 'src', 'batbk.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + sound_data() + own_data())
     if os.environ.get('GB3N_BATTLE'):            # test builds only: every encounter is this battle
         src = src.replace('            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a',
@@ -526,6 +526,10 @@ ev_fxtest:  call ev_shake
         src = src.replace('an_kind:    ld a, [$DEC2]', 'an_kind:    ld a, %s\n            ld [$DE88], a\n            ld a, [$DEC2]\n            cp 4\n            jr nz, .ak\n%s            ld a, %s\n            ret\n.ak:        ld a, [$DEC2]' % (os.environ['GB3N_ANTEST'], extra, os.environ.get('GB3N_ANKIND', '1')))
     if os.environ.get('GB3N_BATHI'):             # test builds only: the battle index + $100 (event battles)
         src = src.replace('.w0:        ld [$DCEE], a', '.w0:        ld a, 1\n            ld [$DCEE], a')
+    if os.environ.get('GB3N_BACKTEST'):          # test builds only: every battle a back attack
+        a = '            ld [$D8BA], a\n            ld a, [$DED8]\n'
+        assert src.count(a) == 1
+        src = src.replace(a, '            ld [$D8BA], a\n            jp .back\n            ld a, [$DED8]\n')
     if os.environ.get('GB3N_WIPETEST'):          # test builds only: the death wipe on slot 0 at the start
         src = src.replace('            call bs_bossin2\n', '            call bs_bossin2\n            ld b, 60\n.wtw:       push bc\n            call bs_frame\n            pop bc\n            dec b\n            jr nz, .wtw\n            ld a, $80\n            call bs_mwipe\n')
     if os.environ.get('GB3N_ANWPN'):             # test builds only: the right hand's weapon animation
@@ -544,6 +548,9 @@ ev_fxtest:  call ev_shake
     secs = sorted(set((a, b) for a, b, _ in asm_sm83.RAM_SECTIONS if b > a))   # (RAM sections may
     for (a0, a1), (b0, b1) in zip(secs, secs[1:]):                        #   not overlap)
         assert a1 <= b0, 'RAM sections overlap: %04X-%04X and %04X-%04X' % (a0, a1, b0, b1)
+    if os.environ.get('GB3N_RAMMAP'):            # the RAM sections (and the gaps between them)
+        for (a0, a1), nx in zip(secs, secs[1:] + [(0xE000, 0xE000)]):
+            print('ram %04X-%04X%s' % (a0, a1, '  gap %d' % (nx[0] - a1) if nx[0] > a1 else ''))
     for a0, a1 in secs:                                                     # ($CF00-$CFFF: the stack)
         assert a1 <= 0xCF00 or a0 >= 0xD000, 'RAM section %04X-%04X in the stack' % (a0, a1)
     banks = dict(r.banks)

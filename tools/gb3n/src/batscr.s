@@ -26,6 +26,12 @@ bs_battle:  call wait_vbl
             ld a, $20
             ldh [rSTAT], a
             call bs_setup
+            ld a, [$D8C3]                   ; (a back attack: everything mirrored)
+            cp $88
+            ld a, 0
+            jr nz, .bk
+            inc a
+.bk:        ld [bs_bk], a
             xor a
             ldh [snd_isr], a
             ldh [rSTAT], a
@@ -33,8 +39,10 @@ bs_battle:  call wait_vbl
             xor a                           ; no scroll in a battle
             ldh [rSCX], a
             ldh [rSCY], a
-            xor a                           ; (no top window yet)
+            xor a                           ; (no top window yet, no summon in the BG cells)
             ld [bs_topon], a
+            ld [an_sbv], a
+            ld [an_sbd], a
             call bs_vall
             call bs_bossin                  ; (a boss: its tiles blank, then its entry: 2F/B486)
             call bs_palette
@@ -1322,15 +1330,22 @@ bs_topoff:  ld hl, MON_T
             ret
 
 ; ---- a frame: wait for V-Blank, copy dirty rows (4 at most), sprites, sound, the pad
-bs_frame:   call wait_vbl
+bs_frame:   call bs_opre                    ; (a back attack: the sprites mirrored)
+            call wait_vbl
             call bs_vrows
             call hram_dma
+            call bs_opre
             call snd_frame
             call read_pad
             ret
 bs_vrows:   ld c, 0                         ; row
-            ld b, 2                         ; rows this frame (V-Blank: two fit)
-.r:         ld a, c
+            ld b, 2                         ; rows this frame (V-Blank: two fit; none
+.r:         ldh a, [rLY]                    ;   from line 150, so a row ends inside it)
+            cp 150
+            ret nc
+            cp 144
+            ret c
+            ld a, c
             ld hl, SH_D
             call bs_hl_a
             ld a, [hl]
@@ -1347,7 +1362,13 @@ bs_vrows:   ld c, 0                         ; row
             cp 18
             jr nz, .r
             ret
-bs_vrow:    ld l, c                         ; SH_T + 20 C -> $9800 + 32 C
+bs_vrow:    ld a, [bs_bk]                   ; (a back attack: the battlefield's rows mirrored)
+            and a
+            jr z, .nm
+            ld a, c
+            cp 12
+            jp c, bs_vrowm
+.nm:        ld l, c                         ; SH_T + 20 C -> $9800 + 32 C
             ld h, 0
             add hl, hl
             add hl, hl
@@ -1650,7 +1671,10 @@ bs_flash:   ld [fl_s], a
             jr .st
 .go:        xor a
             ld [fl_f], a
-.l:         call wait_vbl
+.l:         call bs_opre
+            call wait_vbl
+            call hram_dma
+            call bs_opre
             ld a, 1
             ld [guard_on], a
             ld a, $20
@@ -1659,7 +1683,6 @@ bs_flash:   ld [fl_s], a
             xor a
             ldh [rSTAT], a
             ld [guard_on], a
-            call hram_dma
             call snd_frame
             call read_pad
             ld hl, fl_f
@@ -1677,65 +1700,63 @@ bs_flash:   ld [fl_s], a
             ldh [rSTAT], a
             ld [guard_on], a
             ret
-.rect:      ld a, 1
-            ldh [rVBK], a
-            ld a, [fl_y]
-            ld c, a
+.rect:      ld a, [fl_y]                    ; (cells through bs_mcell: a back attack mirrored)
+            ld [bs_rr], a
             ld a, [fl_h]
-            ld b, a
-.r:         push bc
-            ld l, c                         ; SH_A + 20 y + x, $9800 + 32 y + x
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            ld d, h
-            ld e, l
-            add hl, hl
-            add hl, hl
-            add hl, de
-            ld a, [fl_x]
-            call bs_hl_a
-            ld de, SH_A
-            add hl, de
-            push hl
-            ld l, c
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            ld a, [fl_x]
-            add l
+            ld [bs_rh], a
+.r:         ld a, [fl_x]
+            ld [bs_rc], a
+            ld a, [fl_w]
+            ld [bs_rw], a
+.c:         ld a, [bs_rr]                   ; SH_A + 20 y + x
             ld l, a
-            ld de, $9800
+            add a
+            add a
+            ld e, a
+            add a
+            add a
+            add e
+            ld e, a
+            ld a, [bs_rc]
+            add e
+            ld e, a
+            ld d, 0
+            ld hl, SH_A
             add hl, de
-            ld d, h
-            ld e, l
-            pop hl
+            ld c, [hl]
             ld a, [fl_f]                    ; odd frames: palette 7, else the monster's
             and 1
-            ld a, 7
-            jr nz, .p
-            xor a
-.p:         ld c, a
-            ld a, [fl_w]
-            ld b, a
-.c:         ld a, [hl+]
-            bit 0, c
-            jr z, .s
+            jr z, .p
+            ld a, c
             and $F8
-            or c
-.s:         ld [de], a
-            inc de
-            dec b
-            jr nz, .c
+            or 7
+            ld c, a
+.p:         ld a, [bs_rr]
+            ld d, a
+            ld a, [bs_rc]
+            ld e, a
+            push bc
+            call bs_mcell
+            ld a, b
             pop bc
-            inc c
-            dec b
-            jr nz, .r
+            jr z, .s
+            xor c
+            ld c, a
+            ld a, 1
+            ldh [rVBK], a
+            ld [hl], c
             xor a
             ldh [rVBK], a
+.s:         ld hl, bs_rc
+            inc [hl]
+            ld hl, bs_rw
+            dec [hl]
+            jr nz, .c
+            ld hl, bs_rr
+            inc [hl]
+            ld hl, bs_rh
+            dec [hl]
+            jr nz, .r
             ret
 ; the slot fl_s's cells in the monster area (fl_x, fl_y, fl_w, fl_h; the top window's rows 0-3
 ; left out while it shows); C: none

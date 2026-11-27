@@ -429,12 +429,13 @@ bs_wrect:   ld a, [fl_w]
             call bs_wedge
             jr .nx
 .blank:     call bs_wcell
+            jr z, .nx
             ld a, BLANK_T
             ld [hl], a
             ld a, 1
             ldh [rVBK], a
+            ld [hl], b
             xor a
-            ld [hl], a
             ldh [rVBK], a
 .nx:        ld hl, bs_wc
             inc [hl]
@@ -448,26 +449,15 @@ bs_wrect:   ld a, [fl_w]
             jr nz, .r
             ret
 ; HL = the cell's VRAM map address ($9800 + 32 (fl_y + r) + fl_x + c)
-bs_wcell:   ld a, [fl_y]
+bs_wcell:   ld a, [fl_y]                    ; (Z: not shown; B: the x-flip toggle)
             ld hl, bs_wr
             add [hl]
-            ld l, a
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
+            ld d, a
             ld a, [fl_x]
-            ld de, bs_wc
-            push hl
             ld hl, bs_wc
             add [hl]
-            pop hl
-            call bs_hl_a
-            ld de, $9800
-            add hl, de
-            ret
+            ld e, a
+            jp bs_mcell
 ; the edge cell: its tile from the monster area (MON_T / MON_A), masked rows (row y: d - y pixels
 ; from the left wiped), into a slot of VRAM bank 1, the cell pointed at it
 bs_wedge:   ld a, [bs_wk]
@@ -596,17 +586,21 @@ bs_wedge:   ld a, [bs_wk]
             xor a
             ldh [rVBK], a
             call bs_wcell
+            jr z, .hid
             ld a, [bs_wsl]
             ld [hl], a
             ld a, 1
             ldh [rVBK], a
             ld a, [bs_wat]
             or $08
+            xor b
             ld [hl], a
             xor a
             ldh [rVBK], a
             ld hl, bs_wk
             inc [hl]
+.hid:       xor a
+            ldh [rVBK], a
             ret
 
 section wram, $D9A8
