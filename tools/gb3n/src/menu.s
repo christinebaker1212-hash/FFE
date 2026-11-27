@@ -2272,8 +2272,15 @@ i_use:      ld a, [m_icur]
             call m_warpq
             ret c
             jp i_one
-.noh:       cp $A6                          ; Potion .. Antidote ($A6-$AF) are used; the
-            jp c, i_cant                     ;   Midgard Bread ($A4: the minimap) later
+.noh:       cp $A4                          ; the Midgard Bread (3D/A006): on the world map,
+            jr nz, .nmb                     ;   one used, the minimap
+            ld a, [wmode]
+            and a
+            jp z, i_cant
+            call i_one
+            jp m_mini
+.nmb:       cp $A6                          ; Potion .. Antidote ($A6-$AF) are used
+            jp c, i_cant
             cp $B0
             jp nc, i_cant
             sub $A6                         ; the question (t8200 $5B + n)
@@ -6095,4 +6102,10 @@ f_id:       ds 1
 f_row:      ds 1
 
 section bank B_MENU, $7200
-m_mini:     jp m_sfx_err                    ; (the minimap: being written)
+; the minimap (src/mini.s), then this screen again (its tiles, attributes, palettes)
+m_mini:     %FAR B_MINI, mm_show
+            xor a
+            ld [m_pal], a
+            ld a, 1
+            ld [m_dirty], a
+            jp m_show

@@ -126,6 +126,7 @@ B_MENU = 76                 # the main menu's code
 B_VGFX = 77                 # world map vehicles' graphics (NES 0B)
 B_CUT, B_CUTG = 79, 80      # cutscenes: NES bank $1F + the code; their graphics / texts
 B_WSPR = 81                 # world-map sprites: FF3's tiles $80-$FF, bank $3C's lists, the code
+B_MINI = 82                 # the minimap: its screen data (tools/gb3n/minimap.py) and code
 
 
 def field_banks(rom):
@@ -409,7 +410,7 @@ def main():
            'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
            'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\nB_BSET = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2, B_BSET) +
            'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\nB_MENU = %d\nB_VGFX = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0, B_MENU, B_VGFX) + text_defs +
-           'B_CUT = %d\nB_CUTG = %d\nB_WSPR = %d\n' % (B_CUT, B_CUTG, B_WSPR) + cut_eq +
+           'B_CUT = %d\nB_CUTG = %d\nB_WSPR = %d\nB_MINI = %d\n' % (B_CUT, B_CUTG, B_WSPR, B_MINI) + cut_eq +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
@@ -427,6 +428,7 @@ def main():
            open(os.path.join(HERE, 'src', 'cutend.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'wspr.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sa.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'mini.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + sound_data() + own_data())
     if os.environ.get('GB3N_BATTLE'):            # test builds only: every encounter is this battle
         src = src.replace('            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a',
@@ -437,6 +439,9 @@ def main():
         if st == 'ipick':
             ev = 'ev_iptest'
             src += 'section bank B_FIELD, $7980\nev_iptest:  %FAR B_MENU, m_ipick\n            jp map_reload\n'
+        if st == 'mini':                         # (GB3N_STORY=mini: the minimap on Start)
+            ev = 'ev_mmtest'
+            src += 'section bank B_FIELD, $7980\nev_mmtest:  %FAR B_MINI, mm_show\n            jp map_reload\n'
         if st == 'fat':                          # (GB3N_STORY=fat: the Fat Chocobo on Start)
             ev = 'ev_fattest'
             src += 'section bank B_FIELD, $7980\nev_fattest: ld a, $FC\n            ld [ev_who], a\n            %FAR B_MENU, m_shop\n            jp map_reload\n'
@@ -511,6 +516,11 @@ ev_fxtest:  call ev_shake
         wb[0x800 * k:0x800 * k + 0x800] = b''.join(tiles.gb(t[16 * i:16 * i + 16]) for i in range(128))
     wb[0x1800:0x1D00] = rd(0x3C, 0x8300, 0x500)                       # bank $3C's sprite lists
     banks[B_WSPR] = wb
+    import minimap                               # the minimap's screen data
+    mb = bytearray(banks.get(B_MINI, b'')) + bytearray(0x4000 - len(banks.get(B_MINI, b'')))
+    assert not any(r.claimed.get((B_MINI, o)) for o in range(0x2000))
+    mb[0:0x2000] = minimap.gb_bank(rom)
+    banks[B_MINI] = mb
     for k, v in tbanks.items():
         assert k not in banks, 'bank %d used twice' % k
         banks[k] = v
