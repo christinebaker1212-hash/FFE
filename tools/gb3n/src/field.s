@@ -246,7 +246,8 @@ map_enter:  call char_update                ; the walking member's set / palette
             jr nz, .fc
             ld a, DIR_D
             ld [facing], a
-.fc:        call cam_set
+.fc:        call p_here                     ; the party's priority (3F/E884)
+            call cam_set
             ld c, 0                         ; the 16 rows of the ring, a row at a time
 .row:       push bc
             ld a, [cam_y]
@@ -599,7 +600,12 @@ field_step: call npc_update
             jr .done
 .na:        ldh a, [pad_new]
             and PAD_A
+            jr nz, .aa
+            ld a, [v_again]                 ; (A again: waiting for the guest)
+            and a
             jr z, .pd
+.aa:        xor a
+            ld [v_again], a
             ld a, [wmode]                   ; (the world map: the vehicles' A, 3E/C2B7)
             and a
             jr z, .tk
@@ -639,6 +645,9 @@ field_step: call npc_update
             push af
             call fx_walkf
             pop af
+            cp 9                            ; halfway: the party's priority by the cell
+            call z, p_half                  ;   entered (3F/E20C, 3E/C13A)
+            ld a, [step]
             cp 17
             jr nz, .done
             xor a
@@ -1056,7 +1065,12 @@ party_oam:  ld a, [ev_hide]                 ; (hidden by event $C9: 3E/D8D3)
             jr z, .nv
             ld a, [veh]
             and a
-            jp nz, v_oam
+            jr z, .nv
+            call v_oam
+            ld a, [veh]                     ; (the chocobo: its priority as on foot, 3E/D95E)
+            dec a
+            ret nz
+            jp p_prio
 .nv:
             ld a, [step]                    ; the pose: facing, and the second frame from
             and a                           ;   pixel 8 of a step (FF3: fine scroll & 8)
@@ -1109,6 +1123,8 @@ party_oam:  ld a, [ev_hide]                 ; (hidden by event $C9: 3E/D8D3)
             ld a, e
             add 8
             ld e, a
+            call .spr                       ; DR
+            jp p_prio
 .spr:       ld a, e                         ; one 8 x 8 part: y, x, tile, attributes
             ld [bc], a
             inc c
@@ -1193,8 +1209,69 @@ win_nes:    ds 4
 trig_cnt:   ds 32
 type_cnt:   ds 8
 map_stack:  ds 3 * MAP_DEPTH
+p_43:       ds 1                            ; FF3's $43: the party's priority
 section wram, $C300
 line_buf:   ds 7 * 16
 
 section wram, $DF80
 poses:      ds 64                            ; (work RAM bank 1)
+
+section bank B_FIELD, $7D70
+; the party's priority (3E/D9A7): FF3's $43 & $24 puts its lower half behind the BG, & $14 its
+; upper half (OAM 0-3: UL, DL, UR, DR)
+p_prio:     ld a, [p_43]
+            ld b, a
+            and $24
+            jr z, .u
+            ld hl, oam_buf + 4 + 3
+            ld a, [hl]
+            xor $80
+            ld [hl], a
+            ld l, 12 + 3
+            ld a, [hl]
+            xor $80
+            ld [hl], a
+.u:         ld a, b
+            and $14
+            ret z
+            ld hl, oam_buf + 3
+            ld a, [hl]
+            xor $80
+            ld [hl], a
+            ld l, 8 + 3
+            ld a, [hl]
+            xor $80
+            ld [hl], a
+            ret
+; ... from the cell the party stands on (3F/E884: a map's start; 3E/C10B: the world map's)
+p_here:     ld a, [pos_x]
+            ld d, a
+            ld a, [pos_y]
+            ld e, a
+            jr p_cell
+; ... from the cell being entered, halfway (3F/E900; the world map 3E/C13A: on foot or chocobo)
+p_half:     call dest_cell
+p_cell:     call map_mt
+            ld l, a
+            ld h, W_PROP1
+            ld b, [hl]
+            ld a, [wmode]
+            and a
+            jr z, .m
+            ld a, [veh]
+            cp 2
+            ret nc
+            ld a, b
+            and $20
+            jr .s
+.m:         bit 2, b                        ; (a bridge from above: all in front)
+            jr z, .b
+            ld a, [z_lev]
+            rra
+            ld a, 0
+            jr c, .s
+.b:         ld a, b
+            and $34
+.s:         ld [p_43], a
+            ret
+

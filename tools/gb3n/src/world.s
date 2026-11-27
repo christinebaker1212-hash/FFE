@@ -99,6 +99,7 @@ world_enter:
             ld [z_lev], a
             ld [trig], a
             ld [dlg_on], a
+            call p_here                     ; (3E/C10B: the party's priority)
             call cam_set
             ld c, 0                         ; the 16 rows of the ring
 .row:       push bc

@@ -145,7 +145,8 @@ v_board:    ld a, [veh]
 .canoe:     ld a, [w_p1]
             rra
             jr c, .cs
-            xor a                           ; onto land
+            call gu_off                     ; onto land
+            xor a
             jr v_set
 .cs:        call v_shipok
             ret c
@@ -160,7 +161,29 @@ v_board:    ld a, [veh]
             rra
             ret c
             call v_park
+            call gu_off
             xor a
+; off a canoe / ship onto land (3E/C5C1): the guest at the party, the party waiting for it
+gu_off:     ld a, [SRAM_PAGE + $0B]
+            and a
+            ret z
+            call gu_init
+            ld a, 1
+            ld [gu_wait], a
+            ret
+; is the guest still to come (3E/C379)? gu_wait set if its trail is not empty
+gu_chk:     ld a, [gu_wait]
+            and a
+            ret nz
+            ld a, [SRAM_PAGE + $0B]
+            and a
+            ret z
+            ld a, [gu_stack]
+            and a
+            ret z
+            ld a, 1
+            ld [gu_wait], a
+            ret
 ; the vehicle A from now; the world map's song for it (3E/C93A)
 v_set:      ld [veh], a
             call map_song
@@ -271,7 +294,18 @@ v_abtn:     ld a, [veh]
             ld a, 6
             jr .board
 .inv:       jp v_inv
-.board:     push af
+.board:     ld b, a                         ; (3E/C34F: the guest still walking up: A again
+            call gu_chk                     ;   next frame until it is here)
+            ld a, [gu_wait]
+            and a
+            jr z, .bd
+            ld a, 1
+            ld [v_again], a
+            ld hl, gu_wait
+            inc [hl]
+            ret
+.bd:        ld a, b
+            push af
             ld a, $2D
             call sfx_play
             pop af
@@ -406,6 +440,8 @@ v_land:     ld a, [pos_x]
             ld a, $53
 .sf:        call sfx_play
             %FAR B_WSPR, va_lnd             ; (3E/D710, landing)
+            xor a                           ; (3E/C847: the party in front)
+            ld [p_43], a
             ld a, [veh]
             cp 4
             ld a, 3
@@ -797,6 +833,9 @@ v_select:   ld a, [veh]
 
 section wram, $DFC0
 vposes:     ds 64                           ; (work RAM bank 1)
+
+section wram, $C2D8
+v_again:    ds 1                            ; FF3's $24 set: A again next frame
 
 section wram, $C2E0
 vtab:       ds 24
