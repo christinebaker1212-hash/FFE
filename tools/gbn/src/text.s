@@ -122,7 +122,7 @@ dlg_open:   ld l, a                         ; table entry: 3 x id
             ld [dlg_ptr], a
             ld a, [hl]
             ld [dlg_ptr + 1], a
-            call dlg_page
+dlg_open2:  call dlg_page                   ; (dlg_bank / dlg_ptr set: the post-game's text, pg.s)
             ld a, 1
             ld [box_on], a
             xor a                           ; (a banner showing: gone, the box's cut again)

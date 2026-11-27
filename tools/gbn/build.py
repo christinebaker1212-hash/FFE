@@ -96,12 +96,14 @@ def magic_defs(rom):
     return '\n'.join(out) + '\n'
 
 
-def pg_defs():
+def pg_defs(rom):
     import postgame
     import pgbattle
-    return ('PGM_MAP0 = %d\nPGM_END = %d\n' % (postgame.PG_MAP0, postgame.PG_END) +
-            'PGB_DATA = %d\nPGB_CHR = %d\nPGB_SIL = %d\n' % (pgbattle.PGB_DATA, pgbattle.PGB_CHR, pgbattle.PGB_SIL) +
-            postgame.pg_source(116))
+    return ('PGM_MAP0 = %d\nPGM_END = %d\nPG_STPAL = %d\n' % (postgame.PG_MAP0, postgame.PG_END,
+                                                            postgame.statue(rom)[2]) +
+            'PGB_DATA = %d\nPGB_CHR = %d\nPGB_SIL = %d\nPGB_SGB = %d\n' % (pgbattle.PGB_DATA, pgbattle.PGB_CHR,
+                                                                   pgbattle.PGB_SIL, pgbattle.PGB_SGB) +
+            postgame.pg_source(116) + postgame.text_source() + postgame.items_source())
 
 
 def snd_tables(rom):
@@ -190,6 +192,9 @@ def town_refl_base(p):
 
 def data_banks(rom, ff3=None, init=None):
     banks = {}
+    import postgame
+    postgame.overworld_patch()                       # (the shrines' doors: before the overworld)
+    postgame.names_patch()                           # (its items' names, prices, armour)
     data.FONT_CODES = text.field_codes()
     data.TALL = data.tall_maps(rom)
     c = data.common_pack(rom)
@@ -214,6 +219,8 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, COMMON, 0x5D00, weapon_slots(rom))           # weapon slots (16), armour (16)
     nb = names.names_bank(rom, ff3)
     nb[0x3000:0x3200] = rom.rd(0x0D, 0xBC00, 0x200)            # item prices (FF1 lut_ItemPrices)
+    for code, pr in names.PRICE.items():                       # (the post-game's items)
+        nb[0x3000 + 2 * code:0x3002 + 2 * code] = pr.to_bytes(2, 'little')
     nb[0x3200:0x3300] = rom.rd(0x00, 0xB100, 0x100)            # chest contents (lut_Treasure)
     banks[names.NAMES_BANK] = nb
     banks[ui.MTEXT_BANK] = bytearray(ui.mtext_bank(rom))
@@ -355,6 +362,14 @@ def pg_banks(rom, banks):
         place(banks, b, 0x5800, p['dmg_tiles'])
         banks[battle.BTL_DATA][0x0A00 + m + 1] = 0           # (B_RATES: map + 1)
         PG_INFO[m] = f
+    st_cgb, st_dmg, st_pal = postgame.statue(rom)     # the statue before the sealed door: its tiles
+    place(banks, OW_INFO, 0x7A00, st_cgb)             #   after the vehicles' (veh_tiles: 112)
+    place(banks, OW_INFO, 0x7000, st_dmg)
+    PG_INFO['st_pal'] = st_pal
+    c = banks[COMMON]                                # the shrine's entrance: FF1's entrance tables
+    c[0x02E0 + postgame.PG_ENT] = fl[0][1]['start'][0]   #   (C_ENTRX, C_ENTRY, C_ENTRM)
+    c[0x0300 + postgame.PG_ENT] = fl[0][1]['start'][1]
+    c[0x0320 + postgame.PG_ENT] = fl[0][0]
     import pgbattle                                  # the battles: their own banks (pgbattle.py)
     bs = pgbattle.build(rom)
     for b, blob in bs['banks'].items():
@@ -915,7 +930,7 @@ def main():
            open(os.path.join(HERE, 'src', 'extras.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'packs.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'pgen.s')).read() + '\n' + ui.pg_source() +
-           pg_defs() + open(os.path.join(HERE, 'src', 'pg.s')).read() + '\n' +
+           pg_defs(rom) + open(os.path.join(HERE, 'src', 'pg.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
            'section bank 104, $6000\n' +              # (the small font's glyphs: bank BTL6)

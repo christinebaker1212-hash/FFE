@@ -2,7 +2,8 @@
 
 Owner's request (2026-11-27): add Dawn of Souls' bonus dungeons to the FF1 native build, keeping
 the Dawn of Souls names, their places on the world map and the dungeons' actual design, adapted to
-the NES look. Status: **proposal, waiting for the owner's decisions (section 9)**. Nothing is built.
+the NES look. Status: **Earthgift Shrine built (section 11)**; Hellfire Chasm, Lifespring Grotto and
+Whisperwind Cove next.
 
 Sources: the FINAL FANTASY wiki (finalfantasy.fandom.com, read through its public API on
 2026-11-27): the pages "Soul of Chaos (Final Fantasy)", "Earthgift Shrine", "Hellfire Chasm",
@@ -215,3 +216,22 @@ Engine work (native build), in order:
 8. Checks: every floor in SameBoy on Color / DMG / SGB, strict checker 0, lag 0.
 Earthgift Shrine first, complete (6 floors, 7 monsters, 4 bosses), then Hellfire, Lifespring,
 Whisperwind.
+
+## 11. Earthgift Shrine: built (2026-11-27)
+
+What the native build has (details: docs/ff1-native.md item 70):
+- the door at (132, 141), sealed until Lich falls (Dawn of Souls' words at it), the entrance floor;
+- a run: B1-B4 its four floors in a random order (Altar Cave 1 and 2, the forest maze, the looping desert with
+  its palm trees pointing to the oasis stairs), B5 the boss floor; chests with each depth's treasure, shuffled;
+- B5: the four bosses (Echidna, Cerberus, Ahriman, the Two-Headed Dragon) at orbs behind FF1-style doors, their
+  words, one per run, beaten ones remembered; out to the world map after the boss; a lost battle anywhere
+  inside throws the party back to the world map;
+- the seven monsters (FF1 families in Dawn of Souls' colours), the bosses from the GBA pictures, encounters and
+  rates from the wiki's tables;
+- Earthgift's treasure as new items: Hi-Potion, Remedy, Ether, Megalixir, Silver Apple, Red / White / Vampire
+  Fang, Spider's Silk, White / Blue Curtain, Speed / Protect Drink; Kenpogi, Black Cowl, Elven Cloak.
+
+Not yet: the statue in front of the sealed door (the door and its words show the sealed state), the forest's
+NPCs that start fixed battles (the event scripts are not decoded), the Megalixir after Ahriman (B5's fixed
+chest: the chip is found, its place in B5 needs the event data), item descriptions on the target screen for the
+new items (they show the Potion's line).

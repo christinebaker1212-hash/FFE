@@ -12,8 +12,8 @@ GF_EVENT   = $02
 
 section bank 0, $2000
 ; HL = slot -> A = the dialogue to print (and the routine's effects)
-talk_obj:   ld a, l
-            ld [talk_slot], a
+talk_obj:   call pg_tkchk                   ; (talk_slot = L; the post-game's orbs: pg.s)
+            nop
             ld a, [hl]                      ; object id
             ld [talk_id], a
             ld l, a                         ; talk data -> talk_d (4 bytes)
@@ -557,7 +557,7 @@ talk_after: ld a, [pend_telef]
             xor a
             ld [pend_btlf], a
             ld a, [pend_btl]
-            call do_battle
+            call pg_dobtl                   ; (do_battle; the post-game's bosses: pg.s)
             and a
             ret
 
