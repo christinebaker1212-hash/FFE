@@ -196,6 +196,9 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             call sbank
             call sram_init                  ; (first steps: a new game's state, a test map)
             call win_init                   ; the dialogue box in the window map
+            xor a
+            ldh [snd_isr], a
+            call snd_init
             ld a, B_FIELD                   ; the field's code bank stays mapped
             call sbank
             ld a, START_WORLD
@@ -214,6 +217,7 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             inc a
             ld [wmode], a
 .nw:        call map_enter
+            call map_song
             call pal_apply
             ld a, LCDC_ON
             ldh [rLCDC], a
@@ -224,6 +228,7 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             ei
 main_loop:  call wait_vbl
             call field_vbl
+            call snd_frame
             call read_pad
             call field_step
             jr main_loop
@@ -250,6 +255,31 @@ show_screen: ld de, $9800
 vblank:     push af
             ld a, 1
             ldh [vbl_done], a
+            ldh a, [snd_isr]                ; (during loads the sound runs here; else in the
+            and a                           ;   main loop after the frame's V-Blank work)
+            jr nz, .snd
+            pop af
+            reti
+.snd:       xor a
+            ldh [snd_isr], a                ; (not twice at once)
+            push bc
+            push de
+            push hl
+            ei
+            call snd_frame
+            di
+            ld a, [guard_on]                ; a guarded load goes on in H-Blank or V-Blank only
+            and a
+            jr z, .r
+.g:         ldh a, [rSTAT]
+            and 3
+            cp 2
+            jr nc, .g
+.r:         ld a, 1
+            ldh [snd_isr], a
+            pop hl
+            pop de
+            pop bc
             pop af
             reti
 
@@ -369,8 +399,12 @@ map_change: call wait_vbl
             ld [guard_on], a
             ld a, $20                       ; STAT: the mode-2 interrupt
             ldh [rSTAT], a
+            ld a, 1                         ; the sound from V-Blank meanwhile
+            ldh [snd_isr], a
             call map_enter
+            call map_song
             xor a
+            ldh [snd_isr], a
             ldh [rSTAT], a
             ld [guard_on], a
             call wait_vbl
@@ -382,9 +416,11 @@ far_copy:   push af                         ; A = bank: BC bytes HL -> DE
             ldh a, [rombank]
             ld [fc_save], a
             pop af
+            ldh [mapbank], a                ; (mapbank first: an interrupt maps it again)
             ld [MBC5_BANKL], a
             call memcpy
             ld a, [fc_save]
+            ldh [mapbank], a
             ld [MBC5_BANKL], a
             ret
 far_byte:   push bc                         ; A = bank: A = [HL]
@@ -392,14 +428,17 @@ far_byte:   push bc                         ; A = bank: A = [HL]
             ldh a, [rombank]
             ld c, a
             ld a, b
+            ldh [mapbank], a
             ld [MBC5_BANKL], a
             ld b, [hl]
             ld a, c
+            ldh [mapbank], a
             ld [MBC5_BANKL], a
             ld a, b
             pop bc
             ret
 sbank:      ldh [rombank], a
+            ldh [mapbank], a
             ld [MBC5_BANKL], a
             ret
 
@@ -431,6 +470,8 @@ memcpy:     ld a, [hl+]                     ; HL -> DE, BC bytes
 section hram, $FF80
 hram_dma:   ds 10
 rombank:    ds 1
+mapbank:    ds 1                            ; the bank mapped now (interrupts map it back)
+snd_isr:    ds 1
 is_gba:     ds 1
 soft_rst:   ds 1
 vbl_done:   ds 1

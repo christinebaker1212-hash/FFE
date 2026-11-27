@@ -55,9 +55,10 @@ TR_PREV    = $40            ; pending triggers (FF3's $AB)
 TR_ENTER   = $80
 TR_WORLD   = $C0
 TR_WENT    = $A0              ; a world map entrance (after the step)
-SCRATCH    = $DA00            ; work RAM bank 1: data staged from ROM banks (1 KB: the longest
-                            ;   tilemap stream is 728 bytes); bank 1 map: $D000 save page, $D400 /
-                            ;   $D500 people, $D600 text, $DA00 scratch, $DE00 poses, $DF00 palettes
+SCRATCH    = $DA00            ; work RAM bank 1: data staged from ROM banks (768 bytes: the longest
+                            ;   tilemap stream is 728); bank 1 map: $D000 save page, $D400 / $D500
+                            ;   people, $D600 text, $DA00 scratch, $DD00 music, $DE00 people poses,
+                            ;   $DF00 palettes, $DF80 player poses
 MAP_DEPTH  = 8              ; entrances within entrances (FF3 recurses on its stack)
 
 section bank B_FIELD, $4000
@@ -336,9 +337,9 @@ map_unpack: ld a, [tm_src + 1]               ; (the stream into SCRATCH: up to 1
             ld b, a
             inc bc                          ; BC = $8000 - HL
             ld a, b
-            cp 4
+            cp 3
             jr c, .sz
-            ld bc, $400
+            ld bc, $300
 .sz:        ld de, SCRATCH
             ld a, [tm_src]
             call far_copy

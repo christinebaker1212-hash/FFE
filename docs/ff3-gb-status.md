@@ -124,6 +124,25 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
 - Build checks: RAM sections may not overlap (found and fixed three); GB3N_GAPS=bank lists free
   space.
 
+## Sound (2026-11-27)
+- FF3's sound driver written natively (`tools/gb3n/src/sound.s`, bank 0): channel scripts, all
+  commands, repeats / voltas, volume envelopes (attack / decay / release), pitch envelopes, tempo,
+  fades, song banks, sound effects on pulse 2 / noise. Its state keeps FF3's `$7F40` layout (work
+  RAM bank 1 `$DD00`). Song data: GB banks 50-53 (NES bank $36 + the song bank).
+- Checked against FF3's own 6502 driver run in py65 (scratch harness: both start from the same
+  state, the 192-byte page compared every frame): songs $01 $02 $05 $10 $15 $1E $22 $2B $30 $37
+  $3A $3C $40 (600-900 frames each) and sound effects $00 $01 $04 $10 $25 $28 $3F over a song:
+  0 frames differ. Two faults found by it and fixed (a channel's end keeps its volume; a sound
+  effect's start mutes the old one and clears the tick counters).
+- Output stage: pulses -> CH1 / CH2 (duty, volume restarts the note), triangle -> CH3 (a 32-step
+  triangle wave), noise -> CH4 (NR43 nearest to the NES period). Recorded audio: the pitches are
+  FF3's (522 / 293 / 585 Hz pulses, 130 Hz triangle).
+- Songs: each map's (properties byte 10; bit 7 the conditional script $38 + n at 2C/8870), the
+  world maps' by world and vehicle (3B/A027), event command $F8 (songs, fade, resume, stop, sound
+  effects). The driver runs after each frame's V-Blank work, and from the V-Blank interrupt while
+  a map loads (an HRAM `mapbank` lets the interrupt map back the bank in use).
+- Later: the timer at the NES's 60.0988 Hz, volume changes without restarts (FF1's way).
+
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
   proposal: use FF3's own choice of top / bottom), 18 columns x 6 lines.

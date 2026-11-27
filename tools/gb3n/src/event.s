@@ -516,9 +516,68 @@ evc_table:  dw ev_none, ev_none, ev_none, ev_take        ; E4-E7
             dw ev_none, ev_none, ev_none, ev_none        ; EC-EF (cp, guest, animation)
             dw ev_npcdlg, ev_evdlg, ev_seton, ev_setoff  ; F0-F3
             dw ev_npcon, ev_npcoff, ev_give, ev_none     ; F4-F7 (battle: later)
-            dw ev_none, ev_exit, ev_enter, ev_enterm     ; F8-FB (sound: later)
+            dw ev_sound, ev_exit, ev_enter, ev_enterm    ; F8-FB
             dw ev_wait, ev_prev, ev_none, ev_end         ; FC-FF
 ev_none:    ret
+
+; $F8: a song ($00-$7C), $7D fade out, $7E the song before, $7F stop; $80+: a sound effect ($3B $B71C)
+ev_sound:   bit 7, a
+            jr nz, .sfx
+            cp $7D
+            jp c, mus_play
+            jr z, .fade
+            cp $7E
+            ld a, 2
+            jr z, .c
+            ld a, 4
+.c:         ld [M_CTRL], a
+            ret
+.fade:      ld a, $37
+            ld [M_SONG], a
+            ld a, $0C
+            jr .c
+.sfx:       and $7F
+            jp sfx_play
+
+; ---- the map's song ($3F $E8CE: properties byte 10; bit 7: the conditional script $38 + (song & 7)
+; at 2C/8870 gives it); the world map's by world and vehicle ($3B $A006)
+map_song:   ld a, [wmode]
+            and a
+            jr nz, .world
+            ld a, [map_props + 10]
+            bit 7, a
+            jp z, mus_play
+            and 7
+            add $38
+            ld c, a
+            ld b, 0
+            ld hl, $4870
+            add hl, bc
+            add hl, bc
+            call scr_ptr
+            ld de, scr_buf
+            ld bc, 64
+            ld a, B_SCRIPT
+            call far_copy
+            call scr_event
+            jp mus_play
+.world:     ld a, [world]
+            and a
+            jr z, .w
+            dec a
+.w:         add a
+            add a
+            add a                           ; (on foot: vehicle 0)
+            ld e, a
+            ld d, 0
+            ld hl, w_songs
+            add hl, de
+            ld a, [hl]
+            jp mus_play
+w_songs:    db $1E, $08, $1E, $22, $0A, $0A, $0A, $23   ; (FF3's table, 3B/A027: song ids)
+            db $2F, $08, $2F, $2F, $2F, $0A, $0A, $23
+            db $1E, $08, $1E, $22, $0A, $0A, $0A, $23
+            db $1E, $08, $1E, $22, $09, $09, $15, $23
 
 ev_npcdlg:  ld e, a                         ; $F0: the person's dialogue (their list, entry A)
             ld d, 0

@@ -34,29 +34,24 @@ what is left, kept current as the work goes on.
 | 32-47 B_WORLD0 | the four world maps unpacked (4 banks each) |
 | 48 B_WINFO | world tilesets, palettes, entrance tables |
 | 49 B_WGFX | world BG tiles (3 x 256) |
+| 50-53 B_SND0 | NES bank $36 (driver tables, songs $2B-$36, sound effects) + song bank $37 / $38 / $39 / $09 |
 
 ## RAM
 - Work RAM bank 0: $C000 OAM copy, $C100 field variables, $C200 dialogue, $C240 events, $C2B0
   helpers, $C2C0 world, $C300 line buffer, $C380 people variables, $C400 map (32 x 32), $C800-
   $CEFF metatile tables (UL, UR, DL, DR, palette, property 1, property 2), $CF00 stack.
 - Work RAM bank 1 (always mapped): $D000 FF3's save page ($6000-$63FF layout), $D400 / $D500 people
-  (FF3's $7000 / $7100), $D600 text buffer (1 KB), $DA00 scratch (1 KB), $DE00 people poses,
+  (FF3's $7000 / $7100), $D600 text buffer (1 KB), $DA00 scratch (1 KB), $DD00 sound (FF3's $7F40 page + temporaries), $DE00 people poses,
   $DF00 Color palettes (72), $DF80 player poses.
 - VRAM: BG in $8800 mode; bank 0 = map / world tiles (FF3's tile numbers), bank 1 = sprites (party
   0-15, people 16 + 16 * slot), our font at $9000 (tile = ASCII) and FF3's frame at tiles $10-$17.
   BG palettes 0-3 the map's, 7 the windows; OBJ palettes 0-3 FF3's sprite palettes.
 
-## Next: sound (FF3's driver as native code)
-Listing bank $36: update sound $8003 (sound effects $8B9D, music $8925, then the APU writes $8030
-/ $80AB from shadows: per channel key-on flag $7F4A+ch, frequency $7F6D / $7F74, volume $7F7B,
-duty $7F89, sweep $7F82; triangle $7F7D / $7F6F / $7F76; noise $7F7E / $7F70), channel scripts
-$81E6 / $820B (notes < $E0: duration table $8805; $E0 tempo, $E1-$EE volume, $EF-$F4 octave,
-$F5-$F7 envelopes + duty, $F8 sweep, $F9 / $FA drum presets, $FB-$FD repeats, $FE jump, $FF end),
-envelopes $857D-$86D5, song init $89C3, fades $8AF0 / $8B11. Songs: banks $36 ($2B-$36), $37
-($00-$18), $38 ($19-$2A), $39 ($37-$3A), $09 ($3B-$40). Plan: the sequencer and envelopes native
-(same shadows), the GB output stage from FF1's snd.s (period -> GB frequency table, volume by
-zombie-mode steps, triangle -> wave, noise), music from a timer at the NES rate; verify the
-sequencer against FF3's own 6502 code in py65 (RAM for RAM), as FF1 did.
+## Sound (done: docs/ff3-gb-status.md "Sound")
+`src/sound.s` in bank 0 ($1000-), tables `snd_ftab` ($3000, NES period -> GB frequency) and
+`snd_ntab` ($2FC0) made by build.py; banks 50-53 `B_SND0`. Game calls: `mus_play` (A = song),
+`sfx_play` (A = effect), `M_CTRL` (2 resume, 4 stop, 8 + 4 fade out). Check harness: py65 runs
+FF3's driver (MMC5 build: song bank by a `$5115` write) against SameBoy's `$DD00` page.
 
 ## Then: battle (FF3's rules; layout waits for the owner's mock-up choice)
 Formations: 2E/8000 battle -> (set, count id); 2E/8400 set: 2 palettes, 4 monsters; 2E/8A00

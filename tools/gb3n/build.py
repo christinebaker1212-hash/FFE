@@ -37,6 +37,7 @@ def own_data():
 B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_TMAP0, B_SUB0, B_COMMON = 3, 4, 5, 6, 8, 12, 17
 B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD = 18, 19, 20, 21, 28, 29
 B_WORLD0, B_WINFO, B_WGFX = 32, 48, 49
+B_SND0 = 50                 # 50-53: NES bank $36 at $4000, song bank $37 / $38 / $39 / $09 at $6000
 
 
 def field_banks(rom):
@@ -119,7 +120,36 @@ def field_banks(rom):
     for k, w in enumerate((0, 2, 4)):
         b[0x1000 * k:0x1000 * k + 0x1000] = gbt(data.world_tiles(rom, w))
     banks[B_WGFX] = b
+    for k, sb in enumerate((0x37, 0x38, 0x39, 0x09)):     # sound: driver tables + song data
+        banks[B_SND0 + k] = bytearray(rom.at(0x36 * data.B8, 0x2000) + rom.at(sb * data.B8, 0x2000))
     return banks
+
+
+NES_NOISE = [4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068]
+
+
+def sound_data():
+    """bank 0 tables: NES period -> GB frequency (pulses and triangle alike: 2048 - 1.1717 (p + 1)),
+    NES noise period index (+ 16 for the short mode) -> NR43"""
+    import math
+    ft = []
+    for p in range(2048):
+        x = int(round(2048 - 131072.0 * 16 * (p + 1) / 1789773.0))
+        ft.append(max(0, min(2047, x)))
+    nt = []
+    for mode in (0, 1):
+        for per in NES_NOISE:
+            f = 1789773.0 / per
+            best = min(((abs(math.log(262144.0 / ((r or 0.5) * 2 ** sh)) - math.log(f)), sh << 4 | r)
+                        for sh in range(14) for r in range(8)))
+            nt.append(best[1] | (8 if mode else 0))
+    lines = ['section bank 0, $3000', 'snd_ftab:']
+    for i in range(0, 2048, 8):
+        lines.append('    dw ' + ', '.join('$%04X' % v for v in ft[i:i + 8]))
+    lines.append('section bank 0, $2FC0')
+    lines.append('snd_ntab:')
+    lines.append('    db ' + ', '.join('$%02X' % v for v in nt))
+    return '\n'.join(lines) + '\n'
 
 
 def main():
@@ -141,13 +171,14 @@ def main():
                B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_COMMON) +
            'B_NPCS = %d\nB_NPCGFX = %d\nB_OWN = %d\nB_TEXT = %d\nB_SCRIPT = %d\nB_FIELD = %d\n' % (
                B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD) +
-           'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\n' % (B_WORLD0, B_WINFO, B_WGFX) + text_defs +
+           'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) + text_defs +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'world.s')).read() + '\n' + own_data())
+           open(os.path.join(HERE, 'src', 'world.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'sound.s')).read() + '\n' + sound_data() + own_data())
     import re                                    # (constants from every file first)
     lines = src.split('\n')
     is_def = lambda l: re.match(r'^[A-Za-z_]\w*\s+=', l)
