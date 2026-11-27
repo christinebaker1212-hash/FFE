@@ -364,6 +364,8 @@ ROMDATA = {
     'sm_pal': (0x32, 0x8043, 8),         # the pre-animation's palette by summon
     'sm_pre': (0x33, 0xB1EE, 10),        # the pre-animation's frames
     'sm_fly': (0x33, 0xAFF2, 16),        # its four sprites flying off
+    'fd_spd': (0x10, 0x8A4C, 16),        # the final boss's death: columns' speeds, the shake
+    'fd_shk': (0x10, 0x8A5C, 8),
     'fw_pal': (0x10, 0x8BC9, 12),        # Flare Wave's green palettes, the wave's shapes and
     'fw_rows': (0x10, 0x8D30, 80),       #   sprite lists (10/8A15, 10/8CE6)
     'fw_lst': (0x10, 0x8D80, 0x44),
@@ -537,6 +539,8 @@ ev_fxtest:  call ev_shake
         a = '.w:         ld a, [$D4C6]\n            cp 7\n            jr nz, .v\n'
         assert src.count(a) == 1
         src = src.replace(a, '.w:\n')
+    if os.environ.get('GB3N_FDTEST'):            # test builds only: the boss's death right after its entry
+        src = src.replace('            call bs_bossin2\n', '            call bs_bossin2\n            ld b, 60\n.fdw:       push bc\n            call bs_frame\n            pop bc\n            dec b\n            jr nz, .fdw\n            ld a, $80\n            call bs_bossdie\n')
     if os.environ.get('GB3N_WIPETEST'):          # test builds only: the death wipe on slot 0 at the start
         src = src.replace('            call bs_bossin2\n', '            call bs_bossin2\n            ld b, 60\n.wtw:       push bc\n            call bs_frame\n            pop bc\n            dec b\n            jr nz, .wtw\n            ld a, $80\n            call bs_mwipe\n')
     if os.environ.get('GB3N_ANWPN'):             # test builds only: the right hand's weapon animation

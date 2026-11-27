@@ -70,7 +70,7 @@ bs_bossdie: ld a, [$DCEE]
             call bs_greyf
             ld a, $0E
             call bs_sfxu
-            call .n
+            call bs_fdis                    ; (10/8A9D: the dissolve; 2F/BFB8: the fade)
             ld a, 8                         ; ($6010: the message speed)
             ld [$D010], a
             ret
@@ -300,17 +300,21 @@ bs_greyf:   push bc
             ld a, $43                       ; (FF3's sound $C3)
             call bs_sfxu
             ld b, 16
-.f:         push bc
-            call bs_frame
+.f:         push bc                         ; (the palettes first in V-Blank: they cannot be
+            call wait_vbl                   ;   written while a line is drawn)
             pop bc
             ld a, b
             and 1
             ld hl, BFX_BUF + 128
             jr z, .w
             ld hl, BFX_BUF
-.w:         call bs_pals
+.w:         push bc
+            call bs_pals
+            call snd_frame
+            pop bc
             dec b
             jr nz, .f
+            call wait_vbl
             ld hl, BFX_BUF
             call bs_pals
             pop bc
@@ -629,3 +633,245 @@ bs_wsl:     ds 1
 
 section bank B_BSCR, $7F00
 bs_bblks:   ds 24                           ; (2F/BE7F: each boss's 4-tile blocks)
+
+; ---- the final boss's death (10/8A9D): 16 columns, one per byte of a tile (FF3's planes: bytes
+; 0-7 plane 0, 8-15 plane 1), each clearing its byte in the boss's tiles from $FF down to $70, one
+; tile back when its accumulator (+ 10/8A4C's speed a frame) carries, 143 tiles; meanwhile the
+; screen scrolled up a line every 16 frames (FF3's split: the battlefield's top cut, the windows
+; rising) and shaken across (10/8A5C: 1-3 pixels); then 2F/BFB8: all palettes darker every 8
+; frames, 80 frames
+FD_N       = BFX_BUF                        ; (each column's tile, accumulator, count)
+FD_A       = BFX_BUF + 16
+FD_C       = BFX_BUF + 32
+section bank B_BSCR, $7400
+bs_fdis:    call wait_vbl                   ; (the rows below the windows and right of the
+            ld a, 1                         ;   battlefield blank: they scroll in)
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            ld hl, $9800 + 32 * 18
+            ld b, 7 * 32 / 4
+.bk:        ld a, BLANK_T
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            dec b
+            jr nz, .bk
+            ld a, 1
+            ldh [rVBK], a
+            ld hl, $9800 + 32 * 18
+            ld b, 7 * 32
+            xor a
+.ba:        ld [hl+], a
+            dec b
+            jr nz, .ba
+            xor a
+            ldh [rVBK], a
+            ld hl, $9800 + 20
+            ld c, 18
+.br:        ld b, 12
+            push hl
+.bc:        ld [hl], BLANK_T
+            inc hl
+            dec b
+            jr nz, .bc
+            pop hl
+            ld a, 1
+            ldh [rVBK], a
+            push hl
+            ld b, 12
+            xor a
+.bd:        ld [hl+], a
+            dec b
+            jr nz, .bd
+            pop hl
+            xor a
+            ldh [rVBK], a
+            ld de, 32
+            add hl, de
+            dec c
+            jr nz, .br
+            xor a
+            ldh [rSTAT], a
+            ld [guard_on], a
+            ld hl, FD_N
+            ld b, 16
+.i:         ld [hl], $FF
+            push hl
+            ld de, 16
+            add hl, de
+            ld [hl], 0
+            add hl, de
+            ld [hl], $8F
+            pop hl
+            inc hl
+            dec b
+            jr nz, .i
+            xor a
+            ld [bs_fdy], a
+            ld [bs_fdy + 1], a
+            ld [bs_fdf], a
+.f:         call wait_vbl
+            ld c, 0                         ; the 16 bytes cleared (V-Blank)
+.w:         ld hl, FD_N
+            ld a, c
+            call bs_hl_a
+            ld a, [hl]
+            sub $70                         ; (our tile = FF3's - $70)
+            call bs_tile_addr               ; DE
+            ld a, c                         ; FF3's byte -> ours: plane 0 row r: 2 r, plane 1: 2 r + 1
+            cp 8
+            jr c, .p0
+            sub 8
+            add a
+            inc a
+            jr .pa
+.p0:        add a
+.pa:        add e
+            ld e, a
+            xor a
+            ld [de], a
+            inc c
+            ld a, c
+            cp 16
+            jr nz, .w
+            ld a, [bs_fdy + 1]              ; the scroll: up a line every 16 frames (scaled 5 / 8)
+            ld b, a
+            add a
+            add a
+            add b
+            srl a
+            srl a
+            srl a
+            ldh [rSCY], a
+            ld a, [bs_fdf]                  ; the shake
+            and 7
+            ld hl, fd_shk
+            call bs_hl_a
+            ld a, [hl]
+            ldh [rSCX], a
+            call snd_frame
+            ld hl, bs_fdf
+            inc [hl]
+            ld hl, bs_fdy
+            ld a, [hl]
+            add $10
+            ld [hl+], a
+            jr nc, .y
+            inc [hl]
+.y:         ld c, 0                         ; the columns moved on
+            ld e, 0                         ; (E: still going)
+.u:         ld hl, FD_C
+            ld a, c
+            call bs_hl_a
+            ld a, [hl]
+            and a
+            jr z, .un
+            inc e
+            ld hl, fd_spd
+            ld a, c
+            call bs_hl_a
+            ld b, [hl]
+            ld hl, FD_A
+            ld a, c
+            call bs_hl_a
+            ld a, [hl]
+            add b
+            ld [hl], a
+            jr nc, .un
+            ld hl, FD_C
+            ld a, c
+            call bs_hl_a
+            dec [hl]
+            ld hl, FD_N
+            ld a, c
+            call bs_hl_a
+            dec [hl]
+.un:        inc c
+            ld a, c
+            cp 16
+            jr nz, .u
+            ld a, e
+            and a
+            jp nz, .f
+            ld b, 10                        ; 2F/BFB8: the palettes a step darker every 8 frames
+.d:         push bc
+            call bs_dark
+            ld b, 8
+.dw:        push bc
+            call wait_vbl
+            call snd_frame
+            pop bc
+            dec b
+            jr nz, .dw
+            pop bc
+            dec b
+            jr nz, .d
+            call wait_vbl
+            xor a
+            ldh [rSCX], a
+            ldh [rSCY], a
+            ret
+; all palettes (BG, OBJ) a step darker (FF3's colour - $10: here each channel halved)
+bs_dark:    call wait_vbl
+            ld hl, BFX_BUF + 64
+            ld c, 0
+.r:         ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            ld a, c
+            cp 64
+            jr nz, .r
+            ld c, 0
+.r2:        ld a, c
+            ldh [rOCPS], a
+            ldh a, [rOCPD]
+            ld [hl+], a
+            inc c
+            ld a, c
+            cp 64
+            jr nz, .r2
+            ld hl, BFX_BUF + 64
+            ld b, 64
+.h:         ld e, [hl]
+            inc hl
+            ld d, [hl]
+            srl d
+            rr e
+            ld a, e
+            and $EF
+            ld e, a
+            ld a, d
+            and $3D
+            ld [hl-], a
+            ld [hl], e
+            inc hl
+            inc hl
+            dec b
+            jr nz, .h
+            call wait_vbl
+            ld a, $80
+            ldh [rBCPS], a
+            ld hl, BFX_BUF + 64
+            ld b, 64
+.w:         ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .w
+            ld a, $80
+            ldh [rOCPS], a
+            ld b, 64
+.w2:        ld a, [hl+]
+            ldh [rOCPD], a
+            dec b
+            jr nz, .w2
+            ret
+fd_spd:     ds 16                           ; (10/8A4C)
+fd_shk:     ds 8                            ; (10/8A5C)
+
+section wram, $C5E4
+bs_fdy:     ds 2
+bs_fdf:     ds 1

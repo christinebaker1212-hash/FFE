@@ -858,13 +858,13 @@ bs_cframe:  ld a, c
             ld a, 9
             ret
 .alive:     call bs_cgt
-            bit 6, d                        ; stone: (FF3 draws it in the BG) standing
-            jr nz, .st
+            bit 6, d                        ; stone: kneeling (FF3 draws it in the BG from the
+            jr nz, .kn                      ;   kneeling tiles 28/8080, BG palette 3: here OBJ 5)
             ld a, d
             and $32
             or e
             jr z, .st
-            ld a, d
+.kn:        ld a, d
             and 5
             ld a, $0C
             ret nz
@@ -990,7 +990,17 @@ bs_cdraw:   ld b, a
             and 3
             or $08
             ld [cf_a], a
-            pop bc
+            ld a, c                         ; (stone: OBJ palette 5, FF3's BG palette 3)
+            add a
+            ld hl, $D8BB
+            call bs_hl_a
+            ld a, [hl]
+            and $C0
+            cp $40
+            jr nz, .ns
+            ld a, $0D
+            ld [cf_a], a
+.ns:        pop bc
             ld a, [cf_f]
             ld hl, cf_set
             bit 7, b
@@ -1495,6 +1505,14 @@ bs_palette: ld c, 0                         ; 2E/9E64: rows and jobs, the status
             ldh [rOCPD], a
             dec b
             jr nz, .g
+            ld a, $80 | 5 * 8               ; OBJ 5: the windows' palette (stone characters, as
+            ldh [rOCPS], a                  ;   FF3 draws them with BG palette 3)
+            ld hl, cgb_pal + 64
+            ld b, 8
+.sp:        ld a, [hl+]
+            ldh [rOCPD], a
+            dec b
+            jr nz, .sp
             ld a, 2
             ldh [rSVBK], a
             ld de, $DD93
