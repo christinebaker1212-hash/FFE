@@ -641,11 +641,11 @@ map_reload: call fade_out
 veh_tiles:  ldh a, [maptype]
             and a
             ret z
-            ld a, [map_bank]
-            call sbank
-            ld de, $8100
-            ld bc, 112 * 16                 ; (and the shrine's statue, tiles $70-$7F: pg.s)
-            jp memcpy
+            ld d, h                         ; (and the nearest sealed shrine's statue, tiles $70-$7F:
+            ld e, l                         ;   pg.s pg_veh)
+            ld a, PGM_BANK
+            ld hl, pg_veh
+            jp bank_call
 
 ; the map's object graphics blocks (HL = their tiles in the map bank, 256 bytes a block) to
 ; their tile bases ($8000 + 16 x base; LCD off)

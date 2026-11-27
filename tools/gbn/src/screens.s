@@ -3006,10 +3006,8 @@ eqm_name:   and $7F
             ld b, a
             ld a, [eqm_ft]
             and a
-            ld a, 27                        ; weapons: names 28-67, armour 68-107
-            jr z, .w
-            ld a, 67
-.w:         add a, b
+            ld a, b
+            call gcodez                     ; (its name code: pg.s)
             jp pen_iname
 
 

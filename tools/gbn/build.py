@@ -204,7 +204,7 @@ def data_banks(rom, ff3=None, init=None):
     import postgame
     if postgame.GBA_PATH:
         postgame.overworld_patch()                   # (the shrines' doors: before the overworld)
-    postgame.names_patch()                           # (its items' names, prices, armour)
+    postgame.names_patch(rom)                        # (its items' names, prices, gear)
     data.FONT_CODES = text.field_codes()
     data.TALL = data.tall_maps(rom)
     c = data.common_pack(rom)
@@ -229,6 +229,8 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, COMMON, 0x5D00, weapon_slots(rom))           # weapon slots (16), armour (16)
     nb = names.names_bank(rom, ff3)
     nb[0x3000:0x3200] = rom.rd(0x0D, 0xBC00, 0x200)            # item prices (FF1 lut_ItemPrices)
+    nb[0x2600:0x2800] = rom.rd(0x0D, 0xBC00, 0x200)            # $6600: FF1's gold amounts (N_GOLD: their codes
+                                                               #   name the post-game's gear in N_PRICE)
     for code, pr in names.PRICE.items():                       # (the post-game's items)
         nb[0x3000 + 2 * code:0x3002 + 2 * code] = pr.to_bytes(2, 'little')
     nb[0x3200:0x3300] = rom.rd(0x00, 0xB100, 0x100)            # chest contents (lut_Treasure)
@@ -401,9 +403,11 @@ def pg_banks(rom, banks):
         place(banks, b, 0x5800, p['dmg_tiles'])
         banks[battle.BTL_DATA][0x0A00 + m + 1] = pgbattle_rate(e)  # (B_RATES: map + 1)
         PG_INFO[m] = f
-    st_cgb, st_dmg, st_pal = postgame.statue(rom)     # the statue before the sealed door: its tiles
-    place(banks, OW_INFO, 0x7A00, st_cgb)             #   after the vehicles' (veh_tiles: 112)
-    place(banks, OW_INFO, 0x7000, st_dmg)
+    for s, sh in enumerate(S):                        # the statues before the sealed doors (each shrine's
+        k = {3: 0, 0: 1, 1: 2, 2: 3}[sh['orb']]       #   Fiend): after the vehicles' tiles (pg.s pg_veh)
+        st_cgb, st_dmg, st_pal = postgame.statue(rom, k)
+        place(banks, postgame.STATUE_BANK, 0x4000 + 0x100 * s, st_cgb)
+        place(banks, postgame.STATUE_BANK, 0x4400 + 0x100 * s, st_dmg)
     PG_INFO['st_pal'] = st_pal
     for s_, part, bk, r in bt:                        # the battles: their own banks (pgbattle.py)
         for b, blob in r['banks'].items():

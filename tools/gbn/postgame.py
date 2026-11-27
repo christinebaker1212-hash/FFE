@@ -600,17 +600,13 @@ def gold_code(rom, n):
 
 
 def gift(rom, name):
-    """a Dawn of Souls treasure -> the gift word pg.s gives (None: not in this build yet)"""
+    """a Dawn of Souls treasure -> the gift word pg.s gives (kind << 8 | value: 0 an FF1 code, 1 consumable,
+    2 weapon id, 3 armour id; gold: FF1's nearest gold amount)"""
     import re
     m = re.match(r'(\d+) gil', name)
     if m: return gold_code(rom, int(m.group(1)))
-    for k, (n, code, _, _) in enumerate(NEW_ITEMS):
-        if n == name: return 0x100 + k
-    for n, aid, *_ in NEW_ARMOUR:
-        if n == name: return 0x300 + aid
-    ff1 = {'Potion': 0x19, 'Antidote': 0x1A, 'Gold Needle': 0x1B, 'Tent': 0x17, 'Cottage': 0x18}
-    if name in ff1: return ff1[name]
-    return None
+    k, v = item_code(name)
+    return k << 8 | v
 
 
 T_HELD = "A mysterious power holds you back. Defeat what dwells on this floor first."
@@ -756,95 +752,159 @@ def text_source():
     return out
 
 
-# Dawn of Souls' new items (Earthgift's; effects from the FINAL FANTASY wiki: Hi-Potion 150 HP, Remedy
-# every ailment but KO / stone, Ether MP (Classic: one charge for every level, as the Pixel Remaster),
-# Megalixir all HP / MP of everyone, Silver Apple +5 maximum HP for good; the Fangs, Curtains, Drinks
-# and Spider's Silk cast FF1's own spell). Each takes the name code of an FF1 gold amount no chest
-# gives (names / prices replaced); consumable k counts at save page $B0 + k (FF1 leaves it unused).
-# (name, name code, battle magic (FF1 spell number or our entries $5C-$5F), field use)
-NEW_ITEMS = [('Hi-Potion', 113, 0x5C, 'hp'), ('Remedy', 114, 0x5D, 'cure'), ('Ether', 116, 0x5E, 'ether'),
-             ('Megalixir', 120, 0x5F, 'mega'), ('Silver Apple', 121, None, 'apple'),
-             ('Red Fang', 122, 20, None), ('White Fang', 124, 31, None), ('Vampire Fang', 125, 21, None),
-             ("Spider's Silk", 127, 15, None), ('White Curtain', 158, 26, None),
-             ('Blue Curtain', 165, 10, None), ('Speed Drink', 166, 29, None), ('Protect Drink', 167, 2, None)]
-NEW_PRICE = {'Hi-Potion': 150, 'Remedy': 1000, 'Ether': 1500, 'Megalixir': 50000, 'Silver Apple': 5000,
-             'Red Fang': 500, 'White Fang': 500, 'Vampire Fang': 500, "Spider's Silk": 500,
-             'White Curtain': 1000, 'Blue Curtain': 1000, 'Speed Drink': 1000, 'Protect Drink': 1000}
+# Dawn of Souls' new items. Consumables: Items-screen code $C0 + k, count at save page NEWIT + k, name at index
+# 256 + k (names bank). Weapons / armour past FF1's 40: ids 41 on, their stats, classes and prices from the user's
+# Dawn of Souls ROM (gba.weapon / gba.armour), names at name codes $6C on (weapons) / $84 on (armour): codes of
+# FF1's gold amounts, whose names move to 256 + code (the chest message knows which: text.s). Names: the official
+# Dawn of Souls English. Effects of the consumables (FINAL FANTASY wiki) as FF1's spells or our routines:
+# (name, Dawn of Souls item number, battle magic (FF1 spell or our $5C-$5F; None: not in battle), MP effect in
+# battle (md_mp: 1 a charge a level, 2 two, 3 all, 4 everyone's all, 5 all and HP), field use)
+NEW_CONS = [('Hi-Potion', 1, 0x5C, 0, 'hp'), ('X-Potion', 2, 48, 0, 'hpfull'), ('Ether', 3, 0x5E, 1, 'ether'),
+            ('Turbo Ether', 4, 0x5E, 2, 'ether2'), ('Dry Ether', 5, 0x5E, 3, 'etherx'),
+            ('Elixir', 6, 48, 5, 'elixir'), ('Megalixir', 7, 0x5F, 4, 'mega'), ('Phoenix Down', 8, 33, 0, 'life'),
+            ('Remedy', 9, 0x5D, 0, 'cure'), ('Eye Drops', 12, 8, 0, None), ('Echo Grass', 13, 27, 0, None),
+            ('Emergency Exit', 14, None, 0, 'exit'), ("Spider's Silk", 18, 15, 0, None),
+            ('White Fang', 19, 31, 0, None), ('Red Fang', 20, 20, 0, None), ('Blue Fang', 21, 22, 0, None),
+            ('Light Curtain', 22, 58, 0, None), ('Red Curtain', 23, 18, 0, None),
+            ('White Curtain', 24, 26, 0, None), ('Blue Curtain', 25, 10, 0, None),
+            ('Lunar Curtain', 26, 11, 0, None), ("Hermes' Shoes", 27, 29, 0, None),
+            ('Vampire Fang', 28, 21, 0, None), ('Cockatrice Claw', 29, 53, 0, None),
+            ("Giant's Tonic", 30, 54, 0, None), ('Faerie Tonic', 31, 42, 0, None),
+            ('Strength Tonic', 32, 14, 0, None), ('Protect Drink', 33, 2, 0, None), ('Speed Drink', 34, 29, 0, None),
+            ('Golden Apple', 35, None, 0, 'apple10'), ('Silver Apple', 36, None, 0, 'apple5'),
+            ('Soma Drop', 37, None, 0, 'soma'), ('Power Plus', 38, None, 0, 'str'),
+            ('Stamina Plus', 39, None, 0, 'vit'), ('Mind Plus', 40, None, 0, 'int'), ('Speed Plus', 41, None, 0, 'agi'),
+            ('Luck Plus', 42, None, 0, 'luck')]
+NEW_PRICE = {'Hi-Potion': 150, 'X-Potion': 3000, 'Ether': 1500, 'Turbo Ether': 3000, 'Dry Ether': 5000,
+             'Elixir': 30000, 'Megalixir': 50000, 'Phoenix Down': 500, 'Remedy': 1000, 'Eye Drops': 50,
+             'Echo Grass': 50, 'Emergency Exit': 1000}
 NEWIT = 0xB0                     # (save page offset of consumable 0's count)
-# armour (FF1's 4-byte record: weight, defence, resisted elements, spell; permission word: a set bit is a
-# class that cannot wear it, Fighter bit 11 .. Black Wizard bit 0; type 0 armour, 1 shield, 2 helmet):
-# armour ids whose name code ($43 + id) is an FF1 gold amount no chest gives
-NEW_ARMOUR = [('Kenpogi', 43, (1, 28, 0, 0), 0x0DF7, 0, 'armour', 16000),      # Monk / Master
-              ('Black Cowl', 44, (1, 8, 0x01, 0), 0x0BEF, 2, 'helmet', 12000),  # Thief / Ninja; sleep
-              ('Elven Cloak', 45, (1, 9, 0, 0), 0x0208, 1, 'shield', 12000)]    # all but Monk / Master
-N_ARMOUR = 45
+C_CONS = 0xC0                    # (consumable k's Items-screen code)
+WEAPON_NAMES = ['Ultima Weapon', 'Ragnarok', 'Murasame', 'Lightbringer', 'Rune Staff', 'Judgment Staff',
+                'Dark Claymore', 'Duel Rapier', 'Braveheart', 'Deathbringer', 'Enhancer', 'Gigantaxe', 'Viking Axe',
+                'Rune Axe', 'Ogrekiller', 'Kikuichimonji', 'Asura', 'Kotetsu', 'War Hammer', 'Assassin Dagger',
+                'Orichalcum', 'Mage Masher', 'Gladius', "Sage's Staff"]           # (Dawn of Souls items 83-106)
+ARMOUR_GBA = list(range(123, 134)) + list(range(143, 148)) + list(range(155, 164)) + list(range(172, 177))
+ARMOUR_NAMES = ['Crystal Mail', "Thief's Armlet", 'Black Garb', 'Kenpogi', 'Power Vest', 'Red Jacket',
+                "Sage's Surplice", 'Light Robe', 'Gaia Gear', "Bard's Tunic", 'Genji Armor', 'Genji Shield',
+                'Crystal Shield', "Hero's Shield", 'Zephyr Cape', 'Elven Cloak', 'Genji Helm', 'Crystal Helm',
+                'Black Cowl', 'Twist Headband', 'Tiger Mask', 'Feathered Cap', 'Red Cap', "Wizard's Hat",
+                "Sage's Mitre", 'Crystal Gloves', "Thief's Gloves", 'Crystal Ring', "Angel's Ring", 'Genji Gloves']
+N_WEAPON = 40 + len(WEAPON_NAMES)
+N_ARMOUR = 40 + len(ARMOUR_NAMES)
+
+
+def weapon_code(n): return n + 27 if n <= 40 else n + 67      # (weapon id n -> name code)
+def armour_code(n): return n + 67 if n <= 40 else n + 91
 
 
 def item_code(name):
-    """a Dawn of Souls item -> the native build's item code (FF1's where it has one)"""
-    ff1 = {'Potion': 0x19, 'Antidote': 0x1A, 'Gold Needle': 0x1B, 'Tent': 0x16, 'Cabin': 0x17,
-           'Cottage': 0x18}
-    if name in ff1: return ff1[name]
-    for n, code, _, _ in NEW_ITEMS:
-        if n == name: return code
-    for n, aid, *_ in NEW_ARMOUR:
-        if n == name: return 0x43 + aid
+    """a Dawn of Souls item -> (kind, value): 0 an FF1 code, 1 consumable k, 2 weapon id, 3 armour id"""
+    ff1 = {'Potion': 0x19, 'Antidote': 0x1A, 'Gold Needle': 0x1B, 'Tent': 0x17, 'Cottage': 0x18}
+    if name in ff1: return 0, ff1[name]
+    for k, c in enumerate(NEW_CONS):
+        if c[0] == name: return 1, k
+    if name in WEAPON_NAMES: return 2, 41 + WEAPON_NAMES.index(name)
+    if name in ARMOUR_NAMES: return 3, 41 + ARMOUR_NAMES.index(name)
+    import sys
+    sys.path.insert(0, os.path.join(HERE, '..', '..', 'translations'))
+    import ff1_items                                 # (FF1's own: by the project's names)
+    alias = {'Crystal Helm': None}
+    for c in range(0x1C, 0x6C):
+        if ff1_items.T.get(c) == name: return 0, c
     raise KeyError(name)
 
 
-def names_patch():
-    """the new items' and armour's names in the names bank (names.py), their prices"""
+_ICON_GBA = {0x40: 'sword', 0x41: 'sword', 0x42: 'knife', 0x43: 'claw', 0x44: 'axe', 0x45: 'hammer', 0x46: 'staff'}
+
+
+def names_patch(rom):
+    """the new items in the names bank (names.py): names, prices, the gear's stats (from the user's GBA ROM)"""
     import names
-    for n, code, _, _ in NEW_ITEMS:
-        names.OVERRIDE[code] = ('item', n)
-        names.PRICE[code] = NEW_PRICE[n]
-    for n, aid, _, _, _, icon, price in NEW_ARMOUR:
-        names.OVERRIDE[0x43 + aid] = (icon, n)
-        names.PRICE[0x43 + aid] = price
-        names.ARMOUR_EXTRA[aid] = [x for x in NEW_ARMOUR if x[1] == aid][0]
+    names.EXTRA = {256 + k: ('item', c[0]) for k, c in enumerate(NEW_CONS)}
+    if not GBA_PATH: return
+    G = gba.Gba(GBA_PATH)
+    inames = gba.item_names(G)
+    e0 = names.equip_tables(rom)
+    for i, n in enumerate(WEAPON_NAMES):            # weapons: Dawn of Souls' record in FF1's 8 bytes; the
+        wid = 41 + i                                #   battle picture of FF1's best weapon of its kind
+        w = gba.weapon(G, 40 + i)
+        icon = _ICON_GBA.get(inames[83 + i][0] & 0xFF, 'sword')
+        best = max((k for k in range(40) if names.WPN_GFX.get(e0['wstat'][8 * k + 6] & 0xFC, 'sword') == icon),
+                   key=lambda k: e0['wstat'][8 * k + 1], default=39)
+        sp = pgbattle_spell(w['spell'])
+        crit = w['crit'] if 0 < w['crit'] <= 50 else 10
+        st = bytes([w['hit'], w['dmg'], crit, sp, w['element'], w['category']]) + e0['wstat'][8 * best + 6:8 * best + 8]
+        names.WEAPON_EXTRA[wid] = (st, w['perm'])
+        names.OVERRIDE[weapon_code(wid)] = (icon, n)
+        names.PRICE[weapon_code(wid)] = min(w['price'] or 60000, 65000)   # (FF1's prices: 16 bits)
+    for i, n in enumerate(ARMOUR_NAMES):
+        aid = 41 + i
+        g = ARMOUR_GBA[i]
+        a = gba.armour(G, g - 107)
+        ty = next(t for lo, hi, t in gba.ARMOUR_TYPES if lo <= g < hi)
+        icon = ['armour', 'shield', 'helmet', 'gloves'][ty]
+        if 'Ring' in n or 'Armlet' in n: icon = 'bracelet'
+        if n in ("Sage's Surplice", 'Light Robe', 'Black Garb', 'Kenpogi', 'Red Jacket', "Bard's Tunic", 'Gaia Gear',
+                 'Power Vest'): icon = 'robe'
+        names.ARMOUR_EXTRA[aid] = (bytes([a['weight'], a['defence'], a['element'], 0]), a['perm'], ty)
+        names.OVERRIDE[armour_code(aid)] = (icon, n)
+        names.PRICE[armour_code(aid)] = min(a['price'], 65000) if a['price'] > 2 else 45000
+
+
+def pgbattle_spell(s):
+    """a Dawn of Souls weapon / armour spell byte -> FF1's (spell number + 1; 0 none)"""
+    import pgbattle
+    f = pgbattle.gba_spell(s) if s else None
+    return f + 1 if f is not None else 0
+
+
+USES = [None, 'hp', 'cure', 'ether', 'mega', 'apple5', 'hpfull', 'ether2', 'etherx', 'elixir', 'life', 'exit',
+        'apple10', 'soma', 'str', 'vit', 'int', 'agi', 'luck']
 
 
 def items_source():
-    """the item tables the engine reads (src/pg.s): the new consumables' codes (it_newc, bank 0),
-    the Items screen's orders (Use / after Sort), the battle Medicine list (md_tab, bank 104)"""
+    """the item tables the engine reads (src/pg.s): the Items screen's orders (Use / after Sort), the new
+    consumables' uses, the battle Medicine list (md_tab, bank 104)"""
     db = lambda xs: '            db ' + ', '.join('$%02X' % x for x in xs) + '\n'
-    codes = [c for _, c, _, _ in NEW_ITEMS]
-    out = 'section bank 0, $3574\nit_newc:\n' + db(codes + [0])
+    codes = [C_CONS + k for k in range(len(NEW_CONS))]
     ord0 = [0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B] + codes
-    heal = [0x19, 0x1A, 0x1B] + [c for n, c, _, u in NEW_ITEMS if u in ('hp', 'cure', 'mega', 'ether')]
+    heal = [0x19, 0x1A, 0x1B] + [C_CONS + k for k, c in enumerate(NEW_CONS)
+                                 if c[4] in ('hp', 'hpfull', 'cure', 'mega', 'ether', 'ether2', 'etherx', 'elixir', 'life')]
     ord1 = heal + [c for c in ord0 if c not in heal]
-    use = {None: 0, 'hp': 1, 'cure': 2, 'ether': 3, 'mega': 4, 'apple': 5}
-    out += ('section bank 2, $7D7D\nit_ord0:\n' + db(ord0) + 'it_ord1:\n' + db(ord1) +
-            'it_utab:\n' + db([use[u] for _, _, _, u in NEW_ITEMS]))
-    out += 'N_ARMOUR = %d\n' % N_ARMOUR
-    out += 'IT_NORD = %d\nN_NEWIT = %d\nNEWIT = unsram + $%02X\n' % (len(ord0), len(NEW_ITEMS), NEWIT)
-    # Medicine: count's address (low byte, page $D0), name (battle attack names), magic; Potion, Antidote first
-    md = [(0x20 + 0x19, 0x40, 0x40), (0x20 + 0x1A, 0x41, 0x41)]
-    for k, (n, c, mg, _) in enumerate(NEW_ITEMS):
+    out = ('section bank 2, $5EFE\nit_ord0:\n' + db(ord0) + 'it_ord1:\n' + db(ord1) +
+           'it_utab:\n' + db([USES.index(c[4]) for c in NEW_CONS]))
+    out += 'N_ARMOUR = %d\nN_WEAPON = %d\nC_CONS = $%02X\n' % (N_ARMOUR, N_WEAPON, C_CONS)
+    out += 'IT_NORD = %d\nN_NEWIT = %d\nNEWIT = unsram + $%02X\n' % (len(ord0), len(NEW_CONS), NEWIT)
+    # Medicine: count's address (low byte, page $D0), name (battle attack names), magic, MP effect; Potion,
+    # Antidote first
+    md = [(0x20 + 0x19, 0x40, 0x40, 0), (0x20 + 0x1A, 0x41, 0x41, 0)]
+    for k, (n, gi, mg, mp, _) in enumerate(NEW_CONS):
         if mg is not None:
-            md.append((NEWIT + k, 0x5C + len(md) - 2, mg))
-    out += 'section bank 104, $7C00\nmd_tab:\n' + ''.join(db(list(e) + [0]) for e in md)
+            md.append((NEWIT + k, 0x5C + len(md) - 2, mg, mp))
+    out += 'section bank 104, $7C00\nmd_tab:\n' + ''.join(db(list(e)) for e in md)
     out += 'MD_N = %d\n' % len(md)
     return out
 
 
 def battle_names():
     """the Medicine entries' names after FF1's attack names (battle.py: $5C on)"""
-    return [n for n, c, mg, _ in NEW_ITEMS if mg is not None]
+    return [c[0] for c in NEW_CONS if c[2] is not None]
 
 
+STATUE_BANK = 127               # the statues' tiles (CGB $4000, DMG $4400: 256 bytes each)
 ST_TILE = 0x70                  # the statue's sprite tiles on the overworld ($70-$7F, after the vehicles')
 
 
-def statue(rom):
-    """the statue before Earthgift's sealed door: FF1's own Lich (fiend picture 0, the user's ROM) as grey
-    stone, 32 x 32: (CGB tiles, DMG tiles, the OBJ palette 0-3 it uses on the Color)"""
+def statue(rom, k=0):
+    """the statue before a sealed shrine's door: FF1's own Fiend k (Lich 0, Kary 1, Kraken 2, Tiamat 3: fiend picture k,
+    the user's ROM) as grey stone, 32 x 32: (CGB tiles, DMG tiles, the OBJ palette 0-3 it uses on the Color)"""
     import battle
     forms = rom.rd(battle.BANK_DOMAINS, battle.FORMATIONS, 128 * 16)
-    f = next(k for k in range(128) if forms[16 * k] >> 4 == 3 and forms[16 * k + 1] == 0)
+    f = next(j for j in range(128) if forms[16 * j] >> 4 == 3 and forms[16 * j + 1] == k)
     page = forms[16 * f] & 15
     chr_ = rom.rd(battle.BANK_BATTLECHR + (page >> 3), 0x8000 + 0x800 * (page & 7), 0x800)
-    tsa = rom.rd(battle.BANK_DOMAINS, 0x92E0, 64)
+    tsa = rom.rd(battle.BANK_DOMAINS, 0x92E0 + 0x50 * k, 64)
     pal = list(rom.rd(battle.BANK_BTLC, battle.BTL_PALS + 4 * forms[16 * f + 10], 4))
     lum = [0] + [data.lum(c) for c in pal[1:]]
     px = [[None] * 64 for _ in range(64)]
@@ -856,6 +916,9 @@ def statue(rom):
                 for x in range(8):
                     v = (chr_[16 * t + y] >> (7 - x) & 1) | (chr_[16 * t + 8 + y] >> (7 - x) & 1) << 1
                     if v: px[8 * r + y][8 * c + x] = lum[v]
+    ys = [y for y in range(64) for x in range(64) if px[y][x] is not None]   # (the picture's bottom on the
+    sh = 64 - 1 - max(ys)                                                    #   statue's: standing on its tile)
+    if sh > 0: px = [[None] * 64] * sh + px[:64 - sh]
     out = [[0] * 32 for _ in range(32)]
     mean = {}
     for y in range(32):

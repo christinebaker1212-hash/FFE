@@ -306,7 +306,7 @@ it_draw:    call scr_cls
             push bc
             call pen_at
             ld a, [it_id]
-            call pen_iname
+            call it_pen
             ld a, [it_id]                   ; consumables: the count
             cp $16
             jr c, .nc

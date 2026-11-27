@@ -35,7 +35,7 @@ SHRINES = [
          pool=[[145], [146], [147], [148], [142], [143], [144], [149, 210, 211]],
          bosses=[('Cagnazzo', 140), ('Scarmiglione', 140), ('Barbariccia', 141), ('Rubicante', 141)],
          chests=5),
-    dict(name='Lifespring Grotto', key='LS', orb=1, door=(95, 163), depths=20, boss_depths=[5, 10, 20],
+    dict(name='Lifespring Grotto', key='LS', orb=1, door=(93, 164), depths=20, boss_depths=[5, 10, 20],
          floors=[(122, 0x09, 'entrance', None),
                  (150, 0x09, 'floor', 'Sunken Shrine'), (151, 0x09, 'floor', 'Sunken Shrine'),
                  (154, 0x09, 'floor', 'Sunken Shrine'), (163, 0x09, 'floor', 'Sunken Shrine'),

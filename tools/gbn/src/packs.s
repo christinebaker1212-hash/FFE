@@ -216,10 +216,8 @@ pk_item:    and 4
             ld b, a
             ld a, [eqm_ft]
             and a
-            ld a, 27                        ; (weapons: names 28-67, armour 68-107)
-            jr z, .nw
-            ld a, 67
-.nw:        add a, b
+            ld a, b
+            call gcodez7                    ; (its name code: pg.s)
             call pen_iname
             pop af
             bit 7, a

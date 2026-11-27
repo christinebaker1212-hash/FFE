@@ -14,6 +14,7 @@ PG_RUNB    = unsram + $A5   ;   byte a shrine, a bit a boss), the fixed chests o
 PG_BOSS    = unsram + $A6
 PG_FIXED   = unsram + $AA
 ST_TILE    = $70            ; (the statue's sprite tiles: postgame.statue)
+STATUE_BANK = 127
 PG_TC      = 0              ; (FF1's flag of a chest number no map uses: the post-game's chests)
 PG_ENT     = $1E            ; the shrines' overworld entrance number (postgame.py: their doors)
 PG_OBJ0    = $F0            ; a boss floor's orbs: object ids $F0-$F3 (the shrine's bosses 0-3), and
@@ -78,8 +79,7 @@ pg_give:    and a
             ld [dlgsfx], a
             ld a, DLG_TCGET
             ret
-.ar:        ld hl, C_WPNSLOT + 16
-            jp tc_give.find
+.ar:        jp tc_give.find                 ; (B = the id, HL = the slots: pg_gift)
 .ff:        push af
             ld a, NAMES
             call sbank
@@ -204,6 +204,8 @@ pg_bfi:     ds 1
 pg_dom:     ds 1
 pg_t0:      ds 1                            ; (scratch)
 pg_t1:      ds 1
+dlg_nhi:    ds 1                            ; (the chest message's name index: text.s)
+pg_stl:     ds 1                            ; (the statue loaded: its shrine)
 
 section hram, $FFF0
 hbt_db:     ds 1                            ; the battle data bank (battle.py's layout)
@@ -751,8 +753,8 @@ pg_chest:   ld a, [px]
 .none:      xor a
             jp pg_give
 
-; DE = a gift (D 0: an FF1 code E (items, weapons, armour, gold); 1: Dawn of Souls consumable E; 3: Dawn
-; of Souls armour E) -> given, back through pg_give
+; DE = a gift (D 0: an FF1 code E (items, weapons, armour, gold); 1: Dawn of Souls consumable E; 2 / 3: weapon /
+; armour id E) -> given, back through pg_give (the chest's message: dlg_item, dlg_nhi: text.s)
 pg_gift:    ld a, d
             and a
             jr nz, .n
@@ -760,11 +762,13 @@ pg_gift:    ld a, d
             ld [dlg_item], a
             jp pg_give
 .n:         cp 1
-            jr nz, .ar
-            ld hl, it_newc                  ; (consumable E: its code)
-            ld a, e
-            call pg_ixr
+            jr nz, .gr
+            ld a, e                         ; consumable E: one more (99 at most)
             ld [dlg_item], a
+            ld a, 1
+            ld [dlg_nhi], a
+            ld a, e
+            add a, C_CONS
             call it_cnt
             ld a, [hl]
             cp 99
@@ -772,11 +776,24 @@ pg_gift:    ld a, d
             inc [hl]
 .g1:        ld a, 1
             jp pg_give
-.ar:        ld a, e                         ; Dawn of Souls' armour E: name code $43 + E
-            add a, $43
-            ld [dlg_item], a
-            ld b, e
+.gr:        ld b, e                         ; gear E: a free slot (name code: postgame.weapon_code /
+            ld hl, C_WPNSLOT                ;   armour_code)
+            cp 2
+            ld a, e
+            jr nz, .ga
+            cp 41
+            jr c, .w1
+            add a, 40
+.w1:        add a, 27
+            jr .gc
+.ga:        ld hl, C_WPNSLOT + 16
+            cp 41
+            jr c, .a1
+            add a, 24
+.a1:        add a, 67
+.gc:        ld [dlg_item], a
             ld a, 2
+            ld [dlg_nhi], a
             jp pg_give
 
 ; ---- an orb on the boss floor (its id PG_OBJ0 + k: the shrine's boss k): FF1's Talk_fight (the orb gone,
@@ -933,8 +950,8 @@ pg_revive:  xor a                           ; (no boss beaten: pg_after)
             ld a, MAP_OW
             ret
 
-; ==== Dawn of Souls' items (postgame.py NEW_ITEMS / NEW_ARMOUR): a consumable's id is its name code
-; (an FF1 gold amount no chest gives); its count at NEWIT + its place in it_newc (FF1's items: ITEMS + id)
+; ==== Dawn of Souls' items (postgame.py NEW_CONS, WEAPON_NAMES, ARMOUR_NAMES): consumable k's Items-screen code
+; C_CONS + k, its count at NEWIT + k, its name index 256 + k (names.py); FF1's items: ITEMS + code
 section bank 0, $3FA7                       ; (free space)
 ; A = an item -> HL = its count (A kept)
 it_cnt:     cp $1C
@@ -944,19 +961,19 @@ it_cnt:     cp $1C
             sub low(ITEMS)
             ld h, high(ITEMS)
             ret
-.n:         push bc
-            ld b, a
-            ld hl, it_newc
-            ld c, low(NEWIT)
-.f:         ld a, [hl+]                     ; (A is always one of them)
-            cp b
-            jr z, .g
-            inc c
-            jr .f
-.g:         ld l, c
+.n:         sub C_CONS - low(NEWIT)         ; (Dawn of Souls' k: code C_CONS + k, NEWIT + k)
+            ld l, a
+            add a, C_CONS - low(NEWIT)
             ld h, high(NEWIT)
-            ld a, b
-            pop bc
+            ret
+
+section bank 0, $3574                       ; (free space)
+; the chest message's item: DE = its name index (pg_nidx)
+dlg_nidx:   push hl
+            ld a, PGM_BANK
+            ld hl, pg_nidx
+            call bank_call
+            pop hl
             ret
 
 section bank 0, $2F5E                       ; (free space)
@@ -974,6 +991,7 @@ call6:      push af
             pop af
             ret
 
+MD_MAX     = 23
 section wram, $DD20
 c6_jp:      ds 3
 c6_b:       ds 1
@@ -981,66 +999,63 @@ md_n:       ds 1
 md_pg:      ds 1
 md_sel:     ds 1
 pg_mm:      ds 1
-md_list:    ds 16
+pg_use:     ds 1
+md_list:    ds MD_MAX                       ; (the Medicine owned: at most MD_MAX kinds listed)
 
-; ---- the Items screen (bank 2): the new consumables' uses
-section bank 2, $7DB0
+; ---- the Items screen (bank 2): the new consumables' uses (it_utab: postgame.USES; pg_use1 in the post-game's
+; bank does the member's part)
+U_CURE     = 2
+U_MEGA     = 4
+U_EXIT     = 11
+section bank 2, $7D7D
 ; it_use: FF1's items by its jump table, the new ones here
 it_ux:      cp $1C
             jr nc, .n
             ld hl, it_jt
             ret
 .n:         pop hl
-            ld hl, it_newc                  ; (their use: it_utab by their place)
-            ld e, 0
-.f:         cp [hl]
-            jr z, .g
-            inc hl
-            inc e
-            jr .f
-.g:         ld d, 0
+            sub C_CONS
+            ld e, a
+            ld d, 0
             ld hl, it_utab
             add hl, de
             ld a, [hl]
-            add a, a
-            ld e, a
-            ld hl, .t
-            add hl, de
-            ld a, [hl+]
-            ld h, [hl]
-            ld l, a
-            jp hl
-.t:         dw u_none, u_hp, u_rem, u_eth, u_mega, u_apple
-u_none:     call sfx_err                    ; (a battle item: not here)
-            jp item_menu.l
-; Hi-Potion: FF1's Potion, 150 HP
-u_hp:       ld a, IT_UseItem_Heal_0
+            ld [pg_use], a
+            and a
+            jr z, u_none
+            cp U_CURE
+            jr z, u_rem
+            cp U_EXIT
+            jr z, u_exit
+            cp U_MEGA
+            jr z, u_all
+            ld a, IT_UseItem_Heal_0         ; one member: the target screen, as FF1's Potion
             call tgt_open
             call tgt_pick
             jr .t
 .l:         call tgt_pick2
 .t:         jp c, item_menu.re
-            call ch_rec
-            inc hl
-            ld a, [hl]
-            cp 1
-            jr z, .er
-            cp 2
-            jr z, .er
-            dec hl
-            call hp_atmax
-            jr nz, .ok
+            ld [pg_mm], a
+            ld a, PGM_BANK
+            ld hl, pg_use1
+            call bank_call
+            and a
+            jr z, .ok
+            dec a
+            jr nz, .er
             ld a, IT_UseItem_Heal_0
             call no_eff
             jr .l
-.ok:        ld a, 150
-            call hp_add
-            call u_dec
-            jr nz, .l
-            jp item_menu.re
 .er:        call sfx_err
             jr .l
-; the item used: one fewer, the target screen again; NZ: some left
+.ok:        call u_ok
+            jr nz, .l
+            jp item_menu.re
+u_none:     call sfx_err                    ; (a battle item: not here)
+            jp item_menu.l
+; the item used: its sound, one fewer, the target screen again; NZ: some left
+u_ok:       ld a, TR_HPUP
+            call snd_track
 u_dec:      ld a, [it_id]
             call it_cnt
             dec [hl]
@@ -1056,33 +1071,8 @@ u_rem:      ld a, [it_id]
             ld a, IT_UseItem_Pure_0
             ld b, IT_UseItem_Pure_1
             jp u_cure
-; Ether: a member's MP (Classic: one charge of every level)
-u_eth:      ld a, IT_UseItem_Heal_0
-            call tgt_open
-            call tgt_pick
-            jr .t
-.l:         call tgt_pick2
-.t:         jp c, item_menu.re
-            ld [pg_mm], a
-            call ch_rec
-            inc hl
-            ld a, [hl]
-            cp 1
-            jr z, .er
-            cp 2
-            jr z, .er
-            ld a, PGM_BANK
-            ld hl, pg_ether
-            call bank_call
-            ld a, TR_HPUP
-            call snd_track
-            call u_dec
-            jr nz, .l
-            jp item_menu.re
-.er:        call sfx_err
-            jr .l
-; Megalixir: everyone standing, all HP and MP
-u_mega:     ld a, IT_UseItem_Heal_0
+; Megalixir: everyone standing
+u_all:      ld a, IT_UseItem_Heal_0
             call tgt_open
 .l:         call tg_all
             jp c, item_menu.re
@@ -1090,81 +1080,270 @@ u_mega:     ld a, IT_UseItem_Heal_0
 .m:         push bc
             ld a, b
             ld [pg_mm], a
-            call ch_rec
-            inc hl
-            ld a, [hl]
-            dec hl
-            cp 1
-            jr z, .n
-            cp 2
-            jr z, .n
-            ld a, l
-            add a, CH_HP + 2
-            ld l, a
-            ld a, [hl+]
-            ld e, a
-            ld d, [hl]
-            dec l
-            dec l
-            ld [hl], d
-            dec l
-            ld [hl], e
             ld a, PGM_BANK
-            ld hl, pg_mpfull
+            ld hl, pg_use1
             call bank_call
-.n:         pop bc
+            pop bc
             inc b
             ld a, b
             cp 4
             jr c, .m
-            ld a, TR_HPUP
-            call snd_track
-            call u_dec
+            call u_ok
             jr nz, .l
             jp item_menu.re
-; Silver Apple: a member's maximum HP + 5 for good (and the HP)
-u_apple:    ld a, IT_UseItem_Heal_0
-            call tgt_open
-            call tgt_pick
-            jr .t
-.l:         call tgt_pick2
-.t:         jp c, item_menu.re
+; Emergency Exit: out to the world map (as the Exit spell; not on the world map)
+u_exit:     ld a, [cur_map]
+            inc a
+            jr z, u_none
+            ld a, [it_id]
+            call it_cnt
+            dec [hl]
+            ld a, 2
+            ld [menu_act], a
+            ret
+
+section bank 2, $60D8
+; the main menu's Items: out of the menus too after an Emergency Exit
+item_mx:    call item_menu
+            ld a, [menu_act]
+            and a
+            ret z
+            pop hl
+            ret
+; the name of Items-screen code A at the pen (Dawn of Souls' consumables: name index 256 + k)
+it_pen:     cp C_CONS
+            jp c, pen_iname
+            sub C_CONS
+            ld l, a
+            ld h, 1
+            jp pen_inx
+
+section bank PGM_BANK, $6000
+; a new consumable used on member pg_mm (pg_use: postgame.USES) -> A = 0 used, 1 no effect, 2 not on them
+pg_use1:    ld a, [pg_mm]
             call ch_rec
             inc hl
-            ld a, [hl]
+            ld a, [hl]                      ; (the ailment: 1 dead, 2 stone)
             dec hl
+            ld c, a
+            ld a, [pg_use]
+            cp 10                           ; Phoenix Down: the dead only, back with 1 HP
+            jr nz, .nl
+            ld a, c
             cp 1
-            jr z, .er
-            cp 2
-            jr z, .er
-            push hl
+            ld a, 1
+            ret nz
+            inc hl
+            ld [hl], 0
             ld a, l
-            add a, CH_HP + 2
+            add a, CH_HP - CH_AIL
             ld l, a
-            ld a, [hl+]
-            add a, 5
+            ld [hl], 1
+            xor a
+            ret
+.nl:        ld a, c
+            cp 1
+            jr z, .x2
+            cp 2
+            jr z, .x2
+            ld a, [pg_use]
+            ld b, a
+            ld de, .t - 2
+            add a, a
+            add a, e
             ld e, a
+            jr nc, .j
+            inc d
+.j:         ld a, [de]
+            push af
+            inc de
+            ld a, [de]
+            ld d, a
+            pop af
+            ld e, a
+            push de
+            ret
+.x2:        ld a, 2
+            ret
+.t:         dw .hp, .cu, .eth, .mega, .ap5, .hpf, .eth2, .ethx, .elx, .x2, .x2, .ap10, .soma, .st0, .st3, .st2
+            dw .st1, .st4
+.hp:        ld bc, 150                      ; Hi-Potion
+            jr .hpa
+.hpf:       ld bc, 999                      ; X-Potion
+.hpa:       call pg_hpadd
+            ret
+.cu:        ld a, 1
+            ret
+.eth:       call pg_mpis                    ; Ether: one charge a level
+            ld a, 1
+            ret z
+            call pg_ether
+            xor a
+            ret
+.eth2:      call pg_mpis                    ; Turbo Ether: two
+            ld a, 1
+            ret z
+            call pg_ether
+            call pg_ether
+            xor a
+            ret
+.ethx:      call pg_mpis                    ; Dry Ether: all
+            ld a, 1
+            ret z
+            call pg_mpfull
+            xor a
+            ret
+.mega:      call pg_mpfull                  ; Megalixir (each member): all HP and MP
+            ld bc, 999
+            call pg_hpadd
+            xor a
+            ret
+.elx:       call pg_mpfull                  ; Elixir: all HP and MP
+            ld bc, 999
+            call pg_hpadd
+            xor a
+            ret
+.ap5:       ld c, 5                         ; Silver / Golden Apple: the maximum HP for good
+            jr .ap
+.ap10:      ld c, 10
+.ap:        ld a, [pg_mm]
+            call ch_rec
+            ld a, l
+            add a, CH_MAXHP
+            ld l, a
+            ld a, [hl]
+            add a, c
+            ld e, a
+            inc hl
             ld a, [hl]
             adc a, 0
             ld d, a
-            cp high(999)
-            jr c, .s
-            jr nz, .cap
-            ld a, e
-            cp low(999) + 1
-            jr c, .s
-.cap:       ld de, 999
-.s:         ld [hl], d
-            dec l
+            ld a, e                         ; (999 at most)
+            sub low(1000)
+            ld a, d
+            sbc a, high(1000)
+            jr c, .apw
+            ld de, 999
+.apw:       ld [hl], d
+            dec hl
             ld [hl], e
-            pop hl
-            ld a, 5
-            call hp_add
-            call u_dec
-            jr nz, .l
-            jp item_menu.re
-.er:        call sfx_err
-            jr .l
+            ld b, 0
+            call pg_hpadd
+            xor a
+            ret
+.soma:      ld a, [pg_mm]                   ; Soma Drop: one more charge on each level known (9 at
+            call pg_mrec                    ;   most); Modern MP: 10 more
+            ld a, l
+            add a, $28
+            ld l, a
+            ld b, 8
+.so:        ld a, [hl]
+            and a
+            jr z, .so2
+            cp 9
+            jr nc, .so2
+            inc [hl]
+.so2:       inc l
+            dec b
+            jr nz, .so
+            ld a, [pg_mm]
+            call pg_mrec
+            ld a, l
+            add a, MM_CUR + 2
+            ld l, a
+            ld a, [hl]
+            add a, 10
+            ld [hl+], a
+            ld a, [hl]
+            adc a, 0
+            ld [hl], a
+            xor a
+            ret
+.st0:       ld e, $10                       ; Power / Speed / Mind / Stamina / Luck Plus: the stat + 1
+            jr .st                          ;   for good (99 at most)
+.st1:       ld e, $11
+            jr .st
+.st2:       ld e, $12
+            jr .st
+.st3:       ld e, $13
+            jr .st
+.st4:       ld e, $14
+.st:        ld a, [pg_mm]
+            call ch_rec
+            ld a, l
+            add a, e
+            ld l, a
+            ld a, [hl]
+            cp 99
+            ld a, 1
+            ret nc
+            inc [hl]
+            xor a
+            ret
+; Z: member pg_mm's MP already full (or none)
+pg_mpis:    ld a, [pg_mm]
+            call pg_mrec
+            ld a, l
+            add a, $20
+            ld l, a
+            ld b, 8
+.c:         ld a, l
+            add a, 8
+            ld e, a
+            ld d, h
+            ld a, [de]
+            cp [hl]
+            jr z, .n
+            ret                             ; (a charge short: NZ)
+.n:         inc l
+            dec b
+            jr nz, .c
+            xor a
+            ret
+; member pg_mm's HP + BC, up to the maximum (B = 0 and C = 0: only to the maximum); A = 0, 1 if it was full
+pg_hpadd:   ld a, [pg_mm]
+            call ch_rec
+            ld a, l
+            add a, CH_HP
+            ld l, a
+            ld a, [hl+]
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            ld a, [hl+]
+            cp e
+            jr nz, .add
+            ld a, [hl]
+            cp d
+            ld a, 1
+            jr nz, .add
+            ld a, b
+            or c
+            ld a, 1
+            ret nz
+.add:       dec hl
+            ld a, e
+            add a, c
+            ld e, a
+            ld a, d
+            adc a, b
+            ld d, a
+            ld a, [hl+]                     ; (max: low, high)
+            sub e
+            ld a, [hl]
+            sbc a, d
+            jr nc, .w
+            ld a, [hl-]
+            ld d, a
+            ld e, [hl]
+            inc hl
+.w:         dec hl
+            dec hl
+            ld [hl], d
+            dec hl
+            ld [hl], e
+            xor a
+            ret
 
 ; ---- the MP (bank PGM_BANK; member [pg_mm]): Ether, a full refill
 section bank PGM_BANK, $7000
@@ -1371,7 +1550,10 @@ md_menu:    ld hl, md_list
             ld a, b
             cp 2                            ; (Potion, Antidote: always shown)
             jr nc, .nx
-.add:       ld [hl], b
+.add:       ld a, c
+            cp MD_MAX
+            jr nc, .bd
+            ld [hl], b
             inc hl
             inc c
 .nx:        inc b
@@ -1574,13 +1756,48 @@ md_draw:    call c_msgwin
             cp 4
             jr c, .r
             ret
-; bt_pl_drink (md_use): Ether / Megalixir: the MP of their target / of everyone standing
-md_mp:      ld a, [mg_id]
-            cp $5E
-            jr z, .eth
-            cp $5F
-            ret nz
-            ld b, 0
+; bt_pl_drink (md_use): the item's MP effect (md_tab byte 3: 1 a charge a level, 2 two, 3 all, 4 everyone's all,
+; 5 all, the HP done by its magic) on its target (bt_tgt) / everyone standing; A = the count's address
+md_mp:      ld hl, md_tab + 3
+            ld b, MD_N
+.f:         dec hl
+            dec hl
+            dec hl
+            cp [hl]
+            inc hl
+            inc hl
+            inc hl
+            jr z, .g
+            inc hl
+            inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .f
+            ret
+.g:         ld a, [hl]
+            and a
+            ret z
+            ld [pg_use], a
+            cp 4
+            jr z, .all
+            ld a, [bt_tgt]
+            and 3
+            ld [pg_mm], a
+.one:       ld a, [pg_use]
+            ld hl, pg_ether
+            cp 1
+            jr z, .c
+            cp 2
+            jr nz, .full
+            ld a, PGM_BANK
+            call bank_call
+            ld hl, pg_ether
+            jr .c
+.full:      ld hl, pg_mpfull
+.c:         ld a, PGM_BANK
+            jp bank_call
+.all:       ld b, 0
 .m:         push bc
             ld a, b
             ld [pg_mm], a
@@ -1600,12 +1817,6 @@ md_mp:      ld a, [mg_id]
             cp 4
             jr c, .m
             ret
-.eth:       ld a, [bt_tgt]
-            and 3
-            ld [pg_mm], a
-            ld a, PGM_BANK
-            ld hl, pg_ether
-            jp bank_call
 
 section bank 0, $13F5                       ; (free space)
 ; veh_oam: the bridge and the canal (ow_bc), then the shrine's statue
@@ -1614,9 +1825,106 @@ pg_owst:    call ow_bc
             ld hl, pg_statue
             jp bank_call
 
+section bank PGM_BANK, $6380
+; dlg_item, dlg_nhi -> DE = the item's name index (names.py): dlg_nhi 1: 256 + dlg_item (Dawn of Souls'
+; consumables), 2: dlg_item (the gear); 0: FF1's codes, a gold amount's name at 256 + its code; dlg_nhi cleared
+pg_nidx:    ld a, [dlg_item]
+            ld e, a
+            ld d, 0
+            ld a, [dlg_nhi]
+            and a
+            jr nz, .x
+            ld a, e
+            cp $6C
+            ret c
+            cp $B0
+            ret nc
+            inc d
+            ret
+.x:         dec a
+            jr nz, .y
+            inc d
+.y:         xor a
+            ld [dlg_nhi], a
+            ret
+
+section bank PGM_BANK, $6400
+; veh_tiles (the world map, LCD off; DE = the vehicles' tiles in the map's bank): them to sprite tiles $10-$6F,
+; then the statue of the sealed shrine nearest the party (pg_stl; its tiles after the vehicles', 256 bytes each)
+pg_veh:     push de
+            ld a, [map_bank]
+            ld h, d
+            ld l, e
+            ld de, $8100
+            ld bc, 96 * 16
+            call far_copy
+            ld c, 0                         ; the nearest sealed shrine (by the larger of |dx|, |dy|)
+            ld b, $FF
+            ld e, 0
+.s:         push bc
+            push de
+            ld a, e
+            ld hl, pg_orb
+            call pg_ixr
+            ld l, a
+            ld h, high(ORBS)
+            ld a, [hl]
+            pop de
+            pop bc
+            and a
+            jr nz, .n
+            push bc
+            ld a, e
+            add a, a
+            ld hl, pg_door
+            push de
+            call pg_ixr
+            pop de
+            ld b, a
+            ld a, [px]
+            sub b
+            jr nc, .x
+            cpl
+            inc a
+.x:         ld d, a
+            inc hl
+            ld a, [py]
+            sub [hl]
+            jr nc, .y
+            cpl
+            inc a
+.y:         cp d
+            jr nc, .m
+            ld a, d
+.m:         pop bc
+            cp b
+            jr nc, .n
+            ld b, a
+            ld c, e
+.n:         inc e
+            ld a, e
+            cp 4
+            jr c, .s
+            ld a, c
+            ld [pg_stl], a
+            pop hl                          ; (statue C's tiles: bank STATUE_BANK, $4000 / $4400 + 256 C)
+            ld h, $40
+            ldh a, [is_cgb]
+            and a
+            jr nz, .cg
+            ld h, $44
+.cg:        ld a, c
+            add a, h
+            ld h, a
+            ld l, 0
+            ld a, STATUE_BANK
+            ld de, $8700
+            ld bc, 256
+            jp far_copy
+
 section bank PGM_BANK, $7200
-; the statue before Earthgift's sealed door (until Lich is beaten): FF1's Lich in stone, 4 x 4 sprites
-; (OAM 24-39, tiles $70-$7F) centred on the door, standing on its tile
+; the statue before the nearest sealed shrine's door (pg_stl, until its Fiend is beaten): the Fiend in stone,
+; 4 x 4 sprites (OAM 24-39, tiles $70-$7F) centred on the door, standing on its tile
 pg_statue:  ld a, PG_ON                     ; (built without the Dawn of Souls ROM: no shrine)
             and a
             ret z
@@ -1629,19 +1937,27 @@ pg_statue:  ld a, PG_ON                     ; (built without the Dawn of Souls R
             inc l
             dec b
             jr nz, .z
-            ld a, [pg_orb]                  ; (Earthgift's: shrine 0)
+            ld a, [pg_stl]                  ; (the shrine whose statue is loaded)
+            ld hl, pg_orb
+            call pg_ixr
             ld l, a
             ld h, high(ORBS)
             ld a, [hl]
             and a
             ret nz
-            ld a, [pg_door]
+            ld a, [pg_stl]
+            add a, a
+            ld hl, pg_door
+            call pg_ixr
+            push hl
             ld hl, px
             call ob_pos
+            pop hl
             ret c
             sub 8
             ld b, a
-            ld a, [pg_door + 1]
+            inc hl
+            ld a, [hl]
             ld hl, py
             call ob_pos
             ret c
@@ -1702,3 +2018,65 @@ pg_rpal:    ld a, F3_BANK
             jr nz, .l
             ret
 .g:         dw $0000, $5294, $2108, $0000
+
+; ==== the gear's name codes (postgame.weapon_code / armour_code): weapon / armour id A (Z: a weapon) -> its
+; name code (FF1's 40 of each: $1B + n / $43 + n; Dawn of Souls': $43 + n / $5B + n), and back (gidz)
+section bank 2, $7F11
+gcodez:      jr nz, .a
+            cp 41
+            jr c, .w
+            add a, 40
+.w:         add a, 27
+            ret
+.a:         cp 41
+            jr c, .b
+            add a, 24
+.b:         add a, 67
+            ret
+gidz:       jr nz, .a
+            cp $6C
+            jr c, .w
+            sub 40
+.w:         sub $1B
+            ret
+.a:         cp $84
+            jr c, .b
+            sub 24
+.b:         sub $43
+            ret
+section bank 6, $6C46
+gcodez6:     jr nz, .a
+            cp 41
+            jr c, .w
+            add a, 40
+.w:         add a, 27
+            ret
+.a:         cp 41
+            jr c, .b
+            add a, 24
+.b:         add a, 67
+            ret
+section bank 107, $7FC0
+gcodez7:     jr nz, .a
+            cp 41
+            jr c, .w
+            add a, 40
+.w:         add a, 27
+            ret
+.a:         cp 41
+            jr c, .b
+            add a, 24
+.b:         add a, 67
+            ret
+section bank 110, $7FC0
+gcodez110:   jr nz, .a
+            cp 41
+            jr c, .w
+            add a, 40
+.w:         add a, 27
+            ret
+.a:         cp 41
+            jr c, .b
+            add a, 24
+.b:         add a, 67
+            ret

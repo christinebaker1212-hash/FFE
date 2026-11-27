@@ -235,3 +235,47 @@ Not yet: the statue in front of the sealed door (the door and its words show the
 NPCs that start fixed battles (the event scripts are not decoded), the Megalixir after Ahriman (B5's fixed
 chest: the chip is found, its place in B5 needs the event data), item descriptions on the target screen for the
 new items (they show the Potion's line).
+
+## 12. All four shrines: built (2026-11-27, owner: "Finish the rest")
+
+One engine for the four (`tools/gbn/shrines.py` the data, `postgame.py` the floors, `pgbattle.py` the battles,
+`src/pg.s` the runs; details: docs/ff1-native.md item 71):
+- **Doors**: Earthgift (132, 141), Hellfire on the Cardia islands (97, 60: Cardia's cave mouth), Lifespring on the
+  grass island west of Onrac (93, 164: Dawn of Souls has it in the sea; FF1's ship cannot enter tiles), Whisperwind
+  on the river bank (187, 179: by canoe). Each sealed until its Fiend falls (Dawn of Souls' words at the door,
+  messages 640 / 642 / 644 / 646). The statue of the nearest sealed shrine's Fiend (Lich, Kary, Kraken, Tiamat) in
+  stone before its door: loaded with the world map (one statue's tiles fit beside the vehicles').
+- **Runs**: depth 0 the entrance; boss depths fixed (Earthgift 5; Hellfire 5, 10; Lifespring 5, 10, 20; Whisperwind
+  10, 20, 30, 40); every other depth the next floor of the shrine's pool in this run's order (a shuffle by the run's
+  seed; Hellfire's three overworld maps: one a run). 81 floors in all (map ids 64-144).
+- **Boss floors**: the orbs of their bosses (Dawn of Souls: one boss a floor a run; Whisperwind's four can all be
+  fought in one run); the stairs on and the way out are held ("A mysterious power holds you back") until one is
+  beaten; then a light appears at the floor's start: talking to it takes the party out to the door. A floor whose
+  bosses are all beaten is open from the start. Scarmiglione rises again: his second form when the first falls.
+  Fixed chests: Megalixir (Earthgift B5), Hero's Shield (Lifespring B20), Ultima Weapon (Whisperwind B40), beyond
+  the bosses. A lost battle throws the party out to the world map at the door.
+- **Floors**: every Dawn of Souls floor drawn in the FF1 look its tileset imitates (Earth / Gurgu / Giant's Cave,
+  Ice, Waterfall, Dragon caves, Marsh, Sea Shrine, Floating Castle, Temple of Chaos), the pieces learnt from FF1's own
+  maps of that place; outdoor floors (overworld maps, the floating continent, Feyhome, the swamp, the towns) as
+  grass / forest / water / sand. Floors larger than FF1's 64 x 64 are cut to their best 60 x 60 (the most walkable
+  ground, the stairs kept; owner: "the desert being cut down is fine"); a floor whose stairs fall outside gets them
+  at its farthest point. Chests at dead ends; castle floors (Lifespring's walkways, Whisperwind's Western Keep) also
+  hold the second list's chests.
+- **Battles**: each shrine its own battle set (Whisperwind two: B1-B19 and B21-B39): its monsters (Dawn of Souls'
+  50 new ones as FF1's families in their colours, FF1's dragons), formations per encounter-table entry (mixed groups
+  on one picture page, two colour sets), domains per area and depth band (Lifespring 2, Whisperwind 4); the 17 bosses
+  from the GBA pictures in FF1's fiend style, their attacks as FF1's spells / enemy abilities, their words
+  (messages 648-664).
+- **Treasure**: the wiki's lists per depth, each floor's chests shuffled per run; gold as FF1's nearest chest amount.
+- **Items**: all of Dawn of Souls' new items (37 consumables, 24 weapons, 30 armour) with their stats, classes and
+  prices from the GBA ROM (`gba.weapon`, `gba.armour`). Consumables: Hi-/X-Potion, Ether / Turbo / Dry Ether, Elixir,
+  Megalixir, Phoenix Down, Remedy, Eye Drops, Echo Grass, Emergency Exit, the Fangs, Curtains, Drinks, Tonics,
+  Spider's Silk, Hermes' Shoes, Cockatrice Claw (each FF1's nearest spell in battle), the apples, Soma Drop and the
+  five Plus items (for good). Names: a 512-entry name table (names.py: consumables at 256 + k; new weapons /
+  armour at codes $6C-$A1, whose FF1 gold amounts' names moved to 256 + code).
+
+Walked through for now (their Dawn of Souls events are not made): the non-combat floors' puzzles and people
+(flooded village, dancers, library, walkways' vanishing paths, Seahold's mermaids, the dragon hunt (its dragons met
+as random battles), beavers, dwarves, robots, children, Feyhome's fairies, the swamp's souls with Astos and the
+Vampire, the cursed town of B30, the towns' shops and inns), Hellfire's ship / airship / Thule, the fire shrine's
+timed damage (its floor as Gurgu's lava), the glittering fixed battles of the waterfall.
