@@ -1378,20 +1378,7 @@ bsc_msg:    call msg_at
             ld hl, $D8EF
             inc [hl]
             inc [hl]
-.nn:        ld a, [bs_var]
-            cp 4
-            jr nz, .ni
-            push de                         ; an item's name first
-            ld a, [$D8E4]
-            ld e, a
-            ld d, 0
-            call bs_name
-            pop de
-            ld d, 14
-            ld a, 12
-            ld [bs_maxw], a
-            call bs_putsn
-            inc e
+.nn:
 .ni:        ld a, [bs_var]
             cp 2
             jr z, .hp
@@ -1409,6 +1396,9 @@ bsc_msg:    call msg_at
             sub e
             ld [bs_maxw], a
             call bs_putsw                   ; (wrapped: the English is longer than FF3's)
+            ld a, [bs_var]                  ; (an item: after the English words, "Treasure:",
+            cp 4                            ;   "Found ")
+            call z, bs_mitem
             jr .w
 .hp:        ld de, $0E01                    ; peep: "HP cur/max"
             ld a, 'H'
@@ -2742,3 +2732,21 @@ bs_dlv:     call bs_ilv.cp
             dec b
             jr nz, .d
             ret
+
+; a battle message's item ($7E4F's first byte) after its words: on the line if it fits, else the next
+section bank B_BSCR, $7660
+bs_mitem:   ld a, e
+            cp 8
+            jr c, .f
+            inc d
+            ld e, 1
+.f:         push de
+            ld a, [$D8E4]
+            ld e, a
+            ld d, 0
+            call bs_name
+            pop de
+            ld a, 19
+            sub e
+            ld [bs_maxw], a
+            jp bs_putsn
