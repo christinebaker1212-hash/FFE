@@ -268,6 +268,17 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   damage per step and damage floors (grey flicker, 1 HP) (3B/A09B, A0B1).
 - Not yet: $EF special animations (and the map tile swaps of the statues / Saronia's gate),
   the guest's picture, Hein's castle and the chocobo objects.
+- Plan in progress (world-map sprites as FF3, 3E/D85D): FF3's OBJ tiles $80-$FF on the world map
+  (3D/BDE0): $80-$8F 0B/8700, $90-$97 0B/9E80, $98-$9F 0B/9900, $C0-$FF 0B/9A80; worlds 0 / 1:
+  $A0-$BF 0B/9700 (Hein's castle, whirlpool; $6020 & $0C) or 0B/9500 (Bahamut); other worlds:
+  $A0-$AF 0B/9980, $B0-$BF 0B/9F00. Free on the GB: VRAM bank 1 $8800-$8FFF on the world map
+  (tiles $20-$7F already FF3's numbering). Coordinates: the party is at NES (112, D8CA[vehicle])
+  and GB (64, 64): GB = NES x - 48, y - 44. Each FF3 routine (D8D3 player / vehicle with shadow,
+  chain, spinning ($602F bit 6); DB09 / DB2F / DAD4 parked; DAA3 chocobo running away; D52F
+  leviathan shadow; D537 floating-continent objects; D5E3 continent in the sky; D666 Invincible;
+  DB58 guest; 3A/9442 bubbles; DA3A the 2 x 2 object drawer) appends converted entries to the
+  GB OAM. Then $EF (3B/A4FA) and the map tile swaps (3B/A9BA: metatile Y's tables copied to X,
+  the view redrawn).
 - Not yet in menus: Exit / Teleport / Sightro and the Midgard Bread / Otter's Head (they need the
   minimap and FF3's warp), FF3's spell list Swap, the stat-up messages after equipping.
 
