@@ -305,7 +305,8 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
 - Monster chests (3F/F5A1: the item, then the battle once the message closes); triggers wait for
   the dialogue box as FF3's (3F/E213).
 - The magic menu's Swap (3C/96F5: Use / Swap / Item; two living members' spell lists exchanged).
-- Not yet in menus: FF3's "Effect... Strength rose by 5!" messages (t8200 $3F-$46) for equipment.
+- After equipping (3C/9E4B): the item's stat bonuses from FF3's properties buffer ($7400 + 8 slot
+  + 6) each with its message ("Strength 5 up!" .. "Bolt power up!", t8200 $3F-$46).
 - Battle presentation from FF3's animation layer (banks $2F / $32 / $33), started: the monsters'
   pre-attack flash (2F/B024: the attacker in the windows' palette every other frame, 8 frames), the
   characters drawn by FF3's pose frames (32/9111 with its frame / position tables from the ROM;
@@ -364,9 +365,14 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   explosions, the monsters in red). Whole-screen effects use FF3's coordinates scaled 5 / 8.
   Megaflare's colour emphasis (PPU $2001) is shown as the white backdrop only. Test hooks:
   GB3N_ANKIND='$02' GB3N_ANSUM='$id x 16 + attack'.
+- Reflect (33/B64F): the spell's reflection at the target (palette $B1, 33/B5BB's sprites), then its
+  hit on the one it bounces onto ($7EB9). Ranged weapons (33/A0C0): bow (with arrows in the other
+  hand: the left hand with the right's hits), harp, boomerang, full moon, shuriken: their poses and
+  sprite frames as FF3, the projectile in a straight line to the target's centre (FF3 aims by angle
+  tables made for its NES layout), the arrows / shuriken stuck round the target with each hit,
+  the boomerang's hits at the target and its way back. Test hook GB3N_ANWPN (the right hand's type).
 - Not yet in battle: the airship cannon (32/84C9), Flare Wave's final-boss wave (10/8BD5) and the final boss's death (10/8A85),
-  reflect (33/B64F), bows / harps / boomerangs / moons / shuriken / arrows (their own weapon
-  animations: they show the step only), stone characters in the BG, back attacks drawn flipped (FF3
+  stone characters in the BG, back attacks drawn flipped (FF3
   3F/F942: the monsters' tiles mirrored, the party at x $30), the airship's battle background.
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)

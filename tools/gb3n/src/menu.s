@@ -3272,7 +3272,7 @@ e_pick:     call e_list                     ; -> m_elist (inventory places), m_e
             inc h
 .g:         ld a, [hl]                      ; the pack's place
             call e_equip
-            ret nc
+            jr nc, e_bonus
             ld a, $6F                       ; "Can't equip."
             call m_msg
             call m_show
@@ -3408,6 +3408,44 @@ e_listdraw: ld de, $0B00
             cp 17
             jr nz, .r
 .x:         jp m_show
+; after equipping (3C/9E4B): the item's stat bonuses (FF3's properties buffer $7400 + 8 slot + 6,
+; filled by its equipment update) each with its message "Strength 5 up!" .. "Bolt power up!"
+e_bonus:    ld a, [m_who]
+            ld c, a
+            %FAR B_BSCR, bs_fequip
+            call e_draw
+            call m_show
+            ld a, [m_eslot]                 ; (slot 5: the fifth record)
+            cp 5
+            jr nz, .s
+            dec a
+.s:         add a
+            add a
+            add a
+            add 6
+            ld l, a
+            ld h, $D4
+            ld a, 2
+            ldh [rSVBK], a
+            ld b, [hl]
+            ld a, 1
+            ldh [rSVBK], a
+            ld c, $3F
+.b:         sla b
+            jr nc, .n
+            push bc
+            ld a, c
+            call m_msg
+            call m_show
+            call m_waitkey
+            call e_draw
+            call m_show
+            pop bc
+.n:         inc c
+            ld a, c
+            cp $47
+            jr nz, .b
+            ret
 ; equip the pack's place A in slot [m_eslot] (3C/9C3C): C = can't
 e_equip:    ld [m_islot], a
             add $C0
