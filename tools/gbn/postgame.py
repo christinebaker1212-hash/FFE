@@ -83,7 +83,9 @@ def classify(G, rec):
     for c, ps in zc.items():
         near = [p_ for p_ in ps if any(0 <= p_[0] + a < w and 0 <= p_[1] + b < h and g[p_[1] + b][p_[0] + a] in '.L'
                                        for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
-        if len(ps) > 2 or not near:
+        if len(ps) > 2 and len(near) * 2 > len(ps):   # (a common one along the corridors: floor, e.g. the
+            for x, y in ps: g[y][x] = '.'                   #   Western Keep's carpet)
+        elif len(ps) > 2 or not near:
             for x, y in ps: g[y][x] = ' '
     for (x, y) in doors:                            # the opening above a door: the room's border
         if y > 0 and g[y - 1][x] in 'Cr': g[y - 1][x] = 'O'
@@ -310,8 +312,12 @@ def cave_floor(G, rec, role, n_chests, pc=None, floor_chips=(), stairs_out=True,
         bosses = [(x, y, 0xC0) for x, y in bosses if (x - ox, y - oy) in reach]   # (rooms the party reaches)
         far = sorted((q for q in reach if q in walk and g[q[1]][q[0]] == '.' and q != start and q not in stairs),
                      key=lambda q: -reach[q])
+        n_walk = len(bfs(walk, start))
         for q in far[1 if fixed and not chests else 0:]:   # (the fixed chest's cell kept: far[0])
             if len(bosses) >= 4: break
+            orbs = {(b[0] - ox, b[1] - oy) for b in bosses} | {q}
+            if len(bfs(walk - orbs, start)) < n_walk - len(orbs):   # (an orb never walls in the rest)
+                continue
             if all(abs(q[0] + ox - b[0]) + abs(q[1] + oy - b[1]) > 6 for b in bosses):
                 bosses.append((q[0] + ox, q[1] + oy, 0x40))
         if fixed and not chests:                    # (the boss floor's own chest: beyond the boss)
@@ -320,7 +326,9 @@ def cave_floor(G, rec, role, n_chests, pc=None, floor_chips=(), stairs_out=True,
     # chests on dead ends, far from the start and each other
     if n_chests:
         d0 = reach
-        ok = lambda p: p in d0 and p != start and p not in stairs and g[p[1]][p[0]] in '.C'
+        ok = lambda p: p in d0 and p != start and p not in stairs and g[p[1]][p[0]] in '.C' and \
+            any((p[0] + a, p[1] + b) in walk and (p[0] + a, p[1] + b) not in stairs
+                for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)))       # (not reached by the stairs alone)
         dead = [p for p in walk if ok(p) and
                 sum((p[0] + a, p[1] + b) in walk for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1))) == 1]
         corner = [p for p in walk if ok(p) and g[p[1]][p[0]] == '.' and
@@ -342,6 +350,7 @@ def cave_floor(G, rec, role, n_chests, pc=None, floor_chips=(), stairs_out=True,
     return dict(map=bytes(v for row in out for v in row), start=(start[0] + ox, start[1] + oy),
                 chests=chests, bosses=bosses, stairs=[(x + ox, y + oy) for x, y in stairs], exit=exit_,
                 w=w, h=h, ox=ox, oy=oy, walk={(x + ox, y + oy) for x, y in walk if (x, y) not in stairs},
+                rooms={(x + ox, y + oy) for x, y in inroom},
                 reach={(x + ox, y + oy): d for (x, y), d in reach.items()})
 
 
@@ -427,7 +436,7 @@ def _floors(rom, G=None):
         ev = pgevents.build(rom).get(rec)
         if ev and role != 'boss':                   # (the floor's people: pgevents.py)
             assert len(ev['people']) <= 15, rec
-            pl = pgevents.place(rec, f, ev['people'], f['walk'], f['reach'])
+            pl = pgevents.place(rec, f, ev['people'], f['walk'], f['reach'], ov['t']['prop'])
             assert not ev.get('gate') or None not in pl, 'floor %d: a gate\'s people must all be placed' % rec
             for n, at in enumerate(pl):
                 if at is None: continue

@@ -324,7 +324,7 @@ def floors(shops):
                       ('label', 'ok'), ('say', 677)], 'near', True),
         dragon(F_RED_DRAGON, 0, 679), dragon(F_BLUE_DRAGON, 1, 680), dragon(F_GREEN_DRAGON, 2, 683),
         P(G_DRAGON, say(681)), P(G_DRAGON, say(682))])
-    beaver = lambda k, t: P(G_DWARF, [('set', k), ('hide',), ('say', t)])
+    beaver = lambda k, t: P(G_DWARF, [('set', k), ('hide',), ('say', t)], None, True)
     F[162] = dict(gate=1 << OPEN, held=748, people=[
         P(G_OLD, [('ifset', OPEN, 'ok'), ('ifall', 63, 'won'), ('ifset', 14, 'again'), ('set', 14),
                   ('say', 747), ('label', 'again'), ('say', 748), ('label', 'won'), ('set', OPEN),
@@ -354,7 +354,7 @@ def floors(shops):
         P(G_VAMPIRE, [('fight', F_VAMPIRE), ('set', 1), ('hide',), ('say', 664)], 'far', True)] +
         talk(*[(G_HOOD, t) for t in (686, 687, 688, 689, 690)]))
     fairy = lambda eff, t0, t1, k: P(G_FAIRY, [('ifset', k, 'done'), ('set', k), (eff,), ('say', t0),
-                                                ('label', 'done'), ('say', t1)])
+                                                ('label', 'done'), ('say', t1)], None, True)
     F[188] = dict(people=[P(G_FAIRY, say(812), 'near')] +
                   talk(*[(G_FAIRY, t) for t in (801, 802, 803, 804, 805, 807, 809)]) +
                   [fairy('heal', 813, 814, 0), fairy('mpup', 815, 816, 1), fairy('drain', 817, 818, 2),
@@ -370,11 +370,11 @@ def floors(shops):
                   [P(G_MAN, [('shop', S['cursed_items'])], None, True),
                    P(G_WOMAN, [('shop', S['cursed_inn'])], None, True)])
     F[193] = dict(people=[
-        P(G_MAN, [('ifset', 0, 'done'), ('set', 0), ('sfx',), ('say', 974), ('label', 'done'), ('say', 975)], 'near'),
-        P(G_TOWN, trade(1, 976, [977, 978], 980)), P(G_OLD, trade(2, 981, [982, 983], 985)),
-        P(G_DWARF, trade(3, 986, [987, 988], 990)), P(G_DWARF, trade(4, 991, [992, 993], 993)),
-        P(G_MAN, trade(5, 996, [997, 998], 1000)), P(G_TOWN, trade(6, 1001, [1002, 1003], 1005)),
-        P(G_DWARF, trade(7, 1006, [1007, 1008], 1010)), P(G_MAN, trade(8, 1011, [1012, 1013], 1011 + 2)),
+        P(G_MAN, [('ifset', 0, 'done'), ('set', 0), ('sfx',), ('say', 974), ('label', 'done'), ('say', 975)], 'near', True),
+        P(G_TOWN, trade(1, 976, [977, 978], 980), None, True), P(G_OLD, trade(2, 981, [982, 983], 985), None, True),
+        P(G_DWARF, trade(3, 986, [987, 988], 990), None, True), P(G_DWARF, trade(4, 991, [992, 993], 993), None, True),
+        P(G_MAN, trade(5, 996, [997, 998], 1000), None, True), P(G_TOWN, trade(6, 1001, [1002, 1003], 1005), None, True),
+        P(G_DWARF, trade(7, 1006, [1007, 1008], 1010), None, True), P(G_MAN, trade(8, 1011, [1012, 1013], 1011 + 2), None, True),
         P(G_OLD, trade(9, 1016, [1017, 1018], 1018), None, True),
         P(G_TITAN, [('ifset', 10, 'done'), ('ifset', 9, 'do'), ('say', 691), ('label', 'do'), ('set', 10),
                     ('give', 1, 6), ('sfx',), ('say', 'giant'), ('label', 'done'), ('say', 691)], 'far', True),
@@ -440,12 +440,29 @@ def cons_prices():
 
 
 # ---- placing the people
-def place(rec, f, people, walk, reach):
+def place(rec, f, people, walk, reach, prop=None):
     """(x, y, flags) for each person on floor f (map coordinates): walk = the floor's walkable cells, reach
-    = {cell: steps from the start}"""
+    = {cell: steps from the start}; prop = the floor tileset's property bytes (the way through is checked by
+    them: what the party can really walk)"""
     import random
+    from collections import deque
     rnd = random.Random(rec)
     start = tuple(f['start'])
+    if prop is not None:                             # (passable by the tiles' properties; stairs as goals)
+        def pas(c):
+            p = prop[2 * f['map'][64 * c[1] + c[0]]]
+            if p & 0x1E in (2, 4, 6): return True
+            return not (p & 1) and (p & 0x1E) != 8 and not (p & 0xC0)
+        seen = {start: 0}; dq = deque([start])
+        while dq:
+            c = dq.popleft()
+            for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = ((c[0] + a) % 64, (c[1] + b) % 64)
+                if n not in seen and pas(n): seen[n] = seen[c] + 1; dq.append(n)
+        reach = seen
+        rooms = set(f.get('rooms', ()))
+        walk = set(walk) | {c for c in rooms if c in reach and (prop[2 * f['map'][64 * c[1] + c[0]]] & 0x1E) != 8}
+    else: rooms = set()
     keep = {start} | set(map(tuple, f['stairs'])) | {(c[0], c[1]) for c in f['chests']}
     near = lambda p: [((p[0] + a) % 64, (p[1] + b) % 64) for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1))]
     bad = set(keep)
@@ -456,14 +473,13 @@ def place(rec, f, people, walk, reach):
 
     def ok_still(p):                                 # (the way through kept: every needed cell still reached)
         blocked = taken | {p}
-        from collections import deque
         seen = {start}; dq = deque([start])
         while dq:
             c = dq.popleft()
             for n in near(c):
                 if n in reach and n not in blocked and n not in seen:
                     seen.add(n); dq.append(n)
-        return all(q in seen or q in blocked for q in need) and \
+        return all(q in seen for q in need) and \
             all(any(n in seen for n in near(t)) for t in blocked)
     far_max = max(reach[p] for p in cand) if cand else 1
     for pe in people:
@@ -476,7 +492,7 @@ def place(rec, f, people, walk, reach):
         for p in sorted((c for c in cand if c not in taken and not set(near(c)) & taken), key=score, reverse=True) + \
                 sorted(loose, key=score, reverse=True):
             if ok_still(p):
-                taken.add(p); out.append((p[0], p[1], 0x40 if pe['stand'] else 0)); break
+                taken.add(p); out.append((p[0], p[1], (0x40 if pe['stand'] else 0) | (0x80 if p in rooms else 0))); break
         else:
             out.append(None)                         # (no room: this person is left out)
     return out
