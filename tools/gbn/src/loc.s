@@ -195,15 +195,10 @@ it_list:    ld de, it_box
             and a
             jr z, .o
             ld hl, it_ord1
-.o:         ld b, 6
+.o:         ld b, IT_NORD                   ; (FF1's six, then Dawn of Souls': postgame.py)
 .ol:        ld a, [hl+]
             push hl
-            ld l, a
-            add a, low(ITEMS)
-            ld h, a
-            ld a, l
-            ld l, h
-            ld h, high(ITEMS)
+            call it_cnt
             push af
             ld a, [hl]
             and a
@@ -234,8 +229,6 @@ it_list:    ld de, it_box
 .x:         ld a, c
             ld [it_n], a
             ret
-it_ord0:    db $16, $17, $18, $19, $1A, $1B
-it_ord1:    db $19, $1A, $1B, $16, $17, $18
 
 ; the item screen (the page of it_cur) into the map copy
 it_draw:    call scr_cls
@@ -308,9 +301,7 @@ it_draw:    call scr_cls
             ld a, [it_id]                   ; consumables: the count
             cp $16
             jr c, .nc
-            add a, low(ITEMS)
-            ld l, a
-            ld h, high(ITEMS)
+            call it_cnt
             ld a, [hl]
             call nf_a
             pop bc

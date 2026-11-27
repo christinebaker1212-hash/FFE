@@ -101,7 +101,7 @@ def pg_defs():
     import pgbattle
     return ('PGM_MAP0 = %d\nPGM_END = %d\n' % (postgame.PG_MAP0, postgame.PG_END) +
             'PGB_DATA = %d\nPGB_CHR = %d\nPGB_SIL = %d\n' % (pgbattle.PGB_DATA, pgbattle.PGB_CHR, pgbattle.PGB_SIL) +
-            postgame.pg_source(116))
+            postgame.pg_source(116) + postgame.text_source() + postgame.items_source())
 
 
 def snd_tables(rom):
@@ -190,6 +190,9 @@ def town_refl_base(p):
 
 def data_banks(rom, ff3=None, init=None):
     banks = {}
+    import postgame
+    postgame.overworld_patch()                       # (the shrines' doors: before the overworld)
+    postgame.names_patch()                           # (its items' names, prices, armour)
     data.FONT_CODES = text.field_codes()
     data.TALL = data.tall_maps(rom)
     c = data.common_pack(rom)
@@ -214,6 +217,8 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, COMMON, 0x5D00, weapon_slots(rom))           # weapon slots (16), armour (16)
     nb = names.names_bank(rom, ff3)
     nb[0x3000:0x3200] = rom.rd(0x0D, 0xBC00, 0x200)            # item prices (FF1 lut_ItemPrices)
+    for code, pr in names.PRICE.items():                       # (the post-game's items)
+        nb[0x3000 + 2 * code:0x3002 + 2 * code] = pr.to_bytes(2, 'little')
     nb[0x3200:0x3300] = rom.rd(0x00, 0xB100, 0x100)            # chest contents (lut_Treasure)
     banks[names.NAMES_BANK] = nb
     banks[ui.MTEXT_BANK] = bytearray(ui.mtext_bank(rom))
@@ -355,6 +360,10 @@ def pg_banks(rom, banks):
         place(banks, b, 0x5800, p['dmg_tiles'])
         banks[battle.BTL_DATA][0x0A00 + m + 1] = 0           # (B_RATES: map + 1)
         PG_INFO[m] = f
+    c = banks[COMMON]                                # the shrine's entrance: FF1's entrance tables
+    c[0x02E0 + postgame.PG_ENT] = fl[0][1]['start'][0]   #   (C_ENTRX, C_ENTRY, C_ENTRM)
+    c[0x0300 + postgame.PG_ENT] = fl[0][1]['start'][1]
+    c[0x0320 + postgame.PG_ENT] = fl[0][0]
     import pgbattle                                  # the battles: their own banks (pgbattle.py)
     bs = pgbattle.build(rom)
     for b, blob in bs['banks'].items():

@@ -135,9 +135,17 @@ def icon_of(rom, k, name):
     return None
 
 
+OVERRIDE = {}           # name code -> (icon, name): the post-game's items (postgame.names_patch)
+PRICE = {}              # name code -> price
+ARMOUR_EXTRA = {}       # armour id -> postgame.NEW_ARMOUR row
+
+
 def name_codes(rom, k, icons=True):
     import ff1_items, text
     name = ff1_items.T.get(k, '')
+    if k in OVERRIDE:
+        ic, name = OVERRIDE[k]
+        return (bytes([ICONS[ic][0]]) if icons else b'') + bytes(text.code_of(ch) for ch in name)
     out = bytearray()
     ic = icon_of(rom, k, name)
     if ic and icons: out.append(ICONS[ic][0])
@@ -162,9 +170,16 @@ def equip_tables(rom):
         i = m.start()
         if b14[i + 5:i + 7] == bytes([0x25, 0x14]): perms.append(b14[i + 3] | b14[i + 4] << 8)
     assert len(perms) == 2
-    return dict(wstat=rom.rd(BANK_EQUIP, WEAPONS, 320), astat=rom.rd(BANK_EQUIP, 0x8140, 160),
-                wperm=rom.rd(14, perms[0], 80), aperm=rom.rd(14, perms[1], 80),
-                atype=armour_types(rom))
+    astat = bytearray(rom.rd(BANK_EQUIP, 0x8140, 160)); aperm = bytearray(rom.rd(14, perms[1], 80))
+    atype = bytearray(armour_types(rom))
+    for aid in sorted(ARMOUR_EXTRA):                   # (the post-game's armour: ids past FF1's 40)
+        _, _, st, pm, ty, _, _ = ARMOUR_EXTRA[aid]
+        while len(atype) < aid:
+            astat += bytes(4); aperm += b'\xff\x0f'; atype.append(0)
+        astat[4 * (aid - 1):4 * aid] = bytes(st); aperm[2 * (aid - 1):2 * aid] = pm.to_bytes(2, 'little')
+        atype[aid - 1] = ty
+    return dict(wstat=rom.rd(BANK_EQUIP, WEAPONS, 320), astat=bytes(astat),
+                wperm=rom.rd(14, perms[0], 80), aperm=bytes(aperm), atype=bytes(atype))
 
 
 def shop_tables(rom):
@@ -222,10 +237,11 @@ def names_bank(rom, ff3=None):
     assert 0x200 + len(body) <= 0x3000
     e = equip_tables(rom)
     blob[0x3300:0x3440] = e['wstat']
-    blob[0x3440:0x34E0] = e['astat']
+    assert len(e['astat']) <= 0xC0 and len(e['aperm']) <= 0x60 and len(e['atype']) <= 0x50
+    blob[0x3440:0x3440 + len(e['astat'])] = e['astat']
     blob[0x3500:0x3550] = e['wperm']
-    blob[0x3550:0x35A0] = e['aperm']
-    blob[0x35A0:0x35C8] = e['atype']
+    blob[0x3550:0x3550 + len(e['aperm'])] = e['aperm']
+    blob[0x35B0:0x35B0 + len(e['atype'])] = e['atype']        # (N_ATYPE: moved from $75A0 for 45)
     d, c = inv_icons(ff3)
     blob[0x3600:0x3800] = d
     blob[0x3800:0x3A00] = c

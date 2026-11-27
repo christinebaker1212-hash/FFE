@@ -247,7 +247,7 @@ def map_pack(rom, m, cls=0, ov=None):
     cgb_obj = b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in sppal[p])
     spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)
     party = b''.join(spr_rank_tile(spr[16 * t_:16 * t_ + 16], sppal[t_ >> 1 & 1]) for t_ in range(16))
-    objs = map_objects(rom, m, n, sppal, ov.get('objs'))
+    objs = map_objects(rom, m, n, sppal, ov.get('objs'), ov.get('obj_gfx'))
     taken = set(range(n)) | set(b + k for b in objs['blocks'] if b >= 128 for k in range(16))
     free = [x for x in range(256) if x not in taken]
     assert len(free) >= len(FONT_CODES), 'map %d: %d BG tiles free for the font' % (m, len(free))
@@ -280,11 +280,19 @@ def ow_row(rom, row):
     return bytes(out[:256].ljust(256, b'\0'))
 
 
+OW_MT_PATCH = {}                        # overworld metatile -> (metatile it copies, properties)
+OW_ROW_PATCH = []                       # (x, y, metatile) changed on the overworld
+
+
 def ow_pack(rom, cls=0):
     """the overworld: tileset (properties, metatiles, palettes, 256 BG tiles), DMG pre-shaded
     tiles, the 256 rows"""
-    blk = rom.rd(BANK_SMINFO, OW_INFO, 0x400)
-    prop, tsa, attr, pal = blk[:256], blk[256:768], blk[768:896], bytearray(blk[0x380:0x3B0])
+    blk = bytearray(rom.rd(BANK_SMINFO, OW_INFO, 0x400))
+    for mt, (src, pr) in OW_MT_PATCH.items():         # (the post-game's entrances: postgame.py)
+        blk[2 * mt:2 * mt + 2] = bytes(pr)
+        for k in range(4): blk[256 + 128 * k + mt] = blk[256 + 128 * k + src]
+        blk[768 + mt] = blk[768 + src]
+    prop, tsa, attr, pal = bytes(blk[:256]), bytes(blk[256:768]), bytes(blk[768:896]), bytearray(blk[0x380:0x3B0])
     mp = rom.rd(BANK_SMINFO, MAPMAN_PAL + 2 * cls, 2)
     pal[0x12], pal[0x16] = mp[0], mp[1]
     mt_pal = bytes(a & 3 for a in attr)
@@ -308,6 +316,8 @@ def ow_pack(rom, cls=0):
     party = b''.join(spr_rank_tile(spr[16 * t:16 * t + 16], sppal[t >> 1 & 1]) for t in range(16))
     vch = rom.rd(BANK_MAPCHR, 0x9C00, 0x600)                  # FF1 LoadOWObjectCHR: sprites $10-$6F
     rows = [ow_row(rom, r) for r in range(256)]
+    for x, y, mt in OW_ROW_PATCH:
+        r = bytearray(rows[y]); r[x] = mt; rows[y] = bytes(r)
     freq = {}
     for r_ in rows:
         for v in r_: freq[v & 0x7F] = freq.get(v & 0x7F, 0) + 1
@@ -387,7 +397,7 @@ def hflip_tile(t16):
     return bytes(rev(b) for b in t16)
 
 
-def map_objects(rom, m, n_bg, sppal, raw=None):
+def map_objects(rom, m, n_bg, sppal, raw=None, gfx=None):
     """map m's objects: the 15 slots (id, x + flags, y, sprite tile base) and the graphics:
     a 16-tile block per distinct graphic, placed in VRAM tiles the BG does not use (party at
     0-15, then 16-127, then down from 255 above the BG's 128+ variants)"""
@@ -402,7 +412,7 @@ def map_objects(rom, m, n_bg, sppal, raw=None):
     slots = bytearray()
     for i in range(15):
         oid, xf, y = raw[3 * i], raw[3 * i + 1], raw[3 * i + 2]
-        g = rom.rd(BANK_SMINFO, OBJ_GFX + oid) if oid else 0
+        g = (gfx[oid] if gfx and oid in gfx else rom.rd(BANK_SMINFO, OBJ_GFX + oid)) if oid else 0
         if oid and g not in base:
             assert free, 'map %d: no sprite tiles left' % m
             base[g] = free.pop(0)

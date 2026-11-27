@@ -1128,7 +1128,7 @@ arrived:    ld a, [px]
             jr .ent
 .ncy:       and a                           ; (nothing: C clear, the next step at once)
             ret
-.ent:       ld a, [px]                      ; (the overworld position kept for the warp out)
+.ent:       call pg_echk                    ; (A = [px]; the post-game's shrines: pg.s)
             ld [ow_x], a
             ld a, [py]
             ld [ow_y], a
@@ -2900,8 +2900,8 @@ load_game:  ld a, $0A
             ret
 
 ; FF1 GameOver: back to the title
-game_over:  di
-            ld sp, $E000
+game_over:  jp pg_gover                     ; (the post-game: back to the world map, pg.s)
+            nop
             ld e, $A5
             ldh a, [is_cgb]                 ; (start reads the console from A)
             and a
