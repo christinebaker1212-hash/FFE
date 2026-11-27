@@ -231,10 +231,9 @@ battle_run: ld a, [map_id]                  ; the battle background (39/BC00 wor
             %FAR B_BSCR, bs_battle
             ld a, [pos_x]
             ld [enter_x], a
-            ld [wm_x], a
             ld a, [pos_y]
             ld [enter_y], a
-            ld [wm_y], a
+            call keep_wm
             call keep_people
             call map_change
             pop af
@@ -298,7 +297,31 @@ menu_open:  ld a, [z_lev]
             and a                           ;   party went in (3C/9918)
             jr z, .st
             pop af
+            ld a, [m_exit]
+            cp 2                            ; Warp (3C/9B5D): back m_wn maps, past the first
+            jr nz, .out                     ;   one out to the world map
+            ld a, [m_wn]
+            ld b, a
+            ld a, [map_sp]
+            sub b
+            jr c, .out
+            ld [map_sp], a
+            ld l, a
+            add a
+            add l
+            add low(map_stack)
+            ld l, a
+            ld h, high(map_stack)
+            ld a, [hl+]
+            ld [map_id], a
+            ld a, [hl+]
+            ld [enter_x], a
+            ld a, [hl]
+            ld [enter_y], a
             xor a
+            ld [z_lev], a
+            jp map_change
+.out:       xor a
             ld [map_sp], a
             ld [z_lev], a
             ld a, [wm_x]
@@ -308,14 +331,22 @@ menu_open:  ld a, [z_lev]
             jp world_back
 .st:        ld a, [pos_x]
             ld [enter_x], a
-            ld [wm_x], a
             ld a, [pos_y]
             ld [enter_y], a
-            ld [wm_y], a
+            call keep_wm
             call keep_people
             call map_change
             pop af
             ld [z_lev], a
+            ret
+; on the world map: its place is where the party stands (in a map it stays where it went in)
+keep_wm:    ld a, [wmode]
+            and a
+            ret z
+            ld a, [pos_x]
+            ld [wm_x], a
+            ld a, [pos_y]
+            ld [wm_y], a
             ret
 ; a shop / inn (B_MENU's screen), then the map again and the inn's event
 shop_talk:  ld a, [z_lev]

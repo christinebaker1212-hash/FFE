@@ -2252,11 +2252,22 @@ i_use:      ld a, [m_icur]
             ld [m_iid], a
             cp $C8
             jp nc, i_teach                  ; a spell: who will hold it
-            cp $B0                          ; Otter's Head (3D/A011): in a map, warp outside
+            cp $AB                          ; Maiden's Kiss / Luck Mallet (3D/A057): not where
+            jr z, .sz                       ;   size cannot change
+            cp $AD
+            jr nz, .nsz
+.sz:        call m_f53
+            and $20
+            ld a, $77                       ; "Can't change size."
+            jp nz, m_say
+            ld a, [m_iid]
+.nsz:       cp $B0                          ; Otter's Head (3D/A011): in a map, warp outside
             jr nz, .noh
             ld a, [wmode]
             and a
             jp nz, i_cant
+            call m_nowarp
+            ret c
             ld a, $65
             call m_warpq
             ret c
@@ -2298,6 +2309,103 @@ i_cant:     ld a, $5A                       ; "It can't be used."
             call m_msg
             call m_show
             jp m_waitkey
+
+; message A in the bottom window until a key
+m_say:      call m_msg
+            call m_show
+            jp m_waitkey
+; FF3's $53 for this map (39/BC00 world 0-2, BD00 the others: bit 7 no magic, 6 no warp, 5 no
+; size change; the world map: map 0's)
+m_f53:      ld a, [map_id]
+            ld e, a
+            ld d, 0
+            ld a, [world]
+            and a
+            ld hl, $BC00 - $4000
+            jr z, .b
+            ld hl, $BD00 - $4000
+.b:         add hl, de
+            ld a, [wmode]
+            and a
+            jr z, .g
+            ld hl, $BC00 - $4000
+.g:         ld a, B_BDAT3
+            jp far_byte
+; C (and "Can't warp." shown) where warping is off (3C/98FE)
+m_nowarp:   call m_f53
+            and $40
+            ret z
+            ld a, $78
+            call m_say
+            scf
+            ret
+; Warp (3C/9AD0): "Go back how many?" 0-45 (up / left down, down / right up, every 4th frame
+; held, wrapping), A (once released) on a number above 0; B cancels (C)
+m_warpn:    call m_clear
+            call m_sprclr
+            ld a, $67
+            call m_msg
+            xor a
+            ld [m_wn], a
+            ld [m_tmpc], a                  ; (FF3's $62: A released since)
+.lp:        ld a, [m_mrow]                  ; the number on the window's second line
+            add 2
+            ld d, a
+            ld e, 2
+            ld a, [m_wn]
+            ld l, a
+            ld h, 0
+            ld b, 2
+            call m_num
+            call m_show
+            ldh a, [pad]
+            and PAD_A
+            jr nz, .ah
+            ld a, 1
+            ld [m_tmpc], a
+.ah:        ldh a, [pad_new]
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .d
+            ld a, [m_tmpc]
+            and a
+            jr z, .d
+            ld a, [m_wn]
+            and a
+            jr z, .x
+            call m_sfx_ok
+            ld a, $2D                       ; (FF3's warp sound)
+            call sfx_play
+            ld a, 2
+            ld [m_exit], a
+            and a
+            ret
+.d:         ldh a, [pad]
+            and $F0
+            jr z, .lp
+            ld b, a
+            ld a, [frame]
+            and 3
+            jr nz, .lp
+            ld a, b
+            and $80 | $10                   ; down / right: one more
+            ld a, [m_wn]
+            jr z, .dn
+            inc a
+            cp 46
+            jr c, .s
+            xor a
+            jr .s
+.dn:        dec a
+            bit 7, a
+            jr z, .s
+            ld a, 45
+.s:         ld [m_wn], a
+            jr .lp
+.x:         call m_sfx_ok
+            scf
+            ret
 
 ; Warps outside. (t8200 A) and a key: B cancels (C), else the warp is set ([m_exit])
 m_warpq:    push af
@@ -3694,26 +3802,52 @@ g_use:      call m_canequip                 ; the job may cast it ($7200)
             call m_sp1
             and a
             jp z, m_sfx_err
+            call m_f53                      ; (3C/98EC: no magic in this map)
+            add a
+            ld a, $79                       ; "Can't use magic."
+            jp c, m_say
             ld a, [m_iid]                   ; Exit ($EF, 3C/98FA): in a map only, Warps
             cp $EF                          ;   outside. and A
-            jr nz, .ne
+            jr nz, .nw
             ld a, [wmode]
             and a
             jp nz, m_sfx_err
+            call m_nowarp
+            ret c
             ld a, $68
             call m_warpq
             ret c
-            ld a, [m_mpat]
+.mp:        ld a, [m_mpat]
             ld l, a
             ld h, high(SRAM_PAGE + $100)
             dec [hl]
             ret
+.nw:        cp $D8                          ; Warp (3C/992E): in a map, how many back
+            jr nz, .ns
+            ld a, [wmode]
+            and a
+            jp nz, m_sfx_err
+            call m_nowarp
+            ret c
+            call m_warpn
+            ret c
+            jr .mp
+.ns:        cp $FE                          ; Sight (3C/9948): on the world map, the minimap
+            jr nz, .ne
+            ld a, [wmode]
+            and a
+            jp z, m_sfx_err
+            ld a, [m_mpat]
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            dec [hl]
+            jp m_mini
 .ne:        ld a, [m_iid]                   ; a field spell, with its question
             ld hl, G_SPELLS
 .f:         ld b, a
             ld a, [hl+]
             and a
-            jp z, m_sfx_err                 ; (Exit, Teleport, Sightro: later)
+            jp z, m_sfx_err
             cp b
             ld a, [hl+]
             jr z, .q
@@ -5500,6 +5634,7 @@ s_list:     ds 1
 s_t:        ds 3
 s_acc:      ds 3
 m_exit:     ds 1
+m_wn:       ds 1                            ; Warp: how many maps back
 
 ; ==== the Fat Chocobo (3D/B383): Deposit / Withdraw / Exit; deposits up to 99 of an item
 ; ($6300 + id, key items $9A-$A3 refused), withdrawals by id order (3D/B570) into the pack (3C/937E:
@@ -5507,7 +5642,7 @@ m_exit:     ds 1
 ; picture (0A/8A00, 0D/8E00; 3C/835E / 839F, the head every 8 frames) beside the options
 F_LIST     = SCRATCH + $100     ; (work RAM bank 1) the ids held, as FF3's $7C00
 
-section bank B_MENU, $6900
+section bank B_MENU, $6C00
 f_menu:     call f_gfx
 .top:       ld a, $51                       ; "Yooo, need somethiiing?"
             ld [s_mid], a
@@ -5958,3 +6093,6 @@ section wram, $CE50
 f_n:        ds 1
 f_id:       ds 1
 f_row:      ds 1
+
+section bank B_MENU, $7200
+m_mini:     jp m_sfx_err                    ; (the minimap: being written)
