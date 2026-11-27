@@ -39,12 +39,24 @@ memory, hold-A, enemy counts, low-HP colours, results window. Checked on the NES
 to be seen on screen. NES driver for tests: scratch (New Game, names typed by RAM state; FF3 needs
 6 letters + A and rejects duplicate names).
 
-## Mock-ups waiting for the owner
-- "Game Boy Color only" screen (`tools/gb3n/mockup.py build/mock3` -> `build/mock3/cgbonly.png`):
-  A = black text on white, B = title above a framed window, white on black. Wording "This Game
-  Pak is designed only for use on the Game Boy Color." (Lot Check 3.3 / 4.1 names).
+## First bootable ROM (2026-11-27)
+- Owner chose screen **B** for older systems (title above a framed window, white on black).
+- `tools/gb3n/build.py` -> `build/ff3n.gbc` (2 MB MBC5 + battery, 32 KB cart RAM, header CGB $C0,
+  SGB flag 0); `tools/gb3n/src/main.s` (boot: work RAM / high RAM / VRAM / OAM cleared, the LCD off
+  only in V-Blank, double speed, frame wait with the check and halt race-free, pad with opposite
+  directions cancelled, soft reset A+B+Select+Start); `tools/gb3n/tiles.py` (our font and frame
+  tiles, the screens; no game data). Color / GBA: a placeholder screen (to be replaced by the
+  title). DMG / Pocket / SGB: the notice, with DMG registers only.
+- Checked in SameBoy (`build/sbsh`, core built with `tools/gb/sameboy/sameboy-ffe.patch`,
+  `SB_LCHK=1`), 710 frames with a soft-reset press, on Game Boy Color, Game Boy, Game Boy Pocket,
+  Super Game Boy, Game Boy Advance: strict checker 0, VRAM / OAM checker 0, pictures as expected
+  (the SGB shows the notice in its own default palette, as for any Color-only Game Pak).
+- Test harness rebuild notes (this session): SameBoy at ea667ad + the patch; RGBDS v0.9.1; the
+  `hexdump` stand-in must take the file as its last argument; `sbsh` built with
+  `-I<SameBoy>/libretro` when libretro-common is not installed.
 
 ## Next (after the decisions)
 - Map the listing's routine names onto the ROM (as `tools/gb/ff1dis.py` did for FF1).
-- Copy the build skeleton, generic modules and test tools into `tools/gb3n/`; boot screen, font,
-  the "Game Boy Color only" screen, one map on screen; strict SameBoy checker at 0.
+- One FF3 map on screen: map properties (bank 2), tileset / metatiles / attributes / tile
+  properties (bank 1), the map's graphics subset, its compressed background tilemap ($7400 RAM,
+  bank $11+), palettes (listing: $3A $915E init map, $9267 load map properties).
