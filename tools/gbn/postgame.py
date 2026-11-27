@@ -633,7 +633,7 @@ def statue(rom):
     return cgb, dmg, p
 
 
-def learn_pieces(rom, ts):
+def learn_pieces(rom, ts, only=None):
     """an FF1 tileset's floor-building pieces, learnt from FF1's own maps that use it: the corridor floor (the
     commonest walkable floor outside the room palette), the void (the commonest piece with nothing walkable
     round it), the wall piece for each side the corridor is on (right / left / above / below, then the corners
@@ -645,7 +645,7 @@ def learn_pieces(rom, ts):
     rpal = t['mt_pal'][0x01]
     walk = lambda mt: (not (P(mt) & 1)) or (P(mt) & 0x1E) in (2, 4, 6)
     tsof = [rom.rd(data.BANK_SMINFO, data.TILESETS + m) for m in range(data.N_MAPS)]
-    maps = [m for m in range(data.N_MAPS) if tsof[m] == ts]
+    maps = [m for m in range(data.N_MAPS) if tsof[m] == ts and (only is None or m in only)]
     fl, void, st, up = collections.Counter(), collections.Counter(), collections.Counter(), collections.Counter()
     for m in maps:
         mp = data.std_map(rom, m)
@@ -681,19 +681,23 @@ def learn_pieces(rom, ts):
                 stairs=st.most_common(1)[0][0] if st else None, up=up.most_common(1)[0][0] if up else None)
 
 
-def pieces_for(rom, ts):
+def pieces_for(rom, ts, only=None):
     """everything cave_floor needs for a floor in FF1's tileset ts (learn_pieces, then the room floor, the tile
     below a door, the chests: four of FF1's for rooms and four free metatiles for corridor chests)"""
     import collections
     pc = dict(EARTH_PIECES) if ts == 2 else {}
-    lp = learn_pieces(rom, ts)
+    lp = learn_pieces(rom, ts, only)
+    if only is not None and (lp['stairs'] is None or lp['up'] is None):   # (a one-floor place: the tileset's)
+        whole = learn_pieces(rom, ts)
+        lp['stairs'] = lp['stairs'] if lp['stairs'] is not None else whole['stairs']
+        lp['up'] = lp['up'] if lp['up'] is not None else whole['up']
     t = data.tileset_pack(rom, ts)
     P = lambda mt: t['prop'][2 * mt]
     rpal = t['mt_pal'][0x01]
     tsof = [rom.rd(data.BANK_SMINFO, data.TILESETS + m) for m in range(data.N_MAPS)]
     used, roomfl, below = collections.Counter(), collections.Counter(), collections.Counter()
     for m in range(data.N_MAPS):
-        if tsof[m] != ts: continue
+        if tsof[m] != ts or (only is not None and m not in only): continue
         mp = data.std_map(rom, m)
         for i, v in enumerate(mp):
             used[v] += 1
@@ -727,3 +731,10 @@ def look_tileset(rom, ts, pc):
         pal[mt] = pal[pc['floor']]
         for k in range(4): tsa[128 * k + mt] = tsa[128 * k + src]
     return dict(prop=bytes(prop), tsa=bytes(tsa), mt_pal=bytes(pal), cgb_tiles=t['cgb_tiles'])
+
+
+# Dawn of Souls' floor tilesets -> the FF1 look they imitate: (FF1 tileset, FF1 maps to learn its pieces from,
+# the FF1 map whose palette the floor takes)
+LOOKS = {0x01: (2, (29, 30, 31, 32), 29), 0x0C: (2, (60,), 60), 0x0D: (2, (33, 34, 35, 36), 33),
+         0x09: (5, (42, 43, 44, 45, 46), 42), 0x21: (6, (47, 48, 49, 50, 51), 47), 0x0B: (7, tuple(range(52, 60)), 52),
+         0x16: (3, (15, 37, 38), 15), 0x1C: (3, (18,), 18), 0x1D: (3, (17, 39), 17), 0x20: (4, (22, 27, 28), 22)}
