@@ -12,13 +12,24 @@ AN_TILES   = an_blob + ($968A - $943D)
 AN_FLIP    = an_blob + ($9503 - $943D)
 AN_OAM     = oam_buf + 4 * 24
 
-section bank B_BSCR, $6A00
-; ---- the animation of the action ($7EC2 -> 34/83F8): A = FF3's attack animation id
-an_kind:    ld a, [$DEC2]
-            ld hl, an_ids
-            call bs_hl_a
-            ld a, [hl]
+section bank B_BANIM, $4000
+; calls into the battle screen's bank (BC, DE kept)
+xb_party:   ld hl, bs_party
+xb_go:      ld a, B_BSCR
+            jp far_call
+xb_jobaddr: ld hl, bs_jobaddr
+            jr xb_go
+xb_vrows:   ld hl, bs_vrows
+            jr xb_go
+xb_srect:   ld hl, bs_srectx
+            jr xb_go
+; HL += A
+an_hla:     add l
+            ld l, a
+            ret nc
+            inc h
             ret
+; ---- the animation of the action ($7EC2 -> 34/83F8): A = FF3's attack animation id
 
 ; ---- battle graphics $12, a character's fight (2F/B24F, 33/A0C0): stepping forward, each hand's
 ; swings (8 frames a hit: arm back, then forward with the hit on the target), back
@@ -32,11 +43,11 @@ an_fight:   ld a, [$D8D6]
             call an_savepal
             ld a, [$D8D6]
             ld [bs_act], a
-            call bs_party
+            call xb_party
             ld a, [an_c]                    ; confused: no hits shown (33/A6C3)
             add a
             ld hl, $D8BB
-            call bs_hl_a
+            call an_hla
             bit 3, [hl]
             jr z, .nc
             xor a
@@ -53,12 +64,12 @@ an_fight:   ld a, [$D8D6]
             call an_restpal
             ld a, $FF
             ld [bs_act], a
-            jp bs_party
+            jp xb_party
 
 ; one hand (33/A094): A = its animation (0 fist .. 9 claw); hits limited to 33/A077's - 1
 an_hand:    ld [an_a], a
             ld hl, an_max
-            call bs_hl_a
+            call an_hla
             ld b, [hl]
             ld a, [an_h]
             add low(BZ + $BB)
@@ -184,13 +195,13 @@ an_next:    ld a, [an_n]
 .x:         call an_clr                     ; (33/AC35)
             ld a, $FF
             ld [an_cf], a
-            call bs_party
+            call xb_party
             jp an_frame
 
 ; the attacker's frame A this frame (keeps BC)
 an_cframe:  ld [an_cf], a
             push bc
-            call bs_party
+            call xb_party
             pop bc
             ret
 ; the weapon's animation sprite frame A at the attacker (33/A3EB)
@@ -235,7 +246,7 @@ an_chit:    ld a, [BZ + $BB]                ; (no hits: nothing)
             ld [an_hc], a
             ld [an_c], a
             ld c, a
-            call bs_jobaddr                 ; the hit tiles (2F/A9B1)
+            call xb_jobaddr                 ; the hit tiles (2F/A9B1)
             ld a, [bs_ja]
             ld l, a
             ld a, [bs_ja + 1]
@@ -258,7 +269,7 @@ an_chit:    ld a, [BZ + $BB]                ; (no hits: nothing)
             ld a, [an_hc]                   ; frame 4 (toad / mini $0F)
             add a
             ld hl, $D8BB
-            call bs_hl_a
+            call an_hla
             ld a, [hl]
             and 5
             ld a, 4
@@ -285,7 +296,7 @@ an_chit:    ld a, [BZ + $BB]                ; (no hits: nothing)
             ld a, $FF
             ld [an_cf], a
             ld [an_hc], a
-.w2:        call bs_party                   ; two frames
+.w2:        call xb_party                   ; two frames
             call an_frame
             jp an_frame
 
@@ -355,7 +366,7 @@ an_slice:   call an_tcen
             ld e, a
             ld a, [an_b9]
             ld hl, sl_mask
-            call bs_hl_a
+            call an_hla
             ld a, [hl]
             ld [an_k], a
             ld hl, an_b9
@@ -446,7 +457,7 @@ an_spr:     ld [an_k], a
             push af
             ld a, c
             ld hl, AN_FLIP
-            call bs_hl_a
+            call an_hla
             ld c, [hl]
             pop af
             pop hl
@@ -458,7 +469,7 @@ an_spr:     ld [an_k], a
             ld a, c                         ; HL = the layout (NES pointer - $943D)
             add a
             ld hl, an_blob
-            call bs_hl_a
+            call an_hla
             ld a, [hl+]
             ld h, [hl]
             ld l, a
@@ -472,7 +483,7 @@ an_spr:     ld [an_k], a
 .cp:        ld a, [an_c]
             push hl
             ld hl, $DD93
-            call bs_hl_a
+            call an_hla
             ld a, [hl]
             pop hl
             and 3
@@ -503,7 +514,7 @@ an_spr:     ld [an_k], a
             push hl
             ld a, [an_ti]
             ld hl, AN_TILES
-            call bs_hl_a
+            call an_hla
             ld a, [hl]
             ld [bc], a
             inc bc
@@ -526,6 +537,10 @@ an_spr:     ld [an_k], a
 
 ; the next free animation OAM entry -> HL (C: none left)
 an_slot_oam: ld hl, AN_OAM
+            ld a, [an_bgm]                  ; (the party in the BG: any free entry)
+            and a
+            jr z, .l
+            ld hl, oam_buf
 .l:         ld a, [hl]
             and a
             ret z
@@ -543,10 +558,29 @@ an_clr:     ld hl, AN_OAM
 .l:         ld [hl+], a
             dec b
             jr nz, .l
+            ld a, [an_bgm]                  ; (and the entries of members in the BG)
+            and a
+            ret z
+            ld c, a
+            ld hl, oam_buf
+.m:         ld b, 24
+            srl c
+            jr nc, .k
+            xor a
+.z:         ld [hl+], a
+            dec b
+            jr nz, .z
+            jr .n
+.k:         ld a, l
+            add 24
+            ld l, a
+.n:         ld a, c
+            and a
+            jr nz, .m
             ret
 ; a frame of the animation (FF3's $F8B0 + $8AE6): V-Blank, the windows' rows, sprites, sound
 an_frame:   call wait_vbl
-            call bs_vrows
+            call xb_vrows
             call hram_dma
             call snd_frame
             call read_pad
@@ -556,8 +590,10 @@ an_frame:   call wait_vbl
 ; the target's centre (FF3's $7DD7 / $7DD8) on the screen -> D, E
 an_tcen:    ld a, [an_t]
             ld [fl_s], a
-            call bs_srect
+            call xb_srect
             ld de, $4030
+            ld a, [an_src]
+            rra
             ret c
             ld a, [fl_x]
             add a
@@ -627,7 +663,7 @@ an_vcopy:   push af
 ; the attacker's 16 animation tiles: its job's from tile 14 to OBJ $39 (2F/A9CF)
 an_cgfx:    ld a, [an_c]
             ld c, a
-            call bs_jobaddr
+            call xb_jobaddr
             ld a, [bs_ja]
             ld l, a
             ld a, [bs_ja + 1]
@@ -788,7 +824,7 @@ an_magic:   ld a, [$D8D6]
             rra
             and $3F
             ld hl, mg_blk
-            call bs_hl_a
+            call an_hla
             ld a, [hl]
             call an_wspr0
             call an_bubbles
@@ -816,7 +852,7 @@ an_magic:   ld a, [$D8D6]
             rra
             and $3F
             ld hl, mg_wht
-            call bs_hl_a
+            call an_hla
             ld a, [hl]
             call an_wspr0
             call an_stars
@@ -843,10 +879,10 @@ an_magic:   ld a, [$D8D6]
             ld a, $FF
             ld [an_cf], a
             ld [bs_act], a
-            call bs_party
+            call xb_party
             call an_mhit
             call an_restpal
-            jp bs_party
+            jp xb_party
 ; ---- the spell's projectile (33/B276): a member's spell on monsters, not ineffective: from the
 ; caster (x - 16, y + 8) one sprite (tile $58, v-flipped every other two frames) to each target
 ; at 16 pixels a frame, gone at the target; then 10 frames. (FF3 aims by angle tables made for
@@ -1047,6 +1083,322 @@ an_pspr:    push bc
             ret
 AN_PX      = 136 - 16
 
+; ---- the party in the BG while a large effect runs (the GB has 40 sprites, FF3's spell frames
+; take up to 36 besides the party's 24): each member standing on whole cells clear of windows
+; is copied into the BG (its six tiles to VRAM bank 1 BG tiles $90 + 6 c.., its palette to BG
+; palette 2 + p), its sprites hidden; the effect may then use every free entry. an_bgoff puts
+; the sprites back first, then the monster area's cells.
+an_bgon:    xor a
+            ld [an_bgm], a
+            call wait_vbl                   ; OBJ palettes 0-3 -> BG palettes 2-5
+            ld c, 0
+.p:         ld a, c
+            ldh [rOCPS], a
+            ldh a, [rOCPD]
+            ld b, a
+            ld a, c
+            add 16
+            ldh [rBCPS], a
+            ld a, b
+            ldh [rBCPD], a
+            inc c
+            ld a, c
+            cp 32
+            jr nz, .p
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            ld c, 0
+.c:         push bc
+            call an_bgok
+            pop bc
+            jr c, .n
+            push bc
+            call an_bgch
+            pop bc
+            ld a, c
+            ld hl, bit_rev
+            call an_hla
+            ld a, [an_bgm]
+            or [hl]
+            ld [an_bgm], a
+.n:         inc c
+            ld a, c
+            cp 4
+            jr nz, .c
+            call an_bgw
+            xor a
+            ldh [rSTAT], a
+            ld [guard_on], a
+            call an_clr                     ; the sprites off
+            jp an_frame
+bit_rev:    db 1, 2, 4, 8
+; member C's six entries (oam_buf + 24 C): C set if one is off the cells or on a window
+an_bgok:    ld a, c
+            add a
+            ld b, a
+            add a
+            add b
+            add a
+            add a
+            ld l, a
+            ld h, high(oam_buf)
+            ld b, 6
+.e:         ld a, [hl+]
+            and a
+            jr z, .s3
+            sub 16
+            ld d, a
+            and 7
+            jr nz, .no
+            ld a, [hl]
+            sub 8
+            ld e, a
+            and 7
+            jr nz, .no
+            ld a, d
+            cp 96
+            jr nc, .no
+            ld a, e
+            cp 128
+            jr c, .no
+            cp 160
+            jr nc, .no
+            push hl
+            call an_cell
+            ld a, [hl]
+            ld de, MON_T - SH_T
+            add hl, de
+            cp [hl]
+            pop hl
+            jr nz, .no
+.s3:        inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .e
+            and a
+            ret
+.no:        scf
+            ret
+; HL = SH_T + 20 (D / 8) + E / 8
+an_cell:    ld a, d
+            rrca
+            rrca
+            rrca
+            and $1F
+            ld l, a
+            add a
+            add a
+            add l                           ; 5 row
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl                      ; 20 row
+            ld a, e
+            rrca
+            rrca
+            rrca
+            and $1F
+            call an_hla
+            ld a, h
+            add high(SH_T)
+            ld h, a
+            ld a, l
+            add low(SH_T)
+            ld l, a
+            ret nc
+            inc h
+            ret
+; member C into the BG (under the guard)
+an_bgch:    ld a, c
+            add a
+            ld b, a
+            add a
+            add b
+            ld [an_bgt], a                  ; 6 C
+            add a
+            add a
+            ld l, a
+            ld h, high(oam_buf)
+            ld b, 6
+.e:         push bc
+            ld a, [hl+]
+            and a
+            jr z, .sk
+            sub 16
+            ld d, a
+            ld a, [hl+]
+            sub 8
+            ld e, a
+            ld a, [hl+]                     ; tile -> BG tile $90 + 6 C + j (bank 1)
+            ld c, a
+            ld a, [hl]
+            ld [an_bga], a
+            push hl
+            push de
+            ld l, c
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $8000
+            add hl, de
+            ld a, [an_bgt]
+            add $90
+            ld [an_bgi], a
+            ld e, a
+            ld d, 0
+            sla e
+            rl d
+            sla e
+            rl d
+            sla e
+            rl d
+            sla e
+            rl d
+            ld a, d
+            add $80
+            ld d, a
+            ld a, 1
+            ldh [rVBK], a
+            ld b, 16
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .cp
+            xor a
+            ldh [rVBK], a
+            pop de
+            call an_cell                    ; the cell
+            ld a, [an_bgi]
+            ld [hl], a
+            ld bc, SH_A - SH_T
+            add hl, bc
+            ld a, [an_bga]
+            and $67
+            add 2
+            or $08
+            ld [hl], a
+            pop hl
+            inc hl
+            jr .nx
+.sk:        inc hl
+            inc hl
+            inc hl
+.nx:        ld a, [an_bgt]
+            inc a
+            ld [an_bgt], a
+            pop bc
+            dec b
+            jr nz, .e
+            ret
+; the sprites back (bs_party), then the cells (MON_T, rows 0-11 columns 16-19)
+an_bgoff:   ld a, [an_bgm]
+            and a
+            ret z
+            xor a
+            ld [an_bgm], a
+            call xb_party
+            call an_frame
+            ld hl, SH_T + 16
+            ld de, MON_T + 16
+            ld b, 12
+.r:         push bc
+            ld b, 4
+.c:         ld a, [de]
+            ld [hl], a
+            push hl
+            push de
+            ld bc, SH_A - SH_T
+            add hl, bc
+            ld a, e                         ; (MON_A - MON_T = 240)
+            add 240
+            ld e, a
+            ld a, d
+            adc 0
+            ld d, a
+            ld a, [de]
+            ld [hl], a
+            pop de
+            pop hl
+            inc hl
+            inc de
+            dec b
+            jr nz, .c
+            ld a, l
+            add 16
+            ld l, a
+            jr nc, .r1
+            inc h
+.r1:        ld a, e
+            add 16
+            ld e, a
+            jr nc, .r2
+            inc d
+.r2:        pop bc
+            dec b
+            jr nz, .r
+            call wait_vbl
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            call an_bgw
+            xor a
+            ldh [rSTAT], a
+            ld [guard_on], a
+            ret
+; the cells of rows 0-11, columns 16-19 to VRAM (under the guard)
+an_bgw:     ld hl, SH_T + 16
+            ld de, $9800 + 16
+            ld c, 12
+.r:         push hl
+            push de
+            ld b, 4
+.t:         ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .t
+            pop de
+            pop hl
+            push hl
+            push de
+            ld a, 1
+            ldh [rVBK], a
+            ld a, l
+            add low(SH_A - SH_T)
+            ld l, a
+            ld a, h
+            adc high(SH_A - SH_T)
+            ld h, a
+            ld b, 4
+.a:         ld a, [hl+]
+            ld [de], a
+            inc e
+            dec b
+            jr nz, .a
+            xor a
+            ldh [rVBK], a
+            pop de
+            pop hl
+            ld a, l
+            add 20
+            ld l, a
+            jr nc, .h
+            inc h
+.h:         ld a, e
+            add 32
+            ld e, a
+            jr nc, .h2
+            inc d
+.h2:        dec c
+            jr nz, .r
+            ret
 ; the spell $7E88's graphics properties (33/AF6F: 2E/91D0)
 an_mprop:   ld a, [$DE88]
             ld l, a
@@ -1131,6 +1483,7 @@ an_mhit:    ld a, [$DE9D]
             call an_vcopy
             ld a, 8
             call an_lgfx
+            call an_bgon
             ld a, [$DE88]                   ; the list
             add a
             ld l, a
@@ -1145,7 +1498,7 @@ an_mhit:    ld a, [$DE9D]
             cp MG_NSND
             jr nc, .ns
             ld hl, mg_snd
-            call bs_hl_a
+            call an_hla
             ld a, [hl]
             call bs_sfx
 .ns:        xor a
@@ -1161,7 +1514,8 @@ an_mhit:    ld a, [$DE9D]
             cp 8
             jr nz, .t
             call an_clr
-            jp an_frame
+            call an_frame
+            jp an_bgoff
 ; target an_t: the list's frames
 an_mone:    ld a, [$DE9A]                   ; the place
             bit 6, a
@@ -1269,7 +1623,7 @@ an_mframe:  add a
             add a
             add a
             ld hl, mf_grid
-            call bs_hl_a
+            call an_hla
             ld a, [hl+]
             ld [an_gx0], a
             ld [an_gx], a
@@ -1281,7 +1635,7 @@ an_mframe:  add a
             ld [an_gdy], a
             ld a, [an_fl]
             ld hl, mf_flip
-            call bs_hl_a
+            call an_hla
             ld a, [hl]
             ld [an_gfl], a
             xor a
@@ -1366,6 +1720,12 @@ an_mframe:  add a
             and $C0
             rra
             or $0B
+            ld c, a
+            ld a, [$DE9A]                   ; a member target: behind the party (NES order)
+            cpl
+            and $40
+            add a
+            or c
             ld [hl], a
             ret
 
@@ -1374,7 +1734,7 @@ an_cast:    call an_clr
             ld a, [an_c]
             add a
             ld hl, $D8BB
-            call bs_hl_a
+            call an_hla
             ld a, [hl]
             and 5
             ld a, 8
@@ -1424,7 +1784,7 @@ an_bubbles: call an_mypos
             add b
             push hl
             ld hl, mg_bub
-            call bs_hl_a
+            call an_hla
             ld a, [hl]
             pop hl
             ld e, a
@@ -1514,7 +1874,7 @@ an_stars:   call an_mypos
             ret
 ; A = sin(angle A) x [an_k] (33/BFC6: 256 sin, its size x 2 x the distance / 256, the sign kept)
 an_smul:    ld hl, an_sin
-            call bs_hl_a
+            call an_hla
             ld a, [hl]
             bit 7, a
             jr z, .p
@@ -1575,7 +1935,7 @@ an_lgfx:    add a
             ld a, B_ANIM
             jp an_vcopy
 
-section bank B_BSCR, $7600
+section bank B_BANIM, $7000
 an_blob:    ds $375                         ; (32/943D-97B1)
 mg_prop:    ds 3 * $60                      ; (2E/91D0)
 mg_blk:     ds 11                           ; (33/B1D7)
@@ -1592,7 +1952,7 @@ an_max:     ds 9                            ; (33/A077)
 an_ids:     ds 25                           ; (34/83F8)
 wp_prop:    ds 3 * $60                      ; (2E/9098)
 
-section bank B_BSCR, $7F00
+section bank B_BANIM, $7F00
 an_sin:     ds 256                          ; (10/9A80)
 
 section wram, $CD00
@@ -1625,6 +1985,11 @@ an_hc:      ds 1
 an_m0:      ds 1
 an_m1:      ds 1
 an_lskip:   ds 1
+an_src:     ds 1
+an_bgm:     ds 1
+an_bgt:     ds 1
+an_bga:     ds 1
+an_bgi:     ds 1
 an_pn:      ds 1
 an_py:      ds 1
 an_lp:      ds 2

@@ -1667,26 +1667,26 @@ bsc_anim:   ld a, [$D8D6]
             jr c, .ch
             and 7                           ; a monster: FF3's pre-attack flash (34/8545)
             call bs_flash
-            call an_kind                    ; its fight on a member: the member hit (34/8637);
+            call ui_kind                    ; its fight on a member: the member hit (34/8637);
             cp 1                            ;   its magic: the spell's hit (2F/B15E)
             jr nz, .mf
-            call an_mmon
+            call xa_mmon
             jr .m
 .mf:        and a
             jr nz, .m
             ld a, [$DE9A]
             bit 6, a
             jr nz, .m
-            call an_chit
+            call xa_chit
             jr .m
-.ch:        call an_kind                    ; a character's fight on a monster: its swings
+.ch:        call ui_kind                    ; a character's fight on a monster: its swings
             cp 1                            ;   (34/8613, battle graphics $12); magic: its
-            jp z, an_magic                  ;   casting (34/8577, $1D)
+            jp z, xa_magic                  ;   casting (34/8577, $1D)
             and a
             jr nz, .st
             ld a, [$DE9A]
             bit 6, a
-            jp nz, an_fight
+            jp nz, xa_fight
 .st:        ld a, [$D8D6]
             ld [bs_act], a
             call bs_party
@@ -1699,6 +1699,29 @@ bsc_anim:   ld a, [$D8D6]
             ld a, $FF
             ld [bs_act], a
             jp bs_party
+; the animation bank's routines (B_BANIM)
+xa_mmon:    ld hl, an_mmon
+xa_go:      ld a, B_BANIM
+            jp far_call
+xa_chit:    ld hl, an_chit
+            jr xa_go
+xa_magic:   ld hl, an_magic
+            jr xa_go
+xa_fight:   ld hl, an_fight
+            jr xa_go
+; the action's animation kind (34/83F8)
+ui_kind:    call an_kind
+            ret
+an_kind:    ld a, [$DEC2]
+            ld hl, an_ids
+            call bs_hl_a
+            ld a, B_BANIM
+            jp far_byte
+; bs_srect for the animation bank: its carry in an_src
+bs_srectx:  call bs_srect
+            sbc a
+            ld [an_src], a
+            ret
 ; $0C damage numerals: targets ($7E4F) and attackers ($7E5F), three at a time, 32 frames
 bsc_nums:   xor a
             ld [bs_nn], a

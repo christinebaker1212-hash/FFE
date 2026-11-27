@@ -130,6 +130,7 @@ B_WSPR = 81                 # world-map sprites: FF3's tiles $80-$FF, bank $3C's
 B_MINI = 82                 # the minimap: its screen data (tools/gb3n/minimap.py) and code
 B_ANIM = 83                 # battle animations' graphics: NES 2B/B000 (weapons, hits)
 B_MAGIC = 84                # the spells' graphics: NES 16 KB bank $15 (2A / 2B)
+B_BANIM = 85                # battle animations' code and tables
 
 
 def field_banks(rom):
@@ -432,7 +433,7 @@ def main():
            'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
            'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\nB_BSET = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2, B_BSET) +
            'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\nB_MENU = %d\nB_VGFX = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0, B_MENU, B_VGFX) + text_defs +
-           'B_CUT = %d\nB_CUTG = %d\nB_WSPR = %d\nB_MINI = %d\nB_ANIM = %d\nB_MAGIC = %d\n' % (B_CUT, B_CUTG, B_WSPR, B_MINI, B_ANIM, B_MAGIC) + cut_eq +
+           'B_CUT = %d\nB_CUTG = %d\nB_WSPR = %d\nB_MINI = %d\nB_ANIM = %d\nB_MAGIC = %d\nB_BANIM = %d\n' % (B_CUT, B_CUTG, B_WSPR, B_MINI, B_ANIM, B_MAGIC, B_BANIM) + cut_eq +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
