@@ -182,8 +182,19 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   tilemap, slot types, counts per type, the battle random table (FF3's generator; the seed on the
   GB is our own sum, as FF3's is its zero page's), and the after-action magic message. Checked: 0
   differences over 100 states each.
-- Next: the battle screen (monsters, party, windows, messages, numbers), command menus (ours,
-  writing FF3's records), the battle driver (FF3's main loop order), random encounters.
+- First playable battles (2026-11-27): random encounters on maps and world maps (FF3's rates,
+  groups, chances and field random table), the battle driver in FF3's main-loop order, the screen
+  (`src/batscr.s`, `src/batui.s`): monsters from FF3's formation positions (columns 0-17, rows
+  0-11), the party's battle sprites at the right edge, the party window, FF3's four commands per
+  job (row change with left / right twice), target choice, magic and item lists (FF3's job check,
+  target rules), FF3's action scripts shown in a top window (attacker, attack / hits / Miss,
+  target, status) and a bottom message window (the message queue with its variables), damage
+  numbers as sprites, monster deaths with FF3's experience credit, victory messages, back to the
+  map. Checked in SameBoy: battles fought to defeat (soft restart) and to victory, strict checker
+  and VRAM checker 0.
+- Battle to do: bosses (FF3 draws them from a tilemap, 2A/8000), the monsters' palettes per FF3's
+  attribute data, the party's battle palettes, attack / spell animations, the layout per the
+  owner's mock-up choice, event battles (event command $F7, monster chests).
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
