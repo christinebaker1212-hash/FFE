@@ -321,6 +321,10 @@ ROMDATA = {
     'sp_ptr': (0x3D, 0xA27C, 56),        # menu: each spell's level slots in the list buffer
     'wp_comb': (0x3C, 0x9D4B, 16),       # menu: the hand pairs allowed (weapon types 4 x 4)
     'job_prog': (0x3D, 0xAD59, 44),      # menu: each job's level-up table (bank 39)
+    'nj_h': (0x3B, 0xAC0C, 25),          # event: a person's jump height
+    'dn_x': (0x3B, 0xADB1, 84),          # event: the dance's sub-x, sub-y, facings
+    'dn_y': (0x3B, 0xAE05, 84),
+    'dn_f': (0x3B, 0xAE59, 84),
 }
 
 MACROS = {
@@ -380,6 +384,7 @@ def main():
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'evfx.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'world.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'fbattle.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'vehicle.s')).read() + '\n' +
@@ -392,8 +397,31 @@ def main():
         src = src.replace('            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a',
                           '            ld a, %s\n            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a' % os.environ['GB3N_BATTLE'])
     if os.environ.get('GB3N_STORY'):             # test builds only: Start runs the ending ($DD)
-        ev = {'prol': 'ev_prol', 'epi': 'ev_epi'}.get(os.environ['GB3N_STORY'], 'ev_ending')
+        ev = {'prol': 'ev_prol', 'epi': 'ev_epi', 'fx': 'ev_fxtest'}.get(os.environ['GB3N_STORY'], 'ev_ending')
         src = src.replace('            jp nz, menu_open', '            jp nz, ' + ev)
+        if ev == 'ev_fxtest':                    # (each event effect in turn, Ur's people 1 / 2)
+            src += '''section bank B_FIELD, $7400
+ev_fxtest:  call ev_shake
+            call ev_flash
+            call ev_dark
+            ld b, 60
+.w:         push bc
+            call ev_fx_fr
+            pop bc
+            dec b
+            jr nz, .w
+            call ev_undark
+            ld hl, NPC1 + $10
+            ld a, $0B
+            call ev_npcx
+            ld hl, NPC1 + $10
+            ld a, $0F
+            call ev_npcx
+            ld hl, NPC1 + $20
+            ld a, $0E
+            call ev_npcx
+            jp ev_dance
+'''
     if os.environ.get('GB3N_TEST'):              # test builds: tools/gb3n/test (never a release)
         src = src.replace('.nw:        call map_enter', '.nw:        jp test_loop')
         src += open(os.path.join(HERE, 'src', 'test.s')).read() + '\n'

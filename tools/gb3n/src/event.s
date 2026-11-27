@@ -10,7 +10,7 @@ SR_GIL     = SRAM_PAGE + $1C            ; (gil: 3 bytes at $601C)
 section bank B_FIELD, $6C00
 ; ---- A pressed while standing: a person ahead? run their script
 talk:       call dest_cell
-            call npc_at                     ; HL = their slot
+            call npc_find                   ; HL = their slot (3F/E494)
             jp nc, treasure
             ld a, [hl]                      ; the person's id
             ld [ev_who], a
@@ -522,11 +522,11 @@ ev_exec:    ld a, [ev_cmd]
             ld a, [ev_arg]
             jp hl
 
-evd_table:  dw ev_shake, ev_flash, ev_none, ev_none      ; D0-D3 (palette effects: later)
+evd_table:  dw ev_shake, ev_flash, ev_dark, ev_undark    ; D0-D3 (src/evfx.s)
             dw ev_hpall, ev_mpall, ev_pfloor, ev_pwall   ; D4-D7
-            dw ev_reset, ev_chain, ev_none, ev_prol      ; D8-DB (dance: later)
+            dw ev_reset, ev_chain, ev_dance, ev_prol     ; D8-DB
             dw ev_epi, ev_ending, ev_surf, ev_hp1        ; DC-DF
-            dw ev_none, ev_none, ev_none, ev_none        ; E0-E3 (palette reload, flash)
+            dw ev_repal, ev_repal, ev_flash2, ev_none    ; E0-E3
 evc_table:  dw ev_none, ev_none, ev_none, ev_take        ; E4-E7
             dw ev_stclr, ev_stset, ev_gil, ev_ungil      ; E8-EB
             dw ev_cp, ev_uncp, ev_guest, ev_none         ; EC-EF (special animation: later)
@@ -549,11 +549,6 @@ ev_cutx:    ld a, [pos_x]
 ; $DD: FF3's ending and end credits (src/cutend.s); it ends on The End (soft reset to leave)
 ev_ending:  %FAR B_CUT, cut_end
             jr ev_ending
-; $D0 / $D1: the shake / flash sounds (3B/B58F: sound effects $38, $39; the picture: later)
-ev_shake:   ld a, $58
-            jp sfx_play
-ev_flash:   ld a, $59
-            jp sfx_play
 ; $D4 / $D5: everyone's HP / MP to max (3B/B881 / B862)
 ev_hpall:   ld hl, SRAM_PAGE + $10C
 .m:         ld a, l
@@ -908,7 +903,7 @@ ev_wait:    ld a, [ev_wcnt]                 ; $FC: wait A frames
             jr ev_again
 ev_end:     xor a                           ; $FF: the event's end
             ld [ev_on], a
-            ret
+            jp npc_unface
 ev_again:   ld a, [ev_ptr]                  ; run this command again next frame
             sub 2
             ld [ev_ptr], a
@@ -918,7 +913,7 @@ ev_again:   ld a, [ev_ptr]                  ; run this command again next frame
             ret
 
 ; $00-$BF: person (A >> 4) does A & 15: 0-3 move right / left / down / up, 4-7 face, 8 show,
-; 9 hide ($3B $ACD1; jumps, circles, dances: later)
+; 9 hide, A-F jumps, animation, circle, spin ($3B $ACD1)
 ev_npc:     ld a, [ev_cmd]
             and $F0
             ld l, a
@@ -956,7 +951,7 @@ ev_npc:     ld a, [ev_cmd]
             ld [hl], a
             ret
 .hi:        cp 9
-            ret nz
+            jp nz, ev_npcx                  ; ($0A-$0F: src/evfx.s)
             ld [hl], 0
             ret
 

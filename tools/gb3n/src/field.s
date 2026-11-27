@@ -509,11 +509,16 @@ pal_load:   ld hl, I_RGB                    ; (the NES colour table into SCRATCH
             ld bc, 4
             ld a, B_MAPINFO
             call far_copy
-            ld hl, nes_pal
+            ld c, $3F                       ; (greyscale: the NES's $30 mask, as FF3's flash)
+            ld a, [pl_grey]
+            and a
+            jr z, .m
+            ld c, $30
+.m:         ld hl, nes_pal
             ld de, cgb_pal
             ld b, 36                        ; (nes_pal and win_nes are adjacent)
 .c:         ld a, [hl+]
-            and $3F
+            and c
             add a
             push hl
             ld l, a
