@@ -586,6 +586,9 @@ an_frame:   call wait_vbl
             ld a, [an_opf]                  ; (sprite / summon palettes)
             and a
             call nz, an_oset
+            ld a, [an_bpf]                  ; (a BG palette)
+            and a
+            call nz, an_bpset
             ld a, [an_won]                  ; (a summon in the window)
             and a
             jr z, .nw
@@ -2211,18 +2214,18 @@ an_bput:    xor a
             ld c, a
             ld a, [an_pc + 1]
             ld b, a
-            ld a, $80
+            ld e, $80                       ; colour 0 of BG palettes 0-6 (the monsters', the
+.p:         ld a, e                         ;   party's / a summon's copies)
             ldh [rBCPS], a
             ld a, c
             ldh [rBCPD], a
             ld a, b
             ldh [rBCPD], a
-            ld a, $80 | 8
-            ldh [rBCPS], a
-            ld a, c
-            ldh [rBCPD], a
-            ld a, b
-            ldh [rBCPD], a
+            ld a, e
+            add 8
+            ld e, a
+            cp $80 + 56
+            jr nz, .p
             ret
 
 ; ---- 9: Flare Wave (33/BB45): the hit, the final boss's wave (10/8BD5), the red flash

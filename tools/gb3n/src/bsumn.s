@@ -128,15 +128,27 @@ an_summon:  ld a, [$D8D6]
             pop bc
             dec b
             jr nz, .c2
-            jp an_stepb
+            call an_stepb
+            ld a, [$DE94]                   ; (2F/B158: healing light, barrier, aura: a spell's
+            ld c, $34                       ;   hit on the targets after)
+            cp $30
+            jr z, .sp
+            ld c, $0C
+            cp $50
+            jr z, .sp
+            ld c, $13
+            cp $70
+            ret nz
+.sp:        ld a, c
+            jp an_sspell
 .x:         xor a
             ld [an_bgm], a
             ret
 .go:        jp hl
-.tab:       dw an_s00, an_s01, an_s02, an_none, an_none, an_none
-            dw an_none, an_none, an_none, an_none, an_none, an_none
-            dw an_none, an_none, an_none, an_none, an_none, an_none
-            dw an_none, an_none, an_none, an_none, an_none, an_none
+.tab:       dw an_s00, an_s01, an_s02, an_none, an_s04, an_none
+            dw an_s06, an_s07, an_s07, an_s09, an_none, an_none
+            dw an_none, an_none, an_s14, an_s15, an_s16, an_none
+            dw an_s18, an_none, an_none, an_s21, an_none, an_none
 
 ; the pre-animation's four sprites (AN_OAM 0-3) flying off diagonally (33/B02A, AFF2): out of the
 ; battlefield: tile 0; the tile $55.. by the frame / 8 up to $58
@@ -830,6 +842,366 @@ an_w16:     ld b, 16
             jr nz, .w
             ret
 
+; ---- the targets' ($7E99) cells in BG palette C ($FF: their own again), straight to VRAM
+an_tcells:  ld a, c
+            ld [an_tpc], a
+            ld a, [$DE99]
+            ld [an_tm], a
+            call wait_vbl
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            xor a
+            ld [an_t], a
+.t:         ld a, [an_tm]
+            add a
+            ld [an_tm], a
+            jr nc, .n
+            ld a, [an_t]
+            ld [fl_s], a
+            call xb_srect
+            ld a, [an_src]
+            and a
+            call z, .rect
+.n:         ld hl, an_t
+            inc [hl]
+            ld a, [hl]
+            cp 8
+            jr nz, .t
+            ld a, [an_won]
+            and a
+            jr z, .s
+            ld a, $40
+.s:         ldh [rSTAT], a
+            xor a
+            ld [guard_on], a
+            ret
+.rect:      ld a, [fl_y]
+            ld c, a
+            ld a, [fl_h]
+            ld b, a
+.r:         push bc
+            ld l, c                         ; SH_A + 20 y + x, $9800 + 32 y + x
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, hl
+            add hl, de
+            ld a, [fl_x]
+            call an_hla
+            ld de, SH_A
+            add hl, de
+            push hl
+            ld l, c
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, [fl_x]
+            call an_hla
+            ld de, $9800
+            add hl, de
+            ld d, h
+            ld e, l
+            pop hl
+            ld a, [fl_w]
+            ld b, a
+            ld a, 1
+            ldh [rVBK], a
+.c:         ld a, [an_tpc]
+            cp $FF
+            ld a, [hl+]
+            jr z, .s2
+            and $F8
+            ld c, a
+            ld a, [an_tpc]
+            or c
+.s2:        ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            xor a
+            ldh [rVBK], a
+            pop bc
+            inc c
+            dec b
+            jr nz, .r
+            ret
+; BG palette C = FF3's general palette A (black + its 3 colours), written in the next V-Blank
+an_bgpal:   push bc
+            ld c, 0
+            call an_ogen                    ; (into an_osh palette 0, kept aside)
+            ld hl, an_osh
+            ld de, an_bpq + 1
+            ld b, 4
+.c:         push bc
+            ld a, [hl+]
+            push hl
+            call an_nrgb
+            ld a, c
+            ld [de], a
+            inc de
+            ld a, b
+            ld [de], a
+            inc de
+            pop hl
+            pop bc
+            dec b
+            jr nz, .c
+            pop bc
+            ld a, c
+            add a
+            add a
+            add a
+            or $80
+            ld [an_bpq], a
+            ld a, 1
+            ld [an_bpf], a
+            jp an_oparty0
+; (in V-Blank) the BG palette waiting
+an_bpset:   xor a
+            ld [an_bpf], a
+            ld a, [an_bpq]
+            ldh [rBCPS], a
+            ld hl, an_bpq + 1
+            ld b, 8
+.c:         ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .c
+            ret
+; (an_osh palette 0 back to the party's first)
+an_oparty0: push bc
+            ld c, 0
+            ld a, $FC
+            call an_opal1
+            pop bc
+            ret
+; an_osh palette C = battle palette A (2E/8C00)
+an_opal1:   ld l, a
+            ld h, 0
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, de
+            ld de, $8C00 - $4000
+            add hl, de
+            ld a, c
+            add a
+            add a
+            ld de, an_osh
+            add e
+            ld e, a
+            jr nc, .d
+            inc d
+.d:         ld a, $0F
+            ld [de], a
+            inc de
+            ld bc, 3
+            ld a, B_BDAT2
+            jp far_copy
+; NES colour A -> BC (C low byte, B high)
+an_nrgb:    and $3F
+            add a
+            ld l, a
+            ld h, high(I_RGB)
+            ld a, low(I_RGB)
+            add l
+            ld l, a
+            jr nc, .s
+            inc h
+.s:         push hl
+            ld a, B_MAPINFO
+            call far_byte
+            ld c, a
+            pop hl
+            inc hl
+            ld a, B_MAPINFO
+            call far_byte
+            ld b, a
+            ret
+; the backdrop flashing colour A for B frames (32/8781)
+an_flashn:  ld [an_k4], a
+            ld a, b
+            ld [an_k3], a
+            jp an_flash.f
+
+; ---- 4: Icy Stare (32/8A05), 16: Slash (89FE): the targets in a palette of their own, every
+; other 4 frames general palette $E8 / $FF (FF3's battle palette 2 by turns), 48 frames
+an_s04:     ld a, $E8
+            jr an_s16.g
+an_s16:     ld a, $FF
+.g:         ld c, 6
+            call an_bgpal
+            call an_ssnd
+            xor a
+            ld [an_k3], a
+.f:         ld a, [an_k3]
+            and 3
+            jr nz, .w
+            ld a, [an_k3]
+            and 4
+            ld c, 6
+            jr z, .p
+            ld c, $FF
+.p:         call an_tcells
+.w:         call an_frame
+            ld hl, an_k3
+            inc [hl]
+            ld a, [hl]
+            cp $30
+            jr nz, .f
+            ld c, $FF
+            jp an_tcells
+; ---- 6: Mind Blast (32/89D2): the monsters' palettes cycling white 48 frames (32/8B99, 87AD)
+an_s06:     call an_ssnd
+            ld a, $30
+; the monsters' palettes (BG 0 / 1) cycling in hue A: colours 1-3 the hue at brightness f, f + 1,
+; f + 2 (mod 4) for 48 frames, then their own again
+an_mcyc:    and $0F
+            ld [an_k5], a
+            call an_bgsave
+            xor a
+            ld [an_k3], a
+.f:         ld a, [an_k3]                   ; brightness steps
+            and 3
+            swap a
+            ld b, a
+            ld c, 0                         ; palettes 0 and 1 colours 1-3
+            ld hl, an_bpq + 1
+            ld a, $0F
+            call .one
+            ld a, b
+            call .one
+            ld a, b
+            add $10
+            call .one
+            ld a, b
+            add $20
+            call .one
+            ld a, $80
+            ld [an_bpq], a
+            ld a, 1
+            ld [an_bpf], a
+            call an_frame
+            ld a, $88                       ; (palette 1 the same: written straight after)
+            ldh [rBCPS], a
+            ld hl, an_bpq + 1
+            ld b, 8
+.c1:        ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .c1
+            ld hl, an_k3
+            inc [hl]
+            ld a, [hl]
+            cp $30
+            jr nz, .f
+            jp an_bgrest
+.one:       push bc
+            push hl
+            cp $0F
+            jr z, .k
+            and $30
+            ld c, a
+            ld a, [an_k5]
+            or c
+.k:         call an_nrgb
+            pop hl
+            ld a, c
+            ld [hl+], a
+            ld a, b
+            ld [hl+], a
+            pop bc
+            ret
+; BG palettes 0-1 kept / put back
+an_bgsave:  call wait_vbl
+            ld hl, an_bgs
+            ld c, 0
+.l:         ld a, c
+            ldh [rBCPS], a
+            ldh a, [rBCPD]
+            ld [hl+], a
+            inc c
+            ld a, c
+            cp 16
+            jr nz, .l
+            ret
+an_bgrest:  call wait_vbl
+            ld a, $80
+            ldh [rBCPS], a
+            ld hl, an_bgs
+            ld b, 16
+.l:         ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .l
+            ret
+; ---- 7 / 8: Ramuh (32/8977): the backdrop flashing 16 frames, then (after the summon) spell $2A's
+; hit on the targets
+an_s07:     call an_ssnd
+            ld a, $29
+            ld b, 16
+            call an_flashn
+            ld b, 8                         ; (FF3 cycles its battle background's palette 8 frames)
+.w:         push bc
+            call an_frame
+            pop bc
+            dec b
+            jr nz, .w
+            ld a, $2A
+            jr an_sspell
+; ---- 9: Ifrit's healing light, 15: Odin's barrier, 21: Bahamut's aura: the backdrop flashing (32/877F)
+an_s09:     call an_ssnd
+            ld a, $31
+            jp an_flash
+an_s15:     call an_ssnd
+            ld a, $2B
+            jp an_flash
+an_s21:     call an_ssnd
+            ld a, $31
+            jp an_flash
+; ---- 14: Earthen Fury (32/8C8D): the screen shaking
+an_s14:     jp an_shake
+; ---- 18: Demon Eye (32/89E8): the targets in the windows' palette, the backdrop flashing, 16 frames
+an_s18:     ld a, [$DE9B]
+            and a
+            ret z
+            ld c, 7
+            call an_tcells
+            call an_ssnd
+            ld a, $31
+            call an_flash
+            call an_w16
+            ld c, $FF
+            jp an_tcells
+; a spell's hit (2F/B158 / 32/89B7: type 7) on the targets: A = spell
+an_sspell:  ld [$DE88], a
+            ld a, 7
+            ld [$DE9D], a
+            ld a, [$DE99]
+            ld [$DE9B], a
+            xor a
+            ld [BZ + $CC], a
+            call an_mprop
+            call an_savepal
+            ld a, [an_m2]
+            call an_gpal3
+            call an_mhit
+            jp an_restpal
+
+section wram, $DA00
+an_tpc:     ds 1
+an_bpf:     ds 1
+an_bpq:     ds 9
+an_bgs:     ds 16
+
 section bank B_BANIM, $7D00
 sm_snd:     ds 24                           ; (2F/AFC0)
 sm_pal:     ds 8                            ; (32/8043)
@@ -858,3 +1230,4 @@ an_gp:      ds 2
 an_osh:     ds 16
 an_orgb:    ds 32
 an_wq:      ds 1 + 27
+
