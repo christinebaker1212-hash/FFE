@@ -405,21 +405,39 @@ c_frx:      ld [c_pup], a
 .nb:        ld a, [c_pup]
             and a
             call nz, c_pload
+            ld a, [c_bgcx]
+            ld b, a
             ld a, [c_scx]
+            add b
             ldh [rSCX], a
+            ld a, [c_bgcy]
+            ld b, a
             ld a, [c_scy]
+            add b
             ldh [rSCY], a
             ld a, [c_split]
             and a
             jr z, .ns
-            ld a, [c_top]                   ; (the ending's band: the blank map down to the top line)
-            ldh [rLYC], a
+            ld a, $40                       ; (the ending's band: the blank map $9C00 above line
+            ldh [rSTAT], a                  ;   c_top and from line c_bot: stat_isr switches)
             ld a, [c_bot]
             ld [c_lyb], a
+            ld a, [c_top]
+            and a
+            jr z, .t0
+            ldh [rLYC], a
             ld a, LCDC_CUT | $08
-            ldh [rLCDC], a
+            jr .lc
+.t0:        ld a, [c_bot]
+            ldh [rLYC], a
+            ld a, $FF
+            ld [c_lyb], a
+            ld a, LCDC_CUT
+.lc:        ldh [rLCDC], a
             jr .sn
-.ns:        ld a, LCDC_CUT
+.ns:        xor a
+            ldh [rSTAT], a
+            ld a, LCDC_CUT
             ldh [rLCDC], a
 .sn:        call snd_frame
             jp read_pad
@@ -1347,46 +1365,3 @@ c_mul:      push de
             pop de
             ret
 
-section wram, $CF00
-c_vars:
-c_cnt:      ds 1            ; $B6
-c_bri:      ds 1            ; $B7
-c_tint:     ds 1            ; $CC
-c_cd:       ds 1            ; $CD
-c_mask:     ds 1            ; $09
-c_scx:      ds 1
-c_scy:      ds 1
-c_camx:     ds 1
-c_camy:     ds 1
-c_pup:      ds 1
-c_bgd:      ds 1
-c_split:    ds 1
-c_top:      ds 1
-c_bot:      ds 1
-c_lyb:      ds 1
-c_90:       ds 1
-c_18:       ds 1
-c_19:       ds 1
-c_c8:       ds 1
-c_cb:       ds 1
-c_88:       ds 1
-c_98:       ds 1
-c_4a:       ds 1
-c_4b:       ds 1
-c_7e:       ds 1
-c_7f:       ds 1
-c_80:       ds 1
-c_82:       ds 1
-c_86:       ds 1
-c_87:       ds 1
-c_8c:       ds 1
-c_8d:       ds 1
-c_7ec2:     ds 1
-c_tmp:      ds 1
-c_gx:       ds 1
-c_gy:       ds 1
-c_vy:       ds 2
-c_vdone:    ds 1
-c_v:        ds 1
-c_s:        ds 1
-c_vend:

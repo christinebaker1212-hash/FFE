@@ -461,6 +461,9 @@ dlg_src:    ds 3
 section bank 0, $0E00
 ; line DLG_CUT: the window off from the next line (written in this line's H-Blank)
 stat_isr:   push af
+            ld a, [c_split]                 ; (the ending's band: BG map switch, then the next line)
+            and a
+            jr nz, .cs
             ld a, [guard_on]                ; a guarded load: hold until H-Blank
             and a
             jr nz, .w
@@ -474,5 +477,14 @@ stat_isr:   push af
             and $DF
             ldh [rLCDC], a
 .x:         pop af
+            reti
+.cs:        ldh a, [rLCDC]
+            xor $08
+            ldh [rLCDC], a
+            ld a, [c_lyb]
+            ldh [rLYC], a
+            ld a, $FF
+            ld [c_lyb], a
+            pop af
             reti
 

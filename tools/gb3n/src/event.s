@@ -546,22 +546,9 @@ ev_cutx:    ld a, [pos_x]
             ld [enter_y], a
             call keep_people
             jp map_change
-; $DD: the ending (texts 3-7, then the end) as pages (B_MENU)
-ev_ending:  ld a, 3
-            ld b, 5
-            ld c, 1
-ev_story:   ld [m_sid], a
-            ld a, b
-            ld [m_scnt], a
-            ld a, c
-            ld [m_send], a
-            %FAR B_MENU, m_story
-            ld a, [pos_x]
-            ld [enter_x], a
-            ld a, [pos_y]
-            ld [enter_y], a
-            call keep_people
-            jp map_change
+; $DD: FF3's ending and end credits (src/cutend.s); it ends on The End (soft reset to leave)
+ev_ending:  %FAR B_CUT, cut_end
+            jr ev_ending
 ; $D0 / $D1: the shake / flash sounds (3B/B58F: sound effects $38, $39; the picture: later)
 ev_shake:   ld a, $58
             jp sfx_play
