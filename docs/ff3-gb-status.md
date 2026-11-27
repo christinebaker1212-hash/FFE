@@ -304,7 +304,8 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   own position after a menu or a battle inside a map.
 - Monster chests (3F/F5A1: the item, then the battle once the message closes); triggers wait for
   the dialogue box as FF3's (3F/E213).
-- Not yet in menus: FF3's spell list Swap, the stat-up messages after equipping.
+- The magic menu's Swap (3C/96F5: Use / Swap / Item; two living members' spell lists exchanged).
+- Not yet in menus: FF3's "Effect... Strength rose by 5!" messages (t8200 $3F-$46) for equipment.
 - Not yet in battle: attack / spell animations, back attacks drawn flipped (FF3 3F/F942: the
   monsters' tiles mirrored, the party at x $30), the airship's battle background.
 
