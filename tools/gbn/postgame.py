@@ -36,6 +36,10 @@ CHEST_ROOM = 0x47               # a chest inside a room (FF1's: its palette only
 CHEST_CORR = (0x4B, 0x4C, 0x4D, 0x4E)   # our corridor chests: FF1's chest in the corridor palette
 CHEST_ROOMS = (0x47, 0x48, 0x49, 0x4A)
 EARTH_MAP = 29                  # Earth Cave B1: the palette of the cave floors
+EARTH_PIECES = dict(floor=FLOOR, void=VOID, roomfl=ROOMFL, wl=WL, wr=WR, wtop=WH, wbot=WH, ctl=C_TL, ctr=C_TR,
+                    bt=B_T, bb=B_B, bl=B_L, br=B_R, btl=B_TL, btr=B_TR, bbl=B_BL, bbr=B_BR, door=DOOR,
+                    below=BELOW_DOOR, stairs=STAIRS_DN, up=STAIRS_UP, lava=0x3D,
+                    chest_room=CHEST_ROOMS, chest_corr=CHEST_CORR)
 PG_OBJ0, ORB_GFX = 0xF0, 4      # the boss orbs' object ids (src/pg.s), FF1's orb picture (its fiends')
 PG_ENT, PG_ENT_MT = 0x1E, 0x7A  # Earthgift's overworld entrance: its number, our cave mouth metatile
 PG_OWX, PG_OWY = 132, 141       #   (FF1's cave mouth $0E copied; the overworld's unused $7A)
@@ -65,6 +69,7 @@ def classify(G, rec):
             c = cells[w * y + x]; a = fs['attr'][c]
             if (x, y) in doors: k = 'D'
             elif a == 0: k = ' ' if c == void else 'S'
+            elif a & 0xF000 == 0 and a & 0xFF == 0x13: k = 'L'        # (lava: FF1's damage floor)
             elif a & 0xF000 == 0: k = 'r' if a & 0x100 else ('.' if a & 0xFF else 'C')
             elif a & 0x100: k = 'R'
             else: k = '#'
@@ -114,19 +119,29 @@ def bfs(walk, start):
     return dist
 
 
-def cave_floor(G, rec, role, n_chests):
+def cave_floor(G, rec, role, n_chests, pc=None):
     """a cave floor -> dict(map (64 x 64 bytes), start (x, y), chests [(x, y)], bosses [(x, y)])"""
+    pc = pc or EARTH_PIECES
     w, h, g, r = classify(G, rec)
     W = 64
     ox, oy = (W - w) // 2, (W - h) // 2
     assert ox >= 1 and oy >= 1, 'floor %d too big' % rec
-    out = [[VOID] * W for _ in range(W)]
-    boxes = rooms(g, w, h)
+    out = [[pc['void']] * W for _ in range(W)]
+    boxes = []                                      # (a room only with a door below it: Dawn of Souls also
+    for b in rooms(g, w, h):                        #   marks whole halls; those are floor and walls)
+        x0_, y0_, x1_, y1_ = b
+        if any(0 <= y1_ + 2 < h and g[y1_ + 2][x] == 'D' for x in range(x0_, x1_ + 1)):
+            boxes.append(b)
+        else:
+            for y in range(max(0, y0_ - 1), min(h, y1_ + 2)):
+                for x in range(max(0, x0_ - 1), min(w, x1_ + 2)):
+                    if g[y][x] == 'r': g[y][x] = '.'
+                    elif g[y][x] == 'R': g[y][x] = '#'
     inroom = set()
     for x0, y0, x1, y1 in boxes:
         for y in range(y0, y1 + 1):
             for x in range(x0, x1 + 1): inroom.add((x, y))
-    walk = {(x, y) for y in range(h) for x in range(w) if g[y][x] in '.DSC' and (x, y) not in inroom}
+    walk = {(x, y) for y in range(h) for x in range(w) if g[y][x] in '.DSCL' and (x, y) not in inroom}
     # small blocked clusters inside the floor (Dawn of Souls' boulders): floor, as FF1's corridors
     for _ in range(3):
         add = set()
@@ -146,39 +161,39 @@ def cave_floor(G, rec, role, n_chests):
                 if (x, y) in inroom: continue
                 up, dn = (x, y - 1) in inroom, (x, y + 1) in inroom
                 lf, rt = (x - 1, y) in inroom, (x + 1, y) in inroom
-                if dn: v = B_T
-                elif up: v = B_B
-                elif rt: v = B_L
-                elif lf: v = B_R
-                elif (x + 1, y + 1) in inroom: v = B_TL
-                elif (x - 1, y + 1) in inroom: v = B_TR
-                elif (x + 1, y - 1) in inroom: v = B_BL
-                else: v = B_BR
+                if dn: v = pc['bt']
+                elif up: v = pc['bb']
+                elif rt: v = pc['bl']
+                elif lf: v = pc['br']
+                elif (x + 1, y + 1) in inroom: v = pc['btl']
+                elif (x - 1, y + 1) in inroom: v = pc['btr']
+                elif (x + 1, y - 1) in inroom: v = pc['bbl']
+                else: v = pc['bbr']
                 border[(x, y)] = v
     chests, bosses, stairs = [], [], []
     for y in range(-oy, W - oy):
         for x in range(-ox, W - ox):
             if (x, y) in inroom:
-                put(x, y, ROOMFL); continue
+                put(x, y, pc['roomfl']); continue
             if (x, y) in border:
                 put(x, y, border[(x, y)]); continue
             k = g[y][x] if 0 <= x < w and 0 <= y < h else ' '
             if (x, y) in walk:
                 if k == 'D':
-                    put(x, y, DOOR)
+                    put(x, y, pc['door'])
                 elif k == 'S':
-                    put(x, y, STAIRS_DN); stairs.append((x, y))
+                    put(x, y, pc['stairs']); stairs.append((x, y))
                 else:
-                    put(x, y, BELOW_DOOR if 0 <= y - 1 < h and g[y - 1][x] == 'D' else FLOOR)
+                    put(x, y, pc['below'] if 0 <= y - 1 < h and g[y - 1][x] == 'D' else (pc['lava'] if k == 'L' else pc['floor']))
                 continue
             W_ = lambda a, b: (a, b) in walk
-            if W_(x + 1, y): v = WL
-            elif W_(x - 1, y): v = WR
-            elif W_(x, y - 1) or W_(x, y + 1): v = WH
-            elif W_(x + 1, y + 1): v = C_TL
-            elif W_(x - 1, y + 1): v = C_TR
-            elif W_(x + 1, y - 1) or W_(x - 1, y - 1): v = WH
-            else: v = VOID
+            if W_(x + 1, y): v = pc['wl']
+            elif W_(x - 1, y): v = pc['wr']
+            elif W_(x, y - 1) or W_(x, y + 1): v = pc['wtop']
+            elif W_(x + 1, y + 1): v = pc['ctl']
+            elif W_(x - 1, y + 1): v = pc['ctr']
+            elif W_(x + 1, y - 1) or W_(x - 1, y - 1): v = pc['wtop']
+            else: v = pc['void']
             put(x, y, v)
     floor = {p for p in walk if g[p[1]][p[0]] in '.C' or p in walk and g[p[1]][p[0]] not in 'DS'}
     # rooms: the boss altars (boss floors) and the special chips in rooms (fixed chests)
@@ -187,7 +202,7 @@ def cave_floor(G, rec, role, n_chests):
         for x in range(x0, x1 + 1):
             for y in range(y0, y1 + 1):
                 if g[y][x] == 'C':
-                    put(x, y, CHEST_ROOMS[len(chests) % 4]); chests.append((x + ox, y + oy, 'room'))
+                    put(x, y, pc['chest_room'][len(chests) % 4]); chests.append((x + ox, y + oy, 'room'))
         if role == 'boss' and doors:
             bosses.append((doors[0][0] + ox, y0 + 1 + oy))
     # the start: the entrance floor's corridor end (FF1's stairs up there: the way out), else the
@@ -195,12 +210,12 @@ def cave_floor(G, rec, role, n_chests):
     cand = sorted(walk, key=lambda p: (-p[1], p[0]))
     if role == 'entrance':
         ex = cand[0]
-        put(ex[0], ex[1], STAIRS_UP)
+        put(ex[0], ex[1], pc['up'])
         start = (ex[0], ex[1] - 1)
         top = min(boxes, key=lambda b: b[1]) if boxes else None
         if top:                                     # the way down: in the top room, its middle
             sx, sy = (top[0] + top[2]) // 2, top[1] + 1
-            out[sy + oy][sx + ox] = STAIRS_DN; stairs.append((sx, sy))
+            out[sy + oy][sx + ox] = pc['stairs']; stairs.append((sx, sy))
     elif role == 'boss' or not stairs:
         start = cand[0]
     else:
@@ -222,7 +237,7 @@ def cave_floor(G, rec, role, n_chests):
             p = max(pool, key=lambda p: (p in dead,) + score(p) if len(dead) > len(picked) else score(p))
             pool.remove(p); picked.append(p)
         for i, p in enumerate(picked):
-            put(p[0], p[1], CHEST_CORR[i]); chests.append((p[0] + ox, p[1] + oy, 'corr'))
+            put(p[0], p[1], pc['chest_corr'][i]); chests.append((p[0] + ox, p[1] + oy, 'corr'))
     return dict(map=bytes(v for row in out for v in row), start=(start[0] + ox, start[1] + oy),
                 chests=chests, bosses=bosses, w=w, h=h, ox=ox, oy=oy)
 
