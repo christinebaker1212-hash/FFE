@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
 import tiles, data, text
 
-BATTLE_SRC = ['batlib.s', 'batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s', 'batflow.s', 'batvict.s']
+BATTLE_SRC = ['batlib.s', 'batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s', 'batflow.s', 'batvict.s', 'batloop.s']
 ROM_BANKS = 128             # 2 MB (sized to the game later)
 RAM_CODE = 0x03             # 32 KB cart RAM (4 banks, as retail MBC5 games: docs/gb-lessons.md)
 EN_SHA1 = '4a7f1ae4c89305cf161aa3d78fd4416548663f99'   # build/ff3_en.nes (patches/README.md)
@@ -166,6 +166,7 @@ def sound_data():
 ROMDATA = {
     'w_songs': (0x3B, 0xA027, 32),       # world map songs by world and vehicle
     'refl_bits': (0x31, 0xBB0E, 11),     # spells that Reflect bounces
+    'mon_rows': (0x34, 0x8739, 20),      # monster rows by formation tilemap
 }
 
 MACROS = {

@@ -170,8 +170,16 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   states, execute action 300 states, battle over / cannon 40: 0 differences. FF3 quirks kept:
   Scan's weak-element loop shifts its counter after the first find and writes every message to
   one queue slot; Scare sets every monster's level to the first one's - 3.
-- Next: the main loop's bookkeeping, poison, victory (experience, gil, job levels, level ups,
-  items), the command menus (ours), the battle screen, random encounters.
+- Battle flow, part 2 (`src/batvict.s`, `src/batloop.s`): poison, victory (experience shared by
+  the living, gil, capacity, drops, job experience by command use, job levels, level ups with hp /
+  stat / mp bonuses), the status for display, and the main loop's bookkeeping (turn and action
+  starts, command-use counts, monster rows, first strike / ambush / back attack, near-fatal,
+  defence back, used items returned, the end-of-battle write-back, battle init). Checked with
+  batdiff (50-150 states each): 0 differences. FF3 quirks kept: a dropped item whose stack is at
+  99 goes on looking for a zero from the count's place; experience is capped by testing 9,999,999
+  but storing 10,000,767.
+- Next: the command menus (ours, writing FF3's records), the battle screen and its messages,
+  battle start from the field (formation, monster counts), random encounters.
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;

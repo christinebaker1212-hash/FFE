@@ -80,5 +80,7 @@ t_copy:     ld d, $D0
             ret
 t_table:    dw fe_A400, fe_AA16, fe_A732, fe_9E8A, fe_AF77, fe_A65E, fe_BEBF, fe_BF17, fe_A2E9
             dw fe_9777, fe_9DE4, fe_A458, fe_A487, fe_BA41, fe_BB49, fe_9D06
+            dw fe_81C3, fe_8213, fe_8271, fe_8295, fe_82CE, fe_8306, fe_8374, fe_9CE3, fe_81A0
 t_banks:    db B_BAT, B_BAT, B_BAT, B_BAT, B_BAT, B_BAT, B_BAT, B_BAT, B_BAT
             db B_BAT2, B_BAT2, B_BAT2, B_BAT2, B_BAT2, B_BAT2, B_BAT2
+            db B_BAT2, B_BAT2, B_BAT2, B_BAT2, B_BAT2, B_BAT2, B_BAT2, B_BAT2, B_BAT2

@@ -532,7 +532,7 @@ fe_BD9B:    call b_choff
             ld a, $98
             ld [hl-], a
             ld [BZ + $31], a
-            ld a, $96
+            ld a, $99                       ; (FF3 stores $98997F, not the $98967F it tests)
             ld [hl-], a
             ld [BZ + $30], a
             ld a, $7F
