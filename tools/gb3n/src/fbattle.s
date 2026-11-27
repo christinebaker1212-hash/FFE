@@ -257,12 +257,16 @@ title_boot: ld a, LCDC_ON
             jr z, .res
             ld a, [SRAM_PAGE + $08]         ; a file: its world map position (3E/C0DE)
             ld [world], a
-            ld a, [SRAM_PAGE + $09]
+            ld a, [SRAM_PAGE + $09]         ; (FF3's $27 + 7: the party's tile)
+            add 7
             ld [enter_x], a
             ld [wm_x], a
             ld a, [SRAM_PAGE + $0A]
+            add 7
             ld [enter_y], a
             ld [wm_y], a
+            ld a, [SRAM_PAGE + $0F]         ; the vehicle (3E/C0D7)
+            ld [veh], a
             ld a, $FF
             ld [map_id], a
             ld a, 1

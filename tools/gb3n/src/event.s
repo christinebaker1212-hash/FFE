@@ -763,7 +763,9 @@ map_song:   call enc_setrate
             dec a
 .w:         add a
             add a
-            add a                           ; (on foot: vehicle 0)
+            ld e, a                         ; + the vehicle (3B/A006)
+            ld a, [veh]
+            add e
             ld e, a
             ld d, 0
             ld hl, w_songs

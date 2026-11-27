@@ -568,7 +568,12 @@ field_step: call npc_update
             jp nz, menu_open
             and PAD_A
             jr z, .pd
-            call talk
+            ld a, [wmode]                   ; (the world map: the vehicles' A, 3E/C2B7)
+            and a
+            jr z, .tk
+            call v_abtn
+            jr .done
+.tk:        call talk
             jr .done
 .pd:        ldh a, [pad]                    ; a direction held: FF3's order right, left, down, up
             ld b, DIR_R
@@ -610,7 +615,8 @@ field_step: call npc_update
             ld a, [trig_next]               ; the step's trigger is due
             ld [trig], a
 .done:      call party_oam
-            jp npc_oam
+            call npc_oam
+            jp v_parked
 
 ; a trigger after the step ($3F $E26A): entrance (to the map in the entrance list), back to the
 ; previous map, or out to the world map (the world map: later; for now back as from an exit)
@@ -996,7 +1002,10 @@ line_flush: ld hl, line_buf
             ret
 
 ; the walking character into OAM entries 0-3
-party_oam:  ld a, [step]                    ; the pose: facing, and the second frame from
+party_oam:  ld a, [veh]                     ; in a vehicle: its sprite (vehicle.s)
+            and a
+            jp nz, v_oam
+            ld a, [step]                    ; the pose: facing, and the second frame from
             and a                           ;   pixel 8 of a step (FF3: fine scroll & 8)
             jr z, .f0
             dec a

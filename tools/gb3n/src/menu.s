@@ -1253,11 +1253,13 @@ sr_count:   xor a
 ; FF3's update sram checksum (3D/AE5C): world, vehicle, world position into the page, $601A
 sr_ff3sum:  ld a, [world]
             ld [SRAM_PAGE + $08], a
-            xor a                           ; (vehicles: on foot for now)
+            ld a, [veh]
             ld [SRAM_PAGE + $0F], a
-            ld a, [pos_x]
+            ld a, [pos_x]                   ; (FF3's $27 / $28: the party's tile - 7)
+            sub 7
             ld [SRAM_PAGE + $09], a
             ld a, [pos_y]
+            sub 7
             ld [SRAM_PAGE + $0A], a
             xor a
             ld [SRAM_PAGE + $1A], a
@@ -4453,10 +4455,10 @@ m_config:   call m_clear
             jr m_config
 
 ; ==== 8 Suspend (ours): the page and the field's place in cart RAM bank 1, then the title;
-; bank 1: $A000 page, $A400 field ($C100, 192), $A4C0 world ($C2C0, 16), $A4D0 'S' '3' + sum
+; bank 1: $A000 page, $A400 field ($C100, 192), $A4C0 world / vehicle ($C2C0, 32), $A4F0 'S' '3' + sum
 SU_FIELD   = $A400
 SU_WORLD   = $A4C0
-SU_CHECK   = $A4D0
+SU_CHECK   = $A4F0
 m_suspend:  ld a, 1
             call sr_on
             ld hl, SRAM_PAGE
@@ -4469,7 +4471,7 @@ m_suspend:  ld a, 1
             call memcpy
             ld hl, $C2C0
             ld de, SU_WORLD
-            ld bc, 16
+            ld bc, 32
             call memcpy
             call su_sum
             ld hl, SU_CHECK
@@ -4488,9 +4490,9 @@ m_suspend:  ld a, 1
             call m_waitkey
             call m_leave
             jp soft_reset
-; DE = the sum of $A000-$A4CF (cart RAM on)
+; DE = the sum of $A000-$A4EF (cart RAM on)
 su_sum:     ld hl, $A000
-            ld bc, $4D0
+            ld bc, $4F0
             ld de, 0
 .s:         ld a, [hl+]
             add e
@@ -4542,7 +4544,7 @@ su_load:    ld a, 1
             call memcpy
             ld hl, SU_WORLD
             ld de, $C2C0
-            ld bc, 16
+            ld bc, 32
             call memcpy
             xor a
             ld [SU_CHECK], a

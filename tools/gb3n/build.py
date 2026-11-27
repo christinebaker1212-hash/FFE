@@ -121,6 +121,7 @@ B_BSET = 59                 # NES $2E / $2F: battle setup data
 B_BSCR, B_BINFO, B_CGFX, B_MGFX0 = 60, 61, 62, 64   # battle screen code; monster index; job graphics; monster graphics (64-71)
 B_BOSS0 = 72                # boss graphics (72-75)
 B_MENU = 76                 # the main menu's code
+B_VGFX = 77                 # world map vehicles' graphics (NES 0B)
 
 
 def field_banks(rom):
@@ -148,6 +149,15 @@ def field_banks(rom):
     b[0x0C00:0x0C40] = rom.rd(0x00, 0x8880, 64)
     b[0x0C40:0x0C80] = rom.rd(0x00, 0x88C0, 64)
     b[0x0D00:0x0D40] = rom.player_poses()
+    b[0x0D40:0x0D80] = rom.rd(0x3E, 0xDCAA, 64)                  # vehicles' poses
+    b[0x0D80:0x0D88] = rom.rd(0x3E, 0xC6CD, 8)                   # passability masks
+    b[0x0D88:0x0D90] = rom.rd(0x3E, 0xC851, 8)                   # landing flags
+    b[0x0D90:0x0D98] = rom.rd(0x3E, 0xD8CA, 8)                   # sprite rows
+    v = blank()                                          # vehicles' graphics (NES 0B: 3D/BDE0)
+    v[0x0000:0x0600] = gbt(rom.rd(0x0B, 0x8800, 0x600))
+    v[0x0600:0x0780] = gbt(rom.rd(0x0B, 0x8E00, 0x180))
+    v[0x0780:0x0900] = gbt(rom.rd(0x0B, 0x8F80, 0x180))
+    banks[B_VGFX] = v
     tm = {}                                              # tilemaps: streams packed per bank
     bank, at = B_TMAP0, 0
     for tid in sorted(set(rom.rd(0x00, 0x8A00, 512))):
@@ -361,7 +371,7 @@ def main():
                B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD) +
            'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
            'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\nB_BSET = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2, B_BSET) +
-           'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\nB_MENU = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0, B_MENU) + text_defs +
+           'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\nB_MENU = %d\nB_VGFX = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0, B_MENU, B_VGFX) + text_defs +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
@@ -369,6 +379,7 @@ def main():
            open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'world.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'fbattle.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'vehicle.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sound.s')).read() + '\n' +
            ''.join(open(os.path.join(HERE, 'src', f)).read() + '\n' for f in BATTLE_SRC) +
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + sound_data() + own_data())

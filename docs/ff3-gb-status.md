@@ -229,6 +229,17 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   palette darkening, $DA dance, $DB / $DC prologue / epilogue, $DD ending, $E0-$E2, $EF.
 - Lesson: menu variables live in the map's tables ($C800-$CEFF): read results before the map is
   reloaded, and initialise flags (m_pal) on entry.
+- Vehicles (`src/vehicle.s`): FF3's per-vehicle passability masks (3E/C6CD), boarding the canoe
+  on rivers and the ship by walking into it, leaving them onto land (the ship parked there),
+  A: the Enterprise taking off, boarding / landing the airships (landing flags 3E/C851; the
+  Enterprise lands as the ship), the chocobo leaving; the party drawn as its vehicle (3E/DCAA,
+  tiles from NES 0B at OBJ $20), the parked vehicle (3E/DAD4..), world songs and encounter
+  rates / groups per vehicle, no entrances from vehicles. Saves keep FF3's $6009 format (the
+  party's tile - 7) and the vehicle ($600F). Checked: boarding, sailing, landing the ship.
+  Not yet: the airship's shadow and lift-off / landing animations, the Invincible, the
+  Nautilus diving, chocobo forests, the airship's double speed.
+- Hand cursor: FF3's own 16 x 16 hand (0D/B440) with its cursor palette (owner reported the
+  placeholder looked mangled).
 - Not yet in menus: Exit / Teleport / Sightro and the Midgard Bread / Otter's Head (they need the
   minimap and FF3's warp), FF3's spell list Swap, the stat-up messages after equipping.
 

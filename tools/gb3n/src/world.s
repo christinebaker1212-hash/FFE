@@ -114,8 +114,10 @@ world_enter:
             cp 16
             jr nz, .row
             call scroll_set
+            call veh_load                   ; the vehicles' poses, tables and tiles
             call party_oam
-            jp npc_oam
+            call npc_oam
+            jp v_parked
 
 ; A = the world map's metatile at (D, E) (0-255, wrapping)
 world_mt:   ld a, [world]                   ; wi: worlds 0 / 1 -> 0, 2 -> 1, 3 -> 2, 4 -> 3
@@ -140,33 +142,7 @@ world_mt:   ld a, [world]                   ; wi: worlds 0 / 1 -> 0, 2 -> 1, 3 -
             pop af
             jp far_byte
 
-; on foot over world metatile C ($3E $C65D: impassable when property 1 bit 0 is set; bit 7 a
-; trigger: property 2 bit 7 an event (its script id), else an entrance after the step)
-world_pass: ld b, W_PROP1
-            ld a, [bc]
-            bit 0, a
-            jr nz, .no
-            bit 7, a
-            jr nz, .tr
-            bit 6, a                        ; an encounter tile ($3E $C6D9)
-            call nz, enc_world
-            jr .ok
-.tr:
-            inc b
-            ld a, [bc]
-            bit 7, a
-            jr nz, .ev
-            ld [trig_id], a
-            ld a, TR_WENT
-            ld [trig_next], a
-.ok:        and a
-            ret
-.ev:        and $7F
-            call trig_script
-            and a
-            ret
-.no:        scf
-            ret
+; (passability: vehicle.s world_pass)
 
 ; ---- a world map entrance: the map from FF3's entrance tables (00/8800 world 0, 00/8840)
 world_in:   ld a, [pos_x]
