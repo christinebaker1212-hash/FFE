@@ -414,6 +414,7 @@ def main():
            open(os.path.join(HERE, 'src', 'world.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'fbattle.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'vehicle.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'water.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sound.s')).read() + '\n' +
            ''.join(open(os.path.join(HERE, 'src', f)).read() + '\n' for f in BATTLE_SRC) +
            open(os.path.join(HERE, 'src', 'cut.s')).read() + '\n' +

@@ -212,6 +212,8 @@ map_enter:  call char_update                ; the walking member's set / palette
             call far_copy
             xor a
             ldh [rVBK], a
+            call wat_map                    ; the water animation's flags and buffer (3A/9319)
+            call wat_init
             call npc_load                   ; the people (their tiles: VRAM bank 1 from tile 16)
             ld hl, A_POSE                   ; FF3's player poses
             ld de, poses
@@ -536,7 +538,8 @@ pal_load:   ld hl, I_RGB                    ; (the NES colour table into SCRATCH
             ret
 
 ; ---- one field frame (after the frame wait): V-Blank work, then the walking
-field_vbl:  call ev_pflush                   ; (palettes made by an effect)
+field_vbl:  call wat_vbl                     ; the water (3A/858F)
+            call ev_pflush                  ; (palettes made by an effect)
             ld a, [frame]
             inc a
             ld [frame], a

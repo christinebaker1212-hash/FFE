@@ -898,6 +898,7 @@ ws_lev:     ld a, [SRAM_PAGE + $20]
 ; (3E/D697-D81D): the vehicle at NES ($70, va_y) with its shadow over the other world sprites
 va_frame:   call wait_vbl                   ; (3E/D73E)
             call hram_dma
+            %FAR B_FIELD, wat_vbl           ; (the water: 3E/D74B)
             ld a, [va_tile]                 ; (the Enterprise's 4 tiles of this frame: OBJ $60)
             and a
             call nz, va_tiles
