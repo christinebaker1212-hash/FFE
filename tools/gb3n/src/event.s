@@ -498,8 +498,18 @@ ev_exec:    ld a, [ev_cmd]
             cp $D0
             jp c, ev_player
             cp $E4
-            ret c                           ; ($D0-$E3: screen effects, healing: later)
-            sub $E4
+            jr nc, .e4
+            sub $D0                         ; $D0-$E3 (3B/B567, no argument)
+            add a
+            ld e, a
+            ld d, 0
+            ld hl, evd_table
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            jp hl
+.e4:        sub $E4
             add a
             ld e, a
             ld d, 0
@@ -511,14 +521,194 @@ ev_exec:    ld a, [ev_cmd]
             ld a, [ev_arg]
             jp hl
 
+evd_table:  dw ev_shake, ev_flash, ev_none, ev_none      ; D0-D3 (palette effects: later)
+            dw ev_hpall, ev_mpall, ev_pfloor, ev_pwall   ; D4-D7
+            dw ev_reset, ev_chain, ev_none, ev_none      ; D8-DB (dance, prologue: later)
+            dw ev_none, ev_none, ev_surf, ev_hp1         ; DC-DF (epilogue, ending: later)
+            dw ev_none, ev_none, ev_none, ev_none        ; E0-E3 (palette reload, flash)
 evc_table:  dw ev_none, ev_none, ev_none, ev_take        ; E4-E7
-            dw ev_none, ev_none, ev_none, ev_none        ; E8-EB (status, gil: later)
-            dw ev_none, ev_none, ev_none, ev_none        ; EC-EF (cp, guest, animation)
+            dw ev_stclr, ev_stset, ev_gil, ev_ungil      ; E8-EB
+            dw ev_cp, ev_uncp, ev_guest, ev_none         ; EC-EF (special animation: later)
             dw ev_npcdlg, ev_evdlg, ev_seton, ev_setoff  ; F0-F3
             dw ev_npcon, ev_npcoff, ev_give, ev_battle   ; F4-F7
             dw ev_sound, ev_exit, ev_enter, ev_enterm    ; F8-FB
             dw ev_wait, ev_prev, ev_none, ev_end         ; FC-FF
 ev_none:    ret
+
+; $D0 / $D1: the shake / flash sounds (3B/B58F: sound effects $38, $39; the picture: later)
+ev_shake:   ld a, $58
+            jp sfx_play
+ev_flash:   ld a, $59
+            jp sfx_play
+; $D4 / $D5: everyone's HP / MP to max (3B/B881 / B862)
+ev_hpall:   ld hl, SRAM_PAGE + $10C
+.m:         ld a, l
+            add 2
+            ld e, a
+            ld d, h
+            ld a, [de]
+            ld [hl+], a
+            inc e
+            ld a, [de]
+            ld [hl-], a
+            ld a, l
+            add $40
+            ld l, a
+            jr nc, .m
+            ret
+ev_mpall:   ld c, 4
+            ld hl, SRAM_PAGE + $130
+.c:         ld b, 8
+.m:         inc l
+            ld a, [hl-]
+            ld [hl+], a
+            inc l
+            dec b
+            jr nz, .m
+            ld a, l
+            add $30
+            ld l, a
+            dec c
+            jr nz, .c
+            ret
+; $D6 / $D7: a passage opens (3B/B8A6: the first map tile $5B / $5C becomes + 2)
+ev_pfloor:  ld a, $5B
+            jr ev_pass
+ev_pwall:   ld a, $5C
+ev_pass:    ld b, a
+            ld hl, W_MAP
+.f:         ld a, [hl]
+            cp b
+            jr z, .t
+            inc hl
+            ld a, h
+            cp high(W_MAP) + 4
+            jr c, .f
+            ret
+.t:         add 2
+            ld [hl], a
+            ld a, l
+            and 31
+            ld d, a
+            ld a, l
+            and $E0
+            ld e, a
+            ld a, h
+            sub high(W_MAP)
+            ld b, 5
+.y:         srl a                           ; E = the row: (HL - W_MAP) / 32
+            rr e
+            dec b
+            jr nz, .y
+            ld hl, line_buf
+            call cell_buf
+            ld a, 1
+            ld [line_n], a
+            ret
+; $D8: reset (3B/B5B7: the program's start)
+ev_reset:   jp soft_reset
+; $D9: the ship chained up (3B/B5BA: vehicle 1 at (169, 184) on world 3, switch $6020 bit 5)
+ev_chain:   ld a, $A9
+            ld [SRAM_PAGE + $01], a
+            ld a, $B8
+            ld [SRAM_PAGE + $02], a
+            ld a, 1
+            ld [SRAM_PAGE + $00], a
+            ld a, 3
+            ld [SRAM_PAGE + $03], a
+            ld hl, SRAM_PAGE + $20
+            set 5, [hl]
+            ret
+; $DE: the surface world emerges (3B/B5EF: $6011 bit 7, world 3)
+ev_surf:    ld hl, SRAM_PAGE + $11
+            set 7, [hl]
+            ld a, 3
+            ld [world], a
+            ret
+; $DF: HP 0 -> 1 for everyone (3B/B5FC)
+ev_hp1:     ld hl, SRAM_PAGE + $10C
+.m:         ld a, [hl+]
+            or [hl]
+            dec l
+            jr nz, .n
+            ld [hl], 1
+.n:         ld a, l
+            add $40
+            ld l, a
+            jr nc, .m
+            ret
+; $E8 / $E9: status off / on for everyone (3B/B7B0: AND A, B7C2: OR A)
+ev_stclr:   ld b, a
+            ld hl, SRAM_PAGE + $102
+.m:         ld a, [hl]
+            and b
+            ld [hl], a
+            ld a, l
+            add $40
+            ld l, a
+            jr nc, .m
+            ret
+ev_stset:   ld b, a
+            ld hl, SRAM_PAGE + $102
+.m:         ld a, [hl]
+            or b
+            ld [hl], a
+            ld a, l
+            add $40
+            ld l, a
+            jr nc, .m
+            ret
+; $EA: gil + A x 256 (3B/B7D4: $601D / $601E, at most 9999999)
+ev_gil:     ld hl, SR_GIL + 1
+            add [hl]
+            ld [hl+], a
+            ld a, [hl]
+            adc 0
+            ld [hl], a
+            jp gil_cap
+; $EB: gil - A x 256; too little: the event ends with story text 2 (3B/B80D)
+ev_ungil:   ld b, a
+            ld a, [SR_GIL + 2]
+            and a
+            jr nz, .ok
+            ld a, [SR_GIL + 1]
+            cp b
+            jr nc, .ok
+            call ev_end
+            ld a, 2
+            jp ev_evdlg
+.ok:        ld hl, SR_GIL + 1
+            ld a, [hl]
+            sub b
+            ld [hl+], a
+            ld a, [hl]
+            sbc 0
+            ld [hl], a
+            ret nc
+            xor a
+            ld [SR_GIL], a
+            ld [SR_GIL + 1], a
+            ld [SR_GIL + 2], a
+            ret
+; $EC / $ED: CP + A (at most 255) / - A (too little: story text 3) (3B/B840, B84E)
+ev_cp:      ld hl, SRAM_PAGE + $1B
+            add [hl]
+            jr nc, .s
+            ld a, $FF
+.s:         ld [hl], a
+            ret
+ev_uncp:    ld b, a
+            ld a, [SRAM_PAGE + $1B]
+            sub b
+            jr nc, .s
+            call ev_end
+            ld a, 3
+            jp ev_evdlg
+.s:         ld [SRAM_PAGE + $1B], a
+            ret
+; $EE: the guest ($600B; their picture: later)
+ev_guest:   ld [SRAM_PAGE + $0B], a
+            ret
 
 ; $F7: a battle ($3B $B70F), the event going on after it
 ev_battle:  ld [bs_id], a
