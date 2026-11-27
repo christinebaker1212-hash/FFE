@@ -134,7 +134,7 @@ and no undocumented debug code.
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-26, night: FF1 native build finished: owner's full playthrough and real-hardware run passed)
+# GB port status (last updated 2026-11-27: the post-game's four shrines built)
 
 **Current FF1 build: the native rewrite (`tools/gbn/`, `docs/ff1-native.md`).** The long log below
 (recompiled build, `tools/gb/`) is history and reference; the native build replaced it.
@@ -1460,6 +1460,11 @@ GBA ROM (read at build time: tools/gbn/gba.py, formats docs/ff1-postgame-gba.md)
 monsters, pictures, text found); engine plan in the design doc section 10; Earthgift first.
 Earthgift Shrine built (item 70): floors from the GBA as FF1 maps (ids 64+, ROM 4 MB), runs, the door sealed until
 Lich, B5 bosses at orbs, defeat back to the world map, its monsters / bosses (own battle banks), its 16 new items.
+All four shrines built (owner: "Finish the rest", item 71): Hellfire, Lifespring, Whisperwind with Earthgift, one engine
+(tools/gbn/shrines.py; 81 floors, boss floors held until a boss falls, then a light out; battle sets per shrine; all of
+Dawn of Souls' new items: 37 consumables, 24 weapons, 30 armours, stats from the GBA; the four Fiend statues). Walked
+through for now: the non-combat floors' events (towns, shops, puzzles). Checked in SameBoy: Hellfire door to B5, boss,
+light out (Color).
 
 ## Remaining
 - **FF1 (native build): finished (owner, 2026-11-26):** the owner played it through from New Game to
