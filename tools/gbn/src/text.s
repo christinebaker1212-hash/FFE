@@ -748,6 +748,9 @@ gr_vbl:     ld a, [gr_rst]                  ; (switched off / paused: the flat c
             jr z, .on
             xor a
             ld [gr_rst], a
+            ld a, [fd_in]                   ; (not before a fade-in: it writes every colour;
+            and a                           ;   the full colour here flashed for a frame as
+            jr nz, .nf                      ;   the LCD came on: The End, owner 2026-11-27)
             ld a, [win_pal + 4]
             ld e, a
             ld a, [win_pal + 5]
@@ -756,7 +759,7 @@ gr_vbl:     ld a, [gr_rst]                  ; (switched off / paused: the flat c
             call stat_gr.pal
             ld hl, gr_la
             call stat_gr.pal
-            ld a, [gr_on]                   ; (paused, not off: no events this frame)
+.nf:        ld a, [gr_on]                   ; (paused, not off: no events this frame)
             and a
             ret z
             jr gr_mo
