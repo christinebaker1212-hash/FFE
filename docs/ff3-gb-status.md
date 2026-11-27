@@ -218,6 +218,17 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   Job (jobs by crystals 3F/F38A, CP cost 3D/AD85, checks 3D/AE23, change 3D/AB8F with the new
   job's level-ups from bank 39), Config (FF3's message speed $6010; the battle message wait uses
   it as 34/9450), Suspend (cart RAM bank 1 with its own check, resumed once from the title).
+- Owner (2026-11-27): main menu flipped: the party on the left, commands and Gil / CP on the right.
+- Inns ($E0-$E2: 5 x the living x the script's rate, FF3's texts, HP to max for the living, the
+  script's rest event after) and shops ($E3-$FB: Buy with 1 / 4 / 10 and FF3's discounts 3D/B281,
+  Sell 1 / All at half, key items and Toad / Minimum not sold, FF3's carry check) as full-screen
+  windows; the map comes back with its people where they were. Fat Chocobo: later.
+- Event commands added: $D0 / $D1 sounds, $D4 / $D5 HP / MP to max, $D6 / $D7 passages, $D8
+  reset, $D9 the ship chained, $DE the surface world, $DF, $E8 / $E9 status, $EA-$ED gil / CP
+  (too little: the event ends with FF3's story text 2 / 3), $EE guest. Still stubs: $D2 / $D3
+  palette darkening, $DA dance, $DB / $DC prologue / epilogue, $DD ending, $E0-$E2, $EF.
+- Lesson: menu variables live in the map's tables ($C800-$CEFF): read results before the map is
+  reloaded, and initialise flags (m_pal) on entry.
 - Not yet in menus: Exit / Teleport / Sightro and the Midgard Bread / Otter's Head (they need the
   minimap and FF3's warp), FF3's spell list Swap, the stat-up messages after equipping.
 
