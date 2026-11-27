@@ -1,0 +1,257 @@
+"""FF3's battle algorithms: FF3's own 6502 code (py65, from the user's English NES ROM) against our
+native code (SameBoy, a GB3N_TEST=1 build), on the same random battle states, RAM for RAM.
+
+  python3 tools/gb3n/test/batdiff.py [N] [--seed S] [--only NAME,..]
+  (build first: GB3N_TEST=1 python3 tools/gb3n/build.py --out build/ff3n_test.gbc)
+
+Memory: NES $6000-$63FF <-> GB $D000-$D3FF, NES $7400-$7EFF <-> GB $D400-$DEFF (work RAM bank 2),
+NES zero page <-> GB $C400 (BZ); pointers hold GB addresses on the GB side."""
+import os, sys, random, subprocess
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.join(HERE, '..', '..', '..')
+sys.path.insert(0, os.path.join(HERE, '..'))
+import data
+from py65.devices.mpu6502 import MPU
+
+NES_ROM = os.path.join(ROOT, 'build', 'ff3_en.nes')
+GB_ROM = os.path.join(ROOT, 'build', 'ff3n_test.gbc')
+B8 = 0x2000
+PTRS = [0x57, 0x59, 0x5B, 0x5D, 0x6E, 0x70]            # zero-page pointers into RAM
+
+# routine: (test number in src/test.s, NES address)
+ROUTINES = {'init': (1, 0xA400), 'equip': (2, 0xAA16), 'monact': (3, 0xA732), 'fight': (4, 0x9E8A),
+            'magic': (5, 0xAF77), 'item': (6, 0xA65E), 'consol': (7, 0xBEBF), 'confuse': (8, 0xBF17),
+            'mtarget': (9, 0xA2E9)}
+
+
+class Mem(bytearray):
+    def __init__(self, rom):
+        bytearray.__init__(self, 0x10000)
+        self.rom = rom
+        for slot, b in enumerate((0x30, 0x31, 0x3E, 0x3F)):
+            self.map(slot, b)
+
+    def map(self, slot, b):
+        bytearray.__setitem__(self, slice(0x8000 + slot * B8, 0xA000 + slot * B8), self.rom.at(b * B8, B8))
+
+    def __setitem__(self, a, v):
+        if isinstance(a, int):
+            if 0x5114 <= a <= 0x5117:
+                self.map(a - 0x5114, v & 0x7F); return
+            if a >= 0x8000 or 0x2000 <= a < 0x6000: return
+        bytearray.__setitem__(self, a, v)
+
+
+def nes_run(rom, ram6, ram7, zp, addr):
+    mem = Mem(rom)
+    bytearray.__setitem__(mem, slice(0x6000, 0x6400), ram6)
+    bytearray.__setitem__(mem, slice(0x7400, 0x7F00), ram7)
+    bytearray.__setitem__(mem, slice(0, 0x100), zp)
+    cpu = MPU(memory=mem)
+    cpu.memory[0x1FF] = 0xFF; cpu.memory[0x1FE] = 0xEF; cpu.sp = 0xFD; cpu.pc = addr
+    n = 0
+    while cpu.pc != 0xFFF0:
+        cpu.step(); n += 1
+        if n > 3000000: raise RuntimeError('NES runaway at %04X' % cpu.pc)
+    return bytes(mem[0x6000:0x6400]), bytes(mem[0x7400:0x7F00]), bytes(mem[0:0x100])
+
+
+class GB:
+    def __init__(self):
+        self.p = subprocess.Popen([os.path.join(ROOT, 'build', 'sbsh'), GB_ROM, '--model', 'Game Boy Color'],
+                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                  text=True, cwd=ROOT)
+        self.cmd('f 400')
+
+    def cmd(self, c):
+        self.p.stdin.write(c + '\n'); self.p.stdin.flush()
+        return self.p.stdout.readline().strip()
+
+    def poke(self, base, data):
+        self.p.stdin.write(''.join('p %04X %02X\n' % (base + i, b) for i, b in enumerate(data)))
+        self.p.stdin.flush()
+        for _ in data: self.p.stdout.readline()
+
+    def read(self, base, n):
+        return bytes.fromhex(self.cmd('r %04X %d' % (base, n)))
+
+    def run(self, ram6, ram7, zp, num):
+        self.poke(0xD000, ram6); self.poke(0xD400, ram7); self.poke(0xC400, zp)
+        self.cmd('p C5F0 %02X' % num)
+        for _ in range(600):
+            self.cmd('f 1')
+            if self.read(0xC5F0, 1)[0] == 0: break
+        else: raise RuntimeError('GB routine did not return')
+        return self.read(0xD000, 0x400), self.read(0xD400, 0xB00), self.read(0xC400, 0x100)
+
+    def close(self):
+        self.cmd('q')
+
+
+def gb_ptr(a):
+    """an NES RAM address -> its GB address"""
+    return 0xD000 | (a & 0xFFF) if 0x6000 <= a < 0x8000 else a
+
+
+def state(rnd, kind):
+    """a random battle state: (ram6 $6000-$63FF, ram7 $7400-$7EFF, zp)"""
+    ram6 = bytearray(rnd.getrandbits(8) for _ in range(0x400))
+    ram7 = bytearray(rnd.getrandbits(8) for _ in range(0xB00))
+    zp = bytearray(rnd.getrandbits(8) for _ in range(0x100))
+    for i in range(4):                                   # the characters (save page)
+        c = 0x100 + 0x40 * i
+        ram6[c] = rnd.randrange(22)                       # job
+        ram6[c + 1] = rnd.randrange(1, 100)               # level
+        ram6[c + 2] = rnd.choice([0, 0, 0, 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02])
+        hpmax = rnd.randrange(1, 9999); ram6[c + 0x0E:c + 0x10] = hpmax.to_bytes(2, 'little')
+        ram6[c + 0x0C:c + 0x0E] = rnd.randrange(0, hpmax + 1).to_bytes(2, 'little')
+        ram6[c + 0x10] = rnd.randrange(100)
+        for k in range(5): ram6[c + 0x12 + k] = rnd.randrange(1, 100)
+        e = 0x200 + 0x40 * i                               # equipment: helmet, armour, gloves, R, R qty, L
+        for k in range(3): ram6[e + k] = rnd.choice([0, rnd.randrange(0x58, 0x98)])
+        ram6[e + 3] = rnd.choice([0, rnd.randrange(1, 0x98)])
+        ram6[e + 4] = rnd.randrange(100)
+        ram6[e + 5] = rnd.choice([0, rnd.randrange(1, 0x98)])
+        ram6[e + 0x0F] &= 1                               # row
+    for k in range(0x20):                                 # inventory: items $01-$C7
+        ram6[0xC0 + 2 * k] = rnd.choice([0, rnd.randrange(1, 0xC8)])
+        ram6[0xC1 + 2 * k] = rnd.randrange(1, 100)
+    r7 = lambda a: a - 0x7400
+    for k in range(8):                                    # monster slots: 4 types
+        ram7[r7(0x7DA7) + k] = rnd.choice([0xFF, rnd.randrange(4)])
+    for k in range(4):
+        ram7[r7(0x7D6B) + k] = rnd.randrange(0xE0)
+    ram7[r7(0x7ED8)] = rnd.choice([0, 0, 0, 0x80, 0x01, 0x10])
+    for k in range(10): ram7[r7(0x78DA) + k] = 0xFF       # the message queue empty
+    ram7[r7(0x78EE)] = 0
+    ram7[r7(0x7EC1)] = 0
+    for k in range(0x10): ram7[r7(0x7E4F) + k] = 0xFF
+    for k in range(0x10): ram7[r7(0x7E5F) + k] = 0xFF
+    ram7[r7(0x7CE4):r7(0x7CE4) + 4] = bytes(rnd.choice([0, 0, 1]) for _ in range(4))
+    zp[0x15:0x18] = bytes(rnd.getrandbits(8) for _ in range(3))
+    zp[0x52] = rnd.randrange(4)
+    zp[0x5F] = (zp[0x52] * 0x40) & 0xFF
+    zp[0x74] = rnd.choice([0, 0, 1])
+    zp[0xCC] = rnd.choice([0, 0, 0, 1])
+    return ram6, ram7, zp
+
+
+def nes_ptrs(zp):
+    for p, v in ((0x57, 0x6100), (0x59, 0x6200), (0x5B, 0x7575), (0x5D, 0x7675)):
+        zp[p], zp[p + 1] = v & 0xFF, v >> 8
+
+
+def battle_records(rom, ram6, ram7, zp):
+    """the records as FF3's init leaves them (to test routines that start from a battle in progress)"""
+    nes_ptrs(zp)
+    a, b, z = nes_run(rom, ram6, ram7, zp, 0xA400)
+    for i in range(4):
+        z2 = bytearray(z); z2[0x52] = i; z2[0x5F] = i * 0x40; nes_ptrs(z2)
+        a, b, z = nes_run(rom, a, b, z2, 0xAA16)
+    return bytearray(a), bytearray(b), bytearray(z)
+
+
+def setup(rom, rnd, name):
+    ram6, ram7, zp = state(rnd, name)
+    nes_ptrs(zp)
+    if name in ('fight', 'magic', 'item', 'monact', 'confuse', 'mtarget'):
+        ram6, ram7, zp = battle_records(rom, ram6, ram7, zp)
+        for k in range(0x10): ram7[0x7E4F - 0x7400 + k] = 0xFF
+        for k in range(0x10): ram7[0x7E5F - 0x7400 + k] = 0xFF
+        for k in range(10): ram7[0x78DA - 0x7400 + k] = 0xFF
+        ram7[0x78EE - 0x7400] = 0
+        zp[0x15:0x18] = bytes(rnd.getrandbits(8) for _ in range(3))
+    if name == 'fight':                                    # an attacker and a target record
+        a = rnd.choice([0x7575 + 0x40 * rnd.randrange(4), 0x7675 + 0x40 * rnd.randrange(8)])
+        t = rnd.choice([0x7575 + 0x40 * rnd.randrange(4), 0x7675 + 0x40 * rnd.randrange(8)])
+        zp[0x6E], zp[0x6F], zp[0x70], zp[0x71] = a & 0xFF, a >> 8, t & 0xFF, t >> 8
+        ram7[a - 0x7400 + 0x2E] = 4
+        ram7[a - 0x7400 + 0x30] = rnd.choice([0, 0x80])
+        zp[0x74] = rnd.choice([0, 0, 1])
+    if name in ('magic', 'item'):
+        a = rnd.choice([0x7575 + 0x40 * rnd.randrange(4), 0x7675 + 0x40 * rnd.randrange(8)])
+        zp[0x6E], zp[0x6F] = a & 0xFF, a >> 8
+        ram7[a - 0x7400 + 0x30] = rnd.choice([0, 0x80, 0xC0])
+        ram7[a - 0x7400 + 0x2C] = (ram7[a - 0x7400 + 0x2C] & 0x87) | rnd.choice([0, 0x10, 0x08])
+        ram7[0x7E99 - 0x7400] = rnd.choice([0x80, 0x40, 0xF0, 0xFF, rnd.getrandbits(8)])
+        ram7[0x7E9A - 0x7400] = rnd.choice([0, 0x40, 0x80, 0xC0])
+        ram7[0x7E9B - 0x7400] = ram7[0x7E99 - 0x7400]
+        ram7[0x7EC1 - 0x7400] = 0
+        zp[0xCC] = rnd.choice([0, 0, 0, 1])
+        if zp[0xCC]: ram7[a - 0x7400 + 0x2C] |= 0x10        # (the "ineffective" flag comes with a raw id)
+        if name == 'magic':                                # (a raw attack id with the magic flag, else
+            f = ram7[a - 0x7400 + 0x2C]                     #   a spell as an item id $C8+)
+            zp[0x1A] = rnd.randrange(0x78) if f & 0x18 else 0xC8 + rnd.randrange(0x38)
+        else:
+            inv = [ram6[0xC0 + 2 * k] for k in range(0x20) if ram6[0xC0 + 2 * k]]
+            zp[0x1A] = rnd.choice(inv) if inv else 0x98
+    return ram6, ram7, zp
+
+
+def to_gb(ram6, ram7, zp):
+    z = bytearray(zp)
+    for p in PTRS + ([0x24] if 0x6000 <= zp[0x24] | zp[0x25] << 8 < 0x8000 else []):
+        a = gb_ptr(zp[p] | zp[p + 1] << 8)
+        z[p], z[p + 1] = a & 0xFF, a >> 8
+    r7 = bytearray(ram7)
+    for p in (0x78B5,):
+        a = gb_ptr(ram7[p - 0x7400] | ram7[p - 0x7400 + 1] << 8)
+        r7[p - 0x7400], r7[p - 0x7400 + 1] = a & 0xFF, a >> 8
+    return bytes(ram6), bytes(r7), bytes(z)
+
+
+# zero page bytes compared (results the battle code reads later; not the helpers' scratch $18-$2F)
+ZP_CMP = [a for a in range(0x30, 0x100) if a not in
+          set(PTRS + [p + 1 for p in PTRS] + [0x46, 0x47, 0x4A, 0x4B, 0xA9, 0xAB, 0x22, 0x23, 0x20, 0x21])]
+RAM7_SKIP = {0x78B5, 0x78B6}
+
+
+SKIP = {'consol': (0x7400, 0x7480)}                    # FF3's scratch buffers kept elsewhere on the GB
+
+
+def compare(name, nes, gb):
+    out = []
+    sk = SKIP.get(name, (0, 0))
+    for (lo, hi, a, b, label) in ((0x6000, 0x6400, nes[0], gb[0], ''), (0x7400, 0x7F00, nes[1], gb[1], '')):
+        for i in range(hi - lo):
+            if lo + i in RAM7_SKIP or sk[0] <= lo + i < sk[1]: continue
+            if a[i] != b[i]: out.append('%04X nes %02X gb %02X' % (lo + i, a[i], b[i]))
+    for z in ZP_CMP:
+        if nes[2][z] != gb[2][z]: out.append('zp %02X nes %02X gb %02X' % (z, nes[2][z], gb[2][z]))
+    return out
+
+
+def main():
+    a = sys.argv[1:]
+    n = int(a[0]) if a and a[0].isdigit() else 20
+    seed = int(a[a.index('--seed') + 1]) if '--seed' in a else 1
+    only = a[a.index('--only') + 1].split(',') if '--only' in a else list(ROUTINES)
+    rom = data.Rom(NES_ROM)
+    rnd = random.Random(seed)
+    gb = GB()
+    bad = 0
+    for name in only:
+        num, addr = ROUTINES[name]
+        fails = 0
+        for k in range(n):
+            ram6, ram7, zp = setup(rom, rnd, name)
+            try:
+                res_n = nes_run(rom, ram6, ram7, zp, addr)
+            except RuntimeError as e:
+                print('%s #%d: NES %s (state skipped)' % (name, k, e)); continue
+            try:
+                res_g = gb.run(*to_gb(ram6, ram7, zp), num)
+            except RuntimeError as e:
+                print("%s #%d: GB %s" % (name, k, e)); fails += 1; gb.close(); gb = GB(); continue
+            d = compare(name, res_n, res_g)
+            if d:
+                fails += 1
+                if fails <= 3: print('%s #%d: %d differences: %s' % (name, k, len(d), '; '.join(d[:10])))
+        print('%-8s %d of %d states differ' % (name, fails, n))
+        bad += fails
+    gb.close()
+    sys.exit(1 if bad else 0)
+
+
+if __name__ == '__main__':
+    main()

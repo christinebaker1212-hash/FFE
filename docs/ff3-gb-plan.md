@@ -53,7 +53,20 @@ what is left, kept current as the work goes on.
 `sfx_play` (A = effect), `M_CTRL` (2 resume, 4 stop, 8 + 4 fade out). Check harness: py65 runs
 FF3's driver (MMC5 build: song bank by a `$5115` write) against SameBoy's `$DD00` page.
 
-## Then: battle (FF3's rules; layout waits for the owner's mock-up choice)
+## Battle (in progress; FF3's rules exactly)
+Banks: 54 `B_BAT` battle code ($4000 batcore, $5800 batmagic, $6C00 batinit, $7800 batequip), 55
+`B_BDAT` = NES $30/$31 as mapped in a battle, 56 `B_BDAT2` = NES $2E + $01, 57 `B_BDAT3` = NES
+$38 + $39. RAM: `BZ` $C400 = FF3's zero page; work RAM bank 2 during a battle: NES $6000-$63FF ->
+$D000 (save page copy), NES $7400-$7FFF -> $D400 (records $7575 chars / $7675 monsters, $7400
+buffer, $78DA message queue, $7BE3 random table, $7E4F / $7E5F numerals); $C500 our battle
+variables, $C600 / $C700 the inventory sort buffers. Macros `%LDZ` / `%STZ` / `%PZ` / `%MOVZ`
+(build.py) do FF3's (zp),Y; writes through a pointer into FF3's ROM range go to a dummy.
+Tables of FF3's code banks are filled from the ROM after assembling (`ROMDATA` in build.py).
+Test: `GB3N_TEST=1 python3 tools/gb3n/build.py --out build/ff3n_test.gbc`, then
+`python3 tools/gb3n/test/batdiff.py N [--seed S] [--only init,equip,monact,fight,magic,item,...]`.
+
+## Battle: still to write
+
 Formations: 2E/8000 battle -> (set, count id); 2E/8400 set: 2 palettes, 4 monsters; 2E/8A00
 counts (min / max nibbles, $2F $A0C8 rolled with FF3's RNG); graphics by 2E/8B00 size class
 ($2F $A4B4 / $A4CC; bosses size 6-7: boss tilemaps 2A/8000); palettes 2E/8C00 (3 colours).

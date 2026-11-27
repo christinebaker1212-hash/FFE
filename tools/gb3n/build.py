@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
 import tiles, data, text
 
+BATTLE_SRC = ['batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s']
 ROM_BANKS = 128             # 2 MB (sized to the game later)
 RAM_CODE = 0x03             # 32 KB cart RAM (4 banks, as retail MBC5 games: docs/gb-lessons.md)
 EN_SHA1 = '4a7f1ae4c89305cf161aa3d78fd4416548663f99'   # build/ff3_en.nes (patches/README.md)
@@ -38,6 +39,7 @@ B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_TMAP0, B_SUB0, B_COMMON = 3, 4, 5, 6, 
 B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD = 18, 19, 20, 21, 28, 29
 B_WORLD0, B_WINFO, B_WGFX = 32, 48, 49
 B_SND0 = 50                 # 50-53: NES bank $36 at $4000, song bank $37 / $38 / $39 / $09 at $6000
+B_BAT, B_BDAT, B_BDAT2, B_BDAT3 = 54, 55, 56, 57   # battle code; NES $30 + $31; $2E + $01; $38 + $39
 
 
 def field_banks(rom):
@@ -120,6 +122,9 @@ def field_banks(rom):
     for k, w in enumerate((0, 2, 4)):
         b[0x1000 * k:0x1000 * k + 0x1000] = gbt(data.world_tiles(rom, w))
     banks[B_WGFX] = b
+    banks[B_BDAT] = bytearray(rom.at(0x30 * data.B8, 0x4000))      # battle data: NES $30/$31 as mapped
+    banks[B_BDAT3] = bytearray(rom.at(0x38 * data.B8, 0x4000))
+    banks[B_BDAT2] = bytearray(rom.at(0x2E * data.B8, 0x2000) + rom.at(0x01 * data.B8, 0x2000))
     for k, sb in enumerate((0x37, 0x38, 0x39, 0x09)):     # sound: driver tables + song data
         banks[B_SND0 + k] = bytearray(rom.at(0x36 * data.B8, 0x2000) + rom.at(sb * data.B8, 0x2000))
     return banks
@@ -152,6 +157,42 @@ def sound_data():
     return '\n'.join(lines) + '\n'
 
 
+# battle code macros (src/bat*.s): pointer accesses as FF3's (zp),Y. %LDZ zp, off: A = [[BZ+zp] + off]
+# (HL left at the byte); %STZ zp, off: the same address = A (B used); %PZ zp, off: HL = the address
+# (%STZ / %PZ: an address in FF3's ROM range, GB $E000+, goes to a dummy: the NES ignores such writes);
+# %LDX table: A = [table + X] with X in [BZ_X]; %MOVZ dst, src: a 16-bit pointer copy in BZ
+# tables of FF3's code banks filled from the user's ROM after assembling: label -> (NES bank, address, n)
+ROMDATA = {
+    'w_songs': (0x3B, 0xA027, 32),       # world map songs by world and vehicle
+    'refl_bits': (0x31, 0xBB0E, 11),     # spells that Reflect bounces
+}
+
+MACROS = {
+    'PZ': ['ld hl, BZ + ({0})', 'ld a, [hl+]', 'ld h, [hl]', 'add {1}', 'ld l, a', 'ld a, h', 'adc 0', 'ld h, a',
+           'call wchk'],
+    'LDZ': ['ld hl, BZ + ({0})', 'ld a, [hl+]', 'ld h, [hl]', 'add {1}', 'ld l, a', 'ld a, h', 'adc 0', 'ld h, a',
+            'ld a, [hl]'],
+    'STZ': ['ld b, a', 'ld hl, BZ + ({0})', 'ld a, [hl+]', 'ld h, [hl]', 'add {1}', 'ld l, a', 'ld a, h', 'adc 0',
+            'ld h, a', 'call wchk', 'ld [hl], b', 'ld a, b'],
+    'MOVZ': ['ld a, [BZ + ({1})]', 'ld [BZ + ({0})], a', 'ld a, [BZ + ({1}) + 1]', 'ld [BZ + ({0}) + 1], a'],
+}
+
+
+def expand(src):
+    import re
+    out = []
+    for line in src.split('\n'):
+        m = re.match(r'^(\s*(?:[.\w]+:)?\s*)%(\w+)\s*(.*?)\s*(;.*)?$', line)
+        if m and m.group(2) in MACROS:
+            args = [a.strip() for a in m.group(3).split(',')] if m.group(3) else []
+            body = MACROS[m.group(2)]
+            out.append(m.group(1) + body[0].format(*args))
+            out += ['            ' + b.format(*args) for b in body[1:]]
+        else:
+            out.append(line)
+    return '\n'.join(out)
+
+
 def main():
     a = sys.argv[1:]
     nes = a[a.index('--nes') + 1] if '--nes' in a else os.path.join(ROOT, 'build', 'ff3_en.nes')
@@ -171,16 +212,21 @@ def main():
                B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_COMMON) +
            'B_NPCS = %d\nB_NPCGFX = %d\nB_OWN = %d\nB_TEXT = %d\nB_SCRIPT = %d\nB_FIELD = %d\n' % (
                B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD) +
-           'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) + text_defs +
+           'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
+           'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3) + text_defs +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'world.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'sound.s')).read() + '\n' + sound_data() + own_data())
+           open(os.path.join(HERE, 'src', 'sound.s')).read() + '\n' +
+           ''.join(open(os.path.join(HERE, 'src', f)).read() + '\n' for f in BATTLE_SRC) + sound_data() + own_data())
+    if os.environ.get('GB3N_TEST'):              # test builds: tools/gb3n/test (never a release)
+        src = src.replace('.nw:        call map_enter', '.nw:        jp test_loop')
+        src += open(os.path.join(HERE, 'src', 'test.s')).read() + '\n'
     import re                                    # (constants from every file first)
-    lines = src.split('\n')
+    lines = expand(src).split('\n')
     is_def = lambda l: re.match(r'^[A-Za-z_]\w*\s+=', l)
     src = '\n'.join([l for l in lines if is_def(l)] + [l for l in lines if not is_def(l)])
     import asm_sm83
@@ -198,6 +244,12 @@ def main():
                 if len(run) >= 32: print('bank %d free: $%04X-$%04X (%d)' % (gb, run[0] + (0x4000 if gb else 0), run[-1] + (0x4000 if gb else 0), len(run)))
                 run = []
     rom = data.Rom(nes)
+    for name, (nb, addr, n) in ROMDATA.items():
+        if name not in r.labels: continue
+        gb, ga = r.label_bank[name], r.labels[name]
+        off = ga - (0x4000 if gb else 0)
+        banks[gb] = bytearray(banks[gb])
+        banks[gb][off:off + n] = rom.rd(nb, addr, n)
     for k, v in tbanks.items():
         assert k not in banks, 'bank %d used twice' % k
         banks[k] = v

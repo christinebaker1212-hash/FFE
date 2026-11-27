@@ -143,6 +143,26 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   a map loads (an HRAM `mapbank` lets the interrupt map back the bank in use).
 - Later: the timer at the NES's 60.0988 Hz, volume changes without restarts (FF1's way).
 
+## Battle algorithms (2026-11-27)
+- FF3's battle algorithms written natively (`src/batcore.s`, `batmagic.s`, `batinit.s`, `batequip.s`):
+  character / monster setup ($31 $A400, monster stats, special attack scripts), the equipment update
+  ($AA16: hit / attack / evade / defence / magic values from job, stats and equipment), monster
+  action choice ($A732: run, special attacks, boss scripts in order, targets), the fight effect
+  ($9E8A: hits, two hands, back row, criticals, elements, defending, jump / buildup, drain, status),
+  magic and item effects ($AF77 / $A65E: all 49 attack effects, reflect, m.evade, elements,
+  absorb, split / summon / self-destruct / barrier shift / Odin / Bahamut, kill, life, toad /
+  mini), inventory consolidation, confusion, random targets; FF3's battle random number
+  generator and its helpers (multiply, divide, bit masks).
+- Memory as FF3's: its zero page in `BZ` ($C400) and its $6000-$63FF / $7400-$7FFF in work RAM
+  bank 2 (low 12 bits kept), so the code reads like the listing and can be compared byte for byte.
+- `tools/gb3n/test/batdiff.py` runs FF3's own 6502 code (py65, the user's ROM) and ours (SameBoy,
+  a GB3N_TEST=1 build) on the same random battle states and compares all battle RAM: 0 differences
+  over 150-300 states per routine. Three FF3 quirks found by it and kept: an empty first monster
+  slot loads a monster record into ROM ($A45A's LDX sets Z); a monster petrified by status is also
+  marked dead ($BDF4 tests INY's flags); the run-penalty undo subtracts with FF3's leftover carry.
+- Next: the battle flow (bank $34/$35: turn order, commands, actions, messages, victory) and the
+  battle screen (layout from the mock-up sheet), random encounters.
+
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
   proposal: use FF3's own choice of top / bottom), 18 columns x 6 lines.

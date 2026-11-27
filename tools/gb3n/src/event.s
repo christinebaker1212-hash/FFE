@@ -574,10 +574,7 @@ map_song:   ld a, [wmode]
             add hl, de
             ld a, [hl]
             jp mus_play
-w_songs:    db $1E, $08, $1E, $22, $0A, $0A, $0A, $23   ; (FF3's table, 3B/A027: song ids)
-            db $2F, $08, $2F, $2F, $2F, $0A, $0A, $23
-            db $1E, $08, $1E, $22, $0A, $0A, $0A, $23
-            db $1E, $08, $1E, $22, $09, $09, $15, $23
+w_songs:    ds 32                           ; (FF3's table 3B/A027, from the ROM at build time)
 
 ev_npcdlg:  ld e, a                         ; $F0: the person's dialogue (their list, entry A)
             ld d, 0
