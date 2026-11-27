@@ -1189,6 +1189,11 @@ one reaches parity, so the owner can keep playing).
       results and left-window rows are mapped only once their letters are uploaded (vwf_outf), so a row never
       shows its tiles' old letters.
     - Checked: an "o&" pixel detector over every frame finds 0 (was 119); the right texts show in those frames.
+    - The same lost HL also corrupted game state (owner, 2026-11-27: Thunder Barrier against an Allosaurus, every row
+      "o&", then the lead "Dead" with HP 6464/999): on the build before this fix, formation 61 with Jojo casting
+      Thunder Barrier left Dune's record at status $6F (dead) and HP $1940 (6464); the fixed build shows
+      "Jojo -> Dune / Became resistant to lightning" for each member and leaves the records right. Running away:
+      the old build shows "o&", the fixed one "Dune / Somehow got away..." (SameBoy, Color).
 67. Owner (2026-11-27, a photo from an Analogue Pocket): the Undersea Shrine's water should move like the world map's.
     - The shrine's blue bubble field is one metatile ($3C of tileset 5, the commonest metatile of maps 42-46) whose
       four tiles only it uses. Its 16 x 16 picture now moves as the world map's sea: four bands of 4 lines, each a
