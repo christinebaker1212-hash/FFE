@@ -47,7 +47,24 @@ def menu_data():
             'm_s_erase:  db %s\n' % z(clean(t[0x4C].split('{15')[0]).replace('\n', '\x0a')) +
             'm_s_yes:    db %s\n' % z(clean(t[6].split('\n')[0])) +
             'm_s_no:     db %s\n' % z(clean(t[6].split('\n')[1])) +
-            'm_damaged:  db %s\n' % z('Damaged'))
+            'm_damaged:  db %s\n' % z('Damaged') + name_grid())
+
+
+def name_grid():
+    """the name entry's letters in FF3's codes (the English ROM's ENC): upper / lower case, digits,
+    punctuation (9 x 5 each), and our help lines (Nintendo's button names)"""
+    sys.path.insert(0, os.path.join(HERE, '..', 'ff3'))
+    import insert
+    enc = insert.ENC
+    tail = '0123456789' + ".,'-!?&/:"
+    g0 = [enc[c] for c in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' + tail]
+    g1 = [enc[c] for c in 'abcdefghijklmnopqrstuvwxyz' + tail]
+    assert len(g0) == len(g1) == 45
+    z = lambda w: ''.join('$%02X, ' % ord(c) for c in w) + '0'
+    return ('n_grid0:    db %s\n' % ', '.join('$%02X' % c for c in g0) +
+            'n_grid1:    db %s\n' % ', '.join('$%02X' % c for c in g1) +
+            'n_help0:    db %s\n' % z('SELECT: abc') + 'n_help1:    db %s\n' % z('SELECT: ABC') +
+            'n_help2:    db %s\n' % z('B:Delete  START:OK'))
 
 
 def own_data():

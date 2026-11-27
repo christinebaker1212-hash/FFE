@@ -192,9 +192,25 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   numbers as sprites, monster deaths with FF3's experience credit, victory messages, back to the
   map. Checked in SameBoy: battles fought to defeat (soft restart) and to victory, strict checker
   and VRAM checker 0.
-- Battle to do: bosses (FF3 draws them from a tilemap, 2A/8000), the monsters' palettes per FF3's
-  attribute data, the party's battle palettes, attack / spell animations, the layout per the
-  owner's mock-up choice, event battles (event command $F7, monster chests).
+- Bosses from FF3's tilemaps (2A/8000; graphics pointer decoded as 2F/A3BB, summons flipped),
+  monster / boss palettes from FF3's attribute data (2F/A857, a bit per 16 x 16 block), the party's
+  palettes by job (2E/9E01), event battles ($F7), the battle id's high byte from the world (2E/9E8E).
+- Battle to do: attack / spell animations, the layout per the owner's mock-up choice, monster
+  chests, back attacks (FF3 flips the monsters), the airship's battle background.
+
+## Menus, saves, title (2026-11-27; `src/menu.s`, bank B_MENU = 76)
+- Start on the map: the main menu (FF3's commands from its text $31 + Config / Suspend): commands
+  and Gil / CP on the left, the party (job pictures, Lv or ailment as FF3's 3F/F299, HP) on the
+  right. Full-screen shadow copied by general DMA in one V-Blank; the map reloads after, the
+  people kept where they were (`npc_keep`, also after battles).
+- Order (FF3's row toggle), Status (FF3's values after its equipment update, 34/803D, run in the
+  battle banks with the save page in work RAM bank 2).
+- Save (world map only, as FF3): FF3's three files, its checksum (3D/AE5C) and save count; the
+  title (FF3's game load menu 3D/B9F6): files 1-3 and New Game. Cart RAM is enabled only around
+  each access; each file has our own check (magic + 16-bit sum) besides FF3's; a bad file shows
+  "Damaged". Checked: save, soft reset, load from the title.
+- New Game: the four names (FF3's 3D/B895 flow; our 9 x 5 grid, SELECT switches case).
+- To do: Item, Magic, Equip, Job, Config, Suspend.
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;

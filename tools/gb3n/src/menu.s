@@ -1590,6 +1590,237 @@ t_title:    call m_enter
             call m_sfx_move
             jr .lp
 
+; ==== New Game: the four names (FF3's 3D/B895: a name each, B on an empty name back to the one
+; before); our grid: 9 x 5 letters, one case at a time (SELECT switches), B deletes, START ends
+t_names:    call m_enter
+            call m_winpal
+            xor a
+            ld [n_who], a
+            ld [n_case], a
+.ch:        xor a
+            ld [n_cur], a
+            ld a, [n_who]                   ; the name so far: its length
+            call m_choff
+            add 6
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld b, 0
+.ln:        ld a, [hl+]
+            cp $FF
+            jr z, .lx
+            and a
+            jr z, .lx
+            inc b
+            ld a, b
+            cp 6
+            jr nz, .ln
+.lx:        ld a, b
+            ld [n_len], a
+            call n_fill                     ; (the rest padded with $FF)
+.scr:       call n_draw
+.lp:        ld a, [n_cur]                   ; the hand at letter n_cur
+            ld c, 0
+.dv:        cp 9
+            jr c, .dd
+            sub 9
+            inc c
+            jr .dv
+.dd:        add a                           ; column 2 + 2 x, row 6 + 2 y
+            add 2
+            ld e, a
+            ld a, c
+            add a
+            add 6
+            ld b, a
+            ld c, e
+            call m_hand2
+            call m_frame
+            ldh a, [pad_new]
+            ld b, a
+            and $F0
+            jp nz, .dir
+            bit 2, b
+            jr nz, .case
+            bit 3, b
+            jr nz, .done
+            bit 1, b
+            jr nz, .del
+            bit 0, b
+            jr z, .lp
+            ld a, [n_len]                   ; A: a letter (6 at most)
+            cp 6
+            jr nc, .err
+            ld a, [n_who]
+            call m_choff
+            add 6
+            ld hl, n_len
+            add [hl]
+            ld e, a
+            inc [hl]
+            ld a, [n_case]
+            and a
+            ld hl, n_grid0
+            jr z, .g
+            ld hl, n_grid1
+.g:         ld a, [n_cur]
+            add l
+            ld l, a
+            jr nc, .g2
+            inc h
+.g2:        ld a, [hl]
+            ld l, e
+            ld h, high(SRAM_PAGE + $100)
+            ld [hl], a
+            call m_sfx_ok
+            jp .scr
+.err:       call m_sfx_err
+            jp .lp
+.del:       ld a, [n_len]                   ; B: the last letter off; none: the member before
+            and a
+            jr z, .back
+            dec a
+            ld [n_len], a
+            call n_fill
+            call m_sfx_ok
+            jp .scr
+.back:      ld a, [n_who]
+            and a
+            jr z, .err
+            dec a
+            ld [n_who], a
+            call m_sfx_ok
+            jp .ch
+.case:      ld a, [n_case]
+            xor 1
+            ld [n_case], a
+            call m_sfx_move
+            jp .scr
+.done:      ld a, [n_len]                   ; START: this name (not empty)
+            and a
+            jr z, .err
+            call m_sfx_ok
+            ld a, [n_who]
+            inc a
+            ld [n_who], a
+            cp 4
+            jp nz, .ch
+            call m_hand2off
+            jp m_leave
+.dir:       ld a, [n_cur]
+            bit 4, b
+            jr nz, .r
+            bit 5, b
+            jr nz, .l
+            bit 6, b
+            jr nz, .u
+            add 9                           ; down
+            cp 45
+            jr c, .s
+            sub 45
+            jr .s
+.u:         sub 9
+            jr nc, .s
+            add 45
+            jr .s
+.r:         inc a
+            cp 45
+            jr c, .s
+            xor a
+            jr .s
+.l:         dec a
+            cp $FF
+            jr nz, .s
+            ld a, 44
+.s:         ld [n_cur], a
+            call m_sfx_move
+            jp .lp
+; the name's letters after n_len: $FF
+n_fill:     ld a, [n_who]
+            call m_choff
+            add 6
+            ld hl, n_len
+            add [hl]
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld a, [n_len]
+            ld b, a
+            ld a, 6
+            sub b
+            ret z
+            ld b, a
+.f:         ld [hl], $FF
+            inc l
+            dec b
+            jr nz, .f
+            ret
+; the screen: the member (picture, name, job) at the top, the grid below
+n_draw:     call m_clear
+            ld de, $0000
+            ld bc, $0514
+            call m_win
+            ld a, [n_who]
+            ld de, $0105
+            call m_name
+            ld a, [n_len]                   ; the next letter's place: a dash
+            cp 6
+            jr nc, .nd
+            add 5
+            ld e, a
+            ld a, '-'
+            call m_putc
+.nd:        ld a, [n_who]                   ; the job's name (t8200 $E2 + job)
+            call m_choff
+            call m_sp1
+            add $E2
+            call m_t82
+            ld de, $0305
+            ld a, 14
+            call m_putsn
+            ld de, $0500
+            ld bc, $0D14
+            call m_win
+            ld a, [n_case]
+            and a
+            ld hl, n_grid0
+            jr z, .g
+            ld hl, n_grid1
+.g:         ld d, 6
+.r:         ld e, 2
+            ld b, 9
+.c:         push bc
+            push hl
+            ld a, [hl]
+            call m_ff3c
+            call m_putc
+            pop hl
+            pop bc
+            inc hl
+            inc e
+            inc e
+            dec b
+            jr nz, .c
+            inc d
+            inc d
+            ld a, d
+            cp 16
+            jr nz, .r
+            ld de, $0F01
+            ld hl, n_help0
+            ld a, [n_case]
+            and a
+            jr z, .h
+            ld hl, n_help1
+.h:         call m_puts0
+            ld de, $1001
+            ld hl, n_help2
+            call m_puts0
+            call m_sprclr
+            ld a, [n_who]
+            ld c, a
+            ld de, $1810
+            call m_pictxy
+            jp m_show
+
 section wram, $CD80
 m_cur:      ds 1
 m_who:      ds 1
@@ -1605,3 +1836,7 @@ m_yn:       ds 1
 m_fbuf:     ds 12
 m_res:      ds 1
 m_sf:       ds 1
+n_who:      ds 1
+n_case:     ds 1
+n_cur:      ds 1
+n_len:      ds 1

@@ -214,7 +214,8 @@ title_boot: ld a, LCDC_ON
             ld a, 1
             ld [wmode], a
             jr .go
-.new:       ld a, START_MAP                 ; (test builds: map 255 = the world map)
+.new:       %FAR B_MENU, t_names            ; the party's names (FF3's 3D/B895)
+            ld a, START_MAP                 ; (test builds: map 255 = the world map)
             inc a
             jr nz, .go
             inc a
