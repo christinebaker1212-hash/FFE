@@ -625,7 +625,10 @@ field_step: call npc_update
             jr nz, .dir
             ld b, DIR_U
             bit 6, a
-            jr z, .done
+            jr nz, .dir
+            xor a                           ; (no direction: an airship's next step starts
+            ld [v_4e], a                    ;   slower, 3E/C250)
+            jr .done
 .dir:       ld a, b
             ld [facing], a
             call dest_cell                  ; D, E = the metatile ahead
@@ -637,10 +640,10 @@ field_step: call npc_update
             call fx_flset                   ; (a damage floor ahead: 3F/E561)
             call gu_push                    ; (the guest's trail: 3D/B6DA)
             call edge_line                  ; the row / column coming into view
-            ld a, 1
-            ld [step], a
+            call w_go
             jr .done
-.walk:      inc a                           ; a pixel a frame, 16 to a step
+.walk:      ld hl, w_spd                    ; pixels a frame by the vehicle (3E/CD76), 16 to
+            add [hl]                        ;   a step
             ld [step], a
             push af
             call fx_walkf

@@ -163,6 +163,33 @@ v_board:    ld a, [veh]
             call v_park
             call gu_off
             xor a
+; a step starts: its speed (3E/CD7E): 1 on the maps and under the sea, else by the vehicle; an
+; airship's first step after a stop at 4, then 8
+V_SPD:      db 1, 2, 1, 2, 4, 2, 8, 2
+w_go:       ld a, 1
+            ld [step], a
+            ld [w_spd], a
+            ld a, [wmode]
+            and a
+            ret z
+            ld a, [world]
+            cp 4
+            ret nc
+            ld a, [veh]
+            ld hl, V_SPD
+            call v_hla
+            ld a, [hl]
+            ld [w_spd], a
+            cp 8
+            ret nz
+            ld a, [v_4e]
+            and a
+            ret nz
+            inc a
+            ld [v_4e], a
+            ld a, 4
+            ld [w_spd], a
+            ret
 ; off a canoe / ship onto land (3E/C5C1): the guest at the party, the party waiting for it
 gu_off:     ld a, [SRAM_PAGE + $0B]
             and a
@@ -710,9 +737,7 @@ v_jstep:    ld a, [inv_j]
             xor a
             ld [inv_af], a
 .go:        call edge_line
-            ld a, 1
-            ld [step], a
-            ret
+            jp w_go
 
 ; ---- for the special animations (src/sa.s): the party's vehicle [ev_tmp]; the view again
 sa_vset:    ld a, [sa_tmp]
@@ -836,6 +861,8 @@ vposes:     ds 64                           ; (work RAM bank 1)
 
 section wram, $C2D8
 v_again:    ds 1                            ; FF3's $24 set: A again next frame
+w_spd:      ds 1                            ; FF3's $34: pixels a frame
+v_4e:       ds 1                            ; $4E: the airship under way
 
 section wram, $C2E0
 vtab:       ds 24
