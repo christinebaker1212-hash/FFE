@@ -546,8 +546,8 @@ load_map:   push af
             call ocpd_w
             dec b
             jr nz, .op
-            ld a, F3_BANK                   ; (OBJ 4-7: their darker copies, the reflection's)
-            ld hl, refl_pal
+            ld a, PGM_BANK                  ; (OBJ 4-7: their darker copies, the reflection's;
+            ld hl, pg_rpal                  ;   the world map: 7 the shrine statue's stone, pg.s)
             call bank_call
             ld a, COMMON                    ; party sprite tiles at $8000 (as they are)
             call sbank
@@ -644,7 +644,7 @@ veh_tiles:  ldh a, [maptype]
             ld a, [map_bank]
             call sbank
             ld de, $8100
-            ld bc, 96 * 16
+            ld bc, 112 * 16                 ; (and the shrine's statue, tiles $70-$7F: pg.s)
             jp memcpy
 
 ; the map's object graphics blocks (HL = their tiles in the map bank, 256 bytes a block) to
@@ -1128,7 +1128,7 @@ arrived:    ld a, [px]
             jr .ent
 .ncy:       and a                           ; (nothing: C clear, the next step at once)
             ret
-.ent:       ld a, [px]                      ; (the overworld position kept for the warp out)
+.ent:       call pg_echk                    ; (A = [px]; the post-game's shrines: pg.s)
             ld [ow_x], a
             ld a, [py]
             ld [ow_y], a
@@ -1490,7 +1490,7 @@ veh_oam:    ld a, [vehicle]
             add a, 8
             ld b, a
             call .two
-.objs:      call ow_bc                      ; the bridge and the canal (FF1
+.objs:      call pg_owst                    ; the bridge and the canal (FF1
             ld a, [vehicle]                 ;   DrawOWObj_BridgeCanal); the ship / airship
             cp V_SHIP                       ;   standing on the map
             jr z, .na
@@ -2900,8 +2900,8 @@ load_game:  ld a, $0A
             ret
 
 ; FF1 GameOver: back to the title
-game_over:  di
-            ld sp, $E000
+game_over:  jp pg_gover                     ; (the post-game: back to the world map, pg.s)
+            nop
             ld e, $A5
             ldh a, [is_cgb]                 ; (start reads the console from A)
             and a

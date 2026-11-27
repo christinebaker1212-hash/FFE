@@ -347,7 +347,7 @@ sgb_btl99:  ld a, [sgb_on]
             ld hl, SG_FIXED + 8             ; colours: white, the windows' three
             ld de, sgb_tmp
             ld bc, 8
-            ld a, SGB_BANK
+            ldh a, [hbt_sgb]
             call far_copy
             ld a, [btl_fid]                 ; the enemies' three
             and $7F
@@ -362,7 +362,7 @@ sgb_btl99:  ld a, [sgb_on]
             add hl, de
             ld de, sgb_tmp + 8
             ld bc, 6
-            ld a, SGB_BANK
+            ldh a, [hbt_sgb]
             call far_copy
             ld a, $01
             ld hl, sgb_tmp
@@ -371,12 +371,12 @@ sgb_btl99:  ld a, [sgb_on]
             ld hl, SG_FIXED + 16            ; PAL23: the party's two palettes (FF1's battle
             ld de, sgb_tmp                  ;   sprite palettes 1 and 0)
             ld bc, 8
-            ld a, SGB_BANK
+            ldh a, [hbt_sgb]
             call far_copy
             ld hl, SG_FIXED + 34
             ld de, sgb_tmp + 8
             ld bc, 6
-            ld a, SGB_BANK
+            ldh a, [hbt_sgb]
             call far_copy
             ld a, $09
             ld hl, sgb_tmp

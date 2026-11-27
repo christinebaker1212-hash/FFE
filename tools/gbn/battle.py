@@ -113,6 +113,18 @@ def magic_data(rom):
         d[k + 4] = 0x0E
     return bytes(d)
 
+def pg_magic(md):
+    """the post-game's items as FF1 magic records ($5C-$5F): Hi-Potion (the Potion, power 75: 75-150 HP),
+    Remedy (the Antidote's cure, every ailment but KO / stone), Ether (no effect of its own: the MP,
+    src/pg.s md_mp), Megalixir (Curaga on the whole party; the MP too)"""
+    pot, anti, curaga = md[8 * 0x40:8 * 0x41], md[8 * 0x41:8 * 0x42], md[8 * 48:8 * 49]
+    hi = bytearray(pot); hi[1] = 75
+    rem = bytearray(anti); rem[1] = 0xFC
+    eth = bytearray(anti); eth[1] = 0
+    meg = bytearray(curaga); meg[3] = 0x08
+    return bytes(hi + rem + eth + meg)
+
+
 def data_bank(rom):
     import ff1_monsters, ff1_battle
     b = bytearray(b'\xff' * 0x4000)
@@ -123,8 +135,9 @@ def data_bank(rom):
     put(0x4B00, dn_tiles())
     put(0x4C00, rom.rd(BANK_BTLC, ENEMY_STATS, 128 * 20))
     put(0x5600, rom.rd(BANK_BTLC, ENEMY_AI, 44 * 16))
-    put(0x5900, magic_data(rom))
-    put(0x5C00, rom.rd(BANK_BTLC, MAGIC_MSGS, 0x5C))
+    md = magic_data(rom)                                              # (+ the post-game's items:
+    put(0x5900, md + pg_magic(md))                                    #   $5C-$5F)
+    put(0x5C00, rom.rd(BANK_BTLC, MAGIC_MSGS, 0x5C) + bytes([0, 0, 0, 24]))
     put(0x5C80, rom.rd(BANK_BTLC, BTL_PALS, 64 * 4))
     put(0x5E00, dmg_shades(rom))
     names = strtab(0x6200, [enc(n) for n in ff1_monsters.M[:128]])
@@ -140,6 +153,8 @@ def data_bank(rom):
     an = [names.name_codes(rom, 176 + k) for k in range(64)]          # spell / potion / attack names
     an += [enc(ff1_items.T.get(25, '')), enc(ff1_items.T.get(26, ''))]
     an += [enc(r['en']) for r in ff1_monsters.rows[:26]]
+    import postgame                                                   # (the post-game's items:
+    an += [enc(n) for n in postgame.battle_names()]                   #   Medicine, from $5C)
     at = strtab(0x7400, an)
     assert len(at) <= 0x600
     put(0x7400, at)

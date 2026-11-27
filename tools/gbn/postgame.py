@@ -35,6 +35,10 @@ CHEST_ROOM = 0x47               # a chest inside a room (FF1's: its palette only
 CHEST_CORR = (0x4B, 0x4C, 0x4D, 0x4E)   # our corridor chests: FF1's chest in the corridor palette
 CHEST_ROOMS = (0x47, 0x48, 0x49, 0x4A)
 EARTH_MAP = 29                  # Earth Cave B1: the palette of the cave floors
+PG_OBJ0, ORB_GFX = 0xF0, 4      # the boss orbs' object ids (src/pg.s), FF1's orb picture (its fiends')
+PG_ENT, PG_ENT_MT = 0x1E, 0x7A  # Earthgift's overworld entrance: its number, our cave mouth metatile
+PG_OWX, PG_OWY = 132, 141       #   (FF1's cave mouth $0E copied; the overworld's unused $7A)
+OW_CAVE = 0x0E
 
 # Earthgift Shrine: (Dawn of Souls map record, look, role)
 EARTHGIFT = [(120, 'cave', 'entrance'), (136, 'cave', 'floor'), (137, 'cave', 'floor'),
@@ -253,7 +257,11 @@ def floors(rom, G=None):
         else:
             f = outdoor_floor(G, rec, 'grass' if look == 'forest' else 'sand', 4)
             ov = dict(ts=PG_TS_OUT - 8, t=to, map=f['map'], pal=opal, chr=ochr)
-        ov['objs'] = bytes(45)
+        objs = bytearray(45)
+        for k, (bx, by) in enumerate(f['bosses']):  # the boss floor: an orb for each boss
+            objs[3 * k:3 * k + 3] = bytes([PG_OBJ0 + k, 0xC0 | bx, by])   # (in a room, still)
+        ov['objs'] = bytes(objs)
+        ov['obj_gfx'] = {PG_OBJ0 + k: ORB_GFX for k in range(4)}
         out.append((PG_MAP0 + i, f, ov))
     return out
 
@@ -411,16 +419,178 @@ EG_TREASURE = [['Hi-Potion', "Spider's Silk", 'White Curtain', 'Remedy'],
 EG_FIXED = ['Megalixir']
 
 
-def item_code(name):
-    """a Dawn of Souls item -> the native build's item code (FF1's where it has one)"""
-    ff1 = {'Potion': 0x19, 'Antidote': 0x1A, 'Gold Needle': 0x1B, 'Tent': 0x16, 'Cabin': 0x17,
-           'Cottage': 0x18}
-    return ff1.get(name, 0x19)
-
-
 def pg_source(bank):
     """the run's data in the post-game code bank: the treasure per depth, the fixed chests"""
     db = lambda xs: '            db ' + ', '.join('$%02X' % x for x in xs) + '\n'
     return ('section bank %d, $7F00\npg_treas:\n' % bank +
             ''.join(db([item_code(n) for n in row]) for row in EG_TREASURE) +
             'pg_fixed:\n' + db([item_code(n) for n in EG_FIXED] + [0] * 7))
+
+
+def overworld_patch():
+    """the shrine's door on the overworld: a cave mouth with its own entrance number"""
+    data.OW_MT_PATCH[PG_ENT_MT] = (OW_CAVE, (0x0E, 0x80 | PG_ENT))
+    data.OW_ROW_PATCH.append((PG_OWX, PG_OWY, PG_ENT_MT))
+
+
+# Dawn of Souls' words (its message table, retranslated in the project's style; the official English
+# a guide): 640 at the shrine's door, 648-651 the bosses (Echidna, Cerberus, Ahriman, the Two-Headed
+# Dragon: matched by the official quotes)
+T_SEALED = ("This is the Earthgift Shrine. Long ago, they say, one could enter, but since the earth "
+            "began to rot, no one has been able to get in.")
+T_BOSS = ["You did well to come this far... but this is where your journey ends!",
+          "I'll grant you this much for making it so far... but here you die!",
+          "There is nothing anywhere that can stop me! You, too, will die here by my hand!",
+          "Fwahahaha... Let everything vanish! Die, Warriors of Light!"]
+PGT_BANK = 125
+
+
+def text_source():
+    import text
+    def db(b): return ''.join('            db ' + ', '.join('$%02X' % x for x in b[i:i + 16]) + '\n'
+                              for i in range(0, len(b), 16))
+    out = 'section bank 116, $7E00\npg_t_boss:  dw pg_tb0, pg_tb1, pg_tb2, pg_tb3\n'   # (read in pg.s's bank)
+    out += 'section bank %d, $4000\npg_t_sealed:\n' % PGT_BANK + db(text.encode_dialogue(T_SEALED))
+    for k, t in enumerate(T_BOSS):
+        out += 'pg_tb%d:\n' % k + db(text.encode_dialogue(t))
+    return out
+
+
+# Dawn of Souls' new items (Earthgift's; effects from the FINAL FANTASY wiki: Hi-Potion 150 HP, Remedy
+# every ailment but KO / stone, Ether MP (Classic: one charge for every level, as the Pixel Remaster),
+# Megalixir all HP / MP of everyone, Silver Apple +5 maximum HP for good; the Fangs, Curtains, Drinks
+# and Spider's Silk cast FF1's own spell). Each takes the name code of an FF1 gold amount no chest
+# gives (names / prices replaced); consumable k counts at save page $B0 + k (FF1 leaves it unused).
+# (name, name code, battle magic (FF1 spell number or our entries $5C-$5F), field use)
+NEW_ITEMS = [('Hi-Potion', 113, 0x5C, 'hp'), ('Remedy', 114, 0x5D, 'cure'), ('Ether', 116, 0x5E, 'ether'),
+             ('Megalixir', 120, 0x5F, 'mega'), ('Silver Apple', 121, None, 'apple'),
+             ('Red Fang', 122, 20, None), ('White Fang', 124, 31, None), ('Vampire Fang', 125, 21, None),
+             ("Spider's Silk", 127, 15, None), ('White Curtain', 158, 26, None),
+             ('Blue Curtain', 165, 10, None), ('Speed Drink', 166, 29, None), ('Protect Drink', 167, 2, None)]
+NEW_PRICE = {'Hi-Potion': 150, 'Remedy': 1000, 'Ether': 1500, 'Megalixir': 50000, 'Silver Apple': 5000,
+             'Red Fang': 500, 'White Fang': 500, 'Vampire Fang': 500, "Spider's Silk": 500,
+             'White Curtain': 1000, 'Blue Curtain': 1000, 'Speed Drink': 1000, 'Protect Drink': 1000}
+NEWIT = 0xB0                     # (save page offset of consumable 0's count)
+# armour (FF1's 4-byte record: weight, defence, resisted elements, spell; permission word: a set bit is a
+# class that cannot wear it, Fighter bit 11 .. Black Wizard bit 0; type 0 armour, 1 shield, 2 helmet):
+# armour ids whose name code ($43 + id) is an FF1 gold amount no chest gives
+NEW_ARMOUR = [('Kenpogi', 43, (1, 28, 0, 0), 0x0DF7, 0, 'armour', 16000),      # Monk / Master
+              ('Black Cowl', 44, (1, 8, 0x01, 0), 0x0BEF, 2, 'helmet', 12000),  # Thief / Ninja; sleep
+              ('Elven Cloak', 45, (1, 9, 0, 0), 0x0208, 1, 'shield', 12000)]    # all but Monk / Master
+N_ARMOUR = 45
+
+
+def item_code(name):
+    """a Dawn of Souls item -> the native build's item code (FF1's where it has one)"""
+    ff1 = {'Potion': 0x19, 'Antidote': 0x1A, 'Gold Needle': 0x1B, 'Tent': 0x16, 'Cabin': 0x17,
+           'Cottage': 0x18}
+    if name in ff1: return ff1[name]
+    for n, code, _, _ in NEW_ITEMS:
+        if n == name: return code
+    for n, aid, *_ in NEW_ARMOUR:
+        if n == name: return 0x43 + aid
+    raise KeyError(name)
+
+
+def names_patch():
+    """the new items' and armour's names in the names bank (names.py), their prices"""
+    import names
+    for n, code, _, _ in NEW_ITEMS:
+        names.OVERRIDE[code] = ('item', n)
+        names.PRICE[code] = NEW_PRICE[n]
+    for n, aid, _, _, _, icon, price in NEW_ARMOUR:
+        names.OVERRIDE[0x43 + aid] = (icon, n)
+        names.PRICE[0x43 + aid] = price
+        names.ARMOUR_EXTRA[aid] = [x for x in NEW_ARMOUR if x[1] == aid][0]
+
+
+def items_source():
+    """the item tables the engine reads (src/pg.s): the new consumables' codes (it_newc, bank 0),
+    the Items screen's orders (Use / after Sort), the battle Medicine list (md_tab, bank 104)"""
+    db = lambda xs: '            db ' + ', '.join('$%02X' % x for x in xs) + '\n'
+    codes = [c for _, c, _, _ in NEW_ITEMS]
+    out = 'section bank 0, $3574\nit_newc:\n' + db(codes + [0])
+    ord0 = [0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B] + codes
+    heal = [0x19, 0x1A, 0x1B] + [c for n, c, _, u in NEW_ITEMS if u in ('hp', 'cure', 'mega', 'ether')]
+    ord1 = heal + [c for c in ord0 if c not in heal]
+    use = {None: 0, 'hp': 1, 'cure': 2, 'ether': 3, 'mega': 4, 'apple': 5}
+    out += ('section bank 2, $7D7D\nit_ord0:\n' + db(ord0) + 'it_ord1:\n' + db(ord1) +
+            'it_utab:\n' + db([use[u] for _, _, _, u in NEW_ITEMS]))
+    out += 'N_ARMOUR = %d\n' % N_ARMOUR
+    out += 'IT_NORD = %d\nN_NEWIT = %d\nNEWIT = unsram + $%02X\n' % (len(ord0), len(NEW_ITEMS), NEWIT)
+    # Medicine: count's address (low byte, page $D0), name (battle attack names), magic; Potion, Antidote first
+    md = [(0x20 + 0x19, 0x40, 0x40), (0x20 + 0x1A, 0x41, 0x41)]
+    for k, (n, c, mg, _) in enumerate(NEW_ITEMS):
+        if mg is not None:
+            md.append((NEWIT + k, 0x5C + len(md) - 2, mg))
+    out += 'section bank 104, $7C00\nmd_tab:\n' + ''.join(db(list(e) + [0]) for e in md)
+    out += 'MD_N = %d\n' % len(md)
+    return out
+
+
+def battle_names():
+    """the Medicine entries' names after FF1's attack names (battle.py: $5C on)"""
+    return [n for n, c, mg, _ in NEW_ITEMS if mg is not None]
+
+
+ST_TILE = 0x70                  # the statue's sprite tiles on the overworld ($70-$7F, after the vehicles')
+
+
+def statue(rom):
+    """the statue before Earthgift's sealed door: FF1's own Lich (fiend picture 0, the user's ROM) as grey
+    stone, 32 x 32: (CGB tiles, DMG tiles, the OBJ palette 0-3 it uses on the Color)"""
+    import battle
+    forms = rom.rd(battle.BANK_DOMAINS, battle.FORMATIONS, 128 * 16)
+    f = next(k for k in range(128) if forms[16 * k] >> 4 == 3 and forms[16 * k + 1] == 0)
+    page = forms[16 * f] & 15
+    chr_ = rom.rd(battle.BANK_BATTLECHR + (page >> 3), 0x8000 + 0x800 * (page & 7), 0x800)
+    tsa = rom.rd(battle.BANK_DOMAINS, 0x92E0, 64)
+    pal = list(rom.rd(battle.BANK_BTLC, battle.BTL_PALS + 4 * forms[16 * f + 10], 4))
+    lum = [0] + [data.lum(c) for c in pal[1:]]
+    px = [[None] * 64 for _ in range(64)]
+    for r in range(8):
+        for c in range(8):
+            t = tsa[8 * r + c]
+            if t < 0x12: continue
+            for y in range(8):
+                for x in range(8):
+                    v = (chr_[16 * t + y] >> (7 - x) & 1) | (chr_[16 * t + 8 + y] >> (7 - x) & 1) << 1
+                    if v: px[8 * r + y][8 * c + x] = lum[v]
+    out = [[0] * 32 for _ in range(32)]
+    mean = {}
+    for y in range(32):
+        for x in range(32):
+            vs = [px[2 * y + j][2 * x + i] for j in (0, 1) for i in (0, 1)]
+            vs = [v for v in vs if v is not None]
+            if len(vs) >= 2: mean[(x, y)] = sum(vs) / len(vs)
+    ranked = sorted(mean.values())                                    # stone: the brightest 45% light,
+    t2, t1 = ranked[int(len(ranked) * 0.20)], ranked[int(len(ranked) * 0.55)]   # the next mid, the darkest
+    for (x, y), m in mean.items():                                    # fifth the dark (1 / 2 / 3)
+        out[y][x] = 1 if m >= t1 else (2 if m >= t2 else 3)
+    for y in range(32):                                               # a dark outline round the stone
+        for x in range(32):
+            if out[y][x] == 0 and any(0 <= y + b < 32 and 0 <= x + a < 32 and out[y + b][x + a] in (1, 2)
+                                      for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                out[y][x] = 3
+    def tile(r, c, remap):
+        b = bytearray()
+        for y in range(8):
+            lo = hi = 0
+            for x in range(8):
+                v = remap[out[8 * r + y][8 * c + x]]
+                lo = lo << 1 | (v & 1); hi = hi << 1 | (v >> 1)
+            b += bytes([lo, hi])
+        return bytes(b)
+    blk = rom.rd(data.BANK_SMINFO, data.OW_INFO, 0x400)
+    sp = [[blk[0x390]] + list(blk[0x390 + 4 * p + 1:0x390 + 4 * p + 4]) for p in range(4)]
+    def greyness(p):                                                 # (the most stone-like palette: greys
+        cs = sp[p][1:]                                               #   ($x0, $xD), then a spread of levels)
+        greys = sum(1 for c in cs if (c & 0x0F) in (0x00, 0x0D, 0x0F))
+        return -greys * 2 + sum(abs(data.lum(c) - k) for c, k in
+                                zip(sorted(cs, key=data.lum, reverse=True), (0.85, 0.55, 0.15)))
+    p = 7                                                            # (its own: pg.s pg_rpal)
+    cgb_map = [0, 1, 2, 3]
+    dmg_map = [0, 1, 2, 3]                                           # (OBP0: 1 white .. 3 black: DMG_OBP)
+    cgb = b''.join(tile(r, c, cgb_map) for r in range(4) for c in range(4))
+    dmg = b''.join(tile(r, c, dmg_map) for r in range(4) for c in range(4))
+    return cgb, dmg, p

@@ -18,16 +18,21 @@ def _grey(c):
     return (c & 0x0F) in (0x00, 0x0D, 0x0E, 0x0F)
 
 
-def bank(rom):
+def bank(rom, forms=None):
     import sgb_border
     chr_, pct, n = sgb_border.make()
     blob = bytearray(b'\0' * 0x4000)
     blob[0:len(chr_)] = chr_
     blob[0x1000:0x1000 + len(pct)] = pct
     for f in range(128):
-        fd = rom.rd(battle.BANK_DOMAINS, battle.FORMATIONS + 16 * f, 16)
-        pa = list(rom.rd(battle.BANK_BTLC, battle.BTL_PALS + 4 * fd[10], 4))
-        pb = list(rom.rd(battle.BANK_BTLC, battle.BTL_PALS + 4 * fd[11], 4))
+        if forms is None:
+            fd = rom.rd(battle.BANK_DOMAINS, battle.FORMATIONS + 16 * f, 16)
+            pa = list(rom.rd(battle.BANK_BTLC, battle.BTL_PALS + 4 * fd[10], 4))
+            pb = list(rom.rd(battle.BANK_BTLC, battle.BTL_PALS + 4 * fd[11], 4))
+        elif f < len(forms):
+            pa, pb = forms[f]                      # (the post-game's formations: pgbattle.py)
+        else:
+            continue
         win = [0x0F, 0x00, 0x0F, 0x30]
         msh = data.map_shades([win, pa, pb, win])
         def pick(src, base=None):

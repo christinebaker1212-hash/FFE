@@ -21,6 +21,7 @@ sys.path.insert(0, HERE)
 import data, battle, gba
 
 PGB_DATA, PGB_CHR, PGB_SIL = 119, 121, 123            # Earthgift's banks (CHR / SIL: 2 banks each)
+PGB_SGB = 126                                        # its Super Game Boy bank (sgb.py's, its colours)
 
 # (English name (the official Dawn of Souls name), GBA record)
 EG_MONSTERS = [('Black Goblin', 163), ('Wild Nakk', 185), ('Gloom Widow', 166), ('Desertpede', 165),
@@ -360,5 +361,7 @@ def build(rom, G=None):
     chr0 = b''.join(bytes(pg) for pg in pages[:8]); chr1 = b''.join(bytes(pg) for pg in pages[8:])
     sil0 = b''.join(sil_page(bytes(pg)) for pg in pages[:8]); sil1 = b''.join(sil_page(bytes(pg)) for pg in pages[8:])
     banks = {PGB_DATA: bytes(base), PGB_CHR: chr0, PGB_CHR + 1: chr1, PGB_SIL: sil0, PGB_SIL + 1: sil1}
+    import sgb                                       # (the Super Game Boy's battle colours: a copy of
+    banks[PGB_SGB] = sgb.bank(rom, [(pals[fd[10]], pals[fd[11]]) for fd in forms])   #   its bank)
     return dict(banks=banks, domains=domains, boss_forms=[fid[n] for n, *_ in bosses],
                 forms=fid, names=[n for n, _ in enemies])

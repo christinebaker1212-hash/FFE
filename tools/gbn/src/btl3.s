@@ -1328,109 +1328,18 @@ bt_en_ai:   ld a, [bt_who]
             jp bt_en_attack
 
 ; ---- Medicine (FF1 BattleSubMenu_Drink): Potion / Antidote with their counts this battle
-bt_cmd_drink:
-            call bt_msg_win
-            xor a
-            ld [bt_rows], a
-            ld c, 0
-.r:         push bc
-            ld b, 18
-            call vwf_clr
-            pop bc
-            push bc
-            ld a, c
-            add a, $40
-            call bt_mname
-            ld hl, bt_sbuf
-            ld a, 8
-            call vwf_str
-            pop bc
-            push bc
-            ld e, c
-            ld d, 0
-            ld hl, bt_pots
-            add hl, de
-            ld a, [hl]
-            call nf_a
-            call num_fmt
-            ld hl, nf_dig + 4
-            ld de, bt_sbuf
-            ld a, [hl+]
-            ld [de], a
-            inc de
-            ld a, [hl]
-            ld [de], a
-            inc de
-            xor a
-            ld [de], a
-            ld hl, bt_sbuf
-            ld a, 80
-            call vwf_str
-            call bt_mrow
-            pop bc
-            inc c
-            ld a, c
-            cp 2
-            jr c, .r
-            xor a
-            ld [bt_mcur], a
-.l:         ld a, [bt_mcur]                 ; (the text at x 16: the hand 17 px left)
-            add a, 13
-            add a, a
-            add a, a
-            add a, a
-            ld c, a
-            ld b, 16 - 17
-            call bt_hand
-            call bt_frame
-            ldh a, [pad_new]
-            bit 1, a
-            jr nz, .b
-            bit 0, a
-            jr nz, .a
-            and $C0
-            jr z, .l
-            ld a, [bt_mcur]
-            xor 1
-            ld [bt_mcur], a
-            jr .l
-.a:         ld a, [bt_mcur]                 ; none left: no
-            ld e, a
-            ld d, 0
-            ld hl, bt_pots
-            add hl, de
-            ld a, [hl]
-            and a
-            jr z, .l
+bt_cmd_drink:                               ; (Dawn of Souls' items with FF1's: bank 104, pg.s)
+            ld a, BTL6_BANK
+            ld hl, md_menu
+            jp bank_call
+; bt_pl_drink: A = the count's address (page $D0) -> HL; Ether / Megalixir: the MP (pg.s md_mp)
+md_use:     ld l, a
+            ld h, high(unsram)
             push hl
-            call bt_hand_off
-            call bt_msg_close
-            call bt_names_win
-            ld a, [bt_mcur]                 ; (the Potion: not on a member at full HP)
-            and a
-            jr nz, .an
-            call bt_target_heal
-            jr .at
-.an:        call bt_target_member
-.at:        pop hl
-            ret c
-            dec [hl]                        ; (one fewer to choose this round)
-            ld b, a
-            call bt_commands.slot
-            ld [hl], $08
-            inc hl
-            ld a, [bt_mcur]
-            add a, $40
-            ld [hl+], a
-            ld [hl], b
-            inc hl
-            ld a, [bt_mcur]
-            ld [hl], a
-            and a
-            ret
-.b:         call bt_hand_off
-            call bt_msg_close
-            scf
+            ld a, BTL6_BANK
+            ld hl, md_mp
+            call bank_call
+            pop hl
             ret
 ; a member drinks (FF1 Player_DoDrink): the item used, the potion's magic
 bt_pl_drink:
@@ -1439,10 +1348,8 @@ bt_pl_drink:
             ld [mg_id], a
             ld a, [hl+]
             ld [bt_tgt], a
-            ld a, [hl]                      ; 0 Potion, 1 Antidote: one fewer
-            add a, low(ITEMS + $19)
-            ld l, a
-            ld h, high(ITEMS)
+            ld a, [hl]                      ; the item's count (its address): one fewer
+            call md_use
             ld a, [hl]
             and a
             jr z, .z

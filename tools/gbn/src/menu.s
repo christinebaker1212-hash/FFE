@@ -1148,8 +1148,8 @@ it_use:     ld a, 2                         ; (the target screen's line: the ite
             add hl, de
             ld a, [hl]
             ld [it_id], a
+            call it_ux                      ; (HL = it_jt; Dawn of Souls' items: pg.s)
             ld e, a
-            ld hl, it_jt
             add hl, de
             add hl, de
             ld a, [hl+]
@@ -2108,7 +2108,7 @@ N_WSTAT    = $7300          ; names bank: weapon stats (8 bytes), armour (4), pe
 N_ASTAT    = $7440
 N_WPERM    = $7500
 N_APERM    = $7550
-N_ATYPE    = $75A0
+N_ATYPE    = $75B0
 N_INVDMG   = $7600
 N_INVCGB   = $7800
 INV_TILE   = $A0            ; inverted icons at BG $A0 + icon code
@@ -2619,9 +2619,7 @@ tg_info:    ld bc, $0110
             ld a, $78                       ; x
             call pen_ch
             ld a, [it_id]
-            add a, low(ITEMS)
-            ld l, a
-            ld h, high(ITEMS)
+            call it_cnt
             ld a, [hl]
             call nf_a
             call pen_numl
