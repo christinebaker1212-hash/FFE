@@ -319,12 +319,35 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   party column is at the screen's edge), four shakes, FF3's sounds (a critical hit's own).
 - Spell casting (33/B09B): the cast pose, black magic's frames and bubbles, white magic's stars
   circling and closing in (FF3's vectors and sine table 10/9A80), the spell's palette (2E/91D0),
-  graphics sets from 33/BEB2 packed into B_ANIM at build time. The bubbles can lose up to 4 of their
-  16 sprites to the GB's 40-sprite limit (the party takes 24). Test hook GB3N_ANTEST=spell.
-- Not yet in battle: the spells' projectiles and hits on the targets (33/B276, B68D), bows / harps / boomerangs / moons / shuriken / arrows (their own weapon
-  animations: they show the step only), spell / summon animations,
-  stone characters in the BG, back attacks drawn flipped (FF3 3F/F942: the
-  monsters' tiles mirrored, the party at x $30), the airship's battle background.
+  graphics sets from 33/BEB2 packed into B_ANIM at build time. Test hook GB3N_ANTEST=spell
+  (GB3N_ANTYPE=type, GB3N_ANTGT=char, GB3N_ANKIND=kind: every Fight shows that animation).
+- The animation code is in its own bank (B_BANIM 85, `src/banim.s`); B_BSCR calls it through
+  far_call wrappers (xa_*), it calls back through xb_*.
+- Spells after the casting (2026-11-27): the projectile (33/B276; FF3 aims by angle tables made for
+  its NES layout, here the line runs to the target's centre), the hit (33/B68D: the spell's 24 tiles
+  from NES bank $15 in B_MAGIC, its frame list 06/8C00 and 6 x 6 frames 00/9708 packed in B_ANIM,
+  flips, 4 frames each, Life's last 16 frames, the spell's sound 34/83A0), monsters' spells too.
+  The animation types of 33/BC2B: Kill (the ring of 8 widening round the caster, then flying off),
+  Quake (the party shaking or the screen shaking 64 frames: the battlefield's rows only, by SCX),
+  Meteor / Cave-In (six fireballs, FF3's x scaled 5 / 8 to our field), Drain (8 sprites closing
+  in), Earthquake, Glare / Mind Blast / Megaflare / Explode (the backdrop flashing in 32/804B's
+  colour), the monsters' Flame / Blizzard / Thunder (bank 06's 6 x 16 grids over the party), type
+  10's streaks over the party, Summon / Split's sound.
+- The party into the BG while a big effect runs (`an_bgon`): FF3's frames take up to 36 sprites
+  besides the party's 24 (the GB has 40); members standing on whole cells clear of windows are
+  copied into BG tiles $90.. (VRAM bank 1) with BG palettes 2-5 = OBJ palettes 0-3, their sprites
+  hidden; effects on members use the OBJ-behind-BG bit, so the party stays in front as in FF3's
+  sprite order.
+- Other actions (34/843E): Defend (33/ABF7), Cheer (A92B), Scare (A988), Build Up and its overload
+  (AB27), Jump (AAB8: crouch, up and away, hidden in the air; AA15: the dragoon's falling sprite
+  29/B9C0 onto the target and bouncing, then down into place), running away (33/BC89: turning one by
+  one, running off right; minis and toads their own way), an ineffective cast (34/8555). The party
+  drawer takes per-member frames / offsets (an_pf, an_pxo, an_pyo).
+- Not yet in battle: summons (2F/B050 with 32/8CEF and the 24 summon attacks of bank 32), the airship
+  cannon (32/84C9), Flare Wave's final-boss wave (10/8BD5) and the final boss's death (10/8A85),
+  reflect (33/B64F), bows / harps / boomerangs / moons / shuriken / arrows (their own weapon
+  animations: they show the step only), stone characters in the BG, back attacks drawn flipped (FF3
+  3F/F942: the monsters' tiles mirrored, the party at x $30), the airship's battle background.
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
