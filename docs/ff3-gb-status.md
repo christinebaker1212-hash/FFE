@@ -277,10 +277,23 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   down, the four statues and Saronia's gate (with FF3's tile swaps, also re-applied when world 3
   loads: 3A/8FD1), the Invincible rising, the flying castle's spirals, Bahamut flying to the party,
   the circling stars; each leaves FF3's game state.
-- Not yet: the guest (following the party, its picture, B to talk), the underwater bubbles and fish,
-  the Invincible's jumps over mountains, world-map water animation.
-- Not yet in menus: Exit / Teleport / Sightro and the Midgard Bread / Otter's Head (they need the
-  minimap and FF3's warp), FF3's spell list Swap, the stat-up messages after equipping.
+- Guest (`src/guest.s`): following the party with FF3's trail and speeds, its picture and palette,
+  B to talk; boarding an airship waits for it (3E/C379), it waits at the party after a canoe / ship.
+- Vehicle animations (`src/wspr.s` va_*): lift-off / landing with the shadow, the Enterprise
+  turning into the airship and back, the Nautilus diving / surfacing; FF3's speeds (3E/CD76:
+  airship 4 on its first step, then 8); the Invincible's jump (3D/B66F, 3E/C20E, D622: up, over the
+  mountains while they last, down).
+- Underwater (3A/9442): the small bubbles, the big bubble, the school of fish.
+- Water animation (`src/water.s`, 3A/858F, 3D/B7F9): the sea / map water strips shifting, two
+  bytes a frame in FF3's order; under the sea the tiles sway. The flags come from the last map
+  loaded, as on the Famicom.
+- The party's priority (3E/D9A7, 3F/E900): legs behind forests, bridges from above in front.
+- The Fat Chocobo (3D/B383): Deposit / Withdraw / Exit, FF3's 99 limit, key items refused, its
+  messages and animated picture.
+- RAM rule learnt: the stack is $CF00-$CFFF (the build refuses RAM sections there), and anything an
+  interrupt reads must not live in the map tables ($C400-$CEFF).
+- Not yet in menus: Teleport / Sight and the Midgard Bread (they need the minimap and FF3's warp),
+  FF3's spell list Swap, the stat-up messages after equipping.
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
