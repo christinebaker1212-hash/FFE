@@ -364,6 +364,9 @@ ROMDATA = {
     'sm_pal': (0x32, 0x8043, 8),         # the pre-animation's palette by summon
     'sm_pre': (0x33, 0xB1EE, 10),        # the pre-animation's frames
     'sm_fly': (0x33, 0xAFF2, 16),        # its four sprites flying off
+    'fw_pal': (0x10, 0x8BC9, 12),        # Flare Wave's green palettes, the wave's shapes and
+    'fw_rows': (0x10, 0x8D30, 80),       #   sprite lists (10/8A15, 10/8CE6)
+    'fw_lst': (0x10, 0x8D80, 0x44),
     'sm_data': (0x2A, 0x9440, 0x1C0),    # the summons' properties (2A/9440) and sprite maps
     'sm_lst': (0x32, 0x8F8B, 0x91D7 - 0x8F8B),   # the summon attacks' sprite lists
     'if_hue': (0x32, 0x87E9, 3),

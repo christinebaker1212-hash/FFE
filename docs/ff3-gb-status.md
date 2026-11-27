@@ -378,10 +378,26 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   speed set to 8 after it, as FF3), the ordinary monsters' death and getting away (2F/BB94: FF3
   sweeps a gradient diagonally; here a diagonal edge sweeps their cells, the cells on it masked
   pixel by pixel, 37 frames, sound $31). Test hooks: GB3N_WIPETEST, GB3N_BATHI (event battles).
-- Not yet in battle: the airship cannon (32/84C9), Flare Wave's final-boss wave (10/8BD5), the final boss's own raster dissolve
-  (10/8A85: here the boss dissolve above),
-  stone characters in the BG, back attacks drawn flipped (FF3
-  3F/F942: the monsters' tiles mirrored, the party at x $30), the airship's battle background.
+- Back attacks (`src/batbk.s`; FF3 keeps the normal layout and mirrors at the output: 33/B19B,
+  33/AC93, 3F/F942): the battlefield's rows 0-11 written mirrored (column 19 - c, x-flip toggled;
+  a reversed copy as fast as the normal one), the top window two columns right so the party's
+  columns stay beside it; every cell writer through `bs_mcell` / `an_mcell`; the sprites mirrored
+  before each V-Blank's OAM transfer and back after (damage digits moved as whole numbers, the
+  windows' hands left). Summons (the window layer cannot be mirrored): Chocobo, Shiva, Ramuh in
+  sprites (as Ifrit / Titan), Odin, Leviathan, Bahamut in mirrored BG cells, redrawn by `an_frame`
+  under the guard (new place first, then the old cells it does not cover). Test hook GB3N_BACKTEST.
+- The Invincible's cannon (34/807E, 34/992D, 35/A50B, action script 3 and its command $0E): the
+  damage at the turn's start, "Covering fire from the cannon!", the ball on its arc and the
+  explosions (32/84C9), the numbers, the deaths. Test hook GB3N_CANNON.
+- Flare Wave (10/8BD5): the boss's palette cycling green 104 frames, then the wave's column
+  (10/8D30 shapes, 10/8D80 sprite lists) sweeping right on its sine, then the red flash.
+- Battle messages wrap at spaces over the window's rows (the English is longer than FF3's lines).
+- Fixed on the way: the party's cells after a big spell were restored one per row (a diagonal of
+  blank cells over the top window), Odin's cells all showed column 0 of his map, Odin's charge
+  flickered, Megaflare left a white backdrop, a ranged projectile aimed up flew down, animation
+  graphics sets 12-17 were never packed (the cannon's, two summon attacks', one battle animation's).
+- Not yet in battle: the final boss's own raster dissolve (10/8A85: here the boss dissolve above),
+  stone characters in the BG, the airship's battle background.
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;

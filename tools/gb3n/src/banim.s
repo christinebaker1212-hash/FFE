@@ -2979,8 +2979,6 @@ an_inef:    ld a, [$DE9A]
             ld [BZ + $CC], a
             ret
 
-; the final boss's wave (10/8BD5) for Flare Wave: see an_boss (not yet)
-an_fwave:   ret
 ; the spell $7E88's graphics properties (33/AF6F: 2E/91D0)
 an_mprop:   ld a, [$DE88]
             ld l, a
@@ -4117,3 +4115,179 @@ an_m2:      ds 1
 an_tmp:     ds 4
 an_vd:      ds 36                           ; (vectors / per target / fireballs)
 an_dx:      ds 1
+
+; ---- the final boss's Flare Wave (10/8BD5): its palette (BG 0) cycling green 104 frames (10/8A15:
+; every other frame the next of three, 10/8BC9); then the wave: a column of 10 rows (10/8D30's
+; shapes by frame: caps and middles of 10/8D80's sprite lists, tiles $4C-$52, palette 3) from x $80
+; 8 a frame to $E8, its y $40 + 16 sin (the angle + $10 a frame); the palettes back
+section bank B_BANIM, $7BA8
+an_fwave:   call an_bgsave
+            xor a
+            ld [an_k3], a
+            ld [an_f], a
+.g:         ld a, [an_f]
+            and 1
+            jr nz, .gw
+            ld a, [an_k3]
+            add a
+            add a
+            ld hl, fw_pal
+            call an_hla
+            ld de, an_bpq + 1
+            ld b, 4
+.c:         push bc
+            push de
+            ld a, [hl+]
+            push hl
+            call an_nrgb
+            pop hl
+            pop de
+            ld a, c
+            ld [de], a
+            inc de
+            ld a, b
+            ld [de], a
+            inc de
+            pop bc
+            dec b
+            jr nz, .c
+            ld a, $80
+            ld [an_bpq], a
+            ld a, 1
+            ld [an_bpf], a
+            ld a, [an_k3]
+            inc a
+            cp 3
+            jr c, .s
+            xor a
+.s:         ld [an_k3], a
+.gw:        call an_frame
+            ld a, [an_f]
+            cp $68
+            jr nz, .g
+            xor a
+            ld [an_k4], a
+            ld [an_k3], a                   ; (the frame: the shapes' row)
+            ld a, $80
+            ld [an_ckx], a
+.w:         call an_clr
+            ld a, $10                       ; y = $40 + 16 sin
+            ld [an_k], a
+            ld a, [an_k4]
+            call an_smul
+            add $40
+            ld [an_cky], a
+            ld a, [an_k4]
+            add $10
+            ld [an_k4], a
+            ld a, [an_k3]                   ; fw_rows + 10 frame
+            add a
+            ld b, a
+            add a
+            add a
+            add b
+            ld hl, fw_rows
+            call an_hla
+            ld c, 0
+.r:         ld a, [hl+]
+            cp $FF
+            jr z, .rn
+            push hl
+            push bc
+            add a
+            ld hl, fw_lst
+            call an_hla
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld de, fw_lst - $8D80
+            add hl, de
+            ld a, c                         ; (y + 8 row, x: scaled)
+            add a
+            add a
+            add a
+            ld b, a
+            ld a, [an_cky]
+            add b
+            call an_s58
+            ld e, a
+            ld a, [an_ckx]
+            call an_s58
+            ld d, a
+            call .lst
+            pop bc
+            pop hl
+.rn:        inc c
+            ld a, c
+            cp 10
+            jr nz, .r
+            call an_frame
+            ld a, [an_ckx]
+            add 8
+            ld [an_ckx], a
+            cp $E8
+            jr nc, .x
+            ld a, [an_k3]
+            cp 7
+            jr nc, .w
+            inc a
+            ld [an_k3], a
+            jr .w
+.x:         call an_clr
+            call an_frame
+            jp an_bgrest
+; the list at HL (y, tile, attributes, x; $FF) at (D, E); none off the battlefield
+.lst:       ld a, [hl]
+            cp $FF
+            ret z
+            add e
+            cp 96
+            jr nc, .ln
+            ld [an_sl1], a
+            inc hl
+            ld a, [hl+]
+            ld [an_sl2], a
+            ld a, [hl+]
+            ld [an_sl3], a
+            ld a, [hl]
+            dec hl
+            dec hl
+            dec hl
+            add d
+            cp 160
+            jr nc, .ln
+            ld [an_sl4], a
+            push hl
+            push de
+            call an_slot_oam
+            jr c, .lf
+            ld a, [an_sl1]
+            add 17
+            ld [hl+], a
+            ld a, [an_sl4]
+            add 8
+            ld [hl+], a
+            ld a, [an_sl2]
+            ld [hl+], a
+            ld a, [an_sl3]                  ; (FF3's flips $80 / $40 -> $40 / $20)
+            ld b, a
+            and $C0
+            rra
+            ld c, a
+            ld a, b
+            and 3
+            or c
+            or $08
+            ld [hl], a
+.lf:        pop de
+            pop hl
+.ln:        inc hl
+            inc hl
+            inc hl
+            inc hl
+            jr .lst
+
+section bank B_BANIM, $5A30
+fw_pal:     ds 12                           ; (10/8BC9)
+fw_rows:    ds 80                           ; (10/8D30)
+fw_lst:     ds $44                          ; (10/8D80: pointers, lists)
