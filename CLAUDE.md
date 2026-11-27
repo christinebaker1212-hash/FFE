@@ -1447,11 +1447,13 @@ overworld bank's font table had been placed over them; build.py place() now refu
 Then (item 65): town reflections walking right (the mask now mirrored with the party's sprite), the plain Game Boy's
 town reflection made in time again (it was hidden in most walking frames), town water moving while walking (copied
 in V-Blank right after the OAM), the hands kept on all four members after casting a party-wide heal.
+Then (item 66): the battle "o&" window found and removed (the message row's string pointer was lost while
+the top name window closed; rows now also mapped only after their letters are up).
 
 ## Remaining
 - **FF1 (native build): finished (owner, 2026-11-26):** the owner played it through from New Game to
-  the ending and ran it on real hardware without problems. Left: the open report of a stray "o&"
-  window in battle (lookups guarded, never reproduced); known limits: SGB window frames stay blue
+  the ending and ran it on real hardware without problems. The stray "o&" battle window is fixed
+  (item 66). Known limits: SGB window frames stay blue
   (a frame tile holds one palette), and on the plain Game Boy a 1-pixel strip of town reflection at
   the water's edge in about 3% of walking frames. Black loads on the plain Game Boy not done (about
   3x the load time); its transitions go to white instead.

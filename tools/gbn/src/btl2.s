@@ -648,7 +648,7 @@ bt_left_text:
             add a, BT_TEXT
             push af
             ld b, 7
-            call vwf_out
+            call vwf_outf                   ; (its letters up before the row is mapped)
             pop af
             ld e, a
             ld a, [bt_t + 12]
@@ -2024,7 +2024,7 @@ bt_msg_row: ld a, [bt_defer]                  ; (the result worked out first: no
             add a, BT_TEXT
             push af
             ld b, 18
-            call vwf_out
+            call vwf_outf                   ; (its letters up before the row is mapped)
             pop af
             ld e, a
             ld a, [bt_rows]
@@ -3056,7 +3056,7 @@ bt_banner:  ld a, [ban_on]                  ; (shown: off first, a frame, so the
             ld a, LCDC_WIN                  ;   a message window of garbage)
             ld [lcdc_on], a
             ret
-bt_ban_off: call bt_bw6                      ; (A = ban_on; an enemy's spell name up a second
+bt_ban_off6: call bt_bw6                     ; (A = ban_on; an enemy's spell name up a second
             and a                           ;   at least: owner, 2026-11-26)
             ret z
             xor a
@@ -3956,7 +3956,7 @@ res_put:    ld a, [res_ln]
             add a, $12
             push af
             ld b, 14
-            call vwf_out
+            call vwf_outf                   ; (its letters up before the row is mapped)
             pop af
             ld e, a
             ld a, [res_ln]
