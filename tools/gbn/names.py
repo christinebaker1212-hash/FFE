@@ -137,7 +137,15 @@ def icon_of(rom, k, name):
 
 OVERRIDE = {}           # name code -> (icon, name): the post-game's items (postgame.names_patch)
 PRICE = {}              # name code -> price
-ARMOUR_EXTRA = {}       # armour id -> postgame.NEW_ARMOUR row
+ARMOUR_EXTRA = {}       # armour id -> (4 stat bytes, permission word, type): the post-game's (postgame.names_patch)
+WEAPON_EXTRA = {}       # weapon id -> (8 stat bytes, permission word)
+EXTRA = {}              # name index 256 + k -> (icon, name): the post-game's consumables
+N_W, N_A = 64, 72       # (the equipment tables' room: weapons, armour)
+
+
+def text_codes(name):
+    import text
+    return [text.code_of(ch) for ch in name]
 
 
 def name_codes(rom, k, icons=True):
@@ -172,14 +180,19 @@ def equip_tables(rom):
     assert len(perms) == 2
     astat = bytearray(rom.rd(BANK_EQUIP, 0x8140, 160)); aperm = bytearray(rom.rd(14, perms[1], 80))
     atype = bytearray(armour_types(rom))
+    wstat = bytearray(rom.rd(BANK_EQUIP, WEAPONS, 320)); wperm = bytearray(rom.rd(14, perms[0], 80))
     for aid in sorted(ARMOUR_EXTRA):                   # (the post-game's armour: ids past FF1's 40)
-        _, _, st, pm, ty, _, _ = ARMOUR_EXTRA[aid]
+        st, pm, ty = ARMOUR_EXTRA[aid]
         while len(atype) < aid:
             astat += bytes(4); aperm += b'\xff\x0f'; atype.append(0)
         astat[4 * (aid - 1):4 * aid] = bytes(st); aperm[2 * (aid - 1):2 * aid] = pm.to_bytes(2, 'little')
         atype[aid - 1] = ty
-    return dict(wstat=rom.rd(BANK_EQUIP, WEAPONS, 320), astat=bytes(astat),
-                wperm=rom.rd(14, perms[0], 80), aperm=bytes(aperm), atype=bytes(atype))
+    for wid in sorted(WEAPON_EXTRA):                   # (and weapons)
+        st, pm = WEAPON_EXTRA[wid]
+        while len(wperm) < 2 * wid:
+            wstat += bytes(8); wperm += b'\xff\x0f'
+        wstat[8 * (wid - 1):8 * wid] = bytes(st); wperm[2 * (wid - 1):2 * wid] = pm.to_bytes(2, 'little')
+    return dict(wstat=bytes(wstat), astat=bytes(astat), wperm=bytes(wperm), aperm=bytes(aperm), atype=bytes(atype))
 
 
 def shop_tables(rom):
@@ -225,23 +238,31 @@ def inv_icons(ff3):
 
 
 def names_bank(rom, ff3=None):
-    """$4000 256 pointers, the names (icon + letters, 0-terminated) after them; $7300 the
-    equipment tables, $7600 / $7800 the inverted icons (DMG / CGB)"""
+    """$4000 512 pointers (name indices: FF1's codes 0-255, then the post-game's consumables 256 + k and
+    FF1's gold amounts 256 + code), the names (icon + letters, 0-terminated) after them; $6000 the
+    equipment tables (src/menu.s N_*), $7600 / $7800 the inverted icons (DMG / CGB)"""
+    import ff1_items
     blob = bytearray(b'\xff' * 0x4000)
     body = bytearray(); ptrs = bytearray()
-    for k in range(256):
-        ptrs += (0x4200 + len(body)).to_bytes(2, 'little')
-        body += name_codes(rom, k) + b'\0'
-    blob[0:0x200] = ptrs
-    blob[0x200:0x200 + len(body)] = body
-    assert 0x200 + len(body) <= 0x3000
+    for k in range(512):
+        ptrs += (0x4400 + len(body)).to_bytes(2, 'little')
+        if k < 256: body += name_codes(rom, k) + b'\0'
+        elif k in EXTRA:
+            ic, name = EXTRA[k]
+            body += bytes([ICONS[ic][0]]) + bytes(text_codes(name)) + b'\0'
+        elif 0x6C <= k - 256 < 0xB0:                   # (FF1's gold amounts: their own names)
+            body += bytes(text_codes(ff1_items.T.get(k - 256, ''))) + b'\0'
+        else: body += b'\0'
+    blob[0:0x400] = ptrs
+    blob[0x400:0x400 + len(body)] = body
+    assert 0x400 + len(body) <= 0x2000, hex(len(body))
     e = equip_tables(rom)
-    blob[0x3300:0x3440] = e['wstat']
-    assert len(e['astat']) <= 0xC0 and len(e['aperm']) <= 0x60 and len(e['atype']) <= 0x50
-    blob[0x3440:0x3440 + len(e['astat'])] = e['astat']
-    blob[0x3500:0x3550] = e['wperm']
-    blob[0x3550:0x3550 + len(e['aperm'])] = e['aperm']
-    blob[0x35B0:0x35B0 + len(e['atype'])] = e['atype']        # (N_ATYPE: moved from $75A0 for 45)
+    assert len(e['wstat']) <= 8 * N_W and len(e['astat']) <= 4 * N_A and len(e['atype']) <= N_A
+    blob[0x2000:0x2000 + len(e['wstat'])] = e['wstat']        # $6000 weapons (8 bytes), $6200 armour (4),
+    blob[0x2200:0x2200 + len(e['astat'])] = e['astat']        # $6400 / $6480 permissions, $6580 armour types
+    blob[0x2400:0x2400 + len(e['wperm'])] = e['wperm']
+    blob[0x2480:0x2480 + len(e['aperm'])] = e['aperm']
+    blob[0x2580:0x2580 + len(e['atype'])] = e['atype']
     d, c = inv_icons(ff3)
     blob[0x3600:0x3800] = d
     blob[0x3800:0x3A00] = c

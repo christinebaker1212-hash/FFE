@@ -565,6 +565,7 @@ talk_after: ld a, [pend_telef]
 NAMES      = 4                  ; names bank: $4000 name pointers, $7000 prices, $7200 chests
 N_PRICE    = $7000
 N_TREAS    = $7200
+N_GOLD     = $6600
 ITEMS      = $D020              ; (FF1 items = save page + $20; gold = + $1C, 3 bytes)
 GOLD       = $D01C
 DLG_TCGET  = $F0
@@ -628,10 +629,10 @@ tc_give:    cp $1C                          ; (A = the item, NAMES mapped: the p
 .got:       ld a, b
             ld [de], a
             jr .jg
-.gold:      ld l, a                         ; gold: the item's price (FF1 LoadPrice)
+.gold:      ld l, a                         ; gold: the item's price (FF1 LoadPrice; N_GOLD: names.py)
             ld h, 0
             add hl, hl
-            ld de, N_PRICE
+            ld de, N_GOLD
             add hl, de
             ld a, [hl+]
             ld c, a

@@ -1492,11 +1492,8 @@ bt_islot:   ld a, [bt_cm]
             ld b, a
             ld a, [bt_mpage]
             and a
-            ld a, 27                        ; weapons: name 27 + n, armour 67 + n
-            jr z, .n
-            ld a, 67
-.n:         add a, b
-            ret
+            ld a, b
+            jp gcodez6                      ; (its name code: pg.s)
 ; the name of item id A (the names bank) -> bt_sbuf
 bt_mname_item:
             ld l, a

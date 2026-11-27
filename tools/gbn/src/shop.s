@@ -792,11 +792,7 @@ sh_wpick:   call scr_upd
 sh_idx:     ld a, [sh_type]
             and a
             ld a, [sh_it]
-            jr nz, .ar
-            sub $1B
-            ret
-.ar:        sub $43
-            ret
+            jp gidz                         ; (pg.s)
 ; member A's four slots of the shop's kind -> HL
 sh_slots:   call ch_rec
             ld a, [sh_type]
@@ -1060,10 +1056,8 @@ sh_sellall: xor a
             ld b, a
             ld a, [sh_type]
             and a
-            ld a, $1B                       ; weapon n -> item $1B + n, armour $43 + n
-            jr z, .w
-            ld a, $43
-.w:         add a, b
+            ld a, b
+            call gcodez                     ; (weapon n -> its name code, armour n: pg.s)
             ld b, a
             ld a, [sh_n]
             ld e, a
@@ -1452,10 +1446,7 @@ sh_own:     ld a, [sh_sell]
 .eq:        call .it
             and a                           ; A = the shop's kind: weapons 0, armour 1
             ld a, [hl]                      ; (L = id)
-            ld e, $1B
-            jr z, .w
-            ld e, $43
-.w:         sub e                           ; FF1's slot number (1-based)
+            call gidz                       ; FF1's slot number (1-based: pg.s)
             ld e, a
             ld bc, 0                        ; B owned, C worn
             ld hl, ch_stats + $18
@@ -1884,10 +1875,8 @@ sh_old9:    ld a, [sh_old]
             ld [hl], 0
             ld a, [sh_type]
             and a
-            ld a, $1B
-            jr z, .w
-            ld a, $43
-.w:         add a, b
+            ld a, b
+            call gcodez110                  ; (pg.s)
             ld [sh_it], a
             ld a, 2
             ld hl, sh_ob2

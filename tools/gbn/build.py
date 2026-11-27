@@ -98,13 +98,17 @@ def magic_defs(rom):
 
 def pg_defs(rom):
     import postgame
-    import pgbattle
+    if postgame.GBA_PATH:
+        src = postgame.pg_source(rom)
+    else:                                        # (no Dawn of Souls ROM: no shrine; the tables empty)
+        src = 'section bank 116, $5000\n' + ''.join('%s: ds %d\n' % (l, n) for l, n in (
+            ('pg_bdep', 16), ('pg_bdmap', 16), ('pg_bform', 16), ('pg_b2', 16), ('pg_bfl', 16), ('pg_fy', 16),
+            ('pg_npool', 4), ('pg_ent', 4), ('pg_door', 8), ('pg_orb', 4), ('pg_pool', 8), ('pg_tl', 8),
+            ('pg_fixed', 16)))
     return ('PG_ON = %d\n' % (1 if postgame.GBA_PATH else 0) +
             'PGM_MAP0 = %d\nPGM_END = %d\nPG_STPAL = %d\n' % (postgame.PG_MAP0, postgame.PG_END,
                                                             postgame.statue(rom)[2]) +
-            'PGB_DATA = %d\nPGB_CHR = %d\nPGB_SIL = %d\nPGB_SGB = %d\n' % (pgbattle.PGB_DATA, pgbattle.PGB_CHR,
-                                                                   pgbattle.PGB_SIL, pgbattle.PGB_SGB) +
-            postgame.pg_source(116) + postgame.text_source() + postgame.items_source())
+            src + postgame.text_source() + postgame.items_source())
 
 
 def snd_tables(rom):
@@ -112,9 +116,13 @@ def snd_tables(rom):
     db = lambda b: ''.join('            db ' + ', '.join('$%02X' % x for x in b[i:i + 16]) + '\n'
                            for i in range(0, len(b), 16))
     sfx, nz = sound.sfx_data(rom)
-    import postgame                                 # (tilesets 9 / 10: the post-game's cave, outdoor)
-    tsm = bytes(tsm) + bytes([tsm[2], tsm[2], tsm[2]])
-    return ('section bank 7, $6F00\n' + db(tsm) + 'section bank 7, $6F10\n' + db(vm) +
+    import postgame                                 # (the post-game's tilesets: their FF1 look's music)
+    pgm = ''
+    if postgame.GBA_PATH:
+        for ts, ff1 in sorted(postgame.ts_banks(rom)[1].items()):
+            assert 0x20 <= ts, ts
+            pgm += 'section bank 7, $%04X\n' % (0x6F00 + ts) + db([tsm[ff1]])
+    return (pgm + 'section bank 7, $6F00\n' + db(tsm) + 'section bank 7, $6F10\n' + db(vm) +
             'section bank 7, $7000\n' + db(ft) + 'section bank 7, $%04X\n' % sound.SFX_ADDR +
             db(sfx) + 'section bank 7, $6E40\n' + db(nz))
 
@@ -196,7 +204,7 @@ def data_banks(rom, ff3=None, init=None):
     import postgame
     if postgame.GBA_PATH:
         postgame.overworld_patch()                   # (the shrines' doors: before the overworld)
-    postgame.names_patch()                           # (its items' names, prices, armour)
+    postgame.names_patch(rom)                        # (its items' names, prices, gear)
     data.FONT_CODES = text.field_codes()
     data.TALL = data.tall_maps(rom)
     c = data.common_pack(rom)
@@ -221,6 +229,8 @@ def data_banks(rom, ff3=None, init=None):
     place(banks, COMMON, 0x5D00, weapon_slots(rom))           # weapon slots (16), armour (16)
     nb = names.names_bank(rom, ff3)
     nb[0x3000:0x3200] = rom.rd(0x0D, 0xBC00, 0x200)            # item prices (FF1 lut_ItemPrices)
+    nb[0x2600:0x2800] = rom.rd(0x0D, 0xBC00, 0x200)            # $6600: FF1's gold amounts (N_GOLD: their codes
+                                                               #   name the post-game's gear in N_PRICE)
     for code, pr in names.PRICE.items():                       # (the post-game's items)
         nb[0x3000 + 2 * code:0x3002 + 2 * code] = pr.to_bytes(2, 'little')
     nb[0x3200:0x3300] = rom.rd(0x00, 0xB100, 0x100)            # chest contents (lut_Treasure)
@@ -327,21 +337,27 @@ PG_INFO = {}
 
 
 def pg_banks(rom, banks):
-    """the post-game (postgame.py): its two tilesets, its floors as map banks (map m in bank m + 64;
-    $5061 the start x, y), their encounter rates (none until their battles are in)"""
-    import postgame
+    """the post-game (postgame.py, shrines.py): its floors as map banks (map m in bank m + 64; $5061 the start
+    x, y; $5063 on the M_PG* bytes of src/pg.s), the looks' tilesets, the shrines' battle sets"""
+    import postgame, shrines
     fl = postgame.floors(rom)
-    seen = set()
-    for m, f, ov in fl:
+    bt = postgame.battles(rom)
+    tsb, _ = postgame.ts_banks(rom)              # the looks' tilesets: a bank each after the maps
+    nb = max(tsb.values()) + 1
+    S = shrines.SHRINES
+    mus = {}
+    for e in fl:
+        m, f, ov, s = e['map'], e['f'], e['ov'], e['shrine']
         b = m + 64
-        tb = ov['ts'] + TS_BANK0
-        if tb not in seen:
-            seen.add(tb)
+        tb = tsb[e['tkey']]
+        ov['ts'] = (tb - TS_BANK0) & 0xFF
+        if tb not in mus:
             t = ov['t']
             place(banks, tb, 0x4000, t['prop'])
             place(banks, tb, 0x4100, t['tsa'])
             place(banks, tb, 0x4300, t['mt_pal'])
             place(banks, tb, 0x4400, t['cgb_tiles'])
+            mus[tb] = e['tkey'][0] if isinstance(e['tkey'], tuple) else 2
         p = data.map_pack(rom, m, ov=ov)
         place(banks, b, 0x4000, p['map'])
         place(banks, b, 0x5000, p['cgb_bg_out'])
@@ -349,6 +365,28 @@ def pg_banks(rom, banks):
         place(banks, b, 0x5040, p['cgb_obj'])
         place(banks, b, 0x5060, bytes([p['ts']]))
         place(banks, b, 0x5061, bytes(f['start']))
+        sh = S[s]
+        areas = sorted({a for _, _, _, a in sh['floors'] if a})
+        role = {'floor': 0, 'castle': 0, 'entrance': 1, 'boss': 2}[e['role']]
+        bfi = sh['boss_maps'].index(e['rec']) if e['role'] == 'boss' else 0
+        sets = [next(bk for (s_, p_, bk, _) in bt if s_ == s and p_ == part) for part in range(len(sh['sets']))]
+        if len(sets) == 1: sets.append(sets[0])
+        first1 = min(sh['sets'][1][0]) if len(sh['sets']) > 1 else 255
+        blen = 10 if sh['key'] in ('LS', 'WW') else 255
+        place(banks, b, 0x5063, bytes([areas.index(e['area']) if e['area'] else 0, s, role, bfi]) +
+              bytes(sh['door']) + bytes(sets[0]) + bytes(sets[1]) + bytes([first1, blen]))
+        ch = []                                  # its chests: x, y, kind (0 / 1 the lists, 2 + n fixed n)
+        nA = 0
+        for x, y, kind in f['chests']:
+            if e['role'] == 'boss':
+                fx = postgame.fixed_index(s, e['rec'])
+                if fx is None: continue
+                ch.append((x, y, 2 + fx)); continue
+            k = 1 if e['role'] == 'castle' and nA >= sh['chests'] else 0
+            nA += k == 0
+            ch.append((x, y, k))
+        assert len(ch) <= 13, (m, len(ch))
+        place(banks, b, 0x5080, bytes([len(ch)]) + bytes(v for c in ch for v in c))
         place(banks, b, 0x7200, p['party_dmg'])
         place(banks, b, 0x7380, p['party_perm'])
         place(banks, b, 0x73A0, p['sgb'])
@@ -363,29 +401,26 @@ def pg_banks(rom, banks):
         place(banks, b, 0x5100, p['mt_dmg_out'])
         place(banks, b, 0x5300, p['mt_dmg_in'])
         place(banks, b, 0x5800, p['dmg_tiles'])
-        banks[battle.BTL_DATA][0x0A00 + m + 1] = 0           # (B_RATES: map + 1)
+        banks[battle.BTL_DATA][0x0A00 + m + 1] = pgbattle_rate(e)  # (B_RATES: map + 1)
         PG_INFO[m] = f
-    st_cgb, st_dmg, st_pal = postgame.statue(rom)     # the statue before the sealed door: its tiles
-    place(banks, OW_INFO, 0x7A00, st_cgb)             #   after the vehicles' (veh_tiles: 112)
-    place(banks, OW_INFO, 0x7000, st_dmg)
+    for s, sh in enumerate(S):                        # the statues before the sealed doors (each shrine's
+        k = {3: 0, 0: 1, 1: 2, 2: 3}[sh['orb']]       #   Fiend): after the vehicles' tiles (pg.s pg_veh)
+        st_cgb, st_dmg, st_pal = postgame.statue(rom, k)
+        place(banks, postgame.STATUE_BANK, 0x4000 + 0x100 * s, st_cgb)
+        place(banks, postgame.STATUE_BANK, 0x4400 + 0x100 * s, st_dmg)
     PG_INFO['st_pal'] = st_pal
-    c = banks[COMMON]                                # the shrine's entrance: FF1's entrance tables
-    c[0x02E0 + postgame.PG_ENT] = fl[0][1]['start'][0]   #   (C_ENTRX, C_ENTRY, C_ENTRM)
-    c[0x0300 + postgame.PG_ENT] = fl[0][1]['start'][1]
-    c[0x0320 + postgame.PG_ENT] = fl[0][0]
-    import pgbattle                                  # the battles: their own banks (pgbattle.py)
-    bs = pgbattle.build(rom)
-    for b, blob in bs['banks'].items():
-        assert b not in banks, 'post-game battle bank %d taken' % b
-        banks[b] = bytearray(blob)
-    for i, (rec, look, role) in enumerate(postgame.EARTHGIFT):
-        m = postgame.PG_MAP0 + i
-        kind = None if role == 'entrance' else ('cave' if look == 'cave' else look)
-        if kind:                                     # (domain: map + 64, read from hbt_dom's bank)
-            banks[pgbattle.PGB_DATA][0x1000 + 8 * i:0x1008 + 8 * i] = bs['domains'][kind]
-            banks[battle.BTL_DATA][0x0A00 + m + 1] = pgbattle.ENC_RATE
-    PG_INFO['battle'] = bs
-    print('post-game: %d floors, maps %d-%d; battles: %s' % (len(fl), fl[0][0], fl[-1][0], ', '.join(bs['names'])))
+    for s_, part, bk, r in bt:                        # the battles: their own banks (pgbattle.py)
+        for b, blob in r['banks'].items():
+            assert b not in banks, 'post-game battle bank %d taken' % b
+            banks[b] = bytearray(blob)
+    PG_INFO['battle'] = bt
+    print('post-game: %d floors, maps %d-%d, banks to %d; battle sets: %d' % (len(fl), fl[0]['map'], fl[-1]['map'],
+                                                                             nb - 1, len(bt)))
+
+
+def pgbattle_rate(e):
+    import pgbattle
+    return pgbattle.ENC_RATE if e['area'] and e['role'] in ('floor', 'castle') else 0
 
 
 WANIM_BANK = 106                                 # (src/wanim.s; the DMG's frames in WANIM_DMG)

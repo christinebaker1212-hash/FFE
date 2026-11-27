@@ -1263,3 +1263,33 @@ one reaches parity, so the owner can keep playing).
       Dawn of Souls' item casts (Red Fang Fira, White Fang Blizzara, Vampire Fang Hold, Spider's Silk Slow, the
       Curtains the barriers, Speed Drink Haste, Protect Drink Protes) or our magic records $5C-$5F. Armour ids
       43-45 (Kenpogi, Black Cowl, Elven Cloak) with FF1's armour records (no stat bonuses: FF1 has none).
+71. Owner (2026-11-27): "Shrines... we're finishing all of them" / "Finish the rest": Hellfire Chasm, Lifespring Grotto
+    and Whisperwind Cove with Earthgift, one engine (docs/ff1-postgame-design.md section 12).
+    - Data: tools/gbn/shrines.py (each shrine's floors by Dawn of Souls map record, look, role, encounter area; its
+      pool, boss depths, bosses, door; the wiki's encounter tables (bands) and treasure lists). Floors (postgame.py):
+      one converter for every FF1 look (pieces_for / look_tileset: the pieces learnt from FF1's maps of that place),
+      outdoor floors for the overworld maps and towns, wide floors cut to their best 60 x 60 (window), reachability
+      checked (stairs moved to the farthest reachable cell when cut off). 81 maps (64-144, banks 128-208); each look's
+      tileset a bank of its own (209-217); battle sets after them (232-249; Earthgift's 119-126).
+    - Map bytes ($5063 on: M_PG* in src/pg.s): area, shrine, role, boss floor, door, both battle sets' banks, the band
+      rule; the chest list (x, y, kind) at $5080: chests are found by position, not by metatile.
+    - Runs (src/pg.s): pg_enter (the door by the party's place: sealed text or the entrance), pg_down (a boss depth:
+      its floor, else the pool's k-th in the run's shuffle, pg_perm over bt_sbuf), pg_open / pg_held (a boss floor's
+      stairs held until a boss is beaten this run: PG_RUNB), pg_boss / pg_after (the boss's words, the battle, the
+      second form, the boss remembered (PG_BOSS a byte a shrine), the floor's other orbs gone, the light PG_EXIT
+      shown), the light (out to the door). pg_lcd copies the map's bytes; pg_lcd2 (bank 116) sets the battle banks of
+      the band's set, the encounter domain pg_dom ($80 + 4 area + band; main.s calls pg_domi). Save page: $A0 depth,
+      $A1 shrine, $A2 seed, $A3-$A4 chests, $A5 floors passed, $A6-$A9 bosses, $AA fixed chests, $B0 on the counts.
+    - Battles (pgbattle.build per shrine and set): monster names -> GBA records (MON_REC: the 50 new monsters, the 17
+      bosses, FF1's dragons), formations per table entry (at most two small and two large pictures, two colour sets),
+      pages packed so each formation's monsters share one (alloc_pages), domains at $5000 + 32 area + 8 band, Dawn
+      of Souls' new AI records (spell numbers mapped: gba_spell) in AI slots the set does not use, the bosses' AI from
+      their abilities, hanging Echidna.
+    - Items (postgame.NEW_CONS, WEAPON_NAMES, ARMOUR_NAMES): stats from the GBA (gba.weapon / gba.armour: damage, hit,
+      critical, spell, element, category, classes, price; defence, weight, resistances); the names bank has 512 name
+      pointers (names.py), the equipment tables at $6000-$65FF for 64 weapons / 72 armours, FF1's gold amounts at
+      $6600 (N_GOLD); gear codes gcodez / gidz in every bank that names gear; the chest message's index by pg_nidx.
+      Items screen: pg_use1 (one member: HP, MP, Phoenix Down, Elixir, apples, Soma Drop, the Plus items), Megalixir
+      on everyone, Emergency Exit (out, as the Exit spell). Battle: md_tab's fourth byte the MP effect (md_mp).
+    - The statues (postgame.statue(rom, fiend)): bank 127, the nearest sealed shrine's loaded with the world map
+      (pg_veh).

@@ -641,11 +641,11 @@ map_reload: call fade_out
 veh_tiles:  ldh a, [maptype]
             and a
             ret z
-            ld a, [map_bank]
-            call sbank
-            ld de, $8100
-            ld bc, 112 * 16                 ; (and the shrine's statue, tiles $70-$7F: pg.s)
-            jp memcpy
+            ld d, h                         ; (and the nearest sealed shrine's statue, tiles $70-$7F:
+            ld e, l                         ;   pg.s pg_veh)
+            ld a, PGM_BANK
+            ld hl, pg_veh
+            jp bank_call
 
 ; the map's object graphics blocks (HL = their tiles in the map bank, 256 bytes a block) to
 ; their tile bases ($8000 + 16 x base; LCD off)
@@ -991,8 +991,9 @@ arrived:    ld a, [px]
             ld a, b
             cp c
             jr nc, .nbt
-            ld a, [cur_map]
-            add a, 64
+            call pg_domi                    ; (FF1's: map + 64; the post-game's: by depth, pg.s)
+            nop
+            nop
             call enc_form
             jp do_battle
 .spk:       ld a, e                         ; spiked: the second byte is the formation
@@ -1008,7 +1009,7 @@ arrived:    ld a, [px]
             jr z, .warp
             and a
             ret
-.warp:      ld a, [fdepth]                  ; warp: the previous floor, or the overworld where
+.warp:      ld a, [fdepth]                   ; warp: the previous floor, or the overworld where
             and a                           ;   the party entered from
             jr z, .toow
             dec a
