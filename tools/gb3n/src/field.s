@@ -1010,9 +1010,13 @@ line_flush: ld hl, line_buf
             ret
 
 ; the walking character into OAM entries 0-3
-party_oam:  ld a, [veh]                     ; in a vehicle: its sprite (vehicle.s)
+party_oam:  ld a, [wmode]                   ; in a vehicle on the world map: its sprite
+            and a                           ;   (vehicle.s)
+            jr z, .nv
+            ld a, [veh]
             and a
             jp nz, v_oam
+.nv:
             ld a, [step]                    ; the pose: facing, and the second frame from
             and a                           ;   pixel 8 of a step (FF3: fine scroll & 8)
             jr z, .f0

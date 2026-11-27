@@ -988,8 +988,28 @@ ev_player:  ld a, [ev_cmd]
 .face:      ld a, b
             ld [facing], a
             ret
-.sh:        sub 8
+.sh:        cp $0A                          ; $CA Nautilus, $CB Invincible, $CF chocobo, $CE
+            ld b, 6                         ;   off the Invincible, parked here (3B/A16D-A1C8;
+            jr z, .v                        ;   $C8 / $C9 show / hide: later)
+            cp $0B
+            ld b, 7
+            jr z, .v
+            cp $0F
+            ld b, 1
+            jr z, .v
+            cp $0E
             ret nz
+            ld a, [world]
+            ld [SRAM_PAGE + $07], a
+            ld a, [pos_x]
+            ld [SRAM_PAGE + $05], a
+            ld a, [pos_y]
+            ld [SRAM_PAGE + $06], a
+            ld a, 1
+            ld [SRAM_PAGE + $04], a
+            ld b, 0
+.v:         ld a, b
+            ld [veh], a
             ret
 ev_dirs:    db DIR_R, DIR_L, DIR_D, DIR_U
 
