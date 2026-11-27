@@ -617,7 +617,6 @@ m_label:    ld hl, m_labels
             jr .f
 
 ; ---- not yet: an error sound (first pass)
-m_magic:
 m_job:
 m_config:
 m_suspend:  jp m_sfx_err
@@ -3180,7 +3179,10 @@ e_wtype:    cp $46
 ; NZ when member [m_who]'s job may equip item [m_iid] (35/B8FD: 30/9400 + 8 id, byte 7 & $7F
 ; -> the jobs allowed, 00/8900 + 3 n)
 m_canequip: ld a, [m_iid]
-            ld l, a
+            cp $C8                          ; (a spell: 30/9400 + 8 (id - $30), 34/8053)
+            jr c, .i
+            sub $30
+.i:         ld l, a
             ld h, 0
             add hl, hl
             add hl, hl
@@ -3224,6 +3226,600 @@ m_canequip: ld a, [m_iid]
             add a
             jr .s
 .t:         and [hl]
+            ret
+
+; ==== 1 Magic (FF3's 3C/9761): the member's spells, four levels a page (a level: "Ln MP x/y",
+; its three spells); A on a spell: Use / Item (FF3's options; Swap not offered)
+m_magic:    call m_member
+            ret c
+            call m_who_off
+            ld [m_x7f], a
+            ld [m_caster], a
+            add 2
+            call m_sp1
+            and $C0                         ; dead / stone: no (3D/A5E5)
+            jp nz, m_sfx_err
+            call sp_buf
+            xor a
+            ld [m_mcur], a
+.scr:       call g_draw
+.lp:        ld a, [m_mcur]                  ; the hand: level row + 1 + k
+            call g_rowof
+            ld b, a
+            ld c, 3
+            call m_hand
+            call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            ld a, [m_mcur]
+            ld hl, m_spl
+            add l
+            ld l, a
+            jr nc, .g
+            inc h
+.g:         ld a, [hl]
+            and a
+            jr z, .err
+            ld [m_iid], a
+            call m_sfx_ok
+            call g_opts                     ; Use / Item: C = cancelled, A = 0 / 1
+            jr c, .scr
+            and a
+            jr nz, .item
+            call g_use
+            jr .scr
+.item:      ld a, [m_iid]                   ; 3C/9897: into the pack
+            ld b, a
+            ld c, 1
+            call m_invadd
+            ld a, $6B
+            jr c, .msg
+            ld a, [m_mcur]
+            ld hl, m_spl
+            add l
+            ld l, a
+            jr nc, .i2
+            inc h
+.i2:        ld [hl], 0
+            call sp_save
+            ld a, $6E
+.msg:       call m_msg
+            call m_show
+            call m_waitkey
+            jr .scr
+.err:       call m_sfx_err
+            jr .lp
+.x:         call m_sfx_ok
+            jp sp_save
+.up:        ld a, [m_mcur]
+            and a
+            jr z, .lp
+            dec a
+            jr .m
+.dn:        ld a, [m_mcur]
+            cp 23
+            jr z, .lp
+            inc a
+.m:         ld b, a                         ; another page: redraw
+            ld a, [m_mcur]
+            call g_page
+            ld c, a
+            ld a, b
+            ld [m_mcur], a
+            call g_page
+            cp c
+            push af
+            call m_sfx_move
+            pop af
+            jp nz, .scr
+            jp .lp
+; A = the page (0 / 1) of slot A; g_rowof: A = the BG row of slot A
+g_page:     cp 12
+            ld a, 0
+            ret c
+            inc a
+            ret
+g_rowof:    cp 12
+            jr c, .p
+            sub 12
+.p:         ld c, 0
+.d:         cp 3
+            jr c, .r
+            sub 3
+            inc c
+            jr .d
+.r:         ld b, a                         ; 1 + 4 level + 1 + k
+            ld a, c
+            add a
+            add a
+            add 2
+            add b
+            ret
+; the page of slot [m_mcur]: four levels
+g_draw:     call m_clear
+            call m_sprclr
+            ld de, $0000
+            ld bc, $1214
+            call m_win
+            ld a, [m_mcur]
+            call g_page
+            add a
+            add a
+            ld [m_lvl], a                   ; the first level
+            ld d, 1
+.l:         ld e, 1
+            ld a, 'L'
+            call m_putc
+            inc e
+            ld a, [m_lvl]
+            add '1'
+            call m_putc
+            ld e, 5
+            ld hl, m_mp
+            call m_puts0
+            inc e
+            ld a, [m_lvl]                   ; MP current / max ($6130 + 2 l)
+            add a
+            ld b, a
+            ld a, [m_x7f]
+            add $30
+            add b
+            push af
+            call m_sp1
+            ld l, a
+            ld h, 0
+            ld b, 2
+            call m_num
+            ld a, '/'
+            call m_putc
+            inc e
+            pop af
+            inc a
+            call m_sp1
+            ld l, a
+            ld h, 0
+            ld b, 2
+            call m_num
+            ld c, 0                         ; the three spells
+.s:         inc d
+            push bc
+            push de
+            ld a, [m_lvl]
+            ld b, a
+            add a
+            add b
+            add c
+            ld hl, m_spl
+            add l
+            ld l, a
+            jr nc, .g
+            inc h
+.g:         ld a, [hl]
+            and a
+            jr z, .e
+            ld e, a
+            ld d, 0
+            call m_n88
+            pop de
+            push de
+            ld e, 4
+            ld a, 14
+            call m_putsn
+.e:         pop de
+            pop bc
+            inc c
+            ld a, c
+            cp 3
+            jr nz, .s
+            inc d
+            ld a, [m_lvl]
+            inc a
+            ld [m_lvl], a
+            and 3
+            jr nz, .l
+            jp m_show
+; Use / Item in a small window (11, 14) 9 x 4 (FF3's text $36's words): A = 0 / 1, C = B
+g_opts:     ld de, $0E0B
+            ld bc, $0409
+            call m_win
+            ld hl, m_s_use
+            ld de, $0F0D
+            call m_puts0
+            ld hl, m_s_item
+            ld de, $100D
+            call m_puts0
+            ld a, 1
+            ld [m_dirty], a
+            xor a
+            ld [m_yn], a
+.lp:        ld a, [m_yn]
+            add 15
+            ld b, a
+            ld c, 13
+            call m_hand2
+            call m_frame
+            ldh a, [pad_new]
+            and $C0
+            jr nz, .t
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            call m_sfx_ok
+            call m_hand2off
+            ld a, [m_yn]
+            and a
+            ret
+.t:         ld a, [m_yn]
+            xor 1
+            ld [m_yn], a
+            call m_sfx_move
+            jr .lp
+.x:         call m_sfx_ok
+            call m_hand2off
+            scf
+            ret
+
+; ---- cast spell [m_iid] from slot [m_mcur] (3C/9812-3C/9AD0)
+G_SPELLS:   db $CC, $5E, $D2, $5C, $D3, $66, $DA, $5F, $E0, $5C, $E1, $5E, $EE, $5C
+            db $F6, $69, $F0, $63, $F7, $6A, $FC, $5C, $FD, $64, 0
+g_use:      call m_canequip                 ; the job may cast it ($7200)
+            jp z, m_sfx_err
+            ld a, [m_iid]                   ; MP of its level
+            sub $C8
+            ld c, a
+            ld hl, sp_lvl
+            call m_hla
+            ld a, [hl]
+            add a
+            ld b, a
+            ld a, [m_caster]
+            add $30
+            add b
+            ld [m_mpat], a
+            call m_sp1
+            and a
+            jp z, m_sfx_err
+            ld a, [m_iid]                   ; a field spell, with its question
+            ld hl, G_SPELLS
+.f:         ld b, a
+            ld a, [hl+]
+            and a
+            jp z, m_sfx_err                 ; (Exit, Teleport, Sightro: later)
+            cp b
+            ld a, [hl+]
+            jr z, .q
+            ld a, b
+            jr .f
+.q:         ld [m_q], a
+            ld a, [m_caster]                ; the caster: not dead, stone, toad or silenced
+            add 2                           ;   (Toad: a toad may cast it)
+            call m_sp1
+            ld c, $F0
+            ld b, a
+            ld a, [m_iid]
+            cp $F6
+            jr nz, .c
+            ld c, $D0
+.c:         ld a, b
+            and c
+            jp nz, m_sfx_err
+.ask:       call m_party2
+            ld a, [m_q]
+            call m_msg
+            call m_show
+            ld a, [m_iid]                   ; Arise and Esuna: one member; the rest: one or all
+            cp $CC
+            jr z, .one
+            cp $D3
+            jr z, .one
+            call m_target_all
+            jr .t
+.one:       call m_target
+            xor a
+            ld [m_all], a
+.t:         ret c
+            ld a, [m_all]
+            and a
+            ld a, 1
+            jr z, .n
+            ld a, 4
+.n:         ld [m_tgts], a
+            ld a, [m_who]
+            call m_choff
+            ld [m_x7f], a
+            ld a, [m_all]
+            and a
+            jr z, .e
+            xor a
+            ld [m_x7f], a
+.e:         call g_effect
+            jr c, .bad
+            ld a, [m_mpat]                  ; 3C/9957: MP - 1
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            dec [hl]
+            ld a, [m_caster]
+            ld [m_x7f], a
+            ret
+.bad:       call m_sfx_err
+            jr .ask
+; the effect (3C/99FF): C = nothing to do
+g_effect:   ld a, [m_iid]
+            cp $CC                          ; Arise: life, HP to max
+            jr nz, .a
+            ld c, $80
+            call g_status
+            ret c
+            call m_hpmax
+            ret
+.a:         cp $D2                          ; Curaga: one: HP to max; all: power 220
+            jr nz, .b
+            call g_valid
+            ret c
+            ld a, [m_tgts]
+            cp 1
+            jp z, m_hpmax
+            ld a, 220
+            jr .heal
+.b:         ld c, $7F                       ; Esuna
+            cp $D3
+            jr z, g_status
+            ld c, $40                       ; Stona
+            cp $DA
+            jr z, g_status
+            cp $E0                          ; Curada: 180
+            ld b, 180
+            jr z, .cure
+            ld c, $80                       ; Raise
+            cp $E1
+            jr z, g_status
+            cp $EE                          ; Cura: 125
+            ld b, 125
+            jr z, .cure
+            ld c, $20                       ; Toad (toggle)
+            cp $F6
+            jr z, .tog
+            ld c, $04                       ; Blindna
+            cp $F0
+            jr z, g_status
+            ld c, $08                       ; Minimum (toggle)
+            cp $F7
+            jr z, .tog
+            cp $FC                          ; Cure: 42
+            ld b, 42
+            jr z, .cure
+            ld c, $02                       ; Poisona
+            jr g_status
+.cure:      push bc
+            call g_valid
+            pop bc
+            ret c
+            ld a, b
+.heal:      ld [m_pow], a                   ; 3D/A466: x = job level / 32 + level / 16 +
+            ld a, [m_caster]                ;   spirit / 16 + 1
+            add $10
+            call m_sp1
+            swap a
+            srl a
+            and 7
+            ld b, a
+            ld a, [m_caster]
+            inc a
+            call m_sp1
+            swap a
+            and 15
+            add b
+            ld b, a
+            ld a, [m_caster]
+            add $1B
+            call m_sp1
+            swap a
+            and 15
+            scf
+            adc b
+            ld [m_mult], a
+            jp m_heal
+.tog:       ld a, [m_tgts]                  ; 3C/9AA5: toggle on [m_tgts] from [m_x7f]
+            ld b, a
+            ld a, [m_x7f]
+.tl:        push af
+            add 2
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld a, [hl]
+            xor c
+            ld [hl], a
+            pop af
+            add $40
+            dec b
+            jr nz, .tl
+            and a
+            ret
+; FF3's validate targets for cure spell (3C/9B7A): one: not dead / stone (C); all: count the
+; others, [m_x7f] the last one standing
+g_valid:    ld a, [m_tgts]
+            cp 1
+            jr nz, .all
+            ld a, [m_x7f]
+            add 2
+            call m_sp1
+            and $C0
+            ret z
+            scf
+            ret
+.all:       xor a
+.l:         ld b, a
+            add 2
+            call m_sp1
+            cp $40
+            jr c, .ok
+            ld hl, m_tgts
+            dec [hl]
+            jr .n
+.ok:        ld a, b
+            ld [m_x7f], a
+.n:         ld a, b
+            add $40
+            jr nz, .l
+            and a
+            ret
+; FF3's remove status (3D/A3C2): mask C; one: member [m_x7f] must have it; all: anyone
+g_status:   ld a, [m_tgts]
+            cp 1
+            jr nz, .all
+            ld a, [m_x7f]
+.one:       add 2
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld a, [hl]
+            and c
+            scf
+            ret z
+.rm:        bit 7, a                        ; (dead: HP 1)
+            jr z, .r2
+            push hl
+            ld a, l
+            add $0A
+            ld l, a
+            ld [hl], 1
+            pop hl
+.r2:        ld a, c
+            cpl
+            and [hl]
+            ld [hl], a
+            and a
+            ret
+.all:       ld hl, SRAM_PAGE + $102
+            ld a, [hl]
+            ld l, $42
+            or [hl]
+            ld l, $82
+            or [hl]
+            ld l, $C2
+            or [hl]
+            and c
+            scf
+            ret z
+            xor a
+.l:         push af
+            add 2
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld a, [hl]
+            and c
+            call nz, .rm
+            pop af
+            add $40
+            jr nz, .l
+            and a
+            ret
+; choose a member or all (the hand past the fourth: all four hands)
+m_target_all:
+            xor a
+            ld [m_all], a
+            ld a, [m_who]
+            and 3
+            ld [m_who], a
+.lp:        call .hands
+            call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            call m_sfx_ok
+            call .off
+            and a
+            ret
+.x:         call m_sfx_ok
+            call .off
+            scf
+            ret
+.up:        ld a, [m_all]
+            and a
+            jr z, .u1
+            xor a
+            ld [m_all], a
+            ld a, 3
+            ld [m_who], a
+            jr .mv
+.u1:        ld a, [m_who]
+            and a
+            jr nz, .u2
+            ld a, 1
+            ld [m_all], a
+            jr .mv
+.u2:        dec a
+            ld [m_who], a
+            jr .mv
+.dn:        ld a, [m_all]
+            and a
+            jr z, .d1
+            xor a
+            ld [m_all], a
+            ld [m_who], a
+            jr .mv
+.d1:        ld a, [m_who]
+            cp 3
+            jr nz, .d2
+            ld a, 1
+            ld [m_all], a
+            jr .mv
+.d2:        inc a
+            ld [m_who], a
+.mv:        call m_sfx_move
+            jr .lp
+.hands:     call .off
+            ld a, [m_all]
+            and a
+            jr nz, .h4
+            ld a, [m_who]
+            ld b, a
+            add a
+            add b
+            add 2
+            ld b, a
+            ld c, 1
+            jp m_hand2
+.h4:        ld hl, oam_buf + 4 * 35         ; all four
+            ld b, 2 * 8 + 16
+            ld c, 4
+.h:         ld a, b
+            ld [hl+], a
+            ld a, 8
+            ld [hl+], a
+            ld a, M_HAND
+            ld [hl+], a
+            ld a, $0B
+            ld [hl+], a
+            ld a, b
+            add 24
+            ld b, a
+            dec c
+            jr nz, .h
+            ret
+.off:       ld hl, oam_buf + 4 * 35
+            xor a
+            ld b, 5
+.o:         ld [hl+], a
+            inc l
+            inc l
+            inc l
+            dec b
+            jr nz, .o
             ret
 
 section bank B_MENU, $7C00
@@ -3272,3 +3868,9 @@ m_elo:      ds 1
 m_ehi:      ds 1
 m_en:       ds 1
 m_elist:    ds 32
+m_mcur:     ds 1
+m_lvl:      ds 1
+m_caster:   ds 1
+m_mpat:     ds 1
+m_q:        ds 1
+m_all:      ds 1

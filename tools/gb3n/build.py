@@ -48,6 +48,8 @@ def menu_data():
             'm_s_yes:    db %s\n' % z(clean(t[6].split('\n')[0])) +
             'm_s_no:     db %s\n' % z(clean(t[6].split('\n')[1])) +
             'm_damaged:  db %s\n' % z('Damaged') + 'm_trash:    db %s\n' % z('Trash') +
+            'm_s_use:    db %s\n' % z(re.split(r'\{15:..\}', t[0x36])[1].strip()) +
+            'm_s_item:   db %s\n' % z(re.split(r'\{15:..\}', t[0x36])[3].strip()) +
             'm_remove:   db %s\n' % z(clean(t[0x3E].split('\n')[-1])) + name_grid())
 
 
