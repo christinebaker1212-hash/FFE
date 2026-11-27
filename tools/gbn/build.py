@@ -99,7 +99,8 @@ def magic_defs(rom):
 def pg_defs(rom):
     import postgame
     import pgbattle
-    return ('PGM_MAP0 = %d\nPGM_END = %d\nPG_STPAL = %d\n' % (postgame.PG_MAP0, postgame.PG_END,
+    return ('PG_ON = %d\n' % (1 if postgame.GBA_PATH else 0) +
+            'PGM_MAP0 = %d\nPGM_END = %d\nPG_STPAL = %d\n' % (postgame.PG_MAP0, postgame.PG_END,
                                                             postgame.statue(rom)[2]) +
             'PGB_DATA = %d\nPGB_CHR = %d\nPGB_SIL = %d\nPGB_SGB = %d\n' % (pgbattle.PGB_DATA, pgbattle.PGB_CHR,
                                                                    pgbattle.PGB_SIL, pgbattle.PGB_SGB) +
@@ -193,7 +194,8 @@ def town_refl_base(p):
 def data_banks(rom, ff3=None, init=None):
     banks = {}
     import postgame
-    postgame.overworld_patch()                       # (the shrines' doors: before the overworld)
+    if postgame.GBA_PATH:
+        postgame.overworld_patch()                   # (the shrines' doors: before the overworld)
     postgame.names_patch()                           # (its items' names, prices, armour)
     data.FONT_CODES = text.field_codes()
     data.TALL = data.tall_maps(rom)
@@ -315,7 +317,8 @@ def data_banks(rom, ff3=None, init=None):
         place(banks, b, 0x5100, p['mt_dmg_out'])
         place(banks, b, 0x5300, p['mt_dmg_in'])
         place(banks, b, 0x5800, p['dmg_tiles'])
-    pg_banks(rom, banks)
+    if postgame.GBA_PATH:
+        pg_banks(rom, banks)
     assert not OVERLAPS, ["bank %d $%04X+%d over $%04X-$%04X" % ov for ov in OVERLAPS]
     return banks
 
@@ -882,6 +885,10 @@ def main():
                                                     #   Onrac had no tiles: owner's list, 2026-11-26)
     data.TALL = data.tall_maps(rom)                  # (tall maps: 8 x 16 people; data.map_objects)
     ff3 = names.ff3_rom(a[a.index('--ff3') + 1] if '--ff3' in a else None)
+    import gba, postgame                         # (the post-game: the user's Dawn of Souls ROM, optional)
+    gpath = a[a.index('--gba') + 1] if '--gba' in a else gba.DEFAULT
+    postgame.GBA_PATH = gpath if os.path.exists(gpath) else None
+    print('post-game: %s' % ('from ' + gpath if postgame.GBA_PATH else 'off (no Dawn of Souls ROM)'))
     init = None                                  # --init ADDR=VAL,.. (save page offsets $000-$3FF)
     if '--init' in a:
         init = []
