@@ -34,6 +34,7 @@ world_enter:
             pop bc
             dec c
             jr nz, .ts
+            %FAR B_WSPR, ws_tswaps          ; (world 3: the statues / gate as $602E says)
             ld a, [world]                   ; BG palettes: the world's base palette
             swap a
             add low(W_PALS)

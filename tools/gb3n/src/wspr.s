@@ -31,43 +31,8 @@ ws_tiles:   ld a, [world]
 ; ---- the world map's other sprites into OAM from entry 4 (3E/D85A), the rest hidden
 ws_world:   ld a, 16
             ld [ws_n], a
-            ld a, [veh]                     ; the party as the Invincible (3E/D622; its jumps:
-            cp 7                            ;   later) or an airship's shadow (3E/D9DA)
-            jr nz, .ni
-            xor a
-            ld [ws_n], a
-            ld a, 64
-            ld [ws_x], a
-            ld a, $5F + 1 - 48
-            ld [ws_y], a
-            ld a, [v_dface]
-            and $0F
-            add a
-            ld b, a
-            ld a, [frame]
-            and 4
-            add a
-            add a
-            add a
-            or b
-            call ws_invx
-            jr .go
-.ni:        cp 4
-            jr c, .go
-            ld a, [frame]
-            rra
-            jr nc, .go
-            ld a, $77 + 1 - 48
-            ld b, a
-            ld c, 64
-            ld de, $C003
-            call ws_spr
-            ld a, $77 + 1 - 48
-            ld b, a
-            ld c, 72
-            ld de, $C043
-            call ws_spr
-.go:
+            call ws_pty
+
             ld a, [world]
             srl a
             jr z, .fc
@@ -119,6 +84,46 @@ ws_world:   ld a, 16
             inc l
             inc l
             jr .h
+
+; the party as the Invincible (3E/D622; its jumps: later) or an airship's shadow (3E/D9DA)
+ws_pty:
+            ld a, [veh]                     ; the party as the Invincible (3E/D622; its jumps:
+            cp 7                            ;   later) or an airship's shadow (3E/D9DA)
+            jr nz, .ni
+            xor a
+            ld [ws_n], a
+            ld a, 64
+            ld [ws_x], a
+            ld a, $5F + 1 - 48
+            ld [ws_y], a
+            ld a, [v_dface]
+            and $0F
+            add a
+            ld b, a
+            ld a, [frame]
+            and 4
+            add a
+            add a
+            add a
+            or b
+            call ws_invx
+            ret
+.ni:        cp 4
+            ret c
+            ld a, [frame]
+            rra
+            ret nc
+            ld a, $77 + 1 - 48
+            ld b, a
+            ld c, 64
+            ld de, $C003
+            call ws_spr
+            ld a, $77 + 1 - 48
+            ld b, a
+            ld c, 72
+            ld de, $C043
+            call ws_spr
+            ret
 
 ; is map cell (D, E) on screen? (3E/DBE4) carry set if not; ws_x / ws_y = its top left on the
 ; GB screen (+1 down as FF3's sprites)

@@ -266,19 +266,19 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   off, circle, spin) and $DA (dance); screen effects $D0 (shake), $D1 / $E2 (grey flash), $D2 /
   $D3 (FF3's hue steps to blue and back), $E0 / $E1 (palettes again) (`src/evfx.s`); poison
   damage per step and damage floors (grey flicker, 1 HP) (3B/A09B, A0B1).
-- Not yet: $EF special animations (and the map tile swaps of the statues / Saronia's gate),
-  the guest's picture, Hein's castle and the chocobo objects.
-- Plan in progress (world-map sprites as FF3, 3E/D85D): FF3's OBJ tiles $80-$FF on the world map
-  (3D/BDE0): $80-$8F 0B/8700, $90-$97 0B/9E80, $98-$9F 0B/9900, $C0-$FF 0B/9A80; worlds 0 / 1:
-  $A0-$BF 0B/9700 (Hein's castle, whirlpool; $6020 & $0C) or 0B/9500 (Bahamut); other worlds:
-  $A0-$AF 0B/9980, $B0-$BF 0B/9F00. Free on the GB: VRAM bank 1 $8800-$8FFF on the world map
-  (tiles $20-$7F already FF3's numbering). Coordinates: the party is at NES (112, D8CA[vehicle])
-  and GB (64, 64): GB = NES x - 48, y - 44. Each FF3 routine (D8D3 player / vehicle with shadow,
-  chain, spinning ($602F bit 6); DB09 / DB2F / DAD4 parked; DAA3 chocobo running away; D52F
-  leviathan shadow; D537 floating-continent objects; D5E3 continent in the sky; D666 Invincible;
-  DB58 guest; 3A/9442 bubbles; DA3A the 2 x 2 object drawer) appends converted entries to the
-  GB OAM. Then $EF (3B/A4FA) and the map tile swaps (3B/A9BA: metatile Y's tables copied to X,
-  the view redrawn).
+- World-map sprites as FF3 (3E/D85A; `src/wspr.s`, bank B_WSPR): FF3's tiles $80-$FF per world
+  (3D/BDE0), parked ship / Nautilus / airship, the parked Invincible and its shadow, the boulder,
+  the whirlpool, Hein's castle circling (FF3's sine table, object commands 0 / 2), the continent
+  seen from below, the Leviathan's shadow, the chocobo running off, the chained ship's chain, the
+  airship's shadow, the spin ($602F bit 6), the party as the Invincible; party and people drawn at
+  FF3's offsets above their cells (GB = NES - 48).
+- Special animations $EF 0-E (`src/sa.s`, 3B/A4FA): the Enterprise coming down, the boulder /
+  airship explosion, the lights and stars closing in, Saronia's cannonballs and the airship shot
+  down, the four statues and Saronia's gate (with FF3's tile swaps, also re-applied when world 3
+  loads: 3A/8FD1), the Invincible rising, the flying castle's spirals, Bahamut flying to the party,
+  the circling stars; each leaves FF3's game state.
+- Not yet: the guest (following the party, its picture, B to talk), the underwater bubbles and fish,
+  the Invincible's jumps over mountains, world-map water animation.
 - Not yet in menus: Exit / Teleport / Sightro and the Midgard Bread / Otter's Head (they need the
   minimap and FF3's warp), FF3's spell list Swap, the stat-up messages after equipping.
 

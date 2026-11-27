@@ -529,12 +529,15 @@ evd_table:  dw ev_shake, ev_flash, ev_dark, ev_undark    ; D0-D3 (src/evfx.s)
             dw ev_repal, ev_repal, ev_flash2, ev_none    ; E0-E3
 evc_table:  dw ev_none, ev_none, ev_none, ev_take        ; E4-E7
             dw ev_stclr, ev_stset, ev_gil, ev_ungil      ; E8-EB
-            dw ev_cp, ev_uncp, ev_guest, ev_none         ; EC-EF (special animation: later)
+            dw ev_cp, ev_uncp, ev_guest, ev_sanim        ; EC-EF
             dw ev_npcdlg, ev_evdlg, ev_seton, ev_setoff  ; F0-F3
             dw ev_npcon, ev_npcoff, ev_give, ev_battle   ; F4-F7
             dw ev_sound, ev_exit, ev_enter, ev_enterm    ; F8-FB
             dw ev_wait, ev_prev, ev_none, ev_end         ; FC-FF
 ev_none:    ret
+; $EF: a special animation (src/sa.s)
+ev_sanim:   %FAR B_WSPR, sa_run
+            ret
 
 ; $DB / $DC: FF3's prologue / epilogue (src/cut.s), then the map again with its people
 ev_prol:    %FAR B_CUT, cut_pro

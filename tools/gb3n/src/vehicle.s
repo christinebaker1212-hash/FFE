@@ -577,6 +577,38 @@ v_face:     ld a, [SRAM_PAGE + $2F]
             ld [v_dface], a
             ret
 .t:         db DIR_R, DIR_D, DIR_L, DIR_U
+; ---- for the special animations (src/sa.s): the party's vehicle [ev_tmp]; the view again
+sa_vset:    ld a, [sa_tmp]
+            jp v_set
+sa_redraw:  call wait_vbl
+            ld a, 1
+            ld [guard_on], a
+            ldh [snd_isr], a
+            ld a, $20
+            ldh [rSTAT], a
+.w:         ldh a, [rSTAT]
+            and 3
+            cp 2
+            jr nc, .w
+            ld c, 0
+.row:       push bc
+            ld a, [cam_y]
+            add c
+            ld e, a
+            ld a, [cam_x]
+            ld d, a
+            call line_row
+            call line_flush
+            pop bc
+            inc c
+            ld a, c
+            cp 16
+            jr nz, .row
+            xor a
+            ldh [snd_isr], a
+            ldh [rSTAT], a
+            ld [guard_on], a
+            ret
 ; ---- the walking member ($600E): graphics set (3F/F77B: toad $16, mini $17, else the job) and
 ; palette (3A/9050: toad $16, a job's own, the Onion Kids by member: 0, $17-$19)
 char_update:

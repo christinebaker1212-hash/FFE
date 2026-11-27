@@ -322,6 +322,19 @@ ROMDATA = {
     'sp_ptr': (0x3D, 0xA27C, 56),        # menu: each spell's level slots in the list buffer
     'wp_comb': (0x3C, 0x9D4B, 16),       # menu: the hand pairs allowed (weapon types 4 x 4)
     'job_prog': (0x3D, 0xAD59, 44),      # menu: each job's level-up table (bank 39)
+    'sa_a5f9': (0x3B, 0xA5F9, 16),       # special animations ($EF): their sprite data
+    'sa_a6d4': (0x3B, 0xA6D4, 96),
+    'sa_a77a': (0x3B, 0xA77A, 96),
+    'sa_a906': (0x3B, 0xA906, 80),
+    'sa_a99a': (0x3B, 0xA99A, 32),
+    'sa_ab61': (0x3B, 0xAB61, 8),
+    'sa_99e4': (0x3A, 0x99E4, 80),       # (the statue explosion's five frames, 3 bytes a blast)
+    'sa_9a48': (0x3A, 0x9A48, 40),
+    'sa_9b04': (0x3A, 0x9B04, 16),
+    'sa_9b2e': (0x3A, 0x9B2E, 26),
+    'sa_9c1c': (0x3A, 0x9C1C, 24),
+    'sa_9c34': (0x3A, 0x9C34, 128),
+    'sa_9cb4': (0x3A, 0x9CB4, 240),
     'ws_sin': (0x3A, 0x9E3E, 256),       # world sprites: FF3's sine table, the ship's chain
     'ws_chtab': (0x3D, 0xBF7A, 126),
     'nj_h': (0x3B, 0xAC0C, 25),          # event: a person's jump height
@@ -396,12 +409,16 @@ def main():
            open(os.path.join(HERE, 'src', 'cut.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'cutend.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'wspr.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'sa.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + sound_data() + own_data())
     if os.environ.get('GB3N_BATTLE'):            # test builds only: every encounter is this battle
         src = src.replace('            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a',
                           '            ld a, %s\n            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a' % os.environ['GB3N_BATTLE'])
     if os.environ.get('GB3N_STORY'):             # test builds only: Start runs the ending ($DD)
-        ev = {'prol': 'ev_prol', 'epi': 'ev_epi', 'fx': 'ev_fxtest'}.get(os.environ['GB3N_STORY'], 'ev_ending')
+        st = os.environ['GB3N_STORY']
+        ev = {'prol': 'ev_prol', 'epi': 'ev_epi', 'fx': 'ev_fxtest'}.get(st, 'ev_satest' if st.startswith('sa') else 'ev_ending')
+        if ev == 'ev_satest':                    # (GB3N_STORY=saN: special animation N on Start)
+            src += 'section bank B_FIELD, $7480\nev_satest:  ld a, %d\n            ld [ev_arg], a\n            jp ev_sanim\n' % int(st[2:], 16)
         src = src.replace('            jp nz, menu_open', '            jp nz, ' + ev)
         if ev == 'ev_fxtest':                    # (each event effect in turn, Ur's people 1 / 2)
             src += '''section bank B_FIELD, $7400
@@ -460,7 +477,7 @@ ev_fxtest:  call ev_shake
     cb[0:0x2000] = cut_raw; banks[B_CUT] = cb            # NES bank $1F under the cutscene code
     assert B_CUTG not in banks; banks[B_CUTG] = cut_gfx
     wb = bytearray(banks[B_WSPR]) + bytearray(0x4000 - len(banks[B_WSPR]))   # world-map sprites:
-    assert not any(r.claimed.get((B_WSPR, o)) for o in range(0x2000))      #   3D/BDE0's loads
+    assert not any(r.claimed.get((B_WSPR, o)) for o in range(0x1D00))      #   3D/BDE0's loads
     rd = lambda b8, a, n: rom.rd(b8, a, n)
     base = rd(0x0B, 0x8700, 0x100) + rd(0x0B, 0x9E80, 0x80) + rd(0x0B, 0x9900, 0x80)
     for k, mid in enumerate((rd(0x0B, 0x9500, 0x200), rd(0x0B, 0x9700, 0x200),
