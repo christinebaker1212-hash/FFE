@@ -1583,7 +1583,7 @@ m_winpal:   ld hl, I_WINPAL
             jr nz, .c
             ret
 
-; ==== the title: FF3's game load menu (3D/B9F6): the files, New Game; ours: Resume (later)
+; ==== the title: FF3's game load menu (3D/B9F6): the files, New Game; ours: Resume (a suspend point) first
 ; returns A = 0 new game, 1 a file loaded into the page
 t_title:    call su_state                   ; a suspend point: Resume first
             ld [m_su], a

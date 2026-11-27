@@ -419,10 +419,26 @@ map_triggers:
             ld a, [hl]
             add b                           ; the new metatile
             ld b, a
-            ld a, e                         ; (treasure chests: opened ones show $7D; the
-            cp $1C                          ;   switches come with the game state: later)
+            ld a, e                         ; a treasure chest: its switch clear (taken) ->
+            cp $1C                          ;   the open chest $7D (3A/91F7)
+            jr nz, .pr
+            push bc
+            ld a, c
+            ld hl, treas
+            add l
+            ld l, a
+            adc h
+            sub l
+            ld h, a
+            ld a, [hl]
+            ld [tr_id], a
+            call tr_switch
+            pop bc
             ld a, b
-            jr z, .st
+            jr nz, .st
+            ld a, $7D
+            jr .st
+.pr:        ld a, b
             ld h, W_PROP2
             ld l, a
             ld a, [hl]
@@ -760,8 +776,8 @@ dest_cell:  ld a, [pos_x]
 
 ; can the party step onto metatile A? carry set if not ($3F $E396 check tile passability).
 ; Property 1 bit 7: a trigger, by property 2's high nibble ($3F $E669): 0 previous map,
-; 1 world map, 4 entrance, 5 door, 6 locked door (no key: blocked), C-E impassable, F event
-; (scripts: later), others as a plain tile. Plain tiles: the low three bits 0 stairs (z
+; 1 world map, 4 entrance, 5 door, 6 locked door (no key: blocked), C-E impassable, F an event
+; (trig_event), others as a plain tile. Plain tiles: the low three bits 0 stairs (z
 ; cleared), 4+ a bridge, 3 impassable, 1 / 2 a level: impassable when it and the current level
 ; z make 3, else z becomes it.
 passable:   ld c, a

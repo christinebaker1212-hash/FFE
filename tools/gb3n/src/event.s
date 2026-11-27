@@ -823,7 +823,7 @@ ev_uncp:    ld b, a
             jp ev_evdlg
 .s:         ld [SRAM_PAGE + $1B], a
             ret
-; $EE: the guest ($600B; their picture: later)
+; $EE: the guest ($600B): ev_guest (src/guest.s)
 
 ; $F7: a battle ($3B $B70F), the event going on after it
 ev_battle:  ld [bs_id], a
@@ -1092,7 +1092,7 @@ ev_player:  ld a, [ev_cmd]
             jr z, .hg
             cp $0A                          ; $CA Nautilus, $CB Invincible, $CF chocobo, $CE
             ld b, 6                         ;   off the Invincible, parked here (3B/A16D-A1C8;
-            jr z, .v                        ;   $C8 / $C9 show / hide: later)
+            jr z, .v                        ;   $C8 / $C9 the party shown / hidden above)
             cp $0B
             ld b, 7
             jr z, .v
