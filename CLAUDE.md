@@ -1455,7 +1455,9 @@ are mended silently when a file or suspend point loads.
 Then (item 69): Chaos' picture no longer loses its top left when he is beaten; "The End" draws to the finish
 (its picture buffer had run over the gradient's variables), and the flash before it is gone.
 Post-game proposal (owner, 2026-11-27): Dawn of Souls' four Soul of Chaos dungeons adapted to the NES look,
-with mock-ups; waiting for the owner's decisions D1-D8: docs/ff1-postgame-design.md.
+with mock-ups (docs/ff1-postgame-design.md). Owner decided (2026-11-27): all from the user's Dawn of Souls
+GBA ROM (read at build time: tools/gbn/gba.py, formats docs/ff1-postgame-gba.md); decoding started (floors,
+monsters, pictures, text found); engine plan in the design doc section 10; Earthgift first.
 
 ## Remaining
 - **FF1 (native build): finished (owner, 2026-11-26):** the owner played it through from New Game to

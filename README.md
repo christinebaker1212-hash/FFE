@@ -13,6 +13,7 @@ ROM images are **not** included and must never be committed. The patches target:
 |---|---|---|
 | Final Fantasy I・II (Japan) | `Final Fantasy I, II (Japan).nes` | `4b22c2c88fc71eacf270ea51ef218944bb4c536a` |
 | Final Fantasy III (Japan) | `Final Fantasy III (Japan).nes` | `c4443fc24625e3c2bb859525eb44b6b3a80e7c35` |
+| Final Fantasy I・II Advance (Japan, Rev 1) | `Final Fantasy I, II Advance (Japan) (Rev 1).gba` | `3d1c580b9b3007f6f910d80f4c7421f5d2e19dbe` (no header; read at build time for the FF1 Game Boy post-game only) |
 
 ## Translation rules (set by the project owner — binding)
 
