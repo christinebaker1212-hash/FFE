@@ -68,6 +68,35 @@ Test: `GB3N_TEST=1 python3 tools/gb3n/build.py --out build/ff3n_test.gbc`, then
 Bank 58 `B_BAT2`: battle flow (`batflow.s`); bank 0 $0450: shared helpers (`batlib.s`, `alg_call`).
 Test routines 10-13 (order, exec, over, cannon) run with NES banks $34/$35 mapped.
 
+## Battle screen facts (from the listing; for our presentation)
+- Text: names8800 (our TB_NAMES) holds item names (id), spell names ($C8 + id), monster names
+  ($120 + id), battle messages and command names ($220 + n); status messages are t8200 ($0C + n,
+  middle right $78D9) and t8200 (n - $46) for top-right ids $52-$7F. Top right $78D7: $00 Miss,
+  $01-$20 n hits (message $13 after the number), $21-$38 summon names (monster names $E7 + ..),
+  $39-$51 battle messages (n - $39), $52-$7F status, $80+ spell names (n - $80); $72 set: an item
+  name. Middle left $78D8: target ($FF none, $80+ monster slot -> $7ECD -> $7D6B id, $88 "all"
+  = message $16, else a character). Top left $78D6: attacker.
+- Action scripts 34/950D (by $78D5): 0 fight, 1 magic/command, 2 message, 3 cannon, 4 level/skill
+  up, 5 poison; commands 34/954D: close windows, show attacker / attack / target / status /
+  battle message (queue $78DA + [$78EE]; variable types 34/9575, a nybble each: 0 none, 1 text
+  + wait A, 2 hp (peep: $78E4 values), 3 number ($78E4) + wait A, 4 item name + wait A), wait,
+  animation (34/8411: by $7EC2 through 34/83F8), damage numerals ($7E4F targets / $7E5F
+  attackers, bit 15 green, $40 in the high byte = miss), death animation.
+- State changes inside FF3's animations (ours must do them): a monster death (2F/BB0A): for each
+  dying slot $7DD3[type] += 1 (experience), $7DA7[slot] = $FF, then 2F/B909 recount ($7DCE-$7DD1
+  per type, $7DD2 total); monster summon (2F/B959): living slots' $7DA7 from $7DAF, recount;
+  dead monsters = $7EC4 bit 7 (34/84C7).
+- Commands: 34/9B21 four command ids per job (ROM); names $220 + id; left / right twice: row
+  change (front / back; swapped in a back attack). Handlers 34/9A16: 2/3 rows, 4 attack (targets),
+  5 defend, 6 run, 7 escape, 8 jump (a monster), $0B terrain, $0C peep, $0D scan, $0E steal,
+  $0F buildup, $10 sing, $11 scare, $12 cheer, $14 item (35/ADAF), $15 magic (35/B646). Records:
+  +$2E action, +$2F targets, +$30 target flags ($80 monsters, $40 all), $7AC3 + i the command
+  slot, $78CF + i the command id, $7AC7 + i the spell level, +$3E / +$3F an item in use.
+- Battle setup 2E/9E8E: $7CED battle id (+ $7CEE boss), $7CEF bg, $7ED8 flags; monster set
+  2E/8000 + 2 id -> set 2E/8400 + 6 n (2 palettes, 4 monster ids -> $7D6B), counts 2E/8A00 + 4 n
+  randomized (2F/A0C8: low / high nibble, rng 0); tilemap id $7D7B (2E/9FAA); slots $7DA7 / $7DAF
+  by 2F/A4DA; positions 2F/A5E6 (x, y, size per slot); RNG table 3F/FC27.
+
 ## Battle: still to write
 - Main loop bookkeeping: 34/81C3, 8213, 8271 (command use counts), 8295 (monster rows), 8306,
   8374 (inventory / run flag), 874D / 87AA / 87BE, 9474 (near fatal), 9CE3 (init), 88A4 (rows).
