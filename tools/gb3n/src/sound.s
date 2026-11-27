@@ -6,7 +6,8 @@
 ; k ($37, $38, $39, $09) at $6000, so an NES pointer p reads at p - $4000.
 ; The output stage (snd_out) gives the channel values to the GB sound: pulses to CH1 / CH2, the
 ; triangle to CH3 (a triangle wave), noise to CH4. Volume changes inside a note: zombie-mode steps
-; (no restart). The driver runs once a frame (FF1's timer at the NES rate: later).
+; (no restart; restarts where an emulator ignores them). The driver runs once a frame, with a second
+; tick every ~161 frames: FF3's tempo at the NES's 60.0988 Hz.
 
 MUS        = $DD00          ; FF3's $7F40 page (work RAM bank 1)
 M_CUR      = MUS + $00      ; $7F40
@@ -56,6 +57,8 @@ MZ_BANK    = MZ + 10
 MZ_SAVE    = MZ + 11
 O_CV       = MZ + 12        ; the output stage: GB volume now per GB channel (4)
 O_XLO      = MZ + 16        ; GB frequency low per channel (4)
+MZ_ACC     = MZ + 20        ; (2) the NES rate: a second tick when it carries
+Z_ZMB      = MZ + 22        ; 1: zombie-mode volume steps work here (boot test), 0: restarts
 T_DUR      = $8805 - $4000  ; FF3's tables (NES bank $36, read where the bank is mapped)
 T_DECAY    = $8815 - $4000
 T_VOL      = $8825 - $4000
@@ -86,7 +89,7 @@ snd_init:   ld a, $80
             dec b
             jr nz, .w
             ld hl, MUS                      ; FF3's init sound ($81C3)
-            ld b, $C0 + 20
+            ld b, $C0 + 24
             xor a
 .c:         ld [hl+], a
             dec b
@@ -96,6 +99,54 @@ snd_init:   ld a, $80
             ld [O_CV + 1], a
             ld [O_CV + 2], a
             ld [O_CV + 3], a
+; volume changes inside a note use "zombie mode" (NRx2 = $08 adds 1 to the playing volume): the
+; Game Boy Color and accurate emulators do it, some emulators ignore it (mGBA 0.10 in Color mode:
+; the envelopes would be lost). A silent test note at volume 1, its level read back from PCM12
+; ($FF76) before and after one $08 write: 1 then 1 = ignored (volume changes restart the note);
+; anything else (2, or PCM12 not readable): zombie mode, as the hardware (FF1's test)
+            ld a, 1
+            ld [Z_ZMB], a
+            xor a
+            ldh [$FF25], a                  ; (nothing to the speakers)
+            ld a, $80
+            ldh [$FF11], a
+            ld a, $18                       ; volume 1, up, no envelope steps
+            ldh [$FF12], a
+            ld a, $C0
+            ldh [$FF13], a
+            ld a, $87
+            ldh [$FF14], a
+            ld de, $4000                    ; (a write is ignored until the envelope clock's
+.zw:        dec de                          ;   first tick: 1/64 s)
+            ld a, d
+            or e
+            jr nz, .zw
+            call .zmax
+            ld d, b
+            ld a, $08
+            ldh [$FF12], a
+            call .zmax
+            xor a
+            ldh [$FF12], a                  ; (channel 1 off again)
+            ld a, $FF
+            ldh [$FF25], a
+            ld a, d
+            cp 1
+            ret nz
+            ld a, b
+            cp 1
+            ret nz
+            xor a
+            ld [Z_ZMB], a
+            ret
+.zmax:      ld bc, 0                        ; B = the highest level of 256 reads
+.zr:        ldh a, [$FF76]
+            and $0F
+            cp b
+            jr c, .zn
+            ld b, a
+.zn:        dec c
+            jr nz, .zr
             ret
 snd_wave:   db $01, $23, $45, $67, $89, $AB, $CD, $EF, $FE, $DC, $BA, $98, $76, $54, $32, $10
 
@@ -124,7 +175,19 @@ snd_frame:  ldh a, [rSVBK]                   ; (work RAM bank 1: a battle maps b
             jr .mu
 .sx:        call sfx_update
 .mu:        call mus_update
-            call snd_out
+            ld hl, MZ_ACC                   ; (FF3's 60.0988 Hz on the GB's 59.7275: a second
+            ld a, [hl]                      ;   tick every ~161 frames, 65536 x 0.006216)
+            add low(407)
+            ld [hl+], a
+            ld a, [hl]
+            adc high(407)
+            ld [hl], a
+            jr nc, .o
+            ld a, [M_SONG]
+            cp $37
+            call nz, sfx_update
+            call mus_update
+.o:         call snd_out
             ld a, [M_CTRL]                  ; $7F40 bit 7 = playing
             and $80
             ld b, a
@@ -1314,6 +1377,9 @@ out_pulse:  ld [MZ_SLOT], a
             ld a, b
             cp $FF
             jr z, .key
+            ld a, [Z_ZMB]                   ; (no zombie mode here: a restart)
+            and a
+            jr z, .key
             ld a, [MZ_NOTE]
             ld [hl], a
             sub b
@@ -1482,6 +1548,9 @@ out_noise:  ld [MZ_SLOT], a
             jr z, .key
             ld a, b
             cp $FF
+            jr z, .key
+            ld a, [Z_ZMB]
+            and a
             jr z, .key
             ld a, c
             ld [O_CV + 3], a
