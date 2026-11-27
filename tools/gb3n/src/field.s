@@ -228,6 +228,7 @@ map_enter:  ld a, [map_id]                   ; properties: index map + 256 if wo
             ld [line_n], a
             ld [z_lev], a
             ld [trig], a
+            ld [dlg_on], a                  ; (a running event goes on in the new map, as FF3's)
             ld a, [facing]
             and a
             jr nz, .fc
@@ -250,7 +251,26 @@ map_enter:  ld a, [map_id]                   ; properties: index map + 256 if wo
             jr nz, .row
             call scroll_set
             call party_oam
-            jp npc_oam
+            call npc_oam
+            ld a, [pos_x]                   ; the cell under the party ($3F $E87B): its z-level;
+            ld d, a                         ;   an event trigger there runs now
+            ld a, [pos_y]
+            ld e, a
+            call map_mt
+            ld c, a
+            ld b, W_PROP1
+            ld a, [bc]
+            ld l, a
+            and 3
+            ld [z_lev], a
+            bit 7, l
+            ret z
+            inc b
+            ld a, [bc]
+            cp $F0
+            ret c
+            and 15
+            jp trig_event
 
 ; entrance / treasure / trigger lists (16 bytes each) from bank B_EVENTS ($3A $9350-$93C0):
 ; entrances at properties bytes 12-13, treasures and triggers through the pointer tables at
@@ -697,8 +717,18 @@ passable:   ld c, a
             jr z, .ent
             cp 5
             jr z, .no
+            cp 14                           ; F: an event trigger, then the tile as plain
+            jr z, .evt
             cp 11
             jr nc, .no
+            dec b
+            ld a, [bc]
+            jr .plain
+.evt:       push bc
+            ld a, [trig_id]
+            and 15
+            call trig_event
+            pop bc
             dec b
             ld a, [bc]
             jr .plain

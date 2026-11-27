@@ -99,6 +99,15 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   (bank 0 down to 3.6 KB). Lesson: anything copied to HRAM at boot (the OAM DMA routine) must
   live in bank 0.
 
+## New Game opening (2026-11-27)
+- The build starts as FF3's New Game does: map 0 of world 0 at its start position ($3E $C0E6);
+  the event trigger under the party runs at once ($3F $E87B / $E6C6: 2C/8880 trigger scripts
+  after FF3's vehicle / status switches); events go on across map changes (FF3 never clears
+  $6C on a load); event dialogue ($F1) reads the story table 18/8000, person dialogue ($F0)
+  18/8400 or 18/8600 by world. Checked against the NES picture: the fall through map 0, the
+  cave (map 181), "Ow ow ow..." / "We fell down a pit!" / "Now we're in a fix...", the party's
+  moves, the next lines. Strict checker 0.
+
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
   proposal: use FF3's own choice of top / bottom), 18 columns x 6 lines.

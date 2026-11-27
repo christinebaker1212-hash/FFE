@@ -49,6 +49,60 @@ talk:       call dest_cell
             call scr_event                  ; A = the event chosen by the switch tests
             jp ev_start
 
+; the map's event trigger A (index into its trigger list) -> its script ($3F $E6BE / $E6C6:
+; 2C/8880 pointers, the vehicle / status switches first) -> the event
+trig_event: ld e, a
+            ld d, 0
+            ld hl, trigs
+            add hl, de
+            ld c, [hl]
+            ld b, 0
+            ld hl, $4880
+            add hl, bc
+            add hl, bc
+            call scr_ptr
+            ld de, scr_buf
+            ld bc, 64
+            ld a, B_SCRIPT
+            call far_copy
+            call ev_vsw
+            call scr_event
+            jp ev_start
+
+; FF3's vehicle / status switches before a trigger script ($3C $9274): $602E bits 6 / 7 all
+; members toad / mini, $6021 bit 7 the chocobo, $602F bits 2-5 the vehicles (on foot: none)
+ev_vsw:     ld a, [SRAM_PAGE + $102]
+            ld b, a
+            ld a, [SRAM_PAGE + $142]
+            and b
+            ld b, a
+            ld a, [SRAM_PAGE + $182]
+            and b
+            ld b, a
+            ld a, [SRAM_PAGE + $1C2]
+            and b
+            ld b, a
+            and $20
+            add a
+            ld c, a
+            ld a, b
+            and $08
+            swap a
+            add a
+            or c
+            ld c, a
+            ld a, [SRAM_PAGE + $2E]
+            and $3F
+            or c
+            ld [SRAM_PAGE + $2E], a
+            ld a, [SRAM_PAGE + $21]
+            and $7F
+            ld [SRAM_PAGE + $21], a
+            ld a, [SRAM_PAGE + $2F]
+            and $C3
+            ld [SRAM_PAGE + $2F], a
+            ret
+
 ; the NES pointer at HL in B_SCRIPT -> HL = its address in B_SCRIPT
 scr_ptr:    ld de, ev_tmp
             ld bc, 2
@@ -233,7 +287,9 @@ ev_npcdlg:  ld e, a                         ; $F0: the person's dialogue (their 
             add hl, de
             ld c, [hl]
             jr ev_dlg
-ev_evdlg:   ld c, a                         ; $F1: an event dialogue
+ev_evdlg:   ld c, a                         ; $F1: an event dialogue: the story table 18/8000
+            ld b, TB_STORY                  ;   ($3B $B6D5 jumps past the world test with $80)
+            jp dlg_open
 ev_dlg:     ld b, TB_DLG1                   ; dialogue tables 18/8400 (world 0) / 18/8600
             ld a, [world]
             and a

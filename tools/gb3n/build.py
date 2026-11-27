@@ -109,7 +109,7 @@ def main():
     a = sys.argv[1:]
     nes = a[a.index('--nes') + 1] if '--nes' in a else os.path.join(ROOT, 'build', 'ff3_en.nes')
     out = a[a.index('--out') + 1] if '--out' in a else os.path.join(ROOT, 'build', 'ff3n.gbc')
-    mp = (a[a.index('--map') + 1] if '--map' in a else '10').split(',')   # --map M[,WORLD[,X,Y]]
+    mp = (a[a.index('--map') + 1] if '--map' in a else '0').split(',')   # --map M[,WORLD[,X,Y]]
     mp = [int(v) for v in mp] + [0, 255, 255][len(mp) - 1:]
     test_map, test_world, test_x, test_y = mp[:4]
     raw = open(nes, 'rb').read()
