@@ -458,7 +458,17 @@ v_goto:     ld [world], a
 ; tiles; a ground vehicle's frame from the step, an airship's from the frame counter
 V_TILES:    db 0, $38, $20, $50, $68, $68, $68, $68
 v_oam:      ld a, [veh]
-            cp 4
+            cp 7                            ; (the Invincible: src/wspr.s; OAM 0-3 free)
+            jr nz, .ni
+            call v_face
+            ld hl, oam_buf
+            ld b, 16
+            xor a
+.ic:        ld [hl+], a
+            dec b
+            jr nz, .ic
+            ret
+.ni:        cp 4
             jr nc, .air
             ld a, [step]
             and a
@@ -470,7 +480,7 @@ v_oam:      ld a, [veh]
             add a
             and 8
 .fb:        ld b, a
-            ld a, [facing]                  ; right $00, left $10, down $30, up $20
+            call v_face                     ; right $00, left $10, down $30, up $20
             ld c, $00
             rra
             jr c, .p
@@ -539,6 +549,34 @@ v_parked:   ld a, [wmode]                   ; FF3's world-map sprites (src/wspr.
             ret z
             %FAR B_WSPR, ws_world
             ret
+; the facing to draw: the party's, or while spinning ($602F bit 6, 64 frames: 3E/D8F4) right,
+; down, left, up every 8 frames
+v_face:     ld a, [SRAM_PAGE + $2F]
+            bit 6, a
+            jr z, .n
+            ld a, [v_spin]
+            add 4
+            ld [v_spin], a
+            jr nc, .s
+            ld hl, SRAM_PAGE + $2F
+            res 6, [hl]
+.s:         ld a, [frame]
+            rrca
+            rrca
+            rrca
+            and 3
+            ld hl, .t
+            add l
+            ld l, a
+            jr nc, .h
+            inc h
+.h:         ld a, [hl]
+            ld [v_dface], a
+            ret
+.n:         ld a, [facing]
+            ld [v_dface], a
+            ret
+.t:         db DIR_R, DIR_D, DIR_L, DIR_U
 ; ---- the walking member ($600E): graphics set (3F/F77B: toad $16, mini $17, else the job) and
 ; palette (3A/9050: toad $16, a job's own, the Onion Kids by member: 0, $17-$19)
 char_update:
@@ -632,3 +670,5 @@ vtab:       ds 24
 w_p1:       ds 1
 w_p2:       ds 1
 v_toff:     ds 1
+v_spin:     ds 1
+v_dface:    ds 1                            ; (this frame's facing, for src/wspr.s)

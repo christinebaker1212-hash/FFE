@@ -1040,7 +1040,7 @@ party_oam:  ld a, [wmode]                   ; in a vehicle on the world map: its
             dec a
 .f0:        and 8
             ld b, a
-            ld a, [facing]
+            call v_face
             ld c, $00
             rra
             jr c, .p
