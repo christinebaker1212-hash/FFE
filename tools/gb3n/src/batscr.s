@@ -245,40 +245,20 @@ bs_gfx:     xor a
             ld [bs_t], a
             cp 4
             jr nz, .t
-.party:     ld a, 1                         ; the party: standing pose (6 tiles) at OBJ tiles
-            ldh [rVBK], a                   ;   6 x member, VRAM bank 1
-            ld c, 0
-.p:         push bc
-            call bs_jobaddr
-            pop bc
-            push bc
-            ld a, c
-            add a
-            ld b, a
-            add a
-            add b                           ; 6 x member
-            ld l, a
-            ld h, 0
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            ld de, $8000
-            add hl, de
-            ld d, h
-            ld e, l
-            ld a, [bs_ja]
-            ld l, a
-            ld a, [bs_ja + 1]
-            ld h, a
-            ld bc, 6 * 16
-            ld a, B_CGFX
-            call far_copy
-            pop bc
-            inc c
-            ld a, c
-            cp 4
-            jr nz, .p
+.party:     ld a, 1                         ; the party: OBJ tile 0 blank, the characters'
+            ldh [rVBK], a                   ;   tiles loaded by bs_party (bs_cgt)
+            ld hl, $8000
+            ld b, 16
+            xor a
+.p0:        ld [hl+], a
+            dec b
+            jr nz, .p0
+            ld hl, bs_gt
+            ld a, $FF
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
             ld hl, C_SPRDIG                 ; digits / Miss (our tiles, B_OWN), FF3's hand
             ld de, $8000 + 16 * SPR_DIG
             ld bc, 16 * 16
@@ -748,81 +728,279 @@ bs_party:   ld hl, oam_buf
             dec b
             jr nz, .z
             ld c, 0
-.m:         ld a, c                         ; dead (status 1 bit 7): not shown
-            call bs_rec
-            inc hl
-            bit 7, [hl]
-            jr nz, .nx
-            ld a, c
+.m:         push bc
+            call bs_cframe                  ; the frame by the status (2F/B607), its tiles
+            ld [bs_tmp + 6], a
+            pop bc
+            push bc
+            ld a, c                         ; y = 24 i, x = 144 (136 stepping forward)
             add a
             add a
-            add a
-            ld b, a
-            add a
-            add b                           ; 24 i
-            add 16
-            ld e, a                         ; y
-            ld a, [bs_act]
-            cp c
-            ld d, 144 + 8
-            jr nz, .x
-            ld d, 136 + 8
-.x:         ld a, c                         ; OAM entry 6 i
             add a
             ld b, a
             add a
             add b
+            ld e, a
+            ld a, [bs_act]
+            cp c
+            ld d, 144
+            jr nz, .x
+            ld d, 136
+.x:         ld a, [bs_tmp + 6]
+            call bs_cdraw
+            pop bc
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .m
+            ret
+
+; character C's frame (FF3's $7D83, 2F/B607) from its status for display ($78BB): dead 9 (toad /
+; mini $10), stone 0, paralysed / asleep / confused / any second status 3 (toad / mini $0C),
+; else 2 ($0B); its tiles reloaded when its graphics type changes (2F/B651: 0 normal, 1 dead, 2
+; toad, 3 mini)
+bs_cframe:  ld a, c
+            add a
+            ld hl, $D8BB
+            call bs_hl_a
+            ld a, [hl+]
+            ld d, a                         ; D = status 1, E = status 2
+            ld e, [hl]
+            ld b, 0                         ; graphics type
+            bit 2, d
+            jr z, .nt
+            ld b, 2
+.nt:        bit 0, d
+            jr z, .nm
+            ld b, 3
+.nm:        bit 7, d
+            jr z, .alive
+            ld a, b
+            and a
+            jr nz, .td
+            ld b, 1
+.td:        call bs_cgt
+            ld a, d
+            and 5
+            ld a, $10
+            ret nz
+            ld a, 9
+            ret
+.alive:     call bs_cgt
+            bit 6, d                        ; stone: (FF3 draws it in the BG) standing
+            jr nz, .st
+            ld a, d
+            and $32
+            or e
+            jr z, .st
+            ld a, d
+            and 5
+            ld a, $0C
+            ret nz
+            ld a, 3
+            ret
+.st:        ld a, d
+            and 5
+            ld a, $0B
+            ret nz
+            ld a, 2
+            ret
+; character C's graphics as type B (OBJ tiles 1 + 14 C, VRAM bank 1; keeps BCDE)
+bs_cgt:     ld a, c
+            ld hl, bs_gt
+            call bs_hl_a
+            ld a, [hl]
+            cp b
+            ret z
+            ld [hl], b
+            push bc
+            push de
+            call bs_jobaddr
+            pop de
+            pop bc
+            push bc
+            push de
+            ld a, c                         ; DE = $8000 + 16 (1 + 14 C)
+            add a
+            ld e, a
             add a
             add a
+            add a
+            sub e
+            inc a
             ld l, a
-            ld h, high(oam_buf)
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $8000
+            add hl, de
+            ld d, h
+            ld e, l
+            ld a, [bs_ja]
+            ld l, a
+            ld a, [bs_ja + 1]
+            ld h, a
+            ld a, b
+            ld bc, 14 * 16
+            and a
+            jr z, .go
+            ld bc, 6 * 16                   ; dead: 6 tiles from the job's $240
+            push de
+            ld de, $240
+            add hl, de
+            pop de
+            dec a
+            jr z, .go
+            ld hl, $7F80                    ; toad (29/BF80) / mini (29/BF00): 8 tiles
+            ld bc, 8 * 16
+            dec a
+            jr z, .go
+            ld hl, $7F00
+.go:        ld a, [guard_on]                ; (inside a guarded load: as it is)
+            and a
+            jr nz, .in
             push hl
+            push bc
+            push de
+            ldh a, [rLCDC]
+            bit 7, a
+            call nz, wait_vbl
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            pop de
+            pop bc
+            pop hl
+            call .cp
+            xor a
+            ldh [rSTAT], a
+            ld [guard_on], a
+            pop de
+            pop bc
+            ret
+.in:        call .cp
+            pop de
+            pop bc
+            ret
+.cp:        ld a, 1
+            ldh [rVBK], a
+            ld a, B_CGFX
+            call far_copy
+            xor a
+            ldh [rVBK], a
+            ret
+; frame A (bit 7: flipped) of character C at screen (D, E) into OAM entries 6 C (32/9111: the
+; frame's six tiles, absolute from bit 7, else from the character's first tile 1 + 14 C; the
+; sprites' offsets and flips by the frame's set)
+bs_cdraw:   ld b, a
+            and $7F
+            ld [cf_f], a
+            ld a, d
+            ld [cf_x], a
+            ld a, e
+            ld [cf_y], a
+            ld a, c                         ; the tile base and attributes
+            add a
+            ld e, a
+            add a
+            add a
+            add a
+            sub e
+            inc a
+            ld [cf_b], a
+            push bc
             ld a, c
             ld hl, $DD93
             call bs_hl_a
             ld a, [hl]
             and 3
-            or $08                          ; VRAM bank 1, the member's palette
-            ld [bs_tmp + 7], a
-            pop hl
-            ld a, c                         ; tile 6 i
+            or $08
+            ld [cf_a], a
+            pop bc
+            ld a, [cf_f]
+            ld hl, cf_set
+            bit 7, b
+            jr z, .s
+            ld hl, cf_setf
+.s:         call bs_hl_a
+            ld a, [hl]
+            add a                           ; x 24
+            add a
+            add a
+            ld e, a
+            add a
+            add e
+            ld hl, cf_pos
+            call bs_hl_a
+            ld d, h                         ; DE = the set's 6 x (y, -, attributes, x)
+            ld e, l
+            ld a, [cf_f]                    ; HL = the frame's 6 tiles
+            ld b, a
+            add a
+            add b
+            add a
+            ld hl, cf_tiles
+            call bs_hl_a
+            ld a, c                         ; BC = OAM entry 6 C
             add a
             ld b, a
             add a
             add b
-            ld b, a
-            push bc
-            ld c, 3
-.r:         ld a, e
-            ld [hl+], a
-            ld a, d
-            ld [hl+], a
-            ld a, b
-            ld [hl+], a
-            inc b
-            ld a, [bs_tmp + 7]
-            ld [hl+], a
-            ld a, e
-            ld [hl+], a
-            ld a, d
+            add a
+            add a
+            ld c, a
+            ld b, high(oam_buf)
+            ld a, 6
+            ld [cf_n], a
+.k:         ld a, [de]                      ; y: the screen's + offset + 1 (NES OAM y) + 16
+            inc de
+            push hl
+            ld hl, cf_y
+            add [hl]
+            add 17
+            ld [bc], a
+            inc c
+            inc de
+            ld a, [de]                      ; x after: attributes ($40 h-flip)
+            inc de
+            ld [cf_t], a
+            ld a, [de]
+            inc de
+            ld hl, cf_x
+            add [hl]
             add 8
-            ld [hl+], a
-            ld a, b
-            ld [hl+], a
-            inc b
-            ld a, [bs_tmp + 7]
-            ld [hl+], a
-            ld a, e
-            add 8
-            ld e, a
-            dec c
-            jr nz, .r
-            pop bc
-.nx:        inc c
-            ld a, c
-            cp 4
-            jr nz, .m
+            ld [bc], a
+            inc c
+            pop hl
+            ld a, [hl+]                     ; the tile
+            bit 7, a
+            jr z, .r
+            and $7F
+            jr .t
+.r:         push hl
+            ld hl, cf_b
+            add [hl]
+            pop hl
+.t:         ld [bc], a
+            inc c
+            ld a, [cf_t]
+            and $40
+            rra
+            push hl
+            ld hl, cf_a
+            or [hl]
+            pop hl
+            ld [bc], a
+            inc c
+            ld a, [cf_n]
+            dec a
+            ld [cf_n], a
+            jr nz, .k
             ret
+
 ; HL = the record of character A (B_CH + $40 A)
 bs_rec:     rrca
             rrca
@@ -1386,7 +1564,7 @@ bs_pos:     ds 24
 bs_j:       ds 1                            ; the row within a monster (its palette bits)
 bs_w:       ds 1                            ; the monster's width in tiles
 
-section bank B_BSCR, $4920
+section bank B_BSCR, $5000
 ; ---- FF3's pre-attack flash (2F/B024, 34/8545): the attacking monster (slot A) in the windows'
 ; palette every other frame, 8 frames (not for Flare Wave: $7E9D = 9); the attributes go
 ; straight to VRAM behind the line guard (the shadow keeps the monster's own)
@@ -1584,3 +1762,21 @@ fl_x:       ds 1
 fl_y:       ds 1
 fl_w:       ds 1
 fl_h:       ds 1
+
+section bank B_BSCR, $5600
+cf_tiles:   ds 126                          ; (32/972E: 21 frames x 6 tiles)
+cf_pos:     ds 144                          ; (32/91D7: 6 sets x 6 x (y, tile, attributes, x))
+cf_set:     ds 21                           ; (32/926B: the frame's set; 9280 flipped)
+cf_setf:    ds 21
+
+section wram, $C58B
+bs_gt:      ds 4                            ; FF3's $7DA3: the graphics type loaded
+
+section wram, $C596
+cf_f:       ds 1
+cf_x:       ds 1
+cf_y:       ds 1
+cf_b:       ds 1
+cf_a:       ds 1
+cf_t:       ds 1
+cf_n:       ds 1

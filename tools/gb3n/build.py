@@ -347,6 +347,10 @@ ROMDATA = {
     'sa_9cb4': (0x3A, 0x9CB4, 240),
     'ws_sin': (0x3A, 0x9E3E, 256),       # world sprites: FF3's sine table, the ship's chain
     'ws_chtab': (0x3D, 0xBF7A, 126),
+    'cf_tiles': (0x32, 0x972E, 126),     # battle characters' frames (32/9111)
+    'cf_pos': (0x32, 0x91D7, 144),
+    'cf_set': (0x32, 0x926B, 21),
+    'cf_setf': (0x32, 0x9280, 21),
     'f_spr0': (0x3C, 0x835E, 65),        # the Fat Chocobo's two pictures
     'f_spr1': (0x3C, 0x839F, 65),
     'uw_rng': (0x3F, 0xFE00, 256),       # underwater: random numbers, fish, wobble
