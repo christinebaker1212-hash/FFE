@@ -275,3 +275,41 @@ def world_palettes(rom, world):
     """BG palettes on the world map: the map base palette 00/9640 + 8 * (world & 6) ($3A $9091)"""
     b = rom.rd(0x00, 0x9640 + 8 * (world & 6), 16)
     return [list(b[4 * k:4 * k + 4]) for k in range(4)]
+
+
+# ---- battle data ($2F $A02A load monster set, $2F $A0E7, $2F $A42E load monster graphics)
+MON_GFX = [(0x20, 0x8000, 4, 4), (0x20, 0x9000, 4, 6), (0x22, 0x8000, 6, 6), (0x24, 0x8000, 6, 6),
+           (0x26, 0x8000, 6, 12), (0x26, 0x9200, 12, 6)]   # read from $2F $A4B4 / $A4CC below
+
+
+def mon_gfx_table(rom):
+    """the monster graphics banks / sizes FF3 uses ($2F $A4B4: address, bank / 2, size class;
+    $2F $A4CC: width, height in tiles)"""
+    out = []
+    for k in range(6):
+        a = rom.rd(0x2F, 0xA4B4 + 4 * k, 4)
+        w, h = rom.rd(0x2F, 0xA4CC + 2 * a[3], 2)
+        out.append((a[2] * 2, a[0] | a[1] << 8, w, h))
+    return out
+
+
+def battle_set(rom, battle):
+    """battle index -> (monster set: 2 palette ids and 4 monster ids, the 4 count bytes)"""
+    st, cid = rom.rd(0x2E, 0x8000 + 2 * battle, 2)
+    s = rom.rd(0x2E, 0x8400 + 6 * st, 6)
+    counts = rom.rd(0x2E, 0x8A00 + 4 * (cid & 0x3F), 4)
+    return list(s[:2]), list(s[2:]), list(counts)
+
+
+def monster_gfx(rom, mid):
+    """monster id -> (width, height, NES tiles) from its graphics property (2E/8B00)"""
+    p = rom.rd(0x2E, 0x8B00 + mid)
+    bank, addr, w, h = mon_gfx_table(rom)[p >> 5]
+    size = 16 * w * h
+    o = bank * B8 + (addr - 0x8000) + size * (p & 0x1F)
+    return w, h, rom.at(o, size)
+
+
+def battle_palette(rom, pid):
+    """a battle colour palette: 3 NES colours (2E/8C00 + 3 * id); colour 0 black"""
+    return [0x0F] + list(rom.rd(0x2E, 0x8C00 + 3 * pid, 3))
