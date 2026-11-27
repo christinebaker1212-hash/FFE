@@ -3587,10 +3587,15 @@ m_magic:    call m_member
             jr z, .err
             ld [m_iid], a
             call m_sfx_ok
-            call g_opts                     ; Use / Item: C = cancelled, A = 0 / 1
+            call g_opts                     ; Use / Swap / Item: C = cancelled, A = 0 / 1 / 2
             jr c, .scr
             and a
+            jr z, .use
+            dec a
             jr nz, .item
+            call g_swap
+            jr .scr
+.use:
             call g_use
             ld a, [m_exit]                  ; (Exit: straight out)
             and a
@@ -3747,10 +3752,13 @@ g_draw:     call m_clear
             jr nz, .l
             jp m_show
 ; Use / Item in a small window (11, 14) 9 x 4 (FF3's text $36's words): A = 0 / 1, C = B
-g_opts:     ld de, $0E0B
-            ld bc, $0409
+g_opts:     ld de, $0D0B                    ; (FF3's Use / Swap / Item: text $36)
+            ld bc, $0509
             call m_win
             ld hl, m_s_use
+            ld de, $0E0D
+            call m_puts0
+            ld hl, m_s_swap
             ld de, $0F0D
             call m_puts0
             ld hl, m_s_item
@@ -3761,7 +3769,7 @@ g_opts:     ld de, $0E0B
             xor a
             ld [m_yn], a
 .lp:        ld a, [m_yn]
-            add 15
+            add 14
             ld b, a
             ld c, 13
             call m_hand2
@@ -3779,15 +3787,73 @@ g_opts:     ld de, $0E0B
             ld a, [m_yn]
             and a
             ret
-.t:         ld a, [m_yn]
-            xor 1
-            ld [m_yn], a
+.t:         ld b, a                         ; (up / down through the three)
+            ld a, [m_yn]
+            bit 6, b
+            jr nz, .u
+            inc a
+            cp 3
+            jr c, .s
+            xor a
+            jr .s
+.u:         and a
+            jr nz, .u1
+            ld a, 3
+.u1:        dec a
+.s:         ld [m_yn], a
             call m_sfx_move
             jr .lp
 .x:         call m_sfx_ok
             call m_hand2off
             scf
             ret
+
+; ---- Swap (3C/96F5): another member, living, gets this member's spells and gives theirs
+g_swap:     call sp_save
+            call m_party2
+            call m_show
+            ld a, [m_who]
+            push af
+            call m_target
+            pop bc
+            ld a, b
+            ld [m_tmpc], a
+            jr c, .x
+            call m_who_off                  ; not the same member, not dead or stone
+            ld c, a
+            ld a, [m_x7f]
+            cp c
+            jr z, .err
+            ld a, c
+            add 2
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld a, [hl]
+            and $C0
+            jr nz, .err
+            ld a, [m_x7f]                   ; the 8 bytes at $6207
+            add 7
+            ld e, a
+            ld a, c
+            add 7
+            ld l, a
+            ld h, high(SRAM_PAGE + $200)
+            ld d, h
+            ld b, 8
+.sw:        ld a, [de]
+            ld c, [hl]
+            ld [hl+], a
+            ld a, c
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .sw
+            call m_sfx_ok
+            jr .x
+.err:       call m_sfx_err
+.x:         ld a, [m_tmpc]
+            ld [m_who], a
+            jp sp_buf
 
 ; ---- cast spell [m_iid] from slot [m_mcur] (3C/9812-3C/9AD0)
 G_SPELLS:   db $CC, $5E, $D2, $5C, $D3, $66, $DA, $5F, $E0, $5C, $E1, $5E, $EE, $5C

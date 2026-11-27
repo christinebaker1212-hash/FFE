@@ -61,6 +61,7 @@ def menu_data():
             ''.join('m_f_%s:%s db %s\n' % (n, ' ' * (5 - len(n)), z(w)) for n, w in zip(
                 ['dep', 'wd', 'exit'], [x.strip() for x in re.split(r'\{15:..\}', t[0x24])[1:]])) +
             'm_s_item:   db %s\n' % z(re.split(r'\{15:..\}', t[0x36])[3].strip()) +
+            'm_s_swap:   db %s\n' % z(re.split(r'\{15:..\}', t[0x36])[2].strip()) +
             'm_remove:   db %s\n' % z(clean(t[0x3E].split('\n')[-1])) + name_grid())
 
 
