@@ -1696,7 +1696,7 @@ bsc_anim:   call ui_kind                    ; (the Invincible's cannon: 34/84F6,
             jr c, .k0
             cp $11
             jr nc, .k0
-            cp $0C                          ; (cannon: the airship's, not yet; $0E / $0F: the
+            cp $0C                          ; (cannon: bsc_anim's own; $0E / $0F: the
             jr z, .st                       ;   deaths' and numbers' own commands)
             cp $0E
             jr nc, .k1

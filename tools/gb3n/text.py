@@ -40,7 +40,7 @@ def vlen(s):
         m = TOKEN.match(s, i)
         if m:
             c = m.group(1)
-            if c and '10' <= c <= '13': n += 6
+            if c and '10' <= c <= '13': n += 6 if m.group(2) == '02' else 13   # a name / a job
             elif c == '02': n += 16                   # an item name
             elif c in ('03', '04'): n += 7            # an amount
             i = m.end(); continue

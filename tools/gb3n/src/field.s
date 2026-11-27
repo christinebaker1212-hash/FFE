@@ -670,7 +670,7 @@ field_step: call npc_update
             jp v_parked
 
 ; a trigger after the step ($3F $E26A): entrance (to the map in the entrance list), back to the
-; previous map, or out to the world map (the world map: later; for now back as from an exit)
+; previous map, or out to the world map
 trig_run:   ld b, a
             xor a
             ld [trig], a

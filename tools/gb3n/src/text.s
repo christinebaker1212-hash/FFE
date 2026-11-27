@@ -278,41 +278,6 @@ dlg_step:   ld a, [dlg_clear]
             ld [dlg_state], a
             ret
 
-; a code $10-$13 (member's name) or $14-$17 (job: shown as the name for now) -> dlg_insbuf
-dlg_insert: and 3
-            swap a
-            add a
-            add a
-            add low(SRAM_PAGE + $106)
-            ld l, a
-            ld h, high(SRAM_PAGE + $106)
-            ld de, dlg_insbuf
-            ld c, 0
-            ld b, 6
-.c:         ld a, [hl+]
-            cp $FF
-            jr z, .d
-            push hl
-            ld l, a
-            ld h, 0
-            push de
-            ld de, C_FF3ASC
-            add hl, de
-            pop de
-            ld a, B_OWN
-            call far_byte
-            pop hl
-            ld [de], a
-            inc de
-            inc c
-            dec b
-            jr nz, .c
-.d:         ld a, c
-            ld [dlg_ins], a
-            xor a
-            ld [dlg_insi], a
-            ret
-
 ; code $02: the name of item dlg_item; $03 / $04: the amount dlg_num (24 bits) -> dlg_insbuf
 dlg_value:  cp $02
             jr nz, .num
@@ -320,7 +285,7 @@ dlg_value:  cp $02
             ld c, a
             ld b, 0
             ld hl, T_NAMES8800
-            add hl, bc
+.tb:        add hl, bc
             add hl, bc
             add hl, bc
             ld de, dlg_src
@@ -344,7 +309,21 @@ dlg_value:  cp $02
             ld a, c
             cp 23
             jr c, .n
-.nd:        ld a, c
+.nd:        ld a, c                         ; (trailing spaces off: FF3 pads the job names)
+            and a
+            jr z, .ne
+            ld hl, dlg_insbuf - 1
+            add l
+            ld l, a
+            adc h
+            sub l
+            ld h, a
+            ld a, [hl]
+            cp ' '
+            jr nz, .ne
+            dec c
+            jr .nd
+.ne:        ld a, c
             ld [dlg_ins], a
             xor a
             ld [dlg_insi], a
@@ -534,4 +513,56 @@ stat_isr:   push af
 section wram, $C5C0                         ; (battle only; the STAT interrupt reads them)
 wv_tab:     ds 16
 wv_ph:      ds 1
+
+
+section bank B_FIELD, $6A30
+; a code $10-$13 (member's name: FF3's \char[$02]) or $14-$17 (\char[$01]: the member's job's name,
+; t8200 $E2 + job, as 3F/F301) -> dlg_insbuf
+dlg_insert: cp $14
+            jr c, .nm
+            and 3
+            swap a
+            add a
+            add a
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld a, [hl]
+            add $E2
+            ld c, a
+            ld b, 0
+            ld hl, T_T8200
+            jp dlg_value.tb
+.nm:        and 3
+            swap a
+            add a
+            add a
+            add low(SRAM_PAGE + $106)
+            ld l, a
+            ld h, high(SRAM_PAGE + $106)
+            ld de, dlg_insbuf
+            ld c, 0
+            ld b, 6
+.c:         ld a, [hl+]
+            cp $FF
+            jr z, .d
+            push hl
+            ld l, a
+            ld h, 0
+            push de
+            ld de, C_FF3ASC
+            add hl, de
+            pop de
+            ld a, B_OWN
+            call far_byte
+            pop hl
+            ld [de], a
+            inc de
+            inc c
+            dec b
+            jr nz, .c
+.d:         ld a, c
+            ld [dlg_ins], a
+            xor a
+            ld [dlg_insi], a
+            ret
 

@@ -621,9 +621,6 @@ m_label:    ld hl, m_labels
             jr nz, .s
             jr .f
 
-; ---- not yet: an error sound (first pass)
-
-
 ; ---- FF3's sounds: $85 confirm, $98 move, $86 error (3E/D20D, D213, D529)
 m_sfx_ok:   ld a, $05
             jp sfx_play

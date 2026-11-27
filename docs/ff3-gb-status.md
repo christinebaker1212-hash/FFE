@@ -81,9 +81,7 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   -> metatiles $80-$FF with their ids in property 2, palettes, graphics subsets (banks 12-16).
 - Entrances (the map's entrance list), FF3's start position and facing on entry, the return
   stack, exits to the previous map. Checked in SameBoy: Ur -> a house -> back to Ur on the door
-  cell, strict checker 0. World map exits: not yet (no world map).
-- Known: a map change turns the LCD off (white on a real Color); to be replaced by FF3's wipe
-  / a black mask as FF1 did.
+  cell, strict checker 0. (World map exits and map changes without white: see below.)
 
 ## People, text, talking, events (2026-11-27)
 - FF3's save page ($6000-$63FF) in work RAM bank 1 ($D000), set up as FF3's init sram does.
