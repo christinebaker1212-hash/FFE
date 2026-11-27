@@ -66,7 +66,8 @@ section bank B_FIELD, $4000
 ; ---- load map `map_id` of `world` (LCD off) and show it: FF3's load map ($3F $E7EC: map
 ; properties, tileset, tilemap, triggers, palettes, graphics); the party at (enter_x, enter_y),
 ; or at the map's start position when enter_x = $FF
-map_enter:  ld a, 63
+map_enter:  call char_update                ; the walking member's set / palette ($600E)
+            ld a, 63
             ld [cmask], a
             ld a, [wmode]
             and a
@@ -566,6 +567,11 @@ field_step: call npc_update
 .pl:        ldh a, [pad_new]                ; A: talk to the person ahead
             bit 3, a                        ; Start: the main menu
             jp nz, menu_open
+            bit 2, a                        ; Select: the next member (3E/C258)
+            jr z, .ns
+            call v_select
+            jr .done
+.ns:        ldh a, [pad_new]
             bit 1, a                        ; B on the world map (3E/C282)
             jr z, .na
             ld a, [wmode]

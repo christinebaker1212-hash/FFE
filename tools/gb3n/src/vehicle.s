@@ -591,6 +591,91 @@ v_parked:   ld a, [wmode]
             cp [hl]
             ret
 
+; ---- the walking member ($600E): graphics set (3F/F77B: toad $16, mini $17, else the job) and
+; palette (3A/9050: toad $16, a job's own, the Onion Kids by member: 0, $17-$19)
+char_update:
+            ld a, [SRAM_PAGE + $0E]
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            inc l
+            inc l
+            ld b, [hl]                      ; status
+            dec l
+            dec l
+            ld c, [hl]                      ; job
+            ld a, $16
+            bit 5, b
+            jr nz, .s
+            ld a, $17
+            bit 3, b
+            jr nz, .s
+            ld a, c
+.s:         and $3F
+            ld [char_set], a
+            ld a, $16
+            bit 5, b
+            jr nz, .p
+            ld a, c
+            and a
+            jr nz, .p
+            ld a, l                         ; an Onion Kid: by member
+            rlca
+            rlca
+            and 3
+            jr z, .p
+            add $16
+.p:         and $3F
+            ld [char_pal], a
+            ret
+
+; Select on the map (3E/C258, on foot): the next member not dead or stone shows (3F/F72C);
+; its tiles by general DMA and the palettes in the next V-Blank
+v_select:   ld a, [veh]
+            and a
+            ret nz
+            ld a, $17
+            call sfx_play
+            ld b, 4
+.n:         ld a, [SRAM_PAGE + $0E]
+            add $40
+            ld [SRAM_PAGE + $0E], a
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            inc l
+            inc l
+            ld a, [hl]
+            and $C0
+            jr z, .ok
+            dec b
+            jr nz, .n
+.ok:        call char_update
+            call pal_spr
+            call pal_load
+            ld a, [char_set]                ; (staged in work RAM for the DMA)
+            add $40
+            ld h, a
+            ld l, 0
+            ld de, SCRATCH
+            ld bc, $100
+            ld a, B_CHARS
+            call far_copy
+            call wait_vbl
+            ld a, 1
+            ldh [rVBK], a
+            ld a, high(SCRATCH)
+            ldh [rHDMA1], a
+            ld a, low(SCRATCH)
+            ldh [rHDMA2], a
+            ld a, $80
+            ldh [rHDMA3], a
+            xor a
+            ldh [rHDMA4], a
+            ld a, 15
+            ldh [rHDMA5], a
+            xor a
+            ldh [rVBK], a
+            jp pal_apply
+
 section wram, $DFC0
 vposes:     ds 64                           ; (work RAM bank 1)
 

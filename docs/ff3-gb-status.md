@@ -238,6 +238,16 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   party's tile - 7) and the vehicle ($600F). Checked: boarding, sailing, landing the ship.
   Not yet: the airship's shadow and lift-off / landing animations, the Invincible, the
   Nautilus diving, chocobo forests, the airship's double speed.
+- Worlds: airships off the Floating Continent's edge (tile $64) to world 2 / 3 and back at
+  (32, 224); the Nautilus diving ($1E sea, $6020 bit 7) and surfacing; the Invincible entered
+  with A / B (FF3's entrance 0); party event commands $CA / $CB / $CE / $CF set vehicles.
+- Exit spell and Otter's Head: out to the world map where the party went in.
+- Select on the map (owner's decision: FF3's own): the next member shows (3F/F72C), with FF3's
+  walking graphics (job, toad $16, mini $17) and palettes (3A/9050) - these were always job 0
+  before.
+- Epilogue ($DC) and ending ($DD): FF3's translated texts (epilogue.json) as pages on black; the
+  ending stays on its last page (soft reset). The prologue crawl's text is not in the
+  translation files: $DB does nothing yet.
 - Hand cursor: FF3's own 16 x 16 hand (0D/B440) with its cursor palette (owner reported the
   placeholder looked mangled).
 - Not yet in menus: Exit / Teleport / Sightro and the Midgard Bread / Otter's Head (they need the
