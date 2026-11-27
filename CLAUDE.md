@@ -122,7 +122,7 @@ and no undocumented debug code.
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-27: the post-game's four shrines built)
+# GB port status (last updated 2026-11-27: the shrines' people, towns, shops and puzzles)
 
 **Current FF1 build: the native rewrite (`tools/gbn/`, `docs/ff1-native.md`).** The long log below
 (recompiled build, `tools/gb/`) is history and reference; the native build replaced it.
@@ -1449,9 +1449,12 @@ Earthgift Shrine built (item 70): floors from the GBA as FF1 maps (ids 64+, ROM 
 Lich, B5 bosses at orbs, defeat back to the world map, its monsters / bosses (own battle banks), its 16 new items.
 All four shrines built (owner: "Finish the rest", item 71): Hellfire, Lifespring, Whisperwind with Earthgift, one engine
 (tools/gbn/shrines.py; 81 floors, boss floors held until a boss falls, then a light out; battle sets per shrine; all of
-Dawn of Souls' new items: 37 consumables, 24 weapons, 30 armours, stats from the GBA; the four Fiend statues). Walked
-through for now: the non-combat floors' events (towns, shops, puzzles). Checked in SameBoy: Hellfire door to B5, boss,
-light out (Color).
+Dawn of Souls' new items: 37 consumables, 24 weapons, 30 armours, stats from the GBA; the four Fiend statues). Checked
+in SameBoy: Hellfire door to B5, boss, light out (Color).
+The floors' people (owner: "Finish the rest: towns, shops and the puzzle floors too", item 72): tools/gbn/pgevents.py, src/pg.s
+pg_npc: townsfolk with Dawn of Souls' words, shops / inns (new consumables sold), Dark Bahamut's trial, beavers, robots, the
+hidden child, the desert town's trades, Feyhome's fairies, the swamp (Astos, the Vampire), the Western Keep, the cursed town;
+gates hold a floor's stairs until its puzzle is done.
 
 ## Remaining
 - **FF1 (native build): finished (owner, 2026-11-26):** the owner played it through from New Game to

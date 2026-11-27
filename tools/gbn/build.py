@@ -104,11 +104,19 @@ def pg_defs(rom):
         src = 'section bank 116, $5000\n' + ''.join('%s: ds %d\n' % (l, n) for l, n in (
             ('pg_bdep', 16), ('pg_bdmap', 16), ('pg_bform', 16), ('pg_b2', 16), ('pg_bfl', 16), ('pg_fy', 16),
             ('pg_npool', 4), ('pg_ent', 4), ('pg_door', 8), ('pg_orb', 4), ('pg_pool', 8), ('pg_tl', 8),
-            ('pg_fixed', 16)))
+            ('pg_fixed', 16), ('pg_evt', 2)))
     return ('PG_ON = %d\n' % (1 if postgame.GBA_PATH else 0) +
             'PGM_MAP0 = %d\nPGM_END = %d\nPG_STPAL = %d\n' % (postgame.PG_MAP0, postgame.PG_END,
                                                             postgame.statue(rom)[2]) +
-            src + postgame.text_source() + postgame.items_source())
+            src + postgame.text_source() + postgame.items_source() + pg_people(rom))
+
+
+def pg_people(rom):
+    """the shrines' people (pgevents.py): bank 116's records and scripts, their words in the post-game's text bank"""
+    import postgame, pgevents
+    if not postgame.GBA_PATH: return ''
+    pgevents.build(rom)
+    return pgevents.source(rom, postgame.floors(rom), postgame.PGT_BANK)
 
 
 def snd_tables(rom):
@@ -233,6 +241,16 @@ def data_banks(rom, ff3=None, init=None):
                                                                #   name the post-game's gear in N_PRICE)
     for code, pr in names.PRICE.items():                       # (the post-game's items)
         nb[0x3000 + 2 * code:0x3002 + 2 * code] = pr.to_bytes(2, 'little')
+    if postgame.GBA_PATH:                                      # (the shrines' shops: pgevents.py; the new
+        import pgevents                                        #   consumables' prices at N_PRICE + $380)
+        ty, it = pgevents.shop_data()
+        n0 = pgevents.FF1_SHOPS
+        assert all(x == 0xFF for x in nb[0x3A00 + n0:0x3A00 + n0 + len(ty)]) and 0x3B00 + 5 * n0 + len(it) <= 0x3D00
+        nb[0x3A00 + n0:0x3A00 + n0 + len(ty)] = ty
+        nb[0x3B00 + 5 * n0:0x3B00 + 5 * n0 + len(it)] = it
+        cp = pgevents.cons_prices()
+        assert all(x == 0xFF for x in nb[0x3380:0x3380 + len(cp)]) and len(cp) <= 0x80
+        nb[0x3380:0x3380 + len(cp)] = cp
     nb[0x3200:0x3300] = rom.rd(0x00, 0xB100, 0x100)            # chest contents (lut_Treasure)
     banks[names.NAMES_BANK] = nb
     banks[ui.MTEXT_BANK] = bytearray(ui.mtext_bank(rom))

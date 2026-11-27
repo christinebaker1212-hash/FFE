@@ -582,6 +582,11 @@ def build(rom, s=0, G=None, banks=None, part=0):
     put(0x7FE0, bytes(hands))
     for kd, dom in domains.items():                  # the domains: $5000 + 32 area + 8 band (pg.s pg_dom)
         put(0x5000 + 32 * kd[0] + 8 * kd[1], dom)
+    for a in {k[0] for k in domains}:               # (a band an area has no table for: its nearest band's)
+        have = sorted(b for (a_, b) in domains if a_ == a)
+        for b in range(4):
+            if b not in have:
+                put(0x5000 + 32 * a + 8 * b, domains[(a, min(have, key=lambda h: abs(h - b)))])
     chr0 = b''.join(bytes(pg) for pg in pages[:8]); chr1 = b''.join(bytes(pg) for pg in pages[8:])
     sil0 = b''.join(sil_page(bytes(pg)) for pg in pages[:8]); sil1 = b''.join(sil_page(bytes(pg)) for pg in pages[8:])
     out = {PGB_DATA: bytes(base), PGB_CHR: chr0, PGB_CHR + 1: chr1, PGB_SIL: sil0, PGB_SIL + 1: sil1}
