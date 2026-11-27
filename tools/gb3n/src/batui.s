@@ -660,7 +660,7 @@ bs_thand:   ld a, [bs_side]
             ld [hl+], a
             ld a, SPR_HAND
             ld [hl+], a
-            ld a, $08
+            ld a, $0B
             ld [hl], a
             ret
 ; bs_x / bs_y (tiles) of monster slot A
@@ -693,7 +693,7 @@ bs_hand_cell:
             ld [hl+], a
             ld a, SPR_HAND
             ld [hl+], a
-            ld [hl], $08
+            ld [hl], $0B
             ret
 bs_hand_off:
             xor a
@@ -1500,7 +1500,7 @@ bsc_what:   call bs_topwin
             ld d, a
 .nm:        call bs_name
             ld de, $010A
-            ld a, 9
+            ld a, 7
             ld [bs_maxw], a
             jp bs_putsn
 .hits:      ld l, a                         ; "n hits"
@@ -1509,11 +1509,16 @@ bsc_what:   call bs_topwin
             ld de, $0220 + $13
             call bs_name
             pop hl
+            call bs_dec                     ; two digits at (1, 10), the word at (1, 13)
             ld de, $010A
-            call bs_num4
-            ld a, 5
+            ld a, [bs_numb + 2]
+            call bs_putc
+            inc e
+            ld a, [bs_numb + 3]
+            call bs_putc
+            ld a, 4
             ld [bs_maxw], a
-            ld e, $0E
+            ld de, $010D
             jp bs_putsn
 ; $08 the status message (line 2, right): t8200 $0C + n
 bsc_stat:   ld a, [$D8D9]
@@ -1529,7 +1534,7 @@ bs_t82:     ld d, 0                         ; t8200 entry E at (2, 10)
             add hl, de
             call bs_tget
             ld de, $020A
-            ld a, 9
+            ld a, 7
             ld [bs_maxw], a
             jp bs_putsn
 ; a text index entry at HL (B_TEXT) -> BS_STR
@@ -1756,7 +1761,15 @@ bs_numspr:  push de
             ld [bs_ny], a
             ld a, 112 + 8
             ld [bs_nx], a
-.p:         pop de
+.p:         ld a, [bs_topon]                ; below the top window while it shows
+            and a
+            jr z, .p2
+            ld a, [bs_ny]
+            cp 16 + 32
+            jr nc, .p2
+            ld a, 16 + 32
+            ld [bs_ny], a
+.p2:        pop de
             ld a, [bs_nn]                   ; OAM 24 + 5 n
             ld b, a
             add a
@@ -1798,9 +1811,9 @@ bs_numspr:  push de
             ld [hl+], a
             ld a, [bs_ngr]
             and a
-            ld a, $09
+            ld a, $0C
             jr nz, .g
-            ld a, $08
+            ld a, $0B
 .g:         ld [hl+], a
 .sp:        ld a, [bs_nx]
             add 8
@@ -1819,7 +1832,7 @@ bs_numspr:  push de
             ld a, c
             ld [hl+], a
             inc c
-            ld a, $08
+            ld a, $0B
             ld [hl+], a
             dec b
             jr nz, .m

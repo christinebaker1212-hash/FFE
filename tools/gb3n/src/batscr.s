@@ -351,7 +351,8 @@ bs_minfo:   ld l, a
             jp far_copy
 
 ; ---- the monster area from the slots: shadow rows 0-11 and its base copy
-bs_draw:    ld hl, MON_T                    ; blank
+bs_draw:    call bs_attrd
+            ld hl, MON_T                    ; blank
             ld bc, 240
 .z:         ld a, BLANK_T
             ld [hl+], a
@@ -458,6 +459,27 @@ bs_draw:    ld hl, MON_T                    ; blank
 .bn:        pop bc
             dec b
             jr nz, .br
+            xor a                           ; its palettes: 9 x 6 blocks
+            ld [bs_t], a
+            ld [bs_j], a
+            ld a, 18
+            ld [bs_w], a
+            ld hl, MON_A
+.ba:        ld c, 0
+.bb:        ld a, c
+            call bs_tpal
+            ld [hl+], a
+            inc c
+            ld a, c
+            cp 18
+            jr nz, .bb
+            inc hl
+            inc hl
+            ld a, [bs_j]
+            inc a
+            ld [bs_j], a
+            cp 12
+            jr nz, .ba
 .copy:      ld hl, MON_T                    ; base -> shadow rows 0-11
             ld de, SH_T
             ld bc, 240
@@ -492,9 +514,12 @@ bs_block:   ld a, [bs_t]
             call bs_hl_a
             ld a, [hl]
             ld [bs_n], a                    ; the first tile
-            ld a, [bs_t]                    ; palette: types 0 / 2 -> 0, 1 / 3 -> 1
-            and 1
-            ld [bs_pal], a
+            ld a, [bs_mi + 3]
+            swap a
+            and 15
+            ld [bs_w], a
+            xor a
+            ld [bs_j], a
             ld a, [bs_mi + 3]
             and 15
             ld b, a                         ; rows
@@ -534,7 +559,12 @@ bs_block:   ld a, [bs_t]
             jr nc, .cx
             ld a, [bs_n]
             ld [de], a
-            ld a, [bs_pal]
+            ld a, c
+            push hl
+            ld hl, bs_x
+            sub [hl]
+            pop hl
+            call bs_tpal
             ld [hl], a
 .cx:        inc de
             inc hl
@@ -545,10 +575,169 @@ bs_block:   ld a, [bs_t]
             dec b
             jr nz, .c
             pop bc
+            ld a, [bs_j]
+            inc a
+            ld [bs_j], a
             inc c
             dec b
             jr nz, .r
 .x:         ret
+
+; A = the column within the monster -> its palette (0 / 1): FF3's attribute bits ($7D17 + 4 x
+; type, a bit per 16 x 16 block, most significant first, row pairs in order; 2F/A6FB); keeps BC
+; DE HL
+bs_tpal:    push bc
+            push de
+            push hl
+            srl a
+            ld e, a                         ; the block column
+            ld a, [bs_w]
+            srl a
+            ld d, a                         ; blocks per row
+            ld a, [bs_j]
+            srl a
+            ld b, a
+            ld a, e
+            inc b
+.k:         dec b
+            jr z, .kk
+            add d
+            jr .k
+.kk:        ld c, a                         ; k
+            ld a, [bs_t]
+            add a
+            add a
+            ld e, a
+            ld a, c
+            srl a
+            srl a
+            srl a
+            add e
+            ld hl, $DD17
+            call bs_hl_a
+            ld b, [hl]
+            ld a, c
+            and 7
+            inc a
+.b:         rl b
+            dec a
+            jr nz, .b
+            ld a, 0
+            rla
+            pop hl
+            pop de
+            pop bc
+            ret
+
+; FF3's monster attribute data -> $7D17 (2F/A857: per monster id 4 bytes by graphics size from
+; 2E/8F20.., a boss's 8 bytes from 2E/8FC0 + 7 x id; inverted when the id's attribute byte has bit 7)
+bs_attrd:   ld a, [$DD7B]
+            cp 9
+            jr nz, .m
+            ld a, [$DD74]
+            and $3F
+            ld l, a
+            ld h, 0
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, l
+            sub e
+            ld l, a
+            ld a, h
+            sbc d
+            ld h, a                         ; 7 x id
+            ld de, $8FC0 - $4000
+            add hl, de
+            ld de, $DD17
+            ld bc, 8
+            ld a, B_BSET
+            call far_copy
+            ld a, [$DD74]
+            ld c, 8
+            ld hl, $DD17
+            jr .inv
+.m:         ld c, 0
+.n:         push bc
+            ld a, c
+            ld hl, $DD6B
+            call bs_hl_a
+            ld a, [hl]
+            cp $FF
+            jr z, .nx
+            ld a, c
+            add a
+            ld hl, $DD73
+            call bs_hl_a
+            ld a, [hl+]
+            and $E0
+            swap a
+            ld [bs_tmp], a                  ; 2 x size class
+            ld a, [hl]
+            ld [bs_tmp + 1], a              ; the attribute byte
+            ld a, [bs_tmp]
+            ld hl, $A8D8 - $4000            ; 2F/A8D8: the data's address by size
+            call bs_hl_a
+            ld de, bs_tmp + 2
+            ld bc, 2
+            ld a, B_BSET
+            call far_copy
+            ld a, [bs_tmp]                  ; 2F/A8E4: the length by size
+            srl a
+            ld hl, $A8E4 - $4000
+            call bs_hl_a
+            ld a, B_BSET
+            call far_byte
+            ld b, a
+            ld a, [bs_tmp + 1]
+            and $3F
+            ld c, a
+            xor a
+.mu:        add c
+            dec b
+            jr nz, .mu
+            ld hl, bs_tmp + 2
+            ld e, [hl]
+            inc hl
+            ld d, [hl]
+            ld h, d
+            ld l, e
+            call bs_hl_a
+            ld a, h
+            sub $40
+            ld h, a
+            pop bc
+            push bc
+            ld a, c
+            add a
+            add a
+            add low($DD17)
+            ld e, a
+            ld d, high($DD17)
+            push de
+            ld bc, 4
+            ld a, B_BSET
+            call far_copy
+            pop hl
+            ld a, [bs_tmp + 1]
+            ld c, 4
+            call .inv
+.nx:        pop bc
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .n
+            ret
+.inv:       bit 7, a
+            ret z
+.i:         ld a, [hl]
+            cpl
+            ld [hl+], a
+            dec c
+            jr nz, .i
+            ret
 
 ; ---- the party's sprites (members at x 144, y 24 i; acting: x 136)
 bs_party:   ld hl, oam_buf
@@ -586,6 +775,15 @@ bs_party:   ld hl, oam_buf
             add a
             ld l, a
             ld h, high(oam_buf)
+            push hl
+            ld a, c
+            ld hl, $DD93
+            call bs_hl_a
+            ld a, [hl]
+            and 3
+            or $08                          ; VRAM bank 1, the member's palette
+            ld [bs_tmp + 7], a
+            pop hl
             ld a, c                         ; tile 6 i
             add a
             ld b, a
@@ -601,7 +799,7 @@ bs_party:   ld hl, oam_buf
             ld a, b
             ld [hl+], a
             inc b
-            ld a, $08                       ; VRAM bank 1, palette 0
+            ld a, [bs_tmp + 7]
             ld [hl+], a
             ld a, e
             ld [hl+], a
@@ -611,7 +809,7 @@ bs_party:   ld hl, oam_buf
             ld a, b
             ld [hl+], a
             inc b
-            ld a, $08
+            ld a, [bs_tmp + 7]
             ld [hl+], a
             ld a, e
             add 8
@@ -862,8 +1060,8 @@ bs_win:     push de
             ret
 
 ; the top window (rows 0-3) over the monsters; bs_topoff puts the monsters back
-bs_top:     ld de, 0
-            ld bc, $0414
+bs_top:     ld de, 0                        ; (18 wide: the party's column stays clear)
+            ld bc, $0412
             jp bs_win
 bs_topoff:  ld hl, MON_T
             ld de, SH_T
@@ -981,7 +1179,37 @@ bs_vall:    ld hl, SH_D
             ret
 
 ; ---- palettes: BG 0 / 1 the monster set's two (2E/8C00: 3 colours + black), BG 7 the windows
-bs_palette: ld a, [$DD69]                   ; (cgb_pal is in work RAM bank 1)
+bs_palette: ld c, 0                         ; 2E/9E64: rows and jobs, the status buffer
+.cj:        ld a, c
+            call bs_choff
+            add $0F
+            ld l, a
+            ld h, $D2
+            ld a, [hl]
+            and 1
+            ld b, a
+            ld a, c
+            ld hl, $DD8F
+            call bs_hl_a
+            ld [hl], b
+            ld a, c
+            call bs_choff
+            ld l, a
+            ld h, $D1
+            ld b, [hl]
+            ld a, c
+            ld hl, $DD8B
+            call bs_hl_a
+            ld [hl], b
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .cj
+            ld hl, $D8BB
+            ld de, $DD9B
+            ld bc, 8
+            call memcpy
+            ld a, [$DD69]                   ; (cgb_pal is in work RAM bank 1)
             ld [bs_tmp], a
             ld a, [$DD6A]
             ld [bs_tmp + 1], a
@@ -993,11 +1221,61 @@ bs_palette: ld a, [$DD69]                   ; (cgb_pal is in work RAM bank 1)
             ld a, [bs_tmp + 1]
             ld hl, cgb_pal + 8
             call bs_mpal
+            ld a, $FC                       ; OBJ 0-2: the characters' palettes, 3: the cursor's
+.o:         push af
+            sub $FC
+            add a
+            add a
+            add a
+            add low(cgb_pal + 32)
+            ld l, a
+            ld h, high(cgb_pal + 32)
+            jr nc, .o2
+            inc h
+.o2:        pop af
+            push af
+            call bs_mpal
+            pop af
+            inc a
+            jr nz, .o
             call wait_vbl
             call pal_apply
+            ld a, $80 | 4 * 8               ; OBJ 4 (ours): green numbers
+            ldh [rOCPS], a
+            ld hl, bs_green
+            ld b, 8
+.g:         ld a, [hl+]
+            ldh [rOCPD], a
+            dec b
+            jr nz, .g
             ld a, 2
             ldh [rSVBK], a
+            ld c, 0                         ; the characters' palette ids (2E/9E01: by job,
+.j:         ld a, c                         ;   2E/9E4A by member for the Onion Kid)
+            ld hl, $DD8B
+            call bs_hl_a
+            ld a, [hl]
+            and a
+            ld hl, $9E4E - $4000
+            jr nz, .j1
+            ld hl, $9E4A - $4000
+            ld a, c
+.j1:        call bs_hl_a
+            push bc
+            ld a, B_BSET
+            call far_byte
+            pop bc
+            ld e, a
+            ld a, c
+            ld hl, $DD93
+            call bs_hl_a
+            ld [hl], e
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .j
             ret
+bs_green:   dw $0000, $0000, $0140, $03E8
 bs_mpal:    push hl
             ld l, a
             ld h, 0
@@ -1067,10 +1345,11 @@ bs_t:       ds 1
 bs_x:       ds 1
 bs_y:       ds 1
 bs_n:       ds 1
-bs_pal:     ds 1
 bs_act:     ds 1                            ; the member stepping forward ($FF none)
 bs_numb:    ds 4
 bs_tmp:     ds 8
 bs_seed:    ds 1
 bs_cnt:     ds 1
 bs_pos:     ds 24
+bs_j:       ds 1                            ; the row within a monster (its palette bits)
+bs_w:       ds 1                            ; the monster's width in tiles
