@@ -136,6 +136,10 @@ enc_group:  ld l, a
             ld [trig_next], a
             ret
 ; ---- FF3's field random number ($3E $C711: a counter up or down through 3F/FE00)
+; (for the menu: the number in m_rnd)
+f_rnd_m:    call f_rnd
+            ld [m_rnd], a
+            ret
 f_rnd:      ld hl, f_rng + 1
             bit 7, [hl]
             dec hl

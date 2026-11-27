@@ -617,7 +617,6 @@ m_label:    ld hl, m_labels
             jr .f
 
 ; ---- not yet: an error sound (first pass)
-m_item:
 m_magic:
 m_equip:
 m_job:
@@ -1821,6 +1820,781 @@ n_draw:     call m_clear
             call m_pictxy
             jp m_show
 
+; ==== 0 Item (FF3's 3C/9EC2): the inventory ($60C0 ids, $60E0 counts) and a trash can; an item
+; chosen twice is used, another swaps with it, the trash can discards it
+I_TRASH    = 32
+m_item:     xor a
+            ld [m_icur], a
+            ld [m_top], a
+            ld a, $FF
+            ld [m_isel], a
+.scr:       call i_draw
+.lp:        ld a, [m_icur]                  ; the hand at the cursor's row
+            ld hl, m_top
+            sub [hl]
+            add 4
+            ld b, a
+            ld c, 1
+            call m_hand
+            ld a, [m_isel]                  ; the chosen one: the second hand
+            cp $FF
+            jr z, .ns
+            ld hl, m_top
+            sub [hl]
+            jr c, .nh
+            cp 13
+            jr nc, .nh
+            add 4
+            ld b, a
+            ld c, 2
+            call m_hand2
+            jr .ns
+.nh:        call m_hand2off
+.ns:        call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 1, a
+            jr nz, .b
+            and PAD_A
+            jr z, .lp
+            call m_sfx_ok
+            ld a, [m_isel]
+            cp $FF
+            jr nz, .two
+            ld a, [m_icur]                  ; the first choice
+            ld [m_isel], a
+            jr .lp
+.b:         call m_sfx_ok
+            ld a, [m_isel]
+            cp $FF
+            jr z, .x
+            ld a, $FF
+            ld [m_isel], a
+            call m_hand2off
+            jr .lp
+.x:         call m_hand2off
+            ret
+.two:       ld a, [m_isel]                  ; the second: trash, swap or use (3C/9FA5)
+            ld [m_isel2], a
+            ld a, $FF
+            ld [m_isel], a
+            call m_hand2off
+            ld a, [m_icur]
+            cp I_TRASH
+            jr z, .trash
+            ld b, a
+            ld a, [m_isel2]
+            cp I_TRASH
+            jr z, .trash2
+            cp b
+            jr z, .use
+            ld c, a                         ; swap ids and counts
+            ld h, high(SRAM_PAGE)
+            ld a, $C0
+            add b
+            ld e, a
+            ld a, $C0
+            add c
+            ld l, a
+            ld d, h
+            call .xch
+            ld a, $E0
+            add b
+            ld e, a
+            ld a, $E0
+            add c
+            ld l, a
+            call .xch
+            jp .scr
+.xch:       ld a, [de]
+            push af
+            ld a, [hl]
+            ld [de], a
+            pop af
+            ld [hl], a
+            ret
+.trash2:    ld a, b                         ; (the trash first: the second item goes)
+            ld [m_isel2], a
+.trash:     ld a, [m_isel2]                 ; discard the first choice (not key items $9A-$A3,
+            cp I_TRASH                      ;   the Toad / Mini spells $F6 / $F7)
+            jr z, .err
+            ld l, a
+            add $C0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld a, [hl]
+            cp $F6
+            jr z, .err
+            cp $F7
+            jr z, .err
+            cp $9A
+            jr c, .del
+            cp $A4
+            jr c, .err
+.del:       xor a
+            ld [hl], a
+            ld a, l
+            add $20
+            ld l, a
+            xor a
+            ld [hl], a
+            jp .scr
+.err:       call m_sfx_err
+            jp .lp
+.use:       call i_use
+            jp .scr
+.up:        ld a, [m_icur]
+            and a
+            jr z, .lp2
+            dec a
+            jr .m
+.dn:        ld a, [m_icur]
+            cp I_TRASH
+            jr z, .lp2
+            inc a
+.m:         ld [m_icur], a
+            call m_sfx_move
+            ld hl, m_top                    ; keep the cursor in the 13 rows shown
+            ld a, [m_icur]
+            cp [hl]
+            jr nc, .m1
+            ld [hl], a
+            jp .scr
+.m1:        sub [hl]
+            cp 13
+            jp c, .lp
+            ld a, [hl]
+            inc a
+            ld [hl], a
+            jp .scr
+.lp2:       jp .lp
+; (the first choice is kept apart from m_isel, which the loop clears)
+m_isel2 = m_isel + 1
+
+; the item screen: "Item" (0, 0) 20 x 3, the list (0, 3) 20 x 15 (13 rows from m_top)
+i_draw:     call m_clear
+            call m_sprclr
+            ld de, $0000
+            ld bc, $0314
+            call m_win
+            ld a, $35                       ; "Item" (t8200 $35)
+            call m_t82
+            ld de, $0101
+            ld a, 10
+            call m_putsn
+            ld de, $0300
+            ld bc, $0F14
+            call m_win
+            ld a, [m_top]
+            ld [m_row], a
+            ld d, 4
+.r:         push de
+            ld a, [m_row]
+            cp I_TRASH
+            jr z, .t
+            jr nc, .n
+            add $C0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld a, [hl]
+            and a
+            jr z, .n
+            ld e, a                         ; its name (names8800 = id)
+            ld d, 0
+            call m_n88
+            pop de
+            push de
+            ld e, 2
+            ld a, 12
+            call m_putsn
+            pop de
+            push de
+            ld e, 15
+            ld a, ':'
+            call m_putc
+            inc e
+            ld a, [m_row]
+            add $E0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld l, [hl]
+            ld h, 0
+            ld b, 2
+            call m_num
+            jr .n
+.t:         pop de
+            push de
+            ld e, 2
+            ld hl, m_trash
+            call m_puts0
+.n:         pop de
+            ld a, [m_row]
+            inc a
+            ld [m_row], a
+            inc d
+            ld a, d
+            cp 17
+            jr nz, .r
+            jp m_show
+
+; names8800 entry DE -> M_STR
+m_n88:      ld hl, T_NAMES8800
+            add hl, de
+            add hl, de
+            add hl, de
+            ld de, m_tmp
+            ld bc, 3
+            push hl
+            pop hl
+            push hl
+            ld a, B_TEXT
+            call far_copy
+            pop hl
+            ld a, [m_tmp + 1]
+            ld l, a
+            ld a, [m_tmp + 2]
+            ld h, a
+            ld de, M_STR
+            ld bc, 24
+            ld a, [m_tmp]
+            jp far_copy
+
+; ---- use item [m_icur] (3D/A033)
+i_use:      ld a, [m_icur]
+            ld [m_islot], a
+            add $E0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld a, [hl]                      ; none left
+            and a
+            jp z, m_sfx_err
+            ld a, l
+            sub $20
+            ld l, a
+            ld a, [hl]
+            ld [m_iid], a
+            cp $C8
+            jp nc, i_teach                  ; a spell: who will hold it
+            cp $A6                          ; Potion .. Antidote ($A6-$B0) are used; the
+            jr c, .cant                     ;   Midgard Bread ($A4) and Otter's Head ($B0)
+            cp $B0                          ;   (minimap, warp: later)
+            jr nc, .cant
+            sub $A6                         ; the question (t8200 $5B + n)
+            add $5B
+.again:     push af
+            call m_party2
+            pop af
+            push af
+            call m_msg
+            call m_show
+            call m_target
+            pop bc
+            ret c
+            push bc
+            call i_effect
+            pop bc
+            jr c, .bad
+            ld a, [m_islot]                 ; one used (3D/A33C)
+            add $E0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            dec [hl]
+            ret nz
+            ld a, l
+            sub $20
+            ld l, a
+            ld [hl], 0
+            ret
+.bad:       call m_sfx_err
+            ld a, b
+            jr .again
+.cant:      ld a, $5A                       ; "It can't be used."
+            call m_msg
+            call m_show
+            jp m_waitkey
+
+; the effect of item [m_iid] on member [m_who]: C = no effect (3D/A097-A15A)
+i_effect:   ld a, [m_who]
+            call m_choff
+            ld [m_x7f], a
+            add 2
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)    ; HL = status ($6102)
+            ld a, [m_iid]
+            cp $A6                          ; Potion: power 30
+            ld b, 30
+            jr z, .heal
+            cp $A7                          ; Hi-Potion: 120
+            ld b, 120
+            jr z, .heal
+            cp $A8                          ; Elixir: HP and MP to max
+            jr z, .elix
+            cp $A9                          ; Phoenix Down: dead -> 1 HP
+            jr z, .fenix
+            ld c, $40                       ; Soft, Maiden's Kiss, Echo Herbs: a status off
+            cp $AA
+            jr z, .st
+            ld c, $20
+            cp $AB
+            jr z, .st
+            ld c, $10
+            cp $AC
+            jr z, .st
+            cp $AD                          ; Lucky Mallet: mini on / off
+            jr nz, .eye
+            ld a, [hl]
+            xor $08
+            ld [hl], a
+            and a
+            ret
+.eye:       ld c, $04                       ; Eye Drops, else Antidote
+            cp $AE
+            jr z, .st
+            ld c, $02
+.st:        ld a, [hl]
+            and c
+            scf
+            ret z
+            ld a, c
+            cpl
+            and [hl]
+            ld [hl], a
+            and a
+            ret
+.heal:      ld a, [hl]
+            cp $40
+            ccf
+            ret c                           ; dead or stone
+            ld a, b
+            ld [m_pow], a
+            ld a, 1
+            ld [m_tgts], a
+            ld a, 3
+            ld [m_mult], a
+            jp m_heal
+.elix:      ld a, [hl]
+            cp $40
+            ccf
+            ret c
+            call m_hpmax
+            jp m_mpmax
+.fenix:     bit 7, [hl]
+            scf
+            ret z
+            res 7, [hl]
+            ld a, l
+            add $0A                         ; HP +1 ($610C)
+            ld l, a
+            inc [hl]
+            ret nz
+            inc l
+            inc [hl]
+            and a
+            ret
+
+; ---- FF3's healing (3D/A48A): power P = base + (random / 2 x base) / 256, x multiplier /
+; targets, added to HP up to max ([m_tgts] 1: member [m_x7f], else all four)
+m_heal:     %FAR B_FIELD, f_rnd_m
+            ld a, [m_rnd]
+            srl a
+            ld l, a
+            ld h, 0
+            ld a, [m_pow]
+            ld e, a
+            ld d, 0
+            call m_mul16                    ; HL = rnd/2 x base
+            ld a, [m_pow]
+            add h
+            ld l, a
+            ld a, 0
+            adc 0
+            ld h, a                         ; P
+            ld a, [m_mult]
+            ld e, l
+            ld d, h
+            ld l, a
+            call m_mul16                    ; HL = P x mult (fits 16 bits: P < 512, mult small)
+            ld a, [m_tgts]
+            ld c, a
+            call m_div                      ; HL / C
+            ld a, l
+            ld [m_amt], a
+            ld a, h
+            ld [m_amt + 1], a
+            ld a, [m_tgts]
+            cp 1
+            jr z, m_addhp
+            xor a
+.a:         ld [m_x7f], a
+            call m_addhp
+            ld a, [m_x7f]
+            add $40
+            jr nz, .a
+            and a
+            ret
+; FF3's restore hp (3D/A429): [m_amt] to member [m_x7f] (not dead / stone: C), capped at max
+m_addhp:    ld a, [m_x7f]
+            add 2
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld a, [hl]
+            cp $40
+            ccf
+            ret c
+            ld a, [m_x7f]
+            add $0C
+            ld l, a
+            ld a, [m_amt]
+            add [hl]
+            ld [hl+], a
+            ld c, a
+            ld a, [m_amt + 1]
+            adc [hl]
+            ld [hl+], a
+            ld b, a
+            ld a, [hl+]
+            ld e, a
+            ld d, [hl]                      ; max
+            ld a, d
+            cp b
+            jr c, m_hpmax
+            jr nz, .ok
+            ld a, e
+            cp c
+            jr c, m_hpmax
+.ok:        and a
+            ret
+m_hpmax:    ld a, [m_x7f]
+            add $0E
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld a, [hl+]
+            ld b, [hl]
+            dec l
+            dec l
+            ld [hl], b
+            dec l
+            ld [hl], a
+            and a
+            ret
+; FF3's restore mp to max (3D/A418): each level's current = max
+m_mpmax:    ld a, [m_x7f]
+            add $30
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld b, 8
+.m:         inc l
+            ld a, [hl-]
+            ld [hl+], a
+            inc l
+            dec b
+            jr nz, .m
+            and a
+            ret
+; HL = HL / C (C > 0)
+m_div:      ld b, 16
+            xor a
+.d:         add hl, hl
+            rla
+            cp c
+            jr c, .n
+            sub c
+            inc l
+.n:         dec b
+            jr nz, .d
+            ret
+
+; ---- a spell item: who will hold it (3D/A15F: the level's three places, none twice)
+i_teach:    ld a, $73                       ; "Who will hold this magic?"
+.q:         push af
+            call m_party2
+            pop af
+            call m_msg
+            call m_show
+            call m_target
+            ret c
+            ld a, [m_who]
+            call m_choff
+            ld [m_x7f], a
+            call sp_buf                     ; the spells known -> m_spl (24)
+            ld a, [m_iid]
+            sub $C8
+            ld c, a
+            ld hl, sp_ptr
+            call m_hla
+            ld e, [hl]                      ; the level's first place
+            ld d, 0
+            ld hl, m_spl
+            add hl, de
+            ld a, [m_iid]
+            ld b, 3
+.h:         cp [hl]
+            jr z, .has
+            inc hl
+            dec b
+            jr nz, .h
+            dec hl                          ; 3D/A1B6: the first empty of the three, or the
+            dec hl                          ;   third
+            dec hl
+            ld a, [hl]
+            and a
+            jr z, .put
+            inc hl
+            ld a, [hl]
+            and a
+            jr z, .put
+            inc hl
+            ld a, [hl]
+            and a
+            jr z, .put
+            ld a, $74                       ; "Can't hold any more."
+            jr .msg
+.has:       ld a, $75                       ; "Already holds this magic."
+.msg:       push af
+            call m_msg
+            call m_show
+            call m_waitkey
+            pop af
+            ld a, $73
+            jr .q
+.put:       ld a, [m_iid]
+            ld [hl], a
+            call sp_save
+            ld a, [m_islot]                 ; one fewer
+            add $E0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            dec [hl]
+            ret nz
+            ld a, l
+            sub $20
+            ld l, a
+            ld [hl], 0
+            ret
+; FF3's init spell list buffer (3D/A2B4): member [m_x7f]'s known spells ($6207-$620E bits) ->
+; m_spl (24: three per level, by sp_ptr)
+sp_buf:     ld hl, m_spl
+            ld b, 24
+            xor a
+.z:         ld [hl+], a
+            dec b
+            jr nz, .z
+            ld c, 0
+.s:         ld hl, sp_lvl
+            call m_hla
+            ld a, [m_x7f]
+            add [hl]
+            add 7
+            ld l, a
+            ld h, high(SRAM_PAGE + $200)
+            ld b, [hl]
+            ld hl, sp_mask
+            call m_hla
+            ld a, [hl]
+            and b
+            jr z, .n
+            ld hl, sp_ptr                   ; 3D/A2DF: the first empty of its three places
+            call m_hla
+            ld e, [hl]
+            ld d, 0
+            ld hl, m_spl
+            add hl, de
+            ld a, [hl]
+            and a
+            jr z, .p
+            inc hl
+            ld a, [hl]
+            and a
+            jr z, .p
+            inc hl
+.p:         ld a, c
+            add $C8
+            ld [hl], a
+.n:         inc c
+            ld a, c
+            cp 56
+            jr nz, .s
+            ret
+; FF3's update spell list (3D/A1C9): m_spl -> the bits ($6207-$620E of member [m_x7f])
+sp_save:    ld a, [m_x7f]
+            add 7
+            ld l, a
+            ld h, high(SRAM_PAGE + $200)
+            ld b, 8
+            xor a
+.z:         ld [hl+], a
+            dec b
+            jr nz, .z
+            ld de, m_spl
+            ld b, 24
+.s:         ld a, [de]
+            inc de
+            and a
+            jr z, .n
+            sub $C8
+            ld c, a
+            ld hl, sp_lvl
+            call m_hla
+            ld a, [m_x7f]
+            add [hl]
+            add 7
+            push af
+            ld hl, sp_mask
+            call m_hla
+            ld a, [hl]
+            pop hl
+            ld l, h
+            ld h, high(SRAM_PAGE + $200)
+            or [hl]
+            ld [hl], a
+.n:         dec b
+            jr nz, .s
+            ret
+; HL += C
+m_hla:      ld a, l
+            add c
+            ld l, a
+            ret nc
+            inc h
+            ret
+
+; ---- the party for a target (0, 0) 20 x 13: per member 3 rows: name / Lv (or ailment), HP,
+; MP (current, 8 levels)
+m_party2:   call m_clear
+            call m_sprclr
+            ld de, $0000
+            ld bc, $0D14
+            call m_win
+            ld c, 0
+.m:         push bc
+            ld a, c
+            add a
+            add c
+            inc a
+            ld d, a
+            ld e, 4
+            ld a, c
+            call m_name
+            ld e, 12
+            ld a, c
+            call m_stword
+            jr nz, .s
+            ld hl, m_lv
+            call m_puts0
+            pop bc
+            push bc
+            ld a, c
+            call m_choff
+            inc a
+            call m_sp1
+            inc a
+            ld l, a
+            ld h, 0
+            ld e, 16
+            ld b, 2
+            call m_num
+.s:         inc d
+            ld e, 4
+            ld hl, m_hp
+            call m_puts0
+            inc e
+            pop bc
+            push bc
+            ld a, c
+            call m_hpline
+            inc d
+            ld e, 4
+            pop bc
+            push bc
+            ld a, c
+            call m_choff
+            add $30
+            ld [m_tmpc], a
+            ld b, 8
+.mp:        push bc
+            ld a, [m_tmpc]
+            call m_sp1
+            ld l, a
+            ld h, 0
+            ld b, 1
+            call m_num
+            ld a, [m_tmpc]
+            add 2
+            ld [m_tmpc], a
+            pop bc
+            dec b
+            jr z, .mx
+            ld a, '/'
+            call m_putc
+            inc e
+            jr .mp
+.mx:        pop bc
+            push bc
+            ld a, c
+            add a
+            add c
+            inc a
+            add a
+            add a
+            add a
+            add 16
+            ld d, a
+            ld e, 16
+            call m_pictxy
+            pop bc
+            inc c
+            ld a, c
+            cp 4
+            jp nz, .m
+            ret
+; choose a member in m_party2 (the hand at row 2 + 3 i): C = cancelled
+m_target:   ld a, [m_who]
+            and 3
+            ld [m_who], a
+.lp:        ld a, [m_who]
+            ld b, a
+            add a
+            add b
+            add 2
+            ld b, a
+            ld c, 1
+            call m_hand2
+            call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            call m_sfx_ok
+            call m_hand2off
+            and a
+            ret
+.x:         call m_sfx_ok
+            call m_hand2off
+            scf
+            ret
+.up:        ld a, [m_who]
+            dec a
+            jr .m
+.dn:        ld a, [m_who]
+            inc a
+.m:         and 3
+            ld [m_who], a
+            call m_sfx_move
+            jr .lp
+
+section bank B_MENU, $7C00
+sp_mask:    ds 56                           ; (3D/A20C, A244, A27C: from the ROM)
+sp_lvl:     ds 56
+sp_ptr:     ds 56
+
 section wram, $CD80
 m_cur:      ds 1
 m_who:      ds 1
@@ -1840,3 +2614,17 @@ n_who:      ds 1
 n_case:     ds 1
 n_cur:      ds 1
 n_len:      ds 1
+m_icur:     ds 1
+m_top:      ds 1
+m_isel:     ds 2
+m_islot:    ds 1
+m_iid:      ds 1
+m_x7f:      ds 1
+m_pow:      ds 1
+m_tgts:     ds 1
+m_mult:     ds 1
+m_amt:      ds 2
+m_rnd:      ds 1
+m_tmpc:     ds 1
+m_spl:      ds 24
+m_row:      ds 1

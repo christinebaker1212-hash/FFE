@@ -47,7 +47,7 @@ def menu_data():
             'm_s_erase:  db %s\n' % z(clean(t[0x4C].split('{15')[0]).replace('\n', '\x0a')) +
             'm_s_yes:    db %s\n' % z(clean(t[6].split('\n')[0])) +
             'm_s_no:     db %s\n' % z(clean(t[6].split('\n')[1])) +
-            'm_damaged:  db %s\n' % z('Damaged') + name_grid())
+            'm_damaged:  db %s\n' % z('Damaged') + 'm_trash:    db %s\n' % z('Trash') + name_grid())
 
 
 def name_grid():
@@ -291,6 +291,9 @@ ROMDATA = {
     'terr_bits': (0x35, 0xAB06, 1),      # terrain attacks: one monster or all
     'fld_rng': (0x3F, 0xFE00, 256),      # the field's random numbers
     'enc_prob': (0x3D, 0xBD78, 64),      # which of a group's 8 battles
+    'sp_mask': (0x3D, 0xA20C, 56),       # menu: each spell's bit in its level's known byte
+    'sp_lvl': (0x3D, 0xA244, 56),        # menu: each spell's level byte ($6207 + n)
+    'sp_ptr': (0x3D, 0xA27C, 56),        # menu: each spell's level slots in the list buffer
 }
 
 MACROS = {
