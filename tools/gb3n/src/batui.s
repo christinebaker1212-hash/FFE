@@ -1668,7 +1668,13 @@ bsc_anim:   ld a, [$D8D6]
             and 7                           ; a monster: FF3's pre-attack flash (34/8545)
             call bs_flash
             jr .m
-.ch:
+.ch:        call an_kind                    ; a character's fight on a monster: its swings
+            and a                           ;   (34/8613, battle graphics $12)
+            jr nz, .st
+            ld a, [$DE9A]
+            bit 6, a
+            jp nz, an_fight
+.st:        ld a, [$D8D6]
             ld [bs_act], a
             call bs_party
 .m:         ld b, 12

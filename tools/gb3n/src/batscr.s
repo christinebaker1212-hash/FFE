@@ -253,8 +253,9 @@ bs_gfx:     xor a
 .p0:        ld [hl+], a
             dec b
             jr nz, .p0
-            ld hl, bs_gt
             ld a, $FF
+            ld [an_cf], a
+            ld hl, bs_gt
             ld [hl+], a
             ld [hl+], a
             ld [hl+], a
@@ -732,6 +733,15 @@ bs_party:   ld hl, oam_buf
             call bs_cframe                  ; the frame by the status (2F/B607), its tiles
             ld [bs_tmp + 6], a
             pop bc
+            ld a, [an_cf]                   ; (the attacker's frame while it swings)
+            cp $FF
+            jr z, .nf
+            ld a, [an_c]
+            cp c
+            jr nz, .nf
+            ld a, [an_cf]
+            ld [bs_tmp + 6], a
+.nf:
             push bc
             ld a, c                         ; y = 24 i, x = 144 (136 stepping forward)
             add a

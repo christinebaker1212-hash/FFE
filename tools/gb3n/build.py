@@ -128,6 +128,7 @@ B_VGFX = 77                 # world map vehicles' graphics (NES 0B)
 B_CUT, B_CUTG = 79, 80      # cutscenes: NES bank $1F + the code; their graphics / texts
 B_WSPR = 81                 # world-map sprites: FF3's tiles $80-$FF, bank $3C's lists, the code
 B_MINI = 82                 # the minimap: its screen data (tools/gb3n/minimap.py) and code
+B_ANIM = 83                 # battle animations' graphics: NES 2B/B000 (weapons, hits)
 
 
 def field_banks(rom):
@@ -347,6 +348,13 @@ ROMDATA = {
     'sa_9cb4': (0x3A, 0x9CB4, 240),
     'ws_sin': (0x3A, 0x9E3E, 256),       # world sprites: FF3's sine table, the ship's chain
     'ws_chtab': (0x3D, 0xBF7A, 126),
+    'an_blob': (0x32, 0x943D, 0x375),    # battle animations (src/banim.s)
+    'sl_pos': (0x32, 0x99D1, 24),
+    'sl_tile': (0x32, 0x99E9, 12),
+    'sl_mask': (0x32, 0x9968, 4),
+    'an_max': (0x33, 0xA077, 9),
+    'an_ids': (0x34, 0x83F8, 25),
+    'wp_prop': (0x2E, 0x9098, 3 * 0x60),
     'cf_tiles': (0x32, 0x972E, 126),     # battle characters' frames (32/9111)
     'cf_pos': (0x32, 0x91D7, 144),
     'cf_set': (0x32, 0x926B, 21),
@@ -415,7 +423,7 @@ def main():
            'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
            'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\nB_BSET = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2, B_BSET) +
            'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\nB_MENU = %d\nB_VGFX = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0, B_MENU, B_VGFX) + text_defs +
-           'B_CUT = %d\nB_CUTG = %d\nB_WSPR = %d\nB_MINI = %d\n' % (B_CUT, B_CUTG, B_WSPR, B_MINI) + cut_eq +
+           'B_CUT = %d\nB_CUTG = %d\nB_WSPR = %d\nB_MINI = %d\nB_ANIM = %d\n' % (B_CUT, B_CUTG, B_WSPR, B_MINI, B_ANIM) + cut_eq +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
@@ -434,6 +442,7 @@ def main():
            open(os.path.join(HERE, 'src', 'wspr.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sa.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'mini.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'banim.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + sound_data() + own_data())
     if os.environ.get('GB3N_BATTLE'):            # test builds only: every encounter is this battle
         src = src.replace('            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a',
@@ -529,6 +538,7 @@ ev_fxtest:  call ev_shake
     assert not any(r.claimed.get((B_MINI, o)) for o in range(0x2000))
     mb[0:0x2000] = minimap.gb_bank(rom)
     banks[B_MINI] = mb
+    banks[B_ANIM] = bytearray(b"".join(tiles.gb(t) for t in (rom.rd(0x2B, 0xB000 + 16 * i, 16) for i in range(256)))) + bytearray(0x3000)
     for k, v in tbanks.items():
         assert k not in banks, 'bank %d used twice' % k
         banks[k] = v
