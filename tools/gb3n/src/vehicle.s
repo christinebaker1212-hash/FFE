@@ -232,26 +232,74 @@ v_abtn:     ld a, [veh]
             jr nc, .b6
             ld a, [SRAM_PAGE + $00]
             and a
-            jr z, .no
+            jr z, .inv
             call v_here
-            jr nz, .no
+            jr nz, .inv
             ld a, 5
             jr .board
 .b6:        ld a, [SRAM_PAGE + $20]
             bit 6, a
-            jr z, .no
+            jr z, .inv
             ld a, [world]
             ld hl, SRAM_PAGE + $03
             cp [hl]
-            jr nz, .no
+            jr nz, .inv
             call v_here
-            jr nz, .no
+            jr nz, .inv
             ld a, 6
+            jr .board
+.inv:       jp v_inv
 .board:     push af
             ld a, $2D
             call sfx_play
             pop af
             jp v_set
+; the Invincible (3E/C942): on foot on it ($6004 shown, world $6007, at $6005 / $6006): inside
+; (its entrance 0 of the world, 3E/C292; $602B bit 7 from the tile's property 1 & $81)
+v_inv:      ld a, [SRAM_PAGE + $04]
+            and a
+            jr z, v_no
+            ld a, [world]
+            ld hl, SRAM_PAGE + $07
+            cp [hl]
+            jr nz, v_no
+            ld a, [pos_x]
+            ld hl, SRAM_PAGE + $05
+            cp [hl]
+            jr nz, v_no
+            ld a, [pos_y]
+            inc hl
+            cp [hl]
+            jr nz, v_no
+v_inside:   ld a, [pos_x]
+            ld d, a
+            ld a, [pos_y]
+            ld e, a
+            call map_mt
+            ld l, a
+            ld h, W_PROP1
+            ld a, [hl]
+            and $81
+            ld hl, SRAM_PAGE + $2B
+            res 7, [hl]
+            jr z, .e
+            set 7, [hl]
+.e:         xor a                           ; FF3's $44 = $80, $45 = 0: entrance 0
+            ld [trig_id], a
+            ld a, TR_WENT
+            ld [trig], a
+            and a
+            ret
+v_no:       scf
+            ret
+; B on the world map (3E/C282): in the Invincible: inside; on foot: the Invincible's check
+v_bbtn:     ld a, [veh]
+            and a
+            jr z, v_inv
+            cp 7
+            jr z, v_inside
+            scf
+            ret
 ; Z when the party stands on the parked vehicle
 v_here:     ld a, [pos_x]
             ld hl, SRAM_PAGE + $01

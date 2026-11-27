@@ -566,6 +566,14 @@ field_step: call npc_update
 .pl:        ldh a, [pad_new]                ; A: talk to the person ahead
             bit 3, a                        ; Start: the main menu
             jp nz, menu_open
+            bit 1, a                        ; B on the world map (3E/C282)
+            jr z, .na
+            ld a, [wmode]
+            and a
+            jr z, .pd
+            call v_bbtn
+            jr .done
+.na:        ldh a, [pad_new]
             and PAD_A
             jr z, .pd
             ld a, [wmode]                   ; (the world map: the vehicles' A, 3E/C2B7)
