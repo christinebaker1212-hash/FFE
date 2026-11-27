@@ -45,12 +45,14 @@ PG_ENT, PG_ENT_MT = 0x1E, 0x7A  # Earthgift's overworld entrance: its number, ou
 PG_OWX, PG_OWY = 132, 141       #   (FF1's cave mouth $0E copied; the overworld's unused $7A)
 OW_CAVE = 0x0E
 
-# Earthgift Shrine: (Dawn of Souls map record, look, role)
-EARTHGIFT = [(120, 'cave', 'entrance'), (136, 'cave', 'floor'), (137, 'cave', 'floor'),
-             (138, 'forest', 'floor'), (139, 'desert', 'floor'), (135, 'cave', 'boss')]
-DUNGEONS = ['Earthgift Shrine']
-DUNGEON_FLOORS = {'Earthgift Shrine': EARTHGIFT}
-PG_END = PG_MAP0 + sum(len(v) for v in DUNGEON_FLOORS.values())
+import shrines
+# the post-game's maps: every shrine's floors in order (shrines.py), map ids PG_MAP0 and up
+PG_FLOORS = [(s, rec, look, role, area) for s, sh in enumerate(shrines.SHRINES)
+             for rec, look, role, area in sh['floors']]
+PG_END = PG_MAP0 + len(PG_FLOORS)
+assert PG_END <= 192                            # (map m in ROM bank m + 64)
+def map_of(s, rec):
+    return PG_MAP0 + PG_FLOORS.index(next(f for f in PG_FLOORS if f[0] == s and f[1] == rec))
 
 
 def classify(G, rec):
@@ -128,17 +130,48 @@ def bfs(walk, start):
     return dist
 
 
-def cave_floor(G, rec, role, n_chests, pc=None):
-    """a cave floor -> dict(map (64 x 64 bytes), start (x, y), chests [(x, y)], bosses [(x, y)])"""
+def window(g, w, h, walkable, keep=(), size=60):
+    """a floor larger than FF1's 64 x 64 maps: the size x size part with the most walkable cells (Dawn of
+    Souls' wide floors cut, as its desert was; owner, 2026-11-27), holding the cells in keep if it can ->
+    (x0, y0, x1, y1)"""
+    cs = [(x, y) for y in range(h) for x in range(w) if g[y][x] in walkable]
+    bx0, bx1 = max(0, min(c[0] for c in cs) - 2), min(w, max(c[0] for c in cs) + 3)
+    by0, by1 = max(0, min(c[1] for c in cs) - 2), min(h, max(c[1] for c in cs) + 3)
+    if bx1 - bx0 <= size and by1 - by0 <= size: return bx0, by0, bx1, by1
+    sw, sh = min(size, bx1 - bx0), min(size, by1 - by0)
+    S = [[0] * (w + 1) for _ in range(h + 1)]       # (a summed-area table of the walkable cells)
+    for y in range(h):
+        for x in range(w):
+            S[y + 1][x + 1] = S[y][x + 1] + S[y + 1][x] - S[y][x] + (g[y][x] in walkable)
+    best = None
+    for y0 in range(by0, by1 - sh + 1):
+        for x0 in range(bx0, bx1 - sw + 1):
+            n = S[y0 + sh][x0 + sw] - S[y0][x0 + sw] - S[y0 + sh][x0] + S[y0][x0]
+            n += 10000 * sum(1 for kx, ky in keep if x0 + 2 <= kx < x0 + sw - 2 and y0 + 2 <= ky < y0 + sh - 2)
+            if best is None or n > best[0]: best = (n, x0, y0)
+    _, x0, y0 = best
+    return x0, y0, x0 + sw, y0 + sh
+
+
+def cave_floor(G, rec, role, n_chests, pc=None, floor_chips=(), stairs_out=True, fixed=False):
+    """a cave floor -> dict(map (64 x 64 bytes), start (x, y), chests [(x, y, kind)], bosses [(x, y)]);
+    role: entrance (FF1's stairs up the way out, the stairs down in its top room), floor, boss (the orbs in
+    its rooms, a way out (stairs up) by the start, the stairs down if stairs_out)"""
     pc = pc or EARTH_PIECES
     w, h, g, r = classify(G, rec)
+    if floor_chips:                                 # (chips walked over in Dawn of Souls by other means:
+        cells = [c & 0x3FF for c in r['cells']]     #   the flooded village's canoe water)
+        for y in range(h):
+            for x in range(w):
+                if cells[w * y + x] in floor_chips: g[y][x] = '.'
     if w > 62 or h > 62:                            # (larger floors: cut to their walkable part, 2 around)
-        cs = [(x, y) for y in range(h) for x in range(w) if g[y][x] in '.DSLrO']
-        x0, x1 = max(0, min(c[0] for c in cs) - 2), min(w, max(c[0] for c in cs) + 3)
-        y0, y1 = max(0, min(c[1] for c in cs) - 2), min(h, max(c[1] for c in cs) + 3)
-        assert x1 - x0 <= 62 and y1 - y0 <= 62, 'floor %d: %d x %d after the cut' % (rec, x1 - x0, y1 - y0)
+        keep = [(x, y) for y in range(h) for x in range(w) if g[y][x] in 'SD']
+        x0, y0, x1, y1 = window(g, w, h, '.DSLrO', keep)
         g = [row[x0:x1] for row in g[y0:y1]]
         w, h = x1 - x0, y1 - y0
+        for y in range(h):                          # (the cut edges: walls)
+            for x in range(w):
+                if (x in (0, w - 1) or y in (0, h - 1)) and g[y][x] != ' ': g[y][x] = '#'
     W = 64
     ox, oy = (W - w) // 2, (W - h) // 2
     assert ox >= 1 and oy >= 1, 'floor %d too big' % rec
@@ -154,7 +187,7 @@ def cave_floor(G, rec, role, n_chests, pc=None):
         else:
             for y in range(max(0, y0_ - 1), min(h, y1_ + 2)):
                 for x in range(max(0, x0_ - 1), min(w, x1_ + 2)):
-                    if g[y][x] == 'r': g[y][x] = '.'
+                    if g[y][x] in 'rO': g[y][x] = '.'
                     elif g[y][x] == 'R': g[y][x] = '#'
     inroom = set()
     for x0, y0, x1, y1 in boxes:
@@ -225,27 +258,52 @@ def cave_floor(G, rec, role, n_chests, pc=None):
         if role == 'boss' and doors:
             bosses.append((doors[0][0] + ox, y0 + 1 + oy))
     # the start: the entrance floor's corridor end (FF1's stairs up there: the way out), else the
-    # walkable cell farthest from the stairs (boss floor: the lowest)
+    # walkable cell farthest from the stairs (boss floor: the lowest, with the way out below it)
     cand = sorted(walk, key=lambda p: (-p[1], p[0]))
-    if role == 'entrance':
-        ex = cand[0]
+    if role in ('entrance', 'boss'):
+        ex = next((q for q in cand if (q[0], q[1] - 1) in walk and q not in stairs), cand[0])
         put(ex[0], ex[1], pc['up'])
         start = (ex[0], ex[1] - 1)
+        walk.discard(ex)
+    if role == 'entrance':
         top = min(boxes, key=lambda b: b[1]) if boxes else None
         if top:                                     # the way down: in the top room, its middle
             sx, sy = (top[0] + top[2]) // 2, top[1] + 1
-            out[sy + oy][sx + ox] = pc['stairs']; stairs.append((sx, sy))
-    elif role == 'boss' or not stairs:
+            out[sy + oy][sx + ox] = pc['stairs']; stairs = [(sx, sy)]
+    elif role == 'boss':
+        for sx, sy in stairs:
+            put(sx, sy, pc['floor'] if (sx, sy) in walk else pc['void'])
+        stairs = []
+    elif not stairs:
         start = cand[0]
     else:
         d = bfs(walk, stairs[0])
         start = max(d, key=lambda p: (d[p], -p[1]))
+    reach = bfs(walk | inroom, start)
+    if role == 'floor' or (role == 'boss' and stairs_out):
+        stairs = [s for s in stairs if s in reach][:1]
+        if not stairs:                              # (no stairs down reachable after the cut: the
+            far = max((q for q in reach if q in walk and g[q[1]][q[0]] == '.' and q != start),   # farthest
+                      key=lambda q: reach[q])       #   floor cell)
+            put(far[0], far[1], pc['stairs']); stairs = [far]
+    if role == 'boss':                              # (no boss rooms: the orbs on the farthest cells)
+        bosses = [(x, y, 0xC0) for x, y in bosses]
+        far = sorted((q for q in reach if q in walk and g[q[1]][q[0]] == '.' and q != start and q not in stairs),
+                     key=lambda q: -reach[q])
+        for q in far:
+            if len(bosses) >= 4: break
+            if all(abs(q[0] - ox - b[0]) + abs(q[1] - oy - b[1]) > 6 for b in bosses):
+                bosses.append((q[0] + ox, q[1] + oy, 0x40))
+        if fixed and not chests:                    # (the boss floor's own chest: beyond the boss)
+            q = far[0]
+            put(q[0], q[1], pc['chest_corr'][0]); chests.append((q[0] + ox, q[1] + oy, 'room'))
     # chests on dead ends, far from the start and each other
     if n_chests:
-        d0 = bfs(walk, start)
-        dead = [p for p in walk if g[p[1]][p[0]] in '.C' and p != start and p not in stairs and
+        d0 = reach
+        ok = lambda p: p in d0 and p != start and p not in stairs and g[p[1]][p[0]] in '.C'
+        dead = [p for p in walk if ok(p) and
                 sum((p[0] + a, p[1] + b) in walk for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1))) == 1]
-        corner = [p for p in walk if g[p[1]][p[0]] == '.' and p != start and p not in stairs and
+        corner = [p for p in walk if ok(p) and g[p[1]][p[0]] == '.' and
                   sum((p[0] + a, p[1] + b) in walk for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1))) == 2]
         pool = dead + corner
         picked = []
@@ -256,9 +314,10 @@ def cave_floor(G, rec, role, n_chests, pc=None):
             p = max(pool, key=lambda p: (p in dead,) + score(p) if len(dead) > len(picked) else score(p))
             pool.remove(p); picked.append(p)
         for i, p in enumerate(picked):
-            put(p[0], p[1], pc['chest_corr'][i]); chests.append((p[0] + ox, p[1] + oy, 'corr'))
+            put(p[0], p[1], pc['chest_corr'][0]); chests.append((p[0] + ox, p[1] + oy, 'corr'))
     return dict(map=bytes(v for row in out for v in row), start=(start[0] + ox, start[1] + oy),
-                chests=chests, bosses=bosses, w=w, h=h, ox=ox, oy=oy)
+                chests=chests, bosses=bosses, stairs=[(x + ox, y + oy) for x, y in stairs],
+                w=w, h=h, ox=ox, oy=oy)
 
 
 def cave_tileset(rom):
@@ -277,27 +336,49 @@ def cave_tileset(rom):
     return dict(prop=bytes(prop), tsa=bytes(tsa), mt_pal=bytes(pal), cgb_tiles=t['cgb_tiles'])
 
 
+FLOOD_WATER = {161: (0xF1,)}                    # (the flooded village: its canoe water walked over)
+PALMAP_OUT = None
+
+
 def floors(rom, G=None):
-    """the post-game's maps: [(map id, map_pack overrides, extra bytes)]"""
+    """the post-game's maps: [dict(map, shrine, rec, role, area, f (the floor), ov (map_pack overrides),
+    tkey (its tileset: one bank per distinct tileset))]"""
     G = G or gba.Gba(GBA_PATH)
-    t = cave_tileset(rom)
-    pal = rom.rd(data.BANK_SMINFO, data.SM_PAL + 0x30 * EARTH_MAP, 0x30)
-    chr_ = rom.rd(data.BANK_TILESETCHR, 0x8000 + 0x800 * 2, 0x800)
     to, ochr, opal = outdoor_tileset(rom)
+    looks = {}
     out = []
-    for i, (rec, look, role) in enumerate(EARTHGIFT):
-        if look == 'cave':
-            f = cave_floor(G, rec, role, 0 if role != 'floor' else 3)
-            ov = dict(ts=PG_TS_CAVE - 8, t=t, map=f['map'], pal=pal, chr=chr_)
+    for i, (s, rec, look, role, area) in enumerate(PG_FLOORS):
+        sh = shrines.SHRINES[s]
+        n = sh['chests'] if role in ('floor', 'castle') else 0
+        if role == 'castle': n += 5
+        if isinstance(look, str):
+            f = outdoor_floor(G, rec, look.split(':')[1], n)
+            ov = dict(t=to, map=f['map'], pal=opal, chr=ochr)
+            tkey = 'out'
         else:
-            f = outdoor_floor(G, rec, 'grass' if look == 'forest' else 'sand', 4)
-            ov = dict(ts=PG_TS_OUT - 8, t=to, map=f['map'], pal=opal, chr=ochr)
+            ts, maps, palmap = LOOKS[look]
+            if look not in looks:
+                pc = pieces_for(rom, ts, maps)
+                looks[look] = (pc, look_tileset(rom, ts, pc))
+            pc, t = looks[look]
+            last = rec == sh['boss_maps'][-1]
+            f = cave_floor(G, rec, role if role != 'castle' else 'floor', n, pc,
+                           floor_chips=FLOOD_WATER.get(rec, ()), stairs_out=not last,
+                           fixed=rec in sh.get('fixed', {}) or sh['key'] == 'EG' and role == 'boss')
+            pal = rom.rd(data.BANK_SMINFO, data.SM_PAL + 0x30 * palmap, 0x30)
+            chr_ = rom.rd(data.BANK_TILESETCHR, 0x8000 + 0x800 * ts, 0x800)
+            ov = dict(t=t, map=f['map'], pal=pal, chr=chr_)
+            tkey = (ts, t['prop'], t['tsa'], t['mt_pal'])
         objs = bytearray(45)
-        for k, (bx, by) in enumerate(f['bosses']):  # the boss floor: an orb for each boss
-            objs[3 * k:3 * k + 3] = bytes([PG_OBJ0 + k, 0xC0 | bx, by])   # (in a room, still)
+        k = 0
+        for bk, (bname, bmap) in enumerate(sh['bosses']):    # the boss floor: an orb for each of its bosses
+            if bmap != rec: continue
+            bx, by, fl = f['bosses'][k]
+            objs[3 * k:3 * k + 3] = bytes([PG_OBJ0 + bk, fl | bx, by])   # (in a room or not, still)
+            k += 1
         ov['objs'] = bytes(objs)
         ov['obj_gfx'] = {PG_OBJ0 + k: ORB_GFX for k in range(4)}
-        out.append((PG_MAP0 + i, f, ov))
+        out.append(dict(map=PG_MAP0 + i, shrine=s, rec=rec, role=role, area=area, f=f, ov=ov, tkey=tkey))
     return out
 
 
@@ -370,7 +451,8 @@ def outdoor_floor(G, rec, base, n_chests):
         avg[c] = tuple(sum(p[i] for p in px) // len(px) for i in range(3))
     base_col = avg[max(cnt, key=cnt.get)]
     zero = [c for c in cnt if fs['attr'][c] == 0]               # the stairs: the odd one out
-    stairs_c = max(zero, key=lambda c: sum(abs(u - v) for u, v in zip(avg[c], base_col)))
+    stairs_c = max(zero, key=lambda c: sum(abs(u - v) for u, v in zip(avg[c], base_col))) if zero else -1
+    if cnt.get(stairs_c, 0) > 2: stairs_c = -1                  # (no stairs chip there: placed below)
     kind = {}
     for c in cnt:
         a = fs['attr'][c]; R, Gc, B = avg[c]
@@ -387,6 +469,17 @@ def outdoor_floor(G, rec, base, n_chests):
         kind[c] = k
     g = [[kind[cells[w * y + x]] for x in range(w)] for y in range(h)]
     st = [(x, y) for y in range(h) for x in range(w) if g[y][x] == 'S']
+    if base != 'sand' and (w > 60 or h > 60):      # (a large floor: its best 60 x 60, as cave_floor)
+        x0, y0, x1, y1 = window(g, w, h, '.SgC', st)
+        g = [row[x0:x1] for row in g[y0:y1]]
+        w, h = x1 - x0, y1 - y0
+        st = [(x, y) for y in range(h) for x in range(w) if g[y][x] == 'S']
+    if not st:                                      # (no stairs chip: the walkable cell farthest from
+        cs = [(x, y) for y in range(h) for x in range(w) if g[y][x] in '.gC']   # the bottom middle)
+        c0 = min(cs, key=lambda q: abs(q[0] - w // 2) + abs(q[1] - (h - 1)))
+        dd = bfs(set(cs), c0)
+        fx, fy = max(dd, key=dd.get)
+        g[fy][fx] = 'S'; st = [(fx, fy)]
     sx, sy = st[0]
     if base == 'sand': ox, oy = 32 - sx, 32 - sy    # the desert: the stairs in the middle (it loops)
     else: ox, oy = (64 - w) // 2, (64 - h) // 2      # the forest: the whole floor, its edges trimmed
@@ -440,9 +533,9 @@ def outdoor_floor(G, rec, base, n_chests):
                            for q in picked + [start, stairs])
             p = max(pool, key=lambda p: (score(p), d0.get(p, 0))); pool.remove(p); picked.append(p)
         for i, p in enumerate(picked):
-            out[p[1]][p[0]] = O_CHEST + i; chests.append((p[0], p[1], 'out'))
+            out[p[1]][p[0]] = O_CHEST; chests.append((p[0], p[1], 'out'))
     return dict(map=bytes(v for row in out for v in row), start=start, chests=chests, bosses=[],
-                w=W, h=W, ox=0, oy=0)
+                stairs=[stairs], w=W, h=W, ox=0, oy=0)
 
 
 # Earthgift's treasure (Dawn of Souls; the FINAL FANTASY wiki's lists per depth): B1-B4, then the
