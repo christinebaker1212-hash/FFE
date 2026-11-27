@@ -71,6 +71,29 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   max difference 4 RGB levels, RGB555 rounding); strict checker 0, VRAM / OAM checker 0 on all five
   systems.
 
+## Walking, maps, entrances (2026-11-27)
+- Walking on normal maps with FF3's rules ($3F $E396: property 1 bit 7 trigger by property 2's
+  high nibble; low bits stairs / bridge / impassable / z-levels 1-2 with the walked level),
+  16-frame steps, rows / columns written into the BG ring in V-Blank, the walking character's
+  poses ($3E $DC2A), palettes and bob.
+- Any map loaded at run time as FF3's load map does: properties, tileset pages into work RAM,
+  the RLE tilemap unpacked (streams repacked into ROM banks 8-11 at build time), trigger tiles
+  -> metatiles $80-$FF with their ids in property 2, palettes, graphics subsets (banks 12-16).
+- Entrances (the map's entrance list), FF3's start position and facing on entry, the return
+  stack, exits to the previous map. Checked in SameBoy: Ur -> a house -> back to Ur on the door
+  cell, strict checker 0. World map exits: not yet (no world map).
+- Known: a map change turns the LCD off (white on a real Color); to be replaced by FF3's wipe
+  / a black mask as FF1 did.
+
+## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
+- `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
+  proposal: use FF3's own choice of top / bottom), 18 columns x 6 lines.
+- `battle.png`: A command window over the party window, no backdrop; B the attack with FF3's
+  backdrop strip and a top window (attacker > target, hits); C a full-width message.
+- `menu.png`: Start menu with Config and Suspend added, party with pictures, Gil / CP / place /
+  time. `names.png`: name entry, one case at a time (Select switches), as FF1.
+Building continues on what does not depend on them (people, events, chests, world map).
+
 ## Next (after the decisions)
 - Map the listing's routine names onto the ROM (as `tools/gb/ff1dis.py` did for FF1).
 - Walking on the map: the party's walking sprite (FF3's showing character, Select = next member),
