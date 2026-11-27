@@ -597,3 +597,51 @@ def statue(rom):
     cgb = b''.join(tile(r, c, cgb_map) for r in range(4) for c in range(4))
     dmg = b''.join(tile(r, c, dmg_map) for r in range(4) for c in range(4))
     return cgb, dmg, p
+
+
+def learn_pieces(rom, ts):
+    """an FF1 tileset's floor-building pieces, learnt from FF1's own maps that use it: the corridor floor (the
+    commonest walkable floor outside the room palette), the void (the commonest piece with nothing walkable
+    round it), the wall piece for each side the corridor is on (right / left / above / below, then the corners
+    by a diagonal), the stairs down (teleport) and up (warp). Rooms (00-08), doors (36 / 37 / 3A) are FF1's own
+    numbers in every tileset."""
+    import collections
+    t = data.tileset_pack(rom, ts)
+    P = lambda mt: t['prop'][2 * mt]
+    rpal = t['mt_pal'][0x01]
+    walk = lambda mt: (not (P(mt) & 1)) or (P(mt) & 0x1E) in (2, 4, 6)
+    tsof = [rom.rd(data.BANK_SMINFO, data.TILESETS + m) for m in range(data.N_MAPS)]
+    maps = [m for m in range(data.N_MAPS) if tsof[m] == ts]
+    fl, void, st, up = collections.Counter(), collections.Counter(), collections.Counter(), collections.Counter()
+    for m in maps:
+        mp = data.std_map(rom, m)
+        for v in mp:
+            if (P(v) & 0x1E) == 0x0A and t['mt_pal'][v] != rpal: fl[v] += 1      # (random battles: a floor)
+            if (P(v) & 0xC0) == 0x80: st[v] += 1
+            if (P(v) & 0xC0) == 0x40: up[v] += 1
+    floor = fl.most_common(1)[0][0]
+    pat = collections.defaultdict(collections.Counter)
+    for m in maps:
+        mp = data.std_map(rom, m)
+        at = lambda x, y: mp[64 * (y & 63) + (x & 63)]
+        for y in range(64):
+            for x in range(64):
+                v = at(x, y)
+                if v == floor: continue
+                n4 = tuple(at(x + a, y + b) == floor for a, b in ((1, 0), (-1, 0), (0, -1), (0, 1)))
+                d4 = tuple(at(x + a, y + b) == floor for a, b in ((1, 1), (-1, 1), (1, -1), (-1, -1)))
+                if not any(n4) and not any(d4):
+                    if (P(v) & 0xC0) == 0 and t['mt_pal'][v] != rpal: void[v] += 1
+                    continue
+                if walk(v): continue
+                pat[(n4, d4 if not any(n4) else None)][v] += 1
+    def best(key, dflt):
+        c = pat.get(key)
+        return c.most_common(1)[0][0] if c else dflt
+    F, T = False, True
+    wh = best(((F, F, T, F), None), None) or best(((F, F, F, T), None), floor)
+    return dict(floor=floor, void=void.most_common(1)[0][0] if void else 0,
+                wl=best(((T, F, F, F), None), wh), wr=best(((F, T, F, F), None), wh),
+                wtop=best(((F, F, F, T), None), wh), wbot=best(((F, F, T, F), None), wh),
+                ctl=best(((F, F, F, F), (T, F, F, F)), wh), ctr=best(((F, F, F, F), (F, T, F, F)), wh),
+                stairs=st.most_common(1)[0][0] if st else None, up=up.most_common(1)[0][0] if up else None)
