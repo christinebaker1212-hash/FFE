@@ -1205,3 +1205,12 @@ one reaches parity, so the owner can keep playing).
     - Checked in SameBoy: the field changes every 4 frames in 4-line bands, nothing else on screen changes; no new
       lag on either system (the walk's only long gaps are its map events, the same in the build before); strict
       checker 0 on DMG / Color / SGB over 12,000 frames of random walking there.
+68. Owner (2026-11-27, a video: Chaos, Fire Barrier, two "o&" rows, then Arus "Dead" at 6464/999): asked whether
+    older saves can be corrected silently. The video's symptoms are exactly item 66's (the build before cba1757);
+    the fixed build casts party-wide barriers cleanly (formation 61, Classic and Modern MP).
+    - Saves made after that bug hit keep the broken record (status bits in the out-of-battle ailment byte, HP
+      above max). sv_fix (run after every file or suspend point loads) now ends in sv_chfix (extras.s, bank 107):
+      per member, an ailment above 3 (only 0-3 exist outside battle) becomes 0, or Dead at 0 HP; HP above max HP
+      becomes max HP, and a member "Dead" with that much HP is alive again. Sound records are left as they are.
+    - Checked: the routine run on eight records in PyBoy (the corrupted ones mended, Dead at 0 HP / Stone /
+      healthy ones unchanged); strict checker 0 on Color and DMG over 8,000 frames of random play.
