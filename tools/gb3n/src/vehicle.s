@@ -68,6 +68,11 @@ world_pass: ld b, W_PROP1
             and b
             cp b
             jp z, v_board
+            ld a, [veh]                     ; airships: other worlds (3E/C556)
+            cp 4
+            jr c, .nf
+            call v_edge
+            ret c
             ld a, [veh]                     ; airships (not under the sea): no entrances
             cp 4                            ;   (3E/C6C5; events stay)
             jr c, .nf
@@ -257,21 +262,46 @@ v_here:     ld a, [pos_x]
             cp [hl]
             ret
 ; landing (3E/C7A5): property 1 & the landing flag: not here; else parked here and on foot
-; (the Enterprise becomes the ship)
+; (the Enterprise becomes the ship). Under the sea: surfacing (3E/C786); on the surface world's
+; sea (tile $1E) with $6020 bit 7: diving (3E/C7E4)
 v_land:     ld a, [pos_x]
             ld d, a
             ld a, [pos_y]
             ld e, a
             call map_mt
+            ld c, a
             ld l, a
             ld h, W_PROP1
             ld b, [hl]
-            ld a, [veh]
+            ld a, [world]
+            cp 4
+            jr nz, .nu
+            bit 1, b                        ; surfacing where property 1 bit 1 is clear
+            jr nz, .no
+            ld a, $2D
+            call sfx_play
+            ld a, 3
+            jp v_goto_here
+.nu:        ld a, [veh]
             ld hl, vtab + VT_LAND
             call v_hla
             ld a, [hl]
             and b
+            jr z, .ok
+            ld a, [world]                   ; not here: diving?
+            cp 3
             jr nz, .no
+            ld a, c                         ; (FF3: 2 x the tile = $3C)
+            cp $1E
+            jr nz, .no
+            ld a, [SRAM_PAGE + $20]
+            bit 7, a
+            jr z, .no
+            ld a, $29
+            call sfx_play
+            ld a, 4
+            jp v_goto_here
+.ok:
             ld a, [pos_x]
             ld [SRAM_PAGE + $01], a
             ld a, [pos_y]
@@ -295,6 +325,67 @@ v_land:     ld a, [pos_x]
 m_sfx_err_f:
             ld a, $06
             jp sfx_play
+
+; airships at a world's edge (3E/C566 / C966): world 0's tile $64 takes them to world 2 (3 once
+; $6021 bit 5) at (32, 222), the floating continent's place kept in $600C / $600D (FF3's $27
+; format); worlds 2 / 3 at (32, 224) back to it. C set: changed (no step)
+v_edge:     ld a, [world]
+            and a
+            jr nz, .up
+            ld a, c                         ; (FF3 compares 2 x the tile: $C8)
+            cp $64
+            jr nz, .n
+            ld a, [pos_x]
+            sub 7
+            ld [SRAM_PAGE + $0C], a
+            ld a, [pos_y]
+            sub 7
+            ld [SRAM_PAGE + $0D], a
+            ld a, [SRAM_PAGE + $21]
+            and $20
+            cp 1
+            ld a, 2
+            adc 0
+            ld d, 25 + 7
+            ld e, 215 + 7
+            jr v_goto
+.up:        cp 4
+            jr z, .n
+            ld a, d
+            cp 32
+            jr nz, .n
+            ld a, e
+            cp 224
+            jr nz, .n
+            ld a, [SRAM_PAGE + $0C]
+            add 7
+            ld d, a
+            ld a, [SRAM_PAGE + $0D]
+            add 7
+            ld e, a
+            xor a
+            jr v_goto
+.n:         and a
+            ret
+; to world A at the party's place
+v_goto_here:
+            ld b, a
+            ld a, [pos_x]
+            ld d, a
+            ld a, [pos_y]
+            ld e, a
+            ld a, b
+; to world A at (D, E): the world map loaded there (C set)
+v_goto:     ld [world], a
+            ld a, d
+            ld [wm_x], a
+            ld [enter_x], a
+            ld a, e
+            ld [wm_y], a
+            ld [enter_y], a
+            call map_change
+            scf
+            ret
 
 ; ---- the party in its vehicle (3E/D8D3): OAM 0-3 from the vehicles' poses + the vehicle's
 ; tiles; a ground vehicle's frame from the step, an airship's from the frame counter
