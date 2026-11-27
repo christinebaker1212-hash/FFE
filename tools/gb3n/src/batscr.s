@@ -1221,7 +1221,24 @@ bs_palette: ld c, 0                         ; 2E/9E64: rows and jobs, the status
             ld a, [bs_tmp + 1]
             ld hl, cgb_pal + 8
             call bs_mpal
-            ld a, $FC                       ; OBJ 0-2: the characters' palettes, 3: the cursor's
+            call bs_objpal
+            call wait_vbl
+            call pal_apply
+            ld a, $80 | 4 * 8               ; OBJ 4 (ours): green numbers
+            ldh [rOCPS], a
+            ld hl, bs_green
+            ld b, 8
+.g:         ld a, [hl+]
+            ldh [rOCPD], a
+            dec b
+            jr nz, .g
+            ld a, 2
+            ldh [rSVBK], a
+            ld de, $DD93
+            jp bs_jpals
+; OBJ palettes 0-2: the characters' battle palettes ($FC-$FE), 3: the cursor's ($FF), into
+; cgb_pal (work RAM bank 1 mapped)
+bs_objpal:  ld a, $FC
 .o:         push af
             sub $FC
             add a
@@ -1238,22 +1255,15 @@ bs_palette: ld c, 0                         ; 2E/9E64: rows and jobs, the status
             pop af
             inc a
             jr nz, .o
-            call wait_vbl
-            call pal_apply
-            ld a, $80 | 4 * 8               ; OBJ 4 (ours): green numbers
-            ldh [rOCPS], a
-            ld hl, bs_green
-            ld b, 8
-.g:         ld a, [hl+]
-            ldh [rOCPD], a
-            dec b
-            jr nz, .g
-            ld a, 2
-            ldh [rSVBK], a
-            ld c, 0                         ; the characters' palette ids (2E/9E01: by job,
-.j:         ld a, c                         ;   2E/9E4A by member for the Onion Kid)
-            ld hl, $DD8B
-            call bs_hl_a
+            ret
+; the characters' palette ids -> DE (4 bytes; 2E/9E01: 2E/9E4E + job, 2E/9E4A + member for the
+; Onion Kid); the save page at $D100 (either work RAM bank)
+bs_jpals:   ld c, 0
+.j:         push de
+            ld a, c
+            call bs_choff
+            ld l, a
+            ld h, $D1
             ld a, [hl]
             and a
             ld hl, $9E4E - $4000
@@ -1265,11 +1275,9 @@ bs_palette: ld c, 0                         ; 2E/9E64: rows and jobs, the status
             ld a, B_BSET
             call far_byte
             pop bc
-            ld e, a
-            ld a, c
-            ld hl, $DD93
-            call bs_hl_a
-            ld [hl], e
+            pop de
+            ld [de], a
+            inc de
             inc c
             ld a, c
             cp 4
@@ -1323,6 +1331,29 @@ bs_mpal:    push hl
             call far_byte
             ld [de], a
             inc de
+            ret
+
+; ---- FF3's update character equipment (3E/D10B -> 34/803D: battle algorithm $05) from the field
+; menu: C = member; the save page goes to work RAM bank 2 for it and comes back (FF3's zero page
+; and battle variables at $C400-$C7FF meanwhile)
+bs_fequip:  push bc
+            ld c, 1
+            call bs_page
+            ld a, 2
+            ldh [rSVBK], a
+            ld hl, fe_88E1
+            ld a, B_BAT2
+            call far_call
+            pop bc
+            ld a, c
+            ld [BZ + $52], a
+            ld hl, fe_AA16
+            ld a, B_BAT
+            call far_call
+            ld c, 2
+            call bs_page
+            ld a, 1
+            ldh [rSVBK], a
             ret
 
 ; ---- back to the field (it reloads its map)

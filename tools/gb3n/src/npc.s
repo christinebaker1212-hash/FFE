@@ -111,9 +111,13 @@ sram_init:  ld hl, SRAM_PAGE
 
 ; ---- the map's people (LCD off): FF3's load npcs; each visible person's 16 sprite tiles into
 ; VRAM bank 1 at tile 16 + 16 * slot
-npc_load:   ld hl, NPC1
+npc_load:   ld a, [npc_keep]                ; (back from a menu / battle: the people stay
+            and a                           ;   where they were; their graphics again)
+            jr nz, .k0
+            ld hl, NPC1
             ld de, $200
             call memclr
+.k0:
             ld hl, N_POSE                   ; the people's poses (3B/B41A) into npc_poses
             ld de, npc_poses
             ld bc, 256
@@ -141,6 +145,27 @@ npc_load:   ld hl, NPC1
             call far_copy
             xor a
             ld [npc_list + 4 * NPC_SLOTS], a ; (a terminator after 12)
+            ld a, [npc_keep]
+            and a
+            jr z, .k1
+            xor a
+            ld [npc_keep], a
+            ld de, NPC1
+            ld b, NPC_SLOTS
+.kg:        push bc
+            push de
+            call npc_gfx
+            pop de
+            pop bc
+            ld a, e
+            add 16
+            ld e, a
+            jr nc, .kn
+            inc d
+.kn:        dec b
+            jr nz, .kg
+            ret
+.k1:
             ld hl, npc_list
             ld de, NPC1
             xor a
@@ -228,7 +253,7 @@ npc_one:    ld a, [hl+]                     ; id
             add hl, de
             ld [hl], a
             pop hl
-            ld a, [de]                      ; graphics for a shown person
+npc_gfx:    ld a, [de]                      ; graphics for a shown person (DE = its slot)
             and a
             ret z
             ld a, e                         ; VRAM bank 1 tile 16 + 16 * slot
@@ -549,6 +574,7 @@ nd_sy:      ds 1
 frame:      ds 1
 npc_list:   ds 4 * NPC_SLOTS + 1
 nd_ptr:     ds 2
+npc_keep:   ds 1                            ; 1: the next map load keeps the people
 
 section bank B_FIELD, $7A00
 ; ---- person at slot L (NPC1 page) starts a step in direction A (0 right, 1 left, 2 down, 3 up)

@@ -3,7 +3,7 @@ existing pipeline makes (tools/ff3_mmc5/build.py, then tools/ff3/insert.py). Gam
 from that ROM here, at build time; nothing game-specific is kept in the repository.
 
 usage: python3 tools/gb3n/build.py [--nes build/ff3_en.nes] [--out build/ff3n.gbc] [--map M[,WORLD[,X,Y]]]"""
-import os, sys, hashlib
+import os, sys, hashlib, re
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
@@ -20,6 +20,30 @@ EN_SHA1 = '4a7f1ae4c89305cf161aa3d78fd4416548663f99'   # build/ff3_en.nes (patch
 def db(data, per=16):
     return ''.join('            db ' + ', '.join('$%02X' % b for b in data[i:i + per]) + '\n'
                    for i in range(0, len(data), per))
+
+
+def menu_data():
+    """the menu's words: FF3's own from the English text (t8200 $31 commands, $37 Status, $47 the
+    status labels), ours where FF3 has none (Config, Suspend, CP, Lv, Exp)"""
+    t = text.load('t8200')
+    clean = lambda s: re.sub(r'\{[0-9A-F]{2}(:[0-9A-F]{2})?\}', '', text.plain(s)).replace('…', '').strip()
+    cmds = [clean(l.replace('[E1][E2][E3][E4]', t[0x37])) for l in t[0x31].split('\n')]
+    assert len(cmds) == 7, cmds
+    cmds = cmds[:6] + ['Config', cmds[6], 'Suspend']
+    st = [clean(l) for l in t[0x47].split('\n')]
+    lab = {}
+    for l in st:
+        m = re.match(r'([A-Za-z][A-Za-z ]*?)\s*(\d+x)?$', l.split('‥')[0].strip()) if l else None
+        if m: lab[m.group(1).strip()] = 1
+    want = ['Strength', 'Agility', 'Stamina', 'Intelligence', 'Spirit', 'Attack', 'Hit rate', 'Defense']
+    for w in want: assert any(k.startswith(w) for k in lab), (w, lab)
+    prof = [k for k in lab if k.startswith('Proficiency')][0]
+    z = lambda w: ''.join('$%02X, ' % ord(c) for c in w) + '0'
+    return ('section bank %d, $7800\nm_cmdtxt:\n' % B_MENU + ''.join('            db %s\n' % z(c) for c in cmds) +
+            'm_labels:\n' + ''.join('            db %s\n' % z(w) for w in want) +
+            'm_gil:      db %s\n' % z(clean(t[5])) + 'm_cp:       db %s\n' % z('CP') +
+            'm_lv:       db %s\n' % z('Lv') + 'm_hp:       db %s\n' % z('HP') + 'm_mp:       db %s\n' % z('MP') +
+            'm_exp:      db %s\n' % z('Exp') + 'm_prof:     db %s\n' % z(prof))
 
 
 def own_data():
@@ -63,6 +87,7 @@ B_BAT2 = 58                 # battle flow code
 B_BSET = 59                 # NES $2E / $2F: battle setup data
 B_BSCR, B_BINFO, B_CGFX, B_MGFX0 = 60, 61, 62, 64   # battle screen code; monster index; job graphics; monster graphics (64-71)
 B_BOSS0 = 72                # boss graphics (72-75)
+B_MENU = 76                 # the main menu's code
 
 
 def field_banks(rom):
@@ -295,7 +320,7 @@ def main():
                B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD) +
            'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
            'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\nB_BSET = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2, B_BSET) +
-           'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0) + text_defs +
+           'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\nB_MENU = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0, B_MENU) + text_defs +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
@@ -304,7 +329,8 @@ def main():
            open(os.path.join(HERE, 'src', 'world.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'fbattle.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sound.s')).read() + '\n' +
-           ''.join(open(os.path.join(HERE, 'src', f)).read() + '\n' for f in BATTLE_SRC) + sound_data() + own_data())
+           ''.join(open(os.path.join(HERE, 'src', f)).read() + '\n' for f in BATTLE_SRC) +
+           open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + sound_data() + own_data())
     if os.environ.get('GB3N_BATTLE'):            # test builds only: every encounter is this battle
         src = src.replace('            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a',
                           '            ld a, %s\n            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a' % os.environ['GB3N_BATTLE'])

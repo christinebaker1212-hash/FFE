@@ -564,6 +564,8 @@ field_step: call npc_update
             ld b, a
             jr .dir
 .pl:        ldh a, [pad_new]                ; A: talk to the person ahead
+            bit 3, a                        ; Start: the main menu
+            jp nz, menu_open
             and PAD_A
             jr z, .pd
             call talk

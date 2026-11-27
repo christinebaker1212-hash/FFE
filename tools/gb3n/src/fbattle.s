@@ -183,9 +183,34 @@ battle_run: ld a, [map_id]                  ; the battle background (39/BC00 wor
             ld a, [pos_y]
             ld [enter_y], a
             ld [wm_y], a
+            call keep_people
             call map_change
             pop af
             ld [z_lev], a
+            ret
+; Start on the map: FF3's main menu (its screen in B_MENU), then the map again
+menu_open:  ld a, [z_lev]
+            push af
+            %FAR B_MENU, m_main
+            ld a, [pos_x]
+            ld [enter_x], a
+            ld [wm_x], a
+            ld a, [pos_y]
+            ld [enter_y], a
+            ld [wm_y], a
+            call keep_people
+            call map_change
+            pop af
+            ld [z_lev], a
+            ret
+; the next map load keeps the people where they are (a map, not the world map)
+keep_people:
+            ld a, [wmode]
+            and a
+            ld a, 1
+            jr z, .k
+            xor a
+.k:         ld [npc_keep], a
             ret
 ; the map's battle rate at a map's start (FF3's $F8: 39/BE00 world 0, 39/BF00 others)
 enc_setrate:
