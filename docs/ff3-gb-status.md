@@ -317,7 +317,11 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   on the target (32/97B2, FF3's rng 0 for the random places, as on the Famicom); fists and claws
   (33/A2FB). A monster's hit on a member (33/A8B8): the hit pose, knock-back (half FF3's: the
   party column is at the screen's edge), four shakes, FF3's sounds (a critical hit's own).
-- Not yet in battle: bows / harps / boomerangs / moons / shuriken / arrows (their own weapon
+- Spell casting (33/B09B): the cast pose, black magic's frames and bubbles, white magic's stars
+  circling and closing in (FF3's vectors and sine table 10/9A80), the spell's palette (2E/91D0),
+  graphics sets from 33/BEB2 packed into B_ANIM at build time. The bubbles can lose up to 4 of their
+  16 sprites to the GB's 40-sprite limit (the party takes 24). Test hook GB3N_ANTEST=spell.
+- Not yet in battle: the spells' projectiles and hits on the targets (33/B276, B68D), bows / harps / boomerangs / moons / shuriken / arrows (their own weapon
   animations: they show the step only), spell / summon animations,
   stone characters in the BG, back attacks drawn flipped (FF3 3F/F942: the
   monsters' tiles mirrored, the party at x $30), the airship's battle background.

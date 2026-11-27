@@ -686,9 +686,10 @@ an_wgfx:    ld a, [$DE1F]
 an_hitpal:  ld a, [an_h]
             and a
             ld a, [an_p1]
-            jr z, .p
+            jr z, an_gpal3
             ld a, [an_p2]
-.p:         ld e, a
+; OBJ palette 3, colours 1-3, from FF3's general palette A (V-Blank)
+an_gpal3:   ld e, a
             ld d, 0
             push de
             call wait_vbl
@@ -748,8 +749,326 @@ an_restpal: call wait_vbl
             jr nz, .l
             ret
 
+; ---- battle graphics $1D, magic (2F/B15E): a character steps forward and casts (33/B09B: the
+; spell's properties 2E/91D0, black / white graphics set 5 / 6, the spell's palette as OBJ
+; palette 3; black: the cast pose, the hands' frames 33/B1D7 and the bubbles over the caster 44
+; frames; white: the stars circling 48 frames, then closing in; ineffective: the pose 32 frames)
+an_magic:   ld a, [$D8D6]
+            ld [an_c], a
+            ld [bs_act], a
+            call an_cgfx
+            ld a, [$DE88]
+            ld l, a
+            ld h, 0
+            ld b, h
+            ld c, l
+            add hl, hl
+            add hl, bc
+            ld bc, mg_prop
+            add hl, bc
+            ld a, [hl+]
+            ld [an_m0], a
+            inc hl
+            ld a, [hl]
+            ld [an_m2], a
+            ld a, [an_m0]
+            rlca
+            and 1
+            add 5
+            call an_lgfx
+            call an_savepal
+            ld a, [an_m2]
+            call an_gpal3
+            xor a
+            ld [an_f], a
+            ld a, [BZ + $CC]                ; ineffective: the pose only
+            and a
+            jr z, .bw
+.in:        call an_cast
+            call an_frame
+            ld a, [an_f]
+            cp $20
+            jr nz, .in
+            jr .x
+.bw:        ld a, $21                       ; (FF3's sound $A1)
+            call bs_sfx
+            ld a, [an_m0]
+            bit 7, a
+            jr nz, .wh
+.bk:        call an_cast                    ; black
+            ld a, [an_f]
+            rra
+            rra
+            and $3F
+            ld hl, mg_blk
+            call bs_hl_a
+            ld a, [hl]
+            call an_wspr0
+            call an_bubbles
+            call an_frame
+            ld a, [an_f]
+            cp $2C
+            jr nz, .bk
+            jr .x
+.wh:        ld b, 8                         ; white: 8 stars at distance 16, round the circle
+            ld hl, an_vd
+            xor a
+.v:         ld [hl], $10
+            inc hl
+            ld [hl+], a                     ; (angle: y from 32 i, x from $40 + 32 i)
+            push af
+            add $40
+            ld [hl+], a
+            pop af
+            add $20
+            dec b
+            jr nz, .v
+.w:         call an_cast
+            ld a, [an_f]
+            rra
+            rra
+            and $3F
+            ld hl, mg_wht
+            call bs_hl_a
+            ld a, [hl]
+            call an_wspr0
+            call an_stars
+            call an_frame
+            ld a, [an_f]
+            cp $30
+            jr nz, .w
+.cl:        call an_cast                    ; closing in
+            call an_stars
+            ld hl, an_vd
+            ld b, 8
+.d:         dec [hl]
+            inc hl
+            inc hl
+            inc hl
+            dec b
+            jr nz, .d
+            call an_frame
+            ld a, [an_vd]
+            and a
+            jr nz, .cl
+.x:         call an_clr
+            call an_restpal
+            ld a, $FF
+            ld [an_cf], a
+            ld [bs_act], a
+            jp bs_party
+; the cast pose (33/AF9F: frame 8, toad / mini $0E)
+an_cast:    call an_clr
+            ld a, [an_c]
+            add a
+            ld hl, $D8BB
+            call bs_hl_a
+            ld a, [hl]
+            and 5
+            ld a, 8
+            jr z, .p
+            ld a, $0E
+.p:         jp an_cframe
+; animation frame A at the caster (no offset: 32/9299)
+an_wspr0:   push af
+            call an_mypos
+            pop af
+            ld b, 0
+            jp an_spr
+; the bubbles (33/B1F8): a 4 x 4 block over the caster from 33/AEB2's tiles and flips, the second
+; set every other two frames
+an_bubbles: call an_mypos
+            ld a, [an_f]
+            and 2
+            add a
+            add a
+            add a                           ; 0 / 16
+            ld c, a
+            ld b, 0
+.l:         push bc
+            push de
+            call an_slot_oam
+            jr c, .full
+            ld a, b                         ; y = 8 (i / 4) - 4
+            srl a
+            srl a
+            add a
+            add a
+            add a
+            sub 4
+            add e
+            add 17
+            ld [hl+], a
+            ld a, b                         ; x = 8 (i & 3) - 8
+            and 3
+            add a
+            add a
+            add a
+            sub 8
+            add d
+            add 8
+            ld [hl+], a
+            ld a, c
+            add b
+            push hl
+            ld hl, mg_bub
+            call bs_hl_a
+            ld a, [hl]
+            pop hl
+            ld e, a
+            and $0F
+            add $49
+            ld [hl+], a
+            ld a, e
+            and $C0
+            rra
+            or $0B
+            ld [hl], a
+            pop de
+            pop bc
+            inc b
+            ld a, b
+            cp 16
+            jr nz, .l
+            ret
+.full:      pop de
+            pop bc
+            ret
+; the white magic stars (33/B134): 8 at the caster's (x + 4, y + 6) + the vectors; tile $49, palette
+; 3, flipped by the frame / 4 and the star; each angle on 4
+an_stars:   call an_mypos
+            ld a, d
+            add 4
+            ld [an_ox], a
+            ld a, e
+            add 6
+            ld [an_oy], a
+            ld hl, an_vd
+            ld c, 0
+.l:         push bc
+            push hl
+            ld a, [hl+]
+            ld [an_k], a                    ; distance
+            ld a, [hl+]                     ; y angle
+            ld b, a
+            ld a, [hl]
+            ld [an_k2], a                   ; x angle
+            ld a, b
+            call an_smul
+            ld hl, an_oy
+            add [hl]
+            add 17
+            ld [an_by], a
+            ld a, [an_k2]
+            call an_smul
+            ld hl, an_ox
+            add [hl]
+            add 8
+            ld [an_bx], a
+            call an_slot_oam
+            jr c, .n
+            ld a, [an_by]
+            ld [hl+], a
+            ld a, [an_bx]
+            ld [hl+], a
+            ld a, $49
+            ld [hl+], a
+            ld a, [an_f]
+            rra
+            rra
+            pop de                          ; (the star's index from the stack)
+            pop bc
+            push bc
+            push de
+            xor c
+            and 1
+            rrca
+            rrca                            ; vertical flip: bit 6
+            or $0B
+            ld [hl], a
+.n:         pop hl
+            inc hl                          ; angles + 4
+            ld a, [hl]
+            add 4
+            ld [hl+], a
+            ld a, [hl]
+            add 4
+            ld [hl+], a
+            pop bc
+            inc c
+            ld a, c
+            cp 8
+            jr nz, .l
+            ret
+; A = sin(angle A) x [an_k] (33/BFC6: 256 sin, its size x 2 x the distance / 256, the sign kept)
+an_smul:    ld hl, an_sin
+            call bs_hl_a
+            ld a, [hl]
+            bit 7, a
+            jr z, .p
+            cpl
+            call .m
+            cpl
+            inc a
+            ret
+.p:
+.m:         add a
+            ld e, a
+            ld a, [an_k]
+            ld d, a
+            xor a
+            ld b, 8
+.ml:        srl e
+            jr nc, .ms
+            add d
+.ms:        rra
+            dec b
+            jr nz, .ml
+            ret
+; animation graphics set A (33/BF1E, table made by build.py in B_ANIM $4F00)
+an_lgfx:    add a
+            add a
+            ld l, a
+            ld h, $4F
+            ld de, an_tmp
+            ld bc, 4
+            ld a, B_ANIM
+            call far_copy
+            ld a, [an_tmp + 3]
+            and a
+            ret z
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld b, h
+            ld c, l
+            ld a, [an_tmp + 2]
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $8000
+            add hl, de
+            ld d, h
+            ld e, l
+            ld a, [an_tmp]
+            ld l, a
+            ld a, [an_tmp + 1]
+            ld h, a
+            ld a, B_ANIM
+            jp an_vcopy
+
 section bank B_BSCR, $7600
 an_blob:    ds $375                         ; (32/943D-97B1)
+mg_prop:    ds 3 * $60                      ; (2E/91D0)
+mg_blk:     ds 11                           ; (33/B1D7)
+mg_wht:     ds 12                           ; (33/B1E2)
+mg_bub:     ds 32                           ; (33/AEB2)
 sl_pos:     ds 24                           ; (32/99D1)
 sl_tile:    ds 12                           ; (32/99E9)
 sl_mask:    ds 4                            ; (32/9968)
@@ -757,7 +1076,10 @@ an_max:     ds 9                            ; (33/A077)
 an_ids:     ds 25                           ; (34/83F8)
 wp_prop:    ds 3 * $60                      ; (2E/9098)
 
-section wram, $CECC
+section bank B_BSCR, $7F00
+an_sin:     ds 256                          ; (10/9A80)
+
+section wram, $CD00
 an_c:       ds 1
 an_t:       ds 1
 an_h:       ds 1
@@ -784,4 +1106,8 @@ an_p1:      ds 1
 an_p2:      ds 1
 an_sp:      ds 8
 an_hc:      ds 1
+an_m0:      ds 1
+an_m2:      ds 1
+an_tmp:     ds 4
+an_vd:      ds 24                           ; 8 x (distance, y angle, x angle)
 an_dx:      ds 1

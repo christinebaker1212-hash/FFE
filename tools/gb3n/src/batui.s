@@ -1676,7 +1676,9 @@ bsc_anim:   ld a, [$D8D6]
             call an_chit
             jr .m
 .ch:        call an_kind                    ; a character's fight on a monster: its swings
-            and a                           ;   (34/8613, battle graphics $12)
+            cp 1                            ;   (34/8613, battle graphics $12); magic: its
+            jp z, an_magic                  ;   casting (34/8577, $1D)
+            and a
             jr nz, .st
             ld a, [$DE9A]
             bit 6, a

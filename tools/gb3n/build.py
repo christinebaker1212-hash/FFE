@@ -348,6 +348,11 @@ ROMDATA = {
     'sa_9cb4': (0x3A, 0x9CB4, 240),
     'ws_sin': (0x3A, 0x9E3E, 256),       # world sprites: FF3's sine table, the ship's chain
     'ws_chtab': (0x3D, 0xBF7A, 126),
+    'mg_prop': (0x2E, 0x91D0, 3 * 0x60),  # spells' animation properties (33/AF6F)
+    'an_sin': (0x10, 0x9A80, 256),       # FF3's sine (2E/9F6C)
+    'mg_blk': (0x33, 0xB1D7, 11),        # black / white pre-animation frames
+    'mg_wht': (0x33, 0xB1E2, 12),
+    'mg_bub': (0x33, 0xAEB2, 32),        # black magic's bubbles
     'an_blob': (0x32, 0x943D, 0x375),    # battle animations (src/banim.s)
     'sl_pos': (0x32, 0x99D1, 24),
     'sl_tile': (0x32, 0x99E9, 12),
@@ -488,6 +493,8 @@ ev_fxtest:  call ev_shake
             call ev_npcx
             jp ev_dance
 '''
+    if os.environ.get('GB3N_ANTEST'):            # test builds only: every fight shows spell N's cast
+        src = src.replace('an_kind:    ld a, [$DEC2]', 'an_kind:    ld a, %s\n            ld [$DE88], a\n            ld a, [$DEC2]\n            cp 4\n            ld a, 1\n            ret z\n            ld a, [$DEC2]' % os.environ['GB3N_ANTEST'])
     if os.environ.get('GB3N_TEST'):              # test builds: tools/gb3n/test (never a release)
         src = src.replace('.nw:        call map_enter', '.nw:        jp test_loop')
         src += open(os.path.join(HERE, 'src', 'test.s')).read() + '\n'
@@ -538,7 +545,20 @@ ev_fxtest:  call ev_shake
     assert not any(r.claimed.get((B_MINI, o)) for o in range(0x2000))
     mb[0:0x2000] = minimap.gb_bank(rom)
     banks[B_MINI] = mb
-    banks[B_ANIM] = bytearray(b"".join(tiles.gb(t) for t in (rom.rd(0x2B, 0xB000 + 16 * i, 16) for i in range(256)))) + bytearray(0x3000)
+    ab = bytearray(b"".join(tiles.gb(t) for t in (rom.rd(0x2B, 0xB000 + 16 * i, 16) for i in range(256)))) + bytearray(0x3000)
+    at, an = bytearray(), bytearray()               # 33/BEB2's animation graphics sets: tiles from
+    for k in range(12):                             #   $1000, the table at $0F00 (offset, OBJ tile, count)
+        lo, hi, plo, phi, cnt, bk = rom.rd(0x33, 0xBEB2 + 6 * k, 6)
+        addr, ppu = hi << 8 | lo, phi << 8 | plo
+        if not (0x1000 <= ppu < 0x2000 and addr >= 0x8000):
+            at += bytes(4); continue
+        o = 0x1000 + len(an)
+        an += b''.join(tiles.gb(rom.at(bk * 0x4000 + addr - 0x8000 + 16 * i, 16)) for i in range(cnt))
+        at += bytes([o & 255, (o >> 8) + 0x40, (ppu - 0x1000) // 16, cnt])
+    assert len(an) <= 0x3000
+    ab[0xF00:0xF00 + len(at)] = at
+    ab[0x1000:0x1000 + len(an)] = an
+    banks[B_ANIM] = ab
     for k, v in tbanks.items():
         assert k not in banks, 'bank %d used twice' % k
         banks[k] = v
