@@ -136,3 +136,45 @@ def map_image(G, i):
         if c not in cache: cache[c] = chip_image(fs, c)
         im.paste(cache[c], (16 * (k % m['w']), 16 * (k // m['w'])))
     return im
+
+
+def _asset(G, k):
+    """asset k unpacked (LZ77 when its first byte is $10, else raw: header u32 kind, u32 size)"""
+    p = G.u32(ASSETS + 4 * k) - 0x08000000
+    if G.d[p] == 0x10:
+        return G.lz77(p)[0]
+    n = G.u32(p + 4)
+    return G.d[p:p + 8 + 2 * n + 8]
+
+
+MON_FF1, MON_BOSS, MON_NEW = 117, 501, 552         # asset triples: FF1's 128, the 17 bosses, 50 new
+
+
+def monster_asset(rec):
+    """a monster record id (0-127 FF1's, 128-144 the bosses, 145-194 the new) -> its asset triple"""
+    if rec < 128: return MON_FF1 + 3 * rec
+    if rec < 145: return MON_BOSS + 3 * (rec - 128)
+    return MON_NEW + 3 * (rec - 145)
+
+
+def monster_picture(G, rec):
+    """a monster's battle picture: (tile data pointer (shared by recoloured families), w, h in tiles,
+    [rows of colour indices 0-15], 16 RGB555 colours)"""
+    a = monster_asset(rec)
+    tp = G.u32(ASSETS + 4 * a) - 0x08000000
+    tiles = _asset(G, a)[8:]
+    pal = _asset(G, a + 1)[8:]
+    cols = [pal[2 * i] | pal[2 * i + 1] << 8 for i in range(16)]
+    arr = _asset(G, a + 2)
+    w, h = arr[8], arr[9]
+    ents = [arr[12 + 2 * i] | arr[13 + 2 * i] << 8 for i in range(w * h)]
+    px = [[0] * (8 * w) for _ in range(8 * h)]
+    for i, e in enumerate(ents):
+        t = e & 0x3FF; hf = e >> 10 & 1; vf = e >> 11 & 1
+        for y in range(8):
+            for x in range(8):
+                b = tiles[32 * t + 4 * y + x // 2] if 32 * t + 32 <= len(tiles) else 0
+                v = (b >> 4) if x & 1 else (b & 15)
+                X = 7 - x if hf else x; Y = 7 - y if vf else y
+                px[8 * (i // w) + Y][8 * (i % w) + X] = v
+    return tp, w, h, px, cols

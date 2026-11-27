@@ -51,7 +51,7 @@ battle:     xor a                           ; (no menu sounds, no vehicle noise)
             add hl, de
             ld de, bt_form
             ld bc, 16
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             call bs_seen0                   ; enemies generated (FF1 PrepareEnemyFormation)
             ld a, TR_BATTLE                 ; (FF1: the battle music)
@@ -110,7 +110,7 @@ bt_rng:     push hl
             dec a
             ld l, a
             ld h, high(B_RNG)
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             ld [fc_bank], a
             call far_byte
             pop de
@@ -461,7 +461,7 @@ bt_enemy_gfx:
             ld l, $20
             ld a, b
             cp 8
-            ld a, ENEMY_CHR
+            ldh a, [hbt_cb]
             jr c, .b
             inc a
 .b:         ld de, $9120
@@ -481,7 +481,7 @@ bt_enemy_gfx:
             add hl, de
             ld de, bt_shade
             ld bc, 8
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             ld a, [bt_type]                 ; (fiend / Chaos: by cell, bt_fiend_map)
             cp 3
@@ -722,7 +722,7 @@ bt_pal:     ldh a, [is_cgb]
             add hl, de
             ld de, scr_buf
             ld bc, 4
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             ld a, $0F                       ; (colour 0: the black battlefield)
             ld [scr_buf], a
@@ -834,7 +834,7 @@ bt_fiend_map:
             ld a, $01                       ; (Chaos: x 1, y 0)
             ld [bt_t + 6], a
 .ld:        ld de, bt_stage
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             ld a, [bt_t + 4]                ; the attribute bytes after the TSA
             ld b, a
@@ -1727,7 +1727,7 @@ bt_name_row:
             add hl, de
             ld de, bt_sbuf
             ld bc, 2
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             ld a, [bt_sbuf]
             ld l, a
@@ -1735,7 +1735,7 @@ bt_name_row:
             ld h, a
             ld de, bt_sbuf
             ld bc, 20
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             ld hl, bt_sbuf
             call bt_nstr                    ; (with the kind's count: btl5.s)

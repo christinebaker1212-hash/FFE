@@ -570,7 +570,7 @@ GOLD       = $D01C
 DLG_TCGET  = $F0
 DLG_FULL   = $F1
 DLG_EMPTY  = $F2
-open_chest: ld [tc_id], a
+open_chest: call pg_cchk                    ; (tc_id = A; the post-game's chests: pg.s)
             ld l, a
             ld h, high(game_flags)
             bit 2, [hl]                     ; opened
@@ -583,8 +583,8 @@ open_chest: ld [tc_id], a
             ld h, high(N_TREAS)
             ld a, [hl]
             ld [dlg_item], a
-            cp $1C
-            jr nc, .ni
+tc_give:    cp $1C                          ; (A = the item, NAMES mapped: the post-game's
+            jr nc, .ni                      ;   chests come in here, pg.s)
             add a, low(ITEMS)               ; an item: one more, up to 99
             ld l, a
             ld h, high(ITEMS)
