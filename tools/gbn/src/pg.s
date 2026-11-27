@@ -81,7 +81,9 @@ pg_give:    and a
             jp tc_give
 
 ; load_map (every map): the battle banks of the map's dungeon (pgbattle.py), FF1's elsewhere
-pg_lcd:     ld a, [cur_map]
+pg_lcd:     ld a, $23                       ; (the fiend picture's first cell: FF1's)
+            ldh [hbt_fy], a
+            ld a, [cur_map]
             cp PGM_MAP0
             jr c, .ff1
             inc a                           ; (MAP_OW: FF1's)
@@ -191,6 +193,7 @@ hbt_cb:     ds 1                            ; the enemy graphics banks (2)
 hbt_sb:     ds 1                            ; their silhouettes (2)
 hbt_dom:    ds 1                            ; the encounter domains' bank
 hbt_sgb:    ds 1                            ; the Super Game Boy's battle colours' bank (sgb.s)
+hbt_fy:     ds 1                            ; the fiend picture's first cell (y x: $23, a hanging boss $03)
 
 section bank PGM_BANK, $4000
 ; ---- the stairs down (E = FF1's teleport number, not used)
@@ -376,6 +379,12 @@ pg_bit:     push bc
 pg_boss:    ld a, [talk_id]
             sub PG_OBJ0
             ld [pg_bk], a
+            ld e, a                         ; (its picture's first cell: pg_fy)
+            ld d, 0
+            ld hl, pg_fy
+            add hl, de
+            ld a, [hl]
+            ldh [hbt_fy], a
             ld a, [talk_id]
             call hide_this
             ld a, [pg_bk]

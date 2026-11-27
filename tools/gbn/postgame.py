@@ -423,9 +423,11 @@ EG_FIXED = ['Megalixir']
 def pg_source(bank):
     """the run's data in the post-game code bank: the treasure per depth, the fixed chests"""
     db = lambda xs: '            db ' + ', '.join('$%02X' % x for x in xs) + '\n'
+    import pgbattle
+    fy = [0x03 if n in pgbattle.HANGING else 0x23 for n, _ in pgbattle.EG_BOSSES]
     return ('section bank %d, $7F00\npg_treas:\n' % bank +
             ''.join(db([item_code(n) for n in row]) for row in EG_TREASURE) +
-            'pg_fixed:\n' + db([item_code(n) for n in EG_FIXED] + [0] * 7))
+            'pg_fixed:\n' + db([item_code(n) for n in EG_FIXED] + [0] * 7) + 'pg_fy:\n' + db(fy))
 
 
 def overworld_patch():

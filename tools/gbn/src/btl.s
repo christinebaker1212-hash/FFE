@@ -822,8 +822,8 @@ bt_fiend_map:
             ld a, 8
             ld [bt_t + 4], a                ; width
             ld [bt_t + 5], a                ; rows
-            ld a, $23
-            ld [bt_t + 6], a                ; (top-left cell: x 3, y 2: low nibble x)
+            ldh a, [hbt_fy]                 ; ($23: x 3, y 2: low nibble x; a hanging boss y 0: pg.s)
+            ld [bt_t + 6], a                ; (top-left cell)
             jr .ld
 .ch:        ld hl, B_CHAOS
             ld bc, $C0
