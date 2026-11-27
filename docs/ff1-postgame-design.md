@@ -181,3 +181,37 @@ shops and inns, chests, teleports. New:
 - **D7 Large floors.** Cut to 64 x 64 (FF1's map size) or split.
 - **D8 Order.** Earthgift first as the pilot (6 maps, 7 monsters, 4 bosses), then Hellfire,
   Lifespring, Whisperwind.
+
+## 10. Owner's decisions (2026-11-27) and the build plan
+
+Decisions: everything from Dawn of Souls may be used; its Japanese text is retranslated in the project's
+style with the official English wording as a guide; new items and gear are added as new items;
+statues from FF1's Fiend pictures; the desert cut to fit; "complete everything in one go".
+Source: the user's `Final Fantasy I, II Advance (Japan) (Rev 1).gba`, read at build time
+(`tools/gbn/gba.py`; formats in `docs/ff1-postgame-gba.md`).
+
+What the ROM gives (decoded): the 92 floors (maps, tilesets, per-chip properties, door positions),
+the 17 bosses' and 50 monsters' stats, names and battle pictures, the dialogue message table.
+Taken from the wiki's tables instead (exact enough, extracted from the game by fans): encounter
+formations and rates per area, treasure lists, the floors' mechanics. Not decoded: the event
+scripts (their container at $2652E4 is found, not its format).
+
+Engine work (native build), in order:
+1. Maps: SoC floors as map ids 64+; banks above 128; a large map type (128 wide, wrap 127) for the
+   25 floors over 64 x 64 (23 places assume 64, 51 test the map type); DMG tiles shared per
+   tileset look to stay within 256 banks (or 9-bit bank switching).
+2. Tilesets: FF1's own for floors that imitate an FF1 place; new ones built from FF1 / overworld tiles
+   (desert, forest, overworld floors) and for Dawn of Souls' unique places.
+3. Floor converter: DoS cells -> FF1 metatiles by rule (walkable -> floor, blocked next to floor ->
+   FF1's one-tile walls, rooms with doors as FF1's: black behind the door until entered).
+4. Runs: entrances and statues on the world map, random floor order, chest shuffle, boss floors with
+   one boss per run, the exit portal, defeat back to the world map.
+5. Battle: the 67 new monsters (FF1 pictures recoloured where DoS recoloured them; the others and the
+   17 bosses converted from the GBA pictures), formations and domains for the floors.
+6. Items: Dawn of Souls' consumables and gear as new items (menus, battle effects, stats).
+7. Floor events, one by one (desert compass, forest NPCs, damage floors, vehicles and Thule,
+   vanishing paths, dragon hunt, Seahold, beavers, dwarves, robots, children, Feyhome, swamp of
+   souls, the cursed town, shops / inns), with their text retranslated.
+8. Checks: every floor in SameBoy on Color / DMG / SGB, strict checker 0, lag 0.
+Earthgift Shrine first, complete (6 floors, 7 monsters, 4 bosses), then Hellfire, Lifespring,
+Whisperwind.

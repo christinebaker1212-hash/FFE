@@ -75,10 +75,10 @@ def map_record(G, i):
     out = G.lz77(mp)[0]
     w, h = out[4] | out[5] << 8, out[6] | out[7] << 8
     cells = [out[8 + 2 * k] | out[9 + 2 * k] << 8 for k in range(w * h)]
-    lp = G.u32(r)
+    lp = G.u32(r + 0x20)                # (the record is +8 .. +$27: its point list is in the next row)
     pts = []
     if lp:
-        for k in range(G.u32(r + 4)):
+        for k in range(G.u32(r + 0x24)):
             o = lp - 0x08000000 + 4 * k
             pts.append((G.d[o], G.d[o + 1], G.d[o + 2], G.d[o + 3]))
     return dict(w=w, h=h, cells=cells, kind=out[0], tileset=G.u32(r + 12), area=G.u32(r + 16),
