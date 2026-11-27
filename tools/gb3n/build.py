@@ -36,6 +36,7 @@ def own_data():
 
 B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_TMAP0, B_SUB0, B_COMMON = 3, 4, 5, 6, 8, 12, 17
 B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD = 18, 19, 20, 21, 28, 29
+B_WORLD0, B_WINFO, B_WGFX = 32, 48, 49
 
 
 def field_banks(rom):
@@ -103,6 +104,21 @@ def field_banks(rom):
             if at >= 0x4000: break
         b[0x2700 + 3 * g:0x2703 + 3 * g] = bytes([ent[0], ent[1] & 0xFF, ent[1] >> 8])
     banks[B_NPCS] = b; banks[B_NPCGFX] = gfx
+    for wi, w in enumerate(data.WORLD_MAPS):             # world maps unpacked: 4 banks each
+        rows = data.world_rows(rom, w)
+        for k in range(4):
+            banks[B_WORLD0 + 4 * wi + k] = bytearray(b''.join(rows[64 * k:64 * k + 64]))
+    b = blank()                                          # world tilesets, palettes, entrances
+    for w in range(5):
+        b[0x400 * w:0x400 * w + 0x400] = data.world_tileset(rom, w)
+        b[0x1400 + 16 * w:0x1410 + 16 * w] = bytes(c for pal in data.world_palettes(rom, w) for c in pal)
+    b[0x1500:0x1540] = rom.rd(0x00, 0x8800, 64)
+    b[0x1540:0x1580] = rom.rd(0x00, 0x8840, 64)
+    banks[B_WINFO] = b
+    b = blank()                                          # world graphics: 256 tiles per pair
+    for k, w in enumerate((0, 2, 4)):
+        b[0x1000 * k:0x1000 * k + 0x1000] = gbt(data.world_tiles(rom, w))
+    banks[B_WGFX] = b
     return banks
 
 
@@ -124,18 +140,32 @@ def main():
            'B_MAPINFO = %d\nB_MAPAUX = %d\nB_EVENTS = %d\nB_CHARS = %d\nB_COMMON = %d\n' % (
                B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_COMMON) +
            'B_NPCS = %d\nB_NPCGFX = %d\nB_OWN = %d\nB_TEXT = %d\nB_SCRIPT = %d\nB_FIELD = %d\n' % (
-               B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD) + text_defs +
+               B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD) +
+           'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\n' % (B_WORLD0, B_WINFO, B_WGFX) + text_defs +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' + own_data())
+           open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'world.s')).read() + '\n' + own_data())
     import re                                    # (constants from every file first)
     lines = src.split('\n')
     is_def = lambda l: re.match(r'^[A-Za-z_]\w*\s+=', l)
     src = '\n'.join([l for l in lines if is_def(l)] + [l for l in lines if not is_def(l)])
+    import asm_sm83
+    asm_sm83.RAM_SECTIONS[:] = []
     r = asm(src)
+    secs = sorted(set((a, b) for a, b, _ in asm_sm83.RAM_SECTIONS if b > a))   # (RAM sections may
+    for (a0, a1), (b0, b1) in zip(secs, secs[1:]):                        #   not overlap)
+        assert a1 <= b0, 'RAM sections overlap: %04X-%04X and %04X-%04X' % (a0, a1, b0, b1)
     banks = dict(r.banks)
+    if os.environ.get('GB3N_GAPS'):              # free runs (32+ bytes) of a code bank: GB3N_GAPS=29
+        gb = int(os.environ['GB3N_GAPS']); run = []
+        for off in range(0x4000 + 1):
+            if off < 0x4000 and not r.claimed.get((gb, off)): run.append(off)
+            else:
+                if len(run) >= 32: print('bank %d free: $%04X-$%04X (%d)' % (gb, run[0] + (0x4000 if gb else 0), run[-1] + (0x4000 if gb else 0), len(run)))
+                run = []
     rom = data.Rom(nes)
     for k, v in tbanks.items():
         assert k not in banks, 'bank %d used twice' % k

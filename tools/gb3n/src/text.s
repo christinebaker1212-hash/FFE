@@ -3,7 +3,7 @@
 ; letter at a time (FF1's typewriter text, A speeds it up), pages turned with A. Text tables:
 ; tools/gb3n/text.py (index in B_TEXT: bank, address per string).
 
-TXT_BUF    = $D600          ; the string being shown (work RAM bank 1)
+TXT_BUF    = $D600          ; the string being shown (work RAM bank 1, 1 KB: the longest is 803)
 WIN_MAP    = $9C00
 DLG_ROWS   = 8
 DLG_CUT    = DLG_ROWS * 8 - 1
@@ -13,16 +13,16 @@ TB_SYSTEM  = 1
 TB_DLG1    = 2
 TB_DLG2    = 3
 TB_NAMES   = 4
-FR_TL      = $F7            ; FF3's window frame tiles ($3F $EDF6)
-FR_T       = $F8
-FR_TR      = $F9
-FR_L       = $FA
-FR_R       = $FB
-FR_BL      = $FC
-FR_B       = $FD
-FR_BR      = $FE
-ATTR_FRAME = $03            ; palette 3 (FF3's window colours), VRAM bank 0
-ATTR_TEXT  = $0B            ; palette 3, VRAM bank 1 (our font)
+FR_TL      = $10            ; FF3's window frame tiles ($3F $EDF6: $F7-$FE), copied to VRAM bank 1
+FR_T       = $11            ;   tiles $10-$17 (the world map has no menu tiles in bank 0)
+FR_TR      = $12
+FR_L       = $13
+FR_R       = $14
+FR_BL      = $15
+FR_B       = $16
+FR_BR      = $17
+ATTR_FRAME = $0F            ; palette 7 (FF3's window colours), VRAM bank 1
+ATTR_TEXT  = $0F            ; (the font is in VRAM bank 1 too)
 
 section bank B_FIELD, $6400
 ; ---- the window map's dialogue box (LCD off, once): frame and blank text cells
@@ -133,14 +133,14 @@ dlg_open:   ld a, b
             ld b, a
             inc bc
             ld a, b
-            cp 6
+            cp 4
             jr c, .sz
-            ld bc, $600
+            ld bc, $400
 .sz:        ld de, TXT_BUF
             ld a, [dlg_src]
             call far_copy
             xor a
-            ld [TXT_BUF + $5FF], a
+            ld [TXT_BUF + $3FF], a
 .cd:        ld a, [TXT_BUF]                 ; an empty string shows nothing
             and a
             ret z
@@ -442,7 +442,7 @@ dlg_lcdc:   ld a, [dlg_on]
 .w:         ldh [rLCDC], a
             ret
 
-section wram, $C220
+section wram, $C200
 dlg_on:     ds 1
 dlg_state:  ds 1
 dlg_ptr:    ds 2

@@ -108,6 +108,22 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   cave (map 181), "Ow ow ow..." / "We fell down a pit!" / "Now we're in a fix...", the party's
   moves, the next lines. Strict checker 0.
 
+## Chests, transitions, world maps (2026-11-27)
+- Chests and other treasures ($3F $E917 / $F549: contents 01/9C00 / 9D00, arrows x20, gil maps
+  with item prices, treasure switches, the open chest $7D), locked doors (the Thief), item names
+  and amounts inserted in messages.
+- Map changes with the LCD on: black palettes, the load behind a mode-2 STAT guard, palettes
+  applied in V-Blank (no white frames on a real Color). A house entry takes ~19 black frames:
+  to compare with the NES's own load time and shorten.
+- World maps: the four 256 x 256 maps unpacked at build time (banks 32-47), tilesets / palettes /
+  256 BG tiles per world pair; walking (on-foot rule: property 1 bit 0), world triggers (events
+  by script id, entrances through 00/8800 / 00/8840), back to the world where the party stood,
+  exits through the exit tables (00/8880 / 00/88C0). Checked: the Floating Continent, an
+  entrance into map 78 and back out. The dialogue box has its own palette (7) and FF3's frame
+  tiles in VRAM bank 1, so it works over both map kinds.
+- Build checks: RAM sections may not overlap (found and fixed three); GB3N_GAPS=bank lists free
+  space.
+
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
   proposal: use FF3's own choice of top / bottom), 18 columns x 6 lines.

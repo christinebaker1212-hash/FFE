@@ -54,7 +54,10 @@ DIR_U      = 8
 TR_PREV    = $40            ; pending triggers (FF3's $AB)
 TR_ENTER   = $80
 TR_WORLD   = $C0
-SCRATCH    = $D800            ; work RAM bank 1: data staged from ROM banks (2 KB)
+TR_WENT    = $A0              ; a world map entrance (after the step)
+SCRATCH    = $DA00            ; work RAM bank 1: data staged from ROM banks (1 KB: the longest
+                            ;   tilemap stream is 728 bytes); bank 1 map: $D000 save page, $D400 /
+                            ;   $D500 people, $D600 text, $DA00 scratch, $DE00 poses, $DF00 palettes
 MAP_DEPTH  = 8              ; entrances within entrances (FF3 recurses on its stack)
 
 section bank B_FIELD, $4000
@@ -62,7 +65,12 @@ section bank B_FIELD, $4000
 ; ---- load map `map_id` of `world` (LCD off) and show it: FF3's load map ($3F $E7EC: map
 ; properties, tileset, tilemap, triggers, palettes, graphics); the party at (enter_x, enter_y),
 ; or at the map's start position when enter_x = $FF
-map_enter:  ld a, [map_id]                   ; properties: index map + 256 if world != 0
+map_enter:  ld a, 63
+            ld [cmask], a
+            ld a, [wmode]
+            and a
+            jp nz, world_enter
+            ld a, [map_id]                  ; properties: index map + 256 if world != 0
             ld l, a
             ld a, [world]
             and a
@@ -449,7 +457,13 @@ pal_gather: ld de, nes_pal
             pop hl
             dec c
             jr nz, .p
-            ld a, [world]                   ; sprite palettes: 00/9670 + (world & 4) * 4
+            call pal_spr
+            ld hl, I_WINPAL                 ; BG palette 3 on normal maps: the window colours
+            ld de, nes_pal + 12
+            ld bc, 4
+            ld a, B_MAPINFO
+            jp far_copy
+pal_spr:    ld a, [world]                   ; sprite palettes: 00/9670 + (world & 4) * 4
             and 4
             add a
             add a
@@ -480,11 +494,7 @@ pal_gather: ld de, nes_pal
             ld [nes_pal + 22], a
             ld a, [ptr_tmp + 3]
             ld [nes_pal + 23], a
-            ld hl, I_WINPAL
-            ld de, nes_pal + 12
-            ld bc, 4
-            ld a, B_MAPINFO
-            jp far_copy
+            ret
 
 ; nes_pal -> cgb_pal (RGB555: BG palettes 0-3, OBJ palettes 0-3), shown by pal_apply
 pal_load:   ld hl, I_RGB                    ; (the NES colour table into SCRATCH)
@@ -492,9 +502,14 @@ pal_load:   ld hl, I_RGB                    ; (the NES colour table into SCRATCH
             ld bc, 128
             ld a, B_MAPINFO
             call far_copy
+            ld hl, I_WINPAL                 ; the window's NES colours
+            ld de, win_nes
+            ld bc, 4
+            ld a, B_MAPINFO
+            call far_copy
             ld hl, nes_pal
             ld de, cgb_pal
-            ld b, 32
+            ld b, 36                        ; (nes_pal and win_nes are adjacent)
 .c:         ld a, [hl+]
             and $3F
             add a
@@ -600,11 +615,15 @@ trig_run:   ld b, a
             xor a
             ld [trig], a
             ld a, b
+            cp TR_WENT
+            jp z, world_in
+            cp TR_WORLD
+            jp z, world_exit
             cp TR_ENTER
             jr z, .ent
-            ld a, [map_sp]                  ; to the previous map (or the world: none yet)
-            and a
-            ret z
+            ld a, [map_sp]                  ; to the previous map; from the first map: the world
+            and a                           ;   map where the party stood ($3E $C1DC)
+            jp z, world_back
             dec a
             ld [map_sp], a
             ld l, a
@@ -669,11 +688,11 @@ dest_cell:  ld a, [pos_x]
 .l:         dec d
             jr .m
 .d:         inc e
-.m:         ld a, d
-            and 63
+.m:         ld a, [cmask]                   ; (63 on normal maps, 255 on the world map)
+            and d
             ld d, a
-            ld a, e
-            and 63
+            ld a, [cmask]
+            and e
             ld e, a
             ret
 
@@ -686,6 +705,9 @@ dest_cell:  ld a, [pos_x]
 passable:   ld c, a
             xor a
             ld [trig_next], a
+            ld a, [wmode]
+            and a
+            jp nz, world_pass
             ld b, W_PROP1
             ld a, [bc]
             bit 7, a
@@ -851,7 +873,10 @@ line_go:    ld [line_dir], a
             ret
 
 ; A = the metatile at map (D, E) (0-63; outside the 32 x 32 map: the fill metatile)
-map_mt:     ld a, d
+map_mt:     ld a, [wmode]
+            and a
+            jp nz, world_mt
+            ld a, d
             or e
             and $20
             jr z, .in
@@ -1095,9 +1120,12 @@ ents:       ds 16
 treas:      ds 16
 trigs:      ds 16
 nes_pal:    ds 32
+win_nes:    ds 4
 trig_cnt:   ds 32
 type_cnt:   ds 8
 map_stack:  ds 3 * MAP_DEPTH
-poses:      ds 64
 section wram, $C300
 line_buf:   ds 7 * 16
+
+section wram, $DF80
+poses:      ds 64                            ; (work RAM bank 1)

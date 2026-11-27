@@ -292,7 +292,9 @@ trig_event: ld e, a
             ld d, 0
             ld hl, trigs
             add hl, de
-            ld c, [hl]
+            ld a, [hl]
+trig_script:                                ; (trigger script A: world map triggers use it)
+            ld c, a
             ld b, 0
             ld hl, $4880
             add hl, bc

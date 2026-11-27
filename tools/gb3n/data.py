@@ -226,3 +226,52 @@ def sram_init_data(rom):
             'mp': rom.rd(0x39, 0xBB88, 8), 'hp': rom.rd(0x39, 0xBBD8, 2),
             'stats': rom.rd(0x39, 0xBBDA, 20), 'equip': rom.rd(0x39, 0xBBF0, 16),
             'wmx': rom.rd(0x3A, 0x8E89), 'wmy': rom.rd(0x3A, 0x8E8E)}
+
+
+# ---- world maps ($3E $C859 load world map, $3A $8F43 init world map, $3E $CC47 rows)
+WORLD_MAPS = [0, 2, 3, 4]                     # worlds 0 and 1 share their map (pointer table $90)
+
+
+def world_rows(rom, world):
+    """the 256 rows of world `world`'s map (256 metatiles each), as FF3 unpacks them: pointer
+    table in bank 6 at hi byte $CC42[world] ($3E $CCBB), pointer + $1000 relative to bank 6,
+    RLE as the normal maps' (a run length of 0 means 256)"""
+    hi = rom.rd(0x3E, 0xCC42 + world)
+    rows = []
+    for r in range(256):
+        a = (hi << 8) + 2 * r
+        lo, h = rom.rd(0x06, a, 2)
+        o = 0x06 * B8 + (((h + 0x10) & 0xFF) << 8 | lo)
+        row = bytearray()
+        while len(row) < 256:
+            v = rom.at(o); o += 1
+            if v & 0x80:
+                n = rom.at(o) or 256; o += 1
+                row += bytes([v & 0x7F]) * n
+            else:
+                row.append(v)
+        rows.append(bytes(row[:256]))
+    return rows
+
+
+def world_tileset(rom, world):
+    """1 KB as tileset_block for world `world`: 64 common metatiles (00/8000) and 64 of its pair
+    (00/8100 + 256 * (world >> 1)); palettes 00/8400 (64) + 00/8440 + 32 * (world & 6);
+    properties 00/8500 + 256 * (world >> 1) (2 bytes per metatile)"""
+    c = rom.rd(0x00, 0x8000, 256)
+    w = rom.rd(0x00, 0x8100 + 0x100 * (world >> 1), 256)
+    quads = b''.join(c[64 * k:64 * k + 64] + w[64 * k:64 * k + 64] for k in range(4))
+    pal = rom.rd(0x00, 0x8400, 64) + rom.rd(0x00, 0x8440 + 32 * (world & 6), 64)
+    tp = rom.rd(0x00, 0x8500 + 0x100 * (world >> 1), 256)
+    return quads + bytes(v & 3 for v in pal) + tp[0::2] + tp[1::2] + bytes(0x80)
+
+
+def world_tiles(rom, world):
+    """the world map's 256 BG tiles (NES format): 0A/8C00 (128) and 0A/9400 + $400 * (world & 6)"""
+    return rom.at(0x0A * B8 + 0x0C00, 128 * 16) + rom.at(0x0A * B8 + 0x1400 + 0x400 * (world & 6), 128 * 16)
+
+
+def world_palettes(rom, world):
+    """BG palettes on the world map: the map base palette 00/9640 + 8 * (world & 6) ($3A $9091)"""
+    b = rom.rd(0x00, 0x9640 + 8 * (world & 6), 16)
+    return [list(b[4 * k:4 * k + 4]) for k in range(4)]

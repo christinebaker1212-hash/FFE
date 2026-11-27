@@ -174,6 +174,12 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             ld de, $9000
             ld bc, 128 * 16
             call memcpy
+            ld a, B_COMMON                  ; FF3's window frame ($F7-$FE of its menu tiles) at
+            ld [MBC5_BANKL], a              ;   bank 1 tiles $10-$17
+            ld hl, $4000 + ($F7 - $70) * 16
+            ld de, $9100
+            ld bc, 8 * 16
+            call memcpy
             xor a
             ldh [rVBK], a
             ld hl, dma_rom                  ; the OAM DMA routine into high RAM
@@ -198,9 +204,16 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             ld [map_id], a
             ld a, START_X
             ld [enter_x], a
+            ld [wm_x], a
             ld a, START_Y
             ld [enter_y], a
-            call map_enter
+            ld [wm_y], a
+            ld a, START_MAP                 ; (test builds: map 255 = the world map)
+            inc a
+            jr nz, .nw
+            inc a
+            ld [wmode], a
+.nw:        call map_enter
             call pal_apply
             ld a, LCDC_ON
             ldh [rLCDC], a
@@ -322,6 +335,13 @@ pal_apply:  ld hl, cgb_pal
             ldh [rOCPD], a
             dec b
             jr nz, .o
+            ld a, $80 | 7 * 8               ; BG palette 7: the windows
+            ldh [rBCPS], a
+            ld b, 8
+.w:         ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .w
             ret
 ; all palettes black (V-Blank)
 pal_black:  ld a, $80
@@ -417,8 +437,8 @@ vbl_done:   ds 1
 pad:        ds 1
 pad_new:    ds 1
 
-section wram, $C3F0
+section wram, $C2B0
 fc_save:    ds 1
 guard_on:   ds 1
-section wram, $C3C0
-cgb_pal:    ds 64
+section wram, $DF00
+cgb_pal:    ds 72                            ; (work RAM bank 1: BG 0-3, OBJ 0-3, BG 7)
