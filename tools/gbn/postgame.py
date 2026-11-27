@@ -686,7 +686,10 @@ def pieces_for(rom, ts, only=None):
     below a door, the chests: four of FF1's for rooms and four free metatiles for corridor chests)"""
     import collections
     pc = dict(EARTH_PIECES) if ts == 2 else {}
-    lp = learn_pieces(rom, ts, only)
+    try:
+        lp = learn_pieces(rom, ts, only)
+    except IndexError:                              # (no battle floor there: the whole tileset's)
+        lp = learn_pieces(rom, ts)
     if only is not None and (lp['stairs'] is None or lp['up'] is None):   # (a one-floor place: the tileset's)
         whole = learn_pieces(rom, ts)
         lp['stairs'] = lp['stairs'] if lp['stairs'] is not None else whole['stairs']
