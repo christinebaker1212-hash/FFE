@@ -163,11 +163,8 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             ld de, $8000
             ld bc, $1000
             call memcpy
-            ld hl, C_SCR_TEST
-            call show_screen
-            xor a
-            ldh [rSCX], a
-            ldh [rSCY], a
+            ld a, MAP_BANK                  ; (first step: the test map shown)
+            call map_show
             ld a, LCDC_ON
             ldh [rLCDC], a
             ld a, 1

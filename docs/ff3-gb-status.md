@@ -55,8 +55,24 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   `hexdump` stand-in must take the file as its last argument; `sbsh` built with
   `-I<SameBoy>/libretro` when libretro-common is not installed.
 
+## One map on screen (2026-11-27)
+- `tools/gb3n/data.py`: FF3's map readers from the listing: map properties (02/A000, 16 bytes per
+  map: tileset, start x / y, fill metatile, palettes, song, exits, treasures, triggers), tilesets
+  (01/A380: 128 metatiles as UL / UR / DL / DR pages; 01/B180 palette per metatile; 01/B500 tile
+  properties, 2 bytes), the RLE tilemap (pointers 11/8000, $3E $CBFA: 32 x 32 metatiles), the BG
+  graphics (subset 00/8C00 -> 8 blocks of 26/8/8/14/8/16/16/16 tiles from bank 3+, the count table
+  read from the ROM's code at $3E $DF00; menu / text tiles 0D/B700 at $70-$FF), palettes (00/9100,
+  9200, 9300 by properties bytes 5-7; palette 3 the window). `python3 tools/gb3n/data.py
+  build/ff3_en.nes OUTDIR P..` renders maps to PNG: maps 0-11 look right (rooms, Ur = map 10).
+- `src/field.s`: one map's data bank (built from the ROM: GB tiles, metatile pages, CGB palettes,
+  the unpacked map) drawn into the 32 x 32 BG ring around the start position (fill metatile
+  outside the map), palettes per metatile in VRAM bank 1. `build.py --map P` (default 10, Ur).
+- Checked: SameBoy Color picture = the Python render of the ROM's map at the same camera (map rows:
+  max difference 4 RGB levels, RGB555 rounding); strict checker 0, VRAM / OAM checker 0 on all five
+  systems.
+
 ## Next (after the decisions)
 - Map the listing's routine names onto the ROM (as `tools/gb/ff1dis.py` did for FF1).
-- One FF3 map on screen: map properties (bank 2), tileset / metatiles / attributes / tile
-  properties (bank 1), the map's graphics subset, its compressed background tilemap ($7400 RAM,
-  bank $11+), palettes (listing: $3A $915E init map, $9267 load map properties).
+- Walking on the map: the party's walking sprite (FF3's showing character, Select = next member),
+  scrolling the BG ring with rows / columns in V-Blank, collision from the tile properties; then
+  map changes (entrances / exits), people, text.

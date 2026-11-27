@@ -1,0 +1,135 @@
+"""FF3 data readers (build time): where the ROM keeps each table and how to read it, from the
+everything8215/ff3 listing (build/ref/ff3). No game bytes are kept here; everything is read from
+the user's ROM (the English MMC5 build keeps the Japanese banks 0-63 where they were).
+
+Addresses are 8 KB banks as in the listing ("BB/AAAA"); `lin(bank, addr)` is the PRG offset."""
+import os, sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'gb'))
+from build import NES_RGB                     # (a generic 2C02 palette: no game data)
+
+B8 = 0x2000
+GFX_BLOCKS = 8                                # map BG graphics: 8 blocks of tiles ($3E $DE5A)
+
+
+class Rom:
+    def __init__(self, path):
+        d = open(path, 'rb').read()
+        self.prg = d[16:16 + (d[4] * 0x4000)]
+
+    def lin(self, bank, addr):
+        return bank * B8 + (addr & 0x1FFF)
+
+    def rd(self, bank, addr, n=1):
+        o = self.lin(bank, addr)
+        return self.prg[o:o + n] if n != 1 else self.prg[o]
+
+    def at(self, o, n=1):
+        return self.prg[o:o + n] if n != 1 else self.prg[o]
+
+    # ---- the listing's own constants, read from the ROM's code where they live
+    def gfx_counts(self):
+        """tiles per map BG graphics block: the table after "copy tiles to vram" ($3E $DF00)"""
+        return list(self.rd(0x3E, 0xDF00, GFX_BLOCKS))
+
+
+def ptr(lo, hi, base_bank):
+    """FF3's banked pointer (lo, hi): address lo | ((hi & $1F) | $80) << 8 in 8 KB bank
+    (hi >> 5) + base_bank, mapped as a 16 KB pair: a linear offset"""
+    return base_bank * B8 + ((hi << 8) | lo)
+
+
+class Map:
+    """a normal map: index `p` into the map properties (0-511), `t` into the tilemap / graphics
+    tables (0-511; the game uses p = map + 256 * (world != 0), t = map + 256 * (world >= 2))"""
+
+    def __init__(self, rom, p, t=None):
+        self.rom, self.p = rom, p
+        self.t = p if t is None else t
+        self.props = rom.rd(0x02, 0xA000 + 16 * p, 16)                       # $3A $915E
+        self.tileset = self.props[0] >> 5                                      # $3A $9267
+        ts = self.tileset
+        q = rom.rd(0x01, 0xA380 + 0x200 * ts, 0x200)
+        self.quad = [q[0:128], q[128:256], q[256:384], q[384:512]]            # UL UR DL DR
+        self.attr = rom.rd(0x01, 0xB180 + 0x80 * ts, 0x80)                     # palette per metatile
+        tp = rom.rd(0x01, 0xB500 + 0x100 * ts, 0x100)
+        self.tprop = [(tp[2 * i], tp[2 * i + 1]) for i in range(128)]
+
+    def tilemap(self):
+        """the 32 x 32 metatile map ($3E $CBA4 load map data, $CBFA RLE: a byte < $80 is a
+        metatile; $80 | v is followed by a run length, 0 meaning 256)"""
+        r = self.rom
+        tid = r.rd(0x00, 0x8A00 + self.t)
+        lo, hi = r.rd(0x11, 0x8000 + 2 * tid, 2)
+        o = ptr(lo, hi, 0x11)
+        out = bytearray()
+        while len(out) < 1024:
+            v = r.at(o); o += 1
+            if v & 0x80:
+                n = r.at(o) or 256; o += 1
+                out += bytes([v & 0x7F]) * n
+            else:
+                out.append(v)
+        return bytes(out[:1024])
+
+    def bg_tiles(self):
+        """BG pattern table as the game loads it: 8 graphics blocks from tile 0 ($3E $DE5A), then
+        the menu window / text tiles at $70-$FF (0D/B700, 144 tiles); 256 NES tiles of 16 bytes"""
+        r = self.rom
+        sub = r.rd(0x00, 0x8C00 + self.t)
+        ptrs = r.rd(0x00, 0x8E00 + 16 * sub, 16)
+        out = bytearray()
+        for k, n in enumerate(r.gfx_counts()):
+            o = ptr(ptrs[2 * k], ptrs[2 * k + 1], 0x03)
+            out += r.at(o, 16 * n)
+        out = out[:0x700]
+        out += r.rd(0x0D, 0xB700, 144 * 16)
+        return bytes(out[:0x1000])
+
+    def bg_palettes(self):
+        """the four BG palettes (NES colours): 0-2 from the map properties bytes 5-7 through the
+        general use palettes (00/9100, 9200, 9300), colour 0 black; 3 the menu window
+        ($3A $9091 load map palette)"""
+        r = self.rom
+        pals = []
+        for b in self.props[5:8]:
+            pals.append([0x0F, r.rd(0x00, 0x9100 + b), r.rd(0x00, 0x9200 + b), r.rd(0x00, 0x9300 + b)])
+        pals.append([0x0F, 0x00, 0x02, 0x30])
+        return pals
+
+
+def rgb(c):
+    v = NES_RGB[c & 0x3F]
+    return (v >> 16, (v >> 8) & 0xFF, v & 0xFF)
+
+
+def rgb555(c):
+    v = NES_RGB[c & 0x3F]
+    return (v >> 19) | ((v >> 11) & 0x1F) << 5 | ((v >> 3) & 0x1F) << 10
+
+
+def render(m, path):
+    """the whole 512 x 512 map as the NES draws it (checking the readers)"""
+    from PIL import Image
+    tm, til, pals = m.tilemap(), m.bg_tiles(), m.bg_palettes()
+    im = Image.new('RGB', (512, 512)); px = im.load()
+    def tile(n, x0, y0, pal):
+        t = til[16 * n:16 * n + 16]
+        for y in range(8):
+            for x in range(8):
+                c = ((t[y] >> (7 - x)) & 1) | (((t[8 + y] >> (7 - x)) & 1) << 1)
+                px[x0 + x, y0 + y] = rgb(pal[c])
+    for my in range(32):
+        for mx in range(32):
+            v = tm[32 * my + mx]
+            pal = pals[m.attr[v & 0x7F] & 3]
+            for k, (dx, dy) in enumerate(((0, 0), (8, 0), (0, 8), (8, 8))):
+                tile(m.quad[k][v & 0x7F], 16 * mx + dx, 16 * my + dy, pal)
+    im.save(path)
+
+
+if __name__ == '__main__':
+    rom = Rom(sys.argv[1])
+    for p in map(int, sys.argv[3:]):
+        m = Map(rom, p)
+        print(p, 'props', m.props.hex(), 'tileset', m.tileset)
+        render(m, os.path.join(sys.argv[2], 'map%03d.png' % p))
