@@ -757,20 +757,7 @@ an_magic:   ld a, [$D8D6]
             ld [an_c], a
             ld [bs_act], a
             call an_cgfx
-            ld a, [$DE88]
-            ld l, a
-            ld h, 0
-            ld b, h
-            ld c, l
-            add hl, hl
-            add hl, bc
-            ld bc, mg_prop
-            add hl, bc
-            ld a, [hl+]
-            ld [an_m0], a
-            inc hl
-            ld a, [hl]
-            ld [an_m2], a
+            call an_mprop
             ld a, [an_m0]
             rlca
             and 1
@@ -851,12 +838,537 @@ an_magic:   ld a, [$D8D6]
             ld a, [an_vd]
             and a
             jr nz, .cl
-.x:         call an_clr
-            call an_restpal
+.x:         call an_proj
+            call an_clr
             ld a, $FF
             ld [an_cf], a
             ld [bs_act], a
+            call bs_party
+            call an_mhit
+            call an_restpal
             jp bs_party
+; ---- the spell's projectile (33/B276): a member's spell on monsters, not ineffective: from the
+; caster (x - 16, y + 8) one sprite (tile $58, v-flipped every other two frames) to each target
+; at 16 pixels a frame, gone at the target; then 10 frames. (FF3 aims by angle tables made for
+; its NES layout, 33/A7D7; here the line runs to the target's centre on the GB's layout.)
+; an_vd: per target dx, dy (signed), frames (0: none)
+an_proj:    ld a, [$DE9A]
+            and $C0
+            cp $40
+            ret nz
+            ld a, [BZ + $CC]
+            and a
+            ret nz
+            ld a, [an_c]                    ; the start
+            ld b, a
+            add a
+            add b
+            add a
+            add a
+            add a
+            add 8
+            ld [an_py], a
+            ld a, [$DE99]
+            ld [an_tm], a
+            xor a
+            ld [an_t], a
+            ld [an_pn], a
+            ld hl, an_vd
+.t:         push hl
+            ld a, [an_tm]
+            add a
+            ld [an_tm], a
+            jr nc, .z
+            call an_tcen
+            ld a, AN_PX                     ; dx (none if the target is not to the left)
+            sub d
+            jr nc, .dx
+            xor a
+.dx:        ld [an_ox], a
+            ld b, a
+            ld a, e
+            sub 4
+            ld hl, an_py
+            sub [hl]
+            ld [an_oy], a                   ; dy
+            bit 7, a
+            jr z, .ay
+            cpl
+            inc a
+.ay:        ld d, a                         ; |dy|; length ~ max + min / 2
+            ld a, b
+            cp d
+            jr nc, .mx
+            ld e, b
+            ld b, d
+            ld d, e
+.mx:        srl d
+            ld a, b
+            add d
+            jr nc, .ln
+            ld a, $FF
+.ln:        add 15
+            jr nc, .l2
+            ld a, $FF
+.l2:        swap a
+            and $0F
+            jr nz, .nn
+            inc a
+.nn:        ld c, a                         ; frames
+            pop hl
+            push hl
+            ld a, [an_ox]
+            ld [hl+], a
+            ld a, [an_oy]
+            ld [hl+], a
+            ld a, c
+            ld [hl], a
+            ld hl, an_pn
+            cp [hl]
+            jr c, .z0
+            ld [hl], a
+            jr .z0
+.z:         xor a                           ; (no target)
+            ld [hl+], a
+            ld [hl+], a
+            ld [hl], a
+.z0:        pop hl
+            inc hl
+            inc hl
+            inc hl
+            ld a, [an_t]
+            inc a
+            ld [an_t], a
+            cp 8
+            jr nz, .t
+            ld a, [an_pn]
+            and a
+            ret z
+            ld a, 1
+            ld [an_k3], a
+.f:         call an_cast
+            ld hl, an_vd
+            ld b, 8
+.o:         push bc
+            push hl
+            ld a, [an_k3]
+            ld b, a
+            ld a, [hl+]
+            ld d, a                         ; dx
+            ld a, [hl+]
+            ld c, a                         ; dy
+            ld a, [hl]
+            ld e, a                         ; frames
+            cp b
+            jr c, .on                       ; (gone at its target)
+            call an_pspr
+.on:        pop hl
+            inc hl
+            inc hl
+            inc hl
+            pop bc
+            dec b
+            jr nz, .o
+            call an_frame
+            ld hl, an_k3
+            inc [hl]
+            ld a, [an_pn]
+            cp [hl]
+            jr nc, .f
+            ld b, 10
+.w:         push bc
+            call an_cast
+            call an_frame
+            pop bc
+            dec b
+            jr nz, .w
+            ret
+; the sprite at frame k (B) of E: (AN_PX - D k / E, an_py + C k / E)
+an_pspr:    push bc
+            ld a, d
+            call .sc
+            ld b, a
+            ld a, AN_PX
+            sub b
+            ld [an_ox], a
+            pop bc
+            ld a, c
+            bit 7, a
+            jr z, .p
+            cpl
+            inc a
+            call .sc
+            cpl
+            inc a
+            jr .y
+.p:         call .sc
+.y:         ld hl, an_py
+            add [hl]
+            ld [an_oy], a
+            call an_slot_oam
+            ret c
+            ld a, [an_oy]
+            add 17
+            ld [hl+], a
+            ld a, [an_ox]
+            add 8
+            ld [hl+], a
+            ld a, $58
+            ld [hl+], a
+            ld a, [an_k3]
+            add a
+            add a
+            add a
+            add a
+            add a
+            and $40
+            or $0B
+            ld [hl], a
+            ret
+; A * B / E
+.sc:        push de
+            push bc
+            ld c, e
+            ld e, b
+            call mul8                       ; HL = A * E
+            ld b, 16                        ; HL / C
+            xor a
+.d:         add hl, hl
+            rla
+            cp c
+            jr c, .n
+            sub c
+            inc l
+.n:         dec b
+            jr nz, .d
+            ld a, l
+            pop bc
+            pop de
+            ret
+AN_PX      = 136 - 16
+
+; the spell $7E88's graphics properties (33/AF6F: 2E/91D0)
+an_mprop:   ld a, [$DE88]
+            ld l, a
+            ld h, 0
+            ld b, h
+            ld c, l
+            add hl, hl
+            add hl, bc
+            ld bc, mg_prop
+            add hl, bc
+            ld a, [hl+]
+            ld [an_m0], a
+            ld a, [hl+]
+            ld [an_m1], a
+            ld a, [hl]
+            ld [an_m2], a
+            ret
+; a monster's spell (2F/B15E: no casting, the hit only)
+an_mmon:    call an_mprop
+            call an_savepal
+            ld a, [an_m2]
+            call an_gpal3
+            call an_mhit
+            jp an_restpal
+
+; ---- the spell's hit animation (33/B68D) on each target hit ($7E9B): its 24 tiles (2A/9600 or
+; 2B/A600 by property 0 bit 6, from property 1) and set 8; its frame list (06/8C00): per entry
+; a 6 x 6 frame (00/9708; bit 7 h-flip, $FF before: v-flip), 4 frames each, at the target (a
+; monster: its centre - (24, 16); a member: (x - 16, y - 12), 12 higher for property 0 bit 5, 8
+; left for Life). Life on no one shows on the missed targets; on someone, without its last 16
+; frames. The spell's sound (34/83A0) with the first target. Blank tiles take no sprite.
+; Animation types other than normal (0), Life (5), Break (7), Toad (8) and Mini (13) have their
+; own routines (33/BC2B) and are not shown here yet.
+an_mhit:    ld a, [$DE9D]
+            ld c, 0
+            and a
+            jr z, .ty
+            cp 7
+            jr z, .ty
+            cp 8
+            jr z, .ty
+            cp 13
+            jr z, .ty
+            cp 5
+            ret nz
+            ld a, [$DE9B]                   ; Life (33/B922)
+            and a
+            ld c, 16
+            jr nz, .ty
+            ld a, [$DE99]
+            ld [$DE9B], a
+            ld c, 0
+.ty:        ld a, c
+            ld [an_lskip], a
+            ld a, [$DE9B]
+            and a
+            ret z
+            ld [an_tm], a
+            ld a, [BZ + $CC]                ; (ineffective: the pose only)
+            and a
+            ret nz
+            ld a, [an_m0]                   ; the tiles (33/B589)
+            and $40
+            ld hl, $4000 + $1600
+            jr z, .g
+            ld hl, $4000 + $2600
+.g:         ld a, [an_m1]
+            ld e, a
+            ld d, 0
+            sla e
+            rl d
+            sla e
+            rl d
+            sla e
+            rl d
+            sla e
+            rl d
+            add hl, de
+            ld de, $8000 + 16 * $49
+            ld bc, 24 * 16
+            ld a, B_MAGIC
+            call an_vcopy
+            ld a, 8
+            call an_lgfx
+            ld a, [$DE88]                   ; the list
+            add a
+            ld l, a
+            ld a, 0
+            adc $4E
+            ld h, a
+            ld de, an_lp
+            ld bc, 2
+            ld a, B_ANIM
+            call far_copy
+            ld a, [$DE88]                   ; the sound
+            cp MG_NSND
+            jr nc, .ns
+            ld hl, mg_snd
+            call bs_hl_a
+            ld a, [hl]
+            call bs_sfx
+.ns:        xor a
+            ld [an_t], a
+.t:         ld a, [an_tm]
+            add a
+            ld [an_tm], a
+            jr nc, .nx
+            call an_mone
+.nx:        ld hl, an_t
+            inc [hl]
+            ld a, [hl]
+            cp 8
+            jr nz, .t
+            call an_clr
+            jp an_frame
+; target an_t: the list's frames
+an_mone:    ld a, [$DE9A]                   ; the place
+            bit 6, a
+            jr z, .ch
+            call an_tcen
+            ld a, d
+            sub 24
+            ld [an_bx], a
+            ld a, e
+            sub 16
+            ld [an_by], a
+            jr .go
+.ch:        ld a, [an_t]
+            ld b, a
+            add a
+            add b
+            add a
+            add a
+            add a
+            sub 12
+            ld e, a
+            ld a, [an_m0]
+            bit 5, a
+            jr z, .e
+            ld a, e
+            sub 12
+            ld e, a
+.e:         ld a, e
+            ld [an_by], a
+            ld b, 144 - 16
+            ld a, [$DE9D]
+            cp 5
+            ld a, b
+            jr nz, .x
+            sub 8
+.x:         ld [an_bx], a
+.go:        ld hl, 0                        ; the list's length (less Life's last 16)
+            call .byte
+            ld hl, an_lskip
+            sub [hl]
+            ret c
+            ret z
+            ld [an_n], a
+            ld a, 1
+            ld [an_k3], a
+.f:         ld c, 0                         ; C = the flips (33/B7CF)
+            call .cur
+            cp $FF
+            jr nz, .nf
+            ld c, 2
+            ld hl, an_k3
+            inc [hl]
+            call .cur
+.nf:        ld b, a
+            rlca
+            and 1
+            or c
+            ld c, a
+            ld a, [$DE9A]                   ; a member: flipped the other way (33/B7CB)
+            bit 6, a
+            jr nz, .mf
+            ld a, c
+            xor 1
+            ld c, a
+.mf:        ld a, c
+            ld [an_fl], a
+            ld a, b
+            and $7F
+            call an_mframe
+            ld b, 4
+.w:         push bc
+            call an_frame
+            pop bc
+            dec b
+            jr nz, .w
+            ld hl, an_k3
+            inc [hl]
+            ld a, [an_n]
+            inc a
+            cp [hl]
+            jr nz, .f
+            ret
+.cur:       ld a, [an_k3]
+            ld l, a
+            ld h, 0
+.byte:      ld a, [an_lp]
+            add l
+            ld l, a
+            ld a, [an_lp + 1]
+            adc h
+            ld h, a
+            ld a, B_ANIM
+            jp far_byte
+; frame A (00/9708) at (an_bx, an_by), flips an_fl (33/B8AF): 36 tiles (rvhttttt, r: repeated by
+; the next byte) in a 6 x 6 grid from 33/B89B's corner and steps; tile $7F blank, else + $49
+an_mframe:  add a
+            ld l, a
+            ld h, $4D
+            ld de, an_fp
+            ld bc, 2
+            ld a, B_ANIM
+            call far_copy
+            call an_clr
+            ld a, [an_fl]                   ; x0, dx, y0, dy
+            add a
+            add a
+            ld hl, mf_grid
+            call bs_hl_a
+            ld a, [hl+]
+            ld [an_gx0], a
+            ld [an_gx], a
+            ld a, [hl+]
+            ld [an_gdx], a
+            ld a, [hl+]
+            ld [an_gy], a
+            ld a, [hl]
+            ld [an_gdy], a
+            ld a, [an_fl]
+            ld hl, mf_flip
+            call bs_hl_a
+            ld a, [hl]
+            ld [an_gfl], a
+            xor a
+            ld [an_cnt], a
+            ld [an_rep], a
+.l:         ld a, [an_rep]                  ; a repeated tile still going
+            and a
+            jr nz, .rp
+            call .next
+            bit 7, a
+            jr z, .one
+            ld [an_cur], a
+            call .next
+            ld [an_rep], a
+.rp:        ld hl, an_rep
+            dec [hl]
+            ld a, [an_cur]
+            jr .put
+.one:       ld [an_cur], a
+.put:       call .spr
+            ld hl, an_cnt
+            inc [hl]
+            ld a, [hl]
+            cp 36
+            ret z
+            ld a, [an_gx]                   ; the next column / row
+            ld hl, an_gdx
+            add [hl]
+            ld [an_gx], a
+            ld a, [an_cnt]
+.m6:        sub 6
+            jr z, .row
+            jr nc, .m6
+            jr .l
+.row:       ld a, [an_gx0]
+            ld [an_gx], a
+            ld a, [an_gy]
+            ld hl, an_gdy
+            add [hl]
+            ld [an_gy], a
+            jr .l
+.next:      ld a, [an_fp]
+            ld l, a
+            ld a, [an_fp + 1]
+            ld h, a
+            ld a, B_ANIM
+            call far_byte
+            ld hl, an_fp
+            inc [hl]
+            ret nz
+            inc hl
+            inc [hl]
+            ret
+.spr:       ld b, a                         ; (33/B866)
+            and $7F
+            cp $7F
+            ret z
+            call an_slot_oam
+            ret c
+            ld a, [an_gy]
+            ld c, a
+            ld a, [an_by]
+            add c
+            add 17
+            ld [hl+], a
+            ld a, [an_gx]
+            ld c, a
+            ld a, [an_bx]
+            add c
+            add 8
+            ld [hl+], a
+            ld a, b
+            and $1F
+            add $49
+            ld [hl+], a
+            ld a, b                         ; the tile's flips xor the frame's; NES -> Color bits
+            add a
+            and $C0
+            ld c, a
+            ld a, [an_gfl]
+            xor c
+            and $C0
+            rra
+            or $0B
+            ld [hl], a
+            ret
+
 ; the cast pose (33/AF9F: frame 8, toad / mini $0E)
 an_cast:    call an_clr
             ld a, [an_c]
@@ -1069,6 +1581,10 @@ mg_prop:    ds 3 * $60                      ; (2E/91D0)
 mg_blk:     ds 11                           ; (33/B1D7)
 mg_wht:     ds 12                           ; (33/B1E2)
 mg_bub:     ds 32                           ; (33/AEB2)
+mf_grid:    ds 16                           ; (33/B89B)
+mf_flip:    ds 4                            ; (33/B8AB)
+mg_snd:     ds MG_NSND                      ; (34/83A0: each spell's sound)
+MG_NSND    = $58
 sl_pos:     ds 24                           ; (32/99D1)
 sl_tile:    ds 12                           ; (32/99E9)
 sl_mask:    ds 4                            ; (32/9968)
@@ -1107,6 +1623,23 @@ an_p2:      ds 1
 an_sp:      ds 8
 an_hc:      ds 1
 an_m0:      ds 1
+an_m1:      ds 1
+an_lskip:   ds 1
+an_pn:      ds 1
+an_py:      ds 1
+an_lp:      ds 2
+an_fp:      ds 2
+an_gfl:     ds 1
+an_tm:      ds 1
+an_k3:      ds 1
+an_gx0:     ds 1
+an_gdx:     ds 1
+an_gx:      ds 1
+an_gy:      ds 1
+an_gdy:     ds 1
+an_cnt:     ds 1
+an_rep:     ds 1
+an_cur:     ds 1
 an_m2:      ds 1
 an_tmp:     ds 4
 an_vd:      ds 24                           ; 8 x (distance, y angle, x angle)

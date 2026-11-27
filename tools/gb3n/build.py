@@ -129,6 +129,7 @@ B_CUT, B_CUTG = 79, 80      # cutscenes: NES bank $1F + the code; their graphics
 B_WSPR = 81                 # world-map sprites: FF3's tiles $80-$FF, bank $3C's lists, the code
 B_MINI = 82                 # the minimap: its screen data (tools/gb3n/minimap.py) and code
 B_ANIM = 83                 # battle animations' graphics: NES 2B/B000 (weapons, hits)
+B_MAGIC = 84                # the spells' graphics: NES 16 KB bank $15 (2A / 2B)
 
 
 def field_banks(rom):
@@ -353,6 +354,9 @@ ROMDATA = {
     'mg_blk': (0x33, 0xB1D7, 11),        # black / white pre-animation frames
     'mg_wht': (0x33, 0xB1E2, 12),
     'mg_bub': (0x33, 0xAEB2, 32),        # black magic's bubbles
+    'mf_grid': (0x33, 0xB89B, 16),       # the spells' 6 x 6 frames: corner / steps, flips
+    'mf_flip': (0x33, 0xB8AB, 4),
+    'mg_snd': (0x34, 0x83A0, 0x58),      # each spell's sound
     'an_blob': (0x32, 0x943D, 0x375),    # battle animations (src/banim.s)
     'sl_pos': (0x32, 0x99D1, 24),
     'sl_tile': (0x32, 0x99E9, 12),
@@ -428,7 +432,7 @@ def main():
            'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
            'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\nB_BSET = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2, B_BSET) +
            'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\nB_MENU = %d\nB_VGFX = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0, B_MENU, B_VGFX) + text_defs +
-           'B_CUT = %d\nB_CUTG = %d\nB_WSPR = %d\nB_MINI = %d\nB_ANIM = %d\n' % (B_CUT, B_CUTG, B_WSPR, B_MINI, B_ANIM) + cut_eq +
+           'B_CUT = %d\nB_CUTG = %d\nB_WSPR = %d\nB_MINI = %d\nB_ANIM = %d\nB_MAGIC = %d\n' % (B_CUT, B_CUTG, B_WSPR, B_MINI, B_ANIM, B_MAGIC) + cut_eq +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
@@ -555,10 +559,41 @@ ev_fxtest:  call ev_shake
         o = 0x1000 + len(an)
         an += b''.join(tiles.gb(rom.at(bk * 0x4000 + addr - 0x8000 + 16 * i, 16)) for i in range(cnt))
         at += bytes([o & 255, (o >> 8) + 0x40, (ppu - 0x1000) // 16, cnt])
-    assert len(an) <= 0x3000
+    def rd16(b8, a):                              # (a pointer in a 16 KB bank pair)
+        lo, hi = rom.rd(b8, a, 2)
+        return hi << 8 | lo
+    def at16(b16, a, n):                          # n bytes at $8000-$BFFF of 16 KB bank b16
+        return rom.at(b16 * 0x4000 + a - 0x8000, n)
+    mdat = bytearray()                            # the spells' hit animations (33/B68D): lists
+    mtab = bytearray()                            #   (06/8C00) and 6 x 6 frames (00/9708)
+    base = 0x1000 + len(an)
+    for sp in range(0x80):
+        a = rd16(0x06, 0x8C00 + 2 * sp)
+        n = at16(3, a, 2)[0] if 0x8000 <= a < 0xC000 else 0
+        lst = at16(3, a, n + 1) if n else bytes(1)
+        o = base + len(mdat)
+        mtab += bytes([o & 255, (o >> 8) + 0x40])
+        mdat += lst
+    ftab = bytearray()
+    for f in range(0x80):
+        a = rd16(0x00, 0x9708 + 2 * f)
+        raw, i, k = (at16(0, a, 80) if 0x8000 <= a < 0xC000 else bytes(80)), 0, 0
+        while k < 36 and i < 80:                  # (rvhttttt; r: the next byte repeats it)
+            if raw[i] & 0x80:
+                k += raw[i + 1] or 256; i += 2
+            else:
+                k += 1; i += 1
+        o = base + len(mdat)
+        ftab += bytes([o & 255, (o >> 8) + 0x40])
+        mdat += raw[:i]
+    an += mdat
+    assert len(an) <= 0x2C00, hex(len(an))
+    ab[0xE00:0xF00] = mtab + ftab[:0]
+    ab[0xD00:0xE00] = ftab[:256]
     ab[0xF00:0xF00 + len(at)] = at
     ab[0x1000:0x1000 + len(an)] = an
     banks[B_ANIM] = ab
+    banks[B_MAGIC] = bytearray(b''.join(tiles.gb(rom.at(0x15 * 0x4000 + 16 * i, 16)) for i in range(1024)))
     for k, v in tbanks.items():
         assert k not in banks, 'bank %d used twice' % k
         banks[k] = v
