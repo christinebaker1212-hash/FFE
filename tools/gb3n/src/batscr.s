@@ -69,6 +69,7 @@ bs_setup:   ld hl, BZ                       ; FF3's zero page cleared
             jr nz, .zb
             ld c, 1
             call bs_page
+            call bs_ilv                     ; (3D/BC12: the inventory in id / count pairs)
             ld a, [bs_id]                   ; (2E/9E8E: id + $100 off world 0; the bg byte:
             ld [$DCED], a                   ;   id in the low 5 bits, flags in the top 3)
             ld a, [world]
@@ -1638,7 +1639,8 @@ bs_fequip:  push bc
             ret
 
 ; ---- back to the field (it reloads its map)
-bs_leave:   ld c, 2                         ; the save page back to bank 1
+bs_leave:   call bs_dlv                     ; (3D/BC2D: the inventory as the field keeps it)
+            ld c, 2                         ; the save page back to bank 1
             call bs_page
             xor a
             ld [bs_live], a

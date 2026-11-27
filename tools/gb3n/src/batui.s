@@ -1084,7 +1084,7 @@ bs_putsn:   ld hl, BS_STR
 .c:         ld a, [hl+]
             and a
             ret z
-            cp ' '
+            cp $18                          ; (codes below: none to show; $18 up: icons)
             jr c, .c
             push bc
             push hl
@@ -1983,7 +1983,7 @@ bs_putsw:   ld hl, BS_STR
             and a
             ret z
             inc hl
-            cp ' '
+            cp $18
             jr c, .p
             push bc
             push hl
@@ -2699,3 +2699,47 @@ bs_caneq:   ld l, a
 
 section wram, $C5E7
 bs_tq:      ds 1
+
+; FF3's inventory for a battle (3D/BC12): the field's 32 ids ($60C0) and 32 counts ($60E0) as 32
+; id / count pairs; and back after it (3D/BC2D); work RAM bank 2's copy of the save page
+section bank B_BSCR, $7680
+bs_ilv:     call .cp
+            ld hl, BS_PAGE
+            ld de, $D0C0
+            ld b, 32
+.i:         ld a, [hl]
+            ld [de], a
+            inc e
+            push hl
+            ld a, l
+            add 32
+            ld l, a
+            ld a, [hl]
+            ld [de], a
+            inc e
+            pop hl
+            inc l
+            dec b
+            jr nz, .i
+            ret
+.cp:        ld hl, $D0C0
+            ld de, BS_PAGE
+            ld bc, 64
+            jp memcpy
+bs_dlv:     call bs_ilv.cp
+            ld hl, BS_PAGE
+            ld de, $D0C0
+            ld b, 32
+.d:         ld a, [hl+]
+            ld [de], a
+            push de
+            ld a, e
+            add 32
+            ld e, a
+            ld a, [hl+]
+            ld [de], a
+            pop de
+            inc e
+            dec b
+            jr nz, .d
+            ret

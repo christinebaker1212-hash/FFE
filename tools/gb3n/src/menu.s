@@ -851,7 +851,7 @@ m_putsn:    ld b, a
 .c:         ld a, [hl+]
             and a
             ret z
-            cp ' '
+            cp $18                          ; (codes below: none to show; $18 up: icons)
             jr c, .c
             call m_putc
             inc e
@@ -1445,7 +1445,7 @@ m_msghl:    push hl
             jr z, .nl
             cp $04                          ; {04}: the amount in m_val
             jr z, .num
-            cp ' '
+            cp $18
             jr c, .c
             call m_putc
             inc e

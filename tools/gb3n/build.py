@@ -82,16 +82,21 @@ def name_grid():
             'n_help2:    db %s\n' % z('B:Delete  START:OK'))
 
 
-def own_data():
-    """our own tiles / screens (no game data) in bank 0"""
+def own_data(raw):
+    """our own tiles / screens in bank B_OWN; the window font's icon codes get FF3's icons (font
+    tiles $60-$75 of the user's ROM, text.ICON_CODES)"""
     rgb = lambda r, g, b: (r | g << 5 | b << 10).to_bytes(2, 'little')
     pal0 = rgb(0, 0, 0) + rgb(21, 21, 21) + rgb(10, 10, 10) + rgb(31, 31, 31)
+    wfont = [t if i != 1 else bytes(16) for i, t in enumerate(tiles.tileset(fg=3, bg=2)[:128])]
+    for k, c in enumerate(text.ICON_CODES):
+        o = 16 + 0x1B000 + 16 * (0x60 + k)
+        wfont[c] = tiles.gb(raw[o:o + 16])
     test = tiles.screen([(2, None, 'FINAL FANTASY III'), ('frame', 1, 5, 18, 7),
                          (7, None, 'Native engine'), (9, None, 'Game Boy Color')])
     return ('section bank %d, $4000\nC_TILES:\n' % B_OWN + db(b''.join(tiles.tileset())) +
             'C_SCR_CGBONLY:\n' + db(tiles.screen(tiles.CGB_ONLY), 20) +
             'C_SCR_TEST:\n' + db(test, 20) + 'C_PAL0:\n' + db(pal0) +
-            'section bank %d, $6000\nC_WFONT:\n' % B_OWN + db(b''.join(t if i != 1 else bytes(16) for i, t in enumerate(tiles.tileset(fg=3, bg=2)[:128]))) +
+            'section bank %d, $6000\nC_WFONT:\n' % B_OWN + db(b''.join(wfont)) +
             'C_FF3ASC:\n' + db(tiles.ff3_to_ascii()) +
             'C_SPRDIG:\n' + db(spr_digits()))
 
@@ -475,7 +480,7 @@ def main():
            open(os.path.join(HERE, 'src', 'sa.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'mini.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'banim.s')).read() + '\n' + open(os.path.join(HERE, 'src', 'bsumn.s')).read() + '\n' + open(os.path.join(HERE, 'src', 'batfx.s')).read() + '\n' + open(os.path.join(HERE, 'src', 'batbk.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + sound_data() + own_data())
+           open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + sound_data() + own_data(raw))
     if os.environ.get('GB3N_BATTLE'):            # test builds only: every encounter is this battle
         src = src.replace('            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a',
                           '            ld a, %s\n            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a' % os.environ['GB3N_BATTLE'])
