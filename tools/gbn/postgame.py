@@ -259,7 +259,12 @@ def cave_floor(G, rec, role, n_chests, pc=None, floor_chips=(), stairs_out=True,
             bosses.append((doors[0][0] + ox, y0 + 1 + oy))
     # the start: the entrance floor's corridor end (FF1's stairs up there: the way out), else the
     # walkable cell farthest from the stairs (boss floor: the lowest, with the way out below it)
-    cand = sorted(walk, key=lambda p: (-p[1], p[0]))
+    comp, seen = None, set()                        # (the start in the largest connected part: Dawn of Souls
+    for c0 in walk:                                 #   joins some parts by events we do not have)
+        if c0 in seen: continue
+        cc = bfs(walk | inroom, c0); seen |= set(cc)
+        if comp is None or len(cc) > len(comp): comp = cc
+    cand = sorted((q for q in walk if q in comp), key=lambda p: (-p[1], p[0]))
     exit_ = None
     if role in ('entrance', 'boss'):
         ex = next((q for q in cand if (q[0], q[1] - 1) in walk and q not in stairs), cand[0])
