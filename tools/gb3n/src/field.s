@@ -488,19 +488,43 @@ pal_load:   ld a, B_MAPINFO
 field_vbl:  ld a, [frame]
             inc a
             ld [frame], a
+            call dlg_vbl
+            call dlg_lcdc
             ld a, [line_n]                  ; a pending row / column into the ring
             and a
             call nz, line_flush
             call scroll_set
             jp hram_dma
 
-field_step: ld a, [step]
+field_step: call npc_update
+            ld a, [step]
             and a
             jr nz, .walk
             ld a, [trig]                    ; a trigger stepped on: act now ($3F $E217)
             and a
             jp nz, trig_run
-            ldh a, [pad]                    ; a direction held: FF3's order right, left, down, up
+            ld a, [dlg_on]                  ; the dialogue box: nothing else moves
+            and a
+            jr z, .nd
+            call dlg_step
+            jr .done
+.nd:        ld a, [ev_on]                   ; an event: its commands (a party step as the pad)
+            and a
+            jr z, .pl
+            xor a
+            ld [ev_pad], a
+            call ev_step
+            ld a, [ev_pad]
+            and a
+            jr z, .done
+            ld b, a
+            jr .dir
+.pl:        ldh a, [pad_new]                ; A: talk to the person ahead
+            and PAD_A
+            jr z, .pd
+            call talk
+            jr .done
+.pd:        ldh a, [pad]                    ; a direction held: FF3's order right, left, down, up
             ld b, DIR_R
             bit 4, a
             jr nz, .dir

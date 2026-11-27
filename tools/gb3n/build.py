@@ -126,7 +126,13 @@ def main():
                B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT) + text_defs +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' + own_data())
+           open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' + own_data())
+    import re                                    # (constants from every file first)
+    lines = src.split('\n')
+    is_def = lambda l: re.match(r'^[A-Za-z_]\w*\s+=', l)
+    src = '\n'.join([l for l in lines if is_def(l)] + [l for l in lines if not is_def(l)])
     r = asm(src)
     banks = dict(r.banks)
     rom = data.Rom(nes)

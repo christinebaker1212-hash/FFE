@@ -26,7 +26,7 @@ PAD_RESET  = $0F            ; A + B + Select + Start: soft reset (Lot Check)
 section bank 0, $0040
             jp vblank
 section bank 0, $0048
-            reti
+            jp stat_isr
 section bank 0, $0050
             reti
 section bank 0, $0058
@@ -187,6 +187,7 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             ld a, 1                         ; work RAM bank 1: FF3's save page and the people
             ldh [rSVBK], a
             call sram_init                  ; (first steps: a new game's state, a test map)
+            call win_init                   ; the dialogue box in the window map
             ld a, START_WORLD
             ld [world], a
             ld a, START_MAP
@@ -198,7 +199,7 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             call map_enter
             ld a, LCDC_ON
             ldh [rLCDC], a
-            ld a, 1
+            ld a, 3                         ; V-Blank and the line interrupt (dialogue cut)
             ldh [rIE], a
             xor a
             ldh [rIF], a

@@ -411,8 +411,15 @@ npc_oam:    ld a, [step]                    ; the walk's pixel offset (signed): 
 ; one person (HL = its NPC1 slot) if on screen: 4 sprites at BC (advanced)
 npc_draw:   ld a, l
             ld [nd_slot], a
-            inc hl
-            inc hl
+            add 6
+            ld l, a
+            ld a, [hl+]                     ; sub-tile offsets (+6, +7)
+            ld [nd_sx], a
+            ld a, [hl]
+            ld [nd_sy], a
+            ld a, [nd_slot]
+            add 4
+            ld l, a
             ld a, [cam_x]                   ; metatiles from the camera (0-63): on screen
             ld d, a                         ;   when 0-10 or 63 (a step's partial column)
             ld a, [hl+]
@@ -430,6 +437,9 @@ npc_draw:   ld a, l
             inc a
             add d
             add 8
+            ld d, a
+            ld a, [nd_sx]
+            add d
             ld [nd_x], a
             ld a, [cam_y]
             ld e, a
@@ -448,7 +458,17 @@ npc_draw:   ld a, l
             inc a
             add e
             add 16
+            ld e, a
+            ld a, [nd_sy]
+            add e
             ld [nd_y], a
+            ld a, [dlg_on]                  ; (under the dialogue box: not drawn)
+            and a
+            jr z, .vis
+            ld a, [nd_y]
+            cp 16 + DLG_ROWS * 8
+            ret c
+.vis:
             ld a, [nd_slot]                 ; the pose: palette pair + facing + frame
             ld l, a
             ld h, high(NPC2)
@@ -524,5 +544,147 @@ nd_slot:    ds 1
 nd_x:       ds 1
 nd_y:       ds 1
 nd_tb:      ds 1
+nd_sx:      ds 1
+nd_sy:      ds 1
 frame:      ds 1
 npc_list:   ds 4 * NPC_SLOTS + 1
+
+section bank 0, $1000
+; ---- person at slot L (NPC1 page) starts a step in direction A (0 right, 1 left, 2 down, 3 up)
+; ($3B $AFDD: the destination is claimed at once; right / down count the sub-tile 0 -> 15 from
+; the old cell, left / up 15 -> 0 from the new one)
+npc_move:   ld h, high(NPC1)
+            ld c, a
+            ld a, l
+            ld [nd_slot], a
+            add 14                          ; facing: right 0, left $10, down $20, up $30
+            ld l, a
+            ld a, c
+            swap a
+            ld [hl], a
+            ld a, [nd_slot]
+            add 12
+            ld l, a
+            ld [hl], 1                      ; +12 moving
+            ld a, [nd_slot]
+            ld l, a
+            ld a, c
+            cp 2
+            jr nc, .v
+            inc l                           ; x: +2 dest, +4 current, +6 sub, +8 speed
+            inc l
+            ld a, c
+            and a
+            ld a, [hl]
+            jr nz, .lt
+            inc a
+            and 63
+            ld [hl+], a
+            inc l
+            ld [hl], 0
+            inc l
+            inc l
+            ld [hl], 1
+            ret
+.lt:        dec a
+            and 63
+            ld [hl+], a
+            inc l
+            ld [hl], a
+            inc l
+            inc l
+            ld [hl], 15
+            inc l
+            inc l
+            ld [hl], $FF
+            ret
+.v:         inc l                           ; y: +3 dest, +5 current, +7 sub, +9 speed
+            inc l
+            inc l
+            ld a, c
+            cp 3
+            ld a, [hl]
+            jr z, .up
+            inc a
+            and 63
+            ld [hl+], a
+            inc l
+            ld [hl], 0
+            inc l
+            inc l
+            ld [hl], 1
+            ret
+.up:        dec a
+            and 63
+            ld [hl+], a
+            inc l
+            ld [hl], a
+            inc l
+            inc l
+            ld [hl], 15
+            inc l
+            inc l
+            ld [hl], $FF
+            ret
+
+; ---- a frame of the people's steps: a pixel a frame; at the end the current cell = destination
+npc_update: ld hl, NPC1
+            ld b, NPC_SLOTS
+.c:         push hl
+            ld a, l
+            add 12
+            ld l, a
+            ld a, [hl]
+            and a
+            jr z, .n
+            ld a, l                         ; x speed (+8)
+            sub 4
+            ld l, a
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl]                      ; y speed (+9)
+            ld d, a
+            ld a, l
+            sub 3
+            ld l, a                         ; +6
+            ld a, [hl]
+            add c
+            and 15
+            ld [hl+], a
+            ld e, a
+            ld a, [hl]                      ; +7
+            add d
+            and 15
+            ld [hl], a
+            or e
+            jr nz, .n
+            ld a, l                         ; done: current = destination, speeds and flag 0
+            sub 7
+            ld l, a
+            inc l
+            inc l
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            ld [hl-], a                     ; (+5 = +3)
+            dec l
+            ld a, c
+            inc l
+            inc l
+            ld [hl], a                      ; +4 = +2
+            ld a, l
+            add 4
+            ld l, a
+            xor a
+            ld [hl+], a                     ; +8, +9
+            ld [hl+], a
+            inc l
+            inc l
+            ld [hl], a                      ; +12
+.n:         pop hl
+            ld a, l
+            add 16
+            ld l, a
+            dec b
+            jr nz, .c
+            ret
