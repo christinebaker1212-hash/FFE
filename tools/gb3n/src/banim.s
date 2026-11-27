@@ -220,6 +220,75 @@ an_r01:     xor a
             and 1
             ret
 
+; ---- battle graphics $14, a member hit (2F/B201, 33/A8B8): its hit pose (job tiles 30-35 at OBJ
+; $39; toad / mini frame $0F), knocked back, shaken four times, back; a critical hit knocks
+; further with its own sound. (The GB's party column is at the screen's edge: the knock-back is
+; half FF3's, 4 / 8 pixels.)
+an_chit:    ld a, [BZ + $BB]                ; (no hits: nothing)
+            ld hl, BZ + $BC
+            or [hl]
+            ret z
+            ld a, [$DE99]
+            call an_slot
+            cp 4
+            ret nc
+            ld [an_hc], a
+            ld [an_c], a
+            ld c, a
+            call bs_jobaddr                 ; the hit tiles (2F/A9B1)
+            ld a, [bs_ja]
+            ld l, a
+            ld a, [bs_ja + 1]
+            ld h, a
+            ld de, 30 * 16
+            add hl, de
+            ld de, $8000 + 16 * $39
+            ld bc, 6 * 16
+            ld a, B_CGFX
+            call an_vcopy
+            ld a, [BZ + $CB]
+            and a
+            ld b, 4
+            ld a, $30                       ; (FF3's sound $B0; a critical hit $C6)
+            jr z, .s
+            ld b, 8
+            ld a, $46
+.s:         push bc
+            call bs_sfx
+            ld a, [an_hc]                   ; frame 4 (toad / mini $0F)
+            add a
+            ld hl, $D8BB
+            call bs_hl_a
+            ld a, [hl]
+            and 5
+            ld a, 4
+            jr z, .f
+            ld a, $0F
+.f:         ld [an_cf], a
+            pop bc
+            ld a, b
+            ld [an_dx], a
+            call .w2
+            ld b, 4
+.k:         push bc
+            ld hl, an_dx
+            inc [hl]
+            call .w2
+            ld hl, an_dx
+            dec [hl]
+            call .w2
+            pop bc
+            dec b
+            jr nz, .k
+            xor a
+            ld [an_dx], a
+            ld a, $FF
+            ld [an_cf], a
+            ld [an_hc], a
+.w2:        call bs_party                   ; two frames
+            call an_frame
+            jp an_frame
+
 ; ---- a hit animation (32/97B2): A = 0 slice, 1 blunt, 2 claw; none for a hand without hits; a
 ; critical hit flashes the backdrop orange once ($CB, $B7)
 an_hit:     ld [an_k], a
@@ -714,3 +783,5 @@ an_t2:      ds 1
 an_p1:      ds 1
 an_p2:      ds 1
 an_sp:      ds 8
+an_hc:      ds 1
+an_dx:      ds 1

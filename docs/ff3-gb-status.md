@@ -311,7 +311,14 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   characters drawn by FF3's pose frames (32/9111 with its frame / position tables from the ROM;
   2F/B607: standing, kneeling when weak or ailing, lying when dead, toad / mini; the graphics type
   reloaded as 2F/B651). Test hook: GB3N_STORY=bat GB3N_BATTLE=id (Start fights that battle).
-- Not yet in battle: weapon swings and hits (33/A0C0, 32/9357, 32/97B2), spell / summon animations,
+- Weapon swings (`src/banim.s`, 33/A0C0): stepping forward, each hand's swings 8 frames a hit with
+  FF3's arm poses (the job's animation tiles at OBJ $39), the weapon's sprite frames (32/9357, its
+  8 tiles from NES 2B/B000 in bank B_ANIM, its palette as OBJ palette 3), slice / blunt / claw hits
+  on the target (32/97B2, FF3's rng 0 for the random places, as on the Famicom); fists and claws
+  (33/A2FB). A monster's hit on a member (33/A8B8): the hit pose, knock-back (half FF3's: the
+  party column is at the screen's edge), four shakes, FF3's sounds (a critical hit's own).
+- Not yet in battle: bows / harps / boomerangs / moons / shuriken / arrows (their own weapon
+  animations: they show the step only), spell / summon animations,
   stone characters in the BG, back attacks drawn flipped (FF3 3F/F942: the
   monsters' tiles mirrored, the party at x $30), the airship's battle background.
 

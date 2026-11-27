@@ -255,6 +255,7 @@ bs_gfx:     xor a
             jr nz, .p0
             ld a, $FF
             ld [an_cf], a
+            ld [an_hc], a
             ld hl, bs_gt
             ld [hl+], a
             ld [hl+], a
@@ -756,7 +757,13 @@ bs_party:   ld hl, oam_buf
             ld d, 144
             jr nz, .x
             ld d, 136
-.x:         ld a, [bs_tmp + 6]
+.x:         ld a, [an_hc]                   ; (knocked back by a hit)
+            cp c
+            jr nz, .x2
+            ld a, [an_dx]
+            add d
+            ld d, a
+.x2:        ld a, [bs_tmp + 6]
             call bs_cdraw
             pop bc
             inc c
