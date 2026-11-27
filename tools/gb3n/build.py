@@ -52,6 +52,11 @@ def menu_data():
             'm_s_cfg:    db %s\n' % z('Config') + 'm_s_mspd:   db %s\n' % z('Message Speed') +
             'm_s_resume: db %s\n' % z('Resume') +
             'm_s_susp:   db %s\n' % z('Game suspended.\x0aResume it from the\x0atitle screen.') +
+            ''.join('m_s_%s:%s db %s\n' % (n, ' ' * (6 - len(n)), z(w)) for n, w in zip(
+                ['buy', 'sell', 'exit'], [x.strip() for x in re.split(r'\{15:..\}', t[0x0B])[1:]])) +
+            ''.join('m_s_%s:%s db %s\n' % (n, ' ' * (6 - len(n)), z(w)) for n, w in zip(
+                ['q1', 'q4', 'q10'], [x.strip() for x in re.split(r'\{15:..\}', t[0x2D])[1:]])) +
+            'm_s_qall:   db %s\n' % z(re.split(r'\{15:..\}', t[0x2E])[2].strip()) +
             'm_s_use:    db %s\n' % z(re.split(r'\{15:..\}', t[0x36])[1].strip()) +
             'm_s_item:   db %s\n' % z(re.split(r'\{15:..\}', t[0x36])[3].strip()) +
             'm_remove:   db %s\n' % z(clean(t[0x3E].split('\n')[-1])) + name_grid())

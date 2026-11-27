@@ -248,6 +248,22 @@ menu_open:  ld a, [z_lev]
             pop af
             ld [z_lev], a
             ret
+; a shop / inn (B_MENU's screen), then the map again and the inn's event
+shop_talk:  ld a, [z_lev]
+            push af
+            %FAR B_MENU, m_shop
+            ld a, [m_res]                   ; (menu variables live in the map's tables: read
+            ld [sh_ev], a                   ;   before the map comes back)
+            ld a, [pos_x]
+            ld [enter_x], a
+            ld a, [pos_y]
+            ld [enter_y], a
+            call keep_people
+            call map_change
+            pop af
+            ld [z_lev], a
+            ld a, [sh_ev]
+            jp ev_start
 ; the next map load keeps the people where they are (a map, not the world map)
 keep_people:
             ld a, [wmode]
@@ -280,3 +296,4 @@ section wram, $C2D0
 f_rng:      ds 3                            ; FF3's $F5, $F6, $F7
 enc_rate:   ds 1
 enc_t:      ds 1
+sh_ev:      ds 1

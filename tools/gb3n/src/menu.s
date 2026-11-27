@@ -16,16 +16,19 @@ M_HAND     = $EE            ; the hand (OBJ tile, VRAM bank 1; battle's SPR_HAND
 M_ATTR     = $0F            ; window cells: palette 7, VRAM bank 1
 M_BLACK    = $01            ; outside the windows: colour 0 (VRAM bank 1 tile 1, cleared at boot)
 
+section wram, $C800
+M_STR:      ds 256                          ; a string (the overlap check guards it)
+
 section bank B_MENU, $4000
 ; ---- the menu (called from the field; the field reloads its map after)
 m_main:     call m_enter
             xor a
             ld [m_cur], a
 .top:       call m_mainscr
-.lp:        ld a, [m_cur]                   ; the hand at (1 + cursor, 1)
+.lp:        ld a, [m_cur]                   ; the hand at (1 + cursor, 12)
             inc a
             ld b, a
-            ld c, 1
+            ld c, 12
             call m_hand
             call m_frame
             ldh a, [pad_new]
@@ -71,11 +74,11 @@ M_NCMD     = 9
 
 ; ---- the main screen: commands (0, 0) 9 x 11, Gil / CP (0, 11) 9 x 7, the party (9, 0) 11 x 18
 m_mainscr:  call m_clear
-            ld de, $0000
-            ld bc, $0B09
+            ld de, $000B                    ; (owner, 2026-11-27: the party on the left, the
+            ld bc, $0B09                    ;   commands and Gil / CP on the right)
             call m_win
             ld hl, m_cmdtxt                 ; the commands (FF3's text $31, ours after)
-            ld de, $0101
+            ld de, $010C
             ld b, M_NCMD
 .c:         push bc
             push de
@@ -85,30 +88,30 @@ m_mainscr:  call m_clear
             inc d
             dec b
             jr nz, .c
-            ld de, $0B00
+            ld de, $0B0B
             ld bc, $0709
             call m_win
             ld hl, m_gil
-            ld de, $0C01
+            ld de, $0C0C
             call m_puts0
             ld hl, SRAM_PAGE + $1C          ; gil ($601C, 3 bytes)
-            ld de, $0D01
+            ld de, $0D0C
             ld b, 7
             call m_num24
             ld hl, m_cp
-            ld de, $0F01
+            ld de, $0F0C
             call m_puts0
             ld a, [SRAM_PAGE + $1B]         ; cp ($601B)
             ld l, a
             ld h, 0
-            ld de, $1005
+            ld de, $1010
             ld b, 3
             call m_num
             call m_party
             jp m_show
 
-; the party window (9, 0) 11 x 18: per member 4 rows from 1 + 4 i: name, level, (status), HP
-m_party:    ld de, $0009
+; the party window (0, 0) 11 x 18: per member 4 rows from 1 + 4 i: name, level, (status), HP
+m_party:    ld de, $0000
             ld bc, $120B
             call m_win
             ld c, 0
@@ -118,7 +121,7 @@ m_party:    ld de, $0009
             add a
             inc a
             ld d, a                         ; row
-            ld e, 13
+            ld e, 4
             ld a, c
             call m_name
             inc d
@@ -138,13 +141,12 @@ m_party:    ld de, $0009
             inc a
             ld l, a
             ld h, 0
-            ld e, 16
+            ld e, 7
             ld b, 2
             call m_num
 .s:         inc d
-            ld e, 13
             inc d
-            ld e, 10
+            ld e, 1
             pop bc
             push bc
             ld a, c
@@ -262,7 +264,7 @@ m_pict:     ld a, c
             and 1
             add a
             add a
-            add 80 + 8
+            add 8 + 8
             ld e, a                         ; x
 ; the picture of member C at (E, D) (OAM entries 1 + 6 C)
 m_pictxy:   ld a, c
@@ -328,7 +330,7 @@ m_member:   ld a, [m_who]
             add a
             inc a
             ld b, a
-            ld c, 10
+            ld c, 1
             call m_hand2
             call m_frame
             ldh a, [pad_new]
@@ -627,7 +629,11 @@ m_sfx_err:  ld a, $06
             jp sfx_play
 
 ; ---- screen: enter (black, OBJ tiles, palettes), frame, leave
-m_enter:    call wait_vbl
+m_enter:    xor a
+            ld [m_mh], a
+            ld [m_pal], a                   ; (these live in the map's tables: stale at first)
+            ld [m_dirty], a
+            call wait_vbl
             call pal_black
             ld a, 1
             ld [guard_on], a
@@ -780,7 +786,9 @@ m_frame:    call wait_vbl
             call snd_frame
             jp read_pad
 ; leave: black; the field reloads its map
-m_leave:    call wait_vbl
+m_leave:    xor a
+            ld [m_mh], a
+            call wait_vbl
             call pal_black
             call m_sprclr
             xor a
@@ -948,7 +956,10 @@ m_num:      push bc
 ; the 24-bit number at HL (little end first) as B digits (<= 7) at (D, E)
 m_num24:    push de
             push bc
-            ld a, [hl+]
+            call m_dec24
+            jr m_n24p
+; the 24-bit number at HL -> m_digs (7 characters, leading spaces)
+m_dec24:    ld a, [hl+]
             ld [m_n24], a
             ld a, [hl+]
             ld [m_n24 + 1], a
@@ -962,7 +973,7 @@ m_num24:    push de
             jr nz, .cl
             ld hl, m_digs + 6               ; digits from the right: divide by 10
 .dv:        push hl
-            call .div10                     ; A = remainder
+            call m_div10                    ; A = remainder
             pop hl
             add '0'
             ld [hl-], a
@@ -974,6 +985,8 @@ m_num24:    push de
             ld a, [m_n24 + 2]
             or b
             jr nz, .dv
+            ret
+m_n24p:
             pop bc
             pop de
             ld a, 7
@@ -989,7 +1002,7 @@ m_num24:    push de
             dec b
             jr nz, .p
             ret
-.div10:     ld hl, m_n24 + 2                ; m_n24 /= 10, A = remainder
+m_div10:    ld hl, m_n24 + 2                ; m_n24 /= 10, A = remainder
             ld c, 3
             xor a
 .b:         ld b, 8
@@ -1400,17 +1413,27 @@ m_files:    call m_clear
             jp m_num
 
 ; t8200 message A in the bottom window (0, 13) 20 x 5 (its lines, wrapped at build time)
-m_msg:      push af
-            pop af
-            call m_t82all
+m_msg:      call m_t82all
             ld hl, M_STR
 ; the string HL (lines split by $0A / $0C) in the bottom window
 m_msghl:    push hl
-            ld de, $0D00
-            ld bc, $0514
+            ld a, [m_mh]                    ; (the window: rows m_mrow .. + m_mh; m_mh 0: 13 / 5)
+            and a
+            jr nz, .w
+            ld a, 13
+            ld [m_mrow], a
+            ld a, 5
+            ld [m_mh], a
+.w:         ld a, [m_mrow]
+            ld d, a
+            ld e, 0
+            ld a, [m_mh]
+            ld b, a
+            ld c, 20
             call m_win
             pop hl
-            ld de, $0E01
+            inc d
+            ld e, 1
 .c:         ld a, [hl+]
             and a
             ret z
@@ -1418,6 +1441,8 @@ m_msghl:    push hl
             jr z, .nl
             cp $0C
             jr z, .nl
+            cp $04                          ; {04}: the amount in m_val
+            jr z, .num
             cp ' '
             jr c, .c
             call m_putc
@@ -1425,6 +1450,25 @@ m_msghl:    push hl
             jr .c
 .nl:        inc d
             ld e, 1
+            ld a, d                         ; (never past the screen)
+            cp 17
+            jr c, .c
+            ret
+.num:       push hl
+            push de
+            ld hl, m_val
+            call m_dec24                    ; (printed without the leading spaces)
+            pop de
+            ld hl, m_digs
+            ld b, 7
+.n:         ld a, [hl+]
+            cp ' '
+            jr z, .n2
+            call m_putc
+            inc e
+.n2:        dec b
+            jr nz, .n
+            pop hl
             jr .c
 ; t8200 string A -> M_STR whole (up to 80 bytes, 0 ended)
 m_t82all:   ld l, a
@@ -1444,9 +1488,12 @@ m_t82all:   ld l, a
             ld a, [m_tmp + 2]
             ld h, a
             ld de, M_STR
-            ld bc, 80
+            ld bc, 255
             ld a, [m_tmp]
-            jp far_copy
+            call far_copy
+            xor a
+            ld [M_STR + 255], a
+            ret
 ; Yes / No in the message window's last line (t8200 $06's words): C = No / B
 m_yesno:    xor a
             ld [m_yn], a
@@ -4502,6 +4549,766 @@ su_load:    ld a, 1
             ld [SU_CHECK], a
             jp sr_off
 
+; ==== shops and inns (people $E0-$FF; their script: scr_buf, 3F/E9E8): inns $E0-$E2 (3C/8E8D),
+; shops $E3-$FB (3D/AF1F), the Fat Chocobo $FC+ (later). [m_res] = an event to run after (inns)
+m_shop:     call m_enter
+            call m_winpal
+            xor a
+            ld [m_res], a
+            ld [m_mrow], a
+            ld a, [ev_who]
+            cp $E3
+            jp c, m_inn
+            cp $FC
+            jp nc, .fat
+            ld hl, scr_buf + 1              ; the eight items and their prices (3D/B220)
+            ld de, s_items
+            ld bc, 8
+            call memcpy
+            ld a, $26                       ; "Welcome! What is your business?"
+            ld [s_mid], a
+.top:       xor a
+            ld [s_opt], a
+            ld [s_qty], a
+.tl:        ld a, 3
+            ld [s_mode], a                  ; options: Buy Sell Exit
+            call s_draw
+            call s_opts
+            jr c, .x
+            ld a, [s_opt]
+            cp 2
+            jr z, .x
+            and a
+            jr nz, .sell
+            ld a, 4                         ; how many: 1 4 10
+            ld [s_mode], a
+            ld a, $2D
+            ld [s_mid], a
+            xor a
+            ld [s_opt], a
+            call s_draw
+            call s_opts
+            jr c, .back
+            ld a, [s_opt]
+            ld [s_qty], a
+            ld a, $27                       ; "What shall it be?"
+            ld [s_mid], a
+            call s_buy
+.back:      ld a, $26
+            ld [s_mid], a
+            jr .tl
+.sell:      ld a, 5                         ; how many: 1 All
+            ld [s_mode], a
+            ld a, $2E
+            ld [s_mid], a
+            xor a
+            ld [s_opt], a
+            call s_draw
+            call s_opts
+            jr c, .back
+            ld a, [s_opt]
+            ld [s_qty], a
+            ld a, $2A                       ; "What will you sell?"
+            ld [s_mid], a
+            call s_sell
+            jr .back
+.x:         ld a, $29                       ; "Thank you for your patronage."
+            ld [s_mid], a
+            xor a
+            ld [s_mode], a
+            call s_draw
+            call m_waitkey
+            jp m_leave
+.fat:       call m_sfx_err                  ; (the Fat Chocobo: later)
+            jp m_leave
+
+; the shop screen: message (0, 0) 20 x 4, options (0, 4) 20 x 3, list (0, 7) 20 x 8, Gil
+; (0, 15) 20 x 3; s_mode: 0 none, 3 Buy / Sell / Exit, 4 1 / 4 / 10, 5 1 / All; s_list: 1 buy,
+; 2 sell
+s_draw:     call m_clear
+            call m_sprclr
+            xor a
+            ld [m_mrow], a                  ; (the message at the top: rows 0-3)
+            ld a, 4
+            ld [m_mh], a
+            call s_msg
+            ld de, $0400
+            ld bc, $0314
+            call m_win
+            ld a, [s_mode]
+            ld hl, m_s_buy
+            cp 3
+            jr z, .o3
+            ld hl, m_s_q1
+            cp 4
+            jr z, .o3
+            cp 5
+            jr nz, .no
+            ld de, $0502                    ; 1 / All
+            call m_puts0
+            ld hl, m_s_qall
+            ld e, 8
+            call m_puts0
+            jr .no
+.o3:        ld de, $0502                    ; three words at columns 2, 8, 14
+            call m_puts0
+            ld e, 8
+            call m_puts0
+            ld e, 14
+            call m_puts0
+.no:        ld de, $0700
+            ld bc, $0814
+            call m_win
+            call s_listdraw
+            ld de, $0F00                    ; Gil
+            ld bc, $0314
+            call m_win
+            ld hl, m_gil
+            ld de, $1001
+            call m_puts0
+            ld hl, SRAM_PAGE + $1C
+            ld de, $100B
+            ld b, 7
+            call m_num24
+            jp m_show
+; the message s_msg in rows 0-3 (its {04}: m_val)
+s_msg:      ld a, [s_mid]
+            call m_t82all
+            ld hl, M_STR
+            jp m_msghl
+; choose one of s_mode's options (s_opt): C = B
+s_opts:     ld a, [s_mode]
+            ld b, 3
+            cp 5
+            jr nz, .n
+            dec b
+.n:         ld a, b
+            ld [s_nopt], a
+.lp:        ld a, [s_opt]                   ; the hand at column 1 + 6 opt
+            ld c, a
+            add a
+            add c
+            add a
+            add 2
+            ld c, a
+            ld b, 5
+            call m_hand
+            call m_frame
+            ldh a, [pad_new]
+            bit 4, a
+            jr nz, .r
+            bit 5, a
+            jr nz, .l
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            call m_sfx_ok
+            and a
+            ret
+.x:         call m_sfx_ok
+            scf
+            ret
+.r:         ld a, [s_nopt]
+            ld b, a
+            ld a, [s_opt]
+            inc a
+            cp b
+            jr c, .s
+            xor a
+            jr .s
+.l:         ld a, [s_opt]
+            and a
+            jr nz, .l2
+            ld a, [s_nopt]
+.l2:        dec a
+.s:         ld [s_opt], a
+            call m_sfx_move
+            jr .lp
+; the list: buying: the eight items and their prices (for s_qty); selling: the pack (6 rows
+; from m_top)
+s_listdraw: ld a, [s_list]
+            and a
+            ret z
+            cp 2
+            jr z, .sell
+            ld a, [m_top]
+            ld [m_row], a
+            ld d, 8
+.b:         ld a, [m_row]
+            cp 8
+            ret nc
+            ld hl, s_items
+            add l
+            ld l, a
+            jr nc, .b1
+            inc h
+.b1:        ld a, [hl]
+            and a
+            jr z, .bn
+            push de
+            ld e, a
+            ld d, 0
+            call m_n88
+            pop de
+            push de
+            ld e, 2
+            ld a, 11
+            call m_putsn
+            ld a, [m_row]
+            call s_price                    ; -> m_val
+            pop de
+            push de
+            ld hl, m_val
+            ld e, 12
+            ld b, 7
+            call m_num24
+            pop de
+.bn:        ld a, [m_row]
+            inc a
+            ld [m_row], a
+            inc d
+            ld a, d
+            cp 14
+            jr nz, .b
+            ret
+.sell:      ld a, [m_top]
+            ld [m_row], a
+            ld d, 8
+.s:         ld a, [m_row]
+            cp 32
+            ret nc
+            push de
+            add $C0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld a, [hl]
+            and a
+            jr z, .sn
+            ld e, a
+            ld d, 0
+            call m_n88
+            pop de
+            push de
+            ld e, 2
+            ld a, 13
+            call m_putsn
+            pop de
+            push de
+            ld a, [m_row]
+            add $E0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld l, [hl]
+            ld h, 0
+            ld e, 16
+            ld a, ':'
+            call m_putc
+            inc e
+            ld b, 2
+            call m_num
+.sn:        pop de
+            ld a, [m_row]
+            inc a
+            ld [m_row], a
+            inc d
+            ld a, d
+            cp 14
+            jr nz, .s
+            ret
+; m_val = item A's price (10/9E00 + 2 id: B_EVENTS $5E00)
+s_base:     ld l, a
+            ld h, 0
+            add hl, hl
+            ld bc, $5E00
+            add hl, bc
+            ld de, m_val
+            ld bc, 2
+            ld a, B_EVENTS
+            call far_copy
+            xor a
+            ld [m_val + 2], a
+            ret
+; m_val = the price of shop item A for s_qty (3D/B281: 1: p; 4: 4p - 4p x 26 / 256; 10: 10p -
+; 10p x 51 / 256, 24-bit as FF3)
+s_price:    ld hl, s_items
+            add l
+            ld l, a
+            jr nc, .g
+            inc h
+.g:         ld a, [hl]
+            call s_base
+            ld a, [s_qty]
+            and a
+            ret z
+            cp 1
+            ld b, 4
+            ld c, 26
+            jr z, .d
+            ld b, 10
+            ld c, 51
+.d:         push bc
+            ld a, b
+            call m_mul24                    ; t = p x n
+            ld hl, m_val
+            ld de, s_t
+            ld bc, 3
+            call memcpy
+            pop bc
+            ld a, c
+            call m_mul24                    ; u = t x k
+            ld a, [s_t]                     ; t - u / 256
+            ld hl, m_val + 1
+            sub [hl]
+            ld [m_val], a
+            ld a, [s_t + 1]
+            inc hl
+            sbc [hl]
+            ld [m_val + 1], a
+            ld a, [s_t + 2]
+            sbc 0
+            ld [m_val + 2], a
+            ret
+; m_val = m_val x A (24 bits kept: 3C/8E55)
+m_mul24:    ld b, a
+            ld hl, m_val
+            ld a, [hl+]
+            ld c, a
+            ld a, [hl+]
+            ld d, a
+            ld e, [hl]                      ; EDC = multiplicand
+            xor a
+            ld [s_acc], a
+            ld [s_acc + 1], a
+            ld [s_acc + 2], a
+.l:         srl b
+            jr nc, .s
+            ld hl, s_acc
+            ld a, [hl]
+            add c
+            ld [hl+], a
+            ld a, [hl]
+            adc d
+            ld [hl+], a
+            ld a, [hl]
+            adc e
+            ld [hl], a
+.s:         sla c
+            rl d
+            rl e
+            ld a, b
+            and a
+            jr nz, .l
+            ld hl, s_acc
+            ld de, m_val
+            ld bc, 3
+            jp memcpy
+; C = gil < m_val (3D/B0CA)
+s_short:    ld hl, SRAM_PAGE + $1E
+            ld a, [m_val + 2]
+            cp [hl]
+            jr c, .ok
+            jr nz, .no
+            dec l
+            ld a, [m_val + 1]
+            cp [hl]
+            jr c, .ok
+            jr nz, .no
+            dec l
+            ld a, [m_val]
+            cp [hl]
+            jr c, .ok
+            jr z, .ok
+.no:        scf
+            ret
+.ok:        and a
+            ret
+; gil -= m_val; gil += m_val (at most 9999999)
+s_pay:      ld hl, SRAM_PAGE + $1C
+            ld a, [m_val]
+            ld b, a
+            ld a, [hl]
+            sub b
+            ld [hl+], a
+            ld a, [m_val + 1]
+            ld b, a
+            ld a, [hl]
+            sbc b
+            ld [hl+], a
+            ld a, [m_val + 2]
+            ld b, a
+            ld a, [hl]
+            sbc b
+            ld [hl], a
+            ret
+s_earn:     ld hl, SRAM_PAGE + $1C
+            ld a, [m_val]
+            add [hl]
+            ld [hl+], a
+            ld a, [m_val + 1]
+            adc [hl]
+            ld [hl+], a
+            ld a, [m_val + 2]
+            adc [hl]
+            ld [hl], a
+            %FAR B_FIELD, gil_cap
+            ret
+
+; buying (3D/AFFF): an item of the eight for s_qty x 1 / 4 / 10
+s_buy:      ld a, 1
+            ld [s_list], a
+            xor a
+            ld [m_icur], a
+            ld [m_top], a
+.scr:       call s_draw
+.lp:        ld a, [m_icur]
+            ld hl, m_top
+            sub [hl]
+            add 8
+            ld b, a
+            ld c, 1
+            call m_hand
+            call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            call m_sfx_ok
+            ld a, [m_icur]
+            call s_price
+            call s_short
+            ld a, $6C                       ; "You don't have enough money."
+            jr c, .m
+            ld a, [m_icur]
+            ld hl, s_items
+            add l
+            ld l, a
+            jr nc, .g
+            inc h
+.g:         ld a, [hl]
+            and a
+            jr z, .lp
+            ld b, a
+            ld a, [s_qty]                   ; 1 / 4 / 10 of it
+            and a
+            ld c, 1
+            jr z, .q
+            dec a
+            ld c, 4
+            jr z, .q
+            ld c, 10
+.q:         call s_carry                    ; C = can't carry
+            ld a, $2C
+            jr c, .m
+            call s_pay
+            ld a, $28                       ; "Thank you so much! Anything else?"
+.m:         ld [s_mid], a
+            jr .scr
+.x:         xor a
+            ld [s_list], a
+            ret
+.up:        ld a, [m_icur]
+            and a
+            jr z, .lp
+            dec a
+            jr .mv
+.dn:        ld a, [m_icur]
+            cp 7
+            jr z, .lp
+            inc a
+.mv:        ld [m_icur], a
+            call m_sfx_move
+            ld hl, m_top
+            ld a, [m_icur]
+            cp [hl]
+            jr nc, .m1
+            ld [hl], a
+            jr .scr
+.m1:        sub [hl]
+            cp 6
+            jr c, .lp
+            ld a, [hl]
+            inc a
+            ld [hl], a
+            jr .scr
+; B of item id, C of them into the pack (3D/B078: its stack + C under 100, else the first
+; empty place): C = no room
+s_carry:    ld hl, SRAM_PAGE + $C0
+            ld e, 32
+.f:         ld a, [hl]
+            cp b
+            jr z, .st
+            inc l
+            dec e
+            jr nz, .f
+            ld hl, SRAM_PAGE + $C0
+            ld e, 32
+.e:         ld a, [hl]
+            and a
+            jr z, .new
+            inc l
+            dec e
+            jr nz, .e
+            scf
+            ret
+.st:        ld a, l
+            add $20
+            ld l, a
+            ld a, [hl]
+            add c
+            cp 100
+            ccf
+            ret c
+            ld [hl], a
+            ret
+.new:       ld [hl], b
+            ld a, l
+            add $20
+            ld l, a
+            ld [hl], c
+            and a
+            ret
+
+; selling (3D/B129): one / all of a pack's item for half its price
+s_sell:     ld a, 2
+            ld [s_list], a
+            xor a
+            ld [m_icur], a
+            ld [m_top], a
+.scr:       call s_draw
+.lp:        ld a, [m_icur]
+            ld hl, m_top
+            sub [hl]
+            add 8
+            ld b, a
+            ld c, 1
+            call m_hand
+            call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            ld a, [m_icur]
+            add $C0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld a, [hl]
+            and a
+            jr z, .err
+            cp $9A                          ; not key items, not Toad / Minimum
+            jr c, .ok
+            cp $A4
+            jr c, .err
+            cp $F6
+            jr z, .err
+            cp $F7
+            jr z, .err
+.ok:        call m_sfx_ok
+            call s_base                     ; half the price (x count for All: 3D/B248)
+            ld a, [s_qty]
+            and a
+            jr z, .h
+            ld a, [m_icur]
+            add $E0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld a, [hl]
+            call m_mul24
+.h:         ld hl, m_val + 2
+            srl [hl]
+            dec hl
+            rr [hl]
+            dec hl
+            rr [hl]
+            ld a, $2B                       ; "That will come to N Gil." (A: yes)
+            ld [s_mid], a
+            call s_draw
+            call m_waitkey
+            ldh a, [pad_new]
+            and PAD_A
+            jr z, .no
+            call m_sfx_ok
+            ld a, [m_icur]                  ; one / all of them go
+            add $E0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld a, [s_qty]
+            and a
+            jr nz, .all
+            dec [hl]
+            jr nz, .e
+.all:       ld [hl], 0
+            ld a, l
+            sub $20
+            ld l, a
+            ld [hl], 0
+.e:         call s_earn
+.no:        ld a, $2A
+            ld [s_mid], a
+            jr .scr
+.err:       call m_sfx_err
+            jp .lp
+.x:         xor a
+            ld [s_list], a
+            ret
+.up:        ld a, [m_icur]
+            and a
+            jp z, .lp
+            dec a
+            jr .mv
+.dn:        ld a, [m_icur]
+            cp 31
+            jp z, .lp
+            inc a
+.mv:        ld [m_icur], a
+            call m_sfx_move
+            ld hl, m_top
+            ld a, [m_icur]
+            cp [hl]
+            jr nc, .m1
+            ld [hl], a
+            jp .scr
+.m1:        sub [hl]
+            cp 6
+            jp c, .lp
+            ld a, [hl]
+            inc a
+            ld [hl], a
+            jp .scr
+
+; ---- an inn (3C/8E8D): 5 x the living x the script's rate; yes: pay, HP to max for the
+; living, then the script's event
+m_inn:      ld b, 0                         ; the living (not dead / stone)
+            ld hl, SRAM_PAGE + $102
+.c:         ld a, [hl]
+            and $C0
+            jr nz, .n
+            inc b
+.n:         ld a, l
+            add $40
+            ld l, a
+            jr nc, .c
+            ld a, b
+            add a
+            add a
+            add b
+            push af
+            ld a, [scr_buf]
+            ld [m_val], a
+            xor a
+            ld [m_val + 1], a
+            ld [m_val + 2], a
+            pop af
+            call m_mul24
+            ld a, 3
+            ld [m_mrow], a
+            ld a, 9
+            ld [m_mh], a
+            call m_clear
+            call m_sprclr
+            ld a, $04                       ; the innkeeper's question (its {04}: the cost)
+            call m_msg
+            ld de, $0F00
+            ld bc, $0314
+            call m_win
+            ld hl, m_gil
+            ld de, $1001
+            call m_puts0
+            ld hl, SRAM_PAGE + $1C
+            ld de, $100B
+            ld b, 7
+            call m_num24
+            call m_show
+            call m_yesno2
+            jr c, .x
+            call s_short
+            ld a, $6C                       ; "You don't have enough money."
+            jr c, .m
+            call s_pay
+            ld hl, SRAM_PAGE + $1C          ; (the Gil shown again)
+            ld de, $100B
+            ld b, 7
+            call m_num24
+            ld hl, SRAM_PAGE + $10C         ; 3C/8ED8: HP to max for the living
+.h:         ld a, l
+            sub $0A
+            ld e, a
+            ld d, h
+            ld a, [de]
+            and $C0
+            jr nz, .hn
+            push hl
+            inc l
+            inc l
+            ld a, [hl+]
+            ld b, [hl]
+            pop hl
+            ld [hl+], a
+            ld [hl], b
+            dec l
+.hn:        ld a, l
+            add $40
+            ld l, a
+            jr nc, .h
+            ld a, [scr_buf + 1]             ; the event after
+            ld [m_res], a
+            ld a, $4F                       ; "Thank you very much. Please rest well..."
+.m:         call m_msg
+            call m_show
+            call m_waitkey
+.x:         jp m_leave
+; Yes / No under the inn's message (rows 13-14: the hand at 13 / 14)
+m_yesno2:   ld hl, m_s_yes
+            ld de, $0C02
+            call m_puts0
+            ld hl, m_s_no
+            ld de, $0D02
+            call m_puts0
+            ld a, 1
+            ld [m_dirty], a
+            xor a
+            ld [m_yn], a
+.lp:        ld a, [m_yn]
+            add 12
+            ld b, a
+            ld c, 2
+            call m_hand2
+            call m_frame
+            ldh a, [pad_new]
+            and $C0
+            jr nz, .t
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .no
+            and PAD_A
+            jr z, .lp
+            call m_hand2off
+            call m_sfx_ok
+            ld a, [m_yn]
+            and a
+            ret z
+            scf
+            ret
+.t:         ld a, [m_yn]
+            xor 1
+            ld [m_yn], a
+            call m_sfx_move
+            jr .lp
+.no:        call m_hand2off
+            call m_sfx_ok
+            scf
+            ret
+
 section bank B_MENU, $7C00
 sp_mask:    ds 56                           ; (3D/A20C, A244, A27C: from the ROM)
 sp_lvl:     ds 56
@@ -4563,6 +5370,16 @@ m_jd:       ds 16
 m_jcost:    ds 23
 m_tmp8:     ds 8
 
-section wram, $CEA0
-M_STR:      ds 80                           ; a string (the overlap check guards the variables)
 m_su:       ds 1
+m_mrow:     ds 1
+m_mh:       ds 1
+m_val:      ds 3
+s_items:    ds 8
+s_mid:      ds 1
+s_opt:      ds 1
+s_nopt:     ds 1
+s_qty:      ds 1
+s_mode:     ds 1
+s_list:     ds 1
+s_t:        ds 3
+s_acc:      ds 3

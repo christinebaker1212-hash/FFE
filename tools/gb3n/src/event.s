@@ -14,8 +14,6 @@ talk:       call dest_cell
             jp nc, treasure
             ld a, [hl]                      ; the person's id
             ld [ev_who], a
-            cp $E0                          ; (inns, shops, the fat chocobo: later)
-            ret nc
             ld c, a
             ld b, 0
             ld hl, $4200                    ; trigger scripts: NES 2C/8200 (world 0) / 2C/8400
@@ -30,6 +28,9 @@ talk:       call dest_cell
             ld bc, 64
             ld a, B_SCRIPT
             call far_copy
+            ld a, [ev_who]                  ; inns, shops, the Fat Chocobo (3F/E9D3)
+            cp $E0
+            jp nc, shop_talk
             ld hl, scr_buf                  ; the dialogue list: after the first unconditional
 .f:         ld a, [hl]                      ;   block ($FF, event)
             cp $FF
