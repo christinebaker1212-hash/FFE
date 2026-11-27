@@ -582,8 +582,10 @@ field_step: call npc_update
             jr z, .na
             ld a, [wmode]
             and a
-            jr z, .pd
-            call v_bbtn
+            jr nz, .bw
+            call map_bbtn                   ; (3F/EA9C)
+            jr .done
+.bw:        call v_bbtn
             jr .done
 .na:        ldh a, [pad_new]
             and PAD_A
@@ -1027,7 +1029,17 @@ line_flush: ld hl, line_buf
             ret
 
 ; the walking character into OAM entries 0-3
-party_oam:  ld a, [wmode]                   ; in a vehicle on the world map: its sprite
+party_oam:  ld a, [ev_hide]                 ; (hidden by event $C9: 3E/D8D3)
+            bit 7, a
+            jr z, .vis
+            ld hl, oam_buf
+            ld b, 16
+            xor a
+.h:         ld [hl+], a
+            dec b
+            jr nz, .h
+            ret
+.vis:       ld a, [wmode]                   ; in a vehicle on the world map: its sprite
             and a                           ;   (vehicle.s)
             jr z, .nv
             ld a, [veh]

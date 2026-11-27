@@ -50,6 +50,103 @@ talk:       call dest_cell
             call scr_event                  ; A = the event chosen by the switch tests
             jp ev_start
 
+; ---- B on a normal map (3F/EA9C): a person ahead (or a locked door, as person $DF): an item
+; shown to them (3C/8DE3; scripts 2C/8800 by key item $98-$AF, + $30 off world 0); nobody: the
+; guest's script (2C/8860 by guest), the party turned to the guest
+map_bbtn:   call dest_cell
+            call npc_find
+            jr c, .npc
+            call dest_cell                  ; (a locked door ahead: person $DF)
+            call map_mt
+            ld l, a
+            ld h, W_PROP1
+            bit 7, [hl]
+            jr z, .guest
+            inc h
+            ld a, [hl]
+            swap a
+            and 15
+            cp 6
+            jr nz, .guest
+            ld a, $DF
+            jr .sel
+.npc:       ld a, [hl]
+.sel:       ld [ev_who], a
+            %FAR B_MENU, m_ipick
+            ld a, [m_pick]
+            ld [ev_pitem], a
+            call map_reload
+            ld a, [ev_pitem]
+            sub $98
+            ret c
+            cp $AF - $98 + 1
+            ret nc
+            add a
+            ld c, a
+            ld a, [world]
+            and a
+            ld a, c
+            jr z, .w0
+            add $30
+.w0:        ld c, a
+            ld b, 0
+            ld hl, $4800
+            add hl, bc
+            call scr_ptr
+            ld de, scr_buf
+            ld bc, 64
+            ld a, B_SCRIPT
+            call far_copy
+            ld a, [ev_who]                  ; (the script's first byte: its person)
+            ld hl, scr_buf
+            cp [hl]
+            ret nz
+            inc hl
+            call scr_ev_hl
+            jp ev_start
+.guest:     ld a, [ev_hide]                 ; (3F/EA56)
+            bit 6, a
+            ret nz
+            ld a, [SRAM_PAGE + $0B]
+            and a
+            ret z
+            dec a
+            add a
+            ld c, a
+            ld b, 0
+            ld hl, $4860
+            add hl, bc
+            call scr_ptr
+            ld de, scr_buf
+            ld bc, 64
+            ld a, B_SCRIPT
+            call far_copy
+            call scr_event
+            push af
+            ld a, [gu_stack]                ; (facing the guest: 3F/EA8C)
+            and $0F
+            ld e, a
+            ld d, 0
+            ld hl, .face
+            add hl, de
+            ld a, [hl]
+            ld [facing], a
+            pop af
+            jp ev_start
+.face:      db DIR_U, DIR_L, DIR_R, 0, DIR_U, DIR_L, DIR_R, 0, DIR_D, DIR_L, DIR_R, 0, 0, 0, 0, 0
+; the map again with its people (after a full-screen window)
+map_reload: ld a, [z_lev]
+            push af
+            ld a, [pos_x]
+            ld [enter_x], a
+            ld a, [pos_y]
+            ld [enter_y], a
+            call keep_people
+            call map_change
+            pop af
+            ld [z_lev], a
+            ret
+
 ; ---- A on a treasure or a locked door ($3F $E917): D, E = the cell ahead
 treasure:   ld a, d
             ld [tr_x], a
@@ -360,6 +457,7 @@ scr_addr:   ld a, h
 
 ; the conditional script in scr_buf: the first block whose switch tests all pass -> its event
 scr_event:  ld hl, scr_buf
+scr_ev_hl:
 .b:         ld a, [hl+]
             cp $FF
             jr z, .ev
@@ -979,7 +1077,15 @@ ev_player:  ld a, [ev_cmd]
 .face:      ld a, b
             ld [facing], a
             ret
-.sh:        cp $0A                          ; $CA Nautilus, $CB Invincible, $CF chocobo, $CE
+.sh:        cp $08                          ; $C8 / $C9: the party shown / hidden, $CC / $CD the
+            jr z, .sp                       ;   guest ($7E bits 7 / 6: 3B/A157-A198)
+            cp $09
+            jr z, .hp
+            cp $0C
+            jr z, .sg
+            cp $0D
+            jr z, .hg
+            cp $0A                          ; $CA Nautilus, $CB Invincible, $CF chocobo, $CE
             ld b, 6                         ;   off the Invincible, parked here (3B/A16D-A1C8;
             jr z, .v                        ;   $C8 / $C9 show / hide: later)
             cp $0B
@@ -1001,6 +1107,18 @@ ev_player:  ld a, [ev_cmd]
             ld b, 0
 .v:         ld a, b
             ld [veh], a
+            ret
+.sp:        ld hl, ev_hide
+            res 7, [hl]
+            ret
+.hp:        ld hl, ev_hide
+            set 7, [hl]
+            ret
+.sg:        ld hl, ev_hide
+            res 6, [hl]
+            ret
+.hg:        ld hl, ev_hide
+            set 6, [hl]
             ret
 ev_dirs:    db DIR_R, DIR_L, DIR_D, DIR_U
 

@@ -417,6 +417,9 @@ def main():
     if os.environ.get('GB3N_STORY'):             # test builds only: Start runs the ending ($DD)
         st = os.environ['GB3N_STORY']
         ev = {'prol': 'ev_prol', 'epi': 'ev_epi', 'fx': 'ev_fxtest'}.get(st, 'ev_satest' if st.startswith('sa') else 'ev_ending')
+        if st == 'ipick':
+            ev = 'ev_iptest'
+            src += 'section bank B_FIELD, $7480\nev_iptest:  %FAR B_MENU, m_ipick\n            jp map_reload\n'
         if ev == 'ev_satest':                    # (GB3N_STORY=saN: special animation N on Start)
             src += 'section bank B_FIELD, $7480\nev_satest:  ld a, %d\n            ld [ev_arg], a\n            jp ev_sanim\n' % int(st[2:], 16)
         src = src.replace('            jp nz, menu_open', '            jp nz, ' + ev)

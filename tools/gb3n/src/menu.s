@@ -2084,6 +2084,70 @@ m_item:     xor a
 ; (the first choice is kept apart from m_isel, which the loop clears)
 m_isel2 = m_isel + 1
 
+; ==== an item shown to someone (B on a map: 3C/8DE3): the pack's list, A picks (m_pick = the
+; item; nothing at the trash row), B leaves (m_pick = 0)
+m_ipick:    call m_enter
+            xor a
+            ld [m_icur], a
+            ld [m_top], a
+            ld [m_pick], a
+            ld a, $FF
+            ld [m_isel], a
+.scr:       call i_draw
+.lp:        ld a, [m_icur]
+            ld hl, m_top
+            sub [hl]
+            add 4
+            ld b, a
+            ld c, 1
+            call m_hand
+            call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            ld a, [m_icur]
+            cp I_TRASH
+            jr z, .lp
+            call m_sfx_ok
+            add $C0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld a, [hl]
+            ld [m_pick], a
+            jp m_leave
+.x:         call m_sfx_ok
+            jp m_leave
+.up:        ld a, [m_icur]
+            and a
+            jr z, .lp
+            dec a
+            jr .m
+.dn:        ld a, [m_icur]
+            cp I_TRASH - 1
+            jr z, .lp
+            inc a
+.m:         ld [m_icur], a
+            call m_sfx_move
+            ld hl, m_top
+            ld a, [m_icur]
+            cp [hl]
+            jr nc, .m1
+            ld [hl], a
+            jr .scr
+.m1:        sub [hl]
+            cp 13
+            jr c, .lp
+            ld a, [hl]
+            inc a
+            ld [hl], a
+            jr .scr
+
 ; the item screen: "Item" (0, 0) 20 x 3, the list (0, 3) 20 x 15 (13 rows from m_top)
 i_draw:     call m_clear
             call m_sprclr
@@ -5369,6 +5433,7 @@ wp_comb:    ds 16                           ; (3C/9D4B)
 job_prog:   ds 44                           ; (3D/AD59)
 
 section wram, $CD80
+m_pick:     ds 1
 m_cur:      ds 1
 m_who:      ds 1
 m_dirty:    ds 1

@@ -546,3 +546,6 @@ ev_74:      ds 1
 ev_75:      ds 1
 ev_t:       ds 1
 fl_dmg:     ds 1
+ev_hide:    ds 1                            ; FF3's $7E: bit 7 the party hidden, bit 6 the guest
+ev_pitem:   ds 1
+gu_stack:   ds 4                            ; FF3's $E1-$E4: the guest's steps behind the party

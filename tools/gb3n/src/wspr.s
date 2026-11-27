@@ -812,7 +812,7 @@ section bank B_WSPR, $7C00
 ws_sin:     ds 256                          ; (3A/9E3E, from the ROM)
 ws_chtab:   ds 126                          ; (3D/BF7A: the chain's links by distance)
 
-section wram, $CFC8
+section wram, $CFD0
 ws_n:       ds 1
 ws_x:       ds 1
 ws_y:       ds 1
