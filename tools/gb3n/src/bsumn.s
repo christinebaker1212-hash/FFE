@@ -1410,27 +1410,27 @@ an_slist:   push de
             cp $F8
             jr c, .s
 .y:         add 17
-            ld [an_k2], a
+            ld [an_sl1], a
             ld a, [hl+]
             add c
-            ld [an_k4], a
+            ld [an_sl2], a
             ld a, [hl+]
-            ld [an_k5], a
+            ld [an_sl3], a
             ld a, [hl]
             add d
             cp 160
             jr nc, .s
             add 8
-            ld [an_kx], a
+            ld [an_sl4], a
             call an_slot_oam
             jr c, .s
-            ld a, [an_k2]
+            ld a, [an_sl1]
             ld [hl+], a
-            ld a, [an_kx]
+            ld a, [an_sl4]
             ld [hl+], a
-            ld a, [an_k4]
+            ld a, [an_sl2]
             ld [hl+], a
-            ld a, [an_k5]
+            ld a, [an_sl3]
             ld b, a
             and $C0
             rra
@@ -2817,6 +2817,10 @@ an_bpf:     ds 1
 an_bpq:     ds 9
 an_bgs:     ds 16
 an_bp2:     ds 1
+an_sl1:     ds 1
+an_sl2:     ds 1
+an_sl3:     ds 1
+an_sl4:     ds 1
 an_sbase:   ds 1
 an_smode:   ds 1
 an_sox:     ds 1

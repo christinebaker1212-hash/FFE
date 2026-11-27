@@ -343,8 +343,28 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   29/B9C0 onto the target and bouncing, then down into place), running away (33/BC89: turning one by
   one, running off right; minis and toads their own way), an ineffective cast (34/8555). The party
   drawer takes per-member frames / offsets (an_pf, an_pxo, an_pyo).
-- Not yet in battle: summons (2F/B050 with 32/8CEF and the 24 summon attacks of bank 32), the airship
-  cannon (32/84C9), Flare Wave's final-boss wave (10/8BD5) and the final boss's death (10/8A85),
+- Summons (2026-11-27, `src/bsumn.s`): the pre-animation (33/AFB0: the spinner, four sprites
+  flying off), the party's colours cycling and fading (32/8CBA, 8CA7; FF3's NES colours kept in a
+  shadow, converted for the Color), the summon (2A/9440's properties and maps, its tiles from NES
+  0D/9800 in bank B_SUMN) coming in from the right, its attack, fading out, the party back with its
+  colours cycling, the healing summons' spells on the targets after (2F/B158). FF3 draws a summon in
+  up to 54 sprites: here Chocobo / Shiva / Ramuh / Odin / Leviathan / Bahamut are drawn in the
+  window layer (tiles at BG $90.., BG palettes 2-4, WX / WY to the pixel; the window cut at line 95
+  by the line interrupt), Ifrit and Titan (who move about) in sprites (30 at most, the rest for
+  their effects). All 24 attacks: Chocobo's escape / stumble / kick (its tiles by turns, set 9 into
+  the window's tiles), Mesmerize (the battlefield's lines waving: SCX per line from the STAT
+  interrupt, c_split mode 3), Icy Stare / Slash (the targets' cells in a palette of their own by
+  turns), Diamond Dust (40 snowflakes), Mind Blast (the monsters' palettes cycling white), Ramuh's
+  bolts (spell $2A's hit), Hellfire, Inferno (Ifrit's palettes cycling, his rush with the backdrop
+  flashing, flames row by row: 34/8739's rows), Clobber / Stomp (Titan's fists), Earthen Fury (the
+  screen shaking), Barrier / Healing Light / Aura (flashes, then their spells), Zantetsuken (Odin
+  riding off in the BG cells, the battlefield cut in 24-line bands sliding apart: c_split mode 4,
+  the monsters fading; FF3's state changes: beaten types counted at $7DD3, types cleared), Demon Eye,
+  Cyclone (40 of FF3's 64 tornado sprites), Tidal Wave (with the shake), Rend, Megaflare (two
+  explosions, the monsters in red). Whole-screen effects use FF3's coordinates scaled 5 / 8.
+  Megaflare's colour emphasis (PPU $2001) is shown as the white backdrop only. Test hooks:
+  GB3N_ANKIND='$02' GB3N_ANSUM='$id x 16 + attack'.
+- Not yet in battle: the airship cannon (32/84C9), Flare Wave's final-boss wave (10/8BD5) and the final boss's death (10/8A85),
   reflect (33/B64F), bows / harps / boomerangs / moons / shuriken / arrows (their own weapon
   animations: they show the step only), stone characters in the BG, back attacks drawn flipped (FF3
   3F/F942: the monsters' tiles mirrored, the party at x $30), the airship's battle background.
