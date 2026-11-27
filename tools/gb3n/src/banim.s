@@ -580,6 +580,9 @@ an_clr:     ld hl, AN_OAM
             ret
 ; a frame of the animation (FF3's $F8B0 + $8AE6): V-Blank, the windows' rows, sprites, sound
 an_frame:   call wait_vbl
+            ld a, [an_pfl]                  ; (a backdrop colour waiting: first in V-Blank)
+            and a
+            call nz, an_bput
             call xb_vrows
             call hram_dma
             call snd_frame
@@ -804,6 +807,8 @@ an_magic:   ld a, [$D8D6]
             call an_gpal3
             xor a
             ld [an_f], a
+            call an_nopre                   ; (types without the casting)
+            jp c, .x
             ld a, [BZ + $CC]                ; ineffective: the pose only
             and a
             jr z, .bw
@@ -874,13 +879,8 @@ an_magic:   ld a, [$D8D6]
             ld a, [an_vd]
             and a
             jr nz, .cl
-.x:         call an_proj
-            call an_clr
-            ld a, $FF
-            ld [an_cf], a
-            ld [bs_act], a
-            call xb_party
-            call an_mhit
+.x:         call an_mdisp
+            call an_pose0
             call an_restpal
             jp xb_party
 ; ---- the spell's projectile (33/B276): a member's spell on monsters, not ineffective: from the
@@ -1399,6 +1399,923 @@ an_bgw:     ld hl, SH_T + 16
 .h2:        dec c
             jr nz, .r
             ret
+; ---- the spell's animation by its type ($7E9D, 33/BC2B) after the casting (a monster casts
+; without one): 0, 5, 7, 8, 13 the projectile and the hit; the others their own
+an_mdisp:   ld a, [$DE9D]
+            cp $13
+            ret nc
+            add a
+            ld hl, .tab
+            call an_hla
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            jp hl
+.tab:       dw an_ty0, an_kill, an_quake, an_meteo, an_drain, an_ty0, an_ty6, an_ty0
+            dw an_ty0, an_flare, an_tyA, an_glare, an_expl, an_ty0, an_equake, an_none
+            dw an_emag0, an_emag2, an_emag4
+an_none:    ret
+; the types FF3 runs without the casting (33/BC2B: 6, 10, 11, 12, 15; 9 when no one is hit)
+an_nopre:   ld a, [$DE9D]
+            cp 6
+            jr z, .y
+            cp 10
+            jr z, .y
+            cp 11
+            jr z, .y
+            cp 12
+            jr z, .y
+            cp 15
+            jr z, .y
+            cp 9
+            jr nz, .n
+            ld a, [$DE9B]
+            and a
+            jr z, .y
+.n:         and a
+            ret
+.y:         scf
+            ret
+; the caster back to its standing frame, the sprites off (33/AC35)
+an_pose0:   call an_clr
+            ld a, $FF
+            ld [an_cf], a
+            ld [bs_act], a
+            jp xb_party
+; 33/B911 after the casting: the clean-up, the spell's graphics
+an_b911:    call an_pose0
+            jp an_mgfx
+; the spell's sound (34/83A0)
+an_snd:     ld a, [$DE88]
+            cp MG_NSND
+            ret nc
+            ld hl, mg_snd
+            call an_hla
+            ld a, [hl]
+            jp bs_sfx
+; 0: the projectile, the hit
+an_ty0:     call an_proj
+            call an_pose0
+            jp an_mhit
+; 6: summon / split: the sound only (the summon itself is its own animation)
+an_ty6:     ld a, [$DE99]
+            inc a
+            ret z
+            jp an_snd
+
+; ---- vectors (33/BF5F..): an_vd 9 x (y length, x length, y angle, x angle); a point is
+; (x length sin(x angle), y length sin(y angle)) from a base
+; all lengths A, angles 0 (x: $40); vectors 0-7 round the circle (33/B362)
+an_vinit:   ld [an_fx], a
+            ld hl, an_vd
+            ld c, 0
+.v:         ld a, [an_fx]
+            ld [hl+], a
+            ld [hl+], a
+            ld a, c
+            cp 8
+            ld a, 0
+            jr nc, .s
+            ld a, c
+            swap a
+            add a
+.s:         ld [hl+], a
+            add $40
+            ld [hl+], a
+            inc c
+            ld a, c
+            cp 9
+            jr nz, .v
+            ret
+; HL = vector A's entry
+an_vec:     add a
+            add a
+            ld hl, an_vd
+            jp an_hla
+; vector A's point -> D (x), E (y), signed
+an_vpt:     call an_vec
+            ld a, [hl+]
+            ld [an_k], a
+            push hl
+            inc hl
+            ld a, [hl]                      ; y angle
+            call an_smul
+            ld [an_fx], a
+            pop hl
+            ld a, [hl+]
+            ld [an_k], a
+            inc hl
+            ld a, [hl]                      ; x angle
+            call an_smul
+            ld d, a
+            ld a, [an_fx]
+            ld e, a
+            ret
+; vector A's angles + C, lengths + B
+an_vadd:    call an_vec
+            ld a, [hl]
+            add b
+            ld [hl+], a
+            ld a, [hl]
+            add b
+            ld [hl+], a
+            ld a, [hl]
+            add c
+            ld [hl+], a
+            ld a, [hl]
+            add c
+            ld [hl], a
+            ret
+; one sprite (33/B519) at (an_bx, an_by) + (D, E) signed: tile $49 / $4A by frame bit 1 (an_k3),
+; palette 3; off the screen (or past the battlefield) none
+an_vspr:    ld a, [an_bx]
+            bit 7, d
+            jr nz, .xm
+            add d
+            ret c
+            jr .x
+.xm:        add d
+            ret nc
+.x:         cp 160
+            ret nc
+            ld [an_ox], a
+            ld a, [an_by]
+            bit 7, e
+            jr nz, .ym
+            add e
+            ret c
+            jr .y
+.ym:        add e
+            ret nc
+.y:         cp 96
+            ret nc
+            ld [an_oy], a
+            call an_slot_oam
+            ret c
+            ld a, [an_oy]
+            add 17
+            ld [hl+], a
+            ld a, [an_ox]
+            add 8
+            ld [hl+], a
+            ld a, [an_k3]
+            and 2
+            rrca
+            add $49
+            ld [hl+], a
+            ld [hl], $0B
+            ret
+; A = high byte of sin(A & $7F) x B (33/B3D2's lengths)
+an_sinh:    and $7F
+            ld hl, an_sin
+            call an_hla
+            ld a, [hl]
+            ld e, b
+            call mul8
+            ld a, h
+            ret
+
+; ---- 1: Kill (33/B385): 8 sprites round the caster, the ring widening and turning 60 frames,
+; then flying off toward the monsters (33/B413's angle by member) 48 frames
+an_kill:    ld a, [$DE9B]
+            and a
+            ret z
+            call an_snd
+            call an_cast
+            call an_frame
+            call an_mgfx
+            xor a
+            call an_vinit
+            call an_mypos                   ; the base: (x - 8, y + 8)
+            ld a, d
+            sub 8
+            ld [an_kx], a
+            ld a, e
+            add 8
+            ld [an_ky], a
+            ld a, $80
+            ld [an_k3], a
+.f:         call an_cast
+            xor a
+            ld [an_t], a
+.v:         ld a, [an_kx]
+            ld [an_bx], a
+            ld a, [an_ky]
+            ld [an_by], a
+            ld a, [an_t]
+            call an_vpt
+            call an_vspr
+            ld a, [an_t]                    ; angles - 4
+            ld bc, $00FC
+            call an_vadd
+            ld a, [an_k3]                   ; lengths from the frame
+            srl a
+            ld b, a
+            ld a, [an_k3]
+            add a
+            call an_sinh
+            push af
+            ld a, [an_k3]
+            srl a
+            ld b, a
+            add $40
+            call an_sinh
+            ld c, a
+            ld a, [an_t]
+            call an_vec
+            ld [hl], c                      ; y length
+            inc hl
+            pop af
+            ld [hl], a                      ; x length
+            ld a, [an_t]
+            inc a
+            ld [an_t], a
+            cp 8
+            jr nz, .v
+            ld hl, an_k3
+            inc [hl]
+            call an_frame
+            ld a, [an_k3]
+            cp $BC
+            jr nz, .f
+            ld a, 8                         ; flying off (33/B417)
+            call an_vec
+            xor a
+            ld [hl+], a
+            ld [hl+], a
+            push hl
+            ld a, [an_c]
+            ld hl, kl_ang
+            call an_hla
+            ld c, [hl]
+            pop hl
+            ld a, [hl]
+            add c
+            ld [hl+], a
+            ld a, [hl]
+            add c
+            ld [hl], a
+            xor a
+            ld [an_k3], a
+.g:         call an_cast
+            ld a, 8
+            call an_vpt
+            ld a, [an_kx]
+            add d
+            ld [an_k4], a
+            ld a, [an_ky]
+            add e
+            ld [an_k5], a
+            xor a
+            ld [an_t], a
+.w:         ld a, [an_k4]
+            ld [an_bx], a
+            ld a, [an_k5]
+            ld [an_by], a
+            ld a, [an_t]
+            call an_vpt
+            call an_vspr
+            ld a, [an_t]
+            ld bc, $00FC
+            call an_vadd
+            ld a, [an_t]
+            inc a
+            ld [an_t], a
+            cp 8
+            jr nz, .w
+            ld a, 8
+            ld bc, $0400
+            call an_vadd
+            ld hl, an_k3
+            inc [hl]
+            call an_frame
+            ld a, [an_k3]
+            cp $30
+            jr nz, .g
+            ret
+
+; ---- 4: Drain (33/B48D): per target, 8 sprites closing in on it from 128 pixels, turning
+an_drain:   call an_b911
+            ld a, [$DE9B]
+            and a
+            ret z
+            ld a, [$DE99]
+            ld [an_tm], a
+            xor a
+            ld [an_t], a
+.t:         ld a, [an_tm]
+            add a
+            ld [an_tm], a
+            call c, .one
+            ld hl, an_t
+            inc [hl]
+            ld a, [hl]
+            cp 8
+            jr nz, .t
+            ret
+.one:       call an_snd
+            call an_clr
+            call an_frame
+            ld a, $80
+            call an_vinit
+            call an_frame
+            ld a, [$DE9A]                   ; the base: a monster's centre, a member's (x + 4, y + 8)
+            bit 6, a
+            jr z, .ch
+            call an_tcen
+            jr .b
+.ch:        ld a, [an_t]
+            ld b, a
+            add a
+            add b
+            add a
+            add a
+            add a
+            add 8
+            ld e, a
+            ld d, 144 + 4
+.b:         ld a, d
+            ld [an_kx], a
+            ld a, e
+            ld [an_ky], a
+.f:         call an_clr
+            xor a
+            ld [an_k4], a
+.v:         ld a, [an_kx]
+            ld [an_bx], a
+            ld a, [an_ky]
+            ld [an_by], a
+            ld a, [an_k4]
+            call an_vpt
+            call an_vspr
+            ld a, [an_k4]
+            ld bc, $FCFC                    ; angles - 4, lengths - 4
+            call an_vadd
+            ld a, [an_k4]
+            inc a
+            ld [an_k4], a
+            cp 8
+            jr nz, .v
+            ld hl, an_k3
+            inc [hl]
+            call an_frame
+            ld a, [an_vd]
+            cp 8
+            jr nc, .f
+            jp an_clr
+
+; ---- 2: Quake (33/B954): members hit shake (the party one pixel right / back, 16 times); monsters:
+; the caster's frame 3 with the spell's sprites $5C-$5E, then the screen shakes
+an_quake:   call an_b911
+            ld a, [$DE9B]
+            and a
+            ret z
+            call an_snd
+            ld a, [$DE9A]
+            bit 6, a
+            jr nz, .m
+            ld b, 16
+.s:         push bc
+            ld a, 1
+            ld [an_pdx], a
+            call xb_party
+            call an_frame
+            call an_frame
+            xor a
+            ld [an_pdx], a
+            call xb_party
+            call an_frame
+            call an_frame
+            pop bc
+            dec b
+            jr nz, .s
+            ret
+.m:         ld a, [an_c]                    ; (a monster caster: no frame)
+            cp 4
+            jr nc, .sh
+            add a
+            ld hl, $D8BB
+            call an_hla
+            ld a, [hl]
+            and 5
+            ld a, 3
+            jr z, .p
+            ld a, $0C
+.p:         call an_cframe
+            call an_clr
+            ld a, $5C
+            call an_wspr0
+            ld a, $5D
+            call an_wspr0
+            ld a, $5E
+            call an_wspr0
+.sh:        jp an_shake
+; ---- 14: Earthquake (33/B9C2)
+an_equake:  call an_b911
+            ld a, [$DE9B]
+            and a
+            ret z
+; the screen shaking (32/8C8D): 16 frames, then 64 frames of the battlefield (rows 0-11) moved
+; 0-3 pixels (FF3's random), the windows still
+an_shake:   ld b, 16
+.w:         push bc
+            call an_frame
+            pop bc
+            dec b
+            jr nz, .w
+            call an_snd
+            ld b, 64
+.f:         push bc
+            call an_frame
+            xor a
+            ld [BZ + $21], a
+            ld b, 0
+            ld a, $FF
+            call b_rndx
+            and 3
+            ldh [rSCX], a
+.ly:        ldh a, [rLY]                    ; the windows' rows unmoved
+            cp 95
+            jr nz, .ly
+.hb:        ldh a, [rSTAT]
+            and 3
+            jr nz, .hb
+            xor a
+            ldh [rSCX], a
+            pop bc
+            dec b
+            jr nz, .f
+            ret
+
+; ---- 3: Meteor / Cave-In (33/B9E6): six fireballs (2 x 3 sprites, big / small by turns) falling
+; across toward the targets' side, 64 frames; new ones every 10 frames from 33/B9DA's places
+; (FF3's x on its 256-pixel field: 5 / 8 on ours; 5 across and 8 down a frame)
+an_meteo:   call an_b911
+            ld a, [$DE9B]
+            and a
+            ret z
+            call an_bgon
+            xor a                           ; an_vd: x 0-5, y 6-11, count 12-17, shown 18-23
+            ld [an_t], a
+.i:         ld a, [an_t]
+            ld hl, fb_cnt
+            call an_hla
+            ld c, [hl]
+            ld a, [an_t]
+            ld hl, an_vd + 12
+            call an_hla
+            ld [hl], c
+            ld a, [an_t]
+            ld hl, an_vd + 18
+            call an_hla
+            ld [hl], 0
+            ld hl, an_t
+            inc [hl]
+            ld a, [hl]
+            cp 6
+            jr nz, .i
+            call an_snd
+            ld a, 64
+            ld [an_k3], a
+.f:         call an_frame
+            call an_clr
+            xor a
+            ld [an_t], a
+.b:         ld a, [an_t]
+            ld hl, an_vd + 12
+            call an_hla
+            dec [hl]
+            jr nz, .sh
+            ld [hl], 10                     ; a new one
+            ld bc, -6
+            add hl, bc
+            ld [hl], 5
+            ld hl, an_ri
+            inc [hl]
+            ld a, [hl]
+            ld hl, RNG_TAB
+            call an_hla
+            ld a, [hl]
+            and $38
+            ld c, a
+            ld a, [an_t]
+            ld hl, fb_x
+            call an_hla
+            ld a, [hl]
+            add c
+            ld e, a                         ; x 5 / 8
+            ld a, 5
+            call mul8
+            srl h
+            rr l
+            srl h
+            rr l
+            srl h
+            rr l
+            ld a, [an_t]
+            ld de, an_vd
+            ld c, l
+            ld l, a
+            ld h, 0
+            add hl, de
+            ld [hl], c
+            ld de, 18
+            add hl, de
+            ld [hl], 1
+.sh:        ld a, [an_t]                    ; shown?
+            ld hl, an_vd + 18
+            call an_hla
+            ld a, [hl]
+            and a
+            jr z, .nx
+            ld a, [an_t]
+            ld hl, an_vd
+            call an_hla
+            ld a, [hl]
+            cp 4
+            jr c, .off
+            cp 156
+            jr nc, .off
+            ld d, a
+            push hl
+            ld bc, 6
+            add hl, bc
+            ld a, [hl]
+            pop hl
+            cp 90
+            jr nc, .off
+            ld e, a
+            push hl
+            call an_fball
+            pop hl
+            ld a, [$DE9A]                   ; across: left onto monsters, right onto the party
+            bit 6, a
+            ld a, [hl]
+            jr nz, .l
+            add 5
+            jr .xs
+.l:         sub 5
+.xs:        ld [hl], a
+            ld bc, 6
+            add hl, bc
+            ld a, [hl]
+            add 8
+            ld [hl], a
+            jr .nx
+.off:       ld a, [an_t]
+            ld hl, an_vd + 18
+            call an_hla
+            ld [hl], 0
+.nx:        ld hl, an_t
+            inc [hl]
+            ld a, [hl]
+            cp 6
+            jp nz, .b
+            ld hl, an_k3
+            dec [hl]
+            jp nz, .f
+            call an_clr
+            call an_frame
+            jp an_bgoff
+; fireball an_t at (D, E): 32/91CB's 2 x 3 frame (a monster target's or a member's), the tiles of
+; 33/B9CE (big) or B9D4 (small: odd counts)
+an_fball:   ld a, [$DE9A]
+            and $40
+            ld hl, fb_spr + 24
+            jr z, .s
+            ld hl, fb_spr
+.s:         ld a, [an_t]
+            push hl
+            ld hl, an_vd + 12
+            call an_hla
+            ld a, [hl]
+            pop hl
+            and 1
+            ld bc, fb_tiles
+            jr z, .t
+            ld bc, fb_tiles + 6
+.t:         ld a, 6
+.k:         push af
+            ld a, [bc]
+            inc bc
+            ld [an_k2], a
+            push bc
+            ld a, [hl+]                     ; y
+            add e
+            add 17
+            ld [an_oy], a
+            inc hl
+            ld a, [hl+]
+            ld [an_k4], a
+            ld a, [hl+]
+            add d
+            add 8
+            ld [an_ox], a
+            ld a, [an_k2]
+            and a
+            jr z, .n
+            push hl
+            call an_slot_oam
+            jr c, .n0
+            ld a, [an_oy]
+            ld [hl+], a
+            ld a, [an_ox]
+            ld [hl+], a
+            ld a, [an_k2]
+            ld [hl+], a
+            ld a, [an_k4]
+            and $C0
+            rra
+            or $0B
+            ld [hl], a
+.n0:        pop hl
+.n:         pop bc
+            pop af
+            dec a
+            jr nz, .k
+            ret
+
+; ---- 10: 13 streaks moving right over the party, 88 frames (33/AED2: graphics set 16, palette $BC;
+; FF3's x - 64 on our screen, y - 48)
+an_tyA:     ld a, [$DE9B]
+            and a
+            ret z
+            ld b, 13
+            ld hl, an_vd
+.i:         push hl
+            ld hl, an_ri
+            inc [hl]
+            ld a, [hl]
+            ld hl, RNG_TAB
+            call an_hla
+            ld a, [hl]
+            pop hl
+            and 7
+            add $B0
+            ld [hl+], a
+            dec b
+            jr nz, .i
+            ld a, 16
+            call an_lgfx
+            ld a, $BC
+            call an_gpal3
+            call an_bgon
+            call an_snd
+            xor a
+            ld [an_k3], a
+.f:         call an_frame
+            call an_clr
+            ld a, [an_k3]
+            and 1
+            add $2C - $30
+            ld [an_by], a
+            xor a
+            ld [an_t], a
+.r:         ld a, [an_t]
+            ld hl, an_vd
+            call an_hla
+            ld a, [an_k3]
+            and 3
+            add [hl]
+            inc [hl]
+            ld d, a                         ; FF3's x
+            ld a, $4B
+            ld [an_k2], a
+            ld b, 3
+.s:         ld a, d
+            cp $50
+            jr c, .n
+            sub 64
+            cp 160
+            jr nc, .n
+            add 8
+            ld [an_ox], a
+            ld a, [an_by]
+            add 8
+            cp 96 + 8
+            jr nc, .n
+            push bc
+            push de
+            call an_slot_oam
+            jr c, .n0
+            ld a, [an_by]
+            add 16
+            ld [hl+], a
+            ld a, [an_ox]
+            ld [hl+], a
+            ld a, [an_k2]
+            ld [hl+], a
+            ld [hl], $2B
+.n0:        pop de
+            pop bc
+.n:         ld a, d
+            add 8
+            ld d, a
+            ld hl, an_k2
+            dec [hl]
+            dec b
+            jr nz, .s
+            ld a, [an_by]
+            add 8
+            ld [an_by], a
+            ld hl, an_t
+            inc [hl]
+            ld a, [hl]
+            cp 13
+            jr nz, .r
+            ld hl, an_k3
+            inc [hl]
+            ld a, [hl]
+            cp $58
+            jr nz, .f
+            call an_clr
+            call an_frame
+            jp an_bgoff
+
+; ---- 11: Glare / Mind Blast / Megaflare (33/BB23): the screen flashing in 32/804B's colour;
+; 12: Explode (33/BB38) in red
+an_glare:   ld a, [$DE9B]
+            and a
+            ret z
+            ld a, [$DE88]
+            sub $38
+            ld hl, gl_col
+            call an_hla
+            ld a, [hl]
+            jr an_flashs
+an_expl:    ld a, [$DE99]
+            and a
+            ret z
+            ld a, $16
+an_flashs:  push af
+            call an_snd
+            pop af
+; the backdrop flashing colour A (32/877F): every 4th of 32 frames, black between
+an_flash:   ld [an_k4], a
+            ld a, 32
+            ld [an_k3], a
+.f:         ld a, [an_k3]
+            and 3
+            ld a, [an_k4]
+            jr z, .c
+            ld a, $0F
+.c:         call an_backc
+            call an_frame
+            ld hl, an_k3
+            dec [hl]
+            jr nz, .f
+            ld a, $0F
+            call an_backc
+            jp an_frame
+; BG palettes 0 / 1 colour 0 (the battlefield's backdrop) = FF3 colour A (in V-Blank)
+an_backc:   and $3F
+            add a
+            ld l, a
+            ld h, high(I_RGB)
+            ld a, low(I_RGB)
+            add l
+            ld l, a
+            push hl
+            ld a, B_MAPINFO
+            call far_byte
+            ld c, a
+            pop hl
+            inc hl
+            ld a, B_MAPINFO
+            call far_byte
+            ld b, a
+            ld a, c
+            ld [an_pc], a
+            ld a, b
+            ld [an_pc + 1], a
+            ld a, 1
+            ld [an_pfl], a
+            ret
+an_bput:    xor a
+            ld [an_pfl], a
+            ld a, [an_pc]
+            ld c, a
+            ld a, [an_pc + 1]
+            ld b, a
+            ld a, $80
+            ldh [rBCPS], a
+            ld a, c
+            ldh [rBCPD], a
+            ld a, b
+            ldh [rBCPD], a
+            ld a, $80 | 8
+            ldh [rBCPS], a
+            ld a, c
+            ldh [rBCPD], a
+            ld a, b
+            ldh [rBCPD], a
+            ret
+
+; ---- 9: Flare Wave (33/BB45): the hit, the final boss's wave (10/8BD5), the red flash
+an_flare:   ld a, [$DE9B]
+            and a
+            ret z
+            call an_b911
+            call an_snd
+            call an_fwave
+            ld a, $16
+            jp an_flash
+
+; ---- 16-18: the monsters' Flame / Blizzard / Thunder (33/BB68): a 6 x 16 grid over the party
+; from bank 06's frames (8E20.. two by turns every 4 frames), 32 frames (FF3's x $C8 + 8 col on
+; the party's column: our 128 + 8 col; rows from 20 above the party)
+an_emag0:   xor a
+            jr an_emag
+an_emag2:   ld a, 2
+            jr an_emag
+an_emag4:   ld a, 4
+an_emag:    ld [an_k4], a
+            call an_b911
+            ld a, [$DE9B]
+            and a
+            ret z
+            call an_bgon
+            call an_snd
+            xor a
+            ld [an_k3], a
+.f:         call an_frame
+            call an_clr
+            ld a, [an_k3]
+            and 4
+            rrca
+            rrca
+            ld hl, an_k4
+            add [hl]
+            cp 5                            ; (the sixth "frame" is blank)
+            jr nc, .nx
+            ld e, a                         ; HL = em_data + $60 A
+            ld a, $60
+            call mul8
+            ld de, em_data
+            add hl, de
+            ld c, 0                         ; C = cell
+.c:         ld a, [hl+]
+            cp $FF
+            jr z, .n
+            ld b, a
+            ld a, c                         ; x 128 + 8 (c mod 6), y 8 (c / 6) - 20
+            ld d, 0
+.m6:        cp 6
+            jr c, .md
+            sub 6
+            inc d
+            jr .m6
+.md:        add a
+            add a
+            add a
+            add 128 + 8
+            cp 168
+            jr nc, .n
+            ld [an_ox], a
+            ld a, d
+            add a
+            add a
+            add a
+            sub 20 - 16
+            cp 16 + 96
+            jr nc, .n
+            cp 8
+            jr c, .n
+            ld [an_oy], a
+            push hl
+            push bc
+            call an_slot_oam
+            jr c, .n0
+            ld a, [an_oy]
+            ld [hl+], a
+            ld a, [an_ox]
+            ld [hl+], a
+            ld a, b
+            and $3F
+            add $49
+            ld [hl+], a
+            ld a, b
+            and $C0
+            rra
+            or $8B                          ; (behind the party, as FF3's sprite order)
+            ld [hl], a
+.n0:        pop bc
+            pop hl
+.n:         inc c
+            ld a, c
+            cp $60
+            jr nz, .c
+.nx:        ld hl, an_k3
+            inc [hl]
+            ld a, [hl]
+            cp 32
+            jr nz, .f
+            call an_clr
+            call an_frame
+            jp an_bgoff
+
+; the final boss's wave (10/8BD5) for Flare Wave: see an_boss (not yet)
+an_fwave:   ret
 ; the spell $7E88's graphics properties (33/AF6F: 2E/91D0)
 an_mprop:   ld a, [$DE88]
             ld l, a
@@ -1417,11 +2334,14 @@ an_mprop:   ld a, [$DE88]
             ld [an_m2], a
             ret
 ; a monster's spell (2F/B15E: no casting, the hit only)
-an_mmon:    call an_mprop
+an_mmon:    ld a, [$D8D6]
+            ld [an_c], a
+            call an_mprop
             call an_savepal
             ld a, [an_m2]
             call an_gpal3
-            call an_mhit
+            call an_mdisp
+            call an_pose0
             jp an_restpal
 
 ; ---- the spell's hit animation (33/B68D) on each target hit ($7E9B): its 24 tiles (2A/9600 or
@@ -1434,16 +2354,8 @@ an_mmon:    call an_mprop
 ; own routines (33/BC2B) and are not shown here yet.
 an_mhit:    ld a, [$DE9D]
             ld c, 0
-            and a
-            jr z, .ty
-            cp 7
-            jr z, .ty
-            cp 8
-            jr z, .ty
-            cp 13
-            jr z, .ty
             cp 5
-            ret nz
+            jr nz, .ty
             ld a, [$DE9B]                   ; Life (33/B922)
             and a
             ld c, 16
@@ -1460,7 +2372,11 @@ an_mhit:    ld a, [$DE9D]
             ld a, [BZ + $CC]                ; (ineffective: the pose only)
             and a
             ret nz
-            ld a, [an_m0]                   ; the tiles (33/B589)
+            call an_mgfx
+            call an_bgon
+            jr an_mlist
+; the spell's graphics (33/B589): its 24 tiles at OBJ $49, set 8
+an_mgfx:    ld a, [an_m0]
             and $40
             ld hl, $4000 + $1600
             jr z, .g
@@ -1482,9 +2398,8 @@ an_mhit:    ld a, [$DE9D]
             ld a, B_MAGIC
             call an_vcopy
             ld a, 8
-            call an_lgfx
-            call an_bgon
-            ld a, [$DE88]                   ; the list
+            jp an_lgfx
+an_mlist:   ld a, [$DE88]                   ; the list
             add a
             ld l, a
             ld a, 0
@@ -1943,6 +2858,13 @@ mg_wht:     ds 12                           ; (33/B1E2)
 mg_bub:     ds 32                           ; (33/AEB2)
 mf_grid:    ds 16                           ; (33/B89B)
 mf_flip:    ds 4                            ; (33/B8AB)
+kl_ang:     ds 4                            ; (33/B413: Kill's direction by member)
+fb_tiles:   ds 12                           ; (33/B9CE: big / small fireballs)
+fb_x:       ds 6                            ; (33/B9DA)
+fb_cnt:     ds 6                            ; (33/B9E0)
+fb_spr:     ds 48                           ; (32/91D7: 2 x 3 frames, a monster target's, a member's)
+gl_col:     ds 22                           ; (32/804B: the flash colours of spells $38..)
+em_data:    ds 5 * $60                      ; (06/8E20: the monsters' Flame / Blizzard / Thunder)
 mg_snd:     ds MG_NSND                      ; (34/83A0: each spell's sound)
 MG_NSND    = $58
 sl_pos:     ds 24                           ; (32/99D1)
@@ -1985,6 +2907,15 @@ an_hc:      ds 1
 an_m0:      ds 1
 an_m1:      ds 1
 an_lskip:   ds 1
+an_pfl:     ds 1
+an_pc:      ds 2
+an_pdx:     ds 1
+an_ri:      ds 1
+an_fx:      ds 1
+an_kx:      ds 1
+an_ky:      ds 1
+an_k4:      ds 1
+an_k5:      ds 1
 an_src:     ds 1
 an_bgm:     ds 1
 an_bgt:     ds 1
@@ -2007,5 +2938,5 @@ an_rep:     ds 1
 an_cur:     ds 1
 an_m2:      ds 1
 an_tmp:     ds 4
-an_vd:      ds 24                           ; 8 x (distance, y angle, x angle)
+an_vd:      ds 36                           ; (vectors / per target / fireballs)
 an_dx:      ds 1

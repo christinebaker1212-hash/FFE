@@ -357,6 +357,13 @@ ROMDATA = {
     'mg_bub': (0x33, 0xAEB2, 32),        # black magic's bubbles
     'mf_grid': (0x33, 0xB89B, 16),       # the spells' 6 x 6 frames: corner / steps, flips
     'mf_flip': (0x33, 0xB8AB, 4),
+    'kl_ang': (0x33, 0xB413, 4),
+    'fb_tiles': (0x33, 0xB9CE, 12),
+    'fb_x': (0x33, 0xB9DA, 6),
+    'fb_cnt': (0x33, 0xB9E0, 6),
+    'fb_spr': (0x32, 0x91D7, 48),
+    'gl_col': (0x32, 0x804B, 22),
+    'em_data': (0x06, 0x8E20, 5 * 0x60),
     'mg_snd': (0x34, 0x83A0, 0x58),      # each spell's sound
     'an_blob': (0x32, 0x943D, 0x375),    # battle animations (src/banim.s)
     'sl_pos': (0x32, 0x99D1, 24),
@@ -499,7 +506,12 @@ ev_fxtest:  call ev_shake
             jp ev_dance
 '''
     if os.environ.get('GB3N_ANTEST'):            # test builds only: every fight shows spell N's cast
-        src = src.replace('an_kind:    ld a, [$DEC2]', 'an_kind:    ld a, %s\n            ld [$DE88], a\n            ld a, [$DEC2]\n            cp 4\n            ld a, 1\n            ret z\n            ld a, [$DEC2]' % os.environ['GB3N_ANTEST'])
+        extra = ''
+        if os.environ.get('GB3N_ANTYPE'):       # (and the animation type $7E9D)
+            extra += '            ld a, %s\n            ld [$DE9D], a\n' % os.environ['GB3N_ANTYPE']
+        if os.environ.get('GB3N_ANTGT') == 'char':   # (shown on member 0)
+            extra += '            ld a, [$DE9A]\n            and $BF\n            ld [$DE9A], a\n            ld a, $80\n            ld [$DE9B], a\n            ld [$DE99], a\n'
+        src = src.replace('an_kind:    ld a, [$DEC2]', 'an_kind:    ld a, %s\n            ld [$DE88], a\n            ld a, [$DEC2]\n            cp 4\n            jr nz, .ak\n%s            ld a, 1\n            ret\n.ak:        ld a, [$DEC2]' % (os.environ['GB3N_ANTEST'], extra))
     if os.environ.get('GB3N_TEST'):              # test builds: tools/gb3n/test (never a release)
         src = src.replace('.nw:        call map_enter', '.nw:        jp test_loop')
         src += open(os.path.join(HERE, 'src', 'test.s')).read() + '\n'

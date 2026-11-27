@@ -253,6 +253,9 @@ bs_gfx:     xor a
 .p0:        ld [hl+], a
             dec b
             jr nz, .p0
+            ld [an_pdx], a                  ; (A = 0)
+            ld [an_bgm], a
+            ld [an_pfl], a
             ld a, $FF
             ld [an_cf], a
             ld [an_hc], a
@@ -763,7 +766,10 @@ bs_party:   ld hl, oam_buf
             ld a, [an_dx]
             add d
             ld d, a
-.x2:        ld a, [bs_tmp + 6]
+.x2:        ld a, [an_pdx]                  ; (the party shaken)
+            add d
+            ld d, a
+            ld a, [bs_tmp + 6]
             call bs_cdraw
             pop bc
             inc c
