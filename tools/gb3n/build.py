@@ -9,7 +9,7 @@ ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
-import tiles, data, text
+import tiles, data, text, cutdata
 
 BATTLE_SRC = ['batlib.s', 'batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s', 'batflow.s', 'batvict.s', 'batloop.s', 'batsetup.s', 'batscr.s', 'batui.s']
 ROM_BANKS = 128             # 2 MB (sized to the game later)
@@ -141,6 +141,7 @@ B_BOSS0 = 72                # boss graphics (72-75)
 B_MENU = 76                 # the main menu's code
 B_VGFX = 77                 # world map vehicles' graphics (NES 0B)
 B_STORY = 78                # the epilogue / ending texts
+B_CUT, B_CUTG = 79, 80      # cutscenes: NES bank $1F + the code; their graphics / texts
 
 
 def field_banks(rom):
@@ -376,6 +377,7 @@ def main():
     mp = [int(v) for v in mp] + [0, 255, 255][len(mp) - 1:]
     test_map, test_world, test_x, test_y = mp[:4]
     raw = open(nes, 'rb').read()
+    cut_raw, cut_gfx, cut_eq = cutdata.build(data.Rom(nes))
     tbanks, tlay, tlast = text.banks(B_TEXT)
     assert tlast < B_SCRIPT, 'text banks overflow'
     text_defs = ''.join('T_%s = $%04X\n' % (k.upper(), v) for k, v in tlay.items())
@@ -391,6 +393,7 @@ def main():
            'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
            'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\nB_BSET = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2, B_BSET) +
            'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\nB_MENU = %d\nB_VGFX = %d\nB_STORY = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0, B_MENU, B_VGFX, B_STORY) + text_defs +
+           'B_CUT = %d\nB_CUTG = %d\n' % (B_CUT, B_CUTG) + cut_eq +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
@@ -401,12 +404,14 @@ def main():
            open(os.path.join(HERE, 'src', 'vehicle.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sound.s')).read() + '\n' +
            ''.join(open(os.path.join(HERE, 'src', f)).read() + '\n' for f in BATTLE_SRC) +
+           open(os.path.join(HERE, 'src', 'cut.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + story_data() + sound_data() + own_data())
     if os.environ.get('GB3N_BATTLE'):            # test builds only: every encounter is this battle
         src = src.replace('            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a',
                           '            ld a, %s\n            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a' % os.environ['GB3N_BATTLE'])
     if os.environ.get('GB3N_STORY'):             # test builds only: Start runs the ending ($DD)
-        src = src.replace('            jp nz, menu_open', '            jp nz, ev_ending')
+        ev = {'prol': 'ev_prol', 'epi': 'ev_epi'}.get(os.environ['GB3N_STORY'], 'ev_ending')
+        src = src.replace('            jp nz, menu_open', '            jp nz, ' + ev)
     if os.environ.get('GB3N_TEST'):              # test builds: tools/gb3n/test (never a release)
         src = src.replace('.nw:        call map_enter', '.nw:        jp test_loop')
         src += open(os.path.join(HERE, 'src', 'test.s')).read() + '\n'
@@ -436,6 +441,10 @@ def main():
         banks[gb] = bytearray(banks[gb])
         v = rom.rd(nb, addr, n)
         banks[gb][off:off + n] = bytes([v]) if isinstance(v, int) else v
+    cb = bytearray(banks[B_CUT]) + bytearray(0x4000 - len(banks[B_CUT]))
+    assert not any(r.claimed.get((B_CUT, o)) for o in range(0x2000)), 'cut code below $6000'
+    cb[0:0x2000] = cut_raw; banks[B_CUT] = cb            # NES bank $1F under the cutscene code
+    assert B_CUTG not in banks; banks[B_CUTG] = cut_gfx
     for k, v in tbanks.items():
         assert k not in banks, 'bank %d used twice' % k
         banks[k] = v

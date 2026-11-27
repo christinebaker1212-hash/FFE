@@ -12,6 +12,7 @@ fe_setup_all:
             jp fe_B909
 
 ; ---- $FC27 init rng: the battle random table at $7BE3 (seed: a sum, as FF3's zero page sum)
+fe_FC27s:   ld a, [bs_seed]                 ; (the cutscenes: the seed in bs_seed)
 fe_FC27:    ld [BZ + $15], a                ; A = the seed
             ld [BZ + $16], a
             ld [BZ + $17], a

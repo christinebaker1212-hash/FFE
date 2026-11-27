@@ -524,7 +524,7 @@ ev_exec:    ld a, [ev_cmd]
 
 evd_table:  dw ev_shake, ev_flash, ev_none, ev_none      ; D0-D3 (palette effects: later)
             dw ev_hpall, ev_mpall, ev_pfloor, ev_pwall   ; D4-D7
-            dw ev_reset, ev_chain, ev_none, ev_none      ; D8-DB (dance, prologue: later)
+            dw ev_reset, ev_chain, ev_none, ev_prol      ; D8-DB (dance: later)
             dw ev_epi, ev_ending, ev_surf, ev_hp1        ; DC-DF
             dw ev_none, ev_none, ev_none, ev_none        ; E0-E3 (palette reload, flash)
 evc_table:  dw ev_none, ev_none, ev_none, ev_take        ; E4-E7
@@ -536,11 +536,17 @@ evc_table:  dw ev_none, ev_none, ev_none, ev_take        ; E4-E7
             dw ev_wait, ev_prev, ev_none, ev_end         ; FC-FF
 ev_none:    ret
 
-; $DC / $DD: FF3's epilogue (texts 0-2) / ending (texts 3-7, then the end) as pages (B_MENU)
-ev_epi:     xor a
-            ld b, 3
-            ld c, 0
-            jr ev_story
+; $DB / $DC: FF3's prologue / epilogue (src/cut.s), then the map again with its people
+ev_prol:    %FAR B_CUT, cut_pro
+            jr ev_cutx
+ev_epi:     %FAR B_CUT, cut_epi
+ev_cutx:    ld a, [pos_x]
+            ld [enter_x], a
+            ld a, [pos_y]
+            ld [enter_y], a
+            call keep_people
+            jp map_change
+; $DD: the ending (texts 3-7, then the end) as pages (B_MENU)
 ev_ending:  ld a, 3
             ld b, 5
             ld c, 1
