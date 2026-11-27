@@ -1227,7 +1227,10 @@ bs_load:    call bs_on
             jr nz, .c
             jp bs_off
 bs_zero:    db 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-bs_mark:    call bs_on
+bs_mark:    ldh a, [hbt_db]                 ; (the post-game's monsters: not FF1's ids)
+            cp BTL_DATA
+            ret nz
+            call bs_on
             call bs_chk
             jr z, .ok
             ld hl, BS_RAM                   ; (none yet, or damaged: a new record)

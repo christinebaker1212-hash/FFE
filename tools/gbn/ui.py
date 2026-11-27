@@ -356,17 +356,27 @@ LOC_NAMES = ['Cornelia', 'Pravoka', 'Elfheim', 'Melmond', 'Crescent Lake', 'Gaia
              'Cornelia Castle', 'Elf Castle', 'Northwest Castle', 'Castle of Ordeals', 'Temple of Chaos',
              'Earth Cave', 'Gurgu Volcano', 'Ice Cave', 'Cardia Islands', "Bahamut's Cave", 'Waterfall Cave',
              'Dwarf Cave', "Matoya's Cave", "Sarda's Cave", 'Marsh Cave', 'Mirage Tower', 'Undersea Shrine',
-             'Floating Castle', "Giant's Cave", 'World Map']
+             'Floating Castle', "Giant's Cave", 'World Map', 'Earthgift Shrine']
 LOC_MAP = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
            8, 11, 11, 22, 22, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 17, 23, 23,
            24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 12, 12, 12, 12, 12, 12, 12, 12, 26]
 
 
+def loc_map_all():
+    """map -> place name for FF1's maps and the post-game's (postgame.py: map ids 64 and up)"""
+    import postgame
+    lm = LOC_MAP + [LOC_NAMES.index('World Map')] * (postgame.PG_MAP0 - len(LOC_MAP))
+    for name in postgame.DUNGEONS:
+        lm += [LOC_NAMES.index(name)] * len(postgame.DUNGEON_FLOORS[name])
+    return lm
+
+
 def loc_source():
     """bank 99 $7000: loc_tab (map -> name), loc_ptr, the names (ASCII, 0-terminated)"""
     assert len(LOC_MAP) == 61
+    lm = loc_map_all()
     out = ['section bank 99, $7000', 'loc_tab:']
-    out += ['            db ' + ', '.join(str(v) for v in LOC_MAP[k:k + 16]) for k in range(0, 61, 16)]
+    out += ['            db ' + ', '.join(str(v) for v in lm[k:k + 16]) for k in range(0, len(lm), 16)]
     out.append('loc_ptr:')
     out += ['            dw loc_s%d' % i for i in range(len(LOC_NAMES))]
     for i, n in enumerate(LOC_NAMES):

@@ -12,7 +12,7 @@ import asm_sm83
 asm_sm83.PROTECT_RAM[:] = [(0xD000, 0xD3FF)]          # FF1's save page (main.s unsram): only its own section
 import data, minimap, sgb, text, talkconst, ui, names, battle, sound
 
-COMMON, TS_BANK0, MAP_BANK0, OW_TS, OW_INFO, OW_ROWS, ROM_BANKS = 1, 8, 20, 16, 81, 84, 128
+COMMON, TS_BANK0, MAP_BANK0, OW_TS, OW_INFO, OW_ROWS, ROM_BANKS = 1, 8, 20, 16, 81, 84, 256
 
 
 PLACED = {}
@@ -96,11 +96,21 @@ def magic_defs(rom):
     return '\n'.join(out) + '\n'
 
 
+def pg_defs():
+    import postgame
+    import pgbattle
+    return ('PGM_MAP0 = %d\nPGM_END = %d\n' % (postgame.PG_MAP0, postgame.PG_END) +
+            'PGB_DATA = %d\nPGB_CHR = %d\nPGB_SIL = %d\n' % (pgbattle.PGB_DATA, pgbattle.PGB_CHR, pgbattle.PGB_SIL) +
+            postgame.pg_source(116))
+
+
 def snd_tables(rom):
     ft, tsm, vm = sound.tables(rom)
     db = lambda b: ''.join('            db ' + ', '.join('$%02X' % x for x in b[i:i + 16]) + '\n'
                            for i in range(0, len(b), 16))
     sfx, nz = sound.sfx_data(rom)
+    import postgame                                 # (tilesets 9 / 10: the post-game's cave, outdoor)
+    tsm = bytes(tsm) + bytes([tsm[2], tsm[2], tsm[2]])
     return ('section bank 7, $6F00\n' + db(tsm) + 'section bank 7, $6F10\n' + db(vm) +
             'section bank 7, $7000\n' + db(ft) + 'section bank 7, $%04X\n' % sound.SFX_ADDR +
             db(sfx) + 'section bank 7, $6E40\n' + db(nz))
@@ -298,8 +308,66 @@ def data_banks(rom, ff3=None, init=None):
         place(banks, b, 0x5100, p['mt_dmg_out'])
         place(banks, b, 0x5300, p['mt_dmg_in'])
         place(banks, b, 0x5800, p['dmg_tiles'])
+    pg_banks(rom, banks)
     assert not OVERLAPS, ["bank %d $%04X+%d over $%04X-$%04X" % ov for ov in OVERLAPS]
     return banks
+
+
+PG_INFO = {}
+
+
+def pg_banks(rom, banks):
+    """the post-game (postgame.py): its two tilesets, its floors as map banks (map m in bank m + 64;
+    $5061 the start x, y), their encounter rates (none until their battles are in)"""
+    import postgame
+    fl = postgame.floors(rom)
+    seen = set()
+    for m, f, ov in fl:
+        b = m + 64
+        tb = ov['ts'] + TS_BANK0
+        if tb not in seen:
+            seen.add(tb)
+            t = ov['t']
+            place(banks, tb, 0x4000, t['prop'])
+            place(banks, tb, 0x4100, t['tsa'])
+            place(banks, tb, 0x4300, t['mt_pal'])
+            place(banks, tb, 0x4400, t['cgb_tiles'])
+        p = data.map_pack(rom, m, ov=ov)
+        place(banks, b, 0x4000, p['map'])
+        place(banks, b, 0x5000, p['cgb_bg_out'])
+        place(banks, b, 0x5020, p['cgb_bg_in'])
+        place(banks, b, 0x5040, p['cgb_obj'])
+        place(banks, b, 0x5060, bytes([p['ts']]))
+        place(banks, b, 0x5061, bytes(f['start']))
+        place(banks, b, 0x7200, p['party_dmg'])
+        place(banks, b, 0x7380, p['party_perm'])
+        place(banks, b, 0x73A0, p['sgb'])
+        place(banks, b, 0x73C0, p['nes_bg'])
+        ob = p['objs']
+        place(banks, b, 0x7300, ob['slots'].ljust(64, b'\0'))
+        place(banks, b, 0x7340, ob['blocks'].ljust(16, b'\0'))
+        place(banks, b, 0x7350, bytes([len(ob['blocks']), 1 if ob['tall'] else 0]))
+        place(banks, b, 0x6800, ob['dmg'])
+        place(banks, b, 0x7400, ob['cgb'])
+        place(banks, b, 0x7F00, p['font_tbl'])
+        place(banks, b, 0x5100, p['mt_dmg_out'])
+        place(banks, b, 0x5300, p['mt_dmg_in'])
+        place(banks, b, 0x5800, p['dmg_tiles'])
+        banks[battle.BTL_DATA][0x0A00 + m + 1] = 0           # (B_RATES: map + 1)
+        PG_INFO[m] = f
+    import pgbattle                                  # the battles: their own banks (pgbattle.py)
+    bs = pgbattle.build(rom)
+    for b, blob in bs['banks'].items():
+        assert b not in banks, 'post-game battle bank %d taken' % b
+        banks[b] = bytearray(blob)
+    for i, (rec, look, role) in enumerate(postgame.EARTHGIFT):
+        m = postgame.PG_MAP0 + i
+        kind = None if role == 'entrance' else ('cave' if look == 'cave' else look)
+        if kind:                                     # (domain: map + 64, read from hbt_dom's bank)
+            banks[pgbattle.PGB_DATA][0x1000 + 8 * i:0x1008 + 8 * i] = bs['domains'][kind]
+            banks[battle.BTL_DATA][0x0A00 + m + 1] = pgbattle.ENC_RATE
+    PG_INFO['battle'] = bs
+    print('post-game: %d floors, maps %d-%d; battles: %s' % (len(fl), fl[0][0], fl[-1][0], ', '.join(bs['names'])))
 
 
 WANIM_BANK = 106                                 # (src/wanim.s; the DMG's frames in WANIM_DMG)
@@ -847,6 +915,7 @@ def main():
            open(os.path.join(HERE, 'src', 'extras.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'packs.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'pgen.s')).read() + '\n' + ui.pg_source() +
+           pg_defs() + open(os.path.join(HERE, 'src', 'pg.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'snd.s')).read() + '\nsection bank 7, $4400\n' + sound.engine_source() + '\n' +
            snd_tables(rom) +
            'section bank 104, $6000\n' +              # (the small font's glyphs: bank BTL6)
