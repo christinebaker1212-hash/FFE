@@ -515,10 +515,14 @@ evc_table:  dw ev_none, ev_none, ev_none, ev_take        ; E4-E7
             dw ev_none, ev_none, ev_none, ev_none        ; E8-EB (status, gil: later)
             dw ev_none, ev_none, ev_none, ev_none        ; EC-EF (cp, guest, animation)
             dw ev_npcdlg, ev_evdlg, ev_seton, ev_setoff  ; F0-F3
-            dw ev_npcon, ev_npcoff, ev_give, ev_none     ; F4-F7 (battle: later)
+            dw ev_npcon, ev_npcoff, ev_give, ev_battle   ; F4-F7
             dw ev_sound, ev_exit, ev_enter, ev_enterm    ; F8-FB
             dw ev_wait, ev_prev, ev_none, ev_end         ; FC-FF
 ev_none:    ret
+
+; $F7: a battle ($3B $B70F), the event going on after it
+ev_battle:  ld [bs_id], a
+            jp battle_run
 
 ; $F8: a song ($00-$7C), $7D fade out, $7E the song before, $7F stop; $80+: a sound effect ($3B $B71C)
 ev_sound:   bit 7, a

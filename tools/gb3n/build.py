@@ -62,6 +62,7 @@ B_BAT, B_BDAT, B_BDAT2, B_BDAT3 = 54, 55, 56, 57   # battle code; NES $30 + $31;
 B_BAT2 = 58                 # battle flow code
 B_BSET = 59                 # NES $2E / $2F: battle setup data
 B_BSCR, B_BINFO, B_CGFX, B_MGFX0 = 60, 61, 62, 64   # battle screen code; monster index; job graphics; monster graphics (64-71)
+B_BOSS0 = 72                # boss graphics (72-75)
 
 
 def field_banks(rom):
@@ -175,6 +176,28 @@ def battle_gfx(rom, banks, gbt, blank):
         bk, a, w, h = seen[(cls, g)]
         info[4 * mid:4 * mid + 4] = bytes([bk, a & 0xFF, a >> 8, w << 4 | h])
     assert bank < B_MGFX0 + 8, 'monster graphics overflow'
+    # bosses (2F/A3B8): 144 tiles (2E/9068: bank, tile) and an 18 x 12 tilemap (2A/8000 + $D8 x id;
+    # 0 empty, $70+ the tiles) -> B_BINFO $4400 + 3 x id (bank, address), $4500 + 216 x id the map
+    # (our tiles 0-143, $FF empty)
+    bank, at = B_BOSS0, 0
+    ids = sorted(set(rom.rd(0x2E, 0x8B00 + m) & 0x1F for m in range(256) if rom.rd(0x2E, 0x8B00 + m) >> 5 == 6))
+    for g in ids:
+        w = rom.rd(0x2E, 0x9068 + 2 * g) | rom.rd(0x2E, 0x9069 + 2 * g) << 8
+        # (2F/A3BB: bbs---tt tttttttt: 16 KB bank $10 + b, or $06 for a summon's graphics, which
+        # 2F/A40B flips to face the party)
+        b16 = 0x06 if w & 0x2000 else 0x10 + ((w >> 14) & 3)
+        src = b16 * 2 * data.B8 + ((w & 0x3FF) << 4)
+        raw = rom.at(src, 144 * 16)
+        if w & 0x2000:
+            raw = bytes(int('{:08b}'.format(x)[::-1], 2) for x in raw)
+        gfx = gbt(raw)
+        if at + len(gfx) > 0x4000: bank, at = bank + 1, 0
+        banks.setdefault(bank, blank())[at:at + len(gfx)] = gfx
+        info[0x400 + 3 * g:0x403 + 3 * g] = bytes([bank, (0x4000 + at) & 0xFF, (0x4000 + at) >> 8])
+        at += len(gfx)
+        tm = rom.rd(0x2A, 0x8000 + 0xD8 * g, 0xD8)
+        info[0x500 + 0xD8 * g:0x500 + 0xD8 * g + 0xD8] = bytes(t - 0x70 if 0x70 <= t < 0x70 + 144 else 0xFF for t in tm)
+    assert bank < B_BOSS0 + 4, 'boss graphics overflow'
     banks[B_BINFO] = info
     banks[B_CGFX] = bytearray(gbt(rom.at(0x28 * data.B8, 0x4000)))
 
@@ -272,7 +295,7 @@ def main():
                B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD) +
            'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
            'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\nB_BSET = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2, B_BSET) +
-           'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0) + text_defs +
+           'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0) + text_defs +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
@@ -282,6 +305,9 @@ def main():
            open(os.path.join(HERE, 'src', 'fbattle.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sound.s')).read() + '\n' +
            ''.join(open(os.path.join(HERE, 'src', f)).read() + '\n' for f in BATTLE_SRC) + sound_data() + own_data())
+    if os.environ.get('GB3N_BATTLE'):            # test builds only: every encounter is this battle
+        src = src.replace('            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a',
+                          '            ld a, %s\n            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a' % os.environ['GB3N_BATTLE'])
     if os.environ.get('GB3N_TEST'):              # test builds: tools/gb3n/test (never a release)
         src = src.replace('.nw:        call map_enter', '.nw:        jp test_loop')
         src += open(os.path.join(HERE, 'src', 'test.s')).read() + '\n'

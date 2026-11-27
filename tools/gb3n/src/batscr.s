@@ -57,18 +57,19 @@ bs_setup:   ld hl, BZ                       ; FF3's zero page cleared
             jr nz, .zb
             ld c, 1
             call bs_page
-            ld a, [bs_id]
-            ld [$DCED], a
-            ld a, [bs_id + 1]
-            ld [$DCEE], a
-            ld a, [bs_bg]
-            ld [$DCEF], a
-            ld a, [bs_id + 1]               ; (2E/9E8E: flags $7ED8, bg)
+            ld a, [bs_id]                   ; (2E/9E8E: id + $100 off world 0; the bg byte:
+            ld [$DCED], a                   ;   id in the low 5 bits, flags in the top 3)
+            ld a, [world]
             and a
-            ld a, 0
-            jr z, .f
-            ld a, $80
-.f:         ld [$DED8], a
+            jr z, .w0
+            ld a, 1
+.w0:        ld [$DCEE], a
+            ld a, [bs_bg]
+            and $1F
+            ld [$DCEF], a
+            ld a, [bs_bg]
+            and $E0
+            ld [$DED8], a
             xor a
             ld [$D4C6], a                   ; vehicle (on foot)
             ld a, [map_id]
@@ -163,6 +164,35 @@ bs_gfx:     xor a
             jr nz, .bl
             ld [bs_n], a                    ; the next free tile
             ld [bs_t], a                    ; the type
+            ld a, [$DD7B]                   ; a boss: its 144 tiles (B_BINFO $4400 + 3 x id)
+            cp 9
+            jr nz, .t
+            call bs_bossid
+            ld l, a
+            add a
+            add l
+            ld l, a
+            ld h, high($4400)
+            ld a, l
+            add low($4400)
+            ld l, a
+            ld de, bs_mi
+            ld bc, 3
+            ld a, B_BINFO
+            call far_copy
+            ld a, [bs_mi + 1]
+            ld l, a
+            ld a, [bs_mi + 2]
+            ld h, a
+            ld de, $9000
+            ld bc, 128 * 16
+            ld a, [bs_mi]
+            call far_copy
+            ld de, $8800
+            ld bc, 16 * 16
+            ld a, [bs_mi]
+            call far_copy
+            jp .party
 .t:         ld a, [bs_t]
             ld hl, bs_tb
             call bs_hl_a
@@ -215,7 +245,7 @@ bs_gfx:     xor a
             ld [bs_t], a
             cp 4
             jr nz, .t
-            ld a, 1                         ; the party: standing pose (6 tiles) at OBJ tiles
+.party:     ld a, 1                         ; the party: standing pose (6 tiles) at OBJ tiles
             ldh [rVBK], a                   ;   6 x member, VRAM bank 1
             ld c, 0
 .p:         push bc
@@ -339,7 +369,7 @@ bs_draw:    ld hl, MON_T                    ; blank
             jr nz, .z2
             ld a, [$DD7B]                   ; FF3's positions (2F/A5E6 + 2 x tilemap id)
             cp 9
-            jp z, .copy                     ; (bosses: later)
+            jp z, .boss
             add a
             ld l, a
             ld h, high($A5E6 - $4000)
@@ -401,6 +431,33 @@ bs_draw:    ld hl, MON_T                    ; blank
             ld a, c
             cp 8
             jr nz, .s
+            jr .copy
+.boss:      ld a, [$DDA7]                   ; a boss: its 18 x 12 tilemap (B_BINFO $4500)
+            cp $FF
+            jr z, .copy
+            call bs_bossid
+            ld l, a
+            ld h, 0
+            ld de, 216
+            call bs_mul16hl
+            ld de, $4500
+            add hl, de
+            ld de, MON_T
+            ld b, 12
+.br:        push bc
+            push de
+            ld bc, 18
+            ld a, B_BINFO
+            call far_copy
+            pop de
+            ld a, e
+            add 20
+            ld e, a
+            jr nc, .bn
+            inc d
+.bn:        pop bc
+            dec b
+            jr nz, .br
 .copy:      ld hl, MON_T                    ; base -> shadow rows 0-11
             ld de, SH_T
             ld bc, 240
@@ -415,6 +472,19 @@ bs_draw:    ld hl, MON_T                    ; blank
 .d:         ld [hl+], a
             dec b
             jr nz, .d
+            ret
+; A = the boss's graphics id ($7D73 & $1F)
+bs_bossid:  ld a, [$DD73]
+            and $1F
+            ret
+; HL = L x DE (L small)
+bs_mul16hl: ld a, l
+            ld hl, 0
+            and a
+            ret z
+.m:         add hl, de
+            dec a
+            jr nz, .m
             ret
 ; a type's block (bs_mi: w x h) at (bs_x, bs_y) in MON_T / MON_A
 bs_block:   ld a, [bs_t]
