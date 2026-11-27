@@ -292,8 +292,21 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   messages and animated picture.
 - RAM rule learnt: the stack is $CF00-$CFFF (the build refuses RAM sections there), and anything an
   interrupt reads must not live in the map tables ($C400-$CEFF).
-- Not yet in menus: Teleport / Sight and the Midgard Bread (they need the minimap and FF3's warp),
-  FF3's spell list Swap, the stat-up messages after equipping.
+- The minimap (Sight, the Midgard Bread: 3A/88A3; `src/mini.s`, bank B_MINI): its screen data
+  made at build time by running FF3's own set-up in py65 (`tools/gb3n/minimap.py`, which also
+  renders the mock-ups `build/mock3/minimap_*.png`); FF3's logo on top, the 128 x 112 picture with
+  its border (the outer frame left out for 20 x 18); drawn 8 rows at a time with FF3's noise, towns
+  as sprites (36 at most: the GB's 40 sprites), the flashing marker, hidden while A / a direction
+  is held.
+- Warp (3C/9AD0: "Go back how many?" 0-45, back through the maps entered, past the first one out),
+  FF3's map flags (39/BC00: no magic, no warp for Exit / Warp / Otter's Head, no size change for
+  the Maiden's Kiss / Luck Mallet). Fixed: the world map's return point was overwritten by the map's
+  own position after a menu or a battle inside a map.
+- Monster chests (3F/F5A1: the item, then the battle once the message closes); triggers wait for
+  the dialogue box as FF3's (3F/E213).
+- Not yet in menus: FF3's spell list Swap, the stat-up messages after equipping.
+- Not yet in battle: attack / spell animations, back attacks drawn flipped (FF3 3F/F942: the
+  monsters' tiles mirrored, the party at x $30), the airship's battle background.
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
