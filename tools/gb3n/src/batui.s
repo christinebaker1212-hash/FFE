@@ -604,17 +604,16 @@ bs_tok:     ld c, a
             cp $FF
             jr z, .no
             ld a, c
-            rrca
+            rrca                            ; (HL = B_MO + 1 + 64 A: the carry kept)
             rrca
             ld l, a
             and $C0
-            add low(B_MO + 1)
             ld e, a
             ld a, l
             and 3
-            adc high(B_MO + 1)
-            ld h, a
-            ld l, e
+            ld d, a
+            ld hl, B_MO + 1
+            add hl, de
             ld a, [hl]
             and $C0
             jr nz, .no

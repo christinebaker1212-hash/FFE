@@ -1084,17 +1084,18 @@ bs_cdraw:   ld b, a
             ret
 
 ; HL = the record of character A (B_CH + $40 A)
-bs_rec:     rrca
+bs_rec:     push de                         ; (HL = B_CH + 64 A; keeps DE)
+            rrca
             rrca
             ld l, a
             and $C0
-            add low(B_CH)
             ld e, a
             ld a, l
             and 3
-            adc high(B_CH)
-            ld h, a
-            ld l, e
+            ld d, a
+            ld hl, B_CH
+            add hl, de
+            pop de
             ret
 
 ; ---- the party window (rows 12-17): name, hp / max per member
