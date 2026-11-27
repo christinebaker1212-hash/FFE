@@ -74,6 +74,15 @@ def classify(G, rec):
             elif a & 0x100: k = 'R'
             else: k = '#'
             g[y][x] = k
+    zc = {}                                         # (stairs: a rare attribute-0 chip next to the floor;
+    for y in range(h):                              #   other attribute-0 chips are scenery: void)
+        for x in range(w):
+            if g[y][x] == 'S': zc.setdefault(cells[w * y + x], []).append((x, y))
+    for c, ps in zc.items():
+        near = [p_ for p_ in ps if any(0 <= p_[0] + a < w and 0 <= p_[1] + b < h and g[p_[1] + b][p_[0] + a] in '.L'
+                                       for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)))]
+        if len(ps) > 2 or not near:
+            for x, y in ps: g[y][x] = ' '
     for (x, y) in doors:                            # the opening above a door: the room's border
         if y > 0 and g[y - 1][x] in 'Cr': g[y - 1][x] = 'O'
     return w, h, g, r
@@ -123,6 +132,13 @@ def cave_floor(G, rec, role, n_chests, pc=None):
     """a cave floor -> dict(map (64 x 64 bytes), start (x, y), chests [(x, y)], bosses [(x, y)])"""
     pc = pc or EARTH_PIECES
     w, h, g, r = classify(G, rec)
+    if w > 62 or h > 62:                            # (larger floors: cut to their walkable part, 2 around)
+        cs = [(x, y) for y in range(h) for x in range(w) if g[y][x] in '.DSLrO']
+        x0, x1 = max(0, min(c[0] for c in cs) - 2), min(w, max(c[0] for c in cs) + 3)
+        y0, y1 = max(0, min(c[1] for c in cs) - 2), min(h, max(c[1] for c in cs) + 3)
+        assert x1 - x0 <= 62 and y1 - y0 <= 62, 'floor %d: %d x %d after the cut' % (rec, x1 - x0, y1 - y0)
+        g = [row[x0:x1] for row in g[y0:y1]]
+        w, h = x1 - x0, y1 - y0
     W = 64
     ox, oy = (W - w) // 2, (W - h) // 2
     assert ox >= 1 and oy >= 1, 'floor %d too big' % rec
@@ -130,7 +146,10 @@ def cave_floor(G, rec, role, n_chests, pc=None):
     boxes = []                                      # (a room only with a door below it: Dawn of Souls also
     for b in rooms(g, w, h):                        #   marks whole halls; those are floor and walls)
         x0_, y0_, x1_, y1_ = b
-        if any(0 <= y1_ + 2 < h and g[y1_ + 2][x] == 'D' for x in range(x0_, x1_ + 1)):
+        area = (x1_ - x0_ + 1) * (y1_ - y0_ + 1)
+        inner = sum(1 for y in range(y0_, y1_ + 1) for x in range(x0_, x1_ + 1) if g[y][x] == 'r')
+        if any(0 <= y1_ + 2 < h and g[y1_ + 2][x] == 'D' for x in range(x0_, x1_ + 1)) and \
+           area <= 140 and inner * 2 >= area:        # (a small room; a hall keeps its maze)
             boxes.append(b)
         else:
             for y in range(max(0, y0_ - 1), min(h, y1_ + 2)):
@@ -660,3 +679,51 @@ def learn_pieces(rom, ts):
                 wtop=best(((F, F, F, T), None), wh), wbot=best(((F, F, T, F), None), wh),
                 ctl=best(((F, F, F, F), (T, F, F, F)), wh), ctr=best(((F, F, F, F), (F, T, F, F)), wh),
                 stairs=st.most_common(1)[0][0] if st else None, up=up.most_common(1)[0][0] if up else None)
+
+
+def pieces_for(rom, ts):
+    """everything cave_floor needs for a floor in FF1's tileset ts (learn_pieces, then the room floor, the tile
+    below a door, the chests: four of FF1's for rooms and four free metatiles for corridor chests)"""
+    import collections
+    pc = dict(EARTH_PIECES) if ts == 2 else {}
+    lp = learn_pieces(rom, ts)
+    t = data.tileset_pack(rom, ts)
+    P = lambda mt: t['prop'][2 * mt]
+    rpal = t['mt_pal'][0x01]
+    tsof = [rom.rd(data.BANK_SMINFO, data.TILESETS + m) for m in range(data.N_MAPS)]
+    used, roomfl, below = collections.Counter(), collections.Counter(), collections.Counter()
+    for m in range(data.N_MAPS):
+        if tsof[m] != ts: continue
+        mp = data.std_map(rom, m)
+        for i, v in enumerate(mp):
+            used[v] += 1
+            if t['mt_pal'][v] == rpal and not (P(v) & 1) and (P(v) & 0xC0) == 0 and v not in range(9): roomfl[v] += 1
+            if v == DOOR and i + 64 < 4096: below[mp[i + 64]] += 1
+    chests = [mt for mt in range(128) if (P(mt) & 0x1E) == 0x08]
+    free = [mt for mt in range(9, 128) if not used[mt] and mt not in chests and mt not in DOOR_MTS_ALL]
+    if ts != 2:
+        pc.update(lp)
+        pc.update(roomfl=roomfl.most_common(1)[0][0] if roomfl else lp['floor'],
+                  bt=B_T, bb=B_B, bl=B_L, br=B_R, btl=B_TL, btr=B_TR, bbl=B_BL, bbr=B_BR, door=DOOR,
+                  below=below.most_common(1)[0][0] if below else lp['floor'], lava=lp['floor'],
+                  chest_room=tuple(chests[:4]), chest_corr=tuple(free[-4:]))
+    return pc
+
+
+DOOR_MTS_ALL = (0x36, 0x37, 0x3A, 0x3B)
+
+
+def look_tileset(rom, ts, pc):
+    """FF1's tileset ts with the post-game's properties (cave_tileset, any tileset): stairs down = teleport 0,
+    the chest slots, the corridor chests as FF1's chest in the floor's palette"""
+    t = data.tileset_pack(rom, ts)
+    prop = bytearray(t['prop']); pal = bytearray(t['mt_pal']); tsa = bytearray(t['tsa'])
+    prop[2 * pc['stairs']:2 * pc['stairs'] + 2] = bytes([0x80, 0x00])
+    for i, mt in enumerate(pc['chest_room']):
+        prop[2 * mt:2 * mt + 2] = bytes([0x09, 0x04 + i])
+    src = pc['chest_room'][0]
+    for i, mt in enumerate(pc['chest_corr']):
+        prop[2 * mt:2 * mt + 2] = bytes([0x09, i])
+        pal[mt] = pal[pc['floor']]
+        for k in range(4): tsa[128 * k + mt] = tsa[128 * k + src]
+    return dict(prop=bytes(prop), tsa=bytes(tsa), mt_pal=bytes(pal), cgb_tiles=t['cgb_tiles'])
