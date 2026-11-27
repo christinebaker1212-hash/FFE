@@ -85,6 +85,20 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
 - Known: a map change turns the LCD off (white on a real Color); to be replaced by FF3's wipe
   / a black mask as FF1 did.
 
+## People, text, talking, events (2026-11-27)
+- FF3's save page ($6000-$63FF) in work RAM bank 1 ($D000), set up as FF3's init sram does.
+- People: FF3's npc lists (12 slots), switches, graphics (three sources by graphics id), poses,
+  walking in place, steps with the destination claimed at once; at most 9 drawn.
+- Text: the English tables (script/ff3/*.json) encoded at build time for our font (VRAM bank 1,
+  BG in $8800 mode), wrapped to 18 columns, pages of 6 lines. Dialogue box = FF3's top window
+  (mock-up A) in the GB window layer, cut at line 64, FF3's frame tiles, typewriter text.
+- Talking (A on a person): FF3's conditional scripts and event runner (person / party
+  commands, switches, items, dialogue, entrances / exits, waits, repeat). Checked: the child in
+  Ur ("Gyah!!", then the event moves people / the party). Strict checker 0.
+- Field code in its own ROM bank (B_FIELD = 29); data banks read through far_copy / far_byte
+  (bank 0 down to 3.6 KB). Lesson: anything copied to HRAM at boot (the OAM DMA routine) must
+  live in bank 0.
+
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
   proposal: use FF3's own choice of top / bottom), 18 columns x 6 lines.
