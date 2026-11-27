@@ -550,7 +550,7 @@ frame:      ds 1
 npc_list:   ds 4 * NPC_SLOTS + 1
 nd_ptr:     ds 2
 
-section bank B_FIELD, $7000
+section bank B_FIELD, $7A00
 ; ---- person at slot L (NPC1 page) starts a step in direction A (0 right, 1 left, 2 down, 3 up)
 ; ($3B $AFDD: the destination is claimed at once; right / down count the sub-tile 0 -> 15 from
 ; the old cell, left / up 15 -> 0 from the new one)

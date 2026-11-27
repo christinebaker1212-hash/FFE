@@ -11,7 +11,7 @@ section bank B_FIELD, $6C00
 ; ---- A pressed while standing: a person ahead? run their script
 talk:       call dest_cell
             call npc_at                     ; HL = their slot
-            ret nc
+            jp nc, treasure
             ld a, [hl]                      ; the person's id
             ld [ev_who], a
             cp $E0                          ; (inns, shops, the fat chocobo: later)
@@ -48,6 +48,243 @@ talk:       call dest_cell
             call memcpy
             call scr_event                  ; A = the event chosen by the switch tests
             jp ev_start
+
+; ---- A on a treasure or a locked door ($3F $E917): D, E = the cell ahead
+treasure:   ld a, d
+            ld [tr_x], a
+            ld a, e
+            ld [tr_y], a
+            push de
+            call map_mt
+            pop de
+            ld c, a
+            ld b, W_PROP1
+            ld a, [bc]
+            bit 7, a
+            ret z
+            ld a, c
+            cp $90
+            ret c
+            cp $A0
+            jr c, .lock
+            cp $D0
+            ret c
+            cp $F0
+            ret nc
+            ld [tr_tile], a                 ; $D0-$DF a chest, $E0-$EF another treasure
+            inc b
+            ld a, [bc]
+            and 15
+            ld l, a
+            ld h, 0
+            push de
+            ld de, treas
+            add hl, de
+            pop de
+            ld a, [hl]
+            ld [tr_id], a
+            call tr_switch                  ; Z when taken (not for chests: their tile tells)
+            ld a, [tr_tile]
+            cp $E0
+            jr c, .give
+            ld a, [hl]
+            and c
+            ret z
+.give:      ld a, [tr_tile]                 ; a chest on a gil map: the item's price in gil
+            cp $E0
+            jr nc, .item
+            ld a, [map_props + 1]
+            and $20
+            jr z, .item
+            call tr_contents
+            ld l, a                         ; price: NES 10/9E00 (B_EVENTS $5E00) + 2 * item
+            ld h, 0
+            add hl, hl
+            ld bc, $5E00
+            add hl, bc
+            push de
+            ld de, dlg_num
+            ld bc, 2
+            ld a, B_EVENTS
+            call far_copy
+            pop de
+            xor a
+            ld [dlg_num + 2], a
+            ld hl, SR_GIL                   ; gil += price, at most 9999999 ($98967F)
+            ld a, [dlg_num]
+            add [hl]
+            ld [hl+], a
+            ld a, [dlg_num + 1]
+            adc [hl]
+            ld [hl+], a
+            ld a, 0
+            adc [hl]
+            ld [hl], a
+            call gil_cap
+            call tr_take
+            call tr_open
+            ld c, $01                       ; "From inside the treasure chest, you got N Gil!"
+            ld b, TB_SYSTEM
+            jp dlg_open
+.item:      call tr_contents
+            ld [dlg_item], a
+            ld b, 1                         ; arrows ($4F-$56) come 20 at a time
+            cp $4F
+            jr c, .q
+            cp $57
+            jr nc, .q
+            ld b, 20
+.q:         ld c, a
+            call inv_add
+            jr nc, .ok
+            ld c, $50                       ; "Your inventory is full."
+            ld b, TB_SYSTEM
+            jp dlg_open
+.ok:        call tr_take
+            ld a, [tr_tile]
+            cp $E0
+            ld c, $76                       ; not a chest: "In a place like this, ...!"
+            jr nc, .msg
+            call tr_open
+            ld c, $59                       ; "Inside the treasure chest there was ...!"
+            ld a, [tr_id]
+            cp $E0
+            jr c, .msg
+            ld c, $02                       ; (with a battle: the battle comes later)
+.msg:       ld b, TB_SYSTEM
+            jp dlg_open
+.lock:      ld a, [SRAM_PAGE + $0E]         ; a locked door: the walking member a Thief (job 8)?
+            add low(SRAM_PAGE + $100)
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            ld a, [hl]
+            cp 8
+            ld c, $03                       ; "The door is locked!"
+            jr nz, .lm
+            ld a, [SRAM_PAGE + $21]
+            or $40
+            ld [SRAM_PAGE + $21], a
+            ld c, $7A                       ; "With the Thief's special ability, the lock opened..."
+.lm:        ld b, TB_SYSTEM
+            jp dlg_open
+
+; HL = the treasure switch byte, C = its mask, for treasure tr_id ($6040: id / 8 (+ 32 off
+; world 0), bit id & 7); Z set when the switch is clear (taken)
+tr_switch:  ld a, [tr_id]
+            ld hl, SR_TREAS
+            ld b, a
+            ld a, [world]
+            and a
+            jr z, .w
+            ld hl, SR_TREAS + 32
+.w:         ld a, b
+            call sw_bit
+            ld a, [hl]
+            and c
+            ret
+tr_take:    push de
+            call tr_switch                  ; (the switch cleared: taken)
+            ld a, c
+            cpl
+            and [hl]
+            ld [hl], a
+            pop de
+            ret
+; A = the contents of treasure tr_id (01/9C00 world 0, 01/9D00 others: B_NPCS $6A00 / $6B00)
+tr_contents:
+            ld a, [tr_id]
+            ld l, a
+            ld h, $6A
+            ld a, [world]
+            and a
+            jr z, .w
+            inc h
+.w:         ld a, B_NPCS
+            jp far_byte
+; the chest at (tr_x, tr_y) shown open: metatile $7D in the map and on screen
+tr_open:    ld a, [tr_x]
+            ld d, a
+            ld a, [tr_y]
+            ld e, a
+            and 31
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, d
+            and 31
+            add l
+            ld l, a
+            ld a, h
+            adc high(W_MAP)
+            ld h, a
+            ld a, $7D
+            ld [hl], a
+            ld hl, line_buf
+            call cell_buf
+            ld a, 1
+            ld [line_n], a
+            ret
+gil_cap:    ld hl, SR_GIL + 2               ; at most 9999999 ($98967F)
+            ld a, [hl]
+            cp $98
+            ret c
+            jr nz, .cap
+            dec hl
+            ld a, [hl]
+            cp $96
+            ret c
+            jr nz, .cap2
+            dec hl
+            ld a, [hl]
+            cp $80
+            ret c
+            jr .cap3
+.cap:       dec hl
+.cap2:      dec hl
+.cap3:      ld hl, SR_GIL
+            ld a, $7F
+            ld [hl+], a
+            ld a, $96
+            ld [hl+], a
+            ld a, $98
+            ld [hl], a
+            ret
+; add B of item C to the inventory ($3C $9362: the item's slot or the first empty one, at most
+; 99); carry set when full
+inv_add:    ld hl, SR_ITEMS
+            ld e, 32
+.f:         ld a, [hl]
+            cp c
+            jr z, .add
+            inc l
+            dec e
+            jr nz, .f
+            ld hl, SR_ITEMS
+            ld e, 32
+.e:         ld a, [hl]
+            and a
+            jr z, .new
+            inc l
+            dec e
+            jr nz, .e
+            scf
+            ret
+.new:       ld [hl], c
+.add:       ld a, l
+            add 32
+            ld l, a
+            ld a, [hl]
+            add b
+            cp 99
+            jr c, .s
+            ld a, 99
+.s:         ld [hl], a
+            and a
+            ret
 
 ; the map's event trigger A (index into its trigger list) -> its script ($3F $E6BE / $E6C6:
 ; 2C/8880 pointers, the vehicle / status switches first) -> the event
@@ -492,3 +729,7 @@ ev_pad:     ds 1
 scr_buf:    ds 64
 dlg_list:   ds 32
 ev_tmp:     ds 2
+tr_tile:    ds 1
+tr_id:      ds 1
+tr_x:       ds 1
+tr_y:       ds 1

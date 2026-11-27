@@ -93,6 +93,7 @@ def field_banks(rom):
     b[0x2540:0x2548] = si['base']; b[0x2548:0x2550] = si['mp']; b[0x2550:0x2552] = si['hp']
     b[0x2560:0x2574] = si['stats']; b[0x2580:0x2590] = si['equip']
     b[0x2590:0x2592] = bytes([si['wmx'], si['wmy']])
+    b[0x2A00:0x2C00] = rom.rd(0x01, 0x9C00, 512)        # chest contents (world 0 / others)
     gfx = blank(); at = 0
     for g in range(256):
         if g < 0x40:

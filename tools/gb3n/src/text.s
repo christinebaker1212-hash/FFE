@@ -12,6 +12,7 @@ TB_STORY   = 0              ; text tables (text.py TABLES)
 TB_SYSTEM  = 1
 TB_DLG1    = 2
 TB_DLG2    = 3
+TB_NAMES   = 4
 FR_TL      = $F7            ; FF3's window frame tiles ($3F $EDF6)
 FR_T       = $F8
 FR_TR      = $F9
@@ -159,7 +160,7 @@ dlg_open:   ld a, b
             ld a, DLG_TYPE
             ld [dlg_state], a
             ret
-txt_tables: dw T_T8000, T_T8200, T_T8400, T_T8600
+txt_tables: dw T_T8000, T_T8200, T_T8400, T_T8600, T_NAMES8800
 
 DLG_TYPE   = 1
 DLG_PAGE   = 2
@@ -230,7 +231,13 @@ dlg_step:   ld a, [dlg_clear]
             jr z, .nl
             cp $0C
             jr z, .pg
-            cp $10
+            cp $02
+            jr c, .next
+            cp $05
+            jr nc, .cd
+            call dlg_value                  ; an item's name / an amount
+            jr .next
+.cd:        cp $10
             jr c, .next                     ; (other codes: none in the field's text)
             cp $18
             jr nc, .put
@@ -306,6 +313,85 @@ dlg_insert: and 3
             ld [dlg_insi], a
             ret
 
+; code $02: the name of item dlg_item; $03 / $04: the amount dlg_num (24 bits) -> dlg_insbuf
+dlg_value:  cp $02
+            jr nz, .num
+            ld a, [dlg_item]                ; the name table's entry (B_TEXT index 4)
+            ld c, a
+            ld b, 0
+            ld hl, T_NAMES8800
+            add hl, bc
+            add hl, bc
+            add hl, bc
+            ld de, dlg_src
+            ld bc, 3
+            ld a, B_TEXT
+            call far_copy
+            ld a, [dlg_src + 1]
+            ld l, a
+            ld a, [dlg_src + 2]
+            ld h, a
+            ld de, dlg_insbuf
+            ld bc, 24
+            ld a, [dlg_src]
+            call far_copy
+            ld hl, dlg_insbuf
+            ld c, 0
+.n:         ld a, [hl+]
+            and a
+            jr z, .nd
+            inc c
+            ld a, c
+            cp 23
+            jr c, .n
+.nd:        ld a, c
+            ld [dlg_ins], a
+            xor a
+            ld [dlg_insi], a
+            ret
+.num:       ld hl, dlg_num                  ; decimal digits of the 24-bit amount (C:D:E)
+            ld a, [hl+]
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            ld c, [hl]
+            xor a
+            ld [dlg_ins], a
+            ld hl, dlg_insbuf + 23
+.dv:        xor a                           ; C:D:E / 10, the remainder in A
+            ld b, 24
+.db:        sla e
+            rl d
+            rl c
+            rla
+            cp 10
+            jr c, .dk
+            sub 10
+            inc e
+.dk:        dec b
+            jr nz, .db
+            add $30
+            dec hl
+            ld [hl], a
+            ld a, [dlg_ins]
+            inc a
+            ld [dlg_ins], a
+            ld a, c
+            or d
+            or e
+            jr nz, .dv
+            ld a, [dlg_ins]                 ; the digits down to dlg_insbuf
+            ld b, a
+            ld de, dlg_insbuf
+.mv:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .mv
+            xor a
+            ld [dlg_insi], a
+            ret
+
 ; ---- V-Blank: the dialogue's VRAM writes (a letter, or clearing the text cells)
 dlg_vbl:    ld a, [dlg_clear]
             and a
@@ -367,7 +453,9 @@ dlg_clear:  ds 1
 dlg_cell:   ds 3
 dlg_ins:    ds 1
 dlg_insi:   ds 1
-dlg_insbuf: ds 8
+dlg_insbuf: ds 24
+dlg_item:   ds 1
+dlg_num:    ds 3
 dlg_src:    ds 3
 
 section bank 0, $0E00

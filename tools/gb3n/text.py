@@ -3,8 +3,8 @@
 are the English inserter's (tools/ff3/insert.py, imported, not changed).
 
 GB text format (src/text.s): bytes 32-126 our font (tile = ASCII), 127 the ellipsis glyph;
-$00 end, $0A new line, $0C new page (A to continue), $10-$13 member 0-3's name, $14-$17 member
-0-3's job. Strings of a table: an index (bank, address lo, hi per id) in B_TEXT, the strings in
+$00 end, $0A new line, $0C new page (A to continue), $02 an item's name (dlg_item), $03 / $04
+an amount (dlg_num), $10-$13 member 0-3's name, $14-$17 member 0-3's job. Strings of a table: an index (bank, address lo, hi per id) in B_TEXT, the strings in
 the banks after it."""
 import os, sys, json, re
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -39,7 +39,10 @@ def vlen(s):
     while i < len(s):
         m = TOKEN.match(s, i)
         if m:
-            if m.group(1) and m.group(1)[0] == '1' and m.group(1) <= '13': n += 6
+            c = m.group(1)
+            if c and '10' <= c <= '13': n += 6
+            elif c == '02': n += 16                   # an item name
+            elif c in ('03', '04'): n += 7            # an amount
             i = m.end(); continue
         n += 1; i += 1
     return n
@@ -66,12 +69,20 @@ def encode_lines(lines, per_page=DLG_LINES):
                 c = m.group(1)
                 if c and '10' <= c <= '13':
                     out.append((0x10 if m.group(2) == '02' else 0x14) + int(c, 16) - 0x10)
+                elif c in ('02', '03', '04'):
+                    out.append(int(c, 16))
                 i = m.end(); continue
             ch = line[i]
             out.append(ELLIPSIS if ch == '…' else (ord(ch) if 32 <= ord(ch) < 127 else ord('?')))
             i += 1
     out.append(0)
     return bytes(out)
+
+
+def name(s):
+    """a name-table entry on one line: icons dropped (FF3's icons: later), no wrapping"""
+    s = re.sub(r'\[[0-9A-F]{2}\]', '', plain(s)).strip()
+    return encode_lines([s])
 
 
 def dialogue(s):
@@ -84,12 +95,12 @@ def banks(first_bank):
     idx = blank(); out = {first_bank: idx}
     at_idx = 0; layout = {}
     bank, at = first_bank + 1, 0
-    for t in TABLES[:4]:
+    for t in TABLES:
         tab = load(t)
         n = max(tab) + 1
         layout[t] = 0x4000 + at_idx
         for i in range(n):
-            enc = dialogue(tab.get(i, ''))
+            enc = name(tab.get(i, '')) if t == 'names8800' else dialogue(tab.get(i, ''))
             if at + len(enc) > 0x4000: bank, at = bank + 1, 0
             out.setdefault(bank, blank())[at:at + len(enc)] = enc
             idx[at_idx:at_idx + 3] = bytes([bank, (0x4000 + at) & 0xFF, (0x4000 + at) >> 8])
