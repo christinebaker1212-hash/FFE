@@ -371,7 +371,15 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   sprite frames as FF3, the projectile in a straight line to the target's centre (FF3 aims by angle
   tables made for its NES layout), the arrows / shuriken stuck round the target with each hit,
   the boomerang's hits at the target and its way back. Test hook GB3N_ANWPN (the right hand's type).
-- Not yet in battle: the airship cannon (32/84C9), Flare Wave's final-boss wave (10/8BD5) and the final boss's death (10/8A85),
+- Monsters coming and going (`src/batfx.s`): a boss's entry and death (2F/BE97 / BEA4: its graphics
+  in 4-tile blocks, each written 8 frames with its rows pushed apart, even rows right and odd rows
+  left, 7 down to 0 coming in, 1 up to 8 going, sound $3C every 4 blocks), the final boss's death
+  (2F/BF93: the music fading out, the screen grey three times, then as the others; the message
+  speed set to 8 after it, as FF3), the ordinary monsters' death and getting away (2F/BB94: FF3
+  sweeps a gradient diagonally; here a diagonal edge sweeps their cells, the cells on it masked
+  pixel by pixel, 37 frames, sound $31). Test hooks: GB3N_WIPETEST, GB3N_BATHI (event battles).
+- Not yet in battle: the airship cannon (32/84C9), Flare Wave's final-boss wave (10/8BD5), the final boss's own raster dissolve
+  (10/8A85: here the boss dissolve above),
   stone characters in the BG, back attacks drawn flipped (FF3
   3F/F942: the monsters' tiles mirrored, the party at x $30), the airship's battle background.
 

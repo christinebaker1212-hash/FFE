@@ -33,8 +33,12 @@ bs_battle:  call wait_vbl
             xor a                           ; no scroll in a battle
             ldh [rSCX], a
             ldh [rSCY], a
+            xor a                           ; (no top window yet)
+            ld [bs_topon], a
             call bs_vall
+            call bs_bossin                  ; (a boss: its tiles blank, then its entry: 2F/B486)
             call bs_palette
+            call bs_bossin2
             call bs_loop                    ; (FF3's battle main)
             jp bs_leave
 

@@ -360,6 +360,7 @@ ROMDATA = {
     'mf_flip': (0x33, 0xB8AB, 4),
     'kl_ang': (0x33, 0xB413, 4),
     'sm_snd': (0x2F, 0xAFC0, 24),        # summons: each attack's sound
+    'bs_bblks': (0x2F, 0xBE7F, 24),      # each boss's 4-tile blocks (entry / death)
     'sm_pal': (0x32, 0x8043, 8),         # the pre-animation's palette by summon
     'sm_pre': (0x33, 0xB1EE, 10),        # the pre-animation's frames
     'sm_fly': (0x33, 0xAFF2, 16),        # its four sprites flying off
@@ -468,7 +469,7 @@ def main():
            open(os.path.join(HERE, 'src', 'wspr.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sa.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'mini.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'banim.s')).read() + '\n' + open(os.path.join(HERE, 'src', 'bsumn.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'banim.s')).read() + '\n' + open(os.path.join(HERE, 'src', 'bsumn.s')).read() + '\n' + open(os.path.join(HERE, 'src', 'batfx.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + sound_data() + own_data())
     if os.environ.get('GB3N_BATTLE'):            # test builds only: every encounter is this battle
         src = src.replace('            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a',
@@ -523,6 +524,10 @@ ev_fxtest:  call ev_shake
         if os.environ.get('GB3N_ANTGT') == 'char':   # (shown on member 0)
             extra += '            ld a, [$DE9A]\n            and $BF\n            ld [$DE9A], a\n            ld a, $80\n            ld [$DE9B], a\n            ld [$DE99], a\n'
         src = src.replace('an_kind:    ld a, [$DEC2]', 'an_kind:    ld a, %s\n            ld [$DE88], a\n            ld a, [$DEC2]\n            cp 4\n            jr nz, .ak\n%s            ld a, %s\n            ret\n.ak:        ld a, [$DEC2]' % (os.environ['GB3N_ANTEST'], extra, os.environ.get('GB3N_ANKIND', '1')))
+    if os.environ.get('GB3N_BATHI'):             # test builds only: the battle index + $100 (event battles)
+        src = src.replace('.w0:        ld [$DCEE], a', '.w0:        ld a, 1\n            ld [$DCEE], a')
+    if os.environ.get('GB3N_WIPETEST'):          # test builds only: the death wipe on slot 0 at the start
+        src = src.replace('            call bs_bossin2\n', '            call bs_bossin2\n            ld b, 60\n.wtw:       push bc\n            call bs_frame\n            pop bc\n            dec b\n            jr nz, .wtw\n            ld a, $80\n            call bs_mwipe\n')
     if os.environ.get('GB3N_ANWPN'):             # test builds only: the right hand's weapon animation
         src = src.replace('            call an_wgfx                    ; the weapons\' tiles and palettes (2F/A8EA)',
                           '            call an_wgfx\n            ld a, %s\n            ld [an_t1], a\n            ld a, [BZ + $BB]\n            and a\n            jr nz, .wt\n            inc a\n            ld [BZ + $BB], a\n.wt:' % os.environ['GB3N_ANWPN'])

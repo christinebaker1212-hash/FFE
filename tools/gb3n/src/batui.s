@@ -1668,7 +1668,9 @@ bsc_anim:   ld a, [$D8D6]
             and 7                           ; a monster: FF3's pre-attack flash (34/8545)
             call bs_flash
             call ui_kind                    ; its fight on a member: the member hit (34/8637);
-            cp 1                            ;   its magic: the spell's hit (2F/B15E)
+            cp $0D                          ;   its magic: the spell's hit (2F/B15E); running
+            jr z, .run                      ;   away: those that got away wiped (34/84E6, 2F/BB5E)
+            cp 1
             jr nz, .mf
             call xa_mmon
             jr .m
@@ -1715,6 +1717,30 @@ bsc_anim:   ld a, [$D8D6]
             ld a, $FF
             ld [bs_act], a
             jp bs_party
+; (monsters getting away: wiped, their slots cleared: 2F/BAA2)
+.run:       ld a, [$D8D4]
+            and a
+            jp z, .m
+            call bs_mwipe
+            ld a, [$D8D4]
+            ld b, 0
+.rc:        add a
+            push af
+            jr nc, .rn
+            ld a, b
+            ld hl, $DDA7
+            call bs_hl_a
+            ld [hl], $FF
+.rn:        pop af
+            inc b
+            ld c, a
+            ld a, b
+            cp 8
+            ld a, c
+            jr nz, .rc
+            %FAR B_BAT2, fe_B909
+            call bs_draw
+            jp .m
 ; the animation bank's routines (B_BANIM)
 xa_mmon:    ld hl, an_mmon
 xa_go:      ld a, B_BANIM
@@ -1929,6 +1955,17 @@ bs_deaths:  ld c, 0
             jr nz, .s
             jp bs_party
 .die:       call bs_deadmask                ; 2F/BB0A: experience credit, slots cleared, count
+            push af                         ; (their death: a boss's 2F/BEA4, else the wipe)
+            call bs_isboss
+            jr nz, .wp
+            pop af
+            push af
+            call bs_bossdie
+            jr .wd
+.wp:        pop af
+            push af
+            call bs_mwipe
+.wd:        pop af
             ld [bs_t], a
             ld b, 0                         ; (slot)
 .e:         ld a, [bs_t]
@@ -1942,7 +1979,7 @@ bs_deaths:  ld c, 0
             cp $FF
             jr z, .en
             ld [hl], $FF
-            ld hl, $DDD3
+            ld hl, $DDD3                    ; (2F/BAEE: counted by the monster's type)
             call bs_hl_a
             inc [hl]
 .en:        inc b
