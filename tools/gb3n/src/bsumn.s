@@ -2826,6 +2826,14 @@ an_bpf:     ds 1
 an_bpq:     ds 9
 an_bgs:     ds 16
 an_bp2:     ds 1
+an_pfr:     ds 1
+an_pspin:   ds 1
+an_px0:     ds 1
+an_py0:     ds 1
+an_pdxx:    ds 1
+an_pdy:     ds 1
+an_pn2:     ds 1
+an_pk:      ds 1
 an_sl1:     ds 1
 an_sl2:     ds 1
 an_sl3:     ds 1

@@ -53,7 +53,38 @@ an_fight:   ld a, [$D8D6]
             xor a
             ld [BZ + $BB], a
             ld [BZ + $BC], a
-.nc:        xor a                           ; right hand first, then the left
+.nc:        ld a, [an_t1]                   ; a bow and arrows: the left hand only, with the
+            ld b, a                         ;   right's hits (33/A0CF)
+            ld a, [an_t2]
+            ld c, a
+            ld a, b
+            cp 3
+            jr nz, .b1
+            ld a, c
+            cp 8
+            jr z, .ba
+            jr .hp
+.b1:        cp 8
+            jr nz, .hp
+            ld a, c
+            cp 3
+            jr nz, .hp
+.ba:        ld a, [BZ + $BB]
+            ld [BZ + $BC], a
+            ld a, 1
+            ld [an_h], a
+            ld a, 3
+            call an_hand
+            jr .end
+.hp:        ld a, b                         ; a harp in either hand: the right's hits for both
+            cp 4
+            jr z, .hc
+            ld a, c
+            cp 4
+            jr nz, .two
+.hc:        ld a, [BZ + $BB]
+            ld [BZ + $BC], a
+.two:       xor a                           ; right hand first, then the left
             ld [an_h], a
             ld a, [an_t1]
             call an_hand
@@ -61,7 +92,7 @@ an_fight:   ld a, [$D8D6]
             ld [an_h], a
             ld a, [an_t2]
             call an_hand
-            call an_restpal
+.end:       call an_restpal
             ld a, $FF
             ld [bs_act], a
             jp xb_party
@@ -91,7 +122,19 @@ an_hand:    ld [an_a], a
             jr z, an_fist
             cp 9
             jr z, an_claw
-            ret                             ; (bows, harp, boomerang, moon, shuriken: later)
+            cp 3
+            jp z, an_bow
+            cp 4
+            jp z, an_harp
+            cp 5
+            jp z, an_boom
+            cp 6
+            jp z, an_moon
+            cp 7
+            jp z, an_shur
+            cp 8
+            jr z, an_fist                   ; (an arrow alone: as no weapon)
+            ret
 ; 0: no weapon: a claw swing unless the other hand holds one (33/A2F2)
 an_fist:    ld a, [$DE1F]
             ld hl, $DE20
@@ -3584,6 +3627,399 @@ an_lgfx:    add a
             ld h, a
             ld a, B_ANIM
             jp an_vcopy
+
+
+section bank B_BANIM, $7704
+; ---- ranged weapons (33/A0C0's types 3-7). FF3 aims its projectiles by angle tables made for its
+; NES layout (33/A7A5); here they fly in a straight line from the attacker to the target's centre.
+; the attacker's frame A (B as a toad / mini), then the animation sprite frame C at it
+an_pw:      push bc
+            call an_tpose
+            pop bc
+            ld a, c
+            jp an_wspr0
+; 3: bow (33/A251): 16 frames drawing (right hand: frames 5 / 9 then 6 / 10 with the attacker's
+; frame 1; left: 11 / 7, 12 / 8 with frame 6), then the arrow (33/A6D2)
+an_bow:     ld a, $2F
+            call bs_sfx
+            xor a
+            ld [an_f], a
+.f:         ld a, [an_h]
+            and a
+            jr nz, .l
+            ld a, [an_f]
+            and 8
+            ld c, 5
+            ld e, 9
+            jr z, .r
+            ld c, 6
+            ld e, 10
+.r:         push de
+            ld a, 1
+            ld b, $0A
+            call an_pw
+            pop de
+            ld a, e
+            call an_wspr0
+            jr .w
+.l:         ld a, [an_f]
+            and 8
+            ld c, $0B
+            ld e, 7
+            jr z, .r2
+            ld c, $0C
+            ld e, 8
+.r2:        push de
+            ld a, 6
+            ld b, $0F
+            call an_pw
+            pop de
+            ld a, e
+            call an_wspr0
+.w:         call an_frame
+            ld a, [an_f]
+            cp 16
+            jr nz, .f
+            ld a, [an_h]                    ; the arrow: frames $14 / $16 (+ 1 every other 4)
+            and a
+            ld a, $14
+            jr z, .a
+            ld a, $16
+.a:         ld [an_pfr], a
+            call an_flyto
+            ld a, [an_h]                    ; each hit: an arrow stuck near the centre (32/981C)
+            and a
+            ld a, $52
+            jr z, .t
+            ld a, $4A
+.t:         ld [an_pfr], a
+            jp an_stuck
+; 7: shuriken (33/A1EF): 16 frames throwing (right: 5 with $18 / 1 with $19; left: 7 / $1E, 6 / $1F),
+; the shuriken flying (frames $1A / $1C), then the hits (32/9815)
+an_shur:    ld a, $2F
+            call bs_sfx
+            xor a
+            ld [an_f], a
+.f:         ld a, [an_h]
+            and a
+            jr nz, .l
+            ld a, [an_f]
+            and 8
+            ld a, 5
+            ld c, $18
+            jr z, .p
+            ld a, 1
+            ld c, $19
+            jr .p
+.l:         ld a, [an_f]
+            and 8
+            ld a, 7
+            ld c, $1E
+            jr z, .p
+            ld a, 6
+            ld c, $1F
+.p:         ld b, $0E
+            call an_pw
+            call an_frame
+            ld a, [an_f]
+            cp 16
+            jr nz, .f
+            ld a, [an_h]
+            and a
+            ld a, $1A
+            jr z, .a
+            ld a, $1C
+.a:         ld [an_pfr], a
+            call an_flyto
+            ld a, [an_h]
+            and a
+            ld a, $4B
+            jr z, .t
+            ld a, $53
+.t:         ld [an_pfr], a
+            jp an_stuck
+; 4: harp (33/A1A5): per hit 16 frames playing (right: $0E with frame 7; left: frame 6 with $0F), a
+; blunt hit on the target every other 8 frames
+an_harp:    ld a, [an_n]
+            and a
+            ret z
+.c:         ld a, $0B
+            call bs_sfx
+            xor a
+            ld [an_f], a
+            ld [an_b9], a
+.f:         ld a, [an_h]
+            and a
+            ld a, 7
+            ld c, $0E
+            jr z, .p
+            ld a, 6
+            ld c, $0F
+.p:         ld b, $0E
+            call an_pw
+            ld a, [an_f]
+            and 8
+            jr z, .w
+            ld a, 1
+            call an_hit
+.w:         call an_frame
+            ld a, [an_f]
+            cp 16
+            jr nz, .f
+            ld hl, an_n
+            dec [hl]
+            jr nz, .c
+            ret
+; 5 / 6: boomerang / full moon (33/A12C / A125): 16 frames throwing (right: frame 5 with $20 / 1 with
+; $21; left: $22 / 7, $23 / 6; the moon's frames + $14), then out to the target spinning ($24.. /
+; $2C..), the hits there (frame $10 / $11 at the target), back
+an_boom:    xor a
+            jr an_moon.g
+an_moon:    ld a, 4
+.g:         ld [an_k5], a
+            ld a, $3B
+            call bs_sfx
+            xor a
+            ld [an_f], a
+.f:         ld a, [an_k5]
+            and a
+            ld a, 0
+            jr z, .o
+            ld a, $14
+.o:         ld e, a
+            ld a, [an_h]
+            and a
+            jr nz, .l
+            ld a, [an_f]
+            and 8
+            ld a, 5
+            ld c, $20
+            jr z, .p
+            ld a, 1
+            ld c, $21
+            jr .p
+.l:         ld a, [an_f]
+            and 8
+            ld a, 7
+            ld c, $22
+            jr z, .p
+            ld a, 6
+            ld c, $23
+.p:         push af
+            ld a, c
+            add e
+            ld c, a
+            pop af
+            ld b, $0E
+            call an_pw
+            call an_frame
+            ld a, [an_f]
+            cp 16
+            jr nz, .f
+            ld a, [an_h]                    ; spinning: 4 frames
+            and a
+            ld a, $24
+            jr z, .a
+            ld a, $2C
+.a:         ld hl, an_k5
+            add [hl]
+            ld [an_pfr], a
+            ld a, 1
+            ld [an_pspin], a
+            call an_flyto
+            ld a, $5B                       ; (FF3's sound $DB)
+            call bs_sfx
+            ld a, [an_n]                    ; the hits: 8 frames each
+            add a
+            add a
+            add a
+            ld [an_k3], a
+.h:         ld a, [an_k3]
+            and a
+            jr z, .b
+            dec a
+            ld [an_k3], a
+            call an_pose
+            call an_pdraw
+            call an_tcen                    ; (32/97EB: frame $10 / $11 at the centre + 16)
+            ld a, d
+            add 16
+            ld d, a
+            ld a, e
+            add 16
+            ld e, a
+            ld a, [an_h]
+            add $10
+            ld b, 0
+            call an_spr
+            call an_frame
+            jr .h
+.b:         call an_flyback
+            xor a
+            ld [an_pspin], a
+            ret
+; the attacker's throwing frame (right 1, left 6)
+an_pose:    ld a, [an_h]
+            and a
+            ld a, 1
+            jr z, .p
+            ld a, 6
+.p:         ld b, $0A
+            jp an_tpose
+; the projectile from the attacker (x - 16) to the target's centre, 16 pixels a frame (an_pfr: its
+; frame, + 1 every other 4 frames; spinning: + 0-3 by the frame / 2)
+an_flyto:   call an_mypos
+            ld a, d
+            sub 16
+            ld [an_px0], a
+            ld a, e
+            ld [an_py0], a
+            call an_tcen
+            ld a, [an_px0]
+            sub d
+            jr nc, .d
+            xor a
+.d:         ld [an_pdxx], a                  ; (to the left)
+            ld a, e
+            sub 8
+            ld hl, an_py0
+            sub [hl]
+            ld [an_pdy], a
+            ld a, [an_pdxx]                  ; frames: dx / 16, at least 1
+            swap a
+            and $0F
+            jr nz, .n
+            inc a
+.n:         ld [an_pn2], a
+            ld a, 1
+            ld [an_pk], a
+.f:         call an_pose
+            call an_pdraw
+            call an_frame
+            ld hl, an_pk
+            ld a, [hl]
+            inc [hl]
+            ld hl, an_pn2
+            cp [hl]
+            jr nz, .f
+            ret
+an_flyback: ld a, [an_pn2]
+            ld [an_pk], a
+.f:         call an_pose
+            call an_pdraw
+            call an_frame
+            ld hl, an_pk
+            dec [hl]
+            jr nz, .f
+            jp an_pose
+; the projectile at step an_pk of an_pn2
+an_pdraw:   ld a, [an_pdxx]
+            ld b, a
+            ld a, [an_pk]
+            ld e, a
+            ld a, b
+            call mul8
+            ld a, [an_pn2]
+            ld c, a
+            call an_div8
+            ld b, a
+            ld a, [an_px0]
+            sub b
+            ld d, a
+            ld a, [an_pdy]                  ; (signed)
+            ld b, a
+            bit 7, a
+            jr z, .p
+            cpl
+            inc a
+.p:         push de
+            ld e, a
+            ld a, [an_pk]
+            call mul8
+            ld a, [an_pn2]
+            ld c, a
+            call an_div8
+            pop de
+            bit 7, b
+            jr z, .q
+            cpl
+            inc a
+.q:         ld hl, an_py0
+            add [hl]
+            ld e, a
+            ld a, [an_pspin]
+            and a
+            ld a, [an_f]
+            jr nz, .s
+            rrca
+            rrca
+            and 1
+            jr .t
+.s:         rrca
+            and 3
+.t:         ld hl, an_pfr
+            add [hl]
+            ld b, 0
+            jp an_spr
+; A = HL / C (8-bit quotient)
+an_div8:    ld b, 16
+            xor a
+.d:         add hl, hl
+            rla
+            cp c
+            jr c, .n
+            sub c
+            inc l
+.n:         dec b
+            jr nz, .d
+            ld a, l
+            ret
+; the hits stuck in the target (32/9823): each at a random place round its centre (x - 16 + 0-24,
+; y - 16 + 0-38), tile an_pfr (palette 3), sound $5A, 6 frames; they stay
+an_stuck:   call an_pose
+            ld a, [an_n]
+            and a
+            ret z
+.h:         call an_tcen
+            push de
+            ld b, 0
+            ld a, $18
+            call an_rnd
+            pop de
+            add d
+            sub 16
+            add 8
+            ld d, a
+            push de
+            ld b, 0
+            ld a, $26
+            call an_rnd
+            pop de
+            add e
+            sub 16
+            add 17
+            ld e, a
+            call an_slot_oam
+            jr c, .w
+            ld a, e
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            ld a, [an_pfr]
+            ld [hl+], a
+            ld [hl], $0B
+.w:         ld a, $5A
+            call bs_sfx
+            ld b, 6
+.f:         push bc
+            call an_frame
+            pop bc
+            dec b
+            jr nz, .f
+            ld hl, an_n
+            dec [hl]
+            jr nz, .h
+            ret
 
 section bank B_BANIM, $7000
 an_blob:    ds $375                         ; (32/943D-97B1)
