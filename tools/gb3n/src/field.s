@@ -260,6 +260,7 @@ map_enter:  call char_update                ; the walking member's set / palette
             cp 16
             jr nz, .row
             call scroll_set
+            call gu_mapin                   ; the guest at the party (3D/B627)
             call party_oam
             call npc_oam
             ld a, [pos_x]                   ; the cell under the party ($3F $E87B): its z-level;
@@ -548,6 +549,7 @@ field_vbl:  call ev_pflush                   ; (palettes made by an effect)
             jp hram_dma
 
 field_step: call npc_update
+            call gu_update                  ; the guest (3D/B78A)
             ld a, [step]
             and a
             jr nz, .walk
@@ -619,6 +621,7 @@ field_step: call npc_update
             call passable
             jr c, .done
             call fx_flset                   ; (a damage floor ahead: 3F/E561)
+            call gu_push                    ; (the guest's trail: 3D/B6DA)
             call edge_line                  ; the row / column coming into view
             ld a, 1
             ld [step], a
@@ -642,6 +645,7 @@ field_step: call npc_update
             ld [trig], a
             call fx_stepend                 ; poison, the damage floor (3B/A0B1, A09B)
 .done:      call party_oam
+            call gu_draw
             call npc_oam
             jp v_parked
 

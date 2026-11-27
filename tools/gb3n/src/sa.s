@@ -1152,7 +1152,7 @@ sa_npc0:    ld a, [NPC2 + 5]
             add b
             ld l, a
             ld h, high(npc_poses)
-            ld a, 16
+            ld a, 32
             ld [ws_toff], a
             jp ws_obj
 

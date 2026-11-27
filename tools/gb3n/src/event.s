@@ -110,6 +110,8 @@ map_bbtn:   call dest_cell
             ld a, [SRAM_PAGE + $0B]
             and a
             ret z
+            ld hl, gu_wait
+            inc [hl]
             dec a
             add a
             ld c, a
@@ -817,8 +819,6 @@ ev_uncp:    ld b, a
 .s:         ld [SRAM_PAGE + $1B], a
             ret
 ; $EE: the guest ($600B; their picture: later)
-ev_guest:   ld [SRAM_PAGE + $0B], a
-            ret
 
 ; $F7: a battle ($3B $B70F), the event going on after it
 ev_battle:  ld [bs_id], a

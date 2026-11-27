@@ -29,7 +29,7 @@ ws_tiles:   ld a, [world]
             ret
 
 ; ---- the world map's other sprites into OAM from entry 4 (3E/D85A), the rest hidden
-ws_world:   ld a, 16
+ws_world:   ld a, 32                        ; (after the party and the guest)
             ld [ws_n], a
             call ws_pty
 
@@ -136,6 +136,7 @@ ws_onsc:    ld a, e
             ret c
             sub 7
             swap a
+            and $F0
             add VIEW_Y * 16 + 1
             ld hl, walk_dy
             sub [hl]
@@ -149,6 +150,7 @@ ws_onsc:    ld a, e
             ret c
             sub 7
             swap a
+            and $F0
             add VIEW_X * 16
             ld hl, walk_dx
             sub [hl]

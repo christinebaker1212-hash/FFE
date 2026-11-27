@@ -15,7 +15,7 @@ SR_TREAS   = SRAM_PAGE + $40
 NPC1       = $D400
 NPC2       = $D500
 NPC_SLOTS  = 12
-NPC_DRAWN  = 9              ; at most 9 people drawn (40 sprites: the party takes 4)
+NPC_DRAWN  = 8              ; at most 8 people drawn (40 sprites: the party and the guest take 8)
 N_GFXID    = $6000
 N_SPEED    = $6200
 N_POSE     = $6400
@@ -308,9 +308,9 @@ npc_one:    ld a, [hl+]                     ; id
 npc_gfx:    ld a, [de]                      ; graphics for a shown person (DE = its slot)
             and a
             ret z
-            ld a, e                         ; VRAM bank 1 tile 16 + 16 * slot
-            and $F0
-            add $10
+            ld a, e                         ; VRAM bank 1 tile 32 + 16 * slot (FF3's $1200 +;
+            and $F0                         ;   the guest at 16)
+            add $20
             ld [npc_vram], a
             ld hl, 10
             add hl, de
@@ -465,7 +465,7 @@ npc_oam:    ld a, [step]                    ; the walk's pixel offset (signed): 
             jr .w
 .d:         ld a, b
             ld [walk_dy], a
-.w:         ld bc, oam_buf + 16
+.w:         ld bc, oam_buf + 32             ; (entries 8-39: the guest has 4-7)
             ld hl, NPC1
             ld a, NPC_SLOTS
             ld [npc_n], a
@@ -654,7 +654,7 @@ npc_anim:   ld a, [nd_sx]                   ; halfway across: the cell's priorit
 .h:         ld a, [nd_slot]
             ld l, a
             ld h, high(NPC1)
-            add 16                          ; tiles: 16 per slot
+            add 32                          ; tiles: 16 per slot from 32
             ld [nd_tb], a
             ld a, l
             add 14

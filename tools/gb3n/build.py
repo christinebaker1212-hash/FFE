@@ -148,6 +148,7 @@ def field_banks(rom):
     b[0x0500:0x0700] = rom.rd(0x00, 0x8C00, 512)
     b[0x0700:0x0720] = rom.rd(0x00, 0x9670, 32)
     b[0x0720:0x0788] = rom.rd(0x00, 0x9690, 104)
+    b[0x0788:0x0798] = rom.rd(0x00, 0x96F8, 16)          # the guests' palettes (3B/BB40)
     b[0x0C00:0x0C40] = rom.rd(0x00, 0x8880, 64)
     b[0x0C40:0x0C80] = rom.rd(0x00, 0x88C0, 64)
     b[0x0D00:0x0D40] = rom.player_poses()
@@ -181,6 +182,7 @@ def field_banks(rom):
     b = blank(); b[0:0x4000] = gbt(rom.at(0x0E * data.B8, 0x4000)); banks[B_CHARS] = b
     b = blank(); b[0:144 * 16] = gbt(rom.rd(0x0D, 0xB700, 144 * 16))
     b[0x2000:0x2040] = gbt(rom.rd(0x0D, 0xB440, 64))       # FF3's cursor: 4 tiles (3E/DF31 -> $E4-$E7)
+    b[0x2040:0x2140] = gbt(rom.rd(0x0D, 0x8000, 256))      # Guzco's graphics (guest 4: 3B/BAD8)
     banks[B_COMMON] = b
     banks[B_SCRIPT] = bytearray(rom.at(0x2C * data.B8, 0x4000))   # NES $2C/$2D: npc lists, scripts
     b = blank()                                          # people: tables, init
@@ -337,6 +339,7 @@ ROMDATA = {
     'sa_9cb4': (0x3A, 0x9CB4, 240),
     'ws_sin': (0x3A, 0x9E3E, 256),       # world sprites: FF3's sine table, the ship's chain
     'ws_chtab': (0x3D, 0xBF7A, 126),
+    'gu_poses': (0x3E, 0xDC6A, 64),      # the guest's poses
     'nj_h': (0x3B, 0xAC0C, 25),          # event: a person's jump height
     'dn_x': (0x3B, 0xADB1, 84),          # event: the dance's sub-x, sub-y, facings
     'dn_y': (0x3B, 0xAE05, 84),
@@ -401,6 +404,7 @@ def main():
            open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'evfx.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'guest.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'world.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'fbattle.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'vehicle.s')).read() + '\n' +
@@ -419,9 +423,9 @@ def main():
         ev = {'prol': 'ev_prol', 'epi': 'ev_epi', 'fx': 'ev_fxtest'}.get(st, 'ev_satest' if st.startswith('sa') else 'ev_ending')
         if st == 'ipick':
             ev = 'ev_iptest'
-            src += 'section bank B_FIELD, $7480\nev_iptest:  %FAR B_MENU, m_ipick\n            jp map_reload\n'
+            src += 'section bank B_FIELD, $7980\nev_iptest:  %FAR B_MENU, m_ipick\n            jp map_reload\n'
         if ev == 'ev_satest':                    # (GB3N_STORY=saN: special animation N on Start)
-            src += 'section bank B_FIELD, $7480\nev_satest:  ld a, %d\n            ld [ev_arg], a\n            jp ev_sanim\n' % int(st[2:], 16)
+            src += 'section bank B_FIELD, $7980\nev_satest:  ld a, %d\n            ld [ev_arg], a\n            jp ev_sanim\n' % int(st[2:], 16)
         src = src.replace('            jp nz, menu_open', '            jp nz, ' + ev)
         if ev == 'ev_fxtest':                    # (each event effect in turn, Ur's people 1 / 2)
             src += '''section bank B_FIELD, $7400
