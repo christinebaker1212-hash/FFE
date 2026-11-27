@@ -508,14 +508,13 @@ load_map:   push af
             ldh [maptype], a
             ld a, 63
             ldh [cmask], a
-            ld a, b
-            add a, MAP_BANK0
+            call pg_mbank                   ; (the post-game's maps: pg.s)
             ld [map_bank], a
             call sbank
             ld a, [M_TS]
             add a, TS_BANK0
             ld [ts_bank], a
-.lcd:        call lcd_off                    ; (LCD off in V-Blank, interrupts off)
+.lcd:        call pg_lcd                     ; (LCD off in V-Blank, interrupts off; the battle banks)
 .off:       ldh a, [is_cgb]
             and a
             jr z, .dmg
@@ -1185,9 +1184,9 @@ arrived:    ld a, [px]
             ret
 
 ; a normal teleport (E = its number): this floor pushed (FF1: for a later warp), the new map
-do_tele:    push de                         ; push this floor
+do_tele:    call pg_tchk                    ; (A = fdepth; the post-game's stairs: pg.s)
+            push de                         ; push this floor
 
-            ld a, [fdepth]
             cp 8
             jr nc, .nf
             ld b, a
@@ -2764,7 +2763,7 @@ enc_form:   ld l, a
             call far_byte
             pop hl
             push af
-            ld a, BTL6_BANK                 ; (the domain byte: bank BTL6)
+            ldh a, [hbt_dom]                ; (the domain byte: bank BTL6; the post-game's: pg.s)
             ld [fc_bank], a
             pop af
             add a, l

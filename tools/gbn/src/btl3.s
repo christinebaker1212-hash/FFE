@@ -221,7 +221,7 @@ bt_mname:   ld l, a
             add hl, de
             ld de, bt_sbuf
             ld bc, 2
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             ld a, [bt_sbuf]
             ld l, a
@@ -229,7 +229,7 @@ bt_mname:   ld l, a
             ld h, a
             ld de, bt_sbuf
             ld bc, 20
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             ld hl, bt_sbuf                  ; (White Magic: its battle icon, font code 2: the
             ld a, [hl]                      ;   orb without its shine, not a white blob in the
@@ -408,7 +408,7 @@ bt_mload:   ld [mg_id], a
             add hl, de
             ld de, mg_d
             ld bc, 8
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             jp far_copy
 
 ; ---- casting: a member's spell (FF1 Player_DoMagic): the command's spell / target / level
@@ -830,7 +830,7 @@ bt_effect:  ld a, [dv_player]               ; (the number and the flinch: this t
             ld h, 0
             ld de, B_MAGMSG
             add hl, de
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             ld [fc_bank], a
             call far_byte
             and a
@@ -1260,7 +1260,7 @@ bt_en_ai:   ld a, [bt_who]
             add hl, de
             ld de, mg_ai
             ld bc, 16
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             xor a                           ; random(0..128) < chance: a spell
             ld b, $80

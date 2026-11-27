@@ -67,8 +67,9 @@ def bank(rom):
         for i, (rr, gg, bb) in enumerate(pal):
             c = (rr >> 3) | (gg >> 3) << 5 | (bb >> 3) << 10
             blob[0x1C00 + 32 * r + 2 * i] = c & 0xFF; blob[0x1C01 + 32 * r + 2 * i] = c >> 8
-    for m in range(61):
-        blob[0x1E00 + m] = region_of(m, ui.LOC_NAMES[ui.LOC_MAP[m]])
+    lm = ui.loc_map_all()
+    for m in range(len(lm)):
+        blob[0x1E00 + m] = region_of(m, ui.LOC_NAMES[lm[m]])
     return bytes(blob)
 
 

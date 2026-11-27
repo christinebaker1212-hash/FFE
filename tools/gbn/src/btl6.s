@@ -46,7 +46,7 @@ fl_main:
             add hl, de
             ld a, b
             cp 8
-            ld a, ESIL_BANK
+            ldh a, [hbt_sb]
             jr c, .bk
             inc a
 .bk:        ld [fl_bk], a
@@ -343,7 +343,7 @@ fl_fiend6:  ldh a, [is_cgb]
             add hl, de
             ld de, scr_buf
             ld bc, 4
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             ld a, $0F
             ld [scr_buf], a

@@ -330,7 +330,7 @@ bt_en_init: ld c, 0
             pop de
             push de
             ld bc, 20
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             pop hl
             ld a, [hl+]                     ; (HL: +1; the HP from the maximum)
@@ -1909,7 +1909,7 @@ bt_ename:   cp 9                            ; (no such slot: no name; owner, 202
 ; the string whose pointer is at HL (battle data) -> bt_sbuf (39 letters at most, ended)
 bt_pstr:    ld de, bt_sbuf
             ld bc, 2
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             ld a, [bt_sbuf]
             ld l, a
@@ -1917,7 +1917,7 @@ bt_pstr:    ld de, bt_sbuf
             ld h, a
             ld de, bt_sbuf
             ld bc, 39
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             xor a
             ld [bt_sbuf + 39], a
@@ -2093,7 +2093,7 @@ bt_msg_end: ld a, [bt_defer]
             add a, low(B_RESPOND)
             ld l, a
             ld h, high(B_RESPOND)
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             ld [fc_bank], a
             call far_byte
             ld b, a
@@ -2438,7 +2438,7 @@ bt_dpop:    ld a, b
             ld l, a
             ld h, high(B_DNGLY)
             ld bc, 16
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy                   ; (DE advances)
             pop hl
             inc hl
@@ -3117,7 +3117,7 @@ bt_levelup: ld a, [bt_lvm]
             ld d, 0
             ld hl, B_HITBON
             add hl, de
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             ld [fc_bank], a
             call far_byte
             ld b, a
@@ -3173,7 +3173,7 @@ bt_levelup: ld a, [bt_lvm]
             add hl, de
             ld de, bt_lvd
             ld bc, 2
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             call far_copy
             ld a, [bt_lvc]                  ; MP charges (not Fighter / Thief and their upgrades?
             and a                           ;   FF1: class 0 and 1 only)
@@ -4249,7 +4249,7 @@ bt_tp9:     ld a, [bt_type]
             ld h, 0
             ld de, B_HAND
             add hl, de
-            ld a, BTL_DATA
+            ldh a, [hbt_db]
             ld [fc_bank], a
             call far_byte
             sub 17

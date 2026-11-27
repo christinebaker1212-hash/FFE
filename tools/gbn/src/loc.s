@@ -81,7 +81,7 @@ bn_prep:    ld a, [cur_map]
             ret
 
 ; map A -> A = name number, HL = the name
-loc_get:    cp 61
+loc_get:    cp PGM_END
             ld b, LOC_WORLD
             jr nc, .w
             ld e, a

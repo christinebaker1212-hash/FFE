@@ -209,19 +209,21 @@ def mapman_all(rom):
     return tiles, cols
 
 
-def map_pack(rom, m, cls=0):
+def map_pack(rom, m, cls=0, ov=None):
     """a standard map: metatiles, palettes (outside / in a room), and for DMG the tiles
     pre-shaded per (tile, shading) for the metatiles the map uses (and the door metatiles),
     the in-room set only on maps with doors; the free BG tiles hold the font (DMG)"""
-    ts = rom.rd(BANK_SMINFO, TILESETS + m)
-    t = tileset_pack(rom, ts)
-    mp_ = std_map(rom, m)
+    ov = ov or {}                                   # (the post-game's floors: postgame.py gives
+    ts = ov.get('ts', None)                         #   the map, tileset, palette and objects)
+    if ts is None: ts = rom.rd(BANK_SMINFO, TILESETS + m)
+    t = ov.get('t') or tileset_pack(rom, ts)
+    mp_ = ov.get('map') or std_map(rom, m)
     used = sorted(set(mp_) | set(DOOR_MTS))
     doors = any((t['prop'][2 * x] & 0x1E) in (2, 4) for x in used)
-    pal = bytearray(rom.rd(BANK_SMINFO, SM_PAL + 0x30 * m, 0x30))
+    pal = bytearray(ov.get('pal') or rom.rd(BANK_SMINFO, SM_PAL + 0x30 * m, 0x30))
     mpal = rom.rd(BANK_SMINFO, MAPMAN_PAL + 2 * cls, 2)
     pal[0x12], pal[0x16] = mpal[0], mpal[1]
-    chr_ = rom.rd(BANK_TILESETCHR, 0x8000 + 0x800 * ts, 0x800)
+    chr_ = ov.get('chr') or rom.rd(BANK_TILESETCHR, 0x8000 + 0x800 * ts, 0x800)
     var = {}; dmg_tiles = bytearray(); mt_dmg = {}; cgb_bg = {}; nes_bg = {}
     for room, off in (('out', 0), ('in', 0x20)):
         bg = [[pal[off]] + list(pal[off + 4 * p + 1:off + 4 * p + 4]) for p in range(4)]
@@ -245,7 +247,7 @@ def map_pack(rom, m, cls=0):
     cgb_obj = b''.join(rgb555(c).to_bytes(2, 'little') for p in range(4) for c in sppal[p])
     spr = rom.rd(BANK_MAPCHR, MAPMAN_CHR + 0x100 * cls, 0x100)
     party = b''.join(spr_rank_tile(spr[16 * t_:16 * t_ + 16], sppal[t_ >> 1 & 1]) for t_ in range(16))
-    objs = map_objects(rom, m, n, sppal)
+    objs = map_objects(rom, m, n, sppal, ov.get('objs'))
     taken = set(range(n)) | set(b + k for b in objs['blocks'] if b >= 128 for k in range(16))
     free = [x for x in range(256) if x not in taken]
     assert len(free) >= len(FONT_CODES), 'map %d: %d BG tiles free for the font' % (m, len(free))
@@ -385,11 +387,11 @@ def hflip_tile(t16):
     return bytes(rev(b) for b in t16)
 
 
-def map_objects(rom, m, n_bg, sppal):
+def map_objects(rom, m, n_bg, sppal, raw=None):
     """map m's objects: the 15 slots (id, x + flags, y, sprite tile base) and the graphics:
     a 16-tile block per distinct graphic, placed in VRAM tiles the BG does not use (party at
     0-15, then 16-127, then down from 255 above the BG's 128+ variants)"""
-    raw = rom.rd(BANK_SMINFO, MAP_OBJECTS + 0x30 * m, 45)
+    if raw is None: raw = rom.rd(BANK_SMINFO, MAP_OBJECTS + 0x30 * m, 45)
     tall = m in TALL
     if tall:                                         # (party 0-15, its pairs 16-39, then 24 a block)
         free = list(range(40, 128 - 23, 24))
