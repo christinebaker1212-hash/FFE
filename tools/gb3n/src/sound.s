@@ -5,8 +5,8 @@
 ; pulse 2 and noise). Song data: GB bank B_SND0 + k holds NES bank $36 at $4000 and the song bank
 ; k ($37, $38, $39, $09) at $6000, so an NES pointer p reads at p - $4000.
 ; The output stage (snd_out) gives the channel values to the GB sound: pulses to CH1 / CH2, the
-; triangle to CH3 (a triangle wave), noise to CH4. First pass: a volume change restarts the
-; channel; the driver runs once a frame (FF1's timer at the NES rate and its volume steps: later).
+; triangle to CH3 (a triangle wave), noise to CH4. Volume changes inside a note: zombie-mode steps
+; (no restart). The driver runs once a frame (FF1's timer at the NES rate: later).
 
 MUS        = $DD00          ; FF3's $7F40 page (work RAM bank 1)
 M_CUR      = MUS + $00      ; $7F40
@@ -1303,13 +1303,30 @@ out_pulse:  ld [MZ_SLOT], a
             ld [MZ_NOTE], a
             pop af
             jr nz, .key
-            call o_cv                       ; same note: a volume change restarts it
-            ld a, [hl]
-            ld b, a
-            ld a, [MZ_NOTE]
+            call o_cv                       ; same note: a volume change by "zombie mode" steps
+            ld a, [hl]                      ;   (NRx2 = $08 adds 1 to the playing volume, mod
+            ld b, a                         ;   16: no restart, no click; the Game Boy's and
+            ld a, [MZ_NOTE]                 ;   the Color's own behaviour, as FF1's driver)
             cp b
-            jr nz, .key
-            call o_freq                     ; the period (pitch envelope): frequency only
+            jr z, .fr
+            and a                           ; (to 0, or not known: a restart)
+            jr z, .key
+            ld a, b
+            cp $FF
+            jr z, .key
+            ld a, [MZ_NOTE]
+            ld [hl], a
+            sub b
+            and 15
+            ld b, a
+            ld a, [MZ_T6]
+            add 2
+            ld c, a
+            ld a, $08
+.z:         ldh [c], a
+            dec b
+            jr nz, .z
+.fr:        call o_freq                     ; the period (pitch envelope): frequency only
             ld a, [MZ_T6]
             add 3
             ld c, a
@@ -1454,11 +1471,28 @@ out_noise:  ld [MZ_SLOT], a
             pop bc
             ld a, [hl]
             ldh [$FF22], a
+            bit 0, b                        ; (a new note: started)
+            jr nz, .key
             ld a, [O_CV + 3]
             cp c
-            jr nz, .key
-            bit 0, b
             ret z
+            ld b, a                         ; a volume change: zombie steps (to 0 / unknown:
+            ld a, c                         ;   a restart)
+            and a
+            jr z, .key
+            ld a, b
+            cp $FF
+            jr z, .key
+            ld a, c
+            ld [O_CV + 3], a
+            sub b
+            and 15
+            ld b, a
+            ld a, $08
+.z:         ldh [$FF21], a
+            dec b
+            jr nz, .z
+            ret
 .key:       ld a, c
             ld [O_CV + 3], a
             swap a
