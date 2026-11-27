@@ -879,6 +879,27 @@ def main():
     open(out[:-3] + '.lab', 'w').write(''.join('%04x %s\n' % (a, n) for n, a in sorted(r.labels.items(), key=lambda x: x[1])
                                                if isinstance(a, int) and 0xC000 <= a < 0x10000))
     print('wrote %s (%d KB), bank 0 used %d bytes' % (out, len(img) // 1024, len(r.banks[0])))
+    if os.environ.get('GBN_SPACE'):              # room left: per bank, bytes no code or data claims
+        used = {}
+        for (b, off) in r.claimed:
+            used.setdefault(b, set()).add(off)
+        for b, spans in PLACED.items():
+            for a0, a1 in spans:
+                used.setdefault(b, set()).update(range(a0 - 0x4000, a1 - 0x4000))
+        tot = 0                                  # (counted: runs of 64+ filler bytes ($FF in
+        for b in range(ROM_BANKS):               #   the image) no code or placed data claims;
+            u = used.get(b, ())                  #   some banks are filled without place())
+            free = run = 0
+            for off in range(0x4001):
+                if off < 0x4000 and off not in u and img[b * 0x4000 + off] == 0xFF:
+                    run += 1
+                    continue
+                if run >= 64:
+                    free += run
+                run = 0
+            tot += free
+            print('space bank %3d: %5d free' % (b, free))
+        print('space total: %d KB free of %d KB' % (tot // 1024, ROM_BANKS * 16))
 
 
 if __name__ == '__main__':
