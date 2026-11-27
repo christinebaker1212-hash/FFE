@@ -2314,6 +2314,594 @@ an_emag:    ld [an_k4], a
             call an_frame
             jp an_bgoff
 
+; ---- the other actions' animations (34/843E): A = FF3's attack animation kind
+an_kinds:   ld a, [$D8D6]
+            ld [an_c], a
+            ld a, [an_kk]
+            cp 6
+            jp z, an_defend
+            cp 7
+            jp z, an_jump1
+            cp 8
+            jp z, an_jump2
+            cp 9
+            jp z, an_bup
+            cp $0A
+            jp z, an_scare
+            cp $0B
+            jp z, an_cheer
+            cp $0D
+            jp z, an_run
+            cp $10
+            jp z, an_inef
+            ret
+
+; the attacker's frame A, or X (B) as a toad / mini (33/A972)
+an_tpose:   ld c, a
+            ld a, [an_c]
+            add a
+            ld hl, $D8BB
+            call an_hla
+            ld a, [hl]
+            and 5
+            ld a, c
+            jr z, .p
+            ld a, b
+.p:         jp an_cframe
+; set up: the attacker's animation tiles, OBJ palette 3 = general palette A, graphics set B
+an_kset:    push bc
+            push af
+            call an_cgfx
+            call an_savepal
+            pop af
+            call an_gpal3
+            pop bc
+            ld a, b
+            jp an_lgfx
+; done (33/AC3A): the attacker's frames back, palette 3 back
+an_kend:    call an_pose0
+            jp an_restpal
+; a 32-frame loop: calls HL each frame (an_f counts from 0)
+an_k32:     xor a
+            ld [an_f], a
+.l:         push hl
+            call .go
+            call an_frame
+            pop hl
+            ld a, [an_f]
+            cp 32
+            jr nz, .l
+            ret
+.go:        jp hl
+
+; ---- defend (33/ABF7): frame 8, the shield sprites $38-$3B (graphics set 3, palette $C1)
+an_defend:  ld a, $C1
+            ld b, 3
+            call an_kset
+            ld a, $20
+            call bs_sfx
+            ld hl, .f
+            call an_k32
+            jp an_kend
+.f:         ld a, 8
+            ld b, $0E
+            call an_tpose
+            ld a, [an_f]
+            and $18
+            rrca
+            rrca
+            rrca
+            add $38
+            jp an_wspr0
+
+; ---- cheer (33/A92B): frames 5 / 1 by turns of 8 with sprites 0 / 1 (set 0, palette $E5)
+an_cheer:   ld a, $E5
+            ld b, 0
+            call an_kset
+            ld a, $4B
+            call bs_sfx
+            ld hl, .f
+            call an_k32
+            jp an_kend
+.f:         ld a, [an_f]
+            and 8
+            jr nz, .b
+            ld a, 5
+            ld b, $0E
+            call an_tpose
+            xor a
+            jp an_wspr0
+.b:         ld a, 1
+            ld b, $0A
+            call an_tpose
+            ld a, 1
+            jp an_wspr0
+
+; ---- scare (2F/B1B5, 33/A988): stepping forward, frame 8, sprite 1 shaking up and down (set 1,
+; palette $F1), back
+an_scare:   call an_stepf
+            ld a, $F1
+            ld b, 1
+            call an_kset
+            ld a, $0F
+            call bs_sfx
+            ld hl, .f
+            call an_k32
+            call an_kend
+            jp an_stepb
+.f:         ld a, 8
+            ld b, $0E
+            call an_tpose
+            call an_mypos
+            ld a, [an_f]
+            and 2
+            ld a, 1
+            jr z, .y
+            ld a, $FF
+.y:         add e
+            ld e, a
+            ld a, 1
+            ld b, 0
+            jp an_spr
+
+; ---- build up (2F/B1D8, 33/AB27): stepping forward, frame 8 with sprites $3C.. (four, $40.. every
+; other 4 frames; set 2, palette $BB); overloaded ($7E93): frame 4 with $44-$47 flying out 8 frames
+an_bup:     call an_stepf
+            ld a, $BB
+            ld b, 2
+            call an_kset
+            ld a, $21
+            call bs_sfx
+            ld hl, .f
+            call an_k32
+            ld a, [$DE93]
+            and a
+            jr z, .x
+            ld a, $30
+            call bs_sfx
+            xor a
+            ld [an_f], a
+.o:         ld a, 4
+            ld b, $0F
+            call an_tpose
+            ld a, [an_f]                    ; (-f, -f) (f, -f) (-f, f) (f, f): x the other way if
+            ld c, a                         ;   confused
+            cpl
+            inc a
+            ld b, a
+            ld d, b
+            ld e, b
+            ld a, $44
+            call .s
+            ld d, c
+            ld e, b
+            ld a, $45
+            call .s
+            ld d, b
+            ld e, c
+            ld a, $46
+            call .s
+            ld d, c
+            ld e, c
+            ld a, $47
+            call .s
+            call an_frame
+            ld a, [an_f]
+            cp 8
+            jr nz, .o
+.x:         call an_kend
+            jp an_stepb
+.s:         push bc
+            push af
+            ld a, [an_c]                    ; (33/ABE5: confused)
+            add a
+            ld hl, $D8BB
+            call an_hla
+            ld a, [hl]
+            and 8
+            jr z, .s2
+            ld a, d
+            cpl
+            ld d, a
+.s2:        ld a, d
+            ld [an_ox], a
+            ld a, e
+            ld [an_oy], a
+            call an_mypos
+            ld a, [an_ox]
+            add d
+            ld d, a
+            ld a, [an_oy]
+            add e
+            ld e, a
+            pop af
+            ld b, 0
+            call an_spr
+            pop bc
+            ret
+.f:         ld a, 8
+            ld b, $0E
+            call an_tpose
+            ld a, [an_f]
+            and 4
+            add $3C
+            ld [an_k4], a
+            call an_wspr0
+            ld b, 3
+.f3:        push bc
+            ld hl, an_k4
+            inc [hl]
+            ld a, [hl]
+            call an_wspr0
+            pop bc
+            dec b
+            jr nz, .f3
+            ret
+
+; stepping forward / back (2F/B38E / B25B; our party steps in one go)
+an_stepf:   ld a, [an_c]
+            ld [bs_act], a
+            jp xb_party
+an_stepb:   ld a, $FF
+            ld [bs_act], a
+            jp xb_party
+
+; ---- jump 1 (2F/B1CF, 33/AAB8): stepping forward, crouching (frame 3) 16 frames, then up and
+; away (frame 7, 8 up and 2 left a frame) until off the screen; in the air until jump 2
+an_jump1:   call an_stepf
+            call an_cgfx
+            ld a, $44
+            call bs_sfx
+            xor a
+            ld [an_f], a
+.c:         ld a, 3
+            ld [an_cf], a
+            call xb_party
+            call an_frame
+            ld a, [an_f]
+            cp 16
+            jr nz, .c
+            ld a, 7
+            ld [an_cf], a
+.u:         ld a, [an_c]
+            ld hl, an_pyo
+            call an_hla
+            ld a, [hl]
+            sub 8
+            ld [hl], a
+            ld c, a
+            ld a, [an_c]
+            ld hl, an_pxo
+            call an_hla
+            ld a, [hl]
+            sub 2
+            ld [hl], a
+            call xb_party
+            call an_frame
+            ld a, [an_c]
+            ld hl, an_pyo
+            call an_hla
+            ld c, [hl]
+            ld a, [an_c]                    ; until y + 24 <= 0
+            ld b, a
+            add a
+            add b
+            add a
+            add a
+            add a
+            add c
+            add 24
+            jr z, .t
+            bit 7, a
+            jr z, .u
+.t:         ld a, [an_c]                    ; in the air ($7E22)
+            ld hl, $DE22
+            call an_hla
+            ld [hl], 1
+            ld a, $FF
+            ld [an_cf], a
+            ld [bs_act], a
+            jp xb_party
+
+; ---- jump 2 (2F/B1C1, 33/AA15): the dragoon's falling sprite (29/B9C0: six tiles, palette $FD)
+; onto the target and bouncing up, 32 frames, then coming down into place (frame 8, 8 down and 2
+; right a frame)
+an_jump2:   call an_cgfx
+            call an_savepal
+            ld a, $FD
+            call an_gpal3
+            ld hl, $4000 + $39C0
+            ld de, $8000 + 16 * $49
+            ld bc, 6 * 16
+            ld a, B_CGFX
+            call an_vcopy
+            ld a, [an_c]
+            ld hl, $DE22
+            call an_hla
+            ld [hl], 0
+            ld a, [an_c]                    ; (hidden while the sprite falls)
+            ld hl, an_pf
+            call an_hla
+            ld [hl], $FE
+            call xb_party
+            ld a, [$DE99]                   ; the target's centre x - 8, its bottom - 8
+            call an_slot
+            ld [an_t], a
+            call an_tcen
+            ld a, [fl_h]
+            add a
+            add a
+            add e
+            sub 8
+            ld [an_k5], a                   ; ($8F)
+            srl a
+            srl a
+            ld [an_k4], a                   ; ($90)
+            add d
+            sub 8
+            ld [an_kx], a                   ; ($8E)
+            ld a, [an_k4]
+            srl a
+            ld [an_k3], a                   ; ($91 steps)
+            xor a
+            ld [an_ky], a
+.d:         call .one
+            ld a, [an_ky]
+            add 8
+            ld [an_ky], a
+            ld hl, an_k3
+            dec [hl]
+            jr nz, .d
+            ld a, [an_k4]
+            srl a
+            ld [an_k3], a
+            ld a, $36
+            call bs_sfx
+.b:         call .one
+            ld a, [an_ky]
+            sub 8
+            ld [an_ky], a
+            ld hl, an_k3
+            dec [hl]
+            jr nz, .b
+            call an_clr
+            ld b, 32
+.w:         push bc
+            call an_frame
+            pop bc
+            dec b
+            jr nz, .w
+            ld a, [an_c]                    ; coming down from where jump 1 left it
+            ld hl, an_pf
+            call an_hla
+            ld [hl], 8
+.dn:        ld a, [an_c]
+            ld hl, an_pyo
+            call an_hla
+            ld a, [hl]
+            add 8
+            ld [hl], a
+            ld c, a
+            ld a, [an_c]
+            ld hl, an_pxo
+            call an_hla
+            ld a, [hl]
+            add 2
+            ld [hl], a
+            ld a, c                         ; (the last step lands on 0)
+            bit 7, a
+            jr z, .z
+            call xb_party
+            call an_frame
+            jr .dn
+.z:         ld a, [an_c]
+            ld hl, an_pyo
+            call an_hla
+            ld [hl], 0
+            ld hl, an_pxo
+            ld a, [an_c]
+            call an_hla
+            ld [hl], 0
+            ld hl, an_pf
+            ld a, [an_c]
+            call an_hla
+            ld [hl], $FF
+            ld a, $FF
+            ld [an_cf], a
+            call an_restpal
+            jp xb_party
+; the falling sprite (33/AA02, A9D1): a frame, then the 2 x 3 (32/91D7) at (an_kx, an_ky), x - 2
+.one:       call an_frame
+            call an_clr
+            ld hl, fb_spr
+            ld c, $49
+.s:         push hl
+            call an_slot_oam
+            ld d, h
+            ld e, l
+            pop hl
+            jr c, .sx
+            ld a, [an_ky]
+            add [hl]
+            add 17
+            ld [de], a
+            inc de
+            inc hl
+            inc hl
+            inc hl
+            ld a, [an_kx]
+            add [hl]
+            add 8
+            ld [de], a
+            inc de
+            ld a, c
+            ld [de], a
+            inc de
+            ld a, $0B
+            ld [de], a
+            inc hl
+            inc c
+            ld a, c
+            cp $49 + 6
+            jr nz, .s
+.sx:        ld hl, an_kx
+            dec [hl]
+            dec [hl]
+            ret
+
+; ---- running away (33/BC89): the party turning one by one (every 8 frames) 32 frames, then those
+; standing run off to the right (frames 1 / 2 every 4 frames, 2 pixels a frame; a mini 1, frames
+; $0A / $0B; a toad hops, 33/BDE9)
+an_run:     ld a, [$DE9A]
+            bit 7, a
+            ret nz                          ; (monsters running: their removal is the deaths' work)
+            ld a, [$D8D4]
+            and a
+            ret z
+            xor a
+            ld [an_f], a
+.t:         ld a, [an_f]
+            and $18
+            rrca
+            rrca
+            rrca
+            ld c, a                         ; the member turning now
+            ld b, 0
+.tf:        ld a, b                         ; members up to C standing face right
+            add a
+            ld hl, $D8BB
+            call an_hla
+            ld a, [hl]
+            and $C0
+            jr nz, .tn
+            ld a, b
+            ld hl, an_pf
+            call an_hla
+            push bc
+            push hl
+            ld c, b
+            call an_stand
+            pop hl
+            pop bc
+            or $80
+            ld [hl], a
+.tn:        inc b
+            ld a, b
+            dec a
+            cp c
+            jr nz, .tf
+.t2:        call xb_party
+            call an_frame
+            ld a, [an_f]
+            cp 32
+            jr nz, .t
+            ld a, $33
+            call bs_sfx
+            xor a
+            ld [an_k3], a
+.r:         ld c, 0
+.m:         push bc
+            ld a, c
+            add a
+            ld hl, $D8BB
+            call an_hla
+            ld a, [hl]
+            ld d, a
+            and $C0
+            jr nz, .n
+            ld a, d
+            and 5
+            ld e, 2                         ; speed
+            ld a, [an_k3]
+            and 4
+            rrca
+            rrca
+            inc a                           ; frame 1 / 2
+            bit 2, d
+            jr nz, .toad
+            bit 0, d
+            jr z, .st
+            add 9                           ; mini: $0A / $0B, 1 a frame
+            ld e, 1
+            jr .st
+.toad:      ld a, [an_k3]                   ; toad: hops (33/BDE9 / BDF1)
+            and 7
+            ld hl, td_dy
+            call an_hla
+            ld a, [hl]
+            push af
+            ld a, c
+            ld hl, an_pyo
+            call an_hla
+            pop af
+            add [hl]
+            ld [hl], a
+            ld a, [an_k3]
+            and 7
+            ld hl, td_f
+            call an_hla
+            ld a, [hl]
+.st:        or $80
+            push af
+            ld a, c
+            ld hl, an_pf
+            call an_hla
+            pop af
+            ld [hl], a
+            ld a, c
+            ld hl, an_pxo
+            call an_hla
+            ld a, [hl]
+            add e
+            ld [hl], a
+            cp 24                           ; off the screen: no longer drawn
+            jr c, .n
+            ld a, c
+            ld hl, an_pf
+            call an_hla
+            ld [hl], $FE
+.n:         pop bc
+            inc c
+            ld a, c
+            cp 4
+            jr nz, .m
+            call xb_party
+            call an_frame
+            ld hl, an_k3
+            inc [hl]
+            ld a, [hl]
+            cp 16
+            jr nz, .r
+            ret
+; member C's standing frame by its status (FF3's $7D83): 2, a toad / mini $0B
+an_stand:   ld a, c
+            add a
+            ld hl, $D8BB
+            call an_hla
+            ld a, [hl]
+            and 5
+            ld a, 2
+            ret z
+            ld a, $0B
+            ret
+td_dy:      db $FF, $FD, $FD, $FF, $00, $02, $02, $04
+td_f:       db $0A, $0A, $0A, $0A, $0A, $0A, $0B, $0B
+
+; ---- ineffective (34/8555): a member casts nothing (the pose 32 frames); a monster flashes (done)
+an_inef:    ld a, [$DE9A]
+            bit 7, a
+            ret nz
+            ld a, 1
+            ld [BZ + $CC], a
+            xor a
+            ld [$DE9B], a
+            ld [$DE88], a
+            ld [$DE9D], a
+            call an_magic
+            xor a
+            ld [BZ + $CC], a
+            ret
+
 ; the final boss's wave (10/8BD5) for Flare Wave: see an_boss (not yet)
 an_fwave:   ret
 ; the spell $7E88's graphics properties (33/AF6F: 2E/91D0)
@@ -2910,6 +3498,10 @@ an_lskip:   ds 1
 an_pfl:     ds 1
 an_pc:      ds 2
 an_pdx:     ds 1
+an_kk:      ds 1
+an_pxo:     ds 4
+an_pyo:     ds 4
+an_pf:      ds 4
 an_ri:      ds 1
 an_fx:      ds 1
 an_kx:      ds 1

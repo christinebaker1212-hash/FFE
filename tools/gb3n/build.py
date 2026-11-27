@@ -511,7 +511,7 @@ ev_fxtest:  call ev_shake
             extra += '            ld a, %s\n            ld [$DE9D], a\n' % os.environ['GB3N_ANTYPE']
         if os.environ.get('GB3N_ANTGT') == 'char':   # (shown on member 0)
             extra += '            ld a, [$DE9A]\n            and $BF\n            ld [$DE9A], a\n            ld a, $80\n            ld [$DE9B], a\n            ld [$DE99], a\n'
-        src = src.replace('an_kind:    ld a, [$DEC2]', 'an_kind:    ld a, %s\n            ld [$DE88], a\n            ld a, [$DEC2]\n            cp 4\n            jr nz, .ak\n%s            ld a, 1\n            ret\n.ak:        ld a, [$DEC2]' % (os.environ['GB3N_ANTEST'], extra))
+        src = src.replace('an_kind:    ld a, [$DEC2]', 'an_kind:    ld a, %s\n            ld [$DE88], a\n            ld a, [$DEC2]\n            cp 4\n            jr nz, .ak\n%s            ld a, %s\n            ret\n.ak:        ld a, [$DEC2]' % (os.environ['GB3N_ANTEST'], extra, os.environ.get('GB3N_ANKIND', '1')))
     if os.environ.get('GB3N_TEST'):              # test builds: tools/gb3n/test (never a release)
         src = src.replace('.nw:        call map_enter', '.nw:        jp test_loop')
         src += open(os.path.join(HERE, 'src', 'test.s')).read() + '\n'

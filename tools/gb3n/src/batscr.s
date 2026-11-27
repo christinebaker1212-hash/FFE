@@ -256,7 +256,17 @@ bs_gfx:     xor a
             ld [an_pdx], a                  ; (A = 0)
             ld [an_bgm], a
             ld [an_pfl], a
+            ld hl, an_pxo                   ; (no member offsets / frames of their own)
+            ld b, 8
+.po:        ld [hl+], a
+            dec b
+            jr nz, .po
+            ld hl, an_pf
+            ld b, 4
             ld a, $FF
+.pf:        ld [hl+], a
+            dec b
+            jr nz, .pf
             ld [an_cf], a
             ld [an_hc], a
             ld hl, bs_gt
@@ -745,7 +755,21 @@ bs_party:   ld hl, oam_buf
             jr nz, .nf
             ld a, [an_cf]
             ld [bs_tmp + 6], a
-.nf:
+.nf:        ld a, c                         ; (a member's own frame / offsets in an animation;
+            ld hl, an_pf                    ;   $FE: not shown; in the air after Jump)
+            call bs_hl_a
+            ld a, [hl]
+            cp $FF
+            jr z, .nf2
+            cp $FE
+            jp z, .skip
+            ld [bs_tmp + 6], a
+.nf2:       ld a, c
+            ld hl, $DE22
+            call bs_hl_a
+            ld a, [hl]
+            and a
+            jp nz, .skip
             push bc
             ld a, c                         ; y = 24 i, x = 144 (136 stepping forward)
             add a
@@ -769,10 +793,22 @@ bs_party:   ld hl, oam_buf
 .x2:        ld a, [an_pdx]                  ; (the party shaken)
             add d
             ld d, a
+            ld a, c
+            ld hl, an_pxo
+            call bs_hl_a
+            ld a, [hl]
+            add d
+            ld d, a
+            ld a, c
+            ld hl, an_pyo
+            call bs_hl_a
+            ld a, [hl]
+            add e
+            ld e, a
             ld a, [bs_tmp + 6]
             call bs_cdraw
             pop bc
-            inc c
+.skip:      inc c
             ld a, c
             cp 4
             jr nz, .m

@@ -1681,8 +1681,22 @@ bsc_anim:   ld a, [$D8D6]
             jr .m
 .ch:        call ui_kind                    ; a character's fight on a monster: its swings
             cp 1                            ;   (34/8613, battle graphics $12); magic: its
-            jp z, xa_magic                  ;   casting (34/8577, $1D)
-            and a
+            jp z, xa_magic                  ;   casting (34/8577, $1D); the others (34/843E)
+            cp 6
+            jr c, .k0
+            cp $11
+            jr nc, .k0
+            cp $0C                          ; (cannon: the airship's, not yet; $0E / $0F: the
+            jr z, .st                       ;   deaths' and numbers' own commands)
+            cp $0E
+            jr nc, .k1
+.kg:        ld [an_kk], a
+            ld hl, an_kinds
+            jp xa_go
+.k1:        cp $10
+            jr z, .kg
+            jr .st
+.k0:        and a
             jr nz, .st
             ld a, [$DE9A]
             bit 6, a
