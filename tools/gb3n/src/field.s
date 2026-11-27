@@ -2,77 +2,240 @@
 ; Written from FF3's field code as the listing describes it ($3E $CDA3 init player movement,
 ; $3F $E5EB update player movement, $3E $C65D check destination tile, $3E $D8D3 player sprite).
 ;
-; A map's data bank (made by tools/gb3n/build.py from the user's ROM):
-;   $4000 the 256 BG tiles (Game Boy format)       $5000 metatile corner tiles UL, UR, DL, DR
-;   $5200 metatile palette (CGB attribute byte)     $5300 the four BG palettes (RGB555)
-;   $5400 the 32 x 32 metatile map (decompressed)   $5800 start x, y; $5802 fill metatile;
-;   $5880 tile properties 1, $5900 2 (128 each)
-;   $5A00 the walking character's 16 tiles          $5B00 its two sprite palettes (RGB555)
-;   $5B10 FF3's player sprite poses (64: 4 directions x 2 frames x 4 tiles + attributes)
+; Data banks (tools/gb3n/build.py, all from the user's ROM):
+;   B_MAPINFO $4000 map properties (512 x 16)       $6000 tilesets (7 x 1 KB: UL, UR, DL, DR,
+;             palette, property 1, property 2; 128 each)     $7C00 trigger base tiles (128)
+;             $7C80 trigger type per tile $60-$7F    $7CA0 first metatile per tile $60-$7F
+;             $7CC0 window palette (NES)             $7D00 NES colour -> RGB555 (64 x 2)
+;   B_MAPAUX  $4000 general palettes (3 x 256)      $4300 tilemap id per map (512)
+;             $4500 graphics subset per map (512)    $4700 map sprite palettes (32)
+;             $4720 map character palettes (26 x 4)  $4800 tilemap streams (bank, addr) x 256
+;             $4B00 graphics subsets (bank, addr)    $4C00 exit x (64), $4C40 exit y (64)
+;             $4D00 the player sprite poses (64)
+;   B_EVENTS  NES bank $10 (entrances, treasures, triggers): NES $A000-$BFFF -> $4000-$5FFF
+;   B_CHARS   map character graphics, 64 sets of 16 tiles (Game Boy format)
+;   B_COMMON  the menu window / text tiles (144, loaded at BG tile $70)
+;
+; Work RAM: the map ($C400, 32 x 32) and the metatile tables for metatiles 0-255 ($C800 UL,
+; $C900 UR, $CA00 DL, $CB00 DR, $CC00 palette, $CD00 property 1, $CE00 property 2): trigger
+; tiles get metatiles $80-$FF at load, as FF3 does ($3A $91C8 init trigger).
 
-M_TILES    = $4000
-M_QUAD     = $5000
-M_ATTR     = $5200
-M_PALS     = $5300
-M_MAP      = $5400
-M_START    = $5800
-M_FILL     = $5802
-M_PROP1    = $5880
-M_PROP2    = $5900
-M_PCHR     = $5A00
-M_PPAL     = $5B00
-M_POSE     = $5B10
+W_MAP      = $C400
+W_UL       = $C8
+W_UR       = $C9
+W_DL       = $CA
+W_DR       = $CB
+W_ATTR     = $CC
+W_PROP1    = $CD
+W_PROP2    = $CE
+I_PROPS    = $4000
+I_TSETS    = $6000
+I_TBASE    = $7C00
+I_TTYPE    = $7C80
+I_TFIRST   = $7CA0
+I_WINPAL   = $7CC0
+I_RGB      = $7D00
+A_GPAL     = $4000
+A_TMID     = $4300
+A_GSUB     = $4500
+A_SPAL     = $4700
+A_CPAL     = $4720
+A_TMAPS    = $4800
+A_SUBS     = $4B00
+A_EXITX    = $4C00
+A_EXITY    = $4C40
+A_POSE     = $4D00
 VIEW_X     = 4              ; the party's metatile column / row on screen (10 x 9 visible)
 VIEW_Y     = 4
 DIR_R      = 1              ; facing (FF3's ----udlr)
 DIR_L      = 2
 DIR_D      = 4
 DIR_U      = 8
+TR_PREV    = $40            ; pending triggers (FF3's $AB)
+TR_ENTER   = $80
+TR_WORLD   = $C0
+MAP_DEPTH  = 8              ; entrances within entrances (FF3 recurses on its stack)
 
 section bank 0, $2800
-; ---- start on map bank A: draw it whole (LCD off), the party at its start position
-map_enter:  ld [map_bank], a
+sbank:      ldh [rombank], a
             ld [MBC5_BANKL], a
-            ld a, $80                       ; BG palettes 0-3
-            ldh [rBCPS], a
-            ld hl, M_PALS
-            ld b, 32
-.pl:        ld a, [hl+]
-            ldh [rBCPD], a
-            dec b
-            jr nz, .pl
-            ld a, $80                       ; OBJ palettes 0-1: the walking character
-            ldh [rOCPS], a
-            ld hl, M_PPAL
-            ld b, 16
-.po:        ld a, [hl+]
-            ldh [rOCPD], a
-            dec b
-            jr nz, .po
-            xor a
-            ldh [rVBK], a
-            ld hl, M_TILES                  ; BG tiles at $8000 (tiles 0-255)
-            ld de, $8000
-            ld bc, $1000
+            ret
+
+; ---- load map `map_id` of `world` (LCD off) and show it: FF3's load map ($3F $E7EC: map
+; properties, tileset, tilemap, triggers, palettes, graphics); the party at (enter_x, enter_y),
+; or at the map's start position when enter_x = $FF
+map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if world != 0
+            call sbank
+            ld a, [map_id]
+            ld l, a
+            ld a, [world]
+            and a
+            ld h, 0
+            jr z, .p0
+            inc h
+.p0:        add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, h
+            add high(I_PROPS)
+            ld h, a
+            ld de, map_props
+            ld bc, 16
             call memcpy
-            ld a, 1                         ; the walking character's tiles: VRAM bank 1 $8000
-            ldh [rVBK], a                   ;   (sprite tiles 0-15, bank 1)
-            ld hl, M_PCHR
+            ld a, [map_props]               ; tileset (top 3 bits): 7 pages of 128 into the
+            swap a                          ;   metatile tables 0-127
+            rra
+            and 7
+            add a
+            add a
+            add high(I_TSETS)
+            ld h, a
+            ld l, 0
+            ld d, W_UL
+            ld c, 7
+.ts:        push bc
+            ld e, 0
+            ld bc, 128
+            call memcpy
+            inc d
+            pop bc
+            dec c
+            jr nz, .ts
+            ld c, 0                         ; metatiles $80-$FF copy their base tile ($3A $92D9)
+.tb:        ld h, high(I_TBASE)
+            ld a, c
+            ld l, a
+            ld b, [hl]                      ; B = base tile
+            ld d, W_UL
+.tp:        ld h, d
+            ld l, b
+            ld a, [hl]
+            ld l, c
+            set 7, l
+            ld [hl], a
+            inc d
+            ld a, d
+            cp W_PROP2 + 1
+            jr nz, .tp
+            inc c
+            bit 7, c
+            jr z, .tb
+            ld a, B_MAPAUX                  ; tilemap and graphics subset: index map + 256 if
+            call sbank                      ;   world >= 2
+            ld a, [map_id]
+            ld l, a
+            ld h, 0
+            ld a, [world]
+            cp 2
+            jr c, .t0
+            inc h
+.t0:        push hl
+            ld de, A_TMID
+            add hl, de
+            ld a, [hl]                      ; tilemap id -> (bank, address)
+            ld l, a
+            ld h, 0
+            ld e, l
+            ld d, h
+            add hl, hl
+            add hl, de
+            ld de, A_TMAPS
+            add hl, de
+            ld a, [hl+]
+            ld [tm_src], a
+            ld a, [hl+]
+            ld [tm_src + 1], a
+            ld a, [hl]
+            ld [tm_src + 2], a
+            pop hl
+            ld de, A_GSUB
+            add hl, de
+            ld a, [hl]                      ; graphics subset -> (bank, address)
+            ld l, a
+            ld h, 0
+            ld e, l
+            ld d, h
+            add hl, hl
+            add hl, de
+            ld de, A_SUBS
+            add hl, de
+            ld a, [hl+]
+            ld [gs_src], a
+            ld a, [hl+]
+            ld [gs_src + 1], a
+            ld a, [hl]
+            ld [gs_src + 2], a
+            call pal_gather                 ; NES colours of the 4 BG + 2 sprite palettes
+            call map_lists                  ; entrances, treasures, triggers (bank B_EVENTS)
+            call map_unpack                 ; the tilemap into W_MAP
+            call map_triggers               ; trigger tiles -> metatiles $80-$FF
+            call pal_load                   ; Color palettes (LCD off)
+            xor a                           ; BG tiles: the subset at $00, the menu tiles at $70
+            ldh [rVBK], a
+            ld a, [gs_src]
+            call sbank
+            ld a, [gs_src + 1]
+            ld l, a
+            ld a, [gs_src + 2]
+            ld h, a
+            ld de, $8000
+            ld bc, 112 * 16
+            call memcpy
+            ld a, B_COMMON
+            call sbank
+            ld hl, $4000
+            ld de, $8700
+            ld bc, 144 * 16
+            call memcpy
+            ld a, B_CHARS                   ; the walking character's tiles: VRAM bank 1 $8000
+            call sbank
+            ld a, [char_set]
+            ld h, a
+            ld l, 0
+            ld a, h
+            and $3F
+            add $40
+            ld h, a
+            ld a, 1
+            ldh [rVBK], a
             ld de, $8000
             ld bc, $100
             call memcpy
             xor a
             ldh [rVBK], a
-            ld a, [M_START]
+            ld a, B_MAPAUX                  ; FF3's player poses
+            call sbank
+            ld hl, A_POSE
+            ld de, poses
+            ld bc, 64
+            call memcpy
+            ld a, [enter_x]                 ; the position
+            cp $FF
+            jr nz, .pos
+            ld a, [map_props]
+            and 31
             ld [pos_x], a
-            ld a, [M_START + 1]
+            ld a, [map_props + 1]
+            and 31
             ld [pos_y], a
-            ld a, DIR_D
+            ld a, DIR_D                     ; (FF3 $3F $E85D: facing down at a map's start)
             ld [facing], a
-            xor a
+            jr .pd
+.pos:       ld [pos_x], a
+            ld a, [enter_y]
+            ld [pos_y], a
+.pd:        xor a
             ld [step], a
             ld [line_n], a
-            call cam_set
+            ld [z_lev], a
+            ld [trig], a
+            ld a, [facing]
+            and a
+            jr nz, .fc
+            ld a, DIR_D
+            ld [facing], a
+.fc:        call cam_set
             ld c, 0                         ; the 16 rows of the ring, a row at a time
 .row:       push bc
             ld a, [cam_y]
@@ -88,7 +251,232 @@ map_enter:  ld [map_bank], a
             cp 16
             jr nz, .row
             call scroll_set
-            call party_oam
+            jp party_oam
+
+; entrance / treasure / trigger lists (16 bytes each) from bank B_EVENTS ($3A $9350-$93C0):
+; entrances at properties bytes 12-13, treasures and triggers through the pointer tables at
+; NES $A000 / $A200 by properties bytes 14 / 15
+map_lists:  ld a, B_EVENTS
+            call sbank
+            ld a, [map_props + 12]
+            ld l, a
+            ld a, [map_props + 13]
+            call ev_addr
+            ld de, ents
+            ld bc, 16
+            call memcpy
+            ld a, [map_props + 14]
+            ld hl, $4000
+            call ev_table
+            ld de, treas
+            ld bc, 16
+            call memcpy
+            ld a, [map_props + 15]
+            ld hl, $4200
+            call ev_table
+            ld de, trigs
+            ld bc, 16
+            jp memcpy
+ev_table:   ld e, a                         ; HL = table, A = index: HL = its pointer's address
+            ld d, 0
+            add hl, de
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, h
+ev_addr:    and $1F                         ; NES pointer (L, A) -> $4000 + (ptr & $1FFF)
+            add $40
+            ld h, a
+            ret
+
+; the tilemap's RLE stream into W_MAP ($3E $CBFA: a byte < $80 is a metatile; $80 | v and a
+; run length follow, 0 meaning 256)
+map_unpack: ld a, [tm_src]
+            call sbank
+            ld a, [tm_src + 1]
+            ld l, a
+            ld a, [tm_src + 2]
+            ld h, a
+            ld de, W_MAP
+.n:         ld a, d
+            cp high(W_MAP) + 4
+            ret nc
+            ld a, [hl+]
+            bit 7, a
+            jr nz, .run
+            ld [de], a
+            inc de
+            jr .n
+.run:       and $7F
+            ld c, a
+            ld b, [hl]
+            inc hl
+.r:         ld a, c
+            ld [de], a
+            inc de
+            ld a, d
+            cp high(W_MAP) + 4
+            ret nc
+            dec b
+            jr nz, .r
+            jr .n
+
+; trigger tiles ($60-$63, $70-$7C) become metatiles $80-$FF ($3A $91A0 / $91C8): each gets
+; first[tile] + its count for that tile; property 2 gets the trigger's number within its type
+map_triggers:
+            ld hl, trig_cnt
+            ld b, 40
+            xor a
+.cl:        ld [hl+], a
+            dec b
+            jr nz, .cl
+            ld a, B_MAPINFO
+            call sbank
+            ld hl, W_MAP
+.c:         ld a, [hl]
+            sub $60
+            jr c, .nx
+            cp 4
+            jr c, .tr
+            cp $10
+            jr c, .nx
+            cp $1D
+            jr nc, .nx
+.tr:        push hl
+            ld e, a                         ; E = tile - $60
+            ld d, 0
+            ld hl, trig_cnt
+            add hl, de
+            ld a, [hl]                      ; this tile's count
+            inc [hl]
+            ld b, a
+            ld hl, I_TTYPE
+            add hl, de
+            ld a, [hl]                      ; type
+            ld hl, type_cnt
+            add a, l
+            ld l, a
+            ld a, [hl]                      ; the trigger's number in its type
+            inc [hl]
+            ld c, a
+            ld hl, I_TFIRST
+            add hl, de
+            ld a, [hl]
+            add b                           ; the new metatile
+            ld b, a
+            ld a, e                         ; (treasure chests: opened ones show $7D; the
+            cp $1C                          ;   switches come with the game state: later)
+            ld a, b
+            jr z, .st
+            ld h, W_PROP2
+            ld l, a
+            ld a, [hl]
+            or c
+            ld [hl], a
+            ld a, l
+.st:        pop hl
+            ld [hl], a
+.nx:        inc hl
+            ld a, h
+            cp high(W_MAP) + 4
+            jr nz, .c
+            ret
+
+; the NES colours of BG palettes 0-3 and sprite palettes 0-1 into nes_pal ($3A $9091): BG
+; 0-2 colours 1-3 from the general palettes by properties bytes 5-7, colour 0 black; BG 3 the
+; window; sprites from the map sprite palettes with the walking character's colours 2-3
+pal_gather: ld a, B_MAPAUX
+            call sbank
+            ld de, nes_pal
+            ld hl, map_props + 5
+            ld c, 3
+.p:         ld a, $0F
+            ld [de], a
+            inc de
+            ld a, [hl+]
+            push hl
+            ld l, a
+            ld h, high(A_GPAL)
+            ld a, [hl]
+            ld [de], a
+            inc de
+            inc h
+            ld a, [hl]
+            ld [de], a
+            inc de
+            inc h
+            ld a, [hl]
+            ld [de], a
+            inc de
+            pop hl
+            dec c
+            jr nz, .p
+            ld a, [world]                   ; sprite palettes: 00/9670 + (world & 4) * 4
+            and 4
+            add a
+            add a
+            add low(A_SPAL)
+            ld l, a
+            ld h, high(A_SPAL)
+            ld de, nes_pal + 16
+            ld bc, 8
+            call memcpy
+            ld a, [char_pal]                ; colours 2-3 of each from the character palette
+            add a
+            add a
+            add low(A_CPAL)
+            ld l, a
+            ld a, high(A_CPAL)
+            adc 0
+            ld h, a
+            ld a, [hl+]
+            ld [nes_pal + 18], a
+            ld a, [hl+]
+            ld [nes_pal + 19], a
+            ld a, [hl+]
+            ld [nes_pal + 22], a
+            ld a, [hl]
+            ld [nes_pal + 23], a
+            ld a, B_MAPINFO
+            call sbank
+            ld hl, I_WINPAL
+            ld de, nes_pal + 12
+            ld bc, 4
+            jp memcpy
+
+; nes_pal -> the Color's BG palettes 0-3 and OBJ palettes 0-1 (LCD off or in V-Blank)
+pal_load:   ld a, B_MAPINFO
+            call sbank
+            ld a, $80
+            ldh [rBCPS], a
+            ld hl, nes_pal
+            ld b, 16
+.b:         call .one
+            ldh [rBCPD], a
+            ld a, d
+            ldh [rBCPD], a
+            dec b
+            jr nz, .b
+            ld a, $80
+            ldh [rOCPS], a
+            ld b, 8
+.o:         call .one
+            ldh [rOCPD], a
+            ld a, d
+            ldh [rOCPD], a
+            dec b
+            jr nz, .o
+            ret
+.one:       ld a, [hl+]                     ; A = low, D = high byte of colour [HL]
+            and $3F
+            add a
+            push hl
+            ld l, a
+            ld h, high(I_RGB)
+            ld a, [hl+]
+            ld d, [hl]
+            pop hl
             ret
 
 ; ---- one field frame (after the frame wait): V-Blank work, then the walking
@@ -101,6 +489,9 @@ field_vbl:  ld a, [line_n]                  ; a pending row / column into the ri
 field_step: ld a, [step]
             and a
             jr nz, .walk
+            ld a, [trig]                    ; a trigger stepped on: act now ($3F $E217)
+            and a
+            jp nz, trig_run
             ldh a, [pad]                    ; a direction held: FF3's order right, left, down, up
             ld b, DIR_R
             bit 4, a
@@ -136,36 +527,67 @@ field_step: ld a, [step]
             ld a, e
             ld [pos_y], a
             call cam_set
+            ld a, [trig_next]               ; the step's trigger is due
+            ld [trig], a
 .done:      jp party_oam
 
-; can the party step onto metatile A? carry set if not ($3F $E396 check tile passability):
-; property 1 bit 7 a trigger tile (passable; exits / events: next step), the low three bits
-; 0 stairs (both levels, z cleared), 4+ a bridge, 3 impassable, 1 / 2 a level: impassable
-; when it and the current level z make 3, else z becomes it
-passable:   ld c, a
-            ld b, high(M_PROP1)
-            ld a, [bc]
-            bit 7, a
-            jr nz, .ok
-            and 7
-            jr z, .st
-            cp 4
-            jr nc, .ok
-            cp 3
-            jr z, .no
-            ld b, a
-            ld a, [z_lev]
-            or b
-            cp 3
-            jr z, .no
-            ld [z_lev], a
-.ok:        and a
-            ret
-.st:        xor a
-            ld [z_lev], a
-            ret
-.no:        scf
-            ret
+; a trigger after the step ($3F $E26A): entrance (to the map in the entrance list), back to the
+; previous map, or out to the world map (the world map: later; for now back as from an exit)
+trig_run:   ld b, a
+            xor a
+            ld [trig], a
+            ld a, b
+            cp TR_ENTER
+            jr z, .ent
+            ld a, [map_sp]                  ; to the previous map (or the world: none yet)
+            and a
+            ret z
+            dec a
+            ld [map_sp], a
+            ld l, a
+            add a
+            add l
+            add low(map_stack)
+            ld l, a
+            ld h, high(map_stack)
+            ld a, [hl+]
+            ld [map_id], a
+            ld a, [hl+]
+            ld [enter_x], a
+            ld a, [hl]
+            ld [enter_y], a
+            jr .go
+.ent:       ld a, [map_sp]                  ; push where we stand, enter the new map
+            cp MAP_DEPTH
+            ret nc
+            ld l, a
+            inc a
+            ld [map_sp], a
+            ld a, l
+            add a
+            add l
+            add low(map_stack)
+            ld l, a
+            ld h, high(map_stack)
+            ld a, [map_id]
+            ld [hl+], a
+            ld a, [pos_x]
+            ld [hl+], a
+            ld a, [pos_y]
+            ld [hl], a
+            ld a, [trig_id]
+            and 15
+            ld l, a
+            ld h, 0
+            ld de, ents
+            add hl, de
+            ld a, [hl]
+            ld [map_id], a
+            ld a, $FF
+            ld [enter_x], a
+.go:        call lcd_off
+            call map_enter
+            jp lcd_on
 
 ; D, E = the cell ahead of the party (coordinates wrap at 64, as FF3's AND $3F)
 dest_cell:  ld a, [pos_x]
@@ -192,6 +614,66 @@ dest_cell:  ld a, [pos_x]
             ld a, e
             and 63
             ld e, a
+            ret
+
+; can the party step onto metatile A? carry set if not ($3F $E396 check tile passability).
+; Property 1 bit 7: a trigger, by property 2's high nibble ($3F $E669): 0 previous map,
+; 1 world map, 4 entrance, 5 door, 6 locked door (no key: blocked), C-E impassable, F event
+; (scripts: later), others as a plain tile. Plain tiles: the low three bits 0 stairs (z
+; cleared), 4+ a bridge, 3 impassable, 1 / 2 a level: impassable when it and the current level
+; z make 3, else z becomes it.
+passable:   ld c, a
+            xor a
+            ld [trig_next], a
+            ld b, W_PROP1
+            ld a, [bc]
+            bit 7, a
+            jr z, .plain
+            inc b
+            ld a, [bc]                      ; property 2: type, id
+            ld [trig_id], a
+            swap a
+            and 15
+            jr z, .prev
+            dec a
+            jr z, .world
+            cp 3
+            jr z, .ent
+            cp 4
+            jr z, .ent
+            cp 5
+            jr z, .no
+            cp 11
+            jr nc, .no
+            dec b
+            ld a, [bc]
+            jr .plain
+.prev:      ld a, TR_PREV
+            jr .tok
+.world:     ld a, TR_WORLD
+            jr .tok
+.ent:       ld a, TR_ENTER
+.tok:       ld [trig_next], a
+            and a
+            ret
+.plain:     and 7
+            jr z, .st
+            cp 4
+            jr nc, .ok
+            cp 3
+            jr z, .no
+            ld b, a
+            ld a, [z_lev]
+            or b
+            cp 3
+            jr z, .no
+            ld [z_lev], a
+.ok:        and a
+            ret
+.st:        xor a
+            ld [z_lev], a
+            ret
+.no:        scf
             ret
 
 cam_set:    ld a, [pos_x]
@@ -278,11 +760,9 @@ line_go:    ld [line_dir], a
             ld hl, line_buf
             ld b, 16
 .c:         push bc
-            push de
             push hl
             call map_mt
             pop hl
-            pop de
             push de
             call cell_buf
             pop de
@@ -304,7 +784,7 @@ map_mt:     ld a, d
             or e
             and $20
             jr z, .in
-            ld a, [M_FILL]
+            ld a, [map_props + 3]
             ret
 .in:        ld a, e
             and 31
@@ -320,15 +800,13 @@ map_mt:     ld a, d
             add l
             ld l, a
             ld a, h
-            adc high(M_MAP)
+            adc high(W_MAP)
             ld h, a
             ld a, [hl]
-            and $7F
             ret
 
 ; metatile A at map (D, E) -> 7 bytes at HL: BG map address (lo, hi), UL, UR, DL, DR, palette
-cell_buf:   and $7F
-            ld c, a
+cell_buf:   ld c, a
             push hl
             ld a, e                         ; $9800 + 64 * (y & 15) + 2 * (x & 15)
             and 15
@@ -353,29 +831,19 @@ cell_buf:   and $7F
             ld [hl+], a
             ld a, d
             ld [hl+], a
-            ld b, high(M_QUAD)
-            ld a, [bc]
-            ld [hl+], a
-            ld a, c
-            add $80
-            ld c, a
+            ld b, W_UL
             ld a, [bc]
             ld [hl+], a
             inc b
-            ld a, c
-            sub $80
-            ld c, a
             ld a, [bc]
             ld [hl+], a
-            ld a, c
-            add $80
-            ld c, a
+            inc b
             ld a, [bc]
             ld [hl+], a
-            ld a, c
-            sub $80
-            ld c, a
-            ld b, high(M_ATTR)
+            inc b
+            ld a, [bc]
+            ld [hl+], a
+            inc b
             ld a, [bc]
             ld [hl+], a
             ret
@@ -424,7 +892,7 @@ line_flush: ld hl, line_buf
             ld [line_n], a
             ret
 
-; the walking character into OAM entries 0-3 (FF3: x $70 on the NES; here the party's cell)
+; the walking character into OAM entries 0-3
 party_oam:  ld a, [step]                    ; the pose: facing, and the second frame from
             and a                           ;   pixel 8 of a step (FF3: fine scroll & 8)
             jr z, .f0
@@ -444,9 +912,9 @@ party_oam:  ld a, [step]                    ; the pose: facing, and the second f
             ld c, $20
 .p:         ld a, c
             or b
-            add low(M_POSE)
+            add low(poses)
             ld l, a
-            ld a, high(M_POSE)
+            ld a, high(poses)
             adc 0
             ld h, a
             ld d, VIEW_X * 16 + 8           ; D = x, E = y (OAM: +8 / +16)
@@ -476,7 +944,6 @@ party_oam:  ld a, [step]                    ; the pose: facing, and the second f
             ld a, e
             add 8
             ld e, a
-            jp .spr                         ; DR
 .spr:       ld a, e                         ; one 8 x 8 part: y, x, tile, attributes
             ld [bc], a
             inc c
@@ -487,29 +954,38 @@ party_oam:  ld a, [step]                    ; the pose: facing, and the second f
             ld [bc], a
             inc c
             ld a, [hl+]                     ; NES attributes -> Color: palette (bits 0-1),
-            push af                         ;   flip H ($40 -> $20), behind BG ($20 -> $80),
-            and 3                           ;   tiles in VRAM bank 1
+            push de                         ;   flip H ($40 -> $20), behind BG ($20 -> $80),
+            ld d, a                         ;   tiles in VRAM bank 1
+            and 3
             or $08
-            ld [tmp], a
-            pop af
-            push af
+            ld e, a
+            ld a, d
             and $40
             rra
-            push hl
-            ld hl, tmp
-            or [hl]
-            ld [hl], a
-            pop hl
-            pop af
+            or e
+            ld e, a
+            ld a, d
             and $20
             add a
             add a
-            push hl
-            ld hl, tmp
-            or [hl]
-            pop hl
+            or e
+            pop de
             ld [bc], a
             inc c
+            ret
+
+; the LCD off in V-Blank (Lot Check) / back on
+lcd_off:    ldh a, [rLCDC]
+            bit 7, a
+            ret z
+.w:         ldh a, [rLY]
+            cp 144
+            jr c, .w
+            xor a
+            ldh [rLCDC], a
+            ret
+lcd_on:     ld a, LCDC_ON
+            ldh [rLCDC], a
             ret
 
 dma_rom:    ld a, high(oam_buf)
@@ -523,7 +999,10 @@ dma_end:
 section wram, $C000
 oam_buf:    ds 160
 section wram, $C100
-map_bank:   ds 1
+map_id:     ds 1
+world:      ds 1
+enter_x:    ds 1
+enter_y:    ds 1
 pos_x:      ds 1
 pos_y:      ds 1
 cam_x:      ds 1
@@ -532,6 +1011,23 @@ facing:     ds 1
 step:       ds 1                            ; 0 standing, 1-16 walking (pixels + 1)
 line_n:     ds 1                            ; cells pending in line_buf
 line_dir:   ds 1
-tmp:        ds 1
 z_lev:      ds 1                            ; FF3's $A5: the z-level walked on (0 both)
+trig:       ds 1                            ; a trigger to act on (FF3's $AB)
+trig_next:  ds 1                            ; the trigger of the step under way
+trig_id:    ds 1                            ; its property 2
+char_set:   ds 1                            ; the walking character's graphics set
+char_pal:   ds 1                            ;   and palette
+map_sp:     ds 1
+tm_src:     ds 3
+gs_src:     ds 3
+map_props:  ds 16
+ents:       ds 16
+treas:      ds 16
+trigs:      ds 16
+nes_pal:    ds 24
+trig_cnt:   ds 32
+type_cnt:   ds 8
+map_stack:  ds 3 * MAP_DEPTH
+poses:      ds 64
+section wram, $C300
 line_buf:   ds 7 * 16

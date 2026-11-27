@@ -152,3 +152,53 @@ if __name__ == '__main__':
         m = Map(rom, p)
         print(p, 'props', m.props.hex(), 'tileset', m.tileset)
         render(m, os.path.join(sys.argv[2], 'map%03d.png' % p))
+
+
+# ---- the field's data banks for the GB build (tools/gb3n/build.py places them; layouts are
+# described at the top of src/field.s)
+TILESET_COUNT = 7
+SUBSET_TILES = 112                            # 26+8+8+14+8+16+16+16: BG tiles $00-$6F
+
+
+def tilemap_stream(rom, tid):
+    """the compressed bytes of tilemap `tid`, as stored (RLE, ends when 1024 cells are out)"""
+    lo, hi = rom.rd(0x11, 0x8000 + 2 * tid, 2)
+    o = s = ptr(lo, hi, 0x11)
+    n = 0
+    while n < 1024:
+        v = rom.at(o); o += 1
+        if v & 0x80:
+            n += rom.at(o) or 256; o += 1
+        else:
+            n += 1
+    return rom.at(s, o - s)
+
+
+def subset_tiles(rom, sub):
+    """graphics subset `sub` as the NES loads it: 112 tiles (NES format)"""
+    ptrs = rom.rd(0x00, 0x8E00 + 16 * sub, 16)
+    out = bytearray()
+    for k, n in enumerate(rom.gfx_counts()):
+        o = ptr(ptrs[2 * k], ptrs[2 * k + 1], 0x03)
+        out += rom.at(o, 16 * n)
+    return bytes(out[:16 * SUBSET_TILES])
+
+
+def tileset_block(rom, ts):
+    """1 KB per tileset: UL, UR, DL, DR pages (128 each), palette (& 3), property 1, property 2"""
+    q = rom.rd(0x01, 0xA380 + 0x200 * ts, 0x200)
+    a = rom.rd(0x01, 0xB180 + 0x80 * ts, 0x80)
+    tp = rom.rd(0x01, 0xB500 + 0x100 * ts, 0x100)
+    return q + bytes(v & 3 for v in a) + tp[0::2] + tp[1::2] + bytes(0x80)
+
+
+def trigger_tables(rom):
+    """trigger tiles ($3A $91C8 init trigger): base tile for metatiles $80-$FF (93C1, 128),
+    type per tile $60-$7F (921F, 32), first metatile per tile $60-$7F (923F, 32)"""
+    return rom.rd(0x3A, 0x93C1, 128), rom.rd(0x3A, 0x921F, 32), rom.rd(0x3A, 0x923F, 32)
+
+
+def window_colours(rom):
+    """palette 3 (menu window) on normal maps: the immediates at $3A $9133-$9144 (gray, blue,
+    white, and black as colour 0)"""
+    return bytes([rom.rd(0x3A, 0x9143), rom.rd(0x3A, 0x9134), rom.rd(0x3A, 0x9139), rom.rd(0x3A, 0x913E)])

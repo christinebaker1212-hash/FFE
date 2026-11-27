@@ -171,7 +171,14 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             inc de
             dec b
             jr nz, .dm
-            ld a, MAP_BANK                  ; (first steps: the test map, walking)
+            ld a, START_WORLD               ; (first steps: a test map, walking)
+            ld [world], a
+            ld a, START_MAP
+            ld [map_id], a
+            ld a, START_X
+            ld [enter_x], a
+            ld a, START_Y
+            ld [enter_y], a
             call map_enter
             ld a, LCDC_ON
             ldh [rLCDC], a
@@ -296,6 +303,7 @@ memcpy:     ld a, [hl+]                     ; HL -> DE, BC bytes
 
 section hram, $FF80
 hram_dma:   ds 10
+rombank:    ds 1
 is_gba:     ds 1
 soft_rst:   ds 1
 vbl_done:   ds 1

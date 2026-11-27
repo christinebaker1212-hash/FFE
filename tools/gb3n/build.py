@@ -2,7 +2,7 @@
 existing pipeline makes (tools/ff3_mmc5/build.py, then tools/ff3/insert.py). Game data is read
 from that ROM here, at build time; nothing game-specific is kept in the repository.
 
-usage: python3 tools/gb3n/build.py [--nes build/ff3_en.nes] [--out build/ff3n.gbc] [--map P]"""
+usage: python3 tools/gb3n/build.py [--nes build/ff3_en.nes] [--out build/ff3n.gbc] [--map M[,WORLD[,X,Y]]]"""
 import os, sys, hashlib
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, '..', '..')
@@ -12,7 +12,6 @@ from asm_sm83 import asm, make_rom
 import tiles, data
 
 ROM_BANKS = 128             # 2 MB (sized to the game later)
-MAP_BANK = 2                # the test map's data bank (src/field.s)
 RAM_CODE = 0x03             # 32 KB cart RAM (4 banks, as retail MBC5 games: docs/gb-lessons.md)
 EN_SHA1 = '4a7f1ae4c89305cf161aa3d78fd4416548663f99'   # build/ff3_en.nes (patches/README.md)
 
@@ -33,43 +32,79 @@ def own_data():
             'C_SCR_TEST:\n' + db(test, 20) + 'C_PAL0:\n' + db(pal0))
 
 
-def map_bank(rom, p):
-    """one map's data bank for src/field.s, from the user's ROM"""
-    m = data.Map(rom, p)
-    b = bytearray(b'\xff' * 0x4000)
-    til = m.bg_tiles()
-    b[0:0x1000] = b''.join(tiles.gb(til[16 * i:16 * i + 16]) for i in range(256))
-    b[0x1000:0x1200] = b''.join(m.quad)
-    b[0x1200:0x1280] = bytes(a & 3 for a in m.attr)
-    b[0x1300:0x1320] = b''.join(data.rgb555(c).to_bytes(2, 'little') for pal in m.bg_palettes() for c in pal)
-    b[0x1400:0x1800] = m.tilemap()
-    b[0x1800:0x1803] = bytes([m.props[0] & 31, m.props[1] & 31, m.props[3] & 0x7F])
-    b[0x1880:0x1900] = bytes(p1 for p1, p2 in m.tprop)
-    b[0x1900:0x1980] = bytes(p2 for p1, p2 in m.tprop)
-    chr_ = rom.map_char_tiles(0)                     # (the party's first member: Onion Knight)
-    b[0x1A00:0x1B00] = b''.join(tiles.gb(chr_[16 * i:16 * i + 16]) for i in range(16))
-    b[0x1B00:0x1B10] = b''.join(data.rgb555(c).to_bytes(2, 'little') for pal in rom.char_palettes(0, 0) for c in pal)
-    b[0x1B10:0x1B50] = rom.player_poses()
-    return bytes(b)
+B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_TMAP0, B_SUB0, B_COMMON = 3, 4, 5, 6, 8, 12, 17
+
+
+def field_banks(rom):
+    """the field's data banks (layouts: the top of src/field.s), all from the user's ROM"""
+    banks = {}
+    def blank(): return bytearray(b'\xff' * 0x4000)
+    gbt = lambda nes: b''.join(tiles.gb(nes[16 * i:16 * i + 16]) for i in range(len(nes) // 16))
+    b = blank()                                          # map info
+    b[0x0000:0x2000] = rom.at(0x02 * data.B8, 0x2000)
+    for ts in range(data.TILESET_COUNT):
+        b[0x2000 + 0x400 * ts:0x2400 + 0x400 * ts] = data.tileset_block(rom, ts)
+    base, typ, first = data.trigger_tables(rom)
+    b[0x3C00:0x3C80] = base; b[0x3C80:0x3CA0] = typ; b[0x3CA0:0x3CC0] = first
+    b[0x3CC0:0x3CC4] = data.window_colours(rom)
+    b[0x3D00:0x3D80] = b''.join(data.rgb555(c).to_bytes(2, 'little') for c in range(64))
+    banks[B_MAPINFO] = b
+    b = blank()                                          # map aux tables
+    b[0x0000:0x0100] = rom.rd(0x00, 0x9100, 256)
+    b[0x0100:0x0200] = rom.rd(0x00, 0x9200, 256)
+    b[0x0200:0x0300] = rom.rd(0x00, 0x9300, 256)
+    b[0x0300:0x0500] = rom.rd(0x00, 0x8A00, 512)
+    b[0x0500:0x0700] = rom.rd(0x00, 0x8C00, 512)
+    b[0x0700:0x0720] = rom.rd(0x00, 0x9670, 32)
+    b[0x0720:0x0788] = rom.rd(0x00, 0x9690, 104)
+    b[0x0C00:0x0C40] = rom.rd(0x00, 0x8880, 64)
+    b[0x0C40:0x0C80] = rom.rd(0x00, 0x88C0, 64)
+    b[0x0D00:0x0D40] = rom.player_poses()
+    tm = {}                                              # tilemaps: streams packed per bank
+    bank, at = B_TMAP0, 0
+    for tid in sorted(set(rom.rd(0x00, 0x8A00, 512))):
+        st = data.tilemap_stream(rom, tid)
+        if at + len(st) > 0x4000: bank, at = bank + 1, 0
+        assert bank < B_SUB0, 'tilemaps overflow'
+        banks.setdefault(bank, blank())[at:at + len(st)] = st
+        b[0x0800 + 3 * tid:0x0803 + 3 * tid] = bytes([bank, (0x4000 + at) & 0xFF, (0x4000 + at) >> 8])
+        at += len(st)
+    per = 0x4000 // (16 * data.SUBSET_TILES)             # graphics subsets
+    for sub in range(max(rom.rd(0x00, 0x8C00, 512)) + 1):
+        bk, k = B_SUB0 + sub // per, sub % per
+        assert bk < B_COMMON, 'subsets overflow'
+        a = 16 * data.SUBSET_TILES * k
+        banks.setdefault(bk, blank())[a:a + 16 * data.SUBSET_TILES] = gbt(data.subset_tiles(rom, sub))
+        b[0x0B00 + 3 * sub:0x0B03 + 3 * sub] = bytes([bk, (0x4000 + a) & 0xFF, (0x4000 + a) >> 8])
+    banks[B_MAPAUX] = b
+    b = blank(); b[0:0x2000] = rom.at(0x10 * data.B8, 0x2000); banks[B_EVENTS] = b
+    b = blank(); b[0:0x4000] = gbt(rom.at(0x0E * data.B8, 0x4000)); banks[B_CHARS] = b
+    b = blank(); b[0:144 * 16] = gbt(rom.rd(0x0D, 0xB700, 144 * 16)); banks[B_COMMON] = b
+    return banks
 
 
 def main():
     a = sys.argv[1:]
     nes = a[a.index('--nes') + 1] if '--nes' in a else os.path.join(ROOT, 'build', 'ff3_en.nes')
     out = a[a.index('--out') + 1] if '--out' in a else os.path.join(ROOT, 'build', 'ff3n.gbc')
-    test_map = int(a[a.index('--map') + 1]) if '--map' in a else 10
+    mp = (a[a.index('--map') + 1] if '--map' in a else '10').split(',')   # --map M[,WORLD[,X,Y]]
+    mp = [int(v) for v in mp] + [0, 255, 255][len(mp) - 1:]
+    test_map, test_world, test_x, test_y = mp[:4]
     raw = open(nes, 'rb').read()
     if hashlib.sha1(raw).hexdigest() != EN_SHA1:
         print('note: %s is not the expected English FF3 NES ROM (SHA-1 %s)' % (nes, EN_SHA1))
     src = (open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() + '\n' +
-           'MAP_BANK = %d\nTEST_MAP = %d\n' % (MAP_BANK, test_map) +
+           'START_MAP = %d\nSTART_WORLD = %d\nSTART_X = %d\nSTART_Y = %d\n' % (test_map, test_world, test_x, test_y) +
+           'B_MAPINFO = %d\nB_MAPAUX = %d\nB_EVENTS = %d\nB_CHARS = %d\nB_COMMON = %d\n' % (
+               B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_COMMON) +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' + own_data())
     r = asm(src)
     banks = dict(r.banks)
     rom = data.Rom(nes)
-    assert MAP_BANK not in banks
-    banks[MAP_BANK] = map_bank(rom, test_map)
+    for k, v in field_banks(rom).items():
+        assert k not in banks, 'bank %d used twice' % k
+        banks[k] = v
     img = make_rom(banks, 'FF3 NATIVE', cart_type=0x1B, rom_banks=ROM_BANKS,
                    ram_size_code=RAM_CODE, sgb=False, cgb=0xC0)
     open(out, 'wb').write(img)
