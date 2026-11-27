@@ -1664,7 +1664,11 @@ bsc_wait:   ld a, [$D010]                   ; FF3's 34/9450: (8 - message speed)
 ; $0B the action: the acting member steps forward
 bsc_anim:   ld a, [$D8D6]
             cp 4
-            jr nc, .m
+            jr c, .ch
+            and 7                           ; a monster: FF3's pre-attack flash (34/8545)
+            call bs_flash
+            jr .m
+.ch:
             ld [bs_act], a
             call bs_party
 .m:         ld b, 12

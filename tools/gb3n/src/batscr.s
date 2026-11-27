@@ -1385,3 +1385,202 @@ bs_cnt:     ds 1
 bs_pos:     ds 24
 bs_j:       ds 1                            ; the row within a monster (its palette bits)
 bs_w:       ds 1                            ; the monster's width in tiles
+
+section bank B_BSCR, $4920
+; ---- FF3's pre-attack flash (2F/B024, 34/8545): the attacking monster (slot A) in the windows'
+; palette every other frame, 8 frames (not for Flare Wave: $7E9D = 9); the attributes go
+; straight to VRAM behind the line guard (the shadow keeps the monster's own)
+bs_flash:   ld [fl_s], a
+            ld a, [$DE9D]
+            cp 9
+            ret z
+            call bs_srect
+            ret c
+.st:        ld hl, SH_D                     ; (the windows up first)
+            ld b, 18
+            xor a
+.sd:        or [hl]
+            inc hl
+            dec b
+            jr nz, .sd
+            and a
+            jr z, .go
+            call bs_frame
+            jr .st
+.go:        xor a
+            ld [fl_f], a
+.l:         call wait_vbl
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            call .rect
+            xor a
+            ldh [rSTAT], a
+            ld [guard_on], a
+            call hram_dma
+            call snd_frame
+            call read_pad
+            ld hl, fl_f
+            inc [hl]
+            ld a, [hl]
+            cp 8
+            jr nz, .l
+            call wait_vbl                   ; (its own colours again)
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            call .rect
+            xor a
+            ldh [rSTAT], a
+            ld [guard_on], a
+            ret
+.rect:      ld a, 1
+            ldh [rVBK], a
+            ld a, [fl_y]
+            ld c, a
+            ld a, [fl_h]
+            ld b, a
+.r:         push bc
+            ld l, c                         ; SH_A + 20 y + x, $9800 + 32 y + x
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, hl
+            add hl, de
+            ld a, [fl_x]
+            call bs_hl_a
+            ld de, SH_A
+            add hl, de
+            push hl
+            ld l, c
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, [fl_x]
+            add l
+            ld l, a
+            ld de, $9800
+            add hl, de
+            ld d, h
+            ld e, l
+            pop hl
+            ld a, [fl_f]                    ; odd frames: palette 7, else the monster's
+            and 1
+            ld a, 7
+            jr nz, .p
+            xor a
+.p:         ld c, a
+            ld a, [fl_w]
+            ld b, a
+.c:         ld a, [hl+]
+            bit 0, c
+            jr z, .s
+            and $F8
+            or c
+.s:         ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            pop bc
+            inc c
+            dec b
+            jr nz, .r
+            xor a
+            ldh [rVBK], a
+            ret
+; the slot fl_s's cells in the monster area (fl_x, fl_y, fl_w, fl_h; the top window's rows 0-3
+; left out while it shows); C: none
+bs_srect:   ld a, [$DD7B]
+            cp 9
+            jr nz, .m
+            xor a                           ; a boss: the whole area
+            ld [fl_x], a
+            ld [fl_y], a
+            ld a, 18
+            ld [fl_w], a
+            ld a, 12
+            ld [fl_h], a
+            jr .clip
+.m:         ld a, [fl_s]
+            ld hl, $DDA7
+            call bs_hl_a
+            ld a, [hl]
+            cp $FF
+            scf
+            ret z
+            ld hl, $DD6B
+            call bs_hl_a
+            ld a, [hl]
+            call bs_minfo
+            ld a, [fl_s]
+            ld b, a
+            add a
+            add b
+            ld hl, bs_pos
+            call bs_hl_a
+            ld a, [hl+]
+            sub 2
+            ld [fl_x], a
+            ld a, [hl]
+            sub 6
+            ld [fl_y], a
+            ld a, [bs_mi + 3]
+            ld b, a
+            and 15
+            ld [fl_h], a
+            ld a, b
+            swap a
+            and 15
+            ld b, a
+            ld a, [fl_x]                    ; (18 columns at most)
+            add b
+            cp 19
+            jr c, .w
+            ld a, 18
+.w:         ld hl, fl_x
+            sub [hl]
+            ld [fl_w], a
+.clip:      ld a, [fl_y]                    ; rows to 11, from 4 under the top window
+            ld hl, fl_h
+            add [hl]
+            cp 13
+            jr c, .b
+            ld a, 12
+.b:         ld b, a                         ; B = the end row
+            ld a, [bs_topon]
+            and a
+            ld a, [fl_y]
+            jr z, .t
+            cp 4
+            jr nc, .t
+            ld a, 4
+.t:         ld [fl_y], a
+            ld c, a
+            ld a, b
+            sub c
+            jr z, .no
+            jr c, .no
+            ld [fl_h], a
+            ld a, [fl_w]
+            and a
+            jr z, .no
+            and a
+            ret
+.no:        scf
+            ret
+
+section wram, $C590
+fl_s:       ds 1
+fl_f:       ds 1
+fl_x:       ds 1
+fl_y:       ds 1
+fl_w:       ds 1
+fl_h:       ds 1

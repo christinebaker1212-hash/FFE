@@ -440,6 +440,9 @@ def main():
         if st == 'ipick':
             ev = 'ev_iptest'
             src += 'section bank B_FIELD, $7980\nev_iptest:  %FAR B_MENU, m_ipick\n            jp map_reload\n'
+        if st == 'bat':                          # (GB3N_STORY=bat: battle GB3N_BATTLE on Start)
+            ev = 'ev_battest'
+            src += 'section bank B_FIELD, $7980\nev_battest: ld a, %s\n            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a\n            jp battle_run\n' % os.environ.get('GB3N_BATTLE', '1')
         if st == 'mini':                         # (GB3N_STORY=mini: the minimap on Start)
             ev = 'ev_mmtest'
             src += 'section bank B_FIELD, $7980\nev_mmtest:  %FAR B_MINI, mm_show\n            jp map_reload\n'
