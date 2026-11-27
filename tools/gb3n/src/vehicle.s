@@ -54,7 +54,20 @@ veh_load:   ld hl, A_VPOSE
 
 ; ---- the world map's passability for the vehicle (3E/C65D, 3E/C4FC): C = metatile, D / E the
 ; cell ahead; C set: no step. Boarding / leaving a canoe or ship happens here.
-world_pass: ld b, W_PROP1
+world_pass: ld a, [world]                   ; the boulder (3E/C603: world 0, $6020 bit 0, at
+            and a                           ;   (81, 54)) blocks the way
+            jr nz, .nb
+            ld a, [SRAM_PAGE + $20]
+            rra
+            jr nc, .nb
+            ld a, d
+            cp 81
+            jr nz, .nb
+            ld a, e
+            cp 54
+            scf
+            ret z
+.nb:        ld b, W_PROP1
             ld a, [bc]
             ld [w_p1], a
             inc b
