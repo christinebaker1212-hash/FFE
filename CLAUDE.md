@@ -1450,6 +1450,8 @@ in V-Blank right after the OAM), the hands kept on all four members after castin
 Then (item 66): the battle "o&" window found and removed (the message row's string pointer was lost while
 the top name window closed; rows now also mapped only after their letters are up).
 Then (item 67): the Undersea Shrine's water moves as the world map's sea (its bubble field's 16 x 16 picture, bank 115).
+Then (item 68): saves hit by item 66's lost-pointer bug (status bits as an ailment, HP 6464/999, "Dead" with HP left)
+are mended silently when a file or suspend point loads.
 
 ## Remaining
 - **FF1 (native build): finished (owner, 2026-11-26):** the owner played it through from New Game to

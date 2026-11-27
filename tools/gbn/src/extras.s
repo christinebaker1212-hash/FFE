@@ -1303,10 +1303,10 @@ sv_fix:     call sc_apply                   ; (the Sound Test code played: this 
             call far_copy
 .air:       ld a, [SV_AIR]
             cp 2
-            ret c
+            jp c, sv_chfix
             xor a
             ld [SV_AIR], a
-            ret
+            jp sv_chfix
 
 ; the title menu's up / down: Continue 0, New Game 1, Extras 3 (Continue left out while there is
 ; nothing to continue)
@@ -1498,3 +1498,59 @@ sf_mx:      ds 1                            ; sf_one's map: 0 $9800, 4 $9C00 (th
 bs_vis:     ds 1                            ; the Bestiary's list: 1 while $9C00 is shown
 bs_ini:     ds 1                            ; 1 once $9C00 holds the whole screen
 bs_pend:    ds 1                            ; 1 while the hidden map's rows go up
+
+section bank 107, $7671                     ; (free space)
+; the members' records from the builds before 2026-11-27 (owner: "correct older saves silently"):
+; a lost pointer in battle wrote a spell's data into a record (status $6F, HP $1940 = 6464 over
+; a max of 999), so the member stood "dead" with HP. The save's status is a value 0-3 (fine,
+; dead, stone, poison): above 3 it is battle data left over, made fine (or dead at 0 HP). HP
+; over the maximum is impossible: set to the maximum, and a "dead" mark with it came from the
+; same write: the member alive again. (Dead with HP up to the maximum stays: a death spell
+; leaves HP so.)
+sv_chfix:   ld hl, ch_stats + CH_AIL
+.m:         ld a, l                         ; DE = HP, BC = max HP
+            add a, CH_HP - CH_AIL
+            ld e, a
+            ld d, h
+            ld a, [de]
+            ld c, a
+            inc e
+            ld a, [de]
+            ld b, a                         ; (BC = HP for the moment)
+            ld a, [hl]
+            cp 4
+            jr c, .hp
+            ld a, b                         ; status above 3: fine, or dead at 0 HP
+            or c
+            ld a, 0
+            jr nz, .s
+            inc a
+.s:         ld [hl], a
+.hp:        inc e                           ; DE -> max HP
+            ld a, [de]
+            sub c
+            inc e
+            ld a, [de]
+            sbc a, b                        ; max - HP: borrow if HP > max
+            jr nc, .n
+            dec e                           ; HP = max
+            ld a, [de]
+            ld c, a
+            inc e
+            ld a, [de]
+            dec e
+            dec e
+            ld [de], a
+            dec e
+            ld a, c
+            ld [de], a
+            ld a, [hl]                      ; (dead with it: alive)
+            cp 1
+            jr nz, .n
+            xor a
+            ld [hl], a
+.n:         ld a, l
+            add a, $40
+            ld l, a
+            jr nc, .m                       ; (4 members: $D101, $41, $81, $C1)
+            ret
