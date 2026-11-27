@@ -572,7 +572,12 @@ field_step: call npc_update
             jr z, .done
             ld b, a
             jr .dir
-.pl:        ldh a, [pad_new]                ; A: talk to the person ahead
+.pl:        ld a, [inv_j]                   ; the Invincible jumping: no input (3E/C1EA)
+            add a
+            jr nc, .pl2
+            call v_jstep
+            jr .done
+.pl2:       ldh a, [pad_new]                ; A: talk to the person ahead
             bit 3, a                        ; Start: the main menu
             jp nz, menu_open
             bit 2, a                        ; Select: the next member (3E/C258)

@@ -88,12 +88,26 @@ ws_world2:  ld a, [world]
 
 ; the party as the Invincible (3E/D622; its jumps: later) or an airship's shadow (3E/D9DA)
 ws_pty:
-            ld a, [veh]                     ; the party as the Invincible (3E/D622; its jumps:
-            cp 7                            ;   later) or an airship's shadow (3E/D9DA)
+            ld a, [veh]                     ; the party as the Invincible (3E/D622) or an
+            cp 7                            ;   airship's shadow (3E/D9DA)
             jr nz, .ni
             xor a
             ld [ws_n], a
-            ld a, 64
+            ld a, [inv_j]                   ; jumping: the counter up every other frame, the
+            add a                           ;   landing at 32
+            jr nc, .nj
+            ld a, [frame]
+            rra
+            ld a, [inv_j]
+            adc 0
+            ld [inv_j], a
+            and $1F
+            jr nz, ws_jump
+            xor a
+            ld [inv_j], a
+            ld a, $28
+            call sfx_play
+.nj:        ld a, 64
             ld [ws_x], a
             ld a, $5F + 1 - 48
             ld [ws_y], a
@@ -124,6 +138,75 @@ ws_pty:
             ld c, 72
             ld de, $C043
             call ws_spr
+            ret
+
+; the Invincible in the air (3E/D610, 3C/87A1): raised by the jump, its shadow on the ground at
+; NES ($6F, $77) every other frame
+ws_jump:    ld a, [inv_j]
+            call ws_jy
+            add $60 + 1 - 48
+            ld [ws_y], a
+            ld a, 64
+            ld [ws_x], a
+            ld a, [facing]
+            and $0F
+            add a
+            ld b, a
+            ld a, [frame]
+            and 4
+            add a
+            add a
+            add a
+            or b
+            ld l, a
+            ld h, 0
+            ld de, $83E0 + WS_3C
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld de, WS_3C
+            add hl, de
+            call ws_list
+            ld a, [frame]
+            rra
+            ret nc
+            ld a, $6F - 48
+            ld [ws_x], a
+            ld a, $77 + 1 - 48
+            ld [ws_y], a
+            ld hl, $8608 + WS_3C
+            jp ws_list
+; its height (3E/D97E): A = the jump; up 16 lines, at the top while it steps (two steps from
+; the 16th line of a jump forwards), then down
+ws_jy:      and $1F
+            cp $10
+            jr nc, .f
+            ld b, a
+            ld a, [inv_j]
+            bit 6, a
+            jr nz, .u
+            ld a, b
+            cp $0F
+            jr nz, .u
+            ld a, 2
+            ld [inv_af], a
+.u:         ld a, b
+            cpl
+            ret
+.f:         ld b, a
+            ld a, [inv_af]
+            and a
+            jr nz, .h
+            ld a, [step]
+            and a
+            jr nz, .h
+            ld a, b
+            xor $E0
+            ret
+.h:         ld a, $90
+            ld [inv_j], a
+            ld a, $F0
             ret
 
 ; is map cell (D, E) on screen? (3E/DBE4) carry set if not; ws_x / ws_y = its top left on the

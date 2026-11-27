@@ -225,7 +225,7 @@ v_abtn:     ld a, [veh]
             cp 3
             jr z, .ship
             cp 7
-            jr nc, .no                      ; (the Invincible: later)
+            jp z, v_jump                    ; (the Invincible: a jump)
             cp 4
             jr nc, v_land
 .no:        scf
@@ -605,6 +605,79 @@ v_face:     ld a, [SRAM_PAGE + $2F]
             ld [v_dface], a
             ret
 .t:         db DIR_R, DIR_D, DIR_L, DIR_U
+; ---- the Invincible's jump (3D/B66F): property 1 & $30 three cells ahead: a jump on the spot
+v_jump:     ld a, [pos_x]
+            ld d, a
+            ld a, [pos_y]
+            ld e, a
+            ld a, [facing]
+            ld [inv_e0], a
+            rra
+            jr c, .r
+            rra
+            jr c, .l
+            rra
+            jr c, .d
+            ld a, e
+            sub 3
+            ld e, a
+            jr .t
+.r:         ld a, d
+            add 3
+            ld d, a
+            jr .t
+.l:         ld a, d
+            sub 3
+            ld d, a
+            jr .t
+.d:         ld a, e
+            add 3
+            ld e, a
+.t:         call map_mt
+            ld l, a
+            ld h, W_PROP1
+            ld a, [hl]
+            and $30
+            ld a, $81
+            jr z, .s
+            ld a, $C1
+.s:         ld [inv_j], a
+            xor a
+            ld [inv_af], a
+            ld a, $2C
+            call sfx_play
+            and a
+            ret
+; each frame between steps while it jumps (3E/C20E): no other input; at the top (inv_af set by
+; src/wspr.s ws_jy) steps forwards over whatever is below, the step's checks as any (an
+; entrance, an encounter tile or an event there ends the jump)
+v_jstep:    ld a, [inv_j]
+            bit 6, a
+            ret nz
+            ld a, [inv_af]
+            and a
+            ret z
+            dec a
+            ld [inv_af], a
+            ld a, [inv_e0]
+            ld [facing], a
+            call dest_cell
+            call map_mt
+            call passable
+            ld a, [w_p1]
+            and $C0
+            ld hl, trig_next
+            or [hl]
+            jr z, .go
+            ld a, $90
+            ld [inv_j], a
+            xor a
+            ld [inv_af], a
+.go:        call edge_line
+            ld a, 1
+            ld [step], a
+            ret
+
 ; ---- for the special animations (src/sa.s): the party's vehicle [ev_tmp]; the view again
 sa_vset:    ld a, [sa_tmp]
             jp v_set
@@ -732,3 +805,6 @@ w_p2:       ds 1
 v_toff:     ds 1
 v_spin:     ds 1
 v_dface:    ds 1                            ; (this frame's facing, for src/wspr.s)
+inv_j:      ds 1                            ; FF3's $A6: jumping (bit 7), on the spot (6), counter
+inv_af:     ds 1                            ; $AF: steps at the top
+inv_e0:     ds 1                            ; $E0: the facing it jumped
