@@ -25,9 +25,10 @@ ROUTINES = {'init': (1, 0xA400), 'equip': (2, 0xAA16), 'monact': (3, 0xA732), 'f
             'cannon': (13, 0xA487), 'poison': (14, 0xBA41), 'victory': (15, 0xBB49), 'stdisp': (16, 0x9D06),
             'turn': (17, 0x81C3), 'act0': (18, 0x8213), 'uses': (19, 0x8271), 'mrows': (20, 0x8295),
             'btype': (21, 0x82CE), 'end': (22, 0x8306), 'inv': (23, 0x8374), 'binit': (24, 0x9CE3),
-            'defback': (25, 0x81A0)}
+            'defback': (25, 0x81A0), 'setup': (26, 0x0000), 'mmsg': (27, 0xA56F), 'rng': (28, 0xFC27)}
+SETUP_NES = [0xA02A, 0x9FAA, 0xA31F, 0xB909]               # 'setup': these in order (banks $2E / $2F)
 FLOW = ('order', 'exec', 'over', 'cannon', 'poison', 'victory', 'stdisp', 'turn', 'act0', 'uses', 'mrows',
-        'btype', 'end', 'inv', 'binit', 'defback')   # FF3's banks $34 / $35 mapped
+        'btype', 'end', 'inv', 'binit', 'defback', 'mmsg')   # FF3's banks $34 / $35 mapped
 STUBS = {0x8FF7: 0x34, 0xFA0E: 0x3F, 0x8411: 0x34}       # its message / graphics / animation calls: RTS
 
 
@@ -35,7 +36,8 @@ class Mem(bytearray):
     def __init__(self, rom, flow=False):
         bytearray.__init__(self, 0x10000)
         self.rom = rom
-        for slot, b in enumerate((0x34, 0x35, 0x3E, 0x3F) if flow else (0x30, 0x31, 0x3E, 0x3F)):
+        banks = {False: (0x30, 0x31, 0x3E, 0x3F), True: (0x34, 0x35, 0x3E, 0x3F), 'set': (0x2E, 0x2F, 0x3E, 0x3F)}[flow]
+        for slot, b in enumerate(banks):
             self.map(slot, b)
 
     def map(self, slot, b):
@@ -56,7 +58,7 @@ def nes_run(rom, ram6, ram7, zp, addr, flow=False):
     bytearray.__setitem__(mem, slice(0x6000, 0x6400), ram6)
     bytearray.__setitem__(mem, slice(0x7400, 0x7F00), ram7)
     bytearray.__setitem__(mem, slice(0, 0x100), zp)
-    if flow:
+    if flow is True:
         mem.stubs = STUBS
         for a in STUBS: bytearray.__setitem__(mem, a, 0x60)          # (banks $34 / $3F mapped now)
     cpu = MPU(memory=mem)
@@ -216,6 +218,18 @@ def setup(rom, rnd, name):
         for k in range(4): ram7[r7(0x7DD3) + k] = rnd.choice([0, 0, 1, 2, 3, 4])
         for k in range(16): ram7[r7(0x78F0) + k] = rnd.randrange(6)
         for i in range(4): ram6[0x100 + 0x40 * i + 3:0x100 + 0x40 * i + 6] = bytes([rnd.getrandbits(8), rnd.getrandbits(8), rnd.randrange(0x99)])
+    if name == 'setup':
+        ram7[0x7CED - 0x7400] = rnd.randrange(0x100); ram7[0x7CEE - 0x7400] = rnd.choice([0, 0, 0, 1])
+    if name == 'rng':                                     # (FF3's seed: its zero page added with carries;
+        a, c = 0, 0                                       #   the GB test takes it from BZ + 0)
+        for b in zp: t = a + b + c; a, c = t & 0xFF, t >> 8
+        zp_seed[0] = a
+    if name == 'mmsg':
+        ram7[0x7E88 - 0x7400] = rnd.choice([0xFF, rnd.randrange(0x5B), rnd.randrange(0x60), 0x01, 0x34])
+        ram7[0x7E9B - 0x7400] = rnd.choice([0, 0x80, 0x0F])
+        zp[0x54] = rnd.choice([0, 0, 1, 2, 3, 4, 5])
+        ram7[0x78EE - 0x7400] = rnd.choice([0, 0, 1, 2])
+        for k in range(4): ram7[0x78DA - 0x7400 + k] = rnd.choice([0xFF, 0, 0x44, 0x1A])
     if name in ('turn', 'uses'):
         for k in range(4): ram7[0x7AC3 - 0x7400 + k] = rnd.choice([0xFF, rnd.randrange(4)])
     if name == 'mrows':
@@ -266,8 +280,12 @@ def setup(rom, rnd, name):
     return ram6, ram7, zp
 
 
+zp_seed = [None]
+
+
 def to_gb(ram6, ram7, zp):
     z = bytearray(zp)
+    if zp_seed[0] is not None: z[0] = zp_seed[0]; zp_seed[0] = None
     for p in PTRS + ([0x24] if 0x6000 <= zp[0x24] | zp[0x25] << 8 < 0x8000 else []):
         a = gb_ptr(zp[p] | zp[p + 1] << 8)
         z[p], z[p + 1] = a & 0xFF, a >> 8
@@ -314,7 +332,14 @@ def main():
         for k in range(n):
             ram6, ram7, zp = setup(rom, rnd, name)
             try:
-                res_n = nes_run(rom, ram6, ram7, zp, addr, name in FLOW)
+                if name == 'setup':
+                    a6, a7, z = ram6, ram7, zp
+                    for ad in SETUP_NES: a6, a7, z = nes_run(rom, a6, a7, z, ad, 'set')
+                    res_n = (a6, a7, z)
+                elif name == 'rng':
+                    res_n = nes_run(rom, ram6, ram7, zp, addr, 'set')
+                else:
+                    res_n = nes_run(rom, ram6, ram7, zp, addr, name in FLOW)
             except RuntimeError as e:
                 print('%s #%d: NES %s (state skipped)' % (name, k, e)); continue
             try:

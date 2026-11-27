@@ -178,8 +178,12 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   batdiff (50-150 states each): 0 differences. FF3 quirks kept: a dropped item whose stack is at
   99 goes on looking for a zero from the count's place; experience is capped by testing 9,999,999
   but storing 10,000,767.
-- Next: the command menus (ours, writing FF3's records), the battle screen and its messages,
-  battle start from the field (formation, monster counts), random encounters.
+- Battle setup (`src/batsetup.s`): the monster set and ids, counts randomized, the formation
+  tilemap, slot types, counts per type, the battle random table (FF3's generator; the seed on the
+  GB is our own sum, as FF3's is its zero page's), and the after-action magic message. Checked: 0
+  differences over 100 states each.
+- Next: the battle screen (monsters, party, windows, messages, numbers), command menus (ours,
+  writing FF3's records), the battle driver (FF3's main loop order), random encounters.
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
