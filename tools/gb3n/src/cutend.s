@@ -1128,10 +1128,8 @@ c_camx:     ds 1
 c_camy:     ds 1
 c_pup:      ds 1
 c_bgd:      ds 1
-c_split:    ds 1
 c_top:      ds 1
 c_bot:      ds 1
-c_lyb:      ds 1
 c_90:       ds 1
 c_18:       ds 1
 c_19:       ds 1
@@ -1184,3 +1182,7 @@ c_pn:       ds 1
 c_prow:     ds 1
 c_64:       ds 1
 c_vend:
+
+section wram, $C0E9
+c_split:    ds 1                            ; (read by the STAT interrupt at all times: not in the
+c_lyb:      ds 1                            ;   map tables with the other cutscene variables)

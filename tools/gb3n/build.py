@@ -58,6 +58,8 @@ def menu_data():
                 ['q1', 'q4', 'q10'], [x.strip() for x in re.split(r'\{15:..\}', t[0x2D])[1:]])) +
             'm_s_qall:   db %s\n' % z(re.split(r'\{15:..\}', t[0x2E])[2].strip()) +
             'm_s_use:    db %s\n' % z(re.split(r'\{15:..\}', t[0x36])[1].strip()) +
+            ''.join('m_f_%s:%s db %s\n' % (n, ' ' * (5 - len(n)), z(w)) for n, w in zip(
+                ['dep', 'wd', 'exit'], [x.strip() for x in re.split(r'\{15:..\}', t[0x24])[1:]])) +
             'm_s_item:   db %s\n' % z(re.split(r'\{15:..\}', t[0x36])[3].strip()) +
             'm_remove:   db %s\n' % z(clean(t[0x3E].split('\n')[-1])) + name_grid())
 
@@ -185,6 +187,8 @@ def field_banks(rom):
     b = blank(); b[0:144 * 16] = gbt(rom.rd(0x0D, 0xB700, 144 * 16))
     b[0x2000:0x2040] = gbt(rom.rd(0x0D, 0xB440, 64))       # FF3's cursor: 4 tiles (3E/DF31 -> $E4-$E7)
     b[0x2040:0x2140] = gbt(rom.rd(0x0D, 0x8000, 256))      # Guzco's graphics (guest 4: 3B/BAD8)
+    b[0x2140:0x2240] = gbt(rom.rd(0x0A, 0x8A00, 256))      # the Fat Chocobo (3F/E05A, E06E)
+    b[0x2240:0x2340] = gbt(rom.rd(0x0D, 0x8E00, 256))
     banks[B_COMMON] = b
     banks[B_SCRIPT] = bytearray(rom.at(0x2C * data.B8, 0x4000))   # NES $2C/$2D: npc lists, scripts
     b = blank()                                          # people: tables, init
@@ -341,6 +345,8 @@ ROMDATA = {
     'sa_9cb4': (0x3A, 0x9CB4, 240),
     'ws_sin': (0x3A, 0x9E3E, 256),       # world sprites: FF3's sine table, the ship's chain
     'ws_chtab': (0x3D, 0xBF7A, 126),
+    'f_spr0': (0x3C, 0x835E, 65),        # the Fat Chocobo's two pictures
+    'f_spr1': (0x3C, 0x839F, 65),
     'uw_rng': (0x3F, 0xFE00, 256),       # underwater: random numbers, fish, wobble
     'uw_sw': (0x3A, 0x962D, 64),
     'uw_ft': (0x3A, 0x966D, 32),
@@ -431,6 +437,9 @@ def main():
         if st == 'ipick':
             ev = 'ev_iptest'
             src += 'section bank B_FIELD, $7980\nev_iptest:  %FAR B_MENU, m_ipick\n            jp map_reload\n'
+        if st == 'fat':                          # (GB3N_STORY=fat: the Fat Chocobo on Start)
+            ev = 'ev_fattest'
+            src += 'section bank B_FIELD, $7980\nev_fattest: ld a, $FC\n            ld [ev_who], a\n            %FAR B_MENU, m_shop\n            jp map_reload\n'
         if ev == 'ev_satest':                    # (GB3N_STORY=saN: special animation N on Start)
             src += 'section bank B_FIELD, $7980\nev_satest:  ld a, %d\n            ld [ev_arg], a\n            jp ev_sanim\n' % int(st[2:], 16)
         src = src.replace('            jp nz, menu_open', '            jp nz, ' + ev)

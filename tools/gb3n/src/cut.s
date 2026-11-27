@@ -856,6 +856,9 @@ c_init:     call wait_vbl
             ld hl, c_vars
             ld de, c_vend - c_vars
             call memclr
+            xor a
+            ld [c_split], a
+            ld [c_lyb], a
             ld a, $FF
             ld [c_ar1], a
             ld [c_ar2], a

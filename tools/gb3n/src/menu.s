@@ -4666,7 +4666,7 @@ su_load:    ld a, 1
             jp sr_off
 
 ; ==== shops and inns (people $E0-$FF; their script: scr_buf, 3F/E9E8): inns $E0-$E2 (3C/8E8D),
-; shops $E3-$FB (3D/AF1F), the Fat Chocobo $FC+ (later). [m_res] = an event to run after (inns)
+; shops $E3-$FB (3D/AF1F), the Fat Chocobo $FC+ (3D/B383). [m_res] = an event to run after (inns)
 m_shop:     call m_enter
             call m_winpal
             xor a
@@ -4735,8 +4735,7 @@ m_shop:     call m_enter
             call s_draw
             call m_waitkey
             jp m_leave
-.fat:       call m_sfx_err                  ; (the Fat Chocobo: later)
-            jp m_leave
+.fat:       jp f_menu
 
 ; the shop screen: message (0, 0) 20 x 4, options (0, 4) 20 x 3, list (0, 7) 20 x 8, Gil
 ; (0, 15) 20 x 3; s_mode: 0 none, 3 Buy / Sell / Exit, 4 1 / 4 / 10, 5 1 / All; s_list: 1 buy,
@@ -5501,3 +5500,461 @@ s_list:     ds 1
 s_t:        ds 3
 s_acc:      ds 3
 m_exit:     ds 1
+
+; ==== the Fat Chocobo (3D/B383): Deposit / Withdraw / Exit; deposits up to 99 of an item
+; ($6300 + id, key items $9A-$A3 refused), withdrawals by id order (3D/B570) into the pack (3C/937E:
+; the same item's slot, else a free one; over 99 the rest stays); FF3's messages $51-$58; its
+; picture (0A/8A00, 0D/8E00; 3C/835E / 839F, the head every 8 frames) beside the options
+F_LIST     = SCRATCH + $100     ; (work RAM bank 1) the ids held, as FF3's $7C00
+
+section bank B_MENU, $6900
+f_menu:     call f_gfx
+.top:       ld a, $51                       ; "Yooo, need somethiiing?"
+            ld [s_mid], a
+            xor a
+            ld [s_opt], a
+            ld [s_list], a
+            call f_draw
+.lp:        ld a, [s_opt]                   ; the hand: Deposit (5, 1), Withdraw (6, 1), Exit (7, 1)
+            add 5
+            ld b, a
+            ld c, 1
+            call m_hand
+            call f_spr
+            call m_frame
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .x
+            ld b, a
+            and PAD_A
+            jr nz, .a
+            ld a, b
+            and $C0 | $30
+            jr z, .lp
+            ld a, b
+            and $40 | $20                   ; up / left: back one; down / right: on one
+            ld a, [s_opt]
+            jr z, .dn
+            and a
+            jr nz, .u1
+            ld a, 3
+.u1:        dec a
+            jr .mv
+.dn:        inc a
+            cp 3
+            jr c, .mv
+            xor a
+.mv:        ld [s_opt], a
+            call m_sfx_move
+            jr .lp
+.a:         call m_sfx_ok
+            ld a, [s_opt]
+            cp 2
+            jr z, .x
+            and a
+            jr nz, .take
+            ld a, $52                       ; "Whatcha gonna give meee?"
+            ld [s_mid], a
+            ld a, 1
+            ld [s_list], a
+            call f_list
+            jr .top
+.take:      ld a, $53                       ; "Whaddaya want, ya saaay?"
+            ld [s_mid], a
+            ld a, 2
+            ld [s_list], a
+            call f_held
+            call f_list
+            jr .top
+.x:         call m_sfx_ok
+            jp m_leave
+
+; FF3's ids held (3D/B570): F_LIST, f_n of them
+f_held:     ld hl, F_LIST
+            ld bc, $0001                    ; B = count, C = id
+.l:         ld a, c
+            add low(SRAM_PAGE + $300)
+            ld e, a
+            ld d, high(SRAM_PAGE + $300)
+            ld a, [de]
+            and a
+            jr z, .n
+            ld a, c
+            ld [hl+], a
+            inc b
+.n:         inc c
+            jr nz, .l
+            ld a, b
+            ld [f_n], a
+            ret
+
+; the screen: the message (0, 0) 20 x 4, the options (0, 4) 20 x 6 with the picture at (14, 5),
+; the list (0, 10) 20 x 8 (6 rows)
+f_draw:     call m_clear
+            call m_sprclr
+            xor a
+            ld [m_mrow], a
+            ld a, 4
+            ld [m_mh], a
+            call s_msg
+            ld de, $0400
+            ld bc, $0614
+            call m_win
+            ld hl, m_f_dep
+            ld de, $0502
+            call m_puts0
+            ld hl, m_f_wd
+            ld de, $0602
+            call m_puts0
+            ld hl, m_f_exit
+            ld de, $0702
+            call m_puts0
+            ld de, $0A00
+            ld bc, $0814
+            call m_win
+            call f_rows
+            call f_spr
+            call m_show
+            call wait_vbl                   ; OBJ palette 4: FF3's palette 3 for it ($0F, $27, $30)
+            ld a, $80 | 4 * 8
+            ldh [rOCPS], a
+            xor a
+            ldh [rOCPD], a
+            ldh [rOCPD], a
+            ld hl, I_RGB + 2 * $0F
+            call .c
+            ld hl, I_RGB + 2 * $27
+            call .c
+            ld hl, I_RGB + 2 * $30
+.c:         push hl
+            ld a, B_MAPINFO
+            call far_byte
+            ldh [rOCPD], a
+            pop hl
+            inc hl
+            ld a, B_MAPINFO
+            call far_byte
+            ldh [rOCPD], a
+            ret
+; the list's six rows from m_top: s_list 1 the pack (32), 2 the ids held (f_n)
+f_rows:     ld a, [s_list]
+            and a
+            ret z
+            ld a, [m_top]
+            ld [m_row], a
+            ld d, 11
+.r:         push de
+            ld a, [m_row]
+            call f_item                     ; A = id, C = count (0: none)
+            pop de
+            and a
+            jr z, .n
+            push de
+            push bc
+            ld e, a
+            ld d, 0
+            call m_n88
+            pop bc
+            pop de
+            push de
+            push bc
+            ld e, 2
+            ld a, 13
+            call m_putsn
+            pop bc
+            pop de
+            push de
+            ld e, 16
+            ld a, ':'
+            call m_putc
+            inc e
+            ld l, c
+            ld h, 0
+            ld b, 2
+            call m_num
+            pop de
+.n:         ld a, [m_row]
+            inc a
+            ld [m_row], a
+            inc d
+            ld a, d
+            cp 17
+            jr nz, .r
+            ret
+; row A of the list: A = id, C = count (A = 0: an empty row)
+f_item:     ld b, a
+            ld a, [s_list]
+            cp 2
+            jr z, .h
+            ld a, b
+            cp 32
+            jr nc, .z
+            add low(SRAM_PAGE + $E0)
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld c, [hl]
+            ld a, l
+            sub $20
+            ld l, a
+            ld a, [hl]
+            ret
+.h:         ld a, [f_n]
+            ld c, a
+            ld a, b
+            cp c
+            jr nc, .z
+            ld l, a
+            ld h, high(F_LIST)
+            ld a, [hl]
+            and a
+            ret z
+            ld l, a
+            ld h, high(SRAM_PAGE + $300)
+            ld c, [hl]
+            ret
+.z:         xor a
+            ret
+; choose from the list; A deposits / withdraws (3D/B4AE, B504); B back
+f_list:     xor a
+            ld [m_icur], a
+            ld [m_top], a
+.scr:       call f_draw
+.lp:        ld a, [m_icur]
+            ld hl, m_top
+            sub [hl]
+            add 11
+            ld b, a
+            ld c, 1
+            call m_hand
+            call f_spr
+            call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            ld a, [s_list]
+            cp 2
+            jr z, .take
+            call f_give
+            jr .scr
+.take:      call f_take
+            jr .scr
+.x:         call m_sfx_ok
+            ret
+.up:        ld a, [m_icur]
+            and a
+            jr z, .lp
+            dec a
+            jr .mv
+.dn:        call f_max
+            ld b, a
+            ld a, [m_icur]
+            inc a
+            cp b
+            jr nc, .lp
+.mv:        ld [m_icur], a
+            call m_sfx_move
+            ld hl, m_top
+            ld a, [m_icur]
+            cp [hl]
+            jr nc, .m1
+            ld [hl], a
+            jr .scr
+.m1:        sub [hl]
+            cp 6
+            jr c, .lp
+            ld a, [hl]
+            inc a
+            ld [hl], a
+            jr .scr
+; the list's length
+f_max:      ld a, [s_list]
+            cp 2
+            ld a, 32
+            ret nz
+            ld a, [f_n]
+            and a
+            ret nz
+            inc a
+            ret
+; deposit pack slot m_icur (3D/B4AE)
+f_give:     ld a, [m_icur]
+            add low(SRAM_PAGE + $C0)
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld a, [hl]
+            and a
+            jr z, f_err
+            cp $9A                          ; (key items $9A-$A3)
+            jr c, .ok
+            cp $A4
+            jr c, f_err
+.ok:        push af
+            push hl
+            call m_sfx_ok
+            pop hl
+            pop af
+            ld e, a
+            ld d, high(SRAM_PAGE + $300)
+            ld a, [de]
+            cp 99
+            jr c, .add
+            ld a, $55                       ; "I can't eat no more of the same stuff!"
+            ld [s_mid], a
+            ret
+.add:       set 5, l                        ; (the count: $E0 + slot)
+            add [hl]
+            ld c, 0
+            cp 100
+            jr c, .st
+            sub 99
+            ld c, a
+            ld a, 99
+.st:        ld [de], a
+            ld [hl], c
+            ld a, c
+            and a
+            jr nz, .m
+            res 5, l
+            ld [hl], a
+.m:         ld a, $54                       ; "Time to diiig in. Munch munch..."
+            ld [s_mid], a
+            ret
+f_err:      jp m_sfx_err
+; withdraw row m_icur (3D/B504)
+f_take:     ld a, [f_n]
+            ld b, a
+            ld a, [m_icur]
+            cp b
+            jr nc, f_err
+            ld l, a
+            ld h, high(F_LIST)
+            ld a, [hl]
+            and a
+            jr z, f_err
+            ld [f_id], a
+            ld a, l
+            ld [f_row], a
+            call m_sfx_ok
+            ld a, [f_id]                    ; the pack: the same item, else a free slot
+            ld b, a
+            ld hl, SRAM_PAGE + $C0
+.f:         ld a, [hl]
+            cp b
+            jr z, .same
+            inc l
+            ld a, l
+            cp $E0
+            jr nz, .f
+            ld l, $C0
+.e:         ld a, [hl]
+            and a
+            jr z, .free
+            inc l
+            ld a, l
+            cp $E0
+            jr nz, .e
+            ld a, $56                       ; "Your stuff's full, so I can't give it back"
+            ld [s_mid], a
+            ret
+.free:      ld [hl], b                      ; (3D/B531)
+            ld a, b
+            add low(SRAM_PAGE + $300)
+            ld e, a
+            ld d, high(SRAM_PAGE + $300)
+            ld a, [de]
+            set 5, l
+            ld [hl], a
+            jr .gone
+.same:      ld a, b                         ; (3D/B54E: over 99 the rest stays held)
+            add low(SRAM_PAGE + $300)
+            ld e, a
+            ld d, high(SRAM_PAGE + $300)
+            set 5, l
+            ld a, [de]
+            add [hl]
+            cp 100
+            jr c, .fit
+            sub 99
+            ld [de], a
+            ld [hl], 99
+            jr .msg
+.fit:       ld [hl], a
+.gone:      xor a                           ; (the row empty, none held)
+            ld [de], a
+            ld a, [f_row]
+            ld l, a
+            ld h, high(F_LIST)
+            ld [hl], 0
+.msg:       ld a, $58                       ; "Hang on a sec, I'm gettin' it out..."
+            ld [s_mid], a
+            ret
+
+; its tiles: OBJ $B0-$BF from 0A/8A00, $C0-$CF from 0D/8E00 (VRAM bank 1, behind the line guard)
+f_gfx:      call wait_vbl
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            ld a, 1
+            ldh [rVBK], a
+            ld hl, $6140
+            ld de, $8000 + 16 * $B0
+            ld bc, $200
+            ld a, B_COMMON
+            call far_copy
+            xor a
+            ldh [rVBK], a
+            ldh [rSTAT], a
+            ld [guard_on], a
+            ret
+; its picture into OAM 4-19 at (112, 40) (3C/80D9: the list at 3C/835E, the head from 3C/839F
+; every 8 frames; entries: y step, tile, attributes, x step)
+f_spr:      ld hl, f_spr0
+            ld a, [frame]
+            and 8
+            jr z, .f
+            ld hl, f_spr1
+.f:         ld de, oam_buf + 16
+            ld b, 40 + 16
+            ld c, 112 + 8
+.l:         ld a, [hl+]
+            cp $FF
+            ret z
+            add b
+            ld b, a
+            ld [de], a
+            inc e
+            inc hl
+            inc hl
+            ld a, [hl-]
+            add c
+            ld c, a
+            ld [de], a
+            inc e
+            dec hl
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld a, [hl+]                     ; FF3's flips; the Color's palette 4, VRAM bank 1
+            and $C0
+            rra
+            or $0C
+            ld [de], a
+            inc e
+            inc hl
+            jr .l
+
+section bank B_MENU, $7D00
+f_spr0:     ds 65                           ; (3C/835E, from the ROM)
+f_spr1:     ds 65                           ; (3C/839F)
+
+section wram, $CE50
+f_n:        ds 1
+f_id:       ds 1
+f_row:      ds 1
