@@ -998,7 +998,7 @@ bs_canuse:  ld l, a                         ; attack properties 30/98C0 + 8 A
             ld bc, 8
             ld a, B_BDAT
             call far_copy
-            ld a, [bs_ap + 7]
+.k:         ld a, [bs_ap + 7]
             and $7F
             ld b, a
             add a
@@ -1044,214 +1044,10 @@ bs_canuse:  ld l, a                         ; attack properties 30/98C0 + 8 A
             jr nz, .t
             ret
 
-; ---- items (35/ADAF, simplified): the pack's usable items ($98-$C7), FF3's target rules
-bs_item:    ld de, $0C00
-            ld bc, $0614
-            call bs_win
-            xor a
-            ld [bs_cur], a
-            ld [bs_ipg], a
-.list:      call BS_IList
-.loop:      ld a, [bs_cur]
-            add 13
-            ld b, a
-            ld c, 0
-            call bs_hand_cell
-            call bs_frame
-            ldh a, [pad_new]
-            bit 0, a
-            jr nz, .ok
-            bit 1, a
-            jr nz, .x
-            bit 6, a
-            jr nz, .up
-            bit 7, a
-            jr nz, .dn
-            jr .loop
-.up:        ld a, [bs_cur]
-            and a
-            jr z, .pu
-            dec a
-            ld [bs_cur], a
-            jr .loop
-.pu:        ld a, [bs_ipg]
-            and a
-            jr z, .loop
-            sub 4
-            ld [bs_ipg], a
-            ld a, 3
-            ld [bs_cur], a
-            jr .list
-.dn:        ld a, [bs_cur]
-            cp 3
-            jr z, .pd
-            inc a
-            ld [bs_cur], a
-            jr .loop
-.pd:        ld a, [bs_ipg]
-            add 4
-            cp 28
-            jr nc, .loop
-            ld [bs_ipg], a
-            xor a
-            ld [bs_cur], a
-            jr .list
-.x:         jp bs_hand_off
-.ok:        ld a, [bs_ipg]                  ; the item in the row
-            ld hl, bs_cur
-            add [hl]
-            ld hl, BS_IL
-            call bs_hl_a
-            ld a, [hl]
-            and a
-            jr z, .loop
-            ld [bs_spell], a
-            sub $98                         ; its spell (2E/91A0): properties, targets
-            ld l, a
-            ld h, 0
-            ld de, $91A0 - $4000
-            add hl, de
-            ld a, B_BDAT2
-            call far_byte
-            cp $7F
-            jr z, .one
-            call bs_canuse
-            ld a, [bs_ap + 5]
-            and $20
-            ld a, 0
-            jr nz, .m1
-            inc a
-.m1:        ld b, a
-            ld a, [bs_ap + 5]
-            bit 7, a
-            jr z, .m2
-            set 1, b
-.m2:        ld a, b
-            jr .t
-.one:       ld a, 2
-.t:         ld [BZ + $B3], a
-            call bs_hand_off
-            call bs_target
-            ld a, [BZ + $B4]
-            and a
-            jp z, .list
-            call bs_crec                    ; the record: item flag, the item, targets
-            ld bc, $2C
-            add hl, bc
-            set 3, [hl]
-            inc hl
-            inc hl
-            ld a, [bs_spell]
-            ld [hl+], a
-            ld a, [BZ + $B4]
-            ld [hl+], a
-            ld a, [BZ + $B5]
-            ld [hl], a
-            ld de, $3F - $30
-            add hl, de
-            ld a, [bs_spell]
-            ld [hl], a
-            ld hl, $D0C0                    ; one fewer for now (FF3 removes it after the turn)
-            ld b, $20
-.f:         ld a, [hl+]
-            ld c, a
-            ld a, [bs_spell]
-            cp c
-            jr z, .fd
-            inc hl
-            dec b
-            jr nz, .f
-            jr .done
-.fd:        dec [hl]
-            jr nz, .done
-            dec hl
-            ld [hl], 0
-.done:      ld hl, BZ + $52
-            inc [hl]
-            ret
-; the pack's usable items from bs_ipg: names and counts (4 rows)
-BS_IList:   ld hl, $D0C0                    ; collect ($98-$C7) into BS_IL / bs_ic
-            ld de, BS_IL
-            ld b, $20
-            ld c, 0
-.c:         ld a, [hl+]
-            cp $98
-            jr c, .n
-            cp $C8
-            jr nc, .n
-            ld [de], a
-            push de
-            ld a, e
-            add 32
-            ld e, a
-            ld a, [hl]
-            ld [de], a
-            pop de
-            inc de
-            inc c
-.n:         inc hl
-            dec b
-            jr nz, .c
-.f:         ld a, c
-            cp 32
-            jr z, .d
-            xor a
-            ld [de], a
-            inc de
-            inc c
-            jr .f
-.d:         ld de, $0C00
-            ld bc, $0614
-            call bs_win
-            ld c, 0
-.r:         push bc
-            ld a, [bs_ipg]
-            add c
-            ld hl, BS_IL
-            call bs_hl_a
-            ld a, [hl]
-            and a
-            jr z, .s
-            push hl
-            ld e, a
-            ld d, 0
-            call bs_name
-            pop hl
-            ld a, l
-            add 32
-            ld l, a
-            ld a, [hl]
-            ld [bs_t], a
-            pop bc
-            push bc
-            ld a, c
-            add 13
-            ld d, a
-            ld e, 1
-            ld a, 13
-            ld [bs_maxw], a
-            call bs_putsn
-            pop bc
-            push bc
-            ld a, c
-            add 13
-            ld d, a
-            ld e, 15
-            ld a, [bs_t]
-            ld l, a
-            ld h, 0
-            call bs_num4
-.s:         pop bc
-            inc c
-            ld a, c
-            cp 4
-            jr nz, .r
-            ret
-
 ; ---- strings: bs_name: names8800 entry DE -> BS_STR (0 end); bs_putsn: BS_STR at (D, E), at
 ; most [bs_maxw] characters
 bs_name:    ld hl, T_NAMES8800
-            add hl, de
+bs_namet:   add hl, de
             add hl, de
             add hl, de
             push hl
@@ -2198,3 +1994,708 @@ bs_putsw:   ld hl, BS_STR
             dec b
             jr nz, .p
             ret
+
+; ---- items (35/ADAF): FF3's grid shown a column at a time: column 0 the hands (rows 1 / 3, under
+; t8200's " Right Hand" / " Left Hand"), columns 1-8 the pack's 32 slots, 4 to a column (FF3 scrolls
+; two columns across); "X" before what this member cannot use or equip. A marks an entry (a second
+; hand), A on it again uses it (35/B4F7: an item $98-$C7 or a weapon's spell), A on another swaps
+; it with a hand (35/AF79: one of the two in column 0; 35/B242's checks, stacks, 20 arrows); B drops
+; the mark or leaves. A swap or a cancel goes back to the commands; a use ends the member's turn.
+; FF3's own variables: BZ + $62 / $63 the cursor's row / column, $67 marked, $68 / $69 its row /
+; column; $7AF5 the grid's ids and counts, $7B3D its usable flags.
+IT_B       = $DAF5
+IT_P       = $DAFD
+IT_U       = $DB3D
+
+section bank B_BSCR, $7700
+bs_item:    ld hl, $D0C0                    ; the pack, the hands (rows 0 / 1 right, 2 / 3 left)
+            ld de, IT_P
+            ld bc, $40
+            call memcpy
+            call it_hands
+            ld de, IT_B
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld b, [hl]
+            inc hl
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [IT_B]
+            ld [de], a
+            inc e
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [hl+]
+            ld [de], a
+            inc e
+            ld b, [hl]
+            ld a, b
+            ld [de], a
+            inc e
+            ld a, [IT_B + 4]
+            ld [de], a
+            inc e
+            ld a, b
+            ld [de], a
+            ld hl, IT_U                     ; usable: items $98-$C7, what the job can equip
+            ld b, 36
+            ld a, 1
+.u:         ld [hl+], a
+            dec b
+            jr nz, .u
+            ld c, 0
+.uc:        ld a, c
+            add a
+            ld hl, IT_P
+            call bs_hl_a
+            ld a, [hl]
+            cp $62
+            jr c, .uw
+            cp $98
+            jr c, .un
+            cp $C8
+            jr c, .unx
+            jr .un
+.uw:        push bc
+            call bs_caneq
+            pop bc
+            jr nz, .unx
+.un:        ld a, c
+            add 4
+            ld hl, IT_U
+            call bs_hl_a
+            ld [hl], 0
+.unx:       inc c
+            ld a, c
+            cp 32
+            jr nz, .uc
+            xor a
+            ld [BZ + $62], a
+            ld [BZ + $67], a
+            inc a
+            ld [BZ + $63], a
+.redraw:    call it_draw
+.loop:      ld a, [BZ + $62]
+            add 13
+            ld b, a
+            ld c, 0
+            call bs_hand_cell
+            call bs_frame
+            ldh a, [pad_new]
+            bit 0, a
+            jp nz, .a
+            bit 1, a
+            jp nz, .b
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 5, a
+            jr nz, .lf
+            bit 4, a
+            jr nz, .rt
+            jr .loop
+.up:        ld a, [BZ + $63]                ; (35/AEE0: column 0 rows 1 / 3 only)
+            and a
+            ld a, [BZ + $62]
+            jr nz, .u2
+            cp 1
+            jr z, .loop
+            dec a
+.u2:        and a
+            jr z, .loop
+            dec a
+            ld [BZ + $62], a
+            jr .loop
+.dn:        ld a, [BZ + $62]
+            cp 3
+            jr z, .loop
+            ld b, a
+            ld a, [BZ + $63]
+            and a
+            ld a, b
+            jr nz, .d2
+            inc a
+.d2:        inc a
+            ld [BZ + $62], a
+            jr .loop
+.lf:        ld a, [BZ + $63]
+            and a
+            jr z, .loop
+            dec a
+            ld [BZ + $63], a
+            jr nz, .redraw
+            ld a, [BZ + $62]
+            or 1
+            ld [BZ + $62], a
+            jr .redraw
+.rt:        ld a, [BZ + $63]
+            cp 8
+            jr z, .loop
+            inc a
+            ld [BZ + $63], a
+            jr .redraw
+.b:         ld a, [BZ + $67]
+            and a
+            jr z, .x
+            xor a
+            ld [BZ + $67], a
+            call it_mark
+            jr .loop
+.x:         call bs_hand_off                ; (back to the commands)
+            jp it_close
+.a:         ld a, [BZ + $67]
+            and a
+            jr nz, .a2
+            inc a                           ; marked
+            ld [BZ + $67], a
+            ld a, [BZ + $62]
+            ld [BZ + $68], a
+            ld a, [BZ + $63]
+            ld [BZ + $69], a
+            call it_mark
+            ld a, $05
+            call bs_sfxu
+            ld b, 16
+.aw:        push bc
+            call bs_frame
+            pop bc
+            dec b
+            jr nz, .aw
+            jp .loop
+.a2:        ld a, [BZ + $63]                ; the same entry: used
+            ld hl, BZ + $69
+            cp [hl]
+            jr nz, .sw
+            ld a, [BZ + $62]
+            ld hl, BZ + $68
+            cp [hl]
+            jp z, it_use
+.sw:        call it_swap                    ; (NZ: refused)
+            jp nz, .loop
+            call bs_hand_off
+            jp it_close
+
+; the error sound
+it_err:     ld a, $06
+            jp bs_sfxu
+; HL = the member's hands ($6203 + 64 c: right id, count, left id, count)
+it_hands:   ld a, [BZ + $52]
+            rrca
+            rrca
+            and $C0
+            add 3
+            ld l, a
+            ld h, $D2
+            ret
+; the column [BZ + $63] in the bottom window
+it_draw:    ld de, $0C00
+            ld bc, $0614
+            call bs_win
+            ld c, 0
+.r:         push bc
+            ld a, [BZ + $63]
+            and a
+            jr nz, .e
+            bit 0, c
+            jr nz, .e
+            ld a, c                         ; (column 0, rows 0 / 2: the hands' names)
+            srl a
+            add $E0
+            ld e, a
+            ld d, 0
+            ld hl, T_T8200
+            call bs_namet
+            pop bc
+            push bc
+            ld a, c
+            add 13
+            ld d, a
+            ld e, 1
+            ld a, 17
+            ld [bs_maxw], a
+            call bs_putsn
+            jr .n
+.e:         ld a, [BZ + $63]                ; entry k = 4 column + row
+            add a
+            add a
+            add c
+            ld [bs_t], a
+            add a
+            ld hl, IT_B
+            call bs_hl_a
+            ld a, [hl+]
+            and a
+            jr z, .n
+            ld b, [hl]
+            push bc
+            ld e, a
+            ld d, 0
+            call bs_name
+            pop bc
+            ld a, b
+            ld [bs_tq], a
+            pop bc
+            push bc
+            ld a, c
+            add 13
+            ld d, a
+            ld a, [bs_t]                    ; "X": not usable
+            ld hl, IT_U
+            call bs_hl_a
+            ld a, [hl]
+            and a
+            jr nz, .ok
+            ld e, 1
+            ld a, 'X'
+            call bs_putc
+.ok:        ld e, 2
+            ld a, 12
+            ld [bs_maxw], a
+            call bs_putsn
+            ld e, 14
+            ld a, ':'
+            call bs_putc
+            ld a, [bs_tq]
+            ld l, a
+            ld h, 0
+            push de
+            call bs_dec
+            pop de
+            ld e, 15
+            ld a, [bs_numb + 2]
+            call bs_putc
+            inc e
+            ld a, [bs_numb + 3]
+            call bs_putc
+.n:         pop bc
+            inc c
+            ld a, c
+            cp 4
+            jp nz, .r
+; the mark (OAM 32-35, 4 pixels right of the cursor), when its column shows
+it_mark:    ld hl, oam_buf + 4 * 32
+            ld a, [BZ + $67]
+            and a
+            jp z, hand16off
+            ld a, [BZ + $69]
+            ld b, a
+            ld a, [BZ + $63]
+            cp b
+            jp nz, hand16off
+            ld a, [BZ + $68]
+            add 13
+            add a
+            add a
+            add a
+            add 16 - 2
+            ld b, a
+            ld c, 4
+            jp hand16
+; leaving: the marks off, FF3's equipment update (34/8026: 31/AA16), the party redrawn
+it_close:   ld hl, oam_buf + 4 * 32
+            call hand16off
+            ld hl, fe_AA16
+            ld a, B_BAT
+            call far_call
+            call bs_party
+            jp bs_pwin
+
+; ---- A on the marked entry (35/B4F7): an item's spell (2E/91A0) or a weapon's (30/9400 byte 4)
+it_use:     ld a, [BZ + $63]
+            add a
+            add a
+            ld hl, BZ + $62
+            add [hl]
+            ld [bs_t], a                    ; (k)
+            add a
+            ld hl, IT_B
+            call bs_hl_a
+            ld a, [hl]
+            and a
+            jr z, .no
+            cp $C8
+            jr nc, .no
+            ld [bs_spell], a
+            cp $98
+            jr nc, .item
+            cp $57
+            jr nc, .no
+            ld l, a                         ; a weapon: its spell
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $9400 + 4 - $4000
+            add hl, de
+            ld a, B_BDAT
+            call far_byte
+            cp $7F
+            jr nz, .sp
+            ld a, 9                         ; (none: FF3's $747D = 9)
+            ld [bs_ap + 5], a
+            jr .chk
+.no:        call it_err
+            jp bs_item.loop
+.item:      cp $A6                          ; (potion, hi-potion, elixir: $7CE8)
+            jr c, .i2
+            cp $A9
+            jr nc, .i2
+            ld a, $FF
+            ld [$DCE8], a
+.i2:        ld a, [bs_spell]
+            sub $98
+            ld l, a
+            ld h, 0
+            ld de, $91A0 - $4000
+            add hl, de
+            ld a, B_BDAT2
+            call far_byte
+            cp $7F
+            jr nz, .sp
+            ld a, [bs_t]                    ; (no spell: one target)
+            ld hl, IT_U
+            call bs_hl_a
+            ld a, [hl]
+            and a
+            jr z, .no
+            ld a, 2
+            jr .t
+.sp:        call bs_canuse                  ; (its properties -> bs_ap)
+.chk:       ld a, [bs_t]
+            ld hl, IT_U
+            call bs_hl_a
+            ld a, [hl]
+            and a
+            jr z, .no
+            ld a, $05
+            call bs_sfxu
+            ld a, [bs_ap + 5]
+            and $20
+            ld a, 0
+            jr nz, .m1
+            inc a
+.m1:        ld b, a
+            ld a, [bs_ap + 5]
+            bit 7, a
+            jr z, .m2
+            set 1, b
+.m2:        ld a, b
+.t:         ld [BZ + $B3], a
+            call bs_hand_off
+            ld hl, oam_buf + 4 * 32
+            call hand16off
+            call bs_target
+            ld a, [BZ + $B4]
+            and a
+            jp z, it_close                  ; (cancelled: back to the commands, 35/B5C1)
+            call bs_crec                    ; the record: item flag, the item, targets
+            ld bc, $2C
+            add hl, bc
+            set 3, [hl]
+            inc hl
+            inc hl
+            ld a, [bs_spell]
+            ld [hl+], a
+            ld a, [BZ + $B4]
+            ld [hl+], a
+            ld a, [BZ + $B5]
+            ld [hl], a
+            ld de, $3E - $30
+            add hl, de
+            ld a, [BZ + $63]                ; (from a hand: $3E = 1)
+            and a
+            jr nz, .h
+            ld [hl], 1
+.h:         inc hl
+            ld a, [bs_spell]
+            ld [hl], a
+            ld a, [bs_t]                    ; one fewer (FF3 at once: 35/B5D8)
+            add a
+            inc a
+            ld hl, IT_B
+            call bs_hl_a
+            dec [hl]
+            jr nz, .k
+            dec hl
+            ld [hl], 0
+.k:         ld hl, IT_P
+            ld de, $D0C0
+            ld bc, $40
+            call memcpy
+            ld hl, BZ + $52
+            inc [hl]
+            jp it_close
+
+; ---- A on another entry (35/AF79): a hand swapped with a pack slot; NZ refused
+it_swap:    ld a, [BZ + $63]                ; one of the two in column 0
+            ld b, a
+            ld a, [BZ + $69]
+            ld c, a
+            or b
+            jr z, .err
+            ld a, b
+            and a
+            jr z, .h0
+            ld a, c
+            and a
+            jr nz, .err
+            ld a, [BZ + $62]                ; (the cursor on the pack: the hand is the mark)
+            ld [BZ + $43], a                ; (pack row)
+            ld a, b
+            ld [BZ + $45], a                ; (pack column)
+            ld a, [BZ + $68]
+            ld [BZ + $44], a                ; (hand row)
+            jr .go
+.h0:        ld a, [BZ + $68]
+            ld [BZ + $43], a
+            ld a, c
+            ld [BZ + $45], a
+            ld a, [BZ + $62]
+            ld [BZ + $44], a
+.go:        ld a, [BZ + $45]                ; pack k = 4 column + row; its usable flag
+            add a
+            add a
+            ld hl, BZ + $43
+            add [hl]
+            ld [BZ + $45], a
+            ld hl, IT_U
+            call bs_hl_a
+            ld a, [hl]
+            and a
+            jr z, .err
+            ld a, [BZ + $45]                ; $40 / $41 the pack's id / count
+            add a
+            ld [BZ + $43], a
+            ld hl, IT_B
+            call bs_hl_a
+            ld a, [hl+]
+            cp $62
+            jr nc, .err
+            ld [BZ + $40], a
+            ld a, [hl]
+            ld [BZ + $41], a
+            ld a, [BZ + $44]                ; $3E / $3F the hand's (offset $42)
+            add a
+            ld [BZ + $42], a
+            ld hl, IT_B
+            call bs_hl_a
+            ld a, [hl+]
+            ld [BZ + $3E], a
+            ld a, [hl]
+            ld [BZ + $3F], a
+            call it_hcheck
+            jr c, .err
+            ld a, [BZ + $3E]                ; the same item: the hand's onto the pack's
+            ld hl, BZ + $40
+            cp [hl]
+            jr nz, .df
+            or [hl]
+            jr z, .err
+            ld a, [BZ + $42]
+            ld hl, IT_B
+            call bs_hl_a
+            xor a
+            ld [hl+], a
+            ld [hl], a
+            ld a, [BZ + $44]
+            ld hl, IT_U
+            call bs_hl_a
+            ld [hl], 1
+            ld a, [BZ + $41]
+            ld hl, BZ + $3F
+            add [hl]
+            cp 100
+            jr c, .s9
+            ld a, 99
+.s9:        ld b, a
+            ld a, [BZ + $43]
+            inc a
+            ld hl, IT_B
+            call bs_hl_a
+            ld [hl], b
+            jp .done
+.err:       call it_err
+            or 1
+            ret
+.df:        ld a, [BZ + $41]                ; one of a kind, or an empty slot: a plain swap
+            cp 1
+            jp z, .plain
+            ld a, [BZ + $40]
+            and a
+            jp z, .plain
+            ld hl, IT_P                     ; a stack: an empty pack slot ($24, $25 = 1: none)
+            ld c, 0
+            xor a
+            ld [BZ + $25], a
+.e:         ld a, [hl]
+            and a
+            jr z, .ef
+            inc hl
+            inc hl
+            inc c
+            inc c
+            ld a, c
+            cp $40
+            jr nz, .e
+            ld a, 1
+            ld [BZ + $25], a
+.ef:        ld a, c
+            ld [BZ + $24], a
+            ld a, [BZ + $40]                ; arrows ($4F-$56): 20 into the hand
+            cp $4F
+            jr c, .one
+            cp $57
+            jr nc, .one
+            ld a, [BZ + $41]
+            cp $15
+            jr c, .plain
+            ld b, $14
+            jr .take
+.one:       ld b, 1                         ; else one into the hand
+.take:      ld a, [BZ + $3E]
+            and a
+            jr z, .t2
+            ld a, [BZ + $25]                ; the hand's old item into the empty slot
+            and a
+            jr nz, .err
+            ld a, [BZ + $24]
+            ld hl, IT_P
+            call bs_hl_a
+            ld a, [BZ + $3E]
+            ld [hl+], a
+            ld a, [BZ + $3F]
+            ld [hl], a
+.t2:        ld a, [BZ + $42]
+            ld hl, IT_B
+            call bs_hl_a
+            ld a, [BZ + $40]
+            ld [hl+], a
+            ld [hl], b
+            ld a, [BZ + $43]
+            inc a
+            ld hl, IT_B
+            call bs_hl_a
+            ld a, [hl]
+            sub b
+            ld [hl], a
+            jr .done
+.plain:     ld a, [BZ + $43]                ; (35/B101)
+            ld hl, IT_B
+            call bs_hl_a
+            ld a, [BZ + $3E]
+            ld [hl+], a
+            ld a, [BZ + $3F]
+            ld [hl], a
+            ld a, [BZ + $42]
+            ld hl, IT_B
+            call bs_hl_a
+            ld a, [BZ + $40]
+            ld [hl+], a
+            ld a, [BZ + $41]
+            ld [hl], a
+            ld a, [BZ + $44]
+            ld hl, IT_U
+            call bs_hl_a
+            ld b, [hl]
+            ld a, [BZ + $45]
+            ld de, IT_U
+            add e
+            ld e, a
+            ld a, [de]
+            ld [hl], a
+            ld a, b
+            ld [de], a
+.done:      ld hl, IT_P                     ; (35/B131) the pack and the hands back
+            ld de, $D0C0
+            ld bc, $40
+            call memcpy
+            call it_hands
+            ld a, [IT_B + 2]
+            ld [hl+], a
+            ld a, [IT_B + 3]
+            ld [hl+], a
+            ld a, [IT_B + 6]
+            ld [hl+], a
+            ld a, [IT_B + 7]
+            ld [hl], a
+            ld a, $05
+            call bs_sfxu
+            xor a
+            ret
+
+; 35/B242: C when the new item ($40) cannot go with the other hand's (two-handed weapons, bows and
+; arrows, shields)
+it_hcheck:  ld a, [BZ + $40]
+            ld e, a                         ; E = $1D
+            ld a, [IT_B]
+            ld hl, BZ + $3E
+            cp [hl]
+            jr nz, .o
+            ld a, [IT_B + 4]
+.o:         ld d, a                         ; D = $1C
+            ld a, e
+            cp d
+            jr c, .s
+            ld e, d
+            ld d, a
+.s:         ld a, d                         ; D the larger, E the smaller
+            and a
+            jr z, .ok
+            cp $62
+            jr nc, .no
+            cp $58
+            jr c, .w
+            ld a, e                         ; a shield
+            and a
+            jr z, .ok
+            cp $58
+            jr nc, .ok
+            cp $46
+            jr nc, .no
+            jr .ok
+.w:         cp $4F
+            jr c, .w2
+            ld a, e                         ; arrows: with a bow or nothing
+            and a
+            jr z, .ok
+            cp $4F
+            jr nc, .no
+            cp $4A
+            jr nc, .ok
+            jr .no
+.w2:        cp $4A
+            jr c, .w3
+            ld a, e                         ; a bow: alone (arrows sort above it)
+            and a
+            jr z, .ok
+            jr .no
+.w3:        cp $46
+            jr c, .ok
+            ld a, e                         ; two-handed: alone
+            and a
+            jr z, .ok
+.no:        scf
+            ret
+.ok:        and a
+            ret
+
+; NZ when the member can equip weapon / shield A (35/B8FD with 30/9400)
+bs_caneq:   ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $9400 - $4000
+            add hl, de
+            ld de, bs_ap
+            ld bc, 8
+            ld a, B_BDAT
+            call far_copy
+            jp bs_canuse.k
+
+section wram, $C5E7
+bs_tq:      ds 1

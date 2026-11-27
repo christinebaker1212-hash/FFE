@@ -389,6 +389,13 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   explosions (32/84C9), the numbers, the deaths. Test hook GB3N_CANNON.
 - Flare Wave (10/8BD5): the boss's palette cycling green 104 frames, then the wave's column
   (10/8D30 shapes, 10/8D80 sprite lists) sweeping right on its sine, then the red flash.
+- Battle Item as FF3 (35/ADAF): its grid a column at a time (column 0 the hands under t8200's
+  " Right Hand" / " Left Hand", columns 1-8 the pack), "X" before what the member cannot use or
+  equip; A marks, A again uses (items, or a weapon's spell from a hand or the pack), A on another
+  entry swaps it with a hand (FF3's rules 35/B242: two-handed weapons, bows and arrows, shields;
+  stacks merged; 20 arrows to a hand), B drops the mark or leaves; a swap or a cancel returns to the
+  commands, as FF3. Dialogue's job names (\char[$01]) from t8200. Sound: volume changes inside a
+  note by zombie-mode steps.
 - Battle messages wrap at spaces over the window's rows (the English is longer than FF3's lines).
 - Fixed on the way: the party's cells after a big spell were restored one per row (a diagonal of
   blank cells over the top window), Odin's cells all showed column 0 of his map, Odin's charge
