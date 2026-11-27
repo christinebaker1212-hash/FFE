@@ -15,6 +15,7 @@ M_A        = $CB40          ; 32 x 18 attributes
 M_STR      = $CE00          ; a string (40)
 M_HAND     = $EE            ; the hand (OBJ tile, VRAM bank 1; battle's SPR_HAND)
 M_ATTR     = $0F            ; window cells: palette 7, VRAM bank 1
+M_BLACK    = $01            ; outside the windows: colour 0 (VRAM bank 1 tile 1, cleared at boot)
 
 section bank B_MENU, $4000
 ; ---- the menu (called from the field; the field reloads its map after)
@@ -621,7 +622,6 @@ m_magic:
 m_equip:
 m_job:
 m_config:
-m_save:
 m_suspend:  jp m_sfx_err
 
 ; ---- FF3's sounds: $85 confirm, $98 move, $86 error (3E/D20D, D213, D529)
@@ -778,7 +778,7 @@ m_leave:    call wait_vbl
 ; ---- the shadow: clear (blank cells), windows, letters, numbers
 m_clear:    ld hl, M_T
             ld bc, 32 * 18
-.t:         ld a, ' '
+.t:         ld a, M_BLACK
             ld [hl+], a
             dec bc
             ld a, b
@@ -1062,6 +1062,534 @@ m_sprclr:   ld hl, oam_buf
             jr nz, .z
             ret
 
+; ==== cart RAM (Lot Check: enabled only around each access; every file checked on reading)
+; bank 0: $A000 / $A400 / $A800 FF3's three files (its $6400 / $6800 / $6C00 pages), $AC00 + 4 f
+; our check (magic 'F', '3', 16-bit sum of the page), $AC10 FF3's save count ($7F38-$7F3A).
+SR_ENABLE  = $0000
+SR_BANK    = $4000
+SR_FILE    = $A000
+SR_CHECK   = $AC00
+SR_COUNT   = $AC10
+
+sr_on:      ld [SR_BANK], a                 ; A = cart RAM bank
+            ld a, $0A
+            ld [SR_ENABLE], a
+            ret
+sr_off:     xor a
+            ld [SR_ENABLE], a
+            ret
+; HL = file A's address in cart RAM
+sr_addr:    add a
+            add a
+            add high(SR_FILE)
+            ld h, a
+            ld l, 0
+            ret
+; DE = the 16-bit sum of the 1024 bytes at HL
+sr_sum:     ld de, 0
+            ld bc, $400
+.s:         ld a, [hl+]
+            add e
+            ld e, a
+            jr nc, .n
+            inc d
+.n:         dec bc
+            ld a, b
+            or c
+            jr nz, .s
+            ret
+; file A: 0 empty, 1 good, 2 damaged (our check present, the page's sums wrong)
+sr_state:   ld [m_sf], a
+            xor a
+            call sr_on
+            ld a, [m_sf]
+            add a
+            add a
+            ld l, a
+            ld h, high(SR_CHECK)
+            ld a, [hl+]
+            cp 'F'
+            jr nz, .empty
+            ld a, [hl]
+            cp '3'
+            jr nz, .empty
+            ld a, [m_sf]
+            call sr_addr
+            push hl
+            call sr_sum
+            pop hl
+            ld a, [m_sf]
+            add a
+            add a
+            add 2
+            ld c, a
+            ld b, high(SR_CHECK)
+            ld a, [bc]
+            cp e
+            jr nz, .bad
+            inc c
+            ld a, [bc]
+            cp d
+            jr nz, .bad
+            push hl                         ; FF3's own check (3D/AE97): $6019 = $5A, the
+            ld de, $19                      ;   8-bit sum of the page $FF
+            add hl, de
+            ld a, [hl]
+            pop hl
+            cp $5A
+            jr nz, .bad
+            ld bc, $400
+            ld e, 0
+.f:         ld a, [hl+]
+            add e
+            ld e, a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .f
+            ld a, e
+            inc a
+            jr nz, .bad
+            call sr_off
+            ld a, 1
+            ret
+.bad:       call sr_off
+            ld a, 2
+            ret
+.empty:     call sr_off
+            xor a
+            ret
+; the page ($D000) into file A (FF3's 3D/A960 after its checksum 3D/AE5C), our check after
+sr_write:   ld [m_sf], a
+            xor a
+            call sr_on
+            ld a, [m_sf]
+            call sr_addr
+            push hl
+            ld d, h
+            ld e, l
+            ld hl, SRAM_PAGE
+            ld bc, $400
+            call memcpy
+            pop hl
+            call sr_sum
+            ld a, [m_sf]
+            add a
+            add a
+            ld l, a
+            ld h, high(SR_CHECK)
+            ld [hl], 'F'
+            inc l
+            ld [hl], '3'
+            inc l
+            ld [hl], e
+            inc l
+            ld [hl], d
+            jp sr_off
+; file A into the page
+sr_read:    ld [m_sf], a
+            xor a
+            call sr_on
+            ld a, [m_sf]
+            call sr_addr
+            ld de, SRAM_PAGE
+            ld bc, $400
+            call memcpy
+            jp sr_off
+; FF3's save count (3D/A897: $7F38 = $55, $7F39 = $AA, else count 1) -> A; B = 1: count + 1 stored
+sr_count:   xor a
+            call sr_on
+            ld hl, SR_COUNT
+            ld a, [hl+]
+            cp $55
+            jr nz, .i
+            ld a, [hl+]
+            cp $AA
+            jr z, .v
+.i:         ld hl, SR_COUNT
+            ld [hl], $55
+            inc l
+            ld [hl], $AA
+            inc l
+            ld [hl], 1
+.v:         ld hl, SR_COUNT + 2
+            ld a, b
+            and a
+            ld a, [hl]
+            jr z, .x
+            inc a                           ; (3D/A93D: up to 99, then 1)
+            cp 100
+            jr c, .s
+            ld a, 1
+.s:         ld [hl], a
+.x:         ld c, a
+            call sr_off
+            ld a, c
+            ret
+; FF3's update sram checksum (3D/AE5C): world, vehicle, world position into the page, $601A
+sr_ff3sum:  ld a, [world]
+            ld [SRAM_PAGE + $08], a
+            xor a                           ; (vehicles: on foot for now)
+            ld [SRAM_PAGE + $0F], a
+            ld a, [pos_x]
+            ld [SRAM_PAGE + $09], a
+            ld a, [pos_y]
+            ld [SRAM_PAGE + $0A], a
+            xor a
+            ld [SRAM_PAGE + $1A], a
+            ld a, $5A
+            ld [SRAM_PAGE + $19], a
+            ld hl, SRAM_PAGE
+            ld bc, $400
+            ld e, 0
+.s:         ld a, [hl+]
+            add e
+            ld e, a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .s
+            ld a, e
+            cpl
+            ld [SRAM_PAGE + $1A], a
+            ret
+
+; ---- 7 Save (FF3's 3D/A897; the world map only, as FF3 offers it)
+m_save:     ld a, [wmode]
+            and a
+            jp z, m_sfx_err
+            ld b, 0                         ; the save count into the page, FF3's sum
+            call sr_count
+            ld [SRAM_PAGE + $14], a
+            call sr_ff3sum
+            call m_sprclr
+            xor a
+            ld [m_f], a
+.scr:       call m_files                    ; the three files (rows 3-14)
+            ld a, $4B                       ; "Please choose the file to save to."
+            call m_msg
+            call m_show
+.lp:        ld a, [m_f]                     ; the hand at file f
+            call m_fhand
+            call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            call m_sfx_ok
+            ld hl, m_s_erase                ; "This erases old data." (t8200 $4C) Yes / No
+            call m_msghl
+            call m_show
+            call m_yesno
+            jr c, .scr
+            ld a, [m_f]
+            call sr_write
+            ld b, 1                         ; the count up (3D/A93D)
+            call sr_count
+            ld a, $4D                       ; "Saving is complete."
+            call m_msg
+            ld a, [m_f]
+            call m_files.one
+            call m_show
+            call m_hand2off
+            call m_waitkey
+.x:         call m_hand2off
+            ret
+.up:        ld a, [m_f]
+            dec a
+            cp $FF
+            jr nz, .m
+            ld a, 2
+            jr .m
+.dn:        ld a, [m_f]
+            inc a
+            cp 3
+            jr c, .m
+            xor a
+.m:         ld [m_f], a
+            call m_sfx_move
+            jr .lp
+
+; the hand (OAM 39) at file A's window
+m_fhand:    add a
+            add a
+            inc a
+            ld b, a
+            ld c, 1
+            jp m_hand2
+; the files: three windows (0, 4 f) 20 x 4: "n Name  Lv xx" / "Job" or empty / damaged
+m_files:    call m_clear
+            xor a
+            call .one
+            ld a, 1
+            call .one
+            ld a, 2
+.one:       ld [m_f2], a
+            ld b, a
+            add a
+            add a
+            ld d, a                         ; row 4 f
+            ld e, 0
+            ld bc, $0414
+            call m_win
+            inc d
+            ld e, 2
+            ld a, [m_f2]
+            add '1'
+            call m_putc
+            ld e, 4
+            push de
+            ld a, [m_f2]
+            call sr_state
+            pop de
+            cp 1
+            jr z, .good
+            and a
+            ret z                           ; empty: the number only
+            ld hl, m_damaged
+            jp m_puts0
+.good:      push de                         ; the first member's name, level (cart RAM: on
+            xor a                           ;   only to copy them)
+            call sr_on
+            ld a, [m_f2]
+            call sr_addr
+            inc h                           ; $6100: level, name
+            ld de, m_fbuf
+            ld bc, 12
+            call memcpy
+            call sr_off
+            pop de
+            ld hl, m_fbuf + 6
+            ld b, 6
+.n:         ld a, [hl+]
+            push hl
+            push bc
+            call m_ff3c
+            call m_putc
+            pop bc
+            pop hl
+            inc e
+            dec b
+            jr nz, .n
+            ld e, 12
+            ld hl, m_lv
+            call m_puts0
+            ld a, [m_fbuf + 1]
+            inc a
+            ld l, a
+            ld h, 0
+            ld e, 15
+            ld b, 2
+            jp m_num
+
+; t8200 message A in the bottom window (0, 13) 20 x 5 (its lines, wrapped at build time)
+m_msg:      push af
+            pop af
+            call m_t82all
+            ld hl, M_STR
+; the string HL (lines split by $0A / $0C) in the bottom window
+m_msghl:    push hl
+            ld de, $0D00
+            ld bc, $0514
+            call m_win
+            pop hl
+            ld de, $0E01
+.c:         ld a, [hl+]
+            and a
+            ret z
+            cp $0A
+            jr z, .nl
+            cp $0C
+            jr z, .nl
+            cp ' '
+            jr c, .c
+            call m_putc
+            inc e
+            jr .c
+.nl:        inc d
+            ld e, 1
+            jr .c
+; t8200 string A -> M_STR whole (up to 80 bytes, 0 ended)
+m_t82all:   ld l, a
+            ld h, 0
+            ld e, l
+            ld d, h
+            add hl, hl
+            add hl, de
+            ld de, T_T8200
+            add hl, de
+            ld de, m_tmp
+            ld bc, 3
+            ld a, B_TEXT
+            call far_copy
+            ld a, [m_tmp + 1]
+            ld l, a
+            ld a, [m_tmp + 2]
+            ld h, a
+            ld de, M_STR
+            ld bc, 80
+            ld a, [m_tmp]
+            jp far_copy
+; Yes / No in the message window's last line (t8200 $06's words): C = No / B
+m_yesno:    xor a
+            ld [m_yn], a
+            ld hl, m_s_yes
+            ld de, $1002
+            call m_puts0
+            ld hl, m_s_no
+            ld e, 8
+            call m_puts0
+            ld a, 1
+            ld [m_dirty], a
+.lp:        ld a, [m_yn]
+            and a
+            ld c, 2
+            jr z, .h
+            ld c, 8
+.h:         ld b, 16
+            call m_hand2
+            call m_frame
+            ldh a, [pad_new]
+            and $30
+            jr nz, .t
+            ldh a, [pad_new]
+            bit 1, a
+            jr nz, .no
+            and PAD_A
+            jr z, .lp
+            call m_hand2off
+            ld a, [m_yn]
+            and a
+            jr nz, .no2
+            call m_sfx_ok
+            and a
+            ret
+.t:         ld a, [m_yn]
+            xor 1
+            ld [m_yn], a
+            call m_sfx_move
+            jr .lp
+.no:        call m_hand2off
+.no2:       call m_sfx_ok
+            scf
+            ret
+; wait for A or B
+m_waitkey:  call m_frame
+            ldh a, [pad_new]
+            and PAD_A | PAD_B
+            jr z, m_waitkey
+            ret
+; FF3's window colours as BG palette 7 (cgb_pal + 64; work RAM bank 1)
+m_winpal:   ld hl, I_WINPAL
+            ld de, m_tmp
+            ld bc, 4
+            ld a, B_MAPINFO
+            call far_copy
+            ld de, cgb_pal + 64
+            ld hl, m_tmp
+            ld b, 4
+.c:         ld a, [hl+]
+            push hl
+            push bc
+            and $3F
+            add a
+            ld l, a
+            ld h, high(I_RGB)
+            ld a, low(I_RGB)
+            add l
+            ld l, a
+            jr nc, .s
+            inc h
+.s:         push hl
+            ld a, B_MAPINFO
+            call far_byte
+            ld [de], a
+            inc de
+            pop hl
+            inc hl
+            ld a, B_MAPINFO
+            call far_byte
+            ld [de], a
+            inc de
+            pop bc
+            pop hl
+            dec b
+            jr nz, .c
+            ret
+
+; ==== the title: FF3's game load menu (3D/B9F6): the files, New Game; ours: Resume (later)
+; returns A = 0 new game, 1 a file loaded into the page
+t_title:    call m_enter
+            call m_winpal
+            ld a, $01                       ; FF3's song 1 (3D/BA41)
+            call mus_play
+            ld a, 3
+            ld [m_f], a                     ; (New Game first: FF3's cursor $0C)
+.scr:       call m_files
+            ld de, $0C00
+            ld bc, $0314
+            call m_win
+            ld a, $22                       ; "New Game"
+            call m_t82
+            ld de, $0D02
+            ld a, 16
+            call m_putsn
+            call m_show
+.lp:        ld a, [m_f]
+            cp 3
+            jr nz, .f
+            ld bc, $0D01
+            call m_hand2
+            jr .w
+.f:         call m_fhand
+.w:         call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            and PAD_A
+            jr z, .lp
+            ld a, [m_f]
+            cp 3
+            jr z, .new
+            call sr_state
+            cp 1
+            jr z, .load
+            call m_sfx_err                  ; empty or damaged
+            jr .lp
+.load:      call m_sfx_ok
+            ld a, [m_f]
+            call sr_read
+            call m_leave
+            ld a, 1
+            ld [m_res], a
+            ret
+.new:       call m_sfx_ok
+            call m_leave
+            xor a
+            ld [m_res], a
+            ret
+.up:        ld a, [m_f]
+            dec a
+            cp $FF
+            jr nz, .m
+            ld a, 3
+            jr .m
+.dn:        ld a, [m_f]
+            inc a
+            cp 4
+            jr c, .m
+            xor a
+.m:         ld [m_f], a
+            call m_sfx_move
+            jr .lp
+
 section wram, $CD80
 m_cur:      ds 1
 m_who:      ds 1
@@ -1071,3 +1599,9 @@ m_jpal:     ds 4
 m_digs:     ds 8
 m_n24:      ds 3
 m_tmp:      ds 3
+m_f:        ds 1
+m_f2:       ds 1
+m_yn:       ds 1
+m_fbuf:     ds 12
+m_res:      ds 1
+m_sf:       ds 1

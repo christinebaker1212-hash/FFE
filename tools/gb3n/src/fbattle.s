@@ -188,6 +188,40 @@ battle_run: ld a, [map_id]                  ; the battle background (39/BC00 wor
             pop af
             ld [z_lev], a
             ret
+; ---- (B_FIELD, mapped at boot) the title (FF3's game load menu, B_MENU) with the LCD on, then a new game's map or the
+; loaded file's world map
+title_boot: ld a, LCDC_ON
+            ldh [rLCDC], a
+            ld a, 3
+            ldh [rIE], a
+            xor a
+            ldh [rIF], a
+            ei
+            %FAR B_MENU, t_title
+            ld a, [m_res]
+            and a
+            jr z, .new
+            ld a, [SRAM_PAGE + $08]         ; a file: its world map position (3E/C0DE)
+            ld [world], a
+            ld a, [SRAM_PAGE + $09]
+            ld [enter_x], a
+            ld [wm_x], a
+            ld a, [SRAM_PAGE + $0A]
+            ld [enter_y], a
+            ld [wm_y], a
+            ld a, $FF
+            ld [map_id], a
+            ld a, 1
+            ld [wmode], a
+            jr .go
+.new:       ld a, START_MAP                 ; (test builds: map 255 = the world map)
+            inc a
+            jr nz, .go
+            inc a
+            ld [wmode], a
+.go:        call map_change
+            jp main_loop
+
 ; Start on the map: FF3's main menu (its screen in B_MENU), then the map again
 menu_open:  ld a, [z_lev]
             push af

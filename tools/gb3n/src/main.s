@@ -211,6 +211,9 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             ld a, START_Y
             ld [enter_y], a
             ld [wm_y], a
+            ld a, HAS_TITLE                 ; (the title: not in test builds)
+            and a
+            jp nz, title_boot
             ld a, START_MAP                 ; (test builds: map 255 = the world map)
             inc a
             jr nz, .nw

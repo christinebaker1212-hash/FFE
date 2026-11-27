@@ -43,7 +43,11 @@ def menu_data():
             'm_labels:\n' + ''.join('            db %s\n' % z(w) for w in want) +
             'm_gil:      db %s\n' % z(clean(t[5])) + 'm_cp:       db %s\n' % z('CP') +
             'm_lv:       db %s\n' % z('Lv') + 'm_hp:       db %s\n' % z('HP') + 'm_mp:       db %s\n' % z('MP') +
-            'm_exp:      db %s\n' % z('Exp') + 'm_prof:     db %s\n' % z(prof))
+            'm_exp:      db %s\n' % z('Exp') + 'm_prof:     db %s\n' % z(prof) +
+            'm_s_erase:  db %s\n' % z(clean(t[0x4C].split('{15')[0]).replace('\n', '\x0a')) +
+            'm_s_yes:    db %s\n' % z(clean(t[6].split('\n')[0])) +
+            'm_s_no:     db %s\n' % z(clean(t[6].split('\n')[1])) +
+            'm_damaged:  db %s\n' % z('Damaged'))
 
 
 def own_data():
@@ -55,7 +59,7 @@ def own_data():
     return ('section bank %d, $4000\nC_TILES:\n' % B_OWN + db(b''.join(tiles.tileset())) +
             'C_SCR_CGBONLY:\n' + db(tiles.screen(tiles.CGB_ONLY), 20) +
             'C_SCR_TEST:\n' + db(test, 20) + 'C_PAL0:\n' + db(pal0) +
-            'section bank %d, $6000\nC_WFONT:\n' % B_OWN + db(b''.join(tiles.tileset(fg=3, bg=2)[:128])) +
+            'section bank %d, $6000\nC_WFONT:\n' % B_OWN + db(b''.join(t if i != 1 else bytes(16) for i, t in enumerate(tiles.tileset(fg=3, bg=2)[:128]))) +
             'C_FF3ASC:\n' + db(tiles.ff3_to_ascii()) +
             'C_SPRDIG:\n' + db(spr_digits()))
 
@@ -314,6 +318,7 @@ def main():
         print('note: %s is not the expected English FF3 NES ROM (SHA-1 %s)' % (nes, EN_SHA1))
     src = (open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() + '\n' +
            'START_MAP = %d\nSTART_WORLD = %d\nSTART_X = %d\nSTART_Y = %d\n' % (test_map, test_world, test_x, test_y) +
+           'HAS_TITLE = %d\n' % (1 if os.environ.get('GB3N_TITLE') else 0 if ('--map' in a or os.environ.get('GB3N_TEST')) else 1) +
            'B_MAPINFO = %d\nB_MAPAUX = %d\nB_EVENTS = %d\nB_CHARS = %d\nB_COMMON = %d\n' % (
                B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_COMMON) +
            'B_NPCS = %d\nB_NPCGFX = %d\nB_OWN = %d\nB_TEXT = %d\nB_SCRIPT = %d\nB_FIELD = %d\n' % (
