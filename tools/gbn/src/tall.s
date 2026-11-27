@@ -980,6 +980,13 @@ wp_map:     ld a, $20
             ret
 .rows:      ld b, 3                         ; rows C .. C + 2 of $9C00
 .rw:        push bc
+            ldh a, [rLY]                    ; (each row in V-Blank: a long V-Blank handler left too
+            cp 144                          ;   little for three on the DMG: the strict checker,
+            jr c, .wv                       ;   2026-11-27)
+            cp 151
+            jr c, .go
+.wv:        call wait_vbl
+.go:
             ld l, c
             ld h, 0
             add hl, hl
