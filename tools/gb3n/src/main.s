@@ -201,6 +201,7 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             ld a, START_Y
             ld [enter_y], a
             call map_enter
+            call pal_apply
             ld a, LCDC_ON
             ldh [rLCDC], a
             ld a, 3                         ; V-Blank and the line interrupt (dialogue cut)
@@ -305,6 +306,57 @@ soft_reset: di                              ; (A + B + Select + Start)
             ld e, SOFT_MAGIC
             jp start
 
+; ---- the Color's palettes from cgb_pal (BG 0-3, OBJ 0-3; call in V-Blank or with the LCD off)
+pal_apply:  ld hl, cgb_pal
+            ld a, $80
+            ldh [rBCPS], a
+            ld b, 32
+.b:         ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .b
+            ld a, $80
+            ldh [rOCPS], a
+            ld b, 32
+.o:         ld a, [hl+]
+            ldh [rOCPD], a
+            dec b
+            jr nz, .o
+            ret
+; all palettes black (V-Blank)
+pal_black:  ld a, $80
+            ldh [rBCPS], a
+            ld b, 64
+            xor a
+.b:         ldh [rBCPD], a
+            dec b
+            jr nz, .b
+            ld a, $80
+            ldh [rOCPS], a
+            ld b, 64
+            xor a
+.o:         ldh [rOCPD], a
+            dec b
+            jr nz, .o
+            ret
+
+; ---- a map change with the LCD on (a real Color shows white with it off): the screen black,
+; the load behind the guard (a mode-2 line interrupt holds the CPU until H-Blank, so every VRAM
+; write lands in mode 0 / 1), then the new palettes in V-Blank
+map_change: call wait_vbl
+            call pal_black
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20                       ; STAT: the mode-2 interrupt
+            ldh [rSTAT], a
+            call map_enter
+            xor a
+            ldh [rSTAT], a
+            ld [guard_on], a
+            call wait_vbl
+            call pal_apply
+            jp scroll_set
+
 ; ---- reading data banks from banked code: the caller's bank (rombank) is mapped again after
 far_copy:   push af                         ; A = bank: BC bytes HL -> DE
             ldh a, [rombank]
@@ -367,3 +419,6 @@ pad_new:    ds 1
 
 section wram, $C3F0
 fc_save:    ds 1
+guard_on:   ds 1
+section wram, $C3C0
+cgb_pal:    ds 64

@@ -461,12 +461,18 @@ dlg_src:    ds 3
 section bank 0, $0E00
 ; line DLG_CUT: the window off from the next line (written in this line's H-Blank)
 stat_isr:   push af
+            ld a, [guard_on]                ; a guarded load: hold until H-Blank
+            and a
+            jr nz, .w
 .w:         ldh a, [rSTAT]
             and 3
             jr nz, .w
+            ld a, [guard_on]
+            and a
+            jr nz, .x
             ldh a, [rLCDC]
             and $DF
             ldh [rLCDC], a
-            pop af
+.x:         pop af
             reti
 

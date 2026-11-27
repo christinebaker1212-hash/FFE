@@ -486,41 +486,30 @@ pal_gather: ld de, nes_pal
             ld a, B_MAPINFO
             jp far_copy
 
-; nes_pal -> the Color's BG palettes 0-3 and OBJ palettes 0-1 (LCD off or in V-Blank)
+; nes_pal -> cgb_pal (RGB555: BG palettes 0-3, OBJ palettes 0-3), shown by pal_apply
 pal_load:   ld hl, I_RGB                    ; (the NES colour table into SCRATCH)
             ld de, SCRATCH
             ld bc, 128
             ld a, B_MAPINFO
             call far_copy
-            ld a, $80
-            ldh [rBCPS], a
             ld hl, nes_pal
-            ld b, 16
-.b:         call .one
-            ldh [rBCPD], a
-            ld a, d
-            ldh [rBCPD], a
-            dec b
-            jr nz, .b
-            ld a, $80
-            ldh [rOCPS], a
-            ld b, 16
-.o:         call .one
-            ldh [rOCPD], a
-            ld a, d
-            ldh [rOCPD], a
-            dec b
-            jr nz, .o
-            ret
-.one:       ld a, [hl+]                     ; A = low, D = high byte of colour [HL]
+            ld de, cgb_pal
+            ld b, 32
+.c:         ld a, [hl+]
             and $3F
             add a
             push hl
             ld l, a
             ld h, high(SCRATCH)
             ld a, [hl+]
-            ld d, [hl]
+            ld [de], a
+            inc de
+            ld a, [hl]
+            ld [de], a
+            inc de
             pop hl
+            dec b
+            jr nz, .c
             ret
 
 ; ---- one field frame (after the frame wait): V-Blank work, then the walking
@@ -659,9 +648,7 @@ trig_run:   ld b, a
             ld [map_id], a
             ld a, $FF
             ld [enter_x], a
-.go:        call lcd_off
-            call map_enter
-            jp lcd_on
+.go:        jp map_change
 
 ; D, E = the cell ahead of the party (coordinates wrap at 64, as FF3's AND $3F)
 dest_cell:  ld a, [pos_x]
