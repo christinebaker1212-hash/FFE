@@ -1177,3 +1177,15 @@ one reaches parity, so the owner can keep playing).
       hand (OAM 0-3) while its rows went up and the four hands were drawn only once; the redraw now counts as in
       place (sf_hk, as the Bestiary's scrolling), so the hands stay.
     - Strict checker 0 on DMG / CGB / SGB (random play from New Game, random walks in Crescent Lake).
+66. Owner (2026-11-27): the battle "o&" window, still there at battle start, on an enemy's death and at the end.
+    - Reproduced in SameBoy (formation 10, Color): the message window showed "o&" where "The monsters strike
+      first!" / "Dune -> Shadow" / "Had no effect" belonged, in 119 of 2,000 frames.
+    - Cause: bt_msg_row closes the top name window (bt_ban_off) before saving HL, its string pointer. Closing it
+      waits a frame or more (an enemy's spell name stays up a second; the V-Blank), and the battle frames run
+      meanwhile left HL elsewhere, so the row was drawn from the wrong bytes: "o&". The window is open at battle
+      start, after a kill and at the end, so only then. (Item 63's lookup guards could not catch it: the
+      message number was right.)
+    - Fix: bt_ban_off keeps HL for every caller (bank 0 wrapper around btl2.s bt_ban_off6). Also: message,
+      results and left-window rows are mapped only once their letters are uploaded (vwf_outf), so a row never
+      shows its tiles' old letters.
+    - Checked: an "o&" pixel detector over every frame finds 0 (was 119); the right texts show in those frames.

@@ -1836,3 +1836,18 @@ bt_ail_in:  xor a
             jr c, .m
             jp bub_init                     ; (the bubbles: none yet, btl5.s)
 
+section bank 0, $2F52                       ; (free space)
+; vwf_out, then wait until its tiles are up (bt_flush): for a row mapped right after. Mapped
+; first, the row showed the tiles' old letters for a frame or more at battle start, an enemy's
+; death and the results ("o&"; owner, 2026-11-27). (Called from the battle bank, which stays
+; mapped.)
+vwf_outf:   call vwf_out
+            jp bt_flush
+; the top window off (btl2.s bt_ban_off6) with HL kept: its waits (an enemy's spell name up a
+; second, the V-Blank) ran the battle's frames, which left HL elsewhere, and bt_msg_row's
+; string was then read from there: the "o&" rows at battle start, an enemy's death and the
+; end (owner, 2026-11-27)
+bt_ban_off: push hl
+            call bt_ban_off6
+            pop hl
+            ret

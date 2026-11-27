@@ -248,7 +248,7 @@ bt_mrow:    ld a, [bt_rows]
             add a, BT_TEXT
             push af
             ld b, 18
-            call vwf_out
+            call vwf_outf                   ; (its letters up before the row is mapped)
             pop af
             ld e, a
             ld a, [bt_rows]
