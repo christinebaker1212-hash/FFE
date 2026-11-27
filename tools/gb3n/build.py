@@ -62,6 +62,24 @@ def menu_data():
             'm_remove:   db %s\n' % z(clean(t[0x3E].split('\n')[-1])) + name_grid())
 
 
+def story_data():
+    """FF3's epilogue / ending texts (script/ff3/epilogue.json, the 1F/A700 table), colour codes
+    dropped, wrapped to 18 columns: m_story_t (pointers), each 0-ended with $0A between lines"""
+    import json
+    ents = json.load(open(os.path.join(ROOT, 'script', 'ff3', 'epilogue.json')))
+    out = 'section bank %d, $4000\nm_story_t:\n' % B_STORY
+    body = ''
+    for e in sorted(ents, key=lambda e: e['id']):
+        t = re.sub(r'\{COL:..\}', '', e['en'])
+        lines = []
+        for para in t.split('\n'):
+            lines += text.wrap(para.strip(), 18) if para.strip() else ['']
+        enc = '\x0a'.join(lines)
+        out += '            dw m_story_%d\n' % e['id']
+        body += 'm_story_%d:  db %s\n' % (e['id'], ''.join('$%02X, ' % (ord(c) if 32 <= ord(c) < 127 or c == '\n' else 63) for c in enc) + '0')
+    return out + body
+
+
 def name_grid():
     """the name entry's letters in FF3's codes (the English ROM's ENC): upper / lower case, digits,
     punctuation (9 x 5 each), and our help lines (Nintendo's button names)"""
@@ -122,6 +140,7 @@ B_BSCR, B_BINFO, B_CGFX, B_MGFX0 = 60, 61, 62, 64   # battle screen code; monste
 B_BOSS0 = 72                # boss graphics (72-75)
 B_MENU = 76                 # the main menu's code
 B_VGFX = 77                 # world map vehicles' graphics (NES 0B)
+B_STORY = 78                # the epilogue / ending texts
 
 
 def field_banks(rom):
@@ -371,7 +390,7 @@ def main():
                B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD) +
            'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
            'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\nB_BSET = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2, B_BSET) +
-           'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\nB_MENU = %d\nB_VGFX = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0, B_MENU, B_VGFX) + text_defs +
+           'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\nB_MENU = %d\nB_VGFX = %d\nB_STORY = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0, B_MENU, B_VGFX, B_STORY) + text_defs +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
@@ -382,10 +401,12 @@ def main():
            open(os.path.join(HERE, 'src', 'vehicle.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sound.s')).read() + '\n' +
            ''.join(open(os.path.join(HERE, 'src', f)).read() + '\n' for f in BATTLE_SRC) +
-           open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + sound_data() + own_data())
+           open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + story_data() + sound_data() + own_data())
     if os.environ.get('GB3N_BATTLE'):            # test builds only: every encounter is this battle
         src = src.replace('            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a',
                           '            ld a, %s\n            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a' % os.environ['GB3N_BATTLE'])
+    if os.environ.get('GB3N_STORY'):             # test builds only: Start runs the ending ($DD)
+        src = src.replace('            jp nz, menu_open', '            jp nz, ev_ending')
     if os.environ.get('GB3N_TEST'):              # test builds: tools/gb3n/test (never a release)
         src = src.replace('.nw:        call map_enter', '.nw:        jp test_loop')
         src += open(os.path.join(HERE, 'src', 'test.s')).read() + '\n'

@@ -525,7 +525,7 @@ ev_exec:    ld a, [ev_cmd]
 evd_table:  dw ev_shake, ev_flash, ev_none, ev_none      ; D0-D3 (palette effects: later)
             dw ev_hpall, ev_mpall, ev_pfloor, ev_pwall   ; D4-D7
             dw ev_reset, ev_chain, ev_none, ev_none      ; D8-DB (dance, prologue: later)
-            dw ev_none, ev_none, ev_surf, ev_hp1         ; DC-DF (epilogue, ending: later)
+            dw ev_epi, ev_ending, ev_surf, ev_hp1        ; DC-DF
             dw ev_none, ev_none, ev_none, ev_none        ; E0-E3 (palette reload, flash)
 evc_table:  dw ev_none, ev_none, ev_none, ev_take        ; E4-E7
             dw ev_stclr, ev_stset, ev_gil, ev_ungil      ; E8-EB
@@ -536,6 +536,26 @@ evc_table:  dw ev_none, ev_none, ev_none, ev_take        ; E4-E7
             dw ev_wait, ev_prev, ev_none, ev_end         ; FC-FF
 ev_none:    ret
 
+; $DC / $DD: FF3's epilogue (texts 0-2) / ending (texts 3-7, then the end) as pages (B_MENU)
+ev_epi:     xor a
+            ld b, 3
+            ld c, 0
+            jr ev_story
+ev_ending:  ld a, 3
+            ld b, 5
+            ld c, 1
+ev_story:   ld [m_sid], a
+            ld a, b
+            ld [m_scnt], a
+            ld a, c
+            ld [m_send], a
+            %FAR B_MENU, m_story
+            ld a, [pos_x]
+            ld [enter_x], a
+            ld a, [pos_y]
+            ld [enter_y], a
+            call keep_people
+            jp map_change
 ; $D0 / $D1: the shake / flash sounds (3B/B58F: sound effects $38, $39; the picture: later)
 ev_shake:   ld a, $58
             jp sfx_play

@@ -5310,6 +5310,89 @@ m_yesno2:   ld hl, m_s_yes
             scf
             ret
 
+; ==== FF3's epilogue ($DC) and ending ($DD): its texts as pages on black, A for the next;
+; [m_sid] first text, [m_scnt] how many; [m_send] 1: the end (stays, soft reset only)
+m_story:    call m_enter
+            call m_winpal
+            xor a                           ; (the letters' ground black: palette 7 colour 2)
+            ld [cgb_pal + 64 + 4], a
+            ld [cgb_pal + 64 + 5], a
+.pg:        call m_clear
+            call m_sprclr
+            ld a, [m_sid]                   ; the page into M_STR (B_STORY)
+            add a
+            ld hl, m_story_t
+            add l
+            ld l, a
+            jr nc, .t
+            inc h
+.t:         ld de, m_tmp
+            ld bc, 2
+            ld a, B_STORY
+            call far_copy
+            ld a, [m_tmp]
+            ld l, a
+            ld a, [m_tmp + 1]
+            ld h, a
+            ld de, M_STR
+            ld bc, 255
+            ld a, B_STORY
+            call far_copy
+            ld hl, M_STR
+            push hl                         ; the lines centred: count them first
+            ld b, 1
+.cn:        ld a, [hl+]
+            and a
+            jr z, .cd
+            cp $0A
+            jr nz, .cn
+            inc b
+            jr .cn
+.cd:        ld a, 18
+            sub b
+            srl a
+            ld d, a                         ; the first row
+            pop hl
+.ln:        push hl                         ; a line: its length, then centred
+            ld c, 0
+.ll:        ld a, [hl+]
+            and a
+            jr z, .le
+            cp $0A
+            jr z, .le
+            inc c
+            jr .ll
+.le:        pop hl
+            ld a, 20
+            sub c
+            srl a
+            ld e, a
+.lc:        ld a, [hl+]
+            and a
+            jr z, .done
+            cp $0A
+            jr z, .nl
+            call m_putc
+            inc e
+            jr .lc
+.nl:        inc d
+            jr .ln
+.done:      ld a, 1                         ; (black outside: the text's own cells only)
+            ld [m_dirty], a
+            call m_show
+            call m_waitkey
+            ld a, [m_sid]
+            inc a
+            ld [m_sid], a
+            ld hl, m_scnt
+            dec [hl]
+            jr nz, .pg
+            ld a, [m_send]
+            and a
+            jp z, m_leave
+.end:       call m_frame                    ; the end: here until a soft reset
+            jr .end
+
 section bank B_MENU, $7C00
 sp_mask:    ds 56                           ; (3D/A20C, A244, A27C: from the ROM)
 sp_lvl:     ds 56
@@ -5384,3 +5467,6 @@ s_mode:     ds 1
 s_list:     ds 1
 s_t:        ds 3
 s_acc:      ds 3
+m_sid:      ds 1
+m_scnt:     ds 1
+m_send:     ds 1
