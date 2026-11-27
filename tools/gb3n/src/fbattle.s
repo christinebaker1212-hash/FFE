@@ -205,6 +205,8 @@ title_boot: ld a, LCDC_ON
             ld a, [m_res]
             and a
             jr z, .new
+            cp 2                            ; resumed: the place as it was
+            jr z, .res
             ld a, [SRAM_PAGE + $08]         ; a file: its world map position (3E/C0DE)
             ld [world], a
             ld a, [SRAM_PAGE + $09]
@@ -224,6 +226,10 @@ title_boot: ld a, LCDC_ON
             jr nz, .go
             inc a
             ld [wmode], a
+.res:       ld a, [pos_x]
+            ld [enter_x], a
+            ld a, [pos_y]
+            ld [enter_y], a
 .go:        call map_change
             jp main_loop
 

@@ -616,8 +616,7 @@ m_label:    ld hl, m_labels
             jr .f
 
 ; ---- not yet: an error sound (first pass)
-m_config:
-m_suspend:  jp m_sfx_err
+
 
 ; ---- FF3's sounds: $85 confirm, $98 move, $86 error (3E/D20D, D213, D529)
 m_sfx_ok:   ld a, $05
@@ -1537,7 +1536,9 @@ m_winpal:   ld hl, I_WINPAL
 
 ; ==== the title: FF3's game load menu (3D/B9F6): the files, New Game; ours: Resume (later)
 ; returns A = 0 new game, 1 a file loaded into the page
-t_title:    call m_enter
+t_title:    call su_state                   ; a suspend point: Resume first
+            ld [m_su], a
+            call m_enter
             call m_winpal
             ld a, $01                       ; FF3's song 1 (3D/BA41)
             call mus_play
@@ -1552,11 +1553,29 @@ t_title:    call m_enter
             ld de, $0D02
             ld a, 16
             call m_putsn
-            call m_show
+            ld a, [m_su]
+            and a
+            jr z, .ns
+            ld de, $0F00
+            ld bc, $0314
+            call m_win
+            ld de, $1002
+            ld hl, m_s_resume
+            ld a, [m_su]
+            cp 1
+            jr z, .rs
+            ld hl, m_damaged
+.rs:        call m_puts0
+.ns:        call m_show
 .lp:        ld a, [m_f]
             cp 3
-            jr nz, .f
+            jr nz, .f4
             ld bc, $0D01
+            call m_hand2
+            jr .w
+.f4:        cp 4
+            jr nz, .f
+            ld bc, $1001
             call m_hand2
             jr .w
 .f:         call m_fhand
@@ -1571,6 +1590,8 @@ t_title:    call m_enter
             ld a, [m_f]
             cp 3
             jr z, .new
+            cp 4
+            jr z, .resume
             call sr_state
             cp 1
             jr z, .load
@@ -1588,20 +1609,40 @@ t_title:    call m_enter
             xor a
             ld [m_res], a
             ret
+.resume:    ld a, [m_su]
+            cp 1
+            jr nz, .rerr
+            call m_sfx_ok
+            call su_load
+            call m_leave
+            ld a, 2
+            ld [m_res], a
+            ret
+.rerr:      call m_sfx_err
+            jp .lp
 .up:        ld a, [m_f]
             dec a
             cp $FF
             jr nz, .m
-            ld a, 3
+            call .last
             jr .m
-.dn:        ld a, [m_f]
+.dn:        call .last
+            ld b, a
+            ld a, [m_f]
+            cp b
+            jr z, .z
             inc a
-            cp 4
-            jr c, .m
-            xor a
+            jr .m
+.z:         xor a
 .m:         ld [m_f], a
             call m_sfx_move
-            jr .lp
+            jp .lp
+.last:      ld a, [m_su]                    ; the last entry: Resume (4) or New Game (3)
+            and a
+            ld a, 3
+            ret z
+            inc a
+            ret
 
 ; ==== New Game: the four names (FF3's 3D/B895: a name each, B on an empty name back to the one
 ; before); our grid: 9 x 5 letters, one case at a time (SELECT switches), B deletes, START ends
@@ -4318,6 +4359,149 @@ j_change:   ld a, [m_newj]
             jr nz, .cm
             ret
 
+; ==== 6 Config (ours): FF3's message speed ($6010: 0-7, shown 1-8; 3D/BB59 wraps it)
+m_config:   call m_clear
+            call m_sprclr
+            ld de, $0000
+            ld bc, $0314
+            call m_win
+            ld hl, m_s_cfg
+            ld de, $0101
+            call m_puts0
+            ld de, $0300
+            ld bc, $0414
+            call m_win
+            ld hl, m_s_mspd
+            ld de, $0402
+            call m_puts0
+            ld a, [SRAM_PAGE + $10]
+            and 7
+            inc a
+            ld l, a
+            ld h, 0
+            ld de, $0411
+            ld b, 1
+            call m_num
+            call m_show
+            ld bc, $0401
+            call m_hand
+.lp:        call m_frame
+            ldh a, [pad_new]
+            ld b, a
+            and $30
+            jr nz, .ch
+            ld a, b
+            and PAD_A | PAD_B
+            jr z, .lp
+            call m_sfx_ok
+            ret
+.ch:        ld a, [SRAM_PAGE + $10]
+            bit 4, b
+            jr nz, .r
+            dec a
+            jr .s
+.r:         inc a
+.s:         and 7
+            ld [SRAM_PAGE + $10], a
+            call m_sfx_move
+            jr m_config
+
+; ==== 8 Suspend (ours): the page and the field's place in cart RAM bank 1, then the title;
+; bank 1: $A000 page, $A400 field ($C100, 192), $A4C0 world ($C2C0, 16), $A4D0 'S' '3' + sum
+SU_FIELD   = $A400
+SU_WORLD   = $A4C0
+SU_CHECK   = $A4D0
+m_suspend:  ld a, 1
+            call sr_on
+            ld hl, SRAM_PAGE
+            ld de, $A000
+            ld bc, $400
+            call memcpy
+            ld hl, $C100
+            ld de, SU_FIELD
+            ld bc, 192
+            call memcpy
+            ld hl, $C2C0
+            ld de, SU_WORLD
+            ld bc, 16
+            call memcpy
+            call su_sum
+            ld hl, SU_CHECK
+            ld [hl], 'S'
+            inc l
+            ld [hl], '3'
+            inc l
+            ld [hl], e
+            inc l
+            ld [hl], d
+            call sr_off
+            call m_sprclr
+            ld hl, m_s_susp
+            call m_msghl
+            call m_show
+            call m_waitkey
+            call m_leave
+            jp soft_reset
+; DE = the sum of $A000-$A4CF (cart RAM on)
+su_sum:     ld hl, $A000
+            ld bc, $4D0
+            ld de, 0
+.s:         ld a, [hl+]
+            add e
+            ld e, a
+            jr nc, .n
+            inc d
+.n:         dec bc
+            ld a, b
+            or c
+            jr nz, .s
+            ret
+; A = 0 none, 1 good, 2 damaged
+su_state:   ld a, 1
+            call sr_on
+            ld hl, SU_CHECK
+            ld a, [hl+]
+            cp 'S'
+            jr nz, .none
+            ld a, [hl]
+            cp '3'
+            jr nz, .none
+            call su_sum
+            ld hl, SU_CHECK + 2
+            ld a, [hl+]
+            cp e
+            jr nz, .bad
+            ld a, [hl]
+            cp d
+            jr nz, .bad
+            call sr_off
+            ld a, 1
+            ret
+.bad:       call sr_off
+            ld a, 2
+            ret
+.none:      call sr_off
+            xor a
+            ret
+; resume: everything back, the point erased (used once)
+su_load:    ld a, 1
+            call sr_on
+            ld hl, $A000
+            ld de, SRAM_PAGE
+            ld bc, $400
+            call memcpy
+            ld hl, SU_FIELD
+            ld de, $C100
+            ld bc, 192
+            call memcpy
+            ld hl, SU_WORLD
+            ld de, $C2C0
+            ld bc, 16
+            call memcpy
+            xor a
+            ld [SU_CHECK], a
+            jp sr_off
+
 section bank B_MENU, $7C00
 sp_mask:    ds 56                           ; (3D/A20C, A244, A27C: from the ROM)
 sp_lvl:     ds 56
@@ -4381,3 +4565,4 @@ m_tmp8:     ds 8
 
 section wram, $CEA0
 M_STR:      ds 80                           ; a string (the overlap check guards the variables)
+m_su:       ds 1

@@ -1649,7 +1649,16 @@ bsc_msg:    call msg_at
             inc [hl]
             ret
 ; $0A wait: 40 frames or A
-bsc_wait:   ld b, 40
+bsc_wait:   ld a, [$D010]                   ; FF3's 34/9450: (8 - message speed) x 8 frames
+            ld b, a
+            ld a, 8
+            sub b
+            add a
+            add a
+            add a
+            ld b, a
+            and a
+            ret z
 .w:         push bc
             call bs_frame
             pop bc

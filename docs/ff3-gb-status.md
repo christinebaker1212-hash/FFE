@@ -210,7 +210,16 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   each access; each file has our own check (magic + 16-bit sum) besides FF3's; a bad file shows
   "Damaged". Checked: save, soft reset, load from the title.
 - New Game: the four names (FF3's 3D/B895 flow; our 9 x 5 grid, SELECT switches case).
-- To do: Item, Magic, Equip, Job, Config, Suspend.
+- Item (FF3's choose-twice: use / swap / trash; its item effects and healing formula 3D/A48A;
+  spells taught from items with FF3's three places a level), Magic (FF3's field spells 3C/99FF:
+  Cure family with the caster's multiplier, Raise / Arise, status cures, Toad / Minimum toggles,
+  one or all, MP per level; a spell back into the pack), Equip (FF3's slot rules 3C/9C3C, hand
+  pairs 3C/9D4B, arrows up to 20, remove / remove all, the job check from 30/9400 and 00/8900),
+  Job (jobs by crystals 3F/F38A, CP cost 3D/AD85, checks 3D/AE23, change 3D/AB8F with the new
+  job's level-ups from bank 39), Config (FF3's message speed $6010; the battle message wait uses
+  it as 34/9450), Suspend (cart RAM bank 1 with its own check, resumed once from the title).
+- Not yet in menus: Exit / Teleport / Sightro and the Midgard Bread / Otter's Head (they need the
+  minimap and FF3's warp), FF3's spell list Swap, the stat-up messages after equipping.
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
