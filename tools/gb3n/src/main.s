@@ -5,7 +5,10 @@
 ; This file: the header vectors, boot (memory cleared, Lot Check), the "Game Boy Color only"
 ; screen on older systems, double speed, the frame wait, the pad and the soft reset.
 
-LCDC_ON    = $93            ; LCD on, BG tiles at $8000, BG map $9800, BG and sprites on
+LCDC_ON    = $C3            ; LCD on, window map $9C00 (off), BG tiles $8800 mode, BG map $9800,
+                            ;   BG and sprites on
+LCDC_WIN   = LCDC_ON | $20  ; with the window (dialogue / menus)
+LCDC_NOTE  = $91            ; the notice on older systems: BG tiles at $8000
 rKEY1      = $FF4D
 rVBK       = $FF4F
 rSVBK      = $FF70
@@ -96,7 +99,7 @@ cgb_only:   ld hl, $D000                    ; work RAM bank 1 ($D000-$DFFF) clea
             ldh [rNR52], a                  ; sound off
             ld a, %00100111                 ; BGP: 0 black, 1 light grey, 2 dark grey, 3 white
             ldh [rBGP], a
-            ld a, LCDC_ON
+            ld a, LCDC_NOTE
             ldh [rLCDC], a
             ld a, 1
             ldh [rIE], a
@@ -163,6 +166,16 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             ldh [rOCPD], a
             dec b
             jr nz, .p2
+            ld a, B_OWN                     ; our window font: VRAM bank 1 $9000 (tile = ASCII)
+            ld [MBC5_BANKL], a
+            ld a, 1
+            ldh [rVBK], a
+            ld hl, C_WFONT
+            ld de, $9000
+            ld bc, 128 * 16
+            call memcpy
+            xor a
+            ldh [rVBK], a
             ld hl, dma_rom                  ; the OAM DMA routine into high RAM
             ld de, hram_dma
             ld b, dma_end - dma_rom

@@ -9,7 +9,7 @@ ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
-import tiles, data
+import tiles, data, text
 
 ROM_BANKS = 128             # 2 MB (sized to the game later)
 RAM_CODE = 0x03             # 32 KB cart RAM (4 banks, as retail MBC5 games: docs/gb-lessons.md)
@@ -29,11 +29,13 @@ def own_data():
                          (7, None, 'Native engine'), (9, None, 'Game Boy Color')])
     return ('section bank %d, $4000\nC_TILES:\n' % B_OWN + db(b''.join(tiles.tileset())) +
             'C_SCR_CGBONLY:\n' + db(tiles.screen(tiles.CGB_ONLY), 20) +
-            'C_SCR_TEST:\n' + db(test, 20) + 'C_PAL0:\n' + db(pal0))
+            'C_SCR_TEST:\n' + db(test, 20) + 'C_PAL0:\n' + db(pal0) +
+            'section bank %d, $6000\nC_WFONT:\n' % B_OWN + db(b''.join(tiles.tileset(fg=3, bg=2)[:128])) +
+            'C_FF3ASC:\n' + db(tiles.ff3_to_ascii()))
 
 
 B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_TMAP0, B_SUB0, B_COMMON = 3, 4, 5, 6, 8, 12, 17
-B_NPCS, B_NPCGFX, B_OWN = 18, 19, 20
+B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT = 18, 19, 20, 21, 28
 
 
 def field_banks(rom):
@@ -81,8 +83,8 @@ def field_banks(rom):
     b = blank(); b[0:0x2000] = rom.at(0x10 * data.B8, 0x2000); banks[B_EVENTS] = b
     b = blank(); b[0:0x4000] = gbt(rom.at(0x0E * data.B8, 0x4000)); banks[B_CHARS] = b
     b = blank(); b[0:144 * 16] = gbt(rom.rd(0x0D, 0xB700, 144 * 16)); banks[B_COMMON] = b
-    b = blank()                                          # people: NES bank $2C, tables, init
-    b[0x0000:0x2000] = rom.at(0x2C * data.B8, 0x2000)
+    banks[B_SCRIPT] = bytearray(rom.at(0x2C * data.B8, 0x4000))   # NES $2C/$2D: npc lists, scripts
+    b = blank()                                          # people: tables, init
     b[0x2000:0x2200] = rom.rd(0x00, 0x9400, 512)
     b[0x2200:0x2400] = rom.rd(0x01, 0xBE00, 512)
     b[0x2400:0x2500] = rom.rd(0x3B, 0xB41A, 256)
@@ -111,19 +113,26 @@ def main():
     mp = [int(v) for v in mp] + [0, 255, 255][len(mp) - 1:]
     test_map, test_world, test_x, test_y = mp[:4]
     raw = open(nes, 'rb').read()
+    tbanks, tlay, tlast = text.banks(B_TEXT)
+    assert tlast < B_SCRIPT, 'text banks overflow'
+    text_defs = ''.join('T_%s = $%04X\n' % (k.upper(), v) for k, v in tlay.items())
     if hashlib.sha1(raw).hexdigest() != EN_SHA1:
         print('note: %s is not the expected English FF3 NES ROM (SHA-1 %s)' % (nes, EN_SHA1))
     src = (open(os.path.join(HERE, '..', 'gb', 'rt', 'hw.s')).read() + '\n' +
            'START_MAP = %d\nSTART_WORLD = %d\nSTART_X = %d\nSTART_Y = %d\n' % (test_map, test_world, test_x, test_y) +
            'B_MAPINFO = %d\nB_MAPAUX = %d\nB_EVENTS = %d\nB_CHARS = %d\nB_COMMON = %d\n' % (
                B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_COMMON) +
-           'B_NPCS = %d\nB_NPCGFX = %d\nB_OWN = %d\n' % (B_NPCS, B_NPCGFX, B_OWN) +
+           'B_NPCS = %d\nB_NPCGFX = %d\nB_OWN = %d\nB_TEXT = %d\nB_SCRIPT = %d\n' % (
+               B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT) + text_defs +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' + own_data())
     r = asm(src)
     banks = dict(r.banks)
     rom = data.Rom(nes)
+    for k, v in tbanks.items():
+        assert k not in banks, 'bank %d used twice' % k
+        banks[k] = v
     for k, v in field_banks(rom).items():
         assert k not in banks, 'bank %d used twice' % k
         banks[k] = v

@@ -112,9 +112,9 @@ sram_init:  ld hl, SRAM_PAGE
 npc_load:   ld hl, NPC1
             ld de, $200
             call memclr
-            ld a, B_NPCS
-            call sbank
-            ld a, [map_props + 4]           ; the map's npc list: pointer table at NES $8000
+            ld a, B_SCRIPT                  ; the map's npc list (NES $2C/$2D as one 16 KB bank:
+            call sbank                      ;   NES $8000-$BFFF -> $4000-$7FFF), into npc_list
+            ld a, [map_props + 4]
             ld l, a
             ld h, 0
             add hl, hl
@@ -124,9 +124,21 @@ npc_load:   ld hl, NPC1
             ld h, [hl]
             ld l, a
             ld a, h
-            and $1F
-            add $40
+            and $3F
+            or $40
             ld h, a
+            ld de, npc_list
+            ld b, 4 * NPC_SLOTS
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .cp
+            xor a
+            ld [de], a                      ; (a terminator after 12)
+            ld a, B_NPCS
+            call sbank
+            ld hl, npc_list
             ld de, NPC1
             xor a
             ld [npc_n], a
@@ -513,3 +525,4 @@ nd_x:       ds 1
 nd_y:       ds 1
 nd_tb:      ds 1
 frame:      ds 1
+npc_list:   ds 4 * NPC_SLOTS + 1

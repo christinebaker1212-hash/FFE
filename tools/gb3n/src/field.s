@@ -171,22 +171,25 @@ map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if wor
             call map_unpack                 ; the tilemap into W_MAP
             call map_triggers               ; trigger tiles -> metatiles $80-$FF
             call pal_load                   ; Color palettes (LCD off)
-            xor a                           ; BG tiles: the subset at $00, the menu tiles at $70
-            ldh [rVBK], a
+            xor a                           ; BG tiles ($8800 mode): the subset at $00 ($9000),
+            ldh [rVBK], a                   ;   the menu tiles at $70 ($9700) and $80 ($8800)
             ld a, [gs_src]
             call sbank
             ld a, [gs_src + 1]
             ld l, a
             ld a, [gs_src + 2]
             ld h, a
-            ld de, $8000
+            ld de, $9000
             ld bc, 112 * 16
             call memcpy
             ld a, B_COMMON
             call sbank
             ld hl, $4000
-            ld de, $8700
-            ld bc, 144 * 16
+            ld de, $9700
+            ld bc, 16 * 16
+            call memcpy
+            ld de, $8800
+            ld bc, 128 * 16
             call memcpy
             ld a, B_CHARS                   ; the walking character's tiles: VRAM bank 1 $8000
             call sbank

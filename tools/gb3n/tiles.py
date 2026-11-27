@@ -48,6 +48,9 @@ def tileset(fg=3, bg=0):
     for ch in G:
         if len(ch) == 1 and 32 <= ord(ch) < 127:
             t[ord(ch)] = gb(nes_tile(ch, fg, bg))
+    if '…' in G:
+        t[127] = gb(nes_tile('…', fg, bg))
+    t[32] = gb(nes_tile(' ', fg, bg))
     for n, data in frame_tiles().items():
         t[FRAME[n]] = data
     return t
@@ -77,3 +80,15 @@ def screen(rows):
 CGB_ONLY = [(2, None, 'FINAL FANTASY III'), ('frame', 1, 5, 18, 11),
             (7, None, 'This Game Pak is'), (9, None, 'designed only'),
             (11, None, 'for use on the'), (13, None, 'Game Boy Color.')]
+
+
+def ff3_to_ascii():
+    """256 bytes: the English FF3 ROM's character codes (tools/ff3/insert.py ENC, used in
+    names typed in the game) -> our font's codes; $FF (space / padding) -> space"""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'ff3'))
+    import insert
+    t = bytearray(b'?' * 256)
+    for ch, c in insert.ENC.items():
+        t[c] = 127 if ch == '…' else ord(ch)
+    t[0xFF] = 32
+    return bytes(t)
