@@ -230,7 +230,13 @@ v_abtn:     ld a, [veh]
             jr nc, v_land
 .no:        scf
             ret
-.off:       xor a
+.off:       ld a, $80                       ; (3E/C2E7: it runs off from where the party is)
+            ld [ws_cb], a
+            ld a, $70
+            ld [ws_cbx], a
+            ld a, $6F
+            ld [ws_cby], a
+            xor a
             jp v_set
 .ship:      ld a, [SRAM_PAGE + $20]         ; the Enterprise takes off ($6020 bit 4, not 5)
             and $30

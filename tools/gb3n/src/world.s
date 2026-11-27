@@ -116,6 +116,8 @@ world_enter:
             call scroll_set
             call veh_load                   ; the vehicles' poses, tables and tiles
             %FAR B_WSPR, ws_tiles           ; FF3's tiles $80-$FF (3D/BDE0)
+            ld hl, ws_cb                    ; (3E/C8AC: no chocobo running off after a load)
+            res 7, [hl]
             call party_oam
             call npc_oam
             jp v_parked

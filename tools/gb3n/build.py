@@ -322,6 +322,8 @@ ROMDATA = {
     'sp_ptr': (0x3D, 0xA27C, 56),        # menu: each spell's level slots in the list buffer
     'wp_comb': (0x3C, 0x9D4B, 16),       # menu: the hand pairs allowed (weapon types 4 x 4)
     'job_prog': (0x3D, 0xAD59, 44),      # menu: each job's level-up table (bank 39)
+    'ws_sin': (0x3A, 0x9E3E, 256),       # world sprites: FF3's sine table, the ship's chain
+    'ws_chtab': (0x3D, 0xBF7A, 126),
     'nj_h': (0x3B, 0xAC0C, 25),          # event: a person's jump height
     'dn_x': (0x3B, 0xADB1, 84),          # event: the dance's sub-x, sub-y, facings
     'dn_y': (0x3B, 0xAE05, 84),
