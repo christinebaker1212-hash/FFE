@@ -9,6 +9,7 @@
 WANIM_BANK = 106
 WANIM_DMG  = 108
 WTOWN_BANK = 109           ; the towns' water tile (build.py town_water)
+WSHR_BANK  = 115           ; the Undersea Shrine's water (build.py shrine_water)
 
 section bank 0, $3F94
 ; every field frame. The water keeps its own step count (wa_t: only while it shows), so a menu,
@@ -55,9 +56,12 @@ section bank 0, $3A2B                       ; (free space; was $2F52, grown)
 ; towns (tileset 0: maps 0-7), outside the rooms: their one water tile ($0F) moves as the sea,
 ; in two bands of 4 lines (build.py town_water); a step's picture goes to VRAM in the V-Blank
 wa_town:    ld a, [cur_map]
-            cp 8
+            cp 8                            ; (the towns, and the Undersea Shrine's floors
+            jr c, .tw                       ;   42-46: owner, 2026-11-27)
+            sub 42
+            cp 5
             jr nc, .no
-            ld a, [inroom]
+.tw:        ld a, [inroom]
             and a
             jr nz, .no
             ld a, [wt_req]                  ; (one the V-Blank did not take: wanted again,
@@ -102,11 +106,75 @@ wt_vbl:     ld a, [wt_req]
             ret nc
             xor a
             ld [wt_req], a
-            jp wt_cp
+            jp wt_cpq
 ; the main loop's end (ap_tl)
 wt_end:     ld hl, wt_req
             sla [hl]
             jp main
+
+section bank 0, $31BA                       ; (free space)
+; the water tile(s) of this standard map for step wa_ph: a town's, or the Undersea Shrine's
+wt_cpq:     ld a, [cur_map]
+            cp 8
+            jp c, wt_cp
+            jp ws_cp
+
+section bank 0, $352B                       ; (free space)
+; the Undersea Shrine's water (build.py shrine_water): its four tiles' pictures for step wa_ph
+; (64 bytes a step; on the plain Game Boy some 3.5 lines, from wt_vbl's line 149 at the latest)
+ws_cp:      ld a, WSHR_BANK
+            call sbank
+            ldh a, [is_cgb]
+            and a
+            ld a, 5
+            jr nz, .h
+            ld a, [cur_map]
+            sub 42
+.h:         swap a                          ; HL = the header ($4000 + 16 i)
+            ld l, a
+            ld h, $40
+            ld a, [hl+]
+            ld b, a
+            ld a, [wa_ph]                   ; DE = the pictures + 64 step
+            ld c, a
+            srl a
+            srl a
+            add a, b
+            ld d, a
+            ld a, c
+            rrca
+            rrca
+            and $C0
+            ld e, a
+            inc l
+            ld b, 4
+.t:         push bc
+            ld a, [hl+]                     ; a tile's VRAM
+            ld c, a
+            ld a, [hl+]
+            push hl
+            ld h, a
+            ld l, c
+            ld c, 4
+.c:         ld a, [de]
+            ld [hl+], a
+            inc e
+            ld a, [de]
+            ld [hl+], a
+            inc e
+            ld a, [de]
+            ld [hl+], a
+            inc e
+            ld a, [de]
+            ld [hl+], a
+            inc e
+            dec c
+            jr nz, .c
+            pop hl
+            pop bc
+            dec b
+            jr nz, .t
+            ret
 
 section bank 0, $31CE
 ; the town water tile's picture for step wa_ph (entry: the town, or 8 on the Color): its VRAM
@@ -202,16 +270,19 @@ wa_load:    call tl_setf                    ; (tall or not: tall.s)
             ldh a, [maptype]
             and a
             jr nz, .ow
-            ld a, [cur_map]                 ; towns (maps 0-7)
+            ld a, [cur_map]                 ; towns (maps 0-7), the Undersea Shrine (42-46)
             cp 8
+            jr c, .tw0
+            sub 42
+            cp 5
             ret nc
-            ldh a, [rLCDC]                  ; (the LCD on, a masked load: the V-Blank copies
+.tw0:       ldh a, [rLCDC]                  ; (the LCD on, a masked load: the V-Blank copies
             bit 7, a                        ;   it, wt_vbl; at once it was written in line
             jr z, .twn                      ;   44's drawing: strict checker, 2026-11-26)
             ld a, 2
             ld [wt_req], a
             ret
-.twn:       ld hl, wt_cp                    ; (bank 0 code; bank_call maps this bank back)
+.twn:       ld hl, wt_cpq                   ; (bank 0 code; bank_call maps this bank back)
             jp bank_call
 .ow:        ld hl, $4010                    ; the sea from its whole tiles at step 0 (the
                                             ;   list at $4010), the river idle at 0; then

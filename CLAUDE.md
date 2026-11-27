@@ -1449,6 +1449,7 @@ town reflection made in time again (it was hidden in most walking frames), town 
 in V-Blank right after the OAM), the hands kept on all four members after casting a party-wide heal.
 Then (item 66): the battle "o&" window found and removed (the message row's string pointer was lost while
 the top name window closed; rows now also mapped only after their letters are up).
+Then (item 67): the Undersea Shrine's water moves as the world map's sea (its bubble field's 16 x 16 picture, bank 115).
 
 ## Remaining
 - **FF1 (native build): finished (owner, 2026-11-26):** the owner played it through from New Game to
