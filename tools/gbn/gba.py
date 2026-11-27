@@ -178,3 +178,44 @@ def monster_picture(G, rec):
                 X = 7 - x if hf else x; Y = 7 - y if vf else y
                 px[8 * (i // w) + Y][8 * (i % w) + X] = v
     return tp, w, h, px, cols
+
+
+# Items (offsets in this revision): names from $1970E7 (each: 2 bytes (an icon code) + Shift-JIS, 0-ended),
+# 0-42 consumables, 43-106 weapons (FF1's 40 in FF1's order, then 24 new), 107-176 armour (FF1's 40 by type, the
+# new ones after each type's: bodies 107-133, shields 134-147, helmets 148-163, gloves / rings 164-176).
+ITEM_NAMES = 0x1970E7
+WEAPONS = 0x19A784                      # 64 x 28 bytes: +6 / +7 classes (a bit a class), +8 damage, +9 hit,
+ARMOUR = 0x19AE9C                       #   +10 critical, +11 spell, +12 element, +14 category, +24 price;
+                                        # 70 x 28: +0 price, +10 / +11 classes, +12 defence, +13 weight,
+                                        #   +16 elements resisted
+ARMOUR_TYPES = [(107, 134, 0), (134, 148, 1), (148, 164, 2), (164, 177, 3)]   # (first, end, FF1 type)
+
+
+def item_names(G):
+    """the 177 item names (Japanese) and their icon codes"""
+    o, out = ITEM_NAMES, []
+    while len(out) < 177:
+        e = G.d.index(b'\x00', o)
+        if e > o:
+            out.append((G.d[o + 1], G.d[o + 2:e].decode('shift_jis', 'replace')))
+        o = e + 1
+    return out
+
+
+def classes(lo, hi):
+    """Dawn of Souls' class bytes (base classes bits 0-5, promoted bits 0-5) -> FF1's permission word (a set bit:
+    a class that cannot use it; Fighter bit 11 .. Black Wizard bit 0)"""
+    can = [(lo >> j) & 1 for j in range(6)] + [(hi >> j) & 1 for j in range(6)]
+    return sum((1 - c) << (11 - j) for j, c in enumerate(can))
+
+
+def weapon(G, k):
+    r = G.d[WEAPONS + 28 * k:WEAPONS + 28 * k + 28]
+    return dict(dmg=r[8], hit=r[9], crit=r[10], spell=r[11], element=r[12], category=r[14],
+                perm=classes(r[6], r[7]), price=struct.unpack_from('<I', r, 24)[0])
+
+
+def armour(G, k):
+    r = G.d[ARMOUR + 28 * k:ARMOUR + 28 * k + 28]
+    return dict(defence=r[12], weight=r[13], element=r[16], perm=classes(r[10], r[11]),
+                price=struct.unpack_from('<I', r, 0)[0])

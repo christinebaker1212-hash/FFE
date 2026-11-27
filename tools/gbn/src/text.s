@@ -181,9 +181,7 @@ dlg_page:   ld hl, win_buf                  ; frame and blank inside
 .item:      push de                         ; the item name (names bank), then the text again
             ld a, NAMES
             call sbank
-            ld a, [dlg_item]
-            ld e, a
-            ld d, 0
+            call dlg_nidx                   ; (DE = the name index: pg.s)
             push hl
             ld hl, $4000
             add hl, de

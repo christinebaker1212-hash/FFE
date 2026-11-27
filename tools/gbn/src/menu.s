@@ -202,7 +202,7 @@ pen_name:   call ch_rec
 ; the name of item / spell / class A (names bank: icon + letters)
 pen_iname:  ld l, a
             ld h, 0
-            add hl, hl
+pen_inx:    add hl, hl                      ; (HL = a name index: 256 on the post-game's, names.py)
             ld de, $4000
             add hl, de
             ld de, scr_buf
@@ -267,7 +267,7 @@ menu_main:  ld a, TR_MENU                   ; (FF1: the menu music, again after 
 .a:         ld a, [mm_cur]
             and a
             jr nz, .n0
-            call item_menu
+            call item_mx                    ; (pg.s: out after an Emergency Exit)
             jr .re
 .n0:        cp 1
             jr nz, .n1
@@ -2104,11 +2104,11 @@ m_out:      push bc
 ; Swap / Drop commands; two members a page in (0,4,20,7) / (0,11,20,7): name, then the four slots (icon
 ; at column 1, inverted when equipped; the name from column 2; the hand cut off at the
 ; screen's left edge)
-N_WSTAT    = $7300          ; names bank: weapon stats (8 bytes), armour (4), permissions
-N_ASTAT    = $7440
-N_WPERM    = $7500
-N_APERM    = $7550
-N_ATYPE    = $75B0
+N_WSTAT    = $6000          ; names bank: weapon stats (8 bytes), armour (4), permissions
+N_ASTAT    = $6200
+N_WPERM    = $6400
+N_APERM    = $6480
+N_ATYPE    = $6580
 N_INVDMG   = $7600
 N_INVCGB   = $7800
 INV_TILE   = $A0            ; inverted icons at BG $A0 + icon code
@@ -2613,7 +2613,7 @@ tg_info:    ld bc, $0110
             ld bc, $0110
             call pen_at
             ld a, [it_id]
-            call pen_iname
+            call it_pen
             ld a, $20
             call pen_ch
             ld a, $78                       ; x
