@@ -5,13 +5,14 @@
 section bank B_BSCR, $5800
 ; ---- FF3's battle main
 bs_loop:
-.turn:      %FAR B_BAT2, fe_81C3
+.turn:      call bs_t81c3                   ; (and the Invincible's cannon's damage)
             ld a, [$D8BA]
             and 1
             jr nz, .nm
             ld hl, fe_A732
             call alg_call
-.nm:        %FAR B_BAT2, fe_81A0
+.nm:        call bs_t81a0                   ; (and the cannon's blast: Z when it won)
+            jp z, .over
             call bs_input
             xor a
             ld [$DBE1], a
@@ -1352,7 +1353,7 @@ bs_scripts: dw .s0, .s1, .s2, .s3, .s4, .s5
 .s4:        db $05, $09, $0A, $04, $00, $FF
 .s5:        db $09, $0C, $0A, $04, $FF
 bs_scmds:   dw bsc_none, bsc_none, bsc_none, bsc_more, bsc_close, bsc_who, bsc_what, bsc_whom
-            dw bsc_stat, bsc_msg, bsc_wait, bsc_anim, bsc_nums, bsc_death, bsc_none
+            dw bsc_stat, bsc_msg, bsc_wait, bsc_anim, bsc_nums, bsc_death, bsc_cdie
 bsc_none:   ret
 
 ; $03: more messages in the queue: back to the message command
@@ -1612,7 +1613,7 @@ bsc_msg:    call msg_at
             ld a, 19
             sub e
             ld [bs_maxw], a
-            call bs_putsn
+            call bs_putsw                   ; (wrapped: the English is longer than FF3's)
             jr .w
 .hp:        ld de, $0E01                    ; peep: "HP cur/max"
             ld a, 'H'
@@ -1662,7 +1663,12 @@ bsc_wait:   ld a, [$D010]                   ; FF3's 34/9450: (8 - message speed)
             jr nz, .w
             ret
 ; $0B the action: the acting member steps forward
-bsc_anim:   ld a, [$D8D6]
+bsc_anim:   call ui_kind                    ; (the Invincible's cannon: 34/84F6, 32/84C9)
+            cp $0C
+            jr nz, .nc
+            ld hl, an_cannon
+            jp xa_go
+.nc:        ld a, [$D8D6]
             cp 4
             jr c, .ch
             and 7                           ; a monster: FF3's pre-attack flash (34/8545)
@@ -2061,3 +2067,134 @@ bs_ap:      ds 8
 bs_eq:      ds 3
 bs_jb:      ds 3
 BS_IL      = $C780          ; the item list (ids, then counts: 32 each)
+
+section bank B_BSCR, $7000
+; ---- the battle main's steps with the Invincible's cannon: its damage (34/807E), its blast
+; before the commands (34/992D; Z: the monsters all gone)
+bs_t81c3:   %FAR B_BAT2, fe_81C3
+            ld a, [$DED8]
+            and $20
+            ret z
+            %FAR B_BAT2, fe_A487
+            ret
+bs_t81a0:   %FAR B_BAT2, fe_81A0
+            ld a, [$DED8]
+            and $20
+            jr z, .n
+            call bs_cannon
+            ld a, [$D8D3]
+            cp $40
+            ret
+.n:         or 1
+            ret
+; ---- the Invincible's cannon blast (35/A50B): its message, action script 3, the battle's end
+bs_cannon:  ld a, $15                       ; (its animation: 34/83F8's $15, as 35/A487 set)
+            ld [$DEC2], a
+            ld a, $3D                       ; "Cannon blast!"
+            ld [$D8DA], a
+            ld hl, $DED8
+            res 5, [hl]
+            ld a, 3
+            ld [$D8D5], a
+            call bs_script
+            %FAR B_BAT2, fe_A458
+            ret
+; $0E (34/93C4): the cannon's statuses ($E0) into the monsters' (34/9408: dead ones flagged for
+; the display, $7EC4), then their deaths
+bsc_cdie:   ld c, 0
+            ld de, BZ + $E0
+            ld hl, B_MO + 1
+.m:         ld a, [de]                      ; status 1 |= $E0 + 2 c
+            or [hl]
+            ld [hl], a
+            and $E8
+            jr z, .n
+            or $80                          ; (as FF3: the bits of $E8 and dead)
+            ld [hl], a
+            push hl
+            ld b, a
+            ld hl, $DEC4
+            ld a, l
+            add c
+            ld l, a
+            ld [hl], b
+            pop hl
+.n:         inc hl                          ; status 2 |= $E0 + 2 c + 1
+            inc de
+            ld a, [de]
+            or [hl]
+            ld [hl], a
+            inc de
+            ld a, l                         ; (the next record: + $40)
+            add $3F
+            ld l, a
+            jr nc, .h
+            inc h
+.h:         inc c
+            ld a, c
+            cp 8
+            jr nz, .m
+            jp bs_deaths
+
+; BS_STR at row D, column E, wrapped at spaces: the first line bs_maxw wide, then from column 1 18
+; wide, rows 14-16
+bs_putsw:   ld hl, BS_STR
+.ln:        ld a, [bs_maxw]
+            ld c, a
+            push hl
+            ld [bs_wbr], a                  ; (no space: broken at the width)
+            ld b, 0
+.sc:        ld a, [hl+]
+            and a
+            jr z, .end
+            cp ' '
+            jr nz, .ns
+            ld a, b
+            ld [bs_wbr], a
+.ns:        inc b
+            ld a, b
+            cp c
+            jr c, .sc
+            ld a, [hl]                      ; (exactly the width: fits if a space or the end next)
+            and a
+            jr z, .end
+            cp ' '
+            jr nz, .brk
+            ld a, b
+            ld [bs_wbr], a
+.brk:       pop hl
+            ld a, [bs_wbr]
+            ld b, a
+            call .pr
+            ld a, [hl]
+            cp ' '
+            jr nz, .nl
+            inc hl
+.nl:        ld a, d
+            cp 16
+            ret nc
+            inc d
+            ld e, 1
+            ld a, 18
+            ld [bs_maxw], a
+            jr .ln
+.end:       pop hl
+            ld b, 255
+.pr:        ld a, b
+            and a
+            ret z
+.p:         ld a, [hl]
+            and a
+            ret z
+            inc hl
+            cp ' '
+            jr c, .p
+            push bc
+            push hl
+            call bs_putc
+            pop hl
+            pop bc
+            inc e
+            dec b
+            jr nz, .p
+            ret

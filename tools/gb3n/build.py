@@ -530,6 +530,10 @@ ev_fxtest:  call ev_shake
         a = '            ld [$D8BA], a\n            ld a, [$DED8]\n'
         assert src.count(a) == 1
         src = src.replace(a, '            ld [$D8BA], a\n            jp .back\n            ld a, [$DED8]\n')
+    if os.environ.get('GB3N_CANNON'):            # test builds only: every battle as on the Invincible (cannon)
+        a = '.w:         ld a, [$D4C6]\n            cp 7\n            jr nz, .v\n'
+        assert src.count(a) == 1
+        src = src.replace(a, '.w:\n')
     if os.environ.get('GB3N_WIPETEST'):          # test builds only: the death wipe on slot 0 at the start
         src = src.replace('            call bs_bossin2\n', '            call bs_bossin2\n            ld b, 60\n.wtw:       push bc\n            call bs_frame\n            pop bc\n            dec b\n            jr nz, .wtw\n            ld a, $80\n            call bs_mwipe\n')
     if os.environ.get('GB3N_ANWPN'):             # test builds only: the right hand's weapon animation
@@ -590,7 +594,7 @@ ev_fxtest:  call ev_shake
     banks[B_MINI] = mb
     ab = bytearray(b"".join(tiles.gb(t) for t in (rom.rd(0x2B, 0xB000 + 16 * i, 16) for i in range(256)))) + bytearray(0x3000)
     at, an = bytearray(), bytearray()               # 33/BEB2's animation graphics sets: tiles from
-    for k in range(12):                             #   $1000, the table at $0F00 (offset, OBJ tile, count)
+    for k in range(18):                             #   $1000, the table at $0F00 (offset, OBJ tile, count)
         lo, hi, plo, phi, cnt, bk = rom.rd(0x33, 0xBEB2 + 6 * k, 6)
         addr, ppu = hi << 8 | lo, phi << 8 | plo
         if not (0x1000 <= ppu < 0x2000 and addr >= 0x8000):

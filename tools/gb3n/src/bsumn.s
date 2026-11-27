@@ -2069,7 +2069,9 @@ an_s22:     ld a, $16
 ; ---- 23: Megaflare (32/841A): 60 frames; the backdrop white 16 frames (FF3 also cycles the colour
 ; emphasis); then two explosions (32/8F8F's frames) at random places by turns, the monsters'
 ; palettes cycling red, 64 frames (set 17 from 2B/B1C0, palette $BD)
-an_s23:     ld b, 60
+an_s23:     xor a
+            ld [an_xto], a
+            ld b, 60
 .w:         push bc
             call an_frame
             pop bc
@@ -2144,7 +2146,8 @@ an_xpl:     ld d, [hl]
             ld de, $8F8F
             add hl, de
             pop de
-            ld c, 0
+            ld a, [an_xto]                  ; (the tiles' offset: Megaflare 0, the cannon $38)
+            ld c, a
             jp an_slistp
 ; new places (32/85F8: x 16-128, y 47-111 on FF3's field, scaled)
 an_xpos1:   ld hl, an_xp
@@ -3032,3 +3035,127 @@ an_sbn:     ds 1
 an_sbd:     ds 1
 an_kc:      ds 1                            ; (a restore: the covering place, $80 none)
 an_kxi:     ds 1
+an_xto:     ds 1                            ; (the explosion frames' tile offset)
+an_ckx:     ds 1                            ; (the cannonball's place)
+an_cky:     ds 1
+bs_wbr:     ds 1                            ; (bs_putsw: the line's break)
+
+; ---- the Invincible's cannon blast (32/84C9): a ball (tiles $4D-$50, palette $D9, set $0F) falling
+; from the upper right on an arc (the vector's y: length $60, angle $C0 down 2 a frame; x 3 to the
+; left a frame) 32 frames; then an explosion (32/8F8F's frames, tiles + $38, palette $BD) at a
+; random place (32/85F8), the next frame every other frame and a new place every 8, the monsters'
+; palettes cycling red, 64 frames; the palettes back
+section bank B_BANIM, $7D60
+an_cannon:  call an_savepal
+            call an_bgsave
+            ld a, $D9
+            call an_gpal3
+            ld a, $0F
+            call an_lgfx
+            xor a
+            ld [an_f], a
+            ld [an_k3], a
+            ld a, $C0
+            ld [an_k4], a
+.p:         call an_clr
+            ld hl, an_k3                    ; x = $B0 + $8C ($8C down 3)
+            ld a, [hl]
+            sub 3
+            ld [hl], a
+            add $B0
+            call an_s58
+            ld [an_ckx], a
+            ld a, $60                       ; y = $60 + $60 sin(angle)
+            ld [an_k], a
+            ld a, [an_k4]
+            call an_smul
+            add $60
+            call an_s58
+            ld [an_cky], a
+            ld hl, an_k4
+            dec [hl]
+            dec [hl]
+            ld a, [an_cky]
+            dec a
+            ld e, a
+            ld a, [an_ckx]
+            ld d, a
+            ld b, $4D
+            call .spr
+            ld a, d
+            add 8
+            ld d, a
+            inc b
+            call .spr
+            ld a, e
+            add 8
+            ld e, a
+            ld a, [an_ckx]
+            ld d, a
+            inc b
+            call .spr
+            ld a, d
+            add 8
+            ld d, a
+            inc b
+            call .spr
+            call an_frame
+            ld a, [an_f]
+            cp $20
+            jr nz, .p
+            call an_clr
+            ld a, $BD
+            call an_gpal3
+            ld a, $38
+            ld [an_xto], a
+            call an_xpos1
+            ld a, 2
+            ld [an_xa], a
+.e:         ld a, [an_f]
+            and 1
+            jr nz, .d
+            ld hl, an_xa
+            inc [hl]
+            ld a, [hl]
+            and 3
+            ld [hl], a
+            call z, an_xpos1
+.d:         ld a, $16                       ; (32/87AD: the monsters' palettes in red)
+            call an_mcyc1
+            call an_frame
+            call an_clr
+            ld a, [an_xa]
+            ld hl, an_xp
+            call an_xpl
+            ld a, [an_f]
+            cp $60
+            jr nz, .e
+            call an_clr
+            call an_frame
+            xor a
+            ld [an_xto], a
+            call an_bgrest
+            jp an_restpal
+; a ball sprite: tile B at (D, E) (palette 3); none off the battlefield
+.spr:       ld a, e
+            cp 96
+            ret nc
+            ld a, d
+            cp 160
+            ret nc
+            push bc
+            push de
+            call an_slot_oam
+            pop de
+            pop bc
+            ret c
+            ld a, e
+            add 17
+            ld [hl+], a
+            ld a, d
+            add 8
+            ld [hl+], a
+            ld a, b
+            ld [hl+], a
+            ld [hl], $0B
+            ret
