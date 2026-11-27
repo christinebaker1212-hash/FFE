@@ -186,8 +186,12 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             jr nz, .dm
             ld a, 1                         ; work RAM bank 1: FF3's save page and the people
             ldh [rSVBK], a
+            ld a, B_FIELD
+            call sbank
             call sram_init                  ; (first steps: a new game's state, a test map)
             call win_init                   ; the dialogue box in the window map
+            ld a, B_FIELD                   ; the field's code bank stays mapped
+            call sbank
             ld a, START_WORLD
             ld [world], a
             ld a, START_MAP
@@ -301,6 +305,40 @@ soft_reset: di                              ; (A + B + Select + Start)
             ld e, SOFT_MAGIC
             jp start
 
+; ---- reading data banks from banked code: the caller's bank (rombank) is mapped again after
+far_copy:   push af                         ; A = bank: BC bytes HL -> DE
+            ldh a, [rombank]
+            ld [fc_save], a
+            pop af
+            ld [MBC5_BANKL], a
+            call memcpy
+            ld a, [fc_save]
+            ld [MBC5_BANKL], a
+            ret
+far_byte:   push bc                         ; A = bank: A = [HL]
+            ld b, a
+            ldh a, [rombank]
+            ld c, a
+            ld a, b
+            ld [MBC5_BANKL], a
+            ld b, [hl]
+            ld a, c
+            ld [MBC5_BANKL], a
+            ld a, b
+            pop bc
+            ret
+sbank:      ldh [rombank], a
+            ld [MBC5_BANKL], a
+            ret
+
+dma_rom:    ld a, high(oam_buf)
+            ldh [rDMA], a
+            ld a, 40
+.w:         dec a
+            jr nz, .w
+            ret
+dma_end:
+
 memclr:     xor a                           ; HL = start, DE = length
             ld [hl+], a
             dec de
@@ -326,3 +364,6 @@ soft_rst:   ds 1
 vbl_done:   ds 1
 pad:        ds 1
 pad_new:    ds 1
+
+section wram, $C3F0
+fc_save:    ds 1

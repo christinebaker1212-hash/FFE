@@ -54,19 +54,15 @@ DIR_U      = 8
 TR_PREV    = $40            ; pending triggers (FF3's $AB)
 TR_ENTER   = $80
 TR_WORLD   = $C0
+SCRATCH    = $D800            ; work RAM bank 1: data staged from ROM banks (2 KB)
 MAP_DEPTH  = 8              ; entrances within entrances (FF3 recurses on its stack)
 
-section bank 0, $2800
-sbank:      ldh [rombank], a
-            ld [MBC5_BANKL], a
-            ret
+section bank B_FIELD, $4000
 
 ; ---- load map `map_id` of `world` (LCD off) and show it: FF3's load map ($3F $E7EC: map
 ; properties, tileset, tilemap, triggers, palettes, graphics); the party at (enter_x, enter_y),
 ; or at the map's start position when enter_x = $FF
-map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if world != 0
-            call sbank
-            ld a, [map_id]
+map_enter:  ld a, [map_id]                   ; properties: index map + 256 if world != 0
             ld l, a
             ld a, [world]
             and a
@@ -82,7 +78,8 @@ map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if wor
             ld h, a
             ld de, map_props
             ld bc, 16
-            call memcpy
+            ld a, B_MAPINFO
+            call far_copy
             ld a, [map_props]               ; tileset (top 3 bits): 7 pages of 128 into the
             swap a                          ;   metatile tables 0-127
             rra
@@ -97,13 +94,19 @@ map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if wor
 .ts:        push bc
             ld e, 0
             ld bc, 128
-            call memcpy
+            ld a, B_MAPINFO
+            call far_copy
             inc d
             pop bc
             dec c
             jr nz, .ts
-            ld c, 0                         ; metatiles $80-$FF copy their base tile ($3A $92D9)
-.tb:        ld h, high(I_TBASE)
+            ld hl, I_TBASE                  ; metatiles $80-$FF copy their base tile ($3A $92D9)
+            ld de, SCRATCH
+            ld bc, 128
+            ld a, B_MAPINFO
+            call far_copy
+            ld c, 0
+.tb:        ld h, high(SCRATCH)
             ld a, c
             ld l, a
             ld b, [hl]                      ; B = base tile
@@ -121,10 +124,8 @@ map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if wor
             inc c
             bit 7, c
             jr z, .tb
-            ld a, B_MAPAUX                  ; tilemap and graphics subset: index map + 256 if
-            call sbank                      ;   world >= 2
-            ld a, [map_id]
-            ld l, a
+            ld a, [map_id]                  ; tilemap and graphics subset: index map + 256 if
+            ld l, a                         ;   world >= 2
             ld h, 0
             ld a, [world]
             cp 2
@@ -133,7 +134,8 @@ map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if wor
 .t0:        push hl
             ld de, A_TMID
             add hl, de
-            ld a, [hl]                      ; tilemap id -> (bank, address)
+            ld a, B_MAPAUX
+            call far_byte                   ; tilemap id -> (bank, address)
             ld l, a
             ld h, 0
             ld e, l
@@ -142,16 +144,15 @@ map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if wor
             add hl, de
             ld de, A_TMAPS
             add hl, de
-            ld a, [hl+]
-            ld [tm_src], a
-            ld a, [hl+]
-            ld [tm_src + 1], a
-            ld a, [hl]
-            ld [tm_src + 2], a
+            ld de, tm_src
+            ld bc, 3
+            ld a, B_MAPAUX
+            call far_copy
             pop hl
             ld de, A_GSUB
             add hl, de
-            ld a, [hl]                      ; graphics subset -> (bank, address)
+            ld a, B_MAPAUX
+            call far_byte                   ; graphics subset -> (bank, address)
             ld l, a
             ld h, 0
             ld e, l
@@ -160,12 +161,10 @@ map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if wor
             add hl, de
             ld de, A_SUBS
             add hl, de
-            ld a, [hl+]
-            ld [gs_src], a
-            ld a, [hl+]
-            ld [gs_src + 1], a
-            ld a, [hl]
-            ld [gs_src + 2], a
+            ld de, gs_src
+            ld bc, 3
+            ld a, B_MAPAUX
+            call far_copy
             call pal_gather                 ; NES colours of the 4 BG + 2 sprite palettes
             call map_lists                  ; entrances, treasures, triggers (bank B_EVENTS)
             call map_unpack                 ; the tilemap into W_MAP
@@ -173,47 +172,42 @@ map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if wor
             call pal_load                   ; Color palettes (LCD off)
             xor a                           ; BG tiles ($8800 mode): the subset at $00 ($9000),
             ldh [rVBK], a                   ;   the menu tiles at $70 ($9700) and $80 ($8800)
-            ld a, [gs_src]
-            call sbank
             ld a, [gs_src + 1]
             ld l, a
             ld a, [gs_src + 2]
             ld h, a
             ld de, $9000
             ld bc, 112 * 16
-            call memcpy
-            ld a, B_COMMON
-            call sbank
+            ld a, [gs_src]
+            call far_copy
             ld hl, $4000
             ld de, $9700
             ld bc, 16 * 16
-            call memcpy
+            ld a, B_COMMON
+            call far_copy
             ld de, $8800
             ld bc, 128 * 16
-            call memcpy
-            ld a, B_CHARS                   ; the walking character's tiles: VRAM bank 1 $8000
-            call sbank
-            ld a, [char_set]
-            ld h, a
-            ld l, 0
-            ld a, h
+            ld a, B_COMMON
+            call far_copy
+            ld a, [char_set]                ; the walking character's tiles: VRAM bank 1 $8000
             and $3F
             add $40
             ld h, a
+            ld l, 0
             ld a, 1
             ldh [rVBK], a
             ld de, $8000
             ld bc, $100
-            call memcpy
+            ld a, B_CHARS
+            call far_copy
             xor a
             ldh [rVBK], a
             call npc_load                   ; the people (their tiles: VRAM bank 1 from tile 16)
-            ld a, B_MAPAUX                  ; FF3's player poses
-            call sbank
-            ld hl, A_POSE
+            ld hl, A_POSE                   ; FF3's player poses
             ld de, poses
             ld bc, 64
-            call memcpy
+            ld a, B_MAPAUX
+            call far_copy
             ld a, [enter_x]                 ; the position
             cp $FF
             jr nz, .pos
@@ -261,35 +255,39 @@ map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if wor
 ; entrance / treasure / trigger lists (16 bytes each) from bank B_EVENTS ($3A $9350-$93C0):
 ; entrances at properties bytes 12-13, treasures and triggers through the pointer tables at
 ; NES $A000 / $A200 by properties bytes 14 / 15
-map_lists:  ld a, B_EVENTS
-            call sbank
-            ld a, [map_props + 12]
+map_lists:  ld a, [map_props + 12]
             ld l, a
             ld a, [map_props + 13]
             call ev_addr
             ld de, ents
             ld bc, 16
-            call memcpy
+            ld a, B_EVENTS
+            call far_copy
             ld a, [map_props + 14]
             ld hl, $4000
             call ev_table
             ld de, treas
             ld bc, 16
-            call memcpy
+            ld a, B_EVENTS
+            call far_copy
             ld a, [map_props + 15]
             ld hl, $4200
             call ev_table
             ld de, trigs
             ld bc, 16
-            jp memcpy
-ev_table:   ld e, a                         ; HL = table, A = index: HL = its pointer's address
+            ld a, B_EVENTS
+            jp far_copy
+ev_table:   ld e, a                         ; HL = table, A = index: HL = its pointer's target
             ld d, 0
             add hl, de
             add hl, de
-            ld a, [hl+]
-            ld h, [hl]
+            ld de, ptr_tmp
+            ld bc, 2
+            ld a, B_EVENTS
+            call far_copy
+            ld a, [ptr_tmp]
             ld l, a
-            ld a, h
+            ld a, [ptr_tmp + 1]
 ev_addr:    and $1F                         ; NES pointer (L, A) -> $4000 + (ptr & $1FFF)
             add $40
             ld h, a
@@ -297,12 +295,26 @@ ev_addr:    and $1F                         ; NES pointer (L, A) -> $4000 + (ptr
 
 ; the tilemap's RLE stream into W_MAP ($3E $CBFA: a byte < $80 is a metatile; $80 | v and a
 ; run length follow, 0 meaning 256)
-map_unpack: ld a, [tm_src]
-            call sbank
-            ld a, [tm_src + 1]
-            ld l, a
+map_unpack: ld a, [tm_src + 1]               ; (the stream into SCRATCH: up to 1 KB, not past
+            ld l, a                         ;   the bank's end)
             ld a, [tm_src + 2]
             ld h, a
+            ld a, l
+            cpl
+            ld c, a
+            ld a, h
+            cpl
+            and $7F
+            ld b, a
+            inc bc                          ; BC = $8000 - HL
+            ld a, b
+            cp 4
+            jr c, .sz
+            ld bc, $400
+.sz:        ld de, SCRATCH
+            ld a, [tm_src]
+            call far_copy
+            ld hl, SCRATCH
             ld de, W_MAP
 .n:         ld a, d
             cp high(W_MAP) + 4
@@ -336,8 +348,11 @@ map_triggers:
 .cl:        ld [hl+], a
             dec b
             jr nz, .cl
+            ld hl, I_TTYPE                  ; type / first metatile tables into SCRATCH
+            ld de, SCRATCH
+            ld bc, 64
             ld a, B_MAPINFO
-            call sbank
+            call far_copy
             ld hl, W_MAP
 .c:         ld a, [hl]
             sub $60
@@ -356,7 +371,7 @@ map_triggers:
             ld a, [hl]                      ; this tile's count
             inc [hl]
             ld b, a
-            ld hl, I_TTYPE
+            ld hl, SCRATCH
             add hl, de
             ld a, [hl]                      ; type
             ld hl, type_cnt
@@ -365,7 +380,7 @@ map_triggers:
             ld a, [hl]                      ; the trigger's number in its type
             inc [hl]
             ld c, a
-            ld hl, I_TFIRST
+            ld hl, SCRATCH + 32
             add hl, de
             ld a, [hl]
             add b                           ; the new metatile
@@ -391,9 +406,7 @@ map_triggers:
 ; the NES colours of BG palettes 0-3 and sprite palettes 0-1 into nes_pal ($3A $9091): BG
 ; 0-2 colours 1-3 from the general palettes by properties bytes 5-7, colour 0 black; BG 3 the
 ; window; sprites from the map sprite palettes with the walking character's colours 2-3
-pal_gather: ld a, B_MAPAUX
-            call sbank
-            ld de, nes_pal
+pal_gather: ld de, nes_pal
             ld hl, map_props + 5
             ld c, 3
 .p:         ld a, $0F
@@ -401,19 +414,18 @@ pal_gather: ld a, B_MAPAUX
             inc de
             ld a, [hl+]
             push hl
+            push bc
             ld l, a
             ld h, high(A_GPAL)
-            ld a, [hl]
+            ld b, 3
+.c3:        ld a, B_MAPAUX
+            call far_byte
             ld [de], a
             inc de
             inc h
-            ld a, [hl]
-            ld [de], a
-            inc de
-            inc h
-            ld a, [hl]
-            ld [de], a
-            inc de
+            dec b
+            jr nz, .c3
+            pop bc
             pop hl
             dec c
             jr nz, .p
@@ -426,7 +438,8 @@ pal_gather: ld a, B_MAPAUX
             ld h, high(A_SPAL)
             ld de, nes_pal + 16
             ld bc, 16
-            call memcpy
+            ld a, B_MAPAUX
+            call far_copy
             ld a, [char_pal]                ; colours 2-3 of each from the character palette
             add a
             add a
@@ -435,24 +448,30 @@ pal_gather: ld a, B_MAPAUX
             ld a, high(A_CPAL)
             adc 0
             ld h, a
-            ld a, [hl+]
+            ld de, ptr_tmp
+            ld bc, 4
+            ld a, B_MAPAUX
+            call far_copy
+            ld a, [ptr_tmp]
             ld [nes_pal + 18], a
-            ld a, [hl+]
+            ld a, [ptr_tmp + 1]
             ld [nes_pal + 19], a
-            ld a, [hl+]
+            ld a, [ptr_tmp + 2]
             ld [nes_pal + 22], a
-            ld a, [hl]
+            ld a, [ptr_tmp + 3]
             ld [nes_pal + 23], a
-            ld a, B_MAPINFO
-            call sbank
             ld hl, I_WINPAL
             ld de, nes_pal + 12
             ld bc, 4
-            jp memcpy
+            ld a, B_MAPINFO
+            jp far_copy
 
 ; nes_pal -> the Color's BG palettes 0-3 and OBJ palettes 0-1 (LCD off or in V-Blank)
-pal_load:   ld a, B_MAPINFO
-            call sbank
+pal_load:   ld hl, I_RGB                    ; (the NES colour table into SCRATCH)
+            ld de, SCRATCH
+            ld bc, 128
+            ld a, B_MAPINFO
+            call far_copy
             ld a, $80
             ldh [rBCPS], a
             ld hl, nes_pal
@@ -478,7 +497,7 @@ pal_load:   ld a, B_MAPINFO
             add a
             push hl
             ld l, a
-            ld h, high(I_RGB)
+            ld h, high(SCRATCH)
             ld a, [hl+]
             ld d, [hl]
             pop hl
@@ -1028,13 +1047,6 @@ lcd_on:     ld a, LCDC_ON
             ldh [rLCDC], a
             ret
 
-dma_rom:    ld a, high(oam_buf)
-            ldh [rDMA], a
-            ld a, 40
-.w:         dec a
-            jr nz, .w
-            ret
-dma_end:
 
 section wram, $C000
 oam_buf:    ds 160
@@ -1060,6 +1072,7 @@ char_pal:   ds 1                            ;   and palette
 map_sp:     ds 1
 tm_src:     ds 3
 gs_src:     ds 3
+ptr_tmp:    ds 4
 map_props:  ds 16
 ents:       ds 16
 treas:      ds 16

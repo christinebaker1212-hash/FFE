@@ -22,7 +22,7 @@ N_POSE     = $6400
 N_INITSW   = $6500
 N_GFXTAB   = $6700
 
-section bank 0, $3800
+section bank B_FIELD, $5800
 ; ---- new game: the save page as FF3's init sram leaves it
 sram_init:  ld hl, SRAM_PAGE
             ld de, $400
@@ -33,26 +33,28 @@ sram_init:  ld hl, SRAM_PAGE
 .t:         ld [hl+], a
             dec b
             jr nz, .t
+            ld hl, $6500                    ; the init tables into SCRATCH ($6500-$65FF)
+            ld de, SCRATCH
+            ld bc, $100
             ld a, B_NPCS
-            call sbank
-            ld hl, $6590                    ; the world map start position
-            ld a, [hl+]
+            call far_copy
+            ld a, [SCRATCH + $90]           ; the world map start position
             ld [SRAM_PAGE + $09], a
-            ld a, [hl]
+            ld a, [SCRATCH + $91]
             ld [SRAM_PAGE + $0A], a
-            ld hl, N_INITSW                 ; npc switches
+            ld hl, SCRATCH                  ; npc switches
             ld de, SR_NPCSW
             ld bc, 64
             call memcpy
-            ld hl, $6542                    ; job base stats bytes 2-6 -> $110 and $115
+            ld hl, SCRATCH + $42            ; job base stats bytes 2-6 -> $112 and $117
             ld de, SRAM_PAGE + $112
             ld bc, 5
             call memcpy
-            ld hl, $6542
+            ld hl, SCRATCH + $42
             ld de, SRAM_PAGE + $117
             ld bc, 5
             call memcpy
-            ld hl, $6548                    ; MP: each value twice ($130, $131 ...)
+            ld hl, SCRATCH + $48            ; MP: each value twice ($130, $131 ...)
             ld de, SRAM_PAGE + $130
             ld b, 8
 .m:         ld a, [hl+]
@@ -62,17 +64,17 @@ sram_init:  ld hl, SRAM_PAGE
             inc de
             dec b
             jr nz, .m
-            ld a, [$6550]                   ; HP: current and max
+            ld a, [SCRATCH + $50]           ; HP: current and max
             ld [SRAM_PAGE + $10C], a
             ld [SRAM_PAGE + $10E], a
-            ld a, [$6551]
+            ld a, [SCRATCH + $51]
             ld [SRAM_PAGE + $10D], a
             ld [SRAM_PAGE + $10F], a
-            ld hl, $6560                    ; stats ($11C-$12F)
+            ld hl, SCRATCH + $60            ; stats ($11C-$12F)
             ld de, SRAM_PAGE + $11C
             ld bc, 20
             call memcpy
-            ld hl, $6580                    ; equipment ($200)
+            ld hl, SCRATCH + $80            ; equipment ($200)
             ld de, SRAM_PAGE + $200
             ld bc, 16
             call memcpy
@@ -112,32 +114,33 @@ sram_init:  ld hl, SRAM_PAGE
 npc_load:   ld hl, NPC1
             ld de, $200
             call memclr
-            ld a, B_SCRIPT                  ; the map's npc list (NES $2C/$2D as one 16 KB bank:
-            call sbank                      ;   NES $8000-$BFFF -> $4000-$7FFF), into npc_list
-            ld a, [map_props + 4]
-            ld l, a
+            ld hl, N_POSE                   ; the people's poses (3B/B41A) into npc_poses
+            ld de, npc_poses
+            ld bc, 256
+            ld a, B_NPCS
+            call far_copy
+            ld a, [map_props + 4]           ; the map's npc list (NES $2C/$2D as one 16 KB bank:
+            ld l, a                         ;   NES $8000-$BFFF -> $4000-$7FFF), into npc_list
             ld h, 0
             add hl, hl
             ld de, $4000
             add hl, de
-            ld a, [hl+]
-            ld h, [hl]
+            ld de, nd_ptr
+            ld bc, 2
+            ld a, B_SCRIPT
+            call far_copy
+            ld a, [nd_ptr]
             ld l, a
-            ld a, h
+            ld a, [nd_ptr + 1]
             and $3F
             or $40
             ld h, a
             ld de, npc_list
-            ld b, 4 * NPC_SLOTS
-.cp:        ld a, [hl+]
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .cp
+            ld bc, 4 * NPC_SLOTS
+            ld a, B_SCRIPT
+            call far_copy
             xor a
-            ld [de], a                      ; (a terminator after 12)
-            ld a, B_NPCS
-            call sbank
+            ld [npc_list + 4 * NPC_SLOTS], a ; (a terminator after 12)
             ld hl, npc_list
             ld de, NPC1
             xor a
@@ -242,7 +245,8 @@ npc_one:    ld a, [hl+]                     ; id
             inc h
 .w:         ld bc, N_GFXID
             add hl, bc
-            ld a, [hl]                      ; graphics id
+            ld a, B_NPCS
+            call far_byte                   ; graphics id
             ld l, a
             ld h, 0
             ld c, l
@@ -251,14 +255,12 @@ npc_one:    ld a, [hl+]                     ; id
             add hl, bc
             ld bc, N_GFXTAB
             add hl, bc
-            ld a, [hl+]
-            ld [gfx_src], a
-            ld a, [hl+]
-            ld [gfx_src + 1], a
-            ld a, [hl]
-            ld [gfx_src + 2], a
-            ld a, [gfx_src]
-            call sbank
+            push de
+            ld de, gfx_src
+            ld bc, 3
+            ld a, B_NPCS
+            call far_copy
+            pop de
             ld a, [gfx_src + 1]
             ld l, a
             ld a, [gfx_src + 2]
@@ -276,12 +278,12 @@ npc_one:    ld a, [hl+]                     ; id
             ld a, 1
             ldh [rVBK], a
             ld bc, $100
-            call memcpy
+            ld a, [gfx_src]
+            call far_copy
             xor a
             ldh [rVBK], a
             pop de
-            ld a, B_NPCS
-            jp sbank
+            ret
 
 ; Z clear when npc switch A is set ($3B $B51A: byte id / 8 (+ 32 off world 0), bit id & 7)
 npc_switch: push bc
@@ -373,9 +375,7 @@ npc_oam:    ld a, [step]                    ; the walk's pixel offset (signed): 
             jr .w
 .d:         ld a, b
             ld [walk_dy], a
-.w:         ld a, B_NPCS
-            call sbank
-            ld bc, oam_buf + 16
+.w:         ld bc, oam_buf + 16
             ld hl, NPC1
             ld a, NPC_SLOTS
             ld [npc_n], a
@@ -489,7 +489,7 @@ npc_draw:   ld a, l
             rra
             add e
             ld l, a
-            ld h, high(N_POSE)
+            ld h, high(npc_poses)
             ld a, [nd_slot]
             and $F0
             add 16
@@ -548,8 +548,9 @@ nd_sx:      ds 1
 nd_sy:      ds 1
 frame:      ds 1
 npc_list:   ds 4 * NPC_SLOTS + 1
+nd_ptr:     ds 2
 
-section bank 0, $1000
+section bank B_FIELD, $7000
 ; ---- person at slot L (NPC1 page) starts a step in direction A (0 right, 1 left, 2 down, 3 up)
 ; ($3B $AFDD: the destination is claimed at once; right / down count the sub-tile 0 -> 15 from
 ; the old cell, left / up 15 -> 0 from the new one)
@@ -688,3 +689,6 @@ npc_update: ld hl, NPC1
             dec b
             jr nz, .c
             ret
+
+section wram, $DE00
+npc_poses:  ds 256                          ; (work RAM bank 1)

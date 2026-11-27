@@ -7,7 +7,7 @@ SR_EVSW    = SRAM_PAGE + $20            ; event switches ($6020)
 SR_ITEMS   = SRAM_PAGE + $C0            ; inventory ids ($60C0) and counts ($60E0)
 SR_GIL     = SRAM_PAGE + $1C            ; (gil: 3 bytes at $601C)
 
-section bank 0, $3C00
+section bank B_FIELD, $6C00
 ; ---- A pressed while standing: a person ahead? run their script
 talk:       call dest_cell
             call npc_at                     ; HL = their slot
@@ -18,8 +18,6 @@ talk:       call dest_cell
             ret nc
             ld c, a
             ld b, 0
-            ld a, B_SCRIPT
-            call sbank
             ld hl, $4200                    ; trigger scripts: NES 2C/8200 (world 0) / 2C/8400
             ld a, [world]
             and a
@@ -27,13 +25,11 @@ talk:       call dest_cell
             ld hl, $4400
 .w0:        add hl, bc
             add hl, bc
-            ld a, [hl+]
-            ld h, [hl]
-            ld l, a
-            call scr_addr
+            call scr_ptr
             ld de, scr_buf                  ; 64 bytes of it
             ld bc, 64
-            call memcpy
+            ld a, B_SCRIPT
+            call far_copy
             ld hl, scr_buf                  ; the dialogue list: after the first unconditional
 .f:         ld a, [hl]                      ;   block ($FF, event)
             cp $FF
@@ -53,7 +49,15 @@ talk:       call dest_cell
             call scr_event                  ; A = the event chosen by the switch tests
             jp ev_start
 
-; NES pointer HL (into $2C/$2D) -> the address in B_SCRIPT
+; the NES pointer at HL in B_SCRIPT -> HL = its address in B_SCRIPT
+scr_ptr:    ld de, ev_tmp
+            ld bc, 2
+            ld a, B_SCRIPT
+            call far_copy
+            ld a, [ev_tmp]
+            ld l, a
+            ld a, [ev_tmp + 1]
+            ld h, a
 scr_addr:   ld a, h
             and $3F
             or $40
@@ -136,15 +140,10 @@ ev_start:   and a
             ret z
             ld c, a
             ld b, 0
-            ld a, B_SCRIPT
-            call sbank
             ld hl, $4600
             add hl, bc
             add hl, bc
-            ld a, [hl+]
-            ld h, [hl]
-            ld l, a
-            call scr_addr
+            call scr_ptr
             ld a, l
             ld [ev_ptr], a
             ld a, h
@@ -163,22 +162,28 @@ ev_step:    ld a, [ev_rep]                  ; a repeated command again
             dec a
             ld [ev_rep], a
             jp ev_exec
-.rd:        ld a, B_SCRIPT
-            call sbank
-            ld a, [ev_ptr]
+.rd:        ld a, [ev_ptr]                  ; (the next 2 bytes from B_SCRIPT)
             ld l, a
             ld a, [ev_ptr + 1]
             ld h, a
-            ld a, [hl+]
-            cp $FE                          ; repeat: the next command (count - 1) more times
+            push hl
+            ld de, ev_tmp
+            ld bc, 2
+            ld a, B_SCRIPT
+            call far_copy
+            pop hl
+            inc hl
+            ld a, [ev_tmp]
+            cp $FE                          ; repeat: the command before (count - 1) more times
             jr nz, .one
-            ld a, [hl+]
+            inc hl
+            ld a, [ev_tmp + 1]
             dec a
             ld [ev_rep], a
             jr .sv
 .one:       ld [ev_cmd], a
             ld b, a
-            ld a, [hl]
+            ld a, [ev_tmp + 1]
             ld [ev_arg], a
             ld a, b
             cp $E4                          ; $E4-$FC take an argument
@@ -430,3 +435,4 @@ ev_who:     ds 1
 ev_pad:     ds 1
 scr_buf:    ds 64
 dlg_list:   ds 32
+ev_tmp:     ds 2

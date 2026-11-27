@@ -23,7 +23,7 @@ FR_BR      = $FE
 ATTR_FRAME = $03            ; palette 3 (FF3's window colours), VRAM bank 0
 ATTR_TEXT  = $0B            ; palette 3, VRAM bank 1 (our font)
 
-section bank 0, $3200
+section bank B_FIELD, $6400
 ; ---- the window map's dialogue box (LCD off, once): frame and blank text cells
 win_init:   xor a
             ldh [rVBK], a
@@ -101,38 +101,45 @@ win_init:   xor a
             ret
 
 ; ---- open the dialogue box with string C of table B
-dlg_open:   ld a, B_TEXT
-            call sbank
-            ld a, b
+dlg_open:   ld a, b
             ld hl, txt_tables
             add a
             add l
             ld l, a
-            ld a, [hl+]
+            jr nc, .t
+            inc h
+.t:         ld a, [hl+]
             ld h, [hl]
             ld l, a
             ld b, 0                         ; HL = index + 3 * C
             add hl, bc
             add hl, bc
             add hl, bc
-            ld a, [hl+]
-            ld b, a
-            ld a, [hl+]
-            ld h, [hl]
+            ld de, dlg_src
+            ld bc, 3
+            ld a, B_TEXT
+            call far_copy
+            ld a, [dlg_src + 1]             ; the string into TXT_BUF (1.5 KB, not past the bank)
             ld l, a
+            ld a, [dlg_src + 2]
+            ld h, a
+            ld a, l
+            cpl
+            ld c, a
+            ld a, h
+            cpl
+            and $7F
+            ld b, a
+            inc bc
             ld a, b
-            call sbank
-            ld de, TXT_BUF                  ; the string into TXT_BUF (to its end)
-.cp:        ld a, [hl+]
-            ld [de], a
-            inc de
-            and a
-            jr z, .cd
-            ld a, d
-            cp high(TXT_BUF) + 8
-            jr c, .cp
+            cp 6
+            jr c, .sz
+            ld bc, $600
+.sz:        ld de, TXT_BUF
+            ld a, [dlg_src]
+            call far_copy
             xor a
-            ld [de], a
+            ld [TXT_BUF + $5FF], a
 .cd:        ld a, [TXT_BUF]                 ; an empty string shows nothing
             and a
             ret z
@@ -272,8 +279,6 @@ dlg_insert: and 3
             add low(SRAM_PAGE + $106)
             ld l, a
             ld h, high(SRAM_PAGE + $106)
-            ld a, B_OWN
-            call sbank
             ld de, dlg_insbuf
             ld c, 0
             ld b, 6
@@ -287,7 +292,8 @@ dlg_insert: and 3
             ld de, C_FF3ASC
             add hl, de
             pop de
-            ld a, [hl]
+            ld a, B_OWN
+            call far_byte
             pop hl
             ld [de], a
             inc de
@@ -350,17 +356,6 @@ dlg_lcdc:   ld a, [dlg_on]
 .w:         ldh [rLCDC], a
             ret
 
-; line DLG_CUT: the window off from the next line (written in this line's H-Blank)
-stat_isr:   push af
-.w:         ldh a, [rSTAT]
-            and 3
-            jr nz, .w
-            ldh a, [rLCDC]
-            and $DF
-            ldh [rLCDC], a
-            pop af
-            reti
-
 section wram, $C220
 dlg_on:     ds 1
 dlg_state:  ds 1
@@ -373,3 +368,17 @@ dlg_cell:   ds 3
 dlg_ins:    ds 1
 dlg_insi:   ds 1
 dlg_insbuf: ds 8
+dlg_src:    ds 3
+
+section bank 0, $0E00
+; line DLG_CUT: the window off from the next line (written in this line's H-Blank)
+stat_isr:   push af
+.w:         ldh a, [rSTAT]
+            and 3
+            jr nz, .w
+            ldh a, [rLCDC]
+            and $DF
+            ldh [rLCDC], a
+            pop af
+            reti
+
