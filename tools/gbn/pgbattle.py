@@ -27,6 +27,7 @@ PGB_SGB = 126                                        # its Super Game Boy bank (
 EG_MONSTERS = [('Black Goblin', 163), ('Wild Nakk', 185), ('Gloom Widow', 166), ('Desertpede', 165),
                ('Skuldier', 191), ('Catoblepas', 181), ('Abyss Worm', 146)]
 EG_BOSSES = [('Echidna', 128), ('Cerberus', 129), ('Ahriman', 130), ('Two-Headed Dragon', 131)]
+HANGING = {'Echidna'}                                # (hangs from the top: her fiend picture at cell row 0)
 # boss AI (FF1's record: magic chance, ability chance, 8 spells, $FF, 4 abilities, $FF): the wiki's
 # abilities as FF1's spell numbers (names list 176 + n) / enemy abilities (0-25)
 S_CURA, S_DEATH, S_QUAKE, S_FLARE = 16, 45, 46, 60
@@ -66,6 +67,24 @@ def nearest_nes(rgb, avoid_black=True):
         d = (r - rgb[0]) ** 2 * 3 + (g - rgb[1]) ** 2 * 4 + (b - rgb[2]) ** 2 * 2
         if best is None or d < best[0]: best = (d, c)
     return best[1]
+
+
+def nes_by_hue(rgb):
+    """the NES colour of an RGB colour as a pixel artist picks it: its hue's column, its brightness's row
+    (greys: the grey column)"""
+    import colorsys
+    h, l, s = colorsys.rgb_to_hls(*(v / 255 for v in rgb))
+    y = (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255
+    row = 0 if y < 0.28 else (1 if y < 0.50 else (2 if y < 0.75 else 3))
+    if s < 0.22 or max(rgb) - min(rgb) < 40:
+        return [0x00, 0x10, 0x20, 0x30][row] if row else 0x00
+    best = None
+    for col in range(1, 13):
+        r, g, b = nes_rgb(0x20 | col)
+        hh = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)[0]
+        d = min(abs(hh - h), 1 - abs(hh - h))
+        if best is None or d < best[0]: best = (d, col)
+    return row << 4 | best[1]
 
 
 def stats(G, rec):
@@ -124,65 +143,106 @@ def kmeans(pts, k, it=12):
     return cs
 
 
-def boss_picture(G, rec):
-    """a boss's GBA picture -> 64 x 64 indices 0-3 per pixel, palette per 16 x 16 block (0 / 1),
-    two NES palettes [0x0F, c1, c2, c3] (colours sorted dark to bright)"""
-    from PIL import Image
+def nes_column(rgbs):
+    """an NES hue column (1-12, or 0: greys) for weighted RGB colours"""
+    import colorsys
+    sx = sy = sw = 0.0; sat = 0.0
+    for (r, g, b), w in rgbs:
+        h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+        import math
+        sx += math.cos(2 * math.pi * h) * s * w; sy += math.sin(2 * math.pi * h) * s * w; sw += w; sat += s * w
+    if sw == 0 or sat / sw < 0.18: return 0
+    import math
+    hue = (math.atan2(sy, sx) / (2 * math.pi)) % 1.0
+    best = None
+    for col in range(1, 13):                        # the column's hue: its $2x colour
+        r, g, b = nes_rgb(0x20 | col)
+        h, l, s = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+        d = min(abs(h - hue), 1 - abs(h - hue))
+        if best is None or d < best[0]: best = (d, col)
+    return best[1]
+
+
+def boss_picture(G, rec, top=False):
+    """a boss's GBA picture -> FF1's fiend picture: 64 x 64 of colour 0-3, a palette (0 / 1) per 16 x 16 block,
+    two NES palettes, made as FF1's own fiends are: black behind, then a dark, a mid and a near-white colour
+    (Lich: $16 $14 $30, Kary: $30 $28 $04). Both palettes share the dark and the light colour and differ only
+    in the mid one (the boss's two main hues), so a block's palette changes one colour, not three. Each GBA
+    colour goes to dark / mid / light by its brightness rank (thirds of the pixels); Dawn of Souls' black
+    outlines stay black (colour 0, as FF1's fiends are outlined by the black behind them); reduced by each
+    box's commonest shade, the outlines kept."""
+    import colorsys, math
     tp, w, h, px, cols = gba.monster_picture(G, rec)
     W, H = 8 * w, 8 * h
     ys = [y for y in range(H) for x in range(W) if px[y][x]]
-    top, bot = min(ys), max(ys)
-    for c in range(1, 16):                          # the ground shadow (a colour only in the
-        cy = [y for y in range(H) for x in range(W) if px[y][x] == c]   #   picture's lowest
-        if cy and min(cy) > bot - (bot - top) // 6:                      #   sixth): dropped
+    top_y, bot = min(ys), max(ys)
+    for c in range(1, 16):                          # the ground shadow (only in the lowest sixth): dropped
+        cy = [y for y in range(H) for x in range(W) if px[y][x] == c]
+        if cy and min(cy) > bot - (bot - top_y) // 6:
             px = [[0 if v == c else v for v in row] for row in px]
     xs = [x for y in range(H) for x in range(W) if px[y][x]]
     ys = [y for y in range(H) for x in range(W) if px[y][x]]
     x0, x1, y0, y1 = min(xs), max(xs) + 1, min(ys), max(ys) + 1
-    im = Image.new('RGBA', (x1 - x0, y1 - y0), (0, 0, 0, 0))
+    cnt = [0] * 16
     for y in range(y0, y1):
-        for x in range(x0, x1):
-            if px[y][x]: im.putpixel((x - x0, y - y0), gba_rgb(cols[px[y][x]]) + (255,))
-    s = min(64 / im.width, 64 / im.height, 1.0)
-    nw, nh = max(1, round(im.width * s)), max(1, round(im.height * s))
-    im = im.resize((nw, nh), Image.LANCZOS)
-    can = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
-    can.paste(im, ((64 - nw) // 2, 64 - nh))
-    pix = [[can.getpixel((x, y)) for x in range(64)] for y in range(64)]
-    solid = [(x, y) for y in range(64) for x in range(64) if pix[y][x][3] >= 128 and sum(pix[y][x][:3]) > 60]
-    pts = [pix[y][x][:3] for x, y in solid]
-    pa = kmeans(pts, 3)
-    err = lambda p, cs: min(sum((a - b) ** 2 for a, b in zip(p, c)) for c in cs)
-    worst = sorted(pts, key=lambda p: -err(p, pa))[:max(3, len(pts) // 3)]
-    pb = kmeans(worst, 3)
-    pals = []
-    for cs in (pa, pb):
-        ns = []
-        for c in sorted(cs, key=sum):
-            n = nearest_nes(c)
-            ns.append(n)
-        pals.append([0x0F] + ns)
-    prgb = [[nes_rgb(c) for c in p] for p in pals]
+        for x in range(x0, x1): cnt[px[y][x]] += 1
+    used = [c for c in range(1, 16) if cnt[c]]
+    rgb = {c: gba_rgb(cols[c]) for c in used}
+    lum = {c: (0.299 * rgb[c][0] + 0.587 * rgb[c][1] + 0.114 * rgb[c][2]) / 255 for c in used}
+    hls = {c: colorsys.rgb_to_hls(*(v / 255 for v in rgb[c])) for c in used}
+    black = {c for c in used if lum[c] < 0.10}      # (the outlines: black, colour 0)
+    body = sorted((c for c in used if c not in black), key=lambda c: lum[c])
+    tot = sum(cnt[c] for c in body); acc = 0; level = {}
+    for c in body:                                  # brightness thirds of the pixels: 1 dark, 2 mid, 3 light
+        acc += cnt[c] - cnt[c] / 2
+        level[c] = 1 if acc < tot / 3 else (2 if acc < tot * 2 / 3 else 3)
+        acc += cnt[c] / 2
+    for c in black: level[c] = 0
+    def mean_rgb(cs):
+        n = sum(cnt[c] for c in cs) or 1
+        return tuple(sum(rgb[c][i] * cnt[c] for c in cs) / n for i in range(3))
+    dark = nes_by_hue(mean_rgb([c for c in body if level[c] == 1] or body))
+    def hvec(c):
+        hh, ll, ss = hls[c]
+        return (math.cos(2 * math.pi * hh) * ss, math.sin(2 * math.pi * hh) * ss)
+    sat_body = [c for c in body if level[c] >= 2] or body
+    a = max(sat_body, key=lambda c: cnt[c])           # the two main hues (mid and light colours)
+    b = max(sat_body, key=lambda c: cnt[c] * sum((u - v) ** 2 for u, v in zip(hvec(c), hvec(a))))
+    fam = {c: (0 if sum((u - v) ** 2 for u, v in zip(hvec(c), hvec(a))) <=
+                   sum((u - v) ** 2 for u, v in zip(hvec(c), hvec(b))) else 1) for c in body}
+    mid, light = [], []
+    for k in (0, 1):                                # each hue: its own mid and light (the dark shared)
+        ms = [c for c in body if fam[c] == k and level[c] == 2] or [c for c in body if level[c] == 2] or body
+        ls = [c for c in body if fam[c] == k and level[c] == 3] or [c for c in body if level[c] == 3] or body
+        m_, l_ = nes_by_hue(mean_rgb(ms)), nes_by_hue(mean_rgb(ls))
+        if l_ == m_: l_ = min(0x30 | (m_ & 0x0F), 0x3C) if (m_ & 0x0F) not in (0, 0x0D) else 0x30
+        if m_ == dark: m_ = (m_ + 0x10) & 0x3F
+        mid.append(m_); light.append(l_)
+    pals = [[0x0F, dark, mid[0], light[0]], [0x0F, dark, mid[1], light[1]]]
+    s = min(64 / (x1 - x0), 64 / (y1 - y0), 1.0)
+    nw, nh = max(1, round((x1 - x0) * s)), max(1, round((y1 - y0) * s))
+    ox, oy = (64 - nw) // 2, (0 if top else 64 - nh)
     out = [[0] * 64 for _ in range(64)]
+    fpx = [[None] * 64 for _ in range(64)]
+    for Y in range(nh):
+        for X in range(nw):
+            sx0, sx1 = x0 + int(X / s), x0 + max(int(X / s) + 1, int((X + 1) / s))
+            sy0, sy1 = y0 + int(Y / s), y0 + max(int(Y / s) + 1, int((Y + 1) / s))
+            box = [px[yy][xx] for yy in range(sy0, min(sy1, y1)) for xx in range(sx0, min(sx1, x1))]
+            solid = [v for v in box if v]
+            if len(solid) * 2 < len(box): continue
+            lv = {}
+            for v in solid: lv[level[v]] = lv.get(level[v], 0) + 1
+            L = 0 if lv.get(0, 0) * 3 >= len(solid) else max((k for k in lv if k), key=lambda k: lv[k])
+            out[oy + Y][ox + X] = L
+            mc = [v for v in solid if level.get(v, 0) >= 2]
+            if mc: fpx[oy + Y][ox + X] = fam[max(set(mc), key=mc.count)]
     blk = [[0] * 4 for _ in range(4)]
     for by in range(4):
         for bx in range(4):
-            best = None
-            for k in (0, 1):
-                e = 0
-                for y in range(16 * by, 16 * by + 16):
-                    for x in range(16 * bx, 16 * bx + 16):
-                        p = pix[y][x]
-                        if p[3] < 128 or sum(p[:3]) <= 60: continue
-                        e += min(sum((a - b) ** 2 for a, b in zip(p[:3], prgb[k][i])) for i in (1, 2, 3))
-                if best is None or e < best[0]: best = (e, k)
-            blk[by][bx] = best[1]
-            k = best[1]
-            for y in range(16 * by, 16 * by + 16):
-                for x in range(16 * bx, 16 * bx + 16):
-                    p = pix[y][x]
-                    if p[3] < 128 or sum(p[:3]) <= 60: continue
-                    out[y][x] = min((1, 2, 3), key=lambda i: sum((a - b) ** 2 for a, b in zip(p[:3], prgb[k][i])))
+            votes = [fpx[y][x] for y in range(16 * by, 16 * by + 16) for x in range(16 * bx, 16 * bx + 16)
+                     if fpx[y][x] is not None]
+            blk[by][bx] = max((0, 1), key=votes.count) if votes else 0
     return out, blk, pals
 
 
@@ -230,7 +290,8 @@ def sil_page(page):
 def build(rom, G=None):
     """Earthgift's battle set: {bank: bytes} for its data, graphics and silhouette banks; the domains
     (formation lists of 8) per floor kind; the formation of each boss"""
-    G = G or gba.Gba()
+    import postgame
+    G = G or gba.Gba(postgame.GBA_PATH)
     base = bytearray(battle.data_bank(rom))
     ff1chr = battle.chr_banks(rom)
     def ff1_page(p):
@@ -261,7 +322,7 @@ def build(rom, G=None):
         enemies.append((name, stats(G, rec)))
     bosses = []
     for k, (name, rec) in enumerate(EG_BOSSES):
-        pic, blk, bp = boss_picture(G, rec)
+        pic, blk, bp = boss_picture(G, rec, top=name in HANGING)
         p = 3 + k
         tsa = bytearray(64); t = 0x12
         for cy in range(8):
@@ -271,10 +332,11 @@ def build(rom, G=None):
                 pages[p][16 * t:16 * t + 16] = gb_tile_px(rows)
                 tsa[8 * cy + cx] = t; t += 1
         attr = bytearray(16)                         # FF1's attribute grid (4 x 4 bytes over the
-        for by in range(4):                          #   fiend's 16 x 16 blocks: the fiend's first
-            for bx in range(4):                      #   cell is NES column 4, row 8)
+        r0 = 0 if name in HANGING else 2             #   fiend's 16 x 16 blocks: its first cell is NES
+        for by in range(4):                          #   column 4, row 6 + its cell row)
+            for bx in range(4):
                 v = 1 + blk[by][bx]                  # (BG palette 1 = palette A, 2 = palette B)
-                X, Y = 4 + 2 * bx, 8 + 2 * by        # NES tile column / row of the block
+                X, Y = 4 + 2 * bx, 6 + r0 + 2 * by   # NES tile column / row of the block
                 ai = (Y // 4 - 1) * 4 + X // 4
                 sh = (Y & 2) * 2 + (X & 2)
                 attr[ai] |= v << sh
@@ -355,7 +417,7 @@ def build(rom, G=None):
         pts = [(x, y) for y in range(64) for x in range(64) if pic[y][x]]
         ys = [y for _, y in pts]; mid = (min(ys) + max(ys)) // 2
         left = min(x for x, y in pts if mid - 6 <= y <= mid + 6)
-        hands[2 * k:2 * k + 2] = bytes([left, mid])
+        hands[2 * k:2 * k + 2] = bytes([left, mid - (16 if name in HANGING else 0)])
     hands[8:10] = base[0x3FE8:0x3FEA]
     put(0x7FE0, bytes(hands))
     chr0 = b''.join(bytes(pg) for pg in pages[:8]); chr1 = b''.join(bytes(pg) for pg in pages[8:])

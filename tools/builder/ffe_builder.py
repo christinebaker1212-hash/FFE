@@ -3,7 +3,7 @@ the user's own NES ROM files. Nothing of the games is included: every game byte 
 the ROM chosen here.
 
     FFE-Builder.exe                                  (window)
-    FFE-Builder.exe --cli ROM OUTDIR [FF3ROM]        (console: FF1)
+    FFE-Builder.exe --cli ROM OUTDIR [FF3ROM [GBAROM]] (console: FF1; the GBA ROM: the post-game)
     FFE-Builder.exe --cli ROM OUTDIR --recompiled    (the earlier recompiled build)
 
 Steps for Final Fantasy I (Game Boy / Super Game Boy / Game Boy Color): check the ROM's
@@ -47,7 +47,10 @@ def run(cmd, log):
     if p.wait() != 0: raise RuntimeError('step failed: %s' % ' '.join(cmd[:4]))
 
 
-def build_ff1(rom, outdir, log, ff3=None, recompiled=False):
+SHA1_DOS = '3d1c580b9b3007f6f910d80f4c7421f5d2e19dbe'      # Final Fantasy I・II Advance (Japan) (Rev 1)
+
+
+def build_ff1(rom, outdir, log, ff3=None, recompiled=False, gba=None):
     if recompiled:
         return build_ff1_recompiled(rom, outdir, log)
     if sha1(rom) != SHA1_FF12:
@@ -65,6 +68,11 @@ def build_ff1(rom, outdir, log, ff3=None, recompiled=False):
         if sha1(ff3) != SHA1_FF3:
             raise RuntimeError('%s is not the expected "Final Fantasy III (Japan).nes" (SHA-1 %s)' % (ff3, SHA1_FF3))
         args += ['--ff3', ff3]
+    if gba:                                          # (the post-game: Dawn of Souls' shrines)
+        if sha1(gba) != SHA1_DOS:
+            raise RuntimeError('%s is not the expected "Final Fantasy I, II Advance (Japan) (Rev 1).gba" (SHA-1 %s)'
+                               % (gba, SHA1_DOS))
+        args += ['--gba', gba]
         log('3/3 the Game Boy game (icons from the FF III ROM)')
     else:
         log('3/3 the Game Boy game (no FF III ROM chosen: no item / spell icons)')
@@ -102,7 +110,8 @@ def cli(argv):
     argv = [a for a in argv if a != '--recompiled']
     rom, outdir = argv[0], argv[1] if len(argv) > 1 else os.getcwd()
     ff3 = argv[2] if len(argv) > 2 else None
-    build_ff1(rom, outdir, lambda s: print(s, flush=True), ff3=ff3, recompiled=rec)
+    gba = argv[3] if len(argv) > 3 else None
+    build_ff1(rom, outdir, lambda s: print(s, flush=True), ff3=ff3, recompiled=rec, gba=gba)
 
 
 def gui():
@@ -121,6 +130,12 @@ def gui():
                       command=lambda v=var: v.set(filedialog.askopenfilename(filetypes=[('NES ROM', '*.nes'), ('all', '*.*')]) or v.get()))
         b.pack(side='left', padx=4)
         rows[key] = var
+    gf = tk.Frame(w); gf.pack(fill='x', padx=8, pady=2)                  # (optional: the post-game)
+    tk.Label(gf, text='Dawn of Souls (GBA)', width=18, anchor='w').pack(side='left')
+    gbav = tk.StringVar(value='')
+    tk.Entry(gf, textvariable=gbav).pack(side='left', fill='x', expand=True)
+    tk.Button(gf, text='GBA ROM...', command=lambda: gbav.set(filedialog.askopenfilename(
+        filetypes=[('GBA ROM', '*.gba'), ('all', '*.*')]) or gbav.get())).pack(side='left', padx=4)
     of = tk.Frame(w); of.pack(fill='x', padx=8, pady=2)
     tk.Label(of, text='Output folder', width=18, anchor='w').pack(side='left')
     outv = tk.StringVar(value=os.path.join(os.path.expanduser('~'), 'FFE'))
@@ -139,7 +154,7 @@ def gui():
                 rom = rows['ff1'].get()
                 if not rom: raise RuntimeError('choose the "Final Fantasy I, II (Japan).nes" file first')
                 os.makedirs(outv.get(), exist_ok=True)
-                build_ff1(rom, outv.get(), log, ff3=rows['ff3'].get() or None)
+                build_ff1(rom, outv.get(), log, ff3=rows['ff3'].get() or None, gba=gbav.get() or None)
             except Exception as e:
                 log('ERROR: %s' % e)
             finally:

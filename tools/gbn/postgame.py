@@ -22,6 +22,7 @@ sys.path.insert(0, HERE)
 import data, gba
 
 PG_MAP0 = 64                    # post-game map ids from here (FF1's are 0-60)
+GBA_PATH = None                 # the user's Dawn of Souls ROM (build.py --gba; none: no post-game)
 PG_TS_CAVE = 17                 # ROM bank of the post-game cave tileset (FF1's Earth Cave tiles;
                                 #   tileset number 9: FF1's music table by tileset has room there)
 SONG_CAVE, SONG_BOSS = 0x0D, 0x0D
@@ -244,7 +245,7 @@ def cave_tileset(rom):
 
 def floors(rom, G=None):
     """the post-game's maps: [(map id, map_pack overrides, extra bytes)]"""
-    G = G or gba.Gba()
+    G = G or gba.Gba(GBA_PATH)
     t = cave_tileset(rom)
     pal = rom.rd(data.BANK_SMINFO, data.SM_PAL + 0x30 * EARTH_MAP, 0x30)
     chr_ = rom.rd(data.BANK_TILESETCHR, 0x8000 + 0x800 * 2, 0x800)
@@ -422,9 +423,11 @@ EG_FIXED = ['Megalixir']
 def pg_source(bank):
     """the run's data in the post-game code bank: the treasure per depth, the fixed chests"""
     db = lambda xs: '            db ' + ', '.join('$%02X' % x for x in xs) + '\n'
+    import pgbattle
+    fy = [0x03 if n in pgbattle.HANGING else 0x23 for n, _ in pgbattle.EG_BOSSES]
     return ('section bank %d, $7F00\npg_treas:\n' % bank +
             ''.join(db([item_code(n) for n in row]) for row in EG_TREASURE) +
-            'pg_fixed:\n' + db([item_code(n) for n in EG_FIXED] + [0] * 7))
+            'pg_fixed:\n' + db([item_code(n) for n in EG_FIXED] + [0] * 7) + 'pg_fy:\n' + db(fy))
 
 
 def overworld_patch():
