@@ -7,7 +7,7 @@
 ; shape show the battlefield's cells as they were. The party is hidden (FF3 clears the sprites),
 ; so the attacks' sprites have all 40 entries.
 
-section bank B_BANIM, $5900
+section bank B_BANIM, $5B00
 ; ---- kind 2: a summon (A from batui: [$7E94] = summon id x 16 + attack)
 an_summon:  ld a, [$D8D6]
             ld [an_c], a
@@ -393,7 +393,8 @@ an_sload:   ld a, [an_sid]
             call an_hla
             ld de, an_sprp
             ld bc, 8
-            call memcpy
+            ld a, B_SUMN
+            call far_copy
             ld a, [an_sat]                  ; palettes: the attack's three general palettes
             ld hl, an_sprp + 1
             call an_hla
@@ -494,7 +495,8 @@ an_sload:   ld a, [an_sid]
             ld a, [an_smp + 1]
             ld h, a
             ld c, 0
-.cn:        ld a, [hl+]
+.cn:        call an_sb
+            inc hl
             cp $FF
             jr z, .cz
             inc c
@@ -579,7 +581,7 @@ an_scell:   ld a, [an_sr0]
             ld a, [an_smp + 1]
             adc 0
             ld h, a
-            ld a, [hl]
+            call an_sb
             cp $FF
             jr z, .bf
             ld e, a
@@ -1280,7 +1282,11 @@ an_ssdraw:  ld [an_sox], a
             ld d, a
             ld c, 0                         ; C = row
 .r:         ld b, 0                         ; B = column
-.k:         ld a, [de]
+.k:         push hl
+            ld h, d
+            ld l, e
+            call an_sb
+            pop hl
             inc de
             cp $FF
             jr z, .n
@@ -1397,13 +1403,13 @@ an_slist:   push de
             ld de, sm_lst - $8F8B
             add hl, de
             pop de
-.l:         ld a, [hl]
+.l:         call an_sb
             cp $FF
             ret z
             push hl
             push de
             push bc
-            ld a, [hl+]
+            call an_shl
             add e
             cp 96 + 8
             jr c, .y
@@ -1411,12 +1417,12 @@ an_slist:   push de
             jr c, .s
 .y:         add 17
             ld [an_sl1], a
-            ld a, [hl+]
+            call an_shl
             add c
             ld [an_sl2], a
-            ld a, [hl+]
+            call an_shl
             ld [an_sl3], a
-            ld a, [hl]
+            call an_sb
             add d
             cp 160
             jr nc, .s
@@ -1453,10 +1459,19 @@ an_slistp:  push de
             ld de, sm_lst - $8F8B
             add hl, de
             pop de
-            ld a, [hl+]
-            ld h, [hl]
+            call an_shl
+            push af
+            call an_sb
+            ld h, a
+            pop af
             ld l, a
             jr an_slist
+; A = byte HL of the summons' data (bank B_SUMN); an_shl: and HL + 1 (keep BC, DE)
+an_sb:      ld a, B_SUMN
+            jp far_byte
+an_shl:     call an_sb
+            inc hl
+            ret
 ; NES coordinate A scaled 5 / 8 (FF3's 256-pixel field on ours)
 an_s58:     push hl
             push de
@@ -1545,18 +1560,8 @@ an_s05:     ld a, 14
             call an_lgfx
             ld a, $FF
             call an_gpal3
-            ld a, $20                       ; the sway table: 64 x $20 sin(4 i)
+            ld a, $20                       ; the sway: $20 sin(4 count)
             ld [an_k], a
-            ld hl, dd_osc
-            xor a
-.o:         push af
-            push hl
-            call an_smul
-            pop hl
-            ld [hl+], a
-            pop af
-            add 4
-            jr nz, .o
             ld hl, dd_cnt                   ; counters from the random table, all hidden
             ld de, RNG_TAB
             ld b, 40
@@ -1626,9 +1631,13 @@ an_s05:     ld a, 14
             add hl, bc
             ld a, [hl]
             and $3F
-            ld hl, dd_osc
-            call an_hla
-            ld a, [hl]
+            add a
+            add a
+            push bc
+            push de
+            call an_smul
+            pop de
+            pop bc
             add d
             call an_s58
             add 8
@@ -2293,7 +2302,7 @@ an_sbgdraw: call wait_vbl
             ld a, [an_smp + 1]
             adc 0
             ld h, a
-            ld a, [hl]
+            call an_sb
             pop de
             cp $FF
             jr z, .p
@@ -2831,7 +2840,6 @@ an_xp:      ds 4
 an_mpn:     ds 8
 
 section wram, $D9C0                         ; (one animation's tables at a time)
-dd_osc:     ds 64
 dd_cnt:     ds 40
 dd_dly:     ds 40
 dd_on:      ds 40
@@ -2845,5 +2853,7 @@ tw_cnt     = CY_BASE + 42
 tw_on      = CY_BASE + 63
 
 
-section bank B_BANIM, $7AB0
+section bank B_SUMN, $6800                  ; (after the 640 tiles)
 sm_lst:     ds $24C                         ; (32/8F8B-91D6: the attacks' sprite lists)
+sm_data:    ds $1C0                         ; (2A/9440: the summons' properties, maps)
+em_data:    ds 5 * $60                      ; (06/8E20: the monsters' Flame / Blizzard / Thunder)

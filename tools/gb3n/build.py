@@ -618,7 +618,10 @@ ev_fxtest:  call ev_shake
     ab[0x1000:0x1000 + len(an)] = an
     banks[B_ANIM] = ab
     banks[B_MAGIC] = bytearray(b''.join(tiles.gb(rom.at(0x15 * 0x4000 + 16 * i, 16)) for i in range(1024)))
-    banks[B_SUMN] = bytearray(b''.join(tiles.gb(rom.at(6 * 0x4000 + 0x1800 + 16 * i, 16)) for i in range(640)))
+    st = b''.join(tiles.gb(rom.at(6 * 0x4000 + 0x1800 + 16 * i, 16)) for i in range(640))
+    banks.setdefault(B_SUMN, bytearray(0x4000))
+    banks[B_SUMN] = bytearray(banks[B_SUMN])
+    banks[B_SUMN][:len(st)] = st
     for k, v in tbanks.items():
         assert k not in banks, 'bank %d used twice' % k
         banks[k] = v

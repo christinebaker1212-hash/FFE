@@ -2286,7 +2286,9 @@ an_emag:    ld [an_k4], a
             ld de, em_data
             add hl, de
             ld c, 0                         ; C = cell
-.c:         ld a, [hl+]
+.c:         ld a, B_SUMN
+            call far_byte
+            inc hl
             cp $FF
             jr z, .n
             ld b, a
@@ -3043,8 +3045,13 @@ an_mlist:   ld a, [$DE88]                   ; the list
 .t:         ld a, [an_tm]
             add a
             ld [an_tm], a
-            jr nc, .nx
+            ld hl, $DEB8                    ; (the reflected targets, $7EB8, shifted with them)
+            jr nc, .nh
+            sla [hl]
+            jr c, .rf
             call an_mone
+            jr .nx
+.nh:        sla [hl]
 .nx:        ld hl, an_t
             inc [hl]
             ld a, [hl]
@@ -3053,6 +3060,112 @@ an_mlist:   ld a, [$DE88]                   ; the list
             call an_clr
             call an_frame
             jp an_bgoff
+.rf:        call an_reflect                 ; (33/B64F)
+            jr .nx
+; ---- the spell reflected from target an_t (33/B64F): the reflection (palette $B1, 33/B5BB), then
+; the hit on the one it bounces onto ($7EB9 + target: a mask, the other side)
+an_reflect: ld a, $B1
+            call an_gpal3
+            ld a, 4
+            ld [an_k3], a
+.f:         call an_frame
+            call an_clr
+            ld a, [$DE9A]
+            bit 6, a
+            jr z, .ch
+            call an_tcen
+            ld hl, an_blob + ($9453 - $943D)
+            jr .d
+.ch:        ld a, [an_t]
+            ld b, a
+            add a
+            add b
+            add a
+            add a
+            add a
+            sub 4
+            ld e, a
+            ld d, 144 - 16
+            ld hl, an_blob + ($9473 - $943D)
+.d:         call .four
+            ld a, e
+            add 16
+            ld e, a
+            call .four
+            ld hl, an_k3
+            dec [hl]
+            jr nz, .f
+            call an_clr
+            ld a, [an_m2]
+            call an_gpal3
+            ld a, [an_t]                    ; the other side, the target it bounces onto
+            push af
+            ld a, [$DE9A]
+            push af
+            xor $40
+            ld [$DE9A], a
+            ld a, [an_t]
+            ld hl, $DEB9
+            call an_hla
+            ld b, [hl]
+            ld c, 0
+.b:         sla b
+            jr c, .bt
+            inc c
+            ld a, c
+            cp 8
+            jr nz, .b
+            ld c, 0
+.bt:        ld a, c
+            ld [an_t], a
+            call an_mone
+            pop af
+            ld [$DE9A], a
+            pop af
+            ld [an_t], a
+            ret
+.four:      ld b, 4                         ; 4 sprites: y, tile, flags (palette 3), x at (D, E)
+.s:         push bc
+            push hl
+            call an_slot_oam
+            ld b, h
+            ld c, l
+            pop hl
+            jr c, .x
+            ld a, [hl+]
+            add e
+            add 17
+            ld [bc], a
+            inc bc
+            ld a, [hl+]
+            ld [an_k2], a
+            ld a, [hl+]
+            and $C0
+            rra
+            or $0B
+            push af
+            ld a, [hl+]
+            add d
+            add 8
+            ld [bc], a
+            inc bc
+            ld a, [an_k2]
+            ld [bc], a
+            inc bc
+            pop af
+            ld [bc], a
+            pop bc
+            dec b
+            jr nz, .s
+            ret
+.x:         inc hl
+            inc hl
+            inc hl
+            inc hl
+            pop bc
+            dec b
+            jr nz, .s
+            ret
 ; target an_t: the list's frames
 an_mone:    ld a, [$DE9A]                   ; the place
             bit 6, a
@@ -3486,8 +3599,6 @@ fb_x:       ds 6                            ; (33/B9DA)
 fb_cnt:     ds 6                            ; (33/B9E0)
 fb_spr:     ds 48                           ; (32/91D7: 2 x 3 frames, a monster target's, a member's)
 gl_col:     ds 22                           ; (32/804B: the flash colours of spells $38..)
-em_data:    ds 5 * $60                      ; (06/8E20: the monsters' Flame / Blizzard / Thunder)
-sm_data:    ds $1C0                         ; (2A/9440: the summons' properties, maps)
 mg_snd:     ds MG_NSND                      ; (34/83A0: each spell's sound)
 MG_NSND    = $58
 sl_pos:     ds 24                           ; (32/99D1)
