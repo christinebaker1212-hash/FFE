@@ -1231,3 +1231,35 @@ one reaches parity, so the owner can keep playing).
       traced and filled to the end on the Color and a plain Game Boy, colours steady, no jump, no flash; VRAM
       checker 0 there; menus open / close identical to the build before over 920 frames (Color); strict checker 0
       on Color, Game Boy and Super Game Boy over 15,000 frames of random play.
+70. Owner (2026-11-27): the post-game, Dawn of Souls' Soul of Chaos dungeons, from the user's Dawn of Souls GBA ROM at
+    build time (docs/ff1-postgame-design.md section 10; formats docs/ff1-postgame-gba.md). Earthgift Shrine first.
+    - Floors (tools/gbn/postgame.py): the GBA floors converted to FF1 maps by rule: walkable -> FF1's floor,
+      blocked next to it -> FF1's one-tile walls, rooms -> FF1 rooms (border, the door in the corridor wall, black
+      from outside), the stairs chip -> FF1's stairs; the caves in Earth Cave's tiles, the forest maze and the
+      looping desert (cut to 64 x 64 around its oasis; FF1's maps wrap) in FF1's overworld tiles. Map ids 64+, one
+      ROM bank each (bank = map + 64; the ROM is 4 MB), their two tilesets in banks 17 / 18 (FF1's music table by
+      tileset has room there). Arrival: the floor farthest from the stairs; chests on dead ends.
+    - Runs (src/pg.s): the entrance floor's stairs start a run; B1-B4 are its four other floors in a random order,
+      then the boss floor; each floor's chests hold that depth's treasure (the wiki's lists), shuffled per run.
+      State in the save page's unused bytes ($60A0-$60A9; $6040-$609F hold FF1's new-game class stats).
+    - The door on the world map (132, 141): a cave mouth (the overworld's unused metatile $7A, FF1's own entrance
+      tables, number $1E); sealed until Lich is beaten (Earth orb lit) with Dawn of Souls' words at it (message
+      640, retranslated), then the entrance floor.
+    - Boss floor: an orb in each boss room (FF1's fiend orb, object ids $F0-$F3, shown while not beaten): its
+      boss's words (messages 648-651, matched to the bosses by the official quotes), the battle, then straight
+      back to the world map (Dawn of Souls: one boss a run; beaten bosses remembered). A lost battle anywhere in the
+      shrine throws the party back to the world map alive at 1 HP (pg_gover), as Dawn of Souls does.
+    - Battles (tools/gbn/pgbattle.py): the dungeon has its own copy of the battle data bank, enemy graphics,
+      silhouettes and the Super Game Boy's battle colours; the battle code reads those banks from HRAM (hbt_*,
+      set for each map). Monsters: Dawn of Souls' stats; their pictures are FF1's own of the family Dawn of Souls
+      recoloured (same GBA tile data), with the colours taken over through the two GBA palettes. Bosses: the GBA
+      pictures fitted to FF1's fiend picture (8 x 8 tiles, two palettes per 16 x 16 block, ground shadow dropped);
+      abilities from the wiki as FF1's spells / enemy abilities. Formations and encounter rates: the wiki's tables.
+    - Items: 13 consumables and 3 armours as new items. Names / prices take name codes of FF1 gold amounts that no
+      chest gives; counts at $60B0 + k. Items screen: Hi-Potion 150 HP, Remedy (Poison outside battle), Ether
+      (Classic: one charge of every spell level, the Pixel Remaster's rule; Modern MP: 50), Megalixir (everyone's
+      HP and MP), Silver Apple (+5 max HP for good); the battle-only ones refuse. Battle: Medicine is a paged list
+      (Potion, Antidote, then those owned; counts less what earlier members chose this round), each the FF1 spell
+      Dawn of Souls' item casts (Red Fang Fira, White Fang Blizzara, Vampire Fang Hold, Spider's Silk Slow, the
+      Curtains the barriers, Speed Drink Haste, Protect Drink Protes) or our magic records $5C-$5F. Armour ids
+      43-45 (Kenpogi, Black Cowl, Elven Cloak) with FF1's armour records (no stat bonuses: FF1 has none).

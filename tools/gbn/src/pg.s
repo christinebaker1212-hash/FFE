@@ -11,6 +11,7 @@ PG_FIXED   = unsram + $A6   ;   fixed chests opened (persistent), the bosses bea
 PG_BOSS    = unsram + $A7   ;   each), the boss beaten this run, the run's chest shuffle
 PG_RUNB    = unsram + $A8
 PG_SEED    = unsram + $A9
+ST_TILE    = $70            ; (the statue's sprite tiles: postgame.statue)
 PG_TC      = 0              ; (FF1's flag of a chest number no map uses: the post-game's chests)
 PG_FLOORS  = 4              ; Earthgift: B1-B4 from its four floors (maps PGM_MAP0 + 1-4), B5
 PG_BOSSMAP = PGM_MAP0 + 5
@@ -96,6 +97,8 @@ pg_lcd:     ld a, [cur_map]
             ldh [hbt_cb], a
             ld a, PGB_SIL
             ldh [hbt_sb], a
+            ld a, PGB_SGB
+            ldh [hbt_sgb], a
             jp lcd_off
 .ff1:       ld a, BTL_DATA
             ldh [hbt_db], a
@@ -105,6 +108,8 @@ pg_lcd:     ld a, [cur_map]
             ldh [hbt_cb], a
             ld a, ESIL_BANK
             ldh [hbt_sb], a
+            ld a, SGB_BANK
+            ldh [hbt_sgb], a
             jp lcd_off
 
 section bank 0, $3B5A                       ; (free space)
@@ -185,6 +190,7 @@ hbt_db:     ds 1                            ; the battle data bank (battle.py's 
 hbt_cb:     ds 1                            ; the enemy graphics banks (2)
 hbt_sb:     ds 1                            ; their silhouettes (2)
 hbt_dom:    ds 1                            ; the encounter domains' bank
+hbt_sgb:    ds 1                            ; the Super Game Boy's battle colours' bank (sgb.s)
 
 section bank PGM_BANK, $4000
 ; ---- the stairs down (E = FF1's teleport number, not used)
@@ -354,13 +360,16 @@ pg_chest:   ld a, [tc_id]
 .none:      xor a
             jp pg_give
 
-; A = 1 << B
-pg_bit:     ld a, 1
+; A = 1 << B (B kept)
+pg_bit:     push bc
+            ld a, 1
             inc b
 .l:         dec b
-            ret z
+            jr z, .x
             add a, a
             jr .l
+.x:         pop bc
+            ret
 
 ; ---- an orb on the boss floor (A = its id): FF1's Talk_fight (the orb gone, the battle when the box
 ; closes) with the boss's words (Dawn of Souls' lines)
@@ -1106,3 +1115,93 @@ md_mp:      ld a, [mg_id]
             ld a, PGM_BANK
             ld hl, pg_ether
             jp bank_call
+
+section bank 0, $13F5                       ; (free space)
+; veh_oam: the bridge and the canal (ow_bc), then the shrine's statue
+pg_owst:    call ow_bc
+            ld a, PGM_BANK
+            ld hl, pg_statue
+            jp bank_call
+
+section bank PGM_BANK, $7200
+; the statue before Earthgift's sealed door (until Lich is beaten): FF1's Lich in stone, 4 x 4 sprites
+; (OAM 24-39, tiles $70-$7F) centred on the door, standing on its tile
+pg_statue:  ld hl, oam_buf + 96             ; (hidden first)
+            ld b, 16
+            xor a
+.z:         ld [hl+], a
+            inc l
+            inc l
+            inc l
+            dec b
+            jr nz, .z
+            ld a, [ORB_EARTH]
+            and a
+            ret nz
+            ld a, PG_OWX
+            ld hl, px
+            call ob_pos
+            ret c
+            sub 8
+            ld b, a
+            ld a, PG_OWY
+            ld hl, py
+            call ob_pos
+            ret c
+            ld c, a
+            call ob_step
+            ld a, c
+            add a, 3 - 16
+            ld c, a
+            ld de, oam_buf + 96
+            ld h, ST_TILE
+            ld l, 4
+.r:         push bc
+            ld a, b
+            ld b, 4
+.c:         push af
+            ld a, c
+            ld [de], a
+            inc de
+            pop af
+            ld [de], a
+            inc de
+            push af
+            ld a, h
+            ld [de], a
+            inc de
+            inc h
+            ld a, PG_STPAL
+            ld [de], a
+            inc de
+            pop af
+            add a, 8
+            dec b
+            jr nz, .c
+            pop bc
+            ld a, c
+            add a, 8
+            ld c, a
+            dec l
+            jr nz, .r
+            ret
+
+section bank PGM_BANK, $7300
+; load_map (the Color, LCD off): the reflection's OBJ palettes 4-7, then on the world map (no
+; reflections there) palette 7 the statue's stone: light grey, dark grey, black (NES $10, $00, $0F)
+pg_rpal:    ld a, F3_BANK
+            ld hl, refl_pal
+            call bank_call
+            ldh a, [maptype]
+            and a
+            ret z
+            ld a, $80 | $38
+            call ocps_w
+            ld hl, .g
+            ld b, 8
+.l:         ld a, [hl+]
+            call ocpd_w
+            dec b
+            jr nz, .l
+            ret
+.g:         dw $0000, $5294, $2108, $0000

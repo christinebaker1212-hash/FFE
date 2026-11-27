@@ -546,8 +546,8 @@ load_map:   push af
             call ocpd_w
             dec b
             jr nz, .op
-            ld a, F3_BANK                   ; (OBJ 4-7: their darker copies, the reflection's)
-            ld hl, refl_pal
+            ld a, PGM_BANK                  ; (OBJ 4-7: their darker copies, the reflection's;
+            ld hl, pg_rpal                  ;   the world map: 7 the shrine statue's stone, pg.s)
             call bank_call
             ld a, COMMON                    ; party sprite tiles at $8000 (as they are)
             call sbank
@@ -644,7 +644,7 @@ veh_tiles:  ldh a, [maptype]
             ld a, [map_bank]
             call sbank
             ld de, $8100
-            ld bc, 96 * 16
+            ld bc, 112 * 16                 ; (and the shrine's statue, tiles $70-$7F: pg.s)
             jp memcpy
 
 ; the map's object graphics blocks (HL = their tiles in the map bank, 256 bytes a block) to
@@ -1490,7 +1490,7 @@ veh_oam:    ld a, [vehicle]
             add a, 8
             ld b, a
             call .two
-.objs:      call ow_bc                      ; the bridge and the canal (FF1
+.objs:      call pg_owst                    ; the bridge and the canal (FF1
             ld a, [vehicle]                 ;   DrawOWObj_BridgeCanal); the ship / airship
             cp V_SHIP                       ;   standing on the map
             jr z, .na

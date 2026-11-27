@@ -1445,6 +1445,8 @@ Post-game proposal (owner, 2026-11-27): Dawn of Souls' four Soul of Chaos dungeo
 with mock-ups (docs/ff1-postgame-design.md). Owner decided (2026-11-27): all from the user's Dawn of Souls
 GBA ROM (read at build time: tools/gbn/gba.py, formats docs/ff1-postgame-gba.md); decoding started (floors,
 monsters, pictures, text found); engine plan in the design doc section 10; Earthgift first.
+Earthgift Shrine built (item 70): floors from the GBA as FF1 maps (ids 64+, ROM 4 MB), runs, the door sealed until
+Lich, B5 bosses at orbs, defeat back to the world map, its monsters / bosses (own battle banks), its 16 new items.
 
 ## Remaining
 - **FF1 (native build): finished (owner, 2026-11-26):** the owner played it through from New Game to

@@ -42,6 +42,14 @@ minus $08000000) in that revision; everything was found by searching for values 
   117-500 FF1's 128 monster pictures (tiles, 16-colour palette, arrangement), 501-551 the 17 bonus
   bosses, 552-701 the 50 new monsters, 702-974 other sprites.
 
+## AI and messages
+- Enemy AI: 16-byte records from $2253DC (FF1's format): 0-43 FF1's (some re-balanced), 44 "none", 45-68 new.
+  The bonus bosses' records hold $FF there (their scripts are elsewhere).
+- Monster pictures: asset triples (tiles, 16-colour palette, arrangement: u32 kind 2, u32 size, w, h, pad,
+  u16 entries); a recoloured family shares its tile data pointer with FF1's monster.
+- Dialogue: 1,280 Shift-JIS strings from the pointer table at $1F4A98; 640-647 the four shrines' doors (before /
+  after their Fiend), 648-651 Earthgift's bosses (Echidna, Cerberus, Ahriman, the Two-Headed Dragon).
+
 ## Not decoded yet
-Event scripts (stairs, warps, NPCs, triggers, chests' contents), the dungeons' floor sets and order,
-encounter tables, items / weapons / armour, the dialogue text.
+Event scripts (warps, NPCs, triggers, chests' places and contents), the dungeons' floor sets and order (taken
+from the wiki), encounter tables (from the wiki), items / weapons / armour tables (effects from the wiki).

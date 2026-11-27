@@ -531,3 +531,66 @@ def items_source():
 def battle_names():
     """the Medicine entries' names after FF1's attack names (battle.py: $5C on)"""
     return [n for n, c, mg, _ in NEW_ITEMS if mg is not None]
+
+
+ST_TILE = 0x70                  # the statue's sprite tiles on the overworld ($70-$7F, after the vehicles')
+
+
+def statue(rom):
+    """the statue before Earthgift's sealed door: FF1's own Lich (fiend picture 0, the user's ROM) as grey
+    stone, 32 x 32: (CGB tiles, DMG tiles, the OBJ palette 0-3 it uses on the Color)"""
+    import battle
+    forms = rom.rd(battle.BANK_DOMAINS, battle.FORMATIONS, 128 * 16)
+    f = next(k for k in range(128) if forms[16 * k] >> 4 == 3 and forms[16 * k + 1] == 0)
+    page = forms[16 * f] & 15
+    chr_ = rom.rd(battle.BANK_BATTLECHR + (page >> 3), 0x8000 + 0x800 * (page & 7), 0x800)
+    tsa = rom.rd(battle.BANK_DOMAINS, 0x92E0, 64)
+    pal = list(rom.rd(battle.BANK_BTLC, battle.BTL_PALS + 4 * forms[16 * f + 10], 4))
+    lum = [0] + [data.lum(c) for c in pal[1:]]
+    px = [[None] * 64 for _ in range(64)]
+    for r in range(8):
+        for c in range(8):
+            t = tsa[8 * r + c]
+            if t < 0x12: continue
+            for y in range(8):
+                for x in range(8):
+                    v = (chr_[16 * t + y] >> (7 - x) & 1) | (chr_[16 * t + 8 + y] >> (7 - x) & 1) << 1
+                    if v: px[8 * r + y][8 * c + x] = lum[v]
+    out = [[0] * 32 for _ in range(32)]
+    mean = {}
+    for y in range(32):
+        for x in range(32):
+            vs = [px[2 * y + j][2 * x + i] for j in (0, 1) for i in (0, 1)]
+            vs = [v for v in vs if v is not None]
+            if len(vs) >= 2: mean[(x, y)] = sum(vs) / len(vs)
+    ranked = sorted(mean.values())                                    # stone: the brightest 45% light,
+    t2, t1 = ranked[int(len(ranked) * 0.20)], ranked[int(len(ranked) * 0.55)]   # the next mid, the darkest
+    for (x, y), m in mean.items():                                    # fifth the dark (1 / 2 / 3)
+        out[y][x] = 1 if m >= t1 else (2 if m >= t2 else 3)
+    for y in range(32):                                               # a dark outline round the stone
+        for x in range(32):
+            if out[y][x] == 0 and any(0 <= y + b < 32 and 0 <= x + a < 32 and out[y + b][x + a] in (1, 2)
+                                      for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                out[y][x] = 3
+    def tile(r, c, remap):
+        b = bytearray()
+        for y in range(8):
+            lo = hi = 0
+            for x in range(8):
+                v = remap[out[8 * r + y][8 * c + x]]
+                lo = lo << 1 | (v & 1); hi = hi << 1 | (v >> 1)
+            b += bytes([lo, hi])
+        return bytes(b)
+    blk = rom.rd(data.BANK_SMINFO, data.OW_INFO, 0x400)
+    sp = [[blk[0x390]] + list(blk[0x390 + 4 * p + 1:0x390 + 4 * p + 4]) for p in range(4)]
+    def greyness(p):                                                 # (the most stone-like palette: greys
+        cs = sp[p][1:]                                               #   ($x0, $xD), then a spread of levels)
+        greys = sum(1 for c in cs if (c & 0x0F) in (0x00, 0x0D, 0x0F))
+        return -greys * 2 + sum(abs(data.lum(c) - k) for c, k in
+                                zip(sorted(cs, key=data.lum, reverse=True), (0.85, 0.55, 0.15)))
+    p = 7                                                            # (its own: pg.s pg_rpal)
+    cgb_map = [0, 1, 2, 3]
+    dmg_map = [0, 1, 2, 3]                                           # (OBP0: 1 white .. 3 black: DMG_OBP)
+    cgb = b''.join(tile(r, c, cgb_map) for r in range(4) for c in range(4))
+    dmg = b''.join(tile(r, c, dmg_map) for r in range(4) for c in range(4))
+    return cgb, dmg, p
