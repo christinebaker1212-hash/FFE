@@ -364,6 +364,9 @@ ROMDATA = {
     'sm_pre': (0x33, 0xB1EE, 10),        # the pre-animation's frames
     'sm_fly': (0x33, 0xAFF2, 16),        # its four sprites flying off
     'sm_data': (0x2A, 0x9440, 0x1C0),    # the summons' properties (2A/9440) and sprite maps
+    'sm_lst': (0x32, 0x8F8B, 0x91D7 - 0x8F8B),   # the summon attacks' sprite lists
+    'if_hue': (0x32, 0x87E9, 3),
+    'mn_rows': (0x34, 0x8739, 20),
     'fb_tiles': (0x33, 0xB9CE, 12),
     'fb_x': (0x33, 0xB9DA, 6),
     'fb_cnt': (0x33, 0xB9E0, 6),

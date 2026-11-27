@@ -478,7 +478,12 @@ stat_isr:   push af
             ldh [rLCDC], a
 .x:         pop af
             reti
-.cs:        ldh a, [rLCDC]
+.cs:        ld a, [c_split]                 ; (3: a battle's wave, a line's SCX from wv_tab;
+            cp 3                            ;   4: a battle's bands, SCX negated every 24
+            jr z, .wv                       ;   lines; both to the battlefield's bottom)
+            cp 4
+            jr z, .zb
+            ldh a, [rLCDC]
             xor $08
             ldh [rLCDC], a
             ld a, [c_lyb]
@@ -487,4 +492,46 @@ stat_isr:   push af
             ld [c_lyb], a
             pop af
             reti
+.wv:        ldh a, [rLY]
+            cp 95
+            jr nc, .we
+            inc a
+            push hl
+            ld hl, wv_ph
+            add [hl]
+            and 15
+            add low(wv_tab)
+            ld l, a
+            ld h, high(wv_tab)
+            ld a, [hl]
+            ldh [rSCX], a
+            pop hl
+            pop af
+            reti
+.we:        xor a
+            ldh [rSCX], a
+            ldh a, [rLCDC]
+            and $DF
+            ldh [rLCDC], a
+            pop af
+            reti
+.zb:        ldh a, [rLYC]
+            cp 95
+            jr nc, .ze
+            add 24
+            ldh [rLYC], a
+            ldh a, [rSCX]
+            cpl
+            inc a
+            ldh [rSCX], a
+            pop af
+            reti
+.ze:        xor a
+            ldh [rSCX], a
+            pop af
+            reti
+
+section wram, $C5C0                         ; (battle only; the STAT interrupt reads them)
+wv_tab:     ds 16
+wv_ph:      ds 1
 

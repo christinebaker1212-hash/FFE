@@ -537,10 +537,12 @@ an_spr:     ld [an_k], a
 
 ; the next free animation OAM entry -> HL (C: none left)
 an_slot_oam: ld hl, AN_OAM
-            ld a, [an_bgm]                  ; (the party in the BG: any free entry)
-            and a
+            ld a, [an_bgm]                  ; (the party in the BG: any free entry; a summon
+            and a                           ;   drawn in sprites keeps its first entries)
             jr z, .l
-            ld hl, oam_buf
+            ld a, [an_sbase]
+            ld l, a
+            ld h, high(oam_buf)
 .l:         ld a, [hl]
             and a
             ret z
@@ -552,7 +554,20 @@ an_slot_oam: ld hl, AN_OAM
             scf
             ret
 ; the animation sprites off
-an_clr:     ld hl, AN_OAM
+an_clr:     ld a, [an_sbase]                ; (a summon in sprites: the entries after it)
+            and a
+            jr z, .n0
+            ld l, a
+            ld h, high(oam_buf)
+            xor a
+.s:         ld [hl+], a
+            ld b, a
+            ld a, l
+            cp low(oam_buf + 160)
+            ld a, b
+            jr nz, .s
+            ret
+.n0:        ld hl, AN_OAM
             ld b, 64
             xor a
 .l:         ld [hl+], a

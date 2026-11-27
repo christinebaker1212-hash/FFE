@@ -7,7 +7,7 @@
 ; shape show the battlefield's cells as they were. The party is hidden (FF3 clears the sprites),
 ; so the attacks' sprites have all 40 entries.
 
-section bank B_BANIM, $6000
+section bank B_BANIM, $5900
 ; ---- kind 2: a summon (A from batui: [$7E94] = summon id x 16 + attack)
 an_summon:  ld a, [$D8D6]
             ld [an_c], a
@@ -117,6 +117,12 @@ an_summon:  ld a, [$D8D6]
             jr nz, .b
             xor a
             ld [an_bgm], a
+            ld hl, bs_gt                    ; (the party's tiles reloaded: set 17 may have
+            ld b, 4                         ;   covered them)
+            ld a, $FF
+.gt:        ld [hl+], a
+            dec b
+            jr nz, .gt
             call an_oparty
             call an_oput
             call xb_party
@@ -145,10 +151,10 @@ an_summon:  ld a, [$D8D6]
             ld [an_bgm], a
             ret
 .go:        jp hl
-.tab:       dw an_s00, an_s01, an_s02, an_none, an_s04, an_none
-            dw an_s06, an_s07, an_s07, an_s09, an_none, an_none
-            dw an_none, an_none, an_s14, an_s15, an_s16, an_none
-            dw an_s18, an_none, an_none, an_s21, an_none, an_none
+.tab:       dw an_s00, an_s01, an_s02, an_s03, an_s04, an_s05
+            dw an_s06, an_s07, an_s07, an_s09, an_s10, an_s11
+            dw an_s12, an_s13, an_s14, an_s15, an_s16, an_s17
+            dw an_s18, an_s19, an_s20, an_s21, an_s22, an_s23
 
 ; the pre-animation's four sprites (AN_OAM 0-3) flying off diagonally (33/B02A, AFF2): out of the
 ; battlefield: tile 0; the tile $55.. by the frame / 8 up to $58
@@ -468,6 +474,37 @@ an_sload:   ld a, [an_sid]
             ld [an_smp], a
             ld a, h
             ld [an_smp + 1], a
+            xor a                           ; Ifrit, Titan: in sprites
+            ld [an_smode], a
+            ld [an_sbase], a
+            ld a, [an_sid]
+            cp 3
+            jr z, .sp
+            cp 4
+            jr nz, an_smap
+.sp:        ld a, 1
+            ld [an_smode], a
+            ld a, [an_sw]                   ; entries: its cells that are not empty
+            ld e, a
+            ld a, [an_sh]
+            call mul8
+            ld b, l
+            ld a, [an_smp]
+            ld l, a
+            ld a, [an_smp + 1]
+            ld h, a
+            ld c, 0
+.cn:        ld a, [hl+]
+            cp $FF
+            jr z, .cz
+            inc c
+.cz:        dec b
+            jr nz, .cn
+            ld a, c
+            add a
+            add a
+            ld [an_sbase], a
+            jp an_sotiles
 ; the window map ($9C00), rows 0-17 (12-17 the windows' cells), columns 0 .. 19 - an_sc0
 an_smap:    call wait_vbl
             ld a, 1
@@ -583,7 +620,10 @@ an_scell:   ld a, [an_sr0]
             ret
 
 ; the window on (cut at line 95 by stat_isr), hidden until placed
-an_son:     ld a, 167
+an_son:     ld a, [an_smode]                ; (sprites: no window)
+            and a
+            ret nz
+            ld a, 167
             ld [an_wxv], a
             xor a
             ld [an_wyv], a
@@ -594,7 +634,12 @@ an_son:     ld a, 167
             ld a, 1
             ld [an_won], a
             ret
-an_soff:    xor a
+an_soff:    ld a, [an_smode]                ; (sprites: their entries off)
+            and a
+            call nz, an_sgone
+            xor a
+            ld [an_smode], a
+            ld [an_sbase], a
             ld [an_won], a
             ld [an_sbg], a
             call wait_vbl
@@ -608,6 +653,10 @@ an_soff:    xor a
             ret
 ; the summon at its place + A pixels across (signed), + an_wy down
 an_wpos:    ld b, a
+            ld a, [an_smode]
+            and a
+            ld a, b
+            jp nz, an_ssdraw
             ld a, [an_sx]
             bit 7, b
             jr nz, .m
@@ -975,6 +1024,19 @@ an_bpset:   xor a
             ldh [rBCPD], a
             dec b
             jr nz, .c
+            ld a, [an_bp2]                  ; (and palette 1 the same)
+            and a
+            ret z
+            xor a
+            ld [an_bp2], a
+            ld a, $88
+            ldh [rBCPS], a
+            ld hl, an_bpq + 1
+            ld b, 8
+.d:         ld a, [hl+]
+            ldh [rBCPD], a
+            dec b
+            jr nz, .d
             ret
 ; (an_osh palette 0 back to the party's first)
 an_oparty0: push bc
@@ -1196,17 +1258,1537 @@ an_sspell:  ld [$DE88], a
             call an_mhit
             jp an_restpal
 
-section wram, $DA00
-an_tpc:     ds 1
-an_bpf:     ds 1
-an_bpq:     ds 9
-an_bgs:     ds 16
+
+
+
+; ---- a summon drawn in sprites (Ifrit, Titan: they move about; 30 tiles at most): entries 0..n-1
+; from its map at (an_sx + A, 8 an_sr0 + an_wy), off the screen hidden (FF3 wraps them)
+an_ssdraw:  ld [an_sox], a
+            ld hl, oam_buf
+            ld a, [an_sr0]
+            add a
+            add a
+            add a
+            ld c, a
+            ld a, [an_wy]
+            add c
+            add 16
+            ld [an_soy], a                  ; OAM y of the top row (signed beyond)
+            ld a, [an_smp]
+            ld e, a
+            ld a, [an_smp + 1]
+            ld d, a
+            ld c, 0                         ; C = row
+.r:         ld b, 0                         ; B = column
+.k:         ld a, [de]
+            inc de
+            cp $FF
+            jr z, .n
+            push af
+            ld a, b                         ; x: an_sx + ox + 8 col (signed ox)
+            add a
+            add a
+            add a
+            push hl
+            ld hl, an_sx
+            add [hl]
+            ld l, a
+            ld h, 0
+            jr nc, .x1
+            inc h
+.x1:        ld a, [an_sox]
+            bit 7, a
+            jr z, .x2
+            dec h
+.x2:        add l
+            ld l, a
+            ld a, h
+            adc 0
+            ld h, a
+            and a                           ; 0-159 shown
+            jr nz, .hx
+            ld a, l
+            cp 160
+            jr nc, .hx
+            add 8
+            ld [an_k2], a
+            pop hl
+            ld a, c                         ; y
+            add a
+            add a
+            add a
+            push hl
+            ld hl, an_soy
+            add [hl]
+            pop hl
+            cp 16 + 96 + 8
+            jr nc, .hy
+            ld [hl+], a
+            ld a, [an_k2]
+            ld [hl+], a
+            pop af
+            push af
+            and $3F
+            add $39
+            ld [hl+], a
+            pop af
+            rlca
+            rlca
+            and 3
+            or $08
+            ld [hl+], a
+            jr .n
+.hx:        pop hl
+.hy:        pop af
+            xor a
+            ld [hl+], a
+            inc hl
+            inc hl
+            inc hl
+.n:         inc b
+            ld a, [an_sw]
+            cp b
+            jr nz, .k
+            inc c
+            ld a, [an_sh]
+            cp c
+            jr nz, .r
+            ret
+; the summon's tiles to OBJ $39.. too (sprite mode)
+an_sotiles: ld a, [an_sprp]
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $4000
+            add hl, de
+            ld de, $8000 + 16 * $39
+            ld bc, 55 * 16
+            ld a, B_SUMN
+            jp an_vcopy
+; the summon gone (sprite mode: its entries off)
+an_sgone:   ld a, [an_smode]
+            and a
+            jr z, .w
+            ld hl, oam_buf
+            ld a, [an_sbase]
+            ld b, a
+            xor a
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            ret
+.w:         ld a, 167
+            ld [an_wxv], a
+            ret
+; set $11 (33/BF18: 22 tiles from NES bank $15 at the address DE to OBJ $01-$16; the party's tiles,
+; reloaded after the summon)
+an_l11:     ld hl, $4000 - $8000
+            add hl, de
+            ld de, $8000 + 16
+            ld bc, 22 * 16
+            ld a, B_MAGIC
+            jp an_vcopy
+; a sprite list of 32/8F8B.. (HL = its NES address): y, tile, flags, x until $FF, at (D, E) with
+; tiles + C; NES palette bits kept
+an_slist:   push de
+            ld de, sm_lst - $8F8B
+            add hl, de
+            pop de
+.l:         ld a, [hl]
+            cp $FF
+            ret z
+            push hl
+            push de
+            push bc
+            ld a, [hl+]
+            add e
+            cp 96 + 8
+            jr c, .y
+            cp $F8
+            jr c, .s
+.y:         add 17
+            ld [an_k2], a
+            ld a, [hl+]
+            add c
+            ld [an_k4], a
+            ld a, [hl+]
+            ld [an_k5], a
+            ld a, [hl]
+            add d
+            cp 160
+            jr nc, .s
+            add 8
+            ld [an_kx], a
+            call an_slot_oam
+            jr c, .s
+            ld a, [an_k2]
+            ld [hl+], a
+            ld a, [an_kx]
+            ld [hl+], a
+            ld a, [an_k4]
+            ld [hl+], a
+            ld a, [an_k5]
+            ld b, a
+            and $C0
+            rra
+            ld c, a
+            ld a, b
+            and 3
+            or c
+            or $08
+            ld [hl], a
+.s:         pop bc
+            pop de
+            pop hl
+            inc hl
+            inc hl
+            inc hl
+            inc hl
+            jr .l
+; the list whose pointer is at NES address HL (32/8F8B..)
+an_slistp:  push de
+            ld de, sm_lst - $8F8B
+            add hl, de
+            pop de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            jr an_slist
+; NES coordinate A scaled 5 / 8 (FF3's 256-pixel field on ours)
+an_s58:     push hl
+            push de
+            ld e, a
+            ld a, 5
+            call mul8
+            srl h
+            rr l
+            srl h
+            rr l
+            srl h
+            rr l
+            ld a, l
+            pop de
+            pop hl
+            ret
+; FF3's random (X..A): B = X
+an_rnd:     push hl
+            ld c, a
+            xor a
+            ld [BZ + $21], a
+            ld a, c
+            call b_rndx
+            pop hl
+            ret
+
+; ---- 3: Mesmerize (32/8061): the battlefield's lines waving (SCX by line from a 16-entry table:
+; growing 0..15 over 16 frames, still, then back to 0), 128 frames
+an_s03:     ld hl, wv_tab
+            ld b, 16
+            xor a
+.z:         ld [hl+], a
+            dec b
+            jr nz, .z
+            call an_ssnd
+            ld a, 3
+            ld [c_split], a
+            ld a, $08
+            ldh [rSTAT], a
+            xor a
+            ld [an_k3], a
+.f:         ld a, [an_k3]
+            ld [wv_ph], a
+            call an_frame
+            ld a, [an_k3]                   ; (32/8A44)
+            cp 16
+            jr c, .g
+            cp $70
+            jr c, .n
+            ld hl, wv_tab
+            ld b, 16
+.d:         ld a, [hl]
+            and a
+            jr z, .d2
+            dec [hl]
+.d2:        inc hl
+            dec b
+            jr nz, .d
+            jr .n
+.g:         ld hl, wv_tab + 1
+            ld de, wv_tab
+            ld b, 15
+.s:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .s
+            ld a, [an_k3]
+            ld [de], a
+.n:         ld hl, an_k3
+            inc [hl]
+            ld a, [hl]
+            cp $80
+            jr nz, .f
+            call wait_vbl
+            xor a
+            ld [c_split], a
+            ldh [rSCX], a
+            ld a, $40
+            ldh [rSTAT], a
+            ret
+
+; ---- 5: Diamond Dust (32/813B): 40 snowflakes falling across (FF3's x - 4, y + 4 a frame, a sine
+; sway), 128 frames; FF3's coordinates scaled 5 / 8 (set 14, palette $FF)
+an_s05:     ld a, 14
+            call an_lgfx
+            ld a, $FF
+            call an_gpal3
+            ld a, $20                       ; the sway table: 64 x $20 sin(4 i)
+            ld [an_k], a
+            ld hl, dd_osc
+            xor a
+.o:         push af
+            push hl
+            call an_smul
+            pop hl
+            ld [hl+], a
+            pop af
+            add 4
+            jr nz, .o
+            ld hl, dd_cnt                   ; counters from the random table, all hidden
+            ld de, RNG_TAB
+            ld b, 40
+.i:         ld a, [de]
+            inc de
+            ld [hl], a                      ; (dd_cnt)
+            push hl
+            push de
+            ld de, 40
+            add hl, de
+            and $1F
+            inc a
+            ld [hl], a                      ; (dd_dly)
+            add hl, de
+            ld [hl], 0                      ; (dd_on)
+            pop de
+            pop hl
+            inc hl
+            dec b
+            jr nz, .i
+            call an_ssnd
+            ld a, $80
+            ld [an_k3], a
+.f:         call an_frame
+            call an_clr
+            xor a
+            ld [an_t], a
+.k:         ld a, [an_t]
+            ld c, a
+            ld b, 0
+            ld hl, dd_cnt
+            add hl, bc
+            inc [hl]
+            ld hl, dd_dly
+            add hl, bc
+            dec [hl]
+            jr nz, .sh
+            ld [hl], $26
+            ld hl, dd_on
+            add hl, bc
+            ld [hl], 1
+            ld hl, dd_y
+            add hl, bc
+            ld [hl], 0
+            ld hl, an_ri
+            inc [hl]
+            ld a, [hl]
+            ld hl, RNG_TAB
+            call an_hla
+            ld a, [hl]
+            and $F8
+            ld hl, dd_x
+            add hl, bc
+            ld [hl], a
+.sh:        ld hl, dd_on
+            add hl, bc
+            ld a, [hl]
+            and a
+            jr z, .nx
+            ld hl, dd_x
+            add hl, bc
+            ld a, [hl]
+            ld d, a
+            sub 4
+            ld [hl], a
+            ld hl, dd_cnt
+            add hl, bc
+            ld a, [hl]
+            and $3F
+            ld hl, dd_osc
+            call an_hla
+            ld a, [hl]
+            add d
+            call an_s58
+            add 8
+            ld [an_kx], a
+            ld hl, dd_y
+            add hl, bc
+            ld a, [hl]
+            ld d, a
+            add 4
+            ld [hl], a
+            cp $98
+            jr c, .y
+            ld hl, dd_on
+            add hl, bc
+            ld [hl], 0
+.y:         ld a, d
+            call an_s58
+            add 16
+            ld [an_k2], a
+            call an_slot_oam
+            jr c, .nx
+            ld a, [an_k2]
+            ld [hl+], a
+            ld a, [an_kx]
+            ld [hl+], a
+            ld a, [an_t]
+            and 1
+            add $4B
+            ld [hl+], a
+            ld [hl], $0B
+.nx:        ld hl, an_t
+            inc [hl]
+            ld a, [hl]
+            cp 40
+            jp nz, .k
+            ld hl, an_k3
+            dec [hl]
+            jp nz, .f
+            call an_clr
+            jp an_frame
+
+; ---- 10: Hellfire (32/88B7): Ifrit rising up and away (x - 1, y - 8, 15 frames), 16 frames; flames
+; coming down onto the target (32/8F97) from above, then burning on it (32/8F8B: two frames by
+; turns) 32 frames (set 17 from 2B/B040, palette $BD)
+an_s10:     ld de, $B040
+            call an_l11
+            ld b, 15
+.u:         push bc
+            ld a, [an_wy]
+            sub 8
+            ld [an_wy], a
+            ld a, [an_sox]
+            dec a
+            call an_wpos
+            call an_frame
+            pop bc
+            dec b
+            jr nz, .u
+            call an_w16
+            ld a, $BD
+            call an_gpal3
+            call an_sgone
+            ld a, [$DE99]
+            call an_slot
+            ld [an_t], a
+            call an_tcen
+            ld a, e
+            ld [an_ky], a
+            srl a
+            srl a
+            add d
+            ld [an_kx], a                   ; ($80)
+            xor a
+            ld [an_k3], a                   ; ($81)
+.d:         call an_frame
+            call an_clr
+            ld a, [an_kx]
+            ld d, a
+            ld a, [an_k3]
+            ld e, a
+            ld c, 0
+            ld hl, $8F97
+            call an_slist
+            ld hl, an_kx
+            dec [hl]
+            dec [hl]
+            ld a, [an_k3]
+            add 8
+            ld [an_k3], a
+            ld b, a
+            ld a, [an_ky]
+            cp b
+            jr nc, .d
+            call an_ssnd
+            ld b, 32
+.b:         push bc
+            call an_frame
+            call an_clr
+            call an_burn
+            pop bc
+            dec b
+            jr nz, .b
+            call an_clr
+            jp an_frame
+; flames burning on monster an_t (32/8949): (centre x - 16, bottom - 39), 32/8F8B's lists by f
+an_burn:    call an_tcen
+            ld a, [fl_h]
+            add a
+            add a
+            add e
+            sub 39
+            ld e, a
+            ld a, d
+            sub 16
+            ld d, a
+            ld a, [an_f]
+            and 2
+            ld l, a
+            ld h, 0
+            push de
+            ld de, $8F8B
+            add hl, de
+            pop de
+            ld c, 0
+            jp an_slistp
+
+; ---- 11: Inferno (32/87EC): 16 frames; Ifrit moving right 1 a frame 24 frames (its palettes
+; cycling, 32/87AD with 87E9's hues), then left 8 a frame 26 frames with the backdrop flashing red;
+; then flames on the monsters row by row (back first) 64 frames
+an_s11:     call an_w16
+            ld de, $B040
+            call an_l11
+            xor a
+            ld [an_k4], a
+.r:         ld a, [an_k4]
+            inc a
+            ld [an_k4], a
+            call an_wpos
+            ld a, [an_k4]                   ; the hue
+            rrca
+            rrca
+            rrca
+            and 3
+            ld hl, if_hue
+            call an_hla
+            ld a, [hl]
+            ld [an_k5], a
+            ld c, 0
+.p:         push bc
+            call an_pcyc
+            pop bc
+            inc c
+            ld a, c
+            cp 3
+            jr nz, .p
+            call an_oput
+            call an_frame
+            ld a, [an_k4]
+            cp 24
+            jr nz, .r
+            ld a, 26
+            ld [an_k3], a
+.l:         ld a, [an_k4]
+            sub 8
+            ld [an_k4], a
+            call an_wpos
+            ld a, [an_k3]
+            and 3
+            ld a, $16
+            jr z, .c
+            ld a, $0F
+.c:         call an_backc
+            call an_frame
+            ld hl, an_k3
+            dec [hl]
+            jr nz, .l
+            ld a, $0F
+            call an_backc
+            call an_sgone
+            ld a, $BD
+            call an_gpal3
+            xor a
+            ld [an_f], a
+.m:         call an_frame
+            call an_clr
+            ld a, [an_f]                    ; the row: 3 - f / 16
+            swap a
+            cpl
+            and 3
+            ld [an_k5], a
+            ld a, [an_f]
+            and $0F
+            call z, an_ssnd
+            ld c, 0
+.s:         push bc
+            ld a, c
+            call an_mrow
+            ld hl, an_k5
+            cp [hl]
+            jr nz, .ns
+            ld a, c
+            ld [an_t], a
+            call an_burn
+.ns:        pop bc
+            inc c
+            ld a, c
+            cp 8
+            jr nz, .s
+            ld a, [an_f]
+            cp $40
+            jr nz, .m
+            call an_clr
+            jp an_frame
+; osh palette C cycling: hue an_k5, brightness by the frame (32/87AD)
+an_pcyc:    ld a, c
+            add a
+            add a
+            inc a
+            ld hl, an_osh
+            call an_hla
+            ld a, [an_k5]
+            and $0F
+            ld e, a
+            ld a, [an_f]
+            and 3
+            swap a
+            ld d, a
+            or e
+            ld [hl+], a
+            ld a, d
+            add $10
+            and $30
+            or e
+            ld [hl+], a
+            ld a, d
+            add $20
+            and $30
+            or e
+            ld [hl], a
+            ret
+; monster slot A's row (34/8705: 34/8739 by the monster set's layout), $FF for none
+an_mrow:    ld c, a
+            ld hl, $DDA7
+            call an_hla
+            ld a, [hl]
+            cp $FF
+            ret z
+            ld a, [$DD7B]
+            add a
+            ld hl, mn_rows
+            call an_hla
+            ld a, [hl+]
+            ld d, a
+            ld e, [hl]
+            ld a, c
+            inc a
+            ld b, a
+.s:         sla e
+            rl d
+            rla
+            sla e
+            rl d
+            rla
+            dec b
+            jr nz, .s
+            and 3
+            ret
+
+; ---- 12 / 13: Clobber / Stomp (32/82FE / 82F2): Titan's fists (32/90AD) on the target, placed
+; again every 4 frames 0-24 pixels from its centre - 24, 64 frames (set 17 from 2B/B300 / B390,
+; palette $EC)
+an_s12:     ld de, $B300
+            jr an_s13.g
+an_s13:     ld de, $B390
+.g:         push de
+            ld a, $EC
+            call an_gpal3
+            pop de
+            call an_l11
+            ld a, [$DE99]
+            call an_slot
+            ld [an_t], a
+            call an_tcen
+            ld a, d
+            sub 24
+            ld [an_kx], a
+            ld a, e
+            sub 24
+            ld [an_ky], a
+            call an_ssnd
+            xor a
+            ld [an_f], a
+.f:         call an_frame
+            call an_clr
+            ld a, [an_f]
+            and 3
+            jr nz, .d
+            ld b, 0
+            ld a, $18
+            call an_rnd
+            ld [an_k4], a
+            ld b, 0
+            ld a, $18
+            call an_rnd
+            ld [an_k5], a
+.d:         ld a, [an_kx]
+            ld hl, an_k4
+            add [hl]
+            ld d, a
+            ld a, [an_ky]
+            ld hl, an_k5
+            add [hl]
+            ld e, a
+            ld c, 0
+            ld hl, $90AD
+            call an_slist
+            ld a, [an_f]
+            cp $40
+            jr nz, .f
+            call an_clr
+            jp an_frame
+
+; ---- 22: Rend (32/8376): the backdrop flashing red, then a line of sprites down the target (6, 12
+; for a tall one) 64 frames (set 17 from 2B/B1A0, palette $7A)
+an_s22:     ld a, $16
+            call an_flash
+            ld de, $B1A0
+            call an_l11
+            ld a, $7A
+            call an_gpal3
+            ld a, [$DE99]
+            call an_slot
+            ld [an_t], a
+            call an_tcen
+            ld a, d
+            sub 4
+            add 8
+            ld [an_kx], a
+            ld a, [fl_y]
+            add a
+            add a
+            add a
+            add 7 + 17
+            ld [an_ky], a
+            ld a, [fl_h]
+            cp 7
+            ld a, 6
+            jr c, .n
+            ld a, 12
+.n:         ld [an_k4], a
+            call an_ssnd
+            xor a
+            ld [an_f], a
+.f:         call an_frame
+            call an_clr
+            ld a, [an_f]
+            srl a
+            ld [an_k5], a
+            ld a, [an_ky]
+            ld e, a
+            ld a, [an_k4]
+            ld b, a
+.s:         push bc
+            push de
+            call an_slot_oam
+            pop de
+            jr c, .x
+            ld a, e
+            ld [hl+], a
+            ld a, [an_kx]
+            ld [hl+], a
+            ld a, [an_k5]
+            and 1
+            inc a
+            ld [hl+], a
+            ld [hl], $0B
+            ld hl, an_k5
+            inc [hl]
+.x:         ld a, e
+            add 8
+            ld e, a
+            pop bc
+            dec b
+            jr nz, .s
+            ld a, [an_f]
+            cp $40
+            jr nz, .f
+            call an_clr
+            jp an_frame
+
+; ---- 23: Megaflare (32/841A): 60 frames; the backdrop white 16 frames (FF3 also cycles the colour
+; emphasis); then two explosions (32/8F8F's frames) at random places by turns, the monsters'
+; palettes cycling red, 64 frames (set 17 from 2B/B1C0, palette $BD)
+an_s23:     ld b, 60
+.w:         push bc
+            call an_frame
+            pop bc
+            dec b
+            jr nz, .w
+            call an_ssnd
+            ld a, $30
+            ld b, 16
+            ld [an_k4], a
+            ld a, b
+            ld [an_k3], a
+.wf:        ld a, $30
+            call an_backc
+            call an_frame
+            ld hl, an_k3
+            dec [hl]
+            jr nz, .wf
+            ld a, $0F
+            call an_backc
+            ld de, $B1C0
+            call an_l11
+            ld a, $BD
+            call an_gpal3
+            call an_bgsave
+            call an_xpos1
+            call an_xpos2
+            ld a, 2
+            ld [an_xa], a
+            xor a
+            ld [an_xb], a
+            ld [an_f], a
+.f:         ld a, [an_f]                    ; (32/854D: every other frame the next frames)
+            and 1
+            jr nz, .dr
+            ld hl, an_xa
+            inc [hl]
+            ld a, [hl]
+            and 3
+            ld [hl], a
+            call z, an_xpos1
+            ld hl, an_xb
+            inc [hl]
+            ld a, [hl]
+            and 3
+            ld [hl], a
+            call z, an_xpos2
+.dr:        ld a, $16                       ; the monsters' palettes in red
+            call an_mcyc1
+            call an_frame
+            call an_clr
+            ld a, [an_xa]
+            ld hl, an_xp
+            call an_xpl
+            ld a, [an_xb]
+            ld hl, an_xp + 2
+            call an_xpl
+            ld a, [an_f]
+            cp $40
+            jr nz, .f
+            call an_clr
+            call an_frame
+            jp an_bgrest
+; explosion frame A at (HL), (HL + 1)
+an_xpl:     ld d, [hl]
+            inc hl
+            ld e, [hl]
+            add a
+            ld l, a
+            ld h, 0
+            push de
+            ld de, $8F8F
+            add hl, de
+            pop de
+            ld c, 0
+            jp an_slistp
+; new places (32/85F8: x 16-128, y 47-111 on FF3's field, scaled)
+an_xpos1:   ld hl, an_xp
+            jr an_xpos
+an_xpos2:   ld hl, an_xp + 2
+an_xpos:    push hl
+            ld b, $10
+            ld a, $80
+            call an_rnd
+            call an_s58
+            pop hl
+            ld [hl+], a
+            push hl
+            ld b, $2F
+            ld a, $6F
+            call an_rnd
+            sub $2F
+            call an_s58
+            pop hl
+            ld [hl], a
+            ret
+; the monsters' palettes (BG 0 / 1) in hue A at the brightness of the frame (one step of an_mcyc)
+an_mcyc1:   and $0F
+            ld [an_k5], a
+            ld a, [an_f]
+            and 3
+            swap a
+            ld b, a
+            ld hl, an_bpq + 1
+            ld a, $0F
+            call an_mcyc.one
+            ld a, b
+            call an_mcyc.one
+            ld a, b
+            add $10
+            call an_mcyc.one
+            ld a, b
+            add $20
+            call an_mcyc.one
+            ld a, $80
+            ld [an_bpq], a
+            ld a, 1
+            ld [an_bpf], a
+            ld a, 1
+            ld [an_bp2], a
+            ret
+
+; ---- 17: Zantetsuken (32/874C): (only when it works, $7E93 = 0) 16 frames; Odin riding off to the
+; left 8 a frame (drawn in the BG cells, 23 frames); then the battlefield cut in bands of 24 lines
+; sliding apart (SCX + / - up to 24 by FF3's sine), the monsters' palettes darkening every 8 frames
+; in the last 32 frames, 96 frames; then FF3's state: each target's type counted as beaten
+; ($7DD3), all monster types cleared
+an_s17:     ld a, [$DE93]
+            and a
+            ret nz
+            call an_w16
+            call an_ssnd
+            ld a, 167                       ; (the window off: Odin in the BG cells)
+            ld [an_wxv], a
+            call an_frame
+            xor a
+            ld [an_k4], a
+.r:         call an_sbgdraw
+            ld a, [an_k4]
+            inc a
+            ld [an_k4], a
+            cp 24
+            jr nz, .r
+            call an_blankr                  ; (the BG map's columns 20-31 blank for the bands)
+            call an_mpal0
+            ld a, 23
+            ldh [rLYC], a
+            ld a, 4
+            ld [c_split], a
+            ld a, $40
+            ldh [rSTAT], a
+            xor a
+            ld [an_f], a
+.f:         ld a, [an_f]                    ; s = 24 x 2 sin(min(f, 64)) / 256
+            cp $40
+            jr c, .s
+            ld a, $40
+.s:         ld hl, an_sin
+            call an_hla
+            ld a, [hl]
+            add a
+            ld e, 24
+            call mul8
+            ld a, h
+            ld [an_k4], a
+            call an_frame
+            ld a, [an_k4]                   ; (V-Blank: the first band's scroll, the first split)
+            ldh [rSCX], a
+            ld a, 23
+            ldh [rLYC], a
+            ld a, [an_f]
+            and $C0
+            jr z, .n
+            ld a, [an_f]
+            and 7
+            call z, an_mfade
+.n:         ld a, [an_f]
+            cp $60
+            jr nz, .f
+            call wait_vbl
+            xor a
+            ld [c_split], a
+            ldh [rSCX], a
+            ld a, $40
+            ldh [rSTAT], a
+            ld a, 95
+            ldh [rLYC], a
+            ld a, [$DE99]                   ; FF3's state (32/8757)
+            ld [an_tm], a
+            ld c, 0
+.t:         ld a, [an_tm]
+            add a
+            ld [an_tm], a
+            jr nc, .tn
+            ld a, c
+            ld hl, $DDA7
+            call an_hla
+            ld a, [hl]
+            cp $FF
+            jr z, .tn
+            ld hl, $DDD3
+            call an_hla
+            inc [hl]
+.tn:        inc c
+            ld a, c
+            cp 8
+            jr nz, .t
+            ld hl, $DDA7
+            ld b, 8
+            ld a, $FF
+.cl:        ld [hl+], a
+            dec b
+            jr nz, .cl
+            ret
+; Odin in the BG cells, an_k4 columns to the left (the cells of the last frame back first)
+an_sbgdraw: call wait_vbl
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            ld a, [an_k4]
+            and a
+            jr z, .d
+            dec a                           ; the previous place back to the battlefield
+            ld [an_k5], a
+            ld a, 1
+            ld [an_k2], a
+            call .cells
+.d:         ld a, [an_k4]
+            ld [an_k5], a
+            xor a
+            ld [an_k2], a
+            call .cells
+            ld a, [an_won]
+            and a
+            jr z, .s
+            ld a, $40
+.s:         ldh [rSTAT], a
+            xor a
+            ld [guard_on], a
+            ret
+.cells:     ld c, 0                         ; C = row in the summon
+.r:         ld b, 0
+.k:         ld a, [an_sc0]                  ; screen column = an_sc0 + B - an_k5
+            add b
+            ld hl, an_k5
+            sub [hl]
+            jr c, .n
+            cp 20
+            jr nc, .n
+            ld e, a
+            ld a, [an_sr0]
+            add c
+            cp 12
+            jr nc, .n
+            ld d, a
+            push bc
+            push de
+            ld a, [an_sw]                   ; the map byte
+            ld e, a
+            ld a, c
+            call mul8
+            ld a, l
+            add b
+            ld e, a
+            ld a, [an_smp]
+            add e
+            ld l, a
+            ld a, [an_smp + 1]
+            adc 0
+            ld h, a
+            ld a, [hl]
+            pop de
+            cp $FF
+            jr z, .p
+            ld b, a
+            ld a, [an_k2]
+            and a
+            jr nz, .o
+            ld a, b
+            and $3F
+            add $90
+            ld [an_bgi], a
+            ld a, b
+            rlca
+            rlca
+            and 3
+            add 2
+            or $08
+            ld [an_bga], a
+            jr .w
+.o:         call an_shp                     ; the battlefield's own cell
+            ld a, [hl]
+            ld [an_bgi], a
+            ld bc, SH_A - SH_T
+            add hl, bc
+            ld a, [hl]
+            ld [an_bga], a
+.w:         ld l, d                         ; $9800 + 32 row + column
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld a, e
+            call an_hla
+            ld a, h
+            add $98
+            ld h, a
+            ld a, [an_bgi]
+            ld [hl], a
+            ld a, 1
+            ldh [rVBK], a
+            ld a, [an_bga]
+            ld [hl], a
+            xor a
+            ldh [rVBK], a
+.p:         pop bc
+.n:         inc b
+            ld a, [an_sw]
+            cp b
+            jr nz, .k
+            inc c
+            ld a, [an_sh]
+            cp c
+            jr nz, .r
+            ret
+; HL = SH_T + 20 D + E (keeps DE)
+an_shp:     ld a, d
+            add a
+            add a
+            ld l, a
+            add a
+            add a
+            add l
+            add e
+            ld l, a
+            ld h, 0
+            push de
+            ld de, SH_T
+            add hl, de
+            pop de
+            ret
+; the BG map's columns 20-31, rows 0-11 blank (palette 0)
+an_blankr:  call wait_vbl
+            ld a, 1
+            ld [guard_on], a
+            ld a, $20
+            ldh [rSTAT], a
+            ld hl, $9800 + 20
+            ld c, 12
+.r:         push hl
+            ld b, 12
+.c:         ld [hl], BLANK_T
+            ld a, 1
+            ldh [rVBK], a
+            ld [hl], 0
+            xor a
+            ldh [rVBK], a
+            inc hl
+            dec b
+            jr nz, .c
+            pop hl
+            ld de, 32
+            add hl, de
+            dec c
+            jr nz, .r
+            xor a
+            ldh [rSTAT], a
+            ld [guard_on], a
+            ret
+; the monsters' NES colours (battle palettes $7D69 / $7D6A) into an_mpn, then each fade step
+an_mpal0:   ld a, [$DD69]
+            ld c, 0
+            call .p
+            ld a, [$DD6A]
+            ld c, 4
+.p:         ld l, a
+            ld h, 0
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, de
+            ld de, $8C00 - $4000
+            add hl, de
+            ld a, c
+            ld de, an_mpn
+            add e
+            ld e, a
+            jr nc, .d
+            inc d
+.d:         ld a, $0F
+            ld [de], a
+            inc de
+            ld bc, 3
+            ld a, B_BDAT2
+            jp far_copy
+an_mfade:   ld hl, an_mpn                   ; (32/8C70)
+            ld b, 8
+.c:         ld a, [hl]
+            and $F0
+            jr z, .k
+            ld a, [hl]
+            sub $10
+            jr .s
+.k:         ld a, $0F
+.s:         ld [hl+], a
+            dec b
+            jr nz, .c
+            ld hl, an_mpn
+            ld de, an_bpq + 1
+            ld b, 4
+.r:         push bc
+            ld a, [hl+]
+            push hl
+            push de
+            call an_nrgb
+            pop de
+            ld a, c
+            ld [de], a
+            inc de
+            ld a, b
+            ld [de], a
+            inc de
+            pop hl
+            pop bc
+            dec b
+            jr nz, .r
+            ld a, $80
+            ld [an_bpq], a
+            ld a, 1
+            ld [an_bpf], a
+            call an_frame                   ; (palette 1 the next frame)
+            ld hl, an_mpn + 4
+            ld de, an_bpq + 1
+            ld b, 4
+.r2:        push bc
+            ld a, [hl+]
+            push hl
+            push de
+            call an_nrgb
+            pop de
+            ld a, c
+            ld [de], a
+            inc de
+            ld a, b
+            ld [de], a
+            inc de
+            pop hl
+            pop bc
+            dec b
+            jr nz, .r2
+            ld a, $88
+            ld [an_bpq], a
+            ld a, 1
+            ld [an_bpf], a
+            ret
+
+; ---- 19: Cyclone (32/8272): 60 frames; Leviathan going off; 16 frames; a tornado of 64 sprites
+; (here 40 of them) moving left across the screen 4 a frame, each swaying (set 14, palette $FF)
+an_s19:     ld b, 60
+.w:         push bc
+            call an_frame
+            pop bc
+            dec b
+            jr nz, .w
+            call an_sexit
+            call an_w16
+            ld a, $FF
+            call an_gpal3
+            ld a, 14
+            call an_lgfx
+            ld a, $10                       ; (32/8228: x of each from a sine at $A0 + 4 i, sway
+            ld [an_k], a                    ;   angles random, amplitudes 50 down / 2)
+            ld hl, cy_x
+            ld a, $A0
+            ld b, 64
+.i:         push af
+            push bc
+            push hl
+            call an_smul
+            pop hl
+            ld [hl+], a
+            pop bc
+            pop af
+            add 4
+            dec b
+            jr nz, .i
+            ld hl, cy_ang
+            ld de, RNG_TAB
+            ld b, 64
+.i2:        ld a, [de]
+            inc de
+            ld [hl+], a
+            dec b
+            jr nz, .i2
+            ld a, $FC
+            ld [an_k3], a
+            xor a
+            ld [an_k4], a                   ; ($88)
+            call an_ssnd
+.f:         call an_frame
+            call an_clr
+            ld a, [an_k4]
+            ld [an_k5], a                   ; ($91)
+            xor a
+            ld [an_t], a
+.s:         ld a, [an_t]                    ; (40 of FF3's 64: i = 8 t / 5)
+            ld b, a
+            add a
+            add a
+            add a
+            ld e, a
+            ld d, 0
+            push bc
+            ld bc, 0
+.dv:        ld a, e
+            sub 5
+            ld e, a
+            ld a, d
+            sbc 0
+            ld d, a
+            jr c, .dd
+            inc c
+            jr .dv
+.dd:        ld a, c
+            pop bc
+            ld [an_k2], a                   ; i
+            cp 48                           ; amplitude: 50 - i, the last 16: 2
+            ld a, 2
+            jr nc, .am
+            ld a, [an_k2]
+            cpl
+            add 51
+.am:        ld [an_k], a
+            ld a, [an_k5]
+            ld hl, an_k2
+            add [hl]
+            and $3F
+            push af
+            ld hl, cy_ang
+            call an_hla
+            ld a, [hl]
+            ld c, a
+            add $10
+            ld [hl], a
+            ld a, c
+            call an_smul
+            ld c, a
+            pop af
+            ld hl, cy_x
+            call an_hla
+            ld a, [hl]
+            add c
+            ld c, a                         ; x offset (signed)
+            ld a, [an_k3]
+            call an_s58
+            ld b, a
+            ld a, c
+            sra a
+            sra a                           ; (offsets scaled roughly)
+            add b
+            cp 160
+            jr nc, .nx
+            add 8
+            ld [an_kx], a
+            ld a, [an_k2]                   ; y: $20 + 2 i, scaled
+            add a
+            add $20
+            call an_s58
+            add 16 - 8
+            ld [an_ky], a
+            call an_slot_oam
+            jr c, .nx
+            ld a, [an_ky]
+            ld [hl+], a
+            ld a, [an_kx]
+            ld [hl+], a
+            ld a, $49
+            ld [hl+], a
+            ld [hl], $0B
+.nx:        ld hl, an_t
+            inc [hl]
+            ld a, [hl]
+            cp 40
+            jp nz, .s
+            ld hl, an_k4
+            inc [hl]
+            ld a, [an_k3]
+            sub 4
+            ld [an_k3], a
+            jp nz, .f
+            call an_clr
+            jp an_frame
+
+; ---- 20: Tidal Wave (32/8635): 60 frames; Leviathan going off; 16 frames; 21 waves (3 sprites
+; each) rolling left over the battlefield with the screen shaking, 63 frames (set 17 from 2B/B160,
+; palette $BC); FF3's places scaled 5 / 8
+an_s20:     ld de, $B160
+            call an_l11
+            ld b, 60
+.w:         push bc
+            call an_frame
+            pop bc
+            dec b
+            jr nz, .w
+            call an_sexit
+            call an_w16
+            ld a, $BC
+            call an_gpal3
+            ld hl, tw_x                     ; (32/866A: x random - 12 / - 24, y in steps)
+            ld de, RNG_TAB
+            ld c, $34
+            ld b, 7
+.a:         ld a, [de]
+            inc de
+            and $0F
+            sub $0C + 1
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            add $0C
+            ld c, a
+            dec b
+            jr nz, .a
+            ld c, $28
+            ld b, 14
+.b:         ld a, [de]
+            inc de
+            and $0F
+            sub $18 + 1
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            add 8
+            ld c, a
+            dec b
+            jr nz, .b
+            ld hl, tw_cnt
+            ld de, RNG_TAB
+            ld b, 21
+.c:         ld a, [de]
+            inc de
+            ld [hl], a
+            push hl
+            push de
+            ld de, 21
+            add hl, de
+            ld [hl], 0                      ; (tw_on)
+            pop de
+            pop hl
+            inc hl
+            dec b
+            jr nz, .c
+            call an_ssnd
+            ld a, $FC
+            ld [an_k3], a
+.f:         call an_frame                   ; (the shake: the battlefield 0-3 pixels across)
+            ld b, 0
+            ld a, $FF
+            call an_rnd
+            and 3
+            ldh [rSCX], a
+.ly:        ldh a, [rLY]
+            cp 95
+            jr nz, .ly
+.hb:        ldh a, [rSTAT]
+            and 3
+            jr nz, .hb
+            xor a
+            ldh [rSCX], a
+            call an_clr
+            xor a
+            ld [an_t], a
+.k:         ld a, [an_t]                    ; (32/8701)
+            ld c, a
+            ld b, 0
+            ld hl, tw_cnt
+            add hl, bc
+            dec [hl]
+            ld a, [hl]
+            and 7
+            ld hl, tw_x
+            add hl, bc
+            add hl, bc
+            jr nz, .m
+            ld a, [hl]
+            sub 8
+            ld [hl], a
+.m:         ld a, [hl]
+            sub 4
+            ld [hl+], a
+            ld d, a
+            cp $80
+            jr c, .v
+            cp $E8
+            jr nc, .v
+            push hl
+            ld hl, tw_on
+            add hl, bc
+            ld [hl], 1
+            pop hl
+.v:         ld a, [hl]
+            ld e, a                         ; y
+            ld hl, tw_on
+            add hl, bc
+            ld a, [hl]
+            and a
+            call nz, an_twave
+            ld hl, an_t
+            inc [hl]
+            ld a, [hl]
+            cp 21
+            jr nz, .k
+            ld a, [an_k3]
+            sub 4
+            ld [an_k3], a
+            jr nz, .f
+            call an_clr
+            jp an_frame
+; a wave at FF3's (D, E): tiles 1-3 across, the part left of the screen's edge (an_k3) shown
+an_twave:   ld b, 3
+            ld c, 1
+.s:         push bc
+            push de
+            ld a, d
+            sub 8
+            ld hl, an_k3
+            cp [hl]
+            jr nc, .n                       ; (32/86E1: hidden right of the edge)
+            ld a, d
+            call an_s58
+            cp 160
+            jr nc, .n
+            add 8
+            ld [an_kx], a
+            ld a, e
+            call an_s58
+            add 16 - 8
+            ld [an_ky], a
+            call an_slot_oam
+            jr c, .n
+            ld a, [an_ky]
+            ld [hl+], a
+            ld a, [an_kx]
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            ld [hl], $0B
+.n:         pop de
+            pop bc
+            ld a, d
+            add 8
+            ld d, a
+            inc c
+            dec b
+            jr nz, .s
+            ret
 
 section bank B_BANIM, $7D00
 sm_snd:     ds 24                           ; (2F/AFC0)
 sm_pal:     ds 8                            ; (32/8043)
 sm_pre:     ds 10                           ; (33/B1EE)
 sm_fly:     ds 16                           ; (33/AFF2)
+if_hue:     ds 3                            ; (32/87E9)
+mn_rows:    ds 20                           ; (34/8739: the monsters' rows by layout)
 
 section wram, $D900                         ; (work RAM bank 2: FF3's $7900, its graphics buffer)
 an_sid:     ds 1
@@ -1230,4 +2812,34 @@ an_gp:      ds 2
 an_osh:     ds 16
 an_orgb:    ds 32
 an_wq:      ds 1 + 27
+an_tpc:     ds 1
+an_bpf:     ds 1
+an_bpq:     ds 9
+an_bgs:     ds 16
+an_bp2:     ds 1
+an_sbase:   ds 1
+an_smode:   ds 1
+an_sox:     ds 1
+an_soy:     ds 1
+an_xa:      ds 1
+an_xb:      ds 1
+an_xp:      ds 4
+an_mpn:     ds 8
 
+section wram, $D9C0                         ; (one animation's tables at a time)
+dd_osc:     ds 64
+dd_cnt:     ds 40
+dd_dly:     ds 40
+dd_on:      ds 40
+dd_y:       ds 40
+dd_x:       ds 40
+CY_BASE    = $D9C0                          ; (Cyclone's, Tidal Wave's tables in the same place)
+cy_x       = CY_BASE
+cy_ang     = CY_BASE + 64
+tw_x       = CY_BASE
+tw_cnt     = CY_BASE + 42
+tw_on      = CY_BASE + 63
+
+
+section bank B_BANIM, $7AB0
+sm_lst:     ds $24C                         ; (32/8F8B-91D6: the attacks' sprite lists)
