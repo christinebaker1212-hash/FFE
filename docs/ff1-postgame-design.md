@@ -304,6 +304,12 @@ messages (the user's GBA ROM, 660-1018) and the map: tools/gbn/pgevents.py.
   the stairs open).
 - **Shops**: ids 71-78 after FF1's (names bank N_STYPE / N_SITEMS); item shops sell Dawn of Souls' consumables
   (code $C0 + k: name 256 + k, price at N_PRICE + $380 + 2 k, the count by it_cnt); inns as FF1's.
-- **Floors whose stairs were in a pocket** (Dawn of Souls joins the parts by events): the stairs move into the
-  floor's largest part (Western Keep, Feyhome, the fire shrine, the overworld floors, the sunken floor, the
-  waterfall cavern).
+- **Floor fixes found on the way** (every floor is now checked at build time by its real tile properties: the
+  stairs, every chest, every orb and person reachable from the start, standing people counted as walls):
+  stairs in a small pocket (Dawn of Souls joins the parts by events) move into the floor's largest part
+  (Feyhome, the fire shrine, the overworld floors, the sunken floor, the waterfall cavern); a common
+  zero-attribute chip along the corridors is floor (the Western Keep's carpet: the castle was cut into pieces);
+  chests never on a corridor cell the way needs, never in a nook only the stairs reach; boss orbs only in rooms
+  the party reaches, never walling in the rest; the dragon caves' room floor is no longer a chest tile (the free
+  metatiles for corridor chests are now unused in every map of the tileset); people may stand inside rooms
+  (FF1's in-room objects).

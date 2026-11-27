@@ -342,9 +342,7 @@ pg_enter:   ld c, 0
             jr nz, .op
             ld hl, pg_t_sealed
             call pg_sw
-            call pg_say
-            and a
-            ret
+            jp pg_esay
 .op:        ld a, [pg_shr]
             ld hl, pg_ent
             call pg_ixr
@@ -373,9 +371,7 @@ pg_held:    call pg_evrec                   ; (a floor of people: its own words)
             or h
             jr nz, .s
 .d:         ld hl, pg_t_held
-.s:         call pg_say
-            and a
-            ret
+.s:         jp pg_esay
 ; NZ: this floor's way is open (not a boss floor, or one of its bosses beaten this run; a floor of people:
 ; its gate's flags all set)
 pg_open:    ld a, [pg_role]
@@ -1068,17 +1064,7 @@ pg_npc:     call pg_evrec
 .say:       ld a, [hl+]
             ld h, [hl]
             ld l, a
-            ld a, PGT_BANK
-            ld [dlg_bank], a
-            ld a, l
-            ld [dlg_ptr], a
-            ld a, h
-            ld [dlg_ptr + 1], a
-            ld a, [pg_sfx]
-            ld [dlgsfx], a
-            xor a
-            ld [pg_sfx], a
-            jp dlg_open2
+            jp pg_esay
 .ifset:     ld a, [hl+]
             ld c, [hl]
             inc hl
@@ -1238,6 +1224,19 @@ pg_npc:     call pg_evrec
             inc [hl]
 .gx:        pop hl
             jp .op
+; a box of the post-game's text HL (bank PGT_BANK), with pg_sfx's fanfare; C clear. Always the last thing
+; done (jp): the text bank is mapped while the box opens, so no code of this bank may run after it
+pg_esay:    ld a, PGT_BANK
+            ld [dlg_bank], a
+            ld a, l
+            ld [dlg_ptr], a
+            ld a, h
+            ld [dlg_ptr + 1], a
+            ld a, [pg_sfx]
+            ld [dlgsfx], a
+            xor a
+            ld [pg_sfx], a
+            jp dlg_open2
 ; NZ: floor flag A set (HL kept); DE = its byte, B = its bit
 pg_pfbit:   ld de, PG_PF
             cp 8
