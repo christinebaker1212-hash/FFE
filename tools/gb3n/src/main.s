@@ -84,7 +84,9 @@ cgb_only:   ld hl, $D000                    ; work RAM bank 1 ($D000-$DFFF) clea
             ld hl, $FE00                    ; OAM cleared (LCD off)
             ld de, $A0
             call memclr
-            ld hl, C_TILES                  ; font and frame tiles
+            ld a, B_OWN                     ; font and frame tiles
+            ld [MBC5_BANKL], a
+            ld hl, C_TILES
             ld de, $8000
             ld bc, $1000
             call memcpy
@@ -141,6 +143,8 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             call memclr
             ld a, $80                       ; BG palettes 0-7 and OBJ palettes 0-7: palette 0
             ldh [rBCPS], a                  ;   black / light / dark / white, the rest black
+            ld a, B_OWN
+            ld [MBC5_BANKL], a
             ld hl, C_PAL0
             ld b, 8
 .p0:        ld a, [hl+]
@@ -159,10 +163,6 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             ldh [rOCPD], a
             dec b
             jr nz, .p2
-            ld hl, C_TILES
-            ld de, $8000
-            ld bc, $1000
-            call memcpy
             ld hl, dma_rom                  ; the OAM DMA routine into high RAM
             ld de, hram_dma
             ld b, dma_end - dma_rom
@@ -171,7 +171,10 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             inc de
             dec b
             jr nz, .dm
-            ld a, START_WORLD               ; (first steps: a test map, walking)
+            ld a, 1                         ; work RAM bank 1: FF3's save page and the people
+            ldh [rSVBK], a
+            call sram_init                  ; (first steps: a new game's state, a test map)
+            ld a, START_WORLD
             ld [world], a
             ld a, START_MAP
             ld [map_id], a

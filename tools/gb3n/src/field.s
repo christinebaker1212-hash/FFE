@@ -204,6 +204,7 @@ map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if wor
             call memcpy
             xor a
             ldh [rVBK], a
+            call npc_load                   ; the people (their tiles: VRAM bank 1 from tile 16)
             ld a, B_MAPAUX                  ; FF3's player poses
             call sbank
             ld hl, A_POSE
@@ -251,7 +252,8 @@ map_enter:  ld a, B_MAPINFO                 ; properties: index map + 256 if wor
             cp 16
             jr nz, .row
             call scroll_set
-            jp party_oam
+            call party_oam
+            jp npc_oam
 
 ; entrance / treasure / trigger lists (16 bytes each) from bank B_EVENTS ($3A $9350-$93C0):
 ; entrances at properties bytes 12-13, treasures and triggers through the pointer tables at
@@ -420,7 +422,7 @@ pal_gather: ld a, B_MAPAUX
             ld l, a
             ld h, high(A_SPAL)
             ld de, nes_pal + 16
-            ld bc, 8
+            ld bc, 16
             call memcpy
             ld a, [char_pal]                ; colours 2-3 of each from the character palette
             add a
@@ -460,7 +462,7 @@ pal_load:   ld a, B_MAPINFO
             jr nz, .b
             ld a, $80
             ldh [rOCPS], a
-            ld b, 8
+            ld b, 16
 .o:         call .one
             ldh [rOCPD], a
             ld a, d
@@ -480,7 +482,10 @@ pal_load:   ld a, B_MAPINFO
             ret
 
 ; ---- one field frame (after the frame wait): V-Blank work, then the walking
-field_vbl:  ld a, [line_n]                  ; a pending row / column into the ring
+field_vbl:  ld a, [frame]
+            inc a
+            ld [frame], a
+            ld a, [line_n]                  ; a pending row / column into the ring
             and a
             call nz, line_flush
             call scroll_set
@@ -508,6 +513,8 @@ field_step: ld a, [step]
 .dir:       ld a, b
             ld [facing], a
             call dest_cell                  ; D, E = the metatile ahead
+            call npc_at                     ; a person there (FF3 $3F $E399)
+            jr c, .done
             call map_mt
             call passable
             jr c, .done
@@ -529,7 +536,8 @@ field_step: ld a, [step]
             call cam_set
             ld a, [trig_next]               ; the step's trigger is due
             ld [trig], a
-.done:      jp party_oam
+.done:      call party_oam
+            jp npc_oam
 
 ; a trigger after the step ($3F $E26A): entrance (to the map in the entrance list), back to the
 ; previous map, or out to the world map (the world map: later; for now back as from an exit)
@@ -953,9 +961,16 @@ party_oam:  ld a, [step]                    ; the pose: facing, and the second f
             ld a, [hl+]
             ld [bc], a
             inc c
-            ld a, [hl+]                     ; NES attributes -> Color: palette (bits 0-1),
-            push de                         ;   flip H ($40 -> $20), behind BG ($20 -> $80),
-            ld d, a                         ;   tiles in VRAM bank 1
+            ld a, [hl+]
+            call oam_attr
+            ld [bc], a
+            inc c
+            ret
+
+; NES sprite attributes A -> Color: palette (bits 0-1), flip H ($40 -> $20), behind BG
+; ($20 -> $80), tiles in VRAM bank 1
+oam_attr:   push de
+            ld d, a
             and 3
             or $08
             ld e, a
@@ -970,8 +985,6 @@ party_oam:  ld a, [step]                    ; the pose: facing, and the second f
             add a
             or e
             pop de
-            ld [bc], a
-            inc c
             ret
 
 ; the LCD off in V-Blank (Lot Check) / back on
@@ -1024,7 +1037,7 @@ map_props:  ds 16
 ents:       ds 16
 treas:      ds 16
 trigs:      ds 16
-nes_pal:    ds 24
+nes_pal:    ds 32
 trig_cnt:   ds 32
 type_cnt:   ds 8
 map_stack:  ds 3 * MAP_DEPTH

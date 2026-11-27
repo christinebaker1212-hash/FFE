@@ -27,12 +27,13 @@ def own_data():
     pal0 = rgb(0, 0, 0) + rgb(21, 21, 21) + rgb(10, 10, 10) + rgb(31, 31, 31)
     test = tiles.screen([(2, None, 'FINAL FANTASY III'), ('frame', 1, 5, 18, 7),
                          (7, None, 'Native engine'), (9, None, 'Game Boy Color')])
-    return ('section bank 0, $1000\nC_TILES:\n' + db(b''.join(tiles.tileset())) +
+    return ('section bank %d, $4000\nC_TILES:\n' % B_OWN + db(b''.join(tiles.tileset())) +
             'C_SCR_CGBONLY:\n' + db(tiles.screen(tiles.CGB_ONLY), 20) +
             'C_SCR_TEST:\n' + db(test, 20) + 'C_PAL0:\n' + db(pal0))
 
 
 B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_TMAP0, B_SUB0, B_COMMON = 3, 4, 5, 6, 8, 12, 17
+B_NPCS, B_NPCGFX, B_OWN = 18, 19, 20
 
 
 def field_banks(rom):
@@ -80,6 +81,25 @@ def field_banks(rom):
     b = blank(); b[0:0x2000] = rom.at(0x10 * data.B8, 0x2000); banks[B_EVENTS] = b
     b = blank(); b[0:0x4000] = gbt(rom.at(0x0E * data.B8, 0x4000)); banks[B_CHARS] = b
     b = blank(); b[0:144 * 16] = gbt(rom.rd(0x0D, 0xB700, 144 * 16)); banks[B_COMMON] = b
+    b = blank()                                          # people: NES bank $2C, tables, init
+    b[0x0000:0x2000] = rom.at(0x2C * data.B8, 0x2000)
+    b[0x2000:0x2200] = rom.rd(0x00, 0x9400, 512)
+    b[0x2200:0x2400] = rom.rd(0x01, 0xBE00, 512)
+    b[0x2400:0x2500] = rom.rd(0x3B, 0xB41A, 256)
+    si = data.sram_init_data(rom)
+    b[0x2500:0x2540] = si['npcsw']
+    b[0x2540:0x2548] = si['base']; b[0x2548:0x2550] = si['mp']; b[0x2550:0x2552] = si['hp']
+    b[0x2560:0x2574] = si['stats']; b[0x2580:0x2590] = si['equip']
+    b[0x2590:0x2592] = bytes([si['wmx'], si['wmy']])
+    gfx = blank(); at = 0
+    for g in range(256):
+        if g < 0x40:
+            ent = (B_CHARS, 0x4000 + 0x100 * g)
+        else:
+            gfx[at:at + 0x100] = gbt(data.npc_gfx_block(rom, g)); ent = (B_NPCGFX, 0x4000 + at); at += 0x100
+            if at >= 0x4000: break
+        b[0x2700 + 3 * g:0x2703 + 3 * g] = bytes([ent[0], ent[1] & 0xFF, ent[1] >> 8])
+    banks[B_NPCS] = b; banks[B_NPCGFX] = gfx
     return banks
 
 
@@ -97,8 +117,10 @@ def main():
            'START_MAP = %d\nSTART_WORLD = %d\nSTART_X = %d\nSTART_Y = %d\n' % (test_map, test_world, test_x, test_y) +
            'B_MAPINFO = %d\nB_MAPAUX = %d\nB_EVENTS = %d\nB_CHARS = %d\nB_COMMON = %d\n' % (
                B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_COMMON) +
+           'B_NPCS = %d\nB_NPCGFX = %d\nB_OWN = %d\n' % (B_NPCS, B_NPCGFX, B_OWN) +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' + own_data())
+           open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' + own_data())
     r = asm(src)
     banks = dict(r.banks)
     rom = data.Rom(nes)

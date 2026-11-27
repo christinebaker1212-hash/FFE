@@ -202,3 +202,27 @@ def window_colours(rom):
     """palette 3 (menu window) on normal maps: the immediates at $3A $9133-$9144 (gray, blue,
     white, and black as colour 0)"""
     return bytes([rom.rd(0x3A, 0x9143), rom.rd(0x3A, 0x9134), rom.rd(0x3A, 0x9139), rom.rd(0x3A, 0x913E)])
+
+
+def npc_gfx_block(rom, g):
+    """the 16 sprite tiles (NES format, 256 bytes) FF3 loads for NPC graphics id g ($3E $DF41):
+    g < $40 a map character set (0E/8000); $40-$57 eight tiles of the two-frame sprites (0A/8000
+    + $80 each) twice; $58+ four tiles (0D/8800: $100 per four ids, $40 each) four times"""
+    if g < 0x40:
+        return rom.at(0x0E * B8 + 0x100 * g, 0x100)
+    if g < 0x58:
+        b = rom.at(0x0A * B8 + 0x80 * (g - 0x40), 0x80)
+        return b + b
+    k = g - 0x58
+    b = rom.at(0x0D * B8 + 0x0800 + 0x100 * (k >> 2) + 0x40 * (k & 3), 0x40)
+    return b * 4
+
+
+def sram_init_data(rom):
+    """the tables FF3's init sram ($3A $8E76) copies: npc switches (00/9600, 64), job base stats
+    (39/A000, bytes 2-6), initial MP (39/BB88, 8), initial HP (39/BBD8, 2), initial stats
+    (39/BBDA, 20), initial equipment (39/BBF0, 16), the start position operands"""
+    return {'npcsw': rom.rd(0x00, 0x9600, 64), 'base': rom.rd(0x39, 0xA000, 8),
+            'mp': rom.rd(0x39, 0xBB88, 8), 'hp': rom.rd(0x39, 0xBBD8, 2),
+            'stats': rom.rd(0x39, 0xBBDA, 20), 'equip': rom.rd(0x39, 0xBBF0, 16),
+            'wmx': rom.rd(0x3A, 0x8E89), 'wmy': rom.rd(0x3A, 0x8E8E)}
