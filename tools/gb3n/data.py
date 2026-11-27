@@ -31,6 +31,25 @@ class Rom:
         """tiles per map BG graphics block: the table after "copy tiles to vram" ($3E $DF00)"""
         return list(self.rd(0x3E, 0xDF00, GFX_BLOCKS))
 
+    def player_poses(self):
+        """the player sprite poses ($3E $DC2A, 64 bytes: right, left, up, down; 2 frames each;
+        per frame UL, DL, UR, DR as tile + NES attributes)"""
+        return self.rd(0x3E, 0xDC2A, 64)
+
+    def map_char_tiles(self, pal_id):
+        """16 walking tiles of map character graphics set `pal_id` (job, $16 toad, $17 mini,
+        guests from $18: 0E/8000 + $100 each, $3E $DD2D)"""
+        return self.at(0x0E * B8 + 0x100 * (pal_id & 0x3F), 0x100)
+
+    def char_palettes(self, pal_id, world):
+        """the walking character's two sprite palettes (NES colours): the map sprite palettes
+        (00/9670 + (world & 4) * 4) with colours 2-3 of each from the map character palette
+        (00/9690 + 4 * id; $3A $9050 / $9091)"""
+        base = list(self.rd(0x00, 0x9670 + (world & 4) * 4, 16))
+        c = self.rd(0x00, 0x9690 + 4 * pal_id, 4)
+        base[2], base[3], base[6], base[7] = c[0], c[1], c[2], c[3]
+        return [base[0:4], base[4:8]]
+
 
 def ptr(lo, hi, base_bank):
     """FF3's banked pointer (lo, hi): address lo | ((hi & $1F) | $80) << 8 in 8 KB bank

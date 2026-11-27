@@ -5,7 +5,7 @@
 ; This file: the header vectors, boot (memory cleared, Lot Check), the "Game Boy Color only"
 ; screen on older systems, double speed, the frame wait, the pad and the soft reset.
 
-LCDC_ON    = $91            ; LCD on, BG tiles at $8000, BG map $9800, BG on
+LCDC_ON    = $93            ; LCD on, BG tiles at $8000, BG map $9800, BG and sprites on
 rKEY1      = $FF4D
 rVBK       = $FF4F
 rSVBK      = $FF70
@@ -163,8 +163,16 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             ld de, $8000
             ld bc, $1000
             call memcpy
-            ld a, MAP_BANK                  ; (first step: the test map shown)
-            call map_show
+            ld hl, dma_rom                  ; the OAM DMA routine into high RAM
+            ld de, hram_dma
+            ld b, dma_end - dma_rom
+.dm:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .dm
+            ld a, MAP_BANK                  ; (first steps: the test map, walking)
+            call map_enter
             ld a, LCDC_ON
             ldh [rLCDC], a
             ld a, 1
@@ -173,7 +181,9 @@ boot_cgb:   ldh a, [rKEY1]                  ; double speed (KEY1 + STOP; already
             ldh [rIF], a
             ei
 main_loop:  call wait_vbl
+            call field_vbl
             call read_pad
+            call field_step
             jr main_loop
 
 ; ---- a 20 x 18 screen map (HL) into the BG map at $9800 (LCD off)
@@ -285,6 +295,7 @@ memcpy:     ld a, [hl+]                     ; HL -> DE, BC bytes
             ret
 
 section hram, $FF80
+hram_dma:   ds 10
 is_gba:     ds 1
 soft_rst:   ds 1
 vbl_done:   ds 1

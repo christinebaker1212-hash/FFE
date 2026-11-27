@@ -44,6 +44,12 @@ def map_bank(rom, p):
     b[0x1300:0x1320] = b''.join(data.rgb555(c).to_bytes(2, 'little') for pal in m.bg_palettes() for c in pal)
     b[0x1400:0x1800] = m.tilemap()
     b[0x1800:0x1803] = bytes([m.props[0] & 31, m.props[1] & 31, m.props[3] & 0x7F])
+    b[0x1880:0x1900] = bytes(p1 for p1, p2 in m.tprop)
+    b[0x1900:0x1980] = bytes(p2 for p1, p2 in m.tprop)
+    chr_ = rom.map_char_tiles(0)                     # (the party's first member: Onion Knight)
+    b[0x1A00:0x1B00] = b''.join(tiles.gb(chr_[16 * i:16 * i + 16]) for i in range(16))
+    b[0x1B00:0x1B10] = b''.join(data.rgb555(c).to_bytes(2, 'little') for pal in rom.char_palettes(0, 0) for c in pal)
+    b[0x1B10:0x1B50] = rom.player_poses()
     return bytes(b)
 
 
