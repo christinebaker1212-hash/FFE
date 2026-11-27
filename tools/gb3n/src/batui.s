@@ -1682,6 +1682,8 @@ bsc_anim:   ld a, [$D8D6]
 .ch:        call ui_kind                    ; a character's fight on a monster: its swings
             cp 1                            ;   (34/8613, battle graphics $12); magic: its
             jp z, xa_magic                  ;   casting (34/8577, $1D); the others (34/843E)
+            cp 2                            ; (a summon)
+            jr z, .kg
             cp 6
             jr c, .k0
             cp $11

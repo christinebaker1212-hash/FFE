@@ -583,6 +583,15 @@ an_frame:   call wait_vbl
             ld a, [an_pfl]                  ; (a backdrop colour waiting: first in V-Blank)
             and a
             call nz, an_bput
+            ld a, [an_opf]                  ; (sprite / summon palettes)
+            and a
+            call nz, an_oset
+            ld a, [an_won]                  ; (a summon in the window)
+            and a
+            jr z, .nw
+            call an_wset
+            call an_wqset
+.nw:
             call xb_vrows
             call hram_dma
             call snd_frame
@@ -660,7 +669,12 @@ an_vcopy:   push af
             call far_copy
             xor a
             ldh [rVBK], a
-            ldh [rSTAT], a
+            ld a, [an_won]                  ; (a summon's window cut: the line interrupt back)
+            and a
+            jr z, .s
+            ld a, $40
+.s:         ldh [rSTAT], a
+            xor a
             ld [guard_on], a
             ret
 ; the attacker's 16 animation tiles: its job's from tile 14 to OBJ $39 (2F/A9CF)
@@ -2334,6 +2348,8 @@ an_kinds:   ld a, [$D8D6]
             jp z, an_run
             cp $10
             jp z, an_inef
+            cp 2
+            jp z, an_summon
             ret
 
 ; the attacker's frame A, or X (B) as a toad / mini (33/A972)
@@ -3453,6 +3469,7 @@ fb_cnt:     ds 6                            ; (33/B9E0)
 fb_spr:     ds 48                           ; (32/91D7: 2 x 3 frames, a monster target's, a member's)
 gl_col:     ds 22                           ; (32/804B: the flash colours of spells $38..)
 em_data:    ds 5 * $60                      ; (06/8E20: the monsters' Flame / Blizzard / Thunder)
+sm_data:    ds $1C0                         ; (2A/9440: the summons' properties, maps)
 mg_snd:     ds MG_NSND                      ; (34/83A0: each spell's sound)
 MG_NSND    = $58
 sl_pos:     ds 24                           ; (32/99D1)

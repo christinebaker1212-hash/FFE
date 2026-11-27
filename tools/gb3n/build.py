@@ -131,6 +131,7 @@ B_MINI = 82                 # the minimap: its screen data (tools/gb3n/minimap.p
 B_ANIM = 83                 # battle animations' graphics: NES 2B/B000 (weapons, hits)
 B_MAGIC = 84                # the spells' graphics: NES 16 KB bank $15 (2A / 2B)
 B_BANIM = 85                # battle animations' code and tables
+B_SUMN = 86                 # the summons' tiles: NES 16 KB bank 6 from $9800 (0D/9800..)
 
 
 def field_banks(rom):
@@ -358,6 +359,11 @@ ROMDATA = {
     'mf_grid': (0x33, 0xB89B, 16),       # the spells' 6 x 6 frames: corner / steps, flips
     'mf_flip': (0x33, 0xB8AB, 4),
     'kl_ang': (0x33, 0xB413, 4),
+    'sm_snd': (0x2F, 0xAFC0, 24),        # summons: each attack's sound
+    'sm_pal': (0x32, 0x8043, 8),         # the pre-animation's palette by summon
+    'sm_pre': (0x33, 0xB1EE, 10),        # the pre-animation's frames
+    'sm_fly': (0x33, 0xAFF2, 16),        # its four sprites flying off
+    'sm_data': (0x2A, 0x9440, 0x1C0),    # the summons' properties (2A/9440) and sprite maps
     'fb_tiles': (0x33, 0xB9CE, 12),
     'fb_x': (0x33, 0xB9DA, 6),
     'fb_cnt': (0x33, 0xB9E0, 6),
@@ -440,7 +446,7 @@ def main():
            'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
            'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\nB_BSET = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2, B_BSET) +
            'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\nB_BOSS0 = %d\nB_MENU = %d\nB_VGFX = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0, B_BOSS0, B_MENU, B_VGFX) + text_defs +
-           'B_CUT = %d\nB_CUTG = %d\nB_WSPR = %d\nB_MINI = %d\nB_ANIM = %d\nB_MAGIC = %d\nB_BANIM = %d\n' % (B_CUT, B_CUTG, B_WSPR, B_MINI, B_ANIM, B_MAGIC, B_BANIM) + cut_eq +
+           'B_CUT = %d\nB_CUTG = %d\nB_WSPR = %d\nB_MINI = %d\nB_ANIM = %d\nB_MAGIC = %d\nB_BANIM = %d\nB_SUMN = %d\n' % (B_CUT, B_CUTG, B_WSPR, B_MINI, B_ANIM, B_MAGIC, B_BANIM, B_SUMN) + cut_eq +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
@@ -459,7 +465,7 @@ def main():
            open(os.path.join(HERE, 'src', 'wspr.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sa.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'mini.s')).read() + '\n' +
-           open(os.path.join(HERE, 'src', 'banim.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'banim.s')).read() + '\n' + open(os.path.join(HERE, 'src', 'bsumn.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'menu.s')).read() + '\n' + menu_data() + sound_data() + own_data())
     if os.environ.get('GB3N_BATTLE'):            # test builds only: every encounter is this battle
         src = src.replace('            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a',
@@ -509,6 +515,8 @@ ev_fxtest:  call ev_shake
         extra = ''
         if os.environ.get('GB3N_ANTYPE'):       # (and the animation type $7E9D)
             extra += '            ld a, %s\n            ld [$DE9D], a\n' % os.environ['GB3N_ANTYPE']
+        if os.environ.get('GB3N_ANSUM'):        # (the summon: id x 16 + attack)
+            extra += '            ld a, %s\n            ld [$DE94], a\n' % os.environ['GB3N_ANSUM']
         if os.environ.get('GB3N_ANTGT') == 'char':   # (shown on member 0)
             extra += '            ld a, [$DE9A]\n            and $BF\n            ld [$DE9A], a\n            ld a, $80\n            ld [$DE9B], a\n            ld [$DE99], a\n'
         src = src.replace('an_kind:    ld a, [$DEC2]', 'an_kind:    ld a, %s\n            ld [$DE88], a\n            ld a, [$DEC2]\n            cp 4\n            jr nz, .ak\n%s            ld a, %s\n            ret\n.ak:        ld a, [$DEC2]' % (os.environ['GB3N_ANTEST'], extra, os.environ.get('GB3N_ANKIND', '1')))
@@ -607,6 +615,7 @@ ev_fxtest:  call ev_shake
     ab[0x1000:0x1000 + len(an)] = an
     banks[B_ANIM] = ab
     banks[B_MAGIC] = bytearray(b''.join(tiles.gb(rom.at(0x15 * 0x4000 + 16 * i, 16)) for i in range(1024)))
+    banks[B_SUMN] = bytearray(b''.join(tiles.gb(rom.at(6 * 0x4000 + 0x1800 + 16 * i, 16)) for i in range(640)))
     for k, v in tbanks.items():
         assert k not in banks, 'bank %d used twice' % k
         banks[k] = v
