@@ -1126,7 +1126,10 @@ pg_owst:    call ow_bc
 section bank PGM_BANK, $7200
 ; the statue before Earthgift's sealed door (until Lich is beaten): FF1's Lich in stone, 4 x 4 sprites
 ; (OAM 24-39, tiles $70-$7F) centred on the door, standing on its tile
-pg_statue:  ld hl, oam_buf + 96             ; (hidden first)
+pg_statue:  ld a, PG_ON                     ; (built without the Dawn of Souls ROM: no shrine)
+            and a
+            ret z
+            ld hl, oam_buf + 96             ; (hidden first)
             ld b, 16
             xor a
 .z:         ld [hl+], a

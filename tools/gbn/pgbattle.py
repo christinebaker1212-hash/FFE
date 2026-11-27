@@ -230,7 +230,8 @@ def sil_page(page):
 def build(rom, G=None):
     """Earthgift's battle set: {bank: bytes} for its data, graphics and silhouette banks; the domains
     (formation lists of 8) per floor kind; the formation of each boss"""
-    G = G or gba.Gba()
+    import postgame
+    G = G or gba.Gba(postgame.GBA_PATH)
     base = bytearray(battle.data_bank(rom))
     ff1chr = battle.chr_banks(rom)
     def ff1_page(p):
