@@ -1059,7 +1059,7 @@ party_oam:  ld a, [wmode]                   ; in a vehicle on the world map: its
             adc 0
             ld h, a
             ld d, VIEW_X * 16 + 8           ; D = x, E = y (OAM: +8 / +16)
-            ld e, VIEW_Y * 16 + 16
+            ld e, VIEW_Y * 16 + 13          ; (FF3: the party 3 pixels above its cell)
             ld a, b                         ; FF3: the second frame bobs a pixel (up, or left
             and a                           ;   while walking up / down)
             jr z, .nb

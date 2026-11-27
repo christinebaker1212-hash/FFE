@@ -484,8 +484,7 @@ v_oam:      ld a, [veh]
             ld hl, vtab + VT_ROW
             call v_hla
             ld a, [hl]
-            sub $6C
-            add VIEW_Y * 16 + 16
+            sub $6C - (VIEW_Y * 16 + 13)    ; (3 pixels above the cell as FF3)
             ld e, a
             ld a, [veh]
             ld hl, V_TILES
@@ -529,81 +528,11 @@ v_quad:     call .spr
             ret
 
 ; ---- the parked vehicle (3E/DAD4 ship, DB09 / DB2F airships) at OAM 36-39, after the people
-v_parked:   ld a, [wmode]
+v_parked:   ld a, [wmode]                   ; FF3's world-map sprites (src/wspr.s)
             and a
             ret z
-            ld a, [SRAM_PAGE + $20]
-            ld b, a
-            rra                             ; bit 0: the airship of $6000 (not while in it)
-            jr nc, .s
-            ld a, [veh]
-            cp 5
-            ret z
-            ld a, [SRAM_PAGE + $00]
-            and a
-            ret z
-            ld a, $68
-            ld c, $10
-            jr .draw
-.s:         bit 6, b                        ; bit 6: the airship on world $6003
-            jr z, .sh
-            ld a, [veh]
-            cp 6
-            ret z
-            call .world
-            ret nz
-            ld a, $68
-            ld c, $10
-            jr .draw
-.sh:        bit 5, b                        ; the ship (not chained, not aboard)
-            ret nz
-            ld a, [veh]
-            cp 3
-            ret z
-            cp 4
-            ret z
-            ld a, [SRAM_PAGE + $00]
-            and a
-            ret z
-            call .world
-            ret nz
-            ld a, $50
-            ld c, $00
-.draw:      ld [v_toff], a
-            ld a, [SRAM_PAGE + $01]         ; on screen: within 5 cells of the party
-            ld hl, pos_x
-            sub [hl]
-            add 5
-            cp 11
-            ret nc
-            sub 5
-            swap a
-            add VIEW_X * 16 + 8
-            ld hl, walk_dx
-            sub [hl]
-            ld d, a
-            ld a, [SRAM_PAGE + $02]
-            ld hl, pos_y
-            sub [hl]
-            add 5
-            cp 10
-            ret nc
-            sub 5
-            swap a
-            add VIEW_Y * 16 + 16
-            ld hl, walk_dy
-            sub [hl]
-            ld e, a
-            ld a, c
-            ld hl, vposes
-            call v_hla
-            ld bc, oam_buf + 4 * 36
-            jp v_quad
-.world:     ld a, [world]
-            ld hl, SRAM_PAGE + $03
-            cp [hl]
+            %FAR B_WSPR, ws_world
             ret
-
 ; ---- the walking member ($600E): graphics set (3F/F77B: toad $16, mini $17, else the job) and
 ; palette (3A/9050: toad $16, a job's own, the Onion Kids by member: 0, $17-$19)
 char_update:

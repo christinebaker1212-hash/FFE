@@ -547,7 +547,7 @@ npc_draw:   ld a, l
             cpl
             inc a
             add e
-            add 16
+            add 14                          ; (FF3: people 2 pixels above their cell)
             ld e, a
             ld a, [nd_sy]
             add e

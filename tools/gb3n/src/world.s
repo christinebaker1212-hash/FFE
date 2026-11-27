@@ -115,6 +115,7 @@ world_enter:
             jr nz, .row
             call scroll_set
             call veh_load                   ; the vehicles' poses, tables and tiles
+            %FAR B_WSPR, ws_tiles           ; FF3's tiles $80-$FF (3D/BDE0)
             call party_oam
             call npc_oam
             jp v_parked
