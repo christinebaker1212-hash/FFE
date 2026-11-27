@@ -245,6 +245,9 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
 - Select on the map (owner's decision: FF3's own): the next member shows (3F/F72C), with FF3's
   walking graphics (job, toad $16, mini $17) and palettes (3A/9050) - these were always job 0
   before.
+- The opening crawl at power-on (FF3's prophecy, 3A/8726; skipped after a soft reset as FF3):
+  story texts 0 / 1 on FF3's dark blue, each line fading in to white then grey, A / B the next
+  page, Start on to the files; FF3's lines re-flowed for 20 columns, 8 to a screen.
 - Prologue ($DB), epilogue ($DC), ending ($DD): FF3's cutscene engine (NES bank $1F) written
   natively (`src/cut.s`, `src/cutend.s`; data `tools/gb3n/cutdata.py`): the crystal flashes and
   rises, the title / staff / story pages fade in one by one; the epilogue's starfield (FF3's

@@ -1174,4 +1174,13 @@ c_ac:       ds 1
 c_95:       ds 1
 c_tid:      ds 1
 c_wcol:     ds 3
+c_ar1:      ds 1
+c_av1:      ds 1
+c_ar2:      ds 1
+c_av2:      ds 1
+c_pskip:    ds 1
+c_ppage:    ds 1
+c_pn:       ds 1
+c_prow:     ds 1
+c_64:       ds 1
 c_vend:

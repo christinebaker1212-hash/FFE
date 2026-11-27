@@ -402,7 +402,13 @@ c_frx:      ld [c_pup], a
             ldh [rHDMA4], a
             ld a, 63
             ldh [rHDMA5], a
-.nb:        ld a, [c_pup]
+.nb:        ld a, [c_ar2]                   ; rows' attributes (the prophecy's lines)
+            cp $FF
+            call nz, c_attr2
+            ld a, [c_ar1]
+            cp $FF
+            call nz, c_attr
+            ld a, [c_pup]
             and a
             call nz, c_pload
             ld a, [c_bgcx]
@@ -441,6 +447,40 @@ c_frx:      ld [c_pup], a
             ldh [rLCDC], a
 .sn:        call snd_frame
             jp read_pad
+; attributes of map row [c_ar1] / [c_ar2] (columns 0-19) = [c_av1] / [c_av2] (V-Blank)
+c_attr2:    ld a, [c_av2]
+            ld b, a
+            ld a, [c_ar2]
+            ld c, a
+            ld a, $FF
+            ld [c_ar2], a
+            jr c_attrx
+c_attr:     ld a, [c_av1]
+            ld b, a
+            ld a, [c_ar1]
+            ld c, a
+            ld a, $FF
+            ld [c_ar1], a
+c_attrx:    ld a, 1
+            ldh [rVBK], a
+            ld a, c
+            call c_rowp
+            ld de, C_BG
+            ld a, l
+            sub e
+            ld l, a
+            ld a, h
+            sbc d
+            add $98
+            ld h, a
+            ld a, b
+            ld b, 20
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            xor a
+            ldh [rVBK], a
+            ret
 ; A frames (F8C5 each: 1F/A1EE)
 c_wait:     push af
             call c_fr
@@ -816,6 +856,9 @@ c_init:     call wait_vbl
             ld hl, c_vars
             ld de, c_vend - c_vars
             call memclr
+            ld a, $FF
+            ld [c_ar1], a
+            ld [c_ar2], a
             ld a, 48
             ld [c_camx], a
             ld [c_camy], a
@@ -955,6 +998,216 @@ c_goff:     xor a
             ldh [snd_isr], a
             ldh [rSTAT], a
             ld [guard_on], a
+            ret
+
+; ---- the prophecy at power-on (3A/8726): FF3's two pages of story texts 0 / 1, each line fading
+; in to white (its row on palette 2, colour 3 stepped up every 16 frames, dithered on odd frames),
+; then grey (palette 3); A / B: the next page, Start: on to the files. Song 1 plays.
+cut_proph:  call c_init
+            call c_gfx
+            ld hl, C_PPAL
+            ld de, C_PAL
+            ld bc, 32
+            ld a, B_CUTG
+            call far_copy
+            ld a, 1
+            call mus_play
+            ld a, $0A
+            ld [c_mask], a
+            ld hl, C_PROPH
+            ld a, l
+            ld [c_7e], a
+            ld a, h
+            ld [c_7f], a
+            ld a, $FF
+            ld [c_pskip], a
+.scr:       call c_pbyte                    ; a screen: its page, its lines
+            cp $FF
+            jp z, .end
+            ld b, a
+            ld a, [c_pskip]                 ; (a page skipped by A / B: its other screens too)
+            cp b
+            jr nz, .show
+            call c_pbyte
+            ld b, a
+.sk:        ld a, b
+            and a
+            jr z, .scr
+            push bc
+            call c_pbyte
+            and a
+            jr z, .sk3
+            ld b, a
+.sk2:       call c_pbyte
+            dec b
+            jr nz, .sk2
+.sk3:       pop bc
+            dec b
+            jr .sk
+.show:      ld a, b
+            ld [c_ppage], a
+            ld hl, C_BG                     ; the screen: tile $FF, palette 1 everywhere
+            ld bc, $400
+.f:         ld a, $FF
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, .f
+            call c_pbyte
+            ld [c_pn], a
+            ld c, a                         ; rows: 1 + 2 x line, centred
+            ld a, 8
+            sub c
+            ld [c_prow], a
+            ld b, 0
+.ln:        ld a, b
+            cp c
+            jr z, .drawn
+            push bc
+            ld a, b
+            add a
+            inc a
+            ld e, a
+            ld a, [c_prow]
+            add e
+            call c_rowp
+            push hl
+            call c_pbyte
+            ld b, a
+            ld a, 20
+            sub b
+            srl a
+            pop hl
+            add l
+            ld l, a
+            jr nc, .h
+            inc h
+.h:         ld a, b
+            and a
+            jr z, .nx
+.ch:        call c_pbyte
+            ld [hl+], a
+            dec b
+            jr nz, .ch
+.nx:        pop bc
+            inc b
+            jr .ln
+.drawn:     ld a, 1
+            ld [c_bgd], a
+            ld a, 1                         ; all rows palette 1
+            call c_pall
+            ld b, 0
+.fl:        ld a, [c_pn]
+            cp b
+            jr nz, .fn
+            call c_fr_oc                    ; (3A/87FA: a frame with every line grey)
+            jp .scr
+.fn:
+            push bc
+            ld a, b
+            add a
+            inc a
+            ld e, a
+            ld a, [c_prow]
+            add e
+            ld [c_ar1], a
+            ld a, 2
+            ld [c_av1], a
+            call c_lfade
+            pop bc
+            jr c, .skip
+            jr nz, .end
+            push bc
+            ld a, b
+            add a
+            inc a
+            ld e, a
+            ld a, [c_prow]
+            add e
+            ld [c_ar2], a
+            ld a, 3
+            ld [c_av2], a
+            pop bc
+            inc b
+            jr .fl
+.skip:      ld a, [c_ppage]                 ; A / B: the rest of this page skipped
+            ld [c_pskip], a
+            jp .scr
+.end:       jp c_deinit
+; the next byte of the prophecy data (B_CUTG) at [c_7e]
+c_pbyte:    push hl
+            push bc
+            ld a, [c_7e]
+            ld l, a
+            ld a, [c_7f]
+            ld h, a
+            ld a, B_CUTG
+            call far_byte
+            inc hl
+            ld b, a
+            ld a, l
+            ld [c_7e], a
+            ld a, h
+            ld [c_7f], a
+            ld a, b
+            pop bc
+            pop hl
+            ret
+; every row's attributes = palette A (behind the line guard)
+c_pall:     push af
+            call c_gon
+            ld a, 1
+            ldh [rVBK], a
+            pop af
+            ld hl, $9800
+            ld bc, $400
+.f:         ld [hl+], a
+            ld e, a
+            dec bc
+            ld a, b
+            or c
+            ld a, e
+            jr nz, .f
+            xor a
+            ldh [rVBK], a
+            jp c_goff
+; a line's fade (3A/8801): colour 3 of palette 2 from 0 to $30, a step every 16 frames, the odd
+; frames a step lower; carry set: A / B pressed, Z clear: Start
+c_lfade:    xor a
+            ld [c_64], a
+.set:       ld a, [c_64]
+            ld [C_PAL + 11], a
+.fr:        call c_fr_oc
+            ldh a, [pad_new]
+            and PAD_START
+            jr nz, .st
+            ldh a, [pad_new]
+            and PAD_A | PAD_B
+            jr nz, .ab
+            ld hl, c_cnt
+            inc [hl]
+            ld a, [hl]
+            and $0F
+            jr nz, .od
+            ld a, [c_64]
+            add $10
+            ld [c_64], a
+            cp $40
+            jr c, .set
+            xor a
+            ret
+.od:        rra
+            jr nc, .set
+            ld a, [C_PAL + 11]
+            sub $10
+            jr nc, .p
+            ld a, 1
+.p:         ld [C_PAL + 11], a
+            jr .fr
+.ab:        scf
+            ret
+.st:        or 1
             ret
 
 ; ---- the epilogue ($DC: 1F/B146)

@@ -249,6 +249,11 @@ title_boot: ld a, LCDC_ON
             xor a
             ldh [rIF], a
             ei
+            ldh a, [soft_rst]               ; the prophecy at power-on (not after a soft reset:
+            and a                           ;   3E/C0A1)
+            jr nz, .np
+            %FAR B_CUT, cut_proph
+.np:
             %FAR B_MENU, t_title
             ld a, [m_res]
             and a

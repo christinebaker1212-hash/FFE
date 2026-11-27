@@ -239,6 +239,28 @@ def build(rom):
                 l = l[:max(0, 18 - c)]
                 if r < 14 and l: rows.append((r, c, l))
         cred.append(placed(rows))
+    # the prophecy at power-on (3A/8726): story texts 0 and 1 (18/8000), wrapped for 20 columns,
+    # 8 lines a screen (two rows a line as FF3); each screen: page, line count, lines (len, tiles)
+    import text as gtext
+    import sys as _s
+    _s.path.insert(0, os.path.join(ROOT, 'tools', 'ff3')); _s.path.insert(0, os.path.join(ROOT, 'tools'))
+    from insert import ENC
+    st = gtext.load('t8000')
+    proph = bytearray()
+    for pg in range(2):
+        ls = []
+        for src in st[pg].split('\n'):                      # (FF3's lines kept as lines)
+            ls += [l.strip() for l in gtext.wrap(src, 20)] if src.strip() else ['']
+        while ls and not ls[0]: ls.pop(0)
+        for k in range(0, len(ls), 8):
+            part = ls[k:k + 8]
+            proph += bytes([pg, len(part)])
+            for l in part:
+                enc = bytes(ENC.get(ch, 0xFF) if ch != '…' else 0xC3 for ch in l)
+                proph += bytes([len(enc)]) + enc
+    proph += b'\xFF'
+    put('C_PROPH', bytes(proph))
+    put('C_PPAL', rom.rd(0x3A, 0x8883, 32))                  # 3A/8883: its palettes
     for name, pages in (('C_PRO', pro), ('C_EPI', epi), ('C_CRED', cred)):
         tbl = bytearray(); body = bytearray()
         base = 0x4000 + pos + 2 * len(pages)
