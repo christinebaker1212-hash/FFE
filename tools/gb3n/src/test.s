@@ -21,6 +21,13 @@ test_loop:  xor a
             ldh [rSVBK], a
             ld a, [T_CMD]
             dec a
+            ld c, a
+            ld b, 0
+            ld hl, t_banks
+            add hl, bc
+            ld a, [hl]
+            call sbank
+            ld a, c
             add a
             ld l, a
             ld h, 0
@@ -72,3 +79,6 @@ t_copy:     ld d, $D0
             jr nz, .p
             ret
 t_table:    dw fe_A400, fe_AA16, fe_A732, fe_9E8A, fe_AF77, fe_A65E, fe_BEBF, fe_BF17, fe_A2E9
+            dw fe_9777, fe_9DE4, fe_A458, fe_A487
+t_banks:    db B_BAT, B_BAT, B_BAT, B_BAT, B_BAT, B_BAT, B_BAT, B_BAT, B_BAT
+            db B_BAT2, B_BAT2, B_BAT2, B_BAT2

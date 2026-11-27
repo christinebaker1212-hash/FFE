@@ -160,8 +160,18 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   over 150-300 states per routine. Three FF3 quirks found by it and kept: an empty first monster
   slot loads a monster record into ROM ($A45A's LDX sets Z); a monster petrified by status is also
   marked dead ($BDF4 tests INY's flags); the run-penalty undo subtracts with FF3's leftover carry.
-- Next: the battle flow (bank $34/$35: turn order, commands, actions, messages, victory) and the
-  battle screen (layout from the mock-up sheet), random encounters.
+- Battle flow, part 1 (`src/batflow.s`, bank 58): the attack order ($9777, with FF3's own
+  recursive sort, which decides ties), executing an action ($9DE4: status checks, targets, mp,
+  summons as their own attacker at $7875) and every action: fight (a Knight covering a weak ally,
+  waking sleepers, arrows / shuriken used up), magic, items, sleep / paralysis, rows, defend,
+  run / escape, jump, terrain (backfire), scan, peep, steal, buildup, sing, scare, cheer; the
+  battle-over check and the cannon blast. Shared helpers moved to bank 0 (`src/batlib.s`); the
+  algorithms are called through a bank-0 dispatcher, as FF3's $FDF3. Checked: attack order 60
+  states, execute action 300 states, battle over / cannon 40: 0 differences. FF3 quirks kept:
+  Scan's weak-element loop shifts its counter after the first find and writes every message to
+  one queue slot; Scare sets every monster's level to the first one's - 3.
+- Next: the main loop's bookkeeping, poison, victory (experience, gil, job levels, level ups,
+  items), the command menus (ours), the battle screen, random encounters.
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;

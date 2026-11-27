@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
 import tiles, data, text
 
-BATTLE_SRC = ['batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s']
+BATTLE_SRC = ['batlib.s', 'batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s', 'batflow.s']
 ROM_BANKS = 128             # 2 MB (sized to the game later)
 RAM_CODE = 0x03             # 32 KB cart RAM (4 banks, as retail MBC5 games: docs/gb-lessons.md)
 EN_SHA1 = '4a7f1ae4c89305cf161aa3d78fd4416548663f99'   # build/ff3_en.nes (patches/README.md)
@@ -40,6 +40,7 @@ B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD = 18, 19, 20, 21, 28, 29
 B_WORLD0, B_WINFO, B_WGFX = 32, 48, 49
 B_SND0 = 50                 # 50-53: NES bank $36 at $4000, song bank $37 / $38 / $39 / $09 at $6000
 B_BAT, B_BDAT, B_BDAT2, B_BDAT3 = 54, 55, 56, 57   # battle code; NES $30 + $31; $2E + $01; $38 + $39
+B_BAT2 = 58                 # battle flow code
 
 
 def field_banks(rom):
@@ -213,7 +214,7 @@ def main():
            'B_NPCS = %d\nB_NPCGFX = %d\nB_OWN = %d\nB_TEXT = %d\nB_SCRIPT = %d\nB_FIELD = %d\n' % (
                B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD) +
            'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
-           'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3) + text_defs +
+           'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2) + text_defs +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +

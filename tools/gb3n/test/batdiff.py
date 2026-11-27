@@ -21,14 +21,16 @@ PTRS = [0x57, 0x59, 0x5B, 0x5D, 0x6E, 0x70]            # zero-page pointers into
 # routine: (test number in src/test.s, NES address)
 ROUTINES = {'init': (1, 0xA400), 'equip': (2, 0xAA16), 'monact': (3, 0xA732), 'fight': (4, 0x9E8A),
             'magic': (5, 0xAF77), 'item': (6, 0xA65E), 'consol': (7, 0xBEBF), 'confuse': (8, 0xBF17),
-            'mtarget': (9, 0xA2E9)}
+            'mtarget': (9, 0xA2E9), 'order': (10, 0x9777), 'exec': (11, 0x9DE4), 'over': (12, 0xA458),
+            'cannon': (13, 0xA487)}
+FLOW = ('order', 'exec', 'over', 'cannon')               # FF3's banks $34 / $35 mapped for these
 
 
 class Mem(bytearray):
-    def __init__(self, rom):
+    def __init__(self, rom, flow=False):
         bytearray.__init__(self, 0x10000)
         self.rom = rom
-        for slot, b in enumerate((0x30, 0x31, 0x3E, 0x3F)):
+        for slot, b in enumerate((0x34, 0x35, 0x3E, 0x3F) if flow else (0x30, 0x31, 0x3E, 0x3F)):
             self.map(slot, b)
 
     def map(self, slot, b):
@@ -42,8 +44,8 @@ class Mem(bytearray):
         bytearray.__setitem__(self, a, v)
 
 
-def nes_run(rom, ram6, ram7, zp, addr):
-    mem = Mem(rom)
+def nes_run(rom, ram6, ram7, zp, addr, flow=False):
+    mem = Mem(rom, flow)
     bytearray.__setitem__(mem, slice(0x6000, 0x6400), ram6)
     bytearray.__setitem__(mem, slice(0x7400, 0x7F00), ram7)
     bytearray.__setitem__(mem, slice(0, 0x100), zp)
@@ -154,7 +156,7 @@ def battle_records(rom, ram6, ram7, zp):
 def setup(rom, rnd, name):
     ram6, ram7, zp = state(rnd, name)
     nes_ptrs(zp)
-    if name in ('fight', 'magic', 'item', 'monact', 'confuse', 'mtarget'):
+    if name in ('fight', 'magic', 'item', 'monact', 'confuse', 'mtarget') + FLOW:
         ram6, ram7, zp = battle_records(rom, ram6, ram7, zp)
         for k in range(0x10): ram7[0x7E4F - 0x7400 + k] = 0xFF
         for k in range(0x10): ram7[0x7E5F - 0x7400 + k] = 0xFF
@@ -185,6 +187,47 @@ def setup(rom, rnd, name):
         else:
             inv = [ram6[0xC0 + 2 * k] for k in range(0x20) if ram6[0xC0 + 2 * k]]
             zp[0x1A] = rnd.choice(inv) if inv else 0x98
+    if name in FLOW:
+        r7 = lambda a: a - 0x7400
+        ram7[r7(0x78D9)] = 0xFF
+        ram7[r7(0x7E9A)] = 0
+        ram7[r7(0x7EDF)] = 0
+        ram7[r7(0x78D3)] = rnd.choice([0, 0, 0, 2])
+        ram7[r7(0x7DD2)] = rnd.choice([0, 1, 3])
+        ram7[r7(0x7CEC)] = rnd.getrandbits(8) & 0x0F
+        ram7[r7(0x7CED)] = rnd.choice([rnd.randrange(0x100), 0x55, 0x79, 0x90])
+        ram7[r7(0x7CE3)] = rnd.randrange(0x14)
+        ram7[r7(0x74C8)] = rnd.randrange(0x100)
+        ram7[r7(0x78BA)] = rnd.choice([0, 0, 1, 8])
+        for k in range(4): ram7[r7(0x7AC7) + k] = rnd.randrange(8)
+        for k in range(4): ram7[r7(0x7CE4) + k] = 0
+    if name == 'exec':
+        r7 = lambda a: a - 0x7400
+        ram7[r7(0x7AC2)] = 0
+        who = rnd.choice([rnd.randrange(4), 0x80 | rnd.randrange(8)])
+        ram7[r7(0x7ACB)] = who
+        rec = 0x7575 + 0x40 * (who & 0x7F) + (0x100 if who & 0x80 else 0)
+        f = ram7[r7(rec) + 0x2C] & 0x87
+        kind = rnd.choice(['cmd', 'cmd', 'cmd', 'magic', 'item', 'spell'])
+        if who & 0x80 and kind in ('item', 'spell'): kind = 'cmd'
+        if kind == 'cmd':
+            c = rnd.choice([0, 1, 2, 3, 4, 4, 4, 5, 6, 7, 8, 9, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12])
+        elif kind == 'magic':
+            f |= 0x10; c = rnd.randrange(0x78)
+        elif kind == 'item':
+            f |= 0x08
+            inv = [ram6[0xC0 + 2 * k] for k in range(0x20) if 0x98 <= ram6[0xC0 + 2 * k] < 0xC8]
+            c = rnd.choice(inv) if inv else 0x98
+        else:
+            c = 0xC8 + rnd.randrange(0x38)
+        ram7[r7(rec) + 0x2C] = f
+        ram7[r7(rec) + 0x2E] = c
+        if rnd.random() < 0.5:                          # a character target
+            ram7[r7(rec) + 0x2F] = rnd.choice([0x80, 0x40, 0x20, 0x10, 0xF0])
+            ram7[r7(rec) + 0x30] = rnd.choice([0, 0x40])
+        else:
+            ram7[r7(rec) + 0x2F] = rnd.choice([0x80 >> rnd.randrange(8), 0xFF])
+            ram7[r7(rec) + 0x30] = rnd.choice([0x80, 0xC0])
     return ram6, ram7, zp
 
 
@@ -202,7 +245,7 @@ def to_gb(ram6, ram7, zp):
 
 # zero page bytes compared (results the battle code reads later; not the helpers' scratch $18-$2F)
 ZP_CMP = [a for a in range(0x30, 0x100) if a not in
-          set(PTRS + [p + 1 for p in PTRS] + [0x46, 0x47, 0x4A, 0x4B, 0xA9, 0xAB, 0x22, 0x23, 0x20, 0x21])]
+          set(PTRS + [p + 1 for p in PTRS] + [0x46, 0x47, 0x4A, 0x4B, 0x4C, 0x4D, 0xA9, 0xAB, 0x22, 0x23, 0x20, 0x21])]
 RAM7_SKIP = {0x78B5, 0x78B6}
 
 
@@ -236,13 +279,17 @@ def main():
         for k in range(n):
             ram6, ram7, zp = setup(rom, rnd, name)
             try:
-                res_n = nes_run(rom, ram6, ram7, zp, addr)
+                res_n = nes_run(rom, ram6, ram7, zp, addr, name in FLOW)
             except RuntimeError as e:
                 print('%s #%d: NES %s (state skipped)' % (name, k, e)); continue
             try:
                 res_g = gb.run(*to_gb(ram6, ram7, zp), num)
             except RuntimeError as e:
-                print("%s #%d: GB %s" % (name, k, e)); fails += 1; gb.close(); gb = GB(); continue
+                info = ''
+                if name == 'exec':
+                    w = ram7[0x7ACB - 0x7400]; rec = 0x7575 + 0x40 * (w & 0x7F) + (0x100 if w & 0x80 else 0) - 0x7400
+                    info = ' (who %02X flags %02X cmd %02X)' % (w, ram7[rec + 0x2C], ram7[rec + 0x2E])
+                print("%s #%d: GB %s%s" % (name, k, e, info)); fails += 1; gb.close(); gb = GB(); continue
             d = compare(name, res_n, res_g)
             if d:
                 fails += 1

@@ -771,25 +771,3 @@ fe_AF63:    ld hl, BZ + $2C
             jr nz, .b
             ret
 
-; HL = [$57] / [$59] / [$5B] + C
-p57:        ld a, [BZ + $57]
-            add c
-            ld l, a
-            ld a, [BZ + $58]
-            adc 0
-            ld h, a
-            ret
-p59:        ld a, [BZ + $59]
-            add c
-            ld l, a
-            ld a, [BZ + $5A]
-            adc 0
-            ld h, a
-            ret
-p5b:        ld a, [BZ + $5B]
-            add c
-            ld l, a
-            ld a, [BZ + $5C]
-            adc 0
-            ld h, a
-            ret

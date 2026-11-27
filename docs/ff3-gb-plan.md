@@ -65,7 +65,16 @@ Tables of FF3's code banks are filled from the ROM after assembling (`ROMDATA` i
 Test: `GB3N_TEST=1 python3 tools/gb3n/build.py --out build/ff3n_test.gbc`, then
 `python3 tools/gb3n/test/batdiff.py N [--seed S] [--only init,equip,monact,fight,magic,item,...]`.
 
+Bank 58 `B_BAT2`: battle flow (`batflow.s`); bank 0 $0450: shared helpers (`batlib.s`, `alg_call`).
+Test routines 10-13 (order, exec, over, cannon) run with NES banks $34/$35 mapped.
+
 ## Battle: still to write
+- Main loop bookkeeping: 34/81C3, 8213, 8271 (command use counts), 8295 (monster rows), 8306,
+  8374 (inventory / run flag), 874D / 87AA / 87BE, 9474 (near fatal), 9CE3 (init), 88A4 (rows).
+- Poison 35/BA41, victory 35/BB49 (+ level-up stats BF7C, give item BFB3).
+- Commands (34/986C: ours, writing the same records), messages / numerals / animations (ours,
+  reading FF3's message queue $78D5-$78EE, $7E4F / $7E5F, $7E99 / $7E9B), battle init 2E/9E8E
+  (formation, monster counts 2F/A0C8, graphics), random encounters 3D/BC5B.
 
 Formations: 2E/8000 battle -> (set, count id); 2E/8400 set: 2 palettes, 4 monsters; 2E/8A00
 counts (min / max nibbles, $2F $A0C8 rolled with FF3's RNG); graphics by 2E/8B00 size class
