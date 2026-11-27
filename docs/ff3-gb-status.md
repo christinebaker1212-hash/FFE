@@ -306,7 +306,13 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   the dialogue box as FF3's (3F/E213).
 - The magic menu's Swap (3C/96F5: Use / Swap / Item; two living members' spell lists exchanged).
 - Not yet in menus: FF3's "Effect... Strength rose by 5!" messages (t8200 $3F-$46) for equipment.
-- Not yet in battle: attack / spell animations, back attacks drawn flipped (FF3 3F/F942: the
+- Battle presentation from FF3's animation layer (banks $2F / $32 / $33), started: the monsters'
+  pre-attack flash (2F/B024: the attacker in the windows' palette every other frame, 8 frames), the
+  characters drawn by FF3's pose frames (32/9111 with its frame / position tables from the ROM;
+  2F/B607: standing, kneeling when weak or ailing, lying when dead, toad / mini; the graphics type
+  reloaded as 2F/B651). Test hook: GB3N_STORY=bat GB3N_BATTLE=id (Start fights that battle).
+- Not yet in battle: weapon swings and hits (33/A0C0, 32/9357, 32/97B2), spell / summon animations,
+  stone characters in the BG, back attacks drawn flipped (FF3 3F/F942: the
   monsters' tiles mirrored, the party at x $30), the airship's battle background.
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
