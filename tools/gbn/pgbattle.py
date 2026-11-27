@@ -287,11 +287,122 @@ def sil_page(page):
     return bytes(out)
 
 
-def build(rom, G=None):
-    """Earthgift's battle set: {bank: bytes} for its data, graphics and silhouette banks; the domains
-    (formation lists of 8) per floor kind; the formation of each boss"""
-    import postgame
+# Dawn of Souls' monsters by their English names (the official Dawn of Souls names): the 50 new ones
+# (GBA records 145-194), the 17 bonus bosses (128-144) and FF1's met in the shrines
+NEW_MONSTERS = ['Devil Wizard', 'Abyss Worm', 'Elm Gigas', 'Flare Gigas', 'Unicorn', 'Yellow Ogre', 'Mad Ogre',
+                'Mage Chimera', 'Yellow Dragon', 'Holy Dragon', 'Mythril Golem', 'Killer Shark', 'Death Manticore',
+                'Blood Tiger', 'Dark Eye', 'Bloody Eye', 'Flood Gigas', 'Poison Eagle', 'Black Goblin', 'Knocker',
+                'Desertpede', 'Gloom Widow', 'Duel Knight', 'Squidraken', 'Pharaoh', 'Bonesnatch', 'Silver Dragon',
+                'Black Dragon', 'Blue Troll', 'Earth Troll', 'Poison Naga', 'Earth Plant', 'Yamatano Orochi',
+                'Dark Elemental', 'Devil Hound', 'Sekhret', 'Catoblepas', 'Hundlegs', 'Undergrounder',
+                'Death Elemental', 'Wild Nakk', 'Dark Wolf', 'Rock Gargoyle', 'Sahagin Queen', 'Reaper', 'Python',
+                'Skuldier', 'Red Flan', 'Prototype', 'Revenant']
+BOSSES = ['Echidna', 'Cerberus', 'Ahriman', 'Two-Headed Dragon', 'Scarmiglione', 'Scarmiglione ', 'Cagnazzo',
+          'Barbariccia', 'Rubicante', 'Gilgamesh', 'Omega', 'Shinryu', 'Atomos', 'Typhon', 'Orthros',
+          'Phantom Train', 'Death Gaze']
+MON_REC = dict({n: 145 + i for i, n in enumerate(NEW_MONSTERS)}, **{n: 128 + i for i, n in enumerate(BOSSES)},
+               **{'White Dragon': 66, 'Red Dragon': 67, 'Dragon Zombie': 68, 'Green Dragon': 106,
+                  'Blue Dragon': 107})
+SECOND_FORM = {'Scarmiglione': 'Scarmiglione '}       # (fought right after the first)
+L_SPELL = lambda lv, k: 8 * (lv - 1) + k                # FF1's spell number: level, slot (0-3 white, 4-7 black)
+S_LIT3, S_RUB, S_ICE3, S_FIR3, S_BANE, S_STUN = 44, 45, 52, 36, 37, 47
+S_LIT2, S_ICE2, S_FIR2, S_SLO2, S_FAST, S_STOP, S_ZAP, S_XXXX = 22, 31, 20, 39, 29, 61, 62, 63
+A_POISON, A_TOXIC, A_INFERNO, A_CREMATE, A_TORNADO, A_SWIRL, A_NUCLEAR, A_INK, A_STINGER, A_SNORT, A_GAZE, \
+    A_FLASH = 16, 18, 12, 13, 25, 24, 20, 21, 22, 19, 3, 4
+# the bonus bosses' attacks: their Dawn of Souls abilities (FINAL FANTASY wiki) as FF1's nearest spell / enemy
+# ability (the remake's own scripts are not FF1 records)
+BOSS_AI.update({
+    'Scarmiglione': (0x30, 0x30, [S_LIT3, S_BANE, S_LIT2, S_ICE2] * 2, [A_POISON] * 4),
+    'Scarmiglione ': (0x30, 0x40, [S_LIT3, S_BANE, S_STUN, S_LIT3] * 2, [A_TOXIC, A_POISON] * 2),
+    'Cagnazzo': (0x40, 0x30, [S_ICE3, S_ICE2, S_ICE3, S_SLO2] * 2, [A_BLIZZARD, A_INK] * 2),
+    'Barbariccia': (0x40, 0x40, [S_LIT3, S_ZAP, S_LIT3, S_LIT2] * 2, [A_TORNADO, A_SWIRL] * 2),
+    'Rubicante': (0x40, 0x40, [S_FIR3, S_FIR3, S_FIR2, S_FIR3] * 2, [A_INFERNO, A_CREMATE] * 2),
+    'Gilgamesh': (0x20, 0x20, [S_FAST, S_FAST, S_FIR2, S_ICE2] * 2, [A_CRACK] * 4),
+    'Atomos': (0x40, 0x30, [S_QUAKE, S_SLO2, S_STOP, S_QUAKE] * 2, [A_SWIRL] * 4),
+    'Omega': (0x40, 0x40, [S_FLARE, S_LIT3, S_ICE3, S_FIR3] * 2, [A_NUCLEAR, A_FLASH] * 2),
+    'Shinryu': (0x50, 0x40, [S_FLARE, S_ICE3, S_FIR3, S_LIT3] * 2, [A_TORNADO, A_BLIZZARD, A_INFERNO, A_THUNDER]),
+    'Typhon': (0x00, 0x50, [], [A_SNORT, A_TORNADO] * 2),
+    'Orthros': (0x30, 0x40, [S_ICE2, S_ICE3] * 4, [A_INK, A_STINGER] * 2),
+    'Phantom Train': (0x30, 0x40, [S_RUB, S_BANE, S_RUB, S_STUN] * 2, [A_TOXIC, A_POISON] * 2),
+    'Death Gaze': (0x40, 0x40, [S_RUB, S_XXXX, S_ICE3, S_LIT3] * 2, [A_GAZE, A_TORNADO] * 2)})
+PG_BANKS = {'EG': (119, 121, 123, 126)}             # (data, graphics (2), silhouettes (2), Super Game Boy)
+
+
+def gba_spell(s):
+    """a Dawn of Souls spell number (white 1-32, black 33-64: level by level, four each) -> FF1's (or None)"""
+    if 1 <= s <= 0x20: return L_SPELL((s - 1) // 4 + 1, (s - 1) % 4)
+    if 0x21 <= s <= 0x40: return L_SPELL((s - 0x21) // 4 + 1, 4 + (s - 0x21) % 4)
+    return None
+
+
+def gba_ai(G, k):
+    """Dawn of Souls' enemy AI record k (FF1's 16-byte format) in FF1's numbers: its spells mapped, abilities past
+    FF1's 26 dropped"""
+    g = G.d[0x2253DC + 16 * k:0x2253DC + 16 * k + 16]
+    sp = [gba_spell(x) for x in g[2:10] if x != 0xFF]
+    sp = [x for x in sp if x is not None]
+    ab = [x for x in g[11:15] if x != 0xFF and x < 26]
+    mc = g[0] if sp else 0
+    ac = g[1] if ab else 0
+    return bytes([mc, ac]) + bytes((sp + [0xFF] * 8)[:8]) + b'\xff' + bytes((ab + [0xFF] * 4)[:4]) + b'\xff'
+
+
+def plan_formations(s, bands=(0, 1, 2, 3)):
+    """the shrine's formations (one per distinct monster group in its tables) and domains: (forms [groups],
+    domains {(area index, band): 8 formation numbers}, areas [names])"""
+    import shrines
+    sh = shrines.SHRINES[s]
+    enc = shrines.ENCOUNTERS[sh['key']]
+    areas = sorted({a for _, _, _, a in sh['floors'] if a})
+    forms, fid = [], {}
+    tabs = {}
+    for ai, a in enumerate(areas):
+        bands_ = enc.get(a) or [[(1, [(n, 1, 1)]) for n in b] for b in enc[a + ' (fixed)']]
+        for bi, lst in enumerate(bands_):
+            if bi not in bands: continue
+            out = []
+            for rate, grp in lst:
+                key = tuple(grp)
+                if key not in fid:
+                    fid[key] = len(forms); forms.append(list(grp))
+                out.append((fid[key], rate))
+            tabs[(ai, bi)] = out
+    return forms, tabs, areas
+
+
+def alloc_pages(forms, size, n_pages):
+    """pages (2 small + 2 large graphics each) so that each formation's monsters share one: [page sets], the
+    page of each formation"""
+    pages = []                                      # [{'s': [names], 'l': [names]}]
+    fpage = []
+    for f in sorted(range(len(forms)), key=lambda f: -len({n for n, _, _ in forms[f]})):
+        need = {n for n, _, _ in forms[f]}
+        ns = [n for n in need if not size[n]]; nl = [n for n in need if size[n]]
+        best = None
+        for pi, p in enumerate(pages):
+            ms = [n for n in ns if n not in p['s']]; ml = [n for n in nl if n not in p['l']]
+            if len(p['s']) + len(ms) <= 2 and len(p['l']) + len(ml) <= 2:
+                cost = len(ms) + len(ml)
+                if best is None or cost < best[0]: best = (cost, pi)
+        if best is None:
+            pages.append({'s': [], 'l': []}); best = (0, len(pages) - 1)
+        p = pages[best[1]]
+        for n in ns:
+            if n not in p['s']: p['s'].append(n)
+        for n in nl:
+            if n not in p['l']: p['l'].append(n)
+        fpage.append((f, best[1]))
+    assert len(pages) <= n_pages, 'monster pages: %d > %d' % (len(pages), n_pages)
+    return pages, dict(fpage)
+
+
+def build(rom, s=0, G=None, banks=None, part=0):
+    """shrine s's battle set: {bank: bytes} for its data, graphics, silhouette and Super Game Boy banks; the
+    domains (formation lists of 8) by (area index, band); the formation of each boss"""
+    import postgame, shrines
+    sh = shrines.SHRINES[s]
     G = G or gba.Gba(postgame.GBA_PATH)
+    PGB_DATA, PGB_CHR, PGB_SIL, PGB_SGB = banks or PG_BANKS[sh['key']]
     base = bytearray(battle.data_bank(rom))
     ff1chr = battle.chr_banks(rom)
     def ff1_page(p):
@@ -301,29 +412,65 @@ def build(rom, G=None):
     for e in range(128):
         fam_of.setdefault(gba.monster_picture(G, e)[0], e)
     fg = ff1_graphics(rom)
-    pages = [bytearray(0x800) for _ in range(16)]
-    pals = []                                       # the set's palettes (BTL_PALS)
-    enemies = []                                    # (name, record bytes)
-    mon = {}                                        # name -> (enemy id, page, graphic, palette index, large)
-    small_slots = [(p, g) for p in range(3) for g in (0, 2)]
-    large_slots = [(p, g) for p in range(3) for g in (1, 3)]
-    for name, rec in EG_MONSTERS:
+    set_bands, set_bosses = sh['sets'][part]
+    forms_g, tabs, areas = plan_formations(s, set_bands)
+    names = sorted({n for f in forms_g for n, _, _ in f}, key=lambda n: (MON_REC[n], n))
+    size, src = {}, {}
+    for n in names:                                 # each monster: FF1's family picture (its own for FF1's)
+        rec = MON_REC[n]
         tp, w, h, px, cols = gba.monster_picture(G, rec)
-        fam = fam_of[tp]
+        fam = rec if rec < 128 else fam_of[tp]
         fpage, fgr, fpal = fg[fam]
-        large = fgr & 1
-        p, g = (large_slots if large else small_slots).pop(0)
-        src = ff1_page(fpage)
-        t0, n = SLOT_T0[fgr], SLOT_N[fgr]
-        pages[p][16 * SLOT_T0[g]:16 * (SLOT_T0[g] + n)] = src[16 * t0:16 * (t0 + n)]
-        famcols = gba.monster_picture(G, fam)[4]
-        pals.append(recolour(fpal, famcols, cols))
-        mon[name] = (len(enemies), p, g, len(pals) - 1, large)
-        enemies.append((name, stats(G, rec)))
+        size[n] = fgr & 1
+        pal = fpal if rec < 128 else recolour(fpal, gba.monster_picture(G, fam)[4], cols)
+        src[n] = (fpage, fgr, pal)
+    bosses_n = [b for k, (b, _) in enumerate(sh['bosses']) if k in set_bosses]
+    bosses_n += [SECOND_FORM[b] for b in bosses_n if b in SECOND_FORM]
+    def trim(grp):                                  # (FF1: two small and two large pictures a page)
+        out, ns, nl = [], 0, 0
+        for e in grp:
+            if size[e[0]]:
+                if nl < 2 or e[0] in [x[0] for x in out]: out.append(e); nl += e[0] not in [x[0] for x in out[:-1]]
+            elif ns < 2 or e[0] in [x[0] for x in out]: out.append(e); ns += e[0] not in [x[0] for x in out[:-1]]
+        return out
+    forms_g = [trim(f) for f in forms_g]
+    pages_m, fpage = alloc_pages(forms_g, size, 16 - len(bosses_n))
+    pages = [bytearray(0x800) for _ in range(16)]
+    pals, enemies, eid, pal_of, slot_of = [], [], {}, {}, {}
+    used_ai = set()
+    for n in names:
+        eid[n] = len(enemies)
+        r = stats(G, MON_REC[n])
+        enemies.append([n, r])
+        pal_of[n] = len(pals); pals.append(src[n][2])
+        if MON_REC[n] < 128: used_ai.add(r[7])
+    for pi, p in enumerate(pages_m):                # the pages: each monster's FF1 picture in its slot
+        for kind, lst in (('s', p['s']), ('l', p['l'])):
+            for j, n in enumerate(lst):
+                g = (0, 2)[j] if kind == 's' else (1, 3)[j]
+                fpage_, fgr, _ = src[n]
+                t0, cnt = SLOT_T0[fgr], SLOT_N[fgr]
+                pages[pi][16 * SLOT_T0[g]:16 * (SLOT_T0[g] + cnt)] = ff1_page(fpage_)[16 * t0:16 * (t0 + cnt)]
+                slot_of[(pi, n)] = g
+    ai = bytearray(base[0x1600:0x1600 + 48 * 16])   # (AI: FF1's records in use kept; Dawn of Souls' new ones
+    free_ai = [k for k in range(44) if k not in used_ai]   #   in the slots no monster here uses)
+    ai_map = {}
+    for e in enemies:
+        if MON_REC[e[0]] >= 128 and e[1][7] != 0xFF:
+            k = e[1][7]
+            if k >= 44:
+                if k not in ai_map:
+                    ai_map[k] = free_ai.pop(0)
+                    ai[16 * ai_map[k]:16 * ai_map[k] + 16] = gba_ai(G, k)
+                e[1][7] = ai_map[k]
+            elif k not in used_ai and k not in ai_map:
+                ai_map[k] = k; used_ai.add(k)
+    first_boss_page = len(pages_m)
     bosses = []
-    for k, (name, rec) in enumerate(EG_BOSSES):
+    for k, name in enumerate(bosses_n):
+        rec = MON_REC[name]
         pic, blk, bp = boss_picture(G, rec, top=name in HANGING)
-        p = 3 + k
+        p = first_boss_page + k
         tsa = bytearray(64); t = 0x12
         for cy in range(8):
             for cx in range(8):
@@ -331,34 +478,51 @@ def build(rom, G=None):
                 if not any(any(r) for r in rows): continue
                 pages[p][16 * t:16 * t + 16] = gb_tile_px(rows)
                 tsa[8 * cy + cx] = t; t += 1
-        attr = bytearray(16)                         # FF1's attribute grid (4 x 4 bytes over the
-        r0 = 0 if name in HANGING else 2             #   fiend's 16 x 16 blocks: its first cell is NES
-        for by in range(4):                          #   column 4, row 6 + its cell row)
+        attr = bytearray(16)
+        r0 = 0 if name in HANGING else 2
+        for by in range(4):
             for bx in range(4):
-                v = 1 + blk[by][bx]                  # (BG palette 1 = palette A, 2 = palette B)
-                X, Y = 4 + 2 * bx, 6 + r0 + 2 * by   # NES tile column / row of the block
-                ai = (Y // 4 - 1) * 4 + X // 4
-                sh = (Y & 2) * 2 + (X & 2)
-                attr[ai] |= v << sh
+                v = 1 + blk[by][bx]
+                X, Y = 4 + 2 * bx, 6 + r0 + 2 * by
+                ai_ = (Y // 4 - 1) * 4 + X // 4
+                sh_ = (Y & 2) * 2 + (X & 2)
+                attr[ai_] |= v << sh_
         r = stats(G, rec)
-        ai_rec = BOSS_AI[name]
         r[6] = 0xFF
-        r[7] = (44 + k) if ai_rec else 0xFF
-        enemies.append((name, r))
+        r[7] = (44 + k) if BOSS_AI.get(name) and k < 4 else 0xFF
+        if k >= 4 and BOSS_AI.get(name):            # (a fifth picture: the second form; its AI in a free slot)
+            slot = free_ai.pop(0); r[7] = slot
+            mc, ac, sp, ab = BOSS_AI[name]
+            ai[16 * slot:16 * slot + 16] = (bytes([mc, ac]) + bytes((sp + [0xFF] * 8)[:8]) + b'\xff' +
+                                            bytes((ab + [0xFF] * 4)[:4]) + b'\xff')
+        enemies.append([name.strip(), r])
         pals += bp
         bosses.append((name, len(enemies) - 1, p, k, len(pals) - 2, tsa + attr, pic))
-    # formations: the monsters', then the bosses'
-    forms = []
-    fid = {}
-    for name, (e, p, g, pi, large) in mon.items():
+    forms, fid = [], {}
+    for f, grp in enumerate(forms_g):
+        pi = fpage[f]
         fd = bytearray(16)
-        fd[0] = (0x10 if large else 0x00) | p
-        fd[1] = g
-        fd[2:6] = bytes([e, 0, 0, 0])
-        fd[10] = fd[11] = pi
+        smalls = [n for n, _, _ in grp if not size[n]]; larges = [n for n, _, _ in grp if size[n]]
+        ty = 2 if smalls and larges else (1 if larges else 0)
+        fd[0] = ty << 4 | pi
+        pl = []
+        for gi, (n, lo, hi) in enumerate(grp[:4]):
+            fd[1] |= slot_of[(pi, n)] << (2 * gi)
+            fd[2 + gi] = eid[n]
+            fd[6 + gi] = min(lo, 15) << 4 | min(hi, 15)
+            pn = pal_of[n]
+            if pn not in pl and len(pl) < 2: pl.append(pn)
+            if pn in pl: b = pl.index(pn)
+            else:                                   # (a third colour set: the nearer of the two)
+                b = min((0, 1), key=lambda j: sum(abs(data.lum(x) - data.lum(y)) for x, y in
+                                                  zip(pals[pn][1:], pals[pl[j]][1:])))
+            fd[13] |= b << (7 - gi)
+        fd[10] = pl[0]; fd[11] = pl[1] if len(pl) > 1 else pl[0]
         fd[12] = 4
-        fid[name] = len(forms)
+        fd[14], fd[15] = fd[6], fd[7]
+        fid[f] = len(forms)
         forms.append(fd)
+    boss_form0 = len(forms)
     for name, e, p, k, pi, _, _ in bosses:
         fd = bytearray(16)
         fd[0] = 0x30 | p
@@ -367,52 +531,48 @@ def build(rom, G=None):
         fd[6] = 0x11
         fd[10], fd[11] = pi, pi + 1
         fd[13] = 1                                   # (no running)
-        fid[name] = len(forms)
         forms.append(fd)
-    for kind, lst in EG_ENC.items():                 # quantities set per formation (one each)
-        for name, lo, hi, rate in lst:
-            fd = forms[fid[name]]
-            if fd[6] == 0: fd[6] = lo << 4 | hi; fd[14] = fd[6]
-    # the domains: 8 slots weighted by FF1's lut_FormationWeight (bank's $7F00, 64 entries)
-    wt = base[0x3F00:0x3F40]
-    share = [sum(1 for x in wt if x == s) for s in range(8)]
+    assert len(forms) <= 128 and len(enemies) <= 51, (len(forms), len(enemies))
+    wt = base[0x3F00:0x3F40]                         # the domains: 8 slots weighted by FF1's lut_FormationWeight
+    share = [sum(1 for x in wt if x == q) for q in range(8)]
     domains = {}
-    for kind, lst in EG_ENC.items():
+    for key, lst in tabs.items():
         slots = [None] * 8
-        want = {name: rate for name, lo, hi, rate in lst}
-        got = {name: 0 for name in want}
-        for s in sorted(range(8), key=lambda s: -share[s]):
-            name = max(want, key=lambda n: want[n] - got[n])
-            slots[s] = fid[name]; got[name] += share[s]
-        domains[kind] = bytes(slots)
-    # the data bank
+        want = {}
+        for f, rate in lst: want[f] = want.get(f, 0) + rate
+        got = {f: 0 for f in want}
+        for q in sorted(range(8), key=lambda q: -share[q]):
+            f = max(want, key=lambda f: want[f] - got[f])
+            slots[q] = fid[f]; got[f] += share[q]
+        domains[key] = bytes(slots)
     def put(a, d): base[a - 0x4000:a - 0x4000 + len(d)] = d
     put(0x4000, b''.join(bytes(f) for f in forms).ljust(128 * 16, b'\0'))
-    put(0x4C00, b''.join(bytes(r) for _, r in enemies).ljust(128 * 20, b'\0'))
-    ai = bytearray(base[0x1600:0x1600 + 48 * 16])
+    put(0x4C00, b''.join(bytes(r) for _, r in enemies).ljust(51 * 20, b'\0'))
     for name, e, p, k, pi, _, _ in bosses:
-        a = BOSS_AI[name]
-        if not a: continue
+        a = BOSS_AI.get(name)
+        if not a or k >= 4: continue
         mc, ac, sp, ab = a
-        rec = bytes([mc, ac]) + bytes((sp + [0xFF] * 8)[:8]) + b'\xff' + bytes((ab + [0xFF] * 4)[:4]) + b'\xff'
-        ai[16 * (44 + k):16 * (45 + k)] = rec
+        ai[16 * (44 + k):16 * (45 + k)] = (bytes([mc, ac]) + bytes((sp + [0xFF] * 8)[:8]) + b'\xff' +
+                                           bytes((ab + [0xFF] * 4)[:4]) + b'\xff')
     put(0x5600, bytes(ai))
-    assert len(pals) <= 64
+    assert len(pals) <= 64, len(pals)
     put(0x5C80, b''.join(bytes(p) for p in pals).ljust(256, b'\0'))
-    sh = bytearray()                                 # DMG shades per formation (battle.dmg_shades)
+    shd = bytearray()                                # DMG shades per formation (battle.dmg_shades)
     for fd in forms:
         pa, pb = pals[fd[10]], pals[fd[11]]
         msh = data.map_shades([[0x0F, 0x00, 0x0F, 0x30], pa, pb, [0x0F, 0x00, 0x0F, 0x30]])
         sa = [msh[c] for c in pa]; sb = [msh[c] for c in pb]
         sa[0] = sb[0] = 3
-        sh += bytes(sa) + bytes(sb)
-    put(0x5E00, bytes(sh).ljust(128 * 8, b'\0'))
-    names = [battle.enc(n) for n, _ in enemies] + [b''] * (128 - len(enemies))
-    nt = battle.strtab(0x6200, names)
+        shd += bytes(sa) + bytes(sb)
+    put(0x5E00, bytes(shd).ljust(128 * 8, b'\0'))
+    nms = [battle.enc(n) for n, _ in enemies] + [b''] * (128 - len(enemies))
+    nt = battle.strtab(0x6200, nms)
     assert len(nt) <= 0x600
     put(0x6200, nt)
     hands = bytearray(10)
     for name, e, p, k, pi, tsa, pic in bosses:
+        if k >= 4:                                   # (the second form: its first form's picture slot)
+            continue
         put(0x6A00 + 0x50 * k, tsa)
         pts = [(x, y) for y in range(64) for x in range(64) if pic[y][x]]
         ys = [y for _, y in pts]; mid = (min(ys) + max(ys)) // 2
@@ -420,10 +580,12 @@ def build(rom, G=None):
         hands[2 * k:2 * k + 2] = bytes([left, mid - (16 if name in HANGING else 0)])
     hands[8:10] = base[0x3FE8:0x3FEA]
     put(0x7FE0, bytes(hands))
+    for kd, dom in domains.items():                  # the domains: $5000 + 32 area + 8 band (pg.s pg_dom)
+        put(0x5000 + 32 * kd[0] + 8 * kd[1], dom)
     chr0 = b''.join(bytes(pg) for pg in pages[:8]); chr1 = b''.join(bytes(pg) for pg in pages[8:])
     sil0 = b''.join(sil_page(bytes(pg)) for pg in pages[:8]); sil1 = b''.join(sil_page(bytes(pg)) for pg in pages[8:])
-    banks = {PGB_DATA: bytes(base), PGB_CHR: chr0, PGB_CHR + 1: chr1, PGB_SIL: sil0, PGB_SIL + 1: sil1}
-    import sgb                                       # (the Super Game Boy's battle colours: a copy of
-    banks[PGB_SGB] = sgb.bank(rom, [(pals[fd[10]], pals[fd[11]]) for fd in forms])   #   its bank)
-    return dict(banks=banks, domains=domains, boss_forms=[fid[n] for n, *_ in bosses],
-                forms=fid, names=[n for n, _ in enemies])
+    out = {PGB_DATA: bytes(base), PGB_CHR: chr0, PGB_CHR + 1: chr1, PGB_SIL: sil0, PGB_SIL + 1: sil1}
+    import sgb
+    out[PGB_SGB] = sgb.bank(rom, [(pals[fd[10]], pals[fd[11]]) for fd in forms])
+    return dict(banks=out, domains=domains, areas=areas, boss_form0=boss_form0, boss_names=bosses_n,
+                names=[n for n, _ in enemies], hanging=[n in HANGING for n in bosses_n])

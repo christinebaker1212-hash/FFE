@@ -260,11 +260,15 @@ def cave_floor(G, rec, role, n_chests, pc=None, floor_chips=(), stairs_out=True,
     # the start: the entrance floor's corridor end (FF1's stairs up there: the way out), else the
     # walkable cell farthest from the stairs (boss floor: the lowest, with the way out below it)
     cand = sorted(walk, key=lambda p: (-p[1], p[0]))
+    exit_ = None
     if role in ('entrance', 'boss'):
         ex = next((q for q in cand if (q[0], q[1] - 1) in walk and q not in stairs), cand[0])
-        put(ex[0], ex[1], pc['up'])
         start = (ex[0], ex[1] - 1)
-        walk.discard(ex)
+        if role == 'entrance':
+            put(ex[0], ex[1], pc['up'])
+            walk.discard(ex)
+        else:                                       # (a boss floor: the light out appears there, pg.s)
+            exit_ = (ex[0] + ox, ex[1] + oy)
     if role == 'entrance':
         top = min(boxes, key=lambda b: b[1]) if boxes else None
         if top:                                     # the way down: in the top room, its middle
@@ -316,7 +320,7 @@ def cave_floor(G, rec, role, n_chests, pc=None, floor_chips=(), stairs_out=True,
         for i, p in enumerate(picked):
             put(p[0], p[1], pc['chest_corr'][0]); chests.append((p[0] + ox, p[1] + oy, 'corr'))
     return dict(map=bytes(v for row in out for v in row), start=(start[0] + ox, start[1] + oy),
-                chests=chests, bosses=bosses, stairs=[(x + ox, y + oy) for x, y in stairs],
+                chests=chests, bosses=bosses, stairs=[(x + ox, y + oy) for x, y in stairs], exit=exit_,
                 w=w, h=h, ox=ox, oy=oy)
 
 
@@ -340,9 +344,29 @@ FLOOD_WATER = {161: (0xF1,)}                    # (the flooded village: its cano
 PALMAP_OUT = None
 
 
+_FLOORS = {}
+
+
+def ts_banks(rom):
+    """the looks' tilesets: {tkey: ROM bank}, a bank each after the maps; and {tileset number: FF1 tileset}"""
+    fl = floors(rom)
+    tsb, nb = {}, PG_END + 64
+    for e in fl:
+        if e['tkey'] not in tsb:
+            tsb[e['tkey']] = nb; nb += 1
+    assert nb <= PG_BATTLE0, 'post-game banks: maps and tilesets end at %d' % nb
+    return tsb, {(b - 8) & 0xFF: (k[0] if isinstance(k, tuple) else 2) for k, b in tsb.items()}
+
+
 def floors(rom, G=None):
     """the post-game's maps: [dict(map, shrine, rec, role, area, f (the floor), ov (map_pack overrides),
     tkey (its tileset: one bank per distinct tileset))]"""
+    if 'all' in _FLOORS: return _FLOORS['all']
+    _FLOORS['all'] = _floors(rom, G)
+    return _FLOORS['all']
+
+
+def _floors(rom, G=None):
     G = G or gba.Gba(GBA_PATH)
     to, ochr, opal = outdoor_tileset(rom)
     looks = {}
@@ -376,8 +400,10 @@ def floors(rom, G=None):
             bx, by, fl = f['bosses'][k]
             objs[3 * k:3 * k + 3] = bytes([PG_OBJ0 + bk, fl | bx, by])   # (in a room or not, still)
             k += 1
+        if f.get('exit'):                           # (the light out: hidden until a boss is beaten)
+            objs[3 * k:3 * k + 3] = bytes([PG_OBJ0 + 4, 0x40 | f['exit'][0], f['exit'][1]])
         ov['objs'] = bytes(objs)
-        ov['obj_gfx'] = {PG_OBJ0 + k: ORB_GFX for k in range(4)}
+        ov['obj_gfx'] = {PG_OBJ0 + k: ORB_GFX for k in range(5)}
         out.append(dict(map=PG_MAP0 + i, shrine=s, rec=rec, role=role, area=area, f=f, ov=ov, tkey=tkey))
     return out
 
@@ -538,40 +564,175 @@ def outdoor_floor(G, rec, base, n_chests):
                 stairs=[stairs], w=W, h=W, ox=0, oy=0)
 
 
-# Earthgift's treasure (Dawn of Souls; the FINAL FANTASY wiki's lists per depth): B1-B4, then the
-# boss floor's own chest (after Ahriman)
-EG_TREASURE = [['Hi-Potion', "Spider's Silk", 'White Curtain', 'Remedy'],
-               ['Vampire Fang', 'Blue Curtain', 'White Fang', 'Kenpogi'],
-               ['Potion', 'Speed Drink', 'Protect Drink', 'Black Cowl'],
-               ['Red Fang', 'Ether', 'Silver Apple', 'Elven Cloak']]
-EG_FIXED = ['Megalixir']
+_BATTLES = {}
 
 
-def pg_source(bank):
-    """the run's data in the post-game code bank: the treasure per depth, the fixed chests"""
-    db = lambda xs: '            db ' + ', '.join('$%02X' % x for x in xs) + '\n'
+def battles(rom):
+    """every shrine's battle sets (pgbattle.build, once): [(shrine, part, banks, result)]; banks after the maps
+    and the looks' tilesets (PG_FREE on), Earthgift's where it has always been"""
     import pgbattle
-    fy = [0x03 if n in pgbattle.HANGING else 0x23 for n, _ in pgbattle.EG_BOSSES]
-    return ('section bank %d, $7F00\npg_treas:\n' % bank +
-            ''.join(db([item_code(n) for n in row]) for row in EG_TREASURE) +
-            'pg_fixed:\n' + db([item_code(n) for n in EG_FIXED] + [0] * 7) + 'pg_fy:\n' + db(fy))
+    if 'all' in _BATTLES: return _BATTLES['all']
+    G = gba.Gba(GBA_PATH)
+    out = []
+    nb = PG_BATTLE0
+    for s, sh in enumerate(shrines.SHRINES):
+        for part in range(len(sh['sets'])):
+            if sh['key'] == 'EG': bk = pgbattle.PG_BANKS['EG']
+            else:
+                bk = (nb, nb + 1, nb + 3, nb + 5); nb += 6
+            out.append((s, part, bk, pgbattle.build(rom, s, G, bk, part)))
+    assert nb <= 256, nb
+    _BATTLES['all'] = out
+    return out
+
+
+PG_BATTLE0 = 232                 # (the new shrines' battle banks: 232-249; build.py checks the maps and
+                                 #   looks end below)
+
+
+def gold_code(rom, n):
+    """an amount of gil -> the FF1 gold chest code nearest to it (FF1's chest amounts)"""
+    pr = rom.rd(0x0D, 0xBC00, 0x200)
+    used = set(rom.rd(0x00, 0xB100, 0x100))
+    best = min((c for c in range(0x6C, 0xB0) if c in used),
+               key=lambda c: abs((pr[2 * c] | pr[2 * c + 1] << 8) - n))
+    return best
+
+
+def gift(rom, name):
+    """a Dawn of Souls treasure -> the gift word pg.s gives (None: not in this build yet)"""
+    import re
+    m = re.match(r'(\d+) gil', name)
+    if m: return gold_code(rom, int(m.group(1)))
+    for k, (n, code, _, _) in enumerate(NEW_ITEMS):
+        if n == name: return 0x100 + k
+    for n, aid, *_ in NEW_ARMOUR:
+        if n == name: return 0x300 + aid
+    ff1 = {'Potion': 0x19, 'Antidote': 0x1A, 'Gold Needle': 0x1B, 'Tent': 0x17, 'Cottage': 0x18}
+    if name in ff1: return ff1[name]
+    return None
+
+
+T_HELD = "A mysterious power holds you back. Defeat what dwells on this floor first."
+
+
+def pg_source(rom, bank=116):
+    """the shrines' data in the post-game code bank (pg.s): boss depths and floors, pools, entrances, doors,
+    orbs, boss formations / second forms / floors / picture rows, treasure lists per depth, fixed chests"""
+    import pgbattle
+    db = lambda xs: '            db ' + ', '.join('$%02X' % x for x in xs) + '\n'
+    dw = lambda xs: '            dw ' + ', '.join(xs) + '\n'
+    bt = battles(rom)
+    S = shrines.SHRINES
+    out = 'section bank %d, $5000\n' % bank
+    bdep, bdmap, bform, b2, bfl, fy = [], [], [], [], [], []
+    for s, sh in enumerate(S):
+        deps = sorted(sh['boss_depths'])
+        bdep += deps + [0] * (4 - len(deps))
+        bdmap += [map_of(s, m) for m in sh['boss_maps']] + [0] * (4 - len(sh['boss_maps']))
+        for k, (name, bmap) in enumerate(sh['bosses']):
+            part = next(i for i, (_, bs) in enumerate(sh['sets']) if k in bs)
+            r = next(r for (s_, p_, _, r) in bt if s_ == s and p_ == part)
+            j = r['boss_names'].index(name)
+            bform.append(r['boss_form0'] + j)
+            sf = pgbattle.SECOND_FORM.get(name)
+            b2.append(r['boss_form0'] + r['boss_names'].index(sf) if sf else 0)
+            bfl.append(sh['boss_maps'].index(bmap))
+            fy.append(0x03 if name in pgbattle.HANGING else 0x23)
+    out += 'pg_bdep:\n' + db(bdep) + 'pg_bdmap:\n' + db(bdmap)
+    out += 'pg_bform:\n' + db(bform) + 'pg_b2:\n' + db(b2) + 'pg_bfl:\n' + db(bfl) + 'pg_fy:\n' + db(fy)
+    out += 'pg_npool:\n' + db([len(sh['pool']) for sh in S])
+    out += 'pg_ent:\n' + db([map_of(s, sh['floors'][0][0]) for s, sh in enumerate(S)])
+    out += 'pg_door:\n' + db([v for sh in S for v in sh['door']])
+    out += 'pg_orb:\n' + ''.join('            db low(ORBS + %d)\n' % sh['orb'] for sh in S)
+    out += 'pg_pool:\n' + dw(['pg_pool%d' % s for s in range(4)])
+    for s, sh in enumerate(S):
+        out += 'pg_pool%d:\n' % s + ''.join(db([map_of(s, g[0]), len(g)]) for g in sh['pool'])
+    fixed = []                                      # (the fixed chests, all shrines: their gifts)
+    out += 'pg_tl:\n' + dw(['pg_tl%d' % s for s in range(4)])
+    for s, sh in enumerate(S):
+        tr = shrines.TREASURE[sh['key']]
+        rows = []
+        for d in range(sh['depths'] + 1):
+            a_, b_ = tr.get(d, ([], []))
+            if d in sh['boss_depths']: a_, b_ = [], []
+            labs = []
+            for j, lst in enumerate((a_, b_)):
+                g = [x for x in (gift(rom, n) for n in lst) if x is not None]
+                if g:
+                    labs.append('pg_tr%d_%d_%d' % (s, d, j))
+                    rows.append('pg_tr%d_%d_%d:\n' % (s, d, j) + db([len(g)]) +
+                                dw(['$%04X' % x for x in g]))
+                else: labs.append('0')
+            out_line = labs
+            out += ('pg_tl%d:\n' % s if d == 0 else '') + dw(out_line)
+        out += ''.join(rows)
+        for m, name in sh.get('fixed', {}).items():
+            fixed.append(gift(rom, name) or 0)
+        if sh['key'] == 'EG': fixed.append(gift(rom, 'Megalixir'))
+    out += 'pg_fixed:\n' + dw(['$%04X' % x for x in fixed + [0] * (8 - len(fixed))])
+    return out
+
+
+def fixed_index(s, rec):
+    """the fixed chest number of shrine s's boss floor rec (pg_fixed's order)"""
+    k = 0
+    for s_, sh in enumerate(shrines.SHRINES):
+        for m in sh.get('fixed', {}):
+            if (s_, m) == (s, rec): return k
+            k += 1
+        if sh['key'] == 'EG':
+            if s_ == s: return k
+            k += 1
+    return None
+
+
+OW_CARDIA = 0x67                 # (FF1's Cardia cave mouth: Hellfire's door looks like it)
+PG_ENT_MT2 = 0x7C
 
 
 def overworld_patch():
-    """the shrine's door on the overworld: a cave mouth with its own entrance number"""
+    """the shrines' doors on the overworld: cave mouths with the post-game's entrance number"""
     data.OW_MT_PATCH[PG_ENT_MT] = (OW_CAVE, (0x0E, 0x80 | PG_ENT))
-    data.OW_ROW_PATCH.append((PG_OWX, PG_OWY, PG_ENT_MT))
+    data.OW_MT_PATCH[PG_ENT_MT2] = (OW_CARDIA, (0x0E, 0x80 | PG_ENT))
+    for sh in shrines.SHRINES:
+        x, y = sh['door']
+        data.OW_ROW_PATCH.append((x, y, PG_ENT_MT2 if sh['key'] == 'HF' else PG_ENT_MT))
 
 
 # Dawn of Souls' words (its message table, retranslated in the project's style; the official English
-# a guide): 640 at the shrine's door, 648-651 the bosses (Echidna, Cerberus, Ahriman, the Two-Headed
-# Dragon: matched by the official quotes)
-T_SEALED = ("This is the Earthgift Shrine. Long ago, they say, one could enter, but since the earth "
-            "began to rot, no one has been able to get in.")
-T_BOSS = ["You did well to come this far... but this is where your journey ends!",
-          "I'll grant you this much for making it so far... but here you die!",
-          "There is nothing anywhere that can stop me! You, too, will die here by my hand!",
-          "Fwahahaha... Let everything vanish! Die, Warriors of Light!"]
+# a guide): 640 / 642 / 644 / 646 at the shrines' doors, 648-664 the bosses (652 / 653 Scarmiglione's two
+# forms)
+T_SEALED = ["This is the Earthgift Shrine. Long ago, they say, one could enter, but since the earth "
+            "began to rot, no one has been able to get in.",
+            "This is the Hellfire Chasm. Long ago, we elves proved our worth to be king by bringing back the "
+            "treasure kept here. Now someone seems to have sealed it...",
+            "Eek! A human! ... Huh? You won't hurt me? Then I'll tell you. This is the Lifespring Grotto. "
+            "Long ago, they say, a human and a mermaid who fell in love lived here in secret.",
+            "This is the Whisperwind Cove, where our ancestors laid their treasure to rest. But it has been "
+            "sealed for a very long time."]
+T_BOSS = {'Echidna': "You did well to come this far... but this is where your journey ends!",
+          'Cerberus': "I'll grant you this much for making it so far... but here you die!",
+          'Ahriman': "There is nothing anywhere that can stop me! You, too, will die here by my hand!",
+          'Two-Headed Dragon': "Fwahahaha... Let everything vanish! Die, Warriors of Light!",
+          'Scarmiglione': "Fshurrr... How happy... how happy I am... to bury you all... I am Scarmiglione of "
+                          "Earth...! Now... it's feeding time!",
+          'Cagnazzo': "Kukakakaka... Just the playmates I wanted. I get lonely, you see! Stay and play with me!",
+          'Barbariccia': "Ohohoho... It seems I underestimated you, coming this far! I, Barbariccia of the "
+                         "Wind, will kill you myself!",
+          'Rubicante': "I am Rubicante of Fire... Let me see whether you are worthy warriors...",
+          'Gilgamesh': "Where? Where in the world is the legendary sword? ...!! Is that it, what you've got "
+                       "there!?",
+          'Omega': "Intruders... Eliminate...",
+          'Atomos': "Challengers, after a thousand years... Show me your strength... and defeat me...",
+          'Shinryu': "...I am the one who hunts Omega...",
+          'Typhon': "Fungah!",
+          'Orthros': "Whaaat? You made it this far? I may be just a lowly octopus, but I won't lose to the "
+                     "likes of you! Let's fight!!",
+          'Phantom Train': "...You will come with us...",
+          'Death Gaze': "...Giiiii..."}
+T_BOSS2 = {'Scarmiglione': "You did well to kill me! Now tremble before Scarmiglione of Earth, more fearsome "
+                           "still in death!"}
 PGT_BANK = 125
 
 
@@ -579,10 +740,19 @@ def text_source():
     import text
     def db(b): return ''.join('            db ' + ', '.join('$%02X' % x for x in b[i:i + 16]) + '\n'
                               for i in range(0, len(b), 16))
-    out = 'section bank 116, $7E00\npg_t_boss:  dw pg_tb0, pg_tb1, pg_tb2, pg_tb3\n'   # (read in pg.s's bank)
-    out += 'section bank %d, $4000\npg_t_sealed:\n' % PGT_BANK + db(text.encode_dialogue(T_SEALED))
-    for k, t in enumerate(T_BOSS):
-        out += 'pg_tb%d:\n' % k + db(text.encode_dialogue(t))
+    S = shrines.SHRINES
+    out = 'section bank 116, $4E00\n'               # (the tables: read in pg.s's bank)
+    out += 'pg_t_sealed:\n            dw ' + ', '.join('pg_ts%d' % s for s in range(4)) + '\n'
+    names = [b for sh in S for b, _ in sh['bosses']]
+    out += 'pg_t_boss:\n' + ''.join('            dw pg_tb%d\n' % k for k in range(16))
+    out += 'pg_t_b2:\n' + ''.join('            dw %s\n' % ('pg_tc%d' % k if names[k] in T_BOSS2 else '0')
+                                 for k in range(16))
+    out += 'section bank %d, $4000\npg_t_held:\n' % PGT_BANK + db(text.encode_dialogue(T_HELD))
+    for s in range(4):
+        out += 'pg_ts%d:\n' % s + db(text.encode_dialogue(T_SEALED[s]))
+    for k, n in enumerate(names):
+        out += 'pg_tb%d:\n' % k + db(text.encode_dialogue(T_BOSS[n]))
+        if n in T_BOSS2: out += 'pg_tc%d:\n' % k + db(text.encode_dialogue(T_BOSS2[n]))
     return out
 
 

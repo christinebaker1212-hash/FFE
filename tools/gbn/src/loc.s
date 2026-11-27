@@ -84,7 +84,16 @@ bn_prep:    ld a, [cur_map]
 loc_get:    cp PGM_END
             ld b, LOC_WORLD
             jr nc, .w
-            ld e, a
+            cp PGM_MAP0                     ; (the post-game's: its shrine's name, loc_pg)
+            jr c, .ff
+            ld hl, loc_pg
+            ld b, LOC_PG0
+.p:         cp [hl]
+            jr c, .w
+            inc hl
+            inc b
+            jr .p
+.ff:        ld e, a
             ld d, 0
             ld hl, loc_tab
             add hl, de

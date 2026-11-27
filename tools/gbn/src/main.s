@@ -991,8 +991,9 @@ arrived:    ld a, [px]
             ld a, b
             cp c
             jr nc, .nbt
-            ld a, [cur_map]
-            add a, 64
+            call pg_domi                    ; (FF1's: map + 64; the post-game's: by depth, pg.s)
+            nop
+            nop
             call enc_form
             jp do_battle
 .spk:       ld a, e                         ; spiked: the second byte is the formation
@@ -1008,7 +1009,7 @@ arrived:    ld a, [px]
             jr z, .warp
             and a
             ret
-.warp:      ld a, [fdepth]                  ; warp: the previous floor, or the overworld where
+.warp:      ld a, [fdepth]                   ; warp: the previous floor, or the overworld where
             and a                           ;   the party entered from
             jr z, .toow
             dec a

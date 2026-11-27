@@ -70,9 +70,11 @@ SHRINES = [
                              191, 192, 197, 206, 207, 208, 195, 196, 177, 180, 181, 194, 174, 198, 176, 188,
                              182, 175, 193, 131)],
          bosses=[('Typhon', 170), ('Orthros', 171), ('Phantom Train', 127), ('Death Gaze', 173)],
-         chests=6, fixed={173: 'Ultima Weapon'}),
+         chests=6, fixed={173: 'Ultima Weapon'},
+         sets=[((0, 1), (0, 1)), ((2, 3), (2, 3))]),   # (two battle sets: B1-B20, B21-B40 (bands, bosses))
 ]
 for _s in SHRINES:
+    _s.setdefault('sets', [((0, 1, 2, 3), (0, 1, 2, 3))])
     assert len([d for d in range(1, _s['depths'] + 1) if d not in _s['boss_depths']]) == len(_s['pool']), _s['key']
     _s['boss_maps'] = [f[0] for f in _s['floors'] if f[2] == 'boss']
 

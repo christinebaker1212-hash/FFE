@@ -1,30 +1,36 @@
 ; The post-game: Dawn of Souls' Soul of Chaos dungeons (docs/ff1-postgame-design.md). Our own code.
-; The floors are standard maps PGM_MAP0 and up (tools/gbn/postgame.py: map m in ROM bank m + 64,
-; $5061 / $5062 the arrival x / y). A run: the entrance floor's stairs start it; each stairs down
-; takes the party to the run's next floor (B1-B4 drawn at random from the dungeon's four, then the
-; boss floor); the chests of each floor hold that depth's treasure, shuffled per run.
+; Four shrines (tools/gbn/shrines.py); their floors are standard maps PGM_MAP0 and up (postgame.py: map m in
+; ROM bank m + 64, with M_PG* bytes about it). A run: the entrance floor's stairs start it; each stairs
+; down takes the party one depth on: a boss depth to its boss floor, any other to the next floor of the
+; shrine's pool in this run's order (a shuffle of the pool by the run's seed). A boss floor holds its
+; bosses' orbs; its stairs (on and out) open once one of them is beaten this run. The chests of a floor
+; hold that depth's treasure, shuffled per run.
 PGM_BANK   = 116
 PG_DEPTH   = unsram + $A0   ; the run (kept in the save; FF1 leaves $60A0-$60EF unused, $6040-$609F
-PG_ORDER   = unsram + $A1   ;   hold its new game's class stats): the depth (0 the entrance floor), the
-PG_CHEST   = unsram + $A5   ;   floors B1-B4 (map ids), this floor's chests opened (bits 0-3), the
-PG_FIXED   = unsram + $A6   ;   fixed chests opened (persistent), the bosses beaten (persistent, a bit
-PG_BOSS    = unsram + $A7   ;   each), the boss beaten this run, the run's chest shuffle
-PG_RUNB    = unsram + $A8
-PG_SEED    = unsram + $A9
+PG_DUN     = unsram + $A1   ;   hold its new game's class stats): the depth (0 the entrance floor), the
+PG_SEED    = unsram + $A2   ;   shrine, the run's seed, this floor's chests opened (16 bits), the boss
+PG_CHEST   = unsram + $A3   ;   floors passed this run (a bit each), the bosses beaten (persistent: a
+PG_RUNB    = unsram + $A5   ;   byte a shrine, a bit a boss), the fixed chests opened (persistent)
+PG_BOSS    = unsram + $A6
+PG_FIXED   = unsram + $AA
 ST_TILE    = $70            ; (the statue's sprite tiles: postgame.statue)
 PG_TC      = 0              ; (FF1's flag of a chest number no map uses: the post-game's chests)
-PG_FLOORS  = 4              ; Earthgift: B1-B4 from its four floors (maps PGM_MAP0 + 1-4), B5
-PG_BOSSMAP = PGM_MAP0 + 5
-PG_ENT     = $1E            ; Earthgift's overworld entrance number (postgame.py: a cave mouth metatile)
-PG_OWX     = 132            ; ... at (132, 141): the way back out
-PG_OWY     = 141
-ORB_EARTH  = ORBS + 3       ; (lit once Lich is beaten: the shrine opens)
-PG_OBJ0    = $F0            ; the boss floor's orbs: object ids $F0-$F3 (shown while game flag bit 0)
-PG_BFORM0  = 7              ; the bosses' formations in the dungeon's battle set (pgbattle.py)
-PGT_BANK   = 125            ; the post-game's text (postgame.py pg_text)
+PG_ENT     = $1E            ; the shrines' overworld entrance number (postgame.py: their doors)
+PG_OBJ0    = $F0            ; a boss floor's orbs: object ids $F0-$F3 (the shrine's bosses 0-3), and
+PG_EXIT    = $F4            ;   the light that takes the party out once one of them is beaten
+PGT_BANK   = 125            ; the post-game's text (postgame.py text_source)
+M_PGA      = $5063          ; a post-game map's bytes (build.py): its encounter area, shrine, role (0 floor,
+M_PGS      = $5064          ;   1 entrance, 2 boss floor), boss floor number, the shrine's door (x, y),
+M_PGR      = $5065          ;   the battle banks of its two sets (data, graphics, silhouettes, Super Game
+M_PGB      = $5066          ;   Boy), the first band of set 1, the depths a band; its chests: count, then
+M_PGD      = $5067          ;   x, y, kind (0 / 1 the depth's lists, 2 + n fixed chest n)
+M_PGBK     = $5069
+M_PGBS     = $5071
+M_PGBL     = $5072
+M_PGNC     = $5080
 
 ; ---- bank 0: the hooks (load_map's bank, do_tele, open_chest)
-section bank 0, $3A68                       ; (free space)                       ; (free space)
+section bank 0, $3A68                       ; (free space)
 ; A = map B's ROM bank: FF1's maps from MAP_BANK0, the post-game's at map + 64
 pg_mbank:   ld a, b
             cp PGM_MAP0
@@ -80,7 +86,8 @@ pg_give:    and a
             pop af
             jp tc_give
 
-; load_map (every map): the battle banks of the map's dungeon (pgbattle.py), FF1's elsewhere
+; load_map (every map; its bank mapped): the battle banks of the map's shrine (pgbattle.py), FF1's elsewhere;
+; a post-game floor's facts (pg_shr, pg_role, pg_bfi, the encounter domain pg_dom by its area and depth band)
 pg_lcd:     ld a, $23                       ; (the fiend picture's first cell: FF1's)
             ldh [hbt_fy], a
             ld a, [cur_map]
@@ -88,19 +95,13 @@ pg_lcd:     ld a, $23                       ; (the fiend picture's first cell: F
             jr c, .ff1
             inc a                           ; (MAP_OW: FF1's)
             jr z, .ff1
-            ld a, PG_OWX                    ; (the way back out: the shrine's door)
-            ld [ow_x], a
-            ld a, PG_OWY
-            ld [ow_y], a
-            ld a, PGB_DATA
-            ldh [hbt_db], a
-            ldh [hbt_dom], a
-            ld a, PGB_CHR
-            ldh [hbt_cb], a
-            ld a, PGB_SIL
-            ldh [hbt_sb], a
-            ld a, PGB_SGB
-            ldh [hbt_sgb], a
+            ld hl, M_PGA                    ; (its bytes, then pg_lcd2 in the post-game's bank)
+            ld de, pg_mb
+            ld bc, 16
+            call memcpy
+            ld a, PGM_BANK
+            ld hl, pg_lcd2
+            call bank_call
             jp lcd_off
 .ff1:       ld a, BTL_DATA
             ldh [hbt_db], a
@@ -115,22 +116,16 @@ pg_lcd:     ld a, $23                       ; (the fiend picture's first cell: F
             jp lcd_off
 
 section bank 0, $3B5A                       ; (free space)
-; arrived: an overworld entrance (A = [px] back for FF1's entrances): the shrine sealed until
-; Lich is beaten (Dawn of Souls' words at its door)
+; arrived: an overworld entrance (A = [px] back for FF1's entrances): a shrine's door (pg_enter)
 pg_echk:    ld a, e
             and $3F
             cp PG_ENT
             ld a, [px]
             ret nz
-            ld a, [ORB_EARTH]
-            and a
-            ld a, [px]
-            ret nz
             pop hl
-            ld hl, pg_t_sealed
-            call pg_say
-            and a
-            ret
+            ld a, PGM_BANK
+            ld hl, pg_enter
+            jp bank_call
 ; a box of the post-game's text (HL in bank PGT_BANK), as dlg_open
 pg_say:     ld a, PGT_BANK
             ld [dlg_bank], a
@@ -141,6 +136,20 @@ pg_say:     ld a, PGT_BANK
             xor a
             ld [dlgsfx], a
             jp dlg_open2
+section bank 0, $3B80                       ; (free space)
+; the encounter domain of the map (FF1's: map + 64; the post-game's: pg_dom)
+pg_domi:    ld a, [cur_map]
+            cp PGM_MAP0
+            jr c, .f
+            ld a, [pg_dom]
+            ret
+.f:         add a, 64
+            ret
+; load_map_w for the post-game's bank: back here (bank 0), C set
+pg_lmw:     call load_map_w
+            scf
+            ret
+
 section bank 0, $1DB4                       ; (free space)
 ; talk_obj: the boss floor's orbs (ids PG_OBJ0 and up)
 pg_tkchk:   ld a, l
@@ -154,7 +163,7 @@ pg_tkchk:   ld a, l
             ld a, PGM_BANK
             call sbank
             jp pg_boss
-; talk_after's battle: in the post-game, a boss beaten opens the way out
+; talk_after's battle: in the post-game, a boss beaten opens the way on
 pg_dobtl:   call do_battle
             push af
             ld a, [cur_map]
@@ -187,6 +196,15 @@ section wram, $CC96
 pg_rs:      ds 1
 pg_bk:      ds 1
 
+section wram, $DDE6                         ; (free: rammap.py)
+pg_mb:      ds 16                           ; (the map's M_PG* bytes, $5063 on)
+pg_shr:     ds 1                            ; the floor's shrine, role, boss floor number, encounter domain
+pg_role:    ds 1
+pg_bfi:     ds 1
+pg_dom:     ds 1
+pg_t0:      ds 1                            ; (scratch)
+pg_t1:      ds 1
+
 section hram, $FFF0
 hbt_db:     ds 1                            ; the battle data bank (battle.py's layout)
 hbt_cb:     ds 1                            ; the enemy graphics banks (2)
@@ -196,24 +214,246 @@ hbt_sgb:    ds 1                            ; the Super Game Boy's battle colour
 hbt_fy:     ds 1                            ; the fiend picture's first cell (y x: $23, a hanging boss $03)
 
 section bank PGM_BANK, $4000
+; load_map of a post-game floor (pg_mb = its M_PG* bytes): pg_shr, pg_role, pg_bfi, the door (the way back
+; out), the encounter domain pg_dom (its area and the depth's band), the battle banks of the band's set
+PB_A       = pg_mb
+PB_S       = pg_mb + 1
+PB_D       = pg_mb + 4
+PB_BK      = pg_mb + 6
+PB_BS      = pg_mb + 14
+PB_BL      = pg_mb + 15
+pg_lcd2:    ld hl, PB_S
+            ld a, [hl+]
+            ld [pg_shr], a
+            ld a, [hl+]
+            ld [pg_role], a
+            ld a, [hl+]
+            ld [pg_bfi], a
+            ld a, [hl+]
+            ld [ow_x], a
+            ld a, [hl]
+            ld [ow_y], a
+            ld a, [PG_DEPTH]                ; the band: (depth - 1) / PB_BL, 0-3
+            and a
+            jr z, .b1
+            dec a
+            ld b, 0
+            ld hl, PB_BL
+.bd:        cp [hl]
+            jr c, .bx
+            sub [hl]
+            inc b
+            jr .bd
+.bx:        ld a, b
+            cp 4
+            jr c, .b1
+            ld a, 3
+.b1:        ld c, a
+            ld a, [PB_A]                    ; the domain: $80 + 4 area + band
+            add a, a
+            add a, a
+            add a, c
+            or $80
+            ld [pg_dom], a
+            ld a, [PB_BS]                   ; the battle set: 1 from band PB_BS on
+            ld b, a
+            ld a, c
+            cp b
+            ld hl, PB_BK
+            jr c, .s0
+            ld hl, PB_BK + 4
+.s0:        ld a, [hl+]
+            ldh [hbt_db], a
+            ldh [hbt_dom], a
+            ld a, [hl+]
+            ldh [hbt_cb], a
+            ld a, [hl+]
+            ldh [hbt_sb], a
+            ld a, [hl]
+            ldh [hbt_sgb], a
+            ret
+
+; HL = table HL + A (A kept in E)
+pg_ix:      ld e, a
+            ld d, 0
+            add hl, de
+            ret
+; A = [HL + 4 shrine + A]: a shrine's byte of four
+pg_s4:      push af
+            ld a, [pg_shr]
+            add a, a
+            add a, a
+            ld e, a
+            pop af
+            add a, e
+            jp pg_ixr
+; A = [HL + A]
+pg_ixr:     ld e, a
+            ld d, 0
+            add hl, de
+            ld a, [hl]
+            ret
+; HL = the word at [HL + 2 shrine]
+pg_sw:      ld a, [pg_shr]
+            add a, a
+            ld e, a
+            ld d, 0
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ret
+
+; ---- a shrine's door (overworld entrance PG_ENT): the shrine at the party's place; sealed until its Fiend
+; is beaten (Dawn of Souls' words at its door), else its entrance floor
+pg_enter:   ld c, 0
+            ld hl, pg_door
+.f:         ld a, [px]
+            cp [hl]
+            inc hl
+            jr nz, .n
+            ld a, [py]
+            cp [hl]
+            jr z, .g
+.n:         inc hl
+            inc c
+            ld a, c
+            cp 4
+            jr c, .f
+            and a                           ; (no shrine there: nothing)
+            ret
+.g:         ld a, c
+            ld [pg_shr], a
+            ld hl, pg_orb
+            call pg_ixr
+            ld l, a
+            ld h, high(ORBS)
+            ld a, [hl]
+            and a
+            jr nz, .op
+            ld hl, pg_t_sealed
+            call pg_sw
+            call pg_say
+            and a
+            ret
+.op:        ld a, [pg_shr]
+            ld hl, pg_ent
+            call pg_ixr
+            ld b, a
+            add a, 64
+            ld [fc_bank], a
+            ld hl, $5061
+            call far_byte
+            ld d, a
+            inc hl
+            call far_byte
+            ld e, a
+            xor a
+            ld [fdepth], a
+            ld a, b
+            jp pg_lmw
+
+; ---- a boss floor's way on / out before its boss is beaten this run: "held back" (C clear)
+pg_held:    ld hl, pg_t_held
+            call pg_say
+            and a
+            ret
+; NZ: this floor's way is open (not a boss floor, or one of its bosses beaten this run)
+pg_open:    ld a, [pg_role]
+            cp 2
+            jr nz, .y
+.bf:        ld a, [pg_bfi]
+            ld b, a
+            call pg_bit
+            ld hl, PG_RUNB
+            and [hl]
+            ret
+.y:         or 1
+            ret
+
 ; ---- the stairs down (E = FF1's teleport number, not used)
-pg_down:    ld a, [cur_map]
-            cp PGM_MAP0                     ; the entrance floor: a new run
+pg_down:    ld a, [pg_role]
+            cp 1                            ; the entrance floor: a new run
             call z, pg_newrun
-            ld hl, PG_DEPTH
+            call pg_open
+            jr nz, .on
+            pop hl                          ; (do_tele's caller: the box)
+            jr pg_held
+.on:        ld hl, PG_DEPTH
             inc [hl]
             xor a
             ld [PG_CHEST], a
+            ld [PG_CHEST + 1], a
             ld a, [hl]
-            cp PG_FLOORS + 1
-            ld b, PG_BOSSMAP
-            jr nc, .go
+            ld c, a                         ; C = the depth
+            ld b, 0                         ; a boss depth: its floor; B = boss depths passed
+            ld hl, pg_bdep
+            ld a, [pg_shr]
+            add a, a
+            add a, a
             ld e, a
             ld d, 0
-            ld hl, PG_ORDER - 1
             add hl, de
-            ld b, [hl]
-.go:        ld a, b
+            push hl
+.bl:        ld a, [hl+]
+            and a
+            jr z, .nb
+            cp c
+            jr z, .bm
+            jr nc, .nb
+            inc b
+            ld a, b
+            cp 4
+            jr c, .bl
+            jr .nb
+.bm:        pop hl                          ; the boss floor: pg_bdmap at the same place
+            ld de, pg_bdmap - pg_bdep
+            add hl, de
+            ld a, b
+            call pg_ixr
+            jr .go
+.nb:        pop hl
+            ld a, c                         ; the k-th pool floor, k = depth - 1 - boss depths passed
+            sub b
+            dec a
+            push af
+            call pg_perm
+            pop af
+            ld hl, bt_sbuf
+            call pg_ixr                     ; the pool entry: map, alternatives
+            add a, a
+            ld c, a
+            ld hl, pg_pool
+            call pg_sw
+            ld b, 0
+            add hl, bc
+            ld a, [hl+]
+            ld b, a                         ; B = its first map, [HL] = how many to choose from
+            ld a, [hl]
+            cp 2
+            jr c, .one
+            ld c, a
+            ld a, [PG_SEED]                 ; (one of them a run: by the seed)
+            rrca
+            rrca
+            rrca
+            call pg_mod
+            add a, b
+            ld b, a
+.one:       ld hl, game_flags + PG_EXIT    ; (no light on a pool floor)
+            res 0, [hl]
+            ld a, b
+            jr .go2
+.go:        push af                         ; (a boss floor passed already: its light shown)
+            ld a, b
+            ld [pg_bfi], a
+            call pg_open.bf
+            ld hl, game_flags + PG_EXIT
+            set 0, [hl]
+            jr nz, .gl
+            res 0, [hl]
+.gl:        pop af
+.go2:       ld b, a
             add a, 64
             ld [fc_bank], a
             ld hl, $5061
@@ -225,45 +465,47 @@ pg_down:    ld a, [cur_map]
             ld a, b
             jp load_map_w
 
-; a new run: depth 0, the floors in a random order, a new chest shuffle
-pg_newrun:  xor a
-            ld [PG_DEPTH], a
-            ld [PG_RUNB], a
-            ld a, [PG_BOSS]                 ; the orbs of the bosses not beaten: shown
-            ld c, a
-            ld hl, game_flags + PG_OBJ0
-            ld b, 4
-.o:         res 0, [hl]
-            rr c
-            jr c, .ob
-            set 0, [hl]
-.ob:        inc l
-            dec b
-            jr nz, .o
-            call pg_rand
-            ld [PG_SEED], a
-            ld hl, PG_ORDER                 ; 1, 2, 3, 4, then Fisher-Yates
-            ld b, PG_FLOORS
-            ld a, PGM_MAP0 + 1
-.f:         ld [hl+], a
+; A = A mod C (C > 0)
+pg_mod:     cp c
+            ret c
+            sub c
+            jr pg_mod
+
+; the run's order of the shrine's pool: bt_sbuf = 0 .. P-1 shuffled (Fisher-Yates, a generator seeded by the run)
+pg_perm:    ld a, [pg_shr]
+            ld hl, pg_npool
+            call pg_ixr
+            ld b, a                         ; B = P
+            ld hl, bt_sbuf
+            xor a
+.i:         ld [hl+], a
             inc a
-            dec b
-            jr nz, .f
-            ld c, PG_FLOORS - 1             ; i = 3 .. 1: swap [i] with [rand % (i + 1)]
-.s:         call pg_rand
-            ld b, c
-            inc b
-.m:         cp b
-            jr c, .md
-            sub b
-            jr .m
-.md:        ld e, a
+            cp b
+            jr c, .i
+            ld a, [PG_SEED]
+            ld [pg_t0], a
+            ld c, b                         ; i = P - 1 .. 1: swap [i], [rand % (i + 1)]
+            dec c
+            ret z
+.s:         ld a, [pg_t0]                   ; (x = 5 x + 41)
+            ld e, a
+            add a, a
+            add a, a
+            add a, e
+            add a, 41
+            ld [pg_t0], a
+            swap a
+            push bc
+            inc c
+            call pg_mod
+            pop bc
+            ld e, a
             ld d, 0
-            ld hl, PG_ORDER
+            ld hl, bt_sbuf
             add hl, de
             push hl
             ld e, c
-            ld hl, PG_ORDER
+            ld hl, bt_sbuf
             add hl, de
             pop de
             ld a, [de]
@@ -273,6 +515,77 @@ pg_newrun:  xor a
             ld [de], a
             dec c
             jr nz, .s
+            ret
+
+; a new run of shrine pg_shr: depth 0, a new seed, no boss floor passed; the orbs of the bosses not beaten
+; shown; a boss floor whose bosses are all beaten is open already
+pg_newrun:  ld a, [pg_shr]
+            ld [PG_DUN], a
+            xor a
+            ld [PG_DEPTH], a
+            ld [PG_RUNB], a
+            call pg_rand
+            ld [PG_SEED], a
+            call pg_beat                    ; C = the shrine's beaten bosses
+            ld hl, game_flags + PG_OBJ0
+            ld b, 4
+            ld a, c
+.o:         res 0, [hl]
+            rrca
+            jr c, .ob
+            set 0, [hl]
+.ob:        inc l
+            dec b
+            jr nz, .o
+            ld b, 0                         ; boss floors 0-3: open if none of theirs is left
+.f:         ld c, 0                         ; (C: its bosses not beaten)
+            ld e, 0
+.k:         push bc
+            push de
+            ld a, e
+            ld hl, pg_bfl
+            call pg_s4
+            pop de
+            pop bc
+            cp b
+            jr nz, .kn
+            push bc
+            ld b, e
+            call pg_bit
+            pop bc
+            push bc
+            ld b, a
+            call pg_beat
+            ld a, c
+            and b
+            pop bc
+            jr nz, .kn
+            inc c
+.kn:        inc e
+            ld a, e
+            cp 4
+            jr c, .k
+            ld a, c
+            and a
+            jr nz, .fn
+            call pg_bit
+            ld hl, PG_RUNB
+            or [hl]
+            ld [hl], a
+.fn:        inc b
+            ld a, b
+            cp 4
+            jr c, .f
+            ret
+; C = the bosses of shrine pg_shr beaten (PG_BOSS + shrine), HL there
+pg_beat:    push de
+            ld a, [pg_shr]
+            ld e, a
+            ld d, 0
+            ld hl, PG_BOSS
+            add hl, de
+            ld c, [hl]
+            pop de
             ret
 
 ; A = a random byte (the divider and a running state)
@@ -287,82 +600,6 @@ pg_rand:    push hl
             pop hl
             ret
 
-; ---- a chest (tc_id = its number on the floor: 0-3 the run's, 4-7 the floor's own) -> A = the
-; item code and dlg_item (0: opened already), back through pg_give
-pg_chest:   ld a, [tc_id]
-            cp 4
-            jr nc, .fx
-            ld b, a
-            call pg_bit
-            ld c, a
-            ld hl, PG_CHEST
-            and [hl]
-            jr nz, .none
-            ld a, [hl]
-            or c
-            ld [hl], a
-            ld a, [PG_DEPTH]                ; the depth's list (B1-B4), slot (k + shuffle) & 3
-            dec a
-            and 3
-            add a, a
-            add a, a
-            ld c, a
-            ld a, [PG_SEED]
-            add a, b
-            and 3
-            add a, c
-            ld e, a
-            ld d, 0
-            ld hl, pg_treas
-            add hl, de
-            ld a, [hl]
-            jr .got
-.fx:        sub 4                           ; the floor's own chests: once ever
-            ld b, a
-            call pg_bit
-            ld c, a
-            ld hl, PG_FIXED
-            and [hl]
-            jr nz, .none
-            ld a, [hl]
-            or c
-            ld [hl], a
-            ld a, b
-            ld e, a
-            ld d, 0
-            ld hl, pg_fixed
-            add hl, de
-            ld a, [hl]
-.got:       ld [dlg_item], a
-            ld b, a                         ; a Dawn of Souls consumable: one more (up to 99)
-            ld hl, it_newc
-.f:         ld a, [hl+]
-            and a
-            jr z, .na
-            cp b
-            jr nz, .f
-            ld a, b
-            call it_cnt
-            ld a, [hl]
-            cp 99
-            jr nc, .g1
-            inc [hl]
-.g1:        ld a, 1
-            jp pg_give
-.na:        ld a, b                         ; Dawn of Souls' armour (name code $43 + id past $6B)
-            cp $6C
-            jr c, .ff
-            cp $43 + N_ARMOUR + 1
-            jr nc, .ff
-            sub $43
-            ld b, a
-            ld a, 2
-            jp pg_give
-.ff:        ld a, b
-            jp pg_give
-.none:      xor a
-            jp pg_give
-
 ; A = 1 << B (B kept)
 pg_bit:     push bc
             ld a, 1
@@ -374,57 +611,300 @@ pg_bit:     push bc
 .x:         pop bc
             ret
 
-; ---- an orb on the boss floor (A = its id): FF1's Talk_fight (the orb gone, the battle when the box
-; closes) with the boss's words (Dawn of Souls' lines)
+; ---- a chest: the one in front of the party in the map's list (x, y, kind) -> its gift (pg_gift),
+; back through pg_give (A = 0: opened already)
+pg_chest:   ld a, [px]
+            ld e, a
+            ld a, [py]
+            ld d, a
+            ld a, [facing]
+            and a
+            jr nz, .f1
+            inc e
+.f1:        cp 1
+            jr nz, .f2
+            dec e
+.f2:        cp 2
+            jr nz, .f3
+            dec d
+.f3:        cp 3
+            jr nz, .f4
+            inc d
+.f4:        push de
+            ld a, [map_bank]
+            ld hl, M_PGNC
+            ld de, bt_sbuf
+            ld bc, 40
+            call far_copy
+            pop de
+            ld hl, bt_sbuf
+            ld a, [hl+]
+            ld c, a                         ; C = chests left to look at
+            ld b, 0                         ; B = this chest's number
+            xor a
+            ld [pg_t0], a                   ; (ranks: chests of kind 0 / 1 before it)
+            ld [pg_t1], a
+.l:         ld a, c
+            and a
+            jp z, .none
+            ld a, [hl+]
+            cp e
+            jr nz, .nx
+            ld a, [hl]
+            cp d
+            jr z, .got
+.nx:        inc hl
+            ld a, [hl+]                     ; (its kind: count it)
+            cp 2
+            jr nc, .nk
+            push hl
+            ld hl, pg_t0
+            and a
+            jr z, .k0
+            inc hl
+.k0:        inc [hl]
+            pop hl
+.nk:        inc b
+            dec c
+            jr .l
+.got:       inc hl
+            ld a, [hl]
+            ld [pg_bk], a                   ; (its kind)
+            ld hl, PG_CHEST                 ; HL, C = its bit (opened this run?)
+            ld a, b
+            cp 8
+            jr c, .lo
+            inc hl
+            sub 8
+.lo:        ld b, a
+            call pg_bit
+            ld c, a
+            and [hl]
+            jp nz, .none
+            push hl
+            push bc
+            ld a, [pg_bk]
+            cp 2
+            jr nc, .fx
+            and a                           ; the depth's list (0 / 1): its rank's item, shuffled
+            jr z, .r0
+            ld a, [pg_t1]
+            ld [pg_t0], a
+.r0:        ld hl, pg_tl
+            call pg_sw
+            ld a, [PG_DEPTH]
+            add a, a
+            add a, a
+            ld e, a
+            ld a, [pg_bk]
+            add a, a
+            add a, e
+            call pg_ix
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            or h
+            jr z, .nol
+            ld a, [hl+]                     ; n, then n gifts
+            ld c, a
+            ld a, [PG_SEED]
+            ld e, a
+            ld a, [pg_t0]
+            add a, e
+            call pg_mod
+            add a, a
+            call pg_ix
+            ld a, [hl+]
+            ld e, a
+            ld d, [hl]
+            jr .mark
+.nol:       pop bc
+            pop hl
+            jr .none
+.fx:        sub 2                           ; a fixed chest n: once ever
+            ld [pg_bk], a
+            ld b, a
+            call pg_bit
+            ld c, a
+            ld hl, PG_FIXED
+            and [hl]
+            jr z, .fn
+            pop bc
+            pop hl
+            jr .none
+.fn:        ld a, [hl]
+            or c
+            ld [hl], a
+            ld a, [pg_bk]
+            add a, a
+            ld hl, pg_fixed
+            call pg_ix
+            ld a, [hl+]
+            ld e, a
+            ld d, [hl]
+.mark:      pop bc                          ; (opened this run)
+            pop hl
+            ld a, [hl]
+            or c
+            ld [hl], a
+            jp pg_gift
+.none:      xor a
+            jp pg_give
+
+; DE = a gift (D 0: an FF1 code E (items, weapons, armour, gold); 1: Dawn of Souls consumable E; 3: Dawn
+; of Souls armour E) -> given, back through pg_give
+pg_gift:    ld a, d
+            and a
+            jr nz, .n
+            ld a, e
+            ld [dlg_item], a
+            jp pg_give
+.n:         cp 1
+            jr nz, .ar
+            ld hl, it_newc                  ; (consumable E: its code)
+            ld a, e
+            call pg_ixr
+            ld [dlg_item], a
+            call it_cnt
+            ld a, [hl]
+            cp 99
+            jr nc, .g1
+            inc [hl]
+.g1:        ld a, 1
+            jp pg_give
+.ar:        ld a, e                         ; Dawn of Souls' armour E: name code $43 + E
+            add a, $43
+            ld [dlg_item], a
+            ld b, e
+            ld a, 2
+            jp pg_give
+
+; ---- an orb on the boss floor (its id PG_OBJ0 + k: the shrine's boss k): FF1's Talk_fight (the orb gone,
+; the battle when the box closes) with the boss's words (Dawn of Souls' lines)
 pg_boss:    ld a, [talk_id]
+            cp PG_EXIT                      ; (the light: out to the world map, at the door)
+            jr z, .out
             sub PG_OBJ0
             ld [pg_bk], a
-            ld e, a                         ; (its picture's first cell: pg_fy)
-            ld d, 0
-            ld hl, pg_fy
-            add hl, de
-            ld a, [hl]
+            ld hl, pg_fy                    ; (its picture's first cell)
+            call pg_s4
             ldh [hbt_fy], a
             ld a, [talk_id]
             call hide_this
             ld a, [pg_bk]
-            add a, PG_BFORM0
+            ld hl, pg_bform
+            call pg_s4
             call talk_btl
-            ld a, [pg_bk]
+            ld a, [pg_shr]
             add a, a
-            ld e, a
-            ld d, 0
+            add a, a
+            ld hl, pg_bk
+            add a, [hl]
+            add a, a
             ld hl, pg_t_boss
-            add hl, de
+            call pg_ix
             ld a, [hl+]
             ld h, [hl]
             ld l, a
             jp pg_say
+.out:       ld a, [ow_x]
+            ld d, a
+            ld a, [ow_y]
+            ld e, a
+            xor a
+            ld [fdepth], a
+            ld a, MAP_OW
+            jp pg_lmw
 
-; ---- after a battle in the post-game (A = do_battle's result): a boss beaten: remembered, the way
-; out (Dawn of Souls: one boss a run)
+; ---- after a battle in the post-game (A = do_battle's result): a boss beaten: remembered, its floor
+; passed this run (its other orbs gone), the party stays; a boss with a second form fights it first
 pg_after:   push af
             ld a, [pend_btl]
-            sub PG_BFORM0
-            jr c, .x
+            ld c, a
+            ld e, 0
+.f:         push de                         ; which of the shrine's bosses?
+            ld a, e
+            ld hl, pg_bform
+            call pg_s4
+            pop de
+            cp c
+            jr z, .k
+            push de
+            ld a, e
+            ld hl, pg_b2
+            call pg_s4
+            pop de
+            cp c
+            jr z, .k2
+            inc e
+            ld a, e
             cp 4
-            jr nc, .x
+            jr c, .f
+            pop af
+            ret
+.k:         ld a, e                         ; (boss e: a second form?)
+            ld [pg_bk], a
+            ld hl, pg_b2
+            call pg_s4
+            and a
+            jr z, .won
+            ld b, a
+            pop af
+            ld a, b
+            call talk_btl                   ; (the second form when its box closes)
+            ld a, [pg_shr]
+            add a, a
+            add a, a
+            ld hl, pg_bk
+            add a, [hl]
+            add a, a
+            ld hl, pg_t_b2
+            call pg_ix
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            jp pg_say
+.k2:        ld a, e
+            ld [pg_bk], a
+.won:       ld a, [pg_bk]                   ; beaten: PG_BOSS + shrine, bit k
             ld b, a
             call pg_bit
-            ld hl, PG_BOSS
+            ld b, a
+            call pg_beat
+            ld a, b
+            or c
+            ld [hl], a
+            ld a, [pg_bfi]                  ; this floor passed this run
+            ld b, a
+            call pg_bit
+            ld hl, PG_RUNB
             or [hl]
             ld [hl], a
-            ld a, 1
-            ld [PG_RUNB], a
+            ld a, PG_EXIT                   ; the light out: shown
+            call show_obj
+            ld e, 0                         ; the floor's other orbs: gone
+.o:         push de
+            ld a, e
+            ld hl, pg_bfl
+            call pg_s4
+            ld b, a
+            ld a, [pg_bfi]
+            cp b
+            pop de
+            jr nz, .on
+            ld a, e
+            add a, PG_OBJ0
+            push de
+            call hide_obj
+            pop de
+.on:        inc e
+            ld a, e
+            cp 4
+            jr c, .o
             pop af
-            ld d, PG_OWX
-            ld e, PG_OWY
-            ld a, MAP_OW
-            jp load_map                     ; (no wipe: the battle's own fade has run)
-.x:         pop af
             ret
 
-; ---- the party after a lost battle: alive, ailments gone, 1 HP at least
+; ---- the party after a lost battle: alive, ailments gone, 1 HP at least; A = MAP_OW, D, E = the door
 pg_revive:  xor a                           ; (no boss beaten: pg_after)
             ld [pend_btl], a
             ld hl, ch_stats
@@ -446,8 +926,10 @@ pg_revive:  xor a                           ; (no boss beaten: pg_after)
             ld l, a
             dec b
             jr nz, .l
-            ld d, PG_OWX
-            ld e, PG_OWY
+            ld a, [ow_x]
+            ld d, a
+            ld a, [ow_y]
+            ld e, a
             ld a, MAP_OW
             ret
 
@@ -1147,16 +1629,19 @@ pg_statue:  ld a, PG_ON                     ; (built without the Dawn of Souls R
             inc l
             dec b
             jr nz, .z
-            ld a, [ORB_EARTH]
+            ld a, [pg_orb]                  ; (Earthgift's: shrine 0)
+            ld l, a
+            ld h, high(ORBS)
+            ld a, [hl]
             and a
             ret nz
-            ld a, PG_OWX
+            ld a, [pg_door]
             ld hl, px
             call ob_pos
             ret c
             sub 8
             ld b, a
-            ld a, PG_OWY
+            ld a, [pg_door + 1]
             ld hl, py
             call ob_pos
             ret c
