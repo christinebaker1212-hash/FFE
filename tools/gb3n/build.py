@@ -341,6 +341,10 @@ ROMDATA = {
     'sa_9cb4': (0x3A, 0x9CB4, 240),
     'ws_sin': (0x3A, 0x9E3E, 256),       # world sprites: FF3's sine table, the ship's chain
     'ws_chtab': (0x3D, 0xBF7A, 126),
+    'uw_rng': (0x3F, 0xFE00, 256),       # underwater: random numbers, fish, wobble
+    'uw_sw': (0x3A, 0x962D, 64),
+    'uw_ft': (0x3A, 0x966D, 32),
+    'uw_wt': (0x3A, 0x97EF, 32),
     'gu_poses': (0x3E, 0xDC6A, 64),      # the guest's poses
     'nj_h': (0x3B, 0xAC0C, 25),          # event: a person's jump height
     'dn_x': (0x3B, 0xADB1, 84),          # event: the dance's sub-x, sub-y, facings

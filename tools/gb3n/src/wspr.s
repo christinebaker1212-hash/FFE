@@ -36,8 +36,10 @@ ws_world2:  ld a, [world]
             srl a
             jr z, .fc
             srl a
-            jr nz, .x                       ; (underwater: the bubbles, 3A/9442: later)
-            ld a, [frame]                   ; flooded / surface world (the order turns every
+            jr z, .sf
+            call uw_frame                   ; underwater: the bubbles and the fish (3A/9442)
+            jr .x
+.sf:        ld a, [frame]                   ; flooded / surface world (the order turns every
             rra                             ;   other frame)
             jr c, .s2
             call ws_ship
@@ -71,7 +73,7 @@ ws_world2:  ld a, [world]
             call ws_air
             call ws_naut
 .x:         call ws_chain
-                    ld a, [ws_n]                    ; the rest hidden
+            ld a, [ws_n]                    ; the rest hidden
             ld l, a
             ld h, high(oam_buf)
 .h:         ld a, l
@@ -1079,3 +1081,442 @@ va_vt:      ds 1
 va_8a:      ds 1
 va_tile:    ds 1
 va_src:     ds 2
+
+; ---- underwater (3A/9442): the small bubbles, the big bubble and a school of fish, their order
+; turning every other frame
+section bank B_WSPR, $7540
+uw_frame:   ld a, [frame]                   ; (FF3's $F1: a high byte of the frame count)
+            ld hl, uw_lf
+            cp [hl]
+            ld [hl], a
+            jr nc, .k
+            ld hl, uw_hi
+            inc [hl]
+.k:         ld a, [frame]
+            rra
+            jr c, .o
+            call uw_small
+            call uw_big
+            jp uw_fish
+.o:         call uw_fish
+            call uw_big
+            jp uw_small
+
+; the drift against the party's movement (3A/97CE): D = x, E = y (-1, 0 or 1)
+uw_drift:   ld de, 0
+            ld a, [step]
+            and a
+            ret z
+            ld a, [facing]
+            rra
+            jr nc, .l
+            dec d
+            ret
+.l:         rra
+            jr nc, .d
+            inc d
+            ret
+.d:         rra
+            jr nc, .u
+            dec e
+            ret
+.u:         inc e
+            ret
+; FF3's random numbers by the bubbles' counter (3A/9753)
+uw_rnd:     ld hl, uw_b
+            ld a, [hl]
+            inc [hl]
+            ld l, a
+            ld h, high(uw_rng)
+            ld a, [hl]
+            ret
+; a sprite at NES (C, B): tile D, attributes E (FF3's OAM y in B)
+uw_spr:     ld a, b
+            add 1 - 48
+            ld b, a
+            ld a, c
+            sub 48
+            ld c, a
+            jp ws_spr
+; the wobble (3A/97EF by the bubble's y): A = x moved, carry set when off the side
+uw_wob:     ld c, a
+            ld a, b
+            and $3F
+            cp $20
+            jr nc, .m
+            ld e, a
+            ld d, 0
+            ld hl, uw_wt
+            add hl, de
+            ld a, [hl]
+            add c
+            ret
+.m:         and $1F
+            ld e, a
+            ld d, 0
+            ld hl, uw_wt
+            add hl, de
+            ld a, c
+            sub [hl]
+            ret
+
+; the small bubbles (3A/9736): five, a new one every 64 frames into a free slot, below the screen
+uw_small:   ld c, 1
+.l:         ld b, 0
+            ld hl, uw_b
+            add hl, bc
+            ld a, [hl]
+            and a
+            jr z, .new
+            push bc
+            call .one
+            pop bc
+.n:         inc c
+            inc c
+            ld a, c
+            cp 11
+            jr c, .l
+            ret
+.new:       ld a, [frame]
+            and $3F
+            jr nz, .n
+            push hl
+            call uw_rnd
+            pop hl
+            inc hl
+            ld [hl-], a
+            and $3F
+            add $B8
+            ld [hl], a
+            jr .n
+; one (3A/9764): up a line a frame (two while the party moves down), the drift, the wobble
+.one:       call uw_drift
+            ld a, [hl]
+            sub 1
+            jr c, .z
+            bit 7, e
+            jr z, .s
+            sub 1
+            jr c, .z
+.s:         ld [hl+], a
+            ld b, a
+            ld a, [hl]
+            add d
+            cp $FC
+            jr nc, .z1
+            ld [hl-], a
+            push hl
+            call uw_wob
+            pop hl
+            jr c, .z
+            ld c, a
+            ld de, $B003
+            jp uw_spr
+.z1:        dec hl
+.z:         ld [hl], 0
+            ret
+
+; the big bubble (3A/968D): one every 512 frames, rising and drifting right
+uw_big:     ld hl, uw_bb
+            ld a, [hl]
+            and a
+            jr nz, .one
+            ld a, [frame]
+            and a
+            ret nz
+            ld a, [uw_hi]
+            rra
+            ret c
+            call uw_rnd
+            ld [uw_bb + 1], a
+            and $1F
+            add $D8
+            ld [uw_bb], a
+            ret
+.one:       call uw_drift                   ; (3A/96B6)
+            ld a, [hl]
+            sub 1
+            jr c, .z
+            bit 7, e
+            jr z, .s
+            sub 1
+            jr c, .z
+.s:         ld [hl+], a
+            ld b, a
+            ld a, [hl]
+            add 1
+            jr c, .z1
+            ld [hl], a
+            add d
+            cp $FC
+            jr nc, .z1
+            ld [hl-], a
+            push hl
+            call uw_wob
+            pop hl
+            jr c, .z
+            ld c, a
+            ld a, [frame]
+            and $10
+            ld d, $B3
+            jr nz, .t
+            inc d
+.t:         ld e, $23
+            jp uw_spr
+.z1:        dec hl
+.z:         ld [hl], 0
+            ret
+
+; the school of fish (3A/945A): eight, one school every 2048 frames from the left or the right
+uw_fish:    ld a, [uw_fs]
+            and a
+            jr z, .new
+            xor a
+            ld [uw_drawn], a
+            ld hl, uw_f
+            ld c, 8
+.l:         push bc
+            push hl
+            call uw_f1
+            pop hl
+            ld bc, 6
+            add hl, bc
+            pop bc
+            dec c
+            jr nz, .l
+            ld a, [uw_drawn]                ; (none shown and fish 0 past its first 256 frames:
+            and a                           ;   the school is gone)
+            ret nz
+            ld a, [uw_f + 1]
+            and a
+            ret z
+            xor a
+            ld [uw_fs], a
+            ret
+.new:       ld a, [frame]                   ; (3A/947E)
+            and a
+            ret nz
+            ld a, [uw_hi]
+            and 7
+            ret nz
+            ld hl, uw_ee
+            inc [hl]
+            ld l, [hl]
+            ld h, high(uw_rng)
+            ld a, [hl]
+            ld b, a
+            and $3C
+            ld d, a
+            ld a, b
+            and 1
+            or $80
+            ld [uw_fs], a
+            ld a, b
+            and 3
+            ld e, a
+            ld hl, uw_f
+            ld c, 0
+.s:         ld b, 0                         ; counter (3A/9685), 0
+            push hl
+            ld hl, uw_ft + 24
+            add hl, bc
+            ld a, [hl]
+            pop hl
+            ld [hl+], a
+            ld [hl], b
+            inc hl
+            push hl
+            ld hl, uw_ft                    ; x: from the left (3A/966D, high byte $FF) or the
+            ld a, [uw_fs]                   ;   right (3A/967D, 1)
+            rra
+            ld b, $FF
+            jr nc, .x
+            ld hl, uw_ft + 16
+            ld b, 1
+.x:         ld a, c
+            add l
+            ld l, a
+            ld a, [hl]
+            add d
+            or e
+            pop hl
+            ld [hl+], a
+            ld a, b
+            ld [hl+], a
+            push hl
+            ld hl, uw_ft + 8                ; y (3A/9675)
+            ld b, 0
+            add hl, bc
+            ld a, [hl]
+            add d
+            or e
+            pop hl
+            ld [hl+], a
+            ld [hl], b
+            inc hl
+            ld a, e
+            inc a
+            and 3
+            ld e, a
+            inc c
+            ld a, c
+            cp 8
+            jr c, .s
+            ret
+
+; one fish (3A/94FE), HL = its 6 bytes: counter, x, y (16 bits each)
+uw_f1:      inc [hl]
+            jr nz, .c
+            inc hl
+            inc [hl]
+            dec hl
+.c:         call uw_drift
+            ld a, e                         ; (up or down now and then, 3A/9509)
+            and a
+            jr nz, .h
+            ld a, [frame]
+            ld b, a
+            and 7
+            jr nz, .h
+            ld a, b
+            cp $50
+            jr c, .h
+            cp $80
+            jr c, .up
+            cp $D0
+            jr c, .h
+            inc e
+            jr .h
+.up:        dec e
+.h:         ld a, [hl]                      ; swimming by the counter (3A/962D), forwards but
+            and $3F                         ;   backwards in its second 128 frames
+            push hl
+            ld c, a
+            ld b, 0
+            ld hl, uw_sw
+            add hl, bc
+            ld a, [hl]
+            pop hl
+            and a
+            jr z, .mv
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl-]
+            cp 1
+            jr nz, .fw
+            bit 7, b
+            jr nz, .fw
+            ld a, [uw_fs]
+            rra
+            jr c, .r
+.l:         dec d
+            jr .mv
+.fw:        ld a, [uw_fs]
+            rra
+            jr c, .l
+.r:         inc d
+.mv:        inc hl                          ; x += D (signed)
+            inc hl
+            ld a, d
+            rlca
+            sbc a
+            ld b, a
+            ld a, d
+            add [hl]
+            ld [hl+], a
+            ld a, b
+            adc [hl]
+            ld [hl+], a
+            ld a, e                         ; y += E
+            and a
+            jr z, .dr
+            rlca
+            sbc a
+            ld b, a
+            ld a, e
+            add [hl]
+            ld [hl+], a
+            ld a, b
+            adc [hl]
+            ld [hl-], a
+.dr:        inc hl                          ; shown only within the NES screen
+            ld a, [hl-]
+            dec hl
+            or [hl]
+            ret nz
+            ld hl, uw_drawn
+            inc [hl]
+            pop bc                          ; (HL back: the caller's copy)
+            pop hl
+            push hl
+            push bc
+            ld a, [hl+]                     ; the picture by the counter (3A/95C2)
+            ld c, a
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl+]
+            ld [uw_x], a
+            inc hl
+            ld a, [hl]
+            ld [uw_y], a
+            ld a, b
+            and a
+            jr z, .h0
+            cp 1
+            jr nz, .sw
+            ld a, c
+            cp $8A
+            jr nc, .sw
+            cp $80
+            jr nc, .tn
+            cp $76
+            jr nc, .tb
+            cp $0A
+            jr nc, .sb
+            jr .tb
+.h0:        ld a, c
+            cp $F6
+            jr c, .sw
+.tn:        ld d, $B2                       ; turning: B2, facing its way
+            jr .fw2
+.tb:        ld d, $B2                       ; turning back
+            jr .bk
+.sb:        ld d, $B1                       ; swimming back
+            jr .bk
+.sw:        ld d, $B1                       ; swimming
+.fw2:       ld a, [uw_fs]
+            rra
+            ld e, $23
+            jr c, .o
+            ld e, $63
+            jr .o
+.bk:        ld a, [uw_fs]
+            rra
+            ld e, $63
+            jr c, .o
+            ld e, $23
+.o:         ld a, [uw_x]
+            ld c, a
+            ld a, [uw_y]
+            ld b, a
+            jp uw_spr
+
+section bank B_WSPR, $7A00
+uw_rng:     ds 256                          ; (3F/FE00, from the ROM)
+uw_sw:      ds 64                           ; (3A/962D: the fish's swimming steps)
+uw_ft:      ds 32                           ; (3A/966D: the school's x / y / x / counters)
+uw_wt:      ds 32                           ; (3A/97EF: the bubbles' wobble)
+
+section wram, $C0D4
+uw_b:       ds 11                           ; FF3's $0110-$011A: counter, then 5 x (y, x)
+uw_bb:      ds 2                            ; $011C / $011D: the big bubble
+uw_lf:      ds 1
+uw_hi:      ds 1
+uw_drawn:   ds 1                            ; $86
+uw_x:       ds 1
+uw_y:       ds 1
+
+section wram, $DF48
+uw_fs:      ds 1                            ; $0120: a school (bit 7), from the right (bit 0)
+uw_ee:      ds 1                            ; $EE
+uw_f:       ds 48                           ; $0122: 8 x (counter, x, y; 16 bits each)
