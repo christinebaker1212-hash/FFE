@@ -22,8 +22,9 @@ PTRS = [0x57, 0x59, 0x5B, 0x5D, 0x6E, 0x70]            # zero-page pointers into
 ROUTINES = {'init': (1, 0xA400), 'equip': (2, 0xAA16), 'monact': (3, 0xA732), 'fight': (4, 0x9E8A),
             'magic': (5, 0xAF77), 'item': (6, 0xA65E), 'consol': (7, 0xBEBF), 'confuse': (8, 0xBF17),
             'mtarget': (9, 0xA2E9), 'order': (10, 0x9777), 'exec': (11, 0x9DE4), 'over': (12, 0xA458),
-            'cannon': (13, 0xA487)}
-FLOW = ('order', 'exec', 'over', 'cannon')               # FF3's banks $34 / $35 mapped for these
+            'cannon': (13, 0xA487), 'poison': (14, 0xBA41), 'victory': (15, 0xBB49), 'stdisp': (16, 0x9D06)}
+FLOW = ('order', 'exec', 'over', 'cannon', 'poison', 'victory', 'stdisp')   # FF3's banks $34 / $35 mapped
+STUBS = (0x8FF7, 0xFA0E, 0x8411)                        # its message / graphics / animation calls: RTS
 
 
 class Mem(bytearray):
@@ -35,6 +36,8 @@ class Mem(bytearray):
 
     def map(self, slot, b):
         bytearray.__setitem__(self, slice(0x8000 + slot * B8, 0xA000 + slot * B8), self.rom.at(b * B8, B8))
+        for a in getattr(self, 'stubs', ()):
+            if 0x8000 + slot * B8 <= a < 0xA000 + slot * B8: bytearray.__setitem__(self, a, 0x60)
 
     def __setitem__(self, a, v):
         if isinstance(a, int):
@@ -49,6 +52,9 @@ def nes_run(rom, ram6, ram7, zp, addr, flow=False):
     bytearray.__setitem__(mem, slice(0x6000, 0x6400), ram6)
     bytearray.__setitem__(mem, slice(0x7400, 0x7F00), ram7)
     bytearray.__setitem__(mem, slice(0, 0x100), zp)
+    if flow:
+        mem.stubs = STUBS
+        for a in STUBS: bytearray.__setitem__(mem, a, 0x60)
     cpu = MPU(memory=mem)
     cpu.memory[0x1FF] = 0xFF; cpu.memory[0x1FE] = 0xEF; cpu.sp = 0xFD; cpu.pc = addr
     n = 0
@@ -201,6 +207,15 @@ def setup(rom, rnd, name):
         ram7[r7(0x78BA)] = rnd.choice([0, 0, 1, 8])
         for k in range(4): ram7[r7(0x7AC7) + k] = rnd.randrange(8)
         for k in range(4): ram7[r7(0x7CE4) + k] = 0
+    if name == 'victory':
+        r7 = lambda a: a - 0x7400
+        for k in range(4): ram7[r7(0x7DD3) + k] = rnd.choice([0, 0, 1, 2, 3, 4])
+        for k in range(16): ram7[r7(0x78F0) + k] = rnd.randrange(6)
+        for i in range(4): ram6[0x100 + 0x40 * i + 3:0x100 + 0x40 * i + 6] = bytes([rnd.getrandbits(8), rnd.getrandbits(8), rnd.randrange(0x99)])
+    if name == 'poison':
+        for i in range(12):
+            rec = 0x7575 + 0x40 * i - 0x7400
+            if rnd.random() < 0.5: ram7[rec + 1] = (ram7[rec + 1] & ~0xC2) | 2
     if name == 'exec':
         r7 = lambda a: a - 0x7400
         ram7[r7(0x7AC2)] = 0
