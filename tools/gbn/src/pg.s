@@ -20,6 +20,8 @@ PG_ENT     = $1E            ; the shrines' overworld entrance number (postgame.p
 PG_OBJ0    = $F0            ; a boss floor's orbs: object ids $F0-$F3 (the shrine's bosses 0-3), and
 PG_EXIT    = $F4            ;   the light that takes the party out once one of them is beaten
 PGT_BANK   = 125            ; the post-game's text (postgame.py text_source)
+PG_NPC0    = $D0            ; a floor's people: object ids $D0 + n (pgevents.py; FF1's ids end at $CF)
+PG_PF      = unsram + $AB   ; this floor's flags (16 bits: cleared on arrival; the people's scripts)
 M_PGA      = $5063          ; a post-game map's bytes (build.py): its encounter area, shrine, role (0 floor,
 M_PGS      = $5064          ;   1 entrance, 2 boss floor), boss floor number, the shrine's door (x, y),
 M_PGR      = $5065          ;   the battle banks of its two sets (data, graphics, silhouettes, Super Game
@@ -155,7 +157,7 @@ section bank 0, $1DB4                       ; (free space)
 pg_tkchk:   ld a, l
             ld [talk_slot], a
             ld a, [hl]
-            cp PG_OBJ0
+            cp PG_NPC0
             ret c
             pop de
             pop de                          ; (main's .dlg: the box is opened here)
@@ -179,8 +181,10 @@ pg_dobtl:   call do_battle
             ret
 section bank 0, $3F12                       ; (free space)
 ; game_over: in the post-game, the party is thrown back to the world map instead (Dawn of Souls)
-pg_gover:   ldh a, [hbt_db]
-            cp BTL_DATA
+pg_gover:   ld a, [cur_map]                 ; (a post-game floor, FF1's formations too: pg_ffight)
+            cp PGM_MAP0
+            jr c, .go
+            inc a
             jr z, .go
             ld a, PGM_BANK
             call sbank
@@ -206,6 +210,9 @@ pg_t0:      ds 1                            ; (scratch)
 pg_t1:      ds 1
 dlg_nhi:    ds 1                            ; (the chest message's name index: text.s)
 pg_stl:     ds 1                            ; (the statue loaded: its shrine)
+pg_ffb:     ds 1                            ; a person's battle with FF1's formation pending (pg_ffight)
+pg_sfx:     ds 1                            ; (the next box's fanfare)
+pg_sb:      ds 2                            ; (the script running: its start)
 
 section hram, $FFF0
 hbt_db:     ds 1                            ; the battle data bank (battle.py's layout)
@@ -356,11 +363,21 @@ pg_enter:   ld c, 0
             jp pg_lmw
 
 ; ---- a boss floor's way on / out before its boss is beaten this run: "held back" (C clear)
-pg_held:    ld hl, pg_t_held
-            call pg_say
+pg_held:    call pg_evrec                   ; (a floor of people: its own words)
+            jr z, .d
+            inc hl
+            inc hl
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            or h
+            jr nz, .s
+.d:         ld hl, pg_t_held
+.s:         call pg_say
             and a
             ret
-; NZ: this floor's way is open (not a boss floor, or one of its bosses beaten this run)
+; NZ: this floor's way is open (not a boss floor, or one of its bosses beaten this run; a floor of people:
+; its gate's flags all set)
 pg_open:    ld a, [pg_role]
             cp 2
             jr nz, .y
@@ -370,7 +387,33 @@ pg_open:    ld a, [pg_role]
             ld hl, PG_RUNB
             and [hl]
             ret
-.y:         or 1
+.y:         call pg_evrec
+            jr z, .op
+            ld a, [hl+]                     ; (the gate)
+            ld e, a
+            ld d, [hl]
+            ld a, [PG_PF]
+            and e
+            cp e
+            jr nz, .cl
+            ld a, [PG_PF + 1]
+            and d
+            cp d
+            jr nz, .cl
+.op:        or 1
+            ret
+.cl:        xor a
+            ret
+; HL = this floor's people record (pgevents.py: gate, held text, count, scripts); Z: none
+pg_evrec:   ld a, [cur_map]
+            sub PGM_MAP0
+            add a, a
+            ld hl, pg_evt
+            call pg_ix
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            or h
             ret
 
 ; ---- the stairs down (E = FF1's teleport number, not used)
@@ -386,6 +429,15 @@ pg_down:    ld a, [pg_role]
             xor a
             ld [PG_CHEST], a
             ld [PG_CHEST + 1], a
+            ld [PG_PF], a                   ; (a new floor: its flags clear, its people shown)
+            ld [PG_PF + 1], a
+            ld hl, game_flags + PG_NPC0
+            ld b, 15
+.vis:       set 0, [hl]
+            inc l
+            dec b
+            jr nz, .vis
+            ld hl, PG_DEPTH
             ld a, [hl]
             ld c, a                         ; C = the depth
             ld b, 0                         ; a boss depth: its floor; B = boss depths passed
@@ -801,6 +853,8 @@ pg_gift:    ld a, d
 pg_boss:    ld a, [talk_id]
             cp PG_EXIT                      ; (the light: out to the world map, at the door)
             jr z, .out
+            cp PG_OBJ0                      ; (a floor's people: pg_npc)
+            jp c, pg_npc
             sub PG_OBJ0
             ld [pg_bk], a
             ld hl, pg_fy                    ; (its picture's first cell)
@@ -836,7 +890,15 @@ pg_boss:    ld a, [talk_id]
 ; ---- after a battle in the post-game (A = do_battle's result): a boss beaten: remembered, its floor
 ; passed this run (its other orbs gone), the party stays; a boss with a second form fights it first
 pg_after:   push af
-            ld a, [pend_btl]
+            ld a, [pg_ffb]                  ; (a person's battle: the floor's own battle banks again)
+            and a
+            jr z, .pg
+            xor a
+            ld [pg_ffb], a
+            call pg_lcd2
+            pop af
+            ret
+.pg:        ld a, [pend_btl]
             ld c, a
             ld e, 0
 .f:         push de                         ; which of the shrine's bosses?
@@ -924,6 +986,7 @@ pg_after:   push af
 ; ---- the party after a lost battle: alive, ailments gone, 1 HP at least; A = MAP_OW, D, E = the door
 pg_revive:  xor a                           ; (no boss beaten: pg_after)
             ld [pend_btl], a
+            ld [pg_ffb], a
             ld hl, ch_stats
             ld b, 4
 .l:         push hl
@@ -948,6 +1011,244 @@ pg_revive:  xor a                           ; (no boss beaten: pg_after)
             ld a, [ow_y]
             ld e, a
             ld a, MAP_OW
+            ret
+
+; ---- a floor's people (ids PG_NPC0 + n: pgevents.py): their scripts. Ops: $00 end (no box), $01 say (text in
+; PGT_BANK), $02 if flag (f, offset), $03 set flag, $04 fight (FF1's formation), $05 hide (this person), $06 if all
+; (mask, offset), $07 if boss beaten (shrine, boss, offset), $08 shop, $09 heal, $0A MP full, $0B HP halved,
+; $0D give (kind: 0 FF1 item / 1 new consumable, which), $0F go to (offset), $10 the next box's fanfare
+pg_npc:     call pg_evrec
+            ret z
+            ld a, [talk_id]
+            sub PG_NPC0
+            add a, a
+            add a, 5
+            call pg_ix
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, l
+            ld [pg_sb], a
+            ld a, h
+            ld [pg_sb + 1], a
+.op:        ld a, [hl+]
+            and a
+            ret z
+            dec a
+            jr z, .say
+            dec a
+            jr z, .ifset
+            dec a
+            jr z, .set
+            dec a
+            jp z, .fight
+            dec a
+            jp z, .hide
+            dec a
+            jp z, .ifall
+            dec a
+            jp z, .ifboss
+            dec a
+            jp z, .shop
+            dec a
+            jp z, .heal
+            dec a
+            jp z, .mpup
+            dec a
+            jp z, .drain
+            dec a
+            dec a
+            jp z, .give
+            dec a
+            dec a
+            jp z, .goto
+            ld a, 2                         ; (the treasure ditty with the next box)
+            ld [pg_sfx], a
+            jr .op
+.say:       ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, PGT_BANK
+            ld [dlg_bank], a
+            ld a, l
+            ld [dlg_ptr], a
+            ld a, h
+            ld [dlg_ptr + 1], a
+            ld a, [pg_sfx]
+            ld [dlgsfx], a
+            xor a
+            ld [pg_sfx], a
+            jp dlg_open2
+.ifset:     ld a, [hl+]
+            ld c, [hl]
+            inc hl
+            call pg_pfbit
+            jr z, .op
+.jmp:       ld a, [pg_sb]                   ; (to the script's offset C)
+            add a, c
+            ld l, a
+            ld a, [pg_sb + 1]
+            adc a, 0
+            ld h, a
+            jr .op
+.set:       ld a, [hl+]
+            call pg_pfbit
+            ld a, [de]
+            or b
+            ld [de], a
+            jr .op
+.goto:      ld c, [hl]
+            inc hl
+            jr .jmp
+.fight:     ld a, [hl+]                     ; FF1's formation: FF1's battle banks until pg_after
+            push hl
+            call talk_btl
+            ld a, BTL_DATA
+            ldh [hbt_db], a
+            ld a, BTL6_BANK
+            ldh [hbt_dom], a
+            ld a, ENEMY_CHR
+            ldh [hbt_cb], a
+            ld a, ESIL_BANK
+            ldh [hbt_sb], a
+            ld a, SGB_BANK
+            ldh [hbt_sgb], a
+            ld a, $23
+            ldh [hbt_fy], a
+            ld a, 1
+            ld [pg_ffb], a
+            pop hl
+            jp .op
+.hide:      push hl
+            ld a, [talk_id]
+            call hide_this
+            pop hl
+            jp .op
+.ifall:     ld a, [hl+]
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            ld c, [hl]
+            inc hl
+            ld a, [PG_PF]
+            and e
+            cp e
+            jp nz, .op
+            ld a, [PG_PF + 1]
+            and d
+            cp d
+            jp nz, .op
+            jr .jmp
+.ifboss:    ld a, [hl+]                     ; (PG_BOSS + shrine, the boss's bit)
+            ld e, a
+            ld a, [hl+]
+            ld b, a
+            ld c, [hl]
+            inc hl
+            push hl
+            ld d, 0
+            ld hl, PG_BOSS
+            add hl, de
+            call pg_bit
+            and [hl]
+            pop hl
+            jp z, .op
+            jr .jmp
+.shop:      ld a, [hl]                      ; (as a shop's door: main.s)
+            ld [shop_arg], a
+            ld hl, shop_main
+            call pc_menu
+            jp map_reload
+.heal:      push hl                         ; everyone not dead / stone: HP full
+            ld hl, ch_stats
+            ld b, 4
+.hl:        push hl
+            inc l
+            ld a, [hl]
+            dec l
+            dec a                           ; (1 dead, 2 stone: not healed)
+            cp 2
+            jr c, .hn
+            ld a, l
+            add a, CH_MAXHP
+            ld l, a
+            ld a, [hl+]
+            ld c, [hl]
+            dec l
+            dec l
+            ld [hl], c
+            dec l
+            ld [hl], a
+.hn:        pop hl
+            ld a, l
+            add a, $40
+            ld l, a
+            dec b
+            jr nz, .hl
+            pop hl
+            jp .op
+.mpup:      push hl
+            ld a, 2
+            ld hl, party_mp
+            call bank_call
+            pop hl
+            jp .op
+.drain:     push hl                         ; everyone not dead / stone: HP halved, 1 at least
+            ld hl, ch_stats
+            ld b, 4
+.dl:        push hl
+            inc l
+            ld a, [hl]
+            dec a
+            cp 2
+            jr c, .dn
+            ld a, l
+            add a, CH_HP - CH_AIL + 1
+            ld l, a
+            srl [hl]
+            dec l
+            rr [hl]
+            ld a, [hl+]
+            or [hl]
+            jr nz, .dn
+            dec l
+            ld [hl], 1
+.dn:        pop hl
+            ld a, l
+            add a, $40
+            ld l, a
+            dec b
+            jr nz, .dl
+            pop hl
+            jp .op
+.give:      ld a, [hl+]                     ; (kind, which: one more, 99 at most)
+            ld d, a
+            ld a, [hl+]
+            push hl
+            ld e, a
+            ld a, d
+            and a
+            ld a, e
+            jr z, .gf
+            add a, C_CONS
+.gf:        call it_cnt
+            ld a, [hl]
+            cp 99
+            jr nc, .gx
+            inc [hl]
+.gx:        pop hl
+            jp .op
+; NZ: floor flag A set (HL kept); DE = its byte, B = its bit
+pg_pfbit:   ld de, PG_PF
+            cp 8
+            jr c, .l
+            inc de
+            sub 8
+.l:         ld b, a
+            call pg_bit
+            ld b, a
+            ld a, [de]
+            and b
             ret
 
 ; ==== Dawn of Souls' items (postgame.py NEW_CONS, WEAPON_NAMES, ARMOUR_NAMES): consumable k's Items-screen code

@@ -1293,3 +1293,15 @@ one reaches parity, so the owner can keep playing).
       on everyone, Emergency Exit (out, as the Exit spell). Battle: md_tab's fourth byte the MP effect (md_mp).
     - The statues (postgame.statue(rom, fiend)): bank 127, the nearest sealed shrine's loaded with the world map
       (pg_veh).
+72. Owner (2026-11-27): "Finish the rest: towns, shops and the puzzle floors too": the shrines' people
+    (docs/ff1-postgame-design.md section 13; tools/gbn/pgevents.py, src/pg.s pg_npc).
+    - pgevents.py: per Dawn of Souls map record the people (FF1 sprite, script, where), the gate, the held words; the
+      English of messages 660-1018; the shops (SHOP_DEFS, ids 71 on; the mages' village uses FF1's best magic shops);
+      place() puts them on the converted floor (postgame.cave_floor / outdoor_floor now return walk / reach).
+    - pg.s: pg_tkchk takes ids $D0 on; pg_boss sends $D0-$EF to pg_npc (the script interpreter; ops in pgevents.OPS);
+      pg_open / pg_held read the floor's record (pg_evt, bank 116 $7330: gate, held text, scripts); pg_down clears
+      PG_PF (save page $AB-$AC) and shows game flags $D0-$DE; a fight with an FF1 formation switches the battle banks
+      (pg_ffb) and pg_after restores them; pg_gover tells the post-game by the map, not the battle bank.
+    - shop.s: item counts through it_cnt; sh_pix / sh_inix (an item shop's code $C0 + k: price N_PRICE + $380 + 2 k,
+      name 256 + k). build.py writes the shops into the names bank and the consumables' prices (pgevents.cons_prices).
+    - postgame.py: a floor whose stairs sit in a small pocket gets them in its largest part (cave and outdoor).
