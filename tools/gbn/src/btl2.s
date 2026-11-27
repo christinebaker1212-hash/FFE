@@ -1723,8 +1723,10 @@ bt_erase_enemy:
             ld b, a
             ld a, [bt_type]
             cp 4
-            jr nc, .x                       ; (Chaos: its own ending)
-            cp 3
+            jr nc, .ch                      ; (Chaos: nothing here, his dissolve after the
+            cp 3                            ;   fanfare: bt_chaos_death; owner, 2026-11-27:
+                                            ;   bt_erase_rows took him for slot 0's small
+                                            ;   enemy and cut a block out of his top left)
             jr c, .n
             call fl_fiend                   ; a fiend: its flash first
             ld bc, $0302
@@ -1753,6 +1755,8 @@ bt_erase_enemy:
             jp bt_erase_box
 .x:         pop af
             jp bt_erase_rows                ; (what is left cleared row by row: btl4.s)
+.ch:        pop af
+            ret
             ld [bt_t + 4], a
             call bt_epos
             ld a, e
