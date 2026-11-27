@@ -618,7 +618,6 @@ m_label:    ld hl, m_labels
 
 ; ---- not yet: an error sound (first pass)
 m_magic:
-m_equip:
 m_job:
 m_config:
 m_suspend:  jp m_sfx_err
@@ -2590,10 +2589,648 @@ m_target:   ld a, [m_who]
             call m_sfx_move
             jr .lp
 
+; ==== 2 Equip (FF3's 3C/9BB5): a slot with something: it comes off (3C/9D9B); an empty slot:
+; something from the pack (3C/9C3C); "Remove Equipment": everything off
+E_SLOTS:    db 3, 5, 0, 1, 2                ; our rows: right hand, left hand, head, body, arms
+E_LABEL:    db $E0, $E1, $DD, $DE, $DF      ; their empty names (t8200)
+m_equip:    call m_member
+            ret c
+            xor a
+            ld [m_ecur], a
+.scr:       ld a, [m_who]
+            ld c, a
+            %FAR B_BSCR, bs_fequip          ; (FF3's battle values for Attack / Defense)
+            call e_draw
+.lp:        ld a, [m_ecur]
+            add 4
+            ld b, a
+            ld c, 1
+            call m_hand
+            call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            call m_sfx_ok
+            ld a, [m_ecur]
+            cp 5
+            jr z, .all
+            call e_slotx                    ; L = the slot's page offset
+            ld a, [hl]
+            and a
+            jr z, .pick
+            call e_remove                   ; something there: off
+            jr .scr
+.pick:      call e_pick
+            jr .scr
+.all:       call e_all
+            jr .scr
+.x:         ret
+.up:        ld a, [m_ecur]
+            dec a
+            cp $FF
+            jr nz, .m
+            ld a, 5
+            jr .m
+.dn:        ld a, [m_ecur]
+            inc a
+            cp 6
+            jr c, .m
+            xor a
+.m:         ld [m_ecur], a
+            call m_sfx_move
+            jr .lp
+
+; HL = $6200 + member + slot of row [m_ecur]; [m_eslot] = the slot
+e_slotx:    ld a, [m_ecur]
+            ld hl, E_SLOTS
+            add l
+            ld l, a
+            jr nc, .s
+            inc h
+.s:         ld a, [hl]
+            ld [m_eslot], a
+            ld b, a
+            call m_who_off
+            add b
+            ld l, a
+            ld h, high(SRAM_PAGE + $200)
+            ret
+
+; the screen: the member's window (0, 0) 20 x 11: name, Attack / Defense, the five slots, Remove
+; Equipment; the pack's fitting items below when choosing
+e_draw:     call m_clear
+            call m_sprclr
+            ld de, $0000
+            ld bc, $0B14
+            call m_win
+            ld a, [m_who]
+            ld de, $0101
+            call m_name
+            call m_who_off
+            call m_sp1
+            add $E2
+            call m_t82
+            ld de, $0108
+            ld a, 11
+            call m_putsn
+            ld de, $0201                    ; Attack ($6123 + $6128), Defense ($612D)
+            ld a, 5
+            call m_label
+            call m_toad
+            ld hl, 1
+            jr nz, .a1
+            call m_who_off
+            add $23
+            call m_sp1
+            ld b, a
+            call m_who_off
+            add $28
+            call m_sp1
+            add b
+            ld l, a
+            ld a, 0
+            adc 0
+            ld h, a
+.a1:        ld de, $020D
+            ld b, 3
+            call m_num
+            ld de, $0301
+            ld a, 7
+            call m_label
+            call m_toad
+            ld hl, 1
+            jr nz, .d1
+            call m_who_off
+            add $2D
+            call m_sp1
+            ld l, a
+            ld h, 0
+.d1:        ld de, $030D
+            ld b, 3
+            call m_num
+            xor a
+.s:         ld [m_row], a                   ; the slots (rows 4-8)
+            ld b, a
+            ld a, [m_ecur]
+            push af
+            ld a, b
+            ld [m_ecur], a
+            call e_slotx
+            pop af
+            ld [m_ecur], a
+            ld a, [m_row]
+            add 4
+            ld d, a
+            ld e, 2
+            ld a, [hl]
+            and a
+            jr nz, .it
+            push de
+            ld a, [m_row]
+            ld hl, E_LABEL
+            add l
+            ld l, a
+            jr nc, .l2
+            inc h
+.l2:        ld a, [hl]
+            call m_t82
+            pop de
+            ld a, 14
+            call m_putsn
+            jr .nx
+.it:        push hl
+            push de
+            ld e, a
+            ld d, 0
+            call m_n88
+            pop de
+            ld a, 13
+            call m_putsn
+            pop hl
+            ld a, [m_eslot]                 ; arrows: their number
+            cp 3
+            jr c, .nx
+            inc l
+            ld a, [hl]
+            cp 2
+            jr c, .nx
+            ld l, a
+            ld h, 0
+            ld e, 15
+            ld a, ':'
+            call m_putc
+            inc e
+            ld b, 2
+            call m_num
+.nx:        ld a, [m_row]
+            inc a
+            cp 5
+            jr nz, .s
+            ld de, $0902
+            ld hl, m_remove
+            call m_puts0
+            jp m_show
+
+; ---- off: the slot's item (and its count) into the pack (3C/9D68): C = no room
+e_remove:   call e_off
+            push af
+            ld a, [m_who]
+            ld c, a
+            %FAR B_BSCR, bs_fequip
+            call e_draw
+            pop af
+            ld a, $6B                       ; "Your inventory is full ..."
+            jr c, .m
+            ld a, $6E                       ; "Removed the equipment."
+.m:         call m_msg
+            call m_show
+            jp m_waitkey
+e_off:      call e_slotx
+            ld a, [hl]
+            and a
+            ret z
+            ld [m_iid], a
+            ld c, 1
+            ld a, [m_eslot]
+            cp 3
+            jr c, .q
+            inc l
+            ld c, [hl]
+            dec l
+.q:         push hl
+            ld a, [m_iid]
+            ld b, a
+            call m_invadd
+            pop hl
+            ret c
+            ld [hl], 0                      ; 3C/9E0F
+            ld a, [m_eslot]
+            cp 3
+            jr c, .u
+            inc l
+            ld [hl], 0
+.u:         and a
+            ret
+; FF3's add item to inventory (3C/9362): B id, C count: its stack (up to 99) or the first
+; empty place; C = full
+m_invadd:    ld hl, SRAM_PAGE + $C0
+            ld e, 32
+.f:         ld a, [hl]
+            cp b
+            jr z, .put
+            inc l
+            dec e
+            jr nz, .f
+            ld hl, SRAM_PAGE + $C0
+            ld e, 32
+.e:         ld a, [hl]
+            and a
+            jr z, .put
+            inc l
+            dec e
+            jr nz, .e
+            scf
+            ret
+.put:       ld [hl], b
+            ld a, l
+            add $20
+            ld l, a
+            ld a, [hl]
+            add c
+            cp 99
+            jr c, .s
+            ld a, 99
+.s:         ld [hl], a
+            and a
+            ret
+; FF3's remove item from inventory (3C/90B9): B id, C count
+m_invsub:    ld hl, SRAM_PAGE + $C0
+            ld e, 32
+.f:         ld a, [hl]
+            cp b
+            jr z, .s
+            inc l
+            dec e
+            jr nz, .f
+            ret
+.s:         ld a, l
+            add $20
+            ld l, a
+            ld a, [hl]
+            sub c
+            ld [hl], a
+            ret nz
+            ld a, l
+            sub $20
+            ld l, a
+            ld [hl], 0
+            ret
+
+; ---- Remove Equipment (3C/9DA2): slots 5, 3, 2, 1, 0
+e_all:      xor a
+            ld [m_eany], a
+            ld a, [m_ecur]
+            push af
+            ld b, 5
+.s:         push bc
+            ld a, b                         ; slot -> our row
+            ld hl, E_SLOTS
+            ld c, 0
+.f:         cp [hl]
+            jr z, .g
+            inc hl
+            inc c
+            jr .f
+.g:         ld a, c
+            ld [m_ecur], a
+            call e_slotx
+            ld a, [hl]
+            and a
+            jr z, .n
+            call e_off
+            jr c, .full
+            ld a, 1
+            ld [m_eany], a
+.n:         pop bc
+            dec b
+            ld a, b
+            cp 4
+            jr nz, .n2
+            dec b
+.n2:        bit 7, b
+            jr z, .s
+            pop af
+            ld [m_ecur], a
+            ld a, [m_eany]
+            and a
+            ret z
+            ld a, $6E
+            jr .m
+.full:      pop bc
+            pop af
+            ld [m_ecur], a
+            ld a, $6B
+.m:         call m_msg
+            call m_show
+            jp m_waitkey
+
+; ---- choose from the pack for the empty slot (the pack's fitting items, 5 rows below)
+e_pick:     call e_list                     ; -> m_elist (inventory places), m_en
+            ld a, [m_en]
+            and a
+            jp z, m_sfx_err
+            xor a
+            ld [m_icur], a
+            ld [m_top], a
+.scr:       call e_listdraw
+.lp:        ld a, [m_icur]
+            ld hl, m_top
+            sub [hl]
+            add 12
+            ld b, a
+            ld c, 1
+            call m_hand2
+            call m_frame
+            ldh a, [pad_new]
+            bit 6, a
+            jr nz, .up
+            bit 7, a
+            jr nz, .dn
+            bit 1, a
+            jr nz, .x
+            and PAD_A
+            jr z, .lp
+            call m_hand2off
+            ld a, [m_icur]
+            ld hl, m_elist
+            add l
+            ld l, a
+            jr nc, .g
+            inc h
+.g:         ld a, [hl]                      ; the pack's place
+            call e_equip
+            ret nc
+            ld a, $6F                       ; "Can't equip."
+            call m_msg
+            call m_show
+            call m_waitkey
+            ret
+.x:         call m_hand2off
+            ret
+.up:        ld a, [m_icur]
+            and a
+            jr z, .lp
+            dec a
+            jr .m
+.dn:        ld a, [m_icur]
+            inc a
+            ld hl, m_en
+            cp [hl]
+            jr nc, .lp
+.m:         ld [m_icur], a
+            call m_sfx_move
+            ld hl, m_top
+            ld a, [m_icur]
+            cp [hl]
+            jr nc, .m1
+            ld [hl], a
+            jr .scr
+.m1:        sub [hl]
+            cp 5
+            jr c, .lp
+            ld a, [hl]
+            inc a
+            ld [hl], a
+            jr .scr
+; the pack's places whose items fit slot [m_eslot]: hands $00-$61, head $62-$71, body $72-$8A,
+; arms $8B-$97 (3C/9C72)
+e_list:     call e_slotx
+            ld a, [m_eslot]
+            ld bc, $6200                    ; B low, C high (exclusive)
+            cp 3
+            jr nc, .r
+            ld bc, $7262
+            and a
+            jr z, .r
+            ld bc, $8B72
+            dec a
+            jr z, .r
+            ld bc, $988B
+.r:         ld a, c
+            ld [m_elo], a
+            ld a, b
+            ld [m_ehi], a
+            xor a
+            ld [m_en], a
+            ld c, 0
+.f:         ld a, c
+            add $C0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld a, [hl]
+            and a
+            jr z, .n
+            ld hl, m_elo
+            cp [hl]
+            jr c, .n
+            inc hl
+            cp [hl]
+            jr nc, .n
+            ld a, [m_en]
+            ld hl, m_elist
+            add l
+            ld l, a
+            jr nc, .p
+            inc h
+.p:         ld [hl], c
+            ld hl, m_en
+            inc [hl]
+.n:         inc c
+            ld a, c
+            cp 32
+            jr nz, .f
+            ret
+; the list window (0, 11) 20 x 7: 5 rows from m_top
+e_listdraw: ld de, $0B00
+            ld bc, $0714
+            call m_win
+            ld a, [m_top]
+            ld [m_row], a
+            ld d, 12
+.r:         ld a, [m_row]
+            ld hl, m_en
+            cp [hl]
+            jr nc, .x
+            push de
+            ld hl, m_elist
+            add l
+            ld l, a
+            jr nc, .g
+            inc h
+.g:         ld a, [hl]
+            push af
+            add $C0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld e, [hl]
+            ld d, 0
+            call m_n88
+            pop af
+            pop de
+            push de
+            push af
+            ld e, 2
+            ld a, 12
+            call m_putsn
+            pop af
+            pop de
+            push de
+            add $E0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld l, [hl]
+            ld h, 0
+            ld e, 15
+            ld a, ':'
+            call m_putc
+            inc e
+            ld b, 2
+            call m_num
+            pop de
+            ld a, [m_row]
+            inc a
+            ld [m_row], a
+            inc d
+            ld a, d
+            cp 17
+            jr nz, .r
+.x:         jp m_show
+; equip the pack's place A in slot [m_eslot] (3C/9C3C): C = can't
+e_equip:    ld [m_islot], a
+            add $C0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld a, [hl]
+            ld [m_iid], a
+            call m_canequip
+            scf
+            ret z
+            ld a, [m_eslot]
+            cp 3
+            jr c, .arm
+            ld a, [m_eslot]                 ; a hand: the other hand's item (slot 3 <-> 5)
+            xor 6
+            ld b, a
+            call m_who_off
+            add b
+            ld l, a
+            ld h, high(SRAM_PAGE + $200)
+            ld a, [hl]
+            and a
+            jr z, .ok                       ; (3C/9CDF: the pair allowed? 3C/9D4B)
+            call e_wtype
+            ld b, a
+            ld a, [m_iid]
+            call e_wtype
+            add a
+            add a
+            or b
+            ld hl, wp_comb
+            add l
+            ld l, a
+            jr nc, .w2
+            inc h
+.w2:        ld a, [hl]
+            and a
+            scf
+            ret nz
+.ok:        ld a, [m_islot]                 ; arrows: up to 20 of them; else 1
+            add $E0
+            ld l, a
+            ld h, high(SRAM_PAGE)
+            ld a, [hl]
+            cp 21
+            jr c, .q
+            ld a, 20
+.q:         ld c, a
+            ld a, [m_iid]
+            cp $4F
+            jr c, .one
+            cp $57
+            jr c, .put
+.one:       ld c, 1
+            jr .put
+.arm:       ld c, 1
+.put:       call e_slotx
+            ld a, [m_iid]
+            ld [hl], a
+            ld a, [m_eslot]
+            cp 3
+            jr c, .r
+            inc l
+            ld [hl], c
+.r:         ld a, [m_iid]
+            ld b, a
+            call m_invsub
+            and a
+            ret
+; FF3's weapon type (3C/9D2F): 0 other, 1 bow, 2 arrows, 3 harp
+e_wtype:    cp $46
+            jr c, .o
+            cp $4A
+            jr c, .h
+            cp $4F
+            jr c, .b
+            cp $57
+            jr c, .a
+.o:         xor a
+            ret
+.h:         ld a, 3
+            ret
+.b:         ld a, 1
+            ret
+.a:         ld a, 2
+            ret
+; NZ when member [m_who]'s job may equip item [m_iid] (35/B8FD: 30/9400 + 8 id, byte 7 & $7F
+; -> the jobs allowed, 00/8900 + 3 n)
+m_canequip: ld a, [m_iid]
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $9400 + 7 - $4000
+            add hl, de
+            ld a, B_BDAT
+            call far_byte
+            and $7F
+            ld l, a
+            ld h, 0
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, de
+            ld de, eq_types
+            add hl, de
+            ld de, m_tmp
+            ld bc, 3
+            ld a, B_BSCR
+            call far_copy
+            call m_who_off                  ; the job's bit (job 0: bit 0 of the third byte)
+            call m_sp1
+            ld c, a
+            ld hl, m_tmp + 2
+            ld a, c
+            cp 16
+            jr c, .b1
+            sub 16
+            ld hl, m_tmp
+            jr .b
+.b1:        cp 8
+            jr c, .b
+            sub 8
+            dec hl
+.b:         ld b, a
+            ld a, 1
+            inc b
+.s:         dec b
+            jr z, .t
+            add a
+            jr .s
+.t:         and [hl]
+            ret
+
 section bank B_MENU, $7C00
 sp_mask:    ds 56                           ; (3D/A20C, A244, A27C: from the ROM)
 sp_lvl:     ds 56
 sp_ptr:     ds 56
+wp_comb:    ds 16                           ; (3C/9D4B)
 
 section wram, $CD80
 m_cur:      ds 1
@@ -2628,3 +3265,10 @@ m_rnd:      ds 1
 m_tmpc:     ds 1
 m_spl:      ds 24
 m_row:      ds 1
+m_ecur:     ds 1
+m_eslot:    ds 1
+m_eany:     ds 1
+m_elo:      ds 1
+m_ehi:      ds 1
+m_en:       ds 1
+m_elist:    ds 32

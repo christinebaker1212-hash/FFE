@@ -47,7 +47,8 @@ def menu_data():
             'm_s_erase:  db %s\n' % z(clean(t[0x4C].split('{15')[0]).replace('\n', '\x0a')) +
             'm_s_yes:    db %s\n' % z(clean(t[6].split('\n')[0])) +
             'm_s_no:     db %s\n' % z(clean(t[6].split('\n')[1])) +
-            'm_damaged:  db %s\n' % z('Damaged') + 'm_trash:    db %s\n' % z('Trash') + name_grid())
+            'm_damaged:  db %s\n' % z('Damaged') + 'm_trash:    db %s\n' % z('Trash') +
+            'm_remove:   db %s\n' % z(clean(t[0x3E].split('\n')[-1])) + name_grid())
 
 
 def name_grid():
@@ -294,6 +295,7 @@ ROMDATA = {
     'sp_mask': (0x3D, 0xA20C, 56),       # menu: each spell's bit in its level's known byte
     'sp_lvl': (0x3D, 0xA244, 56),        # menu: each spell's level byte ($6207 + n)
     'sp_ptr': (0x3D, 0xA27C, 56),        # menu: each spell's level slots in the list buffer
+    'wp_comb': (0x3C, 0x9D4B, 16),       # menu: the hand pairs allowed (weapon types 4 x 4)
 }
 
 MACROS = {
