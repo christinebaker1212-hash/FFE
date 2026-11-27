@@ -736,14 +736,16 @@ bs_fdis:    call wait_vbl                   ; (the rows below the windows and ri
             ld a, c
             cp 16
             jr nz, .w
-            ld a, [bs_fdy + 1]              ; the scroll: up a line every 16 frames (scaled 5 / 8)
-            ld b, a
-            add a
-            add a
-            add b
+            ld a, [bs_fdy + 1]              ; the scroll: up a line every 16 frames (scaled 5 / 8:
+            ld b, a                         ;   n - n / 4 - n / 8, no overflow)
             srl a
             srl a
+            ld c, a
             srl a
+            add c
+            ld c, a
+            ld a, b
+            sub c
             ldh [rSCY], a
             ld a, [bs_fdf]                  ; the shake
             and 7

@@ -196,7 +196,7 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   monster / boss palettes from FF3's attribute data (2F/A857, a bit per 16 x 16 block), the party's
   palettes by job (2E/9E01), event battles ($F7), the battle id's high byte from the world (2E/9E8E).
 - Battle to do: attack / spell animations, the layout per the owner's mock-up choice, monster
-  chests, back attacks (FF3 flips the monsters), the airship's battle background.
+  chests (done since: see below).
 
 ## Menus, saves, title (2026-11-27; `src/menu.s`, bank B_MENU = 76)
 - Start on the map: the main menu (FF3's commands from its text $31 + Config / Suspend): commands
@@ -396,8 +396,14 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   blank cells over the top window), Odin's cells all showed column 0 of his map, Odin's charge
   flickered, Megaflare left a white backdrop, a ranged projectile aimed up flew down, animation
   graphics sets 12-17 were never packed (the cannon's, two summon attacks', one battle animation's).
-- Not yet in battle: the final boss's own raster dissolve (10/8A85: here the boss dissolve above),
-  stone characters in the BG, the airship's battle background.
+- The final boss's death as FF3 (10/8A85): three grey flashes, then 16 columns clearing their
+  byte of the boss's tiles at 10/8A4C's speeds (the raster dissolve), the screen scrolled up a line
+  every 16 frames and shaken by 10/8A5C, then 2F/BFB8's fade. Test hook GB3N_FDTEST (with
+  GB3N_BATHI=1, battle $78).
+- Stone characters: FF3 draws them in the BG from the kneeling tiles (28/8080) with BG palette 3;
+  here the kneeling frame as sprites in OBJ palette 5, a copy of the windows' palette.
+- Battle backdrops: none (the black battlefield of mock-up A; FF3's backdrop strip, the airship's
+  among them, would come with mock-up B if the owner chooses it).
 
 ## Mock-ups sent to the owner (2026-11-27; `tools/gb3n/mockup.py`, PNGs in `build/mock3/`)
 - `dialogue.png`: A box at the top, B at the bottom (FF3 itself has a top and a bottom window;
