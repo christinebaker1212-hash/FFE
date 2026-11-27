@@ -2,6 +2,15 @@
 ; (35/A56F) as native code. Data: NES banks $2E (B_BDAT2 $4000) and $2F (B_BSET $6000).
 
 section bank B_BAT2, $5300
+; ---- the battle's setup in FF3's order (2E/9F28-9F34), the seed in bs_seed
+fe_setup_all:
+            ld a, [bs_seed]
+            call fe_FC27
+            call fe_A02A
+            call fe_9FAA
+            call fe_A31F
+            jp fe_B909
+
 ; ---- $FC27 init rng: the battle random table at $7BE3 (seed: a sum, as FF3's zero page sum)
 fe_FC27:    ld [BZ + $15], a                ; A = the seed
             ld [BZ + $16], a

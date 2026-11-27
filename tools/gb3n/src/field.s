@@ -616,6 +616,8 @@ trig_run:   ld b, a
             xor a
             ld [trig], a
             ld a, b
+            cp TR_BATTLE
+            jp z, battle_run
             cp TR_WENT
             jp z, world_in
             cp TR_WORLD
@@ -750,7 +752,9 @@ passable:   ld c, a
 .tok:       ld [trig_next], a
             and a
             ret
-.plain:     and 7
+.plain:     bit 6, a                        ; an encounter tile ($3F $E3A5)
+            call nz, enc_map
+            and 7
             jr z, .st
             cp 4
             jr nc, .ok

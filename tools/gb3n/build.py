@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
 import tiles, data, text
 
-BATTLE_SRC = ['batlib.s', 'batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s', 'batflow.s', 'batvict.s', 'batloop.s', 'batsetup.s']
+BATTLE_SRC = ['batlib.s', 'batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s', 'batflow.s', 'batvict.s', 'batloop.s', 'batsetup.s', 'batscr.s', 'batui.s']
 ROM_BANKS = 128             # 2 MB (sized to the game later)
 RAM_CODE = 0x03             # 32 KB cart RAM (4 banks, as retail MBC5 games: docs/gb-lessons.md)
 EN_SHA1 = '4a7f1ae4c89305cf161aa3d78fd4416548663f99'   # build/ff3_en.nes (patches/README.md)
@@ -32,7 +32,26 @@ def own_data():
             'C_SCR_CGBONLY:\n' + db(tiles.screen(tiles.CGB_ONLY), 20) +
             'C_SCR_TEST:\n' + db(test, 20) + 'C_PAL0:\n' + db(pal0) +
             'section bank %d, $6000\nC_WFONT:\n' % B_OWN + db(b''.join(tiles.tileset(fg=3, bg=2)[:128])) +
-            'C_FF3ASC:\n' + db(tiles.ff3_to_ascii()))
+            'C_FF3ASC:\n' + db(tiles.ff3_to_ascii()) +
+            'C_SPRDIG:\n' + db(spr_digits()))
+
+
+def spr_digits():
+    """battle sprite tiles (ours): digits 0-9, "Miss" in 4 tiles, the hand cursor (colour 0
+    clear, 3 the figure, 1 its outline)"""
+    t = tiles.tileset(fg=3, bg=0)
+    out = [t[ord(c)] for c in '0123456789Miss']
+    hand = ['........', '.11.....', '1331111.', '13333331', '1333331.', '13333311', '1133331.', '.111111.']
+    b = bytearray()
+    for row in hand:
+        lo = hi = 0
+        for x, ch in enumerate(row):
+            v = int(ch) if ch != '.' else 0
+            lo |= (v & 1) << (7 - x); hi |= (v >> 1) << (7 - x)
+        b += bytes([lo, hi])
+    out.append(bytes(b))
+    out.append(bytes(16))
+    return b''.join(out)
 
 
 B_MAPINFO, B_MAPAUX, B_EVENTS, B_CHARS, B_TMAP0, B_SUB0, B_COMMON = 3, 4, 5, 6, 8, 12, 17
@@ -41,7 +60,8 @@ B_WORLD0, B_WINFO, B_WGFX = 32, 48, 49
 B_SND0 = 50                 # 50-53: NES bank $36 at $4000, song bank $37 / $38 / $39 / $09 at $6000
 B_BAT, B_BDAT, B_BDAT2, B_BDAT3 = 54, 55, 56, 57   # battle code; NES $30 + $31; $2E + $01; $38 + $39
 B_BAT2 = 58                 # battle flow code
-B_BSET = 59                 # NES $3A (unused) + $2F at $6000: battle setup data
+B_BSET = 59                 # NES $2E / $2F: battle setup data
+B_BSCR, B_BINFO, B_CGFX, B_MGFX0 = 60, 61, 62, 64   # battle screen code; monster index; job graphics; monster graphics (64-71)
 
 
 def field_banks(rom):
@@ -128,9 +148,35 @@ def field_banks(rom):
     banks[B_BDAT3] = bytearray(rom.at(0x38 * data.B8, 0x4000))
     banks[B_BSET] = bytearray(rom.at(0x2E * data.B8, 0x4000))         # NES $2E / $2F
     banks[B_BDAT2] = bytearray(rom.at(0x2E * data.B8, 0x2000) + rom.at(0x01 * data.B8, 0x2000))
+    battle_gfx(rom, banks, gbt, blank)
     for k, sb in enumerate((0x37, 0x38, 0x39, 0x09)):     # sound: driver tables + song data
         banks[B_SND0 + k] = bytearray(rom.at(0x36 * data.B8, 0x2000) + rom.at(sb * data.B8, 0x2000))
     return banks
+
+
+def battle_gfx(rom, banks, gbt, blank):
+    """monster graphics (GB tiles) by graphics block, the index by monster id in B_BINFO $4000 (4
+    bytes: bank, address, width << 4 | height; 0 for the boss sizes, drawn from their tilemaps);
+    the jobs' battle graphics (NES $28 / $29) in B_CGFX"""
+    tab = data.mon_gfx_table(rom)
+    info = blank(); seen = {}; bank, at = B_MGFX0, 0
+    for mid in range(256):
+        p = rom.rd(0x2E, 0x8B00 + mid)
+        cls, g = p >> 5, p & 0x1F
+        if cls >= len(tab):
+            continue
+        if (cls, g) not in seen:
+            nb, addr, w, h = tab[cls]
+            size = 16 * w * h
+            gfx = gbt(rom.at(nb * data.B8 + (addr - 0x8000) + size * g, size))
+            if at + size > 0x4000: bank, at = bank + 1, 0
+            banks.setdefault(bank, blank())[at:at + size] = gfx
+            seen[(cls, g)] = (bank, 0x4000 + at, w, h); at += size
+        bk, a, w, h = seen[(cls, g)]
+        info[4 * mid:4 * mid + 4] = bytes([bk, a & 0xFF, a >> 8, w << 4 | h])
+    assert bank < B_MGFX0 + 8, 'monster graphics overflow'
+    banks[B_BINFO] = info
+    banks[B_CGFX] = bytearray(gbt(rom.at(0x28 * data.B8, 0x4000)))
 
 
 NES_NOISE = [4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068]
@@ -170,6 +216,12 @@ ROMDATA = {
     'refl_bits': (0x31, 0xBB0E, 11),     # spells that Reflect bounces
     'mon_rows': (0x34, 0x8739, 20),      # monster rows by formation tilemap
     'mmsg_bits': (0x35, 0xA5FD, 9),      # spells with a message after them
+    'job_cmds': (0x34, 0x9B21, 88),      # the four battle commands of each job
+    'msg_vars': (0x34, 0x9575, 72),      # each battle message's variable (a nibble each)
+    'eq_types': (0x00, 0x8900, 384),     # equipment / spell types: the jobs allowed (3 bytes)
+    'terr_bits': (0x35, 0xAB06, 1),      # terrain attacks: one monster or all
+    'fld_rng': (0x3F, 0xFE00, 256),      # the field's random numbers
+    'enc_prob': (0x3D, 0xBD78, 64),      # which of a group's 8 battles
 }
 
 MACROS = {
@@ -179,6 +231,7 @@ MACROS = {
             'ld a, [hl]'],
     'STZ': ['ld b, a', 'ld hl, BZ + ({0})', 'ld a, [hl+]', 'ld h, [hl]', 'add {1}', 'ld l, a', 'ld a, h', 'adc 0',
             'ld h, a', 'call wchk', 'ld [hl], b', 'ld a, b'],
+    'FAR': ['ld hl, {1}', 'ld a, {0}', 'call far_call'],
     'MOVZ': ['ld a, [BZ + ({1})]', 'ld [BZ + ({0})], a', 'ld a, [BZ + ({1}) + 1]', 'ld [BZ + ({0}) + 1], a'],
 }
 
@@ -218,13 +271,15 @@ def main():
            'B_NPCS = %d\nB_NPCGFX = %d\nB_OWN = %d\nB_TEXT = %d\nB_SCRIPT = %d\nB_FIELD = %d\n' % (
                B_NPCS, B_NPCGFX, B_OWN, B_TEXT, B_SCRIPT, B_FIELD) +
            'B_WORLD0 = %d\nB_WINFO = %d\nB_WGFX = %d\nB_SND0 = %d\n' % (B_WORLD0, B_WINFO, B_WGFX, B_SND0) +
-           'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\nB_BSET = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2, B_BSET) + text_defs +
+           'B_BAT = %d\nB_BDAT = %d\nB_BDAT2 = %d\nB_BDAT3 = %d\nB_BAT2 = %d\nB_BSET = %d\n' % (B_BAT, B_BDAT, B_BDAT2, B_BDAT3, B_BAT2, B_BSET) +
+           'B_BSCR = %d\nB_BINFO = %d\nB_CGFX = %d\nB_MGFX0 = %d\n' % (B_BSCR, B_BINFO, B_CGFX, B_MGFX0) + text_defs +
            open(os.path.join(HERE, 'src', 'main.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'field.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'npc.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'text.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'event.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'world.s')).read() + '\n' +
+           open(os.path.join(HERE, 'src', 'fbattle.s')).read() + '\n' +
            open(os.path.join(HERE, 'src', 'sound.s')).read() + '\n' +
            ''.join(open(os.path.join(HERE, 'src', f)).read() + '\n' for f in BATTLE_SRC) + sound_data() + own_data())
     if os.environ.get('GB3N_TEST'):              # test builds: tools/gb3n/test (never a release)
@@ -254,7 +309,8 @@ def main():
         gb, ga = r.label_bank[name], r.labels[name]
         off = ga - (0x4000 if gb else 0)
         banks[gb] = bytearray(banks[gb])
-        banks[gb][off:off + n] = rom.rd(nb, addr, n)
+        v = rom.rd(nb, addr, n)
+        banks[gb][off:off + n] = bytes([v]) if isinstance(v, int) else v
     for k, v in tbanks.items():
         assert k not in banks, 'bank %d used twice' % k
         banks[k] = v

@@ -109,7 +109,11 @@ sfx_play:   or $80
             ret
 
 ; ---- once a frame (V-Blank interrupt): FF3's update sound, then the GB output
-snd_frame:  ldh a, [mapbank]                 ; (the bank mapped now: back at the end)
+snd_frame:  ldh a, [rSVBK]                   ; (work RAM bank 1: a battle maps bank 2)
+            push af
+            ld a, 1
+            ldh [rSVBK], a
+            ldh a, [mapbank]                ; (the bank mapped now: back at the end)
             ld [MZ_SAVE], a
             call snd_bank
             ld a, [M_SONG]                  ; ($8003: song $37 silences the sound effects)
@@ -130,6 +134,8 @@ snd_frame:  ldh a, [mapbank]                 ; (the bank mapped now: back at the
             ld [M_CUR], a
             ld a, [MZ_SAVE]
             ld [MBC5_BANKL], a
+            pop af
+            ldh [rSVBK], a
             ret
 
 ; the song bank for the song asked for ($899F: $00-$18 bank $37, $19-$2A $38, $37-$3A $39,

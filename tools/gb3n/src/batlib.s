@@ -387,6 +387,15 @@ p5b:        ld a, [BZ + $5B]
             ld h, a
             ret
 
+; ---- call routine HL in bank A from another bank (A / flags not kept)
+far_call:   ld [fc_bank], a
+            ldh a, [rombank]
+            push af
+            ld a, [fc_bank]
+            call sbank
+            call alg_call.go
+            pop af
+            jp sbank
 ; ---- call routine HL in B_BAT from another bank (A / flags not kept)
 alg_call:   ldh a, [rombank]
             push af
@@ -396,3 +405,6 @@ alg_call:   ldh a, [rombank]
             pop af
             jp sbank
 .go:        jp hl
+
+section wram, $C502
+fc_bank:    ds 1

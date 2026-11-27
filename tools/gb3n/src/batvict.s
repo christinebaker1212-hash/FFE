@@ -854,7 +854,15 @@ fe_9D1D:    ld a, [BZ + $5F]
             ld [hl], c
             ret
 
-; ---- hooks into the battle screen (test builds: nothing)
-bat_script: ret
-bat_gfx:    ret
-bat_anim:   ret
+; ---- hooks into the battle screen (none in test builds: bs_live is 0 there)
+bat_script: ld a, [bs_live]
+            and a
+            ret z
+            %FAR B_BSCR, bs_script
+            ret
+bat_gfx:    ret                             ; (FF3's graphics steps: ours are in bs_script)
+bat_anim:   ld a, [bs_live]
+            and a
+            ret z
+            %FAR B_BSCR, bs_deaths
+            ret

@@ -147,7 +147,11 @@ world_pass: ld b, W_PROP1
             bit 0, a
             jr nz, .no
             bit 7, a
-            jr z, .ok
+            jr nz, .tr
+            bit 6, a                        ; an encounter tile ($3E $C6D9)
+            call nz, enc_world
+            jr .ok
+.tr:
             inc b
             ld a, [bc]
             bit 7, a

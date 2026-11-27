@@ -541,7 +541,8 @@ ev_sound:   bit 7, a
 
 ; ---- the map's song ($3F $E8CE: properties byte 10; bit 7: the conditional script $38 + (song & 7)
 ; at 2C/8870 gives it); the world map's by world and vehicle ($3B $A006)
-map_song:   ld a, [wmode]
+map_song:   call enc_setrate
+            ld a, [wmode]
             and a
             jr nz, .world
             ld a, [map_props + 10]

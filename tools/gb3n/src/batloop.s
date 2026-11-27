@@ -358,6 +358,38 @@ fe_8374:    xor a
             cp 4
             jr nz, .c
             ret
+; (the battle screen's call: character [$52]'s pending item)
+fe_9AE7_a:  call b_choff
+            add $3F
+            ld c, a
+            call p5b
+            ld a, [hl]
+            jp fe_9AE7
+
+; terrain targets (35/AA22): [bs_n] = the mask, [bs_t] = the flags
+fe_AAC3_t:  call fe_AAC3
+            sub $50
+            inc a
+            ld b, a
+            ld a, [terr_bits]
+.s:         add a
+            dec b
+            jr nz, .s
+            jr nc, .all
+            ld hl, fe_A2E9
+            call alg_call
+            ld a, [$DE99]
+            ld [bs_n], a
+            ld a, $80
+            ld [bs_t], a
+            ret
+.all:       ld a, $FF
+            ld [bs_n], a
+            ld a, $C0
+            ld [bs_t], a
+            ret
+terr_bits:  ds 1                            ; (35/AB06, from the ROM: ROMDATA)
+
 ; $9AE7 return used item A (HL at the record's +$3F) to the inventory
 fe_9AE7:    ld [BZ + $18], a
             ld [hl], 0
