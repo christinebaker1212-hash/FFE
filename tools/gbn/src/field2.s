@@ -1861,10 +1861,13 @@ te_plot:    call te_addr
             sbc a, high(TE_BUF)
             ld d, a
             jr .ix
-.hi:        add a, low(TE_SPLIT)            ; (TE_BUF2's low byte 0)
+.hi:        ld a, h                         ; (TE_BUF2's low byte 0; the carry of the low add kept:
+            sub high(TE_BUF2)               ;   it was lost to the sub, and the last 4 tiles, the
+            ld d, a                         ;   bottom right, went to the wrong place)
+            ld a, l
+            add a, low(TE_SPLIT)
             ld e, a
-            ld a, h
-            sub high(TE_BUF2)
+            ld a, d
             adc a, high(TE_SPLIT)
             ld d, a
 .ix:
