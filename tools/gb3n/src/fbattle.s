@@ -289,7 +289,19 @@ title_boot: ld a, LCDC_ON
 menu_open:  ld a, [z_lev]
             push af
             %FAR B_MENU, m_main
-            ld a, [pos_x]
+            ld a, [m_exit]                  ; Exit / Otter's Head: the world map where the
+            and a                           ;   party went in (3C/9918)
+            jr z, .st
+            pop af
+            xor a
+            ld [map_sp], a
+            ld [z_lev], a
+            ld a, [wm_x]
+            ld [enter_x], a
+            ld a, [wm_y]
+            ld [enter_y], a
+            jp world_back
+.st:        ld a, [pos_x]
             ld [enter_x], a
             ld [wm_x], a
             ld a, [pos_y]

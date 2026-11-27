@@ -24,6 +24,7 @@ section bank B_MENU, $4000
 m_main:     call m_enter
             xor a
             ld [m_cur], a
+            ld [m_exit], a
 .top:       call m_mainscr
 .lp:        ld a, [m_cur]                   ; the hand at (1 + cursor, 12)
             inc a
@@ -53,6 +54,9 @@ m_main:     call m_enter
             ld h, [hl]
             ld l, a
             call .go
+            ld a, [m_exit]                  ; (Exit / Otter's Head: out to the world map)
+            and a
+            jp nz, m_leave
             jr .top
 .go:        jp hl
 .up:        ld a, [m_cur]
@@ -2048,6 +2052,9 @@ m_item:     xor a
 .err:       call m_sfx_err
             jp .lp
 .use:       call i_use
+            ld a, [m_exit]                  ; (warped: straight out)
+            and a
+            ret nz
             jp .scr
 .up:        ld a, [m_icur]
             and a
@@ -2181,10 +2188,19 @@ i_use:      ld a, [m_icur]
             ld [m_iid], a
             cp $C8
             jp nc, i_teach                  ; a spell: who will hold it
-            cp $A6                          ; Potion .. Antidote ($A6-$B0) are used; the
-            jr c, .cant                     ;   Midgard Bread ($A4) and Otter's Head ($B0)
-            cp $B0                          ;   (minimap, warp: later)
-            jr nc, .cant
+            cp $B0                          ; Otter's Head (3D/A011): in a map, warp outside
+            jr nz, .noh
+            ld a, [wmode]
+            and a
+            jp nz, i_cant
+            ld a, $65
+            call m_warpq
+            ret c
+            jp i_one
+.noh:       cp $A6                          ; Potion .. Antidote ($A6-$AF) are used; the
+            jp c, i_cant                     ;   Midgard Bread ($A4: the minimap) later
+            cp $B0
+            jp nc, i_cant
             sub $A6                         ; the question (t8200 $5B + n)
             add $5B
 .again:     push af
@@ -2199,8 +2215,8 @@ i_use:      ld a, [m_icur]
             push bc
             call i_effect
             pop bc
-            jr c, .bad
-            ld a, [m_islot]                 ; one used (3D/A33C)
+            jr c, i_bad
+i_one:      ld a, [m_islot]                 ; one used (3D/A33C)
             add $E0
             ld l, a
             ld h, high(SRAM_PAGE)
@@ -2211,14 +2227,32 @@ i_use:      ld a, [m_icur]
             ld l, a
             ld [hl], 0
             ret
-.bad:       call m_sfx_err
+i_bad:      call m_sfx_err
             ld a, b
-            jr .again
-.cant:      ld a, $5A                       ; "It can't be used."
+            jp i_use.again
+i_cant:     ld a, $5A                       ; "It can't be used."
             call m_msg
             call m_show
             jp m_waitkey
 
+; Warps outside. (t8200 A) and a key: B cancels (C), else the warp is set ([m_exit])
+m_warpq:    push af
+            call m_clear
+            call m_sprclr
+            pop af
+            call m_msg
+            call m_show
+            call m_waitkey
+            ldh a, [pad_new]
+            and PAD_A
+            scf
+            ret z
+            ld a, $2D                       ; (FF3's warp sound)
+            call sfx_play
+            ld a, 1
+            ld [m_exit], a
+            and a
+            ret
 ; the effect of item [m_iid] on member [m_who]: C = no effect (3D/A097-A15A)
 i_effect:   ld a, [m_who]
             call m_choff
@@ -3379,6 +3413,9 @@ m_magic:    call m_member
             and a
             jr nz, .item
             call g_use
+            ld a, [m_exit]                  ; (Exit: straight out)
+            and a
+            ret nz
             jr .scr
 .item:      ld a, [m_iid]                   ; 3C/9897: into the pack
             ld b, a
@@ -3593,7 +3630,21 @@ g_use:      call m_canequip                 ; the job may cast it ($7200)
             call m_sp1
             and a
             jp z, m_sfx_err
-            ld a, [m_iid]                   ; a field spell, with its question
+            ld a, [m_iid]                   ; Exit ($EF, 3C/98FA): in a map only, Warps
+            cp $EF                          ;   outside. and A
+            jr nz, .ne
+            ld a, [wmode]
+            and a
+            jp nz, m_sfx_err
+            ld a, $68
+            call m_warpq
+            ret c
+            ld a, [m_mpat]
+            ld l, a
+            ld h, high(SRAM_PAGE + $100)
+            dec [hl]
+            ret
+.ne:        ld a, [m_iid]                   ; a field spell, with its question
             ld hl, G_SPELLS
 .f:         ld b, a
             ld a, [hl+]
@@ -5470,3 +5521,4 @@ s_acc:      ds 3
 m_sid:      ds 1
 m_scnt:     ds 1
 m_send:     ds 1
+m_exit:     ds 1
