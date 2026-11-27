@@ -222,7 +222,7 @@ def cave_floor(G, rec, role, n_chests, pc=None, floor_chips=(), stairs_out=True,
                 elif (x + 1, y - 1) in inroom: v = pc['bbl']
                 else: v = pc['bbr']
                 border[(x, y)] = v
-    chests, bosses, stairs = [], [], []
+    chests, bosses, stairs, rchest = [], [], [], set()
     for y in range(-oy, W - oy):
         for x in range(-ox, W - ox):
             if (x, y) in inroom:
@@ -255,6 +255,7 @@ def cave_floor(G, rec, role, n_chests, pc=None, floor_chips=(), stairs_out=True,
             for y in range(y0, y1 + 1):
                 if g[y][x] == 'C':
                     put(x, y, pc['chest_room'][len(chests) % 4]); chests.append((x + ox, y + oy, 'room'))
+                    rchest.add((x, y))
         if role == 'boss' and doors:
             bosses.append((doors[0][0] + ox, y0 + 1 + oy))
     # the start: the entrance floor's corridor end (FF1's stairs up there: the way out), else the
@@ -289,6 +290,9 @@ def cave_floor(G, rec, role, n_chests, pc=None, floor_chips=(), stairs_out=True,
         d = bfs(walk, stairs[0])
         start = max(d, key=lambda p: (d[p], -p[1]))
     reach = bfs(walk | inroom, start)
+    for c in list(chests):                          # (a room's chest the party cannot reach: none)
+        if c[2] == 'room' and not any((c[0] - ox + a, c[1] - oy + b) in reach for a, b in ((0, 1), (0, -1), (1, 0), (-1, 0))):
+            chests.remove(c); put(c[0] - ox, c[1] - oy, pc['roomfl'])
     if role == 'floor' or (role == 'boss' and stairs_out):
         stairs = [s for s in stairs if s in reach][:1]
         if not stairs:                              # (no stairs down reachable after the cut: the
