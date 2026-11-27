@@ -1441,6 +1441,8 @@ Then (item 68): saves hit by item 66's lost-pointer bug (status bits as an ailme
 are mended silently when a file or suspend point loads.
 Then (item 69): Chaos' picture no longer loses its top left when he is beaten; "The End" draws to the finish
 (its picture buffer had run over the gradient's variables), and the flash before it is gone.
+Post-game proposal (owner, 2026-11-27): Dawn of Souls' four Soul of Chaos dungeons adapted to the NES look,
+with mock-ups; waiting for the owner's decisions D1-D8: docs/ff1-postgame-design.md.
 
 ## Remaining
 - **FF1 (native build): finished (owner, 2026-11-26):** the owner played it through from New Game to
