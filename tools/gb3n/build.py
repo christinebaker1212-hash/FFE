@@ -167,7 +167,9 @@ def field_banks(rom):
     banks[B_MAPAUX] = b
     b = blank(); b[0:0x2000] = rom.at(0x10 * data.B8, 0x2000); banks[B_EVENTS] = b
     b = blank(); b[0:0x4000] = gbt(rom.at(0x0E * data.B8, 0x4000)); banks[B_CHARS] = b
-    b = blank(); b[0:144 * 16] = gbt(rom.rd(0x0D, 0xB700, 144 * 16)); banks[B_COMMON] = b
+    b = blank(); b[0:144 * 16] = gbt(rom.rd(0x0D, 0xB700, 144 * 16))
+    b[0x2000:0x2040] = gbt(rom.rd(0x0D, 0xB440, 64))       # FF3's cursor: 4 tiles (3E/DF31 -> $E4-$E7)
+    banks[B_COMMON] = b
     banks[B_SCRIPT] = bytearray(rom.at(0x2C * data.B8, 0x4000))   # NES $2C/$2D: npc lists, scripts
     b = blank()                                          # people: tables, init
     b[0x2000:0x2200] = rom.rd(0x00, 0x9400, 512)

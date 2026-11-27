@@ -35,17 +35,49 @@ enc_world:  push af
             ld a, [ev_on]
             and a
             jr nz, .x
-            ld a, [world]                   ; rates 2E/9D47 (world 0), 9D4A (2), 9D4B (3), 9D4F
-            ld hl, $9D47 - $4000
+            ld a, [veh]                     ; the rate by world and vehicle (3D/BC68)
+            ld c, a
+            ld a, [world]
+            and a
+            jr nz, .w1
+            ld hl, $9D47 - $4000            ; world 0: on foot, canoe, ship; else none
+            ld a, c
             and a
             jr z, .r
-            ld hl, $9D4A - $4000
+            ld hl, $9D48 - $4000
             cp 2
             jr z, .r
-            ld hl, $9D4B - $4000
+            ld hl, $9D49 - $4000
             cp 3
             jr z, .r
-            ld hl, $9D4F - $4000
+            jr .x
+.w1:        cp 2
+            jr nz, .w3
+            ld hl, $9D4A - $4000            ; world 2: on foot only
+            ld a, c
+            and a
+            jr z, .r
+            jr .x
+.w3:        cp 3
+            jr nz, .uw
+            ld hl, $9D4B - $4000            ; world 3: on foot, canoe, ship; airships when
+            ld a, c                         ;   $602F bit 0
+            and a
+            jr z, .r
+            ld hl, $9D4C - $4000
+            cp 2
+            jr z, .r
+            ld hl, $9D4D - $4000
+            cp 3
+            jr z, .r
+            ld hl, $9D4E - $4000
+            cp 4
+            jr c, .x
+            ld a, [SRAM_PAGE + $2F]
+            rra
+            jr nc, .x
+            jr .r
+.uw:        ld hl, $9D4F - $4000            ; underwater
 .r:         ld a, B_BSET
             call far_byte
             ld [enc_t], a
@@ -53,18 +85,26 @@ enc_world:  push af
             ld hl, enc_t
             cp [hl]
             jr nc, .x
+            ld a, [veh]                     ; the group (3D/BCD1; pos = FF3's $27 + 7)
+            ld c, a
             ld a, [world]
             and a
             jr nz, .w2
-            ld a, [pos_x]                   ; world 0: 16 areas (2E/9CF0)
-            add 7
+            ld hl, $9D40 - $4000            ; world 0: canoe / ship groups
+            ld a, c
+            and a
+            jr z, .a0
+            cp 2
+            jr z, .g0
+            ld hl, $9D41 - $4000
+            jr .g0
+.a0:        ld a, [pos_x]                   ; world 0: 16 areas (2E/9CF0)
             and $7F
             swap a
             srl a
             and 3
             ld b, a
             ld a, [pos_y]
-            add 7
             and $60
             srl a
             srl a
@@ -76,14 +116,22 @@ enc_world:  push af
             jr .g
 .w2:        cp 3
             jr nz, .w4
-            ld a, [pos_x]                   ; the surface world: 64 areas (2E/9D00)
-            add 7
+            ld hl, $9D43 - $4000            ; the surface world: canoe, ship, airship groups
+            ld a, c
+            cp 2
+            jr z, .g0
+            ld hl, $9D44 - $4000
+            cp 3
+            jr z, .g0
+            ld hl, $9D45 - $4000
+            cp 4
+            jr nc, .g0
+            ld a, [pos_x]                   ; 64 areas (2E/9D00)
             swap a
             srl a
             and 7
             ld b, a
             ld a, [pos_y]
-            add 7
             and $E0
             srl a
             srl a
@@ -297,3 +345,4 @@ f_rng:      ds 3                            ; FF3's $F5, $F6, $F7
 enc_rate:   ds 1
 enc_t:      ds 1
 sh_ev:      ds 1
+veh:        ds 1                            ; FF3's $42: the vehicle (0 on foot)

@@ -396,6 +396,56 @@ far_call:   ld [fc_bank], a
             call alg_call.go
             pop af
             jp sbank
+; ---- FF3's 16 x 16 hand (its cursor tiles at OBJ $EE-$F1, VRAM bank 1, palette 3) into four OAM
+; entries at HL: B = OAM y, C = OAM x of the top left
+hand16:     ld d, $EE
+            call .t
+            ld a, c
+            add 8
+            ld c, a
+            call .t
+            ld a, c
+            sub 8
+            ld c, a
+            ld a, b
+            add 8
+            ld b, a
+            call .t
+            ld a, c
+            add 8
+            ld c, a
+.t:         ld a, b
+            ld [hl+], a
+            ld a, c
+            ld [hl+], a
+            ld a, d
+            ld [hl+], a
+            inc d
+            ld a, $0B
+            ld [hl+], a
+            ret
+; four OAM entries at HL off
+hand16off:  xor a
+            ld [hl+], a
+            inc l
+            inc l
+            inc l
+            ld [hl+], a
+            inc l
+            inc l
+            inc l
+            ld [hl+], a
+            inc l
+            inc l
+            inc l
+            ld [hl], a
+            ret
+; FF3's cursor tiles (B_COMMON $6000) to OBJ tiles $EE-$F1 (VRAM bank 1 mapped by the caller)
+hand_tiles: ld hl, $6000
+            ld de, $8000 + 16 * $EE
+            ld bc, 64
+            ld a, B_COMMON
+            jp far_copy
 ; ---- call routine HL in B_BAT from another bank (A / flags not kept)
 alg_call:   ldh a, [rombank]
             push af

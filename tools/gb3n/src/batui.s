@@ -650,19 +650,17 @@ bs_thand:   ld a, [bs_side]
             ld b, a
             add a
             add b
-            add 16 + 8
+            add 16 + 4
             ld b, a
-            ld c, 144 + 8 - 10
-.s:         ld hl, oam_buf + 4 * 39
+            ld c, 144 + 8 - 18
+.s:         ld a, c                         ; (the 16 x 16 hand: its right half where the old
+            sub 8                           ;   8 x 8 one was)
+            ld c, a
             ld a, b
-            ld [hl+], a
-            ld a, c
-            ld [hl+], a
-            ld a, SPR_HAND
-            ld [hl+], a
-            ld a, $0B
-            ld [hl], a
-            ret
+            sub 4
+            ld b, a
+            ld hl, oam_buf + 4 * 36
+            jp hand16
 ; bs_x / bs_y (tiles) of monster slot A
 bs_mpos:    ld b, a
             add a
@@ -678,27 +676,22 @@ bs_mpos:    ld b, a
             ret
 ; the hand at BG row B, column C
 bs_hand_cell:
-            ld hl, oam_buf + 4 * 39
             ld a, b
             add a
             add a
             add a
-            add 16
-            ld [hl+], a
+            add 16 - 2
+            ld b, a
             ld a, c
             add a
             add a
             add a
-            add 8
-            ld [hl+], a
-            ld a, SPR_HAND
-            ld [hl+], a
-            ld [hl], $0B
-            ret
+            ld c, a
+            ld hl, oam_buf + 4 * 36
+            jp hand16
 bs_hand_off:
-            xor a
-            ld [oam_buf + 4 * 39], a
-            ret
+            ld hl, oam_buf + 4 * 36
+            jp hand16off
 
 ; ---- magic (35/B646): levels with mp, three spells each; FF3's job check and targets
 bs_magic:   ld a, [$DED8]

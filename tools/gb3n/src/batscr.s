@@ -279,11 +279,12 @@ bs_gfx:     xor a
             ld a, c
             cp 4
             jr nz, .p
-            ld hl, C_SPRDIG                 ; digits / Miss / hand (our tiles, B_OWN)
+            ld hl, C_SPRDIG                 ; digits / Miss (our tiles, B_OWN), FF3's hand
             ld de, $8000 + 16 * SPR_DIG
             ld bc, 16 * 16
             ld a, B_OWN
             call far_copy
+            call hand_tiles
             xor a
             ldh [rVBK], a
             ret

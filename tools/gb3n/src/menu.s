@@ -272,8 +272,8 @@ m_pictxy:   ld a, c
             ld b, a
             add a
             add b
-            ld b, a                         ; 6 C
-            inc a
+            ld b, a                         ; 6 C (OAM entries 4 + 6 C: the hand has 0-3)
+            add 4
             add a
             add a
             ld l, a
@@ -666,6 +666,7 @@ m_enter:    xor a
             ld bc, 16 * 16
             ld a, B_OWN
             call far_copy
+            call hand_tiles                 ; FF3's 16 x 16 hand
             xor a
             ldh [rVBK], a
             xor a
@@ -1057,28 +1058,26 @@ m_t82:      ld l, a
 .z:         ld [hl], 0
             ret
 
-; ---- sprites: the hand (OAM 0), a second hand (OAM 39), all off
+; ---- sprites: FF3's 16 x 16 hand (OAM 0-3), a second hand (OAM 36-39), all off; the hand
+; ends just left of column C, its finger at row B
 m_hand:     ld hl, oam_buf
-.s:         ld a, b                         ; at BG row B, column C (left of the text)
+.s:         ld a, b
             add a
             add a
             add a
-            add 16
-            ld [hl+], a
+            add 16 - 2
+            ld b, a
             ld a, c
             add a
             add a
             add a
-            ld [hl+], a
-            ld a, M_HAND
-            ld [hl+], a
-            ld [hl], $0B
-            ret
-m_hand2:    ld hl, oam_buf + 4 * 39
+            sub 8
+            ld c, a
+            jp hand16
+m_hand2:    ld hl, oam_buf + 4 * 36
             jr m_hand.s
-m_hand2off: xor a
-            ld [oam_buf + 4 * 39], a
-            ret
+m_hand2off: ld hl, oam_buf + 4 * 36
+            jp hand16off
 m_sprclr:   ld hl, oam_buf
             ld b, 160
             xor a
@@ -3898,33 +3897,33 @@ m_target_all:
             ld b, a
             ld c, 1
             jp m_hand2
-.h4:        ld hl, oam_buf + 4 * 35         ; all four
-            ld b, 2 * 8 + 16
-            ld c, 4
-.h:         ld a, b
-            ld [hl+], a
-            ld a, 8
-            ld [hl+], a
-            ld a, M_HAND
-            ld [hl+], a
-            ld a, $0B
-            ld [hl+], a
+.h4:        ld de, .slots                   ; all four (OAM 0, 28, 32, 36)
+            ld b, 2
+.h:         push bc
+            push de
+            ld a, [de]
+            ld l, a
+            ld h, high(oam_buf)
+            ld c, 1
+            call m_hand.s
+            pop de
+            inc de
+            pop bc
             ld a, b
-            add 24
+            add 3
             ld b, a
-            dec c
+            cp 14
             jr nz, .h
             ret
-.off:       ld hl, oam_buf + 4 * 35
-            xor a
-            ld b, 5
-.o:         ld [hl+], a
-            inc l
-            inc l
-            inc l
-            dec b
-            jr nz, .o
-            ret
+.slots:     db 0, 4 * 28, 4 * 32, 4 * 36
+.off:       ld hl, oam_buf
+            call hand16off
+            ld hl, oam_buf + 4 * 28
+            call hand16off
+            ld hl, oam_buf + 4 * 32
+            call hand16off
+            ld hl, oam_buf + 4 * 36
+            jp hand16off
 
 ; ==== 5 Job (FF3's 3C/962F): the jobs the crystals give (3F/F38A), FF3's CP cost (3D/AD85), its
 ; checks (3D/AE23) and change (3D/AB8F). Job data: 39/A000 (8 a job), level-ups 39/A1D6..,
