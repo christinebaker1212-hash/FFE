@@ -1628,7 +1628,12 @@ pz_draw:    ld a, [pz_anim]
 ; frame); then nothing more (FF1: the game ends there; a soft reset leaves)
 TE_MOVES   = $7C00          ; (MINI_BANK: minimap.the_end)
 TE_GRAD    = $7820
-TE_BUF     = smap           ; 800 bytes: the picture, 1 bit a pixel, as its tiles
+TE_BUF     = smap           ; 800 bytes: the picture, 1 bit a pixel, as its tiles: bytes
+TE_SPLIT   = $240           ;   0-$23F in the map copy (its 18 rows), the rest in the attribute
+TE_BUF2    = sattr          ;   copy (owner, 2026-11-27: all 800 in smap ran over the gradient's
+                            ;   variables at smap + $240: colours went wrong and the screen dark
+                            ;   halfway, then the picture jumped in; both copies are free once
+                            ;   the screen shows; TE_BUF2 page-aligned)
 the_end:    call scr_open
             xor a
             ld [sfx_menu], a
@@ -1671,13 +1676,11 @@ the_end:    call scr_open
             jr nz, .t
             call scr_show
             ld hl, TE_BUF                   ; (after the show: the buffer is the map copy)
-            ld bc, 800
-.z:         xor a
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .z
+            ld bc, TE_SPLIT
+            call te_zero
+            ld hl, TE_BUF2
+            ld bc, 800 - TE_SPLIT
+            call te_zero
             call te_start                   ; the outline
 .o:         call te_next
             jr z, .f0
@@ -1778,73 +1781,7 @@ te_move:    ld b, a
             ret
 .up:        dec [hl]
             ret
-; the pixel at (te_x, te_y) set, shown (a frame)
-te_set:     ld a, [te_x]
-            ld d, a
-            ld a, [te_y]
-            ld e, a
-; pixel (D, E): set in the buffer, its tile row written in the next V-Blank
-te_plot:    call te_addr
-            or [hl]
-            ld [hl], a
-            push hl
-            push af
-            call wait_vbl
-            pop af
-            pop hl
-            ld b, a
-            ld a, l                         ; VRAM $8800 + 2 index (the buffer is 8 a tile)
-            sub low(TE_BUF)
-            ld e, a
-            ld a, h
-            sbc a, high(TE_BUF)
-            ld d, a
-            sla e
-            rl d
-            ld hl, $8800
-            add hl, de
-            ldh a, [is_cgb]
-            and a
-            ld a, b
-            jr z, .dmg
-            ld [hl], a                      ; CGB: colour 3 (white) where set
-            ret
-.dmg:       cpl                             ; DMG / SGB: shade 0 (white) where set
-            ld [hl+], a
-            ld [hl], a
-            ret
-; pixel (D = x, E = y) -> HL = its byte in the buffer, A = its mask
-te_addr:    ld a, e                         ; tile (y / 8) * 10 + x / 8; byte 8 tile + y & 7
-            and $F8
-            ld l, a
-            ld h, 0
-            ld b, h
-            ld c, l
-            add hl, hl
-            add hl, hl
-            add hl, bc
-            add hl, hl                      ; (y & $F8) x 10 = 8 x 10 (y / 8)
-            ld a, d
-            and $F8
-            ld c, a
-            ld b, 0
-            add hl, bc
-            ld a, e
-            and 7
-            ld c, a
-            add hl, bc
-            ld bc, TE_BUF
-            add hl, bc
-            ld a, d
-            and 7
-            ld b, a
-            ld a, $80
-            inc b
-.m:         dec b
-            ret z
-            rrca
-            jr .m
-
+; (te_set / te_plot / te_zero / te_addr: section bank 99, $69B3 below)
 
 section bank 2, $7322                       ; (free space)
 ; Order: the member shown on the map (SHOW_WHO) follows the person to their new slot
@@ -1897,3 +1834,96 @@ lu_ulc:     ld a, [lu_mode]
 
 section wram, $DA95
 lu_pm:      ds 1                            ; the lineup's mode last seen (lu_ulc)
+
+section bank 99, $69B3                      ; (free space: The End's pixel helpers)
+; the pixel at (te_x, te_y) set, shown (a frame)
+te_set:     ld a, [te_x]
+            ld d, a
+            ld a, [te_y]
+            ld e, a
+; pixel (D, E): set in the buffer, its tile row written in the next V-Blank
+te_plot:    call te_addr
+            or [hl]
+            ld [hl], a
+            push hl
+            push af
+            call wait_vbl
+            pop af
+            pop hl
+            ld b, a
+            ld a, h                         ; VRAM $8800 + 2 index (the buffer is 8 a tile)
+            cp high(TE_BUF2)
+            ld a, l
+            jr nc, .hi
+            sub low(TE_BUF)
+            ld e, a
+            ld a, h
+            sbc a, high(TE_BUF)
+            ld d, a
+            jr .ix
+.hi:        add a, low(TE_SPLIT)            ; (TE_BUF2's low byte 0)
+            ld e, a
+            ld a, h
+            sub high(TE_BUF2)
+            adc a, high(TE_SPLIT)
+            ld d, a
+.ix:
+            sla e
+            rl d
+            ld hl, $8800
+            add hl, de
+            ld d, h                         ; (vput: out of modes 2 / 3 at the write itself;
+            ld e, l                         ;   the V-Blank's own work can end past line 0:
+            ldh a, [is_cgb]                 ;   Lot Check)
+            and a
+            ld a, b
+            jr z, .dmg
+            jp vput                         ; CGB: colour 3 (white) where set
+.dmg:       cpl                             ; DMG / SGB: shade 0 (white) where set
+            call vput
+            jp vput
+te_zero:    xor a
+            ld [hl+], a
+            dec bc
+            ld a, b
+            or c
+            jr nz, te_zero
+            ret
+; pixel (D = x, E = y) -> HL = its byte in the buffer, A = its mask
+te_addr:    ld a, e                         ; tile (y / 8) * 10 + x / 8; byte 8 tile + y & 7
+            and $F8
+            ld l, a
+            ld h, 0
+            ld b, h
+            ld c, l
+            add hl, hl
+            add hl, hl
+            add hl, bc
+            add hl, hl                      ; (y & $F8) x 10 = 8 x 10 (y / 8)
+            ld a, d
+            and $F8
+            ld c, a
+            ld b, 0
+            add hl, bc
+            ld a, e
+            and 7
+            ld c, a
+            add hl, bc
+            ld a, l                         ; (offset TE_SPLIT and on: the second part)
+            sub low(TE_SPLIT)
+            ld a, h
+            sbc a, high(TE_SPLIT)
+            ld bc, TE_BUF
+            jr c, .lo
+            ld bc, TE_BUF2 - TE_SPLIT
+.lo:        add hl, bc
+            ld a, d
+            and 7
+            ld b, a
+            ld a, $80
+            inc b
+.m:         dec b
+            ret z
+            rrca
+            jr .m
+

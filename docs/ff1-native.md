@@ -1214,3 +1214,20 @@ one reaches parity, so the owner can keep playing).
       becomes max HP, and a member "Dead" with that much HP is alive again. Sound records are left as they are.
     - Checked: the routine run on eight records in PyBoy (the corrupted ones mended, Dead at 0 HP / Stone /
       healthy ones unchanged); strict checker 0 on Color and DMG over 8,000 frames of random play.
+69. Owner (2026-11-27): Chaos' top left vanished the moment he was beaten; "The End" never finished drawing, went to
+    a dark screen and then jumped to the whole picture.
+    - Chaos: bt_erase_enemy sent him (bt_type 4) to bt_erase_rows, which took him for slot 0's small enemy and
+      cleared a block of his picture at once; his dissolve comes after the fanfare (bt_chaos_death), so the erase
+      now does nothing for him.
+    - The End: its 800-byte picture buffer (one bit a pixel) was the map copy smap, but the gradient's variables
+      (gr_ramp, gr_win, gr_on, gr_dirty, ..) live at smap + $240: the picture's lower rows wrote into them, so the
+      window colours went wrong and dark halfway, and the gradient rebuild at the end made the jump. The buffer is
+      now split: bytes 0-$23F in smap, the rest in the attribute copy sattr (both unused once the screen shows).
+      Its pixel writes go through vput (40 had landed in drawing time, LY 1-26, after a long V-Blank: Lot Check).
+    - Also a one-frame flash of the full window colour as The End's screen came on (older than these builds): the
+      gradient's "switched off: the flat colour once" write (gr_vbl, gr_rst) ran in the first frame while a
+      fade-in was pending; it is skipped then (the fade writes every colour).
+    - Checked in SameBoy from a Chaos test battle (his HP poked): his picture whole until the dissolve; The End
+      traced and filled to the end on the Color and a plain Game Boy, colours steady, no jump, no flash; VRAM
+      checker 0 there; menus open / close identical to the build before over 920 frames (Color); strict checker 0
+      on Color, Game Boy and Super Game Boy over 15,000 frames of random play.
