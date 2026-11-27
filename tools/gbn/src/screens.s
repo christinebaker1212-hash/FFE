@@ -1727,8 +1727,9 @@ pro_show:   ld a, TR_MINIMAP
 .lc:        call scr_frame                  ; Colour: the line to the fading palette, its
             xor a                           ;   colour back to the blue first (it was still
             ld [pr_cnt], a                  ;   the last line's white: every line showed
-            call pr_cgbstep                 ;   lit for a frame, then faded in from nothing)
-            ld a, $0C
+            call pr_cgbstep                 ;   lit for a frame, then faded in from nothing);
+            call scr_frame                  ;   the blue goes up in this V-Blank (pal.s: the
+            ld a, $0C                       ;   shadows), only then the line takes the palette
             call pr_rattr
 .an0:       xor a
             ld [pr_cnt], a
