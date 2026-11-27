@@ -535,7 +535,8 @@ pal_load:   ld hl, I_RGB                    ; (the NES colour table into SCRATCH
             ret
 
 ; ---- one field frame (after the frame wait): V-Blank work, then the walking
-field_vbl:  ld a, [frame]
+field_vbl:  call ev_pflush                   ; (palettes made by an effect)
+            ld a, [frame]
             inc a
             ld [frame], a
             call dlg_vbl
@@ -615,12 +616,16 @@ field_step: call npc_update
             call map_mt
             call passable
             jr c, .done
+            call fx_flset                   ; (a damage floor ahead: 3F/E561)
             call edge_line                  ; the row / column coming into view
             ld a, 1
             ld [step], a
             jr .done
 .walk:      inc a                           ; a pixel a frame, 16 to a step
             ld [step], a
+            push af
+            call fx_walkf
+            pop af
             cp 17
             jr nz, .done
             xor a
@@ -633,6 +638,7 @@ field_step: call npc_update
             call cam_set
             ld a, [trig_next]               ; the step's trigger is due
             ld [trig], a
+            call fx_stepend                 ; poison, the damage floor (3B/A0B1, A09B)
 .done:      call party_oam
             call npc_oam
             jp v_parked

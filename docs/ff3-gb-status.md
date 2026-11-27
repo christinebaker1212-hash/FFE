@@ -245,11 +245,26 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
 - Select on the map (owner's decision: FF3's own): the next member shows (3F/F72C), with FF3's
   walking graphics (job, toad $16, mini $17) and palettes (3A/9050) - these were always job 0
   before.
-- Epilogue ($DC) and ending ($DD): FF3's translated texts (epilogue.json) as pages on black; the
-  ending stays on its last page (soft reset). The prologue crawl's text is not in the
-  translation files: $DB does nothing yet.
+- Prologue ($DB), epilogue ($DC), ending ($DD): FF3's cutscene engine (NES bank $1F) written
+  natively (`src/cut.s`, `src/cutend.s`; data `tools/gb3n/cutdata.py`): the crystal flashes and
+  rises, the title / staff / story pages fade in one by one; the epilogue's starfield (FF3's
+  3D stars) with the pages scrolling up through it; the ending's scene (its band opening from the
+  middle by line splits, the clouds, the crystal's glow, the greyscale flicker, the Invincible
+  flying off, the flash), the end credits (each member walking in with the weapon, name and
+  level; the guests; the staff pages revealed from both edges by a pair of job sprites) and The
+  End over the stars. All text from the English ROM (bank $2D pages, 10/9640 credits), placed for
+  20 x 18. The cast pages (ids 1-8) were never translated in the NES patch (Japanese bytes shown
+  as Latin letters there): `script/ff3/cast.json` gives them in the translation's names.
 - Hand cursor: FF3's own 16 x 16 hand (0D/B440) with its cursor palette (owner reported the
   placeholder looked mangled).
+- People as FF3 (3B/AEEB-B2C6, AF97, B110, 3F/E494): wandering one at a time with FF3's
+  counters and random table, animation types and speeds per person, the walkers' bob, facing the
+  party when spoken to, bridge priority; event person commands $0A-$0F (jumps, walking frames on /
+  off, circle, spin) and $DA (dance); screen effects $D0 (shake), $D1 / $E2 (grey flash), $D2 /
+  $D3 (FF3's hue steps to blue and back), $E0 / $E1 (palettes again) (`src/evfx.s`); poison
+  damage per step and damage floors (grey flicker, 1 HP) (3B/A09B, A0B1).
+- Not yet: $EF special animations (and the map tile swaps of the statues / Saronia's gate),
+  the guest's picture, Hein's castle and the chocobo objects.
 - Not yet in menus: Exit / Teleport / Sightro and the Midgard Bread / Otter's Head (they need the
   minimap and FF3's warp), FF3's spell list Swap, the stat-up messages after equipping.
 

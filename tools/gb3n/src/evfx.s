@@ -437,6 +437,99 @@ ev_dance:   xor a
             call ev_nfr
             jr .l
 
+; ---- the damage floor and poison (3F/E54C-E56D, 3B/A09B-A12A)
+; the cell ahead: a damage floor (property 1 bit 3, property 2 0; normal maps)
+fx_flset:   xor a
+            ld [fl_dmg], a
+            ld a, [wmode]
+            and a
+            ret nz
+            call dest_cell
+            call map_mt
+            ld l, a
+            ld h, W_PROP1
+            bit 3, [hl]
+            ret z
+            inc h
+            ld a, [hl]
+            and a
+            ret nz
+            inc a
+            ld [fl_dmg], a
+            ret
+; each frame of a step on it: grey every other frame
+fx_walkf:   ld a, [fl_dmg]
+            and a
+            ret z
+            ld a, [frame]
+            and 1
+            jp ev_grey
+; the step's end: poisoned members lose 1 HP (sound $16), on a damage floor everyone (sound
+; $40); never below 1
+fx_stepend: ld hl, SRAM_PAGE + $102
+            ld c, 0
+.p:         ld a, [hl]
+            cp $40
+            jr nc, .pn
+            and 2
+            jr z, .pn
+            inc c
+.pn:        ld a, l
+            add $40
+            ld l, a
+            jr nc, .p
+            ld a, c
+            and a
+            jr z, .fl
+            ld a, $16
+            call sfx_play
+            ld hl, SRAM_PAGE + $102
+.pd:        ld a, [hl]
+            cp $40
+            jr nc, .pe
+            and 2
+            call nz, fx_hp1
+.pe:        ld a, l
+            add $40
+            ld l, a
+            jr nc, .pd
+.fl:        ld a, [fl_dmg]
+            and a
+            ret z
+            xor a
+            ld [fl_dmg], a
+            call ev_grey
+            ld a, $40
+            call sfx_play
+            ld hl, SRAM_PAGE + $102
+.fd:        call fx_hp1
+            ld a, l
+            add $40
+            ld l, a
+            jr nc, .fd
+            ret
+; member at HL ($x02): HP - 1, not below 1
+fx_hp1:     push hl
+            ld a, l
+            add $0A
+            ld l, a
+            ld a, [hl+]
+            ld b, [hl]
+            dec hl
+            ld c, a
+            ld a, b
+            and a
+            jr nz, .d
+            ld a, c
+            cp 2
+            jr c, .x
+.d:         dec bc
+            ld [hl], c
+            inc hl
+            ld [hl], b
+.x:         pop hl
+            ret
+
 section bank B_FIELD, $6700
 nj_h:       ds 25                           ; (3B/AC0C: the jump's height)
 dn_x:       ds 84                           ; (3B/ADB1, AE05, AE59: the dance)
@@ -452,3 +545,4 @@ ev_ns:      ds 1
 ev_74:      ds 1
 ev_75:      ds 1
 ev_t:       ds 1
+fl_dmg:     ds 1
