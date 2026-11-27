@@ -557,14 +557,14 @@ field_step: call npc_update
             ld a, [step]
             and a
             jr nz, .walk
-            ld a, [trig]                    ; a trigger stepped on: act now ($3F $E217)
-            and a
-            jp nz, trig_run
-            ld a, [dlg_on]                  ; the dialogue box: nothing else moves
-            and a
-            jr z, .nd
+            ld a, [dlg_on]                  ; the dialogue box: nothing else moves (and a
+            and a                           ;   trigger waits for it: 3F/E213)
+            jr z, .nt
             call dlg_step
             jr .done
+.nt:        ld a, [trig]                    ; a trigger stepped on: act now ($3F $E217)
+            and a
+            jp nz, trig_run
 .nd:        ld a, [ev_on]                   ; an event: its commands (a party step as the pad)
             and a
             jr z, .pl

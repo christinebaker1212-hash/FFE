@@ -250,7 +250,12 @@ treasure:   ld a, d
             ld a, [tr_id]
             cp $E0
             jr c, .msg
-            ld c, $02                       ; (with a battle: the battle comes later)
+            ld [bs_id], a                   ; (3F/F5A1: a monster inside: battle tr_id once the
+            xor a                           ;   message closes, $AB = $20)
+            ld [bs_id + 1], a
+            ld a, TR_BATTLE
+            ld [trig], a
+            ld c, $02
 .msg:       ld b, TB_SYSTEM
             jp dlg_open
 .lock:      ld a, [SRAM_PAGE + $0E]         ; a locked door: the walking member a Thief (job 8)?
