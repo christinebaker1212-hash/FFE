@@ -1172,7 +1172,7 @@ section bank B_WSPR, $7D80
 sa_9c34:    ds 128
 sa_9cb4:    ds 240
 
-section wram, $CF60
+section wram, $C1C8
 sa_bc:      ds 1
 sa_40:      ds 1
 sa_41:      ds 1

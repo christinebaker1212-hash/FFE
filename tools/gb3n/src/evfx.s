@@ -536,7 +536,7 @@ dn_x:       ds 84                           ; (3B/ADB1, AE05, AE59: the dance)
 dn_y:       ds 84
 dn_f:       ds 84
 
-section wram, $CFA0
+section wram, $C3D0
 pl_grey:    ds 1
 ev_pnew:    ds 1
 ev_w:       ds 16

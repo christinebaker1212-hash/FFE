@@ -418,7 +418,7 @@ gu_draw:    ld hl, oam_buf + 16
 section bank B_FIELD, $6820
 gu_poses:   ds 64                           ; (3E/DC6A, from the ROM)
 
-section wram, $CF90
+section wram, $C0A0
 gu_x:       ds 1                            ; FF3's $AC / $AD
 gu_y:       ds 1
 gu_sx:      ds 1                            ; $13 / $14

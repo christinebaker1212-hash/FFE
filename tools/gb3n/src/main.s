@@ -39,7 +39,7 @@ section bank 0, $0100
 
 section bank 0, $0150
 start:      di
-            ld sp, $D000                    ; (the stack: the top of fixed work RAM)
+            ld sp, $D000                    ; (the stack: $CF00-$CFFF, the top of fixed work RAM)
             ld d, a                         ; A = $11 on a Game Boy Color / Advance
             ld a, e                         ; (E = SOFT_MAGIC: a soft reset)
             cp SOFT_MAGIC

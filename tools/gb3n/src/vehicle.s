@@ -245,7 +245,10 @@ v_abtn:     ld a, [veh]
             ld a, $2A
             call sfx_play
             ld a, 4
-            jp v_set
+            call v_set
+            %FAR B_WSPR, va_lift            ; (3E/D6A7: turning into the airship, rising)
+            and a
+            ret
 .foot:      ld a, [SRAM_PAGE + $20]         ; an airship under the party (3E/C303)
             rra
             jr nc, .b6
@@ -272,7 +275,10 @@ v_abtn:     ld a, [veh]
             ld a, $2D
             call sfx_play
             pop af
-            jp v_set
+            call v_set
+            %FAR B_WSPR, va_lift            ; (3E/C370 -> D6A7)
+            and a
+            ret
 ; the Invincible (3E/C942): on foot on it ($6004 shown, world $6007, at $6005 / $6006): inside
 ; (its entrance 0 of the world, 3E/C292; $602B bit 7 from the tile's property 1 & $81)
 v_inv:      ld a, [SRAM_PAGE + $04]
@@ -343,12 +349,22 @@ v_land:     ld a, [pos_x]
             ld a, [world]
             cp 4
             jr nz, .nu
-            bit 1, b                        ; surfacing where property 1 bit 1 is clear
-            jr nz, .no
+            bit 1, b                        ; surfacing where property 1 bit 1 is clear (3E/C786)
+            jr nz, .nos
             ld a, $2D
             call sfx_play
+            %FAR B_WSPR, va_lift            ; (off the top: 3E/D697)
             ld a, 3
-            jp v_goto_here
+            call v_goto_here
+            ld a, $52                       ; (3E/C18A: rising at the surface)
+            call sfx_play
+            %FAR B_WSPR, va_rise
+            ld a, $27
+            call sfx_play
+            scf
+            ret
+.nos:       and a
+            ret
 .nu:        ld a, [veh]
             ld hl, vtab + VT_LAND
             call v_hla
@@ -357,17 +373,22 @@ v_land:     ld a, [pos_x]
             jr z, .ok
             ld a, [world]                   ; not here: diving?
             cp 3
-            jr nz, .no
+            jr nz, .bnc
             ld a, c                         ; (FF3: 2 x the tile = $3C)
             cp $1E
-            jr nz, .no
+            jr nz, .bnc
             ld a, [SRAM_PAGE + $20]
             bit 7, a
-            jr z, .no
+            jr z, .bnc
             ld a, $29
             call sfx_play
+            %FAR B_WSPR, va_dive            ; (3E/D6F2)
             ld a, 4
             jp v_goto_here
+.bnc:       scf                             ; (cannot land: down and up again, 3E/C7F6)
+            %FAR B_WSPR, va_bnc
+            and a
+            ret
 .ok:
             ld a, [pos_x]
             ld [SRAM_PAGE + $01], a
@@ -378,14 +399,21 @@ v_land:     ld a, [pos_x]
             jr z, .nw
             ld a, [world]
             ld [SRAM_PAGE + $03], a
-.nw:        ld a, $24
-            call sfx_play
+.nw:        ld a, [veh]                     ; (the Enterprise: sound $53, 3E/C80F)
+            cp 4
+            ld a, $24
+            jr nz, .sf
+            ld a, $53
+.sf:        call sfx_play
+            %FAR B_WSPR, va_lnd             ; (3E/D710, landing)
             ld a, [veh]
             cp 4
             ld a, 3
             jr z, .s
             xor a
-.s:         jp v_set
+.s:         call v_set
+            and a
+            ret
 .no:        call m_sfx_err_f
             scf
             ret

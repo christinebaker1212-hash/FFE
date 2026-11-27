@@ -32,8 +32,7 @@ ws_tiles:   ld a, [world]
 ws_world:   ld a, 32                        ; (after the party and the guest)
             ld [ws_n], a
             call ws_pty
-
-            ld a, [world]
+ws_world2:  ld a, [world]
             srl a
             jr z, .fc
             srl a
@@ -810,11 +809,243 @@ ws_lev:     ld a, [SRAM_PAGE + $20]
             add hl, de
             jp ws_list
 
+; ---- the airship lifting off / landing, the Enterprise turning, the Nautilus diving / surfacing
+; (3E/D697-D81D): the vehicle at NES ($70, va_y) with its shadow over the other world sprites
+va_frame:   call wait_vbl                   ; (3E/D73E)
+            call hram_dma
+            ld a, [va_tile]                 ; (the Enterprise's 4 tiles of this frame: OBJ $60)
+            and a
+            call nz, va_tiles
+            ld hl, frame
+            inc [hl]
+            call snd_frame
+            call read_pad
+            ld hl, oam_buf
+            ld b, 160
+            xor a
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            ld [ws_n], a
+            ld a, [va_x]
+            sub 48
+            ld [ws_x], a
+            ld a, [va_y]
+            sub 47
+            ld [ws_y], a
+            ld a, [frame]
+            and 8
+            or $10
+            ld [ws_poff], a
+            ld a, [va_vt]
+            call ws_veh
+            ld a, [frame]                   ; (3E/D9DA: the shadow, every other frame)
+            rra
+            jr nc, .w
+            ld b, $77 + 1 - 48
+            ld c, $70 - 48
+            ld de, $C003
+            call ws_spr
+            ld b, $77 + 1 - 48
+            ld c, $78 - 48
+            ld de, $C043
+            call ws_spr
+.w:         jp ws_world2
+va_tiles:   ld a, [va_src]                  ; 64 bytes into VRAM bank 1 tile $60 (V-Blank)
+            ld l, a
+            ld a, [va_src + 1]
+            ld h, a
+            ld de, $8600
+            ld bc, 64
+            ld a, 1
+            ldh [rVBK], a
+            ld a, B_VGFX
+            call far_copy
+            xor a
+            ldh [rVBK], a
+            ld [va_tile], a
+            ret
+; the airship rising (3E/D6A7): underwater the Nautilus off the top (D697); the Enterprise turns
+; first (D77D)
+va_lift:    ld a, $70
+            ld [va_x], a
+            ld a, $68
+            ld [va_vt], a
+            ld a, [world]
+            cp 4
+            jr c, .s
+            ld a, $5F                       ; (3E/D697)
+            ld [va_y], a
+.u:         call va_frame
+            ld hl, va_y
+            dec [hl]
+            ld a, [hl]
+            cp $10
+            jr nc, .u
+            ret
+.s:         ld a, $6F
+            ld [va_y], a
+            ld a, [veh]
+            cp 4
+            jr nz, va_up
+            xor a                           ; (3E/D77D: counter 0 -> 127)
+            ld [va_8a], a
+.x:         call va_xf
+            ld hl, va_8a
+            inc [hl]
+            bit 7, [hl]
+            jr z, .x
+            ld a, $70
+            ld [va_x], a
+            ld a, $68
+            ld [va_vt], a
+            ld a, $68
+            ld [va_y], a
+; up a line every other frame to $5F, then facing left (3E/D6BE)
+va_up:      call va_frame
+            ld a, [frame]
+            and 1
+            jr nz, va_up
+            ld hl, va_y
+            dec [hl]
+            ld a, [hl]
+            cp $5F
+            jr nc, va_up
+            ld a, DIR_L
+            ld [facing], a
+            ret
+va_bnc:     scf
+            jr va_land
+va_lnd:     and a
+; landing (3E/D710): down a line every other frame to $70 ($68 for the Enterprise, which turns
+; into the ship); carry set: up again (it cannot land here)
+va_land:    push af
+            ld a, $70
+            ld [va_x], a
+            ld a, $68
+            ld [va_vt], a
+            ld a, $5F
+            ld [va_y], a
+.l:         call va_frame
+            ld a, [frame]
+            and 1
+            jr nz, .l
+            ld hl, va_y
+            inc [hl]
+            ld a, [veh]
+            cp 4
+            ld a, [hl]
+            jr nz, .a
+            cp $68
+            jr c, .l
+            pop af
+            jr c, va_up
+            ld a, $7F                       ; (3E/D789: 127 -> 0, then facing left)
+            ld [va_8a], a
+.x:         call va_xf
+            ld hl, va_8a
+            dec [hl]
+            bit 7, [hl]
+            jr z, .x
+            ld a, DIR_L
+            ld [facing], a
+            ret
+.a:         cp $70
+            jr c, .l
+            pop af
+            jr c, va_up
+            ld a, DIR_R
+            ld [facing], a
+            ret
+; one frame of the Enterprise turning (3E/D799): its tiles by the counter, the ship shaking,
+; lower as it turns
+va_xf:      ld a, [va_8a]
+            and a
+            ld hl, $4900                    ; (0B/AC00: the ship)
+            jr z, .t
+            swap a                          ; (0B/B100 + $100 x (counter / 32) + $40 x ((counter
+            srl a                           ;   / 8) & 3))
+            and 7
+            ld h, a
+            ld a, [va_8a]
+            and $18
+            add a
+            add a
+            add a
+            ld l, a
+            ld de, $4940
+            add hl, de
+.t:         ld a, l
+            ld [va_src], a
+            ld a, h
+            ld [va_src + 1], a
+            ld a, 1
+            ld [va_tile], a
+            ld a, [va_8a]
+            cp $60
+            jr c, .lo
+            ld b, a
+            ld a, $80
+            sub b
+            srl a
+            srl a
+            add $68
+            ld [va_y], a
+            ld a, $70
+            jr .x
+.lo:        ld a, $6F
+            ld [va_y], a
+            ld a, [va_8a]
+            and 4
+            ld a, $71
+            jr nz, .x
+            ld a, $6F
+.x:         ld [va_x], a
+            ld a, $10                       ; (the ship: tile $50, its left pose)
+            ld [ws_poff], a
+            ld a, $50
+            ld [va_vt], a
+            jp va_frame
+; the Nautilus diving (3E/D6F2): down a line every other frame to $70
+va_dive:    ld a, $70
+            ld [va_x], a
+            ld a, $68
+            ld [va_vt], a
+            ld a, $5F
+            ld [va_y], a
+.l:         call va_frame
+            ld a, [frame]
+            and 1
+            jr nz, .l
+            ld hl, va_y
+            inc [hl]
+            ld a, [hl]
+            cp $70
+            jr c, .l
+            ret
+; the airship rising at the surface (3E/D6D4): $6F up to $60
+va_rise:    ld a, $70
+            ld [va_x], a
+            ld a, $68
+            ld [va_vt], a
+            ld a, $6F
+            ld [va_y], a
+.l:         call va_frame
+            ld a, [frame]
+            and 1
+            jr nz, .l
+            ld hl, va_y
+            dec [hl]
+            ld a, [hl]
+            cp $60
+            jr nc, .l
+            ret
+
 section bank B_WSPR, $7C00
 ws_sin:     ds 256                          ; (3A/9E3E, from the ROM)
 ws_chtab:   ds 126                          ; (3D/BF7A: the chain's links by distance)
 
-section wram, $CFD0
+section wram, $C0B0
 ws_n:       ds 1
 ws_x:       ds 1
 ws_y:       ds 1
@@ -842,3 +1073,9 @@ ws_hsy:     ds 1
 ws_cb:      ds 1                            ; $B0-$B2: the chocobo running off
 ws_cbx:     ds 1
 ws_cby:     ds 1
+va_x:       ds 1
+va_y:       ds 1
+va_vt:      ds 1
+va_8a:      ds 1
+va_tile:    ds 1
+va_src:     ds 2

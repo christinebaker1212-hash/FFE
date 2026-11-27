@@ -1115,7 +1115,7 @@ c_staff:    xor a
             jr nz, .p
             ret
 
-section wram, $CF00
+section wram, $CE80
 c_vars:
 c_cnt:      ds 1            ; $B6
 c_bri:      ds 1            ; $B7

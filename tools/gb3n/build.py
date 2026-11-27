@@ -160,6 +160,8 @@ def field_banks(rom):
     v[0x0000:0x0600] = gbt(rom.rd(0x0B, 0x8800, 0x600))
     v[0x0600:0x0780] = gbt(rom.rd(0x0B, 0x8E00, 0x180))
     v[0x0780:0x0900] = gbt(rom.rd(0x0B, 0x8F80, 0x180))
+    v[0x0900:0x0940] = gbt(rom.rd(0x0B, 0xAC00, 0x40))       # the Enterprise turning (3E/D799):
+    v[0x0940:0x0D40] = gbt(rom.rd(0x0B, 0xB100, 0x400))      #   the ship, 16 frames of 4 tiles
     banks[B_VGFX] = v
     tm = {}                                              # tilemaps: streams packed per bank
     bank, at = B_TMAP0, 0
@@ -463,6 +465,8 @@ ev_fxtest:  call ev_shake
     secs = sorted(set((a, b) for a, b, _ in asm_sm83.RAM_SECTIONS if b > a))   # (RAM sections may
     for (a0, a1), (b0, b1) in zip(secs, secs[1:]):                        #   not overlap)
         assert a1 <= b0, 'RAM sections overlap: %04X-%04X and %04X-%04X' % (a0, a1, b0, b1)
+    for a0, a1 in secs:                                                     # ($CF00-$CFFF: the stack)
+        assert a1 <= 0xCF00 or a0 >= 0xD000, 'RAM section %04X-%04X in the stack' % (a0, a1)
     banks = dict(r.banks)
     if os.environ.get('GB3N_GAPS'):              # free runs (32+ bytes) of a code bank: GB3N_GAPS=29
         gb = int(os.environ['GB3N_GAPS']); run = []
