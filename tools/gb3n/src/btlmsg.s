@@ -445,15 +445,8 @@ sc_num:     ld a, [ba_dirty]                ; (an animation used their tiles: lo
 .t:         ld a, [btl_k]
             cp 12
             jr z, .show
-            add a, a
-            ld e, a
-            ld d, 0
-            ld hl, W7 + $7E4F
-            add hl, de
-            ld a, [hl+]
-            ld e, a
-            ld a, [hl]
-            ld d, a
+            call num_ent
+            ld a, d
             and e
             inc a
             jr z, .nx                       ; ($FFFF: none)
@@ -479,6 +472,54 @@ sc_num:     ld a, [ba_dirty]                ; (an animation used their tiles: lo
             jr nz, .batch
 .done:      call num_clear
             ld a, [W7 + $7EE1]              ; (the split animation: later)
+            ret
+
+; DE = the numeral of place btl_k (0-7 monster slots, 8-11 members): FF3's buffers are by side,
+; $7E4F the target's ($7E6F: a monster), $7E5F the attacker's ($7E9A bit 7: a monster); the
+; target's first, else the attacker's when it is on this side; $FFFF none
+num_ent:    ld a, [btl_k]
+            ld c, 0                         ; C = 1 for a monster place
+            cp 8
+            jr nc, .m
+            inc c
+            jr .i
+.m:         sub 8
+.i:         add a, a
+            ld e, a
+            ld d, 0
+            ld a, [W7 + $7E6F]
+            and a
+            jr z, .t0
+            ld a, 1
+.t0:        cp c
+            jr nz, .at
+            ld hl, W7 + $7E4F
+            add hl, de
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl]
+            and b
+            inc a
+            jr nz, .rd
+.at:        ld a, [W7 + $7E9A]
+            rlca
+            and 1
+            cp c
+            jr nz, .no
+            ld hl, W7 + $7E5F
+            add hl, de
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl]
+            and b
+            inc a
+            jr z, .no
+.rd:        dec hl
+            ld a, [hl+]
+            ld e, a
+            ld d, [hl]
+            ret
+.no:        ld de, $FFFF
             ret
 
 num_clear:  ld hl, NUM_OAM

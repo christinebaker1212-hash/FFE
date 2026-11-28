@@ -131,7 +131,21 @@ pal_one:    ld c, a
             ret
 
 ; 2F/A37F init monster graphics: each type's tiles to its ppu place (2F/A42E)
-mon_gfx:    xor a
+mon_gfx:    ld hl, W7 + $7300               ; (the monster tiles $70-$FF cleared first: a 4 x 4
+            ld de, $100                     ;   monster sits at the bottom of its 4 x 6 slot, as
+            call memclr                     ;   FF3's blank pattern table leaves its top rows;
+            ld de, $8700                    ;   the field's font was there)
+.c:         push de
+            ld hl, W7 + $7300
+            ld b, 16
+            xor a
+            call vcopyx
+            pop de
+            inc d
+            ld a, d
+            cp $90
+            jr nz, .c
+            xor a
             ld [BZ + $86], a
 .t:         ld [btl_k], a
             add a, low(W7 + $7D6B)
