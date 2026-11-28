@@ -30,8 +30,19 @@ sys.path.insert(0, os.path.join(ROOT, 'tools', 'gb'))
 sys.path.insert(0, HERE)
 from asm_sm83 import asm, make_rom
 import data
+import importlib.util
 
-COMMON, CHARS, TSETS, MAPREC0, TMAP0 = 1, 2, 3, 8, 16
+
+def _load(name):
+    sp = importlib.util.spec_from_file_location('gb3n_' + name, os.path.join(HERE, name + '.py'))
+    m = importlib.util.module_from_spec(sp); sp.loader.exec_module(m)
+    return m
+
+
+tiles = _load('tiles')
+text = _load('text')
+
+COMMON, CHARS, TSETS, SCRIPT, NPCGFX, MAPREC0, TXT_IDX, TMAP0 = 1, 2, 3, 4, 5, 9, 15, 16
 ROM_BANKS = 128
 B8 = data.B8
 
@@ -81,13 +92,31 @@ def data_banks(rom):
             base[2], base[3], base[6], base[7] = cc[0], cc[1], cc[2], cc[3]
             o = 0x0400 + 0x800 * half + 32 * pid
             c[o:o + 32] = b''.join(rgb2(v) for v in base)
-    c[0x1800:0x1800 + 144 * 16] = gbt(rom.rd(0x0D, 0xB700, 144 * 16))
+    c[0x0300:0x0308] = b''.join(rgb2(v) for v in data.window_colours(rom))
+    c[0x1400:0x1500] = rom.rd(0x3B, 0xB41A, 256)        # npc animation data (3B/B41A)
+    c[0x1500:0x1600] = rom.rd(0x3F, 0xFE00, 256)        # the random number table (3F/FE00)
+    c[0x1600:0x1700] = tiles.ff3_to_ascii()
+    c[0x1700:0x1900] = rom.rd(0x00, 0x9400, 512)        # npc id -> graphics id (00/9400, 9500)
+    c[0x1900:0x1B00] = rom.rd(0x01, 0xBE00, 512)        # npc speeds (01/BE00, BF00)
+    c[0x1B00:0x1D00] = rom.rd(0x2C, 0x8000, 512)        # npc list pointers (2C/8000)
+    menut = rom.rd(0x0D, 0xB700, 144 * 16)
+    c[0x2000:0x2000 + 144 * 16] = gbt(menut)
+    font = [bytes(t) for t in tiles.tileset(fg=3, bg=2)[:128]]   # the window font: ours, FF3's frame
+    for k in range(9):                                   #   ($F7-$FF -> $10-$18) and icons
+        font[0x10 + k] = gbt(menut[16 * (0xF7 - 0x70 + k):16 * (0xF7 - 0x70 + k) + 16])
+    raw = rom.at(0x0D * B8 + 0x1000, 0x1000)
+    for k, code in enumerate(text.ICON_CODES):
+        font[code] = gbt(raw[16 * (0x60 + k):16 * (0x60 + k) + 16])
+    c[0x2900:0x3100] = b''.join(font)
     banks[COMMON] = c
     banks[CHARS] = bytearray(gbt(rom.at(0x0E * B8, 0x4000)))
     t = blank()
     for ts in range(8):
         t[0x400 * ts:0x400 * ts + 0x400] = data.tileset_block(rom, ts)
     banks[TSETS] = t
+    banks[SCRIPT] = bytearray(rom.at(0x2C * B8, 0x4000))  # event / trigger / npc scripts (2C / 2D)
+    for k in range(4):                                   # npc graphics by graphics id (3E/DF41)
+        banks[NPCGFX + k] = bytearray(b''.join(gbt(data.npc_gfx_block(rom, g)) for g in range(64 * k, 64 * k + 64)))
     # tilemaps (unpacked) and graphics subsets, then the map records
     tm_at, bank, off = {}, TMAP0, 0
     tids = sorted(set(rom.rd(0x00, 0x8A00, 512)))
@@ -114,7 +143,11 @@ def data_banks(rom):
         banks.setdefault(bank, blank())[off:off + 16 * data.SUBSET_TILES] = gbt(data.subset_tiles(rom, sub))
         sub_at[sub] = (bank, 0x4000 + off)
         off += 16 * data.SUBSET_TILES
-    last = bank
+    tb, layout, last = text.banks(bank + 1)
+    banks[TXT_IDX] = tb.pop(bank + 1)
+    for b, blob in tb.items():
+        banks[b] = blob
+    data_banks.txt = layout
     assert last < ROM_BANKS
     for cls in range(3):                              # world 0; world 1; worlds 2-4
         for m in range(256):
@@ -149,12 +182,22 @@ def main():
     a = sys.argv[1:]
     nes = a[a.index('--nes') + 1] if '--nes' in a else os.path.join(ROOT, 'build', 'ff3_en.nes')
     out = a[a.index('--out') + 1] if '--out' in a else os.path.join(ROOT, 'build', 'ff3p.gbc')
-    st = (a[a.index('--start') + 1] if '--start' in a else '181,0,9,22').split(',')
+    st = (a[a.index('--start') + 1] if '--start' in a else 'new').split(',')
     rom = data.Rom(nes)
+    dbanks = data_banks(rom)
+    L = data_banks.txt
+    if st == ['new']:                                # a new game: map 0, FF3's program start
+        st = ['0', '0', '0', '0']; aa = 0
+    else:
+        aa = 0x81
     src = ('START_MAP = %s\nSTART_WORLD = %s\nSTART_X = %s\nSTART_Y = %s\n' % tuple(st) +
+           'START_AA = $%02X\n' % aa +
            'COMMON = %d\nCHARS = %d\nTSETS = %d\nMAPREC0 = %d\n' % (COMMON, CHARS, TSETS, MAPREC0) +
+           'SCRIPT = %d\nNPCGFX = %d\nTXT_IDX = %d\n' % (SCRIPT, NPCGFX, TXT_IDX) +
+           'section bank 0, $3FF0\ntxt_tab:    dw $%04X, $%04X, $%04X, $%04X\n' % (
+               L['t8000'], L['t8200'], L['t8400'], L['t8600']) +
            open(os.path.join(ROOT, 'tools', 'gb', 'rt', 'hw.s')).read())
-    for f in ('field.s',):
+    for f in ('event.s', 'npc.s', 'dlg.s', 'field.s'):
         src += '\n' + open(os.path.join(HERE, 'eng', f)).read()
     is_def = lambda l: re.match(r'^[A-Za-z_]\w*\s+=', l)
     lines = src.split('\n')
@@ -163,7 +206,7 @@ def main():
     for lbl in ('oam_buf', 'qbuf'):
         assert r.labels[lbl] % 0x100 == 0, '%s not aligned' % lbl
     banks = dict(r.banks)
-    for b, blob in data_banks(rom).items():
+    for b, blob in dbanks.items():
         assert b not in banks, 'bank %d used by code and data' % b
         banks[b] = blob
     img = make_rom(banks, 'FF3 GBC', cart_type=0x1B, rom_banks=ROM_BANKS, ram_size_code=0x03,

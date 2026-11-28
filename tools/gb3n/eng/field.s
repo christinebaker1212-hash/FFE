@@ -6,7 +6,9 @@
 ;
 ; RAM (Color only):
 ;   $C000 oam_buf, $C100-$C8FF qbuf (the metatile queue), $C900- the engine's variables,
-;   $CE00-$CFFF the stack (SP $D000: never in the switchable bank)
+;   $C980 TS7B, $CA00 palettes / the map record, $CB00 FF3's zero page (Z), $CC00 / $CD00 FF3's
+;   objects (O0 / O1), $CE00 FF3's $0700 (T07), $CF00-$CFFF the stack (SP $D000: never in the
+;   switchable bank)
 ;   WRAM bank 1 $D000-$D3FF: SV, FF3's save page ($6000-$63FF: the listing's addresses map to
 ;     SV + (address - $6000)), $D400-$D7FF FF3's $7000-$73FF (map objects)
 ;   WRAM bank 2 (the field's tables, switched in by the field code only; every interrupt
@@ -36,8 +38,18 @@ W_UL       = $D700
 W_UR       = $D800
 W_DL       = $D900
 W_DR       = $DA00
-W_TB       = $DB00          ; FF3 $0700: +$00 entrances, +$10 treasures, +$20 triggers,
-                            ;   +$30 the map exit, +$40 trigger counts per tile, +$60 per type
+W_TB       = T07            ; FF3 $0700 (event.s)
+facing     = Z + $33
+cur_map    = Z + $48
+world      = Z + $78
+aa_mode    = Z + $AA
+fill_mt    = Z + $4C
+t44        = Z + $44
+t45        = Z + $45
+lay43      = Z + $43
+zlev       = Z + $A5
+trig       = Z + $AB
+frame16    = Z + $F0
 C_RGB      = $4000          ; COMMON (port.py)
 C_POSE     = $4080
 C_POSEOFS  = $40C0
@@ -52,13 +64,15 @@ C_INITHP   = $4258
 C_INITST   = $4260
 C_INITEQ   = $4280
 C_SPAL     = $4400
-C_MENUT    = $5800
+C_MENUT    = $6000
+C_FONT     = $6900
+C_WINPAL   = $4300
 MS_MAX     = 8              ; the map stack's depth (FF3: the 6502 stack, up to $20 bytes free)
 
 section bank 0, $0040
             jp vblank
 section bank 0, $0048
-            reti
+            jp stat_int
 section bank 0, $0050
             reti
 section bank 0, $0100
@@ -128,9 +142,29 @@ start:      di
             dec b
             jr nz, .dc
             call sv_init                    ; a new game's save page (FF3 init sram)
+            ld a, COMMON                    ; the window font (VRAM bank 1, tile = code)
+            call sbank
+            ld a, 1
+            ldh [rVBK], a
+            ld hl, C_FONT
+            ld de, $9000
+            ld bc, 128 * 16
+            call memcpy
+            xor a
+            ldh [rVBK], a
+            ld hl, C_WINPAL                 ; BG palette 7: FF3's window colours
+            ld de, sh_pal + 56
+            ld bc, 8
+            call memcpy
+            ld a, $FF
+            ld [z4B], a
+            ld a, BOX_LINES - 1             ; LYC: the dialogue box's bottom
+            ldh [rLYC], a
+            ld a, $40
+            ldh [rSTAT], a
             xor a
             ldh [rIF], a
-            ld a, 1                         ; V-Blank
+            ld a, 3                         ; V-Blank, STAT
             ldh [rIE], a
             ei
             ld a, START_WORLD
@@ -143,30 +177,34 @@ start:      di
             ld [facing], a
             ld a, START_MAP
             ld [cur_map], a
-            ld a, $81                       ; (the position given: kept, as a submap's)
-            call load_map
+            ld a, START_AA                  ; (a new game: map 0 from FF3's program start, 3E/C0E6;
+            call load_map                   ;   test builds: the position given, kept)
 
 ; ---- main loop: FF3 map main (3F/E1E1), one engine frame per GB frame
 main:       call wait_vbl
             call read_pad
-            ld hl, frame16
+            ld hl, zF0
             inc [hl]
-            jr nz, .f
-            inc hl
-            inc [hl]
-.f:         call scroll_step                ; (FF3 update scrolling: the step in progress)
+            call scroll_step                ; (FF3 update scrolling: the step in progress)
             ld a, [moving]
             and a
-            jr nz, .drw
+            jr nz, .spr
+            ld a, [z76]                     ; (a dialogue pending)
+            and a
+            jr nz, .spr
             ld a, [trig]                    ; a trigger stepped on (FF3 $AB)
             and $E0
             jr z, .in
             call do_trigger
             jr main
 .in:        call check_input
-.drw:       call q_feed
+.spr:       ld a, [z76]                     ; a dialogue (FF3 $76 -> show dialogue)
+            and a
+            call nz, dlg_show
+            call q_feed
             call set_scroll
             call make_oam
+            call npc_frame
             jr main
 
 
@@ -200,6 +238,7 @@ vblank:     push af
             jr c, .late
             ld c, MT_DRAWQ
             call q_flush
+            call box_vbl
 .late:      ld a, 1
             ldh [vbl_done], a
             pop af
@@ -561,6 +600,13 @@ load_map:   ld [aa_mode], a
             call init_trig                  ; (3A/9197: trigger tiles numbered)
             ld a, 1
             ldh [rSVBK], a
+            ld a, [aa_mode]                 ; (a reload keeps the npcs: 3F/E7F8)
+            and a
+            jr z, .npc
+            bit 7, a
+            jr z, .nl
+.npc:       call npc_load
+.nl:
             ld a, [mrec + 16 + 3]           ; the fill tile outside the 32 x 32 (byte 3)
             ld [fill_mt], a
             ld a, [aa_mode]                 ; from the world map: the map's own entry point
@@ -575,6 +621,7 @@ load_map:   ld [aa_mode], a
             ld a, 4                         ; facing down (3F/E861)
             ld [facing], a
 .pos:       call load_gfx                   ; (3E/DD0F)
+            call npc_gfx
             call load_pal                   ; (3A/8509)
             ld a, [px]                      ; the tile under the party: its z-level and layer
             ld e, a                         ;   (3F/E87B)
@@ -592,6 +639,12 @@ load_map:   ld [aa_mode], a
             ld a, [t44]
             and $03
             ld [zlev], a
+            ld a, [t44]                     ; (3F/E890: standing on an event trigger: it runs)
+            bit 7, a
+            jr z, .nz
+            ld a, [t45]
+            cp $F0
+            call nc, ev_trigF
 .nz:        ld a, [lay43]                   ; (3F/E89D: $44 = $43, no trigger)
             ld [t44], a
             xor a
@@ -848,24 +901,28 @@ load_pal:   ld hl, mrec + 32
             ld [pal_dirty], a
             ret
 
-; ---- FF3 check player input (3F/E2F8): a direction -> facing, passability, the step
+; ---- FF3 check player input (3F/E2F8): an event's command, else A (talk / look), then a direction
+; (from the pad, or set by the event) -> facing, passability, the step
 check_input:
-            ldh a, [pad]                    ; facing bits as FF3's: right 1, left 2, down 4, up 8
-            swap a
-            ld b, a
-            and $03                         ; (GB: bit 4 right, 5 left, 6 up, 7 down)
-            ld c, a
-            ld a, b
-            and $04
-            add a, a                        ; up -> 8
-            or c
-            ld c, a
-            ld a, b
-            and $08
-            rrca                            ; down -> 4
-            or c
+            ld a, [z6C]
+            and a
+            jr nz, .ev
+            ld a, [z24]                     ; A: npcs and treasures (3F/EA26)
+            and a
+            jp nz, a_button
+            xor a                           ; (B / Start / Select: with the menus)
+            ld [z25], a
+            ld [z23], a
+            ld [z22], a
+.ev:        ld a, [z4B]                     ; (a map title showing: nothing)
+            cp $FF
+            ret nz
+            call ev_step                    ; an event's command, or the joypad (3E/D219)
+            ld a, [z6C]                     ; (an event started by it: the next frame)
+            ld a, [z20]
+            and $0F
             ret z
-            ld c, a                         ; (one direction: FF3 tests right, left, down, up)
+            ld c, a                         ; FF3: right, left, down, up first (3F/E4E9)
             bit 0, c
             ld a, 1
             jr nz, .one
@@ -879,7 +936,7 @@ check_input:
 .one:       ld [facing], a
             call passable
             ret c
-            ld a, 1                         ; FF3 init player movement (3F/CA67): the speed
+            ld a, 1                         ; FF3 init player movement (3F/CA67)
             ld [moving], a
             xor a
             ld [mcount], a
@@ -890,6 +947,47 @@ check_input:
             ld a, c
             ld [mdy], a
             jp draw_edge
+
+; FF3 check npcs and treasures (3F/EA26): the npc ahead -> its event; else a chest / a locked door
+a_button:   xor a
+            ld [z24], a
+            ld a, [facing]
+            call dir_dxy
+            ld a, [px]
+            add a, b
+            and 63
+            ld [tx], a
+            ld a, [py]
+            add a, c
+            and 63
+            ld [ty], a
+            call npc_ahead
+            jp c, npc_event
+            ld a, [lay43]
+            ld [t44], a
+            ret
+
+; FF3 execute npc event (3F/E9BB): the npc's trigger script (2C/8200, 2C/8400 off world 0); below
+; $E0 its dialogue list and the conditional events; then the event
+npc_event:  ld a, [lay43]
+            ld [t44], a
+            ld a, [hl]
+            ld [Z + $A0], a
+            ld de, $8200
+            ld a, [world]
+            and a
+            jr z, .w
+            ld de, $8400
+.w:         ld a, [Z + $A0]
+            call ts_load
+            ld a, [Z + $A0]
+            cp $E0
+            ret nc                          ; (inns, shops, the Fat Chocobo: with the menus)
+            call ts_npc
+            ld a, [z6C]
+            and a
+            ret z
+            jp ev_start
 
 ; A = facing bits -> B = dx, C = dy
 dir_dxy:    ld bc, $0100
@@ -918,6 +1016,11 @@ passable:   ld a, [facing]                  ; the tile in facing direction (3F/E
             add a, c
             and 63
             ld [ty], a
+            call npc_touch                  ; (an npc there: impassable; 3F/E3F1)
+            jp c, .no
+            ld a, [tx]
+            ld e, a
+            ld a, [ty]
             ld d, a
             call tile_props
             ld a, [t44]
@@ -964,7 +1067,8 @@ passable:   ld a, [facing]                  ; the tile in facing direction (3F/E
             jr c, .nt                       ; (2, 3, 7-B: no trigger)
             cp $0F - 6
             jr c, .blk                      ; (C-E: impassable)
-            jr .nt                          ; (F: an event trigger; its scripts come with events)
+            call ev_trigF                   ; (F: an event trigger, then the tile as any other)
+            jp .nt
 .exit_p:    ld a, $40
             jr .st
 .exit_w:    ld a, $C0
@@ -1081,7 +1185,7 @@ do_trigger: ld a, [trig]
             jr z, .entr
             cp $40
             jr z, .back
-            ret                             ; ($C0: the world map, $20 battles: to come)
+            ret                             ; ($C0: the world map, $20 a battle: with them)
 .entr:      ld a, [ms_n]
             cp MS_MAX
             ret nc
@@ -1105,14 +1209,9 @@ do_trigger: ld a, [trig]
             and $0F
             ld e, a
             ld d, 0
-            ld a, 2
-            ldh [rSVBK], a
             ld hl, W_TB
             add hl, de
-            ld b, [hl]
-            ld a, 1
-            ldh [rSVBK], a
-            ld a, b
+            ld a, [hl]
             ld [cur_map], a
             xor a                           ; (from the "world map": the map's own entry point)
             jp load_map
@@ -1144,6 +1243,16 @@ do_trigger: ld a, [trig]
 ; one-pixel lift; the layer priority 3E/D9A7), at screen (72, 64)
 make_oam:   ld a, 1
             ldh [oam_ok], a
+            ld a, [z7E]                     ; (the player hidden by an event)
+            bit 7, a
+            jr z, .sh
+            xor a
+            ld [oam_buf], a
+            ld [oam_buf + 4], a
+            ld [oam_buf + 8], a
+            ld [oam_buf + 12], a
+            ret
+.sh:
             ld a, COMMON
             call sbank
             ld a, [facing]                  ; pose offset by facing (3E/DC1A)
@@ -1249,8 +1358,8 @@ set_scroll: ld a, [mcount]
             swap a
             and $F0
             add a, b
-            sub 64
-            ldh [scy], a
+            sub 67                          ; (the party's tile at line 67: FF3 draws people 3
+            ldh [scy], a                    ;   pixels above their tile, the sprite at line 64)
             ret
 mulsign:    and a                           ; A = sign (-1 / 0 / 1) -> A = sign * C
             ret z
@@ -1613,7 +1722,6 @@ px:         ds 1
 py:         ds 1
 tx:         ds 1
 ty:         ds 1
-facing:     ds 1                            ; FF3's facing bits ($33): right 1, left 2, down 4, up 8
 moving:     ds 1
 mcount:     ds 1
 mdx:        ds 1
@@ -1624,24 +1732,14 @@ de_x:       ds 1
 de_y:       ds 1
 de_n:       ds 1
 de_dir:     ds 1
-cur_map:    ds 1                            ; FF3 $48
-world:      ds 1                            ; FF3 $78
-aa_mode:    ds 1                            ; FF3 $AA
-fill_mt:    ds 1                            ; FF3 $4C
-t44:        ds 1                            ; FF3 $44 / $45: the tile's property bytes
-t45:        ds 1
-lay43:      ds 1                            ; FF3 $43: the layer priority
-zlev:       ds 1                            ; FF3 $A5
-trig:       ds 1                            ; FF3 $AB
 tr88:       ds 1
 tr89:       ds 1
 chr_id:     ds 1
 pose:       ds 1
-frame16:    ds 2                            ; FF3 $F0 / $F1
 pal_dirty:  ds 1
 ms_n:       ds 1
 ms_buf:     ds 4 * MS_MAX
-section wram, $CA00
+section wram, $CA00                         ; (TS7B at $C980: event.s)
 sh_pal:     ds 64                           ; the Color's BG palettes (shadow)
 pal_ob:     ds 64                           ; OBJ
 mrec:       ds 128                          ; the map's record (port.py)
