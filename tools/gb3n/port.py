@@ -49,7 +49,7 @@ ROM_BANKS = 256
 ob = _load('build')                              # the kept battle / sound modules' builder
 KEPT = ['batlib.s', 'batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s', 'batflow.s', 'batvict.s',
         'batloop.s', 'batsetup.s', 'batscr.s', 'batui.s', 'banim.s', 'bsumn.s', 'batfx.s', 'batbk.s', 'sound.s',
-        'menu.s', 'mini.s']
+        'menu.s', 'mini.s', 'cut.s', 'cutend.s']
 BANK0_MOVE = {'batlib.s': ('$0450', '$1D00'), 'sound.s': ('$1000', '$2200')}
 B8 = data.B8
 
@@ -268,6 +268,8 @@ def main():
     dbanks = data_banks(rom)
     raw = open(nes, 'rb').read()
     tbanks, L, tlast = text.banks(ob.B_TEXT)        # (the text: the kept modules' layout)
+    cutdata = _load('cutdata')                       # (the cutscenes' data: prophecy, prologue, ending)
+    cut_raw, cut_gfx, cut_eq = cutdata.build(rom)
     if st == ['new']:                                # a new game: map 0, FF3's program start
         st = ['0', '0', '0', '0']; aa = 0
     elif st[0] == 'w':                               # (test builds: the world map, WORLD,X,Y)
@@ -295,7 +297,7 @@ def main():
         src += '\n' + t
     sd = ob.sound_data()                         # (the period table: out of bank 0)
     assert sd.count('section bank 0, $3000') == 1
-    src += '\n' + ob.menu_data() + '\n' + ob.own_data(raw) + '\n' + sd.replace('section bank 0, $3000', 'section bank %d, $4000' % SNDT)
+    src += '\n' + cut_eq + '\n' + ob.menu_data() + '\n' + ob.own_data(raw) + '\n' + sd.replace('section bank 0, $3000', 'section bank %d, $4000' % SNDT)
     src = ob.expand(src)
     is_def = lambda l: re.match(r'^[A-Za-z_]\w*\s+=', l)
     lines = src.split('\n')
@@ -313,7 +315,7 @@ def main():
     for b, blob in dbanks.items():
         assert b not in banks, 'bank %d used by code and data' % b
         banks[b] = blob
-    ob.post_data(rom, r, banks, tbanks)          # (the kept modules' data: battle, sound, text)
+    ob.post_data(rom, r, banks, tbanks, cut_raw, cut_gfx)          # (the kept modules' data: battle, sound, text)
     img = make_rom(banks, 'FF3 GBC', cart_type=0x1B, rom_banks=ROM_BANKS, ram_size_code=ob.RAM_CODE,
                    sgb=False, cgb=0xC0)
     open(out, 'wb').write(img)

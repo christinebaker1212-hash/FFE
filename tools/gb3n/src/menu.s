@@ -4811,30 +4811,33 @@ m_config:   call m_clear
             call m_sfx_move
             jr m_config
 
-; ==== 8 Suspend (ours): the page and the field's place in cart RAM bank 1, then the title;
-; bank 1: $A000 page, $A400 field ($C100, 192), $A4C0 world / vehicle ($C2C0, 32), $A4F0 'S' '3' + sum
+; ==== 8 Suspend (ours): the page and the field's state in cart RAM bank 1, then the title;
+; bank 1: $A000 page, $A400 the field's RAM (the engine keeps it in WRAM bank 3 at SV_KEEP while a
+; full screen shows: 1.5 KB), $AA00 the map type, $AFF0 'S' '4' + sum
 SU_FIELD   = $A400
-SU_WORLD   = $A4C0
-SU_CHECK   = $A4F0
+SU_MTYPE   = $AA00
+SU_CHECK   = $AFF0
 m_suspend:  ld a, 1
             call sr_on
             ld hl, SRAM_PAGE
             ld de, $A000
             ld bc, $400
             call memcpy
-            ld hl, $C100
+            ld a, 3                         ; (the field's RAM: WRAM bank 3)
+            ldh [rSVBK], a
+            ld hl, SV_KEEP
             ld de, SU_FIELD
-            ld bc, 192
+            ld bc, $600
             call memcpy
-            ld hl, $C2C0
-            ld de, SU_WORLD
-            ld bc, 32
-            call memcpy
+            ld a, 1
+            ldh [rSVBK], a
+            ldh a, [maptype]
+            ld [SU_MTYPE], a
             call su_sum
             ld hl, SU_CHECK
             ld [hl], 'S'
             inc l
-            ld [hl], '3'
+            ld [hl], '4'
             inc l
             ld [hl], e
             inc l
@@ -4847,9 +4850,9 @@ m_suspend:  ld a, 1
             call m_waitkey
             call m_leave
             jp soft_reset
-; DE = the sum of $A000-$A4EF (cart RAM on)
+; DE = the sum of $A000-$AFEF (cart RAM on)
 su_sum:     ld hl, $A000
-            ld bc, $4F0
+            ld bc, $FF0
             ld de, 0
 .s:         ld a, [hl+]
             add e
@@ -4869,7 +4872,7 @@ su_state:   ld a, 1
             cp 'S'
             jr nz, .none
             ld a, [hl]
-            cp '3'
+            cp '4'
             jr nz, .none
             call su_sum
             ld hl, SU_CHECK + 2
@@ -4895,14 +4898,16 @@ su_load:    ld a, 1
             ld de, SRAM_PAGE
             ld bc, $400
             call memcpy
+            ld a, 3                         ; (the field's RAM into WRAM bank 3: the engine takes
+            ldh [rSVBK], a                  ;   it back when the screen closes)
             ld hl, SU_FIELD
-            ld de, $C100
-            ld bc, 192
+            ld de, SV_KEEP
+            ld bc, $600
             call memcpy
-            ld hl, SU_WORLD
-            ld de, $C2C0
-            ld bc, 32
-            call memcpy
+            ld a, 1
+            ldh [rSVBK], a
+            ld a, [SU_MTYPE]
+            ldh [maptype], a
             xor a
             ld [SU_CHECK], a
             jp sr_off

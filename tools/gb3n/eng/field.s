@@ -50,7 +50,7 @@ lay43      = Z + $43
 zlev       = Z + $A5
 trig       = Z + $AB
 frame16    = Z + $F0
-C_RGB      = $4000          ; COMMON (port.py)
+C3_RGB     = $4000          ; COMMON (port.py)
 C_POSE     = $4080
 C_POSEOFS  = $40C0
 C_TRBASE   = $4100
@@ -84,6 +84,7 @@ start:      di
             ld sp, $D000
             cp $11                          ; A = $11 on a Game Boy Color
             jp nz, not_cgb
+            push de                         ; (E = $A5: a soft reset, sreset)
             ldh a, [rLCDC]                  ; the LCD goes off only in V-Blank (if on)
             bit 7, a
             jr z, .lo
@@ -110,6 +111,13 @@ start:      di
             ld hl, $FF80
             ld de, $7F
             call memclr
+            pop de                          ; (after a soft reset: no prophecy, 3E/C0A1)
+            ld a, e
+            cp $A5
+            ld a, 0
+            jr nz, .sr
+            inc a
+.sr:        ldh [soft_rst], a
             ldh a, [rKEY1]                  ; double speed (KEY1 + STOP), FF1's
             bit 7, a
             jr nz, .ds
@@ -176,7 +184,12 @@ start:      di
             ld [py], a
             ld a, 4                         ; facing down
             ld [facing], a
-            ld a, START_MAP
+            ld a, START_AA                  ; (a release: FF3's program start, the title)
+            and a
+            jr nz, .tst
+            call title_boot
+            jp main
+.tst:       ld a, START_MAP
             cp $FF                          ; (test builds: the world map)
             jp z, .wm
             ld [cur_map], a
@@ -349,6 +362,7 @@ sreset:     xor a
             jr z, .w
             di
             ld a, $11
+            ld e, $A5
             jp start
 read_btn:   ld a, $10
             ldh [rP1], a
@@ -481,6 +495,8 @@ sv_init:    ld a, COMMON
 load_map:   ld [aa_mode], a
             call lcd_off
             xor a
+            ld [box_on], a                  ; (the dialogue box closed: full screens use its RAM)
+            ld [win_up], a
             ld [moving], a
             ld [mcount], a
             ld [mdx], a
@@ -944,7 +960,8 @@ load_pal:   ld hl, mrec + 32
             ld de, sh_pal
             ld bc, 32
             call memcpy
-.obj:       ld a, COMMON
+.obj:       call win_pal7
+            ld a, COMMON
             call sbank
             ld a, [world]                   ; (the second half of the sprite palettes on world 4+)
             and 4
@@ -973,6 +990,14 @@ load_pal:   ld hl, mrec + 32
             ld [pal_dirty], a
             ret
 .ob:        jr load_pal.obj
+
+; BG palette 7: FF3's window colours (the dialogue box, every map)
+win_pal7:   ld a, COMMON
+            call sbank
+            ld hl, C_WINPAL
+            ld de, sh_pal + 56
+            ld bc, 8
+            jp memcpy
 
 ; ---- FF3 check player input (3F/E2F8): an event's command, else A (talk / look), then a direction
 ; (from the pad, or set by the event) -> facing, passability, the step

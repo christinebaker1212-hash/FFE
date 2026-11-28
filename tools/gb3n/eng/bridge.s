@@ -72,7 +72,7 @@ vbl_b:      ld a, 1                         ; (from vblank, AF pushed)
             pop af
             reti
 
-stat_b:     ldh a, [c_split]                ; (from stat_int, AF pushed)
+stat_b:     ld a, [c_split]                ; (from stat_int, AF pushed)
             and a
             jr nz, .cs
 .w:         ldh a, [rSTAT]                  ; a guarded load: held until H-Blank
@@ -93,10 +93,10 @@ stat_b:     ldh a, [c_split]                ; (from stat_int, AF pushed)
             ldh a, [rLCDC]
             xor $08
             ldh [rLCDC], a
-            ldh a, [c_lyb]
+            ld a, [c_lyb]
             ldh [rLYC], a
             ld a, $FF
-            ldh [c_lyb], a
+            ld [c_lyb], a
             pop af
             reti
 .wv:        ldh a, [rLY]
@@ -203,6 +203,8 @@ pal_black:  ld a, $80                       ; all palettes black (V-Blank)
             jr nz, .o
             ret
 soft_reset: jp sreset
+; after a cutscene: the dialogue window is rebuilt from win_buf whenever it opens (dlg.s)
+win_init:   ret
 
 ; the field's random number for the menu (m_rnd), FF3's (3E/C711)
 f_rnd_m:    call rnd_fld
@@ -274,16 +276,18 @@ fr_enter:   xor a
             ld a, 1
             ldh [bmode], a
             xor a
-            ldh [c_split], a
+            ld [c_split], a
             ldh [guard_on], a
             ld a, LCDC_ON | $40
             ldh [rLCDC], a
             ret
 ; the field's mode and RAM back
-fr_leave:   di
+fr_leave:   call fr_mode
+            jr fr_ram
+fr_mode:    di
             xor a
             ldh [bmode], a
-            ldh [c_split], a
+            ld [c_split], a
             ldh [guard_on], a
             ldh [snd_isr], a
             ld a, BOX_LINES - 1
@@ -296,7 +300,8 @@ fr_leave:   di
             ld a, 3
             ldh [rIE], a
             ei
-            ld a, 3
+            ret
+fr_ram:     ld a, 3
             ldh [rSVBK], a
             ld hl, SV_KEEP
             ld de, $C900
@@ -317,6 +322,65 @@ fr_reload:  xor a
             jp nz, world_load
             ld a, 1
             jp load_map
+
+; FF3 init zero page (3E/C49E, after the load menu: 3E/C0CA): the field's RAM cleared
+fld_clr:    ld hl, $C900
+            ld de, $0600
+            call memclr
+            ld a, $FF
+            ld [z4B], a
+            ld a, 4
+            ld [facing], a
+            ret
+
+; ---- FF3 program start (3E/C06E): the prophecy at power-on (not after a soft reset: 3E/C0A1), the
+; game load menu (3D/B9F6: New Game, a file, our Resume), then a new game's map 0 (3E/C0E6), a file's
+; world map position (3E/C0CD), or the suspended place
+title_boot: call lcd_off
+            call fr_enter
+            ldh a, [soft_rst]
+            and a
+            jr nz, .np
+            ld hl, cut_proph
+            ld a, B_CUT
+            call far_call
+.np:        ld hl, t_title
+            ld a, B_MENU
+            call far_call
+            ld a, [m_res]
+            and a
+            jr z, .new
+            cp 2
+            jr z, .res
+            call fld_clr
+            call lcd_off                    ; a file: its world map (the page loaded by the menu)
+            call fr_mode
+            ld a, [SV + $08]
+            ld [world], a
+            ld a, [SV + $09]
+            add a, 7
+            ld [px], a
+            ld a, [SV + $0A]
+            add a, 7
+            ld [py], a
+            ld a, [SV + $0F]
+            ld [z42], a
+            ld [z46], a
+            jp world_load
+.new:       ld hl, t_names                  ; a new game: the names (3D/B895), map 0
+            ld a, B_MENU
+            call far_call
+            call lcd_off
+            call fr_mode
+            call fld_clr
+            xor a
+            ld [cur_map], a
+            ld [world], a
+            ld [ms_n], a
+            jp load_map
+.res:       call lcd_off                    ; resumed: the field as it was
+            call fr_leave
+            jp fr_reload
 
 ; ---- FF3 battle from the field (3F/E26E: flash, the default battle background, the battle, the
 ; map reloaded): A = the battle id (z6A); the background from 39/BC00 (world 0) / BD00 by map
@@ -372,6 +436,4 @@ is_gba:     ds 1
 bmode:      ds 1                            ; 1: a battle's interrupt mode
 guard_on:   ds 1
 fc_save:    ds 1
-c_split:    ds 1
-c_lyb:      ds 1
 soft_rst:   ds 1
