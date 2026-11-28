@@ -177,9 +177,14 @@ start:      di
             ld a, 4                         ; facing down
             ld [facing], a
             ld a, START_MAP
+            cp $FF                          ; (test builds: the world map)
+            jp z, .wm
             ld [cur_map], a
             ld a, START_AA                  ; (a new game: map 0 from FF3's program start, 3E/C0E6;
             call load_map                   ;   test builds: the position given, kept)
+
+.wm:        call world_load
+            jp main
 
 ; ---- main loop: FF3 map main (3F/E1E1), one engine frame per GB frame
 main:       call wait_vbl
@@ -187,7 +192,12 @@ main:       call wait_vbl
             call read_pad
             ld hl, zF0
             inc [hl]
-            call scroll_step                ; (FF3 update scrolling: the step in progress)
+            ldh a, [maptype]                ; the world map (world.s)
+            and a
+            jr z, .nm
+            call w_frame
+            jr .spr
+.nm:        call scroll_step                ; (FF3 update scrolling: the step in progress)
             ld a, [moving]
             and a
             jr nz, .spr
@@ -811,8 +821,11 @@ tile_props: call map_at
             ldh [rSVBK], a
             ret
 
-; E = x, D = y (0-63) -> A = metatile (WRAM bank 1 mapped after)
-map_at:     ld a, e
+; E = x, D = y (0-63; the world map 0-255) -> A = metatile (WRAM bank 1 mapped after)
+map_at:     ldh a, [maptype]
+            and a
+            jr nz, .wm
+            ld a, e
             or d
             and $20
             jr z, .in
@@ -837,6 +850,24 @@ map_at:     ld a, e
             ldh [rSVBK], a
             ld a, b
             ret
+.wm:        ld a, d                         ; the world map: its row from ROM (WROWS + 4 x map +
+            rlca                            ;   y / 64, $4000 + 256 (y & 63) + x)
+            rlca
+            and 3
+            ld b, a
+            call w_index
+            add a, a
+            add a, a
+            add a, b
+            add a, WROWS
+            ld b, a
+            ld a, d
+            and 63
+            add a, $40
+            ld h, a
+            ld l, e
+            ld a, b
+            jp far_byte
 
 ; ---- the map's graphics (FF3 3E/DD0F): the BG tiles of the map's graphics subset (0-111) and
 ; the menu window / text tiles (112-255), the showing character's walking tiles (3E/DD2D) into
@@ -912,7 +943,7 @@ load_pal:   ld hl, mrec + 32
             ld de, sh_pal
             ld bc, 32
             call memcpy
-            ld a, COMMON
+.obj:       ld a, COMMON
             call sbank
             ld a, [world]                   ; (the second half of the sprite palettes on world 4+)
             and 4
@@ -940,6 +971,7 @@ load_pal:   ld hl, mrec + 32
             ld a, 1
             ld [pal_dirty], a
             ret
+.ob:        jr load_pal.obj
 
 ; ---- FF3 check player input (3F/E2F8): an event's command, else A (talk / look), then a direction
 ; (from the pad, or set by the event) -> facing, passability, the step
@@ -1192,17 +1224,22 @@ scroll_step:
             ld a, [mcount]
             cp 16
             ret c
-            ld a, [mdx]
+            ld c, 63                        ; (the world map: 256 wide)
+            ldh a, [maptype]
+            and a
+            jr z, .m
+            ld c, $FF
+.m:         ld a, [mdx]
             ld b, a
             ld a, [px]
             add a, b
-            and 63
+            and c
             ld [px], a
             ld a, [mdy]
             ld b, a
             ld a, [py]
             add a, b
-            and 63
+            and c
             ld [py], a
             xor a
             ld [moving], a
@@ -1239,7 +1276,9 @@ do_trigger: ld a, [trig]
             jr z, .back
             cp $20
             jr z, .bat
-            ret                             ; ($C0: the world map: with it)
+            cp $C0
+            jp z, w_exit                    ; (the world map: world.s)
+            ret
 .bat:       ld a, [z6A]                     ; a battle (3F/E26E)
             call battle_run
             ld a, $FF
@@ -1274,9 +1313,17 @@ do_trigger: ld a, [trig]
             ld [cur_map], a
             xor a                           ; (from the "world map": the map's own entry point)
             jp load_map
-.back:      ld a, [ms_n]                    ; exit to the previous map (3F/E2BC)
+.back:      ld a, $94                       ; exit to the previous map (3F/E28B: sound $14; map
+            ld [M_SFX], a                   ;   main returns to its caller: a parent map, 3F/E2BC,
+            ld a, [ms_n]                    ;   or the world map, 3E/C1DC)
             and a
-            ret z
+            jr nz, .pm
+            ld a, [w_px]
+            ld [px], a
+            ld a, [w_py]
+            ld [py], a
+            jp world_load
+.pm:
             dec a
             ld [ms_n], a
             ld l, a
@@ -1522,12 +1569,16 @@ q_feed:     ld c, 1
             ret
 
 ; queue metatile (E = x, D = y), coordinates mod 64; entry: VRAM address, UL UR DL DR, palette
-q_mt:       ld a, e
+q_mt:       ldh a, [maptype]                ; (normal maps: mod 64; the world map: 256)
+            and a
+            jr nz, .wq
+            ld a, e
             and 63
             ld e, a
             ld a, d
             and 63
             ld d, a
+.wq:
             ld a, [q_rd]                    ; full: dropped
             ld b, a
             ld a, [q_n]
@@ -1815,3 +1866,4 @@ rombank:    ds 1
 frame:      ds 1
 q_nolim:    ds 1
 oam_ok:     ds 1
+maptype:    ds 1                            ; 1: the world map

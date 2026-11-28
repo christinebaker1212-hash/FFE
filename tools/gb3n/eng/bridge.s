@@ -192,13 +192,18 @@ soft_reset: jp sreset
 
 ; ---- FF3 battle from the field (3F/E26E: flash, the default battle background, the battle, the
 ; map reloaded): A = the battle id (z6A); the background from 39/BC00 (world 0) / BD00 by map
+battle_runw:                                ; (the world map: the background from the tile
+            ld a, [px]                      ;   underfoot's second property byte, 3E/C1A0)
+            ld e, a
+            ld a, [py]
+            ld d, a
+            call tile_props
+            ld a, [t45]
+            ld [bs_bg], a
+            ld a, [z6A]
+            ld [bs_id], a
+            jr battle_go
 battle_run: ld [bs_id], a
-            ld a, [world]                   ; (+ $100 off world 0: batscr's bs_setup)
-            and a
-            ld a, 0
-            jr z, .w
-            inc a
-.w:         ld [bs_id + 1], a
             ld a, [cur_map]
             ld e, a
             ld d, 0
@@ -211,6 +216,12 @@ battle_run: ld [bs_id], a
             ld a, B_BDAT3
             call far_byte
             ld [bs_bg], a
+battle_go:  ld a, [world]                   ; (+ $100 off world 0: batscr's bs_setup)
+            and a
+            ld a, 0
+            jr z, .w
+            inc a
+.w:         ld [bs_id + 1], a
             call lcd_off
             xor a                           ; (the window off, the box closed)
             ld [box_on], a
@@ -270,7 +281,12 @@ battle_run: ld [bs_id], a
             ld de, sh_pal + 56
             ld bc, 8
             call far_copy
-            ld a, 1                         ; FF3 reload map (3F/E7F8: A = 1, the npcs kept)
+            xor a
+            ld [t44], a
+            ldh a, [maptype]                ; the world map again (3E/C8E6) / FF3 reload map
+            and a                           ;   (3F/E7F8: A = 1, the npcs kept)
+            jp nz, world_load
+            ld a, 1
             jp load_map
 
 section wram, $DF00                         ; (WRAM bank 1)

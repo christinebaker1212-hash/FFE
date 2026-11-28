@@ -44,6 +44,7 @@ text = _load('text')
 
 COMMON, CHARS, TSETS, SCRIPT, NPCGFX, MAPREC0, TMAP0 = 100, 101, 102, 103, 104, 108, 114
 SNDT = 99                                        # the sound's period -> frequency table
+WROWS, WTSET, WGFX = 160, 176, 177              # the world maps (world.s)
 ROM_BANKS = 256
 ob = _load('build')                              # the kept battle / sound modules' builder
 KEPT = ['batlib.s', 'batcore.s', 'batmagic.s', 'batinit.s', 'batequip.s', 'batflow.s', 'batvict.s',
@@ -155,6 +156,27 @@ def data_banks(rom):
         sub_at[sub] = (bank, 0x4000 + off)
         off += 16 * data.SUBSET_TILES
     assert bank < 160
+    for wi, w in enumerate(data.WORLD_MAPS):         # the world maps' rows (3E/CC47: unpacked here)
+        rows = data.world_rows(rom, w)
+        for k in range(4):
+            banks[WROWS + 4 * wi + k] = bytearray(b''.join(rows[64 * k:64 * k + 64]))
+    wt = blank()
+    for w in range(5):
+        wt[0x400 * w:0x400 * w + 0x400] = data.world_tileset(rom, w)
+        wt[0x1400 + 32 * w:0x1420 + 32 * w] = b''.join(rgb2(c) for pal in data.world_palettes(rom, w) for c in pal)
+    wt[0x1500:0x1540] = rom.rd(0x00, 0x8880, 64)         # exits (00/8880, 88C0)
+    wt[0x1540:0x1580] = rom.rd(0x00, 0x88C0, 64)
+    wt[0x1580:0x1600] = rom.rd(0x00, 0x8800, 128)        # entrances (00/8800, 8840)
+    wt[0x1600:0x1640] = rom.rd(0x3B, 0xA027, 64)         # world songs / effects (3B/A027, A047)
+    wt[0x1640:0x1648] = rom.rd(0x3E, 0xC6CD, 8)          # passability masks (3E/C6CD)
+    wt[0x1700:0x1710] = rom.rd(0x2E, 0x9CF0, 16)         # world battles (2E/9CF0, 9D00, 9D40)
+    wt[0x1710:0x1750] = rom.rd(0x2E, 0x9D00, 64)
+    wt[0x1750:0x1760] = rom.rd(0x2E, 0x9D40, 16)
+    banks[WTSET] = wt
+    wg = blank()
+    for k, w in enumerate((0, 2, 4)):
+        wg[0x1000 * k:0x1000 * k + 0x1000] = gbt(data.world_tiles(rom, w))
+    banks[WGFX] = wg
     for cls in range(3):                              # world 0; world 1; worlds 2-4
         for m in range(256):
             p = m + (256 if cls else 0)               # ($3A $9177: maps $100-$1FF off the floating continent)
@@ -223,18 +245,21 @@ def main():
     tbanks, L, tlast = text.banks(ob.B_TEXT)        # (the text: the kept modules' layout)
     if st == ['new']:                                # a new game: map 0, FF3's program start
         st = ['0', '0', '0', '0']; aa = 0
+    elif st[0] == 'w':                               # (test builds: the world map, WORLD,X,Y)
+        st = ['$FF'] + st[1:]; aa = 0
     else:
         aa = 0x81
     src = ('START_MAP = %s\nSTART_WORLD = %s\nSTART_X = %s\nSTART_Y = %s\n' % tuple(st) +
            'START_AA = $%02X\n' % aa +
            'COMMON = %d\nCHARS = %d\nTSETS = %d\nMAPREC0 = %d\n' % (COMMON, CHARS, TSETS, MAPREC0) +
            'SCRIPT = %d\nNPCGFX = %d\nTXT_IDX = %d\n' % (SCRIPT, NPCGFX, ob.B_TEXT) +
+           'WROWS = %d\nWTSET = %d\nWGFX = %d\n' % (WROWS, WTSET, WGFX) +
            ''.join('%s = %d\n' % (k, v) for k, v in sorted(vars(ob).items()) if k.startswith('B_') and isinstance(v, int)) +
            ''.join('T_%s = $%04X\n' % (k.upper(), v) for k, v in L.items()) +
            'section bank 0, $2FB0\ntxt_tab:    dw $%04X, $%04X, $%04X, $%04X, $%04X\n' % (
                L['t8000'], L['t8200'], L['t8400'], L['t8600'], L['names8800']) +
            open(os.path.join(ROOT, 'tools', 'gb', 'rt', 'hw.s')).read())
-    for f in ('event.s', 'npc.s', 'dlg.s', 'bridge.s', 'field.s'):
+    for f in ('event.s', 'npc.s', 'dlg.s', 'bridge.s', 'world.s', 'field.s'):
         src += '\n' + open(os.path.join(HERE, 'eng', f)).read()
     for f in KEPT:                               # FF3's battle rules / screen and sound driver (kept)
         t = open(os.path.join(HERE, 'src', f)).read()
