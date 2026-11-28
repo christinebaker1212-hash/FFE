@@ -80,7 +80,10 @@ section bank 0, $0150
 start:      di
             ld sp, $C800                    ; (WRAM 0: the menus switch WRAM banks)
             cp $11                          ; (Color only: other models get the message)
-            jp nz, dmg_msg
+            jr z, .cgb
+            ld a, CODE6                     ; (wipe.s dmg_msg9: never returns)
+            ld hl, dmg_msg9
+            jp far_call
 .cgb:       xor a
             ldh [rIE], a
             ldh [rNR52], a
@@ -404,6 +407,9 @@ vblank:     push af
             set 5, b
 .w:         ld a, b
             ldh [rLCDC], a
+            ld a, [wp_on]                   ; (a screen wipe: its window and edges, wipe.s)
+            and a
+            call nz, wp_vbl0
             ld a, 1
             ldh [vbl_flag], a
             ldh a, [vbl_cnt]                ; (a V-Blank count: the cutscenes' pacing)
@@ -626,6 +632,9 @@ load_map:   ld a, [lcd_is]
             ldh [pal_dirty], a
             call wait_vbl
             call map_song
+            ld a, [wp_on]                   ; (after a wipe out: the wipe in, then the map's events)
+            and a
+            call nz, wipe_in0
             jp map_enter
 
 ; the map's palettes: the 32 NES colours (M_ENT + 16) through NES_RGB -> the shadow (BG 0-31,
@@ -1163,6 +1172,9 @@ do_act:     ld b, a
             ld a, b
             cp $20
             jp z, battle_go                 ; (a random battle: act_id = battle id)
+            push bc                         ; (FF3: the screen wiped out before the change)
+            call wipe_out0
+            pop bc
             xor a
             ld [zlev], a
             ld a, b
@@ -1171,7 +1183,7 @@ do_act:     ld b, a
             cp $80
             jr nz, .exit
             call .push
-            ret c
+            jp c, wp_undo
             jr .ent
 .push:      ld a, [stk_n]
             cp 16
@@ -1229,7 +1241,7 @@ do_act:     ld b, a
             jr z, .wexit
             ld a, [stk_n]
             and a
-            ret z
+            jp z, wp_undo
 .pop:       dec a
             ld [stk_n], a
             add a, a
@@ -1642,74 +1654,36 @@ q_flush:    ld a, [q_n]
             ld [q_n], a
             ret
 
-; ---- the Color-only message (the Game Pak needs a Game Boy Color): the font and a TM glyph,
-; the message centred, then halt (Lot Check: LCD off only in V-Blank)
-dmg_msg:    ldh a, [rLCDC]
-            bit 7, a
-            jr z, .off
-.w:         ldh a, [rLY]
-            cp 144
-            jr nz, .w
-            xor a
-            ldh [rLCDC], a
-.off:       ld a, MENU_BANK
-            ld [MBC5_BANKL], a
-            ld hl, $6400                    ; the font -> $8700 (2304 bytes)
-            ld de, $8700
-            ld bc, 144 * 16
-.f:         ld a, [hl+]
-            ld [de], a
-            inc de
-            dec bc
-            ld a, b
-            or c
-            jr nz, .f
-            ld hl, $9800                    ; the map: blanks
-            ld bc, $400
-.m:         ld a, $FF
-            ld [hl+], a
-            dec bc
-            ld a, b
-            or c
-            jr nz, .m
-            ld hl, $6D00                    ; the lines (row, column, codes, 0; 0 ends)
-.l:         ld a, [hl+]
+; the screen wipes (wipe.s, CODE6): out before a map change, in when the new map is drawn
+wipe_out0:  ldh a, [is_world]
+            ld [wp_split], a
+            ld a, CODE6
+            ld hl, wipe_out9
+            jp far_call
+wipe_in0:   ldh a, [is_world]
+            ld [wp_split], a
+            ld a, CODE6
+            ld hl, wipe_in9
+            jp far_call
+; from the V-Blank / STAT handlers (as snd_frame: the bank written directly, rom_bank put back)
+wp_undo:    ld a, [wp_on]                   ; (no change after all: the picture back)
             and a
-            jr z, .on
-            ld e, a                         ; DE = $9800 + 32 row + column
-            ld d, 0
-            sla e
-            rl d
-            sla e
-            rl d
-            sla e
-            rl d
-            sla e
-            rl d
-            sla e
-            rl d
-            ld a, [hl+]
-            add a, e
-            ld e, a
-            ld a, d
-            add a, $98
-            ld d, a
-.c:         ld a, [hl+]
-            and a
-            jr z, .l
-            ld [de], a
-            inc de
-            jr .c
-.on:        ld a, $C0                       ; colour 2 white, 3 black
-            ldh [$FF47], a                  ; (BGP)
-            xor a
-            ldh [rSCX], a
-            ldh [rSCY], a
-            ldh [rIE], a
-            ld a, %10010001
-            ldh [rLCDC], a
-.h:         halt
-            jr .h
+            ret z
+            jr wipe_in0
+wp_vbl0:    ld a, CODE6
+            ld [$2100], a
+            call wp_vbl9
+            ld a, [rom_bank]
+            ld [$2100], a
+            ret
+wp_stat0:   ld a, CODE6
+            ld [$2100], a
+            call wp_stat9
+            ld b, a
+            ld a, [rom_bank]
+            ld [$2100], a
+            ld a, b
+            ret
 
 ; ---- banked code (the menus run in CODE1): bank-0 helpers that read another ROM bank restore
 ; the caller's (code_bank) before returning

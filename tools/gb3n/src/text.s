@@ -409,7 +409,10 @@ wait_keys:  call wait_vbl
             ret
 
 ; V-Blank part (from the handler): the box's rows by general-purpose DMA when changed
-win_vbl:    ld a, [win_dirty]
+win_vbl:    ld a, [wp_on]                   ; (a screen wipe covers with the window: its rows
+            and a                           ;   wait until it is done)
+            ret nz
+            ld a, [win_dirty]
             and a
             ret z
             bit 1, a
@@ -444,7 +447,17 @@ win_vbl:    ld a, [win_dirty]
 
 ; LCD status interrupt (LYC = WIN_LINE - 1): the window off from the next line on
 stat_isr:   push af
-            ld a, [menu_on]                 ; (a menu: the whole screen)
+            ld a, [wp_on]                   ; (a screen wipe: its edges, the sound after the last)
+            and a
+            jr z, .nw
+            push bc
+            call wp_stat0
+            pop bc
+            and a
+            jr nz, .x
+            pop af
+            reti
+.nw:        ld a, [menu_on]                 ; (a menu: the whole screen)
             and a
             jr nz, .x
 .w:         ldh a, [rSTAT]

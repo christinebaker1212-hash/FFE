@@ -301,9 +301,12 @@ def engine_src(rom=None):
         codes.append(c)
         rams.append(r)
     codes.append('section bank %d, $4000' % CODE6)
-    c, r = split(rd('anim'))
-    codes.append(c)
-    rams.append(r)
+    for m in ('anim', 'wipe'):
+        c, r = split(rd(m))
+        codes.append(c)
+        rams.append(r)
+    codes.append('section bank %d, $5180\nwp_attr:\n    ds 576, $07' % CODE6)  # (wipe.s: the window's
+                                        # attributes, palette 7; DMA source: 16-aligned, ends $53C0)
     zp = ''.join('Z_%02X = $%04X\n' % (n, 0xFFB0 + n - 0x18) for n in range(0x18, 0x60))
     shadow = lambda t: t.replace('ld [MBC5_BANKL], a', 'ld [rom_bank], a\n            ld [MBC5_BANKL], a')
     return (open(os.path.join(HERE, 'src', 'hw.s')).read() + '\n' + zp + shadow(main_code) + '\n' +
