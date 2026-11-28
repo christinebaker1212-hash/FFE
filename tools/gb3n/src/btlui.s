@@ -456,6 +456,10 @@ get_actions:
 .nc:        ld a, [hl]
             and 1
             jr nz, .skip                    ; (jumping)
+            ld a, [BZ + $52]                ; 34/9940: the member steps forward for its command
+            ld [BZ + $95], a
+            ld [BZ + $53], a
+            call ba_stepf
             call cmd_win
             call atk_mem                    ; (34/98EE: the item flag off, a picked item back)
             res 3, [hl]
@@ -470,6 +474,11 @@ get_actions:
             ld [hl+], a
             ld [hl], a
             call cmd_input                  ; -> A = 0 back, 1 chosen, 2 again from $52
+            push af                         ; 34/99FD: and back once it is chosen (or cancelled)
+            ld a, [BZ + $53]
+            ld [BZ + $95], a
+            call ba_stepb
+            pop af
             and a
             jr z, .back
             cp 2
