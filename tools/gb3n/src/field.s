@@ -1179,16 +1179,7 @@ oam_attr:   push de
             pop de
             ret
 
-; the LCD off in V-Blank (Lot Check) / back on
-lcd_off:    ldh a, [rLCDC]
-            bit 7, a
-            ret z
-.w:         ldh a, [rLY]
-            cp 144
-            jr c, .w
-            xor a
-            ldh [rLCDC], a
-            ret
+; the LCD back on
 lcd_on:     ld a, LCDC_ON
             ldh [rLCDC], a
             ret

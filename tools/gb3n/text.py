@@ -36,6 +36,7 @@ NAMES = load('names8800')
 def plain(s):
     """the string with icon pairs as words, name-table inserts expanded, indents dropped"""
     s = s.replace('‥', '…')
+    s = re.sub(r'\b([AB]) button\b', r'\1 Button', s)     # (Nintendo's names: Lot Check 4.1)
     s = re.sub(r'\[([0-9A-F]{2})\]', lambda m: LETTERS.get(int(m.group(1), 16), m.group(0)), s)
     s = re.sub(r'\{18:([0-9A-F]{2})\}', lambda m: plain(NAMES.get(int(m.group(1), 16), '')), s)
     s = re.sub(r'\{0C\}', '', s)

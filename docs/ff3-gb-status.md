@@ -139,7 +139,9 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   world maps' by world and vehicle (3B/A027), event command $F8 (songs, fade, resume, stop, sound
   effects). The driver runs after each frame's V-Blank work, and from the V-Blank interrupt while
   a map loads (an HRAM `mapbank` lets the interrupt map back the bank in use).
-- Later: the timer at the NES's 60.0988 Hz, volume changes without restarts (FF1's way).
+- Since: FF3's tempo at the NES's 60.0988 Hz (a second driver tick every ~161 frames) and volume
+  changes inside a note without restarts (zombie mode, with a boot test: restarts where an emulator
+  ignores it).
 
 ## Battle algorithms (2026-11-27)
 - FF3's battle algorithms written natively (`src/batcore.s`, `batmagic.s`, `batinit.s`, `batequip.s`):
@@ -193,8 +195,7 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
 - Bosses from FF3's tilemaps (2A/8000; graphics pointer decoded as 2F/A3BB, summons flipped),
   monster / boss palettes from FF3's attribute data (2F/A857, a bit per 16 x 16 block), the party's
   palettes by job (2E/9E01), event battles ($F7), the battle id's high byte from the world (2E/9E8E).
-- Battle to do: attack / spell animations, the layout per the owner's mock-up choice, monster
-  chests (done since: see below).
+- (Animations, back attacks, the cannon, the final boss: see the battle sections below.)
 
 ## Menus, saves, title (2026-11-27; `src/menu.s`, bank B_MENU = 76)
 - Start on the map: the main menu (FF3's commands from its text $31 + Config / Suspend): commands
@@ -220,11 +221,10 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
 - Inns ($E0-$E2: 5 x the living x the script's rate, FF3's texts, HP to max for the living, the
   script's rest event after) and shops ($E3-$FB: Buy with 1 / 4 / 10 and FF3's discounts 3D/B281,
   Sell 1 / All at half, key items and Toad / Minimum not sold, FF3's carry check) as full-screen
-  windows; the map comes back with its people where they were. Fat Chocobo: later.
+  windows; the map comes back with its people where they were. (The Fat Chocobo: below.)
 - Event commands added: $D0 / $D1 sounds, $D4 / $D5 HP / MP to max, $D6 / $D7 passages, $D8
   reset, $D9 the ship chained, $DE the surface world, $DF, $E8 / $E9 status, $EA-$ED gil / CP
-  (too little: the event ends with FF3's story text 2 / 3), $EE guest. Still stubs: $D2 / $D3
-  palette darkening, $DA dance, $DB / $DC prologue / epilogue, $DD ending, $E0-$E2, $EF.
+  (too little: the event ends with FF3's story text 2 / 3), $EE guest. (The others since: below.)
 - Lesson: menu variables live in the map's tables ($C800-$CEFF): read results before the map is
   reloaded, and initialise flags (m_pal) on entry.
 - Vehicles (`src/vehicle.s`): FF3's per-vehicle passability masks (3E/C6CD), boarding the canoe
@@ -234,8 +234,7 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   tiles from NES 0B at OBJ $20), the parked vehicle (3E/DAD4..), world songs and encounter
   rates / groups per vehicle, no entrances from vehicles. Saves keep FF3's $6009 format (the
   party's tile - 7) and the vehicle ($600F). Checked: boarding, sailing, landing the ship.
-  Not yet: the airship's shadow and lift-off / landing animations, the Invincible, the
-  Nautilus diving, chocobo forests, the airship's double speed.
+  (Airship animations, the Invincible, the Nautilus: below.)
 - Worlds: airships off the Floating Continent's edge (tile $64) to world 2 / 3 and back at
   (32, 224); the Nautilus diving ($1E sea, $6020 bit 7) and surfacing; the Invincible entered
   with A / B (FF3's entrance 0); party event commands $CA / $CB / $CE / $CF set vehicles.
@@ -430,3 +429,31 @@ Building continues on what does not depend on them (people, events, chests, worl
 - Walking on the map: the party's walking sprite (FF3's showing character, Select = next member),
   scrolling the BG ring with rows / columns in V-Blank, collision from the tile properties; then
   map changes (entrances / exits), people, text.
+
+## Lot Check pass (2026-11-28; the rules: `docs/gb-release-checks.md`)
+Checked on the release build (`python3 tools/gb3n/build.py`, no test variables):
+- 1.1-1.4 Header: the logo, header and global checksums, $0143 $C0 (Color only), $0146 $00 (no
+  SGB), $0147 $1B (MBC5 + RAM + battery), $0148 $06 (2 MB), $0149 $03 (32 KB), licensee $33 / "00";
+  `build.check_header` recomputes them on every build and stops it on a mismatch. Unused space $FF.
+- 2.1 LCD off only in V-Blank: the only switch-offs are at boot (waits for LY 144+, interrupts off)
+  and the minimap (right after the V-Blank interrupt); every other load keeps the LCD on behind
+  black palettes, its VRAM writes held to H-Blank / V-Blank by the STAT guard.
+- 2.2 VRAM / OAM windows: the patched SameBoy core's checker (`sbsh`, VCHK) and the strict checker
+  (SB_LCHK) at 0 in every run of this pass (title, New Game, field, menus, battles of every kind,
+  summons, back attacks, the cannon, the final boss's death, the cutscenes) and before it.
+- 2.3 Save RAM: all working memory is in the Color's own WRAM; cart RAM is enabled only around each
+  access (`sr_on` / `sr_off`, 20 places) and off otherwise. Every file has a magic and a 16-bit sum
+  of its page; a damaged file is shown as "Damaged" in the file list, never loaded or overwritten
+  without the player choosing it; the suspend point has its own check.
+- 3.1 Soft reset (A + B + Select + Start): checked from the field, a battle and the title: the
+  game starts again cleanly (sound off, cart RAM off, boot again).
+- 3.2 Memory: boot clears work RAM banks 0-7, high RAM, VRAM banks 0 / 1 and OAM.
+- 3.3 Systems (SameBoy): Game Boy, Game Boy Pocket, Super Game Boy: the "This Game Pak is designed
+  only for use on the Game Boy Color." screen; Game Boy Color, Game Boy Advance: the game runs
+  (checkers 0). Real hardware: the owner's test.
+- 4.1 Names: "Game Pak", "Game Boy Color"; the game's text has "A Button" / "B Button" (the
+  translation's "A button" / "B button" capitalised at build time); no other hardware names.
+- 4.2 Colour: FF3's own palettes on every screen.
+- 4.3 No hidden code: test hooks exist only in builds made with GB3N_* variables (never in the
+  release ROM); the release has no debug menus or codes. Documented in this file.
+- Left to the owner: the play-through and the hardware run.

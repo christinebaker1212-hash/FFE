@@ -666,10 +666,25 @@ ev_fxtest:  call ev_shake
         banks[k] = v
     img = make_rom(banks, 'FF3 NATIVE', cart_type=0x1B, rom_banks=ROM_BANKS,
                    ram_size_code=RAM_CODE, sgb=False, cgb=0xC0)
+    check_header(img)
     open(out, 'wb').write(img)
     base = os.path.splitext(out)[0]
     open(base + '.sym', 'w').write(r.sym_file())
     print('wrote %s (%d KB), bank 0 used %d bytes' % (out, len(img) // 1024, len(r.banks[0])))
+
+
+def check_header(rom):
+    """Lot Check 1.x (docs/gb-release-checks.md), recomputed independently of make_rom: the logo (by
+    its SHA-1), the header and global checksums, FF3's flags (Color only $C0, no SGB, MBC5 + RAM +
+    battery, 32 KB cart RAM) and the size"""
+    import hashlib
+    assert hashlib.sha1(bytes(rom[0x104:0x134])).hexdigest() == '0745fdef34132d1b3d488cfbdf0379a39fd54b4c', 'logo'
+    x = 0
+    for i in range(0x134, 0x14D): x = (x - rom[i] - 1) & 0xFF
+    assert rom[0x14D] == x, 'header checksum'
+    assert (sum(rom) - rom[0x14E] - rom[0x14F]) & 0xFFFF == rom[0x14E] << 8 | rom[0x14F], 'global checksum'
+    assert (rom[0x143], rom[0x146], rom[0x147], rom[0x149]) == (0xC0, 0x00, 0x1B, 0x03), 'flags'
+    assert len(rom) == ROM_BANKS * 0x4000 == 0x8000 << rom[0x148], 'ROM size'
 
 
 if __name__ == '__main__':
