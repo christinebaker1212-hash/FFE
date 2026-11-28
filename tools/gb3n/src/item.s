@@ -343,6 +343,70 @@ it_spell:   ld a, $73
 .no:        call m_msgbox
             jr .again
 
+; ---- for the rebuilt Item screen (itm.s, bank CODE11): it_cur = the bag slot, m_i = the member.
+; itx_use: FF3's effect (it_effect); used: one fewer, u_eres 0; else u_eres 1
+itx_use:    ld a, [it_cur]
+            add a, low(GS + $C0)
+            ld l, a
+            ld h, high(GS + $C0)
+            ld a, [hl]
+            ld [it_id], a
+            ld a, [m_i]
+            rrca
+            rrca
+            ld [m_ch], a
+            call it_effect
+            ld a, 1
+            jr c, .r
+            ld a, [it_cur]
+            call itx_dec
+            xor a
+.r:         ld [u_eres], a
+            ret
+itx_dec:    add a, low(GS + $E0)            ; (bag slot A: one fewer, emptied at 0)
+            ld l, a
+            ld h, high(GS + $E0)
+            dec [hl]
+            ret nz
+            ld a, l
+            sub $20
+            ld l, a
+            ld [hl], 0
+            ret
+; itx_teach: the spell it_id learned by m_i (3D/A15F): u_eres 0, or the message $75 (has it) /
+; $74 (three at its level)
+itx_teach:  ld a, [m_i]
+            rrca
+            rrca
+            ld [mg_caster], a
+            ld a, [it_id]
+            sub $C8
+            call spl_bit
+            ld a, [hl]
+            and b
+            ld a, $75
+            jr nz, .r
+            ld a, [hl]
+            ld c, 0
+            ld d, 8
+.cnt:       rrca
+            jr nc, .z
+            inc c
+.z:         dec d
+            jr nz, .cnt
+            ld a, c
+            cp 3
+            ld a, $74
+            jr nc, .r
+            ld a, [hl]
+            or b
+            ld [hl], a
+            ld a, [it_cur]
+            call itx_dec
+            xor a
+.r:         ld [u_eres], a
+            ret
+
 ; the target screen (S2): prompt (rows 0-3), the list around the item, the party (rows 11-17)
 it_party:   call m_clear
             ld bc, $0000

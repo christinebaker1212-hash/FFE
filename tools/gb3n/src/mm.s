@@ -64,8 +64,12 @@ mn_open:    ld a, CODE1                     ; (each member's values from the equ
             jp z, mn_order
             cp 7
             jr z, .cfg
-            cp 0
-            jr z, .old
+            and a                           ; Item: rebuilt (itm.s)
+            jr nz, .ni
+            call u_fadeout
+            call itm_open
+            jp .re
+.ni:
             cp 6
             jr z, .old
             call mn_pick                    ; Magic, Equip, Status, Job: a member first

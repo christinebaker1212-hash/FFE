@@ -153,5 +153,12 @@ def code_data(rom, rgb555, group_world):
     src += db('U_REM', text.encode(w['s_rem']) + b'\0')
     src += db('U_ATK', text.encode(w['s_atk'].rstrip('…').strip()) + b'\0')
     src += db('U_ARROW', bytes([ARROW, 0]))
+    msgs = []                                           # (Item: FF3's prompts / messages $5A-$75)
+    for i in range(0x5A, 0x76):
+        t = text.decode(text.raw_string(rom, 't8200', i)).replace('[77][79]', 'HP')
+        t = clean(t.replace('\n', ' \x01 ')).replace(' \x01 ', '\x01')
+        msgs.append(b'\x01'.join(text.encode(x) for x in t.split('\x01')))
+    src += strtab('U_MSG', msgs)
+    src += db('U_ITEMW', text.encode(clean(text.decode(text.raw_string(rom, 't8200', 0x35)))) + b'\0')
     src += db('U_DEF', text.encode(w['s_def'].rstrip('…').strip()) + b'\0')
     return src

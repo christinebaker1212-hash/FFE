@@ -530,6 +530,14 @@ u_textc:    push bc
             jr nc, .p
             xor a
 .p:         srl a
+            ld e, a                         ; -> cells B + off / 8, pen off & 7
+            srl a
+            srl a
+            srl a
+            add a, b
+            ld b, a
+            ld a, e
+            and 7
             jr u_text0
 u_textr:    push bc
             push hl
@@ -630,7 +638,9 @@ u_text0:    ld [u_pen], a                   ; A = the pen's start in the first c
             srl a
             srl a
             ld [u_nc], a
+            push hl                         ; (HL: after the line's end, for a second line)
             call u_emit
+            pop hl
 .none:      ld a, [u_nc]
             ld b, a
             ld a, [u_bx]
