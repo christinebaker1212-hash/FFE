@@ -1041,8 +1041,10 @@ check_input:
             ld a, [z23]                     ; Start: the main menu (3F/E340 -> 3D/A52F), the map
             and a                           ;   reloaded after
             jp nz, menu_run
-            xor a                           ; (B / Select: with their scripts)
-            ld [z25], a
+            ld a, [z25]                     ; B: an item shown (3F/EA9C)
+            and a
+            jp nz, b_button
+            xor a                           ; (Select: the next member shown, with the guests)
             ld [z22], a
 .ev:        ld a, [z4B]                     ; (a map title showing: nothing)
             cp $FF

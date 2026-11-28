@@ -294,6 +294,81 @@ shop_run:   ld hl, TS7B                     ; (the person's script where the men
             and a
             ret z
             jp ev_start
+; FF3 check item select (3F/EA9C): B on a map: the person ahead (or a locked door: $DF) is shown an
+; item (3C/8DE3: the kept menu's picker); a key / usable item ($98-$AF) runs the person's item script
+; (2C/8800, off world 0 2C/8830) when its first byte is the person
+b_button:   xor a
+            ld [z25], a
+            ld a, [facing]
+            call dir_dxy
+            ld a, [px]
+            add a, b
+            and 63
+            ld [tx], a
+            ld a, [py]
+            add a, c
+            and 63
+            ld [ty], a
+            call npc_ahead
+            jr c, .npc
+            ld a, [tx]
+            ld e, a
+            ld a, [ty]
+            ld d, a
+            call map_at
+            ld c, a
+            push bc
+            ld a, [tx]
+            ld e, a
+            ld a, [ty]
+            ld d, a
+            call tile_props
+            pop bc
+            ld a, [lay43]
+            ld b, a
+            ld a, [t44]
+            bit 7, a
+            ld a, b
+            ld [t44], a
+            ret z                           ; (the guest's script: with the guests)
+            ld a, c
+            cp $90
+            ret c
+            cp $A0
+            ret nc
+            ld a, $DF                       ; (a locked door)
+            jr .pick
+.npc:       ld a, [lay43]
+            ld [t44], a
+            ld a, [hl]
+.pick:      ld [Z + $A0], a
+            ld hl, m_ipick
+            ld b, B_MENU
+            call full_run
+            ldh a, [fr_pick]
+            cp $B0
+            ret nc
+            sub $98
+            ret c
+            ld de, $8800
+            ld b, a
+            ld a, [world]
+            and a
+            ld a, b
+            jr z, .w
+            ld de, $8830
+.w:         call ts_load
+            ld a, [TS7B]
+            ld b, a
+            ld a, [Z + $A0]
+            cp b
+            ret nz
+            call ts_check1                  ; (3C/92EE: past the first byte)
+            ld a, [z6C]
+            and a
+            ret z
+            jp ev_start
+
 ; HL = a routine in bank B: its full screen, the field's RAM kept, the map again; fr_res / fr_exit /
 ; fr_wn: the menu's result, Exit / Warp (read before the field's RAM comes back over theirs)
 full_run:   push hl
@@ -310,6 +385,8 @@ full_run:   push hl
             ldh [fr_exit], a
             ld a, [m_wn]
             ldh [fr_wn], a
+            ld a, [m_pick]
+            ldh [fr_pick], a
             call lcd_off
             call fr_leave
             jp fr_reload
@@ -499,3 +576,4 @@ soft_rst:   ds 1
 fr_res:     ds 1
 fr_exit:    ds 1
 fr_wn:      ds 1
+fr_pick:    ds 1

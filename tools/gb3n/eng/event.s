@@ -652,6 +652,8 @@ ts_npc:     ld hl, TS7B
             ld bc, 32
             call memcpy
 ; FF3 check trigger script (3C/9319): the first conditional met -> z6C = its event id
+ts_check1:  ld hl, TS7B + 1                 ; (3C/92EE: an item script, past its person)
+            jr ts_check.l
 ts_check:   ld hl, TS7B
 .l:         ld a, [hl+]
             cp $FF
