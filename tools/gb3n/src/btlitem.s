@@ -779,7 +779,13 @@ tall_close: ld b, $FF
             jp chr_draw
 
 ; the list: the cursor's column (top four lines), the next one below, the hands (two)
-bit_draw:    ld bc, $0000
+bit_draw:    ld hl, ic_map                   ; (the icons' tiles: chosen again)
+            ld b, 7
+            ld a, $FF
+.ic:        ld [hl+], a
+            dec b
+            jr nz, .ic
+            ld bc, $0000
             ld de, $140A
             call w_box
             ld a, [IT_X]
@@ -902,7 +908,24 @@ it_str:     push bc
             ld a, [btl_tmp + 2]
             ld b, 0
             call bstr
-            ld hl, btl_str + 1
+            ld a, 2                         ; (the name's column: 2, after an icon 3)
+            ld [it_col0], a
+            ld a, [btl_str]                 ; FF3's icon ($50-$6F) in its own cell (column 2)
+            cp $50
+            jr c, .ni
+            cp $70
+            jr nc, .ni
+            ld a, 3
+            ld [it_col0], a
+            ld a, [btl_str]
+            call it_icon
+            pop bc
+            push bc
+            ld b, 2
+            call cv2
+            call m_put
+            call cv3
+.ni:        ld hl, btl_str + 1
             ld de, btl_str
             ld bc, 31
             call memcpy
@@ -915,7 +938,8 @@ it_str:     push bc
             ld e, BVP_L
 .w:         ld a, e
             ld [it_nm], a
-            ld b, 2
+            ld a, [it_col0]
+            ld b, a
             ld d, 16
             ld hl, btl_str
             call bv_put
@@ -935,6 +959,52 @@ it_str:     push bc
             ld d, 19
             ld hl, btl_str
             jp bv_put
+; icon code A -> its tile ($F0-$F6: loaded once a list, MENU_BANK $5E00; $FF none left)
+it_icon:    ld b, a
+            ld hl, ic_map
+            ld c, 0
+.f:         ld a, [hl]
+            cp b
+            jr z, .got
+            cp $FF
+            jr z, .new
+            inc hl
+            inc c
+            ld a, c
+            cp 7
+            jr nz, .f
+            ld a, $FF
+            ret
+.new:       ld [hl], b
+            push bc
+            ld a, MENU_BANK
+            ld [vc_src], a
+            ld a, b                         ; ($50-$6F: the item icons at $5E00; $70-$7F: the
+            sub $50                         ;   font's, the spells' among them, at $6400)
+            cp $20
+            ld h, $5E
+            jr c, .i0
+            sub $20
+            ld h, $64
+.i0:        swap a
+            ld l, a
+            and $0F
+            add a, h
+            ld h, a
+            ld a, l
+            and $F0
+            ld l, a
+            ld a, c
+            swap a
+            ld e, a
+            ld d, $8F
+            ld b, 1
+            ld a, 1
+            call vcopyx
+            pop bc
+.got:       ld a, c
+            add a, $F0
+            ret
 lbl_r:      db $9B, $BE, $91, $A4, $B1, $A7, 0      ; R.Hand
 lbl_l:      db $95, $BE, $91, $A4, $B1, $A7, 0      ; L.Hand
 
@@ -954,3 +1024,6 @@ cv_line:    call cv2
 section wram, $DF57                         ; (WRAM 3: after btlui.s's)
 it_nm:      ds 1                            ; the line is an item (then its palette)
 it_us:      ds 1                            ;   usable
+ic_map:     ds 7                            ; the icons in tiles $F0-$F6
+section wram, $DF50                         ; (WRAM 3: after btlmsg.s's)
+it_col0:    ds 1

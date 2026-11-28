@@ -682,7 +682,7 @@ bv_row:     ld hl, BV_LB
             jp bv_emit
 
 ; A = a code: carry if text (not a blank, not a frame)
-bv_istx:    cp $F7
+bv_istx:    cp $F0                          ; ($F0-$F6: tiles as they are, the item icons)
             ret
 ; a field from cell bv_i: its cells, its room, drawn; bv_fe = the cell after it
 bv_field:   ld a, [bv_i]
@@ -905,8 +905,23 @@ bv_draw:    push hl
 
 ; DE = the glyph of code A (BV_GLY + 9 (A - $80)); carry if one
 bv_gly:     cp $CA                          ; (FF3's battle arrow: ours)
-            jr nz, .g
+            jr nz, .x
             ld a, $C9
+.x:         cp $76                          ; (FF3's "EXP", "HP", "MP" tiles $76-$7A: E H M P X)
+            jr c, .g
+            cp $7B
+            jr nc, .g
+            push hl
+            sub $76
+            add a, low(.t)
+            ld l, a
+            ld a, high(.t)
+            adc a, 0
+            ld h, a
+            ld a, [hl]
+            pop hl
+            jr .g
+.t:         db $8E, $91, $96, $99, $A1
 .g:         cp $80
             ccf
             ret nc
@@ -995,7 +1010,7 @@ bv_emit:    call bv_madr
             add a, c
             ld c, a
             ld a, [bc]
-            cp $F7                          ; a frame: as it is
+            cp $F0                          ; a frame (or an icon): as it is
             jr c, .tx
             cp $FF
             jr z, .tx

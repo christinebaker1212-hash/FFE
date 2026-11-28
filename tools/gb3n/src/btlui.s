@@ -577,8 +577,19 @@ b_back:     ld a, [BZ + $52]
 
 ; the command list's cursor (slots 0-3; left / right: the row commands, slots 4 / 5); A = 1 when
 ; a command was taken, 0 = back (B on a later member)
-cmd_input:  xor a
-            ld [btl_cur], a
+cmd_input:  ld a, [opt_curm]                ; (Config's Cursor: Remember starts on the command the
+            and a                           ;   member chose last, $7AC3 + member; Reset on Fight)
+            jr nz, .c0
+            ld a, [BZ + $52]
+            ld e, a
+            ld d, 0
+            ld hl, W7 + $7AC3
+            add hl, de
+            ld a, [hl]
+            cp 4
+            jr c, .c1
+.c0:        xor a
+.c1:        ld [btl_cur], a
 .l:         ld a, [btl_cur]                 ; the hand at the command's line (screen rows 13-16)
             add a, a
             add a, a

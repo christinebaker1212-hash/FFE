@@ -305,7 +305,13 @@ bmg_spell:   ld [BZ + $18], a
             jp mg_targets
 
 ; the list: two levels a page (the cursor's level first when it is odd)
-bmg_draw:    ld bc, $0000
+bmg_draw:    ld hl, ic_map                   ; (the icons' tiles: chosen again)
+            ld b, 7
+            ld a, $FF
+.ic:        ld [hl+], a
+            dec b
+            jr nz, .ic
+            ld bc, $0000
             ld de, $140A
             call w_box
             ld a, [MG_ROW]
@@ -363,34 +369,58 @@ bmg_blank:   ld hl, win_buf
 ; row btl_k (a level) at canvas row C: "Lv n  MP cur/max", its three spells
 bmg_lvl:     push bc
             call bmg_blank
-            ld a, $95                       ; L v
-            ld [win_buf], a
-            ld a, $B9
-            ld [win_buf + 1], a
+            pop bc
+            push bc
+            ld b, 1
+            call cv_line                    ; (the line blank: its strings below)
             ld a, [btl_k]                   ; level = $46 - row + 1
             ld b, a
             ld a, [BZ + $46]
             sub b
             ld [btl_tmp + 2], a
+            ld hl, btl_str                  ; "Lv n" (the label colour)
+            ld [hl], $95
+            inc hl
+            ld [hl], $B9
+            inc hl
             inc a
             add a, $80
-            ld [win_buf + 2], a
-            ld a, $96                       ; M P
-            ld [win_buf + 5], a
-            ld a, $99
-            ld [win_buf + 6], a
-            ld a, [BZ + $5F]                ; current (+7 + level), max (+$31 + 2 level)
+            ld [hl+], a
+            ld [hl], 0
+            pop bc
+            push bc
+            ld b, 1
+            ld d, 5
+            ld e, BVP_L
+            ld hl, btl_str
+            call bv_put
+            ld hl, btl_str                  ; "MP"
+            ld [hl], $96
+            inc hl
+            ld [hl], $99
+            inc hl
+            ld [hl], 0
+            pop bc
+            push bc
+            ld b, 5
+            ld d, 7
+            ld e, BVP_L
+            ld hl, btl_str
+            call bv_put
+            ld a, [BZ + $5F]                ; current (+7 + level) / max (+$31 + 2 level)
             add a, 7
             ld hl, btl_tmp + 2
             add a, [hl]
             ld c, a
             ld a, $5B
             call zpy
-            ld a, [hl]
-            ld hl, win_buf + 8
-            call bmg_num
-            ld a, $C7
-            ld [win_buf + 10], a
+            ld e, [hl]
+            ld d, 0
+            ld hl, btl_str
+            call bnum
+            ld [hl], $C7
+            inc hl
+            push hl
             ld a, [btl_tmp + 2]
             add a, a
             ld b, a
@@ -400,19 +430,26 @@ bmg_lvl:     push bc
             ld c, a
             ld a, $57
             call zpy
-            ld a, [hl]
-            ld hl, win_buf + 11
-            call bmg_num
+            ld e, [hl]
+            ld d, 0
+            pop hl
+            call bnum
+            ld [hl], 0
             pop bc
             push bc
-            ld b, 1
-            call cv_line
+            ld b, 7
+            ld d, 12
+            ld e, BVP_W
+            ld hl, btl_str
+            call bv_put
             pop bc
             inc c
             xor a
 .s:         ld [btl_n2], a
             push bc
             call bmg_blank
+            ld a, BVP_W
+            ld [it_nm], a
             ld a, [btl_k]
             ld b, a
             add a, a
@@ -426,40 +463,59 @@ bmg_lvl:     push bc
             ld a, [hl]
             cp $FF
             jr nz, .ok
-            ld hl, bmg_shown                 ; (not castable: X and the name)
+            ld hl, bmg_shown                 ; (not castable: grey)
             add hl, de
             ld a, [hl]
             cp $FF
             jr z, .p
             ld b, a
-            ld a, $73
-            ld [win_buf + 1], a
+            ld a, BVP_L
+            ld [it_nm], a
             ld a, b
-.ok:        add a, $C8                      ; spell names $04C8 +
+.ok:        add a, $C8                      ; spell names $04C8 + (FF3's icon first)
             ld b, 0
             jr nc, .n
             inc b
 .n:         call bstr
-            ld hl, btl_str
-            ld de, win_buf + 2
-            ld b, 15
-.cp:        ld a, [hl+]
-            and a
-            jr z, .p
-            ld [de], a
-            inc de
-            dec b
-            jr nz, .cp
-.p:         pop bc
+            xor a
+            ld [it_col0], a
+            ld a, [btl_str]
+            cp $50
+            jr c, .ni
+            cp $80
+            jr nc, .ni
+            call it_icon
+            ld [win_buf + 1], a             ; (its cell: column 2)
+            ld a, 1
+            ld [it_col0], a
+.ni:        pop bc
             push bc
             ld b, 1
             call cv_line
             pop bc
+            push bc
+            ld b, 3
+            ld d, 16
+            ld a, [it_nm]
+            ld e, a
+            ld a, [it_col0]
+            add a, low(btl_str)
+            ld l, a
+            ld a, high(btl_str)
+            adc a, 0
+            ld h, a
+            call bv_put
+            jr .q
+.p:         pop bc
+            push bc
+            ld b, 1
+            call cv_line
+.q:         pop bc
             inc c
             ld a, [btl_n2]
             inc a
             cp 3
-            jr nz, .s
+            jp nz, .s
             ret
 
 ; A (0-99) as two cells at HL (a blank for tens of 0)
