@@ -2734,19 +2734,26 @@ bs_dlv:     call bs_ilv.cp
             ret
 
 ; a battle message's item ($7E4F's first byte) after its words: on the line if it fits, else the next
-section bank B_BSCR, $7660
-bs_mitem:   ld a, e
-            cp 8
-            jr c, .f
-            inc d
-            ld e, 1
-.f:         push de
+section bank B_BSCR, $7F18
+bs_mitem:   push de
             ld a, [$D8E4]
             ld e, a
             ld d, 0
             call bs_name
             pop de
-            ld a, 19
+            ld hl, BS_STR                   ; (its length: on this line if it fits)
+            ld b, e
+.l:         ld a, [hl+]
+            and a
+            jr z, .e
+            inc b
+            jr .l
+.e:         ld a, b
+            cp 20
+            jr c, .f
+            inc d
+            ld e, 1
+.f:         ld a, 19
             sub e
             ld [bs_maxw], a
             jp bs_putsn

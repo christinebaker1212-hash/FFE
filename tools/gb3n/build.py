@@ -493,6 +493,9 @@ def main():
         if st == 'bat':                          # (GB3N_STORY=bat: battle GB3N_BATTLE on Start)
             ev = 'ev_battest'
             src += 'section bank B_FIELD, $7980\nev_battest: ld a, %s\n            ld [bs_id], a\n            xor a\n            ld [bs_id + 1], a\n            jp battle_run\n' % os.environ.get('GB3N_BATTLE', '1')
+        if st == 'dlg':                          # (GB3N_STORY=dlg: dialogue GB3N_DLG of t8400 on Start)
+            ev = 'ev_dlgtest'
+            src += 'section bank B_FIELD, $7980\nev_dlgtest: ld c, %s\n            ld b, TB_DLG1\n            jp dlg_open\n' % os.environ.get('GB3N_DLG', '$1A')
         if st == 'mini':                         # (GB3N_STORY=mini: the minimap on Start)
             ev = 'ev_mmtest'
             src += 'section bank B_FIELD, $7980\nev_mmtest:  %FAR B_MINI, mm_show\n            jp map_reload\n'
@@ -546,6 +549,8 @@ ev_fxtest:  call ev_shake
         src = src.replace(a, '.w:\n')
     if os.environ.get('GB3N_FDTEST'):            # test builds only: the boss's death right after its entry
         src = src.replace('            call bs_bossin2\n', '            call bs_bossin2\n            ld b, 60\n.fdw:       push bc\n            call bs_frame\n            pop bc\n            dec b\n            jr nz, .fdw\n            ld a, $80\n            call bs_bossdie\n')
+    if os.environ.get('GB3N_MSGTEST'):           # test builds only: a battle message with an item at the start
+        src = src.replace('            call bs_bossin2\n', '            call bs_bossin2\n            ld a, %s\n            ld [$D8E4], a\n            ld a, $29\n            ld [$D8DA], a\n            ld a, 2\n            ld [$D8D5], a\n            ld a, 1\n            ld [$DEC2], a\n            call bs_script\n' % os.environ['GB3N_MSGTEST'])
     if os.environ.get('GB3N_WIPETEST'):          # test builds only: the death wipe on slot 0 at the start
         src = src.replace('            call bs_bossin2\n', '            call bs_bossin2\n            ld b, 60\n.wtw:       push bc\n            call bs_frame\n            pop bc\n            dec b\n            jr nz, .wtw\n            ld a, $80\n            call bs_mwipe\n')
     if os.environ.get('GB3N_ANWPN'):             # test builds only: the right hand's weapon animation
