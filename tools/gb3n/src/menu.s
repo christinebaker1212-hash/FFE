@@ -301,6 +301,57 @@ status:     ld [m_i], a
             jr z, .w
             ret
 
+; ---- for the rebuilt Status screen (sts.s, CODE11): FF3's derived values of member A -> stx_buf:
+; next level's EXP (3), attack multiplier, power (2), hit %, defense multiplier, defense (2),
+; evasion %, magic defense, magic evasion %
+stx_valt:   ld a, [mgm_t]
+stx_vals:   rrca
+            rrca
+            ld [m_ch], a
+            call st_next
+            ld hl, n24
+            ld de, stx_buf
+            ld bc, 3
+            call memcpy
+            ld a, $21                       ; attack: the multiplier $6121 + $6126, power
+            call st_byte1
+            ld a, l
+            add a, 5
+            ld l, a
+            ld a, [hl]
+            add a, e
+            ld [stx_buf + 3], a
+            call st_atk
+            ld a, e
+            ld [stx_buf + 4], a
+            ld a, d
+            ld [stx_buf + 5], a
+            call st_hit
+            ld a, e
+            ld [stx_buf + 6], a
+            ld a, $2B
+            call st_byte1
+            ld a, e
+            ld [stx_buf + 7], a
+            call st_def
+            ld a, e
+            ld [stx_buf + 8], a
+            ld a, d
+            ld [stx_buf + 9], a
+            ld a, $2C
+            call st_byte1
+            ld a, e
+            ld [stx_buf + 10], a
+            ld a, $1F
+            call st_byte1
+            ld a, e
+            ld [stx_buf + 11], a
+            ld a, $1E
+            call st_byte1
+            ld a, e
+            ld [stx_buf + 12], a
+            ret
+
 ; DE = the byte at the member's GS + $100 + A (+ m_ch)
 st_byte1:   ld b, a
             ld a, [m_ch]

@@ -116,13 +116,16 @@ def titles(rom, group_world):
     out = []
     for t in range(256):
         nm = re.sub(r',? Part \d+$', '', clean(text.decode(text.raw_string(rom, 't8200', t))))
-        e = text.encode(nm)
-        if width(e) > 46:                               # (two lines in the place window)
-            ws = nm.split(' ')
-            for k in range(len(ws) - 1, 0, -1):
-                if width(text.encode(' '.join(ws[:k]))) <= 46:
-                    e = text.encode(' '.join(ws[:k])) + b'\x01' + text.encode(' '.join(ws[k:]))
-                    break
+        lines, cur = [], []                             # (up to 4 lines of 48 pixels: the place
+        for wd in nm.replace('Underground', 'Under- ground').split(' '):   #   window, mm.s; the one
+                                                        #   word wider than it hyphenated)
+            if cur and width(text.encode(' '.join(cur + [wd]))) > 48:
+                lines.append(' '.join(cur)); cur = []
+            cur.append(wd)
+        lines.append(' '.join(cur))
+        if t in ids:
+            assert len(lines) <= 4 and all(width(text.encode(x)) <= 48 for x in lines), nm
+        e = b'\x01'.join(text.encode(x) for x in lines)
         out.append(e if t in ids else b'')
     return out
 
@@ -187,6 +190,12 @@ def code_data(rom, rgb555, group_world, bank):
     src += db('U_DEF', text.encode(w['s_def'].rstrip('…').strip()) + b'\0')
     sd, spr = sight_data(rom, rgb555)
     src += sd
+    lab = menu.status_labels(rom)                      # (the Status screen: FF3's words, t8200 $47)
+    stw = ['Proficiency', 'Strength', 'Agility', 'Stamina', 'Intelligence', 'Spirit', 'To next level',
+           'Attack', 'Hit rate', 'Defense', 'Evasion rate', 'Magic defense']
+    for x in stw: assert x in lab, x
+    stw += ['Magic evasion', 'EXP', 'MP']
+    src += strtab("U_STW", [text.encode(x) for x in stw])
     for k, v in (('U_USE', 's_use'), ('U_SWAP', 's_swap'), ('U_MITEM', 's_item')):
         src += db(k, text.encode(w[v]) + b'\0')          # (the Magic screen: FF3's Use / Swap / Item)
     # (tiles copied by DMA: 16-byte aligned, at the bank's end)

@@ -2,7 +2,7 @@
 ; font, every member's picture as FF1's main menu; the cursor reaches every command). Layout:
 ; party (0,0,12,18): a member every 4 rows from row 1, the battle picture at x 16 (cells 2-3),
 ; name + LV, job, HP from cell 4; commands (12,0,8,10) from cell 15, the hand at cells 13-14;
-; Gil / Capacity (12,10,8,4); the place (12,14,8,4). Commands as FF3's (t8200 $31) and Config;
+; Gil / Capacity and the place (12,10,8,8). Commands as FF3's (t8200 $31) and Config;
 ; Save only on a world map (3D/A59F: greyed elsewhere, the error sound).
 MM_N       = 8
 
@@ -125,7 +125,15 @@ mn_open:    ld a, CODE1                     ; (each member's values from the equ
             jp u_closeb
 .sight:     call wm_sight                   ; Sight: the minimap, then the menu again (3D/A525)
             jp mn_open
-.nm:        cp 2                            ; Equip: rebuilt (eqm.s)
+.nm:        cp 3                            ; Status: rebuilt (sts.s)
+            jr nz, .ns2
+            push bc
+            call u_fadeout
+            pop bc
+            ld a, b
+            call sts_open
+            jp .re
+.ns2:       cp 2                            ; Equip: rebuilt (eqm.s)
             jr nz, .old2
             push bc
             call u_fadeout
@@ -259,11 +267,8 @@ mn_draw:    call u_cls
             ld bc, $0C00
             ld de, $080A
             call u_box
-            ld bc, $0C0A
-            ld de, $0804
-            call u_box
-            ld bc, $0C0E
-            ld de, $0804
+            ld bc, $0C0A                    ; (Gil, Capacity; the place below: up to 3 lines)
+            ld de, $0808
             call u_box
             xor a
             ld [u_k], a
@@ -344,17 +349,31 @@ mn_draw:    call u_cls
             ld a, [hl+]
             ld h, [hl]
             ld l, a
-.pl:        ld bc, $0D0F
+.pl:        push hl                         ; (four lines: from row 13, else 14)
+            ld c, $0E
+            ld b, 0
+.cn:        ld a, [hl+]
+            and a
+            jr z, .c4
+            dec a
+            jr nz, .cn
+            inc b
+            jr .cn
+.c4:        ld a, b
+            cp 3
+            jr c, .c3
+            dec c
+.c3:        pop hl
+            ld b, $0D
+.ln:        push bc
             call u_text
-            ld a, [hl]                      ; (a second line after the {01})
-            dec hl
-            ld a, [hl]
+            pop bc
+            dec hl                          ; (another line after a {01})
+            ld a, [hl+]
             cp 1
-            jr nz, .nl
-            inc hl
-            ld bc, $0D10
-            call u_text
-.nl:        ret
+            ret nz
+            inc c
+            jr .ln
 
 ; member u_k: the picture, name, LV, job, HP (rows 1 + 4 m ..)
 mn_member:  ld a, [u_k]
