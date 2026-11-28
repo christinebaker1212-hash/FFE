@@ -384,14 +384,16 @@ im_tpromptp: push af                        ; (the pool as it is)
             ld a, [hl+]
             ld h, [hl]
             ld l, a
-            ld bc, $0101
+im_tstr:    ld bc, $0101                    ; (HL = a string: lines split by {01}, from row 1)
+.l:         push bc
             call u_text
+            pop bc
             dec hl
             ld a, [hl+]
             cp 1
             ret nz
-            ld bc, $0102
-            jp u_text
+            inc c
+            jr .l
 ; a message on the target screen, then the prompt back
 im_tmsg:    call im_tprompt
             ld a, 1

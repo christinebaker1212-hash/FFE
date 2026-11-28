@@ -142,6 +142,94 @@ job_menu:   ld [m_i], a
 .msg:       call m_msgbox
             jp .draw
 
+; ---- for the rebuilt Job screen (jbm.s, CODE11): FF3's rules, no drawing
+; A = member: costs, the open jobs (jb_n), jb_cur = the current job
+jbx_initt:  ld a, [mgm_t]
+jbx_init:   ld [m_i], a
+            rrca
+            rrca
+            ld [m_ch], a
+            ld [mg_caster], a
+            call jb_savexp                  ; (3C/96BA)
+            call jb_costs
+            call jb_count
+            ld a, [m_ch]
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]
+            ld [jb_cur], a
+            ret
+; job jb_cur: may the member change to it? (3D/AE23) u_eres 0 (ask), 1 (the current job), $3A (the
+; level: not enough experience), $72 (not enough Capacity)
+jbx_try:    ld a, 1
+            ld [u_eres], a
+            ld a, [jb_cur]
+            ld b, a
+            ld a, [m_ch]
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]
+            cp b
+            ret z
+            ld a, b
+            call jb_load
+            ld a, [m_ch]
+            ld l, a
+            ld h, high(GS + $100)
+            inc l
+            ld a, [hl]
+            ld b, a
+            ld a, [jb_new + 1]
+            ld c, a
+            ld a, b
+            cp c
+            ld a, $3A
+            jr c, .r
+            ld a, [jb_cur]
+            ld e, a
+            ld d, 0
+            ld hl, jb_cost
+            add hl, de
+            ld b, [hl]
+            ld a, [GS + $1B]
+            cp b
+            ld a, $72
+            jr c, .r
+            xor a
+.r:         ld [u_eres], a
+            ret
+; the change (jbx_try passed): the equipment off (u_eres $71 if the bag is full), the job (3D/AB8F),
+; the member's values again
+jbx_do:     call jb_unequip
+            ld a, $71
+            jr c, .r
+            call jb_change
+            ld a, [m_ch]
+            rlca
+            rlca
+            and 3
+            call eq_calc
+            xor a
+.r:         ld [u_eres], a
+            ret
+; job A's cost (jb_cost) and level (+1) for the member -> B, C
+jbx_rowt:   ld a, [mgm_t]
+jbx_row:    ld e, a
+            ld d, 0
+            ld hl, jb_cost
+            add hl, de
+            ld b, [hl]
+            add a, a
+            ld e, a
+            ld a, [m_ch]
+            add a, $10
+            add a, e
+            ld l, a
+            ld h, high(GS + $200)
+            ld c, [hl]
+            inc c
+            ret
+
 ; owner (2026-11-28): a job change takes off all the member's equipment (the five slots into the
 ; bag, as the Equip screen's Remove); carry if the bag is full (what fitted stays off)
 jb_unequip: xor a

@@ -354,7 +354,7 @@ sts_cp:     ld a, [hl+]
             inc de
             jr sts_cp
 
-section wram, $C6B1                         ; (after sight.s's)
+section wram, $C6B0                         ; (after sight.s's: to $C6BF)
 sts_m:      ds 1
 sts_o:      ds 1
 sts_t:      ds 1

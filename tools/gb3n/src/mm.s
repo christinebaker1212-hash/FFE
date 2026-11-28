@@ -133,7 +133,16 @@ mn_open:    ld a, CODE1                     ; (each member's values from the equ
             ld a, b
             call sts_open
             jp .re
-.ns2:       cp 2                            ; Equip: rebuilt (eqm.s)
+.ns2:       cp 5                            ; Job: rebuilt (jbm.s)
+            jr nz, .nj
+            push bc
+            call u_fadeout
+            pop bc
+            ld a, b
+            call jbm_open
+            call u_mpal                     ; (the pictures in their jobs again)
+            jp .re
+.nj:        cp 2                            ; Equip: rebuilt (eqm.s)
             jr nz, .old2
             push bc
             call u_fadeout

@@ -126,6 +126,15 @@ u_mpal:     xor a
             ld a, [hl]
             and $3F
             ld [u_t], a
+            call u_mjob
+            ld hl, u_k
+            inc [hl]
+            ld a, [hl]
+            cp 4
+            jr nz, .m
+            ret
+; member u_k's picture as job u_t: its tiles -> U_PIC + 6 m, its colours -> u_palt OBJ m
+u_mjob:     ld a, [u_t]
             ld l, a                         ; the tiles: $4000 + $2A0 job = $20 x 21 x job
             ld h, 0
             add hl, hl
@@ -196,13 +205,6 @@ u_mpal:     xor a
             ld hl, u_nc + 1
             call .one
             call .one
-            call .one
-            ld hl, u_k
-            inc [hl]
-            ld a, [hl]
-            cp 4
-            jr nz, .m
-            ret
 .one:       push de
             call nes_col                    ; ([HL++] -> A, D)
             ld b, d

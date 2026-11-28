@@ -131,7 +131,7 @@ def titles(rom, group_world):
 
 
 GB_WORDS = {'U_LV': 'LV', 'U_HP': 'HP', 'U_GIL': 'Gil', 'U_CAP': 'Capacity', 'U_CONFIG': 'Config',
-            'U_WORLD': 'World Map', 'U_OPT': 'Optimize', 'U_REMOVE': 'Remove'}
+            'U_WORLD': 'World Map', 'U_OPT': 'Optimize', 'U_REMOVE': 'Remove', 'U_COST': 'Cost'}
 
 
 def sight_data(rom, rgb555):
@@ -180,12 +180,22 @@ def code_data(rom, rgb555, group_world, bank):
     src += db('U_REM', text.encode(w['s_rem']) + b'\0')
     src += db('U_ATK', text.encode(w['s_atk'].rstrip('…').strip()) + b'\0')
     src += db('U_ARROW', bytes([ARROW, 0]))
-    msgs = []                                           # (Item: FF3's prompts / messages $5A-$75)
-    for i in range(0x5A, 0x7A):
-        t = text.decode(text.raw_string(rom, 't8200', i)).replace('[77][79]', 'HP')
-        t = clean(t.replace('\n', ' \x01 ')).replace(' \x01 ', '\x01')
-        msgs.append(b'\x01'.join(text.encode(x) for x in t.split('\x01')))
+    def wrap(i):                                        # (FF3's message, re-wrapped to the window's
+        raw = text.decode(text.raw_string(rom, 't8200', i)).replace('[77][79]', 'HP')
+        keep = [clean(x) for x in raw.split('\n') if clean(x)]
+        if all(width(text.encode(x)) <= 144 for x in keep):  #   144 pixels; FF3's own lines when
+            return b'\x01'.join(text.encode(x) for x in keep)   #   they fit)
+        t = clean(raw)
+        lines, cur = [], []
+        for wd in t.split(' '):
+            if cur and width(text.encode(' '.join(cur + [wd]))) > 144:
+                lines.append(' '.join(cur)); cur = []
+            cur.append(wd)
+        lines.append(' '.join(cur))
+        return b'\x01'.join(text.encode(x) for x in lines)
+    msgs = [wrap(i) for i in range(0x5A, 0x7A)]         # (FF3's prompts / messages $5A-$79)
     src += strtab('U_MSG', msgs)
+    src += db('U_MJOB', wrap(0x3A) + b'\0')              # (the Job screen: $013A)
     src += db('U_ITEMW', text.encode(clean(text.decode(text.raw_string(rom, 't8200', 0x35)))) + b'\0')
     src += db('U_DEF', text.encode(w['s_def'].rstrip('…').strip()) + b'\0')
     sd, spr = sight_data(rom, rgb555)
