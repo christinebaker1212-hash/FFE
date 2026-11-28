@@ -156,7 +156,7 @@ and no undocumented debug code.
 Update the status below as work goes on (about every 5 minutes of work): work done,
 work remaining, scope and plan. Commit and push it with the work.
 
-# GB port status (last updated 2026-11-27: the shrines' people, towns, shops and puzzles)
+# GB port status (last updated 2026-11-28: FF3's polish pass, menus and battle in the small font)
 
 **Current FF1 build: the native rewrite (`tools/gbn/`, `docs/ff1-native.md`).** The long log below
 (recompiled build, `tools/gb/`) is history and reference; the native build replaced it.
@@ -174,6 +174,13 @@ FF3, 2026-11-28 (later): map colours (BG colour 0 = backdrop), menu command word
 transition edges, step forward for commands, outlined numerals, FF3's prophecy (A skips), preset
 names. Waiting on the owner: main menu A / B and battle mock-ups (small letters only), then the
 one-font menu redesign and battle conveyance.
+FF3, 2026-11-28 (polish pass, owner: "Nintendo level polish on all screens"): every menu rebuilt in FF1's
+small font on one UI library (main menu with all four pictures and Save / Config / Suspend, Item, Magic with
+Warp / Exit / Sight, Equip with job filter and Optimize, Status, Job, Save / Load, Config with window colour
+and gradient, Extras with Bestiary and Sound Test, shops / inns / chocobo, name entry); teaching magic; the
+battle as the owner's mock-up in the same small font (`tools/gb3n/src/btlvwf.s`: commands and party list side
+by side, target name and count, narrated actions, full-width messages, no victory flicker, item / magic lists
+with icons, gradient windows); VRAM checker 0. Details: `docs/ff3-native.md`.
 **Handoff (recompiled build, historical): `docs/gb-handoff.md`.**
 
 ## Scope and plan

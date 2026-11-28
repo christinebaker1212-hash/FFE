@@ -1648,7 +1648,12 @@ q_flush:    ld a, [q_n]
             ret z
             ld c, a
             ld hl, qbuf
-.e:         ld a, [hl+]
+.e:         ldh a, [rLY]                    ; (Lot Check: only while the V-Blank lasts; the rest
+            cp 152                          ;   in the next one)
+            jr nc, .late
+            cp 144
+            jr c, .late
+            ld a, [hl+]
             ld e, a
             ld a, [hl+]
             ld d, a
@@ -1691,6 +1696,19 @@ q_flush:    ld a, [q_n]
             jr nz, .e
             xor a
             ld [q_n], a
+            ret
+.late:      ld a, c
+            ld [q_n], a
+            add a, a
+            add a, a
+            add a, a
+            ld b, a
+            ld de, qbuf
+.m:         ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .m
             ret
 
 ; the screen wipes (wipe.s, CODE6): out before a map change, in when the new map is drawn

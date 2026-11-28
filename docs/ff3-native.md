@@ -435,3 +435,38 @@ routine does. Only *data* comes from the user's ROM at build time. The recompile
   - Mock-ups sent: main menu A / B (small letters only, spaced out) and the battle screen (commands,
     target, hits narrated in the left window, outlined numbers).
   - Open: the blue strip behind the party (not reproduced; screenshot asked).
+- 2026-11-28 (polish pass, owner: "Nintendo level polish on all screens"; "don't stop until everything
+  we have discussed is implemented"):
+  - Menus rebuilt on one UI library in FF1's small font (`src/ui.s`, bank CODE11; a renamed copy for
+    bank CODE13, `build.py ui13`): black letter shadow, FF1's hand rule (the fingertip just before the
+    text, the finger on the line's middle), fades between screens, the windows' gradient and colour
+    from Config. Main menu (all four members' pictures, nine commands: Item, Magic, Equip, Status,
+    Order, Job, Save, Config, Suspend), Item, Magic (Use / Swap / Item; Exit, Warp, Sight with FF3's
+    minimap), Equip (only what the job can wear; Optimize above Remove), Status, Job, Save and the
+    title's file screen, Config (FF1's: Battle Speed, Text Speed, Volume, Controls: B Dash / Cursor,
+    Window: Red / Green / Blue / Gradient, Return to Default; kept in cart RAM with a check), Extras
+    (FF1's Bestiary with FF3's battle pictures, the Sound Test), shops / inns / the fat chocobo
+    (`src/shp.s`), name entry (`src/nme.s`), the Select menu (FF3's: the next member).
+  - Teaching magic: a bought spell is used on a member from the Item screen (FF3's rule).
+  - Closing a menu on the field no longer flashes garbage; the map wipes keep their place.
+  - Battle (the owner's mock-up): `src/btlvwf.s` draws the battle windows in the same small font.
+    The battle code still draws its windows into the menu canvas; before a V-Blank wait finds it
+    changed, each changed row is drawn again in the small font into tiles of VRAM bank 1 $70-$EF
+    (staged in WRAM 4, sent by the V-Blank with the window's map once all are sent; a tile on screen
+    is never rewritten: a changed cell takes a free tile). Strings that need more room than their
+    cells (names, messages) are kept per row and squeezed (letter gaps dropped) to fit. Layout: the
+    commands and the party list side by side (the member choosing or acting in yellow, HP current /
+    max, below a quarter yellow, fallen grey; HP updated right after the damage numbers); while a
+    target is chosen the left window names it and how many of its kind stand ("x4"), a member, or
+    "All"; the action narrated in the left window (actor, "1 Hit" / "n Hits" in the label colour,
+    "> target", the status); battle messages over both windows, wrapped by their width; at the
+    battle's end the messages replace each other with no windows between (the victory flicker
+    fixed). Item and magic lists in the tall window with full names, counts, FF3's icons (tiles
+    $F0-$F6 per list), "Lv n  MP cur/max"; FF3's EXP / HP / MP tiles drawn as letters. Config's
+    window colour and gradient apply in battle (text palettes 4-6 under the menus' line handler; the
+    battlefield's palettes 1-3 put back each V-Blank). Config's Cursor: Remember starts each member
+    on the command chosen last.
+  - Fixed: a V-Blank wait inside a tile copy put the code bank back instead of the copy's source
+    (the defend animation showed noise); the field's metatile queue could write VRAM after the
+    V-Blank ended (40 checker hits on the way to the first battle): it now stops at LY 152 and keeps
+    the rest for the next V-Blank. VRAM checker 0 over field, menus and battles.
