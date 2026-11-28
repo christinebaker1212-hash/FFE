@@ -635,9 +635,14 @@ tl_names:   xor a
             dec a
             ld [nm_ch], a
             jp .ch
-.done:      ld a, [nm_pos]                  ; START: this name (not empty, not an earlier one's)
-            and a
-            jp z, .l
+.done:      ld a, [nm_pos]                  ; START: this name (not empty, not an earlier one's);
+            and a                           ;   with none, one of the member's preset names
+            jr nz, .dnm
+            ld a, CODE10                    ; (extras.s)
+            ld hl, nm_preset
+            call far_call
+            jp .draw
+.dnm:
             call nm_dup
             jp c, .draw
             ld a, [nm_ch]
@@ -829,3 +834,4 @@ nm_ch:      ds 1
 nm_pos:     ds 1
 nm_cur:     ds 1
 nm_case:    ds 1
+np_last:    ds 1

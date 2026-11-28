@@ -289,6 +289,61 @@ ex_keys:    call wait_vbl
 .o:         ld a, c
             ret
 
+; START with no name (owner, 2026-11-28; FF1's name entry): one of member nm_ch's preset names
+; (title.py TL_PN: FF1's lists, Luneth / Arc / Refia / Ingus), at random, not the last one again
+nm_preset:  ld a, [nm_ch]
+            add a, a
+            ld e, a
+            ld d, 0
+            ld hl, TL_PN
+            add hl, de
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, [hl+]                     ; B = how many
+            ld b, a
+            ldh a, [rDIV]
+.m:         cp b
+            jr c, .k
+            sub b
+            jr .m
+.k:         ld c, a
+            ld a, [np_last]
+            cp c
+            jr nz, .ok
+            inc c
+            ld a, c
+            cp b
+            jr c, .ok
+            ld c, 0
+.ok:        ld a, c
+            ld [np_last], a
+            add a, a                        ; HL = the name (6 codes)
+            add a, c
+            add a, a
+            ld e, a
+            ld d, 0
+            add hl, de
+            ld a, [nm_ch]                   ; DE = the member's name ($6106 + $40 n)
+            rrca
+            rrca
+            add a, 6
+            ld e, a
+            ld d, high(GS + $100)
+            ld bc, $0600                    ; B = 6 codes, C = the length
+.c:         ld a, [hl+]
+            ld [de], a
+            inc de
+            cp $FF
+            jr z, .s
+            inc c
+.s:         dec b
+            jr nz, .c
+            ld a, c
+            ld [nm_pos], a
+            ret
+
+
 section wram, $C377
 ex_cur:     ds 1
 st_i:       ds 1

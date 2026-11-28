@@ -4,7 +4,7 @@ From the user's English ROM: the prophecy narration (t8000 entries 0 and 1, cent
 the NES), unwrapped and laid out again as GB pages (centred lines of up to 18 columns, a page ending
 at a sentence: the owner's pleasant-reading rule); the name entry's letter grid (t8200 $21: ten
 letters a row); "New Game" (t8200 $22)."""
-import re
+import os, re
 import text
 
 PRO_W = 18
@@ -35,6 +35,33 @@ def grid(rom):
     return bytes(cells)
 
 
+FF3_HEROES = ('Luneth', 'Arc', 'Refia', 'Ingus')
+FF1_EXTRAS = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'gbn', 'src', 'extras.s')
+
+
+def preset_groups():
+    """the four members' preset names (owner, 2026-11-28): FF1's six job lists (tools/gbn/src/
+    extras.s np_0-np_5, read here, not copied), lists 0-3 for members 1-4, the names of lists 4-5
+    dealt out evenly over the four; FF3's Luneth / Arc / Refia / Ingus first in members 1-4's"""
+    src = open(FF1_EXTRAS).read()
+    lists = []
+    for k in range(6):
+        m = re.search(r'^np_%d:\s+db (\d+)\n((?:\s+db [\d, ]+\n)+)' % k, src, re.M)
+        assert m, 'FF1 preset list %d not found' % k
+        rows = [bytes(int(v) for v in l.split('db')[1].split(',')) for l in m.group(2).strip().split('\n')]
+        assert len(rows) == int(m.group(1))
+        lists.append([r.decode('ascii').rstrip() for r in rows])
+    seen = set(FF3_HEROES)
+    def new(names):
+        out = [n for n in names if n not in seen]
+        seen.update(out)
+        return out
+    groups = [[h] + new(lists[k]) for k, h in enumerate(FF3_HEROES)]
+    for i, n in enumerate(new(lists[4] + lists[5])):     # (each name once: FF3 refuses a name twice)
+        groups[i % 4].append(n)
+    return groups
+
+
 def code_data(rom):
     def db(label, data):
         out = '%s:\n' % label
@@ -55,4 +82,18 @@ def code_data(rom):
     return (db('TL_PRO', pro) + db('TL_G0', g0) + db('TL_G1', g1) +
             db('TL_H0', text.encode('SELECT: abc')) + db('TL_H1', text.encode('SELECT: ABC')) +
             db('TL_H2', text.encode('B:Delete  START:OK')) + db('TL_JOB', job) +
-            'TL_JOBE:\n' + db('s_newgame', text.encode(ng) + b'\0'))
+            'TL_JOBE:\n' + db('s_newgame', text.encode(ng) + b'\0') )
+
+
+def presets():
+    """TL_PN: four pointers, each list: the count, then 6 codes a name ($FF after it)"""
+    out = 'TL_PN: dw TL_PN0, TL_PN1, TL_PN2, TL_PN3\n'
+    for k, g in enumerate(preset_groups()):
+        b = bytearray([len(g)])
+        for n in g:
+            e = text.encode(n)
+            assert len(e) <= 6, n
+            b += e + b'\xFF' * (6 - len(e))
+        out += 'TL_PN%d:\n' % k + ''.join('    db %s\n' % ', '.join(str(v) for v in b[i:i + 16])
+                                          for i in range(0, len(b), 16))
+    return out
