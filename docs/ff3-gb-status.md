@@ -424,11 +424,15 @@ to be seen on screen. NES driver for tests: scratch (New Game, names typed by RA
   time. `names.png`: name entry, one case at a time (Select switches), as FF1.
 Building continues on what does not depend on them (people, events, chests, world map).
 
-## Next (after the decisions)
-- Map the listing's routine names onto the ROM (as `tools/gb/ff1dis.py` did for FF1).
-- Walking on the map: the party's walking sprite (FF3's showing character, Select = next member),
-  scrolling the BG ring with rows / columns in V-Blank, collision from the tile properties; then
-  map changes (entrances / exits), people, text.
+## Fixes from the last checks (2026-11-28)
+- Battle: the fourth member's record (and monster slots 3 / 7) were read from the wrong address
+  (the carry of the record offset was lost): the fourth member showed HP 0/0. Fixed.
+- Battle inventory: FF3 interlaces id / count pairs in battle; the field keeps 32 ids then 32 counts.
+  Converted on entering and leaving a battle (`bs_ilv` / `bs_dlv`).
+
+## Next
+- The owner's play-through and hardware run. The battle backdrop stays black (mock-up A) unless the
+  owner chooses the strip (B).
 
 ## Lot Check pass (2026-11-28; the rules: `docs/gb-release-checks.md`)
 Checked on the release build (`python3 tools/gb3n/build.py`, no test variables):
