@@ -189,12 +189,17 @@ start:      di
             jr nz, .tst
             call title_boot
             jp main
-.tst:       ld a, START_MAP
+.tst:       ld a, START_EV                  ; (test builds: an event at once: port.py --event)
+            ld [z6C], a
+            ld a, START_MAP
             cp $FF                          ; (test builds: the world map)
             jp z, .wm
             ld [cur_map], a
             ld a, START_AA                  ; (a new game: map 0 from FF3's program start, 3E/C0E6;
             call load_map                   ;   test builds: the position given, kept)
+            ld a, [z6C]
+            and a
+            call nz, ev_start
 
             jp main
 .wm:        call world_load

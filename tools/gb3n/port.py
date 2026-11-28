@@ -108,6 +108,7 @@ def data_banks(rom):
     c[0x1B00:0x1D00] = rom.rd(0x2C, 0x8000, 512)        # npc list pointers (2C/8000)
     c[0x1D00:0x1F00] = rom.rd(0x01, 0x9C00, 512)        # chest contents (01/9C00, 9D00)
     c[0x3E00:0x4000] = rom.rd(0x10, 0x9E00, 512)        # item prices (10/9E00)
+    c[0x1F00:0x2000] = rom.rd(0x3A, 0x9E3E, 256)        # the sine table (3A/9E3E)
     c[0x3100:0x3300] = rom.rd(0x39, 0xBE00, 512)        # encounter rates by map (39/BE00, BF00)
     c[0x3300:0x3500] = rom.rd(0x2E, 0x92F0, 512)        # battle group by map (2E/92F0, 93F0)
     c[0x3500:0x3540] = rom.rd(0x3D, 0xBD78, 64)         # a group's battle by chance (3D/BD78)
@@ -277,7 +278,7 @@ def main():
     else:
         aa = 0x81
     src = ('START_MAP = %s\nSTART_WORLD = %s\nSTART_X = %s\nSTART_Y = %s\n' % tuple(st) +
-           'START_AA = $%02X\n' % aa +
+           'START_AA = $%02X\n' % aa + 'START_EV = %s\n' % (a[a.index('--event') + 1] if '--event' in a else '0') +
            'COMMON = %d\nCHARS = %d\nTSETS = %d\nMAPREC0 = %d\n' % (COMMON, CHARS, TSETS, MAPREC0) +
            'SCRIPT = %d\nNPCGFX = %d\nTXT_IDX = %d\n' % (SCRIPT, NPCGFX, ob.B_TEXT) +
            'WROWS = %d\nWTSET = %d\nWGFX = %d\n' % (WROWS, WTSET, WGFX) +
@@ -286,7 +287,7 @@ def main():
            'section bank 0, $2FB0\ntxt_tab:    dw $%04X, $%04X, $%04X, $%04X, $%04X\n' % (
                L['t8000'], L['t8200'], L['t8400'], L['t8600'], L['names8800']) +
            open(os.path.join(ROOT, 'tools', 'gb', 'rt', 'hw.s')).read())
-    for f in ('event.s', 'npc.s', 'dlg.s', 'bridge.s', 'world.s', 'field.s'):
+    for f in ('event.s', 'npc.s', 'dlg.s', 'bridge.s', 'world.s', 'sa.s', 'field.s'):
         src += '\n' + open(os.path.join(HERE, 'eng', f)).read()
     for f in KEPT:                               # FF3's battle rules / screen and sound driver (kept)
         t = open(os.path.join(HERE, 'src', f)).read()

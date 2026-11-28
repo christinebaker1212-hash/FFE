@@ -188,7 +188,7 @@ ev_tab:     dw ev_nop, ev_nop, ev_nop, ev_nop               ; $D0-$D3 shake, fla
             dw ev_e0, ev_e0, ev_nop, ev_nop                 ; $E0-$E3
             dw ev_nop, ev_nop, ev_nop, ev_e7                ; $E4-$E7
             dw ev_e8, ev_e9, ev_ea, ev_eb                   ; $E8-$EB
-            dw ev_nop, ev_nop, ev_nop, ev_nop               ; $EC-$EF
+            dw ev_nop, ev_nop, ev_nop, ev_ef                ; $EC-$EF
             dw ev_f0, ev_f1, ev_f2, ev_f3                   ; $F0-$F3
             dw ev_f4, ev_f5, ev_f6, ev_f7                   ; $F4-$F7
             dw ev_f8, ev_f9, ev_fa, ev_fb                   ; $F8-$FB
