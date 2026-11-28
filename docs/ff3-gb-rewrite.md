@@ -1,5 +1,8 @@
 # FF3 GB: the native port
 
+**Superseded (owner, 2026-11-28): the FF3 base is the native engine from `claude/vibrant-davinci-lc8boi`,
+now `tools/gb3n/`; status in `docs/ff3-native.md`.** Kept for its history.
+
 Owner's decision (2026-11-28, binding; see `CLAUDE.md`): FF3 is a **native port, as FF1 was**. We take
 FF3 on the NES, use the everything8215/ff3 disassembly (`build/ref/ff3/ff3j.asm`, never committed) to
 learn what each part of the game does, and write our own Game Boy Color engine that does it. **No

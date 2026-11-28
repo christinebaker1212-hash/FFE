@@ -1,666 +1,969 @@
-; FF3's events on normal maps: talking to people ($3F $EA26, $E9BB), the conditional scripts
-; ($3C $92F3 / $9319: switch tests, then $FF and an event id; a person's dialogue list after the
-; last block), and the event runner ($3E $D219: one command a frame; $3B $A12B commands).
-; Scripts are in B_SCRIPT (NES banks $2C/$2D as one bank: NES $8000-$BFFF -> $4000-$7FFF).
+; ---- events: talking to people (fix:EA26 / E494 / E9BB), their scripts (2C/8200, 2C/8400: a
+; conditional list on event switches, then the dialogue ids -> $0740; 3C/92F3 / 9319) and the event
+; scripts (2C/8600: one command a frame while the party stands still, fix:D219, 3B/A12B).
+; Banks 2C / 2D are copied whole into EVT_BANK at build time (CPU $8000-$BFFF -> GB $4000-$7FFF).
+; (EV_DLG, EV_TRIG: main.s)
 
-SR_EVSW    = SRAM_PAGE + $20            ; event switches ($6020)
-SR_ITEMS   = SRAM_PAGE + $C0            ; inventory ids ($60C0) and counts ($60E0)
-SR_GIL     = SRAM_PAGE + $1C            ; (gil: 3 bytes at $601C)
-
-section bank B_FIELD, $6C00
-; ---- A pressed while standing: a person ahead? run their script
-talk:       call dest_cell
-            call npc_find                   ; HL = their slot (3F/E494)
-            jp nc, treasure
-            ld a, [hl]                      ; the person's id
-            ld [ev_who], a
+section bank 0, $3000
+; A pressed with the party standing: a person in front (fix:E494) -> its script
+talk:       ld a, [px]                      ; the facing tile (fix:E4E9)
+            ld e, a
+            ld a, [py]
+            ld d, a
+            ld a, [facing]
+            rrca
+            jr nc, .f1
+            inc e                           ; right
+            jr .f
+.f1:        rrca
+            jr nc, .f2
+            dec e                           ; left
+            jr .f
+.f2:        rrca
+            jr nc, .f3
+            inc d                           ; down
+            jr .f
+.f3:        dec d                           ; up
+.f:         ld a, e
+            and $3F
+            ld e, a
+            ld a, d
+            and $3F
+            ld d, a
+            ld l, 0                         ; fix:E494
+.l:         ld h, high(N_OB2)
+            ld a, l
+            add a, 6
             ld c, a
-            ld b, 0
-            ld hl, $4200                    ; trigger scripts: NES 2C/8200 (world 0) / 2C/8400
-            ld a, [world]
+            ld b, h
+            ld a, [bc]                      ; npc z: 0 / 3 always, else as the party's
+            and a
+            jr z, .z
+            cp 3
+            jr z, .z
+            ld b, a
+            ld a, [zlev]
+            and a
+            jr z, .z
+            cp b
+            jr nz, .n
+.z:         ld h, high(N_OBJ)
+            ld a, [hl]
+            and a
+            jr z, .n
+            push hl
+            ld a, l                         ; x + (subtile >= 8), y likewise
+            add a, 4
+            ld c, a
+            ld b, h
+            ld a, l
+            add a, 6
+            ld l, a
+            ld a, [hl]
+            cp 8
+            ccf
+            ld a, [bc]
+            adc a, 0
+            and $3F
+            cp e
+            jr nz, .n0
+            inc l
+            inc c
+            ld a, [hl]
+            cp 8
+            ccf
+            ld a, [bc]
+            adc a, 0
+            and $3F
+            cp d
+            jr nz, .n0
+            pop hl
+            ld a, [tk_b]                    ; (B: someone there, fix:EAD0)
+            and a
+            ret nz
+            inc l                           ; type & $30 = 0: it turns to the party
+            ld a, [hl]
+            dec l
+            and $30
+            jr nz, .found
+            ld a, l
+            add a, $0D
+            ld c, a
+            ld b, h
+            ld a, [bc]
+            or $80
+            ld [bc], a
+            jr .found
+.n0:        pop hl
+.n:         ld a, l
+            add a, 16
+            ld l, a
+            cp $C0
+            jr c, .l
+            ld a, [tk_b]                    ; (B, no one: the guest, fix:EA56)
+            and a
+            jp nz, g_talk
+            jp treasure                     ; (no one: treasures, locked doors: fix:E917)
+.found:     ld a, [hl]                      ; the npc's script: 2C/8200 (world 0) / 2C/8400
+            ld [ev_npc], a
+            ld c, a
+            ld b, $42                       ; (GB: $4200 / $4400 + 2 id)
+            ld a, [cur_world]
             and a
             jr z, .w0
-            ld hl, $4400
-.w0:        add hl, bc
-            add hl, bc
-            call scr_ptr
-            ld de, scr_buf                  ; 64 bytes of it
-            ld bc, 64
-            ld a, B_SCRIPT
-            call far_copy
-            ld a, [ev_who]                  ; inns, shops, the Fat Chocobo (3F/E9D3)
+            ld b, $44
+.w0:        ld l, c
+            ld h, 0
+            add hl, hl
+            ld a, h
+            add a, b
+            ld h, a
+            ld a, EVT_BANK
+            ld [MBC5_BANKL], a
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            call ev_trig                    ; -> EV_TRIG
+            ld a, [ev_npc]                  ; (fix:E9D3: $E0- inns, shops, the fat chocobo)
             cp $E0
-            jp nc, shop_talk
-            ld hl, scr_buf                  ; the dialogue list: after the first unconditional
-.f:         ld a, [hl]                      ;   block ($FF, event)
+            jr nc, shop_npc
+            ld hl, EV_TRIG                  ; 3C/92F3: past the conditionals (blocks end with
+            ld c, 0                         ;   $FF id; the list with a block starting $FF)
+.cl:        ld a, [hl]
             cp $FF
-            jr z, .fd
-.fs:        inc hl
+            jr z, .cd
+.cs:        inc l
             ld a, [hl]
             cp $FF
-            jr nz, .fs
-            inc hl
-            inc hl
-            jr .f
-.fd:        inc hl
-            inc hl
-            ld de, dlg_list
-            ld bc, 32
-            call memcpy
-            call scr_event                  ; A = the event chosen by the switch tests
+            jr nz, .cs
+            inc l
+            inc l
+            jr .cl
+.cd:        inc l
+            inc l
+            ld de, EV_DLG                   ; 32 bytes of dialogue ids -> $0740
+            ld b, 32
+.cp:        ld a, [hl+]
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .cp
+            call ev_check                   ; -> event id
+            and a
+            ret z
             jp ev_start
 
-; ---- B on a normal map (3F/EA9C): a person ahead (or a locked door, as person $DF): an item
-; shown to them (3C/8DE3; scripts 2C/8800 by key item $98-$AF, + $30 off world 0); nobody: the
-; guest's script (2C/8860 by guest), the party turned to the guest
-map_bbtn:   call dest_cell
-            call npc_find
-            jr c, .npc
-            call dest_cell                  ; (a locked door ahead: person $DF)
-            call map_mt
+; fix:E9E8: an inn ($E0-$E2), a shop ($E3-$FB) or the fat chocobo ($FC-), in bank CODE1
+; (shop.s); after an inn its event (FF3 $7B01 -> $6C)
+shop_npc:   ld hl, choc_open                ; ($FC-: the fat chocobo, 3D/B383)
+            cp $FC
+            jr nc, .f
+            ld hl, shop_open
+            cp $E3
+            jr nc, .f
+            ld hl, inn_open
+.f:         ld a, CODE1
+            call far_call
+            ld a, [sh_ev]
+            and a
+            ret z
+            jp ev_start
+
+; fix:E917: the tile in front (E, D) is a locked door ($90-$9F) or a treasure ($D0-$DF chests,
+; $E0-$EF hidden ones, only while their switch is on) -> fix:E982 / F549, a message
+treasure:   push de
+            call map_at
+            pop de
+            ld [tr_t], a
             ld l, a
-            ld h, W_PROP1
+            ld h, high(M_P1)
             bit 7, [hl]
-            jr z, .guest
+            ret z
             inc h
             ld a, [hl]
-            swap a
-            and 15
-            cp 6
-            jr nz, .guest
-            ld a, $DF
-            jr .sel
-.npc:       ld a, [hl]
-.sel:       ld [ev_who], a
-            %FAR B_MENU, m_ipick
-            ld a, [m_pick]
-            ld [ev_pitem], a
-            call map_reload
-            ld a, [ev_pitem]
-            sub $98
-            ret c
-            cp $AF - $98 + 1
-            ret nc
-            add a
-            ld c, a
-            ld a, [world]
-            and a
-            ld a, c
-            jr z, .w0
-            add $30
-.w0:        ld c, a
-            ld b, 0
-            ld hl, $4800
-            add hl, bc
-            call scr_ptr
-            ld de, scr_buf
-            ld bc, 64
-            ld a, B_SCRIPT
-            call far_copy
-            ld a, [ev_who]                  ; (the script's first byte: its person)
-            ld hl, scr_buf
-            cp [hl]
-            ret nz
-            inc hl
-            call scr_ev_hl
-            jp ev_start
-.guest:     ld a, [ev_hide]                 ; (3F/EA56)
-            bit 6, a
-            ret nz
-            ld a, [SRAM_PAGE + $0B]
-            and a
-            ret z
-            ld hl, gu_wait
-            inc [hl]
-            dec a
-            add a
-            ld c, a
-            ld b, 0
-            ld hl, $4860
-            add hl, bc
-            call scr_ptr
-            ld de, scr_buf
-            ld bc, 64
-            ld a, B_SCRIPT
-            call far_copy
-            call scr_event
-            push af
-            ld a, [gu_stack]                ; (facing the guest: 3F/EA8C)
             and $0F
-            ld e, a
-            ld d, 0
-            ld hl, .face
-            add hl, de
-            ld a, [hl]
-            ld [facing], a
-            pop af
-            jp ev_start
-.face:      db DIR_U, DIR_L, DIR_R, 0, DIR_U, DIR_L, DIR_R, 0, DIR_D, DIR_L, DIR_R, 0, 0, 0, 0, 0
-; the map again with its people (after a full-screen window)
-map_reload: ld a, [z_lev]
-            push af
-            ld a, [pos_x]
-            ld [enter_x], a
-            ld a, [pos_y]
-            ld [enter_y], a
-            call keep_people
-            call map_change
-            pop af
-            ld [z_lev], a
-            ret
-
-; ---- A on a treasure or a locked door ($3F $E917): D, E = the cell ahead
-treasure:   ld a, d
-            ld [tr_x], a
-            ld a, e
-            ld [tr_y], a
-            push de
-            call map_mt
-            pop de
-            ld c, a
-            ld b, W_PROP1
-            ld a, [bc]
-            bit 7, a
-            ret z
-            ld a, c
+            ld [tr_n2], a
+            ld a, [tr_t]
             cp $90
             ret c
             cp $A0
-            jr c, .lock
+            jr c, .locked
             cp $D0
             ret c
             cp $F0
             ret nc
-            ld [tr_tile], a                 ; $D0-$DF a chest, $E0-$EF another treasure
-            inc b
-            ld a, [bc]
-            and 15
-            ld l, a
-            ld h, 0
-            push de
-            ld de, treas
-            add hl, de
-            pop de
-            ld a, [hl]
-            ld [tr_id], a
-            call tr_switch                  ; Z when taken (not for chests: their tile tells)
-            ld a, [tr_tile]
+            ld a, e
+            ld [tr_x], a
+            ld a, d
+            ld [tr_y], a
+            ld a, [tr_t]
             cp $E0
             jr c, .give
+            ld a, [tr_n2]                   ; (hidden: only if still there)
+            call tr_open
+            ret nz
+.give:      ld a, [tr_n2]                   ; the treasure id -> its contents (01/9C00 / 9D00)
+            add a, low(M_TT)
+            ld l, a
+            ld h, high(M_TT)
             ld a, [hl]
-            and c
-            ret z
-.give:      ld a, [tr_tile]                 ; a chest on a gil map: the item's price in gil
+            ld [tr_id2], a
+            ld l, a
+            ld h, $40
+            ld a, [cur_world]
+            and a
+            jr z, .c0
+            inc h
+.c0:        ld a, GAME_BANK
+            ld [MBC5_BANKL], a
+            ld a, [hl]
+            ld [t_item], a
+            ld a, [tr_t]                    ; a chest on a map whose chests hold gil
             cp $E0
             jr nc, .item
-            ld a, [map_props + 1]
+            ld a, [M_ENT + 10]
             and $20
             jr z, .item
-            call tr_contents
-            ld l, a                         ; price: NES 10/9E00 (B_EVENTS $5E00) + 2 * item
-            ld h, 0
-            add hl, hl
-            ld bc, $5E00
-            add hl, bc
-            push de
-            ld de, dlg_num
-            ld bc, 2
-            ld a, B_EVENTS
-            call far_copy
-            pop de
-            xor a
-            ld [dlg_num + 2], a
-            ld hl, SR_GIL                   ; gil += price, at most 9999999 ($98967F)
-            ld a, [dlg_num]
-            add [hl]
-            ld [hl+], a
-            ld a, [dlg_num + 1]
-            adc [hl]
-            ld [hl+], a
-            ld a, 0
-            adc [hl]
-            ld [hl], a
-            call gil_cap
-            call tr_take
-            call tr_open
-            ld c, $01                       ; "From inside the treasure chest, you got N Gil!"
-            ld b, TB_SYSTEM
-            jp dlg_open
-.item:      call tr_contents
-            ld [dlg_item], a
-            ld b, 1                         ; arrows ($4F-$56) come 20 at a time
+            ld a, [t_item]                  ; gil: the item's price (fix:F5B2)
+            call item_price
+            call gil_add
+            call .toggle
+            ld a, $01
+            jr .msg
+.item:      ld a, [t_item]                  ; an item: 1 (arrows $4F-$56: 20)
+            ld [ev_par], a
+            ld b, 1
             cp $4F
             jr c, .q
             cp $57
             jr nc, .q
             ld b, 20
-.q:         ld c, a
-            call inv_add
-            jr nc, .ok
-            ld c, $50                       ; "Your inventory is full."
-            ld b, TB_SYSTEM
-            jp dlg_open
-.ok:        call tr_take
-            ld a, [tr_tile]
-            cp $E0
-            ld c, $76                       ; not a chest: "In a place like this, ...!"
-            jr nc, .msg
-            call tr_open
-            ld c, $59                       ; "Inside the treasure chest there was ...!"
-            ld a, [tr_id]
-            cp $E0
-            jr c, .msg
-            ld [bs_id], a                   ; (3F/F5A1: a monster inside: battle tr_id once the
-            xor a                           ;   message closes, $AB = $20)
-            ld [bs_id + 1], a
-            ld a, TR_BATTLE
-            ld [trig], a
-            ld c, $02
-.msg:       ld b, TB_SYSTEM
-            jp dlg_open
-.lock:      ld a, [SRAM_PAGE + $0E]         ; a locked door: the walking member a Thief (job 8)?
-            add low(SRAM_PAGE + $100)
+.q:         ld a, b
+            ld [tr_q], a
+            call ev_find                    ; (3C/937E)
+            ld a, $50                       ; "Can't carry anymore." (no change)
+            jr c, .show
+            ld a, [t_item]
+            ld [hl], a
+            ld a, l
+            add a, $20
             ld l, a
-            ld h, high(SRAM_PAGE + $100)
+            ld a, [tr_q]
+            add a, [hl]
+            cp 99
+            jr c, .q99
+            ld a, 99
+.q99:       ld [hl], a
+            call .toggle
+            ld a, [tr_t]
+            cp $E0
+            ld a, $76                       ; (not a chest)
+            jr nc, .show
+            ld a, [tr_id2]
+            cp $E0
+            ld a, $59                       ; "Found ...!"
+            jr c, .msg
+            ld a, [tr_id2]                  ; (FF3 F5A1: the treasure id is the battle, after
+            ld [act_id], a                  ;   "Found ...! A monster appeared!")
+            ld a, $20
+            ld [act], a
+            ld a, $02
+.msg:       push af                         ; a chest: opened ($7D) and redrawn
+            ld a, [tr_x]
+            ld e, a
+            ld a, [tr_y]
+            ld d, a
+            push de
+            call map_at
+            ld [hl], $7D
+            pop de
+            call q_mt
+            pop af
+.show:      ld c, a
+            ld a, 1
+            jp dlg_show
+.toggle:    ld a, [tr_id2]
+            call tr_sw
+            ld a, [hl]
+            xor b
+            ld [hl], a
+            ret
+.locked:    ld a, [GS + $0E]                ; the showing character a Thief (job 8): unlocked
+            ld l, a
+            ld h, high(GS + $100)
             ld a, [hl]
             cp 8
-            ld c, $03                       ; "The door is locked!"
-            jr nz, .lm
-            ld a, [SRAM_PAGE + $21]
-            or $40
-            ld [SRAM_PAGE + $21], a
-            ld c, $7A                       ; "With the Thief's special ability, the lock opened..."
-.lm:        ld b, TB_SYSTEM
-            jp dlg_open
+            ld a, $03                       ; "Locked."
+            jr nz, .show
+            ld hl, GS + $21
+            set 6, [hl]
+            ld a, $7A
+            jr .show
 
-; HL = the treasure switch byte, C = its mask, for treasure tr_id ($6040: id / 8 (+ 32 off
-; world 0), bit id & 7); Z set when the switch is clear (taken)
-tr_switch:  ld a, [tr_id]
-            ld hl, SR_TREAS
-            ld b, a
-            ld a, [world]
-            and a
-            jr z, .w
-            ld hl, SR_TREAS + 32
-.w:         ld a, b
-            call sw_bit
+; CDE added to the party's gil (fix:F5FF: capped when the high byte reaches $98)
+gil_add:    ld hl, GS + $1C
             ld a, [hl]
-            and c
-            ret
-tr_take:    push de
-            call tr_switch                  ; (the switch cleared: taken)
-            ld a, c
-            cpl
-            and [hl]
+            add a, e
+            ld [hl+], a
+            ld a, [hl]
+            adc a, d
+            ld [hl+], a
+            ld a, [hl]
+            adc a, c
             ld [hl], a
-            pop de
+            cp $98
+            ret c
+            ld [hl], $98
+            dec hl
+            ld [hl], $96
+            dec hl
+            ld [hl], $7F
             ret
-; A = the contents of treasure tr_id (01/9C00 world 0, 01/9D00 others: B_NPCS $6A00 / $6B00)
-tr_contents:
-            ld a, [tr_id]
+
+; a trigger tile of type F stepped on (fix:E6BE): its event (2C/8880 + 2 trigger id)
+trig_ev:    add a, low(M_TT + 16)
             ld l, a
-            ld h, $6A
-            ld a, [world]
-            and a
-            jr z, .w
-            inc h
-.w:         ld a, B_NPCS
-            jp far_byte
-; the chest at (tr_x, tr_y) shown open: metatile $7D in the map and on screen
-tr_open:    ld a, [tr_x]
-            ld d, a
-            ld a, [tr_y]
-            ld e, a
-            and 31
+            ld h, high(M_TT + 16)
+            ld a, [hl]
             ld l, a
             ld h, 0
             add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            add hl, hl
-            ld a, d
-            and 31
-            add l
-            ld l, a
-            ld a, h
-            adc high(W_MAP)
-            ld h, a
-            ld a, $7D
-            ld [hl], a
-            ld hl, line_buf
-            call cell_buf
-            ld a, 1
-            ld [line_n], a
-            ret
-gil_cap:    ld hl, SR_GIL + 2               ; at most 9999999 ($98967F)
-            ld a, [hl]
-            cp $98
-            ret c
-            jr nz, .cap
-            dec hl
-            ld a, [hl]
-            cp $96
-            ret c
-            jr nz, .cap2
-            dec hl
-            ld a, [hl]
-            cp $80
-            ret c
-            jr .cap3
-.cap:       dec hl
-.cap2:      dec hl
-.cap3:      ld hl, SR_GIL
-            ld a, $7F
-            ld [hl+], a
-            ld a, $96
-            ld [hl+], a
-            ld a, $98
-            ld [hl], a
-            ret
-; add B of item C to the inventory ($3C $9362: the item's slot or the first empty one, at most
-; 99); carry set when full
-inv_add:    ld hl, SR_ITEMS
-            ld e, 32
-.f:         ld a, [hl]
-            cp c
-            jr z, .add
-            inc l
-            dec e
-            jr nz, .f
-            ld hl, SR_ITEMS
-            ld e, 32
-.e:         ld a, [hl]
-            and a
-            jr z, .new
-            inc l
-            dec e
-            jr nz, .e
-            scf
-            ret
-.new:       ld [hl], c
-.add:       ld a, l
-            add 32
-            ld l, a
-            ld a, [hl]
-            add b
-            cp 99
-            jr c, .s
-            ld a, 99
-.s:         ld [hl], a
-            and a
-            ret
-
-; the map's event trigger A (index into its trigger list) -> its script ($3F $E6BE / $E6C6:
-; 2C/8880 pointers, the vehicle / status switches first) -> the event
-trig_event: ld e, a
-            ld d, 0
-            ld hl, trigs
+            ld de, $4880
             add hl, de
-            ld a, [hl]
-trig_script:                                ; (trigger script A: world map triggers use it)
-            ld c, a
-            ld b, 0
-            ld hl, $4880
-            add hl, bc
-            add hl, bc
-            call scr_ptr
-            ld de, scr_buf
-            ld bc, 64
-            ld a, B_SCRIPT
-            call far_copy
+            ld a, EVT_BANK
+            ld [MBC5_BANKL], a
+            ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            call ev_trig
             call ev_vsw
-            call scr_event
+            call ev_check
+            and a
+            ret z
             jp ev_start
 
-; FF3's vehicle / status switches before a trigger script ($3C $9274): $602E bits 6 / 7 all
-; members toad / mini, $6021 bit 7 the chocobo, $602F bits 2-5 the vehicles (on foot: none)
-ev_vsw:     ld a, [SRAM_PAGE + $102]
+; 3C/9274: the toad / mini event switches from the party, the vehicle flags cleared
+ev_vsw:     ld a, [GS + $102]
             ld b, a
-            ld a, [SRAM_PAGE + $142]
+            ld a, [GS + $142]
             and b
             ld b, a
-            ld a, [SRAM_PAGE + $182]
+            ld a, [GS + $182]
             and b
             ld b, a
-            ld a, [SRAM_PAGE + $1C2]
+            ld a, [GS + $1C2]
             and b
             ld b, a
             and $20
-            add a
+            add a, a
             ld c, a
             ld a, b
             and $08
             swap a
-            add a
             or c
             ld c, a
-            ld a, [SRAM_PAGE + $2E]
+            ld a, [GS + $2E]
             and $3F
             or c
-            ld [SRAM_PAGE + $2E], a
-            ld a, [SRAM_PAGE + $21]
-            and $7F
-            ld [SRAM_PAGE + $21], a
-            ld a, [SRAM_PAGE + $2F]
+            ld [GS + $2E], a
+            ld hl, GS + $21
+            res 7, [hl]
+            ld a, [GS + $2F]
             and $C3
-            ld [SRAM_PAGE + $2F], a
+            ld [GS + $2F], a
             ret
 
-; the NES pointer at HL in B_SCRIPT -> HL = its address in B_SCRIPT
-scr_ptr:    ld de, ev_tmp
-            ld bc, 2
-            ld a, B_SCRIPT
-            call far_copy
-            ld a, [ev_tmp]
-            ld l, a
-            ld a, [ev_tmp + 1]
+; HL = CPU address of a trigger script -> 64 bytes to EV_TRIG (fix:EA1B)
+ev_trig:    ld a, h
+            sub $40
             ld h, a
-scr_addr:   ld a, h
-            and $3F
-            or $40
-            ld h, a
-            ret
+            ld de, EV_TRIG
+            ld bc, 64
+            ld a, EVT_BANK
+            ld [MBC5_BANKL], a
+            jp memcpy
 
-; the conditional script in scr_buf: the first block whose switch tests all pass -> its event
-scr_event:  ld hl, scr_buf
-scr_ev_hl:
-.b:         ld a, [hl+]
+; 3C/9319: the first block whose switches hold: A = its event id
+ev_check:   ld hl, EV_TRIG
+.b:         ld a, [hl]
             cp $FF
-            jr z, .ev
+            jr nz, .c
+            inc l
+            ld a, [hl]
+            ret
+.c:         ld [ev_tmp], a                  ; a switch: bit 7 = must be on, else off
+            inc l
+            push hl
+            call ev_sw
+            pop hl
             ld b, a
-            call ev_switch
-            ld a, 0
-            jr z, .z
-            inc a                           ; A = 1: the switch is on
-.z:         bit 7, b
+            ld a, [ev_tmp]
+            bit 7, a
+            ld a, b
             jr z, .off
-            and a                           ; msb set: needs the switch on
+            and a
             jr nz, .b
             jr .skip
-.off:       and a                           ; msb clear: needs it off
+.off:       and a
             jr z, .b
-.skip:      ld a, [hl+]
+.skip:      ld a, [hl+]                     ; (the block fails: past its $FF and id)
             cp $FF
             jr nz, .skip
-            inc hl
+            inc l
             jr .b
-.ev:        ld a, [hl]
-            ret
 
-; Z clear when event switch B & $7F is on (SR_EVSW bit field)
-ev_switch:  push hl
-            ld a, b
-            and 7
+; A = switch (bit 7 ignored) -> A = its bit in the event switches ($6020)
+ev_sw:      and $7F
             ld c, a
+            and 7
+            ld b, a
             ld a, 1
-            inc c
-.m:         dec c
-            jr z, .g
-            add a
+            inc b
+.m:         dec b
+            jr z, .m1
+            add a, a
             jr .m
-.g:         ld c, a
-            ld a, b
-            and $7F
+.m1:        ld b, a
+            ld a, c
             srl a
             srl a
             srl a
-            add low(SR_EVSW)
+            add a, low(GS + $20)
             ld l, a
-            ld h, high(SR_EVSW)
+            ld h, high(GS + $20)
             ld a, [hl]
-            and c
-            pop hl
+            and b
             ret
 
-; event switch (A) on / off; npc switch on / off (as $3B $B983 / $B999 / $B9B1 / $B9E1)
-sw_bit:     ld b, a                         ; HL = byte, C = mask for bit A of the field at HL
-            and 7
-            ld c, a
-            ld a, 1
-            inc c
-.m:         dec c
-            jr z, .g
-            add a
-            jr .m
-.g:         ld c, a
-            ld a, b
-            srl a
-            srl a
-            srl a
-            add l
-            ld l, a
-            ret nc
-            inc h
-            ret
-
-; ---- start event A (2C/8600 pointers)
-ev_start:   and a
-            ret z
-            ld c, a
-            ld b, 0
-            ld hl, $4600
-            add hl, bc
-            add hl, bc
-            call scr_ptr
-            ld a, l
-            ld [ev_ptr], a
+; A = event id -> the script (2C/8600 + 2 id) runs from the next frame (fix:C72C)
+ev_start:   ld l, a
+            ld h, 0
+            add hl, hl
             ld a, h
+            add a, $46
+            ld h, a
+            ld a, EVT_BANK
+            ld [MBC5_BANKL], a
+            ld a, [hl+]
+            ld [ev_ptr], a
+            ld a, [hl]
             ld [ev_ptr + 1], a
+            ld a, 1
+            ld [ev_on], a
             xor a
             ld [ev_rep], a
-            ld [ev_wcnt], a
-            inc a
-            ld [ev_on], a
+            ld [ev_w75], a
             ret
 
-; ---- one event command (a frame; not while the dialogue box is open)
-ev_step:    ld a, [ev_rep]                  ; a repeated command again
+; one command (fix:D219): $FE n repeats the next command n times; $E4-$FC take a parameter
+ev_step:    ld a, [ev_rep]
             and a
-            jr z, .rd
+            jr z, .fetch
             dec a
             ld [ev_rep], a
-            jp ev_exec
-.rd:        ld a, [ev_ptr]                  ; (the next 2 bytes from B_SCRIPT)
+            jr .exec
+.fetch:     ld a, EVT_BANK
+            ld [MBC5_BANKL], a
+            ld a, [ev_ptr]
             ld l, a
             ld a, [ev_ptr + 1]
+            sub $40
             ld h, a
-            push hl
-            ld de, ev_tmp
-            ld bc, 2
-            ld a, B_SCRIPT
-            call far_copy
-            pop hl
-            inc hl
-            ld a, [ev_tmp]
-            cp $FE                          ; repeat: the command before (count - 1) more times
+            ld a, [hl+]
+            ld b, a
+            ld a, [hl]
+            ld c, a
+            ld a, b
+            cp $FE
             jr nz, .one
-            inc hl
-            ld a, [ev_tmp + 1]
+            ld a, c                         ; $FE n
             dec a
             ld [ev_rep], a
-            jr .sv
+            ld a, 2
+            jr .adv
 .one:       ld [ev_cmd], a
-            ld b, a
-            ld a, [ev_tmp + 1]
-            ld [ev_arg], a
+            ld a, c
+            ld [ev_par], a
             ld a, b
-            cp $E4                          ; $E4-$FC take an argument
-            jr c, .sv
-            cp $FD
-            jr nc, .sv
-            inc hl
-.sv:        ld a, l
-            ld [ev_ptr], a
-            ld a, h
-            ld [ev_ptr + 1], a
-            ld a, [ev_cmd]
-            cp $FE
-            ret z
-
-ev_exec:    ld a, [ev_cmd]
-            cp $C0
-            jp c, ev_npc
-            cp $D0
-            jp c, ev_player
             cp $E4
-            jr nc, .e4
-            sub $D0                         ; $D0-$E3 (3B/B567, no argument)
-            add a
-            ld e, a
-            ld d, 0
-            ld hl, evd_table
+            ld a, 1
+            jr c, .adv1
+            ld a, b
+            cp $FD
+            ld a, 1
+            jr nc, .adv1
+            inc a
+.adv1:      call .add
+            jr .exec
+.adv:
+.add:       ld hl, ev_ptr
+            add a, [hl]
+            ld [hl+], a
+            ret nc
+            inc [hl]
+            ret
+.exec:      ld a, [ev_cmd]
+            cp $C0
+            jp c, ev_npc_cmd
+            cp $D0
+            jp c, ev_pl_cmd
+            cp $E4
+            jp c, ev_misc
+            sub $E4                         ; $E4-$FF: the table
+            add a, a
+            ld l, a
+            ld h, 0
+            ld de, ev_tab
             add hl, de
             ld a, [hl+]
             ld h, [hl]
             ld l, a
             jp hl
-.e4:        sub $E4
-            add a
-            ld e, a
-            ld d, 0
-            ld hl, evc_table
-            add hl, de
-            ld a, [hl+]
-            ld h, [hl]
-            ld l, a
-            ld a, [ev_arg]
-            jp hl
-
-evd_table:  dw ev_shake, ev_flash, ev_dark, ev_undark    ; D0-D3 (src/evfx.s)
-            dw ev_hpall, ev_mpall, ev_pfloor, ev_pwall   ; D4-D7
-            dw ev_reset, ev_chain, ev_dance, ev_prol     ; D8-DB
-            dw ev_epi, ev_ending, ev_surf, ev_hp1        ; DC-DF
-            dw ev_repal, ev_repal, ev_flash2, ev_none    ; E0-E3
-evc_table:  dw ev_none, ev_none, ev_none, ev_take        ; E4-E7
-            dw ev_stclr, ev_stset, ev_gil, ev_ungil      ; E8-EB
-            dw ev_cp, ev_uncp, ev_guest, ev_sanim        ; EC-EF
-            dw ev_npcdlg, ev_evdlg, ev_seton, ev_setoff  ; F0-F3
-            dw ev_npcon, ev_npcoff, ev_give, ev_battle   ; F4-F7
-            dw ev_sound, ev_exit, ev_enter, ev_enterm    ; F8-FB
-            dw ev_wait, ev_prev, ev_none, ev_end         ; FC-FF
+ev_tab:     dw ev_none, ev_none, ev_none, ev_take    ; E4-E7
+            dw ev_stclr, ev_stset, ev_gil, ev_tgil   ; E8-EB
+            dw ev_gcp, ev_tcp, ev_guest, ev_spec     ; EC-EF
+            dw ev_ndlg, ev_edlg, ev_esw1, ev_esw0    ; F0-F3
+            dw ev_nsw1, ev_nsw0, ev_give, ev_btl     ; F4-F7
+            dw ev_f8, ev_xexit, ev_xent, ev_xmap     ; F8-FB
+            dw ev_wait, ev_exit, ev_none, ev_end     ; FC-FF
 ev_none:    ret
-; $EF: a special animation (src/sa.s)
-ev_sanim:   %FAR B_WSPR, sa_run
+; $EB take gil (3B/B80D: the parameter from the middle byte; too little: dialogue 2)
+ev_tgil:    ld a, [GS + $1E]
+            and a
+            jr nz, .t
+            ld a, [ev_par]
+            ld b, a
+            ld a, [GS + $1D]
+            cp b
+            jr nc, .t
+            call ev_end
+            ld a, 0
+            ld c, 2
+            jp dlg_show
+.t:         ld a, [ev_par]
+            ld b, a
+            ld a, [GS + $1D]
+            sub b
+            ld [GS + $1D], a
+            ld a, [GS + $1E]
+            sbc 0
+            ld [GS + $1E], a
+            ret nc
+            xor a
+            ld [GS + $1C], a
+            ld [GS + $1D], a
+            ld [GS + $1E], a
+            ret
+; $EC / $ED give / take capacity (255 at most; too little: dialogue 3)
+ev_gcp:     ld a, [ev_par]
+            ld b, a
+            ld a, [GS + $1B]
+            add a, b
+            jr nc, .s
+            ld a, $FF
+.s:         ld [GS + $1B], a
+            ret
+ev_tcp:     ld a, [ev_par]
+            ld b, a
+            ld a, [GS + $1B]
+            sub b
+            jr nc, ev_gcp.s
+            call ev_end
+            ld a, 0
+            ld c, 3
+            jp dlg_show
+; $EE set guest npc ($600B; its sprite: later)
+ev_spec:    ld a, CODE5                     ; $EF special animation (fx.s)
+            ld hl, fx_special
+            jp far_call
+; 3B/A9BA / 3A/901F metatile C <- metatile B (its four tiles, palette, properties)
+mt_copy:    ld h, high(M_TL)
+            ld d, h
+            ld l, b
+            ld e, c
+            ld b, 7
+.c:         ld a, [hl]
+            ld [de], a
+            inc h
+            inc d
+            dec b
+            jr nz, .c
+            ret
+; 3A/8FD8 world 3 loaded: the statues destroyed ($602E bits 1-4: metatiles $40-$43 <- 0) and
+; Saronia's gate ($602E bit 5: $4A <- 3)
+w3_fix:     ld a, [cur_world]
+            cp 3
+            ret nz
+            ld a, [GS + $2E]
+            ld [ev_tmp], a
+            ld bc, $0040
+.s:         ld a, [ev_tmp]
+            srl a
+            ld [ev_tmp], a
+            bit 0, a
+            jr z, .n
+            push bc
+            call mt_copy
+            pop bc
+.n:         inc c
+            ld a, c
+            cp $44
+            jr nz, .s
+            ld a, [GS + $2E]
+            bit 5, a
+            ret z
+            ld bc, $034A
+            jp mt_copy
+ev_guest:   ld a, [ev_par]                  ; $EE set the guest (3B/B6A5: init, its graphics)
+            ld [GS + $0B], a
+            and a
+            ret z
+            call g_init
+            jp g_gfx
+ev_btl:     ld a, [ev_par]                  ; $F7 battle (3B/B703: after the event)
+            ld [act_id], a
+            ld a, $20
+            ld [act], a
+            ret
+ev_f8:      ld a, [ev_par]                  ; $F8 song / sound effect (snd.s)
+            jp snd_f8
+
+; $00-$BF: object (cmd & $F0) commands; a moving object makes the command wait (3B/ACD1)
+ev_npc_cmd: ld a, [ev_cmd]
+            and $F0
+            ld l, a
+            ld h, high(N_OBJ)
+            push hl
+            ld a, l
+            add a, $0C
+            ld l, a
+            ld a, [hl]
+            pop hl
+            and a
+            jr z, .go
+            ld a, [ev_rep]
+            inc a
+            ld [ev_rep], a
+            ret
+.go:        ld a, [ev_cmd]
+            and $0F
+            cp 4
+            jr nc, .face
+            ld b, a                         ; 0-3 move right / left / down / up (L3B_AFDD)
+            ld a, 1
+            ld [n_ev], a
+            ld a, b
+            call npc_dir
+            xor a
+            ld [n_ev], a
+            ret
+.face:      cp 8
+            jr nc, .s8
+            and 3                           ; 4-7: face right / left / down / up
+            swap a
+            ld b, a
+            ld a, l
+            add a, $0E
+            ld l, a
+            ld [hl], b
+            ret
+.s8:        jr nz, .s9
+            ld a, l                         ; 8: show
+            add a, $0A
+            ld e, a
+            ld d, h
+            ld a, [de]
+            ld [hl], a
+            ret
+.s9:        cp 9
+            jr nz, .sc
+            ld [hl], 0                      ; 9: hide
+            ret
+.sc:        cp $0C
+            jr nz, .sd
+            inc l                           ; C: continuous animation on
+            set 6, [hl]
+            ret
+.sd:        cp $0D
+            jr z, .sd1
+            ld b, a                         ; A / B jumps, E circle, F spin (fx.s)
+            ld a, l
+            ld [fx_slot], a
+            ld a, b
+            ld hl, fx_jumpl
+            cp $0A
+            jr z, .fx
+            ld hl, fx_jumpr
+            cp $0B
+            jr z, .fx
+            ld hl, fx_circle
+            cp $0E
+            jr z, .fx
+            ld hl, fx_spin
+.fx:        ld a, CODE5
+            jp far_call
+.sd1:       inc l                           ; D: off (and $B0)
+            ld a, [hl]
+            and $B0
+            ld [hl], a
             ret
 
-; $DB / $DC: FF3's prologue / epilogue (src/cut.s), then the map again with its people
-ev_prol:    %FAR B_CUT, cut_pro
-            jr ev_cutx
-ev_epi:     %FAR B_CUT, cut_epi
-ev_cutx:    ld a, [pos_x]
-            ld [enter_x], a
-            ld a, [pos_y]
-            ld [enter_y], a
-            call keep_people
-            jp map_change
-; $DD: FF3's ending and end credits (src/cutend.s); it ends on The End (soft reset to leave)
-ev_ending:  %FAR B_CUT, cut_end
-            jr ev_ending
-; $D4 / $D5: everyone's HP / MP to max (3B/B881 / B862)
-ev_hpall:   ld hl, SRAM_PAGE + $10C
-.m:         ld a, l
-            add 2
+; $C0-$CF: the party (3B/A13B)
+ev_pl_cmd:  and $0F
+            cp 4
+            jr nc, .f
+            ld c, a                         ; C0-C3: a step right / left / down / up
+            ld b, 0
+            ld hl, .dirs
+            add hl, bc
+            ld a, [hl]
+            ld [ev_pad], a
+            ret
+.f:         cp 8
+            jr nc, .x
+            and 3                           ; C4-C7: face
+            ld c, a
+            ld b, 0
+            ld hl, .face
+            add hl, bc
+            ld a, [hl]
+            ld [facing], a
+            ret
+.x:         cp $0A                          ; CA: the Nautilus (6), CB: the Invincible (7)
+            jr z, .v6
+            cp $0B
+            jr z, .v7
+            cp $0F
+            jr z, .v1                       ; CF: the chocobo
+            cp $08                          ; C8 / C9 show / hide the party, CC / CD the guest
+            jr z, .sh7
+            cp $09
+            jr z, .hd7
+            cp $0C
+            jr z, .sh6
+            cp $0D
+            jr z, .hd6
+            cp $0E
+            ret nz
+            xor a                           ; CE: off the vehicle, the Invincible left here
+            ld [GS + $0F], a
+            ld a, [cur_world]
+            ld [GS + $07], a
+            ld a, [px]
+            ld [GS + $05], a
+            ld a, [py]
+            ld [GS + $06], a
+            ld a, 1
+            ld [GS + $04], a
+            ret
+.sh7:       ld hl, pl_hide
+            res 7, [hl]
+            ret
+.hd7:       ld hl, pl_hide
+            set 7, [hl]
+            ret
+.sh6:       ld hl, pl_hide
+            res 6, [hl]
+            ret
+.hd6:       ld hl, pl_hide
+            set 6, [hl]
+            ret
+.v1:        ld a, 1
+            jr .v
+.v6:        ld a, 6
+            jr .v
+.v7:        ld a, 7
+.v:         ld [GS + $0F], a
+            ret
+.dirs:      db $10, $20, $80, $40           ; (pad bits: right, left, down, up)
+.face:      db 1, 2, 4, 8
+
+; $D0-$E3 (3B/B555): restores and passage tiles now, the rest later
+ev_misc:    ld hl, .fx                      ; D0-D3, DA, E0-E2: the field effects (fx.s)
+            ld b, a
+.f:         ld a, [hl+]
+            and a
+            jr z, .nf
+            cp b
+            jr z, .go
+            inc hl
+            inc hl
+            jr .f
+.go:        ld a, [hl+]
+            ld h, [hl]
+            ld l, a
+            ld a, CODE5
+            jp far_call
+.fx:        db $D0
+            dw fx_shake
+            db $D1
+            dw fx_flashs
+            db $D2
+            dw fx_dark
+            db $D3
+            dw fx_light
+            db $DA
+            dw fx_dance
+            db $E0
+            dw fx_pal0
+            db $E1
+            dw fx_pal1
+            db $E2
+            dw fx_flash
+            db 0
+.nf:        ld a, b
+            cp $D4
+            jr z, ev_hp
+            cp $D5
+            jr z, ev_mp
+            cp $D6
+            ld b, $5B
+            jr z, ev_pass
+            cp $D7
+            ld b, $5C
+            jr z, ev_pass
+            cp $D8
+            jp z, start                     ; D8 reset the game
+            cp $D9
+            jr z, ev_chain
+            cp $DB                          ; DB / DC the prologue / epilogue: at the next input
+            jr z, ev_cut                    ;   check (fix:E2F8); DD the ending
+            cp $DC
+            jr z, ev_cut
+            cp $DD
+            jr z, ev_ending
+            cp $DE
+            jr z, ev_surf
+            cp $DF
+            jr z, ev_hp1
+            cp $E8
+            jr z, ev_stclr
+            cp $E9
+            jr z, ev_stset
+            ret
+; $D6 / $D7 open passage tile (3B/B8A6): the first $5B / $5C in the map becomes +2
+ev_pass:    ld hl, M_LAY
+            ld de, $0400
+.s:         ld a, [hl]
+            cp b
+            jr z, .f
+            inc hl
+            dec de
+            ld a, d
+            or e
+            jr nz, .s
+            ret
+.f:         add a, 2
+            ld [hl], a
+            ld a, l                         ; (x = offset & 31, y = offset / 32)
+            and $1F
+            ld e, a
+            ld a, h
+            sub high(M_LAY)
+            ld d, a
+            ld a, l
+            rlca
+            rlca
+            rlca
+            and 7
+            ld b, a
+            ld a, d
+            add a, a
+            add a, a
+            add a, a
+            or b
+            ld d, a
+            jp q_mt
+; $DB / $DC (3B/B5BA): FF3's $50 = $80 / $81, run by the field when it next checks the input
+ev_cut:     sub $DB - $80
+            ld [cut_req], a
+            ret
+; $DD the ending (1F/B5B6, then the end credits: it does not return)
+ev_ending:  ld a, CODE5
+            ld hl, cut_end
+            jp far_call
+; fix:E2F8 a cutscene pending: it runs, then the map is loaded again (fix:E7F8)
+cut_go:     ld b, a
+            xor a
+            ld [cut_req], a
+            ld hl, cut_pro
+            ld a, b
+            cp $80
+            jr z, .g
+            ld hl, cut_epi
+            cp $81
+            jr z, .g
+            ld hl, cut_end                  ; ($82: the ending, for tests)
+.g:         ld a, CODE5
+            call far_call
+            ld a, $FF                       ; (no map title)
+            ld [m_title], a
+            ld [m_title2], a
+            jp load_map
+; $D9 the ship chained up at (169, 184) on world 3
+ev_chain:   ld a, $A9
+            ld [GS + $01], a
+            ld a, $B8
+            ld [GS + $02], a
+            ld a, 1
+            ld [GS + $00], a
+            ld a, 3
+            ld [GS + $03], a
+            ld a, [GS + $20]
+            or $20
+            ld [GS + $20], a
+            ret
+; $DE the surface world emerges (the world 3 from now on)
+ev_surf:    ld a, [GS + $11]
+            or $80
+            ld [GS + $11], a
+            ld a, 3
+            ld [cur_world], a
+            ret
+; $DF HP 1 for those at 0
+ev_hp1:     ld hl, GS + $10C
+            ld b, 4
+.l:         ld a, [hl+]
+            or [hl]
+            dec hl
+            jr nz, .n
+            ld [hl], 1
+.n:         ld a, l
+            add a, $40
+            ld l, a
+            jr nc, .c
+            inc h
+.c:         dec b
+            jr nz, .l
+            ret
+; $E8 / $E9 clear / set status (all members): $6102 and / or the parameter
+ev_stclr:   ld c, 0
+            jr ev_st
+ev_stset:   ld c, 1
+ev_st:      ld hl, GS + $102
+            ld b, 4
+.l:         ld a, [ev_par]
+            ld e, a
+            ld a, c
+            and a
+            ld a, [hl]
+            jr z, .and
+            or e
+            jr .s
+.and:       and e
+.s:         ld [hl], a
+            ld a, l
+            add a, $40
+            ld l, a
+            jr nc, .c
+            inc h
+.c:         dec b
+            jr nz, .l
+            jp char_gfx
+ev_hp:      ld hl, GS + $10C                ; max HP ($610E) -> HP ($610C), each character
+            ld b, 4
+.l:         ld a, l
+            add a, 2
             ld e, a
             ld d, h
             ld a, [de]
@@ -669,485 +972,236 @@ ev_hpall:   ld hl, SRAM_PAGE + $10C
             ld a, [de]
             ld [hl-], a
             ld a, l
-            add $40
+            add a, $40
             ld l, a
-            jr nc, .m
+            jr nc, .n
+            inc h
+.n:         dec b
+            jr nz, .l
             ret
-ev_mpall:   ld c, 4
-            ld hl, SRAM_PAGE + $130
-.c:         ld b, 8
-.m:         inc l
-            ld a, [hl-]
-            ld [hl+], a
-            inc l
-            dec b
-            jr nz, .m
-            ld a, l
-            add $30
-            ld l, a
-            dec c
-            jr nz, .c
-            ret
-; $D6 / $D7: a passage opens (3B/B8A6: the first map tile $5B / $5C becomes + 2)
-ev_pfloor:  ld a, $5B
-            jr ev_pass
-ev_pwall:   ld a, $5C
-ev_pass:    ld b, a
-            ld hl, W_MAP
-.f:         ld a, [hl]
-            cp b
-            jr z, .t
-            inc hl
-            ld a, h
-            cp high(W_MAP) + 4
-            jr c, .f
-            ret
-.t:         add 2
-            ld [hl], a
-            ld a, l
-            and 31
-            ld d, a
-            ld a, l
-            and $E0
-            ld e, a
-            ld a, h
-            sub high(W_MAP)
-            ld b, 5
-.y:         srl a                           ; E = the row: (HL - W_MAP) / 32
-            rr e
-            dec b
-            jr nz, .y
-            ld hl, line_buf
-            call cell_buf
-            ld a, 1
-            ld [line_n], a
-            ret
-; $D8: reset (3B/B5B7: the program's start)
-ev_reset:   jp soft_reset
-; $D9: the ship chained up (3B/B5BA: vehicle 1 at (169, 184) on world 3, switch $6020 bit 5)
-ev_chain:   ld a, $A9
-            ld [SRAM_PAGE + $01], a
-            ld a, $B8
-            ld [SRAM_PAGE + $02], a
-            ld a, 1
-            ld [SRAM_PAGE + $00], a
-            ld a, 3
-            ld [SRAM_PAGE + $03], a
-            ld hl, SRAM_PAGE + $20
-            set 5, [hl]
-            ret
-; $DE: the surface world emerges (3B/B5EF: $6011 bit 7, world 3)
-ev_surf:    ld hl, SRAM_PAGE + $11
-            set 7, [hl]
-            ld a, 3
-            ld [world], a
-            ret
-; $DF: HP 0 -> 1 for everyone (3B/B5FC)
-ev_hp1:     ld hl, SRAM_PAGE + $10C
-.m:         ld a, [hl+]
-            or [hl]
-            dec l
-            jr nz, .n
-            ld [hl], 1
-.n:         ld a, l
-            add $40
-            ld l, a
-            jr nc, .m
-            ret
-; $E8 / $E9: status off / on for everyone (3B/B7B0: AND A, B7C2: OR A)
-ev_stclr:   ld b, a
-            ld hl, SRAM_PAGE + $102
-.m:         ld a, [hl]
-            and b
-            ld [hl], a
-            ld a, l
-            add $40
-            ld l, a
-            jr nc, .m
-            ret
-ev_stset:   ld b, a
-            ld hl, SRAM_PAGE + $102
-.m:         ld a, [hl]
-            or b
-            ld [hl], a
-            ld a, l
-            add $40
-            ld l, a
-            jr nc, .m
-            ret
-; $EA: gil + A x 256 (3B/B7D4: $601D / $601E, at most 9999999)
-ev_gil:     ld hl, SR_GIL + 1
-            add [hl]
-            ld [hl+], a
-            ld a, [hl]
-            adc 0
-            ld [hl], a
-            jp gil_cap
-; $EB: gil - A x 256; too little: the event ends with story text 2 (3B/B80D)
-ev_ungil:   ld b, a
-            ld a, [SR_GIL + 2]
-            and a
-            jr nz, .ok
-            ld a, [SR_GIL + 1]
-            cp b
-            jr nc, .ok
-            call ev_end
-            ld a, 2
-            jp ev_evdlg
-.ok:        ld hl, SR_GIL + 1
-            ld a, [hl]
-            sub b
-            ld [hl+], a
-            ld a, [hl]
-            sbc 0
-            ld [hl], a
-            ret nc
-            xor a
-            ld [SR_GIL], a
-            ld [SR_GIL + 1], a
-            ld [SR_GIL + 2], a
-            ret
-; $EC / $ED: CP + A (at most 255) / - A (too little: story text 3) (3B/B840, B84E)
-ev_cp:      ld hl, SRAM_PAGE + $1B
-            add [hl]
-            jr nc, .s
-            ld a, $FF
-.s:         ld [hl], a
-            ret
-ev_uncp:    ld b, a
-            ld a, [SRAM_PAGE + $1B]
-            sub b
-            jr nc, .s
-            call ev_end
-            ld a, 3
-            jp ev_evdlg
-.s:         ld [SRAM_PAGE + $1B], a
-            ret
-; $EE: the guest ($600B): ev_guest (src/guest.s)
-
-; $F7: a battle ($3B $B70F), the event going on after it
-ev_battle:  ld [bs_id], a
-            jp battle_run
-
-; $F8: a song ($00-$7C), $7D fade out, $7E the song before, $7F stop; $80+: a sound effect ($3B $B71C)
-ev_sound:   bit 7, a
-            jr nz, .sfx
-            cp $7D
-            jp c, mus_play
-            jr z, .fade
-            cp $7E
-            ld a, 2
-            jr z, .c
-            ld a, 4
-.c:         ld [M_CTRL], a
-            ret
-.fade:      ld a, $37
-            ld [M_SONG], a
-            ld a, $0C
-            jr .c
-.sfx:       and $7F
-            jp sfx_play
-
-; ---- the map's song ($3F $E8CE: properties byte 10; bit 7: the conditional script $38 + (song & 7)
-; at 2C/8870 gives it); the world map's by world and vehicle ($3B $A006)
-map_song:   call enc_setrate
-            ld a, [wmode]
-            and a
-            jr nz, .world
-            ld a, [map_props + 10]
-            bit 7, a
-            jp z, mus_play
-            and 7
-            add $38                         ; (2C/8800 + 2 x ($38 + n) = 2C/8870 + 2n: 3F/E8DB)
-            ld c, a
-            ld b, 0
-            ld hl, $4800
-            add hl, bc
-            add hl, bc
-            call scr_ptr
-            ld de, scr_buf
-            ld bc, 64
-            ld a, B_SCRIPT
-            call far_copy
-            call scr_event
-            jp ev_sound                     ; (as event command $F8: 3F/E8F1)
-.world:     ld a, [world]
-            and a
-            jr z, .w
-            dec a
-.w:         add a                           ; (8 bytes a world: 3B/A00D)
-            add a
-            add a
-            ld e, a                         ; + the vehicle (3B/A006)
-            ld a, [veh]
-            add e
-            ld e, a
-            ld d, 0
-            ld hl, w_songs
-            add hl, de
-            ld a, [hl]
-            call mus_play
-            ld hl, w_sfx                    ; the vehicle's sound ($FF: none, the last one muted)
-            add hl, de
-            ld a, [hl]
-            or $80
-            ld [M_SFX], a
-            ret
-w_songs:    ds 32                           ; (FF3's table 3B/A027, from the ROM at build time)
-w_sfx:      ds 32                           ; (3B/A047)
-
-ev_npcdlg:  ld e, a                         ; $F0: the person's dialogue (their list, entry A)
-            ld d, 0
-            ld hl, dlg_list
-            add hl, de
-            ld c, [hl]
-            jr ev_dlg
-ev_evdlg:   ld c, a                         ; $F1: an event dialogue: the story table 18/8000
-            ld b, TB_STORY                  ;   ($3B $B6D5 jumps past the world test with $80)
-            jp dlg_open
-ev_dlg:     ld b, TB_DLG1                   ; dialogue tables 18/8400 (world 0) / 18/8600
-            ld a, [world]
-            and a
-            jr z, .w
-            ld b, TB_DLG2
-.w:         jp dlg_open
-ev_seton:   ld hl, SR_EVSW
-            call sw_bit
-            ld a, [hl]
-            or c
-            ld [hl], a
-            ret
-ev_setoff:  ld hl, SR_EVSW
-            call sw_bit
-            ld a, c
-            cpl
-            and [hl]
-            ld [hl], a
-            ret
-ev_npcon:   call npc_swaddr
-            ld a, [hl]
-            or c
-            ld [hl], a
-            ret
-ev_npcoff:  call npc_swaddr
-            ld a, c
-            cpl
-            and [hl]
-            ld [hl], a
-            ret
-npc_swaddr: ld hl, SR_NPCSW             ; (+ 32 bytes off world 0)
-            ld b, a
-            ld a, [world]
-            and a
-            ld a, b
-            jr z, sw_bit
-            ld hl, SR_NPCSW + 32
-            jr sw_bit
-ev_give:    ld b, a                         ; $F6: an item (no room: "Can't carry anymore.")
-            ld hl, SR_ITEMS
-            ld c, 32
-.f:         ld a, [hl]
-            cp b
-            jr z, .add
-            inc l
-            dec c
-            jr nz, .f
-            ld hl, SR_ITEMS
-            ld c, 32
-.e:         ld a, [hl]
-            and a
-            jr z, .new
-            inc l
-            dec c
-            jr nz, .e
-            call ev_end
-            ld c, $90
-            jr ev_dlg
-.new:       ld [hl], b
-.add:       ld a, l
-            add 32
-            ld l, a
-            ld a, [hl]
-            cp 99
-            ret nc
-            inc [hl]
-            ret
-ev_take:    ld b, a                         ; $E7: take an item
-            ld hl, SR_ITEMS
-            ld c, 32
-.f:         ld a, [hl]
-            cp b
-            jr z, .t
-            inc l
-            dec c
-            jr nz, .f
-            ret
-.t:         ld a, l
-            add 32
-            ld l, a
-            dec [hl]
-            ret nz
-            ld a, l
-            sub 32
-            ld l, a
-            ld [hl], 0
-            ret
-ev_exit:    ld a, TR_WORLD                  ; $F9 / $FD / $FA / $FB: map changes after the event
-            jr ev_trig
-ev_prev:    ld a, TR_PREV
-            jr ev_trig
-ev_enter:   ld [ents], a                    ; $FA: entrance to map A
-            xor a
-            ld [trig_id], a
-            ld a, TR_ENTER
-            jr ev_trig
-ev_enterm:  ld [trig_id], a                 ; $FB: the map's entrance A
-            ld a, TR_ENTER
-ev_trig:    ld [trig], a
-            ret
-ev_wait:    ld a, [ev_wcnt]                 ; $FC: wait A frames
-            and a
-            jr nz, .w
-            ld a, [ev_arg]
+ev_mp:      ld hl, GS + $130                ; MP: 8 levels, current / max pairs ($6130)
+            ld b, 4
+.c:         push hl
+            ld c, 8
+.v:         ld a, l
             inc a
-            ld [ev_wcnt], a
-.w:         dec a
-            ld [ev_wcnt], a
-            ret z
-            jr ev_again
-ev_end:     xor a                           ; $FF: the event's end
-            ld [ev_on], a
-            jp npc_unface
-ev_again:   ld a, [ev_ptr]                  ; run this command again next frame
-            sub 2
-            ld [ev_ptr], a
-            ret nc
-            ld hl, ev_ptr + 1
-            dec [hl]
-            ret
-
-; $00-$BF: person (A >> 4) does A & 15: 0-3 move right / left / down / up, 4-7 face, 8 show,
-; 9 hide, A-F jumps, animation, circle, spin ($3B $ACD1)
-ev_npc:     ld a, [ev_cmd]
-            and $F0
-            ld l, a
-            ld h, high(NPC1)
-            ld a, l
-            add 12
-            ld e, a
-            ld d, h
-            ld a, [de]                      ; moving: this command again next frame
-            and a
-            jr z, .go
-            ld a, 1
-            ld [ev_rep], a
-            ret
-.go:        ld a, [ev_cmd]
-            and 15
-            cp 4
-            jp c, npc_move
-            cp 8
-            jr nc, .sh
-            and 3                           ; face: right, left, down, up -> pose offsets
-            swap a
-            ld e, a
-            ld a, l
-            add 14
-            ld l, a
-            ld [hl], e
-            ret
-.sh:        jr nz, .hi
-            ld a, l                         ; 8: show (id from +10)
-            add 10
             ld e, a
             ld d, h
             ld a, [de]
-            ld [hl], a
+            ld [hl+], a
+            inc l
+            dec c
+            jr nz, .v
+            pop hl
+            ld a, l
+            add a, $40
+            ld l, a
+            jr nc, .n2
+            inc h
+.n2:        dec b
+            jr nz, .c
             ret
-.hi:        cp 9
-            jp nz, ev_npcx                  ; ($0A-$0F: src/evfx.s)
+
+; $E7 take item (one), $F6 give item (one; "Can't carry anymore." when full: t8000 $90)
+ev_take:    call ev_find
+            ret c
+            ld a, l
+            add a, $20
+            ld l, a
+            ld a, [hl]
+            and a
+            ret z
+            dec [hl]
+            ret nz
+            ld a, l
+            sub $20
+            ld l, a
             ld [hl], 0
             ret
-
-; $C0-$CF: the party: $C0-$C3 move (as the pad), $C4-$C7 face, $C8 / $C9 show / hide
-ev_player:  ld a, [ev_cmd]
-            and 15
-            cp 8
-            jr nc, .sh
-            and 3
-            ld e, a
-            ld d, 0
-            ld hl, ev_dirs
-            add hl, de
-            ld a, [hl]
+ev_give:    call ev_find
+            jr nc, .ok
+            call ev_end
+            ld a, 0
+            ld c, $90
+            jp dlg_show
+.ok:        ld a, [ev_par]
+            ld [hl], a
+            ld a, l
+            add a, $20
+            ld l, a
+            inc [hl]
+            ret
+; (3B/B8F0) the item's slot, else the first empty one ($60C0 ids, $60E0 counts); C: none / 99
+ev_find:    ld hl, GS + $C0
+            ld a, [ev_par]
             ld b, a
-            ld a, [ev_cmd]
-            and 4
-            jr nz, .face
-            ld a, b                         ; a step, as if pressed
-            ld [ev_pad], a
+.s:         ld a, [hl]
+            cp b
+            jr z, .have
+            inc l
+            ld a, l
+            cp low(GS + $E0)
+            jr nz, .s
+            ld l, low(GS + $C0)
+.e:         ld a, [hl]
+            and a
+            ret z                           ; (carry clear)
+            inc l
+            ld a, l
+            cp low(GS + $E0)
+            jr nz, .e
+            scf
             ret
-.face:      ld a, b
-            ld [facing], a
+.have:      ld a, l
+            add a, $20
+            ld e, a
+            ld d, h
+            ld a, [de]
+            cp 99
+            ccf
             ret
-.sh:        cp $08                          ; $C8 / $C9: the party shown / hidden, $CC / $CD the
-            jr z, .sp                       ;   guest ($7E bits 7 / 6: 3B/A157-A198)
-            cp $09
-            jr z, .hp
-            cp $0C
-            jr z, .sg
-            cp $0D
-            jr z, .hg
-            cp $0A                          ; $CA Nautilus, $CB Invincible, $CF chocobo, $CE
-            ld b, 6                         ;   off the Invincible, parked here (3B/A16D-A1C8;
-            jr z, .v                        ;   $C8 / $C9 the party shown / hidden above)
-            cp $0B
-            ld b, 7
-            jr z, .v
-            cp $0F
-            ld b, 1
-            jr z, .v
-            cp $0E
-            ret nz
-            ld a, [world]
-            ld [SRAM_PAGE + $07], a
-            ld a, [pos_x]
-            ld [SRAM_PAGE + $05], a
-            ld a, [pos_y]
-            ld [SRAM_PAGE + $06], a
-            ld a, 1
-            ld [SRAM_PAGE + $04], a
-            ld b, 0
-.v:         ld a, b
-            ld [veh], a
+; $EA give gil (3B/B7D4: 24 bits at $601C, at most 9999999)
+ev_gil:     ld hl, GS + $1D                 ; (FF3 adds the parameter to the middle byte)
+            ld a, [ev_par]
+            add a, [hl]
+            ld [hl+], a
+            ld a, [hl]
+            adc a, 0
+            ld [hl], a
             ret
-.sp:        ld hl, ev_hide
-            res 7, [hl]
-            ret
-.hp:        ld hl, ev_hide
-            set 7, [hl]
-            ret
-.sg:        ld hl, ev_hide
-            res 6, [hl]
-            ret
-.hg:        ld hl, ev_hide
-            set 6, [hl]
-            ret
-ev_dirs:    db DIR_R, DIR_L, DIR_D, DIR_U
 
-section wram, $C240
+; $F0 a person's dialogue ($0740 + n; t8400 world 0, t8600), $F1 event dialogue (t8000; then
+; the A button: fix:EC9A)
+ev_ndlg:    ld a, [ev_par]
+            add a, low(EV_DLG)
+            ld l, a
+            ld h, high(EV_DLG)
+            ld c, [hl]
+            ld a, [cur_world]
+            and a
+            ld a, 2
+            jr z, .w
+            inc a
+.w:         jp dlg_show
+ev_edlg:    ld a, [ev_par]
+            ld c, a
+            xor a
+            jp dlg_show
+
+; $F2 / $F3 event switches, $F4 / $F5 npc switches (+$20 off world 0)
+ev_esw1:    ld a, [ev_par]
+            call ev_sw
+            ld a, [hl]
+            or b
+            ld [hl], a
+            ret
+ev_esw0:    ld a, [ev_par]
+            call ev_sw
+            ld a, b
+            cpl
+            and [hl]
+            ld [hl], a
+            ret
+ev_nsw:     ld a, [ev_par]                  ; HL = byte, B = bit
+            ld c, a
+            and 7
+            ld b, a
+            ld a, 1
+            inc b
+.m:         dec b
+            jr z, .m1
+            add a, a
+            jr .m
+.m1:        ld b, a
+            ld a, c
+            srl a
+            srl a
+            srl a
+            ld c, a
+            ld a, [cur_world]
+            and a
+            ld a, c
+            jr z, .w
+            add a, $20
+.w:         add a, low(GS + $80)
+            ld l, a
+            ld h, high(GS + $80)
+            ret
+ev_nsw1:    call ev_nsw
+            ld a, [hl]
+            or b
+            ld [hl], a
+            ret
+ev_nsw0:    call ev_nsw
+            ld a, b
+            cpl
+            and [hl]
+            ld [hl], a
+            ret
+
+; $F9 exit (explicit), $FA entrance (explicit: map), $FB entrance (id), $FD exit to the
+; previous map: as the trigger tiles (taken when the event ends: the party stands still)
+ev_xexit:   ld a, $C0
+            jr ev_act
+ev_xent:    ld a, [ev_par]                  ; (destination map in M_ENT + 48: the entrance 0)
+            ld [M_ENT + 48], a
+            xor a
+            ld [act_id], a
+            ld a, $80
+            jr ev_act
+ev_xmap:    ld a, [ev_par]
+            ld [act_id], a
+            ldh a, [is_world]
+            and a
+            ld a, $80
+            jr z, ev_act
+            ld a, $90
+            jr ev_act
+ev_exit:    ld a, $40
+ev_act:     ld [act], a
+            ret
+
+; $FC n: wait n frames (3B/B778)
+ev_wait:    ld a, [ev_w75]
+            bit 7, a
+            jr nz, .c
+            ld a, $80
+            ld [ev_w75], a
+            ld a, [ev_par]
+            ld [ev_w74], a
+.c:         ld a, [ev_w74]
+            sub 1
+            ld [ev_w74], a
+            jr nc, .again
+            xor a
+            ld [ev_w75], a
+            ret
+.again:     ld a, [ev_rep]                  ; (run again next frame)
+            inc a
+            ld [ev_rep], a
+            ret
+
+; $FF end of event
+ev_end:     xor a
+            ld [ev_on], a
+            ret
+
+section wram, $C380
+cut_req:    ds 1
 ev_on:      ds 1
 ev_ptr:     ds 2
-ev_cmd:     ds 1
-ev_arg:     ds 1
 ev_rep:     ds 1
-ev_wcnt:    ds 1
-ev_who:     ds 1
+ev_cmd:     ds 1
+ev_par:     ds 1
+ev_w74:     ds 1
+ev_w75:     ds 1
 ev_pad:     ds 1
-scr_buf:    ds 64
-dlg_list:   ds 32
-ev_tmp:     ds 2
-tr_tile:    ds 1
-tr_id:      ds 1
+ev_npc:     ds 1
+n_ev:       ds 1
+ev_tmp:     ds 1
+tr_t:       ds 1
+tr_n2:      ds 1
+tr_id2:     ds 1
+tr_q:       ds 1
 tr_x:       ds 1
-tr_y:       ds 1
+tr_y:       ds 1                            ; (npc moves for an event: tile passability only)

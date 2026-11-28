@@ -1,568 +1,482 @@
-; The field's dialogue box: FF3's window 0 (the top window) as the GB's window layer, rows 0-7
-; (frame, 6 lines of 18 letters, frame), cut at line 64 by a line interrupt; text typed a
-; letter at a time (FF1's typewriter text, A speeds it up), pages turned with A. Text tables:
-; tools/gb3n/text.py (index in B_TEXT: bank, address per string).
+; ---- dialogue (FF3 fix:EC8B "show dialogue", FEE65 / FEE9A / FEEFA text decoding) on the GB:
+; the window layer at the top of the screen (20 x 6 tiles: frame, 4 lines of 18, frame), cut off
+; at line 48 by an LYC interrupt; its tiles have BG priority (people never show over the box).
+; The text was laid out at build time (tools/gb3n/text.py: pages of 4 lines of 18 broken at
+; paragraph / sentence ends); $01 new line, $0B new page, $00 end, FF3's codes for names.
+; A page shows at once; any button (after all were released) turns the page, as fix:ECAB.
+; (WIN_ROWS, WIN_LINE: main.s)
 
-TXT_BUF    = $D600          ; the string being shown (work RAM bank 1, 1 KB: the longest is 803)
-WIN_MAP    = $9C00
-DLG_ROWS   = 8
-DLG_CUT    = DLG_ROWS * 8 - 1
-TYPE_RATE  = 3              ; frames per letter (A held: every frame)
-TB_STORY   = 0              ; text tables (text.py TABLES)
-TB_SYSTEM  = 1
-TB_DLG1    = 2
-TB_DLG2    = 3
-TB_NAMES   = 4
-FR_TL      = $10            ; FF3's window frame tiles ($3F $EDF6: $F7-$FE), copied to VRAM bank 1
-FR_T       = $11            ;   tiles $10-$17 (the world map has no menu tiles in bank 0)
-FR_TR      = $12
-FR_L       = $13
-FR_R       = $14
-FR_BL      = $15
-FR_B       = $16
-FR_BR      = $17
-ATTR_FRAME = $0F            ; palette 7 (FF3's window colours), VRAM bank 1
-ATTR_TEXT  = $0F            ; (the font is in VRAM bank 1 too)
-
-section bank B_FIELD, $6400
-; ---- the window map's dialogue box (LCD off, once): frame and blank text cells
-win_init:   xor a
-            ldh [rVBK], a
-            ld hl, WIN_MAP
-            ld a, FR_TL
-            ld [hl+], a
-            ld b, 18
-            ld a, FR_T
-.t:         ld [hl+], a
-            dec b
-            jr nz, .t
-            ld a, FR_TR
-            ld [hl+], a
-            ld l, $20
-            ld c, 6
-.r:         ld a, FR_L
-            ld [hl+], a
-            ld b, 18
-            ld a, $20
-.s:         ld [hl+], a
-            dec b
-            jr nz, .s
-            ld a, FR_R
-            ld [hl+], a
-            ld a, l
-            add 12
-            ld l, a
-            jr nc, .rn
-            inc h
-.rn:        dec c
-            jr nz, .r
-            ld a, FR_BL
-            ld [hl+], a
-            ld b, 18
-            ld a, FR_B
-.b:         ld [hl+], a
-            dec b
-            jr nz, .b
-            ld a, FR_BR
-            ld [hl], a
-            ld a, 1                         ; attributes: frame in bank 0, text cells in bank 1
-            ldh [rVBK], a
-            ld hl, WIN_MAP
-            ld c, DLG_ROWS
-.ar:        ld b, 20
-.ac:        ld a, l
-            and 31
-            jr z, .fr
-            cp 19
-            jr z, .fr
-            ld a, c
-            cp DLG_ROWS
-            jr z, .fr
-            cp 1
-            jr z, .fr
-            ld a, ATTR_TEXT
-            jr .aw
-.fr:        ld a, ATTR_FRAME
-.aw:        ld [hl+], a
-            dec b
-            jr nz, .ac
-            ld a, l
-            add 12
-            ld l, a
-            jr nc, .an
-            inc h
-.an:        dec c
-            jr nz, .ar
-            xor a
-            ldh [rVBK], a
-            ld a, 7                         ; window at the top left
-            ldh [rWX], a
-            xor a
-            ldh [rWY], a
-            ret
-
-; ---- open the dialogue box with string C of table B
-dlg_open:   ld a, b
-            ld hl, txt_tables
-            add a
-            add l
-            ld l, a
-            jr nc, .t
-            inc h
-.t:         ld a, [hl+]
-            ld h, [hl]
-            ld l, a
-            ld b, 0                         ; HL = index + 3 * C
-            add hl, bc
-            add hl, bc
-            add hl, bc
-            ld de, dlg_src
-            ld bc, 3
-            ld a, B_TEXT
-            call far_copy
-            ld a, [dlg_src + 1]             ; the string into TXT_BUF (1.5 KB, not past the bank)
-            ld l, a
-            ld a, [dlg_src + 2]
-            ld h, a
-            ld a, l
-            cpl
-            ld c, a
-            ld a, h
-            cpl
-            and $7F
-            ld b, a
-            inc bc
-            ld a, b
-            cp 4
-            jr c, .sz
-            ld bc, $400
-.sz:        ld de, TXT_BUF
-            ld a, [dlg_src]
-            call far_copy
-            xor a
-            ld [TXT_BUF + $3FF], a
-.cd:        ld a, [TXT_BUF]                 ; an empty string shows nothing
-            and a
+section bank 0, $2800
+; A = table (0 t8000 events, 1 t8200 messages, 2 t8400 / 3 t8600 people), C = id
+dlg_show:   call t_open
             ret z
-            ld hl, TXT_BUF
-            ld a, l
-            ld [dlg_ptr], a
-            ld a, h
-            ld [dlg_ptr + 1], a
-            xor a
-            ld [dlg_col], a
-            ld [dlg_row], a
-            ld [dlg_ins], a
-            ld [dlg_timer], a
+            call win_open
+.page:      call win_clear
+            call t_page                     ; one page; Z: the end
+            push af
             ld a, 1
-            ld [dlg_clear], a               ; clear the text cells (V-Blank), then type
-            ld [dlg_on], a
-            ld a, DLG_TYPE
-            ld [dlg_state], a
-            ret
-txt_tables: dw T_T8000, T_T8200, T_T8400, T_T8600, T_NAMES8800
+            ld [win_dirty], a
+            call wait_keys
+            pop af
+            jr nz, .page
+            jp win_close
 
-DLG_TYPE   = 1
-DLG_PAGE   = 2
-DLG_END    = 3
-
-; ---- one frame of the dialogue (main loop, while dlg_on)
-dlg_step:   ld a, [dlg_clear]
-            and a
-            ret nz                          ; (the clear first)
-            ld a, [dlg_state]
-            cp DLG_TYPE
-            jr z, .type
-            ldh a, [pad_new]                ; page / end: wait for A
-            and PAD_A
-            ret z
-            ld a, [dlg_state]
-            cp DLG_END
-            jr z, .close
-            xor a
-            ld [dlg_col], a
-            ld [dlg_row], a
-            inc a
-            ld [dlg_clear], a
-            ld a, DLG_TYPE
-            ld [dlg_state], a
-            ret
-.close:     xor a
-            ld [dlg_on], a
-            ld [dlg_state], a
-            ret
-.type:      ldh a, [pad]                    ; the pace: a letter every TYPE_RATE frames, every
-            and PAD_A                       ;   frame while A is held
-            jr nz, .now
-            ld a, [dlg_timer]
-            inc a
-            ld [dlg_timer], a
-            cp TYPE_RATE
-            ret c
-.now:       xor a
-            ld [dlg_timer], a
-.next:      ld a, [dlg_ins]                 ; inside an inserted name: its next letter
-            and a
-            jr z, .str
-            ld hl, dlg_insbuf
-            ld a, [dlg_insi]
-            add l
-            ld l, a
+; A = table, C = id -> t_bank / t_ptr (the TXT_BANK index); Z if the string is empty
+t_open:     ld b, a                         ; index: TXT_BANK $4000 + 3 (256 table + id)
+            ld a, TXT_BANK
+            ld [MBC5_BANKL], a
+            ld h, b
+            ld l, c
+            ld d, h
+            ld e, l
+            add hl, hl
+            add hl, de
+            ld a, h
+            add a, $40
+            ld h, a
+            ld a, [hl+]
+            ld [t_bank], a
+            ld a, [hl+]
+            ld [t_ptr], a
             ld a, [hl]
-            ld hl, dlg_insi
-            inc [hl]
-            ld hl, dlg_ins
-            dec [hl]
-            jr .put
-.str:       ld a, [dlg_ptr]
+            ld [t_ptr + 1], a
+            ld a, [t_bank]
+            ld [MBC5_BANKL], a
+            ld a, [t_ptr]
             ld l, a
-            ld a, [dlg_ptr + 1]
+            ld a, [t_ptr + 1]
+            ld h, a
+            ld a, [hl]
+            and a
+            jp rbank
+
+; draw one page into win_buf from t_ptr; NZ if a page follows
+t_page:     ld a, 1
+            ld [t_col], a
+            ld [t_row], a
+.ch:        ld a, [t_bank]
+            ld [MBC5_BANKL], a
+            ld a, [t_ptr]
+            ld l, a
+            ld a, [t_ptr + 1]
             ld h, a
             ld a, [hl+]
             ld b, a
+            ld a, [hl]                      ; (the parameter byte, if any)
+            ld c, a
             ld a, l
-            ld [dlg_ptr], a
+            ld [t_ptr], a
             ld a, h
-            ld [dlg_ptr + 1], a
+            ld [t_ptr + 1], a
             ld a, b
             and a
-            jr z, .end
-            cp $0A
-            jr z, .nl
-            cp $0C
-            jr z, .pg
-            cp $02
-            jr c, .next
-            cp $05
-            jr nc, .cd
-            call dlg_value                  ; an item's name / an amount
-            jr .next
-.cd:        cp $10
-            jr c, .next                     ; (other codes: none in the field's text)
-            cp $18
-            jr nc, .put
-            call dlg_insert                 ; a member's name / job
-            jr .next
-.put:       ld b, a                         ; a letter at (col + 1, row + 1)
-            ld a, [dlg_col]
-            cp 18
-            ret nc
-            inc a
-            ld c, a
-            ld [dlg_col], a
-            ld a, [dlg_row]
-            inc a
-            swap a
-            add a
-            add c
-            ld l, a
-            ld h, high(WIN_MAP)
-            jr nc, .pa
-            inc h
-.pa:        ld a, l
-            ld [dlg_cell], a
-            ld a, h
-            ld [dlg_cell + 1], a
-            ld a, b
-            ld [dlg_cell + 2], a
-            ret
-.nl:        xor a
-            ld [dlg_col], a
-            ld hl, dlg_row
+            jp z, rbank                     ; end (Z)
+            cp $0B
+            jr nz, .nl
+            or a                            ; new page (NZ)
+            jp rbank
+.nl:        cp $01
+            jr nz, .code
+            ld a, 1
+            ld [t_col], a
+            ld hl, t_row
             inc [hl]
-            ret
-.pg:        ld a, DLG_PAGE
-            ld [dlg_state], a
-            ret
-.end:       ld a, DLG_END
-            ld [dlg_state], a
-            ret
-
-; code $02: the name of item dlg_item; $03 / $04: the amount dlg_num (24 bits) -> dlg_insbuf
-dlg_value:  cp $02
-            jr nz, .num
-            ld a, [dlg_item]                ; the name table's entry (B_TEXT index 4)
-            ld c, a
-            ld b, 0
-            ld hl, T_NAMES8800
-.tb:        add hl, bc
-            add hl, bc
-            add hl, bc
-            ld de, dlg_src
-            ld bc, 3
-            ld a, B_TEXT
-            call far_copy
-            ld a, [dlg_src + 1]
-            ld l, a
-            ld a, [dlg_src + 2]
-            ld h, a
-            ld de, dlg_insbuf
-            ld bc, 24
-            ld a, [dlg_src]
-            call far_copy
-            ld hl, dlg_insbuf
-            ld c, 0
-.n:         ld a, [hl+]
-            and a
-            jr z, .nd
-            inc c
-            ld a, c
-            cp 23
-            jr c, .n
-.nd:        ld a, c                         ; (trailing spaces off: FF3 pads the job names)
-            and a
-            jr z, .ne
-            ld hl, dlg_insbuf - 1
-            add l
-            ld l, a
-            adc h
-            sub l
-            ld h, a
-            ld a, [hl]
-            cp ' '
-            jr nz, .ne
-            dec c
-            jr .nd
-.ne:        ld a, c
-            ld [dlg_ins], a
-            xor a
-            ld [dlg_insi], a
-            ret
-.num:       ld hl, dlg_num                  ; decimal digits of the 24-bit amount (C:D:E)
+            jr .ch
+.code:      cp $28
+            jr nc, .put
+            cp $02
+            jr nz, .c3
+            ld a, [t_item]                  ; $02: the item's name (fix:EF5B)
+            jr .name
+.c3:        cp $03
+            jr nz, .c4
+            ld a, [t_item]                  ; $03: its price (treasure gil: fix:EF6A)
+            call item_price
+            jr .num
+.c4:        cp $04
+            jr nz, .c5
+            ld hl, t_gil                    ; $04: a shop / inn price (FF3 $61-$63: shop.s t_gil)
             ld a, [hl+]
             ld e, a
             ld a, [hl+]
             ld d, a
             ld c, [hl]
+            jr .num
+.c5:        cp $05
+            jr nz, .c10
+            ld hl, GS + $1C                 ; $05: the party's gil
+            ld a, [hl+]
+            ld e, a
+            ld a, [hl+]
+            ld d, a
+            ld a, [hl]
+            ld c, a
+.num:       call t_num
+            jp .ch
+.c10:       cp $10
+            jp c, .ch                       ; ($04, $06-$0F: later)
+            call t_skip1                    ; $10-$27: one parameter byte
+            ld a, b
+            cp $18
+            jr nz, .c14
+            ld a, c                         ; $18: an item's name (parameter)
+.name:      ld l, a                         ; GAME_BANK $4400 + 16 id
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            add hl, hl
+            ld de, $4400
+            add hl, de
+            ld b, 16
+            ld a, 1
+            ld [t_lead], a                  ; (leading blanks dropped)
+.nc:        ld a, GAME_BANK
+            ld [MBC5_BANKL], a
+            ld a, [hl+]
+            and a
+            jp z, .ch
+            cp $70                          ; (menu icons not in dialogue: fix:EF0E)
+            jr c, .ns
+            cp $FF
+            jr nz, .nf
+            ld a, [t_lead]
+            and a
+            jr nz, .ns
+            ld a, $FF
+.nf:        push af
             xor a
-            ld [dlg_ins], a
-            ld hl, dlg_insbuf + 23
-.dv:        xor a                           ; C:D:E / 10, the remainder in A
-            ld b, 24
-.db:        sla e
-            rl d
-            rl c
-            rla
-            cp 10
-            jr c, .dk
-            sub 10
-            inc e
-.dk:        dec b
-            jr nz, .db
-            add $30
-            dec hl
-            ld [hl], a
-            ld a, [dlg_ins]
+            ld [t_lead], a
+            pop af
+            push hl
+            push bc
+            call t_putc
+            pop bc
+            pop hl
+.ns:        dec b
+            jr nz, .nc
+            jp .ch
+.c14:       ld a, b
+            cp $14
+            jr nz, .nm
+            ld a, c                         ; $14: column
             inc a
-            ld [dlg_ins], a
-            ld a, c
-            or d
-            or e
-            jr nz, .dv
-            ld a, [dlg_ins]                 ; the digits down to dlg_insbuf
-            ld b, a
-            ld de, dlg_insbuf
-.mv:        ld a, [hl+]
-            ld [de], a
-            inc de
+            ld [t_col], a
+            jr .ch
+.nm:        cp $14
+            jr nc, .ch
+            and 3                           ; $10-$13: a character's name ($6106 + $40 n)
+            rrca
+            rrca
+            add a, 6
+            ld l, a
+            ld h, high(GS + $100)
+            ld b, 6
+.nmc:       ld a, [hl+]
+            cp $FF
+            jr z, .ch
+            push hl
+            push bc
+            call t_putc
+            pop bc
+            pop hl
             dec b
-            jr nz, .mv
+            jr nz, .nmc
+            jr .ch
+.put:       call t_putc
+            jr .ch
+
+; CDE = 24-bit number (C high) -> its digits (no leading zeros)
+t_num:      ld a, c
+            ld [n24 + 2], a
+            ld a, d
+            ld [n24 + 1], a
+            ld a, e
+            ld [n24], a
             xor a
-            ld [dlg_insi], a
+            ld [t_lead], a
+            ld hl, t_pow
+            ld b, 7
+.d:         push bc
+            ld c, 0                         ; digit = how often the power subtracts
+.s:         ld a, [n24]
+            sub [hl]
+            ld e, a
+            inc hl
+            ld a, [n24 + 1]
+            sbc [hl]
+            ld d, a
+            inc hl
+            ld a, [n24 + 2]
+            sbc [hl]
+            dec hl
+            dec hl
+            jr c, .done
+            ld [n24 + 2], a
+            ld a, d
+            ld [n24 + 1], a
+            ld a, e
+            ld [n24], a
+            inc c
+            jr .s
+.done:      inc hl
+            inc hl
+            inc hl
+            ld a, c                         ; (the digit: C is the caller's again after pop)
+            pop bc
+            ld c, a
+            and a
+            jr nz, .pr
+            ld a, [t_lead]
+            and a
+            jr nz, .pr
+            ld a, b
+            dec a
+            jr nz, .nx                      ; (the last digit always)
+.pr:        ld a, 1
+            ld [t_lead], a
+            ld a, c
+            add a, $80
+            push hl
+            push bc
+            call t_putc
+            pop bc
+            pop hl
+.nx:        dec b
+            jr nz, .d
+            ret
+t_pow:      db $40, $42, $0F, $A0, $86, $01, $10, $27, $00, $E8, $03, $00
+            db $64, $00, $00, $0A, $00, $00, $01, $00, $00
+
+; A = item -> CDE = its price (10/9E00 + 2 id)
+item_price: ld l, a
+            ld h, 0
+            add hl, hl
+            ld de, $4200
+            add hl, de
+            ld a, GAME_BANK
+            ld [MBC5_BANKL], a
+            ld a, [hl+]
+            ld e, a
+            ld d, [hl]
+            ld c, 0
             ret
 
-; ---- V-Blank: the dialogue's VRAM writes (a letter, or clearing the text cells)
-dlg_vbl:    ld a, [dlg_clear]
+t_skip1:    ld hl, t_ptr
+            inc [hl]
+            ret nz
+            inc hl
+            inc [hl]
+            ret
+
+; A = tile -> win_buf (row t_row, column t_col); the column advances
+t_putc:     ld b, a
+            ld a, [t_dest]                  ; (a menu canvas: at t_bx / t_by, 2 lines)
             and a
-            jr z, .cell
-            xor a                           ; the 6 x 18 text cells blank
-            ldh [rVBK], a
-            ld [dlg_clear], a
-            ld hl, WIN_MAP + $21
-            ld c, 6
-.r:         ld b, 18
-            ld a, $20
-.s:         ld [hl+], a
-            dec b
-            jr nz, .s
-            ld a, l
-            add 14
+            jr z, .w
+            ld a, [t_maxr]
+            ld c, a
+            ld a, [t_row]
+            cp c
+            ret nc
+            ld a, [t_col]
+            cp 19
+            ret nc
+            push bc
+            ld c, a
+            ld a, [t_bx]
+            add a, c
+            dec a
+            ld c, b
+            ld b, a
+            ld a, [t_row]
+            ld e, a
+            ld a, [t_by]
+            add a, e
+            dec a
+            ld e, c
+            ld c, a
+            ld a, e
+            call m_put
+            pop bc
+            ld hl, t_col
+            inc [hl]
+            ret
+.w:         ld a, [t_row]
+            cp WIN_ROWS - 1
+            ret nc
+            swap a                          ; row * 32
+            add a, a
             ld l, a
-            jr nc, .n
-            inc h
-.n:         dec c
+            ld a, [t_col]
+            cp 19
+            ret nc
+            add a, l
+            ld l, a
+            ld h, high(win_buf)
+            ld [hl], b
+            ld hl, t_col
+            inc [hl]
+            ret
+
+; the frame (FEDF6 / FEE1D / FEE3E: $F7 $F8 $F9 / $FA $FB / $FC $FD $FE) and the attributes
+; (BG palette 3, priority over sprites); the window shown
+win_open:   call font_box                   ; (world maps: the font in bank 1, the menu palette 7;
+            ld a, $83                       ;   normal maps: the map's window palette 3)
+            ld b, a
+            ldh a, [is_world]
+            and a
+            jr z, .na
+            call menu_pals
+            ld b, $8F
+.na:        ld a, b
+            ld hl, win_attr
+            ld b, 32 * WIN_ROWS
+.at:        ld [hl+], a
+            dec b
+            jr nz, .at
+            ld hl, win_buf
+            ld a, $F7
+            ld [hl+], a
+            ld b, 18
+            ld a, $F8
+.t:         ld [hl+], a
+            dec b
+            jr nz, .t
+            ld a, $F9
+            ld [hl], a
+            ld hl, win_buf + 32 * (WIN_ROWS - 1)
+            ld a, $FC
+            ld [hl+], a
+            ld b, 18
+            ld a, $FD
+.b:         ld [hl+], a
+            dec b
+            jr nz, .b
+            ld a, $FE
+            ld [hl], a
+            ld hl, win_buf + 32
+            ld c, WIN_ROWS - 2
+.m:         ld a, $FA
+            ld [hl], a
+            ld a, l
+            add a, 19
+            ld l, a
+            ld a, $FB
+            ld [hl], a
+            ld a, l
+            add a, 13
+            ld l, a
+            dec c
+            jr nz, .m
+            call win_clear
+            ld a, 3                         ; attributes: once, by DMA in the next V-Blank
+            ld [win_dirty], a
+            call wait_vbl
+            ld a, 1
+            ld [win_on], a
+            ret
+
+win_clear:  ld hl, win_buf + 32 + 1
+            ld c, WIN_ROWS - 2
+.r:         ld b, 18
+            ld a, $FF
+.c:         ld [hl+], a
+            dec b
+            jr nz, .c
+            ld a, l
+            add a, 14
+            ld l, a
+            dec c
             jr nz, .r
             ret
-.cell:      ld a, [dlg_cell + 1]
+
+win_close:  xor a
+            ld [win_on], a
+            jp wait_vbl
+
+; any button after all were released (fix:ECAB)
+wait_keys:  call wait_vbl
+            call read_pad
+            ldh a, [pad]
+            and a
+            jr nz, wait_keys
+.w:         call wait_vbl
+            call read_pad
+            ldh a, [pad]
+            and a
+            jr z, .w
+            ret
+
+; V-Blank part (from the handler): the box's rows by general-purpose DMA when changed
+win_vbl:    ld a, [win_dirty]
             and a
             ret z
-            ld h, a
-            ld a, [dlg_cell]
-            ld l, a
-            ld a, [dlg_cell + 2]
-            ld [hl], a
+            bit 1, a
+            jr z, .map
+            ld a, 1                         ; attributes: palette 3 + priority, from win_attr
+            ldh [rVBK], a
+            ld a, high(win_attr)
+            ldh [rHDMA1], a
             xor a
-            ld [dlg_cell + 1], a
+            ldh [rHDMA2], a
+            ld a, $9C
+            ldh [rHDMA3], a
+            xor a
+            ldh [rHDMA4], a
+            ld a, WIN_ROWS * 2 - 1
+            ldh [rHDMA5], a
+            xor a
+            ldh [rVBK], a
+.map:       ld a, high(win_buf)
+            ldh [rHDMA1], a
+            xor a
+            ldh [rHDMA2], a
+            ld a, $9C
+            ldh [rHDMA3], a
+            xor a
+            ldh [rHDMA4], a
+            ld a, WIN_ROWS * 2 - 1
+            ldh [rHDMA5], a
+            xor a
+            ld [win_dirty], a
             ret
 
-; the window shown from the top to line DLG_CUT while the dialogue is open (V-Blank)
-dlg_lcdc:   ld a, [dlg_on]
-            and a
-            jr nz, .on
-            ldh [rSTAT], a
-            ld a, LCDC_ON
-            jr .w
-.on:
-            ld a, DLG_CUT
-            ldh [rLYC], a
-            ld a, $40                       ; LYC interrupt
-            ldh [rSTAT], a
-            ld a, LCDC_WIN
-.w:         ldh [rLCDC], a
-            ret
-
-section wram, $C200
-dlg_on:     ds 1
-dlg_state:  ds 1
-dlg_ptr:    ds 2
-dlg_col:    ds 1
-dlg_row:    ds 1
-dlg_timer:  ds 1
-dlg_clear:  ds 1
-dlg_cell:   ds 3
-dlg_ins:    ds 1
-dlg_insi:   ds 1
-dlg_insbuf: ds 24
-dlg_item:   ds 1
-dlg_num:    ds 3
-dlg_src:    ds 3
-
-section bank 0, $0E00
-; line DLG_CUT: the window off from the next line (written in this line's H-Blank)
+; LCD status interrupt (LYC = WIN_LINE - 1): the window off from the next line on
 stat_isr:   push af
-            ld a, [c_split]                 ; (the ending's band: BG map switch, then the next line)
+            ld a, [menu_on]                 ; (a menu: the whole screen)
             and a
-            jr nz, .cs
-            ld a, [guard_on]                ; a guarded load: hold until H-Blank
-            and a
-            jr nz, .w
+            jr nz, .x
 .w:         ldh a, [rSTAT]
             and 3
             jr nz, .w
-            ld a, [guard_on]
-            and a
-            jr nz, .x
             ldh a, [rLCDC]
-            and $DF
+            res 5, a
             ldh [rLCDC], a
-.x:         pop af
-            reti
-.cs:        ld a, [c_split]                 ; (3: a battle's wave, a line's SCX from wv_tab;
-            cp 3                            ;   4: a battle's bands, SCX negated every 24
-            jr z, .wv                       ;   lines; both to the battlefield's bottom)
-            cp 4
-            jr z, .zb
-            ldh a, [rLCDC]
-            xor $08
-            ldh [rLCDC], a
-            ld a, [c_lyb]
-            ldh [rLYC], a
-            ld a, $FF
-            ld [c_lyb], a
-            pop af
-            reti
-.wv:        ldh a, [rLY]
-            cp 95
-            jr nc, .we
-            inc a
+.x:         push bc                         ; then a frame of sound (once a frame, mid-screen:
+            push de                         ;   the V-Blank stays for the VRAM copies)
             push hl
-            ld hl, wv_ph
-            add [hl]
-            and 15
-            add low(wv_tab)
-            ld l, a
-            ld h, high(wv_tab)
-            ld a, [hl]
-            ldh [rSCX], a
+            call snd_frame
             pop hl
-            pop af
-            reti
-.we:        xor a
-            ldh [rSCX], a
-            ldh a, [rLCDC]
-            and $DF
-            ldh [rLCDC], a
-            pop af
-            reti
-.zb:        ldh a, [rLYC]
-            cp 95
-            jr nc, .ze
-            add 24
-            ldh [rLYC], a
-            ldh a, [rSCX]
-            cpl
-            inc a
-            ldh [rSCX], a
-            pop af
-            reti
-.ze:        xor a
-            ldh [rSCX], a
-            pop af
-            reti
-
-section wram, $C5C0                         ; (battle only; the STAT interrupt reads them)
-wv_tab:     ds 16
-wv_ph:      ds 1
-
-
-section bank B_FIELD, $6A30
-; a code $10-$13 (member's name: FF3's \char[$02]) or $14-$17 (\char[$01]: the member's job's name,
-; t8200 $E2 + job, as 3F/F301) -> dlg_insbuf
-dlg_insert: cp $14
-            jr c, .nm
-            and 3
-            swap a
-            add a
-            add a
-            ld l, a
-            ld h, high(SRAM_PAGE + $100)
-            ld a, [hl]
-            add $E2
-            ld c, a
-            ld b, 0
-            ld hl, T_T8200
-            jp dlg_value.tb
-.nm:        and 3
-            swap a
-            add a
-            add a
-            add low(SRAM_PAGE + $106)
-            ld l, a
-            ld h, high(SRAM_PAGE + $106)
-            ld de, dlg_insbuf
-            ld c, 0
-            ld b, 6
-.c:         ld a, [hl+]
-            cp $FF
-            jr z, .d
-            push hl
-            ld l, a
-            ld h, 0
-            push de
-            ld de, C_FF3ASC
-            add hl, de
             pop de
-            ld a, B_OWN
-            call far_byte
-            pop hl
-            ld [de], a
-            inc de
-            inc c
-            dec b
-            jr nz, .c
-.d:         ld a, c
-            ld [dlg_ins], a
-            xor a
-            ld [dlg_insi], a
-            ret
+            pop bc
+            pop af
+            reti
 
+section wram, $CE00
+win_buf:    ds 32 * WIN_ROWS                ; (page-aligned: DMA source)
+section wram, $CF00
+win_attr:   ds 32 * WIN_ROWS
+t_bank:     ds 1
+t_ptr:      ds 2
+t_col:      ds 1
+t_row:      ds 1
+win_dirty:  ds 1
+win_on:     ds 1
+t_dest:     ds 1
+t_maxr:     ds 1
+t_bx:       ds 1
+t_by:       ds 1
+t_item:     ds 1                            ; FF3 $BB: the item of {02} / {03}
+t_lead:     ds 1
+n24:        ds 3

@@ -135,6 +135,14 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   polish.
 - Plan and progress: `docs/ff3-gb-rewrite.md`.
 
+## Owner's decision for FF3 (2026-11-28, later; binding: one engine)
+- **The FF3 base is the native engine from branch `claude/vibrant-davinci-lc8boi`** (owner: "Continue on
+  vibrant-davinci"; "combine your efforts, merging what is better into this project"; "I suspect
+  vibrant-davinci is mostly better"). It is now `tools/gb3n/` on this branch (build:
+  `python3 tools/gb3n/build.py build/ff3_en.nes --out build/ff3.gbc`; byte-identical to that branch's
+  build); its log and remaining work: `docs/ff3-native.md`. The engine of `docs/ff3-gb-rewrite.md`
+  (tools/gb3n/eng, in git history) is superseded: what it did better gets ported into this one.
+
 ## Release requirements (owner's decision, 2026-11-20: absolutely required)
 No GB/GBC release of FF1, FF2 or FF3 until every Nintendo Lot Check standard in
 `docs/gb-release-checks.md` is met and checked: header and boot integrity, LCD off only in
@@ -155,7 +163,7 @@ work remaining, scope and plan. Commit and push it with the work.
 **For FF2 / FF3: `docs/gb-native-reuse.md`** (what made FF1 fully native, which modules carry over,
 the method). Session briefs: `docs/ff2-gb-brief.md`, `docs/ff3-gb-brief.md`.
 **Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
-**FF3 (Game Boy Color only) status: `docs/ff3-gb-status.md`.**
+**FF3 (Game Boy Color only) status: `docs/ff3-native.md`** (engine from vibrant-davinci, 2026-11-28).
 **Handoff (recompiled build, historical): `docs/gb-handoff.md`.**
 
 ## Scope and plan

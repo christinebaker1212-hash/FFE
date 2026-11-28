@@ -1,5 +1,8 @@
 # FF3 Game Boy Color port: status
 
+**Superseded (owner, 2026-11-28): the FF3 base is the native engine from `claude/vibrant-davinci-lc8boi`,
+now `tools/gb3n/`; status in `docs/ff3-native.md`.** Kept for its history.
+
 **2026-11-28: core rewrite (owner's decision): `docs/ff3-gb-rewrite.md`.** The engine described below
 (field, events, text, menus, battle input / screen) is being replaced by a routine-by-routine translation
 of FF3's own program; the battle rules and the sound driver stay.
