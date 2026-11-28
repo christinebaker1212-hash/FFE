@@ -210,6 +210,8 @@ pg_t0:      ds 1                            ; (scratch)
 pg_t1:      ds 1
 dlg_nhi:    ds 1                            ; (the chest message's name index: text.s)
 pg_stl:     ds 1                            ; (the statue loaded: its shrine)
+
+section wram, $CC98                         ; (free: rammap.py; not $DE00 on: the music's page)
 pg_ffb:     ds 1                            ; a person's battle with FF1's formation pending (pg_ffight)
 pg_sfx:     ds 1                            ; (the next box's fanfare)
 pg_sb:      ds 2                            ; (the script running: its start)
@@ -1270,9 +1272,11 @@ it_cnt:     cp $1C
 section bank 0, $3574                       ; (free space)
 ; the chest message's item: DE = its name index (pg_nidx)
 dlg_nidx:   push hl
-            ld a, PGM_BANK
-            ld hl, pg_nidx
+            push bc                         ; (B: the text printer's line start; bank_call
+            ld a, PGM_BANK                  ;   leaves the bank in B: every line after the
+            ld hl, pg_nidx                  ;   item's name went to a wrong place)
             call bank_call
+            pop bc
             pop hl
             ret
 
