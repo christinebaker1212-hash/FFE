@@ -3,7 +3,8 @@
 ; at line 48 by an LYC interrupt; its tiles have BG priority (people never show over the box).
 ; The text was laid out at build time (tools/gb3n/text.py: pages of 4 lines of 18 broken at
 ; paragraph / sentence ends); $01 new line, $0B new page, $00 end, FF3's codes for names.
-; A page shows at once; any button (after all were released) turns the page, as fix:ECAB.
+; A page is typed a letter at a time (FF1's typewriter text, wipe.s tw_page9); then any button
+; (after all were released) turns the page, as fix:ECAB.
 ; (WIN_ROWS, WIN_LINE: main.s)
 
 section bank 0, $2800
@@ -11,13 +12,11 @@ section bank 0, $2800
 dlg_show:   call t_open
             ret z
             call win_open
-.page:      call win_clear
-            call t_page                     ; one page; Z: the end
-            push af
-            ld a, 1
-            ld [win_dirty], a
-            call wait_keys
-            pop af
+.page:      ld a, CODE6                     ; one page typed a letter at a time, then a button
+            ld hl, tw_page9                 ;   (wipe.s; FF1's typewriter text)
+            call far_call
+            ld a, [tw_more]
+            and a
             jr nz, .page
             jp win_close
 
@@ -314,7 +313,22 @@ t_putc:     ld b, a
             add a, l
             ld l, a
             ld h, high(win_buf)
-            ld [hl], b
+            ld a, [tw_on]                   ; (typing: letters past tw_lim blank; blanks free)
+            and a
+            jr z, .p
+            ld a, b
+            inc a
+            jr z, .p
+            ld a, [tw_lim]
+            ld c, a
+            ld a, [tw_cnt]
+            inc a
+            ld [tw_cnt], a
+            dec a
+            cp c
+            jr c, .p
+            ld b, $FF
+.p:         ld [hl], b
             ld hl, t_col
             inc [hl]
             ret
@@ -495,3 +509,13 @@ t_by:       ds 1
 t_item:     ds 1                            ; FF3 $BB: the item of {02} / {03}
 t_lead:     ds 1
 n24:        ds 3
+
+section wram, $C364                         ; (the typewriter: wipe.s tw_page9, t_putc)
+tw_on:      ds 1
+tw_cnt:     ds 1
+tw_lim:     ds 1
+tw_tot:     ds 1
+tw_acc:     ds 1
+tw_more:    ds 1
+tw_sb:      ds 1
+tw_sp:      ds 2

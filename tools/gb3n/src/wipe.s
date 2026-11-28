@@ -426,6 +426,79 @@ wp_stat9:   ld a, [wp_i]
 .none:      xor a
             ret
 
+; ---- FF1's typewriter text for the dialogue box (owner): one page typed a letter at a time,
+; about 21 letters a second (90 / 256 a frame, FF1's TW_RATE), twice as fast with A held; then a
+; button (fix:ECAB). Each frame the page is drawn again from its start with the letters past
+; tw_lim left blank (t_putc); blanks cost no time. tw_more: NZ if another page follows.
+TW_RATE    = 90
+tw_page9:   ld a, [t_bank]                  ; the page's start
+            ld [tw_sb], a
+            ld a, [t_ptr]
+            ld [tw_sp], a
+            ld a, [t_ptr + 1]
+            ld [tw_sp + 1], a
+            ld a, $FF                       ; (counted: all its letters)
+            ld [tw_lim], a
+            call .draw
+            ld [tw_more], a
+            ld a, [tw_cnt]
+            ld [tw_tot], a
+            xor a
+            ld [tw_lim], a
+            ld [tw_acc], a
+.l:         ld a, [tw_lim]
+            ld b, a
+            ld a, [tw_tot]
+            cp b
+            jr c, .done
+            jr z, .done
+            call .draw
+            call wait_vbl
+            call read_pad
+            ld a, TW_RATE
+            ld b, a
+            ldh a, [pad]
+            bit 0, a                        ; (A held: twice as fast)
+            ld a, [tw_acc]
+            jr z, .r1
+            add a, b
+            jr nc, .r1
+            ld hl, tw_lim
+            inc [hl]
+.r1:        add a, b
+            ld [tw_acc], a
+            jr nc, .l
+            ld hl, tw_lim
+            inc [hl]
+            jr .l
+.done:      ld a, $FF
+            ld [tw_lim], a
+            call .draw
+            xor a
+            ld [tw_on], a
+            jp wait_keys
+; the page from its start, letters up to tw_lim; A = NZ if a page follows
+.draw:      ld a, [tw_sb]
+            ld [t_bank], a
+            ld a, [tw_sp]
+            ld [t_ptr], a
+            ld a, [tw_sp + 1]
+            ld [t_ptr + 1], a
+            xor a
+            ld [tw_cnt], a
+            inc a
+            ld [tw_on], a
+            call win_clear
+            call t_page
+            ld a, 0
+            jr z, .d0
+            inc a
+.d0:        push af
+            ld a, 1
+            ld [win_dirty], a
+            pop af
+            ret
+
 section wram, $C321
 wp_on:      ds 1
 wp_top:     ds 1
