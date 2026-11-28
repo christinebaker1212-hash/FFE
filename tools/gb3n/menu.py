@@ -88,7 +88,7 @@ def commands(rom):
 
 # the words of the GB-only screens (Select menu, suspend point): this project's text
 GB_TEXT = {
-    's_opt': 'Options', 's_sus': 'Suspend', 's_spd': 'Battle Speed', 's_bgm': 'Music Volume',
+    's_opt': 'Options', 's_sus': 'Suspend', 's_ext': 'Extras', 's_spd': 'Battle Speed', 's_bgm': 'Music Volume',
     's_sfx': 'Sound Volume', 's_sq1': 'Create a Suspend', 's_sq2': 'Point and return',
     's_sq3': 'to the Title?', 's_sq4': '', 's_yes': 'Yes', 's_no': 'No', 's_cap': 'Capacity',
     's_off': 'You can turn the', 's_off2': 'power off now.',

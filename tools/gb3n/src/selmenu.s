@@ -8,15 +8,18 @@ sel_open:   call menu_pals
             ld [m_cur], a
 .top:       call m_clear_t
             ld bc, $0000
-            ld de, $1404
+            ld de, $1405
             call m_box
             ld hl, s_opt
             ld bc, $0201
             call m_str
-            ld hl, s_sus
+            ld hl, s_ext
             ld bc, $0202
             call m_str
-            ld a, 4 * 8                     ; (the window cut under the box)
+            ld hl, s_sus
+            ld bc, $0203
+            call m_str
+            ld a, 5 * 8                     ; (the window cut under the box)
             call win_cut
 .l:         ld a, [m_cur]                   ; the hand at the entry
             add a, a
@@ -34,21 +37,40 @@ sel_open:   call menu_pals
             jp nz, sel_close
             bit 0, a
             jr nz, .a
+            ld b, a
             and $C0
             jr z, .l
-            ld a, [m_cur]
-            xor 1
-            ld [m_cur], a
+            ld a, [m_cur]                   ; up / down: Options, Extras, Suspend (wrapping)
+            bit 6, b
+            jr z, .dn
+            dec a
+            cp $FF
+            jr nz, .us
+            ld a, 2
+            jr .us
+.dn:        inc a
+            cp 3
+            jr c, .us
+            xor a
+.us:        ld [m_cur], a
             jr .l
 .a:         ld a, [m_cur]
             and a
-            jr nz, .sus
+            jr nz, .ex
             call options
             xor a
             ld [m_cur], a
             jr .top
-.sus:       call suspend
+.ex:        dec a
+            jr nz, .sus
+            ld a, CODE10                    ; (extras.s: the Sound Test, the Bestiary)
+            ld hl, ex_open
+            call far_call
             ld a, 1
+            ld [m_cur], a
+            jr .top
+.sus:       call suspend
+            ld a, 2
             ld [m_cur], a
             jr .top
 
