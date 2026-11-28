@@ -676,6 +676,8 @@ map_pals:   ld hl, pal_sh
 ; script $38 + n (2C/8870, 3C/9319), as event command $F8; a world map's from snd_world
 map_song_r: call map_song                    ; (from a code bank: its bank back after)
             jp rbank
+q_mt_r:     call q_mt                       ; (from a code bank: a world map's read switches banks)
+            jp rbank
 map_song:   ld a, TEST_SONG                 ; (test builds, build.py --song: that song throughout)
             cp $FF
             ret nz

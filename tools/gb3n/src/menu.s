@@ -763,9 +763,8 @@ mm_draw:    call m_clear
             call m_codes
             pop hl
             pop bc
-            ld a, l
-            add a, 8
-            ld l, a
+            ld de, 8                        ; (the table may cross a page)
+            add hl, de
             inc c
             ld a, c
             cp 8

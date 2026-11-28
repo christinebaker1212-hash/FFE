@@ -511,6 +511,7 @@ TR_WT      = $DD00                          ; the fade to white: 8 levels x 32
 TR_FR      = 48
 bt_trans9:  ld a, $95                       ; (FF3's encounter sound)
             ld [S49], a
+            call ring_fill
             ld a, 2
             ldh [rSVBK], a
             ldh a, [scx]
@@ -747,6 +748,36 @@ xtr_prep:    ld a, [xtr_k]                    ; HL = $4000 + 288 k
             ldh [pal_dirty], a
             ret
 
+; the whole 16 x 16 metatile ring around the party (the field draws 12 x 12: the transition's
+; twist and zoom show the BG map beyond the view, which held stale cells): two rows a V-Blank
+ring_fill:  ld a, [py]
+            sub 8
+            ld d, a
+            ld c, 16
+.row:       ld a, [px]
+            sub 8
+            ld e, a
+            ld b, 16
+.col:       push bc
+            push de
+            call q_mt_r
+            pop de
+            pop bc
+            inc e
+            dec b
+            jr nz, .col
+            inc d
+            bit 0, c
+            jr nz, .nx
+            push bc
+            push de
+            call wait_vbl
+            pop de
+            pop bc
+.nx:        dec c
+            jr nz, .row
+            ret
+
 section wram, $C321
 wp_on:      ds 1
 wp_top:     ds 1
@@ -767,4 +798,5 @@ xtr_t:       ds 1
 xtr_r:       ds 1
 xtr_g:       ds 1
 tst_btl:    ds 1                            ; (test hook: main.s tst_choc $B0)
+
 

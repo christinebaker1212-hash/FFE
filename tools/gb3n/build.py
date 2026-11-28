@@ -48,6 +48,15 @@ def group_world(g):
     return (0, 1, 2)[g]
 
 
+def bd_col0(e):
+    """colour 0 of every BG palette is the backdrop ($3F00) on the NES: the PPU never shows the
+    bytes at $3F04 / $3F08 / $3F0C. A CGB palette has its own colour 0, so those slots get the
+    backdrop (else see-through pixels of palettes 1-3 showed the stray byte: green blocks on maps,
+    a green band around the dialogue box)"""
+    for k in (4, 8, 12):
+        e[16 + k] = e[16]
+
+
 def pack(rom):
     """all maps: {bank: bytes}"""
     banks = {}
@@ -91,6 +100,7 @@ def pack(rom):
             e[13] = mp[4]                                              # npc list
             e[48:64] = rom.b(0x10, ((mp[13] | 0x20) << 8) | mp[12], 16)  # entrances (dest maps)
             e[16:48] = rom.map_palettes(mid, w)                        # NES colours
+            bd_col0(e)
             ent[g][64 * mid:64 * mid + 64] = e
     for g in range(3): banks[MT_BANK + g] = ent[g]
     sp = bytearray(b'\xFF' * 0x4000)
@@ -129,6 +139,7 @@ def pack(rom):
         e[0], e[2], e[3], e[4] = WMAP_BANK0 + 4 * WMAPS[w], WCHR_BANK, 0x40 + 0x10 * (w >> 1), w >> 1
         e[12] = WLD_BANK
         e[16:48] = rom.world_palettes(w)
+        bd_col0(e)
         wb[0x3000 + 64 * w:0x3040 + 64 * w] = e
         wb[0x3400 + 64 * w:0x3440 + 64 * w] = rom.world_entrances(w)
     wb[0x3800:0x3840] = rom.b(0, 0x8880, 64)                   # $7800: 00/8880 / 88C0 the map exits'

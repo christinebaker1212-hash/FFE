@@ -115,11 +115,10 @@ job_menu:   ld [m_i], a
             jr c, .msg
             ld a, [jb_cur]                  ; (owner: equipment no longer refuses the change
                                             ;   (FF3's $71): it is taken off with it, below)
-            ld l, a
-            ld h, high(jb_cost)
-            ld a, l
-            add a, low(jb_cost)
-            ld l, a
+            ld e, a
+            ld d, 0
+            ld hl, jb_cost                  ; (16-bit: the table may cross a page)
+            add hl, de
             ld b, [hl]
             ld a, [GS + $1B]
             cp b
