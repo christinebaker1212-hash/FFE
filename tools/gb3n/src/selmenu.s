@@ -338,4 +338,11 @@ opt_spd:    ds 1
 opt_bgm:    ds 1
 opt_sfx:    ds 1
 msg_speed:  ds 1
+opt_txt:    ds 1                            ; Config (cfg.s): Text Speed 0-4
+opt_curm:   ds 1                            ;   Cursor: 0 Remember, 1 Reset
+opt_dash:   ds 1                            ;   B Dash: 0 On, 1 Off
+win_r:      ds 1                            ;   the windows' colour (0-31 each)
+win_g:      ds 1
+win_b:      ds 1
+opt_grad:   ds 1                            ;   Gradient: 0 On, 1 Off
 sus_end:

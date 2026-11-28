@@ -391,7 +391,9 @@ jbm_show:   push af
             jr nz, .f
             ld a, UP_WHITE
             ld [u_pal], a
+            xor a
             ld hl, U_MJOB
+            call u_fstr
             call im_tstr
             jp u_flush
 .f:         call im_tpromptp

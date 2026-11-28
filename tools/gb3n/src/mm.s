@@ -352,17 +352,9 @@ mn_draw:    call u_cls
             and a
             ld hl, U_WORLD
             jr nz, .pl
-            ld a, [M_ENT + 8]               ; (the map's title id)
-            add a, a
-            ld e, a
-            ld a, 0
-            adc a, 0
-            ld d, a
+            ld a, [M_ENT + 8]               ; (the map's title id: its name from CODE12)
             ld hl, U_TITLE
-            add hl, de
-            ld a, [hl+]
-            ld h, [hl]
-            ld l, a
+            call u_fstr
 .pl:        push hl                         ; (four lines: from row 13, else 14)
             ld c, $0E
             ld b, 0

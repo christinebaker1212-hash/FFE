@@ -393,7 +393,7 @@ sg_up:      ld de, $8000 + 16 * $53
             jr nz, .run
             ret
 
-section wram, $C6A6                         ; (free: after the Select menu's options)
+section wram, $C6B0                         ; (shares the Status screen's bytes: sts.s)
 sg_k:       ds 1
 sg_wb:      ds 1
 sg_n:       ds 1

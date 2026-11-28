@@ -376,14 +376,8 @@ im_tpromptp: push af                        ; (the pool as it is)
             ld [u_pal], a
             pop af
             sub $5A
-            add a, a
-            ld e, a
-            ld d, 0
             ld hl, U_MSG
-            add hl, de
-            ld a, [hl+]
-            ld h, [hl]
-            ld l, a
+            call u_fstr
 im_tstr:    ld bc, $0101                    ; (HL = a string: lines split by {01}, from row 1)
 .l:         push bc
             call u_text

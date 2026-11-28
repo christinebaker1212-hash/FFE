@@ -158,7 +158,7 @@ def sight_data(rom, rgb555):
     return db('SG_COL', col) + db('SG_PAL', pal) + db('SG_FL', fl), spr
 
 
-def code_data(rom, rgb555, group_world, bank):
+def code_data(rom, rgb555, group_world, bank, bank12):
     import re
     import menu
     def db(label, data):
@@ -172,7 +172,7 @@ def code_data(rom, rgb555, group_world, bank):
     src += db('U_PFREE', rom.b(0x2E, 0x9E4A, 4)) + db('U_PJOB', rom.b(0x2E, 0x9E4E, 22))
     src += strtab('U_JOBN', [text.encode(n) for n in names])
     src += strtab('U_CMD', cmds)
-    src += strtab('U_TITLE', titles(rom, group_world))
+    far = strtab('U_TITLE', titles(rom, group_world))   # (CODE12: ui.s u_fstr copies one out)
     for k, v in GB_WORDS.items():
         src += db(k, text.encode(v) + b'\0')
     w = menu.rom_words(rom)                             # (FF3's: the slots, Remove Equipment)
@@ -195,8 +195,8 @@ def code_data(rom, rgb555, group_world, bank):
         lines.append(' '.join(cur))
         return b'\x01'.join(text.encode(x) for x in lines)
     msgs = [wrap(i) for i in range(0x5A, 0x7A)]         # (FF3's prompts / messages $5A-$79)
-    src += strtab('U_MSG', msgs)
-    src += db('U_MJOB', wrap(0x3A) + b'\0')              # (the Job screen: $013A)
+    far += strtab('U_MSG', msgs)
+    far += strtab('U_MJOB', [wrap(0x3A)])               # (the Job screen: $013A)
     src += db('U_ITEMW', text.encode(clean(text.decode(text.raw_string(rom, 't8200', 0x35)))) + b'\0')
     src += db('U_DEF', text.encode(w['s_def'].rstrip('…').strip()) + b'\0')
     sd, spr = sight_data(rom, rgb555)
@@ -224,4 +224,5 @@ def code_data(rom, rgb555, group_world, bank):
         src += db(k, text.encode(w[v]) + b'\0')          # (the Magic screen: FF3's Use / Swap / Item)
     # (tiles copied by DMA: 16-byte aligned, at the bank's end)
     src += 'section bank %d, $7FD0\n' % bank + db('U_ZTILE', bytes(16)) + db('SG_SPR', spr)
+    src += 'section bank %d, $4000\n' % bank12 + far
     return src

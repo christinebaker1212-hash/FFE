@@ -1047,6 +1047,31 @@ u_flush:    ld a, [u_dlo]
             call wait_vbl
             jp wait_vbl
 
+; string A of table HL in bank CODE12 (ui.py: place names, FF3's messages) -> U_FBUF (WRAM 2),
+; HL = U_FBUF
+U_FBUF     = $D9A0              ; (WRAM 2: 96 bytes)
+u_fstr:     ld e, a
+            ld d, 0
+            add hl, de
+            add hl, de
+            ld a, CODE12
+            call rd_byte
+            push af
+            ld a, CODE12
+            call rd_byte
+            ld h, a
+            pop af
+            ld l, a
+            ld de, U_FBUF
+.c:         ld a, CODE12
+            call rd_byte
+            ld [de], a
+            inc de
+            and a
+            jr nz, .c
+            ld hl, U_FBUF
+            ret
+
 ; ---- the hand (sprite, OBJ palette 7, OAM 36-39): FF1's rule, its left 16 pixels before the
 ; text at cell B, its top at row C's top (the finger on the line's middle). u_handp: pixel B, C
 ; (the text's left and top); B = $FF: off
