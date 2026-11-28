@@ -45,6 +45,31 @@ choices) go into the rewritten code as each part is done.
 GB-only RAM: $C500-$C5FF (the battle rules' temporaries), $CC00-$CEFF, the stack $CF00-$CFFF, HRAM,
 WRAM banks 2-7 (BG map / tile shadows, decompressed maps, our extras).
 
+## Architecture
+- **Code**: `tools/gb3n/core/bBB.s`, one file per FF3 bank (`b3F.s` holds f3F_xxxx ...), placed in our
+  own GB code banks. The old engine (`tools/gb3n/src`) stays buildable until the new core reaches parity
+  (as FF1's `tools/gb` did for `tools/gbn`); then it goes, except the kept battle rules and sound.
+- **FF3's ROM on the GB**: the whole English PRG (1 MB, 128 NES 8 KB banks) is copied at build time
+  into GB ROM banks 64-127 (NES bank n at GB bank 64 + n / 2, $4000 + $2000 (n & 1)); the GB ROM is
+  4 MB (MBC5). Our code never runs from there; it reads FF3's data through bank-0 helpers.
+- **FF3's bank switching**: FF3 maps 8 KB banks at $8000 / $A000 (3F/FF0C, FF1F, FF17; the English
+  build writes MMC5 $5114 / $5115, nothing in RAM). Ours keep the two NES bank numbers in HRAM
+  (`nb8`, `nbA`; $C000 / $E000 are always NES banks 126 / 127, the English fixed banks); a JSR into
+  $8000-$BFFF becomes a far call to our translation of that routine.
+- **Pointers stay NES addresses** (so RAM is byte-for-byte FF3's). `(zp),Y` and absolute reads of ROM go
+  through `n_rd` (bank 0): NES address -> RAM map (above) or the NES bank mapped at that window ->
+  the GB bank / address, read, our code bank back.
+- **PPU**: FF3's own routines that write the PPU get GB versions with the same inputs: pattern tables
+  -> GB VRAM tiles (2bpp NES -> GB), nametables -> the 32 x 32 GB BG map (NES column x -> x; NES row
+  y of the 60-row vertical pair -> y mod 32, the scroll taken mod 256 likewise), attributes -> CGB
+  attribute bytes (VRAM bank 1), palettes -> CGB palettes, the OAM page $0200 -> GB OAM (x - camera,
+  y - camera, 8 x 16 pairs). FF3's IRQ splits (text windows, battle) -> LYC / window layer. The 160 x 144
+  view is a camera over FF3's 256 x 240 screen: the field centres the party as FF3 does at 256 x 240;
+  windows and menus get positions / sizes for 20 x 18 in FF3's own window tables.
+- **APU**: the kept sound driver (`sound.s`, FF3's $7F40 page moved to $DF40).
+- **Interrupts**: FF3's NMI work (OAM DMA, palette copy, scroll, the sound) and its waits (3F/FF36
+  "wait for vblank" etc.) map onto our V-Blank handler; the frame structure stays FF3's.
+
 ## Order (each step playable and checked before the next)
 1. Tools: routine inventory from the listing (`tools/gb3n/inventory.py` -> `build/ff3_routines.txt`,
    with status), the shell with WRAM bank access, `fdiff.py`.
@@ -61,3 +86,13 @@ Old files are removed as their FF3 routines replace them.
 ## Progress
 (updated as routines are translated and checked; per-routine status in `build/ff3_routines.txt`)
 - 2026-11-28: decision recorded, plan written.
+- Tools: `inventory.py` (730 field / menu routines in banks 3A-3F, ~19.6k instructions; 43 routines of
+  the whole game differ in the English ROM), `test/pynes.py` (FF3 from reset in py65 + MMC5: RAM
+  identical to cynes after 600 frames; New Game to the first map with `test/ff3drive.py`),
+  `test/sbsh3.c` (the shell with work RAM banks), `corebuild.py` (core ROM, FF3's PRG in banks 64-127),
+  `test/fdiff.py`. Build: `python3 tools/gb3n/corebuild.py --test`, then
+  `python3 tools/gb3n/test/fdiff.py --n 60`.
+- First translations, checked (60 random states each, RAM / A / X / Y / carry identical): 3F/FC92
+  divide, FCD6 multiply, FCF5 multiply 16, FD20 / FD2C / FD38 bits, FD3C / FD43 shifts, FBEF random.
+  Lesson kept in the code: SM83 OR / AND / XOR clear the carry, the 6502's do not; FF3's math feeds
+  the caller's carry into its first rotate (kept with LD A, 0 / push af).
