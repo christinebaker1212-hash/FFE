@@ -86,7 +86,46 @@ mn_open:    ld a, CODE1                     ; (each member's values from the equ
             jr .l
 .old:       ld b, 0
 .old1:      ld a, [mn_cur]
-            cp 2                            ; Equip: rebuilt (eqm.s)
+            cp 1                            ; Magic: rebuilt (mgm.s)
+            jr nz, .nm
+            push bc
+            call u_fadeout
+            pop bc
+            ld a, b
+            call mgm_open
+            ld a, [mgm_quit]                ; Exit / Warp: out of the menu, the map changes
+            and a
+            jp z, .re
+            cp 2
+            jr z, .sight
+            ld b, a
+            ldh a, [is_world]               ; (Exit on a world map: nothing more)
+            and a
+            jp nz, u_close
+            ld a, [stk_n]                   ; (the map stack: Exit to its bottom, the world map
+            and a                           ;   where the party entered; Warp n maps back; none:
+            ld c, $C0                       ;   the map's exit to the world, main.s do_act)
+            jr z, .act
+            ld c, a
+            ld a, b
+            cp $C1
+            ld a, 1
+            jr z, .stk
+            ld a, [mgm_quit + 1]
+            ld b, a
+            ld a, c
+            sub b
+            jr nc, .k
+            xor a
+.k:         inc a
+.stk:       ld [stk_n], a
+            ld c, $40
+.act:       ld a, c
+            ld [act], a
+            jp u_closeb
+.sight:     call wm_sight                   ; Sight: the minimap, then the menu again (3D/A525)
+            jp mn_open
+.nm:        cp 2                            ; Equip: rebuilt (eqm.s)
             jr nz, .old2
             push bc
             call u_fadeout

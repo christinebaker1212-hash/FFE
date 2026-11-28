@@ -273,7 +273,7 @@ CODE9 = 122                             # the summons (btlsum.s), 32 at $6000
 TRANS_BANK = 123                        # the encounter transition's tables (trans.py, FF1's)
 CODE10 = 124                            # Extras: the Sound Test, the Bestiary (extras.s)
 CODE11 = 125                            # the menus' UI library and the rebuilt menus (ui.s, mm.s)
-CODE11_MODULES = ('ui', 'mm', 'eqm', 'itm')
+CODE11_MODULES = ('ui', 'mm', 'eqm', 'itm', 'mgm', 'sight')
 W0B_BANK = 117                          # NES bank 0B (world map sprites) as 512 GB tiles
 MGFX_BANK0 = 90                         # monster graphics (NES banks $20-$27, $0C-$0D) as GB tiles: 90-94
 CHGFX_BANK = 95                         # battle characters (NES banks $28 / $29) as GB tiles
@@ -366,7 +366,7 @@ def engine_src(rom=None):
         rams.append(r)
     if rom is not None:
         import ui
-        codes.append(ui.code_data(rom, rgb555, group_world))
+        codes.append(ui.code_data(rom, rgb555, group_world, CODE11))
     codes.append('section bank %d, $4000' % CODE10)
     c, r = split(rd('extras'))
     codes.append(c)

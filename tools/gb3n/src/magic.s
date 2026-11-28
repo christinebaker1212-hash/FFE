@@ -6,68 +6,6 @@
 ; the order of the spell ids (3D/A2B4) -> SPL (24 bytes).
 SPL        = $C680 + $60            ; the slots: level * 3 + n (FF3 $7C00)
 
-magic_menu: ld [m_i], a
-            rrca
-            rrca
-            ld [m_ch], a
-            ld [mg_caster], a
-            call spl_load
-            xor a
-            ld [mg_opt], a
-            ld [mg_slot], a
-.redraw:    call mg_draw
-.opt:       ld a, [mg_opt]                  ; the option hand (row 2: cols 1 / 7 / 14)
-            ld b, 8
-            and a
-            jr z, .x
-            ld b, 8 + 6 * 8
-            dec a
-            jr z, .x
-            ld b, 8 + 13 * 8
-.x:         ld c, 16 + 2 * 8 - 4
-            call cursor_at
-            call wait_vbl
-            call read_pad
-            call m_keys
-            ld a, [m_new]
-            bit 1, a
-            jr nz, .out
-            bit 0, a
-            jr nz, .a
-            ld b, a
-            ld a, [mg_opt]
-            bit 4, b
-            jr z, .lf
-            inc a
-            cp 3
-            jr nz, .so
-            xor a
-            jr .so
-.lf:        bit 5, b
-            jr z, .opt
-            dec a
-            cp $FF
-            jr nz, .so
-            ld a, 2
-.so:        ld [mg_opt], a
-            jr .opt
-.out:       call spl_save
-            jp cur_hide
-.a:         ld a, [mg_opt]
-            cp 1
-            jr nz, .slots
-            call mg_swap                    ; Swap
-            jr .redraw
-.slots:     call mg_pick                    ; Use / Item: a slot (carry: B)
-            jr c, .redraw
-            ld a, [mg_opt]
-            and a
-            jr z, .use
-            call mg_toitem
-            jr .redraw
-.use:       call mg_use
-            jr .redraw
-
 ; 3D/A2B4: the bit masks -> 3 slots per level (spells in id order)
 spl_load:   ld hl, SPL
             ld b, 24
@@ -163,204 +101,6 @@ spl_bit:    push af
 .x:         ld b, a
             ret
 
-; the screen (S3): header, the page of mg_slot (3 levels)
-mg_draw:    call m_clear
-            ld bc, $0000
-            ld de, $1404
-            call m_box
-            ld a, [mg_caster]
-            add a, 6
-            ld l, a
-            ld h, high(GS + $100)
-            ld bc, $0101
-            ld e, 6
-            call m_codes
-            ld hl, s_use
-            ld bc, $0202
-            call m_str
-            ld hl, s_swap
-            ld bc, $0802
-            call m_str
-            ld hl, s_item
-            ld bc, $0F02
-            call m_str
-            ld bc, $0004
-            ld de, $140E
-            call m_box
-            ld a, [mg_slot]                 ; the page: levels 3 p .. 3 p + 2
-            call mg_page
-            ld [mg_lv], a
-            ld [mg_shown], a
-            ld c, 5
-.lv:        push bc
-            ld a, [mg_lv]
-            cp 8
-            jr nc, .skip
-            call mg_level
-.skip:      pop bc
-            ld a, c
-            add a, 4
-            ld c, a
-            ld hl, mg_lv
-            inc [hl]
-            cp 17
-            jr c, .lv
-            ld a, 1
-            ld [m_dirty], a
-            ret
-; A = slot -> A = the first level of its page
-mg_page:    ld b, 0
-.l:         sub 9
-            jr c, .d
-            inc b
-            jr .l
-.d:         ld a, b
-            ld c, a
-            add a, a
-            add a, c
-            ret
-; level mg_lv at row C: "Lv<n>   MP cur/max", its 3 spells
-mg_level:   push bc
-            ld b, 1
-            ld a, $95
-            call m_put
-            inc b
-            ld a, $B9
-            call m_put
-            inc b
-            ld a, [mg_lv]
-            inc a
-            add a, $80
-            call m_put
-            ld b, 10
-            ld a, $78
-            call m_put
-            inc b
-            ld a, $79
-            call m_put
-            ld a, [mg_lv]                   ; $6130 + 2 level (+ caster)
-            add a, a
-            ld e, a
-            ld a, [mg_caster]
-            add a, $30
-            add a, e
-            ld l, a
-            ld h, high(GS + $100)
-            ld a, [hl+]
-            ld b, 14
-            add a, $80
-            call m_put
-            inc b
-            ld a, $C7
-            call m_put
-            inc b
-            ld a, [hl]
-            add a, $80
-            call m_put
-            pop bc
-            ld a, [mg_lv]                   ; the slots
-            ld e, a
-            add a, a
-            add a, e
-            add a, low(SPL)
-            ld l, a
-            ld h, high(SPL)
-            ld e, 3
-.s:         inc c
-            ld a, [hl+]
-            and a
-            jr z, .n
-            push hl
-            push de
-            ld b, 2
-            call it_name
-            pop de
-            pop hl
-.n:         dec e
-            jr nz, .s
-            ret
-
-; a slot hand: up / down through the 24 slots (pages turn); A = the slot (carry: B)
-mg_pick:    ld a, [mg_slot]
-            call mg_page
-            ld b, a
-            ld a, [mg_shown]
-            cp b
-            ld a, b
-            ld [mg_shown], a
-            call nz, mg_draw
-            ld a, [mg_slot]                 ; row = 5 + 4 (level - page) + 1 + n
-            ld b, 0
-.r:         sub 3
-            jr c, .rd
-            inc b
-            jr .r
-.rd:        add a, 3
-            ld c, a                         ; n
-            ld a, [mg_shown]
-            ld d, a
-            ld a, b
-            sub d
-            add a, a
-            add a, a
-            add a, c
-            add a, 6
-            add a, a
-            add a, a
-            add a, a
-            add a, 16 - 4
-            ld c, a
-            ld b, 8 + 4
-            call cursor_at
-            call wait_vbl
-            call read_pad
-            call m_keys
-            ld a, [m_new]
-            bit 1, a
-            jr nz, .b
-            bit 0, a
-            jr nz, .a
-            ld b, a
-            ld a, [mg_slot]
-            bit 6, b
-            jr z, .d
-            and a
-            jr z, mg_pick
-            dec a
-            jr .s
-.d:         bit 7, b
-            jr z, mg_pick
-            cp 23
-            jr z, mg_pick
-            inc a
-.s:         ld [mg_slot], a
-            jr mg_pick
-.a:         ld a, [mg_slot]
-            and a
-            ret
-.b:         scf
-            ret
-
-; Item (3C/9897): the slot's spell to the inventory ("No room to remove" $016B / "Removed" $016E)
-mg_toitem:  call mg_spell
-            ret z
-            ld [ev_par], a
-            call ev_find
-            ld a, $6B
-            jp c, m_msgbox
-            ld a, [ev_par]
-            ld [hl], a
-            ld a, l
-            add a, $20
-            ld l, a
-            inc [hl]
-            ld a, [mg_slot]
-            add a, low(SPL)
-            ld l, a
-            ld h, high(SPL)
-            ld [hl], 0
-            ld a, $6E
-            jp m_msgbox
 ; A = the selected slot's spell (Z if empty)
 mg_spell:   ld a, [mg_slot]
             add a, low(SPL)
@@ -387,7 +127,9 @@ mg_swap:    call it_party
             ld a, [hl]
             and $C0
             ret nz
+.go:        push bc                         ; (spl_save uses B)
             call spl_save
+            pop bc
             ld a, b                         ; $6207-$620E of the two
             add a, 7
             ld e, a
@@ -407,72 +149,6 @@ mg_swap:    call it_party
             jr nz, .x
             jp spl_load
 
-; Use (3C/9812): a spell the caster's job may cast, MP of its level left, a field spell
-mg_use:     call mg_spell
-            ret z
-            ld [mg_id], a
-            call can_equip                  ; (the class: 35/B8FD)
-            ret z
-            ld a, [mg_id]                   ; MP of the level
-            sub $C8
-            call spl_lv
-            add a, a
-            ld e, a
-            ld a, [mg_caster]
-            add a, $30
-            add a, e
-            ld [mg_mp], a
-            ld l, a
-            ld h, high(GS + $100)
-            ld a, [hl]
-            and a
-            ret z
-            ld a, [mg_caster]               ; the caster: not dead, stone, toad or silenced
-            add a, 2                        ;   (Toad itself: not dead, stone or silenced)
-            ld l, a
-            ld a, [hl]
-            ld b, $F0
-            ld a, [mg_id]
-            cp $F6
-            jr nz, .st
-            ld b, $D0
-.st:        ld a, [hl]
-            and b
-            ret nz
-            ld hl, mg_tab                   ; the spell's prompt, kind, value
-.f:         ld a, [hl+]
-            and a
-            ret z                           ; (not a field spell)
-            ld b, a
-            ld a, [mg_id]
-            cp b
-            jr z, .got
-            inc hl
-            inc hl
-            inc hl
-            jr .f
-.got:       ld a, [hl+]
-            ld [it_prompt], a
-            ld a, [hl+]
-            ld [mg_kind], a
-            ld a, [hl]
-            ld [mg_val], a
-            call it_party
-            call sel_target                 ; (one member, or all: left / right)
-            ret c
-            ld [mg_tgt], a
-            call mg_effect
-            ret c
-            ld a, [mg_mp]                   ; one MP fewer (3C/9957)
-            ld l, a
-            ld h, high(GS + $100)
-            dec [hl]
-            call it_party
-            ld b, 30
-.w:         call wait_vbl
-            dec b
-            jr nz, .w
-            ret
 ; spell, prompt (t8200), kind (0 heal: power, 1 remove status: mask, 2 toggle: mask,
 ; 3 Life2, 4 Curaja), value
 mg_tab:     db $FC, $5C, 0, 42              ; Cure
@@ -487,61 +163,10 @@ mg_tab:     db $FC, $5C, 0, 42              ; Cure
             db $FD, $64, 1, $02             ; Poisona (pure)
             db $F6, $69, 2, $20             ; Toad
             db $F7, $6A, 2, $08             ; Mini
+            db $D8, $67, 5, 0               ; Warp: "Go back how many floors?" (3C/9AD0)
+            db $EF, $68, 6, 0               ; Exit: "Warps outside." (3C/98FA)
+            db $FE, 0, 7, 0                 ; Sight: the world's minimap (3A/88A3)
             db 0
-
-; the target hand: rows 12-15, left / right: all four (FF3 $79F0 >= $10); A = member or 4
-sel_target: xor a
-.l:         ld [m_sel2], a
-            cp 4
-            jr z, .all
-            add a, 12
-            add a, a
-            add a, a
-            add a, a
-            add a, 16 - 4
-            ld c, a
-            ld b, 8
-            call cursor_at
-            jr .k
-.all:       ld c, 16 + 13 * 8 + 4           ; (the hand at the window's side)
-            ld b, 8 + 18 * 8
-            call cursor_at
-.k:         call wait_vbl
-            call read_pad
-            call m_keys
-            ld a, [m_new]
-            bit 1, a
-            jr nz, .b
-            bit 0, a
-            jr nz, .a
-            ld b, a
-            ld a, [m_sel2]
-            bit 4, b
-            jr nz, .lr
-            bit 5, b
-            jr nz, .lr
-            cp 4
-            jr z, .l
-            bit 6, b
-            jr z, .d
-            dec a
-            and 3
-            jr .l
-.d:         bit 7, b
-            jr z, .l
-            inc a
-            and 3
-            jr .l
-.lr:        cp 4
-            ld a, 4
-            jr nz, .l
-            xor a
-            jr .l
-.a:         ld a, [m_sel2]
-            and a
-            ret
-.b:         scf
-            ret
 
 ; 3C/99EB: the effect on mg_tgt (4 = all); carry: nothing done
 mg_effect:  ld a, [mg_tgt]
@@ -824,11 +449,220 @@ can_equip:  ld l, a
 .x:         and [hl]
             ret
 
+; ---- for the rebuilt Magic screen (mgm.s, CODE11): FF3's rules, no drawing
+; A = member: the caster, its slots -> SPL
+mgx_load:   ld [m_i], a
+            rrca
+            rrca
+            ld [m_ch], a
+            ld [mg_caster], a
+            jp spl_load
+mgx_save:   jp spl_save
+mgx_loadt:  ld a, [mgm_t]
+            jp mgx_load
+mgx_okt:    ld a, [mgm_t]
+            jp mgx_ok
+mgx_swapt:  ld a, [mgm_t]
+            jp mgx_swap
+; A = spell id: u_eres 0 if a field spell the caster's job may cast (else 1)
+mgx_ok:     ld [mg_id], a
+            ld b, 1
+            ld hl, mg_tab
+.f:         ld a, [hl+]
+            and a
+            jr z, .x
+            ld c, a
+            inc hl
+            inc hl
+            inc hl
+            ld a, [mg_id]
+            cp c
+            jr nz, .f
+            ld a, [mg_id]
+            call can_equip
+            ld b, 1
+            jr z, .x
+            dec b
+.x:         ld a, b
+            ld [u_eres], a
+            ret
+; slot mg_slot to the bag: u_eres 0 (empty slot), $6B (no room), $6E (removed)
+mgx_toitem: xor a
+            ld [u_eres], a
+            call mg_spell
+            ret z
+            ld [ev_par], a
+            call ev_find
+            ld a, $6B
+            jr c, .r
+            ld a, [ev_par]
+            ld [hl], a
+            ld a, l
+            add a, $20
+            ld l, a
+            inc [hl]
+            ld a, [mg_slot]
+            add a, low(SPL)
+            ld l, a
+            ld h, high(SPL)
+            ld [hl], 0
+            call spl_save
+            ld a, $6E
+.r:         ld [u_eres], a
+            ret
+; A = another member: the two members' spells traded (3C/96F5); u_eres 1 if refused (the caster
+; itself, or dead / stone)
+mgx_swap:   ld b, a
+            ld a, 1
+            ld [u_eres], a
+            ld a, b
+            rrca
+            rrca
+            ld b, a
+            ld a, [mg_caster]
+            cp b
+            ret z
+            ld a, b
+            add a, 2
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]
+            and $C0
+            ret nz
+            xor a
+            ld [u_eres], a
+            jp mg_swap.go
+; slot mg_slot: may it be cast now? (3C/9812, 3C/98EC) u_eres 0 (it_prompt, mg_kind, mg_val, mg_mp
+; set), 1 (the error sound: empty, not by this job, no MP, not a field spell, the caster dead /
+; stone / toad / silenced, Warp on a world map, Sight off one), else FF3's message ($77 can't
+; change size, $78 can't warp, $79 can't use magic)
+mgx_check:  ld a, 1
+            ld [u_eres], a
+            call mg_spell
+            ret z
+            ld [mg_id], a
+            call mgx_ok
+            ld a, [u_eres]
+            and a
+            ret nz
+            inc a
+            ld [u_eres], a
+            ld a, [mg_id]                   ; MP of the level
+            sub $C8
+            call spl_lv
+            add a, a
+            ld e, a
+            ld a, [mg_caster]
+            add a, $30
+            add a, e
+            ld [mg_mp], a
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [hl]
+            and a
+            ret z
+            ld a, [mg_caster]
+            add a, 2
+            ld l, a
+            ld b, $F0
+            ld a, [mg_id]
+            cp $F6
+            jr nz, .st
+            ld b, $D0
+.st:        ld a, [hl]
+            and b
+            ret nz
+            ld hl, mg_tab
+.f:         ld a, [hl+]
+            ld b, a
+            ld a, [mg_id]
+            cp b
+            jr z, .got
+            inc hl
+            inc hl
+            inc hl
+            jr .f
+.got:       ld a, [hl+]
+            ld [it_prompt], a
+            ld a, [hl+]
+            ld [mg_kind], a
+            ld a, [hl]
+            ld [mg_val], a
+            call mgx_flags                  ; (3C/98EC: the map's flags, 39/BC00)
+            ld c, a
+            bit 7, c
+            ld a, $79                       ; "Magic cannot be used"
+            jr nz, .r
+            ld a, [mg_kind]
+            cp 5
+            jr z, .warp
+            cp 6
+            jr z, .exit
+            cp 7
+            jr z, .sight
+            ld a, [mg_id]                   ; Toad / Mini: not where FF3's bit 5 is set
+            cp $F6
+            jr z, .sz
+            cp $F7
+            jr nz, .ok
+.sz:        bit 5, c
+            ld a, $77
+            jr nz, .r
+.ok:        xor a
+.r:         ld [u_eres], a
+            ret
+.warp:      ldh a, [is_world]               ; Warp: not on a world map
+            and a
+            ld a, 1
+            jr nz, .r
+.exit:      bit 6, c
+            ld a, $78
+            jr nz, .r
+            xor a
+            jr .r
+.sight:     ldh a, [is_world]               ; Sight: on a world map only
+            and a
+            ld a, 1
+            jr z, .r
+            xor a
+            jr .r
+; the map's flags (FF3 $53: 39/BC00 + map, 39/BD00 off world 0; 0 on a world map)
+mgx_flags:  ldh a, [is_world]
+            and a
+            ld a, 0
+            ret nz
+            ld a, [cur_map]
+            ld l, a
+            ld h, $5C                       ; (JOB_BANK: FF3 bank $39 at $4000)
+            ld a, [cur_grp]
+            and a
+            jr z, .w
+            inc h
+.w:         ld a, JOB_BANK
+            jp rd_byte
+; Exit / Warp / Sight cast: one MP fewer (3C/9957)
+mgx_mpdec:  ld a, [mg_mp]
+            ld l, a
+            ld h, high(GS + $100)
+            dec [hl]
+            ret
+; cast on mg_tgt (4 = all): u_eres 0 (cast, one MP fewer), 1 (no effect: FF3 does not cast it)
+mgx_cast:   call mg_effect
+            ld a, 1
+            jr c, .r
+            ld a, [mg_mp]
+            ld l, a
+            ld h, high(GS + $100)
+            dec [hl]
+            xor a
+.r:         ld [u_eres], a
+            ret
+
 section wram, $C6D0
 mg_caster:  ds 1
-mg_opt:     ds 1
+mg_opt_:    ds 1
 mg_slot:    ds 1
-mg_shown:   ds 1
+mg_shown_:  ds 1
 mg_lv:      ds 1
 mg_id:      ds 1
 mg_mp:      ds 1

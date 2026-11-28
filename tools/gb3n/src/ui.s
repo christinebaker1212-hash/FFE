@@ -43,8 +43,15 @@ u_open:     call u_fadeout
             call memcpy
             jp u_mpal
 
-; the field back: faded out, its tiles and palettes restored, faded in
-u_close:    call u_fadeout
+; the field back: faded out, its tiles and palettes restored, faded in (u_closeb: left black, for
+; a map change that follows: Exit / Warp)
+u_close:    call u_closeb
+            call wait_vbl
+            call u_fadein0
+            ld a, 1
+            ldh [rSVBK], a
+            ret
+u_closeb:   call u_fadeout
             call oam_hide
             xor a
             ld [menu_on], a
@@ -68,8 +75,6 @@ u_close:    call u_fadeout
             call memclr
             ld a, 1
             ldh [pal_dirty], a
-            call wait_vbl
-            call u_fadein0
             ld a, 1
             ldh [rSVBK], a
             ret
@@ -1054,7 +1059,7 @@ u_hand:     ld a, b
             add a, a
             ld c, a
 u_handp:    ld hl, oam_buf + 4 * 36
-            ld a, b                         ; OAM x = text - 16 + 8
+u_handh:    ld a, b                         ; OAM x = text - 16 + 8 (HL: the 4 OAM entries)
             sub 8
             ld b, a
             ld a, c
@@ -1141,8 +1146,6 @@ u_keys:     call read_pad
 .out:       ld a, c
             ld [m_new], a
             ret
-
-U_ZTILE:    ds 16, 0
 
 section wram, $C740                         ; (the stack runs from $C800 down: keep below $C780)
 u_k:        ds 1

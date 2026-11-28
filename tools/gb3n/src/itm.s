@@ -370,6 +370,8 @@ im_tprompt: push af
             jr nz, .cl
             xor a
             ld [u_pool], a
+            pop af
+im_tpromptp: push af                        ; (the pool as it is)
             ld a, UP_WHITE
             ld [u_pal], a
             pop af

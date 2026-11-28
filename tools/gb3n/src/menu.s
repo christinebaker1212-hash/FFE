@@ -18,10 +18,6 @@ old_sub:    call old_setup
             ld a, [mn_arg]
             ld c, a
             ld a, b
-            cp 1
-            ld a, c
-            jp z, magic_menu
-            ld a, b
             cp 2
             ld a, c
             jp z, equip_menu

@@ -131,7 +131,31 @@ GB_WORDS = {'U_LV': 'LV', 'U_HP': 'HP', 'U_GIL': 'Gil', 'U_CAP': 'Capacity', 'U_
             'U_WORLD': 'World Map', 'U_OPT': 'Optimize', 'U_REMOVE': 'Remove'}
 
 
-def code_data(rom, rgb555, group_world):
+def sight_data(rom, rgb555):
+    """the Sight spell's minimap (sight.s, FF3 3A/88A3): colours by metatile (3A/8080; 3A/8100 for
+    metatiles 64-127 on world sets 1 / 2), the map's palette (3A/8050; 3A/8060 + 4 on set 2), the
+    sprites' colours (3A/8986: $0F, $37, $00, $10, $20), their tiles 1 / 2 (3A/8180)"""
+    from data import nes2gb
+    col, pal = bytearray(), bytearray()
+    for k in range(3):
+        t = bytearray(rom.b(0x3A, 0x8080, 128))
+        if k:
+            t[64:128] = rom.b(0x3A, 0x8100 + (0x40 if k == 2 else 0), 64)
+        col += t
+        p = rom.b(0x3A, 0x8050, 4) if k == 0 else rom.b(0x3A, 0x8060 + ((k << 1) & 4), 4)
+        for c in p:
+            v = rgb555(c); pal += bytes([v & 0xFF, v >> 8])
+    w = lambda c: bytes([rgb555(c) & 0xFF, rgb555(c) >> 8])
+    fl = w(0x0F) + w(0x37) + w(0x00) + w(0x0F) + w(0x0F) + w(0x37) + w(0x00) + w(0x10) + w(0x20) + w(0x0F)
+    spr = rom.b(0x3A, 0x8180 + 16, 32)
+    spr = nes2gb(spr[:16]) + nes2gb(spr[16:])
+    def db(label, data):
+        return '%s:\n' % label + ''.join('    db %s\n' % ', '.join(str(v) for v in data[k:k + 16])
+                                         for k in range(0, len(data), 16))
+    return db('SG_COL', col) + db('SG_PAL', pal) + db('SG_FL', fl), spr
+
+
+def code_data(rom, rgb555, group_world, bank):
     import menu
     def db(label, data):
         return '%s:\n' % label + ''.join('    db %s\n' % ', '.join(str(v) for v in data[k:k + 16])
@@ -154,11 +178,17 @@ def code_data(rom, rgb555, group_world):
     src += db('U_ATK', text.encode(w['s_atk'].rstrip('…').strip()) + b'\0')
     src += db('U_ARROW', bytes([ARROW, 0]))
     msgs = []                                           # (Item: FF3's prompts / messages $5A-$75)
-    for i in range(0x5A, 0x76):
+    for i in range(0x5A, 0x7A):
         t = text.decode(text.raw_string(rom, 't8200', i)).replace('[77][79]', 'HP')
         t = clean(t.replace('\n', ' \x01 ')).replace(' \x01 ', '\x01')
         msgs.append(b'\x01'.join(text.encode(x) for x in t.split('\x01')))
     src += strtab('U_MSG', msgs)
     src += db('U_ITEMW', text.encode(clean(text.decode(text.raw_string(rom, 't8200', 0x35)))) + b'\0')
     src += db('U_DEF', text.encode(w['s_def'].rstrip('…').strip()) + b'\0')
+    sd, spr = sight_data(rom, rgb555)
+    src += sd
+    for k, v in (('U_USE', 's_use'), ('U_SWAP', 's_swap'), ('U_MITEM', 's_item')):
+        src += db(k, text.encode(w[v]) + b'\0')          # (the Magic screen: FF3's Use / Swap / Item)
+    # (tiles copied by DMA: 16-byte aligned, at the bank's end)
+    src += 'section bank %d, $7FD0\n' % bank + db('U_ZTILE', bytes(16)) + db('SG_SPR', spr)
     return src
