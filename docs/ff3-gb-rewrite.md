@@ -103,3 +103,8 @@ Old files are removed as their FF3 routines replace them.
   divide, FCD6 multiply, FCF5 multiply 16, FD20 / FD2C / FD38 bits, FD3C / FD43 shifts, FBEF random.
   Lesson kept in the code: SM83 OR / AND / XOR clear the carry, the 6502's do not; FF3's math feeds
   the caller's carry into its first rotate (kept with LD A, 0 / push af).
+- Field, first routines (checked on states captured from play on the first map; fdiff only takes
+  entries with the routine's own bank mapped): 3F/E4E9 tile in the facing direction, E51C tile
+  properties, E3F1 touching a person, E494 people check; 3B/BE00 a map row / column to the nametables
+  through the PPU port (`core/ppu.s`): RAM, registers, carry and every PPU byte (read back from GB
+  VRAM) identical. `callgraph.py 3F/E1DC --stop ...`: the field's routines in translation order.

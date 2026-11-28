@@ -143,6 +143,8 @@ class Nes:
         elif r == 5:
             self.latch ^= 1
         elif r == 7:
+            if getattr(self, 'plog', None) is not None:
+                self.plog.append((self.addr, v))
             k, o = self.vaddr(self.addr)
             if k == 'p':
                 self.pal[o] = v

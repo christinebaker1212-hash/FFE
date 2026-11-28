@@ -9,7 +9,7 @@ ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
 
-CORE = ['main.s', 'ppu.s', 'b3F.s']
+CORE = ['main.s', 'ppu.s', 'b3F.s', 'b3B.s']
 NES_BASE = 64                     # GB bank of NES banks 0 / 1
 ROM_BANKS = 256                   # 4 MB
 
@@ -52,6 +52,7 @@ def main():
     src += ('rSVBK = $FF70\nrVBK = $FF4F\nrKEY1 = $FF4D\nrBCPS = $FF68\nrBCPD = $FF69\nrOCPS = $FF6A\n'
             'rOCPD = $FF6B\nrHDMA1 = $FF51\nrHDMA2 = $FF52\nrHDMA3 = $FF53\nrHDMA4 = $FF54\nrHDMA5 = $FF55\n')
     src += 'CORE_TEST = %d\nNES_BASE = %d\n' % (1 if test else 0, NES_BASE)
+    src += 'GB_3E = 1\nGB_3B = 2\nGB_3A = 3\nGB_3C = 4\nGB_3D = 5\n'   # our code banks per FF3 bank
     files = CORE + (['test.s'] if test else [])
     if not test:
         src += 'section bank 0, $3000\nt_table:\n'   # (no test routines in a game build)

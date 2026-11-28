@@ -195,6 +195,8 @@ t_loop:     ld hl, T_MBOX
             ldh [nb8], a
             ld a, [T_MBOX + 12]
             ldh [nbA], a
+            ld a, [T_MBOX + 13]             ; FF3's PPU control ($2000)
+            ldh [p_ctrl], a
             ld a, [T_MBOX + 3]              ; Y
             ld c, a
             ld a, [T_MBOX + 2]              ; X
@@ -221,3 +223,22 @@ t_loop:     ld hl, T_MBOX
             ld [T_MBOX], a
             jr t_loop
 .go:        jp hl
+
+; ---- n_rdx: A = [NES HL + X]; n_rdy: A = [NES HL + Y] (the carry, C and E kept; B, D, H, L scratch)
+section bank 0, $0E00
+n_rdx:      push af
+            ld a, l
+            add e
+            ld l, a
+            jr nc, .n
+            inc h
+.n:         pop af
+            jp n_rd
+n_rdy:      push af
+            ld a, l
+            add c
+            ld l, a
+            jr nc, .n
+            inc h
+.n:         pop af
+            jp n_rd
