@@ -494,3 +494,16 @@ f3F_E494:   ld e, 0
             jr c, .l
             and a
             ret
+
+; ==== bank switching (3F/FF03-FF2A; the English MMC5 build writes $5114 / $5115): FF3's bank numbers
+; at $8000 / $A000 go to nb8 / nbA, which n_rd follows (our own code is not in those windows)
+section bank 0, $0D00
+f3F_FF03:
+f3F_FF17:   ldh [nb8], a                    ; switch prg bank 0 and 1 (sequential): A, A + 1
+            add 1                           ; (CLC / ADC #1: A = bank + 1, its carry)
+f3F_FF09:
+f3F_FF1F:   ldh [nbA], a                    ; switch prg bank 1 (A kept)
+            ret
+f3F_FF06:
+f3F_FF0C:   ldh [nb8], a                    ; switch prg bank 0
+            ret

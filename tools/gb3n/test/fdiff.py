@@ -21,8 +21,10 @@ ROUTINES = {
     'asl6': (7, 0xFD3C, None), 'lsr6': (8, 0xFD43, None), 'random': (9, 0xFBEF, None),
     'facing': (10, 0xE4E9, 'cap'), 'tileprop': (11, 0xE51C, 'cap'), 'touchnpc': (12, 0xE3F1, 'cap'),
     'chknpc': (13, 0xE494, 'cap'), 'bgdraw': (14, 0xBE00, 'cap', 0x3B),
+    'tileload': (15, 0xCEB4, 'cap'), 'initmove': (16, 0xCDA3, 'cap'), 'bgupd': (17, 0xCA79, 'cap'),
+    'attrrow': (18, 0xCAAD, 'cap'),
 }
-PPU = {'bgdraw'}                  # routines whose PPU writes are compared too (GB VRAM)
+PPU = {'bgdraw', 'bgupd'}                  # routines whose PPU writes are compared too (GB VRAM)
 # input constraints: registers / RAM a routine expects (FF3 never calls it otherwise)
 CONSTRAIN = {'setbit': {'X': range(8)}, 'clrbit': {'X': range(8)}, 'chkbit': {'X': range(8)},
              'random': {'ram': {0x21: range(3)}}}
@@ -34,6 +36,7 @@ MAP = [(0x0000, 0x100, 0, 0xC400), (0x0200, 0x600, 0, 0xC600), (0x6000, 0x400, 1
 
 def nes_run(ram, regs, addr, banks):
     n = pynes.Nes(NES_ROM)
+    n.map(2, regs.get('bC', 126))                  # (the English build's fixed bank $3E copy)
     if 'b8' in regs:
         n.map(0, regs['b8']); n.map(1, regs['bA'])
     for a0, ln, _, _ in MAP:
@@ -116,11 +119,13 @@ def capture(addr, n, seed, bank=None):
             done = False
             while not done:
                 c = nes.cpu
-                if c.pc == addr and (bank is None or nes.banks[(addr - 0x8000) >> 13] == bank):
+                if c.pc == addr and (bank is None or nes.banks[(addr - 0x8000) >> 13] == bank) and \
+                        (addr < 0xC000 or addr >= 0xE000 or nes.banks[2] == 126):
                     ram = {a0 + k: bytearray.__getitem__(nes.bus, a0 + k) if a0 + k < 0x800 or a0 + k >= 0x6000
                            else 0 for a0, ln, _, _ in MAP for k in range(ln)}
                     out.append((ram, {'A': c.a, 'X': c.x, 'Y': c.y, 'C': c.p & 1,
-                                      'b8': nes.banks[0], 'bA': nes.banks[1], 'ctrl': nes.ctrl}))
+                                      'b8': nes.banks[0], 'bA': nes.banks[1], 'bC': nes.banks[2],
+                                      'ctrl': nes.ctrl}))
                 done = nes.step()
             frames += 1
     _caps[key] = out
@@ -132,9 +137,12 @@ def ppu_check(gb, plog):
     (the last write to a GB cell wins), pattern bytes NES plane rows -> GB interleaved. Returns
     ['PPU xxxx:nes/gb', ...] for differences."""
     want = {}
+    att = {}
     for a, v in plog:
         a &= 0x3FFF
-        if 0x2000 <= a < 0x3F00 and (a & 0x3FF) < 0x3C0:
+        if 0x2000 <= a < 0x3F00 and (a & 0x3FF) >= 0x3C0:
+            att[(a & 0x3FF) - 0x3C0] = (a, v)
+        elif 0x2000 <= a < 0x3F00 and (a & 0x3FF) < 0x3C0:
             want[('m', a & 0x3FF)] = (a, v)
         elif a < 0x2000:
             t, i = a >> 4, a & 15
@@ -147,6 +155,16 @@ def ppu_check(gb, plog):
             g = int(gb.cmd('V %X %X 1' % (k[1], 0x8000 + k[2])), 16)
         if g != v:
             bad.append('PPU%04X:%02X/%02X' % (a, v, g))
+    for i, (a, v) in att.items():                   # each cell of the quadrants: its CGB palette
+        for r in range(4 * (i >> 3), 4 * (i >> 3) + 4):
+            if r >= 30:
+                continue
+            for c in range(4 * (i & 7), 4 * (i & 7) + 4):
+                q = ((r & 2) << 1) | (c & 2)
+                pal = (v >> q) & 3
+                g = int(gb.cmd('V 1 %X 1' % (0x9800 + 32 * r + c)), 16) & 7
+                if g != pal:
+                    bad.append('ATT%04X r%d c%d:%d/%d' % (a, r, c, pal, g))
     return bad
 
 

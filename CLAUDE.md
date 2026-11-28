@@ -133,6 +133,9 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
 - **Kept:** the battle rules (already such a translation, checked against FF3's code) and the
   sound driver (checked frame by frame). **Extras** (Config, Suspend, conveniences, the owner's
   screen choices) are built into the rewritten code as each part is done.
+- **The goal (owner, 2026-11-28):** a faithful but updated Final Fantasy III, as an official Nintendo
+  release might be: FF3's game as on the NES (the translated routines) with the FF1 native build's
+  updated mechanics and polish built on top.
 - Plan, RAM map, conventions and progress: `docs/ff3-gb-rewrite.md`.
 
 ## Release requirements (owner's decision, 2026-11-20: absolutely required)

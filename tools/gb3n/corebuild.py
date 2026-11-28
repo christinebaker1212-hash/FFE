@@ -9,7 +9,7 @@ ROOT = os.path.join(HERE, '..', '..')
 sys.path.insert(0, os.path.join(HERE, '..', 'gb'))
 from asm_sm83 import asm, make_rom
 
-CORE = ['main.s', 'ppu.s', 'b3F.s', 'b3B.s']
+CORE = ['main.s', 'ppu.s', 'b3F.s', 'b3B.s', 'b3E.s']
 NES_BASE = 64                     # GB bank of NES banks 0 / 1
 ROM_BANKS = 256                   # 4 MB
 

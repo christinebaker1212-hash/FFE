@@ -8,6 +8,13 @@ flow,equip,vict,lib}.s`, already such a translation, checked against FF3's code 
 driver (`sound.s`, checked frame by frame). Extras (Config, Suspend, conveniences, the owner's screen
 choices) go into the rewritten code as each part is done.
 
+**The goal (owner, 2026-11-28): a faithful but updated Final Fantasy III, as an official Nintendo
+release of it might be: FF3's game as on the NES, with the FF1 native build's updated mechanics and
+polish (its conveniences, menus, battle presentation, options, Lot Check quality).** The translation of
+FF3's own routines is the faithful base (its rules, maps, events, timing and flow); the FF1 mechanics
+and polish are built on top of it, adapted to FF3 (where FF3 already has a mechanic, keep the better
+one, as decided 2026-11-26).
+
 ## Rules
 1. **One routine of ours per FF3 routine**, named by its address: `f3F_E1DC` (bank $3F, $E1DC), local
    labels inside. Same call graph: FF3's JSR / JMP targets are ours. A routine may be split or merged
