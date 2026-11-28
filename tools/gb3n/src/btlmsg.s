@@ -435,7 +435,15 @@ sc_num:     ld a, [ba_dirty]                ; (an animation used their tiles: lo
             ld b, 13
             ld a, 1
             call vcopyx
-.t0:        ld a, $17
+.t0:        ld hl, W7 + $7CF7 + $1D         ; (sprite palette 3 for the numerals: black ring,
+            ld a, $0F                       ;   white ink; the hits' animations left their colours)
+            ld [hl+], a
+            ld a, $10
+            ld [hl+], a
+            ld a, $30
+            ld [hl], a
+            call ba_vblc
+            ld a, $17
             ld [W7 + $7EC2], a
             xor a
             ld [btl_k], a                   ; target 0-11

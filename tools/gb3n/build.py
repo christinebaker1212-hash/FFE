@@ -48,6 +48,44 @@ def group_world(g):
     return (0, 1, 2)[g]
 
 
+# the damage numerals (owner, 2026-11-28: outlined, readable over any monster): FF1's bold 6 x 6
+# glyphs (tools/gbn/battle.py, our own drawing, no game data) with a 1-pixel ring, as 8 x 8 sprite
+# tiles: ink colour 3 (white), ring colour 1 (black in OBJ palette 3, btlgfx.s pal_init)
+DN_GLYPHS = [
+    ['.####.', '##..##', '##..##', '##..##', '##..##', '.####.'],    # 0
+    ['..##..', '.###..', '..##..', '..##..', '..##..', '.####.'],    # 1
+    ['.####.', '##..##', '...##.', '..##..', '.##...', '######'],    # 2
+    ['#####.', '....##', '..###.', '....##', '....##', '#####.'],    # 3
+    ['..###.', '.####.', '##.##.', '######', '...##.', '...##.'],    # 4
+    ['######', '##....', '#####.', '....##', '##..##', '.####.'],    # 5
+    ['.####.', '##....', '#####.', '##..##', '##..##', '.####.'],    # 6
+    ['######', '....##', '...##.', '..##..', '..##..', '..##..'],    # 7
+    ['.####.', '##..##', '.####.', '##..##', '##..##', '.####.'],    # 8
+    ['.####.', '##..##', '##..##', '.#####', '....##', '.####.'],    # 9
+    ['#....#', '##..##', '######', '##..##', '##..##', '##..##'],    # M
+    ['.####.', '..##..', '..##..', '..##..', '..##..', '.####.'],    # I
+    ['.#####', '##....', '.####.', '....##', '....##', '#####.'],    # S
+]
+
+
+def dn_tiles():
+    out = bytearray()
+    for g in DN_GLYPHS:
+        ink = [[0] * 8 for _ in range(8)]
+        for y, row in enumerate(g):
+            for x, c in enumerate(row):
+                if c == '#': ink[y + 1][x + 1] = 1
+        for y in range(8):
+            lo = hi = 0
+            for x in range(8):
+                o = not ink[y][x] and any(0 <= y + dy < 8 and 0 <= x + dx < 8 and ink[y + dy][x + dx]
+                                          for dy in (-1, 0, 1) for dx in (-1, 0, 1))
+                lo = lo << 1 | (1 if ink[y][x] or o else 0)          # ink 3, ring 1
+                hi = hi << 1 | (1 if ink[y][x] else 0)
+            out += bytes([lo, hi])
+    return bytes(out)
+
+
 def bd_col0(e):
     """colour 0 of every BG palette is the backdrop ($3F00) on the NES: the PPU never shows the
     bytes at $3F04 / $3F08 / $3F0C. A CGB palette has its own colour 0, so those slots get the
@@ -402,10 +440,7 @@ def main():
     bd[0x3700:0x3908] = rom.b(0x2E, 0x8FC0, 0x208)             # $7700: 2E/8FC0 boss attribute data
     bd[0x23D0:0x2400] = rom.b(0x2E, 0x91A0, 48)                # $63D0: 2E/91A0 item spells
     bd[0x2F00:0x2F20] = rom.b(0x34, 0x83F8, 0x20)              # $6F00: 34/83F8 attack animation ids
-    f = rom.prg[0x0D * 0x2000 + 0x1700:0x0D * 0x2000 + 0x1700 + 144 * 16]   # $7000: numeral sprites
-    for k, c in enumerate(list(range(0x80, 0x8A)) + [text.ENC[ch] for ch in 'Mis']):
-        p0 = f[16 * (c - 0x70):16 * (c - 0x70) + 8]                 #   (the font's ink, clear around)
-        bd[0x3000 + 16 * k:0x3010 + 16 * k] = bytes(x for r in range(8) for x in (p0[r], p0[r]))
+    bd[0x3000:0x3000 + 16 * len(DN_GLYPHS)] = dn_tiles()       # $7000: numeral sprites (0-9, M I S)
     for k, a in enumerate((0x9100, 0x9200, 0x9300)):           # $6400: general use palettes
         bd[0x2400 + 0x100 * k:0x2500 + 0x100 * k] = rom.b(0, a, 0x100)
     banks[BDATA_BANK] = bd

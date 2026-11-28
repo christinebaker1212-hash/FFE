@@ -104,7 +104,10 @@ pal_init:   ld a, [W7 + $7D69]
             call pal_one
             ld a, $FF
             ld b, $1C
-            ; (fall through)
+            call pal_one
+            ld a, $0F                       ; (colour 1 black: the numerals' outline, the hand's edge)
+            ld [W7 + $7CF7 + $1D], a
+            ret
 ; 2E/9E28 + 9E1A: battle palette A (2E/8C00 + 3 A) -> $7CF7 + B
 pal_one:    ld c, a
             push bc
