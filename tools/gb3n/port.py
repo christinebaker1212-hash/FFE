@@ -192,6 +192,7 @@ def data_banks(rom):
             rec[16:32] = props
             mp = data.Map(rom, p, t)
             rec[32:64] = b''.join(rgb2(v) for pal in mp.bg_palettes() for v in pal)
+            rec[112:128] = bytes(v for pal in mp.bg_palettes() for v in pal)   # (FF3's $03C0: NES colours)
             rec[64:80] = entrances(rom, props)
             rec[80:96] = tbl16(rom, 0x10, 0xA000, props[14])
             rec[96:112] = tbl16(rom, 0x10, 0xA200, props[15])

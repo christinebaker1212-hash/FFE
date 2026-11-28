@@ -181,11 +181,11 @@ ev_dbit:    ld b, a
             add a, a
             jr .l
 
-ev_tab:     dw ev_nop, ev_nop, ev_nop, ev_nop               ; $D0-$D3 shake, flash, darken, restore
+ev_tab:     dw ev_d0, ev_d1, ev_d2, ev_d3                   ; $D0-$D3 shake, flash, darken, restore
             dw ev_d4, ev_d5, ev_d6, ev_d7                   ; $D4-$D7
             dw ev_nop, ev_nop, ev_nop, ev_db                ; $D8-$DB reset, ship, dance, prologue
             dw ev_dc, ev_dd, ev_nop, ev_df                  ; $DC-$DF
-            dw ev_e0, ev_e0, ev_nop, ev_nop                 ; $E0-$E3
+            dw ev_e0, ev_e0, ev_e2, ev_nop                  ; $E0-$E3
             dw ev_nop, ev_nop, ev_nop, ev_e7                ; $E4-$E7
             dw ev_e8, ev_e9, ev_ea, ev_eb                   ; $E8-$EB
             dw ev_nop, ev_nop, ev_nop, ev_ef                ; $EC-$EF

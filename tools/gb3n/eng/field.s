@@ -1432,6 +1432,11 @@ make_oam:   ld a, 1
             ld e, a
             ld hl, C_POSE
             add hl, de
+            xor a                           ; (entries 4-7: the guest's; hidden without one)
+            ld [oam_buf + 16], a
+            ld [oam_buf + 20], a
+            ld [oam_buf + 24], a
+            ld [oam_buf + 28], a
             ld bc, $5050                    ; B = y + 16, C = x + 8
             ld a, [pose]
             and 8

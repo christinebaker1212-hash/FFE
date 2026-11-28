@@ -171,3 +171,230 @@ sa_wait:    call wait_vbl
             ld hl, zF0
             inc [hl]
             ret
+
+; ---- the event's screen effects
+; $D0: shake (3B/B58F / B938: sound $38, 17 frames, the scroll's x EOR (frame & 2))
+ev_d0:      ld a, $D8
+            ld [M_SFX], a
+            xor a
+.l:         push af
+            and 2
+            ld [fx_x], a
+            call wait_vbl
+            call snd_frame
+            call set_scroll
+            ld a, [fx_x]
+            ld b, a
+            ldh a, [scx]
+            xor b
+            ldh [scx], a
+            pop af
+            inc a
+            cp $11
+            jr c, .l
+            call wait_vbl
+            jp set_scroll
+; $D1: flash with a sound (3B/B597: $39), $E2: flash (3B/B913): grey every other 2 frames, 17
+ev_d1:      ld a, $D9
+            ld [M_SFX], a
+ev_e2:      ld hl, sh_pal                   ; (the colours kept)
+            ld de, fx_keep
+            ld bc, 128
+            call memcpy
+            xor a
+.l:         push af
+            srl a
+            and 1
+            call z, fx_norm
+            call nz, fx_grey
+            call wait_vbl
+            call snd_frame
+            pop af
+            inc a
+            cp $11
+            jr c, .l
+            call fx_norm
+            jp wait_vbl
+fx_norm:    push af
+            ld hl, fx_keep
+            ld de, sh_pal
+            ld bc, 128
+            call memcpy
+            ld a, 1
+            ld [pal_dirty], a
+            pop af
+            ret
+; the NES's greyscale (colour & $30): each colour to the grey of its brightness
+fx_grey:    push af
+            ld hl, fx_keep
+            ld de, sh_pal
+            ld b, 64
+.c:         ld a, [hl+]                     ; RGB555: r + g + b
+            ld c, a
+            ld a, [hl+]
+            push hl
+            push de
+            ld h, a
+            ld l, c
+            ld a, l                         ; r = l & 31
+            and 31
+            ld e, a
+            ld a, l                         ; g = (h << 3 | l >> 5) & 31
+            swap a
+            rrca
+            and 7
+            ld d, a
+            ld a, h
+            and 3
+            add a, a
+            add a, a
+            add a, a
+            or d
+            add a, e
+            ld e, a
+            ld a, h                         ; b = h >> 2
+            rrca
+            rrca
+            and 31
+            add a, e                        ; (sum 0-93)
+            ld e, a
+            ld hl, fx_gtab                  ; the NES grey for that brightness
+            cp 12
+            jr c, .g
+            inc hl
+            inc hl
+            cp 40
+            jr c, .g
+            inc hl
+            inc hl
+            cp 70
+            jr c, .g
+            inc hl
+            inc hl
+.g:         ld a, [hl+]
+            ld c, a
+            ld a, [hl]
+            pop de
+            ld h, a
+            ld a, c
+            ld [de], a
+            inc de
+            ld a, h
+            ld [de], a
+            inc de
+            pop hl
+            dec b
+            jr nz, .c
+            ld a, 1
+            ld [pal_dirty], a
+            pop af
+            ret
+fx_gtab:    dw $0000, $3DEF, $5EF7, $7FFF   ; (NES $0F / $00 / $10 / $30 greys)
+
+; $D2 / $D3: the BG colours darkened towards blue / back (3E/D3AF): every 4 frames each colour's hue
+; one step towards 2 (blue), its brightness at most 1, black kept; back: one step towards its own,
+; then the colours as they were
+ev_d2:      ld hl, mrec + 112               ; (FF3's $03C0: the map's NES colours, port.py)
+            ld de, fx_nes
+            ld b, 16
+.c:         ld a, [hl+]
+            and $1F
+            ld [de], a
+            inc de
+            dec b
+            jr nz, .c
+            ld a, 2
+            ld [fx_hue], a
+            jr fx_steps
+ev_d3:      xor a
+            ld [fx_hue], a
+fx_steps:   ld a, 1
+.l:         push af
+            and 3
+            jr nz, .w
+            call fx_step
+            ld a, b
+            and a
+            jr z, .x
+.w:         call wait_vbl
+            call snd_frame
+            pop af
+            inc a
+            jr .l
+.x:         pop af
+            ld a, [fx_hue]                  ; (back: the colours as they were)
+            and a
+            ret nz
+            jp load_pal
+; one step: B = colours changed
+fx_step:    ld b, 0
+            ld c, 0
+.l:         ld hl, fx_nes
+            ld e, c
+            ld d, 0
+            add hl, de
+            ld a, [hl]
+            cp $0F
+            jr z, .n
+            and $10
+            ld [fx_br], a
+            ld a, [fx_hue]                  ; the hue's goal: blue (2), or the colour's own
+            and a
+            jr nz, .g
+            push hl
+            ld hl, mrec + 112
+            add hl, de
+            ld a, [hl]
+            pop hl
+            and $0F
+.g:         ld e, a
+            ld a, [hl]
+            and $0F
+            cp e
+            jr z, .n
+            jr c, .up
+            dec a
+            jr .s
+.up:        inc a
+.s:         ld e, a
+            ld a, [fx_br]
+            or e
+            ld [hl], a
+            inc b
+.n:         inc c
+            ld a, c
+            cp 16
+            jr c, .l
+            push bc                         ; the 16 colours to the BG shadow (palettes 0-3)
+            ld a, COMMON
+            call sbank
+            ld hl, fx_nes
+            ld de, sh_pal
+            ld c, 16
+.r:         ld a, [hl+]
+            push hl
+            and $3F
+            add a, a
+            ld l, a
+            ld h, high(C3_RGB)
+            ld a, [hl+]
+            ld [de], a
+            inc de
+            ld a, [hl]
+            ld [de], a
+            inc de
+            pop hl
+            dec c
+            jr nz, .r
+            ld a, 1
+            ld [pal_dirty], a
+            pop bc
+            ret
+
+section wram, $D700                         ; (WRAM bank 1)
+fx_keep:    ds 128
+fx_nes:     ds 16
+fx_x:       ds 1
+fx_hue:     ds 1
+fx_br:      ds 1
+
