@@ -895,10 +895,10 @@ e_take:     call e_slotof
             ld [hl], 0
             ld a, b
             cp 3
-            ret c
-            inc l
-            ld [hl], 0
-            and a
+            jr c, .ok                       ; (no count byte; carry clear: taken. It returned
+            inc l                           ;   carry here, read as a full bag: head / body /
+            ld [hl], 0                      ;   arms showed the full-bag message)
+.ok:        and a
             ret
 .f:         pop hl
             scf

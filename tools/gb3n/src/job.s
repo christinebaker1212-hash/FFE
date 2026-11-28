@@ -113,21 +113,8 @@ job_menu:   ld [m_i], a
             cp c
             ld a, $3A
             jr c, .msg
-            ld a, [m_ch]
-            ld l, a
-            ld h, high(GS + $200)
-            ld a, [hl+]
-            or [hl]
-            inc l
-            or [hl]
-            inc l
-            or [hl]
-            inc l
-            inc l
-            or [hl]
-            ld a, $71
-            jr nz, .msg
-            ld a, [jb_cur]
+            ld a, [jb_cur]                  ; (owner: equipment no longer refuses the change
+                                            ;   (FF3's $71): it is taken off with it, below)
             ld l, a
             ld h, high(jb_cost)
             ld a, l
@@ -143,10 +130,32 @@ job_menu:   ld [m_i], a
             ldh a, [pad]
             bit 0, a
             jp z, .draw
+            call jb_unequip                 ; (all the equipment to the bag first; a full bag:
+            ld a, $71                       ;   FF3's message, no change)
+            jr c, .msg
             call jb_change
+            ld a, [m_ch]                    ; (the member's values without it)
+            rlca
+            rlca
+            and 3
+            call eq_calc
             jr .out
 .msg:       call m_msgbox
             jp .draw
+
+; owner (2026-11-28): a job change takes off all the member's equipment (the five slots into the
+; bag, as the Equip screen's Remove); carry if the bag is full (what fitted stays off)
+jb_unequip: xor a
+.r:         push af
+            call e_take
+            pop bc
+            ret c
+            ld a, b
+            inc a
+            cp 5
+            jr nz, .r
+            and a
+            ret
 
 ; 3C/96BA: the current job's level / EXP into its slot ($6210 + 2 job)
 jb_savexp:  ld a, [m_ch]
