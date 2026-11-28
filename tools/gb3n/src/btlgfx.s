@@ -1086,8 +1086,12 @@ chr_draw1:  ld b, 0
             add hl, bc
             ld a, [hl]
             and a
-            jr z, .fr
-            xor a
+            jr nz, .jp
+            ld a, [BZ + $90]                ; (frame 0 otherwise, between the step and the
+            and a                           ;   swing: the pose kept, no blink)
+            ret z
+            jr .fr
+.jp:        xor a
             ld [BZ + $90], a
 .fr:        ld a, [BZ + $90]                ; template: 32/91CB [ 926B / 9280 frame ]
             add a, d
@@ -1226,7 +1230,14 @@ chr_draw1:  ld b, 0
             bit 7, a
             jr z, .ro
             and $7F
-            jr .tl
+            jr nz, .tl
+            pop hl                          ; ($80: the NES's blank tile 0, e.g. frame 0: the
+            xor a                           ;   cell hidden; the GB's tile 0 is not blank)
+            ld [hl+], a
+            inc hl
+            inc hl
+            inc hl
+            jr .nx
 .ro:        ld hl, BZ + $82
             add a, [hl]
 .tl:        pop hl
@@ -1239,7 +1250,7 @@ chr_draw1:  ld b, 0
             ld [hl+], a
             ld a, [btl_oa]
             ld [hl+], a
-            inc b
+.nx:        inc b
             ld a, b
             cp 6
             jr nz, .s
