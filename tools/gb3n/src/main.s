@@ -481,6 +481,8 @@ load_map:   ld a, [lcd_is]
             call memcpy
             ld a, [M_ENT + 7]
             ld [fill_mt], a
+            ld a, [M_ENT + 11]              ; the map's exit (3A/9353: $0730)
+            ld [map_exit], a
             ld a, [px]
             inc a
             jr nz, .pos
@@ -1222,14 +1224,12 @@ do_act:     ld b, a
             ld l, a
             ld h, high(W_ENT)
             jr .dest
-.exit:      ld a, [stk_n]
+.exit:      ld a, b
+            cp $C0
+            jr z, .wexit
+            ld a, [stk_n]
             and a
             ret z
-            ld a, b
-            cp $C0
-            ld a, 1
-            jr z, .pop
-            ld a, [stk_n]
 .pop:       dec a
             ld [stk_n], a
             add a, a
@@ -1245,6 +1245,28 @@ do_act:     ld b, a
             ld a, [hl+]
             ld [px], a
             ld a, [hl]
+            ld [py], a
+            jp load_map
+; $C0 exit to the world map (fix:E2CE): the world map of $6008 at the map exit's place (00/8880
+; x, 00/88C0 y by $0730 & $3F), the map stack emptied
+.wexit:     xor a
+            ld [stk_n], a
+            ld [cur_map], a
+            ld a, [cur_world]
+            add a, 3
+            ld [cur_grp], a
+            ld a, [map_exit]
+            and $3F
+            ld l, a
+            ld h, $78
+            push hl
+            ld a, WLD_BANK
+            call rd_byte
+            ld [px], a
+            pop hl
+            set 6, l
+            ld a, WLD_BANK
+            call rd_byte
             ld [py], a
             jp load_map
 
@@ -1796,6 +1818,7 @@ pal_sh:     ds 128
 cur_map:    ds 1
 cur_grp:    ds 1
 fill_mt:    ds 1
+map_exit:   ds 1                            ; FF3 $0730 (map properties byte 11, event $F9)
 
 section hram, $FF80
 hram_dma:   ds 10

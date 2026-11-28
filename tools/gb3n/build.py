@@ -131,6 +131,8 @@ def pack(rom):
         e[16:48] = rom.world_palettes(w)
         wb[0x3000 + 64 * w:0x3040 + 64 * w] = e
         wb[0x3400 + 64 * w:0x3440 + 64 * w] = rom.world_entrances(w)
+    wb[0x3800:0x3840] = rom.b(0, 0x8880, 64)                   # $7800: 00/8880 / 88C0 the map exits'
+    wb[0x3840:0x3880] = rom.b(0, 0x88C0, 64)                   #   world positions (fix:E2DF)
     banks[WLD_BANK], banks[WCHR_BANK] = wb, wc
     t = rom.npc_tables()
     nt = bytearray(b'\xFF' * 0x4000)

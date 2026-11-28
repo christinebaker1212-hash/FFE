@@ -1141,7 +1141,9 @@ ev_nsw0:    call ev_nsw
 
 ; $F9 exit (explicit), $FA entrance (explicit: map), $FB entrance (id), $FD exit to the
 ; previous map: as the trigger tiles (taken when the event ends: the party stands still)
-ev_xexit:   ld a, $C0
+ev_xexit:   ld a, [ev_par]                  ; (3B/B750: the exit id into $0730)
+            ld [map_exit], a
+            ld a, $C0
             jr ev_act
 ev_xent:    ld a, [ev_par]                  ; (destination map in M_ENT + 48: the entrance 0)
             ld [M_ENT + 48], a
