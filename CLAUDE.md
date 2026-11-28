@@ -121,6 +121,20 @@ layouts are the same in both modes. Test the CGB mode in PyBoy and mGBA, SGB in 
   FF3 already has some of them: compare each in battle, keep FF3's where it is better, and adapt
   ours to FF3's style where they are about equal or ours has the edge.
 
+## Owner's decision for FF3 (2026-11-28; binding: core rewrite)
+- The first native FF3 build used the listing as a reference only, and its engine (main loop,
+  field, events, text, menus, battle input / screen) was our own design: owner: "plays like a
+  pre-alpha", "like a weird RPG Maker project". **Rewrite the core as a routine-by-routine
+  translation of FF3's own program from the listing:** FF3's routines, call structure, RAM
+  layout and control flow, each routine named by its address and checked against FF3's 6502
+  original (run from the user's ROM) on the same RAM state. Only the NES hardware layer (PPU /
+  APU / mapper writes) is replaced by Game Boy routines; 160x144 layouts come from changing FF3's
+  window positions / sizes, not its logic. Still no game code or data in the repo.
+- **Kept:** the battle rules (already such a translation, checked against FF3's code) and the
+  sound driver (checked frame by frame). **Extras** (Config, Suspend, conveniences, the owner's
+  screen choices) are built into the rewritten code as each part is done.
+- Plan, RAM map, conventions and progress: `docs/ff3-gb-rewrite.md`.
+
 ## Release requirements (owner's decision, 2026-11-20: absolutely required)
 No GB/GBC release of FF1, FF2 or FF3 until every Nintendo Lot Check standard in
 `docs/gb-release-checks.md` is met and checked: header and boot integrity, LCD off only in

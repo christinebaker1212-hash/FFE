@@ -1,5 +1,9 @@
 # FF3 Game Boy Color port: status
 
+**2026-11-28: core rewrite (owner's decision): `docs/ff3-gb-rewrite.md`.** The engine described below
+(field, events, text, menus, battle input / screen) is being replaced by a routine-by-routine translation
+of FF3's own program; the battle rules and the sound driver stay.
+
 Brief: `docs/ff3-gb-brief.md`. Target: Game Boy Color only (header CGB flag `$C0`, MBC5 + battery
 SRAM), a "Game Boy Color only" screen on DMG / Pocket / Super Game Boy, 0 lag frames, every Lot
 Check standard. Code will go in `tools/gb3n/`, docs in `docs/ff3-gb-*.md`.
