@@ -278,7 +278,11 @@ tl_prophecy: ld a, 1                        ; song 1 (3A/8798)
             call m_clear
             ld a, 1
             ld [m_dirty], a
-            call wait_vbl
+.rel:       call wait_vbl                   ; (the button that ended it let go first: it must
+            call read_pad                   ;   not carry into the load menu)
+            ldh a, [pad]
+            and a
+            jr nz, .rel
             call wait_vbl
             jp menu_pals
 ; line pr_k's row (pr_r0 + 2 k): its 20 cells to palette A, the attributes copied next V-Blank

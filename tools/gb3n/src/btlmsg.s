@@ -898,9 +898,33 @@ mon_gone:   ld a, $0F                       ; 2F/BB5E: the animation palette bla
             call mon_wipe
             jp map_show
 
+mp_blank:   ld a, [W7 + $78C3]              ; (outside the monsters' columns: blank. FF3's effects
+            cp $88                          ;   use parts of $7900 as scratch, harmless on the NES,
+            ld c, 0                         ;   which never sends the buffer again; here the copy
+            jr z, .bk                       ;   showed them: the blue strip by the party. A back
+            ld c, 20                        ;   attack mirrors: its monsters are at the right)
+.bk:        ld hl, W7 + $7900
+            ld b, BT_ROWS
+.br:        push hl
+            ld a, l
+            add a, c
+            ld l, a
+            ld e, 12
+            xor a
+.bc:        ld [hl+], a
+            dec e
+            jr nz, .bc
+            pop hl
+            ld de, 32
+            add hl, de
+            dec b
+            jr nz, .br
+            ret
+
 ; 2F/BB94 the wipe: the new tilemap over the old one, row k's column c at step c + k (25 columns
 ; from the left, from the right in a back attack; 2 frames a step; sound $31)
-mon_wipe:   ld a, $B1
+mon_wipe:   call mp_blank
+            ld a, $B1
             ld [S49], a
             ld c, 0
 .s:         call wait_vbl
@@ -965,7 +989,8 @@ mon_vanish: push af
             ret
 
 ; the tilemap $7900 -> the BG map (rows 0-13; 28 x 16 bytes in the vblanks)
-map_show:   ld a, CODE2
+map_show:   call mp_blank
+            ld a, CODE2
             ld [vc_src], a
             ld hl, W7 + $7900
             ld de, $9800
