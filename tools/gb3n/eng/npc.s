@@ -31,10 +31,12 @@ npc_load:   ld hl, O0                       ; (FF3 clears $7000-$70FF)
             ld a, COMMON
             call sbank
             ld a, [hl+]
-            ld h, [hl]                      ; (NES $8000-$9FFF: bank 2C; | $80 in FF3)
-            ld l, a
-            set 7, h
-            res 6, h                        ; -> GB $4000 + (address & $3FFF) in SCRIPT
+            ld h, [hl]                      ; (FF3: the high byte | $80, NES banks 2C / 2D at
+            ld l, a                         ;   $8000-$BFFF -> GB $4000-$7FFF in SCRIPT)
+            ld a, h
+            or $80
+            sub $40
+            ld h, a
             ld a, SCRIPT
             call sbank
             ld bc, O0                       ; BC = the object

@@ -1091,7 +1091,7 @@ npc_event:  ld a, [lay43]
             call ts_load
             ld a, [Z + $A0]
             cp $E0
-            ret nc                          ; (inns, shops, the Fat Chocobo: with the menus)
+            jp nc, shop_run                 ; (inns, shops, the Fat Chocobo: 3F/E9E8)
             call ts_npc
             ld a, [z6C]
             and a

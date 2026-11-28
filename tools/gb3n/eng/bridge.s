@@ -34,8 +34,8 @@ I_WINPAL   = $7CC0          ; (B_MAPINFO: the window's NES colours)
 veh        = Z + $42        ; FF3's vehicle
 pos_y      = py
 wmode      = maptype        ; 1: the world map
-ev_who     = Z + $A0        ; the person talked to (FF3 $A0)
-scr_buf    = TS7B           ; FF3's $7B00 (a shop's items)
+ev_who     = $DC40          ; (WRAM bank 1) a copy of FF3's $A0 (the person) for the menu
+scr_buf    = $DC00          ; (WRAM bank 1) a copy of FF3's $7B00 for the menu: a shop's items
 SCRATCH    = $DA00          ; (WRAM bank 1: data staged from ROM banks, 768 bytes)
 SV_KEEP    = $D000          ; (WRAM bank 3: the field's RAM while a battle runs)
 
@@ -243,6 +243,59 @@ menu_run:   xor a
             ld [z25], a
             ld hl, m_main
             ld b, B_MENU
+            call full_run
+            ldh a, [fr_exit]                ; Exit (3C/9918): the world map where the party went
+            and a                           ;   in; Warp (3C/9B5D): m_wn maps back, past the
+            ret z                           ;   first one out to the world map
+            cp 2
+            jr nz, .out
+            ldh a, [fr_wn]
+            ld b, a
+            ld a, [ms_n]
+            sub b
+            jr c, .out
+            ld [ms_n], a
+            ld l, a
+            ld h, 0
+            add hl, hl
+            add hl, hl
+            ld de, ms_buf
+            add hl, de
+            ld a, [hl+]
+            ld [px], a
+            ld a, [hl+]
+            ld [py], a
+            ld a, [hl]
+            ld [cur_map], a
+            xor a
+            ld [zlev], a
+            ld a, $81
+            jp load_map
+.out:       xor a
+            ld [ms_n], a
+            ld [zlev], a
+            ld a, [w_px]
+            ld [px], a
+            ld a, [w_py]
+            ld [py], a
+            jp world_load
+; a shop / an inn / the Fat Chocobo (3F/E9E5 / E9EC: the kept menu's m_shop, the person's script in
+; TS7B), then the map again and an inn's event
+shop_run:   ld hl, TS7B                     ; (the person's script where the menu's screen
+            ld de, scr_buf                  ;   buffers do not reach)
+            ld bc, 64
+            call memcpy
+            ld a, [Z + $A0]
+            ld [ev_who], a
+            ld hl, m_shop
+            ld b, B_MENU
+            call full_run
+            ldh a, [fr_res]
+            and a
+            ret z
+            jp ev_start
+; HL = a routine in bank B: its full screen, the field's RAM kept, the map again; fr_res / fr_exit /
+; fr_wn: the menu's result, Exit / Warp (read before the field's RAM comes back over theirs)
 full_run:   push hl
             push bc
             call lcd_off
@@ -251,6 +304,12 @@ full_run:   push hl
             pop hl
             ld a, b
             call far_call
+            ld a, [m_res]
+            ldh [fr_res], a
+            ld a, [m_exit]
+            ldh [fr_exit], a
+            ld a, [m_wn]
+            ldh [fr_wn], a
             call lcd_off
             call fr_leave
             jp fr_reload
@@ -437,3 +496,6 @@ bmode:      ds 1                            ; 1: a battle's interrupt mode
 guard_on:   ds 1
 fc_save:    ds 1
 soft_rst:   ds 1
+fr_res:     ds 1
+fr_exit:    ds 1
+fr_wn:      ds 1
