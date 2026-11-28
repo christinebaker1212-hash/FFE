@@ -47,4 +47,12 @@ def code_data(rom):
     pro[-1] = 0
     ng = text.decode(text.raw_string(rom, 't8200', 0x22))
     ng = re.sub(r'\{[^}]*\}', '', ng).strip()
-    return db('TL_PRO', pro) + db('TL_GRID', grid(rom)) + db('s_newgame', text.encode(ng) + b'\0')
+    tail = '0123456789' + ".,'-!?&/:"
+    g0 = text.encode('ABCDEFGHIJKLMNOPQRSTUVWXYZ' + tail)
+    g1 = text.encode('abcdefghijklmnopqrstuvwxyz' + tail)
+    assert len(g0) == len(g1) == 45
+    job = text.encode(re.sub(r'\{[^}]*\}', '', text.decode(text.raw_string(rom, 't8200', 0xE2))).strip())
+    return (db('TL_PRO', pro) + db('TL_G0', g0) + db('TL_G1', g1) +
+            db('TL_H0', text.encode('SELECT: abc')) + db('TL_H1', text.encode('SELECT: ABC')) +
+            db('TL_H2', text.encode('B:Delete  START:OK')) + db('TL_JOB', job) +
+            'TL_JOBE:\n' + db('s_newgame', text.encode(ng) + b'\0'))

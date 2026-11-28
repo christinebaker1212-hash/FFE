@@ -370,14 +370,23 @@ tl_load:    ld a, 1                         ; song 1 (3D/BA4E; still playing aft
             xor a
             ret
 
-; ---- the name entry (3D/B895): name window on top, the letter grid (t8200 $21) below
+; ---- the name entry (3D/B895, the layout of the earlier engine the owner preferred): the member at
+; the top (its walking picture, the name with a dash at the next letter, the job), the letters
+; below: 9 x 5, one case at a time (SELECT switches), A a letter (6 at most), B the last letter off
+; (none: back to the member before), START this name (not empty). FF3's rule kept: a name like an
+; earlier member's is refused (3D/B981).
 tl_names:   xor a
             ld [nm_ch], a
-            ld [nm_pos], a
+            ld [nm_case], a
+.ch:        xor a
             ld [nm_cur], a
-.draw:      call m_clear
+            call nm_len                     ; (a name already there: its length)
+            ld [nm_pos], a
+            call nm_pic
+.draw:      call nm_fill
+            call m_clear
             ld bc, $0000
-            ld de, $1404
+            ld de, $1405
             call m_box
             ld a, [nm_ch]                   ; the name so far ($6106 + $40 n)
             rrca
@@ -385,22 +394,32 @@ tl_names:   xor a
             add a, 6
             ld l, a
             ld h, high(GS + $100)
-            ld bc, $0701
+            ld bc, $0501
             ld e, 6
             call m_codes
-            ld a, [nm_pos]                  ; the position mark under it
-            add a, 7
+            ld a, [nm_pos]                  ; the next letter's place: a dash
+            cp 6
+            jr nc, .nd
+            add a, 5
             ld b, a
-            ld c, 2
+            ld c, 1
             ld a, $C2                       ; -
             call m_put
-            ld bc, $0004
-            ld de, $140C
+.nd:        ld hl, TL_JOB                   ; the job (all Onion Knights at the start)
+            ld bc, $0503
+            ld e, TL_JOBE - TL_JOB
+            call m_codes
+            ld bc, $0005
+            ld de, $140D
             call m_box
-            ld hl, TL_GRID                  ; ten letters a row, two columns apart, 8 rows
-            ld c, 6
-.gr:        ld b, 1
-            ld e, 10
+            ld hl, TL_G0
+            ld a, [nm_case]
+            and a
+            jr z, .g
+            ld hl, TL_G1
+.g:         ld c, 6
+.gr:        ld b, 2
+            ld e, 9
 .gc:        ld a, [hl+]
             call m_put
             inc b
@@ -408,44 +427,58 @@ tl_names:   xor a
             dec e
             jr nz, .gc
             inc c
+            inc c
             ld a, c
-            cp 6 + 8
+            cp 16
             jr nz, .gr
+            ld hl, TL_H0
+            ld a, [nm_case]
+            and a
+            jr z, .h
+            ld hl, TL_H1
+.h:         ld bc, $010F
+            ld e, 11
+            call m_codes
+            ld hl, TL_H2
+            ld bc, $0110
+            ld e, 18
+            call m_codes
             ld a, 1
             ld [m_dirty], a
-.l:         ld a, [nm_cur]                  ; the hand at the letter (column 2k + 1, row 6 + 2r)
+.l:         ld a, [nm_cur]                  ; the hand at letter nm_cur (column 2 + 2x, row 6 + 2y)
             ld b, 0
-.dv:        sub 10
+.dv:        sub 9
             jr c, .dd
             inc b
             jr .dv
-.dd:        add a, 10
-            swap a                          ; 16 k
+.dd:        add a, 9
+            add a, a
             add a, 2
             ld d, a
             ld a, b
+            add a, a
             add a, 6
-            add a, a
-            add a, a
-            add a, a
-            add a, 16 - 4
             ld c, a
             ld b, d
-            call cursor_at
+            call hand_txt
             call wait_vbl
             call read_pad
             call m_keys
             ld a, [m_new]
             bit 0, a
-            jr nz, .a
+            jp nz, .a
             bit 1, a
             jr nz, .b
+            bit 2, a
+            jr nz, .case
+            bit 3, a
+            jr nz, .done
             ld b, a
             ld a, [nm_cur]
             bit 4, b
             jr z, .lf
             inc a
-            cp 80
+            cp 45
             jr c, .s
             xor a
             jr .s
@@ -454,52 +487,66 @@ tl_names:   xor a
             dec a
             cp $FF
             jr nz, .s
-            ld a, 79
+            ld a, 44
             jr .s
 .up:        bit 6, b
             jr z, .dn
-            sub 10
+            sub 9
             jr nc, .s
-            add a, 80
+            add a, 45
             jr .s
 .dn:        bit 7, b
             jr z, .l
-            add a, 10
-            cp 80
+            add a, 9
+            cp 45
             jr c, .s
-            sub 80
+            sub 45
 .s:         ld [nm_cur], a
             jp .l
-.b:         ld a, [nm_pos]                  ; B: back a letter (at 0: the previous member, at
-            and a                           ;   its last letter)
+.case:      ld a, [nm_case]
+            xor 1
+            ld [nm_case], a
+            jp .draw
+.b:         ld a, [nm_pos]                  ; B: the last letter off; none: the member before
+            and a
             jr z, .bp
             dec a
             ld [nm_pos], a
             jp .draw
 .bp:        ld a, [nm_ch]
             and a
-            jp z, .draw
+            jp z, .l
             dec a
             ld [nm_ch], a
-            ld a, 5
-            ld [nm_pos], a
-            jp .draw
-.a:         ld a, [nm_pos]                  ; A: the letter (after 6: the name is done)
-            cp 6
-            jr nz, .put
-            xor a
-            ld [nm_pos], a
+            jp .ch
+.done:      ld a, [nm_pos]                  ; START: this name (not empty, not an earlier one's)
+            and a
+            jp z, .l
+            call nm_dup
+            jp c, .draw
             ld a, [nm_ch]
             inc a
             ld [nm_ch], a
             cp 4
-            ret z
-            jp .draw
-.put:       ld a, [nm_cur]
+            jp nz, .ch
+            call cur_hide
+            ld hl, oam_buf                  ; (the picture off)
+            ld b, 4
+            call oam_hide.l0
+            ld a, [GS + $0E]
+            ret
+.a:         ld a, [nm_pos]                  ; A: the letter (6 at most)
+            cp 6
+            jp nc, .l
+            ld a, [nm_cur]
             ld e, a
             ld d, 0
-            ld hl, TL_GRID
-            add hl, de
+            ld hl, TL_G0
+            ld a, [nm_case]
+            and a
+            jr z, .a1
+            ld hl, TL_G1
+.a1:        add hl, de
             ld b, [hl]
             ld a, [nm_ch]
             rrca
@@ -514,10 +561,112 @@ tl_names:   xor a
             ld a, [nm_pos]
             inc a
             ld [nm_pos], a
-            cp 6
-            jp nz, .draw
-            call nm_dup                     ; (3D/B981: a name like an earlier member's: back one)
             jp .draw
+
+; the hand with its fingertip just before the text at column B, row C, the finger at the text's
+; middle (FF1's rule: the hand's left = text - 16, its top = the text's top)
+hand_txt:   ld a, b
+            add a, a
+            add a, a
+            add a, a
+            sub 16 - 8
+            ld b, a
+            ld a, c
+            add a, a
+            add a, a
+            add a, a
+            add a, 16
+            ld c, a
+            jp cursor_at
+
+; the length of member nm_ch's name (up to the first blank) -> A
+nm_len:     ld a, [nm_ch]
+            rrca
+            rrca
+            add a, 6
+            ld l, a
+            ld h, high(GS + $100)
+            ld b, 0
+.l:         ld a, [hl+]
+            cp $FF
+            jr z, .x
+            and a
+            jr z, .x
+            inc b
+            ld a, b
+            cp 6
+            jr nz, .l
+.x:         ld a, b
+            ret
+; the name's letters after nm_pos: blanks ($FF)
+nm_fill:    ld a, [nm_ch]
+            rrca
+            rrca
+            add a, 6
+            ld hl, nm_pos
+            add a, [hl]
+            ld l, a
+            ld h, high(GS + $100)
+            ld a, [nm_pos]
+            ld b, a
+            ld a, 6
+            sub b
+            ret z
+            ld b, a
+.f:         ld [hl], $FF
+            inc l
+            dec b
+            jr nz, .f
+            ret
+; member nm_ch's walking picture (facing down) beside the name: its tiles and colours as the
+; field's (select.s char_gfx / char_pal), OAM 0-3 at column 1-2, rows 1-2
+nm_pic:     ld a, [GS + $0E]
+            push af
+            ld a, [nm_ch]
+            rrca
+            rrca
+            ld [GS + $0E], a
+            call char_gfx
+            call char_pal
+            pop af
+            ld [GS + $0E], a
+            ld a, 1
+            ldh [pal_dirty], a
+            ld hl, $7F00                    ; (SPR_BANK: the field's frames, as load_map: M_FACE /
+            ld de, M_FACE                   ;   M_FRAME; frame $30 faces down)
+            ld bc, $50
+            ld a, SPR_BANK
+            call rd_copy
+            ld de, M_FRAME + $30
+            ld hl, oam_buf
+            ld bc, (8 + 12) * 256 + 16 + 8  ; (B = x, C = y in OAM coordinates)
+            call .s
+            ld a, c
+            add a, 8
+            ld c, a
+            call .s
+            ld a, b
+            add a, 8
+            ld b, a
+            ld a, c
+            sub 8
+            ld c, a
+            call .s
+            ld a, c
+            add a, 8
+            ld c, a
+.s:         ld a, c
+            ld [hl+], a
+            ld a, b
+            ld [hl+], a
+            ld a, [de]
+            inc de
+            ld [hl+], a
+            ld a, [de]
+            inc de
+            ld [hl+], a
+            ret
+
 ; 3D/B95D / B981: the name of member nm_ch against the earlier ones
 nm_dup:     ld a, [nm_ch]
             and a
@@ -546,15 +695,14 @@ nm_dup:     ld a, [nm_ch]
             dec b
             jr nz, .c
             pop bc
-            ld a, [nm_pos]
-            dec a
-            ld [nm_pos], a
+            scf                             ; (refused: carry)
             ret
 .diff:      pop bc
             inc c
             ld a, c
             cp b
             jr nz, .m
+            and a
             ret
 
 section wram, $CFF4
@@ -564,3 +712,4 @@ tl_ptr:     ds 2
 nm_ch:      ds 1
 nm_pos:     ds 1
 nm_cur:     ds 1
+nm_case:    ds 1
