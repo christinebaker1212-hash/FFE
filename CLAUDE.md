@@ -164,6 +164,12 @@ work remaining, scope and plan. Commit and push it with the work.
 the method). Session briefs: `docs/ff2-gb-brief.md`, `docs/ff3-gb-brief.md`.
 **Lessons for all ports (FF2/FF3 sessions: read and apply): `docs/gb-lessons.md`.**
 **FF3 (Game Boy Color only) status: `docs/ff3-native.md`** (engine from vibrant-davinci, 2026-11-28).
+FF3, 2026-11-28 (this branch): vibrant-davinci's engine taken as the base; fixed from the owner's play
+(monster / party garble, command window, damage numerals' side, world-map exit, stepping member);
+added: my name entry, FF3's NES map wipes, FF1's encounter transition, typewriter text, hold-A, free
+targeting, centred target hand, FF3's hopping numerals. Mock-ups sent, waiting: main menu (FF1
+arrangement), dialogue box, battle commands over HP, intro (lines fading in). Next: menus' hand rule
+(after the main menu answer), Options / Bestiary / Sound Test / gradients from FF1.
 **Handoff (recompiled build, historical): `docs/gb-handoff.md`.**
 
 ## Scope and plan
